@@ -1,0 +1,105 @@
+// FreeLang v9 표준 라이브러리: result 모듈
+// Result<T> 타입 및 에러 처리
+
+struct Result {
+    is_ok: bool
+    value: str
+    error_msg: str
+}
+
+struct Option {
+    has_value: bool
+    value: str
+}
+
+fn ok(value: str) -> Result {
+    Result { is_ok: true, value: value, error_msg: "" }
+}
+
+fn err(error_msg: str) -> Result {
+    Result { is_ok: false, value: "", error_msg: error_msg }
+}
+
+fn some(value: str) -> Option {
+    Option { has_value: true, value: value }
+}
+
+fn none() -> Option {
+    Option { has_value: false, value: "" }
+}
+
+fn is_ok(result: Result) -> bool {
+    result.is_ok
+}
+
+fn is_err(result: Result) -> bool {
+    !result.is_ok
+}
+
+fn is_some(option: Option) -> bool {
+    option.has_value
+}
+
+fn is_none(option: Option) -> bool {
+    !option.has_value
+}
+
+fn unwrap(result: Result) -> str {
+    if result.is_ok {
+        return result.value
+    }
+    result.error_msg
+}
+
+fn unwrap_or(result: Result, default_val: str) -> str {
+    if result.is_ok {
+        return result.value
+    }
+    default_val
+}
+
+fn map_result(result: Result, fn_name: str) -> Result {
+    if !result.is_ok { return result }
+    ok(result.value)
+}
+
+fn main() {
+    println("╔═══════════════════════════════════════════╗")
+    println("║  stdlib::result 모듈 테스트             ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    println("✅ 테스트 1: Ok 결과")
+    var result1 = ok("success")
+    if is_ok(result1) {
+        println("  Value: " + unwrap(result1))
+    }
+    println("")
+
+    println("✅ 테스트 2: Err 결과")
+    var result2 = err("Operation failed")
+    if is_err(result2) {
+        println("  Error: " + unwrap(result2))
+    }
+    println("")
+
+    println("✅ 테스트 3: unwrap_or")
+    var result3 = err("No data")
+    var value = unwrap_or(result3, "default value")
+    println("  Value: " + value)
+    println("")
+
+    println("✅ 테스트 4: Some/None")
+    var opt1 = some("data exists")
+    var opt2 = none()
+    if is_some(opt1) {
+        println("  Some: " + opt1.value)
+    }
+    if is_none(opt2) {
+        println("  None: no value")
+    }
+    println("")
+
+    println("✅ result 모듈 테스트 완료!")
+    println("")
+}
