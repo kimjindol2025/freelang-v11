@@ -62,6 +62,7 @@ export class Parser {
 
     // Parse fields: :key value :key value ...
     while (!this.check(T.RBracket) && !this.isAtEnd()) {
+      // Expect a keyword at the start of each field
       if (!this.check(T.Keyword)) {
         throw this.error(
           `Expected keyword field (starting with :), got ${this.peek().type}`,
@@ -70,17 +71,22 @@ export class Parser {
       }
 
       const keyToken = this.advance();
-      const keyName = keyToken.value; // Already includes the ':'
+      const keyName = keyToken.value; // e.g., ":body" or ":params"
 
-      // Collect values for this key
+      // Collect values for this key (parse until next keyword or closing bracket)
       const values: ASTNode[] = [];
 
-      // Parse values until next keyword or closing bracket
+      // Single value case (most common): :key value
+      if (!this.check(T.Keyword) && !this.check(T.RBracket)) {
+        values.push(this.parseValue());
+      }
+
+      // Multiple values case: :key val1 val2 ... (until next keyword or ])
       while (!this.check(T.Keyword) && !this.check(T.RBracket) && !this.isAtEnd()) {
         values.push(this.parseValue());
       }
 
-      // Store field: single value as-is, multiple as array
+      // Store field
       if (values.length === 0) {
         throw this.error(`Expected at least one value for keyword ${keyName}`, keyToken);
       } else if (values.length === 1) {

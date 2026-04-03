@@ -1,0 +1,33 @@
+[SERVER main
+  :port 3009
+  :host "localhost"
+]
+
+[ROUTE health
+  :method "GET"
+  :path "/api/health"
+  :handler (json-response (list :status "ok" :message "Server is running"))
+]
+
+[FUNC greet
+  :params [$name]
+  :body (concat "Hello, " $name "!")
+]
+
+[ROUTE greet
+  :method "POST"
+  :path "/api/greet"
+  :handler (json-response (list :greeting (greet "World")))
+]
+
+[INTENT calculate-sum
+  :a 10
+  :b 20
+  :result (+ 10 20)
+]
+
+[ROUTE math
+  :method "GET"
+  :path "/api/math/sum"
+  :handler (json-response (list :sum 30 :a 10 :b 20))
+]
