@@ -9,11 +9,13 @@ import {
   Variable,
   SExpr,
   Keyword,
+  TypeAnnotation,
   makeBlock,
   makeLiteral,
   makeVariable,
   makeSExpr,
   makeKeyword,
+  makeTypeAnnotation,
 } from "./ast";
 
 export class ParserError extends Error {
@@ -59,6 +61,7 @@ export class Parser {
     const blockName = nameToken.value;
 
     const fields = new Map<string, ASTNode | ASTNode[]>();
+    const typeAnnotations = new Map<string, TypeAnnotation>();
 
     // Parse fields: :key value :key value ...
     while (!this.check(T.RBracket) && !this.isAtEnd()) {
@@ -94,10 +97,23 @@ export class Parser {
       } else {
         fields.set(keyName, values);
       }
+
+      // Phase 3: Extract type annotations from :return field
+      if (keyName === ":return" && values.length === 1) {
+        const returnValue = values[0];
+        if ((returnValue as any).kind === "literal" && (returnValue as any).type === "symbol") {
+          const typeName = (returnValue as any).value;
+          typeAnnotations.set("return", makeTypeAnnotation(typeName));
+        }
+      }
     }
 
     this.expect(T.RBracket);
-    return makeBlock(blockType, blockName, fields);
+    const block = makeBlock(blockType, blockName, fields);
+    if (typeAnnotations.size > 0) {
+      block.typeAnnotations = typeAnnotations;
+    }
+    return block;
   }
 
   // Parse any value: literal, variable, block, S-expr, or array
@@ -185,6 +201,37 @@ export class Parser {
 
     this.expect(T.RParen);
     return makeSExpr(op, args);
+  }
+
+  // Parse type annotation: int, string, bool, array<T>, map<K,V>, T?
+  private parseTypeAnnotation(): TypeAnnotation {
+    const token = this.advance();
+    if (token.type !== T.Symbol) {
+      throw this.error(`Expected type annotation (symbol), got ${token.type}`, token);
+    }
+
+    let typeName = token.value;
+    let generic: TypeAnnotation | undefined = undefined;
+    let optional = false;
+
+    // Handle optional type: T?
+    if (this.check(T.Symbol) && this.peek().value === "?") {
+      this.advance();
+      optional = true;
+    }
+
+    // Handle generic types: array<T>, map<K,V>
+    if (typeName.includes("<") && typeName.includes(">")) {
+      // Simple parsing: extract inner type (e.g., "array<int>" → "int")
+      const match = typeName.match(/<(.+)>/);
+      if (match) {
+        const innerTypeName = match[1];
+        generic = makeTypeAnnotation(innerTypeName);
+        typeName = typeName.substring(0, typeName.indexOf("<"));
+      }
+    }
+
+    return makeTypeAnnotation(typeName, generic, undefined, optional);
   }
 
   // ===== Utility Methods =====

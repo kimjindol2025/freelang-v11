@@ -13,6 +13,7 @@ export interface Block {
   type: string; // "INTENT", "FUNC", "PROMPT", "PIPE", "AGENT"
   name: string;
   fields: Map<string, ASTNode | ASTNode[]>;
+  typeAnnotations?: Map<string, TypeAnnotation>; // :params and :return types (Phase 3)
 }
 
 // Literal values
@@ -41,6 +42,22 @@ export interface Keyword {
   name: string;
 }
 
+// Type annotation (NEW for Phase 3)
+export interface TypeAnnotation {
+  kind: "type";
+  name: string;              // "int", "string", "bool", "array<int>", "map<string,int>"
+  generic?: TypeAnnotation;  // for array<T>, map<K,V>
+  union?: TypeAnnotation[];  // for Type1 | Type2
+  optional?: boolean;        // for Type?
+}
+
+// Function signature (NEW for Phase 3)
+export interface FuncSignature {
+  name: string;
+  params: Array<{ name: string; type: TypeAnnotation }>;
+  returnType: TypeAnnotation;
+}
+
 // Parser state
 export interface ParserState {
   tokens: any[];
@@ -66,4 +83,23 @@ export function makeKeyword(name: string): Keyword {
 
 export function makeBlock(type: string, name: string, fields: Map<string, ASTNode | ASTNode[]>): Block {
   return { kind: "block", type, name, fields };
+}
+
+// Helper: Create type annotation (Phase 3)
+export function makeTypeAnnotation(
+  name: string,
+  generic?: TypeAnnotation,
+  union?: TypeAnnotation[],
+  optional?: boolean
+): TypeAnnotation {
+  return { kind: "type", name, generic, union, optional };
+}
+
+// Helper: Create function signature (Phase 3)
+export function makeFuncSignature(
+  name: string,
+  params: Array<{ name: string; type: TypeAnnotation }>,
+  returnType: TypeAnnotation
+): FuncSignature {
+  return { name, params, returnType };
 }

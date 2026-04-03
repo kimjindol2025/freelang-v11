@@ -2,7 +2,8 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation } from "./ast";
+import { TypeChecker, createTypeChecker } from "./type-checker";
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -15,6 +16,7 @@ export interface ExecutionContext {
   middleware: FreeLangMiddleware[];
   errorHandlers: ErrorHandler;
   startTime: number;
+  typeChecker?: TypeChecker; // Phase 3: Type system
 }
 
 export interface FreeLangFunction {
@@ -58,6 +60,7 @@ export class Interpreter {
       middleware: [],
       errorHandlers: { handlers: new Map() },
       startTime: Date.now(),
+      typeChecker: createTypeChecker(), // Phase 3: Initialize type checker
     };
   }
 
@@ -129,6 +132,7 @@ export class Interpreter {
 
   private handleFuncBlock(block: Block): void {
     // [FUNC name :params [$x $y] :body (+ $x $y)]
+    // Phase 3: [FUNC name :params [[$x int] [$y int]] :return int :body (+ $x $y)]
     const paramsField = block.fields.get("params");
     const params: string[] = [];
 
@@ -151,6 +155,14 @@ export class Interpreter {
       params,
       body,
     });
+
+    // Phase 3: Register function type in type checker if type annotations present
+    if (block.typeAnnotations && block.typeAnnotations.has("return") && this.context.typeChecker) {
+      const returnType = block.typeAnnotations.get("return") || { kind: "type" as const, name: "any" };
+      // For now, register with empty param types (can be enhanced to parse :params types)
+      const paramTypes: TypeAnnotation[] = params.map(() => ({ kind: "type" as const, name: "any" }));
+      this.context.typeChecker.registerFunction(block.name, paramTypes, returnType as TypeAnnotation);
+    }
   }
 
   private handleIntentBlock(block: Block): void {
