@@ -1,0 +1,404 @@
+// FreeLang v9 데이터베이스: B-Tree 스토리지 계층
+// 정렬된 키 + 범위 검색 지원
+
+// ==================== B-Tree 노드 구조 ====================
+
+struct BTreeEntry {
+    key: str
+    row_ids: [i32]
+}
+
+struct BTreeNode {
+    node_id: i32
+    entries: [BTreeEntry]
+    children: [i32]      ;; 자식 노드 ID (배열 인덱스)
+    is_leaf: bool
+    entry_count: i32
+}
+
+struct BTree {
+    name: str
+    nodes: [BTreeNode]
+    root_id: i32
+    node_count: i32
+    order: i32           ;; B-Tree 차수 (최대 키 수)
+}
+
+// ==================== B-Tree 관리 ====================
+
+fn btree_new(name: str, order: i32) -> BTree {
+    println("[BTREE-NEW] Creating B-Tree: " + name + " (order=" + str(order) + ")")
+
+    ;; 루트 노드 생성
+    var root = BTreeNode {
+        node_id: 0,
+        entries: [],
+        children: [],
+        is_leaf: true,
+        entry_count: 0
+    }
+
+    var nodes: [BTreeNode] = [root]
+
+    BTree {
+        name: name,
+        nodes: nodes,
+        root_id: 0,
+        node_count: 1,
+        order: order
+    }
+}
+
+fn btree_node_new(node_id: i32, is_leaf: bool) -> BTreeNode {
+    BTreeNode {
+        node_id: node_id,
+        entries: [],
+        children: [],
+        is_leaf: is_leaf,
+        entry_count: 0
+    }
+}
+
+// ==================== 정렬된 삽입 ====================
+
+fn btree_insert(tree: BTree, key: str, row_id: i32) -> BTree {
+    println("[BTREE-INSERT] key=" + key + " row_id=" + str(row_id))
+
+    ;; 루트 노드 가져오기
+    var root = tree.nodes[tree.root_id]
+
+    ;; 기존 키 찾기
+    var found_idx: i32 = -1
+    var i: i32 = 0
+    while i < length(root.entries) {
+        if root.entries[i].key == key {
+            found_idx = i
+            break
+        }
+        i = i + 1
+    }
+
+    ;; 기존 키면 row_id 추가
+    if found_idx >= 0 {
+        root.entries[found_idx].row_ids.push(row_id)
+        tree.nodes[tree.root_id] = root
+        return tree
+    }
+
+    ;; 새로운 키 - 정렬된 위치에 삽입
+    var insert_pos: i32 = 0
+    var j: i32 = 0
+    while j < length(root.entries) {
+        if key < root.entries[j].key {
+            insert_pos = j
+            break
+        }
+        insert_pos = j + 1
+        j = j + 1
+    }
+
+    ;; 삽입 위치로부터 뒤 항목들 밀기 (간단한 구현)
+    var new_entries: [BTreeEntry] = []
+    var k: i32 = 0
+    while k < length(root.entries) {
+        if k == insert_pos {
+            var entry = BTreeEntry {
+                key: key,
+                row_ids: [row_id]
+            }
+            new_entries.push(entry)
+        }
+        new_entries.push(root.entries[k])
+        k = k + 1
+    }
+
+    ;; 끝에 삽입할 경우
+    if insert_pos == length(root.entries) {
+        var entry = BTreeEntry {
+            key: key,
+            row_ids: [row_id]
+        }
+        new_entries.push(entry)
+    }
+
+    root.entries = new_entries
+    root.entry_count = length(new_entries)
+    tree.nodes[tree.root_id] = root
+
+    println("  Inserted at position: " + str(insert_pos))
+
+    tree
+}
+
+// ==================== 검색 ====================
+
+fn btree_search(tree: BTree, key: str) -> [i32] {
+    println("[BTREE-SEARCH] key=" + key)
+
+    var root = tree.nodes[tree.root_id]
+
+    ;; 선형 검색
+    var i: i32 = 0
+    while i < length(root.entries) {
+        if root.entries[i].key == key {
+            println("  Found: " + str(length(root.entries[i].row_ids)) + " row_ids")
+            return root.entries[i].row_ids
+        }
+        i = i + 1
+    }
+
+    println("  Not found")
+    var empty: [i32] = []
+    empty
+}
+
+// ==================== 범위 검색 ====================
+
+fn btree_range_search(tree: BTree, min_key: str, max_key: str) -> [i32] {
+    println("[BTREE-RANGE] min=" + min_key + " max=" + max_key)
+
+    var root = tree.nodes[tree.root_id]
+    var results: [i32] = []
+
+    ;; 범위 내의 모든 항목 수집
+    var i: i32 = 0
+    while i < length(root.entries) {
+        var entry_key = root.entries[i].key
+
+        ;; 키가 범위 내인지 확인 (문자열 비교)
+        if entry_key >= min_key && entry_key <= max_key {
+            var j: i32 = 0
+            while j < length(root.entries[i].row_ids) {
+                results.push(root.entries[i].row_ids[j])
+                j = j + 1
+            }
+        }
+
+        i = i + 1
+    }
+
+    println("  Found: " + str(length(results)) + " rows in range")
+
+    results
+}
+
+// ==================== 비교 연산자 검색 ====================
+
+fn btree_search_operator(tree: BTree, op: str, value: str) -> [i32] {
+    println("[BTREE-OP-SEARCH] operator=" + op + " value=" + value)
+
+    var root = tree.nodes[tree.root_id]
+    var results: [i32] = []
+
+    var i: i32 = 0
+    while i < length(root.entries) {
+        var entry_key = root.entries[i].key
+        var matches: bool = false
+
+        if op == "=" {
+            matches = (entry_key == value)
+        } else if op == ">" {
+            matches = (entry_key > value)
+        } else if op == "<" {
+            matches = (entry_key < value)
+        } else if op == ">=" {
+            matches = (entry_key >= value)
+        } else if op == "<=" {
+            matches = (entry_key <= value)
+        } else if op == "!=" {
+            matches = (entry_key != value)
+        }
+
+        if matches {
+            var j: i32 = 0
+            while j < length(root.entries[i].row_ids) {
+                results.push(root.entries[i].row_ids[j])
+                j = j + 1
+            }
+        }
+
+        i = i + 1
+    }
+
+    println("  Found: " + str(length(results)) + " matching rows")
+
+    results
+}
+
+// ==================== 삭제 ====================
+
+fn btree_delete(tree: BTree, key: str, row_id: i32) -> BTree {
+    println("[BTREE-DELETE] key=" + key + " row_id=" + str(row_id))
+
+    var root = tree.nodes[tree.root_id]
+
+    ;; 키 찾기
+    var found_idx: i32 = -1
+    var i: i32 = 0
+    while i < length(root.entries) {
+        if root.entries[i].key == key {
+            found_idx = i
+            break
+        }
+        i = i + 1
+    }
+
+    if found_idx == -1 {
+        println("  Key not found")
+        return tree
+    }
+
+    ;; row_id 제거
+    var row_ids = root.entries[found_idx].row_ids
+    var new_row_ids: [i32] = []
+    var j: i32 = 0
+    while j < length(row_ids) {
+        if row_ids[j] != row_id {
+            new_row_ids.push(row_ids[j])
+        }
+        j = j + 1
+    }
+
+    ;; 남은 row_id가 없으면 항목 전체 제거
+    if length(new_row_ids) == 0 {
+        var new_entries: [BTreeEntry] = []
+        var k: i32 = 0
+        while k < length(root.entries) {
+            if k != found_idx {
+                new_entries.push(root.entries[k])
+            }
+            k = k + 1
+        }
+        root.entries = new_entries
+        root.entry_count = length(new_entries)
+        println("  Entry removed")
+    } else {
+        ;; row_id만 제거
+        root.entries[found_idx].row_ids = new_row_ids
+        println("  Row_id removed, entry remains")
+    }
+
+    tree.nodes[tree.root_id] = root
+
+    tree
+}
+
+// ==================== 통계 ====================
+
+fn btree_stats(tree: BTree) -> str {
+    var total_keys: i32 = 0
+    var total_rows: i32 = 0
+    var min_key: str = ""
+    var max_key: str = ""
+
+    var root = tree.nodes[tree.root_id]
+
+    var i: i32 = 0
+    while i < length(root.entries) {
+        total_keys = total_keys + 1
+        total_rows = total_rows + length(root.entries[i].row_ids)
+
+        if i == 0 {
+            min_key = root.entries[i].key
+        }
+        if i == length(root.entries) - 1 {
+            max_key = root.entries[i].key
+        }
+
+        i = i + 1
+    }
+
+    var stats = "[BTREE-STATS] " + tree.name + "\n"
+    stats = stats + "  Total keys: " + str(total_keys) + "\n"
+    stats = stats + "  Total row_ids: " + str(total_rows) + "\n"
+    stats = stats + "  Min key: " + min_key + "\n"
+    stats = stats + "  Max key: " + max_key + "\n"
+    stats = stats + "  Nodes: " + str(tree.node_count) + "\n"
+    stats = stats + "  Order: " + str(tree.order)
+
+    stats
+}
+
+// ==================== 정렬된 스캔 ====================
+
+fn btree_scan_all(tree: BTree) -> [str] {
+    println("[BTREE-SCAN-ALL] Sequential scan")
+
+    var root = tree.nodes[tree.root_id]
+    var keys: [str] = []
+
+    var i: i32 = 0
+    while i < length(root.entries) {
+        keys.push(root.entries[i].key)
+        i = i + 1
+    }
+
+    println("  Scanned " + str(length(keys)) + " keys in order")
+
+    keys
+}
+
+// ==================== 메인 ====================
+
+fn main() {
+    println("╔═══════════════════════════════════════════╗")
+    println("║  v9 B-Tree 스토리지 계층                ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    ;; 테스트 1: B-Tree 생성
+    println("✅ 테스트 1: B-Tree 생성")
+    var tree = btree_new("users_city_index", 3)
+    println("")
+
+    ;; 테스트 2: 정렬된 삽입
+    println("✅ 테스트 2: 정렬된 삽입")
+    tree = btree_insert(tree, "Seoul", 1)
+    tree = btree_insert(tree, "Busan", 3)
+    tree = btree_insert(tree, "Daegu", 5)
+    tree = btree_insert(tree, "Seoul", 2)
+    tree = btree_insert(tree, "Incheon", 4)
+    println("")
+
+    ;; 테스트 3: 순차 스캔 (정렬 확인)
+    println("✅ 테스트 3: 정렬된 순차 스캔")
+    var keys = btree_scan_all(tree)
+    var i: i32 = 0
+    while i < length(keys) {
+        println("  [" + str(i + 1) + "] " + keys[i])
+        i = i + 1
+    }
+    println("")
+
+    ;; 테스트 4: 검색
+    println("✅ 테스트 4: 검색")
+    var result1 = btree_search(tree, "Seoul")
+    println("  Seoul rows: [" + str(result1[0]) + ", " + str(result1[1]) + "]")
+    println("")
+
+    ;; 테스트 5: 범위 검색
+    println("✅ 테스트 5: 범위 검색")
+    var range_result = btree_range_search(tree, "Busan", "Incheon")
+    println("  Result count: " + str(length(range_result)))
+    println("")
+
+    ;; 테스트 6: 비교 연산자 검색
+    println("✅ 테스트 6: 비교 연산자 검색 (> 'Daegu')")
+    var op_result = btree_search_operator(tree, ">", "Daegu")
+    println("  Result count: " + str(length(op_result)))
+    println("")
+
+    ;; 테스트 7: 삭제
+    println("✅ 테스트 7: 삭제 (Seoul, row_id=1)")
+    tree = btree_delete(tree, "Seoul", 1)
+    var after_delete = btree_search(tree, "Seoul")
+    println("  Seoul rows after delete: " + str(length(after_delete)))
+    println("")
+
+    ;; 테스트 8: 통계
+    println("✅ 테스트 8: B-Tree 통계")
+    println(btree_stats(tree))
+    println("")
+
+    println("✅ B-Tree 스토리지 계층 완성!")
+}

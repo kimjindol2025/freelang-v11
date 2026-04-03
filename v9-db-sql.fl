@@ -1,0 +1,575 @@
+// FreeLang v9 데이터베이스: SQL 파서 + API 계층
+// 통합 SQL 쿼리 인터페이스
+
+// ==================== SQL 토큰 ====================
+
+struct SQLToken {
+    token_type: str      ;; "keyword", "identifier", "value", "operator", "comma", "paren"
+    value: str
+}
+
+struct SQLQuery {
+    query_type: str      ;; "SELECT", "INSERT", "UPDATE", "DELETE", "CREATE"
+    table_name: str
+    columns: [str]
+    where_column: str
+    where_operator: str
+    where_value: str
+    insert_values: [str]
+    update_column: str
+    update_value: str
+    limit: i32
+    is_valid: bool
+    error_msg: str
+}
+
+// ==================== 토큰화 ====================
+
+fn sql_tokenize(sql_str: str) -> [SQLToken] {
+    println("[TOKENIZE] Tokenizing: " + substring(sql_str, 0, 50) + "...")
+
+    var tokens: [SQLToken] = []
+    var current_token: str = ""
+    var i: i32 = 0
+
+    while i < length(sql_str) {
+        var char = substring(sql_str, i, i + 1)
+
+        if char == " " || char == "(" || char == ")" || char == "," || char == "=" || char == "'" {
+            ;; 이전 토큰 저장
+            if current_token != "" && char != "'" {
+                var token = SQLToken {
+                    token_type: "identifier",
+                    value: current_token
+                }
+                tokens.push(token)
+                current_token = ""
+            }
+
+            ;; 특수문자 토큰
+            if char == "(" || char == ")" {
+                var token = SQLToken {
+                    token_type: "paren",
+                    value: char
+                }
+                tokens.push(token)
+            } else if char == "," {
+                var token = SQLToken {
+                    token_type: "comma",
+                    value: ","
+                }
+                tokens.push(token)
+            } else if char == "=" {
+                var token = SQLToken {
+                    token_type: "operator",
+                    value: "="
+                }
+                tokens.push(token)
+            } else if char == "'" {
+                ;; 문자열 값 추출
+                var j: i32 = i + 1
+                var string_val: str = ""
+                while j < length(sql_str) {
+                    var next_char = substring(sql_str, j, j + 1)
+                    if next_char == "'" {
+                        break
+                    }
+                    string_val = string_val + next_char
+                    j = j + 1
+                }
+                var token = SQLToken {
+                    token_type: "value",
+                    value: string_val
+                }
+                tokens.push(token)
+                i = j  ;; 닫는 따옴표까지 스킵
+            }
+        } else {
+            current_token = current_token + char
+        }
+
+        i = i + 1
+    }
+
+    ;; 마지막 토큰
+    if current_token != "" {
+        var token = SQLToken {
+            token_type: "identifier",
+            value: current_token
+        }
+        tokens.push(token)
+    }
+
+    println("  Tokens: " + str(length(tokens)))
+
+    tokens
+}
+
+// ==================== 파싱 ====================
+
+fn sql_parse(sql_str: str) -> SQLQuery {
+    println("[PARSE] Parsing SQL: " + substring(sql_str, 0, 60) + "...")
+
+    var tokens = sql_tokenize(sql_str)
+
+    var query = SQLQuery {
+        query_type: "",
+        table_name: "",
+        columns: [],
+        where_column: "",
+        where_operator: "",
+        where_value: "",
+        insert_values: [],
+        update_column: "",
+        update_value: "",
+        limit: -1,
+        is_valid: false,
+        error_msg: ""
+    }
+
+    if length(tokens) == 0 {
+        query.error_msg = "Empty query"
+        return query
+    }
+
+    ;; 첫 토큰 = 쿼리 타입
+    var first_token = tokens[0].value
+
+    if first_token == "SELECT" {
+        query.query_type = "SELECT"
+
+        ;; SELECT * FROM table_name [WHERE col op val]
+        if length(tokens) >= 4 {
+            ;; FROM 찾기
+            var i: i32 = 0
+            while i < length(tokens) {
+                if tokens[i].value == "FROM" {
+                    ;; 다음 토큰이 table_name
+                    if i + 1 < length(tokens) {
+                        query.table_name = tokens[i + 1].value
+
+                        ;; WHERE 찾기
+                        var j: i32 = i + 2
+                        while j < length(tokens) {
+                            if tokens[j].value == "WHERE" {
+                                ;; WHERE col op val
+                                if j + 3 < length(tokens) {
+                                    query.where_column = tokens[j + 1].value
+                                    query.where_operator = tokens[j + 2].value
+                                    query.where_value = tokens[j + 3].value
+                                }
+                                break
+                            }
+                            j = j + 1
+                        }
+                    }
+                    break
+                }
+                i = i + 1
+            }
+
+            query.is_valid = true
+        }
+    } else if first_token == "INSERT" {
+        query.query_type = "INSERT"
+
+        ;; INSERT INTO table_name VALUES (v1, v2, ...)
+        if length(tokens) >= 5 {
+            ;; INTO 이후 table_name
+            var i: i32 = 0
+            while i < length(tokens) {
+                if tokens[i].value == "INTO" && i + 1 < length(tokens) {
+                    query.table_name = tokens[i + 1].value
+
+                    ;; VALUES 이후 값들 수집
+                    var j: i32 = i + 2
+                    while j < length(tokens) {
+                        if tokens[j].value == "VALUES" {
+                            var k: i32 = j + 1
+                            while k < length(tokens) {
+                                if tokens[k].token_type == "value" {
+                                    query.insert_values.push(tokens[k].value)
+                                }
+                                k = k + 1
+                            }
+                            break
+                        }
+                        j = j + 1
+                    }
+                    break
+                }
+                i = i + 1
+            }
+
+            query.is_valid = true
+        }
+    } else if first_token == "UPDATE" {
+        query.query_type = "UPDATE"
+
+        ;; UPDATE table_name SET col = 'val' WHERE id = '1'
+        if length(tokens) >= 5 {
+            query.table_name = tokens[1].value
+
+            ;; SET 이후 column = value
+            var i: i32 = 0
+            while i < length(tokens) {
+                if tokens[i].value == "SET" && i + 3 < length(tokens) {
+                    query.update_column = tokens[i + 1].value
+                    query.update_value = tokens[i + 3].value
+
+                    ;; WHERE 찾기
+                    var j: i32 = i + 4
+                    while j < length(tokens) {
+                        if tokens[j].value == "WHERE" && j + 3 < length(tokens) {
+                            query.where_column = tokens[j + 1].value
+                            query.where_value = tokens[j + 3].value
+                            break
+                        }
+                        j = j + 1
+                    }
+                    break
+                }
+                i = i + 1
+            }
+
+            query.is_valid = true
+        }
+    } else if first_token == "DELETE" {
+        query.query_type = "DELETE"
+
+        ;; DELETE FROM table_name WHERE id = '1'
+        if length(tokens) >= 4 {
+            ;; FROM 이후 table_name
+            var i: i32 = 0
+            while i < length(tokens) {
+                if tokens[i].value == "FROM" && i + 1 < length(tokens) {
+                    query.table_name = tokens[i + 1].value
+
+                    ;; WHERE 찾기
+                    var j: i32 = i + 2
+                    while j < length(tokens) {
+                        if tokens[j].value == "WHERE" && j + 3 < length(tokens) {
+                            query.where_column = tokens[j + 1].value
+                            query.where_value = tokens[j + 3].value
+                            break
+                        }
+                        j = j + 1
+                    }
+                    break
+                }
+                i = i + 1
+            }
+
+            query.is_valid = true
+        }
+    } else if first_token == "CREATE" {
+        query.query_type = "CREATE"
+        query.table_name = tokens[2].value
+        query.is_valid = true
+    }
+
+    if !query.is_valid {
+        query.error_msg = "Invalid SQL syntax"
+    }
+
+    println("  Type: " + query.query_type + " Table: " + query.table_name + " Valid: " + str(query.is_valid))
+
+    query
+}
+
+// ==================== SQL 실행 ====================
+
+fn sql_execute_select(query: SQLQuery, table: Table, indices: [HashIndex]) -> [[str]] {
+    println("[EXECUTE-SELECT] " + table.name)
+
+    if query.where_column == "" {
+        ;; SELECT * (no WHERE)
+        var results: [[str]] = []
+        var i: i32 = 0
+        while i < length(table.rows) {
+            if !table.rows[i].deleted {
+                results.push(table.rows[i].values)
+            }
+            i = i + 1
+        }
+        return results
+    }
+
+    ;; WHERE 조건 있음
+    var col_idx: i32 = -1
+    var i: i32 = 0
+    while i < length(table.columns) {
+        if table.columns[i].name == query.where_column {
+            col_idx = i
+            break
+        }
+        i = i + 1
+    }
+
+    var results: [[str]] = []
+    var j: i32 = 0
+    while j < length(table.rows) {
+        var row = table.rows[j]
+        if !row.deleted && row.values[col_idx] == query.where_value {
+            results.push(row.values)
+        }
+        j = j + 1
+    }
+
+    println("  Result: " + str(length(results)) + " rows")
+
+    results
+}
+
+fn sql_execute_insert(query: SQLQuery, table: Table) -> Table {
+    println("[EXECUTE-INSERT] " + table.name)
+
+    if length(query.insert_values) != length(table.columns) {
+        println("  ERROR: Column count mismatch")
+        return table
+    }
+
+    var row = Row {
+        id: table.next_id,
+        values: query.insert_values,
+        deleted: false
+    }
+
+    table.rows.push(row)
+    table.row_count = table.row_count + 1
+    table.next_id = table.next_id + 1
+
+    println("  Inserted row_id: " + str(row.id))
+
+    table
+}
+
+fn sql_execute_update(query: SQLQuery, table: Table) -> Table {
+    println("[EXECUTE-UPDATE] " + table.name)
+
+    ;; WHERE 조건으로 행 찾기
+    var col_idx: i32 = -1
+    var i: i32 = 0
+    while i < length(table.columns) {
+        if table.columns[i].name == query.where_column {
+            col_idx = i
+            break
+        }
+        i = i + 1
+    }
+
+    ;; 업데이트할 컬럼 인덱스
+    var update_col_idx: i32 = -1
+    var j: i32 = 0
+    while j < length(table.columns) {
+        if table.columns[j].name == query.update_column {
+            update_col_idx = j
+            break
+        }
+        j = j + 1
+    }
+
+    ;; 행 업데이트
+    var update_count: i32 = 0
+    var k: i32 = 0
+    while k < length(table.rows) {
+        if table.rows[k].values[col_idx] == query.where_value {
+            table.rows[k].values[update_col_idx] = query.update_value
+            update_count = update_count + 1
+        }
+        k = k + 1
+    }
+
+    println("  Updated: " + str(update_count) + " rows")
+
+    table
+}
+
+fn sql_execute_delete(query: SQLQuery, table: Table) -> Table {
+    println("[EXECUTE-DELETE] " + table.name)
+
+    ;; WHERE 조건으로 행 찾기
+    var col_idx: i32 = -1
+    var i: i32 = 0
+    while i < length(table.columns) {
+        if table.columns[i].name == query.where_column {
+            col_idx = i
+            break
+        }
+        i = i + 1
+    }
+
+    ;; 행 삭제 (소프트 삭제)
+    var delete_count: i32 = 0
+    var j: i32 = 0
+    while j < length(table.rows) {
+        if table.rows[j].values[col_idx] == query.where_value {
+            table.rows[j].deleted = true
+            delete_count = delete_count + 1
+        }
+        j = j + 1
+    }
+
+    println("  Deleted: " + str(delete_count) + " rows")
+
+    table
+}
+
+// ==================== 결과 포맷팅 ====================
+
+fn sql_format_result(rows: [[str]], columns: [Column]) -> str {
+    println("")
+    println("════════════════════════════════════════")
+    println("              쿼리 결과")
+    println("════════════════════════════════════════")
+    println("")
+
+    ;; 컬럼 헤더
+    var header: str = ""
+    var i: i32 = 0
+    while i < length(columns) {
+        header = header + columns[i].name
+        if i < length(columns) - 1 {
+            header = header + " | "
+        }
+        i = i + 1
+    }
+    println(header)
+    println("────────────────────────────────────────")
+
+    ;; 데이터 행
+    var j: i32 = 0
+    while j < length(rows) {
+        var row_str: str = ""
+        var k: i32 = 0
+        while k < length(rows[j]) {
+            row_str = row_str + rows[j][k]
+            if k < length(rows[j]) - 1 {
+                row_str = row_str + " | "
+            }
+            k = k + 1
+        }
+        println(row_str)
+        j = j + 1
+    }
+
+    println("")
+    println("(" + str(length(rows)) + " rows)")
+    println("")
+
+    ""
+}
+
+// ==================== 통합 API ====================
+
+fn db_query(sql_str: str, table: Table, indices: [HashIndex]) -> [[str]] {
+    println("")
+    println("╔═══════════════════════════════════════════╗")
+    println("║  SQL API - 쿼리 실행                      ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    var query = sql_parse(sql_str)
+
+    if !query.is_valid {
+        println("  ERROR: " + query.error_msg)
+        var empty: [[str]] = []
+        return empty
+    }
+
+    println("")
+
+    if query.query_type == "SELECT" {
+        return sql_execute_select(query, table, indices)
+    }
+
+    var empty: [[str]] = []
+    empty
+}
+
+// ==================== 메인 ====================
+
+fn main() {
+    println("╔═══════════════════════════════════════════╗")
+    println("║  v9 SQL 파서 + API 계층                  ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    ;; 테스트 1: 테이블 생성
+    println("✅ 테스트 1: 테이블 생성")
+    var cols: [Column] = []
+    cols.push(Column { name: "id", data_type: "integer", nullable: false, primary_key: true })
+    cols.push(Column { name: "name", data_type: "string", nullable: false, primary_key: false })
+    cols.push(Column { name: "age", data_type: "integer", nullable: true, primary_key: false })
+
+    var table = Table {
+        name: "users",
+        columns: cols,
+        rows: [],
+        row_count: 0,
+        next_id: 1
+    }
+
+    ;; 데이터 삽입
+    var rows_data: [[str]] = [
+        ["1", "Alice", "30"],
+        ["2", "Bob", "25"],
+        ["3", "Charlie", "35"]
+    ]
+
+    var i: i32 = 0
+    while i < length(rows_data) {
+        var row = Row {
+            id: table.next_id,
+            values: rows_data[i],
+            deleted: false
+        }
+        table.rows.push(row)
+        table.row_count = table.row_count + 1
+        table.next_id = table.next_id + 1
+        i = i + 1
+    }
+
+    println("  Inserted " + str(table.row_count) + " rows")
+    println("")
+
+    ;; 테스트 2: SQL SELECT (전체)
+    println("✅ 테스트 2: SELECT * FROM users")
+    var sql1 = "SELECT * FROM users"
+    var result1 = db_query(sql1, table, [])
+    sql_format_result(result1, cols)
+
+    ;; 테스트 3: SQL SELECT with WHERE
+    println("✅ 테스트 3: SELECT * FROM users WHERE name = 'Alice'")
+    var sql2 = "SELECT * FROM users WHERE name = 'Alice'"
+    var result2 = db_query(sql2, table, [])
+    sql_format_result(result2, cols)
+
+    ;; 테스트 4: SQL 파싱 (INSERT)
+    println("✅ 테스트 4: INSERT 파싱")
+    var sql3 = "INSERT INTO users VALUES ('4', 'David', '40')"
+    var query3 = sql_parse(sql3)
+    println("  Query type: " + query3.query_type)
+    println("  Table: " + query3.table_name)
+    println("  Values: " + str(length(query3.insert_values)) + " columns")
+    println("")
+
+    ;; 테스트 5: SQL 파싱 (UPDATE)
+    println("✅ 테스트 5: UPDATE 파싱")
+    var sql4 = "UPDATE users SET age = '31' WHERE id = '1'"
+    var query4 = sql_parse(sql4)
+    println("  Query type: " + query4.query_type)
+    println("  Update column: " + query4.update_column)
+    println("  Update value: " + query4.update_value)
+    println("")
+
+    ;; 테스트 6: SQL 파싱 (DELETE)
+    println("✅ 테스트 6: DELETE 파싱")
+    var sql5 = "DELETE FROM users WHERE id = '2'"
+    var query5 = sql_parse(sql5)
+    println("  Query type: " + query5.query_type)
+    println("  Where clause: " + query5.where_column + " = " + query5.where_value)
+    println("")
+
+    println("✅ SQL 파서 + API 계층 완성!")
+}
