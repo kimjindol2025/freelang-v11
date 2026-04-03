@@ -1,5 +1,29 @@
-// FreeLang v9 표준 라이브러리 5: 도구 시스템
-// 도구 등록, 실행, 검증
+// FreeLang v9 표준 라이브러리: tools 모듈
+//
+// **목적**: 도구 시스템 (도구 등록, 실행, 검증)
+// **주요 기능**:
+//   - 도구 정의/생성: tool_new, tool_set_input_schema, tool_set_output_schema
+//   - 도구 레지스트리: tool_registry_new, register_tool, unregister_tool
+//   - 도구 조회: find_tool, get_all_tools, tool_count
+//   - 도구 실행: execute_tool, validate_input, call_tool
+//   - 도구 검증: is_tool_valid, tool_exists
+//
+// **구조체**:
+//   - Tool: 도구 정의 (이름, 설명, 입력/출력 스키마, 실행 가능 여부)
+//   - ToolRegistry: 도구 레지스트리 (도구 배열, 크기)
+//
+// **핵심 함수** (15개):
+//   도구: tool_new, tool_set_input_schema, tool_set_output_schema,
+//        is_tool_valid
+//   레지스트리: tool_registry_new, register_tool, unregister_tool,
+//             find_tool, get_all_tools, tool_count, tool_exists
+//   실행: execute_tool, validate_input, call_tool
+//
+// **사용 예시**:
+//   var tool = tool_new("weather", "Get weather for a city")
+//   var registry = tool_registry_new()
+//   registry = register_tool(registry, tool)
+//   var result = execute_tool(registry, "weather", ["city", "Seoul"])
 
 // ==================== 도구 정의 ====================
 

@@ -1,5 +1,28 @@
-// FreeLang v9 표준 라이브러리 1: AI/LLM
-// Anthropic Claude API 통합
+// FreeLang v9 표준 라이브러리: ai 모듈
+//
+// **목적**: Anthropic Claude API 통합 (LLM 기능)
+// **주요 기능**:
+//   - AI 클라이언트 생성/설정: ai_client_new, set_model, set_temperature
+//   - 메시지 기반 대화: send_message, send_message_with_context
+//   - 시스템 프롬프트: send_message_with_system
+//   - 요청/응답: ai_request_new, ai_response_parse
+//   - 모델 관리: list_available_models, validate_model
+//
+// **구조체**:
+//   - AIClient: AI 클라이언트 (API 키, 모델, 기본 URL)
+//   - AIRequest: AI 요청 (모델, 메시지, 시스템, 온도, 토큰 한계)
+//   - AIResponse: AI 응답 (콘텐츠, 토큰 사용, 완료 이유, 에러)
+//
+// **핵심 함수** (11개):
+//   클라이언트: ai_client_new, set_model, set_temperature, set_max_tokens
+//   메시지: send_message, send_message_with_context, send_message_with_system
+//   모델: list_available_models, validate_model
+//   파싱: ai_request_new, ai_response_parse
+//
+// **사용 예시**:
+//   var client = ai_client_new("your-api-key")
+//   var response = send_message(client, "Hello Claude")
+//   var result = send_message_with_system(client, "You are a helpful assistant", "What is 2+2?")
 
 struct AIClient {
     api_key: str

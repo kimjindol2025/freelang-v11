@@ -1,5 +1,27 @@
 // FreeLang v9 Phase 2: 에이전트 실행 엔진
-// ReAct 루프 (Reason → Act → Observe)
+//
+// **목적**: ReAct 루프 기반 에이전트 실행 (Reason → Act → Observe)
+// **아키텍처**:
+//   Reason: 다음 액션 결정 (LLM 사용)
+//   Act: 도구 또는 작업 실행
+//   Observe: 결과 수집 및 상태 업데이트
+//   (반복: max_iterations까지 또는 완료될 때까지)
+//
+// **구조체**:
+//   - AgentState: 에이전트 실행 상태 (ID, 목표, 반복, 결과, 상태)
+//   - AgentPlan: 에이전트 계획 (도구 목록, 단계, 완료된 단계)
+//
+// **핵심 함수** (13개):
+//   상태: agent_state_new, agent_state_add_result, agent_state_is_completed
+//   계획: agent_plan_new, agent_plan_next_tool, agent_plan_mark_step_complete
+//   실행: agent_reason (다음 액션 결정), agent_act (도구 실행),
+//        agent_observe (결과 관찰), agent_run_step (ReAct 1단계)
+//   순환: agent_run_loop (ReAct 루프 반복 실행)
+//
+// **사용 예시**:
+//   var state = agent_state_new("data-001", "CSV 분석", 5)
+//   var plan = agent_plan_new("data-001", ["read", "validate", "analyze"])
+//   state = agent_run_loop(state, plan)
 
 // ==================== 에이전트 상태 ====================
 

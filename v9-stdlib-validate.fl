@@ -1,5 +1,24 @@
-// FreeLang v9 표준 라이브러리 - 통합 검증
-// 5개 라이브러리 모두 테스트
+// FreeLang v9 표준 라이브러리: validate 모듈
+//
+// **목적**: 통합 검증 프레임워크 (모든 stdlib 모듈 테스트)
+// **주요 기능**:
+//   - 테스트 케이스 정의: ValidationTest 구조체
+//   - 검증 리포트: ValidationReport 구조체
+//   - 검증 실행 및 결과 추적
+//   - 라이브러리별 검증 (io, string, json, data, memory)
+//
+// **구조체**:
+//   - ValidationTest: 개별 테스트 (이름, 상태, 메시지)
+//   - ValidationReport: 테스트 리포트 (라이브러리명, 테스트, 통과/실패 수)
+//
+// **핵심 함수** (9개):
+//   검증: validate_io, validate_string, validate_json,
+//         validate_data, validate_memory
+//   리포트: report_new, report_add_test, run_all_validations
+//
+// **사용 예시**:
+//   var report = validate_io()
+//   report = run_all_validations()
 
 // ==================== 검증 프레임워크 ====================
 

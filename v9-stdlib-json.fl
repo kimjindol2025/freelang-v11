@@ -1,5 +1,31 @@
 // FreeLang v9 표준 라이브러리: json 모듈
-// JSON 직렬화 및 역직렬화
+//
+// **목적**: JSON 직렬화 및 역직렬화
+// **주요 기능**:
+//   - JSON 값 생성: null, bool, number, string, array, object
+//   - JSON 직렬화: stringify, stringify_pretty
+//   - JSON 역직렬화: parse
+//   - 문자열 이스케이프: json_escape_string, json_unescape_string
+//   - 객체 변환: struct_to_json_string, object_to_json_object
+//
+// **구조체**:
+//   - JSONValue: 모든 JSON 값의 통합 표현 (타입별 필드)
+//   - JSONObject: JSON 객체 (key-value 배열)
+//   - JSONArray: JSON 배열 (요소 배열)
+//   - JSONParseResult: 파싱 결과 (성공 여부, 에러, 파싱된 값)
+//
+// **핵심 함수** (15개):
+//   생성: json_null, json_bool, json_number, json_string, json_array,
+//         json_object, object_to_json_object
+//   직렬화: json_stringify, json_stringify_pretty, json_stringify_value
+//   역직렬화: json_parse, struct_to_json_string
+//   이스케이프: json_escape_string, json_unescape_string
+//
+// **사용 예시**:
+//   var val = json_number(42)
+//   var str = json_stringify(val)  // "42"
+//   var result = json_parse("{\"name\": \"Alice\"}")
+//   var pretty = json_stringify_pretty(result.value)
 
 // ==================== JSON 값 ====================
 

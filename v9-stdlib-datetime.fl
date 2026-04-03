@@ -1,5 +1,27 @@
-// FreeLang v9 DateTime 라이브러리
-// 완전한 시간 처리
+// FreeLang v9 표준 라이브러리: datetime 모듈
+//
+// **목적**: 완전한 DateTime 처리 (파싱, 포매팅, 연산)
+// **주요 기능**:
+//   - DateTime 조회/파싱: datetime_now, datetime_parse
+//   - DateTime 포매팅: datetime_format (커스텀 형식)
+//   - Duration 생성: duration_days, duration_hours, duration_minutes
+//   - DateTime 연산: duration_add_to_datetime
+//
+// **구조체**:
+//   - DateTime: 날짜 및 시간 (년, 월, 일, 시, 분, 초)
+//   - Duration: 기간 (일, 시, 분, 초)
+//
+// **핵심 함수** (7개):
+//   조회/파싱: datetime_now, datetime_parse
+//   포매팅: datetime_format
+//   기간: duration_days, duration_hours, duration_add_to_datetime
+//
+// **사용 예시**:
+//   var dt = datetime_now()
+//   var parsed = datetime_parse("2025-04-04T12:30:00")
+//   var str = datetime_format(dt, "YYYY-MM-DD HH:MM:SS")
+//   var dur = duration_days(7)
+//   var future = duration_add_to_datetime(dt, dur)
 
 struct DateTime {
     year: i32

@@ -1,5 +1,31 @@
 // FreeLang v9 표준 라이브러리: time 모듈
-// 시간 함수 및 타이밍 유틸
+//
+// **목적**: 시간/날짜 처리 및 타이밍 유틸리티
+// **주요 기능**:
+//   - 현재 시간 조회: now, current_timestamp
+//   - 시간 연산: add_hours, add_days, add_milliseconds
+//   - 시간 변환: timestamp_to_string, parse_iso8601, unix_timestamp
+//   - 시간 비교: before, after, is_same_day
+//   - 기간 계산: get_duration, days_between, hours_between
+//
+// **구조체**:
+//   - TimeStamp: 시간 정보 (년, 월, 일, 시, 분, 초, 밀리초)
+//   - Duration: 기간 (총 밀리초)
+//   - TimeInfo: 시간대 정보 (타임존, 오프셋)
+//
+// **핵심 함수** (31개):
+//   조회: now, current_timestamp, current_time, current_year, current_month,
+//        current_day, current_hour, current_minute, current_second
+//   연산: add_hours, add_days, add_milliseconds, add_seconds
+//   변환: timestamp_to_string, parse_iso8601, format_timestamp, unix_timestamp
+//   비교: before, after, is_same_day, compare_timestamps
+//   기간: get_duration, days_between, hours_between, seconds_between
+//
+// **사용 예시**:
+//   var ts = now()
+//   var str = timestamp_to_string(ts)
+//   var future = add_days(ts, 7)
+//   var diff = days_between(ts, future)
 
 // ==================== 시간 구조 ====================
 

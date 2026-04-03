@@ -1,5 +1,26 @@
 // FreeLang v9 표준 라이브러리: result 모듈
-// Result<T> 타입 및 에러 처리
+//
+// **목적**: Result<T> 타입 및 Option<T> 패턴 (에러 처리)
+// **주요 기능**:
+//   - Result 타입: ok, err, is_ok, is_err
+//   - Option 타입: some, none, is_some, is_none
+//   - 값 추출: unwrap, unwrap_or
+//   - 변환: map_result
+//
+// **구조체**:
+//   - Result: 성공 또는 실패 (is_ok, value, error_msg)
+//   - Option: Some 또는 None (has_value, value)
+//
+// **핵심 함수** (12개):
+//   생성: ok, err, some, none
+//   검사: is_ok, is_err, is_some, is_none
+//   추출: unwrap, unwrap_or, map_result
+//
+// **사용 예시**:
+//   var result = ok("success")
+//   if is_ok(result) { var val = unwrap(result) }
+//   var option = some("value")
+//   var default_val = unwrap_or(result, "default")
 
 struct Result {
     is_ok: bool

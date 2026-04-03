@@ -1,5 +1,32 @@
-// FreeLang v9 표준 라이브러리 3: 메모리 & 벡터 저장소
-// 컨텍스트 관리, 임베딩, 의미론적 검색
+// FreeLang v9 표준 라이브러리: memory 모듈
+//
+// **목적**: 벡터 임베딩, 의미론적 검색, 컨텍스트 관리
+// **주요 기능**:
+//   - 임베딩 저장소: embedding_store_new, add, search, search_ranked
+//   - 임베딩 생성/유사도: embed_text, cosine_similarity
+//   - 컨텍스트 윈도우: context_window_new, add, clear, remaining
+//   - 메모리 풀: memory_pool_new, remember, recall, size
+//
+// **구조체**:
+//   - EmbeddingStore: 벡터 임베딩 저장소 (아이디, 텍스트, 메타데이터)
+//   - Embedding: 임베딩 항목 (ID, 벡터, 메타데이터)
+//   - SearchResult: 검색 결과 (ID, 스코어, 메타데이터)
+//   - ContextWindow: 컨텍스트 윈도우 (현재 토큰, 최대 토큰)
+//   - MemoryPool: 메모리 풀 (아이템 배열)
+//
+// **핵심 함수** (16개):
+//   임베딩: embedding_store_new, embedding_store_new_bounded,
+//           embed_text, cosine_similarity, embedding_store_add,
+//           embedding_store_search, embedding_store_search_ranked
+//   컨텍스트: context_window_new, context_window_add, context_window_clear,
+//            context_window_remaining
+//   메모리: memory_pool_new, memory_pool_remember, memory_pool_recall,
+//          memory_pool_size
+//
+// **사용 예시**:
+//   var store = embedding_store_new(768)
+//   store = embedding_store_add(store, "doc1", "Hello world", [])
+//   var results = embedding_store_search(store, "greeting", 5)
 
 // ==================== 검색 결과 ====================
 

@@ -1,5 +1,21 @@
 // FreeLang v9 표준 라이브러리: regex 모듈
-// 기본 패턴 매칭 및 정규식
+//
+// **목적**: 기본 패턴 매칭 및 정규식 처리
+// **주요 기능**:
+//   - 패턴 매칭: regex_match (기본 와일드카드 지원)
+//   - 패턴 검색: regex_find_all (모든 매치 찾기)
+//   - 패턴 치환: regex_replace
+//   - 패턴 분할: regex_split
+//   - 검증: is_valid_email, is_valid_url, is_sql_injection_pattern
+//
+// **핵심 함수** (8개):
+//   매칭: regex_match, regex_find_all, regex_split, regex_replace
+//   검증: is_valid_email, is_valid_url, is_sql_injection_pattern
+//
+// **사용 예시**:
+//   var match = regex_match("hello123", "hello*")
+//   var emails = regex_find_all(text, "*@*")
+//   var safe = !is_sql_injection_pattern(user_input)
 
 fn regex_match(text: str, pattern: str) -> bool {
     if length(pattern) == 0 { return true }

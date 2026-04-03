@@ -1,5 +1,25 @@
-// FreeLang v9 표준 라이브러리 2: 데이터 처리
-// CSV, JSON, 데이터 변환
+// FreeLang v9 표준 라이브러리: data 모듈
+//
+// **목적**: CSV, JSON 등 데이터 형식 처리 및 변환
+// **주요 기능**:
+//   - CSV 파싱/직렬화: csv_parse, csv_stringify
+//   - CSV 필터링: csv_filter (특정 열의 값으로 행 필터)
+//   - CSV 컬럼 선택: csv_select_columns
+//   - JSON 간단 파싱: json_parse_simple
+//   - JSON 직렬화: json_stringify
+//
+// **구조체**:
+//   - CSVData: CSV 데이터 (헤더, 행, 행/열 개수)
+//
+// **핵심 함수** (7개):
+//   CSV: csv_parse, csv_stringify, csv_filter, csv_select_columns
+//   JSON: json_parse_simple, json_stringify
+//
+// **사용 예시**:
+//   var csv = csv_parse("name,age\\nAlice,30\\nBob,25")
+//   var filtered = csv_filter(csv, "age", "30")
+//   var selected = csv_select_columns(csv, ["name"])
+//   var json_str = json_stringify(["key", "value"])
 
 // ==================== CSV 처리 ====================
 

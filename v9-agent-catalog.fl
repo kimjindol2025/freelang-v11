@@ -1,5 +1,31 @@
-// FreeLang v9 Phase 2: 에이전트 카탈로그 (50개)
-// 5개 카테고리 × 10개 에이전트
+// FreeLang v9 Phase 2: 에이전트 카탈로그
+//
+// **목적**: 50개 에이전트 정의 (5개 카테고리 × 10개 에이전트)
+// **구조체**:
+//   - AgentSpec: 에이전트 명세 (ID, 이름, 카테고리, 설명, 도구, 반복 한계, 메모리)
+//
+// **5개 카테고리** (각 10개):
+//   1. **Data (데이터)**: CSV 분석가, SQL 쿼리 작성기, JSON 파서, 데이터 검증, ...
+//      - 역할: 데이터 로드, 변환, 검증, 분석
+//   2. **Code (코드)**: Python 코드 작성, 버그 수정, 성능 최적화, 리팩토링, ...
+//      - 역할: 코드 생성, 검증, 최적화, 디버깅
+//   3. **Knowledge (지식)**: 사실 검증, 요약기, 추천 엔진, 검색기, ...
+//      - 역할: 정보 검색, 요약, 검증, 추천
+//   4. **Comms (통신)**: 이메일 작성, 리포트 생성, 뉴스레터, 마케팅, ...
+//      - 역할: 텍스트 생성, 포매팅, 발송
+//   5. **Ops (운영)**: 작업 스케줄러, 모니터링, 알림, 자동화, ...
+//      - 역할: 시스템 관리, 모니터링, 자동화
+//
+// **핵심 함수** (11개):
+//   명세: agent_spec_new, agent_spec_print
+//   카탈로그: catalog_data_agents, catalog_code_agents, catalog_knowledge_agents,
+//           catalog_comms_agents, catalog_ops_agents
+//   조회: get_all_agents, find_agent_by_id, find_agents_by_category, main
+//
+// **사용 예시**:
+//   var all_agents = get_all_agents()
+//   var data_agents = catalog_data_agents()
+//   var agent = find_agent_by_id(all_agents, "data-001")
 
 // ==================== 에이전트 명세 ====================
 

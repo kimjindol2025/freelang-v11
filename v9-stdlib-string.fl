@@ -1,5 +1,28 @@
 // FreeLang v9 표준 라이브러리: string 모듈
-// 문자열 처리 유틸 함수
+//
+// **목적**: 문자열 처리 및 조작 유틸리티
+// **주요 기능**:
+//   - 분할/결합: split, join
+//   - 트림: trim, ltrim, rtrim
+//   - 대소문자: upper, lower, char_to_upper, char_to_lower
+//   - 검색: contains, starts_with, ends_with, index_of
+//   - 변환: replace, substring, prefix, suffix, repeat
+//   - 조회: length, is_empty, is_blank
+//
+// **핵심 함수** (22개):
+//   분할/결합: string_split, string_join
+//   트림: string_trim, string_ltrim, string_rtrim
+//   대소문자: char_to_upper, char_to_lower, string_upper, string_lower
+//   검색/판단: string_contains, string_starts_with, string_ends_with,
+//             string_index_of, string_is_empty, string_is_blank
+//   변환: string_replace, string_substring, string_prefix, string_suffix,
+//         string_repeat, string_length
+//
+// **사용 예시**:
+//   var parts = string_split("apple,banana,cherry", ",")
+//   var upper = string_upper("hello")
+//   var result = string_replace("cat", "c", "b")  // "bat"
+//   var text = string_repeat("*", 5)  // "*****"
 
 // ==================== 분할 및 결합 ====================
 

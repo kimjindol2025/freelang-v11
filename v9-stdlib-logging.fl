@@ -1,5 +1,24 @@
-// FreeLang v9 로깅 프레임워크
-// Logger, Appender, Formatter
+// FreeLang v9 표준 라이브러리: logging 모듈
+//
+// **목적**: 로깅 프레임워크 (로거, 로그 레벨, 로그 저장)
+// **주요 기능**:
+//   - 로거 생성/설정: logger_new, logger_set_level
+//   - 로깅 메서드: log_debug, log_info, log_warn, log_error
+//   - 로그 레벨: DEBUG, INFO, WARN, ERROR
+//
+// **구조체**:
+//   - LogEntry: 로그 항목 (레벨, 메시지, 타임스탐프)
+//   - Logger: 로거 (이름, 레벨, 로그 배열, 개수)
+//
+// **핵심 함수** (7개):
+//   생성: logger_new, logger_set_level
+//   로깅: log_debug, log_info, log_warn, log_error
+//
+// **사용 예시**:
+//   var logger = logger_new("MyApp")
+//   logger = log_info(logger, "Application started")
+//   logger = log_error(logger, "Error occurred")
+//   logger = logger_set_level(logger, "DEBUG")
 
 struct LogEntry {
     level: str

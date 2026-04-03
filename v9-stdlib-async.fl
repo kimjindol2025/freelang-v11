@@ -1,5 +1,29 @@
-// FreeLang v9 표준 라이브러리 4: 비동기 & 트랜잭션
-// INTENT 실행, 재시도, 롤백
+// FreeLang v9 표준 라이브러리: async 모듈
+//
+// **목적**: 비동기 작업, 트랜잭션, 재시도 및 롤백 기능
+// **주요 기능**:
+//   - 트랜잭션 관리: transaction_new, add_operation, commit, rollback
+//   - 재시도 로직: with_retry, retry_async, get_retry_count
+//   - INTENT 실행: execute_intent, wait_for_intent, intent_status
+//   - 상태 추적: transaction_status, get_operations, get_rollback_ops
+//   - 비동기 래퍼: async_execute, await_result
+//
+// **구조체**:
+//   - Transaction: 트랜잭션 (ID, 이름, 상태, 연산, 롤백, 재시도)
+//   - RetryPolicy: 재시도 정책 (최대 횟수, 지연, 백오프)
+//   - AsyncResult: 비동기 결과 (상태, 값, 에러)
+//
+// **핵심 함수** (15개):
+//   트랜잭션: transaction_new, add_operation, commit, rollback, transaction_status,
+//           get_operations, get_rollback_ops
+//   재시도: with_retry, retry_async, get_retry_count, should_retry
+//   INTENT: execute_intent, wait_for_intent, intent_status
+//
+// **사용 예시**:
+//   var tx = transaction_new("transfer")
+//   tx = add_operation(tx, "debit $100")
+//   tx = add_operation(tx, "credit $100")
+//   tx = commit(tx)
 
 // ==================== 트랜잭션 ====================
 
