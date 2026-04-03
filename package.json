@@ -13,7 +13,7 @@
     "dev": "ts-node src/cli.ts run"
   },
   "dependencies": {
-    "anthropic": "^1.0.0"
+    "anthropic": "^3.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

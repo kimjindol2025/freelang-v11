@@ -1,0 +1,237 @@
+// FreeLang v9: Parser
+// Token[] → AST (Block[])
+
+import { Token, TokenType as T } from "./token";
+import {
+  ASTNode,
+  Block,
+  Literal,
+  Variable,
+  SExpr,
+  Keyword,
+  makeBlock,
+  makeLiteral,
+  makeVariable,
+  makeSExpr,
+  makeKeyword,
+} from "./ast";
+
+export class ParserError extends Error {
+  constructor(
+    message: string,
+    public line: number,
+    public col: number
+  ) {
+    super(`[${line}:${col}] ${message}`);
+  }
+}
+
+export class Parser {
+  private pos = 0;
+  private tokens: Token[];
+
+  constructor(tokens: Token[]) {
+    this.tokens = tokens;
+  }
+
+  parse(): Block[] {
+    const blocks: Block[] = [];
+    while (!this.isAtEnd()) {
+      if (this.check(T.EOF)) break;
+      blocks.push(this.parseBlock());
+    }
+    return blocks;
+  }
+
+  // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
+  private parseBlock(): Block {
+    this.expect(T.LBracket);
+    const typeToken = this.advance();
+    if (typeToken.type !== T.Symbol) {
+      throw this.error(`Expected block type (symbol), got ${typeToken.type}`, typeToken);
+    }
+    const blockType = typeToken.value;
+
+    const nameToken = this.advance();
+    if (nameToken.type !== T.Symbol) {
+      throw this.error(`Expected block name (symbol), got ${nameToken.type}`, nameToken);
+    }
+    const blockName = nameToken.value;
+
+    const fields = new Map<string, ASTNode | ASTNode[]>();
+
+    // Parse fields: :key value :key value ...
+    while (!this.check(T.RBracket) && !this.isAtEnd()) {
+      if (!this.check(T.Keyword)) {
+        throw this.error(
+          `Expected keyword field (starting with :), got ${this.peek().type}`,
+          this.peek()
+        );
+      }
+
+      const keyToken = this.advance();
+      const keyName = keyToken.value; // Already includes the ':'
+
+      // Collect values for this key
+      const values: ASTNode[] = [];
+
+      // Parse values until next keyword or closing bracket
+      while (!this.check(T.Keyword) && !this.check(T.RBracket) && !this.isAtEnd()) {
+        values.push(this.parseValue());
+      }
+
+      // Store field: single value as-is, multiple as array
+      if (values.length === 0) {
+        throw this.error(`Expected at least one value for keyword ${keyName}`, keyToken);
+      } else if (values.length === 1) {
+        fields.set(keyName, values[0]);
+      } else {
+        fields.set(keyName, values);
+      }
+    }
+
+    this.expect(T.RBracket);
+    return makeBlock(blockType, blockName, fields);
+  }
+
+  // Parse any value: literal, variable, block, S-expr, or array
+  private parseValue(): ASTNode {
+    // Check for S-expression: (op arg1 arg2 ...)
+    if (this.check(T.LParen)) {
+      return this.parseSExpr();
+    }
+
+    // Check for literal number
+    if (this.check(T.Number)) {
+      const token = this.advance();
+      return makeLiteral("number", parseFloat(token.value));
+    }
+
+    // Check for literal string
+    if (this.check(T.String)) {
+      const token = this.advance();
+      return makeLiteral("string", token.value);
+    }
+
+    // Check for variable: $name
+    if (this.check(T.Variable)) {
+      const token = this.advance();
+      return makeVariable(token.value);
+    }
+
+    // Check for keyword: :name (can appear as value in S-expressions)
+    if (this.check(T.Keyword)) {
+      const token = this.advance();
+      return makeKeyword(token.value);
+    }
+
+    // Check for block: [TYPE ...]
+    if (this.check(T.LBracket)) {
+      // Lookahead: is this a block or value array?
+      const nextIdx = this.pos + 1;
+      if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {
+        // It's a block
+        return this.parseBlock();
+      } else {
+        // It's a value array: [val1 val2 ...]
+        return this.parseArray();
+      }
+    }
+
+    // Check for symbol (including keywords used as values)
+    if (this.check(T.Symbol)) {
+      const token = this.advance();
+      return makeLiteral("symbol", token.value);
+    }
+
+    throw this.error(`Unexpected token: ${this.peek().type}`, this.peek());
+  }
+
+  // Parse array: [val1 val2 val3 ...]
+  private parseArray(): ASTNode {
+    this.expect(T.LBracket);
+    const values: ASTNode[] = [];
+    while (!this.check(T.RBracket) && !this.isAtEnd()) {
+      values.push(this.parseValue());
+    }
+    this.expect(T.RBracket);
+    // Return as synthetic block-like structure
+    // Actually, arrays in v9 are represented as special blocks
+    const arrayFields = new Map<string, ASTNode | ASTNode[]>();
+    arrayFields.set("items", values);
+    return makeBlock("Array", "$array", arrayFields);
+  }
+
+  // Parse S-expression: (op arg1 arg2 ...)
+  private parseSExpr(): SExpr {
+    this.expect(T.LParen);
+
+    const opToken = this.advance();
+    if (opToken.type !== T.Symbol) {
+      throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
+    }
+    const op = opToken.value;
+
+    const args: ASTNode[] = [];
+    while (!this.check(T.RParen) && !this.isAtEnd()) {
+      args.push(this.parseValue());
+    }
+
+    this.expect(T.RParen);
+    return makeSExpr(op, args);
+  }
+
+  // ===== Utility Methods =====
+
+  private peek(): Token {
+    if (this.pos >= this.tokens.length) {
+      return this.tokens[this.tokens.length - 1]; // EOF
+    }
+    return this.tokens[this.pos];
+  }
+
+  private peekNext(): Token | null {
+    if (this.pos + 1 >= this.tokens.length) return null;
+    return this.tokens[this.pos + 1];
+  }
+
+  private advance(): Token {
+    if (this.pos < this.tokens.length) this.pos++;
+    return this.tokens[this.pos - 1];
+  }
+
+  private check(type: string): boolean {
+    if (this.isAtEnd()) return false;
+    return this.peek().type === type;
+  }
+
+  private expect(type: string): Token {
+    if (this.check(type)) {
+      return this.advance();
+    }
+    const token = this.peek();
+    throw this.error(`Expected ${type}, got ${token.type}`, token);
+  }
+
+  private isAtEnd(): boolean {
+    return this.pos >= this.tokens.length;
+  }
+
+  private error(message: string, token: Token): ParserError {
+    return new ParserError(message, token.line, token.col);
+  }
+
+  // Synchronization for error recovery
+  private synchronize(): void {
+    this.advance();
+    while (!this.isAtEnd()) {
+      if (this.check(T.LBracket)) return; // Next block start
+      this.advance();
+    }
+  }
+}
+
+export function parse(tokens: Token[]): Block[] {
+  const parser = new Parser(tokens);
+  return parser.parse();
+}

@@ -1,0 +1,147 @@
+;; FreeLang v9 HTTP Server Definition
+;; v9로 정의한 실제 동작하는 HTTP 서버
+
+[SERVER freelang-http-api
+  :port 3009
+  :host "localhost"
+  :name "FreeLang v9 API Server"
+  :description "AI-native HTTP API powered by FreeLang v9"
+]
+
+;; GET /api/health - 서버 상태 체크
+[ROUTE health
+  :method "GET"
+  :path "/api/health"
+  :handler (
+    json-response {
+      :status "healthy"
+      :timestamp (now)
+      :version "v9.0.0"
+      :uptime (server-uptime)
+    }
+  )
+]
+
+;; GET /api/projects - 프로젝트 목록 조회
+[ROUTE list-projects
+  :method "GET"
+  :path "/api/projects"
+  :handler (
+    json-response {
+      :projects [
+        {:name "freelang-v9" :status "active" :stars 42}
+        {:name "kim-explore" :status "active" :stars 38}
+        {:name "shared-libs" :status "active" :stars 35}
+      ]
+      :count 3
+    }
+  )
+]
+
+;; POST /api/intent - INTENT 처리 및 응답 생성
+[ROUTE process-intent
+  :method "POST"
+  :path "/api/intent"
+  :params [$intent $context]
+  :handler (
+    let [
+      [:analysis (analyze-intent $intent $context)]
+      [:result (call-llm-with-context $analysis)]
+    ]
+    json-response {
+      :intent $intent
+      :analysis $analysis
+      :ai-response $result
+      :processed-at (now)
+    }
+  )
+]
+
+;; GET /api/search/:query - 함수/프로젝트 검색
+[ROUTE search
+  :method "GET"
+  :path "/api/search/:query"
+  :params [$query]
+  :handler (
+    json-response {
+      :query $query
+      :results (search-codebase $query)
+      :count (length (search-codebase $query))
+    }
+  )
+]
+
+;; POST /api/compile - FreeLang 코드 컴파일
+[ROUTE compile-code
+  :method "POST"
+  :path "/api/compile"
+  :params [$code $language]
+  :handler (
+    try
+      (json-response {
+        :source $code
+        :compiled (compile-freelang $code $language)
+        :status "success"
+      })
+      (json-response {
+        :error (error-message)
+        :code $code
+        :status "error"
+      } 400)
+  )
+]
+
+;; GET /api/docs - API 문서
+[ROUTE api-docs
+  :method "GET"
+  :path "/api/docs"
+  :handler (
+    html-response (generate-api-docs)
+  )
+]
+
+;; WebSocket: /ws/events - 실시간 이벤트 스트림
+[WEBSOCKET event-stream
+  :path "/ws/events"
+  :on-connect (log "Client connected")
+  :on-message (
+    fn [$message]
+      (broadcast-event (parse-json $message))
+  )
+  :on-disconnect (log "Client disconnected")
+]
+
+;; Error Handler
+[ERROR-HANDLER global-error
+  :on-404 (
+    json-response {
+      :error "Not found"
+      :path (request-path)
+      :method (request-method)
+    } 404
+  )
+  :on-500 (
+    json-response {
+      :error "Internal server error"
+      :message (error-message)
+      :timestamp (now)
+    } 500
+  )
+]
+
+;; Middleware
+[MIDDLEWARE cors
+  :origin "*"
+  :methods ["GET" "POST" "PUT" "DELETE"]
+  :headers ["Content-Type" "Authorization"]
+]
+
+[MIDDLEWARE request-logging
+  :log-format "{method} {path} - {status} {duration}ms"
+]
+
+[MIDDLEWARE rate-limit
+  :max-requests 100
+  :window-ms 60000
+  :key-fn (client-ip)
+]
