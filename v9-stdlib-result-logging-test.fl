@@ -1,0 +1,316 @@
+// FreeLang v9 Result/Option + Logging 모듈 테스트
+//
+// **목적**: Result<T>, Option<T>, Logger 함수 검증
+// **테스트 범위**:
+//   - Result: ok, err, is_ok, is_err, unwrap, unwrap_or
+//   - Option: some, none, is_some, is_none
+//   - Logger: log_info, log_debug, log_error, entry_count
+
+struct TestCase {
+    name: str
+    passed: bool
+    message: str
+}
+
+struct TestSuite {
+    name: str
+    cases: [TestCase]
+    pass_count: i32
+    fail_count: i32
+}
+
+struct Result {
+    is_ok: bool
+    value: str
+    error_msg: str
+}
+
+struct Option {
+    has_value: bool
+    value: str
+}
+
+struct LogEntry {
+    timestamp: str
+    level: str
+    message: str
+}
+
+struct Logger {
+    entries: [LogEntry]
+    entry_count: i32
+    debug_enabled: bool
+}
+
+// ============================================================
+// 테스트 헬퍼 함수
+// ============================================================
+
+fn assert_equal(actual: str, expected: str, test_name: str) -> TestCase {
+    var passed = (actual == expected)
+    var msg = ""
+    if !passed {
+        msg = "Expected: '" + expected + "', Got: '" + actual + "'"
+    }
+    TestCase { name: test_name, passed: passed, message: msg }
+}
+
+fn assert_true(condition: bool, test_name: str) -> TestCase {
+    TestCase { name: test_name, passed: condition, message: "" }
+}
+
+fn assert_number(actual: i32, expected: i32, test_name: str) -> TestCase {
+    var passed = (actual == expected)
+    var msg = ""
+    if !passed {
+        msg = "Expected: " + str(expected) + ", Got: " + str(actual)
+    }
+    TestCase { name: test_name, passed: passed, message: msg }
+}
+
+fn test_suite_add_case(suite: TestSuite, case: TestCase) -> TestSuite {
+    suite.cases.push(case)
+    if case.passed {
+        suite.pass_count = suite.pass_count + 1
+    } else {
+        suite.fail_count = suite.fail_count + 1
+    }
+    suite
+}
+
+fn test_suite_report(suite: TestSuite) -> str {
+    var total = suite.pass_count + suite.fail_count
+    println("═════════════════════════════════════════")
+    println("  " + suite.name)
+    println("═════════════════════════════════════════")
+    println("")
+
+    var i: i32 = 0
+    while i < length(suite.cases) {
+        var case = suite.cases[i]
+        if case.passed {
+            println("  ✅ " + case.name)
+        } else {
+            println("  ❌ " + case.name)
+            println("     " + case.message)
+        }
+        i = i + 1
+    }
+
+    println("")
+    println("  Results: " + str(suite.pass_count) + " / " + str(total) + " passed")
+    println("")
+
+    suite.name
+}
+
+// ============================================================
+// Result 구현 및 헬퍼
+// ============================================================
+
+fn result_ok(value: str) -> Result {
+    Result { is_ok: true, value: value, error_msg: "" }
+}
+
+fn result_err(error_msg: str) -> Result {
+    Result { is_ok: false, value: "", error_msg: error_msg }
+}
+
+fn result_is_ok(r: Result) -> bool {
+    r.is_ok
+}
+
+fn result_is_err(r: Result) -> bool {
+    !r.is_ok
+}
+
+fn result_unwrap(r: Result) -> str {
+    if r.is_ok {
+        return r.value
+    }
+    r.error_msg
+}
+
+fn result_unwrap_or(r: Result, default_val: str) -> str {
+    if r.is_ok {
+        return r.value
+    }
+    default_val
+}
+
+// ============================================================
+// Option 구현 및 헬퍼
+// ============================================================
+
+fn option_some(value: str) -> Option {
+    Option { has_value: true, value: value }
+}
+
+fn option_none() -> Option {
+    Option { has_value: false, value: "" }
+}
+
+fn option_is_some(o: Option) -> bool {
+    o.has_value
+}
+
+fn option_is_none(o: Option) -> bool {
+    !o.has_value
+}
+
+// ============================================================
+// Logger 구현
+// ============================================================
+
+fn logger_new() -> Logger {
+    Logger { entries: [], entry_count: 0, debug_enabled: true }
+}
+
+fn logger_log_info(logger: Logger, msg: str) -> Logger {
+    var entry = LogEntry { timestamp: "2026-04-04", level: "INFO", message: msg }
+    logger.entries.push(entry)
+    logger.entry_count = logger.entry_count + 1
+    logger
+}
+
+fn logger_log_debug(logger: Logger, msg: str) -> Logger {
+    if !logger.debug_enabled {
+        return logger
+    }
+    var entry = LogEntry { timestamp: "2026-04-04", level: "DEBUG", message: msg }
+    logger.entries.push(entry)
+    logger.entry_count = logger.entry_count + 1
+    logger
+}
+
+fn logger_log_error(logger: Logger, msg: str) -> Logger {
+    var entry = LogEntry { timestamp: "2026-04-04", level: "ERROR", message: msg }
+    logger.entries.push(entry)
+    logger.entry_count = logger.entry_count + 1
+    logger
+}
+
+fn logger_get_entry_count(logger: Logger) -> i32 {
+    logger.entry_count
+}
+
+// ============================================================
+// Result 테스트
+// ============================================================
+
+fn test_result_ok_err() -> TestSuite {
+    var suite = TestSuite { name: "Result Ok/Err Tests", cases: [], pass_count: 0, fail_count: 0 }
+
+    ;; ok("success") → is_ok == true
+    var r1 = result_ok("success")
+    suite = test_suite_add_case(suite, assert_true(result_is_ok(r1), "ok creates Ok result"))
+
+    ;; unwrap(ok("value")) → "value"
+    var val = result_unwrap(r1)
+    suite = test_suite_add_case(suite, assert_equal(val, "success", "unwrap retrieves ok value"))
+
+    ;; err("error") → is_err == true
+    var r2 = result_err("operation failed")
+    suite = test_suite_add_case(suite, assert_true(result_is_err(r2), "err creates Err result"))
+
+    ;; unwrap_or(err(...), "default") → "default"
+    var default_val = result_unwrap_or(r2, "default")
+    suite = test_suite_add_case(suite, assert_equal(default_val, "default", "unwrap_or returns default on err"))
+
+    ;; unwrap_or(ok("custom"), "default") → "custom"
+    var custom_val = result_unwrap_or(r1, "default")
+    suite = test_suite_add_case(suite, assert_equal(custom_val, "success", "unwrap_or returns value on ok"))
+
+    suite
+}
+
+// ============================================================
+// Option 테스트
+// ============================================================
+
+fn test_option_some_none() -> TestSuite {
+    var suite = TestSuite { name: "Option Some/None Tests", cases: [], pass_count: 0, fail_count: 0 }
+
+    ;; some("value") → is_some == true
+    var o1 = option_some("data")
+    suite = test_suite_add_case(suite, assert_true(option_is_some(o1), "some creates Some option"))
+
+    ;; some("value").value → "value"
+    suite = test_suite_add_case(suite, assert_equal(o1.value, "data", "some stores value"))
+
+    ;; none() → is_none == true
+    var o2 = option_none()
+    suite = test_suite_add_case(suite, assert_true(option_is_none(o2), "none creates None option"))
+
+    ;; is_some(some(...)) → true, is_some(none()) → false
+    var o3 = option_some("test")
+    suite = test_suite_add_case(suite, assert_true(option_is_some(o3), "is_some returns true for Some"))
+    suite = test_suite_add_case(suite, assert_true(option_is_none(o2), "is_none returns true for None"))
+
+    suite
+}
+
+// ============================================================
+// Logger 테스트
+// ============================================================
+
+fn test_logger_entries() -> TestSuite {
+    var suite = TestSuite { name: "Logger Entry Tests", cases: [], pass_count: 0, fail_count: 0 }
+
+    var logger = logger_new()
+
+    ;; 초기 entry_count == 0
+    suite = test_suite_add_case(suite, assert_number(logger_get_entry_count(logger), 0, "logger starts at 0 entries"))
+
+    ;; log_info → entry_count 증가
+    logger = logger_log_info(logger, "Application started")
+    suite = test_suite_add_case(suite, assert_number(logger_get_entry_count(logger), 1, "log_info increases entry_count"))
+
+    ;; log_error → entry_count 증가
+    logger = logger_log_error(logger, "Error occurred")
+    suite = test_suite_add_case(suite, assert_number(logger_get_entry_count(logger), 2, "log_error increases entry_count"))
+
+    ;; log_debug (debug_enabled=true) → entry_count 증가
+    logger = logger_log_debug(logger, "Debug info")
+    suite = test_suite_add_case(suite, assert_number(logger_get_entry_count(logger), 3, "log_debug increases entry_count when enabled"))
+
+    ;; debug_enabled=false → log_debug 무시
+    logger.debug_enabled = false
+    logger = logger_log_debug(logger, "This should be ignored")
+    suite = test_suite_add_case(suite, assert_number(logger_get_entry_count(logger), 3, "log_debug ignored when disabled"))
+
+    ;; 엔트리 내용 검증
+    if length(logger.entries) > 0 {
+        var first_entry = logger.entries[0]
+        suite = test_suite_add_case(suite, assert_equal(first_entry.level, "INFO", "log_info has INFO level"))
+        suite = test_suite_add_case(suite, assert_equal(first_entry.message, "Application started", "log_info stores message"))
+    }
+
+    suite
+}
+
+// ============================================================
+// 메인 테스트 실행
+// ============================================================
+
+fn main() {
+    println("╔═══════════════════════════════════════════╗")
+    println("║  v9 stdlib::result + logging 테스트      ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    ;; 테스트 1: Result Ok/Err
+    var suite1 = test_result_ok_err()
+    test_suite_report(suite1)
+
+    ;; 테스트 2: Option Some/None
+    var suite2 = test_option_some_none()
+    test_suite_report(suite2)
+
+    ;; 테스트 3: Logger 엔트리 관리
+    var suite3 = test_logger_entries()
+    test_suite_report(suite3)
+
+    println("✅ Result/Option + Logging 모듈 테스트 완료!")
+    println("")
+}

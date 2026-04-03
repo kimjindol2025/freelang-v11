@@ -108,6 +108,11 @@ fn agent_plan_progress(plan: AgentPlan) -> str {
 // ==================== ReAct 루프 ====================
 
 fn agent_react_step(registry: str, tool_name: str, prev_result: str) -> str {
+    ;; 입력 검증: 빈 도구명 확인
+    if length(tool_name) == 0 {
+        return "error:agent:empty_tool_name"
+    }
+
     ;; Act: 도구 실행 (시뮬레이션)
     println("[AGENT-ACT] Executing tool: " + tool_name)
     println("  Input: " + substring(prev_result, 0, 40) + "...")
@@ -134,7 +139,8 @@ fn agent_react_step(registry: str, tool_name: str, prev_result: str) -> str {
     } else if tool_name == "synthesize" {
         result = "Synthesized answer ready (confidence: 0.89)"
     } else {
-        result = "Tool executed: " + tool_name
+        ;; 미등록된 도구 → 에러 반환
+        return "error:agent:unknown_tool:" + tool_name
     }
 
     println("[AGENT-OBSERVE] Result: " + substring(result, 0, 50) + "...")
@@ -169,6 +175,14 @@ fn agent_react_loop(agent_id: str, goal: str, plan: AgentPlan, registry: str, ma
 
         ;; Act + Observe: 도구 실행 및 결과 저장
         var result = agent_react_step(registry, next_tool, state.last_result)
+
+        ;; 에러 감지: "error:agent:" 접두사 확인
+        if length(result) >= 12 && substring(result, 0, 11) == "error:agent" {
+            println("[AGENT-ERROR] " + result)
+            state.status = "failed"
+            state = agent_state_add_result(state, result)
+            break
+        }
 
         state = agent_state_add_result(state, result)
         plan = agent_mark_step_completed(plan, next_tool)

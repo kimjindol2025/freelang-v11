@@ -69,7 +69,8 @@ fn unwrap(result: Result) -> str {
     if result.is_ok {
         return result.value
     }
-    result.error_msg
+    // 에러 신호 명시 (다른 함수에서 감지 가능하도록)
+    "error:unwrap_on_err:" + result.error_msg
 }
 
 fn unwrap_or(result: Result, default_val: str) -> str {
@@ -82,6 +83,26 @@ fn unwrap_or(result: Result, default_val: str) -> str {
 fn map_result(result: Result, fn_name: str) -> Result {
     if !result.is_ok { return result }
     ok(result.value)
+}
+
+// ============================================================
+// 에러 감지 헬퍼 함수 (평가 함수와의 호환성)
+// ============================================================
+
+fn is_eval_error(eval_str: str) -> bool {
+    // "error:" 접두사 감지 (평가 함수에서 반환된 에러 감지)
+    if length(eval_str) < 6 {
+        return false
+    }
+    substring(eval_str, 0, 6) == "error:"
+}
+
+fn result_from_eval(eval_str: str) -> Result {
+    // "error:..." 문자열을 Result로 변환
+    if is_eval_error(eval_str) {
+        return err(eval_str)
+    }
+    ok(eval_str)
 }
 
 fn main() {
@@ -118,6 +139,28 @@ fn main() {
     }
     if is_none(opt2) {
         println("  None: no value")
+    }
+    println("")
+
+    println("✅ 테스트 5: is_eval_error 헬퍼")
+    var err_str = "error:type_mismatch:expected:number:got:string"
+    var ok_str = "success"
+    if is_eval_error(err_str) {
+        println("  Detected: " + err_str)
+    }
+    if !is_eval_error(ok_str) {
+        println("  Not an error: " + ok_str)
+    }
+    println("")
+
+    println("✅ 테스트 6: result_from_eval 변환")
+    var r1 = result_from_eval("error:division_by_zero")
+    if is_err(r1) {
+        println("  Converted to Err: " + unwrap(r1))
+    }
+    var r2 = result_from_eval("42")
+    if is_ok(r2) {
+        println("  Converted to Ok: " + unwrap(r2))
     }
     println("")
 
