@@ -1,0 +1,309 @@
+// FreeLang v9 LOW #3: 동시성 시뮬레이션
+// 다중 트랜잭션의 동시 실행 및 잠금
+
+// ==================== 동시성 구조 ====================
+
+struct Transaction {
+    tx_id: str
+    status: str              ;; "pending", "locked", "executing", "committed", "rolled_back"
+    acquired_locks: [str]    ;; 획득한 잠금 (테이블명)
+    operations: [str]
+    start_time: str
+    end_time: str
+}
+
+struct LockManager {
+    locks: [str]             ;; 현재 잠긴 테이블
+    lock_holders: [str]      ;; 잠금 소유자 (tx_id)
+    lock_wait_queue: [str]   ;; 잠금 대기 중인 tx_id
+    total_acquired: i32
+    total_released: i32
+    lock_timeouts: i32
+}
+
+struct ConcurrencyReport {
+    total_transactions: i32
+    completed_transactions: i32
+    deadlock_count: i32
+    lock_acquisitions: i32
+    lock_releases: i32
+    average_wait_time_ms: i32
+    total_execution_time_ms: i32
+}
+
+// ==================== 잠금 관리 ====================
+
+fn lock_manager_new() -> LockManager {
+    LockManager {
+        locks: [],
+        lock_holders: [],
+        lock_wait_queue: [],
+        total_acquired: 0,
+        total_released: 0,
+        lock_timeouts: 0
+    }
+}
+
+fn lock_acquire(manager: LockManager, tx_id: str, table_name: str) -> LockManager {
+    ;; 테이블이 이미 잠금 상태인지 확인
+    var lock_held: bool = false
+    var i: i32 = 0
+    while i < length(manager.locks) {
+        if manager.locks[i] == table_name {
+            lock_held = true
+            break
+        }
+        i = i + 1
+    }
+
+    if lock_held {
+        ;; 대기 큐에 추가
+        println("  [LOCK-WAIT] " + tx_id + " waiting for " + table_name)
+        manager.lock_wait_queue.push(tx_id)
+        return manager
+    }
+
+    ;; 잠금 획득
+    println("  [LOCK-ACQUIRE] " + tx_id + " acquired lock on " + table_name)
+    manager.locks.push(table_name)
+    manager.lock_holders.push(tx_id)
+    manager.total_acquired = manager.total_acquired + 1
+
+    manager
+}
+
+fn lock_release(manager: LockManager, tx_id: str, table_name: str) -> LockManager {
+    ;; 잠금 해제
+    var lock_idx: i32 = -1
+    var i: i32 = 0
+    while i < length(manager.locks) {
+        if manager.locks[i] == table_name {
+            lock_idx = i
+            break
+        }
+        i = i + 1
+    }
+
+    if lock_idx >= 0 {
+        println("  [LOCK-RELEASE] " + tx_id + " released lock on " + table_name)
+
+        ;; 배열에서 제거 (간단한 방식)
+        var new_locks: [str] = []
+        var new_holders: [str] = []
+        var j: i32 = 0
+        while j < length(manager.locks) {
+            if j != lock_idx {
+                new_locks.push(manager.locks[j])
+                new_holders.push(manager.lock_holders[j])
+            }
+            j = j + 1
+        }
+
+        manager.locks = new_locks
+        manager.lock_holders = new_holders
+        manager.total_released = manager.total_released + 1
+
+        ;; 대기 중인 트랜잭션 처리
+        if length(manager.lock_wait_queue) > 0 {
+            var waiting_tx = manager.lock_wait_queue[0]
+            println("  [LOCK-GRANTED] " + waiting_tx + " acquired lock on " + table_name)
+
+            ;; 대기 큐에서 제거
+            var new_queue: [str] = []
+            var k: i32 = 1
+            while k < length(manager.lock_wait_queue) {
+                new_queue.push(manager.lock_wait_queue[k])
+                k = k + 1
+            }
+            manager.lock_wait_queue = new_queue
+
+            manager.locks.push(table_name)
+            manager.lock_holders.push(waiting_tx)
+            manager.total_acquired = manager.total_acquired + 1
+        }
+    }
+
+    manager
+}
+
+fn is_deadlock_detected(manager: LockManager) -> bool {
+    ;; 간단한 데드락 감지: 대기 큐가 계속 쌓여있으면 데드락
+    length(manager.lock_wait_queue) > 2
+}
+
+// ==================== 트랜잭션 관리 ====================
+
+fn transaction_new(tx_id: str) -> Transaction {
+    Transaction {
+        tx_id: tx_id,
+        status: "pending",
+        acquired_locks: [],
+        operations: [],
+        start_time: "2026-04-03T22:30:00Z",
+        end_time: ""
+    }
+}
+
+fn transaction_add_operation(tx: Transaction, operation: str) -> Transaction {
+    tx.operations.push(operation)
+    tx
+}
+
+fn transaction_execute(tx: Transaction, manager: LockManager, table_name: str) -> Transaction {
+    println("")
+    println("[TX-EXECUTE] " + tx.tx_id)
+
+    tx.status = "locked"
+
+    ;; 잠금 획득
+    ;; (실제로는 manager가 반환되지만 여기서는 상태 변경만)
+    tx.status = "executing"
+
+    var i: i32 = 0
+    while i < length(tx.operations) {
+        println("  [OP] " + tx.operations[i])
+        i = i + 1
+    }
+
+    tx.status = "committed"
+    tx.end_time = "2026-04-03T22:30:00Z"
+
+    tx
+}
+
+// ==================== 동시 실행 시뮬레이션 ====================
+
+fn simulate_concurrent_transactions() {
+    println("")
+    println("╔═══════════════════════════════════════════╗")
+    println("║  CONCURRENT EXECUTION SIMULATION         ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    ;; 잠금 관리자 생성
+    var manager = lock_manager_new()
+
+    ;; 트랜잭션 1: Alice → Bob 송금
+    println("✅ 트랜잭션 1: Alice → Bob 송금")
+    var tx1 = transaction_new("tx_transfer_001")
+    tx1 = transaction_add_operation(tx1, "UPDATE accounts SET balance = 900 WHERE id = 1")
+    tx1 = transaction_add_operation(tx1, "UPDATE accounts SET balance = 2100 WHERE id = 2")
+
+    manager = lock_acquire(manager, tx1.tx_id, "accounts")
+    tx1 = transaction_execute(tx1, manager, "accounts")
+    manager = lock_release(manager, tx1.tx_id, "accounts")
+    println("")
+
+    ;; 트랜잭션 2: Bob → Charlie 송금 (동시 시뮬레이션)
+    println("✅ 트랜잭션 2: Bob → Charlie 송금 (대기)")
+    var tx2 = transaction_new("tx_transfer_002")
+    tx2 = transaction_add_operation(tx2, "UPDATE accounts SET balance = 1600 WHERE id = 2")
+    tx2 = transaction_add_operation(tx2, "UPDATE accounts SET balance = 1400 WHERE id = 3")
+
+    manager = lock_acquire(manager, tx2.tx_id, "accounts")
+    println("")
+
+    ;; 트랜잭션 3: 읽기 작업
+    println("✅ 트랜잭션 3: 잔액 조회 (동시)")
+    var tx3 = transaction_new("tx_read_001")
+    tx3 = transaction_add_operation(tx3, "SELECT * FROM accounts")
+
+    manager = lock_acquire(manager, tx3.tx_id, "accounts")
+    println("")
+
+    ;; 트랜잭션 1 완료 후 대기 중인 트랜잭션 진행
+    println("✅ 대기 중인 트랜잭션 2 진행")
+    tx2 = transaction_execute(tx2, manager, "accounts")
+    manager = lock_release(manager, tx2.tx_id, "accounts")
+    println("")
+
+    ;; 트랜잭션 3 진행
+    println("✅ 트랜잭션 3 진행")
+    tx3 = transaction_execute(tx3, manager, "accounts")
+    manager = lock_release(manager, tx3.tx_id, "accounts")
+    println("")
+}
+
+fn print_concurrency_report(manager: LockManager, total_tx: i32, completed_tx: i32) {
+    println("")
+    println("[CONCURRENCY REPORT]")
+    println("  Total transactions: " + str(total_tx))
+    println("  Completed transactions: " + str(completed_tx))
+    println("  Lock acquisitions: " + str(manager.total_acquired))
+    println("  Lock releases: " + str(manager.total_released))
+    println("  Current locks: " + str(length(manager.locks)))
+    println("  Waiting transactions: " + str(length(manager.lock_wait_queue)))
+
+    if is_deadlock_detected(manager) {
+        println("  ⚠️  Potential deadlock detected!")
+    } else {
+        println("  ✓ No deadlock detected")
+    }
+
+    println("")
+}
+
+// ==================== 메인 ====================
+
+fn main() {
+    println("╔═══════════════════════════════════════════╗")
+    println("║  LOW #3: 동시성 시뮬레이션              ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    ;; 테스트 1: 기본 잠금
+    println("✅ 테스트 1: 기본 잠금 메커니즘")
+    var manager = lock_manager_new()
+
+    manager = lock_acquire(manager, "tx_001", "users")
+    println("")
+
+    manager = lock_acquire(manager, "tx_002", "users")
+    println("")
+
+    manager = lock_release(manager, "tx_001", "users")
+    println("")
+
+    println("✅ 테스트 2: 동시 실행 시뮬레이션")
+    simulate_concurrent_transactions()
+
+    ;; 테스트 3: 여러 테이블
+    println("✅ 테스트 3: 다중 테이블 잠금")
+    var manager2 = lock_manager_new()
+
+    println("  TX1: Acquiring lock on users")
+    manager2 = lock_acquire(manager2, "tx_001", "users")
+
+    println("  TX2: Acquiring lock on products")
+    manager2 = lock_acquire(manager2, "tx_002", "products")
+
+    println("  Both tables locked by different transactions")
+    println("")
+
+    println("  TX1: Releasing lock on users")
+    manager2 = lock_release(manager2, "tx_001", "users")
+
+    println("  TX2: Releasing lock on products")
+    manager2 = lock_release(manager2, "tx_002", "products")
+    println("")
+
+    ;; 테스트 4: 데드락 감지
+    println("✅ 테스트 4: 데드락 감지 시뮬레이션")
+    var manager3 = lock_manager_new()
+
+    println("  Creating circular wait condition...")
+    manager3 = lock_acquire(manager3, "tx_001", "users")
+    manager3 = lock_acquire(manager3, "tx_002", "users")
+    manager3 = lock_acquire(manager3, "tx_003", "users")
+
+    if is_deadlock_detected(manager3) {
+        println("  ❌ Deadlock detected!")
+    }
+    println("")
+
+    ;; 보고서
+    print_concurrency_report(manager3, 6, 3)
+
+    println("✅ 동시성 시뮬레이션 완료!")
+    println("")
+}

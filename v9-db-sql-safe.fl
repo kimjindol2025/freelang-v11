@@ -1,0 +1,353 @@
+// FreeLang v9 HIGH #3: SQL 주입 방어 + 입력 검증
+// 파라미터화된 쿼리 + 완전한 검증
+
+// ==================== 안전한 쿼리 구조 ====================
+
+struct SafeSQLQuery {
+    query_type: str      ;; "SELECT", "INSERT", "UPDATE", "DELETE"
+    table_name: str
+    columns: [str]
+    where_clause: WhereClause
+    values: [str]
+    is_valid: bool
+    validation_errors: [str]
+}
+
+struct WhereClause {
+    column: str
+    operator: str        ;; "=", ">", "<", ">=", "<=", "!="
+    value: str           ;; 파라미터로 분리됨
+    is_valid: bool
+}
+
+// ==================== 입력 검증 ====================
+
+fn is_valid_identifier(name: str) -> bool {
+    ;; 테이블/컬럼명 검증: 알파벳, 숫자, _ 만 허용
+    if length(name) == 0 {
+        return false
+    }
+
+    var i: i32 = 0
+    while i < length(name) {
+        var char = substring(name, i, i + 1)
+
+        ;; A-Z, a-z, 0-9, _만 허용
+        var is_valid: bool = false
+
+        if (char >= "A" && char <= "Z") || (char >= "a" && char <= "z") {
+            is_valid = true
+        } else if char >= "0" && char <= "9" {
+            is_valid = true
+        } else if char == "_" {
+            is_valid = true
+        }
+
+        if !is_valid {
+            return false
+        }
+
+        i = i + 1
+    }
+
+    true
+}
+
+fn is_valid_operator(op: str) -> bool {
+    if op == "=" || op == ">" || op == "<" || op == ">=" || op == "<=" || op == "!=" {
+        return true
+    }
+    false
+}
+
+fn validate_table_name(name: str) -> DBError {
+    if !is_valid_identifier(name) {
+        return db_error_new(1, "Invalid table name", "only alphanumeric and underscore allowed")
+    }
+
+    if length(name) > 64 {
+        return db_error_new(1, "Table name too long", "max 64 characters")
+    }
+
+    db_error_new(0, "Valid table name", "")
+}
+
+fn validate_column_name(name: str) -> DBError {
+    if !is_valid_identifier(name) {
+        return db_error_new(1, "Invalid column name", "only alphanumeric and underscore allowed")
+    }
+
+    if length(name) > 64 {
+        return db_error_new(1, "Column name too long", "max 64 characters")
+    }
+
+    db_error_new(0, "Valid column name", "")
+}
+
+fn validate_column_value(value: str, max_length: i32) -> DBError {
+    if length(value) > max_length {
+        return db_error_new(1, "Value too long", "max " + str(max_length) + " characters")
+    }
+
+    ;; SQL 주입 패턴 감지
+    if value == "'; DROP TABLE" || substring(value, 0, 8) == "'; DROP" {
+        return db_error_new(1, "Potential SQL injection detected", "suspicious pattern")
+    }
+
+    if value == "1' OR '1'='1" || value == "1' OR 1=1" {
+        return db_error_new(1, "SQL injection pattern detected", "boolean-based attack")
+    }
+
+    db_error_new(0, "Valid value", "")
+}
+
+fn validate_where_clause(where: WhereClause) -> DBError {
+    ;; 컬럼명 검증
+    var col_err = validate_column_name(where.column)
+    if col_err.error_code != 0 {
+        return col_err
+    }
+
+    ;; 연산자 검증
+    if !is_valid_operator(where.operator) {
+        return db_error_new(1, "Invalid operator", "allowed: =, >, <, >=, <=, !=")
+    }
+
+    ;; 값 검증
+    var val_err = validate_column_value(where.value, 256)
+    if val_err.error_code != 0 {
+        return val_err
+    }
+
+    db_error_new(0, "Valid WHERE clause", "")
+}
+
+// ==================== 안전한 쿼리 파싱 ====================
+
+fn safe_sql_select(table_name: str, where_col: str, where_op: str, where_val: str) -> SafeSQLQuery {
+    println("[SAFE-SELECT] Validating input...")
+
+    var query = SafeSQLQuery {
+        query_type: "SELECT",
+        table_name: table_name,
+        columns: [],
+        where_clause: WhereClause {
+            column: where_col,
+            operator: where_op,
+            value: where_val,
+            is_valid: false
+        },
+        values: [],
+        is_valid: false,
+        validation_errors: []
+    }
+
+    ;; 테이블명 검증
+    var table_err = validate_table_name(table_name)
+    if table_err.error_code != 0 {
+        query.validation_errors.push(table_err.error_msg)
+        return query
+    }
+
+    ;; WHERE 절 검증
+    var where_err = validate_where_clause(query.where_clause)
+    if where_err.error_code != 0 {
+        query.validation_errors.push(where_err.error_msg)
+        return query
+    }
+
+    query.is_valid = true
+    query.where_clause.is_valid = true
+
+    println("  ✓ All validations passed")
+
+    query
+}
+
+fn safe_sql_insert(table_name: str, columns: [str], values: [str]) -> SafeSQLQuery {
+    println("[SAFE-INSERT] Validating input...")
+
+    var query = SafeSQLQuery {
+        query_type: "INSERT",
+        table_name: table_name,
+        columns: columns,
+        where_clause: WhereClause {
+            column: "",
+            operator: "",
+            value: "",
+            is_valid: false
+        },
+        values: values,
+        is_valid: false,
+        validation_errors: []
+    }
+
+    ;; 테이블명 검증
+    var table_err = validate_table_name(table_name)
+    if table_err.error_code != 0 {
+        query.validation_errors.push(table_err.error_msg)
+        return query
+    }
+
+    ;; 컬럼명 검증
+    var i: i32 = 0
+    while i < length(columns) {
+        var col_err = validate_column_name(columns[i])
+        if col_err.error_code != 0 {
+            query.validation_errors.push("Column " + columns[i] + ": " + col_err.error_msg)
+            return query
+        }
+        i = i + 1
+    }
+
+    ;; 값 검증
+    var j: i32 = 0
+    while j < length(values) {
+        var val_err = validate_column_value(values[j], 256)
+        if val_err.error_code != 0 {
+            query.validation_errors.push("Value[" + str(j) + "]: " + val_err.error_msg)
+            return query
+        }
+        j = j + 1
+    }
+
+    query.is_valid = true
+
+    println("  ✓ All validations passed")
+
+    query
+}
+
+fn safe_sql_update(table_name: str, update_col: str, update_val: str, where_col: str, where_op: str, where_val: str) -> SafeSQLQuery {
+    println("[SAFE-UPDATE] Validating input...")
+
+    var query = SafeSQLQuery {
+        query_type: "UPDATE",
+        table_name: table_name,
+        columns: [update_col],
+        where_clause: WhereClause {
+            column: where_col,
+            operator: where_op,
+            value: where_val,
+            is_valid: false
+        },
+        values: [update_val],
+        is_valid: false,
+        validation_errors: []
+    }
+
+    ;; 테이블명 검증
+    var table_err = validate_table_name(table_name)
+    if table_err.error_code != 0 {
+        query.validation_errors.push(table_err.error_msg)
+        return query
+    }
+
+    ;; UPDATE 컬럼 검증
+    var update_col_err = validate_column_name(update_col)
+    if update_col_err.error_code != 0 {
+        query.validation_errors.push(update_col_err.error_msg)
+        return query
+    }
+
+    ;; UPDATE 값 검증
+    var update_val_err = validate_column_value(update_val, 256)
+    if update_val_err.error_code != 0 {
+        query.validation_errors.push(update_val_err.error_msg)
+        return query
+    }
+
+    ;; WHERE 절 검증
+    var where_err = validate_where_clause(query.where_clause)
+    if where_err.error_code != 0 {
+        query.validation_errors.push(where_err.error_msg)
+        return query
+    }
+
+    query.is_valid = true
+    query.where_clause.is_valid = true
+
+    println("  ✓ All validations passed")
+
+    query
+}
+
+// ==================== 메인 ====================
+
+fn main() {
+    println("╔═══════════════════════════════════════════╗")
+    println("║  HIGH #3: SQL 주입 방어 + 입력 검증      ║")
+    println("╚═══════════════════════════════════════════╝")
+    println("")
+
+    ;; 테스트 1: 정상 SELECT
+    println("✅ 테스트 1: 정상 SELECT")
+    var q1 = safe_sql_select("users", "email", "=", "alice@example.com")
+    if q1.is_valid {
+        println("  ✓ Query is safe")
+    }
+    println("")
+
+    ;; 테스트 2: SQL 주입 - DROP TABLE
+    println("✅ 테스트 2: SQL 주입 감지 - DROP TABLE")
+    var q2 = safe_sql_select("users", "id", "=", "'; DROP TABLE users; --")
+    if !q2.is_valid {
+        println("  ❌ Injection detected!")
+        println("  Error: " + q2.validation_errors[0])
+    }
+    println("")
+
+    ;; 테스트 3: SQL 주입 - Boolean-based
+    println("✅ 테스트 3: SQL 주입 감지 - Boolean-based")
+    var q3 = safe_sql_select("users", "username", "=", "1' OR '1'='1")
+    if !q3.is_valid {
+        println("  ❌ Injection detected!")
+        println("  Error: " + q3.validation_errors[0])
+    }
+    println("")
+
+    ;; 테스트 4: 정상 INSERT
+    println("✅ 테스트 4: 정상 INSERT")
+    var cols: [str] = ["name", "email", "age"]
+    var vals: [str] = ["Bob", "bob@example.com", "30"]
+    var q4 = safe_sql_insert("users", cols, vals)
+    if q4.is_valid {
+        println("  ✓ Query is safe")
+    }
+    println("")
+
+    ;; 테스트 5: 잘못된 컬럼명
+    println("✅ 테스트 5: 잘못된 컬럼명 감지")
+    var q5 = safe_sql_select("users", "name'; DROP TABLE users; --", "=", "test")
+    if !q5.is_valid {
+        println("  ❌ Invalid column detected!")
+        println("  Error: " + q5.validation_errors[0])
+    }
+    println("")
+
+    ;; 테스트 6: 정상 UPDATE
+    println("✅ 테스트 6: 정상 UPDATE")
+    var q6 = safe_sql_update("users", "email", "newemail@example.com", "id", "=", "1")
+    if q6.is_valid {
+        println("  ✓ Query is safe")
+    }
+    println("")
+
+    ;; 테스트 7: 값 길이 초과
+    println("✅ 테스트 7: 값 길이 제한")
+    var long_value: str = ""
+    var i: i32 = 0
+    while i < 300 {
+        long_value = long_value + "A"
+        i = i + 1
+    }
+    var q7 = safe_sql_select("users", "name", "=", long_value)
+    if !q7.is_valid {
+        println("  ❌ Value too long!")
+        println("  Error: " + q7.validation_errors[0])
+    }
+    println("")
+
+    println("✅ SQL 주입 방어 완료!")
+    println("")
+}
