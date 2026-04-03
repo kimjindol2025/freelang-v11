@@ -1,0 +1,21 @@
+;; FreeLang v9 - Simple Intent Example
+;; 간단한 의도 기반 코드
+
+[INTENT transfer-money
+  :from (ref account :id $from-id)
+  :to (ref account :id $to-id)
+  :amount 1000.50
+]
+
+[FUNC calculate-total
+  :params [$price $tax-rate]
+  :body (
+    + $price (* $price $tax-rate)
+  )
+]
+
+[PROMPT analyze-sentiment
+  :input "This product is amazing!"
+  :model "claude-haiku"
+  :temperature 0.7
+]
