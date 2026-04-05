@@ -710,6 +710,29 @@ class Interpreter {
             case "pure":
                 // (pure value) → wraps value in default monad
                 return { tag: "Pure", value: args[0], kind: "Monad" };
+            // Phase 5 Week 4: Either monad
+            case "left":
+                // (left error) → Either Left (error value)
+                return { tag: "Left", value: args[0], kind: "Either" };
+            case "right":
+                // (right value) → Either Right (success value)
+                return { tag: "Right", value: args[0], kind: "Either" };
+            // Phase 5 Week 4: Validation monad
+            case "failure":
+                // (failure errors) → Validation Failure
+                const errors = Array.isArray(args[0]) ? args[0] : [args[0]];
+                return { tag: "Failure", value: errors, kind: "Validation" };
+            case "success":
+                // (success value) → Validation Success
+                return { tag: "Success", value: args[0], kind: "Validation" };
+            // Phase 5 Week 4: Writer monad
+            case "tell":
+                // (tell log) → Writer with empty value and log
+                return { kind: "Writer", value: null, log: String(args[0]) };
+            case "return-writer":
+            case "pure-writer":
+                // (return-writer value) or (pure-writer value) → Writer with value and empty log
+                return { kind: "Writer", value: args[0], log: "" };
             case "bind":
                 // Phase 4 Week 2: Monadic bind operation
                 // (bind monad transform-fn)
@@ -741,6 +764,39 @@ class Interpreter {
                         else {
                             result.push(transformed);
                         }
+                    }
+                    return result;
+                }
+                // Phase 5 Week 4: Either monad
+                if (monad.kind === "Either") {
+                    if (monad.tag === "Right") {
+                        return this.callFunction(transformFn, [monad.value]);
+                    }
+                    return monad; // Return Left unchanged
+                }
+                // Phase 5 Week 4: Validation monad
+                if (monad.kind === "Validation") {
+                    if (monad.tag === "Success") {
+                        const result = this.callFunction(transformFn, [monad.value]);
+                        // If result is also a Validation, flatten it
+                        if (result.kind === "Validation" && result.tag === "Failure") {
+                            // Error accumulation could go here in more advanced version
+                            return result;
+                        }
+                        return result;
+                    }
+                    return monad; // Return Failure unchanged
+                }
+                // Phase 5 Week 4: Writer monad
+                if (monad.kind === "Writer") {
+                    const result = this.callFunction(transformFn, [monad.value]);
+                    if (result.kind === "Writer") {
+                        // Concatenate logs
+                        return {
+                            kind: "Writer",
+                            value: result.value,
+                            log: monad.log + result.log
+                        };
                     }
                     return result;
                 }
