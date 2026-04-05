@@ -382,12 +382,13 @@ class Parser {
             this.expect(token_1.TokenType.RParen);
             return matchExpr;
         }
-        // Special case: fn always uses array literal syntax: (fn [params] body)
-        // Never generic function syntax
-        if (op === "fn") {
-            // Fall through to regular argument parsing
-        }
-        else if (this.check(token_1.TokenType.LBracket) && !this.isArrayLiteralStart()) {
+        // Special case: certain operators always use array literal syntax
+        // Never generic function syntax: fn, let, if, cond, match, etc.
+        const specialFormsForbiddingGeneric = new Set([
+            "fn", "let", "if", "cond", "match", "do", "try", "catch",
+            "let*", "letrec", "define"
+        ]);
+        if (!specialFormsForbiddingGeneric.has(op) && this.check(token_1.TokenType.LBracket) && !this.isArrayLiteralStart()) {
             // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)
             // But not array literals: (fn [$x] ...) - those are parsed as regular values
             this.advance(); // consume [

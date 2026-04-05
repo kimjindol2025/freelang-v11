@@ -6,6 +6,7 @@ import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Patt
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
+import { extractParamNames, extractFunctions } from "./ast-helpers";
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -112,10 +113,9 @@ export class Interpreter {
         this.evalModuleBlock(node);
       } else if (isBlock(node)) {
         this.evalBlock(node);
-      } else {
-        // Other ASTNode types (SExpr, PatternMatch, etc.)
-        this.eval(node);
       }
+      // Skip other ASTNode types (SExpr, PatternMatch, etc.)
+      // These are evaluated explicitly by the caller, not during interpret()
     }
 
     // Setup Express routes
@@ -472,6 +472,130 @@ export class Interpreter {
       }
     }
 
+    // Phase 5 Week 1: Function Composition (needs unevaluated arguments)
+    if (op === "compose") {
+      // (compose f g h) → function that applies h, then g, then f (right-to-left)
+      // Result: a function that takes one argument and applies functions in reverse order
+      if (expr.args.length < 2) {
+        throw new Error(`compose requires at least 2 functions`);
+      }
+
+      // Resolve function arguments (handle both symbols and function values)
+      const funcsToCompose = expr.args.map(arg => {
+        if ((arg as any).kind === "literal" && (arg as any).type === "symbol") {
+          // Symbol literal like: 'double'
+          const fnName = (arg as Literal).value as string;
+          if (this.context.functions.has(fnName)) {
+            return { _isFunctionName: true, name: fnName };
+          } else {
+            throw new Error(`compose: '${fnName}' is not a function`);
+          }
+        } else if ((arg as any).kind === "variable") {
+          // Variable reference (e.g., $double)
+          const fnName = (arg as Variable).name;
+          if (this.context.functions.has(fnName)) {
+            return { _isFunctionName: true, name: fnName };
+          } else {
+            const value = this.context.variables.get(fnName);
+            if (value && ((value as any).kind === "function-value" || typeof value === "function")) {
+              return value;
+            }
+            throw new Error(`compose: '${fnName}' is not a function`);
+          }
+        } else {
+          // Direct function value or lambda
+          const fn = this.eval(arg);
+          if (typeof fn !== "function" && (fn as any).kind !== "function-value") {
+            throw new Error(`compose: argument is not a function`);
+          }
+          return fn;
+        }
+      });
+
+      // Return a function that applies all functions in reverse order
+      return (x: any) => {
+        let result = x;
+        // Apply functions from right to left
+        for (let i = funcsToCompose.length - 1; i >= 0; i--) {
+          const fn = funcsToCompose[i];
+          if ((fn as any)._isFunctionName) {
+            result = this.callUserFunction((fn as any).name, [result]);
+          } else {
+            result = this.callFunction(fn, [result]);
+          }
+        }
+        return result;
+      };
+    }
+
+    if (op === "pipe") {
+      // (pipe value f g h) → applies f, then g, then h to value (left-to-right)
+      // Result: the final value after applying all functions
+      if (expr.args.length < 2) {
+        throw new Error(`pipe requires at least a value and one function`);
+      }
+
+      let pipeValue = this.eval(expr.args[0]);
+
+      // Apply each function in order (left to right)
+      for (let i = 1; i < expr.args.length; i++) {
+        const fnArg = expr.args[i];
+        let pipeResult: any;
+
+        // Try to handle as function name (symbol literal like: add-one)
+        if ((fnArg as any).kind === "literal" && (fnArg as any).type === "symbol") {
+          const fnName = (fnArg as Literal).value as string;
+          if (this.context.functions.has(fnName)) {
+            // Call user-defined function by name
+            pipeResult = this.callUserFunction(fnName, [pipeValue]);
+          } else {
+            throw new Error(`Unknown function: ${fnName}`);
+          }
+        } else if ((fnArg as any).kind === "variable") {
+          // Variable reference to a function
+          const fnName = (fnArg as Variable).name;
+          if (this.context.functions.has(fnName)) {
+            // Call user-defined function
+            pipeResult = this.callUserFunction(fnName, [pipeValue]);
+          } else if (this.context.variables.has(fnName)) {
+            // Call function value
+            const fn = this.context.variables.get(fnName);
+            pipeResult = this.callFunction(fn, [pipeValue]);
+          } else {
+            throw new Error(`Unknown function or variable: ${fnName}`);
+          }
+        } else if ((fnArg as any).kind === "s-expression") {
+          // Lambda or other expression
+          const fn = this.eval(fnArg);
+          pipeResult = this.callFunction(fn, [pipeValue]);
+        } else {
+          // Evaluate and call
+          const fn = this.eval(fnArg);
+          pipeResult = this.callFunction(fn, [pipeValue]);
+        }
+
+        pipeValue = pipeResult;
+      }
+
+      return pipeValue;
+    }
+
+    // let: (let [[var1 val1] [var2 val2]] body)
+    if (op === "let") {
+      return this.evalLet(expr.args);
+    }
+
+    // if: (if condition then-branch else-branch)
+    if (op === "if") {
+      const condition = this.eval(expr.args[0]);
+      return condition ? this.eval(expr.args[1]) : (expr.args[2] ? this.eval(expr.args[2]) : null);
+    }
+
+    // cond: (cond [test1 result1] [test2 result2] [else default])
+    if (op === "cond") {
+      return this.evalCond(expr.args);
+    }
+
     // Evaluate all arguments for normal operations
     const args = expr.args.map((arg) => this.eval(arg));
 
@@ -631,16 +755,6 @@ export class Interpreter {
         return Date.now() - this.context.startTime;
 
       // Control flow
-      case "let":
-        // (let [[var1 val1] [var2 val2]] body)
-        return this.evalLet(expr.args);
-      case "if":
-        // (if condition then-branch else-branch)
-        return args[0] ? this.eval(expr.args[1]) : (expr.args[2] ? this.eval(expr.args[2]) : null);
-      case "cond":
-        // (cond [test1 result1] [test2 result2] [else default])
-        return this.evalCond(expr.args);
-
       // String/Character Operations (Phase 3 W2: Self-hosting support)
       case "char-at":
         // (char-at "hello" 1) → "e"
@@ -946,50 +1060,6 @@ export class Interpreter {
 
         throw new Error(`bind: unsupported monad type`);
 
-      // Phase 5 Week 1: Function Composition
-      case "compose":
-        // (compose f g h) → function that applies h, then g, then f (right-to-left)
-        // Result: a function that takes one argument and applies functions in reverse order
-        if (expr.args.length < 2) {
-          throw new Error(`compose requires at least 2 functions`);
-        }
-
-        const funcsToCompose = expr.args.map(arg => this.eval(arg));
-
-        // Validate that all are functions
-        for (let i = 0; i < funcsToCompose.length; i++) {
-          if (typeof funcsToCompose[i] !== "function" && (funcsToCompose[i] as any).kind !== "function-value") {
-            throw new Error(`compose: argument ${i} is not a function`);
-          }
-        }
-
-        // Return a function that applies all functions in reverse order
-        return (x: any) => {
-          let result = x;
-          // Apply functions from right to left
-          for (let i = funcsToCompose.length - 1; i >= 0; i--) {
-            result = this.callFunction(funcsToCompose[i], [result]);
-          }
-          return result;
-        };
-
-      case "pipe":
-        // (pipe value f g h) → applies f, then g, then h to value (left-to-right)
-        // Result: the final value after applying all functions
-        if (expr.args.length < 2) {
-          throw new Error(`pipe requires at least a value and one function`);
-        }
-
-        let pipeValue = this.eval(expr.args[0]);
-
-        // Apply each function in order (left to right)
-        for (let i = 1; i < expr.args.length; i++) {
-          const fn = this.eval(expr.args[i]);
-          pipeValue = this.callFunction(fn, [pipeValue]);
-        }
-
-        return pipeValue;
-
       // Function call
       default:
         // Check if it's a user-defined function (regular or generic)
@@ -1002,6 +1072,16 @@ export class Interpreter {
         if (bracketMatch && this.context.functions.has(bracketMatch[1])) {
           return this.callUserFunction(op, args);
         }
+
+        // Phase 5 Week 1: Check if it's a variable containing a function value
+        // This allows: (let [f (compose g h)] (f 5))
+        if (this.context.variables.has(op)) {
+          const fn = this.context.variables.get(op);
+          if (typeof fn === "function" || (fn as any).kind === "function-value") {
+            return this.callFunction(fn, args);
+          }
+        }
+
         throw new Error(`Unknown operator: ${op}`);
     }
   }
@@ -1023,7 +1103,17 @@ export class Interpreter {
           if ((item as any).kind === "block" && (item as any).type === "Array") {
             const bindingItems = (item as any).fields.get("items");
             if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-              const varName = (bindingItems[0] as any).name;
+              // Extract variable name from either a Variable (with .name) or Literal symbol (with .value)
+              let varName: string;
+              const varNode = bindingItems[0] as any;
+              if (varNode.kind === "variable") {
+                varName = varNode.name;
+              } else if (varNode.kind === "literal" && varNode.type === "symbol") {
+                varName = varNode.value as string;
+              } else {
+                throw new Error(`Invalid binding variable: expected symbol or variable`);
+              }
+
               const value = this.eval(bindingItems[1]);
               this.context.variables.set(varName, value);
             }
@@ -1517,9 +1607,7 @@ export class Interpreter {
       if (isFuncBlock(node)) {
         const funcName = node.name;
         const params = node.fields?.get("params") || [];
-        const paramNames = Array.isArray(params)
-          ? params.map((p: any) => (typeof p === "string" ? p : (p as any).value))
-          : [];
+        const paramNames = extractParamNames(params);
         let body = node.fields?.get("body");
 
         // Skip function if body is undefined
