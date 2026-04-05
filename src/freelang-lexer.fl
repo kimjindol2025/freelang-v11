@@ -1,0 +1,200 @@
+; FreeLang v9 Phase 8-1: Lexer Implementation in FreeLang
+; Simplified self-hosting Lexer - tokenize core FreeLang syntax
+; Target: Implement core tokenization (parentheses, symbols, strings, numbers)
+
+; ============================================================
+; Core Token Scanner - Simplified Implementation
+; ============================================================
+
+; Check if character is whitespace
+[FUNC is-ws :params [$ch]
+  :body (match $ch
+    (" " true)
+    ("\t" true)
+    ("\n" true)
+    _ false
+  )
+]
+
+; Check if character is digit
+[FUNC is-digit :params [$ch]
+  :body (and (>= (char-code $ch) 48) (<= (char-code $ch) 57))
+]
+
+; Check if character is letter or underscore
+[FUNC is-alpha :params [$ch]
+  :body (or
+    (and (>= (char-code $ch) 97) (<= (char-code $ch) 122))   ; a-z
+    (and (>= (char-code $ch) 65) (<= (char-code $ch) 90))    ; A-Z
+    (= $ch "_")
+  )
+]
+
+; Main lexer - tokenize source into list of tokens
+; Returns array of token objects: {:type "TYPE" :value "val" :pos N}
+[FUNC lex :params [$source]
+  :body (
+    (let [[tokens []]
+          [i 0]
+          [len (length $source)]]
+
+      ; Process each character
+      (define process-tokens []
+        (if (>= i len)
+          tokens
+          (let [[ch (get $source i)]]
+            (cond
+              ; Skip whitespace
+              [(is-ws ch)
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+
+              ; Comment: ;; to end of line
+              [(and (= ch ";") (< (+ i 1) len) (= (get $source (+ i 1)) ";"))
+                (set! i (+ i 2))
+                (define skip-comment []
+                  (if (and (< i len) (not (= (get $source i) "\n")))
+                    (do (set! i (+ i 1)) (skip-comment))
+                  )
+                )
+                (skip-comment)
+                (process-tokens)
+              ]
+
+              ; String: "..."
+              [(= ch "\"")
+                (set! i (+ i 1))
+                (define str-val "")
+                (define read-string []
+                  (if (and (< i len) (not (= (get $source i) "\"")))
+                    (do
+                      (set! str-val (concat str-val (get $source i)))
+                      (set! i (+ i 1))
+                      (read-string)
+                    )
+                  )
+                )
+                (read-string)
+                (if (< i len) (set! i (+ i 1)))
+                (set! tokens (append tokens [{:type "STRING" :value str-val}]))
+                (process-tokens)
+              ]
+
+              ; Parentheses
+              [(= ch "(")
+                (set! tokens (append tokens [{:type "LPAREN" :value "("}]))
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+              [(= ch ")")
+                (set! tokens (append tokens [{:type "RPAREN" :value ")"}]))
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+
+              ; Brackets
+              [(= ch "[")
+                (set! tokens (append tokens [{:type "LBRACKET" :value "["}]))
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+              [(= ch "]")
+                (set! tokens (append tokens [{:type "RBRACKET" :value "]"}]))
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+
+              ; Colon
+              [(= ch ":")
+                (set! tokens (append tokens [{:type "COLON" :value ":"}]))
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+
+              ; Pipe
+              [(= ch "|")
+                (set! tokens (append tokens [{:type "SYMBOL" :value "|"}]))
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+
+              ; Variable: $name
+              [(= ch "$")
+                (set! i (+ i 1))
+                (define var-name "")
+                (define read-var []
+                  (if (and (< i len) (or (is-alpha (get $source i)) (is-digit (get $source i))))
+                    (do
+                      (set! var-name (concat var-name (get $source i)))
+                      (set! i (+ i 1))
+                      (read-var)
+                    )
+                  )
+                )
+                (read-var)
+                (set! tokens (append tokens [{:type "VARIABLE" :value var-name}]))
+                (process-tokens)
+              ]
+
+              ; Number
+              [(is-digit ch)
+                (define num-str "")
+                (define read-num []
+                  (if (and (< i len) (or (is-digit (get $source i)) (= (get $source i) ".")))
+                    (do
+                      (set! num-str (concat num-str (get $source i)))
+                      (set! i (+ i 1))
+                      (read-num)
+                    )
+                  )
+                )
+                (read-num)
+                (set! tokens (append tokens [{:type "NUMBER" :value num-str}]))
+                (process-tokens)
+              ]
+
+              ; Symbol or keyword
+              [(is-alpha ch)
+                (define sym-val "")
+                (define read-sym []
+                  (if (and (< i len) (or (is-alpha (get $source i)) (is-digit (get $source i)) (= (get $source i) "-")))
+                    (do
+                      (set! sym-val (concat sym-val (get $source i)))
+                      (set! i (+ i 1))
+                      (read-sym)
+                    )
+                  )
+                )
+                (read-sym)
+                (set! tokens (append tokens [{:type "SYMBOL" :value sym-val}]))
+                (process-tokens)
+              ]
+
+              ; Default: operator or skip
+              [else
+                (match ch
+                  ("+" (set! tokens (append tokens [{:type "SYMBOL" :value "+"}])))
+                  ("-" (set! tokens (append tokens [{:type "SYMBOL" :value "-"}])))
+                  ("*" (set! tokens (append tokens [{:type "SYMBOL" :value "*"}])))
+                  ("/" (set! tokens (append tokens [{:type "SYMBOL" :value "/"}])))
+                  ("=" (set! tokens (append tokens [{:type "SYMBOL" :value "="}])))
+                  ("<" (set! tokens (append tokens [{:type "SYMBOL" :value "<"}])))
+                  (">" (set! tokens (append tokens [{:type "SYMBOL" :value ">"}])))
+                  _ (set! tokens tokens)  ; Skip unknown
+                )
+                (set! i (+ i 1))
+                (process-tokens)
+              ]
+            )
+          )
+        )
+      )
+
+      (process-tokens)
+    )
+  )
+]
+
+; Export main function
+(export lex)

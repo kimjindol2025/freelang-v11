@@ -21,6 +21,12 @@ export enum TokenType {
   Import = "Import",       // import
   Open = "Open",           // open
 
+  // Phase 9a Keywords (Search)
+  Search = "Search",       // search
+  Fetch = "Fetch",         // fetch
+  Browse = "Browse",       // browse
+  Cache = "Cache",         // cache
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

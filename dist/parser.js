@@ -24,9 +24,30 @@ class Parser {
         while (!this.isAtEnd()) {
             if (this.check(token_1.TokenType.EOF))
                 break;
-            // Phase 6: Handle both blocks and S-expressions at top level
+            // Phase 6: Handle blocks, arrays, and S-expressions at top level
             if (this.check(token_1.TokenType.LBracket)) {
-                nodes.push(this.parseBlock());
+                // Distinguish between block [TYPE ...] and array [val1 val2 ...]
+                const nextIdx = this.pos + 1;
+                const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+                if (nextIdx < this.tokens.length) {
+                    const nextToken = this.tokens[nextIdx];
+                    const isBlockKeyword = nextToken.type === token_1.TokenType.Module || nextToken.type === token_1.TokenType.TypeClass || nextToken.type === token_1.TokenType.Instance;
+                    const isKnownBlockType = nextToken.type === token_1.TokenType.Symbol && knownBlockTypes.includes(nextToken.value.toUpperCase());
+                    const hasKeywordAfter = nextIdx + 1 < this.tokens.length &&
+                        (this.tokens[nextIdx + 1].type === token_1.TokenType.Keyword || this.tokens[nextIdx + 1].type === token_1.TokenType.Colon);
+                    if (isBlockKeyword || isKnownBlockType || hasKeywordAfter) {
+                        // It's a block
+                        nodes.push(this.parseBlock());
+                    }
+                    else {
+                        // It's an array
+                        nodes.push(this.parseArray());
+                    }
+                }
+                else {
+                    // Empty or end of tokens, treat as block (will error)
+                    nodes.push(this.parseBlock());
+                }
             }
             else if (this.check(token_1.TokenType.LParen)) {
                 nodes.push(this.parseSExpr());
@@ -455,11 +476,18 @@ class Parser {
         let op;
         const opToken = this.advance();
         // Phase 6: Handle import/open keyword tokens
+        // Phase 9a: Handle search keyword token
         if (opToken.type === token_1.TokenType.Import) {
             op = "import";
         }
         else if (opToken.type === token_1.TokenType.Open) {
             op = "open";
+        }
+        else if (opToken.type === token_1.TokenType.Search) {
+            op = "search";
+        }
+        else if (opToken.type === token_1.TokenType.Fetch) {
+            op = "fetch";
         }
         else if (opToken.type !== token_1.TokenType.Symbol) {
             throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
@@ -478,6 +506,18 @@ class Parser {
             const openBlock = this.parseOpenExpression();
             this.expect(token_1.TokenType.RParen);
             return openBlock;
+        }
+        // Special case: search expressions (Phase 9a)
+        if (op === "search") {
+            const searchBlock = this.parseSearchExpression();
+            this.expect(token_1.TokenType.RParen);
+            return searchBlock;
+        }
+        // Special case: fetch expressions (Phase 9a)
+        if (op === "fetch") {
+            const searchBlock = this.parseFetchExpression();
+            this.expect(token_1.TokenType.RParen);
+            return searchBlock;
         }
         // Special case: match expressions
         if (op === "match") {
@@ -782,6 +822,120 @@ class Parser {
             }
         }
         return (0, ast_1.makeOpenBlock)(moduleName, source);
+    }
+    // Phase 9a: Parse search expression
+    // (search query :source "web"|"api"|"kb" :cache true|false :limit 5)
+    parseSearchExpression() {
+        // First argument: query (string)
+        let query = "";
+        const queryNode = this.parseValue();
+        if (queryNode.kind === "literal" && queryNode.type === "string") {
+            query = queryNode.value;
+        }
+        else {
+            throw this.error(`Expected string query in search expression`, this.peek());
+        }
+        // Parse optional keyword arguments
+        let source = "web";
+        let cache = false;
+        let limit = 10;
+        let name;
+        while (!this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
+            if (this.check(token_1.TokenType.Colon)) {
+                this.advance(); // consume ':'
+                if (!this.check(token_1.TokenType.Symbol)) {
+                    throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+                }
+                const clauseName = this.advance().value;
+                switch (clauseName) {
+                    case "source":
+                        if (!this.check(token_1.TokenType.String)) {
+                            throw this.error(`Expected string after :source`, this.peek());
+                        }
+                        const sourceVal = this.advance().value;
+                        if (sourceVal === "web" || sourceVal === "api" || sourceVal === "kb") {
+                            source = sourceVal;
+                        }
+                        else {
+                            throw this.error(`Invalid source: ${sourceVal}`, this.peek());
+                        }
+                        break;
+                    case "cache":
+                        const cacheVal = this.parseValue();
+                        if (cacheVal.kind === "literal") {
+                            cache = cacheVal.value === "true" || cacheVal.value === true;
+                        }
+                        break;
+                    case "limit":
+                        const limitVal = this.parseValue();
+                        if (limitVal.kind === "literal" && limitVal.type === "number") {
+                            limit = limitVal.value;
+                        }
+                        break;
+                    case "name":
+                        if (!this.check(token_1.TokenType.Symbol)) {
+                            throw this.error(`Expected symbol after :name`, this.peek());
+                        }
+                        name = this.advance().value;
+                        break;
+                    default:
+                        throw this.error(`Unknown search clause: ${clauseName}`, this.peek());
+                }
+            }
+            else {
+                throw this.error(`Expected ':' in search expression, got ${this.peek().type}`, this.peek());
+            }
+        }
+        return {
+            kind: "search-block",
+            query,
+            source,
+            cache,
+            limit,
+            name,
+        };
+    }
+    // Phase 9a: Parse fetch expression
+    // (fetch url :cache true|false)
+    parseFetchExpression() {
+        // First argument: URL (string)
+        let query = "";
+        const urlNode = this.parseValue();
+        if (urlNode.kind === "literal" && urlNode.type === "string") {
+            query = urlNode.value;
+        }
+        else {
+            throw this.error(`Expected string URL in fetch expression`, this.peek());
+        }
+        // Parse optional keyword arguments
+        let cache = false;
+        while (!this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
+            if (this.check(token_1.TokenType.Colon)) {
+                this.advance(); // consume ':'
+                if (!this.check(token_1.TokenType.Symbol)) {
+                    throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+                }
+                const clauseName = this.advance().value;
+                if (clauseName === "cache") {
+                    const cacheVal = this.parseValue();
+                    if (cacheVal.kind === "literal") {
+                        cache = cacheVal.value === "true" || cacheVal.value === true;
+                    }
+                }
+                else {
+                    throw this.error(`Unknown fetch clause: ${clauseName}`, this.peek());
+                }
+            }
+            else {
+                throw this.error(`Expected ':' in fetch expression, got ${this.peek().type}`, this.peek());
+            }
+        }
+        return {
+            kind: "search-block",
+            query,
+            source: "api",
+            cache,
+        };
     }
     // Phase 6: Parse qualified identifier (math or math:add or utils:double:helper)
     // IMPORTANT: Stop when encountering keyword colons like :from, :as, :only

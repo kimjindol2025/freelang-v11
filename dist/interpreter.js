@@ -39,11 +39,15 @@ class Interpreter {
         // Process all blocks/nodes
         for (const node of blocks) {
             // Phase 6: Handle both Block types and new S-expression based types
+            // Phase 9a: Handle SearchBlock
             if ((0, ast_1.isImportBlock)(node)) {
                 this.evalImportBlock(node);
             }
             else if ((0, ast_1.isOpenBlock)(node)) {
                 this.evalOpenBlock(node);
+            }
+            else if ((0, ast_1.isSearchBlock)(node)) {
+                this.context.lastValue = this.handleSearchBlock(node);
             }
             else if ((0, ast_1.isModuleBlock)(node)) {
                 this.evalModuleBlock(node);
@@ -1804,6 +1808,43 @@ class Interpreter {
             }
         });
         this.logger.info(`✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`);
+    }
+    // Phase 9a: Handle Search/Fetch Block - External data retrieval
+    handleSearchBlock(searchBlock) {
+        const { query, source, cache = false, limit = 10, name } = searchBlock;
+        // Log search operation
+        this.logger.info(`🔍 Search: "${query}" from "${source}"${cache ? " (cached)" : ""}`);
+        try {
+            // For now, return a promise-like object with the search configuration
+            // In production, this would actually call external APIs
+            const searchResult = {
+                kind: "search-result",
+                query,
+                source,
+                cache,
+                limit,
+                name,
+                status: "pending",
+                results: [],
+                // Mark for later external API integration
+                _pending: true,
+            };
+            // If cache is enabled, store in context cache
+            if (cache && name) {
+                if (!this.context.cache) {
+                    this.context.cache = new Map();
+                }
+                this.context.cache.set(`search:${name}`, searchResult);
+            }
+            return searchResult;
+        }
+        catch (error) {
+            this.logger.error(`❌ Search failed: ${error.message}`);
+            return {
+                kind: "search-error",
+                message: error.message,
+            };
+        }
     }
     // Phase 5 Week 2: Evaluate Type Class definition
     evalTypeClass(typeClass) {

@@ -32,6 +32,8 @@ export declare class Parser {
     private synchronize;
     private parseImportExpression;
     private parseOpenExpression;
+    private parseSearchExpression;
+    private parseFetchExpression;
     private parseQualifiedIdentifier;
     private parseSelectiveImport;
 }

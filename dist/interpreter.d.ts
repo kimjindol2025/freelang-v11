@@ -17,6 +17,7 @@ export interface ExecutionContext {
     typeClasses?: Map<string, TypeClassInfo>;
     typeClassInstances?: Map<string, TypeClassInstanceInfo>;
     modules?: Map<string, ModuleInfo>;
+    cache?: Map<string, any>;
 }
 export interface FreeLangFunction {
     name: string;
@@ -100,6 +101,7 @@ export declare class Interpreter {
     private evalImportBlock;
     private getConcreteType;
     private evalOpenBlock;
+    private handleSearchBlock;
     private evalTypeClass;
     private evalInstance;
 }

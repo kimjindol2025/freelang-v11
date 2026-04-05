@@ -3,12 +3,17 @@
 import { Token, TokenType as T } from "./token";
 
 // Phase 6: Map keywords to token types
+// Phase 9a: Added search, fetch keywords
 const KEYWORDS: Map<string, T> = new Map([
   ["MODULE", T.Module],
   ["TYPECLASS", T.TypeClass],
   ["INSTANCE", T.Instance],
   ["import", T.Import],
   ["open", T.Open],
+  // Phase 9a: Search functionality keywords
+  ["search", T.Search],
+  ["fetch", T.Fetch],
+  // Note: browse, browse, cache are treated as regular symbols, not keywords
 ]);
 
 function getKeywordTokenType(text: string): T | null {

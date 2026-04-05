@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | AsyncFunction | AwaitExpression;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | SearchBlock | AsyncFunction | AwaitExpression;
 export interface Block {
     kind: "block";
     type: string;
@@ -116,6 +116,14 @@ export interface OpenBlock {
     moduleName: string;
     source?: string;
 }
+export interface SearchBlock {
+    kind: "search-block";
+    query: string;
+    source: "web" | "api" | "kb";
+    cache?: boolean;
+    limit?: number;
+    name?: string;
+}
 export interface AsyncFunction {
     kind: "async-function";
     name: string;
@@ -181,4 +189,5 @@ export declare function isSExpr(node: any): node is SExpr;
 export declare function isModuleBlock(node: any): node is ModuleBlock;
 export declare function isImportBlock(node: any): node is ImportBlock;
 export declare function isOpenBlock(node: any): node is OpenBlock;
+export declare function isSearchBlock(node: any): node is SearchBlock;
 //# sourceMappingURL=ast.d.ts.map

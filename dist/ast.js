@@ -35,6 +35,7 @@ exports.isSExpr = isSExpr;
 exports.isModuleBlock = isModuleBlock;
 exports.isImportBlock = isImportBlock;
 exports.isOpenBlock = isOpenBlock;
+exports.isSearchBlock = isSearchBlock;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -162,5 +163,9 @@ function isImportBlock(node) {
 // OpenBlock 타입 가드
 function isOpenBlock(node) {
     return node && node.kind === "open";
+}
+// SearchBlock 타입 가드 (NEW for Phase 9a)
+function isSearchBlock(node) {
+    return node && node.kind === "search-block";
 }
 //# sourceMappingURL=ast.js.map

@@ -13,6 +13,10 @@ export declare enum TokenType {
     Instance = "Instance",// INSTANCE
     Import = "Import",// import
     Open = "Open",// open
+    Search = "Search",// search
+    Fetch = "Fetch",// fetch
+    Browse = "Browse",// browse
+    Cache = "Cache",// cache
     Colon = "Colon",// :
     EOF = "EOF"
 }

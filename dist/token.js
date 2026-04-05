@@ -21,6 +21,11 @@ var TokenType;
     TokenType["Instance"] = "Instance";
     TokenType["Import"] = "Import";
     TokenType["Open"] = "Open";
+    // Phase 9a Keywords (Search)
+    TokenType["Search"] = "Search";
+    TokenType["Fetch"] = "Fetch";
+    TokenType["Browse"] = "Browse";
+    TokenType["Cache"] = "Cache";
     // Special
     TokenType["Colon"] = "Colon";
     TokenType["EOF"] = "EOF";

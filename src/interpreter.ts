@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -25,6 +25,7 @@ export interface ExecutionContext {
   typeClasses?: Map<string, TypeClassInfo>; // Phase 5 Week 2: Type class registry
   typeClassInstances?: Map<string, TypeClassInstanceInfo>; // Phase 5 Week 2: Type class instances
   modules?: Map<string, ModuleInfo>; // Phase 6: Module registry
+  cache?: Map<string, any>; // Phase 9a: Search result caching
 }
 
 export interface FreeLangFunction {
@@ -107,10 +108,13 @@ export class Interpreter {
     // Process all blocks/nodes
     for (const node of blocks) {
       // Phase 6: Handle both Block types and new S-expression based types
+      // Phase 9a: Handle SearchBlock
       if (isImportBlock(node)) {
         this.evalImportBlock(node);
       } else if (isOpenBlock(node)) {
         this.evalOpenBlock(node);
+      } else if (isSearchBlock(node)) {
+        this.context.lastValue = this.handleSearchBlock(node);
       } else if (isModuleBlock(node)) {
         this.evalModuleBlock(node);
       } else if (isBlock(node)) {
@@ -2042,6 +2046,49 @@ export class Interpreter {
     this.logger.info(
       `✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`
     );
+  }
+
+  // Phase 9a: Handle Search/Fetch Block - External data retrieval
+  private handleSearchBlock(searchBlock: SearchBlock): any {
+    const { query, source, cache = false, limit = 10, name } = searchBlock;
+
+    // Log search operation
+    this.logger.info(
+      `🔍 Search: "${query}" from "${source}"${cache ? " (cached)" : ""}`
+    );
+
+    try {
+      // For now, return a promise-like object with the search configuration
+      // In production, this would actually call external APIs
+      const searchResult = {
+        kind: "search-result",
+        query,
+        source,
+        cache,
+        limit,
+        name,
+        status: "pending",
+        results: [],
+        // Mark for later external API integration
+        _pending: true,
+      };
+
+      // If cache is enabled, store in context cache
+      if (cache && name) {
+        if (!this.context.cache) {
+          this.context.cache = new Map();
+        }
+        this.context.cache.set(`search:${name}`, searchResult);
+      }
+
+      return searchResult;
+    } catch (error) {
+      this.logger.error(`❌ Search failed: ${(error as Error).message}`);
+      return {
+        kind: "search-error",
+        message: (error as Error).message,
+      };
+    }
   }
 
   // Phase 5 Week 2: Evaluate Type Class definition

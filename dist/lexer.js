@@ -4,12 +4,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.lex = lex;
 const token_1 = require("./token");
 // Phase 6: Map keywords to token types
+// Phase 9a: Added search, fetch keywords
 const KEYWORDS = new Map([
     ["MODULE", token_1.TokenType.Module],
     ["TYPECLASS", token_1.TokenType.TypeClass],
     ["INSTANCE", token_1.TokenType.Instance],
     ["import", token_1.TokenType.Import],
     ["open", token_1.TokenType.Open],
+    // Phase 9a: Search functionality keywords
+    ["search", token_1.TokenType.Search],
+    ["fetch", token_1.TokenType.Fetch],
+    // Note: browse, browse, cache are treated as regular symbols, not keywords
 ]);
 function getKeywordTokenType(text) {
     return KEYWORDS.get(text) ?? null;

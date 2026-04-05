@@ -15,6 +15,7 @@ export type ASTNode =
   | ModuleBlock
   | ImportBlock
   | OpenBlock
+  | SearchBlock
   | AsyncFunction
   | AwaitExpression;
 
@@ -204,6 +205,18 @@ export interface OpenBlock {
   kind: "open";
   moduleName: string;
   source?: string;             // optional :from path
+}
+
+// Search Block (NEW for Phase 9a)
+// [search query :source "web"|"api"|"kb" :cache true|false :limit 5]
+// Represents searching external data sources
+export interface SearchBlock {
+  kind: "search-block";
+  query: string;              // search query
+  source: "web" | "api" | "kb"; // data source: web (WebSearch), api (REST API), kb (Knowledge Base)
+  cache?: boolean;            // whether to cache results (default: false)
+  limit?: number;             // max number of results (default: 10)
+  name?: string;              // optional name for this search
 }
 
 // Async Function (NEW for Phase 7)
@@ -438,4 +451,9 @@ export function isImportBlock(node: any): node is ImportBlock {
 // OpenBlock 타입 가드
 export function isOpenBlock(node: any): node is OpenBlock {
   return node && node.kind === "open";
+}
+
+// SearchBlock 타입 가드 (NEW for Phase 9a)
+export function isSearchBlock(node: any): node is SearchBlock {
+  return node && node.kind === "search-block";
 }
