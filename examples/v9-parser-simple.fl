@@ -1,0 +1,9 @@
+[FUNC parse-tokens
+  :params [$tokens]
+  :body $tokens
+]
+
+[FUNC analyze-code
+  :params [$code]
+  :body $code
+]

@@ -1,41 +1,9 @@
-[FUNC string-length
-  :params [[$s string]]
-  :return int
-  :body (length $s)
+[FUNC tokenize-simple
+  :params [$source]
+  :body $source
 ]
 
-[FUNC get-char
-  :params [[$s string] [$pos int]]
-  :return string
-  :body (char-at $s $pos)
-]
-
-[FUNC get-first
-  :params [[$s string]]
-  :return string
-  :body (char-at $s 0)
-]
-
-[FUNC get-last
-  :params [[$s string]]
-  :return string
-  :body (char-at $s (- (length $s) 1))
-]
-
-[FUNC is-digit?
-  :params [[$c string]]
-  :return bool
-  :body (and
-    (>= (char-code $c) 48)
-    (<= (char-code $c) 57)
-  )
-]
-
-[FUNC is-whitespace?
-  :params [[$c string]]
-  :return bool
-  :body (or
-    (= $c " ")
-    (= $c "\t")
-  )
+[FUNC parse-simple
+  :params [$code]
+  :body $code
 ]
