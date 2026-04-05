@@ -23,6 +23,9 @@ export interface FreeLangFunction {
   name: string;
   params: string[];
   body: ASTNode;
+  generics?: string[]; // Generic type variables: [T, K, V] (Phase 4)
+  paramTypes?: TypeAnnotation[]; // Parameter types for type checking (Phase 3)
+  returnType?: TypeAnnotation; // Return type for type checking (Phase 3)
 }
 
 export interface FreeLangRoute {
@@ -142,13 +145,17 @@ export class Interpreter {
       const items = (paramsField as any).fields.get("items");
       if (Array.isArray(items)) {
         params.push(...items.map((item: any) => {
-          // Phase 3: New syntax [[$x int] [$y string]] - item is an Array block with [Variable, Type]
+          // Phase 3: New syntax [[$x int] [$y string]] or [[x int] [y string]] - item is an Array block with [Name, Type]
           if (item.kind === "block" && item.type === "Array") {
             const innerItems = item.fields.get("items");
             if (Array.isArray(innerItems) && innerItems.length > 0) {
               const firstItem = innerItems[0];
               if (firstItem.kind === "variable") {
-                return firstItem.name; // Extract parameter name from Variable
+                return firstItem.name; // Extract parameter name from Variable ($x)
+              }
+              // Phase 4: Support symbol literals as parameter names (x without $)
+              if (firstItem.kind === "literal" && firstItem.type === "symbol") {
+                return "$" + firstItem.value; // Convert symbol to variable: x → $x
               }
             }
           }
@@ -167,29 +174,45 @@ export class Interpreter {
       throw new Error(`[FUNC ${block.name}] Missing :body`);
     }
 
+    // Get parameter types from typeAnnotations
+    let paramTypes: TypeAnnotation[] = [];
+    let returnType: TypeAnnotation = { kind: "type" as const, name: "any" };
+
+    if (block.typeAnnotations && this.context.typeChecker) {
+      const paramsTypeAnnotations = block.typeAnnotations.get("params");
+      if (Array.isArray(paramsTypeAnnotations)) {
+        paramTypes = paramsTypeAnnotations;
+      } else {
+        paramTypes = params.map(() => ({ kind: "type" as const, name: "any" }));
+      }
+
+      const returnTypeAnnotation = block.typeAnnotations.get("return");
+      if (returnTypeAnnotation) {
+        returnType = returnTypeAnnotation as TypeAnnotation;
+      }
+    }
+
+    // Phase 4: Register generic function if :generics present
+    const isGeneric = block.generics && block.generics.length > 0;
+
     this.context.functions.set(block.name, {
       name: block.name,
       params,
       body,
+      generics: block.generics, // Store generic type variables
+      paramTypes,
+      returnType,
     });
 
-    // Phase 3: Register function type in type checker if type annotations present
-    if (block.typeAnnotations && this.context.typeChecker) {
-      // Get parameter types from typeAnnotations (new syntax: [[$x int] [$y int]])
-      let paramTypes: TypeAnnotation[] = [];
-      const paramsTypeAnnotations = block.typeAnnotations.get("params");
-      if (Array.isArray(paramsTypeAnnotations)) {
-        // New syntax: parameter types extracted from parser
-        paramTypes = paramsTypeAnnotations;
+    // Phase 3-4: Register function type in type checker
+    if (this.context.typeChecker) {
+      if (isGeneric && block.generics) {
+        // Phase 4: Register generic function
+        this.context.typeChecker.registerGenericFunction(block.name, block.generics, paramTypes, returnType);
       } else {
-        // Old syntax or no param types: default to 'any'
-        paramTypes = params.map(() => ({ kind: "type" as const, name: "any" }));
+        // Phase 3: Register regular function
+        this.context.typeChecker.registerFunction(block.name, paramTypes, returnType);
       }
-
-      // Get return type (optional, defaults to 'any')
-      const returnType = block.typeAnnotations.get("return") || { kind: "type" as const, name: "any" };
-
-      this.context.typeChecker.registerFunction(block.name, paramTypes, returnType as TypeAnnotation);
     }
   }
 
@@ -279,7 +302,14 @@ export class Interpreter {
 
     // Variables
     if ((node as any).kind === "variable") {
-      const varName = (node as Variable).name;
+      let varName = (node as Variable).name;
+      // Phase 4: Handle variable name resolution
+      // Lexer removes $ prefix, so variable.name is "x" not "$x"
+      // But we store variables with "$" prefix in scope
+      // Try both with and without prefix
+      if (this.context.variables.has("$" + varName)) {
+        return this.context.variables.get("$" + varName);
+      }
       return this.context.variables.get(varName);
     }
 
@@ -612,8 +642,14 @@ export class Interpreter {
 
       // Function call
       default:
-        // Check if it's a user-defined function
+        // Check if it's a user-defined function (regular or generic)
+        // Phase 4: Try full name first (op might be "identity[int]")
         if (this.context.functions.has(op)) {
+          return this.callUserFunction(op, args);
+        }
+        // Phase 4: If full name fails, extract base name and try again (for generic calls)
+        const bracketMatch = op.match(/^([\w\-]+)\[([^\]]+)\]$/);
+        if (bracketMatch && this.context.functions.has(bracketMatch[1])) {
           return this.callUserFunction(op, args);
         }
         throw new Error(`Unknown operator: ${op}`);
@@ -667,13 +703,47 @@ export class Interpreter {
   }
 
   private callUserFunction(name: string, args: any[]): any {
-    const func = this.context.functions.get(name);
-    if (!func) {
-      throw new Error(`Function not found: ${name}`);
+    // Phase 4: Check if this is a generic function call (e.g., identity[int] or first-of-pair[int, string])
+    let baseName = name;
+    let typeArgs: TypeAnnotation[] | null = null;
+
+    // Match: function-name[T] or function-name[T, K, V] (allow hyphens and alphanumerics)
+    const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
+    if (bracketMatch) {
+      baseName = bracketMatch[1];
+      const typeArgStr = bracketMatch[2];
+      // Parse type arguments (comma-separated type names, may have spaces)
+      typeArgs = typeArgStr.split(",").map((t) => ({
+        kind: "type" as const,
+        name: t.trim(),
+      }));
     }
 
-    // Phase 3: Type check function call
-    if (this.context.typeChecker) {
+    const func = this.context.functions.get(baseName);
+    if (!func) {
+      throw new Error(`Function not found: ${baseName}`);
+    }
+
+    // Phase 4: Handle generic function instantiation
+    let isGenericCall = false;
+    if (func.generics && func.generics.length > 0) {
+      if (!typeArgs) {
+        throw new Error(`Generic function '${baseName}' requires type arguments, e.g., ${baseName}[int] or ${baseName}[int string]`);
+      }
+
+      if (this.context.typeChecker) {
+        const instantiation = this.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
+        if (!instantiation.valid) {
+          throw new Error(`Cannot instantiate generic function '${baseName}': ${instantiation.message}`);
+        }
+      }
+      // Mark as generic call to skip standard type checking
+      // (instantiation already validated the types)
+      isGenericCall = true;
+    }
+
+    // Phase 3: Type check function call (skip for generic calls, as instantiation already validated)
+    if (!isGenericCall && this.context.typeChecker) {
       const argTypes = args.map((arg) => {
         // Infer type from argument value
         if (typeof arg === "number") return { kind: "type" as const, name: "int" };
@@ -684,9 +754,9 @@ export class Interpreter {
         return { kind: "type" as const, name: "any" };
       });
 
-      const validation = this.context.typeChecker.checkFunctionCall(name, argTypes);
+      const validation = this.context.typeChecker.checkFunctionCall(baseName, argTypes);
       if (!validation.valid) {
-        throw new Error(`Type error in call to '${name}': ${validation.message}`);
+        throw new Error(`Type error in call to '${baseName}': ${validation.message}`);
       }
     }
 

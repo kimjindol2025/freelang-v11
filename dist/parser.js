@@ -220,14 +220,34 @@ class Parser {
         arrayFields.set("items", values);
         return (0, ast_1.makeBlock)("Array", "$array", arrayFields);
     }
-    // Parse S-expression: (op arg1 arg2 ...)
+    // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
     parseSExpr() {
         this.expect(token_1.TokenType.LParen);
         const opToken = this.advance();
         if (opToken.type !== token_1.TokenType.Symbol) {
             throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
         }
-        const op = opToken.value;
+        let op = opToken.value;
+        // Phase 4: Handle generic function syntax: (identity[int] ...)
+        if (this.check(token_1.TokenType.LBracket)) {
+            this.advance(); // consume [
+            const typeArgs = [];
+            while (!this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
+                const typeToken = this.advance();
+                if (typeToken.type === token_1.TokenType.Symbol) {
+                    typeArgs.push(typeToken.value);
+                }
+                // Skip commas if present
+                if (this.check(token_1.TokenType.Symbol) && this.peek().value === ",") {
+                    this.advance();
+                }
+            }
+            this.expect(token_1.TokenType.RBracket);
+            // Build generic function name: identity[int] or first-of-pair[int string]
+            if (typeArgs.length > 0) {
+                op = `${op}[${typeArgs.join(", ")}]`;
+            }
+        }
         const args = [];
         while (!this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
             args.push(this.parseValue());

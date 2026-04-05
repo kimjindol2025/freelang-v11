@@ -2,19 +2,19 @@
   :generics [T]
   :params [[x T]]
   :return T
-  :body x
+  :body $x
 ]
 
 [FUNC first-of-pair
   :generics [A B]
   :params [[pair any]]
   :return A
-  :body (get pair 0)
+  :body (get $pair 0)
 ]
 
 [FUNC second-of-pair
   :generics [A B]
   :params [[pair any]]
   :return B
-  :body (get pair 1)
+  :body (get $pair 1)
 ]

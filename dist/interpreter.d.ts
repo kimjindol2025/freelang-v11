@@ -1,5 +1,5 @@
 import express from "express";
-import { ASTNode, Block } from "./ast";
+import { ASTNode, Block, TypeAnnotation } from "./ast";
 import { TypeChecker } from "./type-checker";
 export interface ExecutionContext {
     functions: Map<string, FreeLangFunction>;
@@ -17,6 +17,9 @@ export interface FreeLangFunction {
     name: string;
     params: string[];
     body: ASTNode;
+    generics?: string[];
+    paramTypes?: TypeAnnotation[];
+    returnType?: TypeAnnotation;
 }
 export interface FreeLangRoute {
     name: string;

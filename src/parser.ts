@@ -261,7 +261,7 @@ export class Parser {
     return makeBlock("Array", "$array", arrayFields);
   }
 
-  // Parse S-expression: (op arg1 arg2 ...)
+  // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
   private parseSExpr(): SExpr {
     this.expect(T.LParen);
 
@@ -269,7 +269,31 @@ export class Parser {
     if (opToken.type !== T.Symbol) {
       throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
     }
-    const op = opToken.value;
+    let op = opToken.value;
+
+    // Phase 4: Handle generic function syntax: (identity[int] ...)
+    if (this.check(T.LBracket)) {
+      this.advance(); // consume [
+      const typeArgs: string[] = [];
+
+      while (!this.check(T.RBracket) && !this.isAtEnd()) {
+        const typeToken = this.advance();
+        if (typeToken.type === T.Symbol) {
+          typeArgs.push(typeToken.value);
+        }
+        // Skip commas if present
+        if (this.check(T.Symbol) && this.peek().value === ",") {
+          this.advance();
+        }
+      }
+
+      this.expect(T.RBracket);
+
+      // Build generic function name: identity[int] or first-of-pair[int string]
+      if (typeArgs.length > 0) {
+        op = `${op}[${typeArgs.join(", ")}]`;
+      }
+    }
 
     const args: ASTNode[] = [];
     while (!this.check(T.RParen) && !this.isAtEnd()) {
