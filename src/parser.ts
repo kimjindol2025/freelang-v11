@@ -1503,7 +1503,7 @@ export class Parser {
           throw this.error(`Unknown option: ${keyword}`, this.peek());
         }
       } else if (this.check(T.LParen)) {
-        // Phase 9c: Lookahead to check if this is (if ...) or (when ...)
+        // Phase 9c: Lookahead to check if this is (if ...), (when ...), or (repeat ...) / (while ...)
         if (this.pos + 1 < this.tokens.length) {
           const nextToken = this.tokens[this.pos + 1];
           if (nextToken.type === T.If) {
@@ -1516,6 +1516,12 @@ export class Parser {
             // Don't consume '(', let parseWhenReasoningBlock handle it
             const whenBlock = this.parseWhenReasoningBlock();
             stages.push(whenBlock);
+            continue;
+          }
+          if (nextToken.type === T.Repeat || nextToken.type === T.While) {
+            // Don't consume '(', let parseLoopReasoningBlock handle it
+            const loopBlock = this.parseLoopReasoningBlock();
+            stages.push(loopBlock);
             continue;
           }
         }
@@ -1571,9 +1577,13 @@ export class Parser {
         // Phase 9c: Parse when guard clause
         const whenBlock = this.parseWhenReasoningBlock();
         stages.push(whenBlock);
+      } else if (this.check(T.Repeat) || this.check(T.While)) {
+        // Phase 9c: Parse loop control (repeat-until or repeat-while)
+        const loopBlock = this.parseLoopReasoningBlock();
+        stages.push(loopBlock);
       } else {
         throw this.error(
-          `Expected '(' before reasoning block, 'if', 'when', or ':feedback', got ${this.peek().type}`,
+          `Expected '(' before reasoning block, 'if', 'when', 'repeat', 'while', or ':feedback', got ${this.peek().type}`,
           this.peek()
         );
       }
@@ -1894,6 +1904,71 @@ export class Parser {
     return {
       ...block,
       whenGuard: condition,
+    };
+  }
+
+  // Phase 9c: Parse loop control (repeat-until or repeat-while)
+  // Format: (repeat-until condition (block))
+  //         (repeat-while condition (block))
+  private parseLoopReasoningBlock(): ReasoningBlock {
+    this.expect(T.LParen); // consume '('
+
+    // Check if it's repeat or while
+    const loopTypeToken = this.peek();
+    const isRepeat = loopTypeToken.type === T.Repeat;
+    const isWhile = loopTypeToken.type === T.While;
+
+    if (!isRepeat && !isWhile) {
+      throw this.error(
+        `Expected 'repeat' or 'while' in loop, got ${loopTypeToken.type}`,
+        loopTypeToken
+      );
+    }
+
+    this.advance(); // consume 'repeat' or 'while'
+
+    // For repeat-until and repeat-while, expect an 'until' or 'while' keyword
+    let loopType: "repeat-until" | "repeat-while";
+
+    if (isRepeat) {
+      this.expect(T.Until); // consume 'until'
+      loopType = "repeat-until";
+    } else {
+      // already consumed 'while'
+      loopType = "repeat-while";
+    }
+
+    // Parse loop condition
+    const condition = this.parseValue();
+
+    // Parse block (single reasoning stage block)
+    if (!this.check(T.LParen)) {
+      throw this.error(`Expected '(' for loop block, got ${this.peek().type}`, this.peek());
+    }
+
+    this.advance(); // consume '('
+
+    const stageToken = this.peek();
+    const stageName = this.getReasoningStageName(stageToken);
+    if (!stageName) {
+      throw this.error(`Expected reasoning stage in loop block, got ${stageToken.value}`, stageToken);
+    }
+
+    this.advance(); // consume stage name
+    const block = this.parseReasoningExpressionInternal(
+      stageName as "observe" | "analyze" | "decide" | "act" | "verify"
+    );
+    this.expect(T.RParen); // close (block)
+
+    this.expect(T.RParen); // close outer (repeat/while ...)
+
+    // Return block with loop control info
+    return {
+      ...block,
+      loopControl: {
+        type: loopType,
+        condition,
+      },
     };
   }
 

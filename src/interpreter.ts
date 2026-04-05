@@ -2606,8 +2606,36 @@ export class Interpreter {
           }
         }
 
-        // Handle the reasoning block
-        const stageResult = this.handleReasoningBlock(blockToHandle);
+        // Phase 9c: Check for loop control (repeat-until / repeat-while)
+        let stageResult: any;
+        if (stage.loopControl) {
+          const { type, condition, maxIterations = 1000 } = stage.loopControl;
+          const loopMaxIter = Math.min(maxIterations, 1000);
+          let loopIteration = 0;
+
+          while (loopIteration < loopMaxIter) {
+            loopIteration++;
+
+            // Evaluate loop condition
+            const conditionValue = this.evaluateCondition(condition);
+            const shouldContinue = type === "repeat-until" ? !conditionValue : conditionValue;
+
+            if (!shouldContinue && loopIteration > 1) {
+              break; // Exit loop if condition met
+            }
+
+            // Handle the reasoning block
+            stageResult = this.handleReasoningBlock(blockToHandle);
+
+            this.logger.info(
+              `  🔁 ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter} (condition: ${shouldContinue ? "continue" : "exit"})`
+            );
+          }
+        } else {
+          // Handle the reasoning block (no loop)
+          stageResult = this.handleReasoningBlock(blockToHandle);
+        }
+
         iterationResults.push(stageResult);
         executionPath.push(stage.stage);
 
