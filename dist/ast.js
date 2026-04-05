@@ -20,6 +20,9 @@ exports.makeMatchCase = makeMatchCase;
 exports.makePatternMatch = makePatternMatch;
 exports.makeTypeClass = makeTypeClass;
 exports.makeTypeClassInstance = makeTypeClassInstance;
+exports.makeModuleBlock = makeModuleBlock;
+exports.makeImportBlock = makeImportBlock;
+exports.makeOpenBlock = makeOpenBlock;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -84,5 +87,17 @@ function makeTypeClass(name, typeParams, methods) {
 // Helper: Create type class instance (Phase 5 Week 2)
 function makeTypeClassInstance(className, concreteType, implementations) {
     return { kind: "type-class-instance", className, concreteType, implementations };
+}
+// Helper: Create module block (Phase 5 Week 3)
+function makeModuleBlock(name, exports, body, path) {
+    return { kind: "module", name, exports, body, path };
+}
+// Helper: Create import block (Phase 5 Week 3)
+function makeImportBlock(moduleName, source, selective, alias) {
+    return { kind: "import", moduleName, source, selective, alias };
+}
+// Helper: Create open block (Phase 5 Week 3)
+function makeOpenBlock(moduleName, source) {
+    return { kind: "open", moduleName, source };
 }
 //# sourceMappingURL=ast.js.map

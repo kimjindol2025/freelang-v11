@@ -11,7 +11,10 @@ export type ASTNode =
   | Pattern
   | FunctionValue
   | TypeClass
-  | TypeClassInstance;
+  | TypeClassInstance
+  | ModuleBlock
+  | ImportBlock
+  | OpenBlock;
 
 // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
 export interface Block {
@@ -164,6 +167,43 @@ export interface TypeClassInstance {
   implementations: Map<string, ASTNode>;  // method name → implementation (function value)
 }
 
+// Module Definition (NEW for Phase 5 Week 3)
+// [MODULE math
+//   :exports [add subtract multiply]
+//   :body [
+//     [FUNC add ...]
+//     [FUNC subtract ...]
+//   ]
+// ]
+export interface ModuleBlock {
+  kind: "module";
+  name: string;
+  exports: string[];           // exported function/intent names
+  body: ASTNode[];             // module body (FUNC, INTENT blocks)
+  path?: string;               // optional file path for external modules
+}
+
+// Import Block (NEW for Phase 5 Week 3)
+// (import math)
+// (import math :from "./math.fl")
+// (import math :only [add multiply])
+// (import math :as m)
+export interface ImportBlock {
+  kind: "import";
+  moduleName: string;
+  source?: string;             // optional :from path
+  selective?: string[];        // optional :only [names]
+  alias?: string;              // optional :as alias
+}
+
+// Open Block (NEW for Phase 5 Week 3)
+// (open math)  -- imports all exports to global scope
+export interface OpenBlock {
+  kind: "open";
+  moduleName: string;
+  source?: string;             // optional :from path
+}
+
 // Function signature (NEW for Phase 3)
 export interface FuncSignature {
   name: string;
@@ -285,4 +325,29 @@ export function makeTypeClassInstance(
   implementations: Map<string, ASTNode>
 ): TypeClassInstance {
   return { kind: "type-class-instance", className, concreteType, implementations };
+}
+
+// Helper: Create module block (Phase 5 Week 3)
+export function makeModuleBlock(
+  name: string,
+  exports: string[],
+  body: ASTNode[],
+  path?: string
+): ModuleBlock {
+  return { kind: "module", name, exports, body, path };
+}
+
+// Helper: Create import block (Phase 5 Week 3)
+export function makeImportBlock(
+  moduleName: string,
+  source?: string,
+  selective?: string[],
+  alias?: string
+): ImportBlock {
+  return { kind: "import", moduleName, source, selective, alias };
+}
+
+// Helper: Create open block (Phase 5 Week 3)
+export function makeOpenBlock(moduleName: string, source?: string): OpenBlock {
+  return { kind: "open", moduleName, source };
 }

@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock;
 export interface Block {
     kind: "block";
     type: string;
@@ -97,6 +97,25 @@ export interface TypeClassInstance {
     concreteType: string;
     implementations: Map<string, ASTNode>;
 }
+export interface ModuleBlock {
+    kind: "module";
+    name: string;
+    exports: string[];
+    body: ASTNode[];
+    path?: string;
+}
+export interface ImportBlock {
+    kind: "import";
+    moduleName: string;
+    source?: string;
+    selective?: string[];
+    alias?: string;
+}
+export interface OpenBlock {
+    kind: "open";
+    moduleName: string;
+    source?: string;
+}
 export interface FuncSignature {
     name: string;
     params: Array<{
@@ -131,4 +150,7 @@ export declare function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: A
 export declare function makePatternMatch(value: ASTNode, cases: MatchCase[], defaultCase?: ASTNode): PatternMatch;
 export declare function makeTypeClass(name: string, typeParams: string[], methods: Map<string, TypeClassMethod>): TypeClass;
 export declare function makeTypeClassInstance(className: string, concreteType: string, implementations: Map<string, ASTNode>): TypeClassInstance;
+export declare function makeModuleBlock(name: string, exports: string[], body: ASTNode[], path?: string): ModuleBlock;
+export declare function makeImportBlock(moduleName: string, source?: string, selective?: string[], alias?: string): ImportBlock;
+export declare function makeOpenBlock(moduleName: string, source?: string): OpenBlock;
 //# sourceMappingURL=ast.d.ts.map
