@@ -1,5 +1,5 @@
 import express from "express";
-import { ASTNode, Block, TypeAnnotation } from "./ast";
+import { ASTNode, TypeAnnotation } from "./ast";
 import { TypeChecker } from "./type-checker";
 export interface ExecutionContext {
     functions: Map<string, FreeLangFunction>;
@@ -14,6 +14,7 @@ export interface ExecutionContext {
     typeChecker?: TypeChecker;
     typeClasses?: Map<string, TypeClassInfo>;
     typeClassInstances?: Map<string, TypeClassInstanceInfo>;
+    modules?: Map<string, ModuleInfo>;
 }
 export interface FreeLangFunction {
     name: string;
@@ -50,10 +51,15 @@ export interface TypeClassInstanceInfo {
     concreteType: string;
     implementations: Map<string, any>;
 }
+export interface ModuleInfo {
+    name: string;
+    exports: string[];
+    functions: Map<string, FreeLangFunction>;
+}
 export declare class Interpreter {
     private context;
     constructor(app?: express.Express);
-    interpret(blocks: Block[]): ExecutionContext;
+    interpret(blocks: ASTNode[]): ExecutionContext;
     private evalBlock;
     private handleServerBlock;
     private handleRouteBlock;
@@ -84,6 +90,9 @@ export declare class Interpreter {
     getTypeClass(name: string): TypeClassInfo | undefined;
     getTypeClassInstance(className: string, concreteType: string): TypeClassInstanceInfo | undefined;
     satisfiesConstraint(type: string, constraintClass: string): boolean;
+    private evalModuleBlock;
+    private evalImportBlock;
+    private evalOpenBlock;
 }
-export declare function interpret(blocks: Block[], app?: express.Express): ExecutionContext;
+export declare function interpret(blocks: ASTNode[], app?: express.Express): ExecutionContext;
 //# sourceMappingURL=interpreter.d.ts.map

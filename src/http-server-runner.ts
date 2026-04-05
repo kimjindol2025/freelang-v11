@@ -29,8 +29,20 @@ async function runServer(): Promise<void> {
     console.log("\n📝 Parsing...");
     const ast = parse(tokens);
     console.log(`✅ Generated AST with ${ast.length} top-level blocks`);
-    ast.forEach((block, i) => {
-      console.log(`   ${i + 1}. [${block.type} ${block.name}] - ${block.fields.size} fields`);
+    ast.forEach((node, i) => {
+      // Phase 6: Handle both Block and other ASTNode types
+      const block = node as any;
+      if (block.type && block.name) {
+        console.log(`   ${i + 1}. [${block.type} ${block.name}] - ${block.fields?.size || 0} fields`);
+      } else if (block.kind === "import") {
+        console.log(`   ${i + 1}. [import ${block.moduleName}]`);
+      } else if (block.kind === "open") {
+        console.log(`   ${i + 1}. [open ${block.moduleName}]`);
+      } else if (block.kind === "module") {
+        console.log(`   ${i + 1}. [module ${block.name}]`);
+      } else {
+        console.log(`   ${i + 1}. [${block.kind || "?"}]`);
+      }
     });
 
     // Step 4: Interpretation

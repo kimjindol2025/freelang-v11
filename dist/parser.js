@@ -20,22 +20,44 @@ class Parser {
         this.tokens = tokens;
     }
     parse() {
-        const blocks = [];
+        const nodes = [];
         while (!this.isAtEnd()) {
             if (this.check(token_1.TokenType.EOF))
                 break;
-            blocks.push(this.parseBlock());
+            // Phase 6: Handle both blocks and S-expressions at top level
+            if (this.check(token_1.TokenType.LBracket)) {
+                nodes.push(this.parseBlock());
+            }
+            else if (this.check(token_1.TokenType.LParen)) {
+                nodes.push(this.parseSExpr());
+            }
+            else {
+                throw this.error(`Expected block or S-expression, got ${this.peek().type}`, this.peek());
+            }
         }
-        return blocks;
+        return nodes;
     }
     // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
+    // Phase 6: BLOCK_TYPE can be Symbol (old) or keyword token (MODULE, TYPECLASS, INSTANCE)
     parseBlock() {
         this.expect(token_1.TokenType.LBracket);
         const typeToken = this.advance();
-        if (typeToken.type !== token_1.TokenType.Symbol) {
-            throw this.error(`Expected block type (symbol), got ${typeToken.type}`, typeToken);
+        let blockType;
+        if (typeToken.type === token_1.TokenType.Symbol) {
+            blockType = typeToken.value;
         }
-        const blockType = typeToken.value;
+        else if (typeToken.type === token_1.TokenType.Module) {
+            blockType = "MODULE";
+        }
+        else if (typeToken.type === token_1.TokenType.TypeClass) {
+            blockType = "TYPECLASS";
+        }
+        else if (typeToken.type === token_1.TokenType.Instance) {
+            blockType = "INSTANCE";
+        }
+        else {
+            throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
+        }
         const nameToken = this.advance();
         if (nameToken.type !== token_1.TokenType.Symbol) {
             throw this.error(`Expected block name (symbol), got ${nameToken.type}`, nameToken);
@@ -44,27 +66,46 @@ class Parser {
         const fields = new Map();
         const typeAnnotations = new Map();
         let generics;
-        // Parse fields: :key value :key value ...
+        // Parse fields: :key value :key value ... (Phase 6: T.Colon + T.Symbol instead of T.Keyword)
         while (!this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
             // Expect a keyword at the start of each field
-            if (!this.check(token_1.TokenType.Keyword)) {
+            // Phase 6: Accept T.Colon (new) or T.Keyword (backward compat with Phase 5)
+            let keyName;
+            const startToken = this.peek(); // Save token for error reporting
+            if (this.check(token_1.TokenType.Colon)) {
+                // Phase 6 syntax: T.Colon + T.Symbol
+                this.advance(); // consume ':'
+                if (!this.check(token_1.TokenType.Symbol)) {
+                    throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+                }
+                const keyToken = this.advance();
+                keyName = keyToken.value;
+            }
+            else if (this.check(token_1.TokenType.Keyword)) {
+                // Phase 5 backward compatibility: T.Keyword
+                const keyToken = this.advance();
+                keyName = keyToken.value; // e.g., ":body" or ":params"
+                // Remove leading ':' if present
+                if (keyName.startsWith(":")) {
+                    keyName = keyName.substring(1);
+                }
+            }
+            else {
                 throw this.error(`Expected keyword field (starting with :), got ${this.peek().type}`, this.peek());
             }
-            const keyToken = this.advance();
-            const keyName = keyToken.value; // e.g., ":body" or ":params"
             // Collect values for this key (parse until next keyword or closing bracket)
             const values = [];
             // Single value case (most common): :key value
-            if (!this.check(token_1.TokenType.Keyword) && !this.check(token_1.TokenType.RBracket)) {
+            if (!this.check(token_1.TokenType.Keyword) && !this.check(token_1.TokenType.Colon) && !this.check(token_1.TokenType.RBracket)) {
                 values.push(this.parseValue());
             }
-            // Multiple values case: :key val1 val2 ... (until next keyword or ])
-            while (!this.check(token_1.TokenType.Keyword) && !this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
+            // Multiple values case: :key val1 val2 ... (until next keyword/colon or ])
+            while (!this.check(token_1.TokenType.Keyword) && !this.check(token_1.TokenType.Colon) && !this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
                 values.push(this.parseValue());
             }
             // Store field
             if (values.length === 0) {
-                throw this.error(`Expected at least one value for keyword ${keyName}`, keyToken);
+                throw this.error(`Expected at least one value for keyword ${keyName}`, startToken);
             }
             else if (values.length === 1) {
                 fields.set(keyName, values[0]);
@@ -136,6 +177,11 @@ class Parser {
             }
         }
         this.expect(token_1.TokenType.RBracket);
+        // Phase 6: If this is a MODULE block, convert it to ModuleBlock
+        if (blockType === "MODULE") {
+            const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+            return this.convertBlockToModuleBlock(block);
+        }
         const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
         // Phase 3: Always set typeAnnotations (even if empty) for consistent handling
         // FUNC blocks without :return/:params annotations still need to be registered with default types
@@ -147,6 +193,56 @@ class Parser {
             block.generics = generics;
         }
         return block;
+    }
+    // Phase 6: Convert Block to ModuleBlock
+    convertBlockToModuleBlock(block) {
+        const exports = [];
+        const bodyNodes = [];
+        // Extract :exports field (should be an array of symbol names)
+        const exportsField = block.fields?.get("exports");
+        if (exportsField) {
+            if (exportsField.kind === "block" && exportsField.type === "Array") {
+                // :exports [name1 name2 ...]
+                const items = exportsField.fields?.get("items");
+                if (Array.isArray(items)) {
+                    items.forEach((item) => {
+                        if (item.kind === "literal" && item.type === "symbol") {
+                            exports.push(item.value);
+                        }
+                    });
+                }
+            }
+            else if (exportsField.kind === "literal" && exportsField.type === "symbol") {
+                // Single export
+                exports.push(exportsField.value);
+            }
+        }
+        // Extract :body field (should be an array of blocks)
+        const bodyField = block.fields?.get("body");
+        if (bodyField) {
+            if (bodyField.kind === "block" && bodyField.type === "Array") {
+                // :body [blocks...]
+                const items = bodyField.fields?.get("items");
+                if (Array.isArray(items)) {
+                    bodyNodes.push(...items);
+                }
+            }
+            else if (Array.isArray(bodyField)) {
+                // Multiple body items
+                bodyNodes.push(...bodyField);
+            }
+            else {
+                // Single body item
+                bodyNodes.push(bodyField);
+            }
+        }
+        return {
+            kind: "module",
+            name: block.name,
+            exports,
+            body: bodyNodes,
+            path: undefined,
+        };
     }
     // Parse any value: literal, variable, block, S-expr, pattern-match, or array
     parseValue() {
@@ -178,13 +274,14 @@ class Parser {
         if (this.check(token_1.TokenType.LBracket)) {
             // Lookahead: is this a block or value array?
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
             if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === token_1.TokenType.Symbol) {
                 const potentialType = this.tokens[nextIdx].value;
                 // Check if it's a known block type (uppercase) or looks like a block name followed by a keyword
                 const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
                 const nextNextIdx = nextIdx + 1;
-                const hasKeywordAfterName = nextNextIdx < this.tokens.length && this.tokens[nextNextIdx].type === token_1.TokenType.Keyword;
+                const hasKeywordAfterName = nextNextIdx < this.tokens.length &&
+                    (this.tokens[nextNextIdx].type === token_1.TokenType.Keyword || this.tokens[nextNextIdx].type === token_1.TokenType.Colon);
                 if (isKnownType || hasKeywordAfterName) {
                     // It's a block
                     return this.parseBlock();
@@ -193,6 +290,20 @@ class Parser {
                     // It's a value array: [val1 val2 ...]
                     return this.parseArray();
                 }
+            }
+            else if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === token_1.TokenType.Module) {
+                // Phase 6: MODULE keyword token
+                const result = this.parseBlock();
+                // parseBlock() already converts MODULE to ModuleBlock
+                if (result.kind === "module") {
+                    return result;
+                }
+                // Should not reach here
+                throw this.error(`Expected ModuleBlock from parseBlock with MODULE token`, this.peek());
+            }
+            else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === token_1.TokenType.TypeClass || this.tokens[nextIdx].type === token_1.TokenType.Instance)) {
+                // Phase 6: TYPECLASS/INSTANCE keyword tokens
+                return this.parseBlock();
             }
             else {
                 // It's a value array: [val1 val2 ...]
@@ -235,13 +346,36 @@ class Parser {
     }
     // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
     // Also handles match expressions: (match value (pattern body) ...)
+    // Phase 6: Also handles import and open expressions
     parseSExpr() {
         this.expect(token_1.TokenType.LParen);
+        let op;
         const opToken = this.advance();
-        if (opToken.type !== token_1.TokenType.Symbol) {
-            throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
+        // Phase 6: Handle import/open keyword tokens
+        if (opToken.type === token_1.TokenType.Import) {
+            op = "import";
         }
-        let op = opToken.value;
+        else if (opToken.type === token_1.TokenType.Open) {
+            op = "open";
+        }
+        else if (opToken.type !== token_1.TokenType.Symbol) {
+            throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
+        }
+        else {
+            op = opToken.value;
+        }
+        // Special case: import expressions
+        if (op === "import") {
+            const importBlock = this.parseImportExpression();
+            this.expect(token_1.TokenType.RParen);
+            return importBlock;
+        }
+        // Special case: open expressions
+        if (op === "open") {
+            const openBlock = this.parseOpenExpression();
+            this.expect(token_1.TokenType.RParen);
+            return openBlock;
+        }
         // Special case: match expressions
         if (op === "match") {
             const matchExpr = this.parsePatternMatch();
@@ -456,6 +590,124 @@ class Parser {
                 return; // Next block start
             this.advance();
         }
+    }
+    // Phase 6: Parse import expression (import math :from "./math.fl" :as m :only [add])
+    parseImportExpression() {
+        // Module name is next (qualified identifier: math or a:b or a:b:c)
+        const moduleName = this.parseQualifiedIdentifier();
+        // Parse optional clauses: :from, :only, :as
+        let source;
+        let selective;
+        let alias;
+        while (!this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
+            if (this.check(token_1.TokenType.Colon)) {
+                this.advance(); // consume ':'
+                if (!this.check(token_1.TokenType.Symbol)) {
+                    throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+                }
+                const clauseName = this.advance().value;
+                switch (clauseName) {
+                    case "from":
+                        // :from "path"
+                        if (!this.check(token_1.TokenType.String)) {
+                            throw this.error(`Expected string after :from, got ${this.peek().type}`, this.peek());
+                        }
+                        source = this.advance().value;
+                        break;
+                    case "only":
+                        // :only [func1 func2 ...]
+                        if (!this.check(token_1.TokenType.LBracket)) {
+                            throw this.error(`Expected [ after :only, got ${this.peek().type}`, this.peek());
+                        }
+                        selective = this.parseSelectiveImport();
+                        break;
+                    case "as":
+                        // :as alias
+                        if (!this.check(token_1.TokenType.Symbol)) {
+                            throw this.error(`Expected symbol after :as, got ${this.peek().type}`, this.peek());
+                        }
+                        alias = this.advance().value;
+                        break;
+                    default:
+                        throw this.error(`Unknown import clause: ${clauseName}`, this.peek());
+                }
+            }
+            else {
+                throw this.error(`Expected ':' in import expression, got ${this.peek().type}`, this.peek());
+            }
+        }
+        return (0, ast_1.makeImportBlock)(moduleName, source, selective, alias);
+    }
+    // Phase 6: Parse open expression (open math :from "./math.fl")
+    parseOpenExpression() {
+        // Module name is next (qualified identifier)
+        const moduleName = this.parseQualifiedIdentifier();
+        // Parse optional :from clause
+        let source;
+        while (!this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
+            if (this.check(token_1.TokenType.Colon)) {
+                this.advance(); // consume ':'
+                if (!this.check(token_1.TokenType.Symbol)) {
+                    throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+                }
+                const clauseName = this.advance().value;
+                if (clauseName === "from") {
+                    if (!this.check(token_1.TokenType.String)) {
+                        throw this.error(`Expected string after :from, got ${this.peek().type}`, this.peek());
+                    }
+                    source = this.advance().value;
+                }
+                else {
+                    throw this.error(`Unknown open clause: ${clauseName}`, this.peek());
+                }
+            }
+            else {
+                throw this.error(`Expected ':' in open expression, got ${this.peek().type}`, this.peek());
+            }
+        }
+        return (0, ast_1.makeOpenBlock)(moduleName, source);
+    }
+    // Phase 6: Parse qualified identifier (math or math:add or utils:double:helper)
+    // IMPORTANT: Stop when encountering keyword colons like :from, :as, :only
+    parseQualifiedIdentifier() {
+        if (!this.check(token_1.TokenType.Symbol)) {
+            throw this.error(`Expected symbol, got ${this.peek().type}`, this.peek());
+        }
+        const parts = [];
+        parts.push(this.advance().value);
+        // Keyword colons that should NOT be consumed as part of qualified identifiers
+        const keywordColons = new Set(["from", "as", "only", "to", "body", "params", "exports"]);
+        // Check for additional parts separated by colons
+        while (this.check(token_1.TokenType.Colon)) {
+            // Peek ahead to see if the next symbol is a keyword
+            const peekPos = this.pos + 1;
+            if (peekPos >= this.tokens.length)
+                break;
+            const nextToken = this.tokens[peekPos];
+            // If next token is a keyword, stop parsing qualified identifier
+            if (nextToken.type === token_1.TokenType.Symbol && keywordColons.has(nextToken.value)) {
+                break;
+            }
+            this.advance(); // consume ':'
+            if (!this.check(token_1.TokenType.Symbol)) {
+                throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+            }
+            parts.push(this.advance().value);
+        }
+        return parts.join(":");
+    }
+    // Phase 6: Parse selective import list: [func1 func2 ...]
+    parseSelectiveImport() {
+        this.expect(token_1.TokenType.LBracket);
+        const names = [];
+        while (!this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
+            if (!this.check(token_1.TokenType.Symbol)) {
+                throw this.error(`Expected symbol in import list, got ${this.peek().type}`, this.peek());
+            }
+            names.push(this.advance().value);
+        }
+        this.expect(token_1.TokenType.RBracket);
+        return names;
     }
 }
 exports.Parser = Parser;

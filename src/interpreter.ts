@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 
 // ExecutionContext: 런타임 상태 관리
@@ -19,6 +19,7 @@ export interface ExecutionContext {
   typeChecker?: TypeChecker; // Phase 3: Type system
   typeClasses?: Map<string, TypeClassInfo>; // Phase 5 Week 2: Type class registry
   typeClassInstances?: Map<string, TypeClassInstanceInfo>; // Phase 5 Week 2: Type class instances
+  modules?: Map<string, ModuleInfo>; // Phase 6: Module registry
 }
 
 export interface FreeLangFunction {
@@ -64,6 +65,13 @@ export interface TypeClassInstanceInfo {
   implementations: Map<string, any>;  // method name → implementation function
 }
 
+// Phase 6: Module System
+export interface ModuleInfo {
+  name: string;
+  exports: string[];  // 내보낸 함수 이름들
+  functions: Map<string, FreeLangFunction>;  // 모듈 내 정의된 함수들
+}
+
 // Interpreter class
 export class Interpreter {
   private context: ExecutionContext;
@@ -81,16 +89,29 @@ export class Interpreter {
       typeChecker: createTypeChecker(), // Phase 3: Initialize type checker
       typeClasses: new Map(),             // Phase 5 Week 2: Type class registry
       typeClassInstances: new Map(),      // Phase 5 Week 2: Type class instance registry
+      modules: new Map(),                 // Phase 6: Module registry
     };
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
   }
 
-  interpret(blocks: Block[]): ExecutionContext {
-    // Process all blocks
-    for (const block of blocks) {
-      this.evalBlock(block);
+  interpret(blocks: ASTNode[]): ExecutionContext {
+    // Process all blocks/nodes
+    for (const node of blocks) {
+      // Phase 6: Handle both Block types and new S-expression based types
+      if ((node as any).kind === "block" || (node as any).type) {
+        this.evalBlock(node as Block);
+      } else if ((node as any).kind === "import") {
+        this.evalImportBlock(node as any);
+      } else if ((node as any).kind === "open") {
+        this.evalOpenBlock(node as any);
+      } else if ((node as any).kind === "module") {
+        this.evalModuleBlock(node as any);
+      } else {
+        // Other ASTNode types (SExpr, PatternMatch, etc.)
+        this.eval(node);
+      }
     }
 
     // Setup Express routes
@@ -1468,9 +1489,151 @@ export class Interpreter {
   satisfiesConstraint(type: string, constraintClass: string): boolean {
     return !!this.getTypeClassInstance(constraintClass, type);
   }
+
+  // Phase 6 Step 4: Evaluate module block
+  // Module 정의를 등록하고 내부 함수들을 평가
+  private evalModuleBlock(moduleBlock: ModuleBlock): void {
+    const moduleName = moduleBlock.name;
+    const exports = moduleBlock.exports || [];
+    const moduleBody = moduleBlock.body || [];
+
+    // 모듈 내 함수 맵 생성
+    const moduleFunctions = new Map<string, FreeLangFunction>();
+
+    // 모듈 body 내의 블록들을 평가 (함수 등록)
+    for (const node of moduleBody) {
+      const block = node as any;
+      if (block.type === "FUNC") {
+        const funcName = block.name;
+        const params = block.fields?.get("params") || [];
+        const paramNames = Array.isArray(params)
+          ? params.map((p: any) => (typeof p === "string" ? p : (p as any).value))
+          : [];
+        const body = block.fields?.get("body");
+
+        const func: FreeLangFunction = {
+          name: funcName,
+          params: paramNames,
+          body,
+        };
+
+        moduleFunctions.set(funcName, func);
+      }
+    }
+
+    // 모듈 정보 생성 및 등록
+    const moduleInfo: ModuleInfo = {
+      name: moduleName,
+      exports,
+      functions: moduleFunctions,
+    };
+
+    if (!this.context.modules) {
+      this.context.modules = new Map();
+    }
+    this.context.modules.set(moduleName, moduleInfo);
+
+    console.log(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
+  }
+
+  // Phase 6 Step 4: Evaluate import block
+  // 모듈에서 함수를 선택적으로 가져오기
+  private evalImportBlock(importBlock: ImportBlock): void {
+    const moduleName = importBlock.moduleName;
+    const source = importBlock.source; // "./math.fl" 등
+    const selective = importBlock.selective; // :only [add multiply]
+    const alias = importBlock.alias; // :as m
+
+    if (!this.context.modules) {
+      this.context.modules = new Map();
+    }
+
+    // 모듈 찾기
+    const module = this.context.modules.get(moduleName);
+    if (!module) {
+      throw new Error(
+        `Module not found: ${moduleName} (from ${source || "inline"})`
+      );
+    }
+
+    // 가져올 함수 목록 결정
+    let functionsToImport: string[] = [];
+    if (selective && selective.length > 0) {
+      // :only 지정된 함수만 가져오기
+      functionsToImport = selective.filter((name) =>
+        module.exports.includes(name)
+      );
+      // 존재하지 않는 함수 검증
+      selective.forEach((name) => {
+        if (!module.exports.includes(name)) {
+          console.warn(
+            `⚠️  Warning: Function "${name}" not exported from module "${moduleName}"`
+          );
+        }
+      });
+    } else {
+      // 모든 export된 함수 가져오기
+      functionsToImport = [...module.exports];
+    }
+
+    // 함수들을 context.functions에 추가
+    functionsToImport.forEach((funcName) => {
+      const func = module.functions.get(funcName);
+      if (func) {
+        if (alias) {
+          // :as 별칭 사용: (import math :as m) → m:add
+          const qualifiedName = `${alias}:${funcName}`;
+          this.context.functions.set(qualifiedName, func);
+        } else {
+          // 별칭 없음: moduleName:funcName 형식으로 등록
+          const qualifiedName = `${moduleName}:${funcName}`;
+          this.context.functions.set(qualifiedName, func);
+        }
+      }
+    });
+
+    const importedCount = functionsToImport.length;
+    const aliasStr = alias ? ` as ${alias}` : "";
+    const selectStr = selective ? ` (${selective.join(", ")})` : "";
+    console.log(
+      `✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`
+    );
+  }
+
+  // Phase 6 Step 4: Evaluate open block
+  // 모듈의 모든 export된 함수를 전역 네임스페이스에 추가
+  private evalOpenBlock(openBlock: OpenBlock): void {
+    const moduleName = openBlock.moduleName;
+    const source = openBlock.source; // "./math.fl" 등
+
+    if (!this.context.modules) {
+      this.context.modules = new Map();
+    }
+
+    // 모듈 찾기
+    const module = this.context.modules.get(moduleName);
+    if (!module) {
+      throw new Error(
+        `Module not found: ${moduleName} (from ${source || "inline"})`
+      );
+    }
+
+    // 모든 export된 함수를 전역으로 추가
+    module.exports.forEach((funcName) => {
+      const func = module.functions.get(funcName);
+      if (func) {
+        // 전역 네임스페이스에 직접 추가 (별칭 없음)
+        this.context.functions.set(funcName, func);
+      }
+    });
+
+    console.log(
+      `✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`
+    );
+  }
 }
 
-export function interpret(blocks: Block[], app?: express.Express): ExecutionContext {
+export function interpret(blocks: ASTNode[], app?: express.Express): ExecutionContext {
   const interpreter = new Interpreter(app);
   return interpreter.interpret(blocks);
 }

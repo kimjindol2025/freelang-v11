@@ -3,6 +3,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.lex = lex;
 const token_1 = require("./token");
+// Phase 6: Map keywords to token types
+const KEYWORDS = new Map([
+    ["MODULE", token_1.TokenType.Module],
+    ["TYPECLASS", token_1.TokenType.TypeClass],
+    ["INSTANCE", token_1.TokenType.Instance],
+    ["import", token_1.TokenType.Import],
+    ["open", token_1.TokenType.Open],
+]);
+function getKeywordTokenType(text) {
+    return KEYWORDS.get(text) ?? null;
+}
 function lex(source) {
     const tokens = [];
     let i = 0, line = 1, col = 1;
@@ -102,23 +113,12 @@ function lex(source) {
             col++;
             continue;
         }
-        // Colon: keyword prefix
+        // Colon: Phase 6 token separator (not keyword prefix)
         if (ch === ":") {
-            const start = i;
             const startCol = col;
+            tokens.push({ type: token_1.TokenType.Colon, value: ":", line, col: startCol });
             i++;
             col++;
-            // Read keyword name
-            let keyword = "";
-            while (i < source.length && /[a-zA-Z0-9_-]/.test(source[i])) {
-                keyword += source[i];
-                i++;
-                col++;
-            }
-            if (keyword.length === 0) {
-                throw new Error(`Expected keyword name after : at line ${line}, col ${startCol}`);
-            }
-            tokens.push({ type: token_1.TokenType.Keyword, value: keyword, line, col: startCol });
             continue;
         }
         // Variable: $varname
@@ -152,6 +152,7 @@ function lex(source) {
             continue;
         }
         // Symbol: letters, hyphens, etc. (includes & for pattern rest element, | for or-patterns)
+        // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
         if (/[a-zA-Z_<>=!+\-*&/|]/.test(ch)) {
             const start = i;
             const startCol = col;
@@ -160,7 +161,10 @@ function lex(source) {
                 col++;
             }
             const value = source.slice(start, i);
-            tokens.push({ type: token_1.TokenType.Symbol, value, line, col: startCol });
+            // Phase 6: Check for keywords
+            const keywordType = getKeywordTokenType(value);
+            const tokenType = keywordType ?? token_1.TokenType.Symbol;
+            tokens.push({ type: tokenType, value, line, col: startCol });
             continue;
         }
         throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}`);

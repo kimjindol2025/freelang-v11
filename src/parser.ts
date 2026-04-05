@@ -14,6 +14,9 @@ import {
   Pattern,
   PatternMatch,
   MatchCase,
+  ModuleBlock,
+  ImportBlock,
+  OpenBlock,
   makeBlock,
   makeLiteral,
   makeVariable,
@@ -29,6 +32,9 @@ import {
   makeOrPattern,
   makeMatchCase,
   makePatternMatch,
+  makeModuleBlock,
+  makeImportBlock,
+  makeOpenBlock,
 } from "./ast";
 
 export class ParserError extends Error {
@@ -49,23 +55,44 @@ export class Parser {
     this.tokens = tokens;
   }
 
-  parse(): Block[] {
-    const blocks: Block[] = [];
+  parse(): ASTNode[] {
+    const nodes: ASTNode[] = [];
     while (!this.isAtEnd()) {
       if (this.check(T.EOF)) break;
-      blocks.push(this.parseBlock());
+
+      // Phase 6: Handle both blocks and S-expressions at top level
+      if (this.check(T.LBracket)) {
+        nodes.push(this.parseBlock());
+      } else if (this.check(T.LParen)) {
+        nodes.push(this.parseSExpr());
+      } else {
+        throw this.error(
+          `Expected block or S-expression, got ${this.peek().type}`,
+          this.peek()
+        );
+      }
     }
-    return blocks;
+    return nodes;
   }
 
   // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
-  private parseBlock(): Block {
+  // Phase 6: BLOCK_TYPE can be Symbol (old) or keyword token (MODULE, TYPECLASS, INSTANCE)
+  private parseBlock(): Block | ModuleBlock {
     this.expect(T.LBracket);
     const typeToken = this.advance();
-    if (typeToken.type !== T.Symbol) {
-      throw this.error(`Expected block type (symbol), got ${typeToken.type}`, typeToken);
+
+    let blockType: string;
+    if (typeToken.type === T.Symbol) {
+      blockType = typeToken.value;
+    } else if (typeToken.type === T.Module) {
+      blockType = "MODULE";
+    } else if (typeToken.type === T.TypeClass) {
+      blockType = "TYPECLASS";
+    } else if (typeToken.type === T.Instance) {
+      blockType = "INSTANCE";
+    } else {
+      throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
     }
-    const blockType = typeToken.value;
 
     const nameToken = this.advance();
     if (nameToken.type !== T.Symbol) {
@@ -77,35 +104,55 @@ export class Parser {
     const typeAnnotations = new Map<string, TypeAnnotation>();
     let generics: string[] | undefined;
 
-    // Parse fields: :key value :key value ...
+    // Parse fields: :key value :key value ... (Phase 6: T.Colon + T.Symbol instead of T.Keyword)
     while (!this.check(T.RBracket) && !this.isAtEnd()) {
       // Expect a keyword at the start of each field
-      if (!this.check(T.Keyword)) {
+      // Phase 6: Accept T.Colon (new) or T.Keyword (backward compat with Phase 5)
+      let keyName: string;
+      const startToken = this.peek(); // Save token for error reporting
+
+      if (this.check(T.Colon)) {
+        // Phase 6 syntax: T.Colon + T.Symbol
+        this.advance(); // consume ':'
+        if (!this.check(T.Symbol)) {
+          throw this.error(
+            `Expected symbol after ':', got ${this.peek().type}`,
+            this.peek()
+          );
+        }
+        const keyToken = this.advance();
+        keyName = keyToken.value;
+      } else if (this.check(T.Keyword)) {
+        // Phase 5 backward compatibility: T.Keyword
+        const keyToken = this.advance();
+        keyName = keyToken.value; // e.g., ":body" or ":params"
+        // Remove leading ':' if present
+        if (keyName.startsWith(":")) {
+          keyName = keyName.substring(1);
+        }
+      } else {
         throw this.error(
           `Expected keyword field (starting with :), got ${this.peek().type}`,
           this.peek()
         );
       }
 
-      const keyToken = this.advance();
-      const keyName = keyToken.value; // e.g., ":body" or ":params"
-
       // Collect values for this key (parse until next keyword or closing bracket)
       const values: ASTNode[] = [];
 
       // Single value case (most common): :key value
-      if (!this.check(T.Keyword) && !this.check(T.RBracket)) {
+      if (!this.check(T.Keyword) && !this.check(T.Colon) && !this.check(T.RBracket)) {
         values.push(this.parseValue());
       }
 
-      // Multiple values case: :key val1 val2 ... (until next keyword or ])
-      while (!this.check(T.Keyword) && !this.check(T.RBracket) && !this.isAtEnd()) {
+      // Multiple values case: :key val1 val2 ... (until next keyword/colon or ])
+      while (!this.check(T.Keyword) && !this.check(T.Colon) && !this.check(T.RBracket) && !this.isAtEnd()) {
         values.push(this.parseValue());
       }
 
       // Store field
       if (values.length === 0) {
-        throw this.error(`Expected at least one value for keyword ${keyName}`, keyToken);
+        throw this.error(`Expected at least one value for keyword ${keyName}`, startToken);
       } else if (values.length === 1) {
         fields.set(keyName, values[0]);
       } else {
@@ -178,6 +225,13 @@ export class Parser {
     }
 
     this.expect(T.RBracket);
+
+    // Phase 6: If this is a MODULE block, convert it to ModuleBlock
+    if (blockType === "MODULE") {
+      const block = makeBlock(blockType, blockName, fields);
+      return this.convertBlockToModuleBlock(block);
+    }
+
     const block = makeBlock(blockType, blockName, fields);
     // Phase 3: Always set typeAnnotations (even if empty) for consistent handling
     // FUNC blocks without :return/:params annotations still need to be registered with default types
@@ -189,6 +243,57 @@ export class Parser {
       block.generics = generics;
     }
     return block;
+  }
+
+  // Phase 6: Convert Block to ModuleBlock
+  private convertBlockToModuleBlock(block: Block): ModuleBlock {
+    const exports: string[] = [];
+    const bodyNodes: ASTNode[] = [];
+
+    // Extract :exports field (should be an array of symbol names)
+    const exportsField = block.fields?.get("exports");
+    if (exportsField) {
+      if ((exportsField as any).kind === "block" && (exportsField as any).type === "Array") {
+        // :exports [name1 name2 ...]
+        const items = (exportsField as any).fields?.get("items") as ASTNode[];
+        if (Array.isArray(items)) {
+          items.forEach((item) => {
+            if ((item as any).kind === "literal" && (item as any).type === "symbol") {
+              exports.push((item as any).value);
+            }
+          });
+        }
+      } else if ((exportsField as any).kind === "literal" && (exportsField as any).type === "symbol") {
+        // Single export
+        exports.push((exportsField as any).value);
+      }
+    }
+
+    // Extract :body field (should be an array of blocks)
+    const bodyField = block.fields?.get("body");
+    if (bodyField) {
+      if ((bodyField as any).kind === "block" && (bodyField as any).type === "Array") {
+        // :body [blocks...]
+        const items = (bodyField as any).fields?.get("items") as ASTNode[];
+        if (Array.isArray(items)) {
+          bodyNodes.push(...items);
+        }
+      } else if (Array.isArray(bodyField)) {
+        // Multiple body items
+        bodyNodes.push(...(bodyField as ASTNode[]));
+      } else {
+        // Single body item
+        bodyNodes.push(bodyField as ASTNode);
+      }
+    }
+
+    return {
+      kind: "module",
+      name: block.name,
+      exports,
+      body: bodyNodes,
+      path: undefined,
+    };
   }
 
   // Parse any value: literal, variable, block, S-expr, pattern-match, or array
@@ -226,14 +331,16 @@ export class Parser {
     if (this.check(T.LBracket)) {
       // Lookahead: is this a block or value array?
       const nextIdx = this.pos + 1;
-      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE"];
+      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+
 
       if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {
         const potentialType = this.tokens[nextIdx].value;
         // Check if it's a known block type (uppercase) or looks like a block name followed by a keyword
         const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
         const nextNextIdx = nextIdx + 1;
-        const hasKeywordAfterName = nextNextIdx < this.tokens.length && this.tokens[nextNextIdx].type === T.Keyword;
+        const hasKeywordAfterName = nextNextIdx < this.tokens.length &&
+          (this.tokens[nextNextIdx].type === T.Keyword || this.tokens[nextNextIdx].type === T.Colon);
 
         if (isKnownType || hasKeywordAfterName) {
           // It's a block
@@ -242,6 +349,18 @@ export class Parser {
           // It's a value array: [val1 val2 ...]
           return this.parseArray();
         }
+      } else if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Module) {
+        // Phase 6: MODULE keyword token
+        const result = this.parseBlock();
+        // parseBlock() already converts MODULE to ModuleBlock
+        if (result.kind === "module") {
+          return result;
+        }
+        // Should not reach here
+        throw this.error(`Expected ModuleBlock from parseBlock with MODULE token`, this.peek());
+      } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === T.TypeClass || this.tokens[nextIdx].type === T.Instance)) {
+        // Phase 6: TYPECLASS/INSTANCE keyword tokens
+        return this.parseBlock();
       } else {
         // It's a value array: [val1 val2 ...]
         return this.parseArray();
@@ -286,14 +405,37 @@ export class Parser {
 
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
   // Also handles match expressions: (match value (pattern body) ...)
-  private parseSExpr(): SExpr | PatternMatch {
+  // Phase 6: Also handles import and open expressions
+  private parseSExpr(): SExpr | PatternMatch | ImportBlock | OpenBlock {
     this.expect(T.LParen);
 
+    let op: string;
     const opToken = this.advance();
-    if (opToken.type !== T.Symbol) {
-      throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
+
+    // Phase 6: Handle import/open keyword tokens
+    if (opToken.type === T.Import) {
+      op = "import";
+    } else if (opToken.type === T.Open) {
+      op = "open";
+    } else if (opToken.type !== T.Symbol) {
+      throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
+    } else {
+      op = opToken.value;
     }
-    let op = opToken.value;
+
+    // Special case: import expressions
+    if (op === "import") {
+      const importBlock = this.parseImportExpression();
+      this.expect(T.RParen);
+      return importBlock;
+    }
+
+    // Special case: open expressions
+    if (op === "open") {
+      const openBlock = this.parseOpenExpression();
+      this.expect(T.RParen);
+      return openBlock;
+    }
 
     // Special case: match expressions
     if (op === "match") {
@@ -552,9 +694,154 @@ export class Parser {
       this.advance();
     }
   }
+
+  // Phase 6: Parse import expression (import math :from "./math.fl" :as m :only [add])
+  private parseImportExpression(): ImportBlock {
+    // Module name is next (qualified identifier: math or a:b or a:b:c)
+    const moduleName = this.parseQualifiedIdentifier();
+
+    // Parse optional clauses: :from, :only, :as
+    let source: string | undefined;
+    let selective: string[] | undefined;
+    let alias: string | undefined;
+
+    while (!this.check(T.RParen) && !this.isAtEnd()) {
+      if (this.check(T.Colon)) {
+        this.advance(); // consume ':'
+        if (!this.check(T.Symbol)) {
+          throw this.error(
+            `Expected symbol after ':', got ${this.peek().type}`,
+            this.peek()
+          );
+        }
+
+        const clauseName = this.advance().value;
+
+        switch (clauseName) {
+          case "from":
+            // :from "path"
+            if (!this.check(T.String)) {
+              throw this.error(`Expected string after :from, got ${this.peek().type}`, this.peek());
+            }
+            source = this.advance().value;
+            break;
+
+          case "only":
+            // :only [func1 func2 ...]
+            if (!this.check(T.LBracket)) {
+              throw this.error(`Expected [ after :only, got ${this.peek().type}`, this.peek());
+            }
+            selective = this.parseSelectiveImport();
+            break;
+
+          case "as":
+            // :as alias
+            if (!this.check(T.Symbol)) {
+              throw this.error(`Expected symbol after :as, got ${this.peek().type}`, this.peek());
+            }
+            alias = this.advance().value;
+            break;
+
+          default:
+            throw this.error(`Unknown import clause: ${clauseName}`, this.peek());
+        }
+      } else {
+        throw this.error(`Expected ':' in import expression, got ${this.peek().type}`, this.peek());
+      }
+    }
+
+    return makeImportBlock(moduleName, source, selective, alias);
+  }
+
+  // Phase 6: Parse open expression (open math :from "./math.fl")
+  private parseOpenExpression(): OpenBlock {
+    // Module name is next (qualified identifier)
+    const moduleName = this.parseQualifiedIdentifier();
+
+    // Parse optional :from clause
+    let source: string | undefined;
+
+    while (!this.check(T.RParen) && !this.isAtEnd()) {
+      if (this.check(T.Colon)) {
+        this.advance(); // consume ':'
+        if (!this.check(T.Symbol)) {
+          throw this.error(
+            `Expected symbol after ':', got ${this.peek().type}`,
+            this.peek()
+          );
+        }
+
+        const clauseName = this.advance().value;
+
+        if (clauseName === "from") {
+          if (!this.check(T.String)) {
+            throw this.error(`Expected string after :from, got ${this.peek().type}`, this.peek());
+          }
+          source = this.advance().value;
+        } else {
+          throw this.error(`Unknown open clause: ${clauseName}`, this.peek());
+        }
+      } else {
+        throw this.error(`Expected ':' in open expression, got ${this.peek().type}`, this.peek());
+      }
+    }
+
+    return makeOpenBlock(moduleName, source);
+  }
+
+  // Phase 6: Parse qualified identifier (math or math:add or utils:double:helper)
+  // IMPORTANT: Stop when encountering keyword colons like :from, :as, :only
+  private parseQualifiedIdentifier(): string {
+    if (!this.check(T.Symbol)) {
+      throw this.error(`Expected symbol, got ${this.peek().type}`, this.peek());
+    }
+
+    const parts: string[] = [];
+    parts.push(this.advance().value);
+
+    // Keyword colons that should NOT be consumed as part of qualified identifiers
+    const keywordColons = new Set(["from", "as", "only", "to", "body", "params", "exports"]);
+
+    // Check for additional parts separated by colons
+    while (this.check(T.Colon)) {
+      // Peek ahead to see if the next symbol is a keyword
+      const peekPos = this.pos + 1;
+      if (peekPos >= this.tokens.length) break;
+      const nextToken = this.tokens[peekPos];
+
+      // If next token is a keyword, stop parsing qualified identifier
+      if (nextToken.type === T.Symbol && keywordColons.has(nextToken.value)) {
+        break;
+      }
+
+      this.advance(); // consume ':'
+      if (!this.check(T.Symbol)) {
+        throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+      }
+      parts.push(this.advance().value);
+    }
+
+    return parts.join(":");
+  }
+
+  // Phase 6: Parse selective import list: [func1 func2 ...]
+  private parseSelectiveImport(): string[] {
+    this.expect(T.LBracket);
+    const names: string[] = [];
+
+    while (!this.check(T.RBracket) && !this.isAtEnd()) {
+      if (!this.check(T.Symbol)) {
+        throw this.error(`Expected symbol in import list, got ${this.peek().type}`, this.peek());
+      }
+      names.push(this.advance().value);
+    }
+
+    this.expect(T.RBracket);
+    return names;
+  }
 }
 
-export function parse(tokens: Token[]): Block[] {
+export function parse(tokens: Token[]): ASTNode[] {
   const parser = new Parser(tokens);
   return parser.parse();
 }

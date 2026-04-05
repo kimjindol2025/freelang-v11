@@ -2,6 +2,19 @@
 
 import { Token, TokenType as T } from "./token";
 
+// Phase 6: Map keywords to token types
+const KEYWORDS: Map<string, T> = new Map([
+  ["MODULE", T.Module],
+  ["TYPECLASS", T.TypeClass],
+  ["INSTANCE", T.Instance],
+  ["import", T.Import],
+  ["open", T.Open],
+]);
+
+function getKeywordTokenType(text: string): T | null {
+  return KEYWORDS.get(text) ?? null;
+}
+
 export function lex(source: string): Token[] {
   const tokens: Token[] = [];
   let i = 0, line = 1, col = 1;
@@ -98,26 +111,12 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    // Colon: keyword prefix
+    // Colon: Phase 6 token separator (not keyword prefix)
     if (ch === ":") {
-      const start = i;
       const startCol = col;
+      tokens.push({ type: T.Colon, value: ":", line, col: startCol });
       i++;
       col++;
-
-      // Read keyword name
-      let keyword = "";
-      while (i < source.length && /[a-zA-Z0-9_-]/.test(source[i])) {
-        keyword += source[i];
-        i++;
-        col++;
-      }
-
-      if (keyword.length === 0) {
-        throw new Error(`Expected keyword name after : at line ${line}, col ${startCol}`);
-      }
-
-      tokens.push({ type: T.Keyword, value: keyword, line, col: startCol });
       continue;
     }
 
@@ -159,6 +158,7 @@ export function lex(source: string): Token[] {
     }
 
     // Symbol: letters, hyphens, etc. (includes & for pattern rest element, | for or-patterns)
+    // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
     if (/[a-zA-Z_<>=!+\-*&/|]/.test(ch)) {
       const start = i;
       const startCol = col;
@@ -169,7 +169,12 @@ export function lex(source: string): Token[] {
       }
 
       const value = source.slice(start, i);
-      tokens.push({ type: T.Symbol, value, line, col: startCol });
+
+      // Phase 6: Check for keywords
+      const keywordType = getKeywordTokenType(value);
+      const tokenType = keywordType ?? T.Symbol;
+
+      tokens.push({ type: tokenType, value, line, col: startCol });
       continue;
     }
 

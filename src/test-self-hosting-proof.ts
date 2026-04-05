@@ -25,7 +25,8 @@ console.log("\n🌳 STEP 2: TypeScript parser parses into AST");
 const blocks = parse(tokens);
 console.log(`   ✅ Generated ${blocks.length} blocks (FUNC definitions)`);
 blocks.forEach(b => {
-  console.log(`      - [${b.type} ${b.name}]`);
+  const block = b as any;
+  console.log(`      - [${block.type} ${block.name}]`);
 });
 
 // STEP 3: TypeScript interpreter loads the functions

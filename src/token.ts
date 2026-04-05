@@ -14,6 +14,13 @@ export enum TokenType {
   LParen = "LParen",       // (
   RParen = "RParen",       // )
 
+  // Phase 6 Keywords
+  Module = "Module",       // MODULE
+  TypeClass = "TypeClass", // TYPECLASS
+  Instance = "Instance",   // INSTANCE
+  Import = "Import",       // import
+  Open = "Open",           // open
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",
