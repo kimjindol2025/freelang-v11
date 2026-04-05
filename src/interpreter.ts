@@ -141,7 +141,24 @@ export class Interpreter {
     } else if ((paramsField as any)?.kind === "block" && (paramsField as any).type === "Array") {
       const items = (paramsField as any).fields.get("items");
       if (Array.isArray(items)) {
-        params.push(...items.map((item: any) => item.name));
+        params.push(...items.map((item: any) => {
+          // Phase 3: New syntax [[$x int] [$y string]] - item is an Array block with [Variable, Type]
+          if (item.kind === "block" && item.type === "Array") {
+            const innerItems = item.fields.get("items");
+            if (Array.isArray(innerItems) && innerItems.length > 0) {
+              const firstItem = innerItems[0];
+              if (firstItem.kind === "variable") {
+                return firstItem.name; // Extract parameter name from Variable
+              }
+            }
+          }
+          // Old syntax [$x $y] - item is a Variable directly
+          if (item.kind === "variable") {
+            return item.name;
+          }
+          // Fallback
+          return item.name || "$unknown";
+        }));
       }
     }
 

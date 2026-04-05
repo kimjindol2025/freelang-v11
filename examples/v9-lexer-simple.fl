@@ -1,25 +1,25 @@
-[FUNC tokenize-simple
-  :params [[$source string]]
-  :return string
-  :body (concat "Tokenized: " (concat $source " (length=" (length $source) ")"))
-]
-
-[FUNC char-count
-  :params [[$source string]]
+[FUNC string-length
+  :params [[$s string]]
   :return int
-  :body (length $source)
+  :body (length $s)
 ]
 
-[FUNC first-char
-  :params [[$source string]]
+[FUNC get-char
+  :params [[$s string] [$pos int]]
   :return string
-  :body (char-at $source 0)
+  :body (char-at $s $pos)
 ]
 
-[FUNC last-char
-  :params [[$source string]]
+[FUNC get-first
+  :params [[$s string]]
   :return string
-  :body (char-at $source (- (length $source) 1))
+  :body (char-at $s 0)
+]
+
+[FUNC get-last
+  :params [[$s string]]
+  :return string
+  :body (char-at $s (- (length $s) 1))
 ]
 
 [FUNC is-digit?

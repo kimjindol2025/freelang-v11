@@ -1,0 +1,104 @@
+[FUNC test-string-length
+  :params []
+  :return bool
+  :body (= (string-length "[FUNC test]") 11)
+]
+
+[FUNC test-get-first-bracket
+  :params []
+  :return bool
+  :body (= (get-first "[FUNC test]") "[")
+]
+
+[FUNC test-get-first-paren
+  :params []
+  :return bool
+  :body (= (get-first "(+ 1 2)") "(")
+]
+
+[FUNC test-get-last-bracket
+  :params []
+  :return bool
+  :body (= (get-last "[FUNC test]") "]")
+]
+
+[FUNC test-get-last-paren
+  :params []
+  :return bool
+  :body (= (get-last "(+ 1 2)") ")")
+]
+
+[FUNC test-get-char
+  :params []
+  :return bool
+  :body (= (get-char "[FUNC test]" 0) "[")
+]
+
+[FUNC test-is-digit-5
+  :params []
+  :return bool
+  :body (is-digit? "5")
+]
+
+[FUNC test-is-digit-0
+  :params []
+  :return bool
+  :body (is-digit? "0")
+]
+
+[FUNC test-is-digit-9
+  :params []
+  :return bool
+  :body (is-digit? "9")
+]
+
+[FUNC test-not-digit-a
+  :params []
+  :return bool
+  :body (not (is-digit? "a"))
+]
+
+[FUNC test-is-whitespace-space
+  :params []
+  :return bool
+  :body (is-whitespace? " ")
+]
+
+[FUNC test-is-whitespace-tab
+  :params []
+  :return bool
+  :body (is-whitespace? "\t")
+]
+
+[FUNC test-not-whitespace-a
+  :params []
+  :return bool
+  :body (not (is-whitespace? "a"))
+]
+
+[FUNC all-tests-pass
+  :params []
+  :return bool
+  :body (and
+    (test-string-length)
+    (test-get-first-bracket)
+    (test-get-first-paren)
+    (test-get-last-bracket)
+    (test-get-last-paren)
+    (test-get-char)
+    (test-is-digit-5)
+    (test-is-digit-0)
+    (test-is-digit-9)
+    (test-not-digit-a)
+    (test-is-whitespace-space)
+    (test-is-whitespace-tab)
+    (test-not-whitespace-a)
+  )
+]
+
+[INTENT test-lexer
+  :all-pass (all-tests-pass)
+  :length-test (test-string-length)
+  :first-char-test (test-get-first-bracket)
+  :digit-test (test-is-digit-5)
+]
