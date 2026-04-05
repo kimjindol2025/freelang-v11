@@ -158,12 +158,12 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    // Symbol: letters, hyphens, etc.
-    if (/[a-zA-Z_<>=!+\-*/]/.test(ch)) {
+    // Symbol: letters, hyphens, etc. (includes & for pattern rest element)
+    if (/[a-zA-Z_<>=!+\-*&/]/.test(ch)) {
       const start = i;
       const startCol = col;
 
-      while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?]/.test(source[i])) {
+      while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&]/.test(source[i])) {
         i++;
         col++;
       }

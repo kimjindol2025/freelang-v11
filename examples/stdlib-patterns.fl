@@ -1,0 +1,35 @@
+[FUNC classify-number
+  :params [$n]
+  :return symbol
+  :body (match $n
+    (0 "zero")
+    (1 "one")
+    (_ "many")
+  )
+]
+
+[FUNC first
+  :params [$list]
+  :return any
+  :body (match $list
+    ([x & _] $x)
+    (_ nil)
+  )
+]
+
+[FUNC pair-sum
+  :params [$pair]
+  :return number
+  :body (match $pair
+    ([x y] (+ $x $y))
+    (_ 0)
+  )
+]
+
+[FUNC ignore-arg
+  :params [$x]
+  :return number
+  :body (match $x
+    (_ 42)
+  )
+]

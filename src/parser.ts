@@ -11,6 +11,9 @@ import {
   Keyword,
   TypeAnnotation,
   TypeVariable,
+  Pattern,
+  PatternMatch,
+  MatchCase,
   makeBlock,
   makeLiteral,
   makeVariable,
@@ -18,6 +21,13 @@ import {
   makeKeyword,
   makeTypeAnnotation,
   makeTypeVariable,
+  makeLiteralPattern,
+  makeVariablePattern,
+  makeWildcardPattern,
+  makeListPattern,
+  makeStructPattern,
+  makeMatchCase,
+  makePatternMatch,
 } from "./ast";
 
 export class ParserError extends Error {
@@ -180,9 +190,9 @@ export class Parser {
     return block;
   }
 
-  // Parse any value: literal, variable, block, S-expr, or array
+  // Parse any value: literal, variable, block, S-expr, pattern-match, or array
   private parseValue(): ASTNode {
-    // Check for S-expression: (op arg1 arg2 ...)
+    // Check for S-expression or match expression: (op arg1 arg2 ...) or (match ...)
     if (this.check(T.LParen)) {
       return this.parseSExpr();
     }
@@ -262,7 +272,8 @@ export class Parser {
   }
 
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
-  private parseSExpr(): SExpr {
+  // Also handles match expressions: (match value (pattern body) ...)
+  private parseSExpr(): SExpr | PatternMatch {
     this.expect(T.LParen);
 
     const opToken = this.advance();
@@ -270,6 +281,13 @@ export class Parser {
       throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
     }
     let op = opToken.value;
+
+    // Special case: match expressions
+    if (op === "match") {
+      const matchExpr = this.parsePatternMatch();
+      this.expect(T.RParen);
+      return matchExpr;
+    }
 
     // Phase 4: Handle generic function syntax: (identity[int] ...)
     if (this.check(T.LBracket)) {
@@ -333,6 +351,120 @@ export class Parser {
     }
 
     return makeTypeAnnotation(typeName, generic, undefined, optional);
+  }
+
+  // ===== Pattern Matching (Phase 4 Week 3-4) =====
+
+  // Parse pattern: literal, variable, wildcard, list, or struct
+  private parsePattern(): Pattern {
+    // Wildcard pattern: _
+    if (this.check(T.Symbol) && this.peek().value === "_") {
+      this.advance();
+      return makeWildcardPattern();
+    }
+
+    // Variable pattern: x, y, name
+    if (this.check(T.Symbol)) {
+      const nameToken = this.advance();
+      return makeVariablePattern(nameToken.value);
+    }
+
+    // Literal pattern: number, string, boolean
+    if (this.check(T.Number)) {
+      const token = this.advance();
+      return makeLiteralPattern("number", parseFloat(token.value));
+    }
+
+    if (this.check(T.String)) {
+      const token = this.advance();
+      return makeLiteralPattern("string", token.value);
+    }
+
+    // List pattern: [x y z] or [x & rest]
+    if (this.check(T.LBracket)) {
+      this.advance(); // consume [
+      const elements: Pattern[] = [];
+      let restElement: string | undefined;
+
+      while (!this.check(T.RBracket) && !this.isAtEnd()) {
+        // Check for rest element: & name
+        if (this.check(T.Symbol) && this.peek().value === "&") {
+          this.advance(); // consume &
+          if (this.check(T.Symbol)) {
+            const nameToken = this.advance();
+            restElement = nameToken.value;
+          }
+          break; // rest element must be last
+        }
+
+        elements.push(this.parsePattern());
+      }
+
+      this.expect(T.RBracket);
+      return makeListPattern(elements, restElement);
+    }
+
+    // Struct pattern: {:name :age} (not fully implemented yet)
+    if (this.check(T.Keyword)) {
+      const fields = new Map<string, Pattern>();
+      while (this.check(T.Keyword) && !this.isAtEnd()) {
+        const keyToken = this.advance();
+        const fieldName = keyToken.value; // e.g., ":name"
+        const pattern = this.parsePattern();
+        fields.set(fieldName, pattern);
+      }
+      return makeStructPattern(fields);
+    }
+
+    throw this.error(`Expected pattern, got ${this.peek().type}`, this.peek());
+  }
+
+  // Parse match expression: (match value (pattern body) (pattern body) ... [default])
+  // Note: Opening paren '(' already consumed by parseSExpr
+  private parsePatternMatch(): PatternMatch {
+    // 'match' keyword already consumed by parseSExpr
+    // Just parse the value to match and cases
+
+    // Parse value to match
+    const value = this.parseValue();
+
+    // Parse cases: (pattern body) (pattern body) ...
+    const cases: MatchCase[] = [];
+    let defaultCase: ASTNode | undefined;
+
+    while (this.check(T.LParen) && !this.isAtEnd()) {
+      this.advance(); // consume (
+
+      // Check for default case: (default body)
+      if (this.check(T.Symbol) && this.peek().value === "default") {
+        this.advance(); // consume 'default'
+        defaultCase = this.parseValue();
+        this.expect(T.RParen);
+        break; // default must be last
+      }
+
+      // Parse pattern
+      const pattern = this.parsePattern();
+
+      // Check for optional guard: (if condition)
+      let guard: ASTNode | undefined;
+      if (this.check(T.LParen) && this.peekNext()?.value === "if") {
+        this.advance(); // consume (
+        this.advance(); // consume 'if'
+        guard = this.parseValue();
+        this.expect(T.RParen);
+      }
+
+      // Parse body
+      const body = this.parseValue();
+      cases.push(makeMatchCase(pattern, body, guard));
+
+      this.expect(T.RParen);
+    }
+
+    // Note: Closing paren will be consumed by parseSExpr
+
+    return makePatternMatch(value, cases, defaultCase);
   }
 
   // ===== Utility Methods =====

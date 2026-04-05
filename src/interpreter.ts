@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 
 // ExecutionContext: 런타임 상태 관리
@@ -338,6 +338,11 @@ export class Interpreter {
         result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
       }
       return result;
+    }
+
+    // Pattern matching (Phase 4 Week 3-4)
+    if ((node as any).kind === "pattern-match") {
+      return this.evalPatternMatch(node as PatternMatch);
     }
 
     return null;
@@ -783,6 +788,157 @@ export class Interpreter {
       return defaultValue;
     }
     return this.eval(field as ASTNode);
+  }
+
+  // ===== Pattern Matching (Phase 4 Week 3-4) =====
+
+  private evalPatternMatch(match: PatternMatch): any {
+    // Evaluate the value to match
+    const value = this.eval(match.value);
+
+    // Try each case in order
+    for (const caseItem of match.cases) {
+      // Save current variable scope
+      const savedVars = new Map(this.context.variables);
+
+      // Try to match pattern
+      const matchResult = this.matchPattern(caseItem.pattern, value);
+
+      if (matchResult.matched) {
+        // Bind matched variables
+        for (const [varName, varValue] of matchResult.bindings) {
+          this.context.variables.set("$" + varName, varValue);
+        }
+
+        // Check guard condition if present
+        if (caseItem.guard) {
+          const guardResult = this.eval(caseItem.guard);
+          if (!guardResult) {
+            // Guard failed, restore and try next case
+            this.context.variables = savedVars;
+            continue;
+          }
+        }
+
+        // Execute body
+        const result = this.eval(caseItem.body);
+
+        // Restore variables and return result
+        this.context.variables = savedVars;
+        return result;
+      }
+
+      // Restore variables for next iteration
+      this.context.variables = savedVars;
+    }
+
+    // No case matched, try default case
+    if (match.defaultCase) {
+      return this.eval(match.defaultCase);
+    }
+
+    // No match found
+    throw new Error("Pattern match exhausted without matching case");
+  }
+
+  // Try to match a pattern against a value
+  // Returns {matched: boolean, bindings: Map<string, any>}
+  private matchPattern(pattern: Pattern, value: any): { matched: boolean; bindings: Map<string, any> } {
+    const bindings = new Map<string, any>();
+
+    // Literal pattern: match exact value
+    if ((pattern as any).kind === "literal-pattern") {
+      const litPattern = pattern as LiteralPattern;
+      if (litPattern.value === value) {
+        return { matched: true, bindings };
+      }
+      return { matched: false, bindings };
+    }
+
+    // Variable pattern: always matches, binds variable
+    if ((pattern as any).kind === "variable-pattern") {
+      const varPattern = pattern as VariablePattern;
+      bindings.set(varPattern.name, value);
+      return { matched: true, bindings };
+    }
+
+    // Wildcard pattern: always matches, no binding
+    if ((pattern as any).kind === "wildcard-pattern") {
+      return { matched: true, bindings };
+    }
+
+    // List pattern: match array elements
+    if ((pattern as any).kind === "list-pattern") {
+      const listPattern = pattern as ListPattern;
+
+      // Value must be an array
+      if (!Array.isArray(value)) {
+        return { matched: false, bindings };
+      }
+
+      // Match elements
+      const elements = listPattern.elements;
+      let matchedCount = 0;
+
+      for (let i = 0; i < elements.length; i++) {
+        if (i >= value.length) {
+          // Not enough elements
+          return { matched: false, bindings };
+        }
+
+        const elemResult = this.matchPattern(elements[i], value[i]);
+        if (!elemResult.matched) {
+          return { matched: false, bindings };
+        }
+
+        // Merge bindings
+        for (const [name, val] of elemResult.bindings) {
+          bindings.set(name, val);
+        }
+
+        matchedCount++;
+      }
+
+      // Handle rest element: [x & rest]
+      if (listPattern.restElement) {
+        const restValues = value.slice(matchedCount);
+        bindings.set(listPattern.restElement, restValues);
+      } else if (matchedCount < value.length) {
+        // If no rest element, must match exact length
+        return { matched: false, bindings };
+      }
+
+      return { matched: true, bindings };
+    }
+
+    // Struct pattern: match object fields
+    if ((pattern as any).kind === "struct-pattern") {
+      const structPattern = pattern as StructPattern;
+
+      // Value must be an object
+      if (typeof value !== "object" || value === null) {
+        return { matched: false, bindings };
+      }
+
+      // Match each field
+      for (const [fieldName, fieldPattern] of structPattern.fields) {
+        const fieldValue = value[fieldName];
+        const fieldResult = this.matchPattern(fieldPattern, fieldValue);
+        if (!fieldResult.matched) {
+          return { matched: false, bindings };
+        }
+
+        // Merge bindings
+        for (const [name, val] of fieldResult.bindings) {
+          bindings.set(name, val);
+        }
+      }
+
+      return { matched: true, bindings };
+    }
+
+    // Unknown pattern type
+    return { matched: false, bindings };
   }
 
   // Utility: Get context
