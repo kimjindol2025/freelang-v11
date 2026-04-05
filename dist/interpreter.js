@@ -318,6 +318,32 @@ class Interpreter {
     }
     evalSExpr(expr) {
         const op = expr.op;
+        // Phase 5 Week 2: Method dispatch (ClassName:methodName pattern)
+        // Syntax: (Monad:pure $value) or (Functor:fmap $fn $value)
+        if (typeof op === "string" && op.includes(":")) {
+            const [className, methodName] = op.split(":");
+            // For now, assume the first argument is the concrete type value
+            // In future, we can extract the type from the value itself
+            if (expr.args.length > 0) {
+                const concreteValue = this.eval(expr.args[0]);
+                const concreteType = this.getConcreteType(concreteValue);
+                if (concreteType) {
+                    const method = this.resolveMethod(className, concreteType, methodName);
+                    if (method) {
+                        // Evaluate remaining arguments
+                        const args = expr.args.slice(1).map((arg) => this.eval(arg));
+                        // Call the method with the concrete value as first argument
+                        if (method.kind === "function-value") {
+                            return this.callFunctionValue(method, [concreteValue, ...args]);
+                        }
+                        else if (typeof method === "function") {
+                            return method(concreteValue, ...args);
+                        }
+                    }
+                }
+            }
+            // If method dispatch fails, fall through to standard function lookup
+        }
         // Phase 4 Week 1: First-class functions - handle before arg evaluation
         if (op === "fn") {
             // (fn [$x $y] (+ $x $y))
@@ -1397,6 +1423,14 @@ class Interpreter {
     satisfiesConstraint(type, constraintClass) {
         return !!this.getTypeClassInstance(constraintClass, type);
     }
+    // Phase 5 Week 2: Resolve method for a given className and concreteType
+    resolveMethod(className, concreteType, methodName) {
+        const instance = this.getTypeClassInstance(className, concreteType);
+        if (!instance) {
+            return undefined;
+        }
+        return instance.implementations.get(methodName);
+    }
     // Phase 6 Step 4: Helper to ensure modules map exists
     getModules() {
         if (!this.context.modules) {
@@ -1495,6 +1529,32 @@ class Interpreter {
         const aliasStr = alias ? ` as ${alias}` : "";
         const selectStr = selective ? ` (${selective.join(", ")})` : "";
         this.logger.info(`✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`);
+    }
+    // Phase 5 Week 2: Get concrete type from a value
+    // Maps values like {tag: "Ok", ...} to "Result", {tag: "Some", ...} to "Option", etc.
+    getConcreteType(value) {
+        if (!value || typeof value !== "object") {
+            return undefined;
+        }
+        // Check for tagged values (Result, Option, etc.)
+        if (value.tag === "Ok" || value.tag === "Err") {
+            return "Result";
+        }
+        if (value.tag === "Some" || value.tag === "None") {
+            return "Option";
+        }
+        // Check for array (List)
+        if (Array.isArray(value)) {
+            return "List";
+        }
+        // Check for custom type markers
+        if (value.kind === "Result")
+            return "Result";
+        if (value.kind === "Option")
+            return "Option";
+        if (value.kind === "List")
+            return "List";
+        return undefined;
     }
     // Phase 6 Step 4: Evaluate open block
     // 모듈의 모든 export된 함수를 전역 네임스페이스에 추가
