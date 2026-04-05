@@ -395,6 +395,52 @@ export class Interpreter {
         // (cond [test1 result1] [test2 result2] [else default])
         return this.evalCond(expr.args);
 
+      // String/Character Operations (Phase 3 W2: Self-hosting support)
+      case "char-at":
+        // (char-at "hello" 1) → "e"
+        return typeof args[0] === "string" && typeof args[1] === "number"
+          ? args[0][Math.floor(args[1])] || ""
+          : "";
+      case "char-code":
+        // (char-code "A") → 65
+        if (typeof args[0] === "string" && args[0].length > 0) {
+          return args[0].charCodeAt(0);
+        }
+        throw new Error(`char-code expects non-empty string, got ${typeof args[0]}`);
+      case "substring":
+        // (substring "hello" 1 4) → "ell"
+        return typeof args[0] === "string"
+          ? args[0].substring(Math.floor(args[1] || 0), Math.floor(args[2] || args[0].length))
+          : "";
+      case "is-whitespace?":
+        // (is-whitespace? " ") → true
+        return /^\s$/.test(String(args[0]));
+      case "is-digit?":
+        // (is-digit? "5") → true
+        return /^\d$/.test(String(args[0]));
+      case "is-symbol?":
+        // (is-symbol? "add") → true (letters, underscores, dashes)
+        return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args[0]));
+      case "split":
+        // (split "a,b,c" ",") → ["a" "b" "c"]
+        return typeof args[0] === "string" && typeof args[1] === "string"
+          ? args[0].split(args[1])
+          : [];
+
+      // Array Operations
+      case "filter":
+        // (filter [1 2 3 4] (lambda [$x] (> $x 2))) → [3 4]
+        if (!Array.isArray(args[0]) || typeof args[1] !== "function") {
+          return args[0] || [];
+        }
+        return args[0].filter(args[1]);
+      case "find":
+        // (find [1 2 3] (lambda [$x] (= $x 2))) → 2
+        if (!Array.isArray(args[0]) || typeof args[1] !== "function") {
+          return null;
+        }
+        return args[0].find(args[1]) || null;
+
       // Type/Utility
       case "typeof":
         return typeof args[0];

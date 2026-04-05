@@ -1,0 +1,248 @@
+;; FreeLang v9: Parser for S-Expression
+;; Recursive descent parser written in pure v9
+;; Takes token array from lexer, produces AST
+
+[FUNC parse-tokens
+  :params [$tokens]
+  :return (array)
+  :body (
+    ;; State: pos (current token index)
+    (let [$pos 0]
+      (let [$blocks []]
+        (while (< $pos (length $tokens))
+          (let [$token (nth $tokens $pos)
+                $type (nth $token 0)
+                $value (nth $token 1)]
+
+            (if (= $type "EOF")
+              (set! $pos (length $tokens))  ;; End loop
+              (if (= $type "LBracket")
+                (do
+                  ;; Parse a block [TYPE name :key val ...]
+                  (let [$block (parse-block $tokens $pos)]
+                    (set! $blocks (append $blocks (list $block)))
+                    (set! $pos (+ $pos 1))))  ;; Move past block
+                (set! $pos (+ $pos 1))  ;; Skip unknown token
+              )
+            )
+          )
+        )
+        $blocks
+      )
+    )
+  )
+]
+
+[FUNC parse-block
+  :params [$tokens $pos]
+  :return (array)
+  :body (
+    ;; Expected: [LBracket TYPE name :key val :key val ... RBracket]
+    ;; Returns: (TYPE name :key val ...)
+
+    (let [$blockType ""
+          $blockName ""
+          $fields []]
+
+      ;; Skip opening bracket (already verified)
+      (set! $pos (+ $pos 1))
+
+      ;; Get block type (e.g., FUNC, ROUTE, SERVER)
+      (let [$typeToken (nth $tokens $pos)]
+        (set! $blockType (nth $typeToken 1))
+        (set! $pos (+ $pos 1)))
+
+      ;; Get block name
+      (let [$nameToken (nth $tokens $pos)]
+        (set! $blockName (nth $nameToken 1))
+        (set! $pos (+ $pos 1)))
+
+      ;; Parse fields until RBracket
+      (while (and (< $pos (length $tokens))
+                 (!= (nth (nth $tokens $pos) 0) "RBracket"))
+
+        ;; Expect keyword (:key)
+        (let [$keyToken (nth $tokens $pos)
+              $keyType (nth $keyToken 0)
+              $keyName (nth $keyToken 1)]
+
+          (if (= $keyType "Keyword")
+            (do
+              (set! $pos (+ $pos 1))
+
+              ;; Collect values until next keyword or RBracket
+              (let [$values []]
+                (while (and (< $pos (length $tokens))
+                           (!= (nth (nth $tokens $pos) 0) "Keyword")
+                           (!= (nth (nth $tokens $pos) 0) "RBracket"))
+
+                  (let [$value (parse-value $tokens $pos)]
+                    (set! $values (append $values (list $value)))
+                    (set! $pos (+ $pos 1)))
+                )
+
+                ;; Add field to block
+                (set! $fields (append $fields (list $keyName $values)))))
+            (set! $pos (+ $pos 1))))  ;; Skip unexpected token
+      )
+
+      ;; Skip closing bracket
+      (if (and (< $pos (length $tokens))
+              (= (nth (nth $tokens $pos) 0) "RBracket"))
+        (set! $pos (+ $pos 1)))
+
+      ;; Return block as list
+      (append (list $blockType $blockName) $fields)
+    )
+  )
+]
+
+[FUNC parse-value
+  :params [$tokens $pos]
+  :return any
+  :body (
+    ;; Parse a single value (literal, variable, symbol, array, S-expr, or block)
+    (let [$token (nth $tokens $pos)
+          $type (nth $token 0)
+          $value (nth $token 1)]
+
+      (cond
+        ;; String literal
+        ((= $type "String")
+          (list "literal" "string" $value))
+
+        ;; Number literal
+        ((= $type "Number")
+          (list "literal" "number" (num $value)))
+
+        ;; Variable ($var)
+        ((= $type "Variable")
+          (list "variable" $value))
+
+        ;; Keyword (:key) - can appear as value in some contexts
+        ((= $type "Keyword")
+          (list "keyword" $value))
+
+        ;; Left paren - parse S-expression
+        ((= $type "LParen")
+          (parse-sexpr $tokens $pos))
+
+        ;; Left bracket - parse block or array
+        ((= $type "LBracket")
+          (if (and (< (+ $pos 1) (length $tokens))
+                  (= (nth (nth $tokens (+ $pos 1)) 0) "Symbol"))
+            ;; It's a block
+            (parse-block $tokens $pos)
+            ;; It's an array
+            (parse-array $tokens $pos)))
+
+        ;; Symbol (default)
+        ((= $type "Symbol")
+          (list "literal" "symbol" $value))
+
+        ;; Default error
+        (true
+          (throw (concat "Unexpected token: " $type))))
+    )
+  )
+]
+
+[FUNC parse-sexpr
+  :params [$tokens $pos]
+  :return (array)
+  :body (
+    ;; Expected: (op arg1 arg2 ...)
+    ;; Returns: (op arg1 arg2 ...)
+
+    ;; Skip opening paren
+    (set! $pos (+ $pos 1))
+
+    ;; Get operator
+    (let [$op ""]
+      (if (< $pos (length $tokens))
+        (set! $op (nth (nth $tokens $pos) 1)))
+
+      (set! $pos (+ $pos 1))
+
+      ;; Collect arguments until RParen
+      (let [$args []]
+        (while (and (< $pos (length $tokens))
+                   (!= (nth (nth $tokens $pos) 0) "RParen"))
+
+          (let [$arg (parse-value $tokens $pos)]
+            (set! $args (append $args (list $arg)))
+            (set! $pos (+ $pos 1))))
+
+        ;; Skip closing paren
+        (if (and (< $pos (length $tokens))
+                (!= (nth (nth $tokens $pos) 0) "RParen"))
+          (set! $pos (+ $pos 1)))
+
+        ;; Return S-expression
+        (append (list $op) $args)
+      )
+    )
+  )
+]
+
+[FUNC parse-array
+  :params [$tokens $pos]
+  :return (array)
+  :body (
+    ;; Expected: [val1 val2 val3 ...]
+    ;; Returns: (list val1 val2 val3 ...)
+
+    ;; Skip opening bracket
+    (set! $pos (+ $pos 1))
+
+    ;; Collect values until RBracket
+    (let [$values []]
+      (while (and (< $pos (length $tokens))
+                 (!= (nth (nth $tokens $pos) 0) "RBracket"))
+
+        (let [$value (parse-value $tokens $pos)]
+          (set! $values (append $values (list $value)))
+          (set! $pos (+ $pos 1))))
+
+      ;; Skip closing bracket
+      (if (and (< $pos (length $tokens))
+              (= (nth (nth $tokens $pos) 0) "RBracket"))
+        (set! $pos (+ $pos 1)))
+
+      ;; Return array
+      $values
+    )
+  )
+]
+
+;; Helper: Get nth element from list
+[FUNC nth
+  :params [$arr $index]
+  :return any
+  :body (
+    (if (and (>= $index 0) (< $index (length $arr)))
+      (nth-impl $arr $index 0)
+      (throw "Index out of bounds"))
+  )
+]
+
+[FUNC nth-impl
+  :params [$arr $index $current]
+  :return any
+  :body (
+    (if (= $current $index)
+      (first $arr)
+      (if (> (length (rest $arr)) 0)
+        (nth-impl (rest $arr) $index (+ $current 1))
+        (throw "Index out of bounds")))
+  )
+]
+
+;; Helper: Add element to end of array/list
+[FUNC append
+  :params [$arr $elem]
+  :return (array)
+  :body (
+    (list (concat (str $arr) (str $elem))))
+  )
+]

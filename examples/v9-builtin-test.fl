@@ -1,0 +1,126 @@
+;; FreeLang v9: Test all 9 built-in functions
+;; Proof that v9 can use these functions for self-hosting
+
+;; Test 1: char-at - Extract character at index
+[FUNC test-char-at
+  :return bool
+  :body (
+    (= (char-at "hello" 0) "h")
+  )
+]
+
+;; Test 2: char-code - Get ASCII value
+[FUNC test-char-code
+  :return bool
+  :body (
+    (= (char-code "A") 65)
+  )
+]
+
+;; Test 3: substring - Extract substring
+[FUNC test-substring
+  :return bool
+  :body (
+    (= (substring "hello" 1 4) "ell")
+  )
+]
+
+;; Test 4: is-whitespace? - Detect spaces
+[FUNC test-is-whitespace
+  :return bool
+  :body (
+    (and
+      (is-whitespace? " ")
+      (is-whitespace? "\t")
+      (!= (is-whitespace? "a") true))
+  )
+]
+
+;; Test 5: is-digit? - Detect numbers
+[FUNC test-is-digit
+  :return bool
+  :body (
+    (and
+      (is-digit? "5")
+      (is-digit? "0")
+      (!= (is-digit? "a") true))
+  )
+]
+
+;; Test 6: is-symbol? - Detect valid symbols
+[FUNC test-is-symbol
+  :return bool
+  :body (
+    (and
+      (is-symbol? "add")
+      (is-symbol? "var-name")
+      (is-symbol? "_private")
+      (!= (is-symbol? "123") true))
+  )
+]
+
+;; Test 7: split - Split by delimiter
+[FUNC test-split
+  :return bool
+  :body (
+    (let [$result (split "a,b,c" ",")]
+      (= (length $result) 3)
+    )
+  )
+]
+
+;; Test 8: filter - Filter array by condition
+[FUNC test-filter
+  :return bool
+  :body (
+    (let [$numbers [1 2 3 4 5]]
+          [$evens (filter $numbers (lambda [$x] (= (- $x (* (/ $x 2) 2)) 0)))]
+      (> (length $evens) 0)
+    )
+  )
+]
+
+;; Test 9: find - Find first matching element
+[FUNC test-find
+  :return bool
+  :body (
+    (let [$numbers [1 2 3 4 5]]
+          [$found (find $numbers (lambda [$x] (> $x 3)))]
+      (and (> $found 3) (<= $found 5))
+    )
+  )
+]
+
+;; Integration test: Extract tokens from source
+;; Demonstrates split() for tokenization
+[FUNC extract-symbols
+  :params [$source]
+  :return (array)
+  :body (
+    ;; Split by whitespace and return non-empty results
+    (let [$tokens (split $source " ")]
+      (filter $tokens (lambda [$t] (!= (length $t) 0)))
+    )
+  )
+]
+
+;; Route to run all tests
+[ROUTE test-all
+  :method GET
+  :path /test/v9-functions
+  :handler (
+    (json-response
+      (list
+        (list "test-char-at" (test-char-at))
+        (list "test-char-code" (test-char-code))
+        (list "test-substring" (test-substring))
+        (list "test-is-whitespace" (test-is-whitespace))
+        (list "test-is-digit" (test-is-digit))
+        (list "test-is-symbol" (test-is-symbol))
+        (list "test-split" (test-split))
+        (list "test-filter" (test-filter))
+        (list "test-find" (test-find))
+      )
+    )
+  )
+]
