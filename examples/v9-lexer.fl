@@ -1,220 +1,128 @@
-;; FreeLang v9: Lexer for S-Expression
-;; Self-referential lexer written in pure v9
+; FreeLang v9 Self-Referential Lexer (v1)
+; Simple lexer written in v9, can tokenize v9 code
+; Minimal implementation: whitespace, symbols, numbers, strings
 
 [FUNC tokenize
-  :params [$source]
-  :return (array)
+  :params [[$source string]]
+  :return (array token)
   :body (
-    (let [$tokens []]
-         [$i 0]
-         [$line 1]
-         [$col 1]
-
-      ;; Main tokenization loop
-      (while (< $i (length $source))
-        (let [$ch (char-at $source $i)
-              $startCol $col]
-
-          (cond
-            ;; Case 1: Whitespace
-            ((is-whitespace? $ch)
-              (if (= $ch "\n")
-                (do
-                  (set! $line (+ $line 1))
-                  (set! $col 1))
-                (set! $col (+ $col 1)))
-              (set! $i (+ $i 1)))
-
-            ;; Case 2: Comment (;; to end of line)
-            ((and (= $ch ";")
-                  (< (+ $i 1) (length $source))
-                  (= (char-at $source (+ $i 1)) ";"))
-              (set! $i (+ $i 2))
-              (while (and (< $i (length $source))
-                         (!= (char-at $source $i) "\n"))
-                (set! $i (+ $i 1))))
-
-            ;; Case 3: String ("...")
-            ((= $ch "\"")
-              (set! $i (+ $i 1))
-              (set! $col (+ $col 1))
-              (let [$value ""
-                    $escaped false]
-
-                ;; Parse string content
-                (while (and (< $i (length $source))
-                           (or $escaped (!= (char-at $source $i) "\"")))
-                  (let [$c (char-at $source $i)]
-                    (if $escaped
-                      (do
-                        (cond
-                          ((= $c "n") (set! $value (concat $value "\n")))
-                          ((= $c "t") (set! $value (concat $value "\t")))
-                          ((= $c "\\") (set! $value (concat $value "\\")))
-                          ((= $c "\"") (set! $value (concat $value "\"")))
-                          (true (set! $value (concat $value $c))))
-                        (set! $escaped false))
-                      (if (= $c "\\")
-                        (set! $escaped true)
-                        (do
-                          (set! $value (concat $value $c))
-                          (if (= $c "\n")
-                            (do
-                              (set! $line (+ $line 1))
-                              (set! $col 1))
-                            (set! $col (+ $col 1)))))))
-                  (set! $i (+ $i 1)))
-
-                ;; Add string token
-                (set! $tokens (append $tokens (list "String" $value $line $startCol)))))
-
-              ;; Skip closing quote
-              (if (< $i (length $source))
-                (set! $i (+ $i 1))))
-
-            ;; Case 4: Left bracket [
-            ((= $ch "[")
-              (set! $tokens (append $tokens (list "LBracket" "[" $line $col)))
-              (set! $i (+ $i 1))
-              (set! $col (+ $col 1)))
-
-            ;; Case 5: Right bracket ]
-            ((= $ch "]")
-              (set! $tokens (append $tokens (list "RBracket" "]" $line $col)))
-              (set! $i (+ $i 1))
-              (set! $col (+ $col 1)))
-
-            ;; Case 6: Left paren (
-            ((= $ch "(")
-              (set! $tokens (append $tokens (list "LParen" "(" $line $col)))
-              (set! $i (+ $i 1))
-              (set! $col (+ $col 1)))
-
-            ;; Case 7: Right paren )
-            ((= $ch ")")
-              (set! $tokens (append $tokens (list "RParen" ")" $line $col)))
-              (set! $i (+ $i 1))
-              (set! $col (+ $col 1)))
-
-            ;; Case 8: Colon (keyword)
-            ((= $ch ":")
-              (let [$start $i
-                    $keyword ""]
-                (set! $i (+ $i 1))
-                (set! $col (+ $col 1))
-
-                ;; Read keyword name
-                (while (and (< $i (length $source))
-                           (is-keyword-char? (char-at $source $i)))
-                  (set! $keyword (concat $keyword (char-at $source $i)))
-                  (set! $i (+ $i 1))
-                  (set! $col (+ $col 1)))
-
-                ;; Add keyword token
-                (set! $tokens (append $tokens (list "Keyword" $keyword $line $startCol)))))
-
-            ;; Case 9: Dollar sign (variable)
-            ((= $ch "$")
-              (let [$start $i
-                    $varname ""]
-                (set! $i (+ $i 1))
-                (set! $col (+ $col 1))
-
-                ;; Read variable name
-                (while (and (< $i (length $source))
-                           (is-keyword-char? (char-at $source $i)))
-                  (set! $varname (concat $varname (char-at $source $i)))
-                  (set! $i (+ $i 1))
-                  (set! $col (+ $col 1)))
-
-                ;; Add variable token
-                (set! $tokens (append $tokens (list "Variable" $varname $line $startCol)))))
-
-            ;; Case 10: Number (digits with optional decimal)
-            ((is-digit? $ch)
-              (let [$numStr ""]
-                (while (and (< $i (length $source))
-                           (or (is-digit? (char-at $source $i))
-                               (= (char-at $source $i) ".")))
-                  (set! $numStr (concat $numStr (char-at $source $i)))
-                  (set! $i (+ $i 1))
-                  (set! $col (+ $col 1)))
-
-                ;; Add number token
-                (set! $tokens (append $tokens (list "Number" $numStr $line $startCol)))))
-
-            ;; Case 11: Symbol (operators, identifiers)
-            ((is-symbol-start? $ch)
-              (let [$symStr ""]
-                ;; Read symbol characters
-                (while (and (< $i (length $source))
-                           (is-symbol-char? (char-at $source $i)))
-                  (set! $symStr (concat $symStr (char-at $source $i)))
-                  (set! $i (+ $i 1))
-                  (set! $col (+ $col 1)))
-
-                ;; Add symbol token
-                (set! $tokens (append $tokens (list "Symbol" $symStr $line $startCol)))))
-
-            ;; Default: Unexpected character (error)
-            (true
-              (throw (concat "Unexpected character '" $ch "' at line " (str $line) ", col " (str $col))))))
-        )
-      )
-
-      ;; Add EOF token
-      (set! $tokens (append $tokens (list "EOF" "" $line $col)))
-      $tokens
-    )
+    (let [
+      [$tokens (list)]
+      [$i 0]
+      [$len (string-length $source)]
+    ]
+    (while (< $i $len)
+      (let [
+        [$char (char-at $source $i)]
+        [$code (char-code $char)]
+      ]
+      (cond
+        ; Whitespace: skip
+        ((is-whitespace? $char)
+          (set! $i (+ $i 1)))
+        
+        ; String: "..."
+        ((= $char "\"")
+          (let [
+            [$j (+ $i 1)]
+            [$str-content ""]
+          ]
+          (while (< $j $len)
+            (let [
+              [$c (char-at $source $j)]
+            ]
+            (cond
+              ((= $c "\"")
+                (set! $tokens (append $tokens (list "String" $str-content)))
+                (set! $i (+ $j 1))
+                (set! $j $len)) ; break loop
+              
+              (true
+                (set! $str-content (concat $str-content $c))
+                (set! $j (+ $j 1))))))
+          ))
+        
+        ; Number: 0-9
+        ((is-digit? $char)
+          (let [
+            [$num-str $char]
+            [$j (+ $i 1)]
+          ]
+          (while (< $j $len)
+            (let [
+              [$c (char-at $source $j)]
+            ]
+            (cond
+              ((is-digit? $c)
+                (set! $num-str (concat $num-str $c))
+                (set! $j (+ $j 1)))
+              
+              (true
+                (set! $j $len))))) ; break
+          
+          (set! $tokens (append $tokens (list "Number" $num-str)))
+          (set! $i (+ (string-length $num-str) $i))))
+        
+        ; Symbol/Keyword: a-z, A-Z, -, :, etc
+        (true
+          (let [
+            [$sym-str $char]
+            [$j (+ $i 1)]
+          ]
+          (while (< $j $len)
+            (let [
+              [$c (char-at $source $j)]
+              [$is-sym-char (or (is-alpha? $c) (is-digit? $c) (= $c "-"))]
+            ]
+            (cond
+              ($is-sym-char
+                (set! $sym-str (concat $sym-str $c))
+                (set! $j (+ $j 1)))
+              
+              (true
+                (set! $j $len))))) ; break
+          
+          ; Check if keyword (starts with :)
+          (let [
+            [$token-type (cond
+              ((= (char-at $sym-str 0) ":") "Keyword")
+              ((= (char-at $sym-str 0) "[") "LBracket")
+              ((= (char-at $sym-str 0) "]") "RBracket")
+              ((= (char-at $sym-str 0) "(") "LParen")
+              ((= (char-at $sym-str 0) ")") "RParen")
+              (true "Symbol")
+            )]
+          ]
+          (set! $tokens (append $tokens (list $token-type $sym-str)))
+          (set! $i (+ (string-length $sym-str) $i)))))))
+    
+    $tokens)
   )
 ]
 
-;; Helper: Check if character is valid in keyword/variable
-[FUNC is-keyword-char?
-  :params [$ch]
+; Helper functions
+[FUNC is-whitespace?
+  :params [[$c string]]
   :return bool
-  :body (
-    (or
-      (and (>= (char-code $ch) 97) (<= (char-code $ch) 122))    ;; a-z
-      (and (>= (char-code $ch) 65) (<= (char-code $ch) 90))     ;; A-Z
-      (and (>= (char-code $ch) 48) (<= (char-code $ch) 57))     ;; 0-9
-      (= $ch "_")
-      (= $ch "-"))
-  )
+  :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))
 ]
 
-;; Helper: Check if character is valid symbol start
-[FUNC is-symbol-start?
-  :params [$ch]
+[FUNC is-digit?
+  :params [[$c string]]
   :return bool
-  :body (
-    (or
-      (and (>= (char-code $ch) 97) (<= (char-code $ch) 122))    ;; a-z
-      (and (>= (char-code $ch) 65) (<= (char-code $ch) 90))     ;; A-Z
-      (= $ch "_")
-      (= $ch "<") (= $ch ">") (= $ch "=") (= $ch "!")
-      (= $ch "+") (= $ch "-") (= $ch "*") (= $ch "/"))
-  )
+  :body (and (>= (char-code $c) 48) (<= (char-code $c) 57))
 ]
 
-;; Helper: Check if character is valid in symbol body
-[FUNC is-symbol-char?
-  :params [$ch]
+[FUNC is-alpha?
+  :params [[$c string]]
   :return bool
-  :body (
-    (or
-      (and (>= (char-code $ch) 97) (<= (char-code $ch) 122))    ;; a-z
-      (and (>= (char-code $ch) 65) (<= (char-code $ch) 90))     ;; A-Z
-      (and (>= (char-code $ch) 48) (<= (char-code $ch) 57))     ;; 0-9
-      (= $ch "_")
-      (= $ch "<") (= $ch ">") (= $ch "=") (= $ch "!")
-      (= $ch "+") (= $ch "-") (= $ch "*") (= $ch "/") (= $ch "?"))
-  )
+  :body (or
+    (and (>= (char-code $c) 65) (<= (char-code $c) 90))   ; A-Z
+    (and (>= (char-code $c) 97) (<= (char-code $c) 122))) ; a-z
 ]
 
-;; Helper: Convert character to its ASCII code
-[FUNC char-code
-  :params [$ch]
+[FUNC string-length
+  :params [[$s string]]
   :return int
-  :body (throw "char-code not yet implemented - needs interpreter support")
+  :body (length $s)
 ]

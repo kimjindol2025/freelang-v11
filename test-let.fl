@@ -1,0 +1,9 @@
+[FUNC test-let
+  :params [[$x int]]
+  :return int
+  :body (let [[$y 5]] (+ $x $y))
+]
+
+[INTENT test
+  :result (test-let 3)
+]
