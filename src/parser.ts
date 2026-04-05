@@ -301,9 +301,13 @@ export class Parser {
       return matchExpr;
     }
 
-    // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)
-    // But not array literals: (fn [$x] ...) - those are parsed as regular values
-    if (this.check(T.LBracket) && !this.isArrayLiteralStart()) {
+    // Special case: fn always uses array literal syntax: (fn [params] body)
+    // Never generic function syntax
+    if (op === "fn") {
+      // Fall through to regular argument parsing
+    } else if (this.check(T.LBracket) && !this.isArrayLiteralStart()) {
+      // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)
+      // But not array literals: (fn [$x] ...) - those are parsed as regular values
       this.advance(); // consume [
       const typeArgs: string[] = [];
 

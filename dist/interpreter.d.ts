@@ -57,6 +57,7 @@ export declare class Interpreter {
     private evalCond;
     private callUserFunction;
     private callFunctionValue;
+    private callFunction;
     private getFieldValue;
     private evalPatternMatch;
     private matchPattern;

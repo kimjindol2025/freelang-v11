@@ -492,6 +492,66 @@ export class Interpreter {
         }
         return args;
 
+      case "fn":
+        // Phase 4 Week 1: (fn [$param1 $param2 ...] body)
+        // Create a function value with captured environment
+        // expr.args[0] is the parameter array AST (unevaluated list of variables)
+        // expr.args[1] is the body AST
+
+        let params: string[] = [];
+        const paramNode = expr.args[0];
+
+        // paramNode should be an object with structure like: { kind: 'literal', value: [...Variable nodes...] }
+        // OR it could be a raw array if parsed differently
+        // We need to extract the variable names from the parameter list
+
+        // Case 1: paramNode is parsed as a literal with value = array of Variable nodes
+        if (paramNode && typeof paramNode === 'object' && 'kind' in paramNode && paramNode.kind === 'literal' && Array.isArray((paramNode as any).value)) {
+          const paramValues = (paramNode as any).value as ASTNode[];
+          params = paramValues.map(p => {
+            if (p && typeof p === 'object' && 'kind' in p && p.kind === 'variable') {
+              return (p as Variable).name;
+            }
+            throw new Error(`fn parameter must be a variable, got ${(p as any).kind}`);
+          });
+        }
+        // Case 2: paramNode is a Variable node (single parameter)
+        else if (paramNode && typeof paramNode === 'object' && 'kind' in paramNode && paramNode.kind === 'variable') {
+          params = [(paramNode as Variable).name];
+        }
+        // Case 3: paramNode was somehow evaluated (shouldn't happen)
+        else if (Array.isArray(paramNode)) {
+          // This shouldn't happen in normal operation
+          // But if it does, try to extract names
+          params = (paramNode as any[]).map(p => typeof p === 'string' ? p : String(p));
+        }
+        else {
+          throw new Error(`fn expects parameter array, got ${paramNode && typeof paramNode === 'object' && 'kind' in paramNode ? (paramNode as any).kind : typeof paramNode}`);
+        }
+
+        const body = expr.args[1]; // Get unevaluated body
+
+        return {
+          kind: "function-value",
+          params: params,
+          body: body,
+          capturedEnv: new Map(this.context.variables),
+        };
+
+      case "reduce":
+        // Phase 4 Week 2: (reduce [1 2 3 4] 0 (fn [acc x] (+ acc x)))
+        // args[0] = array, args[1] = initial accumulator, args[2] = function
+        if (!Array.isArray(args[0])) {
+          throw new Error(`reduce expects array as first argument, got ${typeof args[0]}`);
+        }
+        let accumulator = args[1];
+        const reduceFn = args[2];
+
+        for (const item of args[0]) {
+          accumulator = this.callFunction(reduceFn, [accumulator, item]);
+        }
+        return accumulator;
+
       // HTTP responses
       case "json-response":
         // Convert arguments to object
@@ -723,6 +783,62 @@ export class Interpreter {
       case "clamp":
         return Math.max(args[1], Math.min(args[2], args[0]));
 
+      // Phase 4 Week 2: Monad Operations
+      case "ok":
+        // (ok value) → Result Ok
+        return { tag: "Ok", value: args[0], kind: "Result" };
+      case "err":
+        // (err message) → Result Err
+        return { tag: "Err", value: args[0], kind: "Result" };
+      case "some":
+        // (some value) → Option Some
+        return { tag: "Some", value: args[0], kind: "Option" };
+      case "none":
+        // (none) → Option None
+        return { tag: "None", value: null, kind: "Option" };
+      case "pure":
+        // (pure value) → wraps value in default monad
+        return { tag: "Pure", value: args[0], kind: "Monad" };
+
+      case "bind":
+        // Phase 4 Week 2: Monadic bind operation
+        // (bind monad transform-fn)
+        if (expr.args.length < 2) {
+          throw new Error(`bind requires monad and transform function`);
+        }
+        const monad = this.eval(expr.args[0]);
+        const transformFn = this.eval(expr.args[1]);
+
+        if ((monad as any).kind === "Result") {
+          if ((monad as any).tag === "Ok") {
+            return this.callFunction(transformFn, [(monad as any).value]);
+          }
+          return monad; // Return Error unchanged
+        }
+
+        if ((monad as any).kind === "Option") {
+          if ((monad as any).tag === "Some") {
+            return this.callFunction(transformFn, [(monad as any).value]);
+          }
+          return monad; // Return None unchanged
+        }
+
+        if (Array.isArray(monad)) {
+          // List monad: flatMap
+          let result: any[] = [];
+          for (const item of monad) {
+            const transformed = this.callFunction(transformFn, [item]);
+            if (Array.isArray(transformed)) {
+              result = result.concat(transformed);
+            } else {
+              result.push(transformed);
+            }
+          }
+          return result;
+        }
+
+        throw new Error(`bind: unsupported monad type`);
+
       // Function call
       default:
         // Check if it's a user-defined function (regular or generic)
@@ -884,6 +1000,21 @@ export class Interpreter {
     this.context.variables = savedVars;
 
     return result;
+  }
+
+  private callFunction(fn: any, args: any[]): any {
+    // Phase 4 Week 2: Universal function caller
+    // Handles: function-value, JavaScript functions, FreeLangFunction
+    if ((fn as any).kind === "function-value") {
+      return this.callFunctionValue(fn, args);
+    } else if (typeof fn === "function") {
+      return fn(...args);
+    } else if ((fn as any).params && (fn as any).body) {
+      // FreeLangFunction
+      return this.callUserFunction(fn.name || "anonymous", args);
+    } else {
+      throw new Error(`Cannot call ${typeof fn}`);
+    }
   }
 
   private getFieldValue(block: Block, key: string, defaultValue: any = null): any {
