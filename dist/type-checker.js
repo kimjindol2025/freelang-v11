@@ -120,6 +120,73 @@ class TypeChecker {
         return { kind: "type", name: "any" };
     }
     /**
+     * Register a generic function type (Phase 4)
+     */
+    registerGenericFunction(funcName, generics, paramTypes, returnType) {
+        this.functionTypes.set(funcName, {
+            params: paramTypes,
+            returnType,
+            generics,
+            isGeneric: generics.length > 0,
+        });
+    }
+    /**
+     * Instantiate generic function with concrete types (Phase 4)
+     * E.g., identity[T] with T=int becomes identity with param type int
+     */
+    instantiateGenericFunction(funcName, typeArgs) {
+        const funcType = this.functionTypes.get(funcName);
+        if (!funcType || !funcType.isGeneric) {
+            return {
+                valid: false,
+                message: `Function '${funcName}' is not generic`,
+            };
+        }
+        if (!funcType.generics || typeArgs.length !== funcType.generics.length) {
+            return {
+                valid: false,
+                message: `Function '${funcName}' expects ${funcType.generics?.length || 0} type arguments, got ${typeArgs.length}`,
+            };
+        }
+        // Create type substitution map
+        const substitution = new Map();
+        for (let i = 0; i < funcType.generics.length; i++) {
+            substitution.set(funcType.generics[i], typeArgs[i]);
+        }
+        // Substitute types in parameters and return type
+        const instantiatedParams = funcType.params.map((param) => this.substituteType(param, substitution));
+        const instantiatedReturn = this.substituteType(funcType.returnType, substitution);
+        return {
+            valid: true,
+            message: "OK",
+            inferredType: instantiatedReturn,
+        };
+    }
+    /**
+     * Substitute type variables with concrete types (Phase 4)
+     */
+    substituteType(type, substitution) {
+        // If this type is a generic variable, replace it
+        if (type.isTypeVariable && substitution.has(type.name)) {
+            return substitution.get(type.name) || type;
+        }
+        // If this type has a generic parameter, substitute recursively
+        if (type.generic) {
+            return {
+                ...type,
+                generic: this.substituteType(type.generic, substitution),
+            };
+        }
+        // If this type is a union, substitute all members
+        if (type.union) {
+            return {
+                ...type,
+                union: type.union.map((t) => this.substituteType(t, substitution)),
+            };
+        }
+        return type;
+    }
+    /**
      * Check type compatibility
      */
     isCompatible(actualType, expectedType) {

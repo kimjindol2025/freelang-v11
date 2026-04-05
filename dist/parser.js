@@ -178,9 +178,21 @@ class Parser {
         if (this.check(token_1.TokenType.LBracket)) {
             // Lookahead: is this a block or value array?
             const nextIdx = this.pos + 1;
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE"];
             if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === token_1.TokenType.Symbol) {
-                // It's a block
-                return this.parseBlock();
+                const potentialType = this.tokens[nextIdx].value;
+                // Check if it's a known block type (uppercase) or looks like a block name followed by a keyword
+                const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
+                const nextNextIdx = nextIdx + 1;
+                const hasKeywordAfterName = nextNextIdx < this.tokens.length && this.tokens[nextNextIdx].type === token_1.TokenType.Keyword;
+                if (isKnownType || hasKeywordAfterName) {
+                    // It's a block
+                    return this.parseBlock();
+                }
+                else {
+                    // It's a value array: [val1 val2 ...]
+                    return this.parseArray();
+                }
             }
             else {
                 // It's a value array: [val1 val2 ...]

@@ -7,6 +7,8 @@ export interface ValidationResult {
 export interface FunctionType {
     params: TypeAnnotation[];
     returnType: TypeAnnotation;
+    generics?: string[];
+    isGeneric?: boolean;
 }
 export declare class TypeChecker {
     private functionTypes;
@@ -31,6 +33,19 @@ export declare class TypeChecker {
      * Infer type from AST node
      */
     inferType(node: ASTNode): TypeAnnotation;
+    /**
+     * Register a generic function type (Phase 4)
+     */
+    registerGenericFunction(funcName: string, generics: string[], paramTypes: TypeAnnotation[], returnType: TypeAnnotation): void;
+    /**
+     * Instantiate generic function with concrete types (Phase 4)
+     * E.g., identity[T] with T=int becomes identity with param type int
+     */
+    instantiateGenericFunction(funcName: string, typeArgs: TypeAnnotation[]): ValidationResult;
+    /**
+     * Substitute type variables with concrete types (Phase 4)
+     */
+    private substituteType;
     /**
      * Check type compatibility
      */
