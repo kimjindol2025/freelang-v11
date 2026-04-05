@@ -26,6 +26,26 @@ var TokenType;
     TokenType["Fetch"] = "Fetch";
     TokenType["Browse"] = "Browse";
     TokenType["Cache"] = "Cache";
+    // Phase 9b Keywords (Learning)
+    TokenType["Learn"] = "Learn";
+    TokenType["Recall"] = "Recall";
+    TokenType["Remember"] = "Remember";
+    TokenType["Forget"] = "Forget";
+    // Phase 9c Keywords (Reasoning)
+    TokenType["Observe"] = "Observe";
+    TokenType["Analyze"] = "Analyze";
+    TokenType["Decide"] = "Decide";
+    TokenType["Act"] = "Act";
+    TokenType["Verify"] = "Verify";
+    // Phase 9c Keywords (Conditional)
+    TokenType["If"] = "If";
+    TokenType["When"] = "When";
+    TokenType["Then"] = "Then";
+    TokenType["Else"] = "Else";
+    // Phase 9c Keywords (Loop Control)
+    TokenType["Repeat"] = "Repeat";
+    TokenType["Until"] = "Until";
+    TokenType["While"] = "While";
     // Special
     TokenType["Colon"] = "Colon";
     TokenType["EOF"] = "EOF";

@@ -261,6 +261,12 @@ export interface ReasoningBlock {
   };
   // Phase 9c: When (guard clause - block only executes if condition is true)
   whenGuard?: ASTNode;         // guard condition (block skipped if false)
+  // Phase 9c: Loop Control (repeat-until / repeat-while)
+  loopControl?: {
+    type: "repeat-until" | "repeat-while"; // loop type
+    condition: ASTNode;       // termination condition
+    maxIterations?: number;   // safety limit (default: 1000)
+  };
 }
 
 // Reasoning Transition (NEW for Phase 9c)
@@ -277,12 +283,17 @@ export interface ReasoningTransition {
 // Represents a complete reasoning flow with automatic state transitions
 export interface ReasoningSequence {
   kind: "reasoning-sequence";
-  stages: ReasoningBlock[];           // sequence of reasoning blocks
+  stages: (ReasoningBlock | SearchBlock | LearnBlock)[]; // Phase 9a/9b: allow search/learn blocks
   metadata?: {
     startTime?: string;
     endTime?: string;
     totalConfidence?: number;
     executionPath?: string[];         // sequence of stages executed
+  };
+  // Phase 9a/9b: Store search and learn results for access in subsequent stages
+  context?: {
+    searches?: Map<string, any>;       // cached search results
+    learned?: Map<string, any>;        // stored learned data
   };
   feedbackLoop?: {
     enabled: boolean;                  // Phase 9c Feedback: enable feedback loop

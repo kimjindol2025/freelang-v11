@@ -5,6 +5,8 @@ exports.lex = lex;
 const token_1 = require("./token");
 // Phase 6: Map keywords to token types
 // Phase 9a: Added search, fetch keywords
+// Phase 9b: Added learn, recall, remember, forget keywords
+// Phase 9c: Added observe, analyze, decide, act, verify keywords
 const KEYWORDS = new Map([
     ["MODULE", token_1.TokenType.Module],
     ["TYPECLASS", token_1.TokenType.TypeClass],
@@ -14,7 +16,27 @@ const KEYWORDS = new Map([
     // Phase 9a: Search functionality keywords
     ["search", token_1.TokenType.Search],
     ["fetch", token_1.TokenType.Fetch],
-    // Note: browse, browse, cache are treated as regular symbols, not keywords
+    // Phase 9b: Learning functionality keywords
+    ["learn", token_1.TokenType.Learn],
+    ["recall", token_1.TokenType.Recall],
+    ["remember", token_1.TokenType.Remember],
+    ["forget", token_1.TokenType.Forget],
+    // Phase 9c: Reasoning functionality keywords
+    ["observe", token_1.TokenType.Observe],
+    ["analyze", token_1.TokenType.Analyze],
+    ["decide", token_1.TokenType.Decide],
+    ["act", token_1.TokenType.Act],
+    ["verify", token_1.TokenType.Verify],
+    // Phase 9c: Conditional branching keywords
+    ["if", token_1.TokenType.If],
+    ["when", token_1.TokenType.When],
+    ["then", token_1.TokenType.Then],
+    ["else", token_1.TokenType.Else],
+    // Phase 9c: Loop control keywords
+    ["repeat", token_1.TokenType.Repeat],
+    ["until", token_1.TokenType.Until],
+    ["while", token_1.TokenType.While],
+    // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 function getKeywordTokenType(text) {
     return KEYWORDS.get(text) ?? null;

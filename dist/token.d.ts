@@ -17,6 +17,22 @@ export declare enum TokenType {
     Fetch = "Fetch",// fetch
     Browse = "Browse",// browse
     Cache = "Cache",// cache
+    Learn = "Learn",// learn
+    Recall = "Recall",// recall
+    Remember = "Remember",// remember
+    Forget = "Forget",// forget
+    Observe = "Observe",// observe
+    Analyze = "Analyze",// analyze
+    Decide = "Decide",// decide
+    Act = "Act",// act
+    Verify = "Verify",// verify
+    If = "If",// if
+    When = "When",// when
+    Then = "Then",// then
+    Else = "Else",// else
+    Repeat = "Repeat",// repeat
+    Until = "Until",// until
+    While = "While",// while
     Colon = "Colon",// :
     EOF = "EOF"
 }

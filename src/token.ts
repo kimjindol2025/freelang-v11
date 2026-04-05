@@ -46,6 +46,11 @@ export enum TokenType {
   Then = "Then",           // then
   Else = "Else",           // else
 
+  // Phase 9c Keywords (Loop Control)
+  Repeat = "Repeat",       // repeat
+  Until = "Until",         // until
+  While = "While",         // while
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

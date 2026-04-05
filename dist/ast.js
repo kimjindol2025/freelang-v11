@@ -25,6 +25,9 @@ exports.makeImportBlock = makeImportBlock;
 exports.makeOpenBlock = makeOpenBlock;
 exports.makeAsyncFunction = makeAsyncFunction;
 exports.makeAwaitExpression = makeAwaitExpression;
+exports.makeReasoningBlock = makeReasoningBlock;
+exports.makeReasoningTransition = makeReasoningTransition;
+exports.makeReasoningSequence = makeReasoningSequence;
 exports.isBlock = isBlock;
 exports.isLiteral = isLiteral;
 exports.isSymbolLiteral = isSymbolLiteral;
@@ -36,6 +39,9 @@ exports.isModuleBlock = isModuleBlock;
 exports.isImportBlock = isImportBlock;
 exports.isOpenBlock = isOpenBlock;
 exports.isSearchBlock = isSearchBlock;
+exports.isLearnBlock = isLearnBlock;
+exports.isReasoningBlock = isReasoningBlock;
+exports.isReasoningSequence = isReasoningSequence;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -121,6 +127,29 @@ function makeAsyncFunction(name, params, body) {
 function makeAwaitExpression(argument) {
     return { kind: "await", argument };
 }
+// Helper: Create reasoning block (Phase 9c)
+function makeReasoningBlock(stage, data, observations, analysis, decisions, actions, verifications, transitions, metadata) {
+    return {
+        kind: "reasoning-block",
+        stage,
+        data,
+        observations,
+        analysis,
+        decisions,
+        actions,
+        verifications,
+        transitions,
+        metadata
+    };
+}
+// Helper: Create reasoning transition (Phase 9c)
+function makeReasoningTransition(from, to, condition, action) {
+    return { from, to, condition, action };
+}
+// Helper: Create reasoning sequence (Phase 9c Extension)
+function makeReasoningSequence(stages, metadata) {
+    return { kind: "reasoning-sequence", stages, metadata };
+}
 // ============================================================
 // Phase 6: Type Guard Functions (타입 안전성 강화)
 // ============================================================
@@ -167,5 +196,17 @@ function isOpenBlock(node) {
 // SearchBlock 타입 가드 (NEW for Phase 9a)
 function isSearchBlock(node) {
     return node && node.kind === "search-block";
+}
+// LearnBlock 타입 가드 (NEW for Phase 9b)
+function isLearnBlock(node) {
+    return node && node.kind === "learn-block";
+}
+// ReasoningBlock 타입 가드 (NEW for Phase 9c)
+function isReasoningBlock(node) {
+    return node && node.kind === "reasoning-block";
+}
+// ReasoningSequence 타입 가드 (NEW for Phase 9c Extension)
+function isReasoningSequence(node) {
+    return node && node.kind === "reasoning-sequence";
 }
 //# sourceMappingURL=ast.js.map

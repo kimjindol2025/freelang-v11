@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | SearchBlock | AsyncFunction | AwaitExpression;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | SearchBlock | LearnBlock | ReasoningBlock | ReasoningSequence | AsyncFunction | AwaitExpression;
 export interface Block {
     kind: "block";
     type: string;
@@ -124,6 +124,66 @@ export interface SearchBlock {
     limit?: number;
     name?: string;
 }
+export interface LearnBlock {
+    kind: "learn-block";
+    key: string;
+    data: any;
+    source?: "search" | "feedback" | "analysis";
+    confidence?: number;
+    timestamp?: string;
+}
+export interface ReasoningBlock {
+    kind: "reasoning-block";
+    stage: "observe" | "analyze" | "decide" | "act" | "verify";
+    data: Map<string, any>;
+    observations?: any[];
+    analysis?: any[];
+    decisions?: any[];
+    actions?: any[];
+    verifications?: any[];
+    transitions?: ReasoningTransition[];
+    metadata?: {
+        startTime?: string;
+        endTime?: string;
+        confidence?: number;
+        feedback?: string;
+    };
+    conditional?: {
+        condition: ASTNode;
+        thenBlock: ReasoningBlock;
+        elseBlock?: ReasoningBlock;
+    };
+    whenGuard?: ASTNode;
+    loopControl?: {
+        type: "repeat-until" | "repeat-while";
+        condition: ASTNode;
+        maxIterations?: number;
+    };
+}
+export interface ReasoningTransition {
+    from: string;
+    to: string;
+    condition?: ASTNode;
+    action?: ASTNode;
+}
+export interface ReasoningSequence {
+    kind: "reasoning-sequence";
+    stages: ReasoningBlock[];
+    metadata?: {
+        startTime?: string;
+        endTime?: string;
+        totalConfidence?: number;
+        executionPath?: string[];
+    };
+    feedbackLoop?: {
+        enabled: boolean;
+        fromStage: "verify" | "act";
+        toStage: "analyze" | "decide";
+        condition?: ASTNode;
+        maxIterations?: number;
+        confidenceDamping?: number;
+    };
+}
 export interface AsyncFunction {
     kind: "async-function";
     name: string;
@@ -179,6 +239,19 @@ export declare function makeAsyncFunction(name: string, params: Array<{
     type?: TypeAnnotation;
 }>, body: ASTNode): AsyncFunction;
 export declare function makeAwaitExpression(argument: ASTNode): AwaitExpression;
+export declare function makeReasoningBlock(stage: "observe" | "analyze" | "decide" | "act" | "verify", data: Map<string, any>, observations?: any[], analysis?: any[], decisions?: any[], actions?: any[], verifications?: any[], transitions?: ReasoningTransition[], metadata?: {
+    startTime?: string;
+    endTime?: string;
+    confidence?: number;
+    feedback?: string;
+}): ReasoningBlock;
+export declare function makeReasoningTransition(from: string, to: string, condition?: ASTNode, action?: ASTNode): ReasoningTransition;
+export declare function makeReasoningSequence(stages: ReasoningBlock[], metadata?: {
+    startTime?: string;
+    endTime?: string;
+    totalConfidence?: number;
+    executionPath?: string[];
+}): ReasoningSequence;
 export declare function isBlock(node: any): node is Block;
 export declare function isLiteral(node: any): node is Literal;
 export declare function isSymbolLiteral(node: any): node is Literal;
@@ -190,4 +263,7 @@ export declare function isModuleBlock(node: any): node is ModuleBlock;
 export declare function isImportBlock(node: any): node is ImportBlock;
 export declare function isOpenBlock(node: any): node is OpenBlock;
 export declare function isSearchBlock(node: any): node is SearchBlock;
+export declare function isLearnBlock(node: any): node is LearnBlock;
+export declare function isReasoningBlock(node: any): node is ReasoningBlock;
+export declare function isReasoningSequence(node: any): node is ReasoningSequence;
 //# sourceMappingURL=ast.d.ts.map

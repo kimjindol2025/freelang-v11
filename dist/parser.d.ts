@@ -34,8 +34,17 @@ export declare class Parser {
     private parseOpenExpression;
     private parseSearchExpression;
     private parseFetchExpression;
+    private parseLearnExpression;
+    private parseRecallExpression;
+    private parseReasoningExpression;
+    private parseReasoningSequenceExpression;
+    private parseReasoningExpressionInternal;
     private parseQualifiedIdentifier;
     private parseSelectiveImport;
+    private parseConditionalReasoningBlock;
+    private parseWhenReasoningBlock;
+    private parseLoopReasoningBlock;
+    private getReasoningStageName;
 }
 export declare function parse(tokens: Token[]): ASTNode[];
 //# sourceMappingURL=parser.d.ts.map

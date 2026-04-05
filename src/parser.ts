@@ -1425,8 +1425,9 @@ export class Parser {
 
   // Phase 9c Extension: Parse reasoning-sequence expression
   // (reasoning-sequence (observe ...) (analyze ...) (decide ...) (act ...) (verify ...))
+  // Phase 9a/9b: Support search and learn blocks in sequences
   private parseReasoningSequenceExpression(): ReasoningSequence {
-    const stages: ReasoningBlock[] = [];
+    const stages: (ReasoningBlock | SearchBlock | LearnBlock)[] = [];
     const startTime = new Date().toISOString();
 
     // Parse multiple reasoning blocks in sequence
@@ -1524,6 +1525,18 @@ export class Parser {
             stages.push(loopBlock);
             continue;
           }
+          if (nextToken.type === T.Search) {
+            // Phase 9a: Don't consume '(', let parseSearchReasoningBlock handle it
+            const searchBlock = this.parseSearchReasoningBlock();
+            stages.push(searchBlock);
+            continue;
+          }
+          if (nextToken.type === T.Learn) {
+            // Phase 9b: Don't consume '(', let parseLearnReasoningBlock handle it
+            const learnBlock = this.parseLearnReasoningBlock();
+            stages.push(learnBlock);
+            continue;
+          }
         }
 
         this.advance(); // consume '('
@@ -1597,7 +1610,13 @@ export class Parser {
       metadata: {
         startTime,
         endTime,
-        executionPath: stages.map((s) => s.stage),
+        // Phase 9a/9b: Support search/learn blocks in execution path
+        executionPath: stages.map((s) => {
+          if ("stage" in s) return (s as ReasoningBlock).stage;
+          if ((s as any).kind === "search-block") return "search";
+          if ((s as any).kind === "learn-block") return "learn";
+          return "unknown";
+        }),
       },
       feedbackLoop: feedbackLoop?.enabled ? feedbackLoop : undefined,
     };
@@ -1910,6 +1929,26 @@ export class Parser {
   // Phase 9c: Parse loop control (repeat-until or repeat-while)
   // Format: (repeat-until condition (block))
   //         (repeat-while condition (block))
+  // Phase 9a: Parse search block in reasoning sequence
+  // (search query :source "web"|"api"|"kb" :cache true|false :limit 5)
+  private parseSearchReasoningBlock(): SearchBlock {
+    this.expect(T.LParen); // consume '('
+    this.expect(T.Search); // consume 'search'
+    const searchBlock = this.parseSearchExpression();
+    this.expect(T.RParen); // consume ')'
+    return searchBlock;
+  }
+
+  // Phase 9b: Parse learn block in reasoning sequence
+  // (learn key data :source "search"|"feedback"|"analysis" :confidence 0.95)
+  private parseLearnReasoningBlock(): LearnBlock {
+    this.expect(T.LParen); // consume '('
+    this.expect(T.Learn); // consume 'learn'
+    const learnBlock = this.parseLearnExpression();
+    this.expect(T.RParen); // consume ')'
+    return learnBlock;
+  }
+
   private parseLoopReasoningBlock(): ReasoningBlock {
     this.expect(T.LParen); // consume '('
 

@@ -28,6 +28,8 @@ export interface ExecutionContext {
   cache?: Map<string, any>; // Phase 9a: Search result caching
   learned?: Map<string, any>; // Phase 9b: Learned data storage (key -> data)
   reasoning?: Map<string, any>; // Phase 9c: Reasoning state storage (stage-timestamp -> reasoning state)
+  currentSearches?: Map<string, any>; // Phase 9a: Current reasoning sequence search results
+  currentLearned?: Map<string, any>; // Phase 9b: Current reasoning sequence learned data
 }
 
 export interface FreeLangFunction {
@@ -2444,6 +2446,12 @@ export class Interpreter {
         break;
 
       case "analyze":
+        // Phase 9a: Show search results if available
+        const currentSearches = (this.context as any).currentSearches;
+        if (currentSearches && currentSearches.size > 0) {
+          logMessage += ` [using ${currentSearches.size} search result(s)]`;
+        }
+
         const angles = data.get("angles");
         if (angles instanceof Map) {
           logMessage += `: ${angles.size} angles analyzed`;
@@ -2455,6 +2463,12 @@ export class Interpreter {
         break;
 
       case "decide":
+        // Phase 9b: Show learned data if available
+        const currentLearned = (this.context as any).currentLearned;
+        if (currentLearned && currentLearned.size > 0) {
+          logMessage += ` [using ${currentLearned.size} learned fact(s)]`;
+        }
+
         const choice = data.get("choice");
         if (choice) {
           logMessage += `: "${choice.value || choice}"`;
@@ -2527,6 +2541,21 @@ export class Interpreter {
     let iteration = 0;
     const maxIterations = feedbackLoop?.maxIterations || 1;
 
+    // Phase 9a/9b: Initialize search and learn context for data sharing
+    if (!reasoningSeq.context) {
+      reasoningSeq.context = {};
+    }
+    if (!reasoningSeq.context.searches) {
+      reasoningSeq.context.searches = new Map();
+    }
+    if (!reasoningSeq.context.learned) {
+      reasoningSeq.context.learned = new Map();
+    }
+
+    // Store references in interpreter context for access during stage execution
+    this.context.currentSearches = reasoningSeq.context.searches;
+    this.context.currentLearned = reasoningSeq.context.learned;
+
     // Execute reasoning sequence with potential feedback loop
     while (iteration < maxIterations) {
       iteration++;
@@ -2548,25 +2577,77 @@ export class Interpreter {
         const stage = currentStages[i];
         const stageNum = i + 1;
 
-        // Log stage entry
+        // Phase 9a: Handle search block
+        if ((stage as any).kind === "search-block") {
+          const searchBlock = stage as any; // SearchBlock
+          this.logger.info(`  [${stageNum}/${currentStages.length}] 🔎 SEARCH`);
+
+          const searchResult = this.handleSearchBlock(searchBlock);
+
+          // Store search result in reasoning sequence context
+          if (!reasoningSeq.context) {
+            reasoningSeq.context = {};
+          }
+          if (!reasoningSeq.context.searches) {
+            reasoningSeq.context.searches = new Map();
+          }
+          const searchKey = `search_${i}`;
+          reasoningSeq.context.searches.set(searchKey, searchResult);
+
+          iterationResults.push(searchResult);
+          executionPath.push("search");
+          this.logger.info(`  ✓ Search result stored in context`);
+          continue;
+        }
+
+        // Phase 9b: Handle learn block
+        if ((stage as any).kind === "learn-block") {
+          const learnBlock = stage as any; // LearnBlock
+          this.logger.info(`  [${stageNum}/${currentStages.length}] 📚 LEARN`);
+
+          const learnResult = this.handleLearnBlock(learnBlock);
+
+          // Store learned data in reasoning sequence context
+          if (!reasoningSeq.context) {
+            reasoningSeq.context = {};
+          }
+          if (!reasoningSeq.context.learned) {
+            reasoningSeq.context.learned = new Map();
+          }
+          const learnKey = (learnBlock as any).key || `learn_${i}`;
+          reasoningSeq.context.learned.set(learnKey, learnResult);
+
+          iterationResults.push(learnResult);
+          executionPath.push("learn");
+          this.logger.info(`  ✓ Learned data stored in context (key: ${learnKey})`);
+          continue;
+        }
+
+        // Phase 9a/9b: Only ReasoningBlock should reach here (Search/Learn already handled)
+        const reasoningBlock = stage as ReasoningBlock;
+        if (reasoningBlock.kind !== "reasoning-block") {
+          throw new Error(`Unexpected stage kind in reasoning sequence: ${(stage as any).kind}`);
+        }
+
+        // Log stage entry for reasoning blocks
         const stageEmoji = {
           observe: "👀",
           analyze: "🔍",
           decide: "🎯",
           act: "⚡",
           verify: "✅",
-        }[stage.stage] || "❓";
+        }[reasoningBlock.stage] || "❓";
 
         const stageLabel =
           iteration === 1
             ? `[${stageNum}/${currentStages.length}]`
             : `[${stageNum}/${currentStages.length}]`;
 
-        this.logger.info(`  ${stageLabel} ${stageEmoji} ${stage.stage.toUpperCase()}`);
+        this.logger.info(`  ${stageLabel} ${stageEmoji} ${reasoningBlock.stage.toUpperCase()}`);
 
         // Phase 9c: Check for when guard clause (skip if condition is false)
-        if (stage.whenGuard) {
-          const guardCondition = this.evaluateCondition(stage.whenGuard);
+        if (reasoningBlock.whenGuard) {
+          const guardCondition = this.evaluateCondition(reasoningBlock.whenGuard);
           if (!guardCondition) {
             this.logger.info(`  ⏭️  SKIPPED (when guard condition false)`);
             continue; // Skip this stage
@@ -2574,15 +2655,15 @@ export class Interpreter {
         }
 
         // Apply confidence damping from previous iterations
-        let adjustedStage = stage;
-        if (iteration > 1 && stage.metadata?.confidence !== undefined) {
+        let adjustedStage = reasoningBlock;
+        if (iteration > 1 && reasoningBlock.metadata?.confidence !== undefined) {
           adjustedStage = {
-            ...stage,
+            ...reasoningBlock,
             metadata: {
-              ...stage.metadata,
+              ...reasoningBlock.metadata,
               confidence: Math.max(
                 0,
-                (stage.metadata.confidence || 1) -
+                (reasoningBlock.metadata.confidence || 1) -
                   (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)
               ),
             },
@@ -2591,16 +2672,16 @@ export class Interpreter {
 
         // Phase 9c: Check for conditional (if/then/else)
         let blockToHandle = adjustedStage;
-        if (stage.conditional) {
-          const conditionMet = this.evaluateCondition(stage.conditional.condition);
-          const selectedBlock = conditionMet ? stage.conditional.thenBlock : stage.conditional.elseBlock;
+        if (reasoningBlock.conditional) {
+          const conditionMet = this.evaluateCondition(reasoningBlock.conditional.condition);
+          const selectedBlock = conditionMet ? reasoningBlock.conditional.thenBlock : reasoningBlock.conditional.elseBlock;
 
           if (selectedBlock) {
             blockToHandle = selectedBlock;
             this.logger.info(
               `  ${conditionMet ? "✓" : "✗"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`
             );
-          } else if (!conditionMet && !stage.conditional.elseBlock) {
+          } else if (!conditionMet && !reasoningBlock.conditional.elseBlock) {
             this.logger.info(`  ⏭️  SKIPPED (if condition false, no else block)`);
             continue; // Skip if condition false and no else
           }
@@ -2608,8 +2689,8 @@ export class Interpreter {
 
         // Phase 9c: Check for loop control (repeat-until / repeat-while)
         let stageResult: any;
-        if (stage.loopControl) {
-          const { type, condition, maxIterations = 1000 } = stage.loopControl;
+        if (reasoningBlock.loopControl) {
+          const { type, condition, maxIterations = 1000 } = reasoningBlock.loopControl;
           const loopMaxIter = Math.min(maxIterations, 1000);
           let loopIteration = 0;
 
@@ -2625,7 +2706,7 @@ export class Interpreter {
             }
 
             // Handle the reasoning block
-            stageResult = this.handleReasoningBlock(blockToHandle);
+            stageResult = this.handleReasoningBlock(blockToHandle as ReasoningBlock);
 
             this.logger.info(
               `  🔁 ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter} (condition: ${shouldContinue ? "continue" : "exit"})`
@@ -2633,20 +2714,20 @@ export class Interpreter {
           }
         } else {
           // Handle the reasoning block (no loop)
-          stageResult = this.handleReasoningBlock(blockToHandle);
+          stageResult = this.handleReasoningBlock(blockToHandle as ReasoningBlock);
         }
 
         iterationResults.push(stageResult);
-        executionPath.push(stage.stage);
+        executionPath.push(reasoningBlock.stage);
 
         // Store verify result for feedback check
-        if (stage.stage === "verify") {
+        if (reasoningBlock.stage === "verify") {
           verifyResult = stageResult;
         }
 
         // Check for stage-specific transitions
-        if (stage.transitions && stage.transitions.length > 0) {
-          for (const transition of stage.transitions) {
+        if (reasoningBlock.transitions && reasoningBlock.transitions.length > 0) {
+          for (const transition of reasoningBlock.transitions) {
             if (transition.condition) {
               const conditionMet = this.eval(transition.condition);
               if (conditionMet && transition.to) {
@@ -2678,7 +2759,7 @@ export class Interpreter {
 
         // Re-execute from feedback target stage
         const feedbackTargetIndex = currentStages.findIndex(
-          (s) => s.stage === feedbackLoop.toStage
+          (s) => (s as ReasoningBlock).stage === feedbackLoop.toStage
         );
         if (feedbackTargetIndex >= 0) {
           currentStages = currentStages.slice(feedbackTargetIndex);

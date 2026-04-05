@@ -31,6 +31,10 @@ const KEYWORDS: Map<string, T> = new Map([
   ["when", T.When],
   ["then", T.Then],
   ["else", T.Else],
+  // Phase 9c: Loop control keywords
+  ["repeat", T.Repeat],
+  ["until", T.Until],
+  ["while", T.While],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

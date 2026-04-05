@@ -18,6 +18,8 @@ export interface ExecutionContext {
     typeClassInstances?: Map<string, TypeClassInstanceInfo>;
     modules?: Map<string, ModuleInfo>;
     cache?: Map<string, any>;
+    learned?: Map<string, any>;
+    reasoning?: Map<string, any>;
 }
 export interface FreeLangFunction {
     name: string;
@@ -102,6 +104,11 @@ export declare class Interpreter {
     private getConcreteType;
     private evalOpenBlock;
     private handleSearchBlock;
+    private handleLearnBlock;
+    private handleReasoningBlock;
+    private handleReasoningSequence;
+    private evaluateFeedbackCondition;
+    private evaluateCondition;
     private evalTypeClass;
     private evalInstance;
 }

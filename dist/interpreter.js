@@ -49,6 +49,15 @@ class Interpreter {
             else if ((0, ast_1.isSearchBlock)(node)) {
                 this.context.lastValue = this.handleSearchBlock(node);
             }
+            else if ((0, ast_1.isLearnBlock)(node)) {
+                this.context.lastValue = this.handleLearnBlock(node);
+            }
+            else if ((0, ast_1.isReasoningBlock)(node)) {
+                this.context.lastValue = this.handleReasoningBlock(node);
+            }
+            else if ((0, ast_1.isReasoningSequence)(node)) {
+                this.context.lastValue = this.handleReasoningSequence(node);
+            }
             else if ((0, ast_1.isModuleBlock)(node)) {
                 this.evalModuleBlock(node);
             }
@@ -414,6 +423,211 @@ class Interpreter {
                 body: expr.args[2],
                 capturedEnv: new Map(this.context.variables),
             };
+        }
+        // Phase 9a: Search/Fetch expressions from eval (when used in S-expression form)
+        if (op === "search" || op === "fetch") {
+            // (search query :source "web" :cache true :limit 5 :name results)
+            // (fetch url :cache true)
+            let query = "";
+            let source = "web";
+            let cache = false;
+            let limit = 10;
+            let name;
+            // Parse arguments
+            for (let i = 0; i < expr.args.length; i++) {
+                const arg = expr.args[i];
+                // First positional argument is query/url
+                if (i === 0) {
+                    const queryValue = this.eval(arg);
+                    query = String(queryValue);
+                    continue;
+                }
+                // Check for keyword arguments
+                if (arg.kind === "keyword") {
+                    const keywordName = arg.name;
+                    if (i + 1 < expr.args.length) {
+                        const value = this.eval(expr.args[i + 1]);
+                        switch (keywordName) {
+                            case "source":
+                                if (value === "web" || value === "api" || value === "kb") {
+                                    source = value;
+                                }
+                                break;
+                            case "cache":
+                                cache = value === true || value === "true";
+                                break;
+                            case "limit":
+                                limit = Number(value) || 10;
+                                break;
+                            case "name":
+                                name = String(value);
+                                break;
+                        }
+                        i++; // Skip the value argument
+                    }
+                }
+            }
+            // For fetch, always use "api" source
+            if (op === "fetch") {
+                source = "api";
+            }
+            const searchBlock = {
+                kind: "search-block",
+                query,
+                source,
+                cache,
+                limit,
+                name,
+            };
+            return this.handleSearchBlock(searchBlock);
+        }
+        // Phase 9b: Learn/Recall expressions from eval (when used in S-expression form)
+        if (op === "learn" || op === "recall" || op === "remember" || op === "forget") {
+            // (learn key data :source "search" :confidence 0.95)
+            // (recall key)
+            // (remember key data) - alias for learn
+            // (forget key) - delete learned data
+            let key = "";
+            let data = null;
+            let source = "search";
+            let confidence;
+            // Parse arguments
+            for (let i = 0; i < expr.args.length; i++) {
+                const arg = expr.args[i];
+                // First positional argument is key
+                if (i === 0) {
+                    const keyValue = this.eval(arg);
+                    key = String(keyValue);
+                    continue;
+                }
+                // Second positional argument is data (for learn/remember)
+                if (i === 1 && (op === "learn" || op === "remember")) {
+                    data = this.eval(arg);
+                    continue;
+                }
+                // Check for keyword arguments
+                if (arg.kind === "keyword") {
+                    const keywordName = arg.name;
+                    if (i + 1 < expr.args.length) {
+                        const value = this.eval(expr.args[i + 1]);
+                        switch (keywordName) {
+                            case "source":
+                                if (value === "search" || value === "feedback" || value === "analysis") {
+                                    source = value;
+                                }
+                                break;
+                            case "confidence":
+                                confidence = Number(value) || undefined;
+                                break;
+                        }
+                        i++; // Skip the value argument
+                    }
+                }
+            }
+            // Handle forget operation
+            if (op === "forget") {
+                if (!this.context.learned) {
+                    this.context.learned = new Map();
+                }
+                const found = this.context.learned.has(key);
+                if (found) {
+                    this.context.learned.delete(key);
+                    this.logger.info(`🗑️ Forgot: "${key}"`);
+                }
+                return {
+                    kind: "learn-result",
+                    operation: "forget",
+                    key,
+                    deleted: found,
+                };
+            }
+            // Handle recall operation
+            if (op === "recall") {
+                data = null; // Mark as recall
+            }
+            const learnBlock = {
+                kind: "learn-block",
+                key,
+                data,
+                source,
+                confidence,
+                timestamp: new Date().toISOString(),
+            };
+            return this.handleLearnBlock(learnBlock);
+        }
+        // Phase 9c: Reasoning expressions from eval (observe, analyze, decide, act, verify)
+        if (op === "observe" || op === "analyze" || op === "decide" || op === "act" || op === "verify") {
+            const stage = op;
+            const data = new Map();
+            let observations;
+            let analysis;
+            let decisions;
+            let actions;
+            let verifications;
+            let confidence;
+            // Parse arguments based on stage
+            for (let i = 0; i < expr.args.length; i++) {
+                const arg = expr.args[i];
+                // Check for keyword arguments
+                if (arg.kind === "keyword") {
+                    const keywordName = arg.name;
+                    if (i + 1 < expr.args.length) {
+                        const value = this.eval(expr.args[i + 1]);
+                        if (keywordName === "confidence") {
+                            confidence = Number(value);
+                        }
+                        else {
+                            data.set(keywordName, value);
+                        }
+                        i++; // Skip the value argument
+                    }
+                }
+                else {
+                    // First positional argument depends on stage
+                    if (i === 0) {
+                        const argValue = this.eval(arg);
+                        switch (stage) {
+                            case "observe":
+                                observations = [argValue];
+                                data.set("observation", argValue);
+                                break;
+                            case "analyze":
+                                // For analyze, first arg might be angle data
+                                data.set("firstArg", argValue);
+                                break;
+                            case "decide":
+                                // For decide, first arg might be choice data
+                                data.set("firstArg", argValue);
+                                break;
+                            case "act":
+                                // For act, first arg might be action data
+                                data.set("firstArg", argValue);
+                                break;
+                            case "verify":
+                                // For verify, first arg might be result data
+                                verifications = [argValue];
+                                data.set("result", argValue);
+                                break;
+                        }
+                    }
+                }
+            }
+            // Build reasoning block
+            const reasoningBlock = {
+                kind: "reasoning-block",
+                stage,
+                data,
+                observations,
+                analysis,
+                decisions,
+                actions,
+                verifications,
+                metadata: {
+                    confidence,
+                    startTime: new Date().toISOString(),
+                },
+            };
+            return this.handleReasoningBlock(reasoningBlock);
         }
         // Phase 7: Await expressions - extract Promise value
         if (op === "await") {
@@ -1844,6 +2058,359 @@ class Interpreter {
                 kind: "search-error",
                 message: error.message,
             };
+        }
+    }
+    // Phase 9b: Handle Learn Block - Store learned information
+    handleLearnBlock(learnBlock) {
+        const { key, data, source = "search", confidence, timestamp } = learnBlock;
+        // Initialize learned data storage if needed
+        if (!this.context.learned) {
+            this.context.learned = new Map();
+        }
+        // Check if this is a recall operation (data is null)
+        if (data === null) {
+            // Recall: retrieve stored data by key
+            if (this.context.learned.has(key)) {
+                const stored = this.context.learned.get(key);
+                this.logger.info(`🔍 Recalled: "${key}"`);
+                return {
+                    kind: "learn-result",
+                    operation: "recall",
+                    key,
+                    data: stored.data,
+                    source: stored.source,
+                    confidence: stored.confidence,
+                    timestamp: stored.timestamp,
+                    found: true,
+                };
+            }
+            else {
+                this.logger.info(`❌ Not found in memory: "${key}"`);
+                return {
+                    kind: "learn-result",
+                    operation: "recall",
+                    key,
+                    data: null,
+                    found: false,
+                };
+            }
+        }
+        // Learn: store new data with metadata
+        const learnedEntry = {
+            data,
+            source,
+            confidence: confidence ?? 0.8, // Default confidence: 80%
+            timestamp: timestamp ?? new Date().toISOString(),
+        };
+        this.context.learned.set(key, learnedEntry);
+        this.logger.info(`🧠 Learned: "${key}" from "${source}"${confidence ? ` (confidence: ${confidence})` : ""}`);
+        return {
+            kind: "learn-result",
+            operation: "learn",
+            key,
+            data,
+            source,
+            confidence: confidence ?? 0.8,
+            timestamp: learnedEntry.timestamp,
+            stored: true,
+        };
+    }
+    // Phase 9c: Handle Reasoning Block - State-based AI reasoning
+    handleReasoningBlock(reasoningBlock) {
+        const { stage, data, observations, analysis, decisions, actions, verifications, metadata, transitions } = reasoningBlock;
+        // Initialize reasoning state storage if needed
+        if (!this.context.reasoning) {
+            this.context.reasoning = new Map();
+        }
+        // Create reasoning state entry
+        const reasoningState = {
+            stage,
+            data: Object.fromEntries(data),
+            observations,
+            analysis,
+            decisions,
+            actions,
+            verifications,
+            metadata: {
+                ...metadata,
+                completedAt: new Date().toISOString(),
+            },
+            transitions: transitions || [],
+        };
+        // Store reasoning state by stage + timestamp
+        const stateKey = `${stage}-${new Date().getTime()}`;
+        this.context.reasoning.set(stateKey, reasoningState);
+        // Log the reasoning stage
+        const stageEmoji = {
+            observe: "👀",
+            analyze: "🔍",
+            decide: "🎯",
+            act: "⚡",
+            verify: "✅",
+        }[stage] || "❓";
+        let logMessage = `${stageEmoji} ${stage.toUpperCase()}`;
+        // Add stage-specific logging
+        switch (stage) {
+            case "observe":
+                if (observations && observations.length > 0) {
+                    logMessage += `: ${observations.length} observations`;
+                }
+                break;
+            case "analyze":
+                const angles = data.get("angles");
+                if (angles instanceof Map) {
+                    logMessage += `: ${angles.size} angles analyzed`;
+                }
+                const selected = data.get("selected");
+                if (selected) {
+                    logMessage += `, selected: "${selected.value || selected}"`;
+                }
+                break;
+            case "decide":
+                const choice = data.get("choice");
+                if (choice) {
+                    logMessage += `: "${choice.value || choice}"`;
+                }
+                const reason = data.get("reason");
+                if (reason) {
+                    logMessage += ` (${reason.value || reason})`;
+                }
+                break;
+            case "act":
+                const action = data.get("action");
+                if (action) {
+                    logMessage += `: "${action.value || action}"`;
+                }
+                break;
+            case "verify":
+                const result = data.get("result");
+                if (result) {
+                    logMessage += `: ${result.value || result}`;
+                }
+                if (metadata?.confidence !== undefined) {
+                    logMessage += ` (confidence: ${(metadata.confidence * 100).toFixed(0)}%)`;
+                }
+                break;
+        }
+        this.logger.info(logMessage);
+        // Return reasoning result
+        return {
+            kind: "reasoning-result",
+            stage,
+            data: Object.fromEntries(data),
+            observations,
+            analysis,
+            decisions,
+            actions,
+            verifications,
+            metadata: reasoningState.metadata,
+            stateKey,
+            completed: true,
+        };
+    }
+    // Phase 9c Extension: Handle Reasoning Sequence - Automatic state transitions
+    // Phase 9c Feedback: Verify result feedback to analyze stage (re-evaluation loop)
+    handleReasoningSequence(reasoningSeq) {
+        const { stages, metadata, feedbackLoop } = reasoningSeq;
+        // Initialize reasoning state storage if needed
+        if (!this.context.reasoning) {
+            this.context.reasoning = new Map();
+        }
+        const sequenceId = new Date().getTime();
+        const executionPath = [];
+        const sequenceResults = [];
+        const iterationHistory = [];
+        // Log sequence start
+        this.logger.info(`🔄 REASONING SEQUENCE START (${stages.length} stages, feedback: ${feedbackLoop?.enabled ? "enabled" : "disabled"})`);
+        let currentStages = stages;
+        let iteration = 0;
+        const maxIterations = feedbackLoop?.maxIterations || 1;
+        // Execute reasoning sequence with potential feedback loop
+        while (iteration < maxIterations) {
+            iteration++;
+            // Log iteration start
+            if (iteration > 1) {
+                this.logger.info(`🔄 FEEDBACK LOOP ITERATION ${iteration}/${maxIterations} (damping: ${(feedbackLoop?.confidenceDamping || 0.1).toFixed(1)})`);
+            }
+            const iterationResults = [];
+            let verifyResult = null;
+            // Execute each reasoning stage in sequence
+            for (let i = 0; i < currentStages.length; i++) {
+                const stage = currentStages[i];
+                const stageNum = i + 1;
+                // Log stage entry
+                const stageEmoji = {
+                    observe: "👀",
+                    analyze: "🔍",
+                    decide: "🎯",
+                    act: "⚡",
+                    verify: "✅",
+                }[stage.stage] || "❓";
+                const stageLabel = iteration === 1
+                    ? `[${stageNum}/${currentStages.length}]`
+                    : `[${stageNum}/${currentStages.length}]`;
+                this.logger.info(`  ${stageLabel} ${stageEmoji} ${stage.stage.toUpperCase()}`);
+                // Phase 9c: Check for when guard clause (skip if condition is false)
+                if (stage.whenGuard) {
+                    const guardCondition = this.evaluateCondition(stage.whenGuard);
+                    if (!guardCondition) {
+                        this.logger.info(`  ⏭️  SKIPPED (when guard condition false)`);
+                        continue; // Skip this stage
+                    }
+                }
+                // Apply confidence damping from previous iterations
+                let adjustedStage = stage;
+                if (iteration > 1 && stage.metadata?.confidence !== undefined) {
+                    adjustedStage = {
+                        ...stage,
+                        metadata: {
+                            ...stage.metadata,
+                            confidence: Math.max(0, (stage.metadata.confidence || 1) -
+                                (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)),
+                        },
+                    };
+                }
+                // Phase 9c: Check for conditional (if/then/else)
+                let blockToHandle = adjustedStage;
+                if (stage.conditional) {
+                    const conditionMet = this.evaluateCondition(stage.conditional.condition);
+                    const selectedBlock = conditionMet ? stage.conditional.thenBlock : stage.conditional.elseBlock;
+                    if (selectedBlock) {
+                        blockToHandle = selectedBlock;
+                        this.logger.info(`  ${conditionMet ? "✓" : "✗"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`);
+                    }
+                    else if (!conditionMet && !stage.conditional.elseBlock) {
+                        this.logger.info(`  ⏭️  SKIPPED (if condition false, no else block)`);
+                        continue; // Skip if condition false and no else
+                    }
+                }
+                // Phase 9c: Check for loop control (repeat-until / repeat-while)
+                let stageResult;
+                if (stage.loopControl) {
+                    const { type, condition, maxIterations = 1000 } = stage.loopControl;
+                    const loopMaxIter = Math.min(maxIterations, 1000);
+                    let loopIteration = 0;
+                    while (loopIteration < loopMaxIter) {
+                        loopIteration++;
+                        // Evaluate loop condition
+                        const conditionValue = this.evaluateCondition(condition);
+                        const shouldContinue = type === "repeat-until" ? !conditionValue : conditionValue;
+                        if (!shouldContinue && loopIteration > 1) {
+                            break; // Exit loop if condition met
+                        }
+                        // Handle the reasoning block
+                        stageResult = this.handleReasoningBlock(blockToHandle);
+                        this.logger.info(`  🔁 ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter} (condition: ${shouldContinue ? "continue" : "exit"})`);
+                    }
+                }
+                else {
+                    // Handle the reasoning block (no loop)
+                    stageResult = this.handleReasoningBlock(blockToHandle);
+                }
+                iterationResults.push(stageResult);
+                executionPath.push(stage.stage);
+                // Store verify result for feedback check
+                if (stage.stage === "verify") {
+                    verifyResult = stageResult;
+                }
+                // Check for stage-specific transitions
+                if (stage.transitions && stage.transitions.length > 0) {
+                    for (const transition of stage.transitions) {
+                        if (transition.condition) {
+                            const conditionMet = this.eval(transition.condition);
+                            if (conditionMet && transition.to) {
+                                this.logger.info(`    ↓ Transition to: ${transition.to}`);
+                            }
+                        }
+                    }
+                }
+            }
+            sequenceResults.push(...iterationResults);
+            iterationHistory.push({
+                iteration,
+                results: iterationResults,
+                verifyConfidence: verifyResult?.metadata?.confidence,
+            });
+            // Check feedback loop condition
+            const shouldContinueFeedback = feedbackLoop?.enabled &&
+                iteration < maxIterations &&
+                verifyResult &&
+                this.evaluateFeedbackCondition(verifyResult, feedbackLoop);
+            if (shouldContinueFeedback) {
+                this.logger.info(`↩️  FEEDBACK TRIGGERED: Returning to "${feedbackLoop.toStage}" stage`);
+                // Re-execute from feedback target stage
+                const feedbackTargetIndex = currentStages.findIndex((s) => s.stage === feedbackLoop.toStage);
+                if (feedbackTargetIndex >= 0) {
+                    currentStages = currentStages.slice(feedbackTargetIndex);
+                }
+            }
+            else {
+                break; // Exit feedback loop
+            }
+        }
+        // Create sequence result with all stage results
+        const sequenceResult = {
+            kind: "reasoning-sequence-result",
+            stages: sequenceResults,
+            executionPath,
+            iterations: iterationHistory.length,
+            feedbackTriggered: iteration > 1,
+            metadata: {
+                ...metadata,
+                sequenceId,
+                completedAt: new Date().toISOString(),
+                totalStages: stages.length,
+                iterations: iteration,
+            },
+            completed: true,
+        };
+        // Store the entire sequence result
+        const sequenceKey = `sequence-${sequenceId}`;
+        this.context.reasoning.set(sequenceKey, sequenceResult);
+        // Log sequence completion
+        const totalConfidence = sequenceResults.reduce((sum, r) => sum + (r.metadata?.confidence || 0), 0) /
+            Math.max(sequenceResults.length, 1);
+        this.logger.info(`✅ REASONING SEQUENCE COMPLETE (${stages.length} stages, ${iteration} iterations, confidence: ${(totalConfidence * 100).toFixed(0)}%)`);
+        return sequenceResult;
+    }
+    // Phase 9c Feedback: Evaluate feedback condition
+    evaluateFeedbackCondition(verifyResult, feedbackLoop) {
+        // Default: trigger feedback if confidence < 0.8
+        const defaultThreshold = 0.8;
+        const confidence = verifyResult?.metadata?.confidence || 0;
+        if (feedbackLoop.condition) {
+            // Evaluate custom condition
+            try {
+                return this.eval(feedbackLoop.condition);
+            }
+            catch (e) {
+                this.logger.warn(`Failed to evaluate feedback condition: ${e.message}`);
+                return confidence < defaultThreshold;
+            }
+        }
+        // Default: trigger if confidence below threshold
+        return confidence < defaultThreshold;
+    }
+    // Phase 9c Conditional: Evaluate condition expression (boolean evaluation)
+    evaluateCondition(conditionNode) {
+        if (!conditionNode)
+            return false;
+        try {
+            const result = this.eval(conditionNode);
+            // Convert result to boolean
+            if (typeof result === "boolean")
+                return result;
+            if (typeof result === "number")
+                return result !== 0;
+            if (typeof result === "string")
+                return result.length > 0;
+            if (result === null || result === undefined)
+                return false;
+            return !!result;
+        }
+        catch (e) {
+            this.logger.warn(`Failed to evaluate condition: ${e.message}`);
+            return false;
         }
     }
     // Phase 5 Week 2: Evaluate Type Class definition
