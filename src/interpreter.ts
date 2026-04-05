@@ -839,6 +839,50 @@ export class Interpreter {
 
         throw new Error(`bind: unsupported monad type`);
 
+      // Phase 5 Week 1: Function Composition
+      case "compose":
+        // (compose f g h) → function that applies h, then g, then f (right-to-left)
+        // Result: a function that takes one argument and applies functions in reverse order
+        if (expr.args.length < 2) {
+          throw new Error(`compose requires at least 2 functions`);
+        }
+
+        const funcsToCompose = expr.args.map(arg => this.eval(arg));
+
+        // Validate that all are functions
+        for (let i = 0; i < funcsToCompose.length; i++) {
+          if (typeof funcsToCompose[i] !== "function" && (funcsToCompose[i] as any).kind !== "function-value") {
+            throw new Error(`compose: argument ${i} is not a function`);
+          }
+        }
+
+        // Return a function that applies all functions in reverse order
+        return (x: any) => {
+          let result = x;
+          // Apply functions from right to left
+          for (let i = funcsToCompose.length - 1; i >= 0; i--) {
+            result = this.callFunction(funcsToCompose[i], [result]);
+          }
+          return result;
+        };
+
+      case "pipe":
+        // (pipe value f g h) → applies f, then g, then h to value (left-to-right)
+        // Result: the final value after applying all functions
+        if (expr.args.length < 2) {
+          throw new Error(`pipe requires at least a value and one function`);
+        }
+
+        let pipeValue = this.eval(expr.args[0]);
+
+        // Apply each function in order (left to right)
+        for (let i = 1; i < expr.args.length; i++) {
+          const fn = this.eval(expr.args[i]);
+          pipeValue = this.callFunction(fn, [pipeValue]);
+        }
+
+        return pipeValue;
+
       // Function call
       default:
         // Check if it's a user-defined function (regular or generic)
