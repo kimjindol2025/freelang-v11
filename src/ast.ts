@@ -9,7 +9,9 @@ export type ASTNode =
   | TypeVariable
   | PatternMatch
   | Pattern
-  | FunctionValue;
+  | FunctionValue
+  | TypeClass
+  | TypeClassInstance;
 
 // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
 export interface Block {
@@ -129,6 +131,39 @@ export interface FunctionValue {
   name?: string;            // optional function name
 }
 
+// Type Class Definition (NEW for Phase 5 Week 2)
+// [TYPECLASS Monad [M]
+//   :methods [
+//     :pure (fn [a] (M a))
+//     :bind (fn [m f] (M b))
+//     :map (fn [m f] (M b))
+//   ]
+// ]
+export interface TypeClass {
+  kind: "type-class";
+  name: string;                           // e.g., "Monad", "Functor"
+  typeParams: string[];                   // e.g., ["M"] or ["F"]
+  methods: Map<string, TypeClassMethod>; // method name → method signature
+}
+
+export interface TypeClassMethod {
+  name: string;
+  type: ASTNode;  // Function type (fn [a] (M a)), stored as AST
+}
+
+// Type Class Instance (NEW for Phase 5 Week 2)
+// [INSTANCE (Monad Result)
+//   :pure (fn [x] (ok x))
+//   :bind (fn [m f] (match m ...))
+//   :map (fn [m f] (match m ...))
+// ]
+export interface TypeClassInstance {
+  kind: "type-class-instance";
+  className: string;           // e.g., "Monad"
+  concreteType: string;        // e.g., "Result"
+  implementations: Map<string, ASTNode>;  // method name → implementation (function value)
+}
+
 // Function signature (NEW for Phase 3)
 export interface FuncSignature {
   name: string;
@@ -232,4 +267,22 @@ export function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: ASTNode):
 
 export function makePatternMatch(value: ASTNode, cases: MatchCase[], defaultCase?: ASTNode): PatternMatch {
   return { kind: "pattern-match", value, cases, defaultCase };
+}
+
+// Helper: Create type class (Phase 5 Week 2)
+export function makeTypeClass(
+  name: string,
+  typeParams: string[],
+  methods: Map<string, TypeClassMethod>
+): TypeClass {
+  return { kind: "type-class", name, typeParams, methods };
+}
+
+// Helper: Create type class instance (Phase 5 Week 2)
+export function makeTypeClassInstance(
+  className: string,
+  concreteType: string,
+  implementations: Map<string, ASTNode>
+): TypeClassInstance {
+  return { kind: "type-class-instance", className, concreteType, implementations };
 }

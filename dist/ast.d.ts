@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance;
 export interface Block {
     kind: "block";
     type: string;
@@ -81,6 +81,22 @@ export interface FunctionValue {
     capturedEnv: Map<string, any>;
     name?: string;
 }
+export interface TypeClass {
+    kind: "type-class";
+    name: string;
+    typeParams: string[];
+    methods: Map<string, TypeClassMethod>;
+}
+export interface TypeClassMethod {
+    name: string;
+    type: ASTNode;
+}
+export interface TypeClassInstance {
+    kind: "type-class-instance";
+    className: string;
+    concreteType: string;
+    implementations: Map<string, ASTNode>;
+}
 export interface FuncSignature {
     name: string;
     params: Array<{
@@ -113,4 +129,6 @@ export declare function makeStructPattern(fields: Map<string, Pattern>): StructP
 export declare function makeOrPattern(alternatives: Pattern[]): OrPattern;
 export declare function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: ASTNode): MatchCase;
 export declare function makePatternMatch(value: ASTNode, cases: MatchCase[], defaultCase?: ASTNode): PatternMatch;
+export declare function makeTypeClass(name: string, typeParams: string[], methods: Map<string, TypeClassMethod>): TypeClass;
+export declare function makeTypeClassInstance(className: string, concreteType: string, implementations: Map<string, ASTNode>): TypeClassInstance;
 //# sourceMappingURL=ast.d.ts.map

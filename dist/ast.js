@@ -18,6 +18,8 @@ exports.makeStructPattern = makeStructPattern;
 exports.makeOrPattern = makeOrPattern;
 exports.makeMatchCase = makeMatchCase;
 exports.makePatternMatch = makePatternMatch;
+exports.makeTypeClass = makeTypeClass;
+exports.makeTypeClassInstance = makeTypeClassInstance;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -74,5 +76,13 @@ function makeMatchCase(pattern, body, guard) {
 }
 function makePatternMatch(value, cases, defaultCase) {
     return { kind: "pattern-match", value, cases, defaultCase };
+}
+// Helper: Create type class (Phase 5 Week 2)
+function makeTypeClass(name, typeParams, methods) {
+    return { kind: "type-class", name, typeParams, methods };
+}
+// Helper: Create type class instance (Phase 5 Week 2)
+function makeTypeClassInstance(className, concreteType, implementations) {
+    return { kind: "type-class-instance", className, concreteType, implementations };
 }
 //# sourceMappingURL=ast.js.map

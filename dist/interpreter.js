@@ -22,7 +22,11 @@ class Interpreter {
             errorHandlers: { handlers: new Map() },
             startTime: Date.now(),
             typeChecker: (0, type_checker_1.createTypeChecker)(), // Phase 3: Initialize type checker
+            typeClasses: new Map(), // Phase 5 Week 2: Type class registry
+            typeClassInstances: new Map(), // Phase 5 Week 2: Type class instance registry
         };
+        // Phase 5 Week 2: Register built-in type classes and instances
+        this.registerBuiltinTypeClasses();
     }
     interpret(blocks) {
         // Process all blocks
@@ -1085,6 +1089,132 @@ class Interpreter {
     // Utility: Set variable
     setVariable(name, value) {
         this.context.variables.set(name, value);
+    }
+    // Phase 5 Week 2: Register built-in type classes and instances
+    registerBuiltinTypeClasses() {
+        if (!this.context.typeClasses || !this.context.typeClassInstances) {
+            return;
+        }
+        // Define Monad type class
+        this.context.typeClasses.set("Monad", {
+            name: "Monad",
+            typeParams: ["M"],
+            methods: new Map([
+                ["pure", "fn [a] (M a)"],
+                ["bind", "fn [m f] (M b)"],
+                ["map", "fn [m f] (M b)"],
+            ]),
+        });
+        // Define Functor type class
+        this.context.typeClasses.set("Functor", {
+            name: "Functor",
+            typeParams: ["F"],
+            methods: new Map([["fmap", "fn [f a] (F a)"]]),
+        });
+        // Instance: Result → Monad
+        this.context.typeClassInstances.set("Monad[Result]", {
+            className: "Monad",
+            concreteType: "Result",
+            implementations: new Map([
+                ["pure", (x) => ({ tag: "Ok", value: x, kind: "Result" })],
+                ["bind", this.bindMonad.bind(this)],
+                ["map", this.mapResult.bind(this)],
+            ]),
+        });
+        // Instance: Option → Monad
+        this.context.typeClassInstances.set("Monad[Option]", {
+            className: "Monad",
+            concreteType: "Option",
+            implementations: new Map([
+                ["pure", (x) => ({ tag: "Some", value: x, kind: "Option" })],
+                ["bind", this.bindMonad.bind(this)],
+                ["map", this.mapOption.bind(this)],
+            ]),
+        });
+        // Instance: List → Monad (FlatMap)
+        this.context.typeClassInstances.set("Monad[List]", {
+            className: "Monad",
+            concreteType: "List",
+            implementations: new Map([
+                ["pure", (x) => [x]],
+                ["bind", this.bindList.bind(this)],
+                ["map", this.mapList.bind(this)],
+            ]),
+        });
+        // Instance: Result → Functor
+        this.context.typeClassInstances.set("Functor[Result]", {
+            className: "Functor",
+            concreteType: "Result",
+            implementations: new Map([["fmap", this.mapResult.bind(this)]]),
+        });
+        // Instance: Option → Functor
+        this.context.typeClassInstances.set("Functor[Option]", {
+            className: "Functor",
+            concreteType: "Option",
+            implementations: new Map([["fmap", this.mapOption.bind(this)]]),
+        });
+        // Instance: List → Functor
+        this.context.typeClassInstances.set("Functor[List]", {
+            className: "Functor",
+            concreteType: "List",
+            implementations: new Map([["fmap", this.mapList.bind(this)]]),
+        });
+    }
+    // Helper methods for type class instances
+    bindMonad(monad, fn) {
+        if (monad.kind === "Result") {
+            if (monad.tag === "Ok") {
+                return this.callFunction(fn, [monad.value]);
+            }
+            return monad;
+        }
+        if (monad.kind === "Option") {
+            if (monad.tag === "Some") {
+                return this.callFunction(fn, [monad.value]);
+            }
+            return monad;
+        }
+        return monad;
+    }
+    bindList(list, fn) {
+        let result = [];
+        for (const item of list) {
+            const transformed = this.callFunction(fn, [item]);
+            if (Array.isArray(transformed)) {
+                result = result.concat(transformed);
+            }
+            else {
+                result.push(transformed);
+            }
+        }
+        return result;
+    }
+    mapResult(result, fn) {
+        if (result.tag === "Ok") {
+            return { tag: "Ok", value: this.callFunction(fn, [result.value]), kind: "Result" };
+        }
+        return result;
+    }
+    mapOption(option, fn) {
+        if (option.tag === "Some") {
+            return { tag: "Some", value: this.callFunction(fn, [option.value]), kind: "Option" };
+        }
+        return option;
+    }
+    mapList(list, fn) {
+        return list.map((item) => this.callFunction(fn, [item]));
+    }
+    // Get type class
+    getTypeClass(name) {
+        return this.context.typeClasses?.get(name);
+    }
+    // Get type class instance
+    getTypeClassInstance(className, concreteType) {
+        return this.context.typeClassInstances?.get(`${className}[${concreteType}]`);
+    }
+    // Check if a type satisfies a type class constraint
+    satisfiesConstraint(type, constraintClass) {
+        return !!this.getTypeClassInstance(constraintClass, type);
     }
 }
 exports.Interpreter = Interpreter;

@@ -12,6 +12,8 @@ export interface ExecutionContext {
     errorHandlers: ErrorHandler;
     startTime: number;
     typeChecker?: TypeChecker;
+    typeClasses?: Map<string, TypeClassInfo>;
+    typeClassInstances?: Map<string, TypeClassInstanceInfo>;
 }
 export interface FreeLangFunction {
     name: string;
@@ -38,6 +40,16 @@ export interface FreeLangMiddleware {
 export interface ErrorHandler {
     handlers: Map<number | "default", ASTNode>;
 }
+export interface TypeClassInfo {
+    name: string;
+    typeParams: string[];
+    methods: Map<string, string>;
+}
+export interface TypeClassInstanceInfo {
+    className: string;
+    concreteType: string;
+    implementations: Map<string, any>;
+}
 export declare class Interpreter {
     private context;
     constructor(app?: express.Express);
@@ -63,6 +75,15 @@ export declare class Interpreter {
     private matchPattern;
     getContext(): ExecutionContext;
     setVariable(name: string, value: any): void;
+    private registerBuiltinTypeClasses;
+    private bindMonad;
+    private bindList;
+    private mapResult;
+    private mapOption;
+    private mapList;
+    getTypeClass(name: string): TypeClassInfo | undefined;
+    getTypeClassInstance(className: string, concreteType: string): TypeClassInstanceInfo | undefined;
+    satisfiesConstraint(type: string, constraintClass: string): boolean;
 }
 export declare function interpret(blocks: Block[], app?: express.Express): ExecutionContext;
 //# sourceMappingURL=interpreter.d.ts.map
