@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | AsyncFunction | AwaitExpression;
 export interface Block {
     kind: "block";
     type: string;
@@ -116,6 +116,19 @@ export interface OpenBlock {
     moduleName: string;
     source?: string;
 }
+export interface AsyncFunction {
+    kind: "async-function";
+    name: string;
+    params: Array<{
+        name: string;
+        type?: TypeAnnotation;
+    }>;
+    body: ASTNode;
+}
+export interface AwaitExpression {
+    kind: "await";
+    argument: ASTNode;
+}
 export interface FuncSignature {
     name: string;
     params: Array<{
@@ -153,6 +166,11 @@ export declare function makeTypeClassInstance(className: string, concreteType: s
 export declare function makeModuleBlock(name: string, exports: string[], body: ASTNode[], path?: string): ModuleBlock;
 export declare function makeImportBlock(moduleName: string, source?: string, selective?: string[], alias?: string): ImportBlock;
 export declare function makeOpenBlock(moduleName: string, source?: string): OpenBlock;
+export declare function makeAsyncFunction(name: string, params: Array<{
+    name: string;
+    type?: TypeAnnotation;
+}>, body: ASTNode): AsyncFunction;
+export declare function makeAwaitExpression(argument: ASTNode): AwaitExpression;
 export declare function isBlock(node: any): node is Block;
 export declare function isLiteral(node: any): node is Literal;
 export declare function isSymbolLiteral(node: any): node is Literal;

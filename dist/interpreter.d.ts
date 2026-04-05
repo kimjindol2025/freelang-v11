@@ -78,6 +78,7 @@ export declare class Interpreter {
     private evalCond;
     private callUserFunction;
     private callFunctionValue;
+    private callAsyncFunctionValue;
     private callFunction;
     private getFieldValue;
     private evalPatternMatch;

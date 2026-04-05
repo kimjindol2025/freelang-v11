@@ -17,6 +17,8 @@ import {
   ModuleBlock,
   ImportBlock,
   OpenBlock,
+  AsyncFunction,
+  AwaitExpression,
   TypeClass,
   TypeClassInstance,
   TypeClassMethod,
@@ -38,6 +40,8 @@ import {
   makeModuleBlock,
   makeImportBlock,
   makeOpenBlock,
+  makeAsyncFunction,
+  makeAwaitExpression,
   makeTypeClass,
   makeTypeClassInstance,
 } from "./ast";
@@ -564,7 +568,7 @@ export class Parser {
     // Never generic function syntax: fn, let, if, cond, match, etc.
     const specialFormsForbiddingGeneric = new Set([
       "fn", "let", "if", "cond", "match", "do", "try", "catch",
-      "let*", "letrec", "define"
+      "let*", "letrec", "define", "async", "await"
     ]);
 
     if (!specialFormsForbiddingGeneric.has(op) && this.check(T.LBracket) && !this.isArrayLiteralStart()) {

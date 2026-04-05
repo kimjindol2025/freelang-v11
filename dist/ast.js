@@ -23,6 +23,8 @@ exports.makeTypeClassInstance = makeTypeClassInstance;
 exports.makeModuleBlock = makeModuleBlock;
 exports.makeImportBlock = makeImportBlock;
 exports.makeOpenBlock = makeOpenBlock;
+exports.makeAsyncFunction = makeAsyncFunction;
+exports.makeAwaitExpression = makeAwaitExpression;
 exports.isBlock = isBlock;
 exports.isLiteral = isLiteral;
 exports.isSymbolLiteral = isSymbolLiteral;
@@ -109,6 +111,14 @@ function makeImportBlock(moduleName, source, selective, alias) {
 // Helper: Create open block (Phase 5 Week 3)
 function makeOpenBlock(moduleName, source) {
     return { kind: "open", moduleName, source };
+}
+// Helper: Create async function (Phase 7)
+function makeAsyncFunction(name, params, body) {
+    return { kind: "async-function", name, params, body };
+}
+// Helper: Create await expression (Phase 7)
+function makeAwaitExpression(argument) {
+    return { kind: "await", argument };
 }
 // ============================================================
 // Phase 6: Type Guard Functions (타입 안전성 강화)

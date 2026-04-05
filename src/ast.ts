@@ -14,7 +14,9 @@ export type ASTNode =
   | TypeClassInstance
   | ModuleBlock
   | ImportBlock
-  | OpenBlock;
+  | OpenBlock
+  | AsyncFunction
+  | AwaitExpression;
 
 // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
 export interface Block {
@@ -55,8 +57,8 @@ export interface Keyword {
 // Type annotation (NEW for Phase 3)
 export interface TypeAnnotation {
   kind: "type";
-  name: string;              // "int", "string", "bool", "array<int>", "map<string,int>", "T"
-  generic?: TypeAnnotation;  // for array<T>, map<K,V>
+  name: string;              // "int", "string", "bool", "array<int>", "map<string,int>", "Promise<int>", "T"
+  generic?: TypeAnnotation;  // for array<T>, map<K,V>, Promise<T>
   union?: TypeAnnotation[];  // for Type1 | Type2
   optional?: boolean;        // for Type?
   isTypeVariable?: boolean;  // true if this is a generic type variable (Phase 4)
@@ -202,6 +204,24 @@ export interface OpenBlock {
   kind: "open";
   moduleName: string;
   source?: string;             // optional :from path
+}
+
+// Async Function (NEW for Phase 7)
+// [async name [params] body]
+// Returns Promise<T> where T is the return type of body
+export interface AsyncFunction {
+  kind: "async-function";
+  name: string;                // function name
+  params: Array<{ name: string; type?: TypeAnnotation }>;  // parameter list
+  body: ASTNode;              // function body
+}
+
+// Await Expression (NEW for Phase 7)
+// (await promise-expression)
+// Extracts value from Promise<T> → T
+export interface AwaitExpression {
+  kind: "await";
+  argument: ASTNode;           // expression that evaluates to Promise<T>
 }
 
 // Function signature (NEW for Phase 3)
@@ -350,6 +370,20 @@ export function makeImportBlock(
 // Helper: Create open block (Phase 5 Week 3)
 export function makeOpenBlock(moduleName: string, source?: string): OpenBlock {
   return { kind: "open", moduleName, source };
+}
+
+// Helper: Create async function (Phase 7)
+export function makeAsyncFunction(
+  name: string,
+  params: Array<{ name: string; type?: TypeAnnotation }>,
+  body: ASTNode
+): AsyncFunction {
+  return { kind: "async-function", name, params, body };
+}
+
+// Helper: Create await expression (Phase 7)
+export function makeAwaitExpression(argument: ASTNode): AwaitExpression {
+  return { kind: "await", argument };
 }
 
 // ============================================================

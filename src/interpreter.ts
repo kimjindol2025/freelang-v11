@@ -2,11 +2,12 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 import { extractParamNames, extractFunctions } from "./ast-helpers";
+import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runtime";
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -478,6 +479,68 @@ export class Interpreter {
       };
     }
 
+    // Phase 7: Async functions - handle before arg evaluation
+    if (op === "async") {
+      // [async name [params] body]
+      // expr.args[0] = name (symbol)
+      // expr.args[1] = params (array of variable names)
+      // expr.args[2] = body
+      if (expr.args.length < 3) {
+        throw new Error(`async requires name, params, and body`);
+      }
+
+      const nameNode = expr.args[0];
+      const name = (nameNode as Variable).name || "async-fn";
+
+      const paramsNode = expr.args[1];
+      const params: string[] = [];
+
+      // Extract parameter names from array block
+      if ((paramsNode as any).kind === "block" && (paramsNode as any).type === "Array") {
+        const items = (paramsNode as any).fields.get("items");
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if ((item as any).kind === "variable") {
+              params.push((item as Variable).name);
+            }
+          }
+        }
+      }
+
+      // Create async function value with captured environment
+      return {
+        kind: "async-function-value",
+        name,
+        params,
+        body: expr.args[2],
+        capturedEnv: new Map(this.context.variables),
+      };
+    }
+
+    // Phase 7: Await expressions - extract Promise value
+    if (op === "await") {
+      // (await promise-expression)
+      if (expr.args.length < 1) {
+        throw new Error(`await requires a Promise argument`);
+      }
+
+      const promise = this.eval(expr.args[0]);
+
+      // Promise resolved 상태이면 값 반환
+      if (promise instanceof FreeLangPromise) {
+        if (promise.getState() === "resolved") {
+          return promise.getValue();
+        } else if (promise.getState() === "rejected") {
+          throw promise.getError() || new Error("Promise rejected");
+        } else {
+          // pending 상태: 현재는 에러 발생 (진정한 비동기는 이벤트 루프 필요)
+          throw new Error("Cannot await unresolved Promise in synchronous context");
+        }
+      } else {
+        throw new TypeError("await requires a Promise, got " + typeof promise);
+      }
+    }
+
     // Define a function: (define name (fn [...] body))
     if (op === "define") {
       if (expr.args.length < 2) {
@@ -561,10 +624,15 @@ export class Interpreter {
       const fn = this.eval(expr.args[0]);
       const args = expr.args.slice(1).map((arg) => this.eval(arg));
 
-      if ((fn as any).kind === "function-value") {
+      if ((fn as any).kind === "builtin-function") {
+        // Phase 7: Handle builtin function wrappers (Promise resolve/reject)
+        return (fn as any).fn(args);
+      } else if ((fn as any).kind === "function-value") {
         return this.callFunctionValue(fn, args);
+      } else if ((fn as any).kind === "async-function-value") {
+        return this.callAsyncFunctionValue(fn, args);
       } else {
-        throw new Error(`call expects function-value, got ${typeof fn}`);
+        throw new Error(`call expects function-value, got ${(fn as any).kind || typeof fn}`);
       }
     }
 
@@ -756,6 +824,69 @@ export class Interpreter {
           return (args[1] || []).map(args[0]);
         }
         return args;
+
+      // Phase 7: Async functions
+      case "set-timeout":
+        // (set-timeout callback delay-ms)
+        // Returns a Promise that resolves after delay_ms
+        if (expr.args.length < 2) {
+          throw new Error(`set-timeout requires callback and delay`);
+        }
+        const callback = this.eval(expr.args[0]);
+        const delay = this.eval(expr.args[1]) as number;
+
+        return new FreeLangPromise((resolve, reject) => {
+          setTimeout(() => {
+            try {
+              if (typeof callback === "function") {
+                const result = callback();
+                resolve(result);
+              } else if ((callback as any).kind === "function-value") {
+                const result = this.callFunctionValue(callback, []);
+                resolve(result);
+              } else {
+                reject(new Error("set-timeout callback must be a function"));
+              }
+            } catch (e) {
+              reject(e as Error);
+            }
+          }, delay);
+        });
+
+      case "promise":
+        // (promise executor-fn)
+        // executor-fn is (fn [resolve reject] ...)
+        if (expr.args.length < 1) {
+          throw new Error(`promise requires executor function`);
+        }
+        const executor = this.eval(expr.args[0]);
+
+        if ((executor as any).kind === "function-value") {
+          // executor is a function value, call it with resolve/reject
+          // Wrap JS functions to make them callable from FreeLang
+          return new FreeLangPromise((resolve, reject) => {
+            try {
+              // Create wrapper functions that FreeLang can call
+              // These are passed as arguments to the executor function
+              const resolveWrapper = {
+                kind: "builtin-function",
+                fn: (args: any[]) => resolve(args[0])
+              };
+              const rejectWrapper = {
+                kind: "builtin-function",
+                fn: (args: any[]) => reject(args[0] instanceof Error ? args[0] : new Error(String(args[0])))
+              };
+
+              // Call the executor function with wrapped resolve/reject
+              // This properly binds parameters through callFunctionValue
+              this.callFunctionValue(executor, [resolveWrapper, rejectWrapper]);
+            } catch (e) {
+              reject(e as Error);
+            }
+          });
+        } else {
+          throw new Error("promise executor must be a function");
+        }
 
       case "fn":
         // Phase 4 Week 1: (fn [$param1 $param2 ...] body)
@@ -1173,7 +1304,10 @@ export class Interpreter {
         // This allows: (let [f (compose g h)] (f 5))
         if (this.context.variables.has(op)) {
           const fn = this.context.variables.get(op);
-          if (typeof fn === "function" || (fn as any).kind === "function-value") {
+          // Phase 7: Handle builtin-function wrappers (for Promise resolve/reject)
+          if ((fn as any).kind === "builtin-function") {
+            return (fn as any).fn(args.map((arg) => this.eval(arg)));
+          } else if (typeof fn === "function" || (fn as any).kind === "function-value") {
             return this.callFunction(fn, args);
           }
         }
@@ -1339,11 +1473,59 @@ export class Interpreter {
     return result;
   }
 
+  private callAsyncFunctionValue(fn: any, args: any[]): FreeLangPromise {
+    // Phase 7: Call an async function value (closure that returns Promise)
+    if ((fn as any).kind !== "async-function-value") {
+      throw new Error(`Expected async-function-value, got ${(fn as any).kind}`);
+    }
+
+    // Return a new Promise that executes the async function
+    return new FreeLangPromise((resolve, reject) => {
+      try {
+        // Save current scope
+        const savedVars = new Map(this.context.variables);
+
+        // Restore captured environment from function definition
+        this.context.variables = new Map(fn.capturedEnv);
+
+        // Bind parameters
+        for (let i = 0; i < fn.params.length; i++) {
+          this.context.variables.set(fn.params[i], args[i]);
+        }
+
+        // Execute body
+        const result = this.eval(fn.body);
+
+        // Restore scope
+        this.context.variables = savedVars;
+
+        // Resolve with the result
+        if (result instanceof FreeLangPromise) {
+          // If the result is already a Promise, chain it
+          result
+            .then((value) => resolve(value))
+            .catch((error) => reject(error));
+        } else {
+          resolve(result);
+        }
+      } catch (error) {
+        reject(error as Error);
+      }
+    });
+  }
+
   private callFunction(fn: any, args: any[]): any {
     // Phase 4 Week 2: Universal function caller
     // Handles: function-value, JavaScript functions, FreeLangFunction
-    if ((fn as any).kind === "function-value") {
+    // Phase 7: Also handles builtin-function wrappers (Promise resolve/reject)
+    if ((fn as any).kind === "builtin-function") {
+      // Phase 7: Built-in wrapper function (for Promise resolve/reject)
+      return (fn as any).fn(args.map((arg) => this.eval(arg)));
+    } else if ((fn as any).kind === "function-value") {
       return this.callFunctionValue(fn, args);
+    } else if ((fn as any).kind === "async-function-value") {
+      // Phase 7: Handle async function calls
+      return this.callAsyncFunctionValue(fn, args);
     } else if (typeof fn === "function") {
       return fn(...args);
     } else if ((fn as any).params && (fn as any).body) {

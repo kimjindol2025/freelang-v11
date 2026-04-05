@@ -489,7 +489,7 @@ class Parser {
         // Never generic function syntax: fn, let, if, cond, match, etc.
         const specialFormsForbiddingGeneric = new Set([
             "fn", "let", "if", "cond", "match", "do", "try", "catch",
-            "let*", "letrec", "define"
+            "let*", "letrec", "define", "async", "await"
         ]);
         if (!specialFormsForbiddingGeneric.has(op) && this.check(token_1.TokenType.LBracket) && !this.isArrayLiteralStart()) {
             // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)
