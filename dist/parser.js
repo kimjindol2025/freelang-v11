@@ -43,6 +43,7 @@ class Parser {
         const blockName = nameToken.value;
         const fields = new Map();
         const typeAnnotations = new Map();
+        let generics;
         // Parse fields: :key value :key value ...
         while (!this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
             // Expect a keyword at the start of each field
@@ -77,6 +78,25 @@ class Parser {
                 if (returnValue.kind === "literal" && returnValue.type === "symbol") {
                     const typeName = returnValue.value;
                     typeAnnotations.set("return", (0, ast_1.makeTypeAnnotation)(typeName));
+                }
+            }
+            // Phase 4: Extract generic type variables from :generics field (new syntax: [T K V])
+            if (keyName === "generics" && values.length === 1) {
+                const genericsValue = values[0];
+                if (genericsValue.kind === "block" && genericsValue.type === "Array") {
+                    // :generics [T K V]
+                    const arrayItems = genericsValue.fields?.get("items");
+                    if (Array.isArray(arrayItems)) {
+                        const gen = [];
+                        for (const item of arrayItems) {
+                            if (item.kind === "literal" && item.type === "symbol") {
+                                gen.push(item.value);
+                            }
+                        }
+                        if (gen.length > 0) {
+                            generics = gen;
+                        }
+                    }
                 }
             }
             // Phase 3: Extract type annotations from :params field (new syntax: [[$x int] [$y int]])
@@ -121,6 +141,10 @@ class Parser {
         // FUNC blocks without :return/:params annotations still need to be registered with default types
         if (blockType === "FUNC" || typeAnnotations.size > 0) {
             block.typeAnnotations = typeAnnotations;
+        }
+        // Phase 4: Set generics if provided
+        if (generics && generics.length > 0) {
+            block.generics = generics;
         }
         return block;
     }

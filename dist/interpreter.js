@@ -395,10 +395,14 @@ class Interpreter {
                 // (lowercase "HELLO") → "hello"
                 return typeof args[0] === "string" ? args[0].toLowerCase() : "";
             case "contains?":
-                // (contains? "hello world" "world") → true
-                return typeof args[0] === "string" && typeof args[1] === "string"
-                    ? args[0].includes(args[1])
-                    : false;
+                // (contains? "hello world" "world") → true or (contains? [1 2 3] 2) → true
+                if (typeof args[0] === "string" && typeof args[1] === "string") {
+                    return args[0].includes(args[1]);
+                }
+                if (Array.isArray(args[0])) {
+                    return args[0].includes(args[1]);
+                }
+                return false;
             case "starts-with?":
                 // (starts-with? "hello" "he") → true
                 return typeof args[0] === "string" && typeof args[1] === "string"
@@ -432,11 +436,71 @@ class Interpreter {
                 }
                 return args[0].filter(args[1]);
             case "find":
-                // (find [1 2 3] (lambda [$x] (= $x 2))) → 2
-                if (!Array.isArray(args[0]) || typeof args[1] !== "function") {
-                    return null;
+                // (find [1 2 3] value-to-find) → index or (find [1 2 3] (lambda [$x] ...)) → value
+                if (Array.isArray(args[0])) {
+                    if (typeof args[1] === "function") {
+                        return args[0].find(args[1]) || null;
+                    }
+                    else {
+                        // Find index of value
+                        return args[0].indexOf(args[1]);
+                    }
                 }
-                return args[0].find(args[1]) || null;
+                return -1;
+            // Array Operations (Phase 3 W4: Standard Library)
+            case "first":
+                // (first [1 2 3]) → 1
+                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : null;
+            case "last":
+                // (last [1 2 3]) → 3
+                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
+            case "get":
+                // (get [1 2 3] 1) → 2
+                return Array.isArray(args[0]) && typeof args[1] === "number" ? args[0][args[1]] || null : null;
+            case "reverse":
+                // (reverse [1 2 3]) → [3 2 1]
+                return Array.isArray(args[0]) ? [...args[0]].reverse() : [];
+            case "flatten":
+                // (flatten [[1 2] [3 4]]) → [1 2 3 4]
+                if (!Array.isArray(args[0]))
+                    return [];
+                const flatten = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
+                return flatten(args[0]);
+            case "unique":
+                // (unique [1 2 2 3 3 3]) → [1 2 3]
+                return Array.isArray(args[0]) ? [...new Set(args[0])] : [];
+            case "sort":
+                // (sort [3 1 2]) → [1 2 3]
+                if (!Array.isArray(args[0]))
+                    return [];
+                return [...args[0]].sort((a, b) => {
+                    if (typeof a === "number" && typeof b === "number")
+                        return a - b;
+                    return String(a).localeCompare(String(b));
+                });
+            case "concat":
+                // (concat [1 2] [3 4]) → [1 2 3 4]
+                if (!Array.isArray(args[0]))
+                    return args[1] || [];
+                if (!Array.isArray(args[1]))
+                    return args[0] || [];
+                return args[0].concat(args[1]);
+            case "push":
+                // (push [1 2] 3) → [1 2 3]
+                if (!Array.isArray(args[0]))
+                    return [args[1]];
+                return [...args[0], args[1]];
+            case "pop":
+                // (pop [1 2 3]) → 3 (returns last element)
+                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
+            case "shift":
+                // (shift [1 2 3]) → 1 (returns first element)
+                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : null;
+            case "unshift":
+                // (unshift [1 2] 0) → [0 1 2]
+                if (!Array.isArray(args[0]))
+                    return [args[1]];
+                return [args[1], ...args[0]];
             // Type/Utility
             case "typeof":
                 return typeof args[0];

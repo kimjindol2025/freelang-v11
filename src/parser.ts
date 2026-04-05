@@ -10,12 +10,14 @@ import {
   SExpr,
   Keyword,
   TypeAnnotation,
+  TypeVariable,
   makeBlock,
   makeLiteral,
   makeVariable,
   makeSExpr,
   makeKeyword,
   makeTypeAnnotation,
+  makeTypeVariable,
 } from "./ast";
 
 export class ParserError extends Error {
@@ -62,6 +64,7 @@ export class Parser {
 
     const fields = new Map<string, ASTNode | ASTNode[]>();
     const typeAnnotations = new Map<string, TypeAnnotation>();
+    let generics: string[] | undefined;
 
     // Parse fields: :key value :key value ...
     while (!this.check(T.RBracket) && !this.isAtEnd()) {
@@ -104,6 +107,26 @@ export class Parser {
         if ((returnValue as any).kind === "literal" && (returnValue as any).type === "symbol") {
           const typeName = (returnValue as any).value;
           typeAnnotations.set("return", makeTypeAnnotation(typeName));
+        }
+      }
+
+      // Phase 4: Extract generic type variables from :generics field (new syntax: [T K V])
+      if (keyName === "generics" && values.length === 1) {
+        const genericsValue = values[0];
+        if ((genericsValue as any).kind === "block" && (genericsValue as any).type === "Array") {
+          // :generics [T K V]
+          const arrayItems = (genericsValue as any).fields?.get("items") as ASTNode[];
+          if (Array.isArray(arrayItems)) {
+            const gen: string[] = [];
+            for (const item of arrayItems) {
+              if ((item as any).kind === "literal" && (item as any).type === "symbol") {
+                gen.push((item as any).value);
+              }
+            }
+            if (gen.length > 0) {
+              generics = gen;
+            }
+          }
         }
       }
 
@@ -150,6 +173,10 @@ export class Parser {
     if (blockType === "FUNC" || typeAnnotations.size > 0) {
       block.typeAnnotations = typeAnnotations;
     }
+    // Phase 4: Set generics if provided
+    if (generics && generics.length > 0) {
+      block.generics = generics;
+    }
     return block;
   }
 
@@ -188,9 +215,22 @@ export class Parser {
     if (this.check(T.LBracket)) {
       // Lookahead: is this a block or value array?
       const nextIdx = this.pos + 1;
+      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE"];
+
       if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {
-        // It's a block
-        return this.parseBlock();
+        const potentialType = this.tokens[nextIdx].value;
+        // Check if it's a known block type (uppercase) or looks like a block name followed by a keyword
+        const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
+        const nextNextIdx = nextIdx + 1;
+        const hasKeywordAfterName = nextNextIdx < this.tokens.length && this.tokens[nextNextIdx].type === T.Keyword;
+
+        if (isKnownType || hasKeywordAfterName) {
+          // It's a block
+          return this.parseBlock();
+        } else {
+          // It's a value array: [val1 val2 ...]
+          return this.parseArray();
+        }
       } else {
         // It's a value array: [val1 val2 ...]
         return this.parseArray();

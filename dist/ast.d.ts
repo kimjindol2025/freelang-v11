@@ -1,10 +1,11 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable;
 export interface Block {
     kind: "block";
     type: string;
     name: string;
     fields: Map<string, ASTNode | ASTNode[]>;
     typeAnnotations?: Map<string, TypeAnnotation>;
+    generics?: string[];
 }
 export interface Literal {
     kind: "literal";
@@ -30,6 +31,11 @@ export interface TypeAnnotation {
     generic?: TypeAnnotation;
     union?: TypeAnnotation[];
     optional?: boolean;
+    isTypeVariable?: boolean;
+}
+export interface TypeVariable {
+    kind: "type-variable";
+    name: string;
 }
 export interface FuncSignature {
     name: string;
@@ -53,4 +59,5 @@ export declare function makeFuncSignature(name: string, params: Array<{
     name: string;
     type: TypeAnnotation;
 }>, returnType: TypeAnnotation): FuncSignature;
+export declare function makeTypeVariable(name: string): TypeVariable;
 //# sourceMappingURL=ast.d.ts.map
