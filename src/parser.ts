@@ -519,6 +519,13 @@ export class Parser {
     // Check for symbol (including keywords used as values)
     if (this.check(T.Symbol)) {
       const token = this.advance();
+      // Phase 9c: Special handling for boolean literals (true/false)
+      if (token.value === "true") {
+        return makeLiteral("boolean", true);
+      }
+      if (token.value === "false") {
+        return makeLiteral("boolean", false);
+      }
       return makeLiteral("symbol", token.value);
     }
 
@@ -1423,8 +1430,79 @@ export class Parser {
     const startTime = new Date().toISOString();
 
     // Parse multiple reasoning blocks in sequence
+    let feedbackLoop: any = undefined;
+
     while (!this.check(T.RParen) && !this.isAtEnd()) {
-      if (this.check(T.LParen)) {
+      // Check for feedback loop configuration (Phase 9c Feedback)
+      if (this.check(T.Colon)) {
+        this.advance(); // consume ':'
+        if (!this.check(T.Symbol)) {
+          throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+        }
+
+        const keyword = this.advance().value;
+
+        if (keyword === "feedback") {
+          feedbackLoop = {
+            enabled: false,
+            fromStage: "verify",
+            toStage: "analyze",
+            maxIterations: 3,
+            confidenceDamping: 0.1,
+          };
+
+          // Parse feedback options
+          while (!this.check(T.RParen) && !this.isAtEnd() && this.check(T.Colon)) {
+            this.advance(); // consume ':'
+            const feedbackKey = this.advance().value;
+
+            switch (feedbackKey) {
+              case "enabled":
+                const enabledVal = this.parseValue();
+                feedbackLoop.enabled =
+                  enabledVal.kind === "literal" && enabledVal.value === true;
+                break;
+
+              case "from":
+                const fromVal = this.parseValue();
+                if (fromVal.kind === "literal" && fromVal.type === "string") {
+                  feedbackLoop.fromStage = fromVal.value as "verify" | "act";
+                }
+                break;
+
+              case "to":
+                const toVal = this.parseValue();
+                if (toVal.kind === "literal" && toVal.type === "string") {
+                  feedbackLoop.toStage = toVal.value as "analyze" | "decide";
+                }
+                break;
+
+              case "max-iterations":
+                const maxVal = this.parseValue();
+                if (maxVal.kind === "literal" && maxVal.type === "number") {
+                  feedbackLoop.maxIterations = maxVal.value as number;
+                }
+                break;
+
+              case "damping":
+                const dampVal = this.parseValue();
+                if (dampVal.kind === "literal" && dampVal.type === "number") {
+                  feedbackLoop.confidenceDamping = dampVal.value as number;
+                }
+                break;
+
+              case "condition":
+                feedbackLoop.condition = this.parseValue();
+                break;
+
+              default:
+                throw this.error(`Unknown feedback option: ${feedbackKey}`, this.peek());
+            }
+          }
+        } else {
+          throw this.error(`Unknown option: ${keyword}`, this.peek());
+        }
+      } else if (this.check(T.LParen)) {
         this.advance(); // consume '('
 
         // Check for reasoning stage keywords
@@ -1470,7 +1548,7 @@ export class Parser {
         this.expect(T.RParen);
       } else {
         throw this.error(
-          `Expected '(' before reasoning block, got ${this.peek().type}`,
+          `Expected '(' before reasoning block or ':feedback', got ${this.peek().type}`,
           this.peek()
         );
       }
@@ -1486,6 +1564,7 @@ export class Parser {
         endTime,
         executionPath: stages.map((s) => s.stage),
       },
+      feedbackLoop: feedbackLoop?.enabled ? feedbackLoop : undefined,
     };
   }
 

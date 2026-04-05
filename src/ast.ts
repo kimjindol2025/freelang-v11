@@ -276,6 +276,14 @@ export interface ReasoningSequence {
     totalConfidence?: number;
     executionPath?: string[];         // sequence of stages executed
   };
+  feedbackLoop?: {
+    enabled: boolean;                  // Phase 9c Feedback: enable feedback loop
+    fromStage: "verify" | "act";      // which stage triggers feedback
+    toStage: "analyze" | "decide";    // which stage to return to
+    condition?: ASTNode;               // feedback condition (e.g., confidence < 0.8)
+    maxIterations?: number;            // max loop iterations (default: 3)
+    confidenceDamping?: number;        // confidence reduction per iteration (default: 0.1)
+  };
 }
 
 // Async Function (NEW for Phase 7)

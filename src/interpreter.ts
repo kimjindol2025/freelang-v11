@@ -2502,8 +2502,9 @@ export class Interpreter {
   }
 
   // Phase 9c Extension: Handle Reasoning Sequence - Automatic state transitions
+  // Phase 9c Feedback: Verify result feedback to analyze stage (re-evaluation loop)
   private handleReasoningSequence(reasoningSeq: ReasoningSequence): any {
-    const { stages, metadata } = reasoningSeq;
+    const { stages, metadata, feedbackLoop } = reasoningSeq;
 
     // Initialize reasoning state storage if needed
     if (!this.context.reasoning) {
@@ -2513,41 +2514,88 @@ export class Interpreter {
     const sequenceId = new Date().getTime();
     const executionPath: string[] = [];
     const sequenceResults: any[] = [];
+    const iterationHistory: any[] = [];
 
     // Log sequence start
-    this.logger.info(`🔄 REASONING SEQUENCE START (${stages.length} stages)`);
+    this.logger.info(
+      `🔄 REASONING SEQUENCE START (${stages.length} stages, feedback: ${
+        feedbackLoop?.enabled ? "enabled" : "disabled"
+      })`
+    );
 
-    // Execute each reasoning stage in sequence with automatic transitions
-    for (let i = 0; i < stages.length; i++) {
-      const stage = stages[i];
-      const stageNum = i + 1;
+    let currentStages = stages;
+    let iteration = 0;
+    const maxIterations = feedbackLoop?.maxIterations || 1;
 
-      // Log stage entry
-      const stageEmoji = {
-        observe: "👀",
-        analyze: "🔍",
-        decide: "🎯",
-        act: "⚡",
-        verify: "✅",
-      }[stage.stage] || "❓";
+    // Execute reasoning sequence with potential feedback loop
+    while (iteration < maxIterations) {
+      iteration++;
 
-      this.logger.info(`  [${stageNum}/${stages.length}] ${stageEmoji} ${stage.stage.toUpperCase()}`);
+      // Log iteration start
+      if (iteration > 1) {
+        this.logger.info(
+          `🔄 FEEDBACK LOOP ITERATION ${iteration}/${maxIterations} (damping: ${(
+            feedbackLoop?.confidenceDamping || 0.1
+          ).toFixed(1)})`
+        );
+      }
 
-      // Handle the reasoning block
-      const stageResult = this.handleReasoningBlock(stage);
-      sequenceResults.push(stageResult);
-      executionPath.push(stage.stage);
+      const iterationResults: any[] = [];
+      let verifyResult: any = null;
 
-      // Check for stage-specific transitions
-      if (stage.transitions && stage.transitions.length > 0) {
-        for (const transition of stage.transitions) {
-          // Evaluate transition condition (if applicable)
-          if (transition.condition) {
-            const conditionMet = this.eval(transition.condition);
+      // Execute each reasoning stage in sequence
+      for (let i = 0; i < currentStages.length; i++) {
+        const stage = currentStages[i];
+        const stageNum = i + 1;
 
-            if (conditionMet) {
-              // Log transition
-              if (transition.to) {
+        // Log stage entry
+        const stageEmoji = {
+          observe: "👀",
+          analyze: "🔍",
+          decide: "🎯",
+          act: "⚡",
+          verify: "✅",
+        }[stage.stage] || "❓";
+
+        const stageLabel =
+          iteration === 1
+            ? `[${stageNum}/${currentStages.length}]`
+            : `[${stageNum}/${currentStages.length}]`;
+
+        this.logger.info(`  ${stageLabel} ${stageEmoji} ${stage.stage.toUpperCase()}`);
+
+        // Apply confidence damping from previous iterations
+        let adjustedStage = stage;
+        if (iteration > 1 && stage.metadata?.confidence !== undefined) {
+          adjustedStage = {
+            ...stage,
+            metadata: {
+              ...stage.metadata,
+              confidence: Math.max(
+                0,
+                (stage.metadata.confidence || 1) -
+                  (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)
+              ),
+            },
+          };
+        }
+
+        // Handle the reasoning block
+        const stageResult = this.handleReasoningBlock(adjustedStage);
+        iterationResults.push(stageResult);
+        executionPath.push(stage.stage);
+
+        // Store verify result for feedback check
+        if (stage.stage === "verify") {
+          verifyResult = stageResult;
+        }
+
+        // Check for stage-specific transitions
+        if (stage.transitions && stage.transitions.length > 0) {
+          for (const transition of stage.transitions) {
+            if (transition.condition) {
+              const conditionMet = this.eval(transition.condition);
+              if (conditionMet && transition.to) {
                 this.logger.info(`    ↓ Transition to: ${transition.to}`);
               }
             }
@@ -2555,8 +2603,35 @@ export class Interpreter {
         }
       }
 
-      // For now, proceed to next stage automatically
-      // In the future: check for feedback loops, conditional branches, etc.
+      sequenceResults.push(...iterationResults);
+      iterationHistory.push({
+        iteration,
+        results: iterationResults,
+        verifyConfidence: verifyResult?.metadata?.confidence,
+      });
+
+      // Check feedback loop condition
+      const shouldContinueFeedback =
+        feedbackLoop?.enabled &&
+        iteration < maxIterations &&
+        verifyResult &&
+        this.evaluateFeedbackCondition(verifyResult, feedbackLoop);
+
+      if (shouldContinueFeedback) {
+        this.logger.info(
+          `↩️  FEEDBACK TRIGGERED: Returning to "${feedbackLoop.toStage}" stage`
+        );
+
+        // Re-execute from feedback target stage
+        const feedbackTargetIndex = currentStages.findIndex(
+          (s) => s.stage === feedbackLoop.toStage
+        );
+        if (feedbackTargetIndex >= 0) {
+          currentStages = currentStages.slice(feedbackTargetIndex);
+        }
+      } else {
+        break; // Exit feedback loop
+      }
     }
 
     // Create sequence result with all stage results
@@ -2564,11 +2639,14 @@ export class Interpreter {
       kind: "reasoning-sequence-result",
       stages: sequenceResults,
       executionPath,
+      iterations: iterationHistory.length,
+      feedbackTriggered: iteration > 1,
       metadata: {
         ...metadata,
         sequenceId,
         completedAt: new Date().toISOString(),
         totalStages: stages.length,
+        iterations: iteration,
       },
       completed: true,
     };
@@ -2583,12 +2661,32 @@ export class Interpreter {
       Math.max(sequenceResults.length, 1);
 
     this.logger.info(
-      `✅ REASONING SEQUENCE COMPLETE (${stages.length} stages, confidence: ${(
+      `✅ REASONING SEQUENCE COMPLETE (${stages.length} stages, ${iteration} iterations, confidence: ${(
         totalConfidence * 100
       ).toFixed(0)}%)`
     );
 
     return sequenceResult;
+  }
+
+  // Phase 9c Feedback: Evaluate feedback condition
+  private evaluateFeedbackCondition(verifyResult: any, feedbackLoop: any): boolean {
+    // Default: trigger feedback if confidence < 0.8
+    const defaultThreshold = 0.8;
+    const confidence = verifyResult?.metadata?.confidence || 0;
+
+    if (feedbackLoop.condition) {
+      // Evaluate custom condition
+      try {
+        return this.eval(feedbackLoop.condition);
+      } catch (e) {
+        this.logger.warn(`Failed to evaluate feedback condition: ${(e as any).message}`);
+        return confidence < defaultThreshold;
+      }
+    }
+
+    // Default: trigger if confidence below threshold
+    return confidence < defaultThreshold;
   }
 
   // Phase 5 Week 2: Evaluate Type Class definition
