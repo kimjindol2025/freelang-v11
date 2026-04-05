@@ -18,6 +18,7 @@ export type ASTNode =
   | SearchBlock
   | LearnBlock
   | ReasoningBlock
+  | ReasoningSequence
   | AsyncFunction
   | AwaitExpression;
 
@@ -263,6 +264,20 @@ export interface ReasoningTransition {
   action?: ASTNode;            // action to execute on transition
 }
 
+// Reasoning Sequence (NEW for Phase 9c Extension)
+// (reasoning-sequence (observe ...) (analyze ...) (decide ...) (act ...) (verify ...))
+// Represents a complete reasoning flow with automatic state transitions
+export interface ReasoningSequence {
+  kind: "reasoning-sequence";
+  stages: ReasoningBlock[];           // sequence of reasoning blocks
+  metadata?: {
+    startTime?: string;
+    endTime?: string;
+    totalConfidence?: number;
+    executionPath?: string[];         // sequence of stages executed
+  };
+}
+
 // Async Function (NEW for Phase 7)
 // [async name [params] body]
 // Returns Promise<T> where T is the return type of body
@@ -479,6 +494,19 @@ export function makeReasoningTransition(
   return { from, to, condition, action };
 }
 
+// Helper: Create reasoning sequence (Phase 9c Extension)
+export function makeReasoningSequence(
+  stages: ReasoningBlock[],
+  metadata?: {
+    startTime?: string;
+    endTime?: string;
+    totalConfidence?: number;
+    executionPath?: string[];
+  }
+): ReasoningSequence {
+  return { kind: "reasoning-sequence", stages, metadata };
+}
+
 // ============================================================
 // Phase 6: Type Guard Functions (타입 안전성 강화)
 // ============================================================
@@ -546,4 +574,9 @@ export function isLearnBlock(node: any): node is LearnBlock {
 // ReasoningBlock 타입 가드 (NEW for Phase 9c)
 export function isReasoningBlock(node: any): node is ReasoningBlock {
   return node && node.kind === "reasoning-block";
+}
+
+// ReasoningSequence 타입 가드 (NEW for Phase 9c Extension)
+export function isReasoningSequence(node: any): node is ReasoningSequence {
+  return node && node.kind === "reasoning-sequence";
 }

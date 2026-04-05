@@ -20,6 +20,7 @@ import {
   SearchBlock,
   LearnBlock,
   ReasoningBlock,
+  ReasoningSequence,
   ReasoningTransition,
   AsyncFunction,
   AwaitExpression,
@@ -48,6 +49,7 @@ import {
   makeAwaitExpression,
   makeReasoningBlock,
   makeReasoningTransition,
+  makeReasoningSequence,
   makeTypeClass,
   makeTypeClassInstance,
 } from "./ast";
@@ -555,7 +557,7 @@ export class Parser {
   // Phase 6: Also handles import and open expressions
   // Phase 9a: Also handles search and fetch expressions
   // Phase 9b: Also handles learn and recall expressions
-  private parseSExpr(): SExpr | PatternMatch | ImportBlock | OpenBlock | SearchBlock | LearnBlock | ReasoningBlock {
+  private parseSExpr(): SExpr | PatternMatch | ImportBlock | OpenBlock | SearchBlock | LearnBlock | ReasoningBlock | ReasoningSequence {
     this.expect(T.LParen);
 
     let op: string;
@@ -667,6 +669,13 @@ export class Parser {
       const reasoningBlock = this.parseReasoningExpression("verify");
       this.expect(T.RParen);
       return reasoningBlock;
+    }
+
+    // Special case: reasoning-sequence expressions (Phase 9c Extension)
+    if (op === "reasoning-sequence") {
+      const reasoningSeq = this.parseReasoningSequenceExpression();
+      this.expect(T.RParen);
+      return reasoningSeq;
     }
 
     // Special case: match expressions
@@ -1385,6 +1394,238 @@ export class Parser {
             }
           } else {
             throw this.error(`Expected ':' in verify expression, got ${this.peek().type}`, this.peek());
+          }
+        }
+        verifications = [data.get("result")];
+        break;
+      }
+    }
+
+    metadata.endTime = new Date().toISOString();
+
+    return {
+      kind: "reasoning-block",
+      stage,
+      data,
+      observations,
+      analysis,
+      decisions,
+      actions,
+      verifications,
+      metadata,
+    };
+  }
+
+  // Phase 9c Extension: Parse reasoning-sequence expression
+  // (reasoning-sequence (observe ...) (analyze ...) (decide ...) (act ...) (verify ...))
+  private parseReasoningSequenceExpression(): ReasoningSequence {
+    const stages: ReasoningBlock[] = [];
+    const startTime = new Date().toISOString();
+
+    // Parse multiple reasoning blocks in sequence
+    while (!this.check(T.RParen) && !this.isAtEnd()) {
+      if (this.check(T.LParen)) {
+        this.advance(); // consume '('
+
+        // Check for reasoning stage keywords
+        const stageToken = this.peek();
+        const isReasoningStage =
+          stageToken.type === T.Observe ||
+          stageToken.type === T.Analyze ||
+          stageToken.type === T.Decide ||
+          stageToken.type === T.Act ||
+          stageToken.type === T.Verify ||
+          (stageToken.type === T.Symbol &&
+            (stageToken.value === "observe" ||
+              stageToken.value === "analyze" ||
+              stageToken.value === "decide" ||
+              stageToken.value === "act" ||
+              stageToken.value === "verify"));
+
+        if (!isReasoningStage) {
+          throw this.error(
+            `Expected reasoning stage (observe/analyze/decide/act/verify), got ${stageToken.value}`,
+            stageToken
+          );
+        }
+
+        const stageName =
+          stageToken.type === T.Observe
+            ? "observe"
+            : stageToken.type === T.Analyze
+            ? "analyze"
+            : stageToken.type === T.Decide
+            ? "decide"
+            : stageToken.type === T.Act
+            ? "act"
+            : stageToken.type === T.Verify
+            ? "verify"
+            : stageToken.value;
+
+        this.advance(); // consume stage name
+        const reasoningBlock = this.parseReasoningExpressionInternal(
+          stageName as "observe" | "analyze" | "decide" | "act" | "verify"
+        );
+        stages.push(reasoningBlock);
+        this.expect(T.RParen);
+      } else {
+        throw this.error(
+          `Expected '(' before reasoning block, got ${this.peek().type}`,
+          this.peek()
+        );
+      }
+    }
+
+    const endTime = new Date().toISOString();
+
+    return {
+      kind: "reasoning-sequence",
+      stages,
+      metadata: {
+        startTime,
+        endTime,
+        executionPath: stages.map((s) => s.stage),
+      },
+    };
+  }
+
+  // Phase 9c: Internal helper for parsing reasoning expressions (used by parseReasoningExpression and parseReasoningSequenceExpression)
+  private parseReasoningExpressionInternal(
+    stage: "observe" | "analyze" | "decide" | "act" | "verify"
+  ): ReasoningBlock {
+    const data = new Map<string, any>();
+    let observations: any[] = [];
+    let analysis: any[] = [];
+    let decisions: any[] = [];
+    let actions: any[] = [];
+    let verifications: any[] = [];
+    const metadata: any = { startTime: new Date().toISOString() };
+
+    switch (stage) {
+      case "observe": {
+        // Parse observation: "message" or :data "message" :confidence 0.9
+        if (!this.check(T.RParen)) {
+          const firstArg = this.parseValue();
+          if (firstArg.kind === "literal" && firstArg.type === "string") {
+            data.set("observation", firstArg.value);
+            observations.push(firstArg.value);
+          }
+        }
+
+        // Parse keyword arguments: :confidence, :feedback, etc.
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance(); // consume ':'
+            if (!this.check(T.Symbol)) {
+              throw this.error(
+                `Expected symbol after ':', got ${this.peek().type}`,
+                this.peek()
+              );
+            }
+
+            const clauseName = this.advance().value;
+            const clauseValue = this.parseValue();
+
+            if (clauseName === "confidence") {
+              if (clauseValue.kind === "literal" && clauseValue.type === "number") {
+                metadata.confidence = clauseValue.value as number;
+              }
+            } else {
+              data.set(clauseName, clauseValue);
+            }
+          } else {
+            throw this.error(
+              `Expected ':' in observe expression, got ${this.peek().type}`,
+              this.peek()
+            );
+          }
+        }
+        break;
+      }
+
+      case "analyze": {
+        // Parse analysis: :angle1 "..." :angle2 "..." :selected "..."
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            data.set(clauseName, clauseValue);
+
+            if (clauseName === "selected") {
+              analysis.push(clauseValue);
+            }
+          } else {
+            throw this.error(
+              `Expected ':' in analyze expression, got ${this.peek().type}`,
+              this.peek()
+            );
+          }
+        }
+        break;
+      }
+
+      case "decide": {
+        // Parse decision: :choice "..." :reason "..."
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            data.set(clauseName, clauseValue);
+          } else {
+            throw this.error(
+              `Expected ':' in decide expression, got ${this.peek().type}`,
+              this.peek()
+            );
+          }
+        }
+        decisions = [data.get("choice")];
+        break;
+      }
+
+      case "act": {
+        // Parse action: :action "..." :parameters {...}
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            data.set(clauseName, clauseValue);
+          } else {
+            throw this.error(
+              `Expected ':' in act expression, got ${this.peek().type}`,
+              this.peek()
+            );
+          }
+        }
+        actions = [data.get("action")];
+        break;
+      }
+
+      case "verify": {
+        // Parse verification: :result success :evidence [...]
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            if (clauseName === "confidence") {
+              if (clauseValue.kind === "literal" && clauseValue.type === "number") {
+                metadata.confidence = clauseValue.value as number;
+              }
+            } else {
+              data.set(clauseName, clauseValue);
+            }
+          } else {
+            throw this.error(
+              `Expected ':' in verify expression, got ${this.peek().type}`,
+              this.peek()
+            );
           }
         }
         verifications = [data.get("result")];

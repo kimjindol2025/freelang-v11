@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -121,6 +121,8 @@ export class Interpreter {
         this.context.lastValue = this.handleLearnBlock(node);
       } else if (isReasoningBlock(node)) {
         this.context.lastValue = this.handleReasoningBlock(node);
+      } else if (isReasoningSequence(node)) {
+        this.context.lastValue = this.handleReasoningSequence(node);
       } else if (isModuleBlock(node)) {
         this.evalModuleBlock(node);
       } else if (isBlock(node)) {
@@ -2497,6 +2499,96 @@ export class Interpreter {
       stateKey,
       completed: true,
     };
+  }
+
+  // Phase 9c Extension: Handle Reasoning Sequence - Automatic state transitions
+  private handleReasoningSequence(reasoningSeq: ReasoningSequence): any {
+    const { stages, metadata } = reasoningSeq;
+
+    // Initialize reasoning state storage if needed
+    if (!this.context.reasoning) {
+      this.context.reasoning = new Map();
+    }
+
+    const sequenceId = new Date().getTime();
+    const executionPath: string[] = [];
+    const sequenceResults: any[] = [];
+
+    // Log sequence start
+    this.logger.info(`🔄 REASONING SEQUENCE START (${stages.length} stages)`);
+
+    // Execute each reasoning stage in sequence with automatic transitions
+    for (let i = 0; i < stages.length; i++) {
+      const stage = stages[i];
+      const stageNum = i + 1;
+
+      // Log stage entry
+      const stageEmoji = {
+        observe: "👀",
+        analyze: "🔍",
+        decide: "🎯",
+        act: "⚡",
+        verify: "✅",
+      }[stage.stage] || "❓";
+
+      this.logger.info(`  [${stageNum}/${stages.length}] ${stageEmoji} ${stage.stage.toUpperCase()}`);
+
+      // Handle the reasoning block
+      const stageResult = this.handleReasoningBlock(stage);
+      sequenceResults.push(stageResult);
+      executionPath.push(stage.stage);
+
+      // Check for stage-specific transitions
+      if (stage.transitions && stage.transitions.length > 0) {
+        for (const transition of stage.transitions) {
+          // Evaluate transition condition (if applicable)
+          if (transition.condition) {
+            const conditionMet = this.eval(transition.condition);
+
+            if (conditionMet) {
+              // Log transition
+              if (transition.to) {
+                this.logger.info(`    ↓ Transition to: ${transition.to}`);
+              }
+            }
+          }
+        }
+      }
+
+      // For now, proceed to next stage automatically
+      // In the future: check for feedback loops, conditional branches, etc.
+    }
+
+    // Create sequence result with all stage results
+    const sequenceResult = {
+      kind: "reasoning-sequence-result",
+      stages: sequenceResults,
+      executionPath,
+      metadata: {
+        ...metadata,
+        sequenceId,
+        completedAt: new Date().toISOString(),
+        totalStages: stages.length,
+      },
+      completed: true,
+    };
+
+    // Store the entire sequence result
+    const sequenceKey = `sequence-${sequenceId}`;
+    this.context.reasoning!.set(sequenceKey, sequenceResult);
+
+    // Log sequence completion
+    const totalConfidence =
+      sequenceResults.reduce((sum, r) => sum + (r.metadata?.confidence || 0), 0) /
+      Math.max(sequenceResults.length, 1);
+
+    this.logger.info(
+      `✅ REASONING SEQUENCE COMPLETE (${stages.length} stages, confidence: ${(
+        totalConfidence * 100
+      ).toFixed(0)}%)`
+    );
+
+    return sequenceResult;
   }
 
   // Phase 5 Week 2: Evaluate Type Class definition
