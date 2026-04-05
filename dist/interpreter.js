@@ -10,9 +10,12 @@ exports.interpret = interpret;
 const express_1 = __importDefault(require("express"));
 const ast_1 = require("./ast");
 const type_checker_1 = require("./type-checker");
+const errors_1 = require("./errors");
+const logger_1 = require("./logger");
 // Interpreter class
 class Interpreter {
-    constructor(app = (0, express_1.default)()) {
+    constructor(app = (0, express_1.default)(), logger) {
+        this.logger = logger || (0, logger_1.getGlobalLogger)();
         this.context = {
             functions: new Map(),
             routes: new Map(),
@@ -1340,7 +1343,7 @@ class Interpreter {
             functions: moduleFunctions,
         };
         this.getModules().set(moduleName, moduleInfo);
-        console.log(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
+        this.logger.info(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
     }
     // Phase 6 Step 4: Evaluate import block
     // 모듈에서 함수를 선택적으로 가져오기
@@ -1352,7 +1355,7 @@ class Interpreter {
         // 모듈 찾기
         const module = this.getModules().get(moduleName);
         if (!module) {
-            throw new Error(`Module not found: ${moduleName} (from ${source || "inline"})`);
+            throw new errors_1.ModuleNotFoundError(moduleName, source);
         }
         // 가져올 함수 목록 결정
         let functionsToImport = [];
@@ -1362,7 +1365,7 @@ class Interpreter {
             // 존재하지 않는 함수 검증
             selective.forEach((name) => {
                 if (!module.exports.includes(name)) {
-                    console.warn(`⚠️  Warning: Function "${name}" not exported from module "${moduleName}"`);
+                    this.logger.warn(`Function "${name}" not exported from module "${moduleName}"`);
                 }
             });
         }
@@ -1389,7 +1392,7 @@ class Interpreter {
         const importedCount = functionsToImport.length;
         const aliasStr = alias ? ` as ${alias}` : "";
         const selectStr = selective ? ` (${selective.join(", ")})` : "";
-        console.log(`✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`);
+        this.logger.info(`✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`);
     }
     // Phase 6 Step 4: Evaluate open block
     // 모듈의 모든 export된 함수를 전역 네임스페이스에 추가
@@ -1399,7 +1402,7 @@ class Interpreter {
         // 모듈 찾기
         const module = this.getModules().get(moduleName);
         if (!module) {
-            throw new Error(`Module not found: ${moduleName} (from ${source || "inline"})`);
+            throw new errors_1.ModuleNotFoundError(moduleName, source);
         }
         // 모든 export된 함수를 전역으로 추가
         module.exports.forEach((funcName) => {
@@ -1409,12 +1412,12 @@ class Interpreter {
                 this.context.functions.set(funcName, func);
             }
         });
-        console.log(`✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`);
+        this.logger.info(`✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`);
     }
 }
 exports.Interpreter = Interpreter;
-function interpret(blocks, app) {
-    const interpreter = new Interpreter(app);
+function interpret(blocks, app, logger) {
+    const interpreter = new Interpreter(app, logger);
     return interpreter.interpret(blocks);
 }
 //# sourceMappingURL=interpreter.js.map

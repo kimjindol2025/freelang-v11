@@ -4,6 +4,8 @@
 import express from "express";
 import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
+import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
+import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -75,8 +77,10 @@ export interface ModuleInfo {
 // Interpreter class
 export class Interpreter {
   private context: ExecutionContext;
+  private logger: Logger;
 
-  constructor(app: express.Express = express()) {
+  constructor(app: express.Express = express(), logger?: Logger) {
+    this.logger = logger || getGlobalLogger();
     this.context = {
       functions: new Map(),
       routes: new Map(),
@@ -1550,7 +1554,7 @@ export class Interpreter {
 
     this.getModules().set(moduleName, moduleInfo);
 
-    console.log(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
+    this.logger.info(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
   }
 
   // Phase 6 Step 4: Evaluate import block
@@ -1564,9 +1568,7 @@ export class Interpreter {
     // 모듈 찾기
     const module = this.getModules().get(moduleName);
     if (!module) {
-      throw new Error(
-        `Module not found: ${moduleName} (from ${source || "inline"})`
-      );
+      throw new ModuleNotFoundError(moduleName, source);
     }
 
     // 가져올 함수 목록 결정
@@ -1579,8 +1581,8 @@ export class Interpreter {
       // 존재하지 않는 함수 검증
       selective.forEach((name) => {
         if (!module.exports.includes(name)) {
-          console.warn(
-            `⚠️  Warning: Function "${name}" not exported from module "${moduleName}"`
+          this.logger.warn(
+            `Function "${name}" not exported from module "${moduleName}"`
           );
         }
       });
@@ -1608,7 +1610,7 @@ export class Interpreter {
     const importedCount = functionsToImport.length;
     const aliasStr = alias ? ` as ${alias}` : "";
     const selectStr = selective ? ` (${selective.join(", ")})` : "";
-    console.log(
+    this.logger.info(
       `✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`
     );
   }
@@ -1622,9 +1624,7 @@ export class Interpreter {
     // 모듈 찾기
     const module = this.getModules().get(moduleName);
     if (!module) {
-      throw new Error(
-        `Module not found: ${moduleName} (from ${source || "inline"})`
-      );
+      throw new ModuleNotFoundError(moduleName, source);
     }
 
     // 모든 export된 함수를 전역으로 추가
@@ -1636,13 +1636,13 @@ export class Interpreter {
       }
     });
 
-    console.log(
+    this.logger.info(
       `✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`
     );
   }
 }
 
-export function interpret(blocks: ASTNode[], app?: express.Express): ExecutionContext {
-  const interpreter = new Interpreter(app);
+export function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext {
+  const interpreter = new Interpreter(app, logger);
   return interpreter.interpret(blocks);
 }

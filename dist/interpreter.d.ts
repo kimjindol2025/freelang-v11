@@ -1,6 +1,7 @@
 import express from "express";
 import { ASTNode, TypeAnnotation } from "./ast";
 import { TypeChecker } from "./type-checker";
+import { Logger } from "./logger";
 export interface ExecutionContext {
     functions: Map<string, FreeLangFunction>;
     routes: Map<string, FreeLangRoute>;
@@ -58,7 +59,8 @@ export interface ModuleInfo {
 }
 export declare class Interpreter {
     private context;
-    constructor(app?: express.Express);
+    private logger;
+    constructor(app?: express.Express, logger?: Logger);
     interpret(blocks: ASTNode[]): ExecutionContext;
     private evalBlock;
     private handleServerBlock;
@@ -95,5 +97,5 @@ export declare class Interpreter {
     private evalImportBlock;
     private evalOpenBlock;
 }
-export declare function interpret(blocks: ASTNode[], app?: express.Express): ExecutionContext;
+export declare function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext;
 //# sourceMappingURL=interpreter.d.ts.map
