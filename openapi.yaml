@@ -1,0 +1,457 @@
+openapi: 3.0.0
+info:
+  title: FreeLang v9 HTTP API
+  version: 9.0.0
+  description: FreeLang v9 언어 해석기의 HTTP 인터페이스
+  contact:
+    name: FreeLang 팀
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: 로컬 개발 서버
+  - url: https://api.freelang.local
+    description: 프로덕션 서버
+
+paths:
+  /api/compile:
+    post:
+      summary: FreeLang 코드 컴파일
+      tags:
+        - Compilation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: FreeLang 소스 코드
+                  example: "var x = 10; fn add(a, b) { a + b }"
+                optimize:
+                  type: boolean
+                  description: 최적화 활성화 여부
+                  default: false
+              required:
+                - code
+      responses:
+        '200':
+          description: 컴파일 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  ast:
+                    type: object
+                    description: 추상 구문 트리
+                  bytecode:
+                    type: string
+                    description: 생성된 바이트코드
+                  metadata:
+                    type: object
+                    properties:
+                      lines:
+                        type: integer
+                      functions:
+                        type: integer
+                      tokens:
+                        type: integer
+        '400':
+          description: 컴파일 오류
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/execute:
+    post:
+      summary: 컴파일된 코드 실행
+      tags:
+        - Execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: FreeLang 소스 코드
+                timeout:
+                  type: integer
+                  description: 실행 타임아웃 (ms)
+                  default: 5000
+                debug:
+                  type: boolean
+                  description: 디버그 모드
+                  default: false
+              required:
+                - code
+      responses:
+        '200':
+          description: 실행 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  output:
+                    type: array
+                    description: 프린트된 출력
+                  result:
+                    type: object
+                    description: 실행 결과 값
+                  executionTime:
+                    type: number
+                    description: 실행 시간 (ms)
+                  memoryUsed:
+                    type: number
+                    description: 메모리 사용량 (MB)
+        '408':
+          description: 타임아웃
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analyze:
+    post:
+      summary: 코드 분석 및 최적화 제안
+      tags:
+        - Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: 분석할 FreeLang 코드
+              required:
+                - code
+      responses:
+        '200':
+          description: 분석 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  complexity:
+                    type: object
+                    properties:
+                      cyclomatic:
+                        type: number
+                      cognitive:
+                        type: number
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [performance, readability, security]
+                        severity:
+                          type: string
+                          enum: [low, medium, high, critical]
+                        message:
+                          type: string
+                  metrics:
+                    type: object
+                    properties:
+                      lines:
+                        type: integer
+                      functions:
+                        type: integer
+                      cyclomaticComplexity:
+                        type: number
+
+  /api/lint:
+    post:
+      summary: 코드 스타일 검사
+      tags:
+        - Linting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                rules:
+                  type: object
+                  description: 검사 규칙
+              required:
+                - code
+      responses:
+        '200':
+          description: 검사 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LintError'
+                  warnings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LintError'
+
+  /api/test:
+    post:
+      summary: 테스트 실행
+      tags:
+        - Testing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: 테스트 코드
+              required:
+                - code
+      responses:
+        '200':
+          description: 테스트 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passed:
+                    type: integer
+                  failed:
+                    type: integer
+                  skipped:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        status:
+                          type: string
+                          enum: [passed, failed, skipped]
+                        error:
+                          type: string
+
+  /api/format:
+    post:
+      summary: 코드 포맷팅
+      tags:
+        - Formatting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: 포맷할 코드
+                options:
+                  type: object
+                  properties:
+                    indentSize:
+                      type: integer
+                      default: 2
+                    lineWidth:
+                      type: integer
+                      default: 80
+              required:
+                - code
+      responses:
+        '200':
+          description: 포맷 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  formatted:
+                    type: string
+                    description: 포맷된 코드
+
+  /api/benchmark:
+    post:
+      summary: 성능 벤치마크
+      tags:
+        - Performance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                iterations:
+                  type: integer
+                  default: 1000
+              required:
+                - code
+      responses:
+        '200':
+          description: 벤치마크 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  iterations:
+                    type: integer
+                  totalTime:
+                    type: number
+                    description: 총 실행 시간 (ms)
+                  avgTime:
+                    type: number
+                    description: 평균 시간 (ms)
+                  opsPerSec:
+                    type: number
+                    description: 초당 연산 수
+                  memoryPeak:
+                    type: number
+                    description: 최대 메모리 (MB)
+
+  /api/debug:
+    post:
+      summary: 디버그 정보
+      tags:
+        - Debugging
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                breakpoints:
+                  type: array
+                  items:
+                    type: integer
+                    description: 라인 번호
+      responses:
+        '200':
+          description: 디버그 세션 생성됨
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  variables:
+                    type: object
+                  stack:
+                    type: array
+                    items:
+                      type: object
+
+  /api/version:
+    get:
+      summary: 버전 정보
+      tags:
+        - System
+      responses:
+        '200':
+          description: 버전 정보
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  name:
+                    type: string
+                  author:
+                    type: string
+                  license:
+                    type: string
+
+  /api/health:
+    get:
+      summary: 헬스 체크
+      tags:
+        - System
+      responses:
+        '200':
+          description: 서버 정상 작동
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded, down]
+                  uptime:
+                    type: number
+                  memoryUsage:
+                    type: object
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 에러 메시지
+        code:
+          type: integer
+          description: 에러 코드
+        details:
+          type: object
+          description: 상세 정보
+
+    LintError:
+      type: object
+      properties:
+        line:
+          type: integer
+        column:
+          type: integer
+        message:
+          type: string
+        rule:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

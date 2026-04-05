@@ -353,13 +353,15 @@ fn eval_arith(op: str, args: [str], env: Environment) -> str {
 //
 // **목적**: 비교 연산 평가 (=, ==, !=, <, >, <=, >=)
 // **입력**: op (연산자), args (["op", arg1, arg2]), env
-// **반환값**: "bool:true" 또는 "bool:false"
+// **반환값**: "bool:true" 또는 "bool:false" 또는 에러
 //
 // **연산자**:
-//   =, == : 같음
-//   !=    : 다름
-//   <, >  : 크기 비교
-//   <=, >= : 크기 비교 (같음 포함)
+//   =, == : 같음 (숫자 또는 문자열 비교)
+//   !=    : 다름 (숫자 또는 문자열 비교)
+//   <, >  : 크기 비교 (숫자만 지원)
+//   <=, >= : 크기 비교 (숫자만 지원)
+//
+// **타입 검증**: 크기 비교 연산자는 반드시 숫자 필요
 fn eval_compare(op: str, args: [str], env: Environment) -> str {
     if length(args) < 3 {
         return "error:compare_arity"
@@ -368,23 +370,48 @@ fn eval_compare(op: str, args: [str], env: Environment) -> str {
     var a_str = evaluate(args[1], env)
     var b_str = evaluate(args[2], env)
 
-    var a = i32(a_str)
-    var b = i32(b_str)
-
     var result = false
 
+    // 등호 연산: 숫자든 문자열이든 비교 가능
     if op == "=" || op == "==" {
-        result = a == b
+        if is_number(a_str) && is_number(b_str) {
+            var a = i32(a_str)
+            var b = i32(b_str)
+            result = a == b
+        } else {
+            // 문자열 비교
+            result = a_str == b_str
+        }
     } else if op == "!=" {
-        result = a != b
-    } else if op == "<" {
-        result = a < b
-    } else if op == ">" {
-        result = a > b
-    } else if op == "<=" {
-        result = a <= b
-    } else if op == ">=" {
-        result = a >= b
+        if is_number(a_str) && is_number(b_str) {
+            var a = i32(a_str)
+            var b = i32(b_str)
+            result = a != b
+        } else {
+            // 문자열 비교
+            result = a_str != b_str
+        }
+    } else if op == "<" || op == ">" || op == "<=" || op == ">=" {
+        // 크기 비교는 반드시 숫자여야 함
+        if !is_number(a_str) {
+            return "error:type:number:got:" + a_str + ":in:eval_compare:" + op
+        }
+        if !is_number(b_str) {
+            return "error:type:number:got:" + b_str + ":in:eval_compare:" + op
+        }
+
+        var a = i32(a_str)
+        var b = i32(b_str)
+
+        if op == "<" {
+            result = a < b
+        } else if op == ">" {
+            result = a > b
+        } else if op == "<=" {
+            result = a <= b
+        } else if op == ">=" {
+            result = a >= b
+        }
     }
 
     if result {
@@ -667,11 +694,32 @@ fn interpret(ast_nodes: [str]) -> str {
     var i: i32 = 0
     while i < length(ast_nodes) {
         result = evaluate(ast_nodes[i], env)
+
+        // 에러 감지 및 조기 종료
+        if length(result) >= 6 && substring(result, 0, 6) == "error:" {
+            println("ERROR at node " + str(i) + ": " + result)
+            println("Execution halted.")
+            return result
+        }
+
         println("➜ " + result)
         i = i + 1
     }
 
     result
+}
+
+// interpret_safe(ast_nodes) -> str
+// interpret() 래퍼 (에러를 Result 형식으로 감싸서 반환)
+// 반환값: "ok:<result>" 또는 "error:<message>"
+fn interpret_safe(ast_nodes: [str]) -> str {
+    var result = interpret(ast_nodes)
+
+    if length(result) >= 6 && substring(result, 0, 6) == "error:" {
+        return result
+    }
+
+    "ok:" + result
 }
 
 // ============================================================

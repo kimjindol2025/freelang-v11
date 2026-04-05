@@ -1,0 +1,71 @@
+name: 성능 모니터링
+
+on:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * *'  # 매일 자정
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: TypeScript 컴파일
+        run: npm run build
+
+      - name: 성능 벤치마크 실행
+        run: npm run benchmark 2>&1 | tee benchmark-results.txt
+        continue-on-error: true
+
+      - name: 메모리 프로파일링
+        run: npm run test -- --detectOpenHandles 2>&1 | tee memory-profile.txt
+        continue-on-error: true
+
+      - name: 컴파일 시간 측정
+        run: |
+          echo "### 컴파일 성능" >> $GITHUB_STEP_SUMMARY
+          time npm run build >> compile-time.txt 2>&1
+          cat compile-time.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: 커버리지 분석
+        run: npm test -- --coverage 2>&1 | tee coverage-report.txt
+        continue-on-error: true
+
+      - name: 성능 결과 저장
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: |
+            benchmark-results.txt
+            memory-profile.txt
+            compile-time.txt
+            coverage-report.txt
+
+      - name: 성능 저하 감지
+        run: |
+          if grep -q "SLOW" benchmark-results.txt; then
+            echo "⚠️ 성능 저하 감지됨"
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: 성능 레포트 생성
+        run: |
+          echo "## 성능 벤치마크 결과" >> $GITHUB_STEP_SUMMARY
+          echo "📊 $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 커버리지" >> $GITHUB_STEP_SUMMARY
+          tail -20 coverage-report.txt >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true

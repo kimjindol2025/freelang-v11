@@ -159,11 +159,11 @@ fn format_type_error(err: TypeError) -> str {
 }
 
 // ============================================================
-// 에러 검증 함수
+// 에러 검증 함수 (bool 버전 - 기존)
 // ============================================================
 
 // validate_not_empty(value, field_name) -> bool
-// 값이 비어있지 않은지 검증
+// 값이 비어있지 않은지 검증 (기존 버전, 부작용 있음)
 fn validate_not_empty(value: str, field_name: str) -> bool {
     if length(value) == 0 {
         println("[VALIDATION ERROR] " + field_name + " cannot be empty")
@@ -183,13 +183,63 @@ fn validate_positive(value: i32, field_name: str) -> bool {
 }
 
 // validate_range(value, min: i32, max: i32, field_name) -> bool
-// 값이 범위 내인지 검증
+// 값이 범위 내인지 검증 (기존 버전)
 fn validate_range(value: i32, min: i32, max: i32, field_name: str) -> bool {
     if value < min || value > max {
         println("[VALIDATION ERROR] " + field_name + " must be between " + str(min) + " and " + str(max) + ", got " + str(value))
         return false
     }
     true
+}
+
+// ============================================================
+// 에러 검증 함수 (Result 버전 - 새로 추가)
+// ============================================================
+
+// validate_not_empty_result(value, field_name) -> Result
+// 값이 비어있지 않은지 검증 (Result 반환)
+fn validate_not_empty_result(value: str, field_name: str) -> str {
+    if length(value) == 0 {
+        return "error:validation:empty_field:" + field_name
+    }
+    "ok"
+}
+
+// validate_positive_result(value, field_name) -> Result
+// 값이 양수인지 검증 (Result 반환)
+fn validate_positive_result(value: i32, field_name: str) -> str {
+    if value <= 0 {
+        return "error:validation:not_positive:" + field_name + ":" + str(value)
+    }
+    "ok"
+}
+
+// validate_range_result(value, min, max, field_name) -> Result
+// 값이 범위 내인지 검증 (Result 반환)
+fn validate_range_result(value: i32, min: i32, max: i32, field_name: str) -> str {
+    if value < min || value > max {
+        return "error:validation:out_of_range:" + field_name + ":" + str(value) + ":" + str(min) + ":" + str(max)
+    }
+    "ok"
+}
+
+// validate_chain(r1, r2) -> str
+// 첫 번째 에러가 있으면 전파, 아니면 두 번째 결과 반환
+fn validate_chain(r1: str, r2: str) -> str {
+    if substring(r1, 0, 6) == "error:" {
+        return r1
+    }
+    r2
+}
+
+// make_type_error_str(expected, actual, context) -> str
+// TypeError를 "error:type:..." 형식의 문자열로 직렬화
+fn make_type_error_str(expected: str, actual: str, context: str) -> str {
+    var msg = "error:type:" + expected + ":" + actual
+    if length(context) > 0 {
+        msg = msg + ":" + context
+    }
+    msg
 }
 
 // ============================================================
@@ -223,11 +273,44 @@ fn main() {
                              "data/missing.txt", "read")
     println(format_io_error(ioerr))
 
-    // 테스트 4: Validation
-    println("📌 테스트 4: Validation")
+    // 테스트 4: Validation (bool 버전)
+    println("📌 테스트 4: Validation (bool 버전)")
     var is_valid = validate_not_empty("", "username")
     var is_positive = validate_positive(5, "count")
     var is_in_range = validate_range(50, 0, 100, "percentage")
+
+    // 테스트 5: Result 버전 검증 함수
+    println("📌 테스트 5: Result 버전 검증")
+    var r1 = validate_not_empty_result("hello", "name")
+    println("  validate_not_empty_result('hello'): " + r1)
+
+    var r2 = validate_not_empty_result("", "email")
+    println("  validate_not_empty_result(''): " + r2)
+
+    var r3 = validate_positive_result(5, "count")
+    println("  validate_positive_result(5): " + r3)
+
+    var r4 = validate_positive_result(-1, "count")
+    println("  validate_positive_result(-1): " + r4)
+
+    var r5 = validate_range_result(50, 0, 100, "score")
+    println("  validate_range_result(50, 0, 100): " + r5)
+
+    var r6 = validate_range_result(150, 0, 100, "score")
+    println("  validate_range_result(150, 0, 100): " + r6)
+
+    // 테스트 6: 검증 체인
+    println("📌 테스트 6: 검증 체인")
+    var chain1 = validate_chain("ok", "ok")
+    println("  chain_ok_ok: " + chain1)
+
+    var chain2 = validate_chain("error:validation:empty", "ok")
+    println("  chain_error_ok: " + chain2)
+
+    // 테스트 7: TypeError 직렬화
+    println("📌 테스트 7: TypeError 직렬화")
+    var type_err = make_type_error_str("number", "string", "eval_compare")
+    println("  type error: " + type_err)
 
     println("✅ 에러 처리 유틸리티 완료!")
 }

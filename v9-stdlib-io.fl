@@ -434,17 +434,31 @@ fn main() {
     println("✅ 테스트 1: 파일 쓰기")
     var content: str = "Hello, FreeLang v9 Database!\nLine 2\nLine 3"
     var write_result = file_write("/tmp/test.txt", content)
+    if write_result.success {
+        println("  PASS: " + str(write_result.bytes_written) + " bytes written")
+    } else {
+        println("  FAIL: " + write_result.error_msg)
+    }
     println("")
 
     ;; 테스트 2: 파일 읽기
     println("✅ 테스트 2: 파일 읽기")
     var read_result = file_read("/tmp/test.txt")
-    println("  Content size: " + str(read_result.bytes_read) + " bytes")
+    if read_result.success {
+        println("  PASS: " + str(read_result.bytes_read) + " bytes read")
+    } else {
+        println("  FAIL: " + read_result.error_msg)
+    }
     println("")
 
     ;; 테스트 3: 파일 추가
     println("✅ 테스트 3: 파일에 내용 추가")
     var append_result = file_append("/tmp/test.txt", "\nAppended line")
+    if append_result.success {
+        println("  PASS: " + str(append_result.bytes_written) + " bytes appended")
+    } else {
+        println("  FAIL: " + append_result.error_msg)
+    }
     println("")
 
     ;; 테스트 4: 파일 메타데이터
@@ -455,6 +469,11 @@ fn main() {
     ;; 테스트 5: 파일 삭제
     println("✅ 테스트 5: 파일 삭제")
     var delete_result = file_delete("/tmp/test.txt")
+    if delete_result.success {
+        println("  PASS: file deleted successfully")
+    } else {
+        println("  FAIL: " + delete_result.error_msg)
+    }
     println("")
 
     ;; 테스트 6: 경로 작업
@@ -480,6 +499,11 @@ fn main() {
     rows.push(["2", "Bob", "bob@example.com"])
     rows.push(["3", "Charlie", "charlie@example.com"])
     var csv_result = file_write_csv("/tmp/users.csv", headers, rows)
+    if csv_result.success {
+        println("  PASS: " + str(csv_result.bytes_written) + " bytes written to CSV")
+    } else {
+        println("  FAIL: " + csv_result.error_msg)
+    }
     println("")
 
     ;; 테스트 9: 파일 존재 여부
