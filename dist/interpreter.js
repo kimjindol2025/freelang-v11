@@ -306,6 +306,14 @@ class Interpreter {
         if (node.kind === "function-value") {
             return node; // Return the function value as-is
         }
+        // Type Class (Phase 5 Week 2: Type Classes)
+        if (node.kind === "type-class") {
+            return this.evalTypeClass(node);
+        }
+        // Type Class Instance (Phase 5 Week 2: Type Classes)
+        if (node.kind === "type-class-instance") {
+            return this.evalInstance(node);
+        }
         return null;
     }
     evalSExpr(expr) {
@@ -1507,6 +1515,45 @@ class Interpreter {
             }
         });
         this.logger.info(`✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`);
+    }
+    // Phase 5 Week 2: Evaluate Type Class definition
+    evalTypeClass(typeClass) {
+        const info = {
+            name: typeClass.name,
+            typeParams: typeClass.typeParams,
+            methods: new Map(),
+        };
+        // Extract method signatures from typeClass.methods Map
+        if (typeClass.methods) {
+            typeClass.methods.forEach((method, methodName) => {
+                // Store method signature (for now, just the method name)
+                info.methods.set(methodName, methodName);
+            });
+        }
+        // Register type class in context
+        this.context.typeClasses.set(typeClass.name, info);
+        this.logger.info(`✅ Registered TYPECLASS "${typeClass.name}" with type params [${typeClass.typeParams.join(", ")}] and ${info.methods.size} method(s)`);
+    }
+    // Phase 5 Week 2: Evaluate Type Class Instance definition
+    evalInstance(instance) {
+        const key = `${instance.className}[${instance.concreteType}]`;
+        const implementations = new Map();
+        // Extract method implementations from instance.implementations Map
+        if (instance.implementations) {
+            instance.implementations.forEach((value, methodName) => {
+                // Evaluate each method implementation
+                const impl = this.eval(value);
+                implementations.set(methodName, impl);
+            });
+        }
+        const info = {
+            className: instance.className,
+            concreteType: instance.concreteType,
+            implementations,
+        };
+        // Register type class instance in context
+        this.context.typeClassInstances.set(key, info);
+        this.logger.info(`✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`);
     }
 }
 exports.Interpreter = Interpreter;

@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -393,6 +393,16 @@ export class Interpreter {
     // Function value (Phase 4 Week 1: First-class functions)
     if ((node as any).kind === "function-value") {
       return node; // Return the function value as-is
+    }
+
+    // Type Class (Phase 5 Week 2: Type Classes)
+    if ((node as any).kind === "type-class") {
+      return this.evalTypeClass(node as TypeClass);
+    }
+
+    // Type Class Instance (Phase 5 Week 2: Type Classes)
+    if ((node as any).kind === "type-class-instance") {
+      return this.evalInstance(node as TypeClassInstance);
     }
 
     return null;
@@ -1726,6 +1736,61 @@ export class Interpreter {
 
     this.logger.info(
       `✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`
+    );
+  }
+
+  // Phase 5 Week 2: Evaluate Type Class definition
+  private evalTypeClass(typeClass: TypeClass): void {
+    const info: TypeClassInfo = {
+      name: typeClass.name,
+      typeParams: typeClass.typeParams,
+      methods: new Map(),
+    };
+
+    // Extract method signatures from typeClass.methods Map
+    if (typeClass.methods) {
+      typeClass.methods.forEach((method, methodName) => {
+        // Store method signature (for now, just the method name)
+        info.methods.set(methodName, methodName);
+      });
+    }
+
+    // Register type class in context
+    this.context.typeClasses!.set(typeClass.name, info);
+
+    this.logger.info(
+      `✅ Registered TYPECLASS "${typeClass.name}" with type params [${typeClass.typeParams.join(
+        ", "
+      )}] and ${info.methods.size} method(s)`
+    );
+  }
+
+  // Phase 5 Week 2: Evaluate Type Class Instance definition
+  private evalInstance(instance: TypeClassInstance): void {
+    const key = `${instance.className}[${instance.concreteType}]`;
+
+    const implementations = new Map<string, any>();
+
+    // Extract method implementations from instance.implementations Map
+    if (instance.implementations) {
+      instance.implementations.forEach((value, methodName) => {
+        // Evaluate each method implementation
+        const impl = this.eval(value);
+        implementations.set(methodName, impl);
+      });
+    }
+
+    const info: TypeClassInstanceInfo = {
+      className: instance.className,
+      concreteType: instance.concreteType,
+      implementations,
+    };
+
+    // Register type class instance in context
+    this.context.typeClassInstances!.set(key, info);
+
+    this.logger.info(
+      `✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`
     );
   }
 }

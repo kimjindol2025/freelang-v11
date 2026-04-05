@@ -96,6 +96,8 @@ export declare class Interpreter {
     private evalModuleBlock;
     private evalImportBlock;
     private evalOpenBlock;
+    private evalTypeClass;
+    private evalInstance;
 }
 export declare function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext;
 //# sourceMappingURL=interpreter.d.ts.map
