@@ -106,10 +106,20 @@ class Interpreter {
             body,
         });
         // Phase 3: Register function type in type checker if type annotations present
-        if (block.typeAnnotations && block.typeAnnotations.has("return") && this.context.typeChecker) {
+        if (block.typeAnnotations && this.context.typeChecker) {
+            // Get parameter types from typeAnnotations (new syntax: [[$x int] [$y int]])
+            let paramTypes = [];
+            const paramsTypeAnnotations = block.typeAnnotations.get("params");
+            if (Array.isArray(paramsTypeAnnotations)) {
+                // New syntax: parameter types extracted from parser
+                paramTypes = paramsTypeAnnotations;
+            }
+            else {
+                // Old syntax or no param types: default to 'any'
+                paramTypes = params.map(() => ({ kind: "type", name: "any" }));
+            }
+            // Get return type (optional, defaults to 'any')
             const returnType = block.typeAnnotations.get("return") || { kind: "type", name: "any" };
-            // For now, register with empty param types (can be enhanced to parse :params types)
-            const paramTypes = params.map(() => ({ kind: "type", name: "any" }));
             this.context.typeChecker.registerFunction(block.name, paramTypes, returnType);
         }
     }
@@ -431,6 +441,27 @@ class Interpreter {
         const func = this.context.functions.get(name);
         if (!func) {
             throw new Error(`Function not found: ${name}`);
+        }
+        // Phase 3: Type check function call
+        if (this.context.typeChecker) {
+            const argTypes = args.map((arg) => {
+                // Infer type from argument value
+                if (typeof arg === "number")
+                    return { kind: "type", name: "int" };
+                if (typeof arg === "string")
+                    return { kind: "type", name: "string" };
+                if (typeof arg === "boolean")
+                    return { kind: "type", name: "bool" };
+                if (Array.isArray(arg))
+                    return { kind: "type", name: "array<any>" };
+                if (typeof arg === "function")
+                    return { kind: "type", name: "function" };
+                return { kind: "type", name: "any" };
+            });
+            const validation = this.context.typeChecker.checkFunctionCall(name, argTypes);
+            if (!validation.valid) {
+                throw new Error(`Type error in call to '${name}': ${validation.message}`);
+            }
         }
         // Create new scope
         const savedVars = new Map(this.context.variables);

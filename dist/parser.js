@@ -117,7 +117,9 @@ class Parser {
         }
         this.expect(token_1.TokenType.RBracket);
         const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
-        if (typeAnnotations.size > 0) {
+        // Phase 3: Always set typeAnnotations (even if empty) for consistent handling
+        // FUNC blocks without :return/:params annotations still need to be registered with default types
+        if (blockType === "FUNC" || typeAnnotations.size > 0) {
             block.typeAnnotations = typeAnnotations;
         }
         return block;
