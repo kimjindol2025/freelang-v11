@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -26,6 +26,8 @@ export interface ExecutionContext {
   typeClassInstances?: Map<string, TypeClassInstanceInfo>; // Phase 5 Week 2: Type class instances
   modules?: Map<string, ModuleInfo>; // Phase 6: Module registry
   cache?: Map<string, any>; // Phase 9a: Search result caching
+  learned?: Map<string, any>; // Phase 9b: Learned data storage (key -> data)
+  reasoning?: Map<string, any>; // Phase 9c: Reasoning state storage (stage-timestamp -> reasoning state)
 }
 
 export interface FreeLangFunction {
@@ -115,6 +117,10 @@ export class Interpreter {
         this.evalOpenBlock(node);
       } else if (isSearchBlock(node)) {
         this.context.lastValue = this.handleSearchBlock(node);
+      } else if (isLearnBlock(node)) {
+        this.context.lastValue = this.handleLearnBlock(node);
+      } else if (isReasoningBlock(node)) {
+        this.context.lastValue = this.handleReasoningBlock(node);
       } else if (isModuleBlock(node)) {
         this.evalModuleBlock(node);
       } else if (isBlock(node)) {
@@ -519,6 +525,239 @@ export class Interpreter {
         body: expr.args[2],
         capturedEnv: new Map(this.context.variables),
       };
+    }
+
+    // Phase 9a: Search/Fetch expressions from eval (when used in S-expression form)
+    if (op === "search" || op === "fetch") {
+      // (search query :source "web" :cache true :limit 5 :name results)
+      // (fetch url :cache true)
+
+      let query: string = "";
+      let source: "web" | "api" | "kb" = "web";
+      let cache: boolean = false;
+      let limit: number = 10;
+      let name: string | undefined;
+
+      // Parse arguments
+      for (let i = 0; i < expr.args.length; i++) {
+        const arg = expr.args[i];
+
+        // First positional argument is query/url
+        if (i === 0) {
+          const queryValue = this.eval(arg);
+          query = String(queryValue);
+          continue;
+        }
+
+        // Check for keyword arguments
+        if ((arg as any).kind === "keyword") {
+          const keywordName = (arg as Keyword).name;
+
+          if (i + 1 < expr.args.length) {
+            const value = this.eval(expr.args[i + 1]);
+
+            switch (keywordName) {
+              case "source":
+                if (value === "web" || value === "api" || value === "kb") {
+                  source = value;
+                }
+                break;
+              case "cache":
+                cache = value === true || value === "true";
+                break;
+              case "limit":
+                limit = Number(value) || 10;
+                break;
+              case "name":
+                name = String(value);
+                break;
+            }
+            i++; // Skip the value argument
+          }
+        }
+      }
+
+      // For fetch, always use "api" source
+      if (op === "fetch") {
+        source = "api";
+      }
+
+      const searchBlock: SearchBlock = {
+        kind: "search-block",
+        query,
+        source,
+        cache,
+        limit,
+        name,
+      };
+
+      return this.handleSearchBlock(searchBlock);
+    }
+
+    // Phase 9b: Learn/Recall expressions from eval (when used in S-expression form)
+    if (op === "learn" || op === "recall" || op === "remember" || op === "forget") {
+      // (learn key data :source "search" :confidence 0.95)
+      // (recall key)
+      // (remember key data) - alias for learn
+      // (forget key) - delete learned data
+
+      let key: string = "";
+      let data: any = null;
+      let source: "search" | "feedback" | "analysis" = "search";
+      let confidence: number | undefined;
+
+      // Parse arguments
+      for (let i = 0; i < expr.args.length; i++) {
+        const arg = expr.args[i];
+
+        // First positional argument is key
+        if (i === 0) {
+          const keyValue = this.eval(arg);
+          key = String(keyValue);
+          continue;
+        }
+
+        // Second positional argument is data (for learn/remember)
+        if (i === 1 && (op === "learn" || op === "remember")) {
+          data = this.eval(arg);
+          continue;
+        }
+
+        // Check for keyword arguments
+        if ((arg as any).kind === "keyword") {
+          const keywordName = (arg as Keyword).name;
+
+          if (i + 1 < expr.args.length) {
+            const value = this.eval(expr.args[i + 1]);
+
+            switch (keywordName) {
+              case "source":
+                if (value === "search" || value === "feedback" || value === "analysis") {
+                  source = value;
+                }
+                break;
+              case "confidence":
+                confidence = Number(value) || undefined;
+                break;
+            }
+            i++; // Skip the value argument
+          }
+        }
+      }
+
+      // Handle forget operation
+      if (op === "forget") {
+        if (!this.context.learned) {
+          this.context.learned = new Map();
+        }
+        const found = this.context.learned.has(key);
+        if (found) {
+          this.context.learned.delete(key);
+          this.logger.info(`🗑️ Forgot: "${key}"`);
+        }
+        return {
+          kind: "learn-result",
+          operation: "forget",
+          key,
+          deleted: found,
+        };
+      }
+
+      // Handle recall operation
+      if (op === "recall") {
+        data = null; // Mark as recall
+      }
+
+      const learnBlock: LearnBlock = {
+        kind: "learn-block",
+        key,
+        data,
+        source,
+        confidence,
+        timestamp: new Date().toISOString(),
+      };
+
+      return this.handleLearnBlock(learnBlock);
+    }
+
+    // Phase 9c: Reasoning expressions from eval (observe, analyze, decide, act, verify)
+    if (op === "observe" || op === "analyze" || op === "decide" || op === "act" || op === "verify") {
+      const stage = op as "observe" | "analyze" | "decide" | "act" | "verify";
+      const data = new Map<string, any>();
+
+      let observations: any[] | undefined;
+      let analysis: any[] | undefined;
+      let decisions: any[] | undefined;
+      let actions: any[] | undefined;
+      let verifications: any[] | undefined;
+      let confidence: number | undefined;
+
+      // Parse arguments based on stage
+      for (let i = 0; i < expr.args.length; i++) {
+        const arg = expr.args[i];
+
+        // Check for keyword arguments
+        if ((arg as any).kind === "keyword") {
+          const keywordName = (arg as Keyword).name;
+
+          if (i + 1 < expr.args.length) {
+            const value = this.eval(expr.args[i + 1]);
+
+            if (keywordName === "confidence") {
+              confidence = Number(value);
+            } else {
+              data.set(keywordName, value);
+            }
+            i++; // Skip the value argument
+          }
+        } else {
+          // First positional argument depends on stage
+          if (i === 0) {
+            const argValue = this.eval(arg);
+            switch (stage) {
+              case "observe":
+                observations = [argValue];
+                data.set("observation", argValue);
+                break;
+              case "analyze":
+                // For analyze, first arg might be angle data
+                data.set("firstArg", argValue);
+                break;
+              case "decide":
+                // For decide, first arg might be choice data
+                data.set("firstArg", argValue);
+                break;
+              case "act":
+                // For act, first arg might be action data
+                data.set("firstArg", argValue);
+                break;
+              case "verify":
+                // For verify, first arg might be result data
+                verifications = [argValue];
+                data.set("result", argValue);
+                break;
+            }
+          }
+        }
+      }
+
+      // Build reasoning block
+      const reasoningBlock: ReasoningBlock = {
+        kind: "reasoning-block",
+        stage,
+        data,
+        observations,
+        analysis,
+        decisions,
+        actions,
+        verifications,
+        metadata: {
+          confidence,
+          startTime: new Date().toISOString(),
+        },
+      };
+
+      return this.handleReasoningBlock(reasoningBlock);
     }
 
     // Phase 7: Await expressions - extract Promise value
@@ -2089,6 +2328,175 @@ export class Interpreter {
         message: (error as Error).message,
       };
     }
+  }
+
+  // Phase 9b: Handle Learn Block - Store learned information
+  private handleLearnBlock(learnBlock: LearnBlock): any {
+    const { key, data, source = "search", confidence, timestamp } = learnBlock;
+
+    // Initialize learned data storage if needed
+    if (!this.context.learned) {
+      this.context.learned = new Map();
+    }
+
+    // Check if this is a recall operation (data is null)
+    if (data === null) {
+      // Recall: retrieve stored data by key
+      if (this.context.learned.has(key)) {
+        const stored = this.context.learned.get(key);
+        this.logger.info(`🔍 Recalled: "${key}"`);
+        return {
+          kind: "learn-result",
+          operation: "recall",
+          key,
+          data: stored.data,
+          source: stored.source,
+          confidence: stored.confidence,
+          timestamp: stored.timestamp,
+          found: true,
+        };
+      } else {
+        this.logger.info(`❌ Not found in memory: "${key}"`);
+        return {
+          kind: "learn-result",
+          operation: "recall",
+          key,
+          data: null,
+          found: false,
+        };
+      }
+    }
+
+    // Learn: store new data with metadata
+    const learnedEntry = {
+      data,
+      source,
+      confidence: confidence ?? 0.8,  // Default confidence: 80%
+      timestamp: timestamp ?? new Date().toISOString(),
+    };
+
+    this.context.learned.set(key, learnedEntry);
+
+    this.logger.info(
+      `🧠 Learned: "${key}" from "${source}"${confidence ? ` (confidence: ${confidence})` : ""}`
+    );
+
+    return {
+      kind: "learn-result",
+      operation: "learn",
+      key,
+      data,
+      source,
+      confidence: confidence ?? 0.8,
+      timestamp: learnedEntry.timestamp,
+      stored: true,
+    };
+  }
+
+  // Phase 9c: Handle Reasoning Block - State-based AI reasoning
+  private handleReasoningBlock(reasoningBlock: ReasoningBlock): any {
+    const { stage, data, observations, analysis, decisions, actions, verifications, metadata, transitions } = reasoningBlock;
+
+    // Initialize reasoning state storage if needed
+    if (!this.context.reasoning) {
+      this.context.reasoning = new Map();
+    }
+
+    // Create reasoning state entry
+    const reasoningState = {
+      stage,
+      data: Object.fromEntries(data),
+      observations,
+      analysis,
+      decisions,
+      actions,
+      verifications,
+      metadata: {
+        ...metadata,
+        completedAt: new Date().toISOString(),
+      },
+      transitions: transitions || [],
+    };
+
+    // Store reasoning state by stage + timestamp
+    const stateKey = `${stage}-${new Date().getTime()}`;
+    this.context.reasoning.set(stateKey, reasoningState);
+
+    // Log the reasoning stage
+    const stageEmoji = {
+      observe: "👀",
+      analyze: "🔍",
+      decide: "🎯",
+      act: "⚡",
+      verify: "✅",
+    }[stage] || "❓";
+
+    let logMessage = `${stageEmoji} ${stage.toUpperCase()}`;
+
+    // Add stage-specific logging
+    switch (stage) {
+      case "observe":
+        if (observations && observations.length > 0) {
+          logMessage += `: ${observations.length} observations`;
+        }
+        break;
+
+      case "analyze":
+        const angles = data.get("angles");
+        if (angles instanceof Map) {
+          logMessage += `: ${angles.size} angles analyzed`;
+        }
+        const selected = data.get("selected");
+        if (selected) {
+          logMessage += `, selected: "${selected.value || selected}"`;
+        }
+        break;
+
+      case "decide":
+        const choice = data.get("choice");
+        if (choice) {
+          logMessage += `: "${choice.value || choice}"`;
+        }
+        const reason = data.get("reason");
+        if (reason) {
+          logMessage += ` (${reason.value || reason})`;
+        }
+        break;
+
+      case "act":
+        const action = data.get("action");
+        if (action) {
+          logMessage += `: "${action.value || action}"`;
+        }
+        break;
+
+      case "verify":
+        const result = data.get("result");
+        if (result) {
+          logMessage += `: ${result.value || result}`;
+        }
+        if (metadata?.confidence !== undefined) {
+          logMessage += ` (confidence: ${(metadata.confidence * 100).toFixed(0)}%)`;
+        }
+        break;
+    }
+
+    this.logger.info(logMessage);
+
+    // Return reasoning result
+    return {
+      kind: "reasoning-result",
+      stage,
+      data: Object.fromEntries(data),
+      observations,
+      analysis,
+      decisions,
+      actions,
+      verifications,
+      metadata: reasoningState.metadata,
+      stateKey,
+      completed: true,
+    };
   }
 
   // Phase 5 Week 2: Evaluate Type Class definition

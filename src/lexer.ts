@@ -4,6 +4,8 @@ import { Token, TokenType as T } from "./token";
 
 // Phase 6: Map keywords to token types
 // Phase 9a: Added search, fetch keywords
+// Phase 9b: Added learn, recall, remember, forget keywords
+// Phase 9c: Added observe, analyze, decide, act, verify keywords
 const KEYWORDS: Map<string, T> = new Map([
   ["MODULE", T.Module],
   ["TYPECLASS", T.TypeClass],
@@ -13,7 +15,18 @@ const KEYWORDS: Map<string, T> = new Map([
   // Phase 9a: Search functionality keywords
   ["search", T.Search],
   ["fetch", T.Fetch],
-  // Note: browse, browse, cache are treated as regular symbols, not keywords
+  // Phase 9b: Learning functionality keywords
+  ["learn", T.Learn],
+  ["recall", T.Recall],
+  ["remember", T.Remember],
+  ["forget", T.Forget],
+  // Phase 9c: Reasoning functionality keywords
+  ["observe", T.Observe],
+  ["analyze", T.Analyze],
+  ["decide", T.Decide],
+  ["act", T.Act],
+  ["verify", T.Verify],
+  // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 
 function getKeywordTokenType(text: string): T | null {

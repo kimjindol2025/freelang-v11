@@ -27,6 +27,19 @@ export enum TokenType {
   Browse = "Browse",       // browse
   Cache = "Cache",         // cache
 
+  // Phase 9b Keywords (Learning)
+  Learn = "Learn",         // learn
+  Recall = "Recall",       // recall
+  Remember = "Remember",   // remember
+  Forget = "Forget",       // forget
+
+  // Phase 9c Keywords (Reasoning)
+  Observe = "Observe",     // observe
+  Analyze = "Analyze",     // analyze
+  Decide = "Decide",       // decide
+  Act = "Act",             // act
+  Verify = "Verify",       // verify
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

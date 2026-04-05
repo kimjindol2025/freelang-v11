@@ -18,6 +18,9 @@ import {
   ImportBlock,
   OpenBlock,
   SearchBlock,
+  LearnBlock,
+  ReasoningBlock,
+  ReasoningTransition,
   AsyncFunction,
   AwaitExpression,
   TypeClass,
@@ -43,6 +46,8 @@ import {
   makeOpenBlock,
   makeAsyncFunction,
   makeAwaitExpression,
+  makeReasoningBlock,
+  makeReasoningTransition,
   makeTypeClass,
   makeTypeClassInstance,
 } from "./ast";
@@ -548,7 +553,9 @@ export class Parser {
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
   // Also handles match expressions: (match value (pattern body) ...)
   // Phase 6: Also handles import and open expressions
-  private parseSExpr(): SExpr | PatternMatch | ImportBlock | OpenBlock | SearchBlock {
+  // Phase 9a: Also handles search and fetch expressions
+  // Phase 9b: Also handles learn and recall expressions
+  private parseSExpr(): SExpr | PatternMatch | ImportBlock | OpenBlock | SearchBlock | LearnBlock | ReasoningBlock {
     this.expect(T.LParen);
 
     let op: string;
@@ -556,6 +563,7 @@ export class Parser {
 
     // Phase 6: Handle import/open keyword tokens
     // Phase 9a: Handle search keyword token
+    // Phase 9b: Handle learn/recall keyword tokens
     if (opToken.type === T.Import) {
       op = "import";
     } else if (opToken.type === T.Open) {
@@ -564,6 +572,24 @@ export class Parser {
       op = "search";
     } else if (opToken.type === T.Fetch) {
       op = "fetch";
+    } else if (opToken.type === T.Learn) {
+      op = "learn";
+    } else if (opToken.type === T.Recall) {
+      op = "recall";
+    } else if (opToken.type === T.Remember) {
+      op = "remember";
+    } else if (opToken.type === T.Forget) {
+      op = "forget";
+    } else if (opToken.type === T.Observe) {
+      op = "observe";
+    } else if (opToken.type === T.Analyze) {
+      op = "analyze";
+    } else if (opToken.type === T.Decide) {
+      op = "decide";
+    } else if (opToken.type === T.Act) {
+      op = "act";
+    } else if (opToken.type === T.Verify) {
+      op = "verify";
     } else if (opToken.type !== T.Symbol) {
       throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
     } else {
@@ -596,6 +622,51 @@ export class Parser {
       const searchBlock = this.parseFetchExpression();
       this.expect(T.RParen);
       return searchBlock;
+    }
+
+    // Special case: learn expressions (Phase 9b)
+    if (op === "learn") {
+      const learnBlock = this.parseLearnExpression();
+      this.expect(T.RParen);
+      return learnBlock;
+    }
+
+    // Special case: recall expressions (Phase 9b)
+    if (op === "recall") {
+      const learnBlock = this.parseRecallExpression();
+      this.expect(T.RParen);
+      return learnBlock;
+    }
+
+    // Special case: reasoning expressions (Phase 9c)
+    if (op === "observe" || opToken.type === T.Observe) {
+      const reasoningBlock = this.parseReasoningExpression("observe");
+      this.expect(T.RParen);
+      return reasoningBlock;
+    }
+
+    if (op === "analyze" || opToken.type === T.Analyze) {
+      const reasoningBlock = this.parseReasoningExpression("analyze");
+      this.expect(T.RParen);
+      return reasoningBlock;
+    }
+
+    if (op === "decide" || opToken.type === T.Decide) {
+      const reasoningBlock = this.parseReasoningExpression("decide");
+      this.expect(T.RParen);
+      return reasoningBlock;
+    }
+
+    if (op === "act" || opToken.type === T.Act) {
+      const reasoningBlock = this.parseReasoningExpression("act");
+      this.expect(T.RParen);
+      return reasoningBlock;
+    }
+
+    if (op === "verify" || opToken.type === T.Verify) {
+      const reasoningBlock = this.parseReasoningExpression("verify");
+      this.expect(T.RParen);
+      return reasoningBlock;
     }
 
     // Special case: match expressions
@@ -1088,6 +1159,251 @@ export class Parser {
       query,
       source: "api",
       cache,
+    };
+  }
+
+  // Phase 9b: Parse learn expression
+  // (learn key data :source "search" :confidence 0.95)
+  private parseLearnExpression(): LearnBlock {
+    // First argument: key (symbol or string)
+    let key = "";
+    const keyNode = this.parseValue();
+    if (keyNode.kind === "literal" && (keyNode.type === "string" || keyNode.type === "symbol")) {
+      key = keyNode.value as string;
+    } else if ((keyNode as any).kind === "variable") {
+      key = (keyNode as Variable).name;
+    } else {
+      throw this.error(`Expected symbol/string key in learn expression`, this.peek());
+    }
+
+    // Second argument: data (any value)
+    const data = this.parseValue();
+
+    // Parse optional keyword arguments
+    let source: "search" | "feedback" | "analysis" = "search";
+    let confidence: number | undefined;
+    let timestamp: string | undefined;
+
+    while (!this.check(T.RParen) && !this.isAtEnd()) {
+      if (this.check(T.Colon)) {
+        this.advance(); // consume ':'
+        if (!this.check(T.Symbol)) {
+          throw this.error(`Expected symbol after ':', got ${this.peek().type}`, this.peek());
+        }
+
+        const clauseName = this.advance().value;
+
+        switch (clauseName) {
+          case "source":
+            const sourceVal = this.parseValue();
+            if (sourceVal.kind === "literal" && sourceVal.type === "string") {
+              const srcStr = sourceVal.value as string;
+              if (srcStr === "search" || srcStr === "feedback" || srcStr === "analysis") {
+                source = srcStr;
+              }
+            }
+            break;
+
+          case "confidence":
+            const confVal = this.parseValue();
+            if (confVal.kind === "literal" && confVal.type === "number") {
+              confidence = confVal.value as number;
+            }
+            break;
+
+          case "timestamp":
+            const timeVal = this.parseValue();
+            if (timeVal.kind === "literal" && timeVal.type === "string") {
+              timestamp = timeVal.value as string;
+            }
+            break;
+
+          default:
+            throw this.error(`Unknown learn clause: ${clauseName}`, this.peek());
+        }
+      } else {
+        throw this.error(`Expected ':' in learn expression, got ${this.peek().type}`, this.peek());
+      }
+    }
+
+    return {
+      kind: "learn-block",
+      key,
+      data,
+      source,
+      confidence,
+      timestamp,
+    };
+  }
+
+  // Phase 9b: Parse recall expression
+  // (recall key) - retrieves learned data by key
+  private parseRecallExpression(): LearnBlock {
+    // First argument: key (symbol or string)
+    let key = "";
+    const keyNode = this.parseValue();
+    if (keyNode.kind === "literal" && (keyNode.type === "string" || keyNode.type === "symbol")) {
+      key = keyNode.value as string;
+    } else if ((keyNode as any).kind === "variable") {
+      key = (keyNode as Variable).name;
+    } else {
+      throw this.error(`Expected symbol/string key in recall expression`, this.peek());
+    }
+
+    // Return a recall block (kind="learn-block" with data=null to indicate retrieval)
+    return {
+      kind: "learn-block",
+      key,
+      data: null, // null indicates this is a recall operation
+      source: "search",
+    };
+  }
+
+  // Phase 9c: Parse reasoning expression
+  // (observe "facts" :confidence 0.9)
+  // (analyze :angle1 "perf" :angle2 "security" :selected "angle1")
+  // (decide :choice "angle2" :reason "best performance")
+  // (act :action "implement" :parameters {...})
+  // (verify :result success :evidence [...])
+  private parseReasoningExpression(stage: "observe" | "analyze" | "decide" | "act" | "verify"): ReasoningBlock {
+    const data = new Map<string, any>();
+    const metadata: { startTime?: string; endTime?: string; confidence?: number; feedback?: string } = {
+      startTime: new Date().toISOString(),
+    };
+
+    let observations: any[] | undefined;
+    let analysis: any[] | undefined;
+    let decisions: any[] | undefined;
+    let actions: any[] | undefined;
+    let verifications: any[] | undefined;
+
+    // Parse stage-specific data
+    switch (stage) {
+      case "observe": {
+        // Parse observation data and optional keyword arguments
+        // (observe "fact" :confidence 0.9)
+        if (!this.check(T.RParen) && !this.check(T.Colon)) {
+          const obs = this.parseValue();
+          observations = [obs];
+          data.set("observation", obs);
+        }
+
+        // Parse keyword arguments
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            if (clauseName === "confidence") {
+              if (clauseValue.kind === "literal" && clauseValue.type === "number") {
+                data.set(clauseName, clauseValue.value);
+              }
+            } else {
+              data.set(clauseName, clauseValue);
+            }
+          } else {
+            throw this.error(`Expected ':' in observe expression, got ${this.peek().type}`, this.peek());
+          }
+        }
+        break;
+      }
+
+      case "analyze": {
+        // Parse multiple angles: :angle1 "value1" :angle2 "value2" :selected "angle1"
+        const angles = new Map<string, any>();
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            if (clauseName === "selected") {
+              const selected = this.parseValue();
+              data.set("selected", selected);
+            } else {
+              // It's an angle
+              const angleValue = this.parseValue();
+              angles.set(clauseName, angleValue);
+            }
+          } else {
+            throw this.error(`Expected ':' in analyze expression, got ${this.peek().type}`, this.peek());
+          }
+        }
+        data.set("angles", angles);
+        analysis = Array.from(angles.values());
+        break;
+      }
+
+      case "decide": {
+        // Parse decision: :choice "angle2" :reason "best performance"
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            data.set(clauseName, clauseValue);
+          } else {
+            throw this.error(`Expected ':' in decide expression, got ${this.peek().type}`, this.peek());
+          }
+        }
+        decisions = [data.get("choice")];
+        break;
+      }
+
+      case "act": {
+        // Parse action: :action "implement" :parameters {...}
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            data.set(clauseName, clauseValue);
+          } else {
+            throw this.error(`Expected ':' in act expression, got ${this.peek().type}`, this.peek());
+          }
+        }
+        actions = [data.get("action")];
+        break;
+      }
+
+      case "verify": {
+        // Parse verification: :result success :evidence [...]
+        while (!this.check(T.RParen) && !this.isAtEnd()) {
+          if (this.check(T.Colon)) {
+            this.advance();
+            const clauseName = this.advance().value;
+
+            const clauseValue = this.parseValue();
+            if (clauseName === "confidence") {
+              if (clauseValue.kind === "literal" && clauseValue.type === "number") {
+                metadata.confidence = clauseValue.value as number;
+              }
+            } else {
+              data.set(clauseName, clauseValue);
+            }
+          } else {
+            throw this.error(`Expected ':' in verify expression, got ${this.peek().type}`, this.peek());
+          }
+        }
+        verifications = [data.get("result")];
+        break;
+      }
+    }
+
+    metadata.endTime = new Date().toISOString();
+
+    return {
+      kind: "reasoning-block",
+      stage,
+      data,
+      observations,
+      analysis,
+      decisions,
+      actions,
+      verifications,
+      metadata,
     };
   }
 

@@ -16,6 +16,8 @@ export type ASTNode =
   | ImportBlock
   | OpenBlock
   | SearchBlock
+  | LearnBlock
+  | ReasoningBlock
   | AsyncFunction
   | AwaitExpression;
 
@@ -219,6 +221,48 @@ export interface SearchBlock {
   name?: string;              // optional name for this search
 }
 
+// Learn Block (NEW for Phase 9b)
+// (learn key data :source "search" :confidence 0.95)
+// Represents learning and storing new information
+export interface LearnBlock {
+  kind: "learn-block";
+  key: string;                 // learning key (identifier)
+  data: any;                   // data to learn
+  source?: "search" | "feedback" | "analysis"; // source of knowledge
+  confidence?: number;         // confidence score (0-1)
+  timestamp?: string;          // when learned (ISO 8601)
+}
+
+// Reasoning Block (NEW for Phase 9c)
+// (observe "facts") → (analyze :angle1 "perf" :angle2 "security") → (decide :choice "angle2")
+// Represents AI reasoning with state transitions: observe → analyze → decide → act → verify
+export interface ReasoningBlock {
+  kind: "reasoning-block";
+  stage: "observe" | "analyze" | "decide" | "act" | "verify"; // current reasoning stage
+  data: Map<string, any>;      // stage-specific data
+  observations?: any[];        // facts gathered (observe stage)
+  analysis?: any[];            // analysis results (analyze stage)
+  decisions?: any[];           // decisions made (decide stage)
+  actions?: any[];             // actions taken (act stage)
+  verifications?: any[];       // verification results (verify stage)
+  transitions?: ReasoningTransition[]; // state transitions
+  metadata?: {                 // metadata for reasoning
+    startTime?: string;        // when reasoning started (ISO 8601)
+    endTime?: string;          // when reasoning ended (ISO 8601)
+    confidence?: number;       // overall confidence (0-1)
+    feedback?: string;         // feedback from verification
+  };
+}
+
+// Reasoning Transition (NEW for Phase 9c)
+// Describes transition from one reasoning stage to next
+export interface ReasoningTransition {
+  from: string;                // source stage
+  to: string;                  // target stage
+  condition?: ASTNode;         // guard condition for transition
+  action?: ASTNode;            // action to execute on transition
+}
+
 // Async Function (NEW for Phase 7)
 // [async name [params] body]
 // Returns Promise<T> where T is the return type of body
@@ -399,6 +443,42 @@ export function makeAwaitExpression(argument: ASTNode): AwaitExpression {
   return { kind: "await", argument };
 }
 
+// Helper: Create reasoning block (Phase 9c)
+export function makeReasoningBlock(
+  stage: "observe" | "analyze" | "decide" | "act" | "verify",
+  data: Map<string, any>,
+  observations?: any[],
+  analysis?: any[],
+  decisions?: any[],
+  actions?: any[],
+  verifications?: any[],
+  transitions?: ReasoningTransition[],
+  metadata?: { startTime?: string; endTime?: string; confidence?: number; feedback?: string }
+): ReasoningBlock {
+  return {
+    kind: "reasoning-block",
+    stage,
+    data,
+    observations,
+    analysis,
+    decisions,
+    actions,
+    verifications,
+    transitions,
+    metadata
+  };
+}
+
+// Helper: Create reasoning transition (Phase 9c)
+export function makeReasoningTransition(
+  from: string,
+  to: string,
+  condition?: ASTNode,
+  action?: ASTNode
+): ReasoningTransition {
+  return { from, to, condition, action };
+}
+
 // ============================================================
 // Phase 6: Type Guard Functions (타입 안전성 강화)
 // ============================================================
@@ -456,4 +536,14 @@ export function isOpenBlock(node: any): node is OpenBlock {
 // SearchBlock 타입 가드 (NEW for Phase 9a)
 export function isSearchBlock(node: any): node is SearchBlock {
   return node && node.kind === "search-block";
+}
+
+// LearnBlock 타입 가드 (NEW for Phase 9b)
+export function isLearnBlock(node: any): node is LearnBlock {
+  return node && node.kind === "learn-block";
+}
+
+// ReasoningBlock 타입 가드 (NEW for Phase 9c)
+export function isReasoningBlock(node: any): node is ReasoningBlock {
+  return node && node.kind === "reasoning-block";
 }
