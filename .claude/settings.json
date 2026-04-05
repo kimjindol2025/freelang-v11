@@ -1,1 +1,16 @@
-{}
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "시작",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.message // .tool_input // empty' | grep -oP '([a-zA-Z0-9_-]+)\\s+시작' | sed 's/\\s시작$//' | { read -r project; [ -n \"$project\" ] && curl -s \"http://localhost:40020/api/project/start?name=$project\" 2>/dev/null || true; }",
+            "statusMessage": "프로젝트 시작 중..."
+          }
+        ]
+      }
+    ]
+  }
+}

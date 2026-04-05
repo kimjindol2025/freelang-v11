@@ -13,8 +13,11 @@ export declare class Parser {
     private parseBlock;
     private parseValue;
     private parseArray;
+    private isArrayLiteralStart;
     private parseSExpr;
     private parseTypeAnnotation;
+    private parsePattern;
+    private parsePatternMatch;
     private peek;
     private peekNext;
     private advance;

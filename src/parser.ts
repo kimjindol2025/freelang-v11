@@ -271,6 +271,18 @@ export class Parser {
     return makeBlock("Array", "$array", arrayFields);
   }
 
+  // Check if next is an array literal (not generic function type args)
+  // Array literal: [$x ...] or [1 2 3] or [value ...]
+  // Generic syntax: [int string] (all symbols)
+  private isArrayLiteralStart(): boolean {
+    if (!this.check(T.LBracket)) return false;
+    const peekPos = this.pos + 1;
+    if (peekPos >= this.tokens.length) return false;
+    const nextToken = this.tokens[peekPos];
+    // If next token is a variable or non-symbol value, it's an array literal
+    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket;
+  }
+
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
   // Also handles match expressions: (match value (pattern body) ...)
   private parseSExpr(): SExpr | PatternMatch {
@@ -289,8 +301,9 @@ export class Parser {
       return matchExpr;
     }
 
-    // Phase 4: Handle generic function syntax: (identity[int] ...)
-    if (this.check(T.LBracket)) {
+    // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)
+    // But not array literals: (fn [$x] ...) - those are parsed as regular values
+    if (this.check(T.LBracket) && !this.isArrayLiteralStart()) {
       this.advance(); // consume [
       const typeArgs: string[] = [];
 

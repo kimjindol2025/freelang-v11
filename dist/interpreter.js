@@ -274,10 +274,81 @@ class Interpreter {
             }
             return result;
         }
+        // Pattern matching (Phase 4 Week 3-4)
+        if (node.kind === "pattern-match") {
+            return this.evalPatternMatch(node);
+        }
+        // Function value (Phase 4 Week 1: First-class functions)
+        if (node.kind === "function-value") {
+            return node; // Return the function value as-is
+        }
         return null;
     }
     evalSExpr(expr) {
         const op = expr.op;
+        // Phase 4 Week 1: First-class functions - handle before arg evaluation
+        if (op === "fn") {
+            // (fn [$x $y] (+ $x $y))
+            // expr.args[0] = params (array of variable names)
+            // expr.args[1] = body
+            if (expr.args.length < 2) {
+                throw new Error(`fn requires at least 2 arguments (params and body)`);
+            }
+            const paramsNode = expr.args[0];
+            const params = [];
+            // Extract parameter names from array block
+            if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+                const items = paramsNode.fields.get("items");
+                if (Array.isArray(items)) {
+                    for (const item of items) {
+                        if (item.kind === "variable") {
+                            params.push(item.name);
+                        }
+                    }
+                }
+            }
+            // Create function value with captured environment
+            return {
+                kind: "function-value",
+                params,
+                body: expr.args[1],
+                capturedEnv: new Map(this.context.variables),
+                name: undefined,
+            };
+        }
+        if (op === "func-ref") {
+            // (func-ref function-name) - get function as value
+            if (expr.args.length < 1) {
+                throw new Error(`func-ref requires function name`);
+            }
+            const funcName = expr.args[0].name || String(expr.args[0]);
+            const func = this.context.functions.get(funcName);
+            if (!func) {
+                throw new Error(`Function not found: ${funcName}`);
+            }
+            return {
+                kind: "function-value",
+                params: func.params,
+                body: func.body,
+                capturedEnv: new Map(this.context.variables),
+                name: funcName,
+            };
+        }
+        if (op === "call") {
+            // (call function-value arg1 arg2 ...)
+            if (expr.args.length < 1) {
+                throw new Error(`call requires function as first argument`);
+            }
+            const fn = this.eval(expr.args[0]);
+            const args = expr.args.slice(1).map((arg) => this.eval(arg));
+            if (fn.kind === "function-value") {
+                return this.callFunctionValue(fn, args);
+            }
+            else {
+                throw new Error(`call expects function-value, got ${typeof fn}`);
+            }
+        }
+        // Evaluate all arguments for normal operations
         const args = expr.args.map((arg) => this.eval(arg));
         // Built-in functions
         switch (op) {
@@ -691,12 +762,153 @@ class Interpreter {
         this.context.variables = savedVars;
         return result;
     }
+    callFunctionValue(fn, args) {
+        // Phase 4 Week 1: Call a function value (closure)
+        if (fn.kind !== "function-value") {
+            throw new Error(`Expected function-value, got ${fn.kind}`);
+        }
+        // Save current scope
+        const savedVars = new Map(this.context.variables);
+        // Restore captured environment from function definition
+        this.context.variables = new Map(fn.capturedEnv);
+        // Bind parameters
+        for (let i = 0; i < fn.params.length; i++) {
+            this.context.variables.set(fn.params[i], args[i]);
+        }
+        // Execute body
+        const result = this.eval(fn.body);
+        // Restore scope
+        this.context.variables = savedVars;
+        return result;
+    }
     getFieldValue(block, key, defaultValue = null) {
         const field = block.fields.get(key);
         if (field === undefined) {
             return defaultValue;
         }
         return this.eval(field);
+    }
+    // ===== Pattern Matching (Phase 4 Week 3-4) =====
+    evalPatternMatch(match) {
+        // Evaluate the value to match
+        const value = this.eval(match.value);
+        // Try each case in order
+        for (const caseItem of match.cases) {
+            // Save current variable scope
+            const savedVars = new Map(this.context.variables);
+            // Try to match pattern
+            const matchResult = this.matchPattern(caseItem.pattern, value);
+            if (matchResult.matched) {
+                // Bind matched variables
+                for (const [varName, varValue] of matchResult.bindings) {
+                    this.context.variables.set("$" + varName, varValue);
+                }
+                // Check guard condition if present
+                if (caseItem.guard) {
+                    const guardResult = this.eval(caseItem.guard);
+                    if (!guardResult) {
+                        // Guard failed, restore and try next case
+                        this.context.variables = savedVars;
+                        continue;
+                    }
+                }
+                // Execute body
+                const result = this.eval(caseItem.body);
+                // Restore variables and return result
+                this.context.variables = savedVars;
+                return result;
+            }
+            // Restore variables for next iteration
+            this.context.variables = savedVars;
+        }
+        // No case matched, try default case
+        if (match.defaultCase) {
+            return this.eval(match.defaultCase);
+        }
+        // No match found
+        throw new Error("Pattern match exhausted without matching case");
+    }
+    // Try to match a pattern against a value
+    // Returns {matched: boolean, bindings: Map<string, any>}
+    matchPattern(pattern, value) {
+        const bindings = new Map();
+        // Literal pattern: match exact value
+        if (pattern.kind === "literal-pattern") {
+            const litPattern = pattern;
+            if (litPattern.value === value) {
+                return { matched: true, bindings };
+            }
+            return { matched: false, bindings };
+        }
+        // Variable pattern: always matches, binds variable
+        if (pattern.kind === "variable-pattern") {
+            const varPattern = pattern;
+            bindings.set(varPattern.name, value);
+            return { matched: true, bindings };
+        }
+        // Wildcard pattern: always matches, no binding
+        if (pattern.kind === "wildcard-pattern") {
+            return { matched: true, bindings };
+        }
+        // List pattern: match array elements
+        if (pattern.kind === "list-pattern") {
+            const listPattern = pattern;
+            // Value must be an array
+            if (!Array.isArray(value)) {
+                return { matched: false, bindings };
+            }
+            // Match elements
+            const elements = listPattern.elements;
+            let matchedCount = 0;
+            for (let i = 0; i < elements.length; i++) {
+                if (i >= value.length) {
+                    // Not enough elements
+                    return { matched: false, bindings };
+                }
+                const elemResult = this.matchPattern(elements[i], value[i]);
+                if (!elemResult.matched) {
+                    return { matched: false, bindings };
+                }
+                // Merge bindings
+                for (const [name, val] of elemResult.bindings) {
+                    bindings.set(name, val);
+                }
+                matchedCount++;
+            }
+            // Handle rest element: [x & rest]
+            if (listPattern.restElement) {
+                const restValues = value.slice(matchedCount);
+                bindings.set(listPattern.restElement, restValues);
+            }
+            else if (matchedCount < value.length) {
+                // If no rest element, must match exact length
+                return { matched: false, bindings };
+            }
+            return { matched: true, bindings };
+        }
+        // Struct pattern: match object fields
+        if (pattern.kind === "struct-pattern") {
+            const structPattern = pattern;
+            // Value must be an object
+            if (typeof value !== "object" || value === null) {
+                return { matched: false, bindings };
+            }
+            // Match each field
+            for (const [fieldName, fieldPattern] of structPattern.fields) {
+                const fieldValue = value[fieldName];
+                const fieldResult = this.matchPattern(fieldPattern, fieldValue);
+                if (!fieldResult.matched) {
+                    return { matched: false, bindings };
+                }
+                // Merge bindings
+                for (const [name, val] of fieldResult.bindings) {
+                    bindings.set(name, val);
+                }
+            }
+            return { matched: true, bindings };
+        }
+        // Unknown pattern type
+        return { matched: false, bindings };
     }
     // Utility: Get context
     getContext() {

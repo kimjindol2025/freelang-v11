@@ -56,7 +56,10 @@ export declare class Interpreter {
     private evalLet;
     private evalCond;
     private callUserFunction;
+    private callFunctionValue;
     private getFieldValue;
+    private evalPatternMatch;
+    private matchPattern;
     getContext(): ExecutionContext;
     setVariable(name: string, value: any): void;
 }

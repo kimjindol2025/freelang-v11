@@ -345,11 +345,89 @@ export class Interpreter {
       return this.evalPatternMatch(node as PatternMatch);
     }
 
+    // Function value (Phase 4 Week 1: First-class functions)
+    if ((node as any).kind === "function-value") {
+      return node; // Return the function value as-is
+    }
+
     return null;
   }
 
   private evalSExpr(expr: SExpr): any {
     const op = expr.op;
+
+    // Phase 4 Week 1: First-class functions - handle before arg evaluation
+    if (op === "fn") {
+      // (fn [$x $y] (+ $x $y))
+      // expr.args[0] = params (array of variable names)
+      // expr.args[1] = body
+      if (expr.args.length < 2) {
+        throw new Error(`fn requires at least 2 arguments (params and body)`);
+      }
+
+      const paramsNode = expr.args[0];
+      const params: string[] = [];
+
+      // Extract parameter names from array block
+      if ((paramsNode as any).kind === "block" && (paramsNode as any).type === "Array") {
+        const items = (paramsNode as any).fields.get("items");
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if ((item as any).kind === "variable") {
+              params.push((item as Variable).name);
+            }
+          }
+        }
+      }
+
+      // Create function value with captured environment
+      return {
+        kind: "function-value",
+        params,
+        body: expr.args[1],
+        capturedEnv: new Map(this.context.variables),
+        name: undefined,
+      };
+    }
+
+    if (op === "func-ref") {
+      // (func-ref function-name) - get function as value
+      if (expr.args.length < 1) {
+        throw new Error(`func-ref requires function name`);
+      }
+
+      const funcName = (expr.args[0] as any).name || String(expr.args[0]);
+      const func = this.context.functions.get(funcName);
+      if (!func) {
+        throw new Error(`Function not found: ${funcName}`);
+      }
+
+      return {
+        kind: "function-value",
+        params: func.params,
+        body: func.body,
+        capturedEnv: new Map(this.context.variables),
+        name: funcName,
+      };
+    }
+
+    if (op === "call") {
+      // (call function-value arg1 arg2 ...)
+      if (expr.args.length < 1) {
+        throw new Error(`call requires function as first argument`);
+      }
+
+      const fn = this.eval(expr.args[0]);
+      const args = expr.args.slice(1).map((arg) => this.eval(arg));
+
+      if ((fn as any).kind === "function-value") {
+        return this.callFunctionValue(fn, args);
+      } else {
+        throw new Error(`call expects function-value, got ${typeof fn}`);
+      }
+    }
+
+    // Evaluate all arguments for normal operations
     const args = expr.args.map((arg) => this.eval(arg));
 
     // Built-in functions
@@ -775,6 +853,32 @@ export class Interpreter {
 
     // Execute body
     const result = this.eval(func.body);
+
+    // Restore scope
+    this.context.variables = savedVars;
+
+    return result;
+  }
+
+  private callFunctionValue(fn: any, args: any[]): any {
+    // Phase 4 Week 1: Call a function value (closure)
+    if ((fn as any).kind !== "function-value") {
+      throw new Error(`Expected function-value, got ${(fn as any).kind}`);
+    }
+
+    // Save current scope
+    const savedVars = new Map(this.context.variables);
+
+    // Restore captured environment from function definition
+    this.context.variables = new Map(fn.capturedEnv);
+
+    // Bind parameters
+    for (let i = 0; i < fn.params.length; i++) {
+      this.context.variables.set(fn.params[i], args[i]);
+    }
+
+    // Execute body
+    const result = this.eval(fn.body);
 
     // Restore scope
     this.context.variables = savedVars;

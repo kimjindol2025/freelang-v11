@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue;
 export interface Block {
     kind: "block";
     type: string;
@@ -37,6 +37,46 @@ export interface TypeVariable {
     kind: "type-variable";
     name: string;
 }
+export interface LiteralPattern {
+    kind: "literal-pattern";
+    type: "number" | "string" | "symbol" | "boolean";
+    value: string | number | boolean;
+}
+export interface VariablePattern {
+    kind: "variable-pattern";
+    name: string;
+}
+export interface WildcardPattern {
+    kind: "wildcard-pattern";
+}
+export interface ListPattern {
+    kind: "list-pattern";
+    elements: Pattern[];
+    restElement?: string;
+}
+export interface StructPattern {
+    kind: "struct-pattern";
+    fields: Map<string, Pattern>;
+}
+export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern;
+export interface PatternMatch {
+    kind: "pattern-match";
+    value: ASTNode;
+    cases: MatchCase[];
+    defaultCase?: ASTNode;
+}
+export interface MatchCase {
+    pattern: Pattern;
+    guard?: ASTNode;
+    body: ASTNode;
+}
+export interface FunctionValue {
+    kind: "function-value";
+    params: string[];
+    body: ASTNode;
+    capturedEnv: Map<string, any>;
+    name?: string;
+}
 export interface FuncSignature {
     name: string;
     params: Array<{
@@ -60,4 +100,12 @@ export declare function makeFuncSignature(name: string, params: Array<{
     type: TypeAnnotation;
 }>, returnType: TypeAnnotation): FuncSignature;
 export declare function makeTypeVariable(name: string): TypeVariable;
+export declare function makeFunctionValue(params: string[], body: ASTNode, capturedEnv: Map<string, any>, name?: string): FunctionValue;
+export declare function makeLiteralPattern(type: "number" | "string" | "symbol" | "boolean", value: string | number | boolean): LiteralPattern;
+export declare function makeVariablePattern(name: string): VariablePattern;
+export declare function makeWildcardPattern(): WildcardPattern;
+export declare function makeListPattern(elements: Pattern[], restElement?: string): ListPattern;
+export declare function makeStructPattern(fields: Map<string, Pattern>): StructPattern;
+export declare function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: ASTNode): MatchCase;
+export declare function makePatternMatch(value: ASTNode, cases: MatchCase[], defaultCase?: ASTNode): PatternMatch;
 //# sourceMappingURL=ast.d.ts.map

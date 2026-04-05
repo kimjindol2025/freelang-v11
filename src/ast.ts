@@ -8,7 +8,8 @@ export type ASTNode =
   | Keyword
   | TypeVariable
   | PatternMatch
-  | Pattern;
+  | Pattern
+  | FunctionValue;
 
 // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
 export interface Block {
@@ -113,6 +114,15 @@ export interface MatchCase {
   body: ASTNode;            // result expression
 }
 
+// Function value (NEW for Phase 4 Week 1 - First-class functions)
+export interface FunctionValue {
+  kind: "function-value";
+  params: string[];          // parameter names
+  body: ASTNode;            // function body
+  capturedEnv: Map<string, any>;  // closure environment
+  name?: string;            // optional function name
+}
+
 // Function signature (NEW for Phase 3)
 export interface FuncSignature {
   name: string;
@@ -169,6 +179,16 @@ export function makeFuncSignature(
 // Helper: Create type variable (Phase 4)
 export function makeTypeVariable(name: string): TypeVariable {
   return { kind: "type-variable", name };
+}
+
+// Helper: Create function value (Phase 4 Week 1)
+export function makeFunctionValue(
+  params: string[],
+  body: ASTNode,
+  capturedEnv: Map<string, any>,
+  name?: string
+): FunctionValue {
+  return { kind: "function-value", params, body, capturedEnv, name };
 }
 
 // Helpers: Create patterns (Phase 4 Week 3-4)

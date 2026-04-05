@@ -148,9 +148,9 @@ class Parser {
         }
         return block;
     }
-    // Parse any value: literal, variable, block, S-expr, or array
+    // Parse any value: literal, variable, block, S-expr, pattern-match, or array
     parseValue() {
-        // Check for S-expression: (op arg1 arg2 ...)
+        // Check for S-expression or match expression: (op arg1 arg2 ...) or (match ...)
         if (this.check(token_1.TokenType.LParen)) {
             return this.parseSExpr();
         }
@@ -220,7 +220,21 @@ class Parser {
         arrayFields.set("items", values);
         return (0, ast_1.makeBlock)("Array", "$array", arrayFields);
     }
+    // Check if next is an array literal (not generic function type args)
+    // Array literal: [$x ...] or [1 2 3] or [value ...]
+    // Generic syntax: [int string] (all symbols)
+    isArrayLiteralStart() {
+        if (!this.check(token_1.TokenType.LBracket))
+            return false;
+        const peekPos = this.pos + 1;
+        if (peekPos >= this.tokens.length)
+            return false;
+        const nextToken = this.tokens[peekPos];
+        // If next token is a variable or non-symbol value, it's an array literal
+        return nextToken.type === token_1.TokenType.Variable || nextToken.type === token_1.TokenType.Number || nextToken.type === token_1.TokenType.String || nextToken.type === token_1.TokenType.RBracket;
+    }
     // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
+    // Also handles match expressions: (match value (pattern body) ...)
     parseSExpr() {
         this.expect(token_1.TokenType.LParen);
         const opToken = this.advance();
@@ -228,8 +242,15 @@ class Parser {
             throw this.error(`Expected operator (symbol) in S-expression, got ${opToken.type}`, opToken);
         }
         let op = opToken.value;
-        // Phase 4: Handle generic function syntax: (identity[int] ...)
-        if (this.check(token_1.TokenType.LBracket)) {
+        // Special case: match expressions
+        if (op === "match") {
+            const matchExpr = this.parsePatternMatch();
+            this.expect(token_1.TokenType.RParen);
+            return matchExpr;
+        }
+        // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)
+        // But not array literals: (fn [$x] ...) - those are parsed as regular values
+        if (this.check(token_1.TokenType.LBracket) && !this.isArrayLiteralStart()) {
             this.advance(); // consume [
             const typeArgs = [];
             while (!this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
@@ -280,6 +301,98 @@ class Parser {
             }
         }
         return (0, ast_1.makeTypeAnnotation)(typeName, generic, undefined, optional);
+    }
+    // ===== Pattern Matching (Phase 4 Week 3-4) =====
+    // Parse pattern: literal, variable, wildcard, list, or struct
+    parsePattern() {
+        // Wildcard pattern: _
+        if (this.check(token_1.TokenType.Symbol) && this.peek().value === "_") {
+            this.advance();
+            return (0, ast_1.makeWildcardPattern)();
+        }
+        // Variable pattern: x, y, name
+        if (this.check(token_1.TokenType.Symbol)) {
+            const nameToken = this.advance();
+            return (0, ast_1.makeVariablePattern)(nameToken.value);
+        }
+        // Literal pattern: number, string, boolean
+        if (this.check(token_1.TokenType.Number)) {
+            const token = this.advance();
+            return (0, ast_1.makeLiteralPattern)("number", parseFloat(token.value));
+        }
+        if (this.check(token_1.TokenType.String)) {
+            const token = this.advance();
+            return (0, ast_1.makeLiteralPattern)("string", token.value);
+        }
+        // List pattern: [x y z] or [x & rest]
+        if (this.check(token_1.TokenType.LBracket)) {
+            this.advance(); // consume [
+            const elements = [];
+            let restElement;
+            while (!this.check(token_1.TokenType.RBracket) && !this.isAtEnd()) {
+                // Check for rest element: & name
+                if (this.check(token_1.TokenType.Symbol) && this.peek().value === "&") {
+                    this.advance(); // consume &
+                    if (this.check(token_1.TokenType.Symbol)) {
+                        const nameToken = this.advance();
+                        restElement = nameToken.value;
+                    }
+                    break; // rest element must be last
+                }
+                elements.push(this.parsePattern());
+            }
+            this.expect(token_1.TokenType.RBracket);
+            return (0, ast_1.makeListPattern)(elements, restElement);
+        }
+        // Struct pattern: {:name :age} (not fully implemented yet)
+        if (this.check(token_1.TokenType.Keyword)) {
+            const fields = new Map();
+            while (this.check(token_1.TokenType.Keyword) && !this.isAtEnd()) {
+                const keyToken = this.advance();
+                const fieldName = keyToken.value; // e.g., ":name"
+                const pattern = this.parsePattern();
+                fields.set(fieldName, pattern);
+            }
+            return (0, ast_1.makeStructPattern)(fields);
+        }
+        throw this.error(`Expected pattern, got ${this.peek().type}`, this.peek());
+    }
+    // Parse match expression: (match value (pattern body) (pattern body) ... [default])
+    // Note: Opening paren '(' already consumed by parseSExpr
+    parsePatternMatch() {
+        // 'match' keyword already consumed by parseSExpr
+        // Just parse the value to match and cases
+        // Parse value to match
+        const value = this.parseValue();
+        // Parse cases: (pattern body) (pattern body) ...
+        const cases = [];
+        let defaultCase;
+        while (this.check(token_1.TokenType.LParen) && !this.isAtEnd()) {
+            this.advance(); // consume (
+            // Check for default case: (default body)
+            if (this.check(token_1.TokenType.Symbol) && this.peek().value === "default") {
+                this.advance(); // consume 'default'
+                defaultCase = this.parseValue();
+                this.expect(token_1.TokenType.RParen);
+                break; // default must be last
+            }
+            // Parse pattern
+            const pattern = this.parsePattern();
+            // Check for optional guard: (if condition)
+            let guard;
+            if (this.check(token_1.TokenType.LParen) && this.peekNext()?.value === "if") {
+                this.advance(); // consume (
+                this.advance(); // consume 'if'
+                guard = this.parseValue();
+                this.expect(token_1.TokenType.RParen);
+            }
+            // Parse body
+            const body = this.parseValue();
+            cases.push((0, ast_1.makeMatchCase)(pattern, body, guard));
+            this.expect(token_1.TokenType.RParen);
+        }
+        // Note: Closing paren will be consumed by parseSExpr
+        return (0, ast_1.makePatternMatch)(value, cases, defaultCase);
     }
     // ===== Utility Methods =====
     peek() {
