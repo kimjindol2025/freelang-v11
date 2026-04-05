@@ -182,6 +182,16 @@ class Parser {
             const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
             return this.convertBlockToModuleBlock(block);
         }
+        // Phase 5: If this is a TYPECLASS block, convert it to TypeClass
+        if (blockType === "TYPECLASS") {
+            const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+            return this.convertBlockToTypeClass(block);
+        }
+        // Phase 5: If this is an INSTANCE block, convert it to TypeClassInstance
+        if (blockType === "INSTANCE") {
+            const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+            return this.convertBlockToInstance(block);
+        }
         const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
         // Phase 3: Always set typeAnnotations (even if empty) for consistent handling
         // FUNC blocks without :return/:params annotations still need to be registered with default types
@@ -242,6 +252,99 @@ class Parser {
             exports,
             body: bodyNodes,
             path: undefined,
+        };
+    }
+    // Phase 5: Convert Block to TypeClass
+    convertBlockToTypeClass(block) {
+        const methods = new Map();
+        let typeParams = [];
+        // Extract :typeParams field (optional, e.g., [M] or [F])
+        const typeParamsField = block.fields?.get("typeParams");
+        if (typeParamsField) {
+            if (typeParamsField.kind === "block" && typeParamsField.type === "Array") {
+                // :typeParams [M F ...]  (Array block)
+                const items = typeParamsField.fields?.get("items");
+                if (Array.isArray(items)) {
+                    items.forEach((item) => {
+                        if (item.kind === "literal" && item.type === "symbol") {
+                            typeParams.push(item.value);
+                        }
+                    });
+                }
+            }
+            else if (typeParamsField.kind === "literal" && typeParamsField.type === "symbol") {
+                // Single type parameter as literal
+                typeParams.push(typeParamsField.value);
+            }
+            else if (Array.isArray(typeParamsField)) {
+                // JavaScript array (shouldn't happen, but keep for safety)
+                typeParamsField.forEach((param) => {
+                    if (param.kind === "literal" && param.type === "symbol") {
+                        typeParams.push(param.value);
+                    }
+                });
+            }
+        }
+        // Extract :methods field (should be a map of method names to function types)
+        const methodsField = block.fields?.get("methods");
+        if (methodsField) {
+            if (methodsField.kind === "block" && methodsField.type === "Array") {
+                // :methods [[:pure (fn [a] (M a))] [:bind (fn [m f] (M b))]]
+                const items = methodsField.fields?.get("items");
+                if (Array.isArray(items)) {
+                    items.forEach((item) => {
+                        // Each item should be a 2-element array: [methodName, methodType]
+                        if (item.kind === "block" && item.type === "Array") {
+                            const subItems = item.fields?.get("items");
+                            if (Array.isArray(subItems) && subItems.length === 2) {
+                                const nameNode = subItems[0];
+                                const typeNode = subItems[1];
+                                if (nameNode.kind === "literal" && nameNode.type === "symbol") {
+                                    const methodName = nameNode.value;
+                                    methods.set(methodName, {
+                                        name: methodName,
+                                        type: typeNode,
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        return {
+            kind: "type-class",
+            name: block.name,
+            typeParams,
+            methods,
+        };
+    }
+    // Phase 5: Convert Block to TypeClassInstance
+    convertBlockToInstance(block) {
+        let className = "";
+        const concreteType = block.name; // Block name is the concrete type (Result, Option, List, etc.)
+        const implementations = new Map();
+        // Extract :typeclass field - the class name (Monad, Functor, etc.)
+        const typeClassField = block.fields?.get("typeclass");
+        if (typeClassField) {
+            if (typeClassField.kind === "literal" && typeClassField.type === "symbol") {
+                className = typeClassField.value;
+            }
+        }
+        // Extract method implementations from fields
+        // Each method name like :pure, :bind, :map, :fmap should have a function value
+        block.fields?.forEach((value, key) => {
+            // Skip special fields
+            if (key !== "typeclass") {
+                // This is a method implementation
+                implementations.set(key, value);
+            }
+        });
+        return {
+            kind: "type-class-instance",
+            className,
+            concreteType,
+            implementations,
         };
     }
     // Parse any value: literal, variable, block, S-expr, pattern-match, or array

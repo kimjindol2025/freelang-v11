@@ -12,6 +12,8 @@ export declare class Parser {
     parse(): ASTNode[];
     private parseBlock;
     private convertBlockToModuleBlock;
+    private convertBlockToTypeClass;
+    private convertBlockToInstance;
     private parseValue;
     private parseArray;
     private isArrayLiteralStart;
