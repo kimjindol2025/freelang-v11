@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 
 // ExecutionContext: 런타임 상태 관리
@@ -1170,6 +1170,21 @@ export class Interpreter {
       }
 
       return { matched: true, bindings };
+    }
+
+    // Or pattern: try alternatives until one matches
+    if ((pattern as any).kind === "or-pattern") {
+      const orPattern = pattern as OrPattern;
+
+      for (const alternative of orPattern.alternatives) {
+        const altResult = this.matchPattern(alternative, value);
+        if (altResult.matched) {
+          return altResult; // Return first matching alternative
+        }
+      }
+
+      // None of the alternatives matched
+      return { matched: false, bindings };
     }
 
     // Unknown pattern type

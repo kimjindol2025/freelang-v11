@@ -151,11 +151,11 @@ function lex(source) {
             tokens.push({ type: token_1.TokenType.Number, value, line, col: startCol });
             continue;
         }
-        // Symbol: letters, hyphens, etc. (includes & for pattern rest element)
-        if (/[a-zA-Z_<>=!+\-*&/]/.test(ch)) {
+        // Symbol: letters, hyphens, etc. (includes & for pattern rest element, | for or-patterns)
+        if (/[a-zA-Z_<>=!+\-*&/|]/.test(ch)) {
             const start = i;
             const startCol = col;
-            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&]/.test(source[i])) {
+            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&|]/.test(source[i])) {
                 i++;
                 col++;
             }

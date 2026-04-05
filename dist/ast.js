@@ -15,6 +15,7 @@ exports.makeVariablePattern = makeVariablePattern;
 exports.makeWildcardPattern = makeWildcardPattern;
 exports.makeListPattern = makeListPattern;
 exports.makeStructPattern = makeStructPattern;
+exports.makeOrPattern = makeOrPattern;
 exports.makeMatchCase = makeMatchCase;
 exports.makePatternMatch = makePatternMatch;
 // Helpers
@@ -64,6 +65,9 @@ function makeListPattern(elements, restElement) {
 }
 function makeStructPattern(fields) {
     return { kind: "struct-pattern", fields };
+}
+function makeOrPattern(alternatives) {
+    return { kind: "or-pattern", alternatives };
 }
 function makeMatchCase(pattern, body, guard) {
     return { pattern, guard, body };

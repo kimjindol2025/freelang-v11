@@ -96,8 +96,14 @@ export interface StructPattern {
   fields: Map<string, Pattern>;  // field name -> pattern
 }
 
+// Or pattern: alternative patterns (1 | 2 | 3)
+export interface OrPattern {
+  kind: "or-pattern";
+  alternatives: Pattern[];  // list of alternative patterns to try
+}
+
 // Union of all pattern types
-export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern;
+export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern | OrPattern;
 
 // Pattern match expression: (match value case1 case2 ...)
 export interface PatternMatch {
@@ -214,6 +220,10 @@ export function makeListPattern(elements: Pattern[], restElement?: string): List
 
 export function makeStructPattern(fields: Map<string, Pattern>): StructPattern {
   return { kind: "struct-pattern", fields };
+}
+
+export function makeOrPattern(alternatives: Pattern[]): OrPattern {
+  return { kind: "or-pattern", alternatives };
 }
 
 export function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: ASTNode): MatchCase {

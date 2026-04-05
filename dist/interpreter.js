@@ -1027,6 +1027,18 @@ class Interpreter {
             }
             return { matched: true, bindings };
         }
+        // Or pattern: try alternatives until one matches
+        if (pattern.kind === "or-pattern") {
+            const orPattern = pattern;
+            for (const alternative of orPattern.alternatives) {
+                const altResult = this.matchPattern(alternative, value);
+                if (altResult.matched) {
+                    return altResult; // Return first matching alternative
+                }
+            }
+            // None of the alternatives matched
+            return { matched: false, bindings };
+        }
         // Unknown pattern type
         return { matched: false, bindings };
     }

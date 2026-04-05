@@ -308,15 +308,29 @@ class Parser {
         return (0, ast_1.makeTypeAnnotation)(typeName, generic, undefined, optional);
     }
     // ===== Pattern Matching (Phase 4 Week 3-4) =====
-    // Parse pattern: literal, variable, wildcard, list, or struct
+    // Parse pattern: literal, variable, wildcard, list, struct, or or-pattern
     parsePattern() {
+        const firstPattern = this.parseAtomicPattern();
+        // Check for or-pattern: pat1 | pat2 | pat3
+        if (this.check(token_1.TokenType.Symbol) && this.peek().value === "|") {
+            const alternatives = [firstPattern];
+            while (this.check(token_1.TokenType.Symbol) && this.peek().value === "|") {
+                this.advance(); // consume |
+                alternatives.push(this.parseAtomicPattern());
+            }
+            return (0, ast_1.makeOrPattern)(alternatives);
+        }
+        return firstPattern;
+    }
+    // Parse atomic pattern (without or-alternatives)
+    parseAtomicPattern() {
         // Wildcard pattern: _
         if (this.check(token_1.TokenType.Symbol) && this.peek().value === "_") {
             this.advance();
             return (0, ast_1.makeWildcardPattern)();
         }
-        // Variable pattern: x, y, name
-        if (this.check(token_1.TokenType.Symbol)) {
+        // Variable pattern: x, y, name (but not |, &, etc)
+        if (this.check(token_1.TokenType.Symbol) && !["&", "|"].includes(this.peek().value)) {
             const nameToken = this.advance();
             return (0, ast_1.makeVariablePattern)(nameToken.value);
         }

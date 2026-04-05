@@ -26,6 +26,7 @@ import {
   makeWildcardPattern,
   makeListPattern,
   makeStructPattern,
+  makeOrPattern,
   makeMatchCase,
   makePatternMatch,
 } from "./ast";
@@ -372,16 +373,35 @@ export class Parser {
 
   // ===== Pattern Matching (Phase 4 Week 3-4) =====
 
-  // Parse pattern: literal, variable, wildcard, list, or struct
+  // Parse pattern: literal, variable, wildcard, list, struct, or or-pattern
   private parsePattern(): Pattern {
+    const firstPattern = this.parseAtomicPattern();
+
+    // Check for or-pattern: pat1 | pat2 | pat3
+    if (this.check(T.Symbol) && this.peek().value === "|") {
+      const alternatives: Pattern[] = [firstPattern];
+
+      while (this.check(T.Symbol) && this.peek().value === "|") {
+        this.advance(); // consume |
+        alternatives.push(this.parseAtomicPattern());
+      }
+
+      return makeOrPattern(alternatives);
+    }
+
+    return firstPattern;
+  }
+
+  // Parse atomic pattern (without or-alternatives)
+  private parseAtomicPattern(): Pattern {
     // Wildcard pattern: _
     if (this.check(T.Symbol) && this.peek().value === "_") {
       this.advance();
       return makeWildcardPattern();
     }
 
-    // Variable pattern: x, y, name
-    if (this.check(T.Symbol)) {
+    // Variable pattern: x, y, name (but not |, &, etc)
+    if (this.check(T.Symbol) && !["&", "|"].includes(this.peek().value)) {
       const nameToken = this.advance();
       return makeVariablePattern(nameToken.value);
     }

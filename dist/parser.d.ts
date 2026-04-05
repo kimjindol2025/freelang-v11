@@ -17,6 +17,7 @@ export declare class Parser {
     private parseSExpr;
     private parseTypeAnnotation;
     private parsePattern;
+    private parseAtomicPattern;
     private parsePatternMatch;
     private peek;
     private peekNext;

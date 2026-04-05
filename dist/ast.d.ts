@@ -58,7 +58,11 @@ export interface StructPattern {
     kind: "struct-pattern";
     fields: Map<string, Pattern>;
 }
-export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern;
+export interface OrPattern {
+    kind: "or-pattern";
+    alternatives: Pattern[];
+}
+export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern | OrPattern;
 export interface PatternMatch {
     kind: "pattern-match";
     value: ASTNode;
@@ -106,6 +110,7 @@ export declare function makeVariablePattern(name: string): VariablePattern;
 export declare function makeWildcardPattern(): WildcardPattern;
 export declare function makeListPattern(elements: Pattern[], restElement?: string): ListPattern;
 export declare function makeStructPattern(fields: Map<string, Pattern>): StructPattern;
+export declare function makeOrPattern(alternatives: Pattern[]): OrPattern;
 export declare function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: ASTNode): MatchCase;
 export declare function makePatternMatch(value: ASTNode, cases: MatchCase[], defaultCase?: ASTNode): PatternMatch;
 //# sourceMappingURL=ast.d.ts.map
