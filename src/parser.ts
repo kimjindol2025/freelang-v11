@@ -69,9 +69,30 @@ export class Parser {
     while (!this.isAtEnd()) {
       if (this.check(T.EOF)) break;
 
-      // Phase 6: Handle both blocks and S-expressions at top level
+      // Phase 6: Handle blocks, arrays, and S-expressions at top level
       if (this.check(T.LBracket)) {
-        nodes.push(this.parseBlock());
+        // Distinguish between block [TYPE ...] and array [val1 val2 ...]
+        const nextIdx = this.pos + 1;
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+
+        if (nextIdx < this.tokens.length) {
+          const nextToken = this.tokens[nextIdx];
+          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance;
+          const isKnownBlockType = nextToken.type === T.Symbol && knownBlockTypes.includes(nextToken.value.toUpperCase());
+          const hasKeywordAfter = nextIdx + 1 < this.tokens.length &&
+            (this.tokens[nextIdx + 1].type === T.Keyword || this.tokens[nextIdx + 1].type === T.Colon);
+
+          if (isBlockKeyword || isKnownBlockType || hasKeywordAfter) {
+            // It's a block
+            nodes.push(this.parseBlock());
+          } else {
+            // It's an array
+            nodes.push(this.parseArray());
+          }
+        } else {
+          // Empty or end of tokens, treat as block (will error)
+          nodes.push(this.parseBlock());
+        }
       } else if (this.check(T.LParen)) {
         nodes.push(this.parseSExpr());
       } else {

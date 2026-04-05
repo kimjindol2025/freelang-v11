@@ -1,0 +1,301 @@
+; FreeLang v9 Phase 8-2: Parser Implementation in FreeLang
+; Token[] → AST (parse tree)
+; Target: Port TypeScript Parser (~1500 lines) to FreeLang (~400-600 lines)
+
+; ============================================================
+; Parser State Management
+; ============================================================
+
+; Make a parser state object
+[FUNC make-parser :params [$tokens]
+  :body {
+    :tokens $tokens
+    :pos 0
+    :len (length $tokens)
+  }
+]
+
+; Check if at end
+[FUNC is-at-end? :params [$parser]
+  :body (>= (get $parser :pos) (get $parser :len))
+]
+
+; Peek current token
+[FUNC peek :params [$parser]
+  :body (
+    (if (is-at-end? $parser)
+      {:type "EOF" :value ""}
+      (get (get $parser :tokens) (get $parser :pos))
+    )
+  )
+]
+
+; Advance to next token
+[FUNC advance :params [$parser]
+  :body (
+    (let [[token (peek $parser)]]
+      (set! $parser :pos (+ (get $parser :pos) 1))
+      $token
+    )
+  )
+]
+
+; Check token type
+[FUNC check? :params [$parser $type]
+  :body (= (get (peek $parser) :type) $type)
+]
+
+; Expect specific token type
+[FUNC expect :params [$parser $type]
+  :body (
+    (if (check? $parser $type)
+      (advance $parser)
+      (error (concat "Expected " $type " but got " (get (peek $parser) :type)))
+    )
+  )
+]
+
+; ============================================================
+; STEP 1: Basic Parser State - Literals & Variables
+; ============================================================
+
+; Parse literal value (number, string)
+[FUNC parse-literal :params [$parser]
+  :body (
+    (let [[token (peek $parser)]]
+      (cond
+        [(= (get $token :type) "NUMBER")
+          (do
+            (advance $parser)
+            {:kind "literal" :type "number" :value (str-to-num (get $token :value))}
+          )
+        ]
+        [(= (get $token :type) "STRING")
+          (do
+            (advance $parser)
+            {:kind "literal" :type "string" :value (get $token :value)}
+          )
+        ]
+        [(= (get $token :type) "SYMBOL")
+          (do
+            (advance $parser)
+            {:kind "literal" :type "symbol" :value (get $token :value)}
+          )
+        ]
+        [else (error (concat "Unexpected token: " (get $token :type)))]
+      )
+    )
+  )
+]
+
+; Parse variable: $name
+[FUNC parse-variable :params [$parser]
+  :body (
+    (if (check? $parser "VARIABLE")
+      (let [[token (advance $parser)]]
+        {:kind "variable" :name (get $token :value)}
+      )
+      (error "Expected variable")
+    )
+  )
+]
+
+; ============================================================
+; STEP 2: S-Expression Parsing
+; ============================================================
+
+; Parse arguments until closing paren
+[FUNC parse-sexpr-args :params [$parser $args]
+  :body (
+    (if (or (check? $parser "RPAREN") (is-at-end? $parser))
+      $args
+      (let [[arg (parse-value $parser)]]
+        (parse-sexpr-args $parser (append $args [$arg]))
+      )
+    )
+  )
+]
+
+; Parse S-expression: (operator arg1 arg2 ...)
+[FUNC parse-sexpr :params [$parser]
+  :body (
+    (do
+      (expect $parser "LPAREN")
+      (let [[op-token (peek $parser)]]
+        (if (= (get $op-token :type) "SYMBOL")
+          (let [[op (get (advance $parser) :value)]]
+            (let [[args (parse-sexpr-args $parser [])]]
+              (expect $parser "RPAREN")
+              {:kind "sexpr" :operator $op :operands $args}
+            )
+          )
+          (error "Expected operator in S-expression")
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; STEP 3: Block Parsing (Arrays & Blocks)
+; ============================================================
+
+; Parse array: [val1 val2 ...]
+[FUNC parse-array :params [$parser]
+  :body (
+    (do
+      (expect $parser "LBRACKET")
+      (let [[items []]]
+        (define collect-items []
+          (if (check? $parser "RBRACKET")
+            items
+            (do
+              (set! $items (append $items [(parse-value $parser)]))
+              (collect-items)
+            )
+          )
+        )
+        (collect-items)
+        (expect $parser "RBRACKET")
+        {:kind "block" :type "Array" :fields {:items $items}}
+      )
+    )
+  )
+]
+
+; ============================================================
+; STEP 4: Generic Value Parsing
+; ============================================================
+
+; Parse any value: literal, variable, array, or S-expr
+[FUNC parse-value :params [$parser]
+  :body (
+    (let [[token (peek $parser)]]
+      (match (get $token :type)
+        ("LPAREN" (parse-sexpr $parser))
+        ("LBRACKET" (parse-array $parser))
+        ("NUMBER" (parse-literal $parser))
+        ("STRING" (parse-literal $parser))
+        ("SYMBOL" (parse-literal $parser))
+        ("VARIABLE" (parse-variable $parser))
+        ("COLON"
+          (do
+            (advance $parser)
+            (let [[kw-val (advance $parser)]]
+              {:kind "keyword" :value (get $kw-val :value)}
+            )
+          )
+        )
+        _
+          (error (concat "Unexpected token in value: " (get $token :type)))
+      )
+    )
+  )
+]
+
+; ============================================================
+; STEP 5: Top-Level Block Parsing
+; ============================================================
+
+; Parse block fields: :key val :key val ...
+[FUNC parse-block-fields :params [$parser $fields]
+  :body (
+    (if (or (check? $parser "RBRACKET") (is-at-end? $parser))
+      $fields
+      (if (check? $parser "COLON")
+        (do
+          (advance $parser)
+          (let [[key-token (advance $parser)]]
+            (if (= (get $key-token :type) "SYMBOL")
+              (let [[key (get $key-token :value)]]
+                (let [[value (parse-value $parser)]]
+                  (set! $fields (append $fields [{:key $key :value $value}]))
+                  (parse-block-fields $parser $fields)
+                )
+              )
+              (error "Expected symbol after :")
+            )
+          )
+        )
+        (error "Expected : in block field")
+      )
+    )
+  )
+]
+
+; Parse block: [TYPE name :key val ...]
+[FUNC parse-block :params [$parser]
+  :body (
+    (do
+      (expect $parser "LBRACKET")
+      (let [[type-token (advance $parser)]]
+        (if (= (get $type-token :type) "SYMBOL")
+          (let [[block-type (get $type-token :value)]]
+            (let [[name-token (advance $parser)]]
+              (if (= (get $name-token :type) "SYMBOL")
+                (let [[block-name (get $name-token :value)]]
+                  (let [[fields (parse-block-fields $parser [])]]
+                    (expect $parser "RBRACKET")
+                    {:kind "block" :type $block-type :name $block-name :fields $fields}
+                  )
+                )
+                (error "Expected block name")
+              )
+            )
+          )
+          (error "Expected block type")
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; MAIN PARSER FUNCTION
+; ============================================================
+
+; Parse entire token stream
+[FUNC parse :params [$tokens]
+  :body (
+    (let [[parser (make-parser $tokens)]]
+      (let [[nodes []]]
+        (define parse-top-level []
+          (if (or (is-at-end? $parser) (check? $parser "EOF"))
+            $nodes
+            (do
+              (if (check? $parser "LBRACKET")
+                (set! $nodes (append $nodes [(parse-block $parser)]))
+                (if (check? $parser "LPAREN")
+                  (set! $nodes (append $nodes [(parse-sexpr $parser)]))
+                  (error (concat "Expected block or S-expr, got " (get (peek $parser) :type)))
+                )
+              )
+              (parse-top-level)
+            )
+          )
+        )
+        (parse-top-level)
+      )
+    )
+  )
+]
+
+; ============================================================
+; HELPER FUNCTIONS
+; ============================================================
+
+; Convert string to number
+[FUNC str-to-num :params [$s]
+  :body (
+    (define convert-num [num-str]
+      (if (contains? num-str ".")
+        (string->float num-str)
+        (string->number num-str)
+      )
+    )
+    (convert-num $s)
+  )
+]
+
+; Export main function
+(export parse)
