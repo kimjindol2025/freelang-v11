@@ -1,0 +1,76 @@
+[FUNC test-abs
+  :params []
+  :return bool
+  :body (= (abs -5) 5)
+]
+
+[FUNC test-min
+  :params []
+  :return bool
+  :body (= (min 3 7) 3)
+]
+
+[FUNC test-max
+  :params []
+  :return bool
+  :body (= (max 3 7) 7)
+]
+
+[FUNC test-floor
+  :params []
+  :return bool
+  :body (= (floor 3) 3)
+]
+
+[FUNC test-ceil
+  :params []
+  :return bool
+  :body (= (ceil 3) 3)
+]
+
+[FUNC test-round
+  :params []
+  :return bool
+  :body (= (round 4) 4)
+]
+
+[FUNC test-sqrt
+  :params []
+  :return bool
+  :body (= (sqrt 16) 4)
+]
+
+[FUNC test-pow
+  :params []
+  :return bool
+  :body (= (pow 2 3) 8)
+]
+
+[FUNC test-clamp
+  :params []
+  :return bool
+  :body (= (clamp 5 1 10) 5)
+]
+
+[FUNC test-random
+  :params []
+  :return bool
+  :body (and (>= (random) 0) (<= (random) 1))
+]
+
+[FUNC all-math-tests-pass
+  :params []
+  :return bool
+  :body (and
+    (test-abs)
+    (test-min)
+    (test-max)
+    (test-floor)
+    (test-ceil)
+    (test-round)
+    (test-sqrt)
+    (test-pow)
+    (test-clamp)
+    (test-random)
+  )
+]

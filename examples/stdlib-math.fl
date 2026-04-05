@@ -1,0 +1,89 @@
+[FUNC abs
+  :params [[$x int]]
+  :return int
+  :body (abs $x)
+]
+
+[FUNC min
+  :params [[$a int] [$b int]]
+  :return int
+  :body (min $a $b)
+]
+
+[FUNC max
+  :params [[$a int] [$b int]]
+  :return int
+  :body (max $a $b)
+]
+
+[FUNC floor
+  :params [[$x int]]
+  :return int
+  :body (floor $x)
+]
+
+[FUNC ceil
+  :params [[$x int]]
+  :return int
+  :body (ceil $x)
+]
+
+[FUNC round
+  :params [[$x int]]
+  :return int
+  :body (round $x)
+]
+
+[FUNC sqrt
+  :params [[$x int]]
+  :return int
+  :body (sqrt $x)
+]
+
+[FUNC pow
+  :params [[$x int] [$y int]]
+  :return int
+  :body (pow $x $y)
+]
+
+[FUNC log
+  :params [[$x int]]
+  :return int
+  :body (log $x)
+]
+
+[FUNC exp
+  :params [[$x int]]
+  :return int
+  :body (exp $x)
+]
+
+[FUNC sin
+  :params [[$x int]]
+  :return int
+  :body (sin $x)
+]
+
+[FUNC cos
+  :params [[$x int]]
+  :return int
+  :body (cos $x)
+]
+
+[FUNC tan
+  :params [[$x int]]
+  :return int
+  :body (tan $x)
+]
+
+[FUNC random
+  :params []
+  :return int
+  :body (random)
+]
+
+[FUNC clamp
+  :params [[$x int] [$min int] [$max int]]
+  :return int
+  :body (clamp $x $min $max)
+]

@@ -1,0 +1,104 @@
+[FUNC test-join
+  :params []
+  :return bool
+  :body (= (join ["a" "b" "c"] ",") "a,b,c")
+]
+
+[FUNC test-trim
+  :params []
+  :return bool
+  :body (= (trim "  hello  ") "hello")
+]
+
+[FUNC test-uppercase
+  :params []
+  :return bool
+  :body (= (uppercase "hello") "HELLO")
+]
+
+[FUNC test-lowercase
+  :params []
+  :return bool
+  :body (= (lowercase "HELLO") "hello")
+]
+
+[FUNC test-split
+  :params []
+  :return bool
+  :body (= (length (split "a,b,c" ",")) 3)
+]
+
+[FUNC test-contains
+  :params []
+  :return bool
+  :body (contains? "hello world" "world")
+]
+
+[FUNC test-starts-with
+  :params []
+  :return bool
+  :body (starts-with? "hello world" "hello")
+]
+
+[FUNC test-ends-with
+  :params []
+  :return bool
+  :body (ends-with? "hello world" "world")
+]
+
+[FUNC test-index-of
+  :params []
+  :return bool
+  :body (= (index-of "hello world" "world") 6)
+]
+
+[FUNC test-replace
+  :params []
+  :return bool
+  :body (= (replace "hello world" "world" "v9") "hello v9")
+]
+
+[FUNC test-repeat
+  :params []
+  :return bool
+  :body (= (repeat "ab" 3) "ababab")
+]
+
+[FUNC test-concat
+  :params []
+  :return bool
+  :body (= (concat "hello" "world") "helloworld")
+]
+
+[FUNC test-length
+  :params []
+  :return bool
+  :body (= (length "hello") 5)
+]
+
+[FUNC test-substring
+  :params []
+  :return bool
+  :body (= (substring "hello" 0 3) "hel")
+]
+
+[FUNC all-string-tests-pass
+  :params []
+  :return bool
+  :body (and
+    (test-join)
+    (test-trim)
+    (test-uppercase)
+    (test-lowercase)
+    (test-split)
+    (test-contains)
+    (test-starts-with)
+    (test-ends-with)
+    (test-index-of)
+    (test-replace)
+    (test-repeat)
+    (test-concat)
+    (test-length)
+    (test-substring)
+  )
+]

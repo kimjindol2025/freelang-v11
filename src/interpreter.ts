@@ -454,6 +454,48 @@ export class Interpreter {
         return typeof args[0] === "string" && typeof args[1] === "string"
           ? args[0].split(args[1])
           : [];
+      case "join":
+        // (join ["a" "b" "c"] ",") → "a,b,c"
+        return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
+      case "trim":
+        // (trim "  hello  ") → "hello"
+        return typeof args[0] === "string" ? args[0].trim() : "";
+      case "uppercase":
+        // (uppercase "hello") → "HELLO"
+        return typeof args[0] === "string" ? args[0].toUpperCase() : "";
+      case "lowercase":
+        // (lowercase "HELLO") → "hello"
+        return typeof args[0] === "string" ? args[0].toLowerCase() : "";
+      case "contains?":
+        // (contains? "hello world" "world") → true
+        return typeof args[0] === "string" && typeof args[1] === "string"
+          ? args[0].includes(args[1])
+          : false;
+      case "starts-with?":
+        // (starts-with? "hello" "he") → true
+        return typeof args[0] === "string" && typeof args[1] === "string"
+          ? args[0].startsWith(args[1])
+          : false;
+      case "ends-with?":
+        // (ends-with? "hello" "lo") → true
+        return typeof args[0] === "string" && typeof args[1] === "string"
+          ? args[0].endsWith(args[1])
+          : false;
+      case "index-of":
+        // (index-of "hello world" "o") → 4
+        return typeof args[0] === "string" && typeof args[1] === "string"
+          ? args[0].indexOf(args[1])
+          : -1;
+      case "replace":
+        // (replace "hello world" "world" "there") → "hello there"
+        return typeof args[0] === "string" && typeof args[1] === "string" && typeof args[2] === "string"
+          ? args[0].replace(args[1], args[2])
+          : "";
+      case "repeat":
+        // (repeat "a" 3) → "aaa"
+        return typeof args[0] === "string" && typeof args[1] === "number"
+          ? args[0].repeat(args[1])
+          : "";
 
       // Array Operations
       case "filter":
@@ -478,6 +520,38 @@ export class Interpreter {
         return Number(args[0]);
       case "bool":
         return Boolean(args[0]);
+
+      // Math Functions (Phase 3 W4: Standard Library)
+      case "abs":
+        return Math.abs(args[0]);
+      case "min":
+        return Math.min(...args);
+      case "max":
+        return Math.max(...args);
+      case "floor":
+        return Math.floor(args[0]);
+      case "ceil":
+        return Math.ceil(args[0]);
+      case "round":
+        return Math.round(args[0]);
+      case "sqrt":
+        return Math.sqrt(args[0]);
+      case "pow":
+        return Math.pow(args[0], args[1]);
+      case "log":
+        return Math.log(args[0]);
+      case "exp":
+        return Math.exp(args[0]);
+      case "sin":
+        return Math.sin(args[0]);
+      case "cos":
+        return Math.cos(args[0]);
+      case "tan":
+        return Math.tan(args[0]);
+      case "random":
+        return Math.random();
+      case "clamp":
+        return Math.max(args[1], Math.min(args[2], args[0]));
 
       // Function call
       default:

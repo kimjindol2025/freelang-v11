@@ -1,0 +1,83 @@
+[FUNC join
+  :params [[$arr array] [$sep string]]
+  :return string
+  :body (join $arr $sep)
+]
+
+[FUNC trim
+  :params [[$s string]]
+  :return string
+  :body (trim $s)
+]
+
+[FUNC uppercase
+  :params [[$s string]]
+  :return string
+  :body (uppercase $s)
+]
+
+[FUNC lowercase
+  :params [[$s string]]
+  :return string
+  :body (lowercase $s)
+]
+
+[FUNC split
+  :params [[$s string] [$sep string]]
+  :return array
+  :body (split $s $sep)
+]
+
+[FUNC contains?
+  :params [[$s string] [$sub string]]
+  :return bool
+  :body (contains? $s $sub)
+]
+
+[FUNC starts-with?
+  :params [[$s string] [$prefix string]]
+  :return bool
+  :body (starts-with? $s $prefix)
+]
+
+[FUNC ends-with?
+  :params [[$s string] [$suffix string]]
+  :return bool
+  :body (ends-with? $s $suffix)
+]
+
+[FUNC index-of
+  :params [[$s string] [$sub string]]
+  :return int
+  :body (index-of $s $sub)
+]
+
+[FUNC replace
+  :params [[$s string] [$old string] [$new string]]
+  :return string
+  :body (replace $s $old $new)
+]
+
+[FUNC repeat
+  :params [[$s string] [$count int]]
+  :return string
+  :body (repeat $s $count)
+]
+
+[FUNC concat
+  :params [[$a string] [$b string]]
+  :return string
+  :body (concat $a $b)
+]
+
+[FUNC length
+  :params [[$s string]]
+  :return int
+  :body (length $s)
+]
+
+[FUNC substring
+  :params [[$s string] [$start int] [$end int]]
+  :return string
+  :body (substring $s $start $end)
+]
