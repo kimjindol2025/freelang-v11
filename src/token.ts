@@ -40,6 +40,12 @@ export enum TokenType {
   Act = "Act",             // act
   Verify = "Verify",       // verify
 
+  // Phase 9c Keywords (Conditional)
+  If = "If",               // if
+  When = "When",           // when
+  Then = "Then",           // then
+  Else = "Else",           // else
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

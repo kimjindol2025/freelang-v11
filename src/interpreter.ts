@@ -2564,6 +2564,15 @@ export class Interpreter {
 
         this.logger.info(`  ${stageLabel} ${stageEmoji} ${stage.stage.toUpperCase()}`);
 
+        // Phase 9c: Check for when guard clause (skip if condition is false)
+        if (stage.whenGuard) {
+          const guardCondition = this.evaluateCondition(stage.whenGuard);
+          if (!guardCondition) {
+            this.logger.info(`  ⏭️  SKIPPED (when guard condition false)`);
+            continue; // Skip this stage
+          }
+        }
+
         // Apply confidence damping from previous iterations
         let adjustedStage = stage;
         if (iteration > 1 && stage.metadata?.confidence !== undefined) {
@@ -2580,8 +2589,25 @@ export class Interpreter {
           };
         }
 
+        // Phase 9c: Check for conditional (if/then/else)
+        let blockToHandle = adjustedStage;
+        if (stage.conditional) {
+          const conditionMet = this.evaluateCondition(stage.conditional.condition);
+          const selectedBlock = conditionMet ? stage.conditional.thenBlock : stage.conditional.elseBlock;
+
+          if (selectedBlock) {
+            blockToHandle = selectedBlock;
+            this.logger.info(
+              `  ${conditionMet ? "✓" : "✗"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`
+            );
+          } else if (!conditionMet && !stage.conditional.elseBlock) {
+            this.logger.info(`  ⏭️  SKIPPED (if condition false, no else block)`);
+            continue; // Skip if condition false and no else
+          }
+        }
+
         // Handle the reasoning block
-        const stageResult = this.handleReasoningBlock(adjustedStage);
+        const stageResult = this.handleReasoningBlock(blockToHandle);
         iterationResults.push(stageResult);
         executionPath.push(stage.stage);
 
@@ -2687,6 +2713,25 @@ export class Interpreter {
 
     // Default: trigger if confidence below threshold
     return confidence < defaultThreshold;
+  }
+
+  // Phase 9c Conditional: Evaluate condition expression (boolean evaluation)
+  private evaluateCondition(conditionNode: ASTNode): boolean {
+    if (!conditionNode) return false;
+
+    try {
+      const result = this.eval(conditionNode);
+
+      // Convert result to boolean
+      if (typeof result === "boolean") return result;
+      if (typeof result === "number") return result !== 0;
+      if (typeof result === "string") return result.length > 0;
+      if (result === null || result === undefined) return false;
+      return !!result;
+    } catch (e) {
+      this.logger.warn(`Failed to evaluate condition: ${(e as any).message}`);
+      return false;
+    }
   }
 
   // Phase 5 Week 2: Evaluate Type Class definition

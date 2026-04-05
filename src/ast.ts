@@ -253,6 +253,14 @@ export interface ReasoningBlock {
     confidence?: number;       // overall confidence (0-1)
     feedback?: string;         // feedback from verification
   };
+  // Phase 9c: Conditional branching (if/when/then/else)
+  conditional?: {
+    condition: ASTNode;        // condition to evaluate (e.g., "confidence > 0.8")
+    thenBlock: ReasoningBlock; // block to execute if true
+    elseBlock?: ReasoningBlock; // block to execute if false (optional)
+  };
+  // Phase 9c: When (guard clause - block only executes if condition is true)
+  whenGuard?: ASTNode;         // guard condition (block skipped if false)
 }
 
 // Reasoning Transition (NEW for Phase 9c)

@@ -1503,6 +1503,23 @@ export class Parser {
           throw this.error(`Unknown option: ${keyword}`, this.peek());
         }
       } else if (this.check(T.LParen)) {
+        // Phase 9c: Lookahead to check if this is (if ...) or (when ...)
+        if (this.pos + 1 < this.tokens.length) {
+          const nextToken = this.tokens[this.pos + 1];
+          if (nextToken.type === T.If) {
+            // Don't consume '(', let parseConditionalReasoningBlock handle it
+            const conditionalBlock = this.parseConditionalReasoningBlock();
+            stages.push(conditionalBlock);
+            continue;
+          }
+          if (nextToken.type === T.When) {
+            // Don't consume '(', let parseWhenReasoningBlock handle it
+            const whenBlock = this.parseWhenReasoningBlock();
+            stages.push(whenBlock);
+            continue;
+          }
+        }
+
         this.advance(); // consume '('
 
         // Check for reasoning stage keywords
@@ -1546,9 +1563,17 @@ export class Parser {
         );
         stages.push(reasoningBlock);
         this.expect(T.RParen);
+      } else if (this.check(T.If)) {
+        // Phase 9c: Parse if/then/else conditional
+        const conditionalBlock = this.parseConditionalReasoningBlock();
+        stages.push(conditionalBlock);
+      } else if (this.check(T.When)) {
+        // Phase 9c: Parse when guard clause
+        const whenBlock = this.parseWhenReasoningBlock();
+        stages.push(whenBlock);
       } else {
         throw this.error(
-          `Expected '(' before reasoning block or ':feedback', got ${this.peek().type}`,
+          `Expected '(' before reasoning block, 'if', 'when', or ':feedback', got ${this.peek().type}`,
           this.peek()
         );
       }
@@ -1776,6 +1801,117 @@ export class Parser {
 
     this.expect(T.RBracket);
     return names;
+  }
+
+  // Phase 9c: Parse if/then/else conditional reasoning block
+  // Format: (if condition (thenBlock) (elseBlock)?)
+  private parseConditionalReasoningBlock(): ReasoningBlock {
+    this.expect(T.LParen); // consume '('
+    this.expect(T.If);      // consume 'if'
+
+    // Parse condition expression
+    const condition = this.parseValue();
+
+    // Parse then block
+    if (!this.check(T.LParen)) {
+      throw this.error(`Expected '(' for then block, got ${this.peek().type}`, this.peek());
+    }
+    this.advance(); // consume '('
+
+    const thenStageToken = this.peek();
+    const thenStageName = this.getReasoningStageName(thenStageToken);
+    if (!thenStageName) {
+      throw this.error(
+        `Expected reasoning stage in then block, got ${thenStageToken.value}`,
+        thenStageToken
+      );
+    }
+
+    this.advance(); // consume stage name
+    const thenBlock = this.parseReasoningExpressionInternal(
+      thenStageName as "observe" | "analyze" | "decide" | "act" | "verify"
+    );
+    this.expect(T.RParen);
+
+    // Parse optional else block
+    let elseBlock: ReasoningBlock | undefined = undefined;
+    if (this.check(T.LParen)) {
+      // Lookahead to check if this is an else block or something else
+      const nextIdx = this.pos + 1;
+      if (nextIdx < this.tokens.length) {
+        const nextToken = this.tokens[nextIdx];
+        const elseStageName = this.getReasoningStageName(nextToken);
+        if (elseStageName) {
+          this.advance(); // consume '('
+          this.advance(); // consume stage name
+          elseBlock = this.parseReasoningExpressionInternal(
+            elseStageName as "observe" | "analyze" | "decide" | "act" | "verify"
+          );
+          this.expect(T.RParen); // close (block)
+        }
+      }
+    }
+
+    this.expect(T.RParen); // close outer (if ...)
+
+    // Return then block with conditional info
+    return {
+      ...thenBlock,
+      conditional: { condition, thenBlock, elseBlock },
+    };
+  }
+
+  // Phase 9c: Parse when guard clause
+  // Format: (when condition (block))
+  private parseWhenReasoningBlock(): ReasoningBlock {
+    this.expect(T.LParen); // consume '('
+    this.expect(T.When);   // consume 'when'
+
+    // Parse guard condition
+    const condition = this.parseValue();
+
+    // Parse block
+    if (!this.check(T.LParen)) {
+      throw this.error(`Expected '(' for when block, got ${this.peek().type}`, this.peek());
+    }
+    this.advance(); // consume '('
+
+    const stageToken = this.peek();
+    const stageName = this.getReasoningStageName(stageToken);
+    if (!stageName) {
+      throw this.error(`Expected reasoning stage in when block, got ${stageToken.value}`, stageToken);
+    }
+
+    this.advance(); // consume stage name
+    const block = this.parseReasoningExpressionInternal(
+      stageName as "observe" | "analyze" | "decide" | "act" | "verify"
+    );
+    this.expect(T.RParen); // close (block)
+
+    this.expect(T.RParen); // close outer (when ...)
+
+    // Return block with when guard
+    return {
+      ...block,
+      whenGuard: condition,
+    };
+  }
+
+  // Helper: Get reasoning stage name from token
+  private getReasoningStageName(token: Token): string | null {
+    if (token.type === T.Observe) return "observe";
+    if (token.type === T.Analyze) return "analyze";
+    if (token.type === T.Decide) return "decide";
+    if (token.type === T.Act) return "act";
+    if (token.type === T.Verify) return "verify";
+    if (token.type === T.Symbol) {
+      if (token.value === "observe") return "observe";
+      if (token.value === "analyze") return "analyze";
+      if (token.value === "decide") return "decide";
+      if (token.value === "act") return "act";
+      if (token.value === "verify") return "verify";
+    }
+    return null;
   }
 }
 

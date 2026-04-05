@@ -26,6 +26,11 @@ const KEYWORDS: Map<string, T> = new Map([
   ["decide", T.Decide],
   ["act", T.Act],
   ["verify", T.Verify],
+  // Phase 9c: Conditional branching keywords
+  ["if", T.If],
+  ["when", T.When],
+  ["then", T.Then],
+  ["else", T.Else],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 
