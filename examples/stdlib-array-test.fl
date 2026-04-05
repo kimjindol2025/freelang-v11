@@ -1,0 +1,69 @@
+[FUNC test-array-length
+  :params []
+  :return bool
+  :body (= (array-length [1 2 3]) 3)
+]
+
+[FUNC test-array-first
+  :params []
+  :return bool
+  :body (= (array-first [1 2 3]) 1)
+]
+
+[FUNC test-array-last
+  :params []
+  :return bool
+  :body (= (array-last [1 2 3]) 3)
+]
+
+[FUNC test-array-get
+  :params []
+  :return bool
+  :body (= (array-get [1 2 3] 1) 2)
+]
+
+[FUNC test-array-contains
+  :params []
+  :return bool
+  :body (array-contains [1 2 3] 2)
+]
+
+[FUNC test-array-reverse
+  :params []
+  :return bool
+  :body (= (array-first (array-reverse [1 2 3])) 3)
+]
+
+[FUNC test-array-flatten
+  :params []
+  :return bool
+  :body (= (array-length (array-flatten [[1 2] [3 4]])) 4)
+]
+
+[FUNC test-array-unique
+  :params []
+  :return bool
+  :body (= (array-length (array-unique [1 2 2 3 3 3])) 3)
+]
+
+[FUNC test-array-sort
+  :params []
+  :return bool
+  :body (= (array-first (array-sort [3 1 2])) 1)
+]
+
+[FUNC all-array-tests-pass
+  :params []
+  :return bool
+  :body (and
+    (test-array-length)
+    (test-array-first)
+    (test-array-last)
+    (test-array-get)
+    (test-array-contains)
+    (test-array-reverse)
+    (test-array-flatten)
+    (test-array-unique)
+    (test-array-sort)
+  )
+]

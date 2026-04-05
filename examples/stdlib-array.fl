@@ -1,0 +1,53 @@
+[FUNC array-length
+  :params [[$arr any]]
+  :return int
+  :body (length $arr)
+]
+
+[FUNC array-first
+  :params [[$arr any]]
+  :return any
+  :body (first $arr)
+]
+
+[FUNC array-last
+  :params [[$arr any]]
+  :return any
+  :body (last $arr)
+]
+
+[FUNC array-get
+  :params [[$arr any] [$index int]]
+  :return any
+  :body (get $arr $index)
+]
+
+[FUNC array-contains
+  :params [[$arr any] [$val any]]
+  :return bool
+  :body (contains? $arr $val)
+]
+
+[FUNC array-reverse
+  :params [[$arr any]]
+  :return any
+  :body (reverse $arr)
+]
+
+[FUNC array-flatten
+  :params [[$arr any]]
+  :return any
+  :body (flatten $arr)
+]
+
+[FUNC array-unique
+  :params [[$arr any]]
+  :return any
+  :body (unique $arr)
+]
+
+[FUNC array-sort
+  :params [[$arr any]]
+  :return any
+  :body (sort $arr)
+]
