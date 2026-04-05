@@ -19,6 +19,7 @@ export interface ExecutionContext {
   middleware: FreeLangMiddleware[];
   errorHandlers: ErrorHandler;
   startTime: number;
+  lastValue?: any; // Last evaluated value (for REPL/testing)
   typeChecker?: TypeChecker; // Phase 3: Type system
   typeClasses?: Map<string, TypeClassInfo>; // Phase 5 Week 2: Type class registry
   typeClassInstances?: Map<string, TypeClassInstanceInfo>; // Phase 5 Week 2: Type class instances
@@ -113,9 +114,11 @@ export class Interpreter {
         this.evalModuleBlock(node);
       } else if (isBlock(node)) {
         this.evalBlock(node);
+      } else {
+        // Evaluate other ASTNode types (SExpr, PatternMatch, etc.)
+        // and store the result as lastValue (for REPL/testing)
+        this.context.lastValue = this.eval(node);
       }
-      // Skip other ASTNode types (SExpr, PatternMatch, etc.)
-      // These are evaluated explicitly by the caller, not during interpret()
     }
 
     // Setup Express routes
@@ -473,6 +476,59 @@ export class Interpreter {
         capturedEnv: new Map(this.context.variables),
         name: undefined,
       };
+    }
+
+    // Define a function: (define name (fn [...] body))
+    if (op === "define") {
+      if (expr.args.length < 2) {
+        throw new Error(`define requires a name and a value`);
+      }
+
+      const nameNode = expr.args[0];
+      const valueNode = expr.args[1];
+
+      // Get the name
+      let name: string;
+      if ((nameNode as any).kind === "literal") {
+        // Handle both "string" and "symbol" literal types
+        name = (nameNode as Literal).value as string;
+      } else if ((nameNode as any).kind === "variable") {
+        name = (nameNode as Variable).name;
+      } else {
+        throw new Error(`define: first argument must be a symbol or string`);
+      }
+
+      // Evaluate the value
+      const value = this.eval(valueNode);
+
+      // If it's a function value, store it in the functions map
+      if ((value as any).kind === "function-value") {
+        const funcDef = {
+          name,
+          params: (value as any).params,
+          body: (value as any).body,
+        };
+        this.context.functions.set(name, funcDef);
+
+        // Also register with type checker if available
+        if (this.context.typeChecker) {
+          // Create type annotations for parameters (all as 'any' for now)
+          const paramTypes = (value as any).params.map(() => ({
+            kind: "type" as const,
+            name: "any",
+          }));
+          this.context.typeChecker.registerFunction(name, paramTypes, {
+            kind: "type" as const,
+            name: "any",
+          });
+        }
+
+        return value;
+      } else {
+        // Store as a variable
+        this.context.variables.set("$" + name, value);
+        return value;
+      }
     }
 
     if (op === "func-ref") {

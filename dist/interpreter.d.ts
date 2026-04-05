@@ -12,6 +12,7 @@ export interface ExecutionContext {
     middleware: FreeLangMiddleware[];
     errorHandlers: ErrorHandler;
     startTime: number;
+    lastValue?: any;
     typeChecker?: TypeChecker;
     typeClasses?: Map<string, TypeClassInfo>;
     typeClassInstances?: Map<string, TypeClassInstanceInfo>;

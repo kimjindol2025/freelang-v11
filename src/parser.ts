@@ -661,7 +661,13 @@ export class Parser {
       return makeWildcardPattern();
     }
 
-    // Variable pattern: x, y, name (but not |, &, etc)
+    // Variable pattern: $x, $y (explicit $ syntax)
+    if (this.check(T.Variable)) {
+      const varToken = this.advance();
+      return makeVariablePattern(varToken.value);
+    }
+
+    // Variable pattern: x, y, name (bare symbol, but not |, &, etc)
     if (this.check(T.Symbol) && !["&", "|"].includes(this.peek().value)) {
       const nameToken = this.advance();
       return makeVariablePattern(nameToken.value);
@@ -676,6 +682,14 @@ export class Parser {
     if (this.check(T.String)) {
       const token = this.advance();
       return makeLiteralPattern("string", token.value);
+    }
+
+    // Parenthesized pattern: (pattern) - allows grouping
+    if (this.check(T.LParen)) {
+      this.advance(); // consume (
+      const pattern = this.parsePattern();
+      this.expect(T.RParen);
+      return pattern;
     }
 
     // List pattern: [x y z] or [x & rest]

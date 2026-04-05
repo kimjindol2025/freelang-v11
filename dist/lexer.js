@@ -113,6 +113,14 @@ function lex(source) {
             col++;
             continue;
         }
+        // Pipe: Or-pattern separator
+        if (ch === "|") {
+            const startCol = col;
+            tokens.push({ type: token_1.TokenType.Symbol, value: "|", line, col: startCol });
+            i++;
+            col++;
+            continue;
+        }
         // Colon: Phase 6 token separator (not keyword prefix)
         if (ch === ":") {
             const startCol = col;
@@ -151,12 +159,13 @@ function lex(source) {
             tokens.push({ type: token_1.TokenType.Number, value, line, col: startCol });
             continue;
         }
-        // Symbol: letters, hyphens, etc. (includes & for pattern rest element, | for or-patterns)
+        // Symbol: letters, hyphens, etc. (includes & for pattern rest element)
         // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
-        if (/[a-zA-Z_<>=!+\-*&/|]/.test(ch)) {
+        // NOTE: '|' excluded - it's a separate Pipe token for or-patterns
+        if (/[a-zA-Z_<>=!+\-*&/]/.test(ch)) {
             const start = i;
             const startCol = col;
-            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&|]/.test(source[i])) {
+            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&]/.test(source[i])) {
                 i++;
                 col++;
             }
