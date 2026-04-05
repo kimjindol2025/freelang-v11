@@ -351,3 +351,57 @@ export function makeImportBlock(
 export function makeOpenBlock(moduleName: string, source?: string): OpenBlock {
   return { kind: "open", moduleName, source };
 }
+
+// ============================================================
+// Phase 6: Type Guard Functions (타입 안전성 강화)
+// ============================================================
+
+// Block 타입 가드
+export function isBlock(node: any): node is Block {
+  return node && node.kind === "block";
+}
+
+// Literal 타입 가드
+export function isLiteral(node: any): node is Literal {
+  return node && node.kind === "literal";
+}
+
+// Symbol 리터럴 가드
+export function isSymbolLiteral(node: any): node is Literal {
+  return isLiteral(node) && node.type === "symbol";
+}
+
+// 배열 블록 가드 (특수: [Array ...] 형식)
+export function isArrayBlock(node: any): node is Block {
+  return isBlock(node) && node.type === "Array";
+}
+
+// FUNC 블록 가드
+export function isFuncBlock(node: any): node is Block {
+  return isBlock(node) && node.type === "FUNC";
+}
+
+// Variable 타입 가드
+export function isVariable(node: any): node is Variable {
+  return node && node.kind === "variable";
+}
+
+// SExpr 타입 가드
+export function isSExpr(node: any): node is SExpr {
+  return node && node.kind === "sexpr";
+}
+
+// ModuleBlock 타입 가드
+export function isModuleBlock(node: any): node is ModuleBlock {
+  return node && node.kind === "module";
+}
+
+// ImportBlock 타입 가드
+export function isImportBlock(node: any): node is ImportBlock {
+  return node && node.kind === "import";
+}
+
+// OpenBlock 타입 가드
+export function isOpenBlock(node: any): node is OpenBlock {
+  return node && node.kind === "open";
+}

@@ -153,4 +153,14 @@ export declare function makeTypeClassInstance(className: string, concreteType: s
 export declare function makeModuleBlock(name: string, exports: string[], body: ASTNode[], path?: string): ModuleBlock;
 export declare function makeImportBlock(moduleName: string, source?: string, selective?: string[], alias?: string): ImportBlock;
 export declare function makeOpenBlock(moduleName: string, source?: string): OpenBlock;
+export declare function isBlock(node: any): node is Block;
+export declare function isLiteral(node: any): node is Literal;
+export declare function isSymbolLiteral(node: any): node is Literal;
+export declare function isArrayBlock(node: any): node is Block;
+export declare function isFuncBlock(node: any): node is Block;
+export declare function isVariable(node: any): node is Variable;
+export declare function isSExpr(node: any): node is SExpr;
+export declare function isModuleBlock(node: any): node is ModuleBlock;
+export declare function isImportBlock(node: any): node is ImportBlock;
+export declare function isOpenBlock(node: any): node is OpenBlock;
 //# sourceMappingURL=ast.d.ts.map

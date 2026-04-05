@@ -23,6 +23,16 @@ exports.makeTypeClassInstance = makeTypeClassInstance;
 exports.makeModuleBlock = makeModuleBlock;
 exports.makeImportBlock = makeImportBlock;
 exports.makeOpenBlock = makeOpenBlock;
+exports.isBlock = isBlock;
+exports.isLiteral = isLiteral;
+exports.isSymbolLiteral = isSymbolLiteral;
+exports.isArrayBlock = isArrayBlock;
+exports.isFuncBlock = isFuncBlock;
+exports.isVariable = isVariable;
+exports.isSExpr = isSExpr;
+exports.isModuleBlock = isModuleBlock;
+exports.isImportBlock = isImportBlock;
+exports.isOpenBlock = isOpenBlock;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -99,5 +109,48 @@ function makeImportBlock(moduleName, source, selective, alias) {
 // Helper: Create open block (Phase 5 Week 3)
 function makeOpenBlock(moduleName, source) {
     return { kind: "open", moduleName, source };
+}
+// ============================================================
+// Phase 6: Type Guard Functions (타입 안전성 강화)
+// ============================================================
+// Block 타입 가드
+function isBlock(node) {
+    return node && node.kind === "block";
+}
+// Literal 타입 가드
+function isLiteral(node) {
+    return node && node.kind === "literal";
+}
+// Symbol 리터럴 가드
+function isSymbolLiteral(node) {
+    return isLiteral(node) && node.type === "symbol";
+}
+// 배열 블록 가드 (특수: [Array ...] 형식)
+function isArrayBlock(node) {
+    return isBlock(node) && node.type === "Array";
+}
+// FUNC 블록 가드
+function isFuncBlock(node) {
+    return isBlock(node) && node.type === "FUNC";
+}
+// Variable 타입 가드
+function isVariable(node) {
+    return node && node.kind === "variable";
+}
+// SExpr 타입 가드
+function isSExpr(node) {
+    return node && node.kind === "sexpr";
+}
+// ModuleBlock 타입 가드
+function isModuleBlock(node) {
+    return node && node.kind === "module";
+}
+// ImportBlock 타입 가드
+function isImportBlock(node) {
+    return node && node.kind === "import";
+}
+// OpenBlock 타입 가드
+function isOpenBlock(node) {
+    return node && node.kind === "open";
 }
 //# sourceMappingURL=ast.js.map

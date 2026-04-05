@@ -90,6 +90,7 @@ export declare class Interpreter {
     getTypeClass(name: string): TypeClassInfo | undefined;
     getTypeClassInstance(className: string, concreteType: string): TypeClassInstanceInfo | undefined;
     satisfiesConstraint(type: string, constraintClass: string): boolean;
+    private getModules;
     private evalModuleBlock;
     private evalImportBlock;
     private evalOpenBlock;

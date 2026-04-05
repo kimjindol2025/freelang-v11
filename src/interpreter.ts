@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, isModuleBlock, isImportBlock, isOpenBlock, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 
 // ExecutionContext: 런타임 상태 관리
@@ -100,14 +100,14 @@ export class Interpreter {
     // Process all blocks/nodes
     for (const node of blocks) {
       // Phase 6: Handle both Block types and new S-expression based types
-      if ((node as any).kind === "block" || (node as any).type) {
-        this.evalBlock(node as Block);
-      } else if ((node as any).kind === "import") {
-        this.evalImportBlock(node as any);
-      } else if ((node as any).kind === "open") {
-        this.evalOpenBlock(node as any);
-      } else if ((node as any).kind === "module") {
-        this.evalModuleBlock(node as any);
+      if (isImportBlock(node)) {
+        this.evalImportBlock(node);
+      } else if (isOpenBlock(node)) {
+        this.evalOpenBlock(node);
+      } else if (isModuleBlock(node)) {
+        this.evalModuleBlock(node);
+      } else if (isBlock(node)) {
+        this.evalBlock(node);
       } else {
         // Other ASTNode types (SExpr, PatternMatch, etc.)
         this.eval(node);
@@ -1490,6 +1490,14 @@ export class Interpreter {
     return !!this.getTypeClassInstance(constraintClass, type);
   }
 
+  // Phase 6 Step 4: Helper to ensure modules map exists
+  private getModules(): Map<string, ModuleInfo> {
+    if (!this.context.modules) {
+      this.context.modules = new Map();
+    }
+    return this.context.modules;
+  }
+
   // Phase 6 Step 4: Evaluate module block
   // Module 정의를 등록하고 내부 함수들을 평가
   private evalModuleBlock(moduleBlock: ModuleBlock): void {
@@ -1502,19 +1510,31 @@ export class Interpreter {
 
     // 모듈 body 내의 블록들을 평가 (함수 등록)
     for (const node of moduleBody) {
-      const block = node as any;
-      if (block.type === "FUNC") {
-        const funcName = block.name;
-        const params = block.fields?.get("params") || [];
+      if (isFuncBlock(node)) {
+        const funcName = node.name;
+        const params = node.fields?.get("params") || [];
         const paramNames = Array.isArray(params)
           ? params.map((p: any) => (typeof p === "string" ? p : (p as any).value))
           : [];
-        const body = block.fields?.get("body");
+        let body = node.fields?.get("body");
+
+        // Skip function if body is undefined
+        if (!body) {
+          continue;
+        }
+
+        // Handle body as array (take first element)
+        if (Array.isArray(body)) {
+          body = body[0];
+          if (!body) {
+            continue;
+          }
+        }
 
         const func: FreeLangFunction = {
           name: funcName,
           params: paramNames,
-          body,
+          body: body as ASTNode,
         };
 
         moduleFunctions.set(funcName, func);
@@ -1528,10 +1548,7 @@ export class Interpreter {
       functions: moduleFunctions,
     };
 
-    if (!this.context.modules) {
-      this.context.modules = new Map();
-    }
-    this.context.modules.set(moduleName, moduleInfo);
+    this.getModules().set(moduleName, moduleInfo);
 
     console.log(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
   }
@@ -1544,12 +1561,8 @@ export class Interpreter {
     const selective = importBlock.selective; // :only [add multiply]
     const alias = importBlock.alias; // :as m
 
-    if (!this.context.modules) {
-      this.context.modules = new Map();
-    }
-
     // 모듈 찾기
-    const module = this.context.modules.get(moduleName);
+    const module = this.getModules().get(moduleName);
     if (!module) {
       throw new Error(
         `Module not found: ${moduleName} (from ${source || "inline"})`
@@ -1606,12 +1619,8 @@ export class Interpreter {
     const moduleName = openBlock.moduleName;
     const source = openBlock.source; // "./math.fl" 등
 
-    if (!this.context.modules) {
-      this.context.modules = new Map();
-    }
-
     // 모듈 찾기
-    const module = this.context.modules.get(moduleName);
+    const module = this.getModules().get(moduleName);
     if (!module) {
       throw new Error(
         `Module not found: ${moduleName} (from ${source || "inline"})`
