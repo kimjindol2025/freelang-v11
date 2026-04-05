@@ -72,11 +72,46 @@ class Parser {
                 fields.set(keyName, values);
             }
             // Phase 3: Extract type annotations from :return field
-            if (keyName === ":return" && values.length === 1) {
+            if (keyName === "return" && values.length === 1) {
                 const returnValue = values[0];
                 if (returnValue.kind === "literal" && returnValue.type === "symbol") {
                     const typeName = returnValue.value;
                     typeAnnotations.set("return", (0, ast_1.makeTypeAnnotation)(typeName));
+                }
+            }
+            // Phase 3: Extract type annotations from :params field (new syntax: [[$x int] [$y int]])
+            if (keyName === "params" && values.length === 1) {
+                const paramsValue = values[0];
+                // Check if it's an array (represented as Block with type="Array")
+                if (paramsValue.kind === "literal" && paramsValue.type === "symbol") {
+                    // Old syntax: :params [$x $y] (no types)
+                    // Keep backward compatibility - no type annotation
+                }
+                else if (paramsValue.kind === "block" && paramsValue.type === "Array") {
+                    // New syntax: :params [[$x int] [$y int]]
+                    // Each item should be [name type] array
+                    const arrayItems = paramsValue.fields?.get("items");
+                    if (Array.isArray(arrayItems)) {
+                        const paramTypes = [];
+                        for (const item of arrayItems) {
+                            if (item.kind === "block" && item.type === "Array") {
+                                // This is a [name type] pair
+                                const pairItems = item.fields?.get("items");
+                                if (Array.isArray(pairItems) && pairItems.length === 2) {
+                                    // pairItems[0] = name ($x), pairItems[1] = type (int)
+                                    const typeNode = pairItems[1];
+                                    if (typeNode.kind === "literal" && typeNode.type === "symbol") {
+                                        const typeName = typeNode.value;
+                                        paramTypes.push((0, ast_1.makeTypeAnnotation)(typeName));
+                                    }
+                                }
+                            }
+                        }
+                        if (paramTypes.length > 0) {
+                            // Store params as array of types
+                            typeAnnotations.set("params", paramTypes);
+                        }
+                    }
                 }
             }
         }

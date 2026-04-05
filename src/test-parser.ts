@@ -137,5 +137,101 @@ try {
   console.log(`✅ Caught error: ${(error as Error).message}`);
 }
 
+console.log("\n");
+
+// Test 7: Parameter type annotations (new syntax)
+console.log("Test 7: Parameter type annotations");
+console.log("───────────────────────────────────");
+try {
+  const code7 = `
+    [FUNC add
+      :params [[$x int] [$y int]]
+      :return int
+      :body (+ $x $y)
+    ]
+  `;
+  const tokens7 = lex(code7);
+  const ast7 = parse(tokens7);
+
+  console.log(`✅ Parsed parameter type annotations`);
+  const block = ast7[0];
+  console.log(`  Block: [${block.type} ${block.name}]`);
+  console.log(`  Fields: ${Array.from(block.fields.keys()).join(", ")}`);
+
+  // Debug: Check what :params contains
+  console.log(`  All field keys: ${Array.from(block.fields.keys()).map(k => `"${k}"`).join(", ")}`);
+  const paramsField = block.fields.get(":params");
+  console.log(`  :params field: ${paramsField ? "found" : "NOT FOUND"}`);
+  console.log(`  :params field kind: ${(paramsField as any)?.kind}`);
+  console.log(`  :params field type: ${(paramsField as any)?.type}`);
+  if ((paramsField as any)?.kind === "block" && (paramsField as any)?.type === "Array") {
+    const items = (paramsField as any)?.fields?.get("items");
+    console.log(`  :params is Array with ${Array.isArray(items) ? items.length : "?"} items`);
+    if (Array.isArray(items)) {
+      items.forEach((item, i) => {
+        console.log(`    Item ${i}: kind=${(item as any)?.kind}, type=${(item as any)?.type}`);
+        if ((item as any)?.kind === "block" && (item as any)?.type === "Array") {
+          const pairItems = (item as any)?.fields?.get("items");
+          console.log(`      Pair items: ${Array.isArray(pairItems) ? pairItems.length : "?"}`);
+        }
+      });
+    }
+  }
+
+  // Check type annotations
+  if (block.typeAnnotations) {
+    console.log(`  Type annotations found: ${block.typeAnnotations.size}`);
+    block.typeAnnotations.forEach((typeOrTypes, key) => {
+      if (Array.isArray(typeOrTypes)) {
+        console.log(`    :${key} = [${typeOrTypes.map((t: any) => t.name).join(", ")}]`);
+      } else {
+        console.log(`    :${key} = ${(typeOrTypes as any).name}`);
+      }
+    });
+  } else {
+    console.log(`  ⚠️ No type annotations found`);
+  }
+} catch (error) {
+  console.error("❌ Error:", (error as Error).message);
+}
+
+console.log("\n");
+
+// Test 8: Backward compatibility (old syntax without types)
+console.log("Test 8: Backward compatibility");
+console.log("───────────────────────────────────");
+try {
+  const code8 = `
+    [FUNC add-old
+      :params [$x $y]
+      :return int
+      :body (+ $x $y)
+    ]
+  `;
+  const tokens8 = lex(code8);
+  const ast8 = parse(tokens8);
+
+  console.log(`✅ Parsed old syntax (no param types)`);
+  const block = ast8[0];
+  console.log(`  Block: [${block.type} ${block.name}]`);
+  console.log(`  Fields: ${Array.from(block.fields.keys()).join(", ")}`);
+
+  // Check type annotations
+  if (block.typeAnnotations) {
+    console.log(`  Type annotations found: ${block.typeAnnotations.size}`);
+    block.typeAnnotations.forEach((typeOrTypes, key) => {
+      if (Array.isArray(typeOrTypes)) {
+        console.log(`    :${key} = [${typeOrTypes.map((t: any) => t.name).join(", ")}]`);
+      } else {
+        console.log(`    :${key} = ${(typeOrTypes as any).name}`);
+      }
+    });
+  } else {
+    console.log(`  ⚠️ No type annotations found (expected for old syntax)`);
+  }
+} catch (error) {
+  console.error("❌ Error:", (error as Error).message);
+}
+
 console.log("\n═══════════════════════════════════");
 console.log("✅ Parser tests complete!\n");

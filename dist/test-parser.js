@@ -158,6 +158,99 @@ try {
 catch (error) {
     console.log(`✅ Caught error: ${error.message}`);
 }
+console.log("\n");
+// Test 7: Parameter type annotations (new syntax)
+console.log("Test 7: Parameter type annotations");
+console.log("───────────────────────────────────");
+try {
+    const code7 = `
+    [FUNC add
+      :params [[$x int] [$y int]]
+      :return int
+      :body (+ $x $y)
+    ]
+  `;
+    const tokens7 = (0, lexer_1.lex)(code7);
+    const ast7 = (0, parser_1.parse)(tokens7);
+    console.log(`✅ Parsed parameter type annotations`);
+    const block = ast7[0];
+    console.log(`  Block: [${block.type} ${block.name}]`);
+    console.log(`  Fields: ${Array.from(block.fields.keys()).join(", ")}`);
+    // Debug: Check what :params contains
+    console.log(`  All field keys: ${Array.from(block.fields.keys()).map(k => `"${k}"`).join(", ")}`);
+    const paramsField = block.fields.get(":params");
+    console.log(`  :params field: ${paramsField ? "found" : "NOT FOUND"}`);
+    console.log(`  :params field kind: ${paramsField?.kind}`);
+    console.log(`  :params field type: ${paramsField?.type}`);
+    if (paramsField?.kind === "block" && paramsField?.type === "Array") {
+        const items = paramsField?.fields?.get("items");
+        console.log(`  :params is Array with ${Array.isArray(items) ? items.length : "?"} items`);
+        if (Array.isArray(items)) {
+            items.forEach((item, i) => {
+                console.log(`    Item ${i}: kind=${item?.kind}, type=${item?.type}`);
+                if (item?.kind === "block" && item?.type === "Array") {
+                    const pairItems = item?.fields?.get("items");
+                    console.log(`      Pair items: ${Array.isArray(pairItems) ? pairItems.length : "?"}`);
+                }
+            });
+        }
+    }
+    // Check type annotations
+    if (block.typeAnnotations) {
+        console.log(`  Type annotations found: ${block.typeAnnotations.size}`);
+        block.typeAnnotations.forEach((typeOrTypes, key) => {
+            if (Array.isArray(typeOrTypes)) {
+                console.log(`    :${key} = [${typeOrTypes.map((t) => t.name).join(", ")}]`);
+            }
+            else {
+                console.log(`    :${key} = ${typeOrTypes.name}`);
+            }
+        });
+    }
+    else {
+        console.log(`  ⚠️ No type annotations found`);
+    }
+}
+catch (error) {
+    console.error("❌ Error:", error.message);
+}
+console.log("\n");
+// Test 8: Backward compatibility (old syntax without types)
+console.log("Test 8: Backward compatibility");
+console.log("───────────────────────────────────");
+try {
+    const code8 = `
+    [FUNC add-old
+      :params [$x $y]
+      :return int
+      :body (+ $x $y)
+    ]
+  `;
+    const tokens8 = (0, lexer_1.lex)(code8);
+    const ast8 = (0, parser_1.parse)(tokens8);
+    console.log(`✅ Parsed old syntax (no param types)`);
+    const block = ast8[0];
+    console.log(`  Block: [${block.type} ${block.name}]`);
+    console.log(`  Fields: ${Array.from(block.fields.keys()).join(", ")}`);
+    // Check type annotations
+    if (block.typeAnnotations) {
+        console.log(`  Type annotations found: ${block.typeAnnotations.size}`);
+        block.typeAnnotations.forEach((typeOrTypes, key) => {
+            if (Array.isArray(typeOrTypes)) {
+                console.log(`    :${key} = [${typeOrTypes.map((t) => t.name).join(", ")}]`);
+            }
+            else {
+                console.log(`    :${key} = ${typeOrTypes.name}`);
+            }
+        });
+    }
+    else {
+        console.log(`  ⚠️ No type annotations found (expected for old syntax)`);
+    }
+}
+catch (error) {
+    console.error("❌ Error:", error.message);
+}
 console.log("\n═══════════════════════════════════");
 console.log("✅ Parser tests complete!\n");
 //# sourceMappingURL=test-parser.js.map

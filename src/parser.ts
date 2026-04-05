@@ -99,11 +99,46 @@ export class Parser {
       }
 
       // Phase 3: Extract type annotations from :return field
-      if (keyName === ":return" && values.length === 1) {
+      if (keyName === "return" && values.length === 1) {
         const returnValue = values[0];
         if ((returnValue as any).kind === "literal" && (returnValue as any).type === "symbol") {
           const typeName = (returnValue as any).value;
           typeAnnotations.set("return", makeTypeAnnotation(typeName));
+        }
+      }
+
+      // Phase 3: Extract type annotations from :params field (new syntax: [[$x int] [$y int]])
+      if (keyName === "params" && values.length === 1) {
+        const paramsValue = values[0];
+        // Check if it's an array (represented as Block with type="Array")
+        if ((paramsValue as any).kind === "literal" && (paramsValue as any).type === "symbol") {
+          // Old syntax: :params [$x $y] (no types)
+          // Keep backward compatibility - no type annotation
+        } else if ((paramsValue as any).kind === "block" && (paramsValue as any).type === "Array") {
+          // New syntax: :params [[$x int] [$y int]]
+          // Each item should be [name type] array
+          const arrayItems = (paramsValue as any).fields?.get("items") as ASTNode[];
+          if (Array.isArray(arrayItems)) {
+            const paramTypes: TypeAnnotation[] = [];
+            for (const item of arrayItems) {
+              if ((item as any).kind === "block" && (item as any).type === "Array") {
+                // This is a [name type] pair
+                const pairItems = (item as any).fields?.get("items") as ASTNode[];
+                if (Array.isArray(pairItems) && pairItems.length === 2) {
+                  // pairItems[0] = name ($x), pairItems[1] = type (int)
+                  const typeNode = pairItems[1];
+                  if ((typeNode as any).kind === "literal" && (typeNode as any).type === "symbol") {
+                    const typeName = (typeNode as any).value;
+                    paramTypes.push(makeTypeAnnotation(typeName));
+                  }
+                }
+              }
+            }
+            if (paramTypes.length > 0) {
+              // Store params as array of types
+              typeAnnotations.set("params", paramTypes as any);
+            }
+          }
         }
       }
     }
