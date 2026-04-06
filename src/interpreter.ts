@@ -127,9 +127,10 @@ export class Interpreter {
         params: [], // Will be handled dynamically
         body: fn as any,
       });
-      // Register with type checker (as function accepting any args, returning any)
+      // Register with actual param count from function signature
       if (this.context.typeChecker) {
-        this.context.typeChecker.registerFunction(name, [], { kind: "type" as const, name: "any" });
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
       }
     }
 
@@ -141,9 +142,10 @@ export class Interpreter {
         params: [], // Will be handled dynamically
         body: fn as any,
       });
-      // Register with type checker (as function accepting any args, returning any)
+      // Register with actual param count from function signature
       if (this.context.typeChecker) {
-        this.context.typeChecker.registerFunction(name, [], { kind: "type" as const, name: "any" });
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
       }
     }
 
@@ -1736,6 +1738,11 @@ export class Interpreter {
       if (!validation.valid) {
         throw new Error(`Type error in call to '${baseName}': ${validation.message}`);
       }
+    }
+
+    // Native JS function (Phase 10/11 builtins): call directly with args
+    if (typeof func.body === "function") {
+      return (func.body as Function)(...args);
     }
 
     // Create new scope
