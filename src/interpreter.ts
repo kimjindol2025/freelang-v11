@@ -12,6 +12,8 @@ import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch 
 import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
 import { createFileModule } from "./stdlib-file"; // Phase 10: File I/O
 import { createErrorModule } from "./stdlib-error"; // Phase 11: Error handling
+import { createHttpModule } from "./stdlib-http"; // Phase 12: HTTP Client
+import { createShellModule } from "./stdlib-shell"; // Phase 12: Shell execution
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -143,6 +145,34 @@ export class Interpreter {
         body: fn as any,
       });
       // Register with actual param count from function signature
+      if (this.context.typeChecker) {
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
+      }
+    }
+
+    // Phase 12: Initialize HTTP Client module
+    const httpModule = createHttpModule();
+    for (const [name, fn] of Object.entries(httpModule)) {
+      this.context.functions.set(name, {
+        name,
+        params: [],
+        body: fn as any,
+      });
+      if (this.context.typeChecker) {
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
+      }
+    }
+
+    // Phase 12: Initialize Shell execution module
+    const shellModule = createShellModule();
+    for (const [name, fn] of Object.entries(shellModule)) {
+      this.context.functions.set(name, {
+        name,
+        params: [],
+        body: fn as any,
+      });
       if (this.context.typeChecker) {
         const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
         this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
