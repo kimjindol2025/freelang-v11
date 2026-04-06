@@ -8,6 +8,8 @@ export declare enum TokenType {
     RBracket = "RBracket",// ]
     LParen = "LParen",// (
     RParen = "RParen",// )
+    LBrace = "LBrace",// {
+    RBrace = "RBrace",// }
     Module = "Module",// MODULE
     TypeClass = "TypeClass",// TYPECLASS
     Instance = "Instance",// INSTANCE

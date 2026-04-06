@@ -14,6 +14,9 @@ const errors_1 = require("./errors");
 const logger_1 = require("./logger");
 const ast_helpers_1 = require("./ast-helpers");
 const async_runtime_1 = require("./async-runtime");
+const web_search_adapter_1 = require("./web-search-adapter"); // Phase 9a: WebSearch integration
+const learned_facts_store_1 = require("./learned-facts-store"); // Phase 9b: Learning persistence
+const stdlib_file_1 = require("./stdlib-file"); // Phase 10: File I/O
 // Interpreter class
 class Interpreter {
     constructor(app = (0, express_1.default)(), logger) {
@@ -32,6 +35,26 @@ class Interpreter {
             typeClassInstances: new Map(), // Phase 5 Week 2: Type class instance registry
             modules: new Map(), // Phase 6: Module registry
         };
+        // Phase 9a: Initialize WebSearchAdapter (mock mode by default)
+        // Production: Use BRAVE_SEARCH_KEY or SERPER_API_KEY from env
+        const apiKey = process.env.BRAVE_SEARCH_KEY || process.env.SERPER_API_KEY;
+        const provider = process.env.BRAVE_SEARCH_KEY ? "brave" : process.env.SERPER_API_KEY ? "serper" : "mock";
+        this.searchAdapter = new web_search_adapter_1.WebSearchAdapter(apiKey, provider);
+        // Phase 9b: Initialize LearnedFactsStore (persistent learning)
+        this.learnedFactsStore = new learned_facts_store_1.LearnedFactsStore("./data/learned-facts.json", 30);
+        // Phase 10: Initialize File I/O module
+        const fileModule = (0, stdlib_file_1.createFileModule)();
+        for (const [name, fn] of Object.entries(fileModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [], // Will be handled dynamically
+                body: fn,
+            });
+            // Register with type checker (as function accepting any args, returning any)
+            if (this.context.typeChecker) {
+                this.context.typeChecker.registerFunction(name, [], { kind: "type", name: "any" });
+            }
+        }
         // Phase 5 Week 2: Register built-in type classes and instances
         this.registerBuiltinTypeClasses();
     }
@@ -307,6 +330,14 @@ class Interpreter {
                 if (Array.isArray(items)) {
                     return items.map((item) => this.eval(item));
                 }
+            }
+            // Phase 9d: Map literal: {:key1 value1 :key2 value2 ...}
+            if (block.type === "Map") {
+                const result = {};
+                for (const [key, value] of block.fields) {
+                    result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
+                }
+                return result;
             }
             // For other block types, return as object
             const result = {};
@@ -2023,14 +2054,18 @@ class Interpreter {
         });
         this.logger.info(`✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`);
     }
-    // Phase 9a: Handle Search/Fetch Block - External data retrieval
+    // Phase 9a Advanced: Handle Search/Fetch Block - External data retrieval with API integration
     handleSearchBlock(searchBlock) {
-        const { query, source, cache = false, limit = 10, name } = searchBlock;
+        const { query, source = "web", cache = true, limit = 10, name } = searchBlock;
         // Log search operation
-        this.logger.info(`🔍 Search: "${query}" from "${source}"${cache ? " (cached)" : ""}`);
+        this.logger.info(`🔎 SEARCH "${query}"`);
         try {
-            // For now, return a promise-like object with the search configuration
-            // In production, this would actually call external APIs
+            // Phase 9a Advanced: Call WebSearchAdapter (sync mode for interpreter integration)
+            // Uses cache or mock results; real API calls require async interpreter
+            const results = this.searchAdapter.searchSync(query, {
+                limit,
+                cache,
+            });
             const searchResult = {
                 kind: "search-result",
                 query,
@@ -2038,82 +2073,112 @@ class Interpreter {
                 cache,
                 limit,
                 name,
-                status: "pending",
-                results: [],
-                // Mark for later external API integration
-                _pending: true,
+                status: "completed",
+                results, // ← Now contains actual search results
+                count: results.length,
+                timestamp: new Date().toISOString(),
             };
-            // If cache is enabled, store in context cache
-            if (cache && name) {
-                if (!this.context.cache) {
-                    this.context.cache = new Map();
-                }
-                this.context.cache.set(`search:${name}`, searchResult);
+            // Store in context cache for use by Analyze stage
+            if (!this.context.cache) {
+                this.context.cache = new Map();
             }
+            const cacheKey = name || `search_${Date.now()}`;
+            this.context.cache.set(cacheKey, searchResult);
             return searchResult;
         }
         catch (error) {
             this.logger.error(`❌ Search failed: ${error.message}`);
             return {
                 kind: "search-error",
+                query,
                 message: error.message,
+                timestamp: new Date().toISOString(),
             };
         }
     }
-    // Phase 9b: Handle Learn Block - Store learned information
+    // Phase 9b Advanced: Handle Learn Block - Store learned information with persistence
     handleLearnBlock(learnBlock) {
-        const { key, data, source = "search", confidence, timestamp } = learnBlock;
+        const { key, data, source = "search", confidence = 0.85, timestamp } = learnBlock;
         // Initialize learned data storage if needed
         if (!this.context.learned) {
             this.context.learned = new Map();
         }
-        // Check if this is a recall operation (data is null)
-        if (data === null) {
-            // Recall: retrieve stored data by key
-            if (this.context.learned.has(key)) {
-                const stored = this.context.learned.get(key);
-                this.logger.info(`🔍 Recalled: "${key}"`);
-                return {
-                    kind: "learn-result",
-                    operation: "recall",
-                    key,
-                    data: stored.data,
-                    source: stored.source,
-                    confidence: stored.confidence,
-                    timestamp: stored.timestamp,
-                    found: true,
-                };
+        try {
+            // Check if this is a recall operation (data is null)
+            if (data === null) {
+                // Recall: retrieve stored data by key (from file storage)
+                const loadedFact = this.learnedFactsStore.load(key);
+                if (loadedFact) {
+                    this.logger.info(`📚 LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
+                    // Also store in memory for fast access
+                    this.context.learned.set(key, {
+                        data: loadedFact.data,
+                        source: loadedFact.source,
+                        confidence: loadedFact.confidence,
+                        timestamp: new Date(loadedFact.timestamp).toISOString(),
+                    });
+                    return {
+                        kind: "learn-result",
+                        operation: "recall",
+                        key,
+                        data: loadedFact.data,
+                        source: loadedFact.source,
+                        confidence: loadedFact.confidence,
+                        timestamp: new Date(loadedFact.timestamp).toISOString(),
+                        found: true,
+                        accessCount: loadedFact.accessCount,
+                    };
+                }
+                else {
+                    this.logger.info(`📚 LEARN (recall) "${key}" - not found`);
+                    return {
+                        kind: "learn-result",
+                        operation: "recall",
+                        key,
+                        data: null,
+                        found: false,
+                    };
+                }
             }
-            else {
-                this.logger.info(`❌ Not found in memory: "${key}"`);
-                return {
-                    kind: "learn-result",
-                    operation: "recall",
-                    key,
-                    data: null,
-                    found: false,
-                };
+            // Learn: store new data with metadata (both in memory and file)
+            // Validate confidence
+            if (confidence < 0 || confidence > 1) {
+                throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
             }
+            // Save to persistent storage
+            this.learnedFactsStore.save(key, data, {
+                confidence,
+                source,
+                ttlDays: 30,
+            });
+            // Also store in memory for fast access
+            this.context.learned.set(key, {
+                data,
+                source,
+                confidence,
+                timestamp: timestamp ?? new Date().toISOString(),
+            });
+            this.logger.info(`  ✓ Learned data stored in context (key: ${key})`);
+            return {
+                kind: "learn-result",
+                operation: "learn",
+                key,
+                data,
+                source,
+                confidence,
+                timestamp: timestamp ?? new Date().toISOString(),
+                saved: "disk", // ← Indicates file persistence
+            };
         }
-        // Learn: store new data with metadata
-        const learnedEntry = {
-            data,
-            source,
-            confidence: confidence ?? 0.8, // Default confidence: 80%
-            timestamp: timestamp ?? new Date().toISOString(),
-        };
-        this.context.learned.set(key, learnedEntry);
-        this.logger.info(`🧠 Learned: "${key}" from "${source}"${confidence ? ` (confidence: ${confidence})` : ""}`);
-        return {
-            kind: "learn-result",
-            operation: "learn",
-            key,
-            data,
-            source,
-            confidence: confidence ?? 0.8,
-            timestamp: learnedEntry.timestamp,
-            stored: true,
-        };
+        catch (error) {
+            this.logger.error(`❌ Learn failed: ${error.message}`);
+            return {
+                kind: "learn-error",
+                key,
+                message: error.message,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
     // Phase 9c: Handle Reasoning Block - State-based AI reasoning
     handleReasoningBlock(reasoningBlock) {
@@ -2157,6 +2222,11 @@ class Interpreter {
                 }
                 break;
             case "analyze":
+                // Phase 9a: Show search results if available
+                const currentSearches = this.context.currentSearches;
+                if (currentSearches && currentSearches.size > 0) {
+                    logMessage += ` [using ${currentSearches.size} search result(s)]`;
+                }
                 const angles = data.get("angles");
                 if (angles instanceof Map) {
                     logMessage += `: ${angles.size} angles analyzed`;
@@ -2167,6 +2237,11 @@ class Interpreter {
                 }
                 break;
             case "decide":
+                // Phase 9b: Show learned data if available
+                const currentLearned = this.context.currentLearned;
+                if (currentLearned && currentLearned.size > 0) {
+                    logMessage += ` [using ${currentLearned.size} learned fact(s)]`;
+                }
                 const choice = data.get("choice");
                 if (choice) {
                     logMessage += `: "${choice.value || choice}"`;
@@ -2225,6 +2300,19 @@ class Interpreter {
         let currentStages = stages;
         let iteration = 0;
         const maxIterations = feedbackLoop?.maxIterations || 1;
+        // Phase 9a/9b: Initialize search and learn context for data sharing
+        if (!reasoningSeq.context) {
+            reasoningSeq.context = {};
+        }
+        if (!reasoningSeq.context.searches) {
+            reasoningSeq.context.searches = new Map();
+        }
+        if (!reasoningSeq.context.learned) {
+            reasoningSeq.context.learned = new Map();
+        }
+        // Store references in interpreter context for access during stage execution
+        this.context.currentSearches = reasoningSeq.context.searches;
+        this.context.currentLearned = reasoningSeq.context.learned;
         // Execute reasoning sequence with potential feedback loop
         while (iteration < maxIterations) {
             iteration++;
@@ -2238,56 +2326,99 @@ class Interpreter {
             for (let i = 0; i < currentStages.length; i++) {
                 const stage = currentStages[i];
                 const stageNum = i + 1;
-                // Log stage entry
+                // Phase 9a: Handle search block
+                if (stage.kind === "search-block") {
+                    const searchBlock = stage; // SearchBlock
+                    this.logger.info(`  [${stageNum}/${currentStages.length}] 🔎 SEARCH`);
+                    const searchResult = this.handleSearchBlock(searchBlock);
+                    // Store search result in reasoning sequence context
+                    if (!reasoningSeq.context) {
+                        reasoningSeq.context = {};
+                    }
+                    if (!reasoningSeq.context.searches) {
+                        reasoningSeq.context.searches = new Map();
+                    }
+                    const searchKey = `search_${i}`;
+                    reasoningSeq.context.searches.set(searchKey, searchResult);
+                    iterationResults.push(searchResult);
+                    executionPath.push("search");
+                    this.logger.info(`  ✓ Search result stored in context`);
+                    continue;
+                }
+                // Phase 9b: Handle learn block
+                if (stage.kind === "learn-block") {
+                    const learnBlock = stage; // LearnBlock
+                    this.logger.info(`  [${stageNum}/${currentStages.length}] 📚 LEARN`);
+                    const learnResult = this.handleLearnBlock(learnBlock);
+                    // Store learned data in reasoning sequence context
+                    if (!reasoningSeq.context) {
+                        reasoningSeq.context = {};
+                    }
+                    if (!reasoningSeq.context.learned) {
+                        reasoningSeq.context.learned = new Map();
+                    }
+                    const learnKey = learnBlock.key || `learn_${i}`;
+                    reasoningSeq.context.learned.set(learnKey, learnResult);
+                    iterationResults.push(learnResult);
+                    executionPath.push("learn");
+                    this.logger.info(`  ✓ Learned data stored in context (key: ${learnKey})`);
+                    continue;
+                }
+                // Phase 9a/9b: Only ReasoningBlock should reach here (Search/Learn already handled)
+                const reasoningBlock = stage;
+                if (reasoningBlock.kind !== "reasoning-block") {
+                    throw new Error(`Unexpected stage kind in reasoning sequence: ${stage.kind}`);
+                }
+                // Log stage entry for reasoning blocks
                 const stageEmoji = {
                     observe: "👀",
                     analyze: "🔍",
                     decide: "🎯",
                     act: "⚡",
                     verify: "✅",
-                }[stage.stage] || "❓";
+                }[reasoningBlock.stage] || "❓";
                 const stageLabel = iteration === 1
                     ? `[${stageNum}/${currentStages.length}]`
                     : `[${stageNum}/${currentStages.length}]`;
-                this.logger.info(`  ${stageLabel} ${stageEmoji} ${stage.stage.toUpperCase()}`);
+                this.logger.info(`  ${stageLabel} ${stageEmoji} ${reasoningBlock.stage.toUpperCase()}`);
                 // Phase 9c: Check for when guard clause (skip if condition is false)
-                if (stage.whenGuard) {
-                    const guardCondition = this.evaluateCondition(stage.whenGuard);
+                if (reasoningBlock.whenGuard) {
+                    const guardCondition = this.evaluateCondition(reasoningBlock.whenGuard);
                     if (!guardCondition) {
                         this.logger.info(`  ⏭️  SKIPPED (when guard condition false)`);
                         continue; // Skip this stage
                     }
                 }
                 // Apply confidence damping from previous iterations
-                let adjustedStage = stage;
-                if (iteration > 1 && stage.metadata?.confidence !== undefined) {
+                let adjustedStage = reasoningBlock;
+                if (iteration > 1 && reasoningBlock.metadata?.confidence !== undefined) {
                     adjustedStage = {
-                        ...stage,
+                        ...reasoningBlock,
                         metadata: {
-                            ...stage.metadata,
-                            confidence: Math.max(0, (stage.metadata.confidence || 1) -
+                            ...reasoningBlock.metadata,
+                            confidence: Math.max(0, (reasoningBlock.metadata.confidence || 1) -
                                 (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)),
                         },
                     };
                 }
                 // Phase 9c: Check for conditional (if/then/else)
                 let blockToHandle = adjustedStage;
-                if (stage.conditional) {
-                    const conditionMet = this.evaluateCondition(stage.conditional.condition);
-                    const selectedBlock = conditionMet ? stage.conditional.thenBlock : stage.conditional.elseBlock;
+                if (reasoningBlock.conditional) {
+                    const conditionMet = this.evaluateCondition(reasoningBlock.conditional.condition);
+                    const selectedBlock = conditionMet ? reasoningBlock.conditional.thenBlock : reasoningBlock.conditional.elseBlock;
                     if (selectedBlock) {
                         blockToHandle = selectedBlock;
                         this.logger.info(`  ${conditionMet ? "✓" : "✗"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`);
                     }
-                    else if (!conditionMet && !stage.conditional.elseBlock) {
+                    else if (!conditionMet && !reasoningBlock.conditional.elseBlock) {
                         this.logger.info(`  ⏭️  SKIPPED (if condition false, no else block)`);
                         continue; // Skip if condition false and no else
                     }
                 }
                 // Phase 9c: Check for loop control (repeat-until / repeat-while)
                 let stageResult;
-                if (stage.loopControl) {
-                    const { type, condition, maxIterations = 1000 } = stage.loopControl;
+                if (reasoningBlock.loopControl) {
+                    const { type, condition, maxIterations = 1000 } = reasoningBlock.loopControl;
                     const loopMaxIter = Math.min(maxIterations, 1000);
                     let loopIteration = 0;
                     while (loopIteration < loopMaxIter) {
@@ -2308,14 +2439,14 @@ class Interpreter {
                     stageResult = this.handleReasoningBlock(blockToHandle);
                 }
                 iterationResults.push(stageResult);
-                executionPath.push(stage.stage);
+                executionPath.push(reasoningBlock.stage);
                 // Store verify result for feedback check
-                if (stage.stage === "verify") {
+                if (reasoningBlock.stage === "verify") {
                     verifyResult = stageResult;
                 }
                 // Check for stage-specific transitions
-                if (stage.transitions && stage.transitions.length > 0) {
-                    for (const transition of stage.transitions) {
+                if (reasoningBlock.transitions && reasoningBlock.transitions.length > 0) {
+                    for (const transition of reasoningBlock.transitions) {
                         if (transition.condition) {
                             const conditionMet = this.eval(transition.condition);
                             if (conditionMet && transition.to) {

@@ -10,6 +10,7 @@ import { extractParamNames, extractFunctions } from "./ast-helpers";
 import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runtime";
 import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch integration
 import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
+import { createFileModule } from "./stdlib-file"; // Phase 10: File I/O
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -86,7 +87,7 @@ export interface ModuleInfo {
 
 // Interpreter class
 export class Interpreter {
-  private context: ExecutionContext;
+  public context: ExecutionContext; // Public for testing
   private logger: Logger;
   private searchAdapter: WebSearchAdapter; // Phase 9a: WebSearch
   private learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
@@ -116,6 +117,20 @@ export class Interpreter {
 
     // Phase 9b: Initialize LearnedFactsStore (persistent learning)
     this.learnedFactsStore = new LearnedFactsStore("./data/learned-facts.json", 30);
+
+    // Phase 10: Initialize File I/O module
+    const fileModule = createFileModule();
+    for (const [name, fn] of Object.entries(fileModule)) {
+      this.context.functions.set(name, {
+        name,
+        params: [], // Will be handled dynamically
+        body: fn as any,
+      });
+      // Register with type checker (as function accepting any args, returning any)
+      if (this.context.typeChecker) {
+        this.context.typeChecker.registerFunction(name, [], { kind: "type" as const, name: "any" });
+      }
+    }
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
@@ -407,6 +422,14 @@ export class Interpreter {
         if (Array.isArray(items)) {
           return items.map((item) => this.eval(item));
         }
+      }
+      // Phase 9d: Map literal: {:key1 value1 :key2 value2 ...}
+      if (block.type === "Map") {
+        const result: Record<string, any> = {};
+        for (const [key, value] of block.fields) {
+          result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
+        }
+        return result;
       }
       // For other block types, return as object
       const result: Record<string, any> = {};

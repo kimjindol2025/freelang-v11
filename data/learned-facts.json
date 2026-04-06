@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-04-06T17:08:23.375Z",
+  "facts": [
+    {
+      "key": "null-test",
+      "data": {
+        "kind": "literal",
+        "type": "symbol",
+        "value": "null"
+      },
+      "confidence": 0.5,
+      "source": "search",
+      "timestamp": 1775493862801,
+      "expiresAt": 1778085862801,
+      "accessCount": 0,
+      "lastAccessed": 1775493862801
+    },
+    {
+      "key": "large-data",
+      "data": {
+        "kind": "block",
+        "type": "Map",
+        "name": "$map",
+        "fields": {}
+      },
+      "confidence": 0.95,
+      "source": "search",
+      "timestamp": 1775495298375,
+      "expiresAt": 1778087298375,
+      "accessCount": 0,
+      "lastAccessed": 1775495298375
+    }
+  ]
+}

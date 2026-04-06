@@ -13,6 +13,8 @@ export enum TokenType {
   RBracket = "RBracket",   // ]
   LParen = "LParen",       // (
   RParen = "RParen",       // )
+  LBrace = "LBrace",       // {
+  RBrace = "RBrace",       // }
 
   // Phase 6 Keywords
   Module = "Module",       // MODULE

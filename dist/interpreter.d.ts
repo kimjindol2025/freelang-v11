@@ -20,6 +20,8 @@ export interface ExecutionContext {
     cache?: Map<string, any>;
     learned?: Map<string, any>;
     reasoning?: Map<string, any>;
+    currentSearches?: Map<string, any>;
+    currentLearned?: Map<string, any>;
 }
 export interface FreeLangFunction {
     name: string;
@@ -62,8 +64,10 @@ export interface ModuleInfo {
     functions: Map<string, FreeLangFunction>;
 }
 export declare class Interpreter {
-    private context;
+    context: ExecutionContext;
     private logger;
+    private searchAdapter;
+    private learnedFactsStore;
     constructor(app?: express.Express, logger?: Logger);
     interpret(blocks: ASTNode[]): ExecutionContext;
     private evalBlock;

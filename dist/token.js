@@ -15,6 +15,8 @@ var TokenType;
     TokenType["RBracket"] = "RBracket";
     TokenType["LParen"] = "LParen";
     TokenType["RParen"] = "RParen";
+    TokenType["LBrace"] = "LBrace";
+    TokenType["RBrace"] = "RBrace";
     // Phase 6 Keywords
     TokenType["Module"] = "Module";
     TokenType["TypeClass"] = "TypeClass";

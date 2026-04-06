@@ -140,6 +140,19 @@ function lex(source) {
             col++;
             continue;
         }
+        // Braces: Map literal delimiters
+        if (ch === "{") {
+            tokens.push({ type: token_1.TokenType.LBrace, value: "{", line, col });
+            i++;
+            col++;
+            continue;
+        }
+        if (ch === "}") {
+            tokens.push({ type: token_1.TokenType.RBrace, value: "}", line, col });
+            i++;
+            col++;
+            continue;
+        }
         // Pipe: Or-pattern separator
         if (ch === "|") {
             const startCol = col;

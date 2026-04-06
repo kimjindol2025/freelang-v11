@@ -476,6 +476,11 @@ export class Parser {
       return makeKeyword(token.value);
     }
 
+    // Check for map literal: {:key1 value1 :key2 value2}
+    if (this.check(T.LBrace)) {
+      return this.parseMap();
+    }
+
     // Check for block: [TYPE ...]
     if (this.check(T.LBracket)) {
       // Lookahead: is this a block or value array?
@@ -545,6 +550,33 @@ export class Parser {
     const arrayFields = new Map<string, ASTNode | ASTNode[]>();
     arrayFields.set("items", values);
     return makeBlock("Array", "$array", arrayFields);
+  }
+
+  // Parse map literal: {:key1 value1 :key2 value2 ...}
+  private parseMap(): ASTNode {
+    this.expect(T.LBrace);
+    const mapFields = new Map<string, ASTNode>();
+
+    while (!this.check(T.RBrace) && !this.isAtEnd()) {
+      // Expect a keyword as key (:key)
+      if (!this.check(T.Colon)) {
+        throw this.error(`Expected ':' keyword in map literal`, this.peek());
+      }
+      this.advance(); // consume ':'
+
+      if (!this.check(T.Symbol)) {
+        throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+      }
+      const key = this.advance().value;
+
+      // Parse the value
+      const value = this.parseValue();
+      mapFields.set(key, value);
+    }
+
+    this.expect(T.RBrace);
+    // Return as Map block
+    return makeBlock("Map", "$map", mapFields);
   }
 
   // Check if next is an array literal (not generic function type args)

@@ -138,6 +138,20 @@ export function lex(source: string): Token[] {
       continue;
     }
 
+    // Braces: Map literal delimiters
+    if (ch === "{") {
+      tokens.push({ type: T.LBrace, value: "{", line, col });
+      i++;
+      col++;
+      continue;
+    }
+    if (ch === "}") {
+      tokens.push({ type: T.RBrace, value: "}", line, col });
+      i++;
+      col++;
+      continue;
+    }
+
     // Pipe: Or-pattern separator
     if (ch === "|") {
       const startCol = col;

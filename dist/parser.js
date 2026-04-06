@@ -394,6 +394,10 @@ class Parser {
             const token = this.advance();
             return (0, ast_1.makeKeyword)(token.value);
         }
+        // Check for map literal: {:key1 value1 :key2 value2}
+        if (this.check(token_1.TokenType.LBrace)) {
+            return this.parseMap();
+        }
         // Check for block: [TYPE ...]
         if (this.check(token_1.TokenType.LBracket)) {
             // Lookahead: is this a block or value array?
@@ -461,6 +465,28 @@ class Parser {
         const arrayFields = new Map();
         arrayFields.set("items", values);
         return (0, ast_1.makeBlock)("Array", "$array", arrayFields);
+    }
+    // Parse map literal: {:key1 value1 :key2 value2 ...}
+    parseMap() {
+        this.expect(token_1.TokenType.LBrace);
+        const mapFields = new Map();
+        while (!this.check(token_1.TokenType.RBrace) && !this.isAtEnd()) {
+            // Expect a keyword as key (:key)
+            if (!this.check(token_1.TokenType.Colon)) {
+                throw this.error(`Expected ':' keyword in map literal`, this.peek());
+            }
+            this.advance(); // consume ':'
+            if (!this.check(token_1.TokenType.Symbol)) {
+                throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+            }
+            const key = this.advance().value;
+            // Parse the value
+            const value = this.parseValue();
+            mapFields.set(key, value);
+        }
+        this.expect(token_1.TokenType.RBrace);
+        // Return as Map block
+        return (0, ast_1.makeBlock)("Map", "$map", mapFields);
     }
     // Check if next is an array literal (not generic function type args)
     // Array literal: [$x ...] or [1 2 3] or [value ...]
@@ -1034,7 +1060,11 @@ class Parser {
             throw this.error(`Expected symbol/string key in learn expression`, this.peek());
         }
         // Second argument: data (any value)
-        const data = this.parseValue();
+        // For now, data is optional - if next token is :keyword, skip data parsing
+        let data = null;
+        if (!this.check(token_1.TokenType.Colon) && !this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
+            data = this.parseValue();
+        }
         // Parse optional keyword arguments
         let source = "search";
         let confidence;
@@ -1251,6 +1281,7 @@ class Parser {
     }
     // Phase 9c Extension: Parse reasoning-sequence expression
     // (reasoning-sequence (observe ...) (analyze ...) (decide ...) (act ...) (verify ...))
+    // Phase 9a/9b: Support search and learn blocks in sequences
     parseReasoningSequenceExpression() {
         const stages = [];
         const startTime = new Date().toISOString();
@@ -1340,6 +1371,18 @@ class Parser {
                         stages.push(loopBlock);
                         continue;
                     }
+                    if (nextToken.type === token_1.TokenType.Search) {
+                        // Phase 9a: Don't consume '(', let parseSearchReasoningBlock handle it
+                        const searchBlock = this.parseSearchReasoningBlock();
+                        stages.push(searchBlock);
+                        continue;
+                    }
+                    if (nextToken.type === token_1.TokenType.Learn) {
+                        // Phase 9b: Don't consume '(', let parseLearnReasoningBlock handle it
+                        const learnBlock = this.parseLearnReasoningBlock();
+                        stages.push(learnBlock);
+                        continue;
+                    }
                 }
                 this.advance(); // consume '('
                 // Check for reasoning stage keywords
@@ -1400,7 +1443,16 @@ class Parser {
             metadata: {
                 startTime,
                 endTime,
-                executionPath: stages.map((s) => s.stage),
+                // Phase 9a/9b: Support search/learn blocks in execution path
+                executionPath: stages.map((s) => {
+                    if ("stage" in s)
+                        return s.stage;
+                    if (s.kind === "search-block")
+                        return "search";
+                    if (s.kind === "learn-block")
+                        return "learn";
+                    return "unknown";
+                }),
             },
             feedbackLoop: feedbackLoop?.enabled ? feedbackLoop : undefined,
         };
@@ -1650,6 +1702,24 @@ class Parser {
     // Phase 9c: Parse loop control (repeat-until or repeat-while)
     // Format: (repeat-until condition (block))
     //         (repeat-while condition (block))
+    // Phase 9a: Parse search block in reasoning sequence
+    // (search query :source "web"|"api"|"kb" :cache true|false :limit 5)
+    parseSearchReasoningBlock() {
+        this.expect(token_1.TokenType.LParen); // consume '('
+        this.expect(token_1.TokenType.Search); // consume 'search'
+        const searchBlock = this.parseSearchExpression();
+        this.expect(token_1.TokenType.RParen); // consume ')'
+        return searchBlock;
+    }
+    // Phase 9b: Parse learn block in reasoning sequence
+    // (learn key data :source "search"|"feedback"|"analysis" :confidence 0.95)
+    parseLearnReasoningBlock() {
+        this.expect(token_1.TokenType.LParen); // consume '('
+        this.expect(token_1.TokenType.Learn); // consume 'learn'
+        const learnBlock = this.parseLearnExpression();
+        this.expect(token_1.TokenType.RParen); // consume ')'
+        return learnBlock;
+    }
     parseLoopReasoningBlock() {
         this.expect(token_1.TokenType.LParen); // consume '('
         // Check if it's repeat or while

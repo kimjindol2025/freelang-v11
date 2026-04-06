@@ -16,6 +16,7 @@ export declare class Parser {
     private convertBlockToInstance;
     private parseValue;
     private parseArray;
+    private parseMap;
     private isArrayLiteralStart;
     private parseSExpr;
     private parseTypeAnnotation;
@@ -43,6 +44,8 @@ export declare class Parser {
     private parseSelectiveImport;
     private parseConditionalReasoningBlock;
     private parseWhenReasoningBlock;
+    private parseSearchReasoningBlock;
+    private parseLearnReasoningBlock;
     private parseLoopReasoningBlock;
     private getReasoningStageName;
 }

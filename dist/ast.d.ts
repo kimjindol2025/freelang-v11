@@ -168,12 +168,16 @@ export interface ReasoningTransition {
 }
 export interface ReasoningSequence {
     kind: "reasoning-sequence";
-    stages: ReasoningBlock[];
+    stages: (ReasoningBlock | SearchBlock | LearnBlock)[];
     metadata?: {
         startTime?: string;
         endTime?: string;
         totalConfidence?: number;
         executionPath?: string[];
+    };
+    context?: {
+        searches?: Map<string, any>;
+        learned?: Map<string, any>;
     };
     feedbackLoop?: {
         enabled: boolean;
