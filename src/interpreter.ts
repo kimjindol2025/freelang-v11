@@ -16,6 +16,7 @@ import { createHttpModule } from "./stdlib-http"; // Phase 12: HTTP Client
 import { createShellModule } from "./stdlib-shell"; // Phase 12: Shell execution
 import { createDataModule } from "./stdlib-data"; // Phase 13: Data Transform
 import { createCollectionModule } from "./stdlib-collection"; // Phase 14: Collection + Control
+import { createAgentModule } from "./stdlib-agent"; // Phase 15: AI Agent State Machine
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -198,6 +199,20 @@ export class Interpreter {
     // Phase 14: Initialize Collection + Control module
     const collectionModule = createCollectionModule();
     for (const [name, fn] of Object.entries(collectionModule)) {
+      this.context.functions.set(name, {
+        name,
+        params: [],
+        body: fn as any,
+      });
+      if (this.context.typeChecker) {
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
+      }
+    }
+
+    // Phase 15: Initialize AI Agent State Machine module
+    const agentModule = createAgentModule();
+    for (const [name, fn] of Object.entries(agentModule)) {
       this.context.functions.set(name, {
         name,
         params: [],
