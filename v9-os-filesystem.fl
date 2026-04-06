@@ -1,0 +1,412 @@
+// FreeLang v9: 가상 파일시스템 (Virtual FileSystem)
+// 프로세스가 사용하는 파일 및 디렉토리 관리
+//
+// 주요 기능:
+//   - 파일 생성/읽기/삭제
+//   - 디렉토리 관리
+//   - 권한 제어 (읽기/쓰기/실행)
+//   - 경로 네비게이션
+
+struct FSFile {
+    inode: i32           ;; 아이노드 번호
+    name: str            ;; 파일명
+    content: str         ;; 파일 내용
+    size: i32            ;; 파일 크기
+    owner: str           ;; 소유자
+    permissions: i32     ;; 권한 (8진수: 755)
+    created_at: str      ;; 생성 시간
+    modified_at: str     ;; 수정 시간
+    file_type: str       ;; FILE or DIRECTORY
+}
+
+struct FSDirectory {
+    inode: i32           ;; 아이노드 번호
+    name: str            ;; 디렉토리명
+    parent_inode: i32    ;; 부모 디렉토리
+    entries: [i32]       ;; 자식 파일/디렉토리 아이노드
+    owner: str           ;; 소유자
+    permissions: i32     ;; 권한
+    created_at: str      ;; 생성 시간
+}
+
+struct VirtualFS {
+    files: [FSFile]
+    directories: [FSDirectory]
+    next_inode: i32
+    current_dir: i32     ;; 현재 디렉토리 아이노드
+    root_inode: i32      ;; 루트 아이노드
+}
+
+;; ==================== 파일시스템 초기화 ====================
+
+fn vfs_new() -> VirtualFS {
+    println("[VFS] Initializing Virtual FileSystem")
+
+    var vfs = VirtualFS {
+        files: [],
+        directories: [],
+        next_inode: 1,
+        current_dir: 0,
+        root_inode: 0
+    }
+
+    ;; 루트 디렉토리 생성
+    var root = FSDirectory {
+        inode: 0,
+        name: "/",
+        parent_inode: 0,
+        entries: [],
+        owner: "root",
+        permissions: 755,
+        created_at: "2026-04-06T20:52:42Z"
+    }
+
+    vfs.directories.push(root)
+    vfs.next_inode = 1
+
+    println("  ✅ Root directory created (inode 0)")
+
+    vfs
+}
+
+;; ==================== 파일 생성 ====================
+
+fn vfs_create_file(
+    vfs: VirtualFS,
+    path: str,
+    content: str,
+    owner: str
+) -> VirtualFS {
+    println("[VFS] Creating file: " + path)
+
+    var inode = vfs.next_inode
+    var file = FSFile {
+        inode: inode,
+        name: path,
+        content: content,
+        size: length(content),
+        owner: owner,
+        permissions: 644,
+        created_at: "2026-04-06T20:52:42Z",
+        modified_at: "2026-04-06T20:52:42Z",
+        file_type: "FILE"
+    }
+
+    vfs.files.push(file)
+    vfs.next_inode = vfs.next_inode + 1
+
+    ;; 현재 디렉토리에 파일 추가
+    var i: i32 = 0
+    while i < length(vfs.directories) {
+        if vfs.directories[i].inode == vfs.current_dir {
+            vfs.directories[i].entries.push(inode)
+        }
+        i = i + 1
+    }
+
+    println("  Inode: " + str(inode))
+    println("  Owner: " + owner)
+    println("  Size: " + str(length(content)) + " bytes")
+    println("  ✅ File created")
+
+    vfs
+}
+
+;; ==================== 디렉토리 생성 ====================
+
+fn vfs_create_dir(
+    vfs: VirtualFS,
+    dirname: str,
+    owner: str
+) -> VirtualFS {
+    println("[VFS] Creating directory: " + dirname)
+
+    var inode = vfs.next_inode
+    var dir = FSDirectory {
+        inode: inode,
+        name: dirname,
+        parent_inode: vfs.current_dir,
+        entries: [],
+        owner: owner,
+        permissions: 755,
+        created_at: "2026-04-06T20:52:42Z"
+    }
+
+    vfs.directories.push(dir)
+    vfs.next_inode = vfs.next_inode + 1
+
+    ;; 부모 디렉토리에 자식 추가
+    var i: i32 = 0
+    while i < length(vfs.directories) {
+        if vfs.directories[i].inode == vfs.current_dir {
+            vfs.directories[i].entries.push(inode)
+        }
+        i = i + 1
+    }
+
+    println("  Inode: " + str(inode))
+    println("  Owner: " + owner)
+    println("  ✅ Directory created")
+
+    vfs
+}
+
+;; ==================== 파일 읽기 ====================
+
+fn vfs_read_file(vfs: VirtualFS, inode: i32) -> str {
+    println("[VFS] Reading file (inode " + str(inode) + ")")
+
+    var i: i32 = 0
+    while i < length(vfs.files) {
+        if vfs.files[i].inode == inode {
+            println("  Size: " + str(vfs.files[i].size) + " bytes")
+            println("  Owner: " + vfs.files[i].owner)
+            return vfs.files[i].content
+        }
+        i = i + 1
+    }
+
+    println("  ❌ File not found")
+    "FILE_NOT_FOUND"
+}
+
+;; ==================== 파일 쓰기 ====================
+
+fn vfs_write_file(vfs: VirtualFS, inode: i32, new_content: str) -> VirtualFS {
+    println("[VFS] Writing to file (inode " + str(inode) + ")")
+
+    var i: i32 = 0
+    while i < length(vfs.files) {
+        if vfs.files[i].inode == inode {
+            vfs.files[i].content = new_content
+            vfs.files[i].size = length(new_content)
+            vfs.files[i].modified_at = "2026-04-06T20:52:42Z"
+            println("  Size: " + str(vfs.files[i].size) + " bytes")
+            println("  ✅ File updated")
+            return vfs
+        }
+        i = i + 1
+    }
+
+    println("  ❌ File not found")
+    vfs
+}
+
+;; ==================== 파일 삭제 ====================
+
+fn vfs_delete_file(vfs: VirtualFS, inode: i32) -> VirtualFS {
+    println("[VFS] Deleting file (inode " + str(inode) + ")")
+
+    var new_files: [FSFile] = []
+    var found: bool = false
+
+    var i: i32 = 0
+    while i < length(vfs.files) {
+        if vfs.files[i].inode != inode {
+            new_files.push(vfs.files[i])
+        } else {
+            found = true
+        }
+        i = i + 1
+    }
+
+    if found {
+        vfs.files = new_files
+        println("  ✅ File deleted")
+
+        ;; 부모 디렉토리에서 제거
+        var j: i32 = 0
+        while j < length(vfs.directories) {
+            if vfs.directories[j].inode == vfs.current_dir {
+                var new_entries: [i32] = []
+                var k: i32 = 0
+                while k < length(vfs.directories[j].entries) {
+                    if vfs.directories[j].entries[k] != inode {
+                        new_entries.push(vfs.directories[j].entries[k])
+                    }
+                    k = k + 1
+                }
+                vfs.directories[j].entries = new_entries
+            }
+            j = j + 1
+        }
+    } else {
+        println("  ❌ File not found")
+    }
+
+    vfs
+}
+
+;; ==================== 디렉토리 나열 ====================
+
+fn vfs_list_dir(vfs: VirtualFS) -> str {
+    println("[VFS] Listing directory (inode " + str(vfs.current_dir) + ")")
+
+    var i: i32 = 0
+    var found: bool = false
+
+    while i < length(vfs.directories) {
+        if vfs.directories[i].inode == vfs.current_dir {
+            found = true
+            var entries = vfs.directories[i].entries
+
+            var output: str = "Total " + str(length(entries)) + " entries\n"
+
+            var j: i32 = 0
+            while j < length(entries) {
+                var entry_inode = entries[j]
+
+                ;; 파일인지 디렉토리인지 확인
+                var file_i: i32 = 0
+                var found_file: bool = false
+                while file_i < length(vfs.files) {
+                    if vfs.files[file_i].inode == entry_inode {
+                        output = output + "  -rw-r--r-- " + vfs.files[file_i].name +
+                                " (" + str(vfs.files[file_i].size) + " bytes)\n"
+                        found_file = true
+                    }
+                    file_i = file_i + 1
+                }
+
+                if !found_file {
+                    var dir_i: i32 = 0
+                    while dir_i < length(vfs.directories) {
+                        if vfs.directories[dir_i].inode == entry_inode {
+                            output = output + "  drwxr-xr-x " + vfs.directories[dir_i].name + "/\n"
+                        }
+                        dir_i = dir_i + 1
+                    }
+                }
+
+                j = j + 1
+            }
+
+            println(output)
+            return output
+        }
+        i = i + 1
+    }
+
+    println("  ❌ Directory not found")
+    "DIRECTORY_NOT_FOUND"
+}
+
+;; ==================== 디렉토리 변경 ====================
+
+fn vfs_change_dir(vfs: VirtualFS, inode: i32) -> VirtualFS {
+    println("[VFS] Changing directory to inode " + str(inode))
+
+    var i: i32 = 0
+    while i < length(vfs.directories) {
+        if vfs.directories[i].inode == inode {
+            vfs.current_dir = inode
+            println("  ✅ Changed to: " + vfs.directories[i].name)
+            return vfs
+        }
+        i = i + 1
+    }
+
+    println("  ❌ Directory not found")
+    vfs
+}
+
+;; ==================== 권한 확인 ====================
+
+fn vfs_check_permission(vfs: VirtualFS, inode: i32, action: str) -> bool {
+    println("[VFS] Checking permission: " + action)
+
+    var i: i32 = 0
+    while i < length(vfs.files) {
+        if vfs.files[i].inode == inode {
+            var perms = vfs.files[i].permissions
+
+            if action == "read" {
+                println("  ✅ Read permission granted")
+                return true
+            }
+            if action == "write" && perms >= 600 {
+                println("  ✅ Write permission granted")
+                return true
+            }
+            if action == "execute" && perms >= 100 {
+                println("  ✅ Execute permission granted")
+                return true
+            }
+
+            println("  ❌ Permission denied")
+            return false
+        }
+        i = i + 1
+    }
+
+    println("  ❌ File not found")
+    false
+}
+
+;; ==================== 통계 ====================
+
+fn vfs_stats(vfs: VirtualFS) -> str {
+    println("[STATS] VirtualFS Status")
+    println("  Total files: " + str(length(vfs.files)))
+    println("  Total directories: " + str(length(vfs.directories)))
+    println("  Current directory inode: " + str(vfs.current_dir))
+    println("  Next inode: " + str(vfs.next_inode))
+
+    var total_size: i32 = 0
+    var i: i32 = 0
+    while i < length(vfs.files) {
+        total_size = total_size + vfs.files[i].size
+        i = i + 1
+    }
+
+    println("  Total file size: " + str(total_size) + " bytes")
+
+    "VirtualFS(files=" + str(length(vfs.files)) +
+    ", dirs=" + str(length(vfs.directories)) +
+    ", size=" + str(total_size) + " bytes)"
+}
+
+;; ==================== 테스트 ====================
+
+fn test_vfs() -> bool {
+    println("[TEST] Virtual FileSystem")
+
+    var vfs = vfs_new()
+    println("  Initialized VFS\n")
+
+    ;; 디렉토리 생성
+    vfs = vfs_create_dir(vfs, "agents", "kim")
+    vfs = vfs_create_dir(vfs, "data", "kim")
+
+    ;; 디렉토리 변경
+    vfs = vfs_change_dir(vfs, 1)
+
+    ;; 파일 생성
+    vfs = vfs_create_file(vfs, "analyzer.fl", "fn analyze(code) { ... }", "kim")
+    vfs = vfs_create_file(vfs, "refactor.fl", "fn refactor(code) { ... }", "kim")
+
+    ;; 디렉토리 나열
+    println("\n--- Listing /agents ---")
+    vfs_list_dir(vfs)
+
+    ;; 파일 읽기
+    println("\n--- Reading file ---")
+    var content = vfs_read_file(vfs, 3)
+    println("Content: " + substring(content, 0, 30) + "...")
+
+    ;; 파일 쓰기
+    println("\n--- Writing file ---")
+    vfs = vfs_write_file(vfs, 3, "fn analyze(code) { IMPROVED }")
+
+    ;; 권한 확인
+    println("\n--- Checking permissions ---")
+    vfs_check_permission(vfs, 3, "read")
+    vfs_check_permission(vfs, 3, "write")
+
+    ;; 통계
+    println("\n" + vfs_stats(vfs))
+
+    true
+}
+
+test_vfs()

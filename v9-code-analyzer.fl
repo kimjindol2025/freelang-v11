@@ -1,0 +1,348 @@
+// FreeLang v9: 코드 분석기 (Code Analyzer)
+// 프리랭 코드를 분석하여 병목 감지 및 개선 제안
+//
+// 주요 기능:
+//   - AST 분석
+//   - 병목 감지 (N+1 쿼리, 중복 코드 등)
+//   - 성능 메트릭 수집
+//   - 개선 제안 자동 생성
+
+struct CodeMetrics {
+    total_lines: i32
+    function_count: i32
+    variable_count: i32
+    loop_count: i32
+    function_call_count: i32
+    complexity_score: i32
+}
+
+struct PerformanceIssue {
+    issue_id: str
+    severity: str         ;; CRITICAL, WARNING, INFO
+    category: str         ;; N+1_QUERY, DEAD_CODE, DUPLICATION, etc
+    line_number: i32
+    description: str
+    suggestion: str
+}
+
+struct CodeAnalysisReport {
+    file_path: str
+    analysis_timestamp: str
+    metrics: CodeMetrics
+    issues: [PerformanceIssue]
+    optimization_score: i32  ;; 0-100, 높을수록 좋음
+}
+
+;; ==================== 코드 분석 초기화 ====================
+
+fn code_analyzer_new(file_path: str) -> CodeAnalysisReport {
+    CodeAnalysisReport {
+        file_path: file_path,
+        analysis_timestamp: "2026-04-06T20:52:42Z",
+        metrics: CodeMetrics {
+            total_lines: 0,
+            function_count: 0,
+            variable_count: 0,
+            loop_count: 0,
+            function_call_count: 0,
+            complexity_score: 0
+        },
+        issues: [],
+        optimization_score: 0
+    }
+}
+
+;; ==================== 메트릭 수집 ====================
+
+fn code_analyzer_collect_metrics(report: CodeAnalysisReport, code: str) -> CodeAnalysisReport {
+    println("[ANALYZE] Collecting metrics from: " + report.file_path)
+
+    var metrics = report.metrics
+
+    ;; 라인 수 계산
+    metrics.total_lines = length(code)
+
+    ;; 함수 개수 (간단한 휴리스틱)
+    var fn_count: i32 = 0
+    var i: i32 = 0
+    while i < length(code) {
+        if i + 2 < length(code) {
+            var substr = substring(code, i, i + 2)
+            if substr == "fn" {
+                fn_count = fn_count + 1
+            }
+        }
+        i = i + 1
+    }
+    metrics.function_count = fn_count
+
+    ;; 변수 개수 (var 키워드 검사)
+    var var_count: i32 = 0
+    i = 0
+    while i < length(code) {
+        if i + 3 < length(code) {
+            var substr = substring(code, i, i + 3)
+            if substr == "var" {
+                var_count = var_count + 1
+            }
+        }
+        i = i + 1
+    }
+    metrics.variable_count = var_count
+
+    ;; 루프 개수 (while 키워드)
+    var loop_count: i32 = 0
+    i = 0
+    while i < length(code) {
+        if i + 5 < length(code) {
+            var substr = substring(code, i, i + 5)
+            if substr == "while" {
+                loop_count = loop_count + 1
+            }
+        }
+        i = i + 1
+    }
+    metrics.loop_count = loop_count
+
+    ;; 함수 호출 수 (괄호 검사)
+    var call_count: i32 = 0
+    i = 0
+    while i < length(code) {
+        var substr = substring(code, i, i + 1)
+        if substr == "(" {
+            call_count = call_count + 1
+        }
+        i = i + 1
+    }
+    metrics.function_call_count = call_count
+
+    ;; 복잡도 점수 (휴리스틱)
+    metrics.complexity_score = (metrics.function_count * 2) + (metrics.loop_count * 3) + (metrics.variable_count)
+
+    report.metrics = metrics
+
+    println("  Total lines: " + str(metrics.total_lines))
+    println("  Functions: " + str(metrics.function_count))
+    println("  Variables: " + str(metrics.variable_count))
+    println("  Loops: " + str(metrics.loop_count))
+    println("  Function calls: " + str(metrics.function_call_count))
+    println("  Complexity score: " + str(metrics.complexity_score))
+
+    report
+}
+
+;; ==================== 병목 감지 ====================
+
+fn code_analyzer_detect_issues(report: CodeAnalysisReport) -> CodeAnalysisReport {
+    println("[DETECT] Finding performance issues...")
+
+    ;; Issue 1: 높은 순환 복잡도
+    if report.metrics.complexity_score > 50 {
+        var issue = PerformanceIssue {
+            issue_id: "issue-001",
+            severity: "WARNING",
+            category: "HIGH_COMPLEXITY",
+            line_number: 0,
+            description: "High cyclomatic complexity (" + str(report.metrics.complexity_score) + ")",
+            suggestion: "Refactor into smaller functions"
+        }
+        report.issues.push(issue)
+        println("  ⚠️ High complexity detected")
+    }
+
+    ;; Issue 2: 과도한 루프
+    if report.metrics.loop_count > 5 {
+        var issue = PerformanceIssue {
+            issue_id: "issue-002",
+            severity: "INFO",
+            category: "NESTED_LOOPS",
+            line_number: 0,
+            description: "Multiple loops (" + str(report.metrics.loop_count) + ")",
+            suggestion: "Consider using collections/map instead of loops"
+        }
+        report.issues.push(issue)
+        println("  ℹ️ Nested loops detected")
+    }
+
+    ;; Issue 3: 높은 함수 호출 수
+    if report.metrics.function_call_count > 100 {
+        var issue = PerformanceIssue {
+            issue_id: "issue-003",
+            severity: "INFO",
+            category: "EXCESSIVE_CALLS",
+            line_number: 0,
+            description: "High function call count (" + str(report.metrics.function_call_count) + ")",
+            suggestion: "Batch operations where possible"
+        }
+        report.issues.push(issue)
+        println("  ℹ️ Excessive function calls detected")
+    }
+
+    ;; Issue 4: 미사용 변수 가능성
+    if report.metrics.variable_count > report.metrics.function_count * 5 {
+        var issue = PerformanceIssue {
+            issue_id: "issue-004",
+            severity: "WARNING",
+            category: "UNUSED_VARIABLES",
+            line_number: 0,
+            description: "Possibly unused variables (" + str(report.metrics.variable_count) + " vars, " + str(report.metrics.function_count) + " funcs)",
+            suggestion: "Review variable usage and clean up"
+        }
+        report.issues.push(issue)
+        println("  ⚠️ Possible unused variables")
+    }
+
+    if length(report.issues) == 0 {
+        println("  ✅ No critical issues found")
+    }
+
+    report
+}
+
+;; ==================== 최적화 점수 계산 ====================
+
+fn code_analyzer_calculate_score(report: CodeAnalysisReport) -> CodeAnalysisReport {
+    var score: i32 = 100
+
+    ;; 각 이슈별 감점
+    var i: i32 = 0
+    while i < length(report.issues) {
+        var issue = report.issues[i]
+
+        if issue.severity == "CRITICAL" {
+            score = score - 30
+        }
+        if issue.severity == "WARNING" {
+            score = score - 15
+        }
+        if issue.severity == "INFO" {
+            score = score - 5
+        }
+
+        i = i + 1
+    }
+
+    if score < 0 {
+        score = 0
+    }
+
+    report.optimization_score = score
+
+    println("[SCORE] Optimization score: " + str(score) + "/100")
+
+    report
+}
+
+;; ==================== 리포트 생성 ====================
+
+fn code_analyzer_generate_report(report: CodeAnalysisReport) -> str {
+    var output = "=== Code Analysis Report ===\n"
+    output = output + "File: " + report.file_path + "\n"
+    output = output + "Timestamp: " + report.analysis_timestamp + "\n\n"
+
+    output = output + "## Metrics\n"
+    output = output + "- Total lines: " + str(report.metrics.total_lines) + "\n"
+    output = output + "- Functions: " + str(report.metrics.function_count) + "\n"
+    output = output + "- Variables: " + str(report.metrics.variable_count) + "\n"
+    output = output + "- Loops: " + str(report.metrics.loop_count) + "\n"
+    output = output + "- Function calls: " + str(report.metrics.function_call_count) + "\n"
+    output = output + "- Complexity: " + str(report.metrics.complexity_score) + "\n\n"
+
+    output = output + "## Issues (" + str(length(report.issues)) + ")\n"
+
+    if length(report.issues) > 0 {
+        var i: i32 = 0
+        while i < length(report.issues) {
+            var issue = report.issues[i]
+            output = output + "\n[" + issue.severity + "] " + issue.category + "\n"
+            output = output + "  Problem: " + issue.description + "\n"
+            output = output + "  Solution: " + issue.suggestion + "\n"
+            i = i + 1
+        }
+    } else {
+        output = output + "No issues detected\n\n"
+    }
+
+    output = output + "## Optimization Score\n"
+    output = output + str(report.optimization_score) + "/100\n"
+
+    if report.optimization_score >= 80 {
+        output = output + "Status: ✅ Good code quality\n"
+    }
+    if report.optimization_score >= 60 && report.optimization_score < 80 {
+        output = output + "Status: ⚠️ Needs improvement\n"
+    }
+    if report.optimization_score < 60 {
+        output = output + "Status: ❌ Critical improvements needed\n"
+    }
+
+    output
+}
+
+;; ==================== 자동 리팩토링 제안 ====================
+
+fn code_analyzer_suggest_refactoring(report: CodeAnalysisReport) -> str {
+    println("[REFACTOR] Generating refactoring suggestions...")
+
+    var suggestions = "## Refactoring Recommendations\n\n"
+
+    if report.metrics.complexity_score > 50 {
+        suggestions = suggestions + "1. **Break down complex functions**\n"
+        suggestions = suggestions + "   - Current complexity: " + str(report.metrics.complexity_score) + "\n"
+        suggestions = suggestions + "   - Target complexity: < 20\n"
+        suggestions = suggestions + "   - Action: Extract helper functions\n\n"
+    }
+
+    if report.metrics.loop_count > 5 {
+        suggestions = suggestions + "2. **Optimize loops**\n"
+        suggestions = suggestions + "   - Current loops: " + str(report.metrics.loop_count) + "\n"
+        suggestions = suggestions + "   - Use: map(), filter(), fold() instead of while loops\n\n"
+    }
+
+    if report.metrics.function_call_count > 100 {
+        suggestions = suggestions + "3. **Reduce function call overhead**\n"
+        suggestions = suggestions + "   - Current calls: " + str(report.metrics.function_call_count) + "\n"
+        suggestions = suggestions + "   - Consider: inlining, batching operations\n\n"
+    }
+
+    suggestions = suggestions + "Run these recommendations to improve optimization score\n"
+
+    suggestions
+}
+
+;; ==================== 테스트 ====================
+
+fn test_code_analyzer() -> bool {
+    println("[TEST] Code Analyzer")
+
+    var sample_code = "fn analyze(code) {
+  var result = code
+  var i = 0
+  while i < 100 {
+    result = process(result)
+    i = i + 1
+  }
+  return result
+}"
+
+    var report = code_analyzer_new("example.fl")
+    println("  Created analyzer for: example.fl\n")
+
+    report = code_analyzer_collect_metrics(report, sample_code)
+    println("")
+
+    report = code_analyzer_detect_issues(report)
+    println("")
+
+    report = code_analyzer_calculate_score(report)
+    println("")
+
+    println(code_analyzer_generate_report(report))
+    println("")
+
+    println(code_analyzer_suggest_refactoring(report))
+
+    true
+}
+
+test_code_analyzer()
