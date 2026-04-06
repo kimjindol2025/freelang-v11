@@ -1,0 +1,31 @@
+; FreeLang v9 — 기본 예제
+
+; print / println
+(println "Hello, FreeLang v9!")
+
+; 문자열 보간
+(let [[$name "Claude"]
+      [$ver 9]]
+  (println "나는 {$name}이고, 이건 FreeLang v{$ver}다."))
+
+; 계산 — 표현식은 먼저 변수에 저장 후 보간
+(let [[$a 10]
+      [$b 3]
+      [$sum (+ 10 3)]
+      [$mul (* 10 3)]]
+  (println "{$a} + {$b} = {$sum}")
+  (println "{$a} * {$b} = {$mul}"))
+
+; 조건
+(let [[$x 42]]
+  (if (> $x 0)
+    (println "{$x} 는 양수")
+    (println "{$x} 는 음수")))
+
+; 함수 정의 + 호출
+[FUNC greet :params [$who]
+  :body (println "안녕, {$who}!")
+]
+
+(greet "AI")
+(greet "FreeLang")

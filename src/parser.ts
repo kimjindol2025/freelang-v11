@@ -64,11 +64,25 @@ export class ParserError extends Error {
   constructor(
     message: string,
     public line: number,
-    public col: number
+    public col: number,
+    public hint?: string
   ) {
-    super(`[${line}:${col}] ${message}`);
+    const loc = `[${line}:${col}]`;
+    const hintLine = hint ? `\n  힌트: ${hint}` : "";
+    super(`${loc} ${message}${hintLine}`);
   }
 }
+
+// 에러 메시지 힌트 테이블
+const ERROR_HINTS: Record<string, string> = {
+  "Expected RParen, got Symbol":        "괄호가 닫히지 않았거나 와일드카드 패턴에 괄호가 필요합니다: _ expr → (_ expr)",
+  "Expected RParen, got EOF":           "괄호가 닫히지 않았습니다. 여는 ( 와 닫는 ) 수를 확인하세요.",
+  "Expected operator":                  "S-expression의 첫 요소는 함수명이어야 합니다: (함수명 인자...)",
+  "Expected ':' keyword in map literal": "맵 리터럴의 키는 :으로 시작해야 합니다: {:key value}",
+  "Unexpected token: Colon":            "콜론 키워드 (:key)는 맵 리터럴 또는 블록 필드에서만 사용할 수 있습니다.",
+  "Expected block type":                "블록은 [FUNC name :params [...] :body ...] 형식이어야 합니다.",
+  "Unterminated string":                "문자열이 닫히지 않았습니다. 닫는 \" 를 추가하세요.",
+};
 
 export class Parser {
   private pos = 0;
@@ -1045,7 +1059,9 @@ export class Parser {
   }
 
   private error(message: string, token: Token): ParserError {
-    return new ParserError(message, token.line, token.col);
+    // 힌트 매칭: 메시지 앞부분으로 검색
+    const hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+    return new ParserError(message, token.line, token.col, hint);
   }
 
   // Synchronization for error recovery

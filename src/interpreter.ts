@@ -540,7 +540,13 @@ export class Interpreter {
 
     // Literal values
     if ((node as any).kind === "literal") {
-      return (node as Literal).value;
+      const lit = node as Literal;
+      // 문자열 보간: "Hello {$name}!" 또는 "결과: {(+ $a $b)}"
+      if (lit.type === "string" && typeof lit.value === "string" &&
+          (lit.value.includes("{$") || lit.value.includes("{("))) {
+        return this.interpolateString(lit.value as string);
+      }
+      return lit.value;
     }
 
     // Variables
@@ -1260,6 +1266,26 @@ export class Interpreter {
       case "not":
         return !args[0];
 
+      // Output — print/println/str
+      case "print":
+        process.stdout.write(args.map((a: any) => this.toDisplayString(a)).join(" "));
+        return null;
+      case "println":
+      case "echo":
+        console.log(...args.map((a: any) => this.toDisplayString(a)));
+        return null;
+      case "print-err":
+        process.stderr.write(args.map((a: any) => this.toDisplayString(a)).join(" ") + "\n");
+        return null;
+      case "str":
+        return args.map((a: any) => this.toDisplayString(a)).join("");
+      case "repr":
+        return JSON.stringify(args[0], null, 2);
+      case "inspect":
+        const inspected = this.toDisplayString(args[0]);
+        console.log(inspected);
+        return args[0]; // pass-through (tap pattern)
+
       // String
       case "concat":
         return args.join("");
@@ -1815,8 +1841,91 @@ export class Interpreter {
       }
     }
 
-    // Evaluate body
-    return this.eval(body);
+    // Evaluate body — 여러 표현식 허용 (마지막 값 반환)
+    let result: any = null;
+    for (let bodyIdx = 1; bodyIdx < args.length; bodyIdx++) {
+      result = this.eval(args[bodyIdx]);
+    }
+    return result;
+  }
+
+  // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
+  private interpolateString(template: string): string {
+    let result = "";
+    let i = 0;
+    while (i < template.length) {
+      if (template[i] === "{" && i + 1 < template.length) {
+        const next = template[i + 1];
+        if (next === "$") {
+          // {$varName} 패턴
+          const end = template.indexOf("}", i);
+          if (end > i) {
+            const varName = template.slice(i + 2, end);
+            let val: any;
+            if (varName.includes(".")) {
+              const parts = varName.split(".");
+              val = this.context.variables.has("$" + parts[0])
+                ? this.context.variables.get("$" + parts[0])
+                : this.context.variables.get(parts[0]);
+              for (let p = 1; p < parts.length; p++) {
+                if (val === null || val === undefined) { val = null; break; }
+                val = typeof val === "object" ? val[parts[p]] : null;
+              }
+            } else {
+              val = this.context.variables.has("$" + varName)
+                ? this.context.variables.get("$" + varName)
+                : this.context.variables.get(varName);
+            }
+            result += val === null || val === undefined ? "" : String(val);
+            i = end + 1;
+            continue;
+          }
+        } else if (next === "(") {
+          // {(expr)} 패턴 — 균형 잡힌 괄호 탐색
+          let depth = 0;
+          let j = i + 1; // '{' 이후
+          while (j < template.length) {
+            if (template[j] === "(") depth++;
+            else if (template[j] === ")") { depth--; if (depth === 0) break; }
+            j++;
+          }
+          if (j < template.length && j + 1 < template.length && template[j + 1] === "}") {
+            const exprStr = template.slice(i + 1, j + 1); // "(expr)"
+            try {
+              const { lex: lexFn } = require("./lexer");
+              const { parse: parseFn } = require("./parser");
+              const tokens = lexFn(exprStr);
+              const ast = parseFn(tokens);
+              const val = ast.length > 0 ? this.eval(ast[0]) : null;
+              result += val === null || val === undefined ? "" : String(val);
+            } catch {
+              result += template.slice(i, j + 2); // 오류 시 원본 유지
+            }
+            i = j + 2; // ')' + '}' 건너뜀
+            continue;
+          }
+        }
+      }
+      result += template[i];
+      i++;
+    }
+    return result;
+  }
+
+  // 값을 사람/AI가 읽기 좋은 문자열로 변환
+  private toDisplayString(val: any): string {
+    if (val === null || val === undefined) return "null";
+    if (typeof val === "string") return val;
+    if (typeof val === "number" || typeof val === "boolean") return String(val);
+    if (Array.isArray(val)) return "[" + val.map((v) => this.toDisplayString(v)).join(", ") + "]";
+    if (typeof val === "object") {
+      if (val.kind === "function-value") return `<fn:${val.name || "λ"}>`;
+      const entries = Object.entries(val)
+        .filter(([k]) => !k.startsWith("_"))
+        .map(([k, v]) => `${k}: ${this.toDisplayString(v)}`);
+      return "{" + entries.join(", ") + "}";
+    }
+    return String(val);
   }
 
   private evalCond(args: ASTNode[]): any {

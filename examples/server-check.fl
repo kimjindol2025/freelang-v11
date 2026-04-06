@@ -1,0 +1,40 @@
+; FreeLang v9 — 서버 자원검색 예제
+; 실행: npm run freelang run examples/server-check.fl
+
+; 기본 정보
+(let [[$host (res_hostname)]
+      [$uptime_s (res_uptime_s)]
+      [$mem_pct (res_mem_pct)]]
+  (println "=== 서버 상태 ===")
+  (println "호스트:   {$host}")
+  (println "업타임:   {(/ $uptime_s 3600)} 시간")
+  (println "메모리:   {$mem_pct}% 사용 중"))
+
+; 헬스체크
+(let [[$health (res_health_check)]]
+  (println "")
+  (println "=== 헬스체크 ===")
+  (if (get $health "ok")
+    (println "상태: 정상")
+    (println "상태: 경고 있음")))
+
+; 포트 확인
+(println "")
+(println "=== 포트 현황 ===")
+(let [[$ports (res_ports)]
+      [$cnt (length $ports)]]
+  (println "열린 포트 수: {$cnt}"))
+
+(println "22번 포트 (SSH):    {(res_port_used 22)}")
+(println "40000번 포트 (kimdb): {(res_port_used 40000)}")
+
+; 빈 포트 탐색
+(let [[$free (res_find_free_port 30000 30010)]]
+  (println "30000-30010 빈 포트: {$free}"))
+
+; PM2 서비스
+(println "")
+(println "=== PM2 서비스 ===")
+(let [[$svcs (res_pm2_list)]
+      [$cnt (length $svcs)]]
+  (println "실행 중: {$cnt}개"))
