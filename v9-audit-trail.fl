@@ -1,0 +1,334 @@
+// FreeLang v9: 감사 추적 (Audit Trail)
+// 모든 변경사항을 기록하고 누가 언제 무엇을 했는지 추적
+//
+// 주요 기능:
+//   - AuditLog: 개별 감사 기록
+//   - AuditTrail: 감사 시스템
+//   - track_event: 이벤트 기록
+//   - get_activity_report: 활동 리포트 생성
+
+struct AuditLog {
+    event_id: str        ;; 이벤트 ID
+    event_type: str      ;; 이벤트 타입 (CREATE, UPDATE, DELETE, READ)
+    timestamp: str       ;; 발생 시간
+    actor: str           ;; 수행자 (에이전트/사용자)
+    target: str          ;; 대상 (파일/기록)
+    action: str          ;; 수행한 작업 설명
+    status: str          ;; 결과 (SUCCESS, FAILED)
+    details: str         ;; 추가 정보
+}
+
+struct AuditTrail {
+    logs: [AuditLog]
+    trail_id: str        ;; 추적 ID
+    total_events: i32    ;; 총 이벤트 수
+}
+
+;; ==================== 감사 추적 초기화 ====================
+
+fn audit_trail_new(trail_id: str) -> AuditTrail {
+    AuditTrail {
+        logs: [],
+        trail_id: trail_id,
+        total_events: 0
+    }
+}
+
+;; ==================== 이벤트 기록 ====================
+
+fn audit_trail_log(
+    trail: AuditTrail,
+    event_type: str,
+    actor: str,
+    target: str,
+    action: str,
+    status: str
+) -> AuditTrail {
+    var event_id = "evt-" + str(trail.total_events + 1)
+
+    var log = AuditLog {
+        event_id: event_id,
+        event_type: event_type,
+        timestamp: "2026-04-06T00:00:00Z",
+        actor: actor,
+        target: target,
+        action: action,
+        status: status,
+        details: ""
+    }
+
+    trail.logs.push(log)
+    trail.total_events = trail.total_events + 1
+
+    println("[AUDIT] " + event_type + " by " + actor + ": " + action)
+
+    trail
+}
+
+fn audit_trail_log_with_details(
+    trail: AuditTrail,
+    event_type: str,
+    actor: str,
+    target: str,
+    action: str,
+    status: str,
+    details: str
+) -> AuditTrail {
+    var event_id = "evt-" + str(trail.total_events + 1)
+
+    var log = AuditLog {
+        event_id: event_id,
+        event_type: event_type,
+        timestamp: "2026-04-06T00:00:00Z",
+        actor: actor,
+        target: target,
+        action: action,
+        status: status,
+        details: details
+    }
+
+    trail.logs.push(log)
+    trail.total_events = trail.total_events + 1
+
+    trail
+}
+
+;; ==================== 감사 기록 조회 ====================
+
+fn audit_trail_get_log(trail: AuditTrail, event_id: str) -> AuditLog {
+    var i: i32 = 0
+    while i < length(trail.logs) {
+        if trail.logs[i].event_id == event_id {
+            return trail.logs[i]
+        }
+        i = i + 1
+    }
+
+    AuditLog {
+        event_id: "not_found",
+        event_type: "",
+        timestamp: "",
+        actor: "",
+        target: "",
+        action: "",
+        status: "",
+        details: ""
+    }
+}
+
+;; 특정 actor의 모든 로그 조회
+fn audit_trail_get_by_actor(trail: AuditTrail, actor: str) -> [AuditLog] {
+    var results: [AuditLog] = []
+    var i: i32 = 0
+
+    while i < length(trail.logs) {
+        if trail.logs[i].actor == actor {
+            results.push(trail.logs[i])
+        }
+        i = i + 1
+    }
+
+    results
+}
+
+;; 특정 타입의 모든 로그 조회
+fn audit_trail_get_by_type(trail: AuditTrail, event_type: str) -> [AuditLog] {
+    var results: [AuditLog] = []
+    var i: i32 = 0
+
+    while i < length(trail.logs) {
+        if trail.logs[i].event_type == event_type {
+            results.push(trail.logs[i])
+        }
+        i = i + 1
+    }
+
+    results
+}
+
+;; 특정 대상의 모든 로그 조회
+fn audit_trail_get_by_target(trail: AuditTrail, target: str) -> [AuditLog] {
+    var results: [AuditLog] = []
+    var i: i32 = 0
+
+    while i < length(trail.logs) {
+        if trail.logs[i].target == target {
+            results.push(trail.logs[i])
+        }
+        i = i + 1
+    }
+
+    results
+}
+
+;; ==================== 활동 리포트 ====================
+
+fn audit_trail_summary(trail: AuditTrail) -> str {
+    println("[SUMMARY] Audit Trail: " + trail.trail_id)
+    println("  Total events: " + str(trail.total_events))
+
+    ;; 이벤트 타입별 집계
+    var create_count: i32 = 0
+    var update_count: i32 = 0
+    var delete_count: i32 = 0
+    var read_count: i32 = 0
+
+    var i: i32 = 0
+    while i < length(trail.logs) {
+        var event_type = trail.logs[i].event_type
+        if event_type == "CREATE" {
+            create_count = create_count + 1
+        }
+        if event_type == "UPDATE" {
+            update_count = update_count + 1
+        }
+        if event_type == "DELETE" {
+            delete_count = delete_count + 1
+        }
+        if event_type == "READ" {
+            read_count = read_count + 1
+        }
+        i = i + 1
+    }
+
+    println("  CREATE: " + str(create_count))
+    println("  UPDATE: " + str(update_count))
+    println("  DELETE: " + str(delete_count))
+    println("  READ: " + str(read_count))
+
+    ;; Actor별 활동
+    var actors: [str] = []
+    var j: i32 = 0
+    while j < length(trail.logs) {
+        var actor = trail.logs[j].actor
+        var found: bool = false
+        var k: i32 = 0
+        while k < length(actors) {
+            if actors[k] == actor {
+                found = true
+            }
+            k = k + 1
+        }
+        if !found {
+            actors.push(actor)
+        }
+        j = j + 1
+    }
+
+    println("\n  Active actors:")
+    var m: i32 = 0
+    while m < length(actors) {
+        var actor_logs = audit_trail_get_by_actor(trail, actors[m])
+        println("    - " + actors[m] + ": " + str(length(actor_logs)) + " events")
+        m = m + 1
+    }
+
+    "AuditTrail(id=" + trail.trail_id + ", events=" + str(trail.total_events) + ")"
+}
+
+fn audit_trail_generate_report(trail: AuditTrail) -> str {
+    var report = "=== Audit Trail Report ===\n"
+    report = report + "Trail ID: " + trail.trail_id + "\n"
+    report = report + "Total Events: " + str(trail.total_events) + "\n\n"
+
+    report = report + "Recent Events:\n"
+    var start_idx = trail.total_events - 5
+    if start_idx < 0 {
+        start_idx = 0
+    }
+
+    var i: i32 = start_idx
+    while i < length(trail.logs) {
+        var log = trail.logs[i]
+        report = report + "[" + log.event_id + "] " + log.event_type + "\n"
+        report = report + "  Actor: " + log.actor + "\n"
+        report = report + "  Target: " + log.target + "\n"
+        report = report + "  Action: " + log.action + "\n"
+        report = report + "  Status: " + log.status + "\n\n"
+        i = i + 1
+    }
+
+    report
+}
+
+;; ==================== 감사 검증 ====================
+
+fn audit_trail_verify(trail: AuditTrail) -> bool {
+    println("[VERIFY] Verifying audit trail integrity...")
+
+    var all_valid: bool = true
+    var i: i32 = 0
+
+    while i < length(trail.logs) {
+        var log = trail.logs[i]
+
+        ;; Event ID 확인
+        if log.event_id == "" {
+            println("  ❌ Log at index " + str(i) + " has empty event_id")
+            all_valid = false
+        }
+
+        ;; Event Type 확인
+        if log.event_type != "CREATE" &&
+           log.event_type != "UPDATE" &&
+           log.event_type != "DELETE" &&
+           log.event_type != "READ" {
+            println("  ❌ Invalid event_type: " + log.event_type)
+            all_valid = false
+        }
+
+        ;; Status 확인
+        if log.status != "SUCCESS" && log.status != "FAILED" {
+            println("  ❌ Invalid status: " + log.status)
+            all_valid = false
+        }
+
+        i = i + 1
+    }
+
+    if all_valid {
+        println("  ✅ All audit logs are valid")
+    }
+
+    all_valid
+}
+
+;; ==================== 테스트 ====================
+
+fn test_audit_trail() -> bool {
+    println("[TEST] Audit Trail System")
+
+    var trail = audit_trail_new("audit-002")
+    println("  Created audit trail")
+
+    ;; 이벤트 기록
+    trail = audit_trail_log(trail, "CREATE", "kim", "v9-immutable.fl", "파일 생성", "SUCCESS")
+    trail = audit_trail_log(trail, "UPDATE", "kim", "v9-immutable.fl", "구조체 추가", "SUCCESS")
+    trail = audit_trail_log(trail, "CREATE", "agent-1", "v9-hash-chain.fl", "파일 생성", "SUCCESS")
+    trail = audit_trail_log(trail, "UPDATE", "kim", "v9-hash-chain.fl", "해시 함수 추가", "SUCCESS")
+    trail = audit_trail_log(trail, "CREATE", "agent-2", "v9-audit-trail.fl", "파일 생성", "SUCCESS")
+
+    println("\nRecorded 5 events")
+
+    ;; 요약
+    var summary = audit_trail_summary(trail)
+
+    ;; 특정 actor의 활동
+    println("\nActivity by kim:")
+    var kim_logs = audit_trail_get_by_actor(trail, "kim")
+    var i: i32 = 0
+    while i < length(kim_logs) {
+        println("  - " + kim_logs[i].action)
+        i = i + 1
+    }
+
+    ;; 리포트 생성
+    println("\n" + audit_trail_generate_report(trail))
+
+    ;; 검증
+    var verified = audit_trail_verify(trail)
+
+    verified
+}
+
+test_audit_trail()
