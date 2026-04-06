@@ -89,6 +89,8 @@ export declare class Interpreter {
     private callFunction;
     private getFieldValue;
     private evalPatternMatch;
+    private evalTryBlock;
+    private evalThrow;
     private matchPattern;
     getContext(): ExecutionContext;
     setVariable(name: string, value: any): void;

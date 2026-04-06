@@ -2,7 +2,7 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -11,6 +11,7 @@ import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runti
 import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch integration
 import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
 import { createFileModule } from "./stdlib-file"; // Phase 10: File I/O
+import { createErrorModule } from "./stdlib-error"; // Phase 11: Error handling
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -121,6 +122,20 @@ export class Interpreter {
     // Phase 10: Initialize File I/O module
     const fileModule = createFileModule();
     for (const [name, fn] of Object.entries(fileModule)) {
+      this.context.functions.set(name, {
+        name,
+        params: [], // Will be handled dynamically
+        body: fn as any,
+      });
+      // Register with type checker (as function accepting any args, returning any)
+      if (this.context.typeChecker) {
+        this.context.typeChecker.registerFunction(name, [], { kind: "type" as const, name: "any" });
+      }
+    }
+
+    // Phase 11: Initialize Error handling module
+    const errorModule = createErrorModule();
+    for (const [name, fn] of Object.entries(errorModule)) {
       this.context.functions.set(name, {
         name,
         params: [], // Will be handled dynamically
@@ -457,6 +472,16 @@ export class Interpreter {
     // Type Class Instance (Phase 5 Week 2: Type Classes)
     if ((node as any).kind === "type-class-instance") {
       return this.evalInstance(node as TypeClassInstance);
+    }
+
+    // Try-catch-finally blocks (Phase 11)
+    if ((node as any).kind === "try-block") {
+      return this.evalTryBlock(node as TryBlock);
+    }
+
+    // Throw expressions (Phase 11)
+    if ((node as any).kind === "throw") {
+      return this.evalThrow(node as ThrowExpression);
     }
 
     return null;
@@ -1876,6 +1901,76 @@ export class Interpreter {
 
     // No match found
     throw new Error("Pattern match exhausted without matching case");
+  }
+
+  // Phase 11: Evaluate try-catch-finally blocks
+  private evalTryBlock(tryBlock: TryBlock): any {
+    let result: any;
+    let errorCaught = false;
+
+    try {
+      // Execute try body
+      result = this.eval(tryBlock.body);
+    } catch (error: any) {
+      errorCaught = true;
+      let handled = false;
+
+      // Try each catch clause
+      if (tryBlock.catchClauses && tryBlock.catchClauses.length > 0) {
+        for (const catchClause of tryBlock.catchClauses) {
+          // For now, all catch clauses handle all errors (no pattern matching)
+          // In future, could support typed catch (catch [IOException e] ...)
+
+          // Save current variable scope
+          const savedVars = new Map(this.context.variables);
+
+          // Bind error to variable if specified
+          if (catchClause.variable) {
+            this.context.variables.set("$" + catchClause.variable, error);
+          }
+
+          try {
+            // Execute catch handler
+            result = this.eval(catchClause.handler);
+            this.context.variables = savedVars;
+            handled = true;
+            break;
+          } catch (innerError: any) {
+            // If catch handler also throws, restore and re-throw
+            this.context.variables = savedVars;
+            throw innerError;
+          }
+        }
+      }
+
+      // If no catch clause handled it, re-throw
+      if (!handled) {
+        throw error;
+      }
+    } finally {
+      // Always execute finally block if present
+      if (tryBlock.finallyBlock) {
+        this.eval(tryBlock.finallyBlock);
+      }
+    }
+
+    return result;
+  }
+
+  // Phase 11: Evaluate throw expressions
+  private evalThrow(throwExpr: ThrowExpression): any {
+    const error = this.eval(throwExpr.argument);
+
+    // Throw the evaluated error value
+    if (error instanceof Error) {
+      throw error;
+    } else if (typeof error === "string") {
+      throw new Error(error);
+    } else if (error && typeof error === "object" && error.message) {
+      throw new Error(error.message);
+    } else {
+      throw new Error(String(error));
+    }
   }
 
   // Try to match a pattern against a value

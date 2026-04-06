@@ -39,6 +39,8 @@ export declare class Parser {
     private parseRecallExpression;
     private parseReasoningExpression;
     private parseReasoningSequenceExpression;
+    private parseTryExpression;
+    private parseThrowExpression;
     private parseReasoningExpressionInternal;
     private parseQualifiedIdentifier;
     private parseSelectiveImport;

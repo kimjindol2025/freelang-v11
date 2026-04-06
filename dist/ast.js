@@ -25,6 +25,9 @@ exports.makeImportBlock = makeImportBlock;
 exports.makeOpenBlock = makeOpenBlock;
 exports.makeAsyncFunction = makeAsyncFunction;
 exports.makeAwaitExpression = makeAwaitExpression;
+exports.makeTryBlock = makeTryBlock;
+exports.makeCatchClause = makeCatchClause;
+exports.makeThrowExpression = makeThrowExpression;
 exports.makeReasoningBlock = makeReasoningBlock;
 exports.makeReasoningTransition = makeReasoningTransition;
 exports.makeReasoningSequence = makeReasoningSequence;
@@ -42,6 +45,9 @@ exports.isSearchBlock = isSearchBlock;
 exports.isLearnBlock = isLearnBlock;
 exports.isReasoningBlock = isReasoningBlock;
 exports.isReasoningSequence = isReasoningSequence;
+exports.isTryBlock = isTryBlock;
+exports.isCatchClause = isCatchClause;
+exports.isThrowExpression = isThrowExpression;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -127,6 +133,18 @@ function makeAsyncFunction(name, params, body) {
 function makeAwaitExpression(argument) {
     return { kind: "await", argument };
 }
+// Helper: Create try block (Phase 11)
+function makeTryBlock(body, catchClauses, finallyBlock) {
+    return { kind: "try-block", body, catchClauses, finallyBlock };
+}
+// Helper: Create catch clause (Phase 11)
+function makeCatchClause(handler, pattern, variable) {
+    return { kind: "catch-clause", pattern, variable, handler };
+}
+// Helper: Create throw expression (Phase 11)
+function makeThrowExpression(argument) {
+    return { kind: "throw", argument };
+}
 // Helper: Create reasoning block (Phase 9c)
 function makeReasoningBlock(stage, data, observations, analysis, decisions, actions, verifications, transitions, metadata) {
     return {
@@ -208,5 +226,17 @@ function isReasoningBlock(node) {
 // ReasoningSequence 타입 가드 (NEW for Phase 9c Extension)
 function isReasoningSequence(node) {
     return node && node.kind === "reasoning-sequence";
+}
+// TryBlock 타입 가드 (NEW for Phase 11)
+function isTryBlock(node) {
+    return node && node.kind === "try-block";
+}
+// CatchClause 타입 가드 (NEW for Phase 11)
+function isCatchClause(node) {
+    return node && node.kind === "catch-clause";
+}
+// ThrowExpression 타입 가드 (NEW for Phase 11)
+function isThrowExpression(node) {
+    return node && node.kind === "throw";
 }
 //# sourceMappingURL=ast.js.map

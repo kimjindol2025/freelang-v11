@@ -1,4 +1,4 @@
-export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | SearchBlock | LearnBlock | ReasoningBlock | ReasoningSequence | AsyncFunction | AwaitExpression;
+export type ASTNode = Block | Literal | Variable | SExpr | Keyword | TypeVariable | PatternMatch | Pattern | FunctionValue | TypeClass | TypeClassInstance | ModuleBlock | ImportBlock | OpenBlock | SearchBlock | LearnBlock | ReasoningBlock | ReasoningSequence | AsyncFunction | AwaitExpression | TryBlock | CatchClause | ThrowExpression;
 export interface Block {
     kind: "block";
     type: string;
@@ -201,6 +201,22 @@ export interface AwaitExpression {
     kind: "await";
     argument: ASTNode;
 }
+export interface TryBlock {
+    kind: "try-block";
+    body: ASTNode;
+    catchClauses?: CatchClause[];
+    finallyBlock?: ASTNode;
+}
+export interface CatchClause {
+    kind: "catch-clause";
+    pattern?: Pattern;
+    variable?: string;
+    handler: ASTNode;
+}
+export interface ThrowExpression {
+    kind: "throw";
+    argument: ASTNode;
+}
 export interface FuncSignature {
     name: string;
     params: Array<{
@@ -243,6 +259,9 @@ export declare function makeAsyncFunction(name: string, params: Array<{
     type?: TypeAnnotation;
 }>, body: ASTNode): AsyncFunction;
 export declare function makeAwaitExpression(argument: ASTNode): AwaitExpression;
+export declare function makeTryBlock(body: ASTNode, catchClauses?: CatchClause[], finallyBlock?: ASTNode): TryBlock;
+export declare function makeCatchClause(handler: ASTNode, pattern?: Pattern, variable?: string): CatchClause;
+export declare function makeThrowExpression(argument: ASTNode): ThrowExpression;
 export declare function makeReasoningBlock(stage: "observe" | "analyze" | "decide" | "act" | "verify", data: Map<string, any>, observations?: any[], analysis?: any[], decisions?: any[], actions?: any[], verifications?: any[], transitions?: ReasoningTransition[], metadata?: {
     startTime?: string;
     endTime?: string;
@@ -270,4 +289,7 @@ export declare function isSearchBlock(node: any): node is SearchBlock;
 export declare function isLearnBlock(node: any): node is LearnBlock;
 export declare function isReasoningBlock(node: any): node is ReasoningBlock;
 export declare function isReasoningSequence(node: any): node is ReasoningSequence;
+export declare function isTryBlock(node: any): node is TryBlock;
+export declare function isCatchClause(node: any): node is CatchClause;
+export declare function isThrowExpression(node: any): node is ThrowExpression;
 //# sourceMappingURL=ast.d.ts.map

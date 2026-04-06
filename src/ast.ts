@@ -20,7 +20,10 @@ export type ASTNode =
   | ReasoningBlock
   | ReasoningSequence
   | AsyncFunction
-  | AwaitExpression;
+  | AwaitExpression
+  | TryBlock
+  | CatchClause
+  | ThrowExpression;
 
 // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
 export interface Block {
@@ -323,6 +326,33 @@ export interface AwaitExpression {
   argument: ASTNode;           // expression that evaluates to Promise<T>
 }
 
+// Try-Catch-Finally Block (NEW for Phase 11)
+// (try body (catch [pattern] handler) (finally cleanup))
+// Represents error handling with catch clauses and optional finally block
+export interface TryBlock {
+  kind: "try-block";
+  body: ASTNode;              // try body
+  catchClauses?: CatchClause[]; // catch clauses (optional)
+  finallyBlock?: ASTNode;     // finally block (optional)
+}
+
+// Catch Clause (NEW for Phase 11)
+// Part of try-catch: (catch [IOError err] (print "File error: " err))
+export interface CatchClause {
+  kind: "catch-clause";
+  pattern?: Pattern;          // optional error pattern (e.g., [IOError], [err])
+  variable?: string;          // optional error variable name
+  handler: ASTNode;           // catch body
+}
+
+// Throw Expression (NEW for Phase 11)
+// (throw error-expression) or (throw "message")
+// Throws an error/exception
+export interface ThrowExpression {
+  kind: "throw";
+  argument: ASTNode;          // error expression to throw
+}
+
 // Function signature (NEW for Phase 3)
 export interface FuncSignature {
   name: string;
@@ -485,6 +515,29 @@ export function makeAwaitExpression(argument: ASTNode): AwaitExpression {
   return { kind: "await", argument };
 }
 
+// Helper: Create try block (Phase 11)
+export function makeTryBlock(
+  body: ASTNode,
+  catchClauses?: CatchClause[],
+  finallyBlock?: ASTNode
+): TryBlock {
+  return { kind: "try-block", body, catchClauses, finallyBlock };
+}
+
+// Helper: Create catch clause (Phase 11)
+export function makeCatchClause(
+  handler: ASTNode,
+  pattern?: Pattern,
+  variable?: string
+): CatchClause {
+  return { kind: "catch-clause", pattern, variable, handler };
+}
+
+// Helper: Create throw expression (Phase 11)
+export function makeThrowExpression(argument: ASTNode): ThrowExpression {
+  return { kind: "throw", argument };
+}
+
 // Helper: Create reasoning block (Phase 9c)
 export function makeReasoningBlock(
   stage: "observe" | "analyze" | "decide" | "act" | "verify",
@@ -606,4 +659,19 @@ export function isReasoningBlock(node: any): node is ReasoningBlock {
 // ReasoningSequence 타입 가드 (NEW for Phase 9c Extension)
 export function isReasoningSequence(node: any): node is ReasoningSequence {
   return node && node.kind === "reasoning-sequence";
+}
+
+// TryBlock 타입 가드 (NEW for Phase 11)
+export function isTryBlock(node: any): node is TryBlock {
+  return node && node.kind === "try-block";
+}
+
+// CatchClause 타입 가드 (NEW for Phase 11)
+export function isCatchClause(node: any): node is CatchClause {
+  return node && node.kind === "catch-clause";
+}
+
+// ThrowExpression 타입 가드 (NEW for Phase 11)
+export function isThrowExpression(node: any): node is ThrowExpression {
+  return node && node.kind === "throw";
 }

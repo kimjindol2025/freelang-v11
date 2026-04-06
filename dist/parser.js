@@ -626,6 +626,18 @@ class Parser {
             this.expect(token_1.TokenType.RParen);
             return reasoningSeq;
         }
+        // Special case: try expressions (Phase 11)
+        if (op === "try") {
+            const tryBlock = this.parseTryExpression();
+            this.expect(token_1.TokenType.RParen);
+            return tryBlock;
+        }
+        // Special case: throw expressions (Phase 11)
+        if (op === "throw") {
+            const throwExpr = this.parseThrowExpression();
+            this.expect(token_1.TokenType.RParen);
+            return throwExpr;
+        }
         // Special case: match expressions
         if (op === "match") {
             const matchExpr = this.parsePatternMatch();
@@ -1456,6 +1468,64 @@ class Parser {
             },
             feedbackLoop: feedbackLoop?.enabled ? feedbackLoop : undefined,
         };
+    }
+    // Phase 11: Parse try-catch-finally expressions
+    // (try body (catch [pattern] handler) (finally cleanup))
+    parseTryExpression() {
+        // 'try' keyword already consumed by parseSExpr
+        const body = this.parseValue();
+        const catchClauses = [];
+        let finallyBlock;
+        while (this.check(token_1.TokenType.LParen) && !this.isAtEnd()) {
+            const clauseToken = this.peek();
+            // Check if this is a catch or finally clause
+            if (this.pos + 1 < this.tokens.length) {
+                const nextToken = this.tokens[this.pos + 1];
+                if (nextToken.type === token_1.TokenType.Symbol && nextToken.value === "catch") {
+                    this.advance(); // consume '('
+                    this.advance(); // consume 'catch'
+                    // Optional error pattern (can be empty)
+                    let pattern;
+                    let variable;
+                    if (this.check(token_1.TokenType.LBracket)) {
+                        // Pattern specified: (catch [ErrorType] handler) or (catch [err] handler)
+                        this.advance(); // consume '['
+                        if (this.check(token_1.TokenType.Symbol)) {
+                            const patternName = this.advance().value;
+                            // Simple pattern: bind to variable
+                            variable = patternName;
+                            pattern = (0, ast_1.makeVariablePattern)(patternName);
+                        }
+                        this.expect(token_1.TokenType.RBracket);
+                    }
+                    // Parse catch handler
+                    const handler = this.parseValue();
+                    catchClauses.push((0, ast_1.makeCatchClause)(handler, pattern, variable));
+                    this.expect(token_1.TokenType.RParen);
+                }
+                else if (nextToken.type === token_1.TokenType.Symbol && nextToken.value === "finally") {
+                    this.advance(); // consume '('
+                    this.advance(); // consume 'finally'
+                    finallyBlock = this.parseValue();
+                    this.expect(token_1.TokenType.RParen);
+                    break; // finally must be last
+                }
+                else {
+                    break;
+                }
+            }
+            else {
+                break;
+            }
+        }
+        return (0, ast_1.makeTryBlock)(body, catchClauses.length > 0 ? catchClauses : undefined, finallyBlock);
+    }
+    // Phase 11: Parse throw expressions
+    // (throw error-value)
+    parseThrowExpression() {
+        // 'throw' keyword already consumed by parseSExpr
+        const argument = this.parseValue();
+        return (0, ast_1.makeThrowExpression)(argument);
     }
     // Phase 9c: Internal helper for parsing reasoning expressions (used by parseReasoningExpression and parseReasoningSequenceExpression)
     parseReasoningExpressionInternal(stage) {

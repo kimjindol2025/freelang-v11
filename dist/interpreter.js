@@ -17,6 +17,7 @@ const async_runtime_1 = require("./async-runtime");
 const web_search_adapter_1 = require("./web-search-adapter"); // Phase 9a: WebSearch integration
 const learned_facts_store_1 = require("./learned-facts-store"); // Phase 9b: Learning persistence
 const stdlib_file_1 = require("./stdlib-file"); // Phase 10: File I/O
+const stdlib_error_1 = require("./stdlib-error"); // Phase 11: Error handling
 // Interpreter class
 class Interpreter {
     constructor(app = (0, express_1.default)(), logger) {
@@ -45,6 +46,19 @@ class Interpreter {
         // Phase 10: Initialize File I/O module
         const fileModule = (0, stdlib_file_1.createFileModule)();
         for (const [name, fn] of Object.entries(fileModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [], // Will be handled dynamically
+                body: fn,
+            });
+            // Register with type checker (as function accepting any args, returning any)
+            if (this.context.typeChecker) {
+                this.context.typeChecker.registerFunction(name, [], { kind: "type", name: "any" });
+            }
+        }
+        // Phase 11: Initialize Error handling module
+        const errorModule = (0, stdlib_error_1.createErrorModule)();
+        for (const [name, fn] of Object.entries(errorModule)) {
             this.context.functions.set(name, {
                 name,
                 params: [], // Will be handled dynamically
@@ -361,6 +375,14 @@ class Interpreter {
         // Type Class Instance (Phase 5 Week 2: Type Classes)
         if (node.kind === "type-class-instance") {
             return this.evalInstance(node);
+        }
+        // Try-catch-finally blocks (Phase 11)
+        if (node.kind === "try-block") {
+            return this.evalTryBlock(node);
+        }
+        // Throw expressions (Phase 11)
+        if (node.kind === "throw") {
+            return this.evalThrow(node);
         }
         return null;
     }
@@ -1672,6 +1694,72 @@ class Interpreter {
         }
         // No match found
         throw new Error("Pattern match exhausted without matching case");
+    }
+    // Phase 11: Evaluate try-catch-finally blocks
+    evalTryBlock(tryBlock) {
+        let result;
+        let errorCaught = false;
+        try {
+            // Execute try body
+            result = this.eval(tryBlock.body);
+        }
+        catch (error) {
+            errorCaught = true;
+            let handled = false;
+            // Try each catch clause
+            if (tryBlock.catchClauses && tryBlock.catchClauses.length > 0) {
+                for (const catchClause of tryBlock.catchClauses) {
+                    // For now, all catch clauses handle all errors (no pattern matching)
+                    // In future, could support typed catch (catch [IOException e] ...)
+                    // Save current variable scope
+                    const savedVars = new Map(this.context.variables);
+                    // Bind error to variable if specified
+                    if (catchClause.variable) {
+                        this.context.variables.set("$" + catchClause.variable, error);
+                    }
+                    try {
+                        // Execute catch handler
+                        result = this.eval(catchClause.handler);
+                        this.context.variables = savedVars;
+                        handled = true;
+                        break;
+                    }
+                    catch (innerError) {
+                        // If catch handler also throws, restore and re-throw
+                        this.context.variables = savedVars;
+                        throw innerError;
+                    }
+                }
+            }
+            // If no catch clause handled it, re-throw
+            if (!handled) {
+                throw error;
+            }
+        }
+        finally {
+            // Always execute finally block if present
+            if (tryBlock.finallyBlock) {
+                this.eval(tryBlock.finallyBlock);
+            }
+        }
+        return result;
+    }
+    // Phase 11: Evaluate throw expressions
+    evalThrow(throwExpr) {
+        const error = this.eval(throwExpr.argument);
+        // Throw the evaluated error value
+        if (error instanceof Error) {
+            throw error;
+        }
+        else if (typeof error === "string") {
+            throw new Error(error);
+        }
+        else if (error && typeof error === "object" && error.message) {
+            throw new Error(error.message);
+        }
+        else {
+            throw new Error(String(error));
+        }
     }
     // Try to match a pattern against a value
     // Returns {matched: boolean, bindings: Map<string, any>}
