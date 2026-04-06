@@ -1193,7 +1193,11 @@ export class Parser {
     }
 
     // Second argument: data (any value)
-    const data = this.parseValue();
+    // For now, data is optional - if next token is :keyword, skip data parsing
+    let data: any = null;
+    if (!this.check(T.Colon) && !this.check(T.RParen) && !this.isAtEnd()) {
+      data = this.parseValue();
+    }
 
     // Parse optional keyword arguments
     let source: "search" | "feedback" | "analysis" = "search";

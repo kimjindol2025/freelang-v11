@@ -8,6 +8,8 @@ import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } 
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 import { extractParamNames, extractFunctions } from "./ast-helpers";
 import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runtime";
+import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch integration
+import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -86,6 +88,8 @@ export interface ModuleInfo {
 export class Interpreter {
   private context: ExecutionContext;
   private logger: Logger;
+  private searchAdapter: WebSearchAdapter; // Phase 9a: WebSearch
+  private learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
 
   constructor(app: express.Express = express(), logger?: Logger) {
     this.logger = logger || getGlobalLogger();
@@ -103,6 +107,15 @@ export class Interpreter {
       typeClassInstances: new Map(),      // Phase 5 Week 2: Type class instance registry
       modules: new Map(),                 // Phase 6: Module registry
     };
+
+    // Phase 9a: Initialize WebSearchAdapter (mock mode by default)
+    // Production: Use BRAVE_SEARCH_KEY or SERPER_API_KEY from env
+    const apiKey = process.env.BRAVE_SEARCH_KEY || process.env.SERPER_API_KEY;
+    const provider = process.env.BRAVE_SEARCH_KEY ? "brave" : process.env.SERPER_API_KEY ? "serper" : "mock";
+    this.searchAdapter = new WebSearchAdapter(apiKey, provider as any);
+
+    // Phase 9b: Initialize LearnedFactsStore (persistent learning)
+    this.learnedFactsStore = new LearnedFactsStore("./data/learned-facts.json", 30);
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
@@ -2291,18 +2304,21 @@ export class Interpreter {
     );
   }
 
-  // Phase 9a: Handle Search/Fetch Block - External data retrieval
+  // Phase 9a Advanced: Handle Search/Fetch Block - External data retrieval with API integration
   private handleSearchBlock(searchBlock: SearchBlock): any {
-    const { query, source, cache = false, limit = 10, name } = searchBlock;
+    const { query, source = "web", cache = true, limit = 10, name } = searchBlock;
 
     // Log search operation
-    this.logger.info(
-      `🔍 Search: "${query}" from "${source}"${cache ? " (cached)" : ""}`
-    );
+    this.logger.info(`🔎 SEARCH "${query}"`);
 
     try {
-      // For now, return a promise-like object with the search configuration
-      // In production, this would actually call external APIs
+      // Phase 9a Advanced: Call WebSearchAdapter (sync mode for interpreter integration)
+      // Uses cache or mock results; real API calls require async interpreter
+      const results = this.searchAdapter.searchSync(query, {
+        limit,
+        cache,
+      });
+
       const searchResult = {
         kind: "search-result",
         query,
@@ -2310,91 +2326,122 @@ export class Interpreter {
         cache,
         limit,
         name,
-        status: "pending",
-        results: [],
-        // Mark for later external API integration
-        _pending: true,
+        status: "completed",
+        results, // ← Now contains actual search results
+        count: results.length,
+        timestamp: new Date().toISOString(),
       };
 
-      // If cache is enabled, store in context cache
-      if (cache && name) {
-        if (!this.context.cache) {
-          this.context.cache = new Map();
-        }
-        this.context.cache.set(`search:${name}`, searchResult);
+      // Store in context cache for use by Analyze stage
+      if (!this.context.cache) {
+        this.context.cache = new Map();
       }
+      const cacheKey = name || `search_${Date.now()}`;
+      this.context.cache.set(cacheKey, searchResult);
 
       return searchResult;
     } catch (error) {
       this.logger.error(`❌ Search failed: ${(error as Error).message}`);
       return {
         kind: "search-error",
+        query,
         message: (error as Error).message,
+        timestamp: new Date().toISOString(),
       };
     }
   }
 
-  // Phase 9b: Handle Learn Block - Store learned information
+  // Phase 9b Advanced: Handle Learn Block - Store learned information with persistence
   private handleLearnBlock(learnBlock: LearnBlock): any {
-    const { key, data, source = "search", confidence, timestamp } = learnBlock;
+    const { key, data, source = "search", confidence = 0.85, timestamp } = learnBlock;
 
     // Initialize learned data storage if needed
     if (!this.context.learned) {
       this.context.learned = new Map();
     }
 
-    // Check if this is a recall operation (data is null)
-    if (data === null) {
-      // Recall: retrieve stored data by key
-      if (this.context.learned.has(key)) {
-        const stored = this.context.learned.get(key);
-        this.logger.info(`🔍 Recalled: "${key}"`);
-        return {
-          kind: "learn-result",
-          operation: "recall",
-          key,
-          data: stored.data,
-          source: stored.source,
-          confidence: stored.confidence,
-          timestamp: stored.timestamp,
-          found: true,
-        };
-      } else {
-        this.logger.info(`❌ Not found in memory: "${key}"`);
-        return {
-          kind: "learn-result",
-          operation: "recall",
-          key,
-          data: null,
-          found: false,
-        };
+    try {
+      // Check if this is a recall operation (data is null)
+      if (data === null) {
+        // Recall: retrieve stored data by key (from file storage)
+        const loadedFact = this.learnedFactsStore.load(key);
+
+        if (loadedFact) {
+          this.logger.info(`📚 LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
+
+          // Also store in memory for fast access
+          this.context.learned.set(key, {
+            data: loadedFact.data,
+            source: loadedFact.source,
+            confidence: loadedFact.confidence,
+            timestamp: new Date(loadedFact.timestamp).toISOString(),
+          });
+
+          return {
+            kind: "learn-result",
+            operation: "recall",
+            key,
+            data: loadedFact.data,
+            source: loadedFact.source,
+            confidence: loadedFact.confidence,
+            timestamp: new Date(loadedFact.timestamp).toISOString(),
+            found: true,
+            accessCount: loadedFact.accessCount,
+          };
+        } else {
+          this.logger.info(`📚 LEARN (recall) "${key}" - not found`);
+          return {
+            kind: "learn-result",
+            operation: "recall",
+            key,
+            data: null,
+            found: false,
+          };
+        }
       }
+
+      // Learn: store new data with metadata (both in memory and file)
+      // Validate confidence
+      if (confidence < 0 || confidence > 1) {
+        throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
+      }
+
+      // Save to persistent storage
+      this.learnedFactsStore.save(key, data, {
+        confidence,
+        source,
+        ttlDays: 30,
+      });
+
+      // Also store in memory for fast access
+      this.context.learned.set(key, {
+        data,
+        source,
+        confidence,
+        timestamp: timestamp ?? new Date().toISOString(),
+      });
+
+      this.logger.info(`  ✓ Learned data stored in context (key: ${key})`);
+
+      return {
+        kind: "learn-result",
+        operation: "learn",
+        key,
+        data,
+        source,
+        confidence,
+        timestamp: timestamp ?? new Date().toISOString(),
+        saved: "disk", // ← Indicates file persistence
+      };
+    } catch (error) {
+      this.logger.error(`❌ Learn failed: ${(error as Error).message}`);
+      return {
+        kind: "learn-error",
+        key,
+        message: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
     }
-
-    // Learn: store new data with metadata
-    const learnedEntry = {
-      data,
-      source,
-      confidence: confidence ?? 0.8,  // Default confidence: 80%
-      timestamp: timestamp ?? new Date().toISOString(),
-    };
-
-    this.context.learned.set(key, learnedEntry);
-
-    this.logger.info(
-      `🧠 Learned: "${key}" from "${source}"${confidence ? ` (confidence: ${confidence})` : ""}`
-    );
-
-    return {
-      kind: "learn-result",
-      operation: "learn",
-      key,
-      data,
-      source,
-      confidence: confidence ?? 0.8,
-      timestamp: learnedEntry.timestamp,
-      stored: true,
-    };
   }
 
   // Phase 9c: Handle Reasoning Block - State-based AI reasoning
