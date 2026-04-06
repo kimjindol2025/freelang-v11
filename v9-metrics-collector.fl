@@ -1,0 +1,230 @@
+// FreeLang v9: 메트릭 수집기 (Metrics Collector)
+// 실패율과 성능 드리프트를 30일간 기록
+//
+// 주요 기능:
+//   - 실패율 트렌드 추적
+//   - 성능 드리프트 감지
+//   - 메모리 사용량 추적
+//   - 지연 시간 분석
+
+struct DailyMetrics {
+    day: i32
+    failure_rate: i32     ;; % (0-100)
+    avg_execution_time: i32 ;; ms
+    peak_memory: i32      ;; bytes
+    error_count: i32      ;; errors
+    performance_delta: i32 ;; % change from baseline
+}
+
+struct MetricsCollector {
+    metrics: [DailyMetrics]
+    baseline_time: i32    ;; 기준 실행 시간
+    baseline_memory: i32  ;; 기준 메모리
+    total_days: i32
+    critical_days: [i32]  ;; 문제 발생 날짜
+}
+
+;; ==================== 수집기 초기화 ====================
+
+fn metrics_collector_new() -> MetricsCollector {
+    println("[METRICS] Initializing metrics collector for 30-day monitoring")
+
+    MetricsCollector {
+        metrics: [],
+        baseline_time: 1200,  ;; 초기 실행 시간 1200ms
+        baseline_memory: 85000, ;; 초기 메모리 85MB
+        total_days: 0,
+        critical_days: []
+    }
+}
+
+;; ==================== 일일 메트릭 기록 ====================
+
+fn metrics_collector_record_day(
+    collector: MetricsCollector,
+    day: i32,
+    failure_rate: i32,
+    execution_time: i32,
+    peak_memory: i32,
+    error_count: i32
+) -> MetricsCollector {
+    var performance_delta = 0
+    if collector.baseline_time > 0 {
+        performance_delta = ((execution_time - collector.baseline_time) * 100) / collector.baseline_time
+    }
+
+    var daily = DailyMetrics {
+        day: day,
+        failure_rate: failure_rate,
+        avg_execution_time: execution_time,
+        peak_memory: peak_memory,
+        error_count: error_count,
+        performance_delta: performance_delta
+    }
+
+    collector.metrics.push(daily)
+    collector.total_days = collector.total_days + 1
+
+    println("[METRICS] Day " + str(day))
+    println("  Failure rate: " + str(failure_rate) + "%")
+    println("  Execution time: " + str(execution_time) + "ms (delta: " + str(performance_delta) + "%)")
+    println("  Peak memory: " + str(peak_memory) + " bytes")
+    println("  Errors: " + str(error_count))
+
+    ;; 임계값 확인
+    if failure_rate > 5 || performance_delta > 20 || error_count > 5 {
+        collector.critical_days.push(day)
+        println("  ⚠️ CRITICAL threshold exceeded")
+    } else {
+        println("  ✅ Within normal range")
+    }
+
+    collector
+}
+
+;; ==================== 성능 드리프트 분석 ====================
+
+fn metrics_collector_analyze_drift(collector: MetricsCollector) -> str {
+    println("[ANALYSIS] Analyzing performance drift...")
+
+    var drift_analysis = "=== Performance Drift Analysis ===\n"
+
+    if length(collector.metrics) < 2 {
+        return "Insufficient data for drift analysis"
+    }
+
+    var first_metric = collector.metrics[0]
+    var last_metric = collector.metrics[length(collector.metrics) - 1]
+
+    var time_change = last_metric.avg_execution_time - first_metric.avg_execution_time
+    var memory_change = last_metric.peak_memory - first_metric.peak_memory
+    var time_drift_pct = 0
+    var memory_drift_pct = 0
+
+    if collector.baseline_time > 0 {
+        time_drift_pct = (time_change * 100) / collector.baseline_time
+    }
+
+    if collector.baseline_memory > 0 {
+        memory_drift_pct = (memory_change * 100) / collector.baseline_memory
+    }
+
+    drift_analysis = drift_analysis + "Baseline:\n"
+    drift_analysis = drift_analysis + "  Time: " + str(collector.baseline_time) + "ms\n"
+    drift_analysis = drift_analysis + "  Memory: " + str(collector.baseline_memory) + " bytes\n\n"
+
+    drift_analysis = drift_analysis + "Day 1:\n"
+    drift_analysis = drift_analysis + "  Time: " + str(first_metric.avg_execution_time) + "ms\n"
+    drift_analysis = drift_analysis + "  Memory: " + str(first_metric.peak_memory) + " bytes\n\n"
+
+    drift_analysis = drift_analysis + "Day " + str(last_metric.day) + ":\n"
+    drift_analysis = drift_analysis + "  Time: " + str(last_metric.avg_execution_time) + "ms\n"
+    drift_analysis = drift_analysis + "  Memory: " + str(last_metric.peak_memory) + " bytes\n\n"
+
+    drift_analysis = drift_analysis + "Change:\n"
+    drift_analysis = drift_analysis + "  Time: " + str(time_change) + "ms (" + str(time_drift_pct) + "%)\n"
+    drift_analysis = drift_analysis + "  Memory: " + str(memory_change) + " bytes (" + str(memory_drift_pct) + "%)\n\n"
+
+    if time_drift_pct > 10 || memory_drift_pct > 10 {
+        drift_analysis = drift_analysis + "⚠️ WARNING: Significant drift detected\n"
+    } else if time_drift_pct < -5 || memory_drift_pct < -5 {
+        drift_analysis = drift_analysis + "✅ Good: Performance improving\n"
+    } else {
+        drift_analysis = drift_analysis + "✅ Stable: Within acceptable range\n"
+    }
+
+    drift_analysis
+}
+
+;; ==================== 실패율 트렌드 ====================
+
+fn metrics_collector_failure_trend(collector: MetricsCollector) -> str {
+    println("[FAILURE_TREND] Analyzing failure rate trend...")
+
+    var trend = "=== Failure Rate Trend (30 days) ===\n"
+    trend = trend + "Day | Failure% | Status\n"
+    trend = trend + "----|----------|--------\n"
+
+    var i: i32 = 0
+    var total_failures: i32 = 0
+
+    while i < length(collector.metrics) {
+        var metric = collector.metrics[i]
+        total_failures = total_failures + metric.failure_rate
+
+        var status = "✅"
+        if metric.failure_rate > 5 {
+            status = "⚠️"
+        }
+        if metric.failure_rate > 10 {
+            status = "❌"
+        }
+
+        var day_str = str(metric.day)
+        if metric.day < 10 {
+            day_str = " " + day_str
+        }
+
+        trend = trend + day_str + "  | " + str(metric.failure_rate) + "%      | " + status + "\n"
+
+        i = i + 1
+    }
+
+    var avg_failure_rate = 0
+    if length(collector.metrics) > 0 {
+        avg_failure_rate = total_failures / length(collector.metrics)
+    }
+
+    trend = trend + "\nAverage failure rate: " + str(avg_failure_rate) + "%\n"
+    trend = trend + "Critical days: " + str(length(collector.critical_days)) + "\n"
+
+    trend
+}
+
+;; ==================== 통계 ====================
+
+fn metrics_collector_stats(collector: MetricsCollector) -> str {
+    println("[STATS] Metrics Collector Statistics")
+    println("  Days monitored: " + str(collector.total_days))
+    println("  Critical days: " + str(length(collector.critical_days)))
+    println("  Baseline execution: " + str(collector.baseline_time) + "ms")
+    println("  Baseline memory: " + str(collector.baseline_memory) + " bytes")
+
+    "MetricsCollector(days=" + str(collector.total_days) +
+    ", critical_days=" + str(length(collector.critical_days)) + ")"
+}
+
+;; ==================== 테스트 ====================
+
+fn test_metrics_collector() -> bool {
+    println("[TEST] Metrics Collector - 30-day Monitoring\n")
+
+    var collector = metrics_collector_new()
+    println("")
+
+    ;; 30일 시뮬레이션 (간단히 14일만)
+    var day: i32 = 1
+    while day <= 14 {
+        var failure_rate = (day % 7) / 2  ;; 점진적 변화
+        var exec_time = 1200 + (day * 5)  ;; 시간이 갈수록 약간 느려짐
+        var memory = 85000 + (day * 1000) ;; 메모리 증가
+
+        metrics_collector_record_day(collector, day, failure_rate, exec_time, memory, day / 3)
+        day = day + 1
+    }
+
+    println("")
+
+    ;; 분석
+    println(metrics_collector_analyze_drift(collector))
+    println("")
+
+    println(metrics_collector_failure_trend(collector))
+    println("")
+
+    println(metrics_collector_stats(collector))
+
+    true
+}
+
+test_metrics_collector()
