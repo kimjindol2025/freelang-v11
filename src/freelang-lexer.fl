@@ -12,7 +12,7 @@
     (" " true)
     ("\t" true)
     ("\n" true)
-    _ false
+    (_ false)
   )
 ]
 
@@ -181,7 +181,7 @@
                   ("=" (set! tokens (append tokens [{:type "SYMBOL" :value "="}])))
                   ("<" (set! tokens (append tokens [{:type "SYMBOL" :value "<"}])))
                   (">" (set! tokens (append tokens [{:type "SYMBOL" :value ">"}])))
-                  _ (set! tokens tokens)  ; Skip unknown
+                  (_ (set! tokens tokens))  ; Skip unknown
                 )
                 (set! i (+ i 1))
                 (process-tokens)

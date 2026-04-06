@@ -186,8 +186,7 @@
             )
           )
         )
-        _
-          (error (concat "Unexpected token in value: " (get $token :type)))
+        (_ (error (concat "Unexpected token in value: " (get $token :type))))
       )
     )
   )

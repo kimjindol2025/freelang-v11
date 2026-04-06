@@ -531,10 +531,19 @@ export class Interpreter {
     // Variables
     if ((node as any).kind === "variable") {
       let varName = (node as Variable).name;
+      // Self-hosting: dot field access — "env.vars" → resolve "env", then access "vars"
+      if (varName.includes(".")) {
+        const parts = varName.split(".");
+        let obj = this.context.variables.has("$" + parts[0])
+          ? this.context.variables.get("$" + parts[0])
+          : this.context.variables.get(parts[0]);
+        for (let p = 1; p < parts.length; p++) {
+          if (obj === null || obj === undefined) return null;
+          obj = typeof obj === "object" ? obj[parts[p]] : null;
+        }
+        return obj ?? null;
+      }
       // Phase 4: Handle variable name resolution
-      // Lexer removes $ prefix, so variable.name is "x" not "$x"
-      // But we store variables with "$" prefix in scope
-      // Try both with and without prefix
       if (this.context.variables.has("$" + varName)) {
         return this.context.variables.get("$" + varName);
       }
@@ -1188,6 +1197,15 @@ export class Interpreter {
     // cond: (cond [test1 result1] [test2 result2] [else default])
     if (op === "cond") {
       return this.evalCond(expr.args);
+    }
+
+    // do/begin: (do expr1 expr2 ...) — evaluate all, return last
+    if (op === "do" || op === "begin" || op === "progn") {
+      let result: any = null;
+      for (const arg of expr.args) {
+        result = this.eval(arg);
+      }
+      return result;
     }
 
     // Evaluate all arguments for normal operations

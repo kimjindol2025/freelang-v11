@@ -482,6 +482,25 @@ export class Parser {
       return makeKeyword(token.value);
     }
 
+    // Phase 8+: control-flow keywords used as values (e.g. [else ...] in cond)
+    if (this.check(T.Else) || this.check(T.Then) || this.check(T.When) ||
+        this.check(T.Repeat) || this.check(T.Until) || this.check(T.While)) {
+      const token = this.advance();
+      return makeLiteral("symbol", token.value);
+    }
+
+    // Phase 8+: :symbol (Colon + Symbol) used as keyword/string value in .fl files
+    // e.g. (get $parser :pos) → ":pos" as a string key
+    if (this.check(T.Colon)) {
+      this.advance(); // consume ':'
+      if (this.check(T.Symbol)) {
+        const token = this.advance();
+        return makeLiteral("string", token.value);
+      }
+      // Bare colon (shouldn't happen in valid code, but handle gracefully)
+      return makeLiteral("string", ":");
+    }
+
     // Check for map literal: {:key1 value1 :key2 value2}
     if (this.check(T.LBrace)) {
       return this.parseMap();
@@ -637,6 +656,32 @@ export class Parser {
       op = "act";
     } else if (opToken.type === T.Verify) {
       op = "verify";
+    } else if (opToken.type === T.If) {
+      op = "if";
+    } else if (opToken.type === T.When) {
+      op = "when";
+    } else if (opToken.type === T.Then) {
+      op = "then";
+    } else if (opToken.type === T.Else) {
+      op = "else";
+    } else if (opToken.type === T.Repeat) {
+      op = "repeat";
+    } else if (opToken.type === T.Until) {
+      op = "until";
+    } else if (opToken.type === T.While) {
+      op = "while";
+    } else if (opToken.type === T.LParen) {
+      // Implicit begin/do block: ( (expr1) (expr2) ... )
+      // Used in .fl self-hosting files where :body wraps multiple forms
+      this.pos--; // un-advance: treat the inner ( as a value, not operator
+      const exprs: ASTNode[] = [];
+      while (!this.check(T.RParen) && !this.isAtEnd()) {
+        exprs.push(this.parseValue());
+      }
+      this.expect(T.RParen);
+      if (exprs.length === 1) return exprs[0] as SExpr;
+      // Multiple exprs: wrap in "do" S-expr
+      return { kind: "sexpr" as const, op: "do", args: exprs } as SExpr;
     } else if (opToken.type !== T.Symbol) {
       throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
     } else {
