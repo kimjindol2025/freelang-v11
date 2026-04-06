@@ -20,6 +20,7 @@ import { createAgentModule } from "./stdlib-agent"; // Phase 15: AI Agent State 
 import { createTimeModule } from "./stdlib-time"; // Phase 16: Time + Logging + Monitoring
 import { createCryptoModule } from "./stdlib-crypto"; // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
+import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -258,6 +259,20 @@ export class Interpreter {
     // Phase 18: Initialize Workflow Engine module
     const workflowModule = createWorkflowModule();
     for (const [name, fn] of Object.entries(workflowModule)) {
+      this.context.functions.set(name, {
+        name,
+        params: [],
+        body: fn as any,
+      });
+      if (this.context.typeChecker) {
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
+      }
+    }
+
+    // Phase 19: Initialize Server Resource Search module
+    const resourceModule = createResourceModule();
+    for (const [name, fn] of Object.entries(resourceModule)) {
       this.context.functions.set(name, {
         name,
         params: [],
