@@ -1,0 +1,289 @@
+// FreeLang v9: OS 스케줄러 (Process Scheduler)
+// 에이전트들을 프로세스로 관리하고 자원을 할당
+//
+// 주요 기능:
+//   - Process 생성 및 관리
+//   - 우선순위 큐 스케줄링
+//   - 메모리 할당 및 추적
+//   - 상태 관리 (READY, RUNNING, BLOCKED, TERMINATED)
+
+struct OSProcess {
+    pid: i32             ;; 프로세스 ID
+    name: str            ;; 프로세스명 (에이전트명)
+    state: str           ;; READY, RUNNING, BLOCKED, TERMINATED
+    priority: i32        ;; 우선순위 (0-10, 높을수록 중요)
+    memory_allocated: i32 ;; 할당된 메모리 (바이트)
+    created_at: str      ;; 생성 시간
+    start_time: str      ;; 시작 시간
+    cpu_ticks: i32       ;; 실행 타이 (CPU 시간)
+}
+
+struct OSScheduler {
+    processes: [OSProcess]
+    ready_queue: [i32]   ;; 준비 상태 PID 큐
+    running_pid: i32     ;; 현재 실행 중인 PID (-1이면 없음)
+    total_memory: i32    ;; 총 메모리
+    allocated_memory: i32 ;; 할당된 메모리
+    next_pid: i32        ;; 다음 PID 번호
+    context_switches: i32 ;; 컨텍스트 스위치 횟수
+}
+
+;; ==================== 스케줄러 초기화 ====================
+
+fn os_scheduler_new(total_memory: i32) -> OSScheduler {
+    OSScheduler {
+        processes: [],
+        ready_queue: [],
+        running_pid: -1,
+        total_memory: total_memory,
+        allocated_memory: 0,
+        next_pid: 1000,
+        context_switches: 0
+    }
+}
+
+;; ==================== 프로세스 생성 ====================
+
+fn os_process_create(
+    scheduler: OSScheduler,
+    name: str,
+    priority: i32,
+    memory_required: i32
+) -> OSScheduler {
+    println("[PROCESS] Creating process: " + name)
+
+    ;; 메모리 확인
+    if scheduler.allocated_memory + memory_required > scheduler.total_memory {
+        println("  ❌ Insufficient memory (need " + str(memory_required) + ", available " + str(scheduler.total_memory - scheduler.allocated_memory) + ")")
+        return scheduler
+    }
+
+    ;; 프로세스 생성
+    var pid = scheduler.next_pid
+    var process = OSProcess {
+        pid: pid,
+        name: name,
+        state: "READY",
+        priority: priority,
+        memory_allocated: memory_required,
+        created_at: "2026-04-06T20:52:42Z",
+        start_time: "",
+        cpu_ticks: 0
+    }
+
+    ;; 프로세스 추가
+    scheduler.processes.push(process)
+    scheduler.allocated_memory = scheduler.allocated_memory + memory_required
+    scheduler.next_pid = scheduler.next_pid + 1
+
+    ;; Ready 큐에 추가
+    scheduler.ready_queue.push(pid)
+
+    println("  PID: " + str(pid))
+    println("  Priority: " + str(priority))
+    println("  Memory: " + str(memory_required) + " bytes")
+    println("  State: READY")
+    println("  ✅ Process created")
+
+    scheduler
+}
+
+;; ==================== 스케줄링 ====================
+
+fn os_scheduler_schedule(scheduler: OSScheduler) -> OSScheduler {
+    println("[SCHEDULER] Running scheduling cycle")
+
+    ;; 우선순위 기반 스케줄링
+    ;; Ready 큐에서 가장 우선순위가 높은 프로세스 선택
+    var highest_priority: i32 = -1
+    var selected_pid: i32 = -1
+    var selected_idx: i32 = -1
+
+    var i: i32 = 0
+    while i < length(scheduler.ready_queue) {
+        var pid = scheduler.ready_queue[i]
+        var process = os_process_get(scheduler, pid)
+
+        if process.priority > highest_priority {
+            highest_priority = process.priority
+            selected_pid = pid
+            selected_idx = i
+        }
+        i = i + 1
+    }
+
+    ;; 현재 실행 중인 프로세스가 있으면 멈춤
+    if scheduler.running_pid >= 0 {
+        var current = os_process_get(scheduler, scheduler.running_pid)
+        current.state = "READY"
+        scheduler = os_process_update(scheduler, current)
+        println("  Preempting PID " + str(scheduler.running_pid))
+    }
+
+    ;; 새 프로세스 시작
+    if selected_pid >= 0 {
+        var process = os_process_get(scheduler, selected_pid)
+        process.state = "RUNNING"
+        process.start_time = "2026-04-06T20:52:42Z"
+        scheduler = os_process_update(scheduler, process)
+        scheduler.running_pid = selected_pid
+
+        println("  Running: " + process.name + " (PID " + str(selected_pid) + ")")
+        println("  Priority: " + str(process.priority))
+
+        scheduler.context_switches = scheduler.context_switches + 1
+    } else {
+        scheduler.running_pid = -1
+        println("  No process to run (Ready queue empty)")
+    }
+
+    scheduler
+}
+
+;; ==================== 프로세스 관리 ====================
+
+fn os_process_get(scheduler: OSScheduler, pid: i32) -> OSProcess {
+    var i: i32 = 0
+    while i < length(scheduler.processes) {
+        if scheduler.processes[i].pid == pid {
+            return scheduler.processes[i]
+        }
+        i = i + 1
+    }
+
+    OSProcess {
+        pid: -1,
+        name: "NOT_FOUND",
+        state: "TERMINATED",
+        priority: 0,
+        memory_allocated: 0,
+        created_at: "",
+        start_time: "",
+        cpu_ticks: 0
+    }
+}
+
+fn os_process_update(scheduler: OSScheduler, process: OSProcess) -> OSScheduler {
+    var i: i32 = 0
+    while i < length(scheduler.processes) {
+        if scheduler.processes[i].pid == process.pid {
+            scheduler.processes[i] = process
+        }
+        i = i + 1
+    }
+    scheduler
+}
+
+fn os_process_terminate(scheduler: OSScheduler, pid: i32) -> OSScheduler {
+    println("[PROCESS] Terminating PID " + str(pid))
+
+    var process = os_process_get(scheduler, pid)
+    process.state = "TERMINATED"
+    scheduler = os_process_update(scheduler, process)
+
+    ;; 메모리 해제
+    scheduler.allocated_memory = scheduler.allocated_memory - process.memory_allocated
+
+    ;; Ready 큐에서 제거
+    var new_queue: [i32] = []
+    var i: i32 = 0
+    while i < length(scheduler.ready_queue) {
+        if scheduler.ready_queue[i] != pid {
+            new_queue.push(scheduler.ready_queue[i])
+        }
+        i = i + 1
+    }
+    scheduler.ready_queue = new_queue
+
+    println("  Memory freed: " + str(process.memory_allocated) + " bytes")
+    println("  ✅ Process terminated")
+
+    scheduler
+}
+
+;; ==================== CPU 시간 시뮬레이션 ====================
+
+fn os_scheduler_cpu_tick(scheduler: OSScheduler, ticks: i32) -> OSScheduler {
+    if scheduler.running_pid >= 0 {
+        var process = os_process_get(scheduler, scheduler.running_pid)
+        process.cpu_ticks = process.cpu_ticks + ticks
+        scheduler = os_process_update(scheduler, process)
+        println("[CPU] +"+str(ticks)+" ticks to PID " + str(scheduler.running_pid))
+    }
+    scheduler
+}
+
+;; ==================== 상태 조회 ====================
+
+fn os_scheduler_get_stats(scheduler: OSScheduler) -> str {
+    var ready_count: i32 = 0
+    var running_count: i32 = 0
+    var blocked_count: i32 = 0
+    var terminated_count: i32 = 0
+
+    var i: i32 = 0
+    while i < length(scheduler.processes) {
+        var state = scheduler.processes[i].state
+        if state == "READY" {
+            ready_count = ready_count + 1
+        }
+        if state == "RUNNING" {
+            running_count = running_count + 1
+        }
+        if state == "BLOCKED" {
+            blocked_count = blocked_count + 1
+        }
+        if state == "TERMINATED" {
+            terminated_count = terminated_count + 1
+        }
+        i = i + 1
+    }
+
+    println("[STATS] Scheduler Status")
+    println("  Total Processes: " + str(length(scheduler.processes)))
+    println("  Ready: " + str(ready_count) + " | Running: " + str(running_count) + " | Blocked: " + str(blocked_count) + " | Terminated: " + str(terminated_count))
+    println("  Memory: " + str(scheduler.allocated_memory) + "/" + str(scheduler.total_memory) + " bytes")
+    println("  Context Switches: " + str(scheduler.context_switches))
+
+    "OSScheduler(processes=" + str(length(scheduler.processes)) +
+    ", memory=" + str(scheduler.allocated_memory) + "/" + str(scheduler.total_memory) +
+    ", switches=" + str(scheduler.context_switches) + ")"
+}
+
+;; ==================== 테스트 ====================
+
+fn test_os_scheduler() -> bool {
+    println("[TEST] FreeLang OS Scheduler")
+
+    var scheduler = os_scheduler_new(1000000)
+    println("  Created scheduler (1MB memory)")
+
+    ;; 프로세스 생성
+    scheduler = os_process_create(scheduler, "agent-analyzer", 8, 100000)
+    scheduler = os_process_create(scheduler, "agent-refactor", 7, 80000)
+    scheduler = os_process_create(scheduler, "agent-test", 5, 50000)
+
+    println("\nCreated 3 processes")
+
+    ;; 스케줄링
+    println("\n=== Scheduling Cycle 1 ===")
+    scheduler = os_scheduler_schedule(scheduler)
+
+    println("\n=== CPU Execution ===")
+    scheduler = os_scheduler_cpu_tick(scheduler, 100)
+    scheduler = os_scheduler_cpu_tick(scheduler, 50)
+
+    println("\n=== Scheduling Cycle 2 ===")
+    scheduler = os_scheduler_schedule(scheduler)
+
+    ;; 프로세스 종료
+    println("\n=== Process Termination ===")
+    scheduler = os_process_terminate(scheduler, 1000)
+
+    ;; 통계
+    println("\n" + os_scheduler_get_stats(scheduler))
+
+    true
+}
+
+test_os_scheduler()
