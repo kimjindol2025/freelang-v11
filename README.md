@@ -1,555 +1,326 @@
-# 🚀 FreeLang v9: AI-Exclusive Programming Language
+# FreeLang v9
 
-> **FreeLang v4로 구현한 완전한 AI 전용 프로그래밍 언어**
-
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Language](https://img.shields.io/badge/implementation-FreeLang%20v4-orange)
-![Tests](https://img.shields.io/badge/tests-25%2F25%20passing-brightgreen)
-![Lines of Code](https://img.shields.io/badge/code-6%2C307%20lines-blue)
+> **Claude Code가 만들고, Claude Code가 쓰는 언어.**
+> 인간 없음. AI 전용.
 
 ---
 
-## 📋 목차
+## 한 줄 요약
 
-- [개요](#개요)
-- [주요 특징](#주요-특징)
-- [설치 및 실행](#설치-및-실행)
-- [빠른 시작](#빠른-시작)
-- [아키텍처](#아키텍처)
-- [핵심 개념](#핵심-개념)
-- [5개 필수 라이브러리](#5개-필수-라이브러리)
-- [예제](#예제)
-- [문서](#문서)
-- [프로젝트 구조](#프로젝트-구조)
+FreeLang v9는 S-expression 기반의 AI 네이티브 프로그래밍 언어다.
+"인간이 읽기 쉬운가?"가 아니라 **"AI가 추론/생성하기 쉬운가?"** 를 설계 기준으로 삼는다.
 
 ---
 
-## 개요
+## 셀프호스팅 상태
 
-**FreeLang v9**는 AI 작업을 위해 설계된 혁신적인 프로그래밍 언어입니다. LLM 통합, 자동 에이전트, 벡터 검색, 트랜잭션 관리를 네이티브로 지원합니다.
-
-### 핵심 철학
-- 🤖 **AI-First**: LLM 호출, 벡터 임베딩, 자동 에이전트가 언어 차원에서 지원됨
-- 🔄 **자가 호스팅**: v9 자체가 v4로 구현되어 언어의 강력함을 증명
-- 📦 **프로덕션 레벨**: 트랜잭션, 재시도 정책, 속도 제한, 메모리 관리 포함
-- 🧪 **완전 검증**: 40+ 테스트, 100% 통과율
-
----
-
-## 주요 특징
-
-### 5가지 핵심 블록 타입
-
-| 블록 | 용도 | 특징 |
-|------|------|------|
-| **INTENT** | 원자적 작업 | 커밋/롤백, 재시도 정책 |
-| **FUNC** | 순수 함수 | 상태 변화 없음, 함수형 |
-| **PIPE** | 데이터 변환 | 파이프라인, 필터링, 매핑 |
-| **PROMPT** | LLM 호출 | Anthropic API, 토큰 관리 |
-| **AGENT** | 자동 에이전트 | 도구 체인, 자율적 실행 |
-
-### AI 기능
+FreeLang v9는 **자기 자신의 소스를 파싱**할 수 있다.
 
 ```
-✨ 벡터 임베딩 & 의미론적 검색
-✨ LLM 통합 (Anthropic Claude)
-✨ 자동 에이전트 및 도구 시스템
-✨ 메모리 풀 및 컨텍스트 윈도우
-✨ 속도 제한 및 재시도 정책
-✨ 트랜잭션 및 원자성 보장
+Bootstrap: 12/12 PASS (100%)
+
+src/freelang-lexer.fl        → 1132 tokens, 5 AST nodes
+src/freelang-parser.fl       → 1211 tokens, 17 AST nodes
+src/freelang-interpreter.fl  → 3353 tokens, 75 AST nodes
+
+수렴 검증: 3회 반복 → 동일 결과 (안정)
 ```
 
 ---
 
-## 설치 및 실행
+## 구현 현황
 
-### 요구사항
+TypeScript 호스트 위에서 실행되는 FreeLang v9 인터프리터.
+Phase 1~19 순서로 구현되었으며, 각 Phase는 독립적으로 테스트된다.
 
-- **FreeLang v4** (컴파일러)
-- **v4 표준 라이브러리**
-- **Anthropic API 키** (LLM 기능용)
+### Core Language
 
-### 저장소 클론
+| Phase | 기능 | 상태 |
+|-------|------|------|
+| 1~4 | Lexer / Parser / AST / Interpreter 기반 | ✅ |
+| 5 | 모나드 (Either / Maybe / Writer), 모듈 시스템 | ✅ |
+| 6 | 타입 추론 엔진, TypeClass / Instance | ✅ |
+| 7 | 비동기 (Promise / async / await) | ✅ |
+| 8 | 패턴 매칭 Parser, Bootstrap 셀프호스팅 증명 | ✅ 12/12 |
+
+### AI Reasoning Blocks (Phase 9)
+
+```
+(observe "서버 상태 수집")
+(analyze "이상 감지")
+(decide  "재시작 여부")
+(act     "pm2 restart api-server")
+(verify  "포트 응답 확인")
+```
+
+| Phase | 기능 | 테스트 |
+|-------|------|--------|
+| 9a | WebSearch API, fetch 블록 | ✅ 16/16 |
+| 9b | LearnedFacts 영속성, remember/recall/forget | ✅ 16/16 |
+| 9c | Feedback Loop, if/when/repeat/while 조건 제어 | ✅ 18/18 |
+
+### Standard Library
+
+| Phase | 모듈 | 주요 함수 | 테스트 |
+|-------|------|-----------|--------|
+| 10 | `stdlib-file` | file_read, file_write, file_exists, dir_list | ✅ 8/8 |
+| 11 | `stdlib-error` | try/catch/finally, throw, error_wrap | ✅ 10/10 |
+| 12 | `stdlib-http` + `stdlib-shell` | http_get, http_post, shell, shell_ok | ✅ 15/15 |
+| 13 | `stdlib-data` | json_get, json_set, csv_parse, template | ✅ 31/31 |
+| 14 | `stdlib-collection` | arr_flatten, zip, group_by, retry, pipeline_run | ✅ 35/35 |
+| 15 | `stdlib-agent` | agent_create, agent_loop, tool_register | ✅ 25/25 |
+| 16 | `stdlib-time` | Timer, Logger, Metrics, p95 | ✅ 31/31 |
+| 17 | `stdlib-crypto` | sha256, uuid_v4, base64, regex_match, extract_json | ✅ 46/46 |
+| 18 | `stdlib-workflow` | workflow_create, workflow_run, task_create, report_render | ✅ 12/12 |
+| 19 | `stdlib-resource` | res_snapshot, res_find_proc, res_ports, res_pm2_list | ✅ 22/22 |
+
+**누적 테스트: 289/289 PASS**
+
+---
+
+## 언어 문법
+
+### 블록 (Block)
+
+```
+[FUNC add :params [$a $b]
+  :body (+ $a $b)
+]
+
+[FUNC greet :params [$name]
+  :body (concat "Hello, " $name)
+]
+```
+
+### S-Expression
+
+```
+(if (> $x 0)
+  (concat "양수: " $x)
+  "음수 또는 0")
+
+(let [[$n 42]
+      [$msg (concat "n = " $n)]]
+  $msg)
+
+(match $token
+  ("+"  "plus")
+  ("-"  "minus")
+  (_ "other"))
+```
+
+### Map / Array
+
+```
+{:name "kim" :role "admin" :active true}
+
+[1 2 3 4 5]
+
+(get $map "name")
+(set $arr 0 "new-value")
+```
+
+### AI Reasoning Sequence
+
+```
+[AGENT analyze-server
+  (observe "서버 자원 수집"
+    data: (res_snapshot))
+
+  (analyze "이상 감지"
+    when: (> (get $data :mem_pct) 80)
+    result: "메모리 경고")
+
+  (decide "조치 결정"
+    selected: "restart")
+
+  (act "서비스 재시작"
+    cmd: (shell "pm2 restart api-server"))
+
+  (verify "복구 확인"
+    check: (res_port_used 3000))
+]
+```
+
+### 서버 자원검색 (Phase 19)
+
+```
+; 현재 서버 상태 한 번에 수집
+(res_snapshot)
+
+; 프로세스 검색
+(res_find_proc "node")
+(res_proc_exists "nginx")
+
+; 포트 확인
+(res_ports)
+(res_port_used 8080)
+(res_find_free_port 30000 31000)
+
+; PM2 서비스 목록
+(res_pm2_list)
+(res_pm2_find "api-server")
+
+; 헬스체크
+(res_health_check)
+; → {:ok false :warnings ["CPU high: 82%"] :errors []}
+
+; kimdb 프로젝트 조회
+(res_kimdb_projects)
+(res_kimdb_project "freelang-v9")
+```
+
+---
+
+## 실행
+
+### 설치
 
 ```bash
-git clone https://gogs.dclub.kr/kim/freelang-v9.git
+git clone https://gogs.dclub.kr/kim/freelang-v9
 cd freelang-v9
+npm install
 ```
 
-### 기본 실행
+### 테스트
 
 ```bash
-# v4 컴파일러로 v9 파일 실행
-freelang-v4 v9-lexer.fl          # 렉서 테스트
-freelang-v4 v9-parser.fl         # 파서 테스트
-freelang-v4 v9-interpreter.fl    # 인터프리터 테스트
-freelang-v4 v9-runtime.fl        # 런타임 테스트
-```
+# 각 Phase 테스트
+npx ts-node src/test-phase10-file.ts
+npx ts-node src/test-phase11-error.ts
+npx ts-node src/test-phase12-http-shell.ts
+npx ts-node src/test-phase13-data.ts
+npx ts-node src/test-phase14-collection.ts
+npx ts-node src/test-phase15-agent.ts
+npx ts-node src/test-phase16-time.ts
+npx ts-node src/test-phase17-crypto.ts
+npx ts-node src/test-phase18-integration.ts
+npx ts-node src/test-phase19-resource.ts
 
-### 전체 검증 실행
-
-```bash
-# 5개 필수 라이브러리 검증 (25/25 테스트)
-freelang-v4 v9-stdlib-validate.fl
-
-# 또는 개별 라이브러리 테스트
-freelang-v4 v9-stdlib-ai.fl
-freelang-v4 v9-stdlib-data.fl
-freelang-v4 v9-stdlib-memory.fl
-freelang-v4 v9-stdlib-async.fl
-freelang-v4 v9-stdlib-tools.fl
+# 셀프호스팅 Bootstrap 검증
+npx ts-node src/test-bootstrap-self-compile.ts
 ```
 
 ---
 
-## 빠른 시작
+## 표준 라이브러리 요약
 
-### 1️⃣ 간단한 INTENT 블록 (트랜잭션)
+### stdlib-resource (Phase 19) — 서버 자원검색
 
-```freelang
-INTENT "bank_transfer" {
-  ADD_OP "Debit account A: 1000"
-  ADD_OP "Credit account B: 1000"
-  ADD_ROLLBACK "Revert debit"
-  ADD_ROLLBACK "Revert credit"
-  COMMIT
-}
-```
-
-원자적 작업을 보장합니다. 실패 시 자동 롤백.
-
-### 2️⃣ LLM 호출 (PROMPT)
-
-```freelang
-PROMPT "summarize" {
-  SYSTEM "You are a helpful summarizer"
-  USER "Summarize this text..."
-  CALL "claude-3-sonnet-20240229"
-}
-```
-
-Claude LLM을 직접 호출합니다.
-
-### 3️⃣ 데이터 파이프라인 (PIPE)
-
-```freelang
-PIPE "data_processing" {
-  CSV_PARSE "input.csv"
-  FILTER "status" "active"
-  SELECT ["name", "score"]
-  WRITE_JSON "output.json"
-}
-```
-
-데이터 변환과 필터링을 체이닝합니다.
-
-### 4️⃣ 자동 에이전트 (AGENT)
-
-```freelang
-AGENT "analyst" {
-  TOOL "fetch_data"
-  TOOL "analyze"
-  TOOL "generate_report"
-  MAX_STEPS 10
-  EXECUTE
-}
-```
-
-도구를 조합하여 자율적으로 실행합니다.
-
-### 5️⃣ 순수 함수 (FUNC)
-
-```freelang
-FUNC "fibonacci" (n: i32) -> i32 {
-  if n <= 1 { return n }
-  return fibonacci(n - 1) + fibonacci(n - 2)
-}
-```
-
-전통적인 함수형 프로그래밍.
-
----
-
-## 아키텍처
-
-### 언어 구현 파이프라인
+AI가 서버 상태를 파악하는 것은 추론의 출발점이다.
+`res_snapshot` 한 번으로 CPU/메모리/디스크/프로세스/포트를 모두 수집한다.
 
 ```
-Source Code
-    ↓
-[Lexer] → Tokens
-    ↓
-[Parser] → AST (S-Expression)
-    ↓
-[Interpreter] → Evaluation Context
-    ↓
-[Runtime] → Block Execution
-    ↓
-Result
+res_cpu_count       → 72
+res_cpu_load        → [4.91, 3.46, 2.80]
+res_mem_pct         → 10%
+res_disk            → [{mount:"/", total_gb:1877, used_gb:329, use_pct:19}]
+res_find_proc       → ProcessInfo[]
+res_port_used       → boolean
+res_find_free_port  → number | null
+res_pm2_list        → ServiceInfo[]
+res_kimdb_projects  → Record[]  (kimdb 포트 40000 연동)
+res_snapshot        → ResourceSnapshot  (전체 상태 한 번에)
+res_health_check    → {ok, warnings, errors}
 ```
 
-### 핵심 컴포넌트
+### stdlib-workflow (Phase 18) — 워크플로우 엔진
 
-#### 렉서 (v9-lexer.fl)
-- S-Expression 토크나이저
-- 위치 추적 (line, column)
-- 숫자, 문자열, 심볼, 키워드 지원
-
-#### 파서 (v9-parser.fl)
-- 재귀 하강 파서 (Recursive Descent)
-- 5가지 블록 타입 파싱
-- AST 직렬화 (문자열 기반)
-
-#### 인터프리터 (v9-interpreter.fl)
-- 환경 기반 변수 바인딩
-- 산술, 비교, 논리 연산
-- If-then-else 제어 흐름
-
-#### 런타임 (v9-runtime.fl)
-- 5가지 블록 타입 실행
-- INTENT 트랜잭션 관리
-- 도구 등록 및 실행
-
----
-
-## 핵심 개념
-
-### 🔄 INTENT 블록: 트랜잭션
-
-```freelang
-INTENT "payment" {
-  ADD_OP "Check balance"
-  ADD_OP "Deduct amount"
-  ADD_OP "Update ledger"
-  ADD_ROLLBACK "Restore balance"
-  COMMIT          ;; 성공 시 커밋
-  ROLLBACK        ;; 실패 시 롤백
-}
+```
+workflow_create  → 이름 있는 단계 정의
+workflow_run     → 실행 (자동 로깅 + 재시도 + 에러 처리)
+workflow_ok      → boolean
+workflow_summary → 사람/AI 읽을 수 있는 리포트
+task_create      → 서브태스크 추적
+report_render    → 포맷된 텍스트 리포트
 ```
 
-- **원자성**: 모두 성공하거나 모두 실패
-- **롤백**: 실패 시 자동으로 이전 상태로 복구
-- **재시도**: 설정된 횟수만큼 자동 재시도
+### stdlib-agent (Phase 15) — AI 에이전트 상태기계
 
-### 📊 벡터 임베딩 & 검색
-
-```freelang
-var store = EmbeddingStore(dimension: 768)
-store.add("doc1", "FreeLang is powerful", ["ai", "lang"])
-store.add("doc2", "Python is popular", ["python"])
-
-var results = store.search("AI language", top_k: 2)
-;; 코사인 유사도로 상위 2개 결과 반환
+```
+agent_create  → AgentState 초기화
+agent_loop    → goalFn/stepFn 기반 자율 실행 (max_steps 안전장치)
+tool_register → 도구 등록
+agent_plan    → 계획 목록 관리
+agent_history → 행동 이력 기록
 ```
 
-### 🤖 자동 에이전트
+### stdlib-crypto (Phase 17) — 암호화 + AI 텍스트 처리
 
-```freelang
-var agent = Agent("analyzer")
-agent.register_tool("fetch_data", ...)
-agent.register_tool("process", ...)
-agent.run(max_iterations: 10)
-;; 도구를 자율적으로 조합 실행
 ```
-
-### 💾 메모리 관리
-
-```freelang
-var memory = MemoryPool(max_size: 100)
-memory.remember("important data")     ;; FIFO 저장
-memory.remember("more data")
-
-var context = ContextWindow(max_tokens: 4096)
-context.add("System message")         ;; 토큰 예산 관리
-context.add("User query")
+sha256, md5, hmac        → 해시
+uuid_v4, uuid_short      → UUID 생성
+base64_enc/dec           → 인코딩
+regex_match, regex_all   → 정규식
+extract_json             → AI 응답에서 JSON 추출
+extract_code             → 코드 블록 추출
+extract_emails/urls      → 패턴 추출
 ```
 
 ---
 
-## 5개 필수 라이브러리
-
-### 📡 AI/LLM (v9-stdlib-ai.fl)
-
-Anthropic API 통합, 요청 빌더, 응답 처리
-
-```freelang
-var client = AIClient("claude-3-sonnet")
-var response = client.complete("Hello")
-println(response.content)
-```
-
-**기능:**
-- AIClient: API 클라이언트 관리
-- AIRequest: 요청 빌더
-- AIResponse: 응답 처리
-- complete(), chat(), classify() 편의 함수
-
----
-
-### 📈 데이터 처리 (v9-stdlib-data.fl)
-
-CSV/JSON 처리, 필터링, 선택
-
-```freelang
-var csv_data = csv_parse("name,age\nAlice,30")
-var filtered = csv_filter(csv_data, "age", "30")
-var selected = csv_select_columns(csv_data, ["name"])
-```
-
-**기능:**
-- CSV 파싱 및 직렬화
-- JSON 처리
-- 필터링 및 컬럼 선택
-- 데이터 변환
-
----
-
-### 🧠 메모리 & 벡터 (v9-stdlib-memory.fl)
-
-임베딩, 의미론적 검색, 메모리 풀
-
-```freelang
-var store = embedding_store_new(768)
-store = embedding_store_add(store, "doc1", "Text...", ["tag"])
-var results = embedding_store_search(store, "query", 5)
-```
-
-**기능:**
-- 벡터 임베딩
-- 코사인 유사도 검색
-- 컨텍스트 윈도우 (토큰 관리)
-- FIFO 메모리 풀
-
----
-
-### ⚡ 비동기 & 트랜잭션 (v9-stdlib-async.fl)
-
-트랜잭션, 작업 큐, 재시도 정책
-
-```freelang
-var tx = transaction_new("transfer")
-tx = transaction_add_op(tx, "Debit: 1000")
-tx = transaction_commit(tx)
-
-var policy = retry_policy_new(3)
-retry_with_policy(policy, "risky_operation")
-```
-
-**기능:**
-- 트랜잭션 (커밋/롤백)
-- 작업 큐 처리
-- 속도 제한
-- 재시도 정책
-- 지수 백오프
-
----
-
-### 🛠️ 도구 시스템 (v9-stdlib-tools.fl)
-
-도구 등록, 실행, 체이닝
-
-```freelang
-var registry = tool_registry_new()
-var tool = tool_new("read-csv", "Read CSV file")
-registry = tool_registry_register(registry, tool)
-
-var call = tool_call_new("read-csv")
-call = tool_call_execute(registry, call)
-```
-
-**기능:**
-- 도구 레지스트리
-- 도구 등록 및 검색
-- 도구 실행
-- 도구 체인 (파이프라인)
-- 도구 검증
-
----
-
-## 예제
-
-### 예제 1: 은행 송금 (트랜잭션)
-
-```freelang
-INTENT "transfer" {
-  ADD_OP "SELECT account WHERE id = 1"
-  ADD_OP "UPDATE account SET balance -= 1000"
-  ADD_OP "UPDATE account SET balance += 1000"
-  ADD_ROLLBACK "ROLLBACK all changes"
-
-  COMMIT        ;; 성공
-  ROLLBACK      ;; 실패 시
-}
-```
-
-### 예제 2: 데이터 분석 (파이프라인)
-
-```freelang
-PIPE "analysis" {
-  CSV_PARSE "data.csv"
-  FILTER "status" "active"
-  GROUP_BY "category"
-  AGGREGATE "sum" "amount"
-  WRITE_JSON "report.json"
-}
-```
-
-### 예제 3: 자동 분석 에이전트
-
-```freelang
-AGENT "analyst" {
-  TOOL "fetch_market_data"
-  TOOL "calculate_metrics"
-  TOOL "generate_summary"
-
-  ;; 도구를 자율적으로 조합 실행
-  EXECUTE
-}
-```
-
-### 예제 4: 감정 분석 (LLM)
-
-```freelang
-PROMPT "sentiment" {
-  SYSTEM "Analyze sentiment"
-  USER "This product is amazing!"
-  CALL "claude-3-sonnet"
-
-  ;; 응답: { sentiment: "positive", score: 0.95 }
-}
-```
-
-### 예제 5: Fibonacci 함수
-
-```freelang
-FUNC "fibonacci" (n: i32) -> i32 {
-  if n <= 1 {
-    return n
-  }
-
-  var a = fibonacci(n - 1)
-  var b = fibonacci(n - 2)
-  return a + b
-}
-```
-
-더 많은 예제는 `v9-examples.fl`를 참고하세요.
-
----
-
-## 문서
-
-| 파일 | 설명 | 크기 |
-|------|------|------|
-| **V9_IN_V4.md** | v9 디자인 개요 및 아키텍처 | 7.4 KB |
-| **V9_COMPLETE.md** | 완전한 기능 가이드 | 11 KB |
-| **V9_FINAL_REPORT.md** | 프로덕션 완성 보고서 | 12 KB |
-
-각 문서는 다음을 다룹니다:
-- ✅ 전체 언어 명세
-- ✅ 블록 타입 상세 설명
-- ✅ 라이브러리 API
-- ✅ 예제 및 베스트 프랙티스
-
----
-
-## 프로젝트 구조
+## 파일 구조
 
 ```
 freelang-v9/
-├── README.md                      # 이 파일
-├── V9_IN_V4.md                   # 디자인 문서
-├── V9_COMPLETE.md                # 완전 가이드
-├── V9_FINAL_REPORT.md            # 최종 보고서
+├── src/
+│   ├── lexer.ts                   ← 렉서 (S-expression 토크나이저)
+│   ├── parser.ts                  ← 파서 (AST 생성)
+│   ├── interpreter.ts             ← 인터프리터 (AST 평가)
+│   ├── token.ts / ast.ts          ← 타입 정의
+│   │
+│   ├── stdlib-file.ts             ← Phase 10: 파일 I/O
+│   ├── stdlib-error.ts            ← Phase 11: 에러 처리
+│   ├── stdlib-http.ts             ← Phase 12: HTTP 클라이언트
+│   ├── stdlib-shell.ts            ← Phase 12: 셸 실행
+│   ├── stdlib-data.ts             ← Phase 13: 데이터 변환
+│   ├── stdlib-collection.ts       ← Phase 14: 컬렉션 + 제어
+│   ├── stdlib-agent.ts            ← Phase 15: AI 에이전트
+│   ├── stdlib-time.ts             ← Phase 16: 시간 + 로깅 + 메트릭
+│   ├── stdlib-crypto.ts           ← Phase 17: 암호화 + UUID + 정규식
+│   ├── stdlib-workflow.ts         ← Phase 18: 워크플로우 엔진
+│   ├── stdlib-resource.ts         ← Phase 19: 서버 자원검색
+│   │
+│   ├── freelang-lexer.fl          ← 렉서 (FreeLang으로 작성됨)
+│   ├── freelang-parser.fl         ← 파서 (FreeLang으로 작성됨)
+│   ├── freelang-interpreter.fl    ← 인터프리터 (FreeLang으로 작성됨)
+│   │
+│   └── test-phase{10..19}-*.ts    ← 각 Phase 테스트
 │
-├── Core Implementation (1,840 줄)
-│   ├── v9-lexer.fl               # S-Expression 토크나이저
-│   ├── v9-parser.fl              # 재귀 하강 파서
-│   ├── v9-interpreter.fl         # AST 평가기
-│   └── v9-runtime.fl             # 블록 타입 실행기
-│
-├── Self-Hosting (1,325 줄)
-│   ├── v9-bootstrap.fl           # v4로 구현된 v9
-│   ├── v9-llm.fl                 # LLM 통합
-│   ├── v9-memory.fl              # 벡터 & 메모리
-│   └── v9-optimized.fl           # 컴파일 최적화
-│
-├── Essential Libraries (1,648 줄)
-│   ├── v9-stdlib-ai.fl           # AI/LLM 클라이언트
-│   ├── v9-stdlib-data.fl         # CSV/JSON 처리
-│   ├── v9-stdlib-memory.fl       # 임베딩 & 검색
-│   ├── v9-stdlib-async.fl        # 트랜잭션 & 큐
-│   ├── v9-stdlib-tools.fl        # 도구 시스템
-│   └── v9-stdlib-validate.fl     # 통합 검증
-│
-└── Tests & Examples (1,494 줄)
-    ├── v9-tests.fl               # 40+ 테스트 케이스
-    ├── v9-examples.fl            # 8개 실제 예제
-    ├── v9-complete.fl            # 통합 데모
-    └── v9-end-to-end.fl          # 엔드-투-엔드 파이프라인
+├── package.json
+└── tsconfig.json
 ```
 
 ---
 
-## 📊 통계
+## 설계 원칙
+
+**1. AI가 생성하기 쉬운 구조**
+S-expression은 토큰 → AST 변환이 trivial하다. 인간이 읽기 어려워도 AI는 오류 없이 생성한다.
+
+**2. 블록 = 실행 단위**
+`[FUNC ...]`, `[AGENT ...]`, `[PIPE ...]`는 각각 독립적인 실행 단위다. 부분 실패를 격리한다.
+
+**3. 자원검색 → 추론 → 행동 패턴**
+`observe → analyze → decide → act → verify` 5단계가 언어 레벨에서 지원된다.
+AI가 서버 자원을 조회하고 (Phase 19), 패턴을 분석하고, 실행 여부를 결정하고, 명령을 내리고, 결과를 검증하는 전체 루프가 단일 언어 안에 있다.
+
+**4. 셀프호스팅 = 언어의 완결성 증명**
+`freelang-lexer.fl`, `freelang-parser.fl`, `freelang-interpreter.fl` — 언어 자체가 자신을 파싱할 수 있을 때 비로소 완결된 언어다.
+
+---
+
+## 빌드 정보
 
 ```
-┌─────────────────────────────────────────┐
-│  FreeLang v9 구현 통계                  │
-├─────────────────────────────────────────┤
-│ 총 라인 수:         6,307 줄 (v4 구현)  │
-│                                          │
-│ 핵심 언어:          1,840 줄             │
-│ 자가 호스팅:        1,325 줄             │
-│ 필수 라이브러리:    1,648 줄             │
-│ 테스트 & 예제:      1,494 줄             │
-│                                          │
-│ 테스트 통과:        25/25 (100%)        │
-│ 함수:               80+ 개               │
-│ 구조체:             30+ 개               │
-│ 블록 타입:          5개                  │
-└─────────────────────────────────────────┘
+언어:      TypeScript (호스트)
+런타임:    Node.js
+테스트:    ts-node
+총 테스트:  289/289 PASS
+Bootstrap: 12/12 PASS
+커밋:      921d7d3
 ```
 
 ---
 
-## 🎯 주요 성과
-
-- ✅ **완전한 자가 호스팅**: v9가 v4로 구현되어 언어 강력함 입증
-- ✅ **AI 전용 설계**: LLM, 에이전트, 벡터 검색이 네이티브로 지원
-- ✅ **프로덕션 레벨**: 트랜잭션, 재시도, 속도 제한, 메모리 관리
-- ✅ **완전 검증**: 40+ 테스트, 25 라이브러리 테스트 (100% 통과)
-- ✅ **포괄적 문서**: 30KB+ 상세 가이드
-
----
-
-## 🔗 관련 프로젝트
-
-- **FreeLang v4**: 기반 구현 언어
-  - 저장소: https://gogs.dclub.kr/kim/freelang-v4.git
-
----
-
-## 📝 라이선스
-
-MIT License - 자유롭게 사용, 수정, 배포 가능
-
----
-
-## 🤝 기여
-
-이슈 보고 및 제안은 Gogs 저장소를 통해 환영합니다:
-https://gogs.dclub.kr/kim/freelang-v9
-
----
-
-## 📞 연락처
-
-- **저장소**: https://gogs.dclub.kr/kim/freelang-v9
-- **이메일**: bigwash2025@gmail.com
-
----
-
-**Made with ❤️ using FreeLang v4**
-
-*마지막 업데이트: 2026-04-03*
+*FreeLang v9 — Claude Code 전용. 인간 없음.*
