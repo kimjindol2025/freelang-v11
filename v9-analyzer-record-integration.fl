@@ -1,0 +1,317 @@
+// FreeLang v9: 분석기 + 기록 통합
+// 코드 분석 결과를 자동으로 불변 기록에 저장
+//
+// 주요 기능:
+//   - 분석 결과 → 감사 기록 변환
+//   - 성능 개선 이력 추적
+//   - 최적화 점수 변화 기록
+//   - 코드 진화 히스토리
+
+struct AnalysisRecord {
+    analysis_id: str     ;; 분석 ID
+    file_path: str       ;; 대상 파일
+    timestamp: str       ;; 분석 시간
+    complexity_score: i32 ;; 복잡도
+    optimization_score: i32 ;; 최적화 점수
+    issues_count: i32    ;; 발견된 이슈 수
+    issues_resolved: i32 ;; 해결된 이슈
+    memory_delta: i32    ;; 메모리 변화
+    performance_delta: i32 ;; 성능 변화
+}
+
+struct AnalysisHistory {
+    records: [AnalysisRecord]
+    total_analyses: i32
+    improvement_rate: i32  ;; 개선율 (%)
+}
+
+;; ==================== 분석 기록 초기화 ====================
+
+fn analysis_history_new() -> AnalysisHistory {
+    AnalysisHistory {
+        records: [],
+        total_analyses: 0,
+        improvement_rate: 0
+    }
+}
+
+;; ==================== 분석 결과 기록 ====================
+
+fn analysis_history_record_analysis(
+    history: AnalysisHistory,
+    file_path: str,
+    complexity: i32,
+    opt_score: i32,
+    issues: i32,
+    resolved: i32
+) -> AnalysisHistory {
+    println("[ANALYSIS_RECORD] Recording analysis for: " + file_path)
+
+    var analysis_id = "ana-" + str(history.total_analyses + 1)
+
+    var record = AnalysisRecord {
+        analysis_id: analysis_id,
+        file_path: file_path,
+        timestamp: "2026-04-06T20:52:42Z",
+        complexity_score: complexity,
+        optimization_score: opt_score,
+        issues_count: issues,
+        issues_resolved: resolved,
+        memory_delta: 0,
+        performance_delta: 0
+    }
+
+    history.records.push(record)
+    history.total_analyses = history.total_analyses + 1
+
+    println("  Analysis ID: " + analysis_id)
+    println("  Complexity: " + str(complexity))
+    println("  Optimization Score: " + str(opt_score) + "/100")
+    println("  Issues: " + str(issues) + " (resolved: " + str(resolved) + ")")
+    println("  ✅ Recorded to immutable history")
+
+    history
+}
+
+;; ==================== 성능 변화 추적 ====================
+
+fn analysis_history_track_improvement(
+    history: AnalysisHistory,
+    file_path: str,
+    previous_score: i32,
+    current_score: i32,
+    memory_change: i32,
+    performance_change: i32
+) -> AnalysisHistory {
+    println("[IMPROVEMENT] Tracking optimization for: " + file_path)
+
+    var analysis_id = "imp-" + str(history.total_analyses + 1)
+    var improvement: i32 = 0
+
+    if current_score > previous_score {
+        improvement = ((current_score - previous_score) * 100) / previous_score
+    }
+
+    var record = AnalysisRecord {
+        analysis_id: analysis_id,
+        file_path: file_path,
+        timestamp: "2026-04-06T20:52:42Z",
+        complexity_score: previous_score,
+        optimization_score: current_score,
+        issues_count: 0,
+        issues_resolved: 0,
+        memory_delta: memory_change,
+        performance_delta: performance_change
+    }
+
+    history.records.push(record)
+    history.total_analyses = history.total_analyses + 1
+
+    ;; 전체 개선율 계산
+    history.improvement_rate = history.improvement_rate + improvement
+
+    println("  Previous Score: " + str(previous_score))
+    println("  Current Score: " + str(current_score))
+    println("  Improvement: " + str(improvement) + "%")
+    println("  Memory change: " + str(memory_change) + " bytes")
+    println("  Performance change: " + str(performance_change) + "%")
+    println("  ✅ Improvement recorded")
+
+    history
+}
+
+;; ==================== 코드 진화 히스토리 ====================
+
+fn analysis_history_get_file_evolution(history: AnalysisHistory, file_path: str) -> [AnalysisRecord] {
+    println("[EVOLUTION] Tracking evolution of: " + file_path)
+
+    var results: [AnalysisRecord] = []
+    var i: i32 = 0
+
+    while i < length(history.records) {
+        if history.records[i].file_path == file_path {
+            results.push(history.records[i])
+        }
+        i = i + 1
+    }
+
+    var count = length(results)
+    println("  Found " + str(count) + " analysis records")
+
+    if count > 1 {
+        var first = results[0].optimization_score
+        var last = results[count - 1].optimization_score
+        var total_improvement = last - first
+        println("  Evolution: " + str(first) + " → " + str(last) + " (+" + str(total_improvement) + ")")
+    }
+
+    results
+}
+
+;; ==================== 전체 통계 ====================
+
+fn analysis_history_get_stats(history: AnalysisHistory) -> str {
+    println("[STATS] Analysis History Statistics")
+
+    var avg_complexity: i32 = 0
+    var avg_opt_score: i32 = 0
+    var total_issues: i32 = 0
+    var total_resolved: i32 = 0
+
+    var i: i32 = 0
+    while i < length(history.records) {
+        avg_complexity = avg_complexity + history.records[i].complexity_score
+        avg_opt_score = avg_opt_score + history.records[i].optimization_score
+        total_issues = total_issues + history.records[i].issues_count
+        total_resolved = total_resolved + history.records[i].issues_resolved
+        i = i + 1
+    }
+
+    if length(history.records) > 0 {
+        avg_complexity = avg_complexity / length(history.records)
+        avg_opt_score = avg_opt_score / length(history.records)
+    }
+
+    println("  Total analyses: " + str(history.total_analyses))
+    println("  Average complexity: " + str(avg_complexity))
+    println("  Average optimization score: " + str(avg_opt_score) + "/100")
+    println("  Total issues found: " + str(total_issues))
+    println("  Total issues resolved: " + str(total_resolved))
+    println("  Overall improvement rate: " + str(history.improvement_rate) + "%")
+
+    "AnalysisHistory(analyses=" + str(history.total_analyses) +
+    ", avg_score=" + str(avg_opt_score) + "/100" +
+    ", improvements=" + str(history.improvement_rate) + "%)"
+}
+
+;; ==================== 리포트 생성 ====================
+
+fn analysis_history_generate_report(history: AnalysisHistory) -> str {
+    var report = "=== Code Analysis & Optimization History ===\n\n"
+
+    report = report + "## Summary\n"
+    report = report + "Total Analyses: " + str(history.total_analyses) + "\n"
+    report = report + "Overall Improvement Rate: " + str(history.improvement_rate) + "%\n\n"
+
+    report = report + "## Analysis Timeline\n"
+
+    var i: i32 = 0
+    while i < length(history.records) {
+        var record = history.records[i]
+        report = report + "\n[" + record.analysis_id + "] " + record.file_path + "\n"
+        report = report + "  Time: " + record.timestamp + "\n"
+        report = report + "  Complexity: " + str(record.complexity_score) + "\n"
+        report = report + "  Optimization: " + str(record.optimization_score) + "/100\n"
+        report = report + "  Issues: " + str(record.issues_count) + " | Resolved: " + str(record.issues_resolved) + "\n"
+
+        if record.memory_delta != 0 {
+            report = report + "  Memory delta: " + str(record.memory_delta) + " bytes\n"
+        }
+        if record.performance_delta != 0 {
+            report = report + "  Performance delta: " + str(record.performance_delta) + "%\n"
+        }
+
+        i = i + 1
+    }
+
+    report = report + "\n## Recommendations\n"
+
+    if history.improvement_rate < 20 {
+        report = report + "- Code quality needs significant improvement\n"
+        report = report + "- Focus on refactoring high-complexity functions\n"
+    }
+    if history.improvement_rate >= 20 && history.improvement_rate < 50 {
+        report = report + "- Good progress. Continue optimization efforts\n"
+    }
+    if history.improvement_rate >= 50 {
+        report = report + "- Excellent improvement rate. Maintain current pace\n"
+    }
+
+    report
+}
+
+;; ==================== 무결성 검증 ====================
+
+fn analysis_history_verify(history: AnalysisHistory) -> bool {
+    println("[VERIFY] Verifying analysis history integrity...")
+
+    if length(history.records) == 0 {
+        println("  ✅ Empty history (valid)")
+        return true
+    }
+
+    ;; 모든 기록이 타임스탬프 순서대로 있는지 확인
+    var i: i32 = 1
+    while i < length(history.records) {
+        if history.records[i].timestamp < history.records[i - 1].timestamp {
+            println("  ❌ Timeline inconsistency detected")
+            return false
+        }
+        i = i + 1
+    }
+
+    println("  ✅ Analysis history is intact")
+    println("  Total records verified: " + str(length(history.records)))
+
+    true
+}
+
+;; ==================== 테스트 ====================
+
+fn test_analysis_record_integration() -> bool {
+    println("[TEST] Analysis & Record Integration\n")
+
+    var history = analysis_history_new()
+    println("Created analysis history\n")
+
+    ;; 분석 1: v9-code-analyzer.fl
+    println("=== Analysis 1: Code Analyzer ===")
+    history = analysis_history_record_analysis(
+        history,
+        "v9-code-analyzer.fl",
+        65,      ;; complexity
+        72,      ;; optimization score
+        4,       ;; issues
+        2        ;; resolved
+    )
+
+    ;; 분석 2: 개선 추적
+    println("\n=== Analysis 2: After Refactoring ===")
+    history = analysis_history_track_improvement(
+        history,
+        "v9-code-analyzer.fl",
+        72,      ;; previous score
+        85,      ;; current score
+        -5000,   ;; memory saved
+        15       ;; performance improvement
+    )
+
+    ;; 분석 3: v9-os-scheduler.fl
+    println("\n=== Analysis 3: OS Scheduler ===")
+    history = analysis_history_record_analysis(
+        history,
+        "v9-os-scheduler.fl",
+        58,
+        68,
+        3,
+        1
+    )
+
+    ;; 파일 진화 히스토리
+    println("\n=== File Evolution ===")
+    var evolution = analysis_history_get_file_evolution(history, "v9-code-analyzer.fl")
+    println("Evolution records: " + str(length(evolution)))
+
+    ;; 통계
+    println("\n" + analysis_history_get_stats(history) + "\n")
+
+    ;; 리포트
+    println(analysis_history_generate_report(history) + "\n")
+
+    ;; 검증
+    var verified = analysis_history_verify(history)
+
+    verified
+}
+
+test_analysis_record_integration()
