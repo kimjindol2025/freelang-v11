@@ -75,8 +75,8 @@ export function extractParamNames(params: any): string[] {
       return String(p.value);
     }
     // 예상하지 못한 타입
-    return "";
-  }).filter((name) => name.length > 0);
+    throw new Error(`extractParamNames: unknown param node type '${(p as any)?.kind ?? typeof p}'`);
+  });
 }
 
 /**

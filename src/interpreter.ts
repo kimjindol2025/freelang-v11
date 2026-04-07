@@ -2,6 +2,8 @@
 // AST → 실행 (Express 서버 포함)
 
 import express from "express";
+import { lex } from "./lexer";
+import { parse } from "./parser";
 import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
@@ -128,164 +130,31 @@ export class Interpreter {
     // Phase 9b: Initialize LearnedFactsStore (persistent learning)
     this.learnedFactsStore = new LearnedFactsStore("./data/learned-facts.json", 30);
 
-    // Phase 10: Initialize File I/O module
-    const fileModule = createFileModule();
-    for (const [name, fn] of Object.entries(fileModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [], // Will be handled dynamically
-        body: fn as any,
-      });
-      // Register with actual param count from function signature
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 11: Initialize Error handling module
-    const errorModule = createErrorModule();
-    for (const [name, fn] of Object.entries(errorModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [], // Will be handled dynamically
-        body: fn as any,
-      });
-      // Register with actual param count from function signature
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 12: Initialize HTTP Client module
-    const httpModule = createHttpModule();
-    for (const [name, fn] of Object.entries(httpModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 12: Initialize Shell execution module
-    const shellModule = createShellModule();
-    for (const [name, fn] of Object.entries(shellModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 13: Initialize Data Transform module
-    const dataModule = createDataModule();
-    for (const [name, fn] of Object.entries(dataModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 14: Initialize Collection + Control module
-    const collectionModule = createCollectionModule();
-    for (const [name, fn] of Object.entries(collectionModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 15: Initialize AI Agent State Machine module
-    const agentModule = createAgentModule();
-    for (const [name, fn] of Object.entries(agentModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 16: Initialize Time + Logging + Monitoring module
-    const timeModule = createTimeModule();
-    for (const [name, fn] of Object.entries(timeModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 17: Initialize Crypto + UUID + Regex module
-    const cryptoModule = createCryptoModule();
-    for (const [name, fn] of Object.entries(cryptoModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 18: Initialize Workflow Engine module
-    const workflowModule = createWorkflowModule();
-    for (const [name, fn] of Object.entries(workflowModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
-
-    // Phase 19: Initialize Server Resource Search module
-    const resourceModule = createResourceModule();
-    for (const [name, fn] of Object.entries(resourceModule)) {
-      this.context.functions.set(name, {
-        name,
-        params: [],
-        body: fn as any,
-      });
-      if (this.context.typeChecker) {
-        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
-        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
-      }
-    }
+    // Phase 10-19: Register all stdlib modules
+    this.registerModule(createFileModule());
+    this.registerModule(createErrorModule());
+    this.registerModule(createHttpModule());
+    this.registerModule(createShellModule());
+    this.registerModule(createDataModule());
+    this.registerModule(createCollectionModule());
+    this.registerModule(createAgentModule());
+    this.registerModule(createTimeModule());
+    this.registerModule(createCryptoModule());
+    this.registerModule(createWorkflowModule());
+    this.registerModule(createResourceModule());
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
+  }
+
+  private registerModule(module: Record<string, unknown>): void {
+    for (const [name, fn] of Object.entries(module)) {
+      this.context.functions.set(name, { name, params: [], body: fn as any });
+      if (this.context.typeChecker) {
+        const paramTypes = Array((fn as Function).length).fill({ kind: "type" as const, name: "any" });
+        this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });
+      }
+    }
   }
 
   interpret(blocks: ASTNode[]): ExecutionContext {
@@ -1892,10 +1761,8 @@ export class Interpreter {
           if (j < template.length && j + 1 < template.length && template[j + 1] === "}") {
             const exprStr = template.slice(i + 1, j + 1); // "(expr)"
             try {
-              const { lex: lexFn } = require("./lexer");
-              const { parse: parseFn } = require("./parser");
-              const tokens = lexFn(exprStr);
-              const ast = parseFn(tokens);
+              const tokens = lex(exprStr);
+              const ast = parse(tokens);
               const val = ast.length > 0 ? this.eval(ast[0]) : null;
               result += val === null || val === undefined ? "" : String(val);
             } catch {
@@ -2007,21 +1874,26 @@ export class Interpreter {
       return (func.body as Function)(...args);
     }
 
+    // Validate arg count for user-defined functions
+    if (func.params.length > args.length) {
+      throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args.length}`);
+    }
+
     // Create new scope
     const savedVars = new Map(this.context.variables);
 
-    // Bind parameters
-    for (let i = 0; i < func.params.length; i++) {
-      this.context.variables.set(func.params[i], args[i]);
+    try {
+      // Bind parameters
+      for (let i = 0; i < func.params.length; i++) {
+        this.context.variables.set(func.params[i], args[i]);
+      }
+
+      // Execute body
+      return this.eval(func.body);
+    } finally {
+      // Restore scope even if exception occurs
+      this.context.variables = savedVars;
     }
-
-    // Execute body
-    const result = this.eval(func.body);
-
-    // Restore scope
-    this.context.variables = savedVars;
-
-    return result;
   }
 
   private callFunctionValue(fn: any, args: any[]): any {
@@ -2033,21 +1905,21 @@ export class Interpreter {
     // Save current scope
     const savedVars = new Map(this.context.variables);
 
-    // Restore captured environment from function definition
-    this.context.variables = new Map(fn.capturedEnv);
+    try {
+      // Restore captured environment from function definition
+      this.context.variables = new Map(fn.capturedEnv);
 
-    // Bind parameters
-    for (let i = 0; i < fn.params.length; i++) {
-      this.context.variables.set(fn.params[i], args[i]);
+      // Bind parameters
+      for (let i = 0; i < fn.params.length; i++) {
+        this.context.variables.set(fn.params[i], args[i]);
+      }
+
+      // Execute body
+      return this.eval(fn.body);
+    } finally {
+      // Restore scope even if exception occurs
+      this.context.variables = savedVars;
     }
-
-    // Execute body
-    const result = this.eval(fn.body);
-
-    // Restore scope
-    this.context.variables = savedVars;
-
-    return result;
   }
 
   private callAsyncFunctionValue(fn: any, args: any[]): FreeLangPromise {
@@ -2058,10 +1930,8 @@ export class Interpreter {
 
     // Return a new Promise that executes the async function
     return new FreeLangPromise((resolve, reject) => {
+      const savedVars = new Map(this.context.variables);
       try {
-        // Save current scope
-        const savedVars = new Map(this.context.variables);
-
         // Restore captured environment from function definition
         this.context.variables = new Map(fn.capturedEnv);
 
@@ -2072,9 +1942,6 @@ export class Interpreter {
 
         // Execute body
         const result = this.eval(fn.body);
-
-        // Restore scope
-        this.context.variables = savedVars;
 
         // Resolve with the result
         if (result instanceof FreeLangPromise) {
@@ -2087,6 +1954,9 @@ export class Interpreter {
         }
       } catch (error) {
         reject(error as Error);
+      } finally {
+        // Restore scope even if exception occurs
+        this.context.variables = savedVars;
       }
     });
   }

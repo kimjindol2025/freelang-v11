@@ -1,7 +1,7 @@
 // FreeLang v9: Shell Execution Standard Library
 // Phase 12: Shell commands for AI-native system interaction
 
-import { execSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 
 /**
  * Create the shell execution module for FreeLang v9
@@ -11,11 +11,13 @@ export function createShellModule() {
   return {
     // shell cmd -> string (run command, return stdout)
     "shell": (cmd: string): string => {
-      try {
-        return execSync(cmd, { encoding: "utf-8", timeout: 30000 });
-      } catch (err: any) {
-        throw new Error(`shell failed: ${err.message}`);
+      const result = spawnSync("sh", ["-c", cmd], { timeout: 30000 });
+      if (result.error) throw new Error(`shell failed: ${result.error.message}`);
+      if ((result.status ?? 1) !== 0) {
+        const stderr = result.stderr?.toString().trim() ?? "";
+        throw new Error(`shell failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
       }
+      return result.stdout?.toString() ?? "";
     },
 
     // shell_status cmd -> number (run command, return exit code)
@@ -32,11 +34,13 @@ export function createShellModule() {
 
     // shell_pipe cmd1 cmd2 -> string (pipe output of cmd1 into cmd2)
     "shell_pipe": (cmd1: string, cmd2: string): string => {
-      try {
-        return execSync(`${cmd1} | ${cmd2}`, { encoding: "utf-8", timeout: 30000 });
-      } catch (err: any) {
-        throw new Error(`shell_pipe failed: ${err.message}`);
+      const result = spawnSync("sh", ["-c", `${cmd1} | ${cmd2}`], { timeout: 30000 });
+      if (result.error) throw new Error(`shell_pipe failed: ${result.error.message}`);
+      if ((result.status ?? 1) !== 0) {
+        const stderr = result.stderr?.toString().trim() ?? "";
+        throw new Error(`shell_pipe failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
       }
+      return result.stdout?.toString() ?? "";
     },
 
     // shell_capture cmd -> {stdout, stderr, code} (capture all output)
