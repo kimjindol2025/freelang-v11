@@ -23,6 +23,8 @@ import { createTimeModule } from "./stdlib-time"; // Phase 16: Time + Logging + 
 import { createCryptoModule } from "./stdlib-crypto"; // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
+import { createServerModule } from "./stdlib-server"; // Phase 20: HTTP Server
+import { createDbModule } from "./stdlib-db";          // Phase 20: DB Driver
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -130,7 +132,7 @@ export class Interpreter {
     // Phase 9b: Initialize LearnedFactsStore (persistent learning)
     this.learnedFactsStore = new LearnedFactsStore("./data/learned-facts.json", 30);
 
-    // Phase 10-19: Register all stdlib modules
+    // Phase 10-20: Register all stdlib modules
     this.registerModule(createFileModule());
     this.registerModule(createErrorModule());
     this.registerModule(createHttpModule());
@@ -142,6 +144,8 @@ export class Interpreter {
     this.registerModule(createCryptoModule());
     this.registerModule(createWorkflowModule());
     this.registerModule(createResourceModule());
+    this.registerModule(createServerModule((n, a) => this.callUserFunction(n, a)));
+    this.registerModule(createDbModule());
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();

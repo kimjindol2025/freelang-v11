@@ -1,0 +1,61 @@
+; FreeLang v9 — Phase 20 미니 서버 예제
+; 실행: npm run freelang run examples/mini-server.fl
+
+; ── 핸들러 정의 ──────────────────────────────────────────────────
+
+; GET /health  → 상태 응답
+[FUNC handle_health
+  :params [$req]
+  :body (server_json {"status" "ok" "lang" "FreeLang v9"})
+]
+
+; GET /hello?name=xxx  → 인사
+[FUNC handle_hello
+  :params [$req]
+  :body (let [[$q (server_req_query $req)]
+              [$name (get $q "name")]]
+          (server_json {"greeting" (concat "안녕, " (or $name "World")) }))
+]
+
+; POST /echo  → body 그대로 돌려줌
+[FUNC handle_echo
+  :params [$req]
+  :body (let [[$body (server_req_body $req)]]
+          (server_json $body))
+]
+
+; GET /projects  → kimdb에서 프로젝트 목록 조회
+[FUNC handle_projects
+  :params [$req]
+  :body (let [[$list (db_projects)]]
+          (server_json {"count" (length $list) "projects" $list}))
+]
+
+; GET /projects/:name  → 특정 프로젝트
+[FUNC handle_project
+  :params [$req]
+  :body (let [[$name (get (server_req_params $req) "name")]
+              [$data (db_project $name)]]
+          (if $data
+            (server_json $data)
+            (server_status 404 {"error" "not found"})))
+]
+
+; ── 라우트 등록 ──────────────────────────────────────────────────
+
+(server_get  "/health"          "handle_health")
+(server_get  "/hello"           "handle_hello")
+(server_post "/echo"            "handle_echo")
+(server_get  "/projects"        "handle_projects")
+(server_get  "/projects/:name"  "handle_project")
+
+; ── 서버 시작 ────────────────────────────────────────────────────
+
+(server_start 30001)
+
+(println "서버 시작됨")
+(println "  GET  http://localhost:30001/health")
+(println "  GET  http://localhost:30001/hello?name=김")
+(println "  POST http://localhost:30001/echo")
+(println "  GET  http://localhost:30001/projects")
+(println "  GET  http://localhost:30001/projects/freelang-v9")
