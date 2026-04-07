@@ -111,6 +111,8 @@ export class Interpreter {
   private searchAdapter: WebSearchAdapter; // Phase 9a: WebSearch
   private learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
   private currentLine = 0; // FreeLang source line tracking
+  private callDepth = 0;
+  private static readonly MAX_CALL_DEPTH = 500;
 
   constructor(app: express.Express = express(), logger?: Logger) {
     this.logger = logger || getGlobalLogger();
@@ -1895,45 +1897,45 @@ export class Interpreter {
       throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args.length}`);
     }
 
+    if (this.callDepth >= Interpreter.MAX_CALL_DEPTH) {
+      throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'`);
+    }
+
     // Create new scope
     const savedVars = new Map(this.context.variables);
+    this.callDepth++;
 
     try {
-      // Bind parameters
       for (let i = 0; i < func.params.length; i++) {
         this.context.variables.set(func.params[i], args[i]);
       }
-
-      // Execute body
       return this.eval(func.body);
     } finally {
-      // Restore scope even if exception occurs
+      this.callDepth--;
       this.context.variables = savedVars;
     }
   }
 
   private callFunctionValue(fn: any, args: any[]): any {
-    // Phase 4 Week 1: Call a function value (closure)
     if ((fn as any).kind !== "function-value") {
       throw new Error(`Expected function-value, got ${(fn as any).kind}`);
     }
 
-    // Save current scope
+    if (this.callDepth >= Interpreter.MAX_CALL_DEPTH) {
+      throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion`);
+    }
+
     const savedVars = new Map(this.context.variables);
+    this.callDepth++;
 
     try {
-      // Restore captured environment from function definition
       this.context.variables = new Map(fn.capturedEnv);
-
-      // Bind parameters
       for (let i = 0; i < fn.params.length; i++) {
         this.context.variables.set(fn.params[i], args[i]);
       }
-
-      // Execute body
       return this.eval(fn.body);
     } finally {
-      // Restore scope even if exception occurs
+      this.callDepth--;
       this.context.variables = savedVars;
     }
   }

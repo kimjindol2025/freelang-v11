@@ -64,7 +64,7 @@ async function runServer(): Promise<void> {
 
     // Step 6: Start server
     console.log("\n🚀 Starting Express server...\n");
-    const PORT = 3009;
+    const PORT = parseInt(process.env.PORT ?? "3009", 10);
     const server = app.listen(PORT, () => {
       console.log(`✅ Server running on http://localhost:${PORT}`);
       console.log(`\n📚 Available endpoints:`);
