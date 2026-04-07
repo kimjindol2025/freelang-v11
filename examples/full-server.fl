@@ -1,0 +1,133 @@
+; FreeLang v9 — Phase 21 풀스택 서버 예제
+; HTTP + WebSocket + Auth + Cache + PubSub
+; 실행: npm run freelang run examples/full-server.fl
+
+; ─── 미들웨어 설정 (server_start 전에 설정) ──────────────────────────────────
+
+(server_cors "*")
+(server_log_enable)
+(server_rate_limit 100 60000)    ; 100 req/분
+
+; ─── 인증 헬퍼 ───────────────────────────────────────────────────────────────
+
+(let [[$JWT_SECRET "my-super-secret-2026"]])
+
+[FUNC require_auth
+  :params [$req]
+  :body (let [[$token (auth_bearer_extract $req)]]
+          (if $token
+            (auth_jwt_verify $token $JWT_SECRET)
+            false))
+]
+
+; ─── 헬스체크 ─────────────────────────────────────────────────────────────────
+
+[FUNC handle_health
+  :params [$req]
+  :body (server_json {
+    "status" "ok"
+    "lang"   "FreeLang v9"
+    "ws_clients" (ws_count)
+  })
+]
+
+; ─── 로그인 ───────────────────────────────────────────────────────────────────
+
+[FUNC handle_login
+  :params [$req]
+  :body (let [[$body  (server_req_body $req)]
+              [$user  (get $body "username")]
+              [$pass  (get $body "password")]]
+          (if (and $user $pass)
+            (let [[$token (auth_jwt_sign {"user" $user "role" "user"} $JWT_SECRET 86400)]]
+              (server_json {"token" $token "user" $user}))
+            (server_status 400 {"error" "username and password required"})))
+]
+
+; ─── 보호된 API (JWT 필요) ────────────────────────────────────────────────────
+
+[FUNC handle_me
+  :params [$req]
+  :body (let [[$claims (require_auth $req)]]
+          (if $claims
+            (server_json {"user" (get $claims "user") "role" (get $claims "role")})
+            (server_status 401 {"error" "Unauthorized"})))
+]
+
+; ─── 캐시 예제 ────────────────────────────────────────────────────────────────
+
+[FUNC handle_data
+  :params [$req]
+  :body (let [[$cached (cache_get "heavy_data")]]
+          (if $cached
+            (server_json {"data" $cached "from_cache" true})
+            (let [[$fresh {"result" "computed" "ts" (time_now)}]]
+              (cache_set "heavy_data" $fresh 30000)   ; 30초 캐시
+              (server_json {"data" $fresh "from_cache" false}))))
+]
+
+; ─── PubSub 이벤트 구독 ───────────────────────────────────────────────────────
+
+[FUNC on_user_event
+  :params [$topic $data]
+  :body (println "[이벤트] {$topic}: {$data}")
+]
+
+(pubsub_subscribe "user.*" "on_user_event")
+
+[FUNC handle_event
+  :params [$req]
+  :body (let [[$body  (server_req_body $req)]
+              [$topic (get $body "topic")]
+              [$data  (get $body "data")]
+              [$cnt   (pubsub_publish $topic $data)]]
+          (server_json {"delivered" $cnt}))
+]
+
+; ─── WebSocket ────────────────────────────────────────────────────────────────
+
+[FUNC on_ws_connect
+  :params [$conn_id]
+  :body (do
+    (println "[WS] 연결: {$conn_id}")
+    (ws_send_json $conn_id {"type" "welcome" "conn" $conn_id})
+    (pubsub_publish "ws.connect" $conn_id))
+]
+
+[FUNC on_ws_message
+  :params [$conn_id $msg]
+  :body (do
+    (println "[WS] 메시지 from {$conn_id}: {$msg}")
+    (ws_broadcast_json {"type" "broadcast" "from" $conn_id "msg" $msg}))
+]
+
+[FUNC on_ws_close
+  :params [$conn_id]
+  :body (println "[WS] 종료: {$conn_id}")
+]
+
+(ws_on_connect_fn "on_ws_connect")
+(ws_on_message_fn "on_ws_message")
+(ws_on_close_fn   "on_ws_close")
+
+; ─── 라우트 등록 ──────────────────────────────────────────────────────────────
+
+(server_get  "/health"   "handle_health")
+(server_post "/login"    "handle_login")
+(server_get  "/me"       "handle_me")
+(server_get  "/data"     "handle_data")
+(server_post "/event"    "handle_event")
+
+; ─── 서버 시작 ────────────────────────────────────────────────────────────────
+
+(ws_start    30002)
+(server_start 30001)
+
+(println "=== FreeLang v9 풀스택 서버 ===")
+(println "HTTP  → http://localhost:30001")
+(println "WS    → ws://localhost:30002")
+(println "")
+(println "테스트:")
+(println "  curl http://localhost:30001/health")
+(println "  curl -X POST http://localhost:30001/login -H 'Content-Type: application/json' -d '{\"username\":\"kim\",\"password\":\"1234\"}'")
+(println "  curl http://localhost:30001/data")

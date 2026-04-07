@@ -23,8 +23,12 @@ import { createTimeModule } from "./stdlib-time"; // Phase 16: Time + Logging + 
 import { createCryptoModule } from "./stdlib-crypto"; // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
-import { createServerModule } from "./stdlib-server"; // Phase 20: HTTP Server
+import { createServerModule } from "./stdlib-server"; // Phase 20-21: HTTP Server + Middleware
 import { createDbModule } from "./stdlib-db";          // Phase 20: DB Driver
+import { createWsModule } from "./stdlib-ws";          // Phase 21: WebSocket
+import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, API key, hash)
+import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
+import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -146,6 +150,10 @@ export class Interpreter {
     this.registerModule(createResourceModule());
     this.registerModule(createServerModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createDbModule());
+    this.registerModule(createWsModule((n, a) => this.callUserFunction(n, a)));
+    this.registerModule(createAuthModule());
+    this.registerModule(createCacheModule());
+    this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
