@@ -377,7 +377,7 @@ export function makeVariable(name: string): Variable {
 }
 
 export function makeSExpr(op: string, args: ASTNode[], line?: number): SExpr {
-  return { kind: "sexpr", op, args, ...(line !== undefined && { line }) };
+  return { kind: "sexpr", op, args, line };
 }
 
 export function makeKeyword(name: string): Keyword {

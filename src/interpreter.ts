@@ -173,36 +173,36 @@ export class Interpreter {
   }
 
   interpret(blocks: ASTNode[]): ExecutionContext {
-    // Process all blocks/nodes
-    for (const node of blocks) {
-      // Phase 6: Handle both Block types and new S-expression based types
-      // Phase 9a: Handle SearchBlock
-      if (isImportBlock(node)) {
-        this.evalImportBlock(node);
-      } else if (isOpenBlock(node)) {
-        this.evalOpenBlock(node);
-      } else if (isSearchBlock(node)) {
-        this.context.lastValue = this.handleSearchBlock(node);
-      } else if (isLearnBlock(node)) {
-        this.context.lastValue = this.handleLearnBlock(node);
-      } else if (isReasoningBlock(node)) {
-        this.context.lastValue = this.handleReasoningBlock(node);
-      } else if (isReasoningSequence(node)) {
-        this.context.lastValue = this.handleReasoningSequence(node);
-      } else if (isModuleBlock(node)) {
-        this.evalModuleBlock(node);
-      } else if (isBlock(node)) {
-        this.evalBlock(node);
-      } else {
-        // Evaluate other ASTNode types (SExpr, PatternMatch, etc.)
-        // and store the result as lastValue (for REPL/testing)
-        this.context.lastValue = this.eval(node);
+    try {
+      for (const node of blocks) {
+        if (isImportBlock(node)) {
+          this.evalImportBlock(node);
+        } else if (isOpenBlock(node)) {
+          this.evalOpenBlock(node);
+        } else if (isSearchBlock(node)) {
+          this.context.lastValue = this.handleSearchBlock(node);
+        } else if (isLearnBlock(node)) {
+          this.context.lastValue = this.handleLearnBlock(node);
+        } else if (isReasoningBlock(node)) {
+          this.context.lastValue = this.handleReasoningBlock(node);
+        } else if (isReasoningSequence(node)) {
+          this.context.lastValue = this.handleReasoningSequence(node);
+        } else if (isModuleBlock(node)) {
+          this.evalModuleBlock(node);
+        } else if (isBlock(node)) {
+          this.evalBlock(node);
+        } else {
+          this.context.lastValue = this.eval(node);
+        }
       }
+    } catch (e: any) {
+      if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
+        e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
+      }
+      throw e;
     }
 
-    // Setup Express routes
     this.setupExpressRoutes();
-
     return this.context;
   }
 
@@ -420,19 +420,6 @@ export class Interpreter {
   }
 
   eval(node: ASTNode): any {
-    if (!node) return null;
-    try {
-      return this._eval(node);
-    } catch (e: any) {
-      // Annotate error with FreeLang source line if not already annotated
-      if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
-        e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
-      }
-      throw e;
-    }
-  }
-
-  private _eval(node: ASTNode): any {
     if (!node) return null;
 
     // Literal values
