@@ -841,7 +841,7 @@ export class Parser {
     }
 
     this.expect(T.RParen);
-    return makeSExpr(op, args);
+    return makeSExpr(op, args, opToken.line);
   }
 
   // Parse type annotation: int, string, bool, array<T>, map<K,V>, T?

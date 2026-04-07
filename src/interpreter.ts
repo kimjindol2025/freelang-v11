@@ -29,6 +29,7 @@ import { createWsModule } from "./stdlib-ws";          // Phase 21: WebSocket
 import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
+import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (env + SIGTERM)
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -109,6 +110,7 @@ export class Interpreter {
   private logger: Logger;
   private searchAdapter: WebSearchAdapter; // Phase 9a: WebSearch
   private learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
+  private currentLine = 0; // FreeLang source line tracking
 
   constructor(app: express.Express = express(), logger?: Logger) {
     this.logger = logger || getGlobalLogger();
@@ -154,6 +156,7 @@ export class Interpreter {
     this.registerModule(createAuthModule());
     this.registerModule(createCacheModule());
     this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
+    this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
@@ -418,6 +421,19 @@ export class Interpreter {
 
   eval(node: ASTNode): any {
     if (!node) return null;
+    try {
+      return this._eval(node);
+    } catch (e: any) {
+      // Annotate error with FreeLang source line if not already annotated
+      if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
+        e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
+      }
+      throw e;
+    }
+  }
+
+  private _eval(node: ASTNode): any {
+    if (!node) return null;
 
     // Literal values
     if ((node as any).kind === "literal") {
@@ -521,6 +537,7 @@ export class Interpreter {
   }
 
   private evalSExpr(expr: SExpr): any {
+    if (expr.line !== undefined) this.currentLine = expr.line;
     const op = expr.op;
 
     // Phase 5 Week 2: Method dispatch (ClassName:methodName pattern)

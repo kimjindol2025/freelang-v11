@@ -53,6 +53,7 @@ export interface SExpr {
   kind: "sexpr";
   op: string;
   args: ASTNode[];
+  line?: number; // FreeLang source line number (for error reporting)
 }
 
 // :keyword
@@ -375,8 +376,8 @@ export function makeVariable(name: string): Variable {
   return { kind: "variable", name };
 }
 
-export function makeSExpr(op: string, args: ASTNode[]): SExpr {
-  return { kind: "sexpr", op, args };
+export function makeSExpr(op: string, args: ASTNode[], line?: number): SExpr {
+  return { kind: "sexpr", op, args, ...(line !== undefined && { line }) };
 }
 
 export function makeKeyword(name: string): Keyword {
