@@ -58,8 +58,8 @@ function lex(source) {
             i++;
             continue;
         }
-        // Comment: ;; to end of line
-        if (ch === ";" && source[i + 1] === ";") {
+        // Comment: ; or ;; to end of line (single ; for self-hosting .fl files)
+        if (ch === ";") {
             while (i < source.length && source[i] !== "\n")
                 i++;
             continue;
@@ -202,10 +202,11 @@ function lex(source) {
         // Symbol: letters, hyphens, etc. (includes & for pattern rest element)
         // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
         // NOTE: '|' excluded - it's a separate Pipe token for or-patterns
+        // NOTE: '.' included for field access: env.vars, node.op (self-hosting .fl files)
         if (/[a-zA-Z_<>=!+\-*&/]/.test(ch)) {
             const start = i;
             const startCol = col;
-            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&]/.test(source[i])) {
+            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&.]/.test(source[i])) {
                 i++;
                 col++;
             }

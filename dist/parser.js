@@ -7,13 +7,26 @@ exports.parse = parse;
 const token_1 = require("./token");
 const ast_1 = require("./ast");
 class ParserError extends Error {
-    constructor(message, line, col) {
-        super(`[${line}:${col}] ${message}`);
+    constructor(message, line, col, hint) {
+        const loc = `[${line}:${col}]`;
+        const hintLine = hint ? `\n  힌트: ${hint}` : "";
+        super(`${loc} ${message}${hintLine}`);
         this.line = line;
         this.col = col;
+        this.hint = hint;
     }
 }
 exports.ParserError = ParserError;
+// 에러 메시지 힌트 테이블
+const ERROR_HINTS = {
+    "Expected RParen, got Symbol": "괄호가 닫히지 않았거나 와일드카드 패턴에 괄호가 필요합니다: _ expr → (_ expr)",
+    "Expected RParen, got EOF": "괄호가 닫히지 않았습니다. 여는 ( 와 닫는 ) 수를 확인하세요.",
+    "Expected operator": "S-expression의 첫 요소는 함수명이어야 합니다: (함수명 인자...)",
+    "Expected ':' keyword in map literal": "맵 리터럴의 키는 :으로 시작해야 합니다: {:key value}",
+    "Unexpected token: Colon": "콜론 키워드 (:key)는 맵 리터럴 또는 블록 필드에서만 사용할 수 있습니다.",
+    "Expected block type": "블록은 [FUNC name :params [...] :body ...] 형식이어야 합니다.",
+    "Unterminated string": "문자열이 닫히지 않았습니다. 닫는 \" 를 추가하세요.",
+};
 class Parser {
     constructor(tokens) {
         this.pos = 0;
@@ -394,6 +407,23 @@ class Parser {
             const token = this.advance();
             return (0, ast_1.makeKeyword)(token.value);
         }
+        // Phase 8+: control-flow keywords used as values (e.g. [else ...] in cond)
+        if (this.check(token_1.TokenType.Else) || this.check(token_1.TokenType.Then) || this.check(token_1.TokenType.When) ||
+            this.check(token_1.TokenType.Repeat) || this.check(token_1.TokenType.Until) || this.check(token_1.TokenType.While)) {
+            const token = this.advance();
+            return (0, ast_1.makeLiteral)("symbol", token.value);
+        }
+        // Phase 8+: :symbol (Colon + Symbol) used as keyword/string value in .fl files
+        // e.g. (get $parser :pos) → ":pos" as a string key
+        if (this.check(token_1.TokenType.Colon)) {
+            this.advance(); // consume ':'
+            if (this.check(token_1.TokenType.Symbol)) {
+                const token = this.advance();
+                return (0, ast_1.makeLiteral)("string", token.value);
+            }
+            // Bare colon (shouldn't happen in valid code, but handle gracefully)
+            return (0, ast_1.makeLiteral)("string", ":");
+        }
         // Check for map literal: {:key1 value1 :key2 value2}
         if (this.check(token_1.TokenType.LBrace)) {
             return this.parseMap();
@@ -551,6 +581,41 @@ class Parser {
         }
         else if (opToken.type === token_1.TokenType.Verify) {
             op = "verify";
+        }
+        else if (opToken.type === token_1.TokenType.If) {
+            op = "if";
+        }
+        else if (opToken.type === token_1.TokenType.When) {
+            op = "when";
+        }
+        else if (opToken.type === token_1.TokenType.Then) {
+            op = "then";
+        }
+        else if (opToken.type === token_1.TokenType.Else) {
+            op = "else";
+        }
+        else if (opToken.type === token_1.TokenType.Repeat) {
+            op = "repeat";
+        }
+        else if (opToken.type === token_1.TokenType.Until) {
+            op = "until";
+        }
+        else if (opToken.type === token_1.TokenType.While) {
+            op = "while";
+        }
+        else if (opToken.type === token_1.TokenType.LParen) {
+            // Implicit begin/do block: ( (expr1) (expr2) ... )
+            // Used in .fl self-hosting files where :body wraps multiple forms
+            this.pos--; // un-advance: treat the inner ( as a value, not operator
+            const exprs = [];
+            while (!this.check(token_1.TokenType.RParen) && !this.isAtEnd()) {
+                exprs.push(this.parseValue());
+            }
+            this.expect(token_1.TokenType.RParen);
+            if (exprs.length === 1)
+                return exprs[0];
+            // Multiple exprs: wrap in "do" S-expr
+            return { kind: "sexpr", op: "do", args: exprs };
         }
         else if (opToken.type !== token_1.TokenType.Symbol) {
             throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
@@ -855,7 +920,9 @@ class Parser {
         return this.pos >= this.tokens.length;
     }
     error(message, token) {
-        return new ParserError(message, token.line, token.col);
+        // 힌트 매칭: 메시지 앞부분으로 검색
+        const hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+        return new ParserError(message, token.line, token.col, hint);
     }
     // Synchronization for error recovery
     synchronize() {

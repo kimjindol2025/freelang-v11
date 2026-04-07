@@ -82,6 +82,8 @@ export declare class Interpreter {
     eval(node: ASTNode): any;
     private evalSExpr;
     private evalLet;
+    private interpolateString;
+    private toDisplayString;
     private evalCond;
     private callUserFunction;
     private callFunctionValue;

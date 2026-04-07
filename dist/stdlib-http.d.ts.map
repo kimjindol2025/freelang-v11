@@ -1,0 +1,1 @@
+{"version":3,"file":"stdlib-http.d.ts","sourceRoot":"","sources":["../src/stdlib-http.ts"],"names":[],"mappings":"AAMA;;;GAGG;AACH,wBAAgB,gBAAgB;oBAGV,MAAM,KAAG,MAAM;qBASd,MAAM,QAAQ,MAAM,KAAG,MAAM;oBAY9B,MAAM,QAAQ,MAAM,KAAG,MAAM;uBAY1B,MAAM,KAAG,MAAM;uBASf,MAAM,KAAG,MAAM;qBAUjB,MAAM,KAAG,GAAG;uBAUV,MAAM,UAAU,MAAM,KAAG,MAAM;EAQvD"}

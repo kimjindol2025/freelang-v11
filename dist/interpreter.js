@@ -18,6 +18,15 @@ const web_search_adapter_1 = require("./web-search-adapter"); // Phase 9a: WebSe
 const learned_facts_store_1 = require("./learned-facts-store"); // Phase 9b: Learning persistence
 const stdlib_file_1 = require("./stdlib-file"); // Phase 10: File I/O
 const stdlib_error_1 = require("./stdlib-error"); // Phase 11: Error handling
+const stdlib_http_1 = require("./stdlib-http"); // Phase 12: HTTP Client
+const stdlib_shell_1 = require("./stdlib-shell"); // Phase 12: Shell execution
+const stdlib_data_1 = require("./stdlib-data"); // Phase 13: Data Transform
+const stdlib_collection_1 = require("./stdlib-collection"); // Phase 14: Collection + Control
+const stdlib_agent_1 = require("./stdlib-agent"); // Phase 15: AI Agent State Machine
+const stdlib_time_1 = require("./stdlib-time"); // Phase 16: Time + Logging + Monitoring
+const stdlib_crypto_1 = require("./stdlib-crypto"); // Phase 17: Crypto + UUID + Regex
+const stdlib_workflow_1 = require("./stdlib-workflow"); // Phase 18: Workflow Engine
+const stdlib_resource_1 = require("./stdlib-resource"); // Phase 19: Server Resource Search
 // Interpreter class
 class Interpreter {
     constructor(app = (0, express_1.default)(), logger) {
@@ -51,9 +60,10 @@ class Interpreter {
                 params: [], // Will be handled dynamically
                 body: fn,
             });
-            // Register with type checker (as function accepting any args, returning any)
+            // Register with actual param count from function signature
             if (this.context.typeChecker) {
-                this.context.typeChecker.registerFunction(name, [], { kind: "type", name: "any" });
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
             }
         }
         // Phase 11: Initialize Error handling module
@@ -64,9 +74,127 @@ class Interpreter {
                 params: [], // Will be handled dynamically
                 body: fn,
             });
-            // Register with type checker (as function accepting any args, returning any)
+            // Register with actual param count from function signature
             if (this.context.typeChecker) {
-                this.context.typeChecker.registerFunction(name, [], { kind: "type", name: "any" });
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 12: Initialize HTTP Client module
+        const httpModule = (0, stdlib_http_1.createHttpModule)();
+        for (const [name, fn] of Object.entries(httpModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 12: Initialize Shell execution module
+        const shellModule = (0, stdlib_shell_1.createShellModule)();
+        for (const [name, fn] of Object.entries(shellModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 13: Initialize Data Transform module
+        const dataModule = (0, stdlib_data_1.createDataModule)();
+        for (const [name, fn] of Object.entries(dataModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 14: Initialize Collection + Control module
+        const collectionModule = (0, stdlib_collection_1.createCollectionModule)();
+        for (const [name, fn] of Object.entries(collectionModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 15: Initialize AI Agent State Machine module
+        const agentModule = (0, stdlib_agent_1.createAgentModule)();
+        for (const [name, fn] of Object.entries(agentModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 16: Initialize Time + Logging + Monitoring module
+        const timeModule = (0, stdlib_time_1.createTimeModule)();
+        for (const [name, fn] of Object.entries(timeModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 17: Initialize Crypto + UUID + Regex module
+        const cryptoModule = (0, stdlib_crypto_1.createCryptoModule)();
+        for (const [name, fn] of Object.entries(cryptoModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 18: Initialize Workflow Engine module
+        const workflowModule = (0, stdlib_workflow_1.createWorkflowModule)();
+        for (const [name, fn] of Object.entries(workflowModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+            }
+        }
+        // Phase 19: Initialize Server Resource Search module
+        const resourceModule = (0, stdlib_resource_1.createResourceModule)();
+        for (const [name, fn] of Object.entries(resourceModule)) {
+            this.context.functions.set(name, {
+                name,
+                params: [],
+                body: fn,
+            });
+            if (this.context.typeChecker) {
+                const paramTypes = Array(fn.length).fill({ kind: "type", name: "any" });
+                this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
             }
         }
         // Phase 5 Week 2: Register built-in type classes and instances
@@ -314,15 +442,31 @@ class Interpreter {
             return null;
         // Literal values
         if (node.kind === "literal") {
-            return node.value;
+            const lit = node;
+            // 문자열 보간: "Hello {$name}!" 또는 "결과: {(+ $a $b)}"
+            if (lit.type === "string" && typeof lit.value === "string" &&
+                (lit.value.includes("{$") || lit.value.includes("{("))) {
+                return this.interpolateString(lit.value);
+            }
+            return lit.value;
         }
         // Variables
         if (node.kind === "variable") {
             let varName = node.name;
+            // Self-hosting: dot field access — "env.vars" → resolve "env", then access "vars"
+            if (varName.includes(".")) {
+                const parts = varName.split(".");
+                let obj = this.context.variables.has("$" + parts[0])
+                    ? this.context.variables.get("$" + parts[0])
+                    : this.context.variables.get(parts[0]);
+                for (let p = 1; p < parts.length; p++) {
+                    if (obj === null || obj === undefined)
+                        return null;
+                    obj = typeof obj === "object" ? obj[parts[p]] : null;
+                }
+                return obj ?? null;
+            }
             // Phase 4: Handle variable name resolution
-            // Lexer removes $ prefix, so variable.name is "x" not "$x"
-            // But we store variables with "$" prefix in scope
-            // Try both with and without prefix
             if (this.context.variables.has("$" + varName)) {
                 return this.context.variables.get("$" + varName);
             }
@@ -917,6 +1061,14 @@ class Interpreter {
         if (op === "cond") {
             return this.evalCond(expr.args);
         }
+        // do/begin: (do expr1 expr2 ...) — evaluate all, return last
+        if (op === "do" || op === "begin" || op === "progn") {
+            let result = null;
+            for (const arg of expr.args) {
+                result = this.eval(arg);
+            }
+            return result;
+        }
         // Evaluate all arguments for normal operations
         const args = expr.args.map((arg) => this.eval(arg));
         // Built-in functions
@@ -950,6 +1102,25 @@ class Interpreter {
                 return args.some((a) => a);
             case "not":
                 return !args[0];
+            // Output — print/println/str
+            case "print":
+                process.stdout.write(args.map((a) => this.toDisplayString(a)).join(" "));
+                return null;
+            case "println":
+            case "echo":
+                console.log(...args.map((a) => this.toDisplayString(a)));
+                return null;
+            case "print-err":
+                process.stderr.write(args.map((a) => this.toDisplayString(a)).join(" ") + "\n");
+                return null;
+            case "str":
+                return args.map((a) => this.toDisplayString(a)).join("");
+            case "repr":
+                return JSON.stringify(args[0], null, 2);
+            case "inspect":
+                const inspected = this.toDisplayString(args[0]);
+                console.log(inspected);
+                return args[0]; // pass-through (tap pattern)
             // String
             case "concat":
                 return args.join("");
@@ -1481,8 +1652,105 @@ class Interpreter {
                 }
             }
         }
-        // Evaluate body
-        return this.eval(body);
+        // Evaluate body — 여러 표현식 허용 (마지막 값 반환)
+        let result = null;
+        for (let bodyIdx = 1; bodyIdx < args.length; bodyIdx++) {
+            result = this.eval(args[bodyIdx]);
+        }
+        return result;
+    }
+    // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
+    interpolateString(template) {
+        let result = "";
+        let i = 0;
+        while (i < template.length) {
+            if (template[i] === "{" && i + 1 < template.length) {
+                const next = template[i + 1];
+                if (next === "$") {
+                    // {$varName} 패턴
+                    const end = template.indexOf("}", i);
+                    if (end > i) {
+                        const varName = template.slice(i + 2, end);
+                        let val;
+                        if (varName.includes(".")) {
+                            const parts = varName.split(".");
+                            val = this.context.variables.has("$" + parts[0])
+                                ? this.context.variables.get("$" + parts[0])
+                                : this.context.variables.get(parts[0]);
+                            for (let p = 1; p < parts.length; p++) {
+                                if (val === null || val === undefined) {
+                                    val = null;
+                                    break;
+                                }
+                                val = typeof val === "object" ? val[parts[p]] : null;
+                            }
+                        }
+                        else {
+                            val = this.context.variables.has("$" + varName)
+                                ? this.context.variables.get("$" + varName)
+                                : this.context.variables.get(varName);
+                        }
+                        result += val === null || val === undefined ? "" : String(val);
+                        i = end + 1;
+                        continue;
+                    }
+                }
+                else if (next === "(") {
+                    // {(expr)} 패턴 — 균형 잡힌 괄호 탐색
+                    let depth = 0;
+                    let j = i + 1; // '{' 이후
+                    while (j < template.length) {
+                        if (template[j] === "(")
+                            depth++;
+                        else if (template[j] === ")") {
+                            depth--;
+                            if (depth === 0)
+                                break;
+                        }
+                        j++;
+                    }
+                    if (j < template.length && j + 1 < template.length && template[j + 1] === "}") {
+                        const exprStr = template.slice(i + 1, j + 1); // "(expr)"
+                        try {
+                            const { lex: lexFn } = require("./lexer");
+                            const { parse: parseFn } = require("./parser");
+                            const tokens = lexFn(exprStr);
+                            const ast = parseFn(tokens);
+                            const val = ast.length > 0 ? this.eval(ast[0]) : null;
+                            result += val === null || val === undefined ? "" : String(val);
+                        }
+                        catch {
+                            result += template.slice(i, j + 2); // 오류 시 원본 유지
+                        }
+                        i = j + 2; // ')' + '}' 건너뜀
+                        continue;
+                    }
+                }
+            }
+            result += template[i];
+            i++;
+        }
+        return result;
+    }
+    // 값을 사람/AI가 읽기 좋은 문자열로 변환
+    toDisplayString(val) {
+        if (val === null || val === undefined)
+            return "null";
+        if (typeof val === "string")
+            return val;
+        if (typeof val === "number" || typeof val === "boolean")
+            return String(val);
+        if (Array.isArray(val))
+            return "[" + val.map((v) => this.toDisplayString(v)).join(", ") + "]";
+        if (typeof val === "object") {
+            if (val.kind === "function-value")
+                return `<fn:${val.name || "λ"}>`;
+            const entries = Object.entries(val)
+                .filter(([k]) => !k.startsWith("_"))
+                .map(([k, v]) => `${k}: ${this.toDisplayString(v)}`);
+            return "{" + entries.join(", ") + "}";
+        }
+        return String(val);
     }
     evalCond(args) {
         // (cond [test1 result1] [test2 result2] ... [else default])
@@ -1554,6 +1822,10 @@ class Interpreter {
             if (!validation.valid) {
                 throw new Error(`Type error in call to '${baseName}': ${validation.message}`);
             }
+        }
+        // Native JS function (Phase 10/11 builtins): call directly with args
+        if (typeof func.body === "function") {
+            return func.body(...args);
         }
         // Create new scope
         const savedVars = new Map(this.context.variables);

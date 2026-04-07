@@ -3,7 +3,8 @@ import { ASTNode } from "./ast";
 export declare class ParserError extends Error {
     line: number;
     col: number;
-    constructor(message: string, line: number, col: number);
+    hint?: string | undefined;
+    constructor(message: string, line: number, col: number, hint?: string | undefined);
 }
 export declare class Parser {
     private pos;
