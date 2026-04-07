@@ -1,200 +1,291 @@
-; FreeLang v9 Phase 8-1: Lexer Implementation in FreeLang
-; Simplified self-hosting Lexer - tokenize core FreeLang syntax
-; Target: Implement core tokenization (parentheses, symbols, strings, numbers)
+; FreeLang v9: Lexer (self-hosting)
+; Source string → Token[]
+; Upgrade: {}, ?, !, dot-access, line tracking, single-; comment
 
-; ============================================================
-; Core Token Scanner - Simplified Implementation
-; ============================================================
+; ── 문자 분류 헬퍼 ───────────────────────────────────────────
 
-; Check if character is whitespace
 [FUNC is-ws :params [$ch]
   :body (match $ch
-    (" " true)
-    ("\t" true)
-    ("\n" true)
+    (" " true) ("\t" true) ("\n" true) ("\r" true)
     (_ false)
-  )
-]
+)]
 
-; Check if character is digit
 [FUNC is-digit :params [$ch]
   :body (and (>= (char-code $ch) 48) (<= (char-code $ch) 57))
 ]
 
-; Check if character is letter or underscore
+; 심볼 시작 문자: a-z A-Z _
 [FUNC is-alpha :params [$ch]
   :body (or
-    (and (>= (char-code $ch) 97) (<= (char-code $ch) 122))   ; a-z
-    (and (>= (char-code $ch) 65) (<= (char-code $ch) 90))    ; A-Z
+    (and (>= (char-code $ch) 97)  (<= (char-code $ch) 122))
+    (and (>= (char-code $ch) 65)  (<= (char-code $ch) 90))
     (= $ch "_")
   )
 ]
 
-; Main lexer - tokenize source into list of tokens
-; Returns array of token objects: {:type "TYPE" :value "val" :pos N}
-[FUNC lex :params [$source]
-  :body (
-    (let [[tokens []]
-          [i 0]
-          [len (length $source)]]
+; 심볼 계속 문자: alpha | digit | - | ? | ! | / | *
+[FUNC is-sym-cont :params [$ch]
+  :body (or
+    (is-alpha $ch)
+    (is-digit $ch)
+    (= $ch "-")
+    (= $ch "?")
+    (= $ch "!")
+    (= $ch "/")
+    (= $ch "*")
+    (= $ch "+")
+    (= $ch "<")
+    (= $ch ">")
+    (= $ch "=")
+  )
+]
 
-      ; Process each character
-      (define process-tokens []
+; 변수 계속 문자: alpha | digit | - | _ | . (dot-access)
+[FUNC is-var-cont :params [$ch]
+  :body (or
+    (is-alpha $ch)
+    (is-digit $ch)
+    (= $ch "-")
+    (= $ch "_")
+    (= $ch ".")
+  )
+]
+
+; ── 메인 렉서 ───────────────────────────────────────────────
+
+[FUNC lex :params [$src]
+  :body (
+    (let [[len (length $src)]]
+      (define tokens [])
+      (define i 0)
+      (define line 1)
+
+      (define ch [] (get $src i))
+
+      (define peek-ch [offset]
+        (if (< (+ i offset) len)
+          (get $src (+ i offset))
+          ""
+        )
+      )
+
+      (define emit [type val]
+        (set! tokens (append tokens [{:type $type :value $val :line line}]))
+      )
+
+      (define scan []
         (if (>= i len)
           tokens
-          (let [[ch (get $source i)]]
+
+          (let [[c (ch)]]
             (cond
-              ; Skip whitespace
-              [(is-ws ch)
+
+              ; ── 개행 ─────────────────────────────────────
+              [(= c "\n")
+                (set! line (+ line 1))
                 (set! i (+ i 1))
-                (process-tokens)
+                (scan)
               ]
 
-              ; Comment: ;; to end of line
-              [(and (= ch ";") (< (+ i 1) len) (= (get $source (+ i 1)) ";"))
-                (set! i (+ i 2))
+              ; ── 공백 ─────────────────────────────────────
+              [(is-ws c)
+                (set! i (+ i 1))
+                (scan)
+              ]
+
+              ; ── 주석: ; 또는 ;; ──────────────────────────
+              [(= c ";")
+                (set! i (+ i 1))
                 (define skip-comment []
-                  (if (and (< i len) (not (= (get $source i) "\n")))
+                  (if (and (< i len) (not (= (ch) "\n")))
                     (do (set! i (+ i 1)) (skip-comment))
                   )
                 )
                 (skip-comment)
-                (process-tokens)
+                (scan)
               ]
 
-              ; String: "..."
-              [(= ch "\"")
+              ; ── 문자열 ───────────────────────────────────
+              [(= c "\"")
                 (set! i (+ i 1))
-                (define str-val "")
-                (define read-string []
-                  (if (and (< i len) (not (= (get $source i) "\"")))
-                    (do
-                      (set! str-val (concat str-val (get $source i)))
-                      (set! i (+ i 1))
-                      (read-string)
+                (define s "")
+                (define read-str []
+                  (if (>= i len)
+                    (error (concat "Unterminated string at line " (num-to-str line)))
+                    (let [[sc (ch)]]
+                      (cond
+                        [(= sc "\\")
+                          (set! i (+ i 1))
+                          (if (< i len)
+                            (let [[esc (ch)]]
+                              (set! i (+ i 1))
+                              (set! s (concat s (match $esc
+                                ("n" "\n") ("t" "\t") ("r" "\r")
+                                ("\"" "\"") ("\\" "\\")
+                                (_ $esc)
+                              )))
+                              (read-str)
+                            )
+                          )
+                        ]
+                        [(= sc "\"")
+                          (set! i (+ i 1))
+                        ]
+                        [else
+                          (set! s (concat s $sc))
+                          (set! i (+ i 1))
+                          (read-str)
+                        ]
+                      )
                     )
                   )
                 )
-                (read-string)
-                (if (< i len) (set! i (+ i 1)))
-                (set! tokens (append tokens [{:type "STRING" :value str-val}]))
-                (process-tokens)
+                (read-str)
+                (emit "STRING" s)
+                (scan)
               ]
 
-              ; Parentheses
-              [(= ch "(")
-                (set! tokens (append tokens [{:type "LPAREN" :value "("}]))
-                (set! i (+ i 1))
-                (process-tokens)
-              ]
-              [(= ch ")")
-                (set! tokens (append tokens [{:type "RPAREN" :value ")"}]))
-                (set! i (+ i 1))
-                (process-tokens)
-              ]
+              ; ── 단일 문자 토큰 ────────────────────────────
+              [(= c "(")  (emit "LPAREN" "(")  (set! i (+ i 1)) (scan)]
+              [(= c ")")  (emit "RPAREN" ")")  (set! i (+ i 1)) (scan)]
+              [(= c "[")  (emit "LBRACKET" "[") (set! i (+ i 1)) (scan)]
+              [(= c "]")  (emit "RBRACKET" "]") (set! i (+ i 1)) (scan)]
+              [(= c "{")  (emit "LBRACE" "{")   (set! i (+ i 1)) (scan)]
+              [(= c "}")  (emit "RBRACE" "}")   (set! i (+ i 1)) (scan)]
+              [(= c "|")  (emit "SYMBOL" "|")   (set! i (+ i 1)) (scan)]
+              [(= c "@")  (emit "SYMBOL" "@")   (set! i (+ i 1)) (scan)]
 
-              ; Brackets
-              [(= ch "[")
-                (set! tokens (append tokens [{:type "LBRACKET" :value "["}]))
+              ; ── 콜론: : ──────────────────────────────────
+              [(= c ":")
                 (set! i (+ i 1))
-                (process-tokens)
-              ]
-              [(= ch "]")
-                (set! tokens (append tokens [{:type "RBRACKET" :value "]"}]))
-                (set! i (+ i 1))
-                (process-tokens)
-              ]
-
-              ; Colon
-              [(= ch ":")
-                (set! tokens (append tokens [{:type "COLON" :value ":"}]))
-                (set! i (+ i 1))
-                (process-tokens)
-              ]
-
-              ; Pipe
-              [(= ch "|")
-                (set! tokens (append tokens [{:type "SYMBOL" :value "|"}]))
-                (set! i (+ i 1))
-                (process-tokens)
-              ]
-
-              ; Variable: $name
-              [(= ch "$")
-                (set! i (+ i 1))
-                (define var-name "")
-                (define read-var []
-                  (if (and (< i len) (or (is-alpha (get $source i)) (is-digit (get $source i))))
+                ; :keyword 토큰 (다음 심볼까지 읽음)
+                (define kw "")
+                (define read-kw []
+                  (if (and (< i len) (is-sym-cont (ch)))
                     (do
-                      (set! var-name (concat var-name (get $source i)))
+                      (set! kw (concat kw (ch)))
+                      (set! i (+ i 1))
+                      (read-kw)
+                    )
+                  )
+                )
+                (read-kw)
+                (if (> (length kw) 0)
+                  (emit "KEYWORD" kw)
+                  (emit "COLON" ":")
+                )
+                (scan)
+              ]
+
+              ; ── 변수: $name 또는 $name.field ─────────────
+              [(= c "$")
+                (set! i (+ i 1))
+                (define vn "")
+                (define read-var []
+                  (if (and (< i len) (is-var-cont (ch)))
+                    (do
+                      (set! vn (concat vn (ch)))
                       (set! i (+ i 1))
                       (read-var)
                     )
                   )
                 )
                 (read-var)
-                (set! tokens (append tokens [{:type "VARIABLE" :value var-name}]))
-                (process-tokens)
+                (emit "VARIABLE" vn)
+                (scan)
               ]
 
-              ; Number
-              [(is-digit ch)
-                (define num-str "")
+              ; ── 숫자 ─────────────────────────────────────
+              [(or (is-digit c) (and (= c "-") (< (+ i 1) len) (is-digit (peek-ch 1))))
+                (define ns "")
                 (define read-num []
-                  (if (and (< i len) (or (is-digit (get $source i)) (= (get $source i) ".")))
+                  (if (and (< i len) (or (is-digit (ch)) (= (ch) ".")))
                     (do
-                      (set! num-str (concat num-str (get $source i)))
+                      (set! ns (concat ns (ch)))
                       (set! i (+ i 1))
                       (read-num)
                     )
                   )
                 )
+                (if (= c "-")
+                  (do (set! ns "-") (set! i (+ i 1)))
+                )
                 (read-num)
-                (set! tokens (append tokens [{:type "NUMBER" :value num-str}]))
-                (process-tokens)
+                (emit "NUMBER" ns)
+                (scan)
               ]
 
-              ; Symbol or keyword
-              [(is-alpha ch)
-                (define sym-val "")
+              ; ── 심볼 (함수명, 키워드 등) ──────────────────
+              [(is-alpha c)
+                (define sv "")
                 (define read-sym []
-                  (if (and (< i len) (or (is-alpha (get $source i)) (is-digit (get $source i)) (= (get $source i) "-")))
+                  (if (and (< i len) (is-sym-cont (ch)))
                     (do
-                      (set! sym-val (concat sym-val (get $source i)))
+                      (set! sv (concat sv (ch)))
                       (set! i (+ i 1))
                       (read-sym)
                     )
                   )
                 )
                 (read-sym)
-                (set! tokens (append tokens [{:type "SYMBOL" :value sym-val}]))
-                (process-tokens)
+                ; true / false / null 은 BOOL/NULL 토큰으로 구분
+                (match sv
+                  ("true"  (emit "BOOL" "true"))
+                  ("false" (emit "BOOL" "false"))
+                  ("null"  (emit "NULL" "null"))
+                  (_       (emit "SYMBOL" sv))
+                )
+                (scan)
               ]
 
-              ; Default: operator or skip
-              [else
-                (match ch
-                  ("+" (set! tokens (append tokens [{:type "SYMBOL" :value "+"}])))
-                  ("-" (set! tokens (append tokens [{:type "SYMBOL" :value "-"}])))
-                  ("*" (set! tokens (append tokens [{:type "SYMBOL" :value "*"}])))
-                  ("/" (set! tokens (append tokens [{:type "SYMBOL" :value "/"}])))
-                  ("=" (set! tokens (append tokens [{:type "SYMBOL" :value "="}])))
-                  ("<" (set! tokens (append tokens [{:type "SYMBOL" :value "<"}])))
-                  (">" (set! tokens (append tokens [{:type "SYMBOL" :value ">"}])))
-                  (_ (set! tokens tokens))  ; Skip unknown
+              ; ── 연산자: 다중문자 우선 처리 ─────────────────
+              [(= c "=")
+                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                  (do (emit "SYMBOL" "==") (set! i (+ i 2)) (scan))
+                  (do (emit "SYMBOL" "=") (set! i (+ i 1)) (scan))
                 )
+              ]
+              [(= c "<")
+                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                  (do (emit "SYMBOL" "<=") (set! i (+ i 2)) (scan))
+                  (do (emit "SYMBOL" "<") (set! i (+ i 1)) (scan))
+                )
+              ]
+              [(= c ">")
+                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                  (do (emit "SYMBOL" ">=") (set! i (+ i 2)) (scan))
+                  (do (emit "SYMBOL" ">") (set! i (+ i 1)) (scan))
+                )
+              ]
+              [(= c "!")
+                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                  (do (emit "SYMBOL" "!=") (set! i (+ i 2)) (scan))
+                  (do (emit "SYMBOL" "!") (set! i (+ i 1)) (scan))
+                )
+              ]
+              [(= c "+") (emit "SYMBOL" "+") (set! i (+ i 1)) (scan)]
+              [(= c "-") (emit "SYMBOL" "-") (set! i (+ i 1)) (scan)]
+              [(= c "*") (emit "SYMBOL" "*") (set! i (+ i 1)) (scan)]
+              [(= c "/") (emit "SYMBOL" "/") (set! i (+ i 1)) (scan)]
+              [(= c "?") (emit "SYMBOL" "?") (set! i (+ i 1)) (scan)]
+              [(= c "&") (emit "SYMBOL" "&") (set! i (+ i 1)) (scan)]
+              [(= c "%") (emit "SYMBOL" "%") (set! i (+ i 1)) (scan)]
+              [(= c "^") (emit "SYMBOL" "^") (set! i (+ i 1)) (scan)]
+              [(= c "~") (emit "SYMBOL" "~") (set! i (+ i 1)) (scan)]
+              [(= c ",") (set! i (+ i 1)) (scan)]  ; 쉼표 무시
+
+              [else
                 (set! i (+ i 1))
-                (process-tokens)
+                (scan)
               ]
             )
           )
         )
       )
 
-      (process-tokens)
+      (append (scan) [{:type "EOF" :value "" :line line}])
     )
   )
 ]
 
-; Export main function
 (export lex)

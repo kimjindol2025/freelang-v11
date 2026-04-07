@@ -1001,13 +1001,22 @@ export class Parser {
       // Parse pattern
       const pattern = this.parsePattern();
 
-      // Check for optional guard: (if condition)
+      // Check for optional guard: (if condition) — only when followed directly by )
+      // If (if cond then else) with then/else, it's the body, not a guard
       let guard: ASTNode | undefined;
       if (this.check(T.LParen) && this.peekNext()?.value === "if") {
+        const savedPos = this.pos;
         this.advance(); // consume (
         this.advance(); // consume 'if'
-        guard = this.parseValue();
-        this.expect(T.RParen);
+        const possibleGuard = this.parseValue();
+        if (this.check(T.RParen)) {
+          // (if condition) with no then/else → it's a guard
+          this.advance(); // consume )
+          guard = possibleGuard;
+        } else {
+          // (if condition then else) → it's the body, backtrack
+          this.pos = savedPos;
+        }
       }
 
       // Parse body

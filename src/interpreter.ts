@@ -290,10 +290,11 @@ export class Interpreter {
           }
           // Old syntax [$x $y] - item is a Variable directly
           if (item.kind === "variable") {
-            return item.name;
+            // Normalize to $-prefix so callUserFunction stores correctly
+            return item.name.startsWith("$") ? item.name : "$" + item.name;
           }
           // Fallback
-          return item.name || "$unknown";
+          return item.name ? (item.name.startsWith("$") ? item.name : "$" + item.name) : "$unknown";
         }));
       }
     }
@@ -431,6 +432,18 @@ export class Interpreter {
       if (lit.type === "string" && typeof lit.value === "string" &&
           (lit.value.includes("{$") || lit.value.includes("{("))) {
         return this.interpolateString(lit.value as string);
+      }
+      // Self-hosting: bare symbol (without $) as variable reference
+      // e.g. (define i 0) then (+ i 1) → looks up $i
+      if (lit.type === "symbol" && typeof lit.value === "string") {
+        // true/false/null always evaluate to their proper JS values
+        if (lit.value === "true")  return true;
+        if (lit.value === "false") return false;
+        if (lit.value === "null")  return null;
+        const varName = "$" + lit.value;
+        if (this.context.variables.has(varName)) {
+          return this.context.variables.get(varName);
+        }
       }
       return lit.value;
     }
@@ -888,6 +901,23 @@ export class Interpreter {
       }
     }
 
+    // set!: (set! name value) — mutable variable update (closure pattern)
+    if (op === "set!") {
+      if (expr.args.length < 2) throw new Error(`set! requires a name and a value`);
+      const nameNode = expr.args[0];
+      let name: string;
+      if ((nameNode as any).kind === "variable") {
+        name = (nameNode as any).name; // already prefixed with $
+      } else if ((nameNode as any).kind === "literal") {
+        name = "$" + (nameNode as any).value;
+      } else {
+        throw new Error(`set!: first argument must be a symbol`);
+      }
+      const value = this.eval(expr.args[1]);
+      this.context.variables.set(name, value);
+      return value;
+    }
+
     // Define a function: (define name (fn [...] body))
     if (op === "define") {
       if (expr.args.length < 2) {
@@ -895,12 +925,10 @@ export class Interpreter {
       }
 
       const nameNode = expr.args[0];
-      const valueNode = expr.args[1];
 
       // Get the name
       let name: string;
       if ((nameNode as any).kind === "literal") {
-        // Handle both "string" and "symbol" literal types
         name = (nameNode as Literal).value as string;
       } else if ((nameNode as any).kind === "variable") {
         name = (nameNode as Variable).name;
@@ -908,6 +936,29 @@ export class Interpreter {
         throw new Error(`define: first argument must be a symbol or string`);
       }
 
+      // 3-arg form: (define name [params] body) → define a function directly
+      // Used in self-hosting FL files: (define scan [] body), (define emit [type val] body)
+      if (expr.args.length >= 3) {
+        const paramsNode = expr.args[1];
+        const bodyNode = expr.args.length === 3 ? expr.args[2]
+          : { kind: "sexpr" as const, op: "do", args: expr.args.slice(2) };
+        let params: string[] = [];
+        // paramsNode is an array-like block or array literal from the TS parser
+        const items = (paramsNode as any).kind === "block" && (paramsNode as any).type === "Array"
+          ? (paramsNode as any).fields.get("items") || []
+          : (paramsNode as any).kind === "array"
+            ? (paramsNode as any).items || []
+            : [];
+        params = (items as any[]).map((item: any) => {
+          if (item.kind === "variable") return item.name.startsWith("$") ? item.name : "$" + item.name;
+          if (item.kind === "literal") return "$" + item.value;
+          return "$" + (item.name || item.value || "?");
+        });
+        this.context.functions.set(name, { name, params, body: bodyNode });
+        return null;
+      }
+
+      const valueNode = expr.args[1];
       // Evaluate the value
       const value = this.eval(valueNode);
 
@@ -1116,6 +1167,60 @@ export class Interpreter {
       return result;
     }
 
+    // Short-circuit logical operators
+    if (op === "and") {
+      let result: any = true;
+      for (const arg of expr.args) {
+        result = this.eval(arg);
+        if (!result) return result;
+      }
+      return result;
+    }
+    if (op === "or") {
+      for (const arg of expr.args) {
+        const result = this.eval(arg);
+        if (result) return result;
+      }
+      return false;
+    }
+
+    // Special form: (map array [binding-var] body) — inline comprehension
+    // Supports multi-var form: (map array [k] body) or (map array [k v] body)
+    if (op === "map" && expr.args.length === 3) {
+      const arr = this.eval(expr.args[0]);
+      const paramNode = expr.args[1];
+      const bodyNode = expr.args[2];
+      // Extract binding names from array literal [var1 var2 ...]
+      const items: any[] =
+        (paramNode as any).kind === "block" && (paramNode as any).type === "Array"
+          ? (paramNode as any).fields.get?.("items") || []
+          : (paramNode as any).kind === "array"
+            ? (paramNode as any).items || []
+            : [];
+      const paramNames = items.map((item: any) => {
+        if (item.kind === "variable") return item.name;   // $x → "x"
+        if (item.kind === "literal")  return "$" + item.value; // symbol "x" → "$x"
+        return "$" + (item.name || item.value || "_");
+      });
+      if (Array.isArray(arr) && paramNames.length > 0) {
+        return arr.map((elem: any) => {
+          const saved = paramNames.map(n => ({ n, v: this.context.variables.get(n) }));
+          this.context.variables.set(paramNames[0], elem);
+          if (paramNames.length > 1) {
+            // Optional: second param gets index (not used here)
+          }
+          try {
+            return this.eval(bodyNode);
+          } finally {
+            for (const { n, v } of saved) {
+              if (v === undefined) this.context.variables.delete(n);
+              else this.context.variables.set(n, v);
+            }
+          }
+        });
+      }
+    }
+
     // Evaluate all arguments for normal operations
     const args = expr.args.map((arg) => this.eval(arg));
 
@@ -1191,6 +1296,11 @@ export class Interpreter {
       case "rest":
         return args[0]?.slice(1);
       case "append":
+        // (append arr elem) → [...arr, elem]  OR  (append arr [e1 e2]) → [...arr, e1, e2] (concat)
+        // Self-hosting FL files use (append tokens [{...}]) to concatenate arrays
+        if (Array.isArray(args[0]) && args.length === 2 && Array.isArray(args[1])) {
+          return [...args[0], ...args[1]];
+        }
         return [...(args[0] || []), ...args.slice(1)];
       case "reverse":
         return [...(args[0] || [])].reverse();
@@ -1385,12 +1495,59 @@ export class Interpreter {
         // (is-symbol? "add") → true (letters, underscores, dashes)
         return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args[0]));
       case "split":
+      case "error":
+        // (error "message") → throws an error
+        throw new Error(String(args[0]));
+      case "null?":
+        return args[0] === null || args[0] === undefined;
+      case "zero?":
+        return args[0] === 0;
+      case "pos?":
+        return typeof args[0] === "number" && args[0] > 0;
+      case "neg?":
+        return typeof args[0] === "number" && args[0] < 0;
+      case "even?":
+        return typeof args[0] === "number" && args[0] % 2 === 0;
+      case "odd?":
+        return typeof args[0] === "number" && args[0] % 2 !== 0;
+      case "string?":
+        return typeof args[0] === "string";
+      case "number?":
+        return typeof args[0] === "number";
+      case "bool?":
+        return typeof args[0] === "boolean";
+      case "array?":
+        return Array.isArray(args[0]);
+      case "map?":
+        return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]);
+      case "json_keys":
+        // (json_keys {:a 1 :b 2}) → ["a" "b"]
+        return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])
+          ? Object.keys(args[0])
+          : [];
+      case "num-to-str":
+        // (num-to-str 42) → "42"
+        return String(args[0]);
+      case "str-to-num":
+        // (str-to-num "42") → 42
+        return parseFloat(String(args[0]));
+      case "slice":
+        // (slice [1 2 3 4] 1 3) → [2 3]  OR  (slice "hello" 1 3) → "el"
+        if (Array.isArray(args[0])) return args[0].slice(args[1], args[2]);
+        if (typeof args[0] === "string") return args[0].slice(args[1], args[2]);
+        return [];
+      case "str-split":
         // (split "a,b,c" ",") → ["a" "b" "c"]
         return typeof args[0] === "string" && typeof args[1] === "string"
           ? args[0].split(args[1])
           : [];
       case "join":
-        // (join ["a" "b" "c"] ",") → "a,b,c"
+      case "str-join":
+        // (join ["a" "b" "c"] ",") → "a,b,c"   OR  (str-join arr sep) where arr is first
+        // str-join: (str-join arr sep) — array first, then separator
+        if (op === "str-join") {
+          return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
+        }
         return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
       case "trim":
         // (trim "  hello  ") → "hello"
@@ -1463,8 +1620,24 @@ export class Interpreter {
         // (last [1 2 3]) → 3
         return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
       case "get":
-        // (get [1 2 3] 1) → 2
-        return Array.isArray(args[0]) && typeof args[1] === "number" ? args[0][args[1]] || null : null;
+        // (get [1 2 3] 1) → 2  OR  (get "hello" 0) → "h"  OR  (get {:k "v"} "k") → "v"
+        if (Array.isArray(args[0])) return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
+        if (typeof args[0] === "string") return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
+        if (args[0] !== null && typeof args[0] === "object") return args[0][args[1]] ?? null;
+        return null;
+      case "assoc":
+        // (assoc {:k "v"} "k2" "v2") → {:k "v" :k2 "v2"}  (immutable map update)
+        if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
+          return { ...args[0], [args[1]]: args[2] };
+        }
+        return { [args[1]]: args[2] };
+      case "dissoc":
+        // (dissoc {:k "v" :k2 "v2"} "k2") → {:k "v"}  (immutable map remove)
+        if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
+          const { [args[1]]: _, ...rest } = args[0];
+          return rest;
+        }
+        return args[0] ?? {};
       case "reverse":
         // (reverse [1 2 3]) → [3 2 1]
         return Array.isArray(args[0]) ? [...args[0]].reverse() : [];
@@ -1688,6 +1861,9 @@ export class Interpreter {
           }
         }
 
+        // (export sym1 sym2 ...) — self-hosting 파일 호환: no-op (인터프리터는 모두 공유 환경)
+        if (op === "export") return null;
+
         throw new Error(`Unknown operator: ${op}`);
     }
   }
@@ -1699,7 +1875,9 @@ export class Interpreter {
 
     // (let [[var1 val1] [var2 val2]] body)
     const bindings = args[0];
-    const body = args[1];
+
+    // Save previously-bound variable values so let doesn't leak into outer scope
+    const savedVars: [string, any][] = [];
 
     // Parse bindings
     if ((bindings as any).kind === "block" && (bindings as any).type === "Array") {
@@ -1715,11 +1893,13 @@ export class Interpreter {
               if (varNode.kind === "variable") {
                 varName = varNode.name;
               } else if (varNode.kind === "literal" && varNode.type === "symbol") {
-                varName = varNode.value as string;
+                // Self-hosting: bare symbol → add $ prefix so symbol-as-variable lookup finds it
+                varName = "$" + (varNode.value as string);
               } else {
                 throw new Error(`Invalid binding variable: expected symbol or variable`);
               }
 
+              savedVars.push([varName, this.context.variables.get(varName)]);
               const value = this.eval(bindingItems[1]);
               this.context.variables.set(varName, value);
             }
@@ -1730,8 +1910,16 @@ export class Interpreter {
 
     // Evaluate body — 여러 표현식 허용 (마지막 값 반환)
     let result: any = null;
-    for (let bodyIdx = 1; bodyIdx < args.length; bodyIdx++) {
-      result = this.eval(args[bodyIdx]);
+    try {
+      for (let bodyIdx = 1; bodyIdx < args.length; bodyIdx++) {
+        result = this.eval(args[bodyIdx]);
+      }
+    } finally {
+      // Restore let-bound variables to prevent leaking into outer scope
+      for (const [name, val] of savedVars) {
+        if (val === undefined) this.context.variables.delete(name);
+        else this.context.variables.set(name, val);
+      }
     }
     return result;
   }
@@ -1815,13 +2003,19 @@ export class Interpreter {
 
   private evalCond(args: ASTNode[]): any {
     // (cond [test1 result1] [test2 result2] ... [else default])
+    // Each clause can have multiple body forms: [test expr1 expr2 ...]
     for (const arg of args) {
       if ((arg as any).kind === "block" && (arg as any).type === "Array") {
         const items = (arg as any).fields.get("items");
         if (Array.isArray(items) && items.length >= 2) {
           const test = this.eval(items[0]);
           if (test) {
-            return this.eval(items[1]);
+            // Execute all body forms, return last
+            let result: any = null;
+            for (let i = 1; i < items.length; i++) {
+              result = this.eval(items[i]);
+            }
+            return result;
           }
         }
       }
@@ -1882,7 +2076,8 @@ export class Interpreter {
       });
 
       const validation = this.context.typeChecker.checkFunctionCall(baseName, argTypes);
-      if (!validation.valid) {
+      // Skip type check for dynamically defined inner functions (define inside function body)
+      if (!validation.valid && validation.message !== `Unknown function: ${baseName}`) {
         throw new Error(`Type error in call to '${baseName}': ${validation.message}`);
       }
     }
@@ -1901,18 +2096,24 @@ export class Interpreter {
       throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'`);
     }
 
-    // Create new scope
-    const savedVars = new Map(this.context.variables);
+    // Save only the params being overwritten (allows set! closures to work)
+    const savedParams: [string, any][] = [];
     this.callDepth++;
 
     try {
       for (let i = 0; i < func.params.length; i++) {
-        this.context.variables.set(func.params[i], args[i]);
+        const paramName = func.params[i];
+        savedParams.push([paramName, this.context.variables.get(paramName)]);
+        this.context.variables.set(paramName, args[i]);
       }
       return this.eval(func.body);
     } finally {
       this.callDepth--;
-      this.context.variables = savedVars;
+      // Restore only the param variables (not the entire scope)
+      for (const [name, val] of savedParams) {
+        if (val === undefined) this.context.variables.delete(name);
+        else this.context.variables.set(name, val);
+      }
     }
   }
 
@@ -2017,24 +2218,27 @@ export class Interpreter {
 
     // Try each case in order
     for (const caseItem of match.cases) {
-      // Save current variable scope
-      const savedVars = new Map(this.context.variables);
-
-      // Try to match pattern
+      // Try to match pattern (only save/restore pattern-binding variables, not all state)
       const matchResult = this.matchPattern(caseItem.pattern, value);
 
       if (matchResult.matched) {
-        // Bind matched variables
-        for (const [varName, varValue] of matchResult.bindings) {
-          this.context.variables.set("$" + varName, varValue);
+        // Save only the variables that will be bound by this pattern
+        const savedBindings: [string, any][] = [];
+        for (const [varName] of matchResult.bindings) {
+          const key = "$" + varName;
+          savedBindings.push([key, this.context.variables.get(key)]);
+          this.context.variables.set(key, matchResult.bindings.get(varName));
         }
 
         // Check guard condition if present
         if (caseItem.guard) {
           const guardResult = this.eval(caseItem.guard);
           if (!guardResult) {
-            // Guard failed, restore and try next case
-            this.context.variables = savedVars;
+            // Guard failed, restore bound variables and try next case
+            for (const [k, v] of savedBindings) {
+              if (v === undefined) this.context.variables.delete(k);
+              else this.context.variables.set(k, v);
+            }
             continue;
           }
         }
@@ -2042,13 +2246,13 @@ export class Interpreter {
         // Execute body
         const result = this.eval(caseItem.body);
 
-        // Restore variables and return result
-        this.context.variables = savedVars;
+        // Restore bound variables
+        for (const [k, v] of savedBindings) {
+          if (v === undefined) this.context.variables.delete(k);
+          else this.context.variables.set(k, v);
+        }
         return result;
       }
-
-      // Restore variables for next iteration
-      this.context.variables = savedVars;
     }
 
     // No case matched, try default case

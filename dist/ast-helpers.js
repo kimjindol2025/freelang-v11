@@ -80,8 +80,8 @@ function extractParamNames(params) {
             return String(p.value);
         }
         // 예상하지 못한 타입
-        return "";
-    }).filter((name) => name.length > 0);
+        throw new Error(`extractParamNames: unknown param node type '${p?.kind ?? typeof p}'`);
+    });
 }
 /**
  * 블록에서 특정 필드 추출

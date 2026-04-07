@@ -55,8 +55,8 @@ function makeLiteral(type, value) {
 function makeVariable(name) {
     return { kind: "variable", name };
 }
-function makeSExpr(op, args) {
-    return { kind: "sexpr", op, args };
+function makeSExpr(op, args, line) {
+    return { kind: "sexpr", op, args, line };
 }
 function makeKeyword(name) {
     return { kind: "keyword", name };

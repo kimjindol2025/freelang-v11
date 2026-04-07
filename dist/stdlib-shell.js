@@ -12,12 +12,14 @@ function createShellModule() {
     return {
         // shell cmd -> string (run command, return stdout)
         "shell": (cmd) => {
-            try {
-                return (0, child_process_1.execSync)(cmd, { encoding: "utf-8", timeout: 30000 });
+            const result = (0, child_process_1.spawnSync)("sh", ["-c", cmd], { timeout: 30000 });
+            if (result.error)
+                throw new Error(`shell failed: ${result.error.message}`);
+            if ((result.status ?? 1) !== 0) {
+                const stderr = result.stderr?.toString().trim() ?? "";
+                throw new Error(`shell failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
             }
-            catch (err) {
-                throw new Error(`shell failed: ${err.message}`);
-            }
+            return result.stdout?.toString() ?? "";
         },
         // shell_status cmd -> number (run command, return exit code)
         "shell_status": (cmd) => {
@@ -31,12 +33,14 @@ function createShellModule() {
         },
         // shell_pipe cmd1 cmd2 -> string (pipe output of cmd1 into cmd2)
         "shell_pipe": (cmd1, cmd2) => {
-            try {
-                return (0, child_process_1.execSync)(`${cmd1} | ${cmd2}`, { encoding: "utf-8", timeout: 30000 });
+            const result = (0, child_process_1.spawnSync)("sh", ["-c", `${cmd1} | ${cmd2}`], { timeout: 30000 });
+            if (result.error)
+                throw new Error(`shell_pipe failed: ${result.error.message}`);
+            if ((result.status ?? 1) !== 0) {
+                const stderr = result.stderr?.toString().trim() ?? "";
+                throw new Error(`shell_pipe failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
             }
-            catch (err) {
-                throw new Error(`shell_pipe failed: ${err.message}`);
-            }
+            return result.stdout?.toString() ?? "";
         },
         // shell_capture cmd -> {stdout, stderr, code} (capture all output)
         "shell_capture": (cmd) => {

@@ -741,7 +741,7 @@ class Parser {
             args.push(this.parseValue());
         }
         this.expect(token_1.TokenType.RParen);
-        return (0, ast_1.makeSExpr)(op, args);
+        return (0, ast_1.makeSExpr)(op, args, opToken.line);
     }
     // Parse type annotation: int, string, bool, array<T>, map<K,V>, T?
     parseTypeAnnotation() {
@@ -871,13 +871,23 @@ class Parser {
             }
             // Parse pattern
             const pattern = this.parsePattern();
-            // Check for optional guard: (if condition)
+            // Check for optional guard: (if condition) — only when followed directly by )
+            // If (if cond then else) with then/else, it's the body, not a guard
             let guard;
             if (this.check(token_1.TokenType.LParen) && this.peekNext()?.value === "if") {
+                const savedPos = this.pos;
                 this.advance(); // consume (
                 this.advance(); // consume 'if'
-                guard = this.parseValue();
-                this.expect(token_1.TokenType.RParen);
+                const possibleGuard = this.parseValue();
+                if (this.check(token_1.TokenType.RParen)) {
+                    // (if condition) with no then/else → it's a guard
+                    this.advance(); // consume )
+                    guard = possibleGuard;
+                }
+                else {
+                    // (if condition then else) → it's the body, backtrack
+                    this.pos = savedPos;
+                }
             }
             // Parse body
             const body = this.parseValue();

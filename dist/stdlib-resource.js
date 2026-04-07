@@ -88,21 +88,11 @@ function createResourceModule() {
             const cpus = os.cpus();
             return cpus.length > 0 ? cpus[0].model : "unknown";
         },
-        // res_cpu_pct -> number (approximate 1s sample via /proc/stat)
+        // res_cpu_pct -> number (1-min loadavg based, avoids busy wait)
         "res_cpu_pct": () => {
-            try {
-                const a = run("cat /proc/stat | head -1").split(/\s+/).slice(1).map(Number);
-                // sleep ~200ms using busy wait (avoids async)
-                const end = Date.now() + 200;
-                while (Date.now() < end) { /* spin */ }
-                const b = run("cat /proc/stat | head -1").split(/\s+/).slice(1).map(Number);
-                const dIdle = b[3] - a[3];
-                const dTotal = b.reduce((s, v) => s + v, 0) - a.reduce((s, v) => s + v, 0);
-                return dTotal > 0 ? Math.round((1 - dIdle / dTotal) * 100) : 0;
-            }
-            catch {
-                return -1;
-            }
+            const load = os.loadavg()[0];
+            const cpus = os.cpus().length;
+            return Math.min(100, Math.round((load / cpus) * 100));
         },
         // ── Memory ──────────────────────────────────────────────────
         // res_mem -> {total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}

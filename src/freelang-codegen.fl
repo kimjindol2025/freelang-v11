@@ -1,0 +1,540 @@
+; FreeLang v9: Code Generator (self-hosting)
+; AST → JavaScript source string
+;
+; 입력:  parse() 가 반환하는 AST 노드 배열
+; 출력:  단독 실행 가능한 Node.js JavaScript 소스 문자열
+
+; ── 식별자 변환 ──────────────────────────────────────────────────
+; FreeLang 이름 (foo-bar, is-digit?) → JS 유효 식별자
+
+[FUNC fl-id :params [$name]
+  :body (
+    (let [[s (replace $name "-" "_")]]
+      (replace $s "?" "_q")
+    )
+  )
+]
+
+[FUNC fl-id-safe :params [$name]
+  :body (
+    (let [[s (fl-id $name)]]
+      ; 예약어 충돌 방지 (_let, _do, _if 등)
+      (if (or (= $s "let") (= $s "do") (= $s "if") (= $s "return") (= $s "function"))
+        (concat "_fl_" $s)
+        $s
+      )
+    )
+  )
+]
+
+; ── 리터럴 생성 ──────────────────────────────────────────────────
+
+[FUNC gen-literal :params [$node]
+  :body (
+    (match (get $node :type)
+      ("number"  (num-to-str (get $node :value)))
+      ("boolean" (if (get $node :value) "true" "false"))
+      ("null"    "null")
+      ("string"
+        (concat "\"" (replace (replace (get $node :value) "\\" "\\\\") "\"" "\\\"") "\"")
+      )
+      ("symbol"  (fl-id-safe (get $node :value)))
+      (_         "null")
+    )
+  )
+]
+
+; ── 변수 생성 ─────────────────────────────────────────────────────
+
+[FUNC gen-variable :params [$node]
+  :body (
+    (let [[raw (get $node :name)]]
+      ; $tok.field → tok.field (dot-access)
+      (if (contains? $raw ".")
+        (let [[parts (str-split $raw ".")]]
+          (let [[head (fl-id-safe (get $parts 0))]
+                [tail (str-join (slice $parts 1 (length $parts)) ".")]]
+            (concat $head "." $tail)
+          )
+        )
+        (fl-id-safe $raw)
+      )
+    )
+  )
+]
+
+; ── 배열 생성 ─────────────────────────────────────────────────────
+
+[FUNC gen-array :params [$node]
+  :body (
+    (let [[items (get $node :items)]]
+      (let [[elems (map $items [item] (gen-expr $item))]]
+        (concat "[" (str-join $elems ", ") "]")
+      )
+    )
+  )
+]
+
+; ── 맵 생성 ───────────────────────────────────────────────────────
+
+[FUNC gen-map :params [$node]
+  :body (
+    (let [[pairs (get $node :pairs)]]
+      (let [[kvs (map (json_keys $pairs) [k]
+                   (concat "\"" $k "\": " (gen-expr (get $pairs $k))))]]
+        (concat "{" (str-join $kvs ", ") "}")
+      )
+    )
+  )
+]
+
+; ── 키워드 생성 (":name" → 문자열 "\"name\"") ───────────────────
+
+[FUNC gen-keyword :params [$node]
+  :body (concat "\"" (get $node :name) "\"")
+]
+
+; ── 내장 연산자 매핑 ─────────────────────────────────────────────
+
+[FUNC gen-builtin-op :params [$op $args]
+  :body (
+    (let [[a0 (if (> (length $args) 0) (get $args 0) "")]
+          [a1 (if (> (length $args) 1) (get $args 1) "")]
+          [a2 (if (> (length $args) 2) (get $args 2) "")]]
+      (match $op
+        ("+"  (concat "(" $a0 " + " $a1 ")"))
+        ("-"  (concat "(" $a0 " - " $a1 ")"))
+        ("*"  (concat "(" $a0 " * " $a1 ")"))
+        ("/"  (concat "(" $a0 " / " $a1 ")"))
+        ("%"  (concat "(" $a0 " % " $a1 ")"))
+        ("="  (concat "(" $a0 " === " $a1 ")"))
+        ("!=" (concat "(" $a0 " !== " $a1 ")"))
+        ("<"  (concat "(" $a0 " < " $a1 ")"))
+        (">"  (concat "(" $a0 " > " $a1 ")"))
+        ("<=" (concat "(" $a0 " <= " $a1 ")"))
+        (">=" (concat "(" $a0 " >= " $a1 ")"))
+        ("and" (concat "(" $a0 " && " $a1 ")"))
+        ("or"  (concat "(" $a0 " || " $a1 ")"))
+        ("not" (concat "(!" $a0 ")"))
+        ("concat" (concat "(" (str-join $args " + ") ")"))
+        ("length"
+          (concat "(Array.isArray(" $a0 ") || typeof " $a0 " === 'string' ? " $a0 ".length : 0)")
+        )
+        ("append" (concat "(Array.isArray(" $a0 ") ? " $a0 ".concat(" $a1 ") : [" $a1 "])"))
+        ("get"
+          (concat "(Array.isArray(" $a0 ") ? " $a0 "[" $a1 "] : (" $a0 " && " $a0 "[" $a1 "]))")
+        )
+        ("assoc"  (concat "Object.assign({}, " $a0 ", {[" $a1 "]: " $a2 "})"))
+        ("dissoc" (concat "((_o => { const {[" $a1 "]: _, ..._r} = _o; return _r; })(" $a0 "))"))
+        ("contains?"
+          (concat "(Array.isArray(" $a0 ") ? " $a0 ".includes(" $a1 ") : (typeof " $a0 " === 'string' ? " $a0 ".includes(" $a1 ") : false))")
+        )
+        ("str-split"  (concat $a0 ".split(" $a1 ")"))
+        ("str-join"   (concat $a1 ".join(" $a0 ")"))
+        ("num-to-str" (concat "String(" $a0 ")"))
+        ("str-to-num" (concat "Number(" $a0 ")"))
+        ("parse-int"  (concat "parseInt(" $a0 ", 10)"))
+        ("parse-float"(concat "parseFloat(" $a0 ")"))
+        ("replace"    (concat $a0 ".split(" $a1 ").join(" $a2 ")"))
+        ("slice"      (concat $a0 ".slice(" $a1 ", " $a2 ")"))
+        ("map"        "/* map not supported in codegen-direct, use JS .map() */")
+        ("filter"     "/* filter not supported in codegen-direct, use JS .filter() */")
+        ("reduce"     "/* reduce not supported in codegen-direct, use JS .reduce() */")
+        ("error"      (concat "((() => { throw new Error(" $a0 "); })())"))
+        ("null?"      (concat "(" $a0 " === null || " $a0 " === undefined)"))
+        ("zero?"      (concat "(" $a0 " === 0)"))
+        ("pos?"       (concat "(" $a0 " > 0)"))
+        ("neg?"       (concat "(" $a0 " < 0)"))
+        ("even?"      (concat "(" $a0 " % 2 === 0)"))
+        ("odd?"       (concat "(" $a0 " % 2 !== 0)"))
+        ("min"        (concat "Math.min(" $a0 ", " $a1 ")"))
+        ("max"        (concat "Math.max(" $a0 ", " $a1 ")"))
+        ("abs"        (concat "Math.abs(" $a0 ")"))
+        ("floor"      (concat "Math.floor(" $a0 ")"))
+        ("ceil"       (concat "Math.ceil(" $a0 ")"))
+        ("round"      (concat "Math.round(" $a0 ")"))
+        ("str-upper"  (concat $a0 ".toUpperCase()"))
+        ("str-lower"  (concat $a0 ".toLowerCase()"))
+        ("str-trim"   (concat $a0 ".trim()"))
+        ("char-code"  (concat $a0 ".charCodeAt(0)"))
+        ("to-str"     (concat "String(" $a0 ")"))
+        ("json-parse" (concat "JSON.parse(" $a0 ")"))
+        ("json-str"   (concat "JSON.stringify(" $a0 ")"))
+        (_
+          ; 사용자 함수 호출
+          (concat (fl-id-safe $op) "(" (str-join $args ", ") ")")
+        )
+      )
+    )
+  )
+]
+
+; ── if 표현식 ────────────────────────────────────────────────────
+
+[FUNC gen-if :params [$args]
+  :body (
+    (let [[cond-expr (gen-expr (get $args 0))]
+          [then-expr (gen-expr (get $args 1))]
+          [else-expr (if (> (length $args) 2) (gen-expr (get $args 2)) "null")]]
+      (concat "(" $cond-expr " ? " $then-expr " : " $else-expr ")")
+    )
+  )
+]
+
+; ── let 바인딩 ───────────────────────────────────────────────────
+
+[FUNC gen-let :params [$args]
+  :body (
+    ; (let [[a expr1] [b expr2]] body...)
+    ; → ((a, b) => body)(expr1, expr2)  또는 IIFE
+    (let [[bindings (get $args 0)]
+          [body-nodes (slice $args 1 (length $args))]]
+      (let [[decls (map (get $bindings :items) [pair]
+                     (let [[pair-items (get $pair :items)]]
+                       (let [[nm (get $pair-items 0)]
+                             [vl (get $pair-items 1)]]
+                         (concat "const " (fl-id-safe (get $nm :value)) " = " (gen-expr $vl) ";")
+                       )
+                     )
+                   )]]
+        (let [[body-stmts (gen-body $body-nodes)]]
+          (concat "((() => {\n  " (str-join $decls "\n  ") "\n  " $body-stmts "\n})())")
+        )
+      )
+    )
+  )
+]
+
+; ── do 블록 ──────────────────────────────────────────────────────
+
+[FUNC gen-do :params [$args]
+  :body (
+    (let [[stmts (gen-body $args)]]
+      (concat "((() => {\n  " $stmts "\n})())")
+    )
+  )
+]
+
+; ── define (내부 함수/변수 정의) ─────────────────────────────────
+
+[FUNC gen-define :params [$args]
+  :body (
+    ; (define name [...params] body)  — 내부 함수
+    ; (define name value)             — 변수 (var for mutability)
+    (let [[name-node (get $args 0)]]
+      (let [[nm (if (= (get $name-node :kind) "literal")
+                  (get $name-node :value)
+                  (get $name-node :name))]]
+        (if (> (length $args) 2)
+          ; 함수: (define name [params] body)
+          (let [[params-node (get $args 1)]
+                [body-args (slice $args 2 (length $args))]]
+            (let [[params (if (= (get $params-node :kind) "array")
+                            (map (get $params-node :items) [p]
+                              (fl-id-safe (get $p :name)))
+                            [])]]
+              (concat "let " (fl-id-safe $nm) " = function("
+                      (str-join $params ", ") ") {\n  "
+                      (gen-body $body-args)
+                      "\n};")
+            )
+          )
+          ; 변수: (define name value)
+          (concat "let " (fl-id-safe $nm) " = " (gen-expr (get $args 1)) ";")
+        )
+      )
+    )
+  )
+]
+
+; ── set! ─────────────────────────────────────────────────────────
+
+[FUNC gen-set :params [$args]
+  :body (
+    (let [[name-node (get $args 0)]
+          [val-expr  (gen-expr (get $args 1))]]
+      (let [[nm (if (= (get $name-node :kind) "variable")
+                  (gen-variable $name-node)
+                  (gen-expr $name-node))]]
+        (concat "(" $nm " = " $val-expr ")")
+      )
+    )
+  )
+]
+
+; ── match 표현식 ─────────────────────────────────────────────────
+
+[FUNC gen-match :params [$args]
+  :body (
+    (let [[subject  (gen-expr (get $args 0))]
+          [clauses  (slice $args 1 (length $args))]]
+      (let [[sw-var "_sw"]]
+        (let [[cases (map $clauses [clause]
+                       (let [[items (get $clause :items)]]
+                         (let [[pat (get $items 0)]
+                               [res (get $items 1)]]
+                           (if (= (get $pat :kind) "literal")
+                             (if (= (get $pat :type) "symbol")
+                               ; (_) 와일드카드
+                               (if (= (get $pat :value) "_")
+                                 (concat "default: return " (gen-expr $res) ";")
+                                 (concat "case " (gen-literal $pat) ": return " (gen-expr $res) ";")
+                               )
+                               (concat "case " (gen-literal $pat) ": return " (gen-expr $res) ";")
+                             )
+                             (concat "default: return " (gen-expr $res) ";")
+                           )
+                         )
+                       )
+                     )]]
+          (concat "((() => { const " $sw-var " = " $subject
+                  "; switch(" $sw-var ") {\n    "
+                  (str-join $cases "\n    ")
+                  "\n  } })())")
+        )
+      )
+    )
+  )
+]
+
+; ── cond 표현식 ──────────────────────────────────────────────────
+
+[FUNC gen-cond :params [$args]
+  :body (
+    (let [[clauses $args]]
+      (let [[parts (map $clauses [clause]
+                     (let [[items (get $clause :items)]]
+                       (let [[test (get $items 0)]
+                             [body (get $items 1)]]
+                         (if (= (get $test :kind) "literal")
+                           (if (= (get $test :value) "else")
+                             (concat "true ? " (gen-expr $body) " : null")
+                             (concat (gen-expr $test) " ? " (gen-expr $body) " : null")
+                           )
+                           (concat (gen-expr $test) " ? " (gen-expr $body) " : null")
+                         )
+                       )
+                     )
+                   )]]
+        ; 중첩 삼항으로 조립: (c1 ? v1 : (c2 ? v2 : null))
+        (let [[build-cond [idx]
+                (if (>= $idx (length $parts))
+                  "null"
+                  (let [[p (get $parts $idx)]]
+                    (let [[cond-part (slice $p 0 (index-of $p " ? "))]]
+                      ; 직접 조립은 복잡하므로 단순 if-else 체인 IIFE로
+                      (concat "((() => {\n    "
+                              (str-join (map $clauses [clause]
+                                (let [[items (get $clause :items)]]
+                                  (let [[test (get $items 0)]
+                                        [body (get $items 1)]]
+                                    (if (= (get $test :kind) "literal")
+                                      (if (= (get $test :value) "else")
+                                        (concat "return " (gen-expr $body) ";")
+                                        (concat "if (" (gen-expr $test) ") return " (gen-expr $body) ";")
+                                      )
+                                      (concat "if (" (gen-expr $test) ") return " (gen-expr $body) ";")
+                                    )
+                                  )
+                                )
+                              ) "\n    ")
+                              "\n  })()")
+                    )
+                  )
+                )
+              ]]
+          (build-cond 0)
+        )
+      )
+    )
+  )
+]
+
+; ── fn (람다) ────────────────────────────────────────────────────
+
+[FUNC gen-fn :params [$args]
+  :body (
+    (let [[params-node (get $args 0)]
+          [body-nodes  (slice $args 1 (length $args))]]
+      (let [[params (if (= (get $params-node :kind) "array")
+                      (map (get $params-node :items) [p]
+                        (if (= (get $p :kind) "variable")
+                          (fl-id-safe (get $p :name))
+                          (fl-id-safe (get $p :value))))
+                      [])]]
+        (concat "((" (str-join $params ", ") ") => {\n  "
+                (gen-body $body-nodes)
+                "\n})")
+      )
+    )
+  )
+]
+
+; ── S-expression 생성 ────────────────────────────────────────────
+
+[FUNC gen-sexpr :params [$node]
+  :body (
+    (let [[op   (get $node :op)]
+          [args (get $node :args)]]
+      (match $op
+        ("if"     (gen-if $args))
+        ("let"    (gen-let $args))
+        ("do"     (gen-do $args))
+        ("define" (gen-define $args))
+        ("set!"   (gen-set $args))
+        ("match"  (gen-match $args))
+        ("cond"   (gen-cond $args))
+        ("fn"     (gen-fn $args))
+        (_
+          (let [[gen-args (map $args [a] (gen-expr $a))]]
+            (gen-builtin-op $op $gen-args)
+          )
+        )
+      )
+    )
+  )
+]
+
+; ── 범용 식 생성 ─────────────────────────────────────────────────
+
+[FUNC gen-expr :params [$node]
+  :body (
+    (match (get $node :kind)
+      ("literal"      (gen-literal $node))
+      ("variable"     (gen-variable $node))
+      ("array"        (gen-array $node))
+      ("map-literal"  (gen-map $node))
+      ("keyword"      (gen-keyword $node))
+      ("sexpr"        (gen-sexpr $node))
+      (_              "null")
+    )
+  )
+]
+
+; ── 함수 본문 (마지막 표현식이 return) ───────────────────────────
+
+[FUNC gen-body :params [$nodes]
+  :body (
+    (if (= (length $nodes) 0)
+      "return null;"
+      (if (= (length $nodes) 1)
+        (let [[last (get $nodes 0)]]
+          ; define/set!은 return 없음
+          (if (and (= (get $last :kind) "sexpr")
+                   (or (= (get $last :op) "define")
+                       (= (get $last :op) "set!")))
+            (concat (gen-expr $last) ";")
+            (concat "return " (gen-expr $last) ";")
+          )
+        )
+        ; 여러 노드: 앞은 statement, 마지막은 return
+        (let [[init (slice $nodes 0 (- (length $nodes) 1))]
+              [last (get $nodes (- (length $nodes) 1))]]
+          (let [[stmts (map $init [n]
+                          (let [[e (gen-expr $n)]]
+                            (if (and (= (get $n :kind) "sexpr")
+                                     (or (= (get $n :op) "define")
+                                         (= (get $n :op) "set!")))
+                              (concat $e ";")
+                              (concat $e ";")
+                            )
+                          )
+                        )]]
+            (let [[last-code
+                    (if (and (= (get $last :kind) "sexpr")
+                             (or (= (get $last :op) "define")
+                                 (= (get $last :op) "set!")))
+                      (concat (gen-expr $last) ";")
+                      (concat "return " (gen-expr $last) ";")
+                    )]]
+              (concat (str-join $stmts "\n  ") "\n  " $last-code)
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+; ── FUNC 블록 → JS function ──────────────────────────────────────
+
+[FUNC gen-func-block :params [$node]
+  :body (
+    (let [[name   (get $node :name)]
+          [fields (get $node :fields)]]
+      (let [[params-node (get $fields :params)]
+            [body-node   (get $fields :body)]]
+        (let [[params (if (and (not (null? $params-node))
+                               (= (get $params-node :kind) "array"))
+                        (map (get $params-node :items) [p]
+                          (if (= (get $p :kind) "variable")
+                            (fl-id-safe (get $p :name))
+                            (fl-id-safe (get $p :value))))
+                        [])]]
+          (let [[body-nodes (if (null? $body-node)
+                               []
+                               (if (= (get $body-node :kind) "sexpr")
+                                 (if (= (get $body-node :op) "")
+                                   (get $body-node :args)
+                                   [$body-node])
+                                 [$body-node]))]]
+            (concat "function " (fl-id-safe $name) "("
+                    (str-join $params ", ") ") {\n  "
+                    (gen-body $body-nodes)
+                    "\n}\n")
+          )
+        )
+      )
+    )
+  )
+]
+
+; ── export → JS module.exports ───────────────────────────────────
+
+[FUNC gen-export :params [$args]
+  :body (
+    (let [[exported (map $args [a] (fl-id-safe (gen-expr $a)))]]
+      (concat "module.exports = { " (str-join $exported ", ") " };\n")
+    )
+  )
+]
+
+; ── 최상위 노드 생성 ─────────────────────────────────────────────
+
+[FUNC gen-top-node :params [$node]
+  :body (
+    (match (get $node :kind)
+      ("block"
+        (match (get $node :type)
+          ("FUNC" (gen-func-block $node))
+          (_      (concat "/* unsupported block: " (get $node :type) " */\n"))
+        )
+      )
+      ("sexpr"
+        (match (get $node :op)
+          ("export" (gen-export (get $node :args)))
+          ("define" (concat (gen-define (get $node :args)) "\n"))
+          (_        (concat (gen-sexpr $node) ";\n"))
+        )
+      )
+      ("literal"     (concat (gen-literal $node) ";\n"))
+      ("variable"    (concat (gen-variable $node) ";\n"))
+      ("array"       (concat (gen-array $node) ";\n"))
+      ("map-literal" (concat (gen-map $node) ";\n"))
+      (_ (concat "/* unknown node kind: " (get $node :kind) " */\n"))
+    )
+  )
+]
+
+; ── 메인 엔트리: gen-js ───────────────────────────────────────────
+
+[FUNC gen-js :params [$nodes]
+  :body (
+    (let [[header "// Generated by FreeLang v9 Self-Hosting Compiler\n// DO NOT EDIT — auto-generated\n\"use strict\";\n\n"]
+          [parts   (map $nodes [n] (gen-top-node $n))]]
+      (concat $header (str-join $parts ""))
+    )
+  )
+]
+
+(export gen-js fl-id fl-id-safe gen-expr gen-literal gen-variable)

@@ -173,8 +173,16 @@ function cmdRepl() {
         let inStr = false;
         for (let i = 0; i < s.length; i++) {
             const ch = s[i];
-            if (ch === '"' && s[i - 1] !== "\\")
-                inStr = !inStr;
+            if (ch === '"') {
+                let backslashCount = 0;
+                let j = i - 1;
+                while (j >= 0 && s[j] === "\\") {
+                    backslashCount++;
+                    j--;
+                }
+                if (backslashCount % 2 === 0)
+                    inStr = !inStr;
+            }
             if (!inStr) {
                 if (ch === "(" || ch === "[" || ch === "{")
                     balance++;

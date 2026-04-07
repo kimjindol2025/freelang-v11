@@ -20,6 +20,7 @@ export interface SExpr {
     kind: "sexpr";
     op: string;
     args: ASTNode[];
+    line?: number;
 }
 export interface Keyword {
     kind: "keyword";
@@ -231,7 +232,7 @@ export interface ParserState {
 }
 export declare function makeLiteral(type: "number" | "string" | "symbol" | "boolean" | "null", value: any): Literal;
 export declare function makeVariable(name: string): Variable;
-export declare function makeSExpr(op: string, args: ASTNode[]): SExpr;
+export declare function makeSExpr(op: string, args: ASTNode[], line?: number): SExpr;
 export declare function makeKeyword(name: string): Keyword;
 export declare function makeBlock(type: string, name: string, fields: Map<string, ASTNode | ASTNode[]>): Block;
 export declare function makeTypeAnnotation(name: string, generic?: TypeAnnotation, union?: TypeAnnotation[], optional?: boolean): TypeAnnotation;

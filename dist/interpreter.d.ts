@@ -68,7 +68,11 @@ export declare class Interpreter {
     private logger;
     private searchAdapter;
     private learnedFactsStore;
+    private currentLine;
+    private callDepth;
+    private static readonly MAX_CALL_DEPTH;
     constructor(app?: express.Express, logger?: Logger);
+    private registerModule;
     interpret(blocks: ASTNode[]): ExecutionContext;
     private evalBlock;
     private handleServerBlock;
