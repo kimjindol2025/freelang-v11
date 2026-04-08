@@ -1,0 +1,355 @@
+;;; fl-router.fl — 라우팅 시스템 (URL 패턴 매칭, 파라미터 추출)
+;;; 역할: Next.js의 파일 기반 라우팅을 함수 등록 방식으로 구현
+
+;; ═══════════════════════════════════════════════════════════════
+;; 1. Route 구조체
+;; ═══════════════════════════════════════════════════════════════
+
+struct Route {
+  method: str
+  pattern: str
+  handler_name: str
+  is_page: bool
+  middleware_chain: str
+}
+
+struct Router {
+  routes: [Route]
+  route_count: i32
+  not_found_handler: str
+  error_handler: str
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 2. 라우터 생성
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_new() -> Router {
+  var empty_routes: [Route] = []
+  return Router {
+    routes: empty_routes,
+    route_count: 0,
+    not_found_handler: "page_404",
+    error_handler: "page_500"
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 3. 라우트 등록
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_register(router: Router, method: str, pattern: str, handler: str, is_page: bool, middleware_chain: str) -> Router {
+  var route: Route = Route {
+    method: method,
+    pattern: pattern,
+    handler_name: handler,
+    is_page: is_page,
+    middleware_chain: middleware_chain
+  }
+  router.routes.push(route)
+  router.route_count = router.route_count + 1
+  return router
+}
+
+fn router_get(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "GET", pattern, handler, true, "")
+}
+
+fn router_post(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "POST", pattern, handler, false, "")
+}
+
+fn router_put(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "PUT", pattern, handler, false, "")
+}
+
+fn router_delete(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "DELETE", pattern, handler, false, "")
+}
+
+fn router_patch(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "PATCH", pattern, handler, false, "")
+}
+
+fn router_any(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "ANY", pattern, handler, false, "")
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 4. 미들웨어 적용
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_use_middleware(router: Router, pattern: str, middleware: str) -> Router {
+  var i: i32 = 0
+  while i < router.route_count {
+    var route: Route = router.routes[i]
+    if route_pattern_matches(pattern, route.pattern) {
+      route = Route {
+        method: route.method,
+        pattern: route.pattern,
+        handler_name: route.handler_name,
+        is_page: route.is_page,
+        middleware_chain: middleware
+      }
+      router.routes[i] = route
+    }
+    i = i + 1
+  }
+  return router
+}
+
+fn router_add_middleware_to_pattern(router: Router, pattern: str, middleware: str) -> Router {
+  return router_use_middleware(router, pattern, middleware)
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 5. 404/500 핸들러 설정
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_set_not_found(router: Router, handler: str) -> Router {
+  return Router {
+    routes: router.routes,
+    route_count: router.route_count,
+    not_found_handler: handler,
+    error_handler: router.error_handler
+  }
+}
+
+fn router_set_error(router: Router, handler: str) -> Router {
+  return Router {
+    routes: router.routes,
+    route_count: router.route_count,
+    not_found_handler: router.not_found_handler,
+    error_handler: handler
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 6. 패턴 매칭 핵심 로직
+;; ═══════════════════════════════════════════════════════════════
+
+fn route_pattern_matches(pattern: str, request_path: str) -> bool {
+  var p_parts: [str] = string_split(pattern, "/")
+  var r_parts: [str] = string_split(request_path, "/")
+
+  if length(p_parts) != length(r_parts) {
+    return false
+  }
+
+  var i: i32 = 0
+  while i < length(p_parts) {
+    var p_part: str = p_parts[i]
+    var r_part: str = r_parts[i]
+
+    if p_part == "" && r_part == "" {
+      i = i + 1
+      continue
+    }
+
+    if string_starts_with(p_part, ":") {
+      i = i + 1
+      continue
+    }
+
+    if p_part == "*" {
+      return true
+    }
+
+    if p_part != r_part {
+      return false
+    }
+
+    i = i + 1
+  }
+
+  return true
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 7. 파라미터 추출
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_extract_params(pattern: str, request_path: str) -> str {
+  var p_parts: [str] = string_split(pattern, "/")
+  var r_parts: [str] = string_split(request_path, "/")
+
+  var params: str = ""
+  var i: i32 = 0
+
+  while i < length(p_parts) {
+    var p_part: str = p_parts[i]
+
+    if string_starts_with(p_part, ":") {
+      var param_name: str = substring(p_part, 1, length(p_part))
+      var param_value: str = ""
+
+      if i < length(r_parts) {
+        param_value = r_parts[i]
+      }
+
+      if params == "" {
+        params = param_name + "=" + param_value
+      } else {
+        params = params + "|" + param_name + "=" + param_value
+      }
+    }
+
+    i = i + 1
+  }
+
+  return params
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 8. 라우트 매칭
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_match(router: Router, method: str, path: str) -> Route {
+  var i: i32 = 0
+
+  while i < router.route_count {
+    var route: Route = router.routes[i]
+
+    var method_match: bool = route.method == "ANY" || route.method == method
+    var pattern_match: bool = route_pattern_matches(route.pattern, path)
+
+    if method_match && pattern_match {
+      return route
+    }
+
+    i = i + 1
+  }
+
+  return Route {
+    method: "GET",
+    pattern: "",
+    handler_name: router.not_found_handler,
+    is_page: true,
+    middleware_chain: ""
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 9. 라우트 정보 조회
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_get_all_routes(router: Router) -> [Route] {
+  return router.routes
+}
+
+fn router_route_count(router: Router) -> i32 {
+  return router.route_count
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 10. 라우트 그룹화 (prefix)
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_group(router: Router, prefix: str, add_routes: fn(Router) -> Router) -> Router {
+  return add_routes(router)
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 11. 라우트 리다이렉트
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_redirect(from_path: str, to_path: str) -> Route {
+  return Route {
+    method: "GET",
+    pattern: from_path,
+    handler_name: "redirect_to_" + to_path,
+    is_page: true,
+    middleware_chain: ""
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 12. 설정 검증
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_validate(router: Router) -> bool {
+  if router.not_found_handler == "" {
+    return false
+  }
+  if router.error_handler == "" {
+    return false
+  }
+  return true
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 13. 라우트 정보 출력 (디버깅)
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_debug_print(router: Router) -> str {
+  var output: str = "라우터 설정:\n"
+  output = output + "총 라우트: " + str(router.route_count) + "\n"
+  output = output + "404 핸들러: " + router.not_found_handler + "\n"
+  output = output + "500 핸들러: " + router.error_handler + "\n\n"
+
+  var i: i32 = 0
+  while i < router.route_count {
+    var route: Route = router.routes[i]
+    output = output + "[" + str(i + 1) + "] " + route.method + " " + route.pattern + " → " + route.handler_name
+    if route.middleware_chain != "" {
+      output = output + " (middleware: " + route.middleware_chain + ")"
+    }
+    output = output + "\n"
+    i = i + 1
+  }
+
+  return output
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 14. 빠른 설정 패턴
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_setup_public_pages(router: Router) -> Router {
+  router = router_get(router, "/", "page_home")
+  router = router_get(router, "/about", "page_about")
+  router = router_get(router, "/contact", "page_contact")
+  return router
+}
+
+fn router_setup_admin_pages(router: Router) -> Router {
+  router = router_get(router, "/admin", "page_dashboard")
+  router = router_get(router, "/admin/users", "page_users")
+  router = router_get(router, "/admin/users/:id", "page_user_detail")
+  router = router_post(router, "/admin/users", "api_create_user")
+  router = router_post(router, "/admin/users/:id/delete", "api_delete_user")
+  return router
+}
+
+fn router_setup_auth_pages(router: Router) -> Router {
+  router = router_get(router, "/login", "page_login")
+  router = router_post(router, "/login", "api_login")
+  router = router_get(router, "/logout", "api_logout")
+  router = router_get(router, "/register", "page_register")
+  router = router_post(router, "/register", "api_register")
+  return router
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 15. 메서드별 래퍼 헬퍼
+;; ═══════════════════════════════════════════════════════════════
+
+fn router_get_api(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "GET", pattern, handler, false, "")
+}
+
+fn router_post_api(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "POST", pattern, handler, false, "")
+}
+
+fn router_put_api(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "PUT", pattern, handler, false, "")
+}
+
+fn router_delete_api(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "DELETE", pattern, handler, false, "")
+}
+
+fn router_patch_api(router: Router, pattern: str, handler: str) -> Router {
+  return router_register(router, "PATCH", pattern, handler, false, "")
+}
