@@ -1,0 +1,374 @@
+;;; fl-ssr.fl — 서버 사이드 렌더링 (SSR) 엔진
+;;; 역할: 페이지 함수를 실행하여 완전한 HTML 응답 생성
+
+;; ═══════════════════════════════════════════════════════════════
+;; 1. SSR 페이지 구조체
+;; ═══════════════════════════════════════════════════════════════
+
+struct SsrPage {
+  title: str
+  meta_desc: str
+  body_html: str
+  head_extra: str
+  status_code: i32
+  headers_extra: str
+}
+
+struct SsrRequest {
+  method: str
+  path: str
+  query: str
+  body: str
+  headers: str
+  params: str
+  session_token: str
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 2. SSR 렌더 함수
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_render(page: SsrPage) -> ApiResponse {
+  var full_html: str = html_doc_full(
+    page.title,
+    "ko",
+    page.head_extra,
+    page.body_html
+  )
+
+  var headers: str = "Content-Type: text/html; charset=utf-8"
+  if page.headers_extra != "" {
+    headers = headers + "\r\n" + page.headers_extra
+  }
+
+  return ApiResponse {
+    status: page.status_code,
+    headers: headers,
+    body: full_html
+  }
+}
+
+fn ssr_render_error(code: i32, message: str) -> SsrPage {
+  var body: str =
+    div("error-page",
+      div("error-container",
+        h1(str(code)) +
+        h2(message) +
+        a("/", "홈으로 돌아가기")
+      )
+    )
+
+  return SsrPage {
+    title: str(code) + " - 오류",
+    meta_desc: "오류 페이지",
+    body_html: body,
+    head_extra: "",
+    status_code: code,
+    headers_extra: ""
+  }
+}
+
+fn ssr_render_404() -> SsrPage {
+  return ssr_render_error(404, "페이지를 찾을 수 없습니다")
+}
+
+fn ssr_render_500() -> SsrPage {
+  return ssr_render_error(500, "서버 오류가 발생했습니다")
+}
+
+fn ssr_render_redirect(url: str) -> SsrPage {
+  return SsrPage {
+    title: "리다이렉트",
+    meta_desc: "",
+    body_html: "",
+    head_extra: "",
+    status_code: 302,
+    headers_extra: "Location: " + url
+  }
+}
+
+fn ssr_render_redirect_permanent(url: str) -> SsrPage {
+  return SsrPage {
+    title: "리다이렉트",
+    meta_desc: "",
+    body_html: "",
+    head_extra: "",
+    status_code: 301,
+    headers_extra: "Location: " + url
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 3. 쿼리 파라미터 파싱
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_parse_query(query_str: str, key: str) -> str {
+  if query_str == "" {
+    return ""
+  }
+
+  if string_starts_with(query_str, "?") {
+    query_str = substring(query_str, 1, length(query_str))
+  }
+
+  var pairs: [str] = string_split(query_str, "&")
+  var i: i32 = 0
+  while i < length(pairs) {
+    var kv: [str] = string_split(pairs[i], "=")
+    if length(kv) == 2 && kv[0] == key {
+      return kv[1]
+    }
+    i = i + 1
+  }
+
+  return ""
+}
+
+fn ssr_parse_query_all(query_str: str) -> str {
+  if string_starts_with(query_str, "?") {
+    return substring(query_str, 1, length(query_str))
+  }
+  return query_str
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 4. 바디 파라미터 파싱
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_parse_body_field(body: str, field: str) -> str {
+  if body == "" {
+    return ""
+  }
+
+  var search_str: str = "\"" + field + "\":"
+  var start_idx: i32 = index_of(body, search_str)
+
+  if start_idx < 0 {
+    return ""
+  }
+
+  start_idx = start_idx + length(search_str)
+  var char_at_start: str = substring(body, start_idx, start_idx + 1)
+
+  if char_at_start == "\"" {
+    var end_idx: i32 = index_of(substring(body, start_idx + 1, length(body)), "\"")
+    if end_idx < 0 {
+      return ""
+    }
+    return substring(body, start_idx + 1, start_idx + 1 + end_idx)
+  } else if char_at_start == "n" {
+    return ""
+  } else {
+    var end_idx: i32 = index_of(substring(body, start_idx, length(body)), ",")
+    if end_idx < 0 {
+      end_idx = index_of(substring(body, start_idx, length(body)), "}")
+    }
+    if end_idx < 0 {
+      return ""
+    }
+    return string_trim(substring(body, start_idx, start_idx + end_idx))
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 5. Meta 태그 빌더
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_meta_tags(description: str, keywords: str) -> str {
+  var desc: str = ""
+  if description != "" {
+    desc = meta("description", description)
+  }
+
+  var kw: str = ""
+  if keywords != "" {
+    kw = meta("keywords", keywords)
+  }
+
+  return desc + "\n" + kw
+}
+
+fn ssr_og_tags(title: str, description: str, image: str, url: str) -> str {
+  var tags: str = ""
+  tags = tags + meta("og:title", title)
+  tags = tags + "\n" + meta("og:description", description)
+  if image != "" {
+    tags = tags + "\n" + meta("og:image", image)
+  }
+  if url != "" {
+    tags = tags + "\n" + meta("og:url", url)
+  }
+  return tags
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 6. CSS/JS 링크
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_css_link(href: str) -> str {
+  return link("stylesheet", href) + "\n"
+}
+
+fn ssr_css_multiple(hrefs: [str]) -> str {
+  var result: str = ""
+  var i: i32 = 0
+  while i < length(hrefs) {
+    result = result + ssr_css_link(hrefs[i])
+    i = i + 1
+  }
+  return result
+}
+
+fn ssr_script_tag(src: str) -> str {
+  return script_src(src) + "\n"
+}
+
+fn ssr_script_inline(js_code: str) -> str {
+  return script(js_code) + "\n"
+}
+
+fn ssr_favicon(href: str) -> str {
+  return link("icon", href) + "\n"
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 7. 캐시 제어 헤더
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_cache_headers(max_age_seconds: i32) -> str {
+  return "Cache-Control: public, max-age=" + str(max_age_seconds)
+}
+
+fn ssr_cache_headers_immutable(max_age_seconds: i32) -> str {
+  return "Cache-Control: public, max-age=" + str(max_age_seconds) + ", immutable"
+}
+
+fn ssr_no_cache_headers() -> str {
+  return "Cache-Control: no-cache, no-store, must-revalidate"
+}
+
+fn ssr_private_cache_headers() -> str {
+  return "Cache-Control: private, max-age=3600"
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 8. Content-Type 헤더
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_html_headers() -> str {
+  return "Content-Type: text/html; charset=utf-8"
+}
+
+fn ssr_json_headers() -> str {
+  return "Content-Type: application/json; charset=utf-8"
+}
+
+fn ssr_text_headers() -> str {
+  return "Content-Type: text/plain; charset=utf-8"
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 9. CORS 헤더
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_cors_headers(origin: str) -> str {
+  return "Access-Control-Allow-Origin: " + origin + "\r\n" +
+         "Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS\r\n" +
+         "Access-Control-Allow-Headers: Content-Type,Authorization"
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 10. 쿠키 설정 헤더
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_set_cookie(name: str, value: str, max_age: i32) -> str {
+  return "Set-Cookie: " + name + "=" + value + "; Path=/; Max-Age=" + str(max_age) + "; HttpOnly; SameSite=Strict"
+}
+
+fn ssr_set_cookie_secure(name: str, value: str, max_age: i32) -> str {
+  return "Set-Cookie: " + name + "=" + value + "; Path=/; Max-Age=" + str(max_age) + "; HttpOnly; Secure; SameSite=Strict"
+}
+
+fn ssr_clear_cookie(name: str) -> str {
+  return "Set-Cookie: " + name + "=; Path=/; Max-Age=0; HttpOnly"
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 11. 페이지 기본 구조 헬퍼
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_page_with_layout(title: str, layout_content: str) -> SsrPage {
+  return SsrPage {
+    title: title,
+    meta_desc: "",
+    body_html: layout_content,
+    head_extra: "",
+    status_code: 200,
+    headers_extra: ""
+  }
+}
+
+fn ssr_page_with_meta(title: str, desc: str, body: str) -> SsrPage {
+  return SsrPage {
+    title: title,
+    meta_desc: desc,
+    body_html: body,
+    head_extra: ssr_meta_tags(desc, ""),
+    status_code: 200,
+    headers_extra: ""
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 12. SSR 요청 헬퍼
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_get_query_param(req: SsrRequest, key: str) -> str {
+  return ssr_parse_query(req.query, key)
+}
+
+fn ssr_get_body_field(req: SsrRequest, field: str) -> str {
+  return ssr_parse_body_field(req.body, field)
+}
+
+fn ssr_get_path_param(req: SsrRequest, param_name: str) -> str {
+  return ssr_parse_query(req.params, param_name)
+}
+
+fn ssr_is_post(req: SsrRequest) -> bool {
+  return req.method == "POST"
+}
+
+fn ssr_is_get(req: SsrRequest) -> bool {
+  return req.method == "GET"
+}
+
+fn ssr_is_put(req: SsrRequest) -> bool {
+  return req.method == "PUT"
+}
+
+fn ssr_is_delete(req: SsrRequest) -> bool {
+  return req.method == "DELETE"
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 13. 빠른 응답 생성
+;; ═══════════════════════════════════════════════════════════════
+
+fn ssr_quick_error(code: i32, title: str, message: str) -> ApiResponse {
+  var page: SsrPage = ssr_render_error(code, title + ": " + message)
+  return ssr_render(page)
+}
+
+fn ssr_quick_json(status: i32, content: str) -> ApiResponse {
+  return ApiResponse {
+    status: status,
+    headers: ssr_json_headers(),
+    body: content
+  }
+}
+
+fn ssr_quick_redirect(url: str) -> ApiResponse {
+  var page: SsrPage = ssr_render_redirect(url)
+  return ssr_render(page)
+}

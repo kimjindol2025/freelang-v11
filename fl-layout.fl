@@ -1,0 +1,395 @@
+;;; fl-layout.fl — 레이아웃 시스템 (navbar, sidebar, pagination, card)
+;;; 역할: 공통 UI 컴포넌트 (Next.js의 _app.tsx, _layout.tsx 대체)
+
+;; ═══════════════════════════════════════════════════════════════
+;; 1. 내비게이션 링크
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_nav_link(href: str, icon: str, text: str, is_active: bool) -> str {
+  var active_class: str = html_if(is_active, " active", "")
+  return li_with_class("nav-item" + active_class,
+    a_with_class(href, "nav-link", icon + " " + text)
+  )
+}
+
+fn layout_nav_link_icon_only(href: str, icon: str, is_active: bool) -> str {
+  var active_class: str = html_if(is_active, " active", "")
+  return li_with_class("nav-item" + active_class,
+    a_with_class(href, "nav-link", icon)
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 2. 네비게이션바 (상단)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_navbar(app_name: str, logo: str, right_content: str) -> str {
+  return header(
+    div("topbar d-flex justify-content-between align-items-center",
+      div("navbar-brand",
+        span("", logo) +
+        span("", " " + app_name)
+      ) +
+      div("navbar-menu", right_content)
+    )
+  )
+}
+
+fn layout_navbar_user_menu(user_name: str, user_role: str) -> str {
+  return div("user-menu",
+    span("user-role", user_role) +
+    span("", " | ") +
+    span("user-name", user_name) +
+    a("/logout", "로그아웃")
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 3. 사이드바 (좌측)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_sidebar(title: str, items: str) -> str {
+  return aside("sidebar",
+    div("sidebar-brand",
+      h3(title)
+    ) +
+    nav(
+      ul("sidebar-nav",
+        items
+      )
+    )
+  )
+}
+
+fn layout_sidebar_section(title: str, items: str) -> str {
+  return div("sidebar-section",
+    div("sidebar-section-title", title) +
+    ul("sidebar-nav",
+      items
+    )
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 4. 푸터 (하단)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_footer(copyright: str) -> str {
+  return footer(
+    div("footer-content",
+      p(html_escape(copyright))
+    )
+  )
+}
+
+fn layout_footer_with_links(copyright: str, links: str) -> str {
+  return footer(
+    div("footer-content",
+      div("footer-links", links) +
+      p(html_escape(copyright))
+    )
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 5. 빵부스러기 (Breadcrumb)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_breadcrumb(items_html: str) -> str {
+  return nav("breadcrumb",
+    ol("breadcrumb", items_html)
+  )
+}
+
+fn layout_breadcrumb_item(href: str, text: str) -> str {
+  return li_with_class("breadcrumb-item",
+    a(href, text)
+  )
+}
+
+fn layout_breadcrumb_item_active(text: str) -> str {
+  return li_with_class("breadcrumb-item active",
+    span("", text)
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 6. 페이지 헤더
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_page_header(title: str, subtitle: str) -> str {
+  var sub: str = html_if(subtitle != "", p_with_class("page-subtitle", subtitle), "")
+  return div("page-header",
+    h1(title) + sub
+  )
+}
+
+fn layout_page_header_with_actions(title: str, actions: str) -> str {
+  return div("page-header d-flex justify-content-between",
+    h1(title) +
+    div("page-actions", actions)
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 7. 플래시 메시지
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_flash_message(flash_type: str, message: str) -> str {
+  var alert_class: str = "alert-" + flash_type
+  return div("alert " + alert_class,
+    button("button", "btn-close", "×") +
+    span("", html_escape(message))
+  )
+}
+
+fn layout_flash_messages(messages_html: str) -> str {
+  return div("alerts-container", messages_html)
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 8. 알림 (Alert)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_alert(alert_type: str, title: str, message: str) -> str {
+  var alert_class: str = "alert-" + alert_type
+  return div("alert " + alert_class,
+    h4_with_class("alert-title", title) +
+    p(message)
+  )
+}
+
+fn layout_alert_success(message: str) -> str {
+  return layout_alert("success", "성공", message)
+}
+
+fn layout_alert_error(message: str) -> str {
+  return layout_alert("danger", "오류", message)
+}
+
+fn layout_alert_warning(message: str) -> str {
+  return layout_alert("warning", "경고", message)
+}
+
+fn layout_alert_info(message: str) -> str {
+  return layout_alert("info", "알림", message)
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 9. 배지 (Badge)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_badge(badge_type: str, text: str) -> str {
+  var badge_class: str = "badge-" + badge_type
+  return span("badge " + badge_class, text)
+}
+
+fn layout_badge_success(text: str) -> str { return layout_badge("success", text) }
+fn layout_badge_danger(text: str) -> str { return layout_badge("danger", text) }
+fn layout_badge_warning(text: str) -> str { return layout_badge("warning", text) }
+fn layout_badge_info(text: str) -> str { return layout_badge("info", text) }
+fn layout_badge_default(text: str) -> str { return layout_badge("default", text) }
+
+;; ═══════════════════════════════════════════════════════════════
+;; 10. 카드 (Card)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_card(title: str, body: str) -> str {
+  return div("card",
+    div("card-body",
+      h5(title) +
+      p(body)
+    )
+  )
+}
+
+fn layout_card_full(header: str, body: str, footer: str) -> str {
+  var footer_html: str = html_if(footer != "", div("card-footer", footer), "")
+  return div("card",
+    div("card-header", header) +
+    div("card-body", body) +
+    footer_html
+  )
+}
+
+fn layout_card_with_actions(title: str, body: str, actions: str) -> str {
+  return div("card",
+    div("card-body",
+      h5(title) +
+      p(body)
+    ) +
+    div("card-actions", actions)
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 11. 모달 (Modal)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_modal(modal_id: str, title: str, body: str, footer: str) -> str {
+  return div("modal",
+    div("modal-dialog",
+      div("modal-content",
+        div("modal-header",
+          h5(title) +
+          button("button", "btn-close", "×")
+        ) +
+        div("modal-body", body) +
+        div("modal-footer", footer)
+      )
+    )
+  )
+}
+
+fn layout_modal_simple(modal_id: str, title: str, body: str) -> str {
+  return layout_modal(modal_id, title, body,
+    button("button", "btn btn-secondary", "닫기")
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 12. 페이지네이션 (Pagination)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_pagination(current_page: i32, total_pages: i32, base_url: str) -> str {
+  var items: str = ""
+
+  if current_page > 1 {
+    items = items + li_html(a(base_url + str(current_page - 1), "이전"))
+  }
+
+  var i: i32 = 1
+  while i <= total_pages {
+    if i == current_page {
+      items = items + li_with_class("active",
+        span("", str(i))
+      )
+    } else {
+      items = items + li_html(a(base_url + str(i), str(i)))
+    }
+    i = i + 1
+  }
+
+  if current_page < total_pages {
+    items = items + li_html(a(base_url + str(current_page + 1), "다음"))
+  }
+
+  return nav("",
+    ul("pagination", items)
+  )
+}
+
+fn layout_pagination_simple(current: i32, total: i32, per_page: i32, base_url: str) -> str {
+  var total_pages: i32 = (total + per_page - 1) / per_page
+  return layout_pagination(current, total_pages, base_url + "?page=")
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 13. 탭 (Tabs)
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_tabs(tabs_html: str, content_html: str) -> str {
+  return div("tabs",
+    ul("tabs-nav", tabs_html) +
+    div("tabs-content", content_html)
+  )
+}
+
+fn layout_tab_item(id: str, label: str, is_active: bool) -> str {
+  var active_class: str = html_if(is_active, " active", "")
+  return li_with_class("tab-item" + active_class,
+    a("#" + id, label)
+  )
+}
+
+fn layout_tab_pane(id: str, content: str, is_active: bool) -> str {
+  var active_class: str = html_if(is_active, " active", "")
+  return div("tab-pane" + active_class,
+    content
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 14. 통계 카드
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_stat_card(label: str, value: str, color: str) -> str {
+  var color_class: str = "border-" + color
+  return div("stat-card " + color_class,
+    div("stat-card-body",
+      span("stat-label", label) +
+      span("stat-value text-" + color, value)
+    )
+  )
+}
+
+fn layout_stat_cards(cards_html: str) -> str {
+  return div("row stats-row", cards_html)
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 15. 테이블 래퍼
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_table_wrapper(title: str, table_html: str, pagination_html: str) -> str {
+  var pag: str = html_if(pagination_html != "", pagination_html, "")
+  return div("table-wrapper",
+    div("table-header",
+      h4(title)
+    ) +
+    div("table-body", table_html) +
+    pag
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 16. 폼 그룹 래퍼
+;; ═══════════════════════════════════════════════════════════════
+
+fn layout_form_group(label: str, input_html: str, help_text: str) -> str {
+  var help: str = html_if(help_text != "",
+    p_with_class("form-help", help_text),
+    "")
+  return div("form-group",
+    label("", label) +
+    input_html +
+    help
+  )
+}
+
+fn layout_form_group_required(label: str, input_html: str) -> str {
+  return div("form-group",
+    label("", label + span("text-danger", " *")) +
+    input_html
+  )
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 17. 유틸리티 헬퍼
+;; ═══════════════════════════════════════════════════════════════
+
+fn h4_with_class(class_name: str, text: str) -> str {
+  return el("h4", attr("class", class_name), html_escape(text))
+}
+
+fn layout_divider() -> str {
+  return "<hr />"
+}
+
+fn layout_spacer(size: str) -> str {
+  return div(size, "")
+}
+
+fn layout_loading_spinner() -> str {
+  return div("spinner",
+    div("spinner-border", "")
+  )
+}
+
+fn layout_empty_state(icon: str, title: str, message: str) -> str {
+  return div("empty-state",
+    div("empty-icon", icon) +
+    h4(title) +
+    p(message)
+  )
+}
