@@ -6,7 +6,7 @@
 
 [FUNC is-ws :params [$ch]
   :body (match $ch
-    (" " true) ("\t" true) ("\n" true) ("\r" true)
+    (" " true) ("\t" true) ("\n" true)
     (_ false)
 )]
 

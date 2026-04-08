@@ -137,9 +137,9 @@
         ("parse-float"(concat "parseFloat(" $a0 ")"))
         ("replace"    (concat $a0 ".split(" $a1 ").join(" $a2 ")"))
         ("slice"      (concat $a0 ".slice(" $a1 ", " $a2 ")"))
-        ("map"        "/* map not supported in codegen-direct, use JS .map() */")
-        ("filter"     "/* filter not supported in codegen-direct, use JS .filter() */")
-        ("reduce"     "/* reduce not supported in codegen-direct, use JS .reduce() */")
+        ("map"        (concat $a0 ".map(" $a1 ")"))
+        ("filter"     (concat $a0 ".filter(" $a1 ")"))
+        ("reduce"     (concat $a0 ".reduce(" $a2 ", " $a1 ")"))    ; fallback: (reduce coll fn init)
         ("error"      (concat "((() => { throw new Error(" $a0 "); })())"))
         ("null?"      (concat "(" $a0 " === null || " $a0 " === undefined)"))
         ("zero?"      (concat "(" $a0 " === 0)"))
@@ -272,6 +272,77 @@
   )
 ]
 
+; ── 람다 파라미터 헬퍼 ───────────────────────────────────────────
+; [x] 또는 [acc x] 형태의 배열 노드에서 파라미터 이름 목록 추출
+
+[FUNC extract-params :params [$array-node]
+  :body (
+    (map (get $array-node :items) [p]
+      (fl-id-safe (if (= (get $p :kind) "variable")
+                    (get $p :name)
+                    (get $p :value)))
+    )
+  )
+]
+
+; ── map 표현식 ────────────────────────────────────────────────────
+; (map $coll [item] body)  → coll.map((item) => body)
+; (map $coll fn-ref)       → coll.map(fn-ref)
+
+[FUNC gen-map-expr :params [$args]
+  :body (
+    (let [[coll (gen-expr (get $args 0))]]
+      (if (and (> (length $args) 2)
+               (= (get (get $args 1) :kind) "array"))
+        (let [[params (extract-params (get $args 1))]
+              [body   (gen-expr (get $args 2))]]
+          (concat $coll ".map((" (str-join $params ", ") ") => " $body ")")
+        )
+        (concat $coll ".map(" (gen-expr (get $args 1)) ")")
+      )
+    )
+  )
+]
+
+; ── filter 표현식 ─────────────────────────────────────────────────
+; (filter $coll [item] body)  → coll.filter((item) => body)
+; (filter $coll fn-ref)       → coll.filter(fn-ref)
+
+[FUNC gen-filter-expr :params [$args]
+  :body (
+    (let [[coll (gen-expr (get $args 0))]]
+      (if (and (> (length $args) 2)
+               (= (get (get $args 1) :kind) "array"))
+        (let [[params (extract-params (get $args 1))]
+              [body   (gen-expr (get $args 2))]]
+          (concat $coll ".filter((" (str-join $params ", ") ") => " $body ")")
+        )
+        (concat $coll ".filter(" (gen-expr (get $args 1)) ")")
+      )
+    )
+  )
+]
+
+; ── reduce 표현식 ─────────────────────────────────────────────────
+; (reduce $coll $init [acc x] body)  → coll.reduce((acc, x) => body, init)
+; (reduce $coll $init fn-ref)        → coll.reduce(fn-ref, init)
+
+[FUNC gen-reduce-expr :params [$args]
+  :body (
+    (let [[coll (gen-expr (get $args 0))]
+          [init (gen-expr (get $args 1))]]
+      (if (and (> (length $args) 3)
+               (= (get (get $args 2) :kind) "array"))
+        (let [[params (extract-params (get $args 2))]
+              [body   (gen-expr (get $args 3))]]
+          (concat $coll ".reduce((" (str-join $params ", ") ") => " $body ", " $init ")")
+        )
+        (concat $coll ".reduce(" (gen-expr (get $args 2)) ", " $init ")")
+      )
+    )
+  )
+]
+
 ; ── match 표현식 ─────────────────────────────────────────────────
 ; FL 파서는 (match v ("a" r) (_ d)) 를 다음 구조로 파싱:
 ;   sexpr: op="match", args=[v, {kind:"sexpr",op:"a",args:[r]}, {kind:"sexpr",op:"_",args:[d]}]
@@ -356,6 +427,9 @@
         ("match"  (gen-match $args))
         ("cond"   (gen-cond $args))
         ("fn"     (gen-fn $args))
+        ("map"    (gen-map-expr $args))
+        ("filter" (gen-filter-expr $args))
+        ("reduce" (gen-reduce-expr $args))
         (_
           (let [[gen-args (map $args [a] (gen-expr $a))]]
             (gen-builtin-op $op $gen-args)
