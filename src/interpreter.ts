@@ -1583,9 +1583,9 @@ export class Interpreter {
           ? args[0].indexOf(args[1])
           : -1;
       case "replace":
-        // (replace "hello world" "world" "there") → "hello there"
+        // (replace "hello world" "world" "there") → "hello there" (all occurrences)
         return typeof args[0] === "string" && typeof args[1] === "string" && typeof args[2] === "string"
-          ? args[0].replace(args[1], args[2])
+          ? args[0].split(args[1]).join(args[2])
           : "";
       case "repeat":
         // (repeat "a" 3) → "aaa"

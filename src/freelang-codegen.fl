@@ -206,11 +206,21 @@
 ]
 
 ; ── do 블록 ──────────────────────────────────────────────────────
+; ((fn [...] body) args...) 패턴 → 즉시 호출 람다로 처리
 
 [FUNC gen-do :params [$args]
   :body (
-    (let [[stmts (gen-body $args)]]
-      (concat "((() => {\n  " $stmts "\n})())")
+    (if (and (> (length $args) 1)
+             (= (get (get $args 0) :kind) "sexpr")
+             (= (get (get $args 0) :op) "fn"))
+      (let [[fn-node   (get $args 0)]
+            [call-args (slice $args 1 (length $args))]]
+        (concat (gen-fn (get $fn-node :args))
+                "(" (str-join (map $call-args [a] (gen-expr $a)) ", ") ")")
+      )
+      (let [[stmts (gen-body $args)]]
+        (concat "((() => {\n  " $stmts "\n})())")
+      )
     )
   )
 ]
@@ -263,89 +273,50 @@
 ]
 
 ; ── match 표현식 ─────────────────────────────────────────────────
+; FL 파서는 (match v ("a" r) (_ d)) 를 다음 구조로 파싱:
+;   sexpr: op="match", args=[v, {kind:"sexpr",op:"a",args:[r]}, {kind:"sexpr",op:"_",args:[d]}]
+; 각 클로즈는 sexpr: op=패턴값, args[0]=결과
 
 [FUNC gen-match :params [$args]
   :body (
     (let [[subject  (gen-expr (get $args 0))]
           [clauses  (slice $args 1 (length $args))]]
-      (let [[sw-var "_sw"]]
-        (let [[cases (map $clauses [clause]
-                       (let [[items (get $clause :items)]]
-                         (let [[pat (get $items 0)]
-                               [res (get $items 1)]]
-                           (if (= (get $pat :kind) "literal")
-                             (if (= (get $pat :type) "symbol")
-                               ; (_) 와일드카드
-                               (if (= (get $pat :value) "_")
-                                 (concat "default: return " (gen-expr $res) ";")
-                                 (concat "case " (gen-literal $pat) ": return " (gen-expr $res) ";")
-                               )
-                               (concat "case " (gen-literal $pat) ": return " (gen-expr $res) ";")
-                             )
-                             (concat "default: return " (gen-expr $res) ";")
-                           )
-                         )
+      (let [[stmts (map $clauses [clause]
+                     (let [[pat-op (get $clause :op)]
+                           [res    (get (get $clause :args) 0)]]
+                       (if (= $pat-op "_")
+                         (concat "return " (gen-expr $res) ";")
+                         (concat "if (String(_sw) === " (if (contains? $pat-op "\"") $pat-op (concat "\"" $pat-op "\"")) ") return " (gen-expr $res) ";")
                        )
-                     )]]
-          (concat "((() => { const " $sw-var " = " $subject
-                  "; switch(" $sw-var ") {\n    "
-                  (str-join $cases "\n    ")
-                  "\n  } })())")
-        )
+                     )
+                   )]]
+        (concat "(() => { const _sw = " $subject ";\n  "
+                (str-join $stmts "\n  ")
+                "\n})()")
       )
     )
   )
 ]
 
 ; ── cond 표현식 ──────────────────────────────────────────────────
+; FL 파서는 (cond [(test) body] [else body]) 를 다음 구조로 파싱:
+;   sexpr: op="cond", args=[{kind:"array",items:[test,body]}, ...]
 
 [FUNC gen-cond :params [$args]
   :body (
-    (let [[clauses $args]]
-      (let [[parts (map $clauses [clause]
-                     (let [[items (get $clause :items)]]
-                       (let [[test (get $items 0)]
-                             [body (get $items 1)]]
-                         (if (= (get $test :kind) "literal")
-                           (if (= (get $test :value) "else")
-                             (concat "true ? " (gen-expr $body) " : null")
-                             (concat (gen-expr $test) " ? " (gen-expr $body) " : null")
-                           )
-                           (concat (gen-expr $test) " ? " (gen-expr $body) " : null")
-                         )
+    (let [[stmts (map $args [clause]
+                   (let [[items (get $clause :items)]]
+                     (let [[test (get $items 0)]
+                           [body (get $items 1)]]
+                       (if (and (= (get $test :kind) "literal")
+                                (= (get $test :value) "else"))
+                         (concat "return " (gen-expr $body) ";")
+                         (concat "if (" (gen-expr $test) ") return " (gen-expr $body) ";")
                        )
                      )
-                   )]]
-        ; 중첩 삼항으로 조립: (c1 ? v1 : (c2 ? v2 : null))
-        (let [[build-cond [idx]
-                (if (>= $idx (length $parts))
-                  "null"
-                  (let [[p (get $parts $idx)]]
-                    (let [[cond-part (slice $p 0 (index-of $p " ? "))]]
-                      ; 직접 조립은 복잡하므로 단순 if-else 체인 IIFE로
-                      (concat "((() => {\n    "
-                              (str-join (map $clauses [clause]
-                                (let [[items (get $clause :items)]]
-                                  (let [[test (get $items 0)]
-                                        [body (get $items 1)]]
-                                    (if (= (get $test :kind) "literal")
-                                      (if (= (get $test :value) "else")
-                                        (concat "return " (gen-expr $body) ";")
-                                        (concat "if (" (gen-expr $test) ") return " (gen-expr $body) ";")
-                                      )
-                                      (concat "if (" (gen-expr $test) ") return " (gen-expr $body) ";")
-                                    )
-                                  )
-                                )
-                              ) "\n    ")
-                              "\n  })()")
-                    )
-                  )
-                )
-              ]]
-          (build-cond 0)
-        )
-      )
+                   )
+                 )]]
+      (concat "(() => {\n  " (str-join $stmts "\n  ") "\n})()")
     )
   )
 ]
@@ -493,8 +464,16 @@
 
 [FUNC gen-export :params [$args]
   :body (
-    (let [[exported (map $args [a] (fl-id-safe (gen-expr $a)))]]
-      (concat "module.exports = { " (str-join $exported ", ") " };\n")
+    (let [[pairs (map $args [a]
+                   (let [[orig (get $a :value)]
+                         [js   (fl-id-safe $orig)]]
+                     (if (= $orig $js)
+                       $js
+                       (concat "\"" $orig "\": " $js)
+                     )
+                   )
+                 )]]
+      (concat "module.exports = { " (str-join $pairs ", ") " };\n")
     )
   )
 ]
