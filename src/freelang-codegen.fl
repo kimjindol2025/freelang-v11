@@ -102,9 +102,9 @@
           [a1 (if (> (length $args) 1) (get $args 1) "")]
           [a2 (if (> (length $args) 2) (get $args 2) "")]]
       (match $op
-        ("+"  (concat "(" $a0 " + " $a1 ")"))
+        ("+"  (concat "(" (str-join $args " + ") ")"))
         ("-"  (concat "(" $a0 " - " $a1 ")"))
-        ("*"  (concat "(" $a0 " * " $a1 ")"))
+        ("*"  (concat "(" (str-join $args " * ") ")"))
         ("/"  (concat "(" $a0 " / " $a1 ")"))
         ("%"  (concat "(" $a0 " % " $a1 ")"))
         ("="  (concat "(" $a0 " === " $a1 ")"))
@@ -122,7 +122,9 @@
         )
         ("append" (concat "(Array.isArray(" $a0 ") ? " $a0 ".concat(" $a1 ") : [" $a1 "])"))
         ("get"
-          (concat "(Array.isArray(" $a0 ") ? " $a0 "[" $a1 "] : (" $a0 " && " $a0 "[" $a1 "]))")
+          (concat "((_v => _v === undefined ? null : _v)("
+                  "Array.isArray(" $a0 ") ? " $a0 "[" $a1 "] : (" $a0 " && " $a0 "[" $a1 "]))"
+                  ")")
         )
         ("assoc"  (concat "Object.assign({}, " $a0 ", {[" $a1 "]: " $a2 "})"))
         ("dissoc" (concat "((_o => { const {[" $a1 "]: _, ..._r} = _o; return _r; })(" $a0 "))"))
@@ -160,6 +162,48 @@
         ("to-str"     (concat "String(" $a0 ")"))
         ("json-parse" (concat "JSON.parse(" $a0 ")"))
         ("json-str"   (concat "JSON.stringify(" $a0 ")"))
+        ; ── 출력 ─────────────────────────────────────────────
+        ("print"      (concat "console.log(" (str-join $args ", ") ")"))
+        ("println"    (concat "console.log(" (str-join $args ", ") ")"))
+        ("echo"       (concat "console.log(" (str-join $args ", ") ")"))
+        ("print-err"  (concat "console.error(" (str-join $args ", ") ")"))
+        ; ── 배열 조작 ──────────────────────────────────────────
+        ("first"      (concat "((_a) => _a[0])(" $a0 ")"))
+        ("rest"       (concat "((_a) => _a.slice(1))(" $a0 ")"))
+        ("last"       (concat "((_a) => _a[_a.length - 1])(" $a0 ")"))
+        ("reverse"    (concat "((_a) => [..._a].reverse())(" $a0 ")"))
+        ("find"       (concat $a0 ".find(" $a1 ")"))
+        ("flatten"    (concat "((_a) => _a.flat())(" $a0 ")"))
+        ("unique"     (concat "((_a) => [...new Set(_a)])(" $a0 ")"))
+        ("sort"
+          (if (> (length $args) 1)
+            (concat "((_a) => [..._a].sort(" $a1 "))(" $a0 ")")
+            (concat "((_a) => [..._a].sort())(" $a0 ")")
+          )
+        )
+        ("push"       (concat "[..." $a0 ", " $a1 "]"))
+        ("pop"        (concat $a0 ".slice(0, -1)"))
+        ; ── 문자열 ─────────────────────────────────────────────
+        ("char-at"      (concat $a0 "[" $a1 "]"))
+        ("substring"    (concat $a0 ".substring(" $a1 ", " $a2 ")"))
+        ("starts-with?" (concat $a0 ".startsWith(" $a1 ")"))
+        ("ends-with?"   (concat $a0 ".endsWith(" $a1 ")"))
+        ("index-of"     (concat $a0 ".indexOf(" $a1 ")"))
+        ("split"        (concat $a0 ".split(" $a1 ")"))
+        ; ── 수학 확장 ──────────────────────────────────────────
+        ("sqrt"   (concat "Math.sqrt(" $a0 ")"))
+        ("pow"    (concat "Math.pow(" $a0 ", " $a1 ")"))
+        ("log"    (concat "Math.log(" $a0 ")"))
+        ("exp"    (concat "Math.exp(" $a0 ")"))
+        ("random" "Math.random()")
+        ; ── 타입 조건자 ────────────────────────────────────────
+        ("string?" (concat "(typeof " $a0 " === 'string')"))
+        ("number?" (concat "(typeof " $a0 " === 'number')"))
+        ("bool?"   (concat "(typeof " $a0 " === 'boolean')"))
+        ("array?"  (concat "Array.isArray(" $a0 ")"))
+        ("map?"    (concat "(typeof " $a0 " === 'object' && " $a0 " !== null && !Array.isArray(" $a0 "))"))
+        ; ── 객체/맵 ────────────────────────────────────────────
+        ("json_keys" (concat "Object.keys(" $a0 ")"))
         (_
           ; 사용자 함수 호출
           (concat (fl-id-safe $op) "(" (str-join $args ", ") ")")
@@ -323,6 +367,25 @@
   )
 ]
 
+; ── find 표현식 ───────────────────────────────────────────────────
+; (find $coll [item] body)  → coll.find((item) => body)
+; (find $coll fn-ref)       → coll.find(fn-ref)
+
+[FUNC gen-find-expr :params [$args]
+  :body (
+    (let [[coll (gen-expr (get $args 0))]]
+      (if (and (> (length $args) 2)
+               (= (get (get $args 1) :kind) "array"))
+        (let [[params (extract-params (get $args 1))]
+              [body   (gen-expr (get $args 2))]]
+          (concat $coll ".find((" (str-join $params ", ") ") => " $body ")")
+        )
+        (concat $coll ".find(" (gen-expr (get $args 1)) ")")
+      )
+    )
+  )
+]
+
 ; ── reduce 표현식 ─────────────────────────────────────────────────
 ; (reduce $coll $init [acc x] body)  → coll.reduce((acc, x) => body, init)
 ; (reduce $coll $init fn-ref)        → coll.reduce(fn-ref, init)
@@ -430,6 +493,7 @@
         ("map"    (gen-map-expr $args))
         ("filter" (gen-filter-expr $args))
         ("reduce" (gen-reduce-expr $args))
+        ("find"   (gen-find-expr $args))
         (_
           (let [[gen-args (map $args [a] (gen-expr $a))]]
             (gen-builtin-op $op $gen-args)
