@@ -259,7 +259,7 @@ test("팰린드롬 검사", () => {
   const exp = compileAndRun(`
 [FUNC palindrome? :params [$s]
   :body (
-    (let [[rev (str-join "" (reverse (split $s "")))]]
+    (let [[rev (str-join (reverse (split $s "")) "")]]
       (= $s $rev)
     )
   )

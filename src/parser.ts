@@ -807,7 +807,8 @@ export class Parser {
     // Never generic function syntax: fn, let, if, cond, match, etc.
     const specialFormsForbiddingGeneric = new Set([
       "fn", "let", "if", "cond", "match", "do", "try", "catch",
-      "let*", "letrec", "define", "async", "await"
+      "let*", "letrec", "define", "async", "await",
+      "loop", "recur", "import", "export"
     ]);
 
     if (!specialFormsForbiddingGeneric.has(op) && this.check(T.LBracket) && !this.isArrayLiteralStart()) {
