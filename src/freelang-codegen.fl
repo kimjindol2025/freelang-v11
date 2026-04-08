@@ -40,9 +40,11 @@
           (replace
             (replace
               (replace
-                (replace (get $node :value) "\\" "\\\\")
-                "\n" "\\n")
-              "\t" "\\t")
+                (replace
+                  (replace (get $node :value) "\\" "\\\\")
+                  "\n" "\\n")
+                "\t" "\\t")
+              "\r" "\\r")
             "\"" "\\\"")
           "\"")
       )
@@ -470,7 +472,13 @@
                            [res    (get (get $clause :args) 0)]]
                        (if (= $pat-op "_")
                          (concat "return " (gen-expr $res) ";")
-                         (concat "if (String(_sw) === " (if (contains? $pat-op "\"") $pat-op (concat "\"" $pat-op "\"")) ") return " (gen-expr $res) ";")
+                         (concat "if (String(_sw) === "
+                           (if (and (> (length $pat-op) 1) (= (get $pat-op 0) "\""))
+                             $pat-op
+                             (concat "\""
+                               (replace (replace (replace (replace (replace $pat-op "\\" "\\\\") "\n" "\\n") "\t" "\\t") "\r" "\\r") "\"" "\\\"")
+                               "\""))
+                           ") return " (gen-expr $res) ";")
                        )
                      )
                    )]]

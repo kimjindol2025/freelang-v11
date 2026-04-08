@@ -1,6 +1,6 @@
-; FreeLang v9: Lexer (self-hosting)
+; FreeLang v9: Lexer (self-hosting) — Phase 31: loop/recur TCO
 ; Source string → Token[]
-; Upgrade: {}, ?, !, dot-access, line tracking, single-; comment
+; scan + 모든 내부 재귀 함수 → loop/recur (스택 오버플로우 없음)
 
 ; ── 문자 분류 헬퍼 ───────────────────────────────────────────
 
@@ -65,219 +65,235 @@
       (define peek-ch [offset]
         (if (< (+ i offset) len)
           (get $src (+ i offset))
-          ""
-        )
+          "")
       )
 
       (define emit [type val]
         (set! tokens (append tokens [{:type $type :value $val :line line}]))
       )
 
+      ; ── 메인 스캔 루프 (loop/recur TCO) ─────────────────
       (define scan []
-        (if (>= i len)
-          tokens
+        (loop [[$_ 0]]
+          (if (>= i len)
+            tokens
 
-          (let [[c (ch)]]
-            (cond
+            (let [[c (ch)]]
+              (cond
 
-              ; ── 개행 ─────────────────────────────────────
-              [(= c "\n")
-                (set! line (+ line 1))
-                (set! i (+ i 1))
-                (scan)
-              ]
+                ; ── 개행 ───────────────────────────────────
+                [(= c "\n")
+                  (set! line (+ line 1))
+                  (set! i (+ i 1))
+                  (recur 0)
+                ]
 
-              ; ── 공백 ─────────────────────────────────────
-              [(is-ws c)
-                (set! i (+ i 1))
-                (scan)
-              ]
+                ; ── 공백 ───────────────────────────────────
+                [(is-ws c)
+                  (set! i (+ i 1))
+                  (recur 0)
+                ]
 
-              ; ── 주석: ; 또는 ;; ──────────────────────────
-              [(= c ";")
-                (set! i (+ i 1))
-                (define skip-comment []
-                  (if (and (< i len) (not (= (ch) "\n")))
-                    (do (set! i (+ i 1)) (skip-comment))
-                  )
-                )
-                (skip-comment)
-                (scan)
-              ]
-
-              ; ── 문자열 ───────────────────────────────────
-              [(= c "\"")
-                (set! i (+ i 1))
-                (define s "")
-                (define read-str []
-                  (if (>= i len)
-                    (error (concat "Unterminated string at line " (num-to-str line)))
-                    (let [[sc (ch)]]
-                      (cond
-                        [(= sc "\\")
-                          (set! i (+ i 1))
-                          (if (< i len)
-                            (let [[esc (ch)]]
-                              (set! i (+ i 1))
-                              (set! s (concat s (match $esc
-                                ("n" "\n") ("t" "\t") ("r" "\r")
-                                ("\"" "\"") ("\\" "\\")
-                                (_ $esc)
-                              )))
-                              (read-str)
-                            )
-                          )
-                        ]
-                        [(= sc "\"")
-                          (set! i (+ i 1))
-                        ]
-                        [else
-                          (set! s (concat s $sc))
-                          (set! i (+ i 1))
-                          (read-str)
-                        ]
+                ; ── 주석: ; 또는 ;; ─────────────────────────
+                [(= c ";")
+                  (set! i (+ i 1))
+                  (define skip-comment []
+                    (loop [[$_ 0]]
+                      (if (and (< i len) (not (= (ch) "\n")))
+                        (do (set! i (+ i 1)) (recur 0))
                       )
                     )
                   )
-                )
-                (read-str)
-                (emit "STRING" s)
-                (scan)
-              ]
+                  (skip-comment)
+                  (recur 0)
+                ]
 
-              ; ── 단일 문자 토큰 ────────────────────────────
-              [(= c "(")  (emit "LPAREN" "(")  (set! i (+ i 1)) (scan)]
-              [(= c ")")  (emit "RPAREN" ")")  (set! i (+ i 1)) (scan)]
-              [(= c "[")  (emit "LBRACKET" "[") (set! i (+ i 1)) (scan)]
-              [(= c "]")  (emit "RBRACKET" "]") (set! i (+ i 1)) (scan)]
-              [(= c "{")  (emit "LBRACE" "{")   (set! i (+ i 1)) (scan)]
-              [(= c "}")  (emit "RBRACE" "}")   (set! i (+ i 1)) (scan)]
-              [(= c "|")  (emit "SYMBOL" "|")   (set! i (+ i 1)) (scan)]
-              [(= c "@")  (emit "SYMBOL" "@")   (set! i (+ i 1)) (scan)]
-
-              ; ── 콜론: : ──────────────────────────────────
-              [(= c ":")
-                (set! i (+ i 1))
-                ; :keyword 토큰 (다음 심볼까지 읽음)
-                (define kw "")
-                (define read-kw []
-                  (if (and (< i len) (is-sym-cont (ch)))
-                    (do
-                      (set! kw (concat kw (ch)))
-                      (set! i (+ i 1))
-                      (read-kw)
+                ; ── 문자열 ─────────────────────────────────
+                [(= c "\"")
+                  (set! i (+ i 1))
+                  (define s "")
+                  (define read-str []
+                    (loop [[$_ 0]]
+                      (if (>= i len)
+                        (error (concat "Unterminated string at line " (num-to-str line)))
+                        (let [[sc (ch)]]
+                          (cond
+                            [(= sc "\\")
+                              (set! i (+ i 1))
+                              (if (< i len)
+                                (let [[esc (ch)]]
+                                  (set! i (+ i 1))
+                                  (set! s (concat s (match esc
+                                    ("n" "\n") ("t" "\t") ("r" "\r")
+                                    ("\"" "\"") ("\\" "\\")
+                                    (_ esc)
+                                  )))
+                                  (recur 0)
+                                )
+                              )
+                            ]
+                            [(= sc "\"")
+                              (set! i (+ i 1))
+                            ]
+                            [else
+                              (set! s (concat s sc))
+                              (set! i (+ i 1))
+                              (recur 0)
+                            ]
+                          )
+                        )
+                      )
                     )
                   )
-                )
-                (read-kw)
-                (if (> (length kw) 0)
-                  (emit "KEYWORD" kw)
-                  (emit "COLON" ":")
-                )
-                (scan)
-              ]
+                  (read-str)
+                  (emit "STRING" s)
+                  (recur 0)
+                ]
 
-              ; ── 변수: $name 또는 $name.field ─────────────
-              [(= c "$")
-                (set! i (+ i 1))
-                (define vn "")
-                (define read-var []
-                  (if (and (< i len) (is-var-cont (ch)))
-                    (do
-                      (set! vn (concat vn (ch)))
-                      (set! i (+ i 1))
-                      (read-var)
+                ; ── 단일 문자 토큰 ──────────────────────────
+                [(= c "(")  (emit "LPAREN" "(")   (set! i (+ i 1)) (recur 0)]
+                [(= c ")")  (emit "RPAREN" ")")   (set! i (+ i 1)) (recur 0)]
+                [(= c "[")  (emit "LBRACKET" "[") (set! i (+ i 1)) (recur 0)]
+                [(= c "]")  (emit "RBRACKET" "]") (set! i (+ i 1)) (recur 0)]
+                [(= c "{")  (emit "LBRACE" "{")   (set! i (+ i 1)) (recur 0)]
+                [(= c "}")  (emit "RBRACE" "}")   (set! i (+ i 1)) (recur 0)]
+                [(= c "|")  (emit "SYMBOL" "|")   (set! i (+ i 1)) (recur 0)]
+                [(= c "@")  (emit "SYMBOL" "@")   (set! i (+ i 1)) (recur 0)]
+
+                ; ── 콜론: : ────────────────────────────────
+                [(= c ":")
+                  (set! i (+ i 1))
+                  (define kw "")
+                  (define read-kw []
+                    (loop [[$_ 0]]
+                      (if (and (< i len) (is-sym-cont (ch)))
+                        (do
+                          (set! kw (concat kw (ch)))
+                          (set! i (+ i 1))
+                          (recur 0)
+                        )
+                      )
                     )
                   )
-                )
-                (read-var)
-                (emit "VARIABLE" vn)
-                (scan)
-              ]
+                  (read-kw)
+                  (if (> (length kw) 0)
+                    (emit "KEYWORD" kw)
+                    (emit "COLON" ":")
+                  )
+                  (recur 0)
+                ]
 
-              ; ── 숫자 ─────────────────────────────────────
-              [(or (is-digit c) (and (= c "-") (< (+ i 1) len) (is-digit (peek-ch 1))))
-                (define ns "")
-                (define read-num []
-                  (if (and (< i len) (or (is-digit (ch)) (= (ch) ".")))
-                    (do
-                      (set! ns (concat ns (ch)))
-                      (set! i (+ i 1))
-                      (read-num)
+                ; ── 변수: $name 또는 $name.field ───────────
+                [(= c "$")
+                  (set! i (+ i 1))
+                  (define vn "")
+                  (define read-var []
+                    (loop [[$_ 0]]
+                      (if (and (< i len) (is-var-cont (ch)))
+                        (do
+                          (set! vn (concat vn (ch)))
+                          (set! i (+ i 1))
+                          (recur 0)
+                        )
+                      )
                     )
                   )
-                )
-                (if (= c "-")
-                  (do (set! ns "-") (set! i (+ i 1)))
-                )
-                (read-num)
-                (emit "NUMBER" ns)
-                (scan)
-              ]
+                  (read-var)
+                  (emit "VARIABLE" vn)
+                  (recur 0)
+                ]
 
-              ; ── 심볼 (함수명, 키워드 등) ──────────────────
-              [(is-alpha c)
-                (define sv "")
-                (define read-sym []
-                  (if (and (< i len) (is-sym-cont (ch)))
-                    (do
-                      (set! sv (concat sv (ch)))
-                      (set! i (+ i 1))
-                      (read-sym)
+                ; ── 숫자 ───────────────────────────────────
+                [(or (is-digit c) (and (= c "-") (< (+ i 1) len) (is-digit (peek-ch 1))))
+                  (define ns "")
+                  (define read-num []
+                    (loop [[$_ 0]]
+                      (if (and (< i len) (or (is-digit (ch)) (= (ch) ".")))
+                        (do
+                          (set! ns (concat ns (ch)))
+                          (set! i (+ i 1))
+                          (recur 0)
+                        )
+                      )
                     )
                   )
-                )
-                (read-sym)
-                ; true / false / null 은 BOOL/NULL 토큰으로 구분
-                (match sv
-                  ("true"  (emit "BOOL" "true"))
-                  ("false" (emit "BOOL" "false"))
-                  ("null"  (emit "NULL" "null"))
-                  (_       (emit "SYMBOL" sv))
-                )
-                (scan)
-              ]
+                  (if (= c "-")
+                    (do (set! ns "-") (set! i (+ i 1)))
+                  )
+                  (read-num)
+                  (emit "NUMBER" ns)
+                  (recur 0)
+                ]
 
-              ; ── 연산자: 다중문자 우선 처리 ─────────────────
-              [(= c "=")
-                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
-                  (do (emit "SYMBOL" "==") (set! i (+ i 2)) (scan))
-                  (do (emit "SYMBOL" "=") (set! i (+ i 1)) (scan))
-                )
-              ]
-              [(= c "<")
-                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
-                  (do (emit "SYMBOL" "<=") (set! i (+ i 2)) (scan))
-                  (do (emit "SYMBOL" "<") (set! i (+ i 1)) (scan))
-                )
-              ]
-              [(= c ">")
-                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
-                  (do (emit "SYMBOL" ">=") (set! i (+ i 2)) (scan))
-                  (do (emit "SYMBOL" ">") (set! i (+ i 1)) (scan))
-                )
-              ]
-              [(= c "!")
-                (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
-                  (do (emit "SYMBOL" "!=") (set! i (+ i 2)) (scan))
-                  (do (emit "SYMBOL" "!") (set! i (+ i 1)) (scan))
-                )
-              ]
-              [(= c "+") (emit "SYMBOL" "+") (set! i (+ i 1)) (scan)]
-              [(= c "-") (emit "SYMBOL" "-") (set! i (+ i 1)) (scan)]
-              [(= c "*") (emit "SYMBOL" "*") (set! i (+ i 1)) (scan)]
-              [(= c "/") (emit "SYMBOL" "/") (set! i (+ i 1)) (scan)]
-              [(= c "?") (emit "SYMBOL" "?") (set! i (+ i 1)) (scan)]
-              [(= c "&") (emit "SYMBOL" "&") (set! i (+ i 1)) (scan)]
-              [(= c "%") (emit "SYMBOL" "%") (set! i (+ i 1)) (scan)]
-              [(= c "^") (emit "SYMBOL" "^") (set! i (+ i 1)) (scan)]
-              [(= c "~") (emit "SYMBOL" "~") (set! i (+ i 1)) (scan)]
-              [(= c ",") (set! i (+ i 1)) (scan)]  ; 쉼표 무시
+                ; ── 심볼 (함수명, 키워드 등) ─────────────────
+                [(is-alpha c)
+                  (define sv "")
+                  (define read-sym []
+                    (loop [[$_ 0]]
+                      (if (and (< i len) (is-sym-cont (ch)))
+                        (do
+                          (set! sv (concat sv (ch)))
+                          (set! i (+ i 1))
+                          (recur 0)
+                        )
+                      )
+                    )
+                  )
+                  (read-sym)
+                  (match sv
+                    ("true"  (emit "BOOL" "true"))
+                    ("false" (emit "BOOL" "false"))
+                    ("null"  (emit "NULL" "null"))
+                    (_       (emit "SYMBOL" sv))
+                  )
+                  (recur 0)
+                ]
 
-              [else
-                (set! i (+ i 1))
-                (scan)
-              ]
+                ; ── 연산자: 다중문자 우선 처리 ──────────────
+                [(= c "=")
+                  (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                    (do (emit "SYMBOL" "==") (set! i (+ i 2)))
+                    (do (emit "SYMBOL" "=")  (set! i (+ i 1)))
+                  )
+                  (recur 0)
+                ]
+                [(= c "<")
+                  (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                    (do (emit "SYMBOL" "<=") (set! i (+ i 2)))
+                    (do (emit "SYMBOL" "<")  (set! i (+ i 1)))
+                  )
+                  (recur 0)
+                ]
+                [(= c ">")
+                  (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                    (do (emit "SYMBOL" ">=") (set! i (+ i 2)))
+                    (do (emit "SYMBOL" ">")  (set! i (+ i 1)))
+                  )
+                  (recur 0)
+                ]
+                [(= c "!")
+                  (if (and (< (+ i 1) len) (= (peek-ch 1) "="))
+                    (do (emit "SYMBOL" "!=") (set! i (+ i 2)))
+                    (do (emit "SYMBOL" "!")  (set! i (+ i 1)))
+                  )
+                  (recur 0)
+                ]
+                [(= c "+") (emit "SYMBOL" "+") (set! i (+ i 1)) (recur 0)]
+                [(= c "-") (emit "SYMBOL" "-") (set! i (+ i 1)) (recur 0)]
+                [(= c "*") (emit "SYMBOL" "*") (set! i (+ i 1)) (recur 0)]
+                [(= c "/") (emit "SYMBOL" "/") (set! i (+ i 1)) (recur 0)]
+                [(= c "?") (emit "SYMBOL" "?") (set! i (+ i 1)) (recur 0)]
+                [(= c "&") (emit "SYMBOL" "&") (set! i (+ i 1)) (recur 0)]
+                [(= c "%") (emit "SYMBOL" "%") (set! i (+ i 1)) (recur 0)]
+                [(= c "^") (emit "SYMBOL" "^") (set! i (+ i 1)) (recur 0)]
+                [(= c "~") (emit "SYMBOL" "~") (set! i (+ i 1)) (recur 0)]
+                [(= c ",") (set! i (+ i 1)) (recur 0)]  ; 쉼표 무시
+
+                [else
+                  (set! i (+ i 1))
+                  (recur 0)
+                ]
+              )
             )
           )
         )
