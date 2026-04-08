@@ -34,6 +34,15 @@
         (get (cur) :line)
       )
 
+      (define cur-col []
+        (get (cur) :col)
+      )
+
+      ; 에러 위치 prefix: "[line:col]"
+      (define loc []
+        (concat "[" (num-to-str (cur-line)) ":" (num-to-str (cur-col)) "]")
+      )
+
       (define advance []
         (let [[tok (cur)]]
           (set! pos (+ pos 1))
@@ -52,8 +61,11 @@
       (define expect [type]
         (if (check $type)
           (advance)
-          (error (concat "Parse error line " (num-to-str (cur-line))
-                         ": expected " $type " got " (peek-type) " '" (peek-val) "'"))
+          (error (concat (loc) " SyntaxError: expected '" $type
+                         "' but got '" (peek-type) "'"
+                         (if (> (length (peek-val)) 0)
+                           (concat " (\"" (peek-val) "\")")
+                           "")))
         )
       )
 
@@ -68,7 +80,7 @@
             ("BOOL"   {:kind "literal" :type "boolean" :value (= (get $tok :value) "true") :line $ln})
             ("NULL"   {:kind "literal" :type "null"    :value null :line $ln})
             ("SYMBOL" {:kind "literal" :type "symbol"  :value (get $tok :value) :line $ln})
-            (_ (error (concat "Expected literal, got " (get $tok :type))))
+            (_ (error (concat "[" (num-to-str (get $tok :line)) ":" (num-to-str (get $tok :col)) "] ParseError: unexpected token type '" (get $tok :type) "' in literal position")))
           )
         )
       )
@@ -160,7 +172,7 @@
         (let [[ln (cur-line)]]
           (expect "LPAREN")
           (if (at-end)
-            (error "Unexpected EOF in S-expression")
+            (error (concat (loc) " SyntaxError: unexpected EOF inside S-expression (unclosed parenthesis?)"))
             ; 암묵적 do-블록: ((expr1) (expr2) ...) → :body에서 다중 표현식 감쌈
             (if (check "LPAREN")
               (do
@@ -242,7 +254,7 @@
           (expect "LBRACKET")
           ; 블록 타입 (FUNC, ROUTE, SERVER, MODULE, import, ...)
           (if (not (check "SYMBOL"))
-            (error (concat "Expected block type symbol, got " (peek-type)))
+            (error (concat (loc) " ParseError: expected block type (FUNC/MODULE/...) but got '" (peek-type) "'"))
             (let [[type-tok (advance)]
                   [btype    (get $type-tok :value)]]
 
@@ -289,9 +301,8 @@
           ("KEYWORD"  (parse-keyword))
           ("COLON"    (parse-keyword))
           (_
-            (error (concat "Unexpected token '"
-                           (peek-val) "' (" (peek-type) ")"
-                           " at line " (num-to-str (cur-line))))
+            (error (concat (loc) " SyntaxError: unexpected token '"
+                           (peek-val) "' (type=" (peek-type) ")"))
           )
         )
       )
