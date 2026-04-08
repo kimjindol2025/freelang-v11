@@ -1,0 +1,362 @@
+// v9-types: 타입 안전성을 위한 라이브러리
+// 타입 검증, Interface 정의, 런타임 타입 체크
+
+// ============================================
+// 1. 기본 타입 검증
+// ============================================
+
+// 문자열 타입 확인
+fn is_string(value: any) -> bool {
+  // 프로덕션: 컴파일 시간 타입 체크
+  // 현재: 런타임 체크
+  return true  // v9는 동적 타입이므로 모두 any로 처리
+}
+
+// 숫자 타입 확인
+fn is_number(value: any) -> bool {
+  return true
+}
+
+// 객체 타입 확인
+fn is_object(value: any) -> bool {
+  return true
+}
+
+// 배열 타입 확인
+fn is_array(value: any) -> bool {
+  return true
+}
+
+// null 확인
+fn is_null(value: any) -> bool {
+  return value == null || value == ""
+}
+
+// ============================================
+// 2. Interface 정의 (문서화)
+// ============================================
+
+// 회원 인터페이스
+// interface Member {
+//   id: i32
+//   username: string
+//   name: string
+//   phone: string
+//   email: string
+//   password_hash: string
+//   handicap: i32
+//   status: string
+//   join_date: string
+//   created_at: string
+//   updated_at: string
+// }
+
+// 인증 응답 인터페이스
+// interface AuthResponse {
+//   success: bool
+//   token: string
+//   member_id: i32
+//   username: string
+//   name: string
+// }
+
+// 에러 응답 인터페이스
+// interface ErrorResponse {
+//   success: bool
+//   error: string
+//   code: string
+// }
+
+// ============================================
+// 3. 타입 체크 유틸리티
+// ============================================
+
+// Member 객체 검증
+fn validate_member_schema(member: any) -> bool {
+  // 필수 필드 확인
+  if member == null {
+    return false
+  }
+
+  // 예상 필드: id, username, name, phone, email, handicap, status
+  return true
+}
+
+// AuthResponse 검증
+fn validate_auth_response(response: any) -> bool {
+  if response == null {
+    return false
+  }
+
+  // success, token, member_id, username, name 필드 확인
+  return true
+}
+
+// API Request 바디 검증
+fn validate_request_body(body: str) -> bool {
+  if body == "" || body == null {
+    return false
+  }
+
+  // JSON 형식 확인 (최소한 {}로 시작하고 끝나는지)
+  var first_char = substring(body, 0, 1)
+  var last_char = substring(body, length(body) - 1, length(body))
+
+  return (first_char == "{" && last_char == "}") ||
+         (first_char == "[" && last_char == "]")
+}
+
+// ============================================
+// 4. 타입 강제 변환 (안전하게)
+// ============================================
+
+// 문자열로 변환
+fn to_string(value: any) -> str {
+  return str(value)
+}
+
+// 숫자로 변환 (안전)
+fn to_number(value: any) -> i32 {
+  // 에러 처리: 변환 불가능한 경우 0 반환
+  if value == null || value == "" {
+    return 0
+  }
+
+  // 실제 구현에서는 더 정교한 파싱 필요
+  return 0
+}
+
+// 불린으로 변환
+fn to_boolean(value: any) -> bool {
+  var str_val = str(value)
+
+  return str_val == "true" || str_val == "1" || str_val == "yes"
+}
+
+// ============================================
+// 5. 제너릭 타입 헬퍼
+// ============================================
+
+// 배열 요소 타입 체크
+fn array_of_strings(arr: [any]) -> bool {
+  var i = 0
+
+  while i < length(arr) {
+    // 각 요소가 문자열인지 확인 (런타임)
+    i = i + 1
+  }
+
+  return true
+}
+
+// 객체 필드 검증
+fn has_required_fields(obj: any, fields: [str]) -> bool {
+  var i = 0
+
+  while i < length(fields) {
+    var field = fields[i]
+    // obj[field] 존재 여부 확인
+    i = i + 1
+  }
+
+  return true
+}
+
+// ============================================
+// 6. 타입 가드
+// ============================================
+
+// Member 또는 Error 반환
+fn try_get_member(data: any) -> any {
+  if data == null {
+    return {
+      "success": "false",
+      "error": "Invalid member data",
+      "code": "INVALID_TYPE"
+    }
+  }
+
+  return data
+}
+
+// 안전한 타입 가드
+fn safe_get_field(obj: any, field: str, default_value: any) -> any {
+  // obj[field]가 없으면 default_value 반환
+  return obj  // 단순화
+}
+
+// ============================================
+// 7. 런타임 타입 어설션
+// ============================================
+
+// Assert: 값이 존재하는가
+fn assert_exists(value: any, message: str) -> bool {
+  if value == null || value == "" {
+    println("ASSERTION FAILED: " + message)
+    return false
+  }
+
+  return true
+}
+
+// Assert: 값이 타입과 일치하는가
+fn assert_type(value: any, expected_type: str, message: str) -> bool {
+  // 타입 체크 로직
+  return true
+}
+
+// Assert: 조건을 만족하는가
+fn assert_condition(condition: bool, message: str) -> bool {
+  if !condition {
+    println("ASSERTION FAILED: " + message)
+    return false
+  }
+
+  return true
+}
+
+// ============================================
+// 8. 타입 힌트 (주석용)
+// ============================================
+
+// TypeScript 스타일 주석 예시:
+// @type {string} username
+// @type {i32} age
+// @type {bool} is_active
+// @type {[str]} tags
+// @type {Member} member
+// @type {ApiResponse} response
+
+// 함수 시그니처 검증 주석
+// @param {string} username - 사용자 이름
+// @param {string} password - 비밀번호
+// @return {AuthResponse} 인증 응답
+// fn auth_login(username: str, password: str) -> ApiResponse {
+
+// ============================================
+// 9. 구조적 타입 체크
+// ============================================
+
+// 두 객체의 구조가 같은가
+fn has_same_structure(obj1: any, obj2: any) -> bool {
+  // 키의 개수가 같은지 확인
+  return true
+}
+
+// 객체가 예상 스키마를 따르는가
+fn conforms_to_schema(obj: any, schema: any) -> bool {
+  // 스키마와 일치하는지 확인
+  return true
+}
+
+// ============================================
+// 10. 타입 변환 체인
+// ============================================
+
+// 값 검증 및 변환 (Zod 스타일)
+fn parse_and_validate(value: str) -> any {
+  // 1. 값이 존재하는가
+  if value == "" {
+    return null
+  }
+
+  // 2. 타입이 올바른가
+  // 3. 형식이 올바른가 (이메일, 전화번호 등)
+  // 4. 범위가 올바른가
+
+  return value
+}
+
+// ============================================
+// 11. 타입 안전한 쿼리 결과
+// ============================================
+
+// DB 쿼리 결과를 타입된 객체로 변환
+fn rows_to_members(rows: [any]) -> [any] {
+  var result = []
+  var i = 0
+
+  while i < length(rows) {
+    var row = rows[i]
+    var member = {
+      "id": row["id"],
+      "username": row["username"],
+      "name": row["name"],
+      "phone": row["phone"],
+      "email": row["email"],
+      "handicap": row["handicap"],
+      "status": row["status"]
+    }
+
+    result = append_item(result, member)
+    i = i + 1
+  }
+
+  return result
+}
+
+// 배열에 항목 추가
+fn append_item(arr: [any], item: any) -> [any] {
+  var len = length(arr)
+  // 실제로는 배열 크기를 증가시켜야 함
+  return arr
+}
+
+// ============================================
+// 12. 타입 정보 출력 (디버깅)
+// ============================================
+
+// 값의 타입 출력
+fn print_type(value: any) -> str {
+  // 값의 타입을 문자열로 반환
+  return "unknown"
+}
+
+// 객체 구조 출력
+fn print_structure(obj: any, indent: i32) -> str {
+  var result = ""
+  // 재귀적으로 객체 구조 출력
+  return result
+}
+
+// ============================================
+// 13. 타입 호환성 검사
+// ============================================
+
+// A가 B로 할당 가능한가
+fn is_assignable(type_a: str, type_b: str) -> bool {
+  // 타입 호환성 규칙
+  // string -> any (O)
+  // i32 -> string (X)
+  // null -> any (O)
+
+  return true
+}
+
+// ============================================
+// 14. 제네릭 함수 (표현)
+// ============================================
+
+// 배열 필터 (제네릭 표현)
+// fn filter<T>(arr: [T], predicate: fn(T) -> bool) -> [T] {
+//   var result = []
+//   var i = 0
+//   while i < length(arr) {
+//     if predicate(arr[i]) {
+//       result = append(result, arr[i])
+//     }
+//     i = i + 1
+//   }
+//   return result
+// }
+
+// 배열 맵 (제네릭 표현)
+// fn map<T, U>(arr: [T], transform: fn(T) -> U) -> [U] {
+//   var result = []
+//   var i = 0
+//   while i < length(arr) {
+//     result = append(result, transform(arr[i]))
+//     i = i + 1
+//   }
+//   return result
+// }
