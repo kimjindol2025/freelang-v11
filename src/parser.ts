@@ -136,7 +136,8 @@ export class Parser {
   // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
   // Phase 6: BLOCK_TYPE can be Symbol (old) or keyword token (MODULE, TYPECLASS, INSTANCE)
   private parseBlock(): Block | ModuleBlock | TypeClass | TypeClassInstance {
-    this.expect(T.LBracket);
+    const lbracket = this.expect(T.LBracket);
+    const blockLine = lbracket.line;
     const typeToken = this.advance();
 
     let blockType: string;
@@ -286,23 +287,23 @@ export class Parser {
 
     // Phase 6: If this is a MODULE block, convert it to ModuleBlock
     if (blockType === "MODULE") {
-      const block = makeBlock(blockType, blockName, fields);
+      const block = makeBlock(blockType, blockName, fields, blockLine);
       return this.convertBlockToModuleBlock(block);
     }
 
     // Phase 5: If this is a TYPECLASS block, convert it to TypeClass
     if (blockType === "TYPECLASS") {
-      const block = makeBlock(blockType, blockName, fields);
+      const block = makeBlock(blockType, blockName, fields, blockLine);
       return this.convertBlockToTypeClass(block);
     }
 
     // Phase 5: If this is an INSTANCE block, convert it to TypeClassInstance
     if (blockType === "INSTANCE") {
-      const block = makeBlock(blockType, blockName, fields);
+      const block = makeBlock(blockType, blockName, fields, blockLine);
       return this.convertBlockToInstance(block);
     }
 
-    const block = makeBlock(blockType, blockName, fields);
+    const block = makeBlock(blockType, blockName, fields, blockLine);
     // Phase 3: Always set typeAnnotations (even if empty) for consistent handling
     // FUNC blocks without :return/:params annotations still need to be registered with default types
     if (blockType === "FUNC" || typeAnnotations.size > 0) {

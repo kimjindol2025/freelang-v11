@@ -33,6 +33,7 @@ export interface Block {
   fields: Map<string, ASTNode | ASTNode[]>;
   typeAnnotations?: Map<string, TypeAnnotation>; // :params and :return types (Phase 3)
   generics?: string[]; // Generic type variables: ["T", "K", "V"] (Phase 4)
+  line?: number; // Phase 35: source line for error messages / source maps
 }
 
 // Literal values
@@ -384,8 +385,8 @@ export function makeKeyword(name: string): Keyword {
   return { kind: "keyword", name };
 }
 
-export function makeBlock(type: string, name: string, fields: Map<string, ASTNode | ASTNode[]>): Block {
-  return { kind: "block", type, name, fields };
+export function makeBlock(type: string, name: string, fields: Map<string, ASTNode | ASTNode[]>, line?: number): Block {
+  return { kind: "block", type, name, fields, line };
 }
 
 // Helper: Create type annotation (Phase 3)
