@@ -247,7 +247,7 @@
                      (let [[pair-items (get $pair :items)]]
                        (let [[nm (get $pair-items 0)]
                              [vl (get $pair-items 1)]]
-                         (concat "const " (fl-id-safe (get $nm :value)) " = " (gen-expr $vl) ";")
+                         (concat "const " (fl-id-safe (if (= (get $nm :kind) "variable") (get $nm :name) (get $nm :value))) " = " (gen-expr $vl) ";")
                        )
                      )
                    )]]
