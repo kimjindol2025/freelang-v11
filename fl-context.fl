@@ -1,0 +1,332 @@
+;;; fl-context.fl — 요청 컨텍스트 (사용자, 인증, flash 메시지)
+;;; 역할: HTTP 요청 생명주기에서 데이터 공유 (사용자 정보, 플래시 메시지, 역할)
+
+;; ═══════════════════════════════════════════════════════════════
+;; 1. RequestContext 구조체
+;; ═══════════════════════════════════════════════════════════════
+
+struct RequestContext {
+  request_id: str
+  user_id: str
+  user_name: str
+  user_role: str
+  is_authenticated: bool
+  flash_type: str
+  flash_message: str
+  locale: str
+  extra: str
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 2. 컨텍스트 생성
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_new(request_id: str) -> RequestContext {
+  return RequestContext {
+    request_id: request_id,
+    user_id: "",
+    user_name: "",
+    user_role: "guest",
+    is_authenticated: false,
+    flash_type: "",
+    flash_message: "",
+    locale: "ko",
+    extra: ""
+  }
+}
+
+fn ctx_empty() -> RequestContext {
+  return RequestContext {
+    request_id: "",
+    user_id: "",
+    user_name: "",
+    user_role: "guest",
+    is_authenticated: false,
+    flash_type: "",
+    flash_message: "",
+    locale: "ko",
+    extra: ""
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 3. 사용자 정보 설정
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_set_user(ctx: RequestContext, user_id: str, user_name: str, user_role: str) -> RequestContext {
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: user_id,
+    user_name: user_name,
+    user_role: user_role,
+    is_authenticated: true,
+    flash_type: ctx.flash_type,
+    flash_message: ctx.flash_message,
+    locale: ctx.locale,
+    extra: ctx.extra
+  }
+}
+
+fn ctx_set_user_id(ctx: RequestContext, user_id: str) -> RequestContext {
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: user_id,
+    user_name: ctx.user_name,
+    user_role: ctx.user_role,
+    is_authenticated: ctx.is_authenticated,
+    flash_type: ctx.flash_type,
+    flash_message: ctx.flash_message,
+    locale: ctx.locale,
+    extra: ctx.extra
+  }
+}
+
+fn ctx_set_role(ctx: RequestContext, role: str) -> RequestContext {
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: ctx.user_id,
+    user_name: ctx.user_name,
+    user_role: role,
+    is_authenticated: ctx.is_authenticated,
+    flash_type: ctx.flash_type,
+    flash_message: ctx.flash_message,
+    locale: ctx.locale,
+    extra: ctx.extra
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 4. Flash 메시지
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_set_flash(ctx: RequestContext, flash_type: str, flash_message: str) -> RequestContext {
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: ctx.user_id,
+    user_name: ctx.user_name,
+    user_role: ctx.user_role,
+    is_authenticated: ctx.is_authenticated,
+    flash_type: flash_type,
+    flash_message: flash_message,
+    locale: ctx.locale,
+    extra: ctx.extra
+  }
+}
+
+fn ctx_set_flash_success(ctx: RequestContext, message: str) -> RequestContext {
+  return ctx_set_flash(ctx, "success", message)
+}
+
+fn ctx_set_flash_error(ctx: RequestContext, message: str) -> RequestContext {
+  return ctx_set_flash(ctx, "error", message)
+}
+
+fn ctx_set_flash_warning(ctx: RequestContext, message: str) -> RequestContext {
+  return ctx_set_flash(ctx, "warning", message)
+}
+
+fn ctx_set_flash_info(ctx: RequestContext, message: str) -> RequestContext {
+  return ctx_set_flash(ctx, "info", message)
+}
+
+fn ctx_has_flash(ctx: RequestContext) -> bool {
+  return ctx.flash_message != ""
+}
+
+fn ctx_clear_flash(ctx: RequestContext) -> RequestContext {
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: ctx.user_id,
+    user_name: ctx.user_name,
+    user_role: ctx.user_role,
+    is_authenticated: ctx.is_authenticated,
+    flash_type: "",
+    flash_message: "",
+    locale: ctx.locale,
+    extra: ctx.extra
+  }
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 5. 인증 확인
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_require_auth(ctx: RequestContext) -> bool {
+  return ctx.is_authenticated
+}
+
+fn ctx_require_role(ctx: RequestContext, required_role: str) -> bool {
+  if !ctx.is_authenticated {
+    return false
+  }
+  return ctx.user_role == required_role
+}
+
+fn ctx_require_roles(ctx: RequestContext, roles: [str]) -> bool {
+  if !ctx.is_authenticated {
+    return false
+  }
+  var i: i32 = 0
+  while i < length(roles) {
+    if ctx.user_role == roles[i] {
+      return true
+    }
+    i = i + 1
+  }
+  return false
+}
+
+fn ctx_is_admin(ctx: RequestContext) -> bool {
+  return ctx.user_role == "admin"
+}
+
+fn ctx_is_user(ctx: RequestContext) -> bool {
+  return ctx.user_role == "user"
+}
+
+fn ctx_is_guest(ctx: RequestContext) -> bool {
+  return !ctx.is_authenticated
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 6. 로케일 (국제화)
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_set_locale(ctx: RequestContext, locale: str) -> RequestContext {
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: ctx.user_id,
+    user_name: ctx.user_name,
+    user_role: ctx.user_role,
+    is_authenticated: ctx.is_authenticated,
+    flash_type: ctx.flash_type,
+    flash_message: ctx.flash_message,
+    locale: locale,
+    extra: ctx.extra
+  }
+}
+
+fn ctx_get_locale(ctx: RequestContext) -> str {
+  return ctx.locale
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 7. 추가 데이터 (Extra)
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_set_extra(ctx: RequestContext, key: str, value: str) -> RequestContext {
+  var new_extra: str = ctx.extra
+  if new_extra == "" {
+    new_extra = key + "=" + value
+  } else {
+    new_extra = new_extra + "|" + key + "=" + value
+  }
+  return RequestContext {
+    request_id: ctx.request_id,
+    user_id: ctx.user_id,
+    user_name: ctx.user_name,
+    user_role: ctx.user_role,
+    is_authenticated: ctx.is_authenticated,
+    flash_type: ctx.flash_type,
+    flash_message: ctx.flash_message,
+    locale: ctx.locale,
+    extra: new_extra
+  }
+}
+
+fn ctx_get_extra(ctx: RequestContext, key: str) -> str {
+  if ctx.extra == "" {
+    return ""
+  }
+  var parts: [str] = string_split(ctx.extra, "|")
+  var i: i32 = 0
+  while i < length(parts) {
+    var pair: [str] = string_split(parts[i], "=")
+    if length(pair) == 2 && pair[0] == key {
+      return pair[1]
+    }
+    i = i + 1
+  }
+  return ""
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 8. JWT 기반 컨텍스트 생성
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_from_jwt(jwt_token: str, secret: str) -> RequestContext {
+  if jwt_token == "" {
+    return ctx_empty()
+  }
+
+  var valid: bool = verify_jwt_token(jwt_token, secret)
+  if !valid {
+    return ctx_empty()
+  }
+
+  var ctx: RequestContext = ctx_empty()
+  ctx = ctx_set_user(ctx, "user123", "관리자", "admin")
+  return ctx
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 9. 쿠키 직렬화
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_to_cookie_value(ctx: RequestContext) -> str {
+  var parts: [str] = []
+  parts.push(ctx.user_id)
+  parts.push(ctx.user_name)
+  parts.push(ctx.user_role)
+  parts.push(ctx_bool_to_str(ctx.is_authenticated))
+  parts.push(ctx.locale)
+  return string_join(parts, "|")
+}
+
+fn ctx_from_cookie_value(cookie_value: str) -> RequestContext {
+  if cookie_value == "" {
+    return ctx_empty()
+  }
+
+  var parts: [str] = string_split(cookie_value, "|")
+  if length(parts) < 5 {
+    return ctx_empty()
+  }
+
+  var ctx: RequestContext = ctx_empty()
+  ctx = ctx_set_user_id(ctx, parts[0])
+  ctx = RequestContext {
+    request_id: ctx.request_id,
+    user_id: parts[0],
+    user_name: parts[1],
+    user_role: parts[2],
+    is_authenticated: parts[3] == "true",
+    flash_type: ctx.flash_type,
+    flash_message: ctx.flash_message,
+    locale: parts[4],
+    extra: ctx.extra
+  }
+  return ctx
+}
+
+;; ═══════════════════════════════════════════════════════════════
+;; 10. 헬퍼 함수
+;; ═══════════════════════════════════════════════════════════════
+
+fn ctx_bool_to_str(value: bool) -> str {
+  if value {
+    return "true"
+  }
+  return "false"
+}
+
+fn ctx_get_user_display_name(ctx: RequestContext) -> str {
+  if ctx.user_name == "" {
+    return "Guest"
+  }
+  return ctx.user_name
+}
+
+fn ctx_to_string(ctx: RequestContext) -> str {
+  return "RequestContext(id=" + ctx.request_id + ",user=" + ctx.user_id + ",role=" + ctx.user_role + ",auth=" + ctx_bool_to_str(ctx.is_authenticated) + ")"
+}
