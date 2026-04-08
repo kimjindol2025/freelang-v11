@@ -1,10 +1,11 @@
-; FreeLang v9: Parser (self-hosting)
+; FreeLang v9: Parser (self-hosting) — Phase 34: loop/recur TCO
 ; Token[] → AST
 ;
 ; 핵심 설계:
-;   - mutable `pos`/`line` 를 클로저로 공유 (set! 패턴)
-;   - 모든 parse-* 함수는 parse 내부 define 으로 정의
-;   - 지원: S-expr, Block, Array, Map{}, import/module, bool/null, 라인 추적
+;   - mutable `pos` 를 클로저로 공유 (set! 패턴)
+;   - 누산기 재귀 (read-*, parse-top) → loop/recur TCO
+;   - 구조적 재귀 (parse-value ↔ parse-sexpr/array/map) 은 유지
+;     (표현식 중첩 깊이에 바인딩 → 실용 범위에서 스택 안전)
 
 [FUNC parse :params [$tokens]
   :body (
@@ -106,18 +107,20 @@
           (expect "LBRACE")
           (define pairs {})
           (define read-pairs []
-            (if (or (check "RBRACE") (at-end))
-              pairs
-              (let [[key-tok (if (or (check "KEYWORD") (check "COLON"))
-                               (parse-keyword)
-                               (parse-value))]]
-                (let [[val (parse-value)]]
-                  (set! pairs (assoc pairs
-                    (if (= (get $key-tok :kind) "keyword")
-                      (get $key-tok :name)
-                      (get $key-tok :value))
-                    $val))
-                  (read-pairs)
+            (loop [[$_ 0]]
+              (if (or (check "RBRACE") (at-end))
+                pairs
+                (let [[key-tok (if (or (check "KEYWORD") (check "COLON"))
+                                 (parse-keyword)
+                                 (parse-value))]]
+                  (let [[val (parse-value)]]
+                    (set! pairs (assoc pairs
+                      (if (= (get $key-tok :kind) "keyword")
+                        (get $key-tok :name)
+                        (get $key-tok :value))
+                      $val))
+                    (recur 0)
+                  )
                 )
               )
             )
@@ -135,11 +138,13 @@
           (expect "LBRACKET")
           (define items [])
           (define read-items []
-            (if (or (check "RBRACKET") (at-end))
-              items
-              (do
-                (set! items (append items [(parse-value)]))
-                (read-items)
+            (loop [[$_ 0]]
+              (if (or (check "RBRACKET") (at-end))
+                items
+                (do
+                  (set! items (append items [(parse-value)]))
+                  (recur 0)
+                )
               )
             )
           )
@@ -161,11 +166,13 @@
               (do
                 (define do-exprs [])
                 (define read-do []
-                  (if (or (check "RPAREN") (at-end))
-                    do-exprs
-                    (do
-                      (set! do-exprs (append do-exprs [(parse-value)]))
-                      (read-do)
+                  (loop [[$_ 0]]
+                    (if (or (check "RPAREN") (at-end))
+                      do-exprs
+                      (do
+                        (set! do-exprs (append do-exprs [(parse-value)]))
+                        (recur 0)
+                      )
                     )
                   )
                 )
@@ -180,11 +187,13 @@
               (let [[op-tok (advance)]]
                 (define args [])
                 (define read-args []
-                  (if (or (check "RPAREN") (at-end))
-                    args
-                    (do
-                      (set! args (append args [(parse-value)]))
-                      (read-args)
+                  (loop [[$_ 0]]
+                    (if (or (check "RPAREN") (at-end))
+                      args
+                      (do
+                        (set! args (append args [(parse-value)]))
+                        (recur 0)
+                      )
                     )
                   )
                 )
@@ -205,19 +214,20 @@
       (define parse-fields []
         (define fields {})
         (define read-fields []
-          (if (or (check "RBRACKET") (at-end))
-            fields
-            (if (or (check "KEYWORD") (check "COLON"))
-              (let [[kw (parse-keyword)]
-                    [key (get $kw :name)]]
-                ; 다중값 필드: :params [$a $b] → 배열
-                (let [[val (parse-value)]]
-                  (set! fields (assoc fields $key $val))
-                  (read-fields)
-                )
-              )
-              ; 필드가 아닌 토큰을 만나면 중단
+          (loop [[$_ 0]]
+            (if (or (check "RBRACKET") (at-end))
               fields
+              (if (or (check "KEYWORD") (check "COLON"))
+                (let [[kw (parse-keyword)]
+                      [key (get $kw :name)]]
+                  (let [[val (parse-value)]]
+                    (set! fields (assoc fields $key $val))
+                    (recur 0)
+                  )
+                )
+                ; 필드가 아닌 토큰을 만나면 중단
+                fields
+              )
             )
           )
         )
@@ -286,23 +296,25 @@
         )
       )
 
-      ; ── 최상위 루프 ───────────────────────────────────────
+      ; ── 최상위 루프 (loop/recur TCO) ─────────────────────
 
       (define parse-top []
-        (if (at-end)
-          nodes
-          (do
-            (cond
-              ; 최상위 블록 [TYPE name :key val ...]
-              [(check "LBRACKET")
-                (set! nodes (append nodes [(parse-block)]))
-              ]
-              ; 그 외 모든 값 (S-expr, 리터럴, 변수, 맵, 배열 등)
-              [else
-                (set! nodes (append nodes [(parse-value)]))
-              ]
+        (loop [[$_ 0]]
+          (if (at-end)
+            nodes
+            (do
+              (cond
+                ; 최상위 블록 [TYPE name :key val ...]
+                [(check "LBRACKET")
+                  (set! nodes (append nodes [(parse-block)]))
+                ]
+                ; 그 외 모든 값 (S-expr, 리터럴, 변수, 맵, 배열 등)
+                [else
+                  (set! nodes (append nodes [(parse-value)]))
+                ]
+              )
+              (recur 0)
             )
-            (parse-top)
           )
         )
       )
