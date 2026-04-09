@@ -237,17 +237,26 @@
 
 ; ── let 바인딩 ───────────────────────────────────────────────────
 
+[FUNC gen-let-lhs :params [$nm]
+  :body (
+    (if (= (get $nm :kind) "array")
+      (concat "[" (str-join (gen-params-list (get $nm :items)) ", ") "]")
+      (fl-id-safe (if (= (get $nm :kind) "variable") (get $nm :name) (get $nm :value)))
+    )
+  )
+]
+
 [FUNC gen-let :params [$args]
   :body (
     ; (let [[a expr1] [b expr2]] body...)
-    ; → ((a, b) => body)(expr1, expr2)  또는 IIFE
+    ; (let [[[$a $b] pair]] body...) — 구조 분해
     (let [[bindings (get $args 0)]
           [body-nodes (slice $args 1 (length $args))]]
       (let [[decls (map (get $bindings :items) [pair]
                      (let [[pair-items (get $pair :items)]]
                        (let [[nm (get $pair-items 0)]
                              [vl (get $pair-items 1)]]
-                         (concat "const " (fl-id-safe (if (= (get $nm :kind) "variable") (get $nm :name) (get $nm :value))) " = " (gen-expr $vl) ";")
+                         (concat "const " (gen-let-lhs $nm) " = " (gen-expr $vl) ";")
                        )
                      )
                    )]]
@@ -272,8 +281,12 @@
         (concat (gen-fn (get $fn-node :args))
                 "(" (str-join (map $call-args [a] (gen-expr $a)) ", ") ")")
       )
-      (let [[stmts (gen-body $args)]]
-        (concat "((() => {\n  " $stmts "\n})())")
+      ; 단일 표현식: IIFE 래핑 생략
+      (if (= (length $args) 1)
+        (gen-expr (get $args 0))
+        (let [[stmts (gen-body $args)]]
+          (concat "((() => {\n  " $stmts "\n})())")
+        )
       )
     )
   )
@@ -294,10 +307,7 @@
           (let [[params-node (get $args 1)]
                 [body-args (slice $args 2 (length $args))]]
             (let [[params (if (= (get $params-node :kind) "array")
-                            (map (get $params-node :items) [p]
-                              (fl-id-safe (if (= (get $p :kind) "variable")
-                                             (get $p :name)
-                                             (get $p :value))))
+                            (gen-params-list (get $params-node :items))
                             [])]]
               (concat "let " (fl-id-safe $nm) " = function("
                       (str-join $params ", ") ") {\n  "
@@ -371,13 +381,41 @@
 ; ── 람다 파라미터 헬퍼 ───────────────────────────────────────────
 ; [x] 또는 [acc x] 형태의 배열 노드에서 파라미터 이름 목록 추출
 
+; ── 파라미터 목록 생성 (& $rest → ...rest 지원) ─────────────────
+
+[FUNC gen-params-list-r :params [$items $i $acc]
+  :body (
+    (if (>= $i (length $items))
+      $acc
+      (let [[p (get $items $i)]]
+        (if (and (= (get $p :kind) "literal") (= (get $p :value) "&"))
+          (let [[rest-p (get $items (+ $i 1))]]
+            (let [[rn (fl-id-safe (if (= (get $rest-p :kind) "variable")
+                                   (get $rest-p :name)
+                                   (get $rest-p :value)))]]
+              (gen-params-list-r $items (+ $i 2) (append $acc [(concat "..." $rn)]))
+            )
+          )
+          (let [[pname (fl-id-safe (if (= (get $p :kind) "variable")
+                                     (get $p :name)
+                                     (get $p :value)))]]
+            (gen-params-list-r $items (+ $i 1) (append $acc [$pname]))
+          )
+        )
+      )
+    )
+  )
+]
+
+[FUNC gen-params-list :params [$items]
+  :body (
+    (gen-params-list-r $items 0 [])
+  )
+]
+
 [FUNC extract-params :params [$array-node]
   :body (
-    (map (get $array-node :items) [p]
-      (fl-id-safe (if (= (get $p :kind) "variable")
-                    (get $p :name)
-                    (get $p :value)))
-    )
+    (gen-params-list (get $array-node :items))
   )
 ]
 
@@ -530,10 +568,7 @@
     (let [[params-node (get $args 0)]
           [body-nodes  (slice $args 1 (length $args))]]
       (let [[params (if (= (get $params-node :kind) "array")
-                      (map (get $params-node :items) [p]
-                        (if (= (get $p :kind) "variable")
-                          (fl-id-safe (get $p :name))
-                          (fl-id-safe (get $p :value))))
+                      (gen-params-list (get $params-node :items))
                       [])]]
         (concat "((" (str-join $params ", ") ") => {\n  "
                 (gen-body $body-nodes)
@@ -553,6 +588,7 @@
         ("if"     (gen-if $args))
         ("let"    (gen-let $args))
         ("do"     (gen-do $args))
+        ("begin"  (gen-do $args))
         ("define" (gen-define $args))
         ("set!"   (gen-set $args))
         ("match"  (gen-match $args))
@@ -645,10 +681,7 @@
             [body-node   (get $fields :body)]]
         (let [[params (if (and (not (null? $params-node))
                                (= (get $params-node :kind) "array"))
-                        (map (get $params-node :items) [p]
-                          (if (= (get $p :kind) "variable")
-                            (fl-id-safe (get $p :name))
-                            (fl-id-safe (get $p :value))))
+                        (gen-params-list (get $params-node :items))
                         [])]]
           (let [[body-nodes (if (null? $body-node)
                                []
@@ -712,30 +745,48 @@
   )
 ]
 
+; ── 소스맵 주석 헬퍼 ─────────────────────────────────────────────
+; 생성된 JS 각 최상위 노드 앞에 // @fl:N 주석 삽입
+
+[FUNC fl-loc :params [$node]
+  :body (
+    (let [[ln (get $node :line)]]
+      (if (null? $ln)
+        ""
+        (concat "// @fl:" (num-to-str $ln) "\n")
+      )
+    )
+  )
+]
+
 ; ── 최상위 노드 생성 ─────────────────────────────────────────────
 
 [FUNC gen-top-node :params [$node]
   :body (
-    (match (get $node :kind)
-      ("block"
-        (match (get $node :type)
-          ("FUNC" (gen-func-block $node))
-          (_      (concat "/* unsupported block: " (get $node :type) " */\n"))
+    (let [[loc (fl-loc $node)]]
+      (concat $loc
+        (match (get $node :kind)
+          ("block"
+            (match (get $node :type)
+              ("FUNC" (gen-func-block $node))
+              (_      (concat "/* unsupported block: " (get $node :type) " */\n"))
+            )
+          )
+          ("sexpr"
+            (match (get $node :op)
+              ("export" (gen-export (get $node :args)))
+              ("import" (gen-import (get $node :args)))
+              ("define" (concat (gen-define (get $node :args)) "\n"))
+              (_        (concat (gen-sexpr $node) ";\n"))
+            )
+          )
+          ("literal"     (concat (gen-literal $node) ";\n"))
+          ("variable"    (concat (gen-variable $node) ";\n"))
+          ("array"       (concat (gen-array $node) ";\n"))
+          ("map-literal" (concat (gen-map $node) ";\n"))
+          (_ (concat "/* unknown node kind: " (get $node :kind) " */\n"))
         )
       )
-      ("sexpr"
-        (match (get $node :op)
-          ("export" (gen-export (get $node :args)))
-          ("import" (gen-import (get $node :args)))
-          ("define" (concat (gen-define (get $node :args)) "\n"))
-          (_        (concat (gen-sexpr $node) ";\n"))
-        )
-      )
-      ("literal"     (concat (gen-literal $node) ";\n"))
-      ("variable"    (concat (gen-variable $node) ";\n"))
-      ("array"       (concat (gen-array $node) ";\n"))
-      ("map-literal" (concat (gen-map $node) ";\n"))
-      (_ (concat "/* unknown node kind: " (get $node :kind) " */\n"))
     )
   )
 ]
