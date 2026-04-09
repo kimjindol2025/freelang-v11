@@ -1,569 +1,410 @@
-;; ============================================================
-;; Phase 8-3: FreeLang Interpreter (AST → 값)
-;; 목표: TypeScript interpreter.ts (2,106줄) → FreeLang (600-800줄)
-;; 아키텍처: 5단계 (eval, 제어흐름, 함수호출, 패턴매칭, 고급기능)
-;; ============================================================
+; FreeLang v9 Self-Hosting Interpreter — Phase 45
+; AST → 값 평가
+; 환경: {:vars [["name" val]...] :parent env|null}
+; 맵 리터럴은 let 바인딩 값으로만 사용 (S-expression 연산자 위치 불가)
 
-;; ============================================================
-;; STEP 1: 기본 평가 엔진 (150줄)
-;; 리터럴, 변수, 기본 S-expression 평가
-;; ============================================================
+; ── 환경 관리 ─────────────────────────────────────────────────
 
-;; 환경 생성 (스코프 체인)
-(define make-env [vars parent]
-  {:vars vars :parent parent :functions {} :modules {}})
+[FUNC env-new :params []
+  :body (
+    (let [[$e {:vars [] :parent null}]]
+      $e
+    )
+  )
+]
 
-(define empty-env []
-  (make-env {} null))
+[FUNC env-child :params [$parent]
+  :body (
+    (let [[$e {:vars [] :parent $parent}]]
+      $e
+    )
+  )
+]
 
-;; 환경에서 변수 조회 (재귀적 탐색)
-(define lookup-var [name env]
-  (if (null? env)
-    null
-    (if (contains? env.vars name)
-      (get env.vars name)
-      (lookup-var name env.parent))))
+; vars 배열에서 이름 탐색
+[FUNC env-find :params [$vars $name $i]
+  :body (
+    (if (>= $i (length $vars))
+      "__not_found__"
+      (let [[$pair (get $vars $i)]]
+        (if (= (get $pair 0) $name)
+          (get $pair 1)
+          (env-find $vars $name (+ $i 1))
+        )
+      )
+    )
+  )
+]
 
-;; 환경에 변수 추가
-(define extend-env [name value env]
-  (make-env
-    (assoc env.vars name value)
-    env.parent))
-
-;; 기본 평가 함수
-(define eval-literal [node]
-  node.value)
-
-(define eval-variable [node env]
-  (lookup-var node.name env))
-
-;; S-expression 디스패처
-(define eval-sexpr [node env]
-  (let [op node.op
-        args node.args]
-    (cond
-      [(= op "+") (reduce (first args) (rest args) (fn [acc x] (+ acc (eval x env))))]
-      [(= op "-") (- (eval (first args) env) (reduce 0 (rest args) (fn [a x] (+ a (eval x env)))))]
-      [(= op "*") (reduce 1 (map (fn [x] (eval x env)) args) (fn [a b] (* a b)))]
-      [(= op "/") (/ (eval (first args) env) (reduce 1 (map (fn [x] (eval x env)) (rest args)) (fn [a b] (* a b))))]
-      [(= op "=") (= (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "<") (< (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op ">") (> (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "<=") (<= (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op ">=") (>= (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "!=") (!= (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "and") (and (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "or") (or (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "not") (not (eval (first args) env))]
-      [else (eval-builtin op args env)])))
-
-;; 내장 함수
-(define eval-builtin [op args env]
-  (let [evaled-args (map (fn [x] (eval x env)) args)]
-    (cond
-      [(= op "list") evaled-args]
-      [(= op "first") (first (nth evaled-args 0))]
-      [(= op "rest") (rest (nth evaled-args 0))]
-      [(= op "length") (length (nth evaled-args 0))]
-      [(= op "append") (append (nth evaled-args 0) (nth evaled-args 1))]
-      [(= op "concat") (concat (nth evaled-args 0) (nth evaled-args 1))]
-      [(= op "upper") (upper (nth evaled-args 0))]
-      [(= op "lower") (lower (nth evaled-args 0))]
-      [else null])))
-
-;; 메인 eval 함수
-(define eval [node env]
-  (cond
-    [(null? node) null]
-    [(= node.kind "literal") (eval-literal node)]
-    [(= node.kind "variable") (eval-variable node env)]
-    [(= node.kind "sexpr") (eval-sexpr node env)]
-    [else null]))
-
-;; ============================================================
-;; STEP 2: 제어 흐름 (100줄)
-;; if, cond, let, define 처리
-;; ============================================================
-
-;; if 처리
-(define eval-if [node env]
-  (let [condition (eval node.condition env)
-        then-branch (eval node.then-branch env)
-        else-branch (eval (get node "else-branch" null) env)]
-    (if condition then-branch else-branch)))
-
-;; cond 처리 (다중 조건)
-(define eval-cond [node env]
-  (let [cases node.cases
-        result (first (filter
-          (fn [c] (eval (nth c 0) env))
-          cases))]
-    (if (null? result)
+[FUNC env-lookup :params [$env $name]
+  :body (
+    (if (null? $env)
       null
-      (eval (nth result 1) env))))
+      (let [[$r (env-find (get $env :vars) $name 0)]]
+        (if (= $r "__not_found__")
+          (env-lookup (get $env :parent) $name)
+          $r
+        )
+      )
+    )
+  )
+]
 
-;; let 처리 (지역 변수)
-(define eval-let [node env]
-  (let [bindings node.bindings
-        new-env (extend-let-bindings bindings env)]
-    (eval node.body new-env)))
+; 환경에 바인딩 추가
+[FUNC env-bind :params [$env $name $val]
+  :body (
+    (let [[$new-vars (append [[$name $val]] (get $env :vars))]
+          [$e {:vars $new-vars :parent (get $env :parent)}]]
+      $e
+    )
+  )
+]
 
-(define extend-let-bindings [bindings env]
-  (if (empty? bindings)
-    env
-    (let [binding (first bindings)
-          name (nth binding 0)
-          value (eval (nth binding 1) env)
-          new-env (extend-env name value env)]
-      (extend-let-bindings (rest bindings) new-env))))
+; 이름 목록 + 값 목록을 환경에 등록
+[FUNC env-bind-all :params [$env $names $vals $i]
+  :body (
+    (if (>= $i (length $names))
+      $env
+      (env-bind-all
+        (env-bind $env (get $names $i) (get $vals $i))
+        $names $vals (+ $i 1)
+      )
+    )
+  )
+]
 
-;; define 처리 (함수/변수 정의)
-(define eval-define [node env]
-  (let [name node.name
-        value (eval node.value env)
-        new-env (extend-env name value env)]
-    new-env))
+; ── 클로저 ────────────────────────────────────────────────────
 
-;; 제어 흐름을 eval에 통합
-(define eval [node env]
-  (cond
-    [(null? node) null]
-    [(= node.kind "literal") (eval-literal node)]
-    [(= node.kind "variable") (eval-variable node env)]
-    [(= node.kind "sexpr") (eval-sexpr node env)]
-    [(= node.kind "if") (eval-if node env)]
-    [(= node.kind "cond") (eval-cond node env)]
-    [(= node.kind "let") (eval-let node env)]
-    [(= node.kind "define") (eval-define node env)]
-    [else null]))
+[FUNC make-closure :params [$params $body $cenv]
+  :body (
+    (let [[$c {:kind "closure" :params $params :body $body :closure-env $cenv}]]
+      $c
+    )
+  )
+]
 
-;; ============================================================
-;; STEP 3: 함수 호출 (200줄)
-;; 사용자 정의 함수, 함수값(클로저), 고차 함수
-;; ============================================================
+[FUNC closure? :params [$v]
+  :body (
+    (and
+      (not (null? $v))
+      (= (get $v :kind) "closure")
+    )
+  )
+]
 
-;; 함수값 생성 (클로저)
-(define make-function-value [params body env]
-  {:kind "function-value"
-   :params params
-   :body body
-   :captured-env env})
+; ── 파라미터 이름 추출 ────────────────────────────────────────
 
-;; 함수 호출 전용 환경 생성
-(define bind-params [params values env]
-  (if (empty? params)
-    env
-    (let [param (first params)
-          value (first values)]
-      (bind-params
-        (rest params)
-        (rest values)
-        (extend-env param value env)))))
+[FUNC param-name :params [$p]
+  :body (
+    (if (= (get $p :kind) "variable")
+      (get $p :name)
+      (get $p :value)
+    )
+  )
+]
 
-;; 사용자 함수 호출
-(define call-user-function [func-name params body args env]
-  (let [evaled-args (map (fn [x] (eval x env)) args)
-        new-env (bind-params params evaled-args env)]
-    (eval body new-env)))
+[FUNC extract-params :params [$items $i $acc]
+  :body (
+    (if (>= $i (length $items))
+      $acc
+      (let [[$p (get $items $i)]]
+        (if (and (= (get $p :kind) "literal") (= (get $p :value) "&"))
+          $acc
+          (extract-params $items (+ $i 1) (append $acc [(param-name $p)]))
+        )
+      )
+    )
+  )
+]
 
-;; 함수값 호출 (캡처된 환경 사용)
-(define call-function-value [fn-value args env]
-  (if (= fn-value.kind "function-value")
-    (let [params fn-value.params
-          body fn-value.body
-          captured-env fn-value.captured-env
-          evaled-args (map (fn [x] (eval x env)) args)
-          new-env (bind-params params evaled-args captured-env)]
-      (eval body new-env))
-    null))
+[FUNC get-param-names :params [$params-node]
+  :body (
+    (extract-params (get $params-node :items) 0 [])
+  )
+]
 
-;; fn 형식 처리
-(define eval-fn [node env]
-  (make-function-value node.params node.body env))
+; ── 메인 평가기 ───────────────────────────────────────────────
 
-;; S-expr에서 함수 호출 감지
-(define eval-sexpr [node env]
-  (let [op node.op
-        args node.args]
-    (cond
-      ;; 산술 연산
-      [(= op "+") (reduce 0 (map (fn [x] (eval x env)) args) +)]
-      [(= op "-") (if (empty? args) 0 (- (eval (first args) env) (reduce 0 (map (fn [x] (eval x env)) (rest args)) +)))]
-      [(= op "*") (reduce 1 (map (fn [x] (eval x env)) args) *)]
-      [(= op "/") (if (empty? args) 1 (/ (eval (first args) env) (reduce 1 (map (fn [x] (eval x env)) (rest args)) *)))]
-      ;; 비교
-      [(= op "=") (= (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op "<") (< (eval (nth args 0) env) (eval (nth args 1) env))]
-      [(= op ">") (> (eval (nth args 0) env) (eval (nth args 1) env))]
-      ;; 람다 정의
-      [(= op "fn") (eval-fn (nth args 0) env)]
-      ;; 함수값 호출
-      [(and (= op "call") (> (length args) 0))
-        (let [fn-node (first args)
-              fn-value (eval fn-node env)
-              fn-args (rest args)]
-          (call-function-value fn-value fn-args env))]
-      ;; 기타 내장 함수
-      [else (eval-builtin op args env)])))
-
-;; ============================================================
-;; STEP 4: 패턴 매칭 (180줄)
-;; 리터럴, 변수, 리스트, 구조체, or-패턴
-;; ============================================================
-
-;; 패턴 매칭 결과 구조
-(define match-result [matched bindings]
-  {:matched matched :bindings bindings})
-
-;; 패턴 매칭 메인 함수
-(define match-pattern [pattern value bindings]
-  (cond
-    ;; 와일드카드 (_)
-    [(= pattern.kind "wildcard-pattern")
-      (match-result true bindings)]
-
-    ;; 리터럴 패턴
-    [(= pattern.kind "literal-pattern")
-      (if (= pattern.value value)
-        (match-result true bindings)
-        (match-result false bindings))]
-
-    ;; 변수 패턴 (바인딩)
-    [(= pattern.kind "variable-pattern")
-      (let [new-bindings (assoc bindings pattern.name value)]
-        (match-result true new-bindings))]
-
-    ;; 리스트 패턴
-    [(= pattern.kind "list-pattern")
-      (match-list-pattern pattern value bindings)]
-
-    ;; or-패턴
-    [(= pattern.kind "or-pattern")
-      (match-or-pattern pattern value bindings)]
-
-    [else (match-result false bindings)]))
-
-;; 리스트 패턴 매칭
-(define match-list-pattern [pattern value bindings]
-  (if (not (array? value))
-    (match-result false bindings)
-    (let [elements pattern.elements
-          len (length elements)
-          val-len (length value)]
-      (if (< val-len len)
-        (match-result false bindings)
-        (match-list-elements elements value 0 bindings)))))
-
-(define match-list-elements [patterns value index bindings]
-  (if (empty? patterns)
-    (match-result true bindings)
-    (let [pattern (first patterns)
-          val-item (nth value index)
-          result (match-pattern pattern val-item bindings)]
-      (if result.matched
-        (match-list-elements (rest patterns) value (+ index 1) result.bindings)
-        (match-result false bindings)))))
-
-;; or-패턴 매칭 (첫 번째 매칭 선택)
-(define match-or-pattern [pattern value bindings]
-  (let [alternatives pattern.alternatives
-        result (match-alternatives alternatives value bindings)]
-    result))
-
-(define match-alternatives [alternatives value bindings]
-  (if (empty? alternatives)
-    (match-result false bindings)
-    (let [alt (first alternatives)
-          result (match-pattern alt value bindings)]
-      (if result.matched
-        result
-        (match-alternatives (rest alternatives) value bindings)))))
-
-;; 패턴 매칭 형식 처리
-(define eval-pattern-match [node env]
-  (let [value (eval node.value env)
-        cases node.cases
-        matched-case (find-matched-case cases value env)]
-    (if (null? matched-case)
+[FUNC fl-eval :params [$node $env]
+  :body (
+    (if (null? $node)
       null
-      (eval matched-case.body (extend-match-bindings matched-case.bindings env)))))
+      (let [[$k (get $node :kind)]]
+        (if (= $k "literal")
+          (get $node :value)
+          (if (= $k "variable")
+            (env-lookup $env (get $node :name))
+            (if (= $k "array")
+              (fl-eval-array (get $node :items) $env 0 [])
+              (if (= $k "sexpr")
+                (fl-eval-sexpr (get $node :op) (get $node :args) $env)
+                (if (= $k "block")
+                  (fl-eval-block $node $env)
+                  null
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+]
 
-(define find-matched-case [cases value env]
-  (if (empty? cases)
+; 배열 아이템 평가
+[FUNC fl-eval-array :params [$items $env $i $acc]
+  :body (
+    (if (>= $i (length $items))
+      $acc
+      (fl-eval-array
+        $items $env (+ $i 1)
+        (append $acc [(fl-eval (get $items $i) $env)])
+      )
+    )
+  )
+]
+
+; FUNC 블록 → 클로저
+[FUNC fl-eval-block :params [$node $env]
+  :body (
+    (if (= (get $node :type) "FUNC")
+      (let [[$fields (get $node :fields)]
+            [$names (get-param-names (get $fields :params))]]
+        (make-closure $names [(get $fields :body)] $env)
+      )
+      null
+    )
+  )
+]
+
+; ── S-expression 평가 ─────────────────────────────────────────
+
+[FUNC fl-eval-sexpr :params [$op $args $env]
+  :body (
+    (if (= $op "if")      (fl-eval-if $args $env)
+    (if (= $op "let")     (fl-eval-let $args $env)
+    (if (= $op "do")      (fl-eval-body $args $env)
+    (if (= $op "begin")   (fl-eval-body $args $env)
+    (if (= $op "fn")      (fl-eval-fn $args $env)
+    (if (= $op "and")     (fl-eval-and $args $env)
+    (if (= $op "or")      (fl-eval-or $args $env)
+    (if (= $op "not")     (not (fl-eval (get $args 0) $env))
+    (if (= $op "null?")   (null? (fl-eval (get $args 0) $env))
+    (if (or (= $op "export") (or (= $op "define") (= $op "set!")))
+      null
+      (fl-eval-call $op $args $env)
+    ))))))))))
+  )
+]
+
+[FUNC fl-eval-if :params [$args $env]
+  :body (
+    (if (fl-eval (get $args 0) $env)
+      (fl-eval (get $args 1) $env)
+      (if (>= (length $args) 3)
+        (fl-eval (get $args 2) $env)
+        null
+      )
+    )
+  )
+]
+
+[FUNC fl-eval-and :params [$args $env]
+  :body (
+    (if (= (length $args) 0)
+      true
+      (if (fl-eval (get $args 0) $env)
+        (fl-eval-and (slice $args 1 (length $args)) $env)
+        false
+      )
+    )
+  )
+]
+
+[FUNC fl-eval-or :params [$args $env]
+  :body (
+    (if (= (length $args) 0)
+      false
+      (if (fl-eval (get $args 0) $env)
+        true
+        (fl-eval-or (slice $args 1 (length $args)) $env)
+      )
+    )
+  )
+]
+
+; let [[$a expr] [$b expr]] body...
+[FUNC fl-eval-let-bindings :params [$items $env $i]
+  :body (
+    (if (>= $i (length $items))
+      $env
+      (let [[$pair (get $items $i)]
+            [$pair-items (get $pair :items)]
+            [$name-node (get $pair-items 0)]
+            [$val (fl-eval (get $pair-items 1) $env)]
+            [$nm (if (= (get $name-node :kind) "variable")
+                   (get $name-node :name)
+                   (get $name-node :value))]]
+        (fl-eval-let-bindings $items (env-bind $env $nm $val) (+ $i 1))
+      )
+    )
+  )
+]
+
+[FUNC fl-eval-let :params [$args $env]
+  :body (
+    (let [[$bindings (get (get $args 0) :items)]
+          [$new-env (fl-eval-let-bindings $bindings $env 0)]]
+      (fl-eval-body (slice $args 1 (length $args)) $new-env)
+    )
+  )
+]
+
+; fn 익명 함수
+[FUNC fl-eval-fn :params [$args $env]
+  :body (
+    (let [[$names (get-param-names (get $args 0))]
+          [$body (slice $args 1 (length $args))]]
+      (make-closure $names $body $env)
+    )
+  )
+]
+
+; 순차 실행, 마지막 값 반환
+[FUNC fl-eval-body :params [$nodes $env]
+  :body (
+    (if (= (length $nodes) 0)
+      null
+      (if (= (length $nodes) 1)
+        (fl-eval (get $nodes 0) $env)
+        (do
+          (fl-eval (get $nodes 0) $env)
+          (fl-eval-body (slice $nodes 1 (length $nodes)) $env)
+        )
+      )
+    )
+  )
+]
+
+; ── 함수 호출 ─────────────────────────────────────────────────
+
+[FUNC fl-eval-args :params [$args $env $i $acc]
+  :body (
+    (if (>= $i (length $args))
+      $acc
+      (fl-eval-args $args $env (+ $i 1)
+        (append $acc [(fl-eval (get $args $i) $env)])
+      )
+    )
+  )
+]
+
+[FUNC fl-apply :params [$fn $vals $env]
+  :body (
+    (if (closure? $fn)
+      (let [[$call-env (env-bind-all
+                         (env-child $env)
+                         (get $fn :params)
+                         $vals 0)]]
+        (fl-eval-body (get $fn :body) $call-env)
+      )
+      null
+    )
+  )
+]
+
+[FUNC fl-eval-call :params [$op $args $env]
+  :body (
+    (let [[$vals (fl-eval-args $args $env 0 [])]
+          [$fn (env-lookup $env $op)]]
+      (if (closure? $fn)
+        (fl-apply $fn $vals $env)
+        (fl-eval-builtin $op $vals)
+      )
+    )
+  )
+]
+
+; ── 내장 함수 ─────────────────────────────────────────────────
+
+[FUNC fl-eval-builtin :params [$op $vals]
+  :body (
+    (if (= $op "+")   (+ (get $vals 0) (get $vals 1))
+    (if (= $op "-")   (- (get $vals 0) (get $vals 1))
+    (if (= $op "*")   (* (get $vals 0) (get $vals 1))
+    (if (= $op "/")   (/ (get $vals 0) (get $vals 1))
+    (if (= $op "%")   (% (get $vals 0) (get $vals 1))
+    (if (= $op "=")   (= (get $vals 0) (get $vals 1))
+    (if (= $op "!=")  (!= (get $vals 0) (get $vals 1))
+    (if (= $op "<")   (< (get $vals 0) (get $vals 1))
+    (if (= $op ">")   (> (get $vals 0) (get $vals 1))
+    (if (= $op "<=")  (<= (get $vals 0) (get $vals 1))
+    (if (= $op ">=")  (>= (get $vals 0) (get $vals 1))
+    (if (= $op "concat")     (fl-concat $vals 0 "")
+    (if (= $op "length")     (length (get $vals 0))
+    (if (= $op "get")        (get (get $vals 0) (get $vals 1))
+    (if (= $op "append")     (append (get $vals 0) (get $vals 1))
+    (if (= $op "slice")      (slice (get $vals 0) (get $vals 1) (get $vals 2))
+    (if (= $op "num-to-str") (num-to-str (get $vals 0))
+    (if (= $op "str-to-num") (str-to-num (get $vals 0))
+    (if (= $op "replace")    (replace (get $vals 0) (get $vals 1) (get $vals 2))
+    (if (= $op "str-join")   (str-join (get $vals 0) (get $vals 1))
+    (if (= $op "null?")      (null? (get $vals 0))
     null
-    (let [case-item (first cases)
-          pattern case-item.pattern
-          result (match-pattern pattern value {})]
-      (if result.matched
-        {:pattern pattern :body case-item.body :bindings result.bindings}
-        (find-matched-case (rest cases) value env)))))
+    )))))))))))))))))))))
+  )
+]
 
-(define extend-match-bindings [bindings env]
-  (if (empty? bindings)
-    env
-    (let [binding-entry (first (object-entries bindings))]
-      (extend-match-bindings
-        (rest bindings)
-        (extend-env (nth binding-entry 0) (nth binding-entry 1) env)))))
+[FUNC fl-concat :params [$vals $i $acc]
+  :body (
+    (if (>= $i (length $vals))
+      $acc
+      (fl-concat $vals (+ $i 1) (concat $acc (get $vals $i)))
+    )
+  )
+]
 
-;; eval에 패턴 매칭 추가
-(define eval [node env]
-  (cond
-    [(null? node) null]
-    [(= node.kind "literal") (eval-literal node)]
-    [(= node.kind "variable") (eval-variable node env)]
-    [(= node.kind "sexpr") (eval-sexpr node env)]
-    [(= node.kind "if") (eval-if node env)]
-    [(= node.kind "cond") (eval-cond node env)]
-    [(= node.kind "let") (eval-let node env)]
-    [(= node.kind "define") (eval-define node env)]
-    [(= node.kind "pattern-match") (eval-pattern-match node env)]
-    [else null]))
+; ── 프로그램 해석 ─────────────────────────────────────────────
 
-;; ============================================================
-;; STEP 5: 고급 기능 (200줄)
-;; 타입 클래스, 모듈, 모나드
-;; ============================================================
+; FUNC 블록들을 환경에 미리 등록 (상호 재귀 지원)
+[FUNC fl-load-funcs :params [$nodes $env $i]
+  :body (
+    (if (>= $i (length $nodes))
+      $env
+      (let [[$node (get $nodes $i)]]
+        (if (and (= (get $node :kind) "block") (= (get $node :type) "FUNC"))
+          (let [[$fn (fl-eval-block $node $env)]]
+            (fl-load-funcs $nodes (env-bind $env (get $node :name) $fn) (+ $i 1))
+          )
+          (fl-load-funcs $nodes $env (+ $i 1))
+        )
+      )
+    )
+  )
+]
 
-;; 모나드 bind 연산
-(define bind-monad [monad fn env]
-  (let [kind monad.kind]
-    (cond
-      ;; Result 모나드
-      [(= kind "Result")
-        (if (= monad.tag "Ok")
-          (let [value (eval (fn [monad.value]) env)]
-            value)
-          monad)]
+; 비-FUNC 노드들 실행
+[FUNC fl-run-nodes :params [$nodes $env $i $last]
+  :body (
+    (if (>= $i (length $nodes))
+      $last
+      (let [[$node (get $nodes $i)]]
+        (if (= (get $node :kind) "block")
+          (fl-run-nodes $nodes $env (+ $i 1) $last)
+          (fl-run-nodes $nodes $env (+ $i 1) (fl-eval $node $env))
+        )
+      )
+    )
+  )
+]
 
-      ;; Option 모나드
-      [(= kind "Option")
-        (if (= monad.tag "Some")
-          (let [value (eval (fn [monad.value]) env)]
-            value)
-          monad)]
+; 메인 진입점: AST 배열 → 마지막 평가값
+[FUNC interpret :params [$ast]
+  :body (
+    (let [[$env (fl-load-funcs $ast (env-new) 0)]]
+      (fl-run-nodes $ast $env 0 null)
+    )
+  )
+]
 
-      ;; Either 모나드
-      [(= kind "Either")
-        (if (= monad.tag "Right")
-          (let [value (eval (fn [monad.value]) env)]
-            value)
-          monad)]
-
-      ;; List 모나드 (flatMap)
-      [(array? monad)
-        (let [results (map (fn [x] (eval (fn [x]) env)) monad)]
-          (reduce [] results (fn [acc r] (concat acc (if (array? r) r [r])))))]
-
-      [else monad])))
-
-;; 타입 클래스 메서드 디스패치
-(define typeclass-dispatch [class-name method-name args env]
-  (let [full-name (concat class-name ":" method-name)]
-    ;; 타입 클래스 메서드 조회 및 호출
-    null))
-
-;; 모듈 처리
-(define eval-module [node env]
-  (let [name node.name
-        exports node.exports
-        body node.body
-        module-env (interpret body env)]
-    (assoc env.modules name {:exports exports :env module-env})))
-
-;; import 처리
-(define eval-import [node env]
-  (let [module-name node.module-name
-        names node.names
-        module (get env.modules module-name)]
-    (if (null? module)
-      env
-      (import-names names module env))))
-
-(define import-names [names module env]
-  (if (empty? names)
-    env
-    (let [name (first names)
-          func (get module.env.functions name)
-          new-env (assoc env.functions name func)]
-      (import-names (rest names) module new-env))))
-
-;; Pipe 연산자 (좌→우)
-(define pipe [value functions]
-  (if (empty? functions)
-    value
-    (let [fn (first functions)
-          result (call-function-value fn [value] {})]
-      (pipe result (rest functions)))))
-
-;; Compose 연산자 (우→좌)
-(define compose [functions value]
-  (if (empty? functions)
-    value
-    (let [fn (last functions)
-          result (call-function-value fn [value] {})
-          remaining (reverse (rest (reverse functions)))]
-      (compose remaining result))))
-
-;; ============================================================
-;; ASYNC/PROMISE 처리
-;; ============================================================
-
-;; Promise 생성
-(define make-promise [executor]
-  {:kind "promise"
-   :state "pending"
-   :value null
-   :reason null
-   :handlers []})
-
-;; Promise then/catch/finally
-(define promise-then [promise on-fulfilled on-rejected]
-  {:kind "promise"
-   :state promise.state
-   :value (if (= promise.state "fulfilled") (call on-fulfilled promise.value) null)
-   :reason promise.reason
-   :handlers []})
-
-;; Async 함수 처리
-(define eval-async [node env]
-  (make-promise (fn [resolve reject]
-    (let [result (eval node.body env)]
-      (resolve result)))))
-
-;; ============================================================
-;; 내장 함수 확장
-;; ============================================================
-
-;; 배열 연산
-(define array-length [arr]
-  (length arr))
-
-(define array-map [arr fn]
-  (map arr fn))
-
-(define array-filter [arr predicate]
-  (filter arr predicate))
-
-(define array-reduce [arr init fn]
-  (reduce init arr fn))
-
-;; 객체/맵 연산
-(define object-keys [obj]
-  (keys obj))
-
-(define object-values [obj]
-  (values obj))
-
-(define object-entries [obj]
-  (entries obj))
-
-(define object-has [obj key]
-  (contains? obj key))
-
-(define object-get [obj key default]
-  (get obj key default))
-
-(define object-set [obj key value]
-  (assoc obj key value))
-
-;; 타입 체크
-(define is-array [val]
-  (array? val))
-
-(define is-object [val]
-  (object? val))
-
-(define is-string [val]
-  (string? val))
-
-(define is-number [val]
-  (number? val))
-
-(define is-boolean [val]
-  (boolean? val))
-
-(define is-null [val]
-  (null? val))
-
-(define is-function [val]
-  (= val.kind "function-value"))
-
-;; ============================================================
-;; 재귀 헬퍼 함수
-;; ============================================================
-
-;; 깊은 복사
-(define deep-copy [obj]
-  (cond
-    [(array? obj) (map obj (fn [x] (deep-copy x)))]
-    [(object? obj) (reduce {} (object-entries obj)
-                    (fn [acc entry]
-                      (assoc acc (nth entry 0) (deep-copy (nth entry 1)))))]
-    [else obj]))
-
-;; 깊은 동등성 검사
-(define deep-equal [a b]
-  (cond
-    [(and (array? a) (array? b))
-      (and (= (length a) (length b))
-        (every (map (range (length a))
-                (fn [i] (deep-equal (nth a i) (nth b i)))) (fn [x] x)))]
-    [(and (object? a) (object? b))
-      (and (= (length (object-keys a)) (length (object-keys b)))
-        (every (map (object-keys a)
-                (fn [k] (deep-equal (get a k) (get b k)))) (fn [x] x)))]
-    [else (= a b)]))
-
-;; 범위 생성
-(define range [n]
-  (if (<= n 0)
-    []
-    (concat [(- n 1)] (range (- n 1)))))
-
-;; ============================================================
-;; 최상위 진입점
-;; ============================================================
-
-;; 환경으로부터 값 추출
-(define get-value [name env]
-  (lookup-var name env))
-
-;; 모든 정의된 함수 획득
-(define get-all-functions [env]
-  env.functions)
-
-;; 모든 변수 획득
-(define get-all-variables [env]
-  env.vars)
-
-;; 최상위 해석기
-(define interpret [ast]
-  (let [env (empty-env)]
-    (let [result (reduce null ast (fn [acc node]
-                                    (eval node env)))]
-      {:result result :environment env})))
-
-;; 메모이제이션 헬퍼
-(define memoize [fn]
-  (let [cache {}]
-    (fn [x]
-      (if (contains? cache x)
-        (get cache x)
-        (let [result (call fn [x])]
-          (do (assoc cache x result)
-            result))))))
-
-;; ============================================================
-;; 내보내기
-;; ============================================================
-
-(export interpret)
-(export eval)
-(export match-pattern)
-(export bind-monad)
-(export eval-async)
-(export call-function-value)
-(export make-function-value)
-(export extend-env)
-(export lookup-var)
+(export interpret fl-eval fl-apply env-new env-bind env-lookup make-closure)

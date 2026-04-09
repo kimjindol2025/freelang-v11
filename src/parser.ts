@@ -628,7 +628,7 @@ export class Parser {
     if (peekPos >= this.tokens.length) return false;
     const nextToken = this.tokens[peekPos];
     // If next token is a variable or non-symbol value, it's an array literal
-    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket;
+    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket || nextToken.type === T.LBracket;
   }
 
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
