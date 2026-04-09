@@ -1,0 +1,608 @@
+; ================================================================
+; FreeLang v9 — GPT Transformer Phase 1: Forward Pass
+;
+; 소형 모델:  vocab=32  d=8  heads=2  dh=4  ffn=16  layers=2
+; 목표: FreeLang v9에서 Transformer forward pass 동작 검증
+; ================================================================
+
+; ─── 설정 ──────────────────────────────────────────────────────
+
+(define VOCAB  32)
+(define D       8)
+(define HEADS   2)
+(define DH      4)   ; D / HEADS
+(define FFN    16)
+(define LAYERS  2)
+(define SEQ     6)
+
+; ─── 벡터 유틸 ─────────────────────────────────────────────────
+
+[FUNC zeros :params [$n]
+  :body (
+    (define v [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n) v
+        ((set! v (append v 0.0)) (set! i (+ i 1)) (recur 0))
+      )
+    )
+  )
+]
+
+[FUNC rand-vec :params [$n $scale]
+  :body (
+    (define v [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n) v
+        (
+          (define r (* (- (* (random) 2.0) 1.0) $scale))
+          (set! v (append v r))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC ones :params [$n]
+  :body (
+    (define v [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n) v
+        ((set! v (append v 1.0)) (set! i (+ i 1)) (recur 0))
+      )
+    )
+  )
+]
+
+; v1 + v2 (같은 크기)
+[FUNC vadd :params [$a $b]
+  :body (
+    (define n (length $a))
+    (define v [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) v
+        (
+          (set! v (append v (+ (get $a i) (get $b i))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 내적
+[FUNC vdot :params [$a $b]
+  :body (
+    (define n (length $a))
+    (define s 0.0)
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) s
+        (
+          (set! s (+ s (* (get $a i) (get $b i))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 행렬(rows×cols flat) × 벡터(cols) → 벡터(rows)
+[FUNC mv :params [$W $rows $cols $x]
+  :body (
+    (define y [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $rows) y
+        (
+          (define s 0.0)
+          (define j 0)
+          (loop [[$_ 0]]
+            (if (>= j $cols) 0
+              (
+                (set! s (+ s (* (get $W (+ (* i $cols) j)) (get $x j))))
+                (set! j (+ j 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! y (append y s))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── Softmax ───────────────────────────────────────────────────
+
+[FUNC softmax :params [$x]
+  :body (
+    (define n (length $x))
+    (define mx (get $x 0))
+    (define i 1)
+    (loop [[$_ 0]]
+      (if (>= i n) 0
+        (
+          (if (> (get $x i) mx) (set! mx (get $x i)) 0)
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+    (define exps [])
+    (define sum 0.0)
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) 0
+        (
+          (define e (exp (- (get $x i) mx)))
+          (set! exps (append exps e))
+          (set! sum (+ sum e))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+    (define out [])
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) out
+        (
+          (set! out (append out (/ (get exps i) sum)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── Layer Norm ────────────────────────────────────────────────
+
+[FUNC layer-norm :params [$x $scale $bias]
+  :body (
+    (define n (length $x))
+    (define mu 0.0)
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) 0
+        ((set! mu (+ mu (get $x i))) (set! i (+ i 1)) (recur 0))
+      )
+    )
+    (set! mu (/ mu n))
+    (define vr 0.0)
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) 0
+        (
+          (define d (- (get $x i) mu))
+          (set! vr (+ vr (* d d)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+    (define inv-std (/ 1.0 (sqrt (+ (/ vr n) 0.00001))))
+    (define out [])
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) out
+        (
+          (define xn (* (- (get $x i) mu) inv-std))
+          (set! out (append out (+ (* xn (get $scale i)) (get $bias i))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── GELU ──────────────────────────────────────────────────────
+
+[FUNC gelu :params [$x]
+  :body (* $x (/ 1.0 (+ 1.0 (exp (* -1.702 $x)))))
+]
+
+; ─── FFN (per position) ────────────────────────────────────────
+
+[FUNC ffn :params [$x $W1 $b1 $W2 $b2 $d $ffn-dim]
+  :body (
+    ; h = GELU(W1·x + b1)
+    (define h [])
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j $ffn-dim) 0
+        (
+          (define s (get $b1 j))
+          (define k 0)
+          (loop [[$_ 0]]
+            (if (>= k $d) 0
+              (
+                (set! s (+ s (* (get $W1 (+ (* k $ffn-dim) j)) (get $x k))))
+                (set! k (+ k 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! h (append h (gelu s)))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+    ; out = W2·h + b2
+    (define out [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $d) out
+        (
+          (define s (get $b2 i))
+          (set! j 0)
+          (loop [[$_ 0]]
+            (if (>= j $ffn-dim) 0
+              (
+                (set! s (+ s (* (get $W2 (+ (* j $d) i)) (get $h j))))
+                (set! j (+ j 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! out (append out s))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 벡터 원소 교체 ───────────────────────────────────────────
+; (vec-set v i val) → v[i]=val 인 새 벡터
+
+[FUNC vec-set :params [$v $idx $val]
+  :body (
+    (define n (length $v))
+    (define result [])
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j n) result
+        (
+          (if (= j $idx)
+            (set! result (append result $val))
+            (set! result (append result (get $v j)))
+          )
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── Causal Self-Attention (단일 헤드, 위치 i) ─────────────────
+; Q,K,V: seq×dh flat 배열
+; 위치 i에서의 attention output (dh 크기 벡터)
+
+[FUNC attn-pos :params [$Q $K $V $i $seq $dh]
+  :body (
+    (define scale (/ 1.0 (sqrt $dh)))
+    ; scores[j] = Q[i]·K[j]/sqrt(dh)  (j <= i: causal)
+    (define scores [])
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j $seq) 0
+        (
+          (define score
+            (if (<= j $i)
+              (* (vdot
+                    (slice $Q (* $i $dh) (+ (* $i $dh) $dh))
+                    (slice $K (* j $dh) (+ (* j $dh) $dh))
+                 )
+                 scale)
+              -999999999.0)
+          )
+          (set! scores (append scores score))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+    (define attn (softmax scores))
+    ; weighted sum of V[j] for j in [0, seq)
+    (define out (zeros $dh))
+    (set! j 0)
+    (loop [[$_ 0]]
+      (if (>= j $seq) out
+        (
+          (define w (get attn j))
+          (define k 0)
+          (loop [[$_ 0]]
+            (if (>= k $dh) 0
+              (
+                (define cur-val (get out k))
+                (define new-val (+ cur-val (* w (get $V (+ (* j $dh) k)))))
+                (set! out (vec-set out k new-val))
+                (set! k (+ k 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── Multi-Head Attention (전체 시퀀스) ────────────────────────
+; x: seq×d flat
+; Wq,Wk,Wv,Wo: d×d
+; 반환: seq×d flat
+
+[FUNC mha :params [$x $Wq $Wk $Wv $Wo $seq $d $heads $dh]
+  :body (
+    ; 모든 위치의 Q,K,V 계산
+    (define Q [])
+    (define K [])
+    (define V [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $seq) 0
+        (
+          (define xi (slice $x (* i $d) (+ (* i $d) $d)))
+          (set! Q (append Q (mv $Wq $d $d xi)))
+          (set! K (append K (mv $Wk $d $d xi)))
+          (set! V (append V (mv $Wv $d $d xi)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+    ; 헤드별 attention + concat → Wo 투영
+    (define mha-out [])
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i $seq) mha-out
+        (
+          ; 모든 헤드의 출력을 concat
+          (define head-cat [])
+          (define h 0)
+          (loop [[$_ 0]]
+            (if (>= h $heads) 0
+              (
+                ; 헤드 h의 Q,K,V (각 위치에서 hoff..hoff+dh 슬라이스)
+                (define Qh [])
+                (define Kh [])
+                (define Vh [])
+                (define ii 0)
+                (loop [[$_ 0]]
+                  (if (>= ii $seq) 0
+                    (
+                      (define hoff (* h $dh))
+                      (set! Qh (append Qh (slice $Q (+ (* ii $d) hoff) (+ (* ii $d) hoff $dh))))
+                      (set! Kh (append Kh (slice $K (+ (* ii $d) hoff) (+ (* ii $d) hoff $dh))))
+                      (set! Vh (append Vh (slice $V (+ (* ii $d) hoff) (+ (* ii $d) hoff $dh))))
+                      (set! ii (+ ii 1))
+                      (recur 0)
+                    )
+                  )
+                )
+                ; 위치 i에서 헤드 h의 attention
+                (define head-out (attn-pos Qh Kh Vh i $seq $dh))
+                (set! head-cat (append head-cat head-out))
+                (set! h (+ h 1))
+                (recur 0)
+              )
+            )
+          )
+          ; Wo 투영
+          (set! mha-out (append mha-out (mv $Wo $d $d head-cat)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── Transformer Block ─────────────────────────────────────────
+; x: seq×d flat
+; 반환: seq×d flat (residual + MHA + LN + FFN + LN)
+
+[FUNC transformer-block :params [$x $blk]
+  :body (
+    (define seq (get $blk :seq))
+    (define d   (get $blk :d))
+    (define heads (get $blk :heads))
+    (define dh  (get $blk :dh))
+    (define ffn-dim (get $blk :ffn))
+
+    ; 1) 각 위치에 LN1 적용
+    (define x-ln1 [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i seq) 0
+        (
+          (define xi (slice $x (* i d) (+ (* i d) d)))
+          (set! x-ln1 (append x-ln1 (layer-norm xi (get $blk :ln1s) (get $blk :ln1b))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; 2) MHA
+    (define attn-out (mha x-ln1
+                          (get $blk :Wq) (get $blk :Wk)
+                          (get $blk :Wv) (get $blk :Wo)
+                          seq d heads dh))
+
+    ; 3) Residual: x + attn-out
+    (define x2 (vadd $x attn-out))
+
+    ; 4) 각 위치에 LN2 + FFN
+    (define x-out [])
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i seq) x-out
+        (
+          (define x2i (slice x2 (* i d) (+ (* i d) d)))
+          (define ln2i (layer-norm x2i (get $blk :ln2s) (get $blk :ln2b)))
+          (define ffni (ffn ln2i (get $blk :W1) (get $blk :b1)
+                               (get $blk :W2) (get $blk :b2) d ffn-dim))
+          ; Residual: x2 + ffn
+          (set! x-out (append x-out (vadd x2i ffni)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 가중치 초기화 ──────────────────────────────────────────────
+
+[FUNC make-block :params [$d $dh $ffn-dim $heads $seq]
+  :body (
+    (define sa (/ 0.02 (sqrt (* $d $d))))
+    (define sf (/ 0.02 (sqrt (* $d $ffn-dim))))
+    {:Wq  (rand-vec (* $d $d) sa)
+     :Wk  (rand-vec (* $d $d) sa)
+     :Wv  (rand-vec (* $d $d) sa)
+     :Wo  (rand-vec (* $d $d) sa)
+     :ln1s (ones $d)  :ln1b (zeros $d)
+     :W1  (rand-vec (* $d $ffn-dim) sf)
+     :b1  (zeros $ffn-dim)
+     :W2  (rand-vec (* $ffn-dim $d) sf)
+     :b2  (zeros $d)
+     :ln2s (ones $d)  :ln2b (zeros $d)
+     :d $d  :dh $dh  :ffn $ffn-dim  :heads $heads  :seq $seq}
+  )
+]
+
+; ─── Forward Pass ──────────────────────────────────────────────
+
+[FUNC forward :params [$tokens $W-emb $blocks $W-proj $b-proj]
+  :body (
+    (define seq (length $tokens))
+    (define d D)
+
+    ; Embedding (+ 단순 위치 인코딩: pos * 0.01)
+    (define x [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i seq) 0
+        (
+          (define tok (get $tokens i))
+          (define emb (slice $W-emb (* tok d) (+ (* tok d) d)))
+          ; 위치 인코딩: 짝수 인덱스 += sin(pos/10000^(j/d))
+          ; 단순 버전: j번째 원소 += (pos/seq) * 0.1
+          (define pe [])
+          (define j 0)
+          (loop [[$_ 0]]
+            (if (>= j d) 0
+              (
+                (define pos-val (* (/ i (+ seq 1.0)) (if (= (floor (/ j 2)) (/ j 2)) 0.1 -0.1)))
+                (set! pe (append pe pos-val))
+                (set! j (+ j 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! x (append x (vadd emb pe)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; Transformer Blocks
+    (define cur x)
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i (length $blocks)) 0
+        (
+          (set! cur (transformer-block cur (get $blocks i)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; LM Head: 마지막 위치 → logits (VOCAB 크기)
+    (define last-x (slice cur (* (- seq 1) d) (* seq d)))
+    (define logits (vadd (mv $W-proj VOCAB d last-x) $b-proj))
+    logits
+  )
+]
+
+; ─── 메인: 초기화 + Forward 테스트 ───────────────────────────
+
+(define W-emb   (rand-vec (* VOCAB D) 0.02))
+(define blocks  [(make-block D DH FFN HEADS SEQ)
+                 (make-block D DH FFN HEADS SEQ)])
+(define W-proj  (rand-vec (* D VOCAB) 0.02))
+(define b-proj  (zeros VOCAB))
+
+(define tokens [3 7 1 12 5 0])   ; 길이 6 시퀀스
+
+(println "=== FreeLang v9 Transformer ===")
+(println (str "vocab="   VOCAB))
+(println (str "d_model=" D))
+(println (str "heads="   HEADS))
+(println (str "layers="  LAYERS))
+(println (str "seq_len=" SEQ))
+(println "")
+(println "Forward pass 실행 중...")
+
+(define logits (forward tokens W-emb blocks W-proj b-proj))
+(define probs (softmax logits))
+
+(println (str "logits 크기: " (length logits)))
+(println (str "probs 크기:  " (length probs)))
+
+; prob 합 확인
+(define prob-sum 0.0)
+(define i 0)
+(loop [[$_ 0]]
+  (if (>= i (length probs)) 0
+    (
+      (set! prob-sum (+ prob-sum (get probs i)))
+      (set! i (+ i 1))
+      (recur 0)
+    )
+  )
+)
+(println (str "probs 합계: " prob-sum))
+
+; argmax (가장 높은 확률 토큰)
+(define best-tok 0)
+(define best-prob (get probs 0))
+(set! i 1)
+(loop [[$_ 0]]
+  (if (>= i (length probs)) 0
+    (
+      (if (> (get probs i) best-prob)
+        ((set! best-prob (get probs i)) (set! best-tok i))
+        0
+      )
+      (set! i (+ i 1))
+      (recur 0)
+    )
+  )
+)
+(println (str "다음 토큰 예측: " best-tok))
+(println (str "확률: " best-prob))
+(println "")
+(println "=== PASS: Forward Pass 완료 ===")

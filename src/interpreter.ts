@@ -1167,6 +1167,87 @@ export class Interpreter {
       return result;
     }
 
+    // loop/recur: (loop [var1 init1 var2 init2 ...] body...)
+    // recur inside loop restarts iteration with new values
+    if (op === "loop") {
+      const bindingsNode = expr.args[0];
+      const bodyNodes = expr.args.slice(1);
+
+      // Parse bindings: [var1 init1 var2 init2 ...]
+      const bindingItems: any[] =
+        (bindingsNode as any).kind === "array"
+          ? (bindingsNode as any).items || []
+          : (bindingsNode as any).kind === "block" && (bindingsNode as any).type === "Array"
+            ? (bindingsNode as any).fields?.get?.("items") || []
+            : [];
+
+      const loopVars: string[] = [];
+      const loopInits: any[] = [];
+      for (let i = 0; i < bindingItems.length; i += 2) {
+        const varNode = bindingItems[i];
+        const valNode = bindingItems[i + 1];
+        const varName = varNode.kind === "variable" ? varNode.name
+          : varNode.kind === "literal" ? String(varNode.value) : String(varNode.name || varNode.value);
+        loopVars.push(varName);
+        loopInits.push(this.eval(valNode));
+      }
+
+      // Save outer bindings
+      const savedVars = loopVars.map(v => ({ v, old: this.context.variables.get(v) }));
+
+      // Initialize loop variables
+      for (let i = 0; i < loopVars.length; i++) {
+        this.context.variables.set(loopVars[i], loopInits[i]);
+      }
+
+      const FL_RECUR = "__FL_RECUR__";
+      let result: any = null;
+      const maxIter = 100000;
+      let iter = 0;
+      try {
+        while (iter++ < maxIter) {
+          let recurred = false;
+          for (const bodyNode of bodyNodes) {
+            result = this.eval(bodyNode);
+            // Check if recur was called (via thrown recur signal)
+            if (result && typeof result === "object" && result.__FL_RECUR__) {
+              const newVals = result.__args as any[];
+              for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
+                this.context.variables.set(loopVars[i], newVals[i]);
+              }
+              recurred = true;
+              break;
+            }
+          }
+          if (!recurred) break;
+        }
+      } finally {
+        // Restore outer bindings
+        for (const { v, old } of savedVars) {
+          if (old === undefined) this.context.variables.delete(v);
+          else this.context.variables.set(v, old);
+        }
+      }
+      return result;
+    }
+
+    // recur: (recur val1 val2 ...) — tail-call back to enclosing loop
+    if (op === "recur") {
+      const newVals = expr.args.map((a) => this.eval(a));
+      return { __FL_RECUR__: true, __args: newVals };
+    }
+
+    // while: (while condition body...)
+    if (op === "while") {
+      let result: any = null;
+      while (this.eval(expr.args[0])) {
+        for (let i = 1; i < expr.args.length; i++) {
+          result = this.eval(expr.args[i]);
+        }
+      }
+      return result;
+    }
+
     // Short-circuit logical operators
     if (op === "and") {
       let result: any = true;
