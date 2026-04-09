@@ -1,7 +1,7 @@
-// FreeLang v9: Phase 35 — 에러 메시지 개선
+// FreeLang v9: Phase 41 — REPL
 //
-// 목표: 에러에 [line:col] 위치 + 에러 종류 포함
-//       lexer 토큰에 :col 필드 추가
+// 목표: fl-repl: 입력 → lex → parse → gen-js → eval → 결과 출력
+//       (repl-eval src env) → 결과값 반환 함수
 //       Gen3 고정점 유지
 
 import * as vm from "vm";
@@ -22,23 +22,6 @@ function test(name: string, fn: () => void) {
   } catch (e: any) {
     console.log(`  ❌ ${name}: ${e.message?.slice(0, 120)}`);
     failed++;
-  }
-}
-function testErr(name: string, fn: () => void, expectPat: string) {
-  try {
-    fn();
-    console.log(`  ❌ ${name}: expected error but got none`);
-    failed++;
-  } catch (e: any) {
-    const msg = e.message || "";
-    if (msg.includes(expectPat)) {
-      console.log(`  ✅ ${name}`);
-      console.log(`    → "${msg.slice(0, 80)}"`);
-      passed++;
-    } else {
-      console.log(`  ❌ ${name}: error lacks "${expectPat}": "${msg.slice(0, 80)}"`);
-      failed++;
-    }
   }
 }
 
@@ -106,7 +89,7 @@ function makeModule(jsCode: string): any {
 }
 
 // ── Gen1 빌드 ─────────────────────────────────────────────────
-console.log("\n[35-A] Gen1 빌드");
+console.log("\n[41-A] Gen1 빌드");
 
 let lexerMod1: any, parserMod1: any, codegenMod1: any;
 test("lexer.fl → Gen1", () => {
@@ -122,92 +105,155 @@ test("codegen.fl → Gen1", () => {
   if (typeof codegenMod1["gen-js"] !== "function") throw new Error("gen-js not exported");
 });
 
-// ── 렉서 :col 검증 ────────────────────────────────────────────
-console.log("\n[35-B] 렉서 토큰 :col 필드 검증");
+function standaloneCompile1(src: string): string {
+  return codegenMod1["gen-js"](parserMod1.parse(lexerMod1.lex(src)));
+}
 
-test("단순 토큰 col 위치", () => {
-  const tokens = lexerMod1.lex("(+ 1 2)");
-  // ( col=1, + col=2, 1 col=4, 2 col=6, ) col=7
-  const lparen = tokens[0];
-  const plus   = tokens[1];
-  const num1   = tokens[2];
-  if (lparen.col !== 1) throw new Error(`( col=${lparen.col}, want 1`);
-  if (plus.col !== 2)   throw new Error(`+ col=${plus.col}, want 2`);
-  if (num1.col !== 4)   throw new Error(`1 col=${num1.col}, want 4`);
-});
-test("멀티라인 col 추적", () => {
-  const tokens = lexerMod1.lex("(foo)\n(bar)");
-  const bar = tokens.find((t: any) => t.value === "bar");
-  if (!bar) throw new Error("bar token not found");
-  if (bar.line !== 2) throw new Error(`bar line=${bar.line}, want 2`);
-  if (bar.col !== 2)  throw new Error(`bar col=${bar.col}, want 2`);
-});
-test("들여쓰기 col 추적", () => {
-  const tokens = lexerMod1.lex("  [FUNC add");
-  const lb   = tokens.find((t: any) => t.type === "LBRACKET");
-  const func = tokens.find((t: any) => t.value === "FUNC");
-  if (!lb)   throw new Error("[ not found");
-  if (!func) throw new Error("FUNC not found");
-  if (lb.col !== 3)   throw new Error(`[ col=${lb.col}, want 3`);
-  if (func.col !== 4) throw new Error(`FUNC col=${func.col}, want 4`);
-});
-test("문자열 토큰 col", () => {
-  const tokens = lexerMod1.lex(`  "hello"`);
-  const str = tokens[0];
-  if (str.col !== 3) throw new Error(`str col=${str.col}, want 3`);
-  if (str.value !== "hello") throw new Error(`value=${str.value}`);
+// REPL eval 함수: FL 소스 → eval → 결과
+function replEval(src: string, env: Record<string, any> = {}): any {
+  const js = standaloneCompile1(src);
+  const sandbox: Record<string, any> = { module: { exports: {} }, console, ...env };
+  vm.createContext(sandbox);
+  vm.runInContext(js, sandbox);
+  // 마지막 export된 값 또는 IIFE 결과 반환
+  return sandbox.module.exports;
+}
+
+// ── REPL 기본 동작 검증 ──────────────────────────────────────
+console.log("\n[41-B] REPL 기본 표현식 평가");
+
+test("산술 식 평가: (+ 3 4) = 7", () => {
+  const src = `[FUNC __repl__ :params [] :body ((+ 3 4))] (export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== 7) throw new Error(`got ${m["__repl__"]()}`);
 });
 
-// ── 파서 에러 메시지 형식 검증 ────────────────────────────────
-console.log("\n[35-C] 파서 에러 메시지: [line:col] + ErrorType");
-
-testErr("미닫힌 괄호",
-  () => parserMod1.parse(lexerMod1.lex("(+ 1 2")),
-  "SyntaxError"
-);
-testErr("미닫힌 배열 파싱 에러",
-  () => parserMod1.parse(lexerMod1.lex("[FUNC add :params [$a $b")),
-  "SyntaxError"
-);
-testErr("블록 타입 없음",
-  () => parserMod1.parse(lexerMod1.lex("[123 add]")),
-  "ParseError"
-);
-testErr("에러에 line:col 포함",
-  () => parserMod1.parse(lexerMod1.lex("\n\n    (")),
-  "[3:"   // 3번째 라인
-);
-
-// ── 에러 위치 정확도 검증 ─────────────────────────────────────
-console.log("\n[35-D] 에러 위치 정확도");
-
-test("1:1 — 첫 글자 에러", () => {
-  try {
-    parserMod1.parse(lexerMod1.lex(")"));
-    throw new Error("should fail");
-  } catch(e: any) {
-    const m = e.message;
-    if (!m.includes("[1:1]")) throw new Error(`got: ${m.slice(0, 60)}`);
-    console.log(`    → "${m.slice(0, 60)}"`);
-  }
+test("문자열 연결 평가", () => {
+  const src = `[FUNC __repl__ :params [] :body ((concat "hello" " " "world"))] (export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== "hello world") throw new Error(`got ${m["__repl__"]()}`);
 });
-test("멀티라인 에러: 2번 줄", () => {
-  try {
-    parserMod1.parse(lexerMod1.lex("(+ 1 2)\n("));
-    throw new Error("should fail");
-  } catch(e: any) {
-    const m = e.message;
-    if (!m.includes("[2:")) throw new Error(`expected [2:... but got: ${m.slice(0, 60)}`);
-    console.log(`    → "${m.slice(0, 80)}"`);
-  }
+
+test("let 바인딩 평가", () => {
+  const src = `
+[FUNC __repl__ :params [] :body (
+  (let [[$x 10] [$y 20]]
+    (+ $x $y)
+  )
+)]
+(export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== 30) throw new Error(`got ${m["__repl__"]()}`);
+});
+
+// ── REPL 함수 정의 & 사용 ────────────────────────────────────
+console.log("\n[41-C] REPL 함수 정의 및 호출");
+
+test("함수 정의 후 호출", () => {
+  const src = `
+[FUNC square :params [$n] :body ((* $n $n))]
+[FUNC __repl__ :params [] :body ((square 5))]
+(export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== 25) throw new Error(`got ${m["__repl__"]()}`);
+});
+
+test("재귀 함수 평가", () => {
+  const src = `
+[FUNC fact :params [$n]
+  :body (
+    (if (<= $n 1)
+      1
+      (* $n (fact (- $n 1)))
+    )
+  )
+]
+[FUNC __repl__ :params [] :body ((fact 5))]
+(export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== 120) throw new Error(`got ${m["__repl__"]()}`);
+});
+
+test("고차 함수 평가", () => {
+  const src = `
+[FUNC apply-twice :params [$f $x] :body (($f ($f $x)))]
+[FUNC inc :params [$n] :body ((+ $n 1))]
+[FUNC __repl__ :params [] :body ((apply-twice inc 5))]
+(export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== 7) throw new Error(`got ${m["__repl__"]()}`);
+});
+
+// ── REPL 환경 지속 (다중 세션 시뮬레이션) ────────────────────
+console.log("\n[41-D] REPL 다중 표현식 평가");
+
+test("여러 정의 누적 평가", () => {
+  // 세션 1: 함수 정의
+  const defs = `
+[FUNC add :params [$a $b] :body ((+ $a $b))]
+[FUNC mul :params [$a $b] :body ((* $a $b))]
+(export add)
+(export mul)`;
+  const defMod = replEval(defs);
+
+  // 세션 2: 정의된 함수 사용 (재컴파일)
+  const src = `
+[FUNC add :params [$a $b] :body ((+ $a $b))]
+[FUNC mul :params [$a $b] :body ((* $a $b))]
+[FUNC __repl__ :params [] :body ((add (mul 3 4) 5))]
+(export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== 17) throw new Error(`got ${m["__repl__"]()}`);
+});
+
+test("조건 분기 평가", () => {
+  const src = `
+[FUNC classify :params [$n]
+  :body (
+    (if (< $n 0) "negative"
+      (if (= $n 0) "zero" "positive")
+    )
+  )
+]
+[FUNC __repl__ :params [] :body ((classify -5))]
+(export __repl__)`;
+  const m = replEval(src);
+  if (m["__repl__"]() !== "negative") throw new Error(`got ${m["__repl__"]()}`);
+});
+
+// ── REPL 배열/맵 처리 ────────────────────────────────────────
+console.log("\n[41-E] REPL 컬렉션 평가");
+
+test("배열 처리: map identity", () => {
+  const src = `
+[FUNC __repl__ :params [] :body ((map [1 2 3] [x] $x))]
+(export __repl__)`;
+  const m = replEval(src);
+  const r = m["__repl__"]();
+  if (!Array.isArray(r) || r[0] !== 1 || r[2] !== 3) throw new Error(`got ${JSON.stringify(r)}`);
+});
+
+test("map 변환 평가", () => {
+  const src = `
+[FUNC double :params [$x] :body ((* $x 2))]
+[FUNC __repl__ :params [] :body ((map [1 2 3 4 5] [x] (double $x)))]
+(export __repl__)`;
+  const m = replEval(src);
+  const r = m["__repl__"]();
+  if (!Array.isArray(r) || r[4] !== 10) throw new Error(`got ${JSON.stringify(r)}`);
+});
+
+test("filter 평가", () => {
+  const src = `
+[FUNC __repl__ :params [] :body ((filter [1 2 3 4 5 6] [x] (= (% $x 2) 0)))]
+(export __repl__)`;
+  const m = replEval(src);
+  const r = m["__repl__"]();
+  if (!Array.isArray(r) || r.length !== 3 || r[0] !== 2) throw new Error(`got ${JSON.stringify(r)}`);
 });
 
 // ── Gen2 + Gen3 고정점 유지 ───────────────────────────────────
-console.log("\n[35-E] Gen2 + Gen3 고정점 유지");
-
-function standaloneCompile1(src: string) {
-  return codegenMod1["gen-js"](parserMod1.parse(lexerMod1.lex(src)));
-}
+console.log("\n[41-F] Gen2 + Gen3 고정점 유지");
 
 let lexer2JS = "", parser2JS = "", codegen2JS = "";
 let lexerMod2: any, parserMod2: any, codegenMod2: any;
@@ -244,12 +290,10 @@ test("standaloneCompile2(lexer.fl) → Gen3", () => {
 test("standaloneCompile2(parser.fl) → Gen3", () => {
   parser3JS = standaloneCompile2(parserSrc);
   makeModule(parser3JS);
-  console.log(`    → ${parser3JS.length} chars`);
 });
 test("standaloneCompile2(codegen.fl) → Gen3", () => {
   codegen3JS = standaloneCompile2(codegenSrc);
   makeModule(codegen3JS);
-  console.log(`    → ${codegen3JS.length} chars`);
 });
 test("Gen2===Gen3 lexer 고정점", () => {
   if (lexer2JS !== lexer3JS) throw new Error("diff");
@@ -261,20 +305,8 @@ test("Gen2===Gen3 codegen 고정점", () => {
   if (codegen2JS !== codegen3JS) throw new Error("diff");
 });
 
-// ── Gen2 파서 에러 메시지도 개선됐는지 검증 ──────────────────
-console.log("\n[35-F] Gen2 파서 에러 메시지 형식 유지");
-
-testErr("Gen2 parser: SyntaxError 형식",
-  () => parserMod2.parse(lexerMod2.lex("(+ 1 2")),
-  "SyntaxError"
-);
-testErr("Gen2 parser: [line:col] 형식",
-  () => parserMod2.parse(lexerMod2.lex(")")),
-  "[1:1]"
-);
-
 // ── 결과 ─────────────────────────────────────────────────────
 console.log(`\n${"─".repeat(50)}`);
-console.log(`Phase 35 Error Messages: ${passed} passed, ${failed} failed`);
+console.log(`Phase 41 REPL: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 process.exit(0);

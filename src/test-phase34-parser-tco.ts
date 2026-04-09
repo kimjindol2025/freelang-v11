@@ -54,9 +54,9 @@ function convertTStoFL(node: any): any {
     }
     if (node.type === "Array") return { kind: "array", items: fields.items || [] };
     if (node.type === "Map")   return { kind: "map-literal", pairs: fields };
-    return { kind: "block", type: node.type, name: node.name, fields };
+    return { kind: "block", type: node.type, name: node.name, fields, line: node.line ?? null };
   }
-  if (kind === "sexpr") return { kind: "sexpr", op: node.op, args: (node.args || []).map(convertTStoFL) };
+  if (kind === "sexpr") return { kind: "sexpr", op: node.op, args: (node.args || []).map(convertTStoFL), line: node.line ?? null };
   if (kind === "pattern-match") {
     const subject = convertTStoFL(node.value);
     const cl: any[] = (node.cases || []).map((c: any) => ({

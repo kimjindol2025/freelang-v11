@@ -69,10 +69,10 @@ function convertTStoFL(node: any): any {
     }
     if (node.type === "Array") return { kind: "array", items: fields.items || [] };
     if (node.type === "Map")   return { kind: "map-literal", pairs: fields };
-    return { kind: "block", type: node.type, name: node.name, fields };
+    return { kind: "block", type: node.type, name: node.name, fields, line: node.line ?? null };
   }
   if (kind === "sexpr") {
-    return { kind: "sexpr", op: node.op, args: (node.args || []).map(convertTStoFL) };
+    return { kind: "sexpr", op: node.op, args: (node.args || []).map(convertTStoFL), line: node.line ?? null };
   }
   // TS PatternMatch → FL match sexpr
   // {kind:"pattern-match", value, cases:[{pattern, body}], defaultCase?}

@@ -1,7 +1,8 @@
-// FreeLang v9: Phase 35 — 에러 메시지 개선
+// FreeLang v9: Phase 40 — 상수 폴딩
 //
-// 목표: 에러에 [line:col] 위치 + 에러 종류 포함
-//       lexer 토큰에 :col 필드 추가
+// 목표: 컴파일 타임에 상수 표현식 계산
+//       (+ 1 2) → 3,  (* 3 4) → 12,  (concat "a" "b") → "ab"
+//       (if true x y) → x,  (if false x y) → y
 //       Gen3 고정점 유지
 
 import * as vm from "vm";
@@ -22,23 +23,6 @@ function test(name: string, fn: () => void) {
   } catch (e: any) {
     console.log(`  ❌ ${name}: ${e.message?.slice(0, 120)}`);
     failed++;
-  }
-}
-function testErr(name: string, fn: () => void, expectPat: string) {
-  try {
-    fn();
-    console.log(`  ❌ ${name}: expected error but got none`);
-    failed++;
-  } catch (e: any) {
-    const msg = e.message || "";
-    if (msg.includes(expectPat)) {
-      console.log(`  ✅ ${name}`);
-      console.log(`    → "${msg.slice(0, 80)}"`);
-      passed++;
-    } else {
-      console.log(`  ❌ ${name}: error lacks "${expectPat}": "${msg.slice(0, 80)}"`);
-      failed++;
-    }
   }
 }
 
@@ -106,7 +90,7 @@ function makeModule(jsCode: string): any {
 }
 
 // ── Gen1 빌드 ─────────────────────────────────────────────────
-console.log("\n[35-A] Gen1 빌드");
+console.log("\n[40-A] Gen1 빌드");
 
 let lexerMod1: any, parserMod1: any, codegenMod1: any;
 test("lexer.fl → Gen1", () => {
@@ -122,92 +106,91 @@ test("codegen.fl → Gen1", () => {
   if (typeof codegenMod1["gen-js"] !== "function") throw new Error("gen-js not exported");
 });
 
-// ── 렉서 :col 검증 ────────────────────────────────────────────
-console.log("\n[35-B] 렉서 토큰 :col 필드 검증");
+function standaloneCompile1(src: string): string {
+  return codegenMod1["gen-js"](parserMod1.parse(lexerMod1.lex(src)));
+}
 
-test("단순 토큰 col 위치", () => {
-  const tokens = lexerMod1.lex("(+ 1 2)");
-  // ( col=1, + col=2, 1 col=4, 2 col=6, ) col=7
-  const lparen = tokens[0];
-  const plus   = tokens[1];
-  const num1   = tokens[2];
-  if (lparen.col !== 1) throw new Error(`( col=${lparen.col}, want 1`);
-  if (plus.col !== 2)   throw new Error(`+ col=${plus.col}, want 2`);
-  if (num1.col !== 4)   throw new Error(`1 col=${num1.col}, want 4`);
-});
-test("멀티라인 col 추적", () => {
-  const tokens = lexerMod1.lex("(foo)\n(bar)");
-  const bar = tokens.find((t: any) => t.value === "bar");
-  if (!bar) throw new Error("bar token not found");
-  if (bar.line !== 2) throw new Error(`bar line=${bar.line}, want 2`);
-  if (bar.col !== 2)  throw new Error(`bar col=${bar.col}, want 2`);
-});
-test("들여쓰기 col 추적", () => {
-  const tokens = lexerMod1.lex("  [FUNC add");
-  const lb   = tokens.find((t: any) => t.type === "LBRACKET");
-  const func = tokens.find((t: any) => t.value === "FUNC");
-  if (!lb)   throw new Error("[ not found");
-  if (!func) throw new Error("FUNC not found");
-  if (lb.col !== 3)   throw new Error(`[ col=${lb.col}, want 3`);
-  if (func.col !== 4) throw new Error(`FUNC col=${func.col}, want 4`);
-});
-test("문자열 토큰 col", () => {
-  const tokens = lexerMod1.lex(`  "hello"`);
-  const str = tokens[0];
-  if (str.col !== 3) throw new Error(`str col=${str.col}, want 3`);
-  if (str.value !== "hello") throw new Error(`value=${str.value}`);
+// ── 상수 폴딩 검증 ────────────────────────────────────────────
+console.log("\n[40-B] 산술 상수 폴딩");
+
+test("(+ 1 2) → 3 리터럴", () => {
+  const src = `[FUNC f :params [] :body ((+ 1 2))] (export f)`;
+  const js = standaloneCompile1(src);
+  if (!js.includes("3")) throw new Error(`no folded 3: ${js}`);
+  if (js.includes("1 + 2") || js.includes("(1) + (2)")) throw new Error(`not folded: ${js}`);
+  console.log(`    → ${js.replace(/\n/g,' ').slice(40, 120)}`);
+  if (makeModule(js).f() !== 3) throw new Error("wrong result");
 });
 
-// ── 파서 에러 메시지 형식 검증 ────────────────────────────────
-console.log("\n[35-C] 파서 에러 메시지: [line:col] + ErrorType");
-
-testErr("미닫힌 괄호",
-  () => parserMod1.parse(lexerMod1.lex("(+ 1 2")),
-  "SyntaxError"
-);
-testErr("미닫힌 배열 파싱 에러",
-  () => parserMod1.parse(lexerMod1.lex("[FUNC add :params [$a $b")),
-  "SyntaxError"
-);
-testErr("블록 타입 없음",
-  () => parserMod1.parse(lexerMod1.lex("[123 add]")),
-  "ParseError"
-);
-testErr("에러에 line:col 포함",
-  () => parserMod1.parse(lexerMod1.lex("\n\n    (")),
-  "[3:"   // 3번째 라인
-);
-
-// ── 에러 위치 정확도 검증 ─────────────────────────────────────
-console.log("\n[35-D] 에러 위치 정확도");
-
-test("1:1 — 첫 글자 에러", () => {
-  try {
-    parserMod1.parse(lexerMod1.lex(")"));
-    throw new Error("should fail");
-  } catch(e: any) {
-    const m = e.message;
-    if (!m.includes("[1:1]")) throw new Error(`got: ${m.slice(0, 60)}`);
-    console.log(`    → "${m.slice(0, 60)}"`);
-  }
+test("(* 6 7) → 42 리터럴", () => {
+  const src = `[FUNC f :params [] :body ((* 6 7))] (export f)`;
+  const js = standaloneCompile1(src);
+  if (!js.includes("42")) throw new Error(`no 42 in ${js}`);
+  if (makeModule(js).f() !== 42) throw new Error("wrong result");
 });
-test("멀티라인 에러: 2번 줄", () => {
-  try {
-    parserMod1.parse(lexerMod1.lex("(+ 1 2)\n("));
-    throw new Error("should fail");
-  } catch(e: any) {
-    const m = e.message;
-    if (!m.includes("[2:")) throw new Error(`expected [2:... but got: ${m.slice(0, 60)}`);
-    console.log(`    → "${m.slice(0, 80)}"`);
-  }
+
+test("(- 10 3) → 7 리터럴", () => {
+  const src = `[FUNC f :params [] :body ((- 10 3))] (export f)`;
+  const js = standaloneCompile1(src);
+  if (makeModule(js).f() !== 7) throw new Error("wrong result");
+});
+
+test("중첩 표현식 정확성: (+ (* 2 3) (- 10 4)) = 12", () => {
+  const src = `[FUNC f :params [] :body ((+ (* 2 3) (- 10 4)))] (export f)`;
+  const js = standaloneCompile1(src);
+  if (makeModule(js).f() !== 12) throw new Error("wrong result");
+});
+
+console.log("\n[40-C] 문자열 상수 폴딩");
+
+test("(concat \"hello\" \" \" \"world\") → 리터럴", () => {
+  const src = `[FUNC f :params [] :body ((concat "hello" " " "world"))] (export f)`;
+  const js = standaloneCompile1(src);
+  if (!js.includes('"hello world"')) throw new Error(`not folded: ${js}`);
+  if (makeModule(js).f() !== "hello world") throw new Error("wrong result");
+});
+
+test("(concat \"a\" \"b\" \"c\") → \"abc\"", () => {
+  const src = `[FUNC f :params [] :body ((concat "a" "b" "c"))] (export f)`;
+  const js = standaloneCompile1(src);
+  if (!js.includes('"abc"')) throw new Error(`not folded: ${js}`);
+  if (makeModule(js).f() !== "abc") throw new Error("wrong result");
+});
+
+console.log("\n[40-D] 조건 상수 폴딩");
+
+test("(if true 1 2) → 1", () => {
+  const src = `[FUNC f :params [] :body ((if true 1 2))] (export f)`;
+  const js = standaloneCompile1(src);
+  const m = makeModule(js);
+  if (m.f() !== 1) throw new Error(`got ${m.f()}`);
+  console.log(`    → ${js.replace(/\n/g,' ').slice(40, 100)}`);
+});
+
+test("(if false 1 2) → 2", () => {
+  const src = `[FUNC f :params [] :body ((if false 1 2))] (export f)`;
+  const js = standaloneCompile1(src);
+  const m = makeModule(js);
+  if (m.f() !== 2) throw new Error(`got ${m.f()}`);
+});
+
+console.log("\n[40-E] 변수가 있으면 폴딩 안 함");
+
+test("(+ $x 1) — 변수 있음, 폴딩 안 함", () => {
+  const src = `[FUNC f :params [$x] :body ((+ $x 1))] (export f)`;
+  const js = standaloneCompile1(src);
+  const m = makeModule(js);
+  if (m.f(10) !== 11) throw new Error(`got ${m.f(10)}`);
+});
+
+test("(concat $s \"!\") — 변수 있음, 폴딩 안 함", () => {
+  const src = `[FUNC f :params [$s] :body ((concat $s "!"))] (export f)`;
+  const m = makeModule(standaloneCompile1(src));
+  if (m.f("hello") !== "hello!") throw new Error(`got ${m.f("hello")}`);
 });
 
 // ── Gen2 + Gen3 고정점 유지 ───────────────────────────────────
-console.log("\n[35-E] Gen2 + Gen3 고정점 유지");
-
-function standaloneCompile1(src: string) {
-  return codegenMod1["gen-js"](parserMod1.parse(lexerMod1.lex(src)));
-}
+console.log("\n[40-F] Gen2 + Gen3 고정점 유지");
 
 let lexer2JS = "", parser2JS = "", codegen2JS = "";
 let lexerMod2: any, parserMod2: any, codegenMod2: any;
@@ -244,12 +227,10 @@ test("standaloneCompile2(lexer.fl) → Gen3", () => {
 test("standaloneCompile2(parser.fl) → Gen3", () => {
   parser3JS = standaloneCompile2(parserSrc);
   makeModule(parser3JS);
-  console.log(`    → ${parser3JS.length} chars`);
 });
 test("standaloneCompile2(codegen.fl) → Gen3", () => {
   codegen3JS = standaloneCompile2(codegenSrc);
   makeModule(codegen3JS);
-  console.log(`    → ${codegen3JS.length} chars`);
 });
 test("Gen2===Gen3 lexer 고정점", () => {
   if (lexer2JS !== lexer3JS) throw new Error("diff");
@@ -261,20 +242,8 @@ test("Gen2===Gen3 codegen 고정점", () => {
   if (codegen2JS !== codegen3JS) throw new Error("diff");
 });
 
-// ── Gen2 파서 에러 메시지도 개선됐는지 검증 ──────────────────
-console.log("\n[35-F] Gen2 파서 에러 메시지 형식 유지");
-
-testErr("Gen2 parser: SyntaxError 형식",
-  () => parserMod2.parse(lexerMod2.lex("(+ 1 2")),
-  "SyntaxError"
-);
-testErr("Gen2 parser: [line:col] 형식",
-  () => parserMod2.parse(lexerMod2.lex(")")),
-  "[1:1]"
-);
-
 // ── 결과 ─────────────────────────────────────────────────────
 console.log(`\n${"─".repeat(50)}`);
-console.log(`Phase 35 Error Messages: ${passed} passed, ${failed} failed`);
+console.log(`Phase 40 Constant Folding: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
 process.exit(0);

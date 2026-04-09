@@ -578,6 +578,90 @@
   )
 ]
 
+; ── 상수 폴딩 ────────────────────────────────────────────────────
+; 인자 타입 체크: number 리터럴 또는 string 리터럴인지만 폴딩
+
+[FUNC all-num-literals? :params [$args]
+  :body (
+    (if (= (length $args) 0)
+      true
+      (let [[p (get $args 0)]]
+        (if (and (= (get $p :kind) "literal") (= (get $p :type) "number"))
+          (all-num-literals? (slice $args 1 (length $args)))
+          false
+        )
+      )
+    )
+  )
+]
+
+[FUNC all-str-literals? :params [$args]
+  :body (
+    (if (= (length $args) 0)
+      true
+      (let [[p (get $args 0)]]
+        (if (and (= (get $p :kind) "literal") (= (get $p :type) "string"))
+          (all-str-literals? (slice $args 1 (length $args)))
+          false
+        )
+      )
+    )
+  )
+]
+
+[FUNC fold-num-op :params [$op $args]
+  :body (
+    (let [[a (get (get $args 0) :value)]
+          [b (get (get $args 1) :value)]]
+      (match $op
+        ("+"  (num-to-str (+ $a $b)))
+        ("-"  (num-to-str (- $a $b)))
+        ("*"  (num-to-str (* $a $b)))
+        ("/"  (num-to-str (/ $a $b)))
+        ("%"  (num-to-str (% $a $b)))
+        (_    null)
+      )
+    )
+  )
+]
+
+[FUNC fold-concat-r :params [$args $i $acc]
+  :body (
+    (if (>= $i (length $args))
+      $acc
+      (fold-concat-r $args (+ $i 1) (concat $acc (get (get $args $i) :value)))
+    )
+  )
+]
+
+[FUNC fold-concat :params [$args]
+  :body (
+    (let [[s (fold-concat-r $args 0 "")]]
+      (concat "\""
+        (replace (replace (replace (replace (replace $s "\\" "\\\\") "\n" "\\n") "\t" "\\t") "\r" "\\r") "\"" "\\\"")
+        "\"")
+    )
+  )
+]
+
+[FUNC try-fold :params [$op $args]
+  :body (
+    (if (or (= $op "+") (= $op "-") (= $op "*") (= $op "/"))
+      (if (and (= (length $args) 2) (all-num-literals? $args))
+        (fold-num-op $op $args)
+        null
+      )
+      (if (= $op "concat")
+        (if (all-str-literals? $args)
+          (fold-concat $args)
+          null
+        )
+        null
+      )
+    )
+  )
+]
+
 ; ── S-expression 생성 ────────────────────────────────────────────
 
 [FUNC gen-sexpr :params [$node]
@@ -585,7 +669,17 @@
     (let [[op   (get $node :op)]
           [args (get $node :args)]]
       (match $op
-        ("if"     (gen-if $args))
+        ("if"
+          (let [[cond-node (get $args 0)]]
+            (if (= (get $cond-node :kind) "literal")
+              (if (get $cond-node :value)
+                (gen-expr (get $args 1))
+                (gen-expr (get $args 2))
+              )
+              (gen-if $args)
+            )
+          )
+        )
         ("let"    (gen-let $args))
         ("do"     (gen-do $args))
         ("begin"  (gen-do $args))
@@ -601,8 +695,13 @@
         ("loop"   (gen-loop $args))
         ("recur"  (gen-recur $args))
         (_
-          (let [[gen-args (map $args [a] (gen-expr $a))]]
-            (gen-builtin-op $op $gen-args)
+          (let [[folded (try-fold $op $args)]]
+            (if (null? $folded)
+              (let [[gen-args (map $args [a] (gen-expr $a))]]
+                (gen-builtin-op $op $gen-args)
+              )
+              $folded
+            )
           )
         )
       )
