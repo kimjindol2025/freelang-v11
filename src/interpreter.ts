@@ -30,6 +30,7 @@ import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, A
 import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (env + SIGTERM)
+import { pgBuiltins } from "./stdlib-pg";               // PostgreSQL + JWT + AI
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -159,6 +160,7 @@ export class Interpreter {
     this.registerModule(createCacheModule());
     this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
+    this.registerModule(pgBuiltins);            // PostgreSQL + JWT + AI
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
@@ -237,11 +239,13 @@ export class Interpreter {
     }
   }
 
+  private serverConfig: { port: number; host: string } | null = null;
+
   private handleServerBlock(block: Block): void {
-    // [SERVER name :port 3009 :host "localhost" ...]
-    const port = this.getFieldValue(block, "port") || 3009;
-    const host = this.getFieldValue(block, "host") || "localhost";
-    // Store server config (implement later)
+    // [SERVER name :port 3009 :host "0.0.0.0" ...]
+    const port = Number(this.getFieldValue(block, "port") || 3009);
+    const host = String(this.getFieldValue(block, "host") || "0.0.0.0");
+    this.serverConfig = { port, host };
   }
 
   private handleRouteBlock(block: Block): void {
@@ -390,20 +394,32 @@ export class Interpreter {
   }
 
   private setupExpressRoutes(): void {
+    // body-parser 미들웨어 등록
+    this.context.app.use(express.json());
+    this.context.app.use(express.urlencoded({ extended: true }));
+
     for (const [, route] of this.context.routes) {
       const method = route.method.toLowerCase();
       const handler = (req: express.Request, res: express.Response) => {
         try {
           this.context.variables.set("request", req);
           this.context.variables.set("response", res);
+          this.context.variables.set("$req", req);
+          this.context.variables.set("$res", res);
 
           const result = this.eval(route.handler);
 
-          // If handler returns an object, send as JSON
-          if (typeof result === "object") {
+          // server_json/server_status returns {__fl_response, type, status, body}
+          if (result && typeof result === "object" && result.__fl_response) {
+            if (result.type === "text") {
+              res.status(result.status || 200).send(result.body);
+            } else {
+              res.status(result.status || 200).json(result.body);
+            }
+          } else if (typeof result === "object") {
             res.json(result);
           } else {
-            res.send(result);
+            res.send(String(result ?? ""));
           }
         } catch (error) {
           res.status(500).json({ error: (error as Error).message });
@@ -419,6 +435,14 @@ export class Interpreter {
       } else if (method === "delete") {
         this.context.app.delete(route.path, handler);
       }
+    }
+
+    // SERVER 블록이 있으면 서버 시작
+    if (this.serverConfig) {
+      const { port, host } = this.serverConfig;
+      this.context.server = this.context.app.listen(port, host, () => {
+        console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
+      });
     }
   }
 

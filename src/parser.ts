@@ -101,7 +101,7 @@ export class Parser {
       if (this.check(T.LBracket)) {
         // Distinguish between block [TYPE ...] and array [val1 val2 ...]
         const nextIdx = this.pos + 1;
-        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
@@ -525,7 +525,7 @@ export class Parser {
     if (this.check(T.LBracket)) {
       // Lookahead: is this a block or value array?
       const nextIdx = this.pos + 1;
-      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
 
 
       if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {
