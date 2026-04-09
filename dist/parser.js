@@ -41,7 +41,7 @@ class Parser {
             if (this.check(token_1.TokenType.LBracket)) {
                 // Distinguish between block [TYPE ...] and array [val1 val2 ...]
                 const nextIdx = this.pos + 1;
-                const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+                const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
                 if (nextIdx < this.tokens.length) {
                     const nextToken = this.tokens[nextIdx];
                     const isBlockKeyword = nextToken.type === token_1.TokenType.Module || nextToken.type === token_1.TokenType.TypeClass || nextToken.type === token_1.TokenType.Instance;
@@ -74,7 +74,8 @@ class Parser {
     // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
     // Phase 6: BLOCK_TYPE can be Symbol (old) or keyword token (MODULE, TYPECLASS, INSTANCE)
     parseBlock() {
-        this.expect(token_1.TokenType.LBracket);
+        const lbracket = this.expect(token_1.TokenType.LBracket);
+        const blockLine = lbracket.line;
         const typeToken = this.advance();
         let blockType;
         if (typeToken.type === token_1.TokenType.Symbol) {
@@ -213,20 +214,20 @@ class Parser {
         this.expect(token_1.TokenType.RBracket);
         // Phase 6: If this is a MODULE block, convert it to ModuleBlock
         if (blockType === "MODULE") {
-            const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+            const block = (0, ast_1.makeBlock)(blockType, blockName, fields, blockLine);
             return this.convertBlockToModuleBlock(block);
         }
         // Phase 5: If this is a TYPECLASS block, convert it to TypeClass
         if (blockType === "TYPECLASS") {
-            const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+            const block = (0, ast_1.makeBlock)(blockType, blockName, fields, blockLine);
             return this.convertBlockToTypeClass(block);
         }
         // Phase 5: If this is an INSTANCE block, convert it to TypeClassInstance
         if (blockType === "INSTANCE") {
-            const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+            const block = (0, ast_1.makeBlock)(blockType, blockName, fields, blockLine);
             return this.convertBlockToInstance(block);
         }
-        const block = (0, ast_1.makeBlock)(blockType, blockName, fields);
+        const block = (0, ast_1.makeBlock)(blockType, blockName, fields, blockLine);
         // Phase 3: Always set typeAnnotations (even if empty) for consistent handling
         // FUNC blocks without :return/:params annotations still need to be registered with default types
         if (blockType === "FUNC" || typeAnnotations.size > 0) {
@@ -432,7 +433,7 @@ class Parser {
         if (this.check(token_1.TokenType.LBracket)) {
             // Lookahead: is this a block or value array?
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
             if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === token_1.TokenType.Symbol) {
                 const potentialType = this.tokens[nextIdx].value;
                 // Check if it's a known block type (uppercase) or looks like a block name followed by a keyword
@@ -529,7 +530,7 @@ class Parser {
             return false;
         const nextToken = this.tokens[peekPos];
         // If next token is a variable or non-symbol value, it's an array literal
-        return nextToken.type === token_1.TokenType.Variable || nextToken.type === token_1.TokenType.Number || nextToken.type === token_1.TokenType.String || nextToken.type === token_1.TokenType.RBracket;
+        return nextToken.type === token_1.TokenType.Variable || nextToken.type === token_1.TokenType.Number || nextToken.type === token_1.TokenType.String || nextToken.type === token_1.TokenType.RBracket || nextToken.type === token_1.TokenType.LBracket;
     }
     // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
     // Also handles match expressions: (match value (pattern body) ...)
@@ -713,7 +714,8 @@ class Parser {
         // Never generic function syntax: fn, let, if, cond, match, etc.
         const specialFormsForbiddingGeneric = new Set([
             "fn", "let", "if", "cond", "match", "do", "try", "catch",
-            "let*", "letrec", "define", "async", "await"
+            "let*", "letrec", "define", "async", "await",
+            "loop", "recur", "import", "export"
         ]);
         if (!specialFormsForbiddingGeneric.has(op) && this.check(token_1.TokenType.LBracket) && !this.isArrayLiteralStart()) {
             // Phase 4: Handle generic function syntax: (identity[int] ...) or (fn[T] ...)

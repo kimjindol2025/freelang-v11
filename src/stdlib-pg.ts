@@ -1,63 +1,66 @@
 // FreeLang v9 — PostgreSQL stdlib
-// pg_query, pg_exec, pg_one, jwt_sign, jwt_verify, bcrypt_hash, bcrypt_verify
+// pg_query, pg_exec, pg_one, jwt_sign, jwt_verify, pbkdf2_hash, pbkdf2_verify, ai_complete
 
-import { Client, Pool } from "pg";
 import * as jwt from "jsonwebtoken";
 import * as crypto from "crypto";
+import * as path from "path";
+import * as fs from "fs";
+import { execSync } from "child_process";
 
-// 글로벌 커넥션 풀 (DATABASE_URL 환경변수)
-let pool: Pool | null = null;
+// freelang-v9 node_modules 위치
+const V9_DIR = path.resolve(__dirname, "..");
+const PG_HELPER = path.join(V9_DIR, "dist", "_pg_helper.js");
 
-function getPool(): Pool {
-  if (!pool) {
-    const url =
-      process.env.DATABASE_URL ||
-      "postgresql://jangjangai:password@localhost:35432/jangjangai";
-    pool = new Pool({ connectionString: url });
-  }
-  return pool;
+// pg helper 스크립트 생성 (dist 폴더에 한 번만)
+function ensurePgHelper(): void {
+  if (fs.existsSync(PG_HELPER)) return;
+  const pgPath = JSON.stringify(path.join(V9_DIR, "node_modules", "pg"));
+  const helperSrc = `
+const { Client } = require(${pgPath});
+const inputFile = process.argv[2];
+const { sql, params, dbUrl } = JSON.parse(require('fs').readFileSync(inputFile, 'utf8'));
+(async () => {
+  const c = new Client({ connectionString: dbUrl });
+  await c.connect();
+  const r = await c.query(sql, params);
+  process.stdout.write(JSON.stringify(r.rows));
+  await c.end();
+})().catch(e => { process.stderr.write(e.message); process.exit(1); });
+`;
+  fs.writeFileSync(PG_HELPER, helperSrc);
 }
+
+let _tmpCounter = 0;
 
 export const pgBuiltins: Record<string, (...args: any[]) => any> = {
   // pg_query sql params -> rows[]
-  pg_query: (sql: string, params: any[] = []): any[] => {
-    const p = getPool();
-    // synchronous wrapper via Atomics — v9는 sync 환경이므로 childProcess 방식 사용
-    const { execSync } = require("child_process");
+  pg_query: (sql: string, params: any[]): any[] => {
+    ensurePgHelper();
     const dbUrl =
       process.env.DATABASE_URL ||
       "postgresql://jangjangai:password@localhost:35432/jangjangai";
-
-    // params를 JSON으로 넘겨서 node 동기 실행
-    const script = `
-const { Client } = require('pg');
-(async () => {
-  const c = new Client({ connectionString: ${JSON.stringify(dbUrl)} });
-  await c.connect();
-  const r = await c.query(${JSON.stringify(sql)}, ${JSON.stringify(params)});
-  console.log(JSON.stringify(r.rows));
-  await c.end();
-})().catch(e => { console.error(e.message); process.exit(1); });
-`;
+    const tmpFile = path.join(V9_DIR, "dist", `_pg_tmp_${++_tmpCounter}.json`);
     try {
-      const out = execSync(`node -e "${script.replace(/"/g, '\\"').replace(/\n/g, " ")}"`, {
-        encoding: "utf8",
-        timeout: 10000,
-      });
-      return JSON.parse(out.trim());
+      fs.writeFileSync(tmpFile, JSON.stringify({ sql, params: params || [], dbUrl }));
+      const out = execSync(`node ${JSON.stringify(PG_HELPER)} ${JSON.stringify(tmpFile)}`,
+        { encoding: "utf8", timeout: 10000 }
+      );
+      return JSON.parse(out.trim() || "[]");
     } catch (e: any) {
-      throw new Error(`pg_query error: ${e.message}`);
+      throw new Error(`pg_query error: ${e.stderr || e.message}`);
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch {}
     }
   },
 
   // pg_one sql params -> row | null
-  pg_one: (sql: string, params: any[] = []): any | null => {
-    const rows = pgBuiltins.pg_query(sql, params);
+  pg_one: (sql: string, params: any[]): any | null => {
+    const rows = pgBuiltins.pg_query(sql, params || []);
     return rows.length > 0 ? rows[0] : null;
   },
 
   // pg_exec sql params -> void
-  pg_exec: (sql: string, params: any[] = []): void => {
+  pg_exec: (sql: string, params: any[]): void => {
     pgBuiltins.pg_query(sql, params);
   },
 
