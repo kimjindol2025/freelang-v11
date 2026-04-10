@@ -1,0 +1,246 @@
+; FreeLang v9 Standard Library — Phase 49
+; 순수 FL로 작성한 고차 함수 및 유틸리티
+; 모든 함수는 순수(pure), accumulator 패턴으로 TCO 근사
+
+; ── Array 유틸 ────────────────────────────────────────────────
+
+[FUNC fl-map :params [$coll $fn]
+  :body ((fl-map-r $coll $fn 0 []))
+]
+[FUNC fl-map-r :params [$coll $fn $i $acc]
+  :body (
+    (if (>= $i (length $coll))
+      $acc
+      (fl-map-r $coll $fn (+ $i 1)
+        (append $acc [(call $fn (get $coll $i))])
+      )
+    )
+  )
+]
+
+[FUNC fl-filter :params [$coll $fn]
+  :body ((fl-filter-r $coll $fn 0 []))
+]
+[FUNC fl-filter-r :params [$coll $fn $i $acc]
+  :body (
+    (if (>= $i (length $coll))
+      $acc
+      (let [[$x (get $coll $i)]]
+        (fl-filter-r $coll $fn (+ $i 1)
+          (if (call $fn $x) (append $acc [$x]) $acc)
+        )
+      )
+    )
+  )
+]
+
+[FUNC fl-reduce :params [$coll $init $fn]
+  :body ((fl-reduce-r $coll $fn $init 0))
+]
+[FUNC fl-reduce-r :params [$coll $fn $acc $i]
+  :body (
+    (if (>= $i (length $coll))
+      $acc
+      (fl-reduce-r $coll $fn
+        (call $fn $acc (get $coll $i))
+        (+ $i 1)
+      )
+    )
+  )
+]
+
+[FUNC fl-find :params [$coll $fn]
+  :body ((fl-find-r $coll $fn 0))
+]
+[FUNC fl-find-r :params [$coll $fn $i]
+  :body (
+    (if (>= $i (length $coll))
+      null
+      (let [[$x (get $coll $i)]]
+        (if (call $fn $x)
+          $x
+          (fl-find-r $coll $fn (+ $i 1))
+        )
+      )
+    )
+  )
+]
+
+[FUNC fl-any? :params [$coll $fn]
+  :body ((fl-any-r $coll $fn 0))
+]
+[FUNC fl-any-r :params [$coll $fn $i]
+  :body (
+    (if (>= $i (length $coll))
+      false
+      (if (call $fn (get $coll $i))
+        true
+        (fl-any-r $coll $fn (+ $i 1))
+      )
+    )
+  )
+]
+
+[FUNC fl-all? :params [$coll $fn]
+  :body ((fl-all-r $coll $fn 0))
+]
+[FUNC fl-all-r :params [$coll $fn $i]
+  :body (
+    (if (>= $i (length $coll))
+      true
+      (if (call $fn (get $coll $i))
+        (fl-all-r $coll $fn (+ $i 1))
+        false
+      )
+    )
+  )
+]
+
+[FUNC fl-flatten :params [$coll]
+  :body ((fl-flatten-r $coll 0 []))
+]
+[FUNC fl-flatten-r :params [$coll $i $acc]
+  :body (
+    (if (>= $i (length $coll))
+      $acc
+      (let [[$item (get $coll $i)]]
+        (fl-flatten-r $coll (+ $i 1)
+          (if (array? $item)
+            (fl-flatten-r $item 0 $acc)
+            (append $acc [$item])
+          )
+        )
+      )
+    )
+  )
+]
+
+[FUNC fl-zip :params [$a $b]
+  :body ((fl-zip-r $a $b 0 []))
+]
+[FUNC fl-zip-r :params [$a $b $i $acc]
+  :body (
+    (if (or (>= $i (length $a)) (>= $i (length $b)))
+      $acc
+      (fl-zip-r $a $b (+ $i 1)
+        (append $acc [[(get $a $i) (get $b $i)]])
+      )
+    )
+  )
+]
+
+[FUNC fl-range :params [$start $end]
+  :body ((fl-range-r $start $end []))
+]
+[FUNC fl-range-r :params [$i $end $acc]
+  :body (
+    (if (>= $i $end)
+      $acc
+      (fl-range-r (+ $i 1) $end (append $acc [$i]))
+    )
+  )
+]
+
+; ── Maybe/Option ──────────────────────────────────────────────
+; 표현: ["some" value] 또는 ["none"]
+
+[FUNC some :params [$v]
+  :body (
+    (let [[$r (append ["some"] [$v])]] $r)
+  )
+]
+
+[FUNC none :params []
+  :body (
+    (let [[$r ["none"]]] $r)
+  )
+]
+
+[FUNC some? :params [$m]
+  :body ((= (get $m 0) "some"))
+]
+
+[FUNC none? :params [$m]
+  :body ((= (get $m 0) "none"))
+]
+
+[FUNC maybe-map :params [$m $fn]
+  :body (
+    (if (some? $m)
+      (append ["some"] [(call $fn (get $m 1))])
+      $m
+    )
+  )
+]
+
+[FUNC maybe-or :params [$m $dflt]
+  :body (
+    (if (some? $m)
+      (get $m 1)
+      $dflt
+    )
+  )
+]
+
+[FUNC maybe-chain :params [$m $fn]
+  :body (
+    (if (some? $m)
+      (call $fn (get $m 1))
+      $m
+    )
+  )
+]
+
+; ── Result/Either ─────────────────────────────────────────────
+; 표현: ["ok" value] 또는 ["err" reason]
+
+[FUNC ok :params [$v]
+  :body (
+    (let [[$r (append ["ok"] [$v])]] $r)
+  )
+]
+
+[FUNC err :params [$e]
+  :body (
+    (let [[$r (append ["err"] [$e])]] $r)
+  )
+]
+
+[FUNC ok? :params [$r]
+  :body ((= (get $r 0) "ok"))
+]
+
+[FUNC err? :params [$r]
+  :body ((= (get $r 0) "err"))
+]
+
+[FUNC result-map :params [$r $fn]
+  :body (
+    (if (ok? $r)
+      (append ["ok"] [(call $fn (get $r 1))])
+      $r
+    )
+  )
+]
+
+[FUNC result-or :params [$r $dflt]
+  :body (
+    (if (ok? $r)
+      (get $r 1)
+      $dflt
+    )
+  )
+]
+
+[FUNC result-chain :params [$r $fn]
+  :body (
+    (if (ok? $r)
+      (call $fn (get $r 1))
+      $r
+    )
+  )
+]
+
+(export fl-map fl-filter fl-reduce fl-find fl-any? fl-all? fl-flatten fl-zip fl-range
+        some none some? none? maybe-map maybe-or maybe-chain
+        ok err ok? err? result-map result-or result-chain)

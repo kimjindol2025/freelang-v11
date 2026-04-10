@@ -177,6 +177,65 @@
   )
 ]
 
+; ── 패턴 매칭 ────────────────────────────────────────────────
+
+; match args: [subject-expr, clause1, clause2, ...]
+; clause: {kind:"sexpr", op:"패턴", args:[result-expr]}
+; 패턴 "_" = wildcard
+[FUNC fl-eval-match :params [$args $env]
+  :body (
+    (let [[$subject (fl-eval (get $args 0) $env)]
+          [$clauses (slice $args 1 (length $args))]]
+      (fl-match-clauses $clauses $subject $env 0)
+    )
+  )
+]
+
+[FUNC fl-match-clauses :params [$clauses $subject $env $i]
+  :body (
+    (if (>= $i (length $clauses))
+      null
+      (let [[$clause (get $clauses $i)]
+            [$result (fl-match-clause $clause $subject $env)]]
+        (if (= (get $result :matched) true)
+          (get $result :value)
+          (fl-match-clauses $clauses $subject $env (+ $i 1))
+        )
+      )
+    )
+  )
+]
+
+[FUNC fl-match-clause :params [$clause $subject $env]
+  :body (
+    (let [[$pat-op (get $clause :op)]
+          [$result-expr (get (get $clause :args) 0)]]
+      (if (= $pat-op "_")
+        (let [[$r {:matched true :value (fl-eval $result-expr $env)}]] $r)
+        (let [[$matched
+                (if (= $pat-op "null")
+                  (null? $subject)
+                  (if (= $pat-op "true")
+                    (= $subject true)
+                    (if (= $pat-op "false")
+                      (= $subject false)
+                      (if (= $subject $pat-op)
+                        true
+                        (= $subject (str-to-num $pat-op))
+                      )
+                    )
+                  )
+                )]]
+          (if $matched
+            (let [[$r {:matched true :value (fl-eval $result-expr $env)}]] $r)
+            (let [[$r {:matched false :value null}]] $r)
+          )
+        )
+      )
+    )
+  )
+]
+
 ; ── S-expression 평가 ─────────────────────────────────────────
 
 [FUNC fl-eval-sexpr :params [$op $args $env]
@@ -190,10 +249,28 @@
     (if (= $op "or")      (fl-eval-or $args $env)
     (if (= $op "not")     (not (fl-eval (get $args 0) $env))
     (if (= $op "null?")   (null? (fl-eval (get $args 0) $env))
+    (if (= $op "match")   (fl-eval-match $args $env)
+    (if (= $op "call")    (fl-eval-call-fn $args $env)
     (if (or (= $op "export") (or (= $op "define") (= $op "set!")))
       null
       (fl-eval-call $op $args $env)
-    ))))))))))
+    ))))))))))))
+  )
+]
+
+; (call $fn arg1 arg2...) — 클로저를 동적으로 호출
+[FUNC fl-eval-call-fn :params [$args $env]
+  :body (
+    (let [[$fn-raw (fl-eval (get $args 0) $env)]
+          [$fn (if (closure? $fn-raw)
+                 $fn-raw
+                 (env-lookup $env $fn-raw))]
+          [$vals (fl-eval-args (slice $args 1 (length $args)) $env 0 [])]]
+      (if (closure? $fn)
+        (fl-apply $fn $vals $env)
+        null
+      )
+    )
   )
 ]
 
@@ -350,8 +427,16 @@
     (if (= $op "replace")    (replace (get $vals 0) (get $vals 1) (get $vals 2))
     (if (= $op "str-join")   (str-join (get $vals 0) (get $vals 1))
     (if (= $op "null?")      (null? (get $vals 0))
+    (if (= $op "array?")     (array? (get $vals 0))
+    (if (= $op "string?")    (string? (get $vals 0))
+    (if (= $op "number?")    (number? (get $vals 0))
+    (if (= $op "read-file")  (file_read (get $vals 0))
+    (if (= $op "write-file") (file_write (get $vals 0) (get $vals 1))
+    (if (= $op "file-exists?") (file_exists (get $vals 0))
+    (if (= $op "file-append")  (file_append (get $vals 0) (get $vals 1))
+    (if (= $op "dir-list")     (dir_list (get $vals 0))
     null
-    )))))))))))))))))))))
+    )))))))))))))))))))))))))))))
   )
 ]
 

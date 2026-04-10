@@ -1,0 +1,422 @@
+; FreeLang v9 Self-Hosting Type Checker — Phase 48
+; 경량 정적 분석: 아리티 체크, 미정의 변수, 타입 불일치 경고
+;
+; 타입: "Int" "Str" "Bool" "Null" "Array" "Fn" "Any"
+; 진단: [{:level "error"|"warning" :msg "..." :line 0}]
+
+; ── 타입 환경 ─────────────────────────────────────────────────
+
+[FUNC tc-env-new :params []
+  :body (
+    (let [[$e {:types [] :fns [] :parent null}]]
+      $e
+    )
+  )
+]
+
+[FUNC tc-env-child :params [$parent]
+  :body (
+    (let [[$e {:types [] :fns [] :parent $parent}]]
+      $e
+    )
+  )
+]
+
+[FUNC tc-find :params [$items $name $i]
+  :body (
+    (if (>= $i (length $items))
+      "__not_found__"
+      (let [[$pair (get $items $i)]]
+        (if (= (get $pair 0) $name)
+          (get $pair 1)
+          (tc-find $items $name (+ $i 1))
+        )
+      )
+    )
+  )
+]
+
+[FUNC tc-var-lookup :params [$env $name]
+  :body (
+    (if (null? $env)
+      null
+      (let [[$r (tc-find (get $env :types) $name 0)]]
+        (if (= $r "__not_found__")
+          (tc-var-lookup (get $env :parent) $name)
+          $r
+        )
+      )
+    )
+  )
+]
+
+[FUNC tc-fn-lookup :params [$env $name]
+  :body (
+    (if (null? $env)
+      null
+      (let [[$r (tc-find (get $env :fns) $name 0)]]
+        (if (= $r "__not_found__")
+          (tc-fn-lookup (get $env :parent) $name)
+          $r
+        )
+      )
+    )
+  )
+]
+
+[FUNC tc-bind-var :params [$env $name $type]
+  :body (
+    (let [[$new-types (append [[$name $type]] (get $env :types))]
+          [$e {:types $new-types :fns (get $env :fns) :parent (get $env :parent)}]]
+      $e
+    )
+  )
+]
+
+; fn-info: [$arity $return-type]
+[FUNC tc-bind-fn :params [$env $name $arity]
+  :body (
+    (let [[$new-fns (append [[$name $arity]] (get $env :fns))]
+          [$e {:types (get $env :types) :fns $new-fns :parent (get $env :parent)}]]
+      $e
+    )
+  )
+]
+
+; ── 진단 생성 ─────────────────────────────────────────────────
+
+[FUNC make-diag :params [$level $msg $line]
+  :body (
+    (let [[$d {:level $level :msg $msg :line $line}]] $d)
+  )
+]
+
+; ── 타입 추론 ─────────────────────────────────────────────────
+
+[FUNC tc-infer-literal :params [$node]
+  :body (
+    (match (get $node :type)
+      ("number" "Int")
+      ("string" "Str")
+      ("bool"   "Bool")
+      (_        "Any")
+    )
+  )
+]
+
+[FUNC tc-infer :params [$node $env $diags]
+  :body (
+    (if (null? $node)
+      ["Null" $diags]
+      (let [[$k (get $node :kind)]]
+        (if (= $k "literal")
+          [(tc-infer-literal $node) $diags]
+          (if (= $k "variable")
+            (tc-infer-var $node $env $diags)
+            (if (= $k "array")
+              ["Array" $diags]
+              (if (= $k "sexpr")
+                (tc-infer-sexpr $node $env $diags)
+                ["Any" $diags]
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+[FUNC tc-infer-var :params [$node $env $diags]
+  :body (
+    (let [[$name (get $node :name)]
+          [$t (tc-var-lookup $env $name)]]
+      (if (null? $t)
+        (let [[$msg (concat "미정의 변수: $" $name)]
+              [$d (make-diag "error" $msg (get $node :line))]]
+          ["Any" (append $diags [$d])]
+        )
+        [$t $diags]
+      )
+    )
+  )
+]
+
+; ── S-expression 타입 추론 ────────────────────────────────────
+
+[FUNC tc-infer-sexpr :params [$node $env $diags]
+  :body (
+    (let [[$op (get $node :op)]
+          [$args (get $node :args)]]
+      (if (= $op "if")
+        (tc-infer-if $args $env $diags)
+        (if (= $op "let")
+          (tc-infer-let $args $env $diags)
+          (if (= $op "do")
+            (tc-infer-body $args $env $diags)
+            (if (= $op "begin")
+              (tc-infer-body $args $env $diags)
+              (if (or (= $op "+") (or (= $op "-") (or (= $op "*") (or (= $op "/") (= $op "%")))))
+                (tc-check-arith $args $env $diags)
+                (if (= $op "concat")
+                  (tc-check-concat $args $env $diags)
+                  (if (or (= $op "=") (or (= $op "!=") (or (= $op "<") (or (= $op ">") (or (= $op "<=") (= $op ">="))))))
+                    ["Bool" $diags]
+                    (if (or (= $op "and") (or (= $op "or") (= $op "not")))
+                      ["Bool" $diags]
+                      (if (or (= $op "null?") (or (= $op "array?") (or (= $op "string?") (= $op "number?"))))
+                        ["Bool" $diags]
+                        (if (or (= $op "export") (or (= $op "define") (= $op "set!")))
+                          ["Null" $diags]
+                          (if (or (= $op "length") (or (= $op "str-to-num") (= $op "num-to-str")))
+                            (tc-infer-builtin $op $args $env $diags)
+                            (tc-infer-call $op $args $env $diags)
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+[FUNC tc-infer-if :params [$args $env $diags]
+  :body (
+    (let [[$r0 (tc-infer (get $args 0) $env $diags)]
+          [$d1 (get $r0 1)]
+          [$r1 (tc-infer (get $args 1) $env $d1)]
+          [$t1 (get $r1 0)]
+          [$d2 (get $r1 1)]]
+      (if (>= (length $args) 3)
+        (let [[$r2 (tc-infer (get $args 2) $env $d2)]
+              [$t2 (get $r2 0)]
+              [$d3 (get $r2 1)]]
+          (if (or (= $t1 "Any") (or (= $t2 "Any") (= $t1 $t2)))
+            [$t1 $d3]
+            (let [[$d (make-diag "warning" (concat "if 분기 타입 불일치: " (concat $t1 (concat " vs " $t2))) 0)]]
+              [$t1 (append $d3 [$d])]
+            )
+          )
+        )
+        [$t1 $d2]
+      )
+    )
+  )
+]
+
+[FUNC tc-infer-let :params [$args $env $diags]
+  :body (
+    (let [[$bindings (get (get $args 0) :items)]
+          [$new-env-result (tc-bind-let-all $bindings $env $diags 0)]]
+      (tc-infer-body (slice $args 1 (length $args)) (get $new-env-result 0) (get $new-env-result 1))
+    )
+  )
+]
+
+[FUNC tc-bind-let-all :params [$bindings $env $diags $i]
+  :body (
+    (if (>= $i (length $bindings))
+      [$env $diags]
+      (let [[$pair (get $bindings $i)]
+            [$pair-items (get $pair :items)]
+            [$name-node (get $pair-items 0)]
+            [$nm (if (= (get $name-node :kind) "variable")
+                   (get $name-node :name)
+                   (get $name-node :value))]
+            [$r (tc-infer (get $pair-items 1) $env $diags)]
+            [$t (get $r 0)]
+            [$d (get $r 1)]
+            [$new-env (tc-bind-var $env $nm $t)]]
+        (tc-bind-let-all $bindings $new-env $d (+ $i 1))
+      )
+    )
+  )
+]
+
+[FUNC tc-infer-body :params [$nodes $env $diags]
+  :body (
+    (if (= (length $nodes) 0)
+      ["Null" $diags]
+      (if (= (length $nodes) 1)
+        (tc-infer (get $nodes 0) $env $diags)
+        (let [[$r (tc-infer (get $nodes 0) $env $diags)]]
+          (tc-infer-body (slice $nodes 1 (length $nodes)) $env (get $r 1))
+        )
+      )
+    )
+  )
+]
+
+[FUNC tc-check-arith :params [$args $env $diags]
+  :body (
+    (let [[$r0 (tc-infer (get $args 0) $env $diags)]
+          [$t0 (get $r0 0)]
+          [$d0 (get $r0 1)]
+          [$r1 (tc-infer (get $args 1) $env $d0)]
+          [$t1 (get $r1 0)]
+          [$d1 (get $r1 1)]]
+      (if (and (not (= $t0 "Any")) (not (= $t0 "Int")))
+        (let [[$d (make-diag "warning" (concat "산술 연산에 Int 기대, 받은: " $t0) 0)]]
+          ["Int" (append $d1 [$d])]
+        )
+        ["Int" $d1]
+      )
+    )
+  )
+]
+
+[FUNC tc-check-concat :params [$args $env $diags]
+  :body (
+    (let [[$r0 (tc-infer (get $args 0) $env $diags)]
+          [$t0 (get $r0 0)]
+          [$d0 (get $r0 1)]]
+      (if (and (not (= $t0 "Any")) (not (= $t0 "Str")))
+        (let [[$d (make-diag "warning" (concat "concat에 Str 기대, 받은: " $t0) 0)]]
+          ["Str" (append $d0 [$d])]
+        )
+        ["Str" $d0]
+      )
+    )
+  )
+]
+
+[FUNC tc-infer-builtin :params [$op $args $env $diags]
+  :body (
+    (let [[$r (tc-infer (get $args 0) $env $diags)]]
+      (if (= $op "length")
+        ["Int" (get $r 1)]
+        (if (= $op "num-to-str")
+          ["Str" (get $r 1)]
+          ["Int" (get $r 1)]
+        )
+      )
+    )
+  )
+]
+
+; ── 함수 호출 아리티 체크 ─────────────────────────────────────
+
+[FUNC tc-infer-call :params [$op $args $env $diags]
+  :body (
+    (let [[$arity (tc-fn-lookup $env $op)]]
+      (if (null? $arity)
+        ["Any" $diags]
+        (if (= $arity (length $args))
+          ["Any" $diags]
+          (let [[$msg (concat $op (concat " 아리티 불일치: 기대 " (concat (num-to-str $arity) (concat "개, 받은 " (num-to-str (length $args))))))]
+                [$d (make-diag "error" $msg 0)]]
+            ["Any" (append $diags [$d])]
+          )
+        )
+      )
+    )
+  )
+]
+
+; ── FUNC 블록 분석 ─────────────────────────────────────────────
+
+[FUNC tc-check-func :params [$node $env $diags]
+  :body (
+    (let [[$fields (get $node :fields)]
+          [$params-node (get $fields :params)]
+          [$param-items (get $params-node :items)]
+          [$arity (length $param-items)]
+          [$name (get $node :name)]
+          [$child-env (tc-env-child $env)]
+          [$bound-env (tc-bind-params $param-items $child-env 0)]]
+      (tc-infer (get $fields :body) $bound-env $diags)
+    )
+  )
+]
+
+[FUNC tc-bind-params :params [$items $env $i]
+  :body (
+    (if (>= $i (length $items))
+      $env
+      (let [[$p (get $items $i)]
+            [$nm (if (= (get $p :kind) "variable")
+                   (get $p :name)
+                   (get $p :value))]]
+        (tc-bind-params $items (tc-bind-var $env $nm "Any") (+ $i 1))
+      )
+    )
+  )
+]
+
+; ── 1패스: FUNC 이름/아리티 수집 ─────────────────────────────
+
+[FUNC tc-collect-funcs :params [$nodes $env $i]
+  :body (
+    (if (>= $i (length $nodes))
+      $env
+      (let [[$node (get $nodes $i)]]
+        (if (and (= (get $node :kind) "block") (= (get $node :type) "FUNC"))
+          (let [[$fields (get $node :fields)]
+                [$arity (length (get (get $fields :params) :items))]
+                [$new-env (tc-bind-fn $env (get $node :name) $arity)]]
+            (tc-collect-funcs $nodes $new-env (+ $i 1))
+          )
+          (tc-collect-funcs $nodes $env (+ $i 1))
+        )
+      )
+    )
+  )
+]
+
+; ── 전체 AST 체크 ─────────────────────────────────────────────
+
+[FUNC tc-check-all :params [$nodes $env $diags $i]
+  :body (
+    (if (>= $i (length $nodes))
+      $diags
+      (let [[$node (get $nodes $i)]]
+        (if (and (= (get $node :kind) "block") (= (get $node :type) "FUNC"))
+          (let [[$r (tc-check-func $node $env $diags)]]
+            (tc-check-all $nodes $env (get $r 1) (+ $i 1))
+          )
+          (let [[$r (tc-infer $node $env $diags)]]
+            (tc-check-all $nodes $env (get $r 1) (+ $i 1))
+          )
+        )
+      )
+    )
+  )
+]
+
+; ── 결과 분리 ─────────────────────────────────────────────────
+
+[FUNC tc-split-diags :params [$diags $errors $warnings $i]
+  :body (
+    (if (>= $i (length $diags))
+      {:errors $errors :warnings $warnings}
+      (let [[$d (get $diags $i)]]
+        (if (= (get $d :level) "error")
+          (tc-split-diags $diags (append $errors [$d]) $warnings (+ $i 1))
+          (tc-split-diags $diags $errors (append $warnings [$d]) (+ $i 1))
+        )
+      )
+    )
+  )
+]
+
+; ── 메인 엔트리 ───────────────────────────────────────────────
+
+[FUNC typecheck :params [$ast]
+  :body (
+    (let [[$env0 (tc-env-new)]
+          [$env1 (tc-collect-funcs $ast $env0 0)]
+          [$diags (tc-check-all $ast $env1 [] 0)]]
+      (let [[$result (tc-split-diags $diags [] [] 0)]]
+        $result
+      )
+    )
+  )
+]
+
+(export typecheck)
