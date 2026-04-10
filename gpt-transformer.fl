@@ -606,3 +606,122 @@
 (println (str "확률: " best-prob))
 (println "")
 (println "=== PASS: Forward Pass 완료 ===")
+
+; ================================================================
+; Phase 2: 학습 루프 — Cross-entropy Loss + 수치미분 + SGD
+;
+; 전략: W-emb만 업데이트 (가장 단순)
+; - 수치미분: (f(x+h) - f(x-h)) / (2h)
+; - SGD: W[i] = W[i] - lr * grad[i]
+; ================================================================
+
+(println "")
+(println "=== Phase 2: 학습 루프 시작 ===")
+
+; cross-entropy loss (scalar)
+[FUNC ce-loss :params [$toks $W-e $blks $Wp $bp $target]
+  :body (
+    (define lg (forward $toks $W-e $blks $Wp $bp))
+    (define pr (softmax lg))
+    (define p (get pr $target))
+    (define safe-p (if (< p 0.000001) 0.000001 p))
+    (* -1.0 (log safe-p))
+  )
+]
+
+; W-emb[tok] 행에 대한 수치미분 (중앙차분)
+; W-emb은 flat 1D: 행 tok의 j번째 원소 = W-emb[tok*D + j]
+[FUNC grad-emb-row :params [$toks $W-e $blks $Wp $bp $target $tok $h]
+  :body (
+    (define grads [])
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j D) grads
+        (
+          (define idx (+ (* $tok D) j))
+          (define orig (get $W-e idx))
+          ; f(x+h)
+          (define We-p (vec-set $W-e idx (+ orig $h)))
+          (define fp (ce-loss $toks We-p $blks $Wp $bp $target))
+          ; f(x-h)
+          (define We-m (vec-set $W-e idx (- orig $h)))
+          (define fm (ce-loss $toks We-m $blks $Wp $bp $target))
+          ; 중앙차분
+          (define g (/ (- fp fm) (* 2.0 $h)))
+          (set! grads (append grads g))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; SGD: W-emb[tok] 행 업데이트
+[FUNC sgd-update-row :params [$W-e $tok $grads $lr]
+  :body (
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j D) $W-e
+        (
+          (define idx (+ (* $tok D) j))
+          (define g (get $grads j))
+          (set! $W-e (vec-set $W-e idx (- (get $W-e idx) (* $lr g))))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 학습 하이퍼파라미터
+(define TRAIN-LR  0.5)      ; 더 큰 LR
+(define TRAIN-H   0.0001)   ; 수치미분 h
+(define TRAIN-STEPS 10)
+(define TARGET-TOK 5)       ; 다음 토큰 정답 (예: 토큰 5)
+
+; W-emb 복사 (학습용)
+(define W-emb-train W-emb)
+
+; 초기 loss
+(define loss0 (ce-loss tokens W-emb-train blocks W-proj b-proj TARGET-TOK))
+(println (str "초기 loss: " loss0))
+(println "")
+
+; 학습 루프 — 시퀀스 내 모든 토큰 업데이트
+(define step 0)
+(loop [[$_ 0]]
+  (if (>= step TRAIN-STEPS) 0
+    (
+      ; 현재 loss
+      (define cur-loss (ce-loss tokens W-emb-train blocks W-proj b-proj TARGET-TOK))
+
+      ; 시퀀스의 각 토큰에 대해 수치미분 + SGD
+      (define ti 0)
+      (loop [[$_ 0]]
+        (if (>= ti (length tokens)) 0
+          (
+            (define tok (get tokens ti))
+            (define grads (grad-emb-row tokens W-emb-train blocks W-proj b-proj TARGET-TOK tok TRAIN-H))
+            (set! W-emb-train (sgd-update-row W-emb-train tok grads TRAIN-LR))
+            (set! ti (+ ti 1))
+            (recur 0)
+          )
+        )
+      )
+
+      (println (str "Step " (+ step 1) " | loss=" cur-loss))
+      (set! step (+ step 1))
+      (recur 0)
+    )
+  )
+)
+
+; 최종 loss
+(define loss-final (ce-loss tokens W-emb-train blocks W-proj b-proj TARGET-TOK))
+(println "")
+(println (str "최종 loss: " loss-final))
+(define improved (< loss-final loss0))
+(println (str "loss 감소: " improved))
+(println "=== Phase 2 완료 ===")

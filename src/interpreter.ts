@@ -1,6 +1,8 @@
 // FreeLang v9: Interpreter
 // AST → 실행 (Express 서버 포함)
 
+import * as fs from "fs";
+import * as path from "path";
 import express from "express";
 import { lex } from "./lexer";
 import { parse } from "./parser";
@@ -162,8 +164,45 @@ export class Interpreter {
     this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
     this.registerModule(pgBuiltins);            // PostgreSQL + JWT + AI
 
+    // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
+    this.loadFlStdlib();
+
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
+  }
+
+  // Phase 49: freelang-stdlib.fl 로드 — fl-map, fl-filter, fl-reduce 등
+  // TS 내장 some/none/ok/err({tag,kind,value})와 FL 배열 표현["some",v]이 다르므로
+  // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
+  private loadFlStdlib(): void {
+    try {
+      const stdlibPath = path.join(__dirname, "freelang-stdlib.fl");
+      if (!fs.existsSync(stdlibPath)) return;
+      const src = fs.readFileSync(stdlibPath, "utf-8");
+      this.interpret(parse(lex(src)));
+    } catch {
+      // stdlib 로드 실패 시 조용히 스킵 (런타임은 계속 동작)
+    }
+
+    // TS 내장 {tag,kind,value} 표현용 Maybe/Result helpers
+    // TS built-in: (ok v)→{tag:"Ok",...}  (some v)→{tag:"Some",...}  etc.
+    const tsHelpers: Record<string, (...a: any[]) => any> = {
+      "ok?":         (r: any) => r?.tag === "Ok",
+      "err?":        (r: any) => r?.tag === "Err",
+      "some?":       (m: any) => Array.isArray(m) ? m[0] === "some" : m?.tag === "Some",
+      "none?":       (m: any) => Array.isArray(m) ? m[0] === "none" : m?.tag === "None",
+      "maybe-or":    (m: any, d: any) =>
+        (Array.isArray(m) ? m[0] === "some" : m?.tag === "Some")
+          ? (Array.isArray(m) ? m[1] : m?.value) : d,
+      "result-or":   (r: any, d: any) => r?.tag === "Ok"  ? r.value : d,
+      "result-map":  (r: any, fn: any) => r?.tag === "Ok"
+        ? { tag: "Ok", kind: "Result", value: typeof fn === "string"
+            ? this.callUserFunction(fn, []) : fn(r.value) }
+        : r,
+    };
+    for (const [name, fn] of Object.entries(tsHelpers)) {
+      this.context.functions.set(name, { name, params: [], body: fn as any });
+    }
   }
 
   private registerModule(module: Record<string, unknown>): void {
@@ -1095,21 +1134,23 @@ export class Interpreter {
     }
 
     if (op === "call") {
-      // (call function-value arg1 arg2 ...)
+      // (call fn arg1 arg2 ...) — fn은 function-value, 문자열 함수명, 또는 심볼 리터럴
       if (expr.args.length < 1) {
         throw new Error(`call requires function as first argument`);
       }
 
       const fn = this.eval(expr.args[0]);
-      const args = expr.args.slice(1).map((arg) => this.eval(arg));
+      const callArgs = expr.args.slice(1);
 
       if ((fn as any).kind === "builtin-function") {
-        // Phase 7: Handle builtin function wrappers (Promise resolve/reject)
-        return (fn as any).fn(args);
+        return (fn as any).fn(callArgs.map((a) => this.eval(a)));
       } else if ((fn as any).kind === "function-value") {
-        return this.callFunctionValue(fn, args);
+        return this.callFunctionValue(fn, callArgs);
       } else if ((fn as any).kind === "async-function-value") {
-        return this.callAsyncFunctionValue(fn, args);
+        return this.callAsyncFunctionValue(fn, callArgs);
+      } else if (typeof fn === "string") {
+        // FL stdlib: 심볼 리터럴 "double" → 함수명으로 lookup
+        return this.callUserFunction(fn, callArgs);
       } else {
         throw new Error(`call expects function-value, got ${(fn as any).kind || typeof fn}`);
       }
@@ -2025,6 +2066,20 @@ export class Interpreter {
 
         // (export sym1 sym2 ...) — self-hosting 파일 호환: no-op (인터프리터는 모두 공유 환경)
         if (op === "export") return null;
+
+        // (call $fn arg...) — FL stdlib 고차 함수용: $fn이 클로저/심볼이면 동적 호출
+        if (op === "call" && args.length >= 1) {
+          const fnRef = this.eval(args[0]);
+          const callArgs = args.slice(1);
+          if (typeof fnRef === "string") {
+            // 심볼 리터럴 "double" → 함수명으로 lookup
+            return this.callUserFunction(fnRef, callArgs);
+          }
+          if (typeof fnRef === "function" || (fnRef as any)?.kind === "function-value") {
+            return this.callFunction(fnRef, callArgs);
+          }
+          return null;
+        }
 
         throw new Error(`Unknown operator: ${op}`);
     }
