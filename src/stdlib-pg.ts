@@ -65,7 +65,18 @@ export const pgBuiltins: Record<string, (...args: any[]) => any> = {
   },
 
   // jwt_sign payload secret expiresIn -> token
+  // payload can be a plain object or a FreeLang (list :key val ...) array
   jwt_sign: (payload: any, secret: string, expiresIn: string = "7d"): string => {
+    if (Array.isArray(payload)) {
+      const obj: Record<string, any> = {};
+      for (let i = 0; i < payload.length; i += 2) {
+        let k = payload[i];
+        const v = payload[i + 1];
+        if (typeof k === "string" && k.startsWith(":")) k = k.slice(1);
+        if (typeof k === "string") obj[k] = v;
+      }
+      payload = obj;
+    }
     return (jwt as any).sign(payload, secret, { expiresIn });
   },
 

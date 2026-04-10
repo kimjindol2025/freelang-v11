@@ -407,16 +407,57 @@ export class Interpreter {
           this.context.variables.set("$req", req);
           this.context.variables.set("$res", res);
 
-          const result = this.eval(route.handler);
+          let result = this.eval(route.handler);
 
-          // server_json/server_status returns {__fl_response, type, status, body}
+          // FreeLang (list :key val ...) 배열 → 객체 재귀 변환
+          function deepConvert(val: any): any {
+            if (!Array.isArray(val)) return val;
+            if (val.length === 0) return val;
+            if (typeof val[0] === "string") {
+              const obj: Record<string, any> = {};
+              for (let i = 0; i < val.length; i += 2) {
+                let k = val[i]; const v = val[i + 1];
+                if (typeof k === "string") {
+                  if (k.startsWith(":")) k = k.slice(1);
+                  obj[k] = deepConvert(v);
+                }
+              }
+              return obj;
+            }
+            return val.map(deepConvert);
+          }
+
+          // FreeLang Result 모나드 처리: {tag:"Ok"|"Err", value:..., kind:"Result"}
+          // (ok data)  → HTTP 200 {success:true, data:data}
+          // (err msg)  → HTTP 400 {success:false, error:msg}
+          if (result && typeof result === "object" && result.kind === "Result") {
+            if (result.tag === "Ok") {
+              const val = result.value;
+              if (val && typeof val === "object" && val.__fl_response) {
+                // server_json/server_status 이미 처리된 경우
+                result = val;
+              } else {
+                result = { __fl_response: true, type: "json", status: 200, body: { success: true, data: deepConvert(val) } };
+              }
+            } else if (result.tag === "Err") {
+              const errVal = result.value;
+              if (errVal && typeof errVal === "object" && errVal.__fl_response) {
+                res.status(errVal.status || 400).json(errVal.body);
+              } else {
+                res.status(400).json({ success: false, error: String(errVal) });
+              }
+              return;
+            }
+          }
+
+          // __fl_response: server_json / server_status 반환값 처리
           if (result && typeof result === "object" && result.__fl_response) {
             if (result.type === "text") {
               res.status(result.status || 200).send(result.body);
             } else {
               res.status(result.status || 200).json(result.body);
             }
-          } else if (typeof result === "object") {
+          } else if (typeof result === "object" && result !== null) {
             res.json(result);
           } else {
             res.send(String(result ?? ""));
@@ -440,6 +481,22 @@ export class Interpreter {
     // SERVER 블록이 있으면 서버 시작
     if (this.serverConfig) {
       const { port, host } = this.serverConfig;
+      // public/ 폴더가 있으면 정적 파일 서빙 (SPA fallback 포함)
+      const path = require("path");
+      const fs = require("fs");
+      const publicDir = path.resolve(process.cwd(), "public");
+      if (fs.existsSync(publicDir)) {
+        this.context.app.use(express.static(publicDir));
+        // SPA fallback: API가 아닌 GET 요청은 index.html 반환
+        this.context.app.get(/^(?!\/api\/).*/, (_req: express.Request, res: express.Response) => {
+          const indexHtml = path.join(publicDir, "index.html");
+          if (fs.existsSync(indexHtml)) {
+            res.sendFile(indexHtml);
+          } else {
+            res.status(404).send("Not Found");
+          }
+        });
+      }
       this.context.server = this.context.app.listen(port, host, () => {
         console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
       });
