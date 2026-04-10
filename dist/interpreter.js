@@ -36,11 +36,13 @@ const stdlib_auth_1 = require("./stdlib-auth"); // Phase 21: Auth (JWT, API key,
 const stdlib_cache_1 = require("./stdlib-cache"); // Phase 21: In-memory TTL cache
 const stdlib_pubsub_1 = require("./stdlib-pubsub"); // Phase 21: Pub/Sub events
 const stdlib_process_1 = require("./stdlib-process"); // Phase 22: Process (env + SIGTERM)
+const stdlib_pg_1 = require("./stdlib-pg"); // PostgreSQL + JWT + AI
 // Interpreter class
 class Interpreter {
     constructor(app = (0, express_1.default)(), logger) {
         this.currentLine = 0; // FreeLang source line tracking
         this.callDepth = 0;
+        this.serverConfig = null;
         this.logger = logger || (0, logger_1.getGlobalLogger)();
         this.context = {
             functions: new Map(),
@@ -82,6 +84,7 @@ class Interpreter {
         this.registerModule((0, stdlib_cache_1.createCacheModule)());
         this.registerModule((0, stdlib_pubsub_1.createPubSubModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_process_1.createProcessModule)()); // Phase 22: env_load, on_sigterm
+        this.registerModule(stdlib_pg_1.pgBuiltins); // PostgreSQL + JWT + AI
         // Phase 5 Week 2: Register built-in type classes and instances
         this.registerBuiltinTypeClasses();
     }
@@ -164,10 +167,10 @@ class Interpreter {
         }
     }
     handleServerBlock(block) {
-        // [SERVER name :port 3009 :host "localhost" ...]
-        const port = this.getFieldValue(block, "port") || 3009;
-        const host = this.getFieldValue(block, "host") || "localhost";
-        // Store server config (implement later)
+        // [SERVER name :port 3009 :host "0.0.0.0" ...]
+        const port = Number(this.getFieldValue(block, "port") || 3009);
+        const host = String(this.getFieldValue(block, "host") || "0.0.0.0");
+        this.serverConfig = { port, host };
     }
     handleRouteBlock(block) {
         // [ROUTE name :method "GET" :path "/api/health" :handler (json-response ...)]
@@ -301,19 +304,32 @@ class Interpreter {
             this.context.errorHandlers.handlers.set(500, on500);
     }
     setupExpressRoutes() {
+        // body-parser 미들웨어 등록
+        this.context.app.use(express_1.default.json());
+        this.context.app.use(express_1.default.urlencoded({ extended: true }));
         for (const [, route] of this.context.routes) {
             const method = route.method.toLowerCase();
             const handler = (req, res) => {
                 try {
                     this.context.variables.set("request", req);
                     this.context.variables.set("response", res);
+                    this.context.variables.set("$req", req);
+                    this.context.variables.set("$res", res);
                     const result = this.eval(route.handler);
-                    // If handler returns an object, send as JSON
-                    if (typeof result === "object") {
+                    // server_json/server_status returns {__fl_response, type, status, body}
+                    if (result && typeof result === "object" && result.__fl_response) {
+                        if (result.type === "text") {
+                            res.status(result.status || 200).send(result.body);
+                        }
+                        else {
+                            res.status(result.status || 200).json(result.body);
+                        }
+                    }
+                    else if (typeof result === "object") {
                         res.json(result);
                     }
                     else {
-                        res.send(result);
+                        res.send(String(result ?? ""));
                     }
                 }
                 catch (error) {
@@ -332,6 +348,13 @@ class Interpreter {
             else if (method === "delete") {
                 this.context.app.delete(route.path, handler);
             }
+        }
+        // SERVER 블록이 있으면 서버 시작
+        if (this.serverConfig) {
+            const { port, host } = this.serverConfig;
+            this.context.server = this.context.app.listen(port, host, () => {
+                console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
+            });
         }
     }
     eval(node) {
@@ -1024,6 +1047,82 @@ class Interpreter {
             }
             return result;
         }
+        // loop/recur: (loop [var1 init1 var2 init2 ...] body...)
+        // recur inside loop restarts iteration with new values
+        if (op === "loop") {
+            const bindingsNode = expr.args[0];
+            const bodyNodes = expr.args.slice(1);
+            // Parse bindings: [var1 init1 var2 init2 ...]
+            const bindingItems = bindingsNode.kind === "array"
+                ? bindingsNode.items || []
+                : bindingsNode.kind === "block" && bindingsNode.type === "Array"
+                    ? bindingsNode.fields?.get?.("items") || []
+                    : [];
+            const loopVars = [];
+            const loopInits = [];
+            for (let i = 0; i < bindingItems.length; i += 2) {
+                const varNode = bindingItems[i];
+                const valNode = bindingItems[i + 1];
+                const varName = varNode.kind === "variable" ? varNode.name
+                    : varNode.kind === "literal" ? String(varNode.value) : String(varNode.name || varNode.value);
+                loopVars.push(varName);
+                loopInits.push(this.eval(valNode));
+            }
+            // Save outer bindings
+            const savedVars = loopVars.map(v => ({ v, old: this.context.variables.get(v) }));
+            // Initialize loop variables
+            for (let i = 0; i < loopVars.length; i++) {
+                this.context.variables.set(loopVars[i], loopInits[i]);
+            }
+            const FL_RECUR = "__FL_RECUR__";
+            let result = null;
+            const maxIter = 100000;
+            let iter = 0;
+            try {
+                while (iter++ < maxIter) {
+                    let recurred = false;
+                    for (const bodyNode of bodyNodes) {
+                        result = this.eval(bodyNode);
+                        // Check if recur was called (via thrown recur signal)
+                        if (result && typeof result === "object" && result.__FL_RECUR__) {
+                            const newVals = result.__args;
+                            for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
+                                this.context.variables.set(loopVars[i], newVals[i]);
+                            }
+                            recurred = true;
+                            break;
+                        }
+                    }
+                    if (!recurred)
+                        break;
+                }
+            }
+            finally {
+                // Restore outer bindings
+                for (const { v, old } of savedVars) {
+                    if (old === undefined)
+                        this.context.variables.delete(v);
+                    else
+                        this.context.variables.set(v, old);
+                }
+            }
+            return result;
+        }
+        // recur: (recur val1 val2 ...) — tail-call back to enclosing loop
+        if (op === "recur") {
+            const newVals = expr.args.map((a) => this.eval(a));
+            return { __FL_RECUR__: true, __args: newVals };
+        }
+        // while: (while condition body...)
+        if (op === "while") {
+            let result = null;
+            while (this.eval(expr.args[0])) {
+                for (let i = 1; i < expr.args.length; i++) {
+                    result = this.eval(expr.args[i]);
+                }
+            }
+            return result;
+        }
         // Short-circuit logical operators
         if (op === "and") {
             let result = true;
@@ -1429,9 +1528,9 @@ class Interpreter {
                     ? args[0].indexOf(args[1])
                     : -1;
             case "replace":
-                // (replace "hello world" "world" "there") → "hello there"
+                // (replace "hello world" "world" "there") → "hello there" (all occurrences)
                 return typeof args[0] === "string" && typeof args[1] === "string" && typeof args[2] === "string"
-                    ? args[0].replace(args[1], args[2])
+                    ? args[0].split(args[1]).join(args[2])
                     : "";
             case "repeat":
                 // (repeat "a" 3) → "aaa"

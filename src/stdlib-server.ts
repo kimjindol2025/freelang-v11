@@ -84,9 +84,19 @@ export function createServerModule(callFn: CallFn) {
     },
 
     // server_json body -> response descriptor
-    "server_json": (body: any): Record<string, any> => ({
-      __fl_response: true, type: "json", status: 200, body,
-    }),
+    "server_json": (body: any): Record<string, any> => {
+      // (list :key value ...) → plain object 변환
+      if (Array.isArray(body)) {
+        const obj: Record<string, any> = {};
+        for (let i = 0; i < body.length; i += 2) {
+          let k = body[i]; const v = body[i + 1];
+          if (typeof k === "string" && k.startsWith(":")) k = k.slice(1);
+          if (typeof k === "string") obj[k] = v;
+        }
+        body = obj;
+      }
+      return { __fl_response: true, type: "json", status: 200, body };
+    },
 
     // server_text body -> response descriptor
     "server_text": (body: string): Record<string, any> => ({
@@ -94,12 +104,18 @@ export function createServerModule(callFn: CallFn) {
     }),
 
     // server_status code body -> response descriptor
-    "server_status": (code: number, body: any): Record<string, any> => ({
-      __fl_response: true,
-      type: typeof body === "string" ? "text" : "json",
-      status: code,
-      body,
-    }),
+    "server_status": (code: number, body: any): Record<string, any> => {
+      if (Array.isArray(body)) {
+        const obj: Record<string, any> = {};
+        for (let i = 0; i < body.length; i += 2) {
+          let k = body[i]; const v = body[i + 1];
+          if (typeof k === "string" && k.startsWith(":")) k = k.slice(1);
+          if (typeof k === "string") obj[k] = v;
+        }
+        body = obj;
+      }
+      return { __fl_response: true, type: typeof body === "string" ? "text" : "json", status: code, body };
+    },
 
     // server_req_body req -> body object
     "server_req_body": (req: express.Request): any => req?.body ?? null,

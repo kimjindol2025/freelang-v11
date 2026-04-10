@@ -30,6 +30,7 @@ import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, A
 import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (env + SIGTERM)
+import { pgBuiltins } from "./stdlib-pg";               // PostgreSQL + JWT + AI
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -159,6 +160,7 @@ export class Interpreter {
     this.registerModule(createCacheModule());
     this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
+    this.registerModule(pgBuiltins);            // PostgreSQL + JWT + AI
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
@@ -237,11 +239,13 @@ export class Interpreter {
     }
   }
 
+  private serverConfig: { port: number; host: string } | null = null;
+
   private handleServerBlock(block: Block): void {
-    // [SERVER name :port 3009 :host "localhost" ...]
-    const port = this.getFieldValue(block, "port") || 3009;
-    const host = this.getFieldValue(block, "host") || "localhost";
-    // Store server config (implement later)
+    // [SERVER name :port 3009 :host "0.0.0.0" ...]
+    const port = Number(this.getFieldValue(block, "port") || 3009);
+    const host = String(this.getFieldValue(block, "host") || "0.0.0.0");
+    this.serverConfig = { port, host };
   }
 
   private handleRouteBlock(block: Block): void {
@@ -390,20 +394,73 @@ export class Interpreter {
   }
 
   private setupExpressRoutes(): void {
+    // body-parser 미들웨어 등록
+    this.context.app.use(express.json());
+    this.context.app.use(express.urlencoded({ extended: true }));
+
     for (const [, route] of this.context.routes) {
       const method = route.method.toLowerCase();
       const handler = (req: express.Request, res: express.Response) => {
         try {
           this.context.variables.set("request", req);
           this.context.variables.set("response", res);
+          this.context.variables.set("$req", req);
+          this.context.variables.set("$res", res);
 
-          const result = this.eval(route.handler);
+          let result = this.eval(route.handler);
 
-          // If handler returns an object, send as JSON
-          if (typeof result === "object") {
+          // FreeLang (list :key val ...) 배열 → 객체 재귀 변환
+          function deepConvert(val: any): any {
+            if (!Array.isArray(val)) return val;
+            if (val.length === 0) return val;
+            if (typeof val[0] === "string") {
+              const obj: Record<string, any> = {};
+              for (let i = 0; i < val.length; i += 2) {
+                let k = val[i]; const v = val[i + 1];
+                if (typeof k === "string") {
+                  if (k.startsWith(":")) k = k.slice(1);
+                  obj[k] = deepConvert(v);
+                }
+              }
+              return obj;
+            }
+            return val.map(deepConvert);
+          }
+
+          // FreeLang Result 모나드 처리: {tag:"Ok"|"Err", value:..., kind:"Result"}
+          // (ok data)  → HTTP 200 {success:true, data:data}
+          // (err msg)  → HTTP 400 {success:false, error:msg}
+          if (result && typeof result === "object" && result.kind === "Result") {
+            if (result.tag === "Ok") {
+              const val = result.value;
+              if (val && typeof val === "object" && val.__fl_response) {
+                // server_json/server_status 이미 처리된 경우
+                result = val;
+              } else {
+                result = { __fl_response: true, type: "json", status: 200, body: { success: true, data: deepConvert(val) } };
+              }
+            } else if (result.tag === "Err") {
+              const errVal = result.value;
+              if (errVal && typeof errVal === "object" && errVal.__fl_response) {
+                res.status(errVal.status || 400).json(errVal.body);
+              } else {
+                res.status(400).json({ success: false, error: String(errVal) });
+              }
+              return;
+            }
+          }
+
+          // __fl_response: server_json / server_status 반환값 처리
+          if (result && typeof result === "object" && result.__fl_response) {
+            if (result.type === "text") {
+              res.status(result.status || 200).send(result.body);
+            } else {
+              res.status(result.status || 200).json(result.body);
+            }
+          } else if (typeof result === "object" && result !== null) {
             res.json(result);
           } else {
-            res.send(result);
+            res.send(String(result ?? ""));
           }
         } catch (error) {
           res.status(500).json({ error: (error as Error).message });
@@ -419,6 +476,30 @@ export class Interpreter {
       } else if (method === "delete") {
         this.context.app.delete(route.path, handler);
       }
+    }
+
+    // SERVER 블록이 있으면 서버 시작
+    if (this.serverConfig) {
+      const { port, host } = this.serverConfig;
+      // public/ 폴더가 있으면 정적 파일 서빙 (SPA fallback 포함)
+      const path = require("path");
+      const fs = require("fs");
+      const publicDir = path.resolve(process.cwd(), "public");
+      if (fs.existsSync(publicDir)) {
+        this.context.app.use(express.static(publicDir));
+        // SPA fallback: API가 아닌 GET 요청은 index.html 반환
+        this.context.app.get(/^(?!\/api\/).*/, (_req: express.Request, res: express.Response) => {
+          const indexHtml = path.join(publicDir, "index.html");
+          if (fs.existsSync(indexHtml)) {
+            res.sendFile(indexHtml);
+          } else {
+            res.status(404).send("Not Found");
+          }
+        });
+      }
+      this.context.server = this.context.app.listen(port, host, () => {
+        console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
+      });
     }
   }
 
