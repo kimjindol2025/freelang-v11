@@ -1,0 +1,29 @@
+; FreeLang v9 — fl-str-utils.fl
+; Phase 54: FL 문자열 유틸리티 라이브러리
+
+; 문자열 n번 반복 — rs-* 접두사
+[FUNC repeat-str :params [$s $n]
+  :body (
+    (define rs-result "")
+    (define rs-i 0)
+    (loop [[$_ 0]]
+      (if (>= rs-i $n) rs-result
+        (
+          (set! rs-result (str rs-result $s))
+          (set! rs-i (+ rs-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 왼쪽 패딩 — pl-* 접두사
+; ("5" 3 "0") → "005"
+[FUNC pad-left :params [$s $n $ch]
+  :body (
+    (define pl-s (str $s))
+    (define pl-pad (repeat-str $ch (if (> $n (length pl-s)) (- $n (length pl-s)) 0)))
+    (str pl-pad pl-s)
+  )
+]

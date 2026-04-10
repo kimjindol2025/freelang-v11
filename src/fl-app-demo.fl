@@ -1,0 +1,19 @@
+; FreeLang v9 — fl-app-demo.fl
+; Phase 54: import 시스템 실전 데모 — 통계 계산기
+
+(import list :from "./fl-list-utils.fl")
+(import stru :from "./fl-str-utils.fl")
+
+(define data [3.0 1.0 4.0 1.0 5.0 9.0 2.0 6.0])
+
+(println "=== FL 통계 계산기 ===")
+(println (str "데이터: " data))
+(println (str "합계:   " (list:sum data)))
+(println (str "평균:   " (list:mean data)))
+(println (str "최대:   " (list:lst-max data)))
+(println (str "최소:   " (list:lst-min data)))
+(println (str "상위 3: " (list:take data 3)))
+(println (str "하위 5: " (list:drop data 3)))
+(println (str "반복:   " (stru:repeat-str "FL" 3)))
+(println (str "패딩:   " (stru:pad-left "42" 5 "0")))
+(println "=== 완료 ===")

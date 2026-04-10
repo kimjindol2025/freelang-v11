@@ -1437,6 +1437,15 @@ export class Interpreter {
     // Evaluate all arguments for normal operations
     const args = expr.args.map((arg) => this.eval(arg));
 
+    // Phase 52: qualified function call (module:func pattern) — check BEFORE switch
+    // so builtins like "list" don't intercept (list:sum data)
+    if (args.length >= 1 && typeof args[0] === "string") {
+      const qualifiedName = `${op}:${args[0]}`;
+      if (this.context.functions.has(qualifiedName)) {
+        return this.callUserFunction(qualifiedName, args.slice(1));
+      }
+    }
+
     // Built-in functions
     switch (op) {
       // Arithmetic
@@ -2344,6 +2353,23 @@ export class Interpreter {
       throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'`);
     }
 
+    // Phase 54: For namespaced functions (list:mean), temporarily expose same-prefix
+    // functions without prefix so internal cross-calls (sum $arr) resolve correctly
+    const prefixMatch = baseName.match(/^([^:]+):/);
+    const tempAliases: string[] = [];
+    if (prefixMatch) {
+      const prefix = prefixMatch[1] + ":";
+      for (const [fname, fval] of this.context.functions) {
+        if (fname.startsWith(prefix)) {
+          const unqualified = fname.slice(prefix.length);
+          if (!this.context.functions.has(unqualified)) {
+            this.context.functions.set(unqualified, fval);
+            tempAliases.push(unqualified);
+          }
+        }
+      }
+    }
+
     // Save only the params being overwritten (allows set! closures to work)
     const savedParams: [string, any][] = [];
     this.callDepth++;
@@ -2361,6 +2387,10 @@ export class Interpreter {
       for (const [name, val] of savedParams) {
         if (val === undefined) this.context.variables.delete(name);
         else this.context.variables.set(name, val);
+      }
+      // Remove temporary namespace aliases
+      for (const alias of tempAliases) {
+        this.context.functions.delete(alias);
       }
     }
   }

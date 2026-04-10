@@ -1,0 +1,108 @@
+; FreeLang v9 — fl-list-utils.fl
+; Phase 54: FL 리스트 유틸리티 라이브러리 (import 시스템 활용)
+
+; 리스트 합계 — sm-* 접두사
+[FUNC sum :params [$arr]
+  :body (
+    (define sm-n (length $arr))
+    (define sm-acc 0.0)
+    (define sm-i 0)
+    (loop [[$_ 0]]
+      (if (>= sm-i sm-n) sm-acc
+        (
+          (set! sm-acc (+ sm-acc (get $arr sm-i)))
+          (set! sm-i (+ sm-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 리스트 평균
+[FUNC mean :params [$arr]
+  :body (
+    (define mn-n (length $arr))
+    (if (= mn-n 0) 0.0
+      (/ (sum $arr) mn-n)
+    )
+  )
+]
+
+; 리스트 최댓값 — lmx-* 접두사
+[FUNC lst-max :params [$arr]
+  :body (
+    (define lmx-n (length $arr))
+    (define lmx-best (get $arr 0))
+    (define lmx-i 1)
+    (loop [[$_ 0]]
+      (if (>= lmx-i lmx-n) lmx-best
+        (
+          (if (> (get $arr lmx-i) lmx-best)
+            (set! lmx-best (get $arr lmx-i))
+            0
+          )
+          (set! lmx-i (+ lmx-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 리스트 최솟값 — lmn-* 접두사
+[FUNC lst-min :params [$arr]
+  :body (
+    (define lmn-n (length $arr))
+    (define lmn-best (get $arr 0))
+    (define lmn-i 1)
+    (loop [[$_ 0]]
+      (if (>= lmn-i lmn-n) lmn-best
+        (
+          (if (< (get $arr lmn-i) lmn-best)
+            (set! lmn-best (get $arr lmn-i))
+            0
+          )
+          (set! lmn-i (+ lmn-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 앞 n개 — tk-* 접두사
+[FUNC take :params [$arr $n]
+  :body (
+    (define tk-result [])
+    (define tk-i 0)
+    (define tk-limit (if (< $n (length $arr)) $n (length $arr)))
+    (loop [[$_ 0]]
+      (if (>= tk-i tk-limit) tk-result
+        (
+          (set! tk-result (append tk-result (get $arr tk-i)))
+          (set! tk-i (+ tk-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 앞 n개 제거 — dp-* 접두사
+[FUNC drop :params [$arr $n]
+  :body (
+    (define dp-result [])
+    (define dp-i $n)
+    (define dp-len (length $arr))
+    (loop [[$_ 0]]
+      (if (>= dp-i dp-len) dp-result
+        (
+          (set! dp-result (append dp-result (get $arr dp-i)))
+          (set! dp-i (+ dp-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
