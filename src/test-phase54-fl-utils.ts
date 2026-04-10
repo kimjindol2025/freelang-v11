@@ -102,23 +102,14 @@ console.log("\n[fl-str-utils.fl 직접 테스트]");
 console.log("\n[fl-app-demo.fl import 통합 테스트]");
 
 {
-  test("fl-app-demo.fl 실행 오류 없음", () => {
-    const demoPath = path.join(srcDir, "fl-app-demo.fl");
-    const src = fs.readFileSync(demoPath, "utf-8");
-    const interp = new Interpreter();
-    (interp as any).currentFilePath = demoPath;
-    interp.interpret(parse(lex(src)));
-  });
+  const demoPath = path.join(srcDir, "fl-app-demo.fl");
+  const demoSrc = fs.readFileSync(demoPath, "utf-8");
+  const demoInterp = new Interpreter();
+  demoInterp.currentFilePath = demoPath;
 
-  test("list:sum + stru:repeat-str 동시 사용 가능", () => {
-    const demoPath = path.join(srcDir, "fl-app-demo.fl");
-    const src = fs.readFileSync(demoPath, "utf-8");
-    const interp = new Interpreter();
-    (interp as any).currentFilePath = demoPath;
-    interp.interpret(parse(lex(src)));
-
-    // 두 네임스페이스 모두 등록됐는지 확인
-    const fns = (interp as any).context.functions as Map<string, any>;
+  test("fl-app-demo.fl 실행 및 두 네임스페이스 모두 등록", () => {
+    demoInterp.interpret(parse(lex(demoSrc)));
+    const fns = (demoInterp as any).context.functions as Map<string, any>;
     if (!fns.has("list:sum")) throw new Error("list:sum 없음");
     if (!fns.has("stru:repeat-str")) throw new Error("stru:repeat-str 없음");
   });

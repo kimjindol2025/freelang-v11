@@ -2098,15 +2098,6 @@ export class Interpreter {
         // (export sym1 sym2 ...) — self-hosting 파일 호환: no-op (인터프리터는 모두 공유 환경)
         if (op === "export") return null;
 
-        // Phase 52: (math:square 4) → lexer가 math / : / square 로 분리
-        // args[0]이 string이면 op:args[0] 형태의 qualified 함수명 시도
-        if (args.length >= 1 && typeof args[0] === "string") {
-          const qualifiedName = `${op}:${args[0]}`;
-          if (this.context.functions.has(qualifiedName)) {
-            return this.callUserFunction(qualifiedName, args.slice(1));
-          }
-        }
-
         // (call $fn arg...) — FL stdlib 고차 함수용: $fn이 클로저/심볼이면 동적 호출
         if (op === "call" && args.length >= 1) {
           const fnRef = this.eval(args[0]);

@@ -4,7 +4,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as http from "http";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, spawnSync, ChildProcess } from "child_process";
 import { Interpreter } from "./interpreter";
 import { lex } from "./lexer";
 import { parse } from "./parser";
@@ -37,11 +37,7 @@ function flEval(interp: Interpreter, src: string): any {
 }
 
 function resetServer(): void {
-  // POST /_reset로 서버 상태 초기화
-  const raw = require("child_process").spawnSync("curl", [
-    "-s", "-X", "POST", `${BASE}/_reset`
-  ], { timeout: 5000 });
-  // 오류 무시 (이미 초기화 됐을 수 있음)
+  spawnSync("curl", ["-s", "-X", "POST", `${BASE}/_reset`], { timeout: 5000 });
 }
 
 function startServer(): Promise<void> {
