@@ -186,19 +186,26 @@ export class Interpreter {
 
     // TS 내장 {tag,kind,value} 표현용 Maybe/Result helpers
     // TS built-in: (ok v)→{tag:"Ok",...}  (some v)→{tag:"Some",...}  etc.
+    const isSomeVal = (m: any) => Array.isArray(m) ? m[0] === "some" : m?.tag === "Some";
+    const getVal    = (m: any) => Array.isArray(m) ? m[1] : m?.value;
+    const callFn    = (fn: any, v: any) =>
+      typeof fn === "string" ? this.callUserFunction(fn, [v]) : fn(v);
+
     const tsHelpers: Record<string, (...a: any[]) => any> = {
-      "ok?":         (r: any) => r?.tag === "Ok",
-      "err?":        (r: any) => r?.tag === "Err",
-      "some?":       (m: any) => Array.isArray(m) ? m[0] === "some" : m?.tag === "Some",
-      "none?":       (m: any) => Array.isArray(m) ? m[0] === "none" : m?.tag === "None",
-      "maybe-or":    (m: any, d: any) =>
-        (Array.isArray(m) ? m[0] === "some" : m?.tag === "Some")
-          ? (Array.isArray(m) ? m[1] : m?.value) : d,
-      "result-or":   (r: any, d: any) => r?.tag === "Ok"  ? r.value : d,
-      "result-map":  (r: any, fn: any) => r?.tag === "Ok"
-        ? { tag: "Ok", kind: "Result", value: typeof fn === "string"
-            ? this.callUserFunction(fn, []) : fn(r.value) }
+      "ok?":          (r: any) => r?.tag === "Ok",
+      "err?":         (r: any) => r?.tag === "Err",
+      "some?":        (m: any) => isSomeVal(m),
+      "none?":        (m: any) => Array.isArray(m) ? m[0] === "none" : m?.tag === "None",
+      "maybe-or":     (m: any, d: any) => isSomeVal(m) ? getVal(m) : d,
+      "maybe-map":    (m: any, fn: any) => isSomeVal(m)
+        ? { tag: "Some", kind: "Option", value: callFn(fn, getVal(m)) }
+        : m,
+      "maybe-chain":  (m: any, fn: any) => isSomeVal(m) ? callFn(fn, getVal(m)) : m,
+      "result-or":    (r: any, d: any) => r?.tag === "Ok" ? r.value : d,
+      "result-map":   (r: any, fn: any) => r?.tag === "Ok"
+        ? { tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
         : r,
+      "result-chain": (r: any, fn: any) => r?.tag === "Ok" ? callFn(fn, r.value) : r,
     };
     for (const [name, fn] of Object.entries(tsHelpers)) {
       this.context.functions.set(name, { name, params: [], body: fn as any });
@@ -1140,17 +1147,17 @@ export class Interpreter {
       }
 
       const fn = this.eval(expr.args[0]);
-      const callArgs = expr.args.slice(1);
+      const evaluatedArgs = expr.args.slice(1).map((a) => this.eval(a));
 
       if ((fn as any).kind === "builtin-function") {
-        return (fn as any).fn(callArgs.map((a) => this.eval(a)));
+        return (fn as any).fn(evaluatedArgs);
       } else if ((fn as any).kind === "function-value") {
-        return this.callFunctionValue(fn, callArgs);
+        return this.callFunctionValue(fn, evaluatedArgs);
       } else if ((fn as any).kind === "async-function-value") {
-        return this.callAsyncFunctionValue(fn, callArgs);
+        return this.callAsyncFunctionValue(fn, evaluatedArgs);
       } else if (typeof fn === "string") {
         // FL stdlib: 심볼 리터럴 "double" → 함수명으로 lookup
-        return this.callUserFunction(fn, callArgs);
+        return this.callUserFunction(fn, evaluatedArgs);
       } else {
         throw new Error(`call expects function-value, got ${(fn as any).kind || typeof fn}`);
       }
@@ -1438,6 +1445,8 @@ export class Interpreter {
         return args.reduce((a: number, b: number) => a * b, 1);
       case "/":
         return args.length === 1 ? 1 / args[0] : args.reduce((a: number, b: number) => a / b);
+      case "%":
+        return args[0] % args[1];
 
       // Comparison
       case "=":
