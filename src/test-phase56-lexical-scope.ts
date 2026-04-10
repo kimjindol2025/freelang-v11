@@ -169,7 +169,7 @@ test("fl-list-utils.fl: sum 내부 $acc가 전역 오염 안 함", () => {
   // sum 호출 전에 acc 정의
   evalIn(interp, "(define acc 777)");
   evalIn(interp, "(sum [1.0 2.0 3.0])");
-  const acc = evalIn(interp, "$acc");
+  const acc = getVar(interp, "acc");
   if (acc !== 777) throw new Error(`$acc가 ${acc}로 변경됨 (777이어야 함)`);
 });
 
@@ -183,7 +183,7 @@ test("중첩 호출 각 스코프의 define이 격리됨", () => {
     [FUNC outer :params [$v] :body (do (inner $v) (define result (* $v 3)))]
     (outer 5)
   `);
-  const result = evalIn(interp, "$result");
+  const result = getVar(interp, "result");
   if (result !== 0) throw new Error(`전역 $result가 ${result}로 변경됨 (0이어야 함)`);
 });
 
