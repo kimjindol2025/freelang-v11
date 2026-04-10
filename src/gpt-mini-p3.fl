@@ -1,0 +1,285 @@
+; FreeLang v9 — GPT Mini Phase 3
+; W-emb + W-proj 동시 역전파 검증
+; FL 동적 스코프 문제 해결: 각 함수 내부 변수명에 고유 접두사 사용
+; 모델: Embedding → Linear Projection (속도 우선)
+; 설정: VOCAB=4 D=2
+
+(define MV 4)   ; VOCAB
+(define MD 2)   ; D
+
+; ─── 벡터 유틸 — 고유 접두사 사용 ──────────────────────────────
+[FUNC zeros :params [$n]
+  :body (
+    (define z-v [])
+    (define z-i 0)
+    (loop [[$_ 0]]
+      (if (>= z-i $n) z-v
+        ((set! z-v (append z-v 0.0)) (set! z-i (+ z-i 1)) (recur 0))
+      )
+    )
+  )
+]
+[FUNC rand-vec :params [$n $scale]
+  :body (
+    (define rv-v [])
+    (define rv-i 0)
+    (loop [[$_ 0]]
+      (if (>= rv-i $n) rv-v
+        (
+          (define rv-r (* (- (* (random) 2.0) 1.0) $scale))
+          (set! rv-v (append rv-v rv-r))
+          (set! rv-i (+ rv-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+; 벡터 원소 교체 — vs-* 접두사
+[FUNC vec-set :params [$v $idx $val]
+  :body (
+    (define vs-n (length $v))
+    (define vs-r [])
+    (define vs-k 0)
+    (loop [[$_ 0]]
+      (if (>= vs-k vs-n) vs-r
+        (
+          (if (= vs-k $idx)
+            (set! vs-r (append vs-r $val))
+            (set! vs-r (append vs-r (get $v vs-k)))
+          )
+          (set! vs-k (+ vs-k 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+; 벡터 합 — va-* 접두사
+[FUNC vadd :params [$a $b]
+  :body (
+    (define va-n (length $a))
+    (define va-v [])
+    (define va-i 0)
+    (loop [[$_ 0]]
+      (if (>= va-i va-n) va-v
+        (
+          (set! va-v (append va-v (+ (get $a va-i) (get $b va-i))))
+          (set! va-i (+ va-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+; 행렬 × 벡터 — mv-* 접두사
+[FUNC mv :params [$W $rows $cols $x]
+  :body (
+    (define mv-y [])
+    (define mv-i 0)
+    (loop [[$_ 0]]
+      (if (>= mv-i $rows) mv-y
+        (
+          (define mv-s 0.0)
+          (define mv-j 0)
+          (loop [[$_ 0]]
+            (if (>= mv-j $cols) 0
+              (
+                (set! mv-s (+ mv-s (* (get $W (+ (* mv-i $cols) mv-j)) (get $x mv-j))))
+                (set! mv-j (+ mv-j 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! mv-y (append mv-y mv-s))
+          (set! mv-i (+ mv-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+; Softmax — sm-* 접두사
+[FUNC softmax :params [$x]
+  :body (
+    (define sm-n (length $x))
+    (define sm-mx (get $x 0))
+    (define sm-i 1)
+    (loop [[$_ 0]]
+      (if (>= sm-i sm-n) 0
+        (
+          (if (> (get $x sm-i) sm-mx) (set! sm-mx (get $x sm-i)) 0)
+          (set! sm-i (+ sm-i 1))
+          (recur 0)
+        )
+      )
+    )
+    (define sm-exps [])
+    (define sm-sum 0.0)
+    (set! sm-i 0)
+    (loop [[$_ 0]]
+      (if (>= sm-i sm-n) 0
+        (
+          (define sm-e (exp (- (get $x sm-i) sm-mx)))
+          (set! sm-exps (append sm-exps sm-e))
+          (set! sm-sum (+ sm-sum sm-e))
+          (set! sm-i (+ sm-i 1))
+          (recur 0)
+        )
+      )
+    )
+    (define sm-out [])
+    (set! sm-i 0)
+    (loop [[$_ 0]]
+      (if (>= sm-i sm-n) sm-out
+        (
+          (set! sm-out (append sm-out (/ (get sm-exps sm-i) sm-sum)))
+          (set! sm-i (+ sm-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 단순 Forward ────────────────────────────────────────────────
+; 마지막 토큰 임베딩 → W-proj → 로짓
+[FUNC forward-simple :params [$toks $W-e $Wp $bp]
+  :body (
+    (define fs-last (get $toks (- (length $toks) 1)))
+    (define fs-emb (slice $W-e (* fs-last MD) (+ (* fs-last MD) MD)))
+    (vadd (mv $Wp MV MD fs-emb) $bp)
+  )
+]
+[FUNC ce-loss-simple :params [$toks $W-e $Wp $bp $target]
+  :body (
+    (define ce-lg (forward-simple $toks $W-e $Wp $bp))
+    (define ce-pr (softmax ce-lg))
+    (define ce-p (get ce-pr $target))
+    (define ce-sp (if (< ce-p 0.000001) 0.000001 ce-p))
+    (* -1.0 (log ce-sp))
+  )
+]
+
+; ─── 수치 역전파 ────────────────────────────────────────────────
+; W-emb 행 $tok의 기울기 — ge-* 접두사
+[FUNC grad-emb-row-simple :params [$toks $W-e $Wp $bp $target $tok $h]
+  :body (
+    (define ge-grads [])
+    (define ge-j 0)
+    (loop [[$_ 0]]
+      (if (>= ge-j MD) ge-grads
+        (
+          (define ge-idx (+ (* $tok MD) ge-j))
+          (define ge-orig (get $W-e ge-idx))
+          (define ge-Wep (vec-set $W-e ge-idx (+ ge-orig $h)))
+          (define ge-fp (ce-loss-simple $toks ge-Wep $Wp $bp $target))
+          (define ge-Wem (vec-set $W-e ge-idx (- ge-orig $h)))
+          (define ge-fm (ce-loss-simple $toks ge-Wem $Wp $bp $target))
+          (define ge-g (/ (- ge-fp ge-fm) (* 2.0 $h)))
+          (set! ge-grads (append ge-grads ge-g))
+          (set! ge-j (+ ge-j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+[FUNC sgd-emb-row :params [$W-e $tok $grads $lr]
+  :body (
+    (define se-j 0)
+    (loop [[$_ 0]]
+      (if (>= se-j MD) $W-e
+        (
+          (define se-idx (+ (* $tok MD) se-j))
+          (set! $W-e (vec-set $W-e se-idx (- (get $W-e se-idx) (* $lr (get $grads se-j)))))
+          (set! se-j (+ se-j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; W-proj 행 $row의 기울기 — gp-* 접두사
+[FUNC grad-proj-row :params [$toks $W-e $Wp $bp $target $row $h]
+  :body (
+    (define gp-grads [])
+    (define gp-j 0)
+    (loop [[$_ 0]]
+      (if (>= gp-j MD) gp-grads
+        (
+          (define gp-idx (+ (* $row MD) gp-j))
+          (define gp-orig (get $Wp gp-idx))
+          (define gp-Wpp (vec-set $Wp gp-idx (+ gp-orig $h)))
+          (define gp-fp (ce-loss-simple $toks $W-e gp-Wpp $bp $target))
+          (define gp-Wpm (vec-set $Wp gp-idx (- gp-orig $h)))
+          (define gp-fm (ce-loss-simple $toks $W-e gp-Wpm $bp $target))
+          (define gp-g (/ (- gp-fp gp-fm) (* 2.0 $h)))
+          (set! gp-grads (append gp-grads gp-g))
+          (set! gp-j (+ gp-j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+[FUNC sgd-proj-row :params [$Wp $row $grads $lr]
+  :body (
+    (define sp-j 0)
+    (loop [[$_ 0]]
+      (if (>= sp-j MD) $Wp
+        (
+          (define sp-idx (+ (* $row MD) sp-j))
+          (set! $Wp (vec-set $Wp sp-idx (- (get $Wp sp-idx) (* $lr (get $grads sp-j)))))
+          (set! sp-j (+ sp-j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; W-emb + W-proj 동시 업데이트 → [updated-We updated-Wp]
+[FUNC train-step-full :params [$toks $W-e $Wp $bp $target $lr $h]
+  :body (
+    (define ts-last (get $toks (- (length $toks) 1)))
+    (define ts-ge (grad-emb-row-simple $toks $W-e $Wp $bp $target ts-last $h))
+    (set! $W-e (sgd-emb-row $W-e ts-last ts-ge $lr))
+    (define ts-ri 0)
+    (loop [[$_ 0]]
+      (if (>= ts-ri MV) 0
+        (
+          (define ts-gp (grad-proj-row $toks $W-e $Wp $bp $target ts-ri $h))
+          (set! $Wp (sgd-proj-row $Wp ts-ri ts-gp $lr))
+          (set! ts-ri (+ ts-ri 1))
+          (recur 0)
+        )
+      )
+    )
+    [$W-e $Wp]
+  )
+]
+
+; ─── 초기화 ─────────────────────────────────────────────────────
+(define mini-We  (rand-vec (* MV MD) 0.1))
+(define mini-Wp  (rand-vec (* MV MD) 0.1))
+(define mini-bp  (zeros MV))
+(define mini-toks [0 1 2])
+(define mini-target 3)
+
+(define mini-loss0 (ce-loss-simple mini-toks mini-We mini-Wp mini-bp mini-target))
+(println (str "초기 loss: " mini-loss0))
+
+; 1 step 학습
+(define mini-We-t mini-We)
+(define mini-Wp-t mini-Wp)
+(define mini-result (train-step-full mini-toks mini-We-t mini-Wp-t mini-bp mini-target 1.0 0.001))
+(set! mini-We-t (get mini-result 0))
+(set! mini-Wp-t (get mini-result 1))
+
+(define mini-loss-final (ce-loss-simple mini-toks mini-We-t mini-Wp-t mini-bp mini-target))
+(define mini-improved (< mini-loss-final mini-loss0))
+(println (str "최종 loss: " mini-loss-final))
+(println (str "loss 감소: " mini-improved))
+(println "=== Phase 3 완료 ===")

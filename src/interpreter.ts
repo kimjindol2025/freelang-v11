@@ -1034,7 +1034,7 @@ export class Interpreter {
       const nameNode = expr.args[0];
       let name: string;
       if ((nameNode as any).kind === "variable") {
-        name = (nameNode as any).name; // already prefixed with $
+        name = "$" + (nameNode as any).name; // name is e.g. "W", prefix to get "$W"
       } else if ((nameNode as any).kind === "literal") {
         name = "$" + (nameNode as any).value;
       } else {
@@ -1738,11 +1738,21 @@ export class Interpreter {
           ? Object.keys(args[0])
           : [];
       case "num-to-str":
+      case "num->str":
         // (num-to-str 42) → "42"
         return String(args[0]);
       case "str-to-num":
+      case "str->num":
         // (str-to-num "42") → 42
         return parseFloat(String(args[0]));
+      case "map-set":
+        // (map-set {:a 1} :b 2) → {:a 1 :b 2}
+        if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
+          const k = typeof args[1] === "string" && args[1].startsWith(":")
+            ? args[1].slice(1) : String(args[1]);
+          return { ...args[0], [k]: args[2] };
+        }
+        return args[0];
       case "slice":
         // (slice [1 2 3 4] 1 3) → [2 3]  OR  (slice "hello" 1 3) → "el"
         if (Array.isArray(args[0])) return args[0].slice(args[1], args[2]);
