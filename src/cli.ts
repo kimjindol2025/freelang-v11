@@ -11,7 +11,7 @@ import * as path from "path";
 import * as readline from "readline";
 import { lex } from "./lexer";
 import { parse, ParserError } from "./parser";
-import { interpret } from "./interpreter";
+import { interpret, Interpreter } from "./interpreter";
 
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
@@ -51,6 +51,13 @@ function runSource(source: string, filePath?: string): { ok: boolean; value: any
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
+    // Phase 52: currentFilePath 전달 — import 상대경로 해석을 파일 기준으로
+    if (filePath) {
+      const interp = new Interpreter();
+      interp.currentFilePath = path.resolve(filePath);
+      const ctx = interp.interpret(ast);
+      return { ok: true, value: ctx.lastValue };
+    }
     const ctx = interpret(ast);
     return { ok: true, value: ctx.lastValue };
   } catch (err: any) {

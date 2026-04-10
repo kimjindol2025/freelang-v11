@@ -81,6 +81,13 @@ function runSource(source, filePath) {
     try {
         const tokens = (0, lexer_1.lex)(source);
         const ast = (0, parser_1.parse)(tokens);
+        // Phase 52: currentFilePath 전달 — import 상대경로 해석을 파일 기준으로
+        if (filePath) {
+            const interp = new interpreter_1.Interpreter();
+            interp.currentFilePath = path.resolve(filePath);
+            const ctx = interp.interpret(ast);
+            return { ok: true, value: ctx.lastValue };
+        }
         const ctx = (0, interpreter_1.interpret)(ast);
         return { ok: true, value: ctx.lastValue };
     }

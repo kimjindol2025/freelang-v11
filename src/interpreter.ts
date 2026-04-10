@@ -118,7 +118,7 @@ export class Interpreter {
   private static readonly MAX_CALL_DEPTH = 500;
   // Phase 52: FL 파일 import 지원
   private importedFiles: Set<string> = new Set();
-  private currentFilePath: string = process.cwd();
+  public currentFilePath: string = process.cwd();
 
   constructor(app: express.Express = express(), logger?: Logger) {
     this.logger = logger || getGlobalLogger();

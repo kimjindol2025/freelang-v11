@@ -1,12 +1,47 @@
 "use strict";
 // FreeLang v9: Interpreter
 // AST → 실행 (Express 서버 포함)
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Interpreter = void 0;
 exports.interpret = interpret;
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const express_1 = __importDefault(require("express"));
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
@@ -42,6 +77,9 @@ class Interpreter {
     constructor(app = (0, express_1.default)(), logger) {
         this.currentLine = 0; // FreeLang source line tracking
         this.callDepth = 0;
+        // Phase 52: FL 파일 import 지원
+        this.importedFiles = new Set();
+        this.currentFilePath = process.cwd();
         this.serverConfig = null;
         this.logger = logger || (0, logger_1.getGlobalLogger)();
         this.context = {
@@ -85,8 +123,49 @@ class Interpreter {
         this.registerModule((0, stdlib_pubsub_1.createPubSubModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_process_1.createProcessModule)()); // Phase 22: env_load, on_sigterm
         this.registerModule(stdlib_pg_1.pgBuiltins); // PostgreSQL + JWT + AI
+        // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
+        this.loadFlStdlib();
         // Phase 5 Week 2: Register built-in type classes and instances
         this.registerBuiltinTypeClasses();
+    }
+    // Phase 49: freelang-stdlib.fl 로드 — fl-map, fl-filter, fl-reduce 등
+    // TS 내장 some/none/ok/err({tag,kind,value})와 FL 배열 표현["some",v]이 다르므로
+    // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
+    loadFlStdlib() {
+        try {
+            const stdlibPath = path.join(__dirname, "freelang-stdlib.fl");
+            if (!fs.existsSync(stdlibPath))
+                return;
+            const src = fs.readFileSync(stdlibPath, "utf-8");
+            this.interpret((0, parser_1.parse)((0, lexer_1.lex)(src)));
+        }
+        catch {
+            // stdlib 로드 실패 시 조용히 스킵 (런타임은 계속 동작)
+        }
+        // TS 내장 {tag,kind,value} 표현용 Maybe/Result helpers
+        // TS built-in: (ok v)→{tag:"Ok",...}  (some v)→{tag:"Some",...}  etc.
+        const isSomeVal = (m) => Array.isArray(m) ? m[0] === "some" : m?.tag === "Some";
+        const getVal = (m) => Array.isArray(m) ? m[1] : m?.value;
+        const callFn = (fn, v) => typeof fn === "string" ? this.callUserFunction(fn, [v]) : fn(v);
+        const tsHelpers = {
+            "ok?": (r) => r?.tag === "Ok",
+            "err?": (r) => r?.tag === "Err",
+            "some?": (m) => isSomeVal(m),
+            "none?": (m) => Array.isArray(m) ? m[0] === "none" : m?.tag === "None",
+            "maybe-or": (m, d) => isSomeVal(m) ? getVal(m) : d,
+            "maybe-map": (m, fn) => isSomeVal(m)
+                ? { tag: "Some", kind: "Option", value: callFn(fn, getVal(m)) }
+                : m,
+            "maybe-chain": (m, fn) => isSomeVal(m) ? callFn(fn, getVal(m)) : m,
+            "result-or": (r, d) => r?.tag === "Ok" ? r.value : d,
+            "result-map": (r, fn) => r?.tag === "Ok"
+                ? { tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
+                : r,
+            "result-chain": (r, fn) => r?.tag === "Ok" ? callFn(fn, r.value) : r,
+        };
+        for (const [name, fn] of Object.entries(tsHelpers)) {
+            this.context.functions.set(name, { name, params: [], body: fn });
+        }
     }
     registerModule(module) {
         for (const [name, fn] of Object.entries(module)) {
@@ -315,8 +394,54 @@ class Interpreter {
                     this.context.variables.set("response", res);
                     this.context.variables.set("$req", req);
                     this.context.variables.set("$res", res);
-                    const result = this.eval(route.handler);
-                    // server_json/server_status returns {__fl_response, type, status, body}
+                    let result = this.eval(route.handler);
+                    // FreeLang (list :key val ...) 배열 → 객체 재귀 변환
+                    function deepConvert(val) {
+                        if (!Array.isArray(val))
+                            return val;
+                        if (val.length === 0)
+                            return val;
+                        if (typeof val[0] === "string") {
+                            const obj = {};
+                            for (let i = 0; i < val.length; i += 2) {
+                                let k = val[i];
+                                const v = val[i + 1];
+                                if (typeof k === "string") {
+                                    if (k.startsWith(":"))
+                                        k = k.slice(1);
+                                    obj[k] = deepConvert(v);
+                                }
+                            }
+                            return obj;
+                        }
+                        return val.map(deepConvert);
+                    }
+                    // FreeLang Result 모나드 처리: {tag:"Ok"|"Err", value:..., kind:"Result"}
+                    // (ok data)  → HTTP 200 {success:true, data:data}
+                    // (err msg)  → HTTP 400 {success:false, error:msg}
+                    if (result && typeof result === "object" && result.kind === "Result") {
+                        if (result.tag === "Ok") {
+                            const val = result.value;
+                            if (val && typeof val === "object" && val.__fl_response) {
+                                // server_json/server_status 이미 처리된 경우
+                                result = val;
+                            }
+                            else {
+                                result = { __fl_response: true, type: "json", status: 200, body: { success: true, data: deepConvert(val) } };
+                            }
+                        }
+                        else if (result.tag === "Err") {
+                            const errVal = result.value;
+                            if (errVal && typeof errVal === "object" && errVal.__fl_response) {
+                                res.status(errVal.status || 400).json(errVal.body);
+                            }
+                            else {
+                                res.status(400).json({ success: false, error: String(errVal) });
+                            }
+                            return;
+                        }
+                    }
+                    // __fl_response: server_json / server_status 반환값 처리
                     if (result && typeof result === "object" && result.__fl_response) {
                         if (result.type === "text") {
                             res.status(result.status || 200).send(result.body);
@@ -325,7 +450,7 @@ class Interpreter {
                             res.status(result.status || 200).json(result.body);
                         }
                     }
-                    else if (typeof result === "object") {
+                    else if (typeof result === "object" && result !== null) {
                         res.json(result);
                     }
                     else {
@@ -352,6 +477,23 @@ class Interpreter {
         // SERVER 블록이 있으면 서버 시작
         if (this.serverConfig) {
             const { port, host } = this.serverConfig;
+            // public/ 폴더가 있으면 정적 파일 서빙 (SPA fallback 포함)
+            const path = require("path");
+            const fs = require("fs");
+            const publicDir = path.resolve(process.cwd(), "public");
+            if (fs.existsSync(publicDir)) {
+                this.context.app.use(express_1.default.static(publicDir));
+                // SPA fallback: API가 아닌 GET 요청은 index.html 반환
+                this.context.app.get(/^(?!\/api\/).*/, (_req, res) => {
+                    const indexHtml = path.join(publicDir, "index.html");
+                    if (fs.existsSync(indexHtml)) {
+                        res.sendFile(indexHtml);
+                    }
+                    else {
+                        res.status(404).send("Not Found");
+                    }
+                });
+            }
             this.context.server = this.context.app.listen(port, host, () => {
                 console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
             });
@@ -794,7 +936,7 @@ class Interpreter {
             const nameNode = expr.args[0];
             let name;
             if (nameNode.kind === "variable") {
-                name = nameNode.name; // already prefixed with $
+                name = "$" + nameNode.name; // name is e.g. "W", prefix to get "$W"
             }
             else if (nameNode.kind === "literal") {
                 name = "$" + nameNode.value;
@@ -896,21 +1038,24 @@ class Interpreter {
             };
         }
         if (op === "call") {
-            // (call function-value arg1 arg2 ...)
+            // (call fn arg1 arg2 ...) — fn은 function-value, 문자열 함수명, 또는 심볼 리터럴
             if (expr.args.length < 1) {
                 throw new Error(`call requires function as first argument`);
             }
             const fn = this.eval(expr.args[0]);
-            const args = expr.args.slice(1).map((arg) => this.eval(arg));
+            const evaluatedArgs = expr.args.slice(1).map((a) => this.eval(a));
             if (fn.kind === "builtin-function") {
-                // Phase 7: Handle builtin function wrappers (Promise resolve/reject)
-                return fn.fn(args);
+                return fn.fn(evaluatedArgs);
             }
             else if (fn.kind === "function-value") {
-                return this.callFunctionValue(fn, args);
+                return this.callFunctionValue(fn, evaluatedArgs);
             }
             else if (fn.kind === "async-function-value") {
-                return this.callAsyncFunctionValue(fn, args);
+                return this.callAsyncFunctionValue(fn, evaluatedArgs);
+            }
+            else if (typeof fn === "string") {
+                // FL stdlib: 심볼 리터럴 "double" → 함수명으로 lookup
+                return this.callUserFunction(fn, evaluatedArgs);
             }
             else {
                 throw new Error(`call expects function-value, got ${fn.kind || typeof fn}`);
@@ -1194,6 +1339,8 @@ class Interpreter {
                 return args.reduce((a, b) => a * b, 1);
             case "/":
                 return args.length === 1 ? 1 / args[0] : args.reduce((a, b) => a / b);
+            case "%":
+                return args[0] % args[1];
             // Comparison
             case "=":
                 return args[0] === args[1];
@@ -1469,11 +1616,21 @@ class Interpreter {
                     ? Object.keys(args[0])
                     : [];
             case "num-to-str":
+            case "num->str":
                 // (num-to-str 42) → "42"
                 return String(args[0]);
             case "str-to-num":
+            case "str->num":
                 // (str-to-num "42") → 42
                 return parseFloat(String(args[0]));
+            case "map-set":
+                // (map-set {:a 1} :b 2) → {:a 1 :b 2}
+                if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
+                    const k = typeof args[1] === "string" && args[1].startsWith(":")
+                        ? args[1].slice(1) : String(args[1]);
+                    return { ...args[0], [k]: args[2] };
+                }
+                return args[0];
             case "slice":
                 // (slice [1 2 3 4] 1 3) → [2 3]  OR  (slice "hello" 1 3) → "el"
                 if (Array.isArray(args[0]))
@@ -1803,6 +1960,27 @@ class Interpreter {
                 // (export sym1 sym2 ...) — self-hosting 파일 호환: no-op (인터프리터는 모두 공유 환경)
                 if (op === "export")
                     return null;
+                // Phase 52: (math:square 4) → lexer가 math / : / square 로 분리
+                // args[0]이 string이면 op:args[0] 형태의 qualified 함수명 시도
+                if (args.length >= 1 && typeof args[0] === "string") {
+                    const qualifiedName = `${op}:${args[0]}`;
+                    if (this.context.functions.has(qualifiedName)) {
+                        return this.callUserFunction(qualifiedName, args.slice(1));
+                    }
+                }
+                // (call $fn arg...) — FL stdlib 고차 함수용: $fn이 클로저/심볼이면 동적 호출
+                if (op === "call" && args.length >= 1) {
+                    const fnRef = this.eval(args[0]);
+                    const callArgs = args.slice(1);
+                    if (typeof fnRef === "string") {
+                        // 심볼 리터럴 "double" → 함수명으로 lookup
+                        return this.callUserFunction(fnRef, callArgs);
+                    }
+                    if (typeof fnRef === "function" || fnRef?.kind === "function-value") {
+                        return this.callFunction(fnRef, callArgs);
+                    }
+                    return null;
+                }
                 throw new Error(`Unknown operator: ${op}`);
         }
     }
@@ -2562,6 +2740,11 @@ class Interpreter {
         const source = importBlock.source; // "./math.fl" 등
         const selective = importBlock.selective; // :only [add multiply]
         const alias = importBlock.alias; // :as m
+        // Phase 52: .fl 파일 import 처리
+        if (source && (source.endsWith(".fl") || source.includes("/"))) {
+            this.evalImportFromFile(source, moduleName, selective, alias);
+            return;
+        }
         // 모듈 찾기
         const module = this.getModules().get(moduleName);
         if (!module) {
@@ -2603,6 +2786,54 @@ class Interpreter {
         const aliasStr = alias ? ` as ${alias}` : "";
         const selectStr = selective ? ` (${selective.join(", ")})` : "";
         this.logger.info(`✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`);
+    }
+    // Phase 52: FL 파일에서 함수를 가져와 현재 context에 등록
+    evalImportFromFile(relPath, prefix, selective, alias) {
+        // 절대 경로 해석: currentFilePath 기준
+        const baseDir = (() => {
+            try {
+                return fs.statSync(this.currentFilePath).isDirectory()
+                    ? this.currentFilePath
+                    : path.dirname(this.currentFilePath);
+            }
+            catch {
+                return this.currentFilePath;
+            }
+        })();
+        const absPath = path.resolve(baseDir, relPath);
+        // 파일 존재 확인
+        if (!fs.existsSync(absPath)) {
+            throw new Error(`Import error: file not found: ${absPath}`);
+        }
+        // 순환 import 방지
+        if (this.importedFiles.has(absPath)) {
+            return;
+        }
+        this.importedFiles.add(absPath);
+        // 서브 인터프리터로 FL 파일 실행
+        const src = fs.readFileSync(absPath, "utf-8");
+        const subInterp = new Interpreter();
+        subInterp.currentFilePath = absPath;
+        subInterp.importedFiles = this.importedFiles; // 순환 방지 공유
+        // stdlib 로드 전 함수 목록 스냅샷 (내장 함수 제외용)
+        const builtinFuncs = new Set(subInterp.context.functions.keys());
+        subInterp.interpret((0, parser_1.parse)((0, lexer_1.lex)(src)));
+        // 사용자 정의 함수만 추출 (stdlib 내장 제외)
+        const effectivePrefix = alias ?? prefix;
+        for (const [funcName, func] of subInterp.context.functions) {
+            if (builtinFuncs.has(funcName))
+                continue; // 내장 함수 skip
+            if (selective && selective.length > 0) {
+                // :only 필터: prefix 없이 직접 등록
+                if (selective.includes(funcName)) {
+                    this.context.functions.set(funcName, func);
+                }
+            }
+            else {
+                // prefix:funcName 형식으로 등록
+                this.context.functions.set(`${effectivePrefix}:${funcName}`, func);
+            }
+        }
     }
     // Phase 5 Week 2: Get concrete type from a value
     // Maps values like {tag: "Ok", ...} to "Result", {tag: "Some", ...} to "Option", etc.
