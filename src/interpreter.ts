@@ -116,6 +116,9 @@ export class Interpreter {
   private currentLine = 0; // FreeLang source line tracking
   private callDepth = 0;
   private static readonly MAX_CALL_DEPTH = 500;
+  // Phase 52: FL 파일 import 지원
+  private importedFiles: Set<string> = new Set();
+  private currentFilePath: string = process.cwd();
 
   constructor(app: express.Express = express(), logger?: Logger) {
     this.logger = logger || getGlobalLogger();
@@ -2915,6 +2918,12 @@ export class Interpreter {
     const selective = importBlock.selective; // :only [add multiply]
     const alias = importBlock.alias; // :as m
 
+    // Phase 52: .fl 파일 import 처리
+    if (source && (source.endsWith(".fl") || source.includes("/"))) {
+      this.evalImportFromFile(source, moduleName, selective, alias);
+      return;
+    }
+
     // 모듈 찾기
     const module = this.getModules().get(moduleName);
     if (!module) {
@@ -2963,6 +2972,63 @@ export class Interpreter {
     this.logger.info(
       `✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`
     );
+  }
+
+  // Phase 52: FL 파일에서 함수를 가져와 현재 context에 등록
+  private evalImportFromFile(
+    relPath: string,
+    prefix: string,
+    selective: string[] | undefined,
+    alias: string | undefined
+  ): void {
+    // 절대 경로 해석: currentFilePath 기준
+    const baseDir = (() => {
+      try {
+        return fs.statSync(this.currentFilePath).isDirectory()
+          ? this.currentFilePath
+          : path.dirname(this.currentFilePath);
+      } catch {
+        return this.currentFilePath;
+      }
+    })();
+    const absPath = path.resolve(baseDir, relPath);
+
+    // 파일 존재 확인
+    if (!fs.existsSync(absPath)) {
+      throw new Error(`Import error: file not found: ${absPath}`);
+    }
+
+    // 순환 import 방지
+    if (this.importedFiles.has(absPath)) {
+      return;
+    }
+    this.importedFiles.add(absPath);
+
+    // 서브 인터프리터로 FL 파일 실행
+    const src = fs.readFileSync(absPath, "utf-8");
+    const subInterp = new Interpreter();
+    subInterp.currentFilePath = absPath;
+    subInterp.importedFiles = this.importedFiles; // 순환 방지 공유
+
+    // stdlib 로드 전 함수 목록 스냅샷 (내장 함수 제외용)
+    const builtinFuncs = new Set<string>(subInterp.context.functions.keys());
+    subInterp.interpret(parse(lex(src)));
+
+    // 사용자 정의 함수만 추출 (stdlib 내장 제외)
+    const effectivePrefix = alias ?? prefix;
+    for (const [funcName, func] of subInterp.context.functions) {
+      if (builtinFuncs.has(funcName)) continue; // 내장 함수 skip
+
+      if (selective && selective.length > 0) {
+        // :only 필터: prefix 없이 직접 등록
+        if (selective.includes(funcName)) {
+          this.context.functions.set(funcName, func);
+        }
+      } else {
+        // prefix:funcName 형식으로 등록
+        this.context.functions.set(`${effectivePrefix}:${funcName}`, func);
+      }
+    }
   }
 
   // Phase 5 Week 2: Get concrete type from a value

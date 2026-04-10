@@ -1,0 +1,90 @@
+"use strict";
+// FreeLang v9: Pub/Sub Event System Standard Library
+// Phase 21: Decoupled event-driven communication for server services
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createPubSubModule = createPubSubModule;
+// Global topic registry
+const _topics = new Map();
+let _subCounter = 0;
+function createPubSubModule(callFn) {
+    return {
+        // pubsub_subscribe topic handlerName → subscriptionId
+        "pubsub_subscribe": (topic, handlerName) => {
+            const id = `sub_${++_subCounter}`;
+            if (!_topics.has(topic))
+                _topics.set(topic, []);
+            _topics.get(topic).push({ id, handlerName, once: false });
+            return id;
+        },
+        // pubsub_once topic handlerName → subscriptionId (auto-unsubscribes after first fire)
+        "pubsub_once": (topic, handlerName) => {
+            const id = `sub_${++_subCounter}`;
+            if (!_topics.has(topic))
+                _topics.set(topic, []);
+            _topics.get(topic).push({ id, handlerName, once: true });
+            return id;
+        },
+        // pubsub_publish topic data → delivered count
+        "pubsub_publish": (topic, data) => {
+            const subs = _topics.get(topic);
+            if (!subs || subs.length === 0)
+                return 0;
+            let count = 0;
+            const toRemove = [];
+            for (const sub of subs) {
+                try {
+                    callFn(sub.handlerName, [topic, data]);
+                    count++;
+                }
+                catch { }
+                if (sub.once)
+                    toRemove.push(sub.id);
+            }
+            if (toRemove.length > 0) {
+                const remaining = subs.filter(s => !toRemove.includes(s.id));
+                if (remaining.length === 0)
+                    _topics.delete(topic);
+                else
+                    _topics.set(topic, remaining);
+            }
+            return count;
+        },
+        // pubsub_unsubscribe subscriptionId → boolean
+        "pubsub_unsubscribe": (subscriptionId) => {
+            for (const [topic, subs] of _topics) {
+                const idx = subs.findIndex(s => s.id === subscriptionId);
+                if (idx !== -1) {
+                    subs.splice(idx, 1);
+                    if (subs.length === 0)
+                        _topics.delete(topic);
+                    return true;
+                }
+            }
+            return false;
+        },
+        // pubsub_unsubscribe_all topic → removed count
+        "pubsub_unsubscribe_all": (topic) => {
+            const subs = _topics.get(topic);
+            if (!subs)
+                return 0;
+            const count = subs.length;
+            _topics.delete(topic);
+            return count;
+        },
+        // pubsub_topics → string[] (active topics with at least one subscriber)
+        "pubsub_topics": () => Array.from(_topics.keys()),
+        // pubsub_subscribers topic → number
+        "pubsub_subscribers": (topic) => {
+            return _topics.get(topic)?.length ?? 0;
+        },
+        // pubsub_clear → total removed
+        "pubsub_clear": () => {
+            let total = 0;
+            for (const subs of _topics.values())
+                total += subs.length;
+            _topics.clear();
+            return total;
+        },
+    };
+}
+//# sourceMappingURL=stdlib-pubsub.js.map

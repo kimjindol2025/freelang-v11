@@ -1,0 +1,14 @@
+; FreeLang v9 — fl-math-lib.fl
+; Phase 52 import 시스템 테스트 픽스처
+
+[FUNC square :params [$x]
+  :body (* $x $x)
+]
+
+[FUNC cube :params [$x]
+  :body (* $x $x $x)
+]
+
+[FUNC clamp :params [$x $lo $hi]
+  :body (if (< $x $lo) $lo (if (> $x $hi) $hi $x))
+]

@@ -1,0 +1,74 @@
+; Phase 50 — 첫 FL 프로덕션 서버
+; 인메모리 TODO REST API
+; 포트: 30116
+
+; ── 전역 상태 ────────────────────────────────────────────────
+(define TODOS [])
+(define NEXT-ID 1)
+(define FILTER-TID 0)
+
+; ── 핸들러 ───────────────────────────────────────────────────
+
+; GET /todos → 모든 TODO 반환 (배열 직접 반환 — server_json은 배열을 객체로 변환하므로 우회)
+[FUNC handle-get-todos :params [$req]
+  :body $TODOS
+]
+
+; POST /todos {title: "..."} → 새 TODO 생성
+[FUNC handle-post-todo :params [$req]
+  :body (
+    (define body (server_req_body $req))
+    (define title (get body "title"))
+    (define todo {:id $NEXT-ID :title title :done false})
+    (set! TODOS (append $TODOS [todo]))
+    (set! NEXT-ID (+ $NEXT-ID 1))
+    (server_status 201 todo)
+  )
+]
+
+; DELETE 필터 헬퍼 — $FILTER-TID 전역 변수 사용
+[FUNC not-filter-tid :params [$t]
+  :body (!= (get $t "id") $FILTER-TID)
+]
+
+; DELETE /todos/:id → 특정 TODO 삭제
+[FUNC handle-delete-todo :params [$req]
+  :body (
+    (define tid (str->num (get (server_req_params $req) "id")))
+    (set! FILTER-TID tid)
+    (set! TODOS (fl-filter $TODOS not-filter-tid))
+    (server_json {:ok true})
+  )
+]
+
+; PATCH /todos/:id {done: true} → 완료 상태 토글
+[FUNC update-todo-done :params [$target-id $todos $i $acc]
+  :body (
+    (if (>= $i (length $todos))
+      $acc
+      (
+        (define t (get $todos $i))
+        (define updated (if (= (get $t "id") $target-id)
+          (map-set $t "done" true)
+          $t
+        ))
+        (update-todo-done $target-id $todos (+ $i 1) (append $acc [updated]))
+      )
+    )
+  )
+]
+
+[FUNC handle-patch-todo :params [$req]
+  :body (
+    (define tid (str->num (get (server_req_params $req) "id")))
+    (set! TODOS (update-todo-done tid $TODOS 0 []))
+    (server_json {:ok true})
+  )
+]
+
+; ── 라우트 등록 ─────────────────────────────────────────────
+(server_get    "/todos"      "handle-get-todos")
+(server_post   "/todos"      "handle-post-todo")
+(server_delete "/todos/:id"  "handle-delete-todo")
+(server_put    "/todos/:id"  "handle-patch-todo")
+(server_start 30116)

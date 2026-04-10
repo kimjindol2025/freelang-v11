@@ -725,3 +725,237 @@
 (define improved (< loss-final loss0))
 (println (str "loss 감소: " improved))
 (println "=== Phase 2 완료 ===")
+
+; ================================================================
+; Phase 3: W-emb + W-proj 동시 역전파
+;
+; 소형 설정: MINI-VOCAB=8  MINI-D=4  MINI-HEADS=1  MINI-SEQ=3
+; 학습 과제: tokens=[0,1,2] → target=3  ("ABCD" 예측)
+; ================================================================
+
+; ─── 소형 설정 ──────────────────────────────────────────────────
+(define MINI-VOCAB  8)
+(define MINI-D      4)
+(define MINI-DH     4)   ; heads=1 이므로 dh=d
+(define MINI-FFN    8)
+(define MINI-HEADS  1)
+(define MINI-SEQ    3)
+(define MINI-TARGET 3)   ; 토큰 3 예측
+(define MINI-TOKENS [0 1 2])
+
+; ─── MINI forward (MINI-D, MINI-VOCAB 사용) ─────────────────────
+[FUNC forward-mini :params [$tokens $W-emb $blocks $W-proj $b-proj]
+  :body (
+    (define seq (length $tokens))
+    (define d MINI-D)
+
+    ; Embedding + 위치 인코딩
+    (define x [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i seq) 0
+        (
+          (define tok (get $tokens i))
+          (define emb (slice $W-emb (* tok d) (+ (* tok d) d)))
+          (define pe [])
+          (define j 0)
+          (loop [[$_ 0]]
+            (if (>= j d) 0
+              (
+                (define pos-val (* (/ i (+ seq 1.0)) (if (= (floor (/ j 2)) (/ j 2)) 0.1 -0.1)))
+                (set! pe (append pe pos-val))
+                (set! j (+ j 1))
+                (recur 0)
+              )
+            )
+          )
+          (set! x (append x (vadd emb pe)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; Transformer Blocks
+    (define cur x)
+    (set! i 0)
+    (loop [[$_ 0]]
+      (if (>= i (length $blocks)) 0
+        (
+          (set! cur (transformer-block cur (get $blocks i)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; LM Head
+    (define last-x (slice cur (* (- seq 1) d) (* seq d)))
+    (define logits (vadd (mv $W-proj MINI-VOCAB d last-x) $b-proj))
+    logits
+  )
+]
+
+[FUNC ce-loss-mini :params [$toks $W-e $blks $Wp $bp $target]
+  :body (
+    (define lg (forward-mini $toks $W-e $blks $Wp $bp))
+    (define pr (softmax lg))
+    (define p (get pr $target))
+    (define safe-p (if (< p 0.000001) 0.000001 p))
+    (* -1.0 (log safe-p))
+  )
+]
+
+; ─── W-emb 수치 기울기 (MINI-D 기준) ───────────────────────────
+[FUNC grad-emb-row-mini :params [$toks $W-e $blks $Wp $bp $target $tok $h]
+  :body (
+    (define grads [])
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j MINI-D) grads
+        (
+          (define idx (+ (* $tok MINI-D) j))
+          (define orig (get $W-e idx))
+          (define We-p (vec-set $W-e idx (+ orig $h)))
+          (define fp (ce-loss-mini $toks We-p $blks $Wp $bp $target))
+          (define We-m (vec-set $W-e idx (- orig $h)))
+          (define fm (ce-loss-mini $toks We-m $blks $Wp $bp $target))
+          (define g (/ (- fp fm) (* 2.0 $h)))
+          (set! grads (append grads g))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC sgd-update-row-mini :params [$W-e $tok $grads $lr]
+  :body (
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j MINI-D) $W-e
+        (
+          (define idx (+ (* $tok MINI-D) j))
+          (define g (get $grads j))
+          (set! $W-e (vec-set $W-e idx (- (get $W-e idx) (* $lr g))))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── W-proj 수치 기울기 ─────────────────────────────────────────
+; W-proj: MINI-VOCAB × MINI-D flat
+; 행 r의 원소: W-proj[r*MINI-D + j], j=0..MINI-D-1
+[FUNC grad-proj-row :params [$toks $W-e $blks $Wp $bp $target $row $h]
+  :body (
+    (define grads [])
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j MINI-D) grads
+        (
+          (define idx (+ (* $row MINI-D) j))
+          (define orig (get $Wp idx))
+          (define Wp-p (vec-set $Wp idx (+ orig $h)))
+          (define fp (ce-loss-mini $toks $W-e $blks Wp-p $bp $target))
+          (define Wp-m (vec-set $Wp idx (- orig $h)))
+          (define fm (ce-loss-mini $toks $W-e $blks Wp-m $bp $target))
+          (define g (/ (- fp fm) (* 2.0 $h)))
+          (set! grads (append grads g))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC sgd-update-proj-row :params [$Wp $row $grads $lr]
+  :body (
+    (define j 0)
+    (loop [[$_ 0]]
+      (if (>= j MINI-D) $Wp
+        (
+          (define idx (+ (* $row MINI-D) j))
+          (define g (get $grads j))
+          (set! $Wp (vec-set $Wp idx (- (get $Wp idx) (* $lr g))))
+          (set! j (+ j 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── W-emb + W-proj 동시 업데이트 ──────────────────────────────
+[FUNC train-step-full :params [$toks $W-e $blks $Wp $bp $target $lr $h]
+  :body (
+    ; W-emb 업데이트: 각 입력 토큰 행
+    (define ti 0)
+    (loop [[$_ 0]]
+      (if (>= ti (length $toks)) 0
+        (
+          (define tok (get $toks ti))
+          (define ge (grad-emb-row-mini $toks $W-e $blks $Wp $bp $target tok $h))
+          (set! $W-e (sgd-update-row-mini $W-e tok ge $lr))
+          (set! ti (+ ti 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; W-proj 업데이트: 모든 행 (MINI-VOCAB개)
+    (define ri 0)
+    (loop [[$_ 0]]
+      (if (>= ri MINI-VOCAB) 0
+        (
+          (define gp (grad-proj-row $toks $W-e $blks $Wp $bp $target ri $h))
+          (set! $Wp (sgd-update-proj-row $Wp ri gp $lr))
+          (set! ri (+ ri 1))
+          (recur 0)
+        )
+      )
+    )
+
+    [$W-e $Wp]
+  )
+]
+
+; ─── Phase 3 학습 ───────────────────────────────────────────────
+(define MINI-LR     1.0)
+(define MINI-H      0.001)
+(define MINI-STEPS  20)
+
+(define mini-We  (rand-vec (* MINI-VOCAB MINI-D) 0.1))
+(define mini-blk [(make-block MINI-D MINI-DH MINI-FFN MINI-HEADS MINI-SEQ)])
+(define mini-Wp  (rand-vec (* MINI-VOCAB MINI-D) 0.1))
+(define mini-bp  (zeros MINI-VOCAB))
+
+(define mini-loss0 (ce-loss-mini MINI-TOKENS mini-We mini-blk mini-Wp mini-bp MINI-TARGET))
+(println "")
+(println (str "Phase3 초기 loss: " mini-loss0))
+
+; 학습 루프
+(define mini-We-t mini-We)
+(define mini-Wp-t mini-Wp)
+(define ms 0)
+(loop [[$_ 0]]
+  (if (>= ms MINI-STEPS) 0
+    (
+      (define result (train-step-full MINI-TOKENS mini-We-t mini-blk mini-Wp-t mini-bp MINI-TARGET MINI-LR MINI-H))
+      (set! mini-We-t (get result 0))
+      (set! mini-Wp-t (get result 1))
+      (set! ms (+ ms 1))
+      (recur 0)
+    )
+  )
+)
+
+(define mini-loss-final (ce-loss-mini MINI-TOKENS mini-We-t mini-blk mini-Wp-t mini-bp MINI-TARGET))
+(define mini-improved (< mini-loss-final mini-loss0))
+(println (str "Phase3 최종 loss: " mini-loss-final))
+(println (str "Phase3 loss 감소: " mini-improved))
+(println "=== Phase 3 완료 ===")
