@@ -28,7 +28,8 @@ function makeInterp(): Interpreter {
 }
 
 function run(interp: Interpreter, src: string): any {
-  return interp.interpret(parse(lex(src)));
+  interp.interpret(parse(lex(src)));
+  return (interp as any).context.lastValue;
 }
 
 const libPath = "./fl-math-lib.fl";
