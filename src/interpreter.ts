@@ -12,6 +12,7 @@ import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } 
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 import { extractParamNames, extractFunctions } from "./ast-helpers";
 import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runtime";
+import { ScopeStack } from "./interpreter-scope"; // Phase A: 렉시컬 스코프
 import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch integration
 import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
 import { createFileModule } from "./stdlib-file"; // Phase 10: File I/O
@@ -39,7 +40,7 @@ export interface ExecutionContext {
   functions: Map<string, FreeLangFunction>;
   routes: Map<string, FreeLangRoute>;
   intents: Map<string, Intent>;
-  variables: Map<string, any>;
+  variables: ScopeStack;
   app: express.Express;
   server?: any;
   middleware: FreeLangMiddleware[];
@@ -64,6 +65,7 @@ export interface FreeLangFunction {
   generics?: string[]; // Generic type variables: [T, K, V] (Phase 4)
   paramTypes?: TypeAnnotation[]; // Parameter types for type checking (Phase 3)
   returnType?: TypeAnnotation; // Return type for type checking (Phase 3)
+  capturedEnv?: Map<string, any>; // Phase A: 클로저 환경 (fn으로 define된 함수)
 }
 
 export interface FreeLangRoute {
@@ -126,7 +128,7 @@ export class Interpreter {
       functions: new Map(),
       routes: new Map(),
       intents: new Map(),
-      variables: new Map(),
+      variables: new ScopeStack(),
       app,
       middleware: [],
       errorHandlers: { handlers: new Map() },
@@ -731,7 +733,7 @@ export class Interpreter {
         kind: "function-value",
         params,
         body: expr.args[1],
-        capturedEnv: new Map(this.context.variables),
+        capturedEnv: this.context.variables.snapshot(),
         name: undefined,
       };
     }
@@ -770,7 +772,7 @@ export class Interpreter {
         name,
         params,
         body: expr.args[2],
-        capturedEnv: new Map(this.context.variables),
+        capturedEnv: this.context.variables.snapshot(),
       };
     }
 
@@ -1044,7 +1046,9 @@ export class Interpreter {
         throw new Error(`set!: first argument must be a symbol`);
       }
       const value = this.eval(expr.args[1]);
-      this.context.variables.set(name, value);
+      if (!this.context.variables.mutate(name, value)) {
+        this.context.variables.set(name, value);
+      }
       return value;
     }
 
@@ -1094,10 +1098,11 @@ export class Interpreter {
 
       // If it's a function value, store it in the functions map
       if ((value as any).kind === "function-value") {
-        const funcDef = {
+        const funcDef: FreeLangFunction = {
           name,
           params: (value as any).params,
           body: (value as any).body,
+          capturedEnv: (value as any).capturedEnv, // 클로저 환경 보존
         };
         this.context.functions.set(name, funcDef);
 
@@ -1138,7 +1143,7 @@ export class Interpreter {
         kind: "function-value",
         params: func.params,
         body: func.body,
-        capturedEnv: new Map(this.context.variables),
+        capturedEnv: this.context.variables.snapshot(),
         name: funcName,
       };
     }
@@ -1324,15 +1329,12 @@ export class Interpreter {
         loopInits.push(this.eval(valNode));
       }
 
-      // Save outer bindings
-      const savedVars = loopVars.map(v => ({ v, old: this.context.variables.get(v) }));
-
-      // Initialize loop variables
+      // 새 스코프에서 loop 바인딩 — 외부 스코프 오염 없음
+      this.context.variables.push();
       for (let i = 0; i < loopVars.length; i++) {
         this.context.variables.set(loopVars[i], loopInits[i]);
       }
 
-      const FL_RECUR = "__FL_RECUR__";
       let result: any = null;
       const maxIter = 100000;
       let iter = 0;
@@ -1341,7 +1343,6 @@ export class Interpreter {
           let recurred = false;
           for (const bodyNode of bodyNodes) {
             result = this.eval(bodyNode);
-            // Check if recur was called (via thrown recur signal)
             if (result && typeof result === "object" && result.__FL_RECUR__) {
               const newVals = result.__args as any[];
               for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
@@ -1354,11 +1355,7 @@ export class Interpreter {
           if (!recurred) break;
         }
       } finally {
-        // Restore outer bindings
-        for (const { v, old } of savedVars) {
-          if (old === undefined) this.context.variables.delete(v);
-          else this.context.variables.set(v, old);
-        }
+        this.context.variables.pop();
       }
       return result;
     }
@@ -1417,18 +1414,12 @@ export class Interpreter {
       });
       if (Array.isArray(arr) && paramNames.length > 0) {
         return arr.map((elem: any) => {
-          const saved = paramNames.map(n => ({ n, v: this.context.variables.get(n) }));
+          this.context.variables.push();
           this.context.variables.set(paramNames[0], elem);
-          if (paramNames.length > 1) {
-            // Optional: second param gets index (not used here)
-          }
           try {
             return this.eval(bodyNode);
           } finally {
-            for (const { n, v } of saved) {
-              if (v === undefined) this.context.variables.delete(n);
-              else this.context.variables.set(n, v);
-            }
+            this.context.variables.pop();
           }
         });
       }
@@ -1641,7 +1632,7 @@ export class Interpreter {
           kind: "function-value",
           params: params,
           body: body,
-          capturedEnv: new Map(this.context.variables),
+          capturedEnv: this.context.variables.snapshot(),
         };
 
       case "reduce":
@@ -2124,8 +2115,8 @@ export class Interpreter {
     // (let [[var1 val1] [var2 val2]] body)
     const bindings = args[0];
 
-    // Save previously-bound variable values so let doesn't leak into outer scope
-    const savedVars: [string, any][] = [];
+    // 새 스코프 — let 바인딩이 외부 스코프로 누출되지 않음
+    this.context.variables.push();
 
     // Parse bindings
     if ((bindings as any).kind === "block" && (bindings as any).type === "Array") {
@@ -2135,19 +2126,15 @@ export class Interpreter {
           if ((item as any).kind === "block" && (item as any).type === "Array") {
             const bindingItems = (item as any).fields.get("items");
             if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-              // Extract variable name from either a Variable (with .name) or Literal symbol (with .value)
               let varName: string;
               const varNode = bindingItems[0] as any;
               if (varNode.kind === "variable") {
                 varName = varNode.name;
               } else if (varNode.kind === "literal" && varNode.type === "symbol") {
-                // Self-hosting: bare symbol → add $ prefix so symbol-as-variable lookup finds it
                 varName = "$" + (varNode.value as string);
               } else {
                 throw new Error(`Invalid binding variable: expected symbol or variable`);
               }
-
-              savedVars.push([varName, this.context.variables.get(varName)]);
               const value = this.eval(bindingItems[1]);
               this.context.variables.set(varName, value);
             }
@@ -2163,11 +2150,7 @@ export class Interpreter {
         result = this.eval(args[bodyIdx]);
       }
     } finally {
-      // Restore let-bound variables to prevent leaking into outer scope
-      for (const [name, val] of savedVars) {
-        if (val === undefined) this.context.variables.delete(name);
-        else this.context.variables.set(name, val);
-      }
+      this.context.variables.pop();
     }
     return result;
   }
@@ -2361,25 +2344,37 @@ export class Interpreter {
       }
     }
 
-    // Save only the params being overwritten (allows set! closures to work)
-    const savedParams: [string, any][] = [];
+    // 클로저: capturedEnv가 있으면 해당 환경에서 실행
+    if (func.capturedEnv) {
+      const savedStack = this.context.variables.saveStack();
+      this.callDepth++;
+      try {
+        this.context.variables.fromSnapshot(func.capturedEnv);
+        for (let i = 0; i < func.params.length; i++) {
+          this.context.variables.set(func.params[i], args[i]);
+        }
+        return this.eval(func.body);
+      } finally {
+        this.callDepth--;
+        this.context.variables.restoreStack(savedStack);
+        for (const alias of tempAliases) {
+          this.context.functions.delete(alias);
+        }
+      }
+    }
+
+    // 일반 함수: 새 렉시컬 스코프 생성 — 함수 내 define이 전역 오염 방지
+    this.context.variables.push();
     this.callDepth++;
 
     try {
       for (let i = 0; i < func.params.length; i++) {
-        const paramName = func.params[i];
-        savedParams.push([paramName, this.context.variables.get(paramName)]);
-        this.context.variables.set(paramName, args[i]);
+        this.context.variables.set(func.params[i], args[i]);
       }
       return this.eval(func.body);
     } finally {
       this.callDepth--;
-      // Restore only the param variables (not the entire scope)
-      for (const [name, val] of savedParams) {
-        if (val === undefined) this.context.variables.delete(name);
-        else this.context.variables.set(name, val);
-      }
-      // Remove temporary namespace aliases
+      this.context.variables.pop();
       for (const alias of tempAliases) {
         this.context.functions.delete(alias);
       }
@@ -2395,18 +2390,18 @@ export class Interpreter {
       throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion`);
     }
 
-    const savedVars = new Map(this.context.variables);
+    const savedStack = this.context.variables.saveStack();
     this.callDepth++;
 
     try {
-      this.context.variables = new Map(fn.capturedEnv);
+      this.context.variables.fromSnapshot(fn.capturedEnv);
       for (let i = 0; i < fn.params.length; i++) {
         this.context.variables.set(fn.params[i], args[i]);
       }
       return this.eval(fn.body);
     } finally {
       this.callDepth--;
-      this.context.variables = savedVars;
+      this.context.variables.restoreStack(savedStack);
     }
   }
 
@@ -2418,22 +2413,14 @@ export class Interpreter {
 
     // Return a new Promise that executes the async function
     return new FreeLangPromise((resolve, reject) => {
-      const savedVars = new Map(this.context.variables);
+      const savedStack = this.context.variables.saveStack();
       try {
-        // Restore captured environment from function definition
-        this.context.variables = new Map(fn.capturedEnv);
-
-        // Bind parameters
+        this.context.variables.fromSnapshot(fn.capturedEnv);
         for (let i = 0; i < fn.params.length; i++) {
           this.context.variables.set(fn.params[i], args[i]);
         }
-
-        // Execute body
         const result = this.eval(fn.body);
-
-        // Resolve with the result
         if (result instanceof FreeLangPromise) {
-          // If the result is already a Promise, chain it
           result
             .then((value) => resolve(value))
             .catch((error) => reject(error));
@@ -2443,8 +2430,7 @@ export class Interpreter {
       } catch (error) {
         reject(error as Error);
       } finally {
-        // Restore scope even if exception occurs
-        this.context.variables = savedVars;
+        this.context.variables.restoreStack(savedStack);
       }
     });
   }
@@ -2491,36 +2477,25 @@ export class Interpreter {
       const matchResult = this.matchPattern(caseItem.pattern, value);
 
       if (matchResult.matched) {
-        // Save only the variables that will be bound by this pattern
-        const savedBindings: [string, any][] = [];
+        this.context.variables.push();
         for (const [varName] of matchResult.bindings) {
-          const key = "$" + varName;
-          savedBindings.push([key, this.context.variables.get(key)]);
-          this.context.variables.set(key, matchResult.bindings.get(varName));
+          this.context.variables.set("$" + varName, matchResult.bindings.get(varName));
         }
 
         // Check guard condition if present
         if (caseItem.guard) {
           const guardResult = this.eval(caseItem.guard);
           if (!guardResult) {
-            // Guard failed, restore bound variables and try next case
-            for (const [k, v] of savedBindings) {
-              if (v === undefined) this.context.variables.delete(k);
-              else this.context.variables.set(k, v);
-            }
+            this.context.variables.pop();
             continue;
           }
         }
 
-        // Execute body
-        const result = this.eval(caseItem.body);
-
-        // Restore bound variables
-        for (const [k, v] of savedBindings) {
-          if (v === undefined) this.context.variables.delete(k);
-          else this.context.variables.set(k, v);
+        try {
+          return this.eval(caseItem.body);
+        } finally {
+          this.context.variables.pop();
         }
-        return result;
       }
     }
 
@@ -2551,24 +2526,19 @@ export class Interpreter {
           // For now, all catch clauses handle all errors (no pattern matching)
           // In future, could support typed catch (catch [IOException e] ...)
 
-          // Save current variable scope
-          const savedVars = new Map(this.context.variables);
-
-          // Bind error to variable if specified
+          this.context.variables.push();
           if (catchClause.variable) {
             this.context.variables.set("$" + catchClause.variable, error);
           }
 
           try {
-            // Execute catch handler
             result = this.eval(catchClause.handler);
-            this.context.variables = savedVars;
             handled = true;
             break;
           } catch (innerError: any) {
-            // If catch handler also throws, restore and re-throw
-            this.context.variables = savedVars;
             throw innerError;
+          } finally {
+            this.context.variables.pop();
           }
         }
       }

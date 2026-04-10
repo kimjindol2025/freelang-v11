@@ -3,7 +3,7 @@
 import { lex } from "./lexer";
 import { parse } from "./parser";
 import { Interpreter } from "./interpreter";
-import { ScopeStack } from "./scope-stack";
+import { ScopeStack } from "./interpreter-scope";
 
 console.log("📊 Phase 4 Week 3-3: Performance Optimization Benchmark\n");
 
