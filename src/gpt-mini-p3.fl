@@ -283,3 +283,34 @@
 (println (str "최종 loss: " mini-loss-final))
 (println (str "loss 감소: " mini-improved))
 (println "=== Phase 3 완료 ===")
+
+; ─── Phase 4: N-step 학습 루프 ────────────────────────────────────
+; train-loop: N번 반복 학습 후 [loss trained-We trained-Wp] 반환 — tl-* 접두사
+[FUNC train-loop :params [$toks $We $Wp $bp $target $n $lr $h]
+  :body (
+    (define tl-We $We)
+    (define tl-Wp $Wp)
+    (define tl-i 0)
+    (loop [[$_ 0]]
+      (if (>= tl-i $n)
+        [(ce-loss-simple $toks tl-We tl-Wp $bp $target) tl-We tl-Wp]
+        (
+          (define tl-res (train-step-full $toks tl-We tl-Wp $bp $target $lr $h))
+          (set! tl-We (get tl-res 0))
+          (set! tl-Wp (get tl-res 1))
+          (set! tl-i (+ tl-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; 500 step 학습
+(define tl-result (train-loop mini-toks mini-We mini-Wp mini-bp mini-target 500 1.0 0.001))
+(define final-loss   (get tl-result 0))
+(define trained-We   (get tl-result 1))
+(define trained-Wp   (get tl-result 2))
+(println (str "500 step 후 loss: " final-loss))
+(println (str "수렴 성공: " (< final-loss 0.5)))
+(println "=== Phase 4 완료 ===")
