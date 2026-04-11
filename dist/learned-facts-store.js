@@ -257,6 +257,7 @@ class LearnedFactsStore {
     }
     /**
      * Private: Start auto-save timer
+     * unref() = allow process to exit even if timer is active
      */
     startAutoSave() {
         this.autoSaveTimer = setInterval(() => {
@@ -264,6 +265,10 @@ class LearnedFactsStore {
                 this.flush();
             }
         }, this.autoSaveInterval);
+        // Allow process to exit even if timer is running
+        if (this.autoSaveTimer && typeof this.autoSaveTimer.unref === 'function') {
+            this.autoSaveTimer.unref();
+        }
     }
 }
 exports.LearnedFactsStore = LearnedFactsStore;

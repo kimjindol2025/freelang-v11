@@ -6,6 +6,7 @@ export interface Block {
     fields: Map<string, ASTNode | ASTNode[]>;
     typeAnnotations?: Map<string, TypeAnnotation>;
     generics?: string[];
+    line?: number;
 }
 export interface Literal {
     kind: "literal";
@@ -234,7 +235,7 @@ export declare function makeLiteral(type: "number" | "string" | "symbol" | "bool
 export declare function makeVariable(name: string): Variable;
 export declare function makeSExpr(op: string, args: ASTNode[], line?: number): SExpr;
 export declare function makeKeyword(name: string): Keyword;
-export declare function makeBlock(type: string, name: string, fields: Map<string, ASTNode | ASTNode[]>): Block;
+export declare function makeBlock(type: string, name: string, fields: Map<string, ASTNode | ASTNode[]>, line?: number): Block;
 export declare function makeTypeAnnotation(name: string, generic?: TypeAnnotation, union?: TypeAnnotation[], optional?: boolean): TypeAnnotation;
 export declare function makeFuncSignature(name: string, params: Array<{
     name: string;

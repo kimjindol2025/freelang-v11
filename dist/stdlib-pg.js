@@ -96,7 +96,20 @@ exports.pgBuiltins = {
         exports.pgBuiltins.pg_query(sql, params);
     },
     // jwt_sign payload secret expiresIn -> token
+    // payload can be a plain object or a FreeLang (list :key val ...) array
     jwt_sign: (payload, secret, expiresIn = "7d") => {
+        if (Array.isArray(payload)) {
+            const obj = {};
+            for (let i = 0; i < payload.length; i += 2) {
+                let k = payload[i];
+                const v = payload[i + 1];
+                if (typeof k === "string" && k.startsWith(":"))
+                    k = k.slice(1);
+                if (typeof k === "string")
+                    obj[k] = v;
+            }
+            payload = obj;
+        }
         return jwt.sign(payload, secret, { expiresIn });
     },
     // jwt_verify token secret -> payload | null

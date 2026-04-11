@@ -3744,7 +3744,24 @@ export class Interpreter {
   }
 }
 
+// Global interpreter reference for cleanup on process exit
+let globalInterpreterInstance: Interpreter | null = null;
+
 export function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext {
   const interpreter = new Interpreter(app, logger);
+  globalInterpreterInstance = interpreter;
+
+  // Register cleanup handler on first interpret() call
+  if (!process.listeners("exit").some(l => l.name === "cleanupInterpreter")) {
+    const cleanupInterpreter = function() {
+      if (globalInterpreterInstance) {
+        globalInterpreterInstance.destroy();
+        globalInterpreterInstance = null;
+      }
+    };
+    Object.defineProperty(cleanupInterpreter, "name", { value: "cleanupInterpreter" });
+    process.on("exit", cleanupInterpreter);
+  }
+
   return interpreter.interpret(blocks);
 }

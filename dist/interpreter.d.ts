@@ -2,11 +2,12 @@ import express from "express";
 import { ASTNode, TypeAnnotation } from "./ast";
 import { TypeChecker } from "./type-checker";
 import { Logger } from "./logger";
+import { ScopeStack } from "./interpreter-scope";
 export interface ExecutionContext {
     functions: Map<string, FreeLangFunction>;
     routes: Map<string, FreeLangRoute>;
     intents: Map<string, Intent>;
-    variables: Map<string, any>;
+    variables: ScopeStack;
     app: express.Express;
     server?: any;
     middleware: FreeLangMiddleware[];
@@ -30,6 +31,7 @@ export interface FreeLangFunction {
     generics?: string[];
     paramTypes?: TypeAnnotation[];
     returnType?: TypeAnnotation;
+    capturedEnv?: Map<string, any>;
 }
 export interface FreeLangRoute {
     name: string;
@@ -71,10 +73,14 @@ export declare class Interpreter {
     private currentLine;
     private callDepth;
     private static readonly MAX_CALL_DEPTH;
+    private importedFiles;
+    currentFilePath: string;
     constructor(app?: express.Express, logger?: Logger);
+    private loadFlStdlib;
     private registerModule;
     interpret(blocks: ASTNode[]): ExecutionContext;
     private evalBlock;
+    private serverConfig;
     private handleServerBlock;
     private handleRouteBlock;
     private handleFuncBlock;
@@ -113,6 +119,7 @@ export declare class Interpreter {
     private getModules;
     private evalModuleBlock;
     private evalImportBlock;
+    private evalImportFromFile;
     private getConcreteType;
     private evalOpenBlock;
     private handleSearchBlock;
@@ -123,6 +130,12 @@ export declare class Interpreter {
     private evaluateCondition;
     private evalTypeClass;
     private evalInstance;
+    /**
+     * Cleanup: Destroy all resources and stop timers
+     * Call this when shutting down the interpreter to prevent memory leaks
+     * (e.g., after all tests complete or on process exit)
+     */
+    destroy(): void;
 }
 export declare function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext;
 //# sourceMappingURL=interpreter.d.ts.map

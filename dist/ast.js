@@ -61,8 +61,8 @@ function makeSExpr(op, args, line) {
 function makeKeyword(name) {
     return { kind: "keyword", name };
 }
-function makeBlock(type, name, fields) {
-    return { kind: "block", type, name, fields };
+function makeBlock(type, name, fields, line) {
+    return { kind: "block", type, name, fields, line };
 }
 // Helper: Create type annotation (Phase 3)
 function makeTypeAnnotation(name, generic, union, optional) {

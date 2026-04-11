@@ -4,7 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const interpreter_1 = require("./interpreter");
-const scope_stack_1 = require("./scope-stack");
+const interpreter_scope_1 = require("./interpreter-scope");
 console.log("📊 Phase 4 Week 3-3: Performance Optimization Benchmark\n");
 // Helper to run code and measure execution time
 function benchmarkCode(code, funcName, iterations = 1) {
@@ -93,7 +93,7 @@ console.log("=".repeat(60) + "\n");
 console.log("📋 Test 2: ScopeStack Operations (Unit Test)");
 console.log("────────────────────────────────────────────");
 try {
-    const scopeStack = new scope_stack_1.ScopeStack();
+    const scopeStack = new interpreter_scope_1.ScopeStack();
     // Benchmark: Push/pop operations
     const pushPopStart = performance.now();
     for (let i = 0; i < 10000; i++) {

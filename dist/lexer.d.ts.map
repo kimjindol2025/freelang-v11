@@ -1,1 +1,1 @@
-{"version":3,"file":"lexer.d.ts","sourceRoot":"","sources":["../src/lexer.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,KAAK,EAAkB,MAAM,SAAS,CAAC;AA0ChD,wBAAgB,GAAG,CAAC,MAAM,EAAE,MAAM,GAAG,KAAK,EAAE,CAiM3C"}
+{"version":3,"file":"lexer.d.ts","sourceRoot":"","sources":["../src/lexer.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,KAAK,EAAkB,MAAM,SAAS,CAAC;AA0ChD,wBAAgB,GAAG,CAAC,MAAM,EAAE,MAAM,GAAG,KAAK,EAAE,CAkM3C"}
