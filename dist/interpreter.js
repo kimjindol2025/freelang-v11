@@ -568,8 +568,7 @@ class Interpreter {
             const block = node;
             // Control blocks (FUNC, SERVER, ROUTE, etc.) must NOT be eval'd here
             // They should be handled by interpret() or evalBlock(), not eval()
-            const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
-            if (controlBlockTypes.includes(block.type)) {
+            if ((0, ast_1.isBlock)(block) && (0, ast_1.isControlBlock)(block)) {
                 throw new Error(`Control block [${block.type}] should not be eval'd directly. This block must be processed by interpret() or evalBlock().`);
             }
             if (block.type === "Array") {
@@ -1201,15 +1200,11 @@ class Interpreter {
             for (const arg of expr.args) {
                 // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
                 // Control blocks should be handled by evalBlock, not eval
-                if (arg.kind === "block") {
-                    const block = arg;
-                    const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
-                    if (controlBlockTypes.includes(block.type)) {
-                        // Process control block via evalBlock (no return value expected)
-                        this.evalBlock(block);
-                        result = null; // Control blocks don't produce values
-                        continue;
-                    }
+                if ((0, ast_1.isBlock)(arg) && (0, ast_1.isControlBlock)(arg)) {
+                    // Process control block via evalBlock (no return value expected)
+                    this.evalBlock(arg);
+                    result = null; // Control blocks don't produce values
+                    continue;
                 }
                 result = this.eval(arg);
             }

@@ -6,7 +6,7 @@ import * as path from "path";
 import express from "express";
 import { lex } from "./lexer";
 import { parse } from "./parser";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock, isControlBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -624,8 +624,7 @@ export class Interpreter {
 
       // Control blocks (FUNC, SERVER, ROUTE, etc.) must NOT be eval'd here
       // They should be handled by interpret() or evalBlock(), not eval()
-      const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
-      if (controlBlockTypes.includes(block.type)) {
+      if (isBlock(block) && isControlBlock(block)) {
         throw new Error(`Control block [${block.type}] should not be eval'd directly. This block must be processed by interpret() or evalBlock().`);
       }
 
@@ -1311,15 +1310,11 @@ export class Interpreter {
       for (const arg of expr.args) {
         // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
         // Control blocks should be handled by evalBlock, not eval
-        if ((arg as any).kind === "block") {
-          const block = arg as Block;
-          const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
-          if (controlBlockTypes.includes(block.type)) {
-            // Process control block via evalBlock (no return value expected)
-            this.evalBlock(block);
-            result = null;  // Control blocks don't produce values
-            continue;
-          }
+        if (isBlock(arg) && isControlBlock(arg)) {
+          // Process control block via evalBlock (no return value expected)
+          this.evalBlock(arg);
+          result = null;  // Control blocks don't produce values
+          continue;
         }
         result = this.eval(arg);
       }

@@ -294,4 +294,6 @@ export declare function isReasoningSequence(node: any): node is ReasoningSequenc
 export declare function isTryBlock(node: any): node is TryBlock;
 export declare function isCatchClause(node: any): node is CatchClause;
 export declare function isThrowExpression(node: any): node is ThrowExpression;
+export declare const CONTROL_BLOCK_TYPES: string[];
+export declare function isControlBlock(node: Block): boolean;
 //# sourceMappingURL=ast.d.ts.map
