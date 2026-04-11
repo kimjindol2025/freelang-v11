@@ -3725,6 +3725,23 @@ export class Interpreter {
       `✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`
     );
   }
+
+  /**
+   * Cleanup: Destroy all resources and stop timers
+   * Call this when shutting down the interpreter to prevent memory leaks
+   * (e.g., after all tests complete or on process exit)
+   */
+  destroy(): void {
+    // Clean up LearnedFactsStore timer
+    this.learnedFactsStore.destroy();
+
+    // Close HTTP server if running
+    if (this.context.server) {
+      this.context.server.close();
+    }
+
+    this.logger.info("Interpreter cleanup completed");
+  }
 }
 
 export function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext {

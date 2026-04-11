@@ -296,4 +296,5 @@ export class LearnedFactsStore {
       }
     }, this.autoSaveInterval);
   }
+
 }
