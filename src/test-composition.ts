@@ -12,7 +12,7 @@ console.log("🚀 Phase 5 Week 4: Function Composition Tests\n");
 function parseAndInterpret(code: string): any {
   const tokens = lex(code);
   const ast = parse(tokens);
-  const context = interpret(ast, express());
+  const context = interpret(ast);
   return context;
 }
 

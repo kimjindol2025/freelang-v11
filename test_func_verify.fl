@@ -1,0 +1,21 @@
+(println "=== Test 1: Control block definition ===")
+
+[FUNC add :params [$a $b] 
+  :body (do
+    (println "INSIDE add body")
+    (+ $a $b)
+  )
+]
+
+(println "Function defined - body did NOT execute")
+
+(println "=== Test 2: Function call ===")
+(let [[$result (add 3 5)]]
+  (println "add(3, 5) =" $result)
+)
+
+(println "=== Test 3: Server block ===")
+[SERVER myapp :port 9000]
+(println "Server configured")
+
+(println "=== SUCCESS ===")

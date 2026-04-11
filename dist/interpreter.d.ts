@@ -1,4 +1,3 @@
-import express from "express";
 import { ASTNode, TypeAnnotation } from "./ast";
 import { TypeChecker } from "./type-checker";
 import { Logger } from "./logger";
@@ -8,7 +7,6 @@ export interface ExecutionContext {
     routes: Map<string, FreeLangRoute>;
     intents: Map<string, Intent>;
     variables: ScopeStack;
-    app: express.Express;
     server?: any;
     middleware: FreeLangMiddleware[];
     errorHandlers: ErrorHandler;
@@ -75,7 +73,7 @@ export declare class Interpreter {
     private static readonly MAX_CALL_DEPTH;
     private importedFiles;
     currentFilePath: string;
-    constructor(app?: express.Express, logger?: Logger);
+    constructor(logger?: Logger);
     private loadFlStdlib;
     private registerModule;
     interpret(blocks: ASTNode[]): ExecutionContext;
@@ -88,7 +86,6 @@ export declare class Interpreter {
     private handleMiddlewareBlock;
     private handleWebSocketBlock;
     private handleErrorHandlerBlock;
-    private setupExpressRoutes;
     eval(node: ASTNode): any;
     private evalSExpr;
     private evalLet;
@@ -137,5 +134,5 @@ export declare class Interpreter {
      */
     destroy(): void;
 }
-export declare function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext;
+export declare function interpret(blocks: ASTNode[], logger?: Logger): ExecutionContext;
 //# sourceMappingURL=interpreter.d.ts.map

@@ -34,15 +34,11 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Interpreter = void 0;
 exports.interpret = interpret;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const express_1 = __importDefault(require("express"));
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const ast_1 = require("./ast");
@@ -77,7 +73,7 @@ const stdlib_module_1 = require("./stdlib-module"); // Phase 24: Module system
 const stdlib_pg_1 = require("./stdlib-pg"); // PostgreSQL + JWT + AI
 // Interpreter class
 class Interpreter {
-    constructor(app = (0, express_1.default)(), logger) {
+    constructor(logger) {
         this.currentLine = 0; // FreeLang source line tracking
         this.callDepth = 0;
         // Phase 52: FL 파일 import 지원
@@ -90,7 +86,6 @@ class Interpreter {
             routes: new Map(),
             intents: new Map(),
             variables: new interpreter_scope_1.ScopeStack(),
-            app,
             middleware: [],
             errorHandlers: { handlers: new Map() },
             startTime: Date.now(),
@@ -220,7 +215,6 @@ class Interpreter {
             }
             throw e;
         }
-        this.setupExpressRoutes();
         return this.context;
     }
     evalBlock(block) {
@@ -387,123 +381,6 @@ class Interpreter {
             this.context.errorHandlers.handlers.set(404, on404);
         if (on500)
             this.context.errorHandlers.handlers.set(500, on500);
-    }
-    setupExpressRoutes() {
-        // body-parser 미들웨어 등록
-        this.context.app.use(express_1.default.json());
-        this.context.app.use(express_1.default.urlencoded({ extended: true }));
-        for (const [, route] of this.context.routes) {
-            const method = route.method.toLowerCase();
-            const handler = (req, res) => {
-                try {
-                    this.context.variables.set("request", req);
-                    this.context.variables.set("response", res);
-                    this.context.variables.set("$req", req);
-                    this.context.variables.set("$res", res);
-                    let result = this.eval(route.handler);
-                    // FreeLang (list :key val ...) 배열 → 객체 재귀 변환
-                    function deepConvert(val) {
-                        if (!Array.isArray(val))
-                            return val;
-                        if (val.length === 0)
-                            return val;
-                        if (typeof val[0] === "string") {
-                            const obj = {};
-                            for (let i = 0; i < val.length; i += 2) {
-                                let k = val[i];
-                                const v = val[i + 1];
-                                if (typeof k === "string") {
-                                    if (k.startsWith(":"))
-                                        k = k.slice(1);
-                                    obj[k] = deepConvert(v);
-                                }
-                            }
-                            return obj;
-                        }
-                        return val.map(deepConvert);
-                    }
-                    // FreeLang Result 모나드 처리: {tag:"Ok"|"Err", value:..., kind:"Result"}
-                    // (ok data)  → HTTP 200 {success:true, data:data}
-                    // (err msg)  → HTTP 400 {success:false, error:msg}
-                    if (result && typeof result === "object" && result.kind === "Result") {
-                        if (result.tag === "Ok") {
-                            const val = result.value;
-                            if (val && typeof val === "object" && val.__fl_response) {
-                                // server_json/server_status 이미 처리된 경우
-                                result = val;
-                            }
-                            else {
-                                result = { __fl_response: true, type: "json", status: 200, body: { success: true, data: deepConvert(val) } };
-                            }
-                        }
-                        else if (result.tag === "Err") {
-                            const errVal = result.value;
-                            if (errVal && typeof errVal === "object" && errVal.__fl_response) {
-                                res.status(errVal.status || 400).json(errVal.body);
-                            }
-                            else {
-                                res.status(400).json({ success: false, error: String(errVal) });
-                            }
-                            return;
-                        }
-                    }
-                    // __fl_response: server_json / server_status 반환값 처리
-                    if (result && typeof result === "object" && result.__fl_response) {
-                        if (result.type === "text") {
-                            res.status(result.status || 200).send(result.body);
-                        }
-                        else {
-                            res.status(result.status || 200).json(result.body);
-                        }
-                    }
-                    else if (typeof result === "object" && result !== null) {
-                        res.json(result);
-                    }
-                    else {
-                        res.send(String(result ?? ""));
-                    }
-                }
-                catch (error) {
-                    res.status(500).json({ error: error.message });
-                }
-            };
-            if (method === "get") {
-                this.context.app.get(route.path, handler);
-            }
-            else if (method === "post") {
-                this.context.app.post(route.path, handler);
-            }
-            else if (method === "put") {
-                this.context.app.put(route.path, handler);
-            }
-            else if (method === "delete") {
-                this.context.app.delete(route.path, handler);
-            }
-        }
-        // SERVER 블록이 있으면 서버 시작
-        if (this.serverConfig) {
-            const { port, host } = this.serverConfig;
-            // public/ 폴더가 있으면 정적 파일 서빙 (SPA fallback 포함)
-            const path = require("path");
-            const fs = require("fs");
-            const publicDir = path.resolve(process.cwd(), "public");
-            if (fs.existsSync(publicDir)) {
-                this.context.app.use(express_1.default.static(publicDir));
-                // SPA fallback: API가 아닌 GET 요청은 index.html 반환
-                this.context.app.get(/^(?!\/api\/).*/, (_req, res) => {
-                    const indexHtml = path.join(publicDir, "index.html");
-                    if (fs.existsSync(indexHtml)) {
-                        res.sendFile(indexHtml);
-                    }
-                    else {
-                        res.status(404).send("Not Found");
-                    }
-                });
-            }
-            this.context.server = this.context.app.listen(port, host, () => {
-                console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
-            });
-        }
     }
     eval(node) {
         if (!node)
@@ -3429,8 +3306,8 @@ exports.Interpreter = Interpreter;
 Interpreter.MAX_CALL_DEPTH = 500;
 // Global interpreter reference for cleanup on process exit
 let globalInterpreterInstance = null;
-function interpret(blocks, app, logger) {
-    const interpreter = new Interpreter(app, logger);
+function interpret(blocks, logger) {
+    const interpreter = new Interpreter(logger);
     globalInterpreterInstance = interpreter;
     // Register cleanup handler on first interpret() call
     if (!process.listeners("exit").some(l => l.name === "cleanupInterpreter")) {

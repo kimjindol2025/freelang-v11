@@ -47,8 +47,7 @@ async function runServer(): Promise<void> {
 
     // Step 4: Interpretation
     console.log("\n⚙️ Interpreting...");
-    const app = express();
-    const context = interpret(ast, app);
+    const context = interpret(ast);
     console.log(`✅ Interpreted successfully`);
     console.log(`   Functions defined: ${context.functions.size}`);
     console.log(`   Intents defined: ${context.intents.size}`);

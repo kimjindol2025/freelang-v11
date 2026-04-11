@@ -1,0 +1,4 @@
+(println "Before")
+[FUNC f :params [$x] :body (+ $x 1)]
+(println "After")
+(println (f 5))
