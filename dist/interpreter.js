@@ -65,7 +65,7 @@ const stdlib_time_1 = require("./stdlib-time"); // Phase 16: Time + Logging + Mo
 const stdlib_crypto_1 = require("./stdlib-crypto"); // Phase 17: Crypto + UUID + Regex
 const stdlib_workflow_1 = require("./stdlib-workflow"); // Phase 18: Workflow Engine
 const stdlib_resource_1 = require("./stdlib-resource"); // Phase 19: Server Resource Search
-const stdlib_server_1 = require("./stdlib-server"); // Phase 20-21: HTTP Server + Middleware
+const stdlib_http_server_1 = require("./stdlib-http-server"); // Phase 4a: Pure HTTP Server (Express-free)
 const stdlib_db_1 = require("./stdlib-db"); // Phase 20: DB Driver
 const stdlib_ws_1 = require("./stdlib-ws"); // Phase 21: WebSocket
 const stdlib_auth_1 = require("./stdlib-auth"); // Phase 21: Auth (JWT, API key, hash)
@@ -118,7 +118,8 @@ class Interpreter {
         this.registerModule((0, stdlib_crypto_1.createCryptoModule)());
         this.registerModule((0, stdlib_workflow_1.createWorkflowModule)());
         this.registerModule((0, stdlib_resource_1.createResourceModule)());
-        this.registerModule((0, stdlib_server_1.createServerModule)((n, a) => this.callUserFunction(n, a)));
+        // Phase 4a: Pure HTTP Server (overrides Express version)
+        this.registerModule((0, stdlib_http_server_1.createHttpServerModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_db_1.createDbModule)());
         this.registerModule((0, stdlib_ws_1.createWsModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_auth_1.createAuthModule)());
@@ -565,6 +566,12 @@ class Interpreter {
         // Blocks (nested structures)
         if (node.kind === "block") {
             const block = node;
+            // Control blocks (FUNC, SERVER, ROUTE, etc.) must NOT be eval'd here
+            // They should be handled by interpret() or evalBlock(), not eval()
+            const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
+            if (controlBlockTypes.includes(block.type)) {
+                throw new Error(`Control block [${block.type}] should not be eval'd directly. This block must be processed by interpret() or evalBlock().`);
+            }
             if (block.type === "Array") {
                 const items = block.fields.get("items");
                 if (Array.isArray(items)) {
@@ -579,12 +586,8 @@ class Interpreter {
                 }
                 return result;
             }
-            // For other block types, return as object
-            const result = {};
-            for (const [key, value] of block.fields) {
-                result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
-            }
-            return result;
+            // For other block types (should only be Array/Map), throw error
+            throw new Error(`Unknown block type: ${block.type}`);
         }
         // Pattern matching (Phase 4 Week 3-4)
         if (node.kind === "pattern-match") {
@@ -1196,6 +1199,18 @@ class Interpreter {
         if (op === "do" || op === "begin" || op === "progn") {
             let result = null;
             for (const arg of expr.args) {
+                // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
+                // Control blocks should be handled by evalBlock, not eval
+                if (arg.kind === "block") {
+                    const block = arg;
+                    const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
+                    if (controlBlockTypes.includes(block.type)) {
+                        // Process control block via evalBlock (no return value expected)
+                        this.evalBlock(block);
+                        result = null; // Control blocks don't produce values
+                        continue;
+                    }
+                }
                 result = this.eval(arg);
             }
             return result;

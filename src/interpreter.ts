@@ -26,7 +26,8 @@ import { createTimeModule } from "./stdlib-time"; // Phase 16: Time + Logging + 
 import { createCryptoModule } from "./stdlib-crypto"; // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
-import { createServerModule } from "./stdlib-server"; // Phase 20-21: HTTP Server + Middleware
+import { createServerModule } from "./stdlib-server"; // Phase 20-21: HTTP Server + Middleware (Express)
+import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
 import { createDbModule } from "./stdlib-db";          // Phase 20: DB Driver
 import { createWsModule } from "./stdlib-ws";          // Phase 21: WebSocket
 import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, API key, hash)
@@ -162,7 +163,8 @@ export class Interpreter {
     this.registerModule(createCryptoModule());
     this.registerModule(createWorkflowModule());
     this.registerModule(createResourceModule());
-    this.registerModule(createServerModule((n, a) => this.callUserFunction(n, a)));
+    // Phase 4a: Pure HTTP Server (overrides Express version)
+    this.registerModule(createHttpServerModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createDbModule());
     this.registerModule(createWsModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createAuthModule());
@@ -619,6 +621,14 @@ export class Interpreter {
     // Blocks (nested structures)
     if ((node as any).kind === "block") {
       const block = node as Block;
+
+      // Control blocks (FUNC, SERVER, ROUTE, etc.) must NOT be eval'd here
+      // They should be handled by interpret() or evalBlock(), not eval()
+      const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
+      if (controlBlockTypes.includes(block.type)) {
+        throw new Error(`Control block [${block.type}] should not be eval'd directly. This block must be processed by interpret() or evalBlock().`);
+      }
+
       if (block.type === "Array") {
         const items = block.fields.get("items");
         if (Array.isArray(items)) {
@@ -633,12 +643,8 @@ export class Interpreter {
         }
         return result;
       }
-      // For other block types, return as object
-      const result: Record<string, any> = {};
-      for (const [key, value] of block.fields) {
-        result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
-      }
-      return result;
+      // For other block types (should only be Array/Map), throw error
+      throw new Error(`Unknown block type: ${block.type}`);
     }
 
     // Pattern matching (Phase 4 Week 3-4)
@@ -1303,6 +1309,18 @@ export class Interpreter {
     if (op === "do" || op === "begin" || op === "progn") {
       let result: any = null;
       for (const arg of expr.args) {
+        // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
+        // Control blocks should be handled by evalBlock, not eval
+        if ((arg as any).kind === "block") {
+          const block = arg as Block;
+          const controlBlockTypes = ["FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"];
+          if (controlBlockTypes.includes(block.type)) {
+            // Process control block via evalBlock (no return value expected)
+            this.evalBlock(block);
+            result = null;  // Control blocks don't produce values
+            continue;
+          }
+        }
         result = this.eval(arg);
       }
       return result;
