@@ -16,6 +16,7 @@
     "test-legacy": "ts-node src/test-full-stack.ts",
     "test-parser": "ts-node src/test-parser.ts",
     "test-interpreter": "ts-node src/test-interpreter.ts",
+    "benchmark": "ts-node benchmark-stdlib.ts",
     "start": "ts-node src/http-server-runner.ts",
     "server": "ts-node src/http-server-runner.ts",
     "benchmark": "node scripts/benchmark.js",

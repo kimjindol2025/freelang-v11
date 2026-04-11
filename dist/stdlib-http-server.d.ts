@@ -15,6 +15,7 @@ export declare function createHttpServerModule(callFn: CallFn): {
     server_get: (path: string, handlerName: string) => null;
     server_post: (path: string, handlerName: string) => null;
     server_put: (path: string, handlerName: string) => null;
+    server_patch: (path: string, handlerName: string) => null;
     server_delete: (path: string, handlerName: string) => null;
     server_start: (port: number) => string;
     server_stop: () => null;

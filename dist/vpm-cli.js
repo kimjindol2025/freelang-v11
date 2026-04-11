@@ -1,0 +1,508 @@
+"use strict";
+/**
+ * FreeLang v9 Package Manager (vpm) CLI
+ * Phase 5b: Package Manager Command Line Interface
+ *
+ * Commands:
+ * - vpm install [package][@version]
+ * - vpm publish
+ * - vpm search <query>
+ * - vpm list
+ * - vpm update [package]
+ * - vpm token create
+ * - vpm uninstall <package>
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VpmCli = void 0;
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const http = __importStar(require("http"));
+const child_process_1 = require("child_process");
+class VpmCli {
+    constructor() {
+        this.registryUrl = process.env.VPM_REGISTRY || 'http://registry.v9.dclub.kr';
+        this.cwd = process.cwd();
+        this.vpmDir = path.join(this.cwd, 'vpm');
+        this.packagesDir = path.join(this.vpmDir, 'packages');
+    }
+    async run(args) {
+        if (args.length === 0) {
+            this.showHelp();
+            return;
+        }
+        const command = args[0];
+        const params = args.slice(1);
+        try {
+            switch (command) {
+                case 'install':
+                case 'i':
+                    await this.install(params);
+                    break;
+                case 'publish':
+                    await this.publish();
+                    break;
+                case 'search':
+                    await this.search(params);
+                    break;
+                case 'list':
+                case 'ls':
+                    await this.list();
+                    break;
+                case 'update':
+                    await this.update(params);
+                    break;
+                case 'uninstall':
+                case 'remove':
+                case 'rm':
+                    await this.uninstall(params);
+                    break;
+                case 'token':
+                    await this.token(params);
+                    break;
+                case 'info':
+                    await this.info(params);
+                    break;
+                case 'help':
+                case '-h':
+                case '--help':
+                    this.showHelp();
+                    break;
+                default:
+                    console.error(`❌ Unknown command: ${command}`);
+                    this.showHelp();
+            }
+        }
+        catch (error) {
+            console.error(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+            process.exit(1);
+        }
+    }
+    async install(params) {
+        if (params.length === 0) {
+            // 의존성 설치
+            await this.installFromLockFile();
+            return;
+        }
+        const packageSpec = params[0];
+        const [packageName, version] = packageSpec.includes('@')
+            ? packageSpec.split('@')
+            : [packageSpec, 'latest'];
+        console.log(`📦 Installing ${packageName}@${version}...`);
+        // 패키지 정보 조회
+        const pkgInfo = await this.fetchPackageInfo(packageName, version);
+        if (!pkgInfo) {
+            throw new Error(`Package ${packageName} not found`);
+        }
+        // 패키지 다운로드 및 설치
+        await this.downloadAndExtract(packageName, version, pkgInfo);
+        // package.json 업데이트
+        await this.updatePackageJson(packageName, version);
+        // 의존성 재귀 설치
+        await this.installDependencies(packageName, version);
+        // 락파일 업데이트
+        await this.updateLockFile();
+        console.log(`✅ ${packageName}@${version} installed`);
+    }
+    async installFromLockFile() {
+        const lockFilePath = path.join(this.cwd, 'package-lock.json');
+        if (!fs.existsSync(lockFilePath)) {
+            console.log('⚠️  No package-lock.json found. Install dependencies manually.');
+            return;
+        }
+        const lockFile = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'));
+        const packages = lockFile.packages || {};
+        console.log('📦 Installing dependencies from lock file...');
+        let count = 0;
+        for (const [pkgName, pkgData] of Object.entries(packages)) {
+            if (!pkgName.startsWith('@'))
+                continue; // 루트 패키지 제외
+            if (pkgData.version) {
+                await this.downloadAndExtract(path.basename(pkgName), pkgData.version, pkgData);
+                count++;
+            }
+        }
+        console.log(`✅ Installed ${count} packages`);
+    }
+    async publish() {
+        const pkgJsonPath = path.join(this.cwd, 'package.json');
+        if (!fs.existsSync(pkgJsonPath)) {
+            throw new Error('package.json not found');
+        }
+        const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+        const token = process.env.VPM_AUTH_TOKEN;
+        if (!token) {
+            throw new Error('VPM_AUTH_TOKEN environment variable not set');
+        }
+        console.log(`📦 Publishing ${pkgJson.name}@${pkgJson.version}...`);
+        // 패키지 압축
+        const tarballPath = await this.createTarball();
+        const fileSize = fs.statSync(tarballPath).size;
+        const checksum = this.calculateChecksum(tarballPath);
+        // 레지스트리에 배포
+        const response = await this.makeRequest('POST', '/registry/publish', {
+            name: pkgJson.name,
+            version: pkgJson.version,
+            description: pkgJson.description,
+            license: pkgJson.license,
+            homepage: pkgJson.homepage,
+            repository: pkgJson.repository,
+            tarball_url: `${this.registryUrl}/download/${pkgJson.name}/${pkgJson.version}`,
+            file_size: fileSize,
+            checksum,
+            keywords: pkgJson.keywords || [],
+            dependencies: pkgJson.dependencies || {},
+        }, token);
+        if (response.success) {
+            console.log(`✅ Published ${pkgJson.name}@${pkgJson.version}`);
+            // 압축 파일 정리
+            fs.unlinkSync(tarballPath);
+        }
+        else {
+            throw new Error(response.message || 'Publish failed');
+        }
+    }
+    async search(params) {
+        if (params.length === 0) {
+            throw new Error('Please provide a search query');
+        }
+        const query = params.join(' ');
+        console.log(`🔍 Searching for "${query}"...`);
+        const response = await this.makeRequest('GET', `/registry/search?q=${encodeURIComponent(query)}&limit=20`);
+        if (!response.success) {
+            throw new Error(response.message || 'Search failed');
+        }
+        if (response.count === 0) {
+            console.log('❌ No packages found');
+            return;
+        }
+        console.log(`\n📦 Search results (${response.count} found):\n`);
+        response.packages.forEach((pkg, idx) => {
+            const downloads = pkg.downloads || 0;
+            const stars = pkg.stars || 0;
+            console.log(`${idx + 1}. ${pkg.name}`);
+            console.log(`   ${pkg.description || 'No description'}`);
+            console.log(`   ⬇️  ${downloads} | ⭐ ${stars}`);
+            console.log();
+        });
+    }
+    async list() {
+        if (!fs.existsSync(this.packagesDir)) {
+            console.log('📦 No packages installed');
+            return;
+        }
+        const packages = fs.readdirSync(this.packagesDir);
+        if (packages.length === 0) {
+            console.log('📦 No packages installed');
+            return;
+        }
+        console.log('📦 Installed packages:\n');
+        packages.forEach((pkg, idx) => {
+            const version = pkg.split('@')[1] || 'unknown';
+            const name = pkg.split('@')[0];
+            console.log(`${idx + 1}. ${name}@${version}`);
+        });
+        console.log();
+    }
+    async update(params) {
+        if (params.length === 0) {
+            // 모든 패키지 업데이트
+            console.log('🔄 Updating all packages...');
+            const pkgJsonPath = path.join(this.cwd, 'package.json');
+            if (!fs.existsSync(pkgJsonPath)) {
+                throw new Error('package.json not found');
+            }
+            const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+            const deps = pkgJson.dependencies || {};
+            let updated = 0;
+            for (const [depName] of Object.entries(deps)) {
+                try {
+                    await this.updateSinglePackage(depName);
+                    updated++;
+                }
+                catch (e) {
+                    console.warn(`⚠️  Failed to update ${depName}`);
+                }
+            }
+            console.log(`✅ Updated ${updated} packages`);
+            return;
+        }
+        const packageName = params[0];
+        await this.updateSinglePackage(packageName);
+    }
+    async updateSinglePackage(packageName) {
+        console.log(`🔄 Updating ${packageName}...`);
+        const pkgInfo = await this.fetchPackageInfo(packageName, 'latest');
+        if (!pkgInfo) {
+            throw new Error(`Package ${packageName} not found`);
+        }
+        const latestVersion = pkgInfo.versions[0].version;
+        const currentVersion = await this.getInstalledVersion(packageName);
+        if (currentVersion === latestVersion) {
+            console.log(`ℹ️  ${packageName} is already at latest version`);
+            return;
+        }
+        await this.uninstallSinglePackage(packageName);
+        await this.downloadAndExtract(packageName, latestVersion, pkgInfo);
+        await this.updatePackageJson(packageName, latestVersion);
+        console.log(`✅ ${packageName} updated from ${currentVersion} to ${latestVersion}`);
+    }
+    async uninstall(params) {
+        if (params.length === 0) {
+            throw new Error('Please specify a package to uninstall');
+        }
+        const packageName = params[0];
+        await this.uninstallSinglePackage(packageName);
+        await this.removeFromPackageJson(packageName);
+        await this.updateLockFile();
+        console.log(`✅ ${packageName} uninstalled`);
+    }
+    async uninstallSinglePackage(packageName) {
+        const pkgPath = path.join(this.packagesDir, fs.readdirSync(this.packagesDir).find((d) => d.startsWith(packageName)));
+        if (fs.existsSync(pkgPath)) {
+            fs.rmSync(pkgPath, { recursive: true });
+        }
+    }
+    async token(params) {
+        const action = params[0];
+        switch (action) {
+            case 'create':
+                console.log('🔑 Creating new token...');
+                const token = await this.createAuthToken();
+                console.log(`✅ Token created: ${token}`);
+                console.log('   Set VPM_AUTH_TOKEN environment variable to use it');
+                break;
+            case 'list':
+                console.log('🔑 Auth tokens:');
+                // 토큰 목록 조회 (실제 구현은 API 필요)
+                break;
+            default:
+                throw new Error('Unknown token action');
+        }
+    }
+    async info(params) {
+        if (params.length === 0) {
+            throw new Error('Please specify a package name');
+        }
+        const packageName = params[0];
+        console.log(`📦 Fetching info for ${packageName}...`);
+        const pkgInfo = await this.fetchPackageInfo(packageName);
+        if (!pkgInfo) {
+            throw new Error(`Package ${packageName} not found`);
+        }
+        console.log(`\n${pkgInfo.name}`);
+        console.log(`${pkgInfo.description || 'No description'}`);
+        console.log(`⬇️  ${pkgInfo.downloads} downloads | ⭐ ${pkgInfo.stars} stars`);
+        console.log(`\nVersions:`);
+        pkgInfo.versions.forEach((v) => {
+            console.log(`  - ${v.version} (${v.published_at})`);
+        });
+        console.log();
+    }
+    // Helper methods
+    async fetchPackageInfo(packageName, version) {
+        try {
+            const path = version
+                ? `/registry/packages/${packageName}/${version}`
+                : `/registry/packages/${packageName}`;
+            const response = await this.makeRequest('GET', path);
+            return response.success ? response.package : null;
+        }
+        catch {
+            return null;
+        }
+    }
+    async downloadAndExtract(packageName, version, pkgInfo) {
+        // 실제 구현에서는 tarball 다운로드 및 추출
+        // 여기서는 시뮬레이션
+        const targetDir = path.join(this.packagesDir, `${packageName}@${version}`);
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+            fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgInfo, null, 2));
+        }
+    }
+    async installDependencies(packageName, version) {
+        const pkgPath = path.join(this.packagesDir, `${packageName}@${version}`);
+        const pkgJsonPath = path.join(pkgPath, 'package.json');
+        if (!fs.existsSync(pkgJsonPath))
+            return;
+        const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+        const deps = pkgJson.dependencies || {};
+        for (const [depName, depVersion] of Object.entries(deps)) {
+            await this.install([`${depName}@${depVersion}`]);
+        }
+    }
+    async updatePackageJson(packageName, version) {
+        const pkgJsonPath = path.join(this.cwd, 'package.json');
+        if (!fs.existsSync(pkgJsonPath))
+            return;
+        const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+        if (!pkgJson.dependencies)
+            pkgJson.dependencies = {};
+        pkgJson.dependencies[packageName] = version;
+        fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2));
+    }
+    async removeFromPackageJson(packageName) {
+        const pkgJsonPath = path.join(this.cwd, 'package.json');
+        if (!fs.existsSync(pkgJsonPath))
+            return;
+        const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+        if (pkgJson.dependencies && packageName in pkgJson.dependencies) {
+            delete pkgJson.dependencies[packageName];
+        }
+        fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2));
+    }
+    async updateLockFile() {
+        const lockFile = {
+            name: 'package',
+            version: '1.0.0',
+            lockfileVersion: 1,
+            requires: true,
+            packages: {},
+        };
+        if (fs.existsSync(this.packagesDir)) {
+            fs.readdirSync(this.packagesDir).forEach((pkg) => {
+                lockFile.packages[pkg] = { version: pkg.split('@')[1] };
+            });
+        }
+        fs.writeFileSync(path.join(this.cwd, 'package-lock.json'), JSON.stringify(lockFile, null, 2));
+    }
+    async createTarball() {
+        const tarballPath = `/tmp/${Date.now()}-package.tar.gz`;
+        try {
+            (0, child_process_1.execSync)(`tar -czf ${tarballPath} --exclude=vpm --exclude=node_modules .`, { cwd: this.cwd });
+        }
+        catch (e) {
+            throw new Error(`Failed to create tarball: ${e}`);
+        }
+        return tarballPath;
+    }
+    calculateChecksum(filePath) {
+        const crypto = require('crypto');
+        const content = fs.readFileSync(filePath);
+        return crypto.createHash('sha256').update(content).digest('hex');
+    }
+    async makeRequest(method, path, body, token) {
+        return new Promise((resolve, reject) => {
+            const url = new URL(this.registryUrl + path);
+            const options = {
+                hostname: url.hostname,
+                port: url.port || 80,
+                path: url.pathname + url.search,
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { Authorization: `Bearer ${token}` }),
+                },
+            };
+            const req = http.request(options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    try {
+                        resolve(JSON.parse(data));
+                    }
+                    catch {
+                        reject(new Error('Invalid JSON response'));
+                    }
+                });
+            });
+            req.on('error', reject);
+            if (body) {
+                req.write(JSON.stringify(body));
+            }
+            req.end();
+        });
+    }
+    async createAuthToken() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let token = '';
+        for (let i = 0; i < 32; i++) {
+            token += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return token;
+    }
+    async getInstalledVersion(packageName) {
+        if (!fs.existsSync(this.packagesDir))
+            return 'none';
+        const dirs = fs.readdirSync(this.packagesDir);
+        const pkg = dirs.find((d) => d.startsWith(packageName + '@'));
+        return pkg ? pkg.split('@')[1] : 'none';
+    }
+    showHelp() {
+        console.log(`
+v9 Package Manager (vpm) - v1.0.0
+
+Usage:
+  vpm <command> [options]
+
+Commands:
+  install [package@version]   Install package(s)
+  publish                     Publish current package to registry
+  search <query>              Search packages
+  list                        List installed packages
+  update [package]            Update package(s)
+  uninstall <package>         Uninstall package
+  info <package>              Show package information
+  token <action>              Manage auth tokens
+  help                        Show this help message
+
+Examples:
+  vpm install awesome-lib
+  vpm install awesome-lib@1.2.0
+  vpm search data
+  vpm list
+  vpm update
+  vpm publish
+
+Environment:
+  VPM_REGISTRY               Registry URL (default: http://registry.v9.dclub.kr)
+  VPM_AUTH_TOKEN             Auth token for publishing
+
+For more info: https://v9.dclub.kr/docs/vpm
+`);
+    }
+}
+exports.VpmCli = VpmCli;
+// CLI Entry Point
+const args = process.argv.slice(2);
+const cli = new VpmCli();
+cli.run(args).catch((error) => {
+    console.error(`❌ ${error.message}`);
+    process.exit(1);
+});
+//# sourceMappingURL=vpm-cli.js.map

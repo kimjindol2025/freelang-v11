@@ -124,6 +124,13 @@ export function createHttpServerModule(callFn: CallFn) {
       return null;
     },
 
+    // server_patch path handlerName -> null
+    "server_patch": (path: string, handlerName: string): null => {
+      const [pattern, params] = pathToRegex(path);
+      routes.push({ method: "PATCH", path, pattern, params, handler: handlerName });
+      return null;
+    },
+
     // server_delete path handlerName -> null
     "server_delete": (path: string, handlerName: string): null => {
       const [pattern, params] = pathToRegex(path);
@@ -141,7 +148,7 @@ export function createHttpServerModule(callFn: CallFn) {
 
           // CORS
           res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+          res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
           res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
           if (method === "OPTIONS") {
