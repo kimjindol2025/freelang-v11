@@ -33,6 +33,8 @@ import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, A
 import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (env + SIGTERM)
+import { createAsyncModule } from "./stdlib-async";     // Phase 23: Async/await primitives
+import { createModuleSystem } from "./stdlib-module";   // Phase 24: Module system
 import { pgBuiltins } from "./stdlib-pg";               // PostgreSQL + JWT + AI
 
 // ExecutionContext: 런타임 상태 관리
@@ -167,6 +169,8 @@ export class Interpreter {
     this.registerModule(createCacheModule());
     this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
+    this.registerModule(createAsyncModule((n, a) => this.callUserFunction(n, a))); // Phase 23: async_call, promise_*
+    this.registerModule(createModuleSystem());  // Phase 24: module_*, namespace_*
     this.registerModule(pgBuiltins);            // PostgreSQL + JWT + AI
 
     // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)

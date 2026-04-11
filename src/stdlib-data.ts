@@ -72,8 +72,22 @@ export function createDataModule() {
       return Object.values(o);
     },
 
+    // json_parse str -> object (parse JSON string to object)
+    "json_parse": (str: string): any => {
+      try {
+        return JSON.parse(str);
+      } catch (e: any) {
+        throw new Error(`json_parse: invalid JSON: ${e.message}`);
+      }
+    },
+
     // json_str obj -> string (serialize to JSON string)
     "json_str": (obj: any): string => {
+      return JSON.stringify(obj);
+    },
+
+    // json_stringify obj -> string (alias for json_str)
+    "json_stringify": (obj: any): string => {
       return JSON.stringify(obj);
     },
 

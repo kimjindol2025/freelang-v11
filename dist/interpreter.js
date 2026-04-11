@@ -72,6 +72,8 @@ const stdlib_auth_1 = require("./stdlib-auth"); // Phase 21: Auth (JWT, API key,
 const stdlib_cache_1 = require("./stdlib-cache"); // Phase 21: In-memory TTL cache
 const stdlib_pubsub_1 = require("./stdlib-pubsub"); // Phase 21: Pub/Sub events
 const stdlib_process_1 = require("./stdlib-process"); // Phase 22: Process (env + SIGTERM)
+const stdlib_async_1 = require("./stdlib-async"); // Phase 23: Async/await primitives
+const stdlib_module_1 = require("./stdlib-module"); // Phase 24: Module system
 const stdlib_pg_1 = require("./stdlib-pg"); // PostgreSQL + JWT + AI
 // Interpreter class
 class Interpreter {
@@ -123,6 +125,8 @@ class Interpreter {
         this.registerModule((0, stdlib_cache_1.createCacheModule)());
         this.registerModule((0, stdlib_pubsub_1.createPubSubModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_process_1.createProcessModule)()); // Phase 22: env_load, on_sigterm
+        this.registerModule((0, stdlib_async_1.createAsyncModule)((n, a) => this.callUserFunction(n, a))); // Phase 23: async_call, promise_*
+        this.registerModule((0, stdlib_module_1.createModuleSystem)()); // Phase 24: module_*, namespace_*
         this.registerModule(stdlib_pg_1.pgBuiltins); // PostgreSQL + JWT + AI
         // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
         this.loadFlStdlib();
