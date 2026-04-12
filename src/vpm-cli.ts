@@ -168,12 +168,16 @@ class VpmCli {
 
     let count = 0;
     for (const [pkgName, pkgData] of Object.entries(packages)) {
-      if (!pkgName.startsWith('@')) continue; // 루트 패키지 제외
+      if (!pkgName || pkgName === '' || pkgName === '.') continue; // 루트 패키지 제외
       if (pkgData.version) {
+        // Extract package name from "name@version" format
+        const lastAtIndex = pkgName.lastIndexOf('@');
+        const pkgNameOnly = lastAtIndex > 0 ? pkgName.substring(0, lastAtIndex) : pkgName;
         await this.downloadAndExtract(
-          path.basename(pkgName),
+          pkgNameOnly,
           pkgData.version,
-          pkgData
+          pkgData,
+          pkgData.integrity
         );
         count++;
       }

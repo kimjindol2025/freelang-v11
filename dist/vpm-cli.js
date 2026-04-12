@@ -153,10 +153,13 @@ class VpmCli {
         console.log('📦 Installing dependencies from lock file...');
         let count = 0;
         for (const [pkgName, pkgData] of Object.entries(packages)) {
-            if (!pkgName.startsWith('@'))
+            if (!pkgName || pkgName === '' || pkgName === '.')
                 continue; // 루트 패키지 제외
             if (pkgData.version) {
-                await this.downloadAndExtract(path.basename(pkgName), pkgData.version, pkgData);
+                // Extract package name from "name@version" format
+                const lastAtIndex = pkgName.lastIndexOf('@');
+                const pkgNameOnly = lastAtIndex > 0 ? pkgName.substring(0, lastAtIndex) : pkgName;
+                await this.downloadAndExtract(pkgNameOnly, pkgData.version, pkgData, pkgData.integrity);
                 count++;
             }
         }

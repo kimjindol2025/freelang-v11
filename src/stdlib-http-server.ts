@@ -53,11 +53,12 @@ export function createHttpServerModule(callFn: CallFn) {
     console.log(`${icon} [${requestId}] ${method} ${path} ${status} ${duration}ms`);
   }
 
-  // URL 경로를 정규표현식으로 변환 (예: /users/:id → /users/(.+))
+  // URL 경로를 정규표현식으로 변환 (예: /users/:id → /users/(.+), /* → /.*))
   function pathToRegex(path: string): [RegExp, string[]] {
     const params: string[] = [];
     const pattern = path
       .replace(/\//g, "\\/")
+      .replace(/\*/g, ".*")
       .replace(/:(\w+)/g, (_, param) => {
         params.push(param);
         return "([^\\/]+)";
@@ -211,6 +212,16 @@ export function createHttpServerModule(callFn: CallFn) {
               // 응답 처리 (응답 보류 중이면 skip)
               if (pendingResponses.has(requestId)) {
                 pendingResponses.delete(requestId);
+              } else if (result && typeof result === "object" && result.__fl_wait_and_respond === true) {
+                // Phase 57+: 비동기 응답 대기 (Promise 처리)
+                const asyncResp = await result.promise;
+                if (!asyncResp) {
+                  sendResponse(res, 504, { error: "Gateway Timeout" });
+                } else {
+                  status = asyncResp.status ?? 200;
+                  const contentType = asyncResp.contentType ?? "application/json";
+                  sendResponse(res, status, asyncResp.body ?? "", contentType);
+                }
               } else {
                 if (result && typeof result === "object") {
                   if (result.__fl_response === true) {
@@ -288,6 +299,24 @@ export function createHttpServerModule(callFn: CallFn) {
         status: code,
         contentType: "application/json",
         body,
+      };
+    },
+
+    // server_html body -> response object (text/html)
+    "server_html": (body: string): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body,
+      };
+    },
+
+    // server_wait_respond promise -> response object (비동기 응답 대기)
+    "server_wait_respond": (promise: Promise<any>): Record<string, any> => {
+      return {
+        __fl_wait_and_respond: true,
+        promise,
       };
     },
 

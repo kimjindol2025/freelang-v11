@@ -10,5 +10,6 @@ export declare function createCacheModule(): {
     cache_incr: (key: string, amount?: number) => number;
     cache_mget: (keys: string[]) => Record<string, any>;
     cache_mset: (entries: Record<string, any>, ttlMs?: number) => null;
+    wait_for_cache: (key: string, timeoutMs?: number, intervalMs?: number) => Promise<any>;
 };
 //# sourceMappingURL=stdlib-cache.d.ts.map

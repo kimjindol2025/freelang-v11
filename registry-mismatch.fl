@@ -1,0 +1,79 @@
+; Phase 7 Stage 3: Test Registry with Intentional Checksum Mismatch
+; 메모리 기반 패키지 저장소 (일부러 잘못된 checksum)
+
+[FUNC get_packages :params []
+  :body {
+    :lodash {
+      :id "lodash"
+      :name "lodash"
+      :description "A utility library for common programming tasks"
+      :downloads 10000000
+      :stars 52000
+      :versions [
+        { :version "4.17.21" :published_at "2021-05-13" :checksum "sha256:99_99" }
+      ]
+    }
+  }
+]
+
+[FUNC handle_registry_packages :params [$req]
+  :body (do
+    (let [
+        [$rid (get $req "request_id")]
+        [$query (get $req "query")]
+        [$method (get $req "method")]
+        [$packages (get_packages)]
+        [$name (get $query "name")]
+        [$version (get $query "version")]
+      ]
+      (do
+        (if (= $method "GET")
+          (do
+            (if (not $name)
+              (server_status 200 {
+                :success true
+                :count 1
+                :packages $packages
+              })
+              (do
+                (let [
+                    [$pkg (get $packages $name)]
+                  ]
+                  (if $pkg
+                    (server_status 200 {
+                      :success true
+                      :package $pkg
+                      :version (if $version $version "latest")
+                    })
+                    (server_status 404 {
+                      :success false
+                      :message (concat "Package " $name " not found")
+                      :code "E_PACKAGE_NOT_FOUND"
+                    })
+                  )
+                )
+              )
+            )
+          )
+          (server_status 405 {
+            :success false
+            :code "E_METHOD_NOT_ALLOWED"
+          })
+        )
+      )
+    )
+  )
+]
+
+(println "🚀 Starting v9 Test Registry (Mismatch) on port 4001...")
+
+(server_get "/registry/packages" "handle_registry_packages")
+(server_get "/registry/packages/:name" "handle_registry_packages")
+(server_get "/registry/packages/:name/:version" "handle_registry_packages")
+
+(let [[$msg (server_start 4001)]]
+  (println $msg)
+)
+
+(println "📖 Registry with INTENTIONAL MISMATCH ready (port 4001)")
+(println "✅ Test Registry ready (port 4001). Press Ctrl+C to stop.")

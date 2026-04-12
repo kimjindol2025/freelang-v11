@@ -112,5 +112,27 @@ export function createCacheModule() {
       }
       return null;
     },
+
+    // Phase F: wait_for_cache key timeoutMs intervalMs → Promise<value or null>
+    // 캐시에 값이 생길 때까지 비동기 대기 (이벤트 루프 비블로킹)
+    "wait_for_cache": (key: string, timeoutMs: number = 30000, intervalMs: number = 50): Promise<any> => {
+      return new Promise((resolve) => {
+        const start = Date.now();
+        const check = () => {
+          const entry = _cache.get(key);
+          if (entry && (!entry.expiresAt || Date.now() <= entry.expiresAt)) {
+            _cache.delete(key); // 소비형 (1회 사용 후 삭제)
+            resolve(entry.value);
+            return;
+          }
+          if (Date.now() - start >= timeoutMs) {
+            resolve(null);
+            return;
+          }
+          setTimeout(check, intervalMs);
+        };
+        check();
+      });
+    },
   };
 }

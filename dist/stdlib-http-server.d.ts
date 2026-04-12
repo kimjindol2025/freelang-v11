@@ -24,6 +24,8 @@ export declare function createHttpServerModule(callFn: CallFn): {
     server_json: (body: any) => Record<string, any>;
     server_text: (body: string) => Record<string, any>;
     server_status: (code: number, body: any) => Record<string, any>;
+    server_html: (body: string) => Record<string, any>;
+    server_wait_respond: (promise: Promise<any>) => Record<string, any>;
     server_req_body: (req: Request) => string;
     server_req_query: (req: Request, key?: string) => any;
     server_req_header: (req: Request, name: string) => string | null;
