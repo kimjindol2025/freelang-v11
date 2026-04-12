@@ -42,6 +42,9 @@ declare class VpmCli {
     private createAuthToken;
     private getInstalledVersion;
     private callResolverInstall;
+    private calculateSHA256;
+    private installedPackages;
+    private detectVersionConflict;
     private resolveVersion;
     private versionMatches;
     private parseVersion;

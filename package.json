@@ -1,0 +1,48 @@
+{
+  "name": "freelang-v9",
+  "version": "9.0.0",
+  "description": "FreeLang v9 - AI-Only Language",
+  "main": "dist/index.js",
+  "bin": {
+    "v9": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "test:e2e": "ts-node src/test-full-stack.ts",
+    "test-legacy": "ts-node src/test-full-stack.ts",
+    "test-parser": "ts-node src/test-parser.ts",
+    "test-interpreter": "ts-node src/test-interpreter.ts",
+    "benchmark": "node scripts/benchmark.js",
+    "start": "ts-node src/http-server-runner.ts",
+    "server": "ts-node src/http-server-runner.ts",
+    "freelang": "ts-node src/cli.ts",
+    "fl": "ts-node src/cli.ts",
+    "repl": "ts-node src/cli.ts repl"
+  },
+  "dependencies": {
+    "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
+    "express": "4.17.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.20.0",
+    "ws": "^8.20.0",
+    "lodash": "4.17.21",
+    "web-app": "2.0.0",
+    "app-utils": "1.0.0",
+    "semver-lib": "2.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.19.37",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  }
+}
