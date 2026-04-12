@@ -42,6 +42,11 @@ import { globalTester, HypothesisConfig } from "./hypothesis"; // Phase 111: Hyp
 import { maybeMap, maybeBind, maybeChain, maybeFilter, maybeCombine, maybeSelect } from "./maybe-chain"; // Phase 112: Maybe Chain
 import { globalDebater, Argument } from "./debate"; // Phase 113: Debate
 import { globalCheckpoint } from "./checkpoint"; // Phase 114: Checkpoint
+import { globalMetaReasoner } from "./meta-reason"; // Phase 115: Meta-Reason
+import { globalBeliefs, BeliefSystem } from "./belief"; // Phase 116: Belief System
+import { globalAnalogy } from "./analogy"; // Phase 117: Analogy
+import { globalCritique, defaultFinders, severityWeight } from "./critique"; // Phase 118: Critique Agent
+import { globalComposer, ReasonStep } from "./compose-reason"; // Phase 119: Compose-Reason
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1393,6 +1398,236 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
           },
         });
         return result.conclusion;
+      }
+
+      // Phase 114: Checkpoint — AI 추론 세이브포인트 저장/복원
+      if (op === "cp-save") {
+        // (cp-save "name" state)
+        const [name, state] = args;
+        globalCheckpoint.save(String(name), state);
+        return null;
+      }
+      if (op === "cp-restore") {
+        // (cp-restore "name") → 최신 state 또는 null
+        const [name] = args;
+        return globalCheckpoint.restore(String(name));
+      }
+      if (op === "cp-branch") {
+        // (cp-branch "name" state fn) → 성공 시 결과, 실패 시 복원된 state
+        const [name, state, fn] = args;
+        const result = globalCheckpoint.branch(String(name), state, (s: any) => {
+          if (typeof fn === "function") return fn(s);
+          if ((fn as any)?.kind === "function-value") return callFn(fn, [s]);
+          throw new Error("cp-branch: fn must be callable");
+        });
+        if (result.success) return result.result;
+        return result.restored;
+      }
+      if (op === "cp-drop") {
+        // (cp-drop "name") → boolean
+        const [name] = args;
+        return globalCheckpoint.drop(String(name));
+      }
+      if (op === "cp-list") {
+        // (cp-list) → 이름 목록 (배열)
+        return globalCheckpoint.list();
+      }
+      if (op === "cp-versions") {
+        // (cp-versions "name") → 버전 수 (number)
+        const [name] = args;
+        return globalCheckpoint.versions(String(name));
+      }
+
+      // Phase 115: Meta-Reason — AI 추론 방법 자동 선택
+      if (op === "meta-reason") {
+        // (meta-reason "problem") → 선택된 전략 이름 문자열
+        const problem = String(args[0] ?? "");
+        const result = globalMetaReasoner.analyze(problem);
+        return result.selected;
+      }
+      if (op === "meta-reason-scores") {
+        // (meta-reason-scores "problem") → 전략별 점수 맵 [{strategy, score, reason}]
+        const problem = String(args[0] ?? "");
+        const result = globalMetaReasoner.analyze(problem);
+        // Map으로 변환: { COT: 0.9, TOT: 0.4, ... }
+        const scoreMap: Record<string, number> = {};
+        for (const s of result.scores) {
+          scoreMap[s.strategy] = s.score;
+        }
+        return scoreMap;
+      }
+      if (op === "meta-reason-rationale") {
+        // (meta-reason-rationale "problem") → 선택 이유 문자열
+        const problem = String(args[0] ?? "");
+        const result = globalMetaReasoner.analyze(problem);
+        return result.rationale;
+      }
+
+      // Phase 116: Belief System — AI 신념 + 베이즈 업데이트
+      if (op === "belief-set") {
+        // (belief-set "claim" confidence) → null
+        const [claim, confidence] = args;
+        globalBeliefs.set(String(claim), Number(confidence));
+        return null;
+      }
+      if (op === "belief-get") {
+        // (belief-get "claim") → confidence 숫자 또는 null
+        const [claim] = args;
+        return globalBeliefs.get(String(claim));
+      }
+      if (op === "belief-update") {
+        // (belief-update "claim" evidence) → 업데이트된 confidence
+        const [claim, evidence] = args;
+        return globalBeliefs.update(String(claim), Number(evidence));
+      }
+      if (op === "belief-negate") {
+        // (belief-negate "claim") → 약화된 confidence
+        const [claim] = args;
+        return globalBeliefs.negate(String(claim));
+      }
+      if (op === "belief-list") {
+        // (belief-list) → 신념 리스트 배열
+        return globalBeliefs.list();
+      }
+      if (op === "belief-certain") {
+        // (belief-certain threshold) → 임계값 이상 신념들
+        const threshold = args.length > 0 ? Number(args[0]) : 0.8;
+        return globalBeliefs.certain(threshold);
+      }
+      if (op === "belief-strongest") {
+        // (belief-strongest) → 가장 강한 신념의 claim 문자열 또는 null
+        const b = globalBeliefs.strongest();
+        return b ? b.claim : null;
+      }
+      if (op === "belief-forget") {
+        // (belief-forget "claim") → boolean
+        const [claim] = args;
+        return globalBeliefs.forget(String(claim));
+      }
+      if (op === "belief-size") {
+        // (belief-size) → 신념 개수
+        return globalBeliefs.size();
+      }
+
+      // Phase 117: Analogy — 유사 패턴 추론
+      if (op === "analogy-store") {
+        // (analogy-store "description" solution tags?) → 패턴 저장, id 반환
+        const [desc, solution, tagsRaw] = args;
+        const tags = Array.isArray(tagsRaw) ? tagsRaw.map(String) : [];
+        const p = globalAnalogy.store(String(desc), solution, tags);
+        return p.id;
+      }
+      if (op === "analogy-find") {
+        // (analogy-find "problem" topK?) → 유사 패턴 description 리스트
+        const [problem, topK] = args;
+        const results = globalAnalogy.find(String(problem), topK != null ? Number(topK) : 3);
+        return results.map(p => p.description);
+      }
+      if (op === "analogy-best") {
+        // (analogy-best "problem") → 가장 유사한 패턴의 solution, 없으면 null
+        const [problem] = args;
+        const p = globalAnalogy.best(String(problem));
+        return p ? p.solution : null;
+      }
+      if (op === "analogy-by-tag") {
+        // (analogy-by-tag "tag") → 태그별 패턴 description 리스트
+        const [tag] = args;
+        const results = globalAnalogy.byTag(String(tag));
+        return results.map(p => p.description);
+      }
+      if (op === "analogy-popular") {
+        // (analogy-popular n?) → 자주 쓰인 패턴 description 리스트
+        const [n] = args;
+        const results = globalAnalogy.popular(n != null ? Number(n) : 3);
+        return results.map(p => p.description);
+      }
+      if (op === "analogy-size") {
+        // (analogy-size) → 저장된 패턴 수
+        return globalAnalogy.size();
+      }
+      if (op === "analogy-all") {
+        // (analogy-all) → 전체 패턴 description 리스트
+        return globalAnalogy.all().map(p => p.description);
+      }
+
+      // Phase 118: Critique Agent — 자기 출력 비판
+      if (op === "critique") {
+        // (critique output) → approved? boolean (defaultFinders 사용)
+        const [output] = args;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.approved;
+      }
+      if (op === "critique-points") {
+        // (critique-points output) → 문제점 리스트 (descriptions)
+        const [output] = args;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.points.map(p => p.description);
+      }
+      if (op === "critique-risk") {
+        // (critique-risk output) → 위험도 숫자
+        const [output] = args;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.overallRisk;
+      }
+      if (op === "critique-summary") {
+        // (critique-summary output) → 요약 문자열
+        const [output] = args;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.summary;
+      }
+
+      // Phase 119: Compose-Reason — 추론 블록 파이프라인 조합기
+      if (op === "compose-reason") {
+        // (compose-reason steps-list input) → 최종 출력값
+        // steps-list: [[name fn], ...] 또는 [[name fn condition], ...]
+        const [stepsList, input] = args;
+        if (!Array.isArray(stepsList)) return input;
+        const steps: ReasonStep[] = stepsList.map((s: any) => {
+          if (!Array.isArray(s)) return { name: String(s), fn: (x: any) => x };
+          const [name, fn, condition] = s;
+          const step: ReasonStep = {
+            name: String(name),
+            fn: typeof fn === "function" ? fn : (x: any) => x,
+          };
+          if (typeof condition === "function") step.condition = condition;
+          return step;
+        });
+        const result = globalComposer.compose(steps, input);
+        return result.output;
+      }
+      if (op === "compose-history") {
+        // (compose-history steps-list input) → 단계별 이름 리스트
+        const [stepsList, input] = args;
+        if (!Array.isArray(stepsList)) return [];
+        const steps: ReasonStep[] = stepsList.map((s: any) => {
+          if (!Array.isArray(s)) return { name: String(s), fn: (x: any) => x };
+          const [name, fn, condition] = s;
+          const step: ReasonStep = {
+            name: String(name),
+            fn: typeof fn === "function" ? fn : (x: any) => x,
+          };
+          if (typeof condition === "function") step.condition = condition;
+          return step;
+        });
+        const result = globalComposer.compose(steps, input);
+        return result.history.map(h => h.name);
+      }
+      if (op === "compose-steps") {
+        // (compose-steps steps-list input) → 실행된 단계 수
+        const [stepsList, input] = args;
+        if (!Array.isArray(stepsList)) return 0;
+        const steps: ReasonStep[] = stepsList.map((s: any) => {
+          if (!Array.isArray(s)) return { name: String(s), fn: (x: any) => x };
+          const [name, fn, condition] = s;
+          const step: ReasonStep = {
+            name: String(name),
+            fn: typeof fn === "function" ? fn : (x: any) => x,
+          };
+          if (typeof condition === "function") step.condition = condition;
+          return step;
+        });
+        const result = globalComposer.compose(steps, input);
+        return result.steps;
       }
 
       // (export sym1 sym2 ...) — self-hosting 파일 호환
