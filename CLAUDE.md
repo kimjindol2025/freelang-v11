@@ -1,231 +1,130 @@
-# 🚀 FreeLang v9 - AI 전용 언어 (Claude Code가 만들고, Claude Code가 쓰는 언어)
+# 🚀 FreeLang v9 - AI 전용 언어
 
-## 🎯 핵심 목적
+## 🎯 핵심 정체성 (IDENTITY — 절대 변경 불가)
 
-**이 언어는 인간을 위한 언어가 아니다.**
-- 제작자: Claude Code (AI)
-- 사용자: Claude Code (AI)
-- 목표: AI가 추론(Reasoning), 검색(Search), 학습(Learn), 파일처리, 에러처리를 네이티브 블록으로 표현
+**이 언어는 인간을 위한 언어가 아니다. 다른 언어와 경쟁하지 않는다.**
 
-인간 친화적 문법보다 **AI 추론 패턴에 최적화**된 구조를 우선한다.
-S-expression 기반 + 블록 구조 = AI가 파싱/생성하기 가장 쉬운 형태.
+```
+목표: AI가 AI답게 사고하고, AI가 편하게 쓰는 유일한 언어
+제작자: Claude Code (AI)
+사용자: Claude Code (AI)
+철학: AI의 사고 패턴 자체를 언어 문법으로
+```
+
+### 다른 언어와의 차이
+
+```
+# Python/JS — AI를 라이브러리로 쓴다
+result = await llm.call(prompt)
+if result.confidence < 0.8:
+    result = await llm.retry(...)
+memory.store(key, result)
+
+# FreeLang — AI 사고가 언어 그 자체다
+[REASON :goal "파리 날씨 파악"
+  :confidence 0.8
+  :on-fail (retry 3)
+  :memory :persist]
+```
+
+**FreeLang만의 카테고리: AI-Native Language**
+- Haskell 따라가지 않는다 (타입 시스템 경쟁 아님)
+- Python 따라가지 않는다 (생산성 경쟁 아님)
+- AI가 추론/검색/학습/반성/메모리를 언어 수준에서 표현하는 것
 
 ---
 
 ## 📋 프로젝트 현황
 
 **프로젝트명**: freelang-v9
-**상태**: 활성 개발
-**마지막 업데이트**: 2026-04-07
-**파일 수**: 93개 (FreeLang .fl 파일)
-**문서**: 50개 (가이드, 리포트, 분석)
+**상태**: 활성 개발 — AI 정체성 강화 단계
+**마지막 업데이트**: 2026-04-12
+**완성도**: Phase 90 완료 시 95%+
 
 ---
 
-## 🎯 현재 완성된 것
+## ✅ 완성된 것 (Phase 57~90)
 
-### v9 Database Engine v5.0
-- ✅ 클러스터링 (분산 데이터)
-- ✅ 복제 (Replication)
-- ✅ 샤딩 (Sharding)
-- ✅ 다중 스레드 지원
-- ✅ 네트워크 서버
-- ✅ 파일 저장 + 복구
-- ✅ 트랜잭션 지원
+### Tier 1 — 언어 핵심 (57~62)
+- interpreter.ts 3,733줄 → 768줄 분해
+- 에러 포매팅: 파일:줄:컬럼 + 유사 함수 힌트
+- TCO — 100만 재귀 안전
+- Jest 커버리지 75%+
 
-### v9 Standard Library
-- ✅ AI 모듈
-- ✅ 비동기 처리
-- ✅ 컬렉션 (배열, 맵)
-- ✅ 데이터 처리
-- ✅ 시간/날짜
-- ✅ 정규식
-- ✅ JSON 처리
-- ✅ 입출력
-- ✅ 메모리 관리
-- ✅ 검증 도구
+### Tier 2 — 언어 기능 (63~72)
+- 위생적 매크로 (defmacro)
+- 프로토콜/인터페이스 (defprotocol)
+- 구조체 (defstruct)
+- 파이프라인 (->, ->>, |>)
+- 레이지 시퀀스
+- 이뮤터블 데이터
+- AI 네이티브 블록 (ai-call, rag-search, embed)
 
-### v9 Core Language
-- ✅ 렉서 (Lexer)
-- ✅ 파서 (Parser)
-- ✅ 런타임 (Runtime)
-- ✅ 제네릭
-- ✅ 포인터
-- ✅ 모듈 시스템
+### Tier 3 — 툴체인 (73~80)
+- `freelang fmt` — Formatter
+- `freelang lint` — Linter (7규칙)
+- REPL 2.0
+- FL 네이티브 테스트 러너 (deftest)
+- `freelang doc` — 문서 생성기
+- 소스맵 + 디버거 (break!)
+- 워치 모드
+- `freelang ci` — CI 파이프라인
 
----
-
-## 🔍 사용 가능한 기능
-
-### 1️⃣ 코드 분석
-```
-"freelang-v9로 [파일명] 분석해"
-→ 코드 구조, 함수, 성능 분석
-```
-
-### 2️⃣ 성능 테스트
-```
-"freelang-v9 벤치마크 실행해"
-→ DB 성능, 메모리 사용량 측정
-```
-
-### 3️⃣ 통합 테스트
-```
-"freelang-v9 전체 테스트 실행"
-→ 모든 모듈 검증
-```
-
-### 4️⃣ 문서 생성
-```
-"freelang-v9 API 문서 만들어"
-→ 자동 문서화
-```
-
-### 5️⃣ 마이그레이션
-```
-"freelang-v9를 v4와 비교해"
-→ 개선사항, 차이점 분석
-```
-
-### 6️⃣ 배포 준비
-```
-"freelang-v9 배포 체크리스트"
-→ 프로덕션 준비 상태 확인
-```
+### Tier 4 — 생태계 (81~90)
+- 패키지 매니저
+- 성능 프로파일러 (VM 148x 빠름)
+- 바이트코드 VM + 최적화기
+- JS 코드 생성기
+- LSP 서버
+- 패키지 3종 (fl-http-client, fl-json-schema, fl-math)
+- 자체 호스팅 2.0
+- 벤치마크
 
 ---
 
-## 📊 프로젝트 구조
+## 🧠 다음 목표: AI 정체성 완성 (Phase 91~110)
 
-```
-freelang-v9/
-├── 문서 (50개)
-│   ├── README.md - 전체 개요
-│   ├── V9_FINAL_REPORT.md - 최종 리포트
-│   ├── PERFORMANCE-GUIDE.md - 성능 가이드
-│   ├── v9-deployment-checklist.md - 배포 체크리스트
-│   └── ... (47개 더)
-│
-├── v9 DB 엔진 (30개 파일)
-│   ├── v9-db-core.fl - 핵심
-│   ├── v9-db-cache.fl - 캐싱
-│   ├── v9-db-cluster.fl - 클러스터링
-│   ├── v9-db-replication.fl - 복제
-│   ├── v9-db-sharding.fl - 샤딩
-│   └── ... (25개 더)
-│
-├── v9 표준 라이브러리 (20개 파일)
-│   ├── v9-stdlib-ai.fl
-│   ├── v9-stdlib-async.fl
-│   ├── v9-stdlib-json.fl
-│   ├── v9-stdlib-string.fl
-│   └── ... (16개 더)
-│
-├── v9 코어 언어 (15개 파일)
-│   ├── v9-lexer.fl - 렉싱
-│   ├── v9-parser.fl - 파싱
-│   ├── v9-runtime.fl - 런타임
-│   └── ... (12개 더)
-│
-├── v9 테스트 & 검증 (15개 파일)
-│   ├── v9-tests.fl
-│   ├── v9-db-integration-test.fl
-│   ├── v9-db-formal-test.fl
-│   └── ... (12개 더)
-│
-├── v9 참고 (10개 파일)
-│   ├── v9-examples.fl - 예제
-│   ├── v9-agent-engine.fl - 에이전트
-│   └── ... (8개 더)
-│
-└── 설정
-    ├── package.json
-    ├── tsconfig.json
-    └── src/ (보조 파일)
-```
+### Tier 5 — AI 사고 모델을 언어로 (91~100)
+
+| Phase | 이름 | 핵심 문법 |
+|-------|------|----------|
+| 91 | 불확실성 타입 | `(maybe 0.85 "Paris")` |
+| 92 | Chain-of-Thought | `[COT :steps [...] :conclude ...]` |
+| 93 | Tree-of-Thought | `[TOT :branches [...] :select best]` |
+| 94 | 관찰/반성 블록 | `[REFLECT :output $x :eval ...]` |
+| 95 | 컨텍스트 윈도우 관리 | `[CONTEXT :limit 4096 :strategy sliding]` |
+| 96 | 프롬프트 타입 | `Prompt` `Completion` 퍼스트 클래스 |
+| 97 | 도구 사용 DSL | `[USE-TOOL :name search :args [...]]` |
+| 98 | 에이전트 루프 | `[AGENT :goal "..." :tools [...] :max-steps 10]` |
+| 99 | 자기 수정 블록 | `[SELF-IMPROVE :code $fn :metric ...]` |
+| 100 | AI 표준 라이브러리 | reasoning/memory/tool/reflect 완전 통합 |
+
+### Tier 6 — AI가 쓰기 편한 구조 (101~110)
+
+| Phase | 이름 | 핵심 |
+|-------|------|------|
+| 101 | 메모리 시스템 | 장기/단기/에피소드 메모리 언어 레벨 |
+| 102 | RAG 블록 완전체 | `[RAG :query $q :top 5 :threshold 0.8]` |
+| 103 | 멀티 에이전트 | 에이전트 간 통신 패턴 |
+| 104 | 실패 복구 | `[TRY-REASON :fallback ...]` |
+| 105 | 스트리밍 출력 | `[STREAM :token-by-token ...]` |
+| 106 | 평가 루프 | FL 코드 자동 품질 평가 |
+| 107 | FL 자체 학습 | FreeLang이 FreeLang을 가르침 |
+| 108 | AI 추론 디버거 | 추론 과정 시각화 |
+| 109 | 프롬프트 컴파일러 | FL → 최적 프롬프트 자동 생성 |
+| 110 | FreeLang AI SDK | 외부 AI가 FL 쓸 수 있는 인터페이스 |
 
 ---
 
-## 🎯 주요 명령어 패턴
+## 🔧 Claude 작업 규칙 (MANDATORY)
 
-### Pattern A: 파일 분석
-```
-"freelang-v9로 v9-db-core.fl 분석해"
-→ 파일의 함수, 데이터 구조, 성능 분석
-```
-
-### Pattern B: 모듈 비교
-```
-"freelang-v9에서 v9-db-cache와 v9-db-index 비교"
-→ 차이점, 성능 비교
-```
-
-### Pattern C: 통합 검증
-```
-"freelang-v9 v5.0 완성도 검증"
-→ 클러스터링, 복제, 샤딩 모두 작동하는지 확인
-```
-
-### Pattern D: 마이그레이션
-```
-"v4 코드를 v9로 마이그레이션하는 가이드"
-→ 단계별 변경사항 설명
-```
-
-### Pattern E: 배포 준비
-```
-"freelang-v9 프로덕션 배포 준비"
-→ 체크리스트, 성능 확인, 최적화
-```
+1. **AI 정체성 우선** — 모든 기능은 "AI가 쓰기 편한가?"로 판단
+2. **테스트 필수** — Phase당 최소 20개 PASS 없으면 완료 인정 안 함
+3. **Gogs push 필수** — 코드 작업 후 push 없이 마무리 금지
+4. **블로그 포스트** — 의미있는 Phase마다 blog.dclub.kr 발행
+5. **regression 필수** — test-phase56-lexical-scope.ts 14/14 항상 확인
 
 ---
 
-## 💾 주요 문서
-
-| 문서 | 용도 |
-|------|------|
-| **README.md** | 전체 프로젝트 개요 |
-| **V9_FINAL_REPORT.md** | 최종 완성 리포트 |
-| **PERFORMANCE-GUIDE.md** | 성능 최적화 가이드 |
-| **v9-deployment-checklist.md** | 배포 체크리스트 |
-| **v9-competitive-analysis.md** | SQLite/PostgreSQL과 비교 |
-| **v9-migration-report.md** | v4→v9 마이그레이션 |
-
----
-
-## 🔧 강제 사항 (MANDATORY)
-
-freelang-v9 작업 시 Claude가 반드시 따를 규칙:
-
-1. **report-to-user (MANDATORY)**
-   - 분석/작업 시 결과 명확히 보고
-   - 현재 상태 → 다음 단계 명시
-
-2. **verify-before-conclude (MANDATORY)**
-   - 테스트 결과 확인 후 결론
-   - 불확실하면 추가 검증
-
-3. **log-all-operations (MANDATORY)**
-   - 모든 변경사항 Gogs 커밋
-   - 추적 가능하게 유지
-
----
-
-## 📌 다음 단계
-
-준비 완료! 이제 다음 중 무엇을 할까요?
-
-```
-"freelang-v9로 [원하는 작업] 해줘"
-
-예시:
-• "freelang-v9로 v9-db-core.fl 분석해"
-• "freelang-v9에서 v5.0 완성도 검증"
-• "freelang-v9를 v4와 성능 비교"
-• "freelang-v9 배포 준비 체크"
-```
-
----
-
-**작성일**: 2026-04-04
-**상태**: ✅ 준비 완료, 명령 대기 중
+**작성일**: 2026-04-12
+**상태**: ✅ AI 정체성 확립, Phase 91+ 준비 완료
