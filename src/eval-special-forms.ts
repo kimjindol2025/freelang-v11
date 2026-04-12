@@ -219,6 +219,103 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return pipeValue;
   }
 
+  // ── -> (thread-first) ────────────────────────────────────────────
+  // (-> val (f1 extra) f2 (f3 a b))
+  // => (f3 (f2 (f1 val extra)) a b)
+  // val이 각 form의 첫 번째 인자 위치에 삽입됨
+  if (op === "->") {
+    if (expr.args.length < 2) throw new Error(`-> requires at least a value and one step`);
+    const TMP_VAR = "__thread_first_tmp__";
+    let val = ev(expr.args[0]);
+    for (let i = 1; i < expr.args.length; i++) {
+      const form = expr.args[i];
+      const fk = (form as any).kind;
+      if (fk === "sexpr") {
+        // (f extra-args...) → (f val extra-args...)
+        const sform = form as SExpr;
+        ctx.variables.set(TMP_VAR, val);
+        const tmpVar: Variable = { kind: "variable", name: TMP_VAR };
+        const newSexpr: SExpr = { kind: "sexpr", op: sform.op, args: [tmpVar, ...sform.args] };
+        val = ev(newSexpr);
+        ctx.variables.delete(TMP_VAR);
+      } else if (fk === "variable") {
+        const fnName = (form as Variable).name;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else if (ctx.variables.has(fnName)) val = callFn(ctx.variables.get(fnName), [val]);
+        else throw new Error(`->: unknown function or variable: ${fnName}`);
+      } else if (fk === "literal" && (form as Literal).type === "symbol") {
+        const fnName = (form as Literal).value as string;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else throw new Error(`->: unknown function: ${fnName}`);
+      } else {
+        const fn = ev(form);
+        val = callFn(fn, [val]);
+      }
+    }
+    return val;
+  }
+
+  // ── ->> (thread-last) ────────────────────────────────────────────
+  // (->> val (f1 extra) f2 (f3 a b))
+  // => (f3 a b (f2 (f1 val extra)))
+  // val이 각 form의 마지막 인자 위치에 삽입됨
+  if (op === "->>") {
+    if (expr.args.length < 2) throw new Error(`->> requires at least a value and one step`);
+    const TMP_VAR = "__thread_last_tmp__";
+    let val = ev(expr.args[0]);
+    for (let i = 1; i < expr.args.length; i++) {
+      const form = expr.args[i];
+      const fk = (form as any).kind;
+      if (fk === "sexpr") {
+        // (f existing-args...) → (f existing-args... val)
+        const sform = form as SExpr;
+        ctx.variables.set(TMP_VAR, val);
+        const tmpVar: Variable = { kind: "variable", name: TMP_VAR };
+        const newSexpr: SExpr = { kind: "sexpr", op: sform.op, args: [...sform.args, tmpVar] };
+        val = ev(newSexpr);
+        ctx.variables.delete(TMP_VAR);
+      } else if (fk === "variable") {
+        const fnName = (form as Variable).name;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else if (ctx.variables.has(fnName)) val = callFn(ctx.variables.get(fnName), [val]);
+        else throw new Error(`->>: unknown function or variable: ${fnName}`);
+      } else if (fk === "literal" && (form as Literal).type === "symbol") {
+        const fnName = (form as Literal).value as string;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else throw new Error(`->>: unknown function: ${fnName}`);
+      } else {
+        const fn = ev(form);
+        val = callFn(fn, [val]);
+      }
+    }
+    return val;
+  }
+
+  // ── |> (simple pipe, alias for pipe) ─────────────────────────────
+  // (|> val f1 f2 f3) ≡ (pipe val f1 f2 f3)
+  if (op === "|>") {
+    if (expr.args.length < 2) throw new Error(`|> requires at least a value and one function`);
+    let pipeVal = ev(expr.args[0]);
+    for (let i = 1; i < expr.args.length; i++) {
+      const fnArg = expr.args[i];
+      const fk = (fnArg as any).kind;
+      if (fk === "literal" && (fnArg as Literal).type === "symbol") {
+        const fnName = (fnArg as Literal).value as string;
+        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
+        else throw new Error(`|>: unknown function: ${fnName}`);
+      } else if (fk === "variable") {
+        const fnName = (fnArg as Variable).name;
+        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
+        else if (ctx.variables.has(fnName)) pipeVal = callFn(ctx.variables.get(fnName), [pipeVal]);
+        else throw new Error(`|>: unknown function or variable: ${fnName}`);
+      } else {
+        const fn = ev(fnArg);
+        pipeVal = callFn(fn, [pipeVal]);
+      }
+    }
+    return pipeVal;
+  }
+
   // ── let ───────────────────────────────────────────────────────────
   if (op === "let") {
     return evalLet(interp, expr.args);
@@ -612,6 +709,56 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
     ctx.protocols.defineImpl({ protocolName: protoName, typeName, methods: implMethods });
     return null;
+  }
+
+  // ── parallel ──────────────────────────────────────────────────────
+  // (parallel expr1 expr2 ...) → [result1, result2, ...]
+  // 동기 버전: 순차 실행 후 배열 반환 (FreeLangPromise는 resolve 후 반환)
+  if (op === "parallel") {
+    if (expr.args.length === 0) return [];
+    const results: any[] = [];
+    for (const arg of expr.args) {
+      let val = ev(arg);
+      // FreeLangPromise면 resolved 값 추출 시도
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try { val = val.getValue(); } catch { val = null; }
+      }
+      results.push(val);
+    }
+    return results;
+  }
+
+  // ── race ──────────────────────────────────────────────────────────
+  // (race expr1 expr2 ...) → 첫 번째로 완료된 결과 (동기 버전: 첫 번째 non-null 반환)
+  if (op === "race") {
+    if (expr.args.length === 0) return null;
+    let firstResult: any = undefined;
+    for (const arg of expr.args) {
+      let val = ev(arg);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try { val = val.getValue(); } catch { val = null; }
+      }
+      if (firstResult === undefined) firstResult = val;
+      if (val !== null && val !== undefined) return val;
+    }
+    return firstResult ?? null;
+  }
+
+  // ── with-timeout ──────────────────────────────────────────────────
+  // (with-timeout ms expr) → result or null
+  // 동기 버전: ms는 무시하고 즉시 실행 (비동기 환경 없으므로)
+  if (op === "with-timeout") {
+    if (expr.args.length < 2) return null;
+    // expr.args[0] = ms (무시), expr.args[1] = expression
+    try {
+      let val = ev(expr.args[1]);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try { val = val.getValue(); } catch { val = null; }
+      }
+      return val;
+    } catch {
+      return null;
+    }
   }
 
   throw new Error(`evalSpecialForm: unknown op "${op}"`);

@@ -23,6 +23,7 @@ import { createProcessModule } from "./stdlib-process";  // Phase 22: Process (e
 import { createAsyncModule } from "./stdlib-async";      // Phase 23: Async/await primitives
 import { createModuleSystem } from "./stdlib-module";    // Phase 24: Module system
 import { pgBuiltins } from "./stdlib-pg";                // PostgreSQL + JWT + AI
+import { createChannelModule } from "./stdlib-channel";  // Phase 67: 채널 기반 동시성
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -62,4 +63,5 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createAsyncModule((n, a) => interp.callUserFunction(n, a))); // Phase 23: async_call, promise_*
   interp.registerModule(createModuleSystem());   // Phase 24: module_*, namespace_*
   interp.registerModule(pgBuiltins);             // PostgreSQL + JWT + AI
+  interp.registerModule(createChannelModule());  // Phase 67: chan, chan-send, chan-recv
 }

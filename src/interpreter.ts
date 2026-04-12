@@ -29,6 +29,7 @@ import { callUserFunction as _callUserFunction, callFunctionValue as _callFuncti
 import { MacroExpander } from "./macro-expander"; // Phase 63: 매크로 시스템
 import { ProtocolRegistry } from "./protocol"; // Phase 64: 프로토콜 시스템
 import { StructRegistry } from "./struct-system"; // Phase 66: 구조체 시스템
+import { isLazySeq, take as lazyTake } from "./lazy-seq"; // Phase 69: 레이지 시퀀스
 
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
@@ -601,7 +602,7 @@ export class Interpreter {
 
     // Phase 57: Dispatch to specialized modules
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl"]);
+    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
@@ -733,6 +734,11 @@ export class Interpreter {
     if (typeof val === "string") return val;
     if (typeof val === "number" || typeof val === "boolean") return String(val);
     if (Array.isArray(val)) return "[" + val.map((v) => this.toDisplayString(v)).join(", ") + "]";
+    // Phase 69: 레이지 시퀀스 — 앞 3개만 미리보기
+    if (isLazySeq(val)) {
+      const preview = lazyTake(3, val).map((v) => this.toDisplayString(v)).join(", ");
+      return `<lazy-seq: ${preview}...>`;
+    }
     if (typeof val === "object") {
       if (val.kind === "function-value") return `<fn:${val.name || "λ"}>`;
       const entries = Object.entries(val)
