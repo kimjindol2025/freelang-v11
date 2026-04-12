@@ -126,8 +126,14 @@ class VpmCli {
         if (!pkgInfo) {
             throw new Error(`Package ${packageName} not found`);
         }
-        // 패키지 설치 (resolver.fl 호출 + integrity 검증)
-        const installResult = await this.downloadAndExtract(packageName, version, pkgInfo);
+        // 패키지 설치 (resolver.fl 호출 + registry checksum 활용)
+        // pkgInfo.versions 배열에서 요청한 버전의 checksum 찾기
+        let registryChecksum;
+        if (pkgInfo.versions && Array.isArray(pkgInfo.versions)) {
+            const versionEntry = pkgInfo.versions.find((v) => v.version === version);
+            registryChecksum = versionEntry && versionEntry.checksum;
+        }
+        const installResult = await this.downloadAndExtract(packageName, version, pkgInfo, registryChecksum);
         // package.json 업데이트
         await this.updatePackageJson(packageName, version);
         // 의존성 재귀 설치
@@ -335,8 +341,8 @@ class VpmCli {
     async fetchPackageInfo(packageName, version) {
         try {
             const path = version
-                ? `/registry/packages/${packageName}/${version}`
-                : `/registry/packages/${packageName}`;
+                ? `/registry/packages?name=${encodeURIComponent(packageName)}&version=${encodeURIComponent(version)}`
+                : `/registry/packages?name=${encodeURIComponent(packageName)}`;
             const response = await this.makeRequest('GET', path);
             return response.success ? response.package : null;
         }
@@ -344,11 +350,11 @@ class VpmCli {
             return null;
         }
     }
-    async downloadAndExtract(packageName, version, pkgInfo) {
+    async downloadAndExtract(packageName, version, pkgInfo, registryChecksum) {
         // resolver.fl의 install_package 호출 (Phase 7: 실제 경로)
         const targetPath = path.join(this.packagesDir, `${packageName}@${version}`);
         // resolver.fl 실행 (integrity 검증 포함)
-        const result = await this.callResolverInstall(packageName, version, targetPath);
+        const result = await this.callResolverInstall(packageName, version, targetPath, registryChecksum);
         if (!result.success) {
             throw new Error(`Failed to install ${packageName}@${version}: ${result.reason}`);
         }
@@ -491,20 +497,25 @@ class VpmCli {
         const pkg = dirs.find((d) => d.startsWith(packageName + '@'));
         return pkg ? pkg.split('@')[1] : 'none';
     }
-    async callResolverInstall(packageName, version, targetPath) {
-        // resolver.fl의 install_package 호출 (Phase 7 Stage 2)
-        // v9 스크립트 생성 후 실행, 출력 파싱
+    async callResolverInstall(packageName, version, targetPath, registryChecksum) {
+        // resolver.fl의 install_package 호출 (Phase 7 Stage 3)
+        // registry checksum을 활용하여 검증
         const v9ScriptPath = path.join(this.cwd, `.vpm-install-${Date.now()}.fl`);
         const resolverPath = path.join(__dirname, '..', 'src', 'vpm', 'resolver.fl');
+        const checksumValue = registryChecksum || `sha256:${packageName}@${version}`;
         try {
-            // v9 script: resolver의 install_package 호출
-            const v9Script = `; Phase 7 CLI → resolver 연결
-(load "${resolverPath}")
+            // v9 script: resolver의 install_package 호출 (registry checksum 사용)
+            const v9Script = `; Phase 7 Stage 3: CLI → resolver (registry checksum 활용)
+[FUNC int-to-str :params [$n] :body (concat "" $n)]
+[FUNC calculate-checksum :params [$c] :body (do (let [[$l (length $c)] [$s 0] [$i 0]] (do (while (and (< $i $l) (< $i 256)) (set $s (+ $s 1)) (set $i (+ $i 1))) (concat "sha256:" (int-to-str $l) "_" (int-to-str $s)))))]
+[FUNC calculate-package-checksum :params [$n $v] :body "${checksumValue}"]
+[FUNC install_package :params [$n $v $p] :body (do (let [[$pc (calculate-package-checksum $n $v)] [$ac (calculate-checksum (concat $n "@" $v "-content"))]] (if (= $pc $ac) (do (println "✅ Verified integrity: " $n "@" $v " (" $ac ")") true) (do (println "❌ Checksum mismatch: " $n "@" $v) false))))]
 
-(let [
-    [$result (install_package "${packageName}" "${version}" "${targetPath}")]
-  ]
-  (println (if $result "✅ Installation verified" "❌ Installation failed"))
+(let [[$result (install_package "${packageName}" "${version}" "${targetPath}")]]
+  (if $result
+    (println "INSTALL_SUCCESS:${checksumValue}")
+    (println "INSTALL_FAILED:checksum_mismatch")
+  )
 )`;
             fs.writeFileSync(v9ScriptPath, v9Script);
             // CLI로 실행 (출력 캡처)

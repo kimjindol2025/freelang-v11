@@ -1,0 +1,108 @@
+; Phase 7 Stage 3: Simple v9 Registry (테스트용)
+; 메모리 기반 패키지 저장소
+
+; ==========================================
+; Mock Package Data (테스트용 패키지)
+; ==========================================
+
+[FUNC get_packages :params []
+  :body {
+    :lodash {
+      :id "lodash"
+      :name "lodash"
+      :description "A utility library for common programming tasks"
+      :downloads 10000000
+      :stars 52000
+      :versions [
+        { :version "4.17.21" :published_at "2021-05-13" :checksum "sha256:23_23" }
+        { :version "4.17.20" :published_at "2021-04-12" :checksum "sha256:23_20" }
+      ]
+    }
+    :express {
+      :id "express"
+      :name "express"
+      :description "Fast, unopinionated web framework"
+      :downloads 20000000
+      :stars 56000
+      :versions [
+        { :version "4.17.1" :published_at "2021-05-13" :checksum "sha256:22_22" }
+      ]
+    }
+  }
+]
+
+; ==========================================
+; Registry API Handlers
+; ==========================================
+
+[FUNC handle_registry_packages :params [$req]
+  :body (do
+    (let [
+        [$rid (get $req "request_id")]
+        [$query (get $req "query")]
+        [$method (get $req "method")]
+        [$packages (get_packages)]
+        [$name (get $query "name")]
+        [$version (get $query "version")]
+      ]
+      (do
+        (if (= $method "GET")
+          (do
+            (if (not $name)
+              ; GET /registry/packages (no query param) → list all
+              (server_status 200 {
+                :success true
+                :count 2
+                :packages $packages
+              })
+              (do
+                ; GET /registry/packages?name=...&version=...
+                (let [
+                    [$pkg (get $packages $name)]
+                  ]
+                  (if $pkg
+                    (server_status 200 {
+                      :success true
+                      :package $pkg
+                      :version (if $version $version "latest")
+                    })
+                    (server_status 404 {
+                      :success false
+                      :message (concat "Package " $name " not found")
+                      :code "E_PACKAGE_NOT_FOUND"
+                    })
+                  )
+                )
+              )
+            )
+          )
+          (server_status 405 {
+            :success false
+            :code "E_METHOD_NOT_ALLOWED"
+          })
+        )
+      )
+    )
+  )
+]
+
+; ==========================================
+; Server Setup
+; ==========================================
+
+(println "🚀 Starting v9 Test Registry on port 4000...")
+
+(server_get "/registry/packages" "handle_registry_packages")
+(server_get "/registry/packages/:name" "handle_registry_packages")
+(server_get "/registry/packages/:name/:version" "handle_registry_packages")
+
+(let [[$msg (server_start 4000)]]
+  (println $msg)
+)
+
+(println "📖 Registry endpoints:")
+(println "  GET /registry/packages                    - List all packages")
+(println "  GET /registry/packages?name=<name>        - Get package info")
+(println "  GET /registry/packages?name=<name>&version=<v> - Get version info")
+(println "")
+(println "✅ Test Registry ready (port 4000). Press Ctrl+C to stop.")

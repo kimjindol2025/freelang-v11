@@ -64,6 +64,7 @@ const stdlib_resource_1 = require("./stdlib-resource"); // Phase 19: Server Reso
 const stdlib_http_server_1 = require("./stdlib-http-server"); // Phase 4a: Pure HTTP Server (Express-free)
 const stdlib_db_1 = require("./stdlib-db"); // Phase 20: DB Driver
 const stdlib_ws_1 = require("./stdlib-ws"); // Phase 21: WebSocket
+const stdlib_wsc_1 = require("./stdlib-wsc"); // Phase 57: WebSocket Client (Tunnel)
 const stdlib_auth_1 = require("./stdlib-auth"); // Phase 21: Auth (JWT, API key, hash)
 const stdlib_cache_1 = require("./stdlib-cache"); // Phase 21: In-memory TTL cache
 const stdlib_pubsub_1 = require("./stdlib-pubsub"); // Phase 21: Pub/Sub events
@@ -117,6 +118,7 @@ class Interpreter {
         this.registerModule((0, stdlib_http_server_1.createHttpServerModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_db_1.createDbModule)());
         this.registerModule((0, stdlib_ws_1.createWsModule)((n, a) => this.callUserFunction(n, a)));
+        this.registerModule((0, stdlib_wsc_1.createWscModule)((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client
         this.registerModule((0, stdlib_auth_1.createAuthModule)());
         this.registerModule((0, stdlib_cache_1.createCacheModule)());
         this.registerModule((0, stdlib_pubsub_1.createPubSubModule)((n, a) => this.callUserFunction(n, a)));

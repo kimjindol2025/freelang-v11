@@ -30,6 +30,9 @@ export declare function createHttpServerModule(callFn: CallFn): {
     server_req_param: (req: Request, name: string) => string | null;
     server_req_method: (req: Request) => string;
     server_req_path: (req: Request) => string;
+    server_req_id: () => string | null;
+    server_hold_response: (reqId: string) => null;
+    server_send_held: (reqId: string, status: number, body: any) => boolean;
 };
 export {};
 //# sourceMappingURL=stdlib-http-server.d.ts.map
