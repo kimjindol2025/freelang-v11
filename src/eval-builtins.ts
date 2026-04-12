@@ -56,7 +56,7 @@ import { globalVoting, VotingSystem, Ballot } from "./vote"; // Phase 123: VOTE
 import { globalSwarm, Swarm } from "./swarm"; // Phase 125: Swarm Intelligence
 import { globalPeerReview, Reviewer, ReviewComment } from "./peer-review"; // Phase 127: Peer-Review
 import { globalCompetition, Competition, Competitor } from "./compete"; // Phase 129: Compete
-import { AgentChain, ChainAgent, ChainResult } from "./chain-agents"; // Phase 128: Chain-Agents
+import { AgentChain, ChainAgent, ChainResult, ChainLink } from "./chain-agents"; // Phase 128: Chain-Agents
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1955,6 +1955,68 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       if (op === "peer-review-list") {
         // (peer-review-list) → reviewer ids
         return globalPeerReview.list();
+      }
+
+      // Phase 128: Chain-Agents — 에이전트 체인 파이프라인
+      if (op === "chain-agents") {
+        // (chain-agents agents-list input) → finalOutput
+        const [rawAgents, input] = args;
+        if (!Array.isArray(rawAgents)) return input;
+        const agents: ChainAgent[] = rawAgents.map((a: any) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as ChainAgent;
+          if (Array.isArray(a)) {
+            const [id, tf, vf] = a;
+            return {
+              id: String(id),
+              transform: (inp: any) => callFn(tf, [inp]),
+              validate: vf ? (out: any) => Boolean(callFn(vf, [out])) : undefined,
+            } as ChainAgent;
+          }
+          return { id: String(a), transform: (x: any) => x } as ChainAgent;
+        });
+        const chain = AgentChain.from(agents);
+        const result = chain.run(input);
+        return result.finalOutput;
+      }
+      if (op === "chain-links") {
+        // (chain-links agents-list input) → agentId 리스트 (완료된 것)
+        const [rawAgents, input] = args;
+        if (!Array.isArray(rawAgents)) return [];
+        const agents: ChainAgent[] = rawAgents.map((a: any) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as ChainAgent;
+          if (Array.isArray(a)) {
+            const [id, tf, vf] = a;
+            return {
+              id: String(id),
+              transform: (inp: any) => callFn(tf, [inp]),
+              validate: vf ? (out: any) => Boolean(callFn(vf, [out])) : undefined,
+            } as ChainAgent;
+          }
+          return { id: String(a), transform: (x: any) => x } as ChainAgent;
+        });
+        const chain = AgentChain.from(agents);
+        const result = chain.run(input);
+        return result.links.filter((l: ChainLink) => !l.skipped).map((l: ChainLink) => l.agentId);
+      }
+      if (op === "chain-steps") {
+        // (chain-steps agents-list input) → 완료 스텝 수
+        const [rawAgents, input] = args;
+        if (!Array.isArray(rawAgents)) return 0;
+        const agents: ChainAgent[] = rawAgents.map((a: any) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as ChainAgent;
+          if (Array.isArray(a)) {
+            const [id, tf, vf] = a;
+            return {
+              id: String(id),
+              transform: (inp: any) => callFn(tf, [inp]),
+              validate: vf ? (out: any) => Boolean(callFn(vf, [out])) : undefined,
+            } as ChainAgent;
+          }
+          return { id: String(a), transform: (x: any) => x } as ChainAgent;
+        });
+        const chain = AgentChain.from(agents);
+        const result = chain.run(input);
+        return result.stepsCompleted;
       }
 
             // (export sym1 sym2 ...) — self-hosting 파일 호환
