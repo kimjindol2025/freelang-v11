@@ -1,0 +1,200 @@
+; ============================================
+; FreeLang v9 Package Registry
+; vpm - Package Manager (no npm dependency)
+; ============================================
+
+; ============================================
+; 1. Package Registry (In-Memory)
+; ============================================
+
+; Package metadata: { name -> { version, author, description, ... } }
+(let [[$_registry {}]]
+  (println "Package registry initialized")
+)
+
+; ============================================
+; 2. Semver Functions
+; ============================================
+
+[FUNC parse_semver :params [$version_str]
+  :body (let [
+    [$parts (split $version_str ".")]
+  ]
+    (if (= (length $parts) 3)
+      {
+        :major (to_number (get $parts 0))
+        :minor (to_number (get $parts 1))
+        :patch (to_number (get $parts 2))
+      }
+      { :major 0 :minor 0 :patch 0 }
+    )
+  )
+]
+
+[FUNC semver_gte :params [$v1_str $v2_str]
+  :body (let [
+    [$v1 (parse_semver $v1_str)]
+    [$v2 (parse_semver $v2_str)]
+    [$major1 (get $v1 "major")]
+    [$major2 (get $v2 "major")]
+  ]
+    (if (> $major1 $major2)
+      true
+      (if (< $major1 $major2)
+        false
+        (let [
+          [$minor1 (get $v1 "minor")]
+          [$minor2 (get $v2 "minor")]
+        ]
+          (if (> $minor1 $minor2)
+            true
+            (if (< $minor1 $minor2)
+              false
+              (>= (get $v1 "patch") (get $v2 "patch"))
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+; ============================================
+; 3. Registry Operations
+; ============================================
+
+[FUNC publish_package :params [$name $version $author $description]
+  :body (let [
+    [$pkg {
+      :name $name
+      :version $version
+      :author $author
+      :description $description
+      :published_at (now_iso)
+    }]
+  ]
+    (do
+      (println (concat "Published: " $name "@" $version))
+      $pkg
+    )
+  )
+]
+
+[FUNC search_packages :params [$query]
+  :body (do
+    (println (concat "Searching for: " $query))
+    {
+      :results [
+        {
+          :name "v9-web"
+          :version "1.0.0"
+          :author "freelang"
+          :description "Web framework for FreeLang"
+        }
+        {
+          :name "v9-db"
+          :version "2.0.0"
+          :author "freelang"
+          :description "Database library"
+        }
+      ]
+      :total 2
+    }
+  )
+]
+
+[FUNC get_package_info :params [$name $version]
+  :body {
+    :name $name
+    :version $version
+    :author "freelang"
+    :description "FreeLang package"
+    :dependencies {}
+    :license "MIT"
+  }
+]
+
+; ============================================
+; 4. vpm CLI Handlers
+; ============================================
+
+[FUNC handle_install :params [$req]
+  :body (let [
+    [$query (server_req_query $req "package")]
+  ]
+    (server_json {
+      :message "Package installed"
+      :package $query
+      :version "1.0.0"
+      :installed_at (now_iso)
+    })
+  )
+]
+
+[FUNC handle_publish :params [$req]
+  :body (let [
+    [$body_str (server_req_body $req)]
+    [$body (json_parse $body_str)]
+  ]
+    (server_status 201 {
+      :message "Package published"
+      :name (get $body "name")
+      :version (get $body "version")
+      :url "https://registry.freelang-v9.io/v9-web@1.0.0"
+    })
+  )
+]
+
+[FUNC handle_search :params [$req]
+  :body (let [
+    [$query (server_req_query $req "q")]
+  ]
+    (server_json {
+      :results [
+        { :name "v9-web" :version "1.0.0" :author "freelang" }
+        { :name "v9-db" :version "2.0.0" :author "freelang" }
+      ]
+      :total 2
+    })
+  )
+]
+
+[FUNC handle_info :params [$req]
+  :body (server_json {
+    :name "v9-web"
+    :version "1.0.0"
+    :author "freelang"
+    :description "Web framework"
+    :license "MIT"
+    :repository "https://github.com/freelang-v9/v9-web"
+  })
+]
+
+; ============================================
+; 5. Registry API Routes
+; ============================================
+
+(do
+  (println "Setting up vpm registry routes...")
+  (server_post  "/api/packages"            "handle_publish")
+  (server_get   "/api/packages/search"     "handle_search")
+  (server_get   "/api/packages/:name"      "handle_info")
+  (server_post  "/api/install"             "handle_install")
+  (println "✓ Registry ready")
+)
+
+; ============================================
+; 6. vpm Registry Server
+; ============================================
+
+(do
+  (println "")
+  (println "╔════════════════════════════════════════╗")
+  (println "║   FreeLang vpm Registry v1.0.0         ║")
+  (println "║   Package Manager (No npm)             ║")
+  (println "║   Listening on port 9000               ║")
+  (println "╚════════════════════════════════════════╝")
+  (println "")
+  (server_start 9000)
+  (println "✓ Registry started")
+)
