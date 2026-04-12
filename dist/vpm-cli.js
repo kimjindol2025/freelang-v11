@@ -101,8 +101,7 @@ class VpmCli {
                     this.showHelp();
                     break;
                 default:
-                    console.error(`❌ Unknown command: ${command}`);
-                    this.showHelp();
+                    throw new Error(`Unknown command: ${command}`);
             }
         }
         catch (error) {
