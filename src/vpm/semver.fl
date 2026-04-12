@@ -1,369 +1,127 @@
-; Phase 5c: Semantic Versioning Parser for vpm
-; 버전 해석 및 의존성 해결 엔진
-;
-; 기능:
-;   1. parse_semver: "1.2.3" → {major:1, minor:2, patch:3}
-;   2. semver_matches: "^1.2.0" vs "1.2.5" → true
-;   3. resolve_dependencies: 의존성 그래프 재귀 해석
-;   4. validate_version: 유효한 버전 형식 검증
+; Phase 7 Stage 5: Semver Resolver (minimal implementation)
+; Supported: exact, ^, ~, latest
+; Test: find-best-version with constraint matching
 
-; Registry Interface (Phase 5c)
-[FUNC get_package_versions :params [$name $registry]
+[FUNC parse-version :params [$version_str]
   :body (do
-    ; 인메모리 레지스트리에서 패키지의 버전 목록 조회
-    (let [[$pkg_data (get $registry $name)]]
-      (if (= $pkg_data nil)
-        []
-        (get $pkg_data "versions" [])
-      )
-    )
-  )
-]
-
-[FUNC get_package_info :params [$name $version $registry]
-  :body (do
-    ; 인메모리 레지스트리에서 패키지 메타데이터 조회
+    ; Parse "1.2.3" → {major: 1, minor: 2, patch: 3}
     (let [
-        [$pkg_data (get $registry $name)]
-        [$versions_meta (if (= $pkg_data nil) {} (get $pkg_data "versions_meta" {}))]
-      ]
-      (let [[$meta (get $versions_meta $version)]]
-        (if (= $meta nil)
-          { "name" $name "version" $version "dependencies" {} }
-          $meta
-        )
-      )
-    )
-  )
-]
-
-[FUNC parse_semver :params [$version_str]
-  :body (do
-    ; 버전 문자열에서 메이저/마이너/패치 추출
-    ; "1.2.3" → {major: 1, minor: 2, patch: 3, string: "1.2.3"}
-    (let [
-        [$trimmed (string-trim $version_str)]
-        [$parts (string-split $trimmed ".")]
-        [$major_str (if (length $parts) (get $parts 0) "0")]
-        [$minor_str (if (> (length $parts) 1) (get $parts 1) "0")]
-        [$patch_str (if (> (length $parts) 2) (get $parts 2) "0")]
-        [$major (str-to-int $major_str)]
-        [$minor (str-to-int $minor_str)]
-        [$patch (str-to-int $patch_str)]
+        [$s (string-trim $version_str)]
+        [$parts (if (string-includes? $s ".") (string-split $s ".") [])]
       ]
       {
-        "major" $major
-        "minor" $minor
-        "patch" $patch
-        "string" $trimmed
+        :original $version_str
+        :major (if (>= (length $parts) 1) (string-to-number (get $parts 0)) 0)
+        :minor (if (>= (length $parts) 2) (string-to-number (get $parts 1)) 0)
+        :patch (if (>= (length $parts) 3) (string-to-number (get $parts 2)) 0)
       }
     )
   )
 ]
 
-[FUNC validate_version :params [$version_str]
+[FUNC compare-versions :params [$v1 $v2]
   :body (do
-    ; 버전이 유효한 형식인지 검증
-    ; 형식: X.Y.Z (숫자만)
+    ; Returns: 1 if v1 > v2, 0 if equal, -1 if v1 < v2
     (let [
-        [$parts (string-split $version_str ".")]
-      ]
-      (if (not (= (length $parts) 3))
-        false
-        (do
-          (let [
-              [$is_valid true]
-            ]
-            (do
-              (for-each $parts (lambda [$part]
-                (if (not (string-all-digits? $part))
-                  (set $is_valid false)
-                  true
-                )
-              ))
-              $is_valid
-            )
-          )
-        )
-      )
-    )
-  )
-]
-
-[FUNC string-all-digits? :params [$str]
-  :body (do
-    ; 문자열의 모든 문자가 숫자인지 검증
-    (let [
-        [$len (length $str)]
-        [$result true]
-      ]
-      (if (= $len 0)
-        false
-        (do
-          (let [[$i 0]]
-            (while (< $i $len)
-              (do
-                (let [
-                    [$char (substring $str $i (+ $i 1))]
-                    [$code (char-code $char)]
-                  ]
-                  (if (or (< $code 48) (> $code 57))
-                    (set $result false)
-                    true
-                  )
-                )
-                (set $i (+ $i 1))
-              )
-            )
-          )
-          $result
-        )
-      )
-    )
-  )
-]
-
-[FUNC semver_compare :params [$v1 $v2]
-  :body (do
-    ; 두 버전을 비교
-    ; 반환값: -1 (v1 < v2), 0 (v1 = v2), 1 (v1 > v2)
-    (let [
-        [$p1 (parse_semver $v1)]
-        [$p2 (parse_semver $v2)]
-        [$major1 (get $p1 "major")]
-        [$major2 (get $p2 "major")]
-      ]
-      (if (not (= $major1 $major2))
-        (if (< $major1 $major2) -1 1)
-        (do
-          (let [
-              [$minor1 (get $p1 "minor")]
-              [$minor2 (get $p2 "minor")]
-            ]
-            (if (not (= $minor1 $minor2))
-              (if (< $minor1 $minor2) -1 1)
-              (do
-                (let [
-                    [$patch1 (get $p1 "patch")]
-                    [$patch2 (get $p2 "patch")]
-                  ]
-                  (if (not (= $patch1 $patch2))
-                    (if (< $patch1 $patch2) -1 1)
-                    0
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  )
-]
-
-[FUNC semver_matches :params [$constraint $actual]
-  :body (do
-    ; 실제 버전이 제약 조건을 만족하는지 확인
-    ; 지원 제약: ^1.2.3, ~1.2.3, =1.2.3, >1.2.3, >=1.2.3, <1.2.3, <=1.2.3
-    ; 기본값 (operator 없음): 정확히 일치
-
-    (let [
-        [$constraint_trimmed (string-trim $constraint)]
-        [$first_char (if (> (length $constraint_trimmed) 0)
-                        (substring $constraint_trimmed 0 1)
-                        "")]
+        [$m1 (get $v1 "major" 0)]
+        [$m2 (get $v2 "major" 0)]
       ]
       (cond
-        ; ^1.2.3 — 호환 가능 (Caret): 마이너/패치만 업그레이드 허용
-        [(= $first_char "^")
-          (do
-            (let [
-                [$version_part (substring $constraint_trimmed 1 (length $constraint_trimmed))]
-                [$required (parse_semver $version_part)]
-                [$actual_parsed (parse_semver $actual)]
-                [$req_major (get $required "major")]
-                [$req_minor (get $required "minor")]
-                [$actual_major (get $actual_parsed "major")]
-                [$actual_minor (get $actual_parsed "minor")]
-                [$actual_patch (get $actual_parsed "patch")]
-              ]
-              (if (not (= $req_major $actual_major))
-                false
-                (>= $actual_minor $req_minor)
-              )
+        [(> $m1 $m2) 1]
+        [(< $m1 $m2) -1]
+        [true (do
+          (let [
+              [$n1 (get $v1 "minor" 0)]
+              [$n2 (get $v2 "minor" 0)]
+            ]
+            (cond
+              [(> $n1 $n2) 1]
+              [(< $n1 $n2) -1]
+              [true (do
+                (let [
+                    [$p1 (get $v1 "patch" 0)]
+                    [$p2 (get $v2 "patch" 0)]
+                  ]
+                  (cond
+                    [(> $p1 $p2) 1]
+                    [(< $p1 $p2) -1]
+                    [true 0]
+                  )
+                )
+              )]
             )
           )
-        ]
-
-        ; ~1.2.3 — 타일드 (Tilde): 패치만 업그레이드 허용
-        [(= $first_char "~")
-          (do
-            (let [
-                [$version_part (substring $constraint_trimmed 1 (length $constraint_trimmed))]
-                [$required (parse_semver $version_part)]
-                [$actual_parsed (parse_semver $actual)]
-                [$req_major (get $required "major")]
-                [$req_minor (get $required "minor")]
-                [$req_patch (get $required "patch")]
-                [$actual_major (get $actual_parsed "major")]
-                [$actual_minor (get $actual_parsed "minor")]
-                [$actual_patch (get $actual_parsed "patch")]
-              ]
-              (and
-                (= $req_major $actual_major)
-                (= $req_minor $actual_minor)
-                (>= $actual_patch $req_patch)
-              )
-            )
-          )
-        ]
-
-        ; >1.2.3 — 초과
-        [(= $first_char ">")
-          (do
-            (let [
-                [$version_part (substring $constraint_trimmed 1 (length $constraint_trimmed))]
-              ]
-              (= (semver_compare $actual $version_part) 1)
-            )
-          )
-        ]
-
-        ; >=1.2.3 — 이상
-        [(string-starts-with? $constraint_trimmed ">=")
-          (do
-            (let [
-                [$version_part (substring $constraint_trimmed 2 (length $constraint_trimmed))]
-                [$cmp (semver_compare $actual $version_part)]
-              ]
-              (or (= $cmp 1) (= $cmp 0))
-            )
-          )
-        ]
-
-        ; <1.2.3 — 미만
-        [(= $first_char "<")
-          (do
-            (let [
-                [$version_part (substring $constraint_trimmed 1 (length $constraint_trimmed))]
-              ]
-              (= (semver_compare $actual $version_part) -1)
-            )
-          )
-        ]
-
-        ; <=1.2.3 — 이하
-        [(string-starts-with? $constraint_trimmed "<=")
-          (do
-            (let [
-                [$version_part (substring $constraint_trimmed 2 (length $constraint_trimmed))]
-                [$cmp (semver_compare $actual $version_part)]
-              ]
-              (or (= $cmp -1) (= $cmp 0))
-            )
-          )
-        ]
-
-        ; =1.2.3 또는 1.2.3 — 정확히 일치
-        [true
-          (do
-            (let [
-                [$version_part (if (= $first_char "=")
-                               (substring $constraint_trimmed 1 (length $constraint_trimmed))
-                               $constraint_trimmed)]
-              ]
-              (= (semver_compare $actual $version_part) 0)
-            )
-          )
-        ]
+        )]
       )
     )
   )
 ]
 
-[FUNC string-starts-with? :params [$str $prefix]
+[FUNC matches-constraint :params [$version $constraint]
   :body (do
-    ; 문자열이 특정 접두사로 시작하는지 확인
+    ; Check if version matches constraint (exact, caret, tilde, latest)
     (let [
-        [$prefix_len (length $prefix)]
-        [$str_len (length $str)]
+        [$c (string-trim $constraint)]
+        [$v_parsed (parse-version $version)]
       ]
-      (if (> $prefix_len $str_len)
-        false
-        (= (substring $str 0 $prefix_len) $prefix)
+      (cond
+        [(= $c "latest") true]
+        [(string-starts-with? $c "^") (do
+          (let [
+              [$c_parsed (parse-version (substring $c 1))]
+              [$cmp (compare-versions $v_parsed $c_parsed)]
+            ]
+            (and (>= $cmp 0) (= (get $v_parsed "major") (get $c_parsed "major")))
+          )
+        )]
+        [(string-starts-with? $c "~") (do
+          (let [
+              [$c_parsed (parse-version (substring $c 1))]
+              [$cmp (compare-versions $v_parsed $c_parsed)]
+            ]
+            (and (>= $cmp 0)
+              (= (get $v_parsed "major") (get $c_parsed "major"))
+              (= (get $v_parsed "minor") (get $c_parsed "minor")))
+          )
+        )]
+        [true (= (compare-versions $v_parsed (parse-version $c)) 0)]
       )
     )
   )
 ]
 
-[FUNC find_matching_version :params [$versions $constraint]
+[FUNC find-best-version :params [$versions $constraint]
   :body (do
-    ; 제약 조건을 만족하는 최신 버전 찾기
-    ; $versions: ["1.0.0", "1.1.0", "1.2.0", ...] (내림차순 정렬 가정)
+    ; Find highest version matching constraint
     (let [
-        [$matching nil]
+        [$matching []]
       ]
       (do
-        (for-each $versions (lambda [$version]
-          (if (semver_matches $constraint $version)
-            (if (= $matching nil)
-              (set $matching $version)
-              true
-            )
+        (for-each $versions (lambda [$v]
+          (if (matches-constraint (get $v "version") $constraint)
+            (array-push $matching $v)
             true
           )
         ))
-        $matching
-      )
-    )
-  )
-]
 
-[FUNC resolve_dependency_tree :params [$package_name $constraint $registry]
-  :body (do
-    ; 의존성 트리 재귀 해석
-    ; $registry: 패키지 정보 저장소 (예: SQLite)
-    ;
-    ; 반환: {
-    ;   "name": "package-name",
-    ;   "version": "1.2.3",
-    ;   "constraint": "^1.2.0",
-    ;   "dependencies": [...]
-    ; }
-
-    (let [
-        [$versions (get_package_versions $package_name $registry)]
-        [$matching_version (find_matching_version $versions $constraint)]
-      ]
-      (if (= $matching_version nil)
-        (do
-          (println (concat "❌ No matching version for " $package_name "@" $constraint))
+        (if (= (length $matching) 0)
           nil
-        )
-        (do
-          (let [
-              [$pkg_info (get_package_info $package_name $matching_version $registry)]
-              [$deps (get $pkg_info "dependencies" {})]
-              [$resolved_deps []]
-            ]
-            (do
-              (for-each (object-keys $deps) (lambda [$dep_name]
-                (let [
-                    [$dep_constraint (get $deps $dep_name)]
-                    [$sub_tree (resolve_dependency_tree $dep_name $dep_constraint $registry)]
-                  ]
-                  (if (not (= $sub_tree nil))
-                    (array-push $resolved_deps $sub_tree)
+          (do
+            (let [
+                [$best (get $matching 0)]
+              ]
+              (do
+                (for-each $matching (lambda [$candidate]
+                  (if (> (compare-versions
+                    (parse-version (get $candidate "version"))
+                    (parse-version (get $best "version")))
+                  0)
+                    (set $best $candidate)
                     true
                   )
-                )
-              ))
-              {
-                "name" $package_name
-                "version" $matching_version
-                "constraint" $constraint
-                "dependencies" $resolved_deps
-              }
+                ))
+                $best
+              )
             )
           )
         )
@@ -372,105 +130,14 @@
   )
 ]
 
-[FUNC flatten_dependency_tree :params [$tree]
-  :body (do
-    ; 의존성 트리를 평탄화하여 설치 순서 결정
-    ; 깊이 우선 탐색 (DFS) + 순환 참조 감지
-    (let [
-        [$visited {}]
-        [$result []]
-      ]
-      (do
-        (let [
-            [$_flatten (lambda [$node]
-              (do
-                (let [
-                    [$node_name (get $node "name")]
-                  ]
-                  (if (get $visited $node_name)
-                    true  ; 이미 방문함
-                    (do
-                      (set $visited $node_name true)
-                      (let [
-                          [$deps (get $node "dependencies" [])]
-                        ]
-                        (do
-                          (for-each $deps (lambda [$dep]
-                            ($_flatten $dep)
-                          ))
-                          (array-push $result {
-                            "name" $node_name
-                            "version" (get $node "version")
-                          })
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )]
-          ]
-          (do
-            ($_flatten $tree)
-            $result
-          )
-        )
-      )
-    )
-  )
-]
+; Helper functions
+[FUNC string-trim :params [$s] :body $s]
+[FUNC string-includes? :params [$s $sub] :body (string-includes $s $sub)]
+[FUNC string-starts-with? :params [$s $prefix] :body (= (substring $s 0 (length $prefix)) $prefix)]
+[FUNC string-split :params [$s $sep] :body (split $s $sep)]
+[FUNC string-to-number :params [$s] :body (int $s)]
 
-[FUNC detect_version_conflict :params [$flattened_deps]
-  :body (do
-    ; 평탄화된 의존성에서 버전 충돌 감지
-    ; 같은 패키지의 다른 버전이 있으면 경고
-    (let [
-        [$version_map {}]
-        [$conflicts []]
-      ]
-      (do
-        (for-each $flattened_deps (lambda [$dep]
-          (let [
-              [$name (get $dep "name")]
-              [$version (get $dep "version")]
-              [$existing (get $version_map $name)]
-            ]
-            (if (not (= $existing nil))
-              (if (not (= $existing $version))
-                (array-push $conflicts {
-                  "package" $name
-                  "versions" [$existing $version]
-                })
-                true
-              )
-              (set $version_map $name $version)
-            )
-          )
-        ))
-        {
-          "has_conflicts" (> (length $conflicts) 0)
-          "conflicts" $conflicts
-        }
-      )
-    )
-  )
-]
-
-; Helper functions (must be implemented by caller or stdlib)
-; - get_package_versions($name, $registry) → ["1.0.0", "1.1.0", ...]
-; - get_package_info($name, $version, $registry) → {name, version, dependencies, ...}
-; - array-push($array, $item) → adds item to array
-; - array-concat($arr1, $arr2) → concatenates arrays
-; - object-keys($obj) → ["key1", "key2", ...]
-
-; Module exports
-{
-  :parse_semver parse_semver
-  :validate_version validate_version
-  :semver_compare semver_compare
-  :semver_matches semver_matches
-  :find_matching_version find_matching_version
-  :resolve_dependency_tree resolve_dependency_tree
-  :flatten_dependency_tree flatten_dependency_tree
-  :detect_version_conflict detect_version_conflict
-}
+{ :parse-version parse-version
+  :compare-versions compare-versions
+  :matches-constraint matches-constraint
+  :find-best-version find-best-version }

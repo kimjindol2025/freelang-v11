@@ -40,6 +40,10 @@ declare class VpmCli {
     private createAuthToken;
     private getInstalledVersion;
     private callResolverInstall;
+    private resolveVersion;
+    private versionMatches;
+    private parseVersion;
+    private compareVersions;
     private showHelp;
 }
 export { VpmCli };

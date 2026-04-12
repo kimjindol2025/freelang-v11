@@ -116,15 +116,21 @@ class VpmCli {
             return;
         }
         const packageSpec = params[0];
-        const [packageName, version] = packageSpec.includes('@')
+        const [packageName, versionSpec] = packageSpec.includes('@')
             ? packageSpec.split('@')
             : [packageSpec, 'latest'];
-        console.log(`📦 Installing ${packageName}@${version}...`);
-        // 패키지 정보 조회
-        const pkgInfo = await this.fetchPackageInfo(packageName, version);
+        console.log(`📦 Installing ${packageName}@${versionSpec}...`);
+        // 패키지 정보 조회 (모든 버전)
+        const pkgInfo = await this.fetchPackageInfo(packageName);
         if (!pkgInfo) {
             throw new Error(`Package ${packageName} not found`);
         }
+        // Stage 5: Semver 해석 - 최적 버전 선택
+        const selectedVersion = this.resolveVersion(pkgInfo.versions, versionSpec);
+        if (!selectedVersion) {
+            throw new Error(`No matching version found for ${packageName}@${versionSpec}`);
+        }
+        const version = selectedVersion.version;
         // 패키지 설치 (resolver.fl 호출 + registry checksum 활용)
         // pkgInfo.versions 배열에서 요청한 버전의 checksum 찾기
         let registryChecksum;
@@ -582,6 +588,55 @@ class VpmCli {
                 // ignore cleanup errors
             }
         }
+    }
+    // Stage 5: Semver Resolution
+    resolveVersion(versions, spec) {
+        // Find the best version matching the semver spec
+        // Supported: "latest", "1.2.3" (exact), "^1.2.3" (caret), "~1.2.3" (tilde)
+        if (spec === 'latest') {
+            return versions.length > 0 ? versions[versions.length - 1] : null;
+        }
+        const matching = versions.filter((v) => this.versionMatches(v.version, spec));
+        if (matching.length === 0)
+            return null;
+        // Return the highest matching version
+        return matching.sort((a, b) => this.compareVersions(b.version, a.version))[0];
+    }
+    versionMatches(version, spec) {
+        if (spec === 'latest')
+            return true;
+        if (spec.startsWith('^')) {
+            // Caret: allow changes to minor and patch, not major
+            const specVersion = spec.substring(1);
+            const [specMajor] = this.parseVersion(specVersion);
+            const [versionMajor] = this.parseVersion(version);
+            return versionMajor === specMajor && this.compareVersions(version, specVersion) >= 0;
+        }
+        if (spec.startsWith('~')) {
+            // Tilde: allow changes to patch, not minor
+            const specVersion = spec.substring(1);
+            const [specMajor, specMinor] = this.parseVersion(specVersion);
+            const [versionMajor, versionMinor] = this.parseVersion(version);
+            return (versionMajor === specMajor &&
+                versionMinor === specMinor &&
+                this.compareVersions(version, specVersion) >= 0);
+        }
+        // Exact version
+        return version === spec;
+    }
+    parseVersion(version) {
+        const parts = version.split('.');
+        return [parseInt(parts[0] || '0'), parseInt(parts[1] || '0'), parseInt(parts[2] || '0')];
+    }
+    compareVersions(v1, v2) {
+        // Returns: >0 if v1 > v2, 0 if equal, <0 if v1 < v2
+        const [m1, n1, p1] = this.parseVersion(v1);
+        const [m2, n2, p2] = this.parseVersion(v2);
+        if (m1 !== m2)
+            return m1 - m2;
+        if (n1 !== n2)
+            return n1 - n2;
+        return p1 - p2;
     }
     showHelp() {
         console.log(`
