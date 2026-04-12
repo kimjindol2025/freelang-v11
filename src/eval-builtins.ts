@@ -6,6 +6,8 @@
 // Phase 96: Result 타입 + AI 에러 처리 추가
 // Phase 101: 장기/단기/에피소드 메모리 시스템
 // Phase 103: 멀티 에이전트 통신
+// Phase 104: TRY-REASON 실패 복구 추론
+// Phase 106: 자동 품질 평가 루프
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -26,6 +28,9 @@ import { globalToolRegistry } from "./tool-registry"; // Phase 97: Tool DSL
 import { globalMemory } from "./memory-system"; // Phase 101: Memory System
 import { globalRAG } from "./rag"; // Phase 102: RAG
 import { globalBus, MessageBus, AgentMessage } from "./multi-agent"; // Phase 103: Multi-Agent
+import { tryReasonBuiltin, tryWithFallback } from "./try-reason"; // Phase 104: TRY-REASON
+import { createStream, getStream, deleteStream, streamText, FLStream } from "./streaming"; // Phase 105: Streaming
+import { evaluateQuality, defaultCriteria } from "./quality-loop"; // Phase 106: Quality Loop
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -914,6 +919,136 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     case "agent-inbox-size": {
       const agentId = String(args[0]);
       return globalBus.inboxSize(agentId);
+    }
+
+    // Phase 104: TRY-REASON
+    // (try-reason [[strategy fn] ...]) → 첫 성공 값
+    case "try-reason": {
+      const attemptsList = args[0];
+      if (!Array.isArray(attemptsList)) {
+        throw new Error("try-reason: attempts must be a list");
+      }
+      const attempts: Array<[string, () => any]> = attemptsList.map((item: any) => {
+        if (Array.isArray(item) && item.length === 2) {
+          const [strategy, fn] = item;
+          return [String(strategy), () => {
+            if (typeof fn === "function") return fn();
+            if (fn && fn.kind === "function-value") return callFn(fn, []);
+            return fn;
+          }] as [string, () => any];
+        }
+        throw new Error("try-reason: each attempt must be [strategy fn]");
+      });
+      return tryReasonBuiltin(attempts);
+    }
+
+    // Phase 106: Quality Loop 내장 함수
+    // (quality-check output threshold?) → score (0.0~1.0)
+    case "quality-check": {
+      const output = args[0];
+      const threshold = args.length > 1 ? Number(args[1]) : 0.7;
+      const result = evaluateQuality(output, defaultCriteria, threshold);
+      return result.score;
+    }
+
+    // (quality-passed? output threshold?) → boolean
+    case "quality-passed?": {
+      const output = args[0];
+      const threshold = args.length > 1 ? Number(args[1]) : 0.7;
+      const result = evaluateQuality(output, defaultCriteria, threshold);
+      return result.passed;
+    }
+
+    // (quality-feedback output) → string[]
+    case "quality-feedback": {
+      const output = args[0];
+      const result = evaluateQuality(output, defaultCriteria, 0.7);
+      return result.feedback;
+    }
+
+    // Phase 105: Streaming Output
+    // (stream-create) → stream-id 문자열
+    case "stream-create": {
+      const { id } = createStream();
+      return id;
+    }
+
+    // (stream-write "id" "chunk") — 청크 쓰기
+    case "stream-write": {
+      const streamId = String(args[0]);
+      const content = String(args[1] ?? "");
+      const s105a = getStream(streamId);
+      if (!s105a) throw new Error(`stream-write: stream not found: ${streamId}`);
+      s105a.write(content);
+      return null;
+    }
+
+    // (stream-end "id") — 스트림 종료
+    case "stream-end": {
+      const streamId = String(args[0]);
+      const s105b = getStream(streamId);
+      if (!s105b) throw new Error(`stream-end: stream not found: ${streamId}`);
+      s105b.end();
+      return null;
+    }
+
+    // (stream-collect "id") → 수집된 문자열 (Promise or string)
+    case "stream-collect": {
+      const streamId = String(args[0]);
+      const s105c = getStream(streamId);
+      if (!s105c) throw new Error(`stream-collect: stream not found: ${streamId}`);
+      return s105c.collect();
+    }
+
+    // (stream-done? "id") → boolean
+    case "stream-done?": {
+      const streamId = String(args[0]);
+      const s105d = getStream(streamId);
+      if (!s105d) return true;
+      return s105d.isDone();
+    }
+
+    // (stream-chunks "id") → StreamChunk[]
+    case "stream-chunks": {
+      const streamId = String(args[0]);
+      const s105e = getStream(streamId);
+      if (!s105e) throw new Error(`stream-chunks: stream not found: ${streamId}`);
+      return s105e.getChunks();
+    }
+
+    // (stream-chunk-count "id") → number
+    case "stream-chunk-count": {
+      const streamId = String(args[0]);
+      const s105f = getStream(streamId);
+      if (!s105f) throw new Error(`stream-chunk-count: stream not found: ${streamId}`);
+      return s105f.chunkCount();
+    }
+
+    // (stream-text "id" "text") — 텍스트를 단어 단위로 자동 스트리밍
+    case "stream-text": {
+      const streamId = String(args[0]);
+      const text = String(args[1] ?? "");
+      const s105g = getStream(streamId);
+      if (!s105g) throw new Error(`stream-text: stream not found: ${streamId}`);
+      return streamText(s105g, text, 0);
+    }
+
+    // (stream-delete "id") → boolean
+    case "stream-delete": {
+      const streamId = String(args[0]);
+      return deleteStream(streamId);
+    }
+
+    // (try-with-fallback fn fallback) → fn() 실패 시 fallback
+    case "try-with-fallback": {
+      const fn = args[0];
+      const fallback = args[1];
+      const wrappedFn = () => {
+        if (typeof fn === "function") return fn();
+        if (fn && fn.kind === "function-value") return callFn(fn, []);
+        return fn;
+      };
+      return tryWithFallback(wrappedFn, fallback);
     }
 
     // Function call (default)
