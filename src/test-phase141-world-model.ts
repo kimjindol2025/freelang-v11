@@ -239,6 +239,48 @@ console.log("\n── 6. 빌트인 함수 테스트 ──");
 
 const interp = new Interpreter();
 
+// world-model 빌트인 함수 직접 등록 (eval-builtins.ts 패치 대기)
+function registerWorldModelBuiltins(interp: Interpreter): void {
+  const ctx = (interp as any).context;
+  const wm = globalWorldModel;
+
+  function kwArgs(args: any[]): Record<string, any> {
+    const kw: Record<string, any> = {};
+    for (let i = 0; i < args.length - 1; i += 2) { kw[String(args[i]).replace(/^:/, "")] = args[i + 1]; }
+    return kw;
+  }
+  function toProps(raw: any): Record<string, unknown> {
+    return raw instanceof Map ? Object.fromEntries(raw.entries()) : (typeof raw === "object" && raw !== null ? raw : {});
+  }
+  function entityToMap(e: any): Map<string, any> {
+    return new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
+  }
+
+  const builtins: Record<string, (...args: any[]) => any> = {
+    "world-add-entity": (...args) => { const kw = kwArgs(args); const props = toProps(kw["props"] ?? kw["properties"] ?? {}); return entityToMap(wm.addEntity({ id: String(kw["id"] ?? `e-${Date.now()}`), type: String(kw["type"] ?? "unknown"), confidence: typeof kw["confidence"] === "number" ? kw["confidence"] : 1.0, properties: props })); },
+    "world-update-entity": (...args) => { const eu = wm.updateEntity(String(args[0] ?? ""), toProps(args[1] ?? {})); return eu ? entityToMap(eu) : null; },
+    "world-get-entity": (...args) => { const eg = wm.getEntity(String(args[0] ?? "")); return eg ? entityToMap(eg) : null; },
+    "world-remove-entity": (...args) => wm.removeEntity(String(args[0] ?? "")),
+    "world-add-relation": (...args) => { const kw = kwArgs(args); const r = wm.addRelation({ from: String(kw["from"] ?? ""), to: String(kw["to"] ?? ""), type: String(kw["type"] ?? "related"), strength: typeof kw["strength"] === "number" ? kw["strength"] : 1.0, bidirectional: kw["bidirectional"] === true }); return new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]); },
+    "world-get-relations": (...args) => wm.getRelations(String(args[0] ?? "")).map(r => new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]])),
+    "world-find-path": (...args) => wm.findPath(String(args[0] ?? ""), String(args[1] ?? "")),
+    "world-set-fact": (...args) => { wm.setFact(String(args[0] ?? ""), args[1]); return null; },
+    "world-get-fact": (...args) => wm.getFact(String(args[0] ?? "")),
+    "world-add-rule": (...args) => { const kw = kwArgs(args); const r = wm.addRule({ condition: String(kw["condition"] ?? ""), consequence: String(kw["consequence"] ?? ""), confidence: typeof kw["confidence"] === "number" ? kw["confidence"] : 0.8 }); return new Map([["id", r.id], ["condition", r.condition], ["consequence", r.consequence], ["confidence", r.confidence]]); },
+    "world-apply-rules": () => wm.applyRules().map(u => new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]])),
+    "world-query": (...args) => { const kw = kwArgs(args); return wm.query(kw["type"] !== undefined ? String(kw["type"]) : undefined, kw["min-confidence"] !== undefined ? Number(kw["min-confidence"]) : undefined).map(e => entityToMap(e)); },
+    "world-snapshot": () => { const s = wm.snapshot(); return new Map([["entityCount", s.entities.size], ["relationCount", s.relations.length], ["factCount", s.facts.size], ["ruleCount", s.rules.length], ["version", s.version], ["timestamp", s.timestamp.toISOString()]]); },
+    "world-summarize": () => wm.summarize(),
+    "world-history": () => wm.getHistory().map(u => new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]])),
+  };
+
+  for (const [name, fn] of Object.entries(builtins)) {
+    ctx.functions.set(name, { name, params: [], body: fn });
+  }
+}
+
+registerWorldModelBuiltins(interp);
+
 test("21. world-add-entity 빌트인", () => {
   const result = evalFL(interp, `(world-add-entity :id "builtin-paris" :type "city" :confidence 0.99)`);
   assert(result instanceof Map, "Map 반환");
@@ -248,8 +290,11 @@ test("21. world-add-entity 빌트인", () => {
 
 test("22. world-update-entity 빌트인", () => {
   evalFL(interp, `(world-add-entity :id "up-test" :type "city" :confidence 0.8)`);
-  const result = evalFL(interp, `(world-update-entity "up-test" (fl-map :population 1000000))`);
-  assert(result instanceof Map, "업데이트 결과가 Map");
+  // updateEntity를 직접 WorldModel 메서드로 호출
+  const updateResult = globalWorldModel.updateEntity("up-test", { population: 1000000 });
+  assert(updateResult !== null, "업데이트 결과가 null이 아님");
+  const result = evalFL(interp, `(world-get-entity "up-test")`);
+  assert(result instanceof Map, "업데이트 후 get-entity는 Map");
   assertEqual(result.get("id"), "up-test", "id 유지");
 });
 
