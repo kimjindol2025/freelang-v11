@@ -68,6 +68,16 @@ interface CacheEntry {
   registry: string;      // 원본 레지스트리 URL
 }
 
+// Phase 12: Parallel download
+interface PackageResolution {
+  name: string;
+  version: string;
+  pkgInfo: any;          // registry response
+  fromCache: boolean;    // 캐시에서 온 경우
+  integrity?: string;    // downloadAndExtract 후 채워짐
+  signature?: string;
+}
+
 class VpmCli {
   private registryUrl = process.env.VPM_REGISTRY || 'http://registry.v9.dclub.kr';
   private cwd = process.cwd();
@@ -94,6 +104,10 @@ class VpmCli {
   private cacheDir: string = process.env.VPM_CACHE_DIR
     ? path.resolve(process.env.VPM_CACHE_DIR)
     : path.join(os.homedir(), '.vpm', 'cache', 'packages');
+
+  // Phase 12: Parallel download
+  private concurrency: number = Math.min(16, Math.max(1,
+    parseInt(process.env.VPM_CONCURRENCY || '4', 10)));
 
   async run(args: string[]): Promise<void> {
     if (args.length === 0) {
@@ -164,6 +178,12 @@ class VpmCli {
     if (params.length === 0) {
       // 의존성 설치
       await this.installFromLockFile();
+      return;
+    }
+
+    // Phase 12: Multi-package parallel support
+    if (params.length > 1) {
+      await this.installParallel(params);
       return;
     }
 
@@ -381,6 +401,8 @@ class VpmCli {
     }
     fs.mkdirSync(this.packagesDir, { recursive: true });
 
+    // Phase 12: Collect all packages to reinstall (parallel)
+    const packagesToInstall: string[] = [];
     for (const [pkgName, pkgData] of Object.entries(packages)) {
       if (!pkgName || pkgName === '') continue;
       const [name, version] = pkgName.lastIndexOf('@') > 0
@@ -388,9 +410,15 @@ class VpmCli {
         : [pkgName, ''];
 
       if (name && version) {
-        // Use exact version from lockfile (skip semver resolution)
-        await this.install([`${name}@${version}`]);
+        packagesToInstall.push(`${name}@${version}`);
       }
+    }
+
+    // Phase 12: Parallel reinstall if multiple packages
+    if (packagesToInstall.length > 1) {
+      await this.installParallel(packagesToInstall);
+    } else if (packagesToInstall.length === 1) {
+      await this.install([packagesToInstall[0]]);
     }
 
     console.log('✅ Reinstall complete');
@@ -408,32 +436,26 @@ class VpmCli {
 
     console.log('📦 Installing dependencies from lock file...');
 
-    let count = 0;
+    // Phase 12: Collect all packages to install (parallel)
+    const packagesToInstall: string[] = [];
     for (const [pkgName, pkgData] of Object.entries(packages)) {
       if (!pkgName || pkgName === '' || pkgName === '.') continue; // 루트 패키지 제외
       if (pkgData.version) {
         // Extract package name from "name@version" format
         const lastAtIndex = pkgName.lastIndexOf('@');
         const pkgNameOnly = lastAtIndex > 0 ? pkgName.substring(0, lastAtIndex) : pkgName;
-
-        // Fetch package info from registry to get registry checksum
-        const pkgInfo = await this.fetchPackageInfo(pkgNameOnly, pkgData.version);
-        if (!pkgInfo) {
-          throw new Error(`Package ${pkgNameOnly}@${pkgData.version} not found in registry`);
-        }
-
-        await this.downloadAndExtract(
-          pkgNameOnly,
-          pkgData.version,
-          pkgInfo
-        );
-        // Phase 9: Track installed package in Map
-        this.installedPackages.set(pkgNameOnly, pkgData.version);
-        count++;
+        packagesToInstall.push(`${pkgNameOnly}@${pkgData.version}`);
       }
     }
 
-    console.log(`✅ Installed ${count} packages`);
+    // Phase 12: Parallel installation if multiple packages
+    if (packagesToInstall.length > 1) {
+      await this.installParallel(packagesToInstall);
+    } else if (packagesToInstall.length === 1) {
+      await this.install([packagesToInstall[0]]);
+    }
+
+    console.log(`✅ Installed ${packagesToInstall.length} packages`);
   }
 
   private async publish(): Promise<void> {
@@ -987,7 +1009,8 @@ class VpmCli {
 
     try {
       // Phase 8: 단순화된 v9 script - 실제 SHA-256 검증만 수행
-      v9ScriptPath = path.join(this.cwd, `.vpm-install-${Date.now()}.fl`);
+      // Phase 12: Use package@version for concurrent-safe filename
+      v9ScriptPath = path.join(this.cwd, `.vpm-install-${packageName.replace(/[/@]/g, '-')}-${version}.fl`);
       const v9Script = `; Phase 8: Real SHA-256 verification
 [FUNC verify-sha256 :params [$n $v $s] :body (do (println "✅ Verified integrity: " $n "@" $v " (" $s ")") true)]
 
@@ -1488,6 +1511,216 @@ class VpmCli {
     }
   }
 
+  // Phase 12: Parallel download - Main orchestrator
+  private async installParallel(packageSpecs: string[]): Promise<void> {
+    console.log(`🚀 Installing ${packageSpecs.length} packages in parallel...`);
+
+    // Step 1: COLLECT — 전체 의존성 수집
+    const collected = new Map<string, PackageResolution>();
+    for (const spec of packageSpecs) {
+      try {
+        await this.collectDependencies(spec, collected, new Set());
+      } catch (error) {
+        throw new Error(`Failed to collect dependencies for ${spec}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    if (collected.size === 0) {
+      console.log('⚠️  No packages to install');
+      return;
+    }
+
+    console.log(`📦 Total packages to install: ${collected.size}`);
+
+    // Step 2: 낙관적 잠금 (미리 예약)
+    for (const [name, res] of collected) {
+      this.installedPackages.set(name, res.version);
+    }
+
+    // Step 3: PARALLEL DOWNLOAD (concurrency limited)
+    try {
+      await this.runWithConcurrencyLimit(
+        Array.from(collected.values()),
+        async (pkg) => {
+          const result = await this.downloadAndExtract(pkg.name, pkg.version, pkg.pkgInfo);
+          pkg.integrity = result.integrity;
+          pkg.signature = result.signature;
+        }
+      );
+    } catch (error) {
+      throw new Error(`Parallel download failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Step 4: WRITE ONCE — lockfile 1회만 업데이트
+    for (const [name, res] of collected) {
+      if (!res.integrity || !res.signature) {
+        console.warn(`⚠️  Missing integrity/signature for ${name}@${res.version}`);
+      }
+    }
+
+    // 배치로 lockfile 업데이트
+    for (const [name, res] of collected) {
+      await this.updateLockFile(name, res.version, res.integrity || '', res.signature || '');
+    }
+
+    // packageJson 배치 업데이트
+    await this.batchUpdatePackageJson(collected);
+
+    console.log(`✅ Parallel installation complete (${collected.size} packages)`);
+  }
+
+  // Phase 12: Parallel download - Dependency collector
+  private async collectDependencies(
+    spec: string,
+    collected: Map<string, PackageResolution>,
+    chain: Set<string>,
+    depth: number = 0
+  ): Promise<void> {
+    const [packageName, versionSpec] = spec.includes('@')
+      ? spec.split('@')
+      : [spec, 'latest'];
+
+    const pkgKey = `${packageName}@${versionSpec}`;
+
+    // 순환 의존성 방지
+    if (chain.has(pkgKey)) {
+      return;
+    }
+    chain.add(pkgKey);
+
+    // 이미 수집됨
+    const existingKey = Array.from(collected.keys()).find((k) => k === packageName);
+    if (existingKey && collected.has(existingKey)) {
+      const existing = collected.get(existingKey)!;
+      if (this.versionMatches(existing.version, versionSpec)) {
+        return; // 이미 수집됨
+      }
+    }
+
+    // Phase 11: Cache hit check
+    let pkgInfo: any = null;
+    let fromCache = false;
+
+    if (this.isExactSpec(versionSpec)) {
+      const cached = this.getCachedPackage(packageName, versionSpec);
+      if (cached) {
+        pkgInfo = cached.pkgInfo;
+        fromCache = true;
+      }
+    }
+
+    // Phase 11: Cache miss → fetch from registry
+    if (!pkgInfo) {
+      pkgInfo = await this.fetchPackageInfo(packageName);
+      if (!pkgInfo) {
+        throw new Error(`Package ${packageName} not found`);
+      }
+    }
+
+    // Resolve version
+    const selectedVersion = this.resolveVersion(pkgInfo.versions, versionSpec);
+    if (!selectedVersion) {
+      throw new Error(`No matching version found for ${packageName}@${versionSpec}`);
+    }
+    const version = selectedVersion.version;
+
+    // Conflict detection (but don't fail — just skip)
+    if (this.detectVersionConflict(packageName, version)) {
+      const existingVersion = this.installedPackages.get(packageName);
+      if (existingVersion) {
+        if (this.versionMatches(existingVersion, version)) {
+          return; // Already have this version
+        }
+        // Try to resolve conflict
+        try {
+          const resolved = this.resolveConflict(packageName, existingVersion, version);
+          if (resolved !== version) {
+            return; // Use existing version
+          }
+        } catch (err) {
+          throw err;
+        }
+      }
+    }
+
+    // Add to collected
+    const resolution: PackageResolution = {
+      name: packageName,
+      version: version,
+      pkgInfo: pkgInfo,
+      fromCache: fromCache
+    };
+    collected.set(packageName, resolution);
+
+    // Recursively collect dependencies
+    const versionEntry = pkgInfo.versions?.find((v: any) => v.version === version);
+    const deps = versionEntry?.dependencies || {};
+    for (const [depName, depVersion] of Object.entries(deps)) {
+      await this.collectDependencies(`${depName}@${depVersion}`, collected, chain, depth + 1);
+    }
+  }
+
+  // Phase 12: Parallel download - Concurrency limiter (semaphore pattern)
+  private async runWithConcurrencyLimit<T>(
+    items: T[],
+    fn: (item: T) => Promise<void>,
+    limit?: number
+  ): Promise<void> {
+    const maxConcurrency = limit ?? this.concurrency;
+    const queue = [...items];
+    let activeCount = 0;
+    let completed = 0;
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        if (!item) break;
+
+        activeCount++;
+        try {
+          await fn(item);
+          completed++;
+        } catch (error) {
+          throw error;
+        } finally {
+          activeCount--;
+        }
+      }
+    };
+
+    const workers = Array(Math.min(maxConcurrency, items.length))
+      .fill(null)
+      .map(() => worker());
+
+    await Promise.all(workers);
+  }
+
+  // Phase 12: Parallel download - Batch packageJson update
+  private async batchUpdatePackageJson(collected: Map<string, PackageResolution>): Promise<void> {
+    const packageJsonPath = path.join(this.cwd, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) {
+      // Create package.json if not exists
+      const pkg: PackageJson = {
+        name: path.basename(this.cwd),
+        version: '1.0.0',
+        dependencies: {}
+      };
+      fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
+    }
+
+    const packageJson: PackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    if (!packageJson.dependencies) {
+      packageJson.dependencies = {};
+    }
+
+    // Batch update all dependencies
+    for (const [name, res] of collected) {
+      packageJson.dependencies[name] = res.version;
+    }
+
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  }
+
   private showHelp(): void {
     console.log(`
 v9 Package Manager (vpm) - v1.0.0
@@ -1496,26 +1729,27 @@ Usage:
   vpm <command> [options]
 
 Commands:
-  install [package@version]   Install package(s)
-  publish                     Publish current package to registry
-  search <query>              Search packages
-  list                        List installed packages
-  update [package]            Update package(s)
-  uninstall <package>         Uninstall package
-  info <package>              Show package information
-  token <action>              Manage auth tokens
-  verify                      Verify package integrity
-  reinstall                   Reinstall all packages from lockfile
-  cache dir                   Show cache directory path
-  cache list                  List cached packages
-  cache verify                Verify cache integrity
-  cache clean                 Clear all cache
-  cache prune                 Remove cache entries not in lockfile
-  help                        Show this help message
+  install [package@version...] Install package(s) - supports multiple (Phase 12 parallel)
+  publish                      Publish current package to registry
+  search <query>               Search packages
+  list                         List installed packages
+  update [package]             Update package(s)
+  uninstall <package>          Uninstall package
+  info <package>               Show package information
+  token <action>               Manage auth tokens
+  verify                       Verify package integrity
+  reinstall                    Reinstall all packages from lockfile (Phase 12 parallel)
+  cache dir                    Show cache directory path
+  cache list                   List cached packages
+  cache verify                 Verify cache integrity
+  cache clean                  Clear all cache
+  cache prune                  Remove cache entries not in lockfile
+  help                         Show this help message
 
 Examples:
   vpm install awesome-lib
   vpm install awesome-lib@1.2.0
+  vpm install pkg1@1.0.0 pkg2@2.0.0 pkg3@latest    (parallel install)
   vpm search data
   vpm list
   vpm update
@@ -1528,6 +1762,7 @@ Environment:
   VPM_AUTH_TOKEN             Auth token for publishing
   VPM_CACHE_DIR              Override cache directory (default: ~/.vpm/cache/packages)
   VPM_SIGNING_KEY            Signing key for package integrity verification
+  VPM_CONCURRENCY            Parallel download limit (default: 4, min: 1, max: 16)
 
 For more info: https://v9.dclub.kr/docs/vpm
 `);

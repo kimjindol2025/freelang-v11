@@ -24,6 +24,7 @@ declare class VpmCli {
     private dependencyGraph;
     private signingKey;
     private cacheDir;
+    private concurrency;
     run(args: string[]): Promise<void>;
     private install;
     private verify;
@@ -74,6 +75,10 @@ declare class VpmCli {
     private cacheVerify;
     private cacheClean;
     private cachePrune;
+    private installParallel;
+    private collectDependencies;
+    private runWithConcurrencyLimit;
+    private batchUpdatePackageJson;
     private showHelp;
 }
 export { VpmCli };
