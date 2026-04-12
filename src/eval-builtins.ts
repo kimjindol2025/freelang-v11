@@ -11,6 +11,7 @@
 // Phase 107: FL 자기 교육 시스템 (FLTutor)
 // Phase 108: AI 추론 시각화 디버거
 // Phase 112: maybe-chain 확률 자동 전파
+// Phase 121: CONSENSUS 여러 에이전트 합의
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -48,6 +49,14 @@ import { globalAnalogy } from "./analogy"; // Phase 117: Analogy
 import { globalCritique, defaultFinders, severityWeight } from "./critique"; // Phase 118: Critique Agent
 import { globalComposer, ReasonStep } from "./compose-reason"; // Phase 119: Compose-Reason
 import { globalCognition } from "./cognitive"; // Phase 120: Cognitive Architecture
+import { globalConsensus, AgentVote, ConsensusEngine } from "./consensus"; // Phase 121: Consensus
+import { globalDelegation, DelegateAgent, DelegateTask } from "./delegate"; // Phase 122: Delegation
+import { globalNegotiator, NegotiationPosition } from "./negotiate"; // Phase 124: Negotiate
+import { globalVoting, VotingSystem, Ballot } from "./vote"; // Phase 123: VOTE
+import { globalSwarm, Swarm } from "./swarm"; // Phase 125: Swarm Intelligence
+import { globalPeerReview, Reviewer, ReviewComment } from "./peer-review"; // Phase 127: Peer-Review
+import { globalCompetition, Competition, Competitor } from "./compete"; // Phase 129: Compete
+import { AgentChain, ChainAgent, ChainResult } from "./chain-agents"; // Phase 128: Chain-Agents
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1703,7 +1712,252 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return p ? p.solution : null;
       }
 
-      // (export sym1 sym2 ...) — self-hosting 파일 호환
+      // Phase 121: Consensus — 여러 에이전트 합의
+      // votes-list 형식: [[agentId answer confidence], ...]
+      {
+        function parseVotes(raw: any): AgentVote<any>[] {
+          if (!Array.isArray(raw)) return [];
+          return raw.map((item: any) => {
+            if (Array.isArray(item)) {
+              return { agentId: String(item[0]), answer: item[1], confidence: Number(item[2]) };
+            }
+            return item as AgentVote<any>;
+          });
+        }
+        if (op === "consensus-majority") {
+          // (consensus-majority votes-list) → answer
+          const votes = parseVotes(args[0]);
+          const result = globalConsensus.majority(votes);
+          return result.answer;
+        }
+        if (op === "consensus-weighted") {
+          // (consensus-weighted votes-list) → 숫자
+          const votes = parseVotes(args[0]) as AgentVote<number>[];
+          const result = globalConsensus.weighted(votes);
+          return result.answer;
+        }
+        if (op === "consensus-threshold") {
+          // (consensus-threshold votes-list threshold) → answer or null
+          const votes = parseVotes(args[0]);
+          const threshold = args[1] !== undefined ? Number(args[1]) : 0.7;
+          const result = globalConsensus.threshold(votes, threshold);
+          return result ? result.answer : null;
+        }
+        if (op === "consensus-agreement") {
+          // (consensus-agreement votes-list) → agreement 숫자
+          const votes = parseVotes(args[0]);
+          return globalConsensus.agreement(votes);
+        }
+      }
+
+      // Phase 123: VOTE — 에이전트 투표 결정
+      // ballots 형식: [[voterId [choice1 choice2 ...] {scores}], ...]
+      {
+        function parseBallots(raw: any): Ballot[] {
+          if (!Array.isArray(raw)) return [];
+          return raw.map((item: any) => {
+            if (Array.isArray(item)) {
+              const voterId = String(item[0]);
+              const choices = Array.isArray(item[1]) ? item[1].map(String) : [];
+              const scores = item[2] && typeof item[2] === "object" && !Array.isArray(item[2]) ? item[2] as Record<string, number> : undefined;
+              return { voterId, choices, scores };
+            }
+            return item as Ballot;
+          });
+        }
+        function parseCandidates(raw: any): string[] {
+          if (Array.isArray(raw)) return raw.map(String);
+          return [];
+        }
+        if (op === "vote-plurality") {
+          const ballots = parseBallots(args[0]);
+          const candidates = parseCandidates(args[1]);
+          const result = globalVoting.plurality(ballots, candidates);
+          return result.winner;
+        }
+        if (op === "vote-approval") {
+          const ballots = parseBallots(args[0]);
+          const candidates = parseCandidates(args[1]);
+          const result = globalVoting.approval(ballots, candidates);
+          return result.winner;
+        }
+        if (op === "vote-score") {
+          const ballots = parseBallots(args[0]);
+          const candidates = parseCandidates(args[1]);
+          const result = globalVoting.score(ballots, candidates);
+          return result.winner;
+        }
+        if (op === "vote-tally") {
+          const ballots = parseBallots(args[0]);
+          const candidates = parseCandidates(args[1]);
+          const t = globalVoting.tally(ballots, candidates);
+          return new Map(Object.entries(t));
+        }
+      }
+
+      // Phase 124: Negotiate — 에이전트 협상 블록
+      if (op === "negotiate") {
+        // (negotiate positions-list) → agreed? boolean
+        const [raw] = args;
+        if (!Array.isArray(raw)) return false;
+        const positions: NegotiationPosition[] = raw.map((p: any) => {
+          if (Array.isArray(p)) {
+            return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
+          }
+          return p as NegotiationPosition;
+        });
+        const result = globalNegotiator.negotiate(positions);
+        return result.agreed;
+      }
+      if (op === "negotiate-value") {
+        // (negotiate-value positions-list) → 합의 값 or null
+        const [raw] = args;
+        if (!Array.isArray(raw)) return null;
+        const positions: NegotiationPosition[] = raw.map((p: any) => {
+          if (Array.isArray(p)) {
+            return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
+          }
+          return p as NegotiationPosition;
+        });
+        const result = globalNegotiator.negotiate(positions);
+        return result.agreed ? (result.value ?? null) : null;
+      }
+      if (op === "negotiate-rounds") {
+        // (negotiate-rounds positions-list) → 라운드 수
+        const [raw] = args;
+        if (!Array.isArray(raw)) return 0;
+        const positions: NegotiationPosition[] = raw.map((p: any) => {
+          if (Array.isArray(p)) {
+            return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
+          }
+          return p as NegotiationPosition;
+        });
+        const result = globalNegotiator.negotiate(positions);
+        return result.rounds.length;
+      }
+
+      // Phase 125: Swarm Intelligence — PSO 기반 군집 지능
+      if (op === "swarm-optimize") {
+        // (swarm-optimize fn particles iterations) → bestPosition
+        const [fnArg, nArg, iterArg] = args;
+        const objective = typeof fnArg === "function"
+          ? fnArg
+          : (x: number) => callFnVal(fnArg, [x]);
+        const result = globalSwarm.optimize({
+          objective,
+          particles: nArg !== undefined ? Number(nArg) : 10,
+          iterations: iterArg !== undefined ? Number(iterArg) : 50,
+        });
+        return result.bestPosition;
+      }
+      if (op === "swarm-best-score") {
+        // (swarm-best-score fn particles iterations) → bestScore
+        const [fnArg, nArg, iterArg] = args;
+        const objective = typeof fnArg === "function"
+          ? fnArg
+          : (x: number) => callFnVal(fnArg, [x]);
+        const result = globalSwarm.optimize({
+          objective,
+          particles: nArg !== undefined ? Number(nArg) : 10,
+          iterations: iterArg !== undefined ? Number(iterArg) : 50,
+        });
+        return result.bestScore;
+      }
+      if (op === "swarm-converged?") {
+        // (swarm-converged? fn) → boolean
+        const [fnArg] = args;
+        const objective = typeof fnArg === "function"
+          ? fnArg
+          : (x: number) => callFnVal(fnArg, [x]);
+        const result = globalSwarm.optimize({ objective });
+        return result.converged;
+      }
+
+      // Phase 129: Compete — 에이전트 경쟁 최선 선택
+      if (op === "compete-register") {
+        // (compete-register id solve-fn) → void
+        const [id, solveFn] = args;
+        const competitor: Competitor = {
+          id: String(id),
+          solve: (problem: any) => callFn(solveFn, [problem]),
+        };
+        globalCompetition.register(competitor);
+        return null;
+      }
+      if (op === "compete") {
+        // (compete problem eval-fn) → winner agentId
+        const [problem, evalFn] = args;
+        const evaluate = (output: any) => Number(callFn(evalFn, [output]));
+        const result = globalCompetition.run(problem, evaluate);
+        return result.winner?.agentId ?? null;
+      }
+      if (op === "compete-score") {
+        // (compete-score problem eval-fn) → winner score
+        const [problem, evalFn] = args;
+        const evaluate = (output: any) => Number(callFn(evalFn, [output]));
+        const result = globalCompetition.run(problem, evaluate);
+        return result.winner?.score ?? null;
+      }
+      if (op === "compete-all") {
+        // (compete-all problem eval-fn) → 전체 순위 리스트 [[agentId score rank] ...]
+        const [problem, evalFn] = args;
+        const evaluate = (output: any) => Number(callFn(evalFn, [output]));
+        const result = globalCompetition.run(problem, evaluate);
+        return result.allResults.map(r => [r.agentId, r.score, r.rank]);
+      }
+      if (op === "compete-list") {
+        // (compete-list) → 등록된 경쟁자 목록
+        return globalCompetition.list();
+      }
+
+      // Phase 127: PEER-REVIEW — 에이전트 간 피어 리뷰
+      if (op === "peer-review-add") {
+        // (peer-review-add "id" review-fn) → void
+        const [idArg, fnArg] = args;
+        const reviewerId = String(idArg);
+        const reviewer: Reviewer = {
+          id: reviewerId,
+          review: (output: any) => {
+            const raw = callFnVal(fnArg, [output]);
+            if (raw && typeof raw === "object") {
+              return {
+                reviewerId,
+                aspect: String(raw.aspect ?? "quality"),
+                score: Number(raw.score ?? 0.5),
+                comment: String(raw.comment ?? ""),
+                suggestion: raw.suggestion !== undefined ? String(raw.suggestion) : undefined,
+              } as ReviewComment;
+            }
+            return { reviewerId, aspect: "quality", score: 0.5, comment: String(raw ?? "") };
+          },
+        };
+        globalPeerReview.addReviewer(reviewer);
+        return null;
+      }
+      if (op === "peer-review") {
+        // (peer-review "targetId" output) → approved? boolean
+        const [targetId, output] = args;
+        const result = globalPeerReview.review(String(targetId), output);
+        return result.approved;
+      }
+      if (op === "peer-review-score") {
+        // (peer-review-score "targetId" output) → averageScore
+        const [targetId, output] = args;
+        const result = globalPeerReview.review(String(targetId), output);
+        return result.averageScore;
+      }
+      if (op === "peer-review-comments") {
+        // (peer-review-comments "targetId" output) → comments list
+        const [targetId, output] = args;
+        const result = globalPeerReview.review(String(targetId), output);
+        return result.comments;
+      }
+      if (op === "peer-review-list") {
+        // (peer-review-list) → reviewer ids
+        return globalPeerReview.list();
+      }
+
+            // (export sym1 sym2 ...) — self-hosting 파일 호환
       if (op === "export") return null;
       // (call $fn arg...) — FL stdlib 고차 함수용
       if (op === "call" && args.length >= 1) {
