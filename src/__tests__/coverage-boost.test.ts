@@ -130,23 +130,57 @@ describe("eval-special-forms — 미커버 케이스", () => {
   });
 });
 
-describe("error-formatter — suggestSimilar 상세", () => {
+describe("error-formatter — suggestSimilar & formatError", () => {
   test("유사 함수명 — 편집거리 기반", () => {
     const { suggestSimilar } = require("../error-formatter");
-    // "strlen"과 유사한 것 찾기
     const result = suggestSimilar("strlen", ["str", "string?", "strlen", "str-split"]);
     expect(result).toBeDefined();
   });
 
-  test("매우 다른 함수명 — null 반환", () => {
+  test("매우 다른 함수명", () => {
     const { suggestSimilar } = require("../error-formatter");
     const result = suggestSimilar("xyz123abc", ["print", "define", "if", "let"]);
-    // 유사도 없으면 null 또는 빈 값
-    expect(true).toBe(true); // 에러 없이 실행됨을 확인
+    expect(true).toBe(true);
+  });
+
+  test("formatError 기본", () => {
+    const { formatError } = require("../error-formatter");
+    const err = {
+      message: "Test error",
+      file: "test.fl",
+      line: 1,
+      col: 1,
+      hint: "check syntax",
+    };
+    const formatted = formatError(err);
+    expect(formatted).toContain("Test error");
+    expect(formatted).toContain("test.fl");
+  });
+
+  test("formatError with source highlight", () => {
+    const { formatError } = require("../error-formatter");
+    const err = {
+      message: "undefined function 'foo'",
+      file: "test.fl",
+      line: 2,
+      col: 3,
+      source: "(define x 1)\n(foo $x)\n(+ 1 2)",
+      hint: "did you mean 'for'?",
+    };
+    const formatted = formatError(err);
+    expect(formatted).toContain("오류:");
+    expect(formatted).toContain("힌트:");
+  });
+
+  test("formatError 파일 없이", () => {
+    const { formatError } = require("../error-formatter");
+    const err = { message: "simple error" };
+    const formatted = formatError(err);
+    expect(formatted).toContain("simple error");
   });
 });
 
-describe("ast.ts — AST 노드 타입 가드", () => {
+describe("ast.ts — AST 노드 타입 가드 및 헬퍼", () => {
   test("isBlock 타입 가드", () => {
     const { isBlock } = require("../ast");
     const block = { kind: "block", type: "Array", fields: new Map() };
@@ -172,6 +206,166 @@ describe("ast.ts — AST 노드 타입 가드", () => {
     const { isImportBlock } = require("../ast");
     const importBlock = { kind: "import", module: "test", names: [] };
     expect(isImportBlock(importBlock)).toBe(true);
+  });
+
+  test("makeSExpr 헬퍼", () => {
+    const { makeSExpr } = require("../ast");
+    const expr = makeSExpr("+", [], 1);
+    expect(expr.kind).toBe("sexpr");
+    expect(expr.op).toBe("+");
+    expect(expr.line).toBe(1);
+  });
+
+  test("makeBlock 헬퍼", () => {
+    const { makeBlock } = require("../ast");
+    const block = makeBlock("Array", "test", new Map());
+    expect(block.kind).toBe("block");
+    expect(block.type).toBe("Array");
+  });
+
+  test("makeKeyword 헬퍼", () => {
+    const { makeKeyword } = require("../ast");
+    const kw = makeKeyword("test");
+    expect(kw.kind).toBe("keyword");
+    expect(kw.name).toBe("test");
+  });
+
+  test("makeTypeAnnotation 헬퍼", () => {
+    const { makeTypeAnnotation } = require("../ast");
+    const ta = makeTypeAnnotation("Int");
+    expect(ta.kind).toBe("type");
+    expect(ta.name).toBe("Int");
+  });
+
+  test("makeFunctionValue 헬퍼", () => {
+    const { makeFunctionValue, makeSExpr } = require("../ast");
+    const body = makeSExpr("+", []);
+    const fv = makeFunctionValue(["$x"], body, new Map(), "my-fn");
+    expect(fv.kind).toBe("function-value");
+    expect(fv.name).toBe("my-fn");
+  });
+
+  test("isOpenBlock 타입 가드", () => {
+    const { isOpenBlock } = require("../ast");
+    expect(isOpenBlock({ kind: "open", module: "test" })).toBe(true);
+    expect(isOpenBlock({ kind: "import" })).toBe(false);
+  });
+
+  test("isSearchBlock 타입 가드", () => {
+    const { isSearchBlock } = require("../ast");
+    expect(isSearchBlock({ kind: "search-block" })).toBe(true);
+    expect(isSearchBlock({ kind: "import" })).toBe(false);
+  });
+
+  test("isLearnBlock 타입 가드", () => {
+    const { isLearnBlock } = require("../ast");
+    expect(isLearnBlock({ kind: "learn-block" })).toBe(true);
+    expect(isLearnBlock({ kind: "search-block" })).toBe(false);
+  });
+
+  test("isReasoningBlock 타입 가드", () => {
+    const { isReasoningBlock } = require("../ast");
+    expect(isReasoningBlock({ kind: "reasoning-block" })).toBe(true);
+    expect(isReasoningBlock({ kind: "learn-block" })).toBe(false);
+  });
+
+  test("CONTROL_BLOCK_TYPES 배열", () => {
+    const { CONTROL_BLOCK_TYPES } = require("../ast");
+    expect(CONTROL_BLOCK_TYPES).toContain("FUNC");
+    expect(CONTROL_BLOCK_TYPES).toContain("SERVER");
+    expect(CONTROL_BLOCK_TYPES).toContain("ROUTE");
+  });
+
+  test("makeLiteralPattern 헬퍼", () => {
+    const { makeLiteralPattern } = require("../ast");
+    const pat = makeLiteralPattern("number", 42);
+    expect(pat.kind).toBe("literal-pattern");
+    expect(pat.value).toBe(42);
+  });
+
+  test("makeVariablePattern 헬퍼", () => {
+    const { makeVariablePattern } = require("../ast");
+    const pat = makeVariablePattern("$x");
+    expect(pat.kind).toBe("variable-pattern");
+    expect(pat.name).toBe("$x");
+  });
+
+  test("makeWildcardPattern 헬퍼", () => {
+    const { makeWildcardPattern } = require("../ast");
+    const pat = makeWildcardPattern();
+    expect(pat.kind).toBe("wildcard-pattern");
+  });
+
+  test("makeListPattern 헬퍼", () => {
+    const { makeListPattern, makeLiteralPattern } = require("../ast");
+    const elem = makeLiteralPattern("number", 1);
+    const pat = makeListPattern([elem], "$rest");
+    expect(pat.kind).toBe("list-pattern");
+    expect(pat.restElement).toBe("$rest");
+  });
+
+  test("makeOrPattern 헬퍼", () => {
+    const { makeOrPattern, makeLiteralPattern } = require("../ast");
+    const a = makeLiteralPattern("number", 1);
+    const b = makeLiteralPattern("number", 2);
+    const pat = makeOrPattern([a, b]);
+    expect(pat.kind).toBe("or-pattern");
+    expect(pat.alternatives).toHaveLength(2);
+  });
+
+  test("makePatternMatch 헬퍼", () => {
+    const { makePatternMatch, makeMatchCase, makeWildcardPattern, makeSExpr } = require("../ast");
+    const body = makeSExpr("str", []);
+    const mc = makeMatchCase(makeWildcardPattern(), body);
+    const pm = makePatternMatch(makeSExpr("+", []), [mc]);
+    expect(pm.kind).toBe("pattern-match");
+    expect(pm.cases).toHaveLength(1);
+  });
+
+  test("makeTypeClass 헬퍼", () => {
+    const { makeTypeClass } = require("../ast");
+    const tc = makeTypeClass("Functor", ["f"], new Map());
+    expect(tc.kind).toBe("type-class");
+    expect(tc.name).toBe("Functor");
+  });
+
+  test("makeModuleBlock 헬퍼", () => {
+    const { makeModuleBlock } = require("../ast");
+    const mb = makeModuleBlock("mymod", ["fn1"], [], "mymod.fl");
+    expect(mb.kind).toBe("module");
+    expect(mb.name).toBe("mymod");
+  });
+
+  test("makeImportBlock 헬퍼", () => {
+    const { makeImportBlock } = require("../ast");
+    const ib = makeImportBlock("mymod", "mymod.fl", ["fn1"], "m");
+    expect(ib.kind).toBe("import");
+    expect(ib.moduleName).toBe("mymod");
+  });
+
+  test("makeOpenBlock 헬퍼", () => {
+    const { makeOpenBlock } = require("../ast");
+    const ob = makeOpenBlock("mymod", "mymod.fl");
+    expect(ob.kind).toBe("open");
+    expect(ob.moduleName).toBe("mymod");
+  });
+
+  test("isReasoningSequence 타입 가드", () => {
+    const { isReasoningSequence } = require("../ast");
+    expect(isReasoningSequence({ kind: "reasoning-sequence" })).toBe(true);
+    expect(isReasoningSequence({ kind: "reasoning-block" })).toBe(false);
+  });
+
+  test("isTryBlock 타입 가드", () => {
+    const { isTryBlock } = require("../ast");
+    expect(isTryBlock({ kind: "try-block" })).toBe(true);
+    expect(isTryBlock({ kind: "reasoning-block" })).toBe(false);
+  });
+
+  test("isThrowExpression 타입 가드", () => {
+    const { isThrowExpression } = require("../ast");
+    expect(isThrowExpression({ kind: "throw" })).toBe(true);
+    expect(isThrowExpression({ kind: "try-block" })).toBe(false);
   });
 });
 
@@ -200,6 +394,170 @@ describe("인터프리터 — 고급 스코프", () => {
       (define add3 (fn [$x] (+ $x 3)))
       (pipe 0 add3 add3)
     `)).toBe(6);
+  });
+});
+
+describe("eval-special-forms — while/while-like 추가", () => {
+  test("while 루프 직접 사용", () => {
+    // while 폼 직접 테스트
+    expect(run(`
+      (define n 0)
+      (while (< $n 5)
+        (set! n (+ $n 1)))
+      (+ $n 0)
+    `)).toBe(5);
+  });
+
+  test("while 루프 합산", () => {
+    expect(run(`
+      (define i 1)
+      (define total 0)
+      (while (<= $i 10)
+        (set! total (+ $total $i))
+        (set! i (+ $i 1)))
+      (+ $total 0)
+    `)).toBe(55);
+  });
+
+  test("map comprehension 3-arg 형식", () => {
+    expect(run("(map (list 1 2 3 4 5) [$x] (* $x $x))")).toEqual([1, 4, 9, 16, 25]);
+  });
+
+  test("defmacro 기본 정의 및 실행", () => {
+    expect(run(`
+      (defmacro my-if [$cond $then $else]
+        (if $cond $then $else))
+      (my-if true "yes" "no")
+    `)).toBe("yes");
+  });
+});
+
+describe("eval-builtins — 추가 케이스 2", () => {
+  test("json_keys 빈 객체", () => {
+    expect(run("(json_keys {})")).toEqual([]);
+  });
+
+  test("assoc 기존 키 덮어쓰기", () => {
+    expect(run("(get (assoc (assoc {} \"a\" 1) \"a\" 2) \"a\")")).toBe(2);
+  });
+
+  test("slice 배열 경계", () => {
+    expect(run("(slice (list 1 2 3 4 5) 0 5)")).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test("find 배열에서 값 탐색 — 인덱스 반환", () => {
+    expect(run("(find (list 10 20 30) 20)")).toBe(1);
+  });
+
+  test("num + bool 처리", () => {
+    expect(run("(bool 0)")).toBe(false);
+    expect(run("(bool \"\")")).toBe(false);
+    expect(run("(bool \"non-empty\")")).toBe(true);
+  });
+
+  test("html-response", () => {
+    expect(run("(html-response \"<p>hello</p>\")")).toEqual({ html: "<p>hello</p>" });
+  });
+
+  test("json-response 객체", () => {
+    expect(run("(json-response (assoc {} \"a\" 1))")).toMatchObject({ a: 1 });
+  });
+
+  test("json-response 배열 → 객체 변환", () => {
+    expect(run("(json-response (list \"a\" 1 \"b\" 2))")).toMatchObject({ a: 1, b: 2 });
+  });
+
+  test("now 시간 문자열", () => {
+    const result = run("(now)");
+    expect(typeof result).toBe("string");
+    expect(result).toMatch(/^\d{4}-/); // ISO 날짜 형식
+  });
+
+  test("server-uptime 숫자", () => {
+    const result = run("(server-uptime)");
+    expect(typeof result).toBe("number");
+    expect(result).toBeGreaterThanOrEqual(0);
+  });
+
+  test("char-at 경계 — 빈 문자열", () => {
+    expect(run("(char-at \"\" 0)")).toBe("");
+  });
+
+  test("index-of 문자열 탐색", () => {
+    expect(run("(index-of \"hello world\" \" \")")).toBe(5);
+  });
+
+  test("filter 비함수 → 원본 반환", () => {
+    // filter의 두 번째 인자가 함수 아니면 원본 배열 반환
+    expect(run("(filter (list 1 2 3) null)")).toEqual([1, 2, 3]);
+  });
+
+  test("find 비배열 → -1", () => {
+    expect(run("(find \"not-array\" 1)")).toBe(-1);
+  });
+
+  test("get null → null", () => {
+    expect(run("(get null \"key\")")).toBeNull();
+  });
+
+  test("assoc 비객체 → 새 맵", () => {
+    expect(run("(assoc null \"a\" 1)")).toMatchObject({ a: 1 });
+  });
+
+  test("dissoc 비객체 → 빈 객체 반환", () => {
+    // null은 args[0] ?? {} → {} 반환
+    expect(run("(dissoc null \"a\")")).toEqual({});
+  });
+
+  test("pop 빈 배열 → null", () => {
+    expect(run("(pop (list))")).toBeNull();
+  });
+
+  test("shift 빈 배열 → null", () => {
+    expect(run("(shift (list))")).toBeNull();
+  });
+
+  test("tan 삼각함수", () => {
+    expect(run("(tan 0)")).toBeCloseTo(0);
+  });
+
+  test("random 범위 [0, 1)", () => {
+    const r = run("(random)");
+    expect(r).toBeGreaterThanOrEqual(0);
+    expect(r).toBeLessThan(1);
+  });
+
+  test("reverse 비배열 — 빈 배열 반환", () => {
+    // 비배열 인자에 reverse 호출
+    expect(run("(reverse null)")).toEqual([]);
+  });
+
+  test("char-code 빈 문자열 → 에러", () => {
+    expect(() => run("(char-code \"\")")).toThrow();
+  });
+
+  test("str-split 비문자열 → 빈 배열", () => {
+    expect(run("(str-split null \",\")")).toEqual([]);
+  });
+
+  test("join 비배열 → 빈 문자열", () => {
+    expect(run("(join null \"-\")")).toBe("");
+  });
+
+  test("trim 비문자열 → 빈 문자열", () => {
+    expect(run("(trim null)")).toBe("");
+  });
+
+  test("contains? 비문자열/비배열 → false", () => {
+    expect(run("(contains? null \"a\")")).toBe(false);
+  });
+
+  test("starts-with? 비문자열 → false", () => {
+    expect(run("(starts-with? null \"a\")")).toBe(false);
+  });
+
+  test("ends-with? 비문자열 → false", () => {
+    expect(run("(ends-with? null \"a\")")).toBe(false);
   });
 });
 
