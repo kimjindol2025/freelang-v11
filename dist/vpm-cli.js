@@ -159,7 +159,18 @@ class VpmCli {
                 // Extract package name from "name@version" format
                 const lastAtIndex = pkgName.lastIndexOf('@');
                 const pkgNameOnly = lastAtIndex > 0 ? pkgName.substring(0, lastAtIndex) : pkgName;
-                await this.downloadAndExtract(pkgNameOnly, pkgData.version, pkgData, pkgData.integrity);
+                // Fetch package info from registry to get registry checksum
+                const pkgInfo = await this.fetchPackageInfo(pkgNameOnly, pkgData.version);
+                if (!pkgInfo) {
+                    throw new Error(`Package ${pkgNameOnly}@${pkgData.version} not found in registry`);
+                }
+                // Get registry checksum from fetched info
+                let registryChecksum;
+                if (pkgInfo.versions && Array.isArray(pkgInfo.versions)) {
+                    const versionEntry = pkgInfo.versions.find((v) => v.version === pkgData.version);
+                    registryChecksum = versionEntry && versionEntry.checksum;
+                }
+                await this.downloadAndExtract(pkgNameOnly, pkgData.version, pkgInfo, registryChecksum);
                 count++;
             }
         }
