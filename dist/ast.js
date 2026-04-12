@@ -1,6 +1,7 @@
 "use strict";
 // FreeLang v9: AST Node definitions
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.CONTROL_BLOCK_TYPES = void 0;
 exports.makeLiteral = makeLiteral;
 exports.makeVariable = makeVariable;
 exports.makeSExpr = makeSExpr;
@@ -48,6 +49,7 @@ exports.isReasoningSequence = isReasoningSequence;
 exports.isTryBlock = isTryBlock;
 exports.isCatchClause = isCatchClause;
 exports.isThrowExpression = isThrowExpression;
+exports.isControlBlock = isControlBlock;
 // Helpers
 function makeLiteral(type, value) {
     return { kind: "literal", type, value };
@@ -61,8 +63,8 @@ function makeSExpr(op, args, line) {
 function makeKeyword(name) {
     return { kind: "keyword", name };
 }
-function makeBlock(type, name, fields) {
-    return { kind: "block", type, name, fields };
+function makeBlock(type, name, fields, line) {
+    return { kind: "block", type, name, fields, line };
 }
 // Helper: Create type annotation (Phase 3)
 function makeTypeAnnotation(name, generic, union, optional) {
@@ -238,5 +240,14 @@ function isCatchClause(node) {
 // ThrowExpression 타입 가드 (NEW for Phase 11)
 function isThrowExpression(node) {
     return node && node.kind === "throw";
+}
+// 제어 블록 타입 목록 (eval()에서 직접 평가되어서는 안 되는 블록들)
+exports.CONTROL_BLOCK_TYPES = [
+    "FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE",
+    "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"
+];
+// 제어 블록 타입 가드 (이미 Block임을 알고 있을 때)
+function isControlBlock(node) {
+    return exports.CONTROL_BLOCK_TYPES.includes(node.type);
 }
 //# sourceMappingURL=ast.js.map

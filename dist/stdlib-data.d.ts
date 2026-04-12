@@ -8,7 +8,9 @@ export declare function createDataModule(): {
     json_deep_merge: (obj1: any, obj2: any) => any;
     json_keys: (obj: any) => string[];
     json_vals: (obj: any) => any[];
+    json_parse: (str: string) => any;
     json_str: (obj: any) => string;
+    json_stringify: (obj: any) => string;
     json_pretty: (obj: any) => string;
     json_has: (obj: any, key: string) => boolean;
     json_del: (obj: any, key: string) => any;

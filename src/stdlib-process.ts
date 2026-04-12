@@ -88,5 +88,12 @@ export function createProcessModule() {
     "process_exit": (code?: number): never => process.exit(code ?? 0),
 
     "process_argv": (): string[] => process.argv.slice(2),
+
+    "process_argv_get": (key: string, defaultVal: any = null): any => {
+      const args = process.argv.slice(2);
+      const idx = args.indexOf(key);
+      if (idx === -1 || idx + 1 >= args.length) return defaultVal;
+      return args[idx + 1];
+    },
   };
 }

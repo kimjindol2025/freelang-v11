@@ -1,0 +1,143 @@
+; Phase 7 Stage 5: Semver Resolver (minimal implementation)
+; Supported: exact, ^, ~, latest
+; Test: find-best-version with constraint matching
+
+[FUNC parse-version :params [$version_str]
+  :body (do
+    ; Parse "1.2.3" → {major: 1, minor: 2, patch: 3}
+    (let [
+        [$s (string-trim $version_str)]
+        [$parts (if (string-includes? $s ".") (string-split $s ".") [])]
+      ]
+      {
+        :original $version_str
+        :major (if (>= (length $parts) 1) (string-to-number (get $parts 0)) 0)
+        :minor (if (>= (length $parts) 2) (string-to-number (get $parts 1)) 0)
+        :patch (if (>= (length $parts) 3) (string-to-number (get $parts 2)) 0)
+      }
+    )
+  )
+]
+
+[FUNC compare-versions :params [$v1 $v2]
+  :body (do
+    ; Returns: 1 if v1 > v2, 0 if equal, -1 if v1 < v2
+    (let [
+        [$m1 (get $v1 "major" 0)]
+        [$m2 (get $v2 "major" 0)]
+      ]
+      (cond
+        [(> $m1 $m2) 1]
+        [(< $m1 $m2) -1]
+        [true (do
+          (let [
+              [$n1 (get $v1 "minor" 0)]
+              [$n2 (get $v2 "minor" 0)]
+            ]
+            (cond
+              [(> $n1 $n2) 1]
+              [(< $n1 $n2) -1]
+              [true (do
+                (let [
+                    [$p1 (get $v1 "patch" 0)]
+                    [$p2 (get $v2 "patch" 0)]
+                  ]
+                  (cond
+                    [(> $p1 $p2) 1]
+                    [(< $p1 $p2) -1]
+                    [true 0]
+                  )
+                )
+              )]
+            )
+          )
+        )]
+      )
+    )
+  )
+]
+
+[FUNC matches-constraint :params [$version $constraint]
+  :body (do
+    ; Check if version matches constraint (exact, caret, tilde, latest)
+    (let [
+        [$c (string-trim $constraint)]
+        [$v_parsed (parse-version $version)]
+      ]
+      (cond
+        [(= $c "latest") true]
+        [(string-starts-with? $c "^") (do
+          (let [
+              [$c_parsed (parse-version (substring $c 1))]
+              [$cmp (compare-versions $v_parsed $c_parsed)]
+            ]
+            (and (>= $cmp 0) (= (get $v_parsed "major") (get $c_parsed "major")))
+          )
+        )]
+        [(string-starts-with? $c "~") (do
+          (let [
+              [$c_parsed (parse-version (substring $c 1))]
+              [$cmp (compare-versions $v_parsed $c_parsed)]
+            ]
+            (and (>= $cmp 0)
+              (= (get $v_parsed "major") (get $c_parsed "major"))
+              (= (get $v_parsed "minor") (get $c_parsed "minor")))
+          )
+        )]
+        [true (= (compare-versions $v_parsed (parse-version $c)) 0)]
+      )
+    )
+  )
+]
+
+[FUNC find-best-version :params [$versions $constraint]
+  :body (do
+    ; Find highest version matching constraint
+    (let [
+        [$matching []]
+      ]
+      (do
+        (for-each $versions (lambda [$v]
+          (if (matches-constraint (get $v "version") $constraint)
+            (array-push $matching $v)
+            true
+          )
+        ))
+
+        (if (= (length $matching) 0)
+          nil
+          (do
+            (let [
+                [$best (get $matching 0)]
+              ]
+              (do
+                (for-each $matching (lambda [$candidate]
+                  (if (> (compare-versions
+                    (parse-version (get $candidate "version"))
+                    (parse-version (get $best "version")))
+                  0)
+                    (set $best $candidate)
+                    true
+                  )
+                ))
+                $best
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+; Helper functions
+[FUNC string-trim :params [$s] :body $s]
+[FUNC string-includes? :params [$s $sub] :body (string-includes $s $sub)]
+[FUNC string-starts-with? :params [$s $prefix] :body (= (substring $s 0 (length $prefix)) $prefix)]
+[FUNC string-split :params [$s $sep] :body (split $s $sep)]
+[FUNC string-to-number :params [$s] :body (int $s)]
+
+{ :parse-version parse-version
+  :compare-versions compare-versions
+  :matches-constraint matches-constraint
+  :find-best-version find-best-version }

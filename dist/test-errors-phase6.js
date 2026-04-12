@@ -21,7 +21,7 @@ console.log("");
 try {
     const tokens = (0, lexer_1.lex)(importNonExistentModule);
     const ast = (0, parser_1.parse)(tokens);
-    const interp = new interpreter_1.Interpreter(undefined, new logger_1.NoOpLogger());
+    const interp = new interpreter_1.Interpreter(new logger_1.NoOpLogger());
     interp.interpret(ast);
     console.log("❌ Error: Expected ModuleNotFoundError but none was thrown");
 }
@@ -57,7 +57,7 @@ console.log("");
 try {
     const tokens = (0, lexer_1.lex)(selectiveImportError);
     const ast = (0, parser_1.parse)(tokens);
-    const interp = new interpreter_1.Interpreter(undefined, new logger_1.NoOpLogger());
+    const interp = new interpreter_1.Interpreter(new logger_1.NoOpLogger());
     const ctx = interp.interpret(ast);
     // Check if functions were imported (should be empty since nonexistent doesn't exist)
     const hasNonexistent = ctx.functions.has("math:nonexistent");
@@ -82,7 +82,7 @@ console.log("");
 try {
     const tokens = (0, lexer_1.lex)(importWithSource);
     const ast = (0, parser_1.parse)(tokens);
-    const interp = new interpreter_1.Interpreter(undefined, new logger_1.NoOpLogger());
+    const interp = new interpreter_1.Interpreter(new logger_1.NoOpLogger());
     interp.interpret(ast);
     console.log("❌ Error: Expected ModuleNotFoundError but none was thrown");
 }
@@ -110,7 +110,7 @@ console.log("");
 try {
     const tokens = (0, lexer_1.lex)(openNonExistentModule);
     const ast = (0, parser_1.parse)(tokens);
-    const interp = new interpreter_1.Interpreter(undefined, new logger_1.NoOpLogger());
+    const interp = new interpreter_1.Interpreter(new logger_1.NoOpLogger());
     interp.interpret(ast);
     console.log("❌ Error: Expected ModuleNotFoundError but none was thrown");
 }

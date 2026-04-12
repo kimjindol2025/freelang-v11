@@ -83,6 +83,9 @@ function lex(source) {
                         case "t":
                             value += "\t";
                             break;
+                        case "r":
+                            value += "\r";
+                            break;
                         case "\\":
                             value += "\\";
                             break;
@@ -203,10 +206,10 @@ function lex(source) {
         // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
         // NOTE: '|' excluded - it's a separate Pipe token for or-patterns
         // NOTE: '.' included for field access: env.vars, node.op (self-hosting .fl files)
-        if (/[a-zA-Z_<>=!+\-*&/]/.test(ch)) {
+        if (/[a-zA-Z_<>=!+\-*&/%]/.test(ch)) {
             const start = i;
             const startCol = col;
-            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&.]/.test(source[i])) {
+            while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&.%]/.test(source[i])) {
                 i++;
                 col++;
             }

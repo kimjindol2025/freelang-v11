@@ -677,3 +677,14 @@ export function isCatchClause(node: any): node is CatchClause {
 export function isThrowExpression(node: any): node is ThrowExpression {
   return node && node.kind === "throw";
 }
+
+// 제어 블록 타입 목록 (eval()에서 직접 평가되어서는 안 되는 블록들)
+export const CONTROL_BLOCK_TYPES: string[] = [
+  "FUNC", "SERVER", "ROUTE", "INTENT", "MIDDLEWARE",
+  "WEBSOCKET", "ERROR-HANDLER", "TYPECLASS", "INSTANCE", "MODULE"
+];
+
+// 제어 블록 타입 가드 (이미 Block임을 알고 있을 때)
+export function isControlBlock(node: Block): boolean {
+  return CONTROL_BLOCK_TYPES.includes(node.type);
+}

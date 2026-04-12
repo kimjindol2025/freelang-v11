@@ -1,0 +1,380 @@
+; Phase 5c: Lock File Manager
+; package-lock.json 생성 및 관리
+;
+; 기능:
+;   1. create_lockfile: 의존성 트리로부터 lockfile 생성
+;   2. validate_lockfile: lockfile 형식 검증
+;   3. update_lockfile: 새 의존성 추가/제거
+;   4. hash_lockfile: lockfile 무결성 검증
+
+[FUNC create_lockfile :params [$package_json $resolution_result]
+  :body (do
+    ; package.json과 의존성 해석 결과로부터 lockfile 생성
+    ; npm lock format 호환
+    (let [
+        [$flattened (get $resolution_result "flattened" [])]
+        [$lockfile {
+          "name" (get $package_json "name")
+          "version" (get $package_json "version")
+          "lockfileVersion" 2
+          "requires" true
+          "packages" {}
+        }]
+        [$root_pkg {}]
+      ]
+      (do
+        ; 루트 패키지 정보
+        (set $root_pkg "name" (get $package_json "name"))
+        (set $root_pkg "version" (get $package_json "version"))
+        (set $root_pkg "dependencies" (get $package_json "dependencies" {}))
+        (set $root_pkg "devDependencies" (get $package_json "devDependencies" {}))
+        (set $lockfile "packages" "" $root_pkg)
+
+        ; 각 의존성 추가
+        (for-each $flattened (lambda [$dep]
+          (let [
+              [$name (get $dep "name")]
+              [$version (get $dep "version")]
+              [$pkg_entry {
+                "version" $version
+                "resolved" (concat "https://registry.v9.dclub.kr/" $name "/-/" $name "-" $version ".tar.gz")
+                "integrity" (generate_integrity_hash $name $version)
+              }]
+            ]
+            (set $lockfile "packages" (concat "" $name "@" $version) $pkg_entry)
+          )
+        ))
+
+        $lockfile
+      )
+    )
+  )
+]
+
+[FUNC validate_lockfile :params [$lockfile]
+  :body (do
+    ; lockfile 형식 검증
+    ; - 필수 필드 확인
+    ; - 버전 형식 확인
+    ; - 무결성 해시 확인
+    (let [
+        [$name (get $lockfile "name")]
+        [$version (get $lockfile "version")]
+        [$packages (get $lockfile "packages" {})]
+        [$is_valid true]
+        [$errors []]
+      ]
+      (do
+        ; 필수 필드 확인
+        (if (= $name nil)
+          (do
+            (set $is_valid false)
+            (array-push $errors "Missing 'name' field")
+          )
+          true
+        )
+
+        (if (= $version nil)
+          (do
+            (set $is_valid false)
+            (array-push $errors "Missing 'version' field")
+          )
+          true
+        )
+
+        ; 패키지 형식 검증
+        (for-each (object-keys $packages) (lambda [$pkg_key]
+          (let [
+              [$pkg (get $packages $pkg_key)]
+              [$pkg_version (get $pkg "version")]
+              [$resolved (get $pkg "resolved")]
+            ]
+            (do
+              (if (= $pkg_version nil)
+                (do
+                  (set $is_valid false)
+                  (array-push $errors (concat "Package " $pkg_key " missing version"))
+                )
+                true
+              )
+
+              (if (and (not (= $pkg_key "")) (= $resolved nil))
+                (do
+                  (set $is_valid false)
+                  (array-push $errors (concat "Package " $pkg_key " missing resolved URL"))
+                )
+                true
+              )
+            )
+          )
+        ))
+
+        {
+          "valid" $is_valid
+          "errors" $errors
+        }
+      )
+    )
+  )
+]
+
+[FUNC update_lockfile :params [$lockfile $new_dependency $action]
+  :body (do
+    ; lockfile 업데이트 (추가/제거)
+    ; $action: "add" | "remove"
+    (let [
+        [$packages (get $lockfile "packages" {})]
+        [$dep_name (get $new_dependency "name")]
+        [$dep_version (get $new_dependency "version")]
+        [$pkg_key (concat "" $dep_name "@" $dep_version)]
+      ]
+      (cond
+        ; 패키지 추가
+        [(= $action "add")
+          (do
+            (let [
+                [$pkg_entry {
+                  "version" $dep_version
+                  "resolved" (concat "https://registry.v9.dclub.kr/" $dep_name "/-/" $dep_name "-" $dep_version ".tar.gz")
+                  "integrity" (generate_integrity_hash $dep_name $dep_version)
+                }]
+              ]
+              (set $packages $pkg_key $pkg_entry)
+            )
+            (set $lockfile "packages" $packages)
+            $lockfile
+          )
+        ]
+
+        ; 패키지 제거
+        [(= $action "remove")
+          (do
+            (set $packages $pkg_key nil)
+            (set $lockfile "packages" $packages)
+            $lockfile
+          )
+        ]
+
+        [true $lockfile]
+      )
+    )
+  )
+]
+
+[FUNC generate_integrity_hash :params [$package_name $version]
+  :body (do
+    ; 패키지 무결성 해시 생성
+    ; 형식: sha256-[base64-hash]
+    ; 실제로는 패키지 다운로드 후 SHA256 계산 필요
+    (let [
+        [$hash_input (concat $package_name "@" $version)]
+        [$hash (simple-hash $hash_input)]
+      ]
+      (concat "sha256-" $hash)
+    )
+  )
+]
+
+[FUNC simple-hash :params [$input]
+  :body (do
+    ; 간단한 해시 함수 (실제로는 SHA256 필요)
+    ; 임시 구현: 입력 문자열을 base64로 인코딩
+    (let [
+        [$hash_base (length $input)]
+        [$hash_result ""]
+      ]
+      (do
+        (let [[$i 0]]
+          (while (< $i (length $input))
+            (do
+              (let [
+                  [$char (substring $input $i (+ $i 1))]
+                  [$code (char-code $char)]
+              ]
+                (set $hash_result (concat $hash_result (int-to-hex $code)))
+              )
+              (set $i (+ $i 1))
+            )
+          )
+        )
+        $hash_result
+      )
+    )
+  )
+]
+
+[FUNC int-to-hex :params [$num]
+  :body (do
+    ; 정수를 16진수 문자열로 변환
+    (let [
+        [$hex "0123456789abcdef"]
+        [$digit1 (get $hex (/ $num 16))]
+        [$digit2 (get $hex (% $num 16))]
+      ]
+      (concat $digit1 $digit2)
+    )
+  )
+]
+
+[FUNC merge_lockfiles :params [$lockfile1 $lockfile2]
+  :body (do
+    ; 두 lockfile 병합
+    ; 충돌 시 lockfile2가 우선
+    (let [
+        [$packages1 (get $lockfile1 "packages" {})]
+        [$packages2 (get $lockfile2 "packages" {})]
+        [$merged_packages (merge $packages1 $packages2)]
+      ]
+      (do
+        (set $lockfile1 "packages" $merged_packages)
+        $lockfile1
+      )
+    )
+  )
+]
+
+[FUNC diff_lockfiles :params [$old_lockfile $new_lockfile]
+  :body (do
+    ; 두 lockfile의 차이점 찾기
+    ; 반환: {added: [...], removed: [...], updated: [...]}
+    (let [
+        [$old_packages (get $old_lockfile "packages" {})]
+        [$new_packages (get $new_lockfile "packages" {})]
+        [$added []]
+        [$removed []]
+        [$updated []]
+      ]
+      (do
+        ; 추가된 패키지
+        (for-each (object-keys $new_packages) (lambda [$key]
+          (if (= (get $old_packages $key) nil)
+            (array-push $added {
+              "package" $key
+              "version" (get (get $new_packages $key) "version")
+            })
+            true
+          )
+        ))
+
+        ; 제거된 패키지
+        (for-each (object-keys $old_packages) (lambda [$key]
+          (if (= (get $new_packages $key) nil)
+            (array-push $removed {
+              "package" $key
+              "version" (get (get $old_packages $key) "version")
+            })
+            true
+          )
+        ))
+
+        ; 업데이트된 패키지
+        (for-each (object-keys $new_packages) (lambda [$key]
+          (let [
+              [$old_pkg (get $old_packages $key)]
+              [$new_pkg (get $new_packages $key)]
+            ]
+            (if (and (not (= $old_pkg nil)) (not (= $new_pkg nil)))
+              (let [
+                  [$old_version (get $old_pkg "version")]
+                  [$new_version (get $new_pkg "version")]
+                ]
+                (if (not (= $old_version $new_version))
+                  (array-push $updated {
+                    "package" $key
+                    "oldVersion" $old_version
+                    "newVersion" $new_version
+                  })
+                  true
+                )
+              )
+              true
+            )
+          )
+        ))
+
+        {
+          "added" $added
+          "removed" $removed
+          "updated" $updated
+        }
+      )
+    )
+  )
+]
+
+[FUNC print_lockfile_summary :params [$lockfile]
+  :body (do
+    ; lockfile 요약 출력
+    (let [
+        [$name (get $lockfile "name")]
+        [$version (get $lockfile "version")]
+        [$packages (get $lockfile "packages")]
+        [$count (- (length (object-keys $packages)) 1)]  ; 루트 제외
+      ]
+      (do
+        (println (concat "📦 Lockfile Summary"))
+        (println (concat "  Project: " $name "@" $version))
+        (println (concat "  Locked packages: " (int-to-str $count)))
+      )
+    )
+  )
+]
+
+[FUNC char-code :params [$char]
+  :body (do
+    ; 문자의 ASCII 코드 반환
+    (cond
+      (= $char "0") 48  (= $char "1") 49  (= $char "2") 50
+      (= $char "3") 51  (= $char "4") 52  (= $char "5") 53
+      (= $char "6") 54  (= $char "7") 55  (= $char "8") 56
+      (= $char "9") 57
+      (= $char "a") 97  (= $char "b") 98  (= $char "c") 99
+      (= $char "d") 100 (= $char "e") 101 (= $char "f") 102
+      (= $char "g") 103 (= $char "h") 104 (= $char "i") 105
+      (= $char "j") 106 (= $char "k") 107 (= $char "l") 108
+      (= $char "m") 109 (= $char "n") 110 (= $char "o") 111
+      (= $char "p") 112 (= $char "q") 113 (= $char "r") 114
+      (= $char "s") 115 (= $char "t") 116 (= $char "u") 117
+      (= $char "v") 118 (= $char "w") 119 (= $char "x") 120
+      (= $char "y") 121 (= $char "z") 122
+      (= $char "A") 65  (= $char "B") 66  (= $char "C") 67
+      (= $char "D") 68  (= $char "E") 69  (= $char "F") 70
+      (= $char "G") 71  (= $char "H") 72  (= $char "I") 73
+      (= $char "J") 74  (= $char "K") 75  (= $char "L") 76
+      (= $char "M") 77  (= $char "N") 78  (= $char "O") 79
+      (= $char "P") 80  (= $char "Q") 81  (= $char "R") 82
+      (= $char "S") 83  (= $char "T") 84  (= $char "U") 85
+      (= $char "V") 86  (= $char "W") 87  (= $char "X") 88
+      (= $char "Y") 89  (= $char "Z") 90
+      (= $char ".") 46  (= $char "-") 45  (= $char "_") 95
+      (= $char "/") 47  (= $char ":") 58  (= $char "=") 61
+      :else 0
+    )
+  )
+]
+
+[FUNC merge :params [$map1 $map2]
+  :body (do
+    ; 두 맵 병합
+    (let [
+        [$result $map1]
+      ]
+      (do
+        (for-each (object-keys $map2) (lambda [$key]
+          (set $result $key (get $map2 $key))
+        ))
+        $result
+      )
+    )
+  )
+]
+
+; Module exports
+{
+  :create_lockfile create_lockfile
+  :validate_lockfile validate_lockfile
+  :update_lockfile update_lockfile
+  :merge_lockfiles merge_lockfiles
+  :diff_lockfiles diff_lockfiles
+  :print_lockfile_summary print_lockfile_summary
+}

@@ -8,6 +8,7 @@ export declare function createProcessModule(): {
     process_pid: () => number;
     process_exit: (code?: number) => never;
     process_argv: () => string[];
+    process_argv_get: (key: string, defaultVal?: any) => any;
 };
 export {};
 //# sourceMappingURL=stdlib-process.d.ts.map

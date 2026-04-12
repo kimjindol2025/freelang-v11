@@ -71,8 +71,21 @@ function createDataModule() {
             const o = typeof obj === "string" ? JSON.parse(obj) : obj;
             return Object.values(o);
         },
+        // json_parse str -> object (parse JSON string to object)
+        "json_parse": (str) => {
+            try {
+                return JSON.parse(str);
+            }
+            catch (e) {
+                throw new Error(`json_parse: invalid JSON: ${e.message}`);
+            }
+        },
         // json_str obj -> string (serialize to JSON string)
         "json_str": (obj) => {
+            return JSON.stringify(obj);
+        },
+        // json_stringify obj -> string (alias for json_str)
+        "json_stringify": (obj) => {
             return JSON.stringify(obj);
         },
         // json_pretty obj -> string (pretty-print JSON)

@@ -84,6 +84,7 @@ export declare class LearnedFactsStore {
     private saveToFile;
     /**
      * Private: Start auto-save timer
+     * unref() = allow process to exit even if timer is active
      */
     private startAutoSave;
 }

@@ -4,7 +4,20 @@ export declare class ParserError extends Error {
     line: number;
     col: number;
     hint?: string | undefined;
-    constructor(message: string, line: number, col: number, hint?: string | undefined);
+    code?: string | undefined;
+    stage: string;
+    constructor(message: string, line: number, col: number, hint?: string | undefined, code?: string | undefined, stage?: string);
+    toJSON(): {
+        code: string;
+        stage: string;
+        message: string;
+        file: undefined;
+        line: number;
+        column: number;
+        symbol: undefined;
+        cause: undefined;
+        hint: string | undefined;
+    };
 }
 export declare class Parser {
     private pos;

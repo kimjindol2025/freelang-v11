@@ -1,0 +1,211 @@
+; Phase 5: Error System Test
+; 에러 모듈 검증
+
+; === Error Functions (from error.fl) ===
+
+[FUNC make-error :params [
+  $code
+  $stage
+  $message
+  $symbol
+  $file
+  $line
+  $column
+  $cause
+  $hint
+]
+  :body {
+    :code $code
+    :stage $stage
+    :message $message
+    :symbol $symbol
+    :file $file
+    :line $line
+    :column $column
+    :cause $cause
+    :hint $hint
+  }
+]
+
+[FUNC analysis-error :params [$code $message $symbol $file $line $hint]
+  :body (make-error $code "analysis" $message $symbol $file $line nil nil $hint)
+]
+
+[FUNC runtime-error :params [$code $message $symbol $cause $hint]
+  :body (make-error $code "runtime" $message $symbol nil nil nil $cause $hint)
+]
+
+[FUNC package-resolve-error :params [$package $constraint $available]
+  :body (make-error
+    "E_PACKAGE_VERSION_CONFLICT"
+    "package_resolve"
+    (concat "Cannot resolve " $package " with constraint " $constraint)
+    $package
+    nil nil nil
+    nil
+    (concat "Available versions: " (get $available 0))
+  )
+]
+
+[FUNC package-verify-error :params [$package $version $expected_hash $actual_hash]
+  :body (make-error
+    "E_PACKAGE_VERIFY_CHECKSUM_FAILED"
+    "package_verify"
+    (concat "Checksum mismatch for " $package "@" $version)
+    $package
+    nil nil nil
+    (concat "Expected: " $expected_hash ", Got: " $actual_hash)
+    "Package may be corrupted. Re-fetch recommended."
+  )
+]
+
+[FUNC format-error-human :params [$err]
+  :body (do
+    (let [
+        [$code (get $err "code")]
+        [$stage (get $err "stage")]
+        [$msg (get $err "message")]
+        [$line (get $err "line")]
+        [$col (get $err "column")]
+        [$file (get $err "file")]
+        [$hint (get $err "hint")]
+      ]
+      (concat
+        "❌ [" $stage ":" $code "]" "\n"
+        "  " $msg "\n"
+        (if (and $file $line) (concat "  at " $file ":" (int-to-str $line) ":" (int-to-str $col) "\n") "")
+        (if $hint (concat "  hint: " $hint "\n") "")
+      )
+    )
+  )
+]
+
+[FUNC format-error-json :params [$err]
+  :body (concat "JSON: " (get $err "code") " | " (get $err "stage") " | " (get $err "message"))
+]
+
+[FUNC int-to-str :params [$n]
+  :body (concat "" $n)
+]
+
+; === Tests ===
+
+[FUNC test-make-error :params []
+  :body (do
+    (println "\n=== Test: make-error ===")
+
+    ; Parse error
+    (let [[$err (make-error
+      "E_PARSE_UNEXPECTED_TOKEN"
+      "parse"
+      "Unexpected token: Expected RParen"
+      nil
+      nil
+      5
+      23
+      nil
+      "Check closing parenthesis"
+    )]]
+      (do
+        (println (concat "Code: " (get $err "code")))
+        (println (concat "Stage: " (get $err "stage")))
+        (println (concat "Message: " (get $err "message")))
+        (println (concat "Line: " (int-to-str (get $err "line"))))
+        (println (concat "Column: " (int-to-str (get $err "column"))))
+      )
+    )
+  )
+]
+
+[FUNC test-package-resolve-error :params []
+  :body (do
+    (println "\n=== Test: package-resolve-error ===")
+
+    (let [
+        [$err (package-resolve-error "lodash" "^4.0.0" ["3.10.1" "4.17.15" "4.17.21"])]
+      ]
+      (do
+        (println (concat "Code: " (get $err "code")))
+        (println (concat "Stage: " (get $err "stage")))
+        (println (concat "Message: " (get $err "message")))
+        (println (concat "Symbol: " (get $err "symbol")))
+      )
+    )
+  )
+]
+
+[FUNC test-package-verify-error :params []
+  :body (do
+    (println "\n=== Test: package-verify-error ===")
+
+    (let [
+        [$err (package-verify-error
+          "react"
+          "18.2.0"
+          "sha256:abc123def456..."
+          "sha256:xyz789uvw012..."
+        )]
+      ]
+      (do
+        (println (concat "Code: " (get $err "code")))
+        (println (concat "Stage: " (get $err "stage")))
+        (println "Cause: " (get $err "cause"))
+      )
+    )
+  )
+]
+
+[FUNC test-format-error-human :params []
+  :body (do
+    (println "\n=== Test: format-error-human ===")
+
+    (let [
+        [$err (analysis-error
+          "E_RUNTIME_UNBOUND_SYMBOL"
+          "Variable 'foo' is not defined"
+          "foo"
+          "main.fl"
+          42
+          "Define 'foo' before using it"
+        )]
+      ]
+      (println (format-error-human $err))
+    )
+  )
+]
+
+[FUNC test-format-error-json :params []
+  :body (do
+    (println "\n=== Test: format-error-json ===")
+
+    (let [
+        [$err (runtime-error
+          "E_RUNTIME_TYPE_ERROR"
+          "Cannot call non-function"
+          "my-var"
+          "Expected function, got number"
+          "Ensure the variable is a function"
+        )]
+      ]
+      (println (format-error-json $err))
+    )
+  )
+]
+
+[FUNC run-all-tests :params []
+  :body (do
+    (println "🧪 Running Error System Tests...")
+    (test-make-error)
+    (test-package-resolve-error)
+    (test-package-verify-error)
+    (test-format-error-human)
+    (test-format-error-json)
+    (println "\n✅ All error tests completed!")
+  )
+]
+
+[FUNC int-to-str :params [$n]
+  :body (concat "" $n)
+]
+
+(run-all-tests)

@@ -1,20 +1,16 @@
 "use strict";
 // Phase 5 Week 4: Function Composition Tests
 // pipe 연산자 (|>) 검증 - compose는 구현되어 있으나 파서 제약으로 테스트 단순화
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const interpreter_1 = require("./interpreter");
-const express_1 = __importDefault(require("express"));
 console.log("🚀 Phase 5 Week 4: Function Composition Tests\n");
 // Helper: Parse and interpret code
 function parseAndInterpret(code) {
     const tokens = (0, lexer_1.lex)(code);
     const ast = (0, parser_1.parse)(tokens);
-    const context = (0, interpreter_1.interpret)(ast, (0, express_1.default)());
+    const context = (0, interpreter_1.interpret)(ast);
     return context;
 }
 // TEST 1: Pipe - Basic Left-to-Right

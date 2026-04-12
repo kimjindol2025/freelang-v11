@@ -1,0 +1,14 @@
+(println "=== Pure HTTP Server Test ===")
+
+[FUNC health_handler :params [$req]
+  :body (server_json { :ok true :status "running" })
+]
+
+(println "Registering routes...")
+(server_get "/health" "health_handler")
+(println "Route registered")
+
+(println "Starting server on port 3333...")
+(server_start 3333)
+(println "Server started!")
+

@@ -3,10 +3,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import express from "express";
 import { lex } from "./lexer";
 import { parse } from "./parser";
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock } from "./ast";
+import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock, isControlBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
@@ -26,13 +25,16 @@ import { createTimeModule } from "./stdlib-time"; // Phase 16: Time + Logging + 
 import { createCryptoModule } from "./stdlib-crypto"; // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
-import { createServerModule } from "./stdlib-server"; // Phase 20-21: HTTP Server + Middleware
+import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
 import { createDbModule } from "./stdlib-db";          // Phase 20: DB Driver
 import { createWsModule } from "./stdlib-ws";          // Phase 21: WebSocket
+import { createWscModule } from "./stdlib-wsc";        // Phase 57: WebSocket Client (Tunnel)
 import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (env + SIGTERM)
+import { createAsyncModule } from "./stdlib-async";     // Phase 23: Async/await primitives
+import { createModuleSystem } from "./stdlib-module";   // Phase 24: Module system
 import { pgBuiltins } from "./stdlib-pg";               // PostgreSQL + JWT + AI
 
 // ExecutionContext: 런타임 상태 관리
@@ -41,7 +43,6 @@ export interface ExecutionContext {
   routes: Map<string, FreeLangRoute>;
   intents: Map<string, Intent>;
   variables: ScopeStack;
-  app: express.Express;
   server?: any;
   middleware: FreeLangMiddleware[];
   errorHandlers: ErrorHandler;
@@ -122,14 +123,13 @@ export class Interpreter {
   private importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();
 
-  constructor(app: express.Express = express(), logger?: Logger) {
+  constructor(logger?: Logger) {
     this.logger = logger || getGlobalLogger();
     this.context = {
       functions: new Map(),
       routes: new Map(),
       intents: new Map(),
       variables: new ScopeStack(),
-      app,
       middleware: [],
       errorHandlers: { handlers: new Map() },
       startTime: Date.now(),
@@ -160,13 +160,20 @@ export class Interpreter {
     this.registerModule(createCryptoModule());
     this.registerModule(createWorkflowModule());
     this.registerModule(createResourceModule());
-    this.registerModule(createServerModule((n, a) => this.callUserFunction(n, a)));
+    // Phase 4a: Pure HTTP Server (overrides Express version)
+    this.registerModule(createHttpServerModule(
+      (n, a) => this.callUserFunction(n, a),
+      (fnValue, a) => this.callFunctionValue(fnValue, a)
+    ));
     this.registerModule(createDbModule());
     this.registerModule(createWsModule((n, a) => this.callUserFunction(n, a)));
+    this.registerModule(createWscModule((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client
     this.registerModule(createAuthModule());
     this.registerModule(createCacheModule());
     this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
+    this.registerModule(createAsyncModule((n, a) => this.callUserFunction(n, a))); // Phase 23: async_call, promise_*
+    this.registerModule(createModuleSystem());  // Phase 24: module_*, namespace_*
     this.registerModule(pgBuiltins);            // PostgreSQL + JWT + AI
 
     // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
@@ -257,7 +264,6 @@ export class Interpreter {
       throw e;
     }
 
-    this.setupExpressRoutes();
     return this.context;
   }
 
@@ -444,116 +450,6 @@ export class Interpreter {
     if (on500) this.context.errorHandlers.handlers.set(500, on500 as ASTNode);
   }
 
-  private setupExpressRoutes(): void {
-    // body-parser 미들웨어 등록
-    this.context.app.use(express.json());
-    this.context.app.use(express.urlencoded({ extended: true }));
-
-    for (const [, route] of this.context.routes) {
-      const method = route.method.toLowerCase();
-      const handler = (req: express.Request, res: express.Response) => {
-        try {
-          this.context.variables.set("request", req);
-          this.context.variables.set("response", res);
-          this.context.variables.set("$req", req);
-          this.context.variables.set("$res", res);
-
-          let result = this.eval(route.handler);
-
-          // FreeLang (list :key val ...) 배열 → 객체 재귀 변환
-          function deepConvert(val: any): any {
-            if (!Array.isArray(val)) return val;
-            if (val.length === 0) return val;
-            if (typeof val[0] === "string") {
-              const obj: Record<string, any> = {};
-              for (let i = 0; i < val.length; i += 2) {
-                let k = val[i]; const v = val[i + 1];
-                if (typeof k === "string") {
-                  if (k.startsWith(":")) k = k.slice(1);
-                  obj[k] = deepConvert(v);
-                }
-              }
-              return obj;
-            }
-            return val.map(deepConvert);
-          }
-
-          // FreeLang Result 모나드 처리: {tag:"Ok"|"Err", value:..., kind:"Result"}
-          // (ok data)  → HTTP 200 {success:true, data:data}
-          // (err msg)  → HTTP 400 {success:false, error:msg}
-          if (result && typeof result === "object" && result.kind === "Result") {
-            if (result.tag === "Ok") {
-              const val = result.value;
-              if (val && typeof val === "object" && val.__fl_response) {
-                // server_json/server_status 이미 처리된 경우
-                result = val;
-              } else {
-                result = { __fl_response: true, type: "json", status: 200, body: { success: true, data: deepConvert(val) } };
-              }
-            } else if (result.tag === "Err") {
-              const errVal = result.value;
-              if (errVal && typeof errVal === "object" && errVal.__fl_response) {
-                res.status(errVal.status || 400).json(errVal.body);
-              } else {
-                res.status(400).json({ success: false, error: String(errVal) });
-              }
-              return;
-            }
-          }
-
-          // __fl_response: server_json / server_status 반환값 처리
-          if (result && typeof result === "object" && result.__fl_response) {
-            if (result.type === "text") {
-              res.status(result.status || 200).send(result.body);
-            } else {
-              res.status(result.status || 200).json(result.body);
-            }
-          } else if (typeof result === "object" && result !== null) {
-            res.json(result);
-          } else {
-            res.send(String(result ?? ""));
-          }
-        } catch (error) {
-          res.status(500).json({ error: (error as Error).message });
-        }
-      };
-
-      if (method === "get") {
-        this.context.app.get(route.path, handler);
-      } else if (method === "post") {
-        this.context.app.post(route.path, handler);
-      } else if (method === "put") {
-        this.context.app.put(route.path, handler);
-      } else if (method === "delete") {
-        this.context.app.delete(route.path, handler);
-      }
-    }
-
-    // SERVER 블록이 있으면 서버 시작
-    if (this.serverConfig) {
-      const { port, host } = this.serverConfig;
-      // public/ 폴더가 있으면 정적 파일 서빙 (SPA fallback 포함)
-      const path = require("path");
-      const fs = require("fs");
-      const publicDir = path.resolve(process.cwd(), "public");
-      if (fs.existsSync(publicDir)) {
-        this.context.app.use(express.static(publicDir));
-        // SPA fallback: API가 아닌 GET 요청은 index.html 반환
-        this.context.app.get(/^(?!\/api\/).*/, (_req: express.Request, res: express.Response) => {
-          const indexHtml = path.join(publicDir, "index.html");
-          if (fs.existsSync(indexHtml)) {
-            res.sendFile(indexHtml);
-          } else {
-            res.status(404).send("Not Found");
-          }
-        });
-      }
-      this.context.server = this.context.app.listen(port, host, () => {
-        console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
-      });
-    }
-  }
-
   eval(node: ASTNode): any {
     if (!node) return null;
 
@@ -615,6 +511,13 @@ export class Interpreter {
     // Blocks (nested structures)
     if ((node as any).kind === "block") {
       const block = node as Block;
+
+      // Control blocks (FUNC, SERVER, ROUTE, etc.) must NOT be eval'd here
+      // They should be handled by interpret() or evalBlock(), not eval()
+      if (isBlock(block) && isControlBlock(block)) {
+        throw new Error(`Control block [${block.type}] should not be eval'd directly. This block must be processed by interpret() or evalBlock().`);
+      }
+
       if (block.type === "Array") {
         const items = block.fields.get("items");
         if (Array.isArray(items)) {
@@ -629,12 +532,8 @@ export class Interpreter {
         }
         return result;
       }
-      // For other block types, return as object
-      const result: Record<string, any> = {};
-      for (const [key, value] of block.fields) {
-        result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
-      }
-      return result;
+      // For other block types (should only be Array/Map), throw error
+      throw new Error(`Unknown block type: ${block.type}`);
     }
 
     // Pattern matching (Phase 4 Week 3-4)
@@ -1284,6 +1183,34 @@ export class Interpreter {
       return this.evalLet(expr.args);
     }
 
+    // set: (set $var new-value) — 기존 바인딩 수정 (Phase 7 P0)
+    // resolver에서 루프 변수 업데이트에 필요
+    if (op === "set") {
+      if (expr.args.length !== 2) {
+        throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
+      }
+
+      const varNode = expr.args[0] as any;
+      let varName: string;
+
+      if (varNode.kind === "variable") {
+        varName = varNode.name;
+      } else if (varNode.kind === "literal" && varNode.type === "symbol") {
+        varName = "$" + varNode.value;
+      } else {
+        throw new Error(`set: first argument must be a variable`);
+      }
+
+      const newValue = this.eval(expr.args[1]);
+      const success = this.context.variables.mutate(varName, newValue);
+
+      if (!success) {
+        throw new Error(`set: variable ${varName} not found in scope`);
+      }
+
+      return newValue;
+    }
+
     // if: (if condition then-branch else-branch)
     if (op === "if") {
       const condition = this.eval(expr.args[0]);
@@ -1299,6 +1226,14 @@ export class Interpreter {
     if (op === "do" || op === "begin" || op === "progn") {
       let result: any = null;
       for (const arg of expr.args) {
+        // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
+        // Control blocks should be handled by evalBlock, not eval
+        if (isBlock(arg) && isControlBlock(arg)) {
+          // Process control block via evalBlock (no return value expected)
+          this.evalBlock(arg);
+          result = null;  // Control blocks don't produce values
+          continue;
+        }
         result = this.eval(arg);
       }
       return result;
@@ -3725,9 +3660,43 @@ export class Interpreter {
       `✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`
     );
   }
+
+  /**
+   * Cleanup: Destroy all resources and stop timers
+   * Call this when shutting down the interpreter to prevent memory leaks
+   * (e.g., after all tests complete or on process exit)
+   */
+  destroy(): void {
+    // Clean up LearnedFactsStore timer
+    this.learnedFactsStore.destroy();
+
+    // Close HTTP server if running
+    if (this.context.server) {
+      this.context.server.close();
+    }
+
+    this.logger.info("Interpreter cleanup completed");
+  }
 }
 
-export function interpret(blocks: ASTNode[], app?: express.Express, logger?: Logger): ExecutionContext {
-  const interpreter = new Interpreter(app, logger);
+// Global interpreter reference for cleanup on process exit
+let globalInterpreterInstance: Interpreter | null = null;
+
+export function interpret(blocks: ASTNode[], logger?: Logger): ExecutionContext {
+  const interpreter = new Interpreter(logger);
+  globalInterpreterInstance = interpreter;
+
+  // Register cleanup handler on first interpret() call
+  if (!process.listeners("exit").some(l => l.name === "cleanupInterpreter")) {
+    const cleanupInterpreter = function() {
+      if (globalInterpreterInstance) {
+        globalInterpreterInstance.destroy();
+        globalInterpreterInstance = null;
+      }
+    };
+    Object.defineProperty(cleanupInterpreter, "name", { value: "cleanupInterpreter" });
+    process.on("exit", cleanupInterpreter);
+  }
+
   return interpreter.interpret(blocks);
 }

@@ -1,6 +1,6 @@
 "use strict";
 // FreeLang v9: HTTP Server Runner
-// Full pipeline: v9 code → Lexer → Parser → Interpreter → Express server
+// Full pipeline: v9 code → Lexer → Parser → Interpreter → Pure HTTP Server (stdlib-http-server)
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -34,11 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
 const fs = __importStar(require("fs"));
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
@@ -84,8 +80,7 @@ async function runServer() {
         });
         // Step 4: Interpretation
         console.log("\n⚙️ Interpreting...");
-        const app = (0, express_1.default)();
-        const context = (0, interpreter_1.interpret)(ast, app);
+        const context = (0, interpreter_1.interpret)(ast);
         console.log(`✅ Interpreted successfully`);
         console.log(`   Functions defined: ${context.functions.size}`);
         console.log(`   Intents defined: ${context.intents.size}`);
@@ -97,29 +92,23 @@ async function runServer() {
                 console.log(`   [${name}] ${route.method.toUpperCase()} ${route.path}`);
             }
         }
-        // Step 6: Start server
-        console.log("\n🚀 Starting Express server...\n");
-        const PORT = parseInt(process.env.PORT ?? "3009", 10);
-        const server = app.listen(PORT, () => {
-            console.log(`✅ Server running on http://localhost:${PORT}`);
-            console.log(`\n📚 Available endpoints:`);
-            for (const [name, route] of context.routes) {
-                console.log(`   ${route.method.toUpperCase()} http://localhost:${PORT}${route.path}`);
-            }
-            console.log(`\n💡 Example request:`);
-            if (context.routes.size > 0) {
-                const firstRoute = Array.from(context.routes.values())[0];
-                console.log(`   curl http://localhost:${PORT}${firstRoute.path}`);
-            }
-            console.log(`\n📌 Press Ctrl+C to stop the server\n`);
-        });
+        // Step 6: Server startup via v9 code
+        // The v9 code should call server_start() to start the pure HTTP server
+        // No Express server startup needed (using stdlib-http-server instead)
+        console.log("\n📌 Server startup handled by v9 code (call server_start() to listen)");
         // Graceful shutdown
         process.on("SIGINT", () => {
             console.log("\n\n👋 Shutting down server...");
-            server.close(() => {
-                console.log("✅ Server closed");
+            if (context.server) {
+                context.server.close(() => {
+                    console.log("✅ Server closed");
+                    process.exit(0);
+                });
+            }
+            else {
+                console.log("✅ No active server to close");
                 process.exit(0);
-            });
+            }
         });
     }
     catch (error) {

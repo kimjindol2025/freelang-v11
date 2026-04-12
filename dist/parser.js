@@ -7,13 +7,29 @@ exports.parse = parse;
 const token_1 = require("./token");
 const ast_1 = require("./ast");
 class ParserError extends Error {
-    constructor(message, line, col, hint) {
+    constructor(message, line, col, hint, code, stage = "parse") {
+        const codeStr = code ? `[${code}]` : "";
         const loc = `[${line}:${col}]`;
         const hintLine = hint ? `\n  힌트: ${hint}` : "";
-        super(`${loc} ${message}${hintLine}`);
+        super(`${codeStr} ${loc} ${message}${hintLine}`);
         this.line = line;
         this.col = col;
         this.hint = hint;
+        this.code = code;
+        this.stage = stage;
+    }
+    toJSON() {
+        return {
+            code: this.code || "E_PARSE_SYNTAX_ERROR",
+            stage: this.stage,
+            message: this.message,
+            file: undefined,
+            line: this.line,
+            column: this.col,
+            symbol: undefined,
+            cause: undefined,
+            hint: this.hint,
+        };
     }
 }
 exports.ParserError = ParserError;
@@ -934,7 +950,18 @@ class Parser {
     error(message, token) {
         // 힌트 매칭: 메시지 앞부분으로 검색
         const hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
-        return new ParserError(message, token.line, token.col, hint);
+        // 메시지 패턴에 따라 에러 코드 결정
+        let code = "E_PARSE_SYNTAX_ERROR";
+        if (message.includes("Expected") || message.includes("Unexpected")) {
+            code = "E_PARSE_UNEXPECTED_TOKEN";
+        }
+        else if (message.includes("Unterminated")) {
+            code = "E_PARSE_UNCLOSED_PAREN";
+        }
+        else if (message.includes("Expected block")) {
+            code = "E_PARSE_SYNTAX_ERROR";
+        }
+        return new ParserError(message, token.line, token.col, hint, code, "parse");
     }
     // Synchronization for error recovery
     synchronize() {

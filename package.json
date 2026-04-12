@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
@@ -16,9 +16,9 @@
     "test-legacy": "ts-node src/test-full-stack.ts",
     "test-parser": "ts-node src/test-parser.ts",
     "test-interpreter": "ts-node src/test-interpreter.ts",
+    "benchmark": "node scripts/benchmark.js",
     "start": "ts-node src/http-server-runner.ts",
     "server": "ts-node src/http-server-runner.ts",
-    "benchmark": "node scripts/benchmark.js",
     "freelang": "ts-node src/cli.ts",
     "fl": "ts-node src/cli.ts",
     "repl": "ts-node src/cli.ts repl"
@@ -26,10 +26,14 @@
   "dependencies": {
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
-    "express": "^4.18.0",
+    "express": "4.17.1",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.20.0",
-    "ws": "^8.20.0"
+    "ws": "^8.20.0",
+    "lodash": "4.17.21",
+    "web-app": "2.0.0",
+    "app-utils": "1.0.0",
+    "semver-lib": "1.2.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

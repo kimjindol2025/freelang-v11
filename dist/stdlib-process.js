@@ -107,6 +107,13 @@ function createProcessModule() {
         "process_pid": () => process.pid,
         "process_exit": (code) => process.exit(code ?? 0),
         "process_argv": () => process.argv.slice(2),
+        "process_argv_get": (key, defaultVal = null) => {
+            const args = process.argv.slice(2);
+            const idx = args.indexOf(key);
+            if (idx === -1 || idx + 1 >= args.length)
+                return defaultVal;
+            return args[idx + 1];
+        },
     };
 }
 //# sourceMappingURL=stdlib-process.js.map

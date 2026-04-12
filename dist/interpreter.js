@@ -34,15 +34,11 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Interpreter = void 0;
 exports.interpret = interpret;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const express_1 = __importDefault(require("express"));
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const ast_1 = require("./ast");
@@ -51,6 +47,7 @@ const errors_1 = require("./errors");
 const logger_1 = require("./logger");
 const ast_helpers_1 = require("./ast-helpers");
 const async_runtime_1 = require("./async-runtime");
+const interpreter_scope_1 = require("./interpreter-scope"); // Phase A: 렉시컬 스코프
 const web_search_adapter_1 = require("./web-search-adapter"); // Phase 9a: WebSearch integration
 const learned_facts_store_1 = require("./learned-facts-store"); // Phase 9b: Learning persistence
 const stdlib_file_1 = require("./stdlib-file"); // Phase 10: File I/O
@@ -64,17 +61,20 @@ const stdlib_time_1 = require("./stdlib-time"); // Phase 16: Time + Logging + Mo
 const stdlib_crypto_1 = require("./stdlib-crypto"); // Phase 17: Crypto + UUID + Regex
 const stdlib_workflow_1 = require("./stdlib-workflow"); // Phase 18: Workflow Engine
 const stdlib_resource_1 = require("./stdlib-resource"); // Phase 19: Server Resource Search
-const stdlib_server_1 = require("./stdlib-server"); // Phase 20-21: HTTP Server + Middleware
+const stdlib_http_server_1 = require("./stdlib-http-server"); // Phase 4a: Pure HTTP Server (Express-free)
 const stdlib_db_1 = require("./stdlib-db"); // Phase 20: DB Driver
 const stdlib_ws_1 = require("./stdlib-ws"); // Phase 21: WebSocket
+const stdlib_wsc_1 = require("./stdlib-wsc"); // Phase 57: WebSocket Client (Tunnel)
 const stdlib_auth_1 = require("./stdlib-auth"); // Phase 21: Auth (JWT, API key, hash)
 const stdlib_cache_1 = require("./stdlib-cache"); // Phase 21: In-memory TTL cache
 const stdlib_pubsub_1 = require("./stdlib-pubsub"); // Phase 21: Pub/Sub events
 const stdlib_process_1 = require("./stdlib-process"); // Phase 22: Process (env + SIGTERM)
+const stdlib_async_1 = require("./stdlib-async"); // Phase 23: Async/await primitives
+const stdlib_module_1 = require("./stdlib-module"); // Phase 24: Module system
 const stdlib_pg_1 = require("./stdlib-pg"); // PostgreSQL + JWT + AI
 // Interpreter class
 class Interpreter {
-    constructor(app = (0, express_1.default)(), logger) {
+    constructor(logger) {
         this.currentLine = 0; // FreeLang source line tracking
         this.callDepth = 0;
         // Phase 52: FL 파일 import 지원
@@ -86,8 +86,7 @@ class Interpreter {
             functions: new Map(),
             routes: new Map(),
             intents: new Map(),
-            variables: new Map(),
-            app,
+            variables: new interpreter_scope_1.ScopeStack(),
             middleware: [],
             errorHandlers: { handlers: new Map() },
             startTime: Date.now(),
@@ -115,13 +114,17 @@ class Interpreter {
         this.registerModule((0, stdlib_crypto_1.createCryptoModule)());
         this.registerModule((0, stdlib_workflow_1.createWorkflowModule)());
         this.registerModule((0, stdlib_resource_1.createResourceModule)());
-        this.registerModule((0, stdlib_server_1.createServerModule)((n, a) => this.callUserFunction(n, a)));
+        // Phase 4a: Pure HTTP Server (overrides Express version)
+        this.registerModule((0, stdlib_http_server_1.createHttpServerModule)((n, a) => this.callUserFunction(n, a), (fnValue, a) => this.callFunctionValue(fnValue, a)));
         this.registerModule((0, stdlib_db_1.createDbModule)());
         this.registerModule((0, stdlib_ws_1.createWsModule)((n, a) => this.callUserFunction(n, a)));
+        this.registerModule((0, stdlib_wsc_1.createWscModule)((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client
         this.registerModule((0, stdlib_auth_1.createAuthModule)());
         this.registerModule((0, stdlib_cache_1.createCacheModule)());
         this.registerModule((0, stdlib_pubsub_1.createPubSubModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_process_1.createProcessModule)()); // Phase 22: env_load, on_sigterm
+        this.registerModule((0, stdlib_async_1.createAsyncModule)((n, a) => this.callUserFunction(n, a))); // Phase 23: async_call, promise_*
+        this.registerModule((0, stdlib_module_1.createModuleSystem)()); // Phase 24: module_*, namespace_*
         this.registerModule(stdlib_pg_1.pgBuiltins); // PostgreSQL + JWT + AI
         // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
         this.loadFlStdlib();
@@ -214,7 +217,6 @@ class Interpreter {
             }
             throw e;
         }
-        this.setupExpressRoutes();
         return this.context;
     }
     evalBlock(block) {
@@ -382,123 +384,6 @@ class Interpreter {
         if (on500)
             this.context.errorHandlers.handlers.set(500, on500);
     }
-    setupExpressRoutes() {
-        // body-parser 미들웨어 등록
-        this.context.app.use(express_1.default.json());
-        this.context.app.use(express_1.default.urlencoded({ extended: true }));
-        for (const [, route] of this.context.routes) {
-            const method = route.method.toLowerCase();
-            const handler = (req, res) => {
-                try {
-                    this.context.variables.set("request", req);
-                    this.context.variables.set("response", res);
-                    this.context.variables.set("$req", req);
-                    this.context.variables.set("$res", res);
-                    let result = this.eval(route.handler);
-                    // FreeLang (list :key val ...) 배열 → 객체 재귀 변환
-                    function deepConvert(val) {
-                        if (!Array.isArray(val))
-                            return val;
-                        if (val.length === 0)
-                            return val;
-                        if (typeof val[0] === "string") {
-                            const obj = {};
-                            for (let i = 0; i < val.length; i += 2) {
-                                let k = val[i];
-                                const v = val[i + 1];
-                                if (typeof k === "string") {
-                                    if (k.startsWith(":"))
-                                        k = k.slice(1);
-                                    obj[k] = deepConvert(v);
-                                }
-                            }
-                            return obj;
-                        }
-                        return val.map(deepConvert);
-                    }
-                    // FreeLang Result 모나드 처리: {tag:"Ok"|"Err", value:..., kind:"Result"}
-                    // (ok data)  → HTTP 200 {success:true, data:data}
-                    // (err msg)  → HTTP 400 {success:false, error:msg}
-                    if (result && typeof result === "object" && result.kind === "Result") {
-                        if (result.tag === "Ok") {
-                            const val = result.value;
-                            if (val && typeof val === "object" && val.__fl_response) {
-                                // server_json/server_status 이미 처리된 경우
-                                result = val;
-                            }
-                            else {
-                                result = { __fl_response: true, type: "json", status: 200, body: { success: true, data: deepConvert(val) } };
-                            }
-                        }
-                        else if (result.tag === "Err") {
-                            const errVal = result.value;
-                            if (errVal && typeof errVal === "object" && errVal.__fl_response) {
-                                res.status(errVal.status || 400).json(errVal.body);
-                            }
-                            else {
-                                res.status(400).json({ success: false, error: String(errVal) });
-                            }
-                            return;
-                        }
-                    }
-                    // __fl_response: server_json / server_status 반환값 처리
-                    if (result && typeof result === "object" && result.__fl_response) {
-                        if (result.type === "text") {
-                            res.status(result.status || 200).send(result.body);
-                        }
-                        else {
-                            res.status(result.status || 200).json(result.body);
-                        }
-                    }
-                    else if (typeof result === "object" && result !== null) {
-                        res.json(result);
-                    }
-                    else {
-                        res.send(String(result ?? ""));
-                    }
-                }
-                catch (error) {
-                    res.status(500).json({ error: error.message });
-                }
-            };
-            if (method === "get") {
-                this.context.app.get(route.path, handler);
-            }
-            else if (method === "post") {
-                this.context.app.post(route.path, handler);
-            }
-            else if (method === "put") {
-                this.context.app.put(route.path, handler);
-            }
-            else if (method === "delete") {
-                this.context.app.delete(route.path, handler);
-            }
-        }
-        // SERVER 블록이 있으면 서버 시작
-        if (this.serverConfig) {
-            const { port, host } = this.serverConfig;
-            // public/ 폴더가 있으면 정적 파일 서빙 (SPA fallback 포함)
-            const path = require("path");
-            const fs = require("fs");
-            const publicDir = path.resolve(process.cwd(), "public");
-            if (fs.existsSync(publicDir)) {
-                this.context.app.use(express_1.default.static(publicDir));
-                // SPA fallback: API가 아닌 GET 요청은 index.html 반환
-                this.context.app.get(/^(?!\/api\/).*/, (_req, res) => {
-                    const indexHtml = path.join(publicDir, "index.html");
-                    if (fs.existsSync(indexHtml)) {
-                        res.sendFile(indexHtml);
-                    }
-                    else {
-                        res.status(404).send("Not Found");
-                    }
-                });
-            }
-            this.context.server = this.context.app.listen(port, host, () => {
-                console.log(`\x1b[32m✓\x1b[0m  FreeLang v9 서버 시작: http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
-            });
-        }
-    }
     eval(node) {
         if (!node)
             return null;
@@ -560,6 +445,11 @@ class Interpreter {
         // Blocks (nested structures)
         if (node.kind === "block") {
             const block = node;
+            // Control blocks (FUNC, SERVER, ROUTE, etc.) must NOT be eval'd here
+            // They should be handled by interpret() or evalBlock(), not eval()
+            if ((0, ast_1.isBlock)(block) && (0, ast_1.isControlBlock)(block)) {
+                throw new Error(`Control block [${block.type}] should not be eval'd directly. This block must be processed by interpret() or evalBlock().`);
+            }
             if (block.type === "Array") {
                 const items = block.fields.get("items");
                 if (Array.isArray(items)) {
@@ -574,12 +464,8 @@ class Interpreter {
                 }
                 return result;
             }
-            // For other block types, return as object
-            const result = {};
-            for (const [key, value] of block.fields) {
-                result[key] = Array.isArray(value) ? value.map((v) => this.eval(v)) : this.eval(value);
-            }
-            return result;
+            // For other block types (should only be Array/Map), throw error
+            throw new Error(`Unknown block type: ${block.type}`);
         }
         // Pattern matching (Phase 4 Week 3-4)
         if (node.kind === "pattern-match") {
@@ -663,7 +549,7 @@ class Interpreter {
                 kind: "function-value",
                 params,
                 body: expr.args[1],
-                capturedEnv: new Map(this.context.variables),
+                capturedEnv: this.context.variables.snapshot(),
                 name: undefined,
             };
         }
@@ -697,7 +583,7 @@ class Interpreter {
                 name,
                 params,
                 body: expr.args[2],
-                capturedEnv: new Map(this.context.variables),
+                capturedEnv: this.context.variables.snapshot(),
             };
         }
         // Phase 9a: Search/Fetch expressions from eval (when used in S-expression form)
@@ -945,7 +831,9 @@ class Interpreter {
                 throw new Error(`set!: first argument must be a symbol`);
             }
             const value = this.eval(expr.args[1]);
-            this.context.variables.set(name, value);
+            if (!this.context.variables.mutate(name, value)) {
+                this.context.variables.set(name, value);
+            }
             return value;
         }
         // Define a function: (define name (fn [...] body))
@@ -997,6 +885,7 @@ class Interpreter {
                     name,
                     params: value.params,
                     body: value.body,
+                    capturedEnv: value.capturedEnv, // 클로저 환경 보존
                 };
                 this.context.functions.set(name, funcDef);
                 // Also register with type checker if available
@@ -1033,7 +922,7 @@ class Interpreter {
                 kind: "function-value",
                 params: func.params,
                 body: func.body,
-                capturedEnv: new Map(this.context.variables),
+                capturedEnv: this.context.variables.snapshot(),
                 name: funcName,
             };
         }
@@ -1175,6 +1064,30 @@ class Interpreter {
         if (op === "let") {
             return this.evalLet(expr.args);
         }
+        // set: (set $var new-value) — 기존 바인딩 수정 (Phase 7 P0)
+        // resolver에서 루프 변수 업데이트에 필요
+        if (op === "set") {
+            if (expr.args.length !== 2) {
+                throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
+            }
+            const varNode = expr.args[0];
+            let varName;
+            if (varNode.kind === "variable") {
+                varName = varNode.name;
+            }
+            else if (varNode.kind === "literal" && varNode.type === "symbol") {
+                varName = "$" + varNode.value;
+            }
+            else {
+                throw new Error(`set: first argument must be a variable`);
+            }
+            const newValue = this.eval(expr.args[1]);
+            const success = this.context.variables.mutate(varName, newValue);
+            if (!success) {
+                throw new Error(`set: variable ${varName} not found in scope`);
+            }
+            return newValue;
+        }
         // if: (if condition then-branch else-branch)
         if (op === "if") {
             const condition = this.eval(expr.args[0]);
@@ -1188,6 +1101,14 @@ class Interpreter {
         if (op === "do" || op === "begin" || op === "progn") {
             let result = null;
             for (const arg of expr.args) {
+                // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
+                // Control blocks should be handled by evalBlock, not eval
+                if ((0, ast_1.isBlock)(arg) && (0, ast_1.isControlBlock)(arg)) {
+                    // Process control block via evalBlock (no return value expected)
+                    this.evalBlock(arg);
+                    result = null; // Control blocks don't produce values
+                    continue;
+                }
                 result = this.eval(arg);
             }
             return result;
@@ -1213,13 +1134,11 @@ class Interpreter {
                 loopVars.push(varName);
                 loopInits.push(this.eval(valNode));
             }
-            // Save outer bindings
-            const savedVars = loopVars.map(v => ({ v, old: this.context.variables.get(v) }));
-            // Initialize loop variables
+            // 새 스코프에서 loop 바인딩 — 외부 스코프 오염 없음
+            this.context.variables.push();
             for (let i = 0; i < loopVars.length; i++) {
                 this.context.variables.set(loopVars[i], loopInits[i]);
             }
-            const FL_RECUR = "__FL_RECUR__";
             let result = null;
             const maxIter = 100000;
             let iter = 0;
@@ -1228,7 +1147,6 @@ class Interpreter {
                     let recurred = false;
                     for (const bodyNode of bodyNodes) {
                         result = this.eval(bodyNode);
-                        // Check if recur was called (via thrown recur signal)
                         if (result && typeof result === "object" && result.__FL_RECUR__) {
                             const newVals = result.__args;
                             for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
@@ -1243,13 +1161,7 @@ class Interpreter {
                 }
             }
             finally {
-                // Restore outer bindings
-                for (const { v, old } of savedVars) {
-                    if (old === undefined)
-                        this.context.variables.delete(v);
-                    else
-                        this.context.variables.set(v, old);
-                }
+                this.context.variables.pop();
             }
             return result;
         }
@@ -1307,27 +1219,27 @@ class Interpreter {
             });
             if (Array.isArray(arr) && paramNames.length > 0) {
                 return arr.map((elem) => {
-                    const saved = paramNames.map(n => ({ n, v: this.context.variables.get(n) }));
+                    this.context.variables.push();
                     this.context.variables.set(paramNames[0], elem);
-                    if (paramNames.length > 1) {
-                        // Optional: second param gets index (not used here)
-                    }
                     try {
                         return this.eval(bodyNode);
                     }
                     finally {
-                        for (const { n, v } of saved) {
-                            if (v === undefined)
-                                this.context.variables.delete(n);
-                            else
-                                this.context.variables.set(n, v);
-                        }
+                        this.context.variables.pop();
                     }
                 });
             }
         }
         // Evaluate all arguments for normal operations
         const args = expr.args.map((arg) => this.eval(arg));
+        // Phase 52: qualified function call (module:func pattern) — check BEFORE switch
+        // so builtins like "list" don't intercept (list:sum data)
+        if (args.length >= 1 && typeof args[0] === "string") {
+            const qualifiedName = `${op}:${args[0]}`;
+            if (this.context.functions.has(qualifiedName)) {
+                return this.callUserFunction(qualifiedName, args.slice(1));
+            }
+        }
         // Built-in functions
         switch (op) {
             // Arithmetic
@@ -1512,7 +1424,7 @@ class Interpreter {
                     kind: "function-value",
                     params: params,
                     body: body,
-                    capturedEnv: new Map(this.context.variables),
+                    capturedEnv: this.context.variables.snapshot(),
                 };
             case "reduce":
                 // Phase 4 Week 2: (reduce [1 2 3 4] 0 (fn [acc x] (+ acc x)))
@@ -1960,14 +1872,6 @@ class Interpreter {
                 // (export sym1 sym2 ...) — self-hosting 파일 호환: no-op (인터프리터는 모두 공유 환경)
                 if (op === "export")
                     return null;
-                // Phase 52: (math:square 4) → lexer가 math / : / square 로 분리
-                // args[0]이 string이면 op:args[0] 형태의 qualified 함수명 시도
-                if (args.length >= 1 && typeof args[0] === "string") {
-                    const qualifiedName = `${op}:${args[0]}`;
-                    if (this.context.functions.has(qualifiedName)) {
-                        return this.callUserFunction(qualifiedName, args.slice(1));
-                    }
-                }
                 // (call $fn arg...) — FL stdlib 고차 함수용: $fn이 클로저/심볼이면 동적 호출
                 if (op === "call" && args.length >= 1) {
                     const fnRef = this.eval(args[0]);
@@ -1990,8 +1894,8 @@ class Interpreter {
         }
         // (let [[var1 val1] [var2 val2]] body)
         const bindings = args[0];
-        // Save previously-bound variable values so let doesn't leak into outer scope
-        const savedVars = [];
+        // 새 스코프 — let 바인딩이 외부 스코프로 누출되지 않음
+        this.context.variables.push();
         // Parse bindings
         if (bindings.kind === "block" && bindings.type === "Array") {
             const items = bindings.fields.get("items");
@@ -2000,20 +1904,17 @@ class Interpreter {
                     if (item.kind === "block" && item.type === "Array") {
                         const bindingItems = item.fields.get("items");
                         if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-                            // Extract variable name from either a Variable (with .name) or Literal symbol (with .value)
                             let varName;
                             const varNode = bindingItems[0];
                             if (varNode.kind === "variable") {
                                 varName = varNode.name;
                             }
                             else if (varNode.kind === "literal" && varNode.type === "symbol") {
-                                // Self-hosting: bare symbol → add $ prefix so symbol-as-variable lookup finds it
                                 varName = "$" + varNode.value;
                             }
                             else {
                                 throw new Error(`Invalid binding variable: expected symbol or variable`);
                             }
-                            savedVars.push([varName, this.context.variables.get(varName)]);
                             const value = this.eval(bindingItems[1]);
                             this.context.variables.set(varName, value);
                         }
@@ -2029,13 +1930,7 @@ class Interpreter {
             }
         }
         finally {
-            // Restore let-bound variables to prevent leaking into outer scope
-            for (const [name, val] of savedVars) {
-                if (val === undefined)
-                    this.context.variables.delete(name);
-                else
-                    this.context.variables.set(name, val);
-            }
+            this.context.variables.pop();
         }
         return result;
     }
@@ -2219,25 +2114,55 @@ class Interpreter {
         if (this.callDepth >= Interpreter.MAX_CALL_DEPTH) {
             throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'`);
         }
-        // Save only the params being overwritten (allows set! closures to work)
-        const savedParams = [];
+        // Phase 54: For namespaced functions (list:mean), temporarily expose same-prefix
+        // functions without prefix so internal cross-calls (sum $arr) resolve correctly
+        const prefixMatch = baseName.match(/^([^:]+):/);
+        const tempAliases = [];
+        if (prefixMatch) {
+            const prefix = prefixMatch[1] + ":";
+            for (const [fname, fval] of this.context.functions) {
+                if (fname.startsWith(prefix)) {
+                    const unqualified = fname.slice(prefix.length);
+                    if (!this.context.functions.has(unqualified)) {
+                        this.context.functions.set(unqualified, fval);
+                        tempAliases.push(unqualified);
+                    }
+                }
+            }
+        }
+        // 클로저: capturedEnv가 있으면 해당 환경에서 실행
+        if (func.capturedEnv) {
+            const savedStack = this.context.variables.saveStack();
+            this.callDepth++;
+            try {
+                this.context.variables.fromSnapshot(func.capturedEnv);
+                for (let i = 0; i < func.params.length; i++) {
+                    this.context.variables.set(func.params[i], args[i]);
+                }
+                return this.eval(func.body);
+            }
+            finally {
+                this.callDepth--;
+                this.context.variables.restoreStack(savedStack);
+                for (const alias of tempAliases) {
+                    this.context.functions.delete(alias);
+                }
+            }
+        }
+        // 일반 함수: 새 렉시컬 스코프 생성 — 함수 내 define이 전역 오염 방지
+        this.context.variables.push();
         this.callDepth++;
         try {
             for (let i = 0; i < func.params.length; i++) {
-                const paramName = func.params[i];
-                savedParams.push([paramName, this.context.variables.get(paramName)]);
-                this.context.variables.set(paramName, args[i]);
+                this.context.variables.set(func.params[i], args[i]);
             }
             return this.eval(func.body);
         }
         finally {
             this.callDepth--;
-            // Restore only the param variables (not the entire scope)
-            for (const [name, val] of savedParams) {
-                if (val === undefined)
-                    this.context.variables.delete(name);
-                else
-                    this.context.variables.set(name, val);
+            this.context.variables.pop();
+            for (const alias of tempAliases) {
+                this.context.functions.delete(alias);
             }
         }
     }
@@ -2248,10 +2173,10 @@ class Interpreter {
         if (this.callDepth >= Interpreter.MAX_CALL_DEPTH) {
             throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion`);
         }
-        const savedVars = new Map(this.context.variables);
+        const savedStack = this.context.variables.saveStack();
         this.callDepth++;
         try {
-            this.context.variables = new Map(fn.capturedEnv);
+            this.context.variables.fromSnapshot(fn.capturedEnv);
             for (let i = 0; i < fn.params.length; i++) {
                 this.context.variables.set(fn.params[i], args[i]);
             }
@@ -2259,7 +2184,7 @@ class Interpreter {
         }
         finally {
             this.callDepth--;
-            this.context.variables = savedVars;
+            this.context.variables.restoreStack(savedStack);
         }
     }
     callAsyncFunctionValue(fn, args) {
@@ -2269,19 +2194,14 @@ class Interpreter {
         }
         // Return a new Promise that executes the async function
         return new async_runtime_1.FreeLangPromise((resolve, reject) => {
-            const savedVars = new Map(this.context.variables);
+            const savedStack = this.context.variables.saveStack();
             try {
-                // Restore captured environment from function definition
-                this.context.variables = new Map(fn.capturedEnv);
-                // Bind parameters
+                this.context.variables.fromSnapshot(fn.capturedEnv);
                 for (let i = 0; i < fn.params.length; i++) {
                     this.context.variables.set(fn.params[i], args[i]);
                 }
-                // Execute body
                 const result = this.eval(fn.body);
-                // Resolve with the result
                 if (result instanceof async_runtime_1.FreeLangPromise) {
-                    // If the result is already a Promise, chain it
                     result
                         .then((value) => resolve(value))
                         .catch((error) => reject(error));
@@ -2294,8 +2214,7 @@ class Interpreter {
                 reject(error);
             }
             finally {
-                // Restore scope even if exception occurs
-                this.context.variables = savedVars;
+                this.context.variables.restoreStack(savedStack);
             }
         });
     }
@@ -2341,37 +2260,24 @@ class Interpreter {
             // Try to match pattern (only save/restore pattern-binding variables, not all state)
             const matchResult = this.matchPattern(caseItem.pattern, value);
             if (matchResult.matched) {
-                // Save only the variables that will be bound by this pattern
-                const savedBindings = [];
+                this.context.variables.push();
                 for (const [varName] of matchResult.bindings) {
-                    const key = "$" + varName;
-                    savedBindings.push([key, this.context.variables.get(key)]);
-                    this.context.variables.set(key, matchResult.bindings.get(varName));
+                    this.context.variables.set("$" + varName, matchResult.bindings.get(varName));
                 }
                 // Check guard condition if present
                 if (caseItem.guard) {
                     const guardResult = this.eval(caseItem.guard);
                     if (!guardResult) {
-                        // Guard failed, restore bound variables and try next case
-                        for (const [k, v] of savedBindings) {
-                            if (v === undefined)
-                                this.context.variables.delete(k);
-                            else
-                                this.context.variables.set(k, v);
-                        }
+                        this.context.variables.pop();
                         continue;
                     }
                 }
-                // Execute body
-                const result = this.eval(caseItem.body);
-                // Restore bound variables
-                for (const [k, v] of savedBindings) {
-                    if (v === undefined)
-                        this.context.variables.delete(k);
-                    else
-                        this.context.variables.set(k, v);
+                try {
+                    return this.eval(caseItem.body);
                 }
-                return result;
+                finally {
+                    this.context.variables.pop();
+                }
             }
         }
         // No case matched, try default case
@@ -2397,23 +2303,20 @@ class Interpreter {
                 for (const catchClause of tryBlock.catchClauses) {
                     // For now, all catch clauses handle all errors (no pattern matching)
                     // In future, could support typed catch (catch [IOException e] ...)
-                    // Save current variable scope
-                    const savedVars = new Map(this.context.variables);
-                    // Bind error to variable if specified
+                    this.context.variables.push();
                     if (catchClause.variable) {
                         this.context.variables.set("$" + catchClause.variable, error);
                     }
                     try {
-                        // Execute catch handler
                         result = this.eval(catchClause.handler);
-                        this.context.variables = savedVars;
                         handled = true;
                         break;
                     }
                     catch (innerError) {
-                        // If catch handler also throws, restore and re-throw
-                        this.context.variables = savedVars;
                         throw innerError;
+                    }
+                    finally {
+                        this.context.variables.pop();
                     }
                 }
             }
@@ -3410,11 +3313,39 @@ class Interpreter {
         this.context.typeClassInstances.set(key, info);
         this.logger.info(`✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`);
     }
+    /**
+     * Cleanup: Destroy all resources and stop timers
+     * Call this when shutting down the interpreter to prevent memory leaks
+     * (e.g., after all tests complete or on process exit)
+     */
+    destroy() {
+        // Clean up LearnedFactsStore timer
+        this.learnedFactsStore.destroy();
+        // Close HTTP server if running
+        if (this.context.server) {
+            this.context.server.close();
+        }
+        this.logger.info("Interpreter cleanup completed");
+    }
 }
 exports.Interpreter = Interpreter;
 Interpreter.MAX_CALL_DEPTH = 500;
-function interpret(blocks, app, logger) {
-    const interpreter = new Interpreter(app, logger);
+// Global interpreter reference for cleanup on process exit
+let globalInterpreterInstance = null;
+function interpret(blocks, logger) {
+    const interpreter = new Interpreter(logger);
+    globalInterpreterInstance = interpreter;
+    // Register cleanup handler on first interpret() call
+    if (!process.listeners("exit").some(l => l.name === "cleanupInterpreter")) {
+        const cleanupInterpreter = function () {
+            if (globalInterpreterInstance) {
+                globalInterpreterInstance.destroy();
+                globalInterpreterInstance = null;
+            }
+        };
+        Object.defineProperty(cleanupInterpreter, "name", { value: "cleanupInterpreter" });
+        process.on("exit", cleanupInterpreter);
+    }
     return interpreter.interpret(blocks);
 }
 //# sourceMappingURL=interpreter.js.map
