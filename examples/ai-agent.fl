@@ -1,0 +1,84 @@
+; ── FreeLang v9: 실용 예제 4 — AI 네이티브 에이전트 ─────────────────
+; ai-call + prompt-template + rag-search + embed + 벡터 유사도
+; Phase 71(AI 네이티브 블록 강화) — 모든 함수는 mock으로 동작
+
+(println "=== AI 네이티브 에이전트 데모 ===")
+
+; ─── 프롬프트 템플릿 생성 ────────────────────────────────────────────
+(println "\n[1] 프롬프트 템플릿")
+
+(define code-review-prompt
+  (prompt-template
+    "다음 코드를 검토해줘:\n코드: {code}\n언어: {lang}\n중점: {focus}"
+    {:code "(define fib (fn [$n] (if (< $n 2) $n (+ (fib (- $n 1)) (fib (- $n 2))))))"
+     :lang "FreeLang v9"
+     :focus "TCO 최적화 가능성"}))
+
+(println (str "생성된 프롬프트:\n" code-review-prompt))
+
+; ─── AI 호출 (mock 동작) ──────────────────────────────────────────────
+(println "\n[2] AI 호출")
+
+(define analysis (ai-call "claude-3" code-review-prompt))
+(println (str "코드 분석 결과: " analysis))
+
+(define summary (ai-call "claude-3"
+  {:prompt "FreeLang v9의 핵심 특징을 3가지로 요약해줘"
+   :context ["S-expression 기반" "TCO 지원" "AI 네이티브 블록"]
+   :max-tokens 200}))
+(println (str "\n요약 결과: " summary))
+
+; ─── 임베딩 생성 ─────────────────────────────────────────────────────
+(println "\n[3] 텍스트 임베딩")
+
+(define docs
+  ["FreeLang은 S-expression 기반의 AI 전용 언어"
+   "TCO로 100만 재귀 호출 지원"
+   "defstruct + defprotocol로 타입 시스템 구현"
+   "레이지 시퀀스로 무한 데이터 처리 가능"
+   "위생적 매크로로 DSL 제작 용이"])
+
+(define embeddings (map docs [$doc] (embed $doc)))
+(println (str "임베딩 생성: " (length embeddings) "개 문서"))
+(define first-emb (get embeddings 0))
+(println (str "임베딩 차원: " (length first-emb) "차원"))
+
+; ─── RAG 검색 ────────────────────────────────────────────────────────
+(println "\n[4] RAG 검색")
+
+(define search-results
+  (rag-search "FreeLang 타입 시스템" {:limit 3}))
+
+(println (str "검색 결과 수: " (length search-results)))
+(map search-results [$r]
+  (println (str "  - 점수: " (get $r :score) " | " (get $r :content))))
+
+; ─── 텍스트 청킹 ─────────────────────────────────────────────────────
+(println "\n[5] 텍스트 청킹")
+
+(define long-text
+  "FreeLang v9는 AI 전용 언어입니다. S-expression 기반으로 AI가 파싱하기 쉬운 구조를 갖습니다. TCO 최적화로 100만 재귀를 지원합니다. 위생적 매크로 시스템으로 DSL을 쉽게 만들 수 있습니다.")
+
+(define chunks (chunk-text long-text 50))
+(println (str "청킹 결과: " (length chunks) "개 청크"))
+(define chunk3 (take 3 chunks))
+(map chunk3 [$chunk]
+  (println (str "  [" (length $chunk) "자] " $chunk)))
+
+; ─── 에이전트 패턴: 분석 → 검색 → 응답 ──────────────────────────────
+(println "\n[6] 에이전트 패턴 (분석 → 검색 → 응답)")
+
+(define ask-agent (fn [$question]
+  (define search-ctx (rag-search $question {:limit 3}))
+  (define context-texts (map search-ctx [$r] (get $r :content)))
+  (define prompt
+    (prompt-template
+      "질문: {question}\n관련 문서:\n{context}"
+      {:question $question
+       :context (str context-texts)}))
+  (ai-call "claude-3" {:prompt prompt :context context-texts})))
+
+(define answer (ask-agent "FreeLang의 TCO는 어떻게 동작하나요?"))
+(println (str "에이전트 답변: " answer))
+
+(println "\n=== AI 에이전트 데모 완료 ===")

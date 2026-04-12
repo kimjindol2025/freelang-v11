@@ -1,0 +1,86 @@
+; ── FreeLang v9: 실용 예제 1 — Todo 앱 ──────────────────────────────
+; defstruct + defprotocol + impl + 컬렉션 조합
+; Phase 63(매크로) + Phase 64(프로토콜) + Phase 66(구조체)
+
+; ─── 구조체 정의 ─────────────────────────────────────────────────────
+(defstruct Todo [:id :int :title :string :done :bool])
+
+; ─── 프로토콜 정의 ───────────────────────────────────────────────────
+(defprotocol Displayable
+  [display [$self] :string])
+
+(defprotocol Toggleable
+  [toggle [$self] :any])
+
+; ─── 프로토콜 구현 ───────────────────────────────────────────────────
+; get $self :field 방식으로 구조체 필드 접근
+(impl Displayable Todo
+  [display [$self]
+    (str (if (get $self :done) "✓" "○")
+         " [" (get $self :id) "] "
+         (get $self :title))])
+
+(impl Toggleable Todo
+  [toggle [$self]
+    (Todo
+      (get $self :id)
+      (get $self :title)
+      (if (get $self :done) false true))])
+
+; ─── 매크로 정의 ─────────────────────────────────────────────────────
+(defmacro when [$cond $body]
+  (if $cond $body nil))
+
+(defmacro unless [$cond $body]
+  (if $cond nil $body))
+
+; ─── Todo 관리 함수 ──────────────────────────────────────────────────
+(define make-todo (fn [$id $title]
+  (Todo $id $title false)))
+
+(define todo-add (fn [$todos $title]
+  (push $todos (make-todo (length $todos) $title))))
+
+(define todo-toggle (fn [$todos $id]
+  (map $todos [$t]
+    (if (= (get $t :id) $id)
+      (toggle $t)
+      $t))))
+
+(define todo-display-all (fn [$todos]
+  (map $todos [$t] (display $t))))
+
+; loop/recur로 완료된 항목 수 세기
+(define todo-count-done (fn [$ts]
+  (loop [$i 0 $cnt 0]
+    (if (>= $i (length $ts))
+      $cnt
+      (recur
+        (+ $i 1)
+        (if (get (get $ts $i) :done)
+          (+ $cnt 1)
+          $cnt))))))
+
+; ─── Todo 앱 실행 ────────────────────────────────────────────────────
+(define todos [])
+(define todos (todo-add todos "FreeLang v9 완성하기"))
+(define todos (todo-add todos "Tier 2 통합 테스트 작성"))
+(define todos (todo-add todos "실용 예제 4개 완성"))
+(define todos (todo-add todos "Gogs에 push"))
+
+; 1번 완료로 표시
+(define todos (todo-toggle todos 1))
+
+; 전체 출력
+(println "=== FreeLang Todo 앱 ===")
+(define lines (todo-display-all todos))
+(map lines [$line] (println $line))
+
+(println (str "\n완료: " (todo-count-done todos) "/" (length todos)))
+
+; 매크로 활용
+(when (> (todo-count-done todos) 0)
+  (println "잘 하고 있습니다!"))
+
+(unless (= (todo-count-done todos) (length todos))
+  (println "아직 할 일이 남아있습니다."))

@@ -1,0 +1,90 @@
+; ── FreeLang v9: 실용 예제 3 — 매크로로 DSL 만들기 ──────────────────
+; defmacro로 로깅 DSL, 검증 DSL, 상태 머신 DSL 구현
+; Phase 63(위생적 매크로 시스템)
+
+(println "=== 매크로 DSL 데모 ===")
+
+; ─── 기본 제어 흐름 매크로 ───────────────────────────────────────────
+(defmacro when [$cond $body]
+  (if $cond $body nil))
+
+(defmacro unless [$cond $body]
+  (if $cond nil $body))
+
+(defmacro and2 [$a $b]
+  (if $a $b false))
+
+(defmacro or2 [$a $b]
+  (if $a $a $b))
+
+(println "\n[기본 제어 흐름]")
+(when true (println "when true: 실행됨"))
+(unless false (println "unless false: 실행됨"))
+(println (str "and2(true, false): " (and2 true false)))
+(println (str "or2(false, 42): " (or2 false 42)))
+
+; ─── 로깅 DSL ────────────────────────────────────────────────────────
+(defmacro with-logging [$name $body]
+  (do
+    (println (str "[시작] " $name))
+    (define logging-result $body)
+    (println (str "[완료] " $name " → " logging-result))
+    logging-result))
+
+(println "\n[로깅 DSL]")
+(define result1
+  (with-logging "합계 계산"
+    (+ 10 20 30)))
+
+(define result2
+  (with-logging "문자열 처리"
+    (str "Hello" ", " "FreeLang!")))
+
+; ─── 검증 DSL ────────────────────────────────────────────────────────
+(defmacro assert-eq [$a $b $msg]
+  (if (= $a $b)
+    (println (str "  PASS " $msg))
+    (println (str "  FAIL " $msg " (expected " $b ", got " $a ")"))))
+
+(defmacro assert-true [$cond $msg]
+  (if $cond
+    (println (str "  PASS " $msg))
+    (println (str "  FAIL " $msg))))
+
+(println "\n[검증 DSL]")
+(assert-eq (+ 1 2) 3 "1 + 2 = 3")
+(assert-eq (* 6 7) 42 "6 × 7 = 42")
+(assert-eq (str "foo" "bar") "foobar" "문자열 연결")
+(assert-true (> 10 5) "10 > 5")
+(assert-true (even? 100) "100은 짝수")
+
+; ─── 반복 DSL ────────────────────────────────────────────────────────
+(defmacro repeat-n [$n $body]
+  (loop [$i 0]
+    (when (< $i $n)
+      (do
+        $body
+        (recur (+ $i 1))))))
+
+(println "\n[반복 DSL]")
+; repeat-n: 5번 메시지 출력
+(repeat-n 3
+  (println "  반복 실행 중..."))
+(println "repeat-n 3 완료")
+
+; ─── 데이터 변환 DSL ─────────────────────────────────────────────────
+(defmacro double-all [$data]
+  (map $data [$item] (* $item 2)))
+
+(defmacro square-all [$data]
+  (map $data [$item] (* $item $item)))
+
+(println "\n[데이터 변환 DSL]")
+(define nums [1 2 3 4 5])
+(define doubled (double-all nums))
+(println (str "doubled: " (str doubled)))
+
+(define squared (square-all nums))
+(println (str "squared: " (str squared)))
+
+(println "\n=== 매크로 DSL 완료 ===")
