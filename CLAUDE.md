@@ -76,16 +76,16 @@ API 호출    → (fl-http-get "https://...")
 ### Tier 5 진행 중 (Phase 91~100) — AI 사고 블록
 | Phase | 상태 | 내용 |
 |-------|------|------|
-| 91 | ⏳ | `(maybe p v)` 불확실성 타입 |
-| 92 | ⏳ | `[COT]` Chain-of-Thought |
-| 93 | ⏳ | `[TOT]` Tree-of-Thought |
-| 94 | ⏳ | `[REFLECT]` 자기 평가 |
-| 95 | ⏳ | `[CONTEXT]` 컨텍스트 관리 |
+| 91 | ✅ 31/31 | `(maybe p v)` 불확실성 타입 — d0aea6c |
+| 92 | ✅ 35/35 | `[COT]` Chain-of-Thought — 445e155 |
+| 93 | ✅ 22/22 | `[TOT]` Tree-of-Thought — 8987780 |
+| 94 | ✅ 22/22 | `[REFLECT]` 자기 평가 — 119136f |
+| 95 | ✅ 22/22 | `[CONTEXT]` 컨텍스트 관리 |
 | 96 | ⏳ | `Result/Ok/Err` AI 에러 처리 전면 개선 |
-| 97 | 예정 | `[USE-TOOL]` 도구 사용 DSL |
-| 98 | 예정 | `[AGENT]` 에이전트 루프 |
-| 99 | 예정 | `[SELF-IMPROVE]` 자기 수정 |
-| 100 | 예정 | AI 표준 라이브러리 완전 통합 |
+| 97 | ✅ 24/24 | `[USE-TOOL]` 도구 사용 DSL — b01d7ce |
+| 98 | ⏳ | `[AGENT]` 에이전트 루프 |
+| 99 | ⏳ | `[SELF-IMPROVE]` 자기 수정 |
+| 100 | ⏳ | AI 표준 라이브러리 완전 통합 |
 
 ### Tier 6 예정 (Phase 101~110) — AI가 편한 구조
 - 101: 장기/단기/에피소드 메모리
