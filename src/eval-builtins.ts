@@ -3439,6 +3439,11 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         if (r148 !== null) return r148;
       }
 
+      // === Phase 149: WISDOM ===
+      if (op.startsWith("wisdom-")) {
+        const r149 = evalWisdom(op, args);
+        if (r149 !== null) return r149;
+      }
 
       // === Phase 145: EXPLAIN ===
       if (op.startsWith("explain-")) {
@@ -4835,6 +4840,170 @@ export function evalWisdom(op: string, args: any[]): any | null {
       ["outcome", e.outcome], ["lesson", e.lesson], ["success", e.success],
       ["importance", e.importance], ["domain", e.domain],
     ]));
+  }
+
+  return null;
+}
+
+// === Phase 145: EXPLAIN ===
+export function evalExplain_PHASE145(op: string, args: any[], callFnVal?: (fn: any, a: any[]) => any): any | null {
+  if (op === "explain-decision") {
+    const decision = args[0];
+    const rawFactors = args[1];
+    const context = args[2] !== undefined ? String(args[2]) : undefined;
+    const factors: Record<string, number> = {};
+    if (rawFactors instanceof Map) {
+      for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+    } else if (rawFactors && typeof rawFactors === "object") {
+      for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
+    }
+    const explanation = globalExplainer.explain(decision, factors, context);
+    return new Map<string, any>([
+      ["decision", explanation.decision],
+      ["reasoning", explanation.reasoning],
+      ["features", explanation.features.map((f: FeatureImportance) => new Map<string, any>([
+        ["feature", f.feature], ["importance", f.importance],
+        ["direction", f.direction], ["description", f.description],
+      ]))],
+      ["confidence", explanation.confidence],
+      ["alternatives", explanation.alternatives.map((a: any) => new Map<string, any>([
+        ["decision", a.decision], ["reason", a.reason], ["probability", a.probability],
+      ]))],
+      ["summary", explanation.summary],
+      ["audience", explanation.audience],
+    ]);
+  }
+
+  if (op === "explain-features") {
+    const toRecord = (v: any): Record<string, number> => {
+      const result: Record<string, number> = {};
+      if (v instanceof Map) {
+        for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
+      } else if (v && typeof v === "object") {
+        for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
+      }
+      return result;
+    };
+    const features = globalExplainer.featureImportance(toRecord(args[0]), toRecord(args[1]), args[2] !== undefined ? toRecord(args[2]) : undefined);
+    return features.map((f: FeatureImportance) => new Map<string, any>([
+      ["feature", f.feature], ["importance", f.importance],
+      ["direction", f.direction], ["description", f.description],
+    ]));
+  }
+
+  if (op === "explain-local") {
+    const rawInput = args[0];
+    const output = args[1];
+    const modelFn = args[2];
+    const input: Record<string, unknown> = {};
+    if (rawInput instanceof Map) {
+      for (const [k, v] of rawInput.entries()) input[String(k).replace(/^:/, "")] = v;
+    } else if (rawInput && typeof rawInput === "object") {
+      for (const [k, v] of Object.entries(rawInput)) input[String(k).replace(/^:/, "")] = v;
+    }
+    const model = (inp: Record<string, unknown>): unknown => {
+      if (modelFn && callFnVal) {
+        try { return callFnVal(modelFn, [new Map(Object.entries(inp))]); }
+        catch { return output; }
+      }
+      return output;
+    };
+    const local = globalExplainer.localExplain(input, output, model);
+    return new Map<string, any>([
+      ["input", new Map(Object.entries(local.input))],
+      ["output", local.output],
+      ["topFactors", local.topFactors.map((f: FeatureImportance) => new Map<string, any>([
+        ["feature", f.feature], ["importance", f.importance],
+        ["direction", f.direction], ["description", f.description],
+      ]))],
+      ["counterfactual", local.counterfactual],
+      ["confidence", local.confidence],
+    ]);
+  }
+
+  if (op === "explain-natural") {
+    const rawExpl = args[0];
+    let audience: 'technical' | 'general' = 'technical';
+    for (let i = 1; i < args.length - 1; i += 2) {
+      const key = String(args[i]).replace(/^:/, "");
+      if (key === "audience") audience = String(args[i + 1]) as 'technical' | 'general';
+    }
+    if (!(rawExpl instanceof Map)) return "설명을 변환할 수 없습니다";
+    const featuresRaw = rawExpl.get("features") ?? [];
+    const features: FeatureImportance[] = (Array.isArray(featuresRaw) ? featuresRaw : []).map((f: any) => {
+      if (f instanceof Map) {
+        return {
+          feature: String(f.get("feature") ?? ""),
+          importance: Number(f.get("importance") ?? 0),
+          direction: String(f.get("direction") ?? "positive") as 'positive' | 'negative',
+          description: String(f.get("description") ?? ""),
+        };
+      }
+      return { feature: "", importance: 0, direction: "positive" as const, description: "" };
+    });
+    const altsRaw = rawExpl.get("alternatives") ?? [];
+    const alternatives = (Array.isArray(altsRaw) ? altsRaw : []).map((a: any) => {
+      if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
+      return { decision: null, reason: "", probability: 0 };
+    });
+    const explanation: DecisionExplanation = {
+      decision: rawExpl.get("decision"),
+      reasoning: rawExpl.get("reasoning") ?? [],
+      features,
+      confidence: Number(rawExpl.get("confidence") ?? 0.5),
+      alternatives,
+      summary: String(rawExpl.get("summary") ?? ""),
+      audience: (rawExpl.get("audience") ?? "technical") as 'technical' | 'general',
+    };
+    return globalExplainer.toNaturalLanguage(explanation, audience);
+  }
+
+  if (op === "explain-contrast") {
+    const factors: Record<string, number> = {};
+    const rawF = args[2];
+    if (rawF instanceof Map) {
+      for (const [k, v] of rawF.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+    } else if (rawF && typeof rawF === "object") {
+      for (const [k, v] of Object.entries(rawF)) factors[String(k).replace(/^:/, "")] = Number(v);
+    }
+    return globalExplainer.contrastiveExplain(args[0], args[1], factors);
+  }
+
+  if (op === "explain-rules") {
+    const examples: Array<{ input: Record<string, unknown>; output: unknown }> = [];
+    const toRec = (v: any): Record<string, unknown> => {
+      const r: Record<string, unknown> = {};
+      if (v instanceof Map) { for (const [k, val] of v.entries()) r[String(k).replace(/^:/, "")] = val; }
+      else if (v && typeof v === "object") { Object.assign(r, v); }
+      return r;
+    };
+    if (Array.isArray(args[0])) {
+      for (const ex of args[0]) {
+        if (ex instanceof Map) examples.push({ input: toRec(ex.get("input")), output: ex.get("output") });
+        else if (ex && typeof ex === "object") examples.push({ input: toRec((ex as any).input), output: (ex as any).output });
+      }
+    }
+    return globalExplainer.extractRules(examples).map((r: any) => new Map<string, any>([
+      ["condition", r.condition], ["outcome", r.outcome], ["support", r.support],
+    ]));
+  }
+
+  if (op === "explain-top-factors") {
+    let n = 3;
+    for (let i = 1; i < args.length - 1; i += 2) {
+      if (String(args[i]).replace(/^:/, "") === "n") n = Number(args[i + 1]);
+    }
+    const rawExpl = args[0];
+    let features: any[] = [];
+    if (rawExpl instanceof Map) features = rawExpl.get("features") ?? [];
+    if (!Array.isArray(features)) features = [];
+    return features.slice(0, n);
+  }
+
+  if (op === "explain-summary") {
+    const rawExpl = args[0];
+    if (rawExpl instanceof Map) return String(rawExpl.get("summary") ?? "");
+    return "";
   }
 
   return null;
