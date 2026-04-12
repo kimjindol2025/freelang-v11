@@ -59,12 +59,18 @@ export interface ListPattern {
 export interface StructPattern {
     kind: "struct-pattern";
     fields: Map<string, Pattern>;
+    asBinding?: string;
 }
 export interface OrPattern {
     kind: "or-pattern";
     alternatives: Pattern[];
 }
-export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern | OrPattern;
+export interface RangePattern {
+    kind: "range-pattern";
+    min: number;
+    max: number;
+}
+export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern | OrPattern | RangePattern;
 export interface PatternMatch {
     kind: "pattern-match";
     value: ASTNode;
@@ -247,7 +253,8 @@ export declare function makeLiteralPattern(type: "number" | "string" | "symbol" 
 export declare function makeVariablePattern(name: string): VariablePattern;
 export declare function makeWildcardPattern(): WildcardPattern;
 export declare function makeListPattern(elements: Pattern[], restElement?: string): ListPattern;
-export declare function makeStructPattern(fields: Map<string, Pattern>): StructPattern;
+export declare function makeStructPattern(fields: Map<string, Pattern>, asBinding?: string): StructPattern;
+export declare function makeRangePattern(min: number, max: number): RangePattern;
 export declare function makeOrPattern(alternatives: Pattern[]): OrPattern;
 export declare function makeMatchCase(pattern: Pattern, body: ASTNode, guard?: ASTNode): MatchCase;
 export declare function makePatternMatch(value: ASTNode, cases: MatchCase[], defaultCase?: ASTNode): PatternMatch;

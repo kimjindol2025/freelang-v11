@@ -141,11 +141,16 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     case "reverse":
       if (Array.isArray(args[0])) return [...args[0]].reverse();
       return [...(args[0] || [])].reverse();
-    case "map":
-      if (typeof args[0] === "function") {
-        return (args[1] || []).map(args[0]);
+    case "map": {
+      const mapFn = args[0];
+      const mapArr = Array.isArray(args[1]) ? args[1] : [];
+      if (typeof mapFn === "function") {
+        return mapArr.map(mapFn);
+      } else if (mapFn && ((mapFn as any).kind === "function-value" || (mapFn as any).kind === "async-function-value")) {
+        return mapArr.map((item: any) => callFnVal(mapFn, [item]));
       }
-      return args;
+      return mapArr;
+    }
 
     // Phase 7: Async functions
     case "set-timeout": {
@@ -215,10 +220,17 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     }
 
     case "reduce": {
-      if (!Array.isArray(args[0])) throw new Error(`reduce expects array as first argument`);
-      let accumulator = args[1];
-      const reduceFn = args[2];
-      for (const item of args[0]) {
+      // (reduce fn init arr) 또는 (reduce arr init fn) 모두 지원
+      let reduceFn: any, accumulator: any, arr: any[];
+      if (Array.isArray(args[0])) {
+        // 구형: (reduce arr init fn)
+        arr = args[0]; accumulator = args[1]; reduceFn = args[2];
+      } else {
+        // 표준: (reduce fn init arr)
+        reduceFn = args[0]; accumulator = args[1]; arr = args[2] || [];
+      }
+      if (!Array.isArray(arr)) throw new Error(`reduce: 배열 인자가 필요합니다`);
+      for (const item of arr) {
         accumulator = callFn(reduceFn, [accumulator, item]);
       }
       return accumulator;
@@ -335,13 +347,23 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       return typeof args[0] === "string" && typeof args[1] === "number" ? args[0].repeat(args[1]) : "";
 
     // Array Operations
-    case "filter":
-      if (!Array.isArray(args[0]) || typeof args[1] !== "function") return args[0] || [];
-      return args[0].filter(args[1]);
+    case "filter": {
+      if (!Array.isArray(args[0])) return [];
+      const filterFn = args[1];
+      if (typeof filterFn === "function") return args[0].filter(filterFn);
+      if (filterFn && (filterFn as any).kind === "function-value") {
+        return args[0].filter((item: any) => callFnVal(filterFn, [item]));
+      }
+      return args[0];
+    }
     case "find":
       if (Array.isArray(args[0])) {
-        if (typeof args[1] === "function") return args[0].find(args[1]) || null;
-        return args[0].indexOf(args[1]);
+        const findFn = args[1];
+        if (typeof findFn === "function") return args[0].find(findFn) ?? null;
+        if (findFn && (findFn as any).kind === "function-value") {
+          return args[0].find((item: any) => callFnVal(findFn, [item])) ?? null;
+        }
+        return args[0].indexOf(findFn);
       }
       return -1;
     case "last":

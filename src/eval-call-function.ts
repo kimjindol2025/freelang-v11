@@ -23,6 +23,8 @@ interface InterpreterLike {
       set(name: string, value: any): void;
       get(name: string): any;
       has(name: string): boolean;
+      mutate(name: string, value: any): boolean;
+      snapshot(): Map<string, any>;
       saveStack(): any;
       restoreStack(snapshot: any): void;
       fromSnapshot(snapshot: any): void;
@@ -30,6 +32,35 @@ interface InterpreterLike {
     typeChecker?: any;
     runtimeTypeChecker?: any;
   };
+}
+
+/**
+ * 클로저 실행 후 변경된 변수를 외부 스코프로 역전파.
+ * set! 로 변경된 캡처 변수가 외부(savedStack)에도 반영되도록 함.
+ * capturedEnv도 갱신하여 동일 클로저의 다음 호출에서도 최신 값 사용.
+ */
+function propagateMutations(
+  interp: InterpreterLike,
+  capturedEnv: Map<string, any>,
+  paramSet: Set<string>,
+  savedStack: Map<string, any>[]
+): void {
+  const finalState = interp.context.variables.snapshot();
+  for (const [key, newVal] of finalState) {
+    if (paramSet.has(key)) continue; // 파라미터는 역전파 안 함
+    if (!capturedEnv.has(key)) continue; // 캡처된 변수만
+    const oldVal = capturedEnv.get(key);
+    if (newVal === oldVal) continue; // 변경 없으면 스킵
+    // capturedEnv 갱신 (동일 클로저 다음 호출용)
+    capturedEnv.set(key, newVal);
+    // savedStack(외부 스코프) 갱신
+    for (let i = savedStack.length - 1; i >= 0; i--) {
+      if (savedStack[i].has(key)) {
+        savedStack[i].set(key, newVal);
+        break;
+      }
+    }
+  }
 }
 
 const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
@@ -117,19 +148,23 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // 클로저: capturedEnv가 있으면 해당 환경에서 실행
   if (func.capturedEnv) {
     const savedStack = interp.context.variables.saveStack();
+    const paramSet = new Set<string>(func.params);
     interp.callDepth++;
+    let result: any;
     try {
       interp.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
         interp.context.variables.set(func.params[i], args[i]);
       }
-      return interp.eval(func.body);
+      result = interp.eval(func.body);
+      propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
     } finally {
       interp.callDepth--;
       interp.context.variables.restoreStack(savedStack);
       for (const alias of tempAliases) interp.context.functions.delete(alias);
       exitProfiler();
     }
+    return result;
   }
 
   // 일반 함수: 새 렉시컬 스코프
@@ -156,17 +191,21 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
     throw new Error(`FreeLang line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) — possible infinite recursion`);
   }
   const savedStack = interp.context.variables.saveStack();
+  const paramSet = new Set<string>(fn.params);
   interp.callDepth++;
+  let result: any;
   try {
     interp.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
       interp.context.variables.set(fn.params[i], args[i]);
     }
-    return interp.eval(fn.body);
+    result = interp.eval(fn.body);
+    propagateMutations(interp, fn.capturedEnv, paramSet, savedStack);
   } finally {
     interp.callDepth--;
     interp.context.variables.restoreStack(savedStack);
   }
+  return result;
 }
 
 export function callAsyncFunctionValue(interp: InterpreterLike, fn: any, args: any[]): FreeLangPromise {

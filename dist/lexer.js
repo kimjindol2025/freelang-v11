@@ -156,12 +156,20 @@ function lex(source) {
             col++;
             continue;
         }
-        // Pipe: Or-pattern separator
+        // Pipe: Or-pattern separator, or |> pipeline operator
         if (ch === "|") {
             const startCol = col;
-            tokens.push({ type: token_1.TokenType.Symbol, value: "|", line, col: startCol });
-            i++;
-            col++;
+            // Phase 68: |> pipeline operator
+            if (i + 1 < source.length && source[i + 1] === ">") {
+                tokens.push({ type: token_1.TokenType.Symbol, value: "|>", line, col: startCol });
+                i += 2;
+                col += 2;
+            }
+            else {
+                tokens.push({ type: token_1.TokenType.Symbol, value: "|", line, col: startCol });
+                i++;
+                col++;
+            }
             continue;
         }
         // Colon: Phase 6 token separator (not keyword prefix)
