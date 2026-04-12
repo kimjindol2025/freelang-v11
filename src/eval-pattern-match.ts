@@ -1,7 +1,7 @@
 // FreeLang v9: Pattern Matching
 // Phase 58: interpreter.ts에서 분리된 패턴 매칭 로직
 
-import { PatternMatch, TryBlock, ThrowExpression, Pattern, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern } from "./ast";
+import { PatternMatch, TryBlock, ThrowExpression, Pattern, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, RangePattern } from "./ast";
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -27,6 +27,10 @@ export function evalPatternMatch(interp: InterpreterLike, match: PatternMatch): 
       interp.context.variables.push();
       for (const [varName] of matchResult.bindings) {
         interp.context.variables.set("$" + varName, matchResult.bindings.get(varName));
+      }
+      // Phase 65: as binding — bind entire matched value
+      if (matchResult.asBinding) {
+        interp.context.variables.set("$" + matchResult.asBinding, value);
       }
 
       if (caseItem.guard) {
@@ -109,7 +113,7 @@ export function matchPattern(
   interp: InterpreterLike,
   pattern: Pattern,
   value: any
-): { matched: boolean; bindings: Map<string, any> } {
+): { matched: boolean; bindings: Map<string, any>; asBinding?: string } {
   const bindings = new Map<string, any>();
 
   if ((pattern as any).kind === "literal-pattern") {
@@ -172,7 +176,9 @@ export function matchPattern(
     }
 
     for (const [fieldName, fieldPattern] of structPattern.fields) {
-      const fieldValue = value[fieldName];
+      // Support nested object patterns: strip leading colon from field key
+      const key = fieldName.startsWith(":") ? fieldName.slice(1) : fieldName;
+      const fieldValue = value[key] !== undefined ? value[key] : value[fieldName];
       const fieldResult = matchPattern(interp, fieldPattern, fieldValue);
       if (!fieldResult.matched) {
         return { matched: false, bindings };
@@ -183,7 +189,8 @@ export function matchPattern(
       }
     }
 
-    return { matched: true, bindings };
+    // Phase 65: as binding
+    return { matched: true, bindings, asBinding: structPattern.asBinding };
   }
 
   if ((pattern as any).kind === "or-pattern") {
@@ -197,6 +204,13 @@ export function matchPattern(
     }
 
     return { matched: false, bindings };
+  }
+
+  // Phase 65: Range pattern — matches min <= val < max
+  if ((pattern as any).kind === "range-pattern") {
+    const rangePattern = pattern as RangePattern;
+    const matched = typeof value === "number" && value >= rangePattern.min && value < rangePattern.max;
+    return { matched, bindings };
   }
 
   return { matched: false, bindings };

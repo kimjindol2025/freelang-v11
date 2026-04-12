@@ -43,8 +43,10 @@ import {
   makeListPattern,
   makeStructPattern,
   makeOrPattern,
+  makeRangePattern,
   makeMatchCase,
   makePatternMatch,
+  RangePattern,
   makeModuleBlock,
   makeImportBlock,
   makeOpenBlock,
@@ -946,9 +948,17 @@ export class Parser {
       return makeLiteralPattern("string", token.value);
     }
 
-    // Parenthesized pattern: (pattern) - allows grouping
+    // Parenthesized pattern or range pattern: (pattern) / (range min max)
     if (this.check(T.LParen)) {
       this.advance(); // consume (
+      // Check for range pattern: (range min max)
+      if (this.check(T.Symbol) && this.peek().value === "range") {
+        this.advance(); // consume 'range'
+        const minToken = this.advance(); // min value
+        const maxToken = this.advance(); // max value
+        this.expect(T.RParen);
+        return makeRangePattern(parseFloat(minToken.value), parseFloat(maxToken.value));
+      }
       const pattern = this.parsePattern();
       this.expect(T.RParen);
       return pattern;
@@ -978,16 +988,70 @@ export class Parser {
       return makeListPattern(elements, restElement);
     }
 
-    // Struct pattern: {:name :age} (not fully implemented yet)
-    if (this.check(T.Keyword)) {
+    // Struct pattern (brace form): {:key pattern :key pattern ...} (Phase 65)
+    // Supports :as $varname inside {} or after closing brace
+    if (this.check(T.LBrace)) {
+      this.advance(); // consume '{'
       const fields = new Map<string, Pattern>();
-      while (this.check(T.Keyword) && !this.isAtEnd()) {
-        const keyToken = this.advance();
-        const fieldName = keyToken.value; // e.g., ":name"
+      let asBinding: string | undefined;
+      while (!this.check(T.RBrace) && !this.isAtEnd()) {
+        let fieldName: string;
+        if (this.check(T.Colon)) {
+          this.advance(); // consume ':'
+          if (!this.check(T.Symbol)) break;
+          const keyToken = this.advance();
+          fieldName = keyToken.value;
+        } else if (this.check(T.Keyword)) {
+          const keyToken = this.advance();
+          fieldName = keyToken.value.startsWith(":") ? keyToken.value.slice(1) : keyToken.value;
+        } else {
+          break;
+        }
+        // :as $varname inside braces (Phase 65)
+        if (fieldName === "as") {
+          if (this.check(T.Variable)) {
+            asBinding = this.advance().value;
+          }
+          continue; // don't parse as field
+        }
         const pattern = this.parsePattern();
         fields.set(fieldName, pattern);
       }
-      return makeStructPattern(fields);
+      this.expect(T.RBrace);
+      // Also check for :as $varname after closing brace (Phase 65)
+      if (!asBinding && this.check(T.Colon)) {
+        const savedPos = this.pos;
+        this.advance(); // consume ':'
+        if (this.check(T.Symbol) && this.peek().value === "as") {
+          this.advance(); // consume 'as'
+          if (this.check(T.Variable)) {
+            asBinding = this.advance().value;
+          }
+        } else {
+          this.pos = savedPos; // backtrack
+        }
+      }
+      return makeStructPattern(fields, asBinding);
+    }
+
+    // Struct pattern (colon form, legacy): :key pattern :key pattern ... (Phase 6: T.Colon + T.Symbol)
+    // Only used outside match-case context (e.g., nested) — kept for backward compatibility
+    if (this.check(T.Keyword)) {
+      const fields = new Map<string, Pattern>();
+      let asBinding: string | undefined;
+      while (this.check(T.Keyword) && !this.isAtEnd()) {
+        const keyToken = this.advance();
+        const fieldName = keyToken.value.startsWith(":") ? keyToken.value.slice(1) : keyToken.value;
+        if (fieldName === "as") {
+          if (this.check(T.Variable)) {
+            asBinding = this.advance().value;
+          }
+          break;
+        }
+        const pattern = this.parsePattern();
+        fields.set(fieldName, pattern);
+      }
+      return makeStructPattern(fields, asBinding);
     }
 
     throw this.error(`Expected pattern, got ${this.peek().type}`, this.peek());
@@ -1020,18 +1084,22 @@ export class Parser {
       // Parse pattern
       const pattern = this.parsePattern();
 
-      // Check for optional guard: (if condition) — only when followed directly by )
+      // Check for optional guard: (if condition) or (when condition)
       // If (if cond then else) with then/else, it's the body, not a guard
       let guard: ASTNode | undefined;
-      if (this.check(T.LParen) && this.peekNext()?.value === "if") {
+      if (this.check(T.LParen) && (this.peekNext()?.value === "if" || this.peekNext()?.value === "when")) {
         const savedPos = this.pos;
         this.advance(); // consume (
-        this.advance(); // consume 'if'
+        const guardKeyword = this.advance().value; // consume 'if' or 'when'
         const possibleGuard = this.parseValue();
         if (this.check(T.RParen)) {
-          // (if condition) with no then/else → it's a guard
+          // (if condition) or (when condition) with no extra args → it's a guard
           this.advance(); // consume )
           guard = possibleGuard;
+        } else if (guardKeyword === "when") {
+          // (when condition ...) — treat all remaining args as do-block
+          // for safety: backtrack and treat as body
+          this.pos = savedPos;
         } else {
           // (if condition then else) → it's the body, backtrack
           this.pos = savedPos;

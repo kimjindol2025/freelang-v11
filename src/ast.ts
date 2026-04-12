@@ -110,6 +110,7 @@ export interface ListPattern {
 export interface StructPattern {
   kind: "struct-pattern";
   fields: Map<string, Pattern>;  // field name -> pattern
+  asBinding?: string;            // Phase 65: :as $varname — binds entire matched value
 }
 
 // Or pattern: alternative patterns (1 | 2 | 3)
@@ -118,8 +119,15 @@ export interface OrPattern {
   alternatives: Pattern[];  // list of alternative patterns to try
 }
 
+// Range pattern: (range min max) — matches min <= val < max (Phase 65)
+export interface RangePattern {
+  kind: "range-pattern";
+  min: number;
+  max: number;
+}
+
 // Union of all pattern types
-export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern | OrPattern;
+export type Pattern = LiteralPattern | VariablePattern | WildcardPattern | ListPattern | StructPattern | OrPattern | RangePattern;
 
 // Pattern match expression: (match value case1 case2 ...)
 export interface PatternMatch {
@@ -444,8 +452,12 @@ export function makeListPattern(elements: Pattern[], restElement?: string): List
   return { kind: "list-pattern", elements, restElement };
 }
 
-export function makeStructPattern(fields: Map<string, Pattern>): StructPattern {
-  return { kind: "struct-pattern", fields };
+export function makeStructPattern(fields: Map<string, Pattern>, asBinding?: string): StructPattern {
+  return { kind: "struct-pattern", fields, asBinding };
+}
+
+export function makeRangePattern(min: number, max: number): RangePattern {
+  return { kind: "range-pattern", min, max };
 }
 
 export function makeOrPattern(alternatives: Pattern[]): OrPattern {
