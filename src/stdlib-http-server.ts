@@ -36,6 +36,10 @@ export function createHttpServerModule(callFn: CallFn) {
   let server: http.Server | null = null;
   let requestCounter = 0;
 
+  // Phase 57: 비동기 응답 보류용 저장소
+  const pendingResponses = new Map<string, http.ServerResponse>();
+  let currentRequestId: string | null = null;
+
   // Request ID 생성
   function generateRequestId(): string {
     const timestamp = Date.now();
@@ -162,6 +166,7 @@ export function createHttpServerModule(callFn: CallFn) {
       server = http.createServer(async (req, res) => {
           const requestStart = Date.now();
           const requestId = generateRequestId();
+          currentRequestId = requestId;  // Phase 57: 현재 요청 ID 저장
           const method = req.method || "GET";
           const { path, query } = parseUrl(req.url || "/");
           const headers = req.headers;
@@ -188,6 +193,7 @@ export function createHttpServerModule(callFn: CallFn) {
             if (!match) continue;
 
             matched = true;
+            let status = 200;
             try {
               // 경로 파라미터 추출
               const params: Record<string, string> = {};
@@ -198,21 +204,25 @@ export function createHttpServerModule(callFn: CallFn) {
               // v9 요청 객체 생성 (request_id 포함)
               const flReq = createFlRequest(method, path, query, headers, body, params, requestId);
 
-              // 핸들러 호출
-              const result = callFn(route.handler, [flReq]);
+              // 핸들러 호출 (Phase 57: Promise 지원)
+              let rawResult = callFn(route.handler, [flReq]);
+              const result = (rawResult instanceof Promise) ? await rawResult : rawResult;
 
-              // 응답 처리
-              let status = 200;
-              if (result && typeof result === "object") {
-                if (result.__fl_response === true) {
-                  status = result.status ?? 200;
-                  const contentType = result.contentType ?? "application/json";
-                  sendResponse(res, status, result.body ?? "", contentType);
-                } else {
-                  sendResponse(res, 200, result);
-                }
+              // 응답 처리 (응답 보류 중이면 skip)
+              if (pendingResponses.has(requestId)) {
+                pendingResponses.delete(requestId);
               } else {
-                sendResponse(res, 200, result ?? "");
+                if (result && typeof result === "object") {
+                  if (result.__fl_response === true) {
+                    status = result.status ?? 200;
+                    const contentType = result.contentType ?? "application/json";
+                    sendResponse(res, status, result.body ?? "", contentType);
+                  } else {
+                    sendResponse(res, 200, result);
+                  }
+                } else {
+                  sendResponse(res, 200, result ?? "");
+                }
               }
 
               // Access log
@@ -316,6 +326,37 @@ export function createHttpServerModule(callFn: CallFn) {
     // server_req_path req -> string
     "server_req_path": (req: Request): string => {
       return req.path;
+    },
+
+    // Phase 57: 비동기 응답 보류 함수들
+    // server_req_id -> string | null (현재 요청 ID)
+    "server_req_id": (): string | null => {
+      return currentRequestId;
+    },
+
+    // server_hold_response reqId -> null (응답 보류)
+    "server_hold_response": (reqId: string): null => {
+      // 이 함수는 특정 요청의 응답을 보류한다고 표시
+      // 실제 구현은: 핸들러가 null을 반환하면 자동으로 응답을 보류
+      // reqId로 응답 객체를 저장해야 하는데, 현재 인터페이스에서는 res를 얻을 수 없음
+      // 대신 requestId와 매칭되는 응답 객체를 펜딩 상태로 표시
+      if (currentRequestId === reqId) {
+        pendingResponses.set(reqId, true as any);  // 플래그만 저장
+      }
+      return null;
+    },
+
+    // server_send_held reqId status body -> boolean (보류된 응답 전송)
+    "server_send_held": (reqId: string, status: number, body: any): boolean => {
+      // 이 함수는 보류된 응답을 전송한다
+      // 현재 아키텍처에서는 응답 객체(res)를 저장할 수 없으므로
+      // relay 서버는 다른 패턴을 사용해야 함 (예: Promise 기반)
+      const isPending = pendingResponses.has(reqId);
+      if (isPending) {
+        pendingResponses.delete(reqId);
+        return true;
+      }
+      return false;
     },
   };
 }

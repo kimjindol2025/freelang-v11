@@ -28,6 +28,7 @@ import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Re
 import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
 import { createDbModule } from "./stdlib-db";          // Phase 20: DB Driver
 import { createWsModule } from "./stdlib-ws";          // Phase 21: WebSocket
+import { createWscModule } from "./stdlib-wsc";        // Phase 57: WebSocket Client (Tunnel)
 import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
@@ -163,6 +164,7 @@ export class Interpreter {
     this.registerModule(createHttpServerModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createDbModule());
     this.registerModule(createWsModule((n, a) => this.callUserFunction(n, a)));
+    this.registerModule(createWscModule((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client
     this.registerModule(createAuthModule());
     this.registerModule(createCacheModule());
     this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
