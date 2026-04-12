@@ -77,8 +77,13 @@ class VpmCli {
             : path.join(os.homedir(), '.vpm', 'cache', 'packages');
         // Phase 12: Parallel download
         this.concurrency = Math.min(16, Math.max(1, parseInt(process.env.VPM_CONCURRENCY || '4', 10)));
+        // Phase 13: OAuth2 Registry (프라이빗 패키지 관리)
+        this.authTokenPath = path.join(os.homedir(), '.vpm', 'auth.json');
+        this.oauthToken = null;
     }
     async run(args) {
+        // Phase 13: OAuth 토큰 로드
+        await this.loadOAuthToken();
         if (args.length === 0) {
             this.showHelp();
             return;
@@ -92,7 +97,7 @@ class VpmCli {
                     await this.install(params);
                     break;
                 case 'publish':
-                    await this.publish();
+                    await this.publish(params);
                     break;
                 case 'search':
                     await this.search(params);
@@ -108,6 +113,15 @@ class VpmCli {
                 case 'remove':
                 case 'rm':
                     await this.uninstall(params);
+                    break;
+                case 'login':
+                    await this.loginCommand(params);
+                    break;
+                case 'logout':
+                    await this.logoutCommand();
+                    break;
+                case 'whoami':
+                    await this.whoamiCommand();
                     break;
                 case 'token':
                     await this.token(params);
@@ -383,23 +397,32 @@ class VpmCli {
         }
         console.log(`✅ Installed ${packagesToInstall.length} packages`);
     }
-    async publish() {
+    async publish(params) {
+        // Phase 13: --private 플래그 감지
+        const isPrivate = params?.includes('--private') || false;
         const pkgJsonPath = path.join(this.cwd, 'package.json');
         if (!fs.existsSync(pkgJsonPath)) {
             throw new Error('package.json not found');
         }
         const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
-        const token = process.env.VPM_AUTH_TOKEN;
+        // Phase 13: OAuth2 토큰 우선, 없으면 env 폴백
+        const token = this.oauthToken?.accessToken || process.env.VPM_AUTH_TOKEN;
         if (!token) {
-            throw new Error('VPM_AUTH_TOKEN environment variable not set');
+            throw new Error('Not authenticated. Run: vpm login <username> <password>');
+        }
+        // Phase 13: 토큰 만료 확인 및 갱신
+        if (this.oauthToken) {
+            await this.validateAndRefreshToken();
         }
         console.log(`📦 Publishing ${pkgJson.name}@${pkgJson.version}...`);
         // 패키지 압축
         const tarballPath = await this.createTarball();
         const fileSize = fs.statSync(tarballPath).size;
         const checksum = this.calculateChecksum(tarballPath);
+        // Phase 13: --private 플래그에 따라 엔드포인트 선택
+        const endpoint = isPrivate ? '/private/publish' : '/registry/publish';
         // 레지스트리에 배포
-        const response = await this.makeRequest('POST', '/registry/publish', {
+        const response = await this.makeRequest('POST', endpoint, {
             name: pkgJson.name,
             version: pkgJson.version,
             description: pkgJson.description,
@@ -561,11 +584,16 @@ class VpmCli {
     // Helper methods
     async fetchPackageInfo(packageName, version) {
         try {
+            // Phase 13: Private 패키지 감지 (@org/ 접두사)
+            const isPrivate = packageName.startsWith('@');
+            const endpoint = isPrivate ? '/private/packages' : '/registry/packages';
             const path = version
-                ? `/registry/packages?name=${encodeURIComponent(packageName)}&version=${encodeURIComponent(version)}`
-                : `/registry/packages?name=${encodeURIComponent(packageName)}`;
+                ? `${endpoint}?name=${encodeURIComponent(packageName)}&version=${encodeURIComponent(version)}`
+                : `${endpoint}?name=${encodeURIComponent(packageName)}`;
+            // Phase 13: OAuth 토큰 전달 (private 패키지인 경우)
+            const token = isPrivate ? this.oauthToken?.accessToken : undefined;
             // Phase 9: Use retry wrapper for network resilience
-            const response = await this.makeRequestWithRetry('GET', path);
+            const response = await this.makeRequestWithRetry('GET', path, undefined, token);
             if (!response.success || !response.package)
                 return null;
             // Phase 9: Validate registry response structure
@@ -1413,6 +1441,116 @@ class VpmCli {
         }
         fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
     }
+    // Phase 13: OAuth2 토큰 영속화
+    async loadOAuthToken() {
+        try {
+            const authDir = path.dirname(this.authTokenPath);
+            if (!fs.existsSync(authDir)) {
+                fs.mkdirSync(authDir, { recursive: true });
+            }
+            if (fs.existsSync(this.authTokenPath)) {
+                const data = fs.readFileSync(this.authTokenPath, 'utf-8');
+                this.oauthToken = JSON.parse(data);
+            }
+        }
+        catch (err) {
+            // 토큰 파일 읽기 실패는 무시 (미로그인 상태)
+        }
+    }
+    async saveOAuthToken() {
+        const authDir = path.dirname(this.authTokenPath);
+        if (!fs.existsSync(authDir)) {
+            fs.mkdirSync(authDir, { recursive: true });
+        }
+        fs.writeFileSync(this.authTokenPath, JSON.stringify(this.oauthToken, null, 2));
+    }
+    async clearOAuthToken() {
+        this.oauthToken = null;
+        if (fs.existsSync(this.authTokenPath)) {
+            fs.unlinkSync(this.authTokenPath);
+        }
+    }
+    // Phase 13: OAuth2 로그인
+    async loginCommand(params) {
+        const registryUrl = params[0] || this.registryUrl;
+        if (params.length < 2) {
+            console.error('Usage: vpm login <username> <password> [registry-url]');
+            process.exit(1);
+        }
+        const username = params[0];
+        const password = params[1];
+        try {
+            const response = await this.makeRequest('POST', `/oauth/token`, { username, password });
+            if (!response.accessToken) {
+                throw new Error('Invalid credentials');
+            }
+            this.oauthToken = {
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken,
+                expiresAt: Date.now() + (response.expiresIn || 3600) * 1000,
+                scope: response.scope || ['install', 'publish'],
+                username,
+                registryUrl
+            };
+            await this.saveOAuthToken();
+            console.log(`✓ Successfully logged in as ${username}`);
+        }
+        catch (err) {
+            console.error(`✗ Login failed: ${err.message}`);
+            process.exit(1);
+        }
+    }
+    // Phase 13: OAuth2 로그아웃
+    async logoutCommand() {
+        await this.clearOAuthToken();
+        console.log('✓ Logged out successfully');
+    }
+    // Phase 13: 현재 사용자 정보
+    async whoamiCommand() {
+        if (!this.oauthToken) {
+            console.log('Not logged in. Run: vpm login <username> <password>');
+            return;
+        }
+        try {
+            const response = await this.makeRequest('GET', '/oauth/userinfo', undefined, this.oauthToken.accessToken);
+            console.log(`User: ${response.username || this.oauthToken.username}`);
+            console.log(`Scope: ${this.oauthToken.scope.join(', ')}`);
+            console.log(`Expires: ${new Date(this.oauthToken.expiresAt).toISOString()}`);
+        }
+        catch (err) {
+            console.error(`✗ Error fetching user info: ${err.message}`);
+            process.exit(1);
+        }
+    }
+    // Phase 13: 토큰 만료 확인 및 갱신
+    async validateAndRefreshToken() {
+        if (!this.oauthToken)
+            return false;
+        // 5분 이내 만료 예정 → 갱신
+        if (this.oauthToken.expiresAt - Date.now() < 5 * 60 * 1000) {
+            await this.refreshOAuthToken();
+        }
+        return true;
+    }
+    // Phase 13: OAuth2 토큰 갱신
+    async refreshOAuthToken() {
+        if (!this.oauthToken || !this.oauthToken.refreshToken) {
+            throw new Error('Cannot refresh token: no refresh token available');
+        }
+        try {
+            const response = await this.makeRequest('POST', '/oauth/refresh', { refreshToken: this.oauthToken.refreshToken });
+            this.oauthToken.accessToken = response.accessToken;
+            this.oauthToken.expiresAt = Date.now() + (response.expiresIn || 3600) * 1000;
+            if (response.refreshToken) {
+                this.oauthToken.refreshToken = response.refreshToken;
+            }
+            await this.saveOAuthToken();
+        }
+        catch (err) {
+            console.error(`✗ Token refresh failed: ${err.message}`);
+            process.exit(1);
+        }
+    }
     showHelp() {
         console.log(`
 v9 Package Manager (vpm) - v1.0.0
@@ -1421,8 +1559,11 @@ Usage:
   vpm <command> [options]
 
 Commands:
+  login [registry-url]         Authenticate with registry using OAuth2 (Phase 13)
+  logout                       Remove saved credentials (Phase 13)
+  whoami                       Show current user info (Phase 13)
   install [package@version...] Install package(s) - supports multiple (Phase 12 parallel)
-  publish                      Publish current package to registry
+  publish [--private]          Publish package (--private for private registry, Phase 13)
   search <query>               Search packages
   list                         List installed packages
   update [package]             Update package(s)
@@ -1451,10 +1592,13 @@ Examples:
 
 Environment:
   VPM_REGISTRY               Registry URL (default: http://registry.v9.dclub.kr)
-  VPM_AUTH_TOKEN             Auth token for publishing
+  VPM_AUTH_TOKEN             Fallback auth token for publishing (use 'vpm login' for OAuth2)
   VPM_CACHE_DIR              Override cache directory (default: ~/.vpm/cache/packages)
   VPM_SIGNING_KEY            Signing key for package integrity verification
   VPM_CONCURRENCY            Parallel download limit (default: 4, min: 1, max: 16)
+
+OAuth2 (Phase 13):
+  ~/.vpm/auth.json           Saved OAuth2 credentials (auto-created by 'vpm login')
 
 For more info: https://v9.dclub.kr/docs/vpm
 `);

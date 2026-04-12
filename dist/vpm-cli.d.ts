@@ -25,6 +25,8 @@ declare class VpmCli {
     private signingKey;
     private cacheDir;
     private concurrency;
+    private authTokenPath;
+    private oauthToken;
     run(args: string[]): Promise<void>;
     private install;
     private verify;
@@ -79,6 +81,14 @@ declare class VpmCli {
     private collectDependencies;
     private runWithConcurrencyLimit;
     private batchUpdatePackageJson;
+    private loadOAuthToken;
+    private saveOAuthToken;
+    private clearOAuthToken;
+    private loginCommand;
+    private logoutCommand;
+    private whoamiCommand;
+    private validateAndRefreshToken;
+    private refreshOAuthToken;
     private showHelp;
 }
 export { VpmCli };
