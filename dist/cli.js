@@ -6,6 +6,9 @@
 //   freelang run <file.fl> --watch  파일 변경시 자동 재실행
 //   freelang repl                   대화형 REPL
 //   freelang check <file.fl>        문법 검사만 (실행 안 함)
+//   freelang fmt <file.fl>          파일 인플레이스 포맷
+//   freelang fmt --check <file.fl>  변경 필요 시 exit 1
+//   freelang fmt --stdin            stdin → stdout 포맷
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -46,6 +49,7 @@ const readline = __importStar(require("readline"));
 const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const interpreter_1 = require("./interpreter");
+const formatter_1 = require("./formatter");
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
 // ─────────────────────────────────────────
@@ -274,6 +278,73 @@ function cmdRepl() {
 // ─────────────────────────────────────────
 // 진입점
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// fmt 커맨드 (Phase 73)
+// ─────────────────────────────────────────
+function cmdFmt(args) {
+    // --stdin 모드
+    if (args.includes("--stdin")) {
+        let src = "";
+        process.stdin.setEncoding("utf-8");
+        process.stdin.on("data", (chunk) => { src += chunk; });
+        process.stdin.on("end", () => {
+            try {
+                const formatted = (0, formatter_1.formatFL)(src);
+                process.stdout.write(formatted);
+            }
+            catch (err) {
+                console.error(`\x1b[31m포맷 오류\x1b[0m  ${err.message}`);
+                process.exit(1);
+            }
+        });
+        return;
+    }
+    // --check 모드
+    const checkMode = args.includes("--check");
+    const filePaths = args.filter((a) => !a.startsWith("--"));
+    if (filePaths.length === 0) {
+        console.error(`\x1b[31m오류\x1b[0m  파일 경로를 지정하세요`);
+        process.exit(1);
+    }
+    let needsChange = false;
+    for (const filePath of filePaths) {
+        const absPath = path.resolve(filePath);
+        if (!fs.existsSync(absPath)) {
+            console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+            process.exit(1);
+        }
+        const src = fs.readFileSync(absPath, "utf-8");
+        let formatted;
+        try {
+            formatted = (0, formatter_1.formatFL)(src);
+        }
+        catch (err) {
+            console.error(`\x1b[31m포맷 오류\x1b[0m  ${path.basename(absPath)}: ${err.message}`);
+            process.exit(1);
+        }
+        if (checkMode) {
+            if (src !== formatted) {
+                console.log(`\x1b[33m변경 필요\x1b[0m  ${path.basename(absPath)}`);
+                needsChange = true;
+            }
+            else {
+                console.log(`\x1b[32m이미 포맷됨\x1b[0m  ${path.basename(absPath)}`);
+            }
+        }
+        else {
+            if (src !== formatted) {
+                fs.writeFileSync(absPath, formatted, "utf-8");
+                console.log(`\x1b[32m포맷 완료\x1b[0m  ${path.basename(absPath)}`);
+            }
+            else {
+                console.log(`\x1b[2m변경 없음\x1b[0m  ${path.basename(absPath)}`);
+            }
+        }
+    }
+    if (checkMode && needsChange) {
+        process.exit(1);
+    }
+}
 function printUsage() {
     console.log([
         "",
@@ -283,12 +354,18 @@ function printUsage() {
         "  freelang run <file.fl>           파일 실행",
         "  freelang run <file.fl> --watch   파일 변경 감지 + 자동 재실행",
         "  freelang check <file.fl>         문법 검사",
+        "  freelang fmt <file.fl>           파일 인플레이스 포맷 (Phase 73)",
+        "  freelang fmt --check <file.fl>   이미 포맷됐는지 확인 (미포맷 → exit 1)",
+        "  freelang fmt --stdin             stdin 입력받아 stdout 출력",
         "  freelang repl                    대화형 REPL",
         "",
         "예제:",
         "  freelang run my-script.fl",
         "  freelang run agent.fl --watch",
         "  freelang check parser.fl",
+        "  freelang fmt my-script.fl",
+        "  freelang fmt --check *.fl",
+        "  cat script.fl | freelang fmt --stdin",
         "  freelang repl",
         "",
     ].join("\n"));
@@ -313,6 +390,10 @@ switch (cmd) {
             process.exit(1);
         }
         cmdCheck(filePath);
+        break;
+    }
+    case "fmt": {
+        cmdFmt(args.slice(1));
         break;
     }
     case "repl":

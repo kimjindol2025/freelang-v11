@@ -151,7 +151,10 @@ describe('Interpreter - ExecutionContext 구조', () => {
   test('context.variables 존재', () => {
     const ctx = run('(+ 1 1)');
     expect(ctx.variables).toBeDefined();
-    expect(ctx.variables instanceof Map).toBe(true);
+    // variables는 ScopeStack (Map-like 인터페이스 제공)
+    expect(ctx.variables).toHaveProperty('has');
+    expect(ctx.variables).toHaveProperty('get');
+    expect(ctx.variables).toHaveProperty('set');
   });
 
   test('context.lastValue 설정됨', () => {

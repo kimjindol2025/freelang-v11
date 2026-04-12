@@ -43,45 +43,39 @@ const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const ast_1 = require("./ast");
 const type_checker_1 = require("./type-checker");
-const errors_1 = require("./errors");
+const type_system_1 = require("./type-system"); // Phase 60: 런타임 타입 검증
 const logger_1 = require("./logger");
-const ast_helpers_1 = require("./ast-helpers");
-const async_runtime_1 = require("./async-runtime");
 const interpreter_scope_1 = require("./interpreter-scope"); // Phase A: 렉시컬 스코프
 const web_search_adapter_1 = require("./web-search-adapter"); // Phase 9a: WebSearch integration
 const learned_facts_store_1 = require("./learned-facts-store"); // Phase 9b: Learning persistence
-const stdlib_file_1 = require("./stdlib-file"); // Phase 10: File I/O
-const stdlib_error_1 = require("./stdlib-error"); // Phase 11: Error handling
-const stdlib_http_1 = require("./stdlib-http"); // Phase 12: HTTP Client
-const stdlib_shell_1 = require("./stdlib-shell"); // Phase 12: Shell execution
-const stdlib_data_1 = require("./stdlib-data"); // Phase 13: Data Transform
-const stdlib_collection_1 = require("./stdlib-collection"); // Phase 14: Collection + Control
-const stdlib_agent_1 = require("./stdlib-agent"); // Phase 15: AI Agent State Machine
-const stdlib_time_1 = require("./stdlib-time"); // Phase 16: Time + Logging + Monitoring
-const stdlib_crypto_1 = require("./stdlib-crypto"); // Phase 17: Crypto + UUID + Regex
-const stdlib_workflow_1 = require("./stdlib-workflow"); // Phase 18: Workflow Engine
-const stdlib_resource_1 = require("./stdlib-resource"); // Phase 19: Server Resource Search
-const stdlib_http_server_1 = require("./stdlib-http-server"); // Phase 4a: Pure HTTP Server (Express-free)
-const stdlib_db_1 = require("./stdlib-db"); // Phase 20: DB Driver
-const stdlib_ws_1 = require("./stdlib-ws"); // Phase 21: WebSocket
-const stdlib_wsc_1 = require("./stdlib-wsc"); // Phase 57: WebSocket Client (Tunnel)
-const stdlib_auth_1 = require("./stdlib-auth"); // Phase 21: Auth (JWT, API key, hash)
-const stdlib_cache_1 = require("./stdlib-cache"); // Phase 21: In-memory TTL cache
-const stdlib_pubsub_1 = require("./stdlib-pubsub"); // Phase 21: Pub/Sub events
-const stdlib_process_1 = require("./stdlib-process"); // Phase 22: Process (env + SIGTERM)
-const stdlib_async_1 = require("./stdlib-async"); // Phase 23: Async/await primitives
-const stdlib_module_1 = require("./stdlib-module"); // Phase 24: Module system
-const stdlib_pg_1 = require("./stdlib-pg"); // PostgreSQL + JWT + AI
+const eval_builtins_1 = require("./eval-builtins"); // Phase 57: Built-in functions
+const eval_ai_blocks_1 = require("./eval-ai-blocks"); // Phase 57: AI blocks
+const eval_special_forms_1 = require("./eval-special-forms"); // Phase 57: Special forms
+const eval_reasoning_sequence_1 = require("./eval-reasoning-sequence"); // Phase 57: Reasoning sequence
+const eval_ai_handlers_1 = require("./eval-ai-handlers"); // Phase 57: AI handlers
+const eval_module_system_1 = require("./eval-module-system"); // Phase 57: Module system
+const stdlib_loader_1 = require("./stdlib-loader"); // Phase 58: Stdlib 로딩 분리
+const eval_pattern_match_1 = require("./eval-pattern-match"); // Phase 58: Pattern matching 분리
+const eval_type_classes_1 = require("./eval-type-classes"); // Phase 58: Type class 분리
+const eval_call_function_1 = require("./eval-call-function"); // Phase 58+61: Function call 분리 + TCO
+const macro_expander_1 = require("./macro-expander"); // Phase 63: 매크로 시스템
+const protocol_1 = require("./protocol"); // Phase 64: 프로토콜 시스템
+const struct_system_1 = require("./struct-system"); // Phase 66: 구조체 시스템
+const lazy_seq_1 = require("./lazy-seq"); // Phase 69: 레이지 시퀀스
 // Interpreter class
 class Interpreter {
-    constructor(logger) {
+    constructor(logger, options) {
         this.currentLine = 0; // FreeLang source line tracking
         this.callDepth = 0;
+        // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
+        this.tcoMode = false;
         // Phase 52: FL 파일 import 지원
         this.importedFiles = new Set();
         this.currentFilePath = process.cwd();
         this.serverConfig = null;
         this.logger = logger || (0, logger_1.getGlobalLogger)();
+        // Phase 60: strict 모드 — 환경변수 FREELANG_STRICT=1 또는 options.strict=true
+        const strictMode = options?.strict ?? process.env.FREELANG_STRICT === "1";
         this.context = {
             functions: new Map(),
             routes: new Map(),
@@ -91,9 +85,13 @@ class Interpreter {
             errorHandlers: { handlers: new Map() },
             startTime: Date.now(),
             typeChecker: (0, type_checker_1.createTypeChecker)(), // Phase 3: Initialize type checker
+            runtimeTypeChecker: new type_system_1.RuntimeTypeChecker(strictMode), // Phase 60: 런타임 타입 검증
             typeClasses: new Map(), // Phase 5 Week 2: Type class registry
             typeClassInstances: new Map(), // Phase 5 Week 2: Type class instance registry
             modules: new Map(), // Phase 6: Module registry
+            macroExpander: new macro_expander_1.MacroExpander(), // Phase 63: 매크로 시스템
+            protocols: new protocol_1.ProtocolRegistry(), // Phase 64: 프로토콜 시스템
+            structs: new struct_system_1.StructRegistry(), // Phase 66: 구조체/레코드 타입 시스템
         };
         // Phase 9a: Initialize WebSearchAdapter (mock mode by default)
         // Production: Use BRAVE_SEARCH_KEY or SERPER_API_KEY from env
@@ -102,34 +100,48 @@ class Interpreter {
         this.searchAdapter = new web_search_adapter_1.WebSearchAdapter(apiKey, provider);
         // Phase 9b: Initialize LearnedFactsStore (persistent learning)
         this.learnedFactsStore = new learned_facts_store_1.LearnedFactsStore("./data/learned-facts.json", 30);
-        // Phase 10-20: Register all stdlib modules
-        this.registerModule((0, stdlib_file_1.createFileModule)());
-        this.registerModule((0, stdlib_error_1.createErrorModule)());
-        this.registerModule((0, stdlib_http_1.createHttpModule)());
-        this.registerModule((0, stdlib_shell_1.createShellModule)());
-        this.registerModule((0, stdlib_data_1.createDataModule)());
-        this.registerModule((0, stdlib_collection_1.createCollectionModule)());
-        this.registerModule((0, stdlib_agent_1.createAgentModule)());
-        this.registerModule((0, stdlib_time_1.createTimeModule)());
-        this.registerModule((0, stdlib_crypto_1.createCryptoModule)());
-        this.registerModule((0, stdlib_workflow_1.createWorkflowModule)());
-        this.registerModule((0, stdlib_resource_1.createResourceModule)());
-        // Phase 4a: Pure HTTP Server (overrides Express version)
-        this.registerModule((0, stdlib_http_server_1.createHttpServerModule)((n, a) => this.callUserFunction(n, a), (fnValue, a) => this.callFunctionValue(fnValue, a)));
-        this.registerModule((0, stdlib_db_1.createDbModule)());
-        this.registerModule((0, stdlib_ws_1.createWsModule)((n, a) => this.callUserFunction(n, a)));
-        this.registerModule((0, stdlib_wsc_1.createWscModule)((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client
-        this.registerModule((0, stdlib_auth_1.createAuthModule)());
-        this.registerModule((0, stdlib_cache_1.createCacheModule)());
-        this.registerModule((0, stdlib_pubsub_1.createPubSubModule)((n, a) => this.callUserFunction(n, a)));
-        this.registerModule((0, stdlib_process_1.createProcessModule)()); // Phase 22: env_load, on_sigterm
-        this.registerModule((0, stdlib_async_1.createAsyncModule)((n, a) => this.callUserFunction(n, a))); // Phase 23: async_call, promise_*
-        this.registerModule((0, stdlib_module_1.createModuleSystem)()); // Phase 24: module_*, namespace_*
-        this.registerModule(stdlib_pg_1.pgBuiltins); // PostgreSQL + JWT + AI
+        // Phase 58: 모든 stdlib 모듈 등록 (stdlib-loader.ts로 분리)
+        (0, stdlib_loader_1.loadAllStdlib)(this);
         // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
         this.loadFlStdlib();
         // Phase 5 Week 2: Register built-in type classes and instances
         this.registerBuiltinTypeClasses();
+        // Phase 63: 표준 매크로 등록 (when, unless, and2)
+        this.registerStandardMacros();
+    }
+    // Phase 63: 표준 매크로 등록
+    registerStandardMacros() {
+        const expander = this.context.macroExpander;
+        // (when $cond $body) → (if $cond $body nil)
+        expander.define("when", ["$cond", "$body"], {
+            kind: "sexpr",
+            op: "if",
+            args: [
+                { kind: "variable", name: "$cond" },
+                { kind: "variable", name: "$body" },
+                { kind: "literal", type: "null", value: null },
+            ],
+        });
+        // (unless $cond $body) → (if $cond nil $body)
+        expander.define("unless", ["$cond", "$body"], {
+            kind: "sexpr",
+            op: "if",
+            args: [
+                { kind: "variable", name: "$cond" },
+                { kind: "literal", type: "null", value: null },
+                { kind: "variable", name: "$body" },
+            ],
+        });
+        // (and2 $a $b) → (if $a $b false)
+        expander.define("and2", ["$a", "$b"], {
+            kind: "sexpr",
+            op: "if",
+            args: [
+                { kind: "variable", name: "$a" },
+                { kind: "variable", name: "$b" },
+                { kind: "literal", type: "boolean", value: false },
+            ],
+        });
     }
     // Phase 49: freelang-stdlib.fl 로드 — fl-map, fl-filter, fl-reduce 등
     // TS 내장 some/none/ok/err({tag,kind,value})와 FL 배열 표현["some",v]이 다르므로
@@ -181,7 +193,22 @@ class Interpreter {
     }
     interpret(blocks) {
         try {
+            // Phase 63: 매크로 확장 전처리 — defmacro 먼저 처리, 나머지는 확장
+            // 1단계: defmacro 노드 선처리
             for (const node of blocks) {
+                if (node.kind === "sexpr" && node.op === "defmacro") {
+                    this.evalDefmacro(node);
+                }
+            }
+            // 2단계: defmacro가 아닌 노드는 매크로 확장 후 실행
+            blocks = blocks.map((node) => {
+                if (node.kind === "sexpr" && node.op === "defmacro")
+                    return node;
+                return this.context.macroExpander.expand(node);
+            });
+            for (const node of blocks) {
+                if (node.kind === "sexpr" && node.op === "defmacro")
+                    continue; // 이미 처리됨
                 if ((0, ast_1.isImportBlock)(node)) {
                     this.evalImportBlock(node);
                 }
@@ -218,6 +245,13 @@ class Interpreter {
             throw e;
         }
         return this.context;
+    }
+    /**
+     * Phase 59: 소스 코드 문자열을 받아 lex → parse → interpret 후 ExecutionContext 반환
+     * 테스트와 인라인 실행에 편리한 단축 메서드
+     */
+    run(source) {
+        return this.interpret((0, parser_1.parse)((0, lexer_1.lex)(source)));
     }
     evalBlock(block) {
         switch (block.type) {
@@ -344,6 +378,13 @@ class Interpreter {
                 // Phase 3: Register regular function
                 this.context.typeChecker.registerFunction(block.name, paramTypes, returnType);
             }
+        }
+        // Phase 60: RuntimeTypeChecker에도 시그니처 등록 (타입 어노테이션이 있는 함수만)
+        // typeAnnotations가 있으면 = 명시적 타입 어노테이션이 있는 함수
+        if (this.context.runtimeTypeChecker && block.typeAnnotations) {
+            const paramTypeNames = paramTypes.map((p) => p.name || "any");
+            const retTypeName = returnType.name || "any";
+            this.context.runtimeTypeChecker.registerFunc(block.name, paramTypeNames, retTypeName);
         }
     }
     handleIntentBlock(block) {
@@ -498,7 +539,6 @@ class Interpreter {
             this.currentLine = expr.line;
         const op = expr.op;
         // Phase 5 Week 2: Method dispatch (ClassName:methodName pattern)
-        // Syntax: (Monad:pure $value) or (Functor:fmap $fn $value)
         if (typeof op === "string" && op.includes(":")) {
             const [className, methodName] = op.split(":");
             // For now, assume the first argument is the concrete type value
@@ -523,1416 +563,67 @@ class Interpreter {
             }
             // If method dispatch fails, fall through to standard function lookup
         }
-        // Phase 4 Week 1: First-class functions - handle before arg evaluation
-        if (op === "fn") {
-            // (fn [$x $y] (+ $x $y))
-            // expr.args[0] = params (array of variable names)
-            // expr.args[1] = body
-            if (expr.args.length < 2) {
-                throw new Error(`fn requires at least 2 arguments (params and body)`);
-            }
-            const paramsNode = expr.args[0];
-            const params = [];
-            // Extract parameter names from array block
-            if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-                const items = paramsNode.fields.get("items");
-                if (Array.isArray(items)) {
-                    for (const item of items) {
-                        if (item.kind === "variable") {
-                            params.push(item.name);
-                        }
-                    }
-                }
-            }
-            // Create function value with captured environment
-            return {
-                kind: "function-value",
-                params,
-                body: expr.args[1],
-                capturedEnv: this.context.variables.snapshot(),
-                name: undefined,
-            };
-        }
-        // Phase 7: Async functions - handle before arg evaluation
-        if (op === "async") {
-            // [async name [params] body]
-            // expr.args[0] = name (symbol)
-            // expr.args[1] = params (array of variable names)
-            // expr.args[2] = body
-            if (expr.args.length < 3) {
-                throw new Error(`async requires name, params, and body`);
-            }
-            const nameNode = expr.args[0];
-            const name = nameNode.name || "async-fn";
-            const paramsNode = expr.args[1];
-            const params = [];
-            // Extract parameter names from array block
-            if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-                const items = paramsNode.fields.get("items");
-                if (Array.isArray(items)) {
-                    for (const item of items) {
-                        if (item.kind === "variable") {
-                            params.push(item.name);
-                        }
-                    }
-                }
-            }
-            // Create async function value with captured environment
-            return {
-                kind: "async-function-value",
-                name,
-                params,
-                body: expr.args[2],
-                capturedEnv: this.context.variables.snapshot(),
-            };
-        }
-        // Phase 9a: Search/Fetch expressions from eval (when used in S-expression form)
-        if (op === "search" || op === "fetch") {
-            // (search query :source "web" :cache true :limit 5 :name results)
-            // (fetch url :cache true)
-            let query = "";
-            let source = "web";
-            let cache = false;
-            let limit = 10;
-            let name;
-            // Parse arguments
-            for (let i = 0; i < expr.args.length; i++) {
-                const arg = expr.args[i];
-                // First positional argument is query/url
-                if (i === 0) {
-                    const queryValue = this.eval(arg);
-                    query = String(queryValue);
-                    continue;
-                }
-                // Check for keyword arguments
-                if (arg.kind === "keyword") {
-                    const keywordName = arg.name;
-                    if (i + 1 < expr.args.length) {
-                        const value = this.eval(expr.args[i + 1]);
-                        switch (keywordName) {
-                            case "source":
-                                if (value === "web" || value === "api" || value === "kb") {
-                                    source = value;
-                                }
-                                break;
-                            case "cache":
-                                cache = value === true || value === "true";
-                                break;
-                            case "limit":
-                                limit = Number(value) || 10;
-                                break;
-                            case "name":
-                                name = String(value);
-                                break;
-                        }
-                        i++; // Skip the value argument
-                    }
-                }
-            }
-            // For fetch, always use "api" source
-            if (op === "fetch") {
-                source = "api";
-            }
-            const searchBlock = {
-                kind: "search-block",
-                query,
-                source,
-                cache,
-                limit,
-                name,
-            };
-            return this.handleSearchBlock(searchBlock);
-        }
-        // Phase 9b: Learn/Recall expressions from eval (when used in S-expression form)
-        if (op === "learn" || op === "recall" || op === "remember" || op === "forget") {
-            // (learn key data :source "search" :confidence 0.95)
-            // (recall key)
-            // (remember key data) - alias for learn
-            // (forget key) - delete learned data
-            let key = "";
-            let data = null;
-            let source = "search";
-            let confidence;
-            // Parse arguments
-            for (let i = 0; i < expr.args.length; i++) {
-                const arg = expr.args[i];
-                // First positional argument is key
-                if (i === 0) {
-                    const keyValue = this.eval(arg);
-                    key = String(keyValue);
-                    continue;
-                }
-                // Second positional argument is data (for learn/remember)
-                if (i === 1 && (op === "learn" || op === "remember")) {
-                    data = this.eval(arg);
-                    continue;
-                }
-                // Check for keyword arguments
-                if (arg.kind === "keyword") {
-                    const keywordName = arg.name;
-                    if (i + 1 < expr.args.length) {
-                        const value = this.eval(expr.args[i + 1]);
-                        switch (keywordName) {
-                            case "source":
-                                if (value === "search" || value === "feedback" || value === "analysis") {
-                                    source = value;
-                                }
-                                break;
-                            case "confidence":
-                                confidence = Number(value) || undefined;
-                                break;
-                        }
-                        i++; // Skip the value argument
-                    }
-                }
-            }
-            // Handle forget operation
-            if (op === "forget") {
-                if (!this.context.learned) {
-                    this.context.learned = new Map();
-                }
-                const found = this.context.learned.has(key);
-                if (found) {
-                    this.context.learned.delete(key);
-                    this.logger.info(`🗑️ Forgot: "${key}"`);
-                }
-                return {
-                    kind: "learn-result",
-                    operation: "forget",
-                    key,
-                    deleted: found,
-                };
-            }
-            // Handle recall operation
-            if (op === "recall") {
-                data = null; // Mark as recall
-            }
-            const learnBlock = {
-                kind: "learn-block",
-                key,
-                data,
-                source,
-                confidence,
-                timestamp: new Date().toISOString(),
-            };
-            return this.handleLearnBlock(learnBlock);
-        }
-        // Phase 9c: Reasoning expressions from eval (observe, analyze, decide, act, verify)
-        if (op === "observe" || op === "analyze" || op === "decide" || op === "act" || op === "verify") {
-            const stage = op;
-            const data = new Map();
-            let observations;
-            let analysis;
-            let decisions;
-            let actions;
-            let verifications;
-            let confidence;
-            // Parse arguments based on stage
-            for (let i = 0; i < expr.args.length; i++) {
-                const arg = expr.args[i];
-                // Check for keyword arguments
-                if (arg.kind === "keyword") {
-                    const keywordName = arg.name;
-                    if (i + 1 < expr.args.length) {
-                        const value = this.eval(expr.args[i + 1]);
-                        if (keywordName === "confidence") {
-                            confidence = Number(value);
-                        }
-                        else {
-                            data.set(keywordName, value);
-                        }
-                        i++; // Skip the value argument
-                    }
-                }
-                else {
-                    // First positional argument depends on stage
-                    if (i === 0) {
-                        const argValue = this.eval(arg);
-                        switch (stage) {
-                            case "observe":
-                                observations = [argValue];
-                                data.set("observation", argValue);
-                                break;
-                            case "analyze":
-                                // For analyze, first arg might be angle data
-                                data.set("firstArg", argValue);
-                                break;
-                            case "decide":
-                                // For decide, first arg might be choice data
-                                data.set("firstArg", argValue);
-                                break;
-                            case "act":
-                                // For act, first arg might be action data
-                                data.set("firstArg", argValue);
-                                break;
-                            case "verify":
-                                // For verify, first arg might be result data
-                                verifications = [argValue];
-                                data.set("result", argValue);
-                                break;
-                        }
-                    }
-                }
-            }
-            // Build reasoning block
-            const reasoningBlock = {
-                kind: "reasoning-block",
-                stage,
-                data,
-                observations,
-                analysis,
-                decisions,
-                actions,
-                verifications,
-                metadata: {
-                    confidence,
-                    startTime: new Date().toISOString(),
-                },
-            };
-            return this.handleReasoningBlock(reasoningBlock);
-        }
-        // Phase 7: Await expressions - extract Promise value
-        if (op === "await") {
-            // (await promise-expression)
-            if (expr.args.length < 1) {
-                throw new Error(`await requires a Promise argument`);
-            }
-            const promise = this.eval(expr.args[0]);
-            // Promise resolved 상태이면 값 반환
-            if (promise instanceof async_runtime_1.FreeLangPromise) {
-                if (promise.getState() === "resolved") {
-                    return promise.getValue();
-                }
-                else if (promise.getState() === "rejected") {
-                    throw promise.getError() || new Error("Promise rejected");
-                }
-                else {
-                    // pending 상태: 현재는 에러 발생 (진정한 비동기는 이벤트 루프 필요)
-                    throw new Error("Cannot await unresolved Promise in synchronous context");
-                }
-            }
-            else {
-                throw new TypeError("await requires a Promise, got " + typeof promise);
-            }
-        }
-        // set!: (set! name value) — mutable variable update (closure pattern)
-        if (op === "set!") {
-            if (expr.args.length < 2)
-                throw new Error(`set! requires a name and a value`);
-            const nameNode = expr.args[0];
-            let name;
-            if (nameNode.kind === "variable") {
-                name = "$" + nameNode.name; // name is e.g. "W", prefix to get "$W"
-            }
-            else if (nameNode.kind === "literal") {
-                name = "$" + nameNode.value;
-            }
-            else {
-                throw new Error(`set!: first argument must be a symbol`);
-            }
-            const value = this.eval(expr.args[1]);
-            if (!this.context.variables.mutate(name, value)) {
-                this.context.variables.set(name, value);
-            }
-            return value;
-        }
-        // Define a function: (define name (fn [...] body))
-        if (op === "define") {
-            if (expr.args.length < 2) {
-                throw new Error(`define requires a name and a value`);
-            }
-            const nameNode = expr.args[0];
-            // Get the name
-            let name;
-            if (nameNode.kind === "literal") {
-                name = nameNode.value;
-            }
-            else if (nameNode.kind === "variable") {
-                name = nameNode.name;
-            }
-            else {
-                throw new Error(`define: first argument must be a symbol or string`);
-            }
-            // 3-arg form: (define name [params] body) → define a function directly
-            // Used in self-hosting FL files: (define scan [] body), (define emit [type val] body)
-            if (expr.args.length >= 3) {
-                const paramsNode = expr.args[1];
-                const bodyNode = expr.args.length === 3 ? expr.args[2]
-                    : { kind: "sexpr", op: "do", args: expr.args.slice(2) };
-                let params = [];
-                // paramsNode is an array-like block or array literal from the TS parser
-                const items = paramsNode.kind === "block" && paramsNode.type === "Array"
-                    ? paramsNode.fields.get("items") || []
-                    : paramsNode.kind === "array"
-                        ? paramsNode.items || []
-                        : [];
-                params = items.map((item) => {
-                    if (item.kind === "variable")
-                        return item.name.startsWith("$") ? item.name : "$" + item.name;
-                    if (item.kind === "literal")
-                        return "$" + item.value;
-                    return "$" + (item.name || item.value || "?");
-                });
-                this.context.functions.set(name, { name, params, body: bodyNode });
-                return null;
-            }
-            const valueNode = expr.args[1];
-            // Evaluate the value
-            const value = this.eval(valueNode);
-            // If it's a function value, store it in the functions map
-            if (value.kind === "function-value") {
-                const funcDef = {
-                    name,
-                    params: value.params,
-                    body: value.body,
-                    capturedEnv: value.capturedEnv, // 클로저 환경 보존
-                };
-                this.context.functions.set(name, funcDef);
-                // Also register with type checker if available
-                if (this.context.typeChecker) {
-                    // Create type annotations for parameters (all as 'any' for now)
-                    const paramTypes = value.params.map(() => ({
-                        kind: "type",
-                        name: "any",
-                    }));
-                    this.context.typeChecker.registerFunction(name, paramTypes, {
-                        kind: "type",
-                        name: "any",
-                    });
-                }
-                return value;
-            }
-            else {
-                // Store as a variable
-                this.context.variables.set("$" + name, value);
-                return value;
-            }
-        }
-        if (op === "func-ref") {
-            // (func-ref function-name) - get function as value
-            if (expr.args.length < 1) {
-                throw new Error(`func-ref requires function name`);
-            }
-            const funcName = expr.args[0].name || String(expr.args[0]);
-            const func = this.context.functions.get(funcName);
-            if (!func) {
-                throw new Error(`Function not found: ${funcName}`);
-            }
-            return {
-                kind: "function-value",
-                params: func.params,
-                body: func.body,
-                capturedEnv: this.context.variables.snapshot(),
-                name: funcName,
-            };
-        }
-        if (op === "call") {
-            // (call fn arg1 arg2 ...) — fn은 function-value, 문자열 함수명, 또는 심볼 리터럴
-            if (expr.args.length < 1) {
-                throw new Error(`call requires function as first argument`);
-            }
-            const fn = this.eval(expr.args[0]);
-            const evaluatedArgs = expr.args.slice(1).map((a) => this.eval(a));
-            if (fn.kind === "builtin-function") {
-                return fn.fn(evaluatedArgs);
-            }
-            else if (fn.kind === "function-value") {
-                return this.callFunctionValue(fn, evaluatedArgs);
-            }
-            else if (fn.kind === "async-function-value") {
-                return this.callAsyncFunctionValue(fn, evaluatedArgs);
-            }
-            else if (typeof fn === "string") {
-                // FL stdlib: 심볼 리터럴 "double" → 함수명으로 lookup
-                return this.callUserFunction(fn, evaluatedArgs);
-            }
-            else {
-                throw new Error(`call expects function-value, got ${fn.kind || typeof fn}`);
-            }
-        }
-        // Phase 5 Week 1: Function Composition (needs unevaluated arguments)
-        if (op === "compose") {
-            // (compose f g h) → function that applies h, then g, then f (right-to-left)
-            // Result: a function that takes one argument and applies functions in reverse order
-            if (expr.args.length < 2) {
-                throw new Error(`compose requires at least 2 functions`);
-            }
-            // Resolve function arguments (handle both symbols and function values)
-            const funcsToCompose = expr.args.map(arg => {
-                if (arg.kind === "literal" && arg.type === "symbol") {
-                    // Symbol literal like: 'double'
-                    const fnName = arg.value;
-                    if (this.context.functions.has(fnName)) {
-                        return { _isFunctionName: true, name: fnName };
-                    }
-                    else {
-                        throw new Error(`compose: '${fnName}' is not a function`);
-                    }
-                }
-                else if (arg.kind === "variable") {
-                    // Variable reference (e.g., $double)
-                    const fnName = arg.name;
-                    if (this.context.functions.has(fnName)) {
-                        return { _isFunctionName: true, name: fnName };
-                    }
-                    else {
-                        const value = this.context.variables.get(fnName);
-                        if (value && (value.kind === "function-value" || typeof value === "function")) {
-                            return value;
-                        }
-                        throw new Error(`compose: '${fnName}' is not a function`);
-                    }
-                }
-                else {
-                    // Direct function value or lambda
-                    const fn = this.eval(arg);
-                    if (typeof fn !== "function" && fn.kind !== "function-value") {
-                        throw new Error(`compose: argument is not a function`);
-                    }
-                    return fn;
-                }
-            });
-            // Return a function that applies all functions in reverse order
-            return (x) => {
-                let result = x;
-                // Apply functions from right to left
-                for (let i = funcsToCompose.length - 1; i >= 0; i--) {
-                    const fn = funcsToCompose[i];
-                    if (fn._isFunctionName) {
-                        result = this.callUserFunction(fn.name, [result]);
-                    }
-                    else {
-                        result = this.callFunction(fn, [result]);
-                    }
-                }
-                return result;
-            };
-        }
-        if (op === "pipe") {
-            // (pipe value f g h) → applies f, then g, then h to value (left-to-right)
-            // Result: the final value after applying all functions
-            if (expr.args.length < 2) {
-                throw new Error(`pipe requires at least a value and one function`);
-            }
-            let pipeValue = this.eval(expr.args[0]);
-            // Apply each function in order (left to right)
-            for (let i = 1; i < expr.args.length; i++) {
-                const fnArg = expr.args[i];
-                let pipeResult;
-                // Try to handle as function name (symbol literal like: add-one)
-                if (fnArg.kind === "literal" && fnArg.type === "symbol") {
-                    const fnName = fnArg.value;
-                    if (this.context.functions.has(fnName)) {
-                        // Call user-defined function by name
-                        pipeResult = this.callUserFunction(fnName, [pipeValue]);
-                    }
-                    else {
-                        throw new Error(`Unknown function: ${fnName}`);
-                    }
-                }
-                else if (fnArg.kind === "variable") {
-                    // Variable reference to a function
-                    const fnName = fnArg.name;
-                    if (this.context.functions.has(fnName)) {
-                        // Call user-defined function
-                        pipeResult = this.callUserFunction(fnName, [pipeValue]);
-                    }
-                    else if (this.context.variables.has(fnName)) {
-                        // Call function value
-                        const fn = this.context.variables.get(fnName);
-                        pipeResult = this.callFunction(fn, [pipeValue]);
-                    }
-                    else {
-                        throw new Error(`Unknown function or variable: ${fnName}`);
-                    }
-                }
-                else if (fnArg.kind === "s-expression") {
-                    // Lambda or other expression
-                    const fn = this.eval(fnArg);
-                    pipeResult = this.callFunction(fn, [pipeValue]);
-                }
-                else {
-                    // Evaluate and call
-                    const fn = this.eval(fnArg);
-                    pipeResult = this.callFunction(fn, [pipeValue]);
-                }
-                pipeValue = pipeResult;
-            }
-            return pipeValue;
-        }
-        // let: (let [[var1 val1] [var2 val2]] body)
-        if (op === "let") {
-            return this.evalLet(expr.args);
-        }
-        // set: (set $var new-value) — 기존 바인딩 수정 (Phase 7 P0)
-        // resolver에서 루프 변수 업데이트에 필요
-        if (op === "set") {
-            if (expr.args.length !== 2) {
-                throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
-            }
-            const varNode = expr.args[0];
-            let varName;
-            if (varNode.kind === "variable") {
-                varName = varNode.name;
-            }
-            else if (varNode.kind === "literal" && varNode.type === "symbol") {
-                varName = "$" + varNode.value;
-            }
-            else {
-                throw new Error(`set: first argument must be a variable`);
-            }
-            const newValue = this.eval(expr.args[1]);
-            const success = this.context.variables.mutate(varName, newValue);
-            if (!success) {
-                throw new Error(`set: variable ${varName} not found in scope`);
-            }
-            return newValue;
-        }
-        // if: (if condition then-branch else-branch)
-        if (op === "if") {
-            const condition = this.eval(expr.args[0]);
-            return condition ? this.eval(expr.args[1]) : (expr.args[2] ? this.eval(expr.args[2]) : null);
-        }
-        // cond: (cond [test1 result1] [test2 result2] [else default])
-        if (op === "cond") {
-            return this.evalCond(expr.args);
-        }
-        // do/begin: (do expr1 expr2 ...) — evaluate all, return last
-        if (op === "do" || op === "begin" || op === "progn") {
-            let result = null;
-            for (const arg of expr.args) {
-                // Check if this is a control block (FUNC, SERVER, ROUTE, etc.)
-                // Control blocks should be handled by evalBlock, not eval
-                if ((0, ast_1.isBlock)(arg) && (0, ast_1.isControlBlock)(arg)) {
-                    // Process control block via evalBlock (no return value expected)
-                    this.evalBlock(arg);
-                    result = null; // Control blocks don't produce values
-                    continue;
-                }
-                result = this.eval(arg);
-            }
-            return result;
-        }
-        // loop/recur: (loop [var1 init1 var2 init2 ...] body...)
-        // recur inside loop restarts iteration with new values
-        if (op === "loop") {
-            const bindingsNode = expr.args[0];
-            const bodyNodes = expr.args.slice(1);
-            // Parse bindings: [var1 init1 var2 init2 ...]
-            const bindingItems = bindingsNode.kind === "array"
-                ? bindingsNode.items || []
-                : bindingsNode.kind === "block" && bindingsNode.type === "Array"
-                    ? bindingsNode.fields?.get?.("items") || []
-                    : [];
-            const loopVars = [];
-            const loopInits = [];
-            for (let i = 0; i < bindingItems.length; i += 2) {
-                const varNode = bindingItems[i];
-                const valNode = bindingItems[i + 1];
-                const varName = varNode.kind === "variable" ? varNode.name
-                    : varNode.kind === "literal" ? String(varNode.value) : String(varNode.name || varNode.value);
-                loopVars.push(varName);
-                loopInits.push(this.eval(valNode));
-            }
-            // 새 스코프에서 loop 바인딩 — 외부 스코프 오염 없음
-            this.context.variables.push();
-            for (let i = 0; i < loopVars.length; i++) {
-                this.context.variables.set(loopVars[i], loopInits[i]);
-            }
-            let result = null;
-            const maxIter = 100000;
-            let iter = 0;
-            try {
-                while (iter++ < maxIter) {
-                    let recurred = false;
-                    for (const bodyNode of bodyNodes) {
-                        result = this.eval(bodyNode);
-                        if (result && typeof result === "object" && result.__FL_RECUR__) {
-                            const newVals = result.__args;
-                            for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
-                                this.context.variables.set(loopVars[i], newVals[i]);
-                            }
-                            recurred = true;
-                            break;
-                        }
-                    }
-                    if (!recurred)
-                        break;
-                }
-            }
-            finally {
-                this.context.variables.pop();
-            }
-            return result;
-        }
-        // recur: (recur val1 val2 ...) — tail-call back to enclosing loop
-        if (op === "recur") {
-            const newVals = expr.args.map((a) => this.eval(a));
-            return { __FL_RECUR__: true, __args: newVals };
-        }
-        // while: (while condition body...)
-        if (op === "while") {
-            let result = null;
-            while (this.eval(expr.args[0])) {
-                for (let i = 1; i < expr.args.length; i++) {
-                    result = this.eval(expr.args[i]);
-                }
-            }
-            return result;
-        }
-        // Short-circuit logical operators
-        if (op === "and") {
-            let result = true;
-            for (const arg of expr.args) {
-                result = this.eval(arg);
-                if (!result)
-                    return result;
-            }
-            return result;
-        }
-        if (op === "or") {
-            for (const arg of expr.args) {
-                const result = this.eval(arg);
-                if (result)
-                    return result;
-            }
-            return false;
-        }
-        // Special form: (map array [binding-var] body) — inline comprehension
-        // Supports multi-var form: (map array [k] body) or (map array [k v] body)
+        // Phase 57: Dispatch to specialized modules
+        const AI_OPS = new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
+        const SPECIAL_OPS = new Set(["fn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout"]);
+        if (AI_OPS.has(op))
+            return (0, eval_ai_blocks_1.evalAiBlock)(this, op, expr);
+        if (SPECIAL_OPS.has(op))
+            return (0, eval_special_forms_1.evalSpecialForm)(this, op, expr);
+        // map (3-arg comprehension form) → evalSpecialForm; otherwise falls through to builtins
         if (op === "map" && expr.args.length === 3) {
-            const arr = this.eval(expr.args[0]);
-            const paramNode = expr.args[1];
-            const bodyNode = expr.args[2];
-            // Extract binding names from array literal [var1 var2 ...]
-            const items = paramNode.kind === "block" && paramNode.type === "Array"
-                ? paramNode.fields.get?.("items") || []
-                : paramNode.kind === "array"
-                    ? paramNode.items || []
-                    : [];
-            const paramNames = items.map((item) => {
-                if (item.kind === "variable")
-                    return item.name; // $x → "x"
-                if (item.kind === "literal")
-                    return "$" + item.value; // symbol "x" → "$x"
-                return "$" + (item.name || item.value || "_");
-            });
-            if (Array.isArray(arr) && paramNames.length > 0) {
-                return arr.map((elem) => {
-                    this.context.variables.push();
-                    this.context.variables.set(paramNames[0], elem);
-                    try {
-                        return this.eval(bodyNode);
-                    }
-                    finally {
-                        this.context.variables.pop();
-                    }
-                });
-            }
+            const mapResult = (0, eval_special_forms_1.evalSpecialForm)(this, op, expr);
+            if (mapResult !== undefined)
+                return mapResult;
         }
-        // Evaluate all arguments for normal operations
+        // Evaluate args for builtins
         const args = expr.args.map((arg) => this.eval(arg));
         // Phase 52: qualified function call (module:func pattern) — check BEFORE switch
-        // so builtins like "list" don't intercept (list:sum data)
         if (args.length >= 1 && typeof args[0] === "string") {
             const qualifiedName = `${op}:${args[0]}`;
             if (this.context.functions.has(qualifiedName)) {
                 return this.callUserFunction(qualifiedName, args.slice(1));
             }
         }
-        // Built-in functions
-        switch (op) {
-            // Arithmetic
-            case "+":
-                return args.reduce((a, b) => a + b, 0);
-            case "-":
-                return args.length === 1 ? -args[0] : args.reduce((a, b) => a - b);
-            case "*":
-                return args.reduce((a, b) => a * b, 1);
-            case "/":
-                return args.length === 1 ? 1 / args[0] : args.reduce((a, b) => a / b);
-            case "%":
-                return args[0] % args[1];
-            // Comparison
-            case "=":
-                return args[0] === args[1];
-            case "<":
-                return args[0] < args[1];
-            case ">":
-                return args[0] > args[1];
-            case "<=":
-                return args[0] <= args[1];
-            case ">=":
-                return args[0] >= args[1];
-            case "!=":
-                return args[0] !== args[1];
-            // Logical
-            case "and":
-                return args.every((a) => a);
-            case "or":
-                return args.some((a) => a);
-            case "not":
-                return !args[0];
-            // Output — print/println/str
-            case "print":
-                process.stdout.write(args.map((a) => this.toDisplayString(a)).join(" "));
-                return null;
-            case "println":
-            case "echo":
-                console.log(...args.map((a) => this.toDisplayString(a)));
-                return null;
-            case "print-err":
-                process.stderr.write(args.map((a) => this.toDisplayString(a)).join(" ") + "\n");
-                return null;
-            case "str":
-                return args.map((a) => this.toDisplayString(a)).join("");
-            case "repr":
-                return JSON.stringify(args[0], null, 2);
-            case "inspect":
-                const inspected = this.toDisplayString(args[0]);
-                console.log(inspected);
-                return args[0]; // pass-through (tap pattern)
-            // String
-            case "concat":
-                return args.join("");
-            case "upper":
-                return args[0]?.toString().toUpperCase();
-            case "lower":
-                return args[0]?.toString().toLowerCase();
-            case "length":
-                return args[0]?.length || 0;
-            // Array/Collection
-            case "list":
-                return args;
-            case "first":
-                return args[0]?.[0];
-            case "rest":
-                return args[0]?.slice(1);
-            case "append":
-                // (append arr elem) → [...arr, elem]  OR  (append arr [e1 e2]) → [...arr, e1, e2] (concat)
-                // Self-hosting FL files use (append tokens [{...}]) to concatenate arrays
-                if (Array.isArray(args[0]) && args.length === 2 && Array.isArray(args[1])) {
-                    return [...args[0], ...args[1]];
+        // Phase 64: 프로토콜 메서드 dispatch — 함수 미발견 시 프로토콜 레지스트리 탐색
+        if (this.context.protocols.hasMethod(op)) {
+            // 첫 번째 인자를 $self로 사용해 타입 확인
+            if (args.length >= 1) {
+                const selfVal = args[0];
+                const impl = this.context.protocols.resolveMethod(op, selfVal);
+                if (impl) {
+                    const methodDef = impl.methods.get(op);
+                    return this.callProtocolMethod(methodDef, selfVal, args.slice(1));
                 }
-                return [...(args[0] || []), ...args.slice(1)];
-            case "reverse":
-                return [...(args[0] || [])].reverse();
-            case "map":
-                // (map fn [1 2 3]) → apply fn to each
-                if (typeof args[0] === "function") {
-                    return (args[1] || []).map(args[0]);
-                }
-                return args;
-            // Phase 7: Async functions
-            case "set-timeout":
-                // (set-timeout callback delay-ms)
-                // Returns a Promise that resolves after delay_ms
-                if (expr.args.length < 2) {
-                    throw new Error(`set-timeout requires callback and delay`);
-                }
-                const callback = this.eval(expr.args[0]);
-                const delay = this.eval(expr.args[1]);
-                return new async_runtime_1.FreeLangPromise((resolve, reject) => {
-                    setTimeout(() => {
-                        try {
-                            if (typeof callback === "function") {
-                                const result = callback();
-                                resolve(result);
-                            }
-                            else if (callback.kind === "function-value") {
-                                const result = this.callFunctionValue(callback, []);
-                                resolve(result);
-                            }
-                            else {
-                                reject(new Error("set-timeout callback must be a function"));
-                            }
-                        }
-                        catch (e) {
-                            reject(e);
-                        }
-                    }, delay);
-                });
-            case "promise":
-                // (promise executor-fn)
-                // executor-fn is (fn [resolve reject] ...)
-                if (expr.args.length < 1) {
-                    throw new Error(`promise requires executor function`);
-                }
-                const executor = this.eval(expr.args[0]);
-                if (executor.kind === "function-value") {
-                    // executor is a function value, call it with resolve/reject
-                    // Wrap JS functions to make them callable from FreeLang
-                    return new async_runtime_1.FreeLangPromise((resolve, reject) => {
-                        try {
-                            // Create wrapper functions that FreeLang can call
-                            // These are passed as arguments to the executor function
-                            const resolveWrapper = {
-                                kind: "builtin-function",
-                                fn: (args) => resolve(args[0])
-                            };
-                            const rejectWrapper = {
-                                kind: "builtin-function",
-                                fn: (args) => reject(args[0] instanceof Error ? args[0] : new Error(String(args[0])))
-                            };
-                            // Call the executor function with wrapped resolve/reject
-                            // This properly binds parameters through callFunctionValue
-                            this.callFunctionValue(executor, [resolveWrapper, rejectWrapper]);
-                        }
-                        catch (e) {
-                            reject(e);
-                        }
-                    });
-                }
-                else {
-                    throw new Error("promise executor must be a function");
-                }
-            case "fn":
-                // Phase 4 Week 1: (fn [$param1 $param2 ...] body)
-                // Create a function value with captured environment
-                // expr.args[0] is the parameter array AST (unevaluated list of variables)
-                // expr.args[1] is the body AST
-                let params = [];
-                const paramNode = expr.args[0];
-                // paramNode should be an object with structure like: { kind: 'literal', value: [...Variable nodes...] }
-                // OR it could be a raw array if parsed differently
-                // We need to extract the variable names from the parameter list
-                // Case 1: paramNode is parsed as a literal with value = array of Variable nodes
-                if (paramNode && typeof paramNode === 'object' && 'kind' in paramNode && paramNode.kind === 'literal' && Array.isArray(paramNode.value)) {
-                    const paramValues = paramNode.value;
-                    params = paramValues.map(p => {
-                        if (p && typeof p === 'object' && 'kind' in p && p.kind === 'variable') {
-                            return p.name;
-                        }
-                        throw new Error(`fn parameter must be a variable, got ${p.kind}`);
-                    });
-                }
-                // Case 2: paramNode is a Variable node (single parameter)
-                else if (paramNode && typeof paramNode === 'object' && 'kind' in paramNode && paramNode.kind === 'variable') {
-                    params = [paramNode.name];
-                }
-                // Case 3: paramNode was somehow evaluated (shouldn't happen)
-                else if (Array.isArray(paramNode)) {
-                    // This shouldn't happen in normal operation
-                    // But if it does, try to extract names
-                    params = paramNode.map(p => typeof p === 'string' ? p : String(p));
-                }
-                else {
-                    throw new Error(`fn expects parameter array, got ${paramNode && typeof paramNode === 'object' && 'kind' in paramNode ? paramNode.kind : typeof paramNode}`);
-                }
-                const body = expr.args[1]; // Get unevaluated body
-                return {
-                    kind: "function-value",
-                    params: params,
-                    body: body,
-                    capturedEnv: this.context.variables.snapshot(),
-                };
-            case "reduce":
-                // Phase 4 Week 2: (reduce [1 2 3 4] 0 (fn [acc x] (+ acc x)))
-                // args[0] = array, args[1] = initial accumulator, args[2] = function
-                if (!Array.isArray(args[0])) {
-                    throw new Error(`reduce expects array as first argument, got ${typeof args[0]}`);
-                }
-                let accumulator = args[1];
-                const reduceFn = args[2];
-                for (const item of args[0]) {
-                    accumulator = this.callFunction(reduceFn, [accumulator, item]);
-                }
-                return accumulator;
-            // HTTP responses
-            case "json-response":
-                // Convert arguments to object
-                // If single argument that's already an object, use it
-                if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
-                    return args[0];
-                }
-                // If it's an array (from list), convert keyword-value pairs to object
-                if (Array.isArray(args[0])) {
-                    const obj = {};
-                    for (let i = 0; i < args[0].length; i += 2) {
-                        let key = args[0][i];
-                        const value = args[0][i + 1];
-                        // Remove leading colon if present
-                        if (typeof key === "string" && key.startsWith(":")) {
-                            key = key.substring(1);
-                        }
-                        if (typeof key === "string") {
-                            obj[key] = value;
-                        }
-                    }
-                    return obj;
-                }
-                return args[0];
-            case "html-response":
-                return { html: args[0] };
-            // Time
-            case "now":
-                return new Date().toISOString();
-            case "server-uptime":
-                return Date.now() - this.context.startTime;
-            // Control flow
-            // String/Character Operations (Phase 3 W2: Self-hosting support)
-            case "char-at":
-                // (char-at "hello" 1) → "e"
-                return typeof args[0] === "string" && typeof args[1] === "number"
-                    ? args[0][Math.floor(args[1])] || ""
-                    : "";
-            case "char-code":
-                // (char-code "A") → 65
-                if (typeof args[0] === "string" && args[0].length > 0) {
-                    return args[0].charCodeAt(0);
-                }
-                throw new Error(`char-code expects non-empty string, got ${typeof args[0]}`);
-            case "substring":
-                // (substring "hello" 1 4) → "ell"
-                return typeof args[0] === "string"
-                    ? args[0].substring(Math.floor(args[1] || 0), Math.floor(args[2] || args[0].length))
-                    : "";
-            case "is-whitespace?":
-                // (is-whitespace? " ") → true
-                return /^\s$/.test(String(args[0]));
-            case "is-digit?":
-                // (is-digit? "5") → true
-                return /^\d$/.test(String(args[0]));
-            case "is-symbol?":
-                // (is-symbol? "add") → true (letters, underscores, dashes)
-                return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args[0]));
-            case "split":
-            case "error":
-                // (error "message") → throws an error
-                throw new Error(String(args[0]));
-            case "null?":
-                return args[0] === null || args[0] === undefined;
-            case "zero?":
-                return args[0] === 0;
-            case "pos?":
-                return typeof args[0] === "number" && args[0] > 0;
-            case "neg?":
-                return typeof args[0] === "number" && args[0] < 0;
-            case "even?":
-                return typeof args[0] === "number" && args[0] % 2 === 0;
-            case "odd?":
-                return typeof args[0] === "number" && args[0] % 2 !== 0;
-            case "string?":
-                return typeof args[0] === "string";
-            case "number?":
-                return typeof args[0] === "number";
-            case "bool?":
-                return typeof args[0] === "boolean";
-            case "array?":
-                return Array.isArray(args[0]);
-            case "map?":
-                return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]);
-            case "json_keys":
-                // (json_keys {:a 1 :b 2}) → ["a" "b"]
-                return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])
-                    ? Object.keys(args[0])
-                    : [];
-            case "num-to-str":
-            case "num->str":
-                // (num-to-str 42) → "42"
-                return String(args[0]);
-            case "str-to-num":
-            case "str->num":
-                // (str-to-num "42") → 42
-                return parseFloat(String(args[0]));
-            case "map-set":
-                // (map-set {:a 1} :b 2) → {:a 1 :b 2}
-                if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
-                    const k = typeof args[1] === "string" && args[1].startsWith(":")
-                        ? args[1].slice(1) : String(args[1]);
-                    return { ...args[0], [k]: args[2] };
-                }
-                return args[0];
-            case "slice":
-                // (slice [1 2 3 4] 1 3) → [2 3]  OR  (slice "hello" 1 3) → "el"
-                if (Array.isArray(args[0]))
-                    return args[0].slice(args[1], args[2]);
-                if (typeof args[0] === "string")
-                    return args[0].slice(args[1], args[2]);
-                return [];
-            case "str-split":
-                // (split "a,b,c" ",") → ["a" "b" "c"]
-                return typeof args[0] === "string" && typeof args[1] === "string"
-                    ? args[0].split(args[1])
-                    : [];
-            case "join":
-            case "str-join":
-                // (join ["a" "b" "c"] ",") → "a,b,c"   OR  (str-join arr sep) where arr is first
-                // str-join: (str-join arr sep) — array first, then separator
-                if (op === "str-join") {
-                    return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
-                }
-                return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
-            case "trim":
-                // (trim "  hello  ") → "hello"
-                return typeof args[0] === "string" ? args[0].trim() : "";
-            case "uppercase":
-                // (uppercase "hello") → "HELLO"
-                return typeof args[0] === "string" ? args[0].toUpperCase() : "";
-            case "lowercase":
-                // (lowercase "HELLO") → "hello"
-                return typeof args[0] === "string" ? args[0].toLowerCase() : "";
-            case "contains?":
-                // (contains? "hello world" "world") → true or (contains? [1 2 3] 2) → true
-                if (typeof args[0] === "string" && typeof args[1] === "string") {
-                    return args[0].includes(args[1]);
-                }
-                if (Array.isArray(args[0])) {
-                    return args[0].includes(args[1]);
-                }
-                return false;
-            case "starts-with?":
-                // (starts-with? "hello" "he") → true
-                return typeof args[0] === "string" && typeof args[1] === "string"
-                    ? args[0].startsWith(args[1])
-                    : false;
-            case "ends-with?":
-                // (ends-with? "hello" "lo") → true
-                return typeof args[0] === "string" && typeof args[1] === "string"
-                    ? args[0].endsWith(args[1])
-                    : false;
-            case "index-of":
-                // (index-of "hello world" "o") → 4
-                return typeof args[0] === "string" && typeof args[1] === "string"
-                    ? args[0].indexOf(args[1])
-                    : -1;
-            case "replace":
-                // (replace "hello world" "world" "there") → "hello there" (all occurrences)
-                return typeof args[0] === "string" && typeof args[1] === "string" && typeof args[2] === "string"
-                    ? args[0].split(args[1]).join(args[2])
-                    : "";
-            case "repeat":
-                // (repeat "a" 3) → "aaa"
-                return typeof args[0] === "string" && typeof args[1] === "number"
-                    ? args[0].repeat(args[1])
-                    : "";
-            // Array Operations
-            case "filter":
-                // (filter [1 2 3 4] (lambda [$x] (> $x 2))) → [3 4]
-                if (!Array.isArray(args[0]) || typeof args[1] !== "function") {
-                    return args[0] || [];
-                }
-                return args[0].filter(args[1]);
-            case "find":
-                // (find [1 2 3] value-to-find) → index or (find [1 2 3] (lambda [$x] ...)) → value
-                if (Array.isArray(args[0])) {
-                    if (typeof args[1] === "function") {
-                        return args[0].find(args[1]) || null;
-                    }
-                    else {
-                        // Find index of value
-                        return args[0].indexOf(args[1]);
-                    }
-                }
-                return -1;
-            // Array Operations (Phase 3 W4: Standard Library)
-            case "first":
-                // (first [1 2 3]) → 1
-                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : null;
-            case "last":
-                // (last [1 2 3]) → 3
-                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
-            case "get":
-                // (get [1 2 3] 1) → 2  OR  (get "hello" 0) → "h"  OR  (get {:k "v"} "k") → "v"
-                if (Array.isArray(args[0]))
-                    return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
-                if (typeof args[0] === "string")
-                    return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
-                if (args[0] !== null && typeof args[0] === "object")
-                    return args[0][args[1]] ?? null;
-                return null;
-            case "assoc":
-                // (assoc {:k "v"} "k2" "v2") → {:k "v" :k2 "v2"}  (immutable map update)
-                if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
-                    return { ...args[0], [args[1]]: args[2] };
-                }
-                return { [args[1]]: args[2] };
-            case "dissoc":
-                // (dissoc {:k "v" :k2 "v2"} "k2") → {:k "v"}  (immutable map remove)
-                if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
-                    const { [args[1]]: _, ...rest } = args[0];
-                    return rest;
-                }
-                return args[0] ?? {};
-            case "reverse":
-                // (reverse [1 2 3]) → [3 2 1]
-                return Array.isArray(args[0]) ? [...args[0]].reverse() : [];
-            case "flatten":
-                // (flatten [[1 2] [3 4]]) → [1 2 3 4]
-                if (!Array.isArray(args[0]))
-                    return [];
-                const flatten = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
-                return flatten(args[0]);
-            case "unique":
-                // (unique [1 2 2 3 3 3]) → [1 2 3]
-                return Array.isArray(args[0]) ? [...new Set(args[0])] : [];
-            case "sort":
-                // (sort [3 1 2]) → [1 2 3]
-                if (!Array.isArray(args[0]))
-                    return [];
-                return [...args[0]].sort((a, b) => {
-                    if (typeof a === "number" && typeof b === "number")
-                        return a - b;
-                    return String(a).localeCompare(String(b));
-                });
-            case "concat":
-                // (concat [1 2] [3 4]) → [1 2 3 4]
-                if (!Array.isArray(args[0]))
-                    return args[1] || [];
-                if (!Array.isArray(args[1]))
-                    return args[0] || [];
-                return args[0].concat(args[1]);
-            case "push":
-                // (push [1 2] 3) → [1 2 3]
-                if (!Array.isArray(args[0]))
-                    return [args[1]];
-                return [...args[0], args[1]];
-            case "pop":
-                // (pop [1 2 3]) → 3 (returns last element)
-                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
-            case "shift":
-                // (shift [1 2 3]) → 1 (returns first element)
-                return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : null;
-            case "unshift":
-                // (unshift [1 2] 0) → [0 1 2]
-                if (!Array.isArray(args[0]))
-                    return [args[1]];
-                return [args[1], ...args[0]];
-            // Type/Utility
-            case "typeof":
-                return typeof args[0];
-            case "str":
-                return String(args[0]);
-            case "num":
-                return Number(args[0]);
-            case "bool":
-                return Boolean(args[0]);
-            // Math Functions (Phase 3 W4: Standard Library)
-            case "abs":
-                return Math.abs(args[0]);
-            case "min":
-                return Math.min(...args);
-            case "max":
-                return Math.max(...args);
-            case "floor":
-                return Math.floor(args[0]);
-            case "ceil":
-                return Math.ceil(args[0]);
-            case "round":
-                return Math.round(args[0]);
-            case "sqrt":
-                return Math.sqrt(args[0]);
-            case "pow":
-                return Math.pow(args[0], args[1]);
-            case "log":
-                return Math.log(args[0]);
-            case "exp":
-                return Math.exp(args[0]);
-            case "sin":
-                return Math.sin(args[0]);
-            case "cos":
-                return Math.cos(args[0]);
-            case "tan":
-                return Math.tan(args[0]);
-            case "random":
-                return Math.random();
-            case "clamp":
-                return Math.max(args[1], Math.min(args[2], args[0]));
-            // Phase 4 Week 2: Monad Operations
-            case "ok":
-                // (ok value) → Result Ok
-                return { tag: "Ok", value: args[0], kind: "Result" };
-            case "err":
-                // (err message) → Result Err
-                return { tag: "Err", value: args[0], kind: "Result" };
-            case "some":
-                // (some value) → Option Some
-                return { tag: "Some", value: args[0], kind: "Option" };
-            case "none":
-                // (none) → Option None
-                return { tag: "None", value: null, kind: "Option" };
-            case "pure":
-                // (pure value) → wraps value in default monad
-                return { tag: "Pure", value: args[0], kind: "Monad" };
-            // Phase 5 Week 4: Either monad
-            case "left":
-                // (left error) → Either Left (error value)
-                return { tag: "Left", value: args[0], kind: "Either" };
-            case "right":
-                // (right value) → Either Right (success value)
-                return { tag: "Right", value: args[0], kind: "Either" };
-            // Phase 5 Week 4: Validation monad
-            case "failure":
-                // (failure errors) → Validation Failure
-                const errors = Array.isArray(args[0]) ? args[0] : [args[0]];
-                return { tag: "Failure", value: errors, kind: "Validation" };
-            case "success":
-                // (success value) → Validation Success
-                return { tag: "Success", value: args[0], kind: "Validation" };
-            // Phase 5 Week 4: Writer monad
-            case "tell":
-                // (tell log) → Writer with empty value and log
-                return { kind: "Writer", value: null, log: String(args[0]) };
-            case "return-writer":
-            case "pure-writer":
-                // (return-writer value) or (pure-writer value) → Writer with value and empty log
-                return { kind: "Writer", value: args[0], log: "" };
-            case "bind":
-                // Phase 4 Week 2: Monadic bind operation
-                // (bind monad transform-fn)
-                if (expr.args.length < 2) {
-                    throw new Error(`bind requires monad and transform function`);
-                }
-                const monad = this.eval(expr.args[0]);
-                const transformFn = this.eval(expr.args[1]);
-                if (monad.kind === "Result") {
-                    if (monad.tag === "Ok") {
-                        return this.callFunction(transformFn, [monad.value]);
-                    }
-                    return monad; // Return Error unchanged
-                }
-                if (monad.kind === "Option") {
-                    if (monad.tag === "Some") {
-                        return this.callFunction(transformFn, [monad.value]);
-                    }
-                    return monad; // Return None unchanged
-                }
-                if (Array.isArray(monad)) {
-                    // List monad: flatMap
-                    let result = [];
-                    for (const item of monad) {
-                        const transformed = this.callFunction(transformFn, [item]);
-                        if (Array.isArray(transformed)) {
-                            result = result.concat(transformed);
-                        }
-                        else {
-                            result.push(transformed);
-                        }
-                    }
-                    return result;
-                }
-                // Phase 5 Week 4: Either monad
-                if (monad.kind === "Either") {
-                    if (monad.tag === "Right") {
-                        return this.callFunction(transformFn, [monad.value]);
-                    }
-                    return monad; // Return Left unchanged
-                }
-                // Phase 5 Week 4: Validation monad
-                if (monad.kind === "Validation") {
-                    if (monad.tag === "Success") {
-                        const result = this.callFunction(transformFn, [monad.value]);
-                        // If result is also a Validation, flatten it
-                        if (result.kind === "Validation" && result.tag === "Failure") {
-                            // Error accumulation could go here in more advanced version
-                            return result;
-                        }
-                        return result;
-                    }
-                    return monad; // Return Failure unchanged
-                }
-                // Phase 5 Week 4: Writer monad
-                if (monad.kind === "Writer") {
-                    const result = this.callFunction(transformFn, [monad.value]);
-                    if (result.kind === "Writer") {
-                        // Concatenate logs
-                        return {
-                            kind: "Writer",
-                            value: result.value,
-                            log: monad.log + result.log
-                        };
-                    }
-                    return result;
-                }
-                throw new Error(`bind: unsupported monad type`);
-            // Function call
-            default:
-                // Check if it's a user-defined function (regular or generic)
-                // Phase 4: Try full name first (op might be "identity[int]")
-                if (this.context.functions.has(op)) {
-                    return this.callUserFunction(op, args);
-                }
-                // Phase 4: If full name fails, extract base name and try again (for generic calls)
-                const bracketMatch = op.match(/^([\w\-]+)\[([^\]]+)\]$/);
-                if (bracketMatch && this.context.functions.has(bracketMatch[1])) {
-                    return this.callUserFunction(op, args);
-                }
-                // Phase 5 Week 1: Check if it's a variable containing a function value
-                // This allows: (let [f (compose g h)] (f 5))
-                if (this.context.variables.has(op)) {
-                    const fn = this.context.variables.get(op);
-                    // Phase 7: Handle builtin-function wrappers (for Promise resolve/reject)
-                    if (fn.kind === "builtin-function") {
-                        return fn.fn(args.map((arg) => this.eval(arg)));
-                    }
-                    else if (typeof fn === "function" || fn.kind === "function-value") {
-                        return this.callFunction(fn, args);
-                    }
-                }
-                // (export sym1 sym2 ...) — self-hosting 파일 호환: no-op (인터프리터는 모두 공유 환경)
-                if (op === "export")
-                    return null;
-                // (call $fn arg...) — FL stdlib 고차 함수용: $fn이 클로저/심볼이면 동적 호출
-                if (op === "call" && args.length >= 1) {
-                    const fnRef = this.eval(args[0]);
-                    const callArgs = args.slice(1);
-                    if (typeof fnRef === "string") {
-                        // 심볼 리터럴 "double" → 함수명으로 lookup
-                        return this.callUserFunction(fnRef, callArgs);
-                    }
-                    if (typeof fnRef === "function" || fnRef?.kind === "function-value") {
-                        return this.callFunction(fnRef, callArgs);
-                    }
-                    return null;
-                }
-                throw new Error(`Unknown operator: ${op}`);
+            }
         }
+        // Phase 66: struct native 함수 dispatch (constructor, predicate, accessor)
+        const nativeKey = `__native_${op}`;
+        if (this.context[nativeKey] !== undefined) {
+            const nativeFn = this.context[nativeKey];
+            return nativeFn(...args);
+        }
+        return (0, eval_builtins_1.evalBuiltin)(this, op, args, expr);
     }
-    evalLet(args) {
-        if (args.length < 2) {
-            throw new Error(`let requires at least 2 arguments`);
-        }
-        // (let [[var1 val1] [var2 val2]] body)
-        const bindings = args[0];
-        // 새 스코프 — let 바인딩이 외부 스코프로 누출되지 않음
+    // Phase 64: 프로토콜 메서드 호출 — $self + 나머지 인자 바인딩
+    callProtocolMethod(methodDef, selfVal, restArgs) {
+        // params: ["$self", "$data", ...] 형태
+        const params = methodDef.params;
         this.context.variables.push();
-        // Parse bindings
-        if (bindings.kind === "block" && bindings.type === "Array") {
-            const items = bindings.fields.get("items");
-            if (Array.isArray(items)) {
-                for (const item of items) {
-                    if (item.kind === "block" && item.type === "Array") {
-                        const bindingItems = item.fields.get("items");
-                        if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-                            let varName;
-                            const varNode = bindingItems[0];
-                            if (varNode.kind === "variable") {
-                                varName = varNode.name;
-                            }
-                            else if (varNode.kind === "literal" && varNode.type === "symbol") {
-                                varName = "$" + varNode.value;
-                            }
-                            else {
-                                throw new Error(`Invalid binding variable: expected symbol or variable`);
-                            }
-                            const value = this.eval(bindingItems[1]);
-                            this.context.variables.set(varName, value);
-                        }
-                    }
-                }
-            }
-        }
-        // Evaluate body — 여러 표현식 허용 (마지막 값 반환)
-        let result = null;
         try {
-            for (let bodyIdx = 1; bodyIdx < args.length; bodyIdx++) {
-                result = this.eval(args[bodyIdx]);
+            // $self 바인딩 (첫 번째 파라미터)
+            if (params.length > 0) {
+                this.context.variables.set(params[0], selfVal);
             }
+            // 나머지 파라미터 바인딩
+            for (let i = 1; i < params.length; i++) {
+                this.context.variables.set(params[i], restArgs[i - 1] ?? null);
+            }
+            return this.eval(methodDef.body);
         }
         finally {
             this.context.variables.pop();
         }
-        return result;
     }
     // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
     interpolateString(template) {
@@ -2015,6 +706,11 @@ class Interpreter {
             return String(val);
         if (Array.isArray(val))
             return "[" + val.map((v) => this.toDisplayString(v)).join(", ") + "]";
+        // Phase 69: 레이지 시퀀스 — 앞 3개만 미리보기
+        if ((0, lazy_seq_1.isLazySeq)(val)) {
+            const preview = (0, lazy_seq_1.take)(3, val).map((v) => this.toDisplayString(v)).join(", ");
+            return `<lazy-seq: ${preview}...>`;
+        }
         if (typeof val === "object") {
             if (val.kind === "function-value")
                 return `<fn:${val.name || "λ"}>`;
@@ -2025,225 +721,17 @@ class Interpreter {
         }
         return String(val);
     }
-    evalCond(args) {
-        // (cond [test1 result1] [test2 result2] ... [else default])
-        // Each clause can have multiple body forms: [test expr1 expr2 ...]
-        for (const arg of args) {
-            if (arg.kind === "block" && arg.type === "Array") {
-                const items = arg.fields.get("items");
-                if (Array.isArray(items) && items.length >= 2) {
-                    const test = this.eval(items[0]);
-                    if (test) {
-                        // Execute all body forms, return last
-                        let result = null;
-                        for (let i = 1; i < items.length; i++) {
-                            result = this.eval(items[i]);
-                        }
-                        return result;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-    callUserFunction(name, args) {
-        // Phase 4: Check if this is a generic function call (e.g., identity[int] or first-of-pair[int, string])
-        let baseName = name;
-        let typeArgs = null;
-        // Match: function-name[T] or function-name[T, K, V] (allow hyphens and alphanumerics)
-        const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
-        if (bracketMatch) {
-            baseName = bracketMatch[1];
-            const typeArgStr = bracketMatch[2];
-            // Parse type arguments (comma-separated type names, may have spaces)
-            typeArgs = typeArgStr.split(",").map((t) => ({
-                kind: "type",
-                name: t.trim(),
-            }));
-        }
-        const func = this.context.functions.get(baseName);
-        if (!func) {
-            throw new Error(`Function not found: ${baseName}`);
-        }
-        // Phase 4: Handle generic function instantiation
-        let isGenericCall = false;
-        if (func.generics && func.generics.length > 0) {
-            if (!typeArgs) {
-                throw new Error(`Generic function '${baseName}' requires type arguments, e.g., ${baseName}[int] or ${baseName}[int string]`);
-            }
-            if (this.context.typeChecker) {
-                const instantiation = this.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
-                if (!instantiation.valid) {
-                    throw new Error(`Cannot instantiate generic function '${baseName}': ${instantiation.message}`);
-                }
-            }
-            // Mark as generic call to skip standard type checking
-            // (instantiation already validated the types)
-            isGenericCall = true;
-        }
-        // Phase 3: Type check function call (skip for generic calls, as instantiation already validated)
-        if (!isGenericCall && this.context.typeChecker) {
-            const argTypes = args.map((arg) => {
-                // Infer type from argument value
-                if (typeof arg === "number")
-                    return { kind: "type", name: "int" };
-                if (typeof arg === "string")
-                    return { kind: "type", name: "string" };
-                if (typeof arg === "boolean")
-                    return { kind: "type", name: "bool" };
-                if (Array.isArray(arg))
-                    return { kind: "type", name: "array<any>" };
-                if (typeof arg === "function")
-                    return { kind: "type", name: "function" };
-                return { kind: "type", name: "any" };
-            });
-            const validation = this.context.typeChecker.checkFunctionCall(baseName, argTypes);
-            // Skip type check for dynamically defined inner functions (define inside function body)
-            if (!validation.valid && validation.message !== `Unknown function: ${baseName}`) {
-                throw new Error(`Type error in call to '${baseName}': ${validation.message}`);
-            }
-        }
-        // Native JS function (Phase 10/11 builtins): call directly with args
-        if (typeof func.body === "function") {
-            return func.body(...args);
-        }
-        // Validate arg count for user-defined functions
-        if (func.params.length > args.length) {
-            throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args.length}`);
-        }
-        if (this.callDepth >= Interpreter.MAX_CALL_DEPTH) {
-            throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'`);
-        }
-        // Phase 54: For namespaced functions (list:mean), temporarily expose same-prefix
-        // functions without prefix so internal cross-calls (sum $arr) resolve correctly
-        const prefixMatch = baseName.match(/^([^:]+):/);
-        const tempAliases = [];
-        if (prefixMatch) {
-            const prefix = prefixMatch[1] + ":";
-            for (const [fname, fval] of this.context.functions) {
-                if (fname.startsWith(prefix)) {
-                    const unqualified = fname.slice(prefix.length);
-                    if (!this.context.functions.has(unqualified)) {
-                        this.context.functions.set(unqualified, fval);
-                        tempAliases.push(unqualified);
-                    }
-                }
-            }
-        }
-        // 클로저: capturedEnv가 있으면 해당 환경에서 실행
-        if (func.capturedEnv) {
-            const savedStack = this.context.variables.saveStack();
-            this.callDepth++;
-            try {
-                this.context.variables.fromSnapshot(func.capturedEnv);
-                for (let i = 0; i < func.params.length; i++) {
-                    this.context.variables.set(func.params[i], args[i]);
-                }
-                return this.eval(func.body);
-            }
-            finally {
-                this.callDepth--;
-                this.context.variables.restoreStack(savedStack);
-                for (const alias of tempAliases) {
-                    this.context.functions.delete(alias);
-                }
-            }
-        }
-        // 일반 함수: 새 렉시컬 스코프 생성 — 함수 내 define이 전역 오염 방지
-        this.context.variables.push();
-        this.callDepth++;
-        try {
-            for (let i = 0; i < func.params.length; i++) {
-                this.context.variables.set(func.params[i], args[i]);
-            }
-            return this.eval(func.body);
-        }
-        finally {
-            this.callDepth--;
-            this.context.variables.pop();
-            for (const alias of tempAliases) {
-                this.context.functions.delete(alias);
-            }
-        }
-    }
-    callFunctionValue(fn, args) {
-        if (fn.kind !== "function-value") {
-            throw new Error(`Expected function-value, got ${fn.kind}`);
-        }
-        if (this.callDepth >= Interpreter.MAX_CALL_DEPTH) {
-            throw new Error(`FreeLang line ${this.currentLine}: Maximum call depth exceeded (${Interpreter.MAX_CALL_DEPTH}) — possible infinite recursion`);
-        }
-        const savedStack = this.context.variables.saveStack();
-        this.callDepth++;
-        try {
-            this.context.variables.fromSnapshot(fn.capturedEnv);
-            for (let i = 0; i < fn.params.length; i++) {
-                this.context.variables.set(fn.params[i], args[i]);
-            }
-            return this.eval(fn.body);
-        }
-        finally {
-            this.callDepth--;
-            this.context.variables.restoreStack(savedStack);
-        }
-    }
-    callAsyncFunctionValue(fn, args) {
-        // Phase 7: Call an async function value (closure that returns Promise)
-        if (fn.kind !== "async-function-value") {
-            throw new Error(`Expected async-function-value, got ${fn.kind}`);
-        }
-        // Return a new Promise that executes the async function
-        return new async_runtime_1.FreeLangPromise((resolve, reject) => {
-            const savedStack = this.context.variables.saveStack();
-            try {
-                this.context.variables.fromSnapshot(fn.capturedEnv);
-                for (let i = 0; i < fn.params.length; i++) {
-                    this.context.variables.set(fn.params[i], args[i]);
-                }
-                const result = this.eval(fn.body);
-                if (result instanceof async_runtime_1.FreeLangPromise) {
-                    result
-                        .then((value) => resolve(value))
-                        .catch((error) => reject(error));
-                }
-                else {
-                    resolve(result);
-                }
-            }
-            catch (error) {
-                reject(error);
-            }
-            finally {
-                this.context.variables.restoreStack(savedStack);
-            }
-        });
-    }
-    callFunction(fn, args) {
-        // Phase 4 Week 2: Universal function caller
-        // Handles: function-value, JavaScript functions, FreeLangFunction
-        // Phase 7: Also handles builtin-function wrappers (Promise resolve/reject)
-        if (fn.kind === "builtin-function") {
-            // Phase 7: Built-in wrapper function (for Promise resolve/reject)
-            return fn.fn(args.map((arg) => this.eval(arg)));
-        }
-        else if (fn.kind === "function-value") {
-            return this.callFunctionValue(fn, args);
-        }
-        else if (fn.kind === "async-function-value") {
-            // Phase 7: Handle async function calls
-            return this.callAsyncFunctionValue(fn, args);
-        }
-        else if (typeof fn === "function") {
-            return fn(...args);
-        }
-        else if (fn.params && fn.body) {
-            // FreeLangFunction
-            return this.callUserFunction(fn.name || "anonymous", args);
-        }
-        else {
-            throw new Error(`Cannot call ${typeof fn}`);
-        }
-    }
+    // Phase 58: 함수 호출 로직 eval-call-function.ts로 분리
+    callUserFunction(name, args) { return (0, eval_call_function_1.callUserFunction)(this, name, args); }
+    callFunctionValue(fn, args) { return (0, eval_call_function_1.callFunctionValue)(this, fn, args); }
+    callAsyncFunctionValue(fn, args) { return (0, eval_call_function_1.callAsyncFunctionValue)(this, fn, args); }
+    callFunction(fn, args) { return (0, eval_call_function_1.callFunction)(this, fn, args); }
+    // Phase 61: TCO 메서드 — 꼬리 재귀를 반복문으로 (100만 재귀 스택 없이)
+    callUserFunctionTCO(name, args) { return (0, eval_call_function_1.callUserFunctionTCO)(this, name, args); }
+    callFunctionValueTCO(fn, args) { return (0, eval_call_function_1.callFunctionValueTCO)(this, fn, args); }
+    // trampoline용 raw 메서드 (TailCall 토큰 그대로 반환)
+    callUserFunctionRaw(name, args) { return (0, eval_call_function_1.callUserFunctionRaw)(this, name, args); }
+    callFunctionValueRaw(fn, args) { return (0, eval_call_function_1.callFunctionValueRaw)(this, fn, args); }
     getFieldValue(block, key, defaultValue = null) {
         const field = block.fields.get(key);
         if (field === undefined) {
@@ -2251,198 +739,12 @@ class Interpreter {
         }
         return this.eval(field);
     }
-    // ===== Pattern Matching (Phase 4 Week 3-4) =====
-    evalPatternMatch(match) {
-        // Evaluate the value to match
-        const value = this.eval(match.value);
-        // Try each case in order
-        for (const caseItem of match.cases) {
-            // Try to match pattern (only save/restore pattern-binding variables, not all state)
-            const matchResult = this.matchPattern(caseItem.pattern, value);
-            if (matchResult.matched) {
-                this.context.variables.push();
-                for (const [varName] of matchResult.bindings) {
-                    this.context.variables.set("$" + varName, matchResult.bindings.get(varName));
-                }
-                // Check guard condition if present
-                if (caseItem.guard) {
-                    const guardResult = this.eval(caseItem.guard);
-                    if (!guardResult) {
-                        this.context.variables.pop();
-                        continue;
-                    }
-                }
-                try {
-                    return this.eval(caseItem.body);
-                }
-                finally {
-                    this.context.variables.pop();
-                }
-            }
-        }
-        // No case matched, try default case
-        if (match.defaultCase) {
-            return this.eval(match.defaultCase);
-        }
-        // No match found
-        throw new Error("Pattern match exhausted without matching case");
-    }
-    // Phase 11: Evaluate try-catch-finally blocks
-    evalTryBlock(tryBlock) {
-        let result;
-        let errorCaught = false;
-        try {
-            // Execute try body
-            result = this.eval(tryBlock.body);
-        }
-        catch (error) {
-            errorCaught = true;
-            let handled = false;
-            // Try each catch clause
-            if (tryBlock.catchClauses && tryBlock.catchClauses.length > 0) {
-                for (const catchClause of tryBlock.catchClauses) {
-                    // For now, all catch clauses handle all errors (no pattern matching)
-                    // In future, could support typed catch (catch [IOException e] ...)
-                    this.context.variables.push();
-                    if (catchClause.variable) {
-                        this.context.variables.set("$" + catchClause.variable, error);
-                    }
-                    try {
-                        result = this.eval(catchClause.handler);
-                        handled = true;
-                        break;
-                    }
-                    catch (innerError) {
-                        throw innerError;
-                    }
-                    finally {
-                        this.context.variables.pop();
-                    }
-                }
-            }
-            // If no catch clause handled it, re-throw
-            if (!handled) {
-                throw error;
-            }
-        }
-        finally {
-            // Always execute finally block if present
-            if (tryBlock.finallyBlock) {
-                this.eval(tryBlock.finallyBlock);
-            }
-        }
-        return result;
-    }
-    // Phase 11: Evaluate throw expressions
-    evalThrow(throwExpr) {
-        const error = this.eval(throwExpr.argument);
-        // Throw the evaluated error value
-        if (error instanceof Error) {
-            throw error;
-        }
-        else if (typeof error === "string") {
-            throw new Error(error);
-        }
-        else if (error && typeof error === "object" && error.message) {
-            throw new Error(error.message);
-        }
-        else {
-            throw new Error(String(error));
-        }
-    }
-    // Try to match a pattern against a value
-    // Returns {matched: boolean, bindings: Map<string, any>}
+    // ===== Pattern Matching (Phase 4 Week 3-4) — Phase 58: eval-pattern-match.ts로 분리 =====
+    evalPatternMatch(match) { return (0, eval_pattern_match_1.evalPatternMatch)(this, match); }
+    evalTryBlock(tryBlock) { return (0, eval_pattern_match_1.evalTryBlock)(this, tryBlock); }
+    evalThrow(throwExpr) { return (0, eval_pattern_match_1.evalThrow)(this, throwExpr); }
     matchPattern(pattern, value) {
-        const bindings = new Map();
-        // Literal pattern: match exact value
-        if (pattern.kind === "literal-pattern") {
-            const litPattern = pattern;
-            if (litPattern.value === value) {
-                return { matched: true, bindings };
-            }
-            return { matched: false, bindings };
-        }
-        // Variable pattern: always matches, binds variable
-        if (pattern.kind === "variable-pattern") {
-            const varPattern = pattern;
-            bindings.set(varPattern.name, value);
-            return { matched: true, bindings };
-        }
-        // Wildcard pattern: always matches, no binding
-        if (pattern.kind === "wildcard-pattern") {
-            return { matched: true, bindings };
-        }
-        // List pattern: match array elements
-        if (pattern.kind === "list-pattern") {
-            const listPattern = pattern;
-            // Value must be an array
-            if (!Array.isArray(value)) {
-                return { matched: false, bindings };
-            }
-            // Match elements
-            const elements = listPattern.elements;
-            let matchedCount = 0;
-            for (let i = 0; i < elements.length; i++) {
-                if (i >= value.length) {
-                    // Not enough elements
-                    return { matched: false, bindings };
-                }
-                const elemResult = this.matchPattern(elements[i], value[i]);
-                if (!elemResult.matched) {
-                    return { matched: false, bindings };
-                }
-                // Merge bindings
-                for (const [name, val] of elemResult.bindings) {
-                    bindings.set(name, val);
-                }
-                matchedCount++;
-            }
-            // Handle rest element: [x & rest]
-            if (listPattern.restElement) {
-                const restValues = value.slice(matchedCount);
-                bindings.set(listPattern.restElement, restValues);
-            }
-            else if (matchedCount < value.length) {
-                // If no rest element, must match exact length
-                return { matched: false, bindings };
-            }
-            return { matched: true, bindings };
-        }
-        // Struct pattern: match object fields
-        if (pattern.kind === "struct-pattern") {
-            const structPattern = pattern;
-            // Value must be an object
-            if (typeof value !== "object" || value === null) {
-                return { matched: false, bindings };
-            }
-            // Match each field
-            for (const [fieldName, fieldPattern] of structPattern.fields) {
-                const fieldValue = value[fieldName];
-                const fieldResult = this.matchPattern(fieldPattern, fieldValue);
-                if (!fieldResult.matched) {
-                    return { matched: false, bindings };
-                }
-                // Merge bindings
-                for (const [name, val] of fieldResult.bindings) {
-                    bindings.set(name, val);
-                }
-            }
-            return { matched: true, bindings };
-        }
-        // Or pattern: try alternatives until one matches
-        if (pattern.kind === "or-pattern") {
-            const orPattern = pattern;
-            for (const alternative of orPattern.alternatives) {
-                const altResult = this.matchPattern(alternative, value);
-                if (altResult.matched) {
-                    return altResult; // Return first matching alternative
-                }
-            }
-            // None of the alternatives matched
-            return { matched: false, bindings };
-        }
-        // Unknown pattern type
-        return { matched: false, bindings };
+        return (0, eval_pattern_match_1.matchPattern)(this, pattern, value);
     }
     // Utility: Get context
     getContext() {
@@ -2452,310 +754,54 @@ class Interpreter {
     setVariable(name, value) {
         this.context.variables.set(name, value);
     }
+    // Phase 63: defmacro 처리 (interpret() 선처리용)
+    evalDefmacro(expr) {
+        if (expr.args.length < 3)
+            throw new Error(`defmacro requires name, params, and body`);
+        const nameNode = expr.args[0];
+        const macroName = nameNode.kind === "literal" ? String(nameNode.value)
+            : nameNode.kind === "variable" ? nameNode.name
+                : String(nameNode.value ?? nameNode.name ?? "");
+        const paramsNode = expr.args[1];
+        const params = [];
+        if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+            const items = paramsNode.fields.get("items");
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    if (item.kind === "variable")
+                        params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
+                    else if (item.kind === "literal")
+                        params.push("$" + item.value);
+                }
+            }
+        }
+        const body = expr.args[2];
+        this.context.macroExpander.define(macroName, params, body);
+    }
     // Phase 5 Week 2: Register built-in type classes and instances
-    registerBuiltinTypeClasses() {
-        if (!this.context.typeClasses || !this.context.typeClassInstances) {
-            return;
-        }
-        // Define Monad type class
-        this.context.typeClasses.set("Monad", {
-            name: "Monad",
-            typeParams: ["M"],
-            methods: new Map([
-                ["pure", "fn [a] (M a)"],
-                ["bind", "fn [m f] (M b)"],
-                ["map", "fn [m f] (M b)"],
-            ]),
-        });
-        // Define Functor type class
-        this.context.typeClasses.set("Functor", {
-            name: "Functor",
-            typeParams: ["F"],
-            methods: new Map([["fmap", "fn [f a] (F a)"]]),
-        });
-        // Instance: Result → Monad
-        this.context.typeClassInstances.set("Monad[Result]", {
-            className: "Monad",
-            concreteType: "Result",
-            implementations: new Map([
-                ["pure", (x) => ({ tag: "Ok", value: x, kind: "Result" })],
-                ["bind", this.bindMonad.bind(this)],
-                ["map", this.mapResult.bind(this)],
-            ]),
-        });
-        // Instance: Option → Monad
-        this.context.typeClassInstances.set("Monad[Option]", {
-            className: "Monad",
-            concreteType: "Option",
-            implementations: new Map([
-                ["pure", (x) => ({ tag: "Some", value: x, kind: "Option" })],
-                ["bind", this.bindMonad.bind(this)],
-                ["map", this.mapOption.bind(this)],
-            ]),
-        });
-        // Instance: List → Monad (FlatMap)
-        this.context.typeClassInstances.set("Monad[List]", {
-            className: "Monad",
-            concreteType: "List",
-            implementations: new Map([
-                ["pure", (x) => [x]],
-                ["bind", this.bindList.bind(this)],
-                ["map", this.mapList.bind(this)],
-            ]),
-        });
-        // Instance: Result → Functor
-        this.context.typeClassInstances.set("Functor[Result]", {
-            className: "Functor",
-            concreteType: "Result",
-            implementations: new Map([["fmap", this.mapResult.bind(this)]]),
-        });
-        // Instance: Option → Functor
-        this.context.typeClassInstances.set("Functor[Option]", {
-            className: "Functor",
-            concreteType: "Option",
-            implementations: new Map([["fmap", this.mapOption.bind(this)]]),
-        });
-        // Instance: List → Functor
-        this.context.typeClassInstances.set("Functor[List]", {
-            className: "Functor",
-            concreteType: "List",
-            implementations: new Map([["fmap", this.mapList.bind(this)]]),
-        });
-    }
-    // Helper methods for type class instances
-    bindMonad(monad, fn) {
-        if (monad.kind === "Result") {
-            if (monad.tag === "Ok") {
-                return this.callFunction(fn, [monad.value]);
-            }
-            return monad;
-        }
-        if (monad.kind === "Option") {
-            if (monad.tag === "Some") {
-                return this.callFunction(fn, [monad.value]);
-            }
-            return monad;
-        }
-        return monad;
-    }
-    bindList(list, fn) {
-        let result = [];
-        for (const item of list) {
-            const transformed = this.callFunction(fn, [item]);
-            if (Array.isArray(transformed)) {
-                result = result.concat(transformed);
-            }
-            else {
-                result.push(transformed);
-            }
-        }
-        return result;
-    }
-    mapResult(result, fn) {
-        if (result.tag === "Ok") {
-            return { tag: "Ok", value: this.callFunction(fn, [result.value]), kind: "Result" };
-        }
-        return result;
-    }
-    mapOption(option, fn) {
-        if (option.tag === "Some") {
-            return { tag: "Some", value: this.callFunction(fn, [option.value]), kind: "Option" };
-        }
-        return option;
-    }
-    mapList(list, fn) {
-        return list.map((item) => this.callFunction(fn, [item]));
-    }
-    // Get type class
+    // Phase 58: Type class 관련 로직 eval-type-classes.ts로 분리
+    registerBuiltinTypeClasses() { (0, eval_type_classes_1.registerBuiltinTypeClasses)(this); }
+    evalTypeClass(typeClass) { (0, eval_type_classes_1.evalTypeClass)(this, typeClass); }
+    evalInstance(instance) { (0, eval_type_classes_1.evalInstance)(this, instance); }
+    // Type class query helpers
     getTypeClass(name) {
         return this.context.typeClasses?.get(name);
     }
-    // Get type class instance
     getTypeClassInstance(className, concreteType) {
         return this.context.typeClassInstances?.get(`${className}[${concreteType}]`);
     }
-    // Check if a type satisfies a type class constraint
     satisfiesConstraint(type, constraintClass) {
         return !!this.getTypeClassInstance(constraintClass, type);
     }
-    // Phase 5 Week 2: Resolve method for a given className and concreteType
-    resolveMethod(className, concreteType, methodName) {
-        const instance = this.getTypeClassInstance(className, concreteType);
-        if (!instance) {
-            return undefined;
-        }
-        return instance.implementations.get(methodName);
-    }
-    // Phase 6 Step 4: Helper to ensure modules map exists
-    getModules() {
-        if (!this.context.modules) {
-            this.context.modules = new Map();
-        }
-        return this.context.modules;
-    }
-    // Phase 6 Step 4: Evaluate module block
-    // Module 정의를 등록하고 내부 함수들을 평가
-    evalModuleBlock(moduleBlock) {
-        const moduleName = moduleBlock.name;
-        const exports = moduleBlock.exports || [];
-        const moduleBody = moduleBlock.body || [];
-        // 모듈 내 함수 맵 생성
-        const moduleFunctions = new Map();
-        // 모듈 body 내의 블록들을 평가 (함수 등록)
-        for (const node of moduleBody) {
-            if ((0, ast_1.isFuncBlock)(node)) {
-                const funcName = node.name;
-                const params = node.fields?.get("params") || [];
-                const paramNames = (0, ast_helpers_1.extractParamNames)(params);
-                let body = node.fields?.get("body");
-                // Skip function if body is undefined
-                if (!body) {
-                    continue;
-                }
-                // Handle body as array (take first element)
-                if (Array.isArray(body)) {
-                    body = body[0];
-                    if (!body) {
-                        continue;
-                    }
-                }
-                const func = {
-                    name: funcName,
-                    params: paramNames,
-                    body: body,
-                };
-                moduleFunctions.set(funcName, func);
-            }
-        }
-        // 모듈 정보 생성 및 등록
-        const moduleInfo = {
-            name: moduleName,
-            exports,
-            functions: moduleFunctions,
-        };
-        this.getModules().set(moduleName, moduleInfo);
-        this.logger.info(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
-    }
-    // Phase 6 Step 4: Evaluate import block
-    // 모듈에서 함수를 선택적으로 가져오기
-    evalImportBlock(importBlock) {
-        const moduleName = importBlock.moduleName;
-        const source = importBlock.source; // "./math.fl" 등
-        const selective = importBlock.selective; // :only [add multiply]
-        const alias = importBlock.alias; // :as m
-        // Phase 52: .fl 파일 import 처리
-        if (source && (source.endsWith(".fl") || source.includes("/"))) {
-            this.evalImportFromFile(source, moduleName, selective, alias);
-            return;
-        }
-        // 모듈 찾기
-        const module = this.getModules().get(moduleName);
-        if (!module) {
-            throw new errors_1.ModuleNotFoundError(moduleName, source);
-        }
-        // 가져올 함수 목록 결정
-        let functionsToImport = [];
-        if (selective && selective.length > 0) {
-            // :only 지정된 함수만 가져오기
-            functionsToImport = selective.filter((name) => module.exports.includes(name));
-            // 존재하지 않는 함수 검증
-            selective.forEach((name) => {
-                if (!module.exports.includes(name)) {
-                    this.logger.warn(`Function "${name}" not exported from module "${moduleName}"`);
-                }
-            });
-        }
-        else {
-            // 모든 export된 함수 가져오기
-            functionsToImport = [...module.exports];
-        }
-        // 함수들을 context.functions에 추가
-        functionsToImport.forEach((funcName) => {
-            const func = module.functions.get(funcName);
-            if (func) {
-                if (alias) {
-                    // :as 별칭 사용: (import math :as m) → m:add
-                    const qualifiedName = `${alias}:${funcName}`;
-                    this.context.functions.set(qualifiedName, func);
-                }
-                else {
-                    // 별칭 없음: moduleName:funcName 형식으로 등록
-                    const qualifiedName = `${moduleName}:${funcName}`;
-                    this.context.functions.set(qualifiedName, func);
-                }
-            }
-        });
-        const importedCount = functionsToImport.length;
-        const aliasStr = alias ? ` as ${alias}` : "";
-        const selectStr = selective ? ` (${selective.join(", ")})` : "";
-        this.logger.info(`✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`);
-    }
-    // Phase 52: FL 파일에서 함수를 가져와 현재 context에 등록
-    evalImportFromFile(relPath, prefix, selective, alias) {
-        // 절대 경로 해석: currentFilePath 기준
-        const baseDir = (() => {
-            try {
-                return fs.statSync(this.currentFilePath).isDirectory()
-                    ? this.currentFilePath
-                    : path.dirname(this.currentFilePath);
-            }
-            catch {
-                return this.currentFilePath;
-            }
-        })();
-        const absPath = path.resolve(baseDir, relPath);
-        // 파일 존재 확인
-        if (!fs.existsSync(absPath)) {
-            throw new Error(`Import error: file not found: ${absPath}`);
-        }
-        // 순환 import 방지
-        if (this.importedFiles.has(absPath)) {
-            return;
-        }
-        this.importedFiles.add(absPath);
-        // 서브 인터프리터로 FL 파일 실행
-        const src = fs.readFileSync(absPath, "utf-8");
-        const subInterp = new Interpreter();
-        subInterp.currentFilePath = absPath;
-        subInterp.importedFiles = this.importedFiles; // 순환 방지 공유
-        // stdlib 로드 전 함수 목록 스냅샷 (내장 함수 제외용)
-        const builtinFuncs = new Set(subInterp.context.functions.keys());
-        subInterp.interpret((0, parser_1.parse)((0, lexer_1.lex)(src)));
-        // 사용자 정의 함수만 추출 (stdlib 내장 제외)
-        const effectivePrefix = alias ?? prefix;
-        for (const [funcName, func] of subInterp.context.functions) {
-            if (builtinFuncs.has(funcName))
-                continue; // 내장 함수 skip
-            if (selective && selective.length > 0) {
-                // :only 필터: prefix 없이 직접 등록
-                if (selective.includes(funcName)) {
-                    this.context.functions.set(funcName, func);
-                }
-            }
-            else {
-                // prefix:funcName 형식으로 등록
-                this.context.functions.set(`${effectivePrefix}:${funcName}`, func);
-            }
-        }
-    }
-    // Phase 5 Week 2: Get concrete type from a value
-    // Maps values like {tag: "Ok", ...} to "Result", {tag: "Some", ...} to "Option", etc.
     getConcreteType(value) {
-        if (!value || typeof value !== "object") {
+        if (!value || typeof value !== "object")
             return undefined;
-        }
-        // Check for tagged values (Result, Option, etc.)
-        if (value.tag === "Ok" || value.tag === "Err") {
+        if (value.tag === "Ok" || value.tag === "Err")
             return "Result";
-        }
-        if (value.tag === "Some" || value.tag === "None") {
+        if (value.tag === "Some" || value.tag === "None")
             return "Option";
-        }
-        // Check for array (List)
-        if (Array.isArray(value)) {
+        if (Array.isArray(value))
             return "List";
-        }
-        // Check for custom type markers
         if (value.kind === "Result")
             return "Result";
         if (value.kind === "Option")
@@ -2764,555 +810,29 @@ class Interpreter {
             return "List";
         return undefined;
     }
-    // Phase 6 Step 4: Evaluate open block
-    // 모듈의 모든 export된 함수를 전역 네임스페이스에 추가
-    evalOpenBlock(openBlock) {
-        const moduleName = openBlock.moduleName;
-        const source = openBlock.source; // "./math.fl" 등
-        // 모듈 찾기
-        const module = this.getModules().get(moduleName);
-        if (!module) {
-            throw new errors_1.ModuleNotFoundError(moduleName, source);
-        }
-        // 모든 export된 함수를 전역으로 추가
-        module.exports.forEach((funcName) => {
-            const func = module.functions.get(funcName);
-            if (func) {
-                // 전역 네임스페이스에 직접 추가 (별칭 없음)
-                this.context.functions.set(funcName, func);
-            }
-        });
-        this.logger.info(`✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`);
+    resolveMethod(className, concreteType, methodName) {
+        const instance = this.getTypeClassInstance(className, concreteType);
+        return instance?.implementations.get(methodName);
     }
-    // Phase 9a Advanced: Handle Search/Fetch Block - External data retrieval with API integration
-    handleSearchBlock(searchBlock) {
-        const { query, source = "web", cache = true, limit = 10, name } = searchBlock;
-        // Log search operation
-        this.logger.info(`🔎 SEARCH "${query}"`);
-        try {
-            // Phase 9a Advanced: Call WebSearchAdapter (sync mode for interpreter integration)
-            // Uses cache or mock results; real API calls require async interpreter
-            const results = this.searchAdapter.searchSync(query, {
-                limit,
-                cache,
-            });
-            const searchResult = {
-                kind: "search-result",
-                query,
-                source,
-                cache,
-                limit,
-                name,
-                status: "completed",
-                results, // ← Now contains actual search results
-                count: results.length,
-                timestamp: new Date().toISOString(),
-            };
-            // Store in context cache for use by Analyze stage
-            if (!this.context.cache) {
-                this.context.cache = new Map();
-            }
-            const cacheKey = name || `search_${Date.now()}`;
-            this.context.cache.set(cacheKey, searchResult);
-            return searchResult;
+    // Phase 6 Step 4: Helper to ensure modules map exists
+    getModules() {
+        if (!this.context.modules) {
+            this.context.modules = new Map();
         }
-        catch (error) {
-            this.logger.error(`❌ Search failed: ${error.message}`);
-            return {
-                kind: "search-error",
-                query,
-                message: error.message,
-                timestamp: new Date().toISOString(),
-            };
-        }
+        return this.context.modules;
     }
-    // Phase 9b Advanced: Handle Learn Block - Store learned information with persistence
-    handleLearnBlock(learnBlock) {
-        const { key, data, source = "search", confidence = 0.85, timestamp } = learnBlock;
-        // Initialize learned data storage if needed
-        if (!this.context.learned) {
-            this.context.learned = new Map();
-        }
-        try {
-            // Check if this is a recall operation (data is null)
-            if (data === null) {
-                // Recall: retrieve stored data by key (from file storage)
-                const loadedFact = this.learnedFactsStore.load(key);
-                if (loadedFact) {
-                    this.logger.info(`📚 LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
-                    // Also store in memory for fast access
-                    this.context.learned.set(key, {
-                        data: loadedFact.data,
-                        source: loadedFact.source,
-                        confidence: loadedFact.confidence,
-                        timestamp: new Date(loadedFact.timestamp).toISOString(),
-                    });
-                    return {
-                        kind: "learn-result",
-                        operation: "recall",
-                        key,
-                        data: loadedFact.data,
-                        source: loadedFact.source,
-                        confidence: loadedFact.confidence,
-                        timestamp: new Date(loadedFact.timestamp).toISOString(),
-                        found: true,
-                        accessCount: loadedFact.accessCount,
-                    };
-                }
-                else {
-                    this.logger.info(`📚 LEARN (recall) "${key}" - not found`);
-                    return {
-                        kind: "learn-result",
-                        operation: "recall",
-                        key,
-                        data: null,
-                        found: false,
-                    };
-                }
-            }
-            // Learn: store new data with metadata (both in memory and file)
-            // Validate confidence
-            if (confidence < 0 || confidence > 1) {
-                throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
-            }
-            // Save to persistent storage
-            this.learnedFactsStore.save(key, data, {
-                confidence,
-                source,
-                ttlDays: 30,
-            });
-            // Also store in memory for fast access
-            this.context.learned.set(key, {
-                data,
-                source,
-                confidence,
-                timestamp: timestamp ?? new Date().toISOString(),
-            });
-            this.logger.info(`  ✓ Learned data stored in context (key: ${key})`);
-            return {
-                kind: "learn-result",
-                operation: "learn",
-                key,
-                data,
-                source,
-                confidence,
-                timestamp: timestamp ?? new Date().toISOString(),
-                saved: "disk", // ← Indicates file persistence
-            };
-        }
-        catch (error) {
-            this.logger.error(`❌ Learn failed: ${error.message}`);
-            return {
-                kind: "learn-error",
-                key,
-                message: error.message,
-                timestamp: new Date().toISOString(),
-            };
-        }
+    // Phase 57: delegated to eval-module-system.ts
+    evalModuleBlock(moduleBlock) { (0, eval_module_system_1.evalModuleBlock)(this, moduleBlock); }
+    evalImportBlock(importBlock) { (0, eval_module_system_1.evalImportBlock)(this, importBlock); }
+    evalImportFromFile(relPath, prefix, selective, alias) {
+        (0, eval_module_system_1.evalImportFromFile)(this, relPath, prefix, selective, alias);
     }
-    // Phase 9c: Handle Reasoning Block - State-based AI reasoning
-    handleReasoningBlock(reasoningBlock) {
-        const { stage, data, observations, analysis, decisions, actions, verifications, metadata, transitions } = reasoningBlock;
-        // Initialize reasoning state storage if needed
-        if (!this.context.reasoning) {
-            this.context.reasoning = new Map();
-        }
-        // Create reasoning state entry
-        const reasoningState = {
-            stage,
-            data: Object.fromEntries(data),
-            observations,
-            analysis,
-            decisions,
-            actions,
-            verifications,
-            metadata: {
-                ...metadata,
-                completedAt: new Date().toISOString(),
-            },
-            transitions: transitions || [],
-        };
-        // Store reasoning state by stage + timestamp
-        const stateKey = `${stage}-${new Date().getTime()}`;
-        this.context.reasoning.set(stateKey, reasoningState);
-        // Log the reasoning stage
-        const stageEmoji = {
-            observe: "👀",
-            analyze: "🔍",
-            decide: "🎯",
-            act: "⚡",
-            verify: "✅",
-        }[stage] || "❓";
-        let logMessage = `${stageEmoji} ${stage.toUpperCase()}`;
-        // Add stage-specific logging
-        switch (stage) {
-            case "observe":
-                if (observations && observations.length > 0) {
-                    logMessage += `: ${observations.length} observations`;
-                }
-                break;
-            case "analyze":
-                // Phase 9a: Show search results if available
-                const currentSearches = this.context.currentSearches;
-                if (currentSearches && currentSearches.size > 0) {
-                    logMessage += ` [using ${currentSearches.size} search result(s)]`;
-                }
-                const angles = data.get("angles");
-                if (angles instanceof Map) {
-                    logMessage += `: ${angles.size} angles analyzed`;
-                }
-                const selected = data.get("selected");
-                if (selected) {
-                    logMessage += `, selected: "${selected.value || selected}"`;
-                }
-                break;
-            case "decide":
-                // Phase 9b: Show learned data if available
-                const currentLearned = this.context.currentLearned;
-                if (currentLearned && currentLearned.size > 0) {
-                    logMessage += ` [using ${currentLearned.size} learned fact(s)]`;
-                }
-                const choice = data.get("choice");
-                if (choice) {
-                    logMessage += `: "${choice.value || choice}"`;
-                }
-                const reason = data.get("reason");
-                if (reason) {
-                    logMessage += ` (${reason.value || reason})`;
-                }
-                break;
-            case "act":
-                const action = data.get("action");
-                if (action) {
-                    logMessage += `: "${action.value || action}"`;
-                }
-                break;
-            case "verify":
-                const result = data.get("result");
-                if (result) {
-                    logMessage += `: ${result.value || result}`;
-                }
-                if (metadata?.confidence !== undefined) {
-                    logMessage += ` (confidence: ${(metadata.confidence * 100).toFixed(0)}%)`;
-                }
-                break;
-        }
-        this.logger.info(logMessage);
-        // Return reasoning result
-        return {
-            kind: "reasoning-result",
-            stage,
-            data: Object.fromEntries(data),
-            observations,
-            analysis,
-            decisions,
-            actions,
-            verifications,
-            metadata: reasoningState.metadata,
-            stateKey,
-            completed: true,
-        };
-    }
-    // Phase 9c Extension: Handle Reasoning Sequence - Automatic state transitions
-    // Phase 9c Feedback: Verify result feedback to analyze stage (re-evaluation loop)
-    handleReasoningSequence(reasoningSeq) {
-        const { stages, metadata, feedbackLoop } = reasoningSeq;
-        // Initialize reasoning state storage if needed
-        if (!this.context.reasoning) {
-            this.context.reasoning = new Map();
-        }
-        const sequenceId = new Date().getTime();
-        const executionPath = [];
-        const sequenceResults = [];
-        const iterationHistory = [];
-        // Log sequence start
-        this.logger.info(`🔄 REASONING SEQUENCE START (${stages.length} stages, feedback: ${feedbackLoop?.enabled ? "enabled" : "disabled"})`);
-        let currentStages = stages;
-        let iteration = 0;
-        const maxIterations = feedbackLoop?.maxIterations || 1;
-        // Phase 9a/9b: Initialize search and learn context for data sharing
-        if (!reasoningSeq.context) {
-            reasoningSeq.context = {};
-        }
-        if (!reasoningSeq.context.searches) {
-            reasoningSeq.context.searches = new Map();
-        }
-        if (!reasoningSeq.context.learned) {
-            reasoningSeq.context.learned = new Map();
-        }
-        // Store references in interpreter context for access during stage execution
-        this.context.currentSearches = reasoningSeq.context.searches;
-        this.context.currentLearned = reasoningSeq.context.learned;
-        // Execute reasoning sequence with potential feedback loop
-        while (iteration < maxIterations) {
-            iteration++;
-            // Log iteration start
-            if (iteration > 1) {
-                this.logger.info(`🔄 FEEDBACK LOOP ITERATION ${iteration}/${maxIterations} (damping: ${(feedbackLoop?.confidenceDamping || 0.1).toFixed(1)})`);
-            }
-            const iterationResults = [];
-            let verifyResult = null;
-            // Execute each reasoning stage in sequence
-            for (let i = 0; i < currentStages.length; i++) {
-                const stage = currentStages[i];
-                const stageNum = i + 1;
-                // Phase 9a: Handle search block
-                if (stage.kind === "search-block") {
-                    const searchBlock = stage; // SearchBlock
-                    this.logger.info(`  [${stageNum}/${currentStages.length}] 🔎 SEARCH`);
-                    const searchResult = this.handleSearchBlock(searchBlock);
-                    // Store search result in reasoning sequence context
-                    if (!reasoningSeq.context) {
-                        reasoningSeq.context = {};
-                    }
-                    if (!reasoningSeq.context.searches) {
-                        reasoningSeq.context.searches = new Map();
-                    }
-                    const searchKey = `search_${i}`;
-                    reasoningSeq.context.searches.set(searchKey, searchResult);
-                    iterationResults.push(searchResult);
-                    executionPath.push("search");
-                    this.logger.info(`  ✓ Search result stored in context`);
-                    continue;
-                }
-                // Phase 9b: Handle learn block
-                if (stage.kind === "learn-block") {
-                    const learnBlock = stage; // LearnBlock
-                    this.logger.info(`  [${stageNum}/${currentStages.length}] 📚 LEARN`);
-                    const learnResult = this.handleLearnBlock(learnBlock);
-                    // Store learned data in reasoning sequence context
-                    if (!reasoningSeq.context) {
-                        reasoningSeq.context = {};
-                    }
-                    if (!reasoningSeq.context.learned) {
-                        reasoningSeq.context.learned = new Map();
-                    }
-                    const learnKey = learnBlock.key || `learn_${i}`;
-                    reasoningSeq.context.learned.set(learnKey, learnResult);
-                    iterationResults.push(learnResult);
-                    executionPath.push("learn");
-                    this.logger.info(`  ✓ Learned data stored in context (key: ${learnKey})`);
-                    continue;
-                }
-                // Phase 9a/9b: Only ReasoningBlock should reach here (Search/Learn already handled)
-                const reasoningBlock = stage;
-                if (reasoningBlock.kind !== "reasoning-block") {
-                    throw new Error(`Unexpected stage kind in reasoning sequence: ${stage.kind}`);
-                }
-                // Log stage entry for reasoning blocks
-                const stageEmoji = {
-                    observe: "👀",
-                    analyze: "🔍",
-                    decide: "🎯",
-                    act: "⚡",
-                    verify: "✅",
-                }[reasoningBlock.stage] || "❓";
-                const stageLabel = iteration === 1
-                    ? `[${stageNum}/${currentStages.length}]`
-                    : `[${stageNum}/${currentStages.length}]`;
-                this.logger.info(`  ${stageLabel} ${stageEmoji} ${reasoningBlock.stage.toUpperCase()}`);
-                // Phase 9c: Check for when guard clause (skip if condition is false)
-                if (reasoningBlock.whenGuard) {
-                    const guardCondition = this.evaluateCondition(reasoningBlock.whenGuard);
-                    if (!guardCondition) {
-                        this.logger.info(`  ⏭️  SKIPPED (when guard condition false)`);
-                        continue; // Skip this stage
-                    }
-                }
-                // Apply confidence damping from previous iterations
-                let adjustedStage = reasoningBlock;
-                if (iteration > 1 && reasoningBlock.metadata?.confidence !== undefined) {
-                    adjustedStage = {
-                        ...reasoningBlock,
-                        metadata: {
-                            ...reasoningBlock.metadata,
-                            confidence: Math.max(0, (reasoningBlock.metadata.confidence || 1) -
-                                (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)),
-                        },
-                    };
-                }
-                // Phase 9c: Check for conditional (if/then/else)
-                let blockToHandle = adjustedStage;
-                if (reasoningBlock.conditional) {
-                    const conditionMet = this.evaluateCondition(reasoningBlock.conditional.condition);
-                    const selectedBlock = conditionMet ? reasoningBlock.conditional.thenBlock : reasoningBlock.conditional.elseBlock;
-                    if (selectedBlock) {
-                        blockToHandle = selectedBlock;
-                        this.logger.info(`  ${conditionMet ? "✓" : "✗"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`);
-                    }
-                    else if (!conditionMet && !reasoningBlock.conditional.elseBlock) {
-                        this.logger.info(`  ⏭️  SKIPPED (if condition false, no else block)`);
-                        continue; // Skip if condition false and no else
-                    }
-                }
-                // Phase 9c: Check for loop control (repeat-until / repeat-while)
-                let stageResult;
-                if (reasoningBlock.loopControl) {
-                    const { type, condition, maxIterations = 1000 } = reasoningBlock.loopControl;
-                    const loopMaxIter = Math.min(maxIterations, 1000);
-                    let loopIteration = 0;
-                    while (loopIteration < loopMaxIter) {
-                        loopIteration++;
-                        // Evaluate loop condition
-                        const conditionValue = this.evaluateCondition(condition);
-                        const shouldContinue = type === "repeat-until" ? !conditionValue : conditionValue;
-                        if (!shouldContinue && loopIteration > 1) {
-                            break; // Exit loop if condition met
-                        }
-                        // Handle the reasoning block
-                        stageResult = this.handleReasoningBlock(blockToHandle);
-                        this.logger.info(`  🔁 ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter} (condition: ${shouldContinue ? "continue" : "exit"})`);
-                    }
-                }
-                else {
-                    // Handle the reasoning block (no loop)
-                    stageResult = this.handleReasoningBlock(blockToHandle);
-                }
-                iterationResults.push(stageResult);
-                executionPath.push(reasoningBlock.stage);
-                // Store verify result for feedback check
-                if (reasoningBlock.stage === "verify") {
-                    verifyResult = stageResult;
-                }
-                // Check for stage-specific transitions
-                if (reasoningBlock.transitions && reasoningBlock.transitions.length > 0) {
-                    for (const transition of reasoningBlock.transitions) {
-                        if (transition.condition) {
-                            const conditionMet = this.eval(transition.condition);
-                            if (conditionMet && transition.to) {
-                                this.logger.info(`    ↓ Transition to: ${transition.to}`);
-                            }
-                        }
-                    }
-                }
-            }
-            sequenceResults.push(...iterationResults);
-            iterationHistory.push({
-                iteration,
-                results: iterationResults,
-                verifyConfidence: verifyResult?.metadata?.confidence,
-            });
-            // Check feedback loop condition
-            const shouldContinueFeedback = feedbackLoop?.enabled &&
-                iteration < maxIterations &&
-                verifyResult &&
-                this.evaluateFeedbackCondition(verifyResult, feedbackLoop);
-            if (shouldContinueFeedback) {
-                this.logger.info(`↩️  FEEDBACK TRIGGERED: Returning to "${feedbackLoop.toStage}" stage`);
-                // Re-execute from feedback target stage
-                const feedbackTargetIndex = currentStages.findIndex((s) => s.stage === feedbackLoop.toStage);
-                if (feedbackTargetIndex >= 0) {
-                    currentStages = currentStages.slice(feedbackTargetIndex);
-                }
-            }
-            else {
-                break; // Exit feedback loop
-            }
-        }
-        // Create sequence result with all stage results
-        const sequenceResult = {
-            kind: "reasoning-sequence-result",
-            stages: sequenceResults,
-            executionPath,
-            iterations: iterationHistory.length,
-            feedbackTriggered: iteration > 1,
-            metadata: {
-                ...metadata,
-                sequenceId,
-                completedAt: new Date().toISOString(),
-                totalStages: stages.length,
-                iterations: iteration,
-            },
-            completed: true,
-        };
-        // Store the entire sequence result
-        const sequenceKey = `sequence-${sequenceId}`;
-        this.context.reasoning.set(sequenceKey, sequenceResult);
-        // Log sequence completion
-        const totalConfidence = sequenceResults.reduce((sum, r) => sum + (r.metadata?.confidence || 0), 0) /
-            Math.max(sequenceResults.length, 1);
-        this.logger.info(`✅ REASONING SEQUENCE COMPLETE (${stages.length} stages, ${iteration} iterations, confidence: ${(totalConfidence * 100).toFixed(0)}%)`);
-        return sequenceResult;
-    }
-    // Phase 9c Feedback: Evaluate feedback condition
-    evaluateFeedbackCondition(verifyResult, feedbackLoop) {
-        // Default: trigger feedback if confidence < 0.8
-        const defaultThreshold = 0.8;
-        const confidence = verifyResult?.metadata?.confidence || 0;
-        if (feedbackLoop.condition) {
-            // Evaluate custom condition
-            try {
-                return this.eval(feedbackLoop.condition);
-            }
-            catch (e) {
-                this.logger.warn(`Failed to evaluate feedback condition: ${e.message}`);
-                return confidence < defaultThreshold;
-            }
-        }
-        // Default: trigger if confidence below threshold
-        return confidence < defaultThreshold;
-    }
-    // Phase 9c Conditional: Evaluate condition expression (boolean evaluation)
-    evaluateCondition(conditionNode) {
-        if (!conditionNode)
-            return false;
-        try {
-            const result = this.eval(conditionNode);
-            // Convert result to boolean
-            if (typeof result === "boolean")
-                return result;
-            if (typeof result === "number")
-                return result !== 0;
-            if (typeof result === "string")
-                return result.length > 0;
-            if (result === null || result === undefined)
-                return false;
-            return !!result;
-        }
-        catch (e) {
-            this.logger.warn(`Failed to evaluate condition: ${e.message}`);
-            return false;
-        }
-    }
-    // Phase 5 Week 2: Evaluate Type Class definition
-    evalTypeClass(typeClass) {
-        const info = {
-            name: typeClass.name,
-            typeParams: typeClass.typeParams,
-            methods: new Map(),
-        };
-        // Extract method signatures from typeClass.methods Map
-        if (typeClass.methods) {
-            typeClass.methods.forEach((method, methodName) => {
-                // Store method signature (for now, just the method name)
-                info.methods.set(methodName, methodName);
-            });
-        }
-        // Register type class in context
-        this.context.typeClasses.set(typeClass.name, info);
-        this.logger.info(`✅ Registered TYPECLASS "${typeClass.name}" with type params [${typeClass.typeParams.join(", ")}] and ${info.methods.size} method(s)`);
-    }
-    // Phase 5 Week 2: Evaluate Type Class Instance definition
-    evalInstance(instance) {
-        const key = `${instance.className}[${instance.concreteType}]`;
-        const implementations = new Map();
-        // Extract method implementations from instance.implementations Map
-        if (instance.implementations) {
-            instance.implementations.forEach((value, methodName) => {
-                // Evaluate each method implementation
-                const impl = this.eval(value);
-                implementations.set(methodName, impl);
-            });
-        }
-        const info = {
-            className: instance.className,
-            concreteType: instance.concreteType,
-            implementations,
-        };
-        // Register type class instance in context
-        this.context.typeClassInstances.set(key, info);
-        this.logger.info(`✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`);
-    }
+    evalOpenBlock(openBlock) { (0, eval_module_system_1.evalOpenBlock)(this, openBlock); }
+    // Phase 57: delegated to eval-ai-handlers.ts
+    handleSearchBlock(searchBlock) { return (0, eval_ai_handlers_1.handleSearchBlock)(this, searchBlock); }
+    handleLearnBlock(learnBlock) { return (0, eval_ai_handlers_1.handleLearnBlock)(this, learnBlock); }
+    handleReasoningBlock(reasoningBlock) { return (0, eval_ai_handlers_1.handleReasoningBlock)(this, reasoningBlock); }
+    handleReasoningSequence(reasoningSeq) { return (0, eval_reasoning_sequence_1.handleReasoningSequence)(this, reasoningSeq); }
     /**
      * Cleanup: Destroy all resources and stop timers
      * Call this when shutting down the interpreter to prevent memory leaks
@@ -3329,7 +849,7 @@ class Interpreter {
     }
 }
 exports.Interpreter = Interpreter;
-Interpreter.MAX_CALL_DEPTH = 500;
+Interpreter.MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 100만 재귀 처리)
 // Global interpreter reference for cleanup on process exit
 let globalInterpreterInstance = null;
 function interpret(blocks, logger) {

@@ -119,7 +119,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     }
 
     const value = ev(expr.args[1]);
-    if ((value as any).kind === "function-value") {
+    if (value !== null && value !== undefined && (value as any).kind === "function-value") {
       const funcDef = {
         name,
         params: (value as any).params,
@@ -902,15 +902,40 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
 function evalCond(interp: Interpreter, args: ASTNode[]): any {
   const ev = (node: any) => (interp as any).eval(node);
   for (const arg of args) {
+    let testNode: any = null;
+    let bodyNodes: any[] = [];
+
+    // [test result...] Array block 형식
     if ((arg as any).kind === "block" && (arg as any).type === "Array") {
       const items = (arg as any).fields.get("items");
       if (Array.isArray(items) && items.length >= 2) {
-        const test = ev(items[0]);
-        if (test) {
-          let result: any = null;
-          for (let i = 1; i < items.length; i++) result = ev(items[i]);
-          return result;
-        }
+        testNode = items[0];
+        bodyNodes = items.slice(1);
+      }
+    }
+    // ((test-expr) body...) → parser creates SExpr{op:"do", args:[test, body...]}
+    else if ((arg as any).kind === "sexpr" && (arg as any).op === "do" && (arg as any).args.length >= 2) {
+      testNode = (arg as any).args[0];
+      bodyNodes = (arg as any).args.slice(1);
+    }
+    // (test body) → SExpr where op is test symbol and args is rest
+    // e.g. (true result) → SExpr{op:"true", args:[result]}
+    else if ((arg as any).kind === "sexpr" && (arg as any).args.length >= 1) {
+      const s = arg as any;
+      testNode = { kind: "literal", type: "boolean", value: s.op === "true" ? true : s.op === "false" ? false : s.op === "else" ? true : undefined };
+      if (testNode.value === undefined) {
+        // op is a symbol test — reconstruct as variable lookup or literal
+        testNode = { kind: "variable", name: s.op.startsWith("$") ? s.op : "$" + s.op };
+      }
+      bodyNodes = s.args;
+    }
+
+    if (testNode && bodyNodes.length >= 1) {
+      const test = ev(testNode);
+      if (test) {
+        let result: any = null;
+        for (const b of bodyNodes) result = ev(b);
+        return result;
       }
     }
   }
