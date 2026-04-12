@@ -34,6 +34,8 @@ import { tryReasonBuiltin, tryWithFallback } from "./try-reason"; // Phase 104: 
 import { createStream, getStream, deleteStream, streamText, FLStream } from "./streaming"; // Phase 105: Streaming
 import { evaluateQuality, defaultCriteria } from "./quality-loop"; // Phase 106: Quality Loop
 import { globalTutor } from "./fl-tutor"; // Phase 107: FL Self-Teaching
+import { createTrace, getTrace, TraceNodeType } from "./reasoning-debugger"; // Phase 108: Reasoning Debugger
+import { globalCompiler, PromptCompiler } from "./prompt-compiler"; // Phase 109: Prompt Compiler
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1076,6 +1078,106 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     // (fl-concepts) → 개념 목록 (공백 구분 문자열)
     case "fl-concepts": {
       return globalTutor.concepts().join(" ");
+    }
+
+    // Phase 108: AI 추론 시각화 디버거 내장 함수
+    // (trace-create "label") → trace-id 문자열
+    case "trace-create": {
+      const label = String(args[0] ?? "trace");
+      const { id } = createTrace(label);
+      return id;
+    }
+
+    // (trace-add id "type" "label") → null
+    // (trace-add id "type" "label" value) → null
+    case "trace-add": {
+      const traceId = String(args[0] ?? "");
+      const nodeType = String(args[1] ?? "thought") as TraceNodeType;
+      const nodeLabel = String(args[2] ?? "");
+      const nodeValue = args.length >= 4 ? args[3] : undefined;
+      const trace = getTrace(traceId);
+      if (!trace) return null;
+      trace.add(nodeType, nodeLabel, nodeValue);
+      return null;
+    }
+
+    // (trace-enter id "type" "label") → null
+    case "trace-enter": {
+      const traceId = String(args[0] ?? "");
+      const nodeType = String(args[1] ?? "thought") as TraceNodeType;
+      const nodeLabel = String(args[2] ?? "");
+      const nodeValue = args.length >= 4 ? args[3] : undefined;
+      const trace = getTrace(traceId);
+      if (!trace) return null;
+      trace.enter(nodeType, nodeLabel, nodeValue);
+      return null;
+    }
+
+    // (trace-exit id) → null
+    // (trace-exit id result) → null
+    case "trace-exit": {
+      const traceId = String(args[0] ?? "");
+      const result = args.length >= 2 ? args[1] : undefined;
+      const trace = getTrace(traceId);
+      if (!trace) return null;
+      trace.exit(result);
+      return null;
+    }
+
+    // (trace-markdown id) → 마크다운 문자열
+    case "trace-markdown": {
+      const traceId = String(args[0] ?? "");
+      const trace = getTrace(traceId);
+      if (!trace) return "";
+      return trace.toMarkdown();
+    }
+
+    // (trace-tree id) → 텍스트 트리 문자열
+    case "trace-tree": {
+      const traceId = String(args[0] ?? "");
+      const trace = getTrace(traceId);
+      if (!trace) return "";
+      return trace.toTree();
+    }
+
+    // (trace-node-count id) → 노드 수 (숫자)
+    case "trace-node-count": {
+      const traceId = String(args[0] ?? "");
+      const trace = getTrace(traceId);
+      if (!trace) return 0;
+      return trace.nodeCount();
+    }
+
+    // Phase 109: FL → 최적 프롬프트 컴파일러 내장 함수
+    // (prompt-compile "blockType" "instruction") → 프롬프트 문자열
+    case "prompt-compile": {
+      const blockType = String(args[0] ?? "COT");
+      const instruction = String(args[1] ?? "");
+      const section = globalCompiler.compileBlock(blockType, {});
+      const sections = section ? [section] : [{ name: 'default', content: '', priority: 0.5 as number }];
+      const result = globalCompiler.compile(sections, instruction);
+      return result.prompt;
+    }
+
+    // (prompt-tokens "text") → 추정 토큰 수 (숫자)
+    case "prompt-tokens": {
+      const text = String(args[0] ?? "");
+      return Math.ceil(text.length / 4);
+    }
+
+    // (prompt-target "claude"|"gpt"|"generic") → 타겟 설정 후 현재 타겟 반환
+    case "prompt-target": {
+      const target = String(args[0] ?? "claude") as 'claude' | 'gpt' | 'generic';
+      globalCompiler.setTarget(target);
+      return target;
+    }
+
+    // (prompt-from-code "fl-code" "instruction") → FL 코드에서 자동 컴파일된 프롬프트
+    case "prompt-from-code": {
+      const flCode = String(args[0] ?? "");
+      const instruction = String(args[1] ?? "");
+      const result = globalCompiler.compileFromCode(flCode, instruction);
+      return result.prompt;
     }
 
     // Function call (default)
