@@ -40,9 +40,13 @@ for (const src of [lexerSrc, parserSrc, codegenSrc]) {
   interp.interpret(parse(lex(src)));
 }
 
-// 대상 FL 컴파일
-const flSrc  = loadFL(entryFile);
-const escaped = JSON.stringify(flSrc);
+// LLM 라이브러리 파일 + 엔트리 합산 컴파일
+const llmLibFiles = ["fl-tensor.fl", "fl-nn.fl", "fl-llm.fl"];
+const allLibSrc = llmLibFiles.map(f => loadFL(f)).join("\n");
+const entrySrc  = loadFL(entryFile);
+const combined  = allLibSrc + "\n" + entrySrc;
+
+const escaped = JSON.stringify(combined);
 interp.interpret(parse(lex(`(gen-js (parse (lex ${escaped})))`)));
 const jsCode = interp.context.lastValue as string;
 
@@ -51,6 +55,8 @@ if (typeof jsCode !== "string") {
   process.exit(1);
 }
 console.log(`✅ JS 컴파일 완료 (${jsCode.length} chars)\n`);
+// 디버그용 JS 저장
+fs.writeFileSync("/tmp/fl-llm-debug.js", jsCode, "utf-8");
 
 // ─── 네이티브 텐서 함수 ─────────────────────────────────────
 
@@ -112,16 +118,16 @@ function nativeRandn(n: number, scale: number): number[] {
   return out;
 }
 
-/** gradient of matmul: dA = dC @ B^T, dB = A^T @ dC */
+/** gradient of matmul: dA = dC @ B^T, dB = A^T @ dC — returns [dA, dB] */
 function nativeMatmulGrad(
   A: number[], B: number[], dC: number[],
   M: number, K: number, N: number
-): { dA: number[]; dB: number[] } {
+): [number[], number[]] {
   // dA[M×K] = dC[M×N] @ B^T[N×K]
   const dA = nativeMatmul(dC, transposeFlat(B, K, N), M, N, K);
   // dB[K×N] = A^T[K×M] @ dC[M×N]
   const dB = nativeMatmul(transposeFlat(A, M, K), dC, K, M, N);
-  return { dA, dB };
+  return [dA, dB];
 }
 
 function transposeFlat(A: number[], rows: number, cols: number): number[] {
@@ -132,10 +138,10 @@ function transposeFlat(A: number[], rows: number, cols: number): number[] {
   return out;
 }
 
-/** cross-entropy loss + gradient */
+/** cross-entropy loss + gradient — returns [loss, dlogits] array for FL */
 function nativeCrossEntropy(
   logits: number[], targets: number[], B: number, V: number
-): { loss: number; dlogits: number[] } {
+): [number, number[]] {
   const dlogits = new Array(B * V).fill(0);
   let loss = 0;
   for (let b = 0; b < B; b++) {
@@ -149,7 +155,7 @@ function nativeCrossEntropy(
   }
   loss /= B;
   for (let i = 0; i < dlogits.length; i++) dlogits[i] /= B;
-  return { loss, dlogits };
+  return [loss, dlogits];
 }
 
 // ─── JS 실행 샌드박스 ────────────────────────────────────────
@@ -169,6 +175,7 @@ const sandbox: Record<string, any> = {
   },
 
   // FreeLang 기본 런타임
+  list:    (...args: any[]) => [...args],
   str:     (...args: any[]) => args.map(String).join(""),
   println: (...args: any[]) => console.log(...args),
   print:   (...args: any[]) => process.stdout.write(args.map(String).join("")),
@@ -183,14 +190,14 @@ const sandbox: Record<string, any> = {
   get:     (arr: any[], i: number) => arr[i],
   set:     (arr: any[], i: number, v: any) => { const a = [...arr]; a[i] = v; return a; },
   slice:   (arr: any[], s: number, e?: number) => arr.slice(s, e),
-  concat:  (...arrs: any[][]) => [].concat(...arrs),
-  map:     (arr: any[], fn: Function) => arr.map((x, i) => fn(x, i)),
-  filter:  (arr: any[], fn: Function) => arr.filter(fn),
+  concat:  (...arrs: any[][]) => ([] as any[]).concat(...arrs),
+  map:     (arr: any[], fn: Function) => arr.map((x: any, i: number) => fn(x, i)),
+  filter:  (arr: any[], fn: Function) => arr.filter((x: any) => fn(x)),
   reduce:  (arr: any[], fn: Function, init: any) => arr.reduce((a, b) => fn(a, b), init),
   range:   (n: number) => Array.from({ length: n }, (_, i) => i),
   zip:     (a: any[], b: any[]) => a.map((x, i) => [x, b[i]]),
 
-  // 네이티브 텐서 연산
+  // 네이티브 텐서 연산 (하이픈 및 언더스코어 모두 지원)
   "native-matmul":       nativeMatmul,
   "native-softmax":      nativeSoftmax,
   "native-softmax-rows": nativeSoftmaxRows,
@@ -205,17 +212,65 @@ const sandbox: Record<string, any> = {
   "native-sqrt":         Math.sqrt,
   "native-abs":          Math.abs,
 
+  // 문자열 유틸
+  "char-code": (s: string, i: number) => s.charCodeAt(i),
+  "random":    () => Math.random(),
+
   // 파일 I/O
   "read-file":  (p: string) => fs.readFileSync(p, "utf-8"),
   "write-file": (p: string, d: string) => fs.writeFileSync(p, d, "utf-8"),
   "file-exists": (p: string) => fs.existsSync(p),
 };
 
+// JS 언더스코어 버전 (codegen 변환 후) — Object.assign으로 추가
+Object.assign(sandbox, {
+  // recur2: 중첩 루프 TCO 마커
+  recur2: (x: any) => ({ __FL_TCO__: true, __args: [x] }),
+  native_matmul:       nativeMatmul,
+  native_softmax:      nativeSoftmax,
+  native_softmax_rows: nativeSoftmaxRows,
+  native_exp:          nativeExp,
+  native_log:          nativeLog,
+  native_randn:        nativeRandn,
+  native_zeros:        (n: number) => new Array(n).fill(0),
+  native_ones:         (n: number) => new Array(n).fill(1),
+  native_transpose:    transposeFlat,
+  native_matmul_grad:  nativeMatmulGrad,
+  native_cross_entropy: nativeCrossEntropy,
+  native_sqrt:         Math.sqrt,
+  native_abs:          Math.abs,
+  char_code:           (s: string, i: number) => s.charCodeAt(i),
+  random:              () => Math.random(),
+  read_file:           (p: string) => fs.readFileSync(p, "utf-8"),
+  write_file:          (p: string, d: string) => fs.writeFileSync(p, d, "utf-8"),
+  file_exists:         (p: string) => fs.existsSync(p),
+});
+
 vm.createContext(sandbox);
+
+// 디버그: strict mode 예약어 오류 위치 찾기
+function findReservedWordError(code: string): void {
+  const lines = code.split("\n");
+  const reserved = ["let", "const", "class", "static", "implements", "interface", "package", "private", "protected", "public", "yield", "delete", "import", "export"];
+  for (let i = 0; i < lines.length; i++) {
+    for (const kw of reserved) {
+      const re = new RegExp(`\\b${kw}\\s*=`, "g");
+      if (re.test(lines[i])) {
+        console.error(`  L${i+1}: ${lines[i].trim()}`);
+      }
+    }
+  }
+}
 
 try {
   vm.runInContext(jsCode, sandbox, { timeout: 3600000 }); // 1시간
 } catch (e: any) {
   console.error("\n❌ 실행 오류:", e.message);
+  if (e.message?.includes("strict mode")) {
+    console.error("예약어 변수 후보:");
+    findReservedWordError(jsCode);
+    // 처음 500자 출력
+    console.error("\nJS 코드 시작:\n" + jsCode.slice(0, 500));
+  }
   process.exit(1);
 }

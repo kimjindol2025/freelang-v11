@@ -1,0 +1,244 @@
+; ================================================================
+; fl-train.fl — FreeLang-LLM 학습 루프
+;
+; 알고리즘: SGD (AdamW는 메모리 제한으로 단순화)
+; 데이터: 바이트 수준 텍스트 (VOCAB=256)
+; 구조: fl-tensor.fl + fl-nn.fl + fl-llm.fl 사용
+;
+; 사용법: npx ts-node run-llm.ts fl-train.fl
+; ================================================================
+
+; ─── 설정 ────────────────────────────────────────────────────
+(define VOCAB       256)   ; byte-level vocab
+(define D             8)   ; tiny hidden dim
+(define N-HEADS       2)
+(define N-LAYERS      1)
+(define BLOCK-SIZE    8)   ; 짧은 context
+(define INIT-SCALE 0.02)
+(define LR         0.05)
+(define STEPS        10)   ; 학습 스텝 수
+(define BATCH         1)   ; 배치 크기 (단순화)
+
+; ─── 학습 데이터 ─────────────────────────────────────────────
+; FreeLang 코드 샘플 (바이트 인코딩)
+; "define loop if recur" → ASCII 바이트
+(define TRAIN-TEXT "(define x 42) (println x) (loop [[_ 0]] (recur 0))")
+
+; 텍스트 → 바이트 배열
+[FUNC text-to-bytes :params [$text]
+  :body (
+    (define n (length $text))
+    (define bytes [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) bytes
+        (
+          (set! bytes (append bytes (char-code $text i)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 파라미터 업데이트 (SGD) ─────────────────────────────────
+; 텐서의 모든 파라미터를 gradient로 업데이트
+[FUNC sgd-update-flat :params [$params $grads $lr]
+  :body (
+    (define n (length $params))
+    (define out (native-zeros n))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) out
+        (
+          (set! out (set out i (- (get $params i) (* $lr (get $grads i)))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 수치 미분으로 임베딩 gradient 계산 ──────────────────────
+; loss(W+eps) - loss(W-eps) / 2eps → grad per element
+(define EPS 0.001)
+
+[FUNC numerical-grad-emb :params [$model $tokens $targets $emb-idx]
+  :body (
+    (define tok-emb (model-tok-emb $model))
+    (define data (tensor-data tok-emb))
+    (define rows (tensor-rows tok-emb))
+    (define cols (tensor-cols tok-emb))
+
+    ; +eps
+    (define data-plus (set data $emb-idx (+ (get data $emb-idx) EPS)))
+    (define tok-emb-plus (tensor-from data-plus rows cols))
+    (define m-plus (list tok-emb-plus (model-pos-emb $model) (model-blocks $model)
+                         (model-ln-w $model) (model-ln-b $model) (model-lm-head $model)
+                         (model-vocab $model) (model-d $model)
+                         (model-n-heads $model) (model-n-layers $model)
+                         (model-block-size $model)))
+    (define logits-plus (llm-forward m-plus $tokens))
+    (define loss-plus (get (cross-entropy logits-plus $targets) 0))
+
+    ; -eps
+    (define data-minus (set data $emb-idx (- (get data $emb-idx) EPS)))
+    (define tok-emb-minus (tensor-from data-minus rows cols))
+    (define m-minus (list tok-emb-minus (model-pos-emb $model) (model-blocks $model)
+                          (model-ln-w $model) (model-ln-b $model) (model-lm-head $model)
+                          (model-vocab $model) (model-d $model)
+                          (model-n-heads $model) (model-n-layers $model)
+                          (model-block-size $model)))
+    (define logits-minus (llm-forward m-minus $tokens))
+    (define loss-minus (get (cross-entropy logits-minus $targets) 0))
+
+    (/ (- loss-plus loss-minus) (* 2.0 EPS))
+  )
+]
+
+; ─── 손실 계산 헬퍼 ─────────────────────────────────────────
+[FUNC compute-loss :params [$model $tokens $targets]
+  :body (
+    (define logits (llm-forward $model $tokens))
+    (define result (cross-entropy logits $targets))
+    (get result 0)
+  )
+]
+
+; ─── LM head gradient (analytical) ─────────────────────────
+; dlogits에서 lm-head 업데이트
+; lm-head [D×V], X-norm [T×D] → dW = X-norm^T @ dlogits
+[FUNC update-lm-head :params [$model $tokens $targets $lr]
+  :body (
+    (define d (model-d $model))
+    (define vocab (model-vocab $model))
+    (define logits (llm-forward $model $tokens))
+    (define result (cross-entropy logits $targets))
+    (define dlogits-flat (get result 1))
+    (define T (length $tokens))
+
+    ; X-norm 재계산 (lm-head 입력)
+    (define tok-embs (emb-lookup (model-tok-emb $model) $tokens d))
+    (define pos-ids [])
+    (define pi 0)
+    (loop [[$_ 0]]
+      (if (>= pi T) 0
+        ((set! pos-ids (append pos-ids pi)) (set! pi (+ pi 1)) (recur 0))
+      )
+    )
+    (define pos-embs (emb-lookup (model-pos-emb $model) pos-ids d))
+    (define X (tensor-add tok-embs pos-embs))
+    (define blocks (model-blocks $model))
+    (define n-layers (model-n-layers $model))
+    (define bi 0)
+    (loop [[$_ 0]]
+      (if (>= bi n-layers) 0
+        (
+          (set! X (block-forward (get blocks bi) X (model-n-heads $model)))
+          (set! bi (+ bi 1))
+          (recur 0)
+        )
+      )
+    )
+    (define X-norm (layernorm X (model-ln-w $model) (model-ln-b $model)))
+
+    ; dW = X-norm^T [D×T] @ dlogits [T×V] = [D×V]
+    (define grad-result (native-matmul-grad
+      (tensor-data X-norm) (tensor-data (model-lm-head $model))
+      dlogits-flat T d vocab))
+    (define dW (get grad-result 1))
+
+    ; SGD 업데이트
+    (define old-W (tensor-data (model-lm-head $model)))
+    (define new-W (sgd-update-flat old-W dW $lr))
+    (define new-lm-head (tensor-from new-W d vocab))
+
+    ; 새 모델 반환
+    (list (model-tok-emb $model) (model-pos-emb $model) (model-blocks $model)
+          (model-ln-w $model) (model-ln-b $model) new-lm-head
+          (model-vocab $model) (model-d $model) (model-n-heads $model)
+          (model-n-layers $model) (model-block-size $model))
+  )
+]
+
+; ─── 메인 학습 루프 ──────────────────────────────────────────
+
+(println "")
+(println "╔══════════════════════════════════════════╗")
+(println "║  FreeLang-LLM v1.0  — FL v9 학습 루프   ║")
+(println "╚══════════════════════════════════════════╝")
+(println "")
+
+; 모델 초기화
+(println (str "⚙️  모델 초기화: vocab=" VOCAB " D=" D " heads=" N-HEADS " layers=" N-LAYERS))
+(define model (llm-init VOCAB D N-HEADS N-LAYERS BLOCK-SIZE INIT-SCALE))
+
+; 학습 데이터 준비
+(define all-bytes (text-to-bytes TRAIN-TEXT))
+(define data-len (length all-bytes))
+(println (str "📄 학습 텍스트: " data-len " 바이트"))
+
+; 시퀀스 구성: 길이 BLOCK-SIZE 슬라이딩 윈도우
+; tokens = [0..BLOCK-SIZE-1], targets = [1..BLOCK-SIZE]
+(define seq-len (if (> data-len BLOCK-SIZE) BLOCK-SIZE (- data-len 1)))
+(define tokens (slice all-bytes 0 seq-len))
+(define targets (slice all-bytes 1 (+ seq-len 1)))
+
+(println (str "🔢 시퀀스 길이: " seq-len " 토큰"))
+(println "")
+
+; 초기 loss
+(define init-loss (compute-loss model tokens targets))
+(println (str "📊 초기 Loss: " init-loss))
+(println "")
+(println "🏋️  학습 시작...")
+(println "")
+
+; 학습 루프
+(define step 0)
+(define current-model model)
+(define prev-loss init-loss)
+
+(loop [[$_ 0]]
+  (if (>= step STEPS) 0
+    (
+      ; lm-head만 업데이트 (가장 빠른 수렴)
+      (set! current-model (update-lm-head current-model tokens targets LR))
+
+      ; Loss 계산
+      (define loss (compute-loss current-model tokens targets))
+
+      ; 진행 상황 출력 (5스텝마다)
+      (if (= (- step (* (/ step 5) 5)) 0)
+        (println (str "  Step " (+ step 1) "/" STEPS
+                      "  loss=" loss
+                      "  Δ=" (- prev-loss loss)))
+        0
+      )
+
+      (set! prev-loss loss)
+      (set! step (+ step 1))
+      (recur 0)
+    )
+  )
+)
+
+(define final-loss (compute-loss current-model tokens targets))
+(println "")
+(println (str "✅ 학습 완료!"))
+(println (str "   초기 Loss: " init-loss))
+(println (str "   최종 Loss: " final-loss))
+(define improvement (- init-loss final-loss))
+(println (str "   개선량:    " improvement))
+(println "")
+
+; 텍스트 생성 테스트
+(println "🔮 텍스트 생성 테스트...")
+(define prompt-tokens (slice all-bytes 0 4))
+(println (str "   입력 토큰 4개: " prompt-tokens))
+(define gen-tokens (llm-generate current-model prompt-tokens 8 1.0))
+(println (str "   출력 토큰: " gen-tokens))
+(println "")
+(println "🎉 FreeLang v9 LLM 학습 완료!")

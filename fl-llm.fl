@@ -1,0 +1,197 @@
+; ================================================================
+; fl-llm.fl — FreeLang-LLM GPT 모델
+;
+; 모델 구조:
+;   tok_emb [vocab × D]
+;   pos_emb [block_size × D]
+;   blocks: n_layers × (MHA + FFN)
+;   ln_f [D]
+;   lm_head [D × vocab]
+;
+; 사용법: (define model (llm-init VOCAB D N-HEADS N-LAYERS BLOCK-SIZE))
+;         (llm-forward model tokens)  → logits [T × vocab]
+; ================================================================
+
+; ─── 임베딩 ──────────────────────────────────────────────────
+
+[FUNC emb-lookup :params [$emb-table $tokens $D]
+  :body (
+    (define T (length $tokens))
+    (define out (native-zeros (* T $D)))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i T) (tensor-from out T $D)
+        (
+          (define tok (get $tokens i))
+          (define row-start (* tok $D))
+          (define j 0)
+          (loop [[$_2 0]]
+            (if (>= j $D) 0
+              (
+                (define v (get (tensor-data $emb-table) (+ row-start j)))
+                (set! out (set out (+ (* i $D) j) v))
+                (set! j (+ j 1))
+                (recur2 0)
+              )
+            )
+          )
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 모델 초기화 ─────────────────────────────────────────────
+
+[FUNC llm-init :params [$vocab $d $n-heads $n-layers $block-size $scale]
+  :body (
+    (define tok-emb (tensor-randn $vocab $d $scale))
+    (define pos-emb (tensor-randn $block-size $d $scale))
+
+    ; Transformer blocks
+    (define blocks [])
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n-layers) 0
+        (
+          (set! blocks (append blocks (list (block-init $d $n-heads $scale))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; 최종 LayerNorm
+    (define ln-f-w (native-ones $d))
+    (define ln-f-b (native-zeros $d))
+
+    ; LM head (가중치 공유: tok-emb 전치)
+    (define lm-head (tensor-randn $d $vocab $scale))
+
+    (list tok-emb pos-emb blocks ln-f-w ln-f-b lm-head
+          $vocab $d $n-heads $n-layers $block-size)
+  )
+]
+
+; 모델 컴포넌트 접근자
+[FUNC model-tok-emb   :params [$m] :body (get $m 0)]
+[FUNC model-pos-emb   :params [$m] :body (get $m 1)]
+[FUNC model-blocks    :params [$m] :body (get $m 2)]
+[FUNC model-ln-w      :params [$m] :body (get $m 3)]
+[FUNC model-ln-b      :params [$m] :body (get $m 4)]
+[FUNC model-lm-head   :params [$m] :body (get $m 5)]
+[FUNC model-vocab     :params [$m] :body (get $m 6)]
+[FUNC model-d         :params [$m] :body (get $m 7)]
+[FUNC model-n-heads   :params [$m] :body (get $m 8)]
+[FUNC model-n-layers  :params [$m] :body (get $m 9)]
+[FUNC model-block-size :params [$m] :body (get $m 10)]
+
+; ─── Forward Pass ────────────────────────────────────────────
+
+[FUNC llm-forward :params [$model $tokens]
+  :body (
+    (define T (length $tokens))
+    (define d (model-d $model))
+    (define n-heads (model-n-heads $model))
+
+    ; 토큰 임베딩 + 위치 임베딩
+    (define tok-embs (emb-lookup (model-tok-emb $model) $tokens d))
+    (define pos-ids [])
+    (define pi 0)
+    (loop [[$_ 0]]
+      (if (>= pi T) 0
+        ((set! pos-ids (append pos-ids pi)) (set! pi (+ pi 1)) (recur 0))
+      )
+    )
+    (define pos-embs (emb-lookup (model-pos-emb $model) pos-ids d))
+    (define X (tensor-add tok-embs pos-embs))
+
+    ; Transformer blocks
+    (define blocks (model-blocks $model))
+    (define n-layers (model-n-layers $model))
+    (define bi 0)
+    (loop [[$_ 0]]
+      (if (>= bi n-layers) 0
+        (
+          (set! X (block-forward (get blocks bi) X n-heads))
+          (set! bi (+ bi 1))
+          (recur 0)
+        )
+      )
+    )
+
+    ; 최종 LayerNorm
+    (define X-norm (layernorm X (model-ln-w $model) (model-ln-b $model)))
+
+    ; LM Head: [T×D] @ [D×vocab] = [T×vocab]
+    (matmul X-norm (model-lm-head $model))
+  )
+]
+
+; ─── 텍스트 생성 ─────────────────────────────────────────────
+
+[FUNC llm-sample-token :params [$logits-row $vocab $temperature]
+  :body (
+    ; temperature scaling
+    (define scaled (map $logits-row (fn [$x $i] (/ $x $temperature))))
+    ; softmax
+    (define probs (native-softmax scaled))
+    ; 누적 분포에서 샘플링
+    (define r (random))
+    (define cumsum 0.0)
+    (define result 0)
+    (define found false)
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (or found (>= i $vocab)) result
+        (
+          (set! cumsum (+ cumsum (get probs i)))
+          (if (>= cumsum r)
+            ((set! result i) (set! found true))
+            0
+          )
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC llm-generate :params [$model $prompt-tokens $max-new $temperature]
+  :body (
+    (define tokens $prompt-tokens)
+    (define block-size (model-block-size $model))
+    (define vocab (model-vocab $model))
+    (define generated 0)
+
+    (loop [[$_ 0]]
+      (if (>= generated $max-new) tokens
+        (
+          ; 최근 block-size 토큰만 사용
+          (define ctx-len (length tokens))
+          (define ctx
+            (if (> ctx-len block-size)
+              (slice tokens (- ctx-len block-size) ctx-len)
+              tokens
+            )
+          )
+
+          ; forward pass
+          (define logits-t (llm-forward $model ctx))
+          (define T (tensor-rows logits-t))
+          (define last-row-start (* (- T 1) vocab))
+          (define last-logits (slice (tensor-data logits-t) last-row-start (+ last-row-start vocab)))
+
+          ; 샘플링
+          (define next-tok (llm-sample-token last-logits vocab $temperature))
+          (set! tokens (append tokens next-tok))
+          (set! generated (+ generated 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]

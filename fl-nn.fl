@@ -1,0 +1,257 @@
+; ================================================================
+; fl-nn.fl — FreeLang v9 신경망 레이어
+;
+; Linear, Attention, FFN, GPT Block
+; 각 레이어: {forward, params, grads}
+; ================================================================
+
+; ─── Linear 레이어 ──────────────────────────────────────────
+; W: [in_dim × out_dim], b: [1 × out_dim]
+; forward: X[B×in] @ W[in×out] + b → [B×out]
+
+[FUNC linear-init :params [$in-dim $out-dim $scale]
+  :body (
+    (define W (tensor-randn $in-dim $out-dim $scale))
+    (define b (tensor-zeros 1 $out-dim))
+    (list W b)
+  )
+]
+
+[FUNC linear-forward :params [$layer $X]
+  :body (
+    (define W (get $layer 0))
+    (define b (get $layer 1))
+    (define XW (matmul $X W))
+    ; 브로드캐스트 bias
+    (define B (tensor-rows $XW))
+    (define N (tensor-cols $XW))
+    (define out-data (native-zeros (* B N)))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i B) (tensor-from out-data B N)
+        (
+          (define j 0)
+          (loop [[$_2 0]]
+            (if (>= j N) 0
+              (
+                (define v (+ (get (tensor-data $XW) (+ (* i N) j))
+                             (get (tensor-data $b) j)))
+                (set! out-data (set out-data (+ (* i N) j) v))
+                (set! j (+ j 1))
+                (recur2 0)
+              )
+            )
+          )
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── GELU 활성화 (근사) ──────────────────────────────────────
+; gelu(x) ≈ 0.5x(1 + tanh(√(2/π)(x + 0.044715x³)))
+
+[FUNC gelu-scalar :params [$x]
+  :body (
+    (define c (native-sqrt (/ 2.0 3.14159265)))
+    (define inner (* c (+ $x (* 0.044715 (* $x (* $x $x))))))
+    ; tanh 근사: tanh(x) ≈ x*(1.0 - x²/3) for small x, else sign(x)
+    (define tanh-inner
+      (if (> (native-abs inner) 4.0)
+        (if (> inner 0.0) 1.0 -1.0)
+        (/ (- (native-sqrt (+ 1 inner)) 1.0)
+           (/ (+ (native-sqrt (+ 1 inner)) 1.0) 2.0))
+      )
+    )
+    (* 0.5 $x (+ 1.0 (/ (* 2.0 inner) (+ 1.0 (* inner inner)))))
+  )
+]
+
+; 빠른 GELU (더 단순한 근사: 0.5x(1+tanh(0.7978x(1+0.0447x²))))
+[FUNC gelu :params [$t]
+  :body (
+    (define data (tensor-data $t))
+    (define n (length data))
+    (define out (native-zeros n))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) (tensor-from out (tensor-rows $t) (tensor-cols $t))
+        (
+          (define x (get data i))
+          (define v (* 0.5 x (+ 1.0 (/ (* 2.0 (* 0.7978 (+ x (* 0.0447 (* x (* x x))))))
+                                        (+ 1.0 (* (* 0.7978 (+ x (* 0.0447 (* x (* x x)))))
+                                                   (* 0.7978 (+ x (* 0.0447 (* x (* x x)))))))))))
+          (set! out (set out i v))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── 스케일드 닷-프로덕트 어텐션 ────────────────────────────
+; Q[T×dh], K[T×dh], V[T×dh] → out[T×dh]
+; att = softmax(QK^T / sqrt(dh)) @ V  (causal mask)
+
+[FUNC causal-mask :params [$T]
+  :body (
+    (define out (native-zeros (* $T $T)))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $T) out
+        (
+          (define j 0)
+          (loop [[$_2 0]]
+            (if (>= j $T) 0
+              (
+                (if (<= j i)
+                  (set! out (set out (+ (* i $T) j) 1.0))
+                  (set! out (set out (+ (* i $T) j) -1000000.0))
+                )
+                (set! j (+ j 1))
+                (recur2 0)
+              )
+            )
+          )
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC sdp-attention :params [$Q $K $V $scale]
+  :body (
+    (define T (tensor-rows $Q))
+    (define dh (tensor-cols $Q))
+    ; QK^T [T×T]
+    (define KT (tensor-from (native-transpose (tensor-data $K) T dh) dh T))
+    (define scores-t (matmul $Q KT))
+    ; scale + causal mask
+    (define scores-data (tensor-data scores-t))
+    (define mask (causal-mask T))
+    (define masked (native-zeros (* T T)))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i (* T T)) 0
+        (
+          (define m (get mask i))
+          (define s (get scores-data i))
+          (set! masked (set masked i
+            (if (< m 0.0) (+ (* s $scale) m) (* s $scale))
+          ))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+    ; softmax row-wise [T×T]
+    (define att-data (native-softmax-rows masked T T))
+    ; att[T×T] @ V[T×dh] = out[T×dh]
+    (define att-t (tensor-from att-data T T))
+    (matmul att-t $V)
+  )
+]
+
+; ─── Multi-Head Attention ─────────────────────────────────────
+; X[T×D] → out[T×D]
+; params: Wq Wk Wv Wo (각 [D×D]), ln_w ln_b ([D])
+
+[FUNC mha-init :params [$D $scale]
+  :body (
+    (define Wq (linear-init $D $D $scale))
+    (define Wk (linear-init $D $D $scale))
+    (define Wv (linear-init $D $D $scale))
+    (define Wo (linear-init $D $D $scale))
+    (define ln-w (native-ones $D))
+    (define ln-b (native-zeros $D))
+    (list Wq Wk Wv Wo ln-w ln-b)
+  )
+]
+
+[FUNC mha-forward :params [$layer $X $n-heads]
+  :body (
+    (define Wq (get $layer 0))
+    (define Wk (get $layer 1))
+    (define Wv (get $layer 2))
+    (define Wo (get $layer 3))
+    (define ln-w (get $layer 4))
+    (define ln-b (get $layer 5))
+    (define T (tensor-rows $X))
+    (define D (tensor-cols $X))
+    (define dh (/ D $n-heads))
+    (define scale (/ 1.0 (native-sqrt dh)))
+
+    ; 레이어 정규화
+    (define X-norm (layernorm $X ln-w ln-b))
+
+    ; Q K V 프로젝션 [T×D]
+    (define Q (linear-forward Wq X-norm))
+    (define K (linear-forward Wk X-norm))
+    (define V (linear-forward Wv X-norm))
+
+    ; 헤드별 어텐션 (단순화: 전체 D로 하나의 어텐션)
+    ; 실제 MHA는 헤드 분할 필요 — 여기선 단일 헤드로 근사
+    (define att-out (sdp-attention Q K V scale))
+
+    ; 출력 프로젝션
+    (define out (linear-forward Wo att-out))
+
+    ; 잔차 연결
+    (tensor-add $X out)
+  )
+]
+
+; ─── Feed-Forward Network ────────────────────────────────────
+; X[T×D] → [T×D]  (확장 비율 4)
+
+[FUNC ffn-init :params [$D $scale]
+  :body (
+    (define D4 (* $D 4))
+    (define W1 (linear-init $D D4 $scale))
+    (define W2 (linear-init D4 $D $scale))
+    (define ln-w (native-ones $D))
+    (define ln-b (native-zeros $D))
+    (list W1 W2 ln-w ln-b)
+  )
+]
+
+[FUNC ffn-forward :params [$layer $X]
+  :body (
+    (define W1 (get $layer 0))
+    (define W2 (get $layer 1))
+    (define ln-w (get $layer 2))
+    (define ln-b (get $layer 3))
+
+    ; LayerNorm
+    (define X-norm (layernorm $X ln-w ln-b))
+
+    ; 확장 → GELU → 축소
+    (define h (gelu (linear-forward W1 X-norm)))
+    (define out (linear-forward W2 h))
+
+    ; 잔차 연결
+    (tensor-add $X out)
+  )
+]
+
+; ─── Transformer Block ───────────────────────────────────────
+
+[FUNC block-init :params [$D $n-heads $scale]
+  :body (
+    (list (mha-init $D $scale) (ffn-init $D $scale))
+  )
+]
+
+[FUNC block-forward :params [$block $X $n-heads]
+  :body (
+    (define mha-layer (get $block 0))
+    (define ffn-layer (get $block 1))
+    (define after-mha (mha-forward mha-layer $X $n-heads))
+    (ffn-forward ffn-layer after-mha)
+  )
+]

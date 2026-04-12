@@ -1,0 +1,181 @@
+; ================================================================
+; fl-tensor.fl — FreeLang v9 텐서 연산
+;
+; 텐서 = [data shape]
+;   data: flat 1D 배열 (row-major)
+;   shape: [rows cols] 또는 [n]
+;
+; 네이티브 함수 호출:
+;   (native-matmul A B M K N) → flat
+;   (native-softmax v) → flat
+;   (native-randn n scale) → flat
+; ================================================================
+
+; ─── 텐서 생성 ──────────────────────────────────────────────
+
+[FUNC tensor-zeros :params [$rows $cols]
+  :body (list (native-zeros (* $rows $cols)) (list $rows $cols))
+]
+
+[FUNC tensor-ones :params [$rows $cols]
+  :body (list (native-ones (* $rows $cols)) (list $rows $cols))
+]
+
+[FUNC tensor-randn :params [$rows $cols $scale]
+  :body (list (native-randn (* $rows $cols) $scale) (list $rows $cols))
+]
+
+[FUNC tensor-from :params [$data $rows $cols]
+  :body (list $data (list $rows $cols))
+]
+
+[FUNC tensor-data :params [$t] :body (get $t 0)]
+[FUNC tensor-shape :params [$t] :body (get $t 1)]
+[FUNC tensor-rows :params [$t] :body (get (get $t 1) 0)]
+[FUNC tensor-cols :params [$t] :body (get (get $t 1) 1)]
+[FUNC tensor-size :params [$t] :body (* (tensor-rows $t) (tensor-cols $t))]
+
+; ─── 행렬곱 A[M×K] @ B[K×N] = C[M×N] ──────────────────────
+
+[FUNC matmul :params [$A $B]
+  :body (
+    (define M (tensor-rows $A))
+    (define K (tensor-cols $A))
+    (define N (tensor-cols $B))
+    (define C-data (native-matmul (tensor-data $A) (tensor-data $B) M K N))
+    (tensor-from C-data M N)
+  )
+]
+
+; ─── element-wise 연산 ──────────────────────────────────────
+
+[FUNC tensor-add :params [$A $B]
+  :body (
+    (define a (tensor-data $A))
+    (define b (tensor-data $B))
+    (define n (length a))
+    (define out (native-zeros n))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i n) (tensor-from out (tensor-rows $A) (tensor-cols $A))
+        (
+          (set! out (set out i (+ (get a i) (get b i))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC tensor-scale :params [$A $s]
+  :body (
+    (define a (tensor-data $A))
+    (tensor-from (map a (fn [$x $i] (* $x $s))) (tensor-rows $A) (tensor-cols $A))
+  )
+]
+
+; ─── Softmax (행별) ─────────────────────────────────────────
+
+[FUNC softmax-rows :params [$A]
+  :body (
+    (define M (tensor-rows $A))
+    (define N (tensor-cols $A))
+    (define out (native-softmax-rows (tensor-data $A) M N))
+    (tensor-from out M N)
+  )
+]
+
+; ─── LayerNorm ───────────────────────────────────────────────
+; 각 행에 대해 정규화: (x - mean) / sqrt(var + eps) * gamma + beta
+
+[FUNC vec-mean :params [$v $n]
+  :body (
+    (define s 0.0)
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n) (/ s $n)
+        ((set! s (+ s (get $v i))) (set! i (+ i 1)) (recur 0))
+      )
+    )
+  )
+]
+
+[FUNC vec-var :params [$v $n $mean]
+  :body (
+    (define s 0.0)
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n) (/ s $n)
+        (
+          (define d (- (get $v i) $mean))
+          (set! s (+ s (* d d)))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC layernorm-row :params [$row $n $gamma $beta $eps]
+  :body (
+    (define mean (vec-mean $row $n))
+    (define variance (vec-var $row $n mean))
+    (define std (native-sqrt (+ variance $eps)))
+    (define out (native-zeros $n))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i $n) out
+        (
+          (define normed (/ (- (get $row i) mean) std))
+          (set! out (set out i (+ (* normed (get $gamma i)) (get $beta i))))
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+[FUNC layernorm :params [$A $gamma $beta]
+  :body (
+    (define M (tensor-rows $A))
+    (define N (tensor-cols $A))
+    (define data (tensor-data $A))
+    (define eps 0.00001)
+    (define out (native-zeros (* M N)))
+    (define i 0)
+    (loop [[$_ 0]]
+      (if (>= i M) (tensor-from out M N)
+        (
+          (define row (slice data (* i N) (* (+ i 1) N)))
+          (define normed (layernorm-row row N $gamma $beta eps))
+          (define j 0)
+          (loop [[$_2 0]]
+            (if (>= j N) 0
+              (
+                (set! out (set out (+ (* i N) j) (get normed j)))
+                (set! j (+ j 1))
+                (recur2 0)
+              )
+            )
+          )
+          (set! i (+ i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+; ─── Cross-entropy loss ──────────────────────────────────────
+; logits [B×V], targets [B] → {loss, dlogits}
+
+[FUNC cross-entropy :params [$logits-t $targets]
+  :body (
+    (define B (tensor-rows $logits-t))
+    (define V (tensor-cols $logits-t))
+    (native-cross-entropy (tensor-data $logits-t) $targets B V)
+  )
+]
