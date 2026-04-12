@@ -83,7 +83,7 @@ API 호출    → (fl-http-get "https://...")
 | 95 | ✅ 22/22 | `[CONTEXT]` 컨텍스트 관리 |
 | 96 | ⏳ | `Result/Ok/Err` AI 에러 처리 전면 개선 |
 | 97 | ✅ 24/24 | `[USE-TOOL]` 도구 사용 DSL — b01d7ce |
-| 98 | ⏳ | `[AGENT]` 에이전트 루프 |
+| 98 | ✅ 24/24 | `[AGENT]` 에이전트 루프 — ea1f37c |
 | 99 | ⏳ | `[SELF-IMPROVE]` 자기 수정 |
 | 100 | ⏳ | AI 표준 라이브러리 완전 통합 |
 
