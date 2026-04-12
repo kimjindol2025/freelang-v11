@@ -47,6 +47,7 @@ import { globalBeliefs, BeliefSystem } from "./belief"; // Phase 116: Belief Sys
 import { globalAnalogy } from "./analogy"; // Phase 117: Analogy
 import { globalCritique, defaultFinders, severityWeight } from "./critique"; // Phase 118: Critique Agent
 import { globalComposer, ReasonStep } from "./compose-reason"; // Phase 119: Compose-Reason
+import { globalCognition } from "./cognitive"; // Phase 120: Cognitive Architecture
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1628,6 +1629,50 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         });
         const result = globalComposer.compose(steps, input);
         return result.steps;
+      }
+
+      // Phase 120: Cognitive Architecture — 인지 아키텍처 통합
+      if (op === "cognition-solve") {
+        // (cognition-solve "problem" solver-fn) → { strategy, output, approved, risk }
+        const [problem, solverFn] = args;
+        const result = globalCognition.solve(String(problem), (strategy: string, prob: string) => {
+          if (typeof solverFn === "function") return solverFn(strategy, prob);
+          if ((solverFn as any)?.kind === "function-value") return callFn(solverFn, [strategy, prob]);
+          return solverFn;
+        });
+        return new Map([
+          ["strategy", result.strategy],
+          ["output", result.output],
+          ["approved", result.approved],
+          ["risk", result.risk]
+        ]);
+      }
+      if (op === "cognition-stats") {
+        // (cognition-stats) → { beliefs, analogies, checkpoints }
+        const s = globalCognition.stats();
+        return new Map([
+          ["beliefs", s.beliefs],
+          ["analogies", s.analogies],
+          ["checkpoints", s.checkpoints]
+        ]);
+      }
+      if (op === "cognition-meta") {
+        // (cognition-meta "problem") → 전략 문자열
+        const [problem] = args;
+        const result = globalCognition.meta.analyze(String(problem));
+        return result.selected;
+      }
+      if (op === "cognition-believe") {
+        // (cognition-believe "claim" confidence) → void
+        const [claim, confidence] = args;
+        globalCognition.beliefs.set(String(claim), Number(confidence));
+        return null;
+      }
+      if (op === "cognition-recall") {
+        // (cognition-recall "pattern") → 유사 패턴 solution or null
+        const [pattern] = args;
+        const p = globalCognition.analogies.best(String(pattern));
+        return p ? p.solution : null;
       }
 
       // (export sym1 sym2 ...) — self-hosting 파일 호환
