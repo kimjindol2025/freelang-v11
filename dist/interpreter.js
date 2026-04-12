@@ -62,6 +62,12 @@ const macro_expander_1 = require("./macro-expander"); // Phase 63: 매크로 시
 const protocol_1 = require("./protocol"); // Phase 64: 프로토콜 시스템
 const struct_system_1 = require("./struct-system"); // Phase 66: 구조체 시스템
 const lazy_seq_1 = require("./lazy-seq"); // Phase 69: 레이지 시퀀스
+const debugger_1 = require("./debugger"); // Phase 78: 디버거
+const cot_1 = require("./cot"); // Phase 92: Chain-of-Thought
+const tot_1 = require("./tot"); // Phase 93: Tree-of-Thought
+const reflect_1 = require("./reflect"); // Phase 94: REFLECT 자기 평가/반성
+const tool_registry_1 = require("./tool-registry"); // Phase 97: Tool DSL
+const agent_1 = require("./agent"); // Phase 98: AGENT 루프
 // Interpreter class
 class Interpreter {
     constructor(logger, options) {
@@ -72,6 +78,8 @@ class Interpreter {
         // Phase 52: FL 파일 import 지원
         this.importedFiles = new Set();
         this.currentFilePath = process.cwd();
+        // Phase 78: 디버거 세션
+        this.debugSession = (0, debugger_1.getGlobalDebugSession)();
         this.serverConfig = null;
         this.logger = logger || (0, logger_1.getGlobalLogger)();
         // Phase 60: strict 모드 — 환경변수 FREELANG_STRICT=1 또는 options.strict=true
@@ -108,6 +116,15 @@ class Interpreter {
         this.registerBuiltinTypeClasses();
         // Phase 63: 표준 매크로 등록 (when, unless, and2)
         this.registerStandardMacros();
+        // Phase 98: Agent 빌트인 등록 (agent-new, agent-run, agent-done?, agent-result, ...)
+        this.registerAgentBuiltins();
+    }
+    // Phase 98: Agent 빌트인 함수 등록
+    registerAgentBuiltins() {
+        const builtins = (0, agent_1.createAgentBuiltins)(this);
+        for (const [name, fn] of Object.entries(builtins)) {
+            this.context.functions.set(name, { name, params: [], body: fn });
+        }
     }
     // Phase 63: 표준 매크로 등록
     registerStandardMacros() {
@@ -172,11 +189,11 @@ class Interpreter {
                 ? { tag: "Some", kind: "Option", value: callFn(fn, getVal(m)) }
                 : m,
             "maybe-chain": (m, fn) => isSomeVal(m) ? callFn(fn, getVal(m)) : m,
-            "result-or": (r, d) => r?.tag === "Ok" ? r.value : d,
-            "result-map": (r, fn) => r?.tag === "Ok"
-                ? { tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
+            "result-or": (r, d) => (r?._tag === "Ok" || r?.tag === "Ok") ? r.value : d,
+            "result-map": (r, fn) => (r?._tag === "Ok" || r?.tag === "Ok")
+                ? { _tag: "Ok", tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
                 : r,
-            "result-chain": (r, fn) => r?.tag === "Ok" ? callFn(fn, r.value) : r,
+            "result-chain": (r, fn) => (r?._tag === "Ok" || r?.tag === "Ok") ? callFn(fn, r.value) : r,
         };
         for (const [name, fn] of Object.entries(tsHelpers)) {
             this.context.functions.set(name, { name, params: [], body: fn });
@@ -276,10 +293,108 @@ class Interpreter {
             case "ERROR-HANDLER":
                 this.handleErrorHandlerBlock(block);
                 break;
+            case "TOOL":
+                // Phase 97: [TOOL name :desc "..." :input {...} :output :T :body expr]
+                this.context.lastValue = this.handleToolBlock(block);
+                break;
+            case "USE-TOOL":
+                // Phase 97: [USE-TOOL toolname :args {key val ...}]
+                this.context.lastValue = this.handleUseToolBlock(block);
+                break;
+            case "AGENT":
+                // Phase 98: [AGENT :goal "..." :max-steps 10 :step (fn ...) :stop-when (fn ...)]
+                this.handleAgentBlock(block);
+                break;
             default:
                 // Unknown block type, skip
                 break;
         }
+    }
+    // Phase 98: AGENT 블록 처리
+    handleAgentBlock(block) {
+        const interp = this;
+        const ev = (node) => interp.eval(node);
+        const callFnVal = (fn, args) => interp.callFunctionValue(fn, args);
+        const state = (0, agent_1.evalAgentBlock)(block.fields, ev, callFnVal);
+        this.context.lastValue = state;
+    }
+    // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
+    handleToolBlock(block) {
+        const name = block.name;
+        const desc = block.fields.has("desc") ? this.eval(block.fields.get("desc")) : "";
+        const bodyNode = block.fields.get("body");
+        // :input 스키마 파싱
+        const inputSchema = {};
+        if (block.fields.has("input")) {
+            const inputNode = block.fields.get("input");
+            // Map 블록이면 key→keyword value 형태
+            if (inputNode?.kind === "block" && inputNode?.type === "Map") {
+                const entries = inputNode.fields.get("entries");
+                if (Array.isArray(entries)) {
+                    for (let i = 0; i < entries.length - 1; i += 2) {
+                        const key = entries[i]?.kind === "keyword" ? entries[i].name
+                            : entries[i]?.kind === "literal" ? String(entries[i].value)
+                                : String(entries[i]);
+                        const valNode = entries[i + 1];
+                        const valStr = valNode?.kind === "keyword" ? valNode.name
+                            : valNode?.kind === "literal" ? String(valNode.value)
+                                : "any";
+                        inputSchema[key] = valStr;
+                    }
+                }
+            }
+        }
+        // :output 스키마
+        let outputSchema = "any";
+        if (block.fields.has("output")) {
+            const outNode = block.fields.get("output");
+            outputSchema = outNode?.kind === "keyword" ? outNode.name
+                : outNode?.kind === "literal" ? String(outNode.value)
+                    : "any";
+        }
+        const interp = this;
+        const toolDef = {
+            name,
+            description: String(desc || ""),
+            inputSchema,
+            outputSchema: outputSchema,
+            execute: (args) => {
+                // 인자들을 $key 변수로 바인딩하여 body 실행
+                interp.context.variables.push();
+                try {
+                    for (const [k, v] of Object.entries(args)) {
+                        interp.context.variables.set(`$${k}`, v);
+                    }
+                    return interp.eval(bodyNode);
+                }
+                finally {
+                    interp.context.variables.pop();
+                }
+            },
+        };
+        tool_registry_1.globalToolRegistry.register(toolDef);
+        return toolDef;
+    }
+    // Phase 97: [USE-TOOL toolname :args {key val ...}]
+    handleUseToolBlock(block) {
+        const name = block.name;
+        const args = {};
+        if (block.fields.has("args")) {
+            const argsNode = block.fields.get("args");
+            if (argsNode?.kind === "block" && argsNode?.type === "Map") {
+                const entries = argsNode.fields.get("entries");
+                if (Array.isArray(entries)) {
+                    for (let i = 0; i < entries.length - 1; i += 2) {
+                        const key = entries[i]?.kind === "keyword" ? entries[i].name
+                            : entries[i]?.kind === "literal" ? String(entries[i].value)
+                                : String(entries[i]);
+                        args[key] = this.eval(entries[i + 1]);
+                    }
+                }
+            }
+        }
+        const result = tool_registry_1.globalToolRegistry.executeSync(name, args);
+        return result.success ? result.output : (() => { throw new Error(result.error || `Tool failed: ${name}`); })();
     }
     handleServerBlock(block) {
         // [SERVER name :port 3009 :host "0.0.0.0" ...]
@@ -565,11 +680,222 @@ class Interpreter {
         }
         // Phase 57: Dispatch to specialized modules
         const AI_OPS = new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
-        const SPECIAL_OPS = new Set(["fn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout"]);
+        const SPECIAL_OPS = new Set(["fn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try"]);
         if (AI_OPS.has(op))
             return (0, eval_ai_blocks_1.evalAiBlock)(this, op, expr);
         if (SPECIAL_OPS.has(op))
             return (0, eval_special_forms_1.evalSpecialForm)(this, op, expr);
+        // Phase 94: REFLECT — 자기 평가/반성 특수 폼
+        if (op === "REFLECT") {
+            const interp = this;
+            const ev = (node) => interp.eval(node);
+            const callFnVal = (fn, args) => interp.callFunctionValue(fn, args);
+            // 키워드 파싱: :output :criteria :threshold :on-fail :revise
+            let outputExpr = null;
+            let criteriaExpr = null;
+            let thresholdExpr = null;
+            let onFailExpr = null;
+            let reviseExpr = null;
+            // 키워드 추출 헬퍼 — kind="keyword" 또는 kind="literal"(string) 모두 지원
+            const getKeyword = (arg) => {
+                if (arg?.kind === "keyword")
+                    return arg.name;
+                if (arg?.kind === "literal" && arg?.type === "string")
+                    return arg.value;
+                return null;
+            };
+            for (let i = 0; i < expr.args.length; i++) {
+                const arg = expr.args[i];
+                const kw = getKeyword(arg);
+                if (kw !== null && i + 1 < expr.args.length) {
+                    const next = expr.args[i + 1];
+                    if (kw === "output") {
+                        outputExpr = next;
+                        i++;
+                    }
+                    else if (kw === "criteria") {
+                        criteriaExpr = next;
+                        i++;
+                    }
+                    else if (kw === "threshold") {
+                        thresholdExpr = next;
+                        i++;
+                    }
+                    else if (kw === "on-fail") {
+                        onFailExpr = next;
+                        i++;
+                    }
+                    else if (kw === "revise") {
+                        reviseExpr = next;
+                        i++;
+                    }
+                }
+            }
+            // output 실행
+            const outputVal = outputExpr != null ? ev(outputExpr) : null;
+            // criteria 배열 실행 — 각 원소는 함수 또는 fn 값
+            const criteriaFns = [];
+            if (criteriaExpr != null) {
+                const criteriaRaw = ev(criteriaExpr);
+                if (Array.isArray(criteriaRaw)) {
+                    for (const c of criteriaRaw) {
+                        if (typeof c === "function") {
+                            criteriaFns.push(c);
+                        }
+                        else if (c?.kind === "function-value") {
+                            criteriaFns.push((v) => {
+                                const r = callFnVal(c, [v]);
+                                return typeof r === "number" ? r : (r ? 1 : 0);
+                            });
+                        }
+                        else if (typeof c === "number") {
+                            const score = c;
+                            criteriaFns.push(() => score);
+                        }
+                    }
+                }
+            }
+            // threshold
+            const threshold = thresholdExpr != null ? Number(ev(thresholdExpr)) : 0.7;
+            // on-fail
+            let onFail;
+            if (onFailExpr != null) {
+                const onFailVal = ev(onFailExpr);
+                if (onFailVal?.kind === "function-value") {
+                    onFail = (r) => callFnVal(onFailVal, [r]);
+                }
+                else if (typeof onFailVal === "function") {
+                    onFail = onFailVal;
+                }
+            }
+            // revise
+            let revise;
+            if (reviseExpr != null) {
+                const reviseVal = ev(reviseExpr);
+                if (reviseVal?.kind === "function-value") {
+                    revise = (r) => callFnVal(reviseVal, [r]);
+                }
+                else if (typeof reviseVal === "function") {
+                    revise = reviseVal;
+                }
+            }
+            return (0, reflect_1.evalReflectForm)({
+                output: outputVal,
+                criteria: criteriaFns,
+                threshold,
+                onFail,
+                revise,
+            });
+        }
+        // Phase 92: COT — Chain-of-Thought 특수 폼
+        if (op === "COT") {
+            const interp = this;
+            const result = (0, cot_1.evalCotForm)(expr.args, (node) => interp.eval(node), (name, value) => interp.context.variables.set(name, value), (name) => interp.context.variables.get(name));
+            // conclude fn이 function-value인 경우 실제 호출
+            if (result.conclusion?.kind === "function-value") {
+                const stepsVar = interp.context.variables.get("$__cot_steps__");
+                result.conclusion = interp.callFunctionValue(result.conclusion, [stepsVar]);
+            }
+            return result;
+        }
+        // Phase 93: TOT — Tree-of-Thought 특수 폼
+        // (TOT :branch "가설A" (expr-a) :branch "가설B" (expr-b) :eval (fn [$r] ...) :prune 0.3 :select best)
+        if (op === "TOT") {
+            const interp = this;
+            const tot = new tot_1.TreeOfThought();
+            // FL 파서에서 :keyword는 두 형태로 올 수 있음:
+            // 1. {kind: "keyword", name: "branch"}
+            // 2. {kind: "literal", type: "string", value: "branch"}  (Colon + Symbol → string literal)
+            function isTotKeyword(node, name) {
+                if (!node)
+                    return false;
+                if (node.kind === "keyword" && node.name === name)
+                    return true;
+                if (node.kind === "literal" && node.type === "string" && node.value === name)
+                    return true;
+                return false;
+            }
+            const args = expr.args;
+            let i = 0;
+            let scoreFnNode = null;
+            let pruneThreshold = null;
+            let selectStrategy = 'best';
+            let selectK = 1;
+            while (i < args.length) {
+                const arg = args[i];
+                if (isTotKeyword(arg, "branch")) {
+                    i++;
+                    const hypoNode = args[i];
+                    i++;
+                    const exprNode = args[i];
+                    i++;
+                    const hypo = String(interp.eval(hypoNode));
+                    const capturedNode = exprNode;
+                    tot.branch(hypo, () => interp.eval(capturedNode));
+                }
+                else if (isTotKeyword(arg, "eval")) {
+                    i++;
+                    scoreFnNode = args[i];
+                    i++;
+                }
+                else if (isTotKeyword(arg, "prune")) {
+                    i++;
+                    pruneThreshold = Number(interp.eval(args[i]));
+                    i++;
+                }
+                else if (isTotKeyword(arg, "select")) {
+                    i++;
+                    const selVal = interp.eval(args[i]);
+                    i++;
+                    if (selVal === "top-k")
+                        selectStrategy = "top-k";
+                    else
+                        selectStrategy = "best";
+                }
+                else if (isTotKeyword(arg, "k")) {
+                    i++;
+                    selectK = Number(interp.eval(args[i]));
+                    i++;
+                }
+                else {
+                    i++;
+                }
+            }
+            if (scoreFnNode != null) {
+                const scoreFnVal = interp.eval(scoreFnNode);
+                tot.evaluate((result) => {
+                    if (typeof scoreFnVal === "function")
+                        return Number(scoreFnVal(result)) || 0;
+                    if (scoreFnVal?.kind === "function-value") {
+                        return Number(interp.callFunctionValue(scoreFnVal, [result])) || 0;
+                    }
+                    return 0.5;
+                });
+            }
+            if (pruneThreshold !== null && !isNaN(pruneThreshold)) {
+                tot.prune(pruneThreshold);
+            }
+            return tot.select(selectStrategy, selectK);
+        }
+        // Phase 78: (break!) — 디버그 중단점
+        if (op === "break!") {
+            const loc = {
+                file: this.currentFilePath || "<unknown>",
+                line: expr.line ?? this.currentLine,
+                col: 0,
+            };
+            // 현재 환경 스냅샷
+            const env = {};
+            try {
+                const snapshot = this.context.variables.snapshot();
+                for (const [k, v] of Object.entries(snapshot)) {
+                    env[k] = v;
+                }
+            }
+            catch (_) { /* snapshot 실패 시 무시 */ }
+            (0, debugger_1.handleBreak)(this.debugSession, loc, env);
+            return null; // (break!)는 null 반환
+        }
         // map (3-arg comprehension form) → evalSpecialForm; otherwise falls through to builtins
         if (op === "map" && expr.args.length === 3) {
             const mapResult = (0, eval_special_forms_1.evalSpecialForm)(this, op, expr);

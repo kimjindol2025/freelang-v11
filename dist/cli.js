@@ -50,6 +50,11 @@ const lexer_1 = require("./lexer");
 const parser_1 = require("./parser");
 const interpreter_1 = require("./interpreter");
 const formatter_1 = require("./formatter");
+const debugger_1 = require("./debugger"); // Phase 78: 디버거
+const hot_reload_1 = require("./hot-reload"); // Phase 79: 워치 모드
+const doc_extractor_1 = require("./doc-extractor"); // Phase 77: 문서 추출기
+const doc_renderer_1 = require("./doc-renderer"); // Phase 77: 문서 렌더러
+const ci_runner_1 = require("./ci-runner"); // Phase 80: CI
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
 // ─────────────────────────────────────────
@@ -345,6 +350,152 @@ function cmdFmt(args) {
         process.exit(1);
     }
 }
+// ─────────────────────────────────────────
+// debug 커맨드 (Phase 78)
+// ─────────────────────────────────────────
+function cmdDebug(filePath, stepMode) {
+    const absPath = path.resolve(filePath);
+    if (!fs.existsSync(absPath)) {
+        console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+        process.exit(1);
+    }
+    // 디버그 세션 설정
+    const session = new debugger_1.DebugSession();
+    session.enabled = true;
+    session.stepMode = stepMode;
+    (0, debugger_1.setGlobalDebugSession)(session);
+    console.log(`\x1b[35m[FreeLang Debugger]\x1b[0m  ${path.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
+    console.log(`\x1b[2m  (break!) 위치에서 중단점 발생\x1b[0m`);
+    console.log(`─────────────────────────────────────────`);
+    try {
+        const source = fs.readFileSync(absPath, "utf-8");
+        const tokens = (0, lexer_1.lex)(source);
+        const ast = (0, parser_1.parse)(tokens);
+        const interp = new interpreter_1.Interpreter();
+        interp.currentFilePath = absPath;
+        interp.debugSession = session;
+        const ctx = interp.interpret(ast);
+        if (ctx.lastValue !== null && ctx.lastValue !== undefined) {
+            if (typeof ctx.lastValue === "object") {
+                console.log(JSON.stringify(ctx.lastValue, null, 2));
+            }
+            else {
+                console.log(String(ctx.lastValue));
+            }
+        }
+        console.log(`\n\x1b[35m[디버그 완료]\x1b[0m  중단점 ${session.breakLog.length}회 도달`);
+    }
+    catch (err) {
+        console.error(formatError(err, undefined, absPath));
+        process.exit(1);
+    }
+}
+// ─────────────────────────────────────────
+// ci 커맨드 (Phase 80)
+// ─────────────────────────────────────────
+async function cmdCi(ciArgs) {
+    const noFailFast = ciArgs.includes("--no-fail-fast");
+    const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
+    let targetFiles;
+    if (filePaths.length > 0) {
+        // 특정 파일 지정
+        targetFiles = filePaths.map((f) => path.resolve(f)).filter((f) => fs.existsSync(f));
+        if (targetFiles.length === 0) {
+            console.error(`\x1b[31m오류\x1b[0m  지정한 파일을 찾을 수 없습니다`);
+            process.exit(1);
+        }
+    }
+    else {
+        // 현재 디렉토리의 .fl 파일 전체
+        const cwd = process.cwd();
+        targetFiles = fs.readdirSync(cwd)
+            .filter((f) => f.endsWith(".fl"))
+            .map((f) => path.join(cwd, f));
+    }
+    console.log(`\x1b[36m[FreeLang CI]\x1b[0m  파일 ${targetFiles.length}개  fail-fast=${!noFailFast}`);
+    console.log(`─────────────────────────────────────────`);
+    const pipeline = (0, ci_runner_1.createDefaultPipeline)(targetFiles, { failFast: !noFailFast });
+    const summary = await pipeline.run();
+    console.log(`─────────────────────────────────────────`);
+    const stepCount = summary.steps.length;
+    const passCount = summary.steps.filter((s) => s.passed && !s.skipped).length;
+    const skipCount = summary.steps.filter((s) => s.skipped).length;
+    if (summary.passed) {
+        console.log(`\x1b[32m[CI PASS]\x1b[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms)`);
+    }
+    else {
+        console.log(`\x1b[31m[CI FAIL]\x1b[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms, ${skipCount} skipped)`);
+        process.exit(1);
+    }
+}
+// ─────────────────────────────────────────
+// doc 커맨드 (Phase 77)
+// ─────────────────────────────────────────
+function cmdDoc(docArgs) {
+    // --dir 모드: 디렉토리 내 모든 .fl 파일 통합 문서화
+    const dirIdx = docArgs.indexOf("--dir");
+    if (dirIdx !== -1) {
+        const dirPath = docArgs[dirIdx + 1];
+        if (!dirPath) {
+            console.error(`\x1b[31m오류\x1b[0m  --dir 뒤에 디렉토리 경로를 지정하세요`);
+            process.exit(1);
+        }
+        const absDir = path.resolve(dirPath);
+        if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
+            console.error(`\x1b[31m오류\x1b[0m  디렉토리를 찾을 수 없습니다: ${dirPath}`);
+            process.exit(1);
+        }
+        const flFiles = fs.readdirSync(absDir)
+            .filter((f) => f.endsWith(".fl"))
+            .map((f) => path.join(absDir, f));
+        if (flFiles.length === 0) {
+            console.error(`\x1b[33m경고\x1b[0m  .fl 파일이 없습니다: ${dirPath}`);
+            return;
+        }
+        const allEntries = [];
+        for (const filePath of flFiles) {
+            const src = fs.readFileSync(filePath, "utf-8");
+            allEntries.push(...(0, doc_extractor_1.extractDocs)(src));
+        }
+        const title = path.basename(absDir) + " API 문서";
+        const md = (0, doc_renderer_1.renderMarkdown)(allEntries, title);
+        const outIdx = docArgs.indexOf("-o");
+        if (outIdx !== -1 && docArgs[outIdx + 1]) {
+            const outPath = path.resolve(docArgs[outIdx + 1]);
+            fs.writeFileSync(outPath, md, "utf-8");
+            console.log(`\x1b[32m문서 저장됨\x1b[0m  ${outPath}  (${allEntries.length}개 항목)`);
+        }
+        else {
+            process.stdout.write(md);
+        }
+        return;
+    }
+    // 단일 파일 모드
+    const filePaths = docArgs.filter((a) => !a.startsWith("-"));
+    if (filePaths.length === 0) {
+        console.error(`\x1b[31m오류\x1b[0m  파일 경로를 지정하세요`);
+        process.exit(1);
+    }
+    const filePath = filePaths[0];
+    const absPath = path.resolve(filePath);
+    if (!fs.existsSync(absPath)) {
+        console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+        process.exit(1);
+    }
+    const src = fs.readFileSync(absPath, "utf-8");
+    const entries = (0, doc_extractor_1.extractDocs)(src);
+    const title = path.basename(absPath, ".fl") + " API 문서";
+    const md = (0, doc_renderer_1.renderMarkdown)(entries, title);
+    const outIdx = docArgs.indexOf("-o");
+    if (outIdx !== -1 && docArgs[outIdx + 1]) {
+        const outPath = path.resolve(docArgs[outIdx + 1]);
+        fs.writeFileSync(outPath, md, "utf-8");
+        console.log(`\x1b[32m문서 저장됨\x1b[0m  ${outPath}  (${entries.length}개 항목)`);
+    }
+    else {
+        process.stdout.write(md);
+    }
+}
 function printUsage() {
     console.log([
         "",
@@ -358,6 +509,16 @@ function printUsage() {
         "  freelang fmt --check <file.fl>   이미 포맷됐는지 확인 (미포맷 → exit 1)",
         "  freelang fmt --stdin             stdin 입력받아 stdout 출력",
         "  freelang repl                    대화형 REPL",
+        "  freelang debug <file.fl>         디버그 모드 실행 (break! 활성화) (Phase 78)",
+        "  freelang debug <file.fl> --step  step 모드 (모든 줄 추적)",
+        "  freelang watch <file.fl>         파일 변경 시 자동 재실행 (Phase 79)",
+        "  freelang watch <file.fl> --no-clear  콘솔 지우지 않고 재실행",
+        "  freelang ci                      현재 디렉토리 .fl 파일 전체 CI (Phase 80)",
+        "  freelang ci <file.fl>            특정 파일 CI",
+        "  freelang ci --no-fail-fast       실패해도 계속 진행",
+        "  freelang doc <file.fl>           Markdown 문서 생성 → stdout (Phase 77)",
+        "  freelang doc <file.fl> -o out.md 파일로 저장",
+        "  freelang doc --dir <dir>         디렉토리 내 모든 .fl 파일 통합 문서화",
         "",
         "예제:",
         "  freelang run my-script.fl",
@@ -367,6 +528,11 @@ function printUsage() {
         "  freelang fmt --check *.fl",
         "  cat script.fl | freelang fmt --stdin",
         "  freelang repl",
+        "  freelang debug my-script.fl",
+        "  freelang debug my-script.fl --step",
+        "  freelang doc fl-math-lib.fl",
+        "  freelang doc fl-math-lib.fl -o math-api.md",
+        "  freelang doc --dir src/",
         "",
     ].join("\n"));
 }
@@ -399,6 +565,47 @@ switch (cmd) {
     case "repl":
         cmdRepl();
         break;
+    case "debug": {
+        const filePath = args[1];
+        if (!filePath) {
+            printUsage();
+            process.exit(1);
+        }
+        const stepMode = args.includes("--step");
+        cmdDebug(filePath, stepMode);
+        break;
+    }
+    case "watch": {
+        // Phase 79: freelang watch <file.fl> [--no-clear]
+        const filePath = args[1];
+        if (!filePath) {
+            printUsage();
+            process.exit(1);
+        }
+        const noClear = args.includes("--no-clear");
+        console.log(`\x1b[36m[Watch Mode]\x1b[0m  ${path.basename(filePath)} — 변경 감지 시 자동 재실행`);
+        (0, hot_reload_1.runWithWatch)(filePath, {
+            clearConsole: !noClear,
+            debounceMs: 300,
+            onError: (file, err) => {
+                console.error(`\x1b[31m[ERROR]\x1b[0m  ${path.basename(file)}: ${err.message}`);
+            },
+        });
+        break;
+    }
+    case "ci": {
+        // Phase 80: freelang ci [<file.fl>] [--no-fail-fast]
+        cmdCi(args.slice(1)).catch((err) => {
+            console.error(`\x1b[31m[CI 오류]\x1b[0m  ${err.message}`);
+            process.exit(1);
+        });
+        break;
+    }
+    case "doc": {
+        // Phase 77: freelang doc <file.fl> [-o out.md] | --dir <dir>
+        cmdDoc(args.slice(1));
+        break;
+    }
     default:
         printUsage();
         if (cmd) {

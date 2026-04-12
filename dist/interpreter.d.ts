@@ -3,6 +3,7 @@ import { Logger } from "./logger";
 import { FreeLangPromise } from "./async-runtime";
 import { WebSearchAdapter } from "./web-search-adapter";
 import { LearnedFactsStore } from "./learned-facts-store";
+import { DebugSession } from "./debugger";
 export type { ExecutionContext, FreeLangFunction, FreeLangRoute, Intent, FreeLangMiddleware, ErrorHandler, TypeClassInfo, TypeClassInstanceInfo, ModuleInfo, } from "./interpreter-context";
 import type { ExecutionContext, TypeClassInfo, TypeClassInstanceInfo, ModuleInfo } from "./interpreter-context";
 export declare class Interpreter {
@@ -16,9 +17,11 @@ export declare class Interpreter {
     tcoMode: boolean;
     importedFiles: Set<string>;
     currentFilePath: string;
+    debugSession: DebugSession;
     constructor(logger?: Logger, options?: {
         strict?: boolean;
     });
+    private registerAgentBuiltins;
     private registerStandardMacros;
     private loadFlStdlib;
     registerModule(module: Record<string, unknown>): void;
@@ -29,6 +32,9 @@ export declare class Interpreter {
      */
     run(source: string): ExecutionContext;
     private evalBlock;
+    private handleAgentBlock;
+    private handleToolBlock;
+    private handleUseToolBlock;
     private serverConfig;
     private handleServerBlock;
     private handleRouteBlock;

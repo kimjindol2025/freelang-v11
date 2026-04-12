@@ -15,6 +15,7 @@ const async_runtime_1 = require("./async-runtime");
 const error_formatter_1 = require("./error-formatter");
 const errors_1 = require("./errors");
 const tco_1 = require("./tco");
+const profiler_1 = require("./profiler");
 /**
  * 클로저 실행 후 변경된 변수를 외부 스코프로 역전파.
  * set! 로 변경된 캡처 변수가 외부(savedStack)에도 반영되도록 함.
@@ -104,6 +105,8 @@ function callUserFunction(interp, name, args) {
             }
         }
     }
+    // Phase 82: Profiler 연동 (enabled=false 시 no-op)
+    const exitProfiler = profiler_1.globalProfiler.enter(baseName);
     // 클로저: capturedEnv가 있으면 해당 환경에서 실행
     if (func.capturedEnv) {
         const savedStack = interp.context.variables.saveStack();
@@ -123,6 +126,7 @@ function callUserFunction(interp, name, args) {
             interp.context.variables.restoreStack(savedStack);
             for (const alias of tempAliases)
                 interp.context.functions.delete(alias);
+            exitProfiler();
         }
         return result;
     }
@@ -140,6 +144,7 @@ function callUserFunction(interp, name, args) {
         interp.context.variables.pop();
         for (const alias of tempAliases)
             interp.context.functions.delete(alias);
+        exitProfiler();
     }
 }
 function callFunctionValue(interp, fn, args) {

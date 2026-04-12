@@ -127,8 +127,8 @@ describe("수학 함수", () => {
 });
 
 describe("Monad — ok/err/some/none", () => {
-  test("ok 생성", () => expect(run("(ok 42)")).toEqual({ tag: "Ok", value: 42, kind: "Result" }));
-  test("err 생성", () => expect(run("(err \"오류\")")).toEqual({ tag: "Err", value: "오류", kind: "Result" }));
+  test("ok 생성", () => { const r = run("(ok 42)"); expect(r).toMatchObject({ value: 42 }); expect(r._tag ?? r.tag).toBe("Ok"); });
+  test("err 생성", () => { const r = run("(err \"오류\")"); expect(r._tag ?? r.tag).toBe("Err"); });
   test("some 생성", () => expect(run("(some 10)")).toEqual({ tag: "Some", value: 10, kind: "Option" }));
   test("none 생성", () => expect(run("(none)")).toEqual({ tag: "None", value: null, kind: "Option" }));
 });

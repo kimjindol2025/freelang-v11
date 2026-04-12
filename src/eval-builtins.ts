@@ -318,6 +318,8 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       return String(args[0]);
     case "str-to-num":
     case "str->num":
+    case "string->number":
+    case "string-to-number":
       return parseFloat(String(args[0]));
     case "map-set":
       if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
@@ -335,6 +337,8 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     case "str-join":
       return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
     case "trim":
+    case "string_trim":
+    case "str_trim":
       return typeof args[0] === "string" ? args[0].trim() : "";
     case "uppercase":
       return typeof args[0] === "string" ? args[0].toUpperCase() : "";

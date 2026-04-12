@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,6 +15,6 @@
     "resolveJsonModule": true,
     "moduleResolution": "node"
   },
-  "include": ["src/**/*", "packages/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "src/test-phase87-packages.ts"]
 }

@@ -200,11 +200,11 @@ export class Interpreter {
         ? { tag: "Some", kind: "Option", value: callFn(fn, getVal(m)) }
         : m,
       "maybe-chain":  (m: any, fn: any) => isSomeVal(m) ? callFn(fn, getVal(m)) : m,
-      "result-or":    (r: any, d: any) => r?.tag === "Ok" ? r.value : d,
-      "result-map":   (r: any, fn: any) => r?.tag === "Ok"
-        ? { tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
+      "result-or":    (r: any, d: any) => (r?._tag === "Ok" || r?.tag === "Ok") ? r.value : d,
+      "result-map":   (r: any, fn: any) => (r?._tag === "Ok" || r?.tag === "Ok")
+        ? { _tag: "Ok", tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
         : r,
-      "result-chain": (r: any, fn: any) => r?.tag === "Ok" ? callFn(fn, r.value) : r,
+      "result-chain": (r: any, fn: any) => (r?._tag === "Ok" || r?.tag === "Ok") ? callFn(fn, r.value) : r,
     };
     for (const [name, fn] of Object.entries(tsHelpers)) {
       this.context.functions.set(name, { name, params: [], body: fn as any });
