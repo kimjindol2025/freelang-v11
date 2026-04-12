@@ -4,6 +4,8 @@
 // Phase 69: 레이지 시퀀스 추가
 // Phase 95: ContextManager (ctx-*) 추가
 // Phase 96: Result 타입 + AI 에러 처리 추가
+// Phase 101: 장기/단기/에피소드 메모리 시스템
+// Phase 103: 멀티 에이전트 통신
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -21,6 +23,9 @@ import {
 } from "./result-type"; // Phase 96
 import { defaultErrorSystem, AIErrorSystem } from "./error-system"; // Phase 96
 import { globalToolRegistry } from "./tool-registry"; // Phase 97: Tool DSL
+import { globalMemory } from "./memory-system"; // Phase 101: Memory System
+import { globalRAG } from "./rag"; // Phase 102: RAG
+import { globalBus, MessageBus, AgentMessage } from "./multi-agent"; // Phase 103: Multi-Agent
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -718,6 +723,91 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       return raw;
     }
 
+    // Phase 101: Memory System
+    // (mem-remember "key" value) — 장기 저장
+    case "mem-remember": {
+      const key = String(args[0]);
+      const value = args[1];
+      globalMemory.remember(key, value, { scope: 'long-term', ttl: 'forever' });
+      return null;
+    }
+
+    // (mem-remember-short "key" value ttl-ms) — 단기 저장
+    case "mem-remember-short": {
+      const key = String(args[0]);
+      const value = args[1];
+      const ttl = typeof args[2] === 'number' ? args[2] : 60000;
+      globalMemory.remember(key, value, { scope: 'short-term', ttl });
+      return null;
+    }
+
+    // (mem-recall "key") / (mem-recall "key" fallback) — 조회
+    case "mem-recall": {
+      const key = String(args[0]);
+      const fallback = args.length > 1 ? args[1] : null;
+      return globalMemory.recall(key, fallback);
+    }
+
+    // (mem-forget "key") — 삭제
+    case "mem-forget": {
+      const key = String(args[0]);
+      return globalMemory.forget(key);
+    }
+
+    // (mem-episode "id" "what") / (mem-episode "id" "what" context outcome)
+    case "mem-episode": {
+      const id = String(args[0]);
+      const what = String(args[1]);
+      const context = args[2] ?? {};
+      const outcome = args[3];
+      return globalMemory.recordEpisode(id, what, context, outcome);
+    }
+
+    // (mem-search-episodes "query") — 에피소드 검색
+    case "mem-search-episodes": {
+      const query = String(args[0]);
+      return globalMemory.searchEpisodes(query);
+    }
+
+    // (mem-working-set value) — 작업 메모리 저장
+    case "mem-working-set": {
+      globalMemory.setWorking(args[0]);
+      return null;
+    }
+
+    // (mem-working-get) — 작업 메모리 조회
+    case "mem-working-get": {
+      return globalMemory.getWorking();
+    }
+
+    // (mem-working-clear) — 작업 메모리 초기화
+    case "mem-working-clear": {
+      globalMemory.clearWorking();
+      return null;
+    }
+
+    // (mem-keys) / (mem-keys "scope") — 모든 키 목록
+    case "mem-keys": {
+      const scope = args.length > 0 ? String(args[0]) as any : undefined;
+      return globalMemory.keys(scope);
+    }
+
+    // (mem-stats) — 통계
+    case "mem-stats": {
+      return globalMemory.stats();
+    }
+
+    // (mem-purge) — 만료 정리
+    case "mem-purge": {
+      return globalMemory.purgeExpired();
+    }
+
+    // (mem-search-tag "tag") — 태그 검색
+    case "mem-search-tag": {
+      const tag = String(args[0]);
+      return globalMemory.searchByTag(tag);
+    }
+
     // Phase 97: (use-tool "toolname" {key val ...}) — 도구 사용
     case "use-tool": {
       const toolName = String(args[0]);
@@ -732,6 +822,98 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     // Phase 97: (list-tools) — 등록된 도구 목록
     case "list-tools": {
       return globalToolRegistry.listAll().map(t => t.name);
+    }
+
+    // Phase 102: RAG 내장 함수
+    // (rag-add "id" "content") — 문서 추가
+    case "rag-add": {
+      const id = String(args[0]);
+      const content = String(args[1]);
+      const metadata = args[2] && typeof args[2] === 'object' ? args[2] : undefined;
+      globalRAG.add({ id, content, metadata });
+      return true;
+    }
+
+    // (rag-retrieve "query" topK) — 검색 → 리스트
+    case "rag-retrieve": {
+      const query = String(args[0]);
+      const topK = typeof args[1] === 'number' ? args[1] : 3;
+      const results = globalRAG.retrieve(query, topK);
+      return results.map(d => ({ id: d.id, content: d.content, score: d.score ?? 0 }));
+    }
+
+    // (rag-query "query") — 검색 + 기본 augment → 문자열
+    case "rag-query": {
+      const query = String(args[0]);
+      const topK = typeof args[1] === 'number' ? args[1] : 3;
+      const result = globalRAG.query(query, { topK });
+      return result.augmented;
+    }
+
+    // (rag-size) — 문서 수
+    case "rag-size": {
+      return globalRAG.size();
+    }
+
+    // (rag-remove "id") — 문서 삭제
+    case "rag-remove": {
+      const id = String(args[0]);
+      return globalRAG.remove(id);
+    }
+
+    // Phase 103: 멀티 에이전트 통신
+
+    // (agent-spawn "id" handler-fn) → AgentHandle
+    case "agent-spawn": {
+      const agentId = String(args[0]);
+      const handlerFn = args[1];
+      const handler = (msg: AgentMessage, bus: MessageBus) => {
+        return callFn(handlerFn, [msg, bus]);
+      };
+      return globalBus.spawn(agentId, handler);
+    }
+
+    // (agent-send "from" "to" content) → AgentMessage
+    case "agent-send": {
+      const from = String(args[0]);
+      const to = String(args[1]);
+      const content = args[2];
+      return globalBus.send(from, to, content);
+    }
+
+    // (agent-broadcast "from" content) → AgentMessage[]
+    case "agent-broadcast": {
+      const from = String(args[0]);
+      const content = args[1];
+      return globalBus.broadcast(from, content);
+    }
+
+    // (agent-recv "id") → AgentMessage | null
+    case "agent-recv": {
+      const agentId = String(args[0]);
+      return globalBus.recv(agentId);
+    }
+
+    // (agent-process "id") → any[]
+    case "agent-process": {
+      const agentId = String(args[0]);
+      return globalBus.process(agentId);
+    }
+
+    // (agent-list) → string[]
+    case "agent-list": {
+      return globalBus.list();
+    }
+
+    // (agent-history) → AgentMessage[]
+    case "agent-history": {
+      return globalBus.history();
+    }
+
+    // (agent-inbox-size "id") → number
+    case "agent-inbox-size": {
+      const agentId = String(args[0]);
+      return globalBus.inboxSize(agentId);
     }
 
     // Function call (default)
