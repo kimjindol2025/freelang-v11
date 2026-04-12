@@ -74,6 +74,13 @@ class VpmCli {
   private readonly REQUEST_TIMEOUT_MS = 5000;
   private readonly MAX_RETRIES = 3;
 
+  // Phase 10: Cross-dependency tracking
+  private dependencyGraph: Map<string, Map<string, string>> = new Map();
+  // key: packageName → value: Map<requester, versionSpec>
+
+  // Phase 10: Signature verification
+  private signingKey = process.env.VPM_SIGNING_KEY || '';
+
   async run(args: string[]): Promise<void> {
     if (args.length === 0) {
       this.showHelp();
@@ -133,7 +140,7 @@ class VpmCli {
     }
   }
 
-  private async install(params: string[]): Promise<void> {
+  private async install(params: string[], visitedChain?: Set<string>): Promise<void> {
     // Phase 9: Load installed packages from lockfile (lazy init)
     this.ensureLockfileLoaded();
 
@@ -150,32 +157,26 @@ class VpmCli {
 
     console.log(`📦 Installing ${packageName}@${versionSpec}...`);
 
-    // Phase 8: 충돌 감지 - 같은 패키지의 다른 버전이 이미 설치되었는가?
-    if (this.detectVersionConflict(packageName, versionSpec)) {
-      const existingVersion = this.installedPackages.get(packageName);
-      // Phase 9: Try to resolve conflict (highest wins for minor/patch, error for major)
-      const resolved = this.resolveConflict(packageName, existingVersion!, versionSpec);
-      if (resolved !== versionSpec) {
-        console.log(`✓ Using ${packageName}@${resolved} instead, skipping`);
-        return;
-      }
+    // Phase 10: Circular dependency detection
+    const chain = visitedChain || new Set<string>();
+    const pkgKey = `${packageName}@${versionSpec}`;
+    if (chain.has(pkgKey)) {
+      console.warn(`⚠️  Circular dependency detected: ${pkgKey} (skipping)`);
+      return;
     }
+    chain.add(pkgKey);
 
-    // Phase 9: Enhanced deduplication - check if file exists + verify integrity
+    // Phase 10: Record dependency request for cross-dep tracking
+    this.recordDependencyRequest(packageName, versionSpec, 'direct');
+
+    // Phase 10: Check if existing version satisfies the spec (deduplication priority)
     if (this.installedPackages.has(packageName)) {
-      const existingVersion = this.installedPackages.get(packageName);
-      if (existingVersion === versionSpec) {
-        const pkgPath = path.join(this.packagesDir, `${packageName}@${versionSpec}`);
+      const existingVersion = this.installedPackages.get(packageName)!;
+      if (this.versionMatches(existingVersion, versionSpec)) {
+        // Existing version satisfies spec → dedupe
+        const pkgPath = path.join(this.packagesDir, `${packageName}@${existingVersion}`);
         if (fs.existsSync(pkgPath)) {
-          console.log(`✓ ${packageName}@${versionSpec} already installed (deduped), skipping`);
-          return;
-        }
-        // File missing - will reinstall below
-      } else {
-        // Different version - try to resolve conflict
-        const resolved = this.resolveConflict(packageName, existingVersion!, versionSpec);
-        if (resolved !== versionSpec) {
-          console.log(`✓ Using ${packageName}@${resolved} instead, skipping`);
+          console.log(`✓ ${packageName}@${existingVersion} satisfies ${versionSpec} (deduped), skipping`);
           return;
         }
       }
@@ -235,12 +236,15 @@ class VpmCli {
     if (Object.keys(dependencies).length > 0) {
       console.log(`📚 Installing ${Object.keys(dependencies).length} dependencies...`);
       for (const [depName, depVersion] of Object.entries(dependencies)) {
-        await this.install([`${depName}@${depVersion}`]);
+        // Phase 10: Record dependency request from this package
+        this.recordDependencyRequest(depName, depVersion, `${packageName}@${version}`);
+        // Phase 10: Pass visitedChain for circular dependency detection
+        await this.install([`${depName}@${depVersion}`], chain);
       }
     }
 
-    // 락파일 업데이트 (integrity 포함)
-    await this.updateLockFile(packageName, version, installResult.integrity);
+    // 락파일 업데이트 (integrity + Phase 10 signature 포함)
+    await this.updateLockFile(packageName, version, installResult.integrity, installResult.signature);
 
     console.log(`✅ ${packageName}@${version} installed with integrity: ${installResult.integrity}`);
   }
@@ -286,6 +290,16 @@ class VpmCli {
           continue;
         }
 
+        // Phase 10: Verify signature if VPM_SIGNING_KEY is set
+        if (this.signingKey && pkgData.signature) {
+          const expectedSig = this.computeSignature(actualContent);
+          if (expectedSig !== pkgData.signature) {
+            console.log(`❌ ${pkgName}: SIGNATURE MISMATCH`);
+            failed++;
+            continue;
+          }
+        }
+
         console.log(`✅ ${pkgName}: OK`);
         verified++;
       } catch (err) {
@@ -303,6 +317,9 @@ class VpmCli {
     // Phase 9: Reset lockfile-based conflict detection
     this.lockfileLoaded = false;
     this.installedPackages.clear();
+
+    // Phase 10: Clear dependency graph
+    this.dependencyGraph.clear();
 
     const lockFilePath = path.join(this.cwd, 'package-lock.json');
     if (!fs.existsSync(lockFilePath)) {
@@ -641,7 +658,7 @@ class VpmCli {
     packageName: string,
     version: string,
     pkgInfo: any
-  ): Promise<{ integrity: string; success: boolean }> {
+  ): Promise<{ integrity: string; signature?: string; success: boolean }> {
     // resolver.fl의 install_package 호출 (Phase 7: 실제 경로)
     const targetPath = path.join(this.packagesDir, `${packageName}@${version}`);
 
@@ -667,8 +684,12 @@ class VpmCli {
     // Phase 9: 실제 저장된 파일 내용으로 SHA-256 계산
     const integrity = this.calculateSHA256(pkgJsonContent);
 
+    // Phase 10: 서명 계산 (VPM_SIGNING_KEY가 설정된 경우)
+    const signature = this.signingKey ? this.computeSignature(pkgJsonContent) : undefined;
+
     return {
       integrity,
+      signature,
       success: true
     };
   }
@@ -727,7 +748,8 @@ class VpmCli {
   private async updateLockFile(
     packageName?: string,
     version?: string,
-    integrity?: string
+    integrity?: string,
+    signature?: string  // Phase 10: HMAC-SHA256 signature
   ): Promise<void> {
     const lockFilePath = path.join(this.cwd, 'package-lock.json');
 
@@ -760,14 +782,16 @@ class VpmCli {
         const pkgName = parts[0] || pkg;
         const pkgVersion = parts[1] || parts[0];
 
-        // 기존 entry 유지하고 integrity만 업데이트
+        // 기존 entry 유지하고 integrity/signature 업데이트
         const existingEntry = lockFile.packages[pkg] || {};
+        const isTargetPackage = pkgName === packageName && pkgVersion === version;
         const entry: any = {
           version: pkgVersion,
           resolved: `${this.registryUrl}/${pkgName}@${pkgVersion}`,
-          integrity: integrity && pkgName === packageName && pkgVersion === version
-            ? integrity
-            : existingEntry.integrity,
+          integrity: isTargetPackage && integrity ? integrity : existingEntry.integrity,
+          // Phase 10: signature 저장 (선택적)
+          ...(isTargetPackage && signature && { signature }),
+          ...(!(isTargetPackage && signature) && existingEntry.signature && { signature: existingEntry.signature }),
           // Stage 6: dependencies 저장 (재설치 시 재참조용)
           dependencies: existingEntry.dependencies || {},
         };
@@ -1031,6 +1055,19 @@ class VpmCli {
     return winner;
   }
 
+  // Phase 10: Record dependency request for cross-dependency conflict detection
+  private recordDependencyRequest(pkgName: string, versionSpec: string, requester: string): void {
+    if (!this.dependencyGraph.has(pkgName)) {
+      this.dependencyGraph.set(pkgName, new Map());
+    }
+    this.dependencyGraph.get(pkgName)!.set(requester, versionSpec);
+  }
+
+  // Phase 10: Compute HMAC-SHA256 signature for package content
+  private computeSignature(content: string): string {
+    return crypto.createHmac('sha256', this.signingKey).update(content).digest('hex');
+  }
+
   private detectVersionConflict(packageName: string, version: string): boolean {
     if (this.installedPackages.has(packageName)) {
       const existingVersion = this.installedPackages.get(packageName)!;
@@ -1059,10 +1096,44 @@ class VpmCli {
   }
 
   private versionMatches(version: string, spec: string): boolean {
+    spec = spec.trim();
+    if (spec === 'latest' || spec === '*' || spec === 'x' || spec === '') return true;
+
+    // Phase 10: OR operator (||)
+    if (spec.includes('||')) {
+      return spec.split('||').map(s => s.trim()).some(s => this.versionMatchesAnd(version, s));
+    }
+
+    return this.versionMatchesAnd(version, spec);
+  }
+
+  // Phase 10: Handle AND conditions (space-separated)
+  private versionMatchesAnd(version: string, spec: string): boolean {
+    const conditions = spec.match(/(>=|<=|>|<|~|\^)[^\s]+|\*/g);
+    if (conditions && conditions.length > 1) {
+      return conditions.every(cond => this.versionMatchesSingle(version, cond));
+    }
+    return this.versionMatchesSingle(version, spec.trim());
+  }
+
+  // Phase 10: Handle single condition or legacy versionMatches logic
+  private versionMatchesSingle(version: string, spec: string): boolean {
     if (spec === 'latest') return true;
 
+    // Phase 10: Wildcard support
+    if (spec === '*' || spec === 'x') return true;
+    if (/^\d+\.x$/.test(spec)) {
+      const [vm] = this.parseVersion(version);
+      return vm === parseInt(spec.split('.')[0]);
+    }
+    if (/^\d+\.\d+\.x$/.test(spec)) {
+      const [vmaj, vmin] = this.parseVersion(version);
+      const parts = spec.split('.');
+      return vmaj === parseInt(parts[0]) && vmin === parseInt(parts[1]);
+    }
+
+    // Phase 8 & legacy: Single operators
     if (spec.startsWith('^')) {
-      // Caret: allow changes to minor and patch, not major
       const specVersion = spec.substring(1);
       const [specMajor] = this.parseVersion(specVersion);
       const [versionMajor] = this.parseVersion(version);
@@ -1070,7 +1141,6 @@ class VpmCli {
     }
 
     if (spec.startsWith('~')) {
-      // Tilde: allow changes to patch, not minor
       const specVersion = spec.substring(1);
       const [specMajor, specMinor] = this.parseVersion(specVersion);
       const [versionMajor, versionMinor] = this.parseVersion(version);
@@ -1081,7 +1151,6 @@ class VpmCli {
       );
     }
 
-    // Phase 8: Advanced operators (>=, <=, >, <)
     if (spec.startsWith('>=')) {
       const specVersion = spec.substring(2);
       return this.compareVersions(version, specVersion) >= 0;

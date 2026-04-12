@@ -13,7 +13,7 @@ interface Route {
   path: string;
   pattern: RegExp;
   params: string[];
-  handler: string;
+  handler: string | Function;
 }
 
 interface Request {
@@ -128,35 +128,35 @@ export function createHttpServerModule(callFn: CallFn) {
 
   return {
     // server_get path handlerName -> null
-    "server_get": (path: string, handlerName: string): null => {
+    "server_get": (path: string, handlerName: string | Function): null => {
       const [pattern, params] = pathToRegex(path);
       routes.push({ method: "GET", path, pattern, params, handler: handlerName });
       return null;
     },
 
     // server_post path handlerName -> null
-    "server_post": (path: string, handlerName: string): null => {
+    "server_post": (path: string, handlerName: string | Function): null => {
       const [pattern, params] = pathToRegex(path);
       routes.push({ method: "POST", path, pattern, params, handler: handlerName });
       return null;
     },
 
     // server_put path handlerName -> null
-    "server_put": (path: string, handlerName: string): null => {
+    "server_put": (path: string, handlerName: string | Function): null => {
       const [pattern, params] = pathToRegex(path);
       routes.push({ method: "PUT", path, pattern, params, handler: handlerName });
       return null;
     },
 
     // server_patch path handlerName -> null
-    "server_patch": (path: string, handlerName: string): null => {
+    "server_patch": (path: string, handlerName: string | Function): null => {
       const [pattern, params] = pathToRegex(path);
       routes.push({ method: "PATCH", path, pattern, params, handler: handlerName });
       return null;
     },
 
     // server_delete path handlerName -> null
-    "server_delete": (path: string, handlerName: string): null => {
+    "server_delete": (path: string, handlerName: string | Function): null => {
       const [pattern, params] = pathToRegex(path);
       routes.push({ method: "DELETE", path, pattern, params, handler: handlerName });
       return null;
@@ -205,8 +205,21 @@ export function createHttpServerModule(callFn: CallFn) {
               // v9 요청 객체 생성 (request_id 포함)
               const flReq = createFlRequest(method, path, query, headers, body, params, requestId);
 
-              // 핸들러 호출 (Phase 57: Promise 지원)
-              let rawResult = callFn(route.handler, [flReq]);
+              // 핸들러 호출 (Phase 57: Promise 지원 + 람다 함수 지원)
+              let rawResult;
+              if (typeof route.handler === 'object' && route.handler?.kind === 'function-value') {
+                // v9 람다 함수 ({kind: 'function-value', ...})
+                // 직접 인터프리터에서 호출할 수 없으므로 callFn을 위한 래퍼로 처리
+                // v9 함수 객체를 직접 실행하려면 interpreter의 evalLambda나 유사한 메커니즘 필요
+                // 대신 이를 특별한 마크로 함수로 취급하거나 eval 컨텍스트 사용
+                // 임시: __fl_lambda_call로 표시하고 interpreter에서 처리하도록
+                rawResult = callFn('__fl_lambda_call', [route.handler, flReq]);
+              } else if (typeof route.handler === 'string') {
+                // 함수 이름 (문자열) → callFn으로 호출
+                rawResult = callFn(route.handler, [flReq]);
+              } else {
+                throw new Error(`Invalid handler type: ${typeof route.handler}`);
+              }
               const result = (rawResult instanceof Promise) ? await rawResult : rawResult;
 
               // 응답 처리 (응답 보류 중이면 skip)
