@@ -34,6 +34,8 @@ import { DebugSession, getGlobalDebugSession, handleBreak } from "./debugger"; /
 import { evalCotForm } from "./cot"; // Phase 92: Chain-of-Thought
 import { evalTotBlock, TreeOfThought } from "./tot"; // Phase 93: Tree-of-Thought
 import { evalReflectForm } from "./reflect"; // Phase 94: REFLECT 자기 평가/반성
+import { globalToolRegistry, ToolRegistry, type ToolDefinition } from "./tool-registry"; // Phase 97: Tool DSL
+import { evalAgentBlock, createAgentBuiltins, type AgentState, type AgentAction } from "./agent"; // Phase 98: AGENT 루프
 
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
@@ -120,6 +122,17 @@ export class Interpreter {
 
     // Phase 63: 표준 매크로 등록 (when, unless, and2)
     this.registerStandardMacros();
+
+    // Phase 98: Agent 빌트인 등록 (agent-new, agent-run, agent-done?, agent-result, ...)
+    this.registerAgentBuiltins();
+  }
+
+  // Phase 98: Agent 빌트인 함수 등록
+  private registerAgentBuiltins(): void {
+    const builtins = createAgentBuiltins(this);
+    for (const [name, fn] of Object.entries(builtins)) {
+      this.context.functions.set(name, { name, params: [], body: fn as any });
+    }
   }
 
   // Phase 63: 표준 매크로 등록
@@ -286,10 +299,116 @@ export class Interpreter {
       case "ERROR-HANDLER":
         this.handleErrorHandlerBlock(block);
         break;
+      case "TOOL":
+        // Phase 97: [TOOL name :desc "..." :input {...} :output :T :body expr]
+        this.context.lastValue = this.handleToolBlock(block);
+        break;
+      case "USE-TOOL":
+        // Phase 97: [USE-TOOL toolname :args {key val ...}]
+        this.context.lastValue = this.handleUseToolBlock(block);
+        break;
+      case "AGENT":
+        // Phase 98: [AGENT :goal "..." :max-steps 10 :step (fn ...) :stop-when (fn ...)]
+        this.handleAgentBlock(block);
+        break;
       default:
         // Unknown block type, skip
         break;
     }
+  }
+
+  // Phase 98: AGENT 블록 처리
+  private handleAgentBlock(block: Block): void {
+    const interp = this;
+    const ev = (node: any) => interp.eval(node);
+    const callFnVal = (fn: any, args: any[]) => interp.callFunctionValue(fn, args);
+    const state = evalAgentBlock(block.fields as Map<string, any>, ev, callFnVal);
+    this.context.lastValue = state;
+  }
+
+  // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
+  private handleToolBlock(block: any): any {
+    const name = block.name as string;
+    const desc = block.fields.has("desc") ? this.eval(block.fields.get("desc")) : "";
+    const bodyNode = block.fields.get("body");
+
+    // :input 스키마 파싱
+    const inputSchema: Record<string, any> = {};
+    if (block.fields.has("input")) {
+      const inputNode = block.fields.get("input");
+      // Map 블록이면 key→keyword value 형태
+      if (inputNode?.kind === "block" && inputNode?.type === "Map") {
+        const entries = inputNode.fields.get("entries");
+        if (Array.isArray(entries)) {
+          for (let i = 0; i < entries.length - 1; i += 2) {
+            const key = entries[i]?.kind === "keyword" ? entries[i].name
+              : entries[i]?.kind === "literal" ? String(entries[i].value)
+              : String(entries[i]);
+            const valNode = entries[i + 1];
+            const valStr = valNode?.kind === "keyword" ? valNode.name
+              : valNode?.kind === "literal" ? String(valNode.value)
+              : "any";
+            inputSchema[key] = valStr;
+          }
+        }
+      }
+    }
+
+    // :output 스키마
+    let outputSchema: string = "any";
+    if (block.fields.has("output")) {
+      const outNode = block.fields.get("output");
+      outputSchema = outNode?.kind === "keyword" ? outNode.name
+        : outNode?.kind === "literal" ? String(outNode.value)
+        : "any";
+    }
+
+    const interp = this;
+    const toolDef: ToolDefinition = {
+      name,
+      description: String(desc || ""),
+      inputSchema,
+      outputSchema: outputSchema as any,
+      execute: (args: Record<string, any>) => {
+        // 인자들을 $key 변수로 바인딩하여 body 실행
+        interp.context.variables.push();
+        try {
+          for (const [k, v] of Object.entries(args)) {
+            interp.context.variables.set(`$${k}`, v);
+          }
+          return interp.eval(bodyNode);
+        } finally {
+          interp.context.variables.pop();
+        }
+      },
+    };
+
+    globalToolRegistry.register(toolDef);
+    return toolDef;
+  }
+
+  // Phase 97: [USE-TOOL toolname :args {key val ...}]
+  private handleUseToolBlock(block: any): any {
+    const name = block.name as string;
+    const args: Record<string, any> = {};
+
+    if (block.fields.has("args")) {
+      const argsNode = block.fields.get("args");
+      if (argsNode?.kind === "block" && argsNode?.type === "Map") {
+        const entries = argsNode.fields.get("entries");
+        if (Array.isArray(entries)) {
+          for (let i = 0; i < entries.length - 1; i += 2) {
+            const key = entries[i]?.kind === "keyword" ? entries[i].name
+              : entries[i]?.kind === "literal" ? String(entries[i].value)
+              : String(entries[i]);
+            args[key] = this.eval(entries[i + 1]);
+          }
+        }
+      }
+    }
+
+    const result = globalToolRegistry.executeSync(name, args);
+    return result.success ? result.output : (() => { throw new Error(result.error || `Tool failed: ${name}`); })();
   }
 
   private serverConfig: { port: number; host: string } | null = null;

@@ -3,6 +3,7 @@
 // evalSExpr에서 args가 평가된 이후 호출됨
 // Phase 69: 레이지 시퀀스 추가
 // Phase 95: ContextManager (ctx-*) 추가
+// Phase 96: Result 타입 + AI 에러 처리 추가
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -13,6 +14,13 @@ import {
   type LazySeq,
 } from "./lazy-seq";
 import { ContextManager } from "./context-window"; // Phase 95
+import {
+  ok, err, isOk, isErr, unwrap, unwrapOr,
+  mapOk, mapErr, flatMap, recover, fromThrown,
+  ErrorCategory,
+} from "./result-type"; // Phase 96
+import { defaultErrorSystem, AIErrorSystem } from "./error-system"; // Phase 96
+import { globalToolRegistry } from "./tool-registry"; // Phase 97: Tool DSL
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -392,11 +400,21 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     case "clamp":
       return Math.max(args[1], Math.min(args[2], args[0]));
 
-    // Monad Operations
+    // Monad Operations — Phase 96: Result 타입으로 업그레이드 (_tag 기반)
     case "ok":
-      return { tag: "Ok", value: args[0], kind: "Result" };
-    case "err":
-      return { tag: "Err", value: args[0], kind: "Result" };
+      return ok(args[0]);
+    case "err": {
+      // (err code message) / (err code message category) — Phase 96 형식
+      // 하위 호환: (err value) → {_tag: "Err", code: "ERR", message: String(value)}
+      if (args.length >= 2) {
+        const code96 = String(args[0] ?? 'ERR');
+        const message96 = String(args[1] ?? '');
+        const category96 = args[2] as ErrorCategory | undefined;
+        return err(code96, message96, category96 ? { category: category96 } : undefined);
+      }
+      // 하위 호환: (err value) → Err
+      return err("ERR", String(args[0] ?? ''));
+    }
     case "some":
       return { tag: "Some", value: args[0], kind: "Option" };
     case "none":
@@ -637,6 +655,83 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const ctx = args[0] as ContextManager;
       const tag = args.length > 1 ? String(args[1]) : undefined;
       return ctx.getAll(tag);
+    }
+
+    // ── Phase 96: Result 타입 추가 함수 ─────────────────────────────────────
+
+    // (ok? result) → bool
+    case "ok?":
+      return isOk(args[0]);
+
+    // (err? result) → bool
+    case "err?":
+      return isErr(args[0]);
+
+    // (unwrap result) → value or throw
+    case "unwrap":
+      return unwrap(args[0]);
+
+    // (unwrap-or result default) → value
+    case "unwrap-or":
+      return unwrapOr(args[0], args[1]);
+
+    // (map-ok result fn) → Result
+    case "map-ok": {
+      const r = args[0];
+      const fn = args[1];
+      return mapOk(r, (v: any) => callFn(fn, [v]));
+    }
+
+    // (map-err result fn) → Result
+    case "map-err": {
+      const r = args[0];
+      const fn = args[1];
+      return mapErr(r, (e: any) => callFn(fn, [e]));
+    }
+
+    // (flat-map result fn) → Result
+    case "flat-map": {
+      const r = args[0];
+      const fn = args[1];
+      return flatMap(r, (v: any) => callFn(fn, [v]));
+    }
+
+    // (recover result fn) → value (Ok값 또는 fn(err) 반환)
+    case "recover": {
+      const r = args[0];
+      const fn = args[1];
+      return recover(r, (e: any) => callFn(fn, [e]));
+    }
+
+    // (result-explain err) → 한국어 설명 문자열
+    case "result-explain": {
+      const e = args[0];
+      if (!isErr(e)) return '(Ok 값 — 에러 없음)';
+      return defaultErrorSystem.explain(e);
+    }
+
+    // (result-classify err-obj) → Err 구조체
+    case "result-classify": {
+      const raw = args[0];
+      if (raw instanceof Error) return defaultErrorSystem.classify(raw);
+      if (typeof raw === 'string') return defaultErrorSystem.classify(new Error(raw));
+      return raw;
+    }
+
+    // Phase 97: (use-tool "toolname" {key val ...}) — 도구 사용
+    case "use-tool": {
+      const toolName = String(args[0]);
+      const toolArgs: Record<string, any> = (args[1] && typeof args[1] === 'object' && !Array.isArray(args[1]))
+        ? args[1]
+        : {};
+      const result = globalToolRegistry.executeSync(toolName, toolArgs);
+      if (!result.success) throw new Error(result.error || `Tool failed: ${toolName}`);
+      return result.output;
+    }
+
+    // Phase 97: (list-tools) — 등록된 도구 목록
+    case "list-tools": {
+      return globalToolRegistry.listAll().map(t => t.name);
     }
 
     // Function call (default)
