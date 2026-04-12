@@ -426,6 +426,81 @@ async function cmdCi(ciArgs: string[]): Promise<void> {
   }
 }
 
+// ─────────────────────────────────────────
+// doc 커맨드 (Phase 77)
+// ─────────────────────────────────────────
+
+function cmdDoc(docArgs: string[]): void {
+  // --dir 모드: 디렉토리 내 모든 .fl 파일 통합 문서화
+  const dirIdx = docArgs.indexOf("--dir");
+  if (dirIdx !== -1) {
+    const dirPath = docArgs[dirIdx + 1];
+    if (!dirPath) {
+      console.error(`\x1b[31m오류\x1b[0m  --dir 뒤에 디렉토리 경로를 지정하세요`);
+      process.exit(1);
+    }
+    const absDir = path.resolve(dirPath);
+    if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
+      console.error(`\x1b[31m오류\x1b[0m  디렉토리를 찾을 수 없습니다: ${dirPath}`);
+      process.exit(1);
+    }
+
+    const flFiles = fs.readdirSync(absDir)
+      .filter((f) => f.endsWith(".fl"))
+      .map((f) => path.join(absDir, f));
+
+    if (flFiles.length === 0) {
+      console.error(`\x1b[33m경고\x1b[0m  .fl 파일이 없습니다: ${dirPath}`);
+      return;
+    }
+
+    const allEntries: import("./doc-extractor").DocEntry[] = [];
+    for (const filePath of flFiles) {
+      const src = fs.readFileSync(filePath, "utf-8");
+      allEntries.push(...extractDocs(src));
+    }
+
+    const title = path.basename(absDir) + " API 문서";
+    const md = renderMarkdown(allEntries, title);
+    const outIdx = docArgs.indexOf("-o");
+    if (outIdx !== -1 && docArgs[outIdx + 1]) {
+      const outPath = path.resolve(docArgs[outIdx + 1]);
+      fs.writeFileSync(outPath, md, "utf-8");
+      console.log(`\x1b[32m문서 저장됨\x1b[0m  ${outPath}  (${allEntries.length}개 항목)`);
+    } else {
+      process.stdout.write(md);
+    }
+    return;
+  }
+
+  // 단일 파일 모드
+  const filePaths = docArgs.filter((a) => !a.startsWith("-"));
+  if (filePaths.length === 0) {
+    console.error(`\x1b[31m오류\x1b[0m  파일 경로를 지정하세요`);
+    process.exit(1);
+  }
+  const filePath = filePaths[0];
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+    process.exit(1);
+  }
+
+  const src = fs.readFileSync(absPath, "utf-8");
+  const entries = extractDocs(src);
+  const title = path.basename(absPath, ".fl") + " API 문서";
+  const md = renderMarkdown(entries, title);
+
+  const outIdx = docArgs.indexOf("-o");
+  if (outIdx !== -1 && docArgs[outIdx + 1]) {
+    const outPath = path.resolve(docArgs[outIdx + 1]);
+    fs.writeFileSync(outPath, md, "utf-8");
+    console.log(`\x1b[32m문서 저장됨\x1b[0m  ${outPath}  (${entries.length}개 항목)`);
+  } else {
+    process.stdout.write(md);
+  }
+}
+
 function printUsage(): void {
   console.log([
     "",
@@ -446,6 +521,9 @@ function printUsage(): void {
     "  freelang ci                      현재 디렉토리 .fl 파일 전체 CI (Phase 80)",
     "  freelang ci <file.fl>            특정 파일 CI",
     "  freelang ci --no-fail-fast       실패해도 계속 진행",
+    "  freelang doc <file.fl>           Markdown 문서 생성 → stdout (Phase 77)",
+    "  freelang doc <file.fl> -o out.md 파일로 저장",
+    "  freelang doc --dir <dir>         디렉토리 내 모든 .fl 파일 통합 문서화",
     "",
     "예제:",
     "  freelang run my-script.fl",
@@ -457,6 +535,9 @@ function printUsage(): void {
     "  freelang repl",
     "  freelang debug my-script.fl",
     "  freelang debug my-script.fl --step",
+    "  freelang doc fl-math-lib.fl",
+    "  freelang doc fl-math-lib.fl -o math-api.md",
+    "  freelang doc --dir src/",
     "",
   ].join("\n"));
 }
@@ -513,6 +594,11 @@ switch (cmd) {
       console.error(`\x1b[31m[CI 오류]\x1b[0m  ${err.message}`);
       process.exit(1);
     });
+    break;
+  }
+  case "doc": {
+    // Phase 77: freelang doc <file.fl> [-o out.md] | --dir <dir>
+    cmdDoc(args.slice(1));
     break;
   }
   default:
