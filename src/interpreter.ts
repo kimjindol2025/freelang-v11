@@ -632,54 +632,6 @@ export class Interpreter {
     return evalBuiltin(this, op, args, expr);
   }
 
-  private evalLet(args: ASTNode[]): any {
-    if (args.length < 2) {
-      throw new Error(`let requires at least 2 arguments`);
-    }
-
-    // (let [[var1 val1] [var2 val2]] body)
-    const bindings = args[0];
-
-    // 새 스코프 — let 바인딩이 외부 스코프로 누출되지 않음
-    this.context.variables.push();
-
-    // Parse bindings
-    if ((bindings as any).kind === "block" && (bindings as any).type === "Array") {
-      const items = (bindings as any).fields.get("items");
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          if ((item as any).kind === "block" && (item as any).type === "Array") {
-            const bindingItems = (item as any).fields.get("items");
-            if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-              let varName: string;
-              const varNode = bindingItems[0] as any;
-              if (varNode.kind === "variable") {
-                varName = varNode.name;
-              } else if (varNode.kind === "literal" && varNode.type === "symbol") {
-                varName = "$" + (varNode.value as string);
-              } else {
-                throw new Error(`Invalid binding variable: expected symbol or variable`);
-              }
-              const value = this.eval(bindingItems[1]);
-              this.context.variables.set(varName, value);
-            }
-          }
-        }
-      }
-    }
-
-    // Evaluate body — 여러 표현식 허용 (마지막 값 반환)
-    let result: any = null;
-    try {
-      for (let bodyIdx = 1; bodyIdx < args.length; bodyIdx++) {
-        result = this.eval(args[bodyIdx]);
-      }
-    } finally {
-      this.context.variables.pop();
-    }
-    return result;
-  }
-
   // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
   private interpolateString(template: string): string {
     let result = "";
