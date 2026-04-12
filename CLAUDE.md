@@ -1,5 +1,10 @@
 # FreeLang v9 — AI를 위한 언어
 
+> **Claude에게**: 컨텍스트가 소거되더라도 이 파일을 읽으면 모든 것을 복구할 수 있다.
+> 세션 시작 시 이 파일을 먼저 읽을 것.
+
+---
+
 ## 설계 원칙 (단 하나)
 
 **AI가 쓰고 싶은 언어.**
@@ -7,6 +12,7 @@
 AI가 생각하는 방식이 곧 문법이다.
 AI가 하는 일이 곧 네이티브 블록이다.
 AI가 불편하면 언어가 틀린 것이다.
+다른 언어와 경쟁하지 않는다. AI-Native Language 카테고리 자체가 다르다.
 
 ---
 
@@ -22,10 +28,30 @@ AI가 불편하면 언어가 틀린 것이다.
 계획한다    → [PLAN :goal "..." :steps [...] :execute?]
 판단한다    → [JUDGE :options [...] :criteria [...] :pick best]
 배운다      → [LEARN :from $data :update-belief ...]
-의심한다    → (maybe 0.8 $value)  ; 확률이 퍼스트 클래스 타입
+의심한다    → (maybe 0.8 $value)       ; 확률이 퍼스트 클래스 타입
+단계추론    → [COT :step "..." expr :conclude fn]
+분기탐색    → [TOT :branch "..." expr :eval fn :select best]
 ```
 
----
+## AI가 에러를 다루는 방식 → FreeLang 에러 처리
+
+```
+; 에러는 throw가 아니다. 값이다.
+(ok 42)                            ; 성공값
+(err "NOT_FOUND" "함수 없음")      ; 구조화된 에러
+(ok? $result)                      ; 성공 여부
+(unwrap-or $result 0)              ; 실패 시 기본값
+
+; AI는 에러 종류별로 다르게 대응한다
+(fl-try (call-api $url)
+  :on-type-error  (fn [$e] (log-and-skip $e))
+  :on-not-found   (fn [$e] (use-fallback))
+  :on-io          (fn [$e] (retry 3))
+  :default        (fn [$e] (report $e)))
+
+; 에러 카테고리 (AI가 분류용)
+; type-error / runtime-error / not-found / arity-error / io-error / ai-error / timeout
+```
 
 ## AI가 코드 짤 때 → FreeLang으로
 
@@ -33,27 +59,35 @@ AI가 불편하면 언어가 틀린 것이다.
 파일 읽기   → (fl-read "path/to/file")
 API 호출    → (fl-http-get "https://...")
 데이터 변환 → (-> $data parse-json filter-errors extract-values)
-에러 처리   → (fl-try $expr :on-fail $fallback)
 병렬 실행   → (parallel [(task-a) (task-b) (task-c)])
+컨텍스트    → [CONTEXT :max-tokens 4096 :strategy sliding ...]
 ```
 
 ---
 
-## 다음 Phase — AI 정체성 완성 (91~110)
+## 현재 완성 현황 (2026-04-12)
 
-### Phase 91~100: AI 사고 블록 완전체
-- 91: `(maybe p v)` — 불확실성 퍼스트 클래스 타입
-- 92: `[COT]` — Chain-of-Thought 네이티브
-- 93: `[TOT]` — Tree-of-Thought (분기 추론)
-- 94: `[REFLECT]` — 자기 평가/반성
-- 95: `[CONTEXT]` — 컨텍스트 윈도우 관리
-- 96: `Prompt` / `Completion` 타입
-- 97: `[USE-TOOL]` — 도구 사용 DSL
-- 98: `[AGENT]` — 에이전트 루프
-- 99: `[SELF-IMPROVE]` — 자기 수정
-- 100: AI 표준 라이브러리 완전 통합
+### Tier 1~4 완료 (Phase 57~90) — v1.0.0 릴리스
+- interpreter 분해, TCO, 타입체킹, Jest 75%+
+- 매크로, 프로토콜, 구조체, 파이프라인, 레이지, 이뮤터블, AI블록
+- Formatter/Linter/REPL/테스트러너/문서생성기/디버거/워치모드/CI
+- 패키지매니저/프로파일러/바이트코드VM(148x빠름)/JS코드생성/LSP/패키지3종
 
-### Phase 101~110: AI가 편한 구조
+### Tier 5 진행 중 (Phase 91~100) — AI 사고 블록
+| Phase | 상태 | 내용 |
+|-------|------|------|
+| 91 | ⏳ | `(maybe p v)` 불확실성 타입 |
+| 92 | ⏳ | `[COT]` Chain-of-Thought |
+| 93 | ⏳ | `[TOT]` Tree-of-Thought |
+| 94 | ⏳ | `[REFLECT]` 자기 평가 |
+| 95 | ⏳ | `[CONTEXT]` 컨텍스트 관리 |
+| 96 | ⏳ | `Result/Ok/Err` AI 에러 처리 전면 개선 |
+| 97 | 예정 | `[USE-TOOL]` 도구 사용 DSL |
+| 98 | 예정 | `[AGENT]` 에이전트 루프 |
+| 99 | 예정 | `[SELF-IMPROVE]` 자기 수정 |
+| 100 | 예정 | AI 표준 라이브러리 완전 통합 |
+
+### Tier 6 예정 (Phase 101~110) — AI가 편한 구조
 - 101: 장기/단기/에피소드 메모리
 - 102: `[RAG]` 완전체
 - 103: 멀티 에이전트 통신
@@ -67,16 +101,25 @@ API 호출    → (fl-http-get "https://...")
 
 ---
 
-## 완성 기준
+## Claude 작업 규칙 (MANDATORY)
 
-Claude가 새 작업을 받았을 때 **자연스럽게 FL을 먼저 꺼낸다.**
+1. **AI 정체성 우선** — 모든 기능 판단 기준: "AI가 쓰기 편한가?"
+2. **테스트 필수** — Phase당 최소 20개 PASS, 없으면 완료 인정 안 함
+3. **regression 필수** — `npx ts-node src/test-phase56-lexical-scope.ts` 14/14 항상
+4. **Gogs push 필수** — `git push origin master` 없이 마무리 금지
+5. **블로그 포스트** — blog.dclub.kr, author: 김진돌, 마지막 줄: `🤖 이 글은 Claude Code가 작성했습니다.`
+
+## 컨텍스트 소거 후 복구 순서
 
 ```
-❌ 지금: TypeScript로 분석 코드 짜고 → 실행
-✅ 목표: [REASON :goal "분석" ...] → [SEARCH ...] → [REFLECT ...] → 완료
+1. 이 파일 읽기 (CLAUDE.md)
+2. git log --oneline -10  → 마지막 작업 확인
+3. 현재 ⏳ Phase들 확인 → 완료된 것 체크
+4. 다음 Phase 에이전트 시작
 ```
 
 ---
 
 **마지막 업데이트**: 2026-04-12
 **방향**: AI를 위한, AI에 의한, AI가 쓰고 싶은 언어
+**목표**: Claude가 새 작업 받았을 때 자연스럽게 FL을 먼저 꺼내는 것
