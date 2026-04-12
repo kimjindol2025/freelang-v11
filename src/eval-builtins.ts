@@ -1,10 +1,16 @@
 // eval-builtins.ts — FreeLang v9 Built-in Functions
 // Phase 57 리팩토링: interpreter.ts의 switch 문을 분리
 // evalSExpr에서 args가 평가된 이후 호출됨
+// Phase 69: 레이지 시퀀스 추가
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
+import {
+  lazySeq, isLazySeq, lazyHead, lazyTail,
+  take, drop, iterate, rangeSeq, filterLazy, mapLazy, zipWithLazy, takeWhile,
+  type LazySeq,
+} from "./lazy-seq";
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -449,6 +455,123 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return result;
       }
       throw new Error(`bind: unsupported monad type`);
+    }
+
+    // ── Phase 69: Lazy Sequences ──────────────────────────────────────────
+
+    // (lazy-seq head-thunk tail-thunk) — 직접 생성 (드물게 사용)
+    case "lazy-seq": {
+      // args[0]: head 값, args[1]: tail 레이지 시퀀스 (이미 평가됨)
+      // 사용: (lazy-seq <head-val> <tail-lazy-or-null>)
+      const hVal = args[0];
+      const tVal = args.length > 1 ? args[1] : null;
+      return lazySeq(() => hVal, () => isLazySeq(tVal) ? tVal : null);
+    }
+
+    // (iterate f init) — 무한 시퀀스: init, f(init), f(f(init)), ...
+    case "iterate": {
+      const fn = args[0];
+      const initVal = args[1];
+      const applyFn = (v: any) => callFn(fn, [v]);
+      const makeIter = (cur: any): LazySeq =>
+        lazySeq(() => cur, () => makeIter(applyFn(cur)));
+      return makeIter(initVal);
+    }
+
+    // (range n) → lazy [0..n-1], (range start end) → lazy [start..end-1]
+    case "range": {
+      if (args.length === 0) {
+        // 무한 자연수
+        return rangeSeq(0);
+      } else if (args.length === 1) {
+        return rangeSeq(0, args[0]);
+      } else {
+        return rangeSeq(args[0], args[1]);
+      }
+    }
+
+    // (take n seq) — lazy or array에서 n개 꺼냄
+    case "take": {
+      const n = args[0] as number;
+      const seq = args[1];
+      return take(n, isLazySeq(seq) ? seq : Array.isArray(seq) ? seq : null);
+    }
+
+    // (drop n seq) — lazy seq에서 n개 버리고 나머지 반환
+    case "drop": {
+      const n = args[0] as number;
+      const seq = args[1];
+      if (Array.isArray(seq)) return seq.slice(n);
+      return drop(n, isLazySeq(seq) ? seq : null);
+    }
+
+    // (filter-lazy pred seq) — 레이지 필터
+    case "filter-lazy": {
+      const pred = args[0];
+      const seq = args[1];
+      const applyPred = (v: any): boolean => Boolean(callFn(pred, [v]));
+      const doFilter = (s: LazySeq | null): LazySeq | null => {
+        if (!s) return null;
+        // pred가 false인 앞부분 건너뜀 (eager skip)
+        let cur: LazySeq | null = s;
+        while (cur && !applyPred(lazyHead(cur))) cur = lazyTail(cur);
+        if (!cur) return null;
+        const h = lazyHead(cur);
+        const t = lazyTail(cur);
+        return lazySeq(() => h, () => doFilter(t));
+      };
+      return doFilter(isLazySeq(seq) ? seq : null);
+    }
+
+    // (map-lazy f seq) — 레이지 맵 (단항)
+    case "map-lazy": {
+      const f2 = args[0];
+      const seq2 = args[1];
+      const doMap = (s: LazySeq | null): LazySeq | null => {
+        if (!s) return null;
+        const h = lazyHead(s);
+        return lazySeq(() => callFn(f2, [h]), () => doMap(lazyTail(s!)));
+      };
+      return doMap(isLazySeq(seq2) ? seq2 : null);
+    }
+
+    // (take-while pred seq) — pred가 true인 동안만 꺼냄 (배열 반환)
+    case "take-while": {
+      const pred = args[0];
+      const seq = args[1];
+      if (Array.isArray(seq)) {
+        const result: any[] = [];
+        for (const v of seq) {
+          if (!callFn(pred, [v])) break;
+          result.push(v);
+        }
+        return result;
+      }
+      const doTakeWhile = (s: LazySeq | null): any[] => {
+        const result: any[] = [];
+        let cur = s;
+        while (cur) {
+          const h = lazyHead(cur);
+          if (!callFn(pred, [h])) break;
+          result.push(h);
+          cur = lazyTail(cur);
+        }
+        return result;
+      };
+      return doTakeWhile(isLazySeq(seq) ? seq : null);
+    }
+
+    // (lazy-head seq) / (lazy-tail seq) — 직접 접근
+    case "lazy-head": {
+      return isLazySeq(args[0]) ? lazyHead(args[0]) : null;
+    }
+    case "lazy-tail": {
+      return isLazySeq(args[0]) ? lazyTail(args[0]) : null;
+    }
+
+    // (lazy? v) — 레이지 시퀀스 여부 확인
+    case "lazy?": {
+      return isLazySeq(args[0]);
     }
 
     // Function call (default)
