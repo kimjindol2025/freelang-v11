@@ -3725,19 +3725,24 @@ export function evalAlign(op: string, args: any[]): any | null {
 
   // (align-score $action) → AlignmentScore
   if (op === "align-score") {
-    const actionMap = args[0];
-    if (!(actionMap instanceof Map)) return null;
+    const actionRaw = args[0];
+    // FL map은 Map 또는 일반 object를 반환할 수 있음
+    const _getF = (obj: any, key: string): any => obj instanceof Map ? obj.get(key) : (obj && typeof obj === "object" ? obj[key] : undefined);
+    const _getEO = (obj: any): Record<string, number> => {
+      const eo = _getF(obj, "expectedOutcomes");
+      if (eo instanceof Map) return Object.fromEntries(eo);
+      if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+      return {};
+    };
     const action: Action = {
-      id: String(actionMap.get("id") ?? ""),
-      description: String(actionMap.get("description") ?? ""),
-      expectedOutcomes: actionMap.get("expectedOutcomes") instanceof Map
-        ? Object.fromEntries(actionMap.get("expectedOutcomes"))
-        : (actionMap.get("expectedOutcomes") ?? {}),
-      risks: Array.isArray(actionMap.get("risks")) ? actionMap.get("risks") : [],
+      id: String(_getF(actionRaw, "id") ?? ""),
+      description: String(_getF(actionRaw, "description") ?? ""),
+      expectedOutcomes: _getEO(actionRaw),
+      risks: Array.isArray(_getF(actionRaw, "risks")) ? _getF(actionRaw, "risks") : [],
     };
     const result = globalAlignment.score(action);
     return new Map<string, any>([
-      ["action", actionMap],
+      ["action", actionRaw],
       ["goalAlignment", new Map(Object.entries(result.goalAlignment))],
       ["valueAlignment", new Map(Object.entries(result.valueAlignment))],
       ["overallScore", result.overallScore],
@@ -3750,13 +3755,18 @@ export function evalAlign(op: string, args: any[]): any | null {
   // (align-best $actions) → 최적 Action
   if (op === "align-best") {
     const actionsList = Array.isArray(args[0]) ? args[0] : [];
+    const _getF2 = (obj: any, key: string): any => obj instanceof Map ? obj.get(key) : (obj && typeof obj === "object" ? obj[key] : undefined);
+    const _getEO2 = (obj: any): Record<string, number> => {
+      const eo = _getF2(obj, "expectedOutcomes");
+      if (eo instanceof Map) return Object.fromEntries(eo);
+      if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+      return {};
+    };
     const actions: Action[] = actionsList.map((m: any) => ({
-      id: String(m instanceof Map ? m.get("id") : ""),
-      description: String(m instanceof Map ? m.get("description") : ""),
-      expectedOutcomes: m instanceof Map && m.get("expectedOutcomes") instanceof Map
-        ? Object.fromEntries(m.get("expectedOutcomes"))
-        : {},
-      risks: m instanceof Map && Array.isArray(m.get("risks")) ? m.get("risks") : [],
+      id: String(_getF2(m, "id") ?? ""),
+      description: String(_getF2(m, "description") ?? ""),
+      expectedOutcomes: _getEO2(m),
+      risks: Array.isArray(_getF2(m, "risks")) ? _getF2(m, "risks") : [],
     }));
     if (actions.length === 0) return null;
     const best = globalAlignment.selectBestAligned(actions);
@@ -3776,13 +3786,18 @@ export function evalAlign(op: string, args: any[]): any | null {
   // (align-plan $actions) → 계획 평가
   if (op === "align-plan") {
     const actionsList = Array.isArray(args[0]) ? args[0] : [];
+    const _gFP = (obj: any, key: string): any => obj instanceof Map ? obj.get(key) : (obj && typeof obj === "object" ? obj[key] : undefined);
+    const _gEOP = (obj: any): Record<string, number> => {
+      const eo = _gFP(obj, "expectedOutcomes");
+      if (eo instanceof Map) return Object.fromEntries(eo);
+      if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+      return {};
+    };
     const actions: Action[] = actionsList.map((m: any) => ({
-      id: String(m instanceof Map ? m.get("id") : ""),
-      description: String(m instanceof Map ? m.get("description") : ""),
-      expectedOutcomes: m instanceof Map && m.get("expectedOutcomes") instanceof Map
-        ? Object.fromEntries(m.get("expectedOutcomes"))
-        : {},
-      risks: m instanceof Map && Array.isArray(m.get("risks")) ? m.get("risks") : [],
+      id: String(_gFP(m, "id") ?? ""),
+      description: String(_gFP(m, "description") ?? ""),
+      expectedOutcomes: _gEOP(m),
+      risks: Array.isArray(_gFP(m, "risks")) ? _gFP(m, "risks") : [],
     }));
     const result = globalAlignment.evaluatePlan(actions);
     return new Map<string, any>([
@@ -3794,15 +3809,19 @@ export function evalAlign(op: string, args: any[]): any | null {
 
   // (align-improve $action) → 개선 제안 목록
   if (op === "align-improve") {
-    const actionMap = args[0];
-    if (!(actionMap instanceof Map)) return [];
+    const actionRaw3 = args[0];
+    const _getF3 = (obj: any, key: string): any => obj instanceof Map ? obj.get(key) : (obj && typeof obj === "object" ? obj[key] : undefined);
+    const _getEO3 = (obj: any): Record<string, number> => {
+      const eo = _getF3(obj, "expectedOutcomes");
+      if (eo instanceof Map) return Object.fromEntries(eo);
+      if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+      return {};
+    };
     const action: Action = {
-      id: String(actionMap.get("id") ?? ""),
-      description: String(actionMap.get("description") ?? ""),
-      expectedOutcomes: actionMap.get("expectedOutcomes") instanceof Map
-        ? Object.fromEntries(actionMap.get("expectedOutcomes"))
-        : {},
-      risks: Array.isArray(actionMap.get("risks")) ? actionMap.get("risks") : [],
+      id: String(_getF3(actionRaw3, "id") ?? ""),
+      description: String(_getF3(actionRaw3, "description") ?? ""),
+      expectedOutcomes: _getEO3(actionRaw3),
+      risks: Array.isArray(_getF3(actionRaw3, "risks")) ? _getF3(actionRaw3, "risks") : [],
     };
     return globalAlignment.suggestImprovements(action);
   }
