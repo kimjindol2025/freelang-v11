@@ -3370,6 +3370,9 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return 0;
       }
 
+      // === Phase 141: WORLD-MODEL ===
+      if (op.startsWith("world-")) { const r141 = evalWorldModel141(op, args); if (r141 !== undefined) return r141; }
+
       // === Phase 143: COUNTERFACTUAL ===
       if (op.startsWith("cf-")) {
         const r143 = evalCounterfactual(op, args, callFn);
@@ -5026,4 +5029,60 @@ export function evalExplain_PHASE145(op: string, args: any[], callFnVal?: (fn: a
   }
 
   return null;
+}
+
+// === Phase 141: WORLD-MODEL ===
+function evalWorldModel141(op: string, args: any[]): any {
+  if (op === "world-add-entity") {
+    const kw: Record<string, any> = {};
+    for (let i = 0; i < args.length - 1; i += 2) { kw[String(args[i]).replace(/^:/, "")] = args[i + 1]; }
+    const rawP = kw["props"] ?? kw["properties"] ?? {};
+    const props: Record<string, unknown> = rawP instanceof Map ? Object.fromEntries(rawP.entries()) : (typeof rawP === "object" && rawP !== null ? rawP : {});
+    const e = globalWorldModel.addEntity({ id: String(kw["id"] ?? `entity-${Date.now()}`), type: String(kw["type"] ?? "unknown"), confidence: typeof kw["confidence"] === "number" ? kw["confidence"] : 1.0, properties: props });
+    return new Map<string, any>([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
+  }
+  if (op === "world-update-entity") {
+    const rawPu = args[1] ?? {};
+    const propsu: Record<string, unknown> = rawPu instanceof Map ? Object.fromEntries(rawPu.entries()) : (typeof rawPu === "object" && rawPu !== null ? rawPu : {});
+    const eu = globalWorldModel.updateEntity(String(args[0] ?? ""), propsu);
+    if (!eu) return null;
+    return new Map<string, any>([["id", eu.id], ["type", eu.type], ["properties", new Map(Object.entries(eu.properties))], ["confidence", eu.confidence], ["lastUpdated", eu.lastUpdated.toISOString()]]);
+  }
+  if (op === "world-get-entity") {
+    const eg = globalWorldModel.getEntity(String(args[0] ?? ""));
+    if (!eg) return null;
+    return new Map<string, any>([["id", eg.id], ["type", eg.type], ["properties", new Map(Object.entries(eg.properties))], ["confidence", eg.confidence], ["lastUpdated", eg.lastUpdated.toISOString()]]);
+  }
+  if (op === "world-remove-entity") { return globalWorldModel.removeEntity(String(args[0] ?? "")); }
+  if (op === "world-add-relation") {
+    const kwr: Record<string, any> = {};
+    for (let i = 0; i < args.length - 1; i += 2) { kwr[String(args[i]).replace(/^:/, "")] = args[i + 1]; }
+    const rel = globalWorldModel.addRelation({ from: String(kwr["from"] ?? ""), to: String(kwr["to"] ?? ""), type: String(kwr["type"] ?? "related"), strength: typeof kwr["strength"] === "number" ? kwr["strength"] : 1.0, bidirectional: kwr["bidirectional"] === true });
+    return new Map<string, any>([["id", rel.id], ["from", rel.from], ["to", rel.to], ["type", rel.type], ["strength", rel.strength], ["bidirectional", rel.bidirectional]]);
+  }
+  if (op === "world-get-relations") {
+    return globalWorldModel.getRelations(String(args[0] ?? "")).map(r => new Map<string, any>([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
+  }
+  if (op === "world-find-path") { return globalWorldModel.findPath(String(args[0] ?? ""), String(args[1] ?? "")); }
+  if (op === "world-set-fact") { globalWorldModel.setFact(String(args[0] ?? ""), args[1]); return null; }
+  if (op === "world-get-fact") { return globalWorldModel.getFact(String(args[0] ?? "")); }
+  if (op === "world-add-rule") {
+    const kwrule: Record<string, any> = {};
+    for (let i = 0; i < args.length - 1; i += 2) { kwrule[String(args[i]).replace(/^:/, "")] = args[i + 1]; }
+    const rule = globalWorldModel.addRule({ condition: String(kwrule["condition"] ?? ""), consequence: String(kwrule["consequence"] ?? ""), confidence: typeof kwrule["confidence"] === "number" ? kwrule["confidence"] : 0.8 });
+    return new Map<string, any>([["id", rule.id], ["condition", rule.condition], ["consequence", rule.consequence], ["confidence", rule.confidence]]);
+  }
+  if (op === "world-apply-rules") { return globalWorldModel.applyRules().map(u => new Map<string, any>([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]])); }
+  if (op === "world-query") {
+    const kwq: Record<string, any> = {};
+    for (let i = 0; i < args.length - 1; i += 2) { kwq[String(args[i]).replace(/^:/, "")] = args[i + 1]; }
+    return globalWorldModel.query(kwq["type"] !== undefined ? String(kwq["type"]) : undefined, kwq["min-confidence"] !== undefined ? Number(kwq["min-confidence"]) : undefined).map(e => new Map<string, any>([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]));
+  }
+  if (op === "world-snapshot") {
+    const snap = globalWorldModel.snapshot();
+    return new Map<string, any>([["entityCount", snap.entities.size], ["relationCount", snap.relations.length], ["factCount", snap.facts.size], ["ruleCount", snap.rules.length], ["version", snap.version], ["timestamp", snap.timestamp.toISOString()]]);
+  }
+  if (op === "world-summarize") { return globalWorldModel.summarize(); }
+  if (op === "world-history") { return globalWorldModel.getHistory().map(u => new Map<string, any>([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]])); }
+  return undefined;
 }
