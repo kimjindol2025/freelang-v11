@@ -31,6 +31,9 @@ import { ProtocolRegistry } from "./protocol"; // Phase 64: 프로토콜 시스�
 import { StructRegistry } from "./struct-system"; // Phase 66: 구조체 시스템
 import { isLazySeq, take as lazyTake } from "./lazy-seq"; // Phase 69: 레이지 시퀀스
 import { DebugSession, getGlobalDebugSession, handleBreak } from "./debugger"; // Phase 78: 디버거
+import { evalCotForm } from "./cot"; // Phase 92: Chain-of-Thought
+import { evalTotBlock, TreeOfThought } from "./tot"; // Phase 93: Tree-of-Thought
+import { evalReflectForm } from "./reflect"; // Phase 94: REFLECT 자기 평가/반성
 
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
@@ -609,6 +612,184 @@ export class Interpreter {
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
+
+    // Phase 94: REFLECT — 자기 평가/반성 특수 폼
+    if (op === "REFLECT") {
+      const interp = this;
+      const ev = (node: any) => interp.eval(node);
+      const callFnVal = (fn: any, args: any[]) => interp.callFunctionValue(fn, args);
+
+      // 키워드 파싱: :output :criteria :threshold :on-fail :revise
+      let outputExpr: any = null;
+      let criteriaExpr: any = null;
+      let thresholdExpr: any = null;
+      let onFailExpr: any = null;
+      let reviseExpr: any = null;
+
+      // 키워드 추출 헬퍼 — kind="keyword" 또는 kind="literal"(string) 모두 지원
+      const getKeyword = (arg: any): string | null => {
+        if (arg?.kind === "keyword") return arg.name;
+        if (arg?.kind === "literal" && arg?.type === "string") return arg.value;
+        return null;
+      };
+
+      for (let i = 0; i < expr.args.length; i++) {
+        const arg = expr.args[i];
+        const kw = getKeyword(arg);
+        if (kw !== null && i + 1 < expr.args.length) {
+          const next = expr.args[i + 1];
+          if (kw === "output") { outputExpr = next; i++; }
+          else if (kw === "criteria") { criteriaExpr = next; i++; }
+          else if (kw === "threshold") { thresholdExpr = next; i++; }
+          else if (kw === "on-fail") { onFailExpr = next; i++; }
+          else if (kw === "revise") { reviseExpr = next; i++; }
+        }
+      }
+
+      // output 실행
+      const outputVal = outputExpr != null ? ev(outputExpr) : null;
+
+      // criteria 배열 실행 — 각 원소는 함수 또는 fn 값
+      const criteriaFns: Array<(v: any) => number> = [];
+      if (criteriaExpr != null) {
+        const criteriaRaw = ev(criteriaExpr);
+        if (Array.isArray(criteriaRaw)) {
+          for (const c of criteriaRaw) {
+            if (typeof c === "function") {
+              criteriaFns.push(c);
+            } else if (c?.kind === "function-value") {
+              criteriaFns.push((v: any) => {
+                const r = callFnVal(c, [v]);
+                return typeof r === "number" ? r : (r ? 1 : 0);
+              });
+            } else if (typeof c === "number") {
+              const score = c;
+              criteriaFns.push(() => score);
+            }
+          }
+        }
+      }
+
+      // threshold
+      const threshold = thresholdExpr != null ? Number(ev(thresholdExpr)) : 0.7;
+
+      // on-fail
+      let onFail: ((r: any) => any) | undefined;
+      if (onFailExpr != null) {
+        const onFailVal = ev(onFailExpr);
+        if (onFailVal?.kind === "function-value") {
+          onFail = (r: any) => callFnVal(onFailVal, [r]);
+        } else if (typeof onFailVal === "function") {
+          onFail = onFailVal;
+        }
+      }
+
+      // revise
+      let revise: ((r: any) => any) | undefined;
+      if (reviseExpr != null) {
+        const reviseVal = ev(reviseExpr);
+        if (reviseVal?.kind === "function-value") {
+          revise = (r: any) => callFnVal(reviseVal, [r]);
+        } else if (typeof reviseVal === "function") {
+          revise = reviseVal;
+        }
+      }
+
+      return evalReflectForm({
+        output: outputVal,
+        criteria: criteriaFns,
+        threshold,
+        onFail,
+        revise,
+      });
+    }
+
+    // Phase 92: COT — Chain-of-Thought 특수 폼
+    if (op === "COT") {
+      const interp = this;
+      const result = evalCotForm(
+        expr.args,
+        (node: any) => interp.eval(node),
+        (name: string, value: any) => interp.context.variables.set(name, value),
+        (name: string) => interp.context.variables.get(name),
+      );
+      // conclude fn이 function-value인 경우 실제 호출
+      if (result.conclusion?.kind === "function-value") {
+        const stepsVar = interp.context.variables.get("$__cot_steps__");
+        result.conclusion = interp.callFunctionValue(result.conclusion, [stepsVar]);
+      }
+      return result;
+    }
+
+    // Phase 93: TOT — Tree-of-Thought 특수 폼
+    // (TOT :branch "가설A" (expr-a) :branch "가설B" (expr-b) :eval (fn [$r] ...) :prune 0.3 :select best)
+    if (op === "TOT") {
+      const interp = this;
+      const tot = new TreeOfThought();
+
+      const args = expr.args;
+      let i = 0;
+      let scoreFnNode: any = null;
+      let pruneThreshold: number | null = null;
+      let selectStrategy: 'best' | 'top-k' = 'best';
+      let selectK = 1;
+
+      while (i < args.length) {
+        const arg = args[i];
+        if ((arg as any).kind === "keyword") {
+          const kw = (arg as any).name as string;
+          if (kw === "branch") {
+            i++;
+            const hypoNode = args[i];
+            i++;
+            const exprNode = args[i];
+            i++;
+            const hypo = String(interp.eval(hypoNode));
+            const capturedNode = exprNode;
+            tot.branch(hypo, () => interp.eval(capturedNode));
+          } else if (kw === "eval") {
+            i++;
+            scoreFnNode = args[i];
+            i++;
+          } else if (kw === "prune") {
+            i++;
+            pruneThreshold = Number(interp.eval(args[i]));
+            i++;
+          } else if (kw === "select") {
+            i++;
+            const selVal = interp.eval(args[i]);
+            i++;
+            if (selVal === "top-k") selectStrategy = "top-k";
+            else selectStrategy = "best";
+          } else if (kw === "k") {
+            i++;
+            selectK = Number(interp.eval(args[i]));
+            i++;
+          } else {
+            i++;
+          }
+        } else {
+          i++;
+        }
+      }
+
+      if (scoreFnNode != null) {
+        const scoreFnVal = interp.eval(scoreFnNode);
+        tot.evaluate((result: any) => {
+          if (typeof scoreFnVal === "function") return Number(scoreFnVal(result)) || 0;
+          if (scoreFnVal?.kind === "function-value") {
+            return Number(interp.callFunctionValue(scoreFnVal, [result])) || 0;
+          }
+          return 0.5;
+        });
+      }
+
+      if (pruneThreshold !== null && !isNaN(pruneThreshold)) {
+        tot.prune(pruneThreshold);
+      }
+
+      return tot.select(selectStrategy, selectK);
+    }
 
     // Phase 78: (break!) — 디버그 중단점
     if (op === "break!") {
