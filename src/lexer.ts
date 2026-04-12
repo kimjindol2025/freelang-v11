@@ -153,12 +153,19 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    // Pipe: Or-pattern separator
+    // Pipe: Or-pattern separator, or |> pipeline operator
     if (ch === "|") {
       const startCol = col;
-      tokens.push({ type: T.Symbol, value: "|", line, col: startCol });
-      i++;
-      col++;
+      // Phase 68: |> pipeline operator
+      if (i + 1 < source.length && source[i + 1] === ">") {
+        tokens.push({ type: T.Symbol, value: "|>", line, col: startCol });
+        i += 2;
+        col += 2;
+      } else {
+        tokens.push({ type: T.Symbol, value: "|", line, col: startCol });
+        i++;
+        col++;
+      }
       continue;
     }
 
