@@ -48,7 +48,12 @@ interface RegistryPackage {
   id: string;
   name: string;
   description?: string;
-  versions: Array<{ version: string; published_at: string; checksum?: string }>;
+  versions: Array<{
+    version: string;
+    published_at: string;
+    checksum?: string;
+    dependencies?: Record<string, string>;
+  }>;
   downloads: number;
   stars: number;
 }
@@ -135,17 +140,24 @@ class VpmCli {
     // 패키지 설치 (resolver.fl 호출 + registry checksum 활용)
     // pkgInfo.versions 배열에서 요청한 버전의 checksum 찾기
     let registryChecksum: string | undefined;
+    let dependencies: Record<string, string> = {};
     if (pkgInfo.versions && Array.isArray(pkgInfo.versions)) {
       const versionEntry = pkgInfo.versions.find((v: any) => v.version === version);
       registryChecksum = versionEntry && versionEntry.checksum;
+      dependencies = (versionEntry && versionEntry.dependencies) || {};
     }
     const installResult = await this.downloadAndExtract(packageName, version, pkgInfo, registryChecksum);
 
     // package.json 업데이트
     await this.updatePackageJson(packageName, version);
 
-    // 의존성 재귀 설치
-    await this.installDependencies(packageName, version);
+    // Stage 4: 의존성 재귀 설치 (registry에서 가져온 의존성 사용)
+    if (Object.keys(dependencies).length > 0) {
+      console.log(`📚 Installing ${Object.keys(dependencies).length} dependencies...`);
+      for (const [depName, depVersion] of Object.entries(dependencies)) {
+        await this.install([`${depName}@${depVersion}`]);
+      }
+    }
 
     // 락파일 업데이트 (integrity 포함)
     await this.updateLockFile(packageName, version, installResult.integrity);
