@@ -1,0 +1,17 @@
+{
+  "id": "app-utils",
+  "name": "app-utils",
+  "description": "Application utilities that depend on lodash",
+  "downloads": 50000,
+  "stars": 150,
+  "versions": [
+    {
+      "version": "1.0.0",
+      "published_at": "2024-01-01",
+      "checksum": "sha256:23_23",
+      "dependencies": {
+        "lodash": "4.17.21"
+      }
+    }
+  ]
+}

@@ -18,6 +18,8 @@ declare class VpmCli {
     private packagesDir;
     run(args: string[]): Promise<void>;
     private install;
+    private verify;
+    private reinstall;
     private installFromLockFile;
     private publish;
     private search;
