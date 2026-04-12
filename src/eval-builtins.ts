@@ -10,6 +10,7 @@
 // Phase 106: 자동 품질 평가 루프
 // Phase 107: FL 자기 교육 시스템 (FLTutor)
 // Phase 108: AI 추론 시각화 디버거
+// Phase 112: maybe-chain 확률 자동 전파
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -37,6 +38,9 @@ import { globalTutor } from "./fl-tutor"; // Phase 107: FL Self-Teaching
 import { createTrace, getTrace, TraceNodeType } from "./reasoning-debugger"; // Phase 108: Reasoning Debugger
 import { globalCompiler, PromptCompiler } from "./prompt-compiler"; // Phase 109: Prompt Compiler
 import { sdk as flSDK } from "./fl-sdk"; // Phase 110: External AI SDK
+import { globalTester, HypothesisConfig } from "./hypothesis"; // Phase 111: Hypothesis
+import { maybeMap, maybeBind, maybeChain, maybeFilter, maybeCombine, maybeSelect } from "./maybe-chain"; // Phase 112: Maybe Chain
+import { globalDebater, Argument } from "./debate"; // Phase 113: Debate
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1211,6 +1215,45 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       return result.valid;
     }
 
+    // ── Phase 112: maybe-chain 확률 자동 전파 ────────────────────────────
+
+    // (maybe-map $m fn) → maybe(same-confidence, fn(value))
+    case "maybe-map": {
+      const [m, fn] = args;
+      return maybeMap(m, (v: any) => callFnVal(fn, [v]));
+    }
+
+    // (maybe-bind $m fn) → fn(value) 결과 maybe와 확률 곱
+    case "maybe-bind": {
+      const [m, fn] = args;
+      return maybeBind(m, (v: any) => callFnVal(fn, [v]));
+    }
+
+    // (maybe-chain maybe-list fn) → 확률 곱 + 값 합성
+    case "maybe-chain": {
+      const [maybes, fn] = args;
+      const list = Array.isArray(maybes) ? maybes : [maybes];
+      return maybeChain(list, (...vals: any[]) => callFnVal(fn, vals));
+    }
+
+    // (maybe-filter $m pred) → 조건 불만족 시 none
+    case "maybe-filter": {
+      const [m, pred] = args;
+      return maybeFilter(m, (v: any) => callFnVal(pred, [v]));
+    }
+
+    // (maybe-combine $a $b fn) → 두 maybe 결합 (확률 곱)
+    case "maybe-combine": {
+      const [a, b, fn] = args;
+      return maybeCombine(a, b, (x: any, y: any) => callFnVal(fn, [x, y]));
+    }
+
+    // (maybe-select maybe-list) → 최고 신뢰도 선택
+    case "maybe-select": {
+      const list = Array.isArray(args[0]) ? args[0] : args;
+      return maybeSelect(list);
+    }
+
     // Function call (default)
     default: {
       // Check if it's a user-defined function
@@ -1231,6 +1274,126 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
           return callFn(fn, args);
         }
       }
+      // Phase 111: Hypothesis 내장 함수
+      if (op === "hypothesis") {
+        // (hypothesis claim test-fn eval-fn) → verdict string
+        const [claim, testFn, evalFn] = args;
+        const config: HypothesisConfig = {
+          claim: String(claim),
+          test: (attempt: number) => {
+            if (typeof testFn === "function") return testFn(attempt);
+            if ((testFn as any)?.kind === "function-value") return callFn(testFn, [attempt]);
+            return null;
+          },
+          evaluate: (evidence: any[]) => {
+            if (typeof evalFn === "function") return evalFn(evidence);
+            if ((evalFn as any)?.kind === "function-value") return callFn(evalFn, [evidence]);
+            return 0;
+          },
+        };
+        const result = globalTester.test(config);
+        return result.verdict;
+      }
+      if (op === "hypothesis-confidence") {
+        // (hypothesis-confidence claim test-fn eval-fn) → confidence number
+        const [claim, testFn, evalFn] = args;
+        const config: HypothesisConfig = {
+          claim: String(claim),
+          test: (attempt: number) => {
+            if (typeof testFn === "function") return testFn(attempt);
+            if ((testFn as any)?.kind === "function-value") return callFn(testFn, [attempt]);
+            return null;
+          },
+          evaluate: (evidence: any[]) => {
+            if (typeof evalFn === "function") return evalFn(evidence);
+            if ((evalFn as any)?.kind === "function-value") return callFn(evalFn, [evidence]);
+            return 0;
+          },
+        };
+        const result = globalTester.test(config);
+        return result.confidence;
+      }
+      if (op === "hypothesis-compete") {
+        // (hypothesis-compete hypotheses-list) → winner claim string
+        // hypotheses-list: array of [claim, test-fn, eval-fn]
+        const hypoList: any[] = args[0];
+        if (!Array.isArray(hypoList) || hypoList.length === 0) return null;
+        const configs: HypothesisConfig[] = hypoList.map((h: any) => {
+          const [claim, testFn, evalFn] = Array.isArray(h) ? h : [h, () => null, () => 0];
+          return {
+            claim: String(claim),
+            test: (attempt: number) => {
+              if (typeof testFn === "function") return testFn(attempt);
+              if ((testFn as any)?.kind === "function-value") return callFn(testFn, [attempt]);
+              return null;
+            },
+            evaluate: (evidence: any[]) => {
+              if (typeof evalFn === "function") return evalFn(evidence);
+              if ((evalFn as any)?.kind === "function-value") return callFn(evalFn, [evidence]);
+              return 0;
+            },
+          };
+        });
+        const winner = globalTester.compete(configs);
+        return winner.claim;
+      }
+
+      // Phase 113: Debate 내장 함수
+      if (op === "debate") {
+        // (debate proposition pro-fn con-fn) → winner string
+        const [proposition, proFn, conFn] = args;
+        const result = globalDebater.debate({
+          proposition: String(proposition),
+          pro: (round: number, conArgs: Argument[]) => {
+            if (typeof proFn === "function") return proFn(round, conArgs);
+            if ((proFn as any)?.kind === "function-value") return callFn(proFn, [round, conArgs]);
+            return { side: 'pro', point: String(proFn), strength: 0.5 };
+          },
+          con: (round: number, proArgs: Argument[]) => {
+            if (typeof conFn === "function") return conFn(round, proArgs);
+            if ((conFn as any)?.kind === "function-value") return callFn(conFn, [round, proArgs]);
+            return { side: 'con', point: String(conFn), strength: 0.5 };
+          },
+        });
+        return result.winner;
+      }
+      if (op === "debate-score") {
+        // (debate-score proposition pro-fn con-fn) → { pro: number; con: number }
+        const [proposition, proFn, conFn] = args;
+        const result = globalDebater.debate({
+          proposition: String(proposition),
+          pro: (round: number, conArgs: Argument[]) => {
+            if (typeof proFn === "function") return proFn(round, conArgs);
+            if ((proFn as any)?.kind === "function-value") return callFn(proFn, [round, conArgs]);
+            return { side: 'pro', point: String(proFn), strength: 0.5 };
+          },
+          con: (round: number, proArgs: Argument[]) => {
+            if (typeof conFn === "function") return conFn(round, proArgs);
+            if ((conFn as any)?.kind === "function-value") return callFn(conFn, [round, proArgs]);
+            return { side: 'con', point: String(conFn), strength: 0.5 };
+          },
+        });
+        return { pro: result.proScore, con: result.conScore };
+      }
+      if (op === "debate-conclusion") {
+        // (debate-conclusion proposition pro-fn con-fn) → conclusion string
+        const [proposition, proFn, conFn] = args;
+        const result = globalDebater.debate({
+          proposition: String(proposition),
+          pro: (round: number, conArgs: Argument[]) => {
+            if (typeof proFn === "function") return proFn(round, conArgs);
+            if ((proFn as any)?.kind === "function-value") return callFn(proFn, [round, conArgs]);
+            return { side: 'pro', point: String(proFn), strength: 0.5 };
+          },
+          con: (round: number, proArgs: Argument[]) => {
+            if (typeof conFn === "function") return conFn(round, proArgs);
+            if ((conFn as any)?.kind === "function-value") return callFn(conFn, [round, proArgs]);
+            return { side: 'con', point: String(conFn), strength: 0.5 };
+          },
+        });
+        return result.conclusion;
+      }
+
       // (export sym1 sym2 ...) — self-hosting 파일 호환
       if (op === "export") return null;
       // (call $fn arg...) — FL stdlib 고차 함수용
