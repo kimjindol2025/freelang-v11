@@ -3164,6 +3164,202 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         ]);
       }
 
+      // === Phase 140: SELF-EVOLUTION HUB ===
+
+      // (self-evolve $population $fitness $mutate $crossover :gens 50) → EvolutionCycleResult
+      if (op === "self-evolve") {
+        const [popArg, fitnessFnArg, mutateFnArg, crossoverFnArg, ...rest] = args;
+        const population: unknown[] = Array.isArray(popArg) ? popArg : [];
+        const cfg: Partial<EvolutionCycleConfig> = {};
+        for (let i = 0; i < rest.length - 1; i += 2) {
+          const k = String(rest[i]).replace(/^:/, "");
+          const v = rest[i + 1];
+          if (k === "gens" || k === "generations") cfg.generations = Number(v);
+          else if (k === "pop" || k === "populationSize") cfg.populationSize = Number(v);
+          else if (k === "rate" || k === "mutationRate") cfg.mutationRate = Number(v);
+          else if (k === "elite" || k === "eliteRatio") cfg.eliteRatio = Number(v);
+          else if (k === "prune" || k === "pruneThreshold") cfg.pruneThreshold = Number(v);
+          else if (k === "versioning" || k === "enableVersioning") cfg.enableVersioning = v === true || v === "true";
+          else if (k === "benchmark" || k === "enableBenchmark") cfg.enableBenchmark = v === true || v === "true";
+          else if (k === "refactor" || k === "enableRefactor") cfg.enableRefactor = v === true || v === "true";
+        }
+        const mkFn1 = (fnArg: unknown) => (item: unknown): unknown => {
+          if (typeof fnArg === "function") return (fnArg as Function)(item);
+          if ((fnArg as any)?.kind === "function-value") return callFn(fnArg, [item]);
+          return item;
+        };
+        const fitnessFunc140 = (item: unknown): number => Number(mkFn1(fitnessFnArg)(item));
+        const mutateFunc140 = (item: unknown): unknown => mkFn1(mutateFnArg)(item);
+        const crossoverFunc140 = (a: unknown, b: unknown): unknown => {
+          if (typeof crossoverFnArg === "function") return (crossoverFnArg as Function)(a, b);
+          if ((crossoverFnArg as any)?.kind === "function-value") return callFn(crossoverFnArg, [a, b]);
+          return a;
+        };
+        const r140 = globalSelfEvolution.runCycle(population, fitnessFunc140, mutateFunc140, crossoverFunc140, cfg);
+        return new Map<string, any>([
+          ["best", r140.best],
+          ["bestFitness", r140.bestFitness],
+          ["generations", r140.generations],
+          ["improvements", r140.improvements],
+          ["prunedCount", r140.prunedCount],
+          ["benchmarkMs", r140.benchmarkMs ?? null],
+          ["versionId", r140.versionId ?? null],
+          ["report", r140.report],
+        ]);
+      }
+
+      // (self-evolve-numbers [1 2 3 4 5] :gens 30) → EvolutionCycleResult
+      if (op === "self-evolve-numbers") {
+        const target140 = Array.isArray(args[0]) ? args[0].map(Number) : [1, 2, 3];
+        const cfg140: Partial<EvolutionCycleConfig> = {};
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "gens" || k === "generations") cfg140.generations = Number(v);
+          else if (k === "pop" || k === "populationSize") cfg140.populationSize = Number(v);
+          else if (k === "rate" || k === "mutationRate") cfg140.mutationRate = Number(v);
+          else if (k === "versioning" || k === "enableVersioning") cfg140.enableVersioning = v === true || v === "true";
+          else if (k === "benchmark" || k === "enableBenchmark") cfg140.enableBenchmark = v === true || v === "true";
+          else if (k === "refactor" || k === "enableRefactor") cfg140.enableRefactor = v === true || v === "true";
+        }
+        const r140n = globalSelfEvolution.evolveNumbers(target140, cfg140);
+        return new Map<string, any>([
+          ["best", r140n.best],
+          ["bestFitness", r140n.bestFitness],
+          ["generations", r140n.generations],
+          ["improvements", r140n.improvements],
+          ["prunedCount", r140n.prunedCount],
+          ["benchmarkMs", r140n.benchmarkMs ?? null],
+          ["versionId", r140n.versionId ?? null],
+          ["report", r140n.report],
+        ]);
+      }
+
+      // (self-evolve-string "target" :gens 50) → EvolutionCycleResult
+      if (op === "self-evolve-string") {
+        const target140s = String(args[0] ?? "hello");
+        const cfg140s: Partial<EvolutionCycleConfig> = {};
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "gens" || k === "generations") cfg140s.generations = Number(v);
+          else if (k === "pop" || k === "populationSize") cfg140s.populationSize = Number(v);
+          else if (k === "rate" || k === "mutationRate") cfg140s.mutationRate = Number(v);
+          else if (k === "versioning" || k === "enableVersioning") cfg140s.enableVersioning = v === true || v === "true";
+          else if (k === "benchmark" || k === "enableBenchmark") cfg140s.enableBenchmark = v === true || v === "true";
+        }
+        const r140s = globalSelfEvolution.evolveString(target140s, cfg140s);
+        return new Map<string, any>([
+          ["best", r140s.best],
+          ["bestFitness", r140s.bestFitness],
+          ["generations", r140s.generations],
+          ["improvements", r140s.improvements],
+          ["prunedCount", r140s.prunedCount],
+          ["benchmarkMs", r140s.benchmarkMs ?? null],
+          ["versionId", r140s.versionId ?? null],
+          ["report", r140s.report],
+        ]);
+      }
+
+      // (evolution-report $results) → SelfEvolutionReport
+      if (op === "evolution-report") {
+        const rawResults140 = Array.isArray(args[0]) ? args[0] : [args[0]].filter(Boolean);
+        const results140: EvolutionCycleResult[] = rawResults140.map((r: any) => {
+          if (r instanceof Map) {
+            return {
+              best: r.get("best"),
+              bestFitness: Number(r.get("bestFitness") ?? 0),
+              generations: Number(r.get("generations") ?? 0),
+              improvements: Number(r.get("improvements") ?? 0),
+              prunedCount: Number(r.get("prunedCount") ?? 0),
+              benchmarkMs: r.get("benchmarkMs") ?? undefined,
+              versionId: r.get("versionId") ?? undefined,
+              report: String(r.get("report") ?? ""),
+            } as EvolutionCycleResult;
+          }
+          return r as EvolutionCycleResult;
+        });
+        const rep140 = globalSelfEvolution.generateReport(results140);
+        return new Map<string, any>([
+          ["timestamp", rep140.timestamp.toISOString()],
+          ["cycles", rep140.cycles],
+          ["totalGenerations", rep140.totalGenerations],
+          ["fitnessProgress", rep140.fitnessProgress],
+          ["refactorSuggestions", rep140.refactorSuggestions],
+          ["versions", rep140.versions],
+          ["summary", rep140.summary],
+        ]);
+      }
+
+      // (self-improve $config) → {optimized, improvement}
+      if (op === "self-improve") {
+        const rawCfg140 = args[0];
+        const cfg140i: Partial<EvolutionCycleConfig> = {};
+        if (rawCfg140 instanceof Map) {
+          const gens = rawCfg140.get("generations") ?? rawCfg140.get("gens");
+          const pop = rawCfg140.get("populationSize") ?? rawCfg140.get("pop");
+          const rate = rawCfg140.get("mutationRate") ?? rawCfg140.get("rate");
+          if (gens !== undefined) cfg140i.generations = Number(gens);
+          if (pop !== undefined) cfg140i.populationSize = Number(pop);
+          if (rate !== undefined) cfg140i.mutationRate = Number(rate);
+        }
+        const imp140 = globalSelfEvolution.selfImprove(cfg140i);
+        return new Map<string, any>([
+          ["optimized", new Map<string, any>(Object.entries(imp140.optimized) as [string, any][])],
+          ["improvement", imp140.improvement],
+        ]);
+      }
+
+      // (evolve-cycle $pop $fitness) → 기본 설정으로 진화 실행
+      if (op === "evolve-cycle") {
+        const [popArg140, fitnessFnArg140] = args;
+        const population140: unknown[] = Array.isArray(popArg140) ? popArg140 : [];
+        const fitnessFunc140c = (item: unknown): number => {
+          if (typeof fitnessFnArg140 === "function") return Number((fitnessFnArg140 as Function)(item));
+          if ((fitnessFnArg140 as any)?.kind === "function-value") return Number(callFn(fitnessFnArg140, [item]));
+          return typeof item === "number" ? item : 0;
+        };
+        const mutateFunc140c = (item: unknown): unknown => {
+          if (Array.isArray(item)) {
+            const arr = [...item] as number[];
+            const idx = Math.floor(Math.random() * arr.length);
+            arr[idx] += (Math.random() - 0.5) * 0.2;
+            return arr;
+          }
+          return item;
+        };
+        const crossoverFunc140c = (a: unknown, b: unknown): unknown => {
+          if (Array.isArray(a) && Array.isArray(b)) {
+            const point = Math.floor(Math.random() * a.length);
+            return [...a.slice(0, point), ...b.slice(point)];
+          }
+          return a;
+        };
+        const rc140 = globalSelfEvolution.runCycle(population140, fitnessFunc140c, mutateFunc140c, crossoverFunc140c);
+        return new Map<string, any>([
+          ["best", rc140.best],
+          ["bestFitness", rc140.bestFitness],
+          ["generations", rc140.generations],
+          ["improvements", rc140.improvements],
+          ["prunedCount", rc140.prunedCount],
+          ["report", rc140.report],
+        ]);
+      }
+
+      // (evolution-best $result) → best 솔루션
+      if (op === "evolution-best") {
+        const [arg140] = args;
+        if (arg140 instanceof Map) return arg140.get("best") ?? null;
+        return null;
+      }
+
+      // (evolution-fitness $result) → bestFitness
+      if (op === "evolution-fitness") {
+        const [arg140f] = args;
+        if (arg140f instanceof Map) return arg140f.get("bestFitness") ?? 0;
+        return 0;
+      }
+
       // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
       return callUser(op, args);
     }
