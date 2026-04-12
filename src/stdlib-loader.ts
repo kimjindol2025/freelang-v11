@@ -24,6 +24,8 @@ import { createAsyncModule } from "./stdlib-async";      // Phase 23: Async/awai
 import { createModuleSystem } from "./stdlib-module";    // Phase 24: Module system
 import { pgBuiltins } from "./stdlib-pg";                // PostgreSQL + JWT + AI
 import { createChannelModule } from "./stdlib-channel";  // Phase 67: 채널 기반 동시성
+import { createImmutableModule } from "./immutable";      // Phase 70: 이뮤터블 데이터 구조
+import { createAiNativeModule } from "./stdlib-ai-native"; // Phase 71: AI 네이티브 블록
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -64,4 +66,6 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createModuleSystem());   // Phase 24: module_*, namespace_*
   interp.registerModule(pgBuiltins);             // PostgreSQL + JWT + AI
   interp.registerModule(createChannelModule());  // Phase 67: chan, chan-send, chan-recv
+  interp.registerModule(createImmutableModule()); // Phase 70: imm-map, imm-vec, ...
+  interp.registerModule(createAiNativeModule());  // Phase 71: ai-call, rag-search, embed, similarity
 }
