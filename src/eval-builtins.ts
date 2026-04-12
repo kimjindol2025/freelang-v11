@@ -8,6 +8,7 @@
 // Phase 103: 멀티 에이전트 통신
 // Phase 104: TRY-REASON 실패 복구 추론
 // Phase 106: 자동 품질 평가 루프
+// Phase 107: FL 자기 교육 시스템 (FLTutor)
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -31,6 +32,7 @@ import { globalBus, MessageBus, AgentMessage } from "./multi-agent"; // Phase 10
 import { tryReasonBuiltin, tryWithFallback } from "./try-reason"; // Phase 104: TRY-REASON
 import { createStream, getStream, deleteStream, streamText, FLStream } from "./streaming"; // Phase 105: Streaming
 import { evaluateQuality, defaultCriteria } from "./quality-loop"; // Phase 106: Quality Loop
+import { globalTutor } from "./fl-tutor"; // Phase 107: FL Self-Teaching
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1049,6 +1051,30 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return fn;
       };
       return tryWithFallback(wrappedFn, fallback);
+    }
+
+    // Phase 107: FL 자기 교육 시스템 내장 함수
+    // (fl-learn "concept") → 레슨 마크다운 문자열
+    case "fl-learn": {
+      const concept = String(args[0] ?? "");
+      return globalTutor.lessonMarkdown(concept);
+    }
+
+    // (fl-examples "tag") → 태그별 예제 리스트 (JSON 문자열)
+    case "fl-examples": {
+      const tag = String(args[0] ?? "");
+      const examples = globalTutor.findByTag(tag);
+      return examples.map(e => `${e.concept}: ${e.description}`).join("\n");
+    }
+
+    // (fl-example-count) → 총 예제 수
+    case "fl-example-count": {
+      return globalTutor.size();
+    }
+
+    // (fl-concepts) → 개념 목록 (공백 구분 문자열)
+    case "fl-concepts": {
+      return globalTutor.concepts().join(" ");
     }
 
     // Function call (default)
