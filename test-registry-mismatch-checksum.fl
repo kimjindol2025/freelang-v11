@@ -1,0 +1,69 @@
+; Phase 8: Test Registry with Intentional Checksum Mismatches
+; For testing real SHA-256 integrity verification failures
+
+[FUNC get_packages :params []
+  :body {
+    :test-lib {
+      :id "test-lib"
+      :name "test-lib"
+      :description "Test library for integrity mismatch testing"
+      :downloads 1000
+      :stars 10
+      :versions [
+        {
+          :version "1.0.0"
+          :published_at "2024-01-01"
+          :checksum "0000000000000000000000000000000000000000000000000000000000000000"
+          :dependencies {}
+        }
+      ]
+    }
+  }
+]
+
+[FUNC handle_registry_packages :params [$req]
+  :body (do
+    (let [
+        [$query (get $req "query")]
+        [$method (get $req "method")]
+        [$packages (get_packages)]
+        [$name (get $query "name")]
+      ]
+      (if (= $method "GET")
+        (if (not $name)
+          (server_status 200 {
+            :success true
+            :packages $packages
+          })
+          (do
+            (let [[$pkg (get $packages $name)]]
+              (if $pkg
+                (server_status 200 {
+                  :success true
+                  :package $pkg
+                })
+                (server_status 404 {
+                  :success false
+                  :message (concat "Package " $name " not found")
+                }))
+            ))
+          ))
+        (server_status 405 {
+          :success false
+        })
+      )
+    )
+  )
+]
+
+(println "🚀 Starting v9 Test Registry (Checksum Mismatch) on port 4003...")
+
+(server_get "/registry/packages" "handle_registry_packages")
+(server_get "/registry/packages/:name" "handle_registry_packages")
+
+(let [[$msg (server_start 4003)]]
+  (println $msg)
+)
+
+(println "📖 Registry with INTENTIONAL MISMATCH ready (port 4003)")
+(println "✅ Test Registry ready (port 4003). Press Ctrl+C to stop.")
