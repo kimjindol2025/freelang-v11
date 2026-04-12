@@ -26,6 +26,7 @@ import { pgBuiltins } from "./stdlib-pg";                // PostgreSQL + JWT + A
 import { createChannelModule } from "./stdlib-channel";  // Phase 67: 채널 기반 동시성
 import { createImmutableModule } from "./immutable";      // Phase 70: 이뮤터블 데이터 구조
 import { createAiNativeModule } from "./stdlib-ai-native"; // Phase 71: AI 네이티브 블록
+import { createTestModule } from "./stdlib-test";           // Phase 76: FL 네이티브 테스트 러너
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -35,7 +36,7 @@ interface InterpreterLike {
 }
 
 /**
- * 19개 stdlib 모듈을 interpreter에 등록
+ * 20개 stdlib 모듈을 interpreter에 등록
  * interpreter.ts constructor 대신 이 함수 한 줄로 호출
  */
 export function loadAllStdlib(interp: InterpreterLike): void {
@@ -68,4 +69,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createChannelModule());  // Phase 67: chan, chan-send, chan-recv
   interp.registerModule(createImmutableModule()); // Phase 70: imm-map, imm-vec, ...
   interp.registerModule(createAiNativeModule());  // Phase 71: ai-call, rag-search, embed, similarity
+  interp.registerModule(createTestModule(         // Phase 76: deftest, describe, assert-eq, ...
+    (fnValue, args) => interp.callFunctionValue(fnValue, args)
+  ));
 }
