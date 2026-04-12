@@ -2021,7 +2021,53 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return result.stepsCompleted;
       }
 
-            // (export sym1 sym2 ...) — self-hosting 파일 호환
+      // Phase 126: Orchestrate — 의존성 기반 에이전트 오케스트레이션
+      if (op === "orchestrate-run") {
+        // (orchestrate-run tasks-list) → outputs map
+        const [rawTasks] = args;
+        if (!Array.isArray(rawTasks)) return {};
+        const tasks: OrchestrateTask[] = rawTasks.map((t: any) => {
+          if (Array.isArray(t)) {
+            return { id: String(t[0]), input: t[1] ?? null, dependsOn: Array.isArray(t[2]) ? t[2].map(String) : undefined };
+          }
+          return { id: String(t.id ?? 'task'), input: t.input ?? null, dependsOn: t.dependsOn };
+        });
+        return globalOrchestrator.run(tasks).outputs;
+      }
+      if (op === "orchestrate-order") {
+        // (orchestrate-order tasks-list) → 실행 순서 배열
+        const [rawTasks] = args;
+        if (!Array.isArray(rawTasks)) return [];
+        const tasks: OrchestrateTask[] = rawTasks.map((t: any) => {
+          if (Array.isArray(t)) {
+            return { id: String(t[0]), input: t[1] ?? null, dependsOn: Array.isArray(t[2]) ? t[2].map(String) : undefined };
+          }
+          return { id: String(t.id ?? 'task'), input: t.input ?? null, dependsOn: t.dependsOn };
+        });
+        return globalOrchestrator.getOrder(tasks);
+      }
+
+      // Phase 130: Multi-Agent Hub — 협업 통합 허브
+      if (op === "hub-route") {
+        // (hub-route "taskType" problem) → result
+        const [taskType, problem] = args;
+        const result = globalHub.route(String(taskType), problem, []);
+        return result.result;
+      }
+      if (op === "hub-stats") {
+        // (hub-stats) → { systems, ready, phases, tier }
+        return globalHub.stats();
+      }
+      if (op === "hub-systems") {
+        // (hub-systems) → 시스템 이름 배열
+        return globalHub.systems();
+      }
+      if (op === "hub-task-types") {
+        // (hub-task-types) → 태스크 타입 배열
+        return globalHub.taskTypes();
+      }
+
+      // (export sym1 sym2 ...) — self-hosting 파일 호환
       if (op === "export") return null;
       // (call $fn arg...) — FL stdlib 고차 함수용
       if (op === "call" && args.length >= 1) {
