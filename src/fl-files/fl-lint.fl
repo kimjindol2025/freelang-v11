@@ -1,0 +1,61 @@
+;;; FreeLang Linter — self-hosted
+;;; Phase 88: 자체 호스팅 2.0
+
+[MODULE fl-lint]
+
+;;; 빈 바디 검사 — node의 body 필드 길이로 판단
+[FUNC check-empty-body :params [$node]
+  :body (if (= (length (get $node "body")) 0)
+    [{:rule "empty-body" :msg "빈 FUNC 바디"}]
+    [])
+]
+
+;;; 노드 이름 추출
+[FUNC node-name :params [$node]
+  :body (get $node "name")
+]
+
+;;; 노드 바디 추출
+[FUNC node-body :params [$node]
+  :body (get $node "body")
+]
+
+;;; 전체 린트 — loop로 각 노드 check-empty-body 적용 후 결과 합산
+[FUNC lint-nodes :params [$nodes]
+  :body (
+    (define ln-n (length $nodes))
+    (define ln-i 0)
+    (define ln-result [])
+    (loop [[$_ 0]]
+      (if (>= ln-i ln-n) ln-result
+        (do
+          (define ln-issues (check-empty-body (get $nodes ln-i)))
+          (set! ln-result (append ln-result ln-issues))
+          (set! ln-i (+ ln-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+;;; 소스 문자열에서 FUNC 블록 수 계산 — loop 방식
+[FUNC count-funcs :params [$src]
+  :body (
+    (define cf-lines (str-split $src "\n"))
+    (define cf-n (length cf-lines))
+    (define cf-i 0)
+    (define cf-count 0)
+    (loop [[$_ 0]]
+      (if (>= cf-i cf-n) cf-count
+        (do
+          (if (contains? (get cf-lines cf-i) "FUNC")
+            (set! cf-count (+ cf-count 1))
+            0)
+          (set! cf-i (+ cf-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]

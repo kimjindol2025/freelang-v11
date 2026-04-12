@@ -1,0 +1,29 @@
+;;; FreeLang Formatter — self-hosted
+;;; Phase 88: 자체 호스팅 2.0
+
+[MODULE fl-fmt]
+
+;;; 들여쓰기 N칸 생성 — repeat로 공백 2칸 반복
+[FUNC indent :params [$n]
+  :body (repeat "  " $n)
+]
+
+;;; S-expression 포맷: op와 args를 공백으로 연결
+[FUNC fmt-sexpr :params [$op $args $depth]
+  :body (concat "(" $op " " (join " " $args) ")")
+]
+
+;;; 단일 토큰을 문자열로 포맷
+[FUNC fmt-expr :params [$token]
+  :body (str $token)
+]
+
+;;; 토큰 목록을 줄바꿈으로 연결해 포맷된 코드 반환
+[FUNC fmt-tokens :params [$tokens]
+  :body (join "\n" (map fmt-expr $tokens))
+]
+
+;;; 최상위 포매터 — 소스를 줄로 분리해 재결합
+[FUNC format-code :params [$src]
+  :body (join "\n" (str-split $src "\n"))
+]

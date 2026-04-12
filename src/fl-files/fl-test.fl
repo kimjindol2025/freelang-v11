@@ -1,0 +1,52 @@
+;;; FreeLang Test Runner — self-hosted
+;;; Phase 88: 자체 호스팅 2.0
+
+[MODULE fl-test]
+
+(define test-results [])
+
+;;; 테스트 케이스 실행 — fn 호출 결과로 pass/fail 판단
+[FUNC my-test :params [$name $fn]
+  :body (do
+    (define ok (call $fn))
+    (set! test-results (append test-results [{:name $name :ok $ok}]))
+    $ok)
+]
+
+;;; pass 카운트 계산 — loop 방식
+[FUNC count-passed :params [$results]
+  :body (
+    (define cp-n (length $results))
+    (define cp-i 0)
+    (define cp-count 0)
+    (loop [[$_ 0]]
+      (if (>= cp-i cp-n) $cp-count
+        (do
+          (if (get (get $results cp-i) "ok")
+            (set! cp-count (+ cp-count 1))
+            0)
+          (set! cp-i (+ cp-i 1))
+          (recur 0)
+        )
+      )
+    )
+  )
+]
+
+;;; 결과 리포트 출력
+[FUNC my-report :params []
+  :body (do
+    (define passed (count-passed test-results))
+    (define total (length test-results))
+    (print (concat "결과: " (num-to-str passed) "/" (num-to-str total))))
+]
+
+;;; assertion — expect와 actual이 같은지 검사
+[FUNC assert-eq :params [$expected $actual]
+  :body (= $expected $actual)
+]
+
+;;; 빈 배열인지 검사
+[FUNC assert-empty :params [$arr]
+  :body (= (length $arr) 0)
+]
