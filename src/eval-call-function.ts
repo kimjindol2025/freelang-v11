@@ -7,6 +7,7 @@ import { FreeLangPromise } from "./async-runtime";
 import { suggestSimilar } from "./error-formatter";
 import { FunctionNotFoundError } from "./errors";
 import { isTailCall } from "./tco";
+import { globalProfiler } from "./profiler";
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -110,6 +111,9 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     }
   }
 
+  // Phase 82: Profiler 연동 (enabled=false 시 no-op)
+  const exitProfiler = globalProfiler.enter(baseName);
+
   // 클로저: capturedEnv가 있으면 해당 환경에서 실행
   if (func.capturedEnv) {
     const savedStack = interp.context.variables.saveStack();
@@ -124,6 +128,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
       interp.callDepth--;
       interp.context.variables.restoreStack(savedStack);
       for (const alias of tempAliases) interp.context.functions.delete(alias);
+      exitProfiler();
     }
   }
 
@@ -139,6 +144,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     interp.callDepth--;
     interp.context.variables.pop();
     for (const alias of tempAliases) interp.context.functions.delete(alias);
+    exitProfiler();
   }
 }
 
