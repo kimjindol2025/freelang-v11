@@ -73,7 +73,7 @@ API 호출    → (fl-http-get "https://...")
 - Formatter/Linter/REPL/테스트러너/문서생성기/디버거/워치모드/CI
 - 패키지매니저/프로파일러/바이트코드VM(148x빠름)/JS코드생성/LSP/패키지3종
 
-### Tier 5 진행 중 (Phase 91~100) — AI 사고 블록
+### Tier 5 완료 ✅ (Phase 91~100) — AI 사고 블록 (2026-04-12)
 | Phase | 상태 | 내용 |
 |-------|------|------|
 | 91 | ✅ 31/31 | `(maybe p v)` 불확실성 타입 — d0aea6c |
@@ -84,7 +84,7 @@ API 호출    → (fl-http-get "https://...")
 | 96 | ✅ 28/28 | `Result/Ok/Err` AI 에러 처리 전면 개선 — cdcbf0c |
 | 97 | ✅ 24/24 | `[USE-TOOL]` 도구 사용 DSL — b01d7ce |
 | 98 | ✅ 24/24 | `[AGENT]` 에이전트 루프 — ea1f37c |
-| 99 | ⏳ | `[SELF-IMPROVE]` 자기 수정 |
+| 99 | ✅ 25/25 | `[SELF-IMPROVE]` 자기 수정 — 4332f4d |
 | 100 | ✅ 36/36 | AI 표준 라이브러리 완전 통합 — 2e1bbda |
 
 ### Tier 6 예정 (Phase 101~110) — AI가 편한 구조
