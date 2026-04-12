@@ -181,6 +181,20 @@ test("TC-1: strict OFF — (+ 1 2) 정상 작동", () => {
   // lastValue 대신 실행만 에러 없이 완료되면 OK
 });
 
+test('TC-1b: strict OFF — (+ "a" 1) 에러 없음 (JS 문자열 concat 허용)', () => {
+  // strict OFF가 기본값 — 타입 검증 없음, JS 방식으로 "a" + 1 = "a1"
+  let errorOccurred = false;
+  let result: any;
+  try {
+    result = run(`(+ "a" 1)`);
+  } catch (e: any) {
+    errorOccurred = true;
+  }
+  if (errorOccurred) throw new Error(`strict OFF에서 에러가 발생하면 안 됨`);
+  // JS에서 "a" + 1 = "a1"
+  if (result !== "a1") throw new Error(`expected "a1", got ${JSON.stringify(result)}`);
+});
+
 test("TC-5: strict OFF — 기본 연산 모두 통과", () => {
   const code = `
 [FUNC greet :params [$name] :body (concat "Hello " $name)]
