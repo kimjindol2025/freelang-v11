@@ -2,6 +2,7 @@
 // Phase 57 리팩토링: interpreter.ts의 switch 문을 분리
 // evalSExpr에서 args가 평가된 이후 호출됨
 // Phase 69: 레이지 시퀀스 추가
+// Phase 95: ContextManager (ctx-*) 추가
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
@@ -11,6 +12,7 @@ import {
   take, drop, iterate, rangeSeq, filterLazy, mapLazy, zipWithLazy, takeWhile,
   type LazySeq,
 } from "./lazy-seq";
+import { ContextManager } from "./context-window"; // Phase 95
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -572,6 +574,69 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     // (lazy? v) — 레이지 시퀀스 여부 확인
     case "lazy?": {
       return isLazySeq(args[0]);
+    }
+
+    // ── Phase 95: Context Window 관리 함수 ─────────────────────────────
+    // (ctx-new max-tokens?) → ContextManager
+    case "ctx-new": {
+      const maxTokens = typeof args[0] === "number" ? args[0] : 4096;
+      return new ContextManager(maxTokens);
+    }
+
+    // (ctx-add ctx content :priority p :tags [...] :tokens n) → id
+    case "ctx-add": {
+      const ctx = args[0] as ContextManager;
+      const content = args[1];
+      const opts: { priority?: number; tags?: string[]; tokens?: number } = {};
+      for (let i = 2; i < expr.args.length - 1; i++) {
+        const raw = expr.args[i];
+        if ((raw as any).kind === "keyword") {
+          const kw = (raw as any).name as string;
+          const val = args[i];
+          if (kw === "priority") opts.priority = Number(val);
+          else if (kw === "tags") opts.tags = Array.isArray(val) ? val : [String(val)];
+          else if (kw === "tokens") opts.tokens = Number(val);
+        }
+      }
+      return ctx.add(content, opts);
+    }
+
+    // (ctx-get ctx id) → ContextEntry | undefined
+    case "ctx-get": {
+      const ctx = args[0] as ContextManager;
+      return ctx.get(String(args[1])) ?? null;
+    }
+
+    // (ctx-remove ctx id) → void
+    case "ctx-remove": {
+      const ctx = args[0] as ContextManager;
+      ctx.remove(String(args[1]));
+      return null;
+    }
+
+    // (ctx-trim ctx) → removed entries
+    case "ctx-trim": {
+      const ctx = args[0] as ContextManager;
+      return ctx.trim();
+    }
+
+    // (ctx-stats ctx) → {used, max, percent, count}
+    case "ctx-stats": {
+      const ctx = args[0] as ContextManager;
+      return ctx.stats();
+    }
+
+    // (ctx-has-room? ctx tokens) → bool
+    case "ctx-has-room?": {
+      const ctx = args[0] as ContextManager;
+      return ctx.hasRoom(Number(args[1]));
+    }
+
+    // (ctx-all ctx) / (ctx-all ctx tag) → entries
+    case "ctx-all": {
+      const ctx = args[0] as ContextManager;
+      const tag = args.length > 1 ? String(args[1]) : undefined;
+      return ctx.getAll(tag);
     }
 
     // Function call (default)
