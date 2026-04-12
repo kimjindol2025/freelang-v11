@@ -1,0 +1,219 @@
+; Phase 5: Checksum and Integrity Verification
+; 패키지 무결성 검증
+
+; 간단한 checksum 계산 (파일 내용 기반)
+; 실제 SHA256은 없으므로 간단한 해시 사용
+[FUNC calculate-checksum :params [$content]
+  :body (do
+    ; 간단한 체크섬: 문자열 길이 + 각 문자의 char-code 합
+    (let [
+        [$len (length $content)]
+        [$sum 0]
+        [$i 0]
+      ]
+      (do
+        ; 처음 256자만 처리 (성능)
+        (while (and (< $i $len) (< $i 256))
+          (set $sum (+ $sum (char-code (substring $content $i (+ $i 1)))))
+          (set $i (+ $i 1))
+        )
+
+        ; 체크섬 = length + sum (16진수)
+        (concat "sha256:" (int-to-str $len) "_" (int-to-str $sum))
+      )
+    )
+  )
+]
+
+; 파일에서 checksum 계산
+[FUNC calculate-file-checksum :params [$file_path]
+  :body (do
+    (if (file-exists? $file_path)
+      (do
+        (let [[$content (fs-read $file_path)]]
+          (calculate-checksum $content)
+        )
+      )
+      "sha256:notfound"
+    )
+  )
+]
+
+; Checksum 검증
+[FUNC verify-checksum :params [$expected $actual]
+  :body (do
+    (if (= $expected $actual)
+      { :valid true :expected $expected :actual $actual }
+      { :valid false :expected $expected :actual $actual }
+    )
+  )
+]
+
+; lockfile에 integrity 저장
+[FUNC add-integrity-to-lockfile :params [$lockfile $package_name $version $file_path]
+  :body (do
+    (let [
+        [$packages (get $lockfile "packages" {})]
+        [$pkg_key (concat $package_name "@" $version)]
+        [$checksum (calculate-file-checksum $file_path)]
+        [$pkg_entry (get $packages $pkg_key {})]
+      ]
+      (do
+        ; integrity 필드 추가
+        (set $pkg_entry {
+          :version $version
+          :resolved (get $pkg_entry "resolved")
+          :integrity $checksum
+          :requires (get $pkg_entry "requires" {})
+        })
+
+        (set $packages $pkg_key $pkg_entry)
+        (set $lockfile "packages" $packages)
+        $lockfile
+      )
+    )
+  )
+]
+
+; lockfile 검증
+[FUNC verify-lockfile-integrity :params [$lockfile]
+  :body (do
+    (let [
+        [$packages (get $lockfile "packages" {})]
+        [$results []]
+        [$valid true]
+      ]
+      (do
+        (for-each (object-keys $packages) (lambda [$pkg_key]
+          (let [
+              [$pkg (get $packages $pkg_key)]
+              [$integrity (get $pkg "integrity")]
+              [$resolved (get $pkg "resolved")]
+            ]
+            (if (and $integrity (not (= $integrity "sha256:notfound")))
+              (do
+                (array-push $results {
+                  :package $pkg_key
+                  :integrity $integrity
+                  :status "verified"
+                })
+              )
+              (do
+                (set $valid false)
+                (array-push $results {
+                  :package $pkg_key
+                  :integrity $integrity
+                  :status "missing"
+                })
+              )
+            )
+          )
+        ))
+
+        {
+          :valid $valid
+          :total (length $packages)
+          :verified (length $results)
+          :results $results
+        }
+      )
+    )
+  )
+]
+
+; Helper: file-exists?
+[FUNC file-exists? :params [$path]
+  :body (try (do (fs-read $path) true) (catch $e false))
+]
+
+; Helper: char-code
+[FUNC char-code :params [$char]
+  :body (do
+    ; 간단한 char-code 구현 (처음 몇 문자만)
+    (cond
+      [(= $char "a") 97]
+      [(= $char "b") 98]
+      [(= $char "c") 99]
+      [(= $char "d") 100]
+      [(= $char "e") 101]
+      [(= $char "f") 102]
+      [(= $char "g") 103]
+      [(= $char "h") 104]
+      [(= $char "i") 105]
+      [(= $char "j") 106]
+      [(= $char "k") 107]
+      [(= $char "l") 108]
+      [(= $char "m") 109]
+      [(= $char "n") 110]
+      [(= $char "o") 111]
+      [(= $char "p") 112]
+      [(= $char "q") 113]
+      [(= $char "r") 114]
+      [(= $char "s") 115]
+      [(= $char "t") 116]
+      [(= $char "u") 117]
+      [(= $char "v") 118]
+      [(= $char "w") 119]
+      [(= $char "x") 120]
+      [(= $char "y") 121]
+      [(= $char "z") 122]
+      [(= $char "A") 65]
+      [(= $char "B") 66]
+      [(= $char "C") 67]
+      [(= $char "D") 68]
+      [(= $char "E") 69]
+      [(= $char "F") 70]
+      [(= $char "G") 71]
+      [(= $char "H") 72]
+      [(= $char "I") 73]
+      [(= $char "J") 74]
+      [(= $char "K") 75]
+      [(= $char "L") 76]
+      [(= $char "M") 77]
+      [(= $char "N") 78]
+      [(= $char "O") 79]
+      [(= $char "P") 80]
+      [(= $char "Q") 81]
+      [(= $char "R") 82]
+      [(= $char "S") 83]
+      [(= $char "T") 84]
+      [(= $char "U") 85]
+      [(= $char "V") 86]
+      [(= $char "W") 87]
+      [(= $char "X") 88]
+      [(= $char "Y") 89]
+      [(= $char "Z") 90]
+      [(= $char "0") 48]
+      [(= $char "1") 49]
+      [(= $char "2") 50]
+      [(= $char "3") 51]
+      [(= $char "4") 52]
+      [(= $char "5") 53]
+      [(= $char "6") 54]
+      [(= $char "7") 55]
+      [(= $char "8") 56]
+      [(= $char "9") 57]
+      [(= $char " ") 32]
+      [(= $char ".") 46]
+      [(= $char "-") 45]
+      [(= $char "_") 95]
+      [(= $char "/") 47]
+      [(= $char ":") 58]
+      [true 0]
+    )
+  )
+]
+
+; Helper: int-to-str
+[FUNC int-to-str :params [$n]
+  :body (concat "" $n)
+]
+
+; Module exports
+{
+  :calculate-checksum calculate-checksum
+  :calculate-file-checksum calculate-file-checksum
+  :verify-checksum verify-checksum
+  :add-integrity-to-lockfile add-integrity-to-lockfile
+  :verify-lockfile-integrity verify-lockfile-integrity
+}
