@@ -68,6 +68,7 @@ import { Pruner, globalPruner, keepBest as _keepBest, removeWeak as _removeWeak,
 import { SelfBenchmark, globalBenchmark, bench as _bench, benchCompare as _benchCompare, BenchmarkResult, ComparisonResult, BenchmarkSuite } from "./benchmark-self"; // Phase 138: BENCHMARK-SELF
 import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./refactor-self"; // Phase 137: REFACTOR-SELF
 import { SelfVersioning, globalVersioning, Snapshot, RollbackResult } from "./version-self"; // Phase 139: VERSION-SELF
+import { SelfEvolutionHub, globalSelfEvolution, EvolutionCycleConfig, EvolutionCycleResult, SelfEvolutionReport } from "./self-evolution-hub"; // Phase 140: SELF-EVOLUTION HUB
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -2569,6 +2570,9 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
           if (item instanceof Map) {
             return { value: item.get("value"), fitness: Number(item.get("fitness") ?? 0) };
           }
+          if (typeof item === "object" && item !== null && "value" in item && "fitness" in item) {
+            return { value: item.value, fitness: Number(item.fitness ?? 0) };
+          }
           return { value: item, fitness: 0 };
         });
         return globalMutator.select(candidates, n);
@@ -2694,6 +2698,82 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return "max-generations";
       }
 
+      // === Phase 134: FITNESS ===
+      if (op === "fitness-proximity") {
+        const fpValue = Number(args[0]);
+        const fpTarget = Number(args[1]);
+        const fpTol = args[2] !== undefined ? Number(args[2]) : undefined;
+        const fpRes = globalFitness.proximity(fpValue, fpTarget, fpTol);
+        return new Map<string, any>([["score", fpRes.score], ["rawScore", fpRes.rawScore], ["details", new Map(Object.entries(fpRes.details))]]);
+      }
+      if (op === "fitness-string") {
+        const fsA = String(args[0] ?? "");
+        const fsB = String(args[1] ?? "");
+        const fsRes = globalFitness.stringSimilarity(fsA, fsB);
+        return new Map<string, any>([["score", fsRes.score], ["rawScore", fsRes.rawScore], ["details", new Map(Object.entries(fsRes.details))]]);
+      }
+      if (op === "fitness-array") {
+        const faArr = Array.isArray(args[0]) ? args[0] : [];
+        const faTgt = Array.isArray(args[1]) ? args[1] : [];
+        const faRes = globalFitness.arrayMatch(faArr, faTgt);
+        return new Map<string, any>([["score", faRes.score], ["rawScore", faRes.rawScore], ["details", new Map(Object.entries(faRes.details))]]);
+      }
+      if (op === "fitness-multi") {
+        const fmVMap = args[0] instanceof Map ? args[0] : new Map();
+        const fmTMap = args[1] instanceof Map ? args[1] : new Map();
+        const fmWMap = args[2] instanceof Map ? args[2] : undefined;
+        const fmV: Record<string, number> = {};
+        const fmT: Record<string, number> = {};
+        const fmW: Record<string, number> | undefined = fmWMap ? {} : undefined;
+        fmVMap.forEach((v: any, k: any) => { fmV[String(k)] = Number(v); });
+        fmTMap.forEach((v: any, k: any) => { fmT[String(k)] = Number(v); });
+        if (fmWMap && fmW) fmWMap.forEach((v: any, k: any) => { fmW[String(k)] = Number(v); });
+        const fmRes = globalFitness.multiObjective(fmV, fmT, fmW);
+        return new Map<string, any>([["score", fmRes.score], ["rawScore", fmRes.rawScore], ["details", new Map(Object.entries(fmRes.details))]]);
+      }
+      if (op === "fitness-constraint") {
+        const fcVal = args[0];
+        const fcRaw = Array.isArray(args[1]) ? args[1] : [];
+        const fcFns: Array<(v: unknown) => boolean> = fcRaw.map((c: any) => {
+          if (typeof c === "function") return c;
+          if ((c as any)?.kind === "function-value") return (v: unknown) => callFn(c, [v]);
+          if (c === "positive" || c === ":positive") return (v: unknown) => typeof v === "number" && v > 0;
+          if (c === "negative" || c === ":negative") return (v: unknown) => typeof v === "number" && v < 0;
+          if (c === "even" || c === ":even") return (v: unknown) => typeof v === "number" && (v as number) % 2 === 0;
+          if (c === "odd" || c === ":odd") return (v: unknown) => typeof v === "number" && (v as number) % 2 !== 0;
+          if (c === "zero" || c === ":zero") return (v: unknown) => v === 0;
+          return () => false;
+        });
+        const fcRes = globalFitness.constraintSatisfaction(fcVal, fcFns);
+        return new Map<string, any>([["score", fcRes.score], ["rawScore", fcRes.rawScore], ["details", new Map(Object.entries(fcRes.details))]]);
+      }
+      if (op === "fitness-rank") {
+        const frItems: any[] = Array.isArray(args[0]) ? args[0] : [];
+        const frScorer = args[1];
+        const frFn = (item: any): number => {
+          if (typeof frScorer === "function") return frScorer(item);
+          if ((frScorer as any)?.kind === "function-value") return callFn(frScorer, [item]);
+          return 0;
+        };
+        const frRanked = globalFitness.rank(frItems, frFn);
+        return frRanked.map((r: any) => new Map<string, any>(Object.entries(r)));
+      }
+      if (op === "fitness-pareto") {
+        const fpPItems: any[] = Array.isArray(args[0]) ? args[0] : [];
+        const fpObjs = (Array.isArray(args[1]) ? args[1] : []).map((f: any) => {
+          if (typeof f === "function") return f;
+          if ((f as any)?.kind === "function-value") return (item: any) => callFn(f, [item]);
+          return () => 0;
+        });
+        return globalFitness.paretoFront(fpPItems, fpObjs);
+      }
+      if (op === "fitness-score") {
+        const fsResult = args[0];
+        if (fsResult instanceof Map) return fsResult.get("score") ?? 0;
+        if (typeof fsResult === "object" && fsResult !== null) return (fsResult as any).score ?? 0;
+        return Number(fsResult);
+      }
+
       // === Phase 136: PRUNE ===
       if (op === "prune-threshold") {
         // (prune-threshold $items $scorer :min 0.5)
@@ -2790,6 +2870,300 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return null;
       }
 
+      // Phase 137: REFACTOR-SELF 빌트인
+      if (op.startsWith("refactor-")) {
+        const r137 = evalRefactorSelf(op, args);
+        if (r137 !== null) return r137;
+      }
+
+      // === Phase 139: VERSION-SELF ===
+      // version-snapshot: (version-snapshot $data "설명") → Snapshot
+      if (op === "version-snapshot") {
+        const data = args[0] ?? null;
+        const description = String(args[1] ?? "snapshot");
+        const tags: string[] = [];
+        let performance: number | undefined;
+        for (let i = 2; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "tags" && Array.isArray(v)) tags.push(...v.map(String));
+          if (k === "performance") performance = Number(v);
+        }
+        const snap = globalVersioning.snapshot(data, description, tags, performance);
+        return new Map<string, any>([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["data", snap.data],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["performance", snap.metadata.performance ?? null],
+          ["parentId", snap.parentId ?? null],
+          ["diff", snap.diff ?? null],
+        ]);
+      }
+
+      // version-rollback: (version-rollback $id) → RollbackResult
+      if (op === "version-rollback") {
+        const id = String(args[0] ?? "");
+        const result = globalVersioning.rollback(id);
+        return new Map<string, any>([
+          ["success", result.success],
+          ["reason", result.reason ?? null],
+          ["previousId", result.previous?.id ?? null],
+          ["restoredId", result.restored?.id ?? null],
+        ]);
+      }
+
+      // version-prev: (version-prev) → 이전 버전으로 롤백
+      if (op === "version-prev") {
+        const result = globalVersioning.rollbackPrev();
+        return new Map<string, any>([
+          ["success", result.success],
+          ["reason", result.reason ?? null],
+          ["previousId", result.previous?.id ?? null],
+          ["restoredId", result.restored?.id ?? null],
+        ]);
+      }
+
+      // version-diff: (version-diff $id1 $id2) → diff 문자열
+      if (op === "version-diff") {
+        const id1 = String(args[0] ?? "");
+        const id2 = String(args[1] ?? "");
+        return globalVersioning.diff(id1, id2);
+      }
+
+      // version-get: (version-get $id) → Snapshot
+      if (op === "version-get") {
+        const id = String(args[0] ?? "");
+        const snap = globalVersioning.get(id);
+        if (!snap) return null;
+        return new Map<string, any>([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["data", snap.data],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["performance", snap.metadata.performance ?? null],
+          ["parentId", snap.parentId ?? null],
+          ["diff", snap.diff ?? null],
+        ]);
+      }
+
+      // version-latest: (version-latest) → 최신 Snapshot
+      if (op === "version-latest") {
+        const snap = globalVersioning.latest();
+        if (!snap) return null;
+        return new Map<string, any>([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["data", snap.data],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["performance", snap.metadata.performance ?? null],
+          ["parentId", snap.parentId ?? null],
+        ]);
+      }
+
+      // version-history: (version-history) → Snapshot[]
+      if (op === "version-history") {
+        return globalVersioning.getHistory().map(snap => new Map<string, any>([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["parentId", snap.parentId ?? null],
+        ]));
+      }
+
+      // version-branch: (version-branch "name") → 브랜치 ID
+      if (op === "version-branch") {
+        const name = String(args[0] ?? "");
+        const fromId = args[1] ? String(args[1]) : undefined;
+        return globalVersioning.branch(name, fromId);
+      }
+
+      // version-checkout: (version-checkout "name") → Snapshot
+      if (op === "version-checkout") {
+        const name = String(args[0] ?? "");
+        const snap = globalVersioning.checkout(name);
+        if (!snap) return null;
+        return new Map<string, any>([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["description", snap.metadata.description],
+        ]);
+      }
+
+      // version-best: (version-best) → 최고 성능 Snapshot
+      if (op === "version-best") {
+        const snap = globalVersioning.bestPerforming();
+        if (!snap) return null;
+        return new Map<string, any>([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["performance", snap.metadata.performance ?? null],
+          ["description", snap.metadata.description],
+        ]);
+      }
+
+
+      // === Phase 138: BENCHMARK-SELF ===
+
+      // bench-measure: (bench-measure "name" $fn :runs 100) → BenchmarkResult
+      if (op === "bench-measure") {
+        const bName = String(args[0] ?? "unnamed");
+        const bFn = args[1];
+        let bRuns = 100;
+        for (let i = 2; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          if (k === "runs") bRuns = Number(args[i + 1]);
+        }
+        const bCallable = () => typeof bFn === 'function' ? bFn() : callFnVal(bFn, []);
+        const bResult = globalBenchmark.measure(bName, bCallable, bRuns);
+        return new Map<string, any>([
+          ["name", bResult.name],
+          ["runs", bResult.runs],
+          ["totalMs", bResult.totalMs],
+          ["avgMs", bResult.avgMs],
+          ["minMs", bResult.minMs],
+          ["maxMs", bResult.maxMs],
+          ["p50", bResult.p50],
+          ["p95", bResult.p95],
+          ["p99", bResult.p99],
+          ["opsPerSec", bResult.opsPerSec],
+          ["memoryUsed", bResult.memoryUsed ?? 0],
+        ]);
+      }
+
+      // bench-compare: (bench-compare $fn1 $fn2 :runs 50) → ComparisonResult
+      if (op === "bench-compare") {
+        const bcFn1 = args[0];
+        const bcFn2 = args[1];
+        let bcRuns = 50;
+        for (let i = 2; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          if (k === "runs") bcRuns = Number(args[i + 1]);
+        }
+        const bcCallable1 = () => typeof bcFn1 === 'function' ? bcFn1() : callFnVal(bcFn1, []);
+        const bcCallable2 = () => typeof bcFn2 === 'function' ? bcFn2() : callFnVal(bcFn2, []);
+        const bcResult = globalBenchmark.compare("fn1", bcCallable1, "fn2", bcCallable2, bcRuns);
+        const bcToMap = (r: BenchmarkResult) => new Map<string, any>([
+          ["name", r.name], ["runs", r.runs], ["avgMs", r.avgMs],
+          ["minMs", r.minMs], ["maxMs", r.maxMs], ["p50", r.p50],
+          ["p95", r.p95], ["p99", r.p99], ["opsPerSec", r.opsPerSec],
+        ]);
+        return new Map<string, any>([
+          ["baseline", bcToMap(bcResult.baseline)],
+          ["target", bcToMap(bcResult.target)],
+          ["speedup", bcResult.speedup],
+          ["winner", bcResult.winner],
+          ["significant", bcResult.significant],
+        ]);
+      }
+
+      // bench-suite: (bench-suite "suite-name") → 새 SelfBenchmark 인스턴스
+      if (op === "bench-suite") {
+        const bsName = String(args[0] ?? "suite");
+        return new SelfBenchmark(bsName);
+      }
+
+      // bench-add: (bench-add $suite "test" $fn) → suite에 추가
+      if (op === "bench-add") {
+        const baSuite = args[0];
+        const baName = String(args[1] ?? "test");
+        const baFn = args[2];
+        if (baSuite instanceof SelfBenchmark) {
+          const baCallable = () => typeof baFn === 'function' ? baFn() : callFnVal(baFn, []);
+          baSuite.add(baName, baCallable);
+          return baSuite;
+        }
+        return null;
+      }
+
+      // bench-run: (bench-run $suite :runs 100) → BenchmarkSuite (실행 완료)
+      if (op === "bench-run") {
+        const brSuite = args[0];
+        let brRuns = 100;
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          if (k === "runs") brRuns = Number(args[i + 1]);
+        }
+        if (brSuite instanceof SelfBenchmark) {
+          const brResult = brSuite.run(brRuns);
+          const brToMap = (r: BenchmarkResult) => new Map<string, any>([
+            ["name", r.name], ["runs", r.runs], ["avgMs", r.avgMs],
+            ["minMs", r.minMs], ["maxMs", r.maxMs], ["opsPerSec", r.opsPerSec],
+          ]);
+          return new Map<string, any>([
+            ["name", brResult.name],
+            ["results", brResult.results.map(brToMap)],
+            ["startTime", brResult.startTime.toISOString()],
+            ["endTime", brResult.endTime?.toISOString() ?? ""],
+            ["summary", new Map<string, any>([
+              ["total", brResult.summary.total],
+              ["fastest", brResult.summary.fastest ? brToMap(brResult.summary.fastest) : null],
+              ["slowest", brResult.summary.slowest ? brToMap(brResult.summary.slowest) : null],
+              ["avgOpsPerSec", brResult.summary.avgOpsPerSec],
+            ])],
+          ]);
+        }
+        return null;
+      }
+
+      // bench-report: (bench-report $result) → 텍스트 리포트
+      if (op === "bench-report") {
+        const rpResult = args[0];
+        if (rpResult instanceof Map) {
+          const r: BenchmarkResult = {
+            name: String(rpResult.get("name") ?? ""),
+            runs: Number(rpResult.get("runs") ?? 0),
+            totalMs: Number(rpResult.get("totalMs") ?? 0),
+            avgMs: Number(rpResult.get("avgMs") ?? 0),
+            minMs: Number(rpResult.get("minMs") ?? 0),
+            maxMs: Number(rpResult.get("maxMs") ?? 0),
+            p50: Number(rpResult.get("p50") ?? 0),
+            p95: Number(rpResult.get("p95") ?? 0),
+            p99: Number(rpResult.get("p99") ?? 0),
+            opsPerSec: Number(rpResult.get("opsPerSec") ?? 0),
+            memoryUsed: Number(rpResult.get("memoryUsed") ?? 0),
+          };
+          return globalBenchmark.report(r);
+        }
+        return "No benchmark result provided";
+      }
+
+      // bench-speedup: (bench-speedup $comparison) → speedup 배수
+      if (op === "bench-speedup") {
+        const spComp = args[0];
+        if (spComp instanceof Map) {
+          return Number(spComp.get("speedup") ?? 1);
+        }
+        return 1;
+      }
+
+      // bench-stats: (bench-stats $result) → {avg, min, max, p95, p99, opsPerSec}
+      if (op === "bench-stats") {
+        const stResult = args[0];
+        if (stResult instanceof Map) {
+          return new Map<string, any>([
+            ["avg", stResult.get("avgMs")],
+            ["min", stResult.get("minMs")],
+            ["max", stResult.get("maxMs")],
+            ["p95", stResult.get("p95")],
+            ["p99", stResult.get("p99")],
+            ["opsPerSec", stResult.get("opsPerSec")],
+          ]);
+        }
+        return new Map<string, any>([
+          ["avg", 0], ["min", 0], ["max", 0],
+          ["p95", 0], ["p99", 0], ["opsPerSec", 0],
+        ]);
+      }
+
       // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
       return callUser(op, args);
     }
@@ -2812,4 +3186,87 @@ function pruneResultToMap<T>(result: PruneResult<T>): Map<string, any> {
     ["strategy", result.strategy],
     ["stats", statsMap],
   ]);
+}
+
+// === Phase 137: REFACTOR-SELF 독립 헬퍼 ===
+// (eval-builtins.ts 내 switch 블록 외부에서 refactor-* op 처리를 위해 export)
+export function evalRefactorSelf(op: string, args: any[]): any | null {
+  if (op === "refactor-analyze") {
+    const code = String(args[0] ?? "");
+    const result = globalRefactorer.refactor(code, true);
+    return new Map<string, any>([
+      ["suggestions", result.suggestions.map((s: RefactorSuggestion) => new Map<string, any>([
+        ["pattern", s.pattern], ["location", s.location], ["original", s.original],
+        ["suggested", s.suggested], ["reason", s.reason], ["impact", s.impact],
+      ]))],
+      ["applied", result.applied],
+      ["skipped", result.skipped],
+      ["score", new Map<string, any>([
+        ["before", result.score.before], ["after", result.score.after], ["improvement", result.score.improvement],
+      ])],
+    ]);
+  }
+  if (op === "refactor-suggest") {
+    const code = String(args[0] ?? "");
+    return globalRefactorer.suggest(code).map((s: RefactorSuggestion) => new Map<string, any>([
+      ["pattern", s.pattern], ["location", s.location], ["original", s.original],
+      ["suggested", s.suggested], ["reason", s.reason], ["impact", s.impact],
+    ]));
+  }
+  if (op === "refactor-apply") {
+    const code = String(args[0] ?? "");
+    const rawSuggestions = Array.isArray(args[1]) ? args[1] : [];
+    const suggestions: RefactorSuggestion[] = rawSuggestions.map((s: any) => {
+      if (s instanceof Map) return {
+        pattern: s.get("pattern") ?? "extract-duplicate", location: s.get("location") ?? "",
+        original: s.get("original") ?? "", suggested: s.get("suggested") ?? "",
+        reason: s.get("reason") ?? "", impact: s.get("impact") ?? "low",
+      } as RefactorSuggestion;
+      return s as RefactorSuggestion;
+    });
+    const applyResult = globalRefactorer.apply(code, suggestions);
+    return new Map<string, any>([
+      ["code", applyResult.code],
+      ["applied", applyResult.applied.map((s: RefactorSuggestion) => new Map<string, any>([
+        ["pattern", s.pattern], ["location", s.location], ["impact", s.impact],
+      ]))],
+    ]);
+  }
+  if (op === "refactor-complexity") {
+    const code = String(args[0] ?? "");
+    const c = globalRefactorer.analyzeComplexity(code);
+    return new Map<string, any>([["lines", c.lines], ["depth", c.depth], ["conditions", c.conditions], ["score", c.score]]);
+  }
+  if (op === "refactor-quality") {
+    const code = String(args[0] ?? "");
+    return globalRefactorer.qualityScore(code);
+  }
+  if (op === "refactor-naming") {
+    const code = String(args[0] ?? "");
+    const n = globalRefactorer.analyzeNaming(code);
+    return new Map<string, any>([
+      ["issues", n.issues.map((i: { name: string; suggestion: string; reason: string }) => new Map<string, any>([
+        ["name", i.name], ["suggestion", i.suggestion], ["reason", i.reason],
+      ]))],
+      ["score", n.score],
+    ]);
+  }
+  if (op === "refactor-duplicates") {
+    const code = String(args[0] ?? "");
+    return globalRefactorer.findDuplicates(code).map((s: RefactorSuggestion) => new Map<string, any>([
+      ["pattern", s.pattern], ["location", s.location], ["original", s.original],
+      ["suggested", s.suggested], ["reason", s.reason], ["impact", s.impact],
+    ]));
+  }
+  if (op === "refactor-score") {
+    const r = args[0];
+    if (r instanceof Map) {
+      const score = r.get("score");
+      if (score instanceof Map) return new Map<string, any>([
+        ["before", score.get("before") ?? 0], ["after", score.get("after") ?? 0], ["improvement", score.get("improvement") ?? 0],
+      ]);
+    }
+    return new Map<string, any>([["before", 0], ["after", 0], ["improvement", 0]]);
+  }
+  return null;
 }
