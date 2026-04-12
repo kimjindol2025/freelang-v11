@@ -51,6 +51,7 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const http = __importStar(require("http"));
 const crypto = __importStar(require("crypto"));
+const os = __importStar(require("os"));
 const child_process_1 = require("child_process");
 class VpmCli {
     constructor() {
@@ -70,6 +71,10 @@ class VpmCli {
         // key: packageName → value: Map<requester, versionSpec>
         // Phase 10: Signature verification
         this.signingKey = process.env.VPM_SIGNING_KEY || '';
+        // Phase 11: Disk Cache
+        this.cacheDir = process.env.VPM_CACHE_DIR
+            ? path.resolve(process.env.VPM_CACHE_DIR)
+            : path.join(os.homedir(), '.vpm', 'cache', 'packages');
     }
     async run(args) {
         if (args.length === 0) {
@@ -113,6 +118,9 @@ class VpmCli {
                     break;
                 case 'reinstall':
                     await this.reinstall();
+                    break;
+                case 'cache':
+                    await this.cacheCommand(params);
                     break;
                 case 'help':
                 case '-h':
@@ -163,6 +171,29 @@ class VpmCli {
                 }
             }
         }
+        // Phase 11: Cache-first strategy (exact spec only)
+        if (this.isExactSpec(versionSpec)) {
+            const cached = this.getCachedPackage(packageName, versionSpec);
+            if (cached) {
+                console.log(`📦 ${packageName}@${versionSpec} (from cache)`);
+                const installResult = await this.downloadAndExtract(packageName, versionSpec, cached.pkgInfo);
+                this.installedPackages.set(packageName, versionSpec);
+                await this.updatePackageJson(packageName, versionSpec);
+                // Extract dependencies from cached pkgInfo
+                const cachedVersion = cached.pkgInfo.versions?.find((v) => v.version === versionSpec);
+                const cachedDeps = cachedVersion?.dependencies || {};
+                if (Object.keys(cachedDeps).length > 0) {
+                    console.log(`📚 Installing ${Object.keys(cachedDeps).length} dependencies...`);
+                    for (const [depName, depVersion] of Object.entries(cachedDeps)) {
+                        this.recordDependencyRequest(depName, depVersion, `${packageName}@${versionSpec}`);
+                        await this.install([`${depName}@${depVersion}`], chain);
+                    }
+                }
+                await this.updateLockFile(packageName, versionSpec, installResult.integrity, installResult.signature);
+                console.log(`✅ ${packageName}@${versionSpec} installed (cached) with integrity: ${installResult.integrity}`);
+                return;
+            }
+        }
         // 패키지 정보 조회 (모든 버전)
         const pkgInfo = await this.fetchPackageInfo(packageName);
         if (!pkgInfo) {
@@ -200,6 +231,8 @@ class VpmCli {
         }
         // Phase 9: downloadAndExtract는 pkgInfo를 파일로 저장 후 integrity 계산
         const installResult = await this.downloadAndExtract(packageName, version, pkgInfo);
+        // Phase 11: Save to cache after successful registry fetch
+        this.saveToCachePackage(packageName, version, pkgInfo);
         // Phase 8: 설치 추적
         this.installedPackages.set(packageName, version);
         // package.json 업데이트
@@ -972,6 +1005,224 @@ class VpmCli {
             return n1 - n2;
         return p1 - p2;
     }
+    // Phase 11: Cache Manager Methods
+    initCacheDir() {
+        try {
+            fs.mkdirSync(this.cacheDir, { recursive: true });
+        }
+        catch (err) {
+            console.warn(`⚠️  Failed to create cache directory: ${this.cacheDir}`);
+        }
+    }
+    isExactSpec(spec) {
+        // Check if spec is a pure X.Y.Z version (not range/latest)
+        return /^\d+\.\d+\.\d+$/.test(spec);
+    }
+    getCachedPackage(name, version) {
+        this.initCacheDir();
+        const cacheFile = path.join(this.cacheDir, `${name}@${version}.json`);
+        if (!fs.existsSync(cacheFile)) {
+            return null; // cache miss
+        }
+        try {
+            const content = fs.readFileSync(cacheFile, 'utf-8');
+            const entry = JSON.parse(content);
+            // Verify integrity
+            const pkgInfoStr = JSON.stringify(entry.pkgInfo, null, 2);
+            const computedIntegrity = this.calculateSHA256(pkgInfoStr);
+            if (computedIntegrity !== entry.integrity) {
+                // Cache corrupted - remove it
+                try {
+                    fs.unlinkSync(cacheFile);
+                }
+                catch { }
+                return null;
+            }
+            return entry;
+        }
+        catch (err) {
+            // JSON parse error or file read error - remove corrupted cache
+            try {
+                fs.unlinkSync(cacheFile);
+            }
+            catch { }
+            return null;
+        }
+    }
+    saveToCachePackage(name, version, pkgInfo) {
+        this.initCacheDir();
+        const cacheFile = path.join(this.cacheDir, `${name}@${version}.json`);
+        try {
+            // Compute integrity from pkgInfo
+            const pkgInfoStr = JSON.stringify(pkgInfo, null, 2);
+            const integrity = this.calculateSHA256(pkgInfoStr);
+            const entry = {
+                pkgInfo,
+                integrity,
+                cachedAt: new Date().toISOString(),
+                registry: this.registryUrl
+            };
+            // Atomic write: write to tmp file first, then rename
+            const tmpFile = cacheFile + '.tmp';
+            fs.writeFileSync(tmpFile, JSON.stringify(entry, null, 2));
+            fs.renameSync(tmpFile, cacheFile);
+        }
+        catch (err) {
+            // Cache save failure is not fatal - warn but continue
+            console.warn(`⚠️  Failed to save cache for ${name}@${version}: ${err.message}`);
+        }
+    }
+    // Phase 11: Cache CLI Commands
+    async cacheCommand(params) {
+        const subcommand = params[0];
+        switch (subcommand) {
+            case 'dir':
+                this.cacheDir_cmd();
+                break;
+            case 'list':
+            case 'ls':
+                await this.cacheList();
+                break;
+            case 'verify':
+                await this.cacheVerify();
+                break;
+            case 'clean':
+                this.cacheClean();
+                break;
+            case 'prune':
+                await this.cachePrune();
+                break;
+            default:
+                throw new Error(`Unknown cache command: ${subcommand}`);
+        }
+    }
+    cacheDir_cmd() {
+        console.log(this.cacheDir);
+    }
+    async cacheList() {
+        this.initCacheDir();
+        if (!fs.existsSync(this.cacheDir)) {
+            console.log('No cached packages');
+            return;
+        }
+        const files = fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'));
+        if (files.length === 0) {
+            console.log('No cached packages');
+            return;
+        }
+        console.log(`Cached packages (${files.length}):`);
+        for (const file of files) {
+            const pkgSpec = file.replace('.json', '');
+            try {
+                const content = fs.readFileSync(path.join(this.cacheDir, file), 'utf-8');
+                const entry = JSON.parse(content);
+                console.log(`  ${pkgSpec} (cached at ${entry.cachedAt})`);
+            }
+            catch (err) {
+                console.log(`  ${pkgSpec} (corrupted)`);
+            }
+        }
+    }
+    async cacheVerify() {
+        this.initCacheDir();
+        if (!fs.existsSync(this.cacheDir)) {
+            console.log('No cached packages');
+            return;
+        }
+        const files = fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'));
+        if (files.length === 0) {
+            console.log('No cached packages');
+            return;
+        }
+        let passed = 0;
+        let failed = 0;
+        for (const file of files) {
+            const pkgSpec = file.replace('.json', '');
+            try {
+                const content = fs.readFileSync(path.join(this.cacheDir, file), 'utf-8');
+                const entry = JSON.parse(content);
+                // Recompute integrity
+                const pkgInfoStr = JSON.stringify(entry.pkgInfo, null, 2);
+                const computedIntegrity = this.calculateSHA256(pkgInfoStr);
+                if (computedIntegrity === entry.integrity) {
+                    console.log(`✓ ${pkgSpec}`);
+                    passed++;
+                }
+                else {
+                    console.log(`❌ CACHE INTEGRITY MISMATCH: ${pkgSpec}`);
+                    failed++;
+                }
+            }
+            catch (err) {
+                console.log(`❌ CACHE INTEGRITY MISMATCH: ${pkgSpec}`);
+                failed++;
+            }
+        }
+        console.log(`\n${passed} OK, ${failed} failed`);
+        if (failed > 0) {
+            process.exit(1);
+        }
+    }
+    cacheClean() {
+        this.initCacheDir();
+        if (fs.existsSync(this.cacheDir)) {
+            try {
+                fs.rmSync(this.cacheDir, { recursive: true });
+            }
+            catch (err) {
+                console.warn(`⚠️  Failed to remove cache directory: ${err.message}`);
+                return;
+            }
+        }
+        try {
+            fs.mkdirSync(this.cacheDir, { recursive: true });
+        }
+        catch (err) {
+            console.warn(`⚠️  Failed to create cache directory: ${err.message}`);
+            return;
+        }
+        console.log('Cache cleared');
+    }
+    async cachePrune() {
+        this.initCacheDir();
+        const lockfilePath = path.join(this.cwd, 'package-lock.json');
+        if (!fs.existsSync(lockfilePath)) {
+            console.log('⚠️  Lockfile not found - cannot prune cache');
+            return;
+        }
+        try {
+            const lockContent = fs.readFileSync(lockfilePath, 'utf-8');
+            const lockfile = JSON.parse(lockContent);
+            const lockfileKeys = new Set(Object.keys(lockfile.packages || {}));
+            if (!fs.existsSync(this.cacheDir)) {
+                console.log('No cache to prune');
+                return;
+            }
+            const cacheFiles = fs.readdirSync(this.cacheDir).filter((f) => f.endsWith('.json'));
+            let prunedCount = 0;
+            for (const file of cacheFiles) {
+                const pkgSpec = file.replace('.json', '');
+                if (!lockfileKeys.has(pkgSpec)) {
+                    try {
+                        fs.unlinkSync(path.join(this.cacheDir, file));
+                        prunedCount++;
+                    }
+                    catch (err) {
+                        console.warn(`⚠️  Failed to remove ${pkgSpec}: ${err.message}`);
+                    }
+                }
+            }
+            if (prunedCount === 0) {
+                console.log('No entries to prune');
+            }
+            else {
+                console.log(`Pruned ${prunedCount} entries`);
+            }
+        }
+        catch (err) {
+            throw new Error(`Failed to prune cache: ${err.message}`);
+        }
+    }
     showHelp() {
         console.log(`
 v9 Package Manager (vpm) - v1.0.0
@@ -988,6 +1239,13 @@ Commands:
   uninstall <package>         Uninstall package
   info <package>              Show package information
   token <action>              Manage auth tokens
+  verify                      Verify package integrity
+  reinstall                   Reinstall all packages from lockfile
+  cache dir                   Show cache directory path
+  cache list                  List cached packages
+  cache verify                Verify cache integrity
+  cache clean                 Clear all cache
+  cache prune                 Remove cache entries not in lockfile
   help                        Show this help message
 
 Examples:
@@ -997,10 +1255,14 @@ Examples:
   vpm list
   vpm update
   vpm publish
+  vpm cache list
+  vpm cache verify
 
 Environment:
   VPM_REGISTRY               Registry URL (default: http://registry.v9.dclub.kr)
   VPM_AUTH_TOKEN             Auth token for publishing
+  VPM_CACHE_DIR              Override cache directory (default: ~/.vpm/cache/packages)
+  VPM_SIGNING_KEY            Signing key for package integrity verification
 
 For more info: https://v9.dclub.kr/docs/vpm
 `);

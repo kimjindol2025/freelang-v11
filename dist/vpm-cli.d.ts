@@ -23,6 +23,7 @@ declare class VpmCli {
     private readonly MAX_RETRIES;
     private dependencyGraph;
     private signingKey;
+    private cacheDir;
     run(args: string[]): Promise<void>;
     private install;
     private verify;
@@ -63,6 +64,16 @@ declare class VpmCli {
     private versionMatchesSingle;
     private parseVersion;
     private compareVersions;
+    private initCacheDir;
+    private isExactSpec;
+    private getCachedPackage;
+    private saveToCachePackage;
+    private cacheCommand;
+    private cacheDir_cmd;
+    private cacheList;
+    private cacheVerify;
+    private cacheClean;
+    private cachePrune;
     private showHelp;
 }
 export { VpmCli };
