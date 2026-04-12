@@ -16,6 +16,11 @@ declare class VpmCli {
     private cwd;
     private vpmDir;
     private packagesDir;
+    private lockfileLoaded;
+    private installedPackages;
+    private fallbackRegistryUrl;
+    private readonly REQUEST_TIMEOUT_MS;
+    private readonly MAX_RETRIES;
     run(args: string[]): Promise<void>;
     private install;
     private verify;
@@ -31,6 +36,7 @@ declare class VpmCli {
     private token;
     private info;
     private fetchPackageInfo;
+    private validateRegistryResponse;
     private downloadAndExtract;
     private installDependencies;
     private updatePackageJson;
@@ -41,9 +47,11 @@ declare class VpmCli {
     private makeRequest;
     private createAuthToken;
     private getInstalledVersion;
+    private makeRequestWithRetry;
     private callResolverInstall;
     private calculateSHA256;
-    private installedPackages;
+    private ensureLockfileLoaded;
+    private resolveConflict;
     private detectVersionConflict;
     private resolveVersion;
     private versionMatches;

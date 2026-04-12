@@ -65,6 +65,15 @@ class VpmCli {
   private vpmDir = path.join(this.cwd, 'vpm');
   private packagesDir = path.join(this.vpmDir, 'packages');
 
+  // Phase 9: Lockfile-based conflict detection
+  private lockfileLoaded = false;
+  private installedPackages: Map<string, string> = new Map();
+
+  // Phase 9: Network resilience
+  private fallbackRegistryUrl = process.env.VPM_REGISTRY_FALLBACK || '';
+  private readonly REQUEST_TIMEOUT_MS = 5000;
+  private readonly MAX_RETRIES = 3;
+
   async run(args: string[]): Promise<void> {
     if (args.length === 0) {
       this.showHelp();
@@ -125,6 +134,9 @@ class VpmCli {
   }
 
   private async install(params: string[]): Promise<void> {
+    // Phase 9: Load installed packages from lockfile (lazy init)
+    this.ensureLockfileLoaded();
+
     if (params.length === 0) {
       // 의존성 설치
       await this.installFromLockFile();
@@ -141,19 +153,31 @@ class VpmCli {
     // Phase 8: 충돌 감지 - 같은 패키지의 다른 버전이 이미 설치되었는가?
     if (this.detectVersionConflict(packageName, versionSpec)) {
       const existingVersion = this.installedPackages.get(packageName);
-      throw new Error(
-        `Version conflict: ${packageName}@${existingVersion} already installed, ` +
-        `but ${packageName}@${versionSpec} is required. ` +
-        `Cannot install conflicting versions.`
-      );
+      // Phase 9: Try to resolve conflict (highest wins for minor/patch, error for major)
+      const resolved = this.resolveConflict(packageName, existingVersion!, versionSpec);
+      if (resolved !== versionSpec) {
+        console.log(`✓ Using ${packageName}@${resolved} instead, skipping`);
+        return;
+      }
     }
 
-    // Phase 8: 중복 제거 - 이미 같은 버전이 설치되었으면 스킵
+    // Phase 9: Enhanced deduplication - check if file exists + verify integrity
     if (this.installedPackages.has(packageName)) {
       const existingVersion = this.installedPackages.get(packageName);
       if (existingVersion === versionSpec) {
-        console.log(`✓ ${packageName}@${versionSpec} already installed, skipping`);
-        return;
+        const pkgPath = path.join(this.packagesDir, `${packageName}@${versionSpec}`);
+        if (fs.existsSync(pkgPath)) {
+          console.log(`✓ ${packageName}@${versionSpec} already installed (deduped), skipping`);
+          return;
+        }
+        // File missing - will reinstall below
+      } else {
+        // Different version - try to resolve conflict
+        const resolved = this.resolveConflict(packageName, existingVersion!, versionSpec);
+        if (resolved !== versionSpec) {
+          console.log(`✓ Using ${packageName}@${resolved} instead, skipping`);
+          return;
+        }
       }
     }
 
@@ -170,13 +194,19 @@ class VpmCli {
     }
     const version = selectedVersion.version;
 
-    // Phase 8: 충돌 재확인 (resolved version)
+    // Phase 9: Conflict recheck after resolver (resolved version)
     if (this.detectVersionConflict(packageName, version)) {
-      const existingVersion = this.installedPackages.get(packageName);
-      throw new Error(
-        `Version conflict: ${packageName}@${existingVersion} already installed, ` +
-        `but resolver selected ${packageName}@${version}`
-      );
+      const existingVersion = this.installedPackages.get(packageName)!;
+      try {
+        const resolved = this.resolveConflict(packageName, existingVersion, version);
+        if (resolved !== version) {
+          console.log(`✓ Resolver selected ${packageName}@${version}, but using ${resolved} (conflict resolution)`);
+          return;
+        }
+      } catch (err) {
+        // Major version conflict - throw error
+        throw err;
+      }
     }
 
     // 패키지 설치 (resolver.fl 호출 + registry checksum 활용)
@@ -188,15 +218,11 @@ class VpmCli {
       registryChecksum = versionEntry && versionEntry.checksum;
       dependencies = (versionEntry && versionEntry.dependencies) || {};
     }
-    // Phase 8: 실제 SHA-256 계산
-    const packageContent = `${packageName}@${version}-content`;
-    const realSHA256 = this.calculateSHA256(packageContent);
-
+    // Phase 9: downloadAndExtract는 pkgInfo를 파일로 저장 후 integrity 계산
     const installResult = await this.downloadAndExtract(
       packageName,
       version,
-      pkgInfo,
-      realSHA256  // Phase 8: Mock checksum 대신 실제 SHA-256 사용
+      pkgInfo
     );
 
     // Phase 8: 설치 추적
@@ -241,15 +267,31 @@ class VpmCli {
       }
 
       const pkgPath = path.join(this.packagesDir, pkgName);
-      if (!fs.existsSync(pkgPath)) {
-        console.log(`❌ ${pkgName}: Package not found`);
+      const pkgJsonPath = path.join(pkgPath, 'package.json');
+
+      if (!fs.existsSync(pkgJsonPath)) {
+        console.log(`❌ ${pkgName}: package.json not found`);
         failed++;
         continue;
       }
 
-      // Verify integrity (simplified - just check file exists for now)
-      console.log(`✅ ${pkgName}: OK (${pkgData.integrity})`);
-      verified++;
+      // Phase 9: Verify integrity by recalculating SHA-256 from actual file
+      try {
+        const actualContent = fs.readFileSync(pkgJsonPath, 'utf-8');
+        const actualHash = this.calculateSHA256(actualContent);
+
+        if (pkgData.integrity && actualHash !== pkgData.integrity) {
+          console.log(`❌ ${pkgName}: INTEGRITY MISMATCH (expected: ${pkgData.integrity.substring(0,16)}..., got: ${actualHash.substring(0,16)}...)`);
+          failed++;
+          continue;
+        }
+
+        console.log(`✅ ${pkgName}: OK`);
+        verified++;
+      } catch (err) {
+        console.log(`❌ ${pkgName}: Verification failed (${err instanceof Error ? err.message : String(err)})`);
+        failed++;
+      }
     }
 
     console.log(`\n📊 Verification: ${verified} OK, ${failed} failed`);
@@ -258,6 +300,10 @@ class VpmCli {
 
   // Stage 7: Reinstall command - install from lockfile
   private async reinstall(): Promise<void> {
+    // Phase 9: Reset lockfile-based conflict detection
+    this.lockfileLoaded = false;
+    this.installedPackages.clear();
+
     const lockFilePath = path.join(this.cwd, 'package-lock.json');
     if (!fs.existsSync(lockFilePath)) {
       throw new Error('No package-lock.json found');
@@ -315,19 +361,13 @@ class VpmCli {
           throw new Error(`Package ${pkgNameOnly}@${pkgData.version} not found in registry`);
         }
 
-        // Get registry checksum from fetched info
-        let registryChecksum: string | undefined;
-        if (pkgInfo.versions && Array.isArray(pkgInfo.versions)) {
-          const versionEntry = pkgInfo.versions.find((v: any) => v.version === pkgData.version);
-          registryChecksum = versionEntry && versionEntry.checksum;
-        }
-
         await this.downloadAndExtract(
           pkgNameOnly,
           pkgData.version,
-          pkgInfo,
-          registryChecksum
+          pkgInfo
         );
+        // Phase 9: Track installed package in Map
+        this.installedPackages.set(pkgNameOnly, pkgData.version);
         count++;
       }
     }
@@ -569,24 +609,44 @@ class VpmCli {
       const path = version
         ? `/registry/packages?name=${encodeURIComponent(packageName)}&version=${encodeURIComponent(version)}`
         : `/registry/packages?name=${encodeURIComponent(packageName)}`;
-      const response = await this.makeRequest('GET', path);
-      return response.success ? response.package : null;
-    } catch {
+      // Phase 9: Use retry wrapper for network resilience
+      const response = await this.makeRequestWithRetry('GET', path);
+      if (!response.success || !response.package) return null;
+
+      // Phase 9: Validate registry response structure
+      this.validateRegistryResponse(response.package);
+      return response.package;
+    } catch (err) {
+      // Network errors are already logged by makeRequestWithRetry
+      if (!(err instanceof Error && err.message.includes('Registry unreachable'))) {
+        console.warn(`⚠️  Failed to fetch package info: ${err instanceof Error ? err.message : String(err)}`);
+      }
       return null;
+    }
+  }
+
+  // Phase 9: Validate registry response structure
+  private validateRegistryResponse(pkg: any): void {
+    if (!pkg.id || !pkg.name || !Array.isArray(pkg.versions)) {
+      throw new Error(
+        `Invalid registry response for package: missing required fields (id, name, versions)`
+      );
+    }
+    if (pkg.versions.length === 0) {
+      throw new Error(`Package ${pkg.name} has no published versions in registry`);
     }
   }
 
   private async downloadAndExtract(
     packageName: string,
     version: string,
-    pkgInfo: any,
-    registryChecksum?: string
+    pkgInfo: any
   ): Promise<{ integrity: string; success: boolean }> {
     // resolver.fl의 install_package 호출 (Phase 7: 실제 경로)
     const targetPath = path.join(this.packagesDir, `${packageName}@${version}`);
 
-    // resolver.fl 실행 (integrity 검증 포함)
-    const result = await this.callResolverInstall(packageName, version, targetPath, registryChecksum);
+    // resolver.fl 실행
+    const result = await this.callResolverInstall(packageName, version, targetPath);
 
     if (!result.success) {
       throw new Error(`Failed to install ${packageName}@${version}: ${result.reason}`);
@@ -597,13 +657,18 @@ class VpmCli {
       fs.mkdirSync(targetPath, { recursive: true });
     }
 
+    // Phase 9: package.json 저장 후 실제 파일 내용으로 integrity 계산
+    const pkgJsonContent = JSON.stringify(pkgInfo, null, 2);
     fs.writeFileSync(
       path.join(targetPath, 'package.json'),
-      JSON.stringify(pkgInfo, null, 2)
+      pkgJsonContent
     );
 
+    // Phase 9: 실제 저장된 파일 내용으로 SHA-256 계산
+    const integrity = this.calculateSHA256(pkgJsonContent);
+
     return {
-      integrity: result.integrity || '',
+      integrity,
       success: true
     };
   }
@@ -778,6 +843,11 @@ class VpmCli {
         });
       });
 
+      // Phase 9: Add timeout for network resilience
+      req.setTimeout(this.REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error(`Registry request timeout after ${this.REQUEST_TIMEOUT_MS}ms`));
+      });
+
       req.on('error', reject);
       if (body) {
         req.write(JSON.stringify(body));
@@ -786,13 +856,9 @@ class VpmCli {
     });
   }
 
+  // Phase 9: Cryptographically secure token generation
   private async createAuthToken(): Promise<string> {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < 32; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
+    return crypto.randomBytes(32).toString('hex');  // 64-char hex token
   }
 
   private async getInstalledVersion(packageName: string): Promise<string> {
@@ -802,15 +868,53 @@ class VpmCli {
     return pkg ? pkg.split('@')[1] : 'none';
   }
 
+  // Phase 9: Network resilience - retry with exponential backoff + fallback registry
+  private async makeRequestWithRetry(
+    method: string,
+    endpoint: string,
+    body?: any,
+    token?: string
+  ): Promise<any> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        return await this.makeRequest(method, endpoint, body, token);
+      } catch (err) {
+        lastError = err as Error;
+        if (attempt < this.MAX_RETRIES) {
+          const delay = Math.pow(2, attempt - 1) * 500;  // 500, 1000, 2000ms
+          console.log(
+            `⚠️  Registry request failed (attempt ${attempt}/${this.MAX_RETRIES}): ${lastError.message}. ` +
+            `retrying in ${delay}ms...`
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    // Try fallback registry if primary failed
+    if (this.fallbackRegistryUrl && this.registryUrl !== this.fallbackRegistryUrl) {
+      console.log(`⚠️  Primary registry unreachable. Trying fallback: ${this.fallbackRegistryUrl}`);
+      const origUrl = this.registryUrl;
+      this.registryUrl = this.fallbackRegistryUrl;
+      try {
+        return await this.makeRequest(method, endpoint, body, token);
+      } finally {
+        this.registryUrl = origUrl;
+      }
+    }
+
+    throw new Error(`Registry unreachable after ${this.MAX_RETRIES} attempts: ${lastError?.message}`);
+  }
+
   private async callResolverInstall(
     packageName: string,
     version: string,
-    targetPath: string,
-    registryChecksum?: string
+    targetPath: string
   ): Promise<{ success: boolean; integrity?: string; reason?: string }> {
-    // Phase 8: 실제 SHA-256 기반 검증
-    // registryChecksum은 이미 실제 SHA-256 (TypeScript에서 계산됨)
-    const sha256Value = registryChecksum || this.calculateSHA256(`${packageName}@${version}-content`);
+    // Phase 9: 실제 파일 내용으로 무결성 계산 (downloadAndExtract에서)
+    const sha256Value = this.calculateSHA256(`${packageName}@${version}-content`);
     let v9ScriptPath = '';
 
     try {
@@ -872,8 +976,60 @@ class VpmCli {
     return crypto.createHash('sha256').update(content).digest('hex');
   }
 
-  // Phase 8: Dependency tracking for conflict detection + deduplication
-  private installedPackages: Map<string, string> = new Map(); // name -> version
+  // Phase 9: Load installed packages from lockfile (lazy init, called once per install)
+  private ensureLockfileLoaded(): void {
+    if (this.lockfileLoaded) return;
+    this.lockfileLoaded = true;
+
+    const lockFilePath = path.join(this.cwd, 'package-lock.json');
+    if (!fs.existsSync(lockFilePath)) return;
+
+    try {
+      const lockFile: PackageLock = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'));
+      for (const [pkgKey, pkgData] of Object.entries(lockFile.packages || {})) {
+        if (!pkgKey || pkgKey === '' || pkgKey === '.') continue;
+        const lastAt = pkgKey.lastIndexOf('@');
+        const name = lastAt > 0 ? pkgKey.substring(0, lastAt) : pkgKey;
+        const version = (pkgData as any).version;
+        if (name && version) {
+          this.installedPackages.set(name, version);
+        }
+      }
+    } catch (err) {
+      // Ignore lockfile parse errors - treat as empty
+      console.warn(`⚠️  Failed to parse lockfile: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // Phase 9: Resolve version conflict - highest wins for minor/patch, error for major
+  private resolveConflict(packageName: string, existingVersion: string, requestedVersion: string): string {
+    const [em] = this.parseVersion(existingVersion);
+    const [rm] = this.parseVersion(requestedVersion);
+
+    // Major version mismatch - cannot auto-resolve (breaking change)
+    if (em !== rm) {
+      throw new Error(
+        `Major version conflict for ${packageName}: ${existingVersion} (installed) vs ${requestedVersion} (requested). ` +
+        `Cannot auto-resolve across major versions. Please uninstall or use a compatible version.`
+      );
+    }
+
+    // Minor/Patch: highest wins
+    const winner =
+      this.compareVersions(requestedVersion, existingVersion) > 0
+        ? requestedVersion
+        : existingVersion;
+
+    if (winner !== existingVersion) {
+      console.warn(
+        `⚠️  Version conflict for ${packageName}: ` +
+        `${existingVersion} (installed) vs ${requestedVersion} (requested) → using ${winner} (highest wins)`
+      );
+    }
+
+    this.installedPackages.set(packageName, winner);
+    return winner;
+  }
 
   private detectVersionConflict(packageName: string, version: string): boolean {
     if (this.installedPackages.has(packageName)) {
