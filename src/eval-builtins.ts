@@ -2579,8 +2579,237 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return 0;
       }
 
+      // === Phase 135: GENERATION ===
+      // (generation-run $pop $fitness $next-gen :max 50) → GenerationResult
+      if (op === "generation-run") {
+        const [popArg, fitnessFnArg, nextGenFnArg, ...rest] = args;
+        const population: any[] = Array.isArray(popArg) ? popArg : [];
+        const maxGen = rest.length >= 2 && rest[0] === "max" ? Number(rest[1]) : 50;
+
+        const fitnessFunc = (item: any): number => {
+          if (typeof fitnessFnArg === "function") return Number(fitnessFnArg(item));
+          if ((fitnessFnArg as any)?.kind === "function-value") return Number(callFn(fitnessFnArg, [item]));
+          if (typeof fitnessFnArg === "string") return Number(callUser(fitnessFnArg, [item]));
+          return 0;
+        };
+
+        const nextGenFunc = (pop: any[], fits: number[]): any[] => {
+          if (typeof nextGenFnArg === "function") return (nextGenFnArg as any)(pop, fits) ?? pop;
+          if ((nextGenFnArg as any)?.kind === "function-value") return callFn(nextGenFnArg, [pop, fits]) ?? pop;
+          if (typeof nextGenFnArg === "string") return callUser(nextGenFnArg, [pop, fits]) ?? pop;
+          // 기본: 정렬 후 상위 절반 유지 + 복사
+          const paired = pop.map((item: any, i: number) => ({ item, fit: fits[i] }));
+          paired.sort((a: any, b: any) => b.fit - a.fit);
+          const half = Math.max(1, Math.floor(paired.length / 2));
+          const elites = paired.slice(0, half).map((p: any) => p.item);
+          const result: any[] = [...elites];
+          while (result.length < pop.length) result.push(elites[result.length % half]);
+          return result;
+        };
+
+        const loop = new GenerationLoop<any>({ maxGenerations: maxGen });
+        const genResult = loop.run(population, fitnessFunc, nextGenFunc);
+
+        return new Map<string, any>([
+          ["best", genResult.best],
+          ["bestFitness", genResult.bestFitness],
+          ["totalGenerations", genResult.totalGenerations],
+          ["history", genResult.history.map((s: GenerationStats) => new Map<string, any>([
+            ["generation", s.generation],
+            ["best", s.best],
+            ["worst", s.worst],
+            ["average", s.average],
+            ["diversity", s.diversity],
+            ["elites", s.elites],
+            ["improved", s.improved],
+          ]))],
+          ["terminationReason", genResult.terminationReason],
+          ["improvementRatio", genResult.improvementRatio],
+        ]);
+      }
+
+      // (generation-stats $result) → 히스토리 배열
+      if (op === "generation-stats") {
+        const [arg] = args;
+        if (arg instanceof Map) {
+          const history = arg.get("history");
+          return Array.isArray(history) ? history : [];
+        }
+        return [];
+      }
+
+      // (generation-best $result) → 최고 개체
+      if (op === "generation-best") {
+        const [arg] = args;
+        if (arg instanceof Map) return arg.get("best") ?? null;
+        return null;
+      }
+
+      // (generation-history $result) → GenerationStats[]
+      if (op === "generation-history") {
+        const [arg] = args;
+        if (arg instanceof Map) {
+          const history = arg.get("history");
+          return Array.isArray(history) ? history : [];
+        }
+        return [];
+      }
+
+      // (generation-converged $result) → boolean
+      if (op === "generation-converged") {
+        const [arg] = args;
+        if (arg instanceof GenerationLoop) return arg.hasConverged();
+        if (arg instanceof Map) {
+          const history: any[] = arg.get("history") ?? [];
+          if (history.length < 5) return false;
+          const recent = history.slice(-5);
+          const firstBest = recent[0] instanceof Map ? recent[0].get("best") : recent[0]?.best;
+          return recent.every((s: any) => {
+            const b = s instanceof Map ? s.get("best") : s?.best;
+            return Math.abs(b - firstBest) < 1e-9;
+          });
+        }
+        return false;
+      }
+
+      // (generation-diversity [0.8 0.7 0.9 0.6]) → 다양성 지수
+      if (op === "generation-diversity") {
+        const [arr] = args;
+        const fitnesses: number[] = Array.isArray(arr) ? arr.map(Number) : [];
+        const tmpLoop = new GenerationLoop<number>({ maxGenerations: 1 });
+        return tmpLoop.calculateDiversity(fitnesses);
+      }
+
+      // (gen-improvement $result) → improvementRatio
+      if (op === "gen-improvement") {
+        const [arg] = args;
+        if (arg instanceof Map) return arg.get("improvementRatio") ?? 0;
+        return 0;
+      }
+
+      // (gen-termination $result) → terminationReason 문자열
+      if (op === "gen-termination") {
+        const [arg] = args;
+        if (arg instanceof Map) return arg.get("terminationReason") ?? "max-generations";
+        return "max-generations";
+      }
+
+      // === Phase 136: PRUNE ===
+      if (op === "prune-threshold") {
+        // (prune-threshold $items $scorer :min 0.5)
+        const [pItems, pScorerFn, ...pKw] = args;
+        const pThreshold = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
+          }
+          return 0.5;
+        })();
+        const pScorer1 = (item: any) => Number(callFn(pScorerFn, [item]));
+        const pArr1 = Array.isArray(pItems) ? pItems : [];
+        const pruner1 = new Pruner<any>();
+        return pruneResultToMap(pruner1.pruneByThreshold(pArr1, pScorer1, pThreshold));
+      }
+      if (op === "prune-top-k") {
+        // (prune-top-k $items $scorer :k 5)
+        const [pItems, pScorerFn, ...pKw] = args;
+        const pK = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
+          }
+          return 5;
+        })();
+        const pScorer2 = (item: any) => Number(callFn(pScorerFn, [item]));
+        const pArr2 = Array.isArray(pItems) ? pItems : [];
+        const pruner2 = new Pruner<any>();
+        return pruneResultToMap(pruner2.pruneToTopK(pArr2, pScorer2, pK));
+      }
+      if (op === "prune-top-percent") {
+        // (prune-top-percent $items $scorer :percent 0.3)
+        const [pItems, pScorerFn, ...pKw] = args;
+        const pPct = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":percent" || pKw[i] === "percent") return Number(pKw[i + 1]);
+          }
+          return 0.3;
+        })();
+        const pScorer3 = (item: any) => Number(callFn(pScorerFn, [item]));
+        const pArr3 = Array.isArray(pItems) ? pItems : [];
+        const pruner3 = new Pruner<any>();
+        return pruneResultToMap(pruner3.pruneToTopPercent(pArr3, pScorer3, pPct));
+      }
+      if (op === "prune-diversity") {
+        // (prune-diversity $items $scorer $similarity :min 0.2)
+        const [pItems, pScorerFn, pSimFn, ...pKw] = args;
+        const pMinDiv = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
+          }
+          return 0.2;
+        })();
+        const pScorer4 = (item: any) => Number(callFn(pScorerFn, [item]));
+        const pSim4 = (a: any, b: any) => Number(callFn(pSimFn, [a, b]));
+        const pArr4 = Array.isArray(pItems) ? pItems : [];
+        const pruner4 = new Pruner<any>();
+        return pruneResultToMap(pruner4.pruneForDiversity(pArr4, pScorer4, pSim4, pMinDiv));
+      }
+      if (op === "prune-dedup") {
+        // (prune-dedup $items)
+        const [pItems, pKeyFn] = args;
+        const pArr5 = Array.isArray(pItems) ? pItems : [];
+        const pruner5 = new Pruner<any>();
+        const pKeyFnWrapped = pKeyFn ? (item: any) => String(callFn(pKeyFn, [item])) : undefined;
+        return pruneResultToMap(pruner5.dedup(pArr5, pKeyFnWrapped));
+      }
+      if (op === "prune-weak") {
+        // (prune-weak $items $scorer)
+        const [pItems, pScorerFn] = args;
+        const pScorer6 = (item: any) => Number(callFn(pScorerFn, [item]));
+        const pArr6 = Array.isArray(pItems) ? pItems : [];
+        const pruner6 = new Pruner<any>();
+        return pruneResultToMap(pruner6.pruneWeak(pArr6, pScorer6));
+      }
+      if (op === "keep-best") {
+        // (keep-best $items $scorer :k 3)
+        const [pItems, pScorerFn, ...pKw] = args;
+        const pK7 = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
+          }
+          return 3;
+        })();
+        const pScorer7 = (item: any) => Number(callFn(pScorerFn, [item]));
+        const pArr7 = Array.isArray(pItems) ? pItems : [];
+        return _keepBest(pArr7, pScorer7, pK7);
+      }
+      if (op === "prune-stats") {
+        // (prune-stats $result) → stats 객체
+        const pRes = args[0];
+        if (pRes instanceof Map && pRes.has("stats")) {
+          return pRes.get("stats");
+        }
+        return null;
+      }
+
       // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
       return callUser(op, args);
     }
   }
+}
+
+// Phase 136: PruneResult → Map 변환 헬퍼
+function pruneResultToMap<T>(result: PruneResult<T>): Map<string, any> {
+  const statsMap = new Map<string, any>([
+    ["originalCount", result.stats.originalCount],
+    ["keptCount", result.stats.keptCount],
+    ["removedCount", result.stats.removedCount],
+    ["avgFitnessKept", result.stats.avgFitnessKept],
+    ["avgFitnessRemoved", result.stats.avgFitnessRemoved],
+  ]);
+  return new Map<string, any>([
+    ["kept", result.kept],
+    ["removed", result.removed],
+    ["keptRatio", result.keptRatio],
+    ["strategy", result.strategy],
+    ["stats", statsMap],
+  ]);
 }
