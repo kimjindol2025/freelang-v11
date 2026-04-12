@@ -36,9 +36,12 @@ import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (en
 import { createAsyncModule } from "./stdlib-async";     // Phase 23: Async/await primitives
 import { createModuleSystem } from "./stdlib-module";   // Phase 24: Module system
 import { pgBuiltins } from "./stdlib-pg";               // PostgreSQL + JWT + AI
-import { evalBuiltin } from "./eval-builtins";           // Phase 57: Built-in functions
-import { evalAiBlock } from "./eval-ai-blocks";           // Phase 57: AI blocks
-import { evalSpecialForm } from "./eval-special-forms";   // Phase 57: Special forms
+import { evalBuiltin } from "./eval-builtins";                       // Phase 57: Built-in functions
+import { evalAiBlock } from "./eval-ai-blocks";                       // Phase 57: AI blocks
+import { evalSpecialForm } from "./eval-special-forms";               // Phase 57: Special forms
+import { handleReasoningSequence } from "./eval-reasoning-sequence";  // Phase 57: Reasoning sequence
+import { handleSearchBlock as _handleSearchBlock, handleLearnBlock as _handleLearnBlock, handleReasoningBlock as _handleReasoningBlock } from "./eval-ai-handlers"; // Phase 57: AI handlers
+import { evalModuleBlock as _evalModuleBlock, evalImportBlock as _evalImportBlock, evalImportFromFile as _evalImportFromFile, evalOpenBlock as _evalOpenBlock } from "./eval-module-system"; // Phase 57: Module system
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -116,14 +119,14 @@ export interface ModuleInfo {
 // Interpreter class
 export class Interpreter {
   public context: ExecutionContext; // Public for testing
-  private logger: Logger;
-  private searchAdapter: WebSearchAdapter; // Phase 9a: WebSearch
-  private learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
-  private currentLine = 0; // FreeLang source line tracking
-  private callDepth = 0;
-  private static readonly MAX_CALL_DEPTH = 500;
+  public logger: Logger;
+  public searchAdapter: WebSearchAdapter; // Phase 9a: WebSearch
+  public learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
+  public currentLine = 0; // FreeLang source line tracking
+  public callDepth = 0;
+  public static readonly MAX_CALL_DEPTH = 500;
   // Phase 52: FL 파일 import 지원
-  private importedFiles: Set<string> = new Set();
+  public importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();
 
   constructor(logger?: Logger) {
@@ -633,7 +636,7 @@ export class Interpreter {
   }
 
   // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
-  private interpolateString(template: string): string {
+  public interpolateString(template: string): string {
     let result = "";
     let i = 0;
     while (i < template.length) {
@@ -707,28 +710,6 @@ export class Interpreter {
       return "{" + entries.join(", ") + "}";
     }
     return String(val);
-  }
-
-  private evalCond(args: ASTNode[]): any {
-    // (cond [test1 result1] [test2 result2] ... [else default])
-    // Each clause can have multiple body forms: [test expr1 expr2 ...]
-    for (const arg of args) {
-      if ((arg as any).kind === "block" && (arg as any).type === "Array") {
-        const items = (arg as any).fields.get("items");
-        if (Array.isArray(items) && items.length >= 2) {
-          const test = this.eval(items[0]);
-          if (test) {
-            // Execute all body forms, return last
-            let result: any = null;
-            for (let i = 1; i < items.length; i++) {
-              result = this.eval(items[i]);
-            }
-            return result;
-          }
-        }
-      }
-    }
-    return null;
   }
 
   public callUserFunction(name: string, args: any[]): any {
@@ -944,7 +925,7 @@ export class Interpreter {
 
   // ===== Pattern Matching (Phase 4 Week 3-4) =====
 
-  private evalPatternMatch(match: PatternMatch): any {
+  public evalPatternMatch(match: PatternMatch): any {
     // Evaluate the value to match
     const value = this.eval(match.value);
 
@@ -986,7 +967,7 @@ export class Interpreter {
   }
 
   // Phase 11: Evaluate try-catch-finally blocks
-  private evalTryBlock(tryBlock: TryBlock): any {
+  public evalTryBlock(tryBlock: TryBlock): any {
     let result: any;
     let errorCaught = false;
 
@@ -1035,7 +1016,7 @@ export class Interpreter {
   }
 
   // Phase 11: Evaluate throw expressions
-  private evalThrow(throwExpr: ThrowExpression): any {
+  public evalThrow(throwExpr: ThrowExpression): any {
     const error = this.eval(throwExpr.argument);
 
     // Throw the evaluated error value
@@ -1052,7 +1033,7 @@ export class Interpreter {
 
   // Try to match a pattern against a value
   // Returns {matched: boolean, bindings: Map<string, any>}
-  private matchPattern(pattern: Pattern, value: any): { matched: boolean; bindings: Map<string, any> } {
+  public matchPattern(pattern: Pattern, value: any): { matched: boolean; bindings: Map<string, any> } {
     const bindings = new Map<string, any>();
 
     // Literal pattern: match exact value
@@ -1176,7 +1157,7 @@ export class Interpreter {
   }
 
   // Phase 5 Week 2: Register built-in type classes and instances
-  private registerBuiltinTypeClasses(): void {
+  public registerBuiltinTypeClasses(): void {
     if (!this.context.typeClasses || !this.context.typeClassInstances) {
       return;
     }
@@ -1317,8 +1298,20 @@ export class Interpreter {
     return !!this.getTypeClassInstance(constraintClass, type);
   }
 
+  // Phase 5 Week 2: Get concrete type from a value
+  public getConcreteType(value: any): string | undefined {
+    if (!value || typeof value !== "object") return undefined;
+    if (value.tag === "Ok" || value.tag === "Err") return "Result";
+    if (value.tag === "Some" || value.tag === "None") return "Option";
+    if (Array.isArray(value)) return "List";
+    if (value.kind === "Result") return "Result";
+    if (value.kind === "Option") return "Option";
+    if (value.kind === "List") return "List";
+    return undefined;
+  }
+
   // Phase 5 Week 2: Resolve method for a given className and concreteType
-  private resolveMethod(className: string, concreteType: string, methodName: string): any {
+  public resolveMethod(className: string, concreteType: string, methodName: string): any {
     const instance = this.getTypeClassInstance(className, concreteType);
     if (!instance) {
       return undefined;
@@ -1327,829 +1320,40 @@ export class Interpreter {
   }
 
   // Phase 6 Step 4: Helper to ensure modules map exists
-  private getModules(): Map<string, ModuleInfo> {
+  public getModules(): Map<string, ModuleInfo> {
     if (!this.context.modules) {
       this.context.modules = new Map();
     }
     return this.context.modules;
   }
 
-  // Phase 6 Step 4: Evaluate module block
-  // Module 정의를 등록하고 내부 함수들을 평가
-  private evalModuleBlock(moduleBlock: ModuleBlock): void {
-    const moduleName = moduleBlock.name;
-    const exports = moduleBlock.exports || [];
-    const moduleBody = moduleBlock.body || [];
-
-    // 모듈 내 함수 맵 생성
-    const moduleFunctions = new Map<string, FreeLangFunction>();
-
-    // 모듈 body 내의 블록들을 평가 (함수 등록)
-    for (const node of moduleBody) {
-      if (isFuncBlock(node)) {
-        const funcName = node.name;
-        const params = node.fields?.get("params") || [];
-        const paramNames = extractParamNames(params);
-        let body = node.fields?.get("body");
-
-        // Skip function if body is undefined
-        if (!body) {
-          continue;
-        }
-
-        // Handle body as array (take first element)
-        if (Array.isArray(body)) {
-          body = body[0];
-          if (!body) {
-            continue;
-          }
-        }
-
-        const func: FreeLangFunction = {
-          name: funcName,
-          params: paramNames,
-          body: body as ASTNode,
-        };
-
-        moduleFunctions.set(funcName, func);
-      }
-    }
-
-    // 모듈 정보 생성 및 등록
-    const moduleInfo: ModuleInfo = {
-      name: moduleName,
-      exports,
-      functions: moduleFunctions,
-    };
-
-    this.getModules().set(moduleName, moduleInfo);
-
-    this.logger.info(`✅ Module registered: ${moduleName} (exports: ${exports.join(", ")})`);
+  // Phase 57: delegated to eval-module-system.ts
+  public evalModuleBlock(moduleBlock: ModuleBlock): void { _evalModuleBlock(this, moduleBlock); }
+  public evalImportBlock(importBlock: ImportBlock): void { _evalImportBlock(this, importBlock); }
+  public evalImportFromFile(relPath: string, prefix: string, selective: string[] | undefined, alias: string | undefined): void {
+    _evalImportFromFile(this, relPath, prefix, selective, alias);
+  }
+  public evalOpenBlock(openBlock: OpenBlock): void { _evalOpenBlock(this, openBlock); }
+  // Phase 57: delegated to eval-ai-handlers.ts
+  public handleSearchBlock(searchBlock: SearchBlock): any {
+    return _handleSearchBlock(this, searchBlock);
   }
 
-  // Phase 6 Step 4: Evaluate import block
-  // 모듈에서 함수를 선택적으로 가져오기
-  private evalImportBlock(importBlock: ImportBlock): void {
-    const moduleName = importBlock.moduleName;
-    const source = importBlock.source; // "./math.fl" 등
-    const selective = importBlock.selective; // :only [add multiply]
-    const alias = importBlock.alias; // :as m
-
-    // Phase 52: .fl 파일 import 처리
-    if (source && (source.endsWith(".fl") || source.includes("/"))) {
-      this.evalImportFromFile(source, moduleName, selective, alias);
-      return;
-    }
-
-    // 모듈 찾기
-    const module = this.getModules().get(moduleName);
-    if (!module) {
-      throw new ModuleNotFoundError(moduleName, source);
-    }
-
-    // 가져올 함수 목록 결정
-    let functionsToImport: string[] = [];
-    if (selective && selective.length > 0) {
-      // :only 지정된 함수만 가져오기
-      functionsToImport = selective.filter((name) =>
-        module.exports.includes(name)
-      );
-      // 존재하지 않는 함수 검증
-      selective.forEach((name) => {
-        if (!module.exports.includes(name)) {
-          this.logger.warn(
-            `Function "${name}" not exported from module "${moduleName}"`
-          );
-        }
-      });
-    } else {
-      // 모든 export된 함수 가져오기
-      functionsToImport = [...module.exports];
-    }
-
-    // 함수들을 context.functions에 추가
-    functionsToImport.forEach((funcName) => {
-      const func = module.functions.get(funcName);
-      if (func) {
-        if (alias) {
-          // :as 별칭 사용: (import math :as m) → m:add
-          const qualifiedName = `${alias}:${funcName}`;
-          this.context.functions.set(qualifiedName, func);
-        } else {
-          // 별칭 없음: moduleName:funcName 형식으로 등록
-          const qualifiedName = `${moduleName}:${funcName}`;
-          this.context.functions.set(qualifiedName, func);
-        }
-      }
-    });
-
-    const importedCount = functionsToImport.length;
-    const aliasStr = alias ? ` as ${alias}` : "";
-    const selectStr = selective ? ` (${selective.join(", ")})` : "";
-    this.logger.info(
-      `✅ Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`
-    );
+  // Phase 57: delegated to eval-ai-handlers.ts
+  public handleLearnBlock(learnBlock: LearnBlock): any {
+    return _handleLearnBlock(this, learnBlock);
   }
-
-  // Phase 52: FL 파일에서 함수를 가져와 현재 context에 등록
-  private evalImportFromFile(
-    relPath: string,
-    prefix: string,
-    selective: string[] | undefined,
-    alias: string | undefined
-  ): void {
-    // 절대 경로 해석: currentFilePath 기준
-    const baseDir = (() => {
-      try {
-        return fs.statSync(this.currentFilePath).isDirectory()
-          ? this.currentFilePath
-          : path.dirname(this.currentFilePath);
-      } catch {
-        return this.currentFilePath;
-      }
-    })();
-    const absPath = path.resolve(baseDir, relPath);
-
-    // 파일 존재 확인
-    if (!fs.existsSync(absPath)) {
-      throw new Error(`Import error: file not found: ${absPath}`);
-    }
-
-    // 순환 import 방지
-    if (this.importedFiles.has(absPath)) {
-      return;
-    }
-    this.importedFiles.add(absPath);
-
-    // 서브 인터프리터로 FL 파일 실행
-    const src = fs.readFileSync(absPath, "utf-8");
-    const subInterp = new Interpreter();
-    subInterp.currentFilePath = absPath;
-    subInterp.importedFiles = this.importedFiles; // 순환 방지 공유
-
-    // stdlib 로드 전 함수 목록 스냅샷 (내장 함수 제외용)
-    const builtinFuncs = new Set<string>(subInterp.context.functions.keys());
-    subInterp.interpret(parse(lex(src)));
-
-    // 사용자 정의 함수만 추출 (stdlib 내장 제외)
-    const effectivePrefix = alias ?? prefix;
-    for (const [funcName, func] of subInterp.context.functions) {
-      if (builtinFuncs.has(funcName)) continue; // 내장 함수 skip
-
-      if (selective && selective.length > 0) {
-        // :only 필터: prefix 없이 직접 등록
-        if (selective.includes(funcName)) {
-          this.context.functions.set(funcName, func);
-        }
-      } else {
-        // prefix:funcName 형식으로 등록
-        this.context.functions.set(`${effectivePrefix}:${funcName}`, func);
-      }
-    }
+  // Phase 57: delegated to eval-ai-handlers.ts
+  public handleReasoningBlock(reasoningBlock: ReasoningBlock): any {
+    return _handleReasoningBlock(this, reasoningBlock);
   }
-
-  // Phase 5 Week 2: Get concrete type from a value
-  // Maps values like {tag: "Ok", ...} to "Result", {tag: "Some", ...} to "Option", etc.
-  private getConcreteType(value: any): string | undefined {
-    if (!value || typeof value !== "object") {
-      return undefined;
-    }
-
-    // Check for tagged values (Result, Option, etc.)
-    if (value.tag === "Ok" || value.tag === "Err") {
-      return "Result";
-    }
-    if (value.tag === "Some" || value.tag === "None") {
-      return "Option";
-    }
-
-    // Check for array (List)
-    if (Array.isArray(value)) {
-      return "List";
-    }
-
-    // Check for custom type markers
-    if (value.kind === "Result") return "Result";
-    if (value.kind === "Option") return "Option";
-    if (value.kind === "List") return "List";
-
-    return undefined;
-  }
-
-  // Phase 6 Step 4: Evaluate open block
-  // 모듈의 모든 export된 함수를 전역 네임스페이스에 추가
-  private evalOpenBlock(openBlock: OpenBlock): void {
-    const moduleName = openBlock.moduleName;
-    const source = openBlock.source; // "./math.fl" 등
-
-    // 모듈 찾기
-    const module = this.getModules().get(moduleName);
-    if (!module) {
-      throw new ModuleNotFoundError(moduleName, source);
-    }
-
-    // 모든 export된 함수를 전역으로 추가
-    module.exports.forEach((funcName) => {
-      const func = module.functions.get(funcName);
-      if (func) {
-        // 전역 네임스페이스에 직접 추가 (별칭 없음)
-        this.context.functions.set(funcName, func);
-      }
-    });
-
-    this.logger.info(
-      `✅ Opened module "${moduleName}" (${module.exports.length} function(s) available globally)`
-    );
-  }
-
-  // Phase 9a Advanced: Handle Search/Fetch Block - External data retrieval with API integration
-  private handleSearchBlock(searchBlock: SearchBlock): any {
-    const { query, source = "web", cache = true, limit = 10, name } = searchBlock;
-
-    // Log search operation
-    this.logger.info(`🔎 SEARCH "${query}"`);
-
-    try {
-      // Phase 9a Advanced: Call WebSearchAdapter (sync mode for interpreter integration)
-      // Uses cache or mock results; real API calls require async interpreter
-      const results = this.searchAdapter.searchSync(query, {
-        limit,
-        cache,
-      });
-
-      const searchResult = {
-        kind: "search-result",
-        query,
-        source,
-        cache,
-        limit,
-        name,
-        status: "completed",
-        results, // ← Now contains actual search results
-        count: results.length,
-        timestamp: new Date().toISOString(),
-      };
-
-      // Store in context cache for use by Analyze stage
-      if (!this.context.cache) {
-        this.context.cache = new Map();
-      }
-      const cacheKey = name || `search_${Date.now()}`;
-      this.context.cache.set(cacheKey, searchResult);
-
-      return searchResult;
-    } catch (error) {
-      this.logger.error(`❌ Search failed: ${(error as Error).message}`);
-      return {
-        kind: "search-error",
-        query,
-        message: (error as Error).message,
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
-  // Phase 9b Advanced: Handle Learn Block - Store learned information with persistence
-  private handleLearnBlock(learnBlock: LearnBlock): any {
-    const { key, data, source = "search", confidence = 0.85, timestamp } = learnBlock;
-
-    // Initialize learned data storage if needed
-    if (!this.context.learned) {
-      this.context.learned = new Map();
-    }
-
-    try {
-      // Check if this is a recall operation (data is null)
-      if (data === null) {
-        // Recall: retrieve stored data by key (from file storage)
-        const loadedFact = this.learnedFactsStore.load(key);
-
-        if (loadedFact) {
-          this.logger.info(`📚 LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
-
-          // Also store in memory for fast access
-          this.context.learned.set(key, {
-            data: loadedFact.data,
-            source: loadedFact.source,
-            confidence: loadedFact.confidence,
-            timestamp: new Date(loadedFact.timestamp).toISOString(),
-          });
-
-          return {
-            kind: "learn-result",
-            operation: "recall",
-            key,
-            data: loadedFact.data,
-            source: loadedFact.source,
-            confidence: loadedFact.confidence,
-            timestamp: new Date(loadedFact.timestamp).toISOString(),
-            found: true,
-            accessCount: loadedFact.accessCount,
-          };
-        } else {
-          this.logger.info(`📚 LEARN (recall) "${key}" - not found`);
-          return {
-            kind: "learn-result",
-            operation: "recall",
-            key,
-            data: null,
-            found: false,
-          };
-        }
-      }
-
-      // Learn: store new data with metadata (both in memory and file)
-      // Validate confidence
-      if (confidence < 0 || confidence > 1) {
-        throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
-      }
-
-      // Save to persistent storage
-      this.learnedFactsStore.save(key, data, {
-        confidence,
-        source,
-        ttlDays: 30,
-      });
-
-      // Also store in memory for fast access
-      this.context.learned.set(key, {
-        data,
-        source,
-        confidence,
-        timestamp: timestamp ?? new Date().toISOString(),
-      });
-
-      this.logger.info(`  ✓ Learned data stored in context (key: ${key})`);
-
-      return {
-        kind: "learn-result",
-        operation: "learn",
-        key,
-        data,
-        source,
-        confidence,
-        timestamp: timestamp ?? new Date().toISOString(),
-        saved: "disk", // ← Indicates file persistence
-      };
-    } catch (error) {
-      this.logger.error(`❌ Learn failed: ${(error as Error).message}`);
-      return {
-        kind: "learn-error",
-        key,
-        message: (error as Error).message,
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
-  // Phase 9c: Handle Reasoning Block - State-based AI reasoning
-  private handleReasoningBlock(reasoningBlock: ReasoningBlock): any {
-    const { stage, data, observations, analysis, decisions, actions, verifications, metadata, transitions } = reasoningBlock;
-
-    // Initialize reasoning state storage if needed
-    if (!this.context.reasoning) {
-      this.context.reasoning = new Map();
-    }
-
-    // Create reasoning state entry
-    const reasoningState = {
-      stage,
-      data: Object.fromEntries(data),
-      observations,
-      analysis,
-      decisions,
-      actions,
-      verifications,
-      metadata: {
-        ...metadata,
-        completedAt: new Date().toISOString(),
-      },
-      transitions: transitions || [],
-    };
-
-    // Store reasoning state by stage + timestamp
-    const stateKey = `${stage}-${new Date().getTime()}`;
-    this.context.reasoning.set(stateKey, reasoningState);
-
-    // Log the reasoning stage
-    const stageEmoji = {
-      observe: "👀",
-      analyze: "🔍",
-      decide: "🎯",
-      act: "⚡",
-      verify: "✅",
-    }[stage] || "❓";
-
-    let logMessage = `${stageEmoji} ${stage.toUpperCase()}`;
-
-    // Add stage-specific logging
-    switch (stage) {
-      case "observe":
-        if (observations && observations.length > 0) {
-          logMessage += `: ${observations.length} observations`;
-        }
-        break;
-
-      case "analyze":
-        // Phase 9a: Show search results if available
-        const currentSearches = (this.context as any).currentSearches;
-        if (currentSearches && currentSearches.size > 0) {
-          logMessage += ` [using ${currentSearches.size} search result(s)]`;
-        }
-
-        const angles = data.get("angles");
-        if (angles instanceof Map) {
-          logMessage += `: ${angles.size} angles analyzed`;
-        }
-        const selected = data.get("selected");
-        if (selected) {
-          logMessage += `, selected: "${selected.value || selected}"`;
-        }
-        break;
-
-      case "decide":
-        // Phase 9b: Show learned data if available
-        const currentLearned = (this.context as any).currentLearned;
-        if (currentLearned && currentLearned.size > 0) {
-          logMessage += ` [using ${currentLearned.size} learned fact(s)]`;
-        }
-
-        const choice = data.get("choice");
-        if (choice) {
-          logMessage += `: "${choice.value || choice}"`;
-        }
-        const reason = data.get("reason");
-        if (reason) {
-          logMessage += ` (${reason.value || reason})`;
-        }
-        break;
-
-      case "act":
-        const action = data.get("action");
-        if (action) {
-          logMessage += `: "${action.value || action}"`;
-        }
-        break;
-
-      case "verify":
-        const result = data.get("result");
-        if (result) {
-          logMessage += `: ${result.value || result}`;
-        }
-        if (metadata?.confidence !== undefined) {
-          logMessage += ` (confidence: ${(metadata.confidence * 100).toFixed(0)}%)`;
-        }
-        break;
-    }
-
-    this.logger.info(logMessage);
-
-    // Return reasoning result
-    return {
-      kind: "reasoning-result",
-      stage,
-      data: Object.fromEntries(data),
-      observations,
-      analysis,
-      decisions,
-      actions,
-      verifications,
-      metadata: reasoningState.metadata,
-      stateKey,
-      completed: true,
-    };
-  }
-
-  // Phase 9c Extension: Handle Reasoning Sequence - Automatic state transitions
-  // Phase 9c Feedback: Verify result feedback to analyze stage (re-evaluation loop)
-  private handleReasoningSequence(reasoningSeq: ReasoningSequence): any {
-    const { stages, metadata, feedbackLoop } = reasoningSeq;
-
-    // Initialize reasoning state storage if needed
-    if (!this.context.reasoning) {
-      this.context.reasoning = new Map();
-    }
-
-    const sequenceId = new Date().getTime();
-    const executionPath: string[] = [];
-    const sequenceResults: any[] = [];
-    const iterationHistory: any[] = [];
-
-    // Log sequence start
-    this.logger.info(
-      `🔄 REASONING SEQUENCE START (${stages.length} stages, feedback: ${
-        feedbackLoop?.enabled ? "enabled" : "disabled"
-      })`
-    );
-
-    let currentStages = stages;
-    let iteration = 0;
-    const maxIterations = feedbackLoop?.maxIterations || 1;
-
-    // Phase 9a/9b: Initialize search and learn context for data sharing
-    if (!reasoningSeq.context) {
-      reasoningSeq.context = {};
-    }
-    if (!reasoningSeq.context.searches) {
-      reasoningSeq.context.searches = new Map();
-    }
-    if (!reasoningSeq.context.learned) {
-      reasoningSeq.context.learned = new Map();
-    }
-
-    // Store references in interpreter context for access during stage execution
-    this.context.currentSearches = reasoningSeq.context.searches;
-    this.context.currentLearned = reasoningSeq.context.learned;
-
-    // Execute reasoning sequence with potential feedback loop
-    while (iteration < maxIterations) {
-      iteration++;
-
-      // Log iteration start
-      if (iteration > 1) {
-        this.logger.info(
-          `🔄 FEEDBACK LOOP ITERATION ${iteration}/${maxIterations} (damping: ${(
-            feedbackLoop?.confidenceDamping || 0.1
-          ).toFixed(1)})`
-        );
-      }
-
-      const iterationResults: any[] = [];
-      let verifyResult: any = null;
-
-      // Execute each reasoning stage in sequence
-      for (let i = 0; i < currentStages.length; i++) {
-        const stage = currentStages[i];
-        const stageNum = i + 1;
-
-        // Phase 9a: Handle search block
-        if ((stage as any).kind === "search-block") {
-          const searchBlock = stage as any; // SearchBlock
-          this.logger.info(`  [${stageNum}/${currentStages.length}] 🔎 SEARCH`);
-
-          const searchResult = this.handleSearchBlock(searchBlock);
-
-          // Store search result in reasoning sequence context
-          if (!reasoningSeq.context) {
-            reasoningSeq.context = {};
-          }
-          if (!reasoningSeq.context.searches) {
-            reasoningSeq.context.searches = new Map();
-          }
-          const searchKey = `search_${i}`;
-          reasoningSeq.context.searches.set(searchKey, searchResult);
-
-          iterationResults.push(searchResult);
-          executionPath.push("search");
-          this.logger.info(`  ✓ Search result stored in context`);
-          continue;
-        }
-
-        // Phase 9b: Handle learn block
-        if ((stage as any).kind === "learn-block") {
-          const learnBlock = stage as any; // LearnBlock
-          this.logger.info(`  [${stageNum}/${currentStages.length}] 📚 LEARN`);
-
-          const learnResult = this.handleLearnBlock(learnBlock);
-
-          // Store learned data in reasoning sequence context
-          if (!reasoningSeq.context) {
-            reasoningSeq.context = {};
-          }
-          if (!reasoningSeq.context.learned) {
-            reasoningSeq.context.learned = new Map();
-          }
-          const learnKey = (learnBlock as any).key || `learn_${i}`;
-          reasoningSeq.context.learned.set(learnKey, learnResult);
-
-          iterationResults.push(learnResult);
-          executionPath.push("learn");
-          this.logger.info(`  ✓ Learned data stored in context (key: ${learnKey})`);
-          continue;
-        }
-
-        // Phase 9a/9b: Only ReasoningBlock should reach here (Search/Learn already handled)
-        const reasoningBlock = stage as ReasoningBlock;
-        if (reasoningBlock.kind !== "reasoning-block") {
-          throw new Error(`Unexpected stage kind in reasoning sequence: ${(stage as any).kind}`);
-        }
-
-        // Log stage entry for reasoning blocks
-        const stageEmoji = {
-          observe: "👀",
-          analyze: "🔍",
-          decide: "🎯",
-          act: "⚡",
-          verify: "✅",
-        }[reasoningBlock.stage] || "❓";
-
-        const stageLabel =
-          iteration === 1
-            ? `[${stageNum}/${currentStages.length}]`
-            : `[${stageNum}/${currentStages.length}]`;
-
-        this.logger.info(`  ${stageLabel} ${stageEmoji} ${reasoningBlock.stage.toUpperCase()}`);
-
-        // Phase 9c: Check for when guard clause (skip if condition is false)
-        if (reasoningBlock.whenGuard) {
-          const guardCondition = this.evaluateCondition(reasoningBlock.whenGuard);
-          if (!guardCondition) {
-            this.logger.info(`  ⏭️  SKIPPED (when guard condition false)`);
-            continue; // Skip this stage
-          }
-        }
-
-        // Apply confidence damping from previous iterations
-        let adjustedStage = reasoningBlock;
-        if (iteration > 1 && reasoningBlock.metadata?.confidence !== undefined) {
-          adjustedStage = {
-            ...reasoningBlock,
-            metadata: {
-              ...reasoningBlock.metadata,
-              confidence: Math.max(
-                0,
-                (reasoningBlock.metadata.confidence || 1) -
-                  (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)
-              ),
-            },
-          };
-        }
-
-        // Phase 9c: Check for conditional (if/then/else)
-        let blockToHandle = adjustedStage;
-        if (reasoningBlock.conditional) {
-          const conditionMet = this.evaluateCondition(reasoningBlock.conditional.condition);
-          const selectedBlock = conditionMet ? reasoningBlock.conditional.thenBlock : reasoningBlock.conditional.elseBlock;
-
-          if (selectedBlock) {
-            blockToHandle = selectedBlock;
-            this.logger.info(
-              `  ${conditionMet ? "✓" : "✗"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`
-            );
-          } else if (!conditionMet && !reasoningBlock.conditional.elseBlock) {
-            this.logger.info(`  ⏭️  SKIPPED (if condition false, no else block)`);
-            continue; // Skip if condition false and no else
-          }
-        }
-
-        // Phase 9c: Check for loop control (repeat-until / repeat-while)
-        let stageResult: any;
-        if (reasoningBlock.loopControl) {
-          const { type, condition, maxIterations = 1000 } = reasoningBlock.loopControl;
-          const loopMaxIter = Math.min(maxIterations, 1000);
-          let loopIteration = 0;
-
-          while (loopIteration < loopMaxIter) {
-            loopIteration++;
-
-            // Evaluate loop condition
-            const conditionValue = this.evaluateCondition(condition);
-            const shouldContinue = type === "repeat-until" ? !conditionValue : conditionValue;
-
-            if (!shouldContinue && loopIteration > 1) {
-              break; // Exit loop if condition met
-            }
-
-            // Handle the reasoning block
-            stageResult = this.handleReasoningBlock(blockToHandle as ReasoningBlock);
-
-            this.logger.info(
-              `  🔁 ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter} (condition: ${shouldContinue ? "continue" : "exit"})`
-            );
-          }
-        } else {
-          // Handle the reasoning block (no loop)
-          stageResult = this.handleReasoningBlock(blockToHandle as ReasoningBlock);
-        }
-
-        iterationResults.push(stageResult);
-        executionPath.push(reasoningBlock.stage);
-
-        // Store verify result for feedback check
-        if (reasoningBlock.stage === "verify") {
-          verifyResult = stageResult;
-        }
-
-        // Check for stage-specific transitions
-        if (reasoningBlock.transitions && reasoningBlock.transitions.length > 0) {
-          for (const transition of reasoningBlock.transitions) {
-            if (transition.condition) {
-              const conditionMet = this.eval(transition.condition);
-              if (conditionMet && transition.to) {
-                this.logger.info(`    ↓ Transition to: ${transition.to}`);
-              }
-            }
-          }
-        }
-      }
-
-      sequenceResults.push(...iterationResults);
-      iterationHistory.push({
-        iteration,
-        results: iterationResults,
-        verifyConfidence: verifyResult?.metadata?.confidence,
-      });
-
-      // Check feedback loop condition
-      const shouldContinueFeedback =
-        feedbackLoop?.enabled &&
-        iteration < maxIterations &&
-        verifyResult &&
-        this.evaluateFeedbackCondition(verifyResult, feedbackLoop);
-
-      if (shouldContinueFeedback) {
-        this.logger.info(
-          `↩️  FEEDBACK TRIGGERED: Returning to "${feedbackLoop.toStage}" stage`
-        );
-
-        // Re-execute from feedback target stage
-        const feedbackTargetIndex = currentStages.findIndex(
-          (s) => (s as ReasoningBlock).stage === feedbackLoop.toStage
-        );
-        if (feedbackTargetIndex >= 0) {
-          currentStages = currentStages.slice(feedbackTargetIndex);
-        }
-      } else {
-        break; // Exit feedback loop
-      }
-    }
-
-    // Create sequence result with all stage results
-    const sequenceResult = {
-      kind: "reasoning-sequence-result",
-      stages: sequenceResults,
-      executionPath,
-      iterations: iterationHistory.length,
-      feedbackTriggered: iteration > 1,
-      metadata: {
-        ...metadata,
-        sequenceId,
-        completedAt: new Date().toISOString(),
-        totalStages: stages.length,
-        iterations: iteration,
-      },
-      completed: true,
-    };
-
-    // Store the entire sequence result
-    const sequenceKey = `sequence-${sequenceId}`;
-    this.context.reasoning!.set(sequenceKey, sequenceResult);
-
-    // Log sequence completion
-    const totalConfidence =
-      sequenceResults.reduce((sum, r) => sum + (r.metadata?.confidence || 0), 0) /
-      Math.max(sequenceResults.length, 1);
-
-    this.logger.info(
-      `✅ REASONING SEQUENCE COMPLETE (${stages.length} stages, ${iteration} iterations, confidence: ${(
-        totalConfidence * 100
-      ).toFixed(0)}%)`
-    );
-
-    return sequenceResult;
-  }
-
-  // Phase 9c Feedback: Evaluate feedback condition
-  private evaluateFeedbackCondition(verifyResult: any, feedbackLoop: any): boolean {
-    // Default: trigger feedback if confidence < 0.8
-    const defaultThreshold = 0.8;
-    const confidence = verifyResult?.metadata?.confidence || 0;
-
-    if (feedbackLoop.condition) {
-      // Evaluate custom condition
-      try {
-        return this.eval(feedbackLoop.condition);
-      } catch (e) {
-        this.logger.warn(`Failed to evaluate feedback condition: ${(e as any).message}`);
-        return confidence < defaultThreshold;
-      }
-    }
-
-    // Default: trigger if confidence below threshold
-    return confidence < defaultThreshold;
-  }
-
-  // Phase 9c Conditional: Evaluate condition expression (boolean evaluation)
-  private evaluateCondition(conditionNode: ASTNode): boolean {
-    if (!conditionNode) return false;
-
-    try {
-      const result = this.eval(conditionNode);
-
-      // Convert result to boolean
-      if (typeof result === "boolean") return result;
-      if (typeof result === "number") return result !== 0;
-      if (typeof result === "string") return result.length > 0;
-      if (result === null || result === undefined) return false;
-      return !!result;
-    } catch (e) {
-      this.logger.warn(`Failed to evaluate condition: ${(e as any).message}`);
-      return false;
-    }
+  // Phase 57: handleReasoningSequence delegated to eval-reasoning-sequence.ts
+  public handleReasoningSequence(reasoningSeq: ReasoningSequence): any {
+    return handleReasoningSequence(this, reasoningSeq);
   }
 
   // Phase 5 Week 2: Evaluate Type Class definition
-  private evalTypeClass(typeClass: TypeClass): void {
+  public evalTypeClass(typeClass: TypeClass): void {
     const info: TypeClassInfo = {
       name: typeClass.name,
       typeParams: typeClass.typeParams,
@@ -2175,7 +1379,7 @@ export class Interpreter {
   }
 
   // Phase 5 Week 2: Evaluate Type Class Instance definition
-  private evalInstance(instance: TypeClassInstance): void {
+  public evalInstance(instance: TypeClassInstance): void {
     const key = `${instance.className}[${instance.concreteType}]`;
 
     const implementations = new Map<string, any>();
