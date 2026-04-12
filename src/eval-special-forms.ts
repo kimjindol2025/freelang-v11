@@ -35,10 +35,13 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
         }
       }
     }
+    const body = expr.args.length === 2
+      ? expr.args[1]
+      : { kind: "sexpr" as const, op: "do", args: expr.args.slice(1) };
     return {
       kind: "function-value",
       params,
-      body: expr.args[1],
+      body,
       capturedEnv: ctx.variables.snapshot(),
       name: undefined,
     };
@@ -72,6 +75,20 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   if (op === "set!") {
     if (expr.args.length < 2) throw new Error(`set! requires a name and a value`);
     const nameNode = expr.args[0];
+
+    // (set! (get $obj "key") value) — map/array 프로퍼티 뮤테이션
+    if ((nameNode as any).kind === "sexpr" && (nameNode as any).op === "get") {
+      const getArgs = (nameNode as any).args;
+      const obj = ev(getArgs[0]);
+      const key = ev(getArgs[1]);
+      const value = ev(expr.args[1]);
+      if (obj !== null && typeof obj === "object") {
+        const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key);
+        obj[k] = value;
+      }
+      return ev(expr.args[1]);
+    }
+
     let name: string;
     if ((nameNode as any).kind === "variable") {
       name = "$" + (nameNode as any).name;
