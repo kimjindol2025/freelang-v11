@@ -5,12 +5,14 @@
 // Phase 63: defmacro, macroexpand 추가
 // Phase 61: TCO 모드에서 꼬리 위치 함수 호출 → TailCall 토큰 반환
 // Phase 66: defstruct — 타입이 있는 레코드 타입
+// Phase 96: fl-try — Result 기반 에러 처리
 
 import { Interpreter } from "./interpreter";
 import { SExpr, ASTNode, Variable, Literal } from "./ast";
 import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
+import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 
 export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): any {
   const ev = (node: any) => (interp as any).eval(node);
@@ -759,6 +761,99 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     } catch {
       return null;
     }
+  }
+
+  // ── Phase 96: fl-try ─────────────────────────────────────────────────
+  // (fl-try expr)
+  // (fl-try expr :on-err fn)
+  // (fl-try expr :on-type-error fn :on-not-found fn :on-io fn :default fn)
+  if (op === "fl-try") {
+    if (expr.args.length < 1) throw new Error(`fl-try requires at least 1 argument`);
+    const bodyNode = expr.args[0];
+
+    // 나머지 인자에서 키워드-핸들러 쌍 추출
+    // 파서: :on-err → {kind:"literal", type:"string", value:"on-err"} (콜론 제거)
+    //       또는 {kind:"keyword", name:"on-err"} 또는 {kind:"keyword", value:"on-err"}
+    const FL_TRY_KEYS = new Set([
+      "on-err", "on-type-error", "on-not-found", "on-io", "on-arity",
+      "on-ai", "on-timeout", "on-runtime", "default",
+    ]);
+    const handlers = new Map<string, any>();
+    let i = 1;
+    while (i < expr.args.length) {
+      const keyNode = expr.args[i] as any;
+      let key: string | null = null;
+      if (keyNode.kind === "keyword") {
+        const v = String(keyNode.name ?? keyNode.value ?? "");
+        if (FL_TRY_KEYS.has(v)) key = v;
+      } else if (keyNode.kind === "literal" && keyNode.type === "string") {
+        // :on-err → "on-err" (파서가 콜론 제거), 또는 ":on-err" (콜론 포함)
+        const v = keyNode.value.startsWith(":") ? keyNode.value.slice(1) : keyNode.value;
+        if (FL_TRY_KEYS.has(v)) key = v;
+      }
+      if (key !== null && i + 1 < expr.args.length) {
+        handlers.set(key, ev(expr.args[i + 1]));
+        i += 2;
+      } else {
+        i++;
+      }
+    }
+
+    // 본문 실행 — Result로 래핑
+    let result: any;
+    try {
+      const val = ev(bodyNode);
+      // 이미 Result 타입이면 그대로, 아니면 ok로 래핑
+      if (val && typeof val === "object" && (val._tag === "Ok" || val._tag === "Err")) {
+        result = val;
+      } else {
+        result = ok(val);
+      }
+    } catch (e: unknown) {
+      const flErr = fromThrown(e);
+      result = flErr;
+    }
+
+    // 핸들러 처리
+    if (isErr(result)) {
+      const e = result;
+      // 카테고리별 핸들러
+      const categoryHandlerMap: Record<string, ErrorCategory> = {
+        "on-type-error": ErrorCategory.TYPE_ERROR,
+        "on-not-found": ErrorCategory.NOT_FOUND,
+        "on-io": ErrorCategory.IO,
+        "on-arity": ErrorCategory.ARITY,
+        "on-ai": ErrorCategory.AI,
+        "on-timeout": ErrorCategory.TIMEOUT,
+      };
+
+      // 카테고리 매칭 핸들러 우선
+      let handled = false;
+      for (const [handlerKey, category] of Object.entries(categoryHandlerMap)) {
+        if (handlers.has(handlerKey) && e.category === category) {
+          const fn = handlers.get(handlerKey);
+          const handlerResult = callFnVal(fn, [e]);
+          return handlerResult;
+        }
+      }
+
+      // :on-err — 모든 에러
+      if (!handled && handlers.has("on-err")) {
+        const fn = handlers.get("on-err");
+        return callFnVal(fn, [e]);
+      }
+
+      // :default — 나머지
+      if (!handled && handlers.has("default")) {
+        const fn = handlers.get("default");
+        return callFnVal(fn, [e]);
+      }
+
+      // 핸들러 없으면 err 값 그대로 반환
+      return result;
+    }
+
+    return result;
   }
 
   throw new Error(`evalSpecialForm: unknown op "${op}"`);
