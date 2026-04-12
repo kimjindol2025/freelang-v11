@@ -4514,11 +4514,18 @@ function evalCounterfactual(op: string, args: any[], callFn: (fn: any, a: any[])
   // (cf-sensitivity $vars $fn)
   if (op === "cf-sensitivity") {
     let variables: Record<string, unknown> = {};
-    if (args[0] instanceof Map) {
-      for (const [k, v] of (args[0] as Map<any,any>)) variables[String(k).replace(/^:/, "")] = v;
+    const rawVars = args[0];
+    if (rawVars instanceof Map) {
+      for (const [k, v] of (rawVars as Map<any,any>)) variables[String(k).replace(/^:/, "")] = v;
+    } else if (rawVars && typeof rawVars === "object" && !Array.isArray(rawVars)) {
+      // FL {: } map literal은 plain object로 평가됨
+      for (const [k, v] of Object.entries(rawVars)) variables[String(k).replace(/^:/, "")] = v;
     }
     const fn = args[1];
-    const outcomeFunc = (vars: Record<string, unknown>) => Number(callFn(fn, [new Map(Object.entries(vars))]));
+    // FL imm-get은 plain object m[k]를 사용하므로 plain object로 전달
+    const outcomeFunc = (vars: Record<string, unknown>) => {
+      try { return Number(callFn(fn, [vars as any])); } catch { return 0; }
+    };
     const sens = globalCounterfactual.sensitivityAnalysis(variables, outcomeFunc);
     return new Map(Object.entries(sens));
   }

@@ -29,7 +29,7 @@ function assert(cond: boolean, msg?: string): void {
   if (!cond) throw new Error(msg ?? "Assertion failed");
 }
 
-// 공통 outcome 함수: 비 + 속도 → 사고 확률
+// 공통 outcome 함수: 비 + 속도 → 사고
 // rain=true && speed>50 → "accident", else "safe"
 function accidentOutcome(vars: Record<string, unknown>): string {
   const rain = vars["rain"] as boolean;
@@ -60,7 +60,6 @@ const scenario: Scenario = {
 };
 reasoner.registerScenario(scenario);
 test("2. registerScenario 시나리오 등록", () => {
-  // 등록 후 createCounterfactual 시 에러 없으면 성공
   const cf = reasoner.createCounterfactual("s1", { rain: false }, accidentOutcome);
   return cf !== null;
 });
@@ -179,11 +178,11 @@ test("19. cf-scenario 빌트인", () => {
   return result instanceof Map && (result as Map<string,any>).get("id") === "s2";
 });
 
-// 20. cf-what-if 빌트인
+// 20. cf-what-if 빌트인 (인라인 fn)
 test("20. cf-what-if 빌트인", () => {
   const result = run(`
-    (let $outcome-fn (fn [$vars] (if (>= (map-get $vars :x) 10) "high" "low"))
-      (cf-what-if {:x 10 :y 5} {:x 3} $outcome-fn))
+    (cf-what-if {:x 10 :y 5} {:x 3}
+      (fn [$vars] (if (>= (imm-get $vars :x) 10) "high" "low")))
   `);
   return result instanceof Map && (result as Map<string,any>).has("counterfactualOutcome");
 });
@@ -192,8 +191,8 @@ test("20. cf-what-if 빌트인", () => {
 test("21. cf-analyze 빌트인", () => {
   run(`(cf-scenario :id "s3" :name "분석테스트" :vars {:a 1 :b 2} :outcome "X")`);
   const result = run(`
-    (let $afn (fn [$vars] (if (> (map-get $vars :a) 0) "X" "Y"))
-      (cf-analyze "s3" [{:a 0} {:b 10}] $afn))
+    (cf-analyze "s3" [{:a 0} {:b 10}]
+      (fn [$vars] (if (> (imm-get $vars :a) 0) "X" "Y")))
   `);
   return result instanceof Map && (result as Map<string,any>).has("counterfactuals");
 });
@@ -202,8 +201,8 @@ test("21. cf-analyze 빌트인", () => {
 test("22. cf-minimal 빌트인", () => {
   run(`(cf-scenario :id "s4" :name "최소개입" :vars {:rain true :speed 60} :outcome "accident")`);
   const result = run(`
-    (let $mfn (fn [$vars] (if (and (map-get $vars :rain) (> (map-get $vars :speed) 50)) "accident" "safe"))
-      (cf-minimal "s4" "safe" $mfn))
+    (cf-minimal "s4" "safe"
+      (fn [$vars] (if (and (imm-get $vars :rain) (> (imm-get $vars :speed) 50)) "accident" "safe")))
   `);
   return result instanceof Map || result === null;
 });
@@ -211,8 +210,8 @@ test("22. cf-minimal 빌트인", () => {
 // 23. cf-sensitivity 빌트인
 test("23. cf-sensitivity 빌트인", () => {
   const result = run(`
-    (let $sfn (fn [$vars] (+ (* (if (map-get $vars :rain) 1 0) 50) (map-get $vars :speed)))
-      (cf-sensitivity {:rain true :speed 60} $sfn))
+    (cf-sensitivity {:rain true :speed 60}
+      (fn [$vars] (+ (* (if (imm-get $vars :rain) 1 0) 50) (imm-get $vars :speed))))
   `);
   return result instanceof Map && (result as Map<string,any>).has("speed");
 });
@@ -221,9 +220,9 @@ test("23. cf-sensitivity 빌트인", () => {
 test("24. cf-key-factors 빌트인", () => {
   run(`(cf-scenario :id "s5" :name "키팩터" :vars {:p 1 :q 2} :outcome "A")`);
   const result = run(`
-    (let $kfn (fn [$vars] (if (> (map-get $vars :p) 0) "A" "B"))
-      (let $analysis (cf-analyze "s5" [{:p 0} {:q 10}] $kfn)
-        (cf-key-factors $analysis)))
+    (cf-key-factors
+      (cf-analyze "s5" [{:p 0} {:q 10}]
+        (fn [$vars] (if (> (imm-get $vars :p) 0) "A" "B"))))
   `);
   return Array.isArray(result);
 });
@@ -232,9 +231,9 @@ test("24. cf-key-factors 빌트인", () => {
 test("25. cf-best-alt 빌트인", () => {
   run(`(cf-scenario :id "s6" :name "최선대안" :vars {:m 5 :n 3} :outcome "OK")`);
   const result = run(`
-    (let $bfn (fn [$vars] (if (> (map-get $vars :m) 3) "OK" "NG"))
-      (let $an (cf-analyze "s6" [{:m 0} {:n 10}] $bfn)
-        (cf-best-alt $an)))
+    (cf-best-alt
+      (cf-analyze "s6" [{:m 0} {:n 10}]
+        (fn [$vars] (if (> (imm-get $vars :m) 3) "OK" "NG"))))
   `);
   return result instanceof Map && (result as Map<string,any>).has("probability");
 });
@@ -242,9 +241,9 @@ test("25. cf-best-alt 빌트인", () => {
 // 26. cf-explain 빌트인
 test("26. cf-explain 빌트인", () => {
   const result = run(`
-    (let $efn (fn [$vars] (if (map-get $vars :rain) "accident" "safe"))
-      (let $cf (cf-what-if {:rain true :speed 60} {:rain false} $efn)
-        (cf-explain $cf)))
+    (cf-explain
+      (cf-what-if {:rain true :speed 60} {:rain false}
+        (fn [$vars] (if (imm-get $vars :rain) "accident" "safe"))))
   `);
   return typeof result === "string" && (result as string).length > 0;
 });
