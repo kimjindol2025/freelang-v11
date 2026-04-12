@@ -39,6 +39,7 @@ declare class VpmCli {
     private makeRequest;
     private createAuthToken;
     private getInstalledVersion;
+    private callResolverInstall;
     private showHelp;
 }
 export { VpmCli };

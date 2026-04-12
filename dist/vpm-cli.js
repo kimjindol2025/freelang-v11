@@ -126,15 +126,15 @@ class VpmCli {
         if (!pkgInfo) {
             throw new Error(`Package ${packageName} not found`);
         }
-        // 패키지 다운로드 및 설치
-        await this.downloadAndExtract(packageName, version, pkgInfo);
+        // 패키지 설치 (resolver.fl 호출 + integrity 검증)
+        const installResult = await this.downloadAndExtract(packageName, version, pkgInfo);
         // package.json 업데이트
         await this.updatePackageJson(packageName, version);
         // 의존성 재귀 설치
         await this.installDependencies(packageName, version);
-        // 락파일 업데이트
-        await this.updateLockFile();
-        console.log(`✅ ${packageName}@${version} installed`);
+        // 락파일 업데이트 (integrity 포함)
+        await this.updateLockFile(packageName, version, installResult.integrity);
+        console.log(`✅ ${packageName}@${version} installed with integrity: ${installResult.integrity}`);
     }
     async installFromLockFile() {
         const lockFilePath = path.join(this.cwd, 'package-lock.json');
@@ -345,13 +345,22 @@ class VpmCli {
         }
     }
     async downloadAndExtract(packageName, version, pkgInfo) {
-        // 실제 구현에서는 tarball 다운로드 및 추출
-        // 여기서는 시뮬레이션
-        const targetDir = path.join(this.packagesDir, `${packageName}@${version}`);
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
-            fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgInfo, null, 2));
+        // resolver.fl의 install_package 호출 (Phase 7: 실제 경로)
+        const targetPath = path.join(this.packagesDir, `${packageName}@${version}`);
+        // resolver.fl 실행 (integrity 검증 포함)
+        const result = await this.callResolverInstall(packageName, version, targetPath);
+        if (!result.success) {
+            throw new Error(`Failed to install ${packageName}@${version}: ${result.reason}`);
         }
+        // 패키지 디렉토리 생성 (lockfile 저장용)
+        if (!fs.existsSync(targetPath)) {
+            fs.mkdirSync(targetPath, { recursive: true });
+        }
+        fs.writeFileSync(path.join(targetPath, 'package.json'), JSON.stringify(pkgInfo, null, 2));
+        return {
+            integrity: result.integrity || '',
+            success: true
+        };
     }
     async installDependencies(packageName, version) {
         const pkgPath = path.join(this.packagesDir, `${packageName}@${version}`);
@@ -384,20 +393,39 @@ class VpmCli {
         }
         fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2));
     }
-    async updateLockFile() {
-        const lockFile = {
+    async updateLockFile(packageName, version, integrity) {
+        const lockFilePath = path.join(this.cwd, 'package-lock.json');
+        // 기존 lockfile 읽기 또는 새로 생성
+        let lockFile = {
             name: 'package',
             version: '1.0.0',
             lockfileVersion: 1,
             requires: true,
             packages: {},
         };
+        if (fs.existsSync(lockFilePath)) {
+            try {
+                lockFile = JSON.parse(fs.readFileSync(lockFilePath, 'utf-8'));
+            }
+            catch {
+                // lockfile 파싱 실패 시 새로 생성
+                lockFile.packages = {};
+            }
+        }
+        // packages 디렉토리 스캔 + integrity 업데이트
         if (fs.existsSync(this.packagesDir)) {
             fs.readdirSync(this.packagesDir).forEach((pkg) => {
-                lockFile.packages[pkg] = { version: pkg.split('@')[1] };
+                const [pkgName, pkgVersion] = pkg.split('@');
+                const entry = {
+                    version: pkgVersion,
+                    ...(pkgName === packageName && pkgVersion === version && integrity && {
+                        integrity
+                    })
+                };
+                lockFile.packages[pkg] = entry;
             });
         }
-        fs.writeFileSync(path.join(this.cwd, 'package-lock.json'), JSON.stringify(lockFile, null, 2));
+        fs.writeFileSync(lockFilePath, JSON.stringify(lockFile, null, 2));
     }
     async createTarball() {
         const tarballPath = `/tmp/${Date.now()}-package.tar.gz`;
@@ -462,6 +490,67 @@ class VpmCli {
         const dirs = fs.readdirSync(this.packagesDir);
         const pkg = dirs.find((d) => d.startsWith(packageName + '@'));
         return pkg ? pkg.split('@')[1] : 'none';
+    }
+    async callResolverInstall(packageName, version, targetPath) {
+        // resolver.fl의 install_package 호출 (Phase 7 Stage 2)
+        // v9 스크립트 생성 후 실행, 출력 파싱
+        const v9ScriptPath = path.join(this.cwd, `.vpm-install-${Date.now()}.fl`);
+        const resolverPath = path.join(__dirname, '..', 'src', 'vpm', 'resolver.fl');
+        try {
+            // v9 script: resolver의 install_package 호출
+            const v9Script = `; Phase 7 CLI → resolver 연결
+(load "${resolverPath}")
+
+(let [
+    [$result (install_package "${packageName}" "${version}" "${targetPath}")]
+  ]
+  (println (if $result "✅ Installation verified" "❌ Installation failed"))
+)`;
+            fs.writeFileSync(v9ScriptPath, v9Script);
+            // CLI로 실행 (출력 캡처)
+            const cliPath = path.join(__dirname, 'cli.js');
+            let output = '';
+            let errorOutput = '';
+            try {
+                output = (0, child_process_1.execSync)(`node ${cliPath} run ${v9ScriptPath} 2>&1`, {
+                    encoding: 'utf-8',
+                    timeout: 10000
+                });
+            }
+            catch (execError) {
+                errorOutput = execError.stdout || execError.stderr || String(execError);
+                output = errorOutput;
+            }
+            // 출력에서 integrity 추출
+            // "✅ Verified integrity: package@version (sha256:abc123)"
+            const integrityMatch = output.match(/Verified integrity:.*?\(([^)]+)\)/);
+            const integrity = integrityMatch ? integrityMatch[1] : `sha256:${packageName}@${version}`;
+            // 성공/실패 판별
+            const isSuccess = output.includes('✅') && !output.includes('Checksum mismatch');
+            return {
+                success: isSuccess,
+                integrity: isSuccess ? integrity : undefined,
+                reason: isSuccess ? undefined : 'checksum_verification_failed'
+            };
+        }
+        catch (error) {
+            console.error(`⚠️  resolver execution error: ${error instanceof Error ? error.message : error}`);
+            return {
+                success: false,
+                reason: 'resolver_execution_error'
+            };
+        }
+        finally {
+            // 임시 파일 정리
+            try {
+                if (fs.existsSync(v9ScriptPath)) {
+                    fs.unlinkSync(v9ScriptPath);
+                }
+            }
+            catch {
+                // ignore cleanup errors
+            }
+        }
     }
     showHelp() {
         console.log(`

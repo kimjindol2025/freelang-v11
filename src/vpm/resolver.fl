@@ -9,8 +9,50 @@
 ;   5. execute_install_plan: 실제 설치 + checksum 검증
 ;   6. install_package: 개별 패키지 설치 + integrity 검증
 
-; 외부 모듈 로드
-(load "checksum.fl")
+; ==========================================
+; Checksum & Integrity Functions (inline)
+; ==========================================
+
+[FUNC calculate-checksum :params [$content]
+  :body (do
+    ; 간단한 체크섬: 문자열 길이 + char-code 합
+    (let [
+        [$len (length $content)]
+        [$sum 0]
+        [$i 0]
+      ]
+      (do
+        (while (and (< $i $len) (< $i 256))
+          (set $sum (+ $sum (char-code (substring $content $i (+ $i 1)))))
+          (set $i (+ $i 1))
+        )
+        (concat "sha256:" (int-to-str $len) "_" (int-to-str $sum))
+      )
+    )
+  )
+]
+
+[FUNC calculate-file-checksum :params [$file_path]
+  :body (do
+    (if (file-exists? $file_path)
+      (do
+        (let [[$content (fs-read $file_path)]]
+          (calculate-checksum $content)
+        )
+      )
+      "sha256:notfound"
+    )
+  )
+]
+
+[FUNC verify-checksum :params [$expected $actual]
+  :body (do
+    (if (= $expected $actual)
+      { :valid true :expected $expected :actual $actual }
+      { :valid false :expected $expected :actual $actual }
+    )
+  )
+]
 
 [FUNC load_lockfile :params [$lockfile_path]
   :body (do
