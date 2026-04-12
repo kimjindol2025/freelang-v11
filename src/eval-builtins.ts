@@ -9,6 +9,7 @@
 // Phase 104: TRY-REASON 실패 복구 추론
 // Phase 106: 자동 품질 평가 루프
 // Phase 107: FL 자기 교육 시스템 (FLTutor)
+// Phase 108: AI 추론 시각화 디버거
 
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
