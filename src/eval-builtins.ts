@@ -41,6 +41,7 @@ import { sdk as flSDK } from "./fl-sdk"; // Phase 110: External AI SDK
 import { globalTester, HypothesisConfig } from "./hypothesis"; // Phase 111: Hypothesis
 import { maybeMap, maybeBind, maybeChain, maybeFilter, maybeCombine, maybeSelect } from "./maybe-chain"; // Phase 112: Maybe Chain
 import { globalDebater, Argument } from "./debate"; // Phase 113: Debate
+import { globalCheckpoint } from "./checkpoint"; // Phase 114: Checkpoint
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
