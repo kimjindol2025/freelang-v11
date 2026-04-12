@@ -608,7 +608,7 @@ export class Interpreter {
 
     // Phase 57: Dispatch to specialized modules
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout"]);
+    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
@@ -727,6 +727,16 @@ export class Interpreter {
       const interp = this;
       const tot = new TreeOfThought();
 
+      // FL 파서에서 :keyword는 두 형태로 올 수 있음:
+      // 1. {kind: "keyword", name: "branch"}
+      // 2. {kind: "literal", type: "string", value: "branch"}  (Colon + Symbol → string literal)
+      function isTotKeyword(node: any, name: string): boolean {
+        if (!node) return false;
+        if (node.kind === "keyword" && node.name === name) return true;
+        if (node.kind === "literal" && node.type === "string" && node.value === name) return true;
+        return false;
+      }
+
       const args = expr.args;
       let i = 0;
       let scoreFnNode: any = null;
@@ -736,38 +746,27 @@ export class Interpreter {
 
       while (i < args.length) {
         const arg = args[i];
-        if ((arg as any).kind === "keyword") {
-          const kw = (arg as any).name as string;
-          if (kw === "branch") {
-            i++;
-            const hypoNode = args[i];
-            i++;
-            const exprNode = args[i];
-            i++;
-            const hypo = String(interp.eval(hypoNode));
-            const capturedNode = exprNode;
-            tot.branch(hypo, () => interp.eval(capturedNode));
-          } else if (kw === "eval") {
-            i++;
-            scoreFnNode = args[i];
-            i++;
-          } else if (kw === "prune") {
-            i++;
-            pruneThreshold = Number(interp.eval(args[i]));
-            i++;
-          } else if (kw === "select") {
-            i++;
-            const selVal = interp.eval(args[i]);
-            i++;
-            if (selVal === "top-k") selectStrategy = "top-k";
-            else selectStrategy = "best";
-          } else if (kw === "k") {
-            i++;
-            selectK = Number(interp.eval(args[i]));
-            i++;
-          } else {
-            i++;
-          }
+        if (isTotKeyword(arg, "branch")) {
+          i++;
+          const hypoNode = args[i]; i++;
+          const exprNode = args[i]; i++;
+          const hypo = String(interp.eval(hypoNode));
+          const capturedNode = exprNode;
+          tot.branch(hypo, () => interp.eval(capturedNode));
+        } else if (isTotKeyword(arg, "eval")) {
+          i++;
+          scoreFnNode = args[i]; i++;
+        } else if (isTotKeyword(arg, "prune")) {
+          i++;
+          pruneThreshold = Number(interp.eval(args[i])); i++;
+        } else if (isTotKeyword(arg, "select")) {
+          i++;
+          const selVal = interp.eval(args[i]); i++;
+          if (selVal === "top-k") selectStrategy = "top-k";
+          else selectStrategy = "best";
+        } else if (isTotKeyword(arg, "k")) {
+          i++;
+          selectK = Number(interp.eval(args[i])); i++;
         } else {
           i++;
         }
