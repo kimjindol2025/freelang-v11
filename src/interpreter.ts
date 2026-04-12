@@ -7,114 +7,50 @@ import { lex } from "./lexer";
 import { parse } from "./parser";
 import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock, isControlBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
-import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError } from "./errors";
+import { RuntimeTypeChecker } from "./type-system"; // Phase 60: 런타임 타입 검증
+import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError, FunctionNotFoundError } from "./errors";
+import { suggestSimilar } from "./error-formatter";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 import { extractParamNames, extractFunctions } from "./ast-helpers";
 import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runtime";
 import { ScopeStack } from "./interpreter-scope"; // Phase A: 렉시컬 스코프
 import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch integration
 import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
-import { createFileModule } from "./stdlib-file"; // Phase 10: File I/O
-import { createErrorModule } from "./stdlib-error"; // Phase 11: Error handling
-import { createHttpModule } from "./stdlib-http"; // Phase 12: HTTP Client
-import { createShellModule } from "./stdlib-shell"; // Phase 12: Shell execution
-import { createDataModule } from "./stdlib-data"; // Phase 13: Data Transform
-import { createCollectionModule } from "./stdlib-collection"; // Phase 14: Collection + Control
-import { createAgentModule } from "./stdlib-agent"; // Phase 15: AI Agent State Machine
-import { createTimeModule } from "./stdlib-time"; // Phase 16: Time + Logging + Monitoring
-import { createCryptoModule } from "./stdlib-crypto"; // Phase 17: Crypto + UUID + Regex
-import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
-import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
-import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
-import { createDbModule } from "./stdlib-db";          // Phase 20: DB Driver
-import { createWsModule } from "./stdlib-ws";          // Phase 21: WebSocket
-import { createWscModule } from "./stdlib-wsc";        // Phase 57: WebSocket Client (Tunnel)
-import { createAuthModule } from "./stdlib-auth";      // Phase 21: Auth (JWT, API key, hash)
-import { createCacheModule } from "./stdlib-cache";    // Phase 21: In-memory TTL cache
-import { createPubSubModule } from "./stdlib-pubsub";  // Phase 21: Pub/Sub events
-import { createProcessModule } from "./stdlib-process"; // Phase 22: Process (env + SIGTERM)
-import { createAsyncModule } from "./stdlib-async";     // Phase 23: Async/await primitives
-import { createModuleSystem } from "./stdlib-module";   // Phase 24: Module system
-import { pgBuiltins } from "./stdlib-pg";               // PostgreSQL + JWT + AI
 import { evalBuiltin } from "./eval-builtins";                       // Phase 57: Built-in functions
 import { evalAiBlock } from "./eval-ai-blocks";                       // Phase 57: AI blocks
 import { evalSpecialForm } from "./eval-special-forms";               // Phase 57: Special forms
 import { handleReasoningSequence } from "./eval-reasoning-sequence";  // Phase 57: Reasoning sequence
 import { handleSearchBlock as _handleSearchBlock, handleLearnBlock as _handleLearnBlock, handleReasoningBlock as _handleReasoningBlock } from "./eval-ai-handlers"; // Phase 57: AI handlers
 import { evalModuleBlock as _evalModuleBlock, evalImportBlock as _evalImportBlock, evalImportFromFile as _evalImportFromFile, evalOpenBlock as _evalOpenBlock } from "./eval-module-system"; // Phase 57: Module system
+import { loadAllStdlib } from "./stdlib-loader"; // Phase 58: Stdlib 로딩 분리
+import { evalPatternMatch as _evalPatternMatch, evalTryBlock as _evalTryBlock, evalThrow as _evalThrow, matchPattern as _matchPattern } from "./eval-pattern-match"; // Phase 58: Pattern matching 분리
+import { registerBuiltinTypeClasses as _registerBuiltinTypeClasses, evalTypeClass as _evalTypeClass, evalInstance as _evalInstance } from "./eval-type-classes"; // Phase 58: Type class 분리
 
-// ExecutionContext: 런타임 상태 관리
-export interface ExecutionContext {
-  functions: Map<string, FreeLangFunction>;
-  routes: Map<string, FreeLangRoute>;
-  intents: Map<string, Intent>;
-  variables: ScopeStack;
-  server?: any;
-  middleware: FreeLangMiddleware[];
-  errorHandlers: ErrorHandler;
-  startTime: number;
-  lastValue?: any; // Last evaluated value (for REPL/testing)
-  typeChecker?: TypeChecker; // Phase 3: Type system
-  typeClasses?: Map<string, TypeClassInfo>; // Phase 5 Week 2: Type class registry
-  typeClassInstances?: Map<string, TypeClassInstanceInfo>; // Phase 5 Week 2: Type class instances
-  modules?: Map<string, ModuleInfo>; // Phase 6: Module registry
-  cache?: Map<string, any>; // Phase 9a: Search result caching
-  learned?: Map<string, any>; // Phase 9b: Learned data storage (key -> data)
-  reasoning?: Map<string, any>; // Phase 9c: Reasoning state storage (stage-timestamp -> reasoning state)
-  currentSearches?: Map<string, any>; // Phase 9a: Current reasoning sequence search results
-  currentLearned?: Map<string, any>; // Phase 9b: Current reasoning sequence learned data
-}
+// Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
+export type {
+  ExecutionContext,
+  FreeLangFunction,
+  FreeLangRoute,
+  Intent,
+  FreeLangMiddleware,
+  ErrorHandler,
+  TypeClassInfo,
+  TypeClassInstanceInfo,
+  ModuleInfo,
+} from "./interpreter-context";
 
-export interface FreeLangFunction {
-  name: string;
-  params: string[];
-  body: ASTNode;
-  generics?: string[]; // Generic type variables: [T, K, V] (Phase 4)
-  paramTypes?: TypeAnnotation[]; // Parameter types for type checking (Phase 3)
-  returnType?: TypeAnnotation; // Return type for type checking (Phase 3)
-  capturedEnv?: Map<string, any>; // Phase A: 클로저 환경 (fn으로 define된 함수)
-}
-
-export interface FreeLangRoute {
-  name: string;
-  method: string;
-  path: string;
-  handler: ASTNode;
-}
-
-export interface Intent {
-  name: string;
-  fields: Map<string, ASTNode>;
-}
-
-export interface FreeLangMiddleware {
-  name: string;
-  config: Map<string, any>;
-}
-
-export interface ErrorHandler {
-  handlers: Map<number | "default", ASTNode>;
-}
-
-// Phase 5 Week 2: Type Class System
-export interface TypeClassInfo {
-  name: string;
-  typeParams: string[];
-  methods: Map<string, string>;  // method name → type signature
-}
-
-export interface TypeClassInstanceInfo {
-  className: string;
-  concreteType: string;
-  implementations: Map<string, any>;  // method name → implementation function
-}
-
-// Phase 6: Module System
-export interface ModuleInfo {
-  name: string;
-  exports: string[];  // 내보낸 함수 이름들
-  functions: Map<string, FreeLangFunction>;  // 모듈 내 정의된 함수들
-}
+// 로컬 사용을 위해 import
+import type {
+  ExecutionContext,
+  FreeLangFunction,
+  FreeLangRoute,
+  Intent,
+  FreeLangMiddleware,
+  ErrorHandler,
+  TypeClassInfo,
+  TypeClassInstanceInfo,
+  ModuleInfo,
+} from "./interpreter-context";
 
 // Interpreter class
 export class Interpreter {
@@ -129,8 +65,10 @@ export class Interpreter {
   public importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();
 
-  constructor(logger?: Logger) {
+  constructor(logger?: Logger, options?: { strict?: boolean }) {
     this.logger = logger || getGlobalLogger();
+    // Phase 60: strict 모드 — 환경변수 FREELANG_STRICT=1 또는 options.strict=true
+    const strictMode = options?.strict ?? process.env.FREELANG_STRICT === "1";
     this.context = {
       functions: new Map(),
       routes: new Map(),
@@ -140,6 +78,7 @@ export class Interpreter {
       errorHandlers: { handlers: new Map() },
       startTime: Date.now(),
       typeChecker: createTypeChecker(), // Phase 3: Initialize type checker
+      runtimeTypeChecker: new RuntimeTypeChecker(strictMode), // Phase 60: 런타임 타입 검증
       typeClasses: new Map(),             // Phase 5 Week 2: Type class registry
       typeClassInstances: new Map(),      // Phase 5 Week 2: Type class instance registry
       modules: new Map(),                 // Phase 6: Module registry
@@ -154,33 +93,8 @@ export class Interpreter {
     // Phase 9b: Initialize LearnedFactsStore (persistent learning)
     this.learnedFactsStore = new LearnedFactsStore("./data/learned-facts.json", 30);
 
-    // Phase 10-20: Register all stdlib modules
-    this.registerModule(createFileModule());
-    this.registerModule(createErrorModule());
-    this.registerModule(createHttpModule());
-    this.registerModule(createShellModule());
-    this.registerModule(createDataModule());
-    this.registerModule(createCollectionModule());
-    this.registerModule(createAgentModule());
-    this.registerModule(createTimeModule());
-    this.registerModule(createCryptoModule());
-    this.registerModule(createWorkflowModule());
-    this.registerModule(createResourceModule());
-    // Phase 4a: Pure HTTP Server (overrides Express version)
-    this.registerModule(createHttpServerModule(
-      (n, a) => this.callUserFunction(n, a),
-      (fnValue, a) => this.callFunctionValue(fnValue, a)
-    ));
-    this.registerModule(createDbModule());
-    this.registerModule(createWsModule((n, a) => this.callUserFunction(n, a)));
-    this.registerModule(createWscModule((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client
-    this.registerModule(createAuthModule());
-    this.registerModule(createCacheModule());
-    this.registerModule(createPubSubModule((n, a) => this.callUserFunction(n, a)));
-    this.registerModule(createProcessModule()); // Phase 22: env_load, on_sigterm
-    this.registerModule(createAsyncModule((n, a) => this.callUserFunction(n, a))); // Phase 23: async_call, promise_*
-    this.registerModule(createModuleSystem());  // Phase 24: module_*, namespace_*
-    this.registerModule(pgBuiltins);            // PostgreSQL + JWT + AI
+    // Phase 58: 모든 stdlib 모듈 등록 (stdlib-loader.ts로 분리)
+    loadAllStdlib(this);
 
     // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
     this.loadFlStdlib();
@@ -230,7 +144,7 @@ export class Interpreter {
     }
   }
 
-  private registerModule(module: Record<string, unknown>): void {
+  public registerModule(module: Record<string, unknown>): void {
     for (const [name, fn] of Object.entries(module)) {
       this.context.functions.set(name, { name, params: [], body: fn as any });
       if (this.context.typeChecker) {
@@ -271,6 +185,14 @@ export class Interpreter {
     }
 
     return this.context;
+  }
+
+  /**
+   * Phase 59: 소스 코드 문자열을 받아 lex → parse → interpret 후 ExecutionContext 반환
+   * 테스트와 인라인 실행에 편리한 단축 메서드
+   */
+  run(source: string): ExecutionContext {
+    return this.interpret(parse(lex(source)));
   }
 
   private evalBlock(block: Block): void {
@@ -410,6 +332,14 @@ export class Interpreter {
         // Phase 3: Register regular function
         this.context.typeChecker.registerFunction(block.name, paramTypes, returnType);
       }
+    }
+
+    // Phase 60: RuntimeTypeChecker에도 시그니처 등록 (타입 어노테이션이 있는 함수만)
+    // typeAnnotations가 있으면 = 명시적 타입 어노테이션이 있는 함수
+    if (this.context.runtimeTypeChecker && block.typeAnnotations) {
+      const paramTypeNames = paramTypes.map((p) => p.name || "any");
+      const retTypeName = returnType.name || "any";
+      this.context.runtimeTypeChecker.registerFunc(block.name, paramTypeNames, retTypeName);
     }
   }
 
@@ -731,7 +661,19 @@ export class Interpreter {
 
     const func = this.context.functions.get(baseName);
     if (!func) {
-      throw new Error(`Function not found: ${baseName}`);
+      // Phase 59: 유사 함수명 힌트 제공
+      const candidates = [...this.context.functions.keys()];
+      const similar = suggestSimilar(baseName, candidates);
+      const hint = similar
+        ? `'${baseName}'를 찾을 수 없습니다. 혹시 '${similar}'를 말씀하신 건가요?`
+        : `'${baseName}'를 찾을 수 없습니다. 함수가 정의되어 있는지 확인하세요.`;
+      throw new FunctionNotFoundError(
+        baseName,
+        this.currentFilePath,
+        this.currentLine > 0 ? this.currentLine : undefined,
+        undefined,
+        hint
+      );
     }
 
     // Phase 4: Handle generic function instantiation
@@ -752,23 +694,10 @@ export class Interpreter {
       isGenericCall = true;
     }
 
-    // Phase 3: Type check function call (skip for generic calls, as instantiation already validated)
-    if (!isGenericCall && this.context.typeChecker) {
-      const argTypes = args.map((arg) => {
-        // Infer type from argument value
-        if (typeof arg === "number") return { kind: "type" as const, name: "int" };
-        if (typeof arg === "string") return { kind: "type" as const, name: "string" };
-        if (typeof arg === "boolean") return { kind: "type" as const, name: "bool" };
-        if (Array.isArray(arg)) return { kind: "type" as const, name: "array<any>" };
-        if (typeof arg === "function") return { kind: "type" as const, name: "function" };
-        return { kind: "type" as const, name: "any" };
-      });
-
-      const validation = this.context.typeChecker.checkFunctionCall(baseName, argTypes);
-      // Skip type check for dynamically defined inner functions (define inside function body)
-      if (!validation.valid && validation.message !== `Unknown function: ${baseName}`) {
-        throw new Error(`Type error in call to '${baseName}': ${validation.message}`);
-      }
+    // Phase 60: RuntimeTypeChecker — strict 모드에서만 런타임 타입 검증
+    // 타입 어노테이션이 명시된 함수에 대해서만 인수 타입 검증 수행
+    if (!isGenericCall && this.context.runtimeTypeChecker) {
+      this.context.runtimeTypeChecker.checkCall(baseName, args);
     }
 
     // Native JS function (Phase 10/11 builtins): call directly with args
@@ -923,227 +852,12 @@ export class Interpreter {
     return this.eval(field as ASTNode);
   }
 
-  // ===== Pattern Matching (Phase 4 Week 3-4) =====
-
-  public evalPatternMatch(match: PatternMatch): any {
-    // Evaluate the value to match
-    const value = this.eval(match.value);
-
-    // Try each case in order
-    for (const caseItem of match.cases) {
-      // Try to match pattern (only save/restore pattern-binding variables, not all state)
-      const matchResult = this.matchPattern(caseItem.pattern, value);
-
-      if (matchResult.matched) {
-        this.context.variables.push();
-        for (const [varName] of matchResult.bindings) {
-          this.context.variables.set("$" + varName, matchResult.bindings.get(varName));
-        }
-
-        // Check guard condition if present
-        if (caseItem.guard) {
-          const guardResult = this.eval(caseItem.guard);
-          if (!guardResult) {
-            this.context.variables.pop();
-            continue;
-          }
-        }
-
-        try {
-          return this.eval(caseItem.body);
-        } finally {
-          this.context.variables.pop();
-        }
-      }
-    }
-
-    // No case matched, try default case
-    if (match.defaultCase) {
-      return this.eval(match.defaultCase);
-    }
-
-    // No match found
-    throw new Error("Pattern match exhausted without matching case");
-  }
-
-  // Phase 11: Evaluate try-catch-finally blocks
-  public evalTryBlock(tryBlock: TryBlock): any {
-    let result: any;
-    let errorCaught = false;
-
-    try {
-      // Execute try body
-      result = this.eval(tryBlock.body);
-    } catch (error: any) {
-      errorCaught = true;
-      let handled = false;
-
-      // Try each catch clause
-      if (tryBlock.catchClauses && tryBlock.catchClauses.length > 0) {
-        for (const catchClause of tryBlock.catchClauses) {
-          // For now, all catch clauses handle all errors (no pattern matching)
-          // In future, could support typed catch (catch [IOException e] ...)
-
-          this.context.variables.push();
-          if (catchClause.variable) {
-            this.context.variables.set("$" + catchClause.variable, error);
-          }
-
-          try {
-            result = this.eval(catchClause.handler);
-            handled = true;
-            break;
-          } catch (innerError: any) {
-            throw innerError;
-          } finally {
-            this.context.variables.pop();
-          }
-        }
-      }
-
-      // If no catch clause handled it, re-throw
-      if (!handled) {
-        throw error;
-      }
-    } finally {
-      // Always execute finally block if present
-      if (tryBlock.finallyBlock) {
-        this.eval(tryBlock.finallyBlock);
-      }
-    }
-
-    return result;
-  }
-
-  // Phase 11: Evaluate throw expressions
-  public evalThrow(throwExpr: ThrowExpression): any {
-    const error = this.eval(throwExpr.argument);
-
-    // Throw the evaluated error value
-    if (error instanceof Error) {
-      throw error;
-    } else if (typeof error === "string") {
-      throw new Error(error);
-    } else if (error && typeof error === "object" && error.message) {
-      throw new Error(error.message);
-    } else {
-      throw new Error(String(error));
-    }
-  }
-
-  // Try to match a pattern against a value
-  // Returns {matched: boolean, bindings: Map<string, any>}
+  // ===== Pattern Matching (Phase 4 Week 3-4) — Phase 58: eval-pattern-match.ts로 분리 =====
+  public evalPatternMatch(match: PatternMatch): any { return _evalPatternMatch(this, match); }
+  public evalTryBlock(tryBlock: TryBlock): any { return _evalTryBlock(this, tryBlock); }
+  public evalThrow(throwExpr: ThrowExpression): any { return _evalThrow(this, throwExpr); }
   public matchPattern(pattern: Pattern, value: any): { matched: boolean; bindings: Map<string, any> } {
-    const bindings = new Map<string, any>();
-
-    // Literal pattern: match exact value
-    if ((pattern as any).kind === "literal-pattern") {
-      const litPattern = pattern as LiteralPattern;
-      if (litPattern.value === value) {
-        return { matched: true, bindings };
-      }
-      return { matched: false, bindings };
-    }
-
-    // Variable pattern: always matches, binds variable
-    if ((pattern as any).kind === "variable-pattern") {
-      const varPattern = pattern as VariablePattern;
-      bindings.set(varPattern.name, value);
-      return { matched: true, bindings };
-    }
-
-    // Wildcard pattern: always matches, no binding
-    if ((pattern as any).kind === "wildcard-pattern") {
-      return { matched: true, bindings };
-    }
-
-    // List pattern: match array elements
-    if ((pattern as any).kind === "list-pattern") {
-      const listPattern = pattern as ListPattern;
-
-      // Value must be an array
-      if (!Array.isArray(value)) {
-        return { matched: false, bindings };
-      }
-
-      // Match elements
-      const elements = listPattern.elements;
-      let matchedCount = 0;
-
-      for (let i = 0; i < elements.length; i++) {
-        if (i >= value.length) {
-          // Not enough elements
-          return { matched: false, bindings };
-        }
-
-        const elemResult = this.matchPattern(elements[i], value[i]);
-        if (!elemResult.matched) {
-          return { matched: false, bindings };
-        }
-
-        // Merge bindings
-        for (const [name, val] of elemResult.bindings) {
-          bindings.set(name, val);
-        }
-
-        matchedCount++;
-      }
-
-      // Handle rest element: [x & rest]
-      if (listPattern.restElement) {
-        const restValues = value.slice(matchedCount);
-        bindings.set(listPattern.restElement, restValues);
-      } else if (matchedCount < value.length) {
-        // If no rest element, must match exact length
-        return { matched: false, bindings };
-      }
-
-      return { matched: true, bindings };
-    }
-
-    // Struct pattern: match object fields
-    if ((pattern as any).kind === "struct-pattern") {
-      const structPattern = pattern as StructPattern;
-
-      // Value must be an object
-      if (typeof value !== "object" || value === null) {
-        return { matched: false, bindings };
-      }
-
-      // Match each field
-      for (const [fieldName, fieldPattern] of structPattern.fields) {
-        const fieldValue = value[fieldName];
-        const fieldResult = this.matchPattern(fieldPattern, fieldValue);
-        if (!fieldResult.matched) {
-          return { matched: false, bindings };
-        }
-
-        // Merge bindings
-        for (const [name, val] of fieldResult.bindings) {
-          bindings.set(name, val);
-        }
-      }
-
-      return { matched: true, bindings };
-    }
-
-    // Or pattern: try alternatives until one matches
-    if ((pattern as any).kind === "or-pattern") {
-      const orPattern = pattern as OrPattern;
-
-      for (const alternative of orPattern.alternatives) {
-        const altResult = this.matchPattern(alternative, value);
-        if (altResult.matched) {
-          return altResult; // Return first matching alternative
-        }
-      }
-
-      // None of the alternatives matched
-      return { matched: false, bindings };
-    }
-
-    // Unknown pattern type
-    return { matched: false, bindings };
+    return _matchPattern(this, pattern, value);
   }
 
   // Utility: Get context
@@ -1157,148 +871,21 @@ export class Interpreter {
   }
 
   // Phase 5 Week 2: Register built-in type classes and instances
-  public registerBuiltinTypeClasses(): void {
-    if (!this.context.typeClasses || !this.context.typeClassInstances) {
-      return;
-    }
+  // Phase 58: Type class 관련 로직 eval-type-classes.ts로 분리
+  public registerBuiltinTypeClasses(): void { _registerBuiltinTypeClasses(this); }
+  public evalTypeClass(typeClass: TypeClass): void { _evalTypeClass(this, typeClass); }
+  public evalInstance(instance: TypeClassInstance): void { _evalInstance(this, instance); }
 
-    // Define Monad type class
-    this.context.typeClasses.set("Monad", {
-      name: "Monad",
-      typeParams: ["M"],
-      methods: new Map([
-        ["pure", "fn [a] (M a)"],
-        ["bind", "fn [m f] (M b)"],
-        ["map", "fn [m f] (M b)"],
-      ]),
-    });
-
-    // Define Functor type class
-    this.context.typeClasses.set("Functor", {
-      name: "Functor",
-      typeParams: ["F"],
-      methods: new Map([["fmap", "fn [f a] (F a)"]]),
-    });
-
-    // Instance: Result → Monad
-    this.context.typeClassInstances.set("Monad[Result]", {
-      className: "Monad",
-      concreteType: "Result",
-      implementations: new Map([
-        ["pure", (x: any) => ({ tag: "Ok", value: x, kind: "Result" })],
-        ["bind", this.bindMonad.bind(this)],
-        ["map", this.mapResult.bind(this)],
-      ]),
-    });
-
-    // Instance: Option → Monad
-    this.context.typeClassInstances.set("Monad[Option]", {
-      className: "Monad",
-      concreteType: "Option",
-      implementations: new Map([
-        ["pure", (x: any) => ({ tag: "Some", value: x, kind: "Option" })],
-        ["bind", this.bindMonad.bind(this)],
-        ["map", this.mapOption.bind(this)],
-      ]),
-    });
-
-    // Instance: List → Monad (FlatMap)
-    this.context.typeClassInstances.set("Monad[List]", {
-      className: "Monad",
-      concreteType: "List",
-      implementations: new Map([
-        ["pure", (x: any) => [x]],
-        ["bind", this.bindList.bind(this)],
-        ["map", this.mapList.bind(this)],
-      ]),
-    });
-
-    // Instance: Result → Functor
-    this.context.typeClassInstances.set("Functor[Result]", {
-      className: "Functor",
-      concreteType: "Result",
-      implementations: new Map([["fmap", this.mapResult.bind(this)]]),
-    });
-
-    // Instance: Option → Functor
-    this.context.typeClassInstances.set("Functor[Option]", {
-      className: "Functor",
-      concreteType: "Option",
-      implementations: new Map([["fmap", this.mapOption.bind(this)]]),
-    });
-
-    // Instance: List → Functor
-    this.context.typeClassInstances.set("Functor[List]", {
-      className: "Functor",
-      concreteType: "List",
-      implementations: new Map([["fmap", this.mapList.bind(this)]]),
-    });
-  }
-
-  // Helper methods for type class instances
-  private bindMonad(monad: any, fn: any): any {
-    if ((monad as any).kind === "Result") {
-      if ((monad as any).tag === "Ok") {
-        return this.callFunction(fn, [(monad as any).value]);
-      }
-      return monad;
-    }
-    if ((monad as any).kind === "Option") {
-      if ((monad as any).tag === "Some") {
-        return this.callFunction(fn, [(monad as any).value]);
-      }
-      return monad;
-    }
-    return monad;
-  }
-
-  private bindList(list: any[], fn: any): any[] {
-    let result: any[] = [];
-    for (const item of list) {
-      const transformed = this.callFunction(fn, [item]);
-      if (Array.isArray(transformed)) {
-        result = result.concat(transformed);
-      } else {
-        result.push(transformed);
-      }
-    }
-    return result;
-  }
-
-  private mapResult(result: any, fn: any): any {
-    if ((result as any).tag === "Ok") {
-      return { tag: "Ok", value: this.callFunction(fn, [(result as any).value]), kind: "Result" };
-    }
-    return result;
-  }
-
-  private mapOption(option: any, fn: any): any {
-    if ((option as any).tag === "Some") {
-      return { tag: "Some", value: this.callFunction(fn, [(option as any).value]), kind: "Option" };
-    }
-    return option;
-  }
-
-  private mapList(list: any[], fn: any): any[] {
-    return list.map((item: any) => this.callFunction(fn, [item]));
-  }
-
-  // Get type class
+  // Type class query helpers
   getTypeClass(name: string): TypeClassInfo | undefined {
     return this.context.typeClasses?.get(name);
   }
-
-  // Get type class instance
   getTypeClassInstance(className: string, concreteType: string): TypeClassInstanceInfo | undefined {
     return this.context.typeClassInstances?.get(`${className}[${concreteType}]`);
   }
-
-  // Check if a type satisfies a type class constraint
   satisfiesConstraint(type: string, constraintClass: string): boolean {
     return !!this.getTypeClassInstance(constraintClass, type);
   }
-
-  // Phase 5 Week 2: Get concrete type from a value
   public getConcreteType(value: any): string | undefined {
     if (!value || typeof value !== "object") return undefined;
     if (value.tag === "Ok" || value.tag === "Err") return "Result";
@@ -1309,14 +896,9 @@ export class Interpreter {
     if (value.kind === "List") return "List";
     return undefined;
   }
-
-  // Phase 5 Week 2: Resolve method for a given className and concreteType
   public resolveMethod(className: string, concreteType: string, methodName: string): any {
     const instance = this.getTypeClassInstance(className, concreteType);
-    if (!instance) {
-      return undefined;
-    }
-    return instance.implementations.get(methodName);
+    return instance?.implementations.get(methodName);
   }
 
   // Phase 6 Step 4: Helper to ensure modules map exists
@@ -1335,77 +917,10 @@ export class Interpreter {
   }
   public evalOpenBlock(openBlock: OpenBlock): void { _evalOpenBlock(this, openBlock); }
   // Phase 57: delegated to eval-ai-handlers.ts
-  public handleSearchBlock(searchBlock: SearchBlock): any {
-    return _handleSearchBlock(this, searchBlock);
-  }
-
-  // Phase 57: delegated to eval-ai-handlers.ts
-  public handleLearnBlock(learnBlock: LearnBlock): any {
-    return _handleLearnBlock(this, learnBlock);
-  }
-  // Phase 57: delegated to eval-ai-handlers.ts
-  public handleReasoningBlock(reasoningBlock: ReasoningBlock): any {
-    return _handleReasoningBlock(this, reasoningBlock);
-  }
-  // Phase 57: handleReasoningSequence delegated to eval-reasoning-sequence.ts
-  public handleReasoningSequence(reasoningSeq: ReasoningSequence): any {
-    return handleReasoningSequence(this, reasoningSeq);
-  }
-
-  // Phase 5 Week 2: Evaluate Type Class definition
-  public evalTypeClass(typeClass: TypeClass): void {
-    const info: TypeClassInfo = {
-      name: typeClass.name,
-      typeParams: typeClass.typeParams,
-      methods: new Map(),
-    };
-
-    // Extract method signatures from typeClass.methods Map
-    if (typeClass.methods) {
-      typeClass.methods.forEach((method, methodName) => {
-        // Store method signature (for now, just the method name)
-        info.methods.set(methodName, methodName);
-      });
-    }
-
-    // Register type class in context
-    this.context.typeClasses!.set(typeClass.name, info);
-
-    this.logger.info(
-      `✅ Registered TYPECLASS "${typeClass.name}" with type params [${typeClass.typeParams.join(
-        ", "
-      )}] and ${info.methods.size} method(s)`
-    );
-  }
-
-  // Phase 5 Week 2: Evaluate Type Class Instance definition
-  public evalInstance(instance: TypeClassInstance): void {
-    const key = `${instance.className}[${instance.concreteType}]`;
-
-    const implementations = new Map<string, any>();
-
-    // Extract method implementations from instance.implementations Map
-    if (instance.implementations) {
-      instance.implementations.forEach((value, methodName) => {
-        // Evaluate each method implementation
-        const impl = this.eval(value);
-        implementations.set(methodName, impl);
-      });
-    }
-
-    const info: TypeClassInstanceInfo = {
-      className: instance.className,
-      concreteType: instance.concreteType,
-      implementations,
-    };
-
-    // Register type class instance in context
-    this.context.typeClassInstances!.set(key, info);
-
-    this.logger.info(
-      `✅ Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`
-    );
-  }
+  public handleSearchBlock(searchBlock: SearchBlock): any { return _handleSearchBlock(this, searchBlock); }
+  public handleLearnBlock(learnBlock: LearnBlock): any { return _handleLearnBlock(this, learnBlock); }
+  public handleReasoningBlock(reasoningBlock: ReasoningBlock): any { return _handleReasoningBlock(this, reasoningBlock); }
+  public handleReasoningSequence(reasoningSeq: ReasoningSequence): any { return handleReasoningSequence(this, reasoningSeq); }
 
   /**
    * Cleanup: Destroy all resources and stop timers
