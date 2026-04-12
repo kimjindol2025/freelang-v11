@@ -3439,6 +3439,13 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         if (r148 !== null) return r148;
       }
 
+
+      // === Phase 145: EXPLAIN ===
+      if (op.startsWith("explain-")) {
+        const r145 = evalExplain_PHASE145(op, args, callFnVal);
+        if (r145 !== null) return r145;
+      }
+
       // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
       return callUser(op, args);
     }
@@ -4699,6 +4706,135 @@ function evalCounterfactual(op: string, args: any[], callFn: (fn: any, a: any[])
     const rawExpl145s = args[0];
     if (rawExpl145s instanceof Map) return String(rawExpl145s.get("summary") ?? "");
     return "";
+  }
+
+  return null;
+}
+
+// === Phase 149: WISDOM ===
+export function evalWisdom(op: string, args: any[]): any | null {
+
+  if (op === "wisdom-add-exp") {
+    const kwargs: Record<string, any> = {};
+    for (let i = 0; i < args.length - 1; i += 2) {
+      const key = String(args[i]).replace(/^:/, "");
+      kwargs[key] = args[i + 1];
+    }
+    const exp = globalWisdom.addExperience({
+      situation: String(kwargs["situation"] ?? ""),
+      action: String(kwargs["action"] ?? ""),
+      outcome: String(kwargs["outcome"] ?? ""),
+      lesson: String(kwargs["lesson"] ?? ""),
+      success: kwargs["success"] === true || kwargs["success"] === "true",
+      importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
+      domain: String(kwargs["domain"] ?? "general"),
+    });
+    return new Map<string, any>([
+      ["id", exp.id], ["situation", exp.situation], ["action", exp.action],
+      ["outcome", exp.outcome], ["lesson", exp.lesson], ["success", exp.success],
+      ["importance", exp.importance], ["domain", exp.domain],
+      ["timestamp", exp.timestamp.toISOString()],
+    ]);
+  }
+
+  if (op === "wisdom-judge") {
+    const situation = String(args[0] ?? "");
+    const judgment = globalWisdom.judge(situation);
+    return new Map<string, any>([
+      ["situation", judgment.situation],
+      ["recommendation", judgment.recommendation],
+      ["reasoning", judgment.reasoning],
+      ["relevantExperiences", judgment.relevantExperiences.map((e: Experience) => new Map<string, any>([
+        ["id", e.id], ["situation", e.situation], ["lesson", e.lesson],
+        ["success", e.success], ["importance", e.importance], ["domain", e.domain],
+      ]))],
+      ["applicableHeuristics", judgment.applicableHeuristics.map((h: Heuristic) => new Map<string, any>([
+        ["id", h.id], ["rule", h.rule], ["confidence", h.confidence],
+        ["successCount", h.successCount], ["totalCount", h.totalCount], ["domain", h.domain],
+      ]))],
+      ["confidence", judgment.confidence],
+      ["caveats", judgment.caveats],
+      ["alternatives", judgment.alternatives],
+    ]);
+  }
+
+  if (op === "wisdom-heuristics") {
+    return globalWisdom.getHeuristics().map((h: Heuristic) => new Map<string, any>([
+      ["id", h.id], ["rule", h.rule], ["confidence", h.confidence],
+      ["successCount", h.successCount], ["totalCount", h.totalCount],
+      ["domain", h.domain], ["derivedFrom", h.derivedFrom],
+    ]));
+  }
+
+  if (op === "wisdom-extract") {
+    const heuristics = globalWisdom.extractHeuristics();
+    return heuristics.map((h: Heuristic) => new Map<string, any>([
+      ["id", h.id], ["rule", h.rule], ["confidence", h.confidence],
+      ["successCount", h.successCount], ["totalCount", h.totalCount],
+      ["domain", h.domain], ["derivedFrom", h.derivedFrom],
+    ]));
+  }
+
+  if (op === "wisdom-relevant") {
+    const situation = String(args[0] ?? "");
+    const limit = typeof args[1] === "number" ? args[1] : 5;
+    return globalWisdom.findRelevantExperiences(situation, limit).map((e: Experience) => new Map<string, any>([
+      ["id", e.id], ["situation", e.situation], ["action", e.action],
+      ["outcome", e.outcome], ["lesson", e.lesson], ["success", e.success],
+      ["importance", e.importance], ["domain", e.domain],
+    ]));
+  }
+
+  if (op === "wisdom-lessons") {
+    let domain: string | undefined;
+    for (let i = 0; i < args.length - 1; i += 2) {
+      const key = String(args[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args[i + 1]);
+    }
+    return globalWisdom.getLessons(domain);
+  }
+
+  if (op === "wisdom-score") {
+    return globalWisdom.wisdomScore();
+  }
+
+  if (op === "wisdom-domain") {
+    const domain = String(args[0] ?? "general");
+    const summary = globalWisdom.summarizeDomain(domain);
+    return new Map<string, any>([
+      ["topLessons", summary.topLessons],
+      ["bestHeuristics", summary.bestHeuristics.map((h: Heuristic) => new Map<string, any>([
+        ["id", h.id], ["rule", h.rule], ["confidence", h.confidence],
+        ["successCount", h.successCount], ["totalCount", h.totalCount],
+      ]))],
+      ["successRate", summary.successRate],
+    ]);
+  }
+
+  if (op === "wisdom-valid?") {
+    const expMap = args[0];
+    if (!(expMap instanceof Map)) return false;
+    const exp: Experience = {
+      id: String(expMap.get("id") ?? ""),
+      situation: String(expMap.get("situation") ?? ""),
+      action: String(expMap.get("action") ?? ""),
+      outcome: String(expMap.get("outcome") ?? ""),
+      lesson: String(expMap.get("lesson") ?? ""),
+      success: expMap.get("success") === true,
+      importance: Number(expMap.get("importance") ?? 0.5),
+      timestamp: new Date(String(expMap.get("timestamp") ?? new Date().toISOString())),
+      domain: String(expMap.get("domain") ?? "general"),
+    };
+    return globalWisdom.isStillValid(exp);
+  }
+
+  if (op === "wisdom-similar") {
+    const situation = String(args[0] ?? "");
+    return globalWisdom.findSimilarCases(situation).map((e: Experience) => new Map<string, any>([
+      ["id", e.id], ["situation", e.situation], ["action", e.action],
+      ["outcome", e.outcome], ["lesson", e.lesson], ["success", e.success],
+      ["importance", e.importance], ["domain", e.domain],
+    ]));
   }
 
   return null;
