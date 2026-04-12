@@ -481,7 +481,8 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         if (typeof fnRef === "function" || (fnRef as any)?.kind === "function-value") return callFn(fnRef, callArgs);
         return null;
       }
-      throw new Error(`Unknown operator: ${op}`);
+      // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
+      return callUser(op, args);
     }
   }
 }
