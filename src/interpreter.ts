@@ -1178,6 +1178,34 @@ export class Interpreter {
       return this.evalLet(expr.args);
     }
 
+    // set: (set $var new-value) — 기존 바인딩 수정 (Phase 7 P0)
+    // resolver에서 루프 변수 업데이트에 필요
+    if (op === "set") {
+      if (expr.args.length !== 2) {
+        throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
+      }
+
+      const varNode = expr.args[0] as any;
+      let varName: string;
+
+      if (varNode.kind === "variable") {
+        varName = varNode.name;
+      } else if (varNode.kind === "literal" && varNode.type === "symbol") {
+        varName = "$" + varNode.value;
+      } else {
+        throw new Error(`set: first argument must be a variable`);
+      }
+
+      const newValue = this.eval(expr.args[1]);
+      const success = this.context.variables.mutate(varName, newValue);
+
+      if (!success) {
+        throw new Error(`set: variable ${varName} not found in scope`);
+      }
+
+      return newValue;
+    }
+
     // if: (if condition then-branch else-branch)
     if (op === "if") {
       const condition = this.eval(expr.args[0]);
