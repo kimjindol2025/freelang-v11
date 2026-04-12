@@ -14,8 +14,8 @@
       :downloads 10000000
       :stars 52000
       :versions [
-        { :version "4.17.21" :published_at "2021-05-13" :checksum "sha256:23_23" }
-        { :version "4.17.20" :published_at "2021-04-12" :checksum "sha256:23_20" }
+        { :version "4.17.21" :published_at "2021-05-13" :checksum "sha256:22_22" }
+        { :version "4.17.20" :published_at "2021-04-12" :checksum "sha256:22_20" }
       ]
     }
     :express {
