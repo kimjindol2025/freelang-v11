@@ -443,6 +443,9 @@ function printUsage(): void {
     "  freelang debug <file.fl> --step  step 모드 (모든 줄 추적)",
     "  freelang watch <file.fl>         파일 변경 시 자동 재실행 (Phase 79)",
     "  freelang watch <file.fl> --no-clear  콘솔 지우지 않고 재실행",
+    "  freelang ci                      현재 디렉토리 .fl 파일 전체 CI (Phase 80)",
+    "  freelang ci <file.fl>            특정 파일 CI",
+    "  freelang ci --no-fail-fast       실패해도 계속 진행",
     "",
     "예제:",
     "  freelang run my-script.fl",
@@ -501,6 +504,14 @@ switch (cmd) {
       onError: (file, err) => {
         console.error(`\x1b[31m[ERROR]\x1b[0m  ${path.basename(file)}: ${err.message}`);
       },
+    });
+    break;
+  }
+  case "ci": {
+    // Phase 80: freelang ci [<file.fl>] [--no-fail-fast]
+    cmdCi(args.slice(1)).catch((err) => {
+      console.error(`\x1b[31m[CI 오류]\x1b[0m  ${err.message}`);
+      process.exit(1);
     });
     break;
   }
