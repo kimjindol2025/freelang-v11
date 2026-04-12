@@ -65,11 +65,28 @@ export class ParserError extends Error {
     message: string,
     public line: number,
     public col: number,
-    public hint?: string
+    public hint?: string,
+    public code?: string,
+    public stage: string = "parse"
   ) {
+    const codeStr = code ? `[${code}]` : "";
     const loc = `[${line}:${col}]`;
     const hintLine = hint ? `\n  힌트: ${hint}` : "";
-    super(`${loc} ${message}${hintLine}`);
+    super(`${codeStr} ${loc} ${message}${hintLine}`);
+  }
+
+  toJSON() {
+    return {
+      code: this.code || "E_PARSE_SYNTAX_ERROR",
+      stage: this.stage,
+      message: this.message,
+      file: undefined,
+      line: this.line,
+      column: this.col,
+      symbol: undefined,
+      cause: undefined,
+      hint: this.hint,
+    };
   }
 }
 
@@ -1072,7 +1089,18 @@ export class Parser {
   private error(message: string, token: Token): ParserError {
     // 힌트 매칭: 메시지 앞부분으로 검색
     const hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
-    return new ParserError(message, token.line, token.col, hint);
+
+    // 메시지 패턴에 따라 에러 코드 결정
+    let code = "E_PARSE_SYNTAX_ERROR";
+    if (message.includes("Expected") || message.includes("Unexpected")) {
+      code = "E_PARSE_UNEXPECTED_TOKEN";
+    } else if (message.includes("Unterminated")) {
+      code = "E_PARSE_UNCLOSED_PAREN";
+    } else if (message.includes("Expected block")) {
+      code = "E_PARSE_SYNTAX_ERROR";
+    }
+
+    return new ParserError(message, token.line, token.col, hint, code, "parse");
   }
 
   // Synchronization for error recovery

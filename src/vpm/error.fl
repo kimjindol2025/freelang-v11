@@ -1,0 +1,218 @@
+; Phase 5: Error System Standardization
+; 공통 에러 구조 정의 및 포맷팅
+
+; 에러 코드 상수
+[FUNC error-codes :params []
+  :body {
+    :PARSE_ERROR "E_PARSE_UNEXPECTED_TOKEN"
+    :PARSE_SYNTAX "E_PARSE_SYNTAX_ERROR"
+    :PARSE_UNCLOSED "E_PARSE_UNCLOSED_PAREN"
+    :ANALYSIS_UNBOUND "E_ANALYSIS_UNBOUND_SYMBOL"
+    :RUNTIME_TYPE "E_RUNTIME_TYPE_ERROR"
+    :RUNTIME_UNBOUND "E_RUNTIME_UNBOUND_SYMBOL"
+    :RUNTIME_INVALID "E_RUNTIME_INVALID_CALL"
+    :PACKAGE_RESOLVE "E_PACKAGE_VERSION_CONFLICT"
+    :PACKAGE_NOTFOUND "E_PACKAGE_NOT_FOUND"
+    :PACKAGE_FETCH "E_PACKAGE_FETCH_FAILED"
+    :PACKAGE_VERIFY "E_PACKAGE_VERIFY_CHECKSUM_FAILED"
+    :PACKAGE_INSTALL "E_PACKAGE_INSTALL_FAILED"
+    :IO_READ "E_IO_READ_FAILED"
+    :IO_WRITE "E_IO_WRITE_FAILED"
+    :NETWORK_TIMEOUT "E_NETWORK_TIMEOUT"
+    :NETWORK_UNREACHABLE "E_NETWORK_UNREACHABLE"
+    :HTTP_NOT_FOUND "E_HTTP_ROUTE_NOT_FOUND"
+    :HTTP_METHOD "E_HTTP_METHOD_NOT_ALLOWED"
+    :HTTP_INVALID "E_HTTP_INVALID_REQUEST"
+  }
+]
+
+; 에러 객체 생성
+[FUNC make-error :params [
+  $code
+  $stage
+  $message
+  $symbol
+  $file
+  $line
+  $column
+  $cause
+  $hint
+]
+  :body {
+    :code $code
+    :stage $stage
+    :message $message
+    :symbol $symbol
+    :file $file
+    :line $line
+    :column $column
+    :cause $cause
+    :hint $hint
+    :timestamp (get-timestamp)
+  }
+]
+
+; stage별 에러 생성 헬퍼
+[FUNC parse-error :params [$code $message $line $column $hint]
+  :body (make-error $code "parse" $message nil nil $line $column nil nil $hint)
+]
+
+[FUNC analysis-error :params [$code $message $symbol $file $line $hint]
+  :body (make-error $code "analysis" $message $symbol $file $line nil nil $hint)
+]
+
+[FUNC runtime-error :params [$code $message $symbol $cause $hint]
+  :body (make-error $code "runtime" $message $symbol nil nil nil $cause nil $hint)
+]
+
+[FUNC package-resolve-error :params [$package $constraint $available]
+  :body (make-error
+    "E_PACKAGE_VERSION_CONFLICT"
+    "package_resolve"
+    (concat "Cannot resolve " $package " with constraint " $constraint ". Available: " (json-stringify $available))
+    $package
+    nil nil nil nil
+    (concat "Available versions: " (json-stringify $available))
+  )
+]
+
+[FUNC package-fetch-error :params [$package $version $reason]
+  :body (make-error
+    "E_PACKAGE_FETCH_FAILED"
+    "package_fetch"
+    (concat "Failed to fetch " $package "@" $version ": " $reason)
+    $package
+    nil nil nil
+    $reason
+    "Check network connection or registry availability"
+  )
+]
+
+[FUNC package-verify-error :params [$package $version $expected_hash $actual_hash]
+  :body (make-error
+    "E_PACKAGE_VERIFY_CHECKSUM_FAILED"
+    "package_verify"
+    (concat "Checksum mismatch for " $package "@" $version)
+    $package
+    nil nil nil
+    (concat "Expected: " $expected_hash ", Got: " $actual_hash)
+    "Package may be corrupted or tampered. Re-fetch recommended."
+  )
+]
+
+[FUNC io-error :params [$code $path $reason]
+  :body (make-error
+    $code
+    "io"
+    (concat "I/O error on " $path ": " $reason)
+    nil
+    $path
+    nil nil
+    $reason
+    (concat "Check file permissions and path: " $path)
+  )
+]
+
+[FUNC network-error :params [$code $url $reason]
+  :body (make-error
+    $code
+    "network"
+    (concat "Network error fetching " $url ": " $reason)
+    nil
+    nil nil nil
+    $reason
+    "Check internet connection or URL"
+  )
+]
+
+; Human-readable 포맷
+[FUNC format-error-human :params [$err]
+  :body (do
+    (let [
+        [$code (get $err "code")]
+        [$stage (get $err "stage")]
+        [$msg (get $err "message")]
+        [$line (get $err "line")]
+        [$col (get $err "column")]
+        [$file (get $err "file")]
+        [$hint (get $err "hint")]
+      ]
+      (concat
+        "❌ [" $stage ":" $code "]" "\n"
+        "  " $msg "\n"
+        (if (and $file $line) (concat "  at " $file ":" (int-to-str $line) ":" (int-to-str $col) "\n") "")
+        (if $hint (concat "  hint: " $hint "\n") "")
+      )
+    )
+  )
+]
+
+; Structured 포맷 (JSON)
+[FUNC format-error-json :params [$err]
+  :body (json-stringify $err)
+]
+
+; 에러 출력 (human-readable)
+[FUNC print-error :params [$err]
+  :body (println (format-error-human $err))
+]
+
+; 에러 반환 (structured for APIs)
+[FUNC error-response :params [$err]
+  :body {
+    :status 400
+    :error (json-stringify $err)
+  }
+]
+
+; Helper: int-to-str
+[FUNC int-to-str :params [$n]
+  :body (concat "" $n)
+]
+
+; Helper: get-timestamp (simplified)
+[FUNC get-timestamp :params []
+  :body (concat "[" (int-to-str (floor (/ 1000000 1000))) "]")
+]
+
+[FUNC floor :params [$n]
+  :body (do
+    (let [[$s (concat "" $n)] [$d (string-index-of $s ".")]]
+      (if (= $d -1) $n (str-to-int (substring $s 0 $d)))
+    )
+  )
+]
+
+[FUNC string-index-of :params [$s $c]
+  :body (do
+    (let [[$len (length $s)] [$i 0]]
+      (do
+        (while (< $i $len)
+          (if (= (substring $s $i (+ $i 1)) $c)
+            (set $i (+ $i $len))
+            (set $i (+ $i 1))
+          )
+        )
+        (if (< $i $len) (- $i 1) -1)
+      )
+    )
+  )
+]
+
+; Module exports
+{
+  :error-codes error-codes
+  :make-error make-error
+  :parse-error parse-error
+  :analysis-error analysis-error
+  :runtime-error runtime-error
+  :package-resolve-error package-resolve-error
+  :package-fetch-error package-fetch-error
+  :package-verify-error package-verify-error
+  :io-error io-error
+  :network-error network-error
+  :format-error-human format-error-human
+  :format-error-json format-error-json
+  :print-error print-error
+  :error-response error-response
+}

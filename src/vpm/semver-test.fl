@@ -126,6 +126,36 @@
   )
 ]
 
+; Test 9: semver_matches (>=, <=)
+[FUNC test_semver_matches_gte_lte :params []
+  :body (do
+    (println "\n=== Test: semver_matches (>= and <=) ===")
+
+    (assert (semver_matches ">=1.2.3" "1.2.3") "GTE: exact match")
+    (assert (semver_matches ">=1.2.3" "1.2.4") "GTE: patch upgrade")
+    (assert (semver_matches ">=1.2.3" "1.3.0") "GTE: minor upgrade")
+    (assert (not (semver_matches ">=1.2.3" "1.2.2")) "GTE: reject lower")
+    (assert (semver_matches "<=1.2.3" "1.2.3") "LTE: exact match")
+    (assert (semver_matches "<=1.2.3" "1.2.2") "LTE: lower version")
+    (assert (not (semver_matches "<=1.2.3" "1.2.4")) "LTE: reject higher")
+  )
+]
+
+; Test 10: find_matching_version
+[FUNC test_find_matching_version :params []
+  :body (do
+    (println "\n=== Test: find_matching_version ===")
+
+    (let [[$versions ["1.0.0" "1.1.0" "1.2.0" "2.0.0"]]]
+      (do
+        (assert (= (find_matching_version $versions "^1.0.0") "1.2.0") "find: caret picks latest compatible")
+        (assert (= (find_matching_version $versions "~1.1.0") "1.1.0") "find: tilde picks exact patch match")
+        (assert (= (find_matching_version $versions "=2.0.0") "2.0.0") "find: exact match")
+      )
+    )
+  )
+]
+
 ; Main test runner
 [FUNC run_all_tests :params []
   :body (do
@@ -139,6 +169,8 @@
     (test_semver_matches_greater)
     (test_semver_matches_exact)
     (test_string_starts_with)
+    (test_semver_matches_gte_lte)
+    (test_find_matching_version)
 
     (println "\n✅ All tests completed!")
   )

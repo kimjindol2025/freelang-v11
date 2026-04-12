@@ -97,10 +97,14 @@
           ]
           (do
             (for-each $resolved_deps (lambda [$tree]
-              (array-concat $all_flattened (flatten_dependency_tree $tree))
+              (for-each (flatten_dependency_tree $tree) (lambda [$item]
+                (array-push $all_flattened $item)
+              ))
             ))
             (for-each $resolved_dev_deps (lambda [$tree]
-              (array-concat $all_flattened (flatten_dependency_tree $tree))
+              (for-each (flatten_dependency_tree $tree) (lambda [$item]
+                (array-push $all_flattened $item)
+              ))
             ))
 
             (let [
@@ -290,16 +294,8 @@
 [FUNC estimate_package_size :params [$package_name $version]
   :body (do
     ; 패키지 크기 추정 (KB 단위)
-    ; 실제로는 registry에서 조회해야 함
-    (let [
-        [$size_kb 0]
-      ]
-      (do
-        ; 임시: 기본값 100KB
-        (set $size_kb 100)
-        $size_kb
-      )
-    )
+    ; 패키지명 길이 기반 추정: length * 10KB
+    (* (length $package_name) 10)
   )
 ]
 
@@ -319,17 +315,24 @@
 
 [FUNC file-exists? :params [$path]
   :body (do
-    ; 파일 존재 여부 확인
-    ; (실제 구현은 fs 라이브러리 필요)
-    true
+    ; 파일 존재 여부 확인 (try-catch로 fs-read 시도)
+    (let [[$content (try (fs-read $path) (catch $e nil))]]
+      (not (= $content nil))
+    )
   )
 ]
 
-[FUNC package-exists-in-registry? :params [$name $version]
+[FUNC package-exists-in-registry? :params [$name $version $registry]
   :body (do
     ; 레지스트리에 패키지가 존재하는지 확인
-    ; (실제 구현은 registry 조회 필요)
-    true
+    (let [[$pkg_data (get $registry $name)]]
+      (if (= $pkg_data nil)
+        false
+        (let [[$versions (get $pkg_data "versions" [])]]
+          (> (length $versions) 0)
+        )
+      )
+    )
   )
 ]
 
@@ -380,23 +383,20 @@
 
 [FUNC string-index-of :params [$str $char]
   :body (do
-    ; 문자의 인덱스 찾기
+    ; 문자의 인덱스 찾기, 없으면 -1 반환
     (let [
         [$len (length $str)]
         [$i 0]
+        [$found -1]
       ]
       (do
-        (while (< $i $len)
-          (do
-            (if (= (substring $str $i (+ $i 1)) $char)
-              (do
-                (set $i (+ $i $len))  ; 루프 종료
-              )
-              (set $i (+ $i 1))
-            )
+        (while (and (< $i $len) (= $found -1))
+          (if (= (substring $str $i (+ $i 1)) $char)
+            (set $found $i)
+            (set $i (+ $i 1))
           )
         )
-        (if (< $i $len) (- $i 1) -1)
+        $found
       )
     )
   )

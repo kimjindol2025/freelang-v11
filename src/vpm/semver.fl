@@ -7,6 +7,36 @@
 ;   3. resolve_dependencies: 의존성 그래프 재귀 해석
 ;   4. validate_version: 유효한 버전 형식 검증
 
+; Registry Interface (Phase 5c)
+[FUNC get_package_versions :params [$name $registry]
+  :body (do
+    ; 인메모리 레지스트리에서 패키지의 버전 목록 조회
+    (let [[$pkg_data (get $registry $name)]]
+      (if (= $pkg_data nil)
+        []
+        (get $pkg_data "versions" [])
+      )
+    )
+  )
+]
+
+[FUNC get_package_info :params [$name $version $registry]
+  :body (do
+    ; 인메모리 레지스트리에서 패키지 메타데이터 조회
+    (let [
+        [$pkg_data (get $registry $name)]
+        [$versions_meta (if (= $pkg_data nil) {} (get $pkg_data "versions_meta" {}))]
+      ]
+      (let [[$meta (get $versions_meta $version)]]
+        (if (= $meta nil)
+          { "name" $name "version" $version "dependencies" {} }
+          $meta
+        )
+      )
+    )
+  )
+]
+
 [FUNC parse_semver :params [$version_str]
   :body (do
     ; 버전 문자열에서 메이저/마이너/패치 추출

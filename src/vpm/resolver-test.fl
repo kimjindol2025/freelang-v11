@@ -1,0 +1,117 @@
+; Phase 5c: Resolver Integration Tests
+; resolver.fl + lock-file.fl 통합 테스트
+
+; Helper function: assert
+[FUNC assert :params [$condition $message]
+  :body (do
+    (if (not $condition)
+      (println (concat "❌ FAIL: " $message))
+      (println (concat "✅ PASS: " $message))
+    )
+  )
+]
+
+; Main test runner
+[FUNC run_resolver_tests :params []
+  :body (do
+    (println "🧪 Running Resolver Integration Tests...")
+
+    ; 샘플 인메모리 레지스트리 구성
+    (let [[$sample_registry {
+      "v9-core" {
+        "versions" ["1.0.0"]
+        "versions_meta" {
+          "1.0.0" {
+            "name" "v9-core"
+            "version" "1.0.0"
+            "dependencies" {}
+          }
+        }
+      }
+      "v9-web" {
+        "versions" ["1.0.0" "2.0.0"]
+        "versions_meta" {
+          "1.0.0" {
+            "name" "v9-web"
+            "version" "1.0.0"
+            "dependencies" { "v9-core" "^1.0.0" }
+          }
+          "2.0.0" {
+            "name" "v9-web"
+            "version" "2.0.0"
+            "dependencies" { "v9-core" "^1.0.0" }
+          }
+        }
+      }
+    }]]
+
+      (println "\n=== Test 1: resolve_dependency_tree ===")
+      (let [[$tree (resolve_dependency_tree "v9-web" "^1.0.0" $sample_registry)]]
+        (do
+          (assert (= (get $tree "name") "v9-web") "resolver: package name correct")
+          (assert (= (get $tree "version") "1.0.0") "resolver: version resolved correctly")
+        )
+      )
+
+      (println "\n=== Test 2: flatten_dependency_tree ===")
+      (let [[$tree (resolve_dependency_tree "v9-web" "^1.0.0" $sample_registry)]]
+        (let [[$flattened (flatten_dependency_tree $tree)]]
+          (do
+            (assert (> (length $flattened) 0) "flatten: returns non-empty array")
+          )
+        )
+      )
+
+      (println "\n=== Test 3: detect_version_conflict ===")
+      (let [[$result (detect_version_conflict [
+        { "name" "v9-core" "version" "1.0.0" }
+        { "name" "v9-core" "version" "2.0.0" }
+      ])]]
+        (do
+          (assert (get $result "has_conflicts") "conflict: detects version conflict")
+          (assert (= (length (get $result "conflicts")) 1) "conflict: one conflict detected")
+        )
+      )
+
+      (println "\n=== Test 4: No conflict scenario ===")
+      (let [[$result (detect_version_conflict [
+        { "name" "v9-core" "version" "1.0.0" }
+        { "name" "v9-web" "version" "1.0.0" }
+      ])]]
+        (do
+          (assert (not (get $result "has_conflicts")) "no-conflict: no conflicts detected")
+          (assert (= (length (get $result "conflicts")) 0) "no-conflict: zero conflicts")
+        )
+      )
+
+      (println "\n=== Test 5: package-exists-in-registry? ===")
+      (do
+        (assert (package-exists-in-registry? "v9-core" "1.0.0" $sample_registry) "exists: v9-core exists")
+        (assert (not (package-exists-in-registry? "nonexistent" "1.0.0" $sample_registry)) "exists: nonexistent package returns false")
+      )
+
+      (println "\n=== Test 6: char-code function ===")
+      (do
+        (assert (= (char-code "5") 53) "char-code: digit '5' is 53")
+        (assert (= (char-code "a") 97) "char-code: lowercase 'a' is 97")
+        (assert (= (char-code "Z") 90) "char-code: uppercase 'Z' is 90")
+        (assert (= (char-code ".") 46) "char-code: dot '.' is 46")
+      )
+
+      (println "\n=== Test 7: estimate_package_size ===")
+      (do
+        (let [[$size_core (estimate_package_size "v9-core" "1.0.0")]]
+          (assert (= $size_core 70) "size: v9-core (7 chars) × 10 = 70KB")
+        )
+        (let [[$size_web (estimate_package_size "v9-web" "1.0.0")]]
+          (assert (= $size_web 60) "size: v9-web (6 chars) × 10 = 60KB")
+        )
+      )
+
+    )
+  )
+]
+
+(println "")
+(run_resolver_tests)
+(println "\n✅ All resolver tests completed!")
