@@ -27,6 +27,7 @@ import { createChannelModule } from "./stdlib-channel";  // Phase 67: 채널 기
 import { createImmutableModule } from "./immutable";      // Phase 70: 이뮤터블 데이터 구조
 import { createAiNativeModule } from "./stdlib-ai-native"; // Phase 71: AI 네이티브 블록
 import { createTestModule } from "./stdlib-test";           // Phase 76: FL 네이티브 테스트 러너
+import { createMaybeModule } from "./maybe-type";           // Phase 91: 불확실성 타입
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -71,5 +72,9 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createAiNativeModule());  // Phase 71: ai-call, rag-search, embed, similarity
   interp.registerModule(createTestModule(         // Phase 76: deftest, describe, assert-eq, ...
     (fnValue, args) => interp.callFunctionValue(fnValue, args)
+  ));
+  interp.registerModule(createMaybeModule(         // Phase 91: 불확실성 타입 (maybe/none/confident)
+    (fnValue, args) => interp.callFunctionValue(fnValue, args),
+    (name, args) => interp.callUserFunction(name, args)
   ));
 }
