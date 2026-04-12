@@ -115,7 +115,7 @@ class Interpreter {
         this.registerModule((0, stdlib_workflow_1.createWorkflowModule)());
         this.registerModule((0, stdlib_resource_1.createResourceModule)());
         // Phase 4a: Pure HTTP Server (overrides Express version)
-        this.registerModule((0, stdlib_http_server_1.createHttpServerModule)((n, a) => this.callUserFunction(n, a)));
+        this.registerModule((0, stdlib_http_server_1.createHttpServerModule)((n, a) => this.callUserFunction(n, a), (fnValue, a) => this.callFunctionValue(fnValue, a)));
         this.registerModule((0, stdlib_db_1.createDbModule)());
         this.registerModule((0, stdlib_ws_1.createWsModule)((n, a) => this.callUserFunction(n, a)));
         this.registerModule((0, stdlib_wsc_1.createWscModule)((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client

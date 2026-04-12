@@ -161,7 +161,10 @@ export class Interpreter {
     this.registerModule(createWorkflowModule());
     this.registerModule(createResourceModule());
     // Phase 4a: Pure HTTP Server (overrides Express version)
-    this.registerModule(createHttpServerModule((n, a) => this.callUserFunction(n, a)));
+    this.registerModule(createHttpServerModule(
+      (n, a) => this.callUserFunction(n, a),
+      (fnValue, a) => this.callFunctionValue(fnValue, a)
+    ));
     this.registerModule(createDbModule());
     this.registerModule(createWsModule((n, a) => this.callUserFunction(n, a)));
     this.registerModule(createWscModule((n, a) => this.callUserFunction(n, a))); // Phase 57: WebSocket Client

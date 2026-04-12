@@ -42,7 +42,7 @@ const url = __importStar(require("url"));
 /**
  * Create pure HTTP server for FreeLang v9 (no Express)
  */
-function createHttpServerModule(callFn) {
+function createHttpServerModule(callFn, callFunctionValue) {
     const routes = [];
     let server = null;
     let requestCounter = 0;
@@ -185,8 +185,19 @@ function createHttpServerModule(callFn) {
                         }
                         // v9 요청 객체 생성 (request_id 포함)
                         const flReq = createFlRequest(method, path, query, headers, body, params, requestId);
-                        // 핸들러 호출 (Phase 57: Promise 지원)
-                        let rawResult = callFn(route.handler, [flReq]);
+                        // 핸들러 호출 (Phase 57: Promise 지원 + 람다 함수 지원)
+                        let rawResult;
+                        if (typeof route.handler === 'string') {
+                            // 함수 이름 (문자열) → callFn으로 호출
+                            rawResult = callFn(route.handler, [flReq]);
+                        }
+                        else if (route.handler && route.handler.kind === 'function-value' && callFunctionValue) {
+                            // v9 람다 함수 (function-value 객체) → callFunctionValue로 호출
+                            rawResult = callFunctionValue(route.handler, [flReq]);
+                        }
+                        else {
+                            throw new Error(`Invalid handler: expected string or function-value, got ${typeof route.handler}`);
+                        }
                         const result = (rawResult instanceof Promise) ? await rawResult : rawResult;
                         // 응답 처리 (응답 보류 중이면 skip)
                         if (pendingResponses.has(requestId)) {

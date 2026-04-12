@@ -1,4 +1,5 @@
 type CallFn = (name: string, args: any[]) => any;
+type CallFunctionValue = (fnValue: any, args: any[]) => any;
 interface Request {
     __fl_request: true;
     method: string;
@@ -13,12 +14,12 @@ interface Request {
 /**
  * Create pure HTTP server for FreeLang v9 (no Express)
  */
-export declare function createHttpServerModule(callFn: CallFn): {
-    server_get: (path: string, handlerName: string) => null;
-    server_post: (path: string, handlerName: string) => null;
-    server_put: (path: string, handlerName: string) => null;
-    server_patch: (path: string, handlerName: string) => null;
-    server_delete: (path: string, handlerName: string) => null;
+export declare function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallFunctionValue): {
+    server_get: (path: string, handlerName: string | any) => null;
+    server_post: (path: string, handlerName: string | any) => null;
+    server_put: (path: string, handlerName: string | any) => null;
+    server_patch: (path: string, handlerName: string | any) => null;
+    server_delete: (path: string, handlerName: string | any) => null;
     server_start: (port: number) => string;
     server_stop: () => null;
     server_json: (body: any) => Record<string, any>;

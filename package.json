@@ -33,7 +33,7 @@
     "lodash": "4.17.21",
     "web-app": "2.0.0",
     "app-utils": "1.0.0",
-    "semver-lib": "2.0.0"
+    "semver-lib": "1.2.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

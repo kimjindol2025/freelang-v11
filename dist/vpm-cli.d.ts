@@ -21,6 +21,8 @@ declare class VpmCli {
     private fallbackRegistryUrl;
     private readonly REQUEST_TIMEOUT_MS;
     private readonly MAX_RETRIES;
+    private dependencyGraph;
+    private signingKey;
     run(args: string[]): Promise<void>;
     private install;
     private verify;
@@ -52,9 +54,13 @@ declare class VpmCli {
     private calculateSHA256;
     private ensureLockfileLoaded;
     private resolveConflict;
+    private recordDependencyRequest;
+    private computeSignature;
     private detectVersionConflict;
     private resolveVersion;
     private versionMatches;
+    private versionMatchesAnd;
+    private versionMatchesSingle;
     private parseVersion;
     private compareVersions;
     private showHelp;
