@@ -2067,6 +2067,69 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return globalHub.taskTypes();
       }
 
+      // Phase 122: Delegation — 서브태스크 위임
+      if (op === "delegate-register") {
+        const [id, caps, fn] = args;
+        const capabilities: string[] = Array.isArray(caps) ? caps.map(String) : [];
+        const agent: DelegateAgent = {
+          id: String(id),
+          capabilities,
+          execute: (task: DelegateTask) => {
+            if (typeof fn === "function") return fn(task);
+            if ((fn as any)?.kind === "function-value") return callFn(fn, [task]);
+            return fn;
+          }
+        };
+        globalDelegation.register(agent);
+        return String(id);
+      }
+      if (op === "delegate") {
+        const [desc, input, capability] = args;
+        const task: DelegateTask = {
+          id: `task-${Date.now()}`,
+          description: String(desc),
+          input,
+          requiredCapability: capability != null ? String(capability) : undefined
+        };
+        const result = globalDelegation.delegate(task);
+        return new Map([
+          ["taskId", result.taskId],
+          ["agentId", result.agentId],
+          ["output", result.output],
+          ["success", result.success],
+          ["duration", result.duration]
+        ]);
+      }
+      if (op === "delegate-all") {
+        const [taskList] = args;
+        const tasks: DelegateTask[] = Array.isArray(taskList)
+          ? taskList.map((t: any, i: number) => ({
+              id: t instanceof Map ? String(t.get("id") ?? `task-${i}`) : `task-${i}`,
+              description: t instanceof Map ? String(t.get("description") ?? "") : String(t),
+              input: t instanceof Map ? t.get("input") : t,
+              requiredCapability: t instanceof Map && t.has("requiredCapability")
+                ? String(t.get("requiredCapability"))
+                : undefined
+            }))
+          : [];
+        const result = globalDelegation.delegateAll(tasks);
+        return new Map<string, any>([
+          ["results", result.results.map(r => new Map<string, any>([
+            ["taskId", r.taskId],
+            ["agentId", r.agentId],
+            ["output", r.output],
+            ["success", r.success],
+            ["duration", r.duration]
+          ]))],
+          ["successful", result.successful],
+          ["failed", result.failed],
+          ["totalDuration", result.totalDuration]
+        ]);
+      }
+      if (op === "delegate-list") {
+        return globalDelegation.list();
+      }
+
       // (export sym1 sym2 ...) — self-hosting 파일 호환
       if (op === "export") return null;
       // (call $fn arg...) — FL stdlib 고차 함수용
