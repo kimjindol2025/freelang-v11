@@ -5,6 +5,7 @@ import { ASTNode, TypeAnnotation } from "./ast";
 import { TypeChecker } from "./type-checker";
 import { RuntimeTypeChecker } from "./type-system"; // Phase 60
 import { ScopeStack } from "./interpreter-scope";
+import { MacroExpander } from "./macro-expander"; // Phase 63: 매크로 시스템
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -27,6 +28,7 @@ export interface ExecutionContext {
   reasoning?: Map<string, any>; // Phase 9c: Reasoning state storage (stage-timestamp -> reasoning state)
   currentSearches?: Map<string, any>; // Phase 9a: Current reasoning sequence search results
   currentLearned?: Map<string, any>; // Phase 9b: Current reasoning sequence learned data
+  macroExpander: MacroExpander; // Phase 63: 매크로 확장기
 }
 
 export interface FreeLangFunction {

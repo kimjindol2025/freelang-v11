@@ -25,7 +25,8 @@ import { evalModuleBlock as _evalModuleBlock, evalImportBlock as _evalImportBloc
 import { loadAllStdlib } from "./stdlib-loader"; // Phase 58: Stdlib 로딩 분리
 import { evalPatternMatch as _evalPatternMatch, evalTryBlock as _evalTryBlock, evalThrow as _evalThrow, matchPattern as _matchPattern } from "./eval-pattern-match"; // Phase 58: Pattern matching 분리
 import { registerBuiltinTypeClasses as _registerBuiltinTypeClasses, evalTypeClass as _evalTypeClass, evalInstance as _evalInstance } from "./eval-type-classes"; // Phase 58: Type class 분리
-import { callUserFunction as _callUserFunction, callFunctionValue as _callFunctionValue, callAsyncFunctionValue as _callAsyncFunctionValue, callFunction as _callFunction } from "./eval-call-function"; // Phase 58: Function call 분리
+import { callUserFunction as _callUserFunction, callFunctionValue as _callFunctionValue, callAsyncFunctionValue as _callAsyncFunctionValue, callFunction as _callFunction, callUserFunctionTCO as _callUserFunctionTCO, callFunctionValueTCO as _callFunctionValueTCO, callUserFunctionRaw as _callUserFunctionRaw, callFunctionValueRaw as _callFunctionValueRaw } from "./eval-call-function"; // Phase 58+61: Function call 분리 + TCO
+import { MacroExpander } from "./macro-expander"; // Phase 63: 매크로 시스템
 
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
@@ -61,7 +62,9 @@ export class Interpreter {
   public learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
   public currentLine = 0; // FreeLang source line tracking
   public callDepth = 0;
-  public static readonly MAX_CALL_DEPTH = 500;
+  public static readonly MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 100만 재귀 처리)
+  // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
+  public tcoMode = false;
   // Phase 52: FL 파일 import 지원
   public importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();
@@ -83,6 +86,7 @@ export class Interpreter {
       typeClasses: new Map(),             // Phase 5 Week 2: Type class registry
       typeClassInstances: new Map(),      // Phase 5 Week 2: Type class instance registry
       modules: new Map(),                 // Phase 6: Module registry
+      macroExpander: new MacroExpander(), // Phase 63: 매크로 시스템
     };
 
     // Phase 9a: Initialize WebSearchAdapter (mock mode by default)
@@ -102,6 +106,44 @@ export class Interpreter {
 
     // Phase 5 Week 2: Register built-in type classes and instances
     this.registerBuiltinTypeClasses();
+
+    // Phase 63: 표준 매크로 등록 (when, unless, and2)
+    this.registerStandardMacros();
+  }
+
+  // Phase 63: 표준 매크로 등록
+  private registerStandardMacros(): void {
+    const expander = this.context.macroExpander;
+    // (when $cond $body) → (if $cond $body nil)
+    expander.define("when", ["$cond", "$body"], {
+      kind: "sexpr",
+      op: "if",
+      args: [
+        { kind: "variable", name: "$cond" },
+        { kind: "variable", name: "$body" },
+        { kind: "literal", type: "null", value: null },
+      ],
+    });
+    // (unless $cond $body) → (if $cond nil $body)
+    expander.define("unless", ["$cond", "$body"], {
+      kind: "sexpr",
+      op: "if",
+      args: [
+        { kind: "variable", name: "$cond" },
+        { kind: "literal", type: "null", value: null },
+        { kind: "variable", name: "$body" },
+      ],
+    });
+    // (and2 $a $b) → (if $a $b false)
+    expander.define("and2", ["$a", "$b"], {
+      kind: "sexpr",
+      op: "if",
+      args: [
+        { kind: "variable", name: "$a" },
+        { kind: "variable", name: "$b" },
+        { kind: "literal", type: "boolean", value: false },
+      ],
+    });
   }
 
   // Phase 49: freelang-stdlib.fl 로드 — fl-map, fl-filter, fl-reduce 등
@@ -157,7 +199,21 @@ export class Interpreter {
 
   interpret(blocks: ASTNode[]): ExecutionContext {
     try {
+      // Phase 63: 매크로 확장 전처리 — defmacro 먼저 처리, 나머지는 확장
+      // 1단계: defmacro 노드 선처리
       for (const node of blocks) {
+        if ((node as any).kind === "sexpr" && (node as any).op === "defmacro") {
+          this.evalDefmacro(node as any);
+        }
+      }
+      // 2단계: defmacro가 아닌 노드는 매크로 확장 후 실행
+      blocks = blocks.map((node) => {
+        if ((node as any).kind === "sexpr" && (node as any).op === "defmacro") return node;
+        return this.context.macroExpander.expand(node);
+      });
+
+      for (const node of blocks) {
+        if ((node as any).kind === "sexpr" && (node as any).op === "defmacro") continue; // 이미 처리됨
         if (isImportBlock(node)) {
           this.evalImportBlock(node);
         } else if (isOpenBlock(node)) {
@@ -541,7 +597,7 @@ export class Interpreter {
 
     // Phase 57: Dispatch to specialized modules
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","let","set","if","cond","do","begin","progn","loop","recur","while","and","or"]);
+    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
@@ -649,6 +705,13 @@ export class Interpreter {
   public callAsyncFunctionValue(fn: any, args: any[]): FreeLangPromise { return _callAsyncFunctionValue(this, fn, args); }
   public callFunction(fn: any, args: any[]): any { return _callFunction(this, fn, args); }
 
+  // Phase 61: TCO 메서드 — 꼬리 재귀를 반복문으로 (100만 재귀 스택 없이)
+  public callUserFunctionTCO(name: string, args: any[]): any { return _callUserFunctionTCO(this, name, args); }
+  public callFunctionValueTCO(fn: any, args: any[]): any { return _callFunctionValueTCO(this, fn, args); }
+  // trampoline용 raw 메서드 (TailCall 토큰 그대로 반환)
+  public callUserFunctionRaw(name: string, args: any[]): any { return _callUserFunctionRaw(this, name, args); }
+  public callFunctionValueRaw(fn: any, args: any[]): any { return _callFunctionValueRaw(this, fn, args); }
+
   private getFieldValue(block: Block, key: string, defaultValue: any = null): any {
     const field = block.fields.get(key);
     if (field === undefined) {
@@ -673,6 +736,29 @@ export class Interpreter {
   // Utility: Set variable
   setVariable(name: string, value: any): void {
     this.context.variables.set(name, value);
+  }
+
+  // Phase 63: defmacro 처리 (interpret() 선처리용)
+  public evalDefmacro(expr: any): void {
+    if (expr.args.length < 3) throw new Error(`defmacro requires name, params, and body`);
+    const nameNode = expr.args[0] as any;
+    const macroName: string = nameNode.kind === "literal" ? String(nameNode.value)
+      : nameNode.kind === "variable" ? nameNode.name
+      : String(nameNode.value ?? nameNode.name ?? "");
+
+    const paramsNode = expr.args[1] as any;
+    const params: string[] = [];
+    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+      const items = paramsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        for (const item of items as any[]) {
+          if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
+          else if (item.kind === "literal") params.push("$" + item.value);
+        }
+      }
+    }
+    const body = expr.args[2];
+    this.context.macroExpander.define(macroName, params, body);
   }
 
   // Phase 5 Week 2: Register built-in type classes and instances

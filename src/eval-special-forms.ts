@@ -2,10 +2,13 @@
 // Phase 57 리팩토링: interpreter.ts의 특수 폼을 분리
 // fn, async, set!, define, func-ref, call, compose, pipe,
 // let, set, if, cond, do/begin/progn, loop, recur, while, and, or, map
+// Phase 63: defmacro, macroexpand 추가
+// Phase 61: TCO 모드에서 꼬리 위치 함수 호출 → TailCall 토큰 반환
 
 import { Interpreter } from "./interpreter";
 import { SExpr, ASTNode, Variable, Literal } from "./ast";
 import { isBlock, isControlBlock } from "./ast";
+import { tailCall, isTailCall } from "./tco";
 
 export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): any {
   const ev = (node: any) => (interp as any).eval(node);
@@ -235,7 +238,24 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // ── if ────────────────────────────────────────────────────────────
   if (op === "if") {
     const condition = ev(expr.args[0]);
-    return condition ? ev(expr.args[1]) : (expr.args[2] ? ev(expr.args[2]) : null);
+    const branch = condition ? expr.args[1] : (expr.args[2] || null);
+    if (branch === null) return null;
+    // Phase 61: TCO 모드 — 꼬리 위치의 사용자 함수 호출을 TailCall 토큰으로 반환
+    if ((interp as any).tcoMode && branch !== null) {
+      const b = branch as any;
+      if (b.kind === "sexpr") {
+        const bop = b.op;
+        // 사용자 정의 함수이거나 아직 알 수 없는 함수 호출 — 일단 eval해서 확인
+        // (builtin이면 그냥 실행, user-func이면 TailCall)
+        const ctx = interp.context;
+        if (typeof bop === "string" && ctx.functions.has(bop)) {
+          // 꼬리 위치 user-function 호출 → TailCall 토큰 반환 (스택 없이)
+          const tailArgs = b.args.map((a: any) => ev(a));
+          return tailCall(bop, tailArgs);
+        }
+      }
+    }
+    return ev(branch);
   }
 
   // ── cond ──────────────────────────────────────────────────────────
@@ -373,6 +393,40 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     }
     // Fall through: return undefined (caller will evaluate args and try builtins)
     return undefined;
+  }
+
+  // ── defmacro ──────────────────────────────────────────────────────
+  // (defmacro name [$cond $body] (if $cond $body nil))
+  if (op === "defmacro") {
+    if (expr.args.length < 3) throw new Error(`defmacro requires name, params, and body`);
+    const nameNode = expr.args[0] as any;
+    const macroName: string = nameNode.kind === "literal" ? String(nameNode.value)
+      : nameNode.kind === "variable" ? nameNode.name
+      : String(nameNode.value ?? nameNode.name ?? "");
+
+    const paramsNode = expr.args[1] as any;
+    const params: string[] = [];
+    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+      const items = paramsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        for (const item of items as any[]) {
+          if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
+          else if (item.kind === "literal") params.push("$" + item.value);
+        }
+      }
+    }
+    const body = expr.args[2];
+    ctx.macroExpander.define(macroName, params, body);
+    return null;
+  }
+
+  // ── macroexpand ───────────────────────────────────────────────────
+  // (macroexpand '(when true (println "yes"))) → 확장된 AST 출력 (디버깅용)
+  if (op === "macroexpand") {
+    if (expr.args.length < 1) throw new Error(`macroexpand requires 1 argument`);
+    const form = expr.args[0];
+    const expanded = ctx.macroExpander.expand(form);
+    return ctx.macroExpander.astToString(expanded);
   }
 
   throw new Error(`evalSpecialForm: unknown op "${op}"`);
