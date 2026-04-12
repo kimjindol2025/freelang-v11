@@ -59,6 +59,15 @@ import { globalCompetition, Competition, Competitor } from "./compete"; // Phase
 import { AgentChain, ChainAgent, ChainResult, ChainLink } from "./chain-agents"; // Phase 128: Chain-Agents
 import { globalHub, MultiAgentHub } from "./multi-agent-hub"; // Phase 130: Multi-Agent Hub
 import { globalOrchestrator, Orchestrator, OrchestrateTask } from "./orchestrate"; // Phase 126: Orchestrate
+import { EvolutionEngine, EvolutionConfig, evolveNumbers, evolveStrings } from "./evolve"; // Phase 131: EVOLVE
+import { Mutator, globalMutator, mutateNumbers as _mutateNumbers, mutateString as _mutateString, selectBest, MutationConfig, MutationType } from "./mutate"; // Phase 132: Mutate
+import { Crossover, globalCrossover, crossoverNumbers as _crossoverNumbers, crossoverStrings as _crossoverStrings } from "./crossover"; // Phase 133: Crossover
+import { FitnessEvaluator, globalFitness, fitnessScore, rankItems, FitnessConfig } from "./fitness"; // Phase 134: FITNESS
+import { GenerationLoop, GenerationConfig, GenerationStats, GenerationResult, runGeneration } from "./generation"; // Phase 135: GENERATION
+import { Pruner, globalPruner, keepBest as _keepBest, removeWeak as _removeWeak, PruneResult } from "./prune"; // Phase 136: PRUNE
+import { SelfBenchmark, globalBenchmark, bench as _bench, benchCompare as _benchCompare, BenchmarkResult, ComparisonResult, BenchmarkSuite } from "./benchmark-self"; // Phase 138: BENCHMARK-SELF
+import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./refactor-self"; // Phase 137: REFACTOR-SELF
+import { SelfVersioning, globalVersioning, Snapshot, RollbackResult } from "./version-self"; // Phase 139: VERSION-SELF
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -2134,6 +2143,133 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         return globalDelegation.list();
       }
 
+      // === Phase 133: CROSSOVER ===
+      // (crossover-single [1 2 3] [4 5 6]) → CrossoverResult
+      if (op === "crossover-single") {
+        const [a, b] = args;
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        const result = globalCrossover.singlePoint(arrA, arrB);
+        return new Map<string, any>([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["crossoverPoint", result.crossoverPoint],
+          ["type", result.type],
+        ]);
+      }
+      // (crossover-two [1 2 3 4] [5 6 7 8]) → CrossoverResult
+      if (op === "crossover-two") {
+        const [a, b] = args;
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        const result = globalCrossover.twoPoint(arrA, arrB);
+        return new Map<string, any>([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["crossoverPoints", result.crossoverPoints],
+          ["type", result.type],
+        ]);
+      }
+      // (crossover-uniform [1 2 3] [4 5 6]) → CrossoverResult
+      if (op === "crossover-uniform") {
+        const [a, b] = args;
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        const result = globalCrossover.uniform(arrA, arrB);
+        return new Map<string, any>([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["type", result.type],
+        ]);
+      }
+      // (crossover-arithmetic [1.0 2.0] [3.0 4.0] :alpha 0.5) → CrossoverResult
+      if (op === "crossover-arithmetic") {
+        let alpha: number | undefined;
+        let cleanArgs = [...args];
+        const alphaIdx = cleanArgs.findIndex((v: any) => v === "alpha" || v === ":alpha");
+        if (alphaIdx !== -1) {
+          alpha = Number(cleanArgs[alphaIdx + 1]);
+          cleanArgs.splice(alphaIdx, 2);
+        }
+        const [a, b] = cleanArgs;
+        const arrA = Array.isArray(a) ? a.map(Number) : [Number(a)];
+        const arrB = Array.isArray(b) ? b.map(Number) : [Number(b)];
+        const result = globalCrossover.arithmetic(arrA, arrB, alpha);
+        return new Map<string, any>([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["type", result.type],
+        ]);
+      }
+      // (crossover-strings "hello" "world") → CrossoverResult
+      if (op === "crossover-strings") {
+        const [a, b] = args;
+        const result = globalCrossover.crossoverStrings(String(a), String(b));
+        return new Map<string, any>([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["crossoverPoint", result.crossoverPoint],
+          ["type", result.type],
+        ]);
+      }
+      // (crossover-objects {:a 1} {:b 2}) → CrossoverResult
+      if (op === "crossover-objects") {
+        const [a, b] = args;
+        const objA: Record<string, unknown> = a instanceof Map
+          ? Object.fromEntries(a.entries())
+          : (typeof a === "object" && a !== null ? a : {});
+        const objB: Record<string, unknown> = b instanceof Map
+          ? Object.fromEntries(b.entries())
+          : (typeof b === "object" && b !== null ? b : {});
+        const result = globalCrossover.crossoverObjects(objA, objB);
+        const toMap = (o: Record<string, unknown>) =>
+          new Map<string, any>(Object.entries(o));
+        return new Map<string, any>([
+          ["parent1", toMap(result.parent1)],
+          ["parent2", toMap(result.parent2)],
+          ["child1", toMap(result.child1)],
+          ["child2", toMap(result.child2)],
+          ["type", result.type],
+        ]);
+      }
+      // (crossover-children $result) → [child1, child2]
+      if (op === "crossover-children") {
+        const [result] = args;
+        if (result instanceof Map) {
+          return [result.get("child1"), result.get("child2")];
+        }
+        return [];
+      }
+      // (blend $a $b :alpha 0.3) → 두 값 혼합
+      if (op === "blend") {
+        let alpha = 0.5;
+        let cleanArgs = [...args];
+        const alphaIdx = cleanArgs.findIndex((v: any) => v === "alpha" || v === ":alpha");
+        if (alphaIdx !== -1) {
+          alpha = Number(cleanArgs[alphaIdx + 1]);
+          cleanArgs.splice(alphaIdx, 2);
+        }
+        const [a, b] = cleanArgs;
+        if (Array.isArray(a) && Array.isArray(b)) {
+          const result = globalCrossover.arithmetic(a.map(Number), b.map(Number), alpha);
+          return result.child1;
+        }
+        if (typeof a === "number" && typeof b === "number") {
+          return alpha * a + (1 - alpha) * b;
+        }
+        return a;
+      }
+
       // (export sym1 sym2 ...) — self-hosting 파일 호환
       if (op === "export") return null;
       // (call $fn arg...) — FL stdlib 고차 함수용
@@ -2144,6 +2280,305 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         if (typeof fnRef === "function" || (fnRef as any)?.kind === "function-value") return callFn(fnRef, callArgs);
         return null;
       }
+      // === Phase 131: EVOLVE ===
+
+      // evolve-numbers: 숫자 배열 진화
+      if (op === "evolve-numbers") {
+        const target = Array.isArray(args[0]) ? args[0].map(Number) : [0];
+        let popSize = 20;
+        let maxGens = 50;
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const key = String(args[i]);
+          if (key === ":pop") popSize = Number(args[i + 1]);
+          if (key === ":gens") maxGens = Number(args[i + 1]);
+        }
+        const result = evolveNumbers(target, popSize, maxGens);
+        return new Map<string, any>([
+          ["best", new Map<string, any>([
+            ["genome", result.best.genome],
+            ["fitness", result.best.fitness],
+            ["generation", result.best.generation],
+            ["id", result.best.id],
+          ])],
+          ["generations", result.generations],
+          ["converged", result.converged],
+          ["history", result.history.map(h => new Map<string, any>([
+            ["gen", h.gen],
+            ["bestFitness", h.bestFitness],
+            ["avgFitness", h.avgFitness],
+          ]))],
+        ]);
+      }
+
+      // evolve-strings: 문자열 진화
+      if (op === "evolve-strings") {
+        const target = String(args[0] ?? "");
+        let popSize = 30;
+        let maxGens = 100;
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const key = String(args[i]);
+          if (key === ":pop") popSize = Number(args[i + 1]);
+          if (key === ":gens") maxGens = Number(args[i + 1]);
+        }
+        const result = evolveStrings(target, popSize, maxGens);
+        return new Map<string, any>([
+          ["best", new Map<string, any>([
+            ["genome", result.best.genome],
+            ["fitness", result.best.fitness],
+            ["generation", result.best.generation],
+            ["id", result.best.id],
+          ])],
+          ["generations", result.generations],
+          ["converged", result.converged],
+          ["history", result.history.map(h => new Map<string, any>([
+            ["gen", h.gen],
+            ["bestFitness", h.bestFitness],
+            ["avgFitness", h.avgFitness],
+          ]))],
+        ]);
+      }
+
+      // evolve-config: 설정 맵 생성
+      if (op === "evolve-config") {
+        let popSize = 20;
+        let maxGens = 50;
+        let mutationRate = 0.1;
+        let eliteRatio = 0.1;
+        let fitnessGoal: number | null = null;
+        for (let i = 0; i < args.length - 1; i += 2) {
+          const key = String(args[i]);
+          if (key === ":pop") popSize = Number(args[i + 1]);
+          if (key === ":gens") maxGens = Number(args[i + 1]);
+          if (key === ":mutation") mutationRate = Number(args[i + 1]);
+          if (key === ":elite") eliteRatio = Number(args[i + 1]);
+          if (key === ":goal") fitnessGoal = Number(args[i + 1]);
+        }
+        return new Map<string, any>([
+          ["populationSize", popSize],
+          ["maxGenerations", maxGens],
+          ["mutationRate", mutationRate],
+          ["eliteRatio", eliteRatio],
+          ["fitnessGoal", fitnessGoal],
+        ]);
+      }
+
+      // evolve-step: 한 세대만 진행
+      if (op === "evolve-step") {
+        const engine = args[0];
+        if (engine instanceof EvolutionEngine) {
+          const stepResult = engine.step();
+          return new Map<string, any>([
+            ["bestFitness", stepResult.bestFitness],
+            ["avgFitness", stepResult.avgFitness],
+          ]);
+        }
+        return null;
+      }
+
+      // evolve-best: 현재 최고 개체 반환
+      if (op === "evolve-best") {
+        const engine = args[0];
+        if (engine instanceof EvolutionEngine) {
+          const best = engine.getBest();
+          if (!best) return null;
+          return new Map<string, any>([
+            ["genome", best.genome],
+            ["fitness", best.fitness],
+            ["generation", best.generation],
+            ["id", best.id],
+          ]);
+        }
+        return null;
+      }
+
+      // evolve-population: 개체군 반환
+      if (op === "evolve-population") {
+        const engine = args[0];
+        if (engine instanceof EvolutionEngine) {
+          return engine.getPopulation().map(ind => new Map<string, any>([
+            ["genome", ind.genome],
+            ["fitness", ind.fitness],
+            ["generation", ind.generation],
+            ["id", ind.id],
+          ]));
+        }
+        return [];
+      }
+
+      // evolve-run: 전체 진화 실행
+      if (op === "evolve-run") {
+        const engine = args[0];
+        if (engine instanceof EvolutionEngine) {
+          const result = engine.run();
+          return new Map<string, any>([
+            ["best", new Map<string, any>([
+              ["genome", result.best.genome],
+              ["fitness", result.best.fitness],
+              ["generation", result.best.generation],
+              ["id", result.best.id],
+            ])],
+            ["generations", result.generations],
+            ["converged", result.converged],
+            ["history", result.history.map(h => new Map<string, any>([
+              ["gen", h.gen],
+              ["bestFitness", h.bestFitness],
+              ["avgFitness", h.avgFitness],
+            ]))],
+          ]);
+        }
+        return null;
+      }
+
+      // evolve-history: 진화 히스토리 반환
+      if (op === "evolve-history") {
+        const arg = args[0];
+        if (arg instanceof EvolutionEngine) {
+          return arg.getHistory().map((h: any) => new Map<string, any>([
+            ["gen", h.gen],
+            ["bestFitness", h.bestFitness],
+            ["avgFitness", h.avgFitness],
+          ]));
+        }
+        if (arg instanceof Map) {
+          const history = arg.get("history");
+          if (Array.isArray(history)) return history;
+        }
+        return [];
+      }
+
+      // === Phase 132: MUTATE ===
+      if (op === "mutate-config") {
+        const config: Partial<MutationConfig> = {};
+        for (let i = 0; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v) as MutationType;
+        }
+        return new Map<string, any>([
+          ["rate", config.rate ?? 0.1],
+          ["strength", config.strength ?? 0.1],
+          ["type", config.type ?? "random"]
+        ]);
+      }
+      if (op === "mutate-numbers") {
+        const arr = Array.isArray(args[0]) ? args[0].map(Number) : [];
+        const config: Partial<MutationConfig> = {};
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v) as MutationType;
+        }
+        const m = new Mutator(config);
+        const r = m.mutateNumbers(arr);
+        return new Map<string, any>([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-string") {
+        const s = String(args[0] ?? "");
+        const config: Partial<MutationConfig> = {};
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v) as MutationType;
+        }
+        const m = new Mutator(config);
+        const r = m.mutateString(s);
+        return new Map<string, any>([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-object") {
+        const raw = args[0];
+        const obj: Record<string, unknown> = raw instanceof Map
+          ? Object.fromEntries(raw.entries())
+          : (typeof raw === "object" && raw !== null ? raw : {});
+        const config: Partial<MutationConfig> = {};
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v) as MutationType;
+        }
+        const m = new Mutator(config);
+        const r = m.mutateObject(obj as Record<string, unknown>);
+        const toMap = (o: Record<string, unknown>) => new Map<string, any>(Object.entries(o));
+        return new Map<string, any>([
+          ["original", toMap(r.original as Record<string, unknown>)],
+          ["mutated", toMap(r.mutated as Record<string, unknown>)],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-swap") {
+        const arr = Array.isArray(args[0]) ? args[0] : [];
+        const config: Partial<MutationConfig> = { type: "swap", rate: 0.3 };
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "rate") config.rate = Number(v);
+        }
+        const m = new Mutator(config);
+        const r = m.swapMutation(arr);
+        return new Map<string, any>([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-flip") {
+        const arr = Array.isArray(args[0]) ? args[0].map(Number) : [];
+        const config: Partial<MutationConfig> = { type: "flip" };
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "rate") config.rate = Number(v);
+        }
+        const m = new Mutator(config);
+        const r = m.flipMutation(arr);
+        return new Map<string, any>([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-select") {
+        const rawList = Array.isArray(args[0]) ? args[0] : [];
+        let n = 1;
+        for (let i = 1; i < args.length - 1; i += 2) {
+          const k = String(args[i]).replace(/^:/, "");
+          const v = args[i + 1];
+          if (k === "n") n = Number(v);
+        }
+        const candidates = rawList.map((item: any) => {
+          if (item instanceof Map) {
+            return { value: item.get("value"), fitness: Number(item.get("fitness") ?? 0) };
+          }
+          return { value: item, fitness: 0 };
+        });
+        return globalMutator.select(candidates, n);
+      }
+      if (op === "mutation-count") {
+        const r = args[0];
+        if (r instanceof Map) return r.get("mutations") ?? 0;
+        return 0;
+      }
+
       // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
       return callUser(op, args);
     }
