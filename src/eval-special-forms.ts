@@ -4,11 +4,13 @@
 // let, set, if, cond, do/begin/progn, loop, recur, while, and, or, map
 // Phase 63: defmacro, macroexpand 추가
 // Phase 61: TCO 모드에서 꼬리 위치 함수 호출 → TailCall 토큰 반환
+// Phase 66: defstruct — 타입이 있는 레코드 타입
 
 import { Interpreter } from "./interpreter";
 import { SExpr, ASTNode, Variable, Literal } from "./ast";
 import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
+import { StructRegistry } from "./struct-system"; // Phase 66
 
 export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): any {
   const ev = (node: any) => (interp as any).eval(node);
@@ -395,6 +397,82 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return undefined;
   }
 
+  // ── defstruct ─────────────────────────────────────────────────────
+  // (defstruct Point [:x :float :y :float])
+  // 자동 생성:
+  //   (Point 1.0 2.0)       → {:x 1.0 :y 2.0 :__type "Point"}
+  //   (Point? v)            → true/false
+  //   (Point.x v)           → v.x
+  if (op === "defstruct") {
+    if (expr.args.length < 2) {
+      throw new Error(`defstruct requires a name and a field vector`);
+    }
+
+    // 1. 이름 추출
+    const nameNode = expr.args[0] as any;
+    const structName: string =
+      nameNode.kind === "literal"  ? String(nameNode.value)
+      : nameNode.kind === "variable" ? nameNode.name
+      : String(nameNode.value ?? nameNode.name ?? "");
+
+    if (!structName) throw new Error(`defstruct: struct name is required`);
+
+    // 2. 필드 벡터 파싱 [:x :float :y :float]
+    const fieldsNode = expr.args[1] as any;
+    const fields: Array<{ name: string; type: string }> = [];
+
+    if (fieldsNode.kind === "block" && fieldsNode.type === "Array") {
+      const items = fieldsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        for (let i = 0; i < items.length; i += 2) {
+          const nameItem = items[i] as any;
+          const typeItem = items[i + 1] as any;
+          // 키워드 (:x) or 변수 (x)
+          const fieldName =
+            nameItem.kind === "keyword" ? nameItem.name
+            : nameItem.kind === "variable" ? nameItem.name
+            : nameItem.kind === "literal"  ? String(nameItem.value)
+            : "";
+          const fieldType =
+            typeItem === undefined            ? "any"
+            : typeItem.kind === "keyword"    ? typeItem.name
+            : typeItem.kind === "variable"   ? typeItem.name
+            : typeItem.kind === "literal"    ? String(typeItem.value)
+            : "any";
+          if (fieldName) fields.push({ name: fieldName, type: fieldType });
+        }
+      }
+    }
+
+    // 3. StructRegistry에 등록
+    const registry: StructRegistry = ctx.structs;
+    registry.define({ name: structName, fields });
+
+    // 4. constructor 등록 — (Point 1.0 2.0)
+    const ctor = registry.makeConstructor(structName);
+    ctx.functions.set(structName, {
+      name: structName,
+      params: fields.map((f) => f.name),
+      body: { kind: "literal", type: "null", value: null } as any,
+      capturedEnv: new Map([["__struct_ctor__", ctor]]),
+    });
+    // native 함수로도 등록 (eval-builtins fallback이 아닌 직접 호출)
+    (ctx as any)[`__native_${structName}`] = ctor;
+
+    // 5. predicate 등록 — (Point? v)
+    const pred = registry.makePredicate(structName);
+    (ctx as any)[`__native_${structName}?`] = pred;
+
+    // 6. field accessor 등록 — (Point.x v), (Point.y v) ...
+    for (const field of fields) {
+      const accessorName = `${structName}.${field.name}`;
+      const acc = registry.makeAccessor(structName, field.name);
+      (ctx as any)[`__native_${accessorName}`] = acc;
+    }
+
+    return null;
+  }
+
   // ── defmacro ──────────────────────────────────────────────────────
   // (defmacro name [$cond $body] (if $cond $body nil))
   if (op === "defmacro") {
@@ -427,6 +505,113 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     const form = expr.args[0];
     const expanded = ctx.macroExpander.expand(form);
     return ctx.macroExpander.astToString(expanded);
+  }
+
+  // ── defprotocol ───────────────────────────────────────────────────
+  // (defprotocol Serializable
+  //   [serialize [$self] :string]
+  //   [deserialize [$data] :any])
+  if (op === "defprotocol") {
+    if (expr.args.length < 1) throw new Error(`defprotocol requires a name`);
+    const nameNode = expr.args[0] as any;
+    const protoName: string =
+      nameNode.kind === "variable" ? nameNode.name
+      : nameNode.kind === "literal" ? String(nameNode.value)
+      : String(nameNode.name ?? nameNode.value ?? "");
+
+    const methods: Array<{ name: string; params: string[]; returnType?: string }> = [];
+
+    for (let i = 1; i < expr.args.length; i++) {
+      const sigNode = expr.args[i] as any;
+      if (sigNode.kind !== "block" || sigNode.type !== "Array") continue;
+      const items = sigNode.fields.get("items");
+      if (!Array.isArray(items) || items.length < 1) continue;
+
+      const methodNameNode = items[0] as any;
+      const methodName: string =
+        methodNameNode.kind === "variable" ? methodNameNode.name
+        : methodNameNode.kind === "literal" ? String(methodNameNode.value)
+        : String(methodNameNode.name ?? methodNameNode.value ?? "");
+
+      const params: string[] = [];
+      if (items.length > 1) {
+        const paramsNode = items[1] as any;
+        if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+          const pItems = paramsNode.fields.get("items");
+          if (Array.isArray(pItems)) {
+            for (const p of pItems as any[]) {
+              if (p.kind === "variable") params.push(p.name);
+              else if (p.kind === "literal") params.push("$" + p.value);
+            }
+          }
+        }
+      }
+
+      let returnType: string | undefined;
+      if (items.length > 2) {
+        const rtNode = items[2] as any;
+        if (rtNode.kind === "keyword") returnType = rtNode.name;
+        else if (rtNode.kind === "literal") returnType = String(rtNode.value);
+      }
+
+      methods.push({ name: methodName, params, returnType });
+    }
+
+    ctx.protocols.defineProtocol({ name: protoName, methods });
+    return null;
+  }
+
+  // ── impl ──────────────────────────────────────────────────────────
+  // (impl Serializable Point
+  //   [serialize [$self] (str "(" $self.x "," $self.y ")")]
+  //   [deserialize [$data] {:x 0.0 :y 0.0}])
+  if (op === "impl") {
+    if (expr.args.length < 3) throw new Error(`impl requires protocol name, type name, and at least one method`);
+
+    const protoNameNode = expr.args[0] as any;
+    const protoName: string =
+      protoNameNode.kind === "variable" ? protoNameNode.name
+      : protoNameNode.kind === "literal" ? String(protoNameNode.value)
+      : String(protoNameNode.name ?? protoNameNode.value ?? "");
+
+    const typeNameNode = expr.args[1] as any;
+    const typeName: string =
+      typeNameNode.kind === "variable" ? typeNameNode.name
+      : typeNameNode.kind === "literal" ? String(typeNameNode.value)
+      : String(typeNameNode.name ?? typeNameNode.value ?? "");
+
+    const implMethods = new Map<string, { params: string[]; body: any }>();
+
+    for (let i = 2; i < expr.args.length; i++) {
+      const implNode = expr.args[i] as any;
+      if (implNode.kind !== "block" || implNode.type !== "Array") continue;
+      const items = implNode.fields.get("items");
+      if (!Array.isArray(items) || items.length < 3) continue;
+
+      const methodNameNode = items[0] as any;
+      const methodName: string =
+        methodNameNode.kind === "variable" ? methodNameNode.name
+        : methodNameNode.kind === "literal" ? String(methodNameNode.value)
+        : String(methodNameNode.name ?? methodNameNode.value ?? "");
+
+      const params: string[] = [];
+      const paramsNode = items[1] as any;
+      if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+        const pItems = paramsNode.fields.get("items");
+        if (Array.isArray(pItems)) {
+          for (const p of pItems as any[]) {
+            if (p.kind === "variable") params.push(p.name);
+            else if (p.kind === "literal") params.push("$" + p.value);
+          }
+        }
+      }
+
+      const body = items[2];
+      implMethods.set(methodName, { params, body });
+    }
+
+    ctx.protocols.defineImpl({ protocolName: protoName, typeName, methods: implMethods });
+    return null;
   }
 
   throw new Error(`evalSpecialForm: unknown op "${op}"`);

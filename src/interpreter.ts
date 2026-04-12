@@ -27,6 +27,8 @@ import { evalPatternMatch as _evalPatternMatch, evalTryBlock as _evalTryBlock, e
 import { registerBuiltinTypeClasses as _registerBuiltinTypeClasses, evalTypeClass as _evalTypeClass, evalInstance as _evalInstance } from "./eval-type-classes"; // Phase 58: Type class 분리
 import { callUserFunction as _callUserFunction, callFunctionValue as _callFunctionValue, callAsyncFunctionValue as _callAsyncFunctionValue, callFunction as _callFunction, callUserFunctionTCO as _callUserFunctionTCO, callFunctionValueTCO as _callFunctionValueTCO, callUserFunctionRaw as _callUserFunctionRaw, callFunctionValueRaw as _callFunctionValueRaw } from "./eval-call-function"; // Phase 58+61: Function call 분리 + TCO
 import { MacroExpander } from "./macro-expander"; // Phase 63: 매크로 시스템
+import { ProtocolRegistry } from "./protocol"; // Phase 64: 프로토콜 시스템
+import { StructRegistry } from "./struct-system"; // Phase 66: 구조체 시스템
 
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
@@ -87,6 +89,8 @@ export class Interpreter {
       typeClassInstances: new Map(),      // Phase 5 Week 2: Type class instance registry
       modules: new Map(),                 // Phase 6: Module registry
       macroExpander: new MacroExpander(), // Phase 63: 매크로 시스템
+      protocols: new ProtocolRegistry(),  // Phase 64: 프로토콜 시스템
+      structs: new StructRegistry(),      // Phase 66: 구조체/레코드 타입 시스템
     };
 
     // Phase 9a: Initialize WebSearchAdapter (mock mode by default)
@@ -597,7 +601,7 @@ export class Interpreter {
 
     // Phase 57: Dispatch to specialized modules
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand"]);
+    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
@@ -619,7 +623,47 @@ export class Interpreter {
       }
     }
 
+    // Phase 64: 프로토콜 메서드 dispatch — 함수 미발견 시 프로토콜 레지스트리 탐색
+    if (this.context.protocols.hasMethod(op)) {
+      // 첫 번째 인자를 $self로 사용해 타입 확인
+      if (args.length >= 1) {
+        const selfVal = args[0];
+        const impl = this.context.protocols.resolveMethod(op, selfVal);
+        if (impl) {
+          const methodDef = impl.methods.get(op)!;
+          return this.callProtocolMethod(methodDef, selfVal, args.slice(1));
+        }
+      }
+    }
+
+    // Phase 66: struct native 함수 dispatch (constructor, predicate, accessor)
+    const nativeKey = `__native_${op}`;
+    if ((this.context as any)[nativeKey] !== undefined) {
+      const nativeFn: (...a: any[]) => any = (this.context as any)[nativeKey];
+      return nativeFn(...args);
+    }
+
     return evalBuiltin(this, op, args, expr);
+  }
+
+  // Phase 64: 프로토콜 메서드 호출 — $self + 나머지 인자 바인딩
+  private callProtocolMethod(methodDef: { params: string[]; body: any }, selfVal: any, restArgs: any[]): any {
+    // params: ["$self", "$data", ...] 형태
+    const params = methodDef.params;
+    this.context.variables.push();
+    try {
+      // $self 바인딩 (첫 번째 파라미터)
+      if (params.length > 0) {
+        this.context.variables.set(params[0], selfVal);
+      }
+      // 나머지 파라미터 바인딩
+      for (let i = 1; i < params.length; i++) {
+        this.context.variables.set(params[i], restArgs[i - 1] ?? null);
+      }
+      return this.eval(methodDef.body);
+    } finally {
+      this.context.variables.pop();
+    }
   }
 
   // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원

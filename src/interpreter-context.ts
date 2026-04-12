@@ -6,6 +6,8 @@ import { TypeChecker } from "./type-checker";
 import { RuntimeTypeChecker } from "./type-system"; // Phase 60
 import { ScopeStack } from "./interpreter-scope";
 import { MacroExpander } from "./macro-expander"; // Phase 63: 매크로 시스템
+import { ProtocolRegistry } from "./protocol"; // Phase 64: 프로토콜 시스템
+import { StructRegistry } from "./struct-system"; // Phase 66: 구조체 시스템
 
 // ExecutionContext: 런타임 상태 관리
 export interface ExecutionContext {
@@ -29,6 +31,8 @@ export interface ExecutionContext {
   currentSearches?: Map<string, any>; // Phase 9a: Current reasoning sequence search results
   currentLearned?: Map<string, any>; // Phase 9b: Current reasoning sequence learned data
   macroExpander: MacroExpander; // Phase 63: 매크로 확장기
+  protocols: ProtocolRegistry;  // Phase 64: 프로토콜/인터페이스 레지스트리
+  structs: StructRegistry;      // Phase 66: 구조체/레코드 타입 레지스트리
 }
 
 export interface FreeLangFunction {
