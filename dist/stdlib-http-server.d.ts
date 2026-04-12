@@ -7,6 +7,8 @@ interface Request {
     headers: Record<string, string | string[]>;
     body?: string;
     params: Record<string, string>;
+    request_id?: string;
+    timestamp?: number;
 }
 /**
  * Create pure HTTP server for FreeLang v9 (no Express)

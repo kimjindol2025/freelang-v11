@@ -45,6 +45,18 @@ const url = __importStar(require("url"));
 function createHttpServerModule(callFn) {
     const routes = [];
     let server = null;
+    let requestCounter = 0;
+    // Request ID 생성
+    function generateRequestId() {
+        const timestamp = Date.now();
+        const counter = ++requestCounter;
+        return `req_${timestamp}_${counter}`;
+    }
+    // Access log 출력
+    function logAccess(method, path, status, duration, requestId) {
+        const icon = status >= 400 ? "❌" : "✅";
+        console.log(`${icon} [${requestId}] ${method} ${path} ${status} ${duration}ms`);
+    }
     // URL 경로를 정규표현식으로 변환 (예: /users/:id → /users/(.+))
     function pathToRegex(path) {
         const params = [];
@@ -87,7 +99,7 @@ function createHttpServerModule(callFn) {
         }
     }
     // v9 요청 객체 생성
-    function createFlRequest(method, path, query, headers, body, params) {
+    function createFlRequest(method, path, query, headers, body, params, requestId) {
         return {
             __fl_request: true,
             method,
@@ -96,6 +108,8 @@ function createHttpServerModule(callFn) {
             headers,
             body: body || undefined,
             params,
+            request_id: requestId,
+            timestamp: Date.now(),
         };
     }
     return {
@@ -132,6 +146,8 @@ function createHttpServerModule(callFn) {
         // server_start port -> string
         "server_start": (port) => {
             server = http.createServer(async (req, res) => {
+                const requestStart = Date.now();
+                const requestId = generateRequestId();
                 const method = req.method || "GET";
                 const { path, query } = parseUrl(req.url || "/");
                 const headers = req.headers;
@@ -140,6 +156,7 @@ function createHttpServerModule(callFn) {
                 res.setHeader("Access-Control-Allow-Origin", "*");
                 res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
                 res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+                res.setHeader("X-Request-Id", requestId);
                 if (method === "OPTIONS") {
                     res.writeHead(200);
                     res.end();
@@ -160,14 +177,15 @@ function createHttpServerModule(callFn) {
                         for (let i = 0; i < route.params.length; i++) {
                             params[route.params[i]] = match[i + 1];
                         }
-                        // v9 요청 객체 생성
-                        const flReq = createFlRequest(method, path, query, headers, body, params);
+                        // v9 요청 객체 생성 (request_id 포함)
+                        const flReq = createFlRequest(method, path, query, headers, body, params, requestId);
                         // 핸들러 호출
                         const result = callFn(route.handler, [flReq]);
                         // 응답 처리
+                        let status = 200;
                         if (result && typeof result === "object") {
                             if (result.__fl_response === true) {
-                                const status = result.status ?? 200;
+                                status = result.status ?? 200;
                                 const contentType = result.contentType ?? "application/json";
                                 sendResponse(res, status, result.body ?? "", contentType);
                             }
@@ -178,15 +196,24 @@ function createHttpServerModule(callFn) {
                         else {
                             sendResponse(res, 200, result ?? "");
                         }
+                        // Access log
+                        const duration = Date.now() - requestStart;
+                        logAccess(method, path, status, duration, requestId);
                     }
                     catch (err) {
-                        sendResponse(res, 500, { error: err.message });
+                        const status = 500;
+                        sendResponse(res, status, { error: err.message });
+                        const duration = Date.now() - requestStart;
+                        logAccess(method, path, status, duration, requestId);
                     }
                     return;
                 }
                 // 404
                 if (!matched) {
-                    sendResponse(res, 404, { error: "Not Found", path });
+                    const status = 404;
+                    sendResponse(res, status, { error: "Not Found", path });
+                    const duration = Date.now() - requestStart;
+                    logAccess(method, path, status, duration, requestId);
                 }
             });
             server.listen(port);

@@ -1,0 +1,194 @@
+; Phase 5: Logging Test Suite
+
+; 로깅 함수 (logging.fl에서 복사)
+[FUNC generate-request-id :params []
+  :body (concat "req_" (int-to-str 1234567890))
+]
+
+[FUNC make-log-entry :params [$level $message $stage $request_id $data]
+  :body {
+    :timestamp 1234567890
+    :level $level
+    :message $message
+    :stage $stage
+    :request_id $request_id
+    :data $data
+  }
+]
+
+[FUNC format-log-human :params [$entry]
+  :body (do
+    (let [
+        [$level (get $entry "level")]
+        [$message (get $entry "message")]
+        [$stage (get $entry "stage")]
+        [$request_id (get $entry "request_id")]
+        [$icon "ℹ️ "]
+      ]
+      (concat
+        $icon
+        "[" $request_id "] "
+        "{" $stage "} "
+        $message
+      )
+    )
+  )
+]
+
+[FUNC make-access-log :params [$request_id $method $path $status $duration_ms $bytes]
+  :body {
+    :timestamp 1234567890
+    :request_id $request_id
+    :method $method
+    :path $path
+    :status $status
+    :duration_ms $duration_ms
+    :bytes $bytes
+  }
+]
+
+[FUNC format-access-log :params [$entry]
+  :body (do
+    (let [
+        [$rid (get $entry "request_id")]
+        [$method (get $entry "method")]
+        [$path (get $entry "path")]
+        [$status (get $entry "status")]
+        [$dur (get $entry "duration_ms")]
+      ]
+      (concat
+        "[" $rid "] "
+        $method " " $path " "
+        (int-to-str $status) " "
+        (int-to-str $dur) "ms"
+      )
+    )
+  )
+]
+
+; Tests
+[FUNC test-request-id :params []
+  :body (do
+    (println "\n=== Test: generate-request-id ===")
+    (let [[$rid (generate-request-id)]]
+      (do
+        (println (concat "Request ID: " $rid))
+        (if (string-starts-with? $rid "req_")
+          (println "✅ Request ID format correct")
+          (println "❌ Request ID format wrong")
+        )
+      )
+    )
+  )
+]
+
+[FUNC test-log-entry :params []
+  :body (do
+    (println "\n=== Test: make-log-entry ===")
+    (let [
+        [$entry (make-log-entry "info" "User logged in" "auth" "req_123" { :user "alice" })]
+      ]
+      (do
+        (println (concat "Level: " (get $entry "level")))
+        (println (concat "Message: " (get $entry "message")))
+        (println (concat "Stage: " (get $entry "stage")))
+        (println (concat "Request ID: " (get $entry "request_id")))
+      )
+    )
+  )
+]
+
+[FUNC test-format-log :params []
+  :body (do
+    (println "\n=== Test: format-log-human ===")
+    (let [
+        [$entry (make-log-entry "info" "Package resolved" "package_resolve" "req_456" { :package "lodash" })]
+      ]
+      (println (format-log-human $entry))
+    )
+  )
+]
+
+[FUNC test-access-log :params []
+  :body (do
+    (println "\n=== Test: access-log ===")
+    (let [
+        [$log (make-access-log "req_789" "GET" "/api/packages" 200 145 512)]
+      ]
+      (println (format-access-log $log))
+    )
+
+    (println)
+
+    (let [
+        [$log (make-access-log "req_790" "POST" "/api/packages/install" 400 89 256)]
+      ]
+      (println (format-access-log $log))
+    )
+  )
+]
+
+[FUNC test-vpm-flow :params []
+  :body (do
+    (println "\n=== Test: vpm install flow logging ===")
+    (let [[$rid (generate-request-id)]]
+      (do
+        (println (concat "📦 vpm install " $rid))
+
+        ; Resolve
+        (let [[$entry (make-log-entry "info" "Resolving lodash ^4.0.0" "package_resolve" $rid {})]]
+          (println (format-log-human $entry))
+        )
+
+        ; Fetch
+        (let [[$entry (make-log-entry "info" "Fetching lodash@4.17.21" "package_fetch" $rid {})]]
+          (println (format-log-human $entry))
+        )
+
+        ; Verify
+        (let [[$entry (make-log-entry "info" "Verifying checksum" "package_verify" $rid {})]]
+          (println (format-log-human $entry))
+        )
+
+        ; Install
+        (let [[$entry (make-log-entry "info" "Installing lodash@4.17.21" "package_install" $rid {})]]
+          (println (format-log-human $entry))
+        )
+
+        (println "✅ Installation complete")
+      )
+    )
+  )
+]
+
+[FUNC string-starts-with? :params [$s $prefix]
+  :body (do
+    (let [
+        [$plen (length $prefix)]
+        [$slen (length $s)]
+      ]
+      (if (> $plen $slen)
+        false
+        (= (substring $s 0 $plen) $prefix)
+      )
+    )
+  )
+]
+
+[FUNC int-to-str :params [$n]
+  :body (concat "" $n)
+]
+
+[FUNC run-all-tests :params []
+  :body (do
+    (println "🧪 Running Logging Tests...")
+    (test-request-id)
+    (test-log-entry)
+    (test-format-log)
+    (test-access-log)
+    (test-vpm-flow)
+    (println "\n✅ All logging tests completed!")
+  )
+]
+
+(run-all-tests)

@@ -1,0 +1,294 @@
+; Phase 5: Structured Logging
+; Human-readable + Machine-readable 로그
+
+; 로그 레벨 상수
+[FUNC log-levels :params []
+  :body {
+    :debug 0
+    :info 1
+    :warn 2
+    :error 3
+  }
+]
+
+; 전역 로그 설정
+(let [[$__log_level__ 1]] (set $__log_level__ 1))
+
+; Request ID 생성
+[FUNC generate-request-id :params []
+  :body (concat "req_" (int-to-str (get-timestamp)))
+]
+
+; Timestamp 생성 (ms)
+[FUNC get-timestamp :params []
+  :body 1234567890
+]
+
+; 로그 엔트리 생성
+[FUNC make-log-entry :params [
+  $level
+  $message
+  $stage
+  $request_id
+  $data
+]
+  :body {
+    :timestamp (get-timestamp)
+    :level $level
+    :message $message
+    :stage $stage
+    :request_id $request_id
+    :data $data
+  }
+]
+
+; Human-readable 포맷
+[FUNC format-log-human :params [$entry]
+  :body (do
+    (let [
+        [$level (get $entry "level")]
+        [$message (get $entry "message")]
+        [$stage (get $entry "stage")]
+        [$request_id (get $entry "request_id")]
+        [$icon "ℹ️ "]
+      ]
+      (do
+        (if (= $level "debug") (set $icon "🔍 "))
+        (if (= $level "info") (set $icon "ℹ️ "))
+        (if (= $level "warn") (set $icon "⚠️ "))
+        (if (= $level "error") (set $icon "❌ "))
+
+        (concat
+          $icon
+          "[" $request_id "]"
+          " {" $stage "}"
+          " " $message
+        )
+      )
+    )
+  )
+]
+
+; Structured 포맷 (JSON-like)
+[FUNC format-log-json :params [$entry]
+  :body (do
+    (let [
+        [$ts (get $entry "timestamp")]
+        [$level (get $entry "level")]
+        [$msg (get $entry "message")]
+        [$stage (get $entry "stage")]
+        [$rid (get $entry "request_id")]
+      ]
+      (concat
+        "{"
+        "\"timestamp\":" (int-to-str $ts) ","
+        "\"level\":\"" $level "\","
+        "\"stage\":\"" $stage "\","
+        "\"request_id\":\"" $rid "\","
+        "\"message\":\"" $msg "\""
+        "}"
+      )
+    )
+  )
+]
+
+; 로그 출력 (human-readable)
+[FUNC log-debug :params [$message $stage $request_id $data]
+  :body (do
+    (let [[$entry (make-log-entry "debug" $message $stage $request_id $data)]]
+      (println (format-log-human $entry))
+    )
+  )
+]
+
+[FUNC log-info :params [$message $stage $request_id $data]
+  :body (do
+    (let [[$entry (make-log-entry "info" $message $stage $request_id $data)]]
+      (println (format-log-human $entry))
+    )
+  )
+]
+
+[FUNC log-warn :params [$message $stage $request_id $data]
+  :body (do
+    (let [[$entry (make-log-entry "warn" $message $stage $request_id $data)]]
+      (println (format-log-human $entry))
+    )
+  )
+]
+
+[FUNC log-error :params [$message $stage $request_id $data]
+  :body (do
+    (let [[$entry (make-log-entry "error" $message $stage $request_id $data)]]
+      (println (format-log-human $entry))
+    )
+  )
+]
+
+; Access log 엔트리
+[FUNC make-access-log :params [
+  $request_id
+  $method
+  $path
+  $status
+  $duration_ms
+  $bytes
+]
+  :body {
+    :timestamp (get-timestamp)
+    :request_id $request_id
+    :method $method
+    :path $path
+    :status $status
+    :duration_ms $duration_ms
+    :bytes $bytes
+  }
+]
+
+; Access log 포맷
+[FUNC format-access-log :params [$entry]
+  :body (do
+    (let [
+        [$rid (get $entry "request_id")]
+        [$method (get $entry "method")]
+        [$path (get $entry "path")]
+        [$status (get $entry "status")]
+        [$dur (get $entry "duration_ms")]
+      ]
+      (concat
+        "[" $rid "] "
+        $method " " $path " "
+        (int-to-str $status) " "
+        (int-to-str $dur) "ms"
+      )
+    )
+  )
+]
+
+[FUNC print-access-log :params [$entry]
+  :body (println (format-access-log $entry))
+]
+
+; vpm 로그 - resolve 단계
+[FUNC log-vpm-resolve-start :params [$request_id $package_name $constraint]
+  :body (log-info
+    (concat "Resolving " $package_name " " $constraint)
+    "package_resolve"
+    $request_id
+    { "package" $package_name "constraint" $constraint }
+  )
+]
+
+[FUNC log-vpm-resolve-end :params [$request_id $package_name $resolved_version]
+  :body (log-info
+    (concat "Resolved " $package_name " → " $resolved_version)
+    "package_resolve"
+    $request_id
+    { "package" $package_name "version" $resolved_version }
+  )
+]
+
+; vpm 로그 - fetch 단계
+[FUNC log-vpm-fetch-start :params [$request_id $package_name $version]
+  :body (log-info
+    (concat "Fetching " $package_name "@" $version)
+    "package_fetch"
+    $request_id
+    { "package" $package_name "version" $version }
+  )
+]
+
+[FUNC log-vpm-fetch-end :params [$request_id $package_name $version $size_kb]
+  :body (log-info
+    (concat "Downloaded " $package_name " (" (int-to-str $size_kb) " KB)")
+    "package_fetch"
+    $request_id
+    { "package" $package_name "version" $version "size_kb" $size_kb }
+  )
+]
+
+; vpm 로그 - verify 단계
+[FUNC log-vpm-verify-start :params [$request_id $package_name]
+  :body (log-info
+    (concat "Verifying checksum " $package_name)
+    "package_verify"
+    $request_id
+    { "package" $package_name }
+  )
+]
+
+[FUNC log-vpm-verify-end :params [$request_id $package_name $valid]
+  :body (do
+    (if $valid
+      (log-info
+        (concat "Checksum verified " $package_name)
+        "package_verify"
+        $request_id
+        { "package" $package_name "valid" true }
+      )
+      (log-error
+        (concat "Checksum failed " $package_name)
+        "package_verify"
+        $request_id
+        { "package" $package_name "valid" false }
+      )
+    )
+  )
+]
+
+; vpm 로그 - install 단계
+[FUNC log-vpm-install-start :params [$request_id $package_name $version]
+  :body (log-info
+    (concat "Installing " $package_name "@" $version)
+    "package_install"
+    $request_id
+    { "package" $package_name "version" $version }
+  )
+]
+
+[FUNC log-vpm-install-end :params [$request_id $package_name $success]
+  :body (do
+    (if $success
+      (log-info
+        (concat "Installed " $package_name)
+        "package_install"
+        $request_id
+        { "package" $package_name "success" true }
+      )
+      (log-error
+        (concat "Install failed " $package_name)
+        "package_install"
+        $request_id
+        { "package" $package_name "success" false }
+      )
+    )
+  )
+]
+
+; Helper
+[FUNC int-to-str :params [$n]
+  :body (concat "" $n)
+]
+
+; Module exports
+{
+  :generate-request-id generate-request-id
+  :make-log-entry make-log-entry
+  :format-log-human format-log-human
+  :format-log-json format-log-json
+  :log-debug log-debug
+  :log-info log-info
+  :log-warn log-warn
+  :log-error log-error
+  :make-access-log make-access-log
+  :format-access-log format-access-log
+  :print-access-log print-access-log
+  :log-vpm-resolve-start log-vpm-resolve-start
+  :log-vpm-resolve-end log-vpm-resolve-end
+  :log-vpm-fetch-start log-vpm-fetch-start
+  :log-vpm-fetch-end log-vpm-fetch-end
+  :log-vpm-verify-start log-vpm-verify-start
+  :log-vpm-verify-end log-vpm-verify-end
+  :log-vpm-install-start log-vpm-install-start
+  :log-vpm-install-end log-vpm-install-end
+}
