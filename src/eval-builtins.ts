@@ -36,6 +36,7 @@ import { evaluateQuality, defaultCriteria } from "./quality-loop"; // Phase 106:
 import { globalTutor } from "./fl-tutor"; // Phase 107: FL Self-Teaching
 import { createTrace, getTrace, TraceNodeType } from "./reasoning-debugger"; // Phase 108: Reasoning Debugger
 import { globalCompiler, PromptCompiler } from "./prompt-compiler"; // Phase 109: Prompt Compiler
+import { sdk as flSDK } from "./fl-sdk"; // Phase 110: External AI SDK
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // interp.eval은 public이어야 하므로 (실제로는 public)
@@ -1178,6 +1179,36 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const instruction = String(args[1] ?? "");
       const result = globalCompiler.compileFromCode(flCode, instruction);
       return result.prompt;
+    }
+
+    // Phase 110: External AI SDK 내장 함수
+    // (sdk-version) → "9.0.0"
+    case "sdk-version": {
+      return flSDK.version;
+    }
+
+    // (sdk-features) → 피처 리스트 (배열)
+    case "sdk-features": {
+      return [...flSDK.features];
+    }
+
+    // (sdk-supports "feature") → boolean
+    case "sdk-supports": {
+      const feature = String(args[0] ?? "");
+      return flSDK.supports(feature);
+    }
+
+    // (sdk-snippet "concept") → 코드 문자열
+    case "sdk-snippet": {
+      const concept = String(args[0] ?? "");
+      return flSDK.snippet(concept);
+    }
+
+    // (sdk-validate "code") → boolean
+    case "sdk-validate": {
+      const code = String(args[0] ?? "");
+      const result = flSDK.validate(code);
+      return result.valid;
     }
 
     // Function call (default)
