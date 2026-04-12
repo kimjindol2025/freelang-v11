@@ -1,10 +1,12 @@
 // FreeLang v9: Function Call Evaluation
 // Phase 58: interpreter.ts에서 분리된 함수 호출 로직
+// Phase 61: TCO (Tail Call Optimization) 추가
 
 import { TypeAnnotation } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
 import { suggestSimilar } from "./error-formatter";
 import { FunctionNotFoundError } from "./errors";
+import { isTailCall } from "./tco";
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -29,7 +31,7 @@ interface InterpreterLike {
   };
 }
 
-const MAX_CALL_DEPTH = 500;
+const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
 
 export function callUserFunction(interp: InterpreterLike, name: string, args: any[]): any {
   let baseName = name;
@@ -199,5 +201,196 @@ export function callFunction(interp: InterpreterLike, fn: any, args: any[]): any
     return callUserFunction(interp, fn.name || "anonymous", args);
   } else {
     throw new Error(`Cannot call ${typeof fn}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Phase 61: TCO (Trampoline 기반) — 스택 없이 100만 재귀 지원
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * callUserFunctionTCO: 꼬리 재귀를 반복문으로 변환
+ * - tcoMode=true로 eval 실행 → if 꼬리 위치 함수 호출이 TailCall 토큰 반환
+ * - TailCall 토큰이 반환되면 인자만 교체하고 다시 실행
+ * - 1,000,000번 반복 가능 (스택 없음)
+ */
+export function callUserFunctionTCO(interp: InterpreterLike, name: string, args: any[]): any {
+  let currentName = name;
+  let currentArgs = args;
+  // TCO 모드 활성화 (if 꼬리 위치 → TailCall 토큰)
+  const prevTcoMode = (interp as any).tcoMode;
+  (interp as any).tcoMode = true;
+
+  try {
+    for (let i = 0; i < 2_000_000; i++) {
+      let baseName = currentName;
+      const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
+      if (bracketMatch) baseName = bracketMatch[1];
+
+      const func = interp.context.functions.get(baseName);
+      if (!func) {
+        const candidates = [...interp.context.functions.keys()];
+        const similar = suggestSimilar(baseName, candidates);
+        const hint = similar
+          ? `'${baseName}'를 찾을 수 없습니다. 혹시 '${similar}'를 말씀하신 건가요?`
+          : `'${baseName}'를 찾을 수 없습니다. 함수가 정의되어 있는지 확인하세요.`;
+        throw new FunctionNotFoundError(baseName, interp.currentFilePath, interp.currentLine > 0 ? interp.currentLine : undefined, undefined, hint);
+      }
+
+      // Native JS 함수는 바로 실행
+      if (typeof func.body === "function") {
+        return (func.body as Function)(...currentArgs);
+      }
+
+      // 네임스페이스 함수 임시 alias
+      const prefixMatch = baseName.match(/^([^:]+):/);
+      const tempAliases: string[] = [];
+      if (prefixMatch) {
+        const prefix = prefixMatch[1] + ":";
+        for (const [fname, fval] of interp.context.functions) {
+          if (fname.startsWith(prefix)) {
+            const unqualified = fname.slice(prefix.length);
+            if (!interp.context.functions.has(unqualified)) {
+              interp.context.functions.set(unqualified, fval);
+              tempAliases.push(unqualified);
+            }
+          }
+        }
+      }
+
+      let result: any;
+      try {
+        if (func.capturedEnv) {
+          // 클로저
+          const savedStack = interp.context.variables.saveStack();
+          try {
+            interp.context.variables.fromSnapshot(func.capturedEnv);
+            for (let j = 0; j < func.params.length; j++) {
+              interp.context.variables.set(func.params[j], currentArgs[j]);
+            }
+            result = interp.eval(func.body);
+          } finally {
+            interp.context.variables.restoreStack(savedStack);
+          }
+        } else {
+          // 일반 함수
+          interp.context.variables.push();
+          try {
+            for (let j = 0; j < func.params.length; j++) {
+              interp.context.variables.set(func.params[j], currentArgs[j]);
+            }
+            result = interp.eval(func.body);
+          } finally {
+            interp.context.variables.pop();
+          }
+        }
+      } finally {
+        for (const alias of tempAliases) interp.context.functions.delete(alias);
+      }
+
+      // TailCall 토큰이면 계속 반복
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          currentName = result.fn;
+          currentArgs = result.args;
+          continue;
+        } else {
+          // function-value TailCall → callFunctionValueTCO로 위임
+          return callFunctionValueTCO(interp, result.fn, result.args);
+        }
+      }
+      return result;
+    }
+    throw new Error(`TCO: 최대 반복(2,000,000) 초과 — '${currentName}'에서 무한 재귀 가능성`);
+  } finally {
+    (interp as any).tcoMode = prevTcoMode;
+  }
+}
+
+/**
+ * callFunctionValueTCO: function-value (람다/클로저) 꼬리 재귀를 반복문으로
+ */
+export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any[]): any {
+  let currentFn = fn;
+  let currentArgs = args;
+
+  for (let i = 0; i < 1_000_000; i++) {
+    if (currentFn.kind !== "function-value") {
+      throw new Error(`Expected function-value, got ${currentFn.kind}`);
+    }
+    const savedStack = interp.context.variables.saveStack();
+    let result: any;
+    try {
+      interp.context.variables.fromSnapshot(currentFn.capturedEnv);
+      for (let j = 0; j < currentFn.params.length; j++) {
+        interp.context.variables.set(currentFn.params[j], currentArgs[j]);
+      }
+      result = interp.eval(currentFn.body);
+    } finally {
+      interp.context.variables.restoreStack(savedStack);
+    }
+
+    if (isTailCall(result)) {
+      if (typeof result.fn === "string") {
+        return callUserFunctionTCO(interp, result.fn, result.args);
+      } else {
+        currentFn = result.fn;
+        currentArgs = result.args;
+        continue;
+      }
+    }
+    return result;
+  }
+  throw new Error("TCO: 최대 반복(1,000,000) 초과 — function-value에서 무한 재귀 가능성");
+}
+
+/**
+ * callUserFunctionRaw: trampoline용 — callDepth 체크 없이 단순 실행, TailCall 토큰 그대로 반환
+ */
+export function callUserFunctionRaw(interp: InterpreterLike, name: string, args: any[]): any {
+  const func = interp.context.functions.get(name);
+  if (!func) throw new FunctionNotFoundError(name, interp.currentFilePath, interp.currentLine > 0 ? interp.currentLine : undefined);
+  if (typeof func.body === "function") return (func.body as Function)(...args);
+
+  let result: any;
+  if (func.capturedEnv) {
+    const savedStack = interp.context.variables.saveStack();
+    try {
+      interp.context.variables.fromSnapshot(func.capturedEnv);
+      for (let i = 0; i < func.params.length; i++) {
+        interp.context.variables.set(func.params[i], args[i]);
+      }
+      result = interp.eval(func.body);
+    } finally {
+      interp.context.variables.restoreStack(savedStack);
+    }
+  } else {
+    interp.context.variables.push();
+    try {
+      for (let i = 0; i < func.params.length; i++) {
+        interp.context.variables.set(func.params[i], args[i]);
+      }
+      result = interp.eval(func.body);
+    } finally {
+      interp.context.variables.pop();
+    }
+  }
+  return result;
+}
+
+/**
+ * callFunctionValueRaw: trampoline용 — TailCall 토큰 그대로 반환
+ */
+export function callFunctionValueRaw(interp: InterpreterLike, fn: any, args: any[]): any {
+  if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
+  const savedStack = interp.context.variables.saveStack();
+  try {
+    interp.context.variables.fromSnapshot(fn.capturedEnv);
+    for (let i = 0; i < fn.params.length; i++) {
+      interp.context.variables.set(fn.params[i], args[i]);
+    }
+    return interp.eval(fn.body);
+  } finally {
+    interp.context.variables.restoreStack(savedStack);
   }
 }
