@@ -1415,11 +1415,17 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       }
       if (op === "cp-branch") {
         // (cp-branch "name" state fn) → 성공 시 결과, 실패 시 복원된 state
+        // fn: function-value (인라인 fn), string (함수이름), 또는 JS function
         const [name, state, fn] = args;
         const result = globalCheckpoint.branch(String(name), state, (s: any) => {
           if (typeof fn === "function") return fn(s);
-          if ((fn as any)?.kind === "function-value") return callFn(fn, [s]);
-          throw new Error("cp-branch: fn must be callable");
+          if (typeof fn === "string") return callUser(fn, [s]);
+          if ((fn as any)?.kind === "function-value" || (fn as any)?.kind === "async-function-value") {
+            return callFnVal(fn, [s]);
+          }
+          // fn이 함수 정의 객체(params+body)인 경우
+          if ((fn as any)?.params && (fn as any)?.body) return callFnVal({ kind: "function-value", ...(fn as any) }, [s]);
+          throw new Error(`cp-branch: fn must be callable, got ${typeof fn} ${(fn as any)?.kind ?? ""}`);
         });
         if (result.success) return result.result;
         return result.restored;
