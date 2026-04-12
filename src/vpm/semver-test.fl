@@ -1,0 +1,148 @@
+; Phase 5c: Semver Parser Test Suite
+; Semantic Versioning Parser 검증
+
+; Helper function: assert
+[FUNC assert :params [$condition $message]
+  :body (do
+    (if (not $condition)
+      (println (concat "❌ FAIL: " $message))
+      (println (concat "✅ PASS: " $message))
+    )
+  )
+]
+
+; Test 1: parse_semver
+[FUNC test_parse_semver :params []
+  :body (do
+    (println "\n=== Test: parse_semver ===")
+
+    (let [[$result (parse_semver "1.2.3")]]
+      (do
+        (assert (= (get $result "major") 1) "parse_semver: major version")
+        (assert (= (get $result "minor") 2) "parse_semver: minor version")
+        (assert (= (get $result "patch") 3) "parse_semver: patch version")
+      )
+    )
+
+    (let [[$result (parse_semver "0.0.1")]]
+      (do
+        (assert (= (get $result "major") 0) "parse_semver: zero major")
+        (assert (= (get $result "patch") 1) "parse_semver: zero minor")
+      )
+    )
+
+    (let [[$result (parse_semver "10.20.30")]]
+      (do
+        (assert (= (get $result "major") 10) "parse_semver: two-digit major")
+        (assert (= (get $result "minor") 20) "parse_semver: two-digit minor")
+        (assert (= (get $result "patch") 30) "parse_semver: two-digit patch")
+      )
+    )
+  )
+]
+
+; Test 2: validate_version
+[FUNC test_validate_version :params []
+  :body (do
+    (println "\n=== Test: validate_version ===")
+
+    (assert (validate_version "1.2.3") "validate_version: valid format")
+    (assert (not (validate_version "1.2")) "validate_version: invalid format (too few parts)")
+    (assert (not (validate_version "1.2.3.4")) "validate_version: invalid format (too many parts)")
+  )
+]
+
+; Test 3: semver_compare
+[FUNC test_semver_compare :params []
+  :body (do
+    (println "\n=== Test: semver_compare ===")
+
+    (assert (= (semver_compare "1.0.0" "1.0.0") 0) "semver_compare: equal versions")
+    (assert (= (semver_compare "1.0.0" "1.0.1") -1) "semver_compare: v1 < v2 (patch)")
+    (assert (= (semver_compare "1.1.0" "1.0.0") 1) "semver_compare: v1 > v2 (minor)")
+    (assert (= (semver_compare "2.0.0" "1.9.9") 1) "semver_compare: v1 > v2 (major)")
+    (assert (= (semver_compare "0.0.1" "0.0.0") 1) "semver_compare: zero versions")
+  )
+]
+
+; Test 4: semver_matches (Caret ^)
+[FUNC test_semver_matches_caret :params []
+  :body (do
+    (println "\n=== Test: semver_matches (Caret ^) ===")
+
+    (assert (semver_matches "^1.2.3" "1.2.3") "Caret: exact match")
+    (assert (semver_matches "^1.2.3" "1.2.5") "Caret: patch upgrade")
+    (assert (semver_matches "^1.2.3" "1.3.0") "Caret: minor upgrade")
+    (assert (not (semver_matches "^1.2.3" "2.0.0")) "Caret: reject major upgrade")
+    (assert (not (semver_matches "^1.2.3" "1.2.0")) "Caret: reject downgrade")
+  )
+]
+
+; Test 5: semver_matches (Tilde ~)
+[FUNC test_semver_matches_tilde :params []
+  :body (do
+    (println "\n=== Test: semver_matches (Tilde ~) ===")
+
+    (assert (semver_matches "~1.2.3" "1.2.3") "Tilde: exact match")
+    (assert (semver_matches "~1.2.3" "1.2.5") "Tilde: patch upgrade")
+    (assert (not (semver_matches "~1.2.3" "1.3.0")) "Tilde: reject minor upgrade")
+    (assert (not (semver_matches "~1.2.3" "2.0.0")) "Tilde: reject major upgrade")
+  )
+]
+
+; Test 6: semver_matches (Greater than >)
+[FUNC test_semver_matches_greater :params []
+  :body (do
+    (println "\n=== Test: semver_matches (Greater than >) ===")
+
+    (assert (semver_matches ">1.2.3" "1.2.4") "Greater: patch upgrade")
+    (assert (semver_matches ">1.2.3" "1.3.0") "Greater: minor upgrade")
+    (assert (semver_matches ">1.2.3" "2.0.0") "Greater: major upgrade")
+    (assert (not (semver_matches ">1.2.3" "1.2.3")) "Greater: reject equal")
+    (assert (not (semver_matches ">1.2.3" "1.2.0")) "Greater: reject downgrade")
+  )
+]
+
+; Test 7: semver_matches (Exact =)
+[FUNC test_semver_matches_exact :params []
+  :body (do
+    (println "\n=== Test: semver_matches (Exact =) ===")
+
+    (assert (semver_matches "=1.2.3" "1.2.3") "Exact: match with =")
+    (assert (semver_matches "1.2.3" "1.2.3") "Exact: match without =")
+    (assert (not (semver_matches "=1.2.3" "1.2.4")) "Exact: reject different patch")
+    (assert (not (semver_matches "=1.2.3" "1.3.3")) "Exact: reject different minor")
+  )
+]
+
+; Test 8: string-starts-with?
+[FUNC test_string_starts_with :params []
+  :body (do
+    (println "\n=== Test: string-starts-with? ===")
+
+    (assert (string-starts-with? "hello world" "hello") "starts-with: simple prefix")
+    (assert (string-starts-with? ">=1.2.3" ">=") "starts-with: operator prefix")
+    (assert (not (string-starts-with? "hello" "hello world")) "starts-with: prefix longer than string")
+  )
+]
+
+; Main test runner
+[FUNC run_all_tests :params []
+  :body (do
+    (println "🧪 Running Semver Parser Tests...")
+
+    (test_parse_semver)
+    (test_validate_version)
+    (test_semver_compare)
+    (test_semver_matches_caret)
+    (test_semver_matches_tilde)
+    (test_semver_matches_greater)
+    (test_semver_matches_exact)
+    (test_string_starts_with)
+
+    (println "\n✅ All tests completed!")
+  )
+]
+
+; Run tests
+(run_all_tests)
