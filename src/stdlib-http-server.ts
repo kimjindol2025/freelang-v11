@@ -267,6 +267,13 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           }
         });
 
+      server.on("error", (err: any) => {
+        if (err.code === "EADDRINUSE") {
+          console.warn(`[server] 포트 ${port} 이미 사용 중 — 서버 시작 건너뜀`);
+        } else {
+          console.error(`[server] 서버 오류: ${err.message}`);
+        }
+      });
       server.listen(port);
       // Keep process alive while server is running
       setInterval(() => {}, 10000).unref();
