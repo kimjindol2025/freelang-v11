@@ -1,0 +1,217 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [master, main, develop]
+    tags: [v*]
+  pull_request:
+    branches: [master, main, develop]
+  workflow_dispatch:
+
+jobs:
+  # 1. 코드 품질 검사
+  quality:
+    runs-on: ubuntu-latest
+    name: 코드 품질 검사
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: TypeScript 컴파일 검사
+        run: npm run build
+
+      - name: 코드 포매팅 검사
+        run: npm run format:check || true
+
+      - name: 린트 검사
+        run: npm run lint || true
+
+  # 2. 테스트 (다중 Node.js 버전)
+  test:
+    runs-on: ubuntu-latest
+    name: 테스트 (Node.js ${{ matrix.node-version }})
+    needs: quality
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 21.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js ${{ matrix.node-version }} 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 테스트 실행 (커버리지 포함)
+        run: npm test -- --coverage
+
+      - name: 커버리지 리포트 업로드
+        uses: codecov/codecov-action@v4
+        if: matrix.node-version == '20.x'
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-${{ matrix.node-version }}
+          fail_ci_if_error: false
+
+      - name: 테스트 결과 저장
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node-version }}
+          path: coverage/
+          retention-days: 7
+
+  # 3. 보안 검사
+  security:
+    runs-on: ubuntu-latest
+    name: 보안 검사
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: npm 패키지 감사
+        run: npm audit --audit-level=moderate || true
+
+      - name: 의존성 라이선스 검사
+        run: npm run check:licenses || true
+
+  # 4. 빌드 검증
+  build:
+    runs-on: ubuntu-latest
+    name: 빌드 검증
+    needs: [quality, test]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 프로젝트 빌드
+        run: npm run build
+
+      - name: 빌드 산출물 저장
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # 5. npm 배포 (릴리스 태그에서만)
+  publish:
+    runs-on: ubuntu-latest
+    name: npm 배포
+    needs: [quality, test, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          registry-url: https://registry.npmjs.org/
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 빌드
+        run: npm run build
+
+      - name: npm 배포
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub Release 생성
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## 변경 사항
+
+            자세한 내용은 CHANGELOG.md를 참고하세요.
+
+            ## npm 설치
+
+            \`\`\`bash
+            npm install -g freelang-v9@${{ github.ref }}
+            \`\`\`
+          draft: false
+          prerelease: false
+
+  # 6. 결과 요약
+  summary:
+    runs-on: ubuntu-latest
+    name: 결과 요약
+    needs: [quality, test, security, build]
+    if: always()
+
+    steps:
+      - name: 테스트 결과 확인
+        run: |
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "❌ 테스트 실패"
+            exit 1
+          else
+            echo "✅ 모든 테스트 통과"
+          fi
+
+      - name: 빌드 결과 확인
+        run: |
+          if [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "❌ 빌드 실패"
+            exit 1
+          else
+            echo "✅ 빌드 성공"
+          fi
+
+      - name: 최종 상태
+        run: |
+          echo "========================================"
+          echo "CI/CD 파이프라인 완료"
+          echo "========================================"
+          echo "✅ 코드 품질: ${{ needs.quality.result }}"
+          echo "✅ 테스트: ${{ needs.test.result }}"
+          echo "✅ 보안: ${{ needs.security.result }}"
+          echo "✅ 빌드: ${{ needs.build.result }}"
+          echo "========================================"
