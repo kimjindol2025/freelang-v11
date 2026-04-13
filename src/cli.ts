@@ -764,6 +764,9 @@ switch (cmd) {
     if (!filePath) { printUsage(); process.exit(1); }
     const watch = args.includes("--watch") || args.includes("-w");
     // `--` 구분자 뒤의 인수는 스크립트로 전달 ($__argv__)
+    // ⚠️ --watch와 extraArgs 충돌: -- 없이 `fl run file.fl --watch arg1` 하면
+    // arg1이 --watch 필터링과 함께 extraArgs로 들어감 (의도한 동작인지 불명확)
+    // 셀프 호스팅 실행 시엔 항상 -- 구분자 사용 권장: fl run interp.fl -- target.fl
     const ddIdx = args.indexOf("--");
     const extraArgs = ddIdx >= 0
       ? args.slice(ddIdx + 1)

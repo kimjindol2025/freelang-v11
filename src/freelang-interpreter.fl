@@ -48,6 +48,9 @@
 ]
 
 ; 환경에 바인딩 추가
+; ⚠️ 설계: 새 env 객체 반환 (비뮤테이션) — 기존 env 절대 수정 안 함
+; 새 vars에 [$name $val]을 prepend → 가장 최근 바인딩이 먼저 검색됨 (섀도잉 지원)
+; parent는 원본 env의 parent 그대로 — 체인이 아니라 플랫 복사!
 [FUNC env-bind :params [$env $name $val]
   :body (
     (let [[$new-vars (append [[$name $val]] (get $env :vars))]
@@ -394,6 +397,9 @@
 ; ── 프로그램 해석 ─────────────────────────────────────────────
 
 ; FUNC 블록들을 환경에 미리 등록 (상호 재귀 지원)
+; ⚠️ 함정: 클로저 생성 시점에 env가 아직 미완성!
+; fact를 등록할 때 fact 자신이 env에 없으므로 closure-env에 자기 자신이 없음.
+; → fl-fix-env로 전체 로드 후 사후 패치. 이 함수만 믿으면 자기재귀도 안 됨.
 [FUNC fl-load-funcs :params [$nodes $env $i]
   :body (
     (if (>= $i (length $nodes))
@@ -411,6 +417,9 @@
 ]
 
 ; 비-FUNC 노드들 실행
+; ⚠️ FUNC 블록은 스킵 — fl-load-funcs가 이미 처리했음 (중복 생성 방지)
+; ⚠️ env는 불변으로 전달 — top-level (define $x v)은 native측에서 뮤테이션으로 처리
+; ⚠️ Stage 3(2중 FL)에서 재귀 함수 실행 시 3겹 스택 소모 → 깊은 재귀는 --stack-size 필요
 [FUNC fl-run-nodes :params [$nodes $env $i $last]
   :body (
     (if (>= $i (length $nodes))
@@ -426,7 +435,8 @@
 ]
 
 ; 메인 진입점: AST 배열 → 마지막 평가값
-; fl-fix-env: 모든 클로저의 closure-env를 final env로 업데이트 (재귀 지원)
+; ⚠️ 임계적 순서: fl-load-funcs → fl-fix-env → fl-run-nodes
+; 이 순서 바꾸면 상호재귀 깨짐. fl-fix-env 빠뜨리면 자기재귀도 깨짐.
 [FUNC interpret :params [$ast]
   :body (
     (let [[$env (fl-fix-env (fl-load-funcs $ast (env-new) 0))]]
