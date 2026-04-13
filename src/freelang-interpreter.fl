@@ -102,33 +102,11 @@
 ]
 
 ; ── 메인 평가기 ───────────────────────────────────────────────
+; fl-eval → native fl-interp 위임: 재귀 스택오버플로우 방지
 
 [FUNC fl-eval :params [$node $env]
   :body (
-    (if (null? $node)
-      null
-      (let [[$k (get $node :kind)]]
-        (if (= $k "literal")
-          (get $node :value)
-          (if (= $k "variable")
-            (env-lookup $env (get $node :name))
-            (if (= $k "array")
-              (fl-eval-array (get $node :items) $env 0 [])
-              (if (= $k "sexpr")
-                (fl-eval-sexpr (get $node :op) (get $node :args) $env)
-                (if (= $k "block")
-                  (if (= (get $node :type) "Array")
-                    (fl-eval-array (block-items $node) $env 0 [])
-                    (fl-eval-block $node $env)
-                  )
-                  null
-                )
-              )
-            )
-          )
-        )
-      )
-    )
+    (fl-interp $node $env)
   )
 ]
 
@@ -429,9 +407,10 @@
 ]
 
 ; 메인 진입점: AST 배열 → 마지막 평가값
+; fl-fix-env: 모든 클로저의 closure-env를 final env로 업데이트 (재귀 지원)
 [FUNC interpret :params [$ast]
   :body (
-    (let [[$env (fl-load-funcs $ast (env-new) 0)]]
+    (let [[$env (fl-fix-env (fl-load-funcs $ast (env-new) 0))]]
       (fl-run-nodes $ast $env 0 null)
     )
   )
