@@ -1,0 +1,59 @@
+;; 사이드바 페이지 트리 렌더링 (Phase 2)
+
+[FUNC render-sidebar
+  :params []
+  :body (str
+"<div class=\"sidebar-header\">
+  <h2>📝 v9-Notion</h2>
+  <button id=\"new-page-btn\">+ 새 페이지</button>
+</div>
+<div id=\"page-tree\"></div>
+<style>
+  .sidebar { padding: 16px; }
+  .sidebar-header { margin-bottom: 16px; }
+  .page-item { padding: 8px 12px; cursor: pointer; border-radius: 4px; }
+  .page-item:hover { background: #f5f5f5; }
+  .page-item.active { background: #e7e5eb; }
+  .page-children { padding-left: 12px; margin-top: 4px; }
+  .page-icon { margin-right: 6px; }
+</style>
+")]
+
+[FUNC render-page-tree-item
+  :params [$page $level]
+  :body (let [[$icon (or (get $page "icon") "📄")]
+              [$title (or (get $page "title") "제목 없음")]
+              [$id (get $page "id")]
+              [$indent (str (* $level 16) "px")]]
+    (str
+      "<div class=\"page-item\" data-page-id=\"" $id "\" style=\"padding-left: " $indent "\">"
+      "<span class=\"page-icon\">" $icon "</span>"
+      "<span class=\"page-title\">" $title "</span>"
+      "</div>"))]
+
+[FUNC render-page-tree
+  :params [$pages $level]
+  :body (if (and $pages (> (length $pages) 0))
+    (let [[$html ""]]
+      (map (fn [$page]
+        (str
+          (render-page-tree-item $page (or $level 0))
+          ;; TODO: 자식 페이지 재귀 렌더링
+          ))
+        $pages))
+    "")]
+
+;; 빈 사이드바 (나중에 JS에서 동적 업데이트)
+[FUNC render-sidebar-placeholder
+  :params []
+  :body (str
+"<div class=\"sidebar\">
+  <div class=\"sidebar-header\">
+    <h2>📝 v9-Notion</h2>
+    <button id=\"new-page-btn\">+ 새 페이지</button>
+  </div>
+  <div id=\"page-tree\" style=\"padding: 12px;\">
+    <p style=\"color: #999; font-size: 14px;\">페이지 로딩 중...</p>
+  </div>
+</div>
+")]

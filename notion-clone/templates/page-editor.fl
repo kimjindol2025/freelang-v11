@@ -1,0 +1,80 @@
+;; SPA 마운트 포인트 (Phase 7)
+
+[FUNC render-app-shell
+  :params []
+  :body (str
+"<!DOCTYPE html>
+<html lang=\"ko\">
+<head>
+  <meta charset=\"UTF-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+  <title>v9-Notion</title>
+  <link rel=\"stylesheet\" href=\"/style.css\">
+</head>
+<body>
+  <div id=\"root\"></div>
+
+  <!-- 로그인 모달 -->
+  <div id=\"login-modal\" class=\"modal hidden\">
+    <div class=\"modal-content\">
+      <h2>v9-Notion에 로그인</h2>
+      <form id=\"login-form\">
+        <input type=\"email\" id=\"email\" placeholder=\"이메일\" required>
+        <input type=\"password\" id=\"password\" placeholder=\"비밀번호\" required>
+        <button type=\"submit\">로그인</button>
+        <p>계정이 없으신가요? <a href=\"#\" id=\"signup-link\">가입하기</a></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- 가입 모달 -->
+  <div id=\"signup-modal\" class=\"modal hidden\">
+    <div class=\"modal-content\">
+      <h2>v9-Notion 가입</h2>
+      <form id=\"signup-form\">
+        <input type=\"email\" id=\"signup-email\" placeholder=\"이메일\" required>
+        <input type=\"text\" id=\"signup-name\" placeholder=\"이름\" required>
+        <input type=\"password\" id=\"signup-password\" placeholder=\"비밀번호\" required>
+        <button type=\"submit\">가입</button>
+        <p>이미 계정이 있으신가요? <a href=\"#\" id=\"login-link\">로그인</a></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- 메인 앱 -->
+  <div id=\"app\" class=\"app hidden\">
+    <!-- 사이드바 -->
+    <aside id=\"sidebar\" class=\"sidebar\">
+      <div class=\"sidebar-header\">
+        <h2>📝 v9-Notion</h2>
+        <button id=\"new-page-btn\" class=\"btn-new-page\">+ 새 페이지</button>
+      </div>
+      <div id=\"page-tree\" class=\"page-tree\"></div>
+    </aside>
+
+    <!-- 메인 콘텐츠 -->
+    <main id=\"main-content\" class=\"main-content\">
+      <div id=\"editor\" class=\"editor\"></div>
+    </main>
+  </div>
+
+  <!-- 검색 모달 -->
+  <div id=\"search-modal\" class=\"modal hidden\">
+    <div class=\"search-content\">
+      <input type=\"text\" id=\"search-input\" placeholder=\"검색... (Cmd+K)\">
+      <div id=\"search-results\" class=\"search-results\"></div>
+    </div>
+  </div>
+
+  <!-- 데이터베이스 모달 -->
+  <div id=\"db-modal\" class=\"modal hidden\">
+    <div class=\"modal-content db-modal-content\">
+      <div id=\"db-view\" class=\"db-view\"></div>
+    </div>
+  </div>
+
+  <script src=\"/app.js\"></script>
+  <script src=\"/editor.js\"></script>
+</body>
+</html>
+")]

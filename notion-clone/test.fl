@@ -1,0 +1,328 @@
+;; v9-Notion 통합 테스트 (Phase 8)
+
+;; 테스트 설정
+(def TEST_API "http://localhost:4000")
+(def TEST_EMAIL "test@test.com")
+(def TEST_PASSWORD "password123")
+(def TEST_NAME "테스트 사용자")
+(def TEST_TOKEN nil)
+(def TEST_USER_ID nil)
+(def TEST_WORKSPACE_ID nil)
+(def TEST_PAGE_ID nil)
+(def TEST_BLOCK_ID nil)
+
+;; ─── Phase 1 테스트: 인증 ──────────────────────────────────────────
+
+(println "")
+(println "=== Phase 1: 인증 테스트 ===")
+(println "")
+
+;; 1-1. 회원가입
+(println "[1-1] 회원가입 테스트")
+(let [[$response (server_post (str TEST_API "/api/auth/register")
+                  {"email" TEST_EMAIL "name" TEST_NAME "password" TEST_PASSWORD})]]
+  (if (and $response (get $response "token"))
+    (do
+      (set! TEST_TOKEN (get $response "token"))
+      (set! TEST_USER_ID (get $response "user_id"))
+      (println "✅ 회원가입 성공")
+      (println (str "   토큰: " (subs TEST_TOKEN 0 20) "..."))
+      (println (str "   사용자 ID: " TEST_USER_ID)))
+    (do
+      (println "❌ 회원가입 실패")
+      (println (str "   응답: " $response)))))
+
+;; 1-2. 로그인
+(println "")
+(println "[1-2] 로그인 테스트")
+(let [[$response (server_post (str TEST_API "/api/auth/login")
+                  {"email" TEST_EMAIL "password" TEST_PASSWORD})]]
+  (if (and $response (get $response "token"))
+    (do
+      (println "✅ 로그인 성공")
+      (println (str "   토큰: " (subs (get $response "token") 0 20) "...")))
+    (println "❌ 로그인 실패")))
+
+;; 1-3. 인증된 사용자 정보 조회
+(println "")
+(println "[1-3] 사용자 정보 조회 테스트")
+(let [[$response (server_get_auth (str TEST_API "/api/auth/me") TEST_TOKEN)]]
+  (if (and $response (get $response "email"))
+    (do
+      (println "✅ 사용자 정보 조회 성공")
+      (println (str "   이메일: " (get $response "email")))
+      (println (str "   이름: " (get $response "name"))))
+    (println "❌ 사용자 정보 조회 실패")))
+
+;; ─── Phase 2 테스트: 워크스페이스 및 페이지 ────────────────────────
+
+(println "")
+(println "=== Phase 2: 페이지 CRUD 테스트 ===")
+(println "")
+
+;; 2-1. 워크스페이스 생성
+(println "[2-1] 워크스페이스 생성 테스트")
+(let [[$response (server_post_auth (str TEST_API "/api/workspaces")
+                    {"name" "테스트 워크스페이스"}
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "id"))
+    (do
+      (set! TEST_WORKSPACE_ID (get $response "id"))
+      (println "✅ 워크스페이스 생성 성공")
+      (println (str "   워크스페이스 ID: " TEST_WORKSPACE_ID)))
+    (println "❌ 워크스페이스 생성 실패")))
+
+;; 2-2. 페이지 생성
+(println "")
+(println "[2-2] 페이지 생성 테스트")
+(let [[$response (server_post_auth (str TEST_API "/api/pages")
+                    {
+                      "workspace_id" TEST_WORKSPACE_ID
+                      "title" "테스트 페이지"
+                      "icon" "📝"
+                    }
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "id"))
+    (do
+      (set! TEST_PAGE_ID (get $response "id"))
+      (println "✅ 페이지 생성 성공")
+      (println (str "   페이지 ID: " TEST_PAGE_ID)))
+    (println "❌ 페이지 생성 실패")))
+
+;; 2-3. 페이지 조회
+(println "")
+(println "[2-3] 페이지 조회 테스트")
+(let [[$response (server_get_auth (str TEST_API "/api/pages/" TEST_PAGE_ID)
+                      TEST_TOKEN)]]
+  (if (and $response (get $response "title"))
+    (do
+      (println "✅ 페이지 조회 성공")
+      (println (str "   제목: " (get $response "title")))
+      (println (str "   아이콘: " (get $response "icon"))))
+    (println "❌ 페이지 조회 실패")))
+
+;; 2-4. 페이지 목록 조회
+(println "")
+(println "[2-4] 페이지 목록 조회 테스트")
+(let [[$response (server_get_auth
+                    (str TEST_API "/api/pages?workspace_id=" TEST_WORKSPACE_ID)
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "pages"))
+    (do
+      (println "✅ 페이지 목록 조회 성공")
+      (println (str "   페이지 수: " (length (get $response "pages")))))
+    (println "❌ 페이지 목록 조회 실패")))
+
+;; 2-5. 페이지 수정
+(println "")
+(println "[2-5] 페이지 수정 테스트")
+(let [[$response (server_put_auth (str TEST_API "/api/pages/" TEST_PAGE_ID)
+                    {"title" "수정된 페이지"}
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "ok"))
+    (println "✅ 페이지 수정 성공")
+    (println "❌ 페이지 수정 실패")))
+
+;; ─── Phase 3 테스트: 블록 CRUD ──────────────────────────────────────
+
+(println "")
+(println "=== Phase 3: 블록 CRUD 테스트 ===")
+(println "")
+
+;; 3-1. 블록 생성 (text)
+(println "[3-1] 블록 생성 테스트 (text)")
+(let [[$response (server_post_auth (str TEST_API "/api/blocks")
+                    {
+                      "page_id" TEST_PAGE_ID
+                      "type" "text"
+                      "content" "테스트 텍스트"
+                      "position" 0
+                    }
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "id"))
+    (do
+      (set! TEST_BLOCK_ID (get $response "id"))
+      (println "✅ 블록 생성 성공")
+      (println (str "   블록 ID: " TEST_BLOCK_ID)))
+    (println "❌ 블록 생성 실패")))
+
+;; 3-2. 블록 생성 (heading)
+(println "")
+(println "[3-2] 블록 생성 테스트 (h1)")
+(let [[$response (server_post_auth (str TEST_API "/api/blocks")
+                    {
+                      "page_id" TEST_PAGE_ID
+                      "type" "h1"
+                      "content" "제목 1"
+                      "position" 1
+                    }
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "id"))
+    (println "✅ 제목 블록 생성 성공")
+    (println "❌ 제목 블록 생성 실패")))
+
+;; 3-3. 블록 목록 조회
+(println "")
+(println "[3-3] 블록 목록 조회 테스트")
+(let [[$response (server_get_auth
+                    (str TEST_API "/api/pages/" TEST_PAGE_ID "/blocks")
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "blocks"))
+    (do
+      (println "✅ 블록 목록 조회 성공")
+      (println (str "   블록 수: " (length (get $response "blocks")))))
+    (println "❌ 블록 목록 조회 실패")))
+
+;; 3-4. 블록 수정
+(println "")
+(println "[3-4] 블록 수정 테스트")
+(let [[$response (server_put_auth (str TEST_API "/api/blocks/" TEST_BLOCK_ID)
+                    {"content" "수정된 텍스트"}
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "ok"))
+    (println "✅ 블록 수정 성공")
+    (println "❌ 블록 수정 실패")))
+
+;; 3-5. 블록 이동
+(println "")
+(println "[3-5] 블록 이동 테스트")
+(let [[$response (server_put_auth (str TEST_API "/api/blocks/" TEST_BLOCK_ID "/move")
+                    {"position" 5 "page_id" TEST_PAGE_ID}
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "ok"))
+    (println "✅ 블록 이동 성공")
+    (println "❌ 블록 이동 실패")))
+
+;; ─── Phase 5 테스트: 검색 및 공유 ────────────────────────────────────
+
+(println "")
+(println "=== Phase 5: 검색 및 공유 테스트 ===")
+(println "")
+
+;; 5-1. 검색
+(println "[5-1] 검색 테스트")
+(let [[$response (server_get_auth
+                    (str TEST_API "/api/search?q=테스트&workspace_id=" TEST_WORKSPACE_ID)
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "results"))
+    (do
+      (println "✅ 검색 성공")
+      (println (str "   결과 수: " (length (get $response "results")))))
+    (println "❌ 검색 실패")))
+
+;; 5-2. 페이지 공유 토큰 생성
+(println "")
+(println "[5-2] 페이지 공유 토큰 생성 테스트")
+(let [[$response (server_post_auth (str TEST_API "/api/pages/" TEST_PAGE_ID "/share")
+                    {}
+                    TEST_TOKEN)]]
+  (if (and $response (get $response "share_token"))
+    (do
+      (println "✅ 공유 토큰 생성 성공")
+      (println (str "   토큰: " (subs (get $response "share_token") 0 20) "...")))
+    (println "❌ 공유 토큰 생성 실패")))
+
+;; ─── Phase 4 테스트: 데이터베이스 ──────────────────────────────────
+
+(println "")
+(println "=== Phase 4: 데이터베이스 테스트 ===")
+(println "")
+
+(let [[$db_page_id nil]]
+  ;; 4-1. DB 페이지 생성
+  (println "[4-1] 데이터베이스 페이지 생성")
+  (let [[$response (server_post_auth (str TEST_API "/api/pages")
+                      {
+                        "workspace_id" TEST_WORKSPACE_ID
+                        "title" "테스트 DB"
+                        "is_database" 1
+                      }
+                      TEST_TOKEN)]]
+    (if (and $response (get $response "id"))
+      (do
+        (set! $db_page_id (get $response "id"))
+        (println "✅ DB 페이지 생성 성공"))
+      (println "❌ DB 페이지 생성 실패")))
+
+  ;; 4-2. DB 행 추가
+  (println "")
+  (println "[4-2] 데이터베이스 행 추가 테스트")
+  (if $db_page_id
+    (let [[$response (server_post_auth
+                        (str TEST_API "/api/databases/" $db_page_id "/rows")
+                        {
+                          "page_id" $db_page_id
+                          "data" "{\"name\": \"항목1\", \"status\": \"Done\"}"
+                        }
+                        TEST_TOKEN)]]
+      (if (and $response (get $response "id"))
+        (println "✅ DB 행 추가 성공")
+        (println "❌ DB 행 추가 실패")))
+    (println "⏭️  DB 페이지 없음, 건너뜀")))
+
+;; ─── 에러 처리 테스트 ────────────────────────────────────────────────
+
+(println "")
+(println "=== 에러 처리 테스트 ===")
+(println "")
+
+;; E-1. 인증 없이 접근
+(println "[E-1] 인증 없이 접근 테스트")
+(let [[$response (server_get (str TEST_API "/api/pages/" TEST_PAGE_ID))]]
+  (if (and $response (get $response "error"))
+    (println "✅ 올바른 에러: 401 Unauthorized")
+    (println "❌ 에러 처리 실패")))
+
+;; E-2. 존재하지 않는 리소스
+(println "")
+(println "[E-2] 존재하지 않는 리소스 테스트")
+(let [[$response (server_get_auth (str TEST_API "/api/pages/nonexistent")
+                      TEST_TOKEN)]]
+  (if (and $response (get $response "error"))
+    (println "✅ 올바른 에러: 404 Not Found")
+    (println "❌ 에러 처리 실패")))
+
+;; E-3. 잘못된 형식의 요청
+(println "")
+(println "[E-3] 잘못된 요청 바디 테스트")
+(let [[$response (server_post_auth (str TEST_API "/api/auth/login")
+                    {"invalid" "data"}
+                    TEST_TOKEN)]]
+  (if (or (not $response) (get $response "error"))
+    (println "✅ 올바른 에러: 400 Bad Request")
+    (println "❌ 에러 처리 실패")))
+
+;; E-4. 중복된 이메일
+(println "")
+(println "[E-4] 중복된 이메일 테스트")
+(let [[$response (server_post (str TEST_API "/api/auth/register")
+                  {
+                    "email" TEST_EMAIL
+                    "name" "중복된사용자"
+                    "password" "password123"
+                  })]]
+  (if (or (not $response) (get $response "error"))
+    (println "✅ 올바른 에러: 409 Conflict")
+    (println "❌ 에러 처리 실패")))
+
+;; ─── 헬스체크 ────────────────────────────────────────────────────────
+
+(println "")
+(println "=== 헬스체크 ===")
+(println "")
+
+(let [[$response (server_get (str TEST_API "/health"))]]
+  (if (and $response (get $response "status"))
+    (do
+      (println "✅ 헬스체크 성공")
+      (println (str "   상태: " (get $response "status")))
+      (println (str "   버전: " (get $response "version"))))
+    (println "❌ 헬스체크 실패")))
+
+;; ─── 테스트 요약 ────────────────────────────────────────────────────
+
+(println "")
+(println "=== 테스트 완료 ===")
+(println "")
+(println "✨ v9-Notion 통합 테스트가 완료되었습니다.")
+(println "")

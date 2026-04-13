@@ -1,0 +1,80 @@
+;; 블록 CRUD 핸들러 (Phase 3)
+;; 11가지 블록 타입: text, h1, h2, h3, todo, code, quote, divider, image, bullet, numbered
+
+;; 블록 목록 조회
+[FUNC handle-block-list
+  :params [$req]
+  :body (let [[$claims (require-auth $req)]
+              [$page_id (server_req_param $req "id")]]
+    (if (not $claims)
+      (server_status 401 {"error" "Unauthorized"})
+      (let [[$rows (db_query DB_PATH
+              "SELECT * FROM blocks WHERE page_id = ? ORDER BY position ASC"
+              [$page_id])]]
+        (server_json {"blocks" (or $rows [])}))))]
+
+;; 블록 생성
+[FUNC handle-block-create
+  :params [$req]
+  :body (let [[$claims (require-auth $req)]]
+    (if (not $claims)
+      (server_status 401 {"error" "Unauthorized"})
+      (let [[$body (json_parse (server_req_body $req))]
+            [$block_id (uuid_v4)]
+            [$now "2026-04-13T21:00:00Z"]]
+        (db_insert DB_PATH "blocks" {
+          "id" $block_id
+          "page_id" (get $body "page_id")
+          "parent_id" (get $body "parent_id")
+          "type" (or (get $body "type") "text")
+          "content" (or (get $body "content") "")
+          "props" (or (get $body "props") "{}")
+          "position" (or (get $body "position") 0)
+          "created_at" $now
+          "updated_at" $now
+        })
+        (pubsub_publish (str "page." (get $body "page_id"))
+                        {"type" "block_created" "block_id" $block_id})
+        (server_json {"id" $block_id "ok" true}))))]
+
+;; 블록 수정
+[FUNC handle-block-update
+  :params [$req]
+  :body (let [[$claims (require-auth $req)]
+              [$block_id (server_req_param $req "id")]
+              [$body (json_parse (server_req_body $req))]
+              [$now "2026-04-13T21:00:00Z"]]
+    (if (not $claims)
+      (server_status 401 {"error" "Unauthorized"})
+      (do
+        (db_update DB_PATH "blocks"
+          (merge $body {"updated_at" $now})
+          (str "id = '" $block_id "'"))
+        (server_json {"id" $block_id "ok" true}))))]
+
+;; 블록 삭제
+[FUNC handle-block-delete
+  :params [$req]
+  :body (let [[$claims (require-auth $req)]
+              [$block_id (server_req_param $req "id")]]
+    (if (not $claims)
+      (server_status 401 {"error" "Unauthorized"})
+      (do
+        (db_delete_row DB_PATH "blocks" (str "id = '" $block_id "'"))
+        (server_json {"id" $block_id "ok" true}))))]
+
+;; 블록 위치 변경
+[FUNC handle-block-move
+  :params [$req]
+  :body (let [[$claims (require-auth $req)]
+              [$block_id (server_req_param $req "id")]
+              [$body (json_parse (server_req_body $req))]
+              [$position (get $body "position")]
+              [$page_id (get $body "page_id")]]
+    (if (not $claims)
+      (server_status 401 {"error" "Unauthorized"})
+      (do
+        (db_update DB_PATH "blocks"
+          {"position" $position}
+          (str "id = '" $block_id "'"))
+        (server_json {"id" $block_id "ok" true}))))]

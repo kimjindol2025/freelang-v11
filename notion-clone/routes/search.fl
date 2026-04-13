@@ -1,0 +1,46 @@
+;; 검색 + 공유 핸들러 (Phase 5)
+
+;; 전체 텍스트 검색 (5초 캐시)
+[FUNC handle-search
+  :params [$req]
+  :body (let [[$claims (require-auth $req)]
+              [$q (server_req_query $req "q")]
+              [$ws_id (server_req_query $req "workspace_id")]
+              [$cache_key (str "search:" $ws_id ":" $q)]
+              [$cached (cache_get $cache_key)]]
+    (if (not $claims)
+      (server_status 401 {"error" "Unauthorized"})
+      (if $cached
+        (server_json {"results" $cached "from_cache" true})
+        (let [[$rows (db_query DB_PATH
+                "SELECT DISTINCT p.id, p.title, p.icon
+                 FROM pages p
+                 LEFT JOIN blocks b ON b.page_id = p.id
+                 WHERE p.workspace_id = ?
+                   AND (p.title LIKE ? OR b.content LIKE ?)
+                 GROUP BY p.id
+                 LIMIT 20"
+                [$ws_id (str "%" $q "%") (str "%" $q "%")])]]
+          (cache_set $cache_key $rows 5000)
+          (server_json {"results" (or $rows [])}))))]
+
+;; 공개 공유 페이지 (읽기 전용)
+[FUNC handle-share-view
+  :params [$req]
+  :body (let [[$token (server_req_param $req "token")]]
+    (if (not $token)
+      (server_status 400 {"error" "토큰 필수"})
+      (let [[$rows (db_query DB_PATH
+              "SELECT * FROM pages WHERE share_token = ?" [$token])]]
+        (if (and $rows (> (length $rows) 0))
+          (let [[$page (get $rows 0)]
+                [$page_id (get $page "id")]
+                [$blocks (db_query DB_PATH
+                  "SELECT * FROM blocks WHERE page_id = ? ORDER BY position ASC"
+                  [$page_id])]]
+            (server_json {
+              "page" $page
+              "blocks" (or $blocks [])
+              "readonly" true
+            }))
+          (server_status 404 {"error" "공유 페이지를 찾을 수 없습니다"}))))]

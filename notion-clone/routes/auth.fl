@@ -1,0 +1,7 @@
+;; 인증 라우트 (Phase 1)
+;; POST /api/auth/register
+;; POST /api/auth/login
+;; GET /api/auth/me
+
+;; Note: 이 파일의 핸들러는 main.fl에 인라인으로 작성되었습니다.
+;; Phase 2 이후에 모듈화할 예정입니다.
