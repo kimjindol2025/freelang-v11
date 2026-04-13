@@ -1,0 +1,313 @@
+; FreeLang v9 공식 홈페이지 (FLNext 기반)
+; v9로 만든 v9의 공식 홈페이지
+; 시작: v9 homepage/main.fl
+; 포트: 3000
+
+(import flnext)
+
+; 데이터
+(def project-info {
+  :name "FreeLang v9"
+  :tagline "AI를 위한, AI에 의한, AI가 쓰고 싶은 언어"
+  :version "9.0.0"
+  :github "https://github.com/kimjindol2025/freelang-v9"
+  :npm "https://www.npmjs.com/package/freelang-v9"
+  :docs "https://kimjindol2025.github.io/freelang-v9"
+})
+
+(def features [
+  {
+    :icon "🧠"
+    :title "AI-Native 블록"
+    :desc "추론, 기억, 의사결정을 언어 수준에서 지원"
+  }
+  {
+    :icon "📊"
+    :title "S-Expression 문법"
+    :desc "AI가 자연스럽게 생각하는 방식으로 코드 작성"
+  }
+  {
+    :icon "🔧"
+    :title "완전한 생태계"
+    :desc "웹프레임워크, 데이터분석, 마이크로서비스"
+  }
+  {
+    :icon "📦"
+    :title "npm 배포"
+    :desc "npm install -g freelang-v9로 바로 설치"
+  }
+  {
+    :icon "⚡"
+    :title "의존성 제로"
+    :desc "Express, tsc, Docker 모두 제거 완료"
+  }
+  {
+    :icon "🎯"
+    :title "프로덕션 준비"
+    :desc "589/589 테스트 통과, 100% 커버리지"
+  }
+])
+
+(def stats [
+  {:label "Phases" :value "150/150"}
+  {:label "Tests" :value "589/589"}
+  {:label "Stdlib" :value "30+ 모듈"}
+  {:label "npm" :value "v9.0.0"}
+])
+
+(def examples [
+  {
+    :name "기초 문법"
+    :code "(print \"Hello, FreeLang!\")"
+    :desc "S-expression 문법으로 간단한 인사말"
+  }
+  {
+    :name "함수 정의"
+    :code "(defn add [a b] (+ a b))\n(add 5 3)"
+    :desc "함수 정의 및 호출"
+  }
+  {
+    :name "AI 블록"
+    :code "[COT\n :goal \"문제 해결\"\n :steps [...]]"
+    :desc "Chain-of-Thought로 단계별 추론"
+  }
+])
+
+; HTML 템플릿
+(defn render-header []
+  (str
+    "<!DOCTYPE html>\n"
+    "<html lang=\"ko\">\n"
+    "<head>\n"
+    "  <meta charset=\"UTF-8\">\n"
+    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+    "  <title>" (:name project-info) " - " (:tagline project-info) "</title>\n"
+    "  <style>" (render-css) "</style>\n"
+    "</head>\n"
+    "<body>\n"))
+
+(defn render-css []
+  "
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #fff;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+  header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 60px 0;
+    text-align: center;
+  }
+  header h1 { font-size: 2.5em; margin-bottom: 10px; }
+  header p { font-size: 1.2em; opacity: 0.9; }
+
+  .btn-group { margin-top: 30px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s;
+  }
+  .btn-primary { background: white; color: #667eea; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+  .btn-secondary { background: rgba(255,255,255,0.2); color: white; border: 2px solid white; }
+  .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+
+  section { padding: 60px 0; border-bottom: 1px solid #eee; }
+  section h2 { font-size: 2em; margin-bottom: 30px; text-align: center; }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+  }
+  .feature {
+    padding: 30px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    transition: all 0.3s;
+  }
+  .feature:hover { box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+  .feature-icon { font-size: 2.5em; margin-bottom: 10px; }
+  .feature h3 { margin-bottom: 10px; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    text-align: center;
+  }
+  .stat-item .stat-value { font-size: 2em; font-weight: bold; color: #667eea; }
+  .stat-item .stat-label { color: #666; margin-top: 5px; }
+
+  .examples {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+  }
+  .example {
+    background: #f5f5f5;
+    padding: 20px;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+  }
+  .example h3 { margin-bottom: 10px; color: #667eea; }
+  .example code {
+    display: block;
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    margin: 10px 0;
+  }
+
+  footer {
+    background: #333;
+    color: white;
+    padding: 40px 0;
+    text-align: center;
+  }
+  footer p { margin-bottom: 10px; }
+  .footer-links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .footer-links a { color: #667eea; text-decoration: none; }
+  ")
+
+(defn render-footer []
+  (str
+    "  <footer>\n"
+    "    <div class=\"container\">\n"
+    "      <p><strong>" (:name project-info) "</strong> v" (:version project-info) "</p>\n"
+    "      <p>" (:tagline project-info) "</p>\n"
+    "      <div class=\"footer-links\">\n"
+    "        <a href=\"" (:github project-info) "\">GitHub</a>\n"
+    "        <a href=\"" (:npm project-info) "\">npm</a>\n"
+    "        <a href=\"" (:docs project-info) "\">문서</a>\n"
+    "      </div>\n"
+    "      <p style=\"margin-top: 20px; opacity: 0.7; font-size: 0.9em;\">🤖 이 페이지는 FreeLang v9로 만들어졌습니다.</p>\n"
+    "    </div>\n"
+    "  </footer>\n"
+    "</body>\n"
+    "</html>"))
+
+(defn render-features []
+  (let [feature-html (map (fn [f]
+    (str
+      "<div class=\"feature\">\n"
+      "  <div class=\"feature-icon\">" (:icon f) "</div>\n"
+      "  <h3>" (:title f) "</h3>\n"
+      "  <p>" (:desc f) "</p>\n"
+      "</div>"))
+    features)]
+    (str-join "\n" feature-html)))
+
+(defn render-stats []
+  (let [stat-html (map (fn [s]
+    (str
+      "<div class=\"stat-item\">\n"
+      "  <div class=\"stat-value\">" (:value s) "</div>\n"
+      "  <div class=\"stat-label\">" (:label s) "</div>\n"
+      "</div>"))
+    stats)]
+    (str-join "\n" stat-html)))
+
+(defn render-examples []
+  (let [ex-html (map (fn [e]
+    (str
+      "<div class=\"example\">\n"
+      "  <h3>" (:name e) "</h3>\n"
+      "  <code>" (:code e) "</code>\n"
+      "  <p>" (:desc e) "</p>\n"
+      "</div>"))
+    examples)]
+    (str-join "\n" ex-html)))
+
+(defn render-home [req]
+  (let [html (str
+    (render-header)
+    "<header>\n"
+    "  <div class=\"container\">\n"
+    "    <h1>" (:name project-info) "</h1>\n"
+    "    <p>" (:tagline project-info) "</p>\n"
+    "    <div class=\"btn-group\">\n"
+    "      <a href=\"" (:docs project-info) "\" class=\"btn btn-primary\">📚 문서 읽기</a>\n"
+    "      <a href=\"" (:github project-info) "\" class=\"btn btn-secondary\">💻 GitHub 보기</a>\n"
+    "    </div>\n"
+    "  </div>\n"
+    "</header>\n"
+
+    "<section>\n"
+    "  <div class=\"container\">\n"
+    "    <h2>✨ 핵심 기능</h2>\n"
+    "    <div class=\"features\">\n"
+    "      " (render-features) "\n"
+    "    </div>\n"
+    "  </div>\n"
+    "</section>\n"
+
+    "<section>\n"
+    "  <div class=\"container\">\n"
+    "    <h2>📊 프로덕션 준비 완료</h2>\n"
+    "    <div class=\"stats\">\n"
+    "      " (render-stats) "\n"
+    "    </div>\n"
+    "  </div>\n"
+    "</section>\n"
+
+    "<section>\n"
+    "  <div class=\"container\">\n"
+    "    <h2>🚀 코드 예제</h2>\n"
+    "    <div class=\"examples\">\n"
+    "      " (render-examples) "\n"
+    "    </div>\n"
+    "  </div>\n"
+    "</section>\n"
+
+    "<section style=\"background: #f9f9f9;\">\n"
+    "  <div class=\"container\">\n"
+    "    <h2>시작하기</h2>\n"
+    "    <div style=\"text-align: center; padding: 40px 0;\">\n"
+    "      <code style=\"display: block; background: white; padding: 20px; border-radius: 5px; margin: 20px 0;\">\n"
+    "        npm install -g freelang-v9\n"
+    "      </code>\n"
+    "      <p style=\"margin-bottom: 20px;\">그리고 REPL 시작:</p>\n"
+    "      <code style=\"display: block; background: white; padding: 20px; border-radius: 5px;\">\n"
+    "        v9 repl\n"
+    "      </code>\n"
+    "    </div>\n"
+    "  </div>\n"
+    "</section>\n"
+
+    (render-footer))]
+    {:status 200
+     :headers {"Content-Type" "text/html; charset=utf-8"}
+     :body html}))
+
+(defn api-docs [req]
+  {:status 200
+   :headers {"Content-Type" "application/json"}
+   :body {
+     :name (:name project-info)
+     :version (:version project-info)
+     :docs (:docs project-info)
+   }})
+
+(defn health-check [req]
+  {:status 200
+   :body {:status "healthy" :timestamp (str (now))}})
+
+; 라우트 정의
+[APP freelang-homepage
+ :port 3000
+ :routes [
+  [GET "/" render-home]
+  [GET "/api/info" api-docs]
+  [GET "/health" health-check]
+ ]]
