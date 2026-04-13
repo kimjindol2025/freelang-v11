@@ -15,6 +15,7 @@ import * as readline from "readline";
 import { lex } from "./lexer";
 import { parse, ParserError } from "./parser";
 import { interpret, Interpreter } from "./interpreter";
+import { JSCodegen } from "./codegen-js"; // Phase 6: FL 컴파일러
 import { formatFL } from "./formatter";
 import { DebugSession, setGlobalDebugSession } from "./debugger"; // Phase 78: 디버거
 import { runWithWatch } from "./hot-reload"; // Phase 79: 워치 모드
@@ -142,6 +143,63 @@ function cmdCheck(filePath: string): void {
   const source = fs.readFileSync(absPath, "utf-8");
   const ok = checkSource(source, absPath);
   if (!ok) process.exit(1);
+}
+
+// ─────────────────────────────────────────
+// compile 커맨드 (Phase 6)
+// ─────────────────────────────────────────
+
+function cmdCompile(args: string[]): void {
+  // 옵션 파싱: compile input.fl -o output.js [--esm] [--runtime]
+  const outputIdx = args.indexOf("-o");
+  const inputFile = args.find(a => !a.startsWith("-") && a !== args[outputIdx + 1]);
+  const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : null;
+  const useEsm = args.includes("--esm");
+  const withRuntime = args.includes("--runtime");
+
+  // 입력 파일 검증
+  if (!inputFile) {
+    console.error(`\x1b[31m오류\x1b[0m  입력 파일을 지정하세요: compile <file.fl> [-o <out.js>]`);
+    process.exit(1);
+  }
+
+  const absInput = path.resolve(inputFile);
+  if (!fs.existsSync(absInput)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${inputFile}`);
+    process.exit(1);
+  }
+
+  try {
+    // 파이프라인: lex → parse → JSCodegen.generate()
+    const source = fs.readFileSync(absInput, "utf-8");
+    const tokens = lex(source);
+    const ast = parse(tokens);
+
+    const cg = new JSCodegen();
+    const js = cg.generate(ast, {
+      module: useEsm ? "esm" : "commonjs",
+      runtime: withRuntime,
+      minify: false,
+      target: "node",
+    });
+
+    // 출력
+    if (outputFile) {
+      const absOutput = path.resolve(outputFile);
+      const dir = path.dirname(absOutput);
+      if (dir !== "." && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(absOutput, js, "utf-8");
+      console.log(`\x1b[32m✓\x1b[0m  컴파일 완료  ${path.basename(inputFile)} → ${outputFile}`);
+    } else {
+      // stdout 출력
+      process.stdout.write(js);
+    }
+  } catch (err: any) {
+    console.error(formatError(err, fs.readFileSync(absInput, "utf-8"), absInput));
+    process.exit(1);
+  }
 }
 
 // ─────────────────────────────────────────
@@ -557,6 +615,11 @@ switch (cmd) {
     const filePath = args[1];
     if (!filePath) { printUsage(); process.exit(1); }
     cmdCheck(filePath);
+    break;
+  }
+  case "compile": {
+    if (args.length < 2) { printUsage(); process.exit(1); }
+    cmdCompile(args.slice(1));
     break;
   }
   case "fmt": {

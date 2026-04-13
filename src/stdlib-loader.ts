@@ -14,20 +14,18 @@ import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow 
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
 import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
 import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver
-import { createWsModule } from "./stdlib-ws";            // Phase 21: WebSocket
-import { createWscModule } from "./stdlib-wsc";          // Phase 57: WebSocket Client (Tunnel)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process";  // Phase 22: Process (env + SIGTERM)
 import { createAsyncModule } from "./stdlib-async";      // Phase 23: Async/await primitives
 import { createModuleSystem } from "./stdlib-module";    // Phase 24: Module system
-import { pgBuiltins } from "./stdlib-pg";                // PostgreSQL + JWT + AI
 import { createChannelModule } from "./stdlib-channel";  // Phase 67: 채널 기반 동시성
 import { createImmutableModule } from "./immutable";      // Phase 70: 이뮤터블 데이터 구조
 import { createAiNativeModule } from "./stdlib-ai-native"; // Phase 71: AI 네이티브 블록
 import { createTestModule } from "./stdlib-test";           // Phase 76: FL 네이티브 테스트 러너
 import { createMaybeModule } from "./maybe-type";           // Phase 91: 불확실성 타입
+import { createCompileModule } from "./stdlib-compile";    // Phase 6: .fl → .js 컴파일러
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -54,19 +52,16 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createResourceModule());
   // Phase 4a: Pure HTTP Server — callUserFunction/callFunctionValue 콜백 필요
   interp.registerModule(createHttpServerModule(
-    (n, a) => interp.callUserFunction(n, a),
-    (fnValue, a) => interp.callFunctionValue(fnValue, a)
+    (n: string, a: any[]) => interp.callUserFunction(n, a),
+    (fnValue: any, a: any[]) => interp.callFunctionValue(fnValue, a)
   ));
   interp.registerModule(createDbModule());
-  interp.registerModule(createWsModule((n, a) => interp.callUserFunction(n, a)));
-  interp.registerModule(createWscModule((n, a) => interp.callUserFunction(n, a))); // Phase 57: WebSocket Client
   interp.registerModule(createAuthModule());
   interp.registerModule(createCacheModule());
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
   interp.registerModule(createProcessModule());  // Phase 22: env_load, on_sigterm
   interp.registerModule(createAsyncModule((n, a) => interp.callUserFunction(n, a))); // Phase 23: async_call, promise_*
   interp.registerModule(createModuleSystem());   // Phase 24: module_*, namespace_*
-  interp.registerModule(pgBuiltins);             // PostgreSQL + JWT + AI
   interp.registerModule(createChannelModule());  // Phase 67: chan, chan-send, chan-recv
   interp.registerModule(createImmutableModule()); // Phase 70: imm-map, imm-vec, ...
   interp.registerModule(createAiNativeModule());  // Phase 71: ai-call, rag-search, embed, similarity
@@ -77,4 +72,5 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (fnValue, args) => interp.callFunctionValue(fnValue, args),
     (name, args) => interp.callUserFunction(name, args)
   ));
+  interp.registerModule(createCompileModule());   // Phase 6: fl_compile, fl_compile_file (tsc 제거)
 }

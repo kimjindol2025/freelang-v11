@@ -1,18 +1,16 @@
 ; FreeLang v9 Build System
-; Phase 5c: TypeScript → JavaScript 컴파일
-; 기반: stdlib-file + stdlib-shell
+; Phase 6: Pure v9 Compiler (tsc 제거)
+; 기반: stdlib-compile + stdlib-file
 
 ; ============================================================
-; [1] 빌드 설정 로드
+; [1] 빌드 설정 로드 (Phase 6: 더 이상 필요 없음)
 ; ============================================================
 
 [FUNC load-tsconfig :params []
   :body
-  ; tsconfig.json 읽기
-  (let [[content (file_read "./tsconfig.json")]
-        [config (json_parse content)]]
-    config
-  )
+  ; tsconfig.json은 Phase 6에서 불필요
+  ; v9 컴파일러는 추가 설정 필요 없음
+  (do)
 ]
 
 ; ============================================================
@@ -26,28 +24,27 @@
     (if (file_exists dist-dir)
       (shell_run (str "rm -rf " dist-dir))
     )
-    (file_mkdir_p dist-dir)
+    (dir_create dist-dir)
     true
   )
 ]
 
 ; ============================================================
-; [3] TypeScript 컴파일 (현재: tsc wrapper)
+; [3] Pure v9 Compiler (Phase 6)
 ; ============================================================
 
-[FUNC compile-typescript :params []
+[FUNC compile-fl-sources :params [src-dir dist-dir]
   :body
-  ; tsc 실행 (현재 단계)
-  ; TODO Phase 5c+: 순수 v9 컴파일러로 대체
-  (let [[result (shell_run "npx tsc --noEmit false")]]
-    (if (= (get result :code) 0)
+  ; 순수 v9 컴파일러: fl_compile으로 .fl 파일들 컴파일
+  (let [[result (fl_compile src-dir dist-dir)]]
+    (if (fl_compile_result_ok result)
       (do
-        (println "✅ TypeScript compilation successful")
+        (println (str "✅ Compiled " (get result :compiled) " FL source files"))
         true
       )
       (do
-        (println "❌ TypeScript compilation failed:")
-        (println (get result :stderr))
+        (println (str "❌ Compilation failed: " (get result :failed) " errors"))
+        (map (get result :errors) [$err] (println (str "   " $err)))
         false
       )
     )
@@ -87,9 +84,9 @@
 
 [FUNC v9-build :params [src-dir dist-dir]
   :body
-  ; TypeScript → JavaScript 컴파일
+  ; Pure v9 컴파일러 (Phase 6: tsc 제거)
   (do
-    (println "🔨 Building FreeLang v9...")
+    (println "🔨 Building FreeLang v9 (Pure Compiler)...")
     (println (str "   Source: " src-dir))
     (println (str "   Output: " dist-dir))
     (println "")
@@ -97,8 +94,8 @@
     ; [1] 빌드 디렉토리 준비
     (prepare-build-dir dist-dir)
 
-    ; [2] TypeScript 컴파일
-    (let [[compile-ok (compile-typescript)]]
+    ; [2] Pure v9 컴파일러로 .fl 파일 컴파일
+    (let [[compile-ok (compile-fl-sources src-dir dist-dir)]]
       (if compile-ok
         (do
           ; [3] 빌드 통계
