@@ -559,6 +559,85 @@ function cmdDoc(docArgs: string[]): void {
   }
 }
 
+// ─────────────────────────────────────────
+// registry 커맨드 (Phase 7)
+// ─────────────────────────────────────────
+
+function cmdRegistry(registryArgs: string[]): void {
+  const subCmd = registryArgs[0];
+
+  if (subCmd === "start") {
+    // 레지스트리 서버 시작
+    const portIdx = registryArgs.indexOf("--port");
+    const port = portIdx !== -1 && registryArgs[portIdx + 1]
+      ? parseInt(registryArgs[portIdx + 1], 10)
+      : 4873;
+
+    if (isNaN(port) || port < 1024 || port > 65535) {
+      console.error(`\x1b[31m오류\x1b[0m  유효하지 않은 포트: ${port}`);
+      process.exit(1);
+    }
+
+    console.log(`\x1b[36m[Registry]\x1b[0m  v9 패키지 레지스트리 시작 (포트 ${port})`);
+    console.log(`\x1b[36m[Registry]\x1b[0m  http://localhost:${port}/`);
+
+    // 레지스트리 서버를 별도 프로세스로 실행
+    const registryPath = path.resolve(__dirname, "../vpm/registry-server.fl");
+    if (!fs.existsSync(registryPath)) {
+      console.error(`\x1b[31m오류\x1b[0m  registry-server.fl을 찾을 수 없습니다: ${registryPath}`);
+      process.exit(1);
+    }
+
+    // registry-server.fl을 v9-run으로 실행
+    const { execSync } = require("child_process");
+    try {
+      process.env.REGISTRY_PORT = String(port);
+      execSync(`node ${path.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
+        stdio: "inherit",
+        env: { ...process.env, REGISTRY_PORT: String(port) }
+      });
+    } catch (err: any) {
+      console.error(`\x1b[31m레지스트리 시작 오류:\x1b[0m  ${err.message}`);
+      process.exit(1);
+    }
+  } else if (subCmd === "status") {
+    // 레지스트리 상태 확인
+    const portIdx = registryArgs.indexOf("--port");
+    const port = portIdx !== -1 && registryArgs[portIdx + 1]
+      ? parseInt(registryArgs[portIdx + 1], 10)
+      : 4873;
+
+    try {
+      const http = require("http");
+      const req = http.get(`http://localhost:${port}/-/all`, (res: any) => {
+        if (res.statusCode === 200) {
+          console.log(`\x1b[32m[OK]\x1b[0m  레지스트리 정상 운영 중 (포트 ${port})`);
+          process.exit(0);
+        } else {
+          console.error(`\x1b[31m오류\x1b[0m  레지스트리 응답 이상 (상태: ${res.statusCode})`);
+          process.exit(1);
+        }
+      });
+      req.on("error", (err: any) => {
+        console.error(`\x1b[31m오류\x1b[0m  레지스트리 연결 실패: ${err.message}`);
+        process.exit(1);
+      });
+      req.setTimeout(5000, () => {
+        req.destroy();
+        console.error(`\x1b[31m오류\x1b[0m  레지스트리 타임아웃`);
+        process.exit(1);
+      });
+    } catch (err: any) {
+      console.error(`\x1b[31m오류\x1b[0m  ${err.message}`);
+      process.exit(1);
+    }
+  } else {
+    console.error(`\x1b[31m알 수 없는 서브커맨드:\x1b[0m  registry ${subCmd}`);
+    console.log(`\n사용법:\n  fl registry start [--port 4873]\n  fl registry status [--port 4873]`);
+    process.exit(1);
+  }
+}
+
 function printUsage(): void {
   console.log([
     "",
@@ -582,6 +661,8 @@ function printUsage(): void {
     "  freelang doc <file.fl>           Markdown 문서 생성 → stdout (Phase 77)",
     "  freelang doc <file.fl> -o out.md 파일로 저장",
     "  freelang doc --dir <dir>         디렉토리 내 모든 .fl 파일 통합 문서화",
+    "  freelang registry start [--port]  npm 호환 패키지 레지스트리 시작 (Phase 7)",
+    "  freelang registry status [--port] 레지스트리 상태 확인",
     "",
     "예제:",
     "  freelang run my-script.fl",
@@ -662,6 +743,11 @@ switch (cmd) {
   case "doc": {
     // Phase 77: freelang doc <file.fl> [-o out.md] | --dir <dir>
     cmdDoc(args.slice(1));
+    break;
+  }
+  case "registry": {
+    // Phase 7: freelang registry start [--port 4873] | status
+    cmdRegistry(args.slice(1));
     break;
   }
   default:

@@ -1,0 +1,115 @@
+; FreeLang v9 Package Registry Server
+; Phase 7: npm 호환 패키지 레지스트리
+
+[FUNC init-registry :params []
+  :body
+  (do
+    (if (not (file_exists "registry-data"))
+      (do
+        (dir_create "registry-data")
+        (dir_create "registry-data/packages")
+        (dir_create "registry-data/tarballs")))
+    (file_write "registry-data/packages.json" "{}")))
+]
+
+[FUNC load-packages-db :params []
+  :body
+  (try
+    (let [[data (file_read "registry-data/packages.json")]]
+      (parse-json data))
+    (fn [$e] (do (println (str "Failed to load packages: " $e)) {})))]
+
+[FUNC save-packages-db :params [data]
+  :body
+  (file_write "registry-data/packages.json" (stringify-json data))]
+
+[FUNC get-package :params [name]
+  :body
+  (let [[packages (load-packages-db)]]
+    (get packages (str "pkg:" name)))]
+
+[FUNC list-all-packages :params []
+  :body
+  (let [[packages (load-packages-db)]]
+    (do
+      (println (stringify-json packages))
+      (ok packages)))]
+
+[FUNC publish-package :params [name version files]
+  :body
+  (let [[packages (load-packages-db)]]
+    (let [[pkg-key (str "pkg:" name)]]
+      (let [[pkg (or (get packages pkg-key) {})]]
+        (let [[versions (or (get pkg :versions) {})]]
+          (do
+            (set! versions (str version) {:time (now) :files files})
+            (set! pkg :versions versions)
+            (set! pkg :latest version)
+            (set! packages pkg-key pkg)
+            (save-packages-db packages)
+            (ok {:name name :version version :published true}))))))]
+
+[FUNC search-packages :params [query]
+  :body
+  (let [[packages (load-packages-db)]]
+    (let [[results (filter (keys packages) (fn [$k]
+      (if (string? query)
+        (includes? $k query)
+        true)))]]
+      (map results (fn [$k]
+        (let [[pkg (get packages $k)]]
+          {:name (str-replace $k "pkg:" "")
+           :latest (get pkg :latest)
+           :description (get pkg :description "")})))))]
+
+[FUNC delete-package-version :params [name version]
+  :body
+  (let [[packages (load-packages-db)]]
+    (let [[pkg-key (str "pkg:" name)]]
+      (let [[pkg (get packages pkg-key)]]
+        (if pkg
+          (do
+            (let [[versions (get pkg :versions)]]
+              (do
+                (set! versions version nil)
+                (if (= (keys versions) [])
+                  (set! packages pkg-key nil)
+                  (set! pkg :versions versions))
+                (save-packages-db packages)
+                (ok {:deleted true}))))
+          (err "NOT_FOUND" "Package not found")))))]
+
+; HTTP 서버 통합 (stdlib-http-server 재사용)
+[FUNC create-registry-server :params [port]
+  :body
+  (let [[routes [
+    [ROUTE GET "/-/all" (fn [$req]
+      (list-all-packages))]
+    [ROUTE GET "/search" (fn [$req]
+      (let [[q (get $req :query)]]
+        (ok (search-packages q))))]
+    [ROUTE PUT "/:name/:version" (fn [$req]
+      (let [[name (get $req :params :name)]
+            [version (get $req :params :version)]
+            [body (get $req :body)]]
+        (publish-package name version body)))]
+    [ROUTE DELETE "/:name/:version" (fn [$req]
+      (let [[name (get $req :params :name)]
+            [version (get $req :params :version)]]
+        (delete-package-version name version)))]
+    [ROUTE GET "/:name" (fn [$req]
+      (let [[name (get $req :params :name)]]
+        (let [[pkg (get-package name)]]
+          (if pkg
+            (ok pkg)
+            (err "NOT_FOUND" "Package not found")))))]
+  ]]]
+    (do
+      (init-registry)
+      (println (str "📦 Registry Server listening on port " port))
+      (ok {:port port :routes (length routes)})))
+]
+
+; 메인 실행
+(define REGISTRY_PORT (or (env_load "REGISTRY_PORT") 4873))
+(create-registry-server REGISTRY_PORT)

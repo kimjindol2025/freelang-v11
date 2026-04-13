@@ -26,6 +26,7 @@ import { createAiNativeModule } from "./stdlib-ai-native"; // Phase 71: AI 네�
 import { createTestModule } from "./stdlib-test";           // Phase 76: FL 네이티브 테스트 러너
 import { createMaybeModule } from "./maybe-type";           // Phase 91: 불확실성 타입
 import { createCompileModule } from "./stdlib-compile";    // Phase 6: .fl → .js 컴파일러
+import { createRegistryModule } from "./stdlib-registry";  // Phase 7: npm 호환 패키지 레지스트리
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -73,4 +74,5 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (name, args) => interp.callUserFunction(name, args)
   ));
   interp.registerModule(createCompileModule());   // Phase 6: fl_compile, fl_compile_file (tsc 제거)
+  interp.registerModule(createRegistryModule());  // Phase 7: registry_publish, registry_search, registry_info, registry_delete, registry_start
 }
