@@ -83,7 +83,7 @@
 [FUNC on-ws-close :params [$conn_id] :body (println (str "[WS] 종료: " $conn_id))]
 
 ;; SPA 마운트
-[FUNC handle-index :params [$req] :body (server_html "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>v9-Notion</title><link rel=\"stylesheet\" href=\"/static/style.css\"></head><body><div id=\"root\"></div><div id=\"login-modal\" class=\"modal\"></div><div id=\"app\" class=\"app hidden\"></div><script src=\"/static/app.js\"></script><script src=\"/static/editor.js\"></script></body></html>")]
+[FUNC handle-index :params [$req] :body (server_html "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>v9-Notion</title><link rel=\"stylesheet\" href=\"http://localhost:3000/style.css\"></head><body><div id=\"root\"></div><div id=\"login-modal\" class=\"modal\"></div><div id=\"app\" class=\"app hidden\"></div><script src=\"http://localhost:3000/app.js\"></script><script src=\"http://localhost:3000/editor.js\"></script></body></html>")]
 
 [FUNC handle-app :params [$req] :body (handle-index $req)]
 
