@@ -1,0 +1,62 @@
+# Jekyll Configuration for GitHub Pages
+
+title: FreeLang v9
+description: "AI를 위한, AI에 의한, AI가 쓰고 싶은 언어"
+url: "https://kimjindol2025.github.io/freelang-v9"
+baseurl: "/freelang-v9"
+
+# Theme
+theme: minima
+
+# Build settings
+markdown: kramdown
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Navigation menu
+header_pages:
+  - docs/index.md
+
+# Exclude directories
+exclude:
+  - node_modules/
+  - vpm/
+  - field-ops-saas/
+  - .github/
+
+# Include directories
+include:
+  - docs/
+
+# Author
+author:
+  name: Kim Jindol
+  url: "https://github.com/kimjindol2025"
+
+# Navigation
+navigation:
+  - title: Guide
+    url: /docs/guide/basics.html
+  - title: API
+    url: /docs/api/stdlib.html
+  - title: Examples
+    url: /docs/examples/
+  - title: GitHub
+    url: "https://github.com/kimjindol2025/freelang-v9"
+
+# Permalink style
+permalink: pretty
+
+# Collections
+collections:
+  docs:
+    output: true
+    permalink: /docs/:path/
+
+# Defaults
+defaults:
+  - scope:
+      path: "docs"
+    values:
+      layout: page
