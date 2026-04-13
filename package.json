@@ -1,7 +1,11 @@
 {
   "name": "freelang-v9",
-  "version": "9.0.0",
-  "description": "FreeLang v9 - AI-Only Language",
+  "version": "9.1.0",
+  "description": "FreeLang v9 — AI-Native Programming Language. AI를 위한, AI에 의한, AI가 쓰고 싶은 언어.",
+  "keywords": ["ai", "language", "freelang", "s-expression", "ai-native", "claude", "agent"],
+  "author": "Claude Code (Anthropic)",
+  "license": "MIT",
+  "homepage": "https://gogs.dclub.kr/kim/freelang-v9",
   "main": "dist/index.js",
   "bin": {
     "v9": "dist/cli.js"
