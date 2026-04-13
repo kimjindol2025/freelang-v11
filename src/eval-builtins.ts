@@ -153,6 +153,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "length": return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
     case "get":
       if (Array.isArray(v0)) return v0[v1] !== undefined ? v0[v1] : null;
+      if (v0 instanceof Map) return v0.get(String(v1).replace(/^:/, "")) ?? null;
       if (v0 !== null && typeof v0 === "object") {
         const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : String(v1);
         return v0[k] !== undefined ? v0[k] : null;
@@ -200,6 +201,25 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "read-file": case "file_read": try { return require("fs").readFileSync(String(v0), "utf-8"); } catch { return null; }
     case "write-file": case "file_write": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
     case "file-exists?": case "file_exists": try { return require("fs").existsSync(String(v0)); } catch { return false; }
+    // ── 셀프 호스팅 native builtins (native fl-interp 내부에서 호출 가능) ──
+    case "fl-interp": return flInterpNative(v0, v1);
+    case "fl-parse": try { return _flParse(_flLex(String(v0 ?? ""))); } catch { return []; }
+    case "fl-fix-env": {
+      const fenv = v0;
+      if (!fenv || !Array.isArray(fenv.vars)) return fenv;
+      for (const pair of fenv.vars) {
+        if (Array.isArray(pair) && pair[1] && typeof pair[1] === "object" && pair[1].kind === "closure")
+          pair[1]["closure-env"] = fenv;
+      }
+      return fenv;
+    }
+    case "fl-env-get": return flEnvGet(v0, String(v1 ?? ""));
+    case "fl-exec-op": return flExecOpNative(String(v0 ?? ""), Array.isArray(v1) ? v1 : []);
+    case "fl-special-op?": {
+      const sop = String(v0 ?? "");
+      const specials = ["if","let","do","begin","fn","and","or","not","null?","match","call","export","define","set!"];
+      return specials.includes(sop) ? sop : null;
+    }
     default: return null;
   }
 }
@@ -235,6 +255,16 @@ function flInterpNative(node: any, env: any): any {
     if (node.type === "Array") {
       const items = flBlockItems(node);
       return items.map((item: any) => flInterpNative(item, env));
+    }
+    if (node.type === "Map") {
+      // 맵 리터럴: {:key1 val1 :key2 val2} → JS 오브젝트
+      const result: Record<string, any> = {};
+      if (node.fields instanceof Map) {
+        for (const [key, valNode] of node.fields) {
+          result[key] = flInterpNative(valNode, env);
+        }
+      }
+      return result;
     }
     if (node.type === "FUNC") {
       const fields = node.fields;

@@ -418,23 +418,37 @@
 
 ; ── 파일 실행 ─────────────────────────────────────────────────
 ; fl-parse: 소스 문자열 → AST (native builtin)
-; interpret-file: 파일 경로를 읽어서 해석
+; interpret-file-with-argv: 파일 실행 + $__argv__ FL env 바인딩 (셀프 호스팅 핵심)
 
-[FUNC interpret-file :params [$path]
+[FUNC interpret-file-with-argv :params [$path $argv]
   :body (
     (let [[$src (file_read $path)]]
       (if (null? $src)
         (do (println "오류: 파일을 읽을 수 없습니다:" $path) null)
-        (interpret (fl-parse $src))
+        (let [[$ast (fl-parse $src)]
+              [$base-env (fl-fix-env (fl-load-funcs $ast (env-new) 0))]
+              [$env (env-bind $base-env "__argv__" $argv)]]
+          (fl-run-nodes $ast $env 0 null)
+        )
       )
     )
   )
 ]
 
+[FUNC interpret-file :params [$path]
+  :body (
+    (interpret-file-with-argv $path [])
+  )
+]
+
 ; ── 메인 실행: $__argv__[0]이 있으면 해당 파일 실행 ───────────────────────
+; $__argv__ = 나머지 인수들 (0번째 = 대상 파일, 1번~= 대상에 전달할 argv)
 (if (not (null? $__argv__))
-  (interpret-file (get $__argv__ 0))
+  (interpret-file-with-argv
+    (get $__argv__ 0)
+    (slice $__argv__ 1 (length $__argv__))
+  )
   null
 )
 
-(export interpret interpret-file fl-eval fl-apply env-new env-bind env-lookup make-closure)
+(export interpret interpret-file interpret-file-with-argv fl-eval fl-apply env-new env-bind env-lookup make-closure)
