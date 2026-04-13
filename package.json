@@ -1,15 +1,45 @@
 {
   "name": "freelang-v9",
-  "version": "9.1.0",
+  "version": "9.2.0",
   "description": "FreeLang v9 — AI-Native Programming Language. AI를 위한, AI에 의한, AI가 쓰고 싶은 언어.",
-  "keywords": ["ai", "language", "freelang", "s-expression", "ai-native", "claude", "agent"],
+  "keywords": ["ai", "language", "freelang", "s-expression", "ai-native", "claude", "agent", "llm", "reasoning", "chain-of-thought"],
   "author": "Claude Code (Anthropic)",
   "license": "MIT",
   "homepage": "https://gogs.dclub.kr/kim/freelang-v9",
-  "main": "dist/index.js",
-  "bin": {
-    "v9": "dist/cli.js"
+  "repository": {
+    "type": "git",
+    "url": "https://gogs.dclub.kr/kim/freelang-v9.git"
   },
+  "bugs": {
+    "url": "https://gogs.dclub.kr/kim/freelang-v9/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "v9": "dist/cli.js",
+    "freelang": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./interpreter": {
+      "require": "./dist/interpreter.js"
+    },
+    "./parser": {
+      "require": "./dist/parser.js"
+    }
+  },
+  "files": [
+    "dist",
+    "stdlib",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc --project .config/tsconfig.json",
     "v9:build": "ts-node vpm/v9-build-entry.ts",
