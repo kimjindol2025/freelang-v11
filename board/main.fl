@@ -1,0 +1,91 @@
+;; 간단한 게시판 앱 (v9)
+
+(let [[$DB_PATH "./board/data/board.db"]
+      [$JWT_SECRET "board-secret-2026"]
+      [$PORT 5000]]
+
+;; ─── DB 초기화 ──────────────────────────────────────────────────
+
+(db_create $DB_PATH "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, pwd_hash TEXT NOT NULL, created_at TEXT NOT NULL)")
+
+(db_create $DB_PATH "CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, user_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id))")
+
+(db_create $DB_PATH "CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, post_id TEXT NOT NULL, content TEXT NOT NULL, user_id TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(post_id) REFERENCES posts(id), FOREIGN KEY(user_id) REFERENCES users(id))")
+
+(db_create $DB_PATH "CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id)")
+(db_create $DB_PATH "CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id)")
+
+(db_exec $DB_PATH "PRAGMA journal_mode=WAL")
+(db_exec $DB_PATH "PRAGMA synchronous=NORMAL")
+
+(println (str "[DB] 초기화: " $DB_PATH))
+
+;; ─── 헬퍼 함수 ──────────────────────────────────────────────────
+
+[FUNC require-auth :params [$req] :body (let [[$token (auth_bearer_extract $req)]] (if $token (auth_jwt_verify $token $JWT_SECRET) false))]
+
+;; ─── 인증 API ──────────────────────────────────────────────────
+
+[FUNC handle-register :params [$req] :body (let [[$body (json_parse (server_req_body $req))] [$email (get $body "email")] [$name (get $body "name")] [$password (get $body "password")]] (if (or (not $email) (not $name) (not $password)) (server_status 400 {:error "필수 항목 누락"}) (let [[$user_id (uuid_v4)] [$pwd_hash (auth_hash_password $password)] [$now "2026-04-13T21:00:00Z"]] (db_insert $DB_PATH "users" {:id $user_id :email $email :name $name :pwd_hash $pwd_hash :created_at $now}) (let [[$token (auth_jwt_sign {:user_id $user_id :email $email} $JWT_SECRET 604800)]] (server_json {:user_id $user_id :email $email :name $name :token $token})))))]
+
+[FUNC handle-login :params [$req] :body (let [[$body (json_parse (server_req_body $req))] [$email (get $body "email")] [$password (get $body "password")]] (if (or (not $email) (not $password)) (server_status 400 {:error "필수 항목 누락"}) (let [[$rows (db_query $DB_PATH "SELECT * FROM users WHERE email = ?" [$email])]] (if (and $rows (> (length $rows) 0)) (let [[$user (get $rows 0)]] (if (auth_verify_password $password (get $user "pwd_hash")) (let [[$token (auth_jwt_sign {:user_id (get $user "id") :email $email} $JWT_SECRET 604800)]] (server_json {:user_id (get $user "id") :email $email :name (get $user "name") :token $token})) (server_status 401 {:error "비밀번호 오류"}))) (server_status 401 {:error "사용자 없음"})))))]
+
+[FUNC handle-me :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "인증 필요"}) (server_json $claims)))]
+
+;; ─── 게시글 API ──────────────────────────────────────────────────
+
+[FUNC handle-posts-list :params [$req] :body (let [[$rows (db_query $DB_PATH "SELECT id, title, content, user_id, created_at FROM posts ORDER BY created_at DESC LIMIT 50" [])]] (server_json {:posts (or $rows [])}))]
+
+[FUNC handle-post-get :params [$req] :body (let [[$post_id (server_req_param $req "id")] [$rows (db_query $DB_PATH "SELECT * FROM posts WHERE id = ?" [$post_id])]] (if (and $rows (> (length $rows) 0)) (server_json (get $rows 0)) (server_status 404 {:error "게시글 없음"})))]
+
+[FUNC handle-post-create :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "인증 필요"}) (let [[$body (json_parse (server_req_body $req))] [$title (get $body "title")] [$content (get $body "content")] [$post_id (uuid_v4)] [$now "2026-04-13T21:00:00Z"]] (if (or (not $title) (not $content)) (server_status 400 {:error "제목, 내용 필수"}) (do (db_insert $DB_PATH "posts" {:id $post_id :title $title :content $content :user_id (get $claims "user_id") :created_at $now :updated_at $now}) (server_json {:id $post_id :ok true}))))))]
+
+[FUNC handle-post-update :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "인증 필요"}) (let [[$post_id (server_req_param $req "id")] [$body (json_parse (server_req_body $req))] [$title (get $body "title")] [$content (get $body "content")] [$now "2026-04-13T21:00:00Z"]] (if (or (not $title) (not $content)) (server_status 400 {:error "제목, 내용 필수"}) (do (db_update $DB_PATH "posts" {:title $title :content $content :updated_at $now} (str "id = '" $post_id "'")) (server_json {:id $post_id :ok true}))))))]
+
+[FUNC handle-post-delete :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "인증 필요"}) (let [[$post_id (server_req_param $req "id")]] (do (db_delete_row $DB_PATH "posts" (str "id = '" $post_id "'")) (server_json {:id $post_id :ok true})))))]
+
+;; ─── 댓글 API ──────────────────────────────────────────────────
+
+[FUNC handle-comments-list :params [$req] :body (let [[$post_id (server_req_param $req "id")] [$rows (db_query $DB_PATH "SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC" [$post_id])]] (server_json {:comments (or $rows [])}))]
+
+[FUNC handle-comment-create :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "인증 필요"}) (let [[$post_id (server_req_param $req "id")] [$body (json_parse (server_req_body $req))] [$content (get $body "content")] [$comment_id (uuid_v4)] [$now "2026-04-13T21:00:00Z"]] (if (not $content) (server_status 400 {:error "댓글 내용 필수"}) (do (db_insert $DB_PATH "comments" {:id $comment_id :post_id $post_id :content $content :user_id (get $claims "user_id") :created_at $now}) (server_json {:id $comment_id :ok true}))))))]
+
+[FUNC handle-comment-delete :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "인증 필요"}) (let [[$comment_id (server_req_param $req "commentId")]] (do (db_delete_row $DB_PATH "comments" (str "id = '" $comment_id "'")) (server_json {:id $comment_id :ok true})))))]
+
+;; ─── 헬스체크 ──────────────────────────────────────────────────
+
+[FUNC handle-health :params [$req] :body (server_json {:status "ok" :app "board"})]
+
+;; ─── SPA ──────────────────────────────────────────────────
+
+[FUNC handle-index :params [$req] :body (server_html "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>간단한 게시판</title><link rel='stylesheet' href='http://localhost:3000/style.css'></head><body><div id='app'></div><script src='http://localhost:3000/app.js'></script></body></html>")]
+
+;; ─── 라우트 등록 ──────────────────────────────────────────────────
+
+(server_post "/api/auth/register" "handle-register")
+(server_post "/api/auth/login" "handle-login")
+(server_get "/api/auth/me" "handle-me")
+
+(server_get "/api/posts" "handle-posts-list")
+(server_post "/api/posts" "handle-post-create")
+(server_get "/api/posts/:id" "handle-post-get")
+(server_put "/api/posts/:id" "handle-post-update")
+(server_delete "/api/posts/:id" "handle-post-delete")
+
+(server_get "/api/posts/:id/comments" "handle-comments-list")
+(server_post "/api/posts/:id/comments" "handle-comment-create")
+(server_delete "/api/posts/:id/comments/:commentId" "handle-comment-delete")
+
+(server_get "/" "handle-index")
+(server_get "/health" "handle-health")
+
+;; ─── 서버 시작 ──────────────────────────────────────────────────
+
+(println (str "[HTTP] 게시판 서버 시작 (포트 " $PORT ")"))
+(println "")
+(println "📝 간단한 게시판 실행 중...")
+(println (str "   🌐 http://localhost:" $PORT "/"))
+(println "")
+
+(server_start $PORT)
+)
