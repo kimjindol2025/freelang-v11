@@ -21,32 +21,10 @@
   )
 ]
 
-; vars 배열에서 이름 탐색
-[FUNC env-find :params [$vars $name $i]
-  :body (
-    (if (>= $i (length $vars))
-      "__not_found__"
-      (let [[$pair (get $vars $i)]]
-        (if (= (get $pair 0) $name)
-          (get $pair 1)
-          (env-find $vars $name (+ $i 1))
-        )
-      )
-    )
-  )
-]
-
+; 네이티브 builtin으로 env 조회 (재귀 스택오버플로우 방지)
 [FUNC env-lookup :params [$env $name]
   :body (
-    (if (null? $env)
-      null
-      (let [[$r (env-find (get $env :vars) $name 0)]]
-        (if (= $r "__not_found__")
-          (env-lookup (get $env :parent) $name)
-          $r
-        )
-      )
-    )
+    (fl-env-get $env $name)
   )
 ]
 
@@ -119,7 +97,7 @@
 
 [FUNC get-param-names :params [$params-node]
   :body (
-    (extract-params (get $params-node :items) 0 [])
+    (extract-params (block-items $params-node) 0 [])
   )
 ]
 
@@ -139,7 +117,10 @@
               (if (= $k "sexpr")
                 (fl-eval-sexpr (get $node :op) (get $node :args) $env)
                 (if (= $k "block")
-                  (fl-eval-block $node $env)
+                  (if (= (get $node :type) "Array")
+                    (fl-eval-array (block-items $node) $env 0 [])
+                    (fl-eval-block $node $env)
+                  )
                   null
                 )
               )
@@ -316,7 +297,7 @@
     (if (>= $i (length $items))
       $env
       (let [[$pair (get $items $i)]
-            [$pair-items (get $pair :items)]
+            [$pair-items (block-items $pair)]
             [$name-node (get $pair-items 0)]
             [$val (fl-eval (get $pair-items 1) $env)]
             [$nm (if (= (get $name-node :kind) "variable")
@@ -330,7 +311,7 @@
 
 [FUNC fl-eval-let :params [$args $env]
   :body (
-    (let [[$bindings (get (get $args 0) :items)]
+    (let [[$bindings (block-items (get $args 0))]
           [$new-env (fl-eval-let-bindings $bindings $env 0)]]
       (fl-eval-body (slice $args 1 (length $args)) $new-env)
     )

@@ -406,8 +406,33 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     case "get":
       if (Array.isArray(args[0])) return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
       if (typeof args[0] === "string") return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
-      if (args[0] !== null && typeof args[0] === "object") return args[0][args[1]] ?? null;
+      if (args[0] instanceof Map) return args[0].get(String(args[1]).replace(/^:/, "")) ?? null;
+      if (args[0] !== null && typeof args[0] === "object") return args[0][String(args[1]).replace(/^:/, "")] ?? args[0][args[1]] ?? null;
       return null;
+    case "block-items":
+      // Array 블록에서 items 추출 (셀프 호스팅용)
+      if (args[0] && typeof args[0] === "object" && args[0].kind === "block" && args[0].type === "Array") {
+        return args[0].fields instanceof Map ? (args[0].fields.get("items") ?? []) : [];
+      }
+      if (Array.isArray(args[0])) return args[0];
+      return [];
+    case "fl-env-get": {
+      // 네이티브 FL 환경 조회 — env-find 재귀 스택오버플로우 방지
+      // env = {vars: [["name", val], ...], parent: env|null}
+      let flenv = args[0];
+      const fname = String(args[1]);
+      while (flenv !== null && flenv !== undefined) {
+        const vars = flenv.vars;
+        if (Array.isArray(vars)) {
+          for (let i = 0; i < vars.length; i++) {
+            const pair = vars[i];
+            if (Array.isArray(pair) && pair[0] === fname) return pair[1];
+          }
+        }
+        flenv = flenv.parent;
+      }
+      return null;
+    }
     case "assoc":
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
         return { ...args[0], [args[1]]: args[2] };
