@@ -1,9 +1,0 @@
-(println "Before FUNC")
-
-[FUNC simple_test :params []
-  :body (println "Inside function")
-]
-
-(println "After FUNC")
-(simple_test)
-(println "After call")

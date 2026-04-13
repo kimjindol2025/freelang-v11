@@ -1,6 +1,0 @@
-(println "Test: Exit handling")
-[FUNC test_func :params []
-  :body (println "Function call works!")
-]
-(test_func)
-(println "Done")
