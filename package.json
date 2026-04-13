@@ -19,7 +19,7 @@
     "v9": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc --project .config/tsconfig.json",
+    "build": "npx esbuild src/cli.ts --bundle --platform=node --outfile=bootstrap.js",
     "v9:build": "ts-node vpm/v9-build-entry.ts",
     "v9:install": "ts-node vpm/v9-pm-entry.ts install",
     "v9:run": "ts-node vpm/v9-run-entry.ts",
