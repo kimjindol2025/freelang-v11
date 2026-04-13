@@ -8,9 +8,19 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 30111;
+const BLOG_API_KEY = process.env.BLOG_API_KEY || 'default-blog-key-dev';
+const BLOG_API_URL = process.env.BLOG_API_URL || 'http://localhost:30112/api/posts';
 
-// HTML 생성
+// 환경변수 로딩 확인
+if (process.env.NODE_ENV === 'production' && process.env.BLOG_API_KEY === undefined) {
+  console.warn('⚠️  BLOG_API_KEY 환경변수가 설정되지 않았습니다.');
+}
+
+// HTML 생성 (환경변수 포함)
 function generateBlogHTML() {
+  const apiKey = process.env.BLOG_API_KEY || 'default-blog-key-dev';
+  const apiUrl = process.env.BLOG_API_URL || 'http://localhost:30112/api/posts';
+
   return `
 <!DOCTYPE html>
 <html lang="ko">
@@ -73,8 +83,8 @@ function generateBlogHTML() {
     // API에서 포스트 로드
     async function loadPosts() {
       try {
-        const response = await fetch('http://localhost:30112/api/posts', {
-          headers: { 'X-API-Key': 'blog-api-key-2025' }
+        const response = await fetch('${apiUrl}', {
+          headers: { 'X-API-Key': '${apiKey}' }
         });
         const data = await response.json();
 

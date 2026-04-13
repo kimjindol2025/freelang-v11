@@ -10,9 +10,16 @@ import { Interpreter } from './src/interpreter';
 
 const PORT = 30111;
 const BLOG_FILE = path.join(__dirname, 'blog.free');
+const BLOG_API_KEY = process.env.BLOG_API_KEY || 'default-blog-key-dev';
+const BLOG_API_URL = process.env.BLOG_API_URL || 'http://localhost:30112/api/posts';
 
 // FreeLang 인터프리터 인스턴스
 const interpreter = new Interpreter();
+
+// 환경변수 로딩 확인
+if (process.env.NODE_ENV === 'production' && process.env.BLOG_API_KEY === undefined) {
+  console.warn('⚠️  BLOG_API_KEY 환경변수가 설정되지 않았습니다.');
+}
 
 // blog.free 파일 읽기
 function loadBlogCode(): string {
@@ -114,8 +121,8 @@ const server = http.createServer((req, res) => {
     // API에서 포스트 로드
     async function loadPosts() {
       try {
-        const response = await fetch('http://localhost:30112/api/posts', {
-          headers: { 'X-API-Key': 'blog-api-key-2025' }
+        const response = await fetch('${BLOG_API_URL}', {
+          headers: { 'X-API-Key': '${BLOG_API_KEY}' }
         });
         const data = await response.json();
 
