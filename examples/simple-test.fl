@@ -1,12 +1,14 @@
-; 셀프 호스팅 테스트용 단순 FL 파일
-[FUNC double :params [$n]
-  :body (* $n 2)
+; simple-test.fl
+[FUNC add :params [$a $b]
+  :body (+ $a $b)
 ]
 
-[FUNC fib :params [$n]
-  :body (if (<= $n 1) $n (+ (fib (- $n 1)) (fib (- $n 2))))
+[FUNC main :params []
+  :body (
+    (let [[$result (add 3 4)]]
+      (println (concat "3 + 4 = " (num-to-str $result)))
+    )
+  )
 ]
 
-(println (str "1 + 2 = " (+ 1 2)))
-(println (str "double(7) = " (double 7)))
-(println (str "fib(8) = " (fib 8)))
+(main)

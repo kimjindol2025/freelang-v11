@@ -761,7 +761,11 @@ switch (cmd) {
     const filePath = args[1];
     if (!filePath) { printUsage(); process.exit(1); }
     const watch = args.includes("--watch") || args.includes("-w");
-    const extraArgs = args.slice(2).filter((a) => a !== "--watch" && a !== "-w");
+    // `--` 구분자 뒤의 인수는 스크립트로 전달 ($__argv__)
+    const ddIdx = args.indexOf("--");
+    const extraArgs = ddIdx >= 0
+      ? args.slice(ddIdx + 1)
+      : args.slice(2).filter((a) => a !== "--watch" && a !== "-w");
     cmdRun(filePath, watch, extraArgs);
     break;
   }
