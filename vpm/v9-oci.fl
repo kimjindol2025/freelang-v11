@@ -1,0 +1,296 @@
+; FreeLang v9 OCI 빌드 도구
+; Phase 8: Docker 없이 v9 앱을 OCI 이미지로 빌드/배포
+
+; ============================================================
+; [1] 런타임 레이어 준비
+; ============================================================
+
+[FUNC prepare-runtime-layer :params [output-dir]
+  :body
+  ; v9 런타임을 레이어로 준비
+  (let [[runtime-files (list
+    "dist/interpreter.js"
+    "dist/lexer.js"
+    "dist/parser.js"
+    "dist/cli.js"
+    "package.json"
+    "README.md"
+  )]]
+    (do
+      (dir_create output-dir)
+      (dir_create (str output-dir "/bin"))
+      (dir_create (str output-dir "/lib"))
+
+      ; 런타임 바이너리 복사
+      (for-each runtime-files
+        (fn [$file]
+          (if (file_exists $file)
+            (do
+              (let [[dest (str output-dir "/" $file)]]
+                (file_mkdir_p (dir_name dest))
+                (shell_run (str "cp " $file " " dest))
+              )
+            )
+          )
+        )
+      )
+
+      (ok {:dir output-dir :type "runtime"})
+    )
+  )
+]
+
+; ============================================================
+; [2] 앱 레이어 준비 (컴파일)
+; ============================================================
+
+[FUNC compile-app-layer :params [app-file output-dir]
+  :body
+  ; v9 앱을 컴파일하여 레이어로 준비
+  (let [[compiled-dir (str output-dir "/app")]]
+    (do
+      (dir_create compiled-dir)
+      (dir_create (str compiled-dir "/src"))
+
+      ; 1. app 파일 컴파일
+      (let [[compile-result (fl_compile_file app-file (str compiled-dir "/app.js"))]]
+        (if compile-result
+          (do
+            ; 2. 의존성 파일들 복사
+            (shell_run (str "cp package.json " compiled-dir "/"))
+            (shell_run (str "cp -r src/ " compiled-dir "/"))
+
+            (ok {:dir compiled-dir :type "app" :compiled app-file})
+          )
+          (err "COMPILE_ERROR" "Failed to compile app")
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [3] 전체 OCI 이미지 빌드
+; ============================================================
+
+[FUNC build-oci-image :params [app-file output-tag]
+  :body
+  ; 전체 OCI 이미지 빌드 (런타임 + 앱)
+  (let [[build-dir ".oci-build"]
+        [runtime-layer-dir (str build-dir "/runtime")]
+        [app-layer-dir (str build-dir "/app")]]
+    (do
+      ; 1. 런타임 레이어 준비
+      (let [[runtime-result (prepare-runtime-layer runtime-layer-dir)]]
+        (if (ok? runtime-result)
+          (do
+            ; 2. 앱 레이어 준비
+            (let [[app-result (compile-app-layer app-file app-layer-dir)]]
+              (if (ok? app-result)
+                (do
+                  ; 3. OCI 레이어 생성
+                  (let [[runtime-layer (oci_create_layer runtime-layer-dir)]
+                        [app-layer (oci_create_layer app-layer-dir)]]
+                    (do
+                      ; 4. 이미지 빌드
+                      (let [[image-info (oci_build output-tag (list runtime-layer app-layer))]]
+                        (do
+                          (println (str "✅ OCI image built: " output-tag))
+                          (println (str "   Digest: " (get image-info :digestSha256)))
+                          (println (str "   Size: " (get image-info :size) " bytes"))
+                          (ok image-info)
+                        )
+                      )
+                    )
+                  )
+                )
+                app-result
+              )
+            )
+          )
+          runtime-result
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [4] OCI 이미지 레지스트리 푸시
+; ============================================================
+
+[FUNC push-oci-image :params [tag registry]
+  :body
+  ; OCI 이미지를 레지스트리에 푸시
+  (let [[registry-url (or registry (env_load "OCI_REGISTRY" "http://localhost:5000"))]]
+    (do
+      (println (str "📤 Pushing " tag " to " registry-url))
+      (let [[result (oci_push tag registry-url)]]
+        (if (get result :pushed)
+          (do
+            (println (str "✅ Image pushed: " tag))
+            (ok result)
+          )
+          (err "PUSH_ERROR" "Failed to push image")
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [5] OCI 이미지 로컬 실행
+; ============================================================
+
+[FUNC run-oci-local :params [tag]
+  :body
+  ; 로컬 OCI 이미지 실행 (Node.js 기반)
+  (let [[image-info (oci_inspect tag)]]
+    (if image-info
+      (do
+        (println (str "🚀 Running OCI image: " tag))
+        (println (str "   Architecture: " (get image-info :architecture)))
+        (println (str "   Size: " (get image-info :size) " bytes"))
+        (println (str "   Command: " (str-join " " (get image-info :cmd))))
+
+        ; node 로 직접 실행 (컨테이너 런타임 없음)
+        (let [[app-dir (str ".oci-images/" tag "/app")]]
+          (if (file_exists (str app-dir "/app.js"))
+            (do
+              (shell_run (str "node " app-dir "/app.js"))
+              (ok {:running true :tag tag})
+            )
+            (err "NOT_FOUND" "app.js not found in image")
+          )
+        )
+      )
+      (err "NOT_FOUND" (str "Image not found: " tag))
+    )
+  )
+]
+
+; ============================================================
+; [6] OCI 이미지 목록
+; ============================================================
+
+[FUNC list-oci-images :params []
+  :body
+  (let [[images (oci_list)]]
+    (do
+      (if (> (count images) 0)
+        (do
+          (println "📦 OCI Images:")
+          (for-each images
+            (fn [$img]
+              (println (str "  - " (get $img :tag)
+                           " (" (get $img :digest)
+                           ", " (get $img :size) " bytes)"))
+            )
+          )
+        )
+        (println "No OCI images found")
+      )
+      (ok images)
+    )
+  )
+]
+
+; ============================================================
+; [7] OCI 이미지 서명
+; ============================================================
+
+[FUNC sign-oci-image :params [tag key]
+  :body
+  (let [[sign-result (oci_sign tag key)]]
+    (if (get sign-result :signed)
+      (do
+        (println (str "✅ Image signed: " tag))
+        (println (str "   Signature: " (get sign-result :signature)))
+        (ok sign-result)
+      )
+      (err "SIGN_ERROR" "Failed to sign image")
+    )
+  )
+]
+
+; ============================================================
+; [8] 진입점 (메인 함수)
+; ============================================================
+
+[FUNC oci-build-main :params [app-file tag registry]
+  :body
+  ; 메인 빌드 워크플로우
+  (let [[app-path (or app-file "app.fl")]
+        [output-tag (or tag "my-app:latest")]
+        [registry-url (or registry nil)]]
+    (do
+      (if (not (file_exists app-path))
+        (err "NOT_FOUND" (str "App file not found: " app-path))
+        (do
+          ; 1. 이미지 빌드
+          (let [[build-result (build-oci-image app-path output-tag)]]
+            (if (ok? build-result)
+              (do
+                ; 2. 레지스트리 푸시 (선택)
+                (if registry-url
+                  (let [[push-result (push-oci-image output-tag registry-url)]]
+                    (if (ok? push-result)
+                      (ok {:built true :pushed true :tag output-tag})
+                      (do
+                        (println "⚠️  Image built but push failed")
+                        (ok {:built true :pushed false :tag output-tag})
+                      )
+                    )
+                  )
+                  (ok {:built true :pushed false :tag output-tag})
+                )
+              )
+              (ok build-result)
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+; 진입 명령어
+(define args (process_argv))
+(if (> (count args) 2)
+  (let [[cmd (get args 2)]
+        [app-file (if (> (count args) 3) (get args 3) nil)]
+        [tag (if (> (count args) 4) (get args 4) nil)]
+        [registry (if (> (count args) 5) (get args 5) nil)]]
+    (cond
+      [(= cmd "build")
+        (oci-build-main app-file tag registry)
+      ]
+      [(= cmd "list")
+        (list-oci-images)
+      ]
+      [(= cmd "inspect")
+        (if tag
+          (let [[info (oci_inspect tag)]]
+            (if info
+              (do
+                (println (str "📋 OCI Image: " tag))
+                (println (str "   Digest: " (get info :digest)))
+                (println (str "   Size: " (get info :size)))
+                (println (str "   Created: " (get info :created)))
+                (ok info)
+              )
+              (err "NOT_FOUND" (str "Image not found: " tag))
+            )
+          )
+          (err "INVALID" "tag required for inspect command")
+        )
+      ]
+      [:default
+        (println "Usage: v9-oci build <app.fl> <tag> [registry]")
+        (println "       v9-oci list")
+        (println "       v9-oci inspect <tag>")
+      ]
+    )
+  )
+  (println "Usage: v9-oci build <app.fl> <tag> [registry]")
+)

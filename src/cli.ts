@@ -560,6 +560,62 @@ function cmdDoc(docArgs: string[]): void {
 }
 
 // ─────────────────────────────────────────
+// build 커맨드 (Phase 8)
+// ─────────────────────────────────────────
+
+function cmdBuild(buildArgs: string[]): void {
+  const isOci = buildArgs.includes("--oci");
+
+  if (isOci) {
+    // OCI 빌드 모드
+    const fileIdx = buildArgs.indexOf("--oci") + 1;
+    const appFile = buildArgs[fileIdx];
+    const tagIdx = buildArgs.indexOf("--tag");
+    const tag = tagIdx !== -1 ? buildArgs[tagIdx + 1] : "my-app:latest";
+    const registryIdx = buildArgs.indexOf("--registry");
+    const registry = registryIdx !== -1 ? buildArgs[registryIdx + 1] : undefined;
+
+    if (!appFile) {
+      console.error(`\x1b[31m오류\x1b[0m  app 파일을 지정하세요: fl build --oci <app.fl> --tag <tag>`);
+      process.exit(1);
+    }
+
+    const absPath = path.resolve(appFile);
+    if (!fs.existsSync(absPath)) {
+      console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${appFile}`);
+      process.exit(1);
+    }
+
+    console.log(`\x1b[36m[OCI Build]\x1b[0m  ${path.basename(appFile)} → ${tag}`);
+
+    // v9-oci.fl 실행
+    const ociScriptPath = path.resolve(__dirname, "../vpm/v9-oci.fl");
+    if (!fs.existsSync(ociScriptPath)) {
+      console.error(`\x1b[31m오류\x1b[0m  v9-oci.fl을 찾을 수 없습니다`);
+      process.exit(1);
+    }
+
+    const { execSync } = require("child_process");
+    try {
+      const cmd = registry
+        ? `node ${path.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}`
+        : `node ${path.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
+
+      console.log(`\x1b[2m  Command: ${cmd}\x1b[0m`);
+      execSync(cmd, { stdio: "inherit" });
+      console.log(`\x1b[32m[OK]\x1b[0m  OCI 빌드 완료: ${tag}`);
+    } catch (err: any) {
+      console.error(`\x1b[31m[Error]\x1b[0m  OCI 빌드 실패: ${err.message}`);
+      process.exit(1);
+    }
+  } else {
+    console.error(`\x1b[31m오류\x1b[0m  --oci 플래그를 지정하세요`);
+    console.log(`\n사용법:\n  fl build --oci <app.fl> --tag <tag> [--registry <url>]`);
+    process.exit(1);
+  }
+}
+
+// ─────────────────────────────────────────
 // registry 커맨드 (Phase 7)
 // ─────────────────────────────────────────
 
@@ -661,6 +717,8 @@ function printUsage(): void {
     "  freelang doc <file.fl>           Markdown 문서 생성 → stdout (Phase 77)",
     "  freelang doc <file.fl> -o out.md 파일로 저장",
     "  freelang doc --dir <dir>         디렉토리 내 모든 .fl 파일 통합 문서화",
+    "  freelang build --oci <app.fl> --tag <tag>        Docker 없이 OCI 이미지 빌드 (Phase 8)",
+    "  freelang build --oci <app.fl> --tag <tag> --registry <url>  OCI 빌드 + push",
     "  freelang registry start [--port]  npm 호환 패키지 레지스트리 시작 (Phase 7)",
     "  freelang registry status [--port] 레지스트리 상태 확인",
     "",
@@ -743,6 +801,11 @@ switch (cmd) {
   case "doc": {
     // Phase 77: freelang doc <file.fl> [-o out.md] | --dir <dir>
     cmdDoc(args.slice(1));
+    break;
+  }
+  case "build": {
+    // Phase 8: freelang build --oci <app.fl> --tag <tag> [--registry <url>]
+    cmdBuild(args.slice(1));
     break;
   }
   case "registry": {
