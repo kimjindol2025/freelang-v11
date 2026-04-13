@@ -218,24 +218,26 @@
 ]
 
 ; ── S-expression 평가 ─────────────────────────────────────────
+; fl-special-op? 네이티브 빌트인으로 12중첩 if 제거
 
 [FUNC fl-eval-sexpr :params [$op $args $env]
   :body (
-    (if (= $op "if")      (fl-eval-if $args $env)
-    (if (= $op "let")     (fl-eval-let $args $env)
-    (if (= $op "do")      (fl-eval-body $args $env)
-    (if (= $op "begin")   (fl-eval-body $args $env)
-    (if (= $op "fn")      (fl-eval-fn $args $env)
-    (if (= $op "and")     (fl-eval-and $args $env)
-    (if (= $op "or")      (fl-eval-or $args $env)
-    (if (= $op "not")     (not (fl-eval (get $args 0) $env))
-    (if (= $op "null?")   (null? (fl-eval (get $args 0) $env))
-    (if (= $op "match")   (fl-eval-match $args $env)
-    (if (= $op "call")    (fl-eval-call-fn $args $env)
-    (if (or (= $op "export") (or (= $op "define") (= $op "set!")))
-      null
-      (fl-eval-call $op $args $env)
-    ))))))))))))
+    (let [[$sop (fl-special-op? $op)]]
+      (if (= $sop "if")     (fl-eval-if $args $env)
+      (if (= $sop "let")    (fl-eval-let $args $env)
+      (if (or (= $sop "do") (= $sop "begin"))  (fl-eval-body $args $env)
+      (if (= $sop "fn")     (fl-eval-fn $args $env)
+      (if (= $sop "and")    (fl-eval-and $args $env)
+      (if (= $sop "or")     (fl-eval-or $args $env)
+      (if (= $sop "not")    (not (fl-eval (get $args 0) $env))
+      (if (= $sop "null?")  (null? (fl-eval (get $args 0) $env))
+      (if (= $sop "match")  (fl-eval-match $args $env)
+      (if (= $sop "call")   (fl-eval-call-fn $args $env)
+      (if (null? $sop)
+        (fl-eval-call $op $args $env)
+        null
+      )))))))))))
+    )
   )
 ]
 
@@ -384,49 +386,11 @@
 ]
 
 ; ── 내장 함수 ─────────────────────────────────────────────────
+; 네이티브 fl-exec-op 빌트인 사용 — 29중첩 if 스택오버플로우 제거
 
 [FUNC fl-eval-builtin :params [$op $vals]
   :body (
-    (if (= $op "+")   (+ (get $vals 0) (get $vals 1))
-    (if (= $op "-")   (- (get $vals 0) (get $vals 1))
-    (if (= $op "*")   (* (get $vals 0) (get $vals 1))
-    (if (= $op "/")   (/ (get $vals 0) (get $vals 1))
-    (if (= $op "%")   (% (get $vals 0) (get $vals 1))
-    (if (= $op "=")   (= (get $vals 0) (get $vals 1))
-    (if (= $op "!=")  (!= (get $vals 0) (get $vals 1))
-    (if (= $op "<")   (< (get $vals 0) (get $vals 1))
-    (if (= $op ">")   (> (get $vals 0) (get $vals 1))
-    (if (= $op "<=")  (<= (get $vals 0) (get $vals 1))
-    (if (= $op ">=")  (>= (get $vals 0) (get $vals 1))
-    (if (= $op "concat")     (fl-concat $vals 0 "")
-    (if (= $op "length")     (length (get $vals 0))
-    (if (= $op "get")        (get (get $vals 0) (get $vals 1))
-    (if (= $op "append")     (append (get $vals 0) (get $vals 1))
-    (if (= $op "slice")      (slice (get $vals 0) (get $vals 1) (get $vals 2))
-    (if (= $op "num-to-str") (num-to-str (get $vals 0))
-    (if (= $op "str-to-num") (str-to-num (get $vals 0))
-    (if (= $op "replace")    (replace (get $vals 0) (get $vals 1) (get $vals 2))
-    (if (= $op "str-join")   (str-join (get $vals 0) (get $vals 1))
-    (if (= $op "null?")      (null? (get $vals 0))
-    (if (= $op "array?")     (array? (get $vals 0))
-    (if (= $op "string?")    (string? (get $vals 0))
-    (if (= $op "number?")    (number? (get $vals 0))
-    (if (= $op "read-file")  (file_read (get $vals 0))
-    (if (= $op "write-file") (file_write (get $vals 0) (get $vals 1))
-    (if (= $op "file-exists?") (file_exists (get $vals 0))
-    (if (= $op "file-append")  (file_append (get $vals 0) (get $vals 1))
-    (if (= $op "dir-list")     (dir_list (get $vals 0))
-    null
-    )))))))))))))))))))))))))))))
-  )
-]
-
-[FUNC fl-concat :params [$vals $i $acc]
-  :body (
-    (if (>= $i (length $vals))
-      $acc
-      (fl-concat $vals (+ $i 1) (concat $acc (get $vals $i)))
-    )
+    (fl-exec-op $op $vals)
   )
 ]
 

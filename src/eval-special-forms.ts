@@ -894,7 +894,7 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
           if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
             let varName: string;
             const varNode = bindingItems[0] as any;
-            if (varNode.kind === "variable") varName = varNode.name;
+            if (varNode.kind === "variable") varName = "$" + varNode.name;
             else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + (varNode.value as string);
             else throw new Error(`Invalid binding variable: expected symbol or variable`);
             ctx.variables.set(varName, ev(bindingItems[1]));

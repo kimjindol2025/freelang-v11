@@ -433,6 +433,61 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       }
       return null;
     }
+    case "fl-special-op?": {
+      // fl-eval-sexpr 12중첩 if 대체 — op가 특수 형식인지 반환
+      const sop = String(args[0]);
+      const specials = ["if","let","do","begin","fn","and","or","not","null?","match","call","export","define","set!"];
+      return specials.includes(sop) ? sop : null;
+    }
+    case "fl-exec-op": {
+      // fl-eval-builtin의 29중첩 if 대체 — 네이티브 산술/비교/문자열 디스패치
+      // (fl-exec-op op vals) — vals는 이미 평가된 JS 배열
+      const op = String(args[0]);
+      const vals: any[] = Array.isArray(args[1]) ? args[1] : [];
+      const v0 = vals[0], v1 = vals[1], v2 = vals[2];
+      switch (op) {
+        case "+": return vals.reduce((a: number, b: number) => a + b, 0);
+        case "-": return vals.length === 1 ? -v0 : vals.reduce((a: number, b: number) => a - b);
+        case "*": return vals.reduce((a: number, b: number) => a * b, 1);
+        case "/": return vals.length === 1 ? 1 / v0 : vals.reduce((a: number, b: number) => a / b);
+        case "%": return typeof v0 === "number" && typeof v1 === "number" ? v0 % v1 : null;
+        case "=": return v0 === v1;
+        case "!=": return v0 !== v1;
+        case "<": return v0 < v1;
+        case ">": return v0 > v1;
+        case "<=": return v0 <= v1;
+        case ">=": return v0 >= v1;
+        case "concat": return vals.reduce((a: string, b: any) => a + String(b ?? ""), "");
+        case "length": return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
+        case "get":
+          if (Array.isArray(v0)) return typeof v1 === "number" ? (v0[v1] ?? null) : null;
+          if (typeof v0 === "string") return typeof v1 === "number" ? (v0[v1] ?? null) : null;
+          if (v0 instanceof Map) return v0.get(String(v1).replace(/^:/, "")) ?? null;
+          if (v0 !== null && typeof v0 === "object") return v0[String(v1).replace(/^:/, "")] ?? v0[v1] ?? null;
+          return null;
+        case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
+        case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
+        case "num-to-str": return String(v0 ?? "");
+        case "str-to-num": return parseFloat(String(v0));
+        case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
+        case "str-join": return Array.isArray(v0) ? v0.join(String(v1 ?? "")) : String(v0 ?? "");
+        case "null?": return v0 === null || v0 === undefined;
+        case "array?": return Array.isArray(v0);
+        case "string?": return typeof v0 === "string";
+        case "number?": return typeof v0 === "number";
+        case "read-file":
+        case "file_read": try { return require("fs").readFileSync(String(v0), "utf-8"); } catch { return null; }
+        case "write-file":
+        case "file_write": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
+        case "file-exists?":
+        case "file_exists": try { return require("fs").existsSync(String(v0)); } catch { return false; }
+        case "file-append":
+        case "file_append": try { require("fs").appendFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
+        case "dir-list":
+        case "dir_list": try { return require("fs").readdirSync(String(v0)); } catch { return []; }
+        default: return null;
+      }
+    }
     case "assoc":
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
         return { ...args[0], [args[1]]: args[2] };
