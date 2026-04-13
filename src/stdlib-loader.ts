@@ -36,6 +36,8 @@ import { createStatsModule } from "./stdlib-stats";         // Phase 10: 통계 
 import { createPlotModule } from "./stdlib-plot";           // Phase 10: 시각화
 import { createTestEnhancedModule } from "./stdlib-test-enhanced"; // Phase 11: 테스트 강화
 import { createServiceModule } from "./stdlib-service";     // Phase 12: 마이크로서비스 (서비스/큐/Circuit Breaker/메트릭)
+import { createWsModule } from "./stdlib-ws";              // Phase 21: WebSocket 서버
+import { createWscModule } from "./stdlib-wsc";            // Phase 21: WebSocket 클라이언트
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -93,4 +95,10 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createPlotModule());       // Phase 10: plot_histogram, plot_bar, plot_line, plot_scatter, plot_heatmap, plot_save
   interp.registerModule(createTestEnhancedModule()); // Phase 11: test_run_all, test_register, test_coverage, test_report
   interp.registerModule(createServiceModule());    // Phase 12: service_define, service_start, service_stop, queue_create, circuit_breaker_define, observe_metric
+  interp.registerModule(createWsModule(            // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
+    (n: string, a: any[]) => interp.callUserFunction(n, a)
+  ));
+  interp.registerModule(createWscModule(           // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
+    (n: string, a: any[]) => interp.callUserFunction(n, a)
+  ));
 }
