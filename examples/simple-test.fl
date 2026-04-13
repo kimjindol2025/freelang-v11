@@ -1,0 +1,12 @@
+; 셀프 호스팅 테스트용 단순 FL 파일
+[FUNC double :params [$n]
+  :body (* $n 2)
+]
+
+[FUNC fib :params [$n]
+  :body (if (<= $n 1) $n (+ (fib (- $n 1)) (fib (- $n 2))))
+]
+
+(println (str "1 + 2 = " (+ 1 2)))
+(println (str "double(7) = " (double 7)))
+(println (str "fib(8) = " (fib 8)))

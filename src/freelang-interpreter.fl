@@ -416,4 +416,25 @@
   )
 ]
 
-(export interpret fl-eval fl-apply env-new env-bind env-lookup make-closure)
+; ── 파일 실행 ─────────────────────────────────────────────────
+; fl-parse: 소스 문자열 → AST (native builtin)
+; interpret-file: 파일 경로를 읽어서 해석
+
+[FUNC interpret-file :params [$path]
+  :body (
+    (let [[$src (file_read $path)]]
+      (if (null? $src)
+        (do (println "오류: 파일을 읽을 수 없습니다:" $path) null)
+        (interpret (fl-parse $src))
+      )
+    )
+  )
+]
+
+; ── 메인 실행: $__argv__[0]이 있으면 해당 파일 실행 ───────────────────────
+(if (not (null? $__argv__))
+  (interpret-file (get $__argv__ 0))
+  null
+)
+
+(export interpret interpret-file fl-eval fl-apply env-new env-bind env-lookup make-closure)

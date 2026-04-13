@@ -93,7 +93,7 @@ function checkSource(source: string, filePath?: string): boolean {
 // run 커맨드
 // ─────────────────────────────────────────
 
-function cmdRun(filePath: string, watch: boolean): void {
+function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): void {
   const absPath = path.resolve(filePath);
 
   if (!fs.existsSync(absPath)) {
@@ -103,16 +103,30 @@ function cmdRun(filePath: string, watch: boolean): void {
 
   function execute(): void {
     const source = fs.readFileSync(absPath, "utf-8");
-    const { ok, value } = runSource(source, absPath);
-    if (ok && value !== null && value !== undefined) {
-      // 마지막 값 출력 (REPL-like)
+    // 추가 인수를 $__argv__로 인터프리터에 전달 (셀프 호스팅 지원)
+    let ctx: any;
+    try {
+      const tokens = lex(source);
+      const ast = parse(tokens);
+      const interp = new Interpreter();
+      interp.currentFilePath = absPath;
+      if (extraArgs.length > 0) {
+        interp.context.variables.set("$__argv__", extraArgs);
+      }
+      ctx = interp.interpret(ast);
+    } catch (err: any) {
+      console.error(formatError(err, source, absPath));
+      if (!watch) process.exit(1);
+      return;
+    }
+    const value = ctx?.lastValue;
+    if (value !== null && value !== undefined) {
       if (typeof value === "object") {
         console.log(JSON.stringify(value, null, 2));
       } else {
         console.log(String(value));
       }
     }
-    if (!ok && !watch) process.exit(1);
   }
 
   execute();
@@ -747,7 +761,8 @@ switch (cmd) {
     const filePath = args[1];
     if (!filePath) { printUsage(); process.exit(1); }
     const watch = args.includes("--watch") || args.includes("-w");
-    cmdRun(filePath, watch);
+    const extraArgs = args.slice(2).filter((a) => a !== "--watch" && a !== "-w");
+    cmdRun(filePath, watch, extraArgs);
     break;
   }
   case "check": {

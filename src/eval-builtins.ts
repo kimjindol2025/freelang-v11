@@ -80,6 +80,11 @@ import { globalCounterfactual, CounterfactualReasoner, Scenario } from "./counte
 import { globalPredictor } from "./predict"; // Phase 144: PREDICT
 import { FreeLangV9, freelangV9, FREELANG_V9_MANIFEST } from "./freelang-v9-complete"; // Phase 150: COMPLETE
 
+// ── FL 파서 접근 ─────────────────────────────────────────────────────────
+// fl-parse: FL 소스 문자열 → AST 배열 (셀프 호스팅용)
+import { lex as _flLex } from "./lexer";
+import { parse as _flParse } from "./parser";
+
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
 
@@ -160,7 +165,8 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "num-to-str": return String(v0 ?? "");
     case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
     case "type-of": return typeof v0;
-    case "print": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
+    case "print": process.stdout.write(vals.map((v: any) => v === null ? "null" : String(v)).join("")); return null;
+    case "println": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
     case "substring": return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== undefined ? Number(v2) : undefined) : "";
     case "char-at": return typeof v0 === "string" ? (v0[Number(v1)] ?? null) : null;
     case "index-of": return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
@@ -758,6 +764,10 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     // fl-fix-env: 로드된 FL env의 모든 closure-env를 final env로 업데이트 (재귀 지원)
     case "fl-interp":
       return flInterpNative(args[0], args[1]);
+    case "fl-parse": {
+      // FL 소스 문자열 → AST 배열 (셀프 호스팅: interpret에 넘기기용)
+      try { return _flParse(_flLex(String(args[0] ?? ""))); } catch { return []; }
+    }
     case "fl-fix-env": {
       // fl-load-funcs 후 모든 클로저의 closure-env를 최종 env로 업데이트
       // 이를 통해 재귀 함수가 자기 자신을 closure-env에서 찾을 수 있음
