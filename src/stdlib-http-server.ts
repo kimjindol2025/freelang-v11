@@ -4,6 +4,8 @@
 
 import * as http from "http";
 import * as url from "url";
+import * as crypto from "crypto";
+import { WebSocketServer, WebSocket } from "ws";
 
 type CallFn = (name: string, args: any[]) => any;
 type CallFunctionValue = (fnValue: any, args: any[]) => any;
@@ -40,6 +42,13 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   // Phase 57: 비동기 응답 보류용 저장소
   const pendingResponses = new Map<string, http.ServerResponse>();
   let currentRequestId: string | null = null;
+
+  // WebSocket 공개 클라이언트 (터널 WS 프록시용)
+  const wsPublicMap = new Map<string, WebSocket>();
+  let upgradeHandler: string | null = null;
+  let wsClientMessageHandler: string | null = null;
+  let wsClientCloseHandler: string | null = null;
+  let wssPublic: WebSocketServer | null = null;
 
   // Request ID 생성
   function generateRequestId(): string {
@@ -89,15 +98,34 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     });
   }
 
-  // 응답 작성
+  // 응답 작성 (extraHeaders: 터널 응답 헤더 전달용)
   function sendResponse(
     res: http.ServerResponse,
     status: number,
     body: any,
-    contentType: string = "application/json"
+    contentType: string = "application/json",
+    extraHeaders?: Record<string, string>
   ) {
-    res.writeHead(status, { "Content-Type": contentType });
-    if (contentType.includes("json")) {
+    const headersToWrite: Record<string, string | string[]> = { "Content-Type": contentType };
+    if (extraHeaders) {
+      // hop-by-hop 헤더 제외 (프록시에서 전달 불가)
+      const hopByHop = new Set([
+        'connection', 'keep-alive', 'transfer-encoding', 'te',
+        'trailer', 'proxy-authorization', 'proxy-authenticate',
+        'upgrade', 'content-encoding'
+      ]);
+      for (const [k, v] of Object.entries(extraHeaders)) {
+        if (!hopByHop.has(k.toLowerCase())) {
+          headersToWrite[k] = v;
+        }
+      }
+    }
+    res.writeHead(status, headersToWrite);
+    if (typeof body === 'string') {
+      res.end(body);
+    } else if (Buffer.isBuffer(body)) {
+      res.end(body);
+    } else if (contentType.includes("json") && typeof body === 'object') {
       res.end(JSON.stringify(body));
     } else {
       res.end(String(body ?? ""));
@@ -229,8 +257,23 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
                   sendResponse(res, 504, { error: "Gateway Timeout" });
                 } else {
                   status = asyncResp.status ?? 200;
-                  const contentType = asyncResp.contentType ?? "application/json";
-                  sendResponse(res, status, asyncResp.body ?? "", contentType);
+                  // encoding: 'base64'이면 binary body 디코딩
+                  let respBody = asyncResp.body ?? "";
+                  let contentType = asyncResp.contentType ?? "application/json";
+                  const extraHeaders = asyncResp.headers ?? {};
+                  if (asyncResp.encoding === 'base64' && typeof respBody === 'string') {
+                    const buf = Buffer.from(respBody, 'base64');
+                    // Content-Type은 에이전트가 준 것 우선
+                    if (extraHeaders['content-type']) {
+                      contentType = extraHeaders['content-type'] as string;
+                    }
+                    sendResponse(res, status, buf, contentType, extraHeaders);
+                  } else {
+                    if (extraHeaders['content-type']) {
+                      contentType = extraHeaders['content-type'] as string;
+                    }
+                    sendResponse(res, status, respBody, contentType, extraHeaders);
+                  }
                 }
               } else {
                 if (result && typeof result === "object") {
@@ -266,6 +309,51 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             logAccess(method, path, status, duration, requestId);
           }
         });
+
+      // WebSocket upgrade 지원 (터널 WS 프록시)
+      wssPublic = new WebSocketServer({ noServer: true });
+      server.on('upgrade', (req, socket, head) => {
+        if (!upgradeHandler || !wssPublic) {
+          socket.destroy();
+          return;
+        }
+        wssPublic.handleUpgrade(req, socket, head, (ws) => {
+          const sessionId = 'wsc-' + crypto.randomBytes(8).toString('hex');
+          wsPublicMap.set(sessionId, ws);
+
+          ws.on('message', async (data, isBinary) => {
+            if (!wsClientMessageHandler) return;
+            const payload = isBinary
+              ? (data as Buffer).toString('base64')
+              : data.toString('utf8');
+            try {
+              await callFn(wsClientMessageHandler, [sessionId, payload, isBinary]);
+            } catch {}
+          });
+
+          ws.on('close', async (code, reason) => {
+            wsPublicMap.delete(sessionId);
+            if (wsClientCloseHandler) {
+              try { await callFn(wsClientCloseHandler, [sessionId, code]); } catch {}
+            }
+          });
+
+          ws.on('error', () => { wsPublicMap.delete(sessionId); });
+
+          // FreeLang upgrade 핸들러 호출
+          const upgradeReq = {
+            __fl_request: true,
+            method: 'WS_UPGRADE',
+            path: req.url || '/',
+            headers: req.headers,
+            query: {},
+            body: '',
+            params: {},
+            session_id: sessionId,
+          };
+          callFn(upgradeHandler!, [upgradeReq]);
+        });
+      });
 
       server.on("error", (err: any) => {
         if (err.code === "EADDRINUSE") {
@@ -394,15 +482,58 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
     // server_send_held reqId status body -> boolean (보류된 응답 전송)
     "server_send_held": (reqId: string, status: number, body: any): boolean => {
-      // 이 함수는 보류된 응답을 전송한다
-      // 현재 아키텍처에서는 응답 객체(res)를 저장할 수 없으므로
-      // relay 서버는 다른 패턴을 사용해야 함 (예: Promise 기반)
       const isPending = pendingResponses.has(reqId);
       if (isPending) {
         pendingResponses.delete(reqId);
         return true;
       }
       return false;
+    },
+
+    // ── WebSocket 터널 프록시 함수들 ─────────────────────────────
+    // server_on_upgrade fnName -> null (WS upgrade 핸들러 등록)
+    "server_on_upgrade": (fnName: string): null => {
+      upgradeHandler = fnName;
+      return null;
+    },
+
+    // server_on_ws_message fnName -> null (클라이언트 WS 메시지 핸들러)
+    "server_on_ws_message": (fnName: string): null => {
+      wsClientMessageHandler = fnName;
+      return null;
+    },
+
+    // server_on_ws_close fnName -> null (클라이언트 WS 종료 핸들러)
+    "server_on_ws_close": (fnName: string): null => {
+      wsClientCloseHandler = fnName;
+      return null;
+    },
+
+    // ws_send_to_client sessionId data [isBinary] -> boolean
+    "ws_send_to_client": (sessionId: string, data: string, isBinary: boolean = false): boolean => {
+      const ws = wsPublicMap.get(sessionId);
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+      if (isBinary) {
+        ws.send(Buffer.from(data, 'base64'));
+      } else {
+        ws.send(data);
+      }
+      return true;
+    },
+
+    // ws_close_client sessionId [code] -> null
+    "ws_close_client": (sessionId: string, code: number = 1000): null => {
+      const ws = wsPublicMap.get(sessionId);
+      if (ws) {
+        ws.close(code);
+        wsPublicMap.delete(sessionId);
+      }
+      return null;
+    },
+
+    // server_req_session_id req -> string | null
+    "server_req_session_id": (req: any): string | null => {
+      return req?.session_id ?? null;
     },
   };
 }

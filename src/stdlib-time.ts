@@ -41,6 +41,9 @@ export function createTimeModule() {
     // now -> number (current timestamp ms)
     "now": (): number => Date.now(),
 
+    // now_ms -> number (ms since epoch, always returns number)
+    "now_ms": (): number => Date.now(),
+
     // now_iso -> string (ISO 8601)
     "now_iso": (): string => new Date().toISOString(),
 
