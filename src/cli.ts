@@ -110,6 +110,8 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
       const ast = parse(tokens);
       const interp = new Interpreter();
       interp.currentFilePath = absPath;
+      // ⚠️ 조건부 정의: extraArgs가 없으면 $__argv__ 변수 자체가 없음 (null이 아님!)
+      // freelang-interpreter.fl에서 (null? $__argv__)로 체크해야 하는 이유
       if (extraArgs.length > 0) {
         interp.context.variables.set("$__argv__", extraArgs);
       }

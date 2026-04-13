@@ -152,6 +152,8 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "or": return !!(v0 || v1);
     case "length": return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
     case "get":
+      // ⚠️ Map vs plain object: 파서가 맵 리터럴을 JS Map으로 반환할 수 있음
+      // instanceof Map 체크 없으면 .get() 없다고 터짐 — 순서 바꾸지 말 것
       if (Array.isArray(v0)) return v0[v1] !== undefined ? v0[v1] : null;
       if (v0 instanceof Map) return v0.get(String(v1).replace(/^:/, "")) ?? null;
       if (v0 !== null && typeof v0 === "object") {
@@ -205,6 +207,10 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "fl-interp": return flInterpNative(v0, v1);
     case "fl-parse": try { return _flParse(_flLex(String(v0 ?? ""))); } catch { return []; }
     case "fl-fix-env": {
+      // ⚠️ 뮤테이션: closure-env 직접 할당 — 함수형 아님!
+      // fl-load-funcs가 클로저를 만들 때 env가 미완성이라 closure-env가 틀림.
+      // 전체 로드 후 이걸 호출해서 모든 클로저를 최종 env로 패치함 (상호재귀 지원).
+      // 이 순서 없으면 fact(5) 같은 자기재귀도 못 찾음.
       const fenv = v0;
       if (!fenv || !Array.isArray(fenv.vars)) return fenv;
       for (const pair of fenv.vars) {
@@ -258,6 +264,8 @@ function flInterpNative(node: any, env: any): any {
     }
     if (node.type === "Map") {
       // 맵 리터럴: {:key1 val1 :key2 val2} → JS 오브젝트
+      // ⚠️ node.fields가 JS Map 인스턴스여야 함 — 아니면 조용히 {} 반환 (데이터 손실)
+      // make-closure 같은 FL 함수가 맵 리터럴 반환할 때 이 경로 탐
       const result: Record<string, any> = {};
       if (node.fields instanceof Map) {
         for (const [key, valNode] of node.fields) {
@@ -269,6 +277,8 @@ function flInterpNative(node: any, env: any): any {
     if (node.type === "FUNC") {
       const fields = node.fields;
       let paramsNode: any = null, bodyNode: any = null;
+      // ⚠️ 이중 구조 지원: 파서 버전에 따라 Map 또는 plain object로 올 수 있음
+      // Map이면 fields.get(), plain이면 fields.params 직접 접근
       if (fields instanceof Map) {
         paramsNode = fields.get("params");
         bodyNode = fields.get("body");
@@ -374,7 +384,23 @@ function flInterpSexpr(op: any, rawArgs: any[], env: any): any {
       }
       return null;
     }
-    case "export": case "define": case "set!": return null;
+    case "export": return null;
+    case "define": case "set!": {
+      if (rawArgs.length >= 2) {
+        const nameNode = rawArgs[0];
+        const name = nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? "");
+        // ⚠️ 이름 추출 규칙: variable 노드면 .name ($x → "x"), literal이면 .value (x → "x")
+        // 즉 (define $x 42)와 (define x 42) 둘 다 "x"로 바인딩됨
+        // 하지만 참조는 $x로 해야 함 — x(심볼)로 참조하면 문자열 "x" 반환 (알려진 함정!)
+        const val = flInterpNative(rawArgs[1], env);
+        // ⚠️ 뮤테이션: env.vars 직접 수정 — 함수형 아님!
+        // fl-run-nodes가 같은 env 참조를 다음 노드에도 재사용하므로 바인딩이 전파됨
+        // env-bind처럼 새 객체 만들면 다음 노드에 안 보임 (참조가 끊어지기 때문)
+        if (env && Array.isArray(env.vars)) env.vars.unshift([name, val]);
+        return val;
+      }
+      return null;
+    }
     default: return null;
   }
 }
