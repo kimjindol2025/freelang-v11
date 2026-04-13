@@ -5,7 +5,7 @@ import { spawnSync } from "child_process";
 
 // ── kimdb helper ─────────────────────────────────────────────────────────────
 
-const KIMDB = "http://localhost:40000";
+const KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
 
 function kimdbReq(method: string, path: string, body?: any): any {
   const url = `${KIMDB}${path}`;
