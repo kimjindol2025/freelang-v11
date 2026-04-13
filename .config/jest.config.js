@@ -1,17 +1,17 @@
+const path = require('path');
+
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  rootDir: path.join(__dirname, '..'),
   globals: {
     'ts-jest': {
       diagnostics: false,
-      tsconfig: {
-        strict: false,
-        skipLibCheck: true,
-      }
+      tsconfig: path.join(__dirname, 'tsconfig.json'),
     }
   },
   roots: ['<rootDir>/src'],
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['<rootDir>/**/__tests__/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverage: true,
   collectCoverageFrom: [
