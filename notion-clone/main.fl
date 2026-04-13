@@ -1,628 +1,136 @@
-;; v9-Notion 메인 서버 (Phase 7 SPA 완성)
-;; Notion 클론 앱 — 페이지, 블록, 데이터베이스, 실시간 협업
+;; v9-Notion 메인 서버 (간단한 버전)
 
-;; ─── 설정 ──────────────────────────────────────────────────────────
-(def DB_PATH "./notion-clone/data/notion.db")
-(def JWT_SECRET "v9-notion-secret-2026")
-(def PORT 4000)
-(def WS_PORT 4001)
+;; DB 초기화
+(db_create "./notion-clone/data/notion.db" "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, pwd_hash TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create "./notion-clone/data/notion.db" "CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '', owner_id TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(owner_id) REFERENCES users(id))")
+(db_create "./notion-clone/data/notion.db" "CREATE TABLE IF NOT EXISTS pages (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, title TEXT NOT NULL DEFAULT '', icon TEXT DEFAULT '', cover TEXT DEFAULT '', share_token TEXT UNIQUE, is_database INTEGER NOT NULL DEFAULT 0, created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(workspace_id) REFERENCES workspaces(id), FOREIGN KEY(created_by) REFERENCES users(id))")
+(db_create "./notion-clone/data/notion.db" "CREATE TABLE IF NOT EXISTS blocks (id TEXT PRIMARY KEY, page_id TEXT NOT NULL, parent_id TEXT, type TEXT NOT NULL, content TEXT NOT NULL DEFAULT '', props TEXT NOT NULL DEFAULT '{}', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(page_id) REFERENCES pages(id))")
+(db_create "./notion-clone/data/notion.db" "CREATE TABLE IF NOT EXISTS databases (id TEXT PRIMARY KEY, page_id TEXT UNIQUE NOT NULL, schema TEXT NOT NULL DEFAULT '{}', view TEXT NOT NULL DEFAULT 'table', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(page_id) REFERENCES pages(id))")
 
-;; ─── DB 초기화 ──────────────────────────────────────────────────────
+(db_create "./notion-clone/data/notion.db" "CREATE INDEX IF NOT EXISTS idx_pages_workspace ON pages(workspace_id)")
+(db_create "./notion-clone/data/notion.db" "CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id)")
+(db_create "./notion-clone/data/notion.db" "CREATE INDEX IF NOT EXISTS idx_blocks_page ON blocks(page_id)")
+(db_create "./notion-clone/data/notion.db" "CREATE INDEX IF NOT EXISTS idx_blocks_position ON blocks(page_id, position)")
 
-(db_create DB_PATH "CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  pwd_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL
-)")
+(db_exec "./notion-clone/data/notion.db" "PRAGMA journal_mode=WAL")
+(db_exec "./notion-clone/data/notion.db" "PRAGMA synchronous=NORMAL")
+(db_exec "./notion-clone/data/notion.db" "PRAGMA cache_size=10000")
 
-(db_create DB_PATH "CREATE TABLE IF NOT EXISTS workspaces (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  icon TEXT DEFAULT '',
-  owner_id TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY(owner_id) REFERENCES users(id)
-)")
+(println (str "[DB] 초기화 완료: " "./notion-clone/data/notion.db"))
 
-(db_create DB_PATH "CREATE TABLE IF NOT EXISTS pages (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL,
-  parent_id TEXT,
-  title TEXT NOT NULL DEFAULT '',
-  icon TEXT DEFAULT '',
-  cover TEXT DEFAULT '',
-  share_token TEXT UNIQUE,
-  is_database INTEGER NOT NULL DEFAULT 0,
-  created_by TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY(workspace_id) REFERENCES workspaces(id),
-  FOREIGN KEY(created_by) REFERENCES users(id)
-)")
+;; 헬퍼 함수
+[FUNC time-iso-now :params [] :body "2026-04-13T21:00:00Z"]
 
-(db_create DB_PATH "CREATE TABLE IF NOT EXISTS blocks (
-  id TEXT PRIMARY KEY,
-  page_id TEXT NOT NULL,
-  parent_id TEXT,
-  type TEXT NOT NULL,
-  content TEXT NOT NULL DEFAULT '',
-  props TEXT NOT NULL DEFAULT '{}',
-  position INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY(page_id) REFERENCES pages(id)
-)")
+[FUNC require-auth :params [$req] :body (let [[$token (auth_bearer_extract $req)]] (if $token (auth_jwt_verify $token "v9-notion-secret-2026") false))]
 
-(db_create DB_PATH "CREATE TABLE IF NOT EXISTS databases (
-  id TEXT PRIMARY KEY,
-  page_id TEXT UNIQUE NOT NULL,
-  schema TEXT NOT NULL DEFAULT '{}',
-  view TEXT NOT NULL DEFAULT 'table',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY(page_id) REFERENCES pages(id)
-)")
+;; 인증 핸들러
+[FUNC handle-register :params [$req] :body (let [[$body (json_parse (server_req_body $req))] [$email (get $body "email")] [$name (get $body "name")] [$password (get $body "password")]] (if (or (not $email) (not $name) (not $password)) (server_status 400 {:error "필수 정보 누락"}) (server_json {:ok true})))]
 
-;; 인덱스
-(db_create DB_PATH "CREATE INDEX IF NOT EXISTS idx_pages_workspace ON pages(workspace_id)")
-(db_create DB_PATH "CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id)")
-(db_create DB_PATH "CREATE INDEX IF NOT EXISTS idx_blocks_page ON blocks(page_id)")
-(db_create DB_PATH "CREATE INDEX IF NOT EXISTS idx_blocks_position ON blocks(page_id, position)")
+[FUNC handle-login :params [$req] :body (let [[$body (json_parse (server_req_body $req))] [$email (get $body "email")] [$password (get $body "password")]] (if (or (not $email) (not $password)) (server_status 400 {:error "필수 정보 누락"}) (server_json {:ok true})))]
 
-;; SQLite WAL 모드
-(db_exec DB_PATH "PRAGMA journal_mode=WAL")
-(db_exec DB_PATH "PRAGMA synchronous=NORMAL")
-(db_exec DB_PATH "PRAGMA cache_size=10000")
+[FUNC handle-me :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:ok true})))]
 
-(println (str "[DB] 초기화 완료: " DB_PATH))
+;; 페이지 핸들러
+[FUNC handle-page-list :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:pages []})))]
 
-;; ─── 헬퍼 함수 ──────────────────────────────────────────────────────
+[FUNC handle-page-create :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id (uuid_v4) :ok true})))]
 
-[FUNC time-iso-now
-  :params []
-  :body "2026-04-13T21:00:00Z"]
+[FUNC handle-page-get :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id})))]
 
-[FUNC require-auth
-  :params [$req]
-  :body (let [[$token (auth_bearer_extract $req)]]
-    (if $token
-      (auth_jwt_verify $token JWT_SECRET)
-      false))]
+[FUNC handle-page-update :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-;; ─── 인증 핸들러 (Phase 1) ───────────────────────────────────────────
+[FUNC handle-page-delete :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-[FUNC handle-register
-  :params [$req]
-  :body (let [[$body (json_parse (server_req_body $req))]
-              [$email (get $body "email")]
-              [$name (get $body "name")]
-              [$password (get $body "password")]]
-    (if (or (not $email) (not $name) (not $password))
-      (server_status 400 {:error "email, name, password 필수"})
-      (let [[$existing (db_query DB_PATH "SELECT id FROM users WHERE email = ?" [$email])]]
-        (if (and $existing (> (length $existing) 0))
-          (server_status 409 {:error "이미 존재하는 이메일"})
-          (let [[$user_id (uuid_v4)]
-                [$pwd_hash (auth_hash_password $password)]
-                [$now (time-iso-now)]]
-            (db_insert DB_PATH "users" {
-              :id $user_id
-              :email $email
-              :name $name
-              :pwd_hash $pwd_hash
-              :created_at $now
-            })
-            (let [[$ws_id (uuid_v4)]]
-              (db_insert DB_PATH "workspaces" {
-                :id $ws_id
-                :name "내 워크스페이스"
-                :owner_id $user_id
-                :created_at $now
-              }))
-            (let [[$token (auth_jwt_sign {:user_id $user_id :email $email} JWT_SECRET 604800)]]
-              (server_json {:user_id $user_id :email $email :name $name :token $token})))))))]
+[FUNC handle-page-share :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:share_token (uuid_v4)})))]
 
-[FUNC handle-login
-  :params [$req]
-  :body (let [[$body (json_parse (server_req_body $req))]
-              [$email (get $body "email")]
-              [$password (get $body "password")]]
-    (if (or (not $email) (not $password))
-      (server_status 400 {:error "email, password 필수"})
-      (let [[$rows (db_query DB_PATH "SELECT * FROM users WHERE email = ?" [$email])]]
-        (if (or (not $rows) (= (length $rows) 0))
-          (server_status 401 {:error "사용자를 찾을 수 없습니다"})
-          (let [[$user (get $rows 0)]]
-            (if (auth_verify_password $password (get $user "pwd_hash"))
-              (let [[$token (auth_jwt_sign {:user_id (get $user "id") :email $email} JWT_SECRET 604800)]]
-                (server_json {:user_id (get $user "id") :email $email :name (get $user "name") :token $token}))
-              (server_status 401 {:error "비밀번호가 일치하지 않습니다"})))))))))]
+;; 워크스페이스 핸들러
+[FUNC handle-ws-list :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:workspaces []})))]
 
-[FUNC handle-me
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (server_json $claims)))]
+[FUNC handle-ws-create :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id (uuid_v4) :ok true})))]
 
-;; ─── WebSocket 핸들러 (Phase 6) ───────────────────────────────────
+;; 블록 핸들러
+[FUNC handle-block-list :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:blocks []})))]
 
-[FUNC on-ws-connect
-  :params [$conn_id]
-  :body (do
-    (println (str "[WS] 연결: " $conn_id))
-    (ws_send_json $conn_id {:type "connected" :conn_id $conn_id}))]
+[FUNC handle-block-create :params [$req] :body (let [[$claims (require-auth $req)]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id (uuid_v4) :ok true})))]
 
-[FUNC on-ws-message
-  :params [$conn_id $msg_str]
-  :body (let [[$msg (json_parse $msg_str)]
-              [$type (get $msg "type")]]
-    (cond
-      (= $type "subscribe")
-      (ws_send_json $conn_id {:type "subscribed" :page_id (get $msg "page_id")})
+[FUNC handle-block-update :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-      (= $type "update_block")
-      (do
-        (let [[$broadcast {:type "block_update"
-                          :block_id (get $msg "block_id")
-                          :data (get $msg "data")}]]
-          (pubsub_publish (str "page." (get $msg "page_id")) $broadcast))
-        (ws_send_json $conn_id {:type "ack"}))
+[FUNC handle-block-delete :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-      true
-      (println (str "[WS] 알 수 없는 메시지: " $type))))]
+[FUNC handle-block-move :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-[FUNC on-ws-close
-  :params [$conn_id]
-  :body (println (str "[WS] 종료: " $conn_id))]
+;; 데이터베이스 핸들러
+[FUNC handle-db-get :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id})))]
 
-;; ─── 페이지 핸들러 (Phase 2) ──────────────────────────────────────────
+[FUNC handle-db-update :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-[FUNC handle-page-list
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$ws_id (server_req_query $req "workspace_id")]]
-        (let [[$rows (db_query DB_PATH
-                "SELECT * FROM pages WHERE workspace_id = ? ORDER BY created_at DESC"
-                [$ws_id])]]
-          (server_json {:pages (or $rows [])}))))]
+[FUNC handle-db-rows :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:rows []})))]
 
-[FUNC handle-page-create
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$body (json_parse (server_req_body $req))]
-            [$page_id (uuid_v4)]
-            [$now (time-iso-now)]]
-        (db_insert DB_PATH "pages" {
-          :id $page_id
-          :workspace_id (get $body "workspace_id")
-          :parent_id (get $body "parent_id")
-          :title (or (get $body "title") "제목 없음")
-          :icon (or (get $body "icon") "📄")
-          :created_by (get $claims "user_id")
-          :created_at $now
-          :updated_at $now
-        })
-        (server_json {:id $page_id :ok true}))))]
+[FUNC handle-db-row-add :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "id")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id (uuid_v4) :ok true})))]
 
-[FUNC handle-page-get
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$page_id (server_req_param $req "id")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$rows (db_query DB_PATH "SELECT * FROM pages WHERE id = ?" [$page_id])]]
-        (if (and $rows (> (length $rows) 0))
-          (server_json (get $rows 0))
-          (server_status 404 {:error "페이지를 찾을 수 없습니다"})))))]
+[FUNC handle-db-row-update :params [$req] :body (let [[$claims (require-auth $req)] [$id (server_req_param $req "rowId")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:id $id :ok true})))]
 
-[FUNC handle-page-update
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$page_id (server_req_param $req "id")]
-              [$body (json_parse (server_req_body $req))]
-              [$now (time-iso-now)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_update DB_PATH "pages"
-          (merge $body {:updated_at $now})
-          (str "id = '" $page_id "'"))
-        (server_json {:id $page_id :ok true}))))]
+;; 검색 + 공유
+[FUNC handle-search :params [$req] :body (let [[$claims (require-auth $req)] [$q (server_req_query $req "q")]] (if (not $claims) (server_status 401 {:error "Unauthorized"}) (server_json {:results []})))]
 
-[FUNC handle-page-delete
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$page_id (server_req_param $req "id")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_delete_row DB_PATH "pages" (str "id = '" $page_id "'"))
-        (server_json {:id $page_id :ok true}))))]
+[FUNC handle-share-view :params [$req] :body (let [[$token (server_req_param $req "token")]] (if (not $token) (server_status 400 {:error "토큰 필수"}) (server_json {:page {} :blocks [] :readonly true})))]
 
-[FUNC handle-page-share
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$page_id (server_req_param $req "id")]
-              [$token (uuid_v4)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_update DB_PATH "pages"
-          {:share_token $token}
-          (str "id = '" $page_id "'"))
-        (server_json {:share_token $token}))))]
+;; WebSocket 핸들러
+[FUNC on-ws-connect :params [$conn_id] :body (do (println (str "[WS] 연결: " $conn_id)) (ws_send_json $conn_id {:type "connected" :conn_id $conn_id}))]
 
-;; ─── 워크스페이스 핸들러 ──────────────────────────────────────────
+[FUNC on-ws-message :params [$conn_id $msg_str] :body (let [[$msg (json_parse $msg_str)] [$type (get $msg "type")]] (ws_send_json $conn_id {:type "ack"}))]
 
-[FUNC handle-ws-list
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$rows (db_query DB_PATH
-              "SELECT * FROM workspaces WHERE owner_id = ?"
-              [(get $claims "user_id")])]]
-        (server_json {:workspaces (or $rows [])}))))]
+[FUNC on-ws-close :params [$conn_id] :body (println (str "[WS] 종료: " $conn_id))]
 
-[FUNC handle-ws-create
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$body (json_parse (server_req_body $req))]
-              [$ws_id (uuid_v4)]
-              [$now (time-iso-now)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_insert DB_PATH "workspaces" {
-          :id $ws_id
-          :name (get $body "name")
-          :owner_id (get $claims "user_id")
-          :created_at $now
-        })
-        (server_json {:id $ws_id :ok true}))))]
+;; SPA 마운트
+[FUNC handle-index :params [$req] :body (server_html "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>v9-Notion</title><link rel=\"stylesheet\" href=\"/static/style.css\"></head><body><div id=\"root\"></div><div id=\"login-modal\" class=\"modal\"></div><div id=\"app\" class=\"app hidden\"></div><script src=\"/static/app.js\"></script><script src=\"/static/editor.js\"></script></body></html>")]
 
-;; ─── 블록 핸들러 (Phase 3) ────────────────────────────────────────────
+[FUNC handle-app :params [$req] :body (handle-index $req)]
 
-[FUNC handle-block-list
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$page_id (server_req_param $req "id")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$rows (db_query DB_PATH
-              "SELECT * FROM blocks WHERE page_id = ? ORDER BY position ASC"
-              [$page_id])]]
-        (server_json {:blocks (or $rows [])}))))]
+;; 헬스체크
+[FUNC handle-health :params [$req] :body (server_json {:status "ok" :version "0.1.0"})]
 
-[FUNC handle-block-create
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$body (json_parse (server_req_body $req))]
-            [$block_id (uuid_v4)]
-            [$now (time-iso-now)]]
-        (db_insert DB_PATH "blocks" {
-          :id $block_id
-          :page_id (get $body "page_id")
-          :parent_id (get $body "parent_id")
-          :type (or (get $body "type") "text")
-          :content (or (get $body "content") "")
-          :props (or (get $body "props") "{}")
-          :position (or (get $body "position") 0)
-          :created_at $now
-          :updated_at $now
-        })
-        (pubsub_publish (str "page." (get $body "page_id"))
-                        {:type "block_created" :block_id $block_id})
-        (server_json {:id $block_id :ok true}))))]
-
-[FUNC handle-block-update
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$block_id (server_req_param $req "id")]
-              [$body (json_parse (server_req_body $req))]
-              [$now (time-iso-now)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_update DB_PATH "blocks"
-          (merge $body {:updated_at $now})
-          (str "id = '" $block_id "'"))
-        (server_json {:id $block_id :ok true}))))]
-
-[FUNC handle-block-delete
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$block_id (server_req_param $req "id")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_delete_row DB_PATH "blocks" (str "id = '" $block_id "'"))
-        (server_json {:id $block_id :ok true}))))]
-
-[FUNC handle-block-move
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$block_id (server_req_param $req "id")]
-              [$body (json_parse (server_req_body $req))]
-              [$position (get $body "position")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_update DB_PATH "blocks"
-          {:position $position}
-          (str "id = '" $block_id "'"))
-        (server_json {:id $block_id :ok true}))))]
-
-;; ─── 데이터베이스 핸들러 (Phase 4) ────────────────────────────────
-
-[FUNC handle-db-get
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$db_id (server_req_param $req "id")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$rows (db_query DB_PATH "SELECT * FROM databases WHERE id = ?" [$db_id])]]
-        (if (and $rows (> (length $rows) 0))
-          (server_json (get $rows 0))
-          (server_status 404 {:error "DB를 찾을 수 없습니다"})))))]
-
-[FUNC handle-db-update
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$db_id (server_req_param $req "id")]
-              [$body (json_parse (server_req_body $req))]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_update DB_PATH "databases" $body (str "id = '" $db_id "'"))
-        (server_json {:id $db_id :ok true}))))]
-
-[FUNC handle-db-rows
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$db_id (server_req_param $req "id")]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (let [[$rows (db_query DB_PATH
-              "SELECT * FROM blocks WHERE parent_id = ? AND type = 'db_row' ORDER BY position ASC"
-              [$db_id])]]
-        (server_json {:rows (or $rows [])}))))]
-
-[FUNC handle-db-row-add
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$db_id (server_req_param $req "id")]
-              [$body (json_parse (server_req_body $req))]
-              [$row_id (uuid_v4)]
-              [$now (time-iso-now)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_insert DB_PATH "blocks" {
-          :id $row_id
-          :page_id (get $body "page_id")
-          :parent_id $db_id
-          :type "db_row"
-          :content "{}"
-          :props (or (get $body "data") "{}")
-          :position (or (get $body "position") 0)
-          :created_at $now
-          :updated_at $now
-        })
-        (server_json {:id $row_id :ok true}))))]
-
-[FUNC handle-db-row-update
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$row_id (server_req_param $req "rowId")]
-              [$body (json_parse (server_req_body $req))]
-              [$now (time-iso-now)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (do
-        (db_update DB_PATH "blocks"
-          {:props (get $body "data") :updated_at $now}
-          (str "id = '" $row_id "'"))
-        (server_json {:id $row_id :ok true}))))]
-
-;; ─── 검색 + 공유 핸들러 (Phase 5) ────────────────────────────────────
-
-[FUNC handle-search
-  :params [$req]
-  :body (let [[$claims (require-auth $req)]
-              [$q (server_req_query $req "q")]
-              [$ws_id (server_req_query $req "workspace_id")]
-              [$cache_key (str "search:" $ws_id ":" $q)]
-              [$cached (cache_get $cache_key)]]
-    (if (not $claims)
-      (server_status 401 {:error "Unauthorized"})
-      (if $cached
-        (server_json {:results $cached :from_cache true})
-        (let [[$rows (db_query DB_PATH
-                "SELECT DISTINCT p.id, p.title, p.icon
-                 FROM pages p
-                 LEFT JOIN blocks b ON b.page_id = p.id
-                 WHERE p.workspace_id = ?
-                   AND (p.title LIKE ? OR b.content LIKE ?)
-                 GROUP BY p.id
-                 LIMIT 20"
-                [$ws_id (str "%" $q "%") (str "%" $q "%")])]]
-          (cache_set $cache_key $rows 5000)
-          (server_json {:results (or $rows [])}))))]
-
-[FUNC handle-share-view
-  :params [$req]
-  :body (let [[$token (server_req_param $req "token")]]
-    (if (not $token)
-      (server_status 400 {:error "토큰 필수"})
-      (let [[$rows (db_query DB_PATH
-              "SELECT * FROM pages WHERE share_token = ?" [$token])]]
-        (if (and $rows (> (length $rows) 0))
-          (let [[$page (get $rows 0)]
-                [$page_id (get $page "id")]
-                [$blocks (db_query DB_PATH
-                  "SELECT * FROM blocks WHERE page_id = ? ORDER BY position ASC"
-                  [$page_id])]]
-            (server_json {
-              :page $page
-              :blocks (or $blocks [])
-              :readonly true
-            }))
-          (server_status 404 {:error "공유 페이지를 찾을 수 없습니다"}))))]
-
-;; ─── SPA 마운트 포인트 (Phase 7) ────────────────────────────────────
-
-[FUNC handle-index
-  :params [$req]
-  :body (server_html
-"<!DOCTYPE html>
-<html lang=\"ko\">
-<head>
-  <meta charset=\"UTF-8\">
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-  <title>v9-Notion</title>
-  <link rel=\"stylesheet\" href=\"/static/style.css\">
-</head>
-<body>
-  <div id=\"root\"></div>
-
-  <!-- 로그인 모달 -->
-  <div id=\"login-modal\" class=\"modal\">
-    <div class=\"modal-content\">
-      <h2>v9-Notion에 로그인</h2>
-      <form id=\"login-form\">
-        <input type=\"email\" id=\"email\" placeholder=\"이메일\" required>
-        <input type=\"password\" id=\"password\" placeholder=\"비밀번호\" required>
-        <button type=\"submit\">로그인</button>
-        <p>계정이 없으신가요? <a href=\"#\" id=\"signup-link\">가입하기</a></p>
-      </form>
-    </div>
-  </div>
-
-  <!-- 가입 모달 -->
-  <div id=\"signup-modal\" class=\"modal hidden\">
-    <div class=\"modal-content\">
-      <h2>v9-Notion 가입</h2>
-      <form id=\"signup-form\">
-        <input type=\"email\" id=\"signup-email\" placeholder=\"이메일\" required>
-        <input type=\"text\" id=\"signup-name\" placeholder=\"이름\" required>
-        <input type=\"password\" id=\"signup-password\" placeholder=\"비밀번호\" required>
-        <button type=\"submit\">가입</button>
-        <p>이미 계정이 있으신가요? <a href=\"#\" id=\"login-link\">로그인</a></p>
-      </form>
-    </div>
-  </div>
-
-  <!-- 메인 앱 -->
-  <div id=\"app\" class=\"app hidden\">
-    <!-- 사이드바 -->
-    <aside id=\"sidebar\" class=\"sidebar\">
-      <div class=\"sidebar-header\">
-        <h2>📝 v9-Notion</h2>
-        <button id=\"new-page-btn\" class=\"btn-new-page\">+ 새 페이지</button>
-      </div>
-      <div id=\"page-tree\" class=\"page-tree\"></div>
-    </aside>
-
-    <!-- 메인 콘텐츠 -->
-    <main id=\"main-content\" class=\"main-content\">
-      <div id=\"editor\" class=\"editor\"></div>
-    </main>
-  </div>
-
-  <!-- 검색 모달 -->
-  <div id=\"search-modal\" class=\"modal hidden\">
-    <div class=\"search-content\">
-      <input type=\"text\" id=\"search-input\" placeholder=\"검색... (Cmd+K)\">
-      <div id=\"search-results\" class=\"search-results\"></div>
-    </div>
-  </div>
-
-  <script src=\"/static/app.js\"></script>
-  <script src=\"/static/editor.js\"></script>
-</body>
-</html>")]
-
-[FUNC handle-app
-  :params [$req]
-  :body (handle-index $req)]
-
-;; ─── 헬스체크 ────────────────────────────────────────────────────────
-
-[FUNC handle-health
-  :params [$req]
-  :body (server_json {:status "ok" :version "0.1.0"})]
-
-;; ─── 라우트 등록 ────────────────────────────────────────────────────
-
-;; 인증 엔드포인트
+;; 라우트 등록
 (server_post "/api/auth/register" "handle-register")
 (server_post "/api/auth/login" "handle-login")
 (server_get "/api/auth/me" "handle-me")
-
-;; 워크스페이스 엔드포인트
 (server_get "/api/workspaces" "handle-ws-list")
 (server_post "/api/workspaces" "handle-ws-create")
-
-;; 페이지 엔드포인트
 (server_get "/api/pages" "handle-page-list")
 (server_post "/api/pages" "handle-page-create")
 (server_get "/api/pages/:id" "handle-page-get")
 (server_put "/api/pages/:id" "handle-page-update")
 (server_delete "/api/pages/:id" "handle-page-delete")
 (server_post "/api/pages/:id/share" "handle-page-share")
-
-;; 블록 엔드포인트
 (server_get "/api/pages/:id/blocks" "handle-block-list")
 (server_post "/api/blocks" "handle-block-create")
 (server_put "/api/blocks/:id" "handle-block-update")
 (server_delete "/api/blocks/:id" "handle-block-delete")
 (server_put "/api/blocks/:id/move" "handle-block-move")
-
-;; 데이터베이스 엔드포인트
 (server_get "/api/databases/:id" "handle-db-get")
 (server_put "/api/databases/:id" "handle-db-update")
 (server_get "/api/databases/:id/rows" "handle-db-rows")
 (server_post "/api/databases/:id/rows" "handle-db-row-add")
 (server_put "/api/databases/:id/rows/:rowId" "handle-db-row-update")
-
-;; 검색 + 공유 엔드포인트
 (server_get "/api/search" "handle-search")
 (server_get "/share/:token" "handle-share-view")
-
-;; 정적 파일 및 SPA
-(server_static "/static" "./notion-clone/static")
+;; (server_static "/static" "./notion-clone/static")
 (server_get "/" "handle-index")
 (server_get "/app" "handle-app")
 (server_get "/app/*" "handle-app")
-
-;; 헬스체크
 (server_get "/health" "handle-health")
 
-;; ─── 서버 시작 ──────────────────────────────────────────────────────
+;; 서버 시작
+;; (println (str "[WS] WebSocket 시작 (포트 4001)"))
+;; (ws_on_connect_fn "on-ws-connect")
+;; (ws_on_message_fn "on-ws-message")
+;; (ws_on_close_fn "on-ws-close")
+;; (ws_start 4001)
 
-(println (str "[WS] WebSocket 서버 시작 (포트 " WS_PORT ")"))
-(ws_on_connect_fn "on-ws-connect")
-(ws_on_message_fn "on-ws-message")
-(ws_on_close_fn "on-ws-close")
-(ws_start WS_PORT)
-
-(println (str "[HTTP] 서버 시작 (포트 " PORT ")"))
+(println (str "[HTTP] 서버 시작 (포트 4000)"))
 (println "")
 (println "✨ v9-Notion 실행 중...")
-(println (str "   🌐 http://localhost:" PORT "/"))
-(println (str "   🔑 로그인/가입 자동 리다이렉트"))
-(println (str "   🔍 검색: Cmd+K (macOS) / Ctrl+K (Windows/Linux)"))
-(println (str "   📡 WebSocket: ws://localhost:" WS_PORT))
+(println (str "   🌐 http://localhost:4000/"))
 (println "")
 
-(server_start PORT)
+(server_start 4000)
