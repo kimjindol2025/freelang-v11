@@ -1,0 +1,133 @@
+; FreeLang v9 Build System
+; Phase 5c: TypeScript → JavaScript 컴파일
+; 기반: stdlib-file + stdlib-shell
+
+; ============================================================
+; [1] 빌드 설정 로드
+; ============================================================
+
+[FUNC load-tsconfig :params []
+  :body
+  ; tsconfig.json 읽기
+  (let [[content (file_read "./tsconfig.json")]
+        [config (json_parse content)]]
+    config
+  )
+]
+
+; ============================================================
+; [2] 빌드 디렉토리 준비
+; ============================================================
+
+[FUNC prepare-build-dir :params [dist-dir]
+  :body
+  ; dist 디렉토리 정리 후 재생성
+  (do
+    (if (file_exists dist-dir)
+      (shell_run (str "rm -rf " dist-dir))
+    )
+    (file_mkdir_p dist-dir)
+    true
+  )
+]
+
+; ============================================================
+; [3] TypeScript 컴파일 (현재: tsc wrapper)
+; ============================================================
+
+[FUNC compile-typescript :params []
+  :body
+  ; tsc 실행 (현재 단계)
+  ; TODO Phase 5c+: 순수 v9 컴파일러로 대체
+  (let [[result (shell_run "npx tsc --noEmit false")]]
+    (if (= (get result :code) 0)
+      (do
+        (println "✅ TypeScript compilation successful")
+        true
+      )
+      (do
+        (println "❌ TypeScript compilation failed:")
+        (println (get result :stderr))
+        false
+      )
+    )
+  )
+]
+
+; ============================================================
+; [4] 빌드 통계
+; ============================================================
+
+[FUNC count-files :params [dir ext]
+  :body
+  ; dir 아래 ext 확장자 파일 개수 세기
+  (let [[result (shell_run (str "find " dir " -name '*" ext "' | wc -l"))]]
+    (parse-int (str-trim (get result :stdout)))
+  )
+]
+
+[FUNC print-build-stats :params [dist-dir]
+  :body
+  ; 빌드 완료 후 통계 출력
+  (let [[js-count (count-files dist-dir ".js")]
+        [ts-count (count-files "src" ".ts")]]
+    (do
+      (println "")
+      (println "📊 Build Statistics:")
+      (println (str "   TypeScript files: " ts-count))
+      (println (str "   JavaScript files: " js-count))
+      (println "")
+    )
+  )
+]
+
+; ============================================================
+; [5] 메인 빌드 함수
+; ============================================================
+
+[FUNC v9-build :params [src-dir dist-dir]
+  :body
+  ; TypeScript → JavaScript 컴파일
+  (do
+    (println "🔨 Building FreeLang v9...")
+    (println (str "   Source: " src-dir))
+    (println (str "   Output: " dist-dir))
+    (println "")
+
+    ; [1] 빌드 디렉토리 준비
+    (prepare-build-dir dist-dir)
+
+    ; [2] TypeScript 컴파일
+    (let [[compile-ok (compile-typescript)]]
+      (if compile-ok
+        (do
+          ; [3] 빌드 통계
+          (print-build-stats dist-dir)
+          (println "✅ Build completed successfully")
+          true
+        )
+        (do
+          (println "❌ Build failed - see errors above")
+          false
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [6] 진입점 (메인 함수)
+; ============================================================
+
+; 기본값
+(define SRC_DIR "src")
+(define DIST_DIR "dist")
+
+; 메인 실행
+(let [[result (v9-build SRC_DIR DIST_DIR)]]
+  (if (not result)
+    (do
+      (process_exit 1)
+    )
+  )
+)

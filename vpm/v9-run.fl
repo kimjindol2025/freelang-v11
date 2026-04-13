@@ -1,0 +1,127 @@
+; FreeLang v9 Runtime
+; Phase 5d: .fl/.js/.ts 파일 실행
+; 기반: stdlib-file + 인터프리터
+
+; ============================================================
+; [1] 파일 타입 판별
+; ============================================================
+
+[FUNC get-file-extension :params [file-path]
+  :body
+  ; file-path에서 확장자 추출 (e.g., "foo.fl" → ".fl")
+  (let [[parts (str-split "." file-path)]]
+    (if (> (count parts) 1)
+      (str "." (get parts (- (count parts) 1)))
+      ""
+    )
+  )
+]
+
+; ============================================================
+; [2] FreeLang 파일 실행
+; ============================================================
+
+[FUNC run-freelang :params [file-path]
+  :body
+  ; .fl 파일을 v9 인터프리터로 실행
+  (let [[source (file_read file-path)]]
+    (do
+      (println (str "▶️  Running " file-path "..."))
+      (eval source)
+      (println "✅ Done")
+    )
+  )
+]
+
+; ============================================================
+; [3] JavaScript 파일 실행
+; ============================================================
+
+[FUNC run-javascript :params [file-path]
+  :body
+  ; .js 파일을 Node.js로 실행
+  (let [[result (shell_run (str "node " file-path))]]
+    (do
+      (println (get result :stdout))
+      (if (> (get result :code) 0)
+        (do
+          (println (get result :stderr))
+          (err "RUNTIME_ERROR" (str "JavaScript execution failed"))
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [4] TypeScript 파일 실행
+; ============================================================
+
+[FUNC run-typescript :params [file-path]
+  :body
+  ; .ts 파일을 ts-node로 실행
+  (let [[result (shell_run (str "npx ts-node " file-path))]]
+    (do
+      (println (get result :stdout))
+      (if (> (get result :code) 0)
+        (do
+          (println (get result :stderr))
+          (err "RUNTIME_ERROR" (str "TypeScript execution failed"))
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [5] 메인 런타임 함수
+; ============================================================
+
+[FUNC v9-run :params [file-path]
+  :body
+  ; 파일 확장자에 따라 적절한 실행기 선택
+  (let [[ext (get-file-extension file-path)]]
+    (do
+      (if (not (file_exists file-path))
+        (do
+          (println (str "❌ File not found: " file-path))
+          (process_exit 1)
+        )
+      )
+
+      (cond
+        [(= ext ".fl")
+          (run-freelang file-path)
+        ]
+        [(= ext ".js")
+          (run-javascript file-path)
+        ]
+        [(= ext ".ts")
+          (run-typescript file-path)
+        ]
+        [:default
+          (do
+            (println (str "❌ Unsupported file type: " ext))
+            (process_exit 1)
+          )
+        ]
+      )
+    )
+  )
+]
+
+; ============================================================
+; [6] 진입점 (메인 함수)
+; ============================================================
+
+(let [[args (process_argv)]]
+  (if (> (count args) 2)
+    (let [[file-path (get args 2)]]
+      (v9-run file-path)
+    )
+    (do
+      (println "Usage: v9-run <file.fl|file.js|file.ts>")
+      (process_exit 1)
+    )
+  )
+)

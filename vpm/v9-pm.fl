@@ -1,0 +1,299 @@
+; FreeLang v9 Package Manager (v9-pm)
+; Phase 5: v9 순수 패키지 관리자 (npm 대체)
+; 기반: vpm-cli.ts 로직 + stdlib-http + stdlib-file
+
+(define REGISTRY_URL (env_load "VPM_REGISTRY" "http://registry.v9.dclub.kr"))
+(define VPM_DIR "./vpm")
+(define PACKAGES_DIR (str VPM_DIR "/packages"))
+(define PACKAGE_JSON "package.json")
+(define LOCK_FILE (str VPM_DIR "/package-lock.json"))
+
+; ============================================================
+; [1] 기본 유틸리티
+; ============================================================
+
+[FUNC parse-package-spec :params [spec]
+  :body
+  ; "package@version" 형태 파싱
+  (let [[parts (str-split "@" spec)]]
+    (if (= (count parts) 2)
+      {
+        :name (get parts 0)
+        :version (get parts 1)
+      }
+      {
+        :name spec
+        :version "latest"
+      }
+    )
+  )
+]
+
+[FUNC is-exact-spec? :params [version]
+  :body
+  ; exact version인지 체크 (e.g., "1.2.3" vs "^1.0.0")
+  (let [[re (regex "^\\d+\\.\\d+\\.\\d+$")]]
+    (regex-match re version)
+  )
+]
+
+; ============================================================
+; [2] HTTP 통신 (stdlib-http)
+; ============================================================
+
+[FUNC fetch-package-info :params [package-name]
+  :body
+  ; 레지스트리에서 패키지 정보 조회
+  (let [[url (str REGISTRY_URL "/registry/packages?name=" package-name)]
+        [response (http_json_get url)]]
+    (if (get response :success)
+      (get response :data)
+      (err "REGISTRY_ERROR" (str "Failed to fetch " package-name))
+    )
+  )
+]
+
+[FUNC fetch-tarball :params [pkg-name version tarball-url]
+  :body
+  ; 패키지 tarball 다운로드
+  (let [[dest (str PACKAGES_DIR "/" pkg-name "@" version ".tar.gz")]]
+    (do
+      (file_mkdir_p (dir_name dest))
+      (let [[response (http_download tarball-url dest)]]
+        (if (get response :success)
+          dest
+          (err "DOWNLOAD_ERROR" (str "Failed to download " pkg-name))
+        )
+      )
+    )
+  )
+]
+
+; ============================================================
+; [3] 캐시 관리 (Phase 11)
+; ============================================================
+
+[FUNC get-cached-package :params [name version]
+  :body
+  ; vpm/cache/{name}@{version}.json 확인
+  (let [[cache-file (str VPM_DIR "/cache/" name "@" version ".json")]]
+    (if (file_exists cache-file)
+      (do
+        (let [[content (file_read cache-file)]
+              [cached (json_parse content)]]
+          cached
+        )
+      )
+      nil
+    )
+  )
+]
+
+[FUNC cache-package :params [name version pkg-info]
+  :body
+  ; 패키지 정보 캐시
+  (let [[cache-dir (str VPM_DIR "/cache")]
+        [cache-file (str cache-dir "/" name "@" version ".json")]]
+    (do
+      (file_mkdir_p cache-dir)
+      (file_write cache-file (json_stringify pkg-info))
+      true
+    )
+  )
+]
+
+; ============================================================
+; [4] 설치 로직 (핵심)
+; ============================================================
+
+[FUNC v9-pm-install :params [spec]
+  :body
+  ; spec: "package@version" 또는 "package"
+  (let [[parsed (parse-package-spec spec)]
+        [name (get parsed :name)]
+        [version (get parsed :version)]]
+    (do
+      (println (str "📦 Installing " name "@" version "..."))
+
+      ; [1] 캐시 확인 (exact spec만)
+      (if (is-exact-spec? version)
+        (let [[cached (get-cached-package name version)]]
+          (if cached
+            (do
+              (println (str "📦 " name "@" version " (from cache)"))
+              (cache-package name version cached)
+              true
+            )
+            (v9-pm-install-from-registry name version)
+          )
+        )
+        (v9-pm-install-from-registry name version)
+      )
+    )
+  )
+]
+
+[FUNC v9-pm-install-from-registry :params [name version]
+  :body
+  ; 레지스트리에서 설치
+  (let [[pkg-info (fetch-package-info name)]]
+    (if pkg-info
+      (let [[selected-version (resolve-version (get pkg-info :versions) version)]
+            [tarball-url (get-in pkg-info [:versions selected-version :tarball_url])]]
+        (do
+          ; [1] tarball 다운로드
+          (let [[tarball-path (fetch-tarball name selected-version tarball-url)]]
+            (do
+              ; [2] 압축 해제
+              (shell_run (str "cd " PACKAGES_DIR " && tar -xzf " (file_name tarball-path)))
+
+              ; [3] package.json 업데이트
+              (update-package-json name selected-version)
+
+              ; [4] lockfile 업데이트
+              (update-lock-file name selected-version)
+
+              ; [5] 캐시 저장
+              (cache-package name selected-version pkg-info)
+
+              (println (str "✅ " name "@" selected-version " installed"))
+              true
+            )
+          )
+        )
+      )
+      (err "NOT_FOUND" (str "Package " name " not found"))
+    )
+  )
+]
+
+; ============================================================
+; [5] package.json 관리
+; ============================================================
+
+[FUNC update-package-json :params [name version]
+  :body
+  ; package.json의 dependencies에 추가
+  (let [[pkg-content (file_read PACKAGE_JSON)]
+        [pkg (json_parse pkg-content)]]
+    (do
+      (if-not (get pkg :dependencies)
+        (set! pkg :dependencies {})
+      )
+      (set! (get pkg :dependencies) name version)
+      (file_write PACKAGE_JSON (json_stringify pkg))
+      true
+    )
+  )
+]
+
+; ============================================================
+; [6] Lockfile 관리
+; ============================================================
+
+[FUNC update-lock-file :params [name version]
+  :body
+  ; package-lock.json 업데이트
+  (let [[lock-content (if (file_exists LOCK_FILE)
+                        (file_read LOCK_FILE)
+                        "{}"
+                      )]
+        [lock (json_parse lock-content)]]
+    (do
+      (if-not (get lock :packages)
+        (set! lock :packages {})
+      )
+      (set! (get lock :packages) (str "node_modules/" name) {
+        :version version
+        :resolved (str REGISTRY_URL "/package/" name "@" version)
+      })
+      (file_write LOCK_FILE (json_stringify lock))
+      true
+    )
+  )
+]
+
+; ============================================================
+; [7] Semver 해석 (간단한 버전)
+; ============================================================
+
+[FUNC resolve-version :params [versions version-spec]
+  :body
+  ; versions: [{:version "1.0.0"} {:version "1.1.0"} ...]
+  ; version-spec: "latest" 또는 "1.0.0" 또는 "^1.0.0"
+  (cond
+    [(= version-spec "latest")
+      (let [[latest (reduce versions nil
+                      (fn [acc v]
+                        (if (or (nil? acc) (version-greater? (get v :version) (get acc :version)))
+                          v
+                          acc
+                        )
+                      )
+                    )]]
+        (get latest :version)
+      )
+    ]
+    [:default version-spec]
+  )
+]
+
+[FUNC version-greater? :params [v1 v2]
+  :body
+  ; v1 > v2 비교 (간단한 구현)
+  (let [[parts1 (str-split "." v1)]
+        [parts2 (str-split "." v2)]]
+    (or
+      (> (parse-int (get parts1 0)) (parse-int (get parts2 0)))
+      (and
+        (= (parse-int (get parts1 0)) (parse-int (get parts2 0)))
+        (> (parse-int (get parts1 1)) (parse-int (get parts2 1)))
+      )
+    )
+  )
+]
+
+; ============================================================
+; [8] 진입점 (메인 함수)
+; ============================================================
+
+[FUNC v9-pm-install-all :params []
+  :body
+  ; package.json의 모든 dependencies 설치
+  (let [[pkg-content (file_read PACKAGE_JSON)]
+        [pkg (json_parse pkg-content)]
+        [deps (get pkg :dependencies)]]
+    (do
+      (if deps
+        (do
+          (for-each (keys deps)
+            (fn [name]
+              (v9-pm-install (str name "@" (get deps name)))
+            )
+          )
+        )
+      )
+      (println "✅ All dependencies installed")
+    )
+  )
+]
+
+; 메인 함수 (CLI 진입점)
+(define args (process_argv))
+(if (> (count args) 2)
+  (let [[cmd (get args 2)]
+        [pkg-spec (if (> (count args) 3) (get args 3) nil)]]
+    (cond
+      [(= cmd "install")
+        (if pkg-spec
+          (v9-pm-install pkg-spec)
+          (v9-pm-install-all)
+        )
+      ]
+      [:default
+        (println "Usage: v9-pm install [package@version]")
+      ]
+    )
+  )
+  (println "Usage: v9-pm install [package@version]")
+)
