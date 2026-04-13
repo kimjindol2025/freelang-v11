@@ -28,6 +28,9 @@ import { createMaybeModule } from "./maybe-type";           // Phase 91: 불확�
 import { createCompileModule } from "./stdlib-compile";    // Phase 6: .fl → .js 컴파일러
 import { createRegistryModule } from "./stdlib-registry";  // Phase 7: npm 호환 패키지 레지스트리
 import { createOciModule } from "./stdlib-oci";             // Phase 8: OCI 자동 빌드
+import { createOrmModule } from "./stdlib-orm";             // Phase 9: ORM (Model CRUD)
+import { createValidationModule } from "./stdlib-validation"; // Phase 9: 스키마 검증
+import { createMiddlewareModule } from "./stdlib-middleware";   // Phase 9: 미들웨어 체인
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -77,4 +80,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createCompileModule());   // Phase 6: fl_compile, fl_compile_file (tsc 제거)
   interp.registerModule(createRegistryModule());  // Phase 7: registry_publish, registry_search, registry_info, registry_delete, registry_start
   interp.registerModule(createOciModule());       // Phase 8: oci_create_manifest, oci_create_layer, oci_build, oci_push, oci_sign, oci_list, oci_inspect, oci_remove
+  interp.registerModule(createOrmModule());       // Phase 9: orm_define_model, orm_create, orm_find, orm_update, orm_delete, orm_all, orm_count
+  interp.registerModule(createValidationModule()); // Phase 9: schema_define, schema_validate, schema_is_valid, validate_email, validate_string, validate_number, validate_regex
+  interp.registerModule(createMiddlewareModule()); // Phase 9: middleware_define, middleware_create_chain, middleware_apply_chain, middleware_auth_check, middleware_logging, middleware_rate_limit, middleware_cors
 }
