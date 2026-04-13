@@ -31,6 +31,9 @@ import { createOciModule } from "./stdlib-oci";             // Phase 8: OCI 자�
 import { createOrmModule } from "./stdlib-orm";             // Phase 9: ORM (Model CRUD)
 import { createValidationModule } from "./stdlib-validation"; // Phase 9: 스키마 검증
 import { createMiddlewareModule } from "./stdlib-middleware";   // Phase 9: 미들웨어 체인
+import { createTableModule } from "./stdlib-table";         // Phase 10: 테이블 조작
+import { createStatsModule } from "./stdlib-stats";         // Phase 10: 통계 함수
+import { createPlotModule } from "./stdlib-plot";           // Phase 10: 시각화
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -83,4 +86,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createOrmModule());       // Phase 9: orm_define_model, orm_create, orm_find, orm_update, orm_delete, orm_all, orm_count
   interp.registerModule(createValidationModule()); // Phase 9: schema_define, schema_validate, schema_is_valid, validate_email, validate_string, validate_number, validate_regex
   interp.registerModule(createMiddlewareModule()); // Phase 9: middleware_define, middleware_create_chain, middleware_apply_chain, middleware_auth_check, middleware_logging, middleware_rate_limit, middleware_cors
+  interp.registerModule(createTableModule());      // Phase 10: table_load_csv, table_select, table_filter, table_sort, table_group_by, table_aggregate, table_join
+  interp.registerModule(createStatsModule());      // Phase 10: stats_mean, stats_median, stats_stddev, stats_correlation, stats_normalize, stats_zscore
+  interp.registerModule(createPlotModule());       // Phase 10: plot_histogram, plot_bar, plot_line, plot_scatter, plot_heatmap, plot_save
 }
