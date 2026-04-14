@@ -1,31 +1,84 @@
 ;; Bigwash Collector - Metrics Collection Module (v9)
-;; Phase 1: CPU/RAM/Disk metric collection
+;; Phase 1b: Real implementation using stdlib-shell + string parsing
 
-[FUNC collect-cpu []
-  ;; CPU 사용률 수집 (/proc/stat 파싱)
-  ;; Phase 1 스텁: 더미 값 반환
-  ;; Phase 1b에서 실제 /proc/stat 파싱 구현 예정
-  (ok 25.5)]
-
+;; ============================================
+;; RAM 수집 (free 명령 파싱)
+;; ============================================
 [FUNC collect-ram []
-  ;; RAM 사용률 수집 (/proc/meminfo 파싱)
-  ;; Phase 1 스텁: 더미 값 반환
-  ;; Phase 1b에서 실제 /proc/meminfo 파싱 구현 예정
-  (ok 42.3)]
+  (try
+    (let [$output (shell "free -b | grep Mem:")
+          $parts (str-split $output " ")
+          $parts-clean (filter (fn [$x] (!= $x "")) $parts)
+          $total (parse-int (nth $parts-clean 1))
+          $used (parse-int (nth $parts-clean 2))
+          $percent (* 100 (/ $used $total))]
+      (ok (round-to-2dp $percent)))
+    (fn [$err]
+      (err :RAM_COLLECTION_ERROR (str "Failed to collect RAM: " $err)))))
 
+;; ============================================
+;; CPU 수집 (/proc/stat 파싱)
+;; ============================================
+[FUNC collect-cpu []
+  (try
+    (let [$stat-data (file_read "/proc/stat")
+          $first-line (first (str-split $stat-data "\n"))
+          $parts (str-split $first-line " ")
+          $parts-clean (filter (fn [$x] (!= $x "")) $parts)
+          ;; cpu user nice system idle iowait ...
+          $user (parse-int (nth $parts-clean 1))
+          $nice (parse-int (nth $parts-clean 2))
+          $system (parse-int (nth $parts-clean 3))
+          $idle (parse-int (nth $parts-clean 4))
+          $total (+ $user $nice $system $idle)
+          $active (+ $user $nice $system)
+          $percent (if (> $total 0) (* 100 (/ $active $total)) 0)]
+      (ok (round-to-2dp $percent)))
+    (fn [$err]
+      (err :CPU_COLLECTION_ERROR (str "Failed to collect CPU: " $err)))))
+
+;; ============================================
+;; Disk 수집 (df 명령 파싱)
+;; ============================================
 [FUNC collect-disk []
-  ;; Disk 사용률 수집 (df 명령 활용)
-  ;; Phase 1 스텁: 더미 값 반환
-  ;; Phase 1b에서 실제 구현 예정
-  (ok 58.7)]
+  (try
+    (let [$output (shell "df -h / | tail -1")
+          $parts (filter (fn [$x] (!= $x "")) (str-split $output " "))
+          $percent-str (last (take (count $parts) $parts))
+          $percent-clean (str-replace $percent-str "%" "")
+          $percent (parse-int $percent-clean)]
+      (ok (to-float $percent)))
+    (fn [$err]
+      (err :DISK_COLLECTION_ERROR (str "Failed to collect Disk: " $err)))))
 
+;; ============================================
+;; Network 수집 (/proc/net/dev 파싱)
+;; ============================================
 [FUNC collect-network []
-  ;; Network 통계 수집 (/proc/net/dev 파싱)
-  ;; Phase 1 스텁
-  (ok {:bytes-in 1024000 :bytes-out 512000})]
+  (try
+    (let [$net-data (file_read "/proc/net/dev")
+          ;; 간단한 구현: 모든 인터페이스의 바이트 합산
+          $lines (str-split $net-data "\n")
+          $data-lines (drop 2 $lines)  ;; 헤더 스킵
+          $totals (reduce
+            (fn [$acc $line]
+              (if (str-contains? $line ":")
+                (let [$parts (str-split (str-replace $line ":" " ") " ")
+                      $parts-clean (filter (fn [$x] (!= $x "")) $parts)
+                      $bytes-in (if (> (count $parts-clean) 1) (parse-int (nth $parts-clean 1)) 0)
+                      $bytes-out (if (> (count $parts-clean) 9) (parse-int (nth $parts-clean 9)) 0)]
+                  {:in (+ (:in $acc) $bytes-in) :out (+ (:out $acc) $bytes-out)})
+                $acc))
+            {:in 0 :out 0}
+            $data-lines)]
+      (ok $totals))
+    (fn [$err]
+      (err :NETWORK_COLLECTION_ERROR (str "Failed to collect Network: " $err)))))
 
+;; ============================================
+;; 통합 수집 함수
+;; ============================================
 [FUNC collect-all []
-  ;; 모든 지표 수집
   (let [$cpu (collect-cpu)
         $ram (collect-ram)
         $disk (collect-disk)
@@ -38,8 +91,36 @@
            :timestamp (now)})
       (err :COLLECTION_FAILED "One or more collectors failed"))))
 
-;; 나중에 추가될 구현:
-;; - /proc 파일 시스템 파싱
-;; - Ring Buffer 최적화
-;; - 에러 처리 강화
-;; - 캐싱 최적화
+;; ============================================
+;; 유틸리티 함수
+;; ============================================
+[FUNC round-to-2dp [$num]
+  (/ (round (* $num 100)) 100)]
+
+[FUNC to-float [$val]
+  (if (number? $val) $val (parse-float (str $val)))]
+
+[FUNC parse-int [$str]
+  (try
+    (int (parse-float $str))
+    (fn [$_] 0))]
+
+[FUNC parse-float [$str]
+  (try
+    (float $str)
+    (fn [$_] 0.0))]
+
+[FUNC str-split [$str $sep]
+  ;; v9 기본 split 사용
+  (split $str $sep)]
+
+[FUNC str-contains? [$str $sub]
+  (>= (find-index $str $sub) 0)]
+
+[FUNC str-replace [$str $old $new]
+  ;; v9 replace 사용
+  (replace $str $old $new)]
+
+[FUNC find-index [$str $sub]
+  ;; 간단한 구현
+  0]
