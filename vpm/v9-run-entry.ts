@@ -13,12 +13,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 
-function runFreeLang(filePath: string): void {
+async function runFreeLang(filePath: string): Promise<void> {
   try {
     const source = fs.readFileSync(filePath, 'utf8');
-    const { lex } = require('../src/lexer');
-    const { parse } = require('../src/parser');
-    const { Interpreter } = require('../src/interpreter');
+    const { lex } = await import('../dist/lexer.js');
+    const { parse } = await import('../dist/parser.js');
+    const { Interpreter } = await import('../dist/interpreter.js');
 
     const tokens = lex(source);
     const ast = parse(tokens);
@@ -31,9 +31,9 @@ function runFreeLang(filePath: string): void {
   }
 }
 
-function runJavaScript(filePath: string): void {
+async function runJavaScript(filePath: string): Promise<void> {
   try {
-    require(path.resolve(filePath));
+    await import(path.resolve(filePath));
   } catch (err: any) {
     console.error(`❌ Error running ${filePath}:`, err.message);
     process.exit(1);
@@ -65,17 +65,19 @@ if (!fs.existsSync(filePath)) {
 }
 
 // 파일 확장자에 따라 적절한 실행기 선택
-switch (ext) {
-  case '.fl':
-    runFreeLang(filePath);
-    break;
-  case '.js':
-    runJavaScript(filePath);
-    break;
-  case '.ts':
-    runTypeScript(filePath);
-    break;
-  default:
-    console.error(`❌ Unsupported file type: ${ext}`);
-    process.exit(1);
-}
+(async () => {
+  switch (ext) {
+    case '.fl':
+      await runFreeLang(filePath);
+      break;
+    case '.js':
+      await runJavaScript(filePath);
+      break;
+    case '.ts':
+      runTypeScript(filePath);
+      break;
+    default:
+      console.error(`❌ Unsupported file type: ${ext}`);
+      process.exit(1);
+  }
+})();
