@@ -1,0 +1,45 @@
+;; Bigwash Collector - Metrics Collection Module (v9)
+;; Phase 1: CPU/RAM/Disk metric collection
+
+[FUNC collect-cpu []
+  ;; CPU 사용률 수집 (/proc/stat 파싱)
+  ;; Phase 1 스텁: 더미 값 반환
+  ;; Phase 1b에서 실제 /proc/stat 파싱 구현 예정
+  (ok 25.5)]
+
+[FUNC collect-ram []
+  ;; RAM 사용률 수집 (/proc/meminfo 파싱)
+  ;; Phase 1 스텁: 더미 값 반환
+  ;; Phase 1b에서 실제 /proc/meminfo 파싱 구현 예정
+  (ok 42.3)]
+
+[FUNC collect-disk []
+  ;; Disk 사용률 수집 (df 명령 활용)
+  ;; Phase 1 스텁: 더미 값 반환
+  ;; Phase 1b에서 실제 구현 예정
+  (ok 58.7)]
+
+[FUNC collect-network []
+  ;; Network 통계 수집 (/proc/net/dev 파싱)
+  ;; Phase 1 스텁
+  (ok {:bytes-in 1024000 :bytes-out 512000})]
+
+[FUNC collect-all []
+  ;; 모든 지표 수집
+  (let [$cpu (collect-cpu)
+        $ram (collect-ram)
+        $disk (collect-disk)
+        $network (collect-network)]
+    (if (and (ok? $cpu) (ok? $ram) (ok? $disk) (ok? $network))
+      (ok {:cpu (:value $cpu)
+           :ram (:value $ram)
+           :disk (:value $disk)
+           :network (:value $network)
+           :timestamp (now)})
+      (err :COLLECTION_FAILED "One or more collectors failed"))))
+
+;; 나중에 추가될 구현:
+;; - /proc 파일 시스템 파싱
+;; - Ring Buffer 최적화
+;; - 에러 처리 강화
+;; - 캐싱 최적화

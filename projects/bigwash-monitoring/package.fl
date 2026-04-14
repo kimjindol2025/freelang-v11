@@ -1,0 +1,14 @@
+;; Bigwash Monitoring - Edge-First Monitoring SaaS
+;; Package Definition (v9)
+
+[PACKAGE
+  :name "bigwash-monitoring"
+  :version "0.1.0"
+  :description "Ultra-light edge monitoring agent for low-spec devices (Termux, RPi, VPS)"
+  :author "Bigwash Team"
+  :license "MIT"
+  :main "main.fl"
+  :keywords ["monitoring" "edge" "agent" "performance"]
+  :repository "https://gogs.dclub.kr/kim/freelang-v9.git"
+  :homepage "https://bigwash.example.com"
+  :dependencies {}]

@@ -1,0 +1,128 @@
+;; Bigwash Agent - Main Entry Point (v9)
+;; Phase 1: Core Engine & Metrics Collection
+
+[FUNC load-config [$path]
+  ;; JSON 설정 파일 로드
+  (if (file-exists? $path)
+    (let [$content (file-read $path)]
+      (json-parse $content))
+    (err :CONFIG_NOT_FOUND (str "Config file not found: " $path)))]
+
+[FUNC main [$args]
+  (let [$config-path (get $args 1 "./config.json")
+        $debug-mode (has? $args "--debug-file")
+        $debug-file (if $debug-mode (get $args 2 "metrics.jsonl") nil)]
+    (observe-log "info" (str "Bigwash Agent v0.1.0 starting..."))
+    (observe-log "info" (str "Config: " $config-path))
+
+    ;; 설정 로드
+    (let [$result (load-config $config-path)]
+      (if (ok? $result)
+        (let [$config (:value $result)
+              $interval (get (:collection $config) "interval_ms" 5000)
+              $buffer-size (get (:collection $config) "buffer_size" 1000)]
+          (observe-log "info" (str "Loaded config - Interval: " $interval "ms, Buffer: " $buffer-size))
+
+          ;; 메트릭 수집 시작
+          (start-collector $config $debug-file))
+
+        ;; 에러: 설정 로드 실패
+        (let [$error (:error $result)]
+          (observe-log "error" (str "Failed to load config: " $error))
+          (process-exit 1))))))
+
+[FUNC start-collector [$config $debug-file]
+  ;; Phase 1: 로컬 디버그 모드 (오프라인 검증)
+  (observe-log "info" "Starting metrics collector...")
+
+  (let [$interval (get (:collection $config) "interval_ms" 5000)
+        $max-iterations (if $debug-file 10 -1)]  ;; 디버그: 10회 후 종료
+
+    ;; 타이머로 주기적 수집
+    (loop [i 0]
+      (if (and (>= 0 $max-iterations) (< i $max-iterations))
+        ;; 디버그 모드: 제한된 반복
+        (do
+          (collect-and-log-metrics $config $debug-file)
+          (sleep $interval)
+          (recur (inc i)))
+
+        ;; 프로덕션 모드: 무한 반복
+        (do
+          (collect-and-log-metrics $config $debug-file)
+          (sleep $interval)
+          (recur (inc i)))))))
+
+[FUNC collect-and-log-metrics [$config $debug-file]
+  ;; CPU, RAM, Disk 지표 수집 및 로깅
+  (let [$metrics (collect-metrics)]
+    (if (ok? $metrics)
+      (let [$data (:value $metrics)
+            $output (json-stringify {:timestamp (now)
+                                     :data $data})]
+        (if $debug-file
+          (file-append $debug-file (str $output "\n"))
+          (observe-log "info" (str "Metrics: " $output))))
+
+      ;; 수집 실패
+      (observe-log "error" (str "Failed to collect metrics: " (:error $metrics))))))
+
+[FUNC collect-metrics []
+  ;; CPU, RAM, Disk 지표 수집 (Linux /proc 파싱)
+  (let [$cpu (collect-cpu)
+        $ram (collect-ram)
+        $disk (collect-disk)]
+    (if (and (ok? $cpu) (ok? $ram) (ok? $disk))
+      (ok {:cpu-percent (:value $cpu)
+           :ram-percent (:value $ram)
+           :disk-percent (:value $disk)})
+
+      (err :COLLECTION_ERROR "One or more metrics failed"))))
+
+[FUNC collect-cpu []
+  ;; Phase 1: 스텁 구현 (나중에 /proc/stat 파싱 추가)
+  (ok 25.5)]  ;; 테스트용 더미 값
+
+[FUNC collect-ram []
+  ;; Phase 1: 스텁 구현 (나중에 /proc/meminfo 파싱 추가)
+  (ok 42.3)]  ;; 테스트용 더미 값
+
+[FUNC collect-disk []
+  ;; Phase 1: 스텁 구현 (나중에 df 명령 활용)
+  (ok 58.7)]  ;; 테스트용 더미 값
+
+;; 유틸리티 함수
+[FUNC file-exists? [$path]
+  ;; 파일 존재 여부 확인
+  true]  ;; Phase 1 스텁
+
+[FUNC file-read [$path]
+  ;; 파일 읽기
+  ""]  ;; Phase 1 스텁
+
+[FUNC file-append [$path $content]
+  ;; 파일 추가 쓰기
+  nil]  ;; Phase 1 스텁
+
+[FUNC json-parse [$str]
+  ;; JSON 파싱
+  (ok {})]  ;; Phase 1 스텁
+
+[FUNC json-stringify [$obj]
+  ;; JSON 직렬화
+  "{}"]  ;; Phase 1 스텁
+
+[FUNC observe-log [$level $msg]
+  ;; 로깅
+  (print (str "[" $level "] " $msg))]
+
+[FUNC sleep [$ms]
+  ;; 대기
+  nil]  ;; Phase 1 스텁
+
+[FUNC process-exit [$code]
+  ;; 프로세스 종료
+  nil]  ;; Phase 1 스텁
+
+;; v9 실행 진입점
+(main *args*)
