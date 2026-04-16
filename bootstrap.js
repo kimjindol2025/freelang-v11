@@ -292,7 +292,19 @@ var init_lexer = __esm({
       ["DOCKER-COMPOSE", "DockerCompose" /* DockerCompose */],
       ["K8S-DEPLOYMENT", "K8sDeployment" /* K8sDeployment */],
       ["K8S-SERVICE", "K8sService" /* K8sService */],
-      ["K8S-INGRESS", "K8sIngress" /* K8sIngress */]
+      ["K8S-INGRESS", "K8sIngress" /* K8sIngress */],
+      // Phase 11: Cloud keywords
+      ["AWS", "AWS" /* AWS */],
+      ["AWS-S3", "AwsS3" /* AwsS3 */],
+      ["AWS-LAMBDA", "AwsLambda" /* AwsLambda */],
+      ["AWS-RDS", "AwsRds" /* AwsRds */],
+      ["AWS-SQS", "AwsSqs" /* AwsSqs */],
+      ["GCP", "GCP" /* GCP */],
+      ["GCP-CLOUD-RUN", "GcpCloudRun" /* GcpCloudRun */],
+      ["GCP-BIGQUERY", "GcpBigquery" /* GcpBigquery */],
+      ["AZURE", "Azure" /* Azure */],
+      ["AZURE-FUNCTION", "AzureFunction" /* AzureFunction */],
+      ["AZURE-COSMOS", "AzureCosmos" /* AzureCosmos */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -488,7 +500,7 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
               const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
@@ -649,7 +661,7 @@ var init_parser = __esm({
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
         }
-        const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
+        const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
         if (enterpriseBlocks.includes(blockType)) {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return block2;
@@ -28793,6 +28805,23 @@ var Interpreter = class {
       case "K8S-INGRESS":
         this.context.lastValue = this.handleK8sIngressBlock(block);
         break;
+      case "AWS":
+      case "AWS-S3":
+      case "AWS-LAMBDA":
+      case "AWS-RDS":
+      case "AWS-SQS":
+        this.context.lastValue = this.handleAwsBlock(block);
+        break;
+      case "GCP":
+      case "GCP-CLOUD-RUN":
+      case "GCP-BIGQUERY":
+        this.context.lastValue = this.handleGcpBlock(block);
+        break;
+      case "AZURE":
+      case "AZURE-FUNCTION":
+      case "AZURE-COSMOS":
+        this.context.lastValue = this.handleAzureBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -29316,6 +29345,54 @@ var Interpreter = class {
     this.context.k8sIngresses = this.context.k8sIngresses || /* @__PURE__ */ new Map();
     this.context.k8sIngresses.set(name, ingress);
     return { status: "registered", "k8s-ingress": name };
+  }
+  // Phase 11 v11: AWS cloud blocks (AWS, AWS-S3, AWS-LAMBDA, AWS-RDS, AWS-SQS)
+  handleAwsBlock(block) {
+    const name = block.name;
+    const blockType = block.type;
+    const region = this.eval(block.fields.get("region")) || "ap-northeast-2";
+    const endpoint = this.eval(block.fields.get("endpoint")) || "";
+    const awsConfig = {
+      name,
+      type: blockType,
+      region,
+      endpoint
+    };
+    this.context.aws = this.context.aws || /* @__PURE__ */ new Map();
+    this.context.aws.set(name, awsConfig);
+    return { status: "registered", aws: name };
+  }
+  // Phase 11 v11: GCP cloud blocks (GCP, GCP-CLOUD-RUN, GCP-BIGQUERY)
+  handleGcpBlock(block) {
+    const name = block.name;
+    const blockType = block.type;
+    const projectId = this.eval(block.fields.get("project-id")) || "project";
+    const region = this.eval(block.fields.get("region")) || "asia-northeast3";
+    const gcpConfig = {
+      name,
+      type: blockType,
+      projectId,
+      region
+    };
+    this.context.gcp = this.context.gcp || /* @__PURE__ */ new Map();
+    this.context.gcp.set(name, gcpConfig);
+    return { status: "registered", gcp: name };
+  }
+  // Phase 11 v11: Azure cloud blocks (AZURE, AZURE-FUNCTION, AZURE-COSMOS)
+  handleAzureBlock(block) {
+    const name = block.name;
+    const blockType = block.type;
+    const subscriptionId = this.eval(block.fields.get("subscription-id")) || "";
+    const resourceGroup = this.eval(block.fields.get("resource-group")) || "default";
+    const azureConfig = {
+      name,
+      type: blockType,
+      subscriptionId,
+      resourceGroup
+    };
+    this.context.azure = this.context.azure || /* @__PURE__ */ new Map();
+    this.context.azure.set(name, azureConfig);
+    return { status: "registered", azure: name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {

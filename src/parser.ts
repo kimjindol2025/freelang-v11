@@ -128,7 +128,7 @@ export class Parser {
       if (this.check(T.LBracket)) {
         // Distinguish between block [TYPE ...] and array [val1 val2 ...]
         const nextIdx = this.pos + 1;
-        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
@@ -341,7 +341,7 @@ export class Parser {
     // Phase 11: Parse all enterprise blocks
     // Note: For PAGE/COMPONENT/FORM, we keep the original fields map intact
     // so that interpreter can access :render, :state, etc. directly
-    const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
+    const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
     if (enterpriseBlocks.includes(blockType)) {
       const block = makeBlock(blockType, blockName, fields, blockLine);
       // Could call parsePage/parseRoute etc for validation, but keep fields as-is

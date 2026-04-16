@@ -378,6 +378,26 @@ export class Interpreter {
         // Phase 11 v11: [K8S-INGRESS name :rules [...]]
         this.context.lastValue = this.handleK8sIngressBlock(block);
         break;
+      case "AWS":
+      case "AWS-S3":
+      case "AWS-LAMBDA":
+      case "AWS-RDS":
+      case "AWS-SQS":
+        // Phase 11 v11: AWS cloud blocks
+        this.context.lastValue = this.handleAwsBlock(block);
+        break;
+      case "GCP":
+      case "GCP-CLOUD-RUN":
+      case "GCP-BIGQUERY":
+        // Phase 11 v11: GCP cloud blocks
+        this.context.lastValue = this.handleGcpBlock(block);
+        break;
+      case "AZURE":
+      case "AZURE-FUNCTION":
+      case "AZURE-COSMOS":
+        // Phase 11 v11: Azure cloud blocks
+        this.context.lastValue = this.handleAzureBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -1040,6 +1060,66 @@ export class Interpreter {
     (this.context as any).k8sIngresses.set(name, ingress);
 
     return { status: "registered", "k8s-ingress": name };
+  }
+
+  // Phase 11 v11: AWS cloud blocks (AWS, AWS-S3, AWS-LAMBDA, AWS-RDS, AWS-SQS)
+  private handleAwsBlock(block: Block): any {
+    const name = block.name;
+    const blockType = block.type;
+    const region = this.eval(block.fields.get("region")) || "ap-northeast-2";
+    const endpoint = this.eval(block.fields.get("endpoint")) || "";
+
+    const awsConfig: any = {
+      name,
+      type: blockType,
+      region,
+      endpoint,
+    };
+
+    (this.context as any).aws = (this.context as any).aws || new Map();
+    (this.context as any).aws.set(name, awsConfig);
+
+    return { status: "registered", aws: name };
+  }
+
+  // Phase 11 v11: GCP cloud blocks (GCP, GCP-CLOUD-RUN, GCP-BIGQUERY)
+  private handleGcpBlock(block: Block): any {
+    const name = block.name;
+    const blockType = block.type;
+    const projectId = this.eval(block.fields.get("project-id")) || "project";
+    const region = this.eval(block.fields.get("region")) || "asia-northeast3";
+
+    const gcpConfig: any = {
+      name,
+      type: blockType,
+      projectId,
+      region,
+    };
+
+    (this.context as any).gcp = (this.context as any).gcp || new Map();
+    (this.context as any).gcp.set(name, gcpConfig);
+
+    return { status: "registered", gcp: name };
+  }
+
+  // Phase 11 v11: Azure cloud blocks (AZURE, AZURE-FUNCTION, AZURE-COSMOS)
+  private handleAzureBlock(block: Block): any {
+    const name = block.name;
+    const blockType = block.type;
+    const subscriptionId = this.eval(block.fields.get("subscription-id")) || "";
+    const resourceGroup = this.eval(block.fields.get("resource-group")) || "default";
+
+    const azureConfig: any = {
+      name,
+      type: blockType,
+      subscriptionId,
+      resourceGroup,
+    };
+
+    (this.context as any).azure = (this.context as any).azure || new Map();
+    (this.context as any).azure.set(name, azureConfig);
+
+    return { status: "registered", azure: name };
   }
 
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]

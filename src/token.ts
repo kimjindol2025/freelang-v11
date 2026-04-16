@@ -103,6 +103,19 @@ export enum TokenType {
   K8sService = "K8sService",           // K8S-SERVICE
   K8sIngress = "K8sIngress",           // K8S-INGRESS
 
+  // Phase 11 Keywords (Cloud)
+  AWS = "AWS",                         // AWS
+  AwsS3 = "AwsS3",                     // AWS-S3
+  AwsLambda = "AwsLambda",             // AWS-LAMBDA
+  AwsRds = "AwsRds",                   // AWS-RDS
+  AwsSqs = "AwsSqs",                   // AWS-SQS
+  GCP = "GCP",                         // GCP
+  GcpCloudRun = "GcpCloudRun",         // GCP-CLOUD-RUN
+  GcpBigquery = "GcpBigquery",         // GCP-BIGQUERY
+  Azure = "Azure",                     // AZURE
+  AzureFunction = "AzureFunction",     // AZURE-FUNCTION
+  AzureCosmos = "AzureCosmos",         // AZURE-COSMOS
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

@@ -80,6 +80,18 @@ const KEYWORDS: Map<string, T> = new Map([
   ["K8S-DEPLOYMENT", T.K8sDeployment],
   ["K8S-SERVICE", T.K8sService],
   ["K8S-INGRESS", T.K8sIngress],
+  // Phase 11: Cloud keywords
+  ["AWS", T.AWS],
+  ["AWS-S3", T.AwsS3],
+  ["AWS-LAMBDA", T.AwsLambda],
+  ["AWS-RDS", T.AwsRds],
+  ["AWS-SQS", T.AwsSqs],
+  ["GCP", T.GCP],
+  ["GCP-CLOUD-RUN", T.GcpCloudRun],
+  ["GCP-BIGQUERY", T.GcpBigquery],
+  ["AZURE", T.Azure],
+  ["AZURE-FUNCTION", T.AzureFunction],
+  ["AZURE-COSMOS", T.AzureCosmos],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 
