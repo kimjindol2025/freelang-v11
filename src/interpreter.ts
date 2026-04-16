@@ -344,18 +344,30 @@ export class Interpreter {
     if (!renderNode) {
       return null;
     }
-    // :render을 eval해서 HTML 문자열 반환
-    const html = this.eval(renderNode);
-    // {{ param }} 템플릿 보간 지원 (간단한 구현)
-    if (typeof html === "string" && this.context.lastValue) {
-      let interpolated = html;
-      const params = (this.context.lastValue as any).__params || {};
-      for (const [key, value] of Object.entries(params)) {
-        interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
-      }
-      return interpolated;
+
+    // params를 $key 형태로 바인딩
+    const params: Record<string, string> = (this.context as any).__params || {};
+    this.context.variables.push();
+    for (const [key, value] of Object.entries(params)) {
+      this.context.variables.set(`$${key}`, value);
     }
-    return html;
+
+    try {
+      // :render을 eval해서 HTML 문자열 반환
+      const html = this.eval(renderNode);
+
+      // {{ param }} 템플릿 보간 지원
+      if (typeof html === "string") {
+        let interpolated = html;
+        for (const [key, value] of Object.entries(params)) {
+          interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
+        }
+        return interpolated;
+      }
+      return html;
+    } finally {
+      this.context.variables.pop();
+    }
   }
 
   // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]

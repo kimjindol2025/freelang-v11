@@ -89,6 +89,9 @@ export class FLExecutor {
       // 컨텍스트를 v9 요청 객체로 변환
       const flRequest = this.createFlRequest(context);
 
+      // params를 interpreter context에 주입 (템플릿 보간용)
+      (this.interpreter.context as any).__params = context.params || {};
+
       // 인터프리터 실행 (interpreter.interpret()로 PAGE/COMPONENT/FORM 블록 처리)
       const execContext = this.interpreter.interpret(astList);
 

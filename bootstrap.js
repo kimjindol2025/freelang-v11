@@ -28746,16 +28746,24 @@ var Interpreter = class {
     if (!renderNode) {
       return null;
     }
-    const html = this.eval(renderNode);
-    if (typeof html === "string" && this.context.lastValue) {
-      let interpolated = html;
-      const params = this.context.lastValue.__params || {};
-      for (const [key, value] of Object.entries(params)) {
-        interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
-      }
-      return interpolated;
+    const params = this.context.__params || {};
+    this.context.variables.push();
+    for (const [key, value] of Object.entries(params)) {
+      this.context.variables.set(`$${key}`, value);
     }
-    return html;
+    try {
+      const html = this.eval(renderNode);
+      if (typeof html === "string") {
+        let interpolated = html;
+        for (const [key, value] of Object.entries(params)) {
+          interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
+        }
+        return interpolated;
+      }
+      return html;
+    } finally {
+      this.context.variables.pop();
+    }
   }
   // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
   handleComponentBlock(block) {
@@ -30816,6 +30824,7 @@ var FLExecutor = class {
       }
       const astList = this.parseFile(filePath);
       const flRequest = this.createFlRequest(context);
+      this.interpreter.context.__params = context.params || {};
       const execContext = this.interpreter.interpret(astList);
       const result = execContext.lastValue;
       return this.processResult(result);

@@ -1,0 +1,11 @@
+[PAGE users
+  :path "/users"
+  :name "Users List"
+  :render "<h1>Users</h1>
+<p>Welcome to the Users list page.</p>
+<ul>
+  <li><a href=\"/users/1\">User 1</a></li>
+  <li><a href=\"/users/2\">User 2</a></li>
+  <li><a href=\"/users/42\">User 42</a></li>
+</ul>"
+]
