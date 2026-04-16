@@ -30,6 +30,10 @@ import {
   TypeClass,
   TypeClassInstance,
   TypeClassMethod,
+  PageNode,
+  RouteNode,
+  ComponentNode,
+  FormNode,
   makeBlock,
   makeLiteral,
   makeVariable,
@@ -60,6 +64,10 @@ import {
   makeReasoningSequence,
   makeTypeClass,
   makeTypeClassInstance,
+  makePageNode,
+  makeRouteNode,
+  makeComponentNode,
+  makeFormNode,
 } from "./ast";
 
 export class ParserError extends Error {
@@ -154,7 +162,7 @@ export class Parser {
 
   // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
   // Phase 6: BLOCK_TYPE can be Symbol (old) or keyword token (MODULE, TYPECLASS, INSTANCE)
-  private parseBlock(): Block | ModuleBlock | TypeClass | TypeClassInstance {
+  private parseBlock(): Block | ModuleBlock | TypeClass | TypeClassInstance | PageNode | RouteNode | ComponentNode | FormNode {
     const lbracket = this.expect(T.LBracket);
     const blockLine = lbracket.line;
     const typeToken = this.advance();
@@ -168,6 +176,14 @@ export class Parser {
       blockType = "TYPECLASS";
     } else if (typeToken.type === T.Instance) {
       blockType = "INSTANCE";
+    } else if (typeToken.type === T.Page) {
+      blockType = "PAGE";
+    } else if (typeToken.type === T.Route) {
+      blockType = "ROUTE";
+    } else if (typeToken.type === T.Component) {
+      blockType = "COMPONENT";
+    } else if (typeToken.type === T.Form) {
+      blockType = "FORM";
     } else {
       throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
     }
@@ -320,6 +336,23 @@ export class Parser {
     if (blockType === "INSTANCE") {
       const block = makeBlock(blockType, blockName, fields, blockLine);
       return this.convertBlockToInstance(block);
+    }
+
+    // Phase 11: Parse web DSL blocks
+    if (blockType === "PAGE") {
+      return this.parsePage(blockName, fields, blockLine);
+    }
+
+    if (blockType === "ROUTE") {
+      return this.parseRoute(blockName, fields, blockLine);
+    }
+
+    if (blockType === "COMPONENT") {
+      return this.parseComponent(blockName, fields, blockLine);
+    }
+
+    if (blockType === "FORM") {
+      return this.parseForm(blockName, fields, blockLine);
     }
 
     const block = makeBlock(blockType, blockName, fields, blockLine);
@@ -2298,6 +2331,189 @@ export class Parser {
         condition,
       },
     };
+  }
+
+  // Phase 11: Parse PAGE block - [PAGE name :title "..." :route "/" :component ComponentName]
+  private parsePage(name: string, fields: Map<string, ASTNode | ASTNode[]>, line: number): PageNode {
+    const title = this.extractStringField(fields, "title");
+    const route = this.extractStringField(fields, "route");
+    const component = this.extractSymbolField(fields, "component");
+    const metadata = this.extractMapField(fields, "metadata");
+
+    return makePageNode(name, title, route, component, metadata, line);
+  }
+
+  // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
+  private parseRoute(name: string, fields: Map<string, ASTNode | ASTNode[]>, line: number): RouteNode {
+    const path = this.extractStringField(fields, "path");
+    const method = this.extractStringField(fields, "method");
+    const handler = this.extractSymbolField(fields, "handler");
+    const middleware = this.extractSymbolArrayField(fields, "middleware");
+    const validation = this.extractSymbolField(fields, "validation");
+
+    return makeRouteNode(name, path, method, handler, middleware, validation, line);
+  }
+
+  // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
+  private parseComponent(name: string, fields: Map<string, ASTNode | ASTNode[]>, line: number): ComponentNode {
+    const render = this.extractSymbolField(fields, "render");
+    const state = this.extractSymbolField(fields, "state");
+    const computed = this.extractSymbolArrayField(fields, "computed");
+    const watch = this.extractWatchField(fields, "watch");
+    const methods = this.extractMethodsField(fields, "methods");
+    const slots = this.extractSymbolArrayField(fields, "slots");
+
+    return makeComponentNode(name, render, state, computed, watch, methods, slots, line);
+  }
+
+  // Phase 11: Parse FORM block - [FORM name :fields [...] :validation validationFn :submit submitFn]
+  private parseForm(name: string, fields: Map<string, ASTNode | ASTNode[]>, line: number): FormNode {
+    const formFields = this.extractMapField(fields, "fields");
+    const validation = this.extractSymbolField(fields, "validation");
+    const submit = this.extractSymbolField(fields, "submit");
+    const handlers = this.extractHandlersField(fields, "handlers");
+
+    return makeFormNode(name, formFields, validation, submit, handlers, line);
+  }
+
+  // Helper: Extract string field from block fields
+  private extractStringField(fields: Map<string, ASTNode | ASTNode[]>, key: string): string | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    if (Array.isArray(value)) {
+      const first = value[0];
+      if ((first as any).kind === "literal" && (first as any).type === "string") {
+        return (first as any).value as string;
+      }
+    } else if ((value as any).kind === "literal" && (value as any).type === "string") {
+      return (value as any).value as string;
+    }
+    return undefined;
+  }
+
+  // Helper: Extract symbol field from block fields
+  private extractSymbolField(fields: Map<string, ASTNode | ASTNode[]>, key: string): string | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    if (Array.isArray(value)) {
+      const first = value[0];
+      if ((first as any).kind === "literal" && (first as any).type === "symbol") {
+        return (first as any).value as string;
+      }
+    } else if ((value as any).kind === "literal" && (value as any).type === "symbol") {
+      return (value as any).value as string;
+    }
+    return undefined;
+  }
+
+  // Helper: Extract array of symbols from block fields
+  private extractSymbolArrayField(fields: Map<string, ASTNode | ASTNode[]>, key: string): string[] | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    const items: string[] = [];
+    let arrayItems: ASTNode[] = [];
+
+    if (Array.isArray(value)) {
+      arrayItems = value;
+    } else if ((value as any).kind === "block" && (value as any).type === "Array") {
+      const innerItems = (value as any).fields?.get("items");
+      if (Array.isArray(innerItems)) {
+        arrayItems = innerItems;
+      }
+    }
+
+    for (const item of arrayItems) {
+      if ((item as any).kind === "literal" && (item as any).type === "symbol") {
+        items.push((item as any).value as string);
+      }
+    }
+
+    return items.length > 0 ? items : undefined;
+  }
+
+  // Helper: Extract map field from block fields
+  private extractMapField(fields: Map<string, ASTNode | ASTNode[]>, key: string): Map<string, any> | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    const result = new Map<string, any>();
+
+    if ((value as any).kind === "block" && (value as any).type === "Map") {
+      const innerFields = (value as any).fields;
+      if (innerFields) {
+        for (const [k, v] of innerFields) {
+          result.set(k, v);
+        }
+      }
+    }
+
+    return result.size > 0 ? result : undefined;
+  }
+
+  // Helper: Extract watch field from block fields (map of property names to handler names)
+  private extractWatchField(fields: Map<string, ASTNode | ASTNode[]>, key: string): Map<string, string> | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    const result = new Map<string, string>();
+
+    if ((value as any).kind === "block" && (value as any).type === "Map") {
+      const innerFields = (value as any).fields;
+      if (innerFields) {
+        for (const [k, v] of innerFields) {
+          if ((v as any).kind === "literal" && (v as any).type === "symbol") {
+            result.set(k, (v as any).value as string);
+          }
+        }
+      }
+    }
+
+    return result.size > 0 ? result : undefined;
+  }
+
+  // Helper: Extract methods field from block fields (map of method names to function names)
+  private extractMethodsField(fields: Map<string, ASTNode | ASTNode[]>, key: string): Map<string, string> | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    const result = new Map<string, string>();
+
+    if ((value as any).kind === "block" && (value as any).type === "Map") {
+      const innerFields = (value as any).fields;
+      if (innerFields) {
+        for (const [k, v] of innerFields) {
+          if ((v as any).kind === "literal" && (v as any).type === "symbol") {
+            result.set(k, (v as any).value as string);
+          }
+        }
+      }
+    }
+
+    return result.size > 0 ? result : undefined;
+  }
+
+  // Helper: Extract handlers field from block fields (map of event names to handler names)
+  private extractHandlersField(fields: Map<string, ASTNode | ASTNode[]>, key: string): Map<string, string> | undefined {
+    const value = fields.get(key);
+    if (!value) return undefined;
+
+    const result = new Map<string, string>();
+
+    if ((value as any).kind === "block" && (value as any).type === "Map") {
+      const innerFields = (value as any).fields;
+      if (innerFields) {
+        for (const [k, v] of innerFields) {
+          if ((v as any).kind === "literal" && (v as any).type === "symbol") {
+            result.set(k, (v as any).value as string);
+          }
+        }
+      }
+    }
+
+    return result.size > 0 ? result : undefined;
   }
 
   // Helper: Get reasoning stage name from token

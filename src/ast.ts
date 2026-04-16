@@ -23,7 +23,11 @@ export type ASTNode =
   | AwaitExpression
   | TryBlock
   | CatchClause
-  | ThrowExpression;
+  | ThrowExpression
+  | PageNode
+  | RouteNode
+  | ComponentNode
+  | FormNode;
 
 // [BLOCK_TYPE name :key1 val1 :key2 val2 ...]
 export interface Block {
@@ -363,6 +367,55 @@ export interface ThrowExpression {
   argument: ASTNode;          // error expression to throw
 }
 
+// Web DSL Nodes (NEW for Phase 11 - Web Keywords Integration)
+
+// PAGE Block: [PAGE name :title "..." :route "/" :component ComponentName]
+export interface PageNode {
+  kind: "page";
+  name: string;
+  title?: string;
+  route?: string;
+  component?: string;
+  metadata?: Map<string, any>;
+  line?: number;
+}
+
+// ROUTE Block: [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
+export interface RouteNode {
+  kind: "route";
+  name: string;
+  path?: string;
+  method?: string;  // GET, POST, PUT, DELETE, PATCH
+  handler?: string;
+  middleware?: string[];
+  validation?: string;
+  line?: number;
+}
+
+// COMPONENT Block: [COMPONENT name :render renderFn :state stateName :methods [...]]
+export interface ComponentNode {
+  kind: "component";
+  name: string;
+  render?: string;
+  state?: string;
+  computed?: string[];
+  watch?: Map<string, string>;
+  methods?: Map<string, string>;
+  slots?: string[];
+  line?: number;
+}
+
+// FORM Block: [FORM name :fields [...] :validation validationFn :submit submitFn]
+export interface FormNode {
+  kind: "form";
+  name: string;
+  fields?: Map<string, any>;
+  validation?: string;
+  submit?: string;
+  handlers?: Map<string, string>;
+  line?: number;
+}
+
 // Function signature (NEW for Phase 3)
 export interface FuncSignature {
   name: string;
@@ -550,6 +603,57 @@ export function makeCatchClause(
 // Helper: Create throw expression (Phase 11)
 export function makeThrowExpression(argument: ASTNode): ThrowExpression {
   return { kind: "throw", argument };
+}
+
+// Helper: Create page node (Phase 11 - Web DSL)
+export function makePageNode(
+  name: string,
+  title?: string,
+  route?: string,
+  component?: string,
+  metadata?: Map<string, any>,
+  line?: number
+): PageNode {
+  return { kind: "page", name, title, route, component, metadata, line };
+}
+
+// Helper: Create route node (Phase 11 - Web DSL)
+export function makeRouteNode(
+  name: string,
+  path?: string,
+  method?: string,
+  handler?: string,
+  middleware?: string[],
+  validation?: string,
+  line?: number
+): RouteNode {
+  return { kind: "route", name, path, method, handler, middleware, validation, line };
+}
+
+// Helper: Create component node (Phase 11 - Web DSL)
+export function makeComponentNode(
+  name: string,
+  render?: string,
+  state?: string,
+  computed?: string[],
+  watch?: Map<string, string>,
+  methods?: Map<string, string>,
+  slots?: string[],
+  line?: number
+): ComponentNode {
+  return { kind: "component", name, render, state, computed, watch, methods, slots, line };
+}
+
+// Helper: Create form node (Phase 11 - Web DSL)
+export function makeFormNode(
+  name: string,
+  fields?: Map<string, any>,
+  validation?: string,
+  submit?: string,
+  handlers?: Map<string, string>,
+  line?: number
+): FormNode {
+  return { kind: "form", name, fields, validation, submit, handlers, line };
 }
 
 // Helper: Create reasoning block (Phase 9c)

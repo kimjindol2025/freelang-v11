@@ -53,6 +53,24 @@ export enum TokenType {
   Until = "Until",         // until
   While = "While",         // while
 
+  // Phase 11 Keywords (Web DSL)
+  Page = "Page",           // PAGE
+  Route = "Route",         // ROUTE
+  Component = "Component", // COMPONENT
+  Form = "Form",           // FORM
+  State = "State",         // STATE
+  Computed = "Computed",   // COMPUTED
+  Watch = "Watch",         // WATCH
+  Method = "Method",       // METHOD
+  Render = "Render",       // RENDER
+  Handler = "Handler",     // HANDLER
+  Validation = "Validation", // VALIDATION
+  Layout = "Layout",       // LAYOUT
+  Middleware = "Middleware", // MIDDLEWARE
+  Suspense = "Suspense",   // SUSPENSE
+  Slot = "Slot",           // SLOT
+  Metadata = "Metadata",   // METADATA
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

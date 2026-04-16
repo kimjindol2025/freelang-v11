@@ -35,6 +35,23 @@ const KEYWORDS: Map<string, T> = new Map([
   ["repeat", T.Repeat],
   ["until", T.Until],
   ["while", T.While],
+  // Phase 11: Web DSL keywords
+  ["PAGE", T.Page],
+  ["ROUTE", T.Route],
+  ["COMPONENT", T.Component],
+  ["FORM", T.Form],
+  ["STATE", T.State],
+  ["COMPUTED", T.Computed],
+  ["WATCH", T.Watch],
+  ["METHOD", T.Method],
+  ["RENDER", T.Render],
+  ["HANDLER", T.Handler],
+  ["VALIDATION", T.Validation],
+  ["LAYOUT", T.Layout],
+  ["MIDDLEWARE", T.Middleware],
+  ["SUSPENSE", T.Suspense],
+  ["SLOT", T.Slot],
+  ["METADATA", T.Metadata],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 
