@@ -283,7 +283,10 @@ var init_lexer = __esm({
       ["PRODUCER", "Producer" /* Producer */],
       ["CONSUMER", "Consumer" /* Consumer */],
       ["QUEUE", "Queue" /* Queue */],
-      ["RABBITMQ", "RabbitMQ" /* RabbitMQ */]
+      ["RABBITMQ", "RabbitMQ" /* RabbitMQ */],
+      // Phase 11: Authentication keywords
+      ["JWT", "JWT" /* JWT */],
+      ["OAUTH", "OAuth" /* OAuth */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -479,7 +482,7 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
               const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
@@ -640,7 +643,7 @@ var init_parser = __esm({
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
         }
-        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE" || blockType === "CACHE" || blockType === "CACHED" || blockType === "KAFKA" || blockType === "PRODUCER" || blockType === "CONSUMER" || blockType === "QUEUE" || blockType === "RABBITMQ") {
+        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE" || blockType === "CACHE" || blockType === "CACHED" || blockType === "KAFKA" || blockType === "PRODUCER" || blockType === "CONSUMER" || blockType === "QUEUE" || blockType === "RABBITMQ" || blockType === "JWT" || blockType === "OAUTH") {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return block2;
         }
@@ -28762,6 +28765,12 @@ var Interpreter = class {
       case "RABBITMQ":
         this.context.lastValue = this.handleRabbitMQBlock(block);
         break;
+      case "JWT":
+        this.context.lastValue = this.handleJWTBlock(block);
+        break;
+      case "OAUTH":
+        this.context.lastValue = this.handleOAuthBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -29153,6 +29162,44 @@ var Interpreter = class {
     this.context.rabbitmqs = this.context.rabbitmqs || /* @__PURE__ */ new Map();
     this.context.rabbitmqs.set(name, rabbitConfig);
     return { status: "registered", rabbitmq: name };
+  }
+  // Phase 11 v11: [JWT name :secret "secret" :expires-in "7d"]
+  handleJWTBlock(block) {
+    const name = block.name;
+    const secret = this.eval(block.fields.get("secret")) || "change-me";
+    const expiresIn = this.eval(block.fields.get("expires-in")) || "7d";
+    const algorithm = this.eval(block.fields.get("algorithm")) || "HS256";
+    const jwtConfig = {
+      name,
+      secret,
+      expiresIn,
+      algorithm
+    };
+    this.context.jwts = this.context.jwts || /* @__PURE__ */ new Map();
+    this.context.jwts.set(name, jwtConfig);
+    return { status: "registered", jwt: name };
+  }
+  // Phase 11 v11: [OAUTH name :provider "google" :client-id "..."]
+  handleOAuthBlock(block) {
+    const name = block.name;
+    const provider = this.eval(block.fields.get("provider")) || "google";
+    const clientId = this.eval(block.fields.get("client-id")) || "";
+    const clientSecret = this.eval(block.fields.get("client-secret")) || "";
+    const callbackUrl = this.eval(block.fields.get("callback-url")) || "/auth/callback";
+    const scope = this.eval(block.fields.get("scope")) || ["email", "profile"];
+    const onSuccess = this.eval(block.fields.get("on-success"));
+    const oauthConfig = {
+      name,
+      provider,
+      clientId,
+      clientSecret,
+      callbackUrl,
+      scope,
+      onSuccess
+    };
+    this.context.oauths = this.context.oauths || /* @__PURE__ */ new Map();
+    this.context.oauths.set(name, oauthConfig);
+    return { status: "registered", oauth: name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {

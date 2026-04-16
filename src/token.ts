@@ -92,6 +92,10 @@ export enum TokenType {
   Queue = "Queue",         // QUEUE
   RabbitMQ = "RabbitMQ",   // RABBITMQ
 
+  // Phase 11 Keywords (Authentication)
+  JWT = "JWT",             // JWT
+  OAuth = "OAuth",         // OAUTH
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

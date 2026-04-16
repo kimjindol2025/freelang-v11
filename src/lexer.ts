@@ -71,6 +71,9 @@ const KEYWORDS: Map<string, T> = new Map([
   ["CONSUMER", T.Consumer],
   ["QUEUE", T.Queue],
   ["RABBITMQ", T.RabbitMQ],
+  // Phase 11: Authentication keywords
+  ["JWT", T.JWT],
+  ["OAUTH", T.OAuth],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

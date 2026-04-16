@@ -350,6 +350,14 @@ export class Interpreter {
         // Phase 11 v11: [RABBITMQ name :url "amqp://localhost"]
         this.context.lastValue = this.handleRabbitMQBlock(block);
         break;
+      case "JWT":
+        // Phase 11 v11: [JWT name :secret "secret" :expires-in "7d"]
+        this.context.lastValue = this.handleJWTBlock(block);
+        break;
+      case "OAUTH":
+        // Phase 11 v11: [OAUTH name :provider "google" :client-id "..."]
+        this.context.lastValue = this.handleOAuthBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -846,6 +854,54 @@ export class Interpreter {
     (this.context as any).rabbitmqs.set(name, rabbitConfig);
 
     return { status: "registered", rabbitmq: name };
+  }
+
+  // Phase 11 v11: [JWT name :secret "secret" :expires-in "7d"]
+  private handleJWTBlock(block: Block): any {
+    const name = block.name;
+    const secret = this.eval(block.fields.get("secret")) || "change-me";
+    const expiresIn = this.eval(block.fields.get("expires-in")) || "7d";
+    const algorithm = this.eval(block.fields.get("algorithm")) || "HS256";
+
+    const jwtConfig: any = {
+      name,
+      secret,
+      expiresIn,
+      algorithm,
+    };
+
+    // 글로벌 JWT 레지스트리에 등록
+    (this.context as any).jwts = (this.context as any).jwts || new Map();
+    (this.context as any).jwts.set(name, jwtConfig);
+
+    return { status: "registered", jwt: name };
+  }
+
+  // Phase 11 v11: [OAUTH name :provider "google" :client-id "..."]
+  private handleOAuthBlock(block: Block): any {
+    const name = block.name;
+    const provider = this.eval(block.fields.get("provider")) || "google";
+    const clientId = this.eval(block.fields.get("client-id")) || "";
+    const clientSecret = this.eval(block.fields.get("client-secret")) || "";
+    const callbackUrl = this.eval(block.fields.get("callback-url")) || "/auth/callback";
+    const scope = this.eval(block.fields.get("scope")) || ["email", "profile"];
+    const onSuccess = this.eval(block.fields.get("on-success"));
+
+    const oauthConfig: any = {
+      name,
+      provider,
+      clientId,
+      clientSecret,
+      callbackUrl,
+      scope,
+      onSuccess,
+    };
+
+    // 글로벌 OAuth 레지스트리에 등록
+    (this.context as any).oauths = (this.context as any).oauths || new Map();
+    (this.context as any).oauths.set(name, oauthConfig);
+
+    return { status: "registered", oauth: name };
   }
 
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]

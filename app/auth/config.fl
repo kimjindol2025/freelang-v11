@@ -1,0 +1,25 @@
+[JWT jwt-config
+  :secret "my-secret-key-change-in-production"
+  :expires-in "7d"
+  :algorithm "HS256"
+]
+
+[OAUTH google-oauth
+  :provider :google
+  :client-id "your-google-client-id.apps.googleusercontent.com"
+  :client-secret "your-google-client-secret"
+  :callback-url "/auth/google/callback"
+  :scope ["email" "profile"]
+  :on-success (fn [$profile]
+    {id $profile.id email $profile.email name $profile.name})
+]
+
+[OAUTH github-oauth
+  :provider :github
+  :client-id "your-github-client-id"
+  :client-secret "your-github-client-secret"
+  :callback-url "/auth/github/callback"
+  :scope ["user:email"]
+  :on-success (fn [$profile]
+    {id $profile.id login $profile.login avatar_url $profile.avatar_url})
+]
