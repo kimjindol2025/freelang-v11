@@ -1,0 +1,13 @@
+[PAGE projects-api
+  :path "/api/projects"
+  :render (fn []
+    (let [[$user (if __headers.authorization (auth-user __headers.authorization) nil)]]
+      (if (not $user)
+        {:status 401 :body {:error "Unauthorized"}}
+        (if (= __method "GET")
+          {:status 200 :body (list __db_projects)}
+          (if (= __method "POST")
+            (let [[$project (create __db_projects (merge __body {:owner_id (get $user "id")}))]]
+              {:status 201 :body $project})
+            {:status 405 :body {:error "Method not allowed"}}))))))
+]

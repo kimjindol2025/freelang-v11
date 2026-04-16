@@ -503,7 +503,7 @@ var init_parser = __esm({
             const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
-              const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
+              const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */ || nextToken.type === "Model" /* Model */ || nextToken.type === "Query" /* Query */ || nextToken.type === "Migration" /* Migration */ || nextToken.type === "Repository" /* Repository */ || nextToken.type === "Database" /* Database */ || nextToken.type === "Cached" /* Cached */ || nextToken.type === "Kafka" /* Kafka */ || nextToken.type === "JWT" /* JWT */ || nextToken.type === "OAuth" /* OAuth */ || nextToken.type === "Dockerfile" /* Dockerfile */ || nextToken.type === "K8sDeployment" /* K8sDeployment */ || nextToken.type === "AWS" /* AWS */ || nextToken.type === "GCP" /* GCP */ || nextToken.type === "Azure" /* Azure */;
               const isKnownBlockType = nextToken.type === "Symbol" /* Symbol */ && knownBlockTypes.includes(nextToken.value.toUpperCase());
               const hasKeywordAfter = nextIdx + 1 < this.tokens.length && (this.tokens[nextIdx + 1].type === "Keyword" /* Keyword */ || this.tokens[nextIdx + 1].type === "Colon" /* Colon */);
               if (isBlockKeyword || isKnownBlockType || hasKeywordAfter) {
@@ -548,6 +548,14 @@ var init_parser = __esm({
           blockType = "COMPONENT";
         } else if (typeToken.type === "Form" /* Form */) {
           blockType = "FORM";
+        } else if (typeToken.type === "Service" /* Service */) {
+          blockType = "SERVICE";
+        } else if (typeToken.type === "Controller" /* Controller */) {
+          blockType = "CONTROLLER";
+        } else if (typeToken.type === "Guard" /* Guard */) {
+          blockType = "GUARD";
+        } else if (typeToken.type === "Model" /* Model */) {
+          blockType = "MODEL";
         } else {
           throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
         }
@@ -852,6 +860,8 @@ var init_parser = __esm({
           } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === "TypeClass" /* TypeClass */ || this.tokens[nextIdx].type === "Instance" /* Instance */)) {
             return this.parseBlock();
           } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === "Page" /* Page */ || this.tokens[nextIdx].type === "Component" /* Component */ || this.tokens[nextIdx].type === "Form" /* Form */ || this.tokens[nextIdx].type === "Route" /* Route */)) {
+            return this.parseBlock();
+          } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === "Service" /* Service */ || this.tokens[nextIdx].type === "Controller" /* Controller */ || this.tokens[nextIdx].type === "Guard" /* Guard */ || this.tokens[nextIdx].type === "Model" /* Model */ || this.tokens[nextIdx].type === "Query" /* Query */ || this.tokens[nextIdx].type === "Migration" /* Migration */ || this.tokens[nextIdx].type === "Repository" /* Repository */ || this.tokens[nextIdx].type === "Database" /* Database */ || this.tokens[nextIdx].type === "Cached" /* Cached */ || this.tokens[nextIdx].type === "Kafka" /* Kafka */ || this.tokens[nextIdx].type === "Producer" /* Producer */ || this.tokens[nextIdx].type === "Consumer" /* Consumer */ || this.tokens[nextIdx].type === "Queue" /* Queue */ || this.tokens[nextIdx].type === "RabbitMQ" /* RabbitMQ */ || this.tokens[nextIdx].type === "JWT" /* JWT */ || this.tokens[nextIdx].type === "OAuth" /* OAuth */ || this.tokens[nextIdx].type === "Dockerfile" /* Dockerfile */ || this.tokens[nextIdx].type === "DockerCompose" /* DockerCompose */ || this.tokens[nextIdx].type === "K8sDeployment" /* K8sDeployment */ || this.tokens[nextIdx].type === "K8sService" /* K8sService */ || this.tokens[nextIdx].type === "K8sIngress" /* K8sIngress */ || this.tokens[nextIdx].type === "AWS" /* AWS */ || this.tokens[nextIdx].type === "GCP" /* GCP */ || this.tokens[nextIdx].type === "Azure" /* Azure */)) {
             return this.parseBlock();
           } else {
             return this.parseArray();
@@ -24735,6 +24745,12 @@ ${exportsStr}
         return this.genFuncBlock(node);
       case "MODULE":
         return this.genModuleBlock(node);
+      case "SERVICE":
+        return this.genServiceBlock(node);
+      case "MODEL":
+        return this.genModelBlock(node);
+      case "CONTROLLER":
+        return this.genControllerBlock(node);
       default:
         return `/* unsupported block: ${node.type} */`;
     }
@@ -24752,6 +24768,111 @@ ${exportsStr}
       return body.map((n) => this.genNode(n)).join("\n");
     }
     return this.genNode(body);
+  }
+  genServiceBlock(node) {
+    const name = node.name;
+    const methods = node.fields.get("methods");
+    const inject = node.fields.get("inject");
+    const injectParams = inject ? Array.isArray(inject) ? inject.map((dep) => {
+      const depName = dep.kind === "variable" ? dep.name : dep.kind === "literal" ? String(dep.value) : String(dep);
+      return `private ${depName}: ${depName}`;
+    }).join(", ") : "" : "";
+    let methodsCode = "";
+    if (methods && methods.kind === "sexpr") {
+      const sExpr = methods;
+      methodsCode = sExpr.args.map((arg) => {
+        if (arg.kind === "sexpr" && arg.op === "fn") {
+          const fnExpr = arg;
+          const fnNameArg = fnExpr.args[0];
+          const fnParamsArg = fnExpr.args[1];
+          const fnBodyArg = fnExpr.args[2];
+          const fnName = fnNameArg.kind === "variable" ? fnNameArg.name.replace(/^\$/, "") : fnNameArg.kind === "literal" ? String(fnNameArg.value) : "method";
+          const fnParams = this.extractParamList(fnParamsArg).map((p) => p.replace(/^\$/, "")).join(", ");
+          const fnBody = fnBodyArg ? this.genNode(fnBodyArg) : "undefined";
+          return `  ${fnName}(${fnParams}) { return ${fnBody}; }`;
+        }
+        return "";
+      }).filter(Boolean).join("\n");
+    }
+    return [
+      `// Generated by FreeLang v11 \u2014 SERVICE block`,
+      `export class ${name} {`,
+      injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`,
+      methodsCode,
+      `}`
+    ].join("\n");
+  }
+  genModelBlock(node) {
+    const name = node.name;
+    const table = node.fields.get("table") || name.toLowerCase() + "s";
+    const fields = node.fields.get("fields");
+    let sqlColumns = "  id SERIAL PRIMARY KEY";
+    let tsInterface = `export interface ${name} {
+  id: number;`;
+    if (fields && fields.kind === "sexpr") {
+      const sExpr = fields;
+      for (const arg of sExpr.args) {
+        if (arg.kind === "sexpr") {
+          const fieldExpr = arg;
+          const fieldName = fieldExpr.op.startsWith("$") || fieldExpr.op.startsWith(":") ? fieldExpr.op : String(fieldExpr.args[0].value || fieldExpr.op);
+          const cleanFieldName = fieldName.replace(/^[\$:]/, "").replace(/-/g, "_");
+          sqlColumns += `,
+  ${cleanFieldName} VARCHAR(255)`;
+          tsInterface += `
+  ${cleanFieldName.replace(/_/g, "")}: string;`;
+        }
+      }
+    }
+    tsInterface += `
+  createdAt: Date;
+  updatedAt: Date;
+}`;
+    return [
+      `-- Generated by FreeLang v11 \u2014 MODEL block (SQL)`,
+      `CREATE TABLE IF NOT EXISTS ${table} (`,
+      sqlColumns,
+      `,
+  created_at TIMESTAMP DEFAULT NOW(),`,
+      `
+  updated_at TIMESTAMP DEFAULT NOW()`,
+      `
+);`,
+      ``,
+      `// TypeScript interface`,
+      tsInterface
+    ].join("\n");
+  }
+  genControllerBlock(node) {
+    const prefix = node.fields.get("prefix") || "/";
+    const routes = node.fields.get("routes");
+    let routeCode = "";
+    if (routes && routes.kind === "sexpr") {
+      const sExpr = routes;
+      for (let i = 0; i < sExpr.args.length; i += 2) {
+        const methodLit = sExpr.args[i];
+        const routeLit = sExpr.args[i + 1];
+        const handlerLit = sExpr.args[i + 2];
+        const method = methodLit.kind === "literal" ? String(methodLit.value) : "GET";
+        const route = routeLit.kind === "literal" ? String(routeLit.value) : "/";
+        const fullRoute = prefix === "/" ? route : `${prefix}${route}`;
+        routeCode += `router.${method.toLowerCase()}("${fullRoute}", async (req, res) => {
+  try {
+    // TODO: Execute handler
+    res.json({ status: 200 });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+`;
+      }
+    }
+    return [
+      `// Generated by FreeLang v11 \u2014 CONTROLLER block`,
+      `import { Router } from "express";`,
+      `export const router = Router();`,
+      ``,
+      routeCode
+    ].join("\n");
   }
   extractVarName(node) {
     if (node.kind === "variable") {
@@ -31397,6 +31518,25 @@ var FLExecutor = class {
     return ast;
   }
   /**
+   * 인메모리 데이터 스토어 초기화
+   */
+  initializeDataStore() {
+    const ctx = this.interpreter.context;
+    if (!ctx.__db) {
+      ctx.__db = {
+        users: /* @__PURE__ */ new Map(),
+        projects: /* @__PURE__ */ new Map(),
+        todos: /* @__PURE__ */ new Map(),
+        sessions: /* @__PURE__ */ new Map(),
+        messages: /* @__PURE__ */ new Map(),
+        boards: /* @__PURE__ */ new Map(),
+        documents: [],
+        boardMembers: /* @__PURE__ */ new Map(),
+        _nextId: { users: 1, projects: 1, todos: 1, messages: 1, boards: 1 }
+      };
+    }
+  }
+  /**
    * 페이지 컴포넌트 실행
    * 반환 값: { html, json, statusCode 등 }
    */
@@ -31411,7 +31551,24 @@ var FLExecutor = class {
       }
       const astList = this.parseFile(filePath);
       const flRequest = this.createFlRequest(context);
-      this.interpreter.context.__params = context.params || {};
+      this.initializeDataStore();
+      const ctx = this.interpreter.context;
+      const db = ctx.__db;
+      ctx.__params = context.params || {};
+      ctx.__body = context.body || {};
+      ctx.__method = context.method || "GET";
+      ctx.__headers = context.headers || {};
+      ctx.__query = context.query || {};
+      ctx.__db_users = db.users;
+      ctx.__db_projects = db.projects;
+      ctx.__db_todos = db.todos;
+      ctx.__db_sessions = db.sessions;
+      ctx.__db_messages = db.messages;
+      ctx.__db_boards = db.boards;
+      ctx.__db_members = db.boardMembers;
+      this.injectJWTFunctions();
+      this.injectAuthHelpers();
+      this.injectDBHelpers();
       const execContext = this.interpreter.interpret(astList);
       const result = execContext.lastValue;
       return this.processResult(result);
@@ -31522,6 +31679,110 @@ var FLExecutor = class {
     return {
       size: this.cache.size,
       files: Array.from(this.cache.keys())
+    };
+  }
+  /**
+   * JWT 함수 주입 (간단한 구현)
+   */
+  injectJWTFunctions() {
+    const ctx = this.interpreter.context;
+    ctx["jwt-sign"] = (payload, secret = "default-secret") => {
+      const header = { alg: "HS256", typ: "JWT" };
+      const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+      const signature = Buffer.from(
+        `${encodedHeader}.${encodedPayload}${secret}`
+      ).toString("base64url").substring(0, 20);
+      return `${encodedHeader}.${encodedPayload}.${signature}`;
+    };
+    ctx["jwt-verify"] = (token, secret = "default-secret") => {
+      try {
+        const parts = token.split(".");
+        if (parts.length !== 3) return null;
+        const payload = JSON.parse(
+          Buffer.from(parts[1], "base64url").toString()
+        );
+        return payload;
+      } catch (e) {
+        return null;
+      }
+    };
+  }
+  /**
+   * 인증 헬퍼 함수 주입
+   */
+  injectAuthHelpers() {
+    const ctx = this.interpreter.context;
+    ctx["auth-user"] = (authHeader) => {
+      if (!authHeader) return null;
+      const token = authHeader.replace("Bearer ", "");
+      const payload = ctx["jwt-verify"](token);
+      if (!payload) return null;
+      const db = ctx.__db;
+      if (db && db.users) {
+        const user = Array.from(db.users.values()).find(
+          (u) => u.id === payload.userId
+        );
+        return user || null;
+      }
+      return payload;
+    };
+  }
+  /**
+   * DB 헬퍼 함수 주입
+   */
+  injectDBHelpers() {
+    const ctx = this.interpreter.context;
+    ctx["create"] = (collection, data) => {
+      const db = ctx.__db;
+      const tableName = Object.keys(db).find(
+        (key) => db[key] === collection
+      );
+      let id = db._nextId[tableName] || 1;
+      db._nextId[tableName] = id + 1;
+      const item = { id, ...data, created_at: /* @__PURE__ */ new Date() };
+      collection.set(id, item);
+      return item;
+    };
+    ctx["get"] = (collection, id) => {
+      return collection.get(id);
+    };
+    ctx["list"] = (collection) => {
+      return Array.from(collection.values());
+    };
+    ctx["update"] = (collection, id, data) => {
+      const item = collection.get(id);
+      if (item) {
+        const updated = { ...item, ...data, updated_at: /* @__PURE__ */ new Date() };
+        collection.set(id, updated);
+        return updated;
+      }
+      return null;
+    };
+    ctx["delete"] = (collection, id) => {
+      return collection.delete(id);
+    };
+    ctx["get-member"] = (memberCollection, boardId, userId) => {
+      const key = `${boardId}:${userId}`;
+      return memberCollection.get(key);
+    };
+    ctx["add-member"] = (memberCollection, boardId, userId, role = "member") => {
+      const key = `${boardId}:${userId}`;
+      const member = { boardId, userId, role, joined_at: /* @__PURE__ */ new Date() };
+      memberCollection.set(key, member);
+      return member;
+    };
+    ctx["str-to-int"] = (str) => {
+      return parseInt(String(str), 10);
+    };
+    ctx["merge"] = (obj1, obj2) => {
+      return { ...obj1, ...obj2 };
+    };
+    ctx["count"] = (obj) => {
+      if (obj instanceof Map) return obj.size;
+      if (Array.isArray(obj)) return obj.length;
+      if (typeof obj === "object" && obj !== null) return Object.keys(obj).length;
+      return 0;
     };
   }
 };
@@ -31929,6 +32190,20 @@ var WebServer = class {
   async handleRequest(req, res) {
     const urlPath = (req.url || "/").split("?")[0];
     const query = this.parseQuery(req.url || "/");
+    let body = {};
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      try {
+        const chunks = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        const bodyStr = Buffer.concat(chunks).toString("utf-8");
+        if (bodyStr && req.headers["content-type"]?.includes("application/json")) {
+          body = JSON.parse(bodyStr);
+        }
+      } catch (e) {
+      }
+    }
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader(
       "Access-Control-Allow-Methods",
@@ -31947,7 +32222,9 @@ var WebServer = class {
           const result = await this.executor.executePage(match.route.filePath, {
             req: { method: req.method, path: urlPath, headers: req.headers },
             params: match.params,
-            query
+            query,
+            body,
+            method: req.method
           });
           if (result.success && typeof result.body === "string") {
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
@@ -32135,6 +32412,40 @@ function cmdCheck(filePath) {
   const source = fs15.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
+}
+function cmdCodegen(args2) {
+  const inputFile = args2.find((a) => !a.startsWith("-") && a.endsWith(".fl"));
+  const target = args2.includes("--target") ? args2[args2.indexOf("--target") + 1] : "all";
+  if (!inputFile) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
+    process.exit(1);
+  }
+  const absInput = path12.resolve(inputFile);
+  if (!fs15.existsSync(absInput)) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
+    process.exit(1);
+  }
+  try {
+    const source = fs15.readFileSync(absInput, "utf-8");
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const cg = new JSCodegen();
+    for (const node of ast) {
+      if (node.kind === "block") {
+        const blockType = node.type;
+        if (["SERVICE", "MODEL", "CONTROLLER"].includes(blockType)) {
+          if (target === "all" || target === "typescript" && blockType !== "MODEL" || target === "sql" && blockType === "MODEL") {
+            const code = cg.generate([node]);
+            console.log(code);
+            console.log("\n" + "\u2500".repeat(80) + "\n");
+          }
+        }
+      }
+    }
+  } catch (err4) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs15.readFileSync(absInput, "utf-8"), absInput)}`);
+    process.exit(1);
+  }
 }
 function cmdCompile(args2) {
   const outputIdx = args2.indexOf("-o");
@@ -32567,6 +32878,7 @@ function cmdServe(args2) {
   let appDir = "app";
   let port = 3e3;
   let renderMode = "ssr";
+  let positionalIdx = 0;
   for (let i = 0; i < args2.length; i++) {
     if (args2[i] === "--app" && args2[i + 1]) {
       appDir = args2[++i];
@@ -32577,6 +32889,11 @@ function cmdServe(args2) {
       if (["ssr", "isr", "ssg"].includes(m)) {
         renderMode = m;
       }
+    } else if (!args2[i].startsWith("--")) {
+      if (positionalIdx === 0) {
+        appDir = args2[i];
+      }
+      positionalIdx++;
     }
   }
   const server = new WebServer({ appDir, port, renderMode });
@@ -32669,6 +32986,14 @@ switch (cmd) {
       process.exit(1);
     }
     cmdCompile(args.slice(1));
+    break;
+  }
+  case "codegen": {
+    if (args.length < 2) {
+      printUsage();
+      process.exit(1);
+    }
+    cmdCodegen(args.slice(1));
     break;
   }
   case "fmt": {

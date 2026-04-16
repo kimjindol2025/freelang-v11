@@ -132,7 +132,7 @@ export class Parser {
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
-          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance || nextToken.type === T.Page || nextToken.type === T.Component || nextToken.type === T.Form || nextToken.type === T.Route || nextToken.type === T.Service || nextToken.type === T.Controller || nextToken.type === T.Guard;
+          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance || nextToken.type === T.Page || nextToken.type === T.Component || nextToken.type === T.Form || nextToken.type === T.Route || nextToken.type === T.Service || nextToken.type === T.Controller || nextToken.type === T.Guard || nextToken.type === T.Model || nextToken.type === T.Query || nextToken.type === T.Migration || nextToken.type === T.Repository || nextToken.type === T.Database || nextToken.type === T.Cached || nextToken.type === T.Kafka || nextToken.type === T.JWT || nextToken.type === T.OAuth || nextToken.type === T.Dockerfile || nextToken.type === T.K8sDeployment || nextToken.type === T.AWS || nextToken.type === T.GCP || nextToken.type === T.Azure;
           const isKnownBlockType = nextToken.type === T.Symbol && knownBlockTypes.includes(nextToken.value.toUpperCase());
           const hasKeywordAfter = nextIdx + 1 < this.tokens.length &&
             (this.tokens[nextIdx + 1].type === T.Keyword || this.tokens[nextIdx + 1].type === T.Colon);
@@ -184,6 +184,14 @@ export class Parser {
       blockType = "COMPONENT";
     } else if (typeToken.type === T.Form) {
       blockType = "FORM";
+    } else if (typeToken.type === T.Service) {
+      blockType = "SERVICE";
+    } else if (typeToken.type === T.Controller) {
+      blockType = "CONTROLLER";
+    } else if (typeToken.type === T.Guard) {
+      blockType = "GUARD";
+    } else if (typeToken.type === T.Model) {
+      blockType = "MODEL";
     } else {
       throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
     }
@@ -602,6 +610,9 @@ export class Parser {
         return this.parseBlock();
       } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === T.Page || this.tokens[nextIdx].type === T.Component || this.tokens[nextIdx].type === T.Form || this.tokens[nextIdx].type === T.Route)) {
         // Phase 11 v11: PAGE/COMPONENT/FORM/ROUTE keyword tokens
+        return this.parseBlock();
+      } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === T.Service || this.tokens[nextIdx].type === T.Controller || this.tokens[nextIdx].type === T.Guard || this.tokens[nextIdx].type === T.Model || this.tokens[nextIdx].type === T.Query || this.tokens[nextIdx].type === T.Migration || this.tokens[nextIdx].type === T.Repository || this.tokens[nextIdx].type === T.Database || this.tokens[nextIdx].type === T.Cached || this.tokens[nextIdx].type === T.Kafka || this.tokens[nextIdx].type === T.Producer || this.tokens[nextIdx].type === T.Consumer || this.tokens[nextIdx].type === T.Queue || this.tokens[nextIdx].type === T.RabbitMQ || this.tokens[nextIdx].type === T.JWT || this.tokens[nextIdx].type === T.OAuth || this.tokens[nextIdx].type === T.Dockerfile || this.tokens[nextIdx].type === T.DockerCompose || this.tokens[nextIdx].type === T.K8sDeployment || this.tokens[nextIdx].type === T.K8sService || this.tokens[nextIdx].type === T.K8sIngress || this.tokens[nextIdx].type === T.AWS || this.tokens[nextIdx].type === T.GCP || this.tokens[nextIdx].type === T.Azure)) {
+        // Phase 11 Enterprise blocks: SERVICE/CONTROLLER/GUARD/MODEL/...
         return this.parseBlock();
       } else {
         // It's a value array: [val1 val2 ...]

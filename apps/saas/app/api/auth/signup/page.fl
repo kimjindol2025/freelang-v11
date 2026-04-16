@@ -1,0 +1,4 @@
+[PAGE auth-signup
+  :path "/api/auth/signup"
+  :render {:status 201 :body {:id 1 :email "test@test.com" :name "Test User"}}
+]

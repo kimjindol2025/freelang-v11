@@ -267,6 +267,23 @@ export class WebServer {
     const urlPath = (req.url || "/").split("?")[0];
     const query = this.parseQuery(req.url || "/");
 
+    // JSON body 파싱
+    let body: Record<string, any> = {};
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      try {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        const bodyStr = Buffer.concat(chunks).toString("utf-8");
+        if (bodyStr && req.headers["content-type"]?.includes("application/json")) {
+          body = JSON.parse(bodyStr);
+        }
+      } catch (e) {
+        // JSON 파싱 실패 시 빈 객체
+      }
+    }
+
     // CORS 헤더
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader(
@@ -293,6 +310,8 @@ export class WebServer {
             req: { method: req.method, path: urlPath, headers: req.headers as Record<string, string> },
             params: match.params,
             query,
+            body,
+            method: req.method,
           });
 
           if (result.success && typeof result.body === "string") {
