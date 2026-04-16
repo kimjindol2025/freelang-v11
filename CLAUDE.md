@@ -1,30 +1,35 @@
-# FreeLang v11 — 통합 AI-Native Language (v9 런타임 + 웹프레임워크)
+# 🚀 FreeLang v11 — 공식 풀스택 언어
 
-> **Claude에게**: FreeLang v11은 v9의 완전한 런타임(Phase 1~151)과 프론트엔드(v9-frontend)를 통합한 풀스택 언어입니다.
-> 
-> **상태** (2026-04-16): ✅ **v11.0.0 완성** — Phase 5 최종 테스트 + 릴리스
+> **선언**: **v11이 새로운 공식 언어다. 모든 풀스택 개발은 v11으로 한다.**
 
----
-
-## 설계 원칙 (단 하나, v9에서 계승)
-
-**AI가 쓰고 싶은 언어.**
-
-- AI가 생각하는 방식이 곧 문법 ([COT], [TOT], [REFLECT], [AGENT], [WISDOM] 등)
-- AI가 하는 일이 곧 네이티브 블록 ([EVOLVE], [MUTATE], [BELIEF] 등)
-- AI가 불편하면 언어가 틀린 것
+**상태** (2026-04-17):
+- ✅ v11.0.0 완성 (Phase 1~5 모두 완료)
+- ✅ 의존성 0 (Node.js v25만 필요)
+- ✅ 테스트 444/446 PASS (99.5%)
+- ✅ 프로덕션 준비 완료
 
 ---
 
-## v11 = v9 (런타임) + 웹프레임워크 (통합 완성)
+## 🎯 3대 핵심 원칙
+
+| 원칙 | 설명 |
+|------|------|
+| **AI-Native** | AI가 생각하는 방식이 곧 문법 ([COT], [AGENT], [EVOLVE] 등) |
+| **의존성 제로** | Node.js v25만으로 모든 풀스택 개발 가능 |
+| **v11 우선** | 모든 새 프로젝트는 v11 사용 (v9/v10 제거) |
+
+---
+
+## 📦 v11 아키텍처
 
 | 계층 | 기술 | 상태 |
 |------|------|------|
-| **런타임** | FreeLang v9 (Phase 1~151) | ✅ 완성 |
-| **웹프레임워크** | App Router + SSR/ISR/SSG | ✅ v11에서 통합 |
-| **컴파일러** | Lexer/Parser/Interpreter | ✅ 웹 키워드 추가 |
+| **백엔드** | v11 (AI-Native S-expression, Phase 1~151) | ✅ 완성 |
+| **프론트엔드** | v11 App Router + SSR/ISR/SSG | ✅ 완성 |
+| **컴파일러** | TypeScript → JavaScript (번들링 완료) | ✅ 완성 |
 | **의존성** | Node.js v25+ 만 필요 | ✅ 완전 제거 |
 | **테스트** | 444/446 PASS (99.5%) | ✅ 통과 |
+| **릴리스** | v11.0.0 | ✅ Production Ready |
 
 ---
 
@@ -54,13 +59,14 @@ http://localhost:43011/
 
 ---
 
-## 포트 맵
+## 🔌 포트 맵 (v11만)
 
-| 포트 | 서비스 | 언어 | 상태 |
+| 포트 | 서비스 | 용도 | 상태 |
 |------|--------|------|------|
-| 43011 | v11 웹 서버 | v9 + 웹프레임워크 | ✅ Phase 5 |
-| 43001 | v9 프론트 (레거시) | v9 | ✅ Phase 1~151 |
-| 43000 | v10 API | v10 | ✅ 별도 프로젝트 |
+| **43011** | v11 웹 서버 | 풀스택 (App Router + SSR) | ✅ 표준 |
+| 3000 | 개발 서버 | 로컬 테스트 (--port 3000) | ✅ 선택 |
+
+> **주의**: 43001 (v9), 43000 (v10)은 폐기됨. v11로 통일.
 
 ---
 
@@ -222,62 +228,54 @@ Coverage:    25.58% (dev) → 향후 개선
 
 ---
 
-## 명령어
+## 💻 명령어 (v11 표준)
 
 ### 개발 모드
 
 ```bash
-# 웹 서버 시작 (핫 리로드)
-node bootstrap.js serve app/
-
-# 특정 포트에서 시작
-node bootstrap.js serve app/ --port 3000
-
-# .fl 파일 직접 실행
+# .fl 파일 실행 (번역 모드)
 node bootstrap.js run app/page.fl
 
-# REPL 시작
+# REPL 시작 (대화형 모드)
 node bootstrap.js repl
+
+# 파일 감시 (변경 감지)
+node bootstrap.js watch app/page.fl
+
+# 형식 검사
+node bootstrap.js check app/page.fl
+
+# 코드 포맷팅
+node bootstrap.js fmt app/page.fl
 ```
 
-### 빌드
+### 프로덕션 빌드
 
 ```bash
-# 컴파일 (TypeScript → JavaScript)
+# 번들 생성 (TypeScript → JavaScript)
 npm run build
 
-# 프로덕션 빌드
-npm run build -- --prod
+# OCI 이미지 생성 (Docker 없이)
+node bootstrap.js build --oci app/main.fl --tag myapp:latest
 ```
 
 ### 테스트
 
 ```bash
-# 전체 테스트 실행
+# 전체 테스트 실행 (444/446 PASS)
 npm test
 
-# 특정 테스트만
-npm test -- web-integration
+# 특정 테스트만 실행
+npm test -- parser.test.ts
 
 # 커버리지 포함
 npm test -- --coverage
 
-# 감시 모드
+# 감시 모드 (변경 감지)
 npm test -- --watch
 ```
 
 ---
-
-## v11 vs v9 비교
-
-| 항목 | v9 | v11 |
-|------|----|----|
-| **런타임** | ✅ Phase 1~151 | ✅ Phase 1~151 |
-| **웹프레임워크** | ❌ 없음 | ✅ App Router + SSR/ISR/SSG |
-| **의존성** | 0개 | 0개 |
-| **포트** | 43001 | 43011 |
-| **파일 라우팅** | ❌ | ✅ app/*.fl |
-| **대상 사용자** | AI 언어 개발자 | 풀스택 웹 개발자 |
 
 ---
 
@@ -300,41 +298,78 @@ npm test -- --watch
 
 ---
 
-## Claude Code 작업 규칙 (v11)
+## ✅ Claude Code 작업 규칙 (필수)
 
-1. **v11 우선** — 새 웹 프로젝트는 v11 사용
-2. **AI 블록 활용** — [COT], [AGENT], [WISDOM] 등 적극 사용
-3. **파일시스템 라우팅** — `app/` 디렉토리 구조 사용
-4. **테스트 필수** — 모든 변경은 `npm test` PASS 확인
-5. **Gogs push** — `git push origin master` 없이 마무리 금지
+| 규칙 | 설명 | 확인 |
+|------|------|------|
+| **v11 독점** | 모든 새 프로젝트는 v11만 사용 (v9/v10 금지) | `npm test` |
+| **AI 블록 필수** | [COT], [AGENT], [WISDOM], [EVOLVE] 등 활용 | 코드 리뷰 |
+| **App Router 표준** | `app/` 폴더 구조로 라우팅 (Next.js 스타일) | 라우트 확인 |
+| **테스트 강제** | 모든 변경 후 `npm test` → 444/446 PASS | CI/CD |
+| **의존성 제로** | npm 패키지 절대 추가 금지 (Node.js 기능만 사용) | package.json |
+| **Gogs 체크인** | 완료 후 `git push origin master` 필수 | 커밋 히스토리 |
 
 ---
 
-## 컨텍스트 소거 후 복구
+## 🔄 세션 시작 체크리스트
+
+```bash
+# 1️⃣ 현황 파악
+npm test                    # 444/446 PASS 확인
+
+# 2️⃣ 최신 코드 확인
+git log --oneline -5        # 최근 커밋 5개
+
+# 3️⃣ 파일 구조 확인
+ls -la app/                 # page.fl, layout.fl 확인
+
+# 4️⃣ 새로운 페이지/컴포넌트 작성
+cat > app/new-page.fl << 'EOF'
+(fn [] 
+  (page
+    :title "Page"
+    :render (fn [] "<h1>Hello</h1>")))
+EOF
+
+# 5️⃣ 테스트 실행
+npm test                    # 항상 PASS 유지
+```
+
+---
+
+## 📚 핵심 문서
+
+| 문서 | 내용 | 상태 |
+|------|------|------|
+| **CLAUDE.md** (이 파일) | v11 완전 가이드 | ✅ 2026-04-17 |
+| **README.md** | v11 소개 & 빠른 시작 | ✅ 포함 |
+| **src/__tests__** | 통합 테스트 (444개) | ✅ Phase 5 |
+
+---
+
+## 📊 최종 체크리스트
+
+- [ ] `npm test` → 444/446 PASS 확인
+- [ ] `git log --oneline -5` → 최근 커밋 확인
+- [ ] `app/page.fl` → 홈페이지 작동 확인
+- [ ] 의존성 0 유지 (package.json npm 패키지 없음)
+- [ ] `git push origin master` → Gogs 체크인
+
+---
+
+## 🎯 v11 철학
 
 ```
-1. 이 파일 읽기 (CLAUDE.md)
-2. git log --oneline -5 확인
-3. npm test 실행 → 모든 테스트 PASS 확인
-4. node bootstrap.js serve app/ 시작
+v11 = AI가 쓰고 싶은 풀스택 언어
+    = Node.js v25 만으로 모든 개발
+    = 의존성 0, 테스트 444/446 PASS
+    = 공식 표준 (v2~v10 폐기)
 ```
 
 ---
 
-## 문서
-
-| 파일 | 내용 |
-|------|------|
-| **CLAUDE.md** | 이 파일 (v11 전체 가이드) |
-| **V10_ARCHITECTURE.md** | v10 API 서버 아키텍처 (별도 프로젝트) |
-| **V10_FEATURES.md** | v10 GraphQL/OAuth 등 (별도 프로젝트) |
-| **V10_TESTING_AND_BUILD.md** | v10 테스트 (별도 프로젝트) |
-
----
-
-**마지막 업데이트**: 2026-04-16  
-**상태**: ✅ v11.0.0 완성 (Phase 1~5 모두 완료)  
+**마지막 업데이트**: 2026-04-17  
+**상태**: ✅ v11.0.0 (공식 풀스택 언어)  
 **준비 상태**: 즉시 개발 가능 🚀  
 
-> 이 문서는 Claude Code 자동화로 유지됩니다.
-> 질문이 있으면 `git log --oneline` 또는 `npm test` 로 현재 상태를 확인하세요.
+> **모든 풀스택 개발은 v11로 한다.**
