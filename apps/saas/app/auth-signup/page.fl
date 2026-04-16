@@ -1,0 +1,4 @@
+[PAGE auth-signup
+  :path "/auth-signup"
+  :render {:id 1 :email "kim@test.com" :name "Kim"}
+]

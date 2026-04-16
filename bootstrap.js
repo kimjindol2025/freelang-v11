@@ -32219,13 +32219,27 @@ var WebServer = class {
     if (match) {
       if (this.executor) {
         try {
+          const isApiPath = urlPath.startsWith("/api/");
           const result = await this.executor.executePage(match.route.filePath, {
             req: { method: req.method, path: urlPath, headers: req.headers },
             params: match.params,
             query,
             body,
-            method: req.method
+            method: req.method,
+            isApiPath
           });
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(result.status || 200);
+            if (typeof result.body === "string") {
+              res.end(result.body);
+            } else if (result.body !== null && typeof result.body === "object") {
+              res.end(JSON.stringify(result.body));
+            } else {
+              res.end(JSON.stringify({ success: result.success, body: result.body }));
+            }
+            return;
+          }
           if (result.success && typeof result.body === "string") {
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
             res.writeHead(result.status || 200);
@@ -32237,9 +32251,16 @@ var WebServer = class {
           }
           return;
         } catch (err4) {
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.writeHead(500);
-          res.end(generateHTML("Error", `<h1>Error</h1><p>${err4.message}</p>`));
+          const isApiPath = urlPath.startsWith("/api/");
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err4.message }));
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(500);
+            res.end(generateHTML("Error", `<h1>Error</h1><p>${err4.message}</p>`));
+          }
           return;
         }
       }

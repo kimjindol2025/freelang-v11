@@ -306,14 +306,35 @@ export class WebServer {
       // executor가 설정되어 있으면 .fl 파일 실행
       if (this.executor) {
         try {
+          // /api/ 경로는 JSON API 모드
+          const isApiPath = urlPath.startsWith("/api/");
+
           const result = await this.executor.executePage(match.route.filePath, {
             req: { method: req.method, path: urlPath, headers: req.headers as Record<string, string> },
             params: match.params,
             query,
             body,
             method: req.method,
+            isApiPath,
           });
 
+          // JSON API 모드: 응답을 JSON으로 처리
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(result.status || 200);
+
+            // result.body가 객체면 JSON 직렬화, 문자열이면 그대로 반환
+            if (typeof result.body === "string") {
+              res.end(result.body);
+            } else if (result.body !== null && typeof result.body === "object") {
+              res.end(JSON.stringify(result.body));
+            } else {
+              res.end(JSON.stringify({ success: result.success, body: result.body }));
+            }
+            return;
+          }
+
+          // HTML 모드: 기존 처리
           if (result.success && typeof result.body === "string") {
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
             res.writeHead(result.status || 200);
@@ -325,9 +346,16 @@ export class WebServer {
           }
           return;
         } catch (err: any) {
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.writeHead(500);
-          res.end(generateHTML("Error", `<h1>Error</h1><p>${err.message}</p>`));
+          const isApiPath = urlPath.startsWith("/api/");
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(500);
+            res.end(generateHTML("Error", `<h1>Error</h1><p>${err.message}</p>`));
+          }
           return;
         }
       }

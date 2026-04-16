@@ -15,7 +15,9 @@ export interface ExecutorContext {
   params?: Record<string, string>;
   query?: Record<string, any>;
   headers?: Record<string, string>;
-  body?: string;
+  body?: Record<string, any> | string;
+  method?: string;
+  isApiPath?: boolean;
 }
 
 export interface ExecutionResult {
