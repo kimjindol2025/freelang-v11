@@ -63,6 +63,14 @@ const KEYWORDS: Map<string, T> = new Map([
   ["MIGRATION", T.Migration],
   ["REPOSITORY", T.Repository],
   ["DATABASE", T.Database],
+  // Phase 11: Cache & Messaging keywords
+  ["CACHE", T.Cache],
+  ["CACHED", T.Cached],
+  ["KAFKA", T.Kafka],
+  ["PRODUCER", T.Producer],
+  ["CONSUMER", T.Consumer],
+  ["QUEUE", T.Queue],
+  ["RABBITMQ", T.RabbitMQ],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

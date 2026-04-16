@@ -84,6 +84,14 @@ export enum TokenType {
   Repository = "Repository", // REPOSITORY
   Database = "Database",   // DATABASE
 
+  // Phase 11 Keywords (Cache & Messaging)
+  Cached = "Cached",       // CACHED
+  Kafka = "Kafka",         // KAFKA
+  Producer = "Producer",   // PRODUCER
+  Consumer = "Consumer",   // CONSUMER
+  Queue = "Queue",         // QUEUE
+  RabbitMQ = "RabbitMQ",   // RABBITMQ
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

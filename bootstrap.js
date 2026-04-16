@@ -275,7 +275,15 @@ var init_lexer = __esm({
       ["QUERY", "Query" /* Query */],
       ["MIGRATION", "Migration" /* Migration */],
       ["REPOSITORY", "Repository" /* Repository */],
-      ["DATABASE", "Database" /* Database */]
+      ["DATABASE", "Database" /* Database */],
+      // Phase 11: Cache & Messaging keywords
+      ["CACHE", "Cache" /* Cache */],
+      ["CACHED", "Cached" /* Cached */],
+      ["KAFKA", "Kafka" /* Kafka */],
+      ["PRODUCER", "Producer" /* Producer */],
+      ["CONSUMER", "Consumer" /* Consumer */],
+      ["QUEUE", "Queue" /* Queue */],
+      ["RABBITMQ", "RabbitMQ" /* RabbitMQ */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -471,7 +479,7 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
               const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
@@ -632,7 +640,7 @@ var init_parser = __esm({
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
         }
-        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE") {
+        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE" || blockType === "CACHE" || blockType === "CACHED" || blockType === "KAFKA" || blockType === "PRODUCER" || blockType === "CONSUMER" || blockType === "QUEUE" || blockType === "RABBITMQ") {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return block2;
         }
@@ -28733,6 +28741,27 @@ var Interpreter = class {
       case "DATABASE":
         this.context.lastValue = this.handleDatabaseBlock(block);
         break;
+      case "CACHE":
+        this.context.lastValue = this.handleCacheBlock(block);
+        break;
+      case "CACHED":
+        this.context.lastValue = this.handleCachedBlock(block);
+        break;
+      case "KAFKA":
+        this.context.lastValue = this.handleKafkaBlock(block);
+        break;
+      case "PRODUCER":
+        this.context.lastValue = this.handleProducerBlock(block);
+        break;
+      case "CONSUMER":
+        this.context.lastValue = this.handleConsumerBlock(block);
+        break;
+      case "QUEUE":
+        this.context.lastValue = this.handleQueueBlock(block);
+        break;
+      case "RABBITMQ":
+        this.context.lastValue = this.handleRabbitMQBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -29013,6 +29042,117 @@ var Interpreter = class {
     this.context.databases = this.context.databases || /* @__PURE__ */ new Map();
     this.context.databases.set(name, dbConfig);
     return { status: "registered", database: name };
+  }
+  // Phase 11 v11: [CACHE name :host "localhost" :port 6379 :ttl 3600]
+  handleCacheBlock(block) {
+    const name = block.name;
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 6379;
+    const ttl = this.eval(block.fields.get("ttl")) || 3600;
+    const cacheConfig = {
+      name,
+      host,
+      port,
+      ttl
+    };
+    this.context.caches = this.context.caches || /* @__PURE__ */ new Map();
+    this.context.caches.set(name, cacheConfig);
+    return { status: "registered", cache: name };
+  }
+  // Phase 11 v11: [CACHED name :cache redis-main :key (...) :fn (...)]
+  handleCachedBlock(block) {
+    const name = block.name;
+    const cacheName = this.eval(block.fields.get("cache"));
+    const keyFn = this.eval(block.fields.get("key"));
+    const fn = this.eval(block.fields.get("fn"));
+    const ttl = this.eval(block.fields.get("ttl")) || 300;
+    const cached = {
+      name,
+      cache: cacheName,
+      key: keyFn,
+      fn,
+      ttl
+    };
+    this.context.cacheds = this.context.cacheds || /* @__PURE__ */ new Map();
+    this.context.cacheds.set(name, cached);
+    return { status: "registered", cached: name };
+  }
+  // Phase 11 v11: [KAFKA name :brokers [...] :client-id "app"]
+  handleKafkaBlock(block) {
+    const name = block.name;
+    const brokersNode = block.fields.get("brokers");
+    const brokers = Array.isArray(brokersNode) ? brokersNode.map((b) => this.eval(b)) : ["localhost:9092"];
+    const clientId = this.eval(block.fields.get("client-id")) || "freelang-app";
+    const kafkaConfig = {
+      name,
+      brokers,
+      clientId
+    };
+    this.context.kafkas = this.context.kafkas || /* @__PURE__ */ new Map();
+    this.context.kafkas.set(name, kafkaConfig);
+    return { status: "registered", kafka: name };
+  }
+  // Phase 11 v11: [PRODUCER name :kafka kafka-main :topic "events"]
+  handleProducerBlock(block) {
+    const name = block.name;
+    const kafkaName = this.eval(block.fields.get("kafka"));
+    const topic = this.eval(block.fields.get("topic")) || "events";
+    const producer = {
+      name,
+      kafka: kafkaName,
+      topic
+    };
+    this.context.producers = this.context.producers || /* @__PURE__ */ new Map();
+    this.context.producers.set(name, producer);
+    return { status: "registered", producer: name };
+  }
+  // Phase 11 v11: [CONSUMER name :kafka kafka-main :topic "events" :handler (...)]
+  handleConsumerBlock(block) {
+    const name = block.name;
+    const kafkaName = this.eval(block.fields.get("kafka"));
+    const topic = this.eval(block.fields.get("topic")) || "events";
+    const groupId = this.eval(block.fields.get("group")) || "default";
+    const handler = this.eval(block.fields.get("handler"));
+    const consumer = {
+      name,
+      kafka: kafkaName,
+      topic,
+      groupId,
+      handler
+    };
+    this.context.consumers = this.context.consumers || /* @__PURE__ */ new Map();
+    this.context.consumers.set(name, consumer);
+    return { status: "registered", consumer: name };
+  }
+  // Phase 11 v11: [QUEUE name :rabbitmq rabbit-main :exchange "app" :handler (...)]
+  handleQueueBlock(block) {
+    const name = block.name;
+    const rabbitName = this.eval(block.fields.get("rabbitmq"));
+    const exchange = this.eval(block.fields.get("exchange")) || "app";
+    const routingKey = this.eval(block.fields.get("routing-key")) || "";
+    const handler = this.eval(block.fields.get("handler"));
+    const queue = {
+      name,
+      rabbitmq: rabbitName,
+      exchange,
+      routingKey,
+      handler
+    };
+    this.context.queues = this.context.queues || /* @__PURE__ */ new Map();
+    this.context.queues.set(name, queue);
+    return { status: "registered", queue: name };
+  }
+  // Phase 11 v11: [RABBITMQ name :url "amqp://localhost"]
+  handleRabbitMQBlock(block) {
+    const name = block.name;
+    const url2 = this.eval(block.fields.get("url")) || "amqp://localhost:5672";
+    const rabbitConfig = {
+      name,
+      url: url2
+    };
+    this.context.rabbitmqs = this.context.rabbitmqs || /* @__PURE__ */ new Map();
+    this.context.rabbitmqs.set(name, rabbitConfig);
+    return { status: "registered", rabbitmq: name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {
