@@ -1,0 +1,397 @@
+; FreeLang Frontend v9 - Code Generator
+; AST에서 JavaScript 코드 생성 (400줄)
+; Generates HTML, JavaScript, and Node.js code
+
+[IMPORT "./v9-parser-web" :as parser]
+[IMPORT "./v9-analyzer-web" :as analyzer]
+
+; Code generation result
+[STRUCT CodeGenResult
+  :html str
+  :javascript str
+  :server-code str
+  :errors [str]
+]
+
+; Generation context
+[STRUCT GenContext
+  :indent i32
+  :page-count i32
+  :route-count i32
+  :component-count i32
+  :agent-count i32
+  :output str
+  :boundary str  ; "server" | "client" | "hybrid"
+]
+
+; Initialize code generator
+[FUNC init-codegen :params []
+  :returns GenContext
+  :body [
+    [GenContext
+      :indent 0
+      :page-count 0
+      :route-count 0
+      :component-count 0
+      :agent-count 0
+      :output ""
+      :boundary "hybrid"
+    ]
+  ]
+]
+
+; Generate indentation
+[FUNC get-indent :params [level]
+  :returns str
+  :body [
+    (do
+      (var indent "")
+      (var i 0)
+      (while (< i (* level 2))
+        (set indent (concat indent " "))
+        (set i (+ i 1)))
+      indent
+    )
+  ]
+]
+
+; Append code
+[FUNC emit :params [context :code]
+  :body [
+    (set context.output (concat context.output code))
+  ]
+]
+
+; Emit with newline
+[FUNC emit-line :params [context :code]
+  :body [
+    (emit context (concat code "\n"))
+  ]
+]
+
+; Generate code from AST
+[FUNC generate :params [ast-nodes :analysis]
+  :returns CodeGenResult
+  :body [
+    (do
+      (var context (init-codegen))
+      (var html "")
+      (var javascript "")
+      (var server-code "")
+      (var errors [])
+
+      ; Generate HTML header
+      (emit-line context "<!DOCTYPE html>")
+      (emit-line context "<html lang=\"en\">")
+      (emit-line context "<head>")
+      (emit-line context "  <meta charset=\"UTF-8\">")
+      (emit-line context "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">")
+      (emit-line context "  <title>FreeLang App</title>")
+      (emit-line context "</head>")
+      (emit-line context "<body>")
+      (emit-line context "  <div id=\"app\"></div>")
+      (emit-line context "  <script>")
+
+      ; Generate JavaScript
+      (emit-line context "    // FreeLang Frontend v9 - Generated Code")
+      (emit-line context "    'use strict';")
+      (emit-line context "")
+
+      ; Generate pages
+      (for-each ast-nodes
+        (fn [node]
+          (match node.type
+            (parser.PAGE (gen-page context node))
+            (parser.ROUTE (gen-route context node))
+            (parser.COMPONENT (gen-component context node))
+            (parser.AGENT (gen-agent context node))
+            (_ true))))
+
+      ; Generate server code
+      (emit-line context "    // Server routes")
+      (emit-line context "    const express = require('express');")
+      (emit-line context "    const app = express();")
+      (emit-line context "    app.use(express.json());")
+      (emit-line context "")
+
+      ; Generate Express routes from ROUTE nodes
+      (for-each ast-nodes
+        (fn [node]
+          (if (eq node.type parser.ROUTE)
+            (gen-express-route context node))))
+
+      ; Close HTML
+      (emit-line context "  </script>")
+      (emit-line context "</body>")
+      (emit-line context "</html>")
+
+      [CodeGenResult
+        :html context.output
+        :javascript javascript
+        :server-code server-code
+        :errors errors
+      ]
+    )
+  ]
+]
+
+; Detect boundary directive from node properties
+[FUNC detect-boundary :params [node]
+  :returns str
+  :body [
+    (do
+      ; Check for "use server" or "use client" in properties
+      (var boundary-hint (get node.properties "boundary"))
+
+      (if (eq boundary-hint "server")
+        "server"
+        (if (eq boundary-hint "client")
+          "client"
+          "hybrid"))  ; Default to hybrid if not specified
+    )
+  ]
+]
+
+; Generate PAGE code based on boundary
+[FUNC gen-page :params [context :node]
+  :body [
+    (do
+      (set context.page-count (+ context.page-count 1))
+      (var path (get node.properties "path"))
+      (var state-def (get node.properties "state"))
+      (var boundary (detect-boundary node))
+
+      ; Set context boundary for code generation
+      (set context.boundary boundary)
+
+      ; Generate code based on boundary
+      (match boundary
+        ("server" (gen-page-server context node path state-def))
+        ("client" (gen-page-client context node path state-def))
+        (_ (gen-page-hybrid context node path state-def)))
+    )
+  ]
+]
+
+; Generate SERVER page (Node.js/Express backend)
+[FUNC gen-page-server :params [context :node :path :state-def]
+  :body [
+    (do
+      (emit-line context "")
+      (emit-line context (concat "    // SERVER Page: " path))
+      (emit-line context "    app.get('" path "', async (req, res) => {")
+      (emit-line context "      try {")
+
+      ; Generate data fetching code
+      (var fetch-data (get node.properties "fetch-data"))
+      (if (not (eq fetch-data ""))
+        (emit-line context (concat "        // Fetch data: " fetch-data)))
+
+      ; Generate render
+      (var render (get node.properties "render"))
+      (emit-line context "        const html = `")
+      (if (not (eq render ""))
+        (emit context render))
+      (emit-line context "        `;")
+      (emit-line context "        res.send(html);")
+      (emit-line context "      } catch (error) {")
+      (emit-line context "        res.status(500).send('Server error');")
+      (emit-line context "      }")
+      (emit-line context "    });")
+    )
+  ]
+]
+
+; Generate CLIENT page (browser-side with Proxy state)
+[FUNC gen-page-client :params [context :node :path :state-def]
+  :body [
+    (do
+      (emit-line context "")
+      (emit-line context (concat "    // CLIENT Page: " path))
+      (emit-line context "    const createPage" context.page-count " = () => {")
+
+      ; Generate Proxy-based state
+      (if (not (eq state-def ""))
+        (gen-state context state-def context.page-count))
+
+      ; Generate render function
+      (var render (get node.properties "render"))
+      (emit-line context "      const render = () => {")
+      (emit-line context "        return `")
+      (if (not (eq render ""))
+        (emit context render))
+      (emit-line context "        `;")
+      (emit-line context "      };")
+
+      ; Generate mount function
+      (emit-line context "      return { state, render, mount() { } };")
+      (emit-line context "    };")
+    )
+  ]
+]
+
+; Generate HYBRID page (both server + client)
+[FUNC gen-page-hybrid :params [context :node :path :state-def]
+  :body [
+    (do
+      (emit-line context "")
+      (emit-line context (concat "    // HYBRID Page: " path))
+      (emit-line context "    const createPage" context.page-count " = () => {")
+
+      ; Parse and generate state (client-side)
+      (if (not (eq state-def ""))
+        (gen-state context state-def context.page-count))
+
+      ; Generate render function
+      (var render (get node.properties "render"))
+      (emit-line context "      const render = () => {")
+      (emit-line context "        return `")
+      (if (not (eq render ""))
+        (emit context render))
+      (emit-line context "        `;")
+      (emit-line context "      };")
+
+      ; Generate mount function
+      (emit-line context "      return { state, render, mount() { } };")
+      (emit-line context "    };")
+    )
+  ]
+]
+
+; Generate STATE code
+[FUNC gen-state :params [context :state-def :page-id]
+  :body [
+    (do
+      (emit-line context "      const stateData = {};")
+      (emit-line context "      const state = new Proxy(stateData, {")
+      (emit-line context "        set(target, key, value) {")
+      (emit-line context "          target[key] = value;")
+      (emit-line context "          updateUI();")
+      (emit-line context "          return true;")
+      (emit-line context "        }")
+      (emit-line context "      });")
+      (emit-line context "")
+    )
+  ]
+]
+
+; Generate ROUTE code
+[FUNC gen-route :params [context :node]
+  :body [
+    (do
+      (set context.route-count (+ context.route-count 1))
+      (var method (get node.properties "method"))
+      (var path (get node.properties "path"))
+
+      (emit-line context "")
+      (emit-line context (concat "    // Route: " method " " path))
+      (emit-line context (concat "    app." (string-lower method) "('" path "', (req, res) => {"))
+      (emit-line context "      // Handler implementation")
+      (emit-line context "      res.json({ success: true });")
+      (emit-line context "    });")
+    )
+  ]
+]
+
+; Generate COMPONENT code (boundary-aware)
+[FUNC gen-component :params [context :node]
+  :body [
+    (do
+      (set context.component-count (+ context.component-count 1))
+      (var comp-name (get node.properties "name"))
+      (var boundary (detect-boundary node))
+
+      ; Update context boundary
+      (set context.boundary boundary)
+
+      (emit-line context "")
+      (emit-line context (concat "    // Component (" boundary "): " comp-name))
+
+      (match boundary
+        ("server" (do
+          (emit-line context (concat "    const " comp-name " = async (props) => {"))
+          (emit-line context "      // Server-side component - can access DB")
+          (emit-line context "      return { html: '<div></div>' };")
+          (emit-line context "    };")))
+        ("client" (do
+          (emit-line context (concat "    const " comp-name " = (props) => {"))
+          (emit-line context "      // Client-side component - use Proxy state")
+          (emit-line context "      return {};")
+          (emit-line context "    };")))
+        (_ (do
+          (emit-line context (concat "    const " comp-name " = (props) => {"))
+          (emit-line context "      // Hybrid component")
+          (emit-line context "      return {};")
+          (emit-line context "    };"))))
+    )
+  ]
+]
+
+; Generate AGENT code
+[FUNC gen-agent :params [context :node]
+  :body [
+    (do
+      (set context.agent-count (+ context.agent-count 1))
+      (var agent-name (get node.properties "name"))
+
+      (emit-line context "")
+      (emit-line context (concat "    // Agent: " agent-name))
+      (emit-line context (concat "    const " agent-name " = {"))
+      (emit-line context "      async run(input) {")
+      (emit-line context "        // ReAct loop")
+      (emit-line context "        const thoughts = [];")
+      (emit-line context "        return { success: true, result: null };")
+      (emit-line context "      }")
+      (emit-line context "    };")
+    )
+  ]
+]
+
+; Generate Express route
+[FUNC gen-express-route :params [context :node]
+  :body [
+    (do
+      (var method (get node.properties "method"))
+      (var path (get node.properties "path"))
+      (var handler (get node.properties "handler"))
+
+      (emit-line context "")
+      (emit-line context (concat "    app." (string-lower method) "('" path "', (req, res) => {"))
+      (if (not (eq handler ""))
+        (emit-line context (concat "      " handler)))
+      (emit-line context "      res.status(404).json({ error: 'Not implemented' });")
+      (emit-line context "    });")
+    )
+  ]
+]
+
+; Helper: string to lowercase
+[FUNC string-lower :params [str]
+  :returns str
+  :body [
+    ; Placeholder - implement using v9 string library
+    str
+  ]
+]
+
+; Generate full application
+[FUNC generate-app :params [ast-nodes]
+  :returns CodeGenResult
+  :body [
+    (do
+      (var analysis (analyzer.analyze ast-nodes))
+      (if (not analysis.valid)
+        (do
+          [CodeGenResult
+            :html ""
+            :javascript ""
+            :server-code ""
+            :errors analysis.errors
+          ])
+        (generate ast-nodes analysis)))
+    )
+  ]
+]
+
+; Export
+[EXPORT generate generate-app CodeGenResult gen-page gen-route gen-component gen-agent]

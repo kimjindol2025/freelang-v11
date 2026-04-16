@@ -1,3 +1,5 @@
-[PAGE :path "/"
-  :name "Home"
-  :render "<h1>Welcome to FreeLang v9</h1><p>App Router Test</p>"]
+(fn [] 
+  (page
+    :title "Home"
+    :render (fn []
+      "<html><body><h1>Hello v11 🚀</h1></body></html>")))
