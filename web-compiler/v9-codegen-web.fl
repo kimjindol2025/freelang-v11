@@ -62,7 +62,7 @@
 
 ; Generate code from AST
 [FUNC generate
-  :params [$ast-nodes $analysis]
+  :params [$ast-nodes]
   :body (do
     (var context (init-codegen))
     (var html "")
@@ -87,11 +87,29 @@
     (emit-line context "    'use strict';")
     (emit-line context "")
 
-    ; Generate pages
+    ; Generate code for each AST node
     (for-each $ast-nodes
       (fn [$node]
-        (if (get $node :type)
-          (emit context (concat (get $node :name) " generated\n")))))
+        (var node-kind (get $node :kind))
+        (cond
+          ; PAGE blocks
+          ((eq node-kind "PAGE")
+            (gen-page context $node))
+          ; COMPONENT blocks
+          ((eq node-kind "COMPONENT")
+            (gen-component context $node))
+          ; ROUTE blocks
+          ((eq node-kind "ROUTE")
+            (gen-route context $node))
+          ; FORM blocks
+          ((eq node-kind "FORM")
+            (emit-line context (concat "// FORM: " (get $node :name))))
+          ; AGENT blocks
+          ((eq node-kind "AGENT")
+            (gen-agent context $node))
+          ; Default
+          (true
+            (emit-line context (concat "// Generated: " node-kind))))))
 
     ; Close HTML
     (emit-line context "  </script>")

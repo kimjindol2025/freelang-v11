@@ -1,6 +1,10 @@
 ; FreeLang Frontend v11 - Main Entrypoint
 ; 웹 컴파일러 파이프라인 (v11 네이티브 구현)
 
+[IMPORT "./v9-lexer-web" :as lexer]
+[IMPORT "./v9-parser-web" :as parser]
+[IMPORT "./v9-codegen-web" :as codegen]
+
 ; Frontend compilation options
 [STRUCT FrontendOptions
   :input-file str
@@ -47,25 +51,45 @@
 
     ; Phase 1: Lexing
     (println "📝 Phase 1: Lexing...")
+    (var tokens (try
+      (lexer.tokenize $input-content)
+      (catch err
+        (do
+          (var err-msg (concat "Lexing error: " (to-string err)))
+          (vec.push errors err-msg)
+          []))))
 
     ; Phase 2: Parsing
     (println "🔨 Phase 2: Parsing...")
+    (var ast (try
+      (parser.parse $tokens)
+      (catch err
+        (do
+          (var err-msg (concat "Parsing error: " (to-string err)))
+          (vec.push errors err-msg)
+          []))))
 
-    ; Phase 3: Analysis
+    ; Phase 3: Analysis (semantic check)
     (println "🔍 Phase 3: Analysis...")
+    ; TODO: Add type checking and semantic analysis
 
     ; Phase 4: Code Generation
     (println "✨ Phase 4: Code Generation...")
+    (var generated (try
+      (codegen.generate $ast)
+      (catch err
+        (do
+          (var err-msg (concat "Code generation error: " (to-string err)))
+          (vec.push errors err-msg)
+          ""))))
 
-    ; Generate output
-    (set output (concat "// FreeLang v11 Generated Code\n"))
-    (set output (concat output "console.log('Hello from v11!');\n"))
+    (set output generated)
 
     (var end-time (current-time-ms))
     (var compilation-time (- end-time start-time))
 
     {
-      :success true
+      :success (eq (length errors) 0)
       :output output
       :errors errors
       :warnings warnings
