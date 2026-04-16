@@ -1,22 +1,3 @@
-[PAGE HomePage
-  :title "Home"
-  :route "/"
-  :component HomeComponent
-]
-
-[ROUTE api_users
-  :path "/api/users"
-  :method "GET"
-  :handler getUsers
-]
-
-[COMPONENT Card
-  :render renderCard
-  :state cardState
-  :methods {:onClick handleClick}
-]
-
-[FORM UserForm
-  :validation validateUser
-  :submit submitForm
-]
+[PAGE :path "/"
+  :name "Home"
+  :render "<h1>Welcome to FreeLang v9</h1><p>App Router Test</p>"]

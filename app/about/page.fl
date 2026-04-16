@@ -1,0 +1,3 @@
+[PAGE :path "/about"
+  :name "About"
+  :render "<h1>About Page</h1><p>Static page example</p>"]

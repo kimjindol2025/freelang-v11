@@ -1,0 +1,5 @@
+[PAGE :path "/client-page"
+  :boundary "client"
+  :name "ClientPage"
+  :state [{count i32 0}]
+  :render "<h1>Client-side Page</h1><p>Count: {{ count }}</p><button @click=\"increment\">+1</button>"]
