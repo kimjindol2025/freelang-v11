@@ -353,8 +353,16 @@ export class Interpreter {
     }
 
     try {
-      // :render을 eval해서 HTML 문자열 반환
-      const html = this.eval(renderNode);
+      let html: any;
+
+      // :render이 Block인 경우 (예: AGENT 블록)
+      if (renderNode.kind === "block") {
+        this.evalBlock(renderNode as Block);
+        html = this.context.lastValue;
+      } else {
+        // 일반 S-expression
+        html = this.eval(renderNode);
+      }
 
       // {{ param }} 템플릿 보간 지원
       if (typeof html === "string") {

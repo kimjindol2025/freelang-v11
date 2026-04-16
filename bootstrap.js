@@ -28752,7 +28752,13 @@ var Interpreter = class {
       this.context.variables.set(`$${key}`, value);
     }
     try {
-      const html = this.eval(renderNode);
+      let html;
+      if (renderNode.kind === "block") {
+        this.evalBlock(renderNode);
+        html = this.context.lastValue;
+      } else {
+        html = this.eval(renderNode);
+      }
       if (typeof html === "string") {
         let interpolated = html;
         for (const [key, value] of Object.entries(params)) {
