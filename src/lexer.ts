@@ -37,6 +37,7 @@ const KEYWORDS: Map<string, T> = new Map([
   ["while", T.While],
   // Phase 11: Web DSL keywords
   ["PAGE", T.Page],
+  ["API", T.Api],
   ["ROUTE", T.Route],
   ["COMPONENT", T.Component],
   ["FORM", T.Form],
@@ -52,6 +53,46 @@ const KEYWORDS: Map<string, T> = new Map([
   ["SUSPENSE", T.Suspense],
   ["SLOT", T.Slot],
   ["METADATA", T.Metadata],
+  // Phase 11: Enterprise backend keywords
+  ["SERVICE", T.Service],
+  ["CONTROLLER", T.Controller],
+  ["GUARD", T.Guard],
+  ["PIPE", T.Pipe],
+  // Phase 11: Database ORM keywords
+  ["MODEL", T.Model],
+  ["QUERY", T.Query],
+  ["MIGRATION", T.Migration],
+  ["REPOSITORY", T.Repository],
+  ["DATABASE", T.Database],
+  // Phase 11: Cache & Messaging keywords
+  ["CACHE", T.Cache],
+  ["CACHED", T.Cached],
+  ["KAFKA", T.Kafka],
+  ["PRODUCER", T.Producer],
+  ["CONSUMER", T.Consumer],
+  ["QUEUE", T.Queue],
+  ["RABBITMQ", T.RabbitMQ],
+  // Phase 11: Authentication keywords
+  ["JWT", T.JWT],
+  ["OAUTH", T.OAuth],
+  // Phase 11: Deployment keywords
+  ["DOCKERFILE", T.Dockerfile],
+  ["DOCKER-COMPOSE", T.DockerCompose],
+  ["K8S-DEPLOYMENT", T.K8sDeployment],
+  ["K8S-SERVICE", T.K8sService],
+  ["K8S-INGRESS", T.K8sIngress],
+  // Phase 11: Cloud keywords
+  ["AWS", T.AWS],
+  ["AWS-S3", T.AwsS3],
+  ["AWS-LAMBDA", T.AwsLambda],
+  ["AWS-RDS", T.AwsRds],
+  ["AWS-SQS", T.AwsSqs],
+  ["GCP", T.GCP],
+  ["GCP-CLOUD-RUN", T.GcpCloudRun],
+  ["GCP-BIGQUERY", T.GcpBigquery],
+  ["AZURE", T.Azure],
+  ["AZURE-FUNCTION", T.AzureFunction],
+  ["AZURE-COSMOS", T.AzureCosmos],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

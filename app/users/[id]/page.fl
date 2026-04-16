@@ -1,4 +1,5 @@
-[PAGE :path "/users/[id]"
+[PAGE user
+  :path "/users/[id]"
   :name "UserDetail"
   :params [id]
   :render "<h1>User {{ id }}</h1><p>Dynamic page example</p>"]

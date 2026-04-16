@@ -39,7 +39,9 @@
     "fl": "ts-node src/cli.ts",
     "repl": "ts-node src/cli.ts repl"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ws": "^8.20.0"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^20.19.37",

@@ -55,6 +55,7 @@ export enum TokenType {
 
   // Phase 11 Keywords (Web DSL)
   Page = "Page",           // PAGE
+  Api = "Api",             // API
   Route = "Route",         // ROUTE
   Component = "Component", // COMPONENT
   Form = "Form",           // FORM
@@ -70,6 +71,51 @@ export enum TokenType {
   Suspense = "Suspense",   // SUSPENSE
   Slot = "Slot",           // SLOT
   Metadata = "Metadata",   // METADATA
+
+  // Phase 11 Keywords (Enterprise Backend)
+  Service = "Service",     // SERVICE
+  Controller = "Controller", // CONTROLLER
+  Guard = "Guard",         // GUARD
+  Pipe = "Pipe",           // PIPE
+
+  // Phase 11 Keywords (Database ORM)
+  Model = "Model",         // MODEL
+  Query = "Query",         // QUERY
+  Migration = "Migration", // MIGRATION
+  Repository = "Repository", // REPOSITORY
+  Database = "Database",   // DATABASE
+
+  // Phase 11 Keywords (Cache & Messaging)
+  Cached = "Cached",       // CACHED
+  Kafka = "Kafka",         // KAFKA
+  Producer = "Producer",   // PRODUCER
+  Consumer = "Consumer",   // CONSUMER
+  Queue = "Queue",         // QUEUE
+  RabbitMQ = "RabbitMQ",   // RABBITMQ
+
+  // Phase 11 Keywords (Authentication)
+  JWT = "JWT",             // JWT
+  OAuth = "OAuth",         // OAUTH
+
+  // Phase 11 Keywords (Deployment)
+  Dockerfile = "Dockerfile",           // DOCKERFILE
+  DockerCompose = "DockerCompose",     // DOCKER-COMPOSE
+  K8sDeployment = "K8sDeployment",     // K8S-DEPLOYMENT
+  K8sService = "K8sService",           // K8S-SERVICE
+  K8sIngress = "K8sIngress",           // K8S-INGRESS
+
+  // Phase 11 Keywords (Cloud)
+  AWS = "AWS",                         // AWS
+  AwsS3 = "AwsS3",                     // AWS-S3
+  AwsLambda = "AwsLambda",             // AWS-LAMBDA
+  AwsRds = "AwsRds",                   // AWS-RDS
+  AwsSqs = "AwsSqs",                   // AWS-SQS
+  GCP = "GCP",                         // GCP
+  GcpCloudRun = "GcpCloudRun",         // GCP-CLOUD-RUN
+  GcpBigquery = "GcpBigquery",         // GCP-BIGQUERY
+  Azure = "Azure",                     // AZURE
+  AzureFunction = "AzureFunction",     // AZURE-FUNCTION
+  AzureCosmos = "AzureCosmos",         // AZURE-COSMOS
 
   // Special
   Colon = "Colon",         // :

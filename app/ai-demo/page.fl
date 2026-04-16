@@ -1,0 +1,5 @@
+[PAGE ai-demo
+  :path "/ai-demo"
+  :name "AI Demo"
+  :render "<h1>FreeLang v11 AI Demo</h1><p>Welcome to the AI-powered page!</p><p>This page demonstrates AI-native language design.</p>"
+]

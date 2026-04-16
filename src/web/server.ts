@@ -267,6 +267,23 @@ export class WebServer {
     const urlPath = (req.url || "/").split("?")[0];
     const query = this.parseQuery(req.url || "/");
 
+    // JSON body 파싱
+    let body: Record<string, any> = {};
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      try {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        const bodyStr = Buffer.concat(chunks).toString("utf-8");
+        if (bodyStr && req.headers["content-type"]?.includes("application/json")) {
+          body = JSON.parse(bodyStr);
+        }
+      } catch (e) {
+        // JSON 파싱 실패 시 빈 객체
+      }
+    }
+
     // CORS 헤더
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader(
@@ -281,17 +298,76 @@ export class WebServer {
       return;
     }
 
-    // App Router로 라우트 매칭
+    // App Router로 라우트 매칭 (먼저 시도)
     const match = this.router.match(urlPath);
 
-    // 레거시 데모 라우트
-    if (urlPath === "/" || urlPath === "") {
+    // App Router 매칭 성공 → .fl 파일 렌더링
+    if (match) {
+      // executor가 설정되어 있으면 .fl 파일 실행
+      if (this.executor) {
+        try {
+          // /api/ 경로는 JSON API 모드
+          const isApiPath = urlPath.startsWith("/api/");
+
+          const result = await this.executor.executePage(match.route.filePath, {
+            req: { method: req.method, path: urlPath, headers: req.headers as Record<string, string> },
+            params: match.params,
+            query,
+            body,
+            method: req.method,
+            isApiPath,
+          });
+
+          // JSON API 모드: 응답을 JSON으로 처리
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(result.status || 200);
+
+            // result.body가 객체면 JSON 직렬화, 문자열이면 그대로 반환
+            if (typeof result.body === "string") {
+              res.end(result.body);
+            } else if (result.body !== null && typeof result.body === "object") {
+              res.end(JSON.stringify(result.body));
+            } else {
+              res.end(JSON.stringify({ success: result.success, body: result.body }));
+            }
+            return;
+          }
+
+          // HTML 모드: 기존 처리
+          if (result.success && typeof result.body === "string") {
+            res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
+            res.writeHead(result.status || 200);
+            res.end(result.body);
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(result.status || 500);
+            res.end(result.error || "Internal Server Error");
+          }
+          return;
+        } catch (err: any) {
+          const isApiPath = urlPath.startsWith("/api/");
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(500);
+            res.end(generateHTML("Error", `<h1>Error</h1><p>${err.message}</p>`));
+          }
+          return;
+        }
+      }
+
+      // executor가 없으면 기본 HTML 생성 (fallback)
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.writeHead(200);
-      res.end(generateIndexHTML());
+      res.end(generatePageHTML(match.route, match.params));
       return;
     }
 
+    // 레거시 데모 라우트 (App Router 매칭 실패 후)
     if (urlPath === "/demo") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.writeHead(200);
@@ -314,11 +390,11 @@ export class WebServer {
       return;
     }
 
-    // App Router 매칭
-    if (match) {
+    // 기본 홈페이지 (App Router에 정의되지 않은 경우)
+    if (urlPath === "/" || urlPath === "") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.writeHead(200);
-      res.end(generatePageHTML(match.route, match.params));
+      res.end(generateIndexHTML());
       return;
     }
 

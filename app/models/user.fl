@@ -1,0 +1,28 @@
+[DATABASE postgres-main
+  :type :postgresql
+  :host "localhost"
+  :port 5432
+  :name "freelang_db"
+]
+
+[MODEL User
+  :table "users"
+  :db :postgresql
+  :fields {
+    id :int
+    name :string
+    email :string
+    created_at :timestamp
+  }
+]
+
+[REPOSITORY UserRepository
+  :model User
+  :methods {
+    find-all (fn [] [])
+    find-one (fn [$id] {id $id name "User"})
+    save (fn [$user] {id 1 name $user.name})
+    update (fn [$id $user] {id $id name $user.name})
+    remove (fn [$id] {status "deleted"})
+  }
+]

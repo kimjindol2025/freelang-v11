@@ -1,0 +1,11 @@
+[PAGE home
+  :path "/"
+  :render """
+    <h1>Welcome to FreeLang Todo</h1>
+    <p>One language for fullstack development</p>
+    <ul>
+      <li><a href="/todos">View Todos</a></li>
+      <li><a href="/auth/login">Login</a></li>
+    </ul>
+  """
+]

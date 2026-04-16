@@ -182,7 +182,7 @@ export class PageRenderer {
     let html = pageHtml;
 
     // 레이아웃 체인을 역순으로 적용 (부모 → 자식)
-    for (const layoutPath of layoutChain.reverse()) {
+    for (const layoutPath of [...layoutChain].reverse()) {
       const layoutResult = await this.executor.executePage(layoutPath, {
         req: { method: "GET", path: "/" },
       });

@@ -128,11 +128,11 @@ export class Parser {
       if (this.check(T.LBracket)) {
         // Distinguish between block [TYPE ...] and array [val1 val2 ...]
         const nextIdx = this.pos + 1;
-        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
-          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance;
+          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance || nextToken.type === T.Page || nextToken.type === T.Api || nextToken.type === T.Component || nextToken.type === T.Form || nextToken.type === T.Route || nextToken.type === T.Service || nextToken.type === T.Controller || nextToken.type === T.Guard || nextToken.type === T.Model || nextToken.type === T.Query || nextToken.type === T.Migration || nextToken.type === T.Repository || nextToken.type === T.Database || nextToken.type === T.Cached || nextToken.type === T.Kafka || nextToken.type === T.JWT || nextToken.type === T.OAuth || nextToken.type === T.Dockerfile || nextToken.type === T.K8sDeployment || nextToken.type === T.AWS || nextToken.type === T.GCP || nextToken.type === T.Azure;
           const isKnownBlockType = nextToken.type === T.Symbol && knownBlockTypes.includes(nextToken.value.toUpperCase());
           const hasKeywordAfter = nextIdx + 1 < this.tokens.length &&
             (this.tokens[nextIdx + 1].type === T.Keyword || this.tokens[nextIdx + 1].type === T.Colon);
@@ -178,12 +178,22 @@ export class Parser {
       blockType = "INSTANCE";
     } else if (typeToken.type === T.Page) {
       blockType = "PAGE";
+    } else if (typeToken.type === T.Api) {
+      blockType = "API";
     } else if (typeToken.type === T.Route) {
       blockType = "ROUTE";
     } else if (typeToken.type === T.Component) {
       blockType = "COMPONENT";
     } else if (typeToken.type === T.Form) {
       blockType = "FORM";
+    } else if (typeToken.type === T.Service) {
+      blockType = "SERVICE";
+    } else if (typeToken.type === T.Controller) {
+      blockType = "CONTROLLER";
+    } else if (typeToken.type === T.Guard) {
+      blockType = "GUARD";
+    } else if (typeToken.type === T.Model) {
+      blockType = "MODEL";
     } else {
       throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
     }
@@ -338,21 +348,14 @@ export class Parser {
       return this.convertBlockToInstance(block);
     }
 
-    // Phase 11: Parse web DSL blocks
-    if (blockType === "PAGE") {
-      return this.parsePage(blockName, fields, blockLine);
-    }
-
-    if (blockType === "ROUTE") {
-      return this.parseRoute(blockName, fields, blockLine);
-    }
-
-    if (blockType === "COMPONENT") {
-      return this.parseComponent(blockName, fields, blockLine);
-    }
-
-    if (blockType === "FORM") {
-      return this.parseForm(blockName, fields, blockLine);
+    // Phase 11: Parse all enterprise blocks
+    // Note: For PAGE/COMPONENT/FORM, we keep the original fields map intact
+    // so that interpreter can access :render, :state, etc. directly
+    const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
+    if (enterpriseBlocks.includes(blockType)) {
+      const block = makeBlock(blockType, blockName, fields, blockLine);
+      // Could call parsePage/parseRoute etc for validation, but keep fields as-is
+      return block;
     }
 
     const block = makeBlock(blockType, blockName, fields, blockLine);
@@ -577,7 +580,7 @@ export class Parser {
     if (this.check(T.LBracket)) {
       // Lookahead: is this a block or value array?
       const nextIdx = this.pos + 1;
-      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
+      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
 
 
       if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {
@@ -606,6 +609,12 @@ export class Parser {
         throw this.error(`Expected ModuleBlock from parseBlock with MODULE token`, this.peek());
       } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === T.TypeClass || this.tokens[nextIdx].type === T.Instance)) {
         // Phase 6: TYPECLASS/INSTANCE keyword tokens
+        return this.parseBlock();
+      } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === T.Page || this.tokens[nextIdx].type === T.Api || this.tokens[nextIdx].type === T.Component || this.tokens[nextIdx].type === T.Form || this.tokens[nextIdx].type === T.Route)) {
+        // Phase 11 v11: PAGE/API/COMPONENT/FORM/ROUTE keyword tokens
+        return this.parseBlock();
+      } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === T.Service || this.tokens[nextIdx].type === T.Controller || this.tokens[nextIdx].type === T.Guard || this.tokens[nextIdx].type === T.Model || this.tokens[nextIdx].type === T.Query || this.tokens[nextIdx].type === T.Migration || this.tokens[nextIdx].type === T.Repository || this.tokens[nextIdx].type === T.Database || this.tokens[nextIdx].type === T.Cached || this.tokens[nextIdx].type === T.Kafka || this.tokens[nextIdx].type === T.Producer || this.tokens[nextIdx].type === T.Consumer || this.tokens[nextIdx].type === T.Queue || this.tokens[nextIdx].type === T.RabbitMQ || this.tokens[nextIdx].type === T.JWT || this.tokens[nextIdx].type === T.OAuth || this.tokens[nextIdx].type === T.Dockerfile || this.tokens[nextIdx].type === T.DockerCompose || this.tokens[nextIdx].type === T.K8sDeployment || this.tokens[nextIdx].type === T.K8sService || this.tokens[nextIdx].type === T.K8sIngress || this.tokens[nextIdx].type === T.AWS || this.tokens[nextIdx].type === T.GCP || this.tokens[nextIdx].type === T.Azure)) {
+        // Phase 11 Enterprise blocks: SERVICE/CONTROLLER/GUARD/MODEL/...
         return this.parseBlock();
       } else {
         // It's a value array: [val1 val2 ...]
@@ -2333,14 +2342,22 @@ export class Parser {
     };
   }
 
-  // Phase 11: Parse PAGE block - [PAGE name :title "..." :route "/" :component ComponentName]
+  // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
   private parsePage(name: string, fields: Map<string, ASTNode | ASTNode[]>, line: number): PageNode {
+    const path = this.extractStringField(fields, "path");
     const title = this.extractStringField(fields, "title");
-    const route = this.extractStringField(fields, "route");
+    const render = this.extractStringField(fields, "render");
     const component = this.extractSymbolField(fields, "component");
     const metadata = this.extractMapField(fields, "metadata");
 
-    return makePageNode(name, title, route, component, metadata, line);
+    // makePageNode의 route 파라미터로 path 사용
+    const pageNode = makePageNode(name, title, path, component, metadata, line) as any;
+    // render 필드 추가 (interpreter가 사용함)
+    if (render) {
+      pageNode.fields = pageNode.fields || new Map();
+      pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
+    }
+    return pageNode;
   }
 
   // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]

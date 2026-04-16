@@ -32,7 +32,7 @@ describe("Web Framework Integration Tests", () => {
       fs.writeFileSync(path.join(userIdDir, "page.fl"), '(page (format "User %s" id))');
 
       const layoutDir = path.join(testAppDir);
-      fs.writeFileSync(path.join(layoutDir, "layout.fl"), '(layout {{{ children }}}));
+      fs.writeFileSync(path.join(layoutDir, "layout.fl"), '(layout {{{ children }}})');
 
       router = new AppRouter(testAppDir);
     });

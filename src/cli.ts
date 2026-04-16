@@ -15,6 +15,7 @@ import * as readline from "readline";
 import { lex } from "./lexer";
 import { parse, ParserError } from "./parser";
 import { interpret, Interpreter } from "./interpreter";
+import { Block } from "./ast";
 import { JSCodegen } from "./codegen-js"; // Phase 6: FL 컴파일러
 import { formatFL } from "./formatter";
 import { DebugSession, setGlobalDebugSession } from "./debugger"; // Phase 78: 디버거
@@ -165,6 +166,48 @@ function cmdCheck(filePath: string): void {
 // ─────────────────────────────────────────
 // compile 커맨드 (Phase 6)
 // ─────────────────────────────────────────
+
+function cmdCodegen(args: string[]): void {
+  // freelang codegen <file.fl> [--target typescript|sql|all]
+  const inputFile = args.find(a => !a.startsWith("-") && a.endsWith(".fl"));
+  const target = args.includes("--target") ? args[args.indexOf("--target") + 1] : "all";
+
+  if (!inputFile) {
+    console.error(`\x1b[31m오류\x1b[0m  입력 파일을 지정하세요: codegen <file.fl>`);
+    process.exit(1);
+  }
+
+  const absInput = path.resolve(inputFile);
+  if (!fs.existsSync(absInput)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${inputFile}`);
+    process.exit(1);
+  }
+
+  try {
+    const source = fs.readFileSync(absInput, "utf-8");
+    const tokens = lex(source);
+    const ast = parse(tokens);
+
+    const cg = new JSCodegen();
+
+    // 모든 블록에 대해 코드 생성
+    for (const node of ast) {
+      if (node.kind === "block") {
+        const blockType = (node as Block).type;
+        if (["SERVICE", "MODEL", "CONTROLLER"].includes(blockType)) {
+          if (target === "all" || (target === "typescript" && blockType !== "MODEL") || (target === "sql" && blockType === "MODEL")) {
+            const code = cg.generate([node]);
+            console.log(code);
+            console.log("\n" + "─".repeat(80) + "\n");
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`\x1b[31m오류\x1b[0m  ${formatError(err as Error, fs.readFileSync(absInput, "utf-8"), absInput)}`);
+    process.exit(1);
+  }
+}
 
 function cmdCompile(args: string[]): void {
   // 옵션 파싱: compile input.fl -o output.js [--esm] [--runtime]
@@ -712,10 +755,11 @@ function cmdRegistry(registryArgs: string[]): void {
 }
 
 function cmdServe(args: string[]): void {
-  // Phase 3: freelang serve [--app app] [--port 3000] [--mode ssr|isr|ssg]
+  // Phase 3: freelang serve [appDir] [--app app] [--port 3000] [--mode ssr|isr|ssg]
   let appDir = "app";
   let port = 3000;
   let renderMode: "ssr" | "isr" | "ssg" = "ssr";
+  let positionalIdx = 0;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--app" && args[i + 1]) {
@@ -727,6 +771,12 @@ function cmdServe(args: string[]): void {
       if (["ssr", "isr", "ssg"].includes(m)) {
         renderMode = m;
       }
+    } else if (!args[i].startsWith("--")) {
+      // 첫 번째 positional argument는 appDir
+      if (positionalIdx === 0) {
+        appDir = args[i];
+      }
+      positionalIdx++;
     }
   }
 
@@ -826,6 +876,11 @@ switch (cmd) {
   case "compile": {
     if (args.length < 2) { printUsage(); process.exit(1); }
     cmdCompile(args.slice(1));
+    break;
+  }
+  case "codegen": {
+    if (args.length < 2) { printUsage(); process.exit(1); }
+    cmdCodegen(args.slice(1));
     break;
   }
   case "fmt": {

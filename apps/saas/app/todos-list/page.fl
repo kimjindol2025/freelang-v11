@@ -1,0 +1,4 @@
+[PAGE todos-list
+  :path "/todos-list"
+  :render [{:id 1 :title "Task 1"} {:id 2 :title "Task 2"}]
+]

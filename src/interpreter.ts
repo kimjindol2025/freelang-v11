@@ -278,6 +278,130 @@ export class Interpreter {
 
   private evalBlock(block: Block): void {
     switch (block.type) {
+      case "PAGE":
+        // Phase 11 v11: [PAGE :path "/" :render "<h1>...</h1>"]
+        this.context.lastValue = this.handlePageBlock(block);
+        break;
+      case "API":
+        // Phase 11 MVP: [API :methods ["POST"] :path "/auth/signup" :do (create $db.users __body)]
+        this.context.lastValue = this.handleApiBlock(block);
+        break;
+      case "COMPONENT":
+        // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
+        this.context.lastValue = this.handleComponentBlock(block);
+        break;
+      case "FORM":
+        // Phase 11 v11: [FORM name :fields [...] :validation ...]
+        this.context.lastValue = this.handleFormBlock(block);
+        break;
+      case "SERVICE":
+        // Phase 11 v11: [SERVICE name :inject [...] :methods {...}]
+        this.context.lastValue = this.handleServiceBlock(block);
+        break;
+      case "CONTROLLER":
+        // Phase 11 v11: [CONTROLLER name :prefix "/api" :routes {...}]
+        this.context.lastValue = this.handleControllerBlock(block);
+        break;
+      case "GUARD":
+        // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
+        this.context.lastValue = this.handleGuardBlock(block);
+        break;
+      case "MODEL":
+        // Phase 11 v11: [MODEL name :table "users" :fields {...}]
+        this.context.lastValue = this.handleModelBlock(block);
+        break;
+      case "QUERY":
+        // Phase 11 v11: [QUERY name :model User :where {...}]
+        this.context.lastValue = this.handleQueryBlock(block);
+        break;
+      case "MIGRATION":
+        // Phase 11 v11: [MIGRATION name :version "001" :up (...) :down (...)]
+        this.context.lastValue = this.handleMigrationBlock(block);
+        break;
+      case "REPOSITORY":
+        // Phase 11 v11: [REPOSITORY name :model User :methods {...}]
+        this.context.lastValue = this.handleRepositoryBlock(block);
+        break;
+      case "DATABASE":
+        // Phase 11 v11: [DATABASE name :type :postgresql :host "localhost"]
+        this.context.lastValue = this.handleDatabaseBlock(block);
+        break;
+      case "CACHE":
+        // Phase 11 v11: [CACHE name :host "localhost" :port 6379 :ttl 3600]
+        this.context.lastValue = this.handleCacheBlock(block);
+        break;
+      case "CACHED":
+        // Phase 11 v11: [CACHED name :cache redis-main :key (...) :fn (...)]
+        this.context.lastValue = this.handleCachedBlock(block);
+        break;
+      case "KAFKA":
+        // Phase 11 v11: [KAFKA name :brokers [...] :client-id "app"]
+        this.context.lastValue = this.handleKafkaBlock(block);
+        break;
+      case "PRODUCER":
+        // Phase 11 v11: [PRODUCER name :kafka kafka-main :topic "events"]
+        this.context.lastValue = this.handleProducerBlock(block);
+        break;
+      case "CONSUMER":
+        // Phase 11 v11: [CONSUMER name :kafka kafka-main :topic "events" :handler (...)]
+        this.context.lastValue = this.handleConsumerBlock(block);
+        break;
+      case "QUEUE":
+        // Phase 11 v11: [QUEUE name :rabbitmq rabbit-main :exchange "app" :handler (...)]
+        this.context.lastValue = this.handleQueueBlock(block);
+        break;
+      case "RABBITMQ":
+        // Phase 11 v11: [RABBITMQ name :url "amqp://localhost"]
+        this.context.lastValue = this.handleRabbitMQBlock(block);
+        break;
+      case "JWT":
+        // Phase 11 v11: [JWT name :secret "secret" :expires-in "7d"]
+        this.context.lastValue = this.handleJWTBlock(block);
+        break;
+      case "OAUTH":
+        // Phase 11 v11: [OAUTH name :provider "google" :client-id "..."]
+        this.context.lastValue = this.handleOAuthBlock(block);
+        break;
+      case "DOCKERFILE":
+        // Phase 11 v11: [DOCKERFILE name :base "node:20" :workdir "/app" ...]
+        this.context.lastValue = this.handleDockerfileBlock(block);
+        break;
+      case "DOCKER-COMPOSE":
+        // Phase 11 v11: [DOCKER-COMPOSE name :services {...} :volumes {...}]
+        this.context.lastValue = this.handleDockerComposeBlock(block);
+        break;
+      case "K8S-DEPLOYMENT":
+        // Phase 11 v11: [K8S-DEPLOYMENT name :replicas 3 :image "..."]
+        this.context.lastValue = this.handleK8sDeploymentBlock(block);
+        break;
+      case "K8S-SERVICE":
+        // Phase 11 v11: [K8S-SERVICE name :selector {:app "name"} :ports [...]]
+        this.context.lastValue = this.handleK8sServiceBlock(block);
+        break;
+      case "K8S-INGRESS":
+        // Phase 11 v11: [K8S-INGRESS name :rules [...]]
+        this.context.lastValue = this.handleK8sIngressBlock(block);
+        break;
+      case "AWS":
+      case "AWS-S3":
+      case "AWS-LAMBDA":
+      case "AWS-RDS":
+      case "AWS-SQS":
+        // Phase 11 v11: AWS cloud blocks
+        this.context.lastValue = this.handleAwsBlock(block);
+        break;
+      case "GCP":
+      case "GCP-CLOUD-RUN":
+      case "GCP-BIGQUERY":
+        // Phase 11 v11: GCP cloud blocks
+        this.context.lastValue = this.handleGcpBlock(block);
+        break;
+      case "AZURE":
+      case "AZURE-FUNCTION":
+      case "AZURE-COSMOS":
+        // Phase 11 v11: Azure cloud blocks
+        this.context.lastValue = this.handleAzureBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -324,6 +448,710 @@ export class Interpreter {
     const callFnVal = (fn: any, args: any[]) => interp.callFunctionValue(fn, args);
     const state = evalAgentBlock(block.fields as Map<string, any>, ev, callFnVal);
     this.context.lastValue = state;
+  }
+
+  // Phase 11 v11: [PAGE :path "/" :name "Home" :render "<h1>...</h1>"]
+  private handlePageBlock(block: Block): any {
+    const renderNode = block.fields.get("render");
+    if (!renderNode) {
+      return null;
+    }
+
+    // params를 $key 형태로 바인딩
+    const params: Record<string, string> = (this.context as any).__params || {};
+    this.context.variables.push();
+    for (const [key, value] of Object.entries(params)) {
+      this.context.variables.set(`$${key}`, value);
+    }
+
+    try {
+      let html: any;
+
+      // :render이 Block인 경우 (예: AGENT 블록)
+      if (renderNode.kind === "block") {
+        this.evalBlock(renderNode as Block);
+        html = this.context.lastValue;
+      } else {
+        // 일반 S-expression
+        html = this.eval(renderNode);
+      }
+
+      // {{ param }} 템플릿 보간 지원
+      if (typeof html === "string") {
+        let interpolated = html;
+        for (const [key, value] of Object.entries(params)) {
+          interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
+        }
+
+        // :state 추출 및 클라이언트 상태 주입
+        const stateNode = block.fields.get("state");
+        if (stateNode) {
+          const stateVal = this.eval(stateNode);
+          const stateJson = JSON.stringify(stateVal);
+          interpolated = interpolated + `\n<script>window.__state = ${stateJson};</script>`;
+        }
+
+        return interpolated;
+      }
+      return html;
+    } finally {
+      this.context.variables.pop();
+    }
+  }
+
+  // Phase 11 MVP: [API :methods ["POST"] :path "/..." :do (create ...)]
+  private handleApiBlock(block: Block): any {
+    const doNode = block.fields.get("do");
+    if (!doNode) {
+      return { status: 400, json: { error: "missing :do" } };
+    }
+
+    // :do 실행
+    this.context.variables.push();
+    try {
+      const result = this.eval(doNode);
+
+      // 응답 형식
+      // {:status 201 :json {...}} 형태로 반환
+      if (result && typeof result === "object") {
+        if (result.status !== undefined && result.json !== undefined) {
+          return result;
+        }
+        // 일반 객체면 200 OK로 반환
+        return { status: 200, json: result };
+      }
+
+      return { status: 200, json: result };
+    } finally {
+      this.context.variables.pop();
+    }
+  }
+
+  // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
+  private handleComponentBlock(block: Block): any {
+    const renderNode = block.fields.get("render");
+    if (!renderNode) {
+      return null;
+    }
+    // :state 초기값 설정
+    const stateNode = block.fields.get("state");
+    if (stateNode && stateNode.kind === "block" && stateNode.type === "Map") {
+      const entries = (stateNode.fields.get("entries") || []) as any[];
+      this.context.variables.push();
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const key = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const value = this.eval(entries[i + 1]);
+        this.context.variables.set(`$${key}`, value);
+      }
+    }
+    // :methods 등록 (필요시)
+    const methodsNode = block.fields.get("methods");
+    // ... methods 처리는 추후 확장
+
+    // :render 평가
+    const html = this.eval(renderNode);
+    if (stateNode) {
+      this.context.variables.pop();
+    }
+    return html;
+  }
+
+  // Phase 11 v11: [FORM name :fields [...] :validation ...]
+  private handleFormBlock(block: Block): any {
+    const fieldsNode = block.fields.get("fields");
+    if (!fieldsNode) {
+      return null;
+    }
+    // 간단한 form HTML 생성
+    const fields = Array.isArray(fieldsNode) ? fieldsNode : [fieldsNode];
+    let formHtml = '<form>\n';
+    for (const field of fields) {
+      if (field?.kind === "block" && field?.type === "Map") {
+        const name = field.fields.get("name") || "field";
+        const type = field.fields.get("type") || "text";
+        formHtml += `  <input type="${type}" name="${name}" />\n`;
+      }
+    }
+    formHtml += '</form>';
+    return formHtml;
+  }
+
+  // Phase 11 v11: [SERVICE name :inject [...] :methods {...}]
+  private handleServiceBlock(block: Block): any {
+    const name = block.name;
+    const injectNode = block.fields.get("inject");
+    const methodsNode = block.fields.get("methods");
+
+    // 서비스 등록
+    const service: any = {
+      name,
+      methods: {},
+    };
+
+    // :methods를 함수로 등록
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = (methodsNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        service.methods[methodName] = methodFn;
+      }
+    }
+
+    // 글로벌 서비스 레지스트리에 등록
+    (this.context as any).services = (this.context as any).services || new Map();
+    (this.context as any).services.set(name, service);
+
+    return { status: "registered", service: name };
+  }
+
+  // Phase 11 v11: [CONTROLLER name :prefix "/api" :routes {...}]
+  private handleControllerBlock(block: Block): any {
+    const name = block.name;
+    const prefix = this.eval(block.fields.get("prefix")) || "";
+    const routesNode = block.fields.get("routes");
+
+    // 컨트롤러 등록
+    const controller: any = {
+      name,
+      prefix,
+      routes: [],
+    };
+
+    // :routes를 HTTP 라우트로 등록
+    if (routesNode && routesNode.kind === "block" && routesNode.type === "Map") {
+      const entries = (routesNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const routeKey = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const routeHandler = this.eval(entries[i + 1]);
+        controller.routes.push({ method: "GET", path: routeKey, handler: routeHandler });
+      }
+    }
+
+    // 글로벌 컨트롤러 레지스트리에 등록
+    (this.context as any).controllers = (this.context as any).controllers || new Map();
+    (this.context as any).controllers.set(name, controller);
+
+    return { status: "registered", controller: name };
+  }
+
+  // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
+  private handleGuardBlock(block: Block): any {
+    const name = block.name;
+    const strategy = this.eval(block.fields.get("strategy")) || "none";
+    const checkFn = this.eval(block.fields.get("check"));
+
+    // 가드 등록
+    const guard: any = {
+      name,
+      strategy,
+      check: checkFn,
+    };
+
+    // 글로벌 가드 레지스트리에 등록
+    (this.context as any).guards = (this.context as any).guards || new Map();
+    (this.context as any).guards.set(name, guard);
+
+    return { status: "registered", guard: name };
+  }
+
+  // Phase 11 v11: [MODEL name :table "users" :fields {...}]
+  private handleModelBlock(block: Block): any {
+    const name = block.name;
+    const tableName = this.eval(block.fields.get("table")) || name.toLowerCase();
+    const dbType = this.eval(block.fields.get("db")) || "postgresql";
+    const fieldsNode = block.fields.get("fields");
+
+    const model: any = {
+      name,
+      tableName,
+      dbType,
+      fields: {},
+    };
+
+    // :fields 정의
+    if (fieldsNode && fieldsNode.kind === "block" && fieldsNode.type === "Map") {
+      const entries = (fieldsNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldType = this.eval(entries[i + 1]);
+        model.fields[fieldName] = fieldType;
+      }
+    }
+
+    // 글로벌 모델 레지스트리에 등록
+    (this.context as any).models = (this.context as any).models || new Map();
+    (this.context as any).models.set(name, model);
+
+    return { status: "registered", model: name };
+  }
+
+  // Phase 11 v11: [QUERY name :model User :where {...}]
+  private handleQueryBlock(block: Block): any {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const whereNode = block.fields.get("where");
+
+    const query: any = {
+      name,
+      model: modelName,
+      where: {},
+    };
+
+    // :where 조건 추출
+    if (whereNode && whereNode.kind === "block" && whereNode.type === "Map") {
+      const entries = (whereNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldVal = this.eval(entries[i + 1]);
+        query.where[fieldName] = fieldVal;
+      }
+    }
+
+    // 글로벌 쿼리 레지스트리에 등록
+    (this.context as any).queries = (this.context as any).queries || new Map();
+    (this.context as any).queries.set(name, query);
+
+    return { status: "registered", query: name };
+  }
+
+  // Phase 11 v11: [MIGRATION name :version "001" :up (...) :down (...)]
+  private handleMigrationBlock(block: Block): any {
+    const name = block.name;
+    const version = this.eval(block.fields.get("version")) || "001";
+    const upFn = this.eval(block.fields.get("up"));
+    const downFn = this.eval(block.fields.get("down"));
+
+    const migration: any = {
+      name,
+      version,
+      up: upFn,
+      down: downFn,
+    };
+
+    // 글로벌 마이그레이션 레지스트리에 등록
+    (this.context as any).migrations = (this.context as any).migrations || new Map();
+    (this.context as any).migrations.set(name, migration);
+
+    return { status: "registered", migration: name };
+  }
+
+  // Phase 11 v11: [REPOSITORY name :model User :methods {...}]
+  private handleRepositoryBlock(block: Block): any {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const methodsNode = block.fields.get("methods");
+
+    const repository: any = {
+      name,
+      model: modelName,
+      methods: {},
+    };
+
+    // :methods 정의
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = (methodsNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        repository.methods[methodName] = methodFn;
+      }
+    }
+
+    // 글로벌 리포지토리 레지스트리에 등록
+    (this.context as any).repositories = (this.context as any).repositories || new Map();
+    (this.context as any).repositories.set(name, repository);
+
+    return { status: "registered", repository: name };
+  }
+
+  // Phase 11 v11: [DATABASE name :type :postgresql :host "localhost"]
+  private handleDatabaseBlock(block: Block): any {
+    const name = block.name;
+    const dbType = this.eval(block.fields.get("type")) || "postgresql";
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 5432;
+    const database = this.eval(block.fields.get("name")) || "freelang_db";
+
+    const dbConfig: any = {
+      name,
+      type: dbType,
+      host,
+      port,
+      database,
+    };
+
+    // 글로벌 데이터베이스 레지스트리에 등록
+    (this.context as any).databases = (this.context as any).databases || new Map();
+    (this.context as any).databases.set(name, dbConfig);
+
+    return { status: "registered", database: name };
+  }
+
+  // Phase 11 v11: [CACHE name :host "localhost" :port 6379 :ttl 3600]
+  private handleCacheBlock(block: Block): any {
+    const name = block.name;
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 6379;
+    const ttl = this.eval(block.fields.get("ttl")) || 3600;
+
+    const cacheConfig: any = {
+      name,
+      host,
+      port,
+      ttl,
+    };
+
+    // 글로벌 캐시 레지스트리에 등록
+    (this.context as any).caches = (this.context as any).caches || new Map();
+    (this.context as any).caches.set(name, cacheConfig);
+
+    return { status: "registered", cache: name };
+  }
+
+  // Phase 11 v11: [CACHED name :cache redis-main :key (...) :fn (...)]
+  private handleCachedBlock(block: Block): any {
+    const name = block.name;
+    const cacheName = this.eval(block.fields.get("cache"));
+    const keyFn = this.eval(block.fields.get("key"));
+    const fn = this.eval(block.fields.get("fn"));
+    const ttl = this.eval(block.fields.get("ttl")) || 300;
+
+    const cached: any = {
+      name,
+      cache: cacheName,
+      key: keyFn,
+      fn,
+      ttl,
+    };
+
+    (this.context as any).cacheds = (this.context as any).cacheds || new Map();
+    (this.context as any).cacheds.set(name, cached);
+
+    return { status: "registered", cached: name };
+  }
+
+  // Phase 11 v11: [KAFKA name :brokers [...] :client-id "app"]
+  private handleKafkaBlock(block: Block): any {
+    const name = block.name;
+    const brokersNode = block.fields.get("brokers");
+    const brokers = Array.isArray(brokersNode) ? brokersNode.map((b: any) => this.eval(b)) : ["localhost:9092"];
+    const clientId = this.eval(block.fields.get("client-id")) || "freelang-app";
+
+    const kafkaConfig: any = {
+      name,
+      brokers,
+      clientId,
+    };
+
+    (this.context as any).kafkas = (this.context as any).kafkas || new Map();
+    (this.context as any).kafkas.set(name, kafkaConfig);
+
+    return { status: "registered", kafka: name };
+  }
+
+  // Phase 11 v11: [PRODUCER name :kafka kafka-main :topic "events"]
+  private handleProducerBlock(block: Block): any {
+    const name = block.name;
+    const kafkaName = this.eval(block.fields.get("kafka"));
+    const topic = this.eval(block.fields.get("topic")) || "events";
+
+    const producer: any = {
+      name,
+      kafka: kafkaName,
+      topic,
+    };
+
+    (this.context as any).producers = (this.context as any).producers || new Map();
+    (this.context as any).producers.set(name, producer);
+
+    return { status: "registered", producer: name };
+  }
+
+  // Phase 11 v11: [CONSUMER name :kafka kafka-main :topic "events" :handler (...)]
+  private handleConsumerBlock(block: Block): any {
+    const name = block.name;
+    const kafkaName = this.eval(block.fields.get("kafka"));
+    const topic = this.eval(block.fields.get("topic")) || "events";
+    const groupId = this.eval(block.fields.get("group")) || "default";
+    const handler = this.eval(block.fields.get("handler"));
+
+    const consumer: any = {
+      name,
+      kafka: kafkaName,
+      topic,
+      groupId,
+      handler,
+    };
+
+    (this.context as any).consumers = (this.context as any).consumers || new Map();
+    (this.context as any).consumers.set(name, consumer);
+
+    return { status: "registered", consumer: name };
+  }
+
+  // Phase 11 v11: [QUEUE name :rabbitmq rabbit-main :exchange "app" :handler (...)]
+  private handleQueueBlock(block: Block): any {
+    const name = block.name;
+    const rabbitName = this.eval(block.fields.get("rabbitmq"));
+    const exchange = this.eval(block.fields.get("exchange")) || "app";
+    const routingKey = this.eval(block.fields.get("routing-key")) || "";
+    const handler = this.eval(block.fields.get("handler"));
+
+    const queue: any = {
+      name,
+      rabbitmq: rabbitName,
+      exchange,
+      routingKey,
+      handler,
+    };
+
+    (this.context as any).queues = (this.context as any).queues || new Map();
+    (this.context as any).queues.set(name, queue);
+
+    return { status: "registered", queue: name };
+  }
+
+  // Phase 11 v11: [RABBITMQ name :url "amqp://localhost"]
+  private handleRabbitMQBlock(block: Block): any {
+    const name = block.name;
+    const url = this.eval(block.fields.get("url")) || "amqp://localhost:5672";
+
+    const rabbitConfig: any = {
+      name,
+      url,
+    };
+
+    (this.context as any).rabbitmqs = (this.context as any).rabbitmqs || new Map();
+    (this.context as any).rabbitmqs.set(name, rabbitConfig);
+
+    return { status: "registered", rabbitmq: name };
+  }
+
+  // Phase 11 v11: [JWT name :secret "secret" :expires-in "7d"]
+  private handleJWTBlock(block: Block): any {
+    const name = block.name;
+    const secret = this.eval(block.fields.get("secret")) || "change-me";
+    const expiresIn = this.eval(block.fields.get("expires-in")) || "7d";
+    const algorithm = this.eval(block.fields.get("algorithm")) || "HS256";
+
+    const jwtConfig: any = {
+      name,
+      secret,
+      expiresIn,
+      algorithm,
+    };
+
+    // 글로벌 JWT 레지스트리에 등록
+    (this.context as any).jwts = (this.context as any).jwts || new Map();
+    (this.context as any).jwts.set(name, jwtConfig);
+
+    return { status: "registered", jwt: name };
+  }
+
+  // Phase 11 v11: [OAUTH name :provider "google" :client-id "..."]
+  private handleOAuthBlock(block: Block): any {
+    const name = block.name;
+    const provider = this.eval(block.fields.get("provider")) || "google";
+    const clientId = this.eval(block.fields.get("client-id")) || "";
+    const clientSecret = this.eval(block.fields.get("client-secret")) || "";
+    const callbackUrl = this.eval(block.fields.get("callback-url")) || "/auth/callback";
+    const scope = this.eval(block.fields.get("scope")) || ["email", "profile"];
+    const onSuccess = this.eval(block.fields.get("on-success"));
+
+    const oauthConfig: any = {
+      name,
+      provider,
+      clientId,
+      clientSecret,
+      callbackUrl,
+      scope,
+      onSuccess,
+    };
+
+    // 글로벌 OAuth 레지스트리에 등록
+    (this.context as any).oauths = (this.context as any).oauths || new Map();
+    (this.context as any).oauths.set(name, oauthConfig);
+
+    return { status: "registered", oauth: name };
+  }
+
+  // Phase 11 v11: [DOCKERFILE name :base "node:20" :workdir "/app" ...]
+  private handleDockerfileBlock(block: Block): any {
+    const name = block.name;
+    const base = this.eval(block.fields.get("base")) || "node:20-alpine";
+    const workdir = this.eval(block.fields.get("workdir")) || "/app";
+    const expose = this.eval(block.fields.get("expose")) || 3000;
+    const cmd = this.eval(block.fields.get("cmd")) || "npm start";
+
+    const dockerfile: any = {
+      name,
+      base,
+      workdir,
+      expose,
+      cmd,
+    };
+
+    (this.context as any).dockerfiles = (this.context as any).dockerfiles || new Map();
+    (this.context as any).dockerfiles.set(name, dockerfile);
+
+    return { status: "registered", dockerfile: name };
+  }
+
+  // Phase 11 v11: [DOCKER-COMPOSE name :services {...} :volumes {...}]
+  private handleDockerComposeBlock(block: Block): any {
+    const name = block.name;
+    const servicesNode = block.fields.get("services");
+    const volumesNode = block.fields.get("volumes");
+
+    const compose: any = {
+      name,
+      services: {},
+      volumes: {},
+    };
+
+    // Extract services
+    if (servicesNode && servicesNode.kind === "block" && servicesNode.type === "Map") {
+      const entries = (servicesNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const serviceName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const serviceConfig = this.eval(entries[i + 1]);
+        compose.services[serviceName] = serviceConfig;
+      }
+    }
+
+    (this.context as any).composes = (this.context as any).composes || new Map();
+    (this.context as any).composes.set(name, compose);
+
+    return { status: "registered", "docker-compose": name };
+  }
+
+  // Phase 11 v11: [K8S-DEPLOYMENT name :replicas 3 :image "..."]
+  private handleK8sDeploymentBlock(block: Block): any {
+    const name = block.name;
+    const replicas = this.eval(block.fields.get("replicas")) || 1;
+    const image = this.eval(block.fields.get("image")) || "app:latest";
+    const namespace = this.eval(block.fields.get("namespace")) || "default";
+
+    const deployment: any = {
+      name,
+      replicas,
+      image,
+      namespace,
+    };
+
+    (this.context as any).k8sDeployments = (this.context as any).k8sDeployments || new Map();
+    (this.context as any).k8sDeployments.set(name, deployment);
+
+    return { status: "registered", "k8s-deployment": name };
+  }
+
+  // Phase 11 v11: [K8S-SERVICE name :selector {:app "name"} :ports [...]]
+  private handleK8sServiceBlock(block: Block): any {
+    const name = block.name;
+    const selectorNode = block.fields.get("selector");
+    const portsNode = block.fields.get("ports");
+    const type = this.eval(block.fields.get("type")) || "ClusterIP";
+
+    const service: any = {
+      name,
+      selector: {},
+      ports: [],
+      type,
+    };
+
+    // Extract selector
+    if (selectorNode && selectorNode.kind === "block" && selectorNode.type === "Map") {
+      const entries = (selectorNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const key = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const val = this.eval(entries[i + 1]);
+        service.selector[key] = val;
+      }
+    }
+
+    (this.context as any).k8sServices = (this.context as any).k8sServices || new Map();
+    (this.context as any).k8sServices.set(name, service);
+
+    return { status: "registered", "k8s-service": name };
+  }
+
+  // Phase 11 v11: [K8S-INGRESS name :rules [...]]
+  private handleK8sIngressBlock(block: Block): any {
+    const name = block.name;
+    const rulesNode = block.fields.get("rules");
+    const annotations = this.eval(block.fields.get("annotations")) || {};
+
+    const ingress: any = {
+      name,
+      rules: [],
+      annotations,
+    };
+
+    (this.context as any).k8sIngresses = (this.context as any).k8sIngresses || new Map();
+    (this.context as any).k8sIngresses.set(name, ingress);
+
+    return { status: "registered", "k8s-ingress": name };
+  }
+
+  // Phase 11 v11: AWS cloud blocks (AWS, AWS-S3, AWS-LAMBDA, AWS-RDS, AWS-SQS)
+  private handleAwsBlock(block: Block): any {
+    const name = block.name;
+    const blockType = block.type;
+    const region = this.eval(block.fields.get("region")) || "ap-northeast-2";
+    const endpoint = this.eval(block.fields.get("endpoint")) || "";
+
+    const awsConfig: any = {
+      name,
+      type: blockType,
+      region,
+      endpoint,
+    };
+
+    (this.context as any).aws = (this.context as any).aws || new Map();
+    (this.context as any).aws.set(name, awsConfig);
+
+    return { status: "registered", aws: name };
+  }
+
+  // Phase 11 v11: GCP cloud blocks (GCP, GCP-CLOUD-RUN, GCP-BIGQUERY)
+  private handleGcpBlock(block: Block): any {
+    const name = block.name;
+    const blockType = block.type;
+    const projectId = this.eval(block.fields.get("project-id")) || "project";
+    const region = this.eval(block.fields.get("region")) || "asia-northeast3";
+
+    const gcpConfig: any = {
+      name,
+      type: blockType,
+      projectId,
+      region,
+    };
+
+    (this.context as any).gcp = (this.context as any).gcp || new Map();
+    (this.context as any).gcp.set(name, gcpConfig);
+
+    return { status: "registered", gcp: name };
+  }
+
+  // Phase 11 v11: Azure cloud blocks (AZURE, AZURE-FUNCTION, AZURE-COSMOS)
+  private handleAzureBlock(block: Block): any {
+    const name = block.name;
+    const blockType = block.type;
+    const subscriptionId = this.eval(block.fields.get("subscription-id")) || "";
+    const resourceGroup = this.eval(block.fields.get("resource-group")) || "default";
+
+    const azureConfig: any = {
+      name,
+      type: blockType,
+      subscriptionId,
+      resourceGroup,
+    };
+
+    (this.context as any).azure = (this.context as any).azure || new Map();
+    (this.context as any).azure.set(name, azureConfig);
+
+    return { status: "registered", azure: name };
   }
 
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]

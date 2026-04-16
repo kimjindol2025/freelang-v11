@@ -247,7 +247,65 @@ var init_lexer = __esm({
       // Phase 9c: Loop control keywords
       ["repeat", "Repeat" /* Repeat */],
       ["until", "Until" /* Until */],
-      ["while", "While" /* While */]
+      ["while", "While" /* While */],
+      // Phase 11: Web DSL keywords
+      ["PAGE", "Page" /* Page */],
+      ["API", "Api" /* Api */],
+      ["ROUTE", "Route" /* Route */],
+      ["COMPONENT", "Component" /* Component */],
+      ["FORM", "Form" /* Form */],
+      ["STATE", "State" /* State */],
+      ["COMPUTED", "Computed" /* Computed */],
+      ["WATCH", "Watch" /* Watch */],
+      ["METHOD", "Method" /* Method */],
+      ["RENDER", "Render" /* Render */],
+      ["HANDLER", "Handler" /* Handler */],
+      ["VALIDATION", "Validation" /* Validation */],
+      ["LAYOUT", "Layout" /* Layout */],
+      ["MIDDLEWARE", "Middleware" /* Middleware */],
+      ["SUSPENSE", "Suspense" /* Suspense */],
+      ["SLOT", "Slot" /* Slot */],
+      ["METADATA", "Metadata" /* Metadata */],
+      // Phase 11: Enterprise backend keywords
+      ["SERVICE", "Service" /* Service */],
+      ["CONTROLLER", "Controller" /* Controller */],
+      ["GUARD", "Guard" /* Guard */],
+      ["PIPE", "Pipe" /* Pipe */],
+      // Phase 11: Database ORM keywords
+      ["MODEL", "Model" /* Model */],
+      ["QUERY", "Query" /* Query */],
+      ["MIGRATION", "Migration" /* Migration */],
+      ["REPOSITORY", "Repository" /* Repository */],
+      ["DATABASE", "Database" /* Database */],
+      // Phase 11: Cache & Messaging keywords
+      ["CACHE", "Cache" /* Cache */],
+      ["CACHED", "Cached" /* Cached */],
+      ["KAFKA", "Kafka" /* Kafka */],
+      ["PRODUCER", "Producer" /* Producer */],
+      ["CONSUMER", "Consumer" /* Consumer */],
+      ["QUEUE", "Queue" /* Queue */],
+      ["RABBITMQ", "RabbitMQ" /* RabbitMQ */],
+      // Phase 11: Authentication keywords
+      ["JWT", "JWT" /* JWT */],
+      ["OAUTH", "OAuth" /* OAuth */],
+      // Phase 11: Deployment keywords
+      ["DOCKERFILE", "Dockerfile" /* Dockerfile */],
+      ["DOCKER-COMPOSE", "DockerCompose" /* DockerCompose */],
+      ["K8S-DEPLOYMENT", "K8sDeployment" /* K8sDeployment */],
+      ["K8S-SERVICE", "K8sService" /* K8sService */],
+      ["K8S-INGRESS", "K8sIngress" /* K8sIngress */],
+      // Phase 11: Cloud keywords
+      ["AWS", "AWS" /* AWS */],
+      ["AWS-S3", "AwsS3" /* AwsS3 */],
+      ["AWS-LAMBDA", "AwsLambda" /* AwsLambda */],
+      ["AWS-RDS", "AwsRds" /* AwsRds */],
+      ["AWS-SQS", "AwsSqs" /* AwsSqs */],
+      ["GCP", "GCP" /* GCP */],
+      ["GCP-CLOUD-RUN", "GcpCloudRun" /* GcpCloudRun */],
+      ["GCP-BIGQUERY", "GcpBigquery" /* GcpBigquery */],
+      ["AZURE", "Azure" /* Azure */],
+      ["AZURE-FUNCTION", "AzureFunction" /* AzureFunction */],
+      ["AZURE-COSMOS", "AzureCosmos" /* AzureCosmos */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -313,6 +371,18 @@ function makeCatchClause(handler, pattern, variable) {
 }
 function makeThrowExpression(argument) {
   return { kind: "throw", argument };
+}
+function makePageNode(name, title, route, component, metadata, line) {
+  return { kind: "page", name, title, route, component, metadata, line };
+}
+function makeRouteNode(name, path13, method, handler, middleware, validation, line) {
+  return { kind: "route", name, path: path13, method, handler, middleware, validation, line };
+}
+function makeComponentNode(name, render, state, computed, watch3, methods, slots, line) {
+  return { kind: "component", name, render, state, computed, watch: watch3, methods, slots, line };
+}
+function makeFormNode(name, fields, validation, submit, handlers, line) {
+  return { kind: "form", name, fields, validation, submit, handlers, line };
 }
 function isBlock(node) {
   return node && node.kind === "block";
@@ -391,6 +461,11 @@ var init_parser = __esm({
         this.code = code;
         this.stage = stage;
       }
+      line;
+      col;
+      hint;
+      code;
+      stage;
       toJSON() {
         return {
           code: this.code || "E_PARSE_SYNTAX_ERROR",
@@ -415,8 +490,9 @@ var init_parser = __esm({
       "Unterminated string": '\uBB38\uC790\uC5F4\uC774 \uB2EB\uD788\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uB2EB\uB294 " \uB97C \uCD94\uAC00\uD558\uC138\uC694.'
     };
     Parser = class {
+      pos = 0;
+      tokens;
       constructor(tokens) {
-        this.pos = 0;
         this.tokens = tokens;
       }
       parse() {
@@ -425,10 +501,10 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
-              const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */;
+              const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Api" /* Api */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */ || nextToken.type === "Model" /* Model */ || nextToken.type === "Query" /* Query */ || nextToken.type === "Migration" /* Migration */ || nextToken.type === "Repository" /* Repository */ || nextToken.type === "Database" /* Database */ || nextToken.type === "Cached" /* Cached */ || nextToken.type === "Kafka" /* Kafka */ || nextToken.type === "JWT" /* JWT */ || nextToken.type === "OAuth" /* OAuth */ || nextToken.type === "Dockerfile" /* Dockerfile */ || nextToken.type === "K8sDeployment" /* K8sDeployment */ || nextToken.type === "AWS" /* AWS */ || nextToken.type === "GCP" /* GCP */ || nextToken.type === "Azure" /* Azure */;
               const isKnownBlockType = nextToken.type === "Symbol" /* Symbol */ && knownBlockTypes.includes(nextToken.value.toUpperCase());
               const hasKeywordAfter = nextIdx + 1 < this.tokens.length && (this.tokens[nextIdx + 1].type === "Keyword" /* Keyword */ || this.tokens[nextIdx + 1].type === "Colon" /* Colon */);
               if (isBlockKeyword || isKnownBlockType || hasKeywordAfter) {
@@ -465,6 +541,24 @@ var init_parser = __esm({
           blockType = "TYPECLASS";
         } else if (typeToken.type === "Instance" /* Instance */) {
           blockType = "INSTANCE";
+        } else if (typeToken.type === "Page" /* Page */) {
+          blockType = "PAGE";
+        } else if (typeToken.type === "Api" /* Api */) {
+          blockType = "API";
+        } else if (typeToken.type === "Route" /* Route */) {
+          blockType = "ROUTE";
+        } else if (typeToken.type === "Component" /* Component */) {
+          blockType = "COMPONENT";
+        } else if (typeToken.type === "Form" /* Form */) {
+          blockType = "FORM";
+        } else if (typeToken.type === "Service" /* Service */) {
+          blockType = "SERVICE";
+        } else if (typeToken.type === "Controller" /* Controller */) {
+          blockType = "CONTROLLER";
+        } else if (typeToken.type === "Guard" /* Guard */) {
+          blockType = "GUARD";
+        } else if (typeToken.type === "Model" /* Model */) {
+          blockType = "MODEL";
         } else {
           throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
         }
@@ -577,6 +671,11 @@ var init_parser = __esm({
         if (blockType === "INSTANCE") {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
+        }
+        const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS", "AWS", "AWS-S3", "AWS-LAMBDA", "AWS-RDS", "AWS-SQS", "GCP", "GCP-CLOUD-RUN", "GCP-BIGQUERY", "AZURE", "AZURE-FUNCTION", "AZURE-COSMOS"];
+        if (enterpriseBlocks.includes(blockType)) {
+          const block2 = makeBlock(blockType, blockName, fields, blockLine);
+          return block2;
         }
         const block = makeBlock(blockType, blockName, fields, blockLine);
         if (blockType === "FUNC" || typeAnnotations.size > 0) {
@@ -744,7 +843,7 @@ var init_parser = __esm({
         }
         if (this.check("LBracket" /* LBracket */)) {
           const nextIdx = this.pos + 1;
-          const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER"];
+          const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
           if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === "Symbol" /* Symbol */) {
             const potentialType = this.tokens[nextIdx].value;
             const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
@@ -762,6 +861,10 @@ var init_parser = __esm({
             }
             throw this.error(`Expected ModuleBlock from parseBlock with MODULE token`, this.peek());
           } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === "TypeClass" /* TypeClass */ || this.tokens[nextIdx].type === "Instance" /* Instance */)) {
+            return this.parseBlock();
+          } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === "Page" /* Page */ || this.tokens[nextIdx].type === "Api" /* Api */ || this.tokens[nextIdx].type === "Component" /* Component */ || this.tokens[nextIdx].type === "Form" /* Form */ || this.tokens[nextIdx].type === "Route" /* Route */)) {
+            return this.parseBlock();
+          } else if (nextIdx < this.tokens.length && (this.tokens[nextIdx].type === "Service" /* Service */ || this.tokens[nextIdx].type === "Controller" /* Controller */ || this.tokens[nextIdx].type === "Guard" /* Guard */ || this.tokens[nextIdx].type === "Model" /* Model */ || this.tokens[nextIdx].type === "Query" /* Query */ || this.tokens[nextIdx].type === "Migration" /* Migration */ || this.tokens[nextIdx].type === "Repository" /* Repository */ || this.tokens[nextIdx].type === "Database" /* Database */ || this.tokens[nextIdx].type === "Cached" /* Cached */ || this.tokens[nextIdx].type === "Kafka" /* Kafka */ || this.tokens[nextIdx].type === "Producer" /* Producer */ || this.tokens[nextIdx].type === "Consumer" /* Consumer */ || this.tokens[nextIdx].type === "Queue" /* Queue */ || this.tokens[nextIdx].type === "RabbitMQ" /* RabbitMQ */ || this.tokens[nextIdx].type === "JWT" /* JWT */ || this.tokens[nextIdx].type === "OAuth" /* OAuth */ || this.tokens[nextIdx].type === "Dockerfile" /* Dockerfile */ || this.tokens[nextIdx].type === "DockerCompose" /* DockerCompose */ || this.tokens[nextIdx].type === "K8sDeployment" /* K8sDeployment */ || this.tokens[nextIdx].type === "K8sService" /* K8sService */ || this.tokens[nextIdx].type === "K8sIngress" /* K8sIngress */ || this.tokens[nextIdx].type === "AWS" /* AWS */ || this.tokens[nextIdx].type === "GCP" /* GCP */ || this.tokens[nextIdx].type === "Azure" /* Azure */)) {
             return this.parseBlock();
           } else {
             return this.parseArray();
@@ -2117,6 +2220,162 @@ var init_parser = __esm({
             condition
           }
         };
+      }
+      // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
+      parsePage(name, fields, line) {
+        const path13 = this.extractStringField(fields, "path");
+        const title = this.extractStringField(fields, "title");
+        const render = this.extractStringField(fields, "render");
+        const component = this.extractSymbolField(fields, "component");
+        const metadata = this.extractMapField(fields, "metadata");
+        const pageNode = makePageNode(name, title, path13, component, metadata, line);
+        if (render) {
+          pageNode.fields = pageNode.fields || /* @__PURE__ */ new Map();
+          pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
+        }
+        return pageNode;
+      }
+      // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
+      parseRoute(name, fields, line) {
+        const path13 = this.extractStringField(fields, "path");
+        const method = this.extractStringField(fields, "method");
+        const handler = this.extractSymbolField(fields, "handler");
+        const middleware = this.extractSymbolArrayField(fields, "middleware");
+        const validation = this.extractSymbolField(fields, "validation");
+        return makeRouteNode(name, path13, method, handler, middleware, validation, line);
+      }
+      // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
+      parseComponent(name, fields, line) {
+        const render = this.extractSymbolField(fields, "render");
+        const state = this.extractSymbolField(fields, "state");
+        const computed = this.extractSymbolArrayField(fields, "computed");
+        const watch3 = this.extractWatchField(fields, "watch");
+        const methods = this.extractMethodsField(fields, "methods");
+        const slots = this.extractSymbolArrayField(fields, "slots");
+        return makeComponentNode(name, render, state, computed, watch3, methods, slots, line);
+      }
+      // Phase 11: Parse FORM block - [FORM name :fields [...] :validation validationFn :submit submitFn]
+      parseForm(name, fields, line) {
+        const formFields = this.extractMapField(fields, "fields");
+        const validation = this.extractSymbolField(fields, "validation");
+        const submit = this.extractSymbolField(fields, "submit");
+        const handlers = this.extractHandlersField(fields, "handlers");
+        return makeFormNode(name, formFields, validation, submit, handlers, line);
+      }
+      // Helper: Extract string field from block fields
+      extractStringField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        if (Array.isArray(value)) {
+          const first = value[0];
+          if (first.kind === "literal" && first.type === "string") {
+            return first.value;
+          }
+        } else if (value.kind === "literal" && value.type === "string") {
+          return value.value;
+        }
+        return void 0;
+      }
+      // Helper: Extract symbol field from block fields
+      extractSymbolField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        if (Array.isArray(value)) {
+          const first = value[0];
+          if (first.kind === "literal" && first.type === "symbol") {
+            return first.value;
+          }
+        } else if (value.kind === "literal" && value.type === "symbol") {
+          return value.value;
+        }
+        return void 0;
+      }
+      // Helper: Extract array of symbols from block fields
+      extractSymbolArrayField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        const items = [];
+        let arrayItems = [];
+        if (Array.isArray(value)) {
+          arrayItems = value;
+        } else if (value.kind === "block" && value.type === "Array") {
+          const innerItems = value.fields?.get("items");
+          if (Array.isArray(innerItems)) {
+            arrayItems = innerItems;
+          }
+        }
+        for (const item of arrayItems) {
+          if (item.kind === "literal" && item.type === "symbol") {
+            items.push(item.value);
+          }
+        }
+        return items.length > 0 ? items : void 0;
+      }
+      // Helper: Extract map field from block fields
+      extractMapField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        const result = /* @__PURE__ */ new Map();
+        if (value.kind === "block" && value.type === "Map") {
+          const innerFields = value.fields;
+          if (innerFields) {
+            for (const [k, v] of innerFields) {
+              result.set(k, v);
+            }
+          }
+        }
+        return result.size > 0 ? result : void 0;
+      }
+      // Helper: Extract watch field from block fields (map of property names to handler names)
+      extractWatchField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        const result = /* @__PURE__ */ new Map();
+        if (value.kind === "block" && value.type === "Map") {
+          const innerFields = value.fields;
+          if (innerFields) {
+            for (const [k, v] of innerFields) {
+              if (v.kind === "literal" && v.type === "symbol") {
+                result.set(k, v.value);
+              }
+            }
+          }
+        }
+        return result.size > 0 ? result : void 0;
+      }
+      // Helper: Extract methods field from block fields (map of method names to function names)
+      extractMethodsField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        const result = /* @__PURE__ */ new Map();
+        if (value.kind === "block" && value.type === "Map") {
+          const innerFields = value.fields;
+          if (innerFields) {
+            for (const [k, v] of innerFields) {
+              if (v.kind === "literal" && v.type === "symbol") {
+                result.set(k, v.value);
+              }
+            }
+          }
+        }
+        return result.size > 0 ? result : void 0;
+      }
+      // Helper: Extract handlers field from block fields (map of event names to handler names)
+      extractHandlersField(fields, key) {
+        const value = fields.get(key);
+        if (!value) return void 0;
+        const result = /* @__PURE__ */ new Map();
+        if (value.kind === "block" && value.type === "Map") {
+          const innerFields = value.fields;
+          if (innerFields) {
+            for (const [k, v] of innerFields) {
+              if (v.kind === "literal" && v.type === "symbol") {
+                result.set(k, v.value);
+              }
+            }
+          }
+        }
+        return result.size > 0 ? result : void 0;
       }
       // Helper: Get reasoning stage name from token
       getReasoningStageName(token) {
@@ -4338,7 +4597,7 @@ var require_websocket = __commonJS({
     "use strict";
     var EventEmitter2 = require("events");
     var https = require("https");
-    var http2 = require("http");
+    var http3 = require("http");
     var net = require("net");
     var tls = require("tls");
     var { randomBytes: randomBytes4, createHash: createHash4 } = require("crypto");
@@ -4368,7 +4627,7 @@ var require_websocket = __commonJS({
     var protocolVersions = [8, 13];
     var readyStates = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
     var subprotocolRegex = /^[!#$%&'*+\-.0-9A-Z^_`|a-z~]+$/;
-    var WebSocket2 = class _WebSocket extends EventEmitter2 {
+    var WebSocket3 = class _WebSocket extends EventEmitter2 {
       /**
        * Create a new `WebSocket`.
        *
@@ -4738,35 +4997,35 @@ var require_websocket = __commonJS({
         }
       }
     };
-    Object.defineProperty(WebSocket2, "CONNECTING", {
+    Object.defineProperty(WebSocket3, "CONNECTING", {
       enumerable: true,
       value: readyStates.indexOf("CONNECTING")
     });
-    Object.defineProperty(WebSocket2.prototype, "CONNECTING", {
+    Object.defineProperty(WebSocket3.prototype, "CONNECTING", {
       enumerable: true,
       value: readyStates.indexOf("CONNECTING")
     });
-    Object.defineProperty(WebSocket2, "OPEN", {
+    Object.defineProperty(WebSocket3, "OPEN", {
       enumerable: true,
       value: readyStates.indexOf("OPEN")
     });
-    Object.defineProperty(WebSocket2.prototype, "OPEN", {
+    Object.defineProperty(WebSocket3.prototype, "OPEN", {
       enumerable: true,
       value: readyStates.indexOf("OPEN")
     });
-    Object.defineProperty(WebSocket2, "CLOSING", {
+    Object.defineProperty(WebSocket3, "CLOSING", {
       enumerable: true,
       value: readyStates.indexOf("CLOSING")
     });
-    Object.defineProperty(WebSocket2.prototype, "CLOSING", {
+    Object.defineProperty(WebSocket3.prototype, "CLOSING", {
       enumerable: true,
       value: readyStates.indexOf("CLOSING")
     });
-    Object.defineProperty(WebSocket2, "CLOSED", {
+    Object.defineProperty(WebSocket3, "CLOSED", {
       enumerable: true,
       value: readyStates.indexOf("CLOSED")
     });
-    Object.defineProperty(WebSocket2.prototype, "CLOSED", {
+    Object.defineProperty(WebSocket3.prototype, "CLOSED", {
       enumerable: true,
       value: readyStates.indexOf("CLOSED")
     });
@@ -4779,10 +5038,10 @@ var require_websocket = __commonJS({
       "readyState",
       "url"
     ].forEach((property) => {
-      Object.defineProperty(WebSocket2.prototype, property, { enumerable: true });
+      Object.defineProperty(WebSocket3.prototype, property, { enumerable: true });
     });
     ["open", "error", "close", "message"].forEach((method) => {
-      Object.defineProperty(WebSocket2.prototype, `on${method}`, {
+      Object.defineProperty(WebSocket3.prototype, `on${method}`, {
         enumerable: true,
         get() {
           for (const listener of this.listeners(method)) {
@@ -4804,9 +5063,9 @@ var require_websocket = __commonJS({
         }
       });
     });
-    WebSocket2.prototype.addEventListener = addEventListener;
-    WebSocket2.prototype.removeEventListener = removeEventListener;
-    module2.exports = WebSocket2;
+    WebSocket3.prototype.addEventListener = addEventListener;
+    WebSocket3.prototype.removeEventListener = removeEventListener;
+    module2.exports = WebSocket3;
     function initAsClient(websocket, address, protocols, options) {
       const opts = {
         allowSynchronousEvents: true,
@@ -4872,7 +5131,7 @@ var require_websocket = __commonJS({
       }
       const defaultPort = isSecure ? 443 : 80;
       const key = randomBytes4(16).toString("base64");
-      const request = isSecure ? https.request : http2.request;
+      const request = isSecure ? https.request : http3.request;
       const protocolSet = /* @__PURE__ */ new Set();
       let perMessageDeflate;
       opts.createConnection = opts.createConnection || (isSecure ? tlsConnect : netConnect);
@@ -4994,7 +5253,7 @@ var require_websocket = __commonJS({
       });
       req.on("upgrade", (res, socket, head) => {
         websocket.emit("upgrade", res);
-        if (websocket.readyState !== WebSocket2.CONNECTING) return;
+        if (websocket.readyState !== WebSocket3.CONNECTING) return;
         req = websocket._req = null;
         const upgrade = res.headers.upgrade;
         if (upgrade === void 0 || upgrade.toLowerCase() !== "websocket") {
@@ -5066,7 +5325,7 @@ var require_websocket = __commonJS({
       }
     }
     function emitErrorAndClose(websocket, err4) {
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket3.CLOSING;
       websocket._errorEmitted = true;
       websocket.emit("error", err4);
       websocket.emitClose();
@@ -5083,7 +5342,7 @@ var require_websocket = __commonJS({
       return tls.connect(options);
     }
     function abortHandshake(websocket, stream, message) {
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket3.CLOSING;
       const err4 = new Error(message);
       Error.captureStackTrace(err4, abortHandshake);
       if (stream.setHeader) {
@@ -5158,9 +5417,9 @@ var require_websocket = __commonJS({
     }
     function senderOnError(err4) {
       const websocket = this[kWebSocket];
-      if (websocket.readyState === WebSocket2.CLOSED) return;
-      if (websocket.readyState === WebSocket2.OPEN) {
-        websocket._readyState = WebSocket2.CLOSING;
+      if (websocket.readyState === WebSocket3.CLOSED) return;
+      if (websocket.readyState === WebSocket3.OPEN) {
+        websocket._readyState = WebSocket3.CLOSING;
         setCloseTimer(websocket);
       }
       this._socket.end();
@@ -5180,7 +5439,7 @@ var require_websocket = __commonJS({
       this.removeListener("close", socketOnClose);
       this.removeListener("data", socketOnData);
       this.removeListener("end", socketOnEnd);
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket3.CLOSING;
       if (!this._readableState.endEmitted && !websocket._closeFrameReceived && !websocket._receiver._writableState.errorEmitted && this._readableState.length !== 0) {
         const chunk = this.read(this._readableState.length);
         websocket._receiver.write(chunk);
@@ -5202,7 +5461,7 @@ var require_websocket = __commonJS({
     }
     function socketOnEnd() {
       const websocket = this[kWebSocket];
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket3.CLOSING;
       websocket._receiver.end();
       this.end();
     }
@@ -5211,7 +5470,7 @@ var require_websocket = __commonJS({
       this.removeListener("error", socketOnError);
       this.on("error", NOOP);
       if (websocket) {
-        websocket._readyState = WebSocket2.CLOSING;
+        websocket._readyState = WebSocket3.CLOSING;
         this.destroy();
       }
     }
@@ -5222,7 +5481,7 @@ var require_websocket = __commonJS({
 var require_stream = __commonJS({
   "node_modules/ws/lib/stream.js"(exports2, module2) {
     "use strict";
-    var WebSocket2 = require_websocket();
+    var WebSocket3 = require_websocket();
     var { Duplex } = require("stream");
     function emitClose(stream) {
       stream.emit("close");
@@ -5366,19 +5625,19 @@ var require_websocket_server = __commonJS({
   "node_modules/ws/lib/websocket-server.js"(exports2, module2) {
     "use strict";
     var EventEmitter2 = require("events");
-    var http2 = require("http");
+    var http3 = require("http");
     var { Duplex } = require("stream");
     var { createHash: createHash4 } = require("crypto");
     var extension2 = require_extension();
     var PerMessageDeflate2 = require_permessage_deflate();
     var subprotocol2 = require_subprotocol();
-    var WebSocket2 = require_websocket();
+    var WebSocket3 = require_websocket();
     var { CLOSE_TIMEOUT, GUID, kWebSocket } = require_constants();
     var keyRegex = /^[+/0-9A-Za-z]{22}==$/;
     var RUNNING = 0;
     var CLOSING = 1;
     var CLOSED = 2;
-    var WebSocketServer2 = class extends EventEmitter2 {
+    var WebSocketServer3 = class extends EventEmitter2 {
       /**
        * Create a `WebSocketServer` instance.
        *
@@ -5432,7 +5691,7 @@ var require_websocket_server = __commonJS({
           host: null,
           path: null,
           port: null,
-          WebSocket: WebSocket2,
+          WebSocket: WebSocket3,
           ...options
         };
         if (options.port == null && !options.server && !options.noServer || options.port != null && (options.server || options.noServer) || options.server && options.noServer) {
@@ -5441,8 +5700,8 @@ var require_websocket_server = __commonJS({
           );
         }
         if (options.port != null) {
-          this._server = http2.createServer((req, res) => {
-            const body = http2.STATUS_CODES[426];
+          this._server = http3.createServer((req, res) => {
+            const body = http3.STATUS_CODES[426];
             res.writeHead(426, {
               "Content-Length": body.length,
               "Content-Type": "text/plain"
@@ -5712,7 +5971,7 @@ var require_websocket_server = __commonJS({
         cb(ws, req);
       }
     };
-    module2.exports = WebSocketServer2;
+    module2.exports = WebSocketServer3;
     function addListeners(server, map) {
       for (const event of Object.keys(map)) server.on(event, map[event]);
       return function removeListeners() {
@@ -5729,7 +5988,7 @@ var require_websocket_server = __commonJS({
       this.destroy();
     }
     function abortHandshake(socket, code, message, headers) {
-      message = message || http2.STATUS_CODES[code];
+      message = message || http3.STATUS_CODES[code];
       headers = {
         Connection: "close",
         "Content-Type": "text/html",
@@ -5738,7 +5997,7 @@ var require_websocket_server = __commonJS({
       };
       socket.once("finish", socket.destroy);
       socket.end(
-        `HTTP/1.1 ${code} ${http2.STATUS_CODES[code]}\r
+        `HTTP/1.1 ${code} ${http3.STATUS_CODES[code]}\r
 ` + Object.keys(headers).map((h) => `${h}: ${headers[h]}`).join("\r\n") + "\r\n\r\n" + message
       );
     }
@@ -5751,6 +6010,31 @@ var require_websocket_server = __commonJS({
         abortHandshake(socket, code, message, headers);
       }
     }
+  }
+});
+
+// node_modules/ws/index.js
+var require_ws = __commonJS({
+  "node_modules/ws/index.js"(exports2, module2) {
+    "use strict";
+    var createWebSocketStream2 = require_stream();
+    var extension2 = require_extension();
+    var PerMessageDeflate2 = require_permessage_deflate();
+    var Receiver2 = require_receiver();
+    var Sender2 = require_sender();
+    var subprotocol2 = require_subprotocol();
+    var WebSocket3 = require_websocket();
+    var WebSocketServer3 = require_websocket_server();
+    WebSocket3.createWebSocketStream = createWebSocketStream2;
+    WebSocket3.extension = extension2;
+    WebSocket3.PerMessageDeflate = PerMessageDeflate2;
+    WebSocket3.Receiver = Receiver2;
+    WebSocket3.Sender = Sender2;
+    WebSocket3.Server = WebSocketServer3;
+    WebSocket3.subprotocol = subprotocol2;
+    WebSocket3.WebSocket = WebSocket3;
+    WebSocket3.WebSocketServer = WebSocketServer3;
+    module2.exports = WebSocket3;
   }
 });
 
@@ -6474,9 +6758,7 @@ var init_linter = __esm({
     init_lexer();
     init_parser();
     FLLinter = class {
-      constructor() {
-        this.rules = [];
-      }
+      rules = [];
       addRule(rule) {
         this.rules.push(rule);
         return this;
@@ -6516,8 +6798,8 @@ var init_linter = __esm({
 });
 
 // src/cli.ts
-var fs12 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs15 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 var readline = __toESM(require("readline"));
 init_lexer();
 init_parser();
@@ -6548,10 +6830,8 @@ var BUILTIN_TYPES = /* @__PURE__ */ new Map([
   ["list", { params: [{ kind: "type", name: "any" }], returnType: { kind: "type", name: "array<any>" } }]
 ]);
 var TypeChecker = class {
-  constructor() {
-    this.functionTypes = /* @__PURE__ */ new Map();
-    this.variableTypes = /* @__PURE__ */ new Map();
-  }
+  functionTypes = /* @__PURE__ */ new Map();
+  variableTypes = /* @__PURE__ */ new Map();
   /**
    * Register a function type (from FUNC block with type annotations)
    */
@@ -6766,9 +7046,10 @@ function toFlType(typeName) {
   }
 }
 var RuntimeTypeChecker = class {
+  strict;
+  // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
+  funcTypes = /* @__PURE__ */ new Map();
   constructor(strict = false) {
-    // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
-    this.funcTypes = /* @__PURE__ */ new Map();
     this.strict = strict;
   }
   get isStrict() {
@@ -6834,13 +7115,14 @@ var RuntimeTypeChecker = class {
 
 // src/logger.ts
 var StructuredLogger = class {
+  logLevelOrder = {
+    debug: 0,
+    info: 1,
+    warn: 2,
+    error: 3
+  };
+  currentLogLevel;
   constructor(initialLevel) {
-    this.logLevelOrder = {
-      debug: 0,
-      info: 1,
-      warn: 2,
-      error: 3
-    };
     const envLevel = process.env.LOG_LEVEL;
     this.currentLogLevel = initialLevel || envLevel || "info";
     if (process.env.DEBUG_LOGGER) {
@@ -6895,9 +7177,7 @@ function getGlobalLogger() {
 
 // src/interpreter-scope.ts
 var ScopeStack = class {
-  constructor() {
-    this.stack = [/* @__PURE__ */ new Map()];
-  }
+  stack = [/* @__PURE__ */ new Map()];
   /** 스코프 체인 역방향 탐색 — 가장 안쪽 스코프 우선 */
   get(name) {
     for (let i = this.stack.length - 1; i >= 0; i--) {
@@ -6970,9 +7250,12 @@ var ScopeStack = class {
 
 // src/web-search-adapter.ts
 var WebSearchAdapter = class {
+  cache;
+  apiKey;
+  apiProvider;
+  cacheTtlMs = 24 * 60 * 60 * 1e3;
   // 24 hours
   constructor(apiKey, provider = "mock") {
-    this.cacheTtlMs = 24 * 60 * 60 * 1e3;
     this.cache = /* @__PURE__ */ new Map();
     this.apiKey = apiKey;
     this.apiProvider = provider;
@@ -7219,11 +7502,14 @@ var WebSearchAdapter = class {
 var fs = __toESM(require("fs"));
 var path = __toESM(require("path"));
 var LearnedFactsStore = class {
+  filePath;
+  facts;
+  defaultTtlDays = 30;
+  autoSaveInterval = 5e3;
+  // Auto-save every 5 seconds
+  isDirty = false;
+  autoSaveTimer;
   constructor(filePath = "./data/learned-facts.json", defaultTtlDays = 30) {
-    this.defaultTtlDays = 30;
-    this.autoSaveInterval = 5e3;
-    // Auto-save every 5 seconds
-    this.isDirty = false;
     this.filePath = filePath;
     this.facts = /* @__PURE__ */ new Map();
     this.defaultTtlDays = defaultTtlDays;
@@ -7434,12 +7720,12 @@ var LearnedFactsStore = class {
 
 // src/async-runtime.ts
 var FreeLangPromise = class _FreeLangPromise {
+  state = "pending";
+  value = void 0;
+  error = null;
+  resolvers = [];
+  rejecters = [];
   constructor(executor) {
-    this.state = "pending";
-    this.value = void 0;
-    this.error = null;
-    this.resolvers = [];
-    this.rejecters = [];
     try {
       executor(this.resolve.bind(this), this.reject.bind(this));
     } catch (e) {
@@ -7699,6 +7985,7 @@ function genId() {
   return `ctx-${Date.now()}-${++_idCounter}`;
 }
 var ContextManager = class {
+  window;
   constructor(maxTokens = 4096, strategy = "priority") {
     this.window = {
       maxTokens,
@@ -7858,9 +8145,7 @@ function fromThrown(e, code = "UNKNOWN") {
 
 // src/error-system.ts
 var AIErrorSystem = class {
-  constructor() {
-    this.strategies = [];
-  }
+  strategies = [];
   addStrategy(s) {
     this.strategies.push(s);
     return this;
@@ -7923,9 +8208,7 @@ defaultErrorSystem.addStrategy({
 
 // src/tool-registry.ts
 var ToolRegistry = class {
-  constructor() {
-    this.tools = /* @__PURE__ */ new Map();
-  }
+  tools = /* @__PURE__ */ new Map();
   /** 도구 등록 (chainable) */
   register(tool) {
     this.tools.set(tool.name, tool);
@@ -8070,12 +8353,10 @@ globalToolRegistry.register({
 
 // src/memory-system.ts
 var MemorySystem = class {
-  constructor() {
-    this.longTerm = /* @__PURE__ */ new Map();
-    this.shortTerm = /* @__PURE__ */ new Map();
-    this.episodes = [];
-    this.working = null;
-  }
+  longTerm = /* @__PURE__ */ new Map();
+  shortTerm = /* @__PURE__ */ new Map();
+  episodes = [];
+  working = null;
   // 저장
   remember(key, value, options = {}) {
     const entry = {
@@ -8185,9 +8466,7 @@ function tfidf(query, doc) {
   return overlap / (Math.sqrt(query.length) * Math.sqrt(doc.length));
 }
 var RAGStore = class {
-  constructor() {
-    this.docs = [];
-  }
+  docs = [];
   // 문서 추가
   add(doc) {
     this.docs.push(doc);
@@ -8234,11 +8513,9 @@ var globalRAG = new RAGStore();
 
 // src/multi-agent.ts
 var MessageBus = class {
-  constructor() {
-    this.agents = /* @__PURE__ */ new Map();
-    this.log = [];
-    this.msgCounter = 0;
-  }
+  agents = /* @__PURE__ */ new Map();
+  log = [];
+  msgCounter = 0;
   // 에이전트 등록
   spawn(id, handler) {
     const handle = { id, handler, inbox: [], running: true };
@@ -8311,9 +8588,7 @@ var globalBus = new MessageBus();
 
 // src/try-reason.ts
 var TryReasoner = class {
-  constructor() {
-    this.history = [];
-  }
+  history = [];
   async run(config) {
     const errors = [];
     for (let i = 0; i < config.attempts.length; i++) {
@@ -8373,13 +8648,10 @@ async function tryWithFallback(fn, fallback) {
 // src/streaming.ts
 var import_events = require("events");
 var FLStream = class extends import_events.EventEmitter {
-  constructor() {
-    super(...arguments);
-    this.chunks = [];
-    this.chunkIndex = 0;
-    this._done = false;
-    this._collected = "";
-  }
+  chunks = [];
+  chunkIndex = 0;
+  _done = false;
+  _collected = "";
   write(content) {
     if (this._done) return;
     const chunk = {
@@ -8525,6 +8797,7 @@ var FL_EXAMPLES = [
   { concept: "SELF-IMPROVE", code: "(self-improve :target $code :evaluate score-fn :improve enhance-fn :iterations 3)", description: "\uC790\uAE30 \uAC1C\uC120", difficulty: "advanced", tags: ["ai", "improve"] }
 ];
 var FLTutor = class {
+  examples;
   constructor(examples = FL_EXAMPLES) {
     this.examples = examples.map((e) => ({ ...e, tags: [...e.tags] }));
   }
@@ -8597,9 +8870,11 @@ var globalTutor = new FLTutor();
 
 // src/reasoning-debugger.ts
 var ReasoningTrace = class {
+  root;
+  current;
+  stack = [];
+  nodeCounter = 0;
   constructor(label) {
-    this.stack = [];
-    this.nodeCounter = 0;
     this.root = this.makeNode("thought", label);
     this.current = this.root;
   }
@@ -8731,6 +9006,7 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   })
 };
 var PromptCompiler = class {
+  target;
   constructor(target = "claude") {
     this.target = target;
   }
@@ -8797,9 +9073,7 @@ var globalCompiler = new PromptCompiler("claude");
 
 // src/fl-sdk.ts
 var FLCodeBuilder = class {
-  constructor() {
-    this.lines = [];
-  }
+  lines = [];
   // 기본 폼
   define(name, value) {
     this.lines.push(`(define ${name} ${value})`);
@@ -8852,30 +9126,28 @@ var FLCodeBuilder = class {
   }
 };
 var FLSDK = class {
-  constructor() {
-    this.version = "9.0.0";
-    this.features = [
-      "maybe",
-      "cot",
-      "tot",
-      "reflect",
-      "context",
-      "result",
-      "fl-try",
-      "use-tool",
-      "agent",
-      "self-improve",
-      "memory",
-      "rag",
-      "multi-agent",
-      "try-reason",
-      "streaming",
-      "quality-loop",
-      "tutor",
-      "debugger",
-      "prompt-compiler"
-    ];
-  }
+  version = "9.0.0";
+  features = [
+    "maybe",
+    "cot",
+    "tot",
+    "reflect",
+    "context",
+    "result",
+    "fl-try",
+    "use-tool",
+    "agent",
+    "self-improve",
+    "memory",
+    "rag",
+    "multi-agent",
+    "try-reason",
+    "streaming",
+    "quality-loop",
+    "tutor",
+    "debugger",
+    "prompt-compiler"
+  ];
   // 코드 빌더 생성
   builder() {
     return new FLCodeBuilder();
@@ -9105,10 +9377,8 @@ var globalDebater = new Debater();
 
 // src/checkpoint.ts
 var CheckpointManager = class {
-  constructor() {
-    this.checkpoints = /* @__PURE__ */ new Map();
-    this.depth = 0;
-  }
+  checkpoints = /* @__PURE__ */ new Map();
+  depth = 0;
   /** 상태 저장 (깊은 복사) */
   save(name, state) {
     const cloned = typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
@@ -9215,6 +9485,7 @@ function scoreStrategy(problem, strategy) {
   return { strategy, score, reason };
 }
 var MetaReasoner = class {
+  strategies;
   constructor(strategies = [...ALL_STRATEGIES]) {
     this.strategies = strategies;
   }
@@ -9237,9 +9508,7 @@ var globalMetaReasoner = new MetaReasoner();
 
 // src/belief.ts
 var BeliefSystem = class {
-  constructor() {
-    this.beliefs = /* @__PURE__ */ new Map();
-  }
+  beliefs = /* @__PURE__ */ new Map();
   // 신념 설정
   set(claim, confidence) {
     const clamped = Math.max(0, Math.min(1, confidence));
@@ -9313,10 +9582,8 @@ function similarity(a, b) {
   return intersection / Math.sqrt(tokA.size * tokB.size);
 }
 var AnalogyStore = class {
-  constructor() {
-    this.patterns = [];
-    this.counter = 0;
-  }
+  patterns = [];
+  counter = 0;
   // 패턴 저장
   store(description, solution, tags = []) {
     const p = {
@@ -9474,8 +9741,9 @@ var ReasonComposer = class {
   }
 };
 var PipelineBuilder = class {
+  steps = [];
+  composer;
   constructor(composer) {
-    this.steps = [];
     this.composer = composer;
   }
   step(name, fn, options = {}) {
@@ -9493,6 +9761,14 @@ var globalComposer = new ReasonComposer();
 
 // src/cognitive.ts
 var CognitiveArchitecture = class {
+  meta;
+  beliefs;
+  analogies;
+  hypothesis;
+  critique;
+  composer;
+  debater;
+  checkpoints;
   constructor() {
     this.meta = new MetaReasoner();
     this.beliefs = new BeliefSystem();
@@ -9623,9 +9899,7 @@ var globalConsensus = new ConsensusEngine();
 
 // src/delegate.ts
 var DelegationManager = class {
-  constructor() {
-    this.agents = /* @__PURE__ */ new Map();
-  }
+  agents = /* @__PURE__ */ new Map();
   register(agent) {
     this.agents.set(agent.id, agent);
   }
@@ -9856,9 +10130,7 @@ var globalSwarm = new Swarm();
 
 // src/peer-review.ts
 var PeerReviewSystem = class {
-  constructor() {
-    this.reviewers = /* @__PURE__ */ new Map();
-  }
+  reviewers = /* @__PURE__ */ new Map();
   addReviewer(reviewer) {
     this.reviewers.set(reviewer.id, reviewer);
   }
@@ -9882,9 +10154,7 @@ var globalPeerReview = new PeerReviewSystem();
 
 // src/compete.ts
 var Competition = class {
-  constructor() {
-    this.competitors = /* @__PURE__ */ new Map();
-  }
+  competitors = /* @__PURE__ */ new Map();
   register(competitor) {
     this.competitors.set(competitor.id, competitor);
   }
@@ -9918,9 +10188,7 @@ var globalCompetition = new Competition();
 
 // src/chain-agents.ts
 var AgentChain = class _AgentChain {
-  constructor() {
-    this.agents = [];
-  }
+  agents = [];
   add(agent) {
     this.agents.push(agent);
     return this;
@@ -9975,9 +10243,7 @@ var globalChain = new AgentChain();
 
 // src/orchestrate.ts
 var Orchestrator = class {
-  constructor() {
-    this.agents = /* @__PURE__ */ new Map();
-  }
+  agents = /* @__PURE__ */ new Map();
   /** 에이전트 등록 */
   register(agent) {
     this.agents.set(agent.id, agent);
@@ -10046,6 +10312,15 @@ var globalOrchestrator = new Orchestrator();
 
 // src/multi-agent-hub.ts
 var MultiAgentHub = class {
+  consensus;
+  delegation;
+  voting;
+  negotiator;
+  swarm;
+  orchestrator;
+  peerReview;
+  chain;
+  competition;
   constructor() {
     this.consensus = new ConsensusEngine();
     this.delegation = new DelegationManager();
@@ -10218,10 +10493,11 @@ var globalHub = new MultiAgentHub();
 // src/evolve.ts
 var import_crypto = require("crypto");
 var EvolutionEngine = class {
+  config;
+  population = [];
+  currentGeneration = 0;
+  history = [];
   constructor(config) {
-    this.population = [];
-    this.currentGeneration = 0;
-    this.history = [];
     this.config = {
       populationSize: config.populationSize ?? 20,
       maxGenerations: config.maxGenerations ?? 50,
@@ -10416,6 +10692,7 @@ var DEFAULT_CONFIG = {
 };
 var CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 var Mutator = class {
+  config;
   constructor(config) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -10570,6 +10847,7 @@ var globalMutator = new Mutator();
 
 // src/crossover.ts
 var Crossover = class {
+  config;
   constructor(config) {
     this.config = {
       type: config?.type ?? "single-point",
@@ -10754,6 +11032,7 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 var FitnessEvaluator = class {
+  config;
   constructor(config = {}) {
     this.config = {
       normalize: config.normalize !== false,
@@ -10908,10 +11187,11 @@ var globalFitness = new FitnessEvaluator();
 
 // src/generation.ts
 var GenerationLoop = class {
+  config;
+  statsHistory = [];
+  stagnationCount = 0;
+  currentStats = null;
   constructor(config) {
-    this.statsHistory = [];
-    this.stagnationCount = 0;
-    this.currentStats = null;
     this.config = {
       maxGenerations: config.maxGenerations,
       targetFitness: config.targetFitness,
@@ -11048,6 +11328,7 @@ function buildResult(kept, removed, scorer, strategy, originalCount) {
   };
 }
 var Pruner = class {
+  config;
   constructor(config) {
     this.config = config ?? {};
   }
@@ -11159,8 +11440,9 @@ function keepBest(items, scorer, k) {
 
 // src/benchmark-self.ts
 var SelfBenchmark = class {
+  suite;
+  pendingFns = [];
   constructor(suiteName = "default") {
-    this.pendingFns = [];
     this.suite = {
       name: suiteName,
       results: [],
@@ -11607,6 +11889,8 @@ function parseVersion(v) {
   return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
 }
 var SelfVersioning = class {
+  history;
+  maxHistory;
   constructor(maxHistory = 100) {
     this.maxHistory = maxHistory;
     this.history = {
@@ -11764,13 +12048,18 @@ var DEFAULT_CYCLE_CONFIG = {
   enableRefactor: false
 };
 var SelfEvolutionHub = class {
+  fitnessEval;
+  pruner;
+  refactorer;
+  benchmark;
+  versioning;
+  // 내부 통계
+  _cycleCount = 0;
+  _totalGenerations = 0;
+  _refactorSuggestions = 0;
+  _versionCount = 0;
+  _fitnessHistory = [];
   constructor() {
-    // 내부 통계
-    this._cycleCount = 0;
-    this._totalGenerations = 0;
-    this._refactorSuggestions = 0;
-    this._versionCount = 0;
-    this._fitnessHistory = [];
     this.fitnessEval = new FitnessEvaluator({ normalize: true, maximize: true });
     this.pruner = new Pruner();
     this.refactorer = new SelfRefactorer();
@@ -12043,6 +12332,8 @@ var globalSelfEvolution = new SelfEvolutionHub();
 
 // src/align.ts
 var AlignmentSystem = class {
+  goals;
+  values;
   constructor() {
     this.goals = /* @__PURE__ */ new Map();
     this.values = /* @__PURE__ */ new Map();
@@ -12451,6 +12742,7 @@ var DEFAULT_PRINCIPLES = [
   autonomyPrinciple
 ];
 var EthicsChecker = class {
+  principles;
   constructor() {
     this.principles = [...DEFAULT_PRINCIPLES];
   }
@@ -12648,6 +12940,9 @@ var globalEthics = new EthicsChecker();
 
 // src/curiosity.ts
 var CuriosityEngine = class {
+  state;
+  ucb1Stats;
+  totalVisits;
   constructor(initialTopics) {
     this.state = {
       explored: /* @__PURE__ */ new Set(),
@@ -12873,6 +13168,8 @@ function experiencesToHeuristic(exps, domain) {
   };
 }
 var WisdomEngine = class {
+  experiences;
+  heuristics;
   constructor() {
     this.experiences = [];
     this.heuristics = [];
@@ -13092,6 +13389,8 @@ var globalWisdom = new WisdomEngine();
 
 // src/causal.ts
 var CausalGraph = class {
+  nodes;
+  edges;
   constructor() {
     this.nodes = /* @__PURE__ */ new Map();
     this.edges = [];
@@ -13507,8 +13806,10 @@ var globalExplainer = new Explainer();
 
 // src/world-model.ts
 var WorldModel = class {
+  state;
+  history;
+  _idCounter = 0;
   constructor() {
-    this._idCounter = 0;
     this.state = {
       entities: /* @__PURE__ */ new Map(),
       relations: [],
@@ -13607,14 +13908,14 @@ var WorldModel = class {
     const visited = /* @__PURE__ */ new Set();
     const queue = [{ id: fromId, path: [fromId] }];
     while (queue.length > 0) {
-      const { id, path: path10 } = queue.shift();
+      const { id, path: path13 } = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
       for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path10, neighbor];
+        if (neighbor === toId) return [...path13, neighbor];
         if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path10, neighbor] });
+          queue.push({ id: neighbor, path: [...path13, neighbor] });
         }
       }
     }
@@ -13790,9 +14091,7 @@ function generateExplanation(baseScenario, intervention, originalOutcome, counte
   return `${changes}\uC73C\uB85C \uBCC0\uACBD\uD574\uB3C4 \uACB0\uACFC "${String(originalOutcome)}"\uB294 \uB3D9\uC77C\uD569\uB2C8\uB2E4.`;
 }
 var CounterfactualReasoner = class {
-  constructor() {
-    this.scenarios = /* @__PURE__ */ new Map();
-  }
+  scenarios = /* @__PURE__ */ new Map();
   // 시나리오 등록
   registerScenario(scenario) {
     this.scenarios.set(scenario.id, scenario);
@@ -20452,6 +20751,11 @@ var ModuleError = class _ModuleError extends Error {
     this.name = "ModuleError";
     Object.setPrototypeOf(this, _ModuleError.prototype);
   }
+  moduleName;
+  file;
+  line;
+  col;
+  hint;
 };
 var ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
   constructor(moduleName, source, file, line, col, hint) {
@@ -20473,6 +20777,11 @@ var FunctionNotFoundError = class _FunctionNotFoundError extends Error {
     this.name = "FunctionNotFoundError";
     Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
   }
+  functionName;
+  file;
+  line;
+  col;
+  hint;
 };
 
 // src/ast-helpers.ts
@@ -21019,8 +21328,8 @@ function createDataModule() {
   return {
     // ── JSON ──────────────────────────────────────────────────
     // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
-    "json_get": (obj, path10) => {
-      const parts = path10.split(".");
+    "json_get": (obj, path13) => {
+      const parts = path13.split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -21029,10 +21338,10 @@ function createDataModule() {
       return cur ?? null;
     },
     // json_set obj path value -> object (immutable update, returns new obj)
-    "json_set": (obj, path10, value) => {
+    "json_set": (obj, path13, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const clone = JSON.parse(JSON.stringify(parsed));
-      const parts = path10.split(".");
+      const parts = path13.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -22138,8 +22447,8 @@ function createResourceModule() {
       });
     },
     // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
-    "res_disk_usage": (path10) => {
-      const line = run(`df -BG --output=size,used,avail,pcent "${path10}" 2>/dev/null | tail -1`);
+    "res_disk_usage": (path13) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path13}" 2>/dev/null | tail -1`);
       if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
       const [total, used, avail, pct] = line.trim().split(/\s+/);
       return {
@@ -22466,18 +22775,30 @@ function createResourceModule() {
 var http = __toESM(require("http"));
 var url = __toESM(require("url"));
 var crypto = __toESM(require("crypto"));
-
-// node_modules/ws/wrapper.mjs
-var import_stream = __toESM(require_stream(), 1);
-var import_extension = __toESM(require_extension(), 1);
-var import_permessage_deflate = __toESM(require_permessage_deflate(), 1);
-var import_receiver = __toESM(require_receiver(), 1);
-var import_sender = __toESM(require_sender(), 1);
-var import_subprotocol = __toESM(require_subprotocol(), 1);
-var import_websocket = __toESM(require_websocket(), 1);
-var import_websocket_server = __toESM(require_websocket_server(), 1);
-
-// src/stdlib-http-server.ts
+var WebSocketServer = null;
+var WebSocket = null;
+try {
+  const wsModule = require_ws();
+  WebSocketServer = wsModule.WebSocketServer;
+  WebSocket = wsModule.WebSocket;
+} catch {
+  WebSocketServer = class {
+    constructor(options) {
+    }
+    on(event, handler) {
+    }
+    broadcast(data) {
+    }
+    close() {
+    }
+  };
+  WebSocket = class {
+    send(data) {
+    }
+    close() {
+    }
+  };
+}
 function createHttpServerModule(callFn, callFunctionValue2) {
   const routes = [];
   let server = null;
@@ -22494,13 +22815,13 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     const counter = ++requestCounter;
     return `req_${timestamp}_${counter}`;
   }
-  function logAccess(method, path10, status, duration, requestId) {
+  function logAccess(method, path13, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path10} ${status} ${duration}ms`);
+    console.log(`${icon} [${requestId}] ${method} ${path13} ${status} ${duration}ms`);
   }
-  function pathToRegex(path10) {
+  function pathToRegex(path13) {
     const params = [];
-    const pattern = path10.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+    const pattern = path13.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
       params.push(param);
       return "([^\\/]+)";
     });
@@ -22555,11 +22876,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       res.end(String(body ?? ""));
     }
   }
-  function createFlRequest(method, path10, query, headers, body, params, requestId) {
+  function createFlRequest(method, path13, query, headers, body, params, requestId) {
     return {
       __fl_request: true,
       method,
-      path: path10,
+      path: path13,
       query,
       headers,
       body: body || void 0,
@@ -22570,33 +22891,33 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   }
   return {
     // server_get path handlerName -> null
-    "server_get": (path10, handlerName) => {
-      const [pattern, params] = pathToRegex(path10);
-      routes.push({ method: "GET", path: path10, pattern, params, handler: handlerName });
+    "server_get": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "GET", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_post path handlerName -> null
-    "server_post": (path10, handlerName) => {
-      const [pattern, params] = pathToRegex(path10);
-      routes.push({ method: "POST", path: path10, pattern, params, handler: handlerName });
+    "server_post": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "POST", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_put path handlerName -> null
-    "server_put": (path10, handlerName) => {
-      const [pattern, params] = pathToRegex(path10);
-      routes.push({ method: "PUT", path: path10, pattern, params, handler: handlerName });
+    "server_put": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "PUT", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_patch path handlerName -> null
-    "server_patch": (path10, handlerName) => {
-      const [pattern, params] = pathToRegex(path10);
-      routes.push({ method: "PATCH", path: path10, pattern, params, handler: handlerName });
+    "server_patch": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "PATCH", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_delete path handlerName -> null
-    "server_delete": (path10, handlerName) => {
-      const [pattern, params] = pathToRegex(path10);
-      routes.push({ method: "DELETE", path: path10, pattern, params, handler: handlerName });
+    "server_delete": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "DELETE", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_start port -> string
@@ -22606,7 +22927,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const requestId = generateRequestId();
         currentRequestId = requestId;
         const method = req.method || "GET";
-        const { path: path10, query } = parseUrl(req.url || "/");
+        const { path: path13, query } = parseUrl(req.url || "/");
         const headers = req.headers;
         const body = await readBody(req);
         res.setHeader("Access-Control-Allow-Origin", "*");
@@ -22621,7 +22942,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
-          const match = route.pattern.exec(path10);
+          const match = route.pattern.exec(path13);
           if (!match) continue;
           matched = true;
           let status = 200;
@@ -22630,7 +22951,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
             for (let i = 0; i < route.params.length; i++) {
               params[route.params[i]] = match[i + 1];
             }
-            const flReq = createFlRequest(method, path10, query, headers, body, params, requestId);
+            const flReq = createFlRequest(method, path13, query, headers, body, params, requestId);
             let rawResult;
             if (typeof route.handler === "string") {
               rawResult = callFn(route.handler, [flReq]);
@@ -22678,23 +22999,23 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               }
             }
             const duration = Date.now() - requestStart;
-            logAccess(method, path10, status, duration, requestId);
+            logAccess(method, path13, status, duration, requestId);
           } catch (err4) {
             const status2 = 500;
             sendResponse(res, status2, { error: err4.message });
             const duration = Date.now() - requestStart;
-            logAccess(method, path10, status2, duration, requestId);
+            logAccess(method, path13, status2, duration, requestId);
           }
           return;
         }
         if (!matched) {
           const status = 404;
-          sendResponse(res, status, { error: "Not Found", path: path10 });
+          sendResponse(res, status, { error: "Not Found", path: path13 });
           const duration = Date.now() - requestStart;
-          logAccess(method, path10, status, duration, requestId);
+          logAccess(method, path13, status, duration, requestId);
         }
       });
-      wssPublic = new import_websocket_server.default({ noServer: true });
+      wssPublic = new WebSocketServer({ noServer: true });
       server.on("upgrade", (req, socket, head) => {
         if (!upgradeHandler || !wssPublic) {
           socket.destroy();
@@ -22870,7 +23191,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     // ws_send_to_client sessionId data [isBinary] -> boolean
     "ws_send_to_client": (sessionId, data, isBinary = false) => {
       const ws = wsPublicMap.get(sessionId);
-      if (!ws || ws.readyState !== import_websocket.default.OPEN) return false;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
       if (isBinary) {
         ws.send(Buffer.from(data, "base64"));
       } else {
@@ -22897,8 +23218,8 @@ function createHttpServerModule(callFn, callFunctionValue2) {
 // src/stdlib-db.ts
 var import_child_process4 = require("child_process");
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
-function kimdbReq(method, path10, body) {
-  const url2 = `${KIMDB}${path10}`;
+function kimdbReq(method, path13, body) {
+  const url2 = `${KIMDB}${path13}`;
   const args2 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args2.push("-X", method);
@@ -23613,9 +23934,9 @@ function createModuleSystem() {
   return {
     // module_load path -> {exports} | null
     // Load a module from file or registry
-    "module_load": (path10) => {
-      if (registry.has(path10)) {
-        return registry.get(path10);
+    "module_load": (path13) => {
+      if (registry.has(path13)) {
+        return registry.get(path13);
       }
       return null;
     },
@@ -23631,9 +23952,9 @@ function createModuleSystem() {
     },
     // module_require path -> {exports}
     // Require and return all exports from a module
-    "module_require": (path10) => {
-      if (registry.has(path10)) {
-        return registry.get(path10) || {};
+    "module_require": (path13) => {
+      if (registry.has(path13)) {
+        return registry.get(path13) || {};
       }
       return {};
     },
@@ -23758,8 +24079,9 @@ function genId2() {
   return `ch_${++_chanIdCounter}_${Date.now()}`;
 }
 var Channel = class {
+  queue = [];
+  maxSize;
   constructor(size = 100) {
-    this.queue = [];
     this.maxSize = size;
   }
   /** 값을 채널에 보냄. 가득 차면 false 반환 */
@@ -24227,8 +24549,9 @@ var BINARY_OPS = {
   "or": "||"
 };
 var JSCodegen = class {
+  opts;
+  exportedNames = [];
   constructor() {
-    this.exportedNames = [];
     this.opts = { ...DEFAULT_OPTIONS };
   }
   generate(nodes, opts) {
@@ -24425,6 +24748,12 @@ ${exportsStr}
         return this.genFuncBlock(node);
       case "MODULE":
         return this.genModuleBlock(node);
+      case "SERVICE":
+        return this.genServiceBlock(node);
+      case "MODEL":
+        return this.genModelBlock(node);
+      case "CONTROLLER":
+        return this.genControllerBlock(node);
       default:
         return `/* unsupported block: ${node.type} */`;
     }
@@ -24442,6 +24771,111 @@ ${exportsStr}
       return body.map((n) => this.genNode(n)).join("\n");
     }
     return this.genNode(body);
+  }
+  genServiceBlock(node) {
+    const name = node.name;
+    const methods = node.fields.get("methods");
+    const inject = node.fields.get("inject");
+    const injectParams = inject ? Array.isArray(inject) ? inject.map((dep) => {
+      const depName = dep.kind === "variable" ? dep.name : dep.kind === "literal" ? String(dep.value) : String(dep);
+      return `private ${depName}: ${depName}`;
+    }).join(", ") : "" : "";
+    let methodsCode = "";
+    if (methods && methods.kind === "sexpr") {
+      const sExpr = methods;
+      methodsCode = sExpr.args.map((arg) => {
+        if (arg.kind === "sexpr" && arg.op === "fn") {
+          const fnExpr = arg;
+          const fnNameArg = fnExpr.args[0];
+          const fnParamsArg = fnExpr.args[1];
+          const fnBodyArg = fnExpr.args[2];
+          const fnName = fnNameArg.kind === "variable" ? fnNameArg.name.replace(/^\$/, "") : fnNameArg.kind === "literal" ? String(fnNameArg.value) : "method";
+          const fnParams = this.extractParamList(fnParamsArg).map((p) => p.replace(/^\$/, "")).join(", ");
+          const fnBody = fnBodyArg ? this.genNode(fnBodyArg) : "undefined";
+          return `  ${fnName}(${fnParams}) { return ${fnBody}; }`;
+        }
+        return "";
+      }).filter(Boolean).join("\n");
+    }
+    return [
+      `// Generated by FreeLang v11 \u2014 SERVICE block`,
+      `export class ${name} {`,
+      injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`,
+      methodsCode,
+      `}`
+    ].join("\n");
+  }
+  genModelBlock(node) {
+    const name = node.name;
+    const table = node.fields.get("table") || name.toLowerCase() + "s";
+    const fields = node.fields.get("fields");
+    let sqlColumns = "  id SERIAL PRIMARY KEY";
+    let tsInterface = `export interface ${name} {
+  id: number;`;
+    if (fields && fields.kind === "sexpr") {
+      const sExpr = fields;
+      for (const arg of sExpr.args) {
+        if (arg.kind === "sexpr") {
+          const fieldExpr = arg;
+          const fieldName = fieldExpr.op.startsWith("$") || fieldExpr.op.startsWith(":") ? fieldExpr.op : String(fieldExpr.args[0].value || fieldExpr.op);
+          const cleanFieldName = fieldName.replace(/^[\$:]/, "").replace(/-/g, "_");
+          sqlColumns += `,
+  ${cleanFieldName} VARCHAR(255)`;
+          tsInterface += `
+  ${cleanFieldName.replace(/_/g, "")}: string;`;
+        }
+      }
+    }
+    tsInterface += `
+  createdAt: Date;
+  updatedAt: Date;
+}`;
+    return [
+      `-- Generated by FreeLang v11 \u2014 MODEL block (SQL)`,
+      `CREATE TABLE IF NOT EXISTS ${table} (`,
+      sqlColumns,
+      `,
+  created_at TIMESTAMP DEFAULT NOW(),`,
+      `
+  updated_at TIMESTAMP DEFAULT NOW()`,
+      `
+);`,
+      ``,
+      `// TypeScript interface`,
+      tsInterface
+    ].join("\n");
+  }
+  genControllerBlock(node) {
+    const prefix = node.fields.get("prefix") || "/";
+    const routes = node.fields.get("routes");
+    let routeCode = "";
+    if (routes && routes.kind === "sexpr") {
+      const sExpr = routes;
+      for (let i = 0; i < sExpr.args.length; i += 2) {
+        const methodLit = sExpr.args[i];
+        const routeLit = sExpr.args[i + 1];
+        const handlerLit = sExpr.args[i + 2];
+        const method = methodLit.kind === "literal" ? String(methodLit.value) : "GET";
+        const route = routeLit.kind === "literal" ? String(routeLit.value) : "/";
+        const fullRoute = prefix === "/" ? route : `${prefix}${route}`;
+        routeCode += `router.${method.toLowerCase()}("${fullRoute}", async (req, res) => {
+  try {
+    // TODO: Execute handler
+    res.json({ status: 200 });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+`;
+      }
+    }
+    return [
+      `// Generated by FreeLang v11 \u2014 CONTROLLER block`,
+      `import { Router } from "express";`,
+      `export const router = Router();`,
+      ``,
+      routeCode
+    ].join("\n");
   }
   extractVarName(node) {
     if (node.kind === "variable") {
@@ -26151,6 +26585,16 @@ function createServiceModule() {
   };
 }
 
+// node_modules/ws/wrapper.mjs
+var import_stream = __toESM(require_stream(), 1);
+var import_extension = __toESM(require_extension(), 1);
+var import_permessage_deflate = __toESM(require_permessage_deflate(), 1);
+var import_receiver = __toESM(require_receiver(), 1);
+var import_sender = __toESM(require_sender(), 1);
+var import_subprotocol = __toESM(require_subprotocol(), 1);
+var import_websocket = __toESM(require_websocket(), 1);
+var import_websocket_server = __toESM(require_websocket_server(), 1);
+
 // src/stdlib-ws.ts
 function createWsModule(callFn) {
   const connections = /* @__PURE__ */ new Map();
@@ -26822,12 +27266,10 @@ function suggestSimilar(name, candidates) {
 
 // src/profiler.ts
 var Profiler = class {
-  constructor() {
-    this.enabled = false;
-    this.entries = /* @__PURE__ */ new Map();
-    // 호출 스택: selfMs(자식 제외 시간) 계산용
-    this.callStack = [];
-  }
+  enabled = false;
+  entries = /* @__PURE__ */ new Map();
+  // 호출 스택: selfMs(자식 제외 시간) 계산용
+  callStack = [];
   /**
    * enter(name) → exit 함수 반환
    * exit 호출 시 경과 시간 기록
@@ -27264,9 +27706,7 @@ function callFunctionValueRaw(interp, fn, args2) {
 
 // src/macro-expander.ts
 var MacroExpander = class {
-  constructor() {
-    this.macros = /* @__PURE__ */ new Map();
-  }
+  macros = /* @__PURE__ */ new Map();
   define(name, params, body) {
     this.macros.set(name, { name, params, body });
   }
@@ -27396,14 +27836,12 @@ var MacroExpander = class {
 
 // src/protocol.ts
 var ProtocolRegistry = class {
-  constructor() {
-    // protocolName → Protocol
-    this.protocols = /* @__PURE__ */ new Map();
-    // "ProtocolName:TypeName" → ProtocolImpl
-    this.impls = /* @__PURE__ */ new Map();
-    // methodName → Set<protocolName> (역인덱스: 어떤 프로토콜에 속하는지)
-    this.methodIndex = /* @__PURE__ */ new Map();
-  }
+  // protocolName → Protocol
+  protocols = /* @__PURE__ */ new Map();
+  // "ProtocolName:TypeName" → ProtocolImpl
+  impls = /* @__PURE__ */ new Map();
+  // methodName → Set<protocolName> (역인덱스: 어떤 프로토콜에 속하는지)
+  methodIndex = /* @__PURE__ */ new Map();
   defineProtocol(proto) {
     this.protocols.set(proto.name, proto);
     for (const method of proto.methods) {
@@ -27483,9 +27921,7 @@ var ProtocolRegistry = class {
 
 // src/struct-system.ts
 var StructRegistry = class {
-  constructor() {
-    this.structs = /* @__PURE__ */ new Map();
-  }
+  structs = /* @__PURE__ */ new Map();
   /** Struct 정의 등록 */
   define(def) {
     this.structs.set(def.name, def);
@@ -27566,20 +28002,18 @@ var StructRegistry = class {
 
 // src/debugger.ts
 var DebugSession = class _DebugSession {
-  constructor() {
-    /** 중단점 집합 — "file:line" 형태 */
-    this.breakpoints = /* @__PURE__ */ new Set();
-    /** step 모드 — true면 모든 줄에서 break */
-    this.stepMode = false;
-    /** 디버그 모드 활성화 여부 */
-    this.enabled = false;
-    /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
-    this.onBreakCallback = null;
-    /** 소스맵 (선택적) */
-    this.sourceMap = null;
-    /** 브레이크 이벤트 로그 (테스트 검증용) */
-    this.breakLog = [];
-  }
+  /** 중단점 집합 — "file:line" 형태 */
+  breakpoints = /* @__PURE__ */ new Set();
+  /** step 모드 — true면 모든 줄에서 break */
+  stepMode = false;
+  /** 디버그 모드 활성화 여부 */
+  enabled = false;
+  /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
+  onBreakCallback = null;
+  /** 소스맵 (선택적) */
+  sourceMap = null;
+  /** 브레이크 이벤트 로그 (테스트 검증용) */
+  breakLog = [];
   static _key(file, line) {
     return `${file}:${line}`;
   }
@@ -27645,9 +28079,7 @@ function handleBreak(session, loc, env) {
 
 // src/cot.ts
 var ChainOfThought = class {
-  constructor() {
-    this.steps = [];
-  }
+  steps = [];
   /**
    * 추론 단계 추가 + 즉시 실행
    * @param thought 이 단계에서 하는 생각 (설명)
@@ -27798,12 +28230,10 @@ function evalCotForm(args2, evalFn, setVar, getVar) {
 
 // src/tot.ts
 var TreeOfThought = class {
-  constructor() {
-    this._branches = [];
-    this._scoreFn = null;
-    this._pruneThreshold = 0;
-    this._executed = [];
-  }
+  _branches = [];
+  _scoreFn = null;
+  _pruneThreshold = 0;
+  _executed = [];
   /**
    * 분기 추가: 가설 이름과 실행 함수
    */
@@ -27917,9 +28347,7 @@ function clamp2(v, min, max) {
 
 // src/reflect.ts
 var Reflector = class {
-  constructor() {
-    this.criteriaList = [];
-  }
+  criteriaList = [];
   addCriteria(c) {
     this.criteriaList.push(c);
     return this;
@@ -28015,10 +28443,12 @@ function evalReflectForm(opts) {
 
 // src/agent.ts
 var FLAgent = class {
+  state;
+  options;
+  // 미리 등록된 단계 함수 목록 (step() 메서드로 추가)
+  stepFunctions = [];
+  stepCursor = 0;
   constructor(opts) {
-    // 미리 등록된 단계 함수 목록 (step() 메서드로 추가)
-    this.stepFunctions = [];
-    this.stepCursor = 0;
     this.options = opts;
     this.state = {
       goal: opts.goal,
@@ -28240,20 +28670,26 @@ function createAgentBuiltins(interp) {
 
 // src/interpreter.ts
 var Interpreter = class {
+  context;
+  // Public for testing
+  logger;
+  searchAdapter;
+  // Phase 9a: WebSearch
+  learnedFactsStore;
+  // Phase 9b: Learning persistence
+  currentLine = 0;
+  // FreeLang source line tracking
+  callDepth = 0;
+  static MAX_CALL_DEPTH = 5e3;
+  // Phase 61: 상향 (trampoline이 100만 재귀 처리)
+  // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
+  tcoMode = false;
+  // Phase 52: FL 파일 import 지원
+  importedFiles = /* @__PURE__ */ new Set();
+  currentFilePath = process.cwd();
+  // Phase 78: 디버거 세션
+  debugSession = getGlobalDebugSession();
   constructor(logger, options) {
-    // Phase 9b: Learning persistence
-    this.currentLine = 0;
-    // FreeLang source line tracking
-    this.callDepth = 0;
-    // Phase 61: 상향 (trampoline이 100만 재귀 처리)
-    // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
-    this.tcoMode = false;
-    // Phase 52: FL 파일 import 지원
-    this.importedFiles = /* @__PURE__ */ new Set();
-    this.currentFilePath = process.cwd();
-    // Phase 78: 디버거 세션
-    this.debugSession = getGlobalDebugSession();
-    this.serverConfig = null;
     this.logger = logger || getGlobalLogger();
     const strictMode = options?.strict ?? process.env.FREELANG_STRICT === "1";
     this.context = {
@@ -28290,9 +28726,6 @@ var Interpreter = class {
     this.registerBuiltinTypeClasses();
     this.registerStandardMacros();
     this.registerAgentBuiltins();
-  }
-  static {
-    this.MAX_CALL_DEPTH = 5e3;
   }
   // Phase 98: Agent 빌트인 함수 등록
   registerAgentBuiltins() {
@@ -28421,6 +28854,101 @@ var Interpreter = class {
   }
   evalBlock(block) {
     switch (block.type) {
+      case "PAGE":
+        this.context.lastValue = this.handlePageBlock(block);
+        break;
+      case "API":
+        this.context.lastValue = this.handleApiBlock(block);
+        break;
+      case "COMPONENT":
+        this.context.lastValue = this.handleComponentBlock(block);
+        break;
+      case "FORM":
+        this.context.lastValue = this.handleFormBlock(block);
+        break;
+      case "SERVICE":
+        this.context.lastValue = this.handleServiceBlock(block);
+        break;
+      case "CONTROLLER":
+        this.context.lastValue = this.handleControllerBlock(block);
+        break;
+      case "GUARD":
+        this.context.lastValue = this.handleGuardBlock(block);
+        break;
+      case "MODEL":
+        this.context.lastValue = this.handleModelBlock(block);
+        break;
+      case "QUERY":
+        this.context.lastValue = this.handleQueryBlock(block);
+        break;
+      case "MIGRATION":
+        this.context.lastValue = this.handleMigrationBlock(block);
+        break;
+      case "REPOSITORY":
+        this.context.lastValue = this.handleRepositoryBlock(block);
+        break;
+      case "DATABASE":
+        this.context.lastValue = this.handleDatabaseBlock(block);
+        break;
+      case "CACHE":
+        this.context.lastValue = this.handleCacheBlock(block);
+        break;
+      case "CACHED":
+        this.context.lastValue = this.handleCachedBlock(block);
+        break;
+      case "KAFKA":
+        this.context.lastValue = this.handleKafkaBlock(block);
+        break;
+      case "PRODUCER":
+        this.context.lastValue = this.handleProducerBlock(block);
+        break;
+      case "CONSUMER":
+        this.context.lastValue = this.handleConsumerBlock(block);
+        break;
+      case "QUEUE":
+        this.context.lastValue = this.handleQueueBlock(block);
+        break;
+      case "RABBITMQ":
+        this.context.lastValue = this.handleRabbitMQBlock(block);
+        break;
+      case "JWT":
+        this.context.lastValue = this.handleJWTBlock(block);
+        break;
+      case "OAUTH":
+        this.context.lastValue = this.handleOAuthBlock(block);
+        break;
+      case "DOCKERFILE":
+        this.context.lastValue = this.handleDockerfileBlock(block);
+        break;
+      case "DOCKER-COMPOSE":
+        this.context.lastValue = this.handleDockerComposeBlock(block);
+        break;
+      case "K8S-DEPLOYMENT":
+        this.context.lastValue = this.handleK8sDeploymentBlock(block);
+        break;
+      case "K8S-SERVICE":
+        this.context.lastValue = this.handleK8sServiceBlock(block);
+        break;
+      case "K8S-INGRESS":
+        this.context.lastValue = this.handleK8sIngressBlock(block);
+        break;
+      case "AWS":
+      case "AWS-S3":
+      case "AWS-LAMBDA":
+      case "AWS-RDS":
+      case "AWS-SQS":
+        this.context.lastValue = this.handleAwsBlock(block);
+        break;
+      case "GCP":
+      case "GCP-CLOUD-RUN":
+      case "GCP-BIGQUERY":
+        this.context.lastValue = this.handleGcpBlock(block);
+        break;
+      case "AZURE":
+      case "AZURE-FUNCTION":
+      case "AZURE-COSMOS":
+        this.context.lastValue = this.handleAzureBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -28462,6 +28990,556 @@ var Interpreter = class {
     const callFnVal = (fn, args2) => interp.callFunctionValue(fn, args2);
     const state = evalAgentBlock(block.fields, ev, callFnVal);
     this.context.lastValue = state;
+  }
+  // Phase 11 v11: [PAGE :path "/" :name "Home" :render "<h1>...</h1>"]
+  handlePageBlock(block) {
+    const renderNode = block.fields.get("render");
+    if (!renderNode) {
+      return null;
+    }
+    const params = this.context.__params || {};
+    this.context.variables.push();
+    for (const [key, value] of Object.entries(params)) {
+      this.context.variables.set(`$${key}`, value);
+    }
+    try {
+      let html;
+      if (renderNode.kind === "block") {
+        this.evalBlock(renderNode);
+        html = this.context.lastValue;
+      } else {
+        html = this.eval(renderNode);
+      }
+      if (typeof html === "string") {
+        let interpolated = html;
+        for (const [key, value] of Object.entries(params)) {
+          interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
+        }
+        const stateNode = block.fields.get("state");
+        if (stateNode) {
+          const stateVal = this.eval(stateNode);
+          const stateJson = JSON.stringify(stateVal);
+          interpolated = interpolated + `
+<script>window.__state = ${stateJson};</script>`;
+        }
+        return interpolated;
+      }
+      return html;
+    } finally {
+      this.context.variables.pop();
+    }
+  }
+  // Phase 11 MVP: [API :methods ["POST"] :path "/..." :do (create ...)]
+  handleApiBlock(block) {
+    const doNode = block.fields.get("do");
+    if (!doNode) {
+      return { status: 400, json: { error: "missing :do" } };
+    }
+    this.context.variables.push();
+    try {
+      const result = this.eval(doNode);
+      if (result && typeof result === "object") {
+        if (result.status !== void 0 && result.json !== void 0) {
+          return result;
+        }
+        return { status: 200, json: result };
+      }
+      return { status: 200, json: result };
+    } finally {
+      this.context.variables.pop();
+    }
+  }
+  // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
+  handleComponentBlock(block) {
+    const renderNode = block.fields.get("render");
+    if (!renderNode) {
+      return null;
+    }
+    const stateNode = block.fields.get("state");
+    if (stateNode && stateNode.kind === "block" && stateNode.type === "Map") {
+      const entries = stateNode.fields.get("entries") || [];
+      this.context.variables.push();
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const key = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const value = this.eval(entries[i + 1]);
+        this.context.variables.set(`$${key}`, value);
+      }
+    }
+    const methodsNode = block.fields.get("methods");
+    const html = this.eval(renderNode);
+    if (stateNode) {
+      this.context.variables.pop();
+    }
+    return html;
+  }
+  // Phase 11 v11: [FORM name :fields [...] :validation ...]
+  handleFormBlock(block) {
+    const fieldsNode = block.fields.get("fields");
+    if (!fieldsNode) {
+      return null;
+    }
+    const fields = Array.isArray(fieldsNode) ? fieldsNode : [fieldsNode];
+    let formHtml = "<form>\n";
+    for (const field of fields) {
+      if (field?.kind === "block" && field?.type === "Map") {
+        const name = field.fields.get("name") || "field";
+        const type = field.fields.get("type") || "text";
+        formHtml += `  <input type="${type}" name="${name}" />
+`;
+      }
+    }
+    formHtml += "</form>";
+    return formHtml;
+  }
+  // Phase 11 v11: [SERVICE name :inject [...] :methods {...}]
+  handleServiceBlock(block) {
+    const name = block.name;
+    const injectNode = block.fields.get("inject");
+    const methodsNode = block.fields.get("methods");
+    const service = {
+      name,
+      methods: {}
+    };
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = methodsNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        service.methods[methodName] = methodFn;
+      }
+    }
+    this.context.services = this.context.services || /* @__PURE__ */ new Map();
+    this.context.services.set(name, service);
+    return { status: "registered", service: name };
+  }
+  // Phase 11 v11: [CONTROLLER name :prefix "/api" :routes {...}]
+  handleControllerBlock(block) {
+    const name = block.name;
+    const prefix = this.eval(block.fields.get("prefix")) || "";
+    const routesNode = block.fields.get("routes");
+    const controller = {
+      name,
+      prefix,
+      routes: []
+    };
+    if (routesNode && routesNode.kind === "block" && routesNode.type === "Map") {
+      const entries = routesNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const routeKey = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const routeHandler = this.eval(entries[i + 1]);
+        controller.routes.push({ method: "GET", path: routeKey, handler: routeHandler });
+      }
+    }
+    this.context.controllers = this.context.controllers || /* @__PURE__ */ new Map();
+    this.context.controllers.set(name, controller);
+    return { status: "registered", controller: name };
+  }
+  // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
+  handleGuardBlock(block) {
+    const name = block.name;
+    const strategy = this.eval(block.fields.get("strategy")) || "none";
+    const checkFn = this.eval(block.fields.get("check"));
+    const guard = {
+      name,
+      strategy,
+      check: checkFn
+    };
+    this.context.guards = this.context.guards || /* @__PURE__ */ new Map();
+    this.context.guards.set(name, guard);
+    return { status: "registered", guard: name };
+  }
+  // Phase 11 v11: [MODEL name :table "users" :fields {...}]
+  handleModelBlock(block) {
+    const name = block.name;
+    const tableName = this.eval(block.fields.get("table")) || name.toLowerCase();
+    const dbType = this.eval(block.fields.get("db")) || "postgresql";
+    const fieldsNode = block.fields.get("fields");
+    const model = {
+      name,
+      tableName,
+      dbType,
+      fields: {}
+    };
+    if (fieldsNode && fieldsNode.kind === "block" && fieldsNode.type === "Map") {
+      const entries = fieldsNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldType = this.eval(entries[i + 1]);
+        model.fields[fieldName] = fieldType;
+      }
+    }
+    this.context.models = this.context.models || /* @__PURE__ */ new Map();
+    this.context.models.set(name, model);
+    return { status: "registered", model: name };
+  }
+  // Phase 11 v11: [QUERY name :model User :where {...}]
+  handleQueryBlock(block) {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const whereNode = block.fields.get("where");
+    const query = {
+      name,
+      model: modelName,
+      where: {}
+    };
+    if (whereNode && whereNode.kind === "block" && whereNode.type === "Map") {
+      const entries = whereNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldVal = this.eval(entries[i + 1]);
+        query.where[fieldName] = fieldVal;
+      }
+    }
+    this.context.queries = this.context.queries || /* @__PURE__ */ new Map();
+    this.context.queries.set(name, query);
+    return { status: "registered", query: name };
+  }
+  // Phase 11 v11: [MIGRATION name :version "001" :up (...) :down (...)]
+  handleMigrationBlock(block) {
+    const name = block.name;
+    const version = this.eval(block.fields.get("version")) || "001";
+    const upFn = this.eval(block.fields.get("up"));
+    const downFn = this.eval(block.fields.get("down"));
+    const migration = {
+      name,
+      version,
+      up: upFn,
+      down: downFn
+    };
+    this.context.migrations = this.context.migrations || /* @__PURE__ */ new Map();
+    this.context.migrations.set(name, migration);
+    return { status: "registered", migration: name };
+  }
+  // Phase 11 v11: [REPOSITORY name :model User :methods {...}]
+  handleRepositoryBlock(block) {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const methodsNode = block.fields.get("methods");
+    const repository = {
+      name,
+      model: modelName,
+      methods: {}
+    };
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = methodsNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        repository.methods[methodName] = methodFn;
+      }
+    }
+    this.context.repositories = this.context.repositories || /* @__PURE__ */ new Map();
+    this.context.repositories.set(name, repository);
+    return { status: "registered", repository: name };
+  }
+  // Phase 11 v11: [DATABASE name :type :postgresql :host "localhost"]
+  handleDatabaseBlock(block) {
+    const name = block.name;
+    const dbType = this.eval(block.fields.get("type")) || "postgresql";
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 5432;
+    const database = this.eval(block.fields.get("name")) || "freelang_db";
+    const dbConfig = {
+      name,
+      type: dbType,
+      host,
+      port,
+      database
+    };
+    this.context.databases = this.context.databases || /* @__PURE__ */ new Map();
+    this.context.databases.set(name, dbConfig);
+    return { status: "registered", database: name };
+  }
+  // Phase 11 v11: [CACHE name :host "localhost" :port 6379 :ttl 3600]
+  handleCacheBlock(block) {
+    const name = block.name;
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 6379;
+    const ttl = this.eval(block.fields.get("ttl")) || 3600;
+    const cacheConfig = {
+      name,
+      host,
+      port,
+      ttl
+    };
+    this.context.caches = this.context.caches || /* @__PURE__ */ new Map();
+    this.context.caches.set(name, cacheConfig);
+    return { status: "registered", cache: name };
+  }
+  // Phase 11 v11: [CACHED name :cache redis-main :key (...) :fn (...)]
+  handleCachedBlock(block) {
+    const name = block.name;
+    const cacheName = this.eval(block.fields.get("cache"));
+    const keyFn = this.eval(block.fields.get("key"));
+    const fn = this.eval(block.fields.get("fn"));
+    const ttl = this.eval(block.fields.get("ttl")) || 300;
+    const cached = {
+      name,
+      cache: cacheName,
+      key: keyFn,
+      fn,
+      ttl
+    };
+    this.context.cacheds = this.context.cacheds || /* @__PURE__ */ new Map();
+    this.context.cacheds.set(name, cached);
+    return { status: "registered", cached: name };
+  }
+  // Phase 11 v11: [KAFKA name :brokers [...] :client-id "app"]
+  handleKafkaBlock(block) {
+    const name = block.name;
+    const brokersNode = block.fields.get("brokers");
+    const brokers = Array.isArray(brokersNode) ? brokersNode.map((b) => this.eval(b)) : ["localhost:9092"];
+    const clientId = this.eval(block.fields.get("client-id")) || "freelang-app";
+    const kafkaConfig = {
+      name,
+      brokers,
+      clientId
+    };
+    this.context.kafkas = this.context.kafkas || /* @__PURE__ */ new Map();
+    this.context.kafkas.set(name, kafkaConfig);
+    return { status: "registered", kafka: name };
+  }
+  // Phase 11 v11: [PRODUCER name :kafka kafka-main :topic "events"]
+  handleProducerBlock(block) {
+    const name = block.name;
+    const kafkaName = this.eval(block.fields.get("kafka"));
+    const topic = this.eval(block.fields.get("topic")) || "events";
+    const producer = {
+      name,
+      kafka: kafkaName,
+      topic
+    };
+    this.context.producers = this.context.producers || /* @__PURE__ */ new Map();
+    this.context.producers.set(name, producer);
+    return { status: "registered", producer: name };
+  }
+  // Phase 11 v11: [CONSUMER name :kafka kafka-main :topic "events" :handler (...)]
+  handleConsumerBlock(block) {
+    const name = block.name;
+    const kafkaName = this.eval(block.fields.get("kafka"));
+    const topic = this.eval(block.fields.get("topic")) || "events";
+    const groupId = this.eval(block.fields.get("group")) || "default";
+    const handler = this.eval(block.fields.get("handler"));
+    const consumer = {
+      name,
+      kafka: kafkaName,
+      topic,
+      groupId,
+      handler
+    };
+    this.context.consumers = this.context.consumers || /* @__PURE__ */ new Map();
+    this.context.consumers.set(name, consumer);
+    return { status: "registered", consumer: name };
+  }
+  // Phase 11 v11: [QUEUE name :rabbitmq rabbit-main :exchange "app" :handler (...)]
+  handleQueueBlock(block) {
+    const name = block.name;
+    const rabbitName = this.eval(block.fields.get("rabbitmq"));
+    const exchange = this.eval(block.fields.get("exchange")) || "app";
+    const routingKey = this.eval(block.fields.get("routing-key")) || "";
+    const handler = this.eval(block.fields.get("handler"));
+    const queue = {
+      name,
+      rabbitmq: rabbitName,
+      exchange,
+      routingKey,
+      handler
+    };
+    this.context.queues = this.context.queues || /* @__PURE__ */ new Map();
+    this.context.queues.set(name, queue);
+    return { status: "registered", queue: name };
+  }
+  // Phase 11 v11: [RABBITMQ name :url "amqp://localhost"]
+  handleRabbitMQBlock(block) {
+    const name = block.name;
+    const url2 = this.eval(block.fields.get("url")) || "amqp://localhost:5672";
+    const rabbitConfig = {
+      name,
+      url: url2
+    };
+    this.context.rabbitmqs = this.context.rabbitmqs || /* @__PURE__ */ new Map();
+    this.context.rabbitmqs.set(name, rabbitConfig);
+    return { status: "registered", rabbitmq: name };
+  }
+  // Phase 11 v11: [JWT name :secret "secret" :expires-in "7d"]
+  handleJWTBlock(block) {
+    const name = block.name;
+    const secret = this.eval(block.fields.get("secret")) || "change-me";
+    const expiresIn = this.eval(block.fields.get("expires-in")) || "7d";
+    const algorithm = this.eval(block.fields.get("algorithm")) || "HS256";
+    const jwtConfig = {
+      name,
+      secret,
+      expiresIn,
+      algorithm
+    };
+    this.context.jwts = this.context.jwts || /* @__PURE__ */ new Map();
+    this.context.jwts.set(name, jwtConfig);
+    return { status: "registered", jwt: name };
+  }
+  // Phase 11 v11: [OAUTH name :provider "google" :client-id "..."]
+  handleOAuthBlock(block) {
+    const name = block.name;
+    const provider = this.eval(block.fields.get("provider")) || "google";
+    const clientId = this.eval(block.fields.get("client-id")) || "";
+    const clientSecret = this.eval(block.fields.get("client-secret")) || "";
+    const callbackUrl = this.eval(block.fields.get("callback-url")) || "/auth/callback";
+    const scope = this.eval(block.fields.get("scope")) || ["email", "profile"];
+    const onSuccess = this.eval(block.fields.get("on-success"));
+    const oauthConfig = {
+      name,
+      provider,
+      clientId,
+      clientSecret,
+      callbackUrl,
+      scope,
+      onSuccess
+    };
+    this.context.oauths = this.context.oauths || /* @__PURE__ */ new Map();
+    this.context.oauths.set(name, oauthConfig);
+    return { status: "registered", oauth: name };
+  }
+  // Phase 11 v11: [DOCKERFILE name :base "node:20" :workdir "/app" ...]
+  handleDockerfileBlock(block) {
+    const name = block.name;
+    const base = this.eval(block.fields.get("base")) || "node:20-alpine";
+    const workdir = this.eval(block.fields.get("workdir")) || "/app";
+    const expose = this.eval(block.fields.get("expose")) || 3e3;
+    const cmd2 = this.eval(block.fields.get("cmd")) || "npm start";
+    const dockerfile = {
+      name,
+      base,
+      workdir,
+      expose,
+      cmd: cmd2
+    };
+    this.context.dockerfiles = this.context.dockerfiles || /* @__PURE__ */ new Map();
+    this.context.dockerfiles.set(name, dockerfile);
+    return { status: "registered", dockerfile: name };
+  }
+  // Phase 11 v11: [DOCKER-COMPOSE name :services {...} :volumes {...}]
+  handleDockerComposeBlock(block) {
+    const name = block.name;
+    const servicesNode = block.fields.get("services");
+    const volumesNode = block.fields.get("volumes");
+    const compose = {
+      name,
+      services: {},
+      volumes: {}
+    };
+    if (servicesNode && servicesNode.kind === "block" && servicesNode.type === "Map") {
+      const entries = servicesNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const serviceName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const serviceConfig = this.eval(entries[i + 1]);
+        compose.services[serviceName] = serviceConfig;
+      }
+    }
+    this.context.composes = this.context.composes || /* @__PURE__ */ new Map();
+    this.context.composes.set(name, compose);
+    return { status: "registered", "docker-compose": name };
+  }
+  // Phase 11 v11: [K8S-DEPLOYMENT name :replicas 3 :image "..."]
+  handleK8sDeploymentBlock(block) {
+    const name = block.name;
+    const replicas = this.eval(block.fields.get("replicas")) || 1;
+    const image = this.eval(block.fields.get("image")) || "app:latest";
+    const namespace = this.eval(block.fields.get("namespace")) || "default";
+    const deployment = {
+      name,
+      replicas,
+      image,
+      namespace
+    };
+    this.context.k8sDeployments = this.context.k8sDeployments || /* @__PURE__ */ new Map();
+    this.context.k8sDeployments.set(name, deployment);
+    return { status: "registered", "k8s-deployment": name };
+  }
+  // Phase 11 v11: [K8S-SERVICE name :selector {:app "name"} :ports [...]]
+  handleK8sServiceBlock(block) {
+    const name = block.name;
+    const selectorNode = block.fields.get("selector");
+    const portsNode = block.fields.get("ports");
+    const type = this.eval(block.fields.get("type")) || "ClusterIP";
+    const service = {
+      name,
+      selector: {},
+      ports: [],
+      type
+    };
+    if (selectorNode && selectorNode.kind === "block" && selectorNode.type === "Map") {
+      const entries = selectorNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const key = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const val = this.eval(entries[i + 1]);
+        service.selector[key] = val;
+      }
+    }
+    this.context.k8sServices = this.context.k8sServices || /* @__PURE__ */ new Map();
+    this.context.k8sServices.set(name, service);
+    return { status: "registered", "k8s-service": name };
+  }
+  // Phase 11 v11: [K8S-INGRESS name :rules [...]]
+  handleK8sIngressBlock(block) {
+    const name = block.name;
+    const rulesNode = block.fields.get("rules");
+    const annotations = this.eval(block.fields.get("annotations")) || {};
+    const ingress = {
+      name,
+      rules: [],
+      annotations
+    };
+    this.context.k8sIngresses = this.context.k8sIngresses || /* @__PURE__ */ new Map();
+    this.context.k8sIngresses.set(name, ingress);
+    return { status: "registered", "k8s-ingress": name };
+  }
+  // Phase 11 v11: AWS cloud blocks (AWS, AWS-S3, AWS-LAMBDA, AWS-RDS, AWS-SQS)
+  handleAwsBlock(block) {
+    const name = block.name;
+    const blockType = block.type;
+    const region = this.eval(block.fields.get("region")) || "ap-northeast-2";
+    const endpoint = this.eval(block.fields.get("endpoint")) || "";
+    const awsConfig = {
+      name,
+      type: blockType,
+      region,
+      endpoint
+    };
+    this.context.aws = this.context.aws || /* @__PURE__ */ new Map();
+    this.context.aws.set(name, awsConfig);
+    return { status: "registered", aws: name };
+  }
+  // Phase 11 v11: GCP cloud blocks (GCP, GCP-CLOUD-RUN, GCP-BIGQUERY)
+  handleGcpBlock(block) {
+    const name = block.name;
+    const blockType = block.type;
+    const projectId = this.eval(block.fields.get("project-id")) || "project";
+    const region = this.eval(block.fields.get("region")) || "asia-northeast3";
+    const gcpConfig = {
+      name,
+      type: blockType,
+      projectId,
+      region
+    };
+    this.context.gcp = this.context.gcp || /* @__PURE__ */ new Map();
+    this.context.gcp.set(name, gcpConfig);
+    return { status: "registered", gcp: name };
+  }
+  // Phase 11 v11: Azure cloud blocks (AZURE, AZURE-FUNCTION, AZURE-COSMOS)
+  handleAzureBlock(block) {
+    const name = block.name;
+    const blockType = block.type;
+    const subscriptionId = this.eval(block.fields.get("subscription-id")) || "";
+    const resourceGroup = this.eval(block.fields.get("resource-group")) || "default";
+    const azureConfig = {
+      name,
+      type: blockType,
+      subscriptionId,
+      resourceGroup
+    };
+    this.context.azure = this.context.azure || /* @__PURE__ */ new Map();
+    this.context.azure.set(name, azureConfig);
+    return { status: "registered", azure: name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {
@@ -28530,6 +29608,7 @@ var Interpreter = class {
       throw new Error(result.error || `Tool failed: ${name}`);
     })();
   }
+  serverConfig = null;
   handleServerBlock(block) {
     const port = Number(this.getFieldValue(block, "port") || 3009);
     const host = String(this.getFieldValue(block, "host") || "0.0.0.0");
@@ -28537,7 +29616,7 @@ var Interpreter = class {
   }
   handleRouteBlock(block) {
     const method = this.getFieldValue(block, "method", "GET");
-    const path10 = this.getFieldValue(block, "path", "/");
+    const path13 = this.getFieldValue(block, "path", "/");
     const handler = block.fields.get("handler");
     if (!handler) {
       throw new Error(`[ROUTE ${block.name}] Missing :handler`);
@@ -28545,7 +29624,7 @@ var Interpreter = class {
     this.context.routes.set(block.name, {
       name: block.name,
       method: method.toLowerCase(),
-      path: path10,
+      path: path13,
       handler
     });
   }
@@ -29250,11 +30329,9 @@ function extractComments(src) {
   return result;
 }
 var FLFormatter = class {
-  constructor() {
-    this.indentStr = "  ";
-    // 2칸
-    this.maxWidth = 80;
-  }
+  indentStr = "  ";
+  // 2칸
+  maxWidth = 80;
   /** 소스 코드를 정형화된 문자열로 변환 */
   format(src) {
     const trimmed = src.trim();
@@ -29728,9 +30805,7 @@ function createDebounce(ms) {
   };
 }
 var FileWatcher = class {
-  constructor() {
-    this.watchers = [];
-  }
+  watchers = [];
   /**
    * 단일 파일 감시
    * @returns stop 함수
@@ -29745,11 +30820,11 @@ var FileWatcher = class {
     try {
       watcher = fs10.watch(file, (_event) => {
         debounced(() => {
-          const basename5 = path8.basename(file);
+          const basename6 = path8.basename(file);
           if (clearConsole) {
             process.stdout.write("\x1B[2J\x1B[0f");
           }
-          console.log(`\x1B[36m[RELOAD]\x1B[0m ${basename5} changed`);
+          console.log(`\x1B[36m[RELOAD]\x1B[0m ${basename6} changed`);
           if (onReload) {
             try {
               onReload(file);
@@ -29757,7 +30832,7 @@ var FileWatcher = class {
               if (onError) {
                 onError(file, err4 instanceof Error ? err4 : new Error(String(err4)));
               } else {
-                console.error(`\x1B[31m[ERROR]\x1B[0m ${basename5}: ${err4.message ?? err4}`);
+                console.error(`\x1B[31m[ERROR]\x1B[0m ${basename6}: ${err4.message ?? err4}`);
               }
             }
           }
@@ -30135,9 +31210,9 @@ function toAnchor(name) {
 var fs11 = __toESM(require("fs"));
 init_linter();
 var CIPipeline = class {
+  steps = [];
+  failFast = true;
   constructor(opts = {}) {
-    this.steps = [];
-    this.failFast = true;
     if (opts.failFast !== void 0) {
       this.failFast = opts.failFast;
     }
@@ -30297,9 +31372,1002 @@ function createDefaultPipeline(files, opts = {}) {
   return pipeline;
 }
 
+// src/web/app-router.ts
+var fs12 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
+var AppRouter = class {
+  appDir;
+  routes = [];
+  layoutChain = {};
+  constructor(appDir = "app") {
+    this.appDir = appDir;
+    this.scan();
+  }
+  /**
+   * 파일시스템 스캔 시작
+   */
+  scan() {
+    if (!fs12.existsSync(this.appDir)) {
+      console.warn(`\u26A0\uFE0F  App directory not found: ${this.appDir}`);
+      return;
+    }
+    this.scanDirectory(this.appDir, "");
+    this.buildLayoutChain();
+  }
+  /**
+   * 재귀적으로 디렉토리 스캔하여 page.fl / layout.fl 찾기
+   */
+  scanDirectory(dir, currentPath = "") {
+    try {
+      const entries = fs12.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path9.join(dir, entry.name);
+        const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
+        if (entry.isDirectory()) {
+          const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
+          const pathForChild = isRouteGroup ? currentPath : nextPath;
+          this.scanDirectory(fullPath, pathForChild);
+        } else if (entry.name === "page.fl") {
+          const routePath = currentPath === "" ? "/" : currentPath;
+          this.registerRoute(routePath, fullPath);
+        } else if (entry.name === "layout.fl") {
+          const layoutPath = currentPath === "" ? "/" : currentPath;
+          if (!this.layoutChain[layoutPath]) {
+            this.layoutChain[layoutPath] = [];
+          }
+          this.layoutChain[layoutPath].push(fullPath);
+        }
+      }
+    } catch (err4) {
+      console.error(`Error scanning directory ${dir}:`, err4.message);
+    }
+  }
+  /**
+   * 라우트 등록
+   */
+  registerRoute(routePath, filePath) {
+    const pattern = this.buildPattern(routePath);
+    const params = this.extractParams(routePath);
+    const isDynamic = routePath.includes("[");
+    const route = {
+      path: routePath,
+      pattern,
+      filePath,
+      params,
+      isDynamic,
+      layouts: this.getLayoutsForPath(routePath)
+    };
+    this.routes.push(route);
+    console.log(
+      `  \u2713 Route: ${routePath.padEnd(30)} \u2192 ${filePath}`
+    );
+  }
+  /**
+   * [id] 문법을 정규표현식으로 변환
+   * /users/[id] → /^\/users\/([^/]+)$/
+   */
+  buildPattern(routePath) {
+    const escaped = routePath.split("/").map((segment) => {
+      if (segment.startsWith("[") && segment.endsWith("]")) {
+        return "([^/]+)";
+      }
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }).join("\\/");
+    return new RegExp(`^${escaped}$`);
+  }
+  /**
+   * 라우트에서 파라미터 이름 추출
+   * /users/[id] → ['id']
+   */
+  extractParams(routePath) {
+    const matches = routePath.match(/\[([^\]]+)\]/g);
+    return matches ? matches.map((m) => m.slice(1, -1)) : [];
+  }
+  /**
+   * 라우트에 대한 레이아웃 체인 구성 (루트 → 부모 → 현재)
+   */
+  getLayoutsForPath(routePath) {
+    const layouts = [];
+    const segments = routePath.split("/").filter(Boolean);
+    if (this.layoutChain["/"] || this.layoutChain[""]) {
+      layouts.push(...this.layoutChain["/"] || this.layoutChain[""] || []);
+    }
+    let currentPath = "";
+    for (const segment of segments) {
+      currentPath += "/" + segment;
+      if (this.layoutChain[currentPath]) {
+        layouts.push(...this.layoutChain[currentPath]);
+      }
+    }
+    return layouts;
+  }
+  /**
+   * 레이아웃 체인 정렬 (깊이 기반)
+   */
+  buildLayoutChain() {
+  }
+  /**
+   * URL 경로와 매칭 및 파라미터 추출
+   */
+  match(pathname) {
+    for (const route of this.routes) {
+      const match = pathname.match(route.pattern);
+      if (match) {
+        const params = {};
+        route.params.forEach((param, index) => {
+          params[param] = match[index + 1];
+        });
+        return { route, params };
+      }
+    }
+    return null;
+  }
+  /**
+   * 등록된 모든 라우트 반환 (디버깅용)
+   */
+  getRoutes() {
+    return this.routes;
+  }
+  /**
+   * 특정 경로에 대한 레이아웃 체인 조회
+   */
+  getLayoutsForRoute(routePath) {
+    return this.layoutChain[routePath] || [];
+  }
+};
+
+// src/web/fl-executor.ts
+var fs13 = __toESM(require("fs"));
+init_lexer();
+init_parser();
+var FLExecutor = class {
+  interpreter;
+  cache = /* @__PURE__ */ new Map();
+  cacheTimeout = 5 * 60 * 1e3;
+  // 5분
+  constructor(interpreter) {
+    this.interpreter = interpreter;
+  }
+  /**
+   * .fl 파일 읽기 및 파싱 (캐싱 적용)
+   */
+  parseFile(filePath) {
+    const now = Date.now();
+    const cached = this.cache.get(filePath);
+    if (cached && now - cached.timestamp < this.cacheTimeout) {
+      return cached.ast;
+    }
+    const code = fs13.readFileSync(filePath, "utf-8");
+    const tokens = lex(code);
+    const ast = parse(tokens);
+    this.cache.set(filePath, { ast, timestamp: now });
+    return ast;
+  }
+  /**
+   * 인메모리 데이터 스토어 초기화
+   */
+  initializeDataStore() {
+    const ctx = this.interpreter.context;
+    if (!ctx.__db) {
+      ctx.__db = {
+        users: /* @__PURE__ */ new Map(),
+        projects: /* @__PURE__ */ new Map(),
+        todos: /* @__PURE__ */ new Map(),
+        sessions: /* @__PURE__ */ new Map(),
+        messages: /* @__PURE__ */ new Map(),
+        boards: /* @__PURE__ */ new Map(),
+        documents: [],
+        boardMembers: /* @__PURE__ */ new Map(),
+        _nextId: { users: 1, projects: 1, todos: 1, messages: 1, boards: 1 }
+      };
+    }
+  }
+  /**
+   * 페이지 컴포넌트 실행
+   * 반환 값: { html, json, statusCode 등 }
+   */
+  async executePage(filePath, context) {
+    try {
+      if (!fs13.existsSync(filePath)) {
+        return {
+          success: false,
+          status: 404,
+          error: `Page not found: ${filePath}`
+        };
+      }
+      const astList = this.parseFile(filePath);
+      const flRequest = this.createFlRequest(context);
+      this.initializeDataStore();
+      const ctx = this.interpreter.context;
+      const db = ctx.__db;
+      ctx.__params = context.params || {};
+      ctx.__body = context.body || {};
+      ctx.__method = context.method || "GET";
+      ctx.__headers = context.headers || {};
+      ctx.__query = context.query || {};
+      ctx.__db_users = db.users;
+      ctx.__db_projects = db.projects;
+      ctx.__db_todos = db.todos;
+      ctx.__db_sessions = db.sessions;
+      ctx.__db_messages = db.messages;
+      ctx.__db_boards = db.boards;
+      ctx.__db_members = db.boardMembers;
+      this.injectJWTFunctions();
+      this.injectAuthHelpers();
+      this.injectDBHelpers();
+      const execContext = this.interpreter.interpret(astList);
+      const result = execContext.lastValue;
+      return this.processResult(result);
+    } catch (err4) {
+      return {
+        success: false,
+        status: 500,
+        error: err4.message,
+        stack: err4.stack
+      };
+    }
+  }
+  /**
+   * API 라우트 실행 (route.fl)
+   */
+  async executeRoute(filePath, context) {
+    try {
+      if (!fs13.existsSync(filePath)) {
+        return {
+          success: false,
+          status: 404,
+          error: `Route not found: ${filePath}`
+        };
+      }
+      const astList = this.parseFile(filePath);
+      const flRequest = this.createFlRequest(context);
+      this.interpreter.globals = this.interpreter.globals || {};
+      this.interpreter.globals.__request = flRequest;
+      this.interpreter.globals.__params = context.params || {};
+      let result = null;
+      for (const ast of astList) {
+        result = this.interpreter.eval(ast);
+      }
+      return this.processResult(result);
+    } catch (err4) {
+      return {
+        success: false,
+        status: 500,
+        error: err4.message,
+        stack: err4.stack
+      };
+    }
+  }
+  /**
+   * 실행 컨텍스트를 v9 요청 객체로 변환
+   */
+  createFlRequest(context) {
+    return {
+      __fl_request: true,
+      method: context.req?.method || "GET",
+      path: context.req?.path || "/",
+      query: context.query || {},
+      params: context.params || {},
+      headers: context.headers || {},
+      body: context.body || "",
+      timestamp: Date.now()
+    };
+  }
+  /**
+   * 인터프리터 결과를 HTTP 응답으로 변환
+   */
+  processResult(result) {
+    if (result && typeof result === "object") {
+      if (result.__fl_response === true) {
+        return {
+          success: true,
+          status: result.status || 200,
+          body: result.body,
+          contentType: result.contentType || "application/json"
+        };
+      }
+      return {
+        success: true,
+        status: 200,
+        body: result,
+        contentType: "application/json"
+      };
+    }
+    if (typeof result === "string") {
+      return {
+        success: true,
+        status: 200,
+        body: result,
+        contentType: result.includes("<") ? "text/html; charset=utf-8" : "text/plain"
+      };
+    }
+    return {
+      success: true,
+      status: 204,
+      body: "",
+      contentType: "text/plain"
+    };
+  }
+  /**
+   * 캐시 비우기
+   */
+  clearCache(filePath) {
+    if (filePath) {
+      this.cache.delete(filePath);
+    } else {
+      this.cache.clear();
+    }
+  }
+  /**
+   * 캐시 상태 조회
+   */
+  getCacheStats() {
+    return {
+      size: this.cache.size,
+      files: Array.from(this.cache.keys())
+    };
+  }
+  /**
+   * JWT 함수 주입 (간단한 구현)
+   */
+  injectJWTFunctions() {
+    const ctx = this.interpreter.context;
+    ctx["jwt-sign"] = (payload, secret = "default-secret") => {
+      const header = { alg: "HS256", typ: "JWT" };
+      const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+      const signature = Buffer.from(
+        `${encodedHeader}.${encodedPayload}${secret}`
+      ).toString("base64url").substring(0, 20);
+      return `${encodedHeader}.${encodedPayload}.${signature}`;
+    };
+    ctx["jwt-verify"] = (token, secret = "default-secret") => {
+      try {
+        const parts = token.split(".");
+        if (parts.length !== 3) return null;
+        const payload = JSON.parse(
+          Buffer.from(parts[1], "base64url").toString()
+        );
+        return payload;
+      } catch (e) {
+        return null;
+      }
+    };
+  }
+  /**
+   * 인증 헬퍼 함수 주입
+   */
+  injectAuthHelpers() {
+    const ctx = this.interpreter.context;
+    ctx["auth-user"] = (authHeader) => {
+      if (!authHeader) return null;
+      const token = authHeader.replace("Bearer ", "");
+      const payload = ctx["jwt-verify"](token);
+      if (!payload) return null;
+      const db = ctx.__db;
+      if (db && db.users) {
+        const user = Array.from(db.users.values()).find(
+          (u) => u.id === payload.userId
+        );
+        return user || null;
+      }
+      return payload;
+    };
+  }
+  /**
+   * DB 헬퍼 함수 주입
+   */
+  injectDBHelpers() {
+    const ctx = this.interpreter.context;
+    ctx["create"] = (collection, data) => {
+      const db = ctx.__db;
+      const tableName = Object.keys(db).find(
+        (key) => db[key] === collection
+      );
+      let id = db._nextId[tableName] || 1;
+      db._nextId[tableName] = id + 1;
+      const item = { id, ...data, created_at: /* @__PURE__ */ new Date() };
+      collection.set(id, item);
+      return item;
+    };
+    ctx["get"] = (collection, id) => {
+      return collection.get(id);
+    };
+    ctx["list"] = (collection) => {
+      return Array.from(collection.values());
+    };
+    ctx["update"] = (collection, id, data) => {
+      const item = collection.get(id);
+      if (item) {
+        const updated = { ...item, ...data, updated_at: /* @__PURE__ */ new Date() };
+        collection.set(id, updated);
+        return updated;
+      }
+      return null;
+    };
+    ctx["delete"] = (collection, id) => {
+      return collection.delete(id);
+    };
+    ctx["get-member"] = (memberCollection, boardId, userId) => {
+      const key = `${boardId}:${userId}`;
+      return memberCollection.get(key);
+    };
+    ctx["add-member"] = (memberCollection, boardId, userId, role = "member") => {
+      const key = `${boardId}:${userId}`;
+      const member = { boardId, userId, role, joined_at: /* @__PURE__ */ new Date() };
+      memberCollection.set(key, member);
+      return member;
+    };
+    ctx["str-to-int"] = (str) => {
+      return parseInt(String(str), 10);
+    };
+    ctx["merge"] = (obj1, obj2) => {
+      return { ...obj1, ...obj2 };
+    };
+    ctx["count"] = (obj) => {
+      if (obj instanceof Map) return obj.size;
+      if (Array.isArray(obj)) return obj.length;
+      if (typeof obj === "object" && obj !== null) return Object.keys(obj).length;
+      return 0;
+    };
+  }
+};
+var fl_executor_default = FLExecutor;
+
+// src/web/page-renderer.ts
+var fs14 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
+var PageRenderer = class {
+  executor;
+  ssrCache = /* @__PURE__ */ new Map();
+  buildOutputDir = ".next";
+  constructor(executor, buildOutputDir) {
+    this.executor = executor;
+    if (buildOutputDir) {
+      this.buildOutputDir = buildOutputDir;
+    }
+  }
+  /**
+   * 페이지 렌더링 (모드별)
+   */
+  async render(context) {
+    switch (context.mode) {
+      case "ssr":
+        return this.renderSSR(context);
+      case "isr":
+        return this.renderISR(context);
+      case "ssg":
+        return this.renderSSG(context);
+      default:
+        throw new Error(`Unknown render mode: ${context.mode}`);
+    }
+  }
+  /**
+   * SSR: 매번 서버에서 렌더링
+   */
+  async renderSSR(context) {
+    const startTime = Date.now();
+    const result = await this.executor.executePage(context.filePath, {
+      req: { method: "GET", path: "/" },
+      params: context.params,
+      query: context.query,
+      headers: context.headers,
+      body: context.body
+    });
+    if (!result.success) {
+      throw new Error(`Failed to render page: ${result.error}`);
+    }
+    const html = typeof result.body === "string" ? result.body : JSON.stringify(result.body);
+    return {
+      html,
+      timestamp: Date.now(),
+      cached: false,
+      cacheAge: Date.now() - startTime
+    };
+  }
+  /**
+   * ISR: 캐시 된 페이지 반환, 백그라운드에서 재생성
+   */
+  async renderISR(context) {
+    const cacheKey = this.getCacheKey(context.filePath, context.params);
+    const revalidateAfter = context.revalidateAfter || 60;
+    const cached = this.ssrCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < revalidateAfter * 1e3) {
+      return {
+        html: cached.html,
+        timestamp: cached.timestamp,
+        cached: true,
+        cacheAge: Date.now() - cached.timestamp
+      };
+    }
+    const result = await this.renderSSR(context);
+    this.ssrCache.set(cacheKey, {
+      html: result.html,
+      timestamp: result.timestamp,
+      revalidate: revalidateAfter
+    });
+    return {
+      ...result,
+      cached: false
+    };
+  }
+  /**
+   * SSG: 빌드 시점에 정적 HTML 생성
+   */
+  async renderSSG(context) {
+    const cacheKey = this.getCacheKey(context.filePath, context.params);
+    const outputPath = path10.join(
+      this.buildOutputDir,
+      cacheKey.replace(/\//g, "_") + ".html"
+    );
+    if (fs14.existsSync(outputPath)) {
+      const html = fs14.readFileSync(outputPath, "utf-8");
+      const stat = fs14.statSync(outputPath);
+      return {
+        html,
+        timestamp: stat.mtime.getTime(),
+        cached: true,
+        cacheAge: Date.now() - stat.mtime.getTime()
+      };
+    }
+    const result = await this.renderSSR(context);
+    if (!fs14.existsSync(this.buildOutputDir)) {
+      fs14.mkdirSync(this.buildOutputDir, { recursive: true });
+    }
+    fs14.writeFileSync(outputPath, result.html, "utf-8");
+    return result;
+  }
+  /**
+   * 레이아웃 래핑 (root layout + page)
+   */
+  async renderWithLayout(pageHtml, layoutChain) {
+    let html = pageHtml;
+    for (const layoutPath of [...layoutChain].reverse()) {
+      const layoutResult = await this.executor.executePage(layoutPath, {
+        req: { method: "GET", path: "/" }
+      });
+      if (layoutResult.success && typeof layoutResult.body === "string") {
+        html = layoutResult.body.replace(
+          /(<Outlet\s*\/>|{{{.*?children.*?}}})/,
+          html
+        );
+      }
+    }
+    return html;
+  }
+  /**
+   * 캐시 키 생성
+   */
+  getCacheKey(filePath, params) {
+    let key = filePath;
+    if (params && Object.keys(params).length > 0) {
+      const paramStr = Object.entries(params).sort().map(([k, v]) => `${k}=${v}`).join("&");
+      key += `?${paramStr}`;
+    }
+    return key;
+  }
+  /**
+   * ISR 캐시 전체 비우기
+   */
+  invalidateISRCache() {
+    this.ssrCache.clear();
+  }
+  /**
+   * 특정 경로의 ISR 캐시 비우기
+   */
+  invalidateISRPath(filePath, params) {
+    const cacheKey = this.getCacheKey(filePath, params);
+    this.ssrCache.delete(cacheKey);
+  }
+  /**
+   * SSG 빌드 (모든 경로 정적 생성)
+   */
+  async buildSSG(routes) {
+    let count = 0;
+    for (const route of routes) {
+      const paramSets = route.params || [{}];
+      for (const params of paramSets) {
+        try {
+          await this.renderSSG({
+            filePath: route.filePath,
+            mode: "ssg",
+            params
+          });
+          count++;
+        } catch (err4) {
+          console.error(`Failed to build ${route.filePath}:`, err4.message);
+        }
+      }
+    }
+    return count;
+  }
+  /**
+   * 캐시 상태 조회
+   */
+  getCacheStats() {
+    return {
+      isrCacheSize: this.ssrCache.size,
+      isrCachedPaths: Array.from(this.ssrCache.keys())
+    };
+  }
+};
+var page_renderer_default = PageRenderer;
+
+// src/web/server.ts
+var http2 = __toESM(require("http"));
+var path11 = __toESM(require("path"));
+function generatePageHTML(route, params = {}) {
+  const title = route.filePath || "Page";
+  let content = `<h1>${title}</h1>`;
+  if (Object.keys(params).length > 0) {
+    content += "<p><strong>Route Parameters:</strong></p><ul>";
+    for (const [key, value] of Object.entries(params)) {
+      content += `<li>${key}: ${value}</li>`;
+    }
+    content += "</ul>";
+  }
+  return generateHTML(title, content);
+}
+function generateHTML(title, content) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeLang v11 - ${title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+    }
+    h1 { color: #667eea; margin-bottom: 20px; }
+    p { color: #666; margin-bottom: 15px; }
+    ul { margin-left: 20px; }
+    li { margin-bottom: 10px; }
+    a { color: #667eea; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${content}
+    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+    <p><small>Powered by FreeLang v11 App Router</small></p>
+    <p><a href="/">\u2190 Back to Home</a></p>
+  </div>
+</body>
+</html>`;
+}
+function generateIndexHTML() {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeLang v11</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .hero {
+      text-align: center;
+      color: white;
+      max-width: 800px;
+    }
+    h1 { font-size: 3em; margin-bottom: 10px; }
+    p { font-size: 1.2em; margin-bottom: 30px; opacity: 0.9; }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+      margin: 40px 0;
+    }
+    .feature {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .feature h3 { margin-bottom: 10px; }
+    .links {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+    a {
+      background: white;
+      color: #667eea;
+      padding: 12px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+    a:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>\u{1F680} FreeLang v11</h1>
+    <p>AI-Native Language with App Router</p>
+
+    <div class="features">
+      <div class="feature">
+        <h3>\u{1F48E} Pure v11</h3>
+        <p>100% FreeLang v11</p>
+      </div>
+      <div class="feature">
+        <h3>\u26A1 Zero Deps</h3>
+        <p>No npm dependencies</p>
+      </div>
+      <div class="feature">
+        <h3>\u{1F3AF} App Router</h3>
+        <p>Filesystem-based routing</p>
+      </div>
+      <div class="feature">
+        <h3>\u{1F916} AGENT</h3>
+        <p>Native AI blocks</p>
+      </div>
+    </div>
+
+    <div class="links">
+      <a href="/demo">Demo</a>
+      <a href="/api/status">Status API</a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+var WebServer = class {
+  router;
+  executor = null;
+  renderer = null;
+  server = null;
+  config;
+  constructor(config = {}) {
+    this.config = {
+      appDir: config.appDir || "app",
+      port: config.port || 3e3,
+      renderMode: config.renderMode || "ssr"
+    };
+    this.router = new AppRouter(this.config.appDir);
+  }
+  /**
+   * 인터프리터 설정 (외부에서 주입)
+   */
+  setInterpreter(interpreter) {
+    this.executor = new fl_executor_default(interpreter);
+    this.renderer = new page_renderer_default(this.executor);
+  }
+  /**
+   * 서버 시작
+   */
+  async start() {
+    this.server = http2.createServer(async (req, res) => {
+      await this.handleRequest(req, res);
+    });
+    return new Promise((resolve7) => {
+      this.server.listen(this.config.port, () => {
+        const msg = `\u{1F680} FreeLang v11 Server running on port ${this.config.port}`;
+        console.log("");
+        console.log("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
+        console.log("\u2551   \u{1F680} FreeLang v11 Server Started          \u2551");
+        console.log("\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D");
+        console.log("");
+        console.log(`\u{1F4CD} Server: http://localhost:${this.config.port}`);
+        console.log("");
+        console.log("\u{1F517} Routes:");
+        console.log(`   http://localhost:${this.config.port}          - Home`);
+        console.log(`   http://localhost:${this.config.port}/demo      - Demo`);
+        console.log(`   http://localhost:${this.config.port}/api/status - Status API`);
+        console.log("");
+        console.log("\u{1F4C2} App Router Routes:");
+        this.router.getRoutes().forEach((route) => {
+          console.log(
+            `   http://localhost:${this.config.port}${route.path} - ${path11.basename(
+              path11.dirname(route.filePath)
+            )}`
+          );
+        });
+        console.log("");
+        console.log("\u{1F4A1} Framework: 100% Pure v11, Zero npm dependencies");
+        console.log("\u2728 Press Ctrl+C to stop the server");
+        console.log("");
+        resolve7(msg);
+      });
+    });
+  }
+  /**
+   * 서버 중지
+   */
+  stop() {
+    if (this.server) {
+      this.server.close();
+      this.server = null;
+    }
+  }
+  /**
+   * HTTP 요청 처리
+   */
+  async handleRequest(req, res) {
+    const urlPath = (req.url || "/").split("?")[0];
+    const query = this.parseQuery(req.url || "/");
+    let body = {};
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      try {
+        const chunks = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        const bodyStr = Buffer.concat(chunks).toString("utf-8");
+        if (bodyStr && req.headers["content-type"]?.includes("application/json")) {
+          body = JSON.parse(bodyStr);
+        }
+      } catch (e) {
+      }
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+    const match = this.router.match(urlPath);
+    if (match) {
+      if (this.executor) {
+        try {
+          const isApiPath = urlPath.startsWith("/api/");
+          const result = await this.executor.executePage(match.route.filePath, {
+            req: { method: req.method, path: urlPath, headers: req.headers },
+            params: match.params,
+            query,
+            body,
+            method: req.method,
+            isApiPath
+          });
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(result.status || 200);
+            if (typeof result.body === "string") {
+              res.end(result.body);
+            } else if (result.body !== null && typeof result.body === "object") {
+              res.end(JSON.stringify(result.body));
+            } else {
+              res.end(JSON.stringify({ success: result.success, body: result.body }));
+            }
+            return;
+          }
+          if (result.success && typeof result.body === "string") {
+            res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
+            res.writeHead(result.status || 200);
+            res.end(result.body);
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(result.status || 500);
+            res.end(result.error || "Internal Server Error");
+          }
+          return;
+        } catch (err4) {
+          const isApiPath = urlPath.startsWith("/api/");
+          if (isApiPath) {
+            res.setHeader("Content-Type", "application/json");
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err4.message }));
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(500);
+            res.end(generateHTML("Error", `<h1>Error</h1><p>${err4.message}</p>`));
+          }
+          return;
+        }
+      }
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.writeHead(200);
+      res.end(generatePageHTML(match.route, match.params));
+      return;
+    }
+    if (urlPath === "/demo") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.writeHead(200);
+      res.end(generateHTML("Demo", "<h1>Demo Page</h1><p>App Router demo</p>"));
+      return;
+    }
+    if (urlPath === "/api/status") {
+      res.setHeader("Content-Type", "application/json");
+      res.writeHead(200);
+      res.end(
+        JSON.stringify({
+          status: "ok",
+          framework: "FreeLang v11",
+          router: "App Router v1.0",
+          routes: this.router.getRoutes().length,
+          message: "\u{1F680} Pure v11 web framework with filesystem routing!"
+        })
+      );
+      return;
+    }
+    if (urlPath === "/" || urlPath === "") {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.writeHead(200);
+      res.end(generateIndexHTML());
+      return;
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.writeHead(404);
+    res.end(
+      generateHTML(
+        "404",
+        `<h1>404 Not Found</h1><p>Route not found: ${urlPath}</p>`
+      )
+    );
+  }
+  /**
+   * URL 쿼리 파싱
+   */
+  parseQuery(url2) {
+    const queryStr = url2.split("?")[1];
+    if (!queryStr) return {};
+    const query = {};
+    for (const pair of queryStr.split("&")) {
+      const [key, value] = pair.split("=");
+      if (key) {
+        query[decodeURIComponent(key)] = decodeURIComponent(value || "");
+      }
+    }
+    return query;
+  }
+  /**
+   * 라우터 조회
+   */
+  getRouter() {
+    return this.router;
+  }
+  /**
+   * 렌더러 조회
+   */
+  getRenderer() {
+    return this.renderer;
+  }
+  /**
+   * 실행기 조회
+   */
+  getExecutor() {
+    return this.executor;
+  }
+};
+
 // src/cli.ts
 function formatError(err4, source, filePath) {
-  const fileName = filePath ? path9.basename(filePath) : "<stdin>";
+  const fileName = filePath ? path12.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
     lines.push(`
@@ -30328,7 +32396,7 @@ function checkSource(source, filePath) {
   try {
     const tokens = lex(source);
     parse(tokens);
-    const fileName = filePath ? path9.basename(filePath) : "<stdin>";
+    const fileName = filePath ? path12.basename(filePath) : "<stdin>";
     console.log(`\x1B[32m\u2713\x1B[0m  ${fileName}  \uBB38\uBC95 \uC774\uC0C1 \uC5C6\uC74C`);
     return true;
   } catch (err4) {
@@ -30337,13 +32405,13 @@ function checkSource(source, filePath) {
   }
 }
 function cmdRun(filePath, watch3, extraArgs = []) {
-  const absPath = path9.resolve(filePath);
-  if (!fs12.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs15.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   function execute() {
-    const source = fs12.readFileSync(absPath, "utf-8");
+    const source = fs15.readFileSync(absPath, "utf-8");
     let ctx;
     try {
       const tokens = lex(source);
@@ -30370,9 +32438,9 @@ function cmdRun(filePath, watch3, extraArgs = []) {
   }
   execute();
   if (watch3) {
-    console.log(`\x1B[2m  watching ${path9.basename(absPath)}...\x1B[0m`);
+    console.log(`\x1B[2m  watching ${path12.basename(absPath)}...\x1B[0m`);
     let debounce = null;
-    fs12.watch(absPath, () => {
+    fs15.watch(absPath, () => {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => {
         console.log(`
@@ -30383,14 +32451,48 @@ function cmdRun(filePath, watch3, extraArgs = []) {
   }
 }
 function cmdCheck(filePath) {
-  const absPath = path9.resolve(filePath);
-  if (!fs12.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs15.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const source = fs12.readFileSync(absPath, "utf-8");
+  const source = fs15.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
+}
+function cmdCodegen(args2) {
+  const inputFile = args2.find((a) => !a.startsWith("-") && a.endsWith(".fl"));
+  const target = args2.includes("--target") ? args2[args2.indexOf("--target") + 1] : "all";
+  if (!inputFile) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
+    process.exit(1);
+  }
+  const absInput = path12.resolve(inputFile);
+  if (!fs15.existsSync(absInput)) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
+    process.exit(1);
+  }
+  try {
+    const source = fs15.readFileSync(absInput, "utf-8");
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const cg = new JSCodegen();
+    for (const node of ast) {
+      if (node.kind === "block") {
+        const blockType = node.type;
+        if (["SERVICE", "MODEL", "CONTROLLER"].includes(blockType)) {
+          if (target === "all" || target === "typescript" && blockType !== "MODEL" || target === "sql" && blockType === "MODEL") {
+            const code = cg.generate([node]);
+            console.log(code);
+            console.log("\n" + "\u2500".repeat(80) + "\n");
+          }
+        }
+      }
+    }
+  } catch (err4) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs15.readFileSync(absInput, "utf-8"), absInput)}`);
+    process.exit(1);
+  }
 }
 function cmdCompile(args2) {
   const outputIdx = args2.indexOf("-o");
@@ -30402,13 +32504,13 @@ function cmdCompile(args2) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
     process.exit(1);
   }
-  const absInput = path9.resolve(inputFile);
-  if (!fs12.existsSync(absInput)) {
+  const absInput = path12.resolve(inputFile);
+  if (!fs15.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs12.readFileSync(absInput, "utf-8");
+    const source = fs15.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -30419,18 +32521,18 @@ function cmdCompile(args2) {
       target: "node"
     });
     if (outputFile) {
-      const absOutput = path9.resolve(outputFile);
-      const dir = path9.dirname(absOutput);
-      if (dir !== "." && !fs12.existsSync(dir)) {
-        fs12.mkdirSync(dir, { recursive: true });
+      const absOutput = path12.resolve(outputFile);
+      const dir = path12.dirname(absOutput);
+      if (dir !== "." && !fs15.existsSync(dir)) {
+        fs15.mkdirSync(dir, { recursive: true });
       }
-      fs12.writeFileSync(absOutput, js, "utf-8");
-      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path9.basename(inputFile)} \u2192 ${outputFile}`);
+      fs15.writeFileSync(absOutput, js, "utf-8");
+      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path12.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(js);
     }
   } catch (err4) {
-    console.error(formatError(err4, fs12.readFileSync(absInput, "utf-8"), absInput));
+    console.error(formatError(err4, fs15.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);
   }
 }
@@ -30558,32 +32660,32 @@ function cmdFmt(args2) {
   }
   let needsChange = false;
   for (const filePath of filePaths) {
-    const absPath = path9.resolve(filePath);
-    if (!fs12.existsSync(absPath)) {
+    const absPath = path12.resolve(filePath);
+    if (!fs15.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
       process.exit(1);
     }
-    const src = fs12.readFileSync(absPath, "utf-8");
+    const src = fs15.readFileSync(absPath, "utf-8");
     let formatted;
     try {
       formatted = formatFL(src);
     } catch (err4) {
-      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path9.basename(absPath)}: ${err4.message}`);
+      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path12.basename(absPath)}: ${err4.message}`);
       process.exit(1);
     }
     if (checkMode) {
       if (src !== formatted) {
-        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path9.basename(absPath)}`);
+        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path12.basename(absPath)}`);
         needsChange = true;
       } else {
-        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path9.basename(absPath)}`);
+        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path12.basename(absPath)}`);
       }
     } else {
       if (src !== formatted) {
-        fs12.writeFileSync(absPath, formatted, "utf-8");
-        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path9.basename(absPath)}`);
+        fs15.writeFileSync(absPath, formatted, "utf-8");
+        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path12.basename(absPath)}`);
       } else {
-        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path9.basename(absPath)}`);
+        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path12.basename(absPath)}`);
       }
     }
   }
@@ -30592,8 +32694,8 @@ function cmdFmt(args2) {
   }
 }
 function cmdDebug(filePath, stepMode) {
-  const absPath = path9.resolve(filePath);
-  if (!fs12.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs15.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
@@ -30601,11 +32703,11 @@ function cmdDebug(filePath, stepMode) {
   session.enabled = true;
   session.stepMode = stepMode;
   setGlobalDebugSession(session);
-  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path9.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
+  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path12.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
   console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   try {
-    const source = fs12.readFileSync(absPath, "utf-8");
+    const source = fs15.readFileSync(absPath, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const interp = new Interpreter();
@@ -30631,14 +32733,14 @@ async function cmdCi(ciArgs) {
   const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
   let targetFiles;
   if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path9.resolve(f)).filter((f) => fs12.existsSync(f));
+    targetFiles = filePaths.map((f) => path12.resolve(f)).filter((f) => fs15.existsSync(f));
     if (targetFiles.length === 0) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
   } else {
     const cwd = process.cwd();
-    targetFiles = fs12.readdirSync(cwd).filter((f) => f.endsWith(".fl")).map((f) => path9.join(cwd, f));
+    targetFiles = fs15.readdirSync(cwd).filter((f) => f.endsWith(".fl")).map((f) => path12.join(cwd, f));
   }
   console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
@@ -30663,27 +32765,27 @@ function cmdDoc(docArgs) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  --dir \uB4A4\uC5D0 \uB514\uB809\uD1A0\uB9AC \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
       process.exit(1);
     }
-    const absDir = path9.resolve(dirPath);
-    if (!fs12.existsSync(absDir) || !fs12.statSync(absDir).isDirectory()) {
+    const absDir = path12.resolve(dirPath);
+    if (!fs15.existsSync(absDir) || !fs15.statSync(absDir).isDirectory()) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       process.exit(1);
     }
-    const flFiles = fs12.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path9.join(absDir, f));
+    const flFiles = fs15.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path12.join(absDir, f));
     if (flFiles.length === 0) {
       console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       return;
     }
     const allEntries = [];
     for (const filePath2 of flFiles) {
-      const src2 = fs12.readFileSync(filePath2, "utf-8");
+      const src2 = fs15.readFileSync(filePath2, "utf-8");
       allEntries.push(...extractDocs(src2));
     }
-    const title2 = path9.basename(absDir) + " API \uBB38\uC11C";
+    const title2 = path12.basename(absDir) + " API \uBB38\uC11C";
     const md2 = renderMarkdown(allEntries, title2);
     const outIdx2 = docArgs.indexOf("-o");
     if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
-      const outPath = path9.resolve(docArgs[outIdx2 + 1]);
-      fs12.writeFileSync(outPath, md2, "utf-8");
+      const outPath = path12.resolve(docArgs[outIdx2 + 1]);
+      fs15.writeFileSync(outPath, md2, "utf-8");
       console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
     } else {
       process.stdout.write(md2);
@@ -30696,19 +32798,19 @@ function cmdDoc(docArgs) {
     process.exit(1);
   }
   const filePath = filePaths[0];
-  const absPath = path9.resolve(filePath);
-  if (!fs12.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs15.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const src = fs12.readFileSync(absPath, "utf-8");
+  const src = fs15.readFileSync(absPath, "utf-8");
   const entries = extractDocs(src);
-  const title = path9.basename(absPath, ".fl") + " API \uBB38\uC11C";
+  const title = path12.basename(absPath, ".fl") + " API \uBB38\uC11C";
   const md = renderMarkdown(entries, title);
   const outIdx = docArgs.indexOf("-o");
   if (outIdx !== -1 && docArgs[outIdx + 1]) {
-    const outPath = path9.resolve(docArgs[outIdx + 1]);
-    fs12.writeFileSync(outPath, md, "utf-8");
+    const outPath = path12.resolve(docArgs[outIdx + 1]);
+    fs15.writeFileSync(outPath, md, "utf-8");
     console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
   } else {
     process.stdout.write(md);
@@ -30727,20 +32829,20 @@ function cmdBuild(buildArgs) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
       process.exit(1);
     }
-    const absPath = path9.resolve(appFile);
-    if (!fs12.existsSync(absPath)) {
+    const absPath = path12.resolve(appFile);
+    if (!fs15.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path9.basename(appFile)} \u2192 ${tag}`);
-    const ociScriptPath = path9.resolve(__dirname, "../vpm/v9-oci.fl");
-    if (!fs12.existsSync(ociScriptPath)) {
+    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path12.basename(appFile)} \u2192 ${tag}`);
+    const ociScriptPath = path12.resolve(__dirname, "../vpm/v9-oci.fl");
+    if (!fs15.existsSync(ociScriptPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
-      const cmd2 = registry ? `node ${path9.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path9.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
+      const cmd2 = registry ? `node ${path12.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path12.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
       console.log(`\x1B[2m  Command: ${cmd2}\x1B[0m`);
       execSync2(cmd2, { stdio: "inherit" });
       console.log(`\x1B[32m[OK]\x1B[0m  OCI \uBE4C\uB4DC \uC644\uB8CC: ${tag}`);
@@ -30767,15 +32869,15 @@ function cmdRegistry(registryArgs) {
     }
     console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
     console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
-    const registryPath = path9.resolve(__dirname, "../vpm/registry-server.fl");
-    if (!fs12.existsSync(registryPath)) {
+    const registryPath = path12.resolve(__dirname, "../vpm/registry-server.fl");
+    if (!fs15.existsSync(registryPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
       process.env.REGISTRY_PORT = String(port);
-      execSync2(`node ${path9.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
+      execSync2(`node ${path12.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
         stdio: "inherit",
         env: { ...process.env, REGISTRY_PORT: String(port) }
       });
@@ -30787,8 +32889,8 @@ function cmdRegistry(registryArgs) {
     const portIdx = registryArgs.indexOf("--port");
     const port = portIdx !== -1 && registryArgs[portIdx + 1] ? parseInt(registryArgs[portIdx + 1], 10) : 4873;
     try {
-      const http2 = require("http");
-      const req = http2.get(`http://localhost:${port}/-/all`, (res) => {
+      const http3 = require("http");
+      const req = http3.get(`http://localhost:${port}/-/all`, (res) => {
         if (res.statusCode === 200) {
           console.log(`\x1B[32m[OK]\x1B[0m  \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC815\uC0C1 \uC6B4\uC601 \uC911 (\uD3EC\uD2B8 ${port})`);
           process.exit(0);
@@ -30819,10 +32921,44 @@ function cmdRegistry(registryArgs) {
     process.exit(1);
   }
 }
+function cmdServe(args2) {
+  let appDir = "app";
+  let port = 3e3;
+  let renderMode = "ssr";
+  let positionalIdx = 0;
+  for (let i = 0; i < args2.length; i++) {
+    if (args2[i] === "--app" && args2[i + 1]) {
+      appDir = args2[++i];
+    } else if (args2[i] === "--port" && args2[i + 1]) {
+      port = parseInt(args2[++i], 10);
+    } else if (args2[i] === "--mode" && args2[i + 1]) {
+      const m = args2[++i];
+      if (["ssr", "isr", "ssg"].includes(m)) {
+        renderMode = m;
+      }
+    } else if (!args2[i].startsWith("--")) {
+      if (positionalIdx === 0) {
+        appDir = args2[i];
+      }
+      positionalIdx++;
+    }
+  }
+  const server = new WebServer({ appDir, port, renderMode });
+  const interp = new Interpreter();
+  server.setInterpreter(interp);
+  server.start().then((msg) => {
+    console.log(msg);
+    setInterval(() => {
+    }, 1e4).unref();
+  }).catch((err4) => {
+    console.error(`\x1B[31m\uC11C\uBC84 \uC624\uB958\x1B[0m  ${err4.message}`);
+    process.exit(1);
+  });
+}
 function printUsage() {
   console.log([
     "",
-    "FreeLang v9 CLI",
+    "FreeLang v11 CLI",
     "",
     "\uC0AC\uC6A9\uBC95:",
     "  freelang run <file.fl>           \uD30C\uC77C \uC2E4\uD589",
@@ -30836,6 +32972,8 @@ function printUsage() {
     "  freelang debug <file.fl> --step  step \uBAA8\uB4DC (\uBAA8\uB4E0 \uC904 \uCD94\uC801)",
     "  freelang watch <file.fl>         \uD30C\uC77C \uBCC0\uACBD \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589 (Phase 79)",
     "  freelang watch <file.fl> --no-clear  \uCF58\uC194 \uC9C0\uC6B0\uC9C0 \uC54A\uACE0 \uC7AC\uC2E4\uD589",
+    "  freelang serve [--app app] [--port 3000]  \uC6F9 \uC11C\uBC84 \uC2DC\uC791 (Phase 3, App Router)",
+    "  freelang serve --mode ssr|isr|ssg         \uB80C\uB354\uB9C1 \uBAA8\uB4DC \uC120\uD0DD",
     "  freelang ci                      \uD604\uC7AC \uB514\uB809\uD1A0\uB9AC .fl \uD30C\uC77C \uC804\uCCB4 CI (Phase 80)",
     "  freelang ci <file.fl>            \uD2B9\uC815 \uD30C\uC77C CI",
     "  freelang ci --no-fail-fast       \uC2E4\uD328\uD574\uB3C4 \uACC4\uC18D \uC9C4\uD589",
@@ -30857,6 +32995,8 @@ function printUsage() {
     "  freelang repl",
     "  freelang debug my-script.fl",
     "  freelang debug my-script.fl --step",
+    "  freelang serve --app app --port 3000",
+    "  freelang serve --mode isr",
     "  freelang doc fl-math-lib.fl",
     "  freelang doc fl-math-lib.fl -o math-api.md",
     "  freelang doc --dir src/",
@@ -30895,6 +33035,14 @@ switch (cmd) {
     cmdCompile(args.slice(1));
     break;
   }
+  case "codegen": {
+    if (args.length < 2) {
+      printUsage();
+      process.exit(1);
+    }
+    cmdCodegen(args.slice(1));
+    break;
+  }
   case "fmt": {
     cmdFmt(args.slice(1));
     break;
@@ -30919,12 +33067,12 @@ switch (cmd) {
       process.exit(1);
     }
     const noClear = args.includes("--no-clear");
-    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path9.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
+    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path12.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
     runWithWatch(filePath, {
       clearConsole: !noClear,
       debounceMs: 300,
       onError: (file, err4) => {
-        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path9.basename(file)}: ${err4.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path12.basename(file)}: ${err4.message}`);
       }
     });
     break;
@@ -30946,6 +33094,10 @@ switch (cmd) {
   }
   case "registry": {
     cmdRegistry(args.slice(1));
+    break;
+  }
+  case "serve": {
+    cmdServe(args.slice(1));
     break;
   }
   default:
