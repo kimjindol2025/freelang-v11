@@ -77,6 +77,13 @@ export enum TokenType {
   Guard = "Guard",         // GUARD
   Pipe = "Pipe",           // PIPE
 
+  // Phase 11 Keywords (Database ORM)
+  Model = "Model",         // MODEL
+  Query = "Query",         // QUERY
+  Migration = "Migration", // MIGRATION
+  Repository = "Repository", // REPOSITORY
+  Database = "Database",   // DATABASE
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

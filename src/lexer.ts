@@ -57,6 +57,12 @@ const KEYWORDS: Map<string, T> = new Map([
   ["CONTROLLER", T.Controller],
   ["GUARD", T.Guard],
   ["PIPE", T.Pipe],
+  // Phase 11: Database ORM keywords
+  ["MODEL", T.Model],
+  ["QUERY", T.Query],
+  ["MIGRATION", T.Migration],
+  ["REPOSITORY", T.Repository],
+  ["DATABASE", T.Database],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

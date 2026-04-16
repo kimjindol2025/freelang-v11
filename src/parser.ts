@@ -128,7 +128,7 @@ export class Parser {
       if (this.check(T.LBracket)) {
         // Distinguish between block [TYPE ...] and array [val1 val2 ...]
         const nextIdx = this.pos + 1;
-        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE"];
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
@@ -338,10 +338,10 @@ export class Parser {
       return this.convertBlockToInstance(block);
     }
 
-    // Phase 11: Parse web DSL blocks
+    // Phase 11: Parse web DSL and ORM blocks
     // Note: For PAGE/COMPONENT/FORM, we keep the original fields map intact
     // so that interpreter can access :render, :state, etc. directly
-    if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD") {
+    if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE") {
       const block = makeBlock(blockType, blockName, fields, blockLine);
       // Could call parsePage/parseRoute etc for validation, but keep fields as-is
       return block;

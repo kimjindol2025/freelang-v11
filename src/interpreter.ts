@@ -302,6 +302,26 @@ export class Interpreter {
         // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
         this.context.lastValue = this.handleGuardBlock(block);
         break;
+      case "MODEL":
+        // Phase 11 v11: [MODEL name :table "users" :fields {...}]
+        this.context.lastValue = this.handleModelBlock(block);
+        break;
+      case "QUERY":
+        // Phase 11 v11: [QUERY name :model User :where {...}]
+        this.context.lastValue = this.handleQueryBlock(block);
+        break;
+      case "MIGRATION":
+        // Phase 11 v11: [MIGRATION name :version "001" :up (...) :down (...)]
+        this.context.lastValue = this.handleMigrationBlock(block);
+        break;
+      case "REPOSITORY":
+        // Phase 11 v11: [REPOSITORY name :model User :methods {...}]
+        this.context.lastValue = this.handleRepositoryBlock(block);
+        break;
+      case "DATABASE":
+        // Phase 11 v11: [DATABASE name :type :postgresql :host "localhost"]
+        this.context.lastValue = this.handleDatabaseBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -525,6 +545,139 @@ export class Interpreter {
     (this.context as any).guards.set(name, guard);
 
     return { status: "registered", guard: name };
+  }
+
+  // Phase 11 v11: [MODEL name :table "users" :fields {...}]
+  private handleModelBlock(block: Block): any {
+    const name = block.name;
+    const tableName = this.eval(block.fields.get("table")) || name.toLowerCase();
+    const dbType = this.eval(block.fields.get("db")) || "postgresql";
+    const fieldsNode = block.fields.get("fields");
+
+    const model: any = {
+      name,
+      tableName,
+      dbType,
+      fields: {},
+    };
+
+    // :fields 정의
+    if (fieldsNode && fieldsNode.kind === "block" && fieldsNode.type === "Map") {
+      const entries = (fieldsNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldType = this.eval(entries[i + 1]);
+        model.fields[fieldName] = fieldType;
+      }
+    }
+
+    // 글로벌 모델 레지스트리에 등록
+    (this.context as any).models = (this.context as any).models || new Map();
+    (this.context as any).models.set(name, model);
+
+    return { status: "registered", model: name };
+  }
+
+  // Phase 11 v11: [QUERY name :model User :where {...}]
+  private handleQueryBlock(block: Block): any {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const whereNode = block.fields.get("where");
+
+    const query: any = {
+      name,
+      model: modelName,
+      where: {},
+    };
+
+    // :where 조건 추출
+    if (whereNode && whereNode.kind === "block" && whereNode.type === "Map") {
+      const entries = (whereNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldVal = this.eval(entries[i + 1]);
+        query.where[fieldName] = fieldVal;
+      }
+    }
+
+    // 글로벌 쿼리 레지스트리에 등록
+    (this.context as any).queries = (this.context as any).queries || new Map();
+    (this.context as any).queries.set(name, query);
+
+    return { status: "registered", query: name };
+  }
+
+  // Phase 11 v11: [MIGRATION name :version "001" :up (...) :down (...)]
+  private handleMigrationBlock(block: Block): any {
+    const name = block.name;
+    const version = this.eval(block.fields.get("version")) || "001";
+    const upFn = this.eval(block.fields.get("up"));
+    const downFn = this.eval(block.fields.get("down"));
+
+    const migration: any = {
+      name,
+      version,
+      up: upFn,
+      down: downFn,
+    };
+
+    // 글로벌 마이그레이션 레지스트리에 등록
+    (this.context as any).migrations = (this.context as any).migrations || new Map();
+    (this.context as any).migrations.set(name, migration);
+
+    return { status: "registered", migration: name };
+  }
+
+  // Phase 11 v11: [REPOSITORY name :model User :methods {...}]
+  private handleRepositoryBlock(block: Block): any {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const methodsNode = block.fields.get("methods");
+
+    const repository: any = {
+      name,
+      model: modelName,
+      methods: {},
+    };
+
+    // :methods 정의
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = (methodsNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        repository.methods[methodName] = methodFn;
+      }
+    }
+
+    // 글로벌 리포지토리 레지스트리에 등록
+    (this.context as any).repositories = (this.context as any).repositories || new Map();
+    (this.context as any).repositories.set(name, repository);
+
+    return { status: "registered", repository: name };
+  }
+
+  // Phase 11 v11: [DATABASE name :type :postgresql :host "localhost"]
+  private handleDatabaseBlock(block: Block): any {
+    const name = block.name;
+    const dbType = this.eval(block.fields.get("type")) || "postgresql";
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 5432;
+    const database = this.eval(block.fields.get("name")) || "freelang_db";
+
+    const dbConfig: any = {
+      name,
+      type: dbType,
+      host,
+      port,
+      database,
+    };
+
+    // 글로벌 데이터베이스 레지스트리에 등록
+    (this.context as any).databases = (this.context as any).databases || new Map();
+    (this.context as any).databases.set(name, dbConfig);
+
+    return { status: "registered", database: name };
   }
 
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]

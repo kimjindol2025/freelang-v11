@@ -269,7 +269,13 @@ var init_lexer = __esm({
       ["SERVICE", "Service" /* Service */],
       ["CONTROLLER", "Controller" /* Controller */],
       ["GUARD", "Guard" /* Guard */],
-      ["PIPE", "Pipe" /* Pipe */]
+      ["PIPE", "Pipe" /* Pipe */],
+      // Phase 11: Database ORM keywords
+      ["MODEL", "Model" /* Model */],
+      ["QUERY", "Query" /* Query */],
+      ["MIGRATION", "Migration" /* Migration */],
+      ["REPOSITORY", "Repository" /* Repository */],
+      ["DATABASE", "Database" /* Database */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -465,7 +471,7 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
               const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
@@ -626,7 +632,7 @@ var init_parser = __esm({
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
         }
-        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD") {
+        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE") {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return block2;
         }
@@ -28712,6 +28718,21 @@ var Interpreter = class {
       case "GUARD":
         this.context.lastValue = this.handleGuardBlock(block);
         break;
+      case "MODEL":
+        this.context.lastValue = this.handleModelBlock(block);
+        break;
+      case "QUERY":
+        this.context.lastValue = this.handleQueryBlock(block);
+        break;
+      case "MIGRATION":
+        this.context.lastValue = this.handleMigrationBlock(block);
+        break;
+      case "REPOSITORY":
+        this.context.lastValue = this.handleRepositoryBlock(block);
+        break;
+      case "DATABASE":
+        this.context.lastValue = this.handleDatabaseBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -28890,6 +28911,108 @@ var Interpreter = class {
     this.context.guards = this.context.guards || /* @__PURE__ */ new Map();
     this.context.guards.set(name, guard);
     return { status: "registered", guard: name };
+  }
+  // Phase 11 v11: [MODEL name :table "users" :fields {...}]
+  handleModelBlock(block) {
+    const name = block.name;
+    const tableName = this.eval(block.fields.get("table")) || name.toLowerCase();
+    const dbType = this.eval(block.fields.get("db")) || "postgresql";
+    const fieldsNode = block.fields.get("fields");
+    const model = {
+      name,
+      tableName,
+      dbType,
+      fields: {}
+    };
+    if (fieldsNode && fieldsNode.kind === "block" && fieldsNode.type === "Map") {
+      const entries = fieldsNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldType = this.eval(entries[i + 1]);
+        model.fields[fieldName] = fieldType;
+      }
+    }
+    this.context.models = this.context.models || /* @__PURE__ */ new Map();
+    this.context.models.set(name, model);
+    return { status: "registered", model: name };
+  }
+  // Phase 11 v11: [QUERY name :model User :where {...}]
+  handleQueryBlock(block) {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const whereNode = block.fields.get("where");
+    const query = {
+      name,
+      model: modelName,
+      where: {}
+    };
+    if (whereNode && whereNode.kind === "block" && whereNode.type === "Map") {
+      const entries = whereNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const fieldName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const fieldVal = this.eval(entries[i + 1]);
+        query.where[fieldName] = fieldVal;
+      }
+    }
+    this.context.queries = this.context.queries || /* @__PURE__ */ new Map();
+    this.context.queries.set(name, query);
+    return { status: "registered", query: name };
+  }
+  // Phase 11 v11: [MIGRATION name :version "001" :up (...) :down (...)]
+  handleMigrationBlock(block) {
+    const name = block.name;
+    const version = this.eval(block.fields.get("version")) || "001";
+    const upFn = this.eval(block.fields.get("up"));
+    const downFn = this.eval(block.fields.get("down"));
+    const migration = {
+      name,
+      version,
+      up: upFn,
+      down: downFn
+    };
+    this.context.migrations = this.context.migrations || /* @__PURE__ */ new Map();
+    this.context.migrations.set(name, migration);
+    return { status: "registered", migration: name };
+  }
+  // Phase 11 v11: [REPOSITORY name :model User :methods {...}]
+  handleRepositoryBlock(block) {
+    const name = block.name;
+    const modelName = this.eval(block.fields.get("model"));
+    const methodsNode = block.fields.get("methods");
+    const repository = {
+      name,
+      model: modelName,
+      methods: {}
+    };
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = methodsNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        repository.methods[methodName] = methodFn;
+      }
+    }
+    this.context.repositories = this.context.repositories || /* @__PURE__ */ new Map();
+    this.context.repositories.set(name, repository);
+    return { status: "registered", repository: name };
+  }
+  // Phase 11 v11: [DATABASE name :type :postgresql :host "localhost"]
+  handleDatabaseBlock(block) {
+    const name = block.name;
+    const dbType = this.eval(block.fields.get("type")) || "postgresql";
+    const host = this.eval(block.fields.get("host")) || "localhost";
+    const port = this.eval(block.fields.get("port")) || 5432;
+    const database = this.eval(block.fields.get("name")) || "freelang_db";
+    const dbConfig = {
+      name,
+      type: dbType,
+      host,
+      port,
+      database
+    };
+    this.context.databases = this.context.databases || /* @__PURE__ */ new Map();
+    this.context.databases.set(name, dbConfig);
+    return { status: "registered", database: name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {
