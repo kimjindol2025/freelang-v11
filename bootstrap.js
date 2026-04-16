@@ -264,7 +264,12 @@ var init_lexer = __esm({
       ["MIDDLEWARE", "Middleware" /* Middleware */],
       ["SUSPENSE", "Suspense" /* Suspense */],
       ["SLOT", "Slot" /* Slot */],
-      ["METADATA", "Metadata" /* Metadata */]
+      ["METADATA", "Metadata" /* Metadata */],
+      // Phase 11: Enterprise backend keywords
+      ["SERVICE", "Service" /* Service */],
+      ["CONTROLLER", "Controller" /* Controller */],
+      ["GUARD", "Guard" /* Guard */],
+      ["PIPE", "Pipe" /* Pipe */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -460,10 +465,10 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
-              const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */;
+              const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
               const isKnownBlockType = nextToken.type === "Symbol" /* Symbol */ && knownBlockTypes.includes(nextToken.value.toUpperCase());
               const hasKeywordAfter = nextIdx + 1 < this.tokens.length && (this.tokens[nextIdx + 1].type === "Keyword" /* Keyword */ || this.tokens[nextIdx + 1].type === "Colon" /* Colon */);
               if (isBlockKeyword || isKnownBlockType || hasKeywordAfter) {
@@ -621,7 +626,7 @@ var init_parser = __esm({
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
         }
-        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM") {
+        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD") {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return block2;
         }
@@ -791,7 +796,7 @@ var init_parser = __esm({
         }
         if (this.check("LBracket" /* LBracket */)) {
           const nextIdx = this.pos + 1;
-          const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM"];
+          const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
           if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === "Symbol" /* Symbol */) {
             const potentialType = this.tokens[nextIdx].value;
             const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
@@ -28698,6 +28703,15 @@ var Interpreter = class {
       case "FORM":
         this.context.lastValue = this.handleFormBlock(block);
         break;
+      case "SERVICE":
+        this.context.lastValue = this.handleServiceBlock(block);
+        break;
+      case "CONTROLLER":
+        this.context.lastValue = this.handleControllerBlock(block);
+        break;
+      case "GUARD":
+        this.context.lastValue = this.handleGuardBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -28819,6 +28833,63 @@ var Interpreter = class {
     }
     formHtml += "</form>";
     return formHtml;
+  }
+  // Phase 11 v11: [SERVICE name :inject [...] :methods {...}]
+  handleServiceBlock(block) {
+    const name = block.name;
+    const injectNode = block.fields.get("inject");
+    const methodsNode = block.fields.get("methods");
+    const service = {
+      name,
+      methods: {}
+    };
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = methodsNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        service.methods[methodName] = methodFn;
+      }
+    }
+    this.context.services = this.context.services || /* @__PURE__ */ new Map();
+    this.context.services.set(name, service);
+    return { status: "registered", service: name };
+  }
+  // Phase 11 v11: [CONTROLLER name :prefix "/api" :routes {...}]
+  handleControllerBlock(block) {
+    const name = block.name;
+    const prefix = this.eval(block.fields.get("prefix")) || "";
+    const routesNode = block.fields.get("routes");
+    const controller = {
+      name,
+      prefix,
+      routes: []
+    };
+    if (routesNode && routesNode.kind === "block" && routesNode.type === "Map") {
+      const entries = routesNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const routeKey = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const routeHandler = this.eval(entries[i + 1]);
+        controller.routes.push({ method: "GET", path: routeKey, handler: routeHandler });
+      }
+    }
+    this.context.controllers = this.context.controllers || /* @__PURE__ */ new Map();
+    this.context.controllers.set(name, controller);
+    return { status: "registered", controller: name };
+  }
+  // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
+  handleGuardBlock(block) {
+    const name = block.name;
+    const strategy = this.eval(block.fields.get("strategy")) || "none";
+    const checkFn = this.eval(block.fields.get("check"));
+    const guard = {
+      name,
+      strategy,
+      check: checkFn
+    };
+    this.context.guards = this.context.guards || /* @__PURE__ */ new Map();
+    this.context.guards.set(name, guard);
+    return { status: "registered", guard: name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {

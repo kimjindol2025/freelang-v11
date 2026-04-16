@@ -290,6 +290,18 @@ export class Interpreter {
         // Phase 11 v11: [FORM name :fields [...] :validation ...]
         this.context.lastValue = this.handleFormBlock(block);
         break;
+      case "SERVICE":
+        // Phase 11 v11: [SERVICE name :inject [...] :methods {...}]
+        this.context.lastValue = this.handleServiceBlock(block);
+        break;
+      case "CONTROLLER":
+        // Phase 11 v11: [CONTROLLER name :prefix "/api" :routes {...}]
+        this.context.lastValue = this.handleControllerBlock(block);
+        break;
+      case "GUARD":
+        // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
+        this.context.lastValue = this.handleGuardBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -434,6 +446,85 @@ export class Interpreter {
     }
     formHtml += '</form>';
     return formHtml;
+  }
+
+  // Phase 11 v11: [SERVICE name :inject [...] :methods {...}]
+  private handleServiceBlock(block: Block): any {
+    const name = block.name;
+    const injectNode = block.fields.get("inject");
+    const methodsNode = block.fields.get("methods");
+
+    // 서비스 등록
+    const service: any = {
+      name,
+      methods: {},
+    };
+
+    // :methods를 함수로 등록
+    if (methodsNode && methodsNode.kind === "block" && methodsNode.type === "Map") {
+      const entries = (methodsNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const methodName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const methodFn = this.eval(entries[i + 1]);
+        service.methods[methodName] = methodFn;
+      }
+    }
+
+    // 글로벌 서비스 레지스트리에 등록
+    (this.context as any).services = (this.context as any).services || new Map();
+    (this.context as any).services.set(name, service);
+
+    return { status: "registered", service: name };
+  }
+
+  // Phase 11 v11: [CONTROLLER name :prefix "/api" :routes {...}]
+  private handleControllerBlock(block: Block): any {
+    const name = block.name;
+    const prefix = this.eval(block.fields.get("prefix")) || "";
+    const routesNode = block.fields.get("routes");
+
+    // 컨트롤러 등록
+    const controller: any = {
+      name,
+      prefix,
+      routes: [],
+    };
+
+    // :routes를 HTTP 라우트로 등록
+    if (routesNode && routesNode.kind === "block" && routesNode.type === "Map") {
+      const entries = (routesNode.fields.get("entries") || []) as any[];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const routeKey = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const routeHandler = this.eval(entries[i + 1]);
+        controller.routes.push({ method: "GET", path: routeKey, handler: routeHandler });
+      }
+    }
+
+    // 글로벌 컨트롤러 레지스트리에 등록
+    (this.context as any).controllers = (this.context as any).controllers || new Map();
+    (this.context as any).controllers.set(name, controller);
+
+    return { status: "registered", controller: name };
+  }
+
+  // Phase 11 v11: [GUARD name :strategy "jwt" :check (fn ...)]
+  private handleGuardBlock(block: Block): any {
+    const name = block.name;
+    const strategy = this.eval(block.fields.get("strategy")) || "none";
+    const checkFn = this.eval(block.fields.get("check"));
+
+    // 가드 등록
+    const guard: any = {
+      name,
+      strategy,
+      check: checkFn,
+    };
+
+    // 글로벌 가드 레지스트리에 등록
+    (this.context as any).guards = (this.context as any).guards || new Map();
+    (this.context as any).guards.set(name, guard);
+
+    return { status: "registered", guard: name };
   }
 
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]

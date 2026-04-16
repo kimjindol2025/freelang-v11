@@ -128,11 +128,11 @@ export class Parser {
       if (this.check(T.LBracket)) {
         // Distinguish between block [TYPE ...] and array [val1 val2 ...]
         const nextIdx = this.pos + 1;
-        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM"];
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
-          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance || nextToken.type === T.Page || nextToken.type === T.Component || nextToken.type === T.Form || nextToken.type === T.Route;
+          const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance || nextToken.type === T.Page || nextToken.type === T.Component || nextToken.type === T.Form || nextToken.type === T.Route || nextToken.type === T.Service || nextToken.type === T.Controller || nextToken.type === T.Guard;
           const isKnownBlockType = nextToken.type === T.Symbol && knownBlockTypes.includes(nextToken.value.toUpperCase());
           const hasKeywordAfter = nextIdx + 1 < this.tokens.length &&
             (this.tokens[nextIdx + 1].type === T.Keyword || this.tokens[nextIdx + 1].type === T.Colon);
@@ -341,7 +341,7 @@ export class Parser {
     // Phase 11: Parse web DSL blocks
     // Note: For PAGE/COMPONENT/FORM, we keep the original fields map intact
     // so that interpreter can access :render, :state, etc. directly
-    if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM") {
+    if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD") {
       const block = makeBlock(blockType, blockName, fields, blockLine);
       // Could call parsePage/parseRoute etc for validation, but keep fields as-is
       return block;
@@ -569,7 +569,7 @@ export class Parser {
     if (this.check(T.LBracket)) {
       // Lookahead: is this a block or value array?
       const nextIdx = this.pos + 1;
-      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM"];
+      const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
 
 
       if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {

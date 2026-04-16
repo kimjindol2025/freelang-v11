@@ -52,6 +52,11 @@ const KEYWORDS: Map<string, T> = new Map([
   ["SUSPENSE", T.Suspense],
   ["SLOT", T.Slot],
   ["METADATA", T.Metadata],
+  // Phase 11: Enterprise backend keywords
+  ["SERVICE", T.Service],
+  ["CONTROLLER", T.Controller],
+  ["GUARD", T.Guard],
+  ["PIPE", T.Pipe],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

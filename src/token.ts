@@ -71,6 +71,12 @@ export enum TokenType {
   Slot = "Slot",           // SLOT
   Metadata = "Metadata",   // METADATA
 
+  // Phase 11 Keywords (Enterprise Backend)
+  Service = "Service",     // SERVICE
+  Controller = "Controller", // CONTROLLER
+  Guard = "Guard",         // GUARD
+  Pipe = "Pipe",           // PIPE
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",
