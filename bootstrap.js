@@ -286,7 +286,13 @@ var init_lexer = __esm({
       ["RABBITMQ", "RabbitMQ" /* RabbitMQ */],
       // Phase 11: Authentication keywords
       ["JWT", "JWT" /* JWT */],
-      ["OAUTH", "OAuth" /* OAuth */]
+      ["OAUTH", "OAuth" /* OAuth */],
+      // Phase 11: Deployment keywords
+      ["DOCKERFILE", "Dockerfile" /* Dockerfile */],
+      ["DOCKER-COMPOSE", "DockerCompose" /* DockerCompose */],
+      ["K8S-DEPLOYMENT", "K8sDeployment" /* K8sDeployment */],
+      ["K8S-SERVICE", "K8sService" /* K8sService */],
+      ["K8S-INGRESS", "K8sIngress" /* K8sIngress */]
       // Note: browse, cache are treated as regular symbols, not keywords
     ]);
   }
@@ -482,7 +488,7 @@ var init_parser = __esm({
           if (this.check("EOF" /* EOF */)) break;
           if (this.check("LBracket" /* LBracket */)) {
             const nextIdx = this.pos + 1;
-            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH"];
+            const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
             if (nextIdx < this.tokens.length) {
               const nextToken = this.tokens[nextIdx];
               const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */;
@@ -643,7 +649,8 @@ var init_parser = __esm({
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return this.convertBlockToInstance(block2);
         }
-        if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE" || blockType === "CACHE" || blockType === "CACHED" || blockType === "KAFKA" || blockType === "PRODUCER" || blockType === "CONSUMER" || blockType === "QUEUE" || blockType === "RABBITMQ" || blockType === "JWT" || blockType === "OAUTH") {
+        const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
+        if (enterpriseBlocks.includes(blockType)) {
           const block2 = makeBlock(blockType, blockName, fields, blockLine);
           return block2;
         }
@@ -28771,6 +28778,21 @@ var Interpreter = class {
       case "OAUTH":
         this.context.lastValue = this.handleOAuthBlock(block);
         break;
+      case "DOCKERFILE":
+        this.context.lastValue = this.handleDockerfileBlock(block);
+        break;
+      case "DOCKER-COMPOSE":
+        this.context.lastValue = this.handleDockerComposeBlock(block);
+        break;
+      case "K8S-DEPLOYMENT":
+        this.context.lastValue = this.handleK8sDeploymentBlock(block);
+        break;
+      case "K8S-SERVICE":
+        this.context.lastValue = this.handleK8sServiceBlock(block);
+        break;
+      case "K8S-INGRESS":
+        this.context.lastValue = this.handleK8sIngressBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -29200,6 +29222,100 @@ var Interpreter = class {
     this.context.oauths = this.context.oauths || /* @__PURE__ */ new Map();
     this.context.oauths.set(name, oauthConfig);
     return { status: "registered", oauth: name };
+  }
+  // Phase 11 v11: [DOCKERFILE name :base "node:20" :workdir "/app" ...]
+  handleDockerfileBlock(block) {
+    const name = block.name;
+    const base = this.eval(block.fields.get("base")) || "node:20-alpine";
+    const workdir = this.eval(block.fields.get("workdir")) || "/app";
+    const expose = this.eval(block.fields.get("expose")) || 3e3;
+    const cmd2 = this.eval(block.fields.get("cmd")) || "npm start";
+    const dockerfile = {
+      name,
+      base,
+      workdir,
+      expose,
+      cmd: cmd2
+    };
+    this.context.dockerfiles = this.context.dockerfiles || /* @__PURE__ */ new Map();
+    this.context.dockerfiles.set(name, dockerfile);
+    return { status: "registered", dockerfile: name };
+  }
+  // Phase 11 v11: [DOCKER-COMPOSE name :services {...} :volumes {...}]
+  handleDockerComposeBlock(block) {
+    const name = block.name;
+    const servicesNode = block.fields.get("services");
+    const volumesNode = block.fields.get("volumes");
+    const compose = {
+      name,
+      services: {},
+      volumes: {}
+    };
+    if (servicesNode && servicesNode.kind === "block" && servicesNode.type === "Map") {
+      const entries = servicesNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const serviceName = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const serviceConfig = this.eval(entries[i + 1]);
+        compose.services[serviceName] = serviceConfig;
+      }
+    }
+    this.context.composes = this.context.composes || /* @__PURE__ */ new Map();
+    this.context.composes.set(name, compose);
+    return { status: "registered", "docker-compose": name };
+  }
+  // Phase 11 v11: [K8S-DEPLOYMENT name :replicas 3 :image "..."]
+  handleK8sDeploymentBlock(block) {
+    const name = block.name;
+    const replicas = this.eval(block.fields.get("replicas")) || 1;
+    const image = this.eval(block.fields.get("image")) || "app:latest";
+    const namespace = this.eval(block.fields.get("namespace")) || "default";
+    const deployment = {
+      name,
+      replicas,
+      image,
+      namespace
+    };
+    this.context.k8sDeployments = this.context.k8sDeployments || /* @__PURE__ */ new Map();
+    this.context.k8sDeployments.set(name, deployment);
+    return { status: "registered", "k8s-deployment": name };
+  }
+  // Phase 11 v11: [K8S-SERVICE name :selector {:app "name"} :ports [...]]
+  handleK8sServiceBlock(block) {
+    const name = block.name;
+    const selectorNode = block.fields.get("selector");
+    const portsNode = block.fields.get("ports");
+    const type = this.eval(block.fields.get("type")) || "ClusterIP";
+    const service = {
+      name,
+      selector: {},
+      ports: [],
+      type
+    };
+    if (selectorNode && selectorNode.kind === "block" && selectorNode.type === "Map") {
+      const entries = selectorNode.fields.get("entries") || [];
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const key = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const val = this.eval(entries[i + 1]);
+        service.selector[key] = val;
+      }
+    }
+    this.context.k8sServices = this.context.k8sServices || /* @__PURE__ */ new Map();
+    this.context.k8sServices.set(name, service);
+    return { status: "registered", "k8s-service": name };
+  }
+  // Phase 11 v11: [K8S-INGRESS name :rules [...]]
+  handleK8sIngressBlock(block) {
+    const name = block.name;
+    const rulesNode = block.fields.get("rules");
+    const annotations = this.eval(block.fields.get("annotations")) || {};
+    const ingress = {
+      name,
+      rules: [],
+      annotations
+    };
+    this.context.k8sIngresses = this.context.k8sIngresses || /* @__PURE__ */ new Map();
+    this.context.k8sIngresses.set(name, ingress);
+    return { status: "registered", "k8s-ingress": name };
   }
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]
   handleToolBlock(block) {

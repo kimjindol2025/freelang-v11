@@ -74,6 +74,12 @@ const KEYWORDS: Map<string, T> = new Map([
   // Phase 11: Authentication keywords
   ["JWT", T.JWT],
   ["OAUTH", T.OAuth],
+  // Phase 11: Deployment keywords
+  ["DOCKERFILE", T.Dockerfile],
+  ["DOCKER-COMPOSE", T.DockerCompose],
+  ["K8S-DEPLOYMENT", T.K8sDeployment],
+  ["K8S-SERVICE", T.K8sService],
+  ["K8S-INGRESS", T.K8sIngress],
   // Note: browse, cache are treated as regular symbols, not keywords
 ]);
 

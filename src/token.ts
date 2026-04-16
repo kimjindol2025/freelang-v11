@@ -96,6 +96,13 @@ export enum TokenType {
   JWT = "JWT",             // JWT
   OAuth = "OAuth",         // OAUTH
 
+  // Phase 11 Keywords (Deployment)
+  Dockerfile = "Dockerfile",           // DOCKERFILE
+  DockerCompose = "DockerCompose",     // DOCKER-COMPOSE
+  K8sDeployment = "K8sDeployment",     // K8S-DEPLOYMENT
+  K8sService = "K8sService",           // K8S-SERVICE
+  K8sIngress = "K8sIngress",           // K8S-INGRESS
+
   // Special
   Colon = "Colon",         // :
   EOF = "EOF",

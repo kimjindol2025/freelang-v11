@@ -128,7 +128,7 @@ export class Parser {
       if (this.check(T.LBracket)) {
         // Distinguish between block [TYPE ...] and array [val1 val2 ...]
         const nextIdx = this.pos + 1;
-        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH"];
+        const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
 
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
@@ -338,10 +338,11 @@ export class Parser {
       return this.convertBlockToInstance(block);
     }
 
-    // Phase 11: Parse web DSL, ORM, messaging, and auth blocks
+    // Phase 11: Parse all enterprise blocks
     // Note: For PAGE/COMPONENT/FORM, we keep the original fields map intact
     // so that interpreter can access :render, :state, etc. directly
-    if (blockType === "PAGE" || blockType === "ROUTE" || blockType === "COMPONENT" || blockType === "FORM" || blockType === "SERVICE" || blockType === "CONTROLLER" || blockType === "GUARD" || blockType === "MODEL" || blockType === "QUERY" || blockType === "MIGRATION" || blockType === "REPOSITORY" || blockType === "DATABASE" || blockType === "CACHE" || blockType === "CACHED" || blockType === "KAFKA" || blockType === "PRODUCER" || blockType === "CONSUMER" || blockType === "QUEUE" || blockType === "RABBITMQ" || blockType === "JWT" || blockType === "OAUTH") {
+    const enterpriseBlocks = ["PAGE", "ROUTE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD", "MODEL", "QUERY", "MIGRATION", "REPOSITORY", "DATABASE", "CACHE", "CACHED", "KAFKA", "PRODUCER", "CONSUMER", "QUEUE", "RABBITMQ", "JWT", "OAUTH", "DOCKERFILE", "DOCKER-COMPOSE", "K8S-DEPLOYMENT", "K8S-SERVICE", "K8S-INGRESS"];
+    if (enterpriseBlocks.includes(blockType)) {
       const block = makeBlock(blockType, blockName, fields, blockLine);
       // Could call parsePage/parseRoute etc for validation, but keep fields as-is
       return block;

@@ -1,0 +1,35 @@
+[DOCKERFILE app-image
+  :base "node:20-alpine"
+  :workdir "/app"
+  :expose 43011
+  :cmd "node bootstrap.js serve app/ --port 43011"
+]
+
+[DOCKER-COMPOSE dev-stack
+  :services {
+    app {image "freelang-app:latest" ports ["43011:43011"]}
+    db {image "postgres:15" ports ["5432:5432"]}
+    redis {image "redis:7-alpine" ports ["6379:6379"]}
+  }
+  :volumes {pgdata {}}
+]
+
+[K8S-DEPLOYMENT app-deployment
+  :name "freelang-app"
+  :namespace "production"
+  :replicas 3
+  :image "registry.example.com/freelang-app:11.0.0"
+]
+
+[K8S-SERVICE app-service
+  :name "freelang-app-svc"
+  :selector {app "freelang-app"}
+  :type :ClusterIP
+  :ports [{port 80 target-port 43011}]
+]
+
+[K8S-INGRESS app-ingress
+  :name "freelang-ingress"
+  :annotations {nginx.ingress.kubernetes.io/rewrite-target "/"}
+  :rules [{host "app.example.com" paths [{path "/" service "freelang-app-svc"}]}]
+]
