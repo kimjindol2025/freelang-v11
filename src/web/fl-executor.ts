@@ -89,16 +89,11 @@ export class FLExecutor {
       // 컨텍스트를 v9 요청 객체로 변환
       const flRequest = this.createFlRequest(context);
 
-      // 인터프리터 실행 (AST 전체 + 전역 요청 객체 바인딩)
-      // v9 interpreter는 eval 이전에 전역 변수 설정 필요
-      (this.interpreter as any).globals = (this.interpreter as any).globals || {};
-      (this.interpreter as any).globals.__request = flRequest;
-      (this.interpreter as any).globals.__params = context.params || {};
+      // 인터프리터 실행 (interpreter.interpret()로 PAGE/COMPONENT/FORM 블록 처리)
+      const execContext = this.interpreter.interpret(astList);
 
-      let result: any = null;
-      for (const ast of astList) {
-        result = this.interpreter.eval(ast);
-      }
+      // lastValue가 결과
+      const result = execContext.lastValue;
 
       // 반환 값 분석
       return this.processResult(result);

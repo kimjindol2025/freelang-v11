@@ -278,6 +278,18 @@ export class Interpreter {
 
   private evalBlock(block: Block): void {
     switch (block.type) {
+      case "PAGE":
+        // Phase 11 v11: [PAGE :path "/" :render "<h1>...</h1>"]
+        this.context.lastValue = this.handlePageBlock(block);
+        break;
+      case "COMPONENT":
+        // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
+        this.context.lastValue = this.handleComponentBlock(block);
+        break;
+      case "FORM":
+        // Phase 11 v11: [FORM name :fields [...] :validation ...]
+        this.context.lastValue = this.handleFormBlock(block);
+        break;
       case "SERVER":
         this.handleServerBlock(block);
         break;
@@ -324,6 +336,75 @@ export class Interpreter {
     const callFnVal = (fn: any, args: any[]) => interp.callFunctionValue(fn, args);
     const state = evalAgentBlock(block.fields as Map<string, any>, ev, callFnVal);
     this.context.lastValue = state;
+  }
+
+  // Phase 11 v11: [PAGE :path "/" :name "Home" :render "<h1>...</h1>"]
+  private handlePageBlock(block: Block): any {
+    const renderNode = block.fields.get("render");
+    if (!renderNode) {
+      return null;
+    }
+    // :render을 eval해서 HTML 문자열 반환
+    const html = this.eval(renderNode);
+    // {{ param }} 템플릿 보간 지원 (간단한 구현)
+    if (typeof html === "string" && this.context.lastValue) {
+      let interpolated = html;
+      const params = (this.context.lastValue as any).__params || {};
+      for (const [key, value] of Object.entries(params)) {
+        interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
+      }
+      return interpolated;
+    }
+    return html;
+  }
+
+  // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
+  private handleComponentBlock(block: Block): any {
+    const renderNode = block.fields.get("render");
+    if (!renderNode) {
+      return null;
+    }
+    // :state 초기값 설정
+    const stateNode = block.fields.get("state");
+    if (stateNode && stateNode.kind === "block" && stateNode.type === "Map") {
+      const entries = (stateNode.fields.get("entries") || []) as any[];
+      this.context.variables.push();
+      for (let i = 0; i < entries.length - 1; i += 2) {
+        const key = entries[i]?.kind === "keyword" ? entries[i].name : String(entries[i]);
+        const value = this.eval(entries[i + 1]);
+        this.context.variables.set(`$${key}`, value);
+      }
+    }
+    // :methods 등록 (필요시)
+    const methodsNode = block.fields.get("methods");
+    // ... methods 처리는 추후 확장
+
+    // :render 평가
+    const html = this.eval(renderNode);
+    if (stateNode) {
+      this.context.variables.pop();
+    }
+    return html;
+  }
+
+  // Phase 11 v11: [FORM name :fields [...] :validation ...]
+  private handleFormBlock(block: Block): any {
+    const fieldsNode = block.fields.get("fields");
+    if (!fieldsNode) {
+      return null;
+    }
+    // 간단한 form HTML 생성
+    const fields = Array.isArray(fieldsNode) ? fieldsNode : [fieldsNode];
+    let formHtml = '<form>\n';
+    for (const field of fields) {
+      if (field?.kind === "block" && field?.type === "Map") {
+        const name = field.fields.get("name") || "field";
+        const type = field.fields.get("type") || "text";
+        formHtml += `  <input type="${type}" name="${name}" />\n`;
+      }
+    }
+    formHtml += '</form>';
+    return formHtml;
   }
 
   // Phase 97: [TOOL name :desc "..." :input {x :number y :number} :output :number :body (+ $x $y)]

@@ -281,17 +281,46 @@ export class WebServer {
       return;
     }
 
-    // App Router로 라우트 매칭
+    // App Router로 라우트 매칭 (먼저 시도)
     const match = this.router.match(urlPath);
 
-    // 레거시 데모 라우트
-    if (urlPath === "/" || urlPath === "") {
+    // App Router 매칭 성공 → .fl 파일 렌더링
+    if (match) {
+      // executor가 설정되어 있으면 .fl 파일 실행
+      if (this.executor) {
+        try {
+          const result = await this.executor.executePage(match.route.filePath, {
+            req: { method: req.method, path: urlPath, headers: req.headers as Record<string, string> },
+            params: match.params,
+            query,
+          });
+
+          if (result.success && typeof result.body === "string") {
+            res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
+            res.writeHead(result.status || 200);
+            res.end(result.body);
+          } else {
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.writeHead(result.status || 500);
+            res.end(result.error || "Internal Server Error");
+          }
+          return;
+        } catch (err: any) {
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.writeHead(500);
+          res.end(generateHTML("Error", `<h1>Error</h1><p>${err.message}</p>`));
+          return;
+        }
+      }
+
+      // executor가 없으면 기본 HTML 생성 (fallback)
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.writeHead(200);
-      res.end(generateIndexHTML());
+      res.end(generatePageHTML(match.route, match.params));
       return;
     }
 
+    // 레거시 데모 라우트 (App Router 매칭 실패 후)
     if (urlPath === "/demo") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.writeHead(200);
@@ -314,11 +343,11 @@ export class WebServer {
       return;
     }
 
-    // App Router 매칭
-    if (match) {
+    // 기본 홈페이지 (App Router에 정의되지 않은 경우)
+    if (urlPath === "/" || urlPath === "") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.writeHead(200);
-      res.end(generatePageHTML(match.route, match.params));
+      res.end(generateIndexHTML());
       return;
     }
 
