@@ -1,0 +1,221 @@
+; FreeLang Frontend v9 - Web Fetch Library
+; API 호출, HTTP 요청, 재시도 로직
+
+; ==================== 기본 Fetch ====================
+
+; fetch-json: JSON API 호출 (GET/POST/PUT/DELETE)
+[FUNC fetch-json :params [url :method "GET" :headers {} :body nil]
+  :returns [dict]
+  :body [
+    (do
+      (var init-opts {
+        :method method
+        :headers (or headers {})
+      })
+
+      ; 바디 추가
+      (if (not (eq body nil))
+        (do
+          (set (get init-opts.headers "Content-Type") "application/json")
+          (set init-opts.body (json-stringify body))))
+
+      ; fetch 실행
+      (var response nil)
+      (try
+        (do
+          (set response (js-call "fetch" [url init-opts]))
+          (json-parse (get response "text")))
+        (catch [e]
+          (do
+            (var error-obj {})
+            (set error-obj.error true)
+            (set error-obj.message (get e "message"))
+            error-obj))))
+    )
+]
+
+; fetch-text: 텍스트 응답 가져오기
+[FUNC fetch-text :params [url :method "GET" :headers {}]
+  :returns str
+  :body [
+    (do
+      (var init-opts {
+        :method method
+        :headers (or headers {})
+      })
+
+      (var response nil)
+      (try
+        (do
+          (set response (js-call "fetch" [url init-opts]))
+          (get response "text"))
+        (catch [e] "")))
+    )
+]
+
+; fetch-blob: 바이너리 데이터 가져오기
+[FUNC fetch-blob :params [url :method "GET" :headers {}]
+  :returns any
+  :body [
+    (do
+      (var init-opts {
+        :method method
+        :headers (or headers {})
+      })
+
+      (try
+        (do
+          (var response (js-call "fetch" [url init-opts]))
+          (js-call response.blob []))
+        (catch [e] nil)))
+    )
+]
+
+; ==================== 재시도 로직 ====================
+
+; fetch-with-retry: 재시도 로직 (지수 백오프)
+[FUNC fetch-with-retry :params [url :max-retries 3 :base-delay 1000]
+  :returns [dict]
+  :body [
+    (do
+      (var attempt 0)
+      (var last-error nil)
+
+      (while (< attempt max-retries)
+        (try
+          (do
+            (var response (js-call "fetch" [url {}]))
+            (if (get response "ok")
+              (return (json-parse (get response "text")))
+              (do
+                (set last-error (get response "statusText"))
+                (set attempt (+ attempt 1)))))
+          (catch [e]
+            (do
+              (set last-error (get e "message"))
+              (set attempt (+ attempt 1))))))
+
+      ; 모두 실패
+      {
+        :error true
+        :message last-error
+        :attempts max-retries
+      })
+    )
+]
+
+; ==================== 요청 빌더 ====================
+
+; create-request: HTTP 요청 객체 생성
+[FUNC create-request :params [url :method "GET"]
+  :returns [dict]
+  :body [
+    {
+      :url url
+      :method method
+      :headers {}
+      :body nil
+      :timeout 30000
+    }
+  ]
+]
+
+; request-set-header: 요청 헤더 설정
+[FUNC request-set-header :params [request :header-name :value]
+  :returns [dict]
+  :body [
+    (do
+      (set (get request.headers header-name) value)
+      request)
+    )
+]
+
+; request-set-body: 요청 바디 설정
+[FUNC request-set-body :params [request :body]
+  :returns [dict]
+  :body [
+    (do
+      (set request.body body)
+      request)
+    )
+]
+
+; request-set-timeout: 타임아웃 설정
+[FUNC request-set-timeout :params [request :timeout-ms]
+  :returns [dict]
+  :body [
+    (do
+      (set request.timeout timeout-ms)
+      request)
+    )
+]
+
+; ==================== 응답 처리 ====================
+
+; response-ok?: 응답 성공 확인
+[FUNC response-ok? :params [response]
+  :returns bool
+  :body [
+    (do
+      (if (eq response nil)
+        false
+        (get response "ok")))
+    )
+]
+
+; response-status: 상태 코드 가져오기
+[FUNC response-status :params [response]
+  :returns i32
+  :body [
+    (do
+      (if (eq response nil)
+        0
+        (get response "status")))
+    )
+]
+
+; response-header: 응답 헤더 가져오기
+[FUNC response-header :params [response :header-name]
+  :returns str
+  :body [
+    (do
+      (if (eq response nil)
+        ""
+        (js-call (get response.headers "get") [header-name])))
+    )
+]
+
+; ==================== 유틸 ====================
+
+; query-string: 쿼리 문자열 생성
+[FUNC query-string :params [params]
+  :returns str
+  :body [
+    (do
+      (var parts [])
+      (for-each params
+        (fn [[key value]]
+          (push parts (concat key "=" (url-encode value)))))
+      (if (> (len parts) 0)
+        (concat "?" (join parts "&"))
+        ""))
+    )
+]
+
+; url-encode: URL 인코딩
+[FUNC url-encode :params [str]
+  :returns str
+  :body [
+    (js-call "encodeURIComponent" [str])
+  ]
+]
+
+; ==================== Export ====================
+
+[EXPORT
+  fetch-json fetch-text fetch-blob
+  fetch-with-retry
+  create-request request-set-header request-set-body request-set-timeout
+  response-ok? response-status response-header
+  query-string url-encode
+]

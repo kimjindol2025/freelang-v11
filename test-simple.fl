@@ -1,0 +1,8 @@
+[FUNC add [a b]
+  (+ a b)]
+
+[FUNC main []
+  (let [result (add 5 3)]
+    (print (str "5 + 3 = " result)))]
+
+(main)

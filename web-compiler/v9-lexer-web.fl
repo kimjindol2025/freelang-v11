@@ -1,0 +1,372 @@
+; FreeLang Frontend v9 - Lexer
+; 웹 특화 토크나이저 (250줄)
+; Converts source code to tokens with web-specific keywords
+
+[IMPORT "lib/collections"]
+
+; Token type definitions
+[ENUM TokenType
+  ; Literals
+  IDENTIFIER NUMBER STRING TEMPLATE
+
+  ; Brackets & Symbols
+  LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE
+  COLON COMMA DOT SEMICOLON ARROW PIPE
+
+  ; Operators
+  PLUS MINUS STAR SLASH PERCENT EQ EQEQ NEQEQ LT GT LTEQ GTEQ AND OR NOT
+
+  ; Web Block Keywords
+  PAGE ROUTE COMPONENT FORM AGENT
+  STATE COMPUTED WATCH METHOD RENDER HANDLER
+  VALIDATION ONSUMBIT ONEVENT
+  LAYOUT MIDDLEWARE SUSPENSE SLOT LOADING_UI METADATA
+
+  ; General Keywords
+  FN LET VAR IF MATCH WHILE FOR IMPORT USE DO END
+
+  ; Special
+  EOF ERROR
+]
+
+; Token structure
+[STRUCT Token
+  :type TokenType
+  :value str
+  :line i32
+  :column i32
+]
+
+; Lexer state
+[STRUCT LexerState
+  :source str
+  :position i32
+  :line i32
+  :column i32
+  :tokens [Token]
+]
+
+; Web keyword mapping
+[VAR WEB_KEYWORDS [dict]
+  ("page" PAGE)
+  ("route" ROUTE)
+  ("component" COMPONENT)
+  ("form" FORM)
+  ("agent" AGENT)
+  ("state" STATE)
+  ("computed" COMPUTED)
+  ("watch" WATCH)
+  ("method" METHOD)
+  ("render" RENDER)
+  ("handler" HANDLER)
+  ("validation" VALIDATION)
+  ("onSubmit" ONSUMBIT)
+  ("onEvent" ONEVENT)
+  ("layout" LAYOUT)
+  ("middleware" MIDDLEWARE)
+  ("suspense" SUSPENSE)
+  ("slot" SLOT)
+  ("loading" LOADING_UI)
+  ("metadata" METADATA)
+]
+
+; General keywords
+[VAR KEYWORDS [dict]
+  ("fn" FN)
+  ("let" LET)
+  ("var" VAR)
+  ("if" IF)
+  ("match" MATCH)
+  ("while" WHILE)
+  ("for" FOR)
+  ("import" IMPORT)
+  ("use" USE)
+  ("do" DO)
+  ("end" END)
+]
+
+; Initialize lexer
+[FUNC init-lexer :params [source]
+  :returns LexerState
+  :body [
+    [LexerState
+      :source source
+      :position 0
+      :line 1
+      :column 1
+      :tokens []
+    ]
+  ]
+]
+
+; Current character
+[FUNC current-char :params [state]
+  :returns str
+  :body [
+    (if (< state.position (length state.source))
+      (substring state.source state.position (+ state.position 1))
+      "")
+  ]
+]
+
+; Peek next character
+[FUNC peek-char :params [state :offset 1]
+  :returns str
+  :body [
+    (if (< (+ state.position offset) (length state.source))
+      (substring state.source (+ state.position offset) (+ state.position offset 1))
+      "")
+  ]
+]
+
+; Advance position
+[FUNC advance :params [state]
+  :body [
+    (do
+      (var char (current-char state))
+      (if (eq char "\n")
+        (do
+          (set state.line (+ state.line 1))
+          (set state.column 1))
+        (set state.column (+ state.column 1)))
+      (set state.position (+ state.position 1)))
+  ]
+]
+
+; Skip whitespace
+[FUNC skip-whitespace :params [state]
+  :body [
+    (while (and (current-char state) (is-whitespace (current-char state)))
+      (advance state))
+  ]
+]
+
+; Check if character is whitespace
+[FUNC is-whitespace :params [char]
+  :returns bool
+  :body [
+    (or (eq char " ") (eq char "\t") (eq char "\n") (eq char "\r"))
+  ]
+]
+
+; Check if character is letter or underscore
+[FUNC is-identifier-start :params [char]
+  :returns bool
+  :body [
+    (and (not (eq char ""))
+      (or (is-alpha char) (eq char "_")))
+  ]
+]
+
+; Check if character is letter
+[FUNC is-alpha :params [char]
+  :returns bool
+  :body [
+    (and (gte (char-code char) 97)
+      (lte (char-code char) 122))
+  ]
+]
+
+; Check if character is digit
+[FUNC is-digit :params [char]
+  :returns bool
+  :body [
+    (and (gte (char-code char) 48)
+      (lte (char-code char) 57))
+  ]
+]
+
+; Get character code
+[FUNC char-code :params [char]
+  :returns i32
+  :body [
+    ; Implementation depends on v9 stdlib
+    0
+  ]
+]
+
+; Read string literal
+[FUNC read-string :params [state :quote-char]
+  :returns Token
+  :body [
+    (do
+      (var start-line state.line)
+      (var start-col state.column)
+      (var value "")
+      (advance state) ; skip opening quote
+
+      (while (and (not (eq (current-char state) quote-char))
+                  (not (eq (current-char state) "")))
+        (if (eq (current-char state) "\\")
+          (do
+            (advance state)
+            (var escaped (current-char state))
+            (set value (concat value escaped))
+            (advance state))
+          (do
+            (set value (concat value (current-char state)))
+            (advance state))))
+
+      (if (eq (current-char state) quote-char)
+        (advance state))
+
+      [Token :type STRING :value value :line start-line :column start-col]
+    )
+  ]
+]
+
+; Read template literal
+[FUNC read-template :params [state]
+  :returns Token
+  :body [
+    (do
+      (var start-line state.line)
+      (var start-col state.column)
+      (var value "")
+      (advance state) ; skip backtick
+
+      (while (and (not (eq (current-char state) "`"))
+                  (not (eq (current-char state) "")))
+        (set value (concat value (current-char state)))
+        (advance state))
+
+      (if (eq (current-char state) "`")
+        (advance state))
+
+      [Token :type TEMPLATE :value value :line start-line :column start-col]
+    )
+  ]
+]
+
+; Read identifier or keyword
+[FUNC read-identifier :params [state]
+  :returns Token
+  :body [
+    (do
+      (var start-line state.line)
+      (var start-col state.column)
+      (var value "")
+
+      (while (and (is-identifier-start (current-char state))
+                  (or (is-alpha (current-char state))
+                      (is-digit (current-char state))
+                      (eq (current-char state) "_")
+                      (eq (current-char state) "-")))
+        (set value (concat value (current-char state)))
+        (advance state))
+
+      (var token-type IDENTIFIER)
+      (if (in WEB_KEYWORDS value)
+        (set token-type (get WEB_KEYWORDS value))
+        (if (in KEYWORDS value)
+          (set token-type (get KEYWORDS value))))
+
+      [Token :type token-type :value value :line start-line :column start-col]
+    )
+  ]
+]
+
+; Read number
+[FUNC read-number :params [state]
+  :returns Token
+  :body [
+    (do
+      (var start-line state.line)
+      (var start-col state.column)
+      (var value "")
+
+      (while (is-digit (current-char state))
+        (set value (concat value (current-char state)))
+        (advance state))
+
+      (if (eq (current-char state) ".")
+        (do
+          (set value (concat value "."))
+          (advance state)
+          (while (is-digit (current-char state))
+            (set value (concat value (current-char state)))
+            (advance state))))
+
+      [Token :type NUMBER :value value :line start-line :column start-col]
+    )
+  ]
+]
+
+; Main tokenize function
+[FUNC tokenize :params [source]
+  :returns [Token]
+  :body [
+    (do
+      (var state (init-lexer source))
+      (var tokens [])
+
+      (while (not (eq (current-char state) ""))
+        (skip-whitespace state)
+
+        ; Handle comments (semicolon until end of line)
+        (while (eq (current-char state) ";")
+          (do
+            (while (and (not (eq (current-char state) ""))
+                        (not (eq (current-char state) "\n")))
+              (advance state))
+            (if (eq (current-char state) "\n")
+              (advance state))
+            (skip-whitespace state)))
+
+        (if (eq (current-char state) "")
+          (break)
+          (match (current-char state)
+            ; Brackets
+            ("(" (do
+              (push tokens [Token :type LPAREN :value "(" :line state.line :column state.column])
+              (advance state)))
+            (")" (do
+              (push tokens [Token :type RPAREN :value ")" :line state.line :column state.column])
+              (advance state)))
+            ("[" (do
+              (push tokens [Token :type LBRACKET :value "[" :line state.line :column state.column])
+              (advance state)))
+            ("]" (do
+              (push tokens [Token :type RBRACKET :value "]" :line state.line :column state.column])
+              (advance state)))
+            ("{" (do
+              (push tokens [Token :type LBRACE :value "{" :line state.line :column state.column])
+              (advance state)))
+            ("}" (do
+              (push tokens [Token :type RBRACE :value "}" :line state.line :column state.column])
+              (advance state)))
+
+            ; Operators
+            (":" (do
+              (push tokens [Token :type COLON :value ":" :line state.line :column state.column])
+              (advance state)))
+            ("," (do
+              (push tokens [Token :type COMMA :value "," :line state.line :column state.column])
+              (advance state)))
+            ("." (do
+              (push tokens [Token :type DOT :value "." :line state.line :column state.column])
+              (advance state)))
+
+            ; String/Template
+            ("\"" (push tokens (read-string state "\"")))
+            ("'" (push tokens (read-string state "'")))
+            ("`" (push tokens (read-template state)))
+
+            ; Default: identifier, number, or comment
+            (_
+              (if (is-identifier-start (current-char state))
+                (push tokens (read-identifier state))
+                (if (is-digit (current-char state))
+                  (push tokens (read-number state))
+                  (advance state)))))))
+
+      ; Add EOF token
+      (push tokens [Token :type EOF :value "" :line state.line :column state.column])
+
+      tokens
+    )
+  ]
+]
+
+; Export
+[EXPORT tokenize TokenType Token]

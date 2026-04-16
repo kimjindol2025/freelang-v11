@@ -1,0 +1,469 @@
+; FreeLang Frontend v9 - Parser
+; AST 생성기 (350줄)
+; Converts tokens to Abstract Syntax Tree
+
+[IMPORT "./v9-lexer-web" :as lexer]
+
+; AST Node Types
+[ENUM ASTNodeType
+  PROGRAM BLOCK
+  PAGE ROUTE COMPONENT AGENT
+  LAYOUT MIDDLEWARE SUSPENSE LOADING
+  PROPERTY EXPRESSION
+  STATE METHOD HANDLER RENDER
+]
+
+; AST Node structure
+[STRUCT ASTNode
+  :type ASTNodeType
+  :name str
+  :properties [dict]
+  :body [ASTNode]
+  :expressions [ASTNode]
+  :line i32
+  :column i32
+]
+
+; Parser state
+[STRUCT ParserState
+  :tokens [lexer.Token]
+  :position i32
+  :errors [str]
+  :ast [ASTNode]
+]
+
+; Initialize parser
+[FUNC init-parser :params [tokens]
+  :returns ParserState
+  :body [
+    [ParserState
+      :tokens tokens
+      :position 0
+      :errors []
+      :ast []
+    ]
+  ]
+]
+
+; Current token
+[FUNC current-token :params [state]
+  :returns lexer.Token
+  :body [
+    (if (< state.position (length state.tokens))
+      (get state.tokens state.position)
+      (get state.tokens (- (length state.tokens) 1)))  ; EOF token
+  ]
+]
+
+; Peek next token
+[FUNC peek-token :params [state :offset 1]
+  :returns lexer.Token
+  :body [
+    (if (< (+ state.position offset) (length state.tokens))
+      (get state.tokens (+ state.position offset))
+      (get state.tokens (- (length state.tokens) 1)))
+  ]
+]
+
+; Advance position
+[FUNC advance :params [state]
+  :body [
+    (set state.position (+ state.position 1))
+  ]
+]
+
+; Check token type
+[FUNC is-token-type :params [state :type]
+  :returns bool
+  :body [
+    (eq (current-token state).type type)
+  ]
+]
+
+; Consume token
+[FUNC consume :params [state :expected-type]
+  :returns lexer.Token
+  :body [
+    (do
+      (var token (current-token state))
+      (if (not (eq token.type expected-type))
+        (push state.errors
+          (concat "Expected " expected-type " but got " token.type)))
+      (advance state)
+      token
+    )
+  ]
+]
+
+; Parse program: WebProgram = Block*
+[FUNC parse-program :params [state]
+  :returns ASTNode
+  :body [
+    (do
+      (var blocks [])
+      (while (and (not (is-token-type state lexer.EOF))
+                  (< state.position (length state.tokens)))
+        (if (is-token-type state lexer.LBRACKET)
+          (push blocks (parse-block state))))
+
+      [ASTNode
+        :type PROGRAM
+        :body blocks
+        :line 1
+        :column 1
+      ]
+    )
+  ]
+]
+
+; Parse block: [TYPE name :props {...}]
+[FUNC parse-block :params [state]
+  :returns ASTNode
+  :body [
+    (do
+      (var start-line (current-token state).line)
+      (var start-col (current-token state).column)
+      (consume state lexer.LBRACKET)
+
+      (var block-type (current-token state).type)
+      (var block-name "")
+      (advance state)
+
+      ; Determine block type
+      (match block-type
+        (lexer.PAGE (parse-page-block state start-line start-col))
+        (lexer.ROUTE (parse-route-block state start-line start-col))
+        (lexer.COMPONENT (parse-component-block state start-line start-col))
+        (lexer.AGENT (parse-agent-block state start-line start-col))
+        (lexer.LAYOUT (parse-layout-block state start-line start-col))
+        (lexer.MIDDLEWARE (parse-middleware-block state start-line start-col))
+        (lexer.SUSPENSE (parse-suspense-block state start-line start-col))
+        (lexer.LOADING_UI (parse-loading-block state start-line start-col))
+        (_
+          (do
+            (push state.errors (concat "Unknown block type: " block-type))
+            [ASTNode :type BLOCK :line start-line :column start-col])))
+    )
+  ]
+]
+
+; Parse PAGE block
+[FUNC parse-page-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      ; Parse properties (:path, :state, :render, etc)
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state) ; consume :
+        (var prop-name (current-token state).value)
+        (advance state)
+
+        ; Parse property value
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      ; Consume closing ]
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type PAGE
+        :name "page"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse ROUTE block
+[FUNC parse-route-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type ROUTE
+        :name "route"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse COMPONENT block
+[FUNC parse-component-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type COMPONENT
+        :name "component"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse AGENT block
+[FUNC parse-agent-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type AGENT
+        :name "agent"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse property value
+[FUNC parse-property-value :params [state]
+  :returns str
+  :body [
+    (match (current-token state).type
+      (lexer.STRING (do
+        (var value (current-token state).value)
+        (advance state)
+        value))
+      (lexer.NUMBER (do
+        (var value (current-token state).value)
+        (advance state)
+        value))
+      (lexer.LBRACKET (do
+        (var value (parse-nested-block state))
+        value))
+      (_
+        (do
+          (var value (current-token state).value)
+          (advance state)
+          value)))
+  ]
+]
+
+; Parse LAYOUT block
+[FUNC parse-layout-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type LAYOUT
+        :name "layout"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse MIDDLEWARE block
+[FUNC parse-middleware-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type MIDDLEWARE
+        :name "middleware"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse SUSPENSE block
+[FUNC parse-suspense-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type SUSPENSE
+        :name "suspense"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse LOADING block
+[FUNC parse-loading-block :params [state :line :column]
+  :returns ASTNode
+  :body [
+    (do
+      (var properties {})
+      (var body [])
+
+      (while (and (is-token-type state lexer.COLON)
+                  (not (is-token-type state lexer.RBRACKET)))
+        (advance state)
+        (var prop-name (current-token state).value)
+        (advance state)
+        (var prop-value (parse-property-value state))
+        (set (get properties prop-name) prop-value))
+
+      (if (is-token-type state lexer.RBRACKET)
+        (advance state))
+
+      [ASTNode
+        :type LOADING
+        :name "loading"
+        :properties properties
+        :body body
+        :line line
+        :column column
+      ]
+    )
+  ]
+]
+
+; Parse nested block in property
+[FUNC parse-nested-block :params [state]
+  :returns str
+  :body [
+    (do
+      (var result "[")
+      (var depth 1)
+
+      (while (> depth 0)
+        (if (is-token-type state lexer.LBRACKET)
+          (set depth (+ depth 1)))
+        (if (is-token-type state lexer.RBRACKET)
+          (set depth (- depth 1)))
+
+        (if (> depth 0)
+          (set result (concat result (current-token state).value)))
+        (advance state))
+
+      (set result (concat result "]"))
+      result
+    )
+  ]
+]
+
+; Main parse function
+[FUNC parse :params [tokens]
+  :returns [ASTNode]
+  :body [
+    (do
+      (var state (init-parser tokens))
+      (var program (parse-program state))
+
+      (if (> (length state.errors) 0)
+        (do
+          (println "Parse errors:")
+          (for-each state.errors (fn [err] (println err)))))
+
+      program.body
+    )
+  ]
+]
+
+; Export
+[EXPORT parse ASTNode ASTNodeType parse-program parse-block]

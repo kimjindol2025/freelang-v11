@@ -1,7 +1,7 @@
 {
-  "name": "freelang-v9",
-  "version": "9.1.0",
-  "description": "FreeLang v9 — AI-Native Programming Language. AI를 위한, AI에 의한, AI가 쓰고 싶은 언어.",
+  "name": "freelang-v11",
+  "version": "11.0.0",
+  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). v9와 v9-frontend 통합.",
   "keywords": [
     "ai",
     "language",
@@ -13,7 +13,7 @@
   ],
   "author": "Claude Code (Anthropic)",
   "license": "MIT",
-  "homepage": "https://gogs.dclub.kr/kim/freelang-v9",
+  "homepage": "https://gogs.dclub.kr/kim/freelang-v11",
   "main": "dist/index.js",
   "bin": {
     "v9": "dist/cli.js"
@@ -38,14 +38,7 @@
     "fl": "ts-node src/cli.ts",
     "repl": "ts-node src/cli.ts repl"
   },
-  "dependencies": {
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/ws": "^8.18.1",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "ws": "^8.20.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^20.19.37",

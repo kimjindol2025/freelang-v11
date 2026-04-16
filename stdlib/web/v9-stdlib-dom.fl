@@ -1,0 +1,237 @@
+; FreeLang Frontend v9 - Web DOM Library
+; DOM 조작, 이벤트, 쿼리셀렉터 (v9 인터프리터 stdlib 패턴)
+
+; ==================== DOM 선택 ====================
+
+; query: CSS 선택자로 요소 찾기
+[FUNC query :params [selector]
+  :returns any
+  :body [
+    (do
+      (var element nil)
+      ; document.querySelector(selector) 에뮬레이션
+      (try
+        (set element (js-call "document.querySelector" [selector]))
+        (catch [e] (set element nil)))
+      element)
+    )
+]
+
+; query-all: 여러 요소 찾기
+[FUNC query-all :params [selector]
+  :returns [any]
+  :body [
+    (do
+      (var elements [])
+      (try
+        (var node-list (js-call "document.querySelectorAll" [selector]))
+        (for-each node-list
+          (fn [node]
+            (push elements node)))
+        (catch [e] (set elements [])))
+      elements)
+    )
+]
+
+; get-by-id: ID로 요소 찾기
+[FUNC get-by-id :params [id]
+  :returns any
+  :body [
+    (js-call "document.getElementById" [id])
+  ]
+]
+
+; ==================== DOM 조작 ====================
+
+; set-text: 요소 텍스트 설정
+[FUNC set-text :params [element :text]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (set element.textContent text)))
+    )
+]
+
+; set-html: 요소 HTML 설정
+[FUNC set-html :params [element :html]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (set element.innerHTML html)))
+    )
+]
+
+; get-text: 요소 텍스트 가져오기
+[FUNC get-text :params [element]
+  :returns str
+  :body [
+    (do
+      (if (eq element nil)
+        ""
+        element.textContent))
+    )
+]
+
+; get-html: 요소 HTML 가져오기
+[FUNC get-html :params [element]
+  :returns str
+  :body [
+    (do
+      (if (eq element nil)
+        ""
+        element.innerHTML))
+    )
+]
+
+; ==================== 속성 조작 ====================
+
+; get-attr: 속성 값 가져오기
+[FUNC get-attr :params [element :attr-name]
+  :returns str
+  :body [
+    (do
+      (if (eq element nil)
+        ""
+        (js-call element.getAttribute [attr-name])))
+    )
+]
+
+; set-attr: 속성 값 설정
+[FUNC set-attr :params [element :attr-name :value]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.setAttribute [attr-name value])))
+    )
+]
+
+; remove-attr: 속성 제거
+[FUNC remove-attr :params [element :attr-name]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.removeAttribute [attr-name])))
+    )
+]
+
+; ==================== 클래스 조작 ====================
+
+; add-class: 클래스 추가
+[FUNC add-class :params [element :class-name]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.classList.add [class-name])))
+    )
+]
+
+; remove-class: 클래스 제거
+[FUNC remove-class :params [element :class-name]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.classList.remove [class-name])))
+    )
+]
+
+; has-class: 클래스 있는지 확인
+[FUNC has-class :params [element :class-name]
+  :returns bool
+  :body [
+    (do
+      (if (eq element nil)
+        false
+        (js-call element.classList.contains [class-name])))
+    )
+]
+
+; toggle-class: 클래스 토글
+[FUNC toggle-class :params [element :class-name]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.classList.toggle [class-name])))
+    )
+]
+
+; ==================== 스타일 조작 ====================
+
+; set-style: 스타일 설정
+[FUNC set-style :params [element :property :value]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (set (get element.style property) value)))
+    )
+]
+
+; get-style: 스타일 가져오기
+[FUNC get-style :params [element :property]
+  :returns str
+  :body [
+    (do
+      (if (eq element nil)
+        ""
+        (get element.style property)))
+    )
+]
+
+; ==================== DOM 트리 조작 ====================
+
+; append: 자식 요소 추가
+[FUNC append :params [parent :child]
+  :body [
+    (do
+      (if (not (eq parent nil))
+        (js-call parent.appendChild [child])))
+    )
+]
+
+; remove: 요소 제거
+[FUNC remove :params [element]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.remove [])))
+    )
+]
+
+; create-element: 요소 생성
+[FUNC create-element :params [tag-name]
+  :returns any
+  :body [
+    (js-call "document.createElement" [tag-name])
+  ]
+]
+
+; ==================== 이벤트 ====================
+
+; add-event: 이벤트 리스너 추가
+[FUNC add-event :params [element :event-name :handler]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.addEventListener [event-name handler])))
+    )
+]
+
+; remove-event: 이벤트 리스너 제거
+[FUNC remove-event :params [element :event-name :handler]
+  :body [
+    (do
+      (if (not (eq element nil))
+        (js-call element.removeEventListener [event-name handler])))
+    )
+]
+
+; ==================== Export ====================
+
+[EXPORT
+  query query-all get-by-id
+  set-text set-html get-text get-html
+  get-attr set-attr remove-attr
+  add-class remove-class has-class toggle-class
+  set-style get-style
+  append remove create-element
+  add-event remove-event
+]

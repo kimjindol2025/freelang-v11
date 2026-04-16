@@ -5,7 +5,31 @@
 import * as http from "http";
 import * as url from "url";
 import * as crypto from "crypto";
-import { WebSocketServer, WebSocket } from "ws";
+
+// WebSocket (ws 패키지 또는 내장 구현)
+let WebSocketServer: any = null;
+let WebSocket: any = null;
+
+try {
+  // Try to import ws package if available
+  const wsModule = require("ws");
+  WebSocketServer = wsModule.WebSocketServer;
+  WebSocket = wsModule.WebSocket;
+} catch {
+  // Fallback: mock WebSocketServer for v11 (simplified, HTTP-only)
+  WebSocketServer = class {
+    constructor(options: any) {
+      // No-op: WebSocket support deferred to v11.1
+    }
+    on(event: string, handler: any) {}
+    broadcast(data: string) {}
+    close() {}
+  };
+  WebSocket = class {
+    send(data: string) {}
+    close() {}
+  };
+}
 
 type CallFn = (name: string, args: any[]) => any;
 type CallFunctionValue = (fnValue: any, args: any[]) => any;

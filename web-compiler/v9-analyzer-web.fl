@@ -1,0 +1,262 @@
+; FreeLang Frontend v9 - Analyzer
+; 의존성 분석 및 검증 (200줄)
+; Validates AST, detects conflicts, analyzes dependencies
+
+[IMPORT "./v9-parser-web" :as parser]
+
+; Analysis result
+[STRUCT AnalysisResult
+  :valid bool
+  :errors [str]
+  :warnings [str]
+  :routes [dict]      ; path -> handler mapping
+  :components [dict]  ; name -> component mapping
+  :states [dict]      ; state -> type mapping
+]
+
+; Validation context
+[STRUCT ValidationContext
+  :defined-routes [str]
+  :defined-components [str]
+  :defined-states [dict]
+  :errors [str]
+  :warnings [str]
+]
+
+; Initialize analyzer
+[FUNC init-analyzer :params []
+  :returns ValidationContext
+  :body [
+    [ValidationContext
+      :defined-routes []
+      :defined-components []
+      :defined-states {}
+      :errors []
+      :warnings []
+    ]
+  ]
+]
+
+; Analyze AST
+[FUNC analyze :params [ast-nodes]
+  :returns AnalysisResult
+  :body [
+    (do
+      (var context (init-analyzer))
+      (var routes {})
+      (var components {})
+
+      ; First pass: collect definitions
+      (for-each ast-nodes
+        (fn [node]
+          (match node.type
+            (parser.PAGE
+              (do
+                (var path (get node.properties "path"))
+                (set (get routes path) node)
+                (push context.defined-routes path)
+                (analyze-page-state context node)))
+            (parser.ROUTE
+              (do
+                (var path (get node.properties "path"))
+                (if (in routes path)
+                  (push context.errors
+                    (concat "Duplicate route: " path))
+                  (set (get routes path) node))
+                (push context.defined-routes path)))
+            (parser.COMPONENT
+              (do
+                (var comp-name (get node.properties "name"))
+                (if (in components comp-name)
+                  (push context.errors
+                    (concat "Duplicate component: " comp-name))
+                  (set (get components comp-name) node))
+                (push context.defined-components comp-name)))
+            (_ true))))
+
+      ; Second pass: validate references
+      (for-each ast-nodes
+        (fn [node]
+          (validate-node context node routes components)))
+
+      ; Return analysis result
+      [AnalysisResult
+        :valid (eq (length context.errors) 0)
+        :errors context.errors
+        :warnings context.warnings
+        :routes routes
+        :components components
+      ]
+    )
+  ]
+]
+
+; Analyze PAGE state
+[FUNC analyze-page-state :params [context :node]
+  :body [
+    (do
+      (var state-prop (get node.properties "state"))
+      (if (not (eq state-prop ""))
+        (do
+          ; Parse state definition
+          (var state-fields (parse-state-fields state-prop))
+          (for-each state-fields
+            (fn [field]
+              (var field-name (get field "name"))
+              (var field-type (get field "type"))
+              (set (get context.defined-states field-name) field-type))))))
+  ]
+]
+
+; Parse state fields from property
+[FUNC parse-state-fields :params [state-str]
+  :returns [dict]
+  :body [
+    ; Simple state parser: [count i32 0] -> [{name: "count", type: "i32"}]
+    []  ; Placeholder for full implementation
+  ]
+]
+
+; Validate node
+[FUNC validate-node :params [context :node :routes :components]
+  :body [
+    (match node.type
+      (parser.PAGE (validate-page context node routes components))
+      (parser.ROUTE (validate-route context node routes))
+      (parser.COMPONENT (validate-component context node))
+      (parser.AGENT (validate-agent context node))
+      (_ true))
+  ]
+]
+
+; Validate PAGE node
+[FUNC validate-page :params [context :node :routes :components]
+  :body [
+    (do
+      (var path (get node.properties "path"))
+      (if (eq path "")
+        (push context.errors "PAGE must have :path property"))
+
+      ; Check render method
+      (var render (get node.properties "render"))
+      (if (eq render "")
+        (push context.warnings "PAGE should have :render method"))
+
+      ; Validate state initialization
+      (var state-prop (get node.properties "state"))
+      (if (not (eq state-prop ""))
+        (validate-state-init context state-prop))
+
+      ; Validate boundary
+      (validate-boundary context node))
+  ]
+]
+
+; Validate ROUTE node
+[FUNC validate-route :params [context :node :routes]
+  :body [
+    (do
+      (var path (get node.properties "path"))
+      (var method (get node.properties "method"))
+
+      (if (eq path "")
+        (push context.errors "ROUTE must have :path property"))
+
+      (if (eq method "")
+        (push context.errors "ROUTE must have :method property")
+        (do
+          (var valid-methods ["GET" "POST" "PUT" "DELETE" "PATCH"])
+          (if (not (in valid-methods method))
+            (push context.errors
+              (concat "Invalid HTTP method: " method)))))))
+  ]
+]
+
+; Validate COMPONENT node
+[FUNC validate-component :params [context :node]
+  :body [
+    (do
+      (var comp-name (get node.properties "name"))
+      (if (eq comp-name "")
+        (push context.errors "COMPONENT must have :name property"))
+
+      ; Validate boundary
+      (validate-boundary context node))
+  ]
+]
+
+; Validate AGENT node
+[FUNC validate-agent :params [context :node]
+  :body [
+    (do
+      (var agent-name (get node.properties "name"))
+      (if (eq agent-name "")
+        (push context.warnings "AGENT should have :name property"))
+
+      (var context-prop (get node.properties "context"))
+      (if (eq context-prop "")
+        (push context.warnings "AGENT should have :context property")))
+  ]
+]
+
+; Validate state initialization
+[FUNC validate-state-init :params [context :state-str]
+  :body [
+    ; Check state field types
+    (do true)  ; Placeholder
+  ]
+]
+
+; Detect circular component dependencies
+[FUNC detect-circular-dependencies :params [components]
+  :returns [str]
+  :body [
+    (do
+      (var cycles [])
+      ; Placeholder for cycle detection algorithm
+      cycles
+    )
+  ]
+]
+
+; Topological sort for component compilation order
+[FUNC topological-sort :params [components]
+  :returns [str]
+  :body [
+    (do
+      (var sorted [])
+      ; Placeholder for topological sort
+      sorted
+    )
+  ]
+]
+
+; Validate boundary constraints
+[FUNC validate-boundary :params [context :node]
+  :body [
+    (do
+      (var boundary (get node.properties "boundary"))
+
+      ; Check if client component has server-only features
+      (if (eq boundary "client")
+        (do
+          ; Client components should not use fetch-data (server-side data fetching)
+          (var fetch-data (get node.properties "fetch-data"))
+          (if (not (eq fetch-data ""))
+            (push context.warnings
+              "Client component should not use :fetch-data (server-only)"))))
+
+      ; Check if server component has client-only features
+      (if (eq boundary "server")
+        (do
+          ; Server components should not use state (client-only)
+          (var state (get node.properties "state"))
+          (if (not (eq state ""))
+            (push context.warnings
+              "Server component should not use :state (client-only)")))))
+    )
+  ]
+]
+
+; Export
+[EXPORT analyze AnalysisResult ValidationContext analyze-page-state validate-node]

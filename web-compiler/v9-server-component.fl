@@ -1,0 +1,225 @@
+; FreeLang Frontend v9 - Server Component Runtime
+; 서버 컴포넌트 렌더링, 캐싱, 데이터 페칭 (250줄)
+
+[IMPORT "./v9-codegen-web" :as codegen]
+
+; Server component result
+[STRUCT ServerComponentResult
+  :name str
+  :html str
+  :props [dict]
+  :hydration-data str
+  :boundary str
+  :cache-key str
+]
+
+; Server component cache
+[STRUCT ComponentCache
+  :key str
+  :value ServerComponentResult
+  :ttl i32          ; seconds
+  :created-at i32
+]
+
+; Cache store
+[VAR component-cache [ComponentCache]]
+
+; Initialize cache entry
+[FUNC create-cache-entry :params [key :value :ttl]
+  :returns ComponentCache
+  :body [
+    [ComponentCache
+      :key key
+      :value value
+      :ttl ttl
+      :created-at 0  ; Would use Date.now() in JS
+    ]
+  ]
+]
+
+; Check if cache is valid (not expired)
+[FUNC is-cache-valid :params [entry :now]
+  :returns bool
+  :body [
+    (do
+      (var elapsed (- now entry.created-at))
+      (< elapsed (* entry.ttl 1000))  ; Convert seconds to milliseconds
+    )
+  ]
+]
+
+; Get from cache
+[FUNC get-from-cache :params [cache-key]
+  :returns ServerComponentResult
+  :body [
+    (do
+      (var result nil)
+      ; Search cache for matching key
+      (for-each component-cache
+        (fn [entry]
+          (if (eq entry.key cache-key)
+            (set result entry.value))))
+      result
+    )
+  ]
+]
+
+; Set in cache
+[FUNC set-in-cache :params [cache-key :value :ttl]
+  :body [
+    (do
+      ; Remove old entry if exists
+      (var new-cache [])
+      (for-each component-cache
+        (fn [entry]
+          (if (not (eq entry.key cache-key))
+            (push new-cache entry))))
+
+      ; Add new entry
+      (var new-entry (create-cache-entry cache-key value ttl))
+      (push new-cache new-entry)
+      (set component-cache new-cache)
+    )
+  ]
+]
+
+; Clear entire cache
+[FUNC clear-cache :params []
+  :body [
+    (set component-cache [])
+  ]
+]
+
+; Render server component
+[FUNC render-server-component :params [component :props :cache-config]
+  :returns ServerComponentResult
+  :body [
+    (do
+      (var cache-key (get cache-config "key"))
+      (var revalidate (get cache-config "revalidate"))
+      (var now 0)  ; Would be Date.now() in actual implementation
+
+      ; Check cache
+      (var cached (get-from-cache cache-key))
+      (if (not (eq cached nil))
+        (do
+          (var entry (find-cache-entry cache-key))
+          (if (is-cache-valid entry now)
+            (return cached))))
+
+      ; Not in cache or expired - render
+      (var html (render-component component props))
+      (var hydration-data (prepare-hydration-data component props))
+
+      ; Create result
+      (var result [ServerComponentResult
+        :name component.name
+        :html html
+        :props props
+        :hydration-data hydration-data
+        :boundary "server"
+        :cache-key cache-key
+      ])
+
+      ; Store in cache if TTL specified
+      (if (not (eq revalidate ""))
+        (set-in-cache cache-key result revalidate))
+
+      result
+    )
+  ]
+]
+
+; Render component HTML
+[FUNC render-component :params [component :props]
+  :returns str
+  :body [
+    (do
+      (var html "")
+
+      ; Get render template from component
+      (var render-template (get component.properties "render"))
+
+      ; Simple template: interpolate props
+      (if (not (eq render-template ""))
+        (set html render-template)
+        (set html "<div></div>"))
+
+      html
+    )
+  ]
+]
+
+; Prepare hydration data for client
+[FUNC prepare-hydration-data :params [component :props]
+  :returns str
+  :body [
+    (do
+      (var hydration {})
+
+      ; Include component props for hydration
+      (set (get hydration "props") props)
+
+      ; Include component state definitions
+      (var state-def (get component.properties "state"))
+      (if (not (eq state-def ""))
+        (set (get hydration "state") state-def))
+
+      ; Convert to JSON string
+      (do true)  ; Placeholder - would use JSON.stringify
+    )
+  ]
+]
+
+; Find cache entry by key
+[FUNC find-cache-entry :params [cache-key]
+  :returns ComponentCache
+  :body [
+    (do
+      (var result nil)
+      (for-each component-cache
+        (fn [entry]
+          (if (eq entry.key cache-key)
+            (set result entry))))
+      result
+    )
+  ]
+]
+
+; Revalidate cache by path
+[FUNC revalidate-path :params [path]
+  :body [
+    (do
+      ; Invalidate all cache entries for this path
+      (var new-cache [])
+      (for-each component-cache
+        (fn [entry]
+          (if (not (starts-with? entry.key path))
+            (push new-cache entry))))
+      (set component-cache new-cache)
+    )
+  ]
+]
+
+; Revalidate cache by tag
+[FUNC revalidate-tag :params [tag]
+  :body [
+    (do
+      ; Invalidate cache entries with matching tag
+      ; Tags would be stored in cache entries for this to work
+      (do true)  ; Placeholder
+    )
+  ]
+]
+
+; Export
+[EXPORT
+  render-server-component
+  ServerComponentResult
+  ComponentCache
+  get-from-cache
+  set-in-cache
+  clear-cache
+  revalidate-path
+  revalidate-tag
+]

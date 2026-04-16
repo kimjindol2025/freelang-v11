@@ -1,0 +1,287 @@
+; FreeLang Frontend v9 - Main Entrypoint
+; 전체 파이프라인 조율 + CLI + 서버 부트스트랩 (200줄)
+
+[IMPORT "./v9-lexer-web" :as lexer]
+[IMPORT "./v9-parser-web" :as parser]
+[IMPORT "./v9-analyzer-web" :as analyzer]
+[IMPORT "./v9-codegen-web" :as codegen]
+[IMPORT "./v9-page-compiler" :as page-compiler]
+[IMPORT "./v9-form-compiler" :as form-compiler]
+[IMPORT "./v9-api-compiler" :as api-compiler]
+[IMPORT "./v9-component-compiler" :as component-compiler]
+[IMPORT "./v9-agent-web" :as agent-compiler]
+[IMPORT "./v9-server-runtime" :as runtime]
+
+; Frontend compilation options
+[STRUCT FrontendOptions
+  :input-file str
+  :output-format str    ; "js", "native", "html"
+  :ssr bool
+  :watch bool
+  :mode str            ; "development", "production"
+  :output-dir str
+]
+
+; Compilation pipeline result
+[STRUCT CompilationResult
+  :success bool
+  :output str
+  :errors [str]
+  :warnings [str]
+  :compilation-time i32
+]
+
+; Parse command-line options
+[FUNC parse-cli-args :params [args]
+  :returns FrontendOptions
+  :body [
+    (do
+      (var options {
+        :input-file ""
+        :output-format "js"
+        :ssr true
+        :watch false
+        :mode "development"
+        :output-dir "./output"
+      })
+
+      (var i 0)
+      (while (< i (length args))
+        (do
+          (var arg (get args i))
+          (cond
+            ((eq arg "--format")
+              (if (< (+ i 1) (length args))
+                (do
+                  (set options.output-format (get args (+ i 1)))
+                  (set i (+ i 2))))
+              (set i (+ i 1))))
+            ((eq arg "--ssr")
+              (set options.ssr true)
+              (set i (+ i 1)))
+            ((eq arg "--no-ssr")
+              (set options.ssr false)
+              (set i (+ i 1)))
+            ((eq arg "--watch")
+              (set options.watch true)
+              (set i (+ i 1)))
+            ((eq arg "--mode")
+              (if (< (+ i 1) (length args))
+                (do
+                  (set options.mode (get args (+ i 1)))
+                  (set i (+ i 2))))
+              (set i (+ i 1))))
+            ((eq arg "--output")
+              (if (< (+ i 1) (length args))
+                (do
+                  (set options.output-dir (get args (+ i 1)))
+                  (set i (+ i 2))))
+              (set i (+ i 1))))
+            (true
+              (if (eq (get arg 0) "-")
+                (set i (+ i 1))
+                (do
+                  (set options.input-file arg)
+                  (set i (+ i 1))))))))
+
+      options
+    )
+  ]
+]
+
+; Main compilation pipeline
+[FUNC compile :params [input-content :options]
+  :returns CompilationResult
+  :body [
+    (do
+      (var start-time (current-time-ms))
+      (var errors [])
+      (var warnings [])
+      (var output "")
+
+      (try
+        (do
+          ; Phase 1: Lexing
+          (var tokens (lexer.tokenize input-content))
+          (if (eq (length tokens) 0)
+            (push errors "Lexer produced no tokens"))
+
+          ; Phase 1: Parsing
+          (var ast (parser.parse tokens))
+          (if (not ast)
+            (push errors "Parser failed to create AST"))
+
+          ; Phase 1: Analysis
+          (var analysis (analyzer.analyze ast))
+          (if (not analysis.success)
+            (do
+              (for-each analysis.errors
+                (fn [err]
+                  (push errors err)))
+              (for-each analysis.warnings
+                (fn [warn]
+                  (push warnings warn)))))
+
+          ; Phase 2: Compilation (AST → JavaScript/Native)
+          (var compilation (codegen.generate ast options))
+          (if (not compilation.success)
+            (push errors compilation.error))
+
+          ; Set output based on format
+          (match options.output-format
+            ("js"
+              (set output compilation.js))
+            ("native"
+              (set output compilation.native))
+            ("html"
+              (set output compilation.html))
+            (_
+              (set output compilation.js))))
+
+        (catch [e]
+          (push errors (concat "Compilation error: " e.message))))
+
+      (var end-time (current-time-ms))
+      (var compilation-time (- end-time start-time))
+
+      [CompilationResult
+        :success (eq (length errors) 0)
+        :output output
+        :errors errors
+        :warnings warnings
+        :compilation-time compilation-time
+      ]
+    )
+  ]
+]
+
+; Write compiled output to files
+[FUNC write-output :params [result :options]
+  :returns bool
+  :body [
+    (do
+      (try
+        (do
+          (var output-file "")
+          (match options.output-format
+            ("js"
+              (set output-file (concat options.output-dir "/index.js")))
+            ("native"
+              (set output-file (concat options.output-dir "/output.fl")))
+            ("html"
+              (set output-file (concat options.output-dir "/index.html")))
+            (_
+              (set output-file (concat options.output-dir "/index.js"))))
+
+          ; Write file
+          (write-file output-file result.output)
+
+          ; Log result
+          (println (concat "✅ Compiled to " output-file))
+          (println (concat "⏱️  Time: " result.compilation-time "ms"))
+
+          (if (> (length result.warnings) 0)
+            (do
+              (println "⚠️  Warnings:")
+              (for-each result.warnings
+                (fn [warn]
+                  (println (concat "  - " warn))))))
+
+          true
+        )
+        (catch [e]
+          (do
+            (eprintln (concat "Write error: " e.message))
+            false)))
+    )
+  ]
+]
+
+; Start development server
+[FUNC start-dev-server :params [options]
+  :returns str
+  :body [
+    (do
+      (var config (runtime.default-config))
+      (set config.mode "development")
+      (set config.hmr-enabled true)
+
+      (var context (runtime.init-runtime config))
+
+      (println "🚀 FreeLang Frontend v9 Development Server")
+      (println (concat "📍 http://localhost:" config.port))
+      (println "🔄 HMR enabled on port 3001")
+
+      "Server started"
+    )
+  ]
+]
+
+; CLI entry point
+[FUNC main :params [args]
+  :returns i32
+  :body [
+    (do
+      (if (eq (length args) 0)
+        (do
+          (println "FreeLang Frontend v9 Compiler")
+          (println "")
+          (println "Usage: node main.fl <input.fl> [options]")
+          (println "")
+          (println "Options:")
+          (println "  --format js|native|html    Output format (default: js)")
+          (println "  --ssr                      Enable server-side rendering (default)")
+          (println "  --no-ssr                   Disable server-side rendering")
+          (println "  --watch                    Watch mode for HMR")
+          (println "  --mode development|prod   Build mode (default: development)")
+          (println "  --output <dir>            Output directory (default: ./output)")
+          (println "")
+          (return 0)))
+
+      (var options (parse-cli-args args))
+
+      (if (eq options.input-file "")
+        (do
+          (eprintln "Error: Input file required")
+          (return 1)))
+
+      ; Read input file
+      (var input-content (read-file options.input-file))
+
+      ; Compile
+      (var result (compile input-content options))
+
+      ; Handle errors
+      (if (not result.success)
+        (do
+          (eprintln "❌ Compilation failed")
+          (for-each result.errors
+            (fn [err]
+              (eprintln (concat "  - " err))))
+          (return 1)))
+
+      ; Write output
+      (var write-ok (write-output result options))
+      (if (not write-ok)
+        (return 1))
+
+      ; Start dev server if in watch mode
+      (if options.watch
+        (do
+          (println "👀 Watching for changes...")
+          (start-dev-server options)))
+
+      0
+    )
+  ]
+]
+
+; v11 빌트인 함수 직접 사용
+; (read-file "path") → str
+; (write-file "path" content) → nil
+; (println msg) → nil
+; (eprintln msg) → nil
+; (current-time-ms) → i32
+
+; Export public API
+[EXPORT compile write-output start-dev-server parse-cli-args main FrontendOptions CompilationResult]

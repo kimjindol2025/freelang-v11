@@ -1,0 +1,263 @@
+; FreeLang Frontend v9 - Component Compiler
+; 컴포넌트 블록을 재사용 가능한 모듈로 컴파일 (200줄)
+
+[IMPORT "./v9-parser-web" :as parser]
+
+; Component compilation result
+[STRUCT ComponentCompilationResult
+  :name str
+  :js str
+  :props [ComponentProp]
+  :events [ComponentEvent]
+  :slots [str]
+  :html str
+]
+
+; Component property definition
+[STRUCT ComponentProp
+  :name str
+  :type str
+  :default-value str
+  :required bool
+]
+
+; Component event definition
+[STRUCT ComponentEvent
+  :name str
+  :description str
+]
+
+; Compile COMPONENT block
+[FUNC compile-component :params [component-node]
+  :returns ComponentCompilationResult
+  :body [
+    (do
+      (var comp-name (get component-node.properties "name"))
+      (var props-def (get component-node.properties "props"))
+      (var events-def (get component-node.properties "events"))
+      (var slots-def (get component-node.properties "slots"))
+      (var template-def (get component-node.properties "template"))
+
+      ; Parse properties
+      (var props (parse-component-props props-def))
+
+      ; Parse events
+      (var events (parse-component-events events-def))
+
+      ; Parse slots
+      (var slots (parse-component-slots slots-def))
+
+      ; Generate HTML template
+      (var html (gen-component-html comp-name template-def slots))
+
+      ; Generate JavaScript
+      (var js (gen-component-js comp-name props events slots template-def))
+
+      [ComponentCompilationResult
+        :name comp-name
+        :js js
+        :props props
+        :events events
+        :slots slots
+        :html html
+      ]
+    )
+  ]
+]
+
+; Parse component properties
+[FUNC parse-component-props :params [props-str]
+  :returns [ComponentProp]
+  :body [
+    (do
+      (var props [])
+      ; Parse: [{title str "Untitled"} {count i32 0 :required}]
+      ; Placeholder for full parsing
+      props
+    )
+  ]
+]
+
+; Parse component events
+[FUNC parse-component-events :params [events-str]
+  :returns [ComponentEvent]
+  :body [
+    (do
+      (var events [])
+      ; Parse: [click change input]
+      ; Placeholder for full parsing
+      events
+    )
+  ]
+]
+
+; Parse component slots
+[FUNC parse-component-slots :params [slots-str]
+  :returns [str]
+  :body [
+    (do
+      (var slots [])
+      ; Parse: [default header footer]
+      ; Placeholder for full parsing
+      slots
+    )
+  ]
+]
+
+; Generate component HTML template
+[FUNC gen-component-html :params [comp-name :template-def :slots]
+  :returns str
+  :body [
+    (do
+      (var html "")
+      (set html (concat html (concat "<!-- Component: " comp-name " -->\n")))
+      (set html (concat html (concat "<div class=\"component-" (string-lower comp-name) "\">\n")))
+
+      ; Generate named slots
+      (for-each slots
+        (fn [slot-name]
+          (if (eq slot-name "default")
+            (set html (concat html "  <slot></slot>\n"))
+            (set html (concat html (concat "  <slot name=\"" slot-name "\"></slot>\n"))))))
+
+      ; Default template
+      (if (eq (length slots) 0)
+        (set html (concat html "  <slot></slot>\n")))
+
+      (set html (concat html "</div>\n"))
+
+      html
+    )
+  ]
+]
+
+; Generate component JavaScript
+[FUNC gen-component-js :params [comp-name :props :events :slots :template-def]
+  :returns str
+  :body [
+    (do
+      (var js "")
+
+      ; Component function
+      (set js (concat js (concat "const " comp-name " = (props = {}, slots = {}) => {\n")))
+
+      ; Validate props
+      (set js (concat js "  // Validate required props\n"))
+      (for-each props
+        (fn [prop]
+          (if prop.required
+            (do
+              (set js (concat js (concat "  if (!props." prop.name ") {\n")))
+              (set js (concat js (concat "    throw new Error('" prop.name " is required');\n")))
+              (set js (concat js "  }\n"))))))
+
+      ; Initialize props with defaults
+      (set js (concat js "  const finalProps = {\n"))
+      (for-each props
+        (fn [prop]
+          (set js (concat js (concat "    " prop.name ": props." prop.name " ?? " prop.default-value ",\n")))))
+      (set js (concat js "  };\n\n"))
+
+      ; Event handlers
+      (if (> (length events) 0)
+        (do
+          (set js (concat js "  const emit = (eventName, payload) => {\n"))
+          (set js (concat js "    if (window[eventName]) {\n"))
+          (set js (concat js "      window[eventName](payload);\n"))
+          (set js (concat js "    }\n"))
+          (set js (concat js "  };\n\n"))))
+
+      ; Render function
+      (set js (concat js "  const render = () => {\n"))
+      (set js (concat js "    const container = document.createElement('div');\n"))
+      (set js (concat js (concat "    container.className = 'component-" (string-lower comp-name) "';\n")))
+
+      ; Render slots
+      (for-each slots
+        (fn [slot-name]
+          (if (eq slot-name "default")
+            (set js (concat js "    container.innerHTML = slots.default || '';\n"))
+            (set js (concat js (concat "    const " slot-name "Element = document.createElement('div');\n")))
+            (set js (concat js (concat "    " slot-name "Element.innerHTML = slots." slot-name " || '';\n")))
+            (set js (concat js (concat "    container.appendChild(" slot-name "Element);\n"))))))
+
+      (set js (concat js "    return container;\n"))
+      (set js (concat js "  };\n\n"))
+
+      ; Return component object
+      (set js (concat js "  return {\n"))
+      (set js (concat js "    name: '" comp-name "',\n"))
+      (set js (concat js "    props: finalProps,\n"))
+      (set js (concat js "    render,\n"))
+      (set js (concat js "    mount(selector) {\n"))
+      (set js (concat js "      const container = document.querySelector(selector);\n"))
+      (set js (concat js "      container.appendChild(this.render());\n"))
+      (set js (concat js "    }\n"))
+      (set js (concat js "  };\n"))
+      (set js (concat js "};\n"))
+
+      js
+    )
+  ]
+]
+
+; Generate component story (Storybook-style)
+[FUNC gen-component-story :params [component]
+  :returns str
+  :body [
+    (do
+      (var story "")
+      (set story (concat story (concat "// Story: " component.name "\n")))
+      (set story (concat story (concat "export const Default = () => " component.name "({\n")))
+      (for-each component.props
+        (fn [prop]
+          (set story (concat story (concat "  " prop.name ": " prop.default-value ",\n")))))
+      (set story (concat story "});\n"))
+      story
+    )
+  ]
+]
+
+; Helper functions
+[FUNC string-lower :params [str]
+  :returns str
+  :body [
+    str
+  ]
+]
+
+; Compile multiple components
+[FUNC compile-components :params [component-nodes]
+  :returns [ComponentCompilationResult]
+  :body [
+    (do
+      (var results [])
+      (for-each component-nodes
+        (fn [node]
+          (if (eq node.type parser.COMPONENT)
+            (push results (compile-component node)))))
+      results
+    )
+  ]
+]
+
+; Register components globally
+[FUNC register-components :params [components]
+  :returns str
+  :body [
+    (do
+      (var js "")
+      (set js (concat js "// Register components\n"))
+      (set js (concat js "const ComponentRegistry = {\n"))
+      (for-each components
+        (fn [component]
+          (set js (concat js (concat "  '" component.name "': " component.name ",\n")))))
+      (set js (concat js "};\n\n"))
+      (set js (concat js "window.ComponentRegistry = ComponentRegistry;\n"))
+      js
+    )
+  ]
+]
+
+; Export
+[EXPORT compile-component compile-components ComponentCompilationResult ComponentProp ComponentEvent]

@@ -1,11 +1,57 @@
-// FreeLang v9 — PostgreSQL stdlib
+// FreeLang v11 — PostgreSQL stdlib
 // pg_query, pg_exec, pg_one, jwt_sign, jwt_verify, pbkdf2_hash, pbkdf2_verify, ai_complete
 
-import * as jwt from "jsonwebtoken";
 import * as crypto from "crypto";
 import * as path from "path";
 import * as fs from "fs";
 import { execSync } from "child_process";
+
+// JWT 헬퍼: Node.js 내장 crypto로 HS256 구현
+const base64url = (buf: Buffer) => buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+function jwtSign(payload: any, secret: string, expiresIn: string = "7d"): string {
+  const header = base64url(Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })));
+
+  // expiresIn 파싱 (예: "7d" → 7일 후)
+  let expSeconds = 7 * 24 * 60 * 60; // 기본 7일
+  if (expiresIn.endsWith("d")) {
+    expSeconds = parseInt(expiresIn) * 24 * 60 * 60;
+  } else if (expiresIn.endsWith("h")) {
+    expSeconds = parseInt(expiresIn) * 60 * 60;
+  } else if (expiresIn.endsWith("m")) {
+    expSeconds = parseInt(expiresIn) * 60;
+  }
+
+  const payloadObj = { ...payload, exp: Math.floor(Date.now() / 1000) + expSeconds };
+  const encodedPayload = base64url(Buffer.from(JSON.stringify(payloadObj)));
+
+  const signature = base64url(
+    crypto.createHmac("sha256", secret).update(`${header}.${encodedPayload}`).digest()
+  );
+
+  return `${header}.${encodedPayload}.${signature}`;
+}
+
+function jwtVerify(token: string, secret: string): any | null {
+  try {
+    const [headerB64, payloadB64, signatureB64] = token.split(".");
+    if (!headerB64 || !payloadB64 || !signatureB64) return null;
+
+    const expectedSignature = base64url(
+      crypto.createHmac("sha256", secret).update(`${headerB64}.${payloadB64}`).digest()
+    );
+
+    if (signatureB64 !== expectedSignature) return null;
+
+    const payload = JSON.parse(Buffer.from(payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4), "base64").toString());
+
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 // freelang-v9 node_modules 위치
 const V9_DIR = path.resolve(__dirname, "..");
@@ -77,16 +123,12 @@ export const pgBuiltins: Record<string, (...args: any[]) => any> = {
       }
       payload = obj;
     }
-    return (jwt as any).sign(payload, secret, { expiresIn });
+    return jwtSign(payload, secret, expiresIn);
   },
 
   // jwt_verify token secret -> payload | null
   jwt_verify: (token: string, secret: string): any | null => {
-    try {
-      return (jwt as any).verify(token, secret);
-    } catch {
-      return null;
-    }
+    return jwtVerify(token, secret);
   },
 
   // pbkdf2_hash password secret -> hash

@@ -1,0 +1,22 @@
+[PAGE HomePage
+  :title "Home"
+  :route "/"
+  :component HomeComponent
+]
+
+[ROUTE api_users
+  :path "/api/users"
+  :method "GET"
+  :handler getUsers
+]
+
+[COMPONENT Card
+  :render renderCard
+  :state cardState
+  :methods {:onClick handleClick}
+]
+
+[FORM UserForm
+  :validation validateUser
+  :submit submitForm
+]

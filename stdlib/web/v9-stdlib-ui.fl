@@ -1,0 +1,311 @@
+; FreeLang Frontend v9 - Web UI Library
+; 모달, 알림, 폼 검증, 반응성 UI 헬퍼
+
+[IMPORT "./v9-stdlib-dom" :as dom]
+
+; ==================== 알림 (Alert/Modal) ====================
+
+; show-alert: 단순 알림
+[FUNC show-alert :params [message]
+  :body [
+    (js-call "alert" [message])
+  ]
+]
+
+; show-confirm: 확인 다이얼로그
+[FUNC show-confirm :params [message]
+  :returns bool
+  :body [
+    (js-call "confirm" [message])
+  ]
+]
+
+; show-prompt: 입력 다이얼로그
+[FUNC show-prompt :params [message :default ""]
+  :returns str
+  :body [
+    (do
+      (var result (js-call "prompt" [message default]))
+      (if (eq result nil) "" result))
+    )
+]
+
+; show-modal: 커스텀 모달 표시
+[FUNC show-modal :params [title :content :buttons []]
+  :returns str
+  :body [
+    (do
+      ; 모달 생성
+      (var modal-div (dom.create-element "div"))
+      (dom.add-class modal-div "modal-overlay")
+
+      (var modal-content (dom.create-element "div"))
+      (dom.add-class modal-content "modal-content")
+
+      ; 제목
+      (var title-elem (dom.create-element "h2"))
+      (dom.set-text title-elem title)
+      (dom.append modal-content title-elem)
+
+      ; 내용
+      (var content-elem (dom.create-element "div"))
+      (dom.set-html content-elem content)
+      (dom.append modal-content content-elem)
+
+      ; 버튼들
+      (var button-container (dom.create-element "div"))
+      (dom.add-class button-container "modal-buttons")
+
+      (for-each buttons
+        (fn [btn]
+          (var btn-elem (dom.create-element "button"))
+          (dom.set-text btn-elem (get btn "label"))
+          (dom.add-event btn-elem "click" (get btn "onclick"))
+          (dom.append button-container btn-elem)))
+
+      (dom.append modal-content button-container)
+      (dom.append modal-div modal-content)
+
+      ; body에 추가
+      (var body (js-call "document.body" []))
+      (dom.append body modal-div)
+
+      "modal-shown")
+    )
+]
+
+; hide-modal: 모달 숨기기
+[FUNC hide-modal :params []
+  :body [
+    (do
+      (var modal (dom.query ".modal-overlay"))
+      (if (not (eq modal nil))
+        (dom.remove modal)))
+    )
+]
+
+; ==================== 폼 검증 ====================
+
+; validate-email: 이메일 형식 검증
+[FUNC validate-email :params [email]
+  :returns bool
+  :body [
+    (do
+      (var pattern "^[^@]+@[^@]+\\.[^@]+$")
+      (js-call (js-call "RegExp" [pattern "i"]).test [email]))
+    )
+]
+
+; validate-phone: 전화번호 형식 검증
+[FUNC validate-phone :params [phone]
+  :returns bool
+  :body [
+    (do
+      (var pattern "^[0-9\\-\\+\\s\\(\\)]+$")
+      (js-call (js-call "RegExp" [pattern]).test [phone]))
+    )
+]
+
+; validate-url: URL 형식 검증
+[FUNC validate-url :params [url]
+  :returns bool
+  :body [
+    (do
+      (try
+        (do
+          (js-call "URL" [url])
+          true)
+        (catch [e] false)))
+    )
+]
+
+; validate-length: 문자열 길이 검증
+[FUNC validate-length :params [str :min :max]
+  :returns bool
+  :body [
+    (do
+      (var len (length str))
+      (and (>= len min) (<= len max)))
+    )
+]
+
+; validate-number: 숫자 범위 검증
+[FUNC validate-number :params [value :min :max]
+  :returns bool
+  :body [
+    (and (>= value min) (<= value max))
+  ]
+]
+
+; validate-form: 폼 필드 검증
+[FUNC validate-form :params [form-data :rules]
+  :returns [dict]
+  :body [
+    (do
+      (var errors {})
+
+      (for-each rules
+        (fn [[field rule]]
+          (var value (get form-data field))
+          (var field-errors [])
+
+          ; 필수 확인
+          (if (get rule "required")
+            (if (or (eq value nil) (eq value ""))
+              (push field-errors (concat field " is required"))))
+
+          ; 최소 길이
+          (if (get rule "minLength")
+            (if (< (length value) (get rule "minLength"))
+              (push field-errors (concat field " is too short"))))
+
+          ; 최대 길이
+          (if (get rule "maxLength")
+            (if (> (length value) (get rule "maxLength"))
+              (push field-errors (concat field " is too long"))))
+
+          ; 패턴
+          (if (get rule "pattern")
+            (if (not (js-call (js-call "RegExp" [(get rule "pattern")]).test [value]))
+              (push field-errors (concat field " has invalid format"))))
+
+          (if (> (len field-errors) 0)
+            (set (get errors field) field-errors))))
+
+      errors)
+    )
+]
+
+; ==================== 로딩 상태 ====================
+
+; show-loading: 로딩 표시
+[FUNC show-loading :params [target-selector]
+  :body [
+    (do
+      (var target (dom.query target-selector))
+      (if (not (eq target nil))
+        (do
+          (dom.add-class target "loading")
+          (var spinner (dom.create-element "div"))
+          (dom.add-class spinner "spinner")
+          (dom.append target spinner))))
+    )
+]
+
+; hide-loading: 로딩 숨기기
+[FUNC hide-loading :params [target-selector]
+  :body [
+    (do
+      (var target (dom.query target-selector))
+      (if (not (eq target nil))
+        (do
+          (dom.remove-class target "loading")
+          (var spinner (dom.query (concat target-selector " .spinner")))
+          (if (not (eq spinner nil))
+            (dom.remove spinner)))))
+    )
+]
+
+; ==================== 토스트 알림 ====================
+
+; show-toast: 토스트 메시지 표시
+[FUNC show-toast :params [message :duration 3000 :type "info"]
+  :body [
+    (do
+      (var toast (dom.create-element "div"))
+      (dom.add-class toast "toast")
+      (dom.add-class toast (concat "toast-" type))
+      (dom.set-text toast message)
+
+      (var body (js-call "document.body" []))
+      (dom.append body toast)
+
+      ; 자동 제거
+      (js-call "setTimeout" [(fn []
+        (dom.remove toast))
+        duration]))
+    )
+]
+
+; ==================== 반응형 UI ====================
+
+; debounce: 함수 실행 지연
+[FUNC debounce :params [fn :delay]
+  :returns [fn]
+  :body [
+    (do
+      (var timeout-id nil)
+      (fn [& args]
+        (do
+          (if (not (eq timeout-id nil))
+            (js-call "clearTimeout" [timeout-id]))
+          (set timeout-id
+            (js-call "setTimeout" [(fn []
+              (apply fn args))
+              delay])))))
+    )
+]
+
+; throttle: 함수 실행 제한
+[FUNC throttle :params [fn :interval]
+  :returns [fn]
+  :body [
+    (do
+      (var last-call 0)
+      (fn [& args]
+        (do
+          (var now (js-call "Date.now" []))
+          (if (>= (- now last-call) interval)
+            (do
+              (set last-call now)
+              (apply fn args))))))
+    )
+]
+
+; ==================== 애니메이션 ====================
+
+; animate: CSS 애니메이션 재생
+[FUNC animate :params [element :animation-name :duration 1000]
+  :body [
+    (do
+      (dom.set-style element "animation" (concat animation-name " " (/ duration 1000) "s"))
+      (js-call "setTimeout" [(fn []
+        (dom.set-style element "animation" "none"))
+        duration]))
+    )
+]
+
+; fade-in: 페이드인 효과
+[FUNC fade-in :params [element :duration 1000]
+  :body [
+    (do
+      (dom.set-style element "opacity" "0")
+      (dom.set-style element "transition" (concat (/ duration 1000) "s opacity"))
+      (js-call "setTimeout" [(fn []
+        (dom.set-style element "opacity" "1"))
+        10]))
+    )
+]
+
+; fade-out: 페이드아웃 효과
+[FUNC fade-out :params [element :duration 1000]
+  :body [
+    (do
+      (dom.set-style element "opacity" "1")
+      (dom.set-style element "transition" (concat (/ duration 1000) "s opacity"))
+      (js-call "setTimeout" [(fn []
+        (dom.set-style element "opacity" "0"))
+        10]))
+    )
+]
+
+; ==================== Export ====================
+
+[EXPORT
+  show-alert show-confirm show-prompt show-modal hide-modal
+  validate-email validate-phone validate-url validate-length validate-number validate-form
+  show-loading hide-loading
+  show-toast
+  debounce throttle
+  animate fade-in fade-out
+]

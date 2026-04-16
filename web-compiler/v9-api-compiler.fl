@@ -1,0 +1,271 @@
+; FreeLang Frontend v9 - API Compiler
+; API 라우트를 Express 핸들러로 컴파일 (250줄)
+
+[IMPORT "./v9-parser-web" :as parser]
+
+; API route compilation result
+[STRUCT APIRouteResult
+  :method str
+  :path str
+  :handler-name str
+  :js str
+  :parameters [APIParameter]
+  :response-type str
+]
+
+; API parameter definition
+[STRUCT APIParameter
+  :name str
+  :type str
+  :from str   ; path, query, body
+  :required bool
+]
+
+; Compile ROUTE block to API handler
+[FUNC compile-api-route :params [route-node]
+  :returns APIRouteResult
+  :body [
+    (do
+      (var method (get route-node.properties "method"))
+      (var path (get route-node.properties "path"))
+      (var handler-def (get route-node.properties "handler"))
+
+      (var handler-name (generate-handler-name method path))
+      (var parameters (parse-api-parameters path handler-def))
+      (var response-type (get route-node.properties "response" "json"))
+
+      ; Generate Express handler
+      (var js (gen-express-handler handler-name method path parameters handler-def response-type))
+
+      [APIRouteResult
+        :method method
+        :path path
+        :handler-name handler-name
+        :js js
+        :parameters parameters
+        :response-type response-type
+      ]
+    )
+  ]
+]
+
+; Generate handler name from method + path
+[FUNC generate-handler-name :params [method :path]
+  :returns str
+  :body [
+    (do
+      (var name "handle")
+      (var method-lower (string-lower method))
+      (set name (concat name (capitalize method-lower)))
+
+      ; Convert /api/users/[id] -> HandleGetUsersById
+      (var parts (string-split path "/"))
+      (for-each parts
+        (fn [part]
+          (if (and (not (eq part "")) (not (eq part "api")))
+            (if (string-starts-with part "[")
+              (do
+                (var param-name (substring part 1 (- (length part) 1)))
+                (set name (concat name (capitalize param-name))))
+              (set name (concat name (capitalize part)))))))
+
+      name
+    )
+  ]
+]
+
+; Parse API parameters from path and handler
+[FUNC parse-api-parameters :params [path :handler-def]
+  :returns [APIParameter]
+  :body [
+    (do
+      (var parameters [])
+
+      ; Extract path parameters: /users/[id] -> id
+      (var parts (string-split path "/"))
+      (for-each parts
+        (fn [part]
+          (if (string-starts-with part "[")
+            (do
+              (var param-name (substring part 1 (- (length part) 1)))
+              (push parameters [APIParameter
+                :name param-name
+                :type "str"
+                :from "path"
+                :required true])))))
+
+      ; Parse query and body parameters from handler definition
+      ; Placeholder for full parsing
+
+      parameters
+    )
+  ]
+]
+
+; Generate Express handler code
+[FUNC gen-express-handler :params [handler-name :method :path :parameters :handler-def :response-type]
+  :returns str
+  :body [
+    (do
+      (var js "")
+      (var method-lower (string-lower method))
+
+      ; Handler function definition
+      (set js (concat js (concat "const " handler-name " = async (req, res) => {\n")))
+      (set js (concat js "  try {\n"))
+
+      ; Extract path parameters
+      (for-each parameters
+        (fn [param]
+          (if (eq param.from "path")
+            (set js (concat js (concat "    const " param.name " = req.params." param.name ";\n"))))))
+
+      ; Extract query parameters
+      (for-each parameters
+        (fn [param]
+          (if (eq param.from "query")
+            (set js (concat js (concat "    const " param.name " = req.query." param.name ";\n"))))))
+
+      ; Extract body parameters
+      (for-each parameters
+        (fn [param]
+          (if (eq param.from "body")
+            (set js (concat js (concat "    const " param.name " = req.body." param.name ";\n"))))))
+
+      ; Validation
+      (set js (concat js "\n    // Validate parameters\n"))
+      (for-each parameters
+        (fn [param]
+          (if param.required
+            (set js (concat js (concat "    if (!req.params." param.name ") {\n")))
+            (set js (concat js (concat "      return res.status(400).json({ error: '" param.name " is required' });\n")))
+            (set js (concat js "    }\n")))))
+
+      ; Handler implementation
+      (set js (concat js "\n    // Handler logic\n"))
+      (if (not (eq handler-def ""))
+        (set js (concat js (concat "    " handler-def "\n")))
+        (set js (concat js "    const data = {};\n")))
+
+      ; Response
+      (match response-type
+        ("json" (set js (concat js "    res.json({ success: true, data });\n")))
+        ("html" (set js (concat js "    res.send(data);\n")))
+        ("text" (set js (concat js "    res.type('text').send(data);\n")))
+        (_ (set js (concat js "    res.json({ success: true, data });\n"))))
+
+      ; Error handling
+      (set js (concat js "  } catch (error) {\n"))
+      (set js (concat js "    res.status(500).json({ error: error.message });\n"))
+      (set js (concat js "  }\n"))
+      (set js (concat js "};\n\n"))
+
+      ; Route definition
+      (set js (concat js (concat "app." method-lower "('" path "', " handler-name ");\n")))
+
+      js
+    )
+  ]
+]
+
+; Generate request validation middleware
+[FUNC gen-validation-middleware :params [parameters]
+  :returns str
+  :body [
+    (do
+      (var js "")
+      (set js (concat js "const validate = (req, res, next) => {\n"))
+
+      (for-each parameters
+        (fn [param]
+          (if param.required
+            (do
+              (set js (concat js (concat "  if (!req." param.from "." param.name ") {\n")))
+              (set js (concat js (concat "    return res.status(400).json({ error: '" param.name " is required' });\n")))
+              (set js (concat js "  }\n"))))))
+
+      (set js (concat js "  next();\n"))
+      (set js (concat js "};\n\n"))
+
+      js
+    )
+  ]
+]
+
+; Generate OpenAPI documentation
+[FUNC gen-openapi-doc :params [route]
+  :returns str
+  :body [
+    (do
+      (var doc "")
+      (set doc (concat doc (concat "  /" route.path ":\n")))
+      (set doc (concat doc (concat "    " (string-lower route.method) ":\n")))
+      (set doc (concat doc "      summary: 'API Endpoint'\n"))
+      (set doc (concat doc "      parameters:\n"))
+
+      (for-each route.parameters
+        (fn [param]
+          (set doc (concat doc (concat "        - name: " param.name "\n")))
+          (set doc (concat doc (concat "          in: " param.from "\n")))
+          (set doc (concat doc (concat "          required: " (if param.required "true" "false") "\n")))
+          (set doc (concat doc (concat "          schema:\n")))
+          (set doc (concat doc (concat "            type: " param.type "\n")))))
+
+      doc
+    )
+  ]
+]
+
+; Helper functions
+[FUNC string-split :params [str :delimiter]
+  :returns [str]
+  :body [
+    []
+  ]
+]
+
+[FUNC string-lower :params [str]
+  :returns str
+  :body [
+    str
+  ]
+]
+
+[FUNC capitalize :params [str]
+  :returns str
+  :body [
+    str
+  ]
+]
+
+[FUNC string-starts-with :params [str :prefix]
+  :returns bool
+  :body [
+    false
+  ]
+]
+
+[FUNC substring :params [str :start :end]
+  :returns str
+  :body [
+    str
+  ]
+]
+
+; Compile multiple API routes
+[FUNC compile-api-routes :params [route-nodes]
+  :returns [APIRouteResult]
+  :body [
+    (do
+      (var results [])
+      (for-each route-nodes
+        (fn [node]
+          (if (eq node.type parser.ROUTE)
+            (push results (compile-api-route node)))))
+      results
+    )
+  ]
+]
+
+; Export
+[EXPORT compile-api-route compile-api-routes APIRouteResult APIParameter gen-express-handler]

@@ -22,6 +22,7 @@ import { runWithWatch } from "./hot-reload"; // Phase 79: 워치 모드
 import { extractDocs } from "./doc-extractor"; // Phase 77: 문서 추출기
 import { renderMarkdown } from "./doc-renderer"; // Phase 77: 문서 렌더러
 import { createDefaultPipeline, createFmtCheckStep, createLintStep, createTestStep } from "./ci-runner"; // Phase 80: CI
+import { WebServer } from "./web"; // Phase 3: Web Server
 
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
@@ -710,10 +711,46 @@ function cmdRegistry(registryArgs: string[]): void {
   }
 }
 
+function cmdServe(args: string[]): void {
+  // Phase 3: freelang serve [--app app] [--port 3000] [--mode ssr|isr|ssg]
+  let appDir = "app";
+  let port = 3000;
+  let renderMode: "ssr" | "isr" | "ssg" = "ssr";
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--app" && args[i + 1]) {
+      appDir = args[++i];
+    } else if (args[i] === "--port" && args[i + 1]) {
+      port = parseInt(args[++i], 10);
+    } else if (args[i] === "--mode" && args[i + 1]) {
+      const m = args[++i] as "ssr" | "isr" | "ssg";
+      if (["ssr", "isr", "ssg"].includes(m)) {
+        renderMode = m;
+      }
+    }
+  }
+
+  const server = new WebServer({ appDir, port, renderMode });
+  const interp = new Interpreter();
+  server.setInterpreter(interp);
+
+  server
+    .start()
+    .then((msg) => {
+      console.log(msg);
+      // Keep process alive
+      setInterval(() => {}, 10000).unref();
+    })
+    .catch((err) => {
+      console.error(`\x1b[31m서버 오류\x1b[0m  ${err.message}`);
+      process.exit(1);
+    });
+}
+
 function printUsage(): void {
   console.log([
     "",
-    "FreeLang v9 CLI",
+    "FreeLang v11 CLI",
     "",
     "사용법:",
     "  freelang run <file.fl>           파일 실행",
@@ -727,6 +764,8 @@ function printUsage(): void {
     "  freelang debug <file.fl> --step  step 모드 (모든 줄 추적)",
     "  freelang watch <file.fl>         파일 변경 시 자동 재실행 (Phase 79)",
     "  freelang watch <file.fl> --no-clear  콘솔 지우지 않고 재실행",
+    "  freelang serve [--app app] [--port 3000]  웹 서버 시작 (Phase 3, App Router)",
+    "  freelang serve --mode ssr|isr|ssg         렌더링 모드 선택",
     "  freelang ci                      현재 디렉토리 .fl 파일 전체 CI (Phase 80)",
     "  freelang ci <file.fl>            특정 파일 CI",
     "  freelang ci --no-fail-fast       실패해도 계속 진행",
@@ -748,12 +787,16 @@ function printUsage(): void {
     "  freelang repl",
     "  freelang debug my-script.fl",
     "  freelang debug my-script.fl --step",
+    "  freelang serve --app app --port 3000",
+    "  freelang serve --mode isr",
     "  freelang doc fl-math-lib.fl",
     "  freelang doc fl-math-lib.fl -o math-api.md",
     "  freelang doc --dir src/",
     "",
   ].join("\n"));
 }
+
+
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -835,6 +878,11 @@ switch (cmd) {
   case "registry": {
     // Phase 7: freelang registry start [--port 4873] | status
     cmdRegistry(args.slice(1));
+    break;
+  }
+  case "serve": {
+    // Phase 3: freelang serve [--app app] [--port 3000] [--mode ssr|isr|ssg]
+    cmdServe(args.slice(1));
     break;
   }
   default:

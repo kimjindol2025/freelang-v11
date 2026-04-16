@@ -1,0 +1,266 @@
+; FreeLang Frontend v9 - Form Compiler
+; 폼 블록을 HTML + 검증으로 컴파일 (250줄)
+
+[IMPORT "./v9-parser-web" :as parser]
+
+; Form compilation result
+[STRUCT FormCompilationResult
+  :name str
+  :path str
+  :html str
+  :js str
+  :fields [FormField]
+  :validators [FormValidator]
+]
+
+; Form field definition
+[STRUCT FormField
+  :name str
+  :type str
+  :label str
+  :required bool
+  :placeholder str
+  :pattern str
+]
+
+; Form validator
+[STRUCT FormValidator
+  :field-name str
+  :type str
+  :message str
+]
+
+; Compile FORM block
+[FUNC compile-form :params [form-node]
+  :returns FormCompilationResult
+  :body [
+    (do
+      (var path (get form-node.properties "path"))
+      (var form-name (generate-form-name path))
+      (var fields-def (get form-node.properties "fields"))
+      (var validation-def (get form-node.properties "validation"))
+      (var submit-def (get form-node.properties "onSubmit"))
+
+      ; Parse fields
+      (var fields (parse-form-fields fields-def))
+
+      ; Parse validators
+      (var validators (parse-form-validators validation-def))
+
+      ; Generate HTML form
+      (var html (gen-form-html form-name path fields))
+
+      ; Generate JavaScript
+      (var js (gen-form-js form-name fields validators submit-def))
+
+      [FormCompilationResult
+        :name form-name
+        :path path
+        :html html
+        :js js
+        :fields fields
+        :validators validators
+      ]
+    )
+  ]
+]
+
+; Generate form name
+[FUNC generate-form-name :params [path]
+  :returns str
+  :body [
+    (do
+      (var name "Form")
+      (var parts (string-split path "/"))
+      (for-each parts
+        (fn [part]
+          (if (not (eq part ""))
+            (set name (concat name (capitalize part))))))
+      name
+    )
+  ]
+]
+
+; Parse form fields
+[FUNC parse-form-fields :params [fields-str]
+  :returns [FormField]
+  :body [
+    (do
+      (var fields [])
+      ; Parse: [{name str} {email str} {age i32}]
+      ; Create FormField for each
+      fields
+    )
+  ]
+]
+
+; Parse form validators
+[FUNC parse-form-validators :params [validation-str]
+  :returns [FormValidator]
+  :body [
+    (do
+      (var validators [])
+      ; Parse validation rules
+      validators
+    )
+  ]
+]
+
+; Generate HTML form
+[FUNC gen-form-html :params [form-name :path :fields]
+  :returns str
+  :body [
+    (do
+      (var html "")
+      (set html (concat html (concat "<form id=\"form-" (string-lower form-name) "\">\n")))
+
+      (for-each fields
+        (fn [field]
+          (var field-id (concat (string-lower form-name) "-" field.name))
+          (set html (concat html "  <div class=\"form-group\">\n"))
+          (set html (concat html (concat "    <label for=\"" field-id "\">" field.label "</label>\n")))
+
+          ; Generate input based on type
+          (match field.type
+            ("str" (set html (concat html (concat "    <input type=\"text\" id=\"" field-id "\" name=\"" field.name "\""))))
+            ("email" (set html (concat html (concat "    <input type=\"email\" id=\"" field-id "\" name=\"" field.name "\""))))
+            ("i32" (set html (concat html (concat "    <input type=\"number\" id=\"" field-id "\" name=\"" field.name "\""))))
+            (_ (set html (concat html (concat "    <input type=\"text\" id=\"" field-id "\" name=\"" field.name "\"")))))
+
+          (if field.required
+            (set html (concat html " required")))
+
+          (if (not (eq field.placeholder ""))
+            (set html (concat html (concat " placeholder=\"" field.placeholder "\""))))
+
+          (set html (concat html " />\n"))
+          (set html (concat html "  </div>\n"))))
+
+      ; Submit button
+      (set html (concat html "  <button type=\"submit\">Submit</button>\n"))
+      (set html (concat html "</form>\n"))
+
+      html
+    )
+  ]
+]
+
+; Generate form JavaScript
+[FUNC gen-form-js :params [form-name :fields :validators :submit-def]
+  :returns str
+  :body [
+    (do
+      (var js "")
+
+      ; Form initialization
+      (set js (concat js (concat "const " form-name " = () => {\n")))
+
+      ; Form data object
+      (set js (concat js "  const formData = {\n"))
+      (for-each fields
+        (fn [field]
+          (set js (concat js (concat "    " field.name ": '',\n")))))
+      (set js (concat js "  };\n\n"))
+
+      ; Validation function
+      (set js (concat js "  const validate = () => {\n"))
+      (set js (concat js "    const errors = {};\n"))
+
+      (for-each validators
+        (fn [validator]
+          (set js (concat js (concat "    // Validate " validator.field-name "\n")))
+          (match validator.type
+            ("required" (set js (concat js (concat "    if (!formData." validator.field-name ") {\n"))))
+            ("email" (set js (concat js (concat "    if (!isValidEmail(formData." validator.field-name ")) {\n"))))
+            ("pattern" (set js (concat js (concat "    if (!formData." validator.field-name ".match(" validator.type ")) {\n"))))
+            (_ true))
+          (set js (concat js (concat "      errors." validator.field-name " = '" validator.message "';\n")))
+          (set js (concat js "    }\n"))))
+
+      (set js (concat js "    return errors;\n"))
+      (set js (concat js "  };\n\n"))
+
+      ; Submit handler
+      (set js (concat js "  const handleSubmit = async (e) => {\n"))
+      (set js (concat js "    e.preventDefault();\n"))
+      (set js (concat js "    const errors = validate();\n"))
+      (set js (concat js "    if (Object.keys(errors).length > 0) {\n"))
+      (set js (concat js "      showErrors(errors);\n"))
+      (set js (concat js "      return;\n"))
+      (set js (concat js "    }\n\n"))
+      (set js (concat js "    // Send form data\n"))
+      (set js (concat js "    await fetch(form.action, {\n"))
+      (set js (concat js "      method: 'POST',\n"))
+      (set js (concat js "      headers: { 'Content-Type': 'application/json' },\n"))
+      (set js (concat js "      body: JSON.stringify(formData)\n"))
+      (set js (concat js "    });\n"))
+      (set js (concat js "  };\n\n"))
+
+      ; Mount function
+      (set js (concat js "  const mount = (selector) => {\n"))
+      (set js (concat js "    const form = document.querySelector(selector);\n"))
+      (set js (concat js "    form.addEventListener('submit', handleSubmit);\n"))
+      (set js (concat js "  };\n\n"))
+
+      ; Return form object
+      (set js (concat js "  return { formData, validate, handleSubmit, mount };\n"))
+      (set js (concat js "};\n"))
+
+      js
+    )
+  ]
+]
+
+; Email validation helper
+[FUNC gen-email-validator :params []
+  :returns str
+  :body [
+    (do
+      (var js "  const isValidEmail = (email) => {\n")
+      (set js (concat js "    const regex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n"))
+      (set js (concat js "    return regex.test(email);\n"))
+      (set js (concat js "  };\n"))
+      js
+    )
+  ]
+]
+
+; Helper functions
+[FUNC string-split :params [str :delimiter]
+  :returns [str]
+  :body [
+    []
+  ]
+]
+
+[FUNC capitalize :params [str]
+  :returns str
+  :body [
+    str
+  ]
+]
+
+[FUNC string-lower :params [str]
+  :returns str
+  :body [
+    str
+  ]
+]
+
+; Compile multiple forms
+[FUNC compile-forms :params [form-nodes]
+  :returns [FormCompilationResult]
+  :body [
+    (do
+      (var results [])
+      (for-each form-nodes
+        (fn [node]
+          (if (eq node.type parser.FORM)
+            (push results (compile-form node)))))
+      results
+    )
+  ]
+]
+
+; Export
+[EXPORT compile-form compile-forms FormCompilationResult FormField FormValidator]

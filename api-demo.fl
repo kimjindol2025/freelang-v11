@@ -1,0 +1,21 @@
+[SERVER api
+  :port 9876
+  :host "localhost"
+]
+
+[ROUTE health
+  :method "GET"
+  :path "/health"
+  :handler (json-response (list :status "ok" :version "v9.0.0"))
+]
+
+[FUNC add-numbers
+  :params [$a $b]
+  :body (+ $a $b)
+]
+
+[ROUTE calculate
+  :method "GET"
+  :path "/api/calc"
+  :handler (json-response (list :sum (add-numbers 100 50)))
+]

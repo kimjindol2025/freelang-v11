@@ -1,0 +1,234 @@
+; FreeLang Frontend v9 - Web Storage Library
+; localStorage, sessionStorage, 데이터 직렬화
+
+; ==================== LocalStorage ====================
+
+; storage-set: localStorage에 데이터 저장
+[FUNC storage-set :params [key :value]
+  :body [
+    (do
+      (var json-str (json-stringify value))
+      (js-call "localStorage.setItem" [key json-str]))
+    )
+]
+
+; storage-get: localStorage에서 데이터 가져오기
+[FUNC storage-get :params [key :default nil]
+  :returns any
+  :body [
+    (do
+      (var value nil)
+      (try
+        (do
+          (var json-str (js-call "localStorage.getItem" [key]))
+          (if (not (eq json-str nil))
+            (set value (json-parse json-str))
+            (set value default)))
+        (catch [e] (set value default)))
+      value)
+    )
+]
+
+; storage-remove: localStorage에서 데이터 제거
+[FUNC storage-remove :params [key]
+  :body [
+    (js-call "localStorage.removeItem" [key])
+  ]
+]
+
+; storage-clear: localStorage 전체 삭제
+[FUNC storage-clear :params []
+  :body [
+    (js-call "localStorage.clear" [])
+  ]
+]
+
+; storage-key: 인덱스로 키 가져오기
+[FUNC storage-key :params [index]
+  :returns str
+  :body [
+    (do
+      (var key (js-call "localStorage.key" [index]))
+      (if (eq key nil) "" key))
+    )
+]
+
+; storage-length: 저장된 항목 개수
+[FUNC storage-length :params []
+  :returns i32
+  :body [
+    (get "localStorage.length")
+  ]
+]
+
+; storage-keys: 모든 키 목록
+[FUNC storage-keys :params []
+  :returns [str]
+  :body [
+    (do
+      (var keys [])
+      (var len (js-call "localStorage.length" []))
+      (for i (range 0 len)
+        (fn []
+          (var key (js-call "localStorage.key" [i]))
+          (if (not (eq key nil))
+            (push keys key))))
+      keys)
+    )
+]
+
+; ==================== SessionStorage ====================
+
+; session-set: sessionStorage에 데이터 저장
+[FUNC session-set :params [key :value]
+  :body [
+    (do
+      (var json-str (json-stringify value))
+      (js-call "sessionStorage.setItem" [key json-str]))
+    )
+]
+
+; session-get: sessionStorage에서 데이터 가져오기
+[FUNC session-get :params [key :default nil]
+  :returns any
+  :body [
+    (do
+      (var value nil)
+      (try
+        (do
+          (var json-str (js-call "sessionStorage.getItem" [key]))
+          (if (not (eq json-str nil))
+            (set value (json-parse json-str))
+            (set value default)))
+        (catch [e] (set value default)))
+      value)
+    )
+]
+
+; session-remove: sessionStorage에서 데이터 제거
+[FUNC session-remove :params [key]
+  :body [
+    (js-call "sessionStorage.removeItem" [key])
+  ]
+]
+
+; session-clear: sessionStorage 전체 삭제
+[FUNC session-clear :params []
+  :body [
+    (js-call "sessionStorage.clear" [])
+  ]
+]
+
+; ==================== TTL 캐시 ====================
+
+; cache-set: TTL을 포함한 로컬스토리지 캐시
+[FUNC cache-set :params [key :value :ttl-seconds 3600]
+  :body [
+    (do
+      (var now (js-call "Date.now" []))
+      (var expires-at (+ now (* ttl-seconds 1000)))
+
+      (var cache-obj {
+        :value value
+        :expires-at expires-at
+      })
+
+      (var json-str (json-stringify cache-obj))
+      (js-call "localStorage.setItem" [key json-str]))
+    )
+]
+
+; cache-get: TTL을 확인하고 캐시 가져오기
+[FUNC cache-get :params [key :default nil]
+  :returns any
+  :body [
+    (do
+      (var value nil)
+      (try
+        (do
+          (var json-str (js-call "localStorage.getItem" [key]))
+          (if (not (eq json-str nil))
+            (do
+              (var cache-obj (json-parse json-str))
+              (var now (js-call "Date.now" []))
+
+              ; TTL 확인
+              (if (< now (get cache-obj "expires-at"))
+                (set value (get cache-obj "value"))
+                (do
+                  (js-call "localStorage.removeItem" [key])
+                  (set value default))))
+            (set value default)))
+        (catch [e] (set value default)))
+      value)
+    )
+]
+
+; cache-remove: 캐시 제거
+[FUNC cache-remove :params [key]
+  :body [
+    (js-call "localStorage.removeItem" [key])
+  ]
+]
+
+; cache-expired?: 캐시 만료 여부 확인
+[FUNC cache-expired? :params [key]
+  :returns bool
+  :body [
+    (do
+      (var is-expired true)
+      (try
+        (do
+          (var json-str (js-call "localStorage.getItem" [key]))
+          (if (not (eq json-str nil))
+            (do
+              (var cache-obj (json-parse json-str))
+              (var now (js-call "Date.now" []))
+              (set is-expired (>= now (get cache-obj "expires-at"))))
+            (set is-expired true)))
+        (catch [e] (set is-expired true)))
+      is-expired)
+    )
+]
+
+; ==================== IndexedDB Wrapper ====================
+
+; db-open: IndexedDB 데이터베이스 열기
+[FUNC db-open :params [db-name :version 1]
+  :returns any
+  :body [
+    (try
+      (js-call "indexedDB.open" [db-name version])
+      (catch [e] nil))
+    )
+]
+
+; db-store-add: IndexedDB에 객체 추가
+[FUNC db-store-add :params [db :store-name :object]
+  :body [
+    (do
+      (var tx (js-call db.transaction [[store-name] "readwrite"]))
+      (var store (js-call tx.objectStore [store-name]))
+      (js-call store.add [object]))
+    )
+]
+
+; db-store-get: IndexedDB에서 객체 가져오기
+[FUNC db-store-get :params [db :store-name :key]
+  :returns any
+  :body [
+    (do
+      (var tx (js-call db.transaction [[store-name] "readonly"]))
+      (var store (js-call tx.objectStore [store-name]))
+      (js-call store.get [key]))
+    )
+]
+
+; ==================== Export ====================
+
+[EXPORT
+  storage-set storage-get storage-remove storage-clear storage-key storage-length storage-keys
+  session-set session-get session-remove session-clear
+  cache-set cache-get cache-remove cache-expired?
+  db-open db-store-add db-store-get
+]

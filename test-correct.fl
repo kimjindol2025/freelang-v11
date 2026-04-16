@@ -1,0 +1,10 @@
+[FUNC add
+  :args [$a $b]
+  :body (+ $a $b)]
+
+[FUNC main
+  :args []
+  :body (let [$result (add 5 3)]
+          (print (str "5 + 3 = " $result)))]
+
+(main)
