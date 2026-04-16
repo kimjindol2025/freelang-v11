@@ -370,6 +370,15 @@ export class Interpreter {
         for (const [key, value] of Object.entries(params)) {
           interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
         }
+
+        // :state 추출 및 클라이언트 상태 주입
+        const stateNode = block.fields.get("state");
+        if (stateNode) {
+          const stateVal = this.eval(stateNode);
+          const stateJson = JSON.stringify(stateVal);
+          interpolated = interpolated + `\n<script>window.__state = ${stateJson};</script>`;
+        }
+
         return interpolated;
       }
       return html;

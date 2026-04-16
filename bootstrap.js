@@ -28764,6 +28764,13 @@ var Interpreter = class {
         for (const [key, value] of Object.entries(params)) {
           interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), String(value));
         }
+        const stateNode = block.fields.get("state");
+        if (stateNode) {
+          const stateVal = this.eval(stateNode);
+          const stateJson = JSON.stringify(stateVal);
+          interpolated = interpolated + `
+<script>window.__state = ${stateJson};</script>`;
+        }
         return interpolated;
       }
       return html;
