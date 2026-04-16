@@ -282,6 +282,10 @@ export class Interpreter {
         // Phase 11 v11: [PAGE :path "/" :render "<h1>...</h1>"]
         this.context.lastValue = this.handlePageBlock(block);
         break;
+      case "API":
+        // Phase 11 MVP: [API :methods ["POST"] :path "/auth/signup" :do (create $db.users __body)]
+        this.context.lastValue = this.handleApiBlock(block);
+        break;
       case "COMPONENT":
         // Phase 11 v11: [COMPONENT name :render ... :state {...} :methods {...}]
         this.context.lastValue = this.handleComponentBlock(block);
@@ -490,6 +494,34 @@ export class Interpreter {
         return interpolated;
       }
       return html;
+    } finally {
+      this.context.variables.pop();
+    }
+  }
+
+  // Phase 11 MVP: [API :methods ["POST"] :path "/..." :do (create ...)]
+  private handleApiBlock(block: Block): any {
+    const doNode = block.fields.get("do");
+    if (!doNode) {
+      return { status: 400, json: { error: "missing :do" } };
+    }
+
+    // :do 실행
+    this.context.variables.push();
+    try {
+      const result = this.eval(doNode);
+
+      // 응답 형식
+      // {:status 201 :json {...}} 형태로 반환
+      if (result && typeof result === "object") {
+        if (result.status !== undefined && result.json !== undefined) {
+          return result;
+        }
+        // 일반 객체면 200 OK로 반환
+        return { status: 200, json: result };
+      }
+
+      return { status: 200, json: result };
     } finally {
       this.context.variables.pop();
     }

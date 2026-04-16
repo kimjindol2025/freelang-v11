@@ -1,0 +1,11 @@
+[API signup-api
+  :methods ["POST"]
+  :path "/auth/signup"
+  :do {:id 1 :email "kim@test.com" :name "Kim"}
+]
+
+[API users-api
+  :methods ["GET"]
+  :path "/users"
+  :do [{:id 1 :name "Kim"} {:id 2 :name "Park"}]
+]

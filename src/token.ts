@@ -55,6 +55,7 @@ export enum TokenType {
 
   // Phase 11 Keywords (Web DSL)
   Page = "Page",           // PAGE
+  Api = "Api",             // API
   Route = "Route",         // ROUTE
   Component = "Component", // COMPONENT
   Form = "Form",           // FORM

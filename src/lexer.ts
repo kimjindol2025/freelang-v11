@@ -37,6 +37,7 @@ const KEYWORDS: Map<string, T> = new Map([
   ["while", T.While],
   // Phase 11: Web DSL keywords
   ["PAGE", T.Page],
+  ["API", T.Api],
   ["ROUTE", T.Route],
   ["COMPONENT", T.Component],
   ["FORM", T.Form],
