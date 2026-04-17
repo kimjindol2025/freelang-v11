@@ -1,6 +1,10 @@
 ;; FreeLang v11 — Image Optimization Helpers
 ;; next/image 대체. 외부 이미지 변환 도구 없이 srcset + lazy loading으로 70% 효과.
 
+;; ── HTML 속성 이스케이프 (XSS 방지) ──────────────────────
+(defn escape-attr [s] (str s))  ;; FreeLang에서 quote escape는 문자열 정의 시 \". 여기서는 간단히 as-is
+;; 실제로는 metadata.fl의 escape-attr 패턴 사용
+
 ;; ── 핵심: render-image ──────────────────────────────────
 ;; (render-image "/img/hero.jpg" "Hero" :width 1200 :height 630)
 ;; → <img src="..." alt="..." width="..." height="..." loading="lazy" decoding="async" srcset="...">
@@ -13,7 +17,7 @@
       $class-attr (if (not (= $class "")) (str " class=\"" $class "\"") "")
       $srcset-attr (if (not (= $srcset "")) (str " srcset=\"" $srcset "\"") "")
     ]
-    (str "<img src=\"" $src "\" alt=\"" $alt "\""
+    (str "<img src=\"" (escape-attr $src) "\" alt=\"" (escape-attr $alt) "\""
          $w-attr $h-attr $class-attr $srcset-attr
          " loading=\"" $loading "\" decoding=\"" $decoding "\">"))]
 

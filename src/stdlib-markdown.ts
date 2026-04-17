@@ -21,7 +21,8 @@ function parseFrontmatter(src: string): { fm: MdFrontmatter; body: string } {
     return { fm, body: src };
   }
   const rest = src.replace(/^---\r?\n/, "");
-  const end = rest.indexOf("\n---");
+  const match = rest.match(/\n---[ \t]*(\r?\n|$)/);
+  const end = match ? rest.indexOf(match[0]) : -1;
   if (end < 0) return { fm, body: src };
   const block = rest.slice(0, end);
   const body = rest.slice(end).replace(/^\n---\r?\n?/, "");

@@ -37,9 +37,21 @@ export class FLExecutor {
   private interpreter: Interpreter;
   private cache: Map<string, { ast: ASTNode[]; timestamp: number }> = new Map();
   private cacheTimeout: number = 5 * 60 * 1000; // 5분
+  private _helpersInjected: boolean = false;
 
   constructor(interpreter: Interpreter) {
     this.interpreter = interpreter;
+  }
+
+  /**
+   * JWT/Auth/DB 헬퍼 주입 (1회만 실행)
+   */
+  private ensureHelpers(): void {
+    if (this._helpersInjected) return;
+    this.injectJWTFunctions();
+    this.injectAuthHelpers();
+    this.injectDBHelpers();
+    this._helpersInjected = true;
   }
 
   /**
@@ -133,12 +145,8 @@ export class FLExecutor {
       ctx.__db_boards = db.boards;
       ctx.__db_members = db.boardMembers;
 
-      // JWT 함수 주입
-      this.injectJWTFunctions();
-      // 인증 헬퍼 주입
-      this.injectAuthHelpers();
-      // DB 헬퍼 주입
-      this.injectDBHelpers();
+      // JWT/Auth/DB 헬퍼 주입 (1회만)
+      this.ensureHelpers();
 
       // 인터프리터 실행 (interpreter.interpret()로 PAGE/COMPONENT/FORM 블록 처리)
       const execContext = this.interpreter.interpret(astList);
@@ -176,6 +184,9 @@ export class FLExecutor {
 
       const astList = this.parseFile(filePath);
       const flRequest = this.createFlRequest(context);
+
+      // JWT/Auth/DB 헬퍼 주입 (1회만)
+      this.ensureHelpers();
 
       // 함수 호출 (route 파일은 보통 handler 함수를 export)
       (this.interpreter as any).globals = (this.interpreter as any).globals || {};

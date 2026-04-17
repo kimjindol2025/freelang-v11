@@ -227,7 +227,7 @@
       "        if(key !== null) flSetState(key, prev);"
       "        if(errEl) errEl.textContent = (body && body.error) || ('HTTP ' + res.status);"
       "      } else {"
-      "        if(key && body && body.data) applyOp(key, 'set', flGetState(key));"
+      "        if(key && body && body.data) applyOp(key, 'set', body.data);"
       "        form.reset();"
       "        form.dispatchEvent(new CustomEvent('fl-submit-ok', { detail: body }));"
       "      }"

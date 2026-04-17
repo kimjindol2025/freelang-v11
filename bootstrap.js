@@ -23592,7 +23592,8 @@ function parseFrontmatter(src) {
     return { fm, body: src };
   }
   const rest = src.replace(/^---\r?\n/, "");
-  const end = rest.indexOf("\n---");
+  const match = rest.match(/\n---[ \t]*(\r?\n|$)/);
+  const end = match ? rest.indexOf(match[0]) : -1;
   if (end < 0) return { fm, body: src };
   const block = rest.slice(0, end);
   const body = rest.slice(end).replace(/^\n---\r?\n?/, "");
@@ -23763,7 +23764,7 @@ function createFeedModule() {
       const buildDate = meta.updated || (/* @__PURE__ */ new Date()).toUTCString();
       const out = [];
       out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-      out.push(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">`);
+      out.push(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">`);
       out.push(`<channel>`);
       out.push(`<title>${esc(meta.title)}</title>`);
       out.push(`<link>${esc(meta.url)}</link>`);
@@ -28636,8 +28637,19 @@ var FLExecutor = class {
   cache = /* @__PURE__ */ new Map();
   cacheTimeout = 5 * 60 * 1e3;
   // 5분
+  _helpersInjected = false;
   constructor(interpreter) {
     this.interpreter = interpreter;
+  }
+  /**
+   * JWT/Auth/DB 헬퍼 주입 (1회만 실행)
+   */
+  ensureHelpers() {
+    if (this._helpersInjected) return;
+    this.injectJWTFunctions();
+    this.injectAuthHelpers();
+    this.injectDBHelpers();
+    this._helpersInjected = true;
   }
   /**
    * .fl 파일 읽기 및 파싱 (캐싱 적용)
@@ -28703,9 +28715,7 @@ var FLExecutor = class {
       ctx.__db_messages = db.messages;
       ctx.__db_boards = db.boards;
       ctx.__db_members = db.boardMembers;
-      this.injectJWTFunctions();
-      this.injectAuthHelpers();
-      this.injectDBHelpers();
+      this.ensureHelpers();
       const execContext = this.interpreter.interpret(astList);
       const result = execContext.lastValue;
       return this.processResult(result);
@@ -28732,6 +28742,7 @@ var FLExecutor = class {
       }
       const astList = this.parseFile(filePath);
       const flRequest = this.createFlRequest(context);
+      this.ensureHelpers();
       this.interpreter.globals = this.interpreter.globals || {};
       this.interpreter.globals.__request = flRequest;
       this.interpreter.globals.__params = context.params || {};
@@ -29111,6 +29122,9 @@ var page_renderer_default = PageRenderer;
 
 // src/web/server.ts
 var http2 = __toESM(require("http"));
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 function generatePageHTML(route, params = {}) {
   const title = route.filePath || "Page";
   let content = `<h1>${title}</h1>`;
@@ -29431,7 +29445,7 @@ var WebServer = class {
     res.end(
       generateHTML(
         "404",
-        `<h1>404 Not Found</h1><p>Route not found: ${urlPath}</p>`
+        `<h1>404 Not Found</h1><p>Route not found: ${escHtml(urlPath)}</p>`
       )
     );
   }

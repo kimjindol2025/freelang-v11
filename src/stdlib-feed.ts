@@ -36,7 +36,7 @@ export function createFeedModule() {
       const buildDate = meta.updated || new Date().toUTCString();
       const out: string[] = [];
       out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-      out.push(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">`);
+      out.push(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">`);
       out.push(`<channel>`);
       out.push(`<title>${esc(meta.title)}</title>`);
       out.push(`<link>${esc(meta.url)}</link>`);

@@ -11,6 +11,13 @@ import FLExecutor from "./fl-executor";
 import PageRenderer from "./page-renderer";
 import { Interpreter } from "../interpreter";
 
+/**
+ * HTML 이스케이프: XSS 방지
+ */
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export interface ServerConfig {
   appDir?: string;
   port?: number;
@@ -394,7 +401,7 @@ export class WebServer {
     res.end(
       generateHTML(
         "404",
-        `<h1>404 Not Found</h1><p>Route not found: ${urlPath}</p>`
+        `<h1>404 Not Found</h1><p>Route not found: ${escHtml(urlPath)}</p>`
       )
     );
   }

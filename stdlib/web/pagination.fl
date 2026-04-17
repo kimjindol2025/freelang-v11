@@ -41,7 +41,7 @@
     (str "<span class=\"fl-pag-disabled\" "
          "style=\"padding:0.4em 0.8em;opacity:0.4\">" label "</span>")
     (str "<a href=\"" base-url "?page=" page "\" "
-         "style=\"padding:0.4em 0.8em;border:1px solid var(--border);"
+         "style=\"padding:0.4em 0.8em;border:1px solid var(--border, #d1d5db);"
          "border-radius:6px;text-decoration:none;color:inherit\">"
          label "</a>")))
 
@@ -55,8 +55,8 @@
 (defn pag-number [base-url p current]
   (if (= p current)
     (str "<span class=\"fl-pag-current\" "
-         "style=\"padding:0.4em 0.8em;background:var(--color-primary);"
+         "style=\"padding:0.4em 0.8em;background:var(--color-primary, #3b82f6);"
          "color:white;border-radius:6px;font-weight:600\">" p "</span>")
     (str "<a href=\"" base-url "?page=" p "\" "
-         "style=\"padding:0.4em 0.8em;border:1px solid var(--border);"
+         "style=\"padding:0.4em 0.8em;border:1px solid var(--border, #d1d5db);"
          "border-radius:6px;text-decoration:none;color:inherit\">" p "</a>")))
