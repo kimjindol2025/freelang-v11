@@ -28630,6 +28630,7 @@ var AppRouter = class {
 
 // src/web/fl-executor.ts
 var fs13 = __toESM(require("fs"));
+var crypto4 = __toESM(require("crypto"));
 init_lexer();
 init_parser();
 var FLExecutor = class {
@@ -28830,26 +28831,35 @@ var FLExecutor = class {
     };
   }
   /**
-   * JWT 함수 주입 (간단한 구현)
+   * JWT 함수 주입 (HMAC-SHA256 + exp 검증)
    */
   injectJWTFunctions() {
     const ctx = this.interpreter.context;
-    ctx["jwt-sign"] = (payload, secret = "default-secret") => {
+    const JWT_SECRET = process.env.JWT_SECRET || "freelang-v11-default-secret";
+    ctx["jwt-sign"] = (payload) => {
       const header = { alg: "HS256", typ: "JWT" };
+      const now = Math.floor(Date.now() / 1e3);
+      const fullPayload = { ...payload, iat: now, exp: now + 24 * 60 * 60 };
       const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
-      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
-      const signature = Buffer.from(
-        `${encodedHeader}.${encodedPayload}${secret}`
-      ).toString("base64url").substring(0, 20);
+      const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString("base64url");
+      const signingInput = `${encodedHeader}.${encodedPayload}`;
+      const signature = crypto4.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     };
-    ctx["jwt-verify"] = (token, secret = "default-secret") => {
+    ctx["jwt-verify"] = (token) => {
       try {
         const parts = token.split(".");
         if (parts.length !== 3) return null;
-        const payload = JSON.parse(
-          Buffer.from(parts[1], "base64url").toString()
-        );
+        const signingInput = `${parts[0]}.${parts[1]}`;
+        const expectedSig = crypto4.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
+        const actualSigBuf = Buffer.from(parts[2]);
+        const expectedSigBuf = Buffer.from(expectedSig);
+        if (actualSigBuf.length !== expectedSigBuf.length || !crypto4.timingSafeEqual(actualSigBuf, expectedSigBuf)) {
+          return null;
+        }
+        const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+        const now = Math.floor(Date.now() / 1e3);
+        if (payload.exp && payload.exp < now) return null;
         return payload;
       } catch (e) {
         return null;

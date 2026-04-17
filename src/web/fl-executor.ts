@@ -5,6 +5,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import { Interpreter } from "../interpreter";
 import { lex } from "../lexer";
 import { parse } from "../parser";
@@ -292,32 +293,58 @@ export class FLExecutor {
   }
 
   /**
-   * JWT 함수 주입 (간단한 구현)
+   * JWT 함수 주입 (HMAC-SHA256 + exp 검증)
    */
   private injectJWTFunctions(): void {
     const ctx = this.interpreter.context as any;
+    const JWT_SECRET = process.env.JWT_SECRET || "freelang-v11-default-secret";
 
-    // JWT Sign (매우 간단한 구현 - production에서는 jsonwebtoken 라이브러리 사용)
-    ctx["jwt-sign"] = (payload: any, secret: string = "default-secret"): string => {
+    // JWT Sign — HMAC-SHA256 + iat/exp
+    ctx["jwt-sign"] = (payload: any): string => {
       const header = { alg: "HS256", typ: "JWT" };
+      const now = Math.floor(Date.now() / 1000);
+      const fullPayload = { ...payload, iat: now, exp: now + 24 * 60 * 60 };
+
       const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
-      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
-      const signature = Buffer.from(
-        `${encodedHeader}.${encodedPayload}${secret}`
-      )
-        .toString("base64url")
-        .substring(0, 20);
+      const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString("base64url");
+
+      const signingInput = `${encodedHeader}.${encodedPayload}`;
+      const signature = crypto
+        .createHmac("sha256", JWT_SECRET)
+        .update(signingInput)
+        .digest("base64url");
+
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     };
 
-    // JWT Verify
-    ctx["jwt-verify"] = (token: string, secret: string = "default-secret"): any => {
+    // JWT Verify — 서명 검증 + exp 확인
+    ctx["jwt-verify"] = (token: string): any => {
       try {
         const parts = token.split(".");
         if (parts.length !== 3) return null;
-        const payload = JSON.parse(
-          Buffer.from(parts[1], "base64url").toString()
-        );
+
+        // 서명 검증
+        const signingInput = `${parts[0]}.${parts[1]}`;
+        const expectedSig = crypto
+          .createHmac("sha256", JWT_SECRET)
+          .update(signingInput)
+          .digest("base64url");
+
+        // timing-safe 비교 (타이밍 공격 방지)
+        const actualSigBuf = Buffer.from(parts[2]);
+        const expectedSigBuf = Buffer.from(expectedSig);
+        if (
+          actualSigBuf.length !== expectedSigBuf.length ||
+          !crypto.timingSafeEqual(actualSigBuf, expectedSigBuf)
+        ) {
+          return null; // 서명 불일치 → 위변조
+        }
+
+        // payload 디코딩 + 만료 체크
+        const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < now) return null; // 만료된 토큰
+
         return payload;
       } catch (e) {
         return null;
