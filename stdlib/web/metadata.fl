@@ -92,3 +92,5 @@
 ;;   :body (let [$id (server_req_param $req "id")
 ;;               $meta {:title (str "User " $id) :description "Profile page"}]
 ;;           (server_html (str "<html>" (page-head $meta) "<body>...</body></html>")))]
+
+[EXPORT escape-attr meta-tag og-tag link-tag render-meta page-head]

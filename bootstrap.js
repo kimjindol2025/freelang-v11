@@ -29592,7 +29592,7 @@ function cmdBuild(buildArgs2) {
         const full = path12.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`\x1B[2m  skip (dynamic):\x1B[0m /${path12.relative(absApp, full)}`);
+            console.log(`build.skip reason=dynamic_route path=/${path12.relative(absApp, full)}`);
             continue;
           }
           if (e.name === "api") continue;
@@ -29611,15 +29611,15 @@ function cmdBuild(buildArgs2) {
     const absApp = path12.resolve(appDir);
     const absOut = path12.resolve(outDir);
     if (!fs15.existsSync(absApp)) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appDir}`);
+      console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[Static Build]\x1B[0m  ${appDir}/ \u2192 ${outDir}/  (port ${port})`);
+    console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
     fs15.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
     if (pages.length === 0) {
-      console.warn(`\x1B[33m\uACBD\uACE0\x1B[0m  page.fl \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4 (${appDir}/)`);
+      console.log(`build.error event=no_pages app=${appDir}`);
       return;
     }
     const { spawn } = require("child_process");
@@ -29716,16 +29716,15 @@ function cmdBuild(buildArgs2) {
           const outPath = path12.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
           fs15.mkdirSync(path12.dirname(outPath), { recursive: true });
           fs15.writeFileSync(outPath, html);
-          console.log(`\x1B[32m\u2713\x1B[0m ${p.route}  \u2192 ${path12.relative(process.cwd(), outPath)}  (${html.length} bytes)`);
+          console.log(`build.page route=${p.route} ok=true file=${path12.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
-          console.error(`\x1B[31m\u2717\x1B[0m ${p.route}`);
+          console.log(`build.page route=${p.route} ok=false`);
           fail++;
         }
       }
       serveProc.kill();
-      console.log(`
-\x1B[36m[\uC644\uB8CC]\x1B[0m  ${ok2} pages built, ${fail} failed \u2192 ${outDir}/`);
+      console.log(`build.done ok=${ok2} fail=${fail} out=${outDir}`);
       if (fail > 0) process.exit(1);
       process.exit(0);
     })();

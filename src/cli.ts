@@ -778,11 +778,11 @@ function cmdBuild(buildArgs: string[]): void {
     const absApp = path.resolve(appDir);
     const absOut = path.resolve(outDir);
     if (!fs.existsSync(absApp)) {
-      console.error(`\x1b[31m오류\x1b[0m  app 디렉토리를 찾을 수 없습니다: ${appDir}`);
+      console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
     }
 
-    console.log(`\x1b[36m[Static Build]\x1b[0m  ${appDir}/ → ${outDir}/  (port ${port})`);
+    console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
     fs.mkdirSync(absOut, { recursive: true });
 
     // Walk app/ and collect page.fl routes (skip dynamic [id] and api/)
@@ -793,7 +793,7 @@ function cmdBuild(buildArgs: string[]): void {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`\x1b[2m  skip (dynamic):\x1b[0m /${path.relative(absApp, full)}`);
+            console.log(`build.skip reason=dynamic_route path=/${path.relative(absApp, full)}`);
             continue;
           }
           if (e.name === "api") continue;
@@ -806,7 +806,7 @@ function cmdBuild(buildArgs: string[]): void {
     walk(absApp, "");
 
     if (pages.length === 0) {
-      console.warn(`\x1b[33m경고\x1b[0m  page.fl 파일을 찾을 수 없습니다 (${appDir}/)`);
+      console.log(`build.error event=no_pages app=${appDir}`);
       return;
     }
 
@@ -903,15 +903,15 @@ function cmdBuild(buildArgs: string[]): void {
           const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
           fs.mkdirSync(path.dirname(outPath), { recursive: true });
           fs.writeFileSync(outPath, html);
-          console.log(`\x1b[32m✓\x1b[0m ${p.route}  → ${path.relative(process.cwd(), outPath)}  (${html.length} bytes)`);
+          console.log(`build.page route=${p.route} ok=true file=${path.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok++;
         } else {
-          console.error(`\x1b[31m✗\x1b[0m ${p.route}`);
+          console.log(`build.page route=${p.route} ok=false`);
           fail++;
         }
       }
       serveProc.kill();
-      console.log(`\n\x1b[36m[완료]\x1b[0m  ${ok} pages built, ${fail} failed → ${outDir}/`);
+      console.log(`build.done ok=${ok} fail=${fail} out=${outDir}`);
       if (fail > 0) process.exit(1);
       process.exit(0);
     })();

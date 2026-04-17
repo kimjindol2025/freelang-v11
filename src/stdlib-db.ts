@@ -117,9 +117,9 @@ export function createDbModule() {
       return sqliteJson(dbPath, bindParams(sql, params));
     },
 
-    // db_exec dbPath sql -> stdout string
-    "db_exec": (dbPath: string, sql: string): string => {
-      return sqliteExec(dbPath, sql);
+    // db_exec dbPath sql [params] -> stdout string
+    "db_exec": (dbPath: string, sql: string, params: any[] = []): string => {
+      return sqliteExec(dbPath, params.length > 0 ? bindParams(sql, params) : sql);
     },
 
     // db_insert dbPath table data -> true

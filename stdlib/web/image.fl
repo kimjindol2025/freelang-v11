@@ -68,3 +68,5 @@
 [FUNC render-image-priority :params [$src $alt :width 0 :height 0 :class ""]
   :doc "LCP(Largest Contentful Paint) 이미지 — eager 로드 + 높은 우선순위"
   :body (render-image $src $alt :width $width :height $height :loading "eager" :decoding "sync" :class $class)]
+
+[EXPORT render-image srcset-for render-picture cdn-url render-image-priority]
