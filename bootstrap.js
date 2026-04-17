@@ -19775,12 +19775,29 @@ function buildArgs(db, sql) {
   args2.push("--batch", "-e", sql);
   return args2;
 }
+function friendlyError(stderr, sql) {
+  let m = stderr.match(/ERROR 1146[^:]*:\s*(.*)/i);
+  if (m) return `\uD14C\uC774\uBE14\uC774 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 ${m[1]}`;
+  m = stderr.match(/ERROR 1054[^:]*:\s*(.*)/i);
+  if (m) return `\uC874\uC7AC\uD558\uC9C0 \uC54A\uB294 \uCEEC\uB7FC \u2014 ${m[1]}`;
+  m = stderr.match(/ERROR 1062[^:]*:\s*(.*)/i);
+  if (m) return `\uC911\uBCF5\uB41C \uAC12 (UNIQUE \uC81C\uC57D) \u2014 ${m[1]}`;
+  m = stderr.match(/ERROR 1452[^:]*:\s*(.*)/i);
+  if (m) return `\uC678\uB798\uD0A4 \uC81C\uC57D \uC704\uBC18 \u2014 ${m[1]}`;
+  m = stderr.match(/ERROR 1366[^:]*:\s*Incorrect (\w+) value:\s*'([^']*)'[^`]*`([^`]+)`/i);
+  if (m) return `\uD0C0\uC785 \uBD88\uC77C\uCE58 \u2014 \uCEEC\uB7FC '${m[3]}'\uB294 ${m[1]} \uC778\uB370 '${m[2]}' \uAC00 \uB4E4\uC5B4\uC634`;
+  m = stderr.match(/ERROR 1064[^:]*:\s*(.*)/i);
+  if (m) return `SQL \uAD6C\uBB38 \uC624\uB958 \u2014 ${m[1]}`;
+  if (/ERROR 2002/.test(stderr)) return `MariaDB \uC11C\uBC84\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC74C (\uB370\uBAAC/\uC18C\uCF13 \uD655\uC778)`;
+  return stderr;
+}
 function runMariadb(db, sql) {
   const r = (0, import_child_process5.spawnSync)("mariadb", buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8" });
   if (r.error) throw new Error(`mariadb CLI not found or failed: ${r.error.message}`);
   if ((r.status ?? 1) !== 0) {
     const stderr = r.stderr?.trim() ?? "";
-    throw new Error(`mariadb exit ${r.status}${stderr ? ": " + stderr : ""}`);
+    const friendly = friendlyError(stderr, sql);
+    throw new Error(`mariadb: ${friendly}`);
   }
   return r.stdout?.toString() ?? "";
 }
