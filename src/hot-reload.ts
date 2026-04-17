@@ -54,51 +54,56 @@ export class FileWatcher {
     const onError = opts?.onError;
 
     const debounced = createDebounce(debounceMs);
+    const basename = path.basename(file);
 
-    let watcher: fs.FSWatcher | null = null;
-
-    try {
-      watcher = fs.watch(file, (_event: string) => {
-        debounced(() => {
-          const basename = path.basename(file);
-
-          if (clearConsole) {
-            process.stdout.write("\x1b[2J\x1b[0f");
-          }
-
-          console.log(`\x1b[36m[RELOAD]\x1b[0m ${basename} changed`);
-
-          if (onReload) {
-            try {
-              onReload(file);
-            } catch (err: any) {
-              if (onError) {
-                onError(file, err instanceof Error ? err : new Error(String(err)));
-              } else {
-                console.error(`\x1b[31m[ERROR]\x1b[0m ${basename}: ${err.message ?? err}`);
-              }
+    const handleChange = () => {
+      debounced(() => {
+        if (clearConsole) {
+          process.stdout.write("\x1b[2J\x1b[0f");
+        }
+        console.log(`\x1b[36m[RELOAD]\x1b[0m ${basename} changed`);
+        if (onReload) {
+          try {
+            onReload(file);
+          } catch (err: any) {
+            if (onError) {
+              onError(file, err instanceof Error ? err : new Error(String(err)));
+            } else {
+              console.error(`\x1b[31m[ERROR]\x1b[0m ${basename}: ${err.message ?? err}`);
             }
           }
-        });
+        }
       });
+    };
 
-      this.watchers.push(watcher);
-    } catch (_err) {
-      // 파일이 존재하지 않아도 stop 함수는 반환
-    }
+    // Simple setInterval-based polling: more reliable than fs.watch/watchFile
+    // on Termux/Android and survives Interpreter re-execution. 500ms resolution.
+    let lastMtime = 0;
+    let lastSize = -1;
+    try {
+      const st = fs.statSync(file);
+      lastMtime = st.mtimeMs;
+      lastSize = st.size;
+    } catch (_e) { /* file may not exist yet */ }
+
+    const interval = setInterval(() => {
+      try {
+        const st = fs.statSync(file);
+        if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
+          lastMtime = st.mtimeMs;
+          lastSize = st.size;
+          handleChange();
+        }
+      } catch (_e) { /* ignore transient errors */ }
+    }, 500);
+    // Keep process alive across reloads
+    (interval as any).unref?.();
 
     let stopped = false;
     return () => {
-      if (!stopped && watcher) {
-        stopped = true;
-        try {
-          watcher.close();
-        } catch (_e) {
-          // 이미 닫혀 있어도 무시
-        }
-        const idx = this.watchers.indexOf(watcher!);
-        if (idx !== -1) this.watchers.splice(idx, 1);
-      }
+      if (stopped) return;
+      stopped = true;
+      clearInterval(interval);
     };
   }
 

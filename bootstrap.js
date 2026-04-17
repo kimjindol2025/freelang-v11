@@ -375,8 +375,8 @@ function makePageNode(name, title, route, component, metadata, line) {
 function makeRouteNode(name, path13, method, handler, middleware, validation, line) {
   return { kind: "route", name, path: path13, method, handler, middleware, validation, line };
 }
-function makeComponentNode(name, render, state, computed, watch3, methods, slots, line) {
-  return { kind: "component", name, render, state, computed, watch: watch3, methods, slots, line };
+function makeComponentNode(name, render, state, computed, watch2, methods, slots, line) {
+  return { kind: "component", name, render, state, computed, watch: watch2, methods, slots, line };
 }
 function makeFormNode(name, fields, validation, submit, handlers, line) {
   return { kind: "form", name, fields, validation, submit, handlers, line };
@@ -2241,10 +2241,10 @@ var init_parser = __esm({
         const render = this.extractSymbolField(fields, "render");
         const state = this.extractSymbolField(fields, "state");
         const computed = this.extractSymbolArrayField(fields, "computed");
-        const watch3 = this.extractWatchField(fields, "watch");
+        const watch2 = this.extractWatchField(fields, "watch");
         const methods = this.extractMethodsField(fields, "methods");
         const slots = this.extractSymbolArrayField(fields, "slots");
-        return makeComponentNode(name, render, state, computed, watch3, methods, slots, line);
+        return makeComponentNode(name, render, state, computed, watch2, methods, slots, line);
       }
       // Phase 11: Parse FORM block - [FORM name :fields [...] :validation validationFn :submit submitFn]
       parseForm(name, fields, line) {
@@ -27325,33 +27325,31 @@ var FileWatcher = class {
         }
       });
     };
-    fs10.watchFile(file, { interval: 500, persistent: true }, (curr, prev) => {
-      if (curr.mtimeMs !== prev.mtimeMs || curr.size !== prev.size) {
-        handleChange();
-      }
-    });
-    let watcher = null;
+    let lastMtime = 0;
+    let lastSize = -1;
     try {
-      watcher = fs10.watch(file, () => handleChange());
-      this.watchers.push(watcher);
-    } catch (_err) {
+      const st = fs10.statSync(file);
+      lastMtime = st.mtimeMs;
+      lastSize = st.size;
+    } catch (_e) {
     }
+    const interval = setInterval(() => {
+      try {
+        const st = fs10.statSync(file);
+        if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
+          lastMtime = st.mtimeMs;
+          lastSize = st.size;
+          handleChange();
+        }
+      } catch (_e) {
+      }
+    }, 500);
+    interval.unref?.();
     let stopped = false;
     return () => {
       if (stopped) return;
       stopped = true;
-      try {
-        fs10.unwatchFile(file);
-      } catch (_e) {
-      }
-      if (watcher) {
-        try {
-          watcher.close();
-        } catch (_e) {
-        }
-        const idx = this.watchers.indexOf(watcher);
-        if (idx !== -1) this.watchers.splice(idx, 1);
-      }
+      clearInterval(interval);
     };
   }
   /**
@@ -28904,7 +28902,7 @@ function checkSource(source, filePath) {
     return false;
   }
 }
-function cmdRun(filePath, watch3, extraArgs = []) {
+function cmdRun(filePath, watch2, extraArgs = []) {
   const absPath = path12.resolve(filePath);
   if (!fs15.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
@@ -28924,7 +28922,7 @@ function cmdRun(filePath, watch3, extraArgs = []) {
       ctx = interp.interpret(ast);
     } catch (err4) {
       console.error(formatError(err4, source, absPath));
-      if (!watch3) process.exit(1);
+      if (!watch2) process.exit(1);
       return;
     }
     const value = ctx?.lastValue;
@@ -28937,17 +28935,33 @@ function cmdRun(filePath, watch3, extraArgs = []) {
     }
   }
   execute();
-  if (watch3) {
+  if (watch2) {
     console.log(`\x1B[2m  watching ${path12.basename(absPath)}...\x1B[0m`);
+    let lastMtime = 0;
+    let lastSize = -1;
+    try {
+      const st = fs15.statSync(absPath);
+      lastMtime = st.mtimeMs;
+      lastSize = st.size;
+    } catch (_e) {
+    }
     let debounce = null;
-    fs15.watch(absPath, () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        console.log(`
+    setInterval(() => {
+      try {
+        const st = fs15.statSync(absPath);
+        if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
+          lastMtime = st.mtimeMs;
+          lastSize = st.size;
+          if (debounce) clearTimeout(debounce);
+          debounce = setTimeout(() => {
+            console.log(`
 \x1B[2m\u2500\u2500\u2500 \uBCC0\uACBD \uAC10\uC9C0, \uC7AC\uC2E4\uD589 \u2500\u2500\u2500\x1B[0m`);
-        execute();
-      }, 100);
-    });
+            execute();
+          }, 100);
+        }
+      } catch (_e) {
+      }
+    }, 500);
   }
 }
 function cmdCheck(filePath) {
@@ -29629,10 +29643,10 @@ switch (cmd) {
       printUsage();
       process.exit(1);
     }
-    const watch3 = args.includes("--watch") || args.includes("-w");
+    const watch2 = args.includes("--watch") || args.includes("-w");
     const ddIdx = args.indexOf("--");
     const extraArgs = ddIdx >= 0 ? args.slice(ddIdx + 1) : args.slice(2).filter((a) => a !== "--watch" && a !== "-w");
-    cmdRun(filePath, watch3, extraArgs);
+    cmdRun(filePath, watch2, extraArgs);
     break;
   }
   case "check": {

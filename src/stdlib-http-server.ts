@@ -6,6 +6,11 @@ import * as http from "http";
 import * as url from "url";
 import * as crypto from "crypto";
 
+// Global registry for hot-reload: tracks the currently active HTTP server
+// across Interpreter instances (each createHttpServerModule() creates a new
+// closure, but this registry persists in the Node.js process).
+export const __activeServer: { server: http.Server | null } = { server: null };
+
 // WebSocket (Node.js v25 native via stdlib-ws.ts)
 // RFC 6455 핸드셰이크는 아래 server.on('upgrade') 에서 처리
 const WS_OPEN = 1;
@@ -203,6 +208,13 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
     // server_start port -> string
     "server_start": (port: number): string => {
+      // Hot-reload: close previous server before starting new one
+      if (__activeServer.server) {
+        try {
+          __activeServer.server.close();
+        } catch (_e) { /* ignore */ }
+        __activeServer.server = null;
+      }
       server = http.createServer(async (req, res) => {
           const requestStart = Date.now();
           const requestId = generateRequestId();
@@ -441,6 +453,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
         }
       });
       server.listen(port);
+      __activeServer.server = server;
       // Keep process alive while server is running
       setInterval(() => {}, 10000).unref();
       return `server listening on :${port}`;

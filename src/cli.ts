@@ -137,14 +137,31 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
 
   if (watch) {
     console.log(`\x1b[2m  watching ${path.basename(absPath)}...\x1b[0m`);
+    // Use setInterval polling for reliability across filesystems
+    // (fs.watch silently breaks on Termux/Android, or after the editor
+    //  rewrites the inode — polling survives re-executes and inode changes)
+    let lastMtime = 0;
+    let lastSize = -1;
+    try {
+      const st = fs.statSync(absPath);
+      lastMtime = st.mtimeMs;
+      lastSize = st.size;
+    } catch (_e) { /* ignore */ }
     let debounce: NodeJS.Timeout | null = null;
-    fs.watch(absPath, () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        console.log(`\n\x1b[2m─── 변경 감지, 재실행 ───\x1b[0m`);
-        execute();
-      }, 100);
-    });
+    setInterval(() => {
+      try {
+        const st = fs.statSync(absPath);
+        if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
+          lastMtime = st.mtimeMs;
+          lastSize = st.size;
+          if (debounce) clearTimeout(debounce);
+          debounce = setTimeout(() => {
+            console.log(`\n\x1b[2m─── 변경 감지, 재실행 ───\x1b[0m`);
+            execute();
+          }, 100);
+        }
+      } catch (_e) { /* transient errors ignored */ }
+    }, 500);
   }
 }
 
