@@ -785,15 +785,55 @@ function cmdBuild(buildArgs: string[]): void {
     console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
     fs.mkdirSync(absOut, { recursive: true });
 
-    // Walk app/ and collect page.fl routes (skip dynamic [id] and api/)
+    // Walk app/ and collect page.fl routes.
+    // Dynamic routes ([slug]): look for generate-static-params.fl in the same
+    // dir. If present, run it and expand each param set into a concrete route.
+    // The params file should `(println <json>)` a JSON array of objects:
+    //   [{"slug":"post-1"},{"slug":"post-2"}]
     const pages: { filePath: string; route: string }[] = [];
+
+    function expandDynamicParams(dir: string, paramName: string): any[] {
+      const paramsFile = path.join(dir, "generate-static-params.fl");
+      if (!fs.existsSync(paramsFile)) return [];
+      try {
+        const cwdBootstrap2 = path.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path.resolve(__dirname, "bootstrap.js");
+        const { execSync } = require("child_process");
+        const out = execSync(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+        // Find a JSON array in stdout
+        const m = out.match(/\[[\s\S]*\]/);
+        if (!m) return [];
+        const parsed = JSON.parse(m[0]);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err: any) {
+        console.log(`build.params_error dir=${dir} err=${(err.message || String(err)).split("\n")[0]}`);
+        return [];
+      }
+    }
+
     function walk(dir: string, routeBase: string): void {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`build.skip reason=dynamic_route path=/${path.relative(absApp, full)}`);
+            const paramName = e.name.slice(1, -1);
+            const params = expandDynamicParams(full, paramName);
+            const pageFile = path.join(full, "page.fl");
+            if (params.length === 0) {
+              console.log(`build.skip reason=dynamic_no_params path=/${path.relative(absApp, full)} param=${paramName}`);
+              continue;
+            }
+            if (!fs.existsSync(pageFile)) {
+              console.log(`build.skip reason=dynamic_no_page path=/${path.relative(absApp, full)}`);
+              continue;
+            }
+            for (const p of params) {
+              const value = p && typeof p === "object" ? p[paramName] : null;
+              if (!value) continue;
+              pages.push({ filePath: pageFile, route: routeBase + "/" + String(value) });
+            }
+            // Also walk into for any non-page files (unlikely but possible)
             continue;
           }
           if (e.name === "api") continue;
@@ -804,6 +844,13 @@ function cmdBuild(buildArgs: string[]): void {
       }
     }
     walk(absApp, "");
+
+    // Special file: app/not-found.fl → dist/404.html (most CDNs serve this
+    // for unmatched routes automatically). Generated via the same strategies.
+    const notFoundFile = path.join(absApp, "not-found.fl");
+    if (fs.existsSync(notFoundFile)) {
+      pages.push({ filePath: notFoundFile, route: "/__404__" });
+    }
 
     if (pages.length === 0) {
       console.log(`build.error event=no_pages app=${appDir}`);
@@ -900,10 +947,13 @@ function cmdBuild(buildArgs: string[]): void {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          // __404__ is the special not-found route → dist/404.html at the root.
+          const outPath = p.route === "/__404__"
+            ? path.join(absOut, "404.html")
+            : path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
           fs.mkdirSync(path.dirname(outPath), { recursive: true });
           fs.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route} ok=true file=${path.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);

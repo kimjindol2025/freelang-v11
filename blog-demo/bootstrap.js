@@ -17129,9 +17129,29 @@ function evalImportBlock(interp, importBlock) {
   const source = importBlock.source;
   const selective = importBlock.selective;
   const alias = importBlock.alias;
-  if (source && (source.endsWith(".fl") || source.includes("/"))) {
-    interp.evalImportFromFile(source, moduleName, selective, alias);
-    return;
+  if (source) {
+    const looksLikeFile = source.endsWith(".fl") || source.includes("/") || source.startsWith("./") || source.startsWith("../");
+    let isFile = looksLikeFile;
+    if (!isFile) {
+      const baseDir = (() => {
+        try {
+          return fs2.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path2.dirname(interp.currentFilePath);
+        } catch {
+          return interp.currentFilePath;
+        }
+      })();
+      const candidates = [
+        path2.resolve(baseDir, source + ".fl"),
+        path2.resolve(baseDir, source),
+        path2.resolve(process.cwd(), source + ".fl"),
+        path2.resolve(process.cwd(), source)
+      ];
+      isFile = candidates.some((c) => fs2.existsSync(c));
+    }
+    if (isFile) {
+      interp.evalImportFromFile(source, moduleName, selective, alias);
+      return;
+    }
   }
   const module2 = interp.getModules().get(moduleName);
   if (!module2) {
@@ -17179,9 +17199,29 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
       return interp.currentFilePath;
     }
   })();
-  const absPath = path2.resolve(baseDir, relPath);
-  if (!fs2.existsSync(absPath)) {
-    throw new Error(`Import error: file not found: ${absPath}`);
+  const tryResolve = (candidate) => {
+    if (fs2.existsSync(candidate) && fs2.statSync(candidate).isFile()) return candidate;
+    if (!candidate.endsWith(".fl") && fs2.existsSync(candidate + ".fl")) return candidate + ".fl";
+    return null;
+  };
+  const isRelative = relPath.startsWith("./") || relPath.startsWith("../") || relPath.startsWith("/");
+  const candidates = [];
+  if (isRelative) {
+    candidates.push(path2.resolve(baseDir, relPath));
+  } else {
+    candidates.push(path2.resolve(process.cwd(), relPath));
+    candidates.push(path2.resolve(baseDir, relPath));
+  }
+  let absPath = null;
+  for (const c of candidates) {
+    const resolved = tryResolve(c);
+    if (resolved) {
+      absPath = resolved;
+      break;
+    }
+  }
+  if (!absPath) {
+    throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
   }
   if (interp.importedFiles.has(absPath)) {
     return;
@@ -17193,6 +17233,13 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
   subInterp.importedFiles = interp.importedFiles;
   const builtinFuncs = new Set(subInterp.context.functions.keys());
   subInterp.interpret(parse(lex(src)));
+  if (process.env.FL_IMPORT_DEBUG === "1") {
+    const userDefined = [];
+    for (const k of subInterp.context.functions.keys()) {
+      if (!builtinFuncs.has(k)) userDefined.push(k);
+    }
+    console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
+  }
   const effectivePrefix = alias ?? prefix;
   for (const [funcName, func] of subInterp.context.functions) {
     if (builtinFuncs.has(funcName)) continue;
@@ -29565,13 +29612,44 @@ function cmdBuild(buildArgs2) {
   const isOci = buildArgs2.includes("--oci");
   const isStatic = buildArgs2.includes("--static");
   if (isStatic) {
-    let walk = function(dir, routeBase) {
+    let expandDynamicParams = function(dir, paramName) {
+      const paramsFile = path11.join(dir, "generate-static-params.fl");
+      if (!fs15.existsSync(paramsFile)) return [];
+      try {
+        const cwdBootstrap2 = path11.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs15.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path11.resolve(__dirname, "bootstrap.js");
+        const { execSync: execSync2 } = require("child_process");
+        const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+        const m = out.match(/\[[\s\S]*\]/);
+        if (!m) return [];
+        const parsed = JSON.parse(m[0]);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err4) {
+        console.log(`build.params_error dir=${dir} err=${(err4.message || String(err4)).split("\n")[0]}`);
+        return [];
+      }
+    }, walk = function(dir, routeBase) {
       const entries = fs15.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
         const full = path11.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`build.skip reason=dynamic_route path=/${path11.relative(absApp, full)}`);
+            const paramName = e.name.slice(1, -1);
+            const params = expandDynamicParams(full, paramName);
+            const pageFile = path11.join(full, "page.fl");
+            if (params.length === 0) {
+              console.log(`build.skip reason=dynamic_no_params path=/${path11.relative(absApp, full)} param=${paramName}`);
+              continue;
+            }
+            if (!fs15.existsSync(pageFile)) {
+              console.log(`build.skip reason=dynamic_no_page path=/${path11.relative(absApp, full)}`);
+              continue;
+            }
+            for (const p of params) {
+              const value = p && typeof p === "object" ? p[paramName] : null;
+              if (!value) continue;
+              pages.push({ filePath: pageFile, route: routeBase + "/" + String(value) });
+            }
             continue;
           }
           if (e.name === "api") continue;
@@ -29597,6 +29675,10 @@ function cmdBuild(buildArgs2) {
     fs15.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
+    const notFoundFile = path11.join(absApp, "not-found.fl");
+    if (fs15.existsSync(notFoundFile)) {
+      pages.push({ filePath: notFoundFile, route: "/__404__" });
+    }
     if (pages.length === 0) {
       console.log(`build.error event=no_pages app=${appDir}`);
       return;
@@ -29692,10 +29774,10 @@ function cmdBuild(buildArgs2) {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = path11.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          const outPath = p.route === "/__404__" ? path11.join(absOut, "404.html") : path11.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
           fs15.mkdirSync(path11.dirname(outPath), { recursive: true });
           fs15.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route} ok=true file=${path11.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path11.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);

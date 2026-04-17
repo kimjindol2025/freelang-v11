@@ -1,0 +1,3 @@
+;; 동적 라우트 페이지 (모든 slug에 같은 템플릿)
+;; 실제로는 serve가 req.params.slug 넘겨주지만, run 실행은 고정.
+(println "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>Dynamic Route</title></head><body><h1>Dynamic Post</h1><p>This page was statically generated from generate-static-params.fl</p></body></html>")

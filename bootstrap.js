@@ -29612,13 +29612,44 @@ function cmdBuild(buildArgs2) {
   const isOci = buildArgs2.includes("--oci");
   const isStatic = buildArgs2.includes("--static");
   if (isStatic) {
-    let walk = function(dir, routeBase) {
+    let expandDynamicParams = function(dir, paramName) {
+      const paramsFile = path11.join(dir, "generate-static-params.fl");
+      if (!fs15.existsSync(paramsFile)) return [];
+      try {
+        const cwdBootstrap2 = path11.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs15.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path11.resolve(__dirname, "bootstrap.js");
+        const { execSync: execSync2 } = require("child_process");
+        const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+        const m = out.match(/\[[\s\S]*\]/);
+        if (!m) return [];
+        const parsed = JSON.parse(m[0]);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err4) {
+        console.log(`build.params_error dir=${dir} err=${(err4.message || String(err4)).split("\n")[0]}`);
+        return [];
+      }
+    }, walk = function(dir, routeBase) {
       const entries = fs15.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
         const full = path11.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`build.skip reason=dynamic_route path=/${path11.relative(absApp, full)}`);
+            const paramName = e.name.slice(1, -1);
+            const params = expandDynamicParams(full, paramName);
+            const pageFile = path11.join(full, "page.fl");
+            if (params.length === 0) {
+              console.log(`build.skip reason=dynamic_no_params path=/${path11.relative(absApp, full)} param=${paramName}`);
+              continue;
+            }
+            if (!fs15.existsSync(pageFile)) {
+              console.log(`build.skip reason=dynamic_no_page path=/${path11.relative(absApp, full)}`);
+              continue;
+            }
+            for (const p of params) {
+              const value = p && typeof p === "object" ? p[paramName] : null;
+              if (!value) continue;
+              pages.push({ filePath: pageFile, route: routeBase + "/" + String(value) });
+            }
             continue;
           }
           if (e.name === "api") continue;
@@ -29644,6 +29675,10 @@ function cmdBuild(buildArgs2) {
     fs15.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
+    const notFoundFile = path11.join(absApp, "not-found.fl");
+    if (fs15.existsSync(notFoundFile)) {
+      pages.push({ filePath: notFoundFile, route: "/__404__" });
+    }
     if (pages.length === 0) {
       console.log(`build.error event=no_pages app=${appDir}`);
       return;
@@ -29739,10 +29774,10 @@ function cmdBuild(buildArgs2) {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = path11.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          const outPath = p.route === "/__404__" ? path11.join(absOut, "404.html") : path11.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
           fs15.mkdirSync(path11.dirname(outPath), { recursive: true });
           fs15.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route} ok=true file=${path11.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path11.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);
