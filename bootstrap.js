@@ -19039,6 +19039,7 @@ function createResourceModule() {
 var http = __toESM(require("http"));
 var url = __toESM(require("url"));
 var crypto = __toESM(require("crypto"));
+var __activeServer = { server: null };
 function createHttpServerModule(callFn, callFunctionValue2) {
   const routes = [];
   let server = null;
@@ -19170,6 +19171,13 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     },
     // server_start port -> string
     "server_start": (port) => {
+      if (__activeServer.server) {
+        try {
+          __activeServer.server.close();
+        } catch (_e) {
+        }
+        __activeServer.server = null;
+      }
       server = http.createServer(async (req, res) => {
         const requestStart = Date.now();
         const requestId = generateRequestId();
@@ -19370,6 +19378,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         }
       });
       server.listen(port);
+      __activeServer.server = server;
       setInterval(() => {
       }, 1e4).unref();
       return `server listening on :${port}`;
@@ -26221,7 +26230,9 @@ var Interpreter = class {
     }
     if (node.kind === "variable") {
       let varName = node.name;
-      const locSuffix = node.line ? ` at line ${node.line}` : "";
+      const line = node.line;
+      const fileHint = this.currentFilePath ? this.currentFilePath.replace(/^.*\//, "") : "";
+      const locSuffix = line ? ` (${fileHint ? fileHint + ":" : "at line "}${line})` : "";
       if (varName.includes(".")) {
         const parts = varName.split(".");
         let obj = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
@@ -27294,35 +27305,46 @@ var FileWatcher = class {
     const onReload = opts?.onReload;
     const onError = opts?.onError;
     const debounced = createDebounce(debounceMs);
-    let watcher = null;
-    try {
-      watcher = fs10.watch(file, (_event) => {
-        debounced(() => {
-          const basename6 = path8.basename(file);
-          if (clearConsole) {
-            process.stdout.write("\x1B[2J\x1B[0f");
-          }
-          console.log(`\x1B[36m[RELOAD]\x1B[0m ${basename6} changed`);
-          if (onReload) {
-            try {
-              onReload(file);
-            } catch (err4) {
-              if (onError) {
-                onError(file, err4 instanceof Error ? err4 : new Error(String(err4)));
-              } else {
-                console.error(`\x1B[31m[ERROR]\x1B[0m ${basename6}: ${err4.message ?? err4}`);
-              }
+    const basename6 = path8.basename(file);
+    const handleChange = () => {
+      debounced(() => {
+        if (clearConsole) {
+          process.stdout.write("\x1B[2J\x1B[0f");
+        }
+        console.log(`\x1B[36m[RELOAD]\x1B[0m ${basename6} changed`);
+        if (onReload) {
+          try {
+            onReload(file);
+          } catch (err4) {
+            if (onError) {
+              onError(file, err4 instanceof Error ? err4 : new Error(String(err4)));
+            } else {
+              console.error(`\x1B[31m[ERROR]\x1B[0m ${basename6}: ${err4.message ?? err4}`);
             }
           }
-        });
+        }
       });
+    };
+    fs10.watchFile(file, { interval: 500, persistent: true }, (curr, prev) => {
+      if (curr.mtimeMs !== prev.mtimeMs || curr.size !== prev.size) {
+        handleChange();
+      }
+    });
+    let watcher = null;
+    try {
+      watcher = fs10.watch(file, () => handleChange());
       this.watchers.push(watcher);
     } catch (_err) {
     }
     let stopped = false;
     return () => {
-      if (!stopped && watcher) {
-        stopped = true;
+      if (stopped) return;
+      stopped = true;
+      try {
+        fs10.unwatchFile(file);
+      } catch (_e) {
+      }
+      if (watcher) {
         try {
           watcher.close();
         } catch (_e) {
@@ -29148,6 +29170,87 @@ function cmdRepl() {
     process.exit(0);
   });
 }
+function cmdStdlibDoc(query) {
+  const fs16 = require("fs");
+  const path22 = require("path");
+  const candidates = [
+    path22.join(__dirname, "src"),
+    path22.join(__dirname, "..", "src"),
+    __dirname,
+    process.cwd(),
+    path22.join(process.cwd(), "src")
+  ];
+  let srcDir = "";
+  let tsFiles = [];
+  for (const d of candidates) {
+    try {
+      const entries2 = fs16.readdirSync(d).filter((f) => f.startsWith("stdlib-") && f.endsWith(".ts"));
+      if (entries2.length > 0) {
+        srcDir = d;
+        tsFiles = entries2.map((f) => path22.join(d, f));
+        break;
+      }
+    } catch {
+    }
+  }
+  const entries = [];
+  for (const file of tsFiles) {
+    const modName = path22.basename(file, ".ts").replace(/^stdlib-/, "");
+    const lines = fs16.readFileSync(file, "utf8").split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const cur = lines[i].trim();
+      const m = cur.match(/^\/\/\s*([a-z_][a-z0-9_\-!?]*)\s+(.*?)\s*->\s*(.+)$/i);
+      if (!m) continue;
+      const [, name, params, ret] = m;
+      const next = (lines[i + 1] || "").trim();
+      const defMatch = next.match(/^"([^"]+)"\s*:/);
+      if (!defMatch || defMatch[1] !== name) continue;
+      entries.push({ module: modName, name, params: params.trim(), ret: ret.trim() });
+    }
+  }
+  if (entries.length === 0) {
+    console.error(`\x1B[33mstdlib \uC18C\uC2A4\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4\x1B[0m (${srcDir} \uD655\uC778)`);
+    process.exit(2);
+  }
+  const q = query.toLowerCase();
+  const exact = entries.filter((e) => e.name === query);
+  const partial = entries.filter((e) => e.name.toLowerCase().includes(q) && e.name !== query);
+  if (exact.length === 0 && partial.length === 0) {
+    console.error(`\x1B[33m\uCC3E\uC744 \uC218 \uC5C6\uC74C:\x1B[0m '${query}'`);
+    const near = entries.map((e) => ({ e, d: levenshtein3(e.name.toLowerCase(), q) })).filter((x) => x.d <= 3).sort((a, b) => a.d - b.d).slice(0, 5);
+    if (near.length > 0) {
+      console.error(`\x1B[2m\uBE44\uC2B7\uD55C \uC774\uB984:\x1B[0m`);
+      for (const { e } of near) console.error(`  ${e.name}  (${e.module})`);
+    }
+    process.exit(1);
+  }
+  const show = (e) => {
+    console.log(`\x1B[36m${e.name}\x1B[0m  \x1B[2m[${e.module}]\x1B[0m`);
+    console.log(`  params : ${e.params}`);
+    console.log(`  returns: ${e.ret}`);
+    console.log();
+  };
+  for (const e of exact) show(e);
+  if (partial.length > 0) {
+    if (exact.length > 0) console.log(`\x1B[2m\u2500\u2500\u2500 partial matches \u2500\u2500\u2500\x1B[0m`);
+    for (const e of partial.slice(0, 20)) show(e);
+    if (partial.length > 20) console.log(`\x1B[2m... and ${partial.length - 20} more\x1B[0m`);
+  }
+}
+function levenshtein3(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array(b.length + 1).fill(0).map((_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : Math.min(prev[j - 1], prev[j], next[j - 1]) + 1;
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = next[j];
+  }
+  return prev[b.length];
+}
 function cmdFmt(args2) {
   if (args2.includes("--stdin")) {
     let src = "";
@@ -29564,6 +29667,17 @@ switch (cmd) {
   case "repl":
     cmdRepl();
     break;
+  case "fn-doc":
+  case "fl-doc": {
+    const query = args[1];
+    if (!query) {
+      console.error("Usage: freelang fn-doc <name>");
+      console.error("       (name can be exact or partial)");
+      process.exit(1);
+    }
+    cmdStdlibDoc(query);
+    break;
+  }
   case "debug": {
     const filePath = args[1];
     if (!filePath) {

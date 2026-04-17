@@ -427,6 +427,111 @@ function cmdRepl(): void {
 // fmt 커맨드 (Phase 73)
 // ─────────────────────────────────────────
 
+// ─────────────────────────────────────────
+// v11.4: help 커맨드 — stdlib 함수 시그니처 빠른 조회
+// ─────────────────────────────────────────
+
+function cmdStdlibDoc(query: string): void {
+  const fs = require("fs") as typeof import("fs");
+  const path2 = require("path") as typeof import("path");
+
+  // src/*.ts 에서 `// funcname args -> ret` 주석 추출
+  // (bootstrap.js 번들 환경에서는 __dirname 이 프로젝트 루트이므로 src/ 서브디렉토리 탐색)
+  const candidates = [
+    path2.join(__dirname, "src"),
+    path2.join(__dirname, "..", "src"),
+    __dirname,
+    process.cwd(),
+    path2.join(process.cwd(), "src"),
+  ];
+  let srcDir = "";
+  let tsFiles: string[] = [];
+  for (const d of candidates) {
+    try {
+      const entries = fs.readdirSync(d)
+        .filter((f: string) => f.startsWith("stdlib-") && f.endsWith(".ts"));
+      if (entries.length > 0) {
+        srcDir = d;
+        tsFiles = entries.map((f: string) => path2.join(d, f));
+        break;
+      }
+    } catch {}
+  }
+
+  interface Entry { module: string; name: string; params: string; ret: string; }
+  const entries: Entry[] = [];
+
+  for (const file of tsFiles) {
+    const modName = path2.basename(file, ".ts").replace(/^stdlib-/, "");
+    const lines = fs.readFileSync(file, "utf8").split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const cur = lines[i].trim();
+      const m = cur.match(/^\/\/\s*([a-z_][a-z0-9_\-!?]*)\s+(.*?)\s*->\s*(.+)$/i);
+      if (!m) continue;
+      const [, name, params, ret] = m;
+      const next = (lines[i + 1] || "").trim();
+      const defMatch = next.match(/^"([^"]+)"\s*:/);
+      if (!defMatch || defMatch[1] !== name) continue;
+      entries.push({ module: modName, name, params: params.trim(), ret: ret.trim() });
+    }
+  }
+
+  if (entries.length === 0) {
+    console.error(`\x1b[33mstdlib 소스를 찾을 수 없습니다\x1b[0m (${srcDir} 확인)`);
+    process.exit(2);
+  }
+
+  const q = query.toLowerCase();
+  const exact = entries.filter((e) => e.name === query);
+  const partial = entries.filter((e) => e.name.toLowerCase().includes(q) && e.name !== query);
+
+  if (exact.length === 0 && partial.length === 0) {
+    console.error(`\x1b[33m찾을 수 없음:\x1b[0m '${query}'`);
+    // 가까운 이름 제안
+    const near = entries
+      .map((e) => ({ e, d: levenshtein(e.name.toLowerCase(), q) }))
+      .filter((x) => x.d <= 3)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 5);
+    if (near.length > 0) {
+      console.error(`\x1b[2m비슷한 이름:\x1b[0m`);
+      for (const { e } of near) console.error(`  ${e.name}  (${e.module})`);
+    }
+    process.exit(1);
+  }
+
+  const show = (e: Entry) => {
+    console.log(`\x1b[36m${e.name}\x1b[0m  \x1b[2m[${e.module}]\x1b[0m`);
+    console.log(`  params : ${e.params}`);
+    console.log(`  returns: ${e.ret}`);
+    console.log();
+  };
+
+  for (const e of exact) show(e);
+  if (partial.length > 0) {
+    if (exact.length > 0) console.log(`\x1b[2m─── partial matches ───\x1b[0m`);
+    for (const e of partial.slice(0, 20)) show(e);
+    if (partial.length > 20) console.log(`\x1b[2m... and ${partial.length - 20} more\x1b[0m`);
+  }
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array(b.length + 1).fill(0).map((_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]
+        : Math.min(prev[j - 1], prev[j], next[j - 1]) + 1;
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = next[j];
+  }
+  return prev[b.length];
+}
+
 function cmdFmt(args: string[]): void {
   // --stdin 모드
   if (args.includes("--stdin")) {
@@ -930,6 +1035,18 @@ switch (cmd) {
   case "repl":
     cmdRepl();
     break;
+  case "fn-doc":
+  case "fl-doc": {
+    // v11.4: node bootstrap.js fn-doc <name>   stdlib 함수 시그니처 검색
+    const query = args[1];
+    if (!query) {
+      console.error("Usage: freelang fn-doc <name>");
+      console.error("       (name can be exact or partial)");
+      process.exit(1);
+    }
+    cmdStdlibDoc(query);
+    break;
+  }
   case "debug": {
     const filePath = args[1];
     if (!filePath) { printUsage(); process.exit(1); }

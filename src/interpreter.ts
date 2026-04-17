@@ -1436,7 +1436,13 @@ export class Interpreter {
     // Variables
     if ((node as any).kind === "variable") {
       let varName = (node as Variable).name;
-      const locSuffix = (node as any).line ? ` at line ${(node as any).line}` : "";
+      const line = (node as any).line;
+      const fileHint = this.currentFilePath
+        ? this.currentFilePath.replace(/^.*\//, "")
+        : "";
+      const locSuffix = line
+        ? ` (${fileHint ? fileHint + ":" : "at line "}${line})`
+        : "";
       // Self-hosting: dot field access — "env.vars" → resolve "env", then access "vars"
       if (varName.includes(".")) {
         const parts = varName.split(".");
