@@ -44,39 +44,12 @@ function buildArgs(db: string, sql: string): string[] {
   return args;
 }
 
-// v11.6: 흔한 MariaDB 에러 코드 → 친화적 한국어 메시지
-function friendlyError(stderr: string, sql: string): string {
-  // ERROR 1146 (42S02): Table 'db.x' doesn't exist
-  let m = stderr.match(/ERROR 1146[^:]*:\s*(.*)/i);
-  if (m) return `테이블이 없습니다 — ${m[1]}`;
-  // ERROR 1054: Unknown column
-  m = stderr.match(/ERROR 1054[^:]*:\s*(.*)/i);
-  if (m) return `존재하지 않는 컬럼 — ${m[1]}`;
-  // ERROR 1062: Duplicate entry
-  m = stderr.match(/ERROR 1062[^:]*:\s*(.*)/i);
-  if (m) return `중복된 값 (UNIQUE 제약) — ${m[1]}`;
-  // ERROR 1452: foreign key
-  m = stderr.match(/ERROR 1452[^:]*:\s*(.*)/i);
-  if (m) return `외래키 제약 위반 — ${m[1]}`;
-  // ERROR 1366: incorrect value
-  m = stderr.match(/ERROR 1366[^:]*:\s*Incorrect (\w+) value:\s*'([^']*)'[^`]*`([^`]+)`/i);
-  if (m) return `타입 불일치 — 컬럼 '${m[3]}'는 ${m[1]} 인데 '${m[2]}' 가 들어옴`;
-  // ERROR 1064: syntax
-  m = stderr.match(/ERROR 1064[^:]*:\s*(.*)/i);
-  if (m) return `SQL 구문 오류 — ${m[1]}`;
-  // ERROR 2002: can't connect
-  if (/ERROR 2002/.test(stderr)) return `MariaDB 서버에 연결할 수 없음 (데몬/소켓 확인)`;
-  // fallback: 원본 유지
-  return stderr;
-}
-
 function runMariadb(db: string, sql: string): string {
   const r = spawnSync("mariadb", buildArgs(db, sql), { timeout: 15000, encoding: "utf-8" });
-  if (r.error) throw new Error(`mariadb CLI not found or failed: ${r.error.message}`);
+  if (r.error) throw new Error(`mariadb CLI failed: ${r.error.message}`);
   if ((r.status ?? 1) !== 0) {
-    const stderr = r.stderr?.trim() ?? "";
-    const friendly = friendlyError(stderr, sql);
-    throw new Error(`mariadb: ${friendly}`);
+    // AI-first: original stderr passthrough (error code intact for programmatic parsing)
+    throw new Error(r.stderr?.trim() ?? `mariadb exit ${r.status}`);
   }
   return r.stdout?.toString() ?? "";
 }

@@ -500,7 +500,7 @@ function cmdStdlibDoc(query: string): void {
   }
 
   if (entries.length === 0) {
-    console.error(`\x1b[33mstdlib 소스를 찾을 수 없습니다\x1b[0m (${srcDir} 확인)`);
+    console.error(JSON.stringify({ error: "stdlib_source_not_found", hint: "run from freelang-v11 dir or set __dirname src/" }));
     process.exit(2);
   }
 
@@ -508,34 +508,29 @@ function cmdStdlibDoc(query: string): void {
   const exact = entries.filter((e) => e.name === query);
   const partial = entries.filter((e) => e.name.toLowerCase().includes(q) && e.name !== query);
 
+  // AI-first: JSON output for programmatic parsing
   if (exact.length === 0 && partial.length === 0) {
-    console.error(`\x1b[33m찾을 수 없음:\x1b[0m '${query}'`);
-    // 가까운 이름 제안
     const near = entries
       .map((e) => ({ e, d: levenshtein(e.name.toLowerCase(), q) }))
       .filter((x) => x.d <= 3)
       .sort((a, b) => a.d - b.d)
       .slice(0, 5);
-    if (near.length > 0) {
-      console.error(`\x1b[2m비슷한 이름:\x1b[0m`);
-      for (const { e } of near) console.error(`  ${e.name}  (${e.module})`);
-    }
+    console.log(JSON.stringify({
+      query,
+      found: false,
+      suggestions: near.map(({ e }) => ({ name: e.name, module: e.module })),
+    }));
     process.exit(1);
   }
 
-  const show = (e: Entry) => {
-    console.log(`\x1b[36m${e.name}\x1b[0m  \x1b[2m[${e.module}]\x1b[0m`);
-    console.log(`  params : ${e.params}`);
-    console.log(`  returns: ${e.ret}`);
-    console.log();
-  };
-
-  for (const e of exact) show(e);
-  if (partial.length > 0) {
-    if (exact.length > 0) console.log(`\x1b[2m─── partial matches ───\x1b[0m`);
-    for (const e of partial.slice(0, 20)) show(e);
-    if (partial.length > 20) console.log(`\x1b[2m... and ${partial.length - 20} more\x1b[0m`);
-  }
+  const trim20 = partial.slice(0, 20);
+  console.log(JSON.stringify({
+    query,
+    found: true,
+    exact: exact.map((e) => ({ name: e.name, module: e.module, params: e.params, returns: e.ret })),
+    partial: trim20.map((e) => ({ name: e.name, module: e.module, params: e.params, returns: e.ret })),
+    partial_truncated: partial.length > 20 ? partial.length - 20 : 0,
+  }));
 }
 
 function levenshtein(a: string, b: string): number {

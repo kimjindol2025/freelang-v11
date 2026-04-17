@@ -19775,29 +19775,11 @@ function buildArgs(db, sql) {
   args2.push("--batch", "-e", sql);
   return args2;
 }
-function friendlyError(stderr, sql) {
-  let m = stderr.match(/ERROR 1146[^:]*:\s*(.*)/i);
-  if (m) return `\uD14C\uC774\uBE14\uC774 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 ${m[1]}`;
-  m = stderr.match(/ERROR 1054[^:]*:\s*(.*)/i);
-  if (m) return `\uC874\uC7AC\uD558\uC9C0 \uC54A\uB294 \uCEEC\uB7FC \u2014 ${m[1]}`;
-  m = stderr.match(/ERROR 1062[^:]*:\s*(.*)/i);
-  if (m) return `\uC911\uBCF5\uB41C \uAC12 (UNIQUE \uC81C\uC57D) \u2014 ${m[1]}`;
-  m = stderr.match(/ERROR 1452[^:]*:\s*(.*)/i);
-  if (m) return `\uC678\uB798\uD0A4 \uC81C\uC57D \uC704\uBC18 \u2014 ${m[1]}`;
-  m = stderr.match(/ERROR 1366[^:]*:\s*Incorrect (\w+) value:\s*'([^']*)'[^`]*`([^`]+)`/i);
-  if (m) return `\uD0C0\uC785 \uBD88\uC77C\uCE58 \u2014 \uCEEC\uB7FC '${m[3]}'\uB294 ${m[1]} \uC778\uB370 '${m[2]}' \uAC00 \uB4E4\uC5B4\uC634`;
-  m = stderr.match(/ERROR 1064[^:]*:\s*(.*)/i);
-  if (m) return `SQL \uAD6C\uBB38 \uC624\uB958 \u2014 ${m[1]}`;
-  if (/ERROR 2002/.test(stderr)) return `MariaDB \uC11C\uBC84\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC74C (\uB370\uBAAC/\uC18C\uCF13 \uD655\uC778)`;
-  return stderr;
-}
 function runMariadb(db, sql) {
   const r = (0, import_child_process5.spawnSync)("mariadb", buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8" });
-  if (r.error) throw new Error(`mariadb CLI not found or failed: ${r.error.message}`);
+  if (r.error) throw new Error(`mariadb CLI failed: ${r.error.message}`);
   if ((r.status ?? 1) !== 0) {
-    const stderr = r.stderr?.trim() ?? "";
-    const friendly = friendlyError(stderr, sql);
-    throw new Error(`mariadb: ${friendly}`);
+    throw new Error(r.stderr?.trim() ?? `mariadb exit ${r.status}`);
   }
   return r.stdout?.toString() ?? "";
 }
@@ -29382,33 +29364,29 @@ function cmdStdlibDoc(query) {
     }
   }
   if (entries.length === 0) {
-    console.error(`\x1B[33mstdlib \uC18C\uC2A4\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4\x1B[0m (${srcDir} \uD655\uC778)`);
+    console.error(JSON.stringify({ error: "stdlib_source_not_found", hint: "run from freelang-v11 dir or set __dirname src/" }));
     process.exit(2);
   }
   const q = query.toLowerCase();
   const exact = entries.filter((e) => e.name === query);
   const partial = entries.filter((e) => e.name.toLowerCase().includes(q) && e.name !== query);
   if (exact.length === 0 && partial.length === 0) {
-    console.error(`\x1B[33m\uCC3E\uC744 \uC218 \uC5C6\uC74C:\x1B[0m '${query}'`);
     const near = entries.map((e) => ({ e, d: levenshtein3(e.name.toLowerCase(), q) })).filter((x) => x.d <= 3).sort((a, b) => a.d - b.d).slice(0, 5);
-    if (near.length > 0) {
-      console.error(`\x1B[2m\uBE44\uC2B7\uD55C \uC774\uB984:\x1B[0m`);
-      for (const { e } of near) console.error(`  ${e.name}  (${e.module})`);
-    }
+    console.log(JSON.stringify({
+      query,
+      found: false,
+      suggestions: near.map(({ e }) => ({ name: e.name, module: e.module }))
+    }));
     process.exit(1);
   }
-  const show = (e) => {
-    console.log(`\x1B[36m${e.name}\x1B[0m  \x1B[2m[${e.module}]\x1B[0m`);
-    console.log(`  params : ${e.params}`);
-    console.log(`  returns: ${e.ret}`);
-    console.log();
-  };
-  for (const e of exact) show(e);
-  if (partial.length > 0) {
-    if (exact.length > 0) console.log(`\x1B[2m\u2500\u2500\u2500 partial matches \u2500\u2500\u2500\x1B[0m`);
-    for (const e of partial.slice(0, 20)) show(e);
-    if (partial.length > 20) console.log(`\x1B[2m... and ${partial.length - 20} more\x1B[0m`);
-  }
+  const trim20 = partial.slice(0, 20);
+  console.log(JSON.stringify({
+    query,
+    found: true,
+    exact: exact.map((e) => ({ name: e.name, module: e.module, params: e.params, returns: e.ret })),
+    partial: trim20.map((e) => ({ name: e.name, module: e.module, params: e.params, returns: e.ret })),
+    partial_truncated: partial.length > 20 ? partial.length - 20 : 0
+  }));
 }
 function levenshtein3(a, b) {
   if (a === b) return 0;
