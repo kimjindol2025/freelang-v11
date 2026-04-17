@@ -1,0 +1,56 @@
+{
+  "defn": {
+    "prefix": "defn",
+    "body": ["(defn ${1:name} [${2:params}]", "  ${3:body})"],
+    "description": "Define a named function (Clojure-style)"
+  },
+  "fn": {
+    "prefix": "fn",
+    "body": ["(fn [${1:params}] ${2:body})"],
+    "description": "Anonymous function (lambda)"
+  },
+  "let": {
+    "prefix": "let",
+    "body": ["(let [${1:$x} ${2:value}]", "  ${3:body})"],
+    "description": "Local bindings (v11.1 flat form)"
+  },
+  "if": {
+    "prefix": "if",
+    "body": ["(if ${1:cond}", "  ${2:then}", "  ${3:else})"],
+    "description": "If expression"
+  },
+  "cond": {
+    "prefix": "cond",
+    "body": ["(cond", "  [${1:test1} ${2:result1}]", "  [${3:test2} ${4:result2}]", "  [true ${5:default}])"],
+    "description": "Multi-branch conditional"
+  },
+  "FUNC": {
+    "prefix": "FUNC",
+    "body": ["[FUNC ${1:name} :params [${2:params}] :body", "  ${3:body}]"],
+    "description": "Block-style function (enterprise)"
+  },
+  "server_get": {
+    "prefix": "sget",
+    "body": ["(server_get \"${1:/path}\" (fn [\\$req]", "  ${2:body}))"],
+    "description": "HTTP GET handler"
+  },
+  "server_post": {
+    "prefix": "spost",
+    "body": [
+      "(server_post \"${1:/path}\" (fn [\\$req]",
+      "  (let [body (get \\$req :body)]",
+      "    ${2:body})))"
+    ],
+    "description": "HTTP POST handler (body auto-parsed when application/json)"
+  },
+  "mariadb_query": {
+    "prefix": "mq",
+    "body": ["(mariadb_query \"${1:db}\" \"SELECT ${2:*} FROM ${3:table} WHERE ${4:1=1}\" [])"],
+    "description": "MariaDB SELECT"
+  },
+  "println": {
+    "prefix": "pl",
+    "body": ["(println ${1:value})"],
+    "description": "Print line"
+  }
+}

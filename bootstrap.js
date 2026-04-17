@@ -26767,22 +26767,6 @@ var Interpreter = class {
     this.logger.info("Interpreter cleanup completed");
   }
 };
-var globalInterpreterInstance = null;
-function interpret(blocks, logger) {
-  const interpreter = new Interpreter(logger);
-  globalInterpreterInstance = interpreter;
-  if (!process.listeners("exit").some((l) => l.name === "cleanupInterpreter")) {
-    const cleanupInterpreter = function() {
-      if (globalInterpreterInstance) {
-        globalInterpreterInstance.destroy();
-        globalInterpreterInstance = null;
-      }
-    };
-    Object.defineProperty(cleanupInterpreter, "name", { value: "cleanupInterpreter" });
-    process.on("exit", cleanupInterpreter);
-  }
-  return interpreter.interpret(blocks);
-}
 
 // src/formatter.ts
 init_lexer();
@@ -29031,15 +29015,37 @@ function cmdCompile(args2) {
   }
 }
 function cmdRepl() {
-  console.log(`FreeLang v9 REPL  (\x1B[2m:q \uC885\uB8CC  :help \uB3C4\uC6C0\uB9D0\x1B[0m)`);
+  console.log(`FreeLang v11 REPL  (\x1B[2m:q \uC885\uB8CC  :help \uB3C4\uC6C0\uB9D0  :reset \uC138\uC158 \uCD08\uAE30\uD654\x1B[0m)`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+  const historyPath = (() => {
+    try {
+      const os2 = require("os");
+      const path13 = require("path");
+      return path13.join(os2.homedir(), ".fl_history");
+    } catch {
+      return null;
+    }
+  })();
+  let initialHistory = [];
+  if (historyPath) {
+    try {
+      const fs16 = require("fs");
+      if (fs16.existsSync(historyPath)) {
+        initialHistory = fs16.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
+      }
+    } catch {
+    }
+  }
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     prompt: "\x1B[36mfl>\x1B[0m ",
-    terminal: true
+    terminal: true,
+    history: initialHistory,
+    historySize: 500
   });
   let buffer = "";
+  let sessionInterp = new Interpreter();
   function countBalance(s) {
     let balance = 0;
     let inStr = false;
@@ -29091,6 +29097,13 @@ function cmdRepl() {
       rl.prompt();
       return;
     }
+    if (trimmed === ":reset") {
+      buffer = "";
+      sessionInterp = new Interpreter();
+      console.log("  \uC138\uC158 \uCD08\uAE30\uD654\uB428 (\uBAA8\uB4E0 \uBCC0\uC218/\uD568\uC218 \uC81C\uAC70).");
+      rl.prompt();
+      return;
+    }
     if (trimmed.startsWith(";")) {
       rl.prompt();
       return;
@@ -29110,7 +29123,7 @@ function cmdRepl() {
     try {
       const tokens = lex(source);
       const ast = parse(tokens);
-      const ctx = interpret(ast);
+      const ctx = sessionInterp.interpret(ast);
       const val = ctx.lastValue;
       if (val !== null && val !== void 0) {
         if (typeof val === "object") {
@@ -29121,6 +29134,13 @@ function cmdRepl() {
       }
     } catch (err4) {
       console.error(formatError(err4, source));
+    }
+    if (historyPath && source) {
+      try {
+        const fs16 = require("fs");
+        fs16.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
+      } catch {
+      }
     }
     rl.prompt();
   });

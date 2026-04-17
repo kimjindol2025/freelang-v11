@@ -1,0 +1,122 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "FreeLang",
+  "scopeName": "source.fl",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#blocks" },
+    { "include": "#special-forms" },
+    { "include": "#builtins" },
+    { "include": "#variables" },
+    { "include": "#boolean" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.fl",
+          "match": ";.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.fl",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.fl",
+              "match": "\\\\."
+            },
+            {
+              "name": "variable.interpolation.fl",
+              "match": "\\{\\$[a-zA-Z_][a-zA-Z0-9_\\-]*\\}"
+            },
+            {
+              "name": "meta.interpolation.fl",
+              "begin": "\\{\\(",
+              "end": "\\)\\}"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.fl",
+          "match": "-?\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "constant.other.keyword.fl",
+          "match": ":[a-zA-Z_][a-zA-Z0-9_\\-]*"
+        }
+      ]
+    },
+    "boolean": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.fl",
+          "match": "\\b(true|false|null)\\b"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.parameter.fl",
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_\\-]*"
+        }
+      ]
+    },
+    "blocks": {
+      "patterns": [
+        {
+          "name": "entity.name.type.block.fl",
+          "match": "\\[\\s*(FUNC|ROUTE|PAGE|COMPONENT|SERVICE|CONTROLLER|GUARD|MODEL|REPOSITORY|KAFKA|JWT|DOCKERFILE|K8S-DEPLOYMENT|AWS|GCP|AZURE|DATABASE|COT|AGENT|EVOLVE|WISDOM|INTENT|CAUSAL|META|REFLECT|DEBATE|CONSENSUS|LEARN|ADAPT|PERSIST|STREAM|PIPELINE|MEMORY|KNOWLEDGE|PROMPT|TOOL|CHAIN|BELIEF)\\b"
+        }
+      ]
+    },
+    "special-forms": {
+      "patterns": [
+        {
+          "name": "keyword.control.fl",
+          "match": "\\b(fn|defn|define|let|if|cond|do|begin|progn|loop|recur|while|when|unless|match|case|and|or|not|null\\?|set!|async|await|quote|try|catch|throw|return|export|import|require)\\b"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.fl",
+          "match": "\\b(println|print|str|str-to-num|num-to-str|substring|char-at|replace|length|abs|min|max|sqrt|pow|floor|ceil|round|list|first|rest|last|append|slice|get|count|map|filter|reduce|fold|range|null\\?|empty\\?|sort|reverse|push|pop)\\b"
+        },
+        {
+          "name": "support.function.io.fl",
+          "match": "\\b(file_read|file_write|file_exists\\?|dir_create|dir_list|shell_exec|http_get|http_post|http_json)\\b"
+        },
+        {
+          "name": "support.function.db.fl",
+          "match": "\\b(db_exec|db_query|db_insert|db_update|mariadb_exec|mariadb_query|mariadb_one|mariadb_health)\\b"
+        },
+        {
+          "name": "support.function.server.fl",
+          "match": "\\b(server_get|server_post|server_put|server_delete|server_patch|server_start|server_html|server_file|server_req_body|server_req_query|server_req_param|server_req_header)\\b"
+        },
+        {
+          "name": "support.function.json.fl",
+          "match": "\\b(json_parse|json_stringify|json_get|json_set|json_merge|json_keys|json_vals)\\b"
+        }
+      ]
+    }
+  }
+}

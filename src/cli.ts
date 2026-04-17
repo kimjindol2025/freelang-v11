@@ -267,18 +267,42 @@ function cmdCompile(args: string[]): void {
 // ─────────────────────────────────────────
 
 function cmdRepl(): void {
-  console.log(`FreeLang v9 REPL  (\x1b[2m:q 종료  :help 도움말\x1b[0m)`);
+  console.log(`FreeLang v11 REPL  (\x1b[2m:q 종료  :help 도움말  :reset 세션 초기화\x1b[0m)`);
   console.log(`─────────────────────────────────────────`);
+
+  // v11.3: ~/.fl_history 기반 영구 history
+  const historyPath = (() => {
+    try {
+      const os = require("os") as typeof import("os");
+      const path = require("path") as typeof import("path");
+      return path.join(os.homedir(), ".fl_history");
+    } catch { return null; }
+  })();
+
+  let initialHistory: string[] = [];
+  if (historyPath) {
+    try {
+      const fs = require("fs") as typeof import("fs");
+      if (fs.existsSync(historyPath)) {
+        initialHistory = fs.readFileSync(historyPath, "utf8")
+          .split("\n").filter(l => l.trim()).slice(-500).reverse();
+      }
+    } catch {}
+  }
 
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     prompt: "\x1b[36mfl>\x1b[0m ",
     terminal: true,
-  });
+    history: initialHistory,
+    historySize: 500,
+  } as any);
 
   // 멀티라인: 여는 괄호/대괄호가 남아있으면 계속 입력 받음
   let buffer = "";
+  // v11.3: 영속 Interpreter — define/defn 바인딩이 세션 내내 유지됨
+  let sessionInterp = new Interpreter();
 
   function countBalance(s: string): number {
     let balance = 0;
@@ -331,6 +355,13 @@ function cmdRepl(): void {
       rl.prompt();
       return;
     }
+    if (trimmed === ":reset") {
+      buffer = "";
+      sessionInterp = new Interpreter();
+      console.log("  세션 초기화됨 (모든 변수/함수 제거).");
+      rl.prompt();
+      return;
+    }
 
     // 세미콜론 주석 줄 스킵
     if (trimmed.startsWith(";")) {
@@ -358,7 +389,8 @@ function cmdRepl(): void {
     try {
       const tokens = lex(source);
       const ast = parse(tokens);
-      const ctx = interpret(ast);
+      // v11.3: persistent interpreter 재사용
+      const ctx = sessionInterp.interpret(ast);
       const val = ctx.lastValue;
       if (val !== null && val !== undefined) {
         if (typeof val === "object") {
@@ -369,6 +401,14 @@ function cmdRepl(): void {
       }
     } catch (err: any) {
       console.error(formatError(err, source));
+    }
+
+    // v11.3: history 저장
+    if (historyPath && source) {
+      try {
+        const fs = require("fs") as typeof import("fs");
+        fs.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
+      } catch {}
     }
 
     rl.prompt();
