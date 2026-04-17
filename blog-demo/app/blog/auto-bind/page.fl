@@ -1,0 +1,63 @@
+;; 포스트: data-fl-bind 선언적 반응성 (인라인 JS로 완전 동작)
+
+(defn page-css [] (str "<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,'Segoe UI',sans-serif;line-height:1.7;color:#1a1a1a;background:#fafafa}a{color:#0066cc;text-decoration:none}.wrap{max-width:720px;margin:0 auto;padding:3rem 1.5rem 5rem}.nav{border-bottom:1px solid #e5e5e5;background:white}.nav .wrap{padding:1.25rem 1.5rem;display:flex;justify-content:space-between;align-items:center}.nav a.logo{font-weight:700;font-size:1.1rem;color:#1a1a1a}.nav nav a{margin-left:1.5rem;color:#555;font-size:.95rem}h1{font-size:2.25rem;margin-bottom:1rem}h2{font-size:1.5rem;margin-top:2.5rem;margin-bottom:.75rem}p{margin-bottom:1rem}.meta{color:#888;font-size:.9rem;margin-bottom:2rem}.tag{display:inline-block;background:#e8f4ff;color:#0066cc;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;margin-right:.4rem}pre{background:#282c34;color:#abb2bf;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85rem;margin:1rem 0}code{font-family:'SF Mono',Monaco,monospace;font-size:.88em}p code{background:#f0f0f0;padding:.1rem .4rem;border-radius:3px}footer{border-top:1px solid #e5e5e5;color:#999;font-size:.85rem;padding:2rem 0;text-align:center;background:white}.counter-box{background:white;border:1px solid #e5e5e5;border-radius:8px;padding:1.5rem;margin:1.5rem 0;text-align:center}.counter-box button{background:#0066cc;color:white;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:1rem;margin:0 .25rem}.counter-box .val{font-size:2.5rem;font-weight:700;color:#0066cc;display:block;margin:.5rem 0}.counter-box input{width:100%;padding:.5rem;border:1px solid #ddd;border-radius:4px;margin-top:.5rem}</style>"))
+
+(defn nav [] "<header class='nav'><div class='wrap'><a href='/' class='logo'>v11 Blog</a><nav><a href='/'>홈</a><a href='/blog'>전체 글</a><a href='/about'>소개</a></nav></div></header>")
+
+(defn foot [] "<footer>Built with FreeLang v11</footer>")
+
+(defn runtime-js [] (str
+  "<script>"
+  "var __S={count:0,name:''};"
+  "var __subs={};"
+  "try{var n=localStorage.getItem('fl-name');if(n)__S.name=n;}catch(e){}"
+  "function get(k){return __S[k]}"
+  "function set(k,v){__S[k]=v;(__subs[k]||[]).forEach(function(f){f(v)});if(k==='name')try{localStorage.setItem('fl-name',v)}catch(e){}}"
+  "function sub(k,f){(__subs[k]=__subs[k]||[]).push(f)}"
+  "var ACT={"
+  "  inc:function(){set('count',get('count')+1)},"
+  "  dec:function(){set('count',get('count')-1)},"
+  "  reset:function(){set('count',0)}"
+  "};"
+  "function scan(root){"
+  "(root.querySelectorAll?root.querySelectorAll('[data-fl-bind]'):[]).forEach(function(el){var k=el.getAttribute('data-fl-bind');if(el.__b===k)return;el.__b=k;var c=get(k);if(c!==undefined)el.textContent=String(c);sub(k,function(v){el.textContent=String(v)});});"
+  "(root.querySelectorAll?root.querySelectorAll('[data-fl-model]'):[]).forEach(function(el){var k=el.getAttribute('data-fl-model');if(el.__m===k)return;el.__m=k;var c=get(k);if(c!==undefined)el.value=String(c);el.addEventListener('input',function(){set(k,el.value)});sub(k,function(v){if(document.activeElement!==el)el.value=String(v)});});"
+  "(root.querySelectorAll?root.querySelectorAll('[data-fl-click]'):[]).forEach(function(el){var n=el.getAttribute('data-fl-click');if(el.__c===n)return;el.__c=n;el.addEventListener('click',function(){var f=ACT[n];if(f)f()});});"
+  "}"
+  "function scanAll(){scan(document)}"
+  "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scanAll);else scanAll();"
+  "new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1)scan(n)})})}).observe(document.body,{childList:true,subtree:true});"
+  "</script>"))
+
+(println (str
+  "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'>"
+  "<title>data-fl-bind 선언적 반응성 — v11 Blog</title>"
+  "<meta name='description' content='React 없이 HTML 속성만으로 양방향 바인딩'>"
+  "<meta property='og:title' content='data-fl-bind'>"
+  "<link rel='canonical' href='https://example.com/blog/auto-bind'>"
+  (page-css)
+  "</head><body>"
+  (nav)
+  "<main class='wrap'><article>"
+  "<h1>data-fl-bind: React 없이 반응형</h1>"
+  "<p class='meta'>2026-04-17 · <span class='tag'>frontend</span> <span class='tag'>state</span></p>"
+  "<p>v11은 React를 쓰지 않지만, HTML 속성만으로 반응형 UI를 선언할 수 있습니다. 아래 카운터가 실시간으로 동작합니다.</p>"
+  "<div class='counter-box'>"
+  "<p>카운터 값:</p>"
+  "<span class='val' data-fl-bind='count'>0</span>"
+  "<div>"
+  "<button data-fl-click='dec'>−1</button>"
+  "<button data-fl-click='reset'>초기화</button>"
+  "<button data-fl-click='inc'>+1</button>"
+  "</div>"
+  "<p style='margin-top:1rem;font-size:.9rem;color:#666'>이름 입력 (localStorage 자동 저장):</p>"
+  "<input data-fl-model='name' placeholder='이름을 입력하세요'>"
+  "<p style='margin-top:.75rem'>안녕하세요, <strong data-fl-bind='name'>(이름)</strong>님!</p>"
+  "</div>"
+  "<h2>작동 원리</h2>"
+  "<pre><code>&lt;span data-fl-bind='count'&gt;0&lt;/span&gt;\n&lt;input data-fl-model='name'&gt;\n&lt;button data-fl-click='inc'&gt;+1&lt;/button&gt;</code></pre>"
+  "<p>페이지 로드 시 스캐너가 모든 <code>data-fl-*</code> 속성을 상태 시스템에 연결합니다. MutationObserver로 동적 삽입도 자동 처리.</p>"
+  "</article></main>"
+  (foot)
+  (runtime-js)
+  "</body></html>"))

@@ -1,0 +1,33 @@
+;; 포스트: Hello, v11
+
+(defn page-css [] (str "<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,'Segoe UI',sans-serif;line-height:1.7;color:#1a1a1a;background:#fafafa}a{color:#0066cc;text-decoration:none}a:hover{text-decoration:underline}.wrap{max-width:720px;margin:0 auto;padding:3rem 1.5rem 5rem}.nav{border-bottom:1px solid #e5e5e5;background:white}.nav .wrap{padding:1.25rem 1.5rem;display:flex;justify-content:space-between;align-items:center}.nav a.logo{font-weight:700;font-size:1.1rem;color:#1a1a1a}.nav nav a{margin-left:1.5rem;color:#555;font-size:.95rem}h1{font-size:2.25rem;line-height:1.2;margin-bottom:1rem}h2{font-size:1.5rem;margin-top:2.5rem;margin-bottom:.75rem}p{margin-bottom:1rem}.meta{color:#888;font-size:.9rem;margin-bottom:2rem}.tag{display:inline-block;background:#e8f4ff;color:#0066cc;padding:.15rem .6rem;border-radius:999px;font-size:.75rem;margin-right:.4rem}code{font-family:'SF Mono',Monaco,monospace;font-size:.88em}p code,li code{background:#f0f0f0;padding:.1rem .4rem;border-radius:3px}blockquote{border-left:3px solid #0066cc;padding:.5rem 1rem;color:#555;margin:1rem 0;background:#f5f9ff}footer{border-top:1px solid #e5e5e5;color:#999;font-size:.85rem;padding:2rem 0;text-align:center;background:white}</style>"))
+
+(defn nav [] "<header class='nav'><div class='wrap'><a href='/' class='logo'>v11 Blog</a><nav><a href='/'>홈</a><a href='/blog'>전체 글</a><a href='/about'>소개</a></nav></div></header>")
+
+(defn foot [] "<footer>Built with FreeLang v11</footer>")
+
+(println (str
+  "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'>"
+  "<title>Hello, v11 — v11 Blog</title>"
+  "<meta name='description' content='FreeLang v11을 왜 만들었나, 무엇이 다른가'>"
+  "<meta property='og:title' content='Hello, v11'>"
+  "<meta property='og:description' content='AI-네이티브 풀스택 S-expression 언어 선언'>"
+  "<link rel='canonical' href='https://example.com/blog/hello-v11'>"
+  (page-css)
+  "</head><body>"
+  (nav)
+  "<main class='wrap'><article>"
+  "<h1>Hello, v11</h1>"
+  "<p class='meta'>2026-04-17 · <span class='tag'>intro</span></p>"
+  "<p>FreeLang v11은 AI가 직접 풀스택 앱을 작성·실행·배포하는 데 초점을 둡니다. React/Next.js 생태계의 유용함은 인정하되, <strong>의존성 0</strong>이라는 제약으로 완전히 다른 축의 설계를 추구합니다.</p>"
+  "<h2>세 가지 핵심 원칙</h2>"
+  "<p><strong>1. AI-Native</strong> — S-expression은 문법 트리가 곧 데이터라 AI가 부분만 교체해도 안전합니다. <code>[FUNC]</code>, <code>[COMPONENT]</code>, <code>[PAGE]</code> 같은 블록 매크로로 의도를 명확히 드러냅니다.</p>"
+  "<p><strong>2. 의존성 제로</strong> — Node.js v25만 있으면 됩니다. bootstrap.js 1.1MB 하나로 런타임이 끝납니다. npm install 없음, node_modules 없음.</p>"
+  "<p><strong>3. 즉시 배포</strong> — <code>node bootstrap.js serve app/</code>로 서빙, <code>build --static</code>으로 정적 export. Docker도 OCI 바이너리 빌드 지원.</p>"
+  "<blockquote>의존성 제로는 제약이 아니라 속도입니다.</blockquote>"
+  "<h2>누구를 위한 언어인가</h2>"
+  "<p>AI 에이전트가 혼자 앱을 만들고 운영할 때 가장 큰 적은 <em>조용한 실패</em>입니다. v11은 strict 해석 (미해결 변수는 즉시 throw), 줄·컬럼 정확한 에러 메시지, <code>check</code>로 런 전 문법 검증을 기본 제공합니다.</p>"
+  "<p>다음 글: <a href='/blog/build-static'>build --static 완전판</a></p>"
+  "</article></main>"
+  (foot)
+  "</body></html>"))

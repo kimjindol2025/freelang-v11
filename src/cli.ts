@@ -861,39 +861,52 @@ function cmdBuild(buildArgs: string[]): void {
         req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
       });
 
+    const runPage = (p: { filePath: string; route: string }): string | null => {
+      try {
+        const { execSync } = require("child_process");
+        const out = execSync(`node "${bootstrap}" run "${p.filePath}"`, {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        const m = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
+        return m ? m[0] : null;
+      } catch { return null; }
+    };
+
+    const isUseful = (html: string | null | undefined): boolean => {
+      if (!html) return false;
+      const t = html.trim();
+      if (t.length < 50) return false;
+      if (t.startsWith("Internal Server Error")) return false;
+      return true;
+    };
+
     (async () => {
       const ready = await waitForServer();
-      if (!ready) {
-        console.error(`\x1b[31m오류\x1b[0m  serve 서버가 ${port}에서 응답하지 않습니다`);
-        serveProc.kill();
-        process.exit(1);
-      }
       let ok = 0;
       let fail = 0;
       for (const p of pages) {
-        try {
-          const html = await fetchRoute(p.route);
+        let html: string | null = null;
+        // Strategy 1: HTTP GET via serve (app-router blocks, layouts, etc.)
+        if (ready) {
+          try {
+            const res = await fetchRoute(p.route);
+            if (isUseful(res)) html = res;
+          } catch { /* fall through to run */ }
+        }
+        // Strategy 2: run page.fl directly (simple println pages)
+        if (!html) {
+          const out = runPage(p);
+          if (isUseful(out)) html = out;
+        }
+        if (html) {
           const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
           fs.mkdirSync(path.dirname(outPath), { recursive: true });
           fs.writeFileSync(outPath, html);
-          console.log(`\x1b[32m✓\x1b[0m ${p.route}  → ${path.relative(process.cwd(), outPath)}`);
+          console.log(`\x1b[32m✓\x1b[0m ${p.route}  → ${path.relative(process.cwd(), outPath)}  (${html.length} bytes)`);
           ok++;
-        } catch (err: any) {
-          // Fallback: try running page.fl directly and grep HTML from stdout
-          try {
-            const { execSync } = require("child_process");
-            const out = execSync(`node "${bootstrap}" run "${p.filePath}"`, { encoding: "utf-8" });
-            const m = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
-            if (m) {
-              const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-              fs.mkdirSync(path.dirname(outPath), { recursive: true });
-              fs.writeFileSync(outPath, m[0]);
-              console.log(`\x1b[32m✓\x1b[0m ${p.route}  \x1b[2m(run fallback)\x1b[0m`);
-              ok++;
-              continue;
-            }
-          } catch { /* ignore fallback error */ }
-          console.error(`\x1b[31m✗\x1b[0m ${p.route}  (${err.message})`);
+        } else {
+          console.error(`\x1b[31m✗\x1b[0m ${p.route}`);
           fail++;
         }
       }
