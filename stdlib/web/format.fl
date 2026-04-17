@@ -1,0 +1,75 @@
+;; stdlib/web/format — 한국 로케일 포매터 (프론트 HTML 렌더용)
+;; 순수 함수. 입력이 null 이면 빈 문자열 또는 "-" 반환.
+
+;; 금액: 1234567 → "1,234,567원"
+(defn format-money [n]
+  (if (null? n) "-"
+    (let [s (str n)
+          len (length s)
+          negative (if (> len 0) (= (char-at s 0) "-") false)
+          body (if negative (substring s 1) s)
+          body-len (length body)]
+      (let [grouped (group-thousands body body-len)]
+        (str (if negative "-" "") grouped "원")))))
+
+(defn group-thousands [s len]
+  (if (<= len 3)
+    s
+    (let [head (substring s 0 (- len 3))
+          tail (substring s (- len 3) len)]
+      (str (group-thousands head (length head)) "," tail))))
+
+;; ISO 날짜: "2026-04-17" → "2026년 4월 17일"
+(defn format-date [iso]
+  (if (null? iso) "-"
+    (let [s (str iso)
+          y (substring s 0 4)
+          m (substring s 5 7)
+          d (substring s 8 10)]
+      (str y "년 " (trim-zero m) "월 " (trim-zero d) "일"))))
+
+(defn trim-zero [s]
+  (if (= (char-at s 0) "0")
+    (substring s 1 2)
+    s))
+
+;; DATETIME: "2026-04-17 10:30:00" → "2026-04-17 10:30"
+(defn format-datetime [iso]
+  (if (null? iso) "-"
+    (let [s (str iso)]
+      (if (>= (length s) 16)
+        (substring s 0 16)
+        s))))
+
+;; 한국 전화번호: "01012345678" → "010-1234-5678"
+(defn format-phone [p]
+  (if (null? p) "-"
+    (let [s (str p)
+          digits-only (strip-nondigit s)
+          len (length digits-only)]
+      (cond
+        [(= len 11) (str (substring digits-only 0 3) "-"
+                         (substring digits-only 3 7) "-"
+                         (substring digits-only 7 11))]
+        [(= len 10) (str (substring digits-only 0 3) "-"
+                         (substring digits-only 3 6) "-"
+                         (substring digits-only 6 10))]
+        [true s]))))
+
+(defn strip-nondigit [s]
+  (let [cleaned (replace s "-" "")
+        c2 (replace cleaned " " "")
+        c3 (replace c2 "(" "")
+        c4 (replace c3 ")" "")]
+    c4))
+
+;; 상대 시간: "3초 전", "5분 전" 등 (now_unix 기반)
+(defn format-ago [unix-ts]
+  (if (null? unix-ts) "-"
+    (let [now (now_unix)
+          diff (- now unix-ts)]
+      (cond
+        [(< diff 60)   (str diff "초 전")]
+        [(< diff 3600) (str (/ diff 60) "분 전")]
+        [(< diff 86400) (str (/ diff 3600) "시간 전")]
+        [true (str (/ diff 86400) "일 전")]))))

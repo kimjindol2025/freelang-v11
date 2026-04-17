@@ -1,0 +1,61 @@
+;; stdlib/web/csrf — 클라이언트 CSRF 토큰 주입/전송
+;; 서버 측 발급·검증은 별도 (백엔드 stdlib, 미들웨어). 여기는 프론트만.
+;;
+;; 사용:
+;;   1) layout <head> 에 (csrf-meta token)   → <meta name="csrf-token" content="...">
+;;   2) layout 끝에 (csrf-fetch-js)          → 모든 fetch() POST 에 자동 헤더 주입
+;;   3) <form> 에 (csrf-input token)         → 기본 제출도 커버
+
+;; <meta name="csrf-token" content="TOKEN">
+(defn csrf-meta [token]
+  (str "<meta name=\"csrf-token\" content=\"" (csrf-esc token) "\">"))
+
+;; <input type="hidden" name="_csrf" value="TOKEN">
+(defn csrf-input [token]
+  (str "<input type=\"hidden\" name=\"_csrf\" value=\"" (csrf-esc token) "\">"))
+
+;; 값 이스케이프 — HTML 속성 안전
+(defn csrf-esc [v]
+  (if (null? v) ""
+    (let [a (replace v "&" "&amp;")
+          b (replace a "\"" "&quot;")
+          c (replace b "<" "&lt;")]
+      c)))
+
+;; fetch monkeypatch — 모든 POST/PUT/PATCH/DELETE 요청에
+;; X-CSRF-Token 헤더 자동 주입. GET/HEAD 는 통과.
+(defn csrf-fetch-js []
+  "<script>
+(function(){
+  if(window.__flCsrfPatched)return;
+  window.__flCsrfPatched = true;
+  var meta = document.querySelector('meta[name=\"csrf-token\"]');
+  var token = meta ? meta.getAttribute('content') : '';
+  if(!token)return;
+  var origFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    var method = ((init.method || (typeof input === 'object' && input.method) || 'GET') + '').toUpperCase();
+    if(['POST','PUT','PATCH','DELETE'].indexOf(method) >= 0){
+      init.headers = new Headers(init.headers || (typeof input === 'object' ? input.headers : null) || {});
+      if(!init.headers.has('X-CSRF-Token')){
+        init.headers.set('X-CSRF-Token', token);
+      }
+    }
+    return origFetch(input, init);
+  };
+  // 일반 form 제출도 hidden input 자동 주입 (이미 있으면 skip)
+  document.addEventListener('submit', function(e){
+    var f = e.target;
+    if(!(f instanceof HTMLFormElement))return;
+    var m = (f.method || 'GET').toUpperCase();
+    if(m === 'GET' || m === 'HEAD')return;
+    if(f.querySelector('input[name=\"_csrf\"]'))return;
+    var inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = '_csrf';
+    inp.value = token;
+    f.appendChild(inp);
+  }, true);
+})();
+</script>")

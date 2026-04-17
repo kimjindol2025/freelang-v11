@@ -1,0 +1,62 @@
+;; stdlib/web/pagination — offset/limit + render-pagination
+;; 서버 SSR 렌더용. 클라이언트 JS 없음 (href 링크).
+
+;; 전체 페이지 수: (ceil-div 101 20) → 6
+(defn ceil-div [n d]
+  (if (= d 0) 0
+    (if (= (% n d) 0) (/ n d) (+ (/ n d) 1))))
+
+;; URL 에서 ?page= 추출, 기본 1
+(defn read-page [query]
+  (if (null? query) 1
+    (let [p (get query "page")]
+      (if (null? p) 1
+        (let [n (str-to-num p)]
+          (if (null? n) 1
+            (if (< n 1) 1 n)))))))
+
+;; SQL LIMIT/OFFSET 문자열 (예: "LIMIT 20 OFFSET 40")
+(defn sql-limit-offset [page per-page]
+  (let [p (if (null? page) 1 page)
+        offset (* (- p 1) per-page)]
+    (str "LIMIT " per-page " OFFSET " offset)))
+
+;; 페이지네이션 HTML — 링크 리스트
+;; (render-pagination :page 3 :total 101 :per-page 20 :base-url "/gallery")
+;; → "<nav class='fl-pag'>...</nav>"
+(defn render-pagination [current total per-page base-url]
+  (let [last-page (ceil-div total per-page)]
+    (if (<= last-page 1) ""
+      (let [prev-p (if (> current 1) (- current 1) 1)
+            next-p (if (< current last-page) (+ current 1) last-page)]
+        (str "<nav class=\"fl-pag\" role=\"navigation\" aria-label=\"pagination\" "
+             "style=\"display:flex;gap:0.5rem;justify-content:center;margin:1.5rem 0\">"
+             (pag-link base-url prev-p "이전" (= current 1))
+             (pag-numbers base-url current last-page)
+             (pag-link base-url next-p "다음" (= current last-page))
+             "</nav>")))))
+
+(defn pag-link [base-url page label disabled]
+  (if disabled
+    (str "<span class=\"fl-pag-disabled\" "
+         "style=\"padding:0.4em 0.8em;opacity:0.4\">" label "</span>")
+    (str "<a href=\"" base-url "?page=" page "\" "
+         "style=\"padding:0.4em 0.8em;border:1px solid var(--border);"
+         "border-radius:6px;text-decoration:none;color:inherit\">"
+         label "</a>")))
+
+;; 현재 페이지 중심 ±2 범위 숫자 렌더
+(defn pag-numbers [base-url current last-page]
+  (let [start (max 1 (- current 2))
+        end   (min last-page (+ current 2))]
+    (reduce str "" (map (fn [p] (pag-number base-url p current))
+                        (range start (+ end 1))))))
+
+(defn pag-number [base-url p current]
+  (if (= p current)
+    (str "<span class=\"fl-pag-current\" "
+         "style=\"padding:0.4em 0.8em;background:var(--color-primary);"
+         "color:white;border-radius:6px;font-weight:600\">" p "</span>")
+    (str "<a href=\"" base-url "?page=" p "\" "
+         "style=\"padding:0.4em 0.8em;border:1px solid var(--border);"
+         "border-radius:6px;text-decoration:none;color:inherit\">" p "</a>")))

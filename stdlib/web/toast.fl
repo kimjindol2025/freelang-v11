@@ -1,0 +1,62 @@
+;; stdlib/web/toast — 플래시 메시지 (XSS 안전)
+;; (toast-container) + (toast-js) 를 layout 에 한번 주입 후,
+;; 페이지에서 (toast-emit-js "저장 완료" "success") 호출.
+
+;; 토스트 컨테이너 DOM (페이지 하단 고정)
+(defn toast-container []
+  "<div id=\"fl-toasts\" role=\"region\" aria-live=\"polite\"
+        aria-label=\"알림\"
+        style=\"position:fixed;bottom:1rem;right:1rem;z-index:9999;
+               display:flex;flex-direction:column;gap:0.5rem\"></div>")
+
+;; 토스트 JS — XSS 안전한 createElement + textContent
+(defn toast-js []
+  "<script>
+(function(){
+  window.flToast = function(msg, type){
+    type = type || 'info';
+    var host = document.getElementById('fl-toasts');
+    if(!host){
+      host = document.createElement('div');
+      host.id = 'fl-toasts';
+      host.setAttribute('role','region');
+      host.setAttribute('aria-live','polite');
+      host.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem';
+      document.body.appendChild(host);
+    }
+    var colors = {
+      info:    '#3b82f6',
+      success: '#10b981',
+      danger:  '#ef4444',
+      warning: '#f59e0b'
+    };
+    var el = document.createElement('div');
+    el.className = 'fl-toast fl-toast-' + type;
+    el.setAttribute('role','status');
+    el.textContent = String(msg);
+    el.style.cssText =
+      'background:' + (colors[type] || colors.info) + ';' +
+      'color:white;padding:0.75rem 1rem;border-radius:8px;' +
+      'box-shadow:0 4px 12px rgba(0,0,0,0.15);' +
+      'max-width:320px;font-size:0.9rem;' +
+      'opacity:0;transform:translateY(10px);transition:all 200ms';
+    host.appendChild(el);
+    requestAnimationFrame(function(){
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    });
+    setTimeout(function(){
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(10px)';
+      setTimeout(function(){ el.remove(); }, 220);
+    }, 3500);
+  };
+})();
+</script>")
+
+;; 페이지 내에서 서버가 플래시 메시지 주입:
+;; (toast-emit-js "저장 완료" "success") → <script>flToast('저장 완료','success')</script>
+;; NOTE: msg 는 서버가 안전한 문자열만 전달해야 함. 사용자 입력 직접 삽입 금지.
+(defn toast-emit-js [msg type]
+  (str "<script>if(window.flToast)flToast("
+       (json_str msg) "," (json_str type) ");</script>"))
