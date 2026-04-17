@@ -1,0 +1,116 @@
+[IMPORT "stdlib/web/styles" :as styles]
+[IMPORT "stdlib/web/components" :as ui]
+[IMPORT "stdlib/web/state" :as state]
+
+(fn []
+  (page
+    :title "컴포넌트 데모 - FreeLang v11"
+    :render (fn []
+      (concat
+        "<html><head><title>컴포넌트 데모</title>"
+        (styles/inject-base)
+        (ui/all-component-css)
+        "</head><body>"
+        (state/render-state-block "demo" {modal-open false count 0})
+
+        "<div style='padding:var(--space-6); max-width:1200px; margin:0 auto'>"
+
+        ; 헤더
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h1>UI 컴포넌트 라이브러리</h1>"
+        "<p class='fl-text-muted'>FreeLang v11 stdlib 컴포넌트 모음</p>"
+        "</div>"
+
+        ; ==================== BUTTON ====================
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h2 style='margin-bottom:var(--space-4)'>Button</h2>"
+        "<div class='fl-flex' style='gap:var(--space-4); flex-wrap:wrap'>"
+        (ui/render-button "Primary" :variant "primary")
+        (ui/render-button "Secondary" :variant "secondary")
+        (ui/render-button "Danger" :variant "danger")
+        (ui/render-button "Small" :variant "primary" :size "sm")
+        (ui/render-button "Large" :variant "primary" :size "lg")
+        (ui/render-button "Disabled" :variant "primary" :disabled true)
+        "</div>"
+        "</div>"
+
+        ; ==================== ALERT ====================
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h2 style='margin-bottom:var(--space-4)'>Alert</h2>"
+        "<div style='display:flex; flex-direction:column; gap:var(--space-2)'>"
+        (ui/render-alert "정보 알림: 시스템 유지보수는 2026-04-20 예정입니다" :type "info")
+        (ui/render-alert "성공! 업로드가 완료되었습니다" :type "success")
+        (ui/render-alert "주의: 변경사항을 저장해주세요" :type "warning")
+        (ui/render-alert "오류: 파일을 찾을 수 없습니다" :type "danger" :dismissible true)
+        "</div>"
+        "</div>"
+
+        ; ==================== BADGE ====================
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h2 style='margin-bottom:var(--space-4)'>Badge</h2>"
+        "<div class='fl-flex' style='gap:var(--space-2); flex-wrap:wrap'>"
+        (ui/render-badge "Primary" :color "primary")
+        (ui/render-badge "Success" :color "success")
+        (ui/render-badge "Warning" :color "warning")
+        (ui/render-badge "Danger" :color "danger")
+        (ui/render-badge "Gray" :color "gray")
+        "</div>"
+        "</div>"
+
+        ; ==================== CARD ====================
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h2 style='margin-bottom:var(--space-4)'>Card</h2>"
+        "<div class='fl-grid' style='grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--space-4)'>"
+        (ui/render-card
+          "Card with Footer"
+          "<p>이것은 카드 컴포넌트의 기본 사용 예입니다.</p><p class='fl-text-muted'>추가 정보나 설명을 여기에 입력할 수 있습니다.</p>"
+          "<a href='#' style='color:var(--color-primary); text-decoration:none'>더 알아보기 →</a>")
+        (ui/render-card
+          "Card with Image"
+          "<p>이미지가 포함된 카드입니다.</p>"
+          ""
+          "https://via.placeholder.com/400x200")
+        (ui/render-card
+          "Empty Card"
+          "<p>내용이 최소한인 카드입니다.</p>"
+          "")
+        "</div>"
+        "</div>"
+
+        ; ==================== MODAL ====================
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h2 style='margin-bottom:var(--space-4)'>Modal</h2>"
+        "<div>"
+        (ui/render-button "모달 열기" :variant "primary" :onclick "flOpenModal('demo-modal')")
+        "</div>"
+        (ui/render-modal
+          "demo-modal"
+          "확인"
+          "<p>이것은 모달 대화상자입니다.</p><p class='fl-text-muted'>내용을 여기에 입력할 수 있습니다.</p>"
+          (concat
+            (ui/render-button "확인" :variant "primary" :onclick "flCloseModal('demo-modal')")
+            " "
+            (ui/render-button "취소" :variant "secondary" :onclick "flCloseModal('demo-modal')")))
+        "</div>"
+
+        ; ==================== 상태 관리 ====================
+        "<div style='margin-bottom:var(--space-8)'>"
+        "<h2 style='margin-bottom:var(--space-4)'>State Management</h2>"
+        "<div style='padding:var(--space-4); background:var(--color-bg-muted); border-radius:var(--radius-md); text-align:center'>"
+        "<p style='margin-bottom:var(--space-4)'>현재 카운트: <span id='count-display' style='font-weight:bold; font-size:var(--font-lg)'>0</span></p>"
+        "<div class='fl-flex' style='gap:var(--space-2); justify-content:center'>"
+        (ui/render-button "-" :variant "secondary" :onclick "flSetState('count', (flGetState('count') || 0) - 1)")
+        (ui/render-button "초기화" :variant "secondary" :onclick "flSetState('count', 0)")
+        (ui/render-button "+" :variant "primary" :onclick "flSetState('count', (flGetState('count') || 0) + 1)")
+        "</div>"
+        "</div>"
+        "</div>"
+
+        "</div>"
+
+        (state/bind-state-js "count" "#count-display")
+        (ui/modal-helpers-js)
+
+        "</body></html>"))
+  )
+)

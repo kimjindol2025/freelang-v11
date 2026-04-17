@@ -1,0 +1,150 @@
+; FreeLang v11 — UI Components Library
+; Phase B: 5개 핵심 컴포넌트 (SSR 지원)
+; styles.fl에 의존
+
+[IMPORT "./styles" :as styles]
+
+; ==================== BUTTON ====================
+
+[COMPONENT button
+  :props {text type variant size disabled onclick}
+  :defaults {type "button" variant "primary" size "md" disabled false}
+  :render "<button type='{{type}}' class='fl-btn fl-btn-{{variant}} fl-btn-{{size}}' {{#if disabled}}disabled{{/if}} onclick='{{onclick}}'>{{text}}</button>"
+]
+
+[FUNC render-button :params [text :variant "primary" :size "md" :onclick "" :disabled false]
+  :returns str
+  :body [
+    (do
+      (var disabled-attr (if disabled " disabled" ""))
+      (var onclick-attr (if (not (eq onclick "")) (concat " onclick=\"" onclick "\"") ""))
+      (concat "<button type=\"button\" class=\"fl-btn fl-btn-" variant " fl-btn-" size "\"" disabled-attr onclick-attr ">" text "</button>"))
+  ]
+]
+
+; ==================== CARD ====================
+
+[COMPONENT card
+  :props {title body footer image}
+  :defaults {title "" footer "" image ""}
+  :render "<div class='fl-card'>{{#if image}}<img class='fl-card-img' src='{{image}}' alt='{{title}}' />{{/if}}<div class='fl-card-body'>{{#if title}}<h3 class='fl-card-title'>{{title}}</h3>{{/if}}<div class='fl-card-content'>{{body}}</div>{{#if footer}}<div class='fl-card-footer'>{{footer}}</div>{{/if}}</div></div>"
+]
+
+[FUNC render-card :params [title body :footer "" :image ""]
+  :returns str
+  :body [
+    (do
+      (var img-html (if (not (eq image "")) (concat "<img class='fl-card-img' src='" image "' alt='" title "' />") ""))
+      (var title-html (if (not (eq title "")) (concat "<h3 class='fl-card-title'>" title "</h3>") ""))
+      (var footer-html (if (not (eq footer "")) (concat "<div class='fl-card-footer'>" footer "</div>") ""))
+      (concat "<div class='fl-card'>" img-html "<div class='fl-card-body'>" title-html "<div class='fl-card-content'>" body "</div>" footer-html "</div></div>"))
+  ]
+]
+
+; ==================== ALERT ====================
+
+[COMPONENT alert
+  :props {message type dismissible}
+  :defaults {type "info" dismissible false}
+  :render "<div class='fl-alert fl-alert-{{type}}' role='alert'><span class='fl-alert-msg'>{{message}}</span>{{#if dismissible}}<button class='fl-alert-close' onclick='this.parentElement.remove()'>×</button>{{/if}}</div>"
+]
+
+[FUNC render-alert :params [message :type "info" :dismissible false]
+  :returns str
+  :body [
+    (do
+      (var close-btn (if dismissible "<button class='fl-alert-close' onclick='this.parentElement.remove()'>×</button>" ""))
+      (concat "<div class='fl-alert fl-alert-" type "' role='alert'><span class='fl-alert-msg'>" message "</span>" close-btn "</div>"))
+  ]
+]
+
+; ==================== BADGE ====================
+
+[COMPONENT badge
+  :props {label color}
+  :defaults {color "primary"}
+  :render "<span class='fl-badge fl-badge-{{color}}'>{{label}}</span>"
+]
+
+[FUNC render-badge :params [label :color "primary"]
+  :returns str
+  :body [
+    (concat "<span class='fl-badge fl-badge-" color "'>" label "</span>")
+  ]
+]
+
+; ==================== MODAL ====================
+
+[COMPONENT modal
+  :props {id title body footer}
+  :defaults {footer ""}
+  :render "<div class='fl-modal-overlay' id='modal-{{id}}' onclick='flCloseModal(\"{{id}}\")' style='display:none'><div class='fl-modal-box' onclick='event.stopPropagation()'><div class='fl-modal-header'><h2>{{title}}</h2><button class='fl-modal-close' onclick='flCloseModal(\"{{id}}\")'>×</button></div><div class='fl-modal-body'>{{body}}</div>{{#if footer}}<div class='fl-modal-footer'>{{footer}}</div>{{/if}}</div></div>"
+]
+
+[FUNC render-modal :params [id title body :footer ""]
+  :returns str
+  :body [
+    (do
+      (var footer-html (if (not (eq footer "")) (concat "<div class='fl-modal-footer'>" footer "</div>") ""))
+      (concat "<div class='fl-modal-overlay' id='modal-" id "' onclick='flCloseModal(\"" id "\")' style='display:none'><div class='fl-modal-box' onclick='event.stopPropagation()'><div class='fl-modal-header'><h2>" title "</h2><button class='fl-modal-close' onclick='flCloseModal(\"" id "\")'>×</button></div><div class='fl-modal-body'>" body "</div>" footer-html "</div></div>"))
+  ]
+]
+
+; ==================== 전체 컴포넌트 CSS ====================
+
+[FUNC all-component-css :params []
+  :returns str
+  :body [
+    "<style>
+.fl-btn { display:inline-flex; align-items:center; cursor:pointer; border:none; font-size:var(--font-base); font-weight:500; border-radius:var(--radius-md); transition:opacity 0.15s; padding:var(--space-2) var(--space-4); }
+.fl-btn:hover { opacity:0.85; } .fl-btn:disabled { opacity:0.5; cursor:not-allowed; }
+.fl-btn-primary { background:var(--color-primary); color:#fff; }
+.fl-btn-secondary { background:var(--color-bg-muted); color:var(--color-text); border:1px solid var(--color-border); }
+.fl-btn-danger { background:var(--color-danger); color:#fff; }
+.fl-btn-sm { font-size:var(--font-sm); padding:var(--space-1) var(--space-3); }
+.fl-btn-lg { font-size:var(--font-lg); padding:var(--space-3) var(--space-6); }
+.fl-card { background:var(--color-bg); border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-sm); }
+.fl-card-img { width:100%; height:200px; object-fit:cover; }
+.fl-card-body { padding:var(--space-4); }
+.fl-card-title { font-size:var(--font-xl); font-weight:600; margin-bottom:var(--space-2); }
+.fl-card-footer { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--color-border); color:var(--color-text-muted); font-size:var(--font-sm); }
+.fl-alert { display:flex; align-items:center; justify-content:space-between; padding:var(--space-3) var(--space-4); border-radius:var(--radius-md); margin:var(--space-2) 0; }
+.fl-alert-info { background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; }
+.fl-alert-success { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+.fl-alert-warning { background:#fef9c3; color:#854d0e; border:1px solid #fde047; }
+.fl-alert-danger { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+.fl-alert-close { background:none; border:none; cursor:pointer; font-size:1.25rem; color:inherit; margin-left:var(--space-2); }
+.fl-badge { display:inline-block; padding:2px var(--space-2); border-radius:9999px; font-size:0.75rem; font-weight:600; line-height:1.5; }
+.fl-badge-primary { background:#dbeafe; color:#1d4ed8; }
+.fl-badge-success { background:#dcfce7; color:#15803d; }
+.fl-badge-warning { background:#fef9c3; color:#a16207; }
+.fl-badge-danger { background:#fee2e2; color:#b91c1c; }
+.fl-badge-gray { background:#f1f5f9; color:#475569; }
+.fl-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center; }
+.fl-modal-box { background:var(--color-bg); border-radius:var(--radius-lg); padding:var(--space-6); max-width:500px; width:90%; box-shadow:var(--shadow-md); }
+.fl-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-4); }
+.fl-modal-close { background:none; border:none; cursor:pointer; font-size:1.5rem; color:var(--color-text-muted); }
+.fl-modal-footer { margin-top:var(--space-4); display:flex; justify-content:flex-end; gap:var(--space-2); }
+    </style>"
+  ]
+]
+
+; ==================== 모달 헬퍼 스크립트 ====================
+
+[FUNC modal-helpers-js :params []
+  :returns str
+  :body [
+    "<script>
+function flOpenModal(id) {
+  var el = document.getElementById('modal-' + id);
+  if (el) el.style.display = 'flex';
+}
+function flCloseModal(id) {
+  var el = document.getElementById('modal-' + id);
+  if (el) el.style.display = 'none';
+}
+    </script>"
+  ]
+]
+
+[EXPORT render-button render-card render-alert render-badge render-modal all-component-css modal-helpers-js]

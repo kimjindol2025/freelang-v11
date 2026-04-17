@@ -1,0 +1,102 @@
+; FreeLang v11 — Reactive State Management
+; Phase D: 상태 관리 + DOM 바인딩
+; 의존성 없음 (순수 JavaScript)
+
+; ==================== 상태 부트스트랩 ====================
+
+[FUNC init-state-js :params [initial-state]
+  :returns str
+  :body [
+    (do
+      (var state-json (json-stringify initial-state))
+      (concat
+        "<script>"
+        "window.__flState = window.__flState || {};"
+        "const _flInitState = " state-json ";"
+        "Object.assign(window.__flState, _flInitState);"
+        "window.__flSubscribers = window.__flSubscribers || {};"
+        "window.flGetState = function(key) {"
+        "  return window.__flState[key];"
+        "};"
+        "window.flSetState = function(key, value) {"
+        "  window.__flState[key] = value;"
+        "  const subs = window.__flSubscribers[key] || [];"
+        "  subs.forEach(function(fn) { fn(value); });"
+        "  document.dispatchEvent(new CustomEvent('fl-state-change', {"
+        "    detail: { key: key, value: value }"
+        "  }));"
+        "};"
+        "window.flSubscribe = function(key, fn) {"
+        "  window.__flSubscribers[key] = window.__flSubscribers[key] || [];"
+        "  window.__flSubscribers[key].push(fn);"
+        "};"
+        "window.flUnsubscribe = function(key, fn) {"
+        "  const subs = window.__flSubscribers[key] || [];"
+        "  window.__flSubscribers[key] = subs.filter(function(s) { return s !== fn; });"
+        "};"
+        "</script>"))
+  ]
+]
+
+; ==================== DOM 상태 바인딩 ====================
+
+[FUNC bind-state-js :params [state-key selector :transform ""]
+  :returns str
+  :body [
+    (do
+      (var transform-fn (if (not (eq transform "")) transform "function(v) { return v; }"))
+      (concat
+        "<script>"
+        "(function() {"
+        "  var _transform = " transform-fn ";"
+        "  function _update(val) {"
+        "    var els = document.querySelectorAll('" selector "');"
+        "    els.forEach(function(el) { el.textContent = _transform(val); });"
+        "  }"
+        "  flSubscribe('" state-key "', _update);"
+        "  document.addEventListener('DOMContentLoaded', function() {"
+        "    _update(flGetState('" state-key "') || '');"
+        "  });"
+        "})();"
+        "</script>"))
+  ]
+]
+
+; ==================== localStorage 영속화 ====================
+
+[FUNC persist-state-js :params [keys]
+  :returns str
+  :body [
+    (do
+      (var keys-json (json-stringify keys))
+      (concat
+        "<script>"
+        "(function() {"
+        "  var persistKeys = " keys-json ";"
+        "  persistKeys.forEach(function(key) {"
+        "    var saved = localStorage.getItem('fl-state-' + key);"
+        "    if (saved !== null) {"
+        "      try { flSetState(key, JSON.parse(saved)); } catch(e) {}"
+        "    }"
+        "    flSubscribe(key, function(val) {"
+        "      localStorage.setItem('fl-state-' + key, JSON.stringify(val));"
+        "    });"
+        "  });"
+        "})();"
+        "</script>"))
+  ]
+]
+
+; ==================== 상태 블록 통합 렌더링 ====================
+
+[FUNC render-state-block :params [id initial-data :persist-keys []]
+  :returns str
+  :body [
+    (do
+      (var init-script (init-state-js initial-data))
+      (var persist-script (if (> (len persist-keys) 0) (persist-state-js persist-keys) ""))
+      (concat init-script persist-script))
+  ]
+]
+
+[EXPORT init-state-js bind-state-js persist-state-js render-state-block]
