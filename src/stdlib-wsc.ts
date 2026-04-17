@@ -1,8 +1,7 @@
 // FreeLang v9: WebSocket Client Standard Library
 // Phase 57: WebSocket 클라이언트 (터널 에이전트용)
 // 에이전트가 릴레이 서버에 연결하는 데 사용
-
-import { WebSocket } from "ws";
+// Node.js v25 globalThis.WebSocket 사용 (의존성 제거)
 
 type CallFn = (name: string, args: any[]) => any;
 
@@ -20,7 +19,7 @@ type CallFn = (name: string, args: any[]) => any;
  */
 export function createWscModule(callFn: CallFn) {
   interface ClientConnection {
-    socket: WebSocket;
+    socket: globalThis.WebSocket;
     url: string;
     token: string;
     reconnecting: boolean;
@@ -43,16 +42,20 @@ export function createWscModule(callFn: CallFn) {
     return `wsc_${++clientCounter}_${Date.now()}`;
   }
 
-  function setupSocket(connId: string, socket: WebSocket) {
-    socket.on("open", () => {
+  function setupSocket(connId: string, socket: globalThis.WebSocket) {
+    socket.addEventListener("open", () => {
       tryCall(onOpenFn, [connId]);
     });
 
-    socket.on("message", (data: Buffer) => {
-      tryCall(onMessageFn, [connId, data.toString()]);
+    socket.addEventListener("message", (event: MessageEvent) => {
+      const data = event.data;
+      const message = typeof data === 'string' ? data :
+        data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)).toString() :
+        data.toString();
+      tryCall(onMessageFn, [connId, message]);
     });
 
-    socket.on("close", () => {
+    socket.addEventListener("close", () => {
       const client = clients.get(connId);
       if (client && !client.reconnecting) {
         clients.delete(connId);
@@ -60,8 +63,9 @@ export function createWscModule(callFn: CallFn) {
       tryCall(onCloseFn, [connId]);
     });
 
-    socket.on("error", (err: Error) => {
-      tryCall(onErrorFn, [connId, err.message]);
+    socket.addEventListener("error", (event: Event) => {
+      const msg = (event as any).message ?? 'WebSocket error';
+      tryCall(onErrorFn, [connId, msg]);
     });
   }
 
@@ -72,9 +76,9 @@ export function createWscModule(callFn: CallFn) {
       headers["authorization"] = `Bearer ${token}`;
     }
 
-    const socket = new WebSocket(url, {
+    const socket = new globalThis.WebSocket(url, {
       headers: Object.keys(headers).length > 0 ? headers : undefined,
-    });
+    } as any);
 
     const client: ClientConnection = {
       socket,
@@ -98,7 +102,7 @@ export function createWscModule(callFn: CallFn) {
     // wsc_send connId message → boolean
     "wsc_send": (connId: string, message: string): boolean => {
       const client = clients.get(connId);
-      if (!client || client.socket.readyState !== WebSocket.OPEN) return false;
+      if (!client || client.socket.readyState !== globalThis.WebSocket.OPEN) return false;
       try {
         client.socket.send(message);
         return true;
@@ -110,7 +114,7 @@ export function createWscModule(callFn: CallFn) {
     // wsc_send_json connId data → boolean
     "wsc_send_json": (connId: string, data: any): boolean => {
       const client = clients.get(connId);
-      if (!client || client.socket.readyState !== WebSocket.OPEN) return false;
+      if (!client || client.socket.readyState !== globalThis.WebSocket.OPEN) return false;
       try {
         client.socket.send(JSON.stringify(data));
         return true;
@@ -138,10 +142,10 @@ export function createWscModule(callFn: CallFn) {
       if (!client) return "CLOSED";
       const socket = client.socket;
       switch (socket.readyState) {
-        case WebSocket.CONNECTING: return "CONNECTING";
-        case WebSocket.OPEN:       return "OPEN";
-        case WebSocket.CLOSING:    return "CLOSING";
-        case WebSocket.CLOSED:     return "CLOSED";
+        case globalThis.WebSocket.CONNECTING: return "CONNECTING";
+        case globalThis.WebSocket.OPEN:       return "OPEN";
+        case globalThis.WebSocket.CLOSING:    return "CLOSING";
+        case globalThis.WebSocket.CLOSED:     return "CLOSED";
         default:                   return "UNKNOWN";
       }
     },
@@ -196,14 +200,14 @@ export function createWscModule(callFn: CallFn) {
           const currentClient = clients.get(connId);
           if (!currentClient) return;
 
-          const newSocket = new WebSocket(currentClient.url, {
+          const newSocket = new globalThis.WebSocket(currentClient.url, {
             headers: currentClient.token ? { authorization: `Bearer ${currentClient.token}` } : undefined,
-          });
+          } as any);
 
           currentClient.socket = newSocket;
           setupSocket(connId, newSocket);
 
-          newSocket.on("open", () => {
+          newSocket.addEventListener("open", () => {
             const openClient = clients.get(connId);
             if (openClient) {
               openClient.reconnecting = false;
@@ -212,7 +216,7 @@ export function createWscModule(callFn: CallFn) {
             }
           });
 
-          newSocket.on("close", () => {
+          newSocket.addEventListener("close", () => {
             const closeClient = clients.get(connId);
             if (closeClient && closeClient.reconnecting) {
               attemptReconnect();
@@ -221,8 +225,9 @@ export function createWscModule(callFn: CallFn) {
             }
           });
 
-          newSocket.on("error", (err: Error) => {
-            tryCall(onErrorFn, [connId, err.message]);
+          newSocket.addEventListener("error", (event: Event) => {
+            const msg = (event as any).message ?? 'WebSocket error';
+            tryCall(onErrorFn, [connId, msg]);
             const errClient = clients.get(connId);
             if (errClient && errClient.reconnecting) {
               attemptReconnect();

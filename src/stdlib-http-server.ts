@@ -6,30 +6,10 @@ import * as http from "http";
 import * as url from "url";
 import * as crypto from "crypto";
 
-// WebSocket (ws 패키지 또는 내장 구현)
-let WebSocketServer: any = null;
-let WebSocket: any = null;
-
-try {
-  // Try to import ws package if available
-  const wsModule = require("ws");
-  WebSocketServer = wsModule.WebSocketServer;
-  WebSocket = wsModule.WebSocket;
-} catch {
-  // Fallback: mock WebSocketServer for v11 (simplified, HTTP-only)
-  WebSocketServer = class {
-    constructor(options: any) {
-      // No-op: WebSocket support deferred to v11.1
-    }
-    on(event: string, handler: any) {}
-    broadcast(data: string) {}
-    close() {}
-  };
-  WebSocket = class {
-    send(data: string) {}
-    close() {}
-  };
-}
+// WebSocket (Node.js v25 native via stdlib-ws.ts)
+// RFC 6455 핸드셰이크는 아래 server.on('upgrade') 에서 처리
+const WS_OPEN = 1;
+const WS_CLOSING = 2;
 
 type CallFn = (name: string, args: any[]) => any;
 type CallFunctionValue = (fnValue: any, args: any[]) => any;
@@ -334,49 +314,117 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           }
         });
 
-      // WebSocket upgrade 지원 (터널 WS 프록시)
-      wssPublic = new WebSocketServer({ noServer: true });
+      // WebSocket upgrade 지원 (RFC 6455 직접 구현)
       server.on('upgrade', (req, socket, head) => {
-        if (!upgradeHandler || !wssPublic) {
+        if (!upgradeHandler) {
           socket.destroy();
           return;
         }
-        wssPublic.handleUpgrade(req, socket, head, (ws) => {
-          const sessionId = 'wsc-' + crypto.randomBytes(8).toString('hex');
-          wsPublicMap.set(sessionId, ws);
 
-          ws.on('message', async (data, isBinary) => {
-            if (!wsClientMessageHandler) return;
-            const payload = isBinary
-              ? (data as Buffer).toString('base64')
-              : data.toString('utf8');
-            try {
-              await callFn(wsClientMessageHandler, [sessionId, payload, isBinary]);
-            } catch {}
-          });
+        // RFC 6455 핸드셰이크
+        const key = (req.headers as any)['sec-websocket-key'];
+        if (!key) {
+          socket.destroy();
+          return;
+        }
 
-          ws.on('close', async (code, reason) => {
-            wsPublicMap.delete(sessionId);
-            if (wsClientCloseHandler) {
-              try { await callFn(wsClientCloseHandler, [sessionId, code]); } catch {}
+        const accept = crypto.createHash('sha1')
+          .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+          .digest('base64');
+
+        socket.write([
+          'HTTP/1.1 101 Switching Protocols',
+          'Upgrade: websocket',
+          'Connection: Upgrade',
+          'Sec-WebSocket-Accept: ' + accept,
+          '', ''
+        ].join('\r\n'));
+
+        const sessionId = 'wsc-' + crypto.randomBytes(8).toString('hex');
+        wsPublicMap.set(sessionId, socket as any);
+
+        let buf = Buffer.alloc(0);
+
+        socket.on('data', async (chunk: Buffer) => {
+          buf = Buffer.concat([buf, chunk]);
+
+          // RFC 6455 프레임 파싱 (간단한 구현)
+          while (buf.length >= 2) {
+            const fin = (buf[0] & 0x80) !== 0;
+            const opcode = buf[0] & 0x0f;
+            const masked = (buf[1] & 0x80) !== 0;
+            let payloadLen = buf[1] & 0x7f;
+            let hdrLen = 2;
+
+            if (payloadLen === 126) {
+              if (buf.length < 4) break;
+              payloadLen = buf.readUInt16BE(2);
+              hdrLen = 4;
+            } else if (payloadLen === 127) {
+              if (buf.length < 10) break;
+              payloadLen = Number(buf.readBigUInt64BE(2));
+              hdrLen = 10;
             }
-          });
 
-          ws.on('error', () => { wsPublicMap.delete(sessionId); });
+            if (masked) hdrLen += 4;
+            if (buf.length < hdrLen + payloadLen) break;
 
-          // FreeLang upgrade 핸들러 호출
-          const upgradeReq = {
-            __fl_request: true,
-            method: 'WS_UPGRADE',
-            path: req.url || '/',
-            headers: req.headers,
-            query: {},
-            body: '',
-            params: {},
-            session_id: sessionId,
-          };
-          callFn(upgradeHandler!, [upgradeReq]);
+            let maskKey: Buffer | null = null;
+            if (masked) maskKey = buf.slice(hdrLen - 4, hdrLen);
+
+            const payload = Buffer.from(buf.slice(hdrLen, hdrLen + payloadLen));
+            if (maskKey) {
+              for (let i = 0; i < payload.length; i++) {
+                payload[i] ^= maskKey[i % 4];
+              }
+            }
+
+            if (opcode === 8) { // CLOSE
+              wsPublicMap.delete(sessionId);
+              if (wsClientCloseHandler) {
+                try { await callFn(wsClientCloseHandler, [sessionId, 1000]); } catch {}
+              }
+              socket.end();
+              return;
+            }
+
+            if (opcode === 9) { // PING
+              socket.write(Buffer.from([0x8a, 0x00]));
+            } else if (opcode === 0x01 || opcode === 0x02) { // TEXT or BINARY
+              if (wsClientMessageHandler) {
+                const isBinary = opcode === 0x02;
+                const data = isBinary ? payload.toString('base64') : payload.toString('utf8');
+                try {
+                  await callFn(wsClientMessageHandler, [sessionId, data, isBinary]);
+                } catch {}
+              }
+            }
+
+            buf = buf.slice(hdrLen + payloadLen);
+          }
         });
+
+        socket.on('close', async () => {
+          wsPublicMap.delete(sessionId);
+          if (wsClientCloseHandler) {
+            try { await callFn(wsClientCloseHandler, [sessionId, 1006]); } catch {}
+          }
+        });
+
+        socket.on('error', () => { wsPublicMap.delete(sessionId); });
+
+        // FreeLang upgrade 핸들러 호출
+        const upgradeReq = {
+          __fl_request: true,
+          method: 'WS_UPGRADE',
+          path: req.url || '/',
+          headers: req.headers,
+          query: {},
+          body: '',
+          params: {},
+          session_id: sessionId,
+        };
+        callFn(upgradeHandler!, [upgradeReq]);
       });
 
       server.on("error", (err: any) => {
@@ -535,21 +583,51 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
     // ws_send_to_client sessionId data [isBinary] -> boolean
     "ws_send_to_client": (sessionId: string, data: string, isBinary: boolean = false): boolean => {
-      const ws = wsPublicMap.get(sessionId);
-      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-      if (isBinary) {
-        ws.send(Buffer.from(data, 'base64'));
-      } else {
-        ws.send(data);
+      const socket = wsPublicMap.get(sessionId) as any;
+      if (!socket || socket.destroyed) return false;
+      try {
+        // RFC 6455 프레임 빌더 (서버→클라이언트, 마스킹 없음)
+        const payload = isBinary ? Buffer.from(data, 'base64') : Buffer.from(data);
+        const opcode = isBinary ? 0x02 : 0x01;
+        let frame: Buffer;
+
+        if (payload.length < 126) {
+          const h = Buffer.alloc(2);
+          h[0] = 0x80 | opcode;
+          h[1] = payload.length;
+          frame = Buffer.concat([h, payload]);
+        } else if (payload.length < 65536) {
+          const h = Buffer.alloc(4);
+          h[0] = 0x80 | opcode;
+          h[1] = 126;
+          h.writeUInt16BE(payload.length, 2);
+          frame = Buffer.concat([h, payload]);
+        } else {
+          const h = Buffer.alloc(10);
+          h[0] = 0x80 | opcode;
+          h[1] = 127;
+          h.writeBigUInt64BE(BigInt(payload.length), 2);
+          frame = Buffer.concat([h, payload]);
+        }
+
+        socket.write(frame);
+        return true;
+      } catch {
+        return false;
       }
-      return true;
     },
 
     // ws_close_client sessionId [code] -> null
     "ws_close_client": (sessionId: string, code: number = 1000): null => {
-      const ws = wsPublicMap.get(sessionId);
-      if (ws) {
-        ws.close(code);
+      const socket = wsPublicMap.get(sessionId) as any;
+      if (socket && !socket.destroyed) {
+        // RFC 6455 CLOSE 프레임
+        const b = Buffer.alloc(4);
+        b[0] = 0x88;
+        b[1] = 0x02;
+        b.writeUInt16BE(code, 2);
+        socket.write(b);
+        socket.end();
         wsPublicMap.delete(sessionId);
       }
       return null;
