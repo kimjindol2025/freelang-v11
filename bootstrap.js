@@ -19195,6 +19195,16 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           res.end();
           return;
         }
+        if (process.env.FL_DEV === "1" && path13 === "/__hot" && method === "GET") {
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+          });
+          res.write("retry: 400\n\n");
+          return;
+        }
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
@@ -19419,12 +19429,23 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       };
     },
     // server_html body -> response object (text/html)
+    // In dev mode (FL_DEV=1), injects hot-reload script before </body>
+    // so browsers auto-refresh when the FreeLang source file changes.
     "server_html": (body) => {
+      let finalBody = body;
+      if (process.env.FL_DEV === "1" && typeof finalBody === "string") {
+        const script = `<script>(function(){let w=false;function c(){const e=new EventSource('/__hot');e.onopen=function(){if(w)location.reload();w=true;};e.onerror=function(){e.close();setTimeout(c,400);};}c();})();</script>`;
+        if (finalBody.includes("</body>")) {
+          finalBody = finalBody.replace("</body>", script + "</body>");
+        } else {
+          finalBody = finalBody + script;
+        }
+      }
       return {
         __fl_response: true,
         status: 200,
         contentType: "text/html; charset=utf-8",
-        body
+        body: finalBody
       };
     },
     // server_wait_respond promise -> response object (비동기 응답 대기)
@@ -28934,9 +28955,12 @@ function cmdRun(filePath, watch2, extraArgs = []) {
       }
     }
   }
+  if (watch2) {
+    process.env.FL_DEV = "1";
+  }
   execute();
   if (watch2) {
-    console.log(`\x1B[2m  watching ${path12.basename(absPath)}...\x1B[0m`);
+    console.log(`\x1B[2m  watching ${path12.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
     let lastMtime = 0;
     let lastSize = -1;
     try {

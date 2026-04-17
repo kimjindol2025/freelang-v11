@@ -236,6 +236,21 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             return;
           }
 
+          // Dev mode: /__hot SSE endpoint for browser hot-reload
+          // Client connects, keeps open; when server restarts the connection
+          // drops and EventSource auto-reconnects → onopen fires → reload().
+          if (process.env.FL_DEV === "1" && path === "/__hot" && method === "GET") {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+              "X-Accel-Buffering": "no",
+            });
+            res.write("retry: 400\n\n");
+            // Keep connection open until client disconnects or server restarts
+            return;
+          }
+
           // 라우트 매칭
           let matched = false;
           for (const route of routes) {
@@ -499,12 +514,23 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     },
 
     // server_html body -> response object (text/html)
+    // In dev mode (FL_DEV=1), injects hot-reload script before </body>
+    // so browsers auto-refresh when the FreeLang source file changes.
     "server_html": (body: string): Record<string, any> => {
+      let finalBody = body;
+      if (process.env.FL_DEV === "1" && typeof finalBody === "string") {
+        const script = `<script>(function(){let w=false;function c(){const e=new EventSource('/__hot');e.onopen=function(){if(w)location.reload();w=true;};e.onerror=function(){e.close();setTimeout(c,400);};}c();})();</script>`;
+        if (finalBody.includes("</body>")) {
+          finalBody = finalBody.replace("</body>", script + "</body>");
+        } else {
+          finalBody = finalBody + script;
+        }
+      }
       return {
         __fl_response: true,
         status: 200,
         contentType: "text/html; charset=utf-8",
-        body,
+        body: finalBody,
       };
     },
 

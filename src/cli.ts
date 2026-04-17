@@ -133,10 +133,16 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
     }
   }
 
+  if (watch) {
+    // Enable dev mode BEFORE first execute: server_html will inject the
+    // hot-reload client script, and /__hot SSE endpoint will be served.
+    process.env.FL_DEV = "1";
+  }
+
   execute();
 
   if (watch) {
-    console.log(`\x1b[2m  watching ${path.basename(absPath)}...\x1b[0m`);
+    console.log(`\x1b[2m  watching ${path.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1b[0m`);
     // Use setInterval polling for reliability across filesystems
     // (fs.watch silently breaks on Termux/Android, or after the editor
     //  rewrites the inode — polling survives re-executes and inode changes)
