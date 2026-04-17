@@ -99,4 +99,82 @@
   ]
 ]
 
-[EXPORT init-state-js bind-state-js persist-state-js render-state-block]
+; ==================== 선언적 자동 바인딩 ====================
+; HTML 속성으로 반응성 선언 — React 대체 수준의 간단 DSL:
+;   <p data-fl-bind="count">0</p>          ← 상태 값 textContent 반영
+;   <input data-fl-model="name">           ← 양방향 input
+;   <button data-fl-click="inc">+1</button> ← 클릭 이벤트 연결
+;   <div data-fl-show="loggedIn">...</div> ← 조건부 표시
+;
+; 한 번만 auto-bind-js를 호출하면 전체 페이지가 반응형이 됨.
+; MutationObserver로 동적 삽입 요소도 자동 처리.
+
+[FUNC auto-bind-js :params []
+  :returns str
+  :body [
+    (concat
+      "<script>"
+      "(function(){"
+      "var actions = {};"
+      "window.flAction = function(name, fn){ actions[name] = fn; };"
+      "function scanElement(root){"
+      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-bind]') : []).forEach(function(el){"
+      "    var key = el.getAttribute('data-fl-bind');"
+      "    if(el.__flBound === key) return;"
+      "    el.__flBound = key;"
+      "    var cur = flGetState(key);"
+      "    if(cur !== undefined) el.textContent = String(cur);"
+      "    flSubscribe(key, function(v){ el.textContent = String(v); });"
+      "  });"
+      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-model]') : []).forEach(function(el){"
+      "    var key = el.getAttribute('data-fl-model');"
+      "    if(el.__flModel === key) return;"
+      "    el.__flModel = key;"
+      "    var cur = flGetState(key);"
+      "    if(cur !== undefined) el.value = String(cur);"
+      "    el.addEventListener('input', function(){ flSetState(key, el.value); });"
+      "    flSubscribe(key, function(v){ if(document.activeElement !== el) el.value = String(v); });"
+      "  });"
+      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-click]') : []).forEach(function(el){"
+      "    var name = el.getAttribute('data-fl-click');"
+      "    if(el.__flClick === name) return;"
+      "    el.__flClick = name;"
+      "    el.addEventListener('click', function(e){"
+      "      var fn = actions[name];"
+      "      if(fn) fn(e, el);"
+      "      else console.warn('[fl] no action: ' + name);"
+      "    });"
+      "  });"
+      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-show]') : []).forEach(function(el){"
+      "    var key = el.getAttribute('data-fl-show');"
+      "    if(el.__flShow === key) return;"
+      "    el.__flShow = key;"
+      "    function apply(v){ el.style.display = (v && v !== 'false') ? '' : 'none'; }"
+      "    apply(flGetState(key));"
+      "    flSubscribe(key, apply);"
+      "  });"
+      "}"
+      "function scanAll(){ scanElement(document); }"
+      "if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scanAll);"
+      "else scanAll();"
+      "new MutationObserver(function(muts){"
+      "  muts.forEach(function(m){"
+      "    m.addedNodes.forEach(function(n){ if(n.nodeType===1) scanElement(n); });"
+      "  });"
+      "}).observe(document.body, { childList: true, subtree: true });"
+      "})();"
+      "</script>")
+  ]
+]
+
+; ==================== 액션 등록 (서버 측 헬퍼) ====================
+; (register-action "inc" "function(e,el){ flSetState('count', (flGetState('count')||0)+1); }")
+
+[FUNC register-action-js :params [name body-js]
+  :returns str
+  :body [
+    (concat "<script>flAction(" (json-stringify name) ", " body-js ");</script>")
+  ]
+]
+
+[EXPORT init-state-js bind-state-js persist-state-js render-state-block auto-bind-js register-action-js]

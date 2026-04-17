@@ -796,12 +796,15 @@ function cmdBuild(buildArgs: string[]): void {
   const isStatic = buildArgs.includes("--static");
 
   if (isStatic) {
-    // Static HTML export
-    // Usage: fl build --static --app app/ --out dist/
+    // Static HTML export — starts serve, GETs each route, saves HTML, stops serve.
+    // Supports both (println ...) style pages and full [PAGE]/(page ...) blocks via app-router.
+    // Usage: fl build --static [--app app/] [--out dist/] [--port 43099]
     const appIdx = buildArgs.indexOf("--app");
     const outIdx = buildArgs.indexOf("--out");
+    const portIdx = buildArgs.indexOf("--port");
     const appDir = appIdx !== -1 ? buildArgs[appIdx + 1] : "app";
     const outDir = outIdx !== -1 ? buildArgs[outIdx + 1] : "dist";
+    const port = portIdx !== -1 ? parseInt(buildArgs[portIdx + 1], 10) : 43099;
 
     const absApp = path.resolve(appDir);
     const absOut = path.resolve(outDir);
@@ -810,10 +813,10 @@ function cmdBuild(buildArgs: string[]): void {
       process.exit(1);
     }
 
-    console.log(`\x1b[36m[Static Build]\x1b[0m  ${appDir}/ → ${outDir}/`);
+    console.log(`\x1b[36m[Static Build]\x1b[0m  ${appDir}/ → ${outDir}/  (port ${port})`);
     fs.mkdirSync(absOut, { recursive: true });
 
-    // Walk app/ and collect page.fl files (skip dynamic routes [id])
+    // Walk app/ and collect page.fl routes (skip dynamic [id] and api/)
     const pages: { filePath: string; route: string }[] = [];
     function walk(dir: string, routeBase: string): void {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -821,7 +824,7 @@ function cmdBuild(buildArgs: string[]): void {
         const full = path.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`\x1b[2m  skip (dynamic):\x1b[0m ${full}`);
+            console.log(`\x1b[2m  skip (dynamic):\x1b[0m /${path.relative(absApp, full)}`);
             continue;
           }
           if (e.name === "api") continue;
@@ -838,36 +841,98 @@ function cmdBuild(buildArgs: string[]): void {
       return;
     }
 
-    // Render each page via `run` and capture stdout
-    const { execSync } = require("child_process");
-    // Use the bootstrap.js in the current working directory (most common),
-    // falling back to the one next to this script.
+    // Start `serve` in the background, then HTTP GET each route.
+    const { spawn } = require("child_process");
+    const http = require("http");
     const cwdBootstrap = path.resolve(process.cwd(), "bootstrap.js");
     const bootstrap = fs.existsSync(cwdBootstrap)
       ? cwdBootstrap
       : path.resolve(__dirname, "bootstrap.js");
-    let ok = 0;
-    let fail = 0;
-    for (const p of pages) {
-      try {
-        const out = execSync(`node "${bootstrap}" run "${p.filePath}"`, {
-          encoding: "utf-8",
-          stdio: ["ignore", "pipe", "pipe"],
+
+    const serveProc = spawn(
+      "node",
+      [bootstrap, "serve", "--app", absApp, "--port", String(port)],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+
+    // Wait for server to be ready (poll /__probe or any known route with timeout)
+    const waitForServer = async (): Promise<boolean> => {
+      for (let i = 0; i < 30; i++) {
+        const ready = await new Promise<boolean>((resolve) => {
+          const req = http.get(
+            { host: "localhost", port, path: "/", timeout: 500 },
+            (res: any) => { res.destroy(); resolve(true); },
+          );
+          req.on("error", () => resolve(false));
+          req.on("timeout", () => { req.destroy(); resolve(false); });
         });
-        const htmlMatch = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
-        const html = htmlMatch ? htmlMatch[0] : out;
-        const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-        fs.mkdirSync(path.dirname(outPath), { recursive: true });
-        fs.writeFileSync(outPath, html);
-        console.log(`\x1b[32m✓\x1b[0m ${p.route}  → ${path.relative(process.cwd(), outPath)}`);
-        ok++;
-      } catch (err: any) {
-        console.error(`\x1b[31m✗\x1b[0m ${p.route}  (${err.message.split("\n")[0]})`);
-        fail++;
+        if (ready) return true;
+        await new Promise((r) => setTimeout(r, 200));
       }
-    }
-    console.log(`\n\x1b[36m[완료]\x1b[0m  ${ok} pages built, ${fail} failed → ${outDir}/`);
-    if (fail > 0) process.exit(1);
+      return false;
+    };
+
+    const fetchRoute = (route: string): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const req = http.get(
+          { host: "localhost", port, path: route, timeout: 5000 },
+          (res: any) => {
+            let buf = "";
+            res.on("data", (c: any) => { buf += c.toString(); });
+            res.on("end", () => {
+              if (res.statusCode && res.statusCode >= 400) {
+                reject(new Error(`HTTP ${res.statusCode}`));
+              } else {
+                resolve(buf);
+              }
+            });
+          },
+        );
+        req.on("error", reject);
+        req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+      });
+
+    (async () => {
+      const ready = await waitForServer();
+      if (!ready) {
+        console.error(`\x1b[31m오류\x1b[0m  serve 서버가 ${port}에서 응답하지 않습니다`);
+        serveProc.kill();
+        process.exit(1);
+      }
+      let ok = 0;
+      let fail = 0;
+      for (const p of pages) {
+        try {
+          const html = await fetchRoute(p.route);
+          const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          fs.mkdirSync(path.dirname(outPath), { recursive: true });
+          fs.writeFileSync(outPath, html);
+          console.log(`\x1b[32m✓\x1b[0m ${p.route}  → ${path.relative(process.cwd(), outPath)}`);
+          ok++;
+        } catch (err: any) {
+          // Fallback: try running page.fl directly and grep HTML from stdout
+          try {
+            const { execSync } = require("child_process");
+            const out = execSync(`node "${bootstrap}" run "${p.filePath}"`, { encoding: "utf-8" });
+            const m = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
+            if (m) {
+              const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+              fs.mkdirSync(path.dirname(outPath), { recursive: true });
+              fs.writeFileSync(outPath, m[0]);
+              console.log(`\x1b[32m✓\x1b[0m ${p.route}  \x1b[2m(run fallback)\x1b[0m`);
+              ok++;
+              continue;
+            }
+          } catch { /* ignore fallback error */ }
+          console.error(`\x1b[31m✗\x1b[0m ${p.route}  (${err.message})`);
+          fail++;
+        }
+      }
+      serveProc.kill();
+      console.log(`\n\x1b[36m[완료]\x1b[0m  ${ok} pages built, ${fail} failed → ${outDir}/`);
+      if (fail > 0) process.exit(1);
+      process.exit(0);
+    })();
     return;
   }
 

@@ -29616,7 +29616,7 @@ function cmdBuild(buildArgs2) {
         const full = path12.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            console.log(`\x1B[2m  skip (dynamic):\x1B[0m ${full}`);
+            console.log(`\x1B[2m  skip (dynamic):\x1B[0m /${path12.relative(absApp, full)}`);
             continue;
           }
           if (e.name === "api") continue;
@@ -29628,15 +29628,17 @@ function cmdBuild(buildArgs2) {
     };
     const appIdx = buildArgs2.indexOf("--app");
     const outIdx = buildArgs2.indexOf("--out");
+    const portIdx = buildArgs2.indexOf("--port");
     const appDir = appIdx !== -1 ? buildArgs2[appIdx + 1] : "app";
     const outDir = outIdx !== -1 ? buildArgs2[outIdx + 1] : "dist";
+    const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
     const absApp = path12.resolve(appDir);
     const absOut = path12.resolve(outDir);
     if (!fs15.existsSync(absApp)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appDir}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[Static Build]\x1B[0m  ${appDir}/ \u2192 ${outDir}/`);
+    console.log(`\x1B[36m[Static Build]\x1B[0m  ${appDir}/ \u2192 ${outDir}/  (port ${port})`);
     fs15.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
@@ -29644,32 +29646,101 @@ function cmdBuild(buildArgs2) {
       console.warn(`\x1B[33m\uACBD\uACE0\x1B[0m  page.fl \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4 (${appDir}/)`);
       return;
     }
-    const { execSync: execSync2 } = require("child_process");
+    const { spawn } = require("child_process");
+    const http3 = require("http");
     const cwdBootstrap = path12.resolve(process.cwd(), "bootstrap.js");
     const bootstrap = fs15.existsSync(cwdBootstrap) ? cwdBootstrap : path12.resolve(__dirname, "bootstrap.js");
-    let ok2 = 0;
-    let fail = 0;
-    for (const p of pages) {
-      try {
-        const out = execSync2(`node "${bootstrap}" run "${p.filePath}"`, {
-          encoding: "utf-8",
-          stdio: ["ignore", "pipe", "pipe"]
+    const serveProc = spawn(
+      "node",
+      [bootstrap, "serve", "--app", absApp, "--port", String(port)],
+      { stdio: ["ignore", "pipe", "pipe"] }
+    );
+    const waitForServer = async () => {
+      for (let i = 0; i < 30; i++) {
+        const ready = await new Promise((resolve7) => {
+          const req = http3.get(
+            { host: "localhost", port, path: "/", timeout: 500 },
+            (res) => {
+              res.destroy();
+              resolve7(true);
+            }
+          );
+          req.on("error", () => resolve7(false));
+          req.on("timeout", () => {
+            req.destroy();
+            resolve7(false);
+          });
         });
-        const htmlMatch = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
-        const html = htmlMatch ? htmlMatch[0] : out;
-        const outPath = path12.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-        fs15.mkdirSync(path12.dirname(outPath), { recursive: true });
-        fs15.writeFileSync(outPath, html);
-        console.log(`\x1B[32m\u2713\x1B[0m ${p.route}  \u2192 ${path12.relative(process.cwd(), outPath)}`);
-        ok2++;
-      } catch (err4) {
-        console.error(`\x1B[31m\u2717\x1B[0m ${p.route}  (${err4.message.split("\n")[0]})`);
-        fail++;
+        if (ready) return true;
+        await new Promise((r) => setTimeout(r, 200));
       }
-    }
-    console.log(`
+      return false;
+    };
+    const fetchRoute = (route) => new Promise((resolve7, reject) => {
+      const req = http3.get(
+        { host: "localhost", port, path: route, timeout: 5e3 },
+        (res) => {
+          let buf = "";
+          res.on("data", (c) => {
+            buf += c.toString();
+          });
+          res.on("end", () => {
+            if (res.statusCode && res.statusCode >= 400) {
+              reject(new Error(`HTTP ${res.statusCode}`));
+            } else {
+              resolve7(buf);
+            }
+          });
+        }
+      );
+      req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error("timeout"));
+      });
+    });
+    (async () => {
+      const ready = await waitForServer();
+      if (!ready) {
+        console.error(`\x1B[31m\uC624\uB958\x1B[0m  serve \uC11C\uBC84\uAC00 ${port}\uC5D0\uC11C \uC751\uB2F5\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4`);
+        serveProc.kill();
+        process.exit(1);
+      }
+      let ok2 = 0;
+      let fail = 0;
+      for (const p of pages) {
+        try {
+          const html = await fetchRoute(p.route);
+          const outPath = path12.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          fs15.mkdirSync(path12.dirname(outPath), { recursive: true });
+          fs15.writeFileSync(outPath, html);
+          console.log(`\x1B[32m\u2713\x1B[0m ${p.route}  \u2192 ${path12.relative(process.cwd(), outPath)}`);
+          ok2++;
+        } catch (err4) {
+          try {
+            const { execSync: execSync2 } = require("child_process");
+            const out = execSync2(`node "${bootstrap}" run "${p.filePath}"`, { encoding: "utf-8" });
+            const m = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
+            if (m) {
+              const outPath = path12.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+              fs15.mkdirSync(path12.dirname(outPath), { recursive: true });
+              fs15.writeFileSync(outPath, m[0]);
+              console.log(`\x1B[32m\u2713\x1B[0m ${p.route}  \x1B[2m(run fallback)\x1B[0m`);
+              ok2++;
+              continue;
+            }
+          } catch {
+          }
+          console.error(`\x1B[31m\u2717\x1B[0m ${p.route}  (${err4.message})`);
+          fail++;
+        }
+      }
+      serveProc.kill();
+      console.log(`
 \x1B[36m[\uC644\uB8CC]\x1B[0m  ${ok2} pages built, ${fail} failed \u2192 ${outDir}/`);
-    if (fail > 0) process.exit(1);
+      if (fail > 0) process.exit(1);
+      process.exit(0);
+    })();
     return;
   }
   if (isOci) {
