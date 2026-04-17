@@ -793,6 +793,83 @@ function cmdDoc(docArgs: string[]): void {
 
 function cmdBuild(buildArgs: string[]): void {
   const isOci = buildArgs.includes("--oci");
+  const isStatic = buildArgs.includes("--static");
+
+  if (isStatic) {
+    // Static HTML export
+    // Usage: fl build --static --app app/ --out dist/
+    const appIdx = buildArgs.indexOf("--app");
+    const outIdx = buildArgs.indexOf("--out");
+    const appDir = appIdx !== -1 ? buildArgs[appIdx + 1] : "app";
+    const outDir = outIdx !== -1 ? buildArgs[outIdx + 1] : "dist";
+
+    const absApp = path.resolve(appDir);
+    const absOut = path.resolve(outDir);
+    if (!fs.existsSync(absApp)) {
+      console.error(`\x1b[31m오류\x1b[0m  app 디렉토리를 찾을 수 없습니다: ${appDir}`);
+      process.exit(1);
+    }
+
+    console.log(`\x1b[36m[Static Build]\x1b[0m  ${appDir}/ → ${outDir}/`);
+    fs.mkdirSync(absOut, { recursive: true });
+
+    // Walk app/ and collect page.fl files (skip dynamic routes [id])
+    const pages: { filePath: string; route: string }[] = [];
+    function walk(dir: string, routeBase: string): void {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          if (e.name.startsWith("[") && e.name.endsWith("]")) {
+            console.log(`\x1b[2m  skip (dynamic):\x1b[0m ${full}`);
+            continue;
+          }
+          if (e.name === "api") continue;
+          walk(full, routeBase + "/" + e.name);
+        } else if (e.name === "page.fl") {
+          pages.push({ filePath: full, route: routeBase || "/" });
+        }
+      }
+    }
+    walk(absApp, "");
+
+    if (pages.length === 0) {
+      console.warn(`\x1b[33m경고\x1b[0m  page.fl 파일을 찾을 수 없습니다 (${appDir}/)`);
+      return;
+    }
+
+    // Render each page via `run` and capture stdout
+    const { execSync } = require("child_process");
+    // Use the bootstrap.js in the current working directory (most common),
+    // falling back to the one next to this script.
+    const cwdBootstrap = path.resolve(process.cwd(), "bootstrap.js");
+    const bootstrap = fs.existsSync(cwdBootstrap)
+      ? cwdBootstrap
+      : path.resolve(__dirname, "bootstrap.js");
+    let ok = 0;
+    let fail = 0;
+    for (const p of pages) {
+      try {
+        const out = execSync(`node "${bootstrap}" run "${p.filePath}"`, {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        const htmlMatch = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
+        const html = htmlMatch ? htmlMatch[0] : out;
+        const outPath = path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.writeFileSync(outPath, html);
+        console.log(`\x1b[32m✓\x1b[0m ${p.route}  → ${path.relative(process.cwd(), outPath)}`);
+        ok++;
+      } catch (err: any) {
+        console.error(`\x1b[31m✗\x1b[0m ${p.route}  (${err.message.split("\n")[0]})`);
+        fail++;
+      }
+    }
+    console.log(`\n\x1b[36m[완료]\x1b[0m  ${ok} pages built, ${fail} failed → ${outDir}/`);
+    if (fail > 0) process.exit(1);
+    return;
+  }
 
   if (isOci) {
     // OCI 빌드 모드
@@ -990,6 +1067,7 @@ function printUsage(): void {
     "  freelang doc <file.fl>           Markdown 문서 생성 → stdout (Phase 77)",
     "  freelang doc <file.fl> -o out.md 파일로 저장",
     "  freelang doc --dir <dir>         디렉토리 내 모든 .fl 파일 통합 문서화",
+    "  freelang build --static [--app app/] [--out dist/]  정적 HTML export",
     "  freelang build --oci <app.fl> --tag <tag>        Docker 없이 OCI 이미지 빌드 (Phase 8)",
     "  freelang build --oci <app.fl> --tag <tag> --registry <url>  OCI 빌드 + push",
     "  freelang registry start [--port]  npm 호환 패키지 레지스트리 시작 (Phase 7)",

@@ -1,0 +1,94 @@
+;; FreeLang v11 — Metadata/SEO Helpers
+;; Next.js Metadata API 대체. <head>에 들어갈 태그 문자열 생성.
+
+;; ── render-meta: 통합 메타데이터 생성 ───────────────────
+;; (render-meta {:title "Home" :description "..." :og-image "/img/hero.jpg" :url "https://..."})
+;; → <title>...</title><meta ...><meta ...>...
+
+[FUNC escape-attr :params [$s]
+  :doc "HTML attribute escape (XSS 방지)"
+  :body (if (not $s) ""
+          (replace (replace (replace (replace (str $s) "&" "&amp;") "\"" "&quot;") "<" "&lt;") ">" "&gt;"))]
+
+[FUNC meta-tag :params [$name $content]
+  :doc "<meta name=NAME content=CONTENT>"
+  :body (if (or (not $content) (= $content "")) ""
+          (str "<meta name=\"" $name "\" content=\"" (escape-attr $content) "\">"))]
+
+[FUNC og-tag :params [$property $content]
+  :doc "<meta property=og:...>"
+  :body (if (or (not $content) (= $content "")) ""
+          (str "<meta property=\"" $property "\" content=\"" (escape-attr $content) "\">"))]
+
+[FUNC link-tag :params [$rel $href]
+  :doc "<link rel=... href=...>"
+  :body (if (or (not $href) (= $href "")) ""
+          (str "<link rel=\"" $rel "\" href=\"" (escape-attr $href) "\">"))]
+
+;; ── 통합 메타데이터 렌더러 ──────────────────────────────
+;; 지원 키:
+;;   :title :description :keywords :author :viewport :theme-color
+;;   :og-title :og-description :og-image :og-url :og-type
+;;   :twitter-card :twitter-site :twitter-creator
+;;   :canonical :robots :lang
+
+[FUNC render-meta :params [$meta]
+  :doc "메타데이터 객체 → <head>에 삽입할 HTML 문자열"
+  :body (let [
+      $title (or (get $meta "title") "")
+      $title-tag (if (= $title "") "" (str "<title>" (escape-attr $title) "</title>"))
+      $desc (or (get $meta "description") "")
+      $keywords (or (get $meta "keywords") "")
+      $author (or (get $meta "author") "")
+      $viewport (or (get $meta "viewport") "width=device-width, initial-scale=1")
+      $theme (or (get $meta "theme-color") "")
+      $canonical (or (get $meta "canonical") "")
+      $robots (or (get $meta "robots") "")
+
+      $og-title (or (get $meta "og-title") $title)
+      $og-desc (or (get $meta "og-description") $desc)
+      $og-image (or (get $meta "og-image") "")
+      $og-url (or (get $meta "og-url") "")
+      $og-type (or (get $meta "og-type") "website")
+
+      $tw-card (or (get $meta "twitter-card") (if (not (= $og-image "")) "summary_large_image" "summary"))
+      $tw-site (or (get $meta "twitter-site") "")
+    ]
+    (str
+      $title-tag
+      (meta-tag "viewport" $viewport)
+      (meta-tag "description" $desc)
+      (meta-tag "keywords" $keywords)
+      (meta-tag "author" $author)
+      (meta-tag "theme-color" $theme)
+      (meta-tag "robots" $robots)
+      (link-tag "canonical" $canonical)
+      (og-tag "og:title" $og-title)
+      (og-tag "og:description" $og-desc)
+      (og-tag "og:image" $og-image)
+      (og-tag "og:url" $og-url)
+      (og-tag "og:type" $og-type)
+      (meta-tag "twitter:card" $tw-card)
+      (meta-tag "twitter:site" $tw-site)
+      (meta-tag "twitter:title" $og-title)
+      (meta-tag "twitter:description" $og-desc)
+      (meta-tag "twitter:image" $og-image)))]
+
+;; ── 간편 헬퍼 ───────────────────────────────────────────
+
+[FUNC page-head :params [$meta :charset "UTF-8" :extra ""]
+  :doc "<head>부터 </head>까지 완성된 블록. extra는 추가 <link>/<script> 삽입 공간."
+  :body (str "<head>"
+             "<meta charset=\"" $charset "\">"
+             (render-meta $meta)
+             $extra
+             "</head>")]
+
+;; ── 동적 메타 패턴 (사용자 지침) ────────────────────────
+;; v11은 변수 직접 호출 `($fn arg)`을 지원하지 않으므로
+;; 핸들러 내부에서 request 기반으로 메타 객체를 먼저 만들고 render-meta 호출:
+;;
+;; [FUNC handle-user-page :params [$req]
+;;   :body (let [$id (server_req_param $req "id")
+;;               $meta {:title (str "User " $id) :description "Profile page"}]
+;;           (server_html (str "<html>" (page-head $meta) "<body>...</body></html>")))]
