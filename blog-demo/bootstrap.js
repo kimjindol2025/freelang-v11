@@ -29773,11 +29773,14 @@ function cmdBuild(buildArgs2) {
       if (t.startsWith("Internal Server Error")) return false;
       return true;
     };
+    const concIdx = buildArgs2.indexOf("--concurrency");
+    const concurrency = Math.max(1, concIdx !== -1 ? parseInt(buildArgs2[concIdx + 1] || "8", 10) : 8);
     (async () => {
       const ready = await waitForServer();
+      const t0 = Date.now();
       let ok2 = 0;
       let fail = 0;
-      for (const p of pages) {
+      const renderOne = async (p) => {
         let html = null;
         if (ready) {
           try {
@@ -29800,9 +29803,14 @@ function cmdBuild(buildArgs2) {
           console.log(`build.page route=${p.route} ok=false`);
           fail++;
         }
+      };
+      for (let i = 0; i < pages.length; i += concurrency) {
+        const batch = pages.slice(i, i + concurrency);
+        await Promise.all(batch.map(renderOne));
       }
       serveProc.kill();
-      console.log(`build.done ok=${ok2} fail=${fail} out=${outDir}`);
+      const ms = Date.now() - t0;
+      console.log(`build.done ok=${ok2} fail=${fail} out=${outDir} ms=${ms} concurrency=${concurrency}`);
       if (fail > 0) process.exit(1);
       process.exit(0);
     })();

@@ -928,26 +928,29 @@ function cmdBuild(buildArgs: string[]): void {
       return true;
     };
 
+    // Concurrency: --concurrency=N (default 8)
+    const concIdx = buildArgs.indexOf("--concurrency");
+    const concurrency = Math.max(1, concIdx !== -1 ? parseInt(buildArgs[concIdx + 1] || "8", 10) : 8);
+
     (async () => {
       const ready = await waitForServer();
+      const t0 = Date.now();
       let ok = 0;
       let fail = 0;
-      for (const p of pages) {
+
+      const renderOne = async (p: { filePath: string; route: string }): Promise<void> => {
         let html: string | null = null;
-        // Strategy 1: HTTP GET via serve (app-router blocks, layouts, etc.)
         if (ready) {
           try {
             const res = await fetchRoute(p.route);
             if (isUseful(res)) html = res;
-          } catch { /* fall through to run */ }
+          } catch { /* fall through */ }
         }
-        // Strategy 2: run page.fl directly (simple println pages)
         if (!html) {
           const out = runPage(p);
           if (isUseful(out)) html = out;
         }
         if (html) {
-          // __404__ is the special not-found route → dist/404.html at the root.
           const outPath = p.route === "/__404__"
             ? path.join(absOut, "404.html")
             : path.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
@@ -959,9 +962,17 @@ function cmdBuild(buildArgs: string[]): void {
           console.log(`build.page route=${p.route} ok=false`);
           fail++;
         }
+      };
+
+      // Render pages in parallel batches of size `concurrency`.
+      for (let i = 0; i < pages.length; i += concurrency) {
+        const batch = pages.slice(i, i + concurrency);
+        await Promise.all(batch.map(renderOne));
       }
+
       serveProc.kill();
-      console.log(`build.done ok=${ok} fail=${fail} out=${outDir}`);
+      const ms = Date.now() - t0;
+      console.log(`build.done ok=${ok} fail=${fail} out=${outDir} ms=${ms} concurrency=${concurrency}`);
       if (fail > 0) process.exit(1);
       process.exit(0);
     })();
