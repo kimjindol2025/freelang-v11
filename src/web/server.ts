@@ -318,9 +318,17 @@ export class WebServer {
 
           // HTML 모드: 기존 처리
           if (result.success && typeof result.body === "string") {
+            let finalBody = result.body;
+            // Apply layout chain if any (match.route.layouts from app-router)
+            const layouts = (match.route as any).layouts as string[] | undefined;
+            if (this.renderer && layouts && layouts.length > 0) {
+              try {
+                finalBody = await this.renderer.renderWithLayout(finalBody, layouts);
+              } catch { /* fall back to raw body */ }
+            }
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
             res.writeHead(result.status || 200);
-            res.end(result.body);
+            res.end(finalBody);
           } else {
             res.setHeader("Content-Type", "text/html; charset=utf-8");
             res.writeHead(result.status || 500);

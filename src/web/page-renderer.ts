@@ -173,7 +173,11 @@ export class PageRenderer {
   }
 
   /**
-   * 레이아웃 래핑 (root layout + page)
+   * Wrap page HTML with layout chain.
+   * Convention: each layout.fl returns a string (via last expression or
+   * server_html) containing {{children}} or <Outlet /> where the page goes.
+   * Layouts are applied outermost → innermost. Unresolved layouts are
+   * skipped so pages still render.
    */
   async renderWithLayout(
     pageHtml: string,
@@ -181,18 +185,26 @@ export class PageRenderer {
   ): Promise<string> {
     let html = pageHtml;
 
-    // 레이아웃 체인을 역순으로 적용 (부모 → 자식)
+    // Apply from deepest-first so outer wraps last (produces correct nesting)
     for (const layoutPath of [...layoutChain].reverse()) {
       const layoutResult = await this.executor.executePage(layoutPath, {
         req: { method: "GET", path: "/" },
       });
 
-      if (layoutResult.success && typeof layoutResult.body === "string") {
-        // 레이아웃이 <Outlet /> 또는 {{{ children }}} 같은 플레이스홀더 포함
-        html = layoutResult.body.replace(
-          /(<Outlet\s*\/>|{{{.*?children.*?}}})/,
-          html
-        );
+      if (!layoutResult.success) continue;
+      const layoutHtml =
+        typeof layoutResult.body === "string"
+          ? layoutResult.body
+          : typeof layoutResult.body === "object" && layoutResult.body !== null &&
+            typeof (layoutResult.body as any).html === "string"
+            ? (layoutResult.body as any).html
+            : "";
+      if (!layoutHtml) continue;
+
+      // Match {{children}} (2 or 3 braces, any whitespace) and <Outlet />
+      const placeholder = /\{\{\s*children\s*\}\}|\{\{\{\s*children\s*\}\}\}|<Outlet\s*\/?>/i;
+      if (placeholder.test(layoutHtml)) {
+        html = layoutHtml.replace(placeholder, html);
       }
     }
 

@@ -28095,13 +28095,16 @@ var AppRouter = class {
       console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
       return;
     }
-    this.scanDirectory(this.appDir, "");
+    this.scanDirectory(this.appDir, "", "layout");
+    this.scanDirectory(this.appDir, "", "page");
     this.buildLayoutChain();
   }
   /**
-   * 재귀적으로 디렉토리 스캔하여 page.fl / layout.fl 찾기
+   * Recursive directory scan.
+   * @param phase "layout" = register only layout.fl files;
+   *              "page" = register only page.fl files (so layouts exist first)
    */
-  scanDirectory(dir, currentPath = "") {
+  scanDirectory(dir, currentPath = "", phase = "page") {
     try {
       const entries = fs12.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
@@ -28110,16 +28113,17 @@ var AppRouter = class {
         if (entry.isDirectory()) {
           const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
           const pathForChild = isRouteGroup ? currentPath : nextPath;
-          this.scanDirectory(fullPath, pathForChild);
-        } else if (entry.name === "page.fl") {
+          this.scanDirectory(fullPath, pathForChild, phase);
+        } else if (phase === "page" && entry.name === "page.fl") {
           const routePath = currentPath === "" ? "/" : currentPath;
           this.registerRoute(routePath, fullPath);
-        } else if (entry.name === "layout.fl") {
+        } else if (phase === "layout" && entry.name === "layout.fl") {
           const layoutPath = currentPath === "" ? "/" : currentPath;
           if (!this.layoutChain[layoutPath]) {
             this.layoutChain[layoutPath] = [];
           }
           this.layoutChain[layoutPath].push(fullPath);
+          console.log(`approuter.layout scope=${layoutPath} file=${fullPath}`);
         }
       }
     } catch (err4) {
@@ -28620,7 +28624,11 @@ var PageRenderer = class {
     return result;
   }
   /**
-   * 레이아웃 래핑 (root layout + page)
+   * Wrap page HTML with layout chain.
+   * Convention: each layout.fl returns a string (via last expression or
+   * server_html) containing {{children}} or <Outlet /> where the page goes.
+   * Layouts are applied outermost → innermost. Unresolved layouts are
+   * skipped so pages still render.
    */
   async renderWithLayout(pageHtml, layoutChain) {
     let html = pageHtml;
@@ -28628,11 +28636,12 @@ var PageRenderer = class {
       const layoutResult = await this.executor.executePage(layoutPath, {
         req: { method: "GET", path: "/" }
       });
-      if (layoutResult.success && typeof layoutResult.body === "string") {
-        html = layoutResult.body.replace(
-          /(<Outlet\s*\/>|{{{.*?children.*?}}})/,
-          html
-        );
+      if (!layoutResult.success) continue;
+      const layoutHtml = typeof layoutResult.body === "string" ? layoutResult.body : typeof layoutResult.body === "object" && layoutResult.body !== null && typeof layoutResult.body.html === "string" ? layoutResult.body.html : "";
+      if (!layoutHtml) continue;
+      const placeholder = /\{\{\s*children\s*\}\}|\{\{\{\s*children\s*\}\}\}|<Outlet\s*\/?>/i;
+      if (placeholder.test(layoutHtml)) {
+        html = layoutHtml.replace(placeholder, html);
       }
     }
     return html;
@@ -28950,9 +28959,17 @@ var WebServer = class {
             return;
           }
           if (result.success && typeof result.body === "string") {
+            let finalBody = result.body;
+            const layouts = match.route.layouts;
+            if (this.renderer && layouts && layouts.length > 0) {
+              try {
+                finalBody = await this.renderer.renderWithLayout(finalBody, layouts);
+              } catch {
+              }
+            }
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
             res.writeHead(result.status || 200);
-            res.end(result.body);
+            res.end(finalBody);
           } else {
             res.setHeader("Content-Type", "text/html; charset=utf-8");
             res.writeHead(result.status || 500);

@@ -1,0 +1,5 @@
+;; /blog/* 공통 레이아웃 — 모든 blog 페이지를 감싸는 외곽 프레임
+(str "<div data-section='blog-wrapper' style='border-top:3px solid #0066cc'>"
+     "{{children}}"
+     "<div style='text-align:center;padding:1rem;color:#888;font-size:.8rem'>— blog layout applied —</div>"
+     "</div>")

@@ -59,44 +59,44 @@ export class AppRouter {
       return;
     }
 
-    this.scanDirectory(this.appDir, "");
+    // Two-pass scan: collect all layouts first, then register pages so that
+    // every page can resolve its parent layout chain correctly.
+    this.scanDirectory(this.appDir, "", "layout");
+    this.scanDirectory(this.appDir, "", "page");
     this.buildLayoutChain();
   }
 
   /**
-   * 재귀적으로 디렉토리 스캔하여 page.fl / layout.fl 찾기
+   * Recursive directory scan.
+   * @param phase "layout" = register only layout.fl files;
+   *              "page" = register only page.fl files (so layouts exist first)
    */
-  private scanDirectory(dir: string, currentPath: string = ""): void {
+  private scanDirectory(dir: string, currentPath: string = "", phase: "layout" | "page" = "page"): void {
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
 
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
-        // 경로 정규화 (항상 / 로 시작)
         const nextPath =
           currentPath === ""
             ? "/" + entry.name
             : currentPath + "/" + entry.name;
 
         if (entry.isDirectory()) {
-          // 라우트 그룹 감지 (괄호로 감싼 폴더명)
           const isRouteGroup =
             entry.name.startsWith("(") && entry.name.endsWith(")");
-
-          // 라우트 그룹이면 현재 경로 유지, 아니면 새 경로
           const pathForChild = isRouteGroup ? currentPath : nextPath;
-          this.scanDirectory(fullPath, pathForChild);
-        } else if (entry.name === "page.fl") {
-          // 페이지 발견
+          this.scanDirectory(fullPath, pathForChild, phase);
+        } else if (phase === "page" && entry.name === "page.fl") {
           const routePath = currentPath === "" ? "/" : currentPath;
           this.registerRoute(routePath, fullPath);
-        } else if (entry.name === "layout.fl") {
-          // 레이아웃 발견 (추후 사용)
+        } else if (phase === "layout" && entry.name === "layout.fl") {
           const layoutPath = currentPath === "" ? "/" : currentPath;
           if (!this.layoutChain[layoutPath]) {
             this.layoutChain[layoutPath] = [];
           }
           this.layoutChain[layoutPath].push(fullPath);
+          console.log(`approuter.layout scope=${layoutPath} file=${fullPath}`);
         }
       }
     } catch (err: any) {

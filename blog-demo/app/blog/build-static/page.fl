@@ -6,7 +6,7 @@
 
 (defn foot [] "<footer>Built with FreeLang v11</footer>")
 
-(println (str
+(server_html (str
   "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'>"
   "<title>build --static 완전판 — v11 Blog</title>"
   "<meta name='description' content='serve+fetch 방식으로 모든 페이지 블록을 정적 HTML로'>"

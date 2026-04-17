@@ -29,7 +29,7 @@
   "new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1)scan(n)})})}).observe(document.body,{childList:true,subtree:true});"
   "</script>"))
 
-(println (str
+(server_html (str
   "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'>"
   "<title>data-fl-bind 선언적 반응성 — v11 Blog</title>"
   "<meta name='description' content='React 없이 HTML 속성만으로 양방향 바인딩'>"

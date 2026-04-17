@@ -2,4 +2,4 @@
 
 (defn page-css [] (str "<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#fafafa;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center}.box{max-width:500px;padding:2rem}h1{font-size:5rem;color:#0066cc;margin-bottom:.5rem}p{color:#666;margin-bottom:1.5rem}a{display:inline-block;padding:.6rem 1.2rem;background:#0066cc;color:white;text-decoration:none;border-radius:6px}</style>"))
 
-(println (str "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>404 — v11 Blog</title>" (page-css) "</head><body><div class='box'><h1>404</h1><p>페이지를 찾을 수 없습니다.</p><a href='/'>홈으로</a></div></body></html>"))
+(server_html (str "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>404 — v11 Blog</title>" (page-css) "</head><body><div class='box'><h1>404</h1><p>페이지를 찾을 수 없습니다.</p><a href='/'>홈으로</a></div></body></html>"))

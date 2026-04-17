@@ -52,7 +52,7 @@
        (page-css)
        "</head>"))
 
-(println
+(server_html
   (str "<!DOCTYPE html><html lang='ko'>"
        (head-meta "v11 Blog — FreeLang v11 학습 노트"
                   "FreeLang v11으로 만든 제로 의존성 블로그"

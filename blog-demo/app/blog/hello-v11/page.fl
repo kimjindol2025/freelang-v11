@@ -6,7 +6,7 @@
 
 (defn foot [] "<footer>Built with FreeLang v11</footer>")
 
-(println (str
+(server_html (str
   "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'>"
   "<title>Hello, v11 — v11 Blog</title>"
   "<meta name='description' content='FreeLang v11을 왜 만들었나, 무엇이 다른가'>"
