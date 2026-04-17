@@ -301,6 +301,23 @@ export class FLFormatter {
       return "[]";
     }
 
+    // Map literal 특수 처리: {:key val ...} 형태로 재생성
+    if (node.type === "Map") {
+      const parts: string[] = [];
+      for (const [key, val] of node.fields) {
+        const formattedVal = Array.isArray(val)
+          ? this.formatNodeArray(val, depth + 1)
+          : this.formatNode(val, depth + 1);
+        parts.push(`:${key} ${formattedVal}`);
+      }
+      if (parts.length === 0) return "{}";
+      const inline = `{${parts.join(" ")}}`;
+      const limit = this.maxWidth - depth * 2;
+      if (inline.length <= limit) return inline;
+      const innerIndent2 = this.ind(depth + 1);
+      return `{\n${parts.map((p) => innerIndent2 + p).join("\n")}\n${this.ind(depth)}}`;
+    }
+
     const innerIndent = this.ind(depth + 1);
     const lines: string[] = [];
 
