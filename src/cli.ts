@@ -454,53 +454,27 @@ function cmdRepl(): void {
 // v11.4: help 커맨드 — stdlib 함수 시그니처 빠른 조회
 // ─────────────────────────────────────────
 
+// v11.10: 빌드 시점에 embed 된 stdlib 시그니처 (배포 후에도 fn-doc 동작)
+// scripts/build.js 가 src/_stdlib-signatures.json 을 생성 → esbuild 가 bundle.
+// dev 환경(ts-jest 등)에서 이 파일이 없을 수 있으므로 try/catch fallback.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+function loadEmbeddedSignatures(): { module: string; name: string; params: string; returns: string }[] {
+  try {
+    return require("./_stdlib-signatures.json");
+  } catch {
+    return [];
+  }
+}
+
 function cmdStdlibDoc(query: string): void {
-  const fs = require("fs") as typeof import("fs");
-  const path2 = require("path") as typeof import("path");
-
-  // src/*.ts 에서 `// funcname args -> ret` 주석 추출
-  // (bootstrap.js 번들 환경에서는 __dirname 이 프로젝트 루트이므로 src/ 서브디렉토리 탐색)
-  const candidates = [
-    path2.join(__dirname, "src"),
-    path2.join(__dirname, "..", "src"),
-    __dirname,
-    process.cwd(),
-    path2.join(process.cwd(), "src"),
-  ];
-  let srcDir = "";
-  let tsFiles: string[] = [];
-  for (const d of candidates) {
-    try {
-      const entries = fs.readdirSync(d)
-        .filter((f: string) => f.startsWith("stdlib-") && f.endsWith(".ts"));
-      if (entries.length > 0) {
-        srcDir = d;
-        tsFiles = entries.map((f: string) => path2.join(d, f));
-        break;
-      }
-    } catch {}
-  }
-
   interface Entry { module: string; name: string; params: string; ret: string; }
-  const entries: Entry[] = [];
-
-  for (const file of tsFiles) {
-    const modName = path2.basename(file, ".ts").replace(/^stdlib-/, "");
-    const lines = fs.readFileSync(file, "utf8").split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const cur = lines[i].trim();
-      const m = cur.match(/^\/\/\s*([a-z_][a-z0-9_\-!?]*)\s+(.*?)\s*->\s*(.+)$/i);
-      if (!m) continue;
-      const [, name, params, ret] = m;
-      const next = (lines[i + 1] || "").trim();
-      const defMatch = next.match(/^"([^"]+)"\s*:/);
-      if (!defMatch || defMatch[1] !== name) continue;
-      entries.push({ module: modName, name, params: params.trim(), ret: ret.trim() });
-    }
-  }
+  const signatures = loadEmbeddedSignatures();
+  const entries: Entry[] = signatures.map((s) => ({
+    module: s.module, name: s.name, params: s.params, ret: s.returns,
+  }));
 
   if (entries.length === 0) {
-    console.error(JSON.stringify({ error: "stdlib_source_not_found", hint: "run from freelang-v11 dir or set __dirname src/" }));
+    console.error(JSON.stringify({ error: "stdlib_signatures_missing", hint: "run `npm run build` to regenerate" }));
     process.exit(2);
   }
 

@@ -936,6 +936,15 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
       //       그렇지 않으면 1차원 ([$x expr $y expr] or [x expr y expr])
       const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
 
+      // v11.10: 혼합 감지 — 모든 원소가 동일한 구조여야 함
+      for (let i = 1; i < items.length; i++) {
+        const cur = items[i]?.kind === "block" && items[i]?.type === "Array";
+        if (cur !== isNested) {
+          ctx.variables.pop();
+          throw new Error(`let: 바인딩 형식이 일관되지 않음 (2차원 [[$x ...]] 와 1차원 [$x ...] 혼합 불가, index=${i})`);
+        }
+      }
+
       if (isNested) {
         // 기존 2차원 경로 (v11 호환)
         for (const item of items) {

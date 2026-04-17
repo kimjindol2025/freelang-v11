@@ -1427,8 +1427,12 @@ export class Interpreter {
         if (this.context.variables.has(bareName)) {
           return this.context.variables.get(bareName);
         }
-        // v11.1: Literal symbols are permissive (may be function-names / operator tokens).
-        // Strict resolution is enforced on Variable nodes ($-prefixed) below.
+        // v11.10: FL_STRICT=1 opt-in → 정의 없는 심볼을 throw.
+        // 기본은 permissive (하위 호환). AI-first 프로젝트는 FL_STRICT=1 권장.
+        if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
+          const line = (lit as any).line;
+          throw new Error(`Unresolved symbol: '${bareName}'${line ? ` (line ${line})` : ""} — set FL_STRICT=0 to silence`);
+        }
       }
       return lit.value;
     }
