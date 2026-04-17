@@ -147,24 +147,24 @@ function generateIndexHTML(): string {
 </head>
 <body>
   <div class="hero">
-    <h1>🚀 FreeLang v11</h1>
+    <h1>FreeLang v11</h1>
     <p>AI-Native Language with App Router</p>
 
     <div class="features">
       <div class="feature">
-        <h3>💎 Pure v11</h3>
+        <h3>Pure v11</h3>
         <p>100% FreeLang v11</p>
       </div>
       <div class="feature">
-        <h3>⚡ Zero Deps</h3>
+        <h3>Zero Deps</h3>
         <p>No npm dependencies</p>
       </div>
       <div class="feature">
-        <h3>🎯 App Router</h3>
+        <h3>App Router</h3>
         <p>Filesystem-based routing</p>
       </div>
       <div class="feature">
-        <h3>🤖 AGENT</h3>
+        <h3>AGENT</h3>
         <p>Native AI blocks</p>
       </div>
     </div>
@@ -216,31 +216,13 @@ export class WebServer {
 
     return new Promise((resolve) => {
       this.server!.listen(this.config.port, () => {
-        const msg = `🚀 FreeLang v11 Server running on port ${this.config.port}`;
-        console.log("");
-        console.log("╔════════════════════════════════════════════╗");
-        console.log("║   🚀 FreeLang v11 Server Started          ║");
-        console.log("╚════════════════════════════════════════════╝");
-        console.log("");
-        console.log(`📍 Server: http://localhost:${this.config.port}`);
-        console.log("");
-        console.log("🔗 Routes:");
-        console.log(`   http://localhost:${this.config.port}          - Home`);
-        console.log(`   http://localhost:${this.config.port}/demo      - Demo`);
-        console.log(`   http://localhost:${this.config.port}/api/status - Status API`);
-        console.log("");
-        console.log("📂 App Router Routes:");
-        this.router.getRoutes().forEach((route) => {
-          console.log(
-            `   http://localhost:${this.config.port}${route.path} - ${path.basename(
-              path.dirname(route.filePath)
-            )}`
-          );
-        });
-        console.log("");
-        console.log("💡 Framework: 100% Pure v11, Zero npm dependencies");
-        console.log("✨ Press Ctrl+C to stop the server");
-        console.log("");
+        const port = this.config.port;
+        const routes = this.router.getRoutes();
+        const msg = `server.listening port=${port}`;
+        console.log(`server.start port=${port} app_routes=${routes.length}`);
+        for (const route of routes) {
+          console.log(`server.route path=${route.path} file=${route.filePath}`);
+        }
         resolve(msg);
       });
     });
@@ -384,7 +366,7 @@ export class WebServer {
           framework: "FreeLang v11",
           router: "App Router v1.0",
           routes: this.router.getRoutes().length,
-          message: "🚀 Pure v11 web framework with filesystem routing!",
+          message: "Pure v11 web framework with filesystem routing",
         })
       );
       return;

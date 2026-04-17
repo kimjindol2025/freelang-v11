@@ -55,7 +55,7 @@ export class AppRouter {
    */
   private scan(): void {
     if (!fs.existsSync(this.appDir)) {
-      console.warn(`⚠️  App directory not found: ${this.appDir}`);
+      console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
       return;
     }
 
@@ -123,9 +123,7 @@ export class AppRouter {
     };
 
     this.routes.push(route);
-    console.log(
-      `  ✓ Route: ${routePath.padEnd(30)} → ${filePath}`
-    );
+    console.log(`approuter.route path=${routePath} file=${filePath} dynamic=${isDynamic}`);
   }
 
   /**
