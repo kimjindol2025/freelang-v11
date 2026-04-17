@@ -1,0 +1,98 @@
+;; FreeLang v11 — WebSocket client stdlib
+;; Browser-side helpers. Generates inline JS to be injected into HTML.
+;; Auto-reconnect with exponential backoff. Pub/sub by topic.
+
+;; ── ws-client-js : core runtime ─────────────────────────────
+;; Usage:
+;;   (server_html (str "<html>...<body>..."
+;;                     (ws-client-runtime "/api/ws")
+;;                     "</body></html>"))
+;;
+;; Then subscribe in page JS:
+;;   flWs.on('chat', function(msg) { ... });
+;;   flWs.send('chat', {text: "hi"});
+;;
+;; Or declaratively via data-fl-ws-on="topic:handlerName".
+
+[FUNC ws-client-runtime :params [url]
+  :doc "브라우저 측 WebSocket 런타임 JS <script>. auto-reconnect + topic pub/sub."
+  :body (str
+    "<script>"
+    "(function(){"
+    "  var url = " (json_stringify url) ";"
+    "  if (url.startsWith('/')) {"
+    "    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';"
+    "    url = proto + '//' + location.host + url;"
+    "  }"
+    "  var ws = null;"
+    "  var delay = 500;"
+    "  var subs = {};"
+    "  var queue = [];"
+    "  function connect(){"
+    "    ws = new WebSocket(url);"
+    "    ws.onopen = function(){"
+    "      delay = 500;"
+    "      while(queue.length) ws.send(queue.shift());"
+    "      (subs['__open'] || []).forEach(function(fn){ fn(); });"
+    "    };"
+    "    ws.onmessage = function(ev){"
+    "      var m; try { m = JSON.parse(ev.data); } catch(e){ m = { topic: '__raw', data: ev.data }; }"
+    "      var topic = m.topic || '__message';"
+    "      (subs[topic] || []).forEach(function(fn){ fn(m.data, m); });"
+    "      (subs['__message'] || []).forEach(function(fn){ fn(m); });"
+    "    };"
+    "    ws.onclose = function(){"
+    "      (subs['__close'] || []).forEach(function(fn){ fn(); });"
+    "      setTimeout(connect, Math.min(delay, 10000));"
+    "      delay = Math.min(delay * 2, 10000);"
+    "    };"
+    "    ws.onerror = function(){ try { ws.close(); } catch(e){} };"
+    "  }"
+    "  window.flWs = {"
+    "    on: function(topic, fn){ (subs[topic] = subs[topic] || []).push(fn); },"
+    "    off: function(topic, fn){ subs[topic] = (subs[topic] || []).filter(function(f){ return f !== fn; }); },"
+    "    send: function(topic, data){"
+    "      var payload = JSON.stringify({ topic: topic, data: data });"
+    "      if (ws && ws.readyState === 1) ws.send(payload);"
+    "      else queue.push(payload);"
+    "    }"
+    "  };"
+    "  connect();"
+    "  function scanDeclarative(root){"
+    "    (root.querySelectorAll ? root.querySelectorAll('[data-fl-ws-on]') : []).forEach(function(el){"
+    "      var spec = el.getAttribute('data-fl-ws-on');"
+    "      if (el.__flWs === spec) return;"
+    "      el.__flWs = spec;"
+    "      var parts = spec.split(':');"
+    "      var topic = parts[0]; var action = parts[1] || 'text';"
+    "      window.flWs.on(topic, function(data){"
+    "        if (action === 'text') el.textContent = typeof data === 'string' ? data : JSON.stringify(data);"
+    "        else if (action === 'html') el.innerHTML = typeof data === 'string' ? data : JSON.stringify(data);"
+    "        else if (action === 'append') {"
+    "          var li = document.createElement('div');"
+    "          li.textContent = typeof data === 'string' ? data : JSON.stringify(data);"
+    "          el.appendChild(li);"
+    "        }"
+    "      });"
+    "    });"
+    "  }"
+    "  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ scanDeclarative(document); });"
+    "  else scanDeclarative(document);"
+    "  new MutationObserver(function(ms){ ms.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.nodeType===1) scanDeclarative(n); }); }); })"
+    "    .observe(document.body, { childList: true, subtree: true });"
+    "})();"
+    "</script>")]
+
+;; ── 간편 헬퍼: 토픽별 프리셋 ────────────────────────────────
+
+[FUNC ws-on :params [topic handler-body]
+  :doc "window.flWs.on(topic, function(data){ <handler-body> }) 주입 <script>"
+  :body (str "<script>flWs.on(" (json_stringify topic) ", function(data, msg){ " handler-body " });</script>")]
+
+[FUNC ws-send-on-click :params [selector topic data-expr]
+  :doc "클릭 시 flWs.send 호출하는 <script>. selector 는 CSS 선택자."
+  :body (str "<script>document.querySelectorAll(" (json_stringify selector) ").forEach(function(el){"
+             "el.addEventListener('click', function(){ flWs.send(" (json_stringify topic) ", (" data-expr ")); });"
+             "});</script>")]
+
+[EXPORT ws-client-runtime ws-on ws-send-on-click]

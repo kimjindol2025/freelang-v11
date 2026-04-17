@@ -177,4 +177,78 @@
   ]
 ]
 
-[EXPORT init-state-js bind-state-js persist-state-js render-state-block auto-bind-js register-action-js]
+; ==================== Q3-3 옵티미스틱 UI ====================
+; <form data-fl-submit="/api/posts" data-fl-optimistic="posts:prepend">
+;   <input name="title">
+;   <button>Post</button>
+; </form>
+;
+; On submit: AJAX POST (form serialized) → optimistic state update →
+; on success merge response, on error rollback + show error in [data-fl-error].
+; data-fl-optimistic="key:op" where op = prepend|append|set|increment.
+
+[FUNC optimistic-submit-js :params []
+  :doc "data-fl-submit 폼을 AJAX + 낙관 업데이트로 처리하는 <script>"
+  :body [
+    (concat
+      "<script>"
+      "(function(){"
+      "function applyOp(key, op, value){"
+      "  if(op==='set') flSetState(key, value);"
+      "  else if(op==='prepend'){ var arr = flGetState(key) || []; flSetState(key, [value].concat(arr)); }"
+      "  else if(op==='append'){ var arr = flGetState(key) || []; flSetState(key, arr.concat([value])); }"
+      "  else if(op==='increment'){ flSetState(key, (flGetState(key) || 0) + (Number(value) || 1)); }"
+      "}"
+      "function attach(form){"
+      "  if(form.__flSubmit) return; form.__flSubmit = true;"
+      "  form.addEventListener('submit', async function(ev){"
+      "    ev.preventDefault();"
+      "    var endpoint = form.getAttribute('data-fl-submit');"
+      "    var optSpec = form.getAttribute('data-fl-optimistic');"
+      "    var data = {};"
+      "    new FormData(form).forEach(function(v,k){ data[k] = v; });"
+      "    var prev = null, key = null, op = null;"
+      "    if(optSpec){"
+      "      var parts = optSpec.split(':'); key = parts[0]; op = parts[1] || 'set';"
+      "      prev = flGetState(key);"
+      "      applyOp(key, op, data);"
+      "    }"
+      "    var errEl = form.querySelector('[data-fl-error]');"
+      "    if(errEl) errEl.textContent = '';"
+      "    form.classList.add('fl-submitting');"
+      "    try {"
+      "      var res = await fetch(endpoint, {"
+      "        method: form.getAttribute('method') || 'POST',"
+      "        headers: {'Content-Type': 'application/json'},"
+      "        body: JSON.stringify(data)"
+      "      });"
+      "      var body; try { body = await res.json(); } catch(e){ body = { ok: res.ok }; }"
+      "      if(!res.ok || body.success === false){"
+      "        if(key !== null) flSetState(key, prev);"
+      "        if(errEl) errEl.textContent = (body && body.error) || ('HTTP ' + res.status);"
+      "      } else {"
+      "        if(key && body && body.data) applyOp(key, 'set', flGetState(key));"
+      "        form.reset();"
+      "        form.dispatchEvent(new CustomEvent('fl-submit-ok', { detail: body }));"
+      "      }"
+      "    } catch(err){"
+      "      if(key !== null) flSetState(key, prev);"
+      "      if(errEl) errEl.textContent = err.message || 'network error';"
+      "    } finally {"
+      "      form.classList.remove('fl-submitting');"
+      "    }"
+      "  });"
+      "}"
+      "function scan(root){"
+      "  (root.querySelectorAll ? root.querySelectorAll('form[data-fl-submit]') : []).forEach(attach);"
+      "}"
+      "if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ scan(document); });"
+      "else scan(document);"
+      "new MutationObserver(function(ms){ ms.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.nodeType===1) scan(n); }); }); })"
+      "  .observe(document.body, { childList: true, subtree: true });"
+      "})();"
+      "</script>")
+  ]
+]
+
+[EXPORT init-state-js bind-state-js persist-state-js render-state-block auto-bind-js register-action-js optimistic-submit-js]
