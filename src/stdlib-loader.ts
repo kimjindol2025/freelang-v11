@@ -41,6 +41,7 @@ import { createWsModule } from "./stdlib-ws";              // Phase 21: WebSocke
 import { createWscModule } from "./stdlib-wsc";            // Phase 21: WebSocket 클라이언트
 import { createMarkdownModule } from "./stdlib-markdown";  // Q2-1: Markdown (CommonMark subset + frontmatter)
 import { createFeedModule } from "./stdlib-feed";          // Q2-2/3/4: RSS/Atom/sitemap/robots/JSON-LD
+import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관련글/검색인덱스/페이지네이션
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -107,4 +108,5 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   ));
   interp.registerModule(createMarkdownModule());   // Q2-1: markdown_to_html, markdown_frontmatter, markdown_render_full
   interp.registerModule(createFeedModule());       // Q2-2/3/4: rss_feed, atom_feed, sitemap_xml, robots_txt, jsonld_article/breadcrumb/organization
+  interp.registerModule(createBlogModule());       // Q2-5: blog_all_tags, blog_posts_by_tag, blog_tag_counts, blog_related, blog_search_index, blog_search, blog_posts_sorted, blog_paginate
 }
