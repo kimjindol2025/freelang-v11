@@ -17129,9 +17129,29 @@ function evalImportBlock(interp, importBlock) {
   const source = importBlock.source;
   const selective = importBlock.selective;
   const alias = importBlock.alias;
-  if (source && (source.endsWith(".fl") || source.includes("/"))) {
-    interp.evalImportFromFile(source, moduleName, selective, alias);
-    return;
+  if (source) {
+    const looksLikeFile = source.endsWith(".fl") || source.includes("/") || source.startsWith("./") || source.startsWith("../");
+    let isFile = looksLikeFile;
+    if (!isFile) {
+      const baseDir = (() => {
+        try {
+          return fs2.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path2.dirname(interp.currentFilePath);
+        } catch {
+          return interp.currentFilePath;
+        }
+      })();
+      const candidates = [
+        path2.resolve(baseDir, source + ".fl"),
+        path2.resolve(baseDir, source),
+        path2.resolve(process.cwd(), source + ".fl"),
+        path2.resolve(process.cwd(), source)
+      ];
+      isFile = candidates.some((c) => fs2.existsSync(c));
+    }
+    if (isFile) {
+      interp.evalImportFromFile(source, moduleName, selective, alias);
+      return;
+    }
   }
   const module2 = interp.getModules().get(moduleName);
   if (!module2) {
@@ -17179,9 +17199,29 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
       return interp.currentFilePath;
     }
   })();
-  const absPath = path2.resolve(baseDir, relPath);
-  if (!fs2.existsSync(absPath)) {
-    throw new Error(`Import error: file not found: ${absPath}`);
+  const tryResolve = (candidate) => {
+    if (fs2.existsSync(candidate) && fs2.statSync(candidate).isFile()) return candidate;
+    if (!candidate.endsWith(".fl") && fs2.existsSync(candidate + ".fl")) return candidate + ".fl";
+    return null;
+  };
+  const isRelative = relPath.startsWith("./") || relPath.startsWith("../") || relPath.startsWith("/");
+  const candidates = [];
+  if (isRelative) {
+    candidates.push(path2.resolve(baseDir, relPath));
+  } else {
+    candidates.push(path2.resolve(process.cwd(), relPath));
+    candidates.push(path2.resolve(baseDir, relPath));
+  }
+  let absPath = null;
+  for (const c of candidates) {
+    const resolved = tryResolve(c);
+    if (resolved) {
+      absPath = resolved;
+      break;
+    }
+  }
+  if (!absPath) {
+    throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
   }
   if (interp.importedFiles.has(absPath)) {
     return;
@@ -17193,6 +17233,13 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
   subInterp.importedFiles = interp.importedFiles;
   const builtinFuncs = new Set(subInterp.context.functions.keys());
   subInterp.interpret(parse(lex(src)));
+  if (process.env.FL_IMPORT_DEBUG === "1") {
+    const userDefined = [];
+    for (const k of subInterp.context.functions.keys()) {
+      if (!builtinFuncs.has(k)) userDefined.push(k);
+    }
+    console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
+  }
   const effectivePrefix = alias ?? prefix;
   for (const [funcName, func] of subInterp.context.functions) {
     if (builtinFuncs.has(funcName)) continue;

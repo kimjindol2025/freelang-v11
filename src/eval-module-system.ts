@@ -73,9 +73,33 @@ export function evalImportBlock(interp: Interpreter, importBlock: ImportBlock): 
     const alias = importBlock.alias; // :as m
 
     // Phase 52: .fl 파일 import 처리
-    if (source && (source.endsWith(".fl") || source.includes("/"))) {
-      interp.evalImportFromFile(source, moduleName, selective, alias);
-      return;
+    // Accept: ends with .fl, contains /, OR a matching .fl file exists next to
+    // the importing file or at project root (bare module name like "lib").
+    if (source) {
+      const looksLikeFile = source.endsWith(".fl") || source.includes("/") ||
+        source.startsWith("./") || source.startsWith("../");
+      let isFile = looksLikeFile;
+      if (!isFile) {
+        // Try resolving "lib" → "./lib.fl" or "<cwd>/lib.fl"
+        const baseDir = (() => {
+          try {
+            return fs.statSync(interp.currentFilePath).isDirectory()
+              ? interp.currentFilePath
+              : path.dirname(interp.currentFilePath);
+          } catch { return interp.currentFilePath; }
+        })();
+        const candidates = [
+          path.resolve(baseDir, source + ".fl"),
+          path.resolve(baseDir, source),
+          path.resolve(process.cwd(), source + ".fl"),
+          path.resolve(process.cwd(), source),
+        ];
+        isFile = candidates.some((c) => fs.existsSync(c));
+      }
+      if (isFile) {
+        interp.evalImportFromFile(source, moduleName, selective, alias);
+        return;
+      }
     }
 
     // 모듈 찾기
@@ -130,7 +154,10 @@ export function evalImportBlock(interp: Interpreter, importBlock: ImportBlock): 
 
   // Phase 52: FL 파일에서 함수를 가져와 현재 context에 등록
 export function evalImportFromFile(interp: Interpreter, relPath: string, prefix: string, selective: string[] | undefined, alias: string | undefined): void {
-    // 절대 경로 해석: currentFilePath 기준
+    // Path resolution rules:
+    // 1. Starts with "./" "../" "/": relative to importing file's directory (baseDir)
+    // 2. Bare (e.g. "stdlib/web/metadata"): project root first, then baseDir fallback
+    // 3. ".fl" extension auto-appended if file not found without it
     const baseDir = (() => {
       try {
         return fs.statSync(interp.currentFilePath).isDirectory()
@@ -140,11 +167,30 @@ export function evalImportFromFile(interp: Interpreter, relPath: string, prefix:
         return interp.currentFilePath;
       }
     })();
-    const absPath = path.resolve(baseDir, relPath);
 
-    // 파일 존재 확인
-    if (!fs.existsSync(absPath)) {
-      throw new Error(`Import error: file not found: ${absPath}`);
+    const tryResolve = (candidate: string): string | null => {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+      if (!candidate.endsWith(".fl") && fs.existsSync(candidate + ".fl")) return candidate + ".fl";
+      return null;
+    };
+
+    const isRelative = relPath.startsWith("./") || relPath.startsWith("../") || relPath.startsWith("/");
+    const candidates: string[] = [];
+    if (isRelative) {
+      candidates.push(path.resolve(baseDir, relPath));
+    } else {
+      // bare path: try project root (cwd) first, then baseDir
+      candidates.push(path.resolve(process.cwd(), relPath));
+      candidates.push(path.resolve(baseDir, relPath));
+    }
+
+    let absPath: string | null = null;
+    for (const c of candidates) {
+      const resolved = tryResolve(c);
+      if (resolved) { absPath = resolved; break; }
+    }
+    if (!absPath) {
+      throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
     }
 
     // 순환 import 방지
@@ -162,6 +208,13 @@ export function evalImportFromFile(interp: Interpreter, relPath: string, prefix:
     // stdlib 로드 전 함수 목록 스냅샷 (내장 함수 제외용)
     const builtinFuncs = new Set<string>(subInterp.context.functions.keys());
     subInterp.interpret(parse(lex(src)));
+    if (process.env.FL_IMPORT_DEBUG === "1") {
+      const userDefined: string[] = [];
+      for (const k of subInterp.context.functions.keys()) {
+        if (!builtinFuncs.has(k)) userDefined.push(k);
+      }
+      console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
+    }
 
     // 사용자 정의 함수만 추출 (stdlib 내장 제외)
     const effectivePrefix = alias ?? prefix;
