@@ -430,12 +430,12 @@ export interface ParserState {
 }
 
 // Helpers
-export function makeLiteral(type: "number" | "string" | "symbol" | "boolean" | "null", value: any): Literal {
-  return { kind: "literal", type, value };
+export function makeLiteral(type: "number" | "string" | "symbol" | "boolean" | "null", value: any, line?: number): Literal {
+  return { kind: "literal", type, value, line } as any;
 }
 
-export function makeVariable(name: string): Variable {
-  return { kind: "variable", name };
+export function makeVariable(name: string, line?: number): Variable {
+  return { kind: "variable", name, line } as any;
 }
 
 export function makeSExpr(op: string, args: ASTNode[], line?: number): SExpr {

@@ -543,7 +543,7 @@ export class Parser {
     // Check for variable: $name
     if (this.check(T.Variable)) {
       const token = this.advance();
-      return makeVariable(token.value);
+      return makeVariable(token.value, token.line);
     }
 
     // Check for keyword: :name (can appear as value in S-expressions)

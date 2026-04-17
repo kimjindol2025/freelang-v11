@@ -151,16 +151,25 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "and": return !!(v0 && v1);
     case "or": return !!(v0 || v1);
     case "length": return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
-    case "get":
-      // ⚠️ Map vs plain object: 파서가 맵 리터럴을 JS Map으로 반환할 수 있음
-      // instanceof Map 체크 없으면 .get() 없다고 터짐 — 순서 바꾸지 말 것
-      if (Array.isArray(v0)) return v0[v1] !== undefined ? v0[v1] : null;
-      if (v0 instanceof Map) return v0.get(String(v1).replace(/^:/, "")) ?? null;
+    case "get": {
+      // v11.2 규칙 (get obj key):
+      //   - key가 :name (keyword) → obj["name"] (콜론 제거 후)
+      //   - key가 "name" (string) → obj["name"] (그대로)
+      //   - 둘 다 동일 결과. 사용자 편의대로 선택 가능.
+      //   - key가 keyword AST 노드면 name 필드 추출.
+      let k: any = v1;
+      if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
+      if (Array.isArray(v0)) return v0[k as any] !== undefined ? v0[k as any] : null;
+      if (v0 instanceof Map) return v0.get(String(k).replace(/^:/, "")) ?? null;
       if (v0 !== null && typeof v0 === "object") {
-        const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : String(v1);
-        return v0[k] !== undefined ? v0[k] : null;
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (v0[normalized] !== undefined) return v0[normalized];
+        // ":key" 형태로 저장된 객체도 허용
+        if (typeof k === "string" && v0[k] !== undefined) return v0[k];
+        return null;
       }
       return null;
+    }
     case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str": case "concat": return vals.map((v: any) => v === null || v === undefined ? "null" : String(v)).join("");
@@ -730,12 +739,21 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       return -1;
     case "last":
       return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
-    case "get":
-      if (Array.isArray(args[0])) return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
-      if (typeof args[0] === "string") return typeof args[1] === "number" ? (args[0][args[1]] ?? null) : null;
-      if (args[0] instanceof Map) return args[0].get(String(args[1]).replace(/^:/, "")) ?? null;
-      if (args[0] !== null && typeof args[0] === "object") return args[0][String(args[1]).replace(/^:/, "")] ?? args[0][args[1]] ?? null;
+    case "get": {
+      // v11.2: 일관된 키 규칙 — keyword/string 동일 결과
+      let k: any = args[1];
+      if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
+      if (Array.isArray(args[0])) return typeof k === "number" ? (args[0][k] ?? null) : null;
+      if (typeof args[0] === "string") return typeof k === "number" ? (args[0][k] ?? null) : null;
+      if (args[0] instanceof Map) return args[0].get(String(k).replace(/^:/, "")) ?? null;
+      if (args[0] !== null && typeof args[0] === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (args[0][normalized] !== undefined) return args[0][normalized];
+        if (typeof k === "string" && args[0][k] !== undefined) return args[0][k];
+        return null;
+      }
       return null;
+    }
     case "block-items":
       // Array 블록에서 items 추출 (셀프 호스팅용)
       if (args[0] && typeof args[0] === "object" && args[0].kind === "block" && args[0].type === "Array") {

@@ -190,6 +190,18 @@ freelang-v11/
 ; Error: Undefined variable: '$undefined-var'
 ```
 
+### (get obj key) 키 규칙 (v11.2+)
+
+keyword와 string 둘 다 **동일 결과**:
+
+```lisp
+(def body {:name "김" :age 30})
+(get body :name)     ; "김"  (keyword)
+(get body "name")    ; "김"  (string)  ← 동일
+```
+
+JSON으로 파싱된 객체 (`POST` body 등)는 내부적으로 `"name"` key. 어느 쪽이든 사용 가능.
+
 ### POST Body 자동 JSON 파싱 (v11.1+)
 
 ```lisp

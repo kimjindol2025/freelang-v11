@@ -1436,6 +1436,7 @@ export class Interpreter {
     // Variables
     if ((node as any).kind === "variable") {
       let varName = (node as Variable).name;
+      const locSuffix = (node as any).line ? ` at line ${(node as any).line}` : "";
       // Self-hosting: dot field access — "env.vars" → resolve "env", then access "vars"
       if (varName.includes(".")) {
         const parts = varName.split(".");
@@ -1443,7 +1444,7 @@ export class Interpreter {
           ? this.context.variables.get("$" + parts[0])
           : this.context.variables.get(parts[0]);
         if (obj === undefined && !this.context.variables.has("$" + parts[0]) && !this.context.variables.has(parts[0])) {
-          throw new Error(`Undefined variable: '$${parts[0]}' (accessed via '${varName}')`);
+          throw new Error(`Undefined variable: '$${parts[0]}' (accessed via '${varName}')${locSuffix}`);
         }
         for (let p = 1; p < parts.length; p++) {
           if (obj === null || obj === undefined) return null;
@@ -1458,7 +1459,7 @@ export class Interpreter {
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
       }
-      throw new Error(`Undefined variable: '$${varName}'`);
+      throw new Error(`Undefined variable: '$${varName}'${locSuffix}`);
     }
 
     // Keywords
