@@ -14,6 +14,7 @@ import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow 
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
 import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
 import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver
+import { createMariadbModule } from "./stdlib-mariadb";  // v11.5: MariaDB (mariadb CLI)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
@@ -68,6 +69,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (fnValue: any, a: any[]) => interp.callFunctionValue(fnValue, a)
   ));
   interp.registerModule(createDbModule());
+  interp.registerModule(createMariadbModule());   // v11.5: mariadb_exec/query/one/health/databases/tables
   interp.registerModule(createAuthModule());
   interp.registerModule(createCacheModule());
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));

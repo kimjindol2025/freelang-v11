@@ -19732,6 +19732,123 @@ function createDbModule() {
   };
 }
 
+// src/stdlib-mariadb.ts
+var import_child_process5 = require("child_process");
+var cachedSock = null;
+function resolveSocket() {
+  if (cachedSock) return cachedSock;
+  if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
+  const fs16 = require("fs");
+  const candidates = [
+    "/data/data/com.termux/files/usr/tmp/mysqld.sock",
+    // Termux
+    "/var/run/mysqld/mysqld.sock",
+    // Debian/Ubuntu
+    "/var/lib/mysql/mysql.sock",
+    // RHEL/CentOS
+    "/tmp/mysqld.sock",
+    "/tmp/mysql.sock"
+  ];
+  for (const s of candidates) {
+    try {
+      if (fs16.existsSync(s)) return cachedSock = s;
+    } catch {
+    }
+  }
+  return cachedSock = "/tmp/mysqld.sock";
+}
+function buildArgs(db, sql) {
+  const sock = resolveSocket();
+  const user = process.env.MARIADB_USER || "root";
+  const pass = process.env.MARIADB_PASS || "";
+  const host = process.env.MARIADB_HOST;
+  const port = process.env.MARIADB_PORT;
+  const args2 = ["-u", user];
+  if (host) {
+    args2.push("-h", host);
+    if (port) args2.push("-P", port);
+  } else {
+    args2.push("--socket=" + sock);
+  }
+  if (pass) args2.push("-p" + pass);
+  if (db) args2.push(db);
+  args2.push("--batch", "-e", sql);
+  return args2;
+}
+function runMariadb(db, sql) {
+  const r = (0, import_child_process5.spawnSync)("mariadb", buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8" });
+  if (r.error) throw new Error(`mariadb CLI not found or failed: ${r.error.message}`);
+  if ((r.status ?? 1) !== 0) {
+    const stderr = r.stderr?.trim() ?? "";
+    throw new Error(`mariadb exit ${r.status}${stderr ? ": " + stderr : ""}`);
+  }
+  return r.stdout?.toString() ?? "";
+}
+function parseRows(raw) {
+  const lines = raw.split("\n").filter((l) => l.length > 0);
+  if (lines.length < 1) return [];
+  const headers = lines[0].split("	");
+  return lines.slice(1).map((line) => {
+    const vals = line.split("	");
+    const obj = {};
+    headers.forEach((h, i) => {
+      const v = vals[i];
+      if (v === void 0 || v === "NULL") obj[h] = null;
+      else if (/^-?\d+$/.test(v)) obj[h] = parseInt(v, 10);
+      else if (/^-?\d+\.\d+$/.test(v)) obj[h] = parseFloat(v);
+      else obj[h] = v;
+    });
+    return obj;
+  });
+}
+function bindParams2(sql, params) {
+  if (!params || params.length === 0) return sql;
+  return params.reduce(
+    (s, p) => {
+      if (p === null || p === void 0) return s.replace("?", "NULL");
+      if (typeof p === "number") return s.replace("?", String(p));
+      if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
+      return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
+    },
+    sql
+  );
+}
+function createMariadbModule() {
+  return {
+    // mariadb_exec db sql [params] -> raw output string (INSERT/UPDATE/DELETE/CREATE)
+    "mariadb_exec": (db, sql, params = []) => {
+      return runMariadb(db, bindParams2(sql, params));
+    },
+    // mariadb_query db sql [params] -> rows[] (SELECT)
+    "mariadb_query": (db, sql, params = []) => {
+      return parseRows(runMariadb(db, bindParams2(sql, params)));
+    },
+    // mariadb_one db sql [params] -> first row or null
+    "mariadb_one": (db, sql, params = []) => {
+      const rows = parseRows(runMariadb(db, bindParams2(sql, params)));
+      return rows[0] ?? null;
+    },
+    // mariadb_health -> true if server reachable
+    "mariadb_health": () => {
+      const sock = resolveSocket();
+      const user = process.env.MARIADB_USER || "root";
+      const args2 = ["-u", user, "--socket=" + sock, "ping"];
+      const r = (0, import_child_process5.spawnSync)("mariadb-admin", args2, { timeout: 3e3, encoding: "utf-8" });
+      return (r.status ?? 1) === 0;
+    },
+    // mariadb_databases -> list of database names
+    "mariadb_databases": () => {
+      const rows = parseRows(runMariadb("", "SHOW DATABASES"));
+      return rows.map((r) => r.Database);
+    },
+    // mariadb_tables db -> list of table names in given db
+    "mariadb_tables": (db) => {
+      const rows = parseRows(runMariadb(db, "SHOW TABLES"));
+      return rows.map((r) => Object.values(r)[0]);
+    }
+  };
+}
+
 // src/stdlib-auth.ts
 var import_crypto4 = require("crypto");
 function b64url(input) {
@@ -23420,6 +23537,7 @@ function loadAllStdlib(interp) {
     (fnValue, a) => interp.callFunctionValue(fnValue, a)
   ));
   interp.registerModule(createDbModule());
+  interp.registerModule(createMariadbModule());
   interp.registerModule(createAuthModule());
   interp.registerModule(createCacheModule());
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
@@ -29471,15 +29589,15 @@ function cmdDoc(docArgs) {
     process.stdout.write(md);
   }
 }
-function cmdBuild(buildArgs) {
-  const isOci = buildArgs.includes("--oci");
+function cmdBuild(buildArgs2) {
+  const isOci = buildArgs2.includes("--oci");
   if (isOci) {
-    const fileIdx = buildArgs.indexOf("--oci") + 1;
-    const appFile = buildArgs[fileIdx];
-    const tagIdx = buildArgs.indexOf("--tag");
-    const tag = tagIdx !== -1 ? buildArgs[tagIdx + 1] : "my-app:latest";
-    const registryIdx = buildArgs.indexOf("--registry");
-    const registry = registryIdx !== -1 ? buildArgs[registryIdx + 1] : void 0;
+    const fileIdx = buildArgs2.indexOf("--oci") + 1;
+    const appFile = buildArgs2[fileIdx];
+    const tagIdx = buildArgs2.indexOf("--tag");
+    const tag = tagIdx !== -1 ? buildArgs2[tagIdx + 1] : "my-app:latest";
+    const registryIdx = buildArgs2.indexOf("--registry");
+    const registry = registryIdx !== -1 ? buildArgs2[registryIdx + 1] : void 0;
     if (!appFile) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
       process.exit(1);
