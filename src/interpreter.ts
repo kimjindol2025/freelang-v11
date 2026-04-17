@@ -1419,10 +1419,16 @@ export class Interpreter {
         if (lit.value === "true")  return true;
         if (lit.value === "false") return false;
         if (lit.value === "null")  return null;
-        const varName = "$" + lit.value;
+        const bareName = lit.value as string;
+        const varName = "$" + bareName;
         if (this.context.variables.has(varName)) {
           return this.context.variables.get(varName);
         }
+        if (this.context.variables.has(bareName)) {
+          return this.context.variables.get(bareName);
+        }
+        // v11.1: Literal symbols are permissive (may be function-names / operator tokens).
+        // Strict resolution is enforced on Variable nodes ($-prefixed) below.
       }
       return lit.value;
     }
@@ -1436,6 +1442,9 @@ export class Interpreter {
         let obj = this.context.variables.has("$" + parts[0])
           ? this.context.variables.get("$" + parts[0])
           : this.context.variables.get(parts[0]);
+        if (obj === undefined && !this.context.variables.has("$" + parts[0]) && !this.context.variables.has(parts[0])) {
+          throw new Error(`Undefined variable: '$${parts[0]}' (accessed via '${varName}')`);
+        }
         for (let p = 1; p < parts.length; p++) {
           if (obj === null || obj === undefined) return null;
           obj = typeof obj === "object" ? obj[parts[p]] : null;
@@ -1446,7 +1455,10 @@ export class Interpreter {
       if (this.context.variables.has("$" + varName)) {
         return this.context.variables.get("$" + varName);
       }
-      return this.context.variables.get(varName);
+      if (this.context.variables.has(varName)) {
+        return this.context.variables.get(varName);
+      }
+      throw new Error(`Undefined variable: '$${varName}'`);
     }
 
     // Keywords
@@ -1555,7 +1567,7 @@ export class Interpreter {
 
     // Phase 57: Dispatch to specialized modules
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const SPECIAL_OPS = new Set(["fn","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try"]);
+    const SPECIAL_OPS = new Set(["fn","defn","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);

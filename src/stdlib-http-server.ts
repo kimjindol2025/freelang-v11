@@ -29,7 +29,9 @@ interface Request {
   path: string;
   query: Record<string, string | string[]>;
   headers: Record<string, string | string[]>;
-  body?: string;
+  // v11.1: body is auto-parsed JSON (object) when Content-Type: application/json,
+  //        otherwise raw string (or undefined)
+  body?: string | any;
   params: Record<string, string>;
   request_id?: string;
   timestamp?: number;
@@ -89,14 +91,18 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     };
   }
 
-  // 요청 본문 읽기
-  async function readBody(req: http.IncomingMessage): Promise<string> {
+  // 요청 본문 읽기 (v11.1: Content-Type 이 application/json 이면 자동 파싱)
+  async function readBody(req: http.IncomingMessage): Promise<string | any> {
     return new Promise((resolve) => {
       let body = "";
       req.on("data", (chunk) => {
         body += chunk.toString();
       });
       req.on("end", () => {
+        const ct = (req.headers["content-type"] || "").toString().toLowerCase();
+        if (ct.includes("application/json") && body.trim()) {
+          try { resolve(JSON.parse(body)); return; } catch { /* fall through */ }
+        }
         resolve(body);
       });
     });

@@ -151,6 +151,58 @@ freelang-v11/
 
 ---
 
+## v11.1 문법 가이드 (신규)
+
+### 함수 정의 (3가지 모두 지원)
+
+```lisp
+; 1) [FUNC] 블록 — 엔터프라이즈 기능(타입, :docs 등) 풀 지원
+[FUNC add :params [$a $b] :body (+ $a $b)]
+
+; 2) (fn ...) — 익명 람다
+(define double (fn [$x] (* $x 2)))
+
+; 3) (defn ...) — Clojure 스타일 sugar (v11.1+)
+(defn square [$x] (* $x $x))
+(defn greet [name]    ; bare symbol도 OK, $ 자동 주입
+  (str "Hello " name))
+```
+
+### let 바인딩 (1차원·2차원 모두 지원, v11.1+)
+
+```lisp
+; 기존 2차원 (v11)
+(let [[$x 5] [$y 10]] (+ $x $y))
+
+; 신규 1차원 평탄 (v11.1)
+(let [$x 5 $y 10] (+ $x $y))
+
+; bare symbol + $ 자동
+(let [x 5 y 10] (+ x y))
+```
+
+### Strict Symbol Resolution (v11.1+)
+
+미해결 심볼은 즉시 런타임 에러:
+
+```lisp
+(+ undefined-var 1)
+; Error: Undefined variable: '$undefined-var'
+```
+
+### POST Body 자동 JSON 파싱 (v11.1+)
+
+```lisp
+(server_post "/api/users" (fn [$req]
+  (let [body (get $req :body)        ; 자동 파싱된 객체
+        name (get body "name")]       ; string key 접근
+    (mariadb_exec "db" (str "INSERT ... VALUES ('" name "')")))))
+```
+
+Content-Type: application/json 이면 `req.body`는 객체. 아니면 raw string.
+
+---
+
 ## v11 주요 기능
 
 ### 1. 파일시스템 기반 라우팅 (App Router)

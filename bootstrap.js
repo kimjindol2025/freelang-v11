@@ -19690,7 +19690,13 @@ function evalSpecialForm(interp, op, expr) {
       const items = paramsNode.fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
-          if (item.kind === "variable") params.push(item.name);
+          if (item.kind === "variable") {
+            const n = item.name;
+            params.push(n.startsWith("$") ? n.slice(1) : n);
+          } else if (item.kind === "literal" && item.type === "symbol") {
+            const v = item.value;
+            params.push(v.startsWith("$") ? v.slice(1) : v);
+          }
         }
       }
     }
@@ -19702,6 +19708,22 @@ function evalSpecialForm(interp, op, expr) {
       capturedEnv: ctx.variables.snapshot(),
       name: void 0
     };
+  }
+  if (op === "defn") {
+    if (expr.args.length < 3) throw new Error(`defn requires name, params, and body`);
+    const nameNode = expr.args[0];
+    let name;
+    if (nameNode.kind === "variable") name = nameNode.name;
+    else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value;
+    else throw new Error(`defn: first argument must be a symbol (function name)`);
+    const paramsNode = expr.args[1];
+    const bodyArgs = expr.args.slice(2);
+    const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
+    const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
+    const fnValue = interp.evalSExpr(fnExpr);
+    ctx.variables.set("$" + name, fnValue);
+    ctx.variables.set(name, fnValue);
+    return fnValue;
   }
   if (op === "async") {
     if (expr.args.length < 3) throw new Error(`async requires name, params, and body`);
@@ -20349,21 +20371,40 @@ function evalLet(interp, args2) {
   const bindings = args2[0];
   const ctx = interp.context;
   const ev = (node) => interp.eval(node);
+  const toVarName = (node) => {
+    if (node?.kind === "variable") {
+      const n = node.name;
+      return n.startsWith("$") ? n : "$" + n;
+    }
+    if (node?.kind === "literal" && node.type === "symbol") {
+      const v = node.value;
+      return v.startsWith("$") ? v : "$" + v;
+    }
+    throw new Error(`Invalid binding variable: expected symbol or variable, got ${node?.kind}`);
+  };
   ctx.variables.push();
   if (bindings.kind === "block" && bindings.type === "Array") {
     const items = bindings.fields.get("items");
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        if (item.kind === "block" && item.type === "Array") {
-          const bindingItems = item.fields.get("items");
-          if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-            let varName;
-            const varNode = bindingItems[0];
-            if (varNode.kind === "variable") varName = "$" + varNode.name;
-            else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + varNode.value;
-            else throw new Error(`Invalid binding variable: expected symbol or variable`);
-            ctx.variables.set(varName, ev(bindingItems[1]));
+    if (Array.isArray(items) && items.length > 0) {
+      const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
+      if (isNested) {
+        for (const item of items) {
+          if (item.kind === "block" && item.type === "Array") {
+            const bindingItems = item.fields.get("items");
+            if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
+              const varName = toVarName(bindingItems[0]);
+              ctx.variables.set(varName, ev(bindingItems[1]));
+            }
           }
+        }
+      } else {
+        if (items.length % 2 !== 0) {
+          ctx.variables.pop();
+          throw new Error(`let: expected even number of binding items, got ${items.length}`);
+        }
+        for (let i = 0; i < items.length; i += 2) {
+          const varName = toVarName(items[i]);
+          ctx.variables.set(varName, ev(items[i + 1]));
         }
       }
     }
@@ -22841,6 +22882,10 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         body += chunk.toString();
       });
       req.on("end", () => {
+        const ct = (req.headers["content-type"] || "").toString().toLowerCase();
+        if (ct.includes("application/json") && body.trim()) {
+          try { resolve7(JSON.parse(body)); return; } catch {}
+        }
         resolve7(body);
       });
     });
@@ -29740,10 +29785,15 @@ var Interpreter = class {
         if (lit.value === "true") return true;
         if (lit.value === "false") return false;
         if (lit.value === "null") return null;
-        const varName = "$" + lit.value;
+        const bareName = lit.value;
+        const varName = "$" + bareName;
         if (this.context.variables.has(varName)) {
           return this.context.variables.get(varName);
         }
+        if (this.context.variables.has(bareName)) {
+          return this.context.variables.get(bareName);
+        }
+        // v11.1: Literal symbols are permissive — strict resolution applies to $-Variables below.
       }
       return lit.value;
     }
@@ -29751,7 +29801,11 @@ var Interpreter = class {
       let varName = node.name;
       if (varName.includes(".")) {
         const parts = varName.split(".");
+        const hasRoot = this.context.variables.has("$" + parts[0]) || this.context.variables.has(parts[0]);
         let obj = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
+        if (!hasRoot) {
+          throw new Error(`Undefined variable: '$${parts[0]}' (accessed via '${varName}')`);
+        }
         for (let p = 1; p < parts.length; p++) {
           if (obj === null || obj === void 0) return null;
           obj = typeof obj === "object" ? obj[parts[p]] : null;
@@ -29761,7 +29815,10 @@ var Interpreter = class {
       if (this.context.variables.has("$" + varName)) {
         return this.context.variables.get("$" + varName);
       }
-      return this.context.variables.get(varName);
+      if (this.context.variables.has(varName)) {
+        return this.context.variables.get(varName);
+      }
+      throw new Error(`Undefined variable: '$${varName}'`);
     }
     if (node.kind === "keyword") {
       return node.name;
@@ -29831,7 +29888,7 @@ var Interpreter = class {
       }
     }
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
     if (op === "REFLECT") {

@@ -31,7 +31,14 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       const items = (paramsNode as any).fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
-          if ((item as any).kind === "variable") params.push((item as Variable).name);
+          // v11.1: variable ($x) 또는 bare symbol (x) 모두 허용 → 정식 이름은 $-접두사 포함
+          if ((item as any).kind === "variable") {
+            const n = (item as Variable).name;
+            params.push(n.startsWith("$") ? n.slice(1) : n);
+          } else if ((item as any).kind === "literal" && (item as any).type === "symbol") {
+            const v = (item as any).value as string;
+            params.push(v.startsWith("$") ? v.slice(1) : v);
+          }
         }
       }
     }
@@ -45,6 +52,31 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       capturedEnv: ctx.variables.snapshot(),
       name: undefined,
     };
+  }
+
+  // ── defn (v11.1: Clojure 스타일 sugar) ───────────────────────────
+  // (defn name [params...] body) → (define name (fn [params...] body))
+  if (op === "defn") {
+    if (expr.args.length < 3) throw new Error(`defn requires name, params, and body`);
+    const nameNode = expr.args[0] as any;
+    let name: string;
+    if (nameNode.kind === "variable") name = nameNode.name;
+    else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value as string;
+    else throw new Error(`defn: first argument must be a symbol (function name)`);
+
+    const paramsNode = expr.args[1];
+    const bodyArgs = expr.args.slice(2);
+    const body = bodyArgs.length === 1
+      ? bodyArgs[0]
+      : ({ kind: "sexpr" as const, op: "do", args: bodyArgs } as any);
+
+    // (fn [params] body) 를 synth → 현재 scope에서 eval하여 function-value 획득
+    const fnExpr: any = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
+    const fnValue = (interp as any).evalSExpr(fnExpr);
+    // name을 set → bare symbol/variable 둘 다로 접근 가능하게 저장
+    ctx.variables.set("$" + name, fnValue);
+    ctx.variables.set(name, fnValue);
+    return fnValue;
   }
 
   // ── async ─────────────────────────────────────────────────────────
@@ -876,29 +908,54 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   throw new Error(`evalSpecialForm: unknown op "${op}"`);
 }
 
-// ── Helper: evalLet ───────────────────────────────────────────────
+// ── Helper: evalLet (v11.1: 1차원/2차원 대괄호 + bare symbol 모두 지원) ───
 function evalLet(interp: Interpreter, args: ASTNode[]): any {
   if (args.length < 2) throw new Error(`let requires at least 2 arguments`);
   const bindings = args[0];
   const ctx = interp.context;
   const ev = (node: any) => (interp as any).eval(node);
 
+  const toVarName = (node: any): string => {
+    if (node?.kind === "variable") {
+      const n = node.name as string;
+      return n.startsWith("$") ? n : "$" + n;
+    }
+    if (node?.kind === "literal" && node.type === "symbol") {
+      const v = node.value as string;
+      return v.startsWith("$") ? v : "$" + v;
+    }
+    throw new Error(`Invalid binding variable: expected symbol or variable, got ${node?.kind}`);
+  };
+
   ctx.variables.push();
 
   if ((bindings as any).kind === "block" && (bindings as any).type === "Array") {
     const items = (bindings as any).fields.get("items");
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        if ((item as any).kind === "block" && (item as any).type === "Array") {
-          const bindingItems = (item as any).fields.get("items");
-          if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-            let varName: string;
-            const varNode = bindingItems[0] as any;
-            if (varNode.kind === "variable") varName = "$" + varNode.name;
-            else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + (varNode.value as string);
-            else throw new Error(`Invalid binding variable: expected symbol or variable`);
-            ctx.variables.set(varName, ev(bindingItems[1]));
+    if (Array.isArray(items) && items.length > 0) {
+      // 감지: 첫 원소가 Array block 이면 2차원 ([[$x expr] [$y expr]])
+      //       그렇지 않으면 1차원 ([$x expr $y expr] or [x expr y expr])
+      const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
+
+      if (isNested) {
+        // 기존 2차원 경로 (v11 호환)
+        for (const item of items) {
+          if ((item as any).kind === "block" && (item as any).type === "Array") {
+            const bindingItems = (item as any).fields.get("items");
+            if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
+              const varName = toVarName(bindingItems[0]);
+              ctx.variables.set(varName, ev(bindingItems[1]));
+            }
           }
+        }
+      } else {
+        // v11.1 신규: 1차원 평탄 문법
+        if (items.length % 2 !== 0) {
+          ctx.variables.pop();
+          throw new Error(`let: expected even number of binding items, got ${items.length}`);
+        }
+        for (let i = 0; i < items.length; i += 2) {
+          const varName = toVarName(items[i]);
+          ctx.variables.set(varName, ev(items[i + 1]));
         }
       }
     }
