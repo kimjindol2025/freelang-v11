@@ -613,6 +613,18 @@
             [(= $op "exit") (str "process.exit(" $as ")")]
             [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
 
+            ;; ─── Time (10) ───
+            [(= $op "now") (str "now()")]
+            [(= $op "now_ms") (str "now_ms()")]
+            [(= $op "now_iso") (str "now_iso()")]
+            [(= $op "now_unix") (str "now_unix()")]
+            [(= $op "time_diff") (str "((t1,t2)=>t2-t1)(" $as ")")]
+            [(= $op "time_since") (str "((ts)=>Date.now()-ts)(" $as ")")]
+            [(= $op "sleep_ms") (str "((ms)=>{const start=Date.now();while(Date.now()-start<ms){}})(" $as ")")]
+            [(= $op "timer_start") (str "{__timer:{label:" $as ",start:Date.now(),laps:[]}}")]
+            [(= $op "timer_elapsed") (str "((t)=>Date.now()-t.__timer.start)(" $as ")")]
+            [(= $op "timer_lap") (str "((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(" $as ")")]
+
             [true (cg-call $op $args)]))]
 
 [FUNC cg-call :params [$op $args]
@@ -716,6 +728,17 @@
     "const map_entries = (m) => m instanceof Map ? [...m.entries()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.entries(m) : []);"
     "const map_keys = (m) => m instanceof Map ? [...m.keys()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m) : []);"
     "const map_values = (m) => m instanceof Map ? [...m.values()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.values(m) : []);"
+    "const now = () => Date.now();"
+    "const now_ms = () => Date.now();"
+    "const now_iso = () => new Date().toISOString();"
+    "const now_unix = () => Math.floor(Date.now()/1000);"
+    "const regex_match = (s, p) => new RegExp(p).test(s);"
+    "const regex_find = (s, p) => { const m = s.match(new RegExp(p)); return m ? m[0] : null; };"
+    "const regex_find_all = (s, p) => s.match(new RegExp(p, 'g')) || [];"
+    "const regex_replace = (s, p, r) => s.replace(new RegExp(p, 'g'), r);"
+    "const regex_split = (s, p) => s.split(new RegExp(p));"
+    "const regex_count = (s, p) => (s.match(new RegExp(p, 'g')) || []).length;"
+    "const regex_extract = (s, p) => { const m = s.match(new RegExp(p)); return m ? m.slice(1) : []; };"
     ;; I/O
     "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
     "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"

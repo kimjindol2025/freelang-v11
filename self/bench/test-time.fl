@@ -1,0 +1,8 @@
+(do
+  (let [[$t1 (now_ms)]
+        [$t2 (now_iso)]
+        [$t3 (now_unix)]]
+    (do
+      (println (str "now_ms: " (number? $t1)))
+      (println (str "now_iso: " (string? $t2)))
+      (println (str "now_unix: " (number? $t3))))))
