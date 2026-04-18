@@ -82,9 +82,29 @@ self/tests/test-lexer.fl: 10 smoke pass=10/10
 - `@atom` 은 현재 Unknown 토큰. 사용 예가 적어 Phase 02-03 로 연기.
 - Token 의 `value` 는 항상 string. Number 는 parser 가 parseFloat.
 
-## Phase 02 — AST 타입
+## Phase 02 — AST 타입 ✅
 
-(미진행)
+```
+phase=02 stage=21 status=done target=ast.fl constructors=basic (literal/variable/keyword/sexpr)
+phase=02 stage=22 status=done target=ast_literal_wrappers (number/string/bool/null/symbol)
+phase=02 stage=23 status=done target=ast_block (make-block/array-block/map-block)
+phase=02 stage=24 status=done target=ast_pattern_7 (literal/variable/wildcard/list/struct/or/range)
+phase=02 stage=25 status=done target=ast_match (pattern-match/match-case)
+phase=02 stage=26 status=done target=ast_function_and_types (function-value/type-class/instance)
+phase=02 stage=27 status=done target=ast_module (module/import/open)
+phase=02 stage=28 status=done target=ast_ai_blocks (search/learn/reasoning)
+phase=02 stage=29 status=done target=ast_async_try (async-function/await/try/catch/throw)
+phase=02 stage=30 status=done target=ast_web_and_equal (page/route/component/form + deep-equal?)
+```
+
+실측:
+- self/ast.fl: 36 [FUNC] 블록
+- self/tests/test-ast.fl smoke 7/7 pass
+  literal/variable/keyword/sexpr/block/pattern-wc/try — 모두 :kind 필드 생성 확인
+
+제한:
+- list? / map? predicate 는 placeholder (FL 런타임의 타입 검사 기본 부족)
+  Phase 07 builtins/type.fl 에서 교체 예정.
 
 ## Phase 03 — Self Parser
 

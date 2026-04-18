@@ -1,0 +1,36 @@
+;; P02 smoke: AST 생성자 동작 확인
+
+[FUNC make-literal :params [$type $value $line]
+  :body {:kind "literal" :type $type :value $value :line $line}]
+
+[FUNC make-variable :params [$name $line]
+  :body {:kind "variable" :name $name :line $line}]
+
+[FUNC make-keyword :params [$name $line]
+  :body {:kind "keyword" :name $name :line $line}]
+
+[FUNC make-sexpr :params [$op $args $line]
+  :body {:kind "sexpr" :op $op :args $args :line $line}]
+
+[FUNC make-block :params [$type $name $fields $line]
+  :body {:kind "block" :type $type :name $name :fields $fields :line $line}]
+
+[FUNC make-pattern-wildcard :params [$line]
+  :body {:kind "pattern-wildcard" :line $line}]
+
+[FUNC make-try :params [$body $catch $finally $line]
+  :body {:kind "try" :body $body :catch $catch :finally $finally :line $line}]
+
+[FUNC show :params [$label $node]
+  :body (let [[$k (get $node :kind)]]
+          (if (= $k (get $node :kind))
+            (println (str "pass " $label " kind=" $k))
+            (println (str "fail " $label))))]
+
+(show "literal"     (make-literal "number" 42 1))
+(show "variable"    (make-variable "x" 1))
+(show "keyword"     (make-keyword "name" 1))
+(show "sexpr"       (make-sexpr "+" (list 1 2) 1))
+(show "block"       (make-block "FUNC" "add" {:params [] :body null} 1))
+(show "pattern-wc"  (make-pattern-wildcard 1))
+(show "try"         (make-try (list) null null 1))
