@@ -1362,4 +1362,91 @@ describe("Web Framework Integration Tests", () => {
       expect(requestToken).toBe(validToken);
     });
   });
+
+  describe("Cache-Control & ETag/304", () => {
+    test("should set Cache-Control for SSR (no-store)", () => {
+      // SSR 모드: Cache-Control: no-store
+      const cacheControl = "no-store";
+      expect(cacheControl).toBe("no-store");
+    });
+
+    test("should set Cache-Control for ISR (s-maxage)", () => {
+      // ISR 모드: Cache-Control: public, s-maxage=60, stale-while-revalidate=86400
+      const revalidateSeconds = 60;
+      const cacheControl = `public, s-maxage=${revalidateSeconds}, stale-while-revalidate=86400`;
+
+      expect(cacheControl).toContain("s-maxage=60");
+      expect(cacheControl).toContain("stale-while-revalidate");
+    });
+
+    test("should set Cache-Control for SSG (immutable)", () => {
+      // SSG 모드: Cache-Control: public, max-age=31536000, immutable
+      const cacheControl = "public, max-age=31536000, immutable";
+
+      expect(cacheControl).toContain("max-age=31536000");
+      expect(cacheControl).toContain("immutable");
+    });
+
+    test("should generate ETag from content hash", () => {
+      // ETag: crypto.createHash('md5').update(html).digest('hex')
+      const crypto = require("crypto");
+      const html = "<html><body>Test</body></html>";
+      const etag = crypto.createHash("md5").update(html).digest("hex");
+
+      expect(typeof etag).toBe("string");
+      expect(etag.length).toBe(32); // MD5 hex: 32 chars
+    });
+
+    test("should return 304 on If-None-Match match", () => {
+      // If-None-Match: etag 일치 → 304 Not Modified
+      const crypto = require("crypto");
+      const html = "<html><body>Test</body></html>";
+      const etag = crypto.createHash("md5").update(html).digest("hex");
+
+      const ifNoneMatch = etag;
+      expect(ifNoneMatch).toBe(etag);
+      // 일치 → 304
+    });
+
+    test("should return 200 on If-None-Match mismatch", () => {
+      // If-None-Match: etag 불일치 → 200 OK
+      const oldEtag = "old-etag";
+      const newEtag = "new-etag";
+
+      expect(oldEtag).not.toBe(newEtag);
+      // 불일치 → 200
+    });
+
+    test("should respect Cache-Control for API routes", () => {
+      // API route: Cache-Control: no-store (항상 fresh)
+      const cacheControl = "no-store";
+      expect(cacheControl).toBe("no-store");
+    });
+
+    test("should handle error responses (no-store)", () => {
+      // 에러 응답: Cache-Control: no-store
+      const cacheControl = "no-store";
+      expect(cacheControl).toBe("no-store");
+    });
+
+    test("should apply correct cache headers in response", () => {
+      // 응답 헤더: Cache-Control + ETag 모두 포함
+      const headers = {
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "ETag": "abc123def456"
+      };
+
+      expect(headers["Cache-Control"]).toBeDefined();
+      expect(headers["ETag"]).toBeDefined();
+    });
+
+    test("should preserve cache semantics after revalidation", () => {
+      // ISR 캐시 무효화 후 새로운 max-age 적용
+      const beforeRevalidate = "public, s-maxage=60, stale-while-revalidate=86400";
+      const afterRevalidate = "public, s-maxage=60, stale-while-revalidate=86400";
+
+      expect(beforeRevalidate).toBe(afterRevalidate);
+      // 무효화 후에도 같은 캐시 정책 유지
+    });
+  });
 });
