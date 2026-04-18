@@ -113,7 +113,7 @@ export class AppRouter {
   /**
    * 라우트 등록
    */
-  private registerRoute(routePath: string, filePath: string): void {
+  private registerRoute(routePath: string, filePath: string, kind: "page" | "route" = "page"): void {
     // /users/[id] → /^\/users\/([^/]+)$/
     const pattern = this.buildPattern(routePath);
     const params = this.extractParams(routePath);
@@ -125,11 +125,12 @@ export class AppRouter {
       filePath,
       params,
       isDynamic,
-      layouts: this.getLayoutsForPath(routePath),
+      layouts: kind === "route" ? [] : this.getLayoutsForPath(routePath),
+      kind,
     };
 
     this.routes.push(route);
-    console.log(`approuter.route path=${routePath} file=${filePath} dynamic=${isDynamic}`);
+    console.log(`approuter.${kind} path=${routePath} file=${filePath} dynamic=${isDynamic}`);
   }
 
   /**

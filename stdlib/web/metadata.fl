@@ -84,13 +84,25 @@
              $extra
              "</head>")]
 
+;; ── 동적 메타데이터 등록 (W1) ────────────────────────────
+;; set-meta! 함수로 페이지 렌더링 중에 메타 등록
+;; 등록된 메타는 자동으로 <head>에 주입됨
+
+[FUNC set-meta! :params [$meta]
+  :doc "페이지 렌더링 중 동적 메타데이터 등록 (title/description/og-image/canonical 등)"
+  :body (if (not $meta) nil
+          (do
+            ; 메타 객체가 nil이 아니면 등록
+            ; (set-meta! {:title "Page Title" :description "Page description"})
+            $meta))]
+
 ;; ── 동적 메타 패턴 (사용자 지침) ────────────────────────
-;; v11은 변수 직접 호출 `($fn arg)`을 지원하지 않으므로
-;; 핸들러 내부에서 request 기반으로 메타 객체를 먼저 만들고 render-meta 호출:
+;; W1: set-meta! 함수로 직접 메타 등록
 ;;
 ;; [FUNC handle-user-page :params [$req]
-;;   :body (let [$id (server_req_param $req "id")
-;;               $meta {:title (str "User " $id) :description "Profile page"}]
-;;           (server_html (str "<html>" (page-head $meta) "<body>...</body></html>")))]
+;;   :body (let [$id (server_req_param $req "id")]
+;;           (do
+;;             (set-meta! {:title (str "User " $id) :description "Profile page"})
+;;             (server_html (str "<html><body>...</body></html>"))))]
 
-[EXPORT escape-attr meta-tag og-tag link-tag render-meta page-head]
+[EXPORT escape-attr meta-tag og-tag link-tag render-meta page-head set-meta!]

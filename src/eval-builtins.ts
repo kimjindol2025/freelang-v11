@@ -198,6 +198,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "sort": return Array.isArray(v0) ? [...v0].sort((a: any, b: any) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
     case "keys": return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
     case "values": return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+    case "map-entries": case "map_entries": return v0 instanceof Map ? [...v0.entries()] : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : []);
     case "floor": return Math.floor(v0);
     case "ceil": return Math.ceil(v0);
     case "round": return Math.round(v0);

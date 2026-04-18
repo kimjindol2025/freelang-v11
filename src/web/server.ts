@@ -295,17 +295,22 @@ export class WebServer {
       // executor가 설정되어 있으면 .fl 파일 실행
       if (this.executor) {
         try {
-          // /api/ 경로는 JSON API 모드
-          const isApiPath = urlPath.startsWith("/api/");
+          const routeKind = (match.route as any).kind || "page";
+          // route.fl 이면 항상 JSON API 모드, 그 외엔 /api/ 접두사 규칙 유지
+          const isApiPath = routeKind === "route" || urlPath.startsWith("/api/");
 
-          const result = await this.executor.executePage(match.route.filePath, {
+          const executorContext = {
             req: { method: req.method, path: urlPath, headers: req.headers as Record<string, string> },
             params: match.params,
             query,
             body,
             method: req.method,
             isApiPath,
-          });
+          };
+
+          const result = routeKind === "route"
+            ? await this.executor.executeRoute(match.route.filePath, executorContext)
+            : await this.executor.executePage(match.route.filePath, executorContext);
 
           // JSON API 모드: 응답을 JSON으로 처리
           if (isApiPath) {
@@ -333,6 +338,12 @@ export class WebServer {
                 finalBody = await this.renderer.renderWithLayout(finalBody, layouts);
               } catch { /* fall back to raw body */ }
             }
+
+            // W1: 동적 메타데이터 주입
+            if (result.meta && Object.keys(result.meta).length > 0) {
+              finalBody = this.injectMetaIntoHead(finalBody, result.meta);
+            }
+
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
             res.writeHead(result.status || 200);
             res.end(finalBody);
@@ -403,6 +414,66 @@ export class WebServer {
         "404",
         `<h1>404 Not Found</h1><p>Route not found: ${escHtml(urlPath)}</p>`
       )
+    );
+  }
+
+  /**
+   * W1: HTML <head>에 메타데이터 주입
+   */
+  private injectMetaIntoHead(html: string, meta: Record<string, string>): string {
+    // <head> 태그 찾기
+    const headMatch = html.match(/<head[^>]*>/i);
+    if (!headMatch) return html; // <head> 없으면 그대로 반환
+
+    const headTag = headMatch[0];
+    const headIndex = html.indexOf(headTag);
+    const headEndIndex = headIndex + headTag.length;
+
+    // 메타 태그 생성 (기존 메타와 중복 방지)
+    const existingMeta = html.substring(headIndex, html.indexOf("</head>", headIndex));
+    const metaTags: string[] = [];
+
+    // title 태그
+    if (meta.title && !existingMeta.includes("<title>")) {
+      metaTags.push(`<title>${escHtml(meta.title)}</title>`);
+    }
+
+    // description 메타
+    if (meta.description && !existingMeta.includes('name="description"')) {
+      metaTags.push(`<meta name="description" content="${escHtml(meta.description)}">`);
+    }
+
+    // og:image
+    if (meta["og-image"] && !existingMeta.includes('property="og:image"')) {
+      metaTags.push(`<meta property="og:image" content="${escHtml(meta["og-image"])}">`);
+    }
+
+    // og:url
+    if (meta["og-url"] && !existingMeta.includes('property="og:url"')) {
+      metaTags.push(`<meta property="og:url" content="${escHtml(meta["og-url"])}">`);
+    }
+
+    // canonical
+    if (meta.canonical && !existingMeta.includes('rel="canonical"')) {
+      metaTags.push(`<link rel="canonical" href="${escHtml(meta.canonical)}">`);
+    }
+
+    // 추가 메타 태그들
+    if (meta["og-title"] && !existingMeta.includes('property="og:title"')) {
+      metaTags.push(`<meta property="og:title" content="${escHtml(meta["og-title"])}">`);
+    }
+
+    if (meta["og-description"] && !existingMeta.includes('property="og:description"')) {
+      metaTags.push(`<meta property="og:description" content="${escHtml(meta["og-description"])}">`);
+    }
+
+    // 메타 태그 주입
+    const metaString = metaTags.join("\n  ");
+    return (
+      html.substring(0, headEndIndex) +
+      "\n  " +
+      metaString +
+      html.substring(headEndIndex)
     );
   }
 

@@ -1,0 +1,7 @@
+(println (fl-parse "(defprotocol Show show)"))
+(println "---")
+(println (fl-parse "(impl Show Int (show [x] (num-to-str x)))"))
+(println "---")
+(println (fl-parse "(defmacro when [c body] (list 'if c body null))"))
+(println "---")
+(println (fl-parse "(macroexpand '(when x y))"))

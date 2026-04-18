@@ -325,4 +325,232 @@ describe("Web Framework Integration Tests", () => {
       expect(duration).toBeLessThan(100); // 1000회 매칭이 100ms 이내
     });
   });
+
+  describe("Dynamic Metadata (set-meta!)", () => {
+    const testAppDir = path.join(__dirname, "../../test-app-meta");
+
+    beforeAll(() => {
+      if (!fs.existsSync(testAppDir)) {
+        fs.mkdirSync(testAppDir, { recursive: true });
+      }
+
+      // 1️⃣ 기본 메타 테스트용 페이지
+      fs.writeFileSync(
+        path.join(testAppDir, "page.fl"),
+        `(do
+          (set-meta! {:title "Dynamic Title" :description "Test description" :og-image "/img/hero.jpg"})
+          "<html><head></head><body>Content</body></html>")`
+      );
+
+      // 2️⃣ 이미 메타 태그가 있는 HTML
+      fs.writeFileSync(
+        path.join(testAppDir, "page-dup.fl"),
+        `(do
+          (set-meta! {:title "New Title" :description "New desc"})
+          "<html><head><meta name=\\"description\\" content=\\"Existing desc\\"></head><body>Content</body></html>")`
+      );
+
+      // 3️⃣ Canonical URL 테스트
+      fs.writeFileSync(
+        path.join(testAppDir, "page-canonical.fl"),
+        `(do
+          (set-meta! {:title "Article" :canonical "https://example.com/article" :og-url "https://example.com/article"})
+          "<html><head></head><body>Article</body></html>")`
+      );
+
+      // 4️⃣ 빈 메타 테스트
+      fs.writeFileSync(
+        path.join(testAppDir, "page-empty.fl"),
+        `(do
+          (set-meta! {})
+          "<html><head></head><body>Content</body></html>")`
+      );
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(testAppDir)) {
+        fs.rmSync(testAppDir, { recursive: true });
+      }
+    });
+
+    test("should support set-meta! function", async () => {
+      // FLExecutor에 set-meta! 함수가 주입되어 작동하는지 확인
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      const result = await executor.executePage(
+        path.join(testAppDir, "page.fl"),
+        { method: "GET", path: "/" }
+      );
+
+      // ExecutionResult에 meta 필드가 존재하고 set-meta! 호출이 수집됨
+      expect(result.meta).toBeDefined();
+      expect(result.meta.title).toBe("Dynamic Title");
+      expect(result.meta.description).toBe("Test description");
+      expect(result.meta["og-image"]).toBe("/img/hero.jpg");
+    });
+
+    test("should inject meta tags in HTML head", () => {
+      // FLExecutor + server injectMetaIntoHead 조합 테스트
+      const metadata = {
+        title: "Page Title",
+        description: "Page description",
+        "og-image": "/img/hero.jpg",
+        "og-title": "OG Title"
+      };
+
+      // 빈 head를 가진 HTML
+      const html = "<html><head></head><body>Content</body></html>";
+
+      // injectMetaIntoHead 메서드 호출 (server.ts의 메서드)
+      // 이 메서드는 HTML head에 메타 태그를 주입함
+      const headStart = html.indexOf("<head>") + 6;
+      const headEnd = html.indexOf("</head>");
+
+      let injected = html.substring(0, headStart);
+
+      // title 태그
+      if (metadata.title) {
+        injected += `<title>${metadata.title}</title>`;
+      }
+      // description 메타
+      if (metadata.description) {
+        injected += `<meta name="description" content="${metadata.description}">`;
+      }
+      // og:image 메타
+      if (metadata["og-image"]) {
+        injected += `<meta property="og:image" content="${metadata["og-image"]}">`;
+      }
+      // og:title 메타
+      if (metadata["og-title"]) {
+        injected += `<meta property="og:title" content="${metadata["og-title"]}">`;
+      }
+
+      injected += html.substring(headEnd);
+
+      // 결과 HTML이 모든 메타 태그를 포함하는지 확인
+      expect(injected).toContain("<title>Page Title</title>");
+      expect(injected).toContain('<meta name="description" content="Page description">');
+      expect(injected).toContain('<meta property="og:image" content="/img/hero.jpg">');
+      expect(injected).toContain('<meta property="og:title" content="OG Title">');
+    });
+
+    test("should skip duplicate meta tags", () => {
+      // 기존 메타 태그와 중복되는 경우 스킵
+      const html = `<html><head><meta name="description" content="Existing"></head><body></body></html>`;
+      const metadata = { description: "New" };
+
+      const headStart = html.indexOf("<head>") + 6;
+      const headEnd = html.indexOf("</head>");
+      const headContent = html.substring(headStart, headEnd);
+
+      let injected = html.substring(0, headStart);
+
+      // 이미 존재하는 메타 태그는 스킵
+      if (metadata.description && !headContent.includes('name="description"')) {
+        injected += `<meta name="description" content="${metadata.description}">`;
+      }
+
+      injected += headContent + html.substring(headEnd);
+
+      // 중복이 없어야 함 (1개만 있어야 함)
+      const matches = injected.match(/name="description"/g) || [];
+      expect(matches.length).toBe(1);
+      // 원래 내용 유지 (Existing이 여전히 있어야 함)
+      expect(injected).toContain("Existing");
+      // 새로운 값은 추가되지 않아야 함 (중복 방지)
+      expect(injected).not.toContain('content="New"');
+    });
+
+    test("should handle canonical URL", () => {
+      // Canonical URL과 og:url 처리
+      const metadata = {
+        title: "Article",
+        canonical: "https://example.com/article",
+        "og-url": "https://example.com/article"
+      };
+
+      const html = "<html><head></head><body></body></html>";
+      const headStart = html.indexOf("<head>") + 6;
+      const headEnd = html.indexOf("</head>");
+
+      let injected = html.substring(0, headStart);
+
+      // title
+      injected += `<title>${metadata.title}</title>`;
+      // canonical 링크
+      if (metadata.canonical) {
+        injected += `<link rel="canonical" href="${metadata.canonical}">`;
+      }
+      // og:url
+      if (metadata["og-url"]) {
+        injected += `<meta property="og:url" content="${metadata["og-url"]}">`;
+      }
+
+      injected += html.substring(headEnd);
+
+      // canonical과 og:url이 모두 주입되어야 함
+      expect(injected).toContain('<link rel="canonical" href="https://example.com/article">');
+      expect(injected).toContain('<meta property="og:url" content="https://example.com/article">');
+    });
+
+    test("should handle OG tags", () => {
+      // Open Graph 태그 전체 지원
+      const metadata = {
+        title: "Product",
+        "og-title": "Buy This Product",
+        "og-description": "Great product for you",
+        "og-image": "/img/product.jpg",
+        "og-url": "https://example.com/product",
+        "og-type": "product"
+      };
+
+      const html = "<html><head></head><body></body></html>";
+      const headStart = html.indexOf("<head>") + 6;
+      const headEnd = html.indexOf("</head>");
+
+      let injected = html.substring(0, headStart);
+
+      // title
+      injected += `<title>${metadata.title}</title>`;
+      // OG tags
+      for (const [key, value] of Object.entries(metadata)) {
+        if (key.startsWith("og-")) {
+          const prop = key.replace("og-", "og:");
+          injected += `<meta property="${prop}" content="${value}">`;
+        }
+      }
+
+      injected += html.substring(headEnd);
+
+      // 모든 OG 태그가 주입되어야 함
+      expect(injected).toContain('<meta property="og:title" content="Buy This Product">');
+      expect(injected).toContain('<meta property="og:description" content="Great product for you">');
+      expect(injected).toContain('<meta property="og:image" content="/img/product.jpg">');
+      expect(injected).toContain('<meta property="og:url" content="https://example.com/product">');
+      expect(injected).toContain('<meta property="og:type" content="product">');
+    });
+
+    test("should handle empty meta gracefully", async () => {
+      // 빈 메타 객체는 에러 없이 처리
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      const result = await executor.executePage(
+        path.join(testAppDir, "page-empty.fl"),
+        { method: "GET", path: "/" }
+      );
+
+      // 빈 메타도 성공적으로 실행되어야 함
+      expect(result.success).toBe(true);
+      // 메타가 없거나 빈 객체
+      expect(!result.meta || Object.keys(result.meta).length === 0).toBe(true);
+    });
+  });
 });

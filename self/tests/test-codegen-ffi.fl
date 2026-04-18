@@ -1,0 +1,69 @@
+;; Phase 11 — Node FFI codegen 검증
+;; file_read, file_write, file_exists, shell_capture
+
+(defn test-file-write-codegen []
+  (let [[$src "(file_write \"/tmp/fl-test.txt\" \"hello\")"]
+        [$ast (fl-parse $src)]
+        [$js (fl->js-with-prelude $ast)]]
+    (do
+      (println "=== test-file-write-codegen ===")
+      (println (str "src: " $src))
+      (println (str "js contains _fl_file_write: " (contains? $js "_fl_file_write")))
+      (= (contains? $js "_fl_file_write") true))))
+
+(defn test-file-read-codegen []
+  (let [[$src "(file_read \"/tmp/fl-test.txt\")"]
+        [$ast (fl-parse $src)]
+        [$js (fl->js-with-prelude $ast)]]
+    (do
+      (println "=== test-file-read-codegen ===")
+      (println (str "js contains _fl_file_read: " (contains? $js "_fl_file_read")))
+      (= (contains? $js "_fl_file_read") true))))
+
+(defn test-file-exists-codegen []
+  (let [[$src "(file_exists \"/tmp/fl-test.txt\")"]
+        [$ast (fl-parse $src)]
+        [$js (fl->js-with-prelude $ast)]]
+    (do
+      (println "=== test-file-exists-codegen ===")
+      (println (str "js contains _fl_file_exists: " (contains? $js "_fl_file_exists")))
+      (= (contains? $js "_fl_file_exists") true))))
+
+(defn test-shell-capture-codegen []
+  (let [[$src "(shell_capture \"echo hello\")"]
+        [$ast (fl-parse $src)]
+        [$js (fl->js-with-prelude $ast)]]
+    (do
+      (println "=== test-shell-capture-codegen ===")
+      (println (str "js contains _fl_shell_capture: " (contains? $js "_fl_shell_capture")))
+      (= (contains? $js "_fl_shell_capture") true))))
+
+(defn test-ffi-runtime-prelude []
+  (let [[$prelude (runtime-prelude)]]
+    (do
+      (println "=== test-ffi-runtime-prelude ===")
+      (println (str "prelude contains _fl_file_read: " (contains? $prelude "_fl_file_read")))
+      (println (str "prelude contains _fl_file_write: " (contains? $prelude "_fl_file_write")))
+      (println (str "prelude contains _fl_file_exists: " (contains? $prelude "_fl_file_exists")))
+      (println (str "prelude contains _fl_shell_capture: " (contains? $prelude "_fl_shell_capture")))
+      (and (contains? $prelude "_fl_file_read")
+           (contains? $prelude "_fl_file_write")
+           (contains? $prelude "_fl_file_exists")
+           (contains? $prelude "_fl_shell_capture")))))
+
+;; 실행
+(println "\n======== Phase 11 Test Suite ========")
+(let [[$t1 (test-file-write-codegen)]
+      [$t2 (test-file-read-codegen)]
+      [$t3 (test-file-exists-codegen)]
+      [$t4 (test-shell-capture-codegen)]
+      [$t5 (test-ffi-runtime-prelude)]
+      [$pass (+ (if $t1 1 0) (if $t2 1 0) (if $t3 1 0) (if $t4 1 0) (if $t5 1 0))]
+      [$total 5]]
+  (do
+    (println (str "\n총: " $pass "/" $total " PASS"))
+    (if (= $pass $total)
+        (println "✓ Phase 11 FFI codegen PASS")
+        (do
+          (println "✗ Phase 11 FFI codegen FAIL")
+          (exit 1)))))

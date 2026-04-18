@@ -1,0 +1,11 @@
+;; self/stdlib/json.fl — JSON stdlib
+
+[FUNC json-str :params [$obj] :body (json-stringify $obj)]
+[FUNC json-load :params [$path] :body (json-parse (file_read $path))]
+[FUNC json-save :params [$path $obj] :body (file_write $path (json-stringify $obj))]
+
+[FUNC json-get :params [$obj $key] :body (get $obj $key)]
+[FUNC json-keys :params [$obj] :body (keys $obj)]
+[FUNC json-values :params [$obj] :body (values $obj)]
+[FUNC json-has? :params [$obj $key] :body (has-key? $obj $key)]
+[FUNC json-merge :params [$a $b] :body (merge $a $b)]

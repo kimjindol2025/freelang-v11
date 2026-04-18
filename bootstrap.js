@@ -11008,6 +11008,9 @@ function flExecOpNative(op, vals) {
       return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
     case "values":
       return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+    case "map-entries":
+    case "map_entries":
+      return v0 instanceof Map ? [...v0.entries()] : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : [];
     case "floor":
       return Math.floor(v0);
     case "ceil":
@@ -20314,10 +20317,7 @@ function createProcessModule() {
       const idx = args2.indexOf(key);
       if (idx === -1 || idx + 1 >= args2.length) return defaultVal;
       return args2[idx + 1];
-    },
-    "map_keys": (m) => m instanceof Map ? [...m.keys()] : (m && typeof m === "object" && !Array.isArray(m) ? Object.keys(m) : []),
-    "map_values": (m) => m instanceof Map ? [...m.values()] : (m && typeof m === "object" && !Array.isArray(m) ? Object.values(m) : []),
-    "map_entries": (m) => m instanceof Map ? [...m.entries()] : (m && typeof m === "object" && !Array.isArray(m) ? Object.entries(m) : [])
+    }
   };
 }
 
@@ -28506,6 +28506,7 @@ var AppRouter = class {
     }
     this.scanDirectory(this.appDir, "", "layout");
     this.scanDirectory(this.appDir, "", "page");
+    this.scanDirectory(this.appDir, "", "route");
     this.buildLayoutChain();
   }
   /**
@@ -28525,7 +28526,10 @@ var AppRouter = class {
           this.scanDirectory(fullPath, pathForChild, phase);
         } else if (phase === "page" && entry.name === "page.fl") {
           const routePath = currentPath === "" ? "/" : currentPath;
-          this.registerRoute(routePath, fullPath);
+          this.registerRoute(routePath, fullPath, "page");
+        } else if (phase === "route" && entry.name === "route.fl") {
+          const routePath = currentPath === "" ? "/" : currentPath;
+          this.registerRoute(routePath, fullPath, "route");
         } else if (phase === "layout" && entry.name === "layout.fl") {
           const layoutPath = currentPath === "" ? "/" : currentPath;
           if (!this.layoutChain[layoutPath]) {
@@ -28542,7 +28546,7 @@ var AppRouter = class {
   /**
    * 라우트 등록
    */
-  registerRoute(routePath, filePath) {
+  registerRoute(routePath, filePath, kind = "page") {
     const pattern = this.buildPattern(routePath);
     const params = this.extractParams(routePath);
     const isDynamic = routePath.includes("[");
@@ -28552,10 +28556,11 @@ var AppRouter = class {
       filePath,
       params,
       isDynamic,
-      layouts: this.getLayoutsForPath(routePath)
+      layouts: kind === "route" ? [] : this.getLayoutsForPath(routePath),
+      kind
     };
     this.routes.push(route);
-    console.log(`approuter.route path=${routePath} file=${filePath} dynamic=${isDynamic}`);
+    console.log(`approuter.${kind} path=${routePath} file=${filePath} dynamic=${isDynamic}`);
   }
   /**
    * [id] 문법을 정규표현식으로 변환
@@ -28646,13 +28651,14 @@ var FLExecutor = class {
     this.interpreter = interpreter;
   }
   /**
-   * JWT/Auth/DB 헬퍼 주입 (1회만 실행)
+   * JWT/Auth/DB/Meta 헬퍼 주입 (1회만 실행)
    */
   ensureHelpers() {
     if (this._helpersInjected) return;
     this.injectJWTFunctions();
     this.injectAuthHelpers();
     this.injectDBHelpers();
+    this.injectMetaHelpers();
     this._helpersInjected = true;
   }
   /**
@@ -28712,6 +28718,7 @@ var FLExecutor = class {
       ctx.__method = context.method || "GET";
       ctx.__headers = context.headers || {};
       ctx.__query = context.query || {};
+      ctx.__page_meta = {};
       ctx.__db_users = db.users;
       ctx.__db_projects = db.projects;
       ctx.__db_todos = db.todos;
@@ -28722,7 +28729,12 @@ var FLExecutor = class {
       this.ensureHelpers();
       const execContext = this.interpreter.interpret(astList);
       const result = execContext.lastValue;
-      return this.processResult(result);
+      const meta = ctx.__page_meta && Object.keys(ctx.__page_meta).length > 0 ? ctx.__page_meta : void 0;
+      const executionResult = this.processResult(result);
+      if (meta) {
+        executionResult.meta = meta;
+      }
+      return executionResult;
     } catch (err4) {
       return {
         success: false,
@@ -28750,9 +28762,21 @@ var FLExecutor = class {
       this.interpreter.globals = this.interpreter.globals || {};
       this.interpreter.globals.__request = flRequest;
       this.interpreter.globals.__params = context.params || {};
+      this.interpreter.context.variables.set("$__request", flRequest);
+      this.interpreter.context.variables.set("$__params", context.params || {});
       let result = null;
       for (const ast of astList) {
         result = this.interpreter.eval(ast);
+      }
+      const method = (context.method || context.req?.method || "GET").toUpperCase();
+      const vars = this.interpreter.context.variables;
+      const fnValue = vars.has(method) ? vars.get(method) : vars.has("$" + method) ? vars.get("$" + method) : null;
+      if (fnValue && typeof fnValue === "object" && fnValue.kind === "function-value") {
+        try {
+          result = this.interpreter.callFunctionValue(fnValue, [flRequest]);
+        } catch (err4) {
+          return { success: false, status: 500, error: err4.message, stack: err4.stack };
+        }
       }
       return this.processResult(result);
     } catch (err4) {
@@ -28945,6 +28969,24 @@ var FLExecutor = class {
       if (typeof obj === "object" && obj !== null) return Object.keys(obj).length;
       return 0;
     };
+  }
+  /**
+   * W1: 동적 메타데이터 헬퍼 주입
+   */
+  injectMetaHelpers() {
+    const ctx = this.interpreter.context;
+    const setMetaFn = (meta) => {
+      if (!ctx.__page_meta) {
+        ctx.__page_meta = {};
+      }
+      if (meta && typeof meta === "object") {
+        Object.assign(ctx.__page_meta, meta);
+      }
+      return meta;
+    };
+    ctx["set-meta!"] = setMetaFn;
+    this.interpreter.context.variables.set("$set-meta!", setMetaFn);
+    this.interpreter.context.variables.set("set-meta!", setMetaFn);
   }
 };
 var fl_executor_default = FLExecutor;
@@ -29369,15 +29411,17 @@ var WebServer = class {
     if (match) {
       if (this.executor) {
         try {
-          const isApiPath = urlPath.startsWith("/api/");
-          const result = await this.executor.executePage(match.route.filePath, {
+          const routeKind = match.route.kind || "page";
+          const isApiPath = routeKind === "route" || urlPath.startsWith("/api/");
+          const executorContext = {
             req: { method: req.method, path: urlPath, headers: req.headers },
             params: match.params,
             query,
             body,
             method: req.method,
             isApiPath
-          });
+          };
+          const result = routeKind === "route" ? await this.executor.executeRoute(match.route.filePath, executorContext) : await this.executor.executePage(match.route.filePath, executorContext);
           if (isApiPath) {
             res.setHeader("Content-Type", "application/json");
             res.writeHead(result.status || 200);
@@ -29398,6 +29442,9 @@ var WebServer = class {
                 finalBody = await this.renderer.renderWithLayout(finalBody, layouts);
               } catch {
               }
+            }
+            if (result.meta && Object.keys(result.meta).length > 0) {
+              finalBody = this.injectMetaIntoHead(finalBody, result.meta);
             }
             res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
             res.writeHead(result.status || 200);
@@ -29461,6 +29508,41 @@ var WebServer = class {
         `<h1>404 Not Found</h1><p>Route not found: ${escHtml(urlPath)}</p>`
       )
     );
+  }
+  /**
+   * W1: HTML <head>에 메타데이터 주입
+   */
+  injectMetaIntoHead(html, meta) {
+    const headMatch = html.match(/<head[^>]*>/i);
+    if (!headMatch) return html;
+    const headTag = headMatch[0];
+    const headIndex = html.indexOf(headTag);
+    const headEndIndex = headIndex + headTag.length;
+    const existingMeta = html.substring(headIndex, html.indexOf("</head>", headIndex));
+    const metaTags = [];
+    if (meta.title && !existingMeta.includes("<title>")) {
+      metaTags.push(`<title>${escHtml(meta.title)}</title>`);
+    }
+    if (meta.description && !existingMeta.includes('name="description"')) {
+      metaTags.push(`<meta name="description" content="${escHtml(meta.description)}">`);
+    }
+    if (meta["og-image"] && !existingMeta.includes('property="og:image"')) {
+      metaTags.push(`<meta property="og:image" content="${escHtml(meta["og-image"])}">`);
+    }
+    if (meta["og-url"] && !existingMeta.includes('property="og:url"')) {
+      metaTags.push(`<meta property="og:url" content="${escHtml(meta["og-url"])}">`);
+    }
+    if (meta.canonical && !existingMeta.includes('rel="canonical"')) {
+      metaTags.push(`<link rel="canonical" href="${escHtml(meta.canonical)}">`);
+    }
+    if (meta["og-title"] && !existingMeta.includes('property="og:title"')) {
+      metaTags.push(`<meta property="og:title" content="${escHtml(meta["og-title"])}">`);
+    }
+    if (meta["og-description"] && !existingMeta.includes('property="og:description"')) {
+      metaTags.push(`<meta property="og:description" content="${escHtml(meta["og-description"])}">`);
+    }
+    const metaString = metaTags.join("\n  ");
+    return html.substring(0, headEndIndex) + "\n  " + metaString + html.substring(headEndIndex);
   }
   /**
    * URL 쿼리 파싱

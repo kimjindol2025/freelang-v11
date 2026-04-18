@@ -28,6 +28,7 @@ export interface ExecutionResult {
   status?: number;
   error?: string;
   stack?: string;
+  meta?: Record<string, string>; // W1: 동적 메타데이터
 }
 
 /**
@@ -45,13 +46,14 @@ export class FLExecutor {
   }
 
   /**
-   * JWT/Auth/DB 헬퍼 주입 (1회만 실행)
+   * JWT/Auth/DB/Meta 헬퍼 주입 (1회만 실행)
    */
   private ensureHelpers(): void {
     if (this._helpersInjected) return;
     this.injectJWTFunctions();
     this.injectAuthHelpers();
     this.injectDBHelpers();
+    this.injectMetaHelpers(); // W1: 동적 메타데이터 헬퍼
     this._helpersInjected = true;
   }
 
@@ -137,6 +139,9 @@ export class FLExecutor {
       ctx.__headers = context.headers || {};
       ctx.__query = context.query || {};
 
+      // W1: 동적 메타데이터 저장소 초기화
+      ctx.__page_meta = {};
+
       // DB 컬렉션을 직접 주입
       ctx.__db_users = db.users;
       ctx.__db_projects = db.projects;
@@ -155,8 +160,17 @@ export class FLExecutor {
       // lastValue가 결과
       const result = execContext.lastValue;
 
+      // W1: 메타데이터 수집
+      const meta = (ctx.__page_meta && Object.keys(ctx.__page_meta).length > 0)
+        ? ctx.__page_meta
+        : undefined;
+
       // 반환 값 분석
-      return this.processResult(result);
+      const executionResult = this.processResult(result);
+      if (meta) {
+        executionResult.meta = meta;
+      }
+      return executionResult;
     } catch (err: any) {
       return {
         success: false,
@@ -189,14 +203,32 @@ export class FLExecutor {
       // JWT/Auth/DB 헬퍼 주입 (1회만)
       this.ensureHelpers();
 
-      // 함수 호출 (route 파일은 보통 handler 함수를 export)
+      // __request / __params 를 FL 변수 스코프에 주입 (defn 내부에서 $__request 로 접근)
       (this.interpreter as any).globals = (this.interpreter as any).globals || {};
       (this.interpreter as any).globals.__request = flRequest;
       (this.interpreter as any).globals.__params = context.params || {};
+      this.interpreter.context.variables.set("$__request", flRequest);
+      this.interpreter.context.variables.set("$__params", context.params || {});
 
       let result: any = null;
       for (const ast of astList) {
         result = this.interpreter.eval(ast);
+      }
+
+      // HTTP 메서드 이름(GET/POST/PUT/PATCH/DELETE)의 함수가 정의돼 있으면
+      // 해당 함수를 $__request 로 호출한 결과를 응답으로 사용.
+      // defn 은 variables scope 에 function-value 로 저장되므로 variables 에서 조회.
+      const method = (context.method || context.req?.method || "GET").toUpperCase();
+      const vars = this.interpreter.context.variables;
+      const fnValue = vars.has(method)
+        ? vars.get(method)
+        : vars.has("$" + method) ? vars.get("$" + method) : null;
+      if (fnValue && typeof fnValue === "object" && (fnValue as any).kind === "function-value") {
+        try {
+          result = this.interpreter.callFunctionValue(fnValue, [flRequest]);
+        } catch (err: any) {
+          return { success: false, status: 500, error: err.message, stack: err.stack };
+        }
       }
 
       return this.processResult(result);
@@ -462,6 +494,30 @@ export class FLExecutor {
       if (typeof obj === "object" && obj !== null) return Object.keys(obj).length;
       return 0;
     };
+  }
+
+  /**
+   * W1: 동적 메타데이터 헬퍼 주입
+   */
+  private injectMetaHelpers(): void {
+    const ctx = this.interpreter.context as any;
+
+    // set-meta! — 메타데이터 등록
+    const setMetaFn = (meta: any): any => {
+      if (!ctx.__page_meta) {
+        ctx.__page_meta = {};
+      }
+      if (meta && typeof meta === "object") {
+        // 메타 객체 병합
+        Object.assign(ctx.__page_meta, meta);
+      }
+      return meta;
+    };
+
+    // context 객체와 variables 모두에 저장 (호환성)
+    ctx["set-meta!"] = setMetaFn;
+    this.interpreter.context.variables.set("$set-meta!", setMetaFn);
+    this.interpreter.context.variables.set("set-meta!", setMetaFn);
   }
 }
 

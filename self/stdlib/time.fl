@@ -1,0 +1,27 @@
+;; self/stdlib/time.fl — 시간 관련 stdlib (v12-candidate 호환)
+
+[FUNC now-ms :params [] :body (now)]
+[FUNC now-s :params [] :body (floor (/ (now) 1000))]
+
+[FUNC time-diff-ms :params [$t1 $t2] :body (- $t2 $t1)]
+[FUNC time-elapsed :params [$start] :body (- (now) $start)]
+
+[FUNC date-parts :params [$ts]
+  :body {:ts $ts :s (floor (/ $ts 1000))
+         :m (floor (/ $ts 60000))
+         :h (floor (/ $ts 3600000))
+         :d (floor (/ $ts 86400000))}]
+
+[FUNC ts-to-s :params [$ts] :body (floor (/ $ts 1000))]
+[FUNC s-to-ts :params [$s] :body (* $s 1000)]
+
+[FUNC time-ago :params [$ts]
+  :body (let [[$diff (- (now) $ts)]
+              [$s (floor (/ $diff 1000))]
+              [$m (floor (/ $s 60))]
+              [$h (floor (/ $m 60))]
+              [$d (floor (/ $h 24))]]
+          (cond [(< $s 60) (str $s "s ago")]
+                [(< $m 60) (str $m "m ago")]
+                [(< $h 24) (str $h "h ago")]
+                [true (str $d "d ago")]))]

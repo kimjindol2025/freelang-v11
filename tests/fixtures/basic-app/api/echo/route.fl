@@ -1,0 +1,5 @@
+(defn POST [req]
+  (server_json (get req :body)))
+
+(defn GET [req]
+  (server_json {:method "GET" :params (get req :params)}))
