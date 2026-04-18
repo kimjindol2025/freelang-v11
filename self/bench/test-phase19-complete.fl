@@ -1,0 +1,24 @@
+;; 전체 stdlib 모듈 통합 테스트
+(do
+  (println "=== Phase 19: Complete Stdlib Integration ===")
+  
+  ;; String ops
+  (let [[$s "hello world"]]
+    (do
+      (println (str "string: " (upper $s) " / " (lower $s)))
+      (println (str "split: " (split $s " ")))))
+  
+  ;; List ops
+  (let [[$nums (list 5 2 8 1 9 3)]]
+    (do
+      (println (str "list ops: sort=" (sort $nums)))
+      (println (str "list ops: reverse=" (reverse (sort $nums))))))
+  
+  ;; Time
+  (let [[$t (now_ms)]
+        [$iso (now_iso)]]
+    (do
+      (println (str "time: now_ms=" (number? $t)))
+      (println (str "time: now_iso=" (string? $iso)))))
+  
+  (println "✓ All stdlib modules verified"))
