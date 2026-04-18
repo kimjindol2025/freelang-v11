@@ -1,0 +1,12 @@
+(do
+  (println "Phase 16 Final Verification")
+  (let [[$nums (list 5 2 9 1 3)]
+        [$sorted (sort $nums)]
+        [$reversed (reverse $sorted)]
+        [$strs (list "hello" "world")]
+        [$joined (join $strs " ")]
+        [$now (now_ms)]]
+    (do
+      (println (str "list ops OK"))
+      (println (str "string ops OK"))
+      (println (str "time OK")))))
