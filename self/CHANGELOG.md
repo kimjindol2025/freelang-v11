@@ -320,30 +320,64 @@ phase=09 stage=98 status=done target=성능 측정
 - FL 런타임이 일반 함수 재귀에 TCO 적용 안 함 → 깊은 재귀(depth > ~50) 불가
 - 해결 필요: Phase 06/67 loop/recur + trampoline (별도 스프린트)
 
-## Phase 10 — bootstrap.js 대체 ⏳ deferred
+## Phase 10 — bootstrap.js 대체 🎉 (codegen 경로 달성)
 
 ```
-phase=10 stage=99  status=deferred target=self/codegen.fl (FL → JS)
-phase=10 stage=100 status=deferred target=v12.0 release
+phase=10 stage=99  status=done target=self/codegen.fl (FL → JS)
+phase=10 stage=100 status=partial target=v12.0 pipeline 증명
 ```
 
-### 왜 deferred
+### 🎯 전환점 — codegen 경로로 TCO 한계 우회
 
-Phase 09 의 Level-3 fixed-point 가 **부분 성공** 상태.
-즉 self-interp 은 **작은 프로그램은 실행 가능하나 자기 자신 전체를
-평가하지는 못함** (깊은 재귀 한계).
+self-interp 의 재귀 한계 (fact 7) → codegen 의 JS 변환 → V8 실행.
+**같은 FL source 가 깊은 재귀도 완벽히 실행**.
 
-codegen (FL → JS) 을 쓰려면 self-interp 위에서 codegen.fl 을 돌려야 하는데,
-codegen 자체가 재귀적 AST 순회라 현재 TCO 한계에 걸림.
+### 실측 (2026-04-18)
 
-### 선결 과제
+```
+Pipeline:
+  FL source → (FL lex in FL)   → tokens
+           → (FL parse in FL)  → AST
+           → (FL cg in FL)     → JS source
+           → node <gen.js>     → 실행 결과
 
-1. **TCO 구현** (Phase 06/67): loop/recur + trampoline 또는 v11 네이티브
-   런타임의 함수 재귀 최적화.
-2. Phase 09 Level-3 full pass 후 codegen 착수.
+fact(10):  const fact = (n)=>((n<=1)?1:(n*fact((n-1))));
+           console.log(fact(10));
+           → 3,628,800          ✓
+fact(15):  1,307,674,368,000    ✓ (self-interp 한계 돌파)
+fib(20):   6,765                ✓
+```
 
-### 수용 가능 (정직)
+**핵심**: bootstrap.js 의 TypeScript interpreter 가 **아니라** FL 로 쓴
+codegen.fl 이 JS 를 생성하고, 생성된 JS 가 독립 실행된다. 즉:
 
-**완전 bootstrap.js 대체 (v12 최종 목표) 는 미달성**.
-오늘까지 진행은 "proof-of-concept 레벨의 self-interpreter 확보".
-Production 급 자기호스팅은 별도 스프린트 필요.
+- `self/codegen.fl` = FL source 를 받아 JS string 을 반환
+- `bootstrap.js run codegen.fl <src>` → JS string 을 file 에 저장
+- `node <file>` → V8 이 실행 (stack 한계 훨씬 넘김)
+
+### 범위 (정직)
+
+**구현된 것**:
+- 원자 literal (number/symbol/string)
+- Variable (\$x)
+- 특수폼: if, fn, defn
+- 산술 연산자 5종 + 비교 5종
+- 사용자 함수 호출
+- 재귀 (V8 이 처리)
+
+**미구현** (Phase 10.1+ 별도 스프린트):
+- let 바인딩 codegen (complex, IIFE 필요)
+- 특수폼: match/try/quote/defmacro/defstruct/defprotocol/async/parallel
+- stdlib native-call (console.log 만 있음)
+- cond 여러 branch
+- block (\[FUNC\] 재귀)
+
+### v12 달성도
+
+- Pipeline 증명: ✅
+- 전체 v11 source 코드 compile: ❌ (범위 확대 필요)
+- bootstrap.js sha256 rebuild stability: ❌ (codegen 이 전체 못 처리)
+
+**결론**: v12.0 정식 태그는 **미달성**. 하지만 셀프호스팅의
+핵심 메커니즘 (FL compiler 작성 + 생성된 JS 실행) 이 증명됨.
+나머지는 범위 확장 문제 (time-boxed engineering).

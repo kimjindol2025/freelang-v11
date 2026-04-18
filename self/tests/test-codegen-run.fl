@@ -1,0 +1,252 @@
+;; P10/99 최종: FL → JS → file → node 실행 → 결과 회수.
+;; self-host 파이프라인의 실질 증명.
+
+[FUNC is-digit? :params [$c] :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
+[FUNC is-alpha? :params [$c]
+  :body (if (null? $c) false
+          (or (and (>= $c "a") (<= $c "z")) (and (>= $c "A") (<= $c "Z"))))]
+[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
+[FUNC is-space? :params [$c] :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
+[FUNC is-symbol-char? :params [$c]
+  :body (if (null? $c) false
+          (or (is-alnum? $c) (= $c "-") (= $c "_") (= $c "?") (= $c "!")
+              (= $c "/") (= $c ".") (= $c "<") (= $c ">") (= $c "=")
+              (= $c "+") (= $c "*") (= $c "%")))]
+[FUNC make-state :params [$src] :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
+[FUNC peek-at :params [$st $o]
+  :body (let [[$s (get $st :src)] [$i (+ (get $st :idx) $o)]]
+          (if (>= $i (length $s)) null (char-at $s $i)))]
+[FUNC peek :params [$st] :body (peek-at $st 0)]
+[FUNC at-end? :params [$st] :body (>= (get $st :idx) (length (get $st :src)))]
+[FUNC advance :params [$st]
+  :body (let [[$c (peek $st)]]
+          (if (= $c "\n")
+            {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (+ (get $st :line) 1) :col 1 :tokens (get $st :tokens)}
+            {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (get $st :line) :col (+ (get $st :col) 1) :tokens (get $st :tokens)}))]
+[FUNC emit :params [$st $k $v $sl $sc]
+  :body {:src (get $st :src) :idx (get $st :idx) :line (get $st :line) :col (get $st :col)
+         :tokens (append (get $st :tokens) (list {:kind $k :value $v :line $sl :col $sc}))}]
+[FUNC skip-ws :params [$st]
+  :body (if (at-end? $st) $st
+          (let [[$c (peek $st)]]
+            (if (is-space? $c) (skip-ws (advance $st)) $st)))]
+[FUNC read-number-body :params [$st $a $d $l $c]
+  :body (if (at-end? $st) (emit $st "Number" $a $l $c)
+          (let [[$ch (peek $st)]]
+            (cond [(is-digit? $ch) (read-number-body (advance $st) (str $a $ch) $d $l $c)]
+                  [true (emit $st "Number" $a $l $c)])))]
+[FUNC read-number :params [$st] :body (read-number-body $st "" false (get $st :line) (get $st :col))]
+[FUNC read-sym-body :params [$st $a $l $c $k]
+  :body (if (at-end? $st) (emit $st $k $a $l $c)
+          (let [[$ch (peek $st)]]
+            (if (is-symbol-char? $ch) (read-sym-body (advance $st) (str $a $ch) $l $c $k)
+              (emit $st $k $a $l $c))))]
+[FUNC read-symbol :params [$st] :body (read-sym-body $st "" (get $st :line) (get $st :col) "Symbol")]
+[FUNC read-variable :params [$st]
+  :body (let [[$l (get $st :line)] [$c (get $st :col)] [$s1 (advance $st)]]
+          (read-sym-body $s1 "" $l $c "Variable"))]
+[FUNC read-token :params [$st]
+  :body (let [[$s1 (skip-ws $st)]]
+          (if (at-end? $s1) $s1
+            (let [[$c (peek $s1)] [$l (get $s1 :line)] [$col (get $s1 :col)]]
+              (cond
+                [(= $c "(") (emit (advance $s1) "LParen" $c $l $col)]
+                [(= $c ")") (emit (advance $s1) "RParen" $c $l $col)]
+                [(= $c "[") (emit (advance $s1) "LBracket" $c $l $col)]
+                [(= $c "]") (emit (advance $s1) "RBracket" $c $l $col)]
+                [(= $c "$") (read-variable $s1)]
+                [(is-digit? $c) (read-number $s1)]
+                [(and (= $c "-") (is-digit? (peek-at $s1 1)))
+                 (read-number-body (advance $s1) "-" false $l $col)]
+                [(is-symbol-char? $c) (read-symbol $s1)]
+                [true (emit (advance $s1) "Unknown" $c $l $col)]))))]
+[FUNC lex-loop :params [$st]
+  :body (let [[$s1 (skip-ws $st)]]
+          (if (at-end? $s1) (get $s1 :tokens) (lex-loop (read-token $s1))))]
+[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+
+[FUNC make-literal :params [$t $v $l] :body {:kind "literal" :type $t :value $v :line $l}]
+[FUNC make-variable :params [$n $l] :body {:kind "variable" :name $n :line $l}]
+[FUNC make-sexpr :params [$op $args $l] :body {:kind "sexpr" :op $op :args $args :line $l}]
+[FUNC make-array-block :params [$items $l]
+  :body {:kind "block" :type "Array" :name null :fields {:items $items} :line $l}]
+
+[FUNC p-make :params [$t] :body {:tokens $t :idx 0}]
+[FUNC p-peek :params [$p]
+  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
+          (if (>= $i (length $t)) null (get $t $i)))]
+[FUNC p-end? :params [$p] :body (>= (get $p :idx) (length (get $p :tokens)))]
+[FUNC p-advance :params [$p] :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1)}]
+[FUNC r-pair :params [$p $n] :body {:p $p :node $n}]
+
+[FUNC parse-atom :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$l (get $t :line)]]
+          (cond
+            [(= $k "Number") (r-pair (p-advance $p) (make-literal "number" $v $l))]
+            [(= $k "Symbol") (r-pair (p-advance $p) (make-literal "symbol" $v $l))]
+            [(= $k "Variable") (r-pair (p-advance $p) (make-variable $v $l))]
+            [true (r-pair (p-advance $p) (make-literal "unknown" $v $l))]))]
+
+[FUNC parse-expr :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+          (cond
+            [(= $k "LParen") (parse-sexpr $p)]
+            [(= $k "LBracket") (parse-array $p)]
+            [true (parse-atom $p)]))]
+
+[FUNC parse-args :params [$p $acc]
+  :body (let [[$t (p-peek $p)]]
+          (cond [(null? $t) (r-pair $p $acc)]
+                [(= (get $t :kind) "RParen") (r-pair $p $acc)]
+                [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
+                [true (let [[$one (parse-expr $p)]]
+                        (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+
+[FUNC parse-sexpr :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
+              [$coll (parse-args $p1 [])] [$p2 (get $coll :p)] [$args (get $coll :node)]
+              [$p3 (if (and (not (null? (p-peek $p2))) (= (get (p-peek $p2) :kind) "RParen"))
+                     (p-advance $p2) $p2)]]
+          (if (= (length $args) 0) (r-pair $p3 (make-sexpr "" (list) $line))
+            (let [[$op-n (get $args 0)]
+                  [$op (cond [(= (get $op-n :kind) "literal") (get $op-n :value)]
+                             [(= (get $op-n :kind) "variable") (str "$" (get $op-n :name))]
+                             [true "unknown"])]
+                  [$rest (slice $args 1 (length $args))]]
+              (r-pair $p3 (make-sexpr $op $rest $line)))))]
+
+[FUNC parse-array :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
+              [$coll (parse-args $p1 [])] [$p2 (get $coll :p)] [$items (get $coll :node)]
+              [$p3 (if (and (not (null? (p-peek $p2))) (= (get (p-peek $p2) :kind) "RBracket"))
+                     (p-advance $p2) $p2)]]
+          (r-pair $p3 (make-array-block $items $line)))]
+
+[FUNC parse-all :params [$p $acc]
+  :body (if (p-end? $p) $acc
+          (let [[$one (parse-expr $p)]]
+            (parse-all (get $one :p) (append $acc (list (get $one :node))))))]
+
+[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens) [])]
+
+;; ── codegen ──
+[FUNC js-name :params [$n]
+  :body (if (null? $n) "_"
+          (let [[$a (replace $n "-" "_")] [$b (replace $a "?" "_q")] [$c (replace $b "!" "_x")]]
+            $c))]
+
+[FUNC cg :params [$n]
+  :body (cond
+          [(null? $n) "null"]
+          [(= (get $n :kind) "literal") (cg-literal $n)]
+          [(= (get $n :kind) "variable") (js-name (get $n :name))]
+          [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
+          [true "null"])]
+
+[FUNC cg-literal :params [$n]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond
+            [(= $t "number") $v]
+            [(= $t "symbol")
+             (cond [(= $v "true") "true"] [(= $v "false") "false"]
+                   [(= $v "null") "null"] [true (js-name $v)])]
+            [true "null"]))]
+
+[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (args-loop $args (+ $i 1)
+                     (if (= (length $acc) 0) (cg (get $args $i)) (str $acc "," (cg (get $args $i))))))]
+
+[FUNC cg-binop :params [$args $op $zero]
+  :body (cond [(= (length $args) 0) $zero]
+              [(= (length $args) 1) (cg (get $args 0))]
+              [true (str "(" (binop-loop $args 0 "" $op) ")")])]
+[FUNC binop-loop :params [$args $i $acc $op]
+  :body (if (>= $i (length $args)) $acc
+          (binop-loop $args (+ $i 1)
+                      (if (= (length $acc) 0) (cg (get $args $i)) (str $acc $op (cg (get $args $i)))) $op))]
+
+[FUNC cg-pair :params [$args $op]
+  :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+
+[FUNC cg-sub :params [$args]
+  :body (if (= (length $args) 1) (str "(-" (cg (get $args 0)) ")")
+          (str "(" (cg (get $args 0)) "-" (cg (get $args 1)) ")"))]
+
+[FUNC extract-params :params [$items]
+  :body (param-loop $items 0 "")]
+[FUNC param-loop :params [$items $i $acc]
+  :body (if (null? $items) $acc
+          (if (>= $i (length $items)) $acc
+            (let [[$n (get $items $i)]
+                  [$name (js-name (cond [(= (get $n :kind) "variable") (get $n :name)]
+                                        [true (get $n :value)]))]]
+              (param-loop $items (+ $i 1)
+                          (if (= (length $acc) 0) $name (str $acc "," $name))))))]
+
+[FUNC cg-fn :params [$args]
+  :body (let [[$pnode (get $args 0)] [$body (get $args 1)]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]]
+          (str "((" $ps ")=>" (cg $body) ")"))]
+
+[FUNC cg-defn :params [$args]
+  :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
+              [$name (js-name (cond [(= (get $name-n :kind) "variable") (get $name-n :name)]
+                                    [true (get $name-n :value)]))]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]]
+          (str "const " $name " = (" $ps ")=>" (cg $body)))]
+
+[FUNC cg-if :params [$args]
+  :body (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":"
+             (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
+
+[FUNC cg-call :params [$op $args]
+  :body (let [[$fn-name (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op))]]
+          (str $fn-name "(" (cg-args $args) ")"))]
+
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (cond
+            [(= $op "if") (cg-if $args)]
+            [(= $op "fn") (cg-fn $args)]
+            [(= $op "defn") (cg-defn $args)]
+            [(= $op "println") (str "console.log(" (cg-args $args) ")")]
+            [(= $op "+") (cg-binop $args "+" "0")]
+            [(= $op "-") (cg-sub $args)]
+            [(= $op "*") (cg-binop $args "*" "1")]
+            [(= $op "/") (cg-pair $args "/")]
+            [(= $op "%") (cg-pair $args "%")]
+            [(= $op "<") (cg-pair $args "<")]
+            [(= $op ">") (cg-pair $args ">")]
+            [(= $op "<=") (cg-pair $args "<=")]
+            [(= $op ">=") (cg-pair $args ">=")]
+            [(= $op "=") (cg-pair $args "===")]
+            [true (cg-call $op $args)]))]
+
+[FUNC codegen-loop :params [$ast $i $acc]
+  :body (if (>= $i (length $ast)) $acc
+          (codegen-loop $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+
+[FUNC fl->js :params [$src] :body (codegen-loop (parse (lex $src)) 0 "")]
+
+;; ═══════ 최종 Pipeline: FL → JS → file → node ═══════
+[FUNC transpile-and-run :params [$fl-src $output-file]
+  :body (let [[$js (fl->js $fl-src)]]
+          (file_write $output-file $js)
+          (println (str "JS (" (length $js) " chars): " $js))
+          (println (str "node exec: " (shell_capture (str "node " $output-file)))))]
+
+(transpile-and-run
+  "(defn fact [$n] (if (<= $n 1) 1 (* $n (fact (- $n 1))))) (println (fact 10))"
+  "self/bench/_generated.js")
+
+(transpile-and-run
+  "(defn fib [$n] (if (< $n 2) $n (+ (fib (- $n 1)) (fib (- $n 2))))) (println (fib 20))"
+  "self/bench/_fib.js")
+
+(println "===")
+(println "Large recursion test: fact(15)")
+(transpile-and-run
+  "(defn fact [$n] (if (<= $n 1) 1 (* $n (fact (- $n 1))))) (println (fact 15))"
+  "self/bench/_fact15.js")
