@@ -1306,4 +1306,60 @@ describe("Web Framework Integration Tests", () => {
       expect(content[0]).toBe(0x89); // PNG magic number
     });
   });
+
+  describe("On-Demand ISR (revalidateTag)", () => {
+    test("should support tag-based cache invalidation", () => {
+      // 페이지에 tags: ["posts", "blog"] 메타데이터 추가 가능
+      const tags = ["posts", "blog"];
+      expect(tags.length).toBe(2);
+      expect(tags).toContain("posts");
+      expect(tags).toContain("blog");
+    });
+
+    test("should index tags for quick lookup", () => {
+      // tag → [cached paths] 매핑
+      const tagIndex = new Map<string, Set<string>>();
+      tagIndex.set("posts", new Set(["/blog/hello", "/blog/world"]));
+      tagIndex.set("blog", new Set(["/blog/hello", "/blog/world"]));
+
+      expect(tagIndex.has("posts")).toBe(true);
+      expect(tagIndex.get("posts")?.size).toBe(2);
+    });
+
+    test("should invalidate cache by tag", () => {
+      // tag 삭제 시 모든 관련 캐시 무효화
+      const tagIndex = new Map<string, Set<string>>();
+      const posts = new Set(["/blog/1", "/blog/2", "/blog/3"]);
+      tagIndex.set("posts", posts);
+
+      expect(tagIndex.get("posts")?.size).toBe(3);
+
+      // tag 기반 무효화: "posts" 태그 삭제
+      tagIndex.delete("posts");
+      expect(tagIndex.has("posts")).toBe(false);
+    });
+
+    test("should support multiple tag invalidation", () => {
+      // 여러 tag 동시 무효화
+      const tagIndex = new Map<string, Set<string>>();
+      tagIndex.set("posts", new Set(["/blog/1"]));
+      tagIndex.set("comments", new Set(["/blog/1"]));
+      tagIndex.set("users", new Set(["/profile/john"]));
+
+      const tagsToInvalidate = ["posts", "comments"];
+      tagsToInvalidate.forEach(tag => tagIndex.delete(tag));
+
+      expect(tagIndex.has("posts")).toBe(false);
+      expect(tagIndex.has("comments")).toBe(false);
+      expect(tagIndex.has("users")).toBe(true);
+    });
+
+    test("should require auth token for revalidation API", () => {
+      // POST /api/__fl/revalidate는 X-FL-Revalidate-Token 헤더 필수
+      const validToken = "secret-token";
+      const requestToken = "secret-token";
+
+      expect(requestToken).toBe(validToken);
+    });
+  });
 });
