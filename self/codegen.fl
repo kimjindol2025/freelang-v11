@@ -1,15 +1,13 @@
-;; self/codegen.fl — FL AST → JS source (Phase 10/99)
+;; self/codegen.fl — FL AST → JS source (v2, Phase 10 확장)
 ;;
-;; 목적: bootstrap.js 대체. FL 로 작성한 codegen 이 FL AST 를 받아
-;; JS 소스를 생성하고, 생성된 JS 를 node 가 직접 실행.
-;; → TS 의존성 0, self-interp 재귀 한계 우회 (JS V8 이 실행).
+;; 새로 추가:
+;;   특수폼: let (1D/2D), cond, do, and, or, quote
+;;   native stdlib: str, length, substring, char-at, replace
+;;                  first, last, rest, append, get, slice
+;;                  list, println, print, min, max, abs
+;;                  null?, not, empty?, mod
 ;;
-;; 범위: Phase 05-07 smoke 수준만 지원.
-;;   - literal (number/string/bool/null/symbol)
-;;   - variable ($x)
-;;   - sexpr: 특수폼 (if/fn/defn/let) + 산술/비교 native call
-;;   - 사용자 함수 호출
-;; 제외: pattern match, async, try/catch, block.
+;; 생성된 JS 는 runtime prelude 함수 (_fl_*) 가 선두에 포함됨.
 
 ;; ═══════ 유틸 ═══════
 
@@ -24,7 +22,7 @@
                 [$c (replace $b "!" "_x")]]
             $c))]
 
-;; ═══════ codegen 디스패치 ═══════
+;; ═══════ 디스패치 ═══════
 
 [FUNC cg :params [$n]
   :body (cond
@@ -32,6 +30,7 @@
           [(= (get $n :kind) "literal") (cg-literal $n)]
           [(= (get $n :kind) "variable") (js-name (get $n :name))]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
+          [(= (get $n :kind) "block") (cg-block $n)]
           [true "null"])]
 
 [FUNC cg-literal :params [$n]
@@ -40,103 +39,113 @@
             [(= $t "number") $v]
             [(= $t "string") (js-esc $v)]
             [(= $t "symbol")
-             (cond [(= $v "true") "true"] [(= $v "false") "false"]
-                   [(= $v "null") "null"] [true (js-name $v)])]
+             (cond [(= $v "true") "true"]
+                   [(= $v "false") "false"]
+                   [(= $v "null") "null"]
+                   [true (js-name $v)])]
             [true "null"]))]
 
-[FUNC cg-sexpr :params [$n]
-  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+[FUNC cg-block :params [$n]
+  :body (let [[$t (get $n :type)]]
           (cond
-            [(= $op "if")     (cg-if $args)]
-            [(= $op "fn")     (cg-fn $args)]
-            [(= $op "defn")   (cg-defn $args)]
-            [(= $op "define") (cg-define $args)]
-            [(= $op "let")    (cg-let $args)]
-            [(= $op "do")     (cg-do $args)]
-            [(= $op "println") (str "console.log(" (cg-args $args) ")")]
-            [(= $op "+")  (cg-binop $args "+" "0")]
-            [(= $op "-")  (cg-sub $args)]
-            [(= $op "*")  (cg-binop $args "*" "1")]
-            [(= $op "/")  (cg-pair $args "/")]
-            [(= $op "%")  (cg-pair $args "%")]
-            [(= $op "<")  (cg-pair $args "<")]
-            [(= $op ">")  (cg-pair $args ">")]
-            [(= $op "<=") (cg-pair $args "<=")]
-            [(= $op ">=") (cg-pair $args ">=")]
-            [(= $op "=")  (cg-pair $args "===")]
-            [(= $op "!=") (cg-pair $args "!==")]
-            [true (cg-call $op $args)]))]
+            [(= $t "Array")
+             (str "[" (cg-args (get (get $n :fields) "items")) "]")]
+            [true "null"]))]
 
-;; ═══════ 특수폼 codegen ═══════
+;; ═══════ 특수폼 ═══════
 
 [FUNC cg-if :params [$args]
-  :body (str "(" (cg (get $args 0)) " ? "
-             (cg (get $args 1)) " : "
+  :body (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":"
              (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
 
 [FUNC cg-fn :params [$args]
   :body (let [[$pnode (get $args 0)] [$body (get $args 1)]
-              [$ps (extract-param-names (get (get $pnode :fields) "items"))]]
-          (str "((" $ps ") => " (cg $body) ")"))]
-
-[FUNC extract-param-names :params [$items]
-  :body (if (null? $items) ""
-          (param-loop $items 0 ""))]
-
-[FUNC param-loop :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$n (get $items $i)]
-                [$name (js-name (cond [(= (get $n :kind) "variable") (get $n :name)]
-                                      [true (get $n :value)]))]]
-            (param-loop $items (+ $i 1)
-                        (if (= (length $acc) 0) $name (str $acc "," $name)))))]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]]
+          (str "((" $ps ")=>" (cg $body) ")"))]
 
 [FUNC cg-defn :params [$args]
   :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
-              [$name (js-name (cond [(= (get $name-n :kind) "variable") (get $name-n :name)]
-                                    [true (get $name-n :value)]))]
-              [$ps (extract-param-names (get (get $pnode :fields) "items"))]]
-          (str "const " $name " = (" $ps ") => " (cg $body) ";"))]
+              [$name (extract-name $name-n)]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]]
+          (str "const " $name " = (" $ps ")=>" (cg $body)))]
 
 [FUNC cg-define :params [$args]
-  :body (let [[$name-n (get $args 0)]
-              [$name (js-name (cond [(= (get $name-n :kind) "variable") (get $name-n :name)]
-                                    [true (get $name-n :value)]))]
-              [$val (cg (get $args 1))]]
-          (str "const " $name " = " $val ";"))]
+  :body (if (= (length $args) 2)
+          (str "const " (extract-name (get $args 0)) " = " (cg (get $args 1)))
+          (cg-defn $args))]
 
 [FUNC cg-let :params [$args]
   :body (let [[$bnode (get $args 0)]
               [$items (get (get $bnode :fields) "items")]
-              [$bindings (cg-let-bindings $items 0 "")]
+              [$first-item (if (null? $items) null (get $items 0))]
+              [$nested (if (null? $first-item) false
+                         (and (= (get $first-item :kind) "block")
+                              (= (get $first-item :type) "Array")))]
+              [$bindings (if $nested (cg-let-2d $items 0 "") (cg-let-1d $items 0 ""))]
               [$body-args (slice $args 1 (length $args))]
-              [$body-code (cg-do body-args)]]
-          (str "(() => { " $bindings $body-code " })()"))]
+              [$body-js (cg-do-body $body-args 0 "")]]
+          (str "((()=>{" $bindings $body-js "})())"))]
 
-[FUNC cg-let-bindings :params [$items $i $acc]
+[FUNC cg-let-1d :params [$items $i $acc]
   :body (if (>= $i (length $items)) $acc
-          (let [[$key-n (get $items $i)]
-                [$val (cg (get $items (+ $i 1)))]
-                [$name (js-name (cond [(= (get $key-n :kind) "variable") (get $key-n :name)]
-                                      [true (get $key-n :value)]))]]
-            (cg-let-bindings $items (+ $i 2)
-                             (str $acc "let " $name " = " $val "; "))))]
+          (let [[$k-n (get $items $i)] [$v-n (get $items (+ $i 1))]
+                [$name (extract-name $k-n)] [$val (cg $v-n)]]
+            (cg-let-1d $items (+ $i 2) (str $acc "let " $name "=" $val ";"))))]
+
+[FUNC cg-let-2d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$pair (get $items $i)]
+                [$pitems (get (get $pair :fields) "items")]
+                [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
+                [$name (extract-name $k-n)] [$val (cg $v-n)]]
+            (cg-let-2d $items (+ $i 1) (str $acc "let " $name "=" $val ";"))))]
 
 [FUNC cg-do :params [$args]
   :body (if (= (length $args) 0) "null"
-          (cg-do-loop $args 0 ""))]
+          (str "(()=>{" (cg-do-body $args 0 "") "})()"))]
 
-[FUNC cg-do-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args))
-          (str "return " $acc ";")
-          (let [[$c (cg (get $args $i))]
-                [$sep (if (= (length $acc) 0) "" "; ")]
-                [$last (= $i (- (length $args) 1))]]
-            (if $last
-              (str "return " $c ";")
-              (cg-do-loop $args (+ $i 1) (str $acc $sep $c)))))]
+[FUNC cg-do-body :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$last (= $i (- (length $args) 1))]
+                [$c (cg (get $args $i))]
+                [$sep (if $last "return " "")]]
+            (cg-do-body $args (+ $i 1) (str $acc $sep $c ";"))))]
 
-;; ═══════ 연산 codegen ═══════
+[FUNC cg-cond :params [$args]
+  :body (cg-cond-loop $args 0)]
+
+[FUNC cg-cond-loop :params [$args $i]
+  :body (if (>= $i (length $args)) "null"
+          (let [[$clause (get $args $i)]
+                [$citems (get (get $clause :fields) "items")]
+                [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]
+                [$rest (cg-cond-loop $args (+ $i 1))]]
+            (str "(" $test "?" $result ":" $rest ")")))]
+
+[FUNC cg-and :params [$args]
+  :body (if (= (length $args) 0) "true"
+          (str "(" (and-loop $args 0 "") ")")) ]
+
+[FUNC and-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (cg (get $args $i))]]
+            (and-loop $args (+ $i 1)
+                      (if (= (length $acc) 0) $c (str $acc "&&" $c)))))]
+
+[FUNC cg-or :params [$args]
+  :body (if (= (length $args) 0) "false"
+          (str "(" (or-loop $args 0 "") ")")) ]
+
+[FUNC or-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (cg (get $args $i))]]
+            (or-loop $args (+ $i 1)
+                     (if (= (length $acc) 0) $c (str $acc "||" $c)))))]
+
+[FUNC cg-quote :params [$args]
+  :body (if (= (length $args) 0) "null" (js-esc (str (cg (get $args 0)))))]
+
+;; ═══════ 연산/인자 ═══════
 
 [FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
 [FUNC args-loop :params [$args $i $acc]
@@ -146,15 +155,14 @@
                        (if (= (length $acc) 0) $c (str $acc "," $c)))))]
 
 [FUNC cg-binop :params [$args $op $zero]
-  :body (if (= (length $args) 0) $zero
-          (if (= (length $args) 1) (cg (get $args 0))
-            (str "(" (binop-loop $args 0 "") ")"))) ]
-
-[FUNC binop-loop :params [$args $i $acc]
+  :body (cond [(= (length $args) 0) $zero]
+              [(= (length $args) 1) (cg (get $args 0))]
+              [true (str "(" (binop-loop $args 0 "" $op) ")")])]
+[FUNC binop-loop :params [$args $i $acc $op]
   :body (if (>= $i (length $args)) $acc
           (let [[$c (cg (get $args $i))]]
             (binop-loop $args (+ $i 1)
-                        (if (= (length $acc) 0) $c (str $acc "+" $c)))))]
+                        (if (= (length $acc) 0) $c (str $acc $op $c)) $op)))]
 
 [FUNC cg-pair :params [$args $op]
   :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
@@ -163,17 +171,118 @@
   :body (if (= (length $args) 1) (str "(-" (cg (get $args 0)) ")")
           (str "(" (cg (get $args 0)) "-" (cg (get $args 1)) ")"))]
 
+;; ═══════ 파라미터/이름 추출 ═══════
+
+[FUNC extract-name :params [$n]
+  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
+              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+              [true "_anon"])]
+
+[FUNC extract-params :params [$items]
+  :body (param-loop $items 0 "")]
+[FUNC param-loop :params [$items $i $acc]
+  :body (if (null? $items) $acc
+          (if (>= $i (length $items)) $acc
+            (let [[$name (extract-name (get $items $i))]]
+              (param-loop $items (+ $i 1)
+                          (if (= (length $acc) 0) $name (str $acc "," $name))))))]
+
+;; ═══════ stdlib native → JS 매핑 ═══════
+
+[FUNC cg-native :params [$op $args]
+  :body (let [[$as (cg-args $args)] [$fs (str "_fl_" (js-name $op) "(" $as ")")]]
+          (cond
+            ;; 산술/비교는 inline binop 이라 이미 처리됨
+            [(= $op "str") (str "_fl_str(" $as ")")]
+            [(= $op "concat") (str "_fl_str(" $as ")")]
+            [(= $op "length") (str "_fl_length(" $as ")")]
+            [(= $op "substring") (str "_fl_substring(" $as ")")]
+            [(= $op "char-at") (str "_fl_char_at(" $as ")")]
+            [(= $op "replace") (str "_fl_replace(" $as ")")]
+            [(= $op "first") (str "_fl_first(" $as ")")]
+            [(= $op "last") (str "_fl_last(" $as ")")]
+            [(= $op "rest") (str "_fl_rest(" $as ")")]
+            [(= $op "append") (str "_fl_append(" $as ")")]
+            [(= $op "get") (str "_fl_get(" $as ")")]
+            [(= $op "slice") (str "_fl_slice(" $as ")")]
+            [(= $op "list") (str "[" $as "]")]
+            [(= $op "println") (str "console.log(" $as ")")]
+            [(= $op "print") (str "process.stdout.write(String(" $as "))")]
+            [(= $op "min") (str "Math.min(" $as ")")]
+            [(= $op "max") (str "Math.max(" $as ")")]
+            [(= $op "abs") (str "Math.abs(" $as ")")]
+            [(= $op "sqrt") (str "Math.sqrt(" $as ")")]
+            [(= $op "pow") (str "Math.pow(" $as ")")]
+            [(= $op "floor") (str "Math.floor(" $as ")")]
+            [(= $op "ceil") (str "Math.ceil(" $as ")")]
+            [(= $op "round") (str "Math.round(" $as ")")]
+            [(= $op "null?") (str "(" $as "==null)")]
+            [(= $op "not") (str "(!" $as ")")]
+            [(= $op "empty?") (str "_fl_empty_q(" $as ")")]
+            [(= $op "true?") (str "(" $as "===true)")]
+            [(= $op "false?") (str "(" $as "===false)")]
+            [(= $op "str-to-num") (str "Number(" $as ")")]
+            [(= $op "num-to-str") (str "String(" $as ")")]
+            [true (cg-call $op $args)]))]
+
 [FUNC cg-call :params [$op $args]
   :body (let [[$fn-name (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op))]]
           (str $fn-name "(" (cg-args $args) ")"))]
 
-;; ═══════ 최상위 ═══════
+;; ═══════ sexpr 메인 dispatch ═══════
 
-[FUNC codegen :params [$ast]
-  :body (codegen-loop $ast 0 "")]
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (cond
+            [(= $op "if")      (cg-if $args)]
+            [(= $op "fn")      (cg-fn $args)]
+            [(= $op "defn")    (cg-defn $args)]
+            [(= $op "define")  (cg-define $args)]
+            [(= $op "let")     (cg-let $args)]
+            [(= $op "do")      (cg-do $args)]
+            [(= $op "begin")   (cg-do $args)]
+            [(= $op "cond")    (cg-cond $args)]
+            [(= $op "and")     (cg-and $args)]
+            [(= $op "or")      (cg-or $args)]
+            [(= $op "quote")   (cg-quote $args)]
+            [(= $op "+")       (cg-binop $args "+" "0")]
+            [(= $op "-")       (cg-sub $args)]
+            [(= $op "*")       (cg-binop $args "*" "1")]
+            [(= $op "/")       (cg-pair $args "/")]
+            [(= $op "%")       (cg-pair $args "%")]
+            [(= $op "<")       (cg-pair $args "<")]
+            [(= $op ">")       (cg-pair $args ">")]
+            [(= $op "<=")      (cg-pair $args "<=")]
+            [(= $op ">=")      (cg-pair $args ">=")]
+            [(= $op "=")       (cg-pair $args "===")]
+            [(= $op "!=")      (cg-pair $args "!==")]
+            [true              (cg-native $op $args)]))]
+
+;; ═══════ 런타임 prelude (생성 JS 앞에 삽입) ═══════
+
+[FUNC runtime-prelude :params []
+  :body (str
+    "const _fl_str = (...xs) => xs.map(x => x==null?'null':String(x)).join('');"
+    "const _fl_length = (x) => (x==null ? 0 : x.length);"
+    "const _fl_substring = (s, a, b) => (b==null ? s.slice(a) : s.slice(a, b));"
+    "const _fl_char_at = (s, i) => (s[i] || null);"
+    "const _fl_replace = (s, a, b) => s.split(a).join(b);"
+    "const _fl_first = (l) => (l==null || l.length===0 ? null : l[0]);"
+    "const _fl_last = (l) => (l==null || l.length===0 ? null : l[l.length-1]);"
+    "const _fl_rest = (l) => (l==null || l.length===0 ? [] : l.slice(1));"
+    "const _fl_append = (a, b) => (Array.isArray(b) ? [...a, ...b] : [...a, b]);"
+    "const _fl_get = (o, k) => (o==null ? null : (o[k]===undefined ? null : o[k]));"
+    "const _fl_slice = (l, a, b) => l.slice(a, b);"
+    "const _fl_empty_q = (x) => (x==null || x.length===0);")]
+
+;; ═══════ 최상위 ═══════
 
 [FUNC codegen-loop :params [$ast $i $acc]
   :body (if (>= $i (length $ast)) $acc
-          (let [[$c (cg (get $ast $i))]
-                [$sep (if (= (length $acc) 0) "" "\n")]]
-            (codegen-loop $ast (+ $i 1) (str $acc $sep $c ";"))))]
+          (codegen-loop $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+
+[FUNC fl->js-code :params [$ast]
+  :body (codegen-loop $ast 0 "")]
+
+[FUNC fl->js-with-prelude :params [$ast]
+  :body (str (runtime-prelude) "\n" (codegen-loop $ast 0 ""))]
