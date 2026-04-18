@@ -11,6 +11,12 @@
 
 ;; ═══════ 유틸 ═══════
 
+;; map_entries: JS Map 또는 object → [[key, value], ...]
+[FUNC map_entries :params [$m]
+  :body (if (null? $m) (list)
+          (if (array? $m) $m
+              (list)))]
+
 [FUNC js-esc :params [$s]
   :body (let [[$a (replace $s "\\" "\\\\")]
               [$b (replace $a "\"" "\\\"")]
