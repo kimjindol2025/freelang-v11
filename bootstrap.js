@@ -29751,7 +29751,31 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     process.exit(1);
   }
   function execute() {
-    const source = fs15.readFileSync(absPath, "utf-8");
+    let source = "";
+
+    // self/main.fl 실행 시 핵심 모듈 자동 로드
+    if (absPath.endsWith("self/main.fl")) {
+      const selfDir = path11.dirname(absPath);
+      const coreModules = [
+        path11.join(selfDir, "lexer.fl"),
+        path11.join(selfDir, "parser.fl"),
+        path11.join(selfDir, "codegen.fl"),
+      ];
+
+      for (const mod of coreModules) {
+        if (fs15.existsSync(mod)) {
+          const content = fs15.readFileSync(mod, "utf-8");
+          source += "\n;; === MODULE: " + path11.basename(mod) + " ===\n" + content + "\n";
+        }
+      }
+
+      // main.fl도 추가
+      source += "\n;; === MAIN: main.fl ===\n" + fs15.readFileSync(absPath, "utf-8");
+    } else {
+      // 일반 .fl 파일은 그냥 로드
+      source = fs15.readFileSync(absPath, "utf-8");
+    }
+
     let ctx;
     try {
       const tokens = lex(source);

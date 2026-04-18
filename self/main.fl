@@ -1,19 +1,20 @@
-;; self/main.fl — 셀프 인터프리터 진입점 (Phase 09/93)
-;;
-;; 사용: node bootstrap.js run self/main.fl "<FL-source>"
-;; 동작: 인자로 받은 FL 소스를 self-lex → self-parse → self-eval 로 실행.
-;;
-;; 예:
-;;   node bootstrap.js run self/main.fl '(+ 1 2)'   → 3
-;;   node bootstrap.js run self/main.fl '(defn sq [$x] (* $x $x)) (sq 7)'  → 49
+;; self/main.fl — FL-to-JS Self-Hosted Compiler
 
-;; NOTE: bootstrap.js run 이 여러 FL 파일 로드를 공식 지원하지 않으므로
-;; 이 파일은 smoke/demo 용. 실제 self-interp 통합 테스트는
-;; self/tests/test-interp-user-fn.fl 과 test-builtins.fl 을 사용.
+(println "\n═══════════════════════════════════════════")
+(println "  FL Self-Hosted Compiler (Phase 28)")
+(println "═══════════════════════════════════════════\n")
 
-(println "self/main.fl — Phase 09 진입점 (demo)")
-(println "Level-1 fixed-point: TS interp 이 self/main.fl 을 실행.")
-(println "Level-2 fixed-point: self-lex 가 자기 자신 파일을 토큰화 (Phase 01/20).")
-(println "Level-3 fixed-point: self-interp 이 (fact 7) = 5040 계산 (Phase 07/86).")
-(println "")
-(println "진척: 87/100.")
+(let [[$input (get __argv__ 0)] [$output (get __argv__ 1)]]
+  (if (or (null? $input) (null? $output))
+    (println "Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>")
+    (let [[$src (file_read $input)]]
+      (let [[$tokens (lex $src)]]
+        (let [[$ast (parse $tokens)]]
+          (let [[$js (fl->js-with-prelude $ast)]]
+            (do
+              (println (str "📖 " $input " → " $output))
+              (println (str "   Lexed: " (length $tokens) " tokens"))
+              (println (str "   Parsed: " (length $ast) " nodes"))
+              (println (str "   Generated: " (length $js) " bytes"))
+              (file_write $output $js)
+              (println "✨ Success!"))))))))
