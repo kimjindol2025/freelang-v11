@@ -1,0 +1,16 @@
+(defn fib [$n]
+  (if (<= $n 1) $n
+      (+ (fib (- $n 1)) (fib (- $n 2)))))
+
+(do
+  (println "=== Phase 15 Integration ===")
+  (let [[$nums (list 5 2 8 1 9)]
+        [$sorted (sort $nums)]
+        [$reversed (reverse $sorted)]
+        [$fib10 (fib 10)]
+        [$str-up (upper "hello")]]
+    (do
+      (println (str "sorted: " $sorted))
+      (println (str "reversed: " $reversed))
+      (println (str "fib(10): " $fib10))
+      (println (str "upper: " $str-up)))))

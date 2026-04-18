@@ -1,0 +1,9 @@
+;; Test stdlib module codegen
+(do
+  (println "=== stdlib codegen test ===")
+  (let [[$nums (list 1 2 3 4 5)]]
+    (do
+      (println (str "original: " $nums))
+      (println (str "reverse: " (reverse $nums)))
+      (println (str "sorted: " (sort $nums)))
+      (println (str "string ops: " (upper "hello"))))))
