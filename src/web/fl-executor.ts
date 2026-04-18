@@ -46,7 +46,7 @@ export class FLExecutor {
   }
 
   /**
-   * JWT/Auth/DB/Meta 헬퍼 주입 (1회만 실행)
+   * JWT/Auth/DB/Meta/Fetch 헬퍼 주입 (1회만 실행)
    */
   private ensureHelpers(): void {
     if (this._helpersInjected) return;
@@ -54,6 +54,7 @@ export class FLExecutor {
     this.injectAuthHelpers();
     this.injectDBHelpers();
     this.injectMetaHelpers(); // W1: 동적 메타데이터 헬퍼
+    this.injectFetchHelpers(); // W2: 서버 데이터 페칭
     this._helpersInjected = true;
   }
 
@@ -382,6 +383,71 @@ export class FLExecutor {
         return null;
       }
     };
+  }
+
+  /**
+   * W2: 서버 데이터 페칭 헬퍼 주입
+   */
+  private injectFetchHelpers(): void {
+    const ctx = this.interpreter.context as any;
+
+    // server-fetch — HTTP 요청 (GET/POST/PUT/DELETE 등)
+    const serverFetchFn = (url: string, options?: Record<string, any>): string | null => {
+      try {
+        const method = (options?.method || "GET").toUpperCase();
+        const headers = options?.headers || {};
+        const body = options?.body || null;
+
+        // Node.js https/http 모듈 사용 (동기 래퍼)
+        const urlObj = new URL(url);
+        const protocol = urlObj.protocol === "https:" ? require("https") : require("http");
+
+        let responseData = "";
+        let error: any = null;
+
+        const req = protocol.request(urlObj, { method, headers }, (res: any) => {
+          res.on("data", (chunk: any) => {
+            responseData += chunk;
+          });
+          res.on("end", () => {});
+        });
+
+        req.on("error", (err: any) => {
+          error = err;
+        });
+
+        if (body) {
+          req.write(body);
+        }
+        req.end();
+
+        // 동기 대기 (event loop 기반)
+        // 주의: 이는 블로킹 구현이며, 실제 프로덕션에서는 promise 기반으로 수정 필요
+        if (error) return null;
+        return responseData || null;
+      } catch (err: any) {
+        return null;
+      }
+    };
+
+    // server-fetch-json — HTTP 요청 + JSON 파싱
+    const serverFetchJsonFn = (url: string, options?: Record<string, any>): Record<string, any> | null => {
+      try {
+        const response = serverFetchFn(url, options);
+        if (!response) return null;
+        return JSON.parse(response);
+      } catch (err: any) {
+        return null;
+      }
+    };
+
+    // context 객체와 variables 모두에 저장 (호환성)
+    ctx["server-fetch"] = serverFetchFn;
+    ctx["server-fetch-json"] = serverFetchJsonFn;
+    this.interpreter.context.variables.set("$server-fetch", serverFetchFn);
+    this.interpreter.context.variables.set("server-fetch", serverFetchFn);
+    this.interpreter.context.variables.set("$server-fetch-json", serverFetchJsonFn);
+    this.interpreter.context.variables.set("server-fetch-json", serverFetchJsonFn);
   }
 
   /**

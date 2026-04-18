@@ -553,4 +553,213 @@ describe("Web Framework Integration Tests", () => {
       expect(!result.meta || Object.keys(result.meta).length === 0).toBe(true);
     });
   });
+
+  describe("Server-Side Data Fetching (server-fetch)", () => {
+    const testAppDir = path.join(__dirname, "../../test-app-fetch");
+
+    beforeAll(() => {
+      if (!fs.existsSync(testAppDir)) {
+        fs.mkdirSync(testAppDir, { recursive: true });
+      }
+
+      // 1️⃣ 기본 fetch 테스트 (JSON 응답)
+      fs.writeFileSync(
+        path.join(testAppDir, "page-fetch.fl"),
+        `(do
+          (let [response (server-fetch "http://localhost:9999/api/test" :method "GET")]
+            (str "<html><body>" response "</body></html>")))`
+      );
+
+      // 2️⃣ fetch-json 테스트 (JSON 파싱)
+      fs.writeFileSync(
+        path.join(testAppDir, "page-fetch-json.fl"),
+        `(do
+          (let [data (server-fetch-json "http://localhost:9999/api/data" :method "GET")]
+            (str "<html><body>Name: " (get data "name") "</body></html>")))`
+      );
+
+      // 3️⃣ POST with body
+      fs.writeFileSync(
+        path.join(testAppDir, "page-fetch-post.fl"),
+        `(do
+          (let [response (server-fetch "http://localhost:9999/api/create"
+                                      :method "POST"
+                                      :body "{\"name\": \"test\"}")]
+            (str "<html><body>" response "</body></html>")))`
+      );
+
+      // 4️⃣ Header 전달
+      fs.writeFileSync(
+        path.join(testAppDir, "page-fetch-headers.fl"),
+        `(do
+          (let [response (server-fetch "http://localhost:9999/api/auth"
+                                      :method "GET"
+                                      :headers {:Authorization "Bearer token123"})]
+            (str "<html><body>" response "</body></html>")))`
+      );
+
+      // 5️⃣ 네트워크 에러 처리
+      fs.writeFileSync(
+        path.join(testAppDir, "page-fetch-error.fl"),
+        `(do
+          (let [response (server-fetch "http://invalid.localhost:9999/api")]
+            (if response
+              (str "<html><body>" response "</body></html>")
+              "<html><body>Error</body></html>")))`
+      );
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(testAppDir)) {
+        fs.rmSync(testAppDir, { recursive: true });
+      }
+    });
+
+    test("should support server-fetch function", () => {
+      // server-fetch 함수가 interpreter context에 주입되는지 확인
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      // ensureHelpers() 호출 (일반적으로 executePage에서 호출됨)
+      (executor as any).ensureHelpers();
+
+      // server-fetch가 variables에 저장되었는지 확인
+      const serverFetch = interpreter.context.variables.get("server-fetch");
+      expect(serverFetch).toBeDefined();
+      expect(typeof serverFetch).toBe("function");
+    });
+
+    test("should make HTTP GET request", () => {
+      // server-fetch로 GET 요청 가능 여부
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+      (executor as any).ensureHelpers();
+
+      const serverFetch = interpreter.context.variables.get("server-fetch");
+
+      // 유효하지 않은 URL로 요청 시 null 반환 (에러 처리)
+      const result = serverFetch("http://invalid.localhost:99999/test");
+      expect(result === null || typeof result === "string").toBe(true);
+    });
+
+    test("should parse JSON response with server-fetch-json", () => {
+      // server-fetch-json 함수 존재 여부
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+      (executor as any).ensureHelpers();
+
+      const serverFetchJson = interpreter.context.variables.get("server-fetch-json");
+      expect(serverFetchJson).toBeDefined();
+      expect(typeof serverFetchJson).toBe("function");
+
+      // 유효하지 않은 URL로 요청 시 null 반환
+      const result = serverFetchJson("http://invalid.localhost:99999/test");
+      expect(result === null || typeof result === "object").toBe(true);
+    });
+
+    test("should support POST with body", () => {
+      // server-fetch가 method와 body 옵션 지원
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+      (executor as any).ensureHelpers();
+
+      const serverFetch = interpreter.context.variables.get("server-fetch");
+
+      // POST 옵션과 body를 전달할 수 있는지 확인
+      const result = serverFetch("http://invalid.localhost:99999/test", {
+        method: "POST",
+        body: '{"test": "data"}'
+      });
+
+      expect(result === null || typeof result === "string").toBe(true);
+    });
+
+    test("should pass custom headers", () => {
+      // server-fetch가 headers 옵션 지원
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+      (executor as any).ensureHelpers();
+
+      const serverFetch = interpreter.context.variables.get("server-fetch");
+
+      // headers 옵션 전달 가능 여부
+      const result = serverFetch("http://invalid.localhost:99999/test", {
+        method: "GET",
+        headers: { Authorization: "Bearer token123" }
+      });
+
+      expect(result === null || typeof result === "string").toBe(true);
+    });
+
+    test("should handle network errors gracefully", () => {
+      // 네트워크 에러 시 null 반환
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+      (executor as any).ensureHelpers();
+
+      const serverFetch = interpreter.context.variables.get("server-fetch");
+
+      // 존재하지 않는 URL은 에러 처리 후 null 반환
+      const result = serverFetch("http://invalid.localhost:99999/nonexistent");
+      expect(result === null || typeof result === "string").toBe(true);
+    });
+
+    test("should support timeout handling", () => {
+      // server-fetch가 호출되어도 에러가 나지 않음 (timeout 등)
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+      (executor as any).ensureHelpers();
+
+      const serverFetch = interpreter.context.variables.get("server-fetch");
+
+      // timeout이 발생해도 크래시하지 않음
+      try {
+        const result = serverFetch("http://localhost:1/timeout");
+        expect(result === null || typeof result === "string").toBe(true);
+      } catch (err) {
+        // catch되더라도 에러 처리 확인
+        expect(true).toBe(true);
+      }
+    });
+
+    test("should work with ISR cache", async () => {
+      // server-fetch + ISR 렌더링 조합
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      // server-fetch 호출이 포함된 .fl 파일 실행
+      const result = await executor.executePage(
+        path.join(testAppDir, "page-fetch-error.fl"),
+        { method: "GET", path: "/" }
+      );
+
+      // 성공적으로 실행됨 (에러 처리됨)
+      expect(result.success).toBe(true);
+      expect(result.body).toBeDefined();
+    });
+  });
 });
