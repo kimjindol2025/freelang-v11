@@ -520,9 +520,13 @@
 ;;   자기참조 bootstrap 형태에서 "items" 키가 있어도 그 값은 단일 node 이지 list 아님.
 [FUNC cg-map-entries :params [$fields]
   :body (let [[$items-val (get $fields "items")]]
-          (if (array? $items-val)
-            (cg-map-flat-loop $items-val 0 "")
-            (cg-map-loop (list) 0 ""))) ]
+          (if (null? $items-val)
+            (if (map? $fields)
+              (cg-map-loop (map-entries $fields) 0 "")
+              "")
+            (if (array? $items-val)
+              (cg-map-flat-loop $items-val 0 "")
+              "")))]
 
 [FUNC cg-map-loop-inner :params [$entries $i $acc $e]
   :body (let [[$k (get $e 0)]
@@ -1275,24 +1279,3 @@
     (compile-file (get $__argv__ 0)
                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
                       (str (get $__argv__ 0) ".out.js")))))
-
-;; self/main.fl — FL-to-JS Self-Hosted Compiler
-
-(println "\n═══════════════════════════════════════════")
-(println "  FL Self-Hosted Compiler (Phase 28)")
-(println "═══════════════════════════════════════════\n")
-
-(let [[$input (get __argv__ 0)] [$output (get __argv__ 1)]]
-  (if (or (null? $input) (null? $output))
-    (println "Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>")
-    (let [[$src (file_read $input)]]
-      (let [[$tokens (lex $src)]]
-        (let [[$ast (parse $tokens)]]
-          (let [[$js (fl->js-with-prelude $ast)]]
-            (do
-              (println (str "📖 " $input " → " $output))
-              (println (str "   Lexed: " (length $tokens) " tokens"))
-              (println (str "   Parsed: " (length $ast) " nodes"))
-              (println (str "   Generated: " (length $js) " bytes"))
-              (file_write $output $js)
-              (println "✨ Success!"))))))))

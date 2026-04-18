@@ -27145,6 +27145,11 @@ var Interpreter = class {
       const mapResult = evalSpecialForm(this, op, expr);
       if (mapResult !== void 0) return mapResult;
     }
+    // compile-time builtin fallback: map_entries
+    if ((op === "map-entries" || op === "map_entries") && !this.context.functions.has(op)) {
+      const argsEval = expr.args.map((arg) => this.eval(arg));
+      return evalBuiltin(this, op, argsEval, expr);
+    }
     const args2 = expr.args.map((arg) => this.eval(arg));
     if (args2.length >= 1 && typeof args2[0] === "string") {
       const qualifiedName = `${op}:${args2[0]}`;
@@ -29785,6 +29790,13 @@ function cmdRun(filePath, watch2, extraArgs = []) {
       if (extraArgs.length > 0) {
         interp.context.variables.set("$__argv__", extraArgs);
       }
+      // map_entries prelude 로드 (self-hosting compile-time builtin)
+      const preludeSrc = "(define map-entries (fn [m] (if (map? m) (fl-exec-op \"map-entries\" [m]) (fl-exec-op \"entries\" [m]))))";
+      try {
+        const preludeTokens = lex(preludeSrc);
+        const preludeAst = parse(preludeTokens);
+        interp.interpret(preludeAst);
+      } catch (e) { console.error("[prelude] error:", e.message); }
       ctx = interp.interpret(ast);
     } catch (err4) {
       console.error(formatError(err4, source, absPath));
