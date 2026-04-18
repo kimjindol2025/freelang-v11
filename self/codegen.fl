@@ -11,7 +11,7 @@
 
 ;; ═══════ 유틸 ═══════
 
-;; map_entries: runtime-prelude에서 정의됨, FL 함수 정의 불필요
+;; map_entries: native 또는 runtime prelude 제공 (FL에서 정의 불필요)
 
 [FUNC esc-1 :params [$s] :body (replace $s "\\" "\\\\")]
 [FUNC esc-2 :params [$s] :body (replace $s "\"" "\\\"")]
@@ -98,12 +98,10 @@
 ;;   self-parser: plain obj {items: [kw-node1, val-node1, kw-node2, val-node2, ...]}
 ;;   자기참조 bootstrap 형태에서 "items" 키가 있어도 그 값은 단일 node 이지 list 아님.
 [FUNC cg-map-entries :params [$fields]
-  :body (let [[$entries (map_entries $fields)]]
-          (if (and (= (length $entries) 1)
-                   (= (get (get $entries 0) 0) "items")
-                   (array? (get (get $entries 0) 1)))
-            (cg-map-flat-loop (get (get $entries 0) 1) 0 "")
-            (cg-map-loop $entries 0 ""))) ]
+  :body (let [[$items-val (get $fields "items")]]
+          (if (array? $items-val)
+            (cg-map-flat-loop $items-val 0 "")
+            (cg-map-loop (list) 0 ""))) ]
 
 [FUNC cg-map-loop-inner :params [$entries $i $acc $e]
   :body (let [[$k (get $e 0)]
@@ -844,9 +842,10 @@
 ;; 인자 없이 실행하면 FUNC 등록만 하고 종료.
 
 [FUNC compile-file :params [$input $output]
-  :body (let [[$src (file_read $input)]
-              [$ast (fl-parse $src)]
-              [$js (fl->js-with-prelude $ast)]]
+  :body (let [[$src    (file_read $input)]
+              [$tokens (lex $src)]
+              [$ast    (parse $tokens)]
+              [$js     (fl->js-with-prelude $ast)]]
           (file_write $output $js)
           (println (str "compiled " $input " -> " $output " size=" (length $js))))]
 

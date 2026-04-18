@@ -1,0 +1,1 @@
+console.log((()=>{try{return (()=>{throw new Error(String("boom"))})();}catch(e){return "caught";}})())

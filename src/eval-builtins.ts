@@ -215,6 +215,8 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "file-exists?": case "file_exists": try { return require("fs").existsSync(String(v0)); } catch { return false; }
     // ── 셀프 호스팅 native builtins (native fl-interp 내부에서 호출 가능) ──
     case "fl-interp": return flInterpNative(v0, v1);
+    case "lex": try { return _flLex(String(v0 ?? "")); } catch { return []; }
+    case "parse": try { return _flParse(Array.isArray(v0) ? v0 : []); } catch { return []; }
     case "fl-parse": try { return _flParse(_flLex(String(v0 ?? ""))); } catch { return []; }
     case "fl-fix-env": {
       // ⚠️ 뮤테이션: closure-env 직접 할당 — 함수형 아님!
@@ -839,6 +841,10 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     // fl-fix-env: 로드된 FL env의 모든 closure-env를 final env로 업데이트 (재귀 지원)
     case "fl-interp":
       return flInterpNative(args[0], args[1]);
+    case "lex":
+      try { return _flLex(String(args[0] ?? "")); } catch { return []; }
+    case "parse":
+      try { return _flParse(Array.isArray(args[0]) ? args[0] : []); } catch { return []; }
     case "fl-parse": {
       // FL 소스 문자열 → AST 배열 (셀프 호스팅: interpret에 넘기기용)
       try { return _flParse(_flLex(String(args[0] ?? ""))); } catch { return []; }

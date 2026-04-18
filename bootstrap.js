@@ -11057,6 +11057,18 @@ function flExecOpNative(op, vals) {
       }
     case "fl-interp":
       return flInterpNative(v0, v1);
+    case "lex":
+      try {
+        return lex(String(v0 ?? ""));
+      } catch {
+        return [];
+      }
+    case "parse":
+      try {
+        return parse(Array.isArray(v0) ? v0 : []);
+      } catch {
+        return [];
+      }
     case "fl-parse":
       try {
         return parse(lex(String(v0 ?? "")));
@@ -11686,6 +11698,18 @@ function evalBuiltin(interp, op, args2, expr) {
     }
     case "fl-interp":
       return flInterpNative(args2[0], args2[1]);
+    case "lex":
+      try {
+        return lex(String(args2[0] ?? ""));
+      } catch {
+        return [];
+      }
+    case "parse":
+      try {
+        return parse(Array.isArray(args2[0]) ? args2[0] : []);
+      } catch {
+        return [];
+      }
     case "fl-parse": {
       try {
         return parse(lex(String(args2[0] ?? "")));
