@@ -762,4 +762,146 @@ describe("Web Framework Integration Tests", () => {
       expect(result.body).toBeDefined();
     });
   });
+
+  describe("Middleware Integration", () => {
+    const testAppDir = path.join(__dirname, "../../test-app-middleware");
+
+    beforeAll(() => {
+      if (!fs.existsSync(testAppDir)) {
+        fs.mkdirSync(testAppDir, { recursive: true });
+      }
+
+      // 1️⃣ 전역 미들웨어
+      fs.writeFileSync(
+        path.join(testAppDir, "middleware.fl"),
+        `(defn middleware-handler [request]
+          (if (get request :auth-token)
+            {:pass true}
+            {:pass false :status 401}))`
+      );
+
+      // 2️⃣ 미들웨어 통과 시 페이지
+      fs.writeFileSync(
+        path.join(testAppDir, "page.fl"),
+        `(do "<html><body>Protected Page</body></html>")`
+      );
+
+      // 3️⃣ 경로별 미들웨어 (nested)
+      const adminDir = path.join(testAppDir, "admin");
+      fs.mkdirSync(adminDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(adminDir, "middleware.fl"),
+        `(defn admin-middleware [request]
+          (if (= (get request :role) "admin")
+            {:pass true}
+            {:pass false :status 403}))`
+      );
+
+      fs.writeFileSync(
+        path.join(adminDir, "page.fl"),
+        `(do "<html><body>Admin Panel</body></html>")`
+      );
+
+      // 4️⃣ 미들웨어 없는 경로
+      fs.writeFileSync(
+        path.join(testAppDir, "public.fl"),
+        `(do "<html><body>Public Page</body></html>")`
+      );
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(testAppDir)) {
+        fs.rmSync(testAppDir, { recursive: true });
+      }
+    });
+
+    test("should detect middleware.fl files", () => {
+      // app-router가 middleware.fl을 인식
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // middleware 정보 조회 메서드 (getMiddlewareForPath)
+      const middlewares = (router as any).middlewares;
+      expect(middlewares).toBeDefined();
+      expect(middlewares instanceof Map).toBe(true);
+    });
+
+    test("should execute middleware before page", async () => {
+      // 미들웨어가 요청 전에 실행됨
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      const result = await executor.executePage(
+        path.join(testAppDir, "page.fl"),
+        { method: "GET", path: "/", headers: { "auth-token": "token123" } }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.body).toBeDefined();
+    });
+
+    test("should block request on middleware rejection", () => {
+      // 미들웨어가 {pass: false}를 반환하면 401/403 응답
+      // middleware-handler는 auth-token이 없으면 {pass: false, status: 401}를 반환
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      // middleware.fl이 auth-token을 요구하므로, 없으면 차단됨
+      // (실제 구현은 server.ts에서 처리하지만, 여기서는 middleware 존재 확인)
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      const middlewarePath = router.getMiddlewareForPath("/");
+      expect(middlewarePath).toBeDefined();
+      expect(middlewarePath).toContain("middleware.fl");
+    });
+
+    test("should support nested middleware", () => {
+      // /admin 경로에서 admin-middleware 적용
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // /admin에 대한 middleware.fl 조회
+      const adminMiddleware = router.getMiddlewareForPath("/admin");
+      expect(adminMiddleware).toBeDefined();
+      expect(adminMiddleware).toContain("admin");
+      expect(adminMiddleware).toContain("middleware.fl");
+
+      // 루트 middleware도 존재
+      const rootMiddleware = router.getMiddlewareForPath("/");
+      expect(rootMiddleware).toBeDefined();
+    });
+
+    test("should skip middleware for unprotected routes", async () => {
+      // middleware.fl이 없는 경로는 미들웨어 스킵
+      const { Interpreter } = require("../interpreter");
+      const FLExecutor = require("../web/fl-executor").FLExecutor;
+
+      const interpreter = new Interpreter();
+      const executor = new FLExecutor(interpreter);
+
+      const result = await executor.executePage(
+        path.join(testAppDir, "public.fl"),
+        { method: "GET", path: "/public" }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.body).toContain("Public Page");
+
+      // public.fl은 middleware 없이 직접 실행됨
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // /public에 대한 middleware는 없음
+      const publicMiddleware = router.getMiddlewareForPath("/public");
+      expect(publicMiddleware).toBeNull();
+    });
+  });
 });

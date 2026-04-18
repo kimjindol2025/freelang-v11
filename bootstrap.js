@@ -28492,6 +28492,8 @@ var AppRouter = class {
   appDir;
   routes = [];
   layoutChain = {};
+  middlewares = /* @__PURE__ */ new Map();
+  // W3: 경로 → middleware.fl 파일
   constructor(appDir = "app") {
     this.appDir = appDir;
     this.scan();
@@ -28505,6 +28507,7 @@ var AppRouter = class {
       return;
     }
     this.scanDirectory(this.appDir, "", "layout");
+    this.scanDirectory(this.appDir, "", "middleware");
     this.scanDirectory(this.appDir, "", "page");
     this.scanDirectory(this.appDir, "", "route");
     this.buildLayoutChain();
@@ -28537,6 +28540,10 @@ var AppRouter = class {
           }
           this.layoutChain[layoutPath].push(fullPath);
           console.log(`approuter.layout scope=${layoutPath} file=${fullPath}`);
+        } else if (phase === "middleware" && entry.name === "middleware.fl") {
+          const middlewarePath = currentPath === "" ? "/" : currentPath;
+          this.middlewares.set(middlewarePath, fullPath);
+          console.log(`approuter.middleware scope=${middlewarePath} file=${fullPath}`);
         }
       }
     } catch (err4) {
@@ -28629,6 +28636,12 @@ var AppRouter = class {
     return this.routes;
   }
   /**
+   * W3: 특정 경로에 대한 미들웨어 파일 조회
+   */
+  getMiddlewareForPath(routePath) {
+    return this.middlewares.get(routePath) || null;
+  }
+  /**
    * 특정 경로에 대한 레이아웃 체인 조회
    */
   getLayoutsForRoute(routePath) {
@@ -28651,7 +28664,7 @@ var FLExecutor = class {
     this.interpreter = interpreter;
   }
   /**
-   * JWT/Auth/DB/Meta 헬퍼 주입 (1회만 실행)
+   * JWT/Auth/DB/Meta/Fetch 헬퍼 주입 (1회만 실행)
    */
   ensureHelpers() {
     if (this._helpersInjected) return;
@@ -28659,6 +28672,7 @@ var FLExecutor = class {
     this.injectAuthHelpers();
     this.injectDBHelpers();
     this.injectMetaHelpers();
+    this.injectFetchHelpers();
     this._helpersInjected = true;
   }
   /**
@@ -28892,6 +28906,56 @@ var FLExecutor = class {
         return null;
       }
     };
+  }
+  /**
+   * W2: 서버 데이터 페칭 헬퍼 주입
+   */
+  injectFetchHelpers() {
+    const ctx = this.interpreter.context;
+    const serverFetchFn = (url2, options) => {
+      try {
+        const method = (options?.method || "GET").toUpperCase();
+        const headers = options?.headers || {};
+        const body = options?.body || null;
+        const urlObj = new URL(url2);
+        const protocol = urlObj.protocol === "https:" ? require("https") : require("http");
+        let responseData = "";
+        let error = null;
+        const req = protocol.request(urlObj, { method, headers }, (res) => {
+          res.on("data", (chunk) => {
+            responseData += chunk;
+          });
+          res.on("end", () => {
+          });
+        });
+        req.on("error", (err4) => {
+          error = err4;
+        });
+        if (body) {
+          req.write(body);
+        }
+        req.end();
+        if (error) return null;
+        return responseData || null;
+      } catch (err4) {
+        return null;
+      }
+    };
+    const serverFetchJsonFn = (url2, options) => {
+      try {
+        const response = serverFetchFn(url2, options);
+        if (!response) return null;
+        return JSON.parse(response);
+      } catch (err4) {
+        return null;
+      }
+    };
+    ctx["server-fetch"] = serverFetchFn;
+    ctx["server-fetch-json"] = serverFetchJsonFn;
+    this.interpreter.context.variables.set("$server-fetch", serverFetchFn);
+    this.interpreter.context.variables.set("server-fetch", serverFetchFn);
+    this.interpreter.context.variables.set("$server-fetch-json", serverFetchJsonFn);
+    this.interpreter.context.variables.set("server-fetch-json", serverFetchJsonFn);
   }
   /**
    * 인증 헬퍼 함수 주입

@@ -45,6 +45,7 @@ export class AppRouter {
   private appDir: string;
   private routes: Route[] = [];
   private layoutChain: LayoutChain = {};
+  private middlewares: Map<string, string> = new Map(); // W3: 경로 → middleware.fl 파일
 
   constructor(appDir: string = "app") {
     this.appDir = appDir;
@@ -60,10 +61,10 @@ export class AppRouter {
       return;
     }
 
-    // Two-pass scan: collect all layouts first, then register pages and
-    // API route handlers (route.fl) so every entry can resolve its parent
-    // layout chain correctly.
+    // Three-pass scan: collect layouts, middlewares, then pages
+    // W3: middleware.fl 스캔 추가
     this.scanDirectory(this.appDir, "", "layout");
+    this.scanDirectory(this.appDir, "", "middleware");  // W3: middleware 스캔
     this.scanDirectory(this.appDir, "", "page");
     this.scanDirectory(this.appDir, "", "route");
     this.buildLayoutChain();
@@ -103,6 +104,11 @@ export class AppRouter {
           }
           this.layoutChain[layoutPath].push(fullPath);
           console.log(`approuter.layout scope=${layoutPath} file=${fullPath}`);
+        } else if (phase === "middleware" && entry.name === "middleware.fl") {
+          // W3: middleware.fl 등록
+          const middlewarePath = currentPath === "" ? "/" : currentPath;
+          this.middlewares.set(middlewarePath, fullPath);
+          console.log(`approuter.middleware scope=${middlewarePath} file=${fullPath}`);
         }
       }
     } catch (err: any) {
@@ -217,6 +223,13 @@ export class AppRouter {
    */
   getRoutes(): Route[] {
     return this.routes;
+  }
+
+  /**
+   * W3: 특정 경로에 대한 미들웨어 파일 조회
+   */
+  getMiddlewareForPath(routePath: string): string | null {
+    return this.middlewares.get(routePath) || null;
   }
 
   /**

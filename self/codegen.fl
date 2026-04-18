@@ -17,13 +17,14 @@
           (if (array? $m) $m
               (list)))]
 
+[FUNC esc-1 :params [$s] :body (replace $s "\\" "\\\\")]
+[FUNC esc-2 :params [$s] :body (replace $s "\"" "\\\"")]
+[FUNC esc-3 :params [$s] :body (replace $s "\n" "\\n")]
+[FUNC esc-4 :params [$s] :body (replace $s "\r" "\\r")]
+[FUNC esc-5 :params [$s] :body (replace $s "\t" "\\t")]
+
 [FUNC js-esc-inner :params [$s]
-  :body (let [[$a (replace $s "\\" "\\\\")]
-              [$b (replace $a "\"" "\\\"")]
-              [$c (replace $b "\n" "\\n")]
-              [$d (replace $c "\r" "\\r")]
-              [$e (replace $d "\t" "\\t")]]
-          $e)]
+  :body (esc-5 (esc-4 (esc-3 (esc-2 (esc-1 $s)))))]
 
 [FUNC js-esc :params [$s]
   :body (str "\"" (js-esc-inner $s) "\"")]
@@ -41,15 +42,17 @@
             (= $n "enum") (= $n "do") (= $n "with") (= $n "finally")
             (= $n "null") (= $n "true") (= $n "false"))]
 
+[FUNC rename-1 :params [$n] :body (replace $n "-" "_")]
+[FUNC rename-2 :params [$n] :body (replace $n "?" "_q")]
+[FUNC rename-3 :params [$n] :body (replace $n "!" "_x")]
+[FUNC rename-4 :params [$n] :body (replace $n ">" "_gt")]
+[FUNC rename-5 :params [$n] :body (replace $n "<" "_lt")]
+[FUNC rename-6 :params [$n] :body (replace $n "*" "_st")]
+[FUNC rename-7 :params [$n] :body (replace $n "+" "_pl")]
+
 [FUNC js-name-inner :params [$n]
-  :body (let [[$a (replace $n "-" "_")]
-              [$b (replace $a "?" "_q")]
-              [$c (replace $b "!" "_x")]
-              [$d (replace $c ">" "_gt")]
-              [$e (replace $d "<" "_lt")]
-              [$f (replace $e "*" "_st")]
-              [$g (replace $f "+" "_pl")]]
-            (if (js-reserved? $g) (str $g "_") $g))]
+  :body (let [[$g (rename-7 (rename-6 (rename-5 (rename-4 (rename-3 (rename-2 (rename-1 $n)))))))]]
+          (if (js-reserved? $g) (str $g "_") $g))]
 
 [FUNC js-name :params [$n]
   :body (if (null? $n) "_" (js-name-inner $n))]
@@ -106,25 +109,28 @@
             (cg-map-flat-loop (get (get $entries 0) 1) 0 "")
             (cg-map-loop $entries 0 ""))) ]
 
+[FUNC cg-map-loop-inner :params [$entries $i $acc $e]
+  :body (let [[$k (get $e 0)]
+              [$v (cg (get $e 1))]
+              [$pair (str (js-esc $k) ":" $v)]]
+          (cg-map-loop $entries (+ $i 1)
+                       (if (= $i 0) $pair (str $acc "," $pair))))]
+
 [FUNC cg-map-loop :params [$entries $i $acc]
   :body (if (>= $i (length $entries)) $acc
-          (let [[$e (get $entries $i)]
-                [$k (get $e 0)]
-                [$v (cg (get $e 1))]
-                [$pair (str (js-esc $k) ":" $v)]]
-            (cg-map-loop $entries (+ $i 1)
-                         (if (= $i 0) $pair (str $acc "," $pair)))))]
+          (cg-map-loop-inner $entries $i $acc (get $entries $i)))]
 
 ;; self-parser 형태: items = [kw-node val-node kw-node val-node ...]
+[FUNC cg-map-flat-loop-inner :params [$items $i $acc $k-n $v-n]
+  :body (let [[$k-str (cg-keyword-key $k-n)]
+              [$v-js (str (cg $v-n))]
+              [$pair (str $k-str ":" $v-js)]]
+          (cg-map-flat-loop $items (+ $i 2)
+                            (if (= $i 0) $pair (str $acc "," $pair))))]
+
 [FUNC cg-map-flat-loop :params [$items $i $acc]
   :body (if (>= $i (length $items)) $acc
-          (let [[$k-n (get $items $i)]
-                [$v-n (get $items (+ $i 1))]
-                [$k-str (cg-keyword-key $k-n)]
-                [$v-js (str (cg $v-n))]
-                [$pair (str $k-str ":" $v-js)]]
-            (cg-map-flat-loop $items (+ $i 2)
-                              (if (= $i 0) $pair (str $acc "," $pair)))))]
+          (cg-map-flat-loop-inner $items $i $acc (get $items $i) (get $items (+ $i 1))))]
 
 ;; keyword/literal 에서 키 문자열 추출
 [FUNC cg-keyword-key :params [$n]
@@ -134,14 +140,15 @@
 
 ;; [FUNC name :params [$a $b] :body expr]
 ;;   → const name = (a, b) => expr;
-[FUNC cg-func-block :params [$n]
-  :body (let [[$name (js-name (get $n :name))]
-              [$fields (get $n :fields)]
-              [$pnode (get $fields "params")]
-              [$body (get $fields "body")]
-              [$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
+[FUNC cg-func-block-inner :params [$name $fields $pnode $body]
+  :body (let [[$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
               [$ps (extract-params $pitems)]]
           (str "const " $name " = (" $ps ")=>" (cg $body) ";"))]
+
+[FUNC cg-func-block :params [$n]
+  :body (let [[$name (js-name (get $n :name))]
+              [$fields (get $n :fields)]]
+          (cg-func-block-inner $name $fields (get $fields "params") (get $fields "body")))]
 
 ;; ═══════ 특수폼 ═══════
 
