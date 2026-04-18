@@ -1,0 +1,177 @@
+;; 함수 조합 + async/await codegen 검증
+;; compose / pipe / -> / ->> / call / async / await
+
+;; ═══════ 인라인 minimal codegen ═══════
+[FUNC js-esc :params [$s]
+  :body (let [[$a (replace $s "\\" "\\\\")] [$b (replace $a "\"" "\\\"")]]
+          (str "\"" $b "\""))]
+[FUNC js-name :params [$n]
+  :body (if (null? $n) "_"
+          (let [[$a (replace $n "-" "_")] [$b (replace $a "?" "_q")] [$c (replace $b "!" "_x")]]
+            $c))]
+[FUNC extract-name :params [$n]
+  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
+              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+              [true "_anon"])]
+
+[FUNC cg :params [$n]
+  :body (cond [(null? $n) "null"]
+              [(= (get $n :kind) "literal") (cg-literal $n)]
+              [(= (get $n :kind) "variable") (js-name (get $n :name))]
+              [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
+              [true "null"])]
+
+[FUNC cg-literal :params [$n]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
+                [(= $t "symbol")
+                 (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
+                       [true (js-name $v)])]
+                [true "null"]))]
+
+[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (str (cg (get $args $i)))]]
+            (args-loop $args (+ $i 1)
+              (if (= $i 0) $c (str $acc "," $c)))))]
+
+[FUNC cg-pair :params [$args $op] :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+
+[FUNC cg-do-body :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$last (= $i (- (length $args) 1))]]
+            (cg-do-body $args (+ $i 1)
+                        (str $acc (if $last "return " "") (cg (get $args $i)) ";"))))]
+
+;; ═══════ 신규 특수폼 ═══════
+;; compose: 오른쪽→왼쪽, 마지막 args 먼저 적용
+[FUNC compose-nest :params [$args $i $acc]
+  :body (if (< $i 0) $acc
+          (let [[$f (str (cg (get $args $i)))]]
+            (compose-nest $args (- $i 1) (str $f "(" $acc ")"))))]
+[FUNC cg-compose :params [$args]
+  :body (str "((__x)=>" (compose-nest $args (- (length $args) 1) "__x") ")")]
+
+;; pipe: 왼쪽→오른쪽, 첫 args 먼저 적용
+[FUNC pipe-nest :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$f (str (cg (get $args $i)))]]
+            (pipe-nest $args (+ $i 1) (str $f "(" $acc ")"))))]
+[FUNC cg-pipe :params [$args]
+  :body (str "((__x)=>" (pipe-nest $args 0 "__x") ")")]
+
+[FUNC thread-apply :params [$step $acc $fst]
+  :body (cond
+          [(= (get $step :kind) "sexpr")
+           (let [[$op (js-name (get $step :op))] [$a (get $step :args)]]
+             (if $fst
+               (str $op "(" $acc (if (= (length $a) 0) "" (str "," (cg-args $a))) ")")
+               (str $op "(" (if (= (length $a) 0) "" (str (cg-args $a) ",")) $acc ")")))]
+          [true (str (str (cg $step)) "(" $acc ")")])]
+
+[FUNC thread-first-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (thread-first-loop $args (+ $i 1) (thread-apply (get $args $i) $acc true)))]
+[FUNC cg-thread-first :params [$args]
+  :body (let [[$init (str (cg (get $args 0)))]] (thread-first-loop $args 1 $init))]
+
+[FUNC thread-last-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (thread-last-loop $args (+ $i 1) (thread-apply (get $args $i) $acc false)))]
+[FUNC cg-thread-last :params [$args]
+  :body (let [[$init (str (cg (get $args 0)))]] (thread-last-loop $args 1 $init))]
+
+[FUNC cg-call-form :params [$args]
+  :body (let [[$fn (str (cg (get $args 0)))]
+              [$rest (slice $args 1 (length $args))]]
+          (str $fn "(" (cg-args $rest) ")"))]
+
+[FUNC cg-async :params [$args]
+  :body (str "(async()=>{" (cg-do-body $args 0 "") "})()")]
+
+[FUNC cg-await :params [$args]
+  :body (str "(await " (cg (get $args 0)) ")")]
+
+;; ═══════ sexpr dispatch ═══════
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (cond
+            [(= $op "compose") (cg-compose $args)]
+            [(= $op "pipe")    (cg-pipe $args)]
+            [(= $op "->")      (cg-thread-first $args)]
+            [(= $op "->>")     (cg-thread-last $args)]
+            [(= $op "call")    (cg-call-form $args)]
+            [(= $op "async")   (cg-async $args)]
+            [(= $op "await")   (cg-await $args)]
+            [(= $op "define")  (str "const " (extract-name (get $args 0)) "=" (cg (get $args 1)))]
+            [(= $op "+") (cg-pair $args "+")]
+            [(= $op "-") (cg-pair $args "-")]
+            [(= $op "*") (cg-pair $args "*")]
+            [(= $op "=") (cg-pair $args "===")]
+            [(= $op "<") (cg-pair $args "<")]
+            [(= $op "println") (str "console.log(" (cg-args $args) ")")]
+            [true (str (js-name $op) "(" (cg-args $args) ")")]))]
+
+[FUNC compile-all :params [$ast $i $acc]
+  :body (if (>= $i (length $ast)) $acc
+          (compile-all $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+
+(define PRELUDE
+  (str "const inc=(x)=>x+1;const dbl=(x)=>x*2;const neg=(x)=>-x;"
+       "const addn=(x,n)=>x+n;const muln=(x,n)=>x*n;"
+       "const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));\n"))
+
+[FUNC run-js :params [$label $fl $expected]
+  :body (let [[$ast (fl-parse $fl)]
+              [$js (str PRELUDE (compile-all $ast 0 ""))]
+              [$file (str "self/bench/_fn_" $label ".js")]]
+          (file_write $file $js)
+          (let [[$r (shell_capture (str "node " $file))]
+                [$out (get $r :stdout)]
+                [$trim (if (null? $out) "" (replace $out "\n" ""))]]
+            (if (= $trim $expected)
+              (println (str "pass " $label "=" $trim))
+              (println (str "fail " $label " expected=\"" $expected "\" got=\"" $trim "\"")))))]
+
+;; ─── compose (right-to-left) ───
+;; (compose inc dbl) 5 → inc(dbl(5)) = 11
+(run-js "compose"
+  "(println (call (compose inc dbl) 5))"
+  "11")
+
+;; ─── pipe (left-to-right) ───
+;; (pipe inc dbl) 5 → dbl(inc(5)) = 12
+(run-js "pipe"
+  "(println (call (pipe inc dbl) 5))"
+  "12")
+
+;; ─── thread-first: (-> 5 inc dbl) = dbl(inc(5)) = 12 ───
+(run-js "thread-first"
+  "(println (-> 5 inc dbl))"
+  "12")
+
+;; ─── thread-first with sexpr step ───
+(run-js "thread-first-sexpr"
+  "(println (-> 10 (addn 3) dbl))"
+  "26")
+
+;; ─── thread-last: (->> 5 (addn 3) dbl) = dbl(addn(3, 5)) = 16 ───
+(run-js "thread-last"
+  "(println (->> 5 (addn 3) dbl))"
+  "16")
+
+;; ─── call ───
+(run-js "call-form"
+  "(println (call inc 10))"
+  "11")
+
+;; ─── async 내부에서 println ───
+(run-js "async-print"
+  "(async (println (+ 1 2)))"
+  "3")
+
+;; ─── async + await + sleep (순서 보장) ───
+(run-js "async-await-seq"
+  "(async (await (sleep 10)) (println 42))"
+  "42")

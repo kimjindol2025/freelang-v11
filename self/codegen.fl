@@ -310,6 +310,69 @@
             [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
             [true ""]))]
 
+;; (compose f g h) → ((__x)=>f(g(h(__x))))  right-to-left
+;;   마지막 arg (h) 먼저 적용, 맨 처음 (f) 가 바깥
+[FUNC cg-compose :params [$args]
+  :body (str "((__x)=>" (compose-nest $args (- (length $args) 1) "__x") ")")]
+[FUNC compose-nest :params [$args $i $acc]
+  :body (if (< $i 0) $acc
+          (let [[$f (str (cg (get $args $i)))]]
+            (compose-nest $args (- $i 1) (str $f "(" $acc ")")))) ]
+
+;; (pipe f g h) → ((__x)=>h(g(f(__x))))  left-to-right
+;;   첫 arg (f) 먼저 적용, 마지막 (h) 이 바깥
+[FUNC cg-pipe :params [$args]
+  :body (str "((__x)=>" (pipe-nest $args 0 "__x") ")")]
+[FUNC pipe-nest :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$f (str (cg (get $args $i)))]]
+            (pipe-nest $args (+ $i 1) (str $f "(" $acc ")")))) ]
+
+;; (-> x step1 step2)  thread-first: step(acc, args...)
+;;   step 이 symbol → step(acc); step 이 sexpr → (op acc args...)
+[FUNC cg-thread-first :params [$args]
+  :body (let [[$init (str (cg (get $args 0)))]]
+          (thread-first-loop $args 1 $init))]
+[FUNC thread-first-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (thread-first-loop $args (+ $i 1)
+                             (thread-apply (get $args $i) $acc true))) ]
+
+;; (->> x step1 step2)  thread-last: step(args..., acc)
+[FUNC cg-thread-last :params [$args]
+  :body (let [[$init (str (cg (get $args 0)))]]
+          (thread-last-loop $args 1 $init))]
+[FUNC thread-last-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (thread-last-loop $args (+ $i 1)
+                            (thread-apply (get $args $i) $acc false))) ]
+
+;; thread-apply: step, acc, first? → new acc
+[FUNC thread-apply :params [$step $acc $fst]
+  :body (cond
+          [(= (get $step :kind) "sexpr")
+           (let [[$op (js-name (get $step :op))] [$a (get $step :args)]]
+             (if $fst
+               (str $op "(" $acc (if (= (length $a) 0) "" (str "," (cg-args $a))) ")")
+               (str $op "(" (if (= (length $a) 0) "" (str (cg-args $a) ",")) $acc ")")))]
+          [true
+           (str (str (cg $step)) "(" $acc ")")])]
+
+;; (call f 1 2) → f(1,2)
+[FUNC cg-call-form :params [$args]
+  :body (let [[$fn (str (cg (get $args 0)))]
+              [$rest (slice $args 1 (length $args))]]
+          (str $fn "(" (cg-args $rest) ")"))]
+
+;; (async body...) → (async()=>{...})()
+;; 반환: Promise
+[FUNC cg-async :params [$args]
+  :body (str "(async()=>{" (cg-do-body $args 0 "") "})()")]
+
+;; (await p) → await p (런타임에 async context 필요)
+[FUNC cg-await :params [$args]
+  :body (str "(await " (cg (get $args 0)) ")")]
+
 ;; (defstruct Name field1 field2 ...)
 ;;   → const Name = (field1, field2, ...) => ({__struct:"Name", field1, field2, ...});
 [FUNC cg-defstruct :params [$args]
@@ -439,6 +502,14 @@
             [(= $op "loop")    (cg-loop $args)]
             [(= $op "recur")   (cg-recur $args)]
             [(= $op "defstruct") (cg-defstruct $args)]
+            [(= $op "compose") (cg-compose $args)]
+            [(= $op "pipe")    (cg-pipe $args)]
+            [(= $op "->")      (cg-thread-first $args)]
+            [(= $op "->>")     (cg-thread-last $args)]
+            [(= $op "|>")      (cg-thread-first $args)]
+            [(= $op "call")    (cg-call-form $args)]
+            [(= $op "async")   (cg-async $args)]
+            [(= $op "await")   (cg-await $args)]
             [(= $op "+")       (cg-binop $args "+" "0")]
             [(= $op "-")       (cg-sub $args)]
             [(= $op "*")       (cg-binop $args "*" "1")]

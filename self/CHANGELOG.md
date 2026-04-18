@@ -561,3 +561,58 @@ test-codegen-match.fl 7/7 PASS  ✓  (신규)
       defprotocol impl
       patterns: list-pattern struct-pattern
 ```
+
+## Phase 10.5 — 함수 조합 + async/await codegen (2026-04-17)
+
+```
+phase=10 stage=5 status=done note=compose+pipe+thread+call+async+await
+```
+
+### 추가 특수폼 7 개
+
+| 폼 | JS 변환 |
+|----|---------|
+| `(compose f g h)` | `((__x)=>f(g(h(__x))))` (right-to-left) |
+| `(pipe f g h)` | `((__x)=>h(g(f(__x))))` (left-to-right) |
+| `(-> x f g)` | `g(f(x))` (thread-first, sexpr 은 첫 arg 삽입) |
+| `(->> x f g)` | `g(f(x))` (thread-last, sexpr 은 마지막 arg 삽입) |
+| `(call f 1 2)` | `f(1,2)` |
+| `(async body)` | `(async()=>{body})()` → Promise |
+| `(await p)` | `(await p)` |
+
+### `test-codegen-fn.fl` 8/8 PASS
+
+```
+pass compose=11             ((compose inc dbl) 5) = inc(dbl(5))
+pass pipe=12                ((pipe inc dbl) 5) = dbl(inc(5))
+pass thread-first=12        (-> 5 inc dbl) = dbl(inc(5))
+pass thread-first-sexpr=26  (-> 10 (addn 3) dbl) = dbl(13)
+pass thread-last=16         (->> 5 (addn 3) dbl) = dbl(addn(3,5))
+pass call-form=11           (call inc 10)
+pass async-print=3          (async (println (+ 1 2)))
+pass async-await-seq=42     (async (await (sleep 10)) (println 42))
+```
+
+### 지원 특수폼 현황 (27/31 = 87%)
+
+```
+완성: if fn defn define let do begin cond and or quote
+      set! throw try while loop recur defstruct match
+      compose pipe -> ->> call async await
+      산술 (+/-/*/////<=>>=!=)
+
+남은 (4): defprotocol impl macroexpand defmacro  
+       + patterns: list-pattern struct-pattern 완전 바인딩
+```
+
+### 전체 회귀 (누적)
+
+```
+test-selfcompile.fl    5/5  PASS
+test-real-stdlib.fl    6/6  PASS
+test-codegen-sf.fl     5/5  PASS
+test-codegen-match.fl  7/7  PASS
+test-codegen-fn.fl     8/8  PASS
+─────────────────────────────
+총                     31/31 PASS
+```
