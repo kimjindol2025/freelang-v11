@@ -1,0 +1,3 @@
+(do
+  (file_write "self/bench/test-output.txt" "hello from FFI")
+  (file_read "self/bench/test-output.txt"))
