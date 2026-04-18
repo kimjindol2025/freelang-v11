@@ -1,0 +1,5 @@
+(do
+  (let [[$nums (list 1 2 3 4 5)]]
+    (do
+      (println "=== HOF Test ===")
+      (println (str "map with +: test")))))

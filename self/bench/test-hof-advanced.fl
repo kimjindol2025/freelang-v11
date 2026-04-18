@@ -1,0 +1,7 @@
+(do
+  (let [[$nums (list 1 2 3 4 5)]]
+    (do
+      (println "=== Advanced HOF ===")
+      (println (str "numbers: " $nums))
+      (let [[$sum-direct (+ 1 2 3 4 5)]]
+        (println (str "sum direct: " $sum-direct))))))
