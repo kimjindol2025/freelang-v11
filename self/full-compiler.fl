@@ -1,0 +1,1301 @@
+;; self/full-compiler.fl — Complete self-hosted FL compiler
+;; lexer.fl + parser.fl + codegen.fl in one file
+
+(println "🚀 Loading Full Self-Hosted Compiler...")
+
+;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
+;;
+;; v11 defn 이 forward-ref 를 지원하지 않아 [FUNC] 블록 사용.
+;; [FUNC] 는 2-pass 등록이라 상호재귀 허용.
+;;
+;; 입력: source string
+;; 출력: tokens list. 각 토큰 = {:kind :value :line :col}
+;;
+;; 토큰 종류: LParen / RParen / LBracket / RBracket / LBrace / RBrace
+;;          / Number / String / Symbol / Variable / Keyword
+;;          / Unknown / (comment 는 drop)
+
+;; ──────────────────────────────────────
+;; char predicates
+;; ──────────────────────────────────────
+
+[FUNC is-digit? :params [$c]
+  :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
+
+[FUNC is-alpha? :params [$c]
+  :body (if (null? $c) false
+          (or (and (>= $c "a") (<= $c "z"))
+              (and (>= $c "A") (<= $c "Z"))))]
+
+[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
+
+[FUNC is-space? :params [$c]
+  :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
+
+[FUNC is-symbol-char? :params [$c]
+  :body (if (null? $c) false
+          (or (is-alnum? $c)
+              (= $c "-") (= $c "_") (= $c "?") (= $c "!")
+              (= $c "/") (= $c ".") (= $c "<") (= $c ">")
+              (= $c "=") (= $c "+") (= $c "*") (= $c "%")
+              (= $c "&") (= $c "|") (= $c "^") (= $c "~")))]
+
+;; ──────────────────────────────────────
+;; state = {:src :idx :line :col :tokens}
+;; ──────────────────────────────────────
+
+[FUNC make-state :params [$src]
+  :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
+
+[FUNC peek-at :params [$st $offset]
+  :body (let [[$src (get $st :src)]
+              [$i (+ (get $st :idx) $offset)]]
+          (if (>= $i (length $src)) null (char-at $src $i)))]
+
+[FUNC peek :params [$st] :body (peek-at $st 0)]
+
+[FUNC at-end? :params [$st]
+  :body (>= (get $st :idx) (length (get $st :src)))]
+
+[FUNC advance :params [$st]
+  :body (let [[$c (peek $st)]]
+          (if (= $c "\n")
+            {:src (get $st :src) :idx (+ (get $st :idx) 1)
+             :line (+ (get $st :line) 1) :col 1
+             :tokens (get $st :tokens)}
+            {:src (get $st :src) :idx (+ (get $st :idx) 1)
+             :line (get $st :line) :col (+ (get $st :col) 1)
+             :tokens (get $st :tokens)}))]
+
+[FUNC emit :params [$st $kind $value $sl $sc]
+  :body {:src (get $st :src) :idx (get $st :idx)
+         :line (get $st :line) :col (get $st :col)
+         :tokens (append (get $st :tokens)
+                         (list {:type $kind :value $value :line $sl :col $sc}))}]
+
+;; ──────────────────────────────────────
+;; 스킵 (whitespace + ; line comment)
+;; ──────────────────────────────────────
+
+[FUNC skip-comment :params [$st]
+  :body (if (at-end? $st) $st
+          (let [[$c (peek $st)]]
+            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
+
+[FUNC skip-ws :params [$st]
+  :body (if (at-end? $st) $st
+          (let [[$c (peek $st)]]
+            (cond
+              [(is-space? $c) (skip-ws (advance $st))]
+              [(= $c ";") (skip-ws (skip-comment $st))]
+              [true $st])))]
+
+;; ──────────────────────────────────────
+;; 숫자 (정수/실수/음수)
+;; ──────────────────────────────────────
+
+[FUNC read-number-body :params [$st $acc $has-dot $line $col]
+  :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
+          (let [[$c (peek $st)]]
+            (cond
+              [(is-digit? $c)
+               (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
+              [(and (= $c ".") (not $has-dot))
+               (read-number-body (advance $st) (str $acc $c) true $line $col)]
+              [true (emit $st "Number" $acc $line $col)])))]
+
+[FUNC read-number :params [$st]
+  :body (read-number-body $st "" false (get $st :line) (get $st :col))]
+
+;; ──────────────────────────────────────
+;; 문자열 (escape \n \t \r \" \\)
+;; ──────────────────────────────────────
+
+[FUNC translate-esc :params [$c]
+  :body (cond
+          [(= $c "n") "\n"] [(= $c "t") "\t"] [(= $c "r") "\r"]
+          [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
+
+[FUNC read-string-body :params [$st $acc $line $col]
+  :body (if (at-end? $st) (emit $st "String" $acc $line $col)
+          (let [[$c (peek $st)]]
+            (cond
+              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
+              [(= $c "\\")
+               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
+                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
+              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
+
+[FUNC read-string :params [$st]
+  :body (let [[$line (get $st :line)] [$col (get $st :col)]
+              [$st1 (advance $st)]]
+          (read-string-body $st1 "" $line $col))]
+
+;; ──────────────────────────────────────
+;; 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
+;; ──────────────────────────────────────
+
+[FUNC read-symbol-body-kind :params [$st $acc $line $col $kind]
+  :body (if (at-end? $st) (emit $st $kind $acc $line $col)
+          (let [[$c (peek $st)]]
+            (if (is-symbol-char? $c)
+              (read-symbol-body-kind (advance $st) (str $acc $c) $line $col $kind)
+              (emit $st $kind $acc $line $col))))]
+
+[FUNC read-symbol :params [$st]
+  :body (read-symbol-body-kind $st "" (get $st :line) (get $st :col) "Symbol")]
+
+[FUNC read-variable :params [$st]
+  :body (let [[$line (get $st :line)] [$col (get $st :col)]
+              [$st1 (advance $st)]]
+          (read-symbol-body-kind $st1 "" $line $col "Variable"))]
+
+[FUNC read-keyword :params [$st]
+  :body (let [[$line (get $st :line)] [$col (get $st :col)]
+              [$st1 (advance $st)]]
+          (read-symbol-body-kind $st1 "" $line $col "Keyword"))]
+
+;; ──────────────────────────────────────
+;; 토큰 하나 읽기
+;; ──────────────────────────────────────
+
+[FUNC read-token :params [$st]
+  :body (let [[$st1 (skip-ws $st)]]
+          (if (at-end? $st1) $st1
+            (let [[$c (peek $st1)] [$line (get $st1 :line)] [$col (get $st1 :col)]]
+              (cond
+                [(= $c "(") (emit (advance $st1) "LParen"   $c $line $col)]
+                [(= $c ")") (emit (advance $st1) "RParen"   $c $line $col)]
+                [(= $c "[") (emit (advance $st1) "LBracket" $c $line $col)]
+                [(= $c "]") (emit (advance $st1) "RBracket" $c $line $col)]
+                [(= $c "{") (emit (advance $st1) "LBrace"   $c $line $col)]
+                [(= $c "}") (emit (advance $st1) "RBrace"   $c $line $col)]
+                [(= $c "\"") (read-string $st1)]
+                [(= $c "$") (read-variable $st1)]
+                [(= $c ":") (read-keyword $st1)]
+                [(is-digit? $c) (read-number $st1)]
+                [(and (= $c "-") (is-digit? (peek-at $st1 1)))
+                 (read-number-body (advance $st1) "-" false $line $col)]
+                [(is-symbol-char? $c) (read-symbol $st1)]
+                [true (emit (advance $st1) "Unknown" $c $line $col)]))))]
+
+;; ──────────────────────────────────────
+;; 메인 루프 — 모든 토큰 수집
+;; ──────────────────────────────────────
+
+[FUNC lex-loop :params [$st]
+  :body (let [[$st1 (skip-ws $st)]]
+          (if (at-end? $st1)
+            (get $st1 :tokens)
+            (lex-loop (read-token $st1))))]
+
+[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+
+;; self/parser.fl — FL 로 작성된 Parser (Phase 03/31-45)
+;;
+;; 입력: tokens (lexer 출력)
+;; 출력: AST nodes (list of ast nodes)
+;;
+;; 모든 함수 [FUNC] 블록. 파서 상태 = {:tokens :idx}.
+;; node 생성자는 self/ast.fl 정의 재사용. 테스트 단독 실행 위해 여기에도 복제.
+
+;; ──────────────────────────────────────
+;; AST 생성자 (ast.fl 과 동일)
+;; ──────────────────────────────────────
+
+[FUNC make-literal :params [$type $value $line]
+  :body {:kind "literal" :type $type :value $value :line $line}]
+
+[FUNC make-variable :params [$name $line]
+  :body {:kind "variable" :name $name :line $line}]
+
+[FUNC make-keyword :params [$name $line]
+  :body {:kind "keyword" :name $name :line $line}]
+
+[FUNC make-sexpr :params [$op $args $line]
+  :body {:kind "sexpr" :op $op :args $args :line $line}]
+
+[FUNC make-array-block :params [$items $line]
+  :body {:kind "block" :type "Array" :name null
+         :fields {:items $items} :line $line}]
+
+[FUNC make-map-block :params [$items $line]
+  :body {:kind "block" :type "Map" :name null
+         :fields {:items $items} :line $line}]
+
+[FUNC make-block :params [$type $name $fields $line]
+  :body {:kind "block" :type $type :name $name :fields $fields :line $line}]
+
+;; ──────────────────────────────────────
+;; 31 파서 상태 + peek/advance/expect
+;; ──────────────────────────────────────
+
+[FUNC p-make :params [$tokens]
+  :body {:tokens $tokens :idx 0 :ast []}]
+
+[FUNC p-peek :params [$p]
+  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
+          (if (>= $i (length $t)) null (get $t $i)))]
+
+[FUNC p-peek-at :params [$p $offset]
+  :body (let [[$i (+ (get $p :idx) $offset)] [$t (get $p :tokens)]]
+          (if (>= $i (length $t)) null (get $t $i)))]
+
+[FUNC p-end? :params [$p]
+  :body (>= (get $p :idx) (length (get $p :tokens)))]
+
+[FUNC p-advance :params [$p]
+  :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1) :ast (get $p :ast)}]
+
+[FUNC p-with-ast :params [$p $ast]
+  :body {:tokens (get $p :tokens) :idx (get $p :idx) :ast $ast}]
+
+[FUNC p-append-ast :params [$p $node]
+  :body (p-with-ast $p (append (get $p :ast) (list $node)))]
+
+;; 2-tuple 반환용 map {:p p' :node n}
+[FUNC r-pair :params [$p $node]
+  :body {:p $p :node $node}]
+
+;; ──────────────────────────────────────
+;; 32 parseAtom — number/string/symbol/keyword/variable
+;; ──────────────────────────────────────
+
+[FUNC parse-atom :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$line (get $t :line)]]
+          (cond
+            [(= $k "Number")
+             (r-pair (p-advance $p) (make-literal "number" $v $line))]
+            [(= $k "String")
+             (r-pair (p-advance $p) (make-literal "string" $v $line))]
+            [(= $k "Symbol")
+             (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
+            [(= $k "Variable")
+             (r-pair (p-advance $p) (make-variable $v $line))]
+            [(= $k "Keyword")
+             (r-pair (p-advance $p) (make-keyword $v $line))]
+            [true (r-pair (p-advance $p) (make-literal "unknown" $v $line))]))]
+
+;; ──────────────────────────────────────
+;; 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
+;; ──────────────────────────────────────
+
+[FUNC parse-expr :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+          (cond
+            [(= $k "LParen")   (parse-sexpr $p)]
+            [(= $k "LBracket") (parse-bracket $p)]
+            [(= $k "LBrace")   (parse-map $p)]
+            [true (parse-atom $p)]))]
+
+;; ──────────────────────────────────────
+;; 33 parse-sexpr (parens)
+;; ──────────────────────────────────────
+
+[FUNC parse-sexpr :params [$p]
+  :body (let [[$start-tok (p-peek $p)] [$line (get $start-tok :line)]
+              [$p1 (p-advance $p)]                          ;; consume (
+              [$first (parse-args $p1 [])]                  ;; collect until )
+              [$p2 (get $first :p)] [$args (get $first :node)]]
+          (if (= (length $args) 0)
+            (r-pair (parse-consume-rparen $p2) (make-sexpr "" (list) $line))
+            (let [[$op-node (get $args 0)]
+                  [$op (if (= (get $op-node :kind) "literal")
+                         (get $op-node :value)
+                         (if (= (get $op-node :kind) "variable")
+                           (str "$" (get $op-node :name))
+                           "unknown"))]
+                  [$rest (slice $args 1 (length $args))]]
+              (r-pair (parse-consume-rparen $p2)
+                      (make-sexpr $op $rest $line)))))]
+
+[FUNC parse-consume-rparen :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t)) (= (get $t :kind) "RParen"))
+            (p-advance $p)
+            $p))]
+
+;; args 수집 (재귀): RParen 만나면 중단
+[FUNC parse-args :params [$p $acc]
+  :body (let [[$t (p-peek $p)]]
+          (cond
+            [(null? $t)                              (r-pair $p $acc)]
+            [(= (get $t :kind) "RParen")             (r-pair $p $acc)]
+            [(= (get $t :kind) "RBracket")           (r-pair $p $acc)]
+            [(= (get $t :kind) "RBrace")             (r-pair $p $acc)]
+            [true
+             (let [[$one (parse-expr $p)]]
+               (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+
+;; ──────────────────────────────────────
+;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
+;; ──────────────────────────────────────
+
+[FUNC parse-bracket :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
+              [$p1 (p-advance $p)]                ;; consume [
+              [$next (p-peek $p1)]]
+          (if (and (not (null? $next))
+                   (= (get $next :kind) "Symbol")
+                   (is-block-type? (get $next :value))
+                   (= (get $next :value) (upper-case (get $next :value))))
+            (parse-named-block $p1 $line)
+            (parse-array $p1 $line)))]
+
+[FUNC is-block-type? :params [$s]
+  :body (let [[$c (char-at $s 0)]]
+          (and (>= $c "A") (<= $c "Z")))]
+
+[FUNC upper-case :params [$s] :body $s]   ;; FL stdlib 기본 upper-case 가 없으면 identity. 판별엔 첫글자만 본다.
+
+[FUNC parse-array :params [$p $line]
+  :body (let [[$collected (parse-args $p [])]
+              [$p2 (get $collected :p)] [$items (get $collected :node)]]
+          (r-pair (parse-consume-rbracket $p2) (make-array-block $items $line)))]
+
+[FUNC parse-consume-rbracket :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t)) (= (get $t :kind) "RBracket"))
+            (p-advance $p)
+            $p))]
+
+;; [TYPE name? :k v :k v ...]  Named block (FUNC/ROUTE/PAGE 등)
+[FUNC parse-named-block :params [$p $line]
+  :body (let [[$type-tok (p-peek $p)] [$type (get $type-tok :value)]
+              [$p1 (p-advance $p)]
+              [$name-info (parse-optional-name $p1)]
+              [$p2 (get $name-info :p)] [$name (get $name-info :node)]
+              [$fields-info (parse-block-fields $p2 {})]
+              [$p3 (get $fields-info :p)] [$fields (get $fields-info :node)]]
+          (r-pair (parse-consume-rbracket $p3)
+                  (make-block $type $name $fields $line)))]
+
+[FUNC parse-optional-name :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t))
+                   (= (get $t :kind) "Symbol")
+                   (not (= (char-at (get $t :value) 0) ":")))
+            (r-pair (p-advance $p) (get $t :value))
+            (r-pair $p null)))]
+
+;; :k v :k v ... 반복. RBracket 만나면 중단.
+[FUNC parse-block-fields :params [$p $acc]
+  :body (let [[$t (p-peek $p)]]
+          (cond
+            [(null? $t) (r-pair $p $acc)]
+            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
+            [(= (get $t :kind) "Keyword")
+             (let [[$key (get $t :value)]
+                   [$p1 (p-advance $p)]
+                   [$val (parse-expr $p1)]
+                   [$p2 (get $val :p)] [$v (get $val :node)]]
+               (parse-block-fields $p2 (json_set $acc $key $v)))]
+            [true (r-pair (p-advance $p) $acc)]))]
+
+;; ──────────────────────────────────────
+;; 35 parse-map — {:k v :k v ...}
+;; ──────────────────────────────────────
+
+[FUNC parse-map :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
+              [$p1 (p-advance $p)]
+              [$collected (parse-args $p1 [])]
+              [$p2 (get $collected :p)] [$items (get $collected :node)]]
+          (r-pair (parse-consume-rbrace $p2) (make-map-block $items $line)))]
+
+[FUNC parse-consume-rbrace :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t)) (= (get $t :kind) "RBrace"))
+            (p-advance $p)
+            $p))]
+
+;; ──────────────────────────────────────
+;; 40/44 공개 API: parse(tokens) → ast list
+;; ──────────────────────────────────────
+
+[FUNC parse-all :params [$p]
+  :body (if (p-end? $p)
+          (get $p :ast)
+          (let [[$one (parse-expr $p)]
+                [$p2 (p-append-ast (get $one :p) (get $one :node))]]
+            (parse-all $p2)))]
+
+[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
+
+;; self/codegen.fl — FL AST → JS source (v2, Phase 10 확장)
+;;
+;; 새로 추가:
+;;   특수폼: let (1D/2D), cond, do, and, or, quote
+;;   native stdlib: str, length, substring, char-at, replace
+;;                  first, last, rest, append, get, slice
+;;                  list, println, print, min, max, abs
+;;                  null?, not, empty?, mod
+;;
+;; 생성된 JS 는 runtime prelude 함수 (_fl_*) 가 선두에 포함됨.
+
+;; ═══════ 유틸 ═══════
+
+;; map_entries: native 또는 runtime prelude 제공 (FL에서 정의 불필요)
+
+[FUNC esc-1 :params [$s] :body (replace $s "\\" "\\\\")]
+[FUNC esc-2 :params [$s] :body (replace $s "\"" "\\\"")]
+[FUNC esc-3 :params [$s] :body (replace $s "\n" "\\n")]
+[FUNC esc-4 :params [$s] :body (replace $s "\r" "\\r")]
+[FUNC esc-5 :params [$s] :body (replace $s "\t" "\\t")]
+
+[FUNC js-esc-inner :params [$s]
+  :body (esc-5 (esc-4 (esc-3 (esc-2 (esc-1 $s)))))]
+
+[FUNC js-esc :params [$s]
+  :body (str "\"" (js-esc-inner $s) "\"")]
+
+;; JS 예약어 회피: let/const/default/class/etc → 뒤에 _ 추가
+[FUNC js-reserved? :params [$n]
+  :body (or (= $n "default") (= $n "class") (= $n "const") (= $n "let")
+            (= $n "if") (= $n "else") (= $n "switch") (= $n "case")
+            (= $n "break") (= $n "continue") (= $n "for") (= $n "while")
+            (= $n "function") (= $n "return") (= $n "throw") (= $n "try")
+            (= $n "catch") (= $n "new") (= $n "delete") (= $n "typeof")
+            (= $n "instanceof") (= $n "var") (= $n "in") (= $n "of")
+            (= $n "this") (= $n "super") (= $n "void") (= $n "yield")
+            (= $n "async") (= $n "await") (= $n "import") (= $n "export")
+            (= $n "enum") (= $n "do") (= $n "with") (= $n "finally")
+            (= $n "null") (= $n "true") (= $n "false"))]
+
+[FUNC rename-1 :params [$n] :body (replace $n "-" "_")]
+[FUNC rename-2 :params [$n] :body (replace $n "?" "_q")]
+[FUNC rename-3 :params [$n] :body (replace $n "!" "_x")]
+[FUNC rename-4 :params [$n] :body (replace $n ">" "_gt")]
+[FUNC rename-5 :params [$n] :body (replace $n "<" "_lt")]
+[FUNC rename-6 :params [$n] :body (replace $n "*" "_st")]
+[FUNC rename-7 :params [$n] :body (replace $n "+" "_pl")]
+
+[FUNC js-name-inner :params [$n]
+  :body (let [[$g (rename-7 (rename-6 (rename-5 (rename-4 (rename-3 (rename-2 (rename-1 $n)))))))]]
+          (if (js-reserved? $g) (str $g "_") $g))]
+
+[FUNC js-name :params [$n]
+  :body (if (null? $n) "_" (js-name-inner $n))]
+
+;; ═══════ 디스패치 ═══════
+
+[FUNC cg :params [$n]
+  :body (cond
+          [(null? $n) "null"]
+          [(= (get $n :kind) "literal") (cg-literal $n)]
+          [(= (get $n :kind) "variable") (js-name (get $n :name))]
+          [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
+          [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
+          [(= (get $n :kind) "block") (cg-block $n)]
+          [(= (get $n :kind) "pattern-match") (cg-match $n)]
+          [true "null"])]
+
+[FUNC cg-literal :params [$n]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond
+            [(= $t "number") $v]
+            [(= $t "string") (js-esc $v)]
+            [(= $t "boolean") (if $v "true" "false")]
+            [(= $t "symbol")
+             (cond [(= $v "true") "true"]
+                   [(= $v "false") "false"]
+                   [(= $v "null") "null"]
+                   [true (js-name $v)])]
+            [true "null"]))]
+
+[FUNC cg-block :params [$n]
+  :body (let [[$t (get $n :type)]]
+          (cond
+            [(= $t "Array")
+             (str "[" (cg-args (get (get $n :fields) "items")) "]")]
+            [(= $t "Map")
+             (str "({" (cg-map-entries (get $n :fields)) "})")]
+            [(= $t "FUNC")
+             (cg-func-block $n)]
+            [true "null"]))]
+
+;; Map literal: 두 AST 형태 지원
+;;   1) bootstrap parser: fields = JS Map, map_entries 로 [[k,v] ...]
+;;   2) self-parser: fields = {items: [k1,v1,k2,v2,...]} (평탄한 쌍 리스트)
+;; Map fields 형태 감지:
+;;   bootstrap: JS Map{"key1"→node, "key2"→node, ...}
+;;   self-parser: plain obj {items: [kw-node1, val-node1, kw-node2, val-node2, ...]}
+;;   자기참조 bootstrap 형태에서 "items" 키가 있어도 그 값은 단일 node 이지 list 아님.
+[FUNC cg-map-entries :params [$fields]
+  :body (let [[$items-val (get $fields "items")]]
+          (if (array? $items-val)
+            (cg-map-flat-loop $items-val 0 "")
+            (cg-map-loop (list) 0 ""))) ]
+
+[FUNC cg-map-loop-inner :params [$entries $i $acc $e]
+  :body (let [[$k (get $e 0)]
+              [$v (cg (get $e 1))]
+              [$pair (str (js-esc $k) ":" $v)]]
+          (cg-map-loop $entries (+ $i 1)
+                       (if (= $i 0) $pair (str $acc "," $pair))))]
+
+[FUNC cg-map-loop :params [$entries $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (cg-map-loop-inner $entries $i $acc (get $entries $i)))]
+
+;; self-parser 형태: items = [kw-node val-node kw-node val-node ...]
+[FUNC cg-map-flat-loop-inner :params [$items $i $acc $k-n $v-n]
+  :body (let [[$k-str (cg-keyword-key $k-n)]
+              [$v-js (str (cg $v-n))]
+              [$pair (str $k-str ":" $v-js)]]
+          (cg-map-flat-loop $items (+ $i 2)
+                            (if (= $i 0) $pair (str $acc "," $pair))))]
+
+[FUNC cg-map-flat-loop :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (cg-map-flat-loop-inner $items $i $acc (get $items $i) (get $items (+ $i 1))))]
+
+;; keyword/literal 에서 키 문자열 추출
+[FUNC cg-keyword-key :params [$n]
+  :body (cond [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
+              [(= (get $n :kind) "literal") (js-esc (str (get $n :value)))]
+              [true "\"_anon\""])]
+
+;; [FUNC name :params [$a $b] :body expr]
+;;   → const name = (a, b) => expr;
+[FUNC cg-func-block-inner :params [$name $fields $pnode $body]
+  :body (let [[$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
+              [$ps (extract-params $pitems)]]
+          (str "const " $name " = (" $ps ")=>" (cg $body) ";"))]
+
+[FUNC cg-func-block :params [$n]
+  :body (let [[$name (js-name (get $n :name))]
+              [$fields (get $n :fields)]]
+          (cg-func-block-inner $name $fields (get $fields "params") (get $fields "body")))]
+
+;; ═══════ 특수폼 ═══════
+
+[FUNC cg-if :params [$args]
+  :body (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":"
+             (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
+
+[FUNC cg-fn :params [$args]
+  :body (let [[$pnode (get $args 0)] [$body (get $args 1)]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]]
+          (str "((" $ps ")=>" (cg $body) ")"))]
+
+[FUNC cg-defn :params [$args]
+  :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
+              [$name (extract-name $name-n)]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]]
+          (str "const " $name " = (" $ps ")=>" (cg $body)))]
+
+[FUNC cg-define :params [$args]
+  :body (if (= (length $args) 2)
+          (str "const " (extract-name (get $args 0)) " = " (cg (get $args 1)))
+          (cg-defn $args))]
+
+[FUNC cg-let :params [$args]
+  :body (let [[$bnode (get $args 0)]
+              [$items (get (get $bnode :fields) "items")]
+              [$first-item (if (null? $items) null (get $items 0))]
+              [$nested (if (null? $first-item) false
+                         (and (= (get $first-item :kind) "block")
+                              (= (get $first-item :type) "Array")))]
+              [$bindings (if $nested (cg-let-2d $items 0 "") (cg-let-1d $items 0 ""))]
+              [$body-args (slice $args 1 (length $args))]
+              [$body-js (cg-do-body $body-args 0 "")]]
+          (str "((()=>{" $bindings $body-js "})())"))]
+
+[FUNC cg-let-1d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$k-n (get $items $i)] [$v-n (get $items (+ $i 1))]
+                [$name (extract-name $k-n)] [$val (cg $v-n)]]
+            (cg-let-1d $items (+ $i 2) (str $acc "let " $name "=" $val ";"))))]
+
+[FUNC cg-let-2d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$pair (get $items $i)]
+                [$pitems (get (get $pair :fields) "items")]
+                [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
+                [$name (extract-name $k-n)] [$val (cg $v-n)]]
+            (cg-let-2d $items (+ $i 1) (str $acc "let " $name "=" $val ";"))))]
+
+[FUNC cg-do :params [$args]
+  :body (if (= (length $args) 0) "null"
+          (str "(()=>{" (cg-do-body $args 0 "") "})()"))]
+
+[FUNC cg-do-body :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$last (= $i (- (length $args) 1))]
+                [$c (cg (get $args $i))]
+                [$sep (if $last "return " "")]]
+            (cg-do-body $args (+ $i 1) (str $acc $sep $c ";"))))]
+
+[FUNC cg-cond :params [$args]
+  :body (cg-cond-loop $args 0)]
+
+[FUNC cg-cond-loop :params [$args $i]
+  :body (if (>= $i (length $args)) "null"
+          (let [[$clause (get $args $i)]
+                [$citems (get (get $clause :fields) "items")]
+                [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]
+                [$rest (cg-cond-loop $args (+ $i 1))]]
+            (str "(" $test "?" $result ":" $rest ")")))]
+
+[FUNC cg-and :params [$args]
+  :body (if (= (length $args) 0) "true"
+          (str "(" (and-loop $args 0 "") ")")) ]
+
+[FUNC and-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (str (cg (get $args $i)))]]
+            (and-loop $args (+ $i 1)
+                      (if (= $i 0) $c (str $acc "&&" $c)))))]
+
+[FUNC cg-or :params [$args]
+  :body (if (= (length $args) 0) "false"
+          (str "(" (or-loop $args 0 "") ")")) ]
+
+[FUNC or-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (str (cg (get $args $i)))]]
+            (or-loop $args (+ $i 1)
+                     (if (= $i 0) $c (str $acc "||" $c)))))]
+
+[FUNC cg-quote :params [$args]
+  :body (if (= (length $args) 0) "null" (js-esc (str (cg (get $args 0)))))]
+
+;; (set! x v) → (x=v)
+[FUNC cg-set! :params [$args]
+  :body (str "(" (extract-name (get $args 0)) "=" (cg (get $args 1)) ")")]
+
+;; (throw msg) → (()=>{throw new Error(msg)})()
+[FUNC cg-throw :params [$args]
+  :body (let [[$m (if (= (length $args) 0) "\"error\"" (cg (get $args 0)))]]
+          (str "(()=>{throw new Error(String(" $m "))})()"))]
+
+;; (try body (catch err handler))
+;;   → (()=>{try{return body;}catch($err){return handler;}})()
+[FUNC cg-try :params [$args]
+  :body (let [[$body (cg (get $args 0))]
+              [$catch-node (if (>= (length $args) 2) (get $args 1) null)]
+              [$catch-info (if (null? $catch-node) null (extract-catch $catch-node))]
+              [$evar (if (null? $catch-info) "_err" (get $catch-info :evar))]
+              [$ebody (if (null? $catch-info) "null" (get $catch-info :ebody))]]
+          (str "(()=>{try{return " $body ";}catch(" $evar "){return " $ebody ";}})()"))]
+
+[FUNC extract-catch :params [$n]
+  :body (let [[$args (get $n :args)]
+              [$ev (extract-name (get $args 0))]
+              [$handler (cg (get $args 1))]]
+          {:evar $ev :ebody $handler})]
+
+;; (while cond body...) → (()=>{while(cond){body;}})()
+[FUNC cg-while :params [$args]
+  :body (let [[$cond (cg (get $args 0))]
+              [$body-args (slice $args 1 (length $args))]
+              [$body (while-body $body-args 0 "")]]
+          (str "(()=>{while(" $cond "){" $body "}})()"))]
+
+[FUNC while-body :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (while-body $args (+ $i 1) (str $acc (cg (get $args $i)) ";")))]
+
+;; (loop [[$i 0] [$acc 0]] body-with-recur)
+;;   → mutable let + while(true) { const __r=...; if(__r?.__recur){[i,acc]=__r.a;continue;} return __r; }
+;; recur 는 { __recur:true, a:[v1,v2,...] } 를 반환
+[FUNC cg-loop :params [$args]
+  :body (let [[$bnode (get $args 0)]
+              [$items (get (get $bnode :fields) "items")]
+              [$first (if (null? $items) null (get $items 0))]
+              [$nested (if (null? $first) false
+                         (and (= (get $first :kind) "block")
+                              (= (get $first :type) "Array")))]
+              [$bindings (if $nested (loop-inits-2d $items 0 "") (loop-inits-1d $items 0 ""))]
+              [$names    (if $nested (loop-names-2d $items 0 "") (loop-names-1d $items 0 ""))]
+              [$body-args (slice $args 1 (length $args))]
+              [$body-js (cg-do-body $body-args 0 "")]]
+          (str "((()=>{" $bindings
+               "while(true){let __r=(()=>{" $body-js "})();"
+               "if(__r&&__r.__recur){[" $names "]=__r.a;continue;}"
+               "return __r;}})())"))]
+
+[FUNC loop-inits-1d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$k (get $items $i)] [$v (get $items (+ $i 1))]]
+            (loop-inits-1d $items (+ $i 2)
+                           (str $acc "let " (extract-name $k) "=" (cg $v) ";"))))]
+[FUNC loop-inits-2d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$pair (get $items $i)]
+                [$pit (get (get $pair :fields) "items")]]
+            (loop-inits-2d $items (+ $i 1)
+                           (str $acc "let " (extract-name (get $pit 0)) "=" (cg (get $pit 1)) ";"))))]
+
+[FUNC loop-names-1d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$k (get $items $i)] [$n (extract-name $k)]]
+            (loop-names-1d $items (+ $i 2)
+                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+[FUNC loop-names-2d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$pair (get $items $i)]
+                [$pit (get (get $pair :fields) "items")]
+                [$n (extract-name (get $pit 0))]]
+            (loop-names-2d $items (+ $i 1)
+                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+
+;; (recur v1 v2 ...) → {__recur:true, a:[v1,v2,...]}
+[FUNC cg-recur :params [$args]
+  :body (str "{__recur:true,a:[" (cg-args $args) "]}")]
+
+;; ═══════ match (pattern-match node) ═══════
+;; (match value
+;;   (pat1 body1)
+;;   (pat2 body2)
+;;   (default body))
+;;
+;; → ((__v)=>{
+;;     if(<test1>){let b=__v; return <body1>;}
+;;     if(<test2>){return <body2>;}
+;;     return <default>;
+;;   })(value)
+
+[FUNC cg-match :params [$n]
+  :body (let [[$val (cg (get $n :value))]
+              [$cases (get $n :cases)]
+              [$default-n (get $n :defaultCase)]
+              [$default (if (null? $default-n) "null" (cg $default-n))]
+              [$cases-js (match-cases-loop $cases 0 "")]]
+          (str "((__v)=>{" $cases-js "return " $default ";})(" $val ")"))]
+
+;; 각 case: if (pattern-test) { bindings; if (guard) { return body; } }
+;;   guard 가 binding 변수를 참조할 수 있어 bindings 를 먼저 실행
+[FUNC match-cases-loop :params [$cases $i $acc]
+  :body (if (>= $i (length $cases)) $acc
+          (let [[$c (get $cases $i)]
+                [$pat (get $c :pattern)]
+                [$body (cg (get $c :body))]
+                [$guard-n (get $c :guard)]
+                [$test (pattern-test $pat "__v")]
+                [$bind (pattern-bindings $pat "__v")]
+                [$guard-js (if (null? $guard-n) "true" (cg $guard-n))]
+                [$inner (if (null? $guard-n)
+                          (str $bind "return " $body ";")
+                          (str $bind "if(" $guard-js "){return " $body ";}"))]]
+            (match-cases-loop $cases (+ $i 1)
+              (str $acc "if(" $test "){" $inner "}"))))]
+
+;; pattern-test: JS expression that returns truthy if pat matches __v
+[FUNC pattern-test :params [$pat $v]
+  :body (let [[$k (get $pat :kind)]]
+          (cond
+            [(= $k "wildcard-pattern") "true"]
+            [(= $k "variable-pattern") "true"]
+            [(= $k "literal-pattern")
+             (str "(" $v "===" (literal-to-js (get $pat :type) (get $pat :value)) ")")]
+            [(= $k "or-pattern") (or-pattern-test (get $pat :patterns) $v 0 "")]
+            [(= $k "range-pattern")
+             (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
+            [true "false"]))]
+
+[FUNC literal-to-js :params [$t $v]
+  :body (cond [(= $t "number") $v]
+              [(= $t "string") (js-esc $v)]
+              [(= $t "symbol")
+               (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
+                     [true (js-esc $v)])]
+              [true "null"])]
+
+[FUNC or-pattern-test :params [$pats $v $i $acc]
+  :body (if (>= $i (length $pats)) (if (= (length $acc) 0) "false" (str "(" $acc ")"))
+          (let [[$t (pattern-test (get $pats $i) $v)]]
+            (or-pattern-test $pats $v (+ $i 1)
+              (if (= (length $acc) 0) $t (str $acc "||" $t))))) ]
+
+;; pattern-bindings: JS statement that binds pattern variables from __v
+[FUNC pattern-bindings :params [$pat $v]
+  :body (let [[$k (get $pat :kind)]]
+          (cond
+            [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
+            [true ""]))]
+
+;; (compose f g h) → ((__x)=>f(g(h(__x))))  right-to-left
+;;   마지막 arg (h) 먼저 적용, 맨 처음 (f) 가 바깥
+[FUNC cg-compose :params [$args]
+  :body (str "((__x)=>" (compose-nest $args (- (length $args) 1) "__x") ")")]
+[FUNC compose-nest :params [$args $i $acc]
+  :body (if (< $i 0) $acc
+          (let [[$f (str (cg (get $args $i)))]]
+            (compose-nest $args (- $i 1) (str $f "(" $acc ")")))) ]
+
+;; (pipe f g h) → ((__x)=>h(g(f(__x))))  left-to-right
+;;   첫 arg (f) 먼저 적용, 마지막 (h) 이 바깥
+[FUNC cg-pipe :params [$args]
+  :body (str "((__x)=>" (pipe-nest $args 0 "__x") ")")]
+[FUNC pipe-nest :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$f (str (cg (get $args $i)))]]
+            (pipe-nest $args (+ $i 1) (str $f "(" $acc ")")))) ]
+
+;; (-> x step1 step2)  thread-first: step(acc, args...)
+;;   step 이 symbol → step(acc); step 이 sexpr → (op acc args...)
+[FUNC cg-thread-first :params [$args]
+  :body (let [[$init (str (cg (get $args 0)))]]
+          (thread-first-loop $args 1 $init))]
+[FUNC thread-first-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (thread-first-loop $args (+ $i 1)
+                             (thread-apply (get $args $i) $acc true))) ]
+
+;; (->> x step1 step2)  thread-last: step(args..., acc)
+[FUNC cg-thread-last :params [$args]
+  :body (let [[$init (str (cg (get $args 0)))]]
+          (thread-last-loop $args 1 $init))]
+[FUNC thread-last-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (thread-last-loop $args (+ $i 1)
+                            (thread-apply (get $args $i) $acc false))) ]
+
+;; thread-apply: step, acc, first? → new acc
+[FUNC thread-apply :params [$step $acc $fst]
+  :body (cond
+          [(= (get $step :kind) "sexpr")
+           (let [[$op (js-name (get $step :op))] [$a (get $step :args)]]
+             (if $fst
+               (str $op "(" $acc (if (= (length $a) 0) "" (str "," (cg-args $a))) ")")
+               (str $op "(" (if (= (length $a) 0) "" (str (cg-args $a) ",")) $acc ")")))]
+          [true
+           (str (str (cg $step)) "(" $acc ")")])]
+
+;; (call f 1 2) → f(1,2)
+[FUNC cg-call-form :params [$args]
+  :body (let [[$fn (str (cg (get $args 0)))]
+              [$rest (slice $args 1 (length $args))]]
+          (str $fn "(" (cg-args $rest) ")"))]
+
+;; (async body...) → (async()=>{...})()
+;; 반환: Promise
+[FUNC cg-async :params [$args]
+  :body (str "(async()=>{" (cg-do-body $args 0 "") "})()")]
+
+;; (await p) → await p (런타임에 async context 필요)
+[FUNC cg-await :params [$args]
+  :body (str "(await " (cg (get $args 0)) ")")]
+
+;; (defstruct Name field1 field2 ...)
+;;   → const Name = (field1, field2, ...) => ({__struct:"Name", field1, field2, ...});
+[FUNC cg-defstruct :params [$args]
+  :body (let [[$name-n (get $args 0)]
+              [$name (extract-name $name-n)]
+              [$fields (slice $args 1 (length $args))]
+              [$params (struct-field-list $fields 0 "")]
+              [$init   (struct-init-list $fields 0 "")]]
+          (str "const " $name " = (" $params ")=>({__struct:\"" $name "\"," $init "})"))]
+
+[FUNC struct-field-list :params [$fs $i $acc]
+  :body (if (>= $i (length $fs)) $acc
+          (let [[$n (extract-name (get $fs $i))]]
+            (struct-field-list $fs (+ $i 1)
+                               (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+
+[FUNC struct-init-list :params [$fs $i $acc]
+  :body (if (>= $i (length $fs)) $acc
+          (let [[$n (extract-name (get $fs $i))]]
+            (struct-init-list $fs (+ $i 1)
+                              (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+
+;; ═══════ 연산/인자 ═══════
+
+[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (str (cg (get $args $i)))]]
+            (args-loop $args (+ $i 1)
+                       (if (= $i 0) $c (str $acc "," $c)))))]
+
+[FUNC cg-binop :params [$args $op $zero]
+  :body (cond [(= (length $args) 0) $zero]
+              [(= (length $args) 1) (str (cg (get $args 0)))]
+              [true (str "(" (binop-loop $args 0 "" $op) ")")])]
+[FUNC binop-loop :params [$args $i $acc $op]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (str (cg (get $args $i)))]]
+            (binop-loop $args (+ $i 1)
+                        (if (= $i 0) $c (str $acc $op $c)) $op)))]
+
+[FUNC cg-pair :params [$args $op]
+  :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+
+[FUNC cg-sub :params [$args]
+  :body (if (= (length $args) 1) (str "(-" (cg (get $args 0)) ")")
+          (str "(" (cg (get $args 0)) "-" (cg (get $args 1)) ")"))]
+
+;; ═══════ 파라미터/이름 추출 ═══════
+
+[FUNC extract-name :params [$n]
+  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
+              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+              [true "_anon"])]
+
+[FUNC extract-params :params [$items]
+  :body (param-loop $items 0 "")]
+[FUNC param-loop :params [$items $i $acc]
+  :body (if (null? $items) $acc
+          (if (>= $i (length $items)) $acc
+            (let [[$name (extract-name (get $items $i))]]
+              (param-loop $items (+ $i 1)
+                          (if (= $i 0) $name (str $acc "," $name))))))]
+
+;; ═══════ stdlib native → JS 매핑 ═══════
+
+[FUNC cg-native :params [$op $args]
+  :body (let [[$as (cg-args $args)]]
+          (cond
+            ;; ─── String (15) ───
+            [(= $op "str") (str "_fl_str(" $as ")")]
+            [(= $op "concat") (str "_fl_str(" $as ")")]
+            [(= $op "length") (str "_fl_length(" $as ")")]
+            [(= $op "substring") (str "_fl_substring(" $as ")")]
+            [(= $op "char-at") (str "_fl_char_at(" $as ")")]
+            [(= $op "replace") (str "_fl_replace(" $as ")")]
+            [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
+            [(= $op "ends-with?") (str "_fl_ends_with(" $as ")")]
+            [(= $op "contains?") (str "_fl_contains(" $as ")")]
+            [(= $op "split") (str "_fl_split(" $as ")")]
+            [(= $op "join") (str "_fl_join(" $as ")")]
+            [(= $op "trim") (str "_fl_trim(" $as ")")]
+            [(= $op "upper") (str "_fl_upper(" $as ")")]
+            [(= $op "lower") (str "_fl_lower(" $as ")")]
+            [(= $op "repeat") (str "_fl_repeat(" $as ")")]
+            [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+
+            ;; ─── List (15) ───
+            [(= $op "first") (str "_fl_first(" $as ")")]
+            [(= $op "last") (str "_fl_last(" $as ")")]
+            [(= $op "rest") (str "_fl_rest(" $as ")")]
+            [(= $op "append") (str "_fl_append(" $as ")")]
+            [(= $op "slice") (str "_fl_slice(" $as ")")]
+            [(= $op "list") (str "[" $as "]")]
+            [(= $op "map") (str "_fl_map(" $as ")")]
+            [(= $op "filter") (str "_fl_filter(" $as ")")]
+            [(= $op "reduce") (str "_fl_reduce(" $as ")")]
+            [(= $op "find") (str "_fl_find(" $as ")")]
+            [(= $op "every?") (str "_fl_every(" $as ")")]
+            [(= $op "some?") (str "_fl_some(" $as ")")]
+            [(= $op "sort") (str "_fl_sort(" $as ")")]
+            [(= $op "reverse") (str "_fl_reverse(" $as ")")]
+            [(= $op "flatten") (str "_fl_flatten(" $as ")")]
+            [(= $op "distinct") (str "_fl_distinct(" $as ")")]
+            [(= $op "range") (str "_fl_range(" $as ")")]
+            [(= $op "take") (str "_fl_take(" $as ")")]
+            [(= $op "drop") (str "_fl_drop(" $as ")")]
+            [(= $op "count") (str "_fl_length(" $as ")")]
+
+            ;; ─── Map (8) ───
+            [(= $op "get") (str "_fl_get(" $as ")")]
+            [(= $op "keys") (str "_fl_keys(" $as ")")]
+            [(= $op "values") (str "_fl_values(" $as ")")]
+            [(= $op "entries") (str "_fl_entries(" $as ")")]
+            [(= $op "has-key?") (str "_fl_has_key(" $as ")")]
+            [(= $op "map-set") (str "_fl_map_set(" $as ")")]
+            [(= $op "map-delete") (str "_fl_map_delete(" $as ")")]
+            [(= $op "merge") (str "_fl_merge(" $as ")")]
+            [(= $op "json_set") (str "_fl_map_set(" $as ")")]
+
+            ;; ─── JSON (4) ───
+            [(= $op "json-parse") (str "JSON.parse(" $as ")")]
+            [(= $op "json-stringify") (str "JSON.stringify(" $as ")")]
+            [(= $op "json_parse") (str "JSON.parse(" $as ")")]
+            [(= $op "json_stringify") (str "JSON.stringify(" $as ")")]
+
+            ;; ─── Type predicates (10) ───
+            [(= $op "null?") (str "(" $as "==null)")]
+            [(= $op "not") (str "(!" $as ")")]
+            [(= $op "empty?") (str "_fl_empty_q(" $as ")")]
+            [(= $op "true?") (str "(" $as "===true)")]
+            [(= $op "false?") (str "(" $as "===false)")]
+            [(= $op "string?") (str "(typeof " $as "===\"string\")")]
+            [(= $op "number?") (str "(typeof " $as "===\"number\")")]
+            [(= $op "list?") (str "Array.isArray(" $as ")")]
+            [(= $op "array?") (str "Array.isArray(" $as ")")]
+            [(= $op "map?") (str "_fl_is_map(" $as ")")]
+            [(= $op "fn?") (str "(typeof " $as "===\"function\")")]
+            [(= $op "boolean?") (str "(typeof " $as "===\"boolean\")")]
+            [(= $op "type-of") (str "_fl_type_of(" $as ")")]
+
+            ;; ─── Math (15) ───
+            [(= $op "min") (str "Math.min(" $as ")")]
+            [(= $op "max") (str "Math.max(" $as ")")]
+            [(= $op "abs") (str "Math.abs(" $as ")")]
+            [(= $op "sqrt") (str "Math.sqrt(" $as ")")]
+            [(= $op "pow") (str "Math.pow(" $as ")")]
+            [(= $op "floor") (str "Math.floor(" $as ")")]
+            [(= $op "ceil") (str "Math.ceil(" $as ")")]
+            [(= $op "round") (str "Math.round(" $as ")")]
+            [(= $op "mod") (cg-pair $args "%")]
+            [(= $op "neg") (str "(-" $as ")")]
+            [(= $op "sign") (str "Math.sign(" $as ")")]
+            [(= $op "random") (str "Math.random()")]
+            [(= $op "log") (str "Math.log(" $as ")")]
+            [(= $op "exp") (str "Math.exp(" $as ")")]
+            [(= $op "sin") (str "Math.sin(" $as ")")]
+            [(= $op "cos") (str "Math.cos(" $as ")")]
+            [(= $op "str-to-num") (str "Number(" $as ")")]
+            [(= $op "num-to-str") (str "String(" $as ")")]
+
+            ;; ─── I/O (7) ───
+            [(= $op "println") (str "console.log(" $as ")")]
+            [(= $op "print") (str "process.stdout.write(String(" $as "))")]
+            [(= $op "file_read") (str "_fl_file_read(" $as ")")]
+            [(= $op "file_write") (str "_fl_file_write(" $as ")")]
+            [(= $op "file_exists") (str "_fl_file_exists(" $as ")")]
+            [(= $op "exit") (str "process.exit(" $as ")")]
+            [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
+
+            ;; ─── Time (10) ───
+            [(= $op "now") (str "now()")]
+            [(= $op "now_ms") (str "now_ms()")]
+            [(= $op "now_iso") (str "now_iso()")]
+            [(= $op "now_unix") (str "now_unix()")]
+            [(= $op "time_diff") (str "((t1,t2)=>t2-t1)(" $as ")")]
+            [(= $op "time_since") (str "((ts)=>Date.now()-ts)(" $as ")")]
+            [(= $op "sleep_ms") (str "((ms)=>{const start=Date.now();while(Date.now()-start<ms){}})(" $as ")")]
+            [(= $op "timer_start") (str "{__timer:{label:" $as ",start:Date.now(),laps:[]}}")]
+            [(= $op "timer_elapsed") (str "((t)=>Date.now()-t.__timer.start)(" $as ")")]
+            [(= $op "timer_lap") (str "((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(" $as ")")]
+
+            ;; ─── String 추가 (starts-with?, ends-with?, contains?, split, join, trim, upper, lower, repeat, index-of) ───
+            [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
+            [(= $op "ends-with?") (str "_fl_ends_with(" $as ")")]
+            [(= $op "contains?") (str "_fl_contains(" $as ")")]
+            [(= $op "split") (str "_fl_split(" $as ")")]
+            [(= $op "join") (str "_fl_join(" $as ")")]
+            [(= $op "trim") (str "_fl_trim(" $as ")")]
+            [(= $op "upper") (str "_fl_upper(" $as ")")]
+            [(= $op "lower") (str "_fl_lower(" $as ")")]
+            [(= $op "repeat") (str "_fl_repeat(" $as ")")]
+            [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+
+            ;; ─── List 추가 (map, filter, reduce, find, every?, some?, sort, reverse, flatten, distinct, range, take, drop, count) ───
+            [(= $op "map") (str "_fl_map(" $as ")")]
+            [(= $op "filter") (str "_fl_filter(" $as ")")]
+            [(= $op "reduce") (str "_fl_reduce(" $as ")")]
+            [(= $op "find") (str "_fl_find(" $as ")")]
+            [(= $op "every?") (str "_fl_every(" $as ")")]
+            [(= $op "some?") (str "_fl_some(" $as ")")]
+            [(= $op "sort") (str "_fl_sort(" $as ")")]
+            [(= $op "reverse") (str "_fl_reverse(" $as ")")]
+            [(= $op "flatten") (str "_fl_flatten(" $as ")")]
+            [(= $op "distinct") (str "_fl_distinct(" $as ")")]
+
+            ;; ─── Database (8, placeholder for JS env) ───
+            [(= $op "pg_exec") (str "_fl_pg_exec(" $as ")")]
+            [(= $op "pg_query") (str "_fl_pg_query(" $as ")")]
+            [(= $op "pg_connect") (str "_fl_pg_connect(" $as ")")]
+            [(= $op "mariadb_exec") (str "_fl_mariadb_exec(" $as ")")]
+            [(= $op "mariadb_query") (str "_fl_mariadb_query(" $as ")")]
+            [(= $op "mariadb_one") (str "_fl_mariadb_one(" $as ")")]
+            [(= $op "db_query") (str "_fl_db_query(" $as ")")]
+            [(= $op "db_exec") (str "_fl_db_exec(" $as ")")]
+
+            ;; ─── Server/HTTP (placeholder) ───
+            [(= $op "server_post") (str "_fl_server_post(" $as ")")]
+            [(= $op "server_get") (str "_fl_server_get(" $as ")")]
+            [(= $op "server_put") (str "_fl_server_put(" $as ")")]
+            [(= $op "server_delete") (str "_fl_server_delete(" $as ")")]
+            [(= $op "server_start") (str "_fl_server_start(" $as ")")]
+            [(= $op "server_stop") (str "_fl_server_stop(" $as ")")]
+            [(= $op "http_get") (str "_fl_http_get(" $as ")")]
+            [(= $op "http_post") (str "_fl_http_post(" $as ")")]
+            [(= $op "ws_send") (str "_fl_ws_send(" $as ")")]
+
+            [true (cg-call $op $args)]))]
+
+[FUNC cg-call :params [$op $args]
+  :body (let [[$fn-name (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op))]]
+          (str $fn-name "(" (cg-args $args) ")"))]
+
+;; ═══════ sexpr 메인 dispatch ═══════
+
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (cond
+            [(= $op "if")      (cg-if $args)]
+            [(= $op "fn")      (cg-fn $args)]
+            [(= $op "defn")    (cg-defn $args)]
+            [(= $op "define")  (cg-define $args)]
+            [(= $op "let")     (cg-let $args)]
+            [(= $op "do")      (cg-do $args)]
+            [(= $op "begin")   (cg-do $args)]
+            [(= $op "cond")    (cg-cond $args)]
+            [(= $op "and")     (cg-and $args)]
+            [(= $op "or")      (cg-or $args)]
+            [(= $op "quote")   (cg-quote $args)]
+            [(= $op "set!")    (cg-set! $args)]
+            [(= $op "throw")   (cg-throw $args)]
+            [(= $op "try")     (cg-try $args)]
+            [(= $op "while")   (cg-while $args)]
+            [(= $op "loop")    (cg-loop $args)]
+            [(= $op "recur")   (cg-recur $args)]
+            [(= $op "defstruct") (cg-defstruct $args)]
+            [(= $op "compose") (cg-compose $args)]
+            [(= $op "pipe")    (cg-pipe $args)]
+            [(= $op "->")      (cg-thread-first $args)]
+            [(= $op "->>")     (cg-thread-last $args)]
+            [(= $op "|>")      (cg-thread-first $args)]
+            [(= $op "call")    (cg-call-form $args)]
+            [(= $op "async")   (cg-async $args)]
+            [(= $op "await")   (cg-await $args)]
+            [(= $op "+")       (cg-binop $args "+" "0")]
+            [(= $op "-")       (cg-sub $args)]
+            [(= $op "*")       (cg-binop $args "*" "1")]
+            [(= $op "/")       (cg-pair $args "/")]
+            [(= $op "%")       (cg-pair $args "%")]
+            [(= $op "<")       (cg-pair $args "<")]
+            [(= $op ">")       (cg-pair $args ">")]
+            [(= $op "<=")      (cg-pair $args "<=")]
+            [(= $op ">=")      (cg-pair $args ">=")]
+            [(= $op "=")       (cg-pair $args "===")]
+            [(= $op "!=")      (cg-pair $args "!==")]
+            [true              (cg-native $op $args)]))]
+
+;; ═══════ 런타임 prelude (생성 JS 앞에 삽입) ═══════
+
+[FUNC runtime-prelude :params []
+  :body (str
+    ;; String
+    "const _fl_str = (...xs) => xs.map(x => x==null?'null':String(x)).join('');"
+    "const _fl_length = (x) => (x==null ? 0 : x.length);"
+    "const _fl_substring = (s, a, b) => (b==null ? s.slice(a) : s.slice(a, b));"
+    "const _fl_char_at = (s, i) => (s[i] || null);"
+    "const _fl_replace = (s, a, b) => s.split(a).join(b);"
+    "const _fl_starts_with = (s, p) => s.startsWith(p);"
+    "const _fl_ends_with = (s, p) => s.endsWith(p);"
+    "const _fl_contains = (s, p) => s.includes(p);"
+    "const _fl_split = (s, sep) => s.split(sep);"
+    "const _fl_join = (l, sep) => l.join(sep==null?'':sep);"
+    "const _fl_trim = (s) => s.trim();"
+    "const _fl_upper = (s) => s.toUpperCase();"
+    "const _fl_lower = (s) => s.toLowerCase();"
+    "const _fl_repeat = (s, n) => s.repeat(n);"
+    "const _fl_index_of = (s, p) => s.indexOf(p);"
+    ;; List
+    "const _fl_first = (l) => (l==null || l.length===0 ? null : l[0]);"
+    "const _fl_last = (l) => (l==null || l.length===0 ? null : l[l.length-1]);"
+    "const _fl_rest = (l) => (l==null || l.length===0 ? [] : l.slice(1));"
+    "const _fl_append = (a, b) => (Array.isArray(b) ? [...a, ...b] : [...a, b]);"
+    "const _fl_slice = (l, a, b) => l.slice(a, b);"
+    "const _fl_map = (f, l) => l.map(x => f(x));"
+    "const _fl_filter = (f, l) => l.filter(x => f(x));"
+    "const _fl_reduce = (f, init, l) => l.reduce((acc, x) => f(acc, x), init);"
+    "const _fl_find = (f, l) => (l.find(x => f(x)) ?? null);"
+    "const _fl_every = (f, l) => l.every(x => f(x));"
+    "const _fl_some = (f, l) => l.some(x => f(x));"
+    "const _fl_sort = (l, cmp) => [...l].sort(cmp || ((a,b)=>a<b?-1:a>b?1:0));"
+    "const _fl_reverse = (l) => [...l].reverse();"
+    "const _fl_flatten = (l) => l.flat(Infinity);"
+    "const _fl_distinct = (l) => [...new Set(l)];"
+    "const _fl_range = (a, b, s) => { let r=[]; let step=s||1; for(let i=a;i<b;i+=step)r.push(i); return r; };"
+    "const _fl_take = (n, l) => l.slice(0, n);"
+    "const _fl_drop = (n, l) => l.slice(n);"
+    ;; Map
+    "const _fl_get = (o, k) => (o==null ? null : (o[k]===undefined ? null : o[k]));"
+    "const _fl_keys = (o) => (o==null ? [] : Object.keys(o));"
+    "const _fl_values = (o) => (o==null ? [] : Object.values(o));"
+    "const _fl_entries = (o) => (o==null ? [] : Object.entries(o).map(([k,v])=>[k,v]));"
+    "const _fl_has_key = (o, k) => (o!=null && k in o);"
+    "const _fl_map_set = (o, k, v) => ({...o, [k]: v});"
+    "const _fl_map_delete = (o, k) => { const c={...o}; delete c[k]; return c; };"
+    "const _fl_merge = (...os) => Object.assign({}, ...os);"
+    "const _fl_is_map = (x) => (x!=null && typeof x==='object' && !Array.isArray(x));"
+    "const _fl_type_of = (x) => (x==null?'null':Array.isArray(x)?'list':typeof x);"
+    "const map_entries = (m) => m instanceof Map ? [...m.entries()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.entries(m) : []);"
+    "const map_keys = (m) => m instanceof Map ? [...m.keys()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m) : []);"
+    "const map_values = (m) => m instanceof Map ? [...m.values()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.values(m) : []);"
+    "const now = () => Date.now();"
+    "const now_ms = () => Date.now();"
+    "const now_iso = () => new Date().toISOString();"
+    "const now_unix = () => Math.floor(Date.now()/1000);"
+    "const regex_match = (s, p) => new RegExp(p).test(s);"
+    "const regex_find = (s, p) => { const m = s.match(new RegExp(p)); return m ? m[0] : null; };"
+    "const regex_find_all = (s, p) => s.match(new RegExp(p, 'g')) || [];"
+    "const regex_replace = (s, p, r) => s.replace(new RegExp(p, 'g'), r);"
+    "const regex_split = (s, p) => s.split(new RegExp(p));"
+    "const regex_count = (s, p) => (s.match(new RegExp(p, 'g')) || []).length;"
+    "const regex_extract = (s, p) => { const m = s.match(new RegExp(p)); return m ? m.slice(1) : []; };"
+    ;; I/O
+    "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
+    "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
+    "const _fl_file_exists = (p) => require('fs').existsSync(p);"
+    "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
+    ;; Common
+    "const _fl_empty_q = (x) => (x==null || x.length===0);"
+    ;; argv
+    "const __argv__ = process.argv.slice(2);"
+    ;; Database stubs (requires external connection mgmt)
+    "const _fl_pg_exec = (db,sql,...args) => null;"
+    "const _fl_pg_query = (db,sql,...args) => [];"
+    "const _fl_pg_connect = (cfg) => null;"
+    "const _fl_mariadb_exec = (db,sql,...args) => null;"
+    "const _fl_mariadb_query = (db,sql,...args) => [];"
+    "const _fl_mariadb_one = (db,sql,...args) => null;"
+    "const _fl_db_query = (path,sql,...args) => [];"
+    "const _fl_db_exec = (path,sql,...args) => null;"
+    ;; Server/HTTP stubs (requires global server state)
+    "const _fl_server_post = (path,fn) => null;"
+    "const _fl_server_get = (path,fn) => null;"
+    "const _fl_server_put = (path,fn) => null;"
+    "const _fl_server_delete = (path,fn) => null;"
+    "const _fl_server_start = (port) => null;"
+    "const _fl_server_stop = () => null;"
+    "const _fl_http_get = (url) => '';"
+    "const _fl_http_post = (url,body) => '';"
+    "const _fl_ws_send = (sid,data) => null;")]
+
+;; ═══════ 최상위 ═══════
+
+[FUNC codegen-loop :params [$ast $i $acc]
+  :body (if (>= $i (length $ast)) $acc
+          (codegen-loop $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+
+[FUNC fl->js-code :params [$ast]
+  :body (codegen-loop $ast 0 "")]
+
+[FUNC fl->js-with-prelude :params [$ast]
+  :body (str (runtime-prelude) "\n" (codegen-loop $ast 0 ""))]
+
+;; ═══════ driver ═══════
+;; 사용법: node bootstrap.js run self/codegen.fl <input.fl> [<output.js>]
+;; 인자 없이 실행하면 FUNC 등록만 하고 종료.
+
+[FUNC compile-file :params [$input $output]
+  :body (let [[$src    (file_read $input)]
+              [$tokens (lex $src)]
+              [$ast    (parse $tokens)]
+              [$js     (fl->js-with-prelude $ast)]]
+          (file_write $output $js)
+          (println (str "compiled " $input " -> " $output " size=" (length $js))))]
+
+(if (null? $__argv__) null
+  (if (= (length $__argv__) 0) null
+    (compile-file (get $__argv__ 0)
+                  (if (>= (length $__argv__) 2) (get $__argv__ 1)
+                      (str (get $__argv__ 0) ".out.js")))))
+
+;; self/main.fl — FL-to-JS Self-Hosted Compiler
+
+(println "\n═══════════════════════════════════════════")
+(println "  FL Self-Hosted Compiler (Phase 28)")
+(println "═══════════════════════════════════════════\n")
+
+(let [[$input (get __argv__ 0)] [$output (get __argv__ 1)]]
+  (if (or (null? $input) (null? $output))
+    (println "Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>")
+    (let [[$src (file_read $input)]]
+      (let [[$tokens (lex $src)]]
+        (let [[$ast (parse $tokens)]]
+          (let [[$js (fl->js-with-prelude $ast)]]
+            (do
+              (println (str "📖 " $input " → " $output))
+              (println (str "   Lexed: " (length $tokens) " tokens"))
+              (println (str "   Parsed: " (length $ast) " nodes"))
+              (println (str "   Generated: " (length $js) " bytes"))
+              (file_write $output $js)
+              (println "✨ Success!"))))))))

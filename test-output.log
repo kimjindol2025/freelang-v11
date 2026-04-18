@@ -1,0 +1,12 @@
+🚀 Loading Full Self-Hosted Compiler...
+compiled self/bench/hello.fl -> test-self3.js size=4713
+
+═══════════════════════════════════════════
+  FL Self-Hosted Compiler (Phase 28)
+═══════════════════════════════════════════
+
+📖 self/bench/hello.fl → test-self3.js
+   Lexed: 0 tokens
+   Parsed: 0 nodes
+   Generated: 4713 bytes
+✨ Success!
