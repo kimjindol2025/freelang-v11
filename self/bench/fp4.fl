@@ -1,0 +1,9 @@
+;; string 조작
+[FUNC rev-str :params [$s]
+  :body (if (= (length $s) 0) ""
+          (str (rev-str (substring $s 1 (length $s))) (char-at $s 0)))]
+
+(println (rev-str "hello"))
+(println (str "u:" (upper "hi")))
+(println (str "l:" (lower "HI")))
+(println (contains? "hello world" "world"))

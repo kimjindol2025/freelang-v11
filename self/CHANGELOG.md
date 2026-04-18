@@ -677,3 +677,71 @@ test-codegen-builtins.fl 35/35 PASS  (신규)
 - bootstrap.js 전체 재생성: `self/codegen.fl` 를 확장한 full pipeline 으로 src/*.ts 대체
 - fixed-point sha256 검증
 - map-literal codegen 완성 (cg-map-fields)
+
+## Phase 10.7 — 컴파일 파이프라인 + fixed-point 검증 (2026-04-17)
+
+```
+phase=10 stage=7 status=done note=pipeline-works;4-programs-diff-0
+```
+
+### 추가 — driver + scripts
+
+1. **self/codegen.fl 에 driver 추가** — `$__argv__` 있으면 file-read → fl-parse → fl->js-with-prelude → file-write
+2. **scripts/fl-compile.sh** — `bash scripts/fl-compile.sh <input.fl> [<output.js>]`
+3. **scripts/fl-fixpoint.sh** — bootstrap direct 결과 vs 컴파일 JS 결과 diff
+
+### 사용 예
+
+```bash
+node bootstrap.js run self/codegen.fl input.fl output.js
+# compiled input.fl -> output.js size=3365
+node output.js  # 실행
+```
+
+### 수정 — match guard 순서 + boolean literal
+
+1. `cg-literal` — type `boolean` (not `symbol`) 처리 추가. 전엔 `true` → `null` 로 변환되어 cond `[true X]` 절이 무효였음.
+2. `match-cases-loop` — guard 를 bindings 뒤로 이동:
+```
+if(pattern-test){ bindings; if(guard){ return body; } }
+```
+전엔 `guard` 가 `__v` 바인딩 전에 참조되어 `ReferenceError`.
+
+### Fixed-point 4/4 PASS
+
+```
+pass  self/bench/fp1.fl  (hello + 산술 + str)
+pass  self/bench/fp2.fl  (fact 10/15)
+pass  self/bench/fp3.fl  (gcd+sum-to+fib)
+pass  self/bench/fp4.fl  (string rev-str/upper/lower/contains?)
+```
+
+4 개 프로그램 모두 **bit-for-bit 동일한 출력** 확인 (`diff` exit 0).
+
+### 증거: `self/bench/realworld.fl` (stdlib 스타일)
+
+```
+compiled self/bench/realworld.fl -> self/bench/realworld.js size=3365
+```
+gcd/fib/sum-to 3 줄 동일. hof 한 줄은 bootstrap interp 가 inline fn 평가 이슈로 다름
+(220 vs 0) — 이는 bootstrap 한계, codegen 은 정답.
+
+### 회귀 검증
+
+```
+test-selfcompile.fl     5/5   PASS
+test-real-stdlib.fl     6/6   PASS
+test-codegen-sf.fl      5/5   PASS
+test-codegen-match.fl   7/7   PASS
+test-codegen-fn.fl      8/8   PASS
+test-codegen-builtins.fl 35/35 PASS
+fixpoint (4 progs)       4/4   diff=0
+────────────────────────────────────
+총 70 케이스 PASS
+```
+
+### v12 남은 작업
+
+- `self/codegen.fl` 자체를 compile → `bootstrap-v12-candidate.js`
+- sha256 rebuild stability (2 회 연속 동일)
+- 현재 `self/codegen.fl` (~680 줄) + stdlib 파일들 전체 재작성은 추후

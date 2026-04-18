@@ -1,0 +1,6 @@
+(define ast (fl-parse "(cond [true \"b\"])"))
+(define c (get ast 0))
+(define clause (get (get c :args) 0))
+(define items (get (get clause :fields) "items"))
+(println "items:" items)
+(println "item0:" (get items 0))

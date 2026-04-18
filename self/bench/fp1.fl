@@ -1,0 +1,3 @@
+(println "hello")
+(println (+ 1 2 3))
+(println (str "pi ~= " 3.14))

@@ -1,0 +1,11 @@
+[FUNC gcd :params [$a $b] :body (if (= $b 0) $a (gcd $b (% $a $b)))]
+[FUNC sum-to :params [$n $acc]
+  :body (if (= $n 0) $acc (sum-to (- $n 1) (+ $acc $n)))]
+[FUNC fib :params [$n]
+  :body (cond [(= $n 0) 0] [(= $n 1) 1]
+              [true (+ (fib (- $n 1)) (fib (- $n 2)))])]
+
+(println (gcd 48 18))
+(println (sum-to 30 0))
+(println (fib 10))
+(println (str "ok: " (= (gcd 48 18) 6)))

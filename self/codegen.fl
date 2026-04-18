@@ -39,6 +39,7 @@
           (cond
             [(= $t "number") $v]
             [(= $t "string") (js-esc $v)]
+            [(= $t "boolean") (if $v "true" "false")]
             [(= $t "symbol")
              (cond [(= $v "true") "true"]
                    [(= $v "false") "false"]
@@ -263,6 +264,8 @@
               [$cases-js (match-cases-loop $cases 0 "")]]
           (str "((__v)=>{" $cases-js "return " $default ";})(" $val ")"))]
 
+;; 각 case: if (pattern-test) { bindings; if (guard) { return body; } }
+;;   guard 가 binding 변수를 참조할 수 있어 bindings 를 먼저 실행
 [FUNC match-cases-loop :params [$cases $i $acc]
   :body (if (>= $i (length $cases)) $acc
           (let [[$c (get $cases $i)]
@@ -272,9 +275,11 @@
                 [$test (pattern-test $pat "__v")]
                 [$bind (pattern-bindings $pat "__v")]
                 [$guard-js (if (null? $guard-n) "true" (cg $guard-n))]
-                [$cond (str "(" $test ")&&(" $guard-js ")")]]
+                [$inner (if (null? $guard-n)
+                          (str $bind "return " $body ";")
+                          (str $bind "if(" $guard-js "){return " $body ";}"))]]
             (match-cases-loop $cases (+ $i 1)
-              (str $acc "if(" $cond "){" $bind "return " $body ";}"))))]
+              (str $acc "if(" $test "){" $inner "}"))))]
 
 ;; pattern-test: JS expression that returns truthy if pat matches __v
 [FUNC pattern-test :params [$pat $v]
@@ -661,3 +666,20 @@
 
 [FUNC fl->js-with-prelude :params [$ast]
   :body (str (runtime-prelude) "\n" (codegen-loop $ast 0 ""))]
+
+;; ═══════ driver ═══════
+;; 사용법: node bootstrap.js run self/codegen.fl <input.fl> [<output.js>]
+;; 인자 없이 실행하면 FUNC 등록만 하고 종료.
+
+[FUNC compile-file :params [$input $output]
+  :body (let [[$src (file_read $input)]
+              [$ast (fl-parse $src)]
+              [$js (fl->js-with-prelude $ast)]]
+          (file_write $output $js)
+          (println (str "compiled " $input " -> " $output " size=" (length $js))))]
+
+(if (null? $__argv__) null
+  (if (= (length $__argv__) 0) null
+    (compile-file (get $__argv__ 0)
+                  (if (>= (length $__argv__) 2) (get $__argv__ 1)
+                      (str (get $__argv__ 0) ".out.js")))))
