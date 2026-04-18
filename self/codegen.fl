@@ -158,6 +158,90 @@
 [FUNC cg-quote :params [$args]
   :body (if (= (length $args) 0) "null" (js-esc (str (cg (get $args 0)))))]
 
+;; (set! x v) → (x=v)
+[FUNC cg-set! :params [$args]
+  :body (str "(" (extract-name (get $args 0)) "=" (cg (get $args 1)) ")")]
+
+;; (throw msg) → (()=>{throw new Error(msg)})()
+[FUNC cg-throw :params [$args]
+  :body (let [[$m (if (= (length $args) 0) "\"error\"" (cg (get $args 0)))]]
+          (str "(()=>{throw new Error(String(" $m "))})()"))]
+
+;; (try body (catch err handler))
+;;   → (()=>{try{return body;}catch($err){return handler;}})()
+[FUNC cg-try :params [$args]
+  :body (let [[$body (cg (get $args 0))]
+              [$catch-node (if (>= (length $args) 2) (get $args 1) null)]
+              [$catch-info (if (null? $catch-node) null (extract-catch $catch-node))]
+              [$evar (if (null? $catch-info) "_err" (get $catch-info :evar))]
+              [$ebody (if (null? $catch-info) "null" (get $catch-info :ebody))]]
+          (str "(()=>{try{return " $body ";}catch(" $evar "){return " $ebody ";}})()"))]
+
+[FUNC extract-catch :params [$n]
+  :body (let [[$args (get $n :args)]
+              [$ev (extract-name (get $args 0))]
+              [$handler (cg (get $args 1))]]
+          {:evar $ev :ebody $handler})]
+
+;; (while cond body...) → (()=>{while(cond){body;}})()
+[FUNC cg-while :params [$args]
+  :body (let [[$cond (cg (get $args 0))]
+              [$body-args (slice $args 1 (length $args))]
+              [$body (while-body $body-args 0 "")]]
+          (str "(()=>{while(" $cond "){" $body "}})()"))]
+
+[FUNC while-body :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (while-body $args (+ $i 1) (str $acc (cg (get $args $i)) ";")))]
+
+;; (loop [[$i 0] [$acc 0]] body-with-recur)
+;;   → mutable let + while(true) { const __r=...; if(__r?.__recur){[i,acc]=__r.a;continue;} return __r; }
+;; recur 는 { __recur:true, a:[v1,v2,...] } 를 반환
+[FUNC cg-loop :params [$args]
+  :body (let [[$bnode (get $args 0)]
+              [$items (get (get $bnode :fields) "items")]
+              [$first (if (null? $items) null (get $items 0))]
+              [$nested (if (null? $first) false
+                         (and (= (get $first :kind) "block")
+                              (= (get $first :type) "Array")))]
+              [$bindings (if $nested (loop-inits-2d $items 0 "") (loop-inits-1d $items 0 ""))]
+              [$names    (if $nested (loop-names-2d $items 0 "") (loop-names-1d $items 0 ""))]
+              [$body-args (slice $args 1 (length $args))]
+              [$body-js (cg-do-body $body-args 0 "")]]
+          (str "((()=>{" $bindings
+               "while(true){let __r=(()=>{" $body-js "})();"
+               "if(__r&&__r.__recur){[" $names "]=__r.a;continue;}"
+               "return __r;}})())"))]
+
+[FUNC loop-inits-1d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$k (get $items $i)] [$v (get $items (+ $i 1))]]
+            (loop-inits-1d $items (+ $i 2)
+                           (str $acc "let " (extract-name $k) "=" (cg $v) ";"))))]
+[FUNC loop-inits-2d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$pair (get $items $i)]
+                [$pit (get (get $pair :fields) "items")]]
+            (loop-inits-2d $items (+ $i 1)
+                           (str $acc "let " (extract-name (get $pit 0)) "=" (cg (get $pit 1)) ";"))))]
+
+[FUNC loop-names-1d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$k (get $items $i)] [$n (extract-name $k)]]
+            (loop-names-1d $items (+ $i 2)
+                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+[FUNC loop-names-2d :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$pair (get $items $i)]
+                [$pit (get (get $pair :fields) "items")]
+                [$n (extract-name (get $pit 0))]]
+            (loop-names-2d $items (+ $i 1)
+                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+
+;; (recur v1 v2 ...) → {__recur:true, a:[v1,v2,...]}
+[FUNC cg-recur :params [$args]
+  :body (str "{__recur:true,a:[" (cg-args $args) "]}")]
+
 ;; ═══════ 연산/인자 ═══════
 
 [FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
@@ -258,6 +342,12 @@
             [(= $op "and")     (cg-and $args)]
             [(= $op "or")      (cg-or $args)]
             [(= $op "quote")   (cg-quote $args)]
+            [(= $op "set!")    (cg-set! $args)]
+            [(= $op "throw")   (cg-throw $args)]
+            [(= $op "try")     (cg-try $args)]
+            [(= $op "while")   (cg-while $args)]
+            [(= $op "loop")    (cg-loop $args)]
+            [(= $op "recur")   (cg-recur $args)]
             [(= $op "+")       (cg-binop $args "+" "0")]
             [(= $op "-")       (cg-sub $args)]
             [(= $op "*")       (cg-binop $args "*" "1")]

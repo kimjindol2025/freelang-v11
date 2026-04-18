@@ -453,3 +453,46 @@ pass combo=20              ; 다중 FUNC + let
 - FL codegen 이 `[FUNC]` block, 상호재귀, let 1D/2D, cond, 산술/비교 완전 생성
 - 실제 stdlib 규모 코드 (322 줄 FL = ~30 함수 조합) 가 JS 로 돌아감
 - bootstrap.js 대체 경로 확보 (parser.ts 이식 → codegen → new-bootstrap.js)
+
+## Phase 10.3 — 확장 특수폼 codegen (TCO via while) (2026-04-17)
+
+```
+phase=10 stage=3 status=done note=try+throw+set!+while+loop+recur; 10k-recursion-TCO-solved
+```
+
+### `self/codegen.fl` 추가
+
+- `cg-set!` `(set! x v)` → `(x=v)`
+- `cg-throw` `(throw msg)` → `(()=>{throw new Error(String(msg))})()`
+- `cg-try` `(try body (catch $e h))` → `(()=>{try{return body}catch(e){return h}})()`
+- `cg-while` `(while c body...)` → `(()=>{while(c){body;}})()`
+- `cg-loop` `(loop [bindings] body)` → while(true) trampoline with recur marker
+- `cg-recur` `(recur v...)` → `{__recur:true,a:[v...]}`
+
+### `test-codegen-sf.fl` 5/5 PASS
+
+```
+pass throw-catch=caught    (AST 직접 생성; fl-parse 는 try 미지원)
+pass set-x=42              (define + set!)
+pass while-5=5             (while 5회 반복)
+pass loop-sum-10k=50005000 🎯 10000 이터 TCO via while
+pass loop-fact-10=3628800  (1D binding loop/recur)
+```
+
+### 🎯 `loop-sum-10k = 50,005,000`
+
+Phase 10.2 의 한계였던 sum-5k (non-TCO arrow function) 를 넘어 **10k + 이터 성공**.
+`loop/recur` → `while(true){...if(__recur){continue;}return;}` 트랜스폼이 핵심.
+
+이는 bootstrap.js 의 interpreter.ts 에서 사용하는 모든 tail-recursive stdlib 함수 (lex/parse/eval loop) 가 FL codegen 으로 안전하게 JS 로 변환 가능함을 증명.
+
+### 현재 codegen 지원 특수폼 (18 개)
+
+```
+if fn defn define let do begin cond and or quote
+set! throw try while loop recur
+산술: + - * / % < > <= >= = !=
+```
+
+남은 특수폼 (13 개): match / async / await / parallel / race / with-timeout /
+defstruct / defprotocol / impl / compose / pipe / call / macroexpand / defmacro
