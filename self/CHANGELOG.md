@@ -1,6 +1,82 @@
 # `self/` 셀프호스팅 CHANGELOG
 
-100 단계 기획: `.claude/plans/steady-stirring-zephyr.md` 참고.
+100 단계 기획: 진행 중 (Phase 11-16 완료, Phase 17+ 예정)
+
+---
+
+## ⭐ Phase 11-16 완성 (2026-04-18, 자동 스프린트)
+
+하루 내 단계적 진행 — 각 phase마다 npm test 583/583 PASS 유지, diff=0 검증
+
+### Phase 11 — Node FFI codegen ✅
+
+```
+file_read, file_write, file_exists, shell_capture
+✓ runtime-prelude _fl_* 헬퍼 포함
+✓ 통합 test: test-ffi.fl → JS → 실행
+✓ 파일 I/O 정상
+```
+
+### Phase 12 — Time builtins codegen (10) ✅
+
+```
+now, now_ms, now_iso, now_unix
+time_diff, time_since, sleep_ms
+timer_start, timer_elapsed, timer_lap
+✓ test-time.fl 3/3 PASS
+```
+
+### Phase 13 — Database codegen placeholder (8) ✅
+
+```
+pg_exec, pg_query, pg_connect
+mariadb_exec, mariadb_query, mariadb_one
+db_query, db_exec
+✓ runtime-prelude stubs 포함
+```
+
+### Phase 14 — String/List operations codegen (20) ✅
+
+```
+String: starts-with?, ends-with?, contains?, split, join, trim, upper, lower, repeat, index-of
+List: map, filter, reduce, find, every?, some?, sort, reverse, flatten, distinct
+✓ runtime-prelude _fl_* 함수 재사용
+```
+
+### Phase 15 — Stdlib integration (140줄) ✅
+
+```
+self/stdlib/ 6개 모듈 (time, collection, math, string, json, regex)
+✓ reverse, sort, upper/lower, fib(10)=55 성공
+✓ test-phase15-integration.fl 5/5 PASS
+```
+
+### Phase 16 — v12 파이프라인 최종 검증 ✅
+
+```
+✓ bootstrap-v12-candidate.js: 38.5KB
+✓ sha256: c5b3bb05... (3-level fixed-point stable)
+✓ L1, L2, L3 모두 동일 결과
+✓ final-test.fl 통합 test PASS
+
+🔴 알려진 제한:
+- Higher-order function ref codegen (reduce with +)
+- map_entries compile-time issue (선언 위치)
+```
+
+---
+
+## 누적 통계 (Phase 11-16 후)
+
+| 항목 | 값 |
+|------|-----|
+| Codegen 지원 builtins | 138+ |
+| Stdlib FL 모듈 | 6/47 |
+| npm test PASS | 583/583 |
+| Regression | 0 |
+| v12 후보 크기 | 38.5KB |
+
+---
 
 ## 규약
 
