@@ -1,0 +1,85 @@
+;; self/stdlib/types.fl — Phase 26
+;; 타입 체크 및 변환 함수
+
+;; 타입 이름 반환
+[FUNC get-type :params [$v]
+  :body (type-of $v)]
+
+;; 타입 가져오기 (type-of alias)
+[FUNC typeof :params [$v]
+  :body (type-of $v)]
+
+;; 문자열 변환
+[FUNC to-string :params [$v]
+  :body (str $v)]
+
+;; 숫자 변환
+[FUNC to-number :params [$v]
+  :body (if (number? $v) $v
+          (if (string? $v) (str-to-num $v)
+            null))]
+
+;; 불린 변환 (truthiness)
+[FUNC to-boolean :params [$v]
+  :body (if (null? $v) false
+          (if (= $v false) false
+            true))]
+
+;; 배열 변환
+[FUNC to-array :params [$v]
+  :body (if (array? $v) $v
+          (if (null? $v) (list)
+            (list $v)))]
+
+;; 문자열인지 확인 (string? alias)
+[FUNC is-string :params [$v]
+  :body (string? $v)]
+
+;; 숫자인지 확인
+[FUNC is-number :params [$v]
+  :body (number? $v)]
+
+;; 배열인지 확인
+[FUNC is-array :params [$v]
+  :body (array? $v)]
+
+;; 객체인지 확인 (map?)
+[FUNC is-object :params [$v]
+  :body (map? $v)]
+
+;; 함수인지 확인
+[FUNC is-function :params [$v]
+  :body (fn? $v)]
+
+;; 비어있는지 확인
+[FUNC is-empty :params [$v]
+  :body (empty? $v)]
+
+;; 존재하는지 확인 (not null)
+[FUNC is-defined :params [$v]
+  :body (not (null? $v))]
+
+;; 정수인지 확인
+[FUNC is-integer :params [$v]
+  :body (if (not (number? $v)) false
+          (= $v (floor $v)))]
+
+;; 부동소수점인지 확인
+[FUNC is-float :params [$v]
+  :body (if (not (number? $v)) false
+          (not (= $v (floor $v))))]
+
+;; 양수인지 확인
+[FUNC is-positive :params [$v]
+  :body (if (not (number? $v)) false
+          (> $v 0))]
+
+;; 음수인지 확인
+[FUNC is-negative :params [$v]
+  :body (if (not (number? $v)) false
+          (< $v 0))]
+
+;; 0인지 확인
+[FUNC is-zero :params [$v]
+  :body (if (not (number? $v)) false
+          (= $v 0))]

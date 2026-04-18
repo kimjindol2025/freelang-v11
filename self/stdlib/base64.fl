@@ -1,0 +1,22 @@
+;; self/stdlib/base64.fl — Phase 26 Part 3
+;; Base64 인코딩/디코딩
+
+[FUNC base64-encode :params [$s]
+  :body (let [[$b (str $s)]]
+          (base64_encode $b))]
+
+[FUNC base64-decode :params [$s]
+  :body (base64_decode (str $s))]
+
+[FUNC is-base64? :params [$s]
+  :body (let [[$pat "^[A-Za-z0-9+/]*={0,2}$"]]
+          (if (= (% (length $s) 4) 0)
+            (regex-match $pat $s)
+            false))]
+
+[FUNC base64-safe-encode :params [$s]
+  :body (let [[$encoded (base64-encode $s)]]
+          (replace (replace (str $encoded) "+" "-") "/" "_"))]
+
+[FUNC base64-safe-decode :params [$s]
+  :body (base64-decode (replace (replace (str $s) "-" "+") "_" "/"))]

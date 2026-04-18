@@ -1,0 +1,49 @@
+;; self/stdlib/encoding.fl — Phase 26 Part 3
+;; Base32, Hex 인코딩/디코딩
+
+[FUNC hex-encode :params [$s]
+  :body (hex-encode-loop (str $s) 0 "")]
+[FUNC hex-encode-loop :params [$s $i $acc]
+  :body (if (>= $i (length $s)) $acc
+          (let [[$code (char-code-at $s $i)]]
+            (hex-encode-loop $s (+ $i 1)
+              (str $acc (to-hex $code)))))]
+
+[FUNC hex-decode :params [$hex]
+  :body (hex-decode-loop (str $hex) 0 "")]
+[FUNC hex-decode-loop :params [$hex $i $acc]
+  :body (if (>= $i (length $hex)) $acc
+          (let [[$code (hex-to-num (substring $hex $i (+ $i 2)))]]
+            (hex-decode-loop $hex (+ $i 2)
+              (str $acc (char-from-code $code)))))]
+
+[FUNC to-hex :params [$num]
+  :body (let [[$h (/ (floor (% $num 256)) 16)]
+              [$l (% (floor $num) 16)]]
+          (str (digit-to-hex (floor $h)) (digit-to-hex (floor $l))))]
+
+[FUNC digit-to-hex :params [$d]
+  :body (cond
+          (< $d 10) (str $d)
+          (= $d 10) "a"
+          (= $d 11) "b"
+          (= $d 12) "c"
+          (= $d 13) "d"
+          (= $d 14) "e"
+          true "f")]
+
+[FUNC hex-to-num :params [$hex]
+  :body (let [[$h1 (hex-digit (substring $hex 0 1))]
+              [$h2 (hex-digit (substring $hex 1 2))]]
+          (+ (* $h1 16) $h2))]
+
+[FUNC hex-digit :params [$c]
+  :body (let [[$u (upper (str $c))]]
+          (cond
+            (= $u "0") 0 (= $u "1") 1 (= $u "2") 2 (= $u "3") 3
+            (= $u "4") 4 (= $u "5") 5 (= $u "6") 6 (= $u "7") 7
+            (= $u "8") 8 (= $u "9") 9 (= $u "A") 10 (= $u "B") 11
+            (= $u "C") 12 (= $u "D") 13 (= $u "E") 14 true 15))]
+
+[FUNC is-hex-string? :params [$s]
+  :body (regex-match "^[0-9a-fA-F]*$" (str $s))]

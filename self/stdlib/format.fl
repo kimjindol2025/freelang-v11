@@ -1,0 +1,34 @@
+;; self/stdlib/format.fl — Phase 26
+;; 포맷팅 함수
+
+[FUNC pad-left :params [$s $n $char]
+  :body (let [[$len (length (str $s))]]
+          (if (>= $len $n) (str $s)
+            (str (str-repeat $char (- $n $len)) $s)))]
+
+[FUNC pad-right :params [$s $n $char]
+  :body (let [[$len (length (str $s))]]
+          (if (>= $len $n) (str $s)
+            (str $s (str-repeat $char (- $n $len)))))]
+
+[FUNC pad-zero :params [$n $len]
+  :body (pad-left (str $n) $len "0")]
+
+[FUNC format-percent :params [$v $decimals]
+  :body (let [[$str (str (* $v 100))]]
+          (if (= $decimals 0) (str (floor (* $v 100)) "%")
+            (str (substring $str 0 (+ (index-of $str ".") $decimals 1)) "%")))]
+
+[FUNC format-bytes :params [$bytes]
+  :body (cond
+    [(< $bytes 1024) (str $bytes " B")]
+    [(< $bytes 1048576) (str (/ $bytes 1024) " KB")]
+    [(< $bytes 1073741824) (str (/ $bytes 1048576) " MB")]
+    [true (str (/ $bytes 1073741824) " GB")])]
+
+[FUNC format-number :params [$n $decimals]
+  :body (let [[$factor (pow 10 $decimals)]]
+          (/ (floor (* $n $factor)) $factor))]
+
+[FUNC repeat-char :params [$char $n]
+  :body (str-repeat $char $n)]

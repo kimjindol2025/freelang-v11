@@ -1,0 +1,65 @@
+;; self/stdlib/queue.fl — Phase 26 Part 4
+;; 큐와 덱 (deque) 자료구조
+
+[FUNC queue-new :params [] :body (list (list) (list))]
+
+[FUNC queue-enqueue :params [$q $item]
+  :body (list (get $q 0) (append (get $q 1) (list $item)))]
+
+[FUNC queue-dequeue :params [$q]
+  :body (if (= (length (get $q 0)) 0)
+          (if (= (length (get $q 1)) 0) nil
+            (list (rest (reverse (get $q 1))) (list)))
+          (list (rest (get $q 0)) (get $q 1)))]
+
+[FUNC queue-front :params [$q]
+  :body (if (> (length (get $q 0)) 0)
+          (get (get $q 0) 0)
+          (if (> (length (get $q 1)) 0)
+            (get (reverse (get $q 1)) 0)
+            nil))]
+
+[FUNC queue-size :params [$q]
+  :body (+ (length (get $q 0)) (length (get $q 1)))]
+
+[FUNC queue-empty? :params [$q]
+  :body (= (queue-size $q) 0)]
+
+[FUNC deque-new :params [] :body (list (list) (list))]
+
+[FUNC deque-push-front :params [$d $item]
+  :body (list (append (list $item) (get $d 0)) (get $d 1))]
+
+[FUNC deque-push-back :params [$d $item]
+  :body (list (get $d 0) (append (get $d 1) (list $item)))]
+
+[FUNC deque-pop-front :params [$d]
+  :body (if (> (length (get $d 0)) 0)
+          (list (rest (get $d 0)) (get $d 1))
+          (if (> (length (get $d 1)) 0)
+            (list (list) (slice (get $d 1) 0 (- (length (get $d 1)) 1)))
+            $d))]
+
+[FUNC deque-pop-back :params [$d]
+  :body (if (> (length (get $d 1)) 0)
+          (list (get $d 0) (slice (get $d 1) 0 (- (length (get $d 1)) 1)))
+          (if (> (length (get $d 0)) 0)
+            (list (reverse (rest (reverse (get $d 0)))) (list))
+            $d))]
+
+[FUNC deque-front :params [$d]
+  :body (if (> (length (get $d 0)) 0)
+          (get (get $d 0) 0)
+          (if (> (length (get $d 1)) 0)
+            (get (get $d 1) 0)
+            nil))]
+
+[FUNC deque-back :params [$d]
+  :body (if (> (length (get $d 1)) 0)
+          (get (get $d 1) (- (length (get $d 1)) 1))
+          (if (> (length (get $d 0)) 0)
+            (get (get $d 0) (- (length (get $d 0)) 1))
+            nil))]
+
+[FUNC deque-size :params [$d]
+  :body (+ (length (get $d 0)) (length (get $d 1)))]

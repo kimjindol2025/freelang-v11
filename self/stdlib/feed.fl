@@ -1,0 +1,86 @@
+;; self/stdlib/feed.fl — Phase 26
+;; RSS/Atom/Sitemap 피드 생성
+
+;; HTML 이스케이프 (& < > " ')
+[FUNC feed-esc :params [$s]
+  :body (replace (replace (replace (replace (replace (str $s)
+    "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#39;")]
+
+;; RSS 아이템 1개 생성
+[FUNC feed-rss-item :params [$item]
+  :body (str "<item>"
+             "<title>" (feed-esc (get $item "title")) "</title>"
+             "<link>" (feed-esc (get $item "url")) "</link>"
+             "<description>" (feed-esc (get $item "description")) "</description>"
+             "<pubDate>" (get $item "date") "</pubDate>"
+             "</item>")]
+
+;; RSS 아이템 목록 생성
+[FUNC feed-rss-items :params [$items]
+  :body (feed-rss-items-loop $items 0 "")]
+[FUNC feed-rss-items-loop :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (feed-rss-items-loop $items (+ $i 1)
+            (str $acc (feed-rss-item (get $items $i)))))]
+
+;; RSS 2.0 피드 완성
+[FUNC feed-rss :params [$meta $items]
+  :body (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+             "<rss version=\"2.0\"><channel>"
+             "<title>" (feed-esc (get $meta "title")) "</title>"
+             "<link>" (feed-esc (get $meta "url")) "</link>"
+             "<description>" (feed-esc (get $meta "description")) "</description>"
+             "<language>" (get $meta "language") "</language>"
+             (feed-rss-items $items)
+             "</channel></rss>")]
+
+;; Atom 엔트리 1개 생성
+[FUNC feed-atom-entry :params [$entry]
+  :body (str "<entry>"
+             "<title>" (feed-esc (get $entry "title")) "</title>"
+             "<link href=\"" (feed-esc (get $entry "url")) "\"/>"
+             "<summary>" (feed-esc (get $entry "description")) "</summary>"
+             "<published>" (get $entry "date") "</published>"
+             "</entry>")]
+
+;; Atom 엔트리 목록
+[FUNC feed-atom-entries :params [$entries]
+  :body (feed-atom-entries-loop $entries 0 "")]
+[FUNC feed-atom-entries-loop :params [$entries $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (feed-atom-entries-loop $entries (+ $i 1)
+            (str $acc (feed-atom-entry (get $entries $i)))))]
+
+;; Atom 1.0 피드
+[FUNC feed-atom :params [$meta $entries]
+  :body (str "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+             "<feed xmlns=\"http://www.w3.org/2005/Atom\">"
+             "<title>" (feed-esc (get $meta "title")) "</title>"
+             "<link href=\"" (feed-esc (get $meta "url")) "\"/>"
+             "<id>" (feed-esc (get $meta "id")) "</id>"
+             "<updated>" (get $meta "updated") "</updated>"
+             (feed-atom-entries $entries)
+             "</feed>")]
+
+;; Sitemap URL 엔트리
+[FUNC feed-sitemap-url :params [$url]
+  :body (str "<url>"
+             "<loc>" (feed-esc (get $url "loc")) "</loc>"
+             "<lastmod>" (get $url "lastmod") "</lastmod>"
+             "<priority>" (get $url "priority") "</priority>"
+             "</url>")]
+
+;; Sitemap URLs
+[FUNC feed-sitemap-urls :params [$urls]
+  :body (feed-sitemap-urls-loop $urls 0 "")]
+[FUNC feed-sitemap-urls-loop :params [$urls $i $acc]
+  :body (if (>= $i (length $urls)) $acc
+          (feed-sitemap-urls-loop $urls (+ $i 1)
+            (str $acc (feed-sitemap-url (get $urls $i)))))]
+
+;; Sitemap 1.0
+[FUNC feed-sitemap :params [$urls]
+  :body (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+             "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
+             (feed-sitemap-urls $urls)
+             "</urlset>")]

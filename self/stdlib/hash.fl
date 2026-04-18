@@ -1,0 +1,32 @@
+;; self/stdlib/hash.fl — Phase 26 Part 3
+;; 해시 함수
+
+[FUNC hash-simple :params [$s]
+  :body (hash-simple-loop (str $s) 0 5381 0)]
+[FUNC hash-simple-loop :params [$s $i $hash $max]
+  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
+          (hash-simple-loop $s (+ $i 1)
+            (+ (* $hash 33) (char-code-at $s $i)) (+ $i 1)))]
+
+[FUNC hash-fnv1a :params [$s]
+  :body (let [[$fnv-offset 2166136261]
+              [$fnv-prime 16777619]]
+          (hash-fnv-loop (str $s) 0 $fnv-offset))]
+[FUNC hash-fnv-loop :params [$s $i $hash]
+  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
+          (hash-fnv-loop $s (+ $i 1)
+            (* (bit-xor $hash (char-code-at $s $i)) 16777619)))]
+
+[FUNC hash-djb2 :params [$s]
+  :body (hash-djb-loop (str $s) 0 5381)]
+[FUNC hash-djb-loop :params [$s $i $hash]
+  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
+          (hash-djb-loop $s (+ $i 1)
+            (+ (* $hash 33) (char-code-at $s $i))))]
+
+[FUNC hash-object :params [$obj]
+  :body (hash-simple (json-stringify $obj))]
+
+[FUNC hash-consistent :params [$s $seed]
+  :body (let [[$h (hash-simple $s)]]
+          (% (+ (* $h $seed) $seed) 2147483647))]

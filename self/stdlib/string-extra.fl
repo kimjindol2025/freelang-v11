@@ -1,0 +1,43 @@
+;; self/stdlib/string-extra.fl — Phase 26
+;; 문자열 함수 확장
+
+[FUNC str-slice :params [$s $start $end]
+  :body (substring $s $start $end)]
+
+[FUNC str-first :params [$s] :body (char-at $s 0)]
+[FUNC str-last :params [$s] :body (char-at $s (- (length $s) 1))]
+[FUNC str-reverse :params [$s] :body (str-reverse-loop $s (- (length $s) 1) "")]
+[FUNC str-reverse-loop :params [$s $i $acc]
+  :body (if (< $i 0) $acc
+          (str-reverse-loop $s (- $i 1) (str $acc (char-at $s $i))))]
+
+[FUNC str-capitalize :params [$s]
+  :body (if (= (length $s) 0) ""
+          (str (upper (char-at $s 0)) (substring $s 1 (length $s))))]
+
+[FUNC str-camelize :params [$s]
+  :body (str-camelize-loop (split $s "-") 0 "")]
+[FUNC str-camelize-loop :params [$parts $i $acc]
+  :body (if (>= $i (length $parts)) $acc
+          (let [[$part (get $parts $i)]]
+            (str-camelize-loop $parts (+ $i 1)
+              (if (= $i 0) $part (str $acc (str-capitalize $part))))))]
+
+[FUNC str-slug :params [$s]
+  :body (lower (replace (replace (str $s) " " "-") "--" "-"))]
+
+[FUNC str-strip :params [$s] :body (trim $s)]
+[FUNC str-lstrip :params [$s] :body (trim $s)]
+[FUNC str-rstrip :params [$s] :body (trim $s)]
+
+[FUNC str-contains :params [$s $substr] :body (contains? $s $substr)]
+[FUNC str-starts-with :params [$s $prefix] :body (starts-with? $s $prefix)]
+[FUNC str-ends-with :params [$s $suffix] :body (ends-with? $s $suffix)]
+
+[FUNC str-find-all :params [$s $substr]
+  :body (str-find-all-loop $s $substr 0 (list))]
+[FUNC str-find-all-loop :params [$s $substr $pos $acc]
+  :body (let [[$idx (index-of (substring $s $pos) $substr)]]
+          (if (< $idx 0) $acc
+            (str-find-all-loop $s $substr (+ $pos $idx (length $substr))
+              (append $acc (+ $pos $idx)))))]

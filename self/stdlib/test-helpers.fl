@@ -1,0 +1,51 @@
+;; self/stdlib/test-helpers.fl — Phase 26
+;; 테스트 헬퍼 함수 (fl- prefix로 native assert와 충돌 방지)
+
+;; 단순 assert (실패 시 에러 메시지 반환)
+[FUNC fl-assert :params [$val $msg]
+  :body (if $val true (str "❌ " $msg))]
+
+;; 동등성 검증
+[FUNC fl-assert-eq :params [$a $b]
+  :body (if (= $a $b) true (str "❌ expected " $b " got " $a))]
+
+;; 부등성 검증
+[FUNC fl-assert-neq :params [$a $b]
+  :body (if (not (= $a $b)) true (str "❌ expected not " $b " got " $a))]
+
+;; null 검증
+[FUNC fl-assert-nil :params [$v]
+  :body (if (null? $v) true (str "❌ expected null got " $v))]
+
+;; non-null 검증
+[FUNC fl-assert-not-nil :params [$v]
+  :body (if (not (null? $v)) true (str "❌ expected non-null"))]
+
+;; 크기 비교
+[FUNC fl-assert-gt :params [$a $b]
+  :body (if (> $a $b) true (str "❌ expected " $a " > " $b))]
+
+[FUNC fl-assert-lt :params [$a $b]
+  :body (if (< $a $b) true (str "❌ expected " $a " < " $b))]
+
+[FUNC fl-assert-gte :params [$a $b]
+  :body (if (>= $a $b) true (str "❌ expected " $a " >= " $b))]
+
+[FUNC fl-assert-lte :params [$a $b]
+  :body (if (<= $a $b) true (str "❌ expected " $a " <= " $b))]
+
+;; 타입 검증
+[FUNC fl-assert-string :params [$v]
+  :body (if (string? $v) true (str "❌ expected string got " (type-of $v)))]
+
+[FUNC fl-assert-number :params [$v]
+  :body (if (number? $v) true (str "❌ expected number got " (type-of $v)))]
+
+[FUNC fl-assert-array :params [$v]
+  :body (if (array? $v) true (str "❌ expected array got " (type-of $v)))]
+
+[FUNC fl-assert-truthy :params [$v]
+  :body (if (not (or (null? $v) (= $v false))) true (str "❌ expected truthy got " $v))]
+
+[FUNC fl-assert-falsy :params [$v]
+  :body (if (or (null? $v) (= $v false)) true (str "❌ expected falsy got " $v))]

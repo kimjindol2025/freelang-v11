@@ -1,0 +1,61 @@
+;; self/stdlib/sort.fl — Phase 26 Part 3
+;; 정렬 알고리즘
+
+[FUNC sort-bubble :params [$lst]
+  :body (sort-bubble-loop (copy $lst) (length $lst) 0)]
+[FUNC sort-bubble-loop :params [$lst $n $i]
+  :body (if (>= $i $n) $lst
+          (sort-bubble-pass $lst (- $n 1) 0 (+ $i 1)))]
+[FUNC sort-bubble-pass :params [$lst $n $i $outer]
+  :body (if (>= $i $n) (sort-bubble-loop $lst $n $outer)
+          (let [[$a (get $lst $i)] [$b (get $lst (+ $i 1))]]
+            (if (> $a $b)
+              (do (swap-items $lst $i (+ $i 1))
+                  (sort-bubble-pass $lst $n (+ $i 1) $outer))
+              (sort-bubble-pass $lst $n (+ $i 1) $outer))))]
+
+[FUNC sort-insertion :params [$lst]
+  :body (sort-insertion-loop (copy $lst) 1 (length $lst))]
+[FUNC sort-insertion-loop :params [$lst $i $len]
+  :body (if (>= $i $len) $lst
+          (let [[$key (get $lst $i)] [$j (- $i 1)]]
+            (sort-insertion-inner $lst $key $j $i)))]
+[FUNC sort-insertion-inner :params [$lst $key $j $i]
+  :body (if (< $j 0)
+          (do (set $lst $i $key) (sort-insertion-loop $lst (+ $i 1) (length $lst)))
+          (if (> (get $lst $j) $key)
+            (do (set $lst (+ $j 1) (get $lst $j))
+                (sort-insertion-inner $lst $key (- $j 1) $i))
+            (do (set $lst (+ $j 1) $key) (sort-insertion-loop $lst (+ $i 1) (length $lst)))))]
+
+[FUNC sort-quicksort :params [$lst]
+  :body (sort-quicksort-loop (copy $lst) 0 (- (length $lst) 1))]
+[FUNC sort-quicksort-loop :params [$lst $low $high]
+  :body (if (< $low $high)
+          (let [[$pi (quicksort-partition $lst $low $high)]]
+            (do (sort-quicksort-loop $lst $low (- $pi 1))
+                (sort-quicksort-loop $lst (+ $pi 1) $high)))
+          $lst)]
+
+[FUNC quicksort-partition :params [$lst $low $high]
+  :body (let [[$pivot (get $lst $high)]]
+          (quicksort-partition-loop $lst $low (- $low 1) $high $pivot))]
+[FUNC quicksort-partition-loop :params [$lst $low $i $high $pivot]
+  :body (if (>= $low $high) (+ $i 1)
+          (if (<= (get $lst $low) $pivot)
+            (do (swap-items $lst (+ $i 1) $low)
+                (quicksort-partition-loop $lst (+ $low 1) (+ $i 1) $high $pivot))
+            (quicksort-partition-loop $lst (+ $low 1) $i $high $pivot)))]
+
+[FUNC swap-items :params [$lst $i $j]
+  :body (let [[$tmp (get $lst $i)]]
+          (do (set $lst $i (get $lst $j))
+              (set $lst $j $tmp)
+              $lst))]
+
+[FUNC sort-is-sorted? :params [$lst]
+  :body (sort-is-sorted-loop $lst 0 (length $lst))]
+[FUNC sort-is-sorted-loop :params [$lst $i $len]
+  :body (if (>= (+ $i 1) $len) true
+          (if (> (get $lst $i) (get $lst (+ $i 1))) false
+            (sort-is-sorted-loop $lst (+ $i 1) $len)))]

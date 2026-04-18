@@ -1,0 +1,32 @@
+;; self/stdlib/list-extra.fl — Phase 26
+;; 리스트 조작 함수 확장
+
+[FUNC list-nth :params [$lst $n] :body (get $lst $n)]
+[FUNC list-at :params [$lst $n] :body (get $lst $n)]
+[FUNC list-head :params [$lst] :body (first $lst)]
+[FUNC list-tail :params [$lst] :body (rest $lst)]
+[FUNC list-last :params [$lst] :body (last $lst)]
+[FUNC list-init :params [$lst] :body (slice $lst 0 (- (length $lst) 1))]
+
+[FUNC list-take :params [$lst $n] :body (take $n $lst)]
+[FUNC list-drop :params [$lst $n] :body (drop $n $lst)]
+
+[FUNC list-zip :params [$a $b]
+  :body (list-zip-loop $a $b 0 (list))]
+[FUNC list-zip-loop :params [$a $b $i $acc]
+  :body (if (>= $i (min (length $a) (length $b))) $acc
+          (list-zip-loop $a $b (+ $i 1)
+            (append $acc (list (list (get $a $i) (get $b $i))))))]
+
+[FUNC list-sum :params [$lst] :body (coll-sum $lst)]
+[FUNC list-product :params [$lst] :body (list-product-loop $lst 0 1)]
+[FUNC list-product-loop :params [$lst $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (list-product-loop $lst (+ $i 1) (* $acc (get $lst $i))))]
+
+[FUNC list-unique :params [$lst] :body (distinct $lst)]
+[FUNC list-group :params [$lst $size] :body (list-group-loop $lst $size 0 (list))]
+[FUNC list-group-loop :params [$lst $size $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (list-group-loop $lst $size (+ $i $size)
+            (append $acc (slice $lst $i (min (+ $i $size) (length $lst))))))]

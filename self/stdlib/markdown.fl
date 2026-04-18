@@ -1,0 +1,59 @@
+;; self/stdlib/markdown.fl — Phase 26
+;; Markdown 변환 헬퍼 함수 (thin wrapper)
+;; native markdown_to_html 등에 위임
+
+;; Markdown to HTML
+[FUNC md->html :params [$src]
+  :body (markdown_to_html $src)]
+
+;; Frontmatter 추출
+[FUNC md-frontmatter :params [$src]
+  :body (markdown_frontmatter $src)]
+
+;; 완전 렌더링 (frontmatter + html)
+[FUNC md-render :params [$src]
+  :body (markdown_render_full $src)]
+
+;; Frontmatter에서 값 추출
+[FUNC md-fm-get :params [$src $key]
+  :body (let [[$fm (markdown_frontmatter $src)]]
+          (if (null? $fm) null
+            (get (get $fm "fm") $key)))]
+
+;; 문제: markdown_* native builtin이 정의되지 않을 수 있음
+;; 이 경우 대체 구현 (간단한 마크다운 변환)
+
+;; 간단한 마크다운 → HTML 변환
+[FUNC simple-md->html :params [$src]
+  :body (simple-md-convert (split $src "\n") 0 "")]
+
+[FUNC simple-md-convert :params [$lines $i $acc]
+  :body (if (>= $i (length $lines)) $acc
+          (let [[$line (get $lines $i)]
+                [$tag (simple-md-tag $line)]]
+            (simple-md-convert $lines (+ $i 1)
+              (str $acc $tag "\n"))))]
+
+[FUNC simple-md-tag :params [$line]
+  :body (cond
+    [(starts-with? $line "# ") (str "<h1>" (substring $line 2 (length $line)) "</h1>")]
+    [(starts-with? $line "## ") (str "<h2>" (substring $line 3 (length $line)) "</h2>")]
+    [(starts-with? $line "### ") (str "<h3>" (substring $line 4 (length $line)) "</h3>")]
+    [(starts-with? $line "- ") (str "<li>" (substring $line 2 (length $line)) "</li>")]
+    [(= $line "") "<br>"]
+    [true (str "<p>" $line "</p>")])]
+
+;; 코드 블록 감지
+[FUNC md-extract-code :params [$src]
+  :body (md-code-blocks (split $src "\n") 0 null (list))]
+
+[FUNC md-code-blocks :params [$lines $i $in-code $acc]
+  :body (if (>= $i (length $lines)) $acc
+          (let [[$line (get $lines $i)]]
+            (if (starts-with? $line "```")
+              (if (null? $in-code)
+                (md-code-blocks $lines (+ $i 1) true $acc)
+                (md-code-blocks $lines (+ $i 1) null (append $acc (list "```"))))
+              (if (null? $in-code)
+                (md-code-blocks $lines (+ $i 1) $in-code $acc)
+                (md-code-blocks $lines (+ $i 1) $in-code (append $acc $line))))))]

@@ -1,0 +1,69 @@
+;; self/stdlib/data.fl — Phase 26
+;; 순수 데이터 변환 함수
+
+;; 줄 분리
+[FUNC str-lines :params [$s]
+  :body (split $s "\n")]
+
+;; 단어 분리
+[FUNC str-words :params [$s]
+  :body (split (trim $s) " ")]
+
+;; 줄 합치기
+[FUNC str-join-lines :params [$lines]
+  :body (str-join-loop $lines 0 "")]
+[FUNC str-join-loop :params [$lst $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (str-join-loop $lst (+ $i 1)
+            (if (= $i 0) (get $lst 0) (str $acc "\n" (get $lst $i)))))]
+
+;; 부분 문자열 출현 횟수
+[FUNC str-count :params [$s $sub]
+  :body (if (= (length $sub) 0) 0
+          (str-count-loop $s $sub 0 0))]
+[FUNC str-count-loop :params [$s $sub $pos $acc]
+  :body (let [[$rest (substring $s $pos (length $s))]
+              [$idx (index-of $rest $sub)]]
+          (if (< $idx 0) $acc
+            (str-count-loop $s $sub (+ $pos $idx (length $sub)) (+ $acc 1))))]
+
+;; CSV 행 파싱 (간단한 버전, 따옴표 미지원)
+[FUNC csv-parse-line :params [$line]
+  :body (split $line ",")]
+
+;; CSV 본문 파싱
+[FUNC csv-parse :params [$csv]
+  :body (let [[$lines (split $csv "\n")]]
+          (csv-parse-loop $lines 0 (list)))]
+[FUNC csv-parse-loop :params [$lines $i $acc]
+  :body (if (>= $i (length $lines)) $acc
+          (csv-parse-loop $lines (+ $i 1)
+            (append $acc (csv-parse-line (get $lines $i)))))]
+
+;; 문자열 반복
+[FUNC str-repeat :params [$s $n]
+  :body (if (<= $n 0) ""
+          (str-repeat-loop $s $n 0 ""))]
+[FUNC str-repeat-loop :params [$s $n $i $acc]
+  :body (if (>= $i $n) $acc
+          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
+
+;; JSON 헬퍼 (json.fl 기반)
+[FUNC data-json-parse :params [$s]
+  :body (json-parse $s)]
+
+[FUNC data-json-str :params [$obj]
+  :body (json-stringify $obj)]
+
+[FUNC data-json-pretty :params [$obj]
+  :body (json-stringify $obj)]
+
+;; 객체를 쿼리 문자열로 변환
+[FUNC to-query-string :params [$obj]
+  :body (to-query-loop (keys $obj) $obj 0 (list))]
+[FUNC to-query-loop :params [$ks $obj $i $acc]
+  :body (if (>= $i (length $ks)) (join $acc "&")
+          (let [[$k (get $ks $i)]
+                [$v (get $obj $k)]]
+            (to-query-loop $ks $obj (+ $i 1)
+              (append $acc (str $k "=" $v)))))]

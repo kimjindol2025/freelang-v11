@@ -1,0 +1,36 @@
+;; self/stdlib/error.fl — Phase 26
+;; 에러 구조 조회 함수
+;; create는 native new Error() 필요하므로 native 모듈에 남겨두고,
+;; 조회/판별만 FL로 구현
+
+;; 에러 메시지 추출 (에러 객체 또는 문자열)
+[FUNC error-message :params [$err]
+  :body (cond [(null? $err) "null"]
+              [(string? $err) $err]
+              [true (let [[$m (get $err "message")]]
+                      (if (null? $m) "unknown error" $m))])]
+
+;; 에러 타입 추출
+[FUNC error-type :params [$err]
+  :body (cond [(null? $err) "null"]
+              [(string? $err) "string"]
+              [true (let [[$t (get $err "type")]]
+                      (if (null? $t) "Error" $t))])]
+
+;; 에러 여부 판별 (객체이면서 message 필드 있음)
+[FUNC is-error? :params [$v]
+  :body (if (null? $v) false
+          (if (string? $v) false
+            (not (null? (get $v "message")))))]
+
+;; 에러 스택 추출 (없으면 빈 문자열)
+[FUNC error-stack :params [$err]
+  :body (if (null? $err) ""
+          (if (string? $err) ""
+            (let [[$s (get $err "stack")]]
+              (if (null? $s) "" $s))))]
+
+;; 에러 원인 체인 (cause 필드 있으면 반환)
+[FUNC error-cause :params [$err]
+  :body (if (null? $err) null
+          (get $err "cause"))]

@@ -1,0 +1,76 @@
+;; self/stdlib/heap.fl — Phase 26 Part 4
+;; 힙 (우선순위 큐) 자료구조
+
+[FUNC heap-new :params [] :body (list)]
+
+[FUNC heap-parent :params [$i]
+  :body (floor (/ (- $i 1) 2))]
+
+[FUNC heap-left-child :params [$i]
+  :body (+ (* 2 $i) 1)]
+
+[FUNC heap-right-child :params [$i]
+  :body (+ (* 2 $i) 2)]
+
+[FUNC heap-push :params [$h $value]
+  :body (let [[$new-heap (append $h (list $value))]]
+          (heap-bubble-up $new-heap (- (length $new-heap) 1)))]
+
+[FUNC heap-bubble-up :params [$h $i]
+  :body (if (<= $i 0) $h
+          (let [[$parent-idx (heap-parent $i)]
+                [$parent-val (get $h $parent-idx)]
+                [$val (get $h $i)]]
+            (if (< $val $parent-val)
+              (do (swap-in-heap $h $i $parent-idx)
+                  (heap-bubble-up $h $parent-idx))
+              $h)))]
+
+[FUNC heap-pop :params [$h]
+  :body (if (= (length $h) 0) $h
+          (if (= (length $h) 1) (list)
+            (let [[$new-heap (append (list (get $h (- (length $h) 1)))
+                                      (slice $h 1 (- (length $h) 1)))]]
+              (heap-bubble-down $new-heap 0))))]
+
+[FUNC heap-bubble-down :params [$h $i]
+  :body (let [[$left (heap-left-child $i)]
+              [$right (heap-right-child $i)]
+              [$smallest $i]]
+          (if (and (< $left (length $h)) (< (get $h $left) (get $h $smallest)))
+            (set (let [] $smallest) 0 $left))
+          (if (and (< $right (length $h)) (< (get $h $right) (get $h $smallest)))
+            (set (let [] $smallest) 0 $right))
+          (if (= $smallest $i) $h
+            (do (swap-in-heap $h $i $smallest)
+                (heap-bubble-down $h $smallest)))))]
+
+[FUNC swap-in-heap :params [$h $i $j]
+  :body (let [[$tmp (get $h $i)]]
+          (do (set $h $i (get $h $j))
+              (set $h $j $tmp)
+              $h))]
+
+[FUNC heap-peek :params [$h]
+  :body (if (> (length $h) 0) (get $h 0) nil)]
+
+[FUNC heap-size :params [$h] :body (length $h)]
+
+[FUNC heap-empty? :params [$h] :body (= (length $h) 0)]
+
+[FUNC heap-to-sorted :params [$h]
+  :body (heap-to-sorted-loop (copy $h) (list))]
+[FUNC heap-to-sorted-loop :params [$h $acc]
+  :body (if (heap-empty? $h) $acc
+          (let [[$root (heap-peek $h)]]
+            (heap-to-sorted-loop (heap-pop $h) (append $acc (list $root)))))]
+
+[FUNC heap-is-valid? :params [$h]
+  :body (heap-is-valid-loop $h 0)]
+[FUNC heap-is-valid-loop :params [$h $i]
+  :body (if (>= $i (length $h)) true
+          (let [[$left (heap-left-child $i)]
+                [$right (heap-right-child $i)]]
+            (if (and (< $left (length $h)) (< (get $h $left) (get $h $i))) false
+              (if (and (< $right (length $h)) (< (get $h $right) (get $h $i))) false
+                (heap-is-valid-loop $h (+ $i 1))))))]
