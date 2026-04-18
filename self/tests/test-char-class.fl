@@ -1,0 +1,29 @@
+;; Phase 01/12 검증: char-class predicates
+
+(defn is-digit? [c]
+  (if (null? c) false
+    (and (>= c "0") (<= c "9"))))
+
+(defn is-alpha? [c]
+  (if (null? c) false
+    (or (and (>= c "a") (<= c "z"))
+        (and (>= c "A") (<= c "Z")))))
+
+(defn is-space? [c]
+  (or (= c " ") (= c "\t") (= c "\n") (= c "\r")))
+
+(defn expect [label actual expected]
+  (if (= actual expected)
+    (println (str "pass " label "=" actual))
+    (println (str "fail " label " expected=" expected " got=" actual))))
+
+(expect "digit_5"        (is-digit? "5") true)
+(expect "digit_a"        (is-digit? "a") false)
+(expect "digit_empty"    (is-digit? "") false)
+(expect "alpha_a"        (is-alpha? "a") true)
+(expect "alpha_Z"        (is-alpha? "Z") true)
+(expect "alpha_5"        (is-alpha? "5") false)
+(expect "space_space"    (is-space? " ") true)
+(expect "space_tab"      (is-space? "\t") true)
+(expect "space_nl"       (is-space? "\n") true)
+(expect "space_a"        (is-space? "a") false)

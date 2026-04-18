@@ -1,0 +1,221 @@
+;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01/13-19)
+;;
+;; v11 TS src/lexer.ts (304줄) 의 FL 재작성.
+;; 입력: source string
+;; 출력: tokens (list of {:kind :value :line :col})
+;;
+;; 토큰 종류: LParen / RParen / LBracket / RBracket / LBrace / RBrace
+;;          / Number / String / Symbol / Variable / Keyword
+;;          / Comment (drop) / EOF
+;;
+;; 구현: 재귀 대신 iterative approach (loop/recur) 로 stack overflow 방지.
+;; FL 에서 loop/recur 가 작동하면 최적. 아니면 재귀 + TCO.
+
+;; ──────────────────────────────────────
+;; char predicates (char-class.fl 과 동일 본문)
+;; ──────────────────────────────────────
+
+(defn is-digit? [c]
+  (if (null? c) false
+    (and (>= c "0") (<= c "9"))))
+
+(defn is-alpha? [c]
+  (if (null? c) false
+    (or (and (>= c "a") (<= c "z"))
+        (and (>= c "A") (<= c "Z")))))
+
+(defn is-alnum? [c] (or (is-digit? c) (is-alpha? c)))
+
+(defn is-space? [c]
+  (or (= c " ") (= c "\t") (= c "\n") (= c "\r")))
+
+(defn is-symbol-char? [c]
+  (if (null? c) false
+    (or (is-alnum? c)
+        (= c "-") (= c "_") (= c "?") (= c "!")
+        (= c "/") (= c ".") (= c "<") (= c ">")
+        (= c "=") (= c "+") (= c "*") (= c "%")
+        (= c "&") (= c "|") (= c "^") (= c "~"))))
+
+;; ──────────────────────────────────────
+;; 상태 조작 헬퍼 (state = {:src :idx :line :col :tokens})
+;; ──────────────────────────────────────
+
+(defn make-state [src]
+  {:src src :idx 0 :line 1 :col 1 :tokens []})
+
+(defn peek-at [st offset]
+  (let [src (get st :src)
+        i (+ (get st :idx) offset)]
+    (if (>= i (length src)) null
+      (char-at src i))))
+
+(defn peek [st] (peek-at st 0))
+
+(defn at-end? [st]
+  (>= (get st :idx) (length (get st :src))))
+
+(defn advance [st]
+  (let [c (peek st)]
+    (if (= c "\n")
+      {:src (get st :src)
+       :idx (+ (get st :idx) 1)
+       :line (+ (get st :line) 1)
+       :col 1
+       :tokens (get st :tokens)}
+      {:src (get st :src)
+       :idx (+ (get st :idx) 1)
+       :line (get st :line)
+       :col (+ (get st :col) 1)
+       :tokens (get st :tokens)})))
+
+(defn emit [st kind value start-line start-col]
+  {:src (get st :src)
+   :idx (get st :idx)
+   :line (get st :line)
+   :col (get st :col)
+   :tokens (append (get st :tokens)
+                   (list {:kind kind :value value :line start-line :col start-col}))})
+
+;; ──────────────────────────────────────
+;; 토큰 인식기
+;; ──────────────────────────────────────
+
+;; whitespace + line comment(;) skip
+(defn skip-ws [st]
+  (if (at-end? st) st
+    (let [c (peek st)]
+      (cond
+        [(is-space? c) (skip-ws (advance st))]
+        [(= c ";")     (skip-ws (skip-comment st))]
+        [true st]))))
+
+(defn skip-comment [st]
+  (if (at-end? st) st
+    (let [c (peek st)]
+      (if (= c "\n")
+        (advance st)
+        (skip-comment (advance st))))))
+
+;; 숫자 읽기 — 정수/실수/음수 일단 지원
+(defn read-number [st]
+  (let [line (get st :line) col (get st :col)]
+    (read-number-body st "" false line col)))
+
+(defn read-number-body [st acc has-dot line col]
+  (if (at-end? st)
+    (emit st "Number" acc line col)
+    (let [c (peek st)]
+      (cond
+        [(is-digit? c)
+         (read-number-body (advance st) (str acc c) has-dot line col)]
+        [(and (= c ".") (not has-dot))
+         (read-number-body (advance st) (str acc c) true line col)]
+        [true (emit st "Number" acc line col)]))))
+
+;; 문자열 읽기 — escape 지원 (\n \t \" \\)
+(defn read-string [st]
+  (let [line (get st :line) col (get st :col)
+        st1 (advance st)]  ;; 여는 "
+    (read-string-body st1 "" line col)))
+
+(defn read-string-body [st acc line col]
+  (if (at-end? st)
+    (emit st "String" acc line col)  ;; 미종료여도 관대하게
+    (let [c (peek st)]
+      (cond
+        [(= c "\"") (emit (advance st) "String" acc line col)]
+        [(= c "\\")
+         (let [st2 (advance st) c2 (peek st2)]
+           (read-string-body (advance st2) (str acc (translate-esc c2)) line col))]
+        [true (read-string-body (advance st) (str acc c) line col)]))))
+
+(defn translate-esc [c]
+  (cond
+    [(= c "n") "\n"]
+    [(= c "t") "\t"]
+    [(= c "r") "\r"]
+    [(= c "\"") "\""]
+    [(= c "\\") "\\"]
+    [true c]))
+
+;; 심볼/불리언/null 읽기
+(defn read-symbol [st]
+  (let [line (get st :line) col (get st :col)]
+    (read-symbol-body st "" line col)))
+
+(defn read-symbol-body [st acc line col]
+  (if (at-end? st)
+    (emit st "Symbol" acc line col)
+    (let [c (peek st)]
+      (if (is-symbol-char? c)
+        (read-symbol-body (advance st) (str acc c) line col)
+        (emit st "Symbol" acc line col)))))
+
+;; $variable
+(defn read-variable [st]
+  (let [line (get st :line) col (get st :col)
+        st1 (advance st)]  ;; $
+    (read-variable-body st1 "" line col)))
+
+(defn read-variable-body [st acc line col]
+  (if (at-end? st)
+    (emit st "Variable" acc line col)
+    (let [c (peek st)]
+      (if (is-symbol-char? c)
+        (read-variable-body (advance st) (str acc c) line col)
+        (emit st "Variable" acc line col)))))
+
+;; :keyword
+(defn read-keyword [st]
+  (let [line (get st :line) col (get st :col)
+        st1 (advance st)]  ;; :
+    (read-keyword-body st1 "" line col)))
+
+(defn read-keyword-body [st acc line col]
+  (if (at-end? st)
+    (emit st "Keyword" acc line col)
+    (let [c (peek st)]
+      (if (is-symbol-char? c)
+        (read-keyword-body (advance st) (str acc c) line col)
+        (emit st "Keyword" acc line col)))))
+
+;; ──────────────────────────────────────
+;; 메인 루프 — 1 개 토큰 읽기
+;; ──────────────────────────────────────
+
+(defn read-token [st]
+  (let [st1 (skip-ws st)]
+    (if (at-end? st1) st1
+      (let [c (peek st1) line (get st1 :line) col (get st1 :col)]
+        (cond
+          [(= c "(") (emit (advance st1) "LParen" c line col)]
+          [(= c ")") (emit (advance st1) "RParen" c line col)]
+          [(= c "[") (emit (advance st1) "LBracket" c line col)]
+          [(= c "]") (emit (advance st1) "RBracket" c line col)]
+          [(= c "{") (emit (advance st1) "LBrace" c line col)]
+          [(= c "}") (emit (advance st1) "RBrace" c line col)]
+          [(= c "\"") (read-string st1)]
+          [(= c "$") (read-variable st1)]
+          [(= c ":") (read-keyword st1)]
+          [(is-digit? c) (read-number st1)]
+          ;; 음수: - 다음 숫자
+          [(and (= c "-")
+                (is-digit? (peek-at st1 1)))
+           (let [st2 (advance st1)]
+             (read-number-body st2 "-" false line col))]
+          [(is-symbol-char? c) (read-symbol st1)]
+          [true (emit (advance st1) "Unknown" c line col)])))))
+
+;; ──────────────────────────────────────
+;; 공개 API: (lex source) → tokens
+;; ──────────────────────────────────────
+
+(defn lex [src]
+  (lex-loop (make-state src)))
+
+(defn lex-loop [st]
+  (let [st1 (skip-ws st)]
+    (if (at-end? st1)
+      (get st1 :tokens)
+      (lex-loop (read-token st1)))))

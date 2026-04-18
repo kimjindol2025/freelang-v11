@@ -1,0 +1,6 @@
+;; workaround: forward declare + set!
+(define bar null)
+(defn foo [n] (if (= n 0) "foo-done" (bar n)))
+(set! $bar (fn [n] (str "bar-" n)))
+(println (foo 0))
+(println (foo 5))

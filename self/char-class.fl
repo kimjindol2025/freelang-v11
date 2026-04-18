@@ -1,0 +1,45 @@
+;; self/char-class.fl — char predicates (Phase 01/12)
+;;
+;; 모든 predicate 는 1-char string 을 받아 boolean 반환.
+;; FL 에 char 타입 없음 — (char-at s i) 는 1-char string.
+
+(defn is-digit? [c]
+  (if (null? c) false
+    (and (>= c "0") (<= c "9"))))
+
+(defn is-alpha? [c]
+  (if (null? c) false
+    (or (and (>= c "a") (<= c "z"))
+        (and (>= c "A") (<= c "Z")))))
+
+(defn is-alnum? [c]
+  (or (is-digit? c) (is-alpha? c)))
+
+(defn is-space? [c]
+  (or (= c " ") (= c "\t") (= c "\n") (= c "\r")))
+
+;; S-expression 식별자 구성 가능 문자: alnum + - _ ? ! / . < > = + * % & | ^ ~
+;; (괄호/대괄호/중괄호/따옴표/콤마/백틱/@/#/$/:는 제외 — 구분자)
+(defn is-symbol-char? [c]
+  (if (null? c) false
+    (or (is-alnum? c)
+        (= c "-") (= c "_") (= c "?") (= c "!")
+        (= c "/") (= c ".") (= c "<") (= c ">")
+        (= c "=") (= c "+") (= c "*") (= c "%")
+        (= c "&") (= c "|") (= c "^") (= c "~"))))
+
+;; 심볼의 첫 글자로 허용 (숫자 제외, 일부 연산자 포함)
+(defn is-symbol-start? [c]
+  (if (null? c) false
+    (or (is-alpha? c)
+        (= c "-") (= c "_") (= c "/") (= c "<") (= c ">")
+        (= c "=") (= c "+") (= c "*") (= c "%")
+        (= c "&") (= c "|") (= c "^") (= c "~") (= c "!") (= c "?"))))
+
+(defn is-paren? [c]
+  (or (= c "(") (= c ")")
+      (= c "[") (= c "]")
+      (= c "{") (= c "}")))
+
+(defn is-quote? [c]
+  (= c "\""))

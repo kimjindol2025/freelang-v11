@@ -1,0 +1,4 @@
+[FUNC foo :params [$n] :body (if (= $n 0) "done" (bar $n))]
+[FUNC bar :params [$n] :body (str "bar-" $n)]
+(println (foo 0))
+(println (foo 5))

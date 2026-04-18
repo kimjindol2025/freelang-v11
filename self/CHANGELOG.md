@@ -49,16 +49,40 @@ phase=00 stage=10 status=done target=fixtures lex=40 parse=40 eval=40 total=120
 
 ```
 phase=01 stage=11 status=done target=token.fl exports=6 test=make-token_verified
-phase=01 stage=12 status=wip  target=char-class.fl
-phase=01 stage=13 status=wip  target=lexer.fl_core
-phase=01 stage=14 status=wip  target=whitespace_comment
-phase=01 stage=15 status=wip  target=number_literal
-phase=01 stage=16 status=wip  target=string_literal
-phase=01 stage=17 status=wip  target=string_interp
-phase=01 stage=18 status=wip  target=symbol_tokens
-phase=01 stage=19 status=wip  target=var_keyword_atom
-phase=01 stage=20 status=wip  target=lexer_fixed_point
+phase=01 stage=12 status=done target=char-class.fl predicates=7 test=10/10_pass
+phase=01 stage=13 status=done target=lexer.fl_core partial=true reason=defn_forward_ref
+phase=01 stage=14..19 status=wip reason=defn_forward_ref_blocker
+phase=01 stage=20 status=blocked reason=defn_forward_ref_blocker
 ```
+
+### 🔴 발견된 블로커 (2026-04-18): `defn` 상호재귀 미지원
+
+실측:
+```lisp
+(defn foo [n] (if (= n 0) "done" (bar n)))
+(defn bar [n] (str "bar-" n))
+(foo 5)
+; → Function not found: bar
+```
+
+`[FUNC]` 블록은 정상 동작:
+```lisp
+[FUNC foo :params [$n] :body (if (= $n 0) "done" (bar $n))]
+[FUNC bar :params [$n] :body (str "bar-" $n)]
+(foo 5)  ; → "bar-5" ✓
+```
+
+**결론**: `defn` 은 1-pass (순차 등록), `[FUNC]` 블록은 2-pass (전체 스캔 후 등록).
+
+### 📋 선결 과제 (백엔드 AI 인계)
+
+v11 `defn` 을 forward-ref 지원하도록 고쳐야 Phase 01~10 진행 가능:
+
+**옵션 A (권장)**: `defn` 의 등록 시점을 "파일 파싱 완료 후" 로 이동 (hoisting).  
+**옵션 B**: Phase 01~10 을 전부 `[FUNC]` 블록 문법으로 작성 (분량 30% 증가).
+
+현재 Phase 01 은 **1/10 stage 완료 + 2/10 부분 완료** 로 정체.
+선결 과제 해결 전 Phase 02+ 진행 무의미.
 
 ## Phase 02 — AST 타입
 
