@@ -1,0 +1,66 @@
+;; Complete test-parser.fl with debug output
+
+;; ─── Lexer ───────────────────────────
+[FUNC is-digit? :params [$c] :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
+[FUNC is-alpha? :params [$c] :body (if (null? $c) false (or (and (>= $c "a") (<= $c "z")) (and (>= $c "A") (<= $c "Z"))))]
+[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
+[FUNC is-space? :params [$c] :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
+[FUNC is-symbol-char? :params [$c] :body (if (null? $c) false (or (is-alnum? $c) (= $c "-") (= $c "_") (= $c "?") (= $c "!") (= $c "/") (= $c ".") (= $c "<") (= $c ">") (= $c "=") (= $c "+") (= $c "*") (= $c "%") (= $c "&") (= $c "|") (= $c "^")))]
+
+[FUNC make-state :params [$src] :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
+[FUNC peek-at :params [$st $o] :body (let [[$s (get $st :src)] [$i (+ (get $st :idx) $o)]] (if (>= $i (length $s)) null (char-at $s $i)))]
+[FUNC peek :params [$st] :body (peek-at $st 0)]
+[FUNC at-end? :params [$st] :body (>= (get $st :idx) (length (get $st :src)))]
+[FUNC advance :params [$st] :body (let [[$c (peek $st)]] (if (= $c "\n") {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (+ (get $st :line) 1) :col 1 :tokens (get $st :tokens)} {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (get $st :line) :col (+ (get $st :col) 1) :tokens (get $st :tokens)}))]
+[FUNC emit :params [$st $k $v $sl $sc] :body {:src (get $st :src) :idx (get $st :idx) :line (get $st :line) :col (get $st :col) :tokens (append (get $st :tokens) (list {:type $k :value $v :line $sl :col $sc}))}]
+
+[FUNC skip-comment :params [$st] :body (if (at-end? $st) $st (let [[$c (peek $st)]] (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
+[FUNC skip-ws :params [$st] :body (if (at-end? $st) $st (let [[$c (peek $st)]] (cond [(is-space? $c) (skip-ws (advance $st))] [(= $c ";") (skip-ws (skip-comment $st))] [true $st])))]
+
+[FUNC read-number-body :params [$st $a $d $l $c] :body (if (at-end? $st) (emit $st "Number" $a $l $c) (let [[$ch (peek $st)]] (cond [(is-digit? $ch) (read-number-body (advance $st) (str $a $ch) $d $l $c)] [(and (= $ch ".") (not $d)) (read-number-body (advance $st) (str $a $ch) true $l $c)] [true (emit $st "Number" $a $l $c)])))]
+[FUNC read-number :params [$st] :body (read-number-body $st "" false (get $st :line) (get $st :col))]
+
+[FUNC translate-esc :params [$c] :body (cond [(= $c "n") "\n"] [(= $c "t") "\t"] [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
+[FUNC read-string-body :params [$st $a $l $c] :body (if (at-end? $st) (emit $st "String" $a $l $c) (let [[$ch (peek $st)]] (cond [(= $ch "\"") (emit (advance $st) "String" $a $l $c)] [(= $ch "\\") (let [[$s2 (advance $st)] [$c2 (peek $s2)]] (read-string-body (advance $s2) (str $a (translate-esc $c2)) $l $c))] [true (read-string-body (advance $st) (str $a $ch) $l $c)])))]
+[FUNC read-string :params [$st] :body (let [[$l (get $st :line)] [$c (get $st :col)] [$s1 (advance $st)]] (read-string-body $s1 "" $l $c))]
+
+[FUNC read-sym-body :params [$st $a $l $c $k] :body (if (at-end? $st) (emit $st $k $a $l $c) (let [[$ch (peek $st)]] (if (is-symbol-char? $ch) (read-sym-body (advance $st) (str $a $ch) $l $c $k) (emit $st $k $a $l $c))))]
+[FUNC read-symbol :params [$st] :body (read-sym-body $st "" (get $st :line) (get $st :col) "Symbol")]
+[FUNC read-variable :params [$st] :body (let [[$line (get $st :line)] [$col (get $st :col)] [$st1 (advance $st)]] (read-sym-body $st1 "" $line $col "Variable"))]
+[FUNC read-keyword :params [$st] :body (let [[$line (get $st :line)] [$col (get $st :col)] [$st1 (advance $st)]] (read-sym-body $st1 "" $line $col "Keyword"))]
+
+[FUNC read-token :params [$st] :body (let [[$st1 (skip-ws $st)]] (if (at-end? $st1) $st1 (let [[$c (peek $st1)] [$line (get $st1 :line)] [$col (get $st1 :col)]] (cond [(= $c "(") (emit (advance $st1) "LParen" $c $line $col)] [(= $c ")") (emit (advance $st1) "RParen" $c $line $col)] [(= $c "[") (emit (advance $st1) "LBracket" $c $line $col)] [(= $c "]") (emit (advance $st1) "RBracket" $c $line $col)] [(= $c "{") (emit (advance $st1) "LBrace" $c $line $col)] [(= $c "}") (emit (advance $st1) "RBrace" $c $line $col)] [(= $c "\"") (read-string $st1)] [(= $c "$") (read-variable $st1)] [(= $c ":") (read-keyword $st1)] [(is-digit? $c) (read-number $st1)] [(and (= $c "-") (is-digit? (peek-at $st1 1))) (read-number-body (advance $st1) "-" false $line $col)] [(is-symbol-char? $c) (read-symbol $st1)] [true (emit (advance $st1) "Unknown" $c $line $col)])))]
+
+[FUNC lex-loop :params [$st] :body (if (at-end? $st) (get $st :tokens) (lex-loop (read-token $st)))]
+[FUNC fl-lex :params [$src] :body (lex-loop (make-state $src))]
+
+;; ─── AST structures ─────────────────────────
+[FUNC make-literal :params [$t $v $l] :body {:kind "literal" :type $t :value $v :line $l}]
+[FUNC make-variable :params [$n $l] :body {:kind "variable" :name $n :line $l}]
+[FUNC make-keyword :params [$n $l] :body {:kind "keyword" :name $n :line $l}]
+
+;; ─── Parser state ────────────────────────────
+[FUNC p-make :params [$tokens] :body {:tokens $tokens :idx 0 :ast []}]
+[FUNC p-peek :params [$p] :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]] (if (>= $i (length $t)) null (get $t $i)))]
+[FUNC p-advance :params [$p] :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1) :ast (get $p :ast)}]
+[FUNC p-end? :params [$p] :body (>= (get $p :idx) (length (get $p :tokens)))]
+[FUNC p-append-ast :params [$p $n] :body {:tokens (get $p :tokens) :idx (get $p :idx) :ast (append (get $p :ast) (list $n))}]
+[FUNC r-pair :params [$p $n] :body {:p $p :node $n}]
+
+;; ─── Parser ────────────────────────────
+[FUNC parse-atom :params [$p] :body (let [[$t (p-peek $p)] [$k (if (null? $t) "null" (get $t :type))] [$v (if (null? $t) "null" (get $t :value))] [$l (if (null? $t) 0 (get $t :line))]] (cond [(= $k "Number") (r-pair (p-advance $p) (make-literal "number" $v $l))] [(= $k "String") (r-pair (p-advance $p) (make-literal "string" $v $l))] [(= $k "Symbol") (r-pair (p-advance $p) (make-literal "symbol" $v $l))] [(= $k "Variable") (r-pair (p-advance $p) (make-variable $v $l))] [(= $k "Keyword") (r-pair (p-advance $p) (make-keyword $v $l))] [true (r-pair (p-advance $p) (make-literal "unknown" $v $l))]))]
+
+[FUNC parse-expr :params [$p] :body (let [[$t (p-peek $p)] [$k (if (null? $t) "null" (get $t :type))]] (if (= $k "LParen") "sexpr-stub" (if (= $k "LBracket") "bracket-stub" (if (= $k "LBrace") "map-stub" (parse-atom $p)))))]
+
+[FUNC parse-all :params [$p] :body (if (p-end? $p) (get $p :ast) (let [[$one (parse-expr $p)] [$p2 (p-append-ast (get $one :p) (get $one :node))]] (parse-all $p2)))]
+
+[FUNC fl-parse :params [$tokens] :body (parse-all (p-make $tokens))]
+
+;; ─── Test ────────────────────────────
+(println "=== Parser Debug Test ===")
+(let [[$src "42"]]
+  (println (str "Input: \"" $src "\""))
+  (let [[$tokens (fl-lex $src)]]
+    (println (str "Tokens: " $tokens))
+    (let [[$ast (fl-parse $tokens)]]
+      (println (str "AST: " $ast)))))

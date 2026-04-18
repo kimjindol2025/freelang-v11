@@ -141,15 +141,15 @@
   :body (let [[$t (p-peek $p)]]
           (cond
             [(null? $t) (r-pair $p $acc)]
-            [(= (get $t :kind) "RParen") (r-pair $p $acc)]
-            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
-            [(= (get $t :kind) "RBrace") (r-pair $p $acc)]
+            [(= (get $t :type) "RParen") (r-pair $p $acc)]
+            [(= (get $t :type) "RBracket") (r-pair $p $acc)]
+            [(= (get $t :type) "RBrace") (r-pair $p $acc)]
             [true (let [[$one (parse-expr $p)]]
                     (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
 
 [FUNC parse-consume-rparen :params [$p]
   :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RParen")) (p-advance $p) $p))]
+          (if (and (not (null? $t)) (= (get $t :type) "RParen")) (p-advance $p) $p))]
 
 [FUNC parse-sexpr :params [$p]
   :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
@@ -165,11 +165,11 @@
 
 [FUNC parse-consume-rbracket :params [$p]
   :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RBracket")) (p-advance $p) $p))]
+          (if (and (not (null? $t)) (= (get $t :type) "RBracket")) (p-advance $p) $p))]
 
 [FUNC parse-consume-rbrace :params [$p]
   :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RBrace")) (p-advance $p) $p))]
+          (if (and (not (null? $t)) (= (get $t :type) "RBrace")) (p-advance $p) $p))]
 
 [FUNC is-block-type? :params [$s]
   :body (let [[$c (char-at $s 0)]] (and (>= $c "A") (<= $c "Z")))]
@@ -177,7 +177,7 @@
 [FUNC parse-optional-name :params [$p]
   :body (let [[$t (p-peek $p)]]
           (if (and (not (null? $t))
-                   (= (get $t :kind) "Symbol")
+                   (= (get $t :type) "Symbol")
                    (not (= (char-at (get $t :value) 0) ":")))
             (r-pair (p-advance $p) (get $t :value))
             (r-pair $p null)))]
@@ -186,8 +186,8 @@
   :body (let [[$t (p-peek $p)]]
           (cond
             [(null? $t) (r-pair $p $acc)]
-            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
-            [(= (get $t :kind) "Keyword")
+            [(= (get $t :type) "RBracket") (r-pair $p $acc)]
+            [(= (get $t :type) "Keyword")
              (let [[$key (get $t :value)] [$p1 (p-advance $p)]
                    [$val (parse-expr $p1)] [$p2 (get $val :p)] [$v (get $val :node)]]
                (parse-block-fields $p2 (json_set $acc $key $v)))]
@@ -207,7 +207,7 @@
   :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
               [$next (p-peek $p1)]]
           (if (and (not (null? $next))
-                   (= (get $next :kind) "Symbol")
+                   (= (get $next :type) "Symbol")
                    (is-block-type? (get $next :value)))
             (parse-named-block $p1 $line)
             (parse-array $p1 $line)))]
@@ -224,7 +224,7 @@
                 [$p2 (p-append-ast (get $one :p) (get $one :node))]]
             (parse-all $p2)))]
 
-[FUNC fl-parse :params [$tokens] :body (parse-all (p-make $tokens))]
+[FUNC fl-parse-impl :params [$tokens] :body (parse-all (p-make $tokens))]
 
 ;; ─── smoke ───────────────────────────
 
@@ -245,7 +245,7 @@
                 "" $nodes)]
 
 [FUNC check :params [$label $src $expected]
-  :body (let [[$got (ast-summary (fl-parse (fl-lex $src)))]]
+  :body (let [[$got (ast-summary (fl-parse-impl (fl-lex $src)))]]
           (if (= $got $expected)
             (println (str "pass " $label))
             (println (str "fail " $label " expected=\"" $expected "\" got=\"" $got "\""))))]
