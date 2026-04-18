@@ -1,0 +1,3 @@
+(let [s (file_read "self/bench/sample.json")
+      parsed (json_parse s)]
+  (println (length parsed)))

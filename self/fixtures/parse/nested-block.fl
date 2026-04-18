@@ -1,0 +1,1 @@
+[FUNC outer :body [FUNC inner :body 1]]

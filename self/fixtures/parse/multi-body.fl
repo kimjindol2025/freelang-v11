@@ -1,0 +1,1 @@
+(fn [$x] (println "hi") (* $x 2))
