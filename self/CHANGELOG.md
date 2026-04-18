@@ -106,9 +106,39 @@ phase=02 stage=30 status=done target=ast_web_and_equal (page/route/component/for
 - list? / map? predicate 는 placeholder (FL 런타임의 타입 검사 기본 부족)
   Phase 07 builtins/type.fl 에서 교체 예정.
 
-## Phase 03 — Self Parser
+## Phase 03 — Self Parser ✅
 
-(미진행)
+```
+phase=03 stage=31 status=done target=parser_state peek/advance/expect
+phase=03 stage=32 status=done target=parseAtom number/string/symbol/keyword/variable
+phase=03 stage=33 status=done target=parseSExpr (op arg1 arg2)
+phase=03 stage=34 status=done target=parseArray [1 2 3]
+phase=03 stage=35 status=done target=parseMap {:k v}
+phase=03 stage=36 status=done target=parseBlock [TYPE :field value]
+phase=03 stage=37 status=done target=keyword_fields :params :body :render
+phase=03 stage=38 status=done target=nested_blocks
+phase=03 stage=39 status=deferred target=string_interp (Phase 03 후속)
+phase=03 stage=40 status=done target=line_col_propagation line 전파
+phase=03 stage=41 status=deferred target=error_passthrough (Phase 05 interpreter)
+phase=03 stage=42 status=deferred target=pattern_parser (Phase 06 match 시)
+phase=03 stage=43 status=deferred target=trampoline_TCO (FL 런타임 recur 지원 여부 확인 후)
+phase=03 stage=44 status=done target=parser_smoke pass=10/10
+phase=03 stage=45 status=deferred target=parser_self_parse (stage 43 trampoline 후)
+```
+
+실측 (2026-04-18):
+- self/parser.fl: 23 [FUNC] 블록, ~200 줄
+- self/tests/test-parser.fl smoke 10/10 pass:
+  num / sym / var / kw / sexpr / nested / array / map / if / funcblk
+- parse("(+ 1 2)") → sexpr:+(2) [args 2개]
+- parse("[FUNC add :params []]") → block:FUNC
+- parse("{:a 1}") → block:Map
+
+연기:
+- string interp (Phase 03 후속): `"{$x}"` → (concat "" $x "") 변환
+- pattern parser (Phase 06 match 에서)
+- trampoline TCO (FL 런타임 recur 가 제대로 최적화되는지 확인 후)
+- parser self-parse (trampoline 후 self/parser.fl 자신 파싱)
 
 ## Phase 04 — Scope
 
