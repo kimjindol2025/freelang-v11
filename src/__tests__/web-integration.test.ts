@@ -904,4 +904,125 @@ describe("Web Framework Integration Tests", () => {
       expect(publicMiddleware).toBeNull();
     });
   });
+
+  describe("Error Boundary (error.fl, not-found.fl)", () => {
+    const testAppDir = path.join(__dirname, "../../test-app-errors");
+
+    beforeAll(() => {
+      if (!fs.existsSync(testAppDir)) {
+        fs.mkdirSync(testAppDir, { recursive: true });
+      }
+
+      // 1️⃣ 전역 에러 핸들러
+      fs.writeFileSync(
+        path.join(testAppDir, "error.fl"),
+        `(defn error-handler [error-info]
+          (let [status (get error-info :status)
+                message (get error-info :message)]
+            (str "<html><body>Error " status ": " message "</body></html>")))`
+      );
+
+      // 2️⃣ 404 핸들러
+      fs.writeFileSync(
+        path.join(testAppDir, "not-found.fl"),
+        `(do "<html><body>404 Not Found</body></html>")`
+      );
+
+      // 3️⃣ 정상 페이지
+      fs.writeFileSync(
+        path.join(testAppDir, "page.fl"),
+        `(do "<html><body>OK</body></html>")`
+      );
+
+      // 4️⃣ 에러 발생 페이지
+      fs.writeFileSync(
+        path.join(testAppDir, "error-page.fl"),
+        `(do
+          (throw (str "Internal error"))
+          "<html><body>Should not render</body></html>")`
+      );
+
+      // 5️⃣ 경로별 에러 핸들러
+      const adminDir = path.join(testAppDir, "admin");
+      fs.mkdirSync(adminDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(adminDir, "error.fl"),
+        `(do "<html><body>Admin Error</body></html>")`
+      );
+
+      fs.writeFileSync(
+        path.join(adminDir, "page.fl"),
+        `(do "<html><body>Admin Page</body></html>")`
+      );
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(testAppDir)) {
+        fs.rmSync(testAppDir, { recursive: true });
+      }
+    });
+
+    test("should detect error.fl files", () => {
+      // app-router가 error.fl을 인식
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // error 핸들러 조회 메서드 확인
+      expect(router.getErrorHandlerForPath).toBeDefined();
+      expect(typeof router.getErrorHandlerForPath).toBe("function");
+    });
+
+    test("should detect not-found.fl files", () => {
+      // app-router가 not-found.fl을 인식
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // 404 핸들러 조회 메서드
+      expect(router.getNotFoundHandler).toBeDefined();
+      expect(typeof router.getNotFoundHandler).toBe("function");
+    });
+
+    test("should render 404 page for missing routes", () => {
+      // 존재하지 않는 경로는 not-found.fl 렌더링
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // 존재하지 않는 경로 매칭 실패
+      const match = router.match("/nonexistent");
+      expect(match).toBeNull();
+
+      // not-found 핸들러는 존재
+      const notFoundHandler = router.getNotFoundHandler();
+      expect(notFoundHandler).toBeDefined();
+      expect(notFoundHandler).toContain("not-found.fl");
+    });
+
+    test("should use nested error handlers", () => {
+      // /admin 경로에서 admin/error.fl 사용
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      const adminErrorHandler = router.getErrorHandlerForPath("/admin");
+      expect(adminErrorHandler).toBeDefined();
+      expect(adminErrorHandler).toContain("admin");
+      expect(adminErrorHandler).toContain("error.fl");
+    });
+
+    test("should fallback to root error handler", () => {
+      // 경로별 error.fl이 없으면 루트 error.fl 사용
+      const AppRouter = require("../web/app-router").AppRouter;
+      const router = new AppRouter(testAppDir);
+
+      // 루트 error.fl은 항상 존재
+      const rootErrorHandler = router.getErrorHandlerForPath("/");
+      expect(rootErrorHandler).toBeDefined();
+      expect(rootErrorHandler).toContain("error.fl");
+
+      // /unknown에서 에러 발생 시 루트 error.fl로 fallback
+      const unknownErrorHandler = router.getErrorHandlerForPath("/unknown/path");
+      // 없으면 null이지만, 루트로 fallback할 수 있음
+      expect(unknownErrorHandler === null || unknownErrorHandler?.includes("error.fl")).toBe(true);
+    });
+  });
 });

@@ -11,7 +11,8 @@
 
 ;; ═══════ 유틸 ═══════
 
-;; map_entries: JS Map 또는 object → [[key, value], ...]
+;; map_entries: 간단한 구현 (FL 인터프리터 호환)
+;; 실제로는 native로도 지원되지만, FL 코드 자체에서도 작동해야 함
 [FUNC map_entries :params [$m]
   :body (if (null? $m) (list)
           (if (array? $m) $m

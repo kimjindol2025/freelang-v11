@@ -46,10 +46,27 @@ export class AppRouter {
   private routes: Route[] = [];
   private layoutChain: LayoutChain = {};
   private middlewares: Map<string, string> = new Map(); // W3: 경로 → middleware.fl 파일
+  private errorHandlers: Map<string, string> = new Map(); // W4: 경로 → error.fl 파일
+  private notFoundHandler: string | null = null; // W4: not-found.fl 파일
 
   constructor(appDir: string = "app") {
     this.appDir = appDir;
     this.scan();
+  }
+
+  /**
+   * W4: not-found.fl 스캔
+   */
+  private scanNotFound(dir: string): void {
+    try {
+      const notFoundPath = path.join(dir, "not-found.fl");
+      if (fs.existsSync(notFoundPath)) {
+        this.notFoundHandler = notFoundPath;
+        console.log(`approuter.not-found file=${notFoundPath}`);
+      }
+    } catch (err: any) {
+      // ignore
+    }
   }
 
   /**
@@ -61,10 +78,12 @@ export class AppRouter {
       return;
     }
 
-    // Three-pass scan: collect layouts, middlewares, then pages
-    // W3: middleware.fl 스캔 추가
+    // Five-pass scan: layouts, middlewares, error handlers, not-found, then pages
+    // W3: middleware.fl, W4: error.fl/not-found.fl 스캔 추가
     this.scanDirectory(this.appDir, "", "layout");
     this.scanDirectory(this.appDir, "", "middleware");  // W3: middleware 스캔
+    this.scanDirectory(this.appDir, "", "error");       // W4: error 스캔
+    this.scanNotFound(this.appDir);                     // W4: not-found.fl 스캔
     this.scanDirectory(this.appDir, "", "page");
     this.scanDirectory(this.appDir, "", "route");
     this.buildLayoutChain();
@@ -109,6 +128,11 @@ export class AppRouter {
           const middlewarePath = currentPath === "" ? "/" : currentPath;
           this.middlewares.set(middlewarePath, fullPath);
           console.log(`approuter.middleware scope=${middlewarePath} file=${fullPath}`);
+        } else if (phase === "error" && entry.name === "error.fl") {
+          // W4: error.fl 등록
+          const errorPath = currentPath === "" ? "/" : currentPath;
+          this.errorHandlers.set(errorPath, fullPath);
+          console.log(`approuter.error scope=${errorPath} file=${fullPath}`);
         }
       }
     } catch (err: any) {
@@ -230,6 +254,25 @@ export class AppRouter {
    */
   getMiddlewareForPath(routePath: string): string | null {
     return this.middlewares.get(routePath) || null;
+  }
+
+  /**
+   * W4: 특정 경로에 대한 에러 핸들러 파일 조회
+   */
+  getErrorHandlerForPath(routePath: string): string | null {
+    // 경로별 error.fl이 있으면 반환, 없으면 부모 경로 확인
+    if (this.errorHandlers.has(routePath)) {
+      return this.errorHandlers.get(routePath) || null;
+    }
+    // 루트 error.fl 반환
+    return this.errorHandlers.get("/") || null;
+  }
+
+  /**
+   * W4: 404 핸들러 파일 조회
+   */
+  getNotFoundHandler(): string | null {
+    return this.notFoundHandler;
   }
 
   /**

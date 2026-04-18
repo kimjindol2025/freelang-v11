@@ -28494,9 +28494,26 @@ var AppRouter = class {
   layoutChain = {};
   middlewares = /* @__PURE__ */ new Map();
   // W3: 경로 → middleware.fl 파일
+  errorHandlers = /* @__PURE__ */ new Map();
+  // W4: 경로 → error.fl 파일
+  notFoundHandler = null;
+  // W4: not-found.fl 파일
   constructor(appDir = "app") {
     this.appDir = appDir;
     this.scan();
+  }
+  /**
+   * W4: not-found.fl 스캔
+   */
+  scanNotFound(dir) {
+    try {
+      const notFoundPath = path9.join(dir, "not-found.fl");
+      if (fs12.existsSync(notFoundPath)) {
+        this.notFoundHandler = notFoundPath;
+        console.log(`approuter.not-found file=${notFoundPath}`);
+      }
+    } catch (err4) {
+    }
   }
   /**
    * 파일시스템 스캔 시작
@@ -28508,6 +28525,8 @@ var AppRouter = class {
     }
     this.scanDirectory(this.appDir, "", "layout");
     this.scanDirectory(this.appDir, "", "middleware");
+    this.scanDirectory(this.appDir, "", "error");
+    this.scanNotFound(this.appDir);
     this.scanDirectory(this.appDir, "", "page");
     this.scanDirectory(this.appDir, "", "route");
     this.buildLayoutChain();
@@ -28544,6 +28563,10 @@ var AppRouter = class {
           const middlewarePath = currentPath === "" ? "/" : currentPath;
           this.middlewares.set(middlewarePath, fullPath);
           console.log(`approuter.middleware scope=${middlewarePath} file=${fullPath}`);
+        } else if (phase === "error" && entry.name === "error.fl") {
+          const errorPath = currentPath === "" ? "/" : currentPath;
+          this.errorHandlers.set(errorPath, fullPath);
+          console.log(`approuter.error scope=${errorPath} file=${fullPath}`);
         }
       }
     } catch (err4) {
