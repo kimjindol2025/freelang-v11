@@ -1,0 +1,56 @@
+;; self/stdlib/stream.fl — Phase 27
+;; 스트림 I/O (native stream_* builtin wrapper)
+
+[FUNC stream-create :params [$source]
+  :body (stream_create $source)]
+
+[FUNC stream-read :params [$stream $size]
+  :body (stream_read $stream (floor $size))]
+
+[FUNC stream-write :params [$stream $data]
+  :body (stream_write $stream (str $data))]
+
+[FUNC stream-end :params [$stream]
+  :body (stream_end $stream)]
+
+[FUNC stream-close :params [$stream]
+  :body (stream_close $stream)]
+
+[FUNC stream-pause :params [$stream]
+  :body (stream_pause $stream)]
+
+[FUNC stream-resume :params [$stream]
+  :body (stream_resume $stream)]
+
+[FUNC stream-on-data :params [$stream $handler]
+  :body (stream_on_data $stream $handler)]
+
+[FUNC stream-on-end :params [$stream $handler]
+  :body (stream_on_end $stream $handler)]
+
+[FUNC stream-on-error :params [$stream $handler]
+  :body (stream_on_error $stream $handler)]
+
+[FUNC stream-pipe :params [$source $dest]
+  :body (stream_pipe $source $dest)]
+
+[FUNC stream-transform :params [$stream $fn]
+  :body (stream_transform $stream $fn)]
+
+[FUNC stream-filter :params [$stream $pred]
+  :body (stream_filter $stream $pred)]
+
+[FUNC stream-map :params [$stream $fn]
+  :body (stream_map $stream $fn)]
+
+[FUNC stream-batch :params [$stream $size]
+  :body (stream_batch $stream (floor $size))]
+
+[FUNC stream-limit :params [$stream $count]
+  :body (stream_limit $stream (floor $count))]
+
+[FUNC stream-buffer :params [$stream]
+  :body (stream_buffer $stream)]
+
+[FUNC stream-collect :params [$stream]
+  :body (stream_collect $stream)]

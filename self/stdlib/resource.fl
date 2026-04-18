@@ -1,0 +1,61 @@
+;; self/stdlib/resource.fl — Phase 27
+;; 리소스 관리 (cleanup, defer, using 패턴)
+
+[FUNC with-resource :params [$acquire $use $release]
+  :body (let [[$resource ($acquire)]]
+          (try
+            ($use $resource)
+            (finally ($release $resource))))]
+
+[FUNC defer :params [$fn $resource]
+  :body (let [[$deferred (list $fn $resource)]]
+          (try $resource
+            (finally (($fn (get $deferred 1))))))]
+
+[FUNC defer-multiple :params [$resources]
+  :body (defer-multiple-loop $resources (length $resources))]
+[FUNC defer-multiple-loop :params [$resources $i]
+  :body (if (<= $i 0) nil
+          (let [[$resource (get $resources (- $i 1))]]
+            (do ($resource) (defer-multiple-loop $resources (- $i 1)))))]
+
+[FUNC guard-resource :params [$acquire $release]
+  :body (list $acquire $release)]
+
+[FUNC acquire :params [$guard]
+  :body ((get $guard 0))]
+
+[FUNC release :params [$guard $resource]
+  :body (((get $guard 1)) $resource))]
+
+[FUNC finally :params [$fn $body]
+  :body (try $body
+          (finally ($fn)))]
+
+[FUNC using :params [$resource $fn]
+  :body (try ($fn $resource)
+          (finally (close-resource $resource)))]
+
+[FUNC close-resource :params [$res]
+  :body (if (and (map? $res) (contains? $res :close))
+          ((get $res :close))
+          nil)]
+
+[FUNC disposable :params [$fn]
+  :body (fn [] (try ($fn)
+                 (finally (dispose-all))))]
+
+[FUNC dispose-all :params []
+  :body (dispose-all-loop (list))]
+[FUNC dispose-all-loop :params [$items]
+  :body (if (= (length $items) 0) nil
+          (do ((get (get $items 0) :dispose))
+              (dispose-all-loop (rest $items))))]
+
+[FUNC auto-close :params [$obj]
+  :body (if (callable? (get $obj :close))
+          (set $obj :__auto-close true)
+          $obj)]
+
+[FUNC is-auto-close? :params [$obj]
+  :body (get $obj :__auto-close false)]

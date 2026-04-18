@@ -1,0 +1,50 @@
+;; self/stdlib/crypto.fl — Phase 27
+;; 암호화 연산 (native crypto_* builtin wrapper)
+
+[FUNC crypto-random-bytes :params [$size]
+  :body (crypto_random_bytes (floor $size))]
+
+[FUNC crypto-random-int :params [$min $max]
+  :body (crypto_random_int (floor $min) (floor $max))]
+
+[FUNC crypto-random-string :params [$length]
+  :body (crypto_random_string (floor $length))]
+
+[FUNC crypto-hash :params [$algo $data]
+  :body (crypto_hash (str $algo) (str $data))]
+
+[FUNC crypto-hmac :params [$algo $key $data]
+  :body (crypto_hmac (str $algo) (str $key) (str $data))]
+
+[FUNC crypto-pbkdf2 :params [$password $salt $iterations $keylen $digest]
+  :body (crypto_pbkdf2 (str $password) (str $salt) (floor $iterations) (floor $keylen) (str $digest))]
+
+[FUNC crypto-encrypt :params [$algo $key $iv $data]
+  :body (crypto_encrypt (str $algo) (str $key) (str $iv) (str $data))]
+
+[FUNC crypto-decrypt :params [$algo $key $iv $data]
+  :body (crypto_decrypt (str $algo) (str $key) (str $iv) (str $data))]
+
+[FUNC crypto-rsa-generate :params [$size]
+  :body (crypto_rsa_generate (floor $size))]
+
+[FUNC crypto-rsa-sign :params [$key $data]
+  :body (crypto_rsa_sign (str $key) (str $data))]
+
+[FUNC crypto-rsa-verify :params [$key $data $signature]
+  :body (crypto_rsa_verify (str $key) (str $data) (str $signature))]
+
+[FUNC crypto-jwt-sign :params [$payload $secret]
+  :body (crypto_jwt_sign $payload (str $secret))]
+
+[FUNC crypto-jwt-verify :params [$token $secret]
+  :body (crypto_jwt_verify (str $token) (str $secret))]
+
+[FUNC crypto-jwt-decode :params [$token]
+  :body (crypto_jwt_decode (str $token))]
+
+[FUNC crypto-uuid :params []
+  :body (crypto_uuid)]
+
+[FUNC crypto-uuid-v4 :params []
+  :body (crypto_uuid_v4)]

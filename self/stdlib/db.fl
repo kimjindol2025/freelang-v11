@@ -1,0 +1,53 @@
+;; self/stdlib/db.fl — Phase 27
+;; 데이터베이스 I/O (native db_* builtin wrapper)
+
+[FUNC db-query :params [$db $sql]
+  :body (db_query (str $db) (str $sql))]
+
+[FUNC db-query-one :params [$db $sql]
+  :body (db_query_one (str $db) (str $sql))]
+
+[FUNC db-query-all :params [$db $sql]
+  :body (db_query_all (str $db) (str $sql))]
+
+[FUNC db-exec :params [$db $sql]
+  :body (db_exec (str $db) (str $sql))]
+
+[FUNC db-insert :params [$db $table $data]
+  :body (db_insert (str $db) (str $table) $data)]
+
+[FUNC db-update :params [$db $table $data $where]
+  :body (db_update (str $db) (str $table) $data (str $where))]
+
+[FUNC db-delete :params [$db $table $where]
+  :body (db_delete (str $db) (str $table) (str $where))]
+
+[FUNC db-select :params [$db $table $where]
+  :body (db_select (str $db) (str $table) (str $where))]
+
+[FUNC db-count :params [$db $table $where]
+  :body (db_count (str $db) (str $table) (str $where))]
+
+[FUNC db-exists? :params [$db $table $where]
+  :body (> (db_count $db $table $where) 0)]
+
+[FUNC db-transaction :params [$db $fn]
+  :body (db_transaction (str $db) $fn)]
+
+[FUNC db-prepare :params [$db $sql]
+  :body (db_prepare (str $db) (str $sql))]
+
+[FUNC db-execute :params [$stmt $params]
+  :body (db_execute $stmt $params)]
+
+[FUNC db-close :params [$db]
+  :body (db_close (str $db))]
+
+[FUNC db-begin :params [$db]
+  :body (db_begin (str $db))]
+
+[FUNC db-commit :params [$db]
+  :body (db_commit (str $db))]
+
+[FUNC db-rollback :params [$db]
+  :body (db_rollback (str $db))]

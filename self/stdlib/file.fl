@@ -1,0 +1,53 @@
+;; self/stdlib/file.fl — Phase 27
+;; 파일 I/O 연산 (native file_* builtin wrapper)
+
+[FUNC file-read :params [$path]
+  :body (file_read (str $path))]
+
+[FUNC file-write :params [$path $content]
+  :body (file_write (str $path) (str $content))]
+
+[FUNC file-append :params [$path $content]
+  :body (file_append (str $path) (str $content))]
+
+[FUNC file-exists? :params [$path]
+  :body (file_exists (str $path))]
+
+[FUNC file-delete :params [$path]
+  :body (file_delete (str $path))]
+
+[FUNC file-copy :params [$src $dest]
+  :body (file_copy (str $src) (str $dest))]
+
+[FUNC file-rename :params [$old $new]
+  :body (file_rename (str $old) (str $new))]
+
+[FUNC file-size :params [$path]
+  :body (file_size (str $path))]
+
+[FUNC file-modified :params [$path]
+  :body (file_modified (str $path))]
+
+[FUNC file-json :params [$path]
+  :body (json-parse (file_read (str $path)))]
+
+[FUNC file-json-write :params [$path $obj]
+  :body (file_write (str $path) (json-stringify $obj))]
+
+[FUNC file-lines :params [$path]
+  :body (str-lines (file_read (str $path)))]
+
+[FUNC file-mkdir :params [$path]
+  :body (file_mkdir (str $path))]
+
+[FUNC file-rmdir :params [$path]
+  :body (file_rmdir (str $path))]
+
+[FUNC file-list :params [$path]
+  :body (file_list (str $path))]
+
+[FUNC file-is-file? :params [$path]
+  :body (file_is_file (str $path))]
+
+[FUNC file-is-dir? :params [$path]
+  :body (file_is_dir (str $path))]
