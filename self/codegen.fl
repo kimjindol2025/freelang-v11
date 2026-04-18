@@ -625,6 +625,30 @@
             [(= $op "timer_elapsed") (str "((t)=>Date.now()-t.__timer.start)(" $as ")")]
             [(= $op "timer_lap") (str "((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(" $as ")")]
 
+            ;; ─── String 추가 (starts-with?, ends-with?, contains?, split, join, trim, upper, lower, repeat, index-of) ───
+            [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
+            [(= $op "ends-with?") (str "_fl_ends_with(" $as ")")]
+            [(= $op "contains?") (str "_fl_contains(" $as ")")]
+            [(= $op "split") (str "_fl_split(" $as ")")]
+            [(= $op "join") (str "_fl_join(" $as ")")]
+            [(= $op "trim") (str "_fl_trim(" $as ")")]
+            [(= $op "upper") (str "_fl_upper(" $as ")")]
+            [(= $op "lower") (str "_fl_lower(" $as ")")]
+            [(= $op "repeat") (str "_fl_repeat(" $as ")")]
+            [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+
+            ;; ─── List 추가 (map, filter, reduce, find, every?, some?, sort, reverse, flatten, distinct, range, take, drop, count) ───
+            [(= $op "map") (str "_fl_map(" $as ")")]
+            [(= $op "filter") (str "_fl_filter(" $as ")")]
+            [(= $op "reduce") (str "_fl_reduce(" $as ")")]
+            [(= $op "find") (str "_fl_find(" $as ")")]
+            [(= $op "every?") (str "_fl_every(" $as ")")]
+            [(= $op "some?") (str "_fl_some(" $as ")")]
+            [(= $op "sort") (str "_fl_sort(" $as ")")]
+            [(= $op "reverse") (str "_fl_reverse(" $as ")")]
+            [(= $op "flatten") (str "_fl_flatten(" $as ")")]
+            [(= $op "distinct") (str "_fl_distinct(" $as ")")]
+
             ;; ─── Database (8, placeholder for JS env) ───
             [(= $op "pg_exec") (str "_fl_pg_exec(" $as ")")]
             [(= $op "pg_query") (str "_fl_pg_query(" $as ")")]
