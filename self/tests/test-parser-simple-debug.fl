@@ -1,0 +1,35 @@
+;; Minimal parser test
+
+[FUNC p-make :params [$tokens] :body {:tokens $tokens :idx 0 :ast []}]
+[FUNC p-peek :params [$p] :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]] (if (>= $i (length $t)) null (get $t $i)))]
+[FUNC p-advance :params [$p] :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1) :ast (get $p :ast)}]
+[FUNC p-end? :params [$p] :body (>= (get $p :idx) (length (get $p :tokens)))]
+[FUNC p-append-ast :params [$p $n] :body (let [[$old-ast (get $p :ast)] [$new-list (append $old-ast (list $n))] [$result {:tokens (get $p :tokens) :idx (get $p :idx) :ast $new-list}]] (println (str "  p-append-ast: old=" $old-ast " node=" $n " new=" $new-list)) $result)]
+[FUNC r-pair :params [$p $n] :body {:p $p :node $n}]
+
+[FUNC make-literal :params [$t $v $l] :body {:kind "literal" :type $t :value $v :line $l}]
+
+[FUNC parse-atom :params [$p]
+  :body (let [[$t (p-peek $p)] [$node (make-literal "number" 42 1)] [$result (r-pair (p-advance $p) $node)]]
+          (println (str "parse-atom: token=" $t " node=" $node))
+          $result)]
+
+[FUNC parse-expr :params [$p] :body (parse-atom $p)]
+
+[FUNC parse-all :params [$p]
+  :body (if (p-end? $p)
+          (do (println (str "parse-all: at end, returning AST=" (get $p :ast))) (get $p :ast))
+          (let [[$one (parse-expr $p)]]
+            (println (str "parse-all: got one=" $one))
+            (let [[$p2 (p-append-ast (get $one :p) (get $one :node))]]
+              (println (str "parse-all: p2=" $p2))
+              (parse-all $p2))))]
+
+;; Test
+(println "=== Minimal Parser Test ===")
+(let [[$tokens [{:type "Number" :value 42}]]]
+  (println (str "Input tokens: " $tokens))
+  (let [[$p (p-make $tokens)]]
+    (println (str "Initial parser state: " $p))
+    (let [[$ast (parse-all $p)]]
+      (println (str "Final AST: " $ast)))))

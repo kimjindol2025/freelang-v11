@@ -45,7 +45,7 @@
   :body {:src (get $st :src) :idx (get $st :idx)
          :line (get $st :line) :col (get $st :col)
          :tokens (append (get $st :tokens)
-                         (list {:kind $kind :value $value :line $sl :col $sc}))}]
+                         (list {:type $kind :value $value :line $sl :col $sc}))}]
 
 [FUNC skip-comment :params [$st]
   :body (if (at-end? $st) $st
@@ -132,18 +132,20 @@
   :body (let [[$st1 (skip-ws $st)]]
           (if (at-end? $st1) (get $st1 :tokens) (lex-loop (read-token $st1))))]
 
-[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+[FUNC fl-lex :params [$src] :body (lex-loop (make-state $src))]
 
 ;; ─────────────────────────────
 ;; smoke 10 케이스
 ;; ─────────────────────────────
 
 [FUNC tokens-summary :params [$tokens]
-  :body (reduce (fn [$acc $t] (str $acc (get $t :kind) ":" (get $t :value) " "))
+  :body (reduce (fn [$acc $t]
+                  (if (= (get $t :type) "EOF") $acc
+                    (str $acc (get $t :type) ":" (get $t :value) " ")))
                 "" $tokens)]
 
 [FUNC check :params [$label $src $expected]
-  :body (let [[$got (tokens-summary (lex $src))]]
+  :body (let [[$got (tokens-summary (fl-lex $src))]]
           (if (= $got $expected)
             (println (str "pass " $label))
             (println (str "fail " $label " expected=\"" $expected "\" got=\"" $got "\""))))]

@@ -29,7 +29,7 @@
             {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (get $st :line) :col (+ (get $st :col) 1) :tokens (get $st :tokens)}))]
 [FUNC emit :params [$st $k $v $sl $sc]
   :body {:src (get $st :src) :idx (get $st :idx) :line (get $st :line) :col (get $st :col)
-         :tokens (append (get $st :tokens) (list {:kind $k :value $v :line $sl :col $sc}))}]
+         :tokens (append (get $st :tokens) (list {:type $k :value $v :line $sl :col $sc}))}]
 [FUNC skip-comment :params [$st]
   :body (if (at-end? $st) $st
           (let [[$c (peek $st)]]
@@ -94,7 +94,7 @@
 [FUNC lex-loop :params [$st]
   :body (let [[$s1 (skip-ws $st)]]
           (if (at-end? $s1) (get $s1 :tokens) (lex-loop (read-token $s1))))]
-[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+[FUNC fl-lex :params [$src] :body (lex-loop (make-state $src))]
 
 ;; ─── AST ─────────────────────────────
 [FUNC make-literal :params [$t $v $l] :body {:kind "literal" :type $t :value $v :line $l}]
@@ -120,7 +120,7 @@
 [FUNC r-pair :params [$p $n] :body {:p $p :node $n}]
 
 [FUNC parse-atom :params [$p]
-  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$l (get $t :line)]]
+  :body (let [[$t (p-peek $p)] [$k (get $t :type)] [$v (get $t :value)] [$l (get $t :line)]]
           (cond
             [(= $k "Number") (r-pair (p-advance $p) (make-literal "number" $v $l))]
             [(= $k "String") (r-pair (p-advance $p) (make-literal "string" $v $l))]
@@ -130,7 +130,7 @@
             [true (r-pair (p-advance $p) (make-literal "unknown" $v $l))]))]
 
 [FUNC parse-expr :params [$p]
-  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+  :body (let [[$t (p-peek $p)] [$k (get $t :type)]]
           (cond
             [(= $k "LParen") (parse-sexpr $p)]
             [(= $k "LBracket") (parse-bracket $p)]
@@ -224,7 +224,7 @@
                 [$p2 (p-append-ast (get $one :p) (get $one :node))]]
             (parse-all $p2)))]
 
-[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
+[FUNC fl-parse :params [$tokens] :body (parse-all (p-make $tokens))]
 
 ;; ─── smoke ───────────────────────────
 
@@ -245,7 +245,7 @@
                 "" $nodes)]
 
 [FUNC check :params [$label $src $expected]
-  :body (let [[$got (ast-summary (parse (lex $src)))]]
+  :body (let [[$got (ast-summary (fl-parse (fl-lex $src)))]]
           (if (= $got $expected)
             (println (str "pass " $label))
             (println (str "fail " $label " expected=\"" $expected "\" got=\"" $got "\""))))]

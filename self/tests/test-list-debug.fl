@@ -1,0 +1,21 @@
+;; Test FL list handling
+(println "=== Testing FL List ===")
+
+;; Test 1: Create a simple list
+(let [[$lst (list 1 2 3)]]
+  (println (str "list (list 1 2 3): " $lst)))
+
+;; Test 2: Append to a list
+(let [[$lst (append [] (list 42))]]
+  (println (str "append [] (list 42): " $lst)))
+
+;; Test 3: Create a map and put in a list
+(let [[$node {:kind "literal" :type "number" :value 42}]]
+  (println (str "Node: " $node))
+  (let [[$lst (list $node)]]
+    (println (str "List with node: " $lst))))
+
+;; Test 4: Append a node to a list
+(let [[$node {:kind "literal" :type "number" :value 42}]]
+  (let [[$lst (append [] (list $node))]]
+    (println (str "Appended node: " $lst))))
