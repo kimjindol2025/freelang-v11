@@ -202,7 +202,7 @@
 
 [FUNC cg-literal :params [$n]
   :body (let [[$t (get $n :type)] [$v (get $n :value)]]
-          (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
+          (cond [(= $t "number") (str $v)] [(= $t "boolean") (if $v "true" "false")] [(= $t "string") (js-esc $v)]
                 [(= $t "symbol")
                  (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
                        [true (js-name $v)])]
@@ -240,7 +240,7 @@
 [FUNC args-loop :params [$args $i $acc]
   :body (if (>= $i (length $args)) $acc
           (let [[$c (cg (get $args $i))]]
-            (args-loop $args (+ $i 1) (if (= (length $acc) 0) $c (str $acc "," $c)))))]
+            (args-loop $args (+ $i 1) (if (= $i 0) $c (str $acc "," $c)))))]
 
 [FUNC cg-binop :params [$args $op $zero]
   :body (cond [(= (length $args) 0) $zero] [(= (length $args) 1) (cg (get $args 0))]

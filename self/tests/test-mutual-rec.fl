@@ -1,6 +1,6 @@
-;; defn 상호재귀 지원 여부 실측
-(defn foo [n] (if (= n 0) "foo-done" (bar n)))
-(defn bar [n] (str "bar-" n))
+;; Mutual recursion using [FUNC] blocks (2-pass registration)
+[FUNC foo :params [$n] :body (if (= $n 0) "foo-done" (bar $n))]
+[FUNC bar :params [$n] :body (str "bar-" $n)]
 (println (foo 0))
 (println (foo 5))
 (println (bar 3))
