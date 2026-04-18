@@ -659,6 +659,17 @@
             [(= $op "db_query") (str "_fl_db_query(" $as ")")]
             [(= $op "db_exec") (str "_fl_db_exec(" $as ")")]
 
+            ;; ─── Server/HTTP (placeholder) ───
+            [(= $op "server_post") (str "_fl_server_post(" $as ")")]
+            [(= $op "server_get") (str "_fl_server_get(" $as ")")]
+            [(= $op "server_put") (str "_fl_server_put(" $as ")")]
+            [(= $op "server_delete") (str "_fl_server_delete(" $as ")")]
+            [(= $op "server_start") (str "_fl_server_start(" $as ")")]
+            [(= $op "server_stop") (str "_fl_server_stop(" $as ")")]
+            [(= $op "http_get") (str "_fl_http_get(" $as ")")]
+            [(= $op "http_post") (str "_fl_http_post(" $as ")")]
+            [(= $op "ws_send") (str "_fl_ws_send(" $as ")")]
+
             [true (cg-call $op $args)]))]
 
 [FUNC cg-call :params [$op $args]
@@ -790,7 +801,17 @@
     "const _fl_mariadb_query = (db,sql,...args) => [];"
     "const _fl_mariadb_one = (db,sql,...args) => null;"
     "const _fl_db_query = (path,sql,...args) => [];"
-    "const _fl_db_exec = (path,sql,...args) => null;")]
+    "const _fl_db_exec = (path,sql,...args) => null;"
+    ;; Server/HTTP stubs (requires global server state)
+    "const _fl_server_post = (path,fn) => null;"
+    "const _fl_server_get = (path,fn) => null;"
+    "const _fl_server_put = (path,fn) => null;"
+    "const _fl_server_delete = (path,fn) => null;"
+    "const _fl_server_start = (port) => null;"
+    "const _fl_server_stop = () => null;"
+    "const _fl_http_get = (url) => '';"
+    "const _fl_http_post = (url,body) => '';"
+    "const _fl_ws_send = (sid,data) => null;")]
 
 ;; ═══════ 최상위 ═══════
 
