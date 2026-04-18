@@ -1,57 +1,283 @@
 ;; Phase 11 — Node FFI codegen 검증
 ;; file_read, file_write, file_exists, shell_capture
 
-(defn test-file-write-codegen []
-  (let [[$src "(file_write \"/tmp/fl-test.txt\" \"hello\")"]
-        [$ast (fl-parse $src)]
-        [$js (fl->js-with-prelude $ast)]]
-    (do
-      (println "=== test-file-write-codegen ===")
-      (println (str "src: " $src))
-      (println (str "js contains _fl_file_write: " (contains? $js "_fl_file_write")))
-      (= (contains? $js "_fl_file_write") true))))
+;; ─────────────── Lexer (inline) ───────────────
+[FUNC is-digit? :params [$c] :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
+[FUNC is-alpha? :params [$c]
+  :body (if (null? $c) false
+          (or (and (>= $c "a") (<= $c "z")) (and (>= $c "A") (<= $c "Z"))))]
+[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
+[FUNC is-space? :params [$c] :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
+[FUNC is-symbol-char? :params [$c]
+  :body (if (null? $c) false
+          (or (is-alnum? $c) (= $c "-") (= $c "_") (= $c "?") (= $c "!")
+              (= $c "/") (= $c ".") (= $c "<") (= $c ">") (= $c "=")
+              (= $c "+") (= $c "*") (= $c "%")))]
+[FUNC make-state :params [$src] :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
+[FUNC peek-at :params [$st $o]
+  :body (let [[$s (get $st :src)] [$i (+ (get $st :idx) $o)]]
+          (if (>= $i (length $s)) null (char-at $s $i)))]
+[FUNC peek :params [$st] :body (peek-at $st 0)]
+[FUNC at-end? :params [$st] :body (>= (get $st :idx) (length (get $st :src)))]
+[FUNC advance :params [$st]
+  :body (let [[$c (peek $st)]]
+          (if (= $c "\n")
+            {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (+ (get $st :line) 1) :col 1 :tokens (get $st :tokens)}
+            {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (get $st :line) :col (+ (get $st :col) 1) :tokens (get $st :tokens)}))]
+[FUNC emit :params [$st $k $v $sl $sc]
+  :body {:src (get $st :src) :idx (get $st :idx) :line (get $st :line) :col (get $st :col)
+         :tokens (append (get $st :tokens) (list {:kind $k :value $v :line $sl :col $sc}))}]
+[FUNC skip-ws :params [$st]
+  :body (if (at-end? $st) $st
+          (let [[$c (peek $st)]] (if (is-space? $c) (skip-ws (advance $st)) $st)))]
+[FUNC read-number-body :params [$st $a $d $l $c]
+  :body (if (at-end? $st) (emit $st "Number" $a $l $c)
+          (let [[$ch (peek $st)]]
+            (cond [(is-digit? $ch) (read-number-body (advance $st) (str $a $ch) $d $l $c)]
+                  [(and (= $ch ".") (not $d)) (read-number-body (advance $st) (str $a $ch) true $l $c)]
+                  [true (emit $st "Number" $a $l $c)])))]
+[FUNC read-number :params [$st] :body (read-number-body $st "" false (get $st :line) (get $st :col))]
+[FUNC read-string-body :params [$st $a $l $c]
+  :body (if (at-end? $st) (emit $st "String" $a $l $c)
+          (let [[$ch (peek $st)]]
+            (cond [(= $ch "\"") (emit (advance $st) "String" $a $l $c)]
+                  [true (read-string-body (advance $st) (str $a $ch) $l $c)])))]
+[FUNC read-string :params [$st]
+  :body (let [[$l (get $st :line)] [$c (get $st :col)] [$s1 (advance $st)]]
+          (read-string-body $s1 "" $l $c))]
+[FUNC read-sym-body :params [$st $a $l $c $k]
+  :body (if (at-end? $st) (emit $st $k $a $l $c)
+          (let [[$ch (peek $st)]]
+            (if (is-symbol-char? $ch) (read-sym-body (advance $st) (str $a $ch) $l $c $k)
+              (emit $st $k $a $l $c))))]
+[FUNC read-symbol :params [$st] :body (read-sym-body $st "" (get $st :line) (get $st :col) "Symbol")]
+[FUNC read-variable :params [$st]
+  :body (let [[$l (get $st :line)] [$c (get $st :col)] [$s1 (advance $st)]]
+          (read-sym-body $s1 "" $l $c "Variable"))]
+[FUNC read-token :params [$st]
+  :body (let [[$s1 (skip-ws $st)]]
+          (if (at-end? $s1) $s1
+            (let [[$c (peek $s1)] [$l (get $s1 :line)] [$col (get $s1 :col)]]
+              (cond
+                [(= $c "(") (emit (advance $s1) "LParen" $c $l $col)]
+                [(= $c ")") (emit (advance $s1) "RParen" $c $l $col)]
+                [(= $c "[") (emit (advance $s1) "LBracket" $c $l $col)]
+                [(= $c "]") (emit (advance $s1) "RBracket" $c $l $col)]
+                [(= $c "\"") (read-string $s1)]
+                [(= $c "$") (read-variable $s1)]
+                [(is-digit? $c) (read-number $s1)]
+                [(and (= $c "-") (is-digit? (peek-at $s1 1)))
+                 (read-number-body (advance $s1) "-" false $l $col)]
+                [(is-symbol-char? $c) (read-symbol $s1)]
+                [true (emit (advance $s1) "Unknown" $c $l $col)]))))]
+[FUNC lex-loop :params [$st]
+  :body (let [[$s1 (skip-ws $st)]]
+          (if (at-end? $s1) (get $s1 :tokens) (lex-loop (read-token $s1))))]
+[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
 
-(defn test-file-read-codegen []
-  (let [[$src "(file_read \"/tmp/fl-test.txt\")"]
-        [$ast (fl-parse $src)]
-        [$js (fl->js-with-prelude $ast)]]
-    (do
-      (println "=== test-file-read-codegen ===")
-      (println (str "js contains _fl_file_read: " (contains? $js "_fl_file_read")))
-      (= (contains? $js "_fl_file_read") true))))
+;; ─────────────── Parser (inline) ───────────────
+[FUNC make-literal :params [$t $v $l] :body {:kind "literal" :type $t :value $v :line $l}]
+[FUNC make-variable :params [$n $l] :body {:kind "variable" :name $n :line $l}]
+[FUNC make-sexpr :params [$op $args $l] :body {:kind "sexpr" :op $op :args $args :line $l}]
+[FUNC make-array-block :params [$items $l]
+  :body {:kind "block" :type "Array" :name null :fields {:items $items} :line $l}]
 
-(defn test-file-exists-codegen []
-  (let [[$src "(file_exists \"/tmp/fl-test.txt\")"]
-        [$ast (fl-parse $src)]
-        [$js (fl->js-with-prelude $ast)]]
-    (do
-      (println "=== test-file-exists-codegen ===")
-      (println (str "js contains _fl_file_exists: " (contains? $js "_fl_file_exists")))
-      (= (contains? $js "_fl_file_exists") true))))
+[FUNC p-make :params [$t] :body {:tokens $t :idx 0}]
+[FUNC p-peek :params [$p]
+  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
+          (if (>= $i (length $t)) null (get $t $i)))]
+[FUNC p-end? :params [$p] :body (>= (get $p :idx) (length (get $p :tokens)))]
+[FUNC p-advance :params [$p] :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1)}]
+[FUNC r-pair :params [$p $n] :body {:p $p :node $n}]
 
-(defn test-shell-capture-codegen []
-  (let [[$src "(shell_capture \"echo hello\")"]
-        [$ast (fl-parse $src)]
-        [$js (fl->js-with-prelude $ast)]]
-    (do
-      (println "=== test-shell-capture-codegen ===")
-      (println (str "js contains _fl_shell_capture: " (contains? $js "_fl_shell_capture")))
-      (= (contains? $js "_fl_shell_capture") true))))
+[FUNC parse-atom :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$l (get $t :line)]]
+          (cond
+            [(= $k "Number") (r-pair (p-advance $p) (make-literal "number" $v $l))]
+            [(= $k "String") (r-pair (p-advance $p) (make-literal "string" $v $l))]
+            [(= $k "Symbol") (r-pair (p-advance $p) (make-literal "symbol" $v $l))]
+            [(= $k "Variable") (r-pair (p-advance $p) (make-variable $v $l))]
+            [true (r-pair (p-advance $p) (make-literal "unknown" $v $l))]))]
 
-(defn test-ffi-runtime-prelude []
-  (let [[$prelude (runtime-prelude)]]
-    (do
-      (println "=== test-ffi-runtime-prelude ===")
-      (println (str "prelude contains _fl_file_read: " (contains? $prelude "_fl_file_read")))
-      (println (str "prelude contains _fl_file_write: " (contains? $prelude "_fl_file_write")))
-      (println (str "prelude contains _fl_file_exists: " (contains? $prelude "_fl_file_exists")))
-      (println (str "prelude contains _fl_shell_capture: " (contains? $prelude "_fl_shell_capture")))
-      (and (contains? $prelude "_fl_file_read")
-           (contains? $prelude "_fl_file_write")
-           (contains? $prelude "_fl_file_exists")
-           (contains? $prelude "_fl_shell_capture")))))
+[FUNC parse-expr :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+          (cond
+            [(= $k "LParen") (parse-sexpr $p)]
+            [(= $k "LBracket") (parse-array $p)]
+            [true (parse-atom $p)]))]
 
-;; 실행
+[FUNC parse-args :params [$p $acc]
+  :body (let [[$t (p-peek $p)]]
+          (cond [(null? $t) (r-pair $p $acc)]
+                [(= (get $t :kind) "RParen") (r-pair $p $acc)]
+                [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
+                [true (let [[$one (parse-expr $p)]]
+                        (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+
+[FUNC parse-sexpr :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
+              [$coll (parse-args $p1 [])] [$p2 (get $coll :p)] [$args (get $coll :node)]
+              [$p3 (if (and (not (null? (p-peek $p2))) (= (get (p-peek $p2) :kind) "RParen"))
+                     (p-advance $p2) $p2)]]
+          (if (= (length $args) 0) (r-pair $p3 (make-sexpr "" (list) $line))
+            (let [[$op-n (get $args 0)]
+                  [$op (cond [(= (get $op-n :kind) "literal") (get $op-n :value)]
+                             [(= (get $op-n :kind) "variable") (str "$" (get $op-n :name))]
+                             [true "unknown"])]
+                  [$rest (slice $args 1 (length $args))]]
+              (r-pair $p3 (make-sexpr $op $rest $line)))))]
+
+[FUNC parse-array :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
+              [$coll (parse-args $p1 [])] [$p2 (get $coll :p)] [$items (get $coll :node)]
+              [$p3 (if (and (not (null? (p-peek $p2))) (= (get (p-peek $p2) :kind) "RBracket"))
+                     (p-advance $p2) $p2)]]
+          (r-pair $p3 (make-array-block $items $line)))]
+
+[FUNC parse-all :params [$p $acc]
+  :body (if (p-end? $p) $acc
+          (let [[$one (parse-expr $p)]]
+            (parse-all (get $one :p) (append $acc (list (get $one :node))))))]
+
+[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens) [])]
+
+;; ─────────────── Codegen (with FFI) ───────────────
+[FUNC js-esc :params [$s]
+  :body (let [[$a (replace $s "\\" "\\\\")] [$b (replace $a "\"" "\\\"")]]
+          (str "\"" $b "\""))]
+[FUNC js-name :params [$n]
+  :body (if (null? $n) "_"
+          (let [[$a (replace $n "-" "_")] [$b (replace $a "?" "_q")] [$c (replace $b "!" "_x")]]
+            $c))]
+
+[FUNC cg :params [$n]
+  :body (cond
+          [(null? $n) "null"]
+          [(= (get $n :kind) "literal") (cg-literal $n)]
+          [(= (get $n :kind) "variable") (js-name (get $n :name))]
+          [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
+          [(= (get $n :kind) "block") (cg-block $n)]
+          [true "null"])]
+
+[FUNC cg-literal :params [$n]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond
+            [(= $t "number") (str $v)]
+            [(= $t "boolean") (if $v "true" "false")]
+            [(= $t "string") (js-esc $v)]
+            [(= $t "symbol")
+             (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
+                   [true (js-name $v)])]
+            [true "null"]))]
+
+[FUNC cg-block :params [$n]
+  :body (cond [(= (get $n :type) "Array")
+               (str "[" (cg-args (get (get $n :fields) "items")) "]")]
+              [true "null"])]
+
+[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (let [[$c (cg (get $args $i))]]
+            (args-loop $args (+ $i 1)
+                       (if (= $i 0) $c (str $acc "," $c)))))]
+
+[FUNC cg-pair :params [$args $op]
+  :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+
+[FUNC extract-name :params [$n]
+  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
+              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+              [true "_anon"])]
+
+[FUNC cg-if :params [$args]
+  :body (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":"
+             (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
+
+[FUNC cg-native :params [$op $args]
+  :body (let [[$as (cg-args $args)]]
+          (cond
+            [(= $op "println") (str "console.log(" $as ")")]
+            [(= $op "file_read") (str "_fl_file_read(" $as ")")]
+            [(= $op "file_write") (str "_fl_file_write(" $as ")")]
+            [(= $op "file_exists") (str "_fl_file_exists(" $as ")")]
+            [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
+            [(= $op "contains?") (str "_fl_contains(" $as ")")]
+            [true (cg-call $op $args)]))]
+
+[FUNC cg-call :params [$op $args]
+  :body (let [[$fn (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op))]]
+          (str $fn "(" (cg-args $args) ")"))]
+
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (cond
+            [(= $op "if") (cg-if $args)]
+            [(= $op "=") (cg-pair $args "===")]
+            [true (cg-native $op $args)]))]
+
+[FUNC runtime-prelude :params []
+  :body (str
+    "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
+    "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
+    "const _fl_file_exists = (p) => require('fs').existsSync(p);"
+    "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
+    "const _fl_contains = (s, p) => s.includes(p);")]
+
+[FUNC codegen-loop :params [$ast $i $acc]
+  :body (if (>= $i (length $ast)) $acc
+          (codegen-loop $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+
+[FUNC fl->js-with-prelude :params [$ast]
+  :body (str (runtime-prelude) "\n" (codegen-loop $ast 0 ""))]
+
+;; ─────────────── Tests ───────────────
+[FUNC test-file-write-codegen :params [] :body (let [[$src "(file_write \"/tmp/fl-test.txt\" \"hello\")"]
+              [$ast (fl-parse $src)]
+              [$js (fl->js-with-prelude $ast)]]
+          (do
+            (println "=== test-file-write-codegen ===")
+            (println (str "src: " $src))
+            (println (str "js contains _fl_file_write: " (contains? $js "_fl_file_write")))
+            (= (contains? $js "_fl_file_write") true)))]
+
+[FUNC test-file-read-codegen :params [] :body (let [[$src "(file_read \"/tmp/fl-test.txt\")"]
+              [$ast (fl-parse $src)]
+              [$js (fl->js-with-prelude $ast)]]
+          (do
+            (println "=== test-file-read-codegen ===")
+            (println (str "js contains _fl_file_read: " (contains? $js "_fl_file_read")))
+            (= (contains? $js "_fl_file_read") true)))]
+
+[FUNC test-file-exists-codegen :params [] :body (let [[$src "(file_exists \"/tmp/fl-test.txt\")"]
+              [$ast (fl-parse $src)]
+              [$js (fl->js-with-prelude $ast)]]
+          (do
+            (println "=== test-file-exists-codegen ===")
+            (println (str "js contains _fl_file_exists: " (contains? $js "_fl_file_exists")))
+            (= (contains? $js "_fl_file_exists") true)))]
+
+[FUNC test-shell-capture-codegen :params [] :body (let [[$src "(shell_capture \"echo hello\")"]
+              [$ast (fl-parse $src)]
+              [$js (fl->js-with-prelude $ast)]]
+          (do
+            (println "=== test-shell-capture-codegen ===")
+            (println (str "js contains _fl_shell_capture: " (contains? $js "_fl_shell_capture")))
+            (= (contains? $js "_fl_shell_capture") true)))]
+
+[FUNC test-ffi-runtime-prelude :params [] :body (let [[$prelude (runtime-prelude)]]
+          (do
+            (println "=== test-ffi-runtime-prelude ===")
+            (println (str "prelude contains _fl_file_read: " (contains? $prelude "_fl_file_read")))
+            (println (str "prelude contains _fl_file_write: " (contains? $prelude "_fl_file_write")))
+            (println (str "prelude contains _fl_file_exists: " (contains? $prelude "_fl_file_exists")))
+            (println (str "prelude contains _fl_shell_capture: " (contains? $prelude "_fl_shell_capture")))
+            (and (contains? $prelude "_fl_file_read")
+                 (contains? $prelude "_fl_file_write")
+                 (contains? $prelude "_fl_file_exists")
+                 (contains? $prelude "_fl_shell_capture"))))]
+
+;; ─────────────── Run Tests ───────────────
 (println "\n======== Phase 11 Test Suite ========")
 (let [[$t1 (test-file-write-codegen)]
       [$t2 (test-file-read-codegen)]
