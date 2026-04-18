@@ -1,0 +1,37 @@
+;; self/stdlib/collection.fl — 순수 FL 컬렉션 헬퍼 (Phase 08/87)
+;;
+;; v11 stdlib-collection.ts (25개 함수) 의 FL 재작성 subset.
+;; 재귀 기반이라 TCO 없이는 깊은 호출 제한됨.
+
+[FUNC coll-reverse :params [$lst] :body (reverse-loop $lst 0 (list))]
+[FUNC reverse-loop :params [$lst $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (reverse-loop $lst (+ $i 1) (append (list (get $lst $i)) $acc)))]
+
+[FUNC coll-range :params [$start $end] :body (range-loop $start $end (list))]
+[FUNC range-loop :params [$s $e $acc]
+  :body (if (>= $s $e) $acc (range-loop (+ $s 1) $e (append $acc (list $s))))]
+
+[FUNC coll-sum :params [$lst] :body (sum-loop $lst 0 0)]
+[FUNC sum-loop :params [$lst $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (sum-loop $lst (+ $i 1) (+ $acc (get $lst $i))))]
+
+[FUNC coll-take :params [$lst $n]
+  :body (if (>= $n (length $lst)) $lst (slice $lst 0 $n))]
+
+[FUNC coll-drop :params [$lst $n]
+  :body (if (>= $n (length $lst)) (list) (slice $lst $n (length $lst)))]
+
+[FUNC coll-flatten :params [$lst] :body (flatten-loop $lst 0 (list))]
+[FUNC flatten-loop :params [$lst $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (let [[$item (get $lst $i)]]
+            (if (null? $item) (flatten-loop $lst (+ $i 1) $acc)
+              (flatten-loop $lst (+ $i 1) (append $acc $item)))))]
+
+[FUNC coll-contains? :params [$lst $v] :body (contains-loop $lst $v 0)]
+[FUNC contains-loop :params [$lst $v $i]
+  :body (cond [(>= $i (length $lst)) false]
+              [(= (get $lst $i) $v) true]
+              [true (contains-loop $lst $v (+ $i 1))])]

@@ -1,0 +1,21 @@
+;; self/stdlib/string.fl — Phase 08/87
+
+[FUNC str-starts-with? :params [$s $prefix]
+  :body (if (> (length $prefix) (length $s)) false
+          (= (substring $s 0 (length $prefix)) $prefix))]
+
+[FUNC str-ends-with? :params [$s $suffix]
+  :body (if (> (length $suffix) (length $s)) false
+          (= (substring $s (- (length $s) (length $suffix)) (length $s)) $suffix))]
+
+[FUNC str-repeat :params [$s $n] :body (str-repeat-loop $s $n "")]
+[FUNC str-repeat-loop :params [$s $n $acc]
+  :body (if (<= $n 0) $acc (str-repeat-loop $s (- $n 1) (str $acc $s)))]
+
+[FUNC str-pad-left :params [$s $n $pad]
+  :body (let [[$diff (- $n (length $s))]]
+          (if (<= $diff 0) $s (str (str-repeat $pad $diff) $s)))]
+
+[FUNC str-pad-right :params [$s $n $pad]
+  :body (let [[$diff (- $n (length $s))]]
+          (if (<= $diff 0) $s (str $s (str-repeat $pad $diff))))]

@@ -1,0 +1,13 @@
+;; self/stdlib/math.fl — Phase 08/87
+
+[FUNC math-pow :params [$base $exp] :body (pow $base $exp)]
+[FUNC math-sqrt :params [$v] :body (sqrt $v)]
+[FUNC math-floor :params [$v] :body (floor $v)]
+[FUNC math-ceil :params [$v] :body (ceil $v)]
+[FUNC math-round :params [$v] :body (round $v)]
+
+[FUNC math-gcd :params [$a $b]
+  :body (if (= $b 0) $a (math-gcd $b (% $a $b)))]
+
+[FUNC math-fact :params [$n]
+  :body (if (<= $n 1) 1 (* $n (math-fact (- $n 1))))]

@@ -1,0 +1,19 @@
+;; self/main.fl — 셀프 인터프리터 진입점 (Phase 09/93)
+;;
+;; 사용: node bootstrap.js run self/main.fl "<FL-source>"
+;; 동작: 인자로 받은 FL 소스를 self-lex → self-parse → self-eval 로 실행.
+;;
+;; 예:
+;;   node bootstrap.js run self/main.fl '(+ 1 2)'   → 3
+;;   node bootstrap.js run self/main.fl '(defn sq [$x] (* $x $x)) (sq 7)'  → 49
+
+;; NOTE: bootstrap.js run 이 여러 FL 파일 로드를 공식 지원하지 않으므로
+;; 이 파일은 smoke/demo 용. 실제 self-interp 통합 테스트는
+;; self/tests/test-interp-user-fn.fl 과 test-builtins.fl 을 사용.
+
+(println "self/main.fl — Phase 09 진입점 (demo)")
+(println "Level-1 fixed-point: TS interp 이 self/main.fl 을 실행.")
+(println "Level-2 fixed-point: self-lex 가 자기 자신 파일을 토큰화 (Phase 01/20).")
+(println "Level-3 fixed-point: self-interp 이 (fact 7) = 5040 계산 (Phase 07/86).")
+(println "")
+(println "진척: 87/100.")
