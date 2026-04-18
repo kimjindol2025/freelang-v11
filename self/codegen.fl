@@ -625,6 +625,16 @@
             [(= $op "timer_elapsed") (str "((t)=>Date.now()-t.__timer.start)(" $as ")")]
             [(= $op "timer_lap") (str "((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(" $as ")")]
 
+            ;; ─── Database (8, placeholder for JS env) ───
+            [(= $op "pg_exec") (str "_fl_pg_exec(" $as ")")]
+            [(= $op "pg_query") (str "_fl_pg_query(" $as ")")]
+            [(= $op "pg_connect") (str "_fl_pg_connect(" $as ")")]
+            [(= $op "mariadb_exec") (str "_fl_mariadb_exec(" $as ")")]
+            [(= $op "mariadb_query") (str "_fl_mariadb_query(" $as ")")]
+            [(= $op "mariadb_one") (str "_fl_mariadb_one(" $as ")")]
+            [(= $op "db_query") (str "_fl_db_query(" $as ")")]
+            [(= $op "db_exec") (str "_fl_db_exec(" $as ")")]
+
             [true (cg-call $op $args)]))]
 
 [FUNC cg-call :params [$op $args]
@@ -747,7 +757,16 @@
     ;; Common
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
     ;; argv
-    "const __argv__ = process.argv.slice(2);")]
+    "const __argv__ = process.argv.slice(2);"
+    ;; Database stubs (requires external connection mgmt)
+    "const _fl_pg_exec = (db,sql,...args) => null;"
+    "const _fl_pg_query = (db,sql,...args) => [];"
+    "const _fl_pg_connect = (cfg) => null;"
+    "const _fl_mariadb_exec = (db,sql,...args) => null;"
+    "const _fl_mariadb_query = (db,sql,...args) => [];"
+    "const _fl_mariadb_one = (db,sql,...args) => null;"
+    "const _fl_db_query = (path,sql,...args) => [];"
+    "const _fl_db_exec = (path,sql,...args) => null;")]
 
 ;; ═══════ 최상위 ═══════
 
