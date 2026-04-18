@@ -199,9 +199,38 @@ smoke 7/7 pass. lex → parse → eval end-to-end.
 - let 은 통합 테스트엔 미포함 (lexer 부분 축소)
 - Phase 06 에서 특수폼 완성 + Phase 07 에서 builtin 342 확장
 
-## Phase 06 — 특수폼 31
+## Phase 06 — 특수폼 31 (부분 완성)
 
-(미진행)
+```
+phase=06 stage=66 status=done target=user_fn_apply + self-ref 재귀 smoke=4/4
+phase=06 stage=67 status=deferred target=loop/recur+trampoline (TCO)
+phase=06 stage=68 status=deferred target=while
+phase=06 stage=69 status=done target=and/or/not/null? (이미 Phase 05)
+phase=06 stage=70 status=deferred target=compose/pipe/->/->>/|>
+phase=06 stage=71 status=done target=call/func-ref (test-interp-user-fn 의 hof 확인)
+phase=06 stage=72 status=deferred target=quote/macroexpand/defmacro
+phase=06 stage=73 status=deferred target=defstruct/defprotocol/impl
+phase=06 stage=74 status=deferred target=match/MatchCase
+phase=06 stage=75 status=deferred target=try/catch/throw/fl-try
+phase=06 stage=76 status=deferred target=async/await/parallel/race/with-timeout
+```
+
+🎉 **핵심 달성**: 사용자 정의 함수 재귀 호출 성공.
+
+실측 (test-interp-user-fn.fl):
+```
+(defn double [$x] (* $x 2)) (double 21)                 → 42  ✓
+(defn add [$a $b] (+ $a $b)) (add 10 20)                → 30  ✓
+(defn fact [$n]
+  (if (<= $n 1) 1 (* $n (fact (- $n 1))))) (fact 5)     → 120 ✓ (재귀!)
+(defn mk [$n] (fn [$x] (+ $x $n))) (call (mk 10) 5)     → 15  ✓ (HOF + closure)
+```
+
+**이로써 self interpreter 가 Turing complete 수준 — 함수/재귀/클로저 동작.**
+
+연기된 특수폼 (10개) 는 Phase 07 (builtins) 와 병행 작업.
+복잡도가 높거나 (async/defstruct/defprotocol) 현재 핵심 기능에
+무관한 것들. 작동하는 subset 을 우선 확보한 후 추가.
 
 ## Phase 07 — Builtins 342
 
