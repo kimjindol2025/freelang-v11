@@ -140,9 +140,25 @@ phase=03 stage=45 status=deferred target=parser_self_parse (stage 43 trampoline 
 - trampoline TCO (FL 런타임 recur 가 제대로 최적화되는지 확인 후)
 - parser self-parse (trampoline 후 self/parser.fl 자신 파싱)
 
-## Phase 04 — Scope
+## Phase 04 — Scope ✅
 
-(미진행)
+```
+phase=04 stage=46 status=done target=make/push/pop
+phase=04 stage=47 status=done target=$-norm-key
+phase=04 stage=48 status=deferred target=dot_lookup (env.vars) — Phase 05 interpreter
+phase=04 stage=49 status=done target=snapshot (identity on list)
+phase=04 stage=50 status=done target=restore
+phase=04 stage=51 status=done target=multi-scope smoke=10/10
+phase=04 stage=52 status=done target=ts_diff (단일 시퀀스 기준 동등)
+```
+
+실측:
+- self/scope.fl: 11 [FUNC] 블록, ~50 줄
+- self/tests/test-scope.fl smoke 10/10 pass:
+  empty-depth / set-get / norm-save-$ / norm-load-$
+  has-yes / has-no / shadow-top / shadow-pop / nested-l / nested-g
+
+연기: stage 48 (dot lookup env.vars.x) — Phase 05 interpreter 에서 자연히 처리.
 
 ## Phase 05 — Interpreter Core
 

@@ -1,0 +1,74 @@
+;; P04 smoke: scope push/pop/get/set/$-norm
+
+[FUNC make-scope :params [] :body (list {})]
+[FUNC push-scope :params [$s] :body (append (list {}) $s)]
+[FUNC pop-scope :params [$s] :body (if (= (length $s) 0) $s (slice $s 1 (length $s)))]
+
+[FUNC norm-key :params [$k]
+  :body (if (null? $k) ""
+          (if (and (>= (length $k) 1) (= (char-at $k 0) "$"))
+            (substring $k 1 (length $k))
+            $k))]
+
+[FUNC has-key-loop :params [$s $k $i]
+  :body (cond
+          [(>= $i (length $s)) false]
+          [(not (null? (get (get $s $i) $k))) true]
+          [true (has-key-loop $s $k (+ $i 1))])]
+
+[FUNC has-key? :params [$s $k] :body (has-key-loop $s (norm-key $k) 0)]
+
+[FUNC scope-get-loop :params [$s $k $i]
+  :body (cond
+          [(>= $i (length $s)) null]
+          [(not (null? (get (get $s $i) $k))) (get (get $s $i) $k)]
+          [true (scope-get-loop $s $k (+ $i 1))])]
+
+[FUNC scope-get :params [$s $k] :body (scope-get-loop $s (norm-key $k) 0)]
+
+[FUNC scope-set :params [$s $k $v]
+  :body (let [[$nk (norm-key $k)]
+              [$top (get $s 0)]
+              [$rest (slice $s 1 (length $s))]
+              [$top2 (json_set $top $nk $v)]]
+          (append (list $top2) $rest))]
+
+[FUNC check :params [$label $actual $expected]
+  :body (if (= $actual $expected)
+          (println (str "pass " $label))
+          (println (str "fail " $label " expected=" $expected " got=" $actual)))]
+
+;; 1. 빈 scope
+(check "empty-depth"   (length (make-scope))                1)
+
+;; 2. set + get
+(let [[$s1 (scope-set (make-scope) "x" 42)]]
+  (check "set-get"     (scope-get $s1 "x")                   42))
+
+;; 3. $ 정규화 — 저장 "$x", 조회 "x"
+(let [[$s1 (scope-set (make-scope) "$x" 99)]]
+  (check "norm-save-$" (scope-get $s1 "x")                   99))
+
+;; 4. $ 정규화 반대 — 저장 "y", 조회 "$y"
+(let [[$s1 (scope-set (make-scope) "y" 7)]]
+  (check "norm-load-$" (scope-get $s1 "$y")                  7))
+
+;; 5. has-key?
+(let [[$s1 (scope-set (make-scope) "k" 1)]]
+  (check "has-yes"     (has-key? $s1 "k")                    true)
+  (check "has-no"      (has-key? $s1 "absent")               false))
+
+;; 6. push + shadow
+(let [[$s1 (scope-set (make-scope) "x" 10)]
+      [$s2 (push-scope $s1)]
+      [$s3 (scope-set $s2 "x" 20)]]
+  (check "shadow-top"  (scope-get $s3 "x")                   20)
+  (let [[$s4 (pop-scope $s3)]]
+    (check "shadow-pop"  (scope-get $s4 "x")                 10)))
+
+;; 7. nested lookup
+(let [[$s1 (scope-set (make-scope) "g" "global")]
+      [$s2 (push-scope $s1)]
+      [$s3 (scope-set $s2 "l" "local")]]
+  (check "nested-l"    (scope-get $s3 "l")                   "local")
+  (check "nested-g"    (scope-get $s3 "g")                   "global"))
