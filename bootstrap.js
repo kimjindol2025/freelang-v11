@@ -28665,6 +28665,21 @@ var AppRouter = class {
     return this.middlewares.get(routePath) || null;
   }
   /**
+   * W4: 특정 경로에 대한 에러 핸들러 파일 조회
+   */
+  getErrorHandlerForPath(routePath) {
+    if (this.errorHandlers.has(routePath)) {
+      return this.errorHandlers.get(routePath) || null;
+    }
+    return this.errorHandlers.get("/") || null;
+  }
+  /**
+   * W4: 404 핸들러 파일 조회
+   */
+  getNotFoundHandler() {
+    return this.notFoundHandler;
+  }
+  /**
    * 특정 경로에 대한 레이아웃 체인 조회
    */
   getLayoutsForRoute(routePath) {
