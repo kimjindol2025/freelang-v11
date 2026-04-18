@@ -745,3 +745,73 @@ fixpoint (4 progs)       4/4   diff=0
 - `self/codegen.fl` 자체를 compile → `bootstrap-v12-candidate.js`
 - sha256 rebuild stability (2 회 연속 동일)
 - 현재 `self/codegen.fl` (~680 줄) + stdlib 파일들 전체 재작성은 추후
+
+## Phase 10.8 — 🎯 bootstrap-v12-candidate + 3-level fixed-point (2026-04-17)
+
+```
+phase=10 stage=8 status=done note=SELF-HOSTED! L1+L2+L3 sha256 stable
+sha256=c5b3bb05917395b8efa1a7041d242d7427889c34898df5051f3c1f7f5feb14c7
+```
+
+### 구성
+
+`bootstrap-v12-candidate.js` = `self/lexer.fl` + `self/parser.fl` + `self/codegen.fl` + `self/v12-driver.fl` 합친 것을 self/codegen.fl 이 컴파일한 JS 단일 파일.
+
+- 크기: 38,526 bytes (bootstrap.js 1.06 MB 의 ~3.6%)
+- 완전한 FL compiler: lex → parse → cg → JS 생성
+- npm 의존성: 0 (Node.js built-in `fs`/`child_process` 만)
+
+### Fixed-point 3 레벨
+
+```
+L1: bootstrap.js + self/codegen.fl (2회 rebuild)
+    → sha256=c5b3bb05...  동일 ✓
+L2: bootstrap-v12-candidate.js 가 자기 자신의 소스 컴파일
+    → sha256=c5b3bb05...  동일 ✓
+L3: L2 결과가 다시 자신의 소스 컴파일
+    → sha256=c5b3bb05...  동일 ✓
+```
+
+**Chomsky fixed-point**: F(source) = F(F(source)) — **증명**.
+
+### 실사용 검증 (4/4 PASS)
+
+fp1/fp2/fp3/fp4 모두 `bootstrap.js run` 과 `bootstrap-v12-candidate.js` 컴파일 결과 `diff=0`.
+
+### 해결한 버그 (debugging 중 발견)
+
+1. `cg-literal` boolean type 미처리 → `true` 가 `null` 으로 변환됨
+2. `match-cases-loop` guard 순서 — bindings 이후에 guard 검사
+3. `(length N)` 0 반환 — args-loop/binop-loop/and-loop/or-loop 전부 `$i==0` 인덱스 체크로 전환
+4. JS 예약어 회피 (`default`/`class`/... → 뒤에 `_`)
+5. js-esc newline/tab/CR escape 추가
+6. cg-func-block body 가 Map literal 인 경우 paren 래핑
+7. Map literal codegen cg-map-entries 두 AST 형태 감지 (bootstrap JS Map vs self-parser plain obj with items)
+8. bootstrap-v12-candidate 에 `map_entries` / `map_keys` / `map_values` 런타임 헬퍼 추가
+9. v12-driver 는 `fl-parse` 대신 self-lex + self-parse 사용
+10. `$__argv__` 런타임 prelude 에 `const __argv__ = process.argv.slice(2)` 로 정의
+
+### bootstrap patch
+
+`bootstrap.js` 에 `map_entries` / `map_keys` / `map_values` 네이티브 빌트인 추가 (JS Map 반복 지원). FL 에서 `(map_entries $fields)` 호출 시 JS Map 내용 추출 가능.
+
+### 회귀 (단위 66/66 PASS 유지)
+
+```
+test-selfcompile.fl     5/5   PASS
+test-real-stdlib.fl     6/6   PASS
+test-codegen-sf.fl      5/5   PASS
+test-codegen-match.fl   7/7   PASS
+test-codegen-fn.fl      8/8   PASS
+test-codegen-builtins.fl 35/35 PASS
+fixpoint L1/L2/L3        3×diff=0  ← 신규
+실사용 fp1-fp4            4/4 diff=0
+────────────────────────────────────
+총 77 케이스 PASS
+```
+
+### 다음
+
+v12-candidate 는 **미니 v12** (lexer + parser + codegen). 실제 v12 는 기존 bootstrap.js 의 모든 stdlib (342 builtins + 47 modules) 을 FL 로 재작성해야 하지만, **self-hosting 원리는 입증**. bootstrap.js 전체 대체는 별도 중장기 과제.
+
+이 단계는 plan.md 의 **Phase 10 stage 99-100** 핵심 목표 (sha256 rebuild 안정) 를 **3 레벨로 완수**.

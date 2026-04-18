@@ -1,0 +1,1 @@
+(println (robots_txt {:disallow ["/admin"] :sitemap "https://ex.com/sitemap.xml"}))

@@ -1,0 +1,6 @@
+(define posts [{:slug "p1" :title "Post1" :date "2026-04-18" :tags ["alpha" "beta"] :body "body1" :summary "s1"}
+               {:slug "p2" :title "Post2" :date "2026-04-17" :tags ["beta" "gamma"] :body "body2" :summary "s2"}
+               {:slug "p3" :title "Post3" :date "2026-04-16" :tags ["alpha" "gamma"] :body "body3" :summary "s3"}])
+(println (json_stringify (blog_all_tags posts)))
+(println (json_stringify (blog_tag_counts posts)))
+(println (json_stringify (blog_posts_by_tag posts "beta")))

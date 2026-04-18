@@ -30,6 +30,7 @@ export interface Route {
   params: string[];
   isDynamic: boolean;
   layouts: string[];
+  kind?: "page" | "route";
 }
 
 export interface RouteMatch {
@@ -59,10 +60,12 @@ export class AppRouter {
       return;
     }
 
-    // Two-pass scan: collect all layouts first, then register pages so that
-    // every page can resolve its parent layout chain correctly.
+    // Two-pass scan: collect all layouts first, then register pages and
+    // API route handlers (route.fl) so every entry can resolve its parent
+    // layout chain correctly.
     this.scanDirectory(this.appDir, "", "layout");
     this.scanDirectory(this.appDir, "", "page");
+    this.scanDirectory(this.appDir, "", "route");
     this.buildLayoutChain();
   }
 
@@ -71,7 +74,7 @@ export class AppRouter {
    * @param phase "layout" = register only layout.fl files;
    *              "page" = register only page.fl files (so layouts exist first)
    */
-  private scanDirectory(dir: string, currentPath: string = "", phase: "layout" | "page" = "page"): void {
+  private scanDirectory(dir: string, currentPath: string = "", phase: "layout" | "page" | "route" = "page"): void {
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -89,7 +92,10 @@ export class AppRouter {
           this.scanDirectory(fullPath, pathForChild, phase);
         } else if (phase === "page" && entry.name === "page.fl") {
           const routePath = currentPath === "" ? "/" : currentPath;
-          this.registerRoute(routePath, fullPath);
+          this.registerRoute(routePath, fullPath, "page");
+        } else if (phase === "route" && entry.name === "route.fl") {
+          const routePath = currentPath === "" ? "/" : currentPath;
+          this.registerRoute(routePath, fullPath, "route");
         } else if (phase === "layout" && entry.name === "layout.fl") {
           const layoutPath = currentPath === "" ? "/" : currentPath;
           if (!this.layoutChain[layoutPath]) {

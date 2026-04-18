@@ -1,0 +1,131 @@
+{
+  "generated_at": "2026-04-18T04:44:25Z",
+  "node_version": "v25.8.2",
+  "commit": "e8d0ba2",
+  "features": {
+    "app-router-static": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/01-about.html",
+      "observed": {
+        "http_status": "200",
+        "body_match": "true"
+      }
+    },
+    "app-router-dynamic": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/02-post-hello.html",
+      "observed": {
+        "hello": "200,true",
+        "world": "200,true"
+      }
+    },
+    "layout-children": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/03-home.html",
+      "observed": {
+        "http_status": "200",
+        "wrap": "true"
+      }
+    },
+    "not-found-404": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/04-dist/404.html",
+      "observed": {
+        "build_exit": "0",
+        "has_file": "true",
+        "content_ok": "true"
+      }
+    },
+    "ssg-static-export": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/05-dist",
+      "observed": {
+        "home": "true",
+        "about": "true",
+        "hello": "true",
+        "world": "true"
+      }
+    },
+    "parallel-render": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/06-build.log",
+      "observed": {
+        "build_exit": "0",
+        "concurrency_log": "true",
+        "done_log": "true"
+      }
+    },
+    "markdown-to-html": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/07-markdown.html",
+      "observed": {
+        "exit": "0",
+        "h1": "true",
+        "strong": "true"
+      }
+    },
+    "rss-atom-feed": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/08-rss.xml",
+      "observed": {
+        "exit": "0",
+        "rss": "true",
+        "channel": "true",
+        "item": "true",
+        "self": "true"
+      }
+    },
+    "sitemap-robots": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/09-sitemap.xml",
+      "observed": {
+        "sitemap": "true,true",
+        "robots": "true,true,true"
+      }
+    },
+    "jsonld-article": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/10-jsonld.html",
+      "observed": {
+        "exit": "0",
+        "script_tag": "true",
+        "type_article": "true"
+      }
+    },
+    "blog-helpers": {
+      "category": "B",
+      "pass": true,
+      "score": 0.95,
+      "evidence": "tests/evidence/11-blog.log",
+      "observed": {
+        "exit": "0",
+        "tags": "true",
+        "counts": "true",
+        "filter": "true"
+      }
+    }
+  },
+  "weighted_average": 0.95,
+  "threshold": 0.95,
+  "result": "pass"
+}

@@ -1,0 +1,6 @@
+(define src (file_read "self/bench/fp1.fl"))
+(define toks (lex src))
+(println "toks-len:" (length toks))
+(define ast (parse toks))
+(println "ast-len:" (length ast))
+(println "ast:" ast)

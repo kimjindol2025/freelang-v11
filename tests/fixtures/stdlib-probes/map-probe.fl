@@ -1,0 +1,3 @@
+(define m {:a "hello" :b "world"})
+(println (get m :a))
+(println (get m "a"))

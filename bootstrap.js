@@ -20314,7 +20314,10 @@ function createProcessModule() {
       const idx = args2.indexOf(key);
       if (idx === -1 || idx + 1 >= args2.length) return defaultVal;
       return args2[idx + 1];
-    }
+    },
+    "map_keys": (m) => m instanceof Map ? [...m.keys()] : (m && typeof m === "object" && !Array.isArray(m) ? Object.keys(m) : []),
+    "map_values": (m) => m instanceof Map ? [...m.values()] : (m && typeof m === "object" && !Array.isArray(m) ? Object.values(m) : []),
+    "map_entries": (m) => m instanceof Map ? [...m.entries()] : (m && typeof m === "object" && !Array.isArray(m) ? Object.entries(m) : [])
   };
 }
 

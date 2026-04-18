@@ -12,15 +12,36 @@
 ;; ═══════ 유틸 ═══════
 
 [FUNC js-esc :params [$s]
-  :body (let [[$a (replace $s "\\" "\\\\")] [$b (replace $a "\"" "\\\"")]]
-          (str "\"" $b "\""))]
+  :body (let [[$a (replace $s "\\" "\\\\")]
+              [$b (replace $a "\"" "\\\"")]
+              [$c (replace $b "\n" "\\n")]
+              [$d (replace $c "\r" "\\r")]
+              [$e (replace $d "\t" "\\t")]]
+          (str "\"" $e "\""))]
+
+;; JS 예약어 회피: let/const/default/class/etc → 뒤에 _ 추가
+[FUNC js-reserved? :params [$n]
+  :body (or (= $n "default") (= $n "class") (= $n "const") (= $n "let")
+            (= $n "if") (= $n "else") (= $n "switch") (= $n "case")
+            (= $n "break") (= $n "continue") (= $n "for") (= $n "while")
+            (= $n "function") (= $n "return") (= $n "throw") (= $n "try")
+            (= $n "catch") (= $n "new") (= $n "delete") (= $n "typeof")
+            (= $n "instanceof") (= $n "var") (= $n "in") (= $n "of")
+            (= $n "this") (= $n "super") (= $n "void") (= $n "yield")
+            (= $n "async") (= $n "await") (= $n "import") (= $n "export")
+            (= $n "enum") (= $n "do") (= $n "with") (= $n "finally")
+            (= $n "null") (= $n "true") (= $n "false"))]
 
 [FUNC js-name :params [$n]
   :body (if (null? $n) "_"
           (let [[$a (replace $n "-" "_")]
                 [$b (replace $a "?" "_q")]
-                [$c (replace $b "!" "_x")]]
-            $c))]
+                [$c (replace $b "!" "_x")]
+                [$d (replace $c ">" "_gt")]
+                [$e (replace $d "<" "_lt")]
+                [$f (replace $e "*" "_st")]
+                [$g (replace $f "+" "_pl")]]
+            (if (js-reserved? $g) (str $g "_") $g)))]
 
 ;; ═══════ 디스패치 ═══════
 
@@ -29,6 +50,7 @@
           [(null? $n) "null"]
           [(= (get $n :kind) "literal") (cg-literal $n)]
           [(= (get $n :kind) "variable") (js-name (get $n :name))]
+          [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
@@ -52,9 +74,52 @@
           (cond
             [(= $t "Array")
              (str "[" (cg-args (get (get $n :fields) "items")) "]")]
+            [(= $t "Map")
+             (str "({" (cg-map-entries (get $n :fields)) "})")]
             [(= $t "FUNC")
              (cg-func-block $n)]
             [true "null"]))]
+
+;; Map literal: 두 AST 형태 지원
+;;   1) bootstrap parser: fields = JS Map, map_entries 로 [[k,v] ...]
+;;   2) self-parser: fields = {items: [k1,v1,k2,v2,...]} (평탄한 쌍 리스트)
+;; Map fields 형태 감지:
+;;   bootstrap: JS Map{"key1"→node, "key2"→node, ...}
+;;   self-parser: plain obj {items: [kw-node1, val-node1, kw-node2, val-node2, ...]}
+;;   자기참조 bootstrap 형태에서 "items" 키가 있어도 그 값은 단일 node 이지 list 아님.
+[FUNC cg-map-entries :params [$fields]
+  :body (let [[$entries (map_entries $fields)]]
+          (if (and (= (length $entries) 1)
+                   (= (get (get $entries 0) 0) "items")
+                   (array? (get (get $entries 0) 1)))
+            (cg-map-flat-loop (get (get $entries 0) 1) 0 "")
+            (cg-map-loop $entries 0 ""))) ]
+
+[FUNC cg-map-loop :params [$entries $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (let [[$e (get $entries $i)]
+                [$k (get $e 0)]
+                [$v (cg (get $e 1))]
+                [$pair (str (js-esc $k) ":" $v)]]
+            (cg-map-loop $entries (+ $i 1)
+                         (if (= $i 0) $pair (str $acc "," $pair)))))]
+
+;; self-parser 형태: items = [kw-node val-node kw-node val-node ...]
+[FUNC cg-map-flat-loop :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+          (let [[$k-n (get $items $i)]
+                [$v-n (get $items (+ $i 1))]
+                [$k-str (cg-keyword-key $k-n)]
+                [$v-js (str (cg $v-n))]
+                [$pair (str $k-str ":" $v-js)]]
+            (cg-map-flat-loop $items (+ $i 2)
+                              (if (= $i 0) $pair (str $acc "," $pair)))))]
+
+;; keyword/literal 에서 키 문자열 추출
+[FUNC cg-keyword-key :params [$n]
+  :body (cond [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
+              [(= (get $n :kind) "literal") (js-esc (str (get $n :value)))]
+              [true "\"_anon\""])]
 
 ;; [FUNC name :params [$a $b] :body expr]
 ;;   → const name = (a, b) => expr;
@@ -440,7 +505,7 @@
           (if (>= $i (length $items)) $acc
             (let [[$name (extract-name (get $items $i))]]
               (param-loop $items (+ $i 1)
-                          (if (= (length $acc) 0) $name (str $acc "," $name))))))]
+                          (if (= $i 0) $name (str $acc "," $name))))))]
 
 ;; ═══════ stdlib native → JS 매핑 ═══════
 
@@ -513,6 +578,7 @@
             [(= $op "string?") (str "(typeof " $as "===\"string\")")]
             [(= $op "number?") (str "(typeof " $as "===\"number\")")]
             [(= $op "list?") (str "Array.isArray(" $as ")")]
+            [(= $op "array?") (str "Array.isArray(" $as ")")]
             [(= $op "map?") (str "_fl_is_map(" $as ")")]
             [(= $op "fn?") (str "(typeof " $as "===\"function\")")]
             [(= $op "boolean?") (str "(typeof " $as "===\"boolean\")")]
@@ -647,13 +713,18 @@
     "const _fl_merge = (...os) => Object.assign({}, ...os);"
     "const _fl_is_map = (x) => (x!=null && typeof x==='object' && !Array.isArray(x));"
     "const _fl_type_of = (x) => (x==null?'null':Array.isArray(x)?'list':typeof x);"
+    "const map_entries = (m) => m instanceof Map ? [...m.entries()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.entries(m) : []);"
+    "const map_keys = (m) => m instanceof Map ? [...m.keys()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m) : []);"
+    "const map_values = (m) => m instanceof Map ? [...m.values()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.values(m) : []);"
     ;; I/O
     "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
     "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
     "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
     ;; Common
-    "const _fl_empty_q = (x) => (x==null || x.length===0);")]
+    "const _fl_empty_q = (x) => (x==null || x.length===0);"
+    ;; argv
+    "const __argv__ = process.argv.slice(2);")]
 
 ;; ═══════ 최상위 ═══════
 

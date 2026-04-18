@@ -1,8 +1,0 @@
-[PAGE dashboard
-  :path "/dashboard"
-  :render (fn []
-    (let [[$user (if __headers.authorization (auth-user __headers.authorization) nil)]]
-      (if (not $user)
-        (str "<html><head><meta http-equiv='refresh' content='0; url=/login'/></head></html>")
-        (str "<html><body style='font-family: sans-serif; padding: 20px;'><h1>대시보드</h1><p>안녕하세요!</p><p><a href='/'>로그아웃</a></p></body></html>"))))
-]

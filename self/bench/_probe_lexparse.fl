@@ -1,0 +1,4 @@
+(define toks (lex "(+ 1 2)"))
+(println "toks-len:" (length toks))
+(define ast (parse toks))
+(println "ast:" ast)

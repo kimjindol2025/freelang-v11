@@ -1,0 +1,7 @@
+build.start app=tests/fixtures/basic-app out=tests/evidence/06-dist port=30095
+build.page route=/about ok=true file=tests/evidence/06-dist/about/index.html bytes=145
+build.page route=/ ok=true file=tests/evidence/06-dist/index.html bytes=143
+build.page route=/post/world ok=true file=tests/evidence/06-dist/post/world/index.html bytes=134
+build.page route=/post/hello ok=true file=tests/evidence/06-dist/post/hello/index.html bytes=134
+build.page route=/404 ok=true file=tests/evidence/06-dist/404.html bytes=114
+build.done ok=5 fail=0 out=tests/evidence/06-dist ms=191 concurrency=4

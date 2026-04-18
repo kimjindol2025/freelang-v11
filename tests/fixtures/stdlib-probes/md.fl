@@ -1,0 +1,1 @@
+(println (markdown_to_html "# Hello\n\nsome **bold** text."))

@@ -1,9 +1,0 @@
-[FUNC tokenize-simple
-  :params [$source]
-  :body $source
-]
-
-[FUNC parse-simple
-  :params [$code]
-  :body $code
-]

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+<title>TestFeed</title>
+<link>https://ex.com</link>
+<description>Test RSS</description>
+<language>en</language>
+<lastBuildDate>Sat, 18 Apr 2026 04:44:30 GMT</lastBuildDate>
+<atom:link href="https://ex.com/feed.xml" rel="self" type="application/rss+xml"/>
+<item>
+<title>Post1</title>
+<link>https://ex.com/p1</link>
+<guid isPermaLink="true">https://ex.com/p1</guid>
+<pubDate>Sat, 18 Apr 2026 00:00:00 GMT</pubDate>
+<description>first</description>
+</item>
+<item>
+<title>Post2</title>
+<link>https://ex.com/p2</link>
+<guid isPermaLink="true">https://ex.com/p2</guid>
+<pubDate>Fri, 17 Apr 2026 00:00:00 GMT</pubDate>
+<description>second</description>
+</item>
+</channel>
+</rss>

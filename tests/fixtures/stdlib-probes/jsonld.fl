@@ -1,0 +1,1 @@
+(println (jsonld_article {:title "Hello" :url "https://ex.com/hello" :description "first post" :datePublished "2026-04-18" :author "Tester"}))

@@ -1,7 +1,0 @@
-[SERVICE TodoService
-  :inject [TodoRepository]
-  :methods {
-    :find-all (fn [$user-id] nil)
-    :create (fn [$title $user-id] nil)
-  }
-]

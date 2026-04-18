@@ -1,0 +1,2 @@
+(define m {:title "t" :url "u"})
+(println (json_stringify m))

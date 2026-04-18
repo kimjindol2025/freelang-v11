@@ -1,0 +1,4 @@
+(define meta {:title "TestFeed" :url "https://ex.com" :description "Test RSS"})
+(define items [{:title "Post1" :url "https://ex.com/p1" :description "first" :date "2026-04-18"}
+               {:title "Post2" :url "https://ex.com/p2" :description "second" :date "2026-04-17"}])
+(println (rss_feed meta items))

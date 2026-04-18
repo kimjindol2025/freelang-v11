@@ -1,0 +1,12 @@
+;; Check what parse produces for {:a 1 :b 2}
+(define toks (lex "{:a 1 :b 2}"))
+(println "toks-len:" (length toks))
+(define ast (parse toks))
+(define n (get ast 0))
+(println "kind:" (get n :kind))
+(println "type:" (get n :type))
+(define f (get n :fields))
+(println "f:" f)
+(define items (get f "items"))
+(println "items-len:" (length items))
+(println "items:" items)

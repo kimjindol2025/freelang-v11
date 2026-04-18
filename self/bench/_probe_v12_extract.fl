@@ -1,0 +1,8 @@
+;; Test extract-params via bootstrap-v12-candidate
+;; 단순히 items 주고 뭐 반환하는지 확인
+(define items [{:kind "variable" :name "x" :line 1}])
+(println "items:" items)
+(println "len:" (length items))
+(define p0 (get items 0))
+(println "p0-kind:" (get p0 :kind))
+(println "p0-name:" (get p0 :name))

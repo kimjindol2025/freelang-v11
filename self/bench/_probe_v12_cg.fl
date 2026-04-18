@@ -1,0 +1,7 @@
+;; Directly test what self-parser produces for a map literal, then what bootstrap's cg does with it.
+(define toks (lex "{:a 1}"))
+(define ast (parse toks))
+(define n (get ast 0))
+(println "type:" (get n :type))
+(define f (get n :fields))
+(println "fields type check:" (get f "items"))

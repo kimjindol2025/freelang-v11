@@ -1,0 +1,16 @@
+;; v12 candidate driver: FL 기반 lex+parse+codegen
+;; 사용법: node bootstrap-v12-candidate.js <input.fl> [<output.js>]
+
+[FUNC compile-v12 :params [$input $output]
+  :body (let [[$src (file_read $input)]
+              [$tokens (lex $src)]
+              [$ast (parse $tokens)]
+              [$js (fl->js-with-prelude $ast)]]
+          (file_write $output $js)
+          (println (str "v12 compiled " $input " -> " $output " size=" (length $js))))]
+
+(if (null? $__argv__) null
+  (if (= (length $__argv__) 0) null
+    (compile-v12 (get $__argv__ 0)
+                 (if (>= (length $__argv__) 2) (get $__argv__ 1)
+                     (str (get $__argv__ 0) ".out.js")))))

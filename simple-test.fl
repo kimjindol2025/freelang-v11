@@ -1,7 +1,0 @@
-[FUNC greet
-  :params [$name]
-  :body (concat "Hello, " $name)
-]
-
-(print (greet "v9"))
-(print "✅ v9 런타임 정상")

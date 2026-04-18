@@ -1,0 +1,1 @@
+(println (sitemap_xml "https://ex.com" ["/" "/about" "/post/hello"]))

@@ -1,4 +1,0 @@
-[PAGE home
-  :path "/"
-  :render "<html><body style='font-family:sans-serif; background:#f5f7fa; padding:40px; text-align:center;'><h1>🚀 FreeLang SaaS</h1><p>AI-Native Project Management</p><a href='/login' style='padding:10px 20px; background:#667eea; color:white; text-decoration:none; border-radius:6px; margin-right:10px;'>로그인</a><a href='/signup' style='padding:10px 20px; background:#667eea; color:white; text-decoration:none; border-radius:6px;'>회원가입</a></body></html>"
-]

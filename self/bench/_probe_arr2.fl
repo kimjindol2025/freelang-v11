@@ -1,0 +1,5 @@
+;; self-parse an array with a map inside
+(define toks (lex "[{:a 1}]"))
+(println "toks:" toks)
+(define ast (parse toks))
+(println "ast:" (get ast 0))

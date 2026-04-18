@@ -1,4 +1,0 @@
-[PAGE auth-login
-  :path "/auth-login"
-  :render {:access_token "token123" :user {:id 1 :email "kim@test.com"}}
-]

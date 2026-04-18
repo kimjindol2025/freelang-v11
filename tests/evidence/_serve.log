@@ -1,0 +1,30 @@
+approuter.layout scope=/ file=/data/data/com.termux/files/home/freelang-v11/tests/fixtures/basic-app/layout.fl
+approuter.route path=/about file=/data/data/com.termux/files/home/freelang-v11/tests/fixtures/basic-app/about/page.fl dynamic=false
+approuter.route path=/ file=/data/data/com.termux/files/home/freelang-v11/tests/fixtures/basic-app/page.fl dynamic=false
+approuter.route path=/post/[slug] file=/data/data/com.termux/files/home/freelang-v11/tests/fixtures/basic-app/post/[slug]/page.fl dynamic=true
+node:events:486
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::30099
+    at Server.setupListenHandle [as _listen2] (node:net:2008:16)
+    at listenInCluster (node:net:2065:12)
+    at Server.listen (node:net:2170:7)
+    at /data/data/com.termux/files/home/freelang-v11/bootstrap.js:29316:19
+    at new Promise (<anonymous>)
+    at WebServer.start (/data/data/com.termux/files/home/freelang-v11/bootstrap.js:29315:12)
+    at cmdServe (/data/data/com.termux/files/home/freelang-v11/bootstrap.js:30379:10)
+    at Object.<anonymous> (/data/data/com.termux/files/home/freelang-v11/bootstrap.js:30542:5)
+    at Module._compile (node:internal/modules/cjs/loader:1829:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1969:10)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2044:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 30099
+}
+
+Node.js v25.8.2
