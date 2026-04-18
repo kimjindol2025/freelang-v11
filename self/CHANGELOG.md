@@ -496,3 +496,68 @@ set! throw try while loop recur
 
 남은 특수폼 (13 개): match / async / await / parallel / race / with-timeout /
 defstruct / defprotocol / impl / compose / pipe / call / macroexpand / defmacro
+
+## Phase 10.4 — match + defstruct codegen + length(num) 버그 fix (2026-04-17)
+
+```
+phase=10 stage=4 status=done note=match+defstruct; length-num-zero-bug-fixed
+```
+
+### 발견된 버그
+
+`(length N)` where N is number → returns 0 (JS: `String(3).length` 로 처리 안 됨).
+결과: args-loop 등에서 `(if (= (length $acc) 0) ...)` 가 숫자 누적값을 "초기 상태" 로 오인식 → 이전 인자 삭제.
+
+**Before**: `(cg (Point 3 4))` → `Point(4)` (arg 3 lost)
+**After**: `(cg (Point 3 4))` → `Point(3,4)` ✓
+
+### 수정
+
+- `self/codegen.fl` args-loop / binop-loop / and-loop / or-loop 전부
+  - `$i == 0` 체크로 교체 (길이 대신 인덱스)
+  - `(cg ...)` 결과를 `(str ...)` 로 감싸 반드시 문자열로 변환
+
+### `self/codegen.fl` 추가 — match
+
+- `cg-match` PatternMatch node → `((__v)=>{if(test1){bind1;return b1;}...return default;})(value)`
+- `pattern-test` 5 kinds: literal-pattern / variable-pattern / wildcard-pattern / or-pattern / range-pattern
+- `pattern-bindings` variable-pattern 에서 `__v` → 바인딩
+
+### `self/codegen.fl` 추가 — defstruct
+
+- `cg-defstruct` `(defstruct Name f1 f2)` → `const Name=(f1,f2)=>({__struct:"Name",f1,f2})`
+- `sfield-list` 필드 리스트 생성
+
+### `test-codegen-match.fl` 7/7 PASS
+
+```
+pass match-num=b          (literal-pattern)
+pass match-default=z      (default case fallthrough)
+pass match-str=1          (string literal match)
+pass match-var=got-n      (variable-pattern 바인딩)
+pass match-wild=anything  (wildcard _)
+pass struct-make=7        (Point 3 4 → get :x + :y = 7)
+pass struct-tag=User      (User "kim" 30 → __struct tag)
+```
+
+### 회귀 검증 (기존 테스트)
+
+```
+test-real-stdlib.fl   6/6 PASS  ✓
+test-codegen-sf.fl    5/5 PASS  ✓
+test-selfcompile.fl   5/5 PASS  ✓
+test-codegen-match.fl 7/7 PASS  ✓  (신규)
+  총합 23/23 PASS
+```
+
+### 지원 특수폼 현황 (20/31)
+
+```
+완성: if fn defn define let do begin cond and or quote
+      set! throw try while loop recur defstruct match
+      산술 (+/-/*/////<=>>=!=)
+남은: compose pipe call macroexpand defmacro
+      async await parallel race with-timeout
+      defprotocol impl
+      patterns: list-pattern struct-pattern
+```

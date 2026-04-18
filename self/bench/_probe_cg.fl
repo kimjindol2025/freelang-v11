@@ -1,0 +1,27 @@
+[FUNC js-esc :params [$s] :body (str "\"" $s "\"")]
+[FUNC js-name :params [$n] :body (if (null? $n) "_" $n)]
+
+[FUNC cg :params [$n]
+  :body (cond [(null? $n) "null"]
+              [(= (get $n :kind) "literal") (cg-literal $n)]
+              [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
+              [true "null"])]
+
+[FUNC cg-literal :params [$n]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
+                [true "null"]))]
+
+[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (args-loop $args (+ $i 1)
+            (if (= (length $acc) 0) (cg (get $args $i)) (str $acc "," (cg (get $args $i))))))]
+
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (str (js-name $op) "(" (cg-args $args) ")"))]
+
+(define ast (fl-parse "(Point 3 4)"))
+(define sx (get ast 0))
+(println (cg sx))

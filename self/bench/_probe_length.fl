@@ -1,0 +1,5 @@
+(println "len-empty:" (length ""))
+(println "len-num3:" (length 3))
+(println "len-str3:" (length "3"))
+(println "eq-0:" (= (length 3) 0))
+(println "str-test:" (str 3 "," 4))

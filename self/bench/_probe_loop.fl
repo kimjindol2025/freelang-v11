@@ -1,0 +1,12 @@
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (args-loop $args (+ $i 1)
+            (if (= (length $acc) 0) (str (get $args $i)) (str $acc "," (str (get $args $i))))))]
+
+(define ast (fl-parse "(Point 3 4)"))
+(define sx (get ast 0))
+(define args (get sx :args))
+(println "len:" (length args))
+(println "args[0]:" (get args 0))
+(println "args[1]:" (get args 1))
+(println "loop:" (args-loop args 0 ""))

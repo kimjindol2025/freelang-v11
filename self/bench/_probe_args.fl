@@ -1,0 +1,7 @@
+[FUNC args-loop :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (args-loop $args (+ $i 1)
+            (if (= (length $acc) 0) (str (get $args $i)) (str $acc "," (get $args $i)))))]
+
+(println (args-loop [3 4] 0 ""))
+(println (args-loop [10 20 30] 0 ""))
