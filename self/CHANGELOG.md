@@ -232,9 +232,37 @@ phase=06 stage=76 status=deferred target=async/await/parallel/race/with-timeout
 복잡도가 높거나 (async/defstruct/defprotocol) 현재 핵심 기능에
 무관한 것들. 작동하는 subset 을 우선 확보한 후 추가.
 
-## Phase 07 — Builtins 342
+## Phase 07 — Builtins 확장 ✅ (핵심 33 / 342)
 
-(미진행)
+```
+phase=07 stage=77 status=done target=산술 12 (+,-,*,/,%,abs,min,max)
+phase=07 stage=78 status=done target=비교/논리 10 (<,>,<=,>=,=,!=,not,null?,empty?)
+phase=07 stage=79 status=done target=문자열 8 (str,concat,length,substring,char-at,replace,str-to-num,num-to-str)
+phase=07 stage=80 status=done target=리스트 7 (list,first,last,rest,append,get,slice)
+phase=07 stage=81 status=deferred target=map 40 (assoc/dissoc/keys/vals/merge)
+phase=07 stage=82 status=deferred target=HOF 30 (map/filter/reduce — AST native 재귀)
+phase=07 stage=83 status=deferred target=type 30 (type-of/class-of/instance?)
+phase=07 stage=84 status=partial target=JSON 2 (str-to-num)
+phase=07 stage=85 status=deferred target=regex
+phase=07 stage=86 status=done target=I/O 2 (println/print)
+```
+
+self/builtins/core.fl + inline in test:
+  native-dispatch 가 33 개 op 분기. Phase 01-06 의 self-interp 과 통합.
+
+🎯 smoke 27/27 pass:
+  산술:   add/sub1/sub2/mul/div/mod/abs-neg
+  비교:   lt/gt-f/le/ge/eq/ne
+  논리:   not-t/null-t
+  문자열: str/concat/length-s/substr
+  리스트: list/first/last/get-idx
+  조합:   nested/user-fn/fact5/fact7
+
+**fact(7) = 5040** — FL self-interp 이 7 단계 재귀 factorial 을 정확히 계산.
+
+제한:
+- fact10 이상은 JS stack overflow (native TCO 없음. Phase 06/67 loop/recur+trampoline 필요)
+- builtin 342 중 33 개만 구현. 나머지 309 개는 Phase 08 에서 stdlib 위임으로 축소 가능.
 
 ## Phase 08 — Stdlib 47
 
