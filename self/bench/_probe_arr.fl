@@ -1,0 +1,7 @@
+(define ast (fl-parse "(fn [x] (+ x 1))"))
+(define fn (get ast 0))
+(define params (get (get fn :args) 0))
+(println "params kind:" (get params :kind))
+(println "params type:" (get params :type))
+(define f (get params :fields))
+(println "items:" (get f "items"))

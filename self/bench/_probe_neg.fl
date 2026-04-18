@@ -1,0 +1,7 @@
+(println (fl-parse "-7"))
+(println "---")
+(println (fl-parse "[1 2 3]"))
+(println "---")
+(println (fl-parse "{:a 1 :b 2}"))
+(println "---")
+(println (fl-parse "(fn [x] (+ x 1))"))

@@ -616,3 +616,64 @@ test-codegen-fn.fl     8/8  PASS
 ─────────────────────────────
 총                     31/31 PASS
 ```
+
+## Phase 10.6 — builtins codegen 33 → 100+ (2026-04-17)
+
+```
+phase=10 stage=6 status=done note=builtins-coverage-100+
+```
+
+### 추가 builtins (≈ 70 개)
+
+**String (15)**: starts-with? / ends-with? / contains? / split / join / trim / upper / lower / repeat / index-of / (기존: str / length / substring / char-at / replace)
+
+**List (20)**: map / filter / reduce / find / every? / some? / sort / reverse / flatten / distinct / range / take / drop / count / (기존: first / last / rest / append / slice / list)
+
+**Map (8)**: keys / values / entries / has-key? / map-set / map-delete / merge / (기존: get)
+
+**JSON (4)**: json-parse / json-stringify / json_parse / json_stringify
+
+**Type (10)**: string? / number? / list? / map? / fn? / boolean? / type-of / (기존: null? / not / empty? / true? / false?)
+
+**Math (15)**: mod / neg / sign / random / log / exp / sin / cos / (기존: min/max/abs/sqrt/pow/floor/ceil/round/str-to-num/num-to-str)
+
+**I/O (7)**: file_read / file_write / file_exists / exit / shell_capture / (기존: println / print)
+
+### runtime-prelude 확장
+
+`self/codegen.fl` 의 `runtime-prelude` 에 `_fl_*` 헬퍼 40+ 추가. JS 생성물에 prepend 되어 필요 함수 제공.
+
+### `test-codegen-builtins.fl` 35/35 PASS
+
+```
+String:  10/10  starts/ends/contains/split+join/trim/upper/lower/repeat/index/concat
+List:    10/10  first/last/map/filter/reduce/sort/reverse/distinct/range/take
+Map:      3/3   keys/values/has-key?
+JSON:     2/2   parse/stringify
+Type:     5/5   null?/string?/number?/list?/type-of
+Math:     5/5   abs/max/min/floor/mod
+```
+
+### 한계 (수용)
+
+- fl-parse 가 standalone 음수 literal (`-7`) 과 map literal 을 일부 상황에서 `[]` 로 반환 → 테스트에서 `(- 0 7)` / `(json-parse "...")` 로 우회
+- 사전 map-literal codegen 은 추가 필요 (cg-map-fields 는 현재 stub — 반복 불가 이슈)
+
+### 회귀 검증
+
+```
+test-selfcompile.fl     5/5   PASS
+test-real-stdlib.fl     6/6   PASS
+test-codegen-sf.fl      5/5   PASS
+test-codegen-match.fl   7/7   PASS
+test-codegen-fn.fl      8/8   PASS
+test-codegen-builtins.fl 35/35 PASS  (신규)
+────────────────────────────────────
+총                      66/66 PASS
+```
+
+### v12 남은 작업
+
+- bootstrap.js 전체 재생성: `self/codegen.fl` 를 확장한 full pipeline 으로 src/*.ts 대체
+- fixed-point sha256 검증
+- map-literal codegen 완성 (cg-map-fields)

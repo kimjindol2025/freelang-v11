@@ -1,0 +1,8 @@
+(define ast (fl-parse "{:a 1 :b 2}"))
+(println "len:" (length ast))
+(define ast2 (fl-parse "(println {:a 1 :b 2})"))
+(println "ast2 first:" (get ast2 0))
+(define inner (get (get ast2 0) :args))
+(println "inner[0]:" (get inner 0))
+(define b (get inner 0))
+(println "fields:" (get b :fields))

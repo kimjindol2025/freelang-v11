@@ -1,0 +1,7 @@
+(define ast (fl-parse "[1 2 3]"))
+(define b (get ast 0))
+(println "kind:" (get b :kind))
+(println "type:" (get b :type))
+(println "fields:" (get b :fields))
+(println "fields.items:" (get (get b :fields) "items"))
+(println "keys:" (keys (get b :fields)))

@@ -1,0 +1,8 @@
+(define ast (fl-parse "(println {:a 1 :b 2})"))
+(define block (get (get (get ast 0) :args) 0))
+(println "type:" (get block :type))
+(define f (get block :fields))
+(println "fields:" f)
+(println "entries:" (get f "entries"))
+(println "items:" (get f "items"))
+(println "pairs:" (get f "pairs"))

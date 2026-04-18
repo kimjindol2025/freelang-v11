@@ -440,24 +440,80 @@
 ;; ═══════ stdlib native → JS 매핑 ═══════
 
 [FUNC cg-native :params [$op $args]
-  :body (let [[$as (cg-args $args)] [$fs (str "_fl_" (js-name $op) "(" $as ")")]]
+  :body (let [[$as (cg-args $args)]]
           (cond
-            ;; 산술/비교는 inline binop 이라 이미 처리됨
+            ;; ─── String (15) ───
             [(= $op "str") (str "_fl_str(" $as ")")]
             [(= $op "concat") (str "_fl_str(" $as ")")]
             [(= $op "length") (str "_fl_length(" $as ")")]
             [(= $op "substring") (str "_fl_substring(" $as ")")]
             [(= $op "char-at") (str "_fl_char_at(" $as ")")]
             [(= $op "replace") (str "_fl_replace(" $as ")")]
+            [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
+            [(= $op "ends-with?") (str "_fl_ends_with(" $as ")")]
+            [(= $op "contains?") (str "_fl_contains(" $as ")")]
+            [(= $op "split") (str "_fl_split(" $as ")")]
+            [(= $op "join") (str "_fl_join(" $as ")")]
+            [(= $op "trim") (str "_fl_trim(" $as ")")]
+            [(= $op "upper") (str "_fl_upper(" $as ")")]
+            [(= $op "lower") (str "_fl_lower(" $as ")")]
+            [(= $op "repeat") (str "_fl_repeat(" $as ")")]
+            [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+
+            ;; ─── List (15) ───
             [(= $op "first") (str "_fl_first(" $as ")")]
             [(= $op "last") (str "_fl_last(" $as ")")]
             [(= $op "rest") (str "_fl_rest(" $as ")")]
             [(= $op "append") (str "_fl_append(" $as ")")]
-            [(= $op "get") (str "_fl_get(" $as ")")]
             [(= $op "slice") (str "_fl_slice(" $as ")")]
             [(= $op "list") (str "[" $as "]")]
-            [(= $op "println") (str "console.log(" $as ")")]
-            [(= $op "print") (str "process.stdout.write(String(" $as "))")]
+            [(= $op "map") (str "_fl_map(" $as ")")]
+            [(= $op "filter") (str "_fl_filter(" $as ")")]
+            [(= $op "reduce") (str "_fl_reduce(" $as ")")]
+            [(= $op "find") (str "_fl_find(" $as ")")]
+            [(= $op "every?") (str "_fl_every(" $as ")")]
+            [(= $op "some?") (str "_fl_some(" $as ")")]
+            [(= $op "sort") (str "_fl_sort(" $as ")")]
+            [(= $op "reverse") (str "_fl_reverse(" $as ")")]
+            [(= $op "flatten") (str "_fl_flatten(" $as ")")]
+            [(= $op "distinct") (str "_fl_distinct(" $as ")")]
+            [(= $op "range") (str "_fl_range(" $as ")")]
+            [(= $op "take") (str "_fl_take(" $as ")")]
+            [(= $op "drop") (str "_fl_drop(" $as ")")]
+            [(= $op "count") (str "_fl_length(" $as ")")]
+
+            ;; ─── Map (8) ───
+            [(= $op "get") (str "_fl_get(" $as ")")]
+            [(= $op "keys") (str "_fl_keys(" $as ")")]
+            [(= $op "values") (str "_fl_values(" $as ")")]
+            [(= $op "entries") (str "_fl_entries(" $as ")")]
+            [(= $op "has-key?") (str "_fl_has_key(" $as ")")]
+            [(= $op "map-set") (str "_fl_map_set(" $as ")")]
+            [(= $op "map-delete") (str "_fl_map_delete(" $as ")")]
+            [(= $op "merge") (str "_fl_merge(" $as ")")]
+            [(= $op "json_set") (str "_fl_map_set(" $as ")")]
+
+            ;; ─── JSON (4) ───
+            [(= $op "json-parse") (str "JSON.parse(" $as ")")]
+            [(= $op "json-stringify") (str "JSON.stringify(" $as ")")]
+            [(= $op "json_parse") (str "JSON.parse(" $as ")")]
+            [(= $op "json_stringify") (str "JSON.stringify(" $as ")")]
+
+            ;; ─── Type predicates (10) ───
+            [(= $op "null?") (str "(" $as "==null)")]
+            [(= $op "not") (str "(!" $as ")")]
+            [(= $op "empty?") (str "_fl_empty_q(" $as ")")]
+            [(= $op "true?") (str "(" $as "===true)")]
+            [(= $op "false?") (str "(" $as "===false)")]
+            [(= $op "string?") (str "(typeof " $as "===\"string\")")]
+            [(= $op "number?") (str "(typeof " $as "===\"number\")")]
+            [(= $op "list?") (str "Array.isArray(" $as ")")]
+            [(= $op "map?") (str "_fl_is_map(" $as ")")]
+            [(= $op "fn?") (str "(typeof " $as "===\"function\")")]
+            [(= $op "boolean?") (str "(typeof " $as "===\"boolean\")")]
+            [(= $op "type-of") (str "_fl_type_of(" $as ")")]
+
+            ;; ─── Math (15) ───
             [(= $op "min") (str "Math.min(" $as ")")]
             [(= $op "max") (str "Math.max(" $as ")")]
             [(= $op "abs") (str "Math.abs(" $as ")")]
@@ -466,13 +522,26 @@
             [(= $op "floor") (str "Math.floor(" $as ")")]
             [(= $op "ceil") (str "Math.ceil(" $as ")")]
             [(= $op "round") (str "Math.round(" $as ")")]
-            [(= $op "null?") (str "(" $as "==null)")]
-            [(= $op "not") (str "(!" $as ")")]
-            [(= $op "empty?") (str "_fl_empty_q(" $as ")")]
-            [(= $op "true?") (str "(" $as "===true)")]
-            [(= $op "false?") (str "(" $as "===false)")]
+            [(= $op "mod") (cg-pair $args "%")]
+            [(= $op "neg") (str "(-" $as ")")]
+            [(= $op "sign") (str "Math.sign(" $as ")")]
+            [(= $op "random") (str "Math.random()")]
+            [(= $op "log") (str "Math.log(" $as ")")]
+            [(= $op "exp") (str "Math.exp(" $as ")")]
+            [(= $op "sin") (str "Math.sin(" $as ")")]
+            [(= $op "cos") (str "Math.cos(" $as ")")]
             [(= $op "str-to-num") (str "Number(" $as ")")]
             [(= $op "num-to-str") (str "String(" $as ")")]
+
+            ;; ─── I/O (7) ───
+            [(= $op "println") (str "console.log(" $as ")")]
+            [(= $op "print") (str "process.stdout.write(String(" $as "))")]
+            [(= $op "file_read") (str "_fl_file_read(" $as ")")]
+            [(= $op "file_write") (str "_fl_file_write(" $as ")")]
+            [(= $op "file_exists") (str "_fl_file_exists(" $as ")")]
+            [(= $op "exit") (str "process.exit(" $as ")")]
+            [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
+
             [true (cg-call $op $args)]))]
 
 [FUNC cg-call :params [$op $args]
@@ -527,17 +596,58 @@
 
 [FUNC runtime-prelude :params []
   :body (str
+    ;; String
     "const _fl_str = (...xs) => xs.map(x => x==null?'null':String(x)).join('');"
     "const _fl_length = (x) => (x==null ? 0 : x.length);"
     "const _fl_substring = (s, a, b) => (b==null ? s.slice(a) : s.slice(a, b));"
     "const _fl_char_at = (s, i) => (s[i] || null);"
     "const _fl_replace = (s, a, b) => s.split(a).join(b);"
+    "const _fl_starts_with = (s, p) => s.startsWith(p);"
+    "const _fl_ends_with = (s, p) => s.endsWith(p);"
+    "const _fl_contains = (s, p) => s.includes(p);"
+    "const _fl_split = (s, sep) => s.split(sep);"
+    "const _fl_join = (l, sep) => l.join(sep==null?'':sep);"
+    "const _fl_trim = (s) => s.trim();"
+    "const _fl_upper = (s) => s.toUpperCase();"
+    "const _fl_lower = (s) => s.toLowerCase();"
+    "const _fl_repeat = (s, n) => s.repeat(n);"
+    "const _fl_index_of = (s, p) => s.indexOf(p);"
+    ;; List
     "const _fl_first = (l) => (l==null || l.length===0 ? null : l[0]);"
     "const _fl_last = (l) => (l==null || l.length===0 ? null : l[l.length-1]);"
     "const _fl_rest = (l) => (l==null || l.length===0 ? [] : l.slice(1));"
     "const _fl_append = (a, b) => (Array.isArray(b) ? [...a, ...b] : [...a, b]);"
-    "const _fl_get = (o, k) => (o==null ? null : (o[k]===undefined ? null : o[k]));"
     "const _fl_slice = (l, a, b) => l.slice(a, b);"
+    "const _fl_map = (f, l) => l.map(x => f(x));"
+    "const _fl_filter = (f, l) => l.filter(x => f(x));"
+    "const _fl_reduce = (f, init, l) => l.reduce((acc, x) => f(acc, x), init);"
+    "const _fl_find = (f, l) => (l.find(x => f(x)) ?? null);"
+    "const _fl_every = (f, l) => l.every(x => f(x));"
+    "const _fl_some = (f, l) => l.some(x => f(x));"
+    "const _fl_sort = (l, cmp) => [...l].sort(cmp || ((a,b)=>a<b?-1:a>b?1:0));"
+    "const _fl_reverse = (l) => [...l].reverse();"
+    "const _fl_flatten = (l) => l.flat(Infinity);"
+    "const _fl_distinct = (l) => [...new Set(l)];"
+    "const _fl_range = (a, b, s) => { let r=[]; let step=s||1; for(let i=a;i<b;i+=step)r.push(i); return r; };"
+    "const _fl_take = (n, l) => l.slice(0, n);"
+    "const _fl_drop = (n, l) => l.slice(n);"
+    ;; Map
+    "const _fl_get = (o, k) => (o==null ? null : (o[k]===undefined ? null : o[k]));"
+    "const _fl_keys = (o) => (o==null ? [] : Object.keys(o));"
+    "const _fl_values = (o) => (o==null ? [] : Object.values(o));"
+    "const _fl_entries = (o) => (o==null ? [] : Object.entries(o).map(([k,v])=>[k,v]));"
+    "const _fl_has_key = (o, k) => (o!=null && k in o);"
+    "const _fl_map_set = (o, k, v) => ({...o, [k]: v});"
+    "const _fl_map_delete = (o, k) => { const c={...o}; delete c[k]; return c; };"
+    "const _fl_merge = (...os) => Object.assign({}, ...os);"
+    "const _fl_is_map = (x) => (x!=null && typeof x==='object' && !Array.isArray(x));"
+    "const _fl_type_of = (x) => (x==null?'null':Array.isArray(x)?'list':typeof x);"
+    ;; I/O
+    "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
+    "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
+    "const _fl_file_exists = (p) => require('fs').existsSync(p);"
+    "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
+    ;; Common
     "const _fl_empty_q = (x) => (x==null || x.length===0);")]
 
 ;; ═══════ 최상위 ═══════
