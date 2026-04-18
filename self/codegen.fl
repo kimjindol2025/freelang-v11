@@ -50,7 +50,20 @@
           (cond
             [(= $t "Array")
              (str "[" (cg-args (get (get $n :fields) "items")) "]")]
+            [(= $t "FUNC")
+             (cg-func-block $n)]
             [true "null"]))]
+
+;; [FUNC name :params [$a $b] :body expr]
+;;   → const name = (a, b) => expr;
+[FUNC cg-func-block :params [$n]
+  :body (let [[$name (js-name (get $n :name))]
+              [$fields (get $n :fields)]
+              [$pnode (get $fields "params")]
+              [$body (get $fields "body")]
+              [$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
+              [$ps (extract-params $pitems)]]
+          (str "const " $name " = (" $ps ")=>" (cg $body) ";"))]
 
 ;; ═══════ 특수폼 ═══════
 

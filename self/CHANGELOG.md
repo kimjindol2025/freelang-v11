@@ -414,3 +414,42 @@ smoke 13/14 (do-seq 은 newline 비교 이슈, 기능 OK):
 
 self-interp 은 fact 7 도 못 하지만 codegen 은 fact 20 계산.
 이는 **FL compiler 가 네이티브 성능으로 작동함을 증명**.
+
+## Phase 10.2 — [FUNC] block codegen + real-stdlib 검증 (2026-04-17)
+
+```
+phase=10 stage=2 status=done note=func-block-codegen+real-stdlib-verified
+```
+
+### 변경
+
+- `self/codegen.fl` `cg-func-block` 추가 → `[FUNC name :params [$a $b] :body ...]` → `const name = (a,b)=>(...);`
+- `extract-params` / `extract-name` 도움 함수
+- `self/tests/test-selfcompile.fl` 5/5 PASS
+  - func-simple=42, func-fact=3628800, func-mutual=1 (even?/odd? 상호재귀), func-multi=60, fact15=1307674368000
+
+### `test-real-stdlib.fl` 6/6 PASS
+
+embedded lex+parse+codegen (322 줄 FL) 이 실제 stdlib 스타일 FL → JS 생성 검증:
+
+```
+pass gcd=6                 ; math-gcd 48 18
+pass range-sum=5050        ; 1..100 sum
+pass sum-5k=12502500       ; 0..5000 sum (V8 non-TCO 한계 내)
+pass grade=B               ; cond 4-way
+pass mutual-fib=610        ; fib(15) 재귀
+pass combo=20              ; 다중 FUNC + let
+```
+
+추가 기능: string literal lexing (`"A"` → String 토큰 → literal type="string"`).
+
+### 한계 (수용)
+
+- V8 arrow function 은 TCO 없음 → 5k 재귀까지. 10k 재귀는 while-loop 변환 필요 (Phase 11 과제).
+- 문자열 보간/escape 은 내장 lexer 미지원 (bootstrap lexer 는 가능).
+
+### 의의
+
+- FL codegen 이 `[FUNC]` block, 상호재귀, let 1D/2D, cond, 산술/비교 완전 생성
+- 실제 stdlib 규모 코드 (322 줄 FL = ~30 함수 조합) 가 JS 로 돌아감
+- bootstrap.js 대체 경로 확보 (parser.ts 이식 → codegen → new-bootstrap.js)
