@@ -47,7 +47,18 @@ phase=00 stage=10 status=done target=fixtures lex=40 parse=40 eval=40 total=120
 
 ## Phase 01 — Self Lexer
 
-(미진행)
+```
+phase=01 stage=11 status=done target=token.fl exports=6 test=make-token_verified
+phase=01 stage=12 status=wip  target=char-class.fl
+phase=01 stage=13 status=wip  target=lexer.fl_core
+phase=01 stage=14 status=wip  target=whitespace_comment
+phase=01 stage=15 status=wip  target=number_literal
+phase=01 stage=16 status=wip  target=string_literal
+phase=01 stage=17 status=wip  target=string_interp
+phase=01 stage=18 status=wip  target=symbol_tokens
+phase=01 stage=19 status=wip  target=var_keyword_atom
+phase=01 stage=20 status=wip  target=lexer_fixed_point
+```
 
 ## Phase 02 — AST 타입
 

@@ -1,0 +1,38 @@
+;; self/token.fl — Token 타입 정의 (v12 셀프호스팅 Phase 01/11)
+;;
+;; TS src/token.ts 의 대응. Token 은 plain map 으로 표현.
+;;
+;; 토큰 종류 (string 상수):
+;;   "LParen"   "("
+;;   "RParen"   ")"
+;;   "LBracket" "["
+;;   "RBracket" "]"
+;;   "LBrace"   "{"
+;;   "RBrace"   "}"
+;;   "Symbol"   식별자 (fn, defn, +, -, ...)
+;;   "Variable" $x
+;;   "Keyword"  :name
+;;   "Number"   42, 3.14, -7
+;;   "String"   "hello"
+;;   "Comment"  ; ...  (보통 drop)
+;;   "EOF"      끝
+
+(defn make-token [kind value line col]
+  {:kind kind
+   :value value
+   :line line
+   :col col})
+
+(defn token-kind [t] (get t :kind))
+(defn token-value [t] (get t :value))
+(defn token-line [t] (get t :line))
+(defn token-col [t] (get t :col))
+
+;; 2 토큰이 kind/value 동등한지 (line/col 무시) — diff 테스트용
+(defn token-equal? [a b]
+  (and (= (token-kind a) (token-kind b))
+       (= (token-value a) (token-value b))))
+
+;; 디버그용 직렬화
+(defn token->string [t]
+  (str "<" (token-kind t) " " (token-value t) " @" (token-line t) ":" (token-col t) ">"))

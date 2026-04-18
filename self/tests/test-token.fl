@@ -1,0 +1,4 @@
+(defn make-token [kind value line col]
+  {:kind kind :value value :line line :col col})
+(let [t (make-token "Number" "42" 1 1)]
+  (println (str "kind=" (get t :kind) " value=" (get t :value) " line=" (get t :line))))
