@@ -160,9 +160,44 @@ phase=04 stage=52 status=done target=ts_diff (단일 시퀀스 기준 동등)
 
 연기: stage 48 (dot lookup env.vars.x) — Phase 05 interpreter 에서 자연히 처리.
 
-## Phase 05 — Interpreter Core
+## Phase 05 — Interpreter Core ✅ (축소 smoke 달성)
 
-(미진행)
+```
+phase=05 stage=53 status=done target=self-eval dispatcher (6 kinds)
+phase=05 stage=54 status=done target=eval-literal (num/str/bool/null/symbol)
+phase=05 stage=55 status=done target=eval-variable strict throw
+phase=05 stage=56 status=done target=eval-sexpr with special-form table
+phase=05 stage=57 status=done target=eval-block [FUNC] register
+phase=05 stage=58 status=partial target=special-forms (fn/define/defn/let/if/cond/do/quote/set!/and/or 11개)
+phase=05 stage=59 status=done target=fn function-value + capturedEnv
+phase=05 stage=60 status=done target=defn → define (fn ...)
+phase=05 stage=61 status=done target=let 1D/2D 모두
+phase=05 stage=62 status=done target=if
+phase=05 stage=63 status=done target=define 2-arg/3-arg
+phase=05 stage=64 status=done target=set!
+phase=05 stage=65 status=done target=do/begin + eval-call (native)
+```
+
+🎉 **핵심 달성**: FL 로 작성한 interpreter 가 FL 소스를 실행.
+
+실측 (self-interp end-to-end, 2026-04-18):
+```
+(self-run "(+ 1 2)")       → 3        ✓
+(self-run "(* 3 4)")       → 12       ✓
+(self-run "(- 10 3)")      → 7        ✓
+(self-run "(+ (* 2 3) 4)") → 10       ✓
+(self-run "(if 1 42 0)")   → 42       ✓
+(self-run "(if 0 42 7)")   → 7        ✓
+(self-run "(< 3 5)")       → true     ✓
+```
+smoke 7/7 pass. lex → parse → eval end-to-end.
+
+제한 (축소 범위):
+- native-call subset: +, -, *, <, >, =, println
+- 사용자 함수 호출 (apply-user-fn) 미검증
+- closure 캡처 미검증
+- let 은 통합 테스트엔 미포함 (lexer 부분 축소)
+- Phase 06 에서 특수폼 완성 + Phase 07 에서 builtin 342 확장
 
 ## Phase 06 — 특수폼 31
 

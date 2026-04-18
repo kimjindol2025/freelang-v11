@@ -1,0 +1,351 @@
+;; self/interpreter.fl — FL 로 작성된 Interpreter Core (Phase 05/53-65)
+;;
+;; 입력: AST node + scope
+;; 출력: value (number/string/bool/null/function-value/map/list)
+;;
+;; 특수폼: fn, define, let, if, do, quote, set! (9개 기본)
+;; 나머지 22 개는 Phase 06 에서 추가.
+;;
+;; builtins 은 FL runtime 이 이미 제공하는 것을 그대로 사용.
+;; (+ - * / < > = str length append list first rest get ...)
+;; 자체 interp 이 이들을 호출할 때 native-call 로 위임.
+
+;; ──────────────────────────────────────
+;; 53 eval dispatcher
+;; ──────────────────────────────────────
+
+[FUNC self-eval :params [$node $scope]
+  :body (cond
+          [(null? $node) null]
+          [(= (get $node :kind) "literal")   (eval-literal $node $scope)]
+          [(= (get $node :kind) "variable")  (eval-variable $node $scope)]
+          [(= (get $node :kind) "keyword")   (get $node :name)]
+          [(= (get $node :kind) "sexpr")     (eval-sexpr $node $scope)]
+          [(= (get $node :kind) "block")     (eval-block $node $scope)]
+          [true null])]
+
+;; ──────────────────────────────────────
+;; 54 Literal eval
+;; ──────────────────────────────────────
+
+[FUNC eval-literal :params [$n $scope]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond
+            [(= $t "number")  (str-to-num $v)]
+            [(= $t "string")  $v]
+            [(= $t "boolean") (= $v "true")]
+            [(= $t "null")    null]
+            [(= $t "symbol")
+             (let [[$v2 (scope-get $scope $v)]]
+               (if (null? $v2) $v $v2))]
+            [true $v]))]
+
+;; ──────────────────────────────────────
+;; 55 Variable eval ($x) — strict resolve
+;; ──────────────────────────────────────
+
+[FUNC eval-variable :params [$n $scope]
+  :body (let [[$name (get $n :name)]
+              [$v (scope-get $scope $name)]]
+          (if (null? $v)
+            (throw-undefined $name (get $n :line))
+            $v))]
+
+[FUNC throw-undefined :params [$name $line]
+  :body (error (str "Undefined variable: '$" $name "' (line " $line ")"))]
+
+;; ──────────────────────────────────────
+;; 56 SExpr eval — 특수폼 테이블 + 함수 호출
+;; ──────────────────────────────────────
+
+[FUNC eval-sexpr :params [$n $scope]
+  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+          (cond
+            [(= $op "fn")      (eval-fn $args $scope (get $n :line))]
+            [(= $op "define")  (eval-define $args $scope)]
+            [(= $op "defn")    (eval-defn $args $scope (get $n :line))]
+            [(= $op "let")     (eval-let $args $scope)]
+            [(= $op "if")      (eval-if $args $scope)]
+            [(= $op "cond")    (eval-cond $args $scope)]
+            [(= $op "do")      (eval-do $args $scope)]
+            [(= $op "quote")   (if (= (length $args) 0) null (get $args 0))]
+            [(= $op "set!")    (eval-set $args $scope)]
+            [(= $op "and")     (eval-and $args $scope)]
+            [(= $op "or")      (eval-or $args $scope)]
+            [true (eval-call $op $args $scope (get $n :line))]))]
+
+;; ──────────────────────────────────────
+;; 57 Block eval — [FUNC] 만 처리 (register), 나머지는 meta
+;; ──────────────────────────────────────
+
+[FUNC eval-block :params [$n $scope]
+  :body (let [[$type (get $n :type)]]
+          (if (= $type "FUNC")
+            (eval-func-block $n $scope)
+            null))]
+
+[FUNC eval-func-block :params [$n $scope]
+  :body (let [[$name (get $n :name)]
+              [$fields (get $n :fields)]
+              [$params-node (get $fields "params")]
+              [$body (get $fields "body")]
+              [$params (extract-params $params-node)]
+              [$fv {:kind "function-value" :params $params :body $body
+                    :capturedEnv $scope :name $name}]]
+          ;; scope 에 name 등록
+          (scope-set $scope $name $fv))]
+
+[FUNC extract-params :params [$pnode]
+  :body (if (null? $pnode) (list)
+          (let [[$items (get (get $pnode :fields) "items")]]
+            (if (null? $items) (list)
+              (map (fn [$x] (extract-param-name $x)) $items))))]
+
+[FUNC extract-param-name :params [$x]
+  :body (cond
+          [(= (get $x :kind) "variable") (get $x :name)]
+          [(= (get $x :kind) "literal") (get $x :value)]
+          [true "_"])]
+
+;; ──────────────────────────────────────
+;; 58-65 특수폼 구현
+;; ──────────────────────────────────────
+
+;; fn — function-value 생성
+[FUNC eval-fn :params [$args $scope $line]
+  :body (let [[$pnode (get $args 0)]
+              [$body (get $args 1)]
+              [$params (extract-params $pnode)]]
+          {:kind "function-value" :params $params :body $body
+           :capturedEnv $scope :name null})]
+
+;; define — 변수 또는 함수
+[FUNC eval-define :params [$args $scope]
+  :body (let [[$name-node (get $args 0)]
+              [$name (get-name $name-node)]]
+          (if (= (length $args) 2)
+            (let [[$v (self-eval (get $args 1) $scope)]]
+              (scope-set $scope $name $v))
+            (let [[$pnode (get $args 1)] [$body (get $args 2)]
+                  [$params (extract-params $pnode)]
+                  [$fv {:kind "function-value" :params $params :body $body
+                        :capturedEnv $scope :name $name}]]
+              (scope-set $scope $name $fv))))]
+
+[FUNC get-name :params [$n]
+  :body (cond
+          [(= (get $n :kind) "variable") (get $n :name)]
+          [(= (get $n :kind) "literal")  (get $n :value)]
+          [true "_anon"])]
+
+;; defn → define (fn ...)
+[FUNC eval-defn :params [$args $scope $line]
+  :body (let [[$name (get-name (get $args 0))]
+              [$pnode (get $args 1)]
+              [$body (get $args 2)]
+              [$params (extract-params $pnode)]
+              [$fv {:kind "function-value" :params $params :body $body
+                    :capturedEnv $scope :name $name}]]
+          (scope-set $scope $name $fv))]
+
+;; let — 1D/2D 모두 지원
+[FUNC eval-let :params [$args $scope]
+  :body (let [[$bindings-node (get $args 0)]
+              [$items (get (get $bindings-node :fields) "items")]
+              [$scope2 (push-scope $scope)]
+              [$scope3 (bind-all $items $scope2)]
+              [$body-args (slice $args 1 (length $args))]
+              [$result (eval-do $body-args $scope3)]]
+          $result)]
+
+[FUNC bind-all :params [$items $scope]
+  :body (if (= (length $items) 0) $scope
+          (let [[$first (get $items 0)]]
+            (if (and (= (get $first :kind) "block") (= (get $first :type) "Array"))
+              ;; 2D case [[$x v] [$y w]]
+              (bind-2d $items $scope 0)
+              ;; 1D case [$x v $y w]
+              (bind-1d $items $scope 0))))]
+
+[FUNC bind-2d :params [$items $scope $i]
+  :body (if (>= $i (length $items)) $scope
+          (let [[$pair (get $items $i)]
+                [$pitems (get (get $pair :fields) "items")]
+                [$k (get-name (get $pitems 0))]
+                [$v (self-eval (get $pitems 1) $scope)]
+                [$scope2 (scope-set $scope $k $v)]]
+            (bind-2d $items $scope2 (+ $i 1))))]
+
+[FUNC bind-1d :params [$items $scope $i]
+  :body (if (>= $i (length $items)) $scope
+          (let [[$k (get-name (get $items $i))]
+                [$v (self-eval (get $items (+ $i 1)) $scope)]
+                [$scope2 (scope-set $scope $k $v)]]
+            (bind-1d $items $scope2 (+ $i 2))))]
+
+;; if
+[FUNC eval-if :params [$args $scope]
+  :body (let [[$cond (self-eval (get $args 0) $scope)]]
+          (if (truthy? $cond)
+            (self-eval (get $args 1) $scope)
+            (if (>= (length $args) 3)
+              (self-eval (get $args 2) $scope)
+              null)))]
+
+[FUNC truthy? :params [$v]
+  :body (cond
+          [(null? $v) false]
+          [(= $v false) false]
+          [(= $v 0) false]
+          [(= $v "") false]
+          [true true])]
+
+;; cond — [[test result] [test result] [true default]]
+[FUNC eval-cond :params [$args $scope]
+  :body (cond-loop $args $scope 0)]
+
+[FUNC cond-loop :params [$args $scope $i]
+  :body (if (>= $i (length $args)) null
+          (let [[$clause (get $args $i)]
+                [$items (get (get $clause :fields) "items")]
+                [$test (self-eval (get $items 0) $scope)]]
+            (if (truthy? $test)
+              (self-eval (get $items 1) $scope)
+              (cond-loop $args $scope (+ $i 1)))))]
+
+;; do/begin — sequence, 마지막 값
+[FUNC eval-do :params [$args $scope]
+  :body (do-loop $args $scope 0 null)]
+
+[FUNC do-loop :params [$args $scope $i $last]
+  :body (if (>= $i (length $args)) $last
+          (do-loop $args $scope (+ $i 1)
+                   (self-eval (get $args $i) $scope)))]
+
+;; set! — 기존 변수 재할당
+[FUNC eval-set :params [$args $scope]
+  :body (let [[$name (get-name (get $args 0))]
+              [$v (self-eval (get $args 1) $scope)]]
+          (scope-set $scope $name $v))]
+
+;; and / or — short-circuit
+[FUNC eval-and :params [$args $scope]
+  :body (and-loop $args $scope 0 true)]
+
+[FUNC and-loop :params [$args $scope $i $last]
+  :body (if (>= $i (length $args)) $last
+          (let [[$v (self-eval (get $args $i) $scope)]]
+            (if (truthy? $v) (and-loop $args $scope (+ $i 1) $v) false)))]
+
+[FUNC eval-or :params [$args $scope]
+  :body (or-loop $args $scope 0)]
+
+[FUNC or-loop :params [$args $scope $i]
+  :body (if (>= $i (length $args)) false
+          (let [[$v (self-eval (get $args $i) $scope)]]
+            (if (truthy? $v) $v (or-loop $args $scope (+ $i 1)))))]
+
+;; ──────────────────────────────────────
+;; 65 eval-call — 사용자 함수 또는 builtin
+;; ──────────────────────────────────────
+
+[FUNC eval-call :params [$op $args $scope $line]
+  :body (let [[$clean-op (strip-dollar $op)]
+              [$fn-val (scope-get $scope $clean-op)]
+              [$vals (eval-args $args $scope 0 (list))]]
+          (cond
+            [(and (not (null? $fn-val))
+                  (= (get $fn-val :kind) "function-value"))
+             (apply-user-fn $fn-val $vals)]
+            [true (native-call $clean-op $vals)]))]
+
+[FUNC strip-dollar :params [$s]
+  :body (if (null? $s) $s
+          (if (and (>= (length $s) 1) (= (char-at $s 0) "$"))
+            (substring $s 1 (length $s))
+            $s))]
+
+[FUNC eval-args :params [$args $scope $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (eval-args $args $scope (+ $i 1)
+                     (append $acc (list (self-eval (get $args $i) $scope)))))]
+
+[FUNC apply-user-fn :params [$fv $vals]
+  :body (let [[$params (get $fv :params)]
+              [$body (get $fv :body)]
+              [$captured (get $fv :capturedEnv)]
+              [$scope2 (push-scope $captured)]
+              [$scope3 (bind-params $params $vals $scope2 0)]]
+          (self-eval $body $scope3))]
+
+[FUNC bind-params :params [$params $vals $scope $i]
+  :body (if (>= $i (length $params)) $scope
+          (bind-params $params $vals
+                       (scope-set $scope (get $params $i) (get $vals $i))
+                       (+ $i 1)))]
+
+;; native-call — FL 런타임의 실제 builtin 직접 호출.
+;; 현재 셀프 interp 은 subset 만 지원. + - * / < > = str length get 등.
+[FUNC native-call :params [$op $vals]
+  :body (cond
+          [(= $op "+") (apply-add $vals 0 0)]
+          [(= $op "-") (apply-sub $vals)]
+          [(= $op "*") (apply-mul $vals 1 0)]
+          [(= $op "/") (apply-div $vals)]
+          [(= $op "<") (< (get $vals 0) (get $vals 1))]
+          [(= $op ">") (> (get $vals 0) (get $vals 1))]
+          [(= $op "<=") (<= (get $vals 0) (get $vals 1))]
+          [(= $op ">=") (>= (get $vals 0) (get $vals 1))]
+          [(= $op "=")  (= (get $vals 0) (get $vals 1))]
+          [(= $op "!=") (not (= (get $vals 0) (get $vals 1)))]
+          [(= $op "not") (not (get $vals 0))]
+          [(= $op "str") (str-apply $vals 0 "")]
+          [(= $op "println")  (println (first-val $vals))]
+          [(= $op "length") (length (get $vals 0))]
+          [(= $op "list") $vals]
+          [true (error (str "native-call unknown op: " $op))])]
+
+[FUNC apply-add :params [$vals $i $acc]
+  :body (if (>= $i (length $vals)) $acc
+          (apply-add $vals (+ $i 1) (+ $acc (get $vals $i))))]
+
+[FUNC apply-sub :params [$vals]
+  :body (if (= (length $vals) 1) (- 0 (get $vals 0))
+          (- (get $vals 0) (sub-rest $vals 1 0)))]
+
+[FUNC sub-rest :params [$vals $i $acc]
+  :body (if (>= $i (length $vals)) $acc
+          (sub-rest $vals (+ $i 1) (+ $acc (get $vals $i))))]
+
+[FUNC apply-mul :params [$vals $acc $i]
+  :body (if (>= $i (length $vals)) $acc
+          (apply-mul $vals (* $acc (get $vals $i)) (+ $i 1)))]
+
+[FUNC apply-div :params [$vals]
+  :body (/ (get $vals 0) (get $vals 1))]
+
+[FUNC str-apply :params [$vals $i $acc]
+  :body (if (>= $i (length $vals)) $acc
+          (str-apply $vals (+ $i 1) (str $acc (get $vals $i))))]
+
+[FUNC first-val :params [$vals]
+  :body (if (= (length $vals) 0) "" (get $vals 0))]
+
+;; ──────────────────────────────────────
+;; 공개 API — (run-ast ast-list) → 마지막 값
+;; ──────────────────────────────────────
+
+[FUNC run-ast :params [$ast]
+  :body (run-ast-loop $ast (make-scope) 0 null)]
+
+[FUNC run-ast-loop :params [$ast $scope $i $last]
+  :body (if (>= $i (length $ast)) $last
+          (let [[$v (self-eval (get $ast $i) $scope)]]
+            (if (and (not (null? $v))
+                     (= (get $v :kind) nil)
+                     (= (length $v) 1))  ;; scope 가 반환된 경우
+              (run-ast-loop $ast $v (+ $i 1) $last)
+              (run-ast-loop $ast $scope (+ $i 1) $v))))]
+
+;; NOTE: 이 interp 는 smoke 수준. Phase 06 에서 특수폼 22 개 추가,
+;; Phase 07 에서 builtin 342 개 native-call 확장.
