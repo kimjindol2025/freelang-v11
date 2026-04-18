@@ -1,165 +1,152 @@
-;; P01/20 lexer smoke: 10 개 fixture 토큰화 검증.
-;; lexer.fl 의 함수들을 재선언해서 독립 실행.
+;; P01/20 smoke: 10 케이스 — [FUNC] 블록 lexer 단독 검증.
 
-(defn is-digit? [c]
-  (if (null? c) false
-    (and (>= c "0") (<= c "9"))))
+[FUNC is-digit? :params [$c]
+  :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
 
-(defn is-alpha? [c]
-  (if (null? c) false
-    (or (and (>= c "a") (<= c "z"))
-        (and (>= c "A") (<= c "Z")))))
+[FUNC is-alpha? :params [$c]
+  :body (if (null? $c) false
+          (or (and (>= $c "a") (<= $c "z"))
+              (and (>= $c "A") (<= $c "Z"))))]
 
-(defn is-alnum? [c] (or (is-digit? c) (is-alpha? c)))
+[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
 
-(defn is-space? [c]
-  (or (= c " ") (= c "\t") (= c "\n") (= c "\r")))
+[FUNC is-space? :params [$c]
+  :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
 
-(defn is-symbol-char? [c]
-  (if (null? c) false
-    (or (is-alnum? c)
-        (= c "-") (= c "_") (= c "?") (= c "!")
-        (= c "/") (= c ".") (= c "<") (= c ">")
-        (= c "=") (= c "+") (= c "*") (= c "%")
-        (= c "&") (= c "|") (= c "^") (= c "~"))))
+[FUNC is-symbol-char? :params [$c]
+  :body (if (null? $c) false
+          (or (is-alnum? $c)
+              (= $c "-") (= $c "_") (= $c "?") (= $c "!")
+              (= $c "/") (= $c ".") (= $c "<") (= $c ">")
+              (= $c "=") (= $c "+") (= $c "*") (= $c "%")
+              (= $c "&") (= $c "|") (= $c "^") (= $c "~")))]
 
-(defn make-state [src]
-  {:src src :idx 0 :line 1 :col 1 :tokens []})
+[FUNC make-state :params [$src]
+  :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
 
-(defn peek-at [st offset]
-  (let [src (get st :src) i (+ (get st :idx) offset)]
-    (if (>= i (length src)) null (char-at src i))))
+[FUNC peek-at :params [$st $offset]
+  :body (let [[$src (get $st :src)] [$i (+ (get $st :idx) $offset)]]
+          (if (>= $i (length $src)) null (char-at $src $i)))]
 
-(defn peek [st] (peek-at st 0))
+[FUNC peek :params [$st] :body (peek-at $st 0)]
 
-(defn at-end? [st] (>= (get st :idx) (length (get st :src))))
+[FUNC at-end? :params [$st]
+  :body (>= (get $st :idx) (length (get $st :src)))]
 
-(defn advance [st]
-  (let [c (peek st)]
-    (if (= c "\n")
-      {:src (get st :src) :idx (+ (get st :idx) 1)
-       :line (+ (get st :line) 1) :col 1 :tokens (get st :tokens)}
-      {:src (get st :src) :idx (+ (get st :idx) 1)
-       :line (get st :line) :col (+ (get st :col) 1) :tokens (get st :tokens)})))
+[FUNC advance :params [$st]
+  :body (let [[$c (peek $st)]]
+          (if (= $c "\n")
+            {:src (get $st :src) :idx (+ (get $st :idx) 1)
+             :line (+ (get $st :line) 1) :col 1 :tokens (get $st :tokens)}
+            {:src (get $st :src) :idx (+ (get $st :idx) 1)
+             :line (get $st :line) :col (+ (get $st :col) 1) :tokens (get $st :tokens)}))]
 
-(defn emit [st kind value sl sc]
-  {:src (get st :src) :idx (get st :idx)
-   :line (get st :line) :col (get st :col)
-   :tokens (append (get st :tokens)
-                   (list {:kind kind :value value :line sl :col sc}))})
+[FUNC emit :params [$st $kind $value $sl $sc]
+  :body {:src (get $st :src) :idx (get $st :idx)
+         :line (get $st :line) :col (get $st :col)
+         :tokens (append (get $st :tokens)
+                         (list {:kind $kind :value $value :line $sl :col $sc}))}]
 
-(defn skip-ws [st]
-  (if (at-end? st) st
-    (let [c (peek st)]
-      (cond
-        [(is-space? c) (skip-ws (advance st))]
-        [(= c ";") (skip-ws (skip-comment st))]
-        [true st]))))
+[FUNC skip-comment :params [$st]
+  :body (if (at-end? $st) $st
+          (let [[$c (peek $st)]]
+            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
 
-(defn skip-comment [st]
-  (if (at-end? st) st
-    (let [c (peek st)]
-      (if (= c "\n") (advance st) (skip-comment (advance st))))))
+[FUNC skip-ws :params [$st]
+  :body (if (at-end? $st) $st
+          (let [[$c (peek $st)]]
+            (cond
+              [(is-space? $c) (skip-ws (advance $st))]
+              [(= $c ";") (skip-ws (skip-comment $st))]
+              [true $st])))]
 
-(defn read-number-body [st acc has-dot line col]
-  (if (at-end? st) (emit st "Number" acc line col)
-    (let [c (peek st)]
-      (cond
-        [(is-digit? c) (read-number-body (advance st) (str acc c) has-dot line col)]
-        [(and (= c ".") (not has-dot))
-         (read-number-body (advance st) (str acc c) true line col)]
-        [true (emit st "Number" acc line col)]))))
+[FUNC read-number-body :params [$st $acc $has-dot $line $col]
+  :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
+          (let [[$c (peek $st)]]
+            (cond
+              [(is-digit? $c) (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
+              [(and (= $c ".") (not $has-dot))
+               (read-number-body (advance $st) (str $acc $c) true $line $col)]
+              [true (emit $st "Number" $acc $line $col)])))]
 
-(defn read-number [st]
-  (read-number-body st "" false (get st :line) (get st :col)))
+[FUNC read-number :params [$st]
+  :body (read-number-body $st "" false (get $st :line) (get $st :col))]
 
-(defn translate-esc [c]
-  (cond
-    [(= c "n") "\n"] [(= c "t") "\t"] [(= c "r") "\r"]
-    [(= c "\"") "\""] [(= c "\\") "\\"] [true c]))
+[FUNC translate-esc :params [$c]
+  :body (cond [(= $c "n") "\n"] [(= $c "t") "\t"] [(= $c "r") "\r"]
+              [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
 
-(defn read-string-body [st acc line col]
-  (if (at-end? st) (emit st "String" acc line col)
-    (let [c (peek st)]
-      (cond
-        [(= c "\"") (emit (advance st) "String" acc line col)]
-        [(= c "\\")
-         (let [st2 (advance st) c2 (peek st2)]
-           (read-string-body (advance st2) (str acc (translate-esc c2)) line col))]
-        [true (read-string-body (advance st) (str acc c) line col)]))))
+[FUNC read-string-body :params [$st $acc $line $col]
+  :body (if (at-end? $st) (emit $st "String" $acc $line $col)
+          (let [[$c (peek $st)]]
+            (cond
+              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
+              [(= $c "\\")
+               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
+                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
+              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
 
-(defn read-string [st]
-  (let [line (get st :line) col (get st :col) st1 (advance st)]
-    (read-string-body st1 "" line col)))
+[FUNC read-string :params [$st]
+  :body (let [[$line (get $st :line)] [$col (get $st :col)] [$st1 (advance $st)]]
+          (read-string-body $st1 "" $line $col))]
 
-(defn read-symbol-body [st acc line col]
-  (if (at-end? st) (emit st "Symbol" acc line col)
-    (let [c (peek st)]
-      (if (is-symbol-char? c)
-        (read-symbol-body (advance st) (str acc c) line col)
-        (emit st "Symbol" acc line col)))))
+[FUNC read-symbol-body-kind :params [$st $acc $line $col $kind]
+  :body (if (at-end? $st) (emit $st $kind $acc $line $col)
+          (let [[$c (peek $st)]]
+            (if (is-symbol-char? $c)
+              (read-symbol-body-kind (advance $st) (str $acc $c) $line $col $kind)
+              (emit $st $kind $acc $line $col))))]
 
-(defn read-symbol [st]
-  (read-symbol-body st "" (get st :line) (get st :col)))
+[FUNC read-symbol :params [$st]
+  :body (read-symbol-body-kind $st "" (get $st :line) (get $st :col) "Symbol")]
 
-(defn read-variable [st]
-  (let [line (get st :line) col (get st :col) st1 (advance st)]
-    (read-symbol-body-kind st1 "" line col "Variable")))
+[FUNC read-variable :params [$st]
+  :body (let [[$line (get $st :line)] [$col (get $st :col)] [$st1 (advance $st)]]
+          (read-symbol-body-kind $st1 "" $line $col "Variable"))]
 
-(defn read-keyword [st]
-  (let [line (get st :line) col (get st :col) st1 (advance st)]
-    (read-symbol-body-kind st1 "" line col "Keyword")))
+[FUNC read-keyword :params [$st]
+  :body (let [[$line (get $st :line)] [$col (get $st :col)] [$st1 (advance $st)]]
+          (read-symbol-body-kind $st1 "" $line $col "Keyword"))]
 
-(defn read-symbol-body-kind [st acc line col kind]
-  (if (at-end? st) (emit st kind acc line col)
-    (let [c (peek st)]
-      (if (is-symbol-char? c)
-        (read-symbol-body-kind (advance st) (str acc c) line col kind)
-        (emit st kind acc line col)))))
+[FUNC read-token :params [$st]
+  :body (let [[$st1 (skip-ws $st)]]
+          (if (at-end? $st1) $st1
+            (let [[$c (peek $st1)] [$line (get $st1 :line)] [$col (get $st1 :col)]]
+              (cond
+                [(= $c "(") (emit (advance $st1) "LParen"   $c $line $col)]
+                [(= $c ")") (emit (advance $st1) "RParen"   $c $line $col)]
+                [(= $c "[") (emit (advance $st1) "LBracket" $c $line $col)]
+                [(= $c "]") (emit (advance $st1) "RBracket" $c $line $col)]
+                [(= $c "{") (emit (advance $st1) "LBrace"   $c $line $col)]
+                [(= $c "}") (emit (advance $st1) "RBrace"   $c $line $col)]
+                [(= $c "\"") (read-string $st1)]
+                [(= $c "$") (read-variable $st1)]
+                [(= $c ":") (read-keyword $st1)]
+                [(is-digit? $c) (read-number $st1)]
+                [(and (= $c "-") (is-digit? (peek-at $st1 1)))
+                 (read-number-body (advance $st1) "-" false $line $col)]
+                [(is-symbol-char? $c) (read-symbol $st1)]
+                [true (emit (advance $st1) "Unknown" $c $line $col)]))))]
 
-(defn read-token [st]
-  (let [st1 (skip-ws st)]
-    (if (at-end? st1) st1
-      (let [c (peek st1) line (get st1 :line) col (get st1 :col)]
-        (cond
-          [(= c "(") (emit (advance st1) "LParen" c line col)]
-          [(= c ")") (emit (advance st1) "RParen" c line col)]
-          [(= c "[") (emit (advance st1) "LBracket" c line col)]
-          [(= c "]") (emit (advance st1) "RBracket" c line col)]
-          [(= c "{") (emit (advance st1) "LBrace" c line col)]
-          [(= c "}") (emit (advance st1) "RBrace" c line col)]
-          [(= c "\"") (read-string st1)]
-          [(= c "$") (read-variable st1)]
-          [(= c ":") (read-keyword st1)]
-          [(is-digit? c) (read-number st1)]
-          [(and (= c "-") (is-digit? (peek-at st1 1)))
-           (let [st2 (advance st1)]
-             (read-number-body st2 "-" false line col))]
-          [(is-symbol-char? c) (read-symbol st1)]
-          [true (emit (advance st1) "Unknown" c line col)])))))
+[FUNC lex-loop :params [$st]
+  :body (let [[$st1 (skip-ws $st)]]
+          (if (at-end? $st1) (get $st1 :tokens) (lex-loop (read-token $st1))))]
 
-(defn lex-loop [st]
-  (let [st1 (skip-ws st)]
-    (if (at-end? st1)
-      (get st1 :tokens)
-      (lex-loop (read-token st1)))))
-
-(defn lex [src] (lex-loop (make-state src)))
+[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
 
 ;; ─────────────────────────────
-;; 검증 10 케이스
+;; smoke 10 케이스
 ;; ─────────────────────────────
 
-(defn tokens-summary [tokens]
-  (reduce (fn [acc t]
-            (str acc (get t :kind) ":" (get t :value) " "))
-          "" tokens))
+[FUNC tokens-summary :params [$tokens]
+  :body (reduce (fn [$acc $t] (str $acc (get $t :kind) ":" (get $t :value) " "))
+                "" $tokens)]
 
-(defn check [label src expected]
-  (let [got (tokens-summary (lex src))]
-    (if (= got expected)
-      (println (str "pass " label))
-      (println (str "fail " label " expected=\"" expected "\" got=\"" got "\"")))))
+[FUNC check :params [$label $src $expected]
+  :body (let [[$got (tokens-summary (lex $src))]]
+          (if (= $got $expected)
+            (println (str "pass " $label))
+            (println (str "fail " $label " expected=\"" $expected "\" got=\"" $got "\""))))]
 
 (check "empty"      ""         "")
 (check "num"        "42"       "Number:42 ")
