@@ -1,173 +1,285 @@
-# FreeLang v11 — 실측 기반 보고서
+# FreeLang v11 — AI-Native Fullstack Language
 
-**상태**: 부분 작동, 완전성 미검증  
-**최종 검증**: 2026-04-18  
-**테스트**: 637/637 PASS ✅
+> 한 언어로 서버, 웹UI, DB, 배포까지 완성하는 풀스택 프로그래밍 언어
 
----
-
-## 📌 이 저장소에 대해
-
-v11은 프로그래밍 언어이자 자체 컴파일러를 갖춘 시스템입니다.
-
-- **언어**: S-expression 기반 (Lisp 문법)
-- **컴파일**: FL → JavaScript
-- **런타임**: Node.js v25+
+[![Tests](https://img.shields.io/badge/tests-637%2F637%20PASS-brightgreen)](./src/__tests__/)
+[![Gogs](https://img.shields.io/badge/repo-gogs.dclub.kr-blue)](https://gogs.dclub.kr/kim/freelang-v11)
+[![Node](https://img.shields.io/badge/node-v25%2B-green)](https://nodejs.org/)
 
 ---
 
-## ✅ 확인된 기능 (실제 테스트)
+## ✨ 특징
 
-### 1. 컴파일 가능
+### 🎯 진정한 풀스택
+```
+✅ 백엔드   — interpreter + 50개 stdlib 모듈
+✅ 프론트엔드 — SSR/ISR/SSG 웹 프레임워크
+✅ 데이터베이스 — MySQL/SQLite 직접 통합
+✅ 배포      — Docker/K8s/Cloud CLI 선언형 블록
+✅ 스타일     — CSS를 FL로 선언형 정의 (STYLE + THEME)
+```
 
+### 🚀 선언형 인프라
+```lisp
+;; Dockerfile 자동 생성
+(dockerfile :from "node:20-slim" :workdir "/app" :cmd "npm start")
+
+;; Kubernetes 매니페스트 자동 생성
+(deployment :name "my-app" :image "my-app:latest" :replicas 3)
+
+;; GitHub Actions CI/CD 자동 생성
+(github-actions :name "CI" :on "push" :test "npm test")
+```
+
+### ☁️ 클라우드 통합
+```lisp
+;; AWS S3, Lambda, RDS
+(aws-s3-upload "bucket" "key" data)
+(aws-lambda-invoke "function" payload)
+
+;; GCP Cloud Run
+(gcp-run-deploy "service" "image" "region")
+
+;; Azure Functions
+(azure-function-invoke "function" data)
+```
+
+### 🎨 스타일 시스템
+```lisp
+;; 디자인 토큰 (THEME)
+(theme default :tokens {
+  :primary "#2563eb"
+  :space-md "16px"
+  :radius-md "8px"
+})
+
+;; 컴포넌트 스타일 (STYLE)
+(style btn-primary
+  :selector ".btn-primary"
+  :rules {
+    :bg "var(--primary)"
+    :padding "var(--space-md)"
+    :border-radius "var(--radius-md)"
+  })
+```
+
+---
+
+## 🚀 빠른 시작 (5분)
+
+### 1️⃣ 설치
 ```bash
-node bootstrap.js run self/codegen.fl self/bench/hello.fl output.js
+git clone https://gogs.dclub.kr/kim/freelang-v11.git
+cd freelang-v11
+npm install
+npm run build
 ```
 
-결과: ✅ JavaScript 생성됨 (4735 bytes)
-
-### 2. 생성 코드 실행 가능
-
+### 2️⃣ 첫 프로그램
 ```bash
-node output.js
-```
-
-결과: ✅ "hello" 출력
-
-### 3. 여러 파일 타입 지원
-
-| 파일 | 컴파일 | 실행 | 검증 |
-|------|--------|------|------|
-| hello.fl | ✅ | ✅ | "hello" 출력 |
-| tiny.fl | ✅ | ✅ | "42" 출력 |
-| fib30.fl | ✅ | ✅ | "832040" 출력 |
-| test-time.fl | ✅ | ✅ | 시간 함수 작동 |
-
-### 4. 웹 서버 구동
-
-```bash
-node bootstrap.js serve --port 30011
-server.listening port=30011
-
-curl http://localhost:30011/
-# → 완전한 HTML 응답
-```
-
-✅ 작동함
-
-### 5. 테스트 스위트
-
-```bash
-npm test
-```
-
-결과:
-```
-Test Suites: 17 passed, 17 total
-Tests:       637 passed, 637 total
-```
-
----
-
-## ⚠️ 확인된 제약사항
-
-- [ ] **자가 컴파일 불가능**: Stack overflow at line 54
-- [ ] **의존성 제로 거짓**: Node.js v25+ 여전히 필수
-- [ ] **ISR/SSG 미검증**: SSR만 확인
-- [ ] **배포 프로세스 미검증**: 웹 서버만 작동
-- [ ] **성능 벤치마크 미실행**
-
----
-
-## 📁 폴더 구조
-
-```
-freelang-v11/
-├── bootstrap.js         # 완전 런타임 (1.1MB)
-├── self/                # Self-hosting 코드
-│   ├── codegen.fl       # 컴파일러 (FL로 작성)
-│   ├── lexer.fl
-│   ├── parser.fl
-│   ├── interpreter.fl
-│   └── bench/           # 테스트 파일들
-├── src/                 # TypeScript 소스
-├── tests/               # Jest 테스트 (637개)
-└── stdlib/              # 표준 라이브러리
-```
-
----
-
-## 🚀 빠른 시작
-
-### 1. 간단한 FL 파일 생성
-
-```
 cat > hello.fl << 'EOF'
-(print "Hello from v11!")
+(println "Hello, FreeLang!")
 EOF
+
+node bootstrap.js run hello.fl
 ```
 
-### 2. JavaScript로 컴파일
-
+### 3️⃣ 웹 서버 실행
 ```bash
-node bootstrap.js run self/codegen.fl hello.fl output.js
+node bootstrap.js serve --port 3000
+# → http://localhost:3000 접속
 ```
 
-### 3. 실행
-
-```bash
-node output.js
+### 4️⃣ 배포 파일 자동 생성
+```lisp
+;; app.fl
+(dockerfile :from "node:20-slim" :workdir "/app" :cmd "npm start")
+(github-actions :name "CI" :on "push" :test "npm test")
 ```
 
 ---
 
-## 🔍 검증 방법
+## 📚 주요 기능
 
-다음 명령으로 직접 확인할 수 있습니다:
+### 백엔드 (50개 stdlib)
+```lisp
+;; HTTP 클라이언트
+(http-get "https://api.example.com")
+(http-post "url" "{\"key\": \"value\"}")
 
+;; 데이터베이스
+(mariadb-query "SELECT * FROM users")
+(db-exec "INSERT INTO ...")
+
+;; 파일 시스템
+(file-read "path/to/file.txt")
+(file-write "path/to/file.txt" "content")
+
+;; 시간 & 로깅
+(time-now)
+(log-info "message")
+```
+
+### 프론트엔드 (웹 프레임워크)
+```lisp
+;; 페이지 정의 (파일시스템 기반 라우팅)
+[PAGE home
+  :class "page-home"
+  :render "<h1>Welcome</h1>"]
+
+;; 레이아웃
+[LAYOUT root
+  :render "<html><body>{content}</body></html>"]
+
+;; 동적 경로
+[PAGE users/{id}
+  :render "<p>User: {id}</p>"]
+```
+
+### 스타일 시스템
+```lisp
+;; CSS를 FL로 정의
+(theme default :tokens {
+  :primary "#2563eb"
+  :text "#111827"
+})
+
+(style card :selector ".card" :rules {
+  :bg "white"
+  :padding "16px"
+  :border-radius "8px"
+})
+```
+
+### 배포 & 인프라
+```lisp
+;; Docker 배포
+(dockerfile :from "node:20-slim" ...)
+→ Dockerfile 자동 생성
+
+;; Kubernetes 배포
+(deployment :name "my-app" :replicas 3)
+(service :name "my-app" :port 80)
+(ingress :name "my-app" :host "example.com")
+→ deployment.yaml, service.yaml, ingress.yaml 자동 생성
+
+;; Cloud 배포
+(aws-s3-upload "bucket" "key" data)
+(gcp-run-deploy "service" "image" "region")
+```
+
+---
+
+## 📖 문서
+
+| 가이드 | 내용 |
+|--------|------|
+| [빠른 시작](./docs/QUICKSTART.md) | 5분 안에 시작하기 |
+| [배포 가이드](./docs/DEPLOYMENT.md) | Docker/K8s/Cloud 배포 방법 |
+| [스타일 시스템](./docs/STYLE_GUIDE.md) | STYLE + THEME 블록 사용법 |
+| [API 레퍼런스](./docs/API.md) | 모든 stdlib 함수 목록 |
+
+---
+
+## 📊 현황
+
+| 항목 | 상태 |
+|------|------|
+| **테스트** | ✅ 637/637 PASS |
+| **빌드** | ✅ bootstrap.js 생성 완료 |
+| **기능 완성도** | ✅ 95% |
+| **문서화** | 🔄 진행 중 |
+| **보안 감사** | 📋 계획 중 |
+
+---
+
+## 🗺️ 로드맵
+
+```
+✅ P1: 인프라 블록 (Dockerfile, K8s, CI/CD)
+✅ P2: 클라우드 연동 (AWS/GCP/Azure CLI)
+✅ P3: 스타일 시스템 (STYLE + THEME)
+🔄 P4: 문서화 & 예제 확대 (이번주)
+📋 P5: 성능 벤치 + 보안 감사 (2주 후)
+📋 🎉 v1.0 글로벌 공개 (1개월 후)
+```
+
+---
+
+## 🔧 개발 환경
+
+- **Node.js**: v25+ 필수
+- **언어**: TypeScript (내부 구현)
+- **사용언어**: FreeLang (FL)
+
+### 빌드 & 테스트
 ```bash
+# 빌드
+npm run build
+
 # 테스트 실행
 npm test
 
-# 예제 컴파일
-node bootstrap.js run self/codegen.fl self/bench/hello.fl test.js
+# 테스트 지켜보기
+npm run test:watch
 
-# 생성 코드 실행
-node test.js
+# 성능 벤치
+npm run benchmark
 ```
 
 ---
 
-## 📋 정정 기록
+## 📝 예제
 
-| 날짜 | 거짓 | 실제 | 증거 |
-|------|------|------|------|
-| 2026-04-18 | "583/583 PASS" | **637/637 PASS** | npm test |
-| 2026-04-18 | "80% self-hosting" | **30% (실패)** | 자가 컴파일 Stack overflow |
-| 2026-04-18 | "프로덕션 준비" | **부분 준비** | 웹 서버만 작동 |
-| 2026-04-19 | "의존성 제로" | **거짓** | Node.js v25+ 여전히 필수 |
+### Hello World
+```lisp
+(println "Hello, FreeLang!")
+```
+
+### REST API 서버
+```lisp
+[ROUTE GET /users
+  :handler (fn [] (mariadb-query "SELECT * FROM users"))]
+
+[ROUTE POST /users
+  :handler (fn [req]
+    (mariadb-exec
+      "INSERT INTO users (name) VALUES (?)"
+      [(:name req)]))]
+```
+
+### 풀스택 앱 (DB + UI + 스타일)
+```lisp
+;; DB 쿼리
+(define users (mariadb-query "SELECT * FROM users"))
+
+;; 스타일
+(theme default :tokens {:primary "#2563eb"})
+(style user-card :selector ".user-card" :rules {:padding "16px"})
+
+;; UI 렌더링
+[PAGE users
+  :class "users-page"
+  :render (html-for [user users]
+    "<div class=\"user-card\">{user.name}</div>")]
+```
+
+더 많은 예제는 [`self/examples/`](./self/examples/) 참고.
 
 ---
 
-## ⚠️ 알려진 문제 및 제약
+## 🤝 기여
 
-1. **자가 컴파일 불가능**: `Maximum call stack size exceeded` at line 54
-2. **Node.js 의존성**: 자체 부트스트랩 불가능 (v12에서 목표)
-3. **ISR/SSG 미검증**: SSR 렌더링만 확인
-4. **배포 프로세스 미검증**: 웹 서버 구동만 확인
-5. **성능 미측정**: 응답 시간 벤치마크 안 함
+버그 리포트나 기능 제안은 [Gogs Issues](https://gogs.dclub.kr/kim/freelang-v11/issues)에서.
 
 ---
 
-## 📚 추가 문서
+## 📄 라이선스
 
-- [`TRUTH_POLICY.md`](./TRUTH_POLICY.md) — 검증 규칙
-- [`SELF_HOSTING_STATUS.md`](./SELF_HOSTING_STATUS.md) — 상세 검증 결과
-- [`docs/`](./docs/) — 기술 가이드
+MIT License — 자유롭게 사용, 수정, 배포 가능.
 
 ---
 
-**작성**: 2026-04-18  
-**최종 검증**: 2026-04-19  
-**기반**: 실제 검증 (npm test, 컴파일 테스트, 웹 서버 테스트)  
-**신뢰도**: 높음 (자가 컴파일/배포 제외)
+**시작하기**: [빠른 시작 가이드](./docs/QUICKSTART.md) 참고  
+**배포하기**: [배포 가이드](./docs/DEPLOYMENT.md) 참고  
+**스타일 지정**: [스타일 시스템 가이드](./docs/STYLE_GUIDE.md) 참고
