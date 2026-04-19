@@ -566,10 +566,14 @@
 
 ;; [FUNC name :params [$a $b] :body expr]
 ;;   → const name = (a, b) => expr;
+;; 또는 여러 statements면: const name = (a, b) => (()=>{...})()
 [FUNC cg-func-block-inner :params [$name $fields $pnode $body]
   :body (let [[$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
-              [$ps (extract-params $pitems)]]
-          (str "const " $name " = (" $ps ")=>" (cg $body) ";"))]
+              [$ps (extract-params $pitems)]
+              [$body-code (cg $body)]]
+          (if (contains? $body-code ";")
+            (str "const " $name " = (" $ps ")=>(()=>{" $body-code "})()")
+            (str "const " $name " = (" $ps ")=>" $body-code ";")))]
 
 [FUNC cg-func-block :params [$n]
   :body (let [[$name (js-name (get $n :name))]
@@ -584,14 +588,20 @@
 
 [FUNC cg-fn :params [$args]
   :body (let [[$pnode (get $args 0)] [$body (get $args 1)]
-              [$ps (extract-params (get (get $pnode :fields) "items"))]]
-          (str "((" $ps ")=>" (cg $body) ")"))]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]
+              [$body-code (cg $body)]]
+          (if (contains? $body-code ";")
+            (str "((" $ps ")=>(()=>{" $body-code "})())")
+            (str "((" $ps ")=>" $body-code ")")))]
 
 [FUNC cg-defn :params [$args]
   :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
               [$name (extract-name $name-n)]
-              [$ps (extract-params (get (get $pnode :fields) "items"))]]
-          (str "const " $name " = (" $ps ")=>" (cg $body)))]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]
+              [$body-code (cg $body)]]
+          (if (contains? $body-code ";")
+            (str "const " $name " = (" $ps ")=>(()=>{" $body-code "})()")
+            (str "const " $name " = (" $ps ")=>" $body-code)))]
 
 [FUNC cg-define :params [$args]
   :body (if (= (length $args) 2)

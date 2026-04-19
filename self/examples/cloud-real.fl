@@ -1,0 +1,134 @@
+;; cloud-real.fl — FreeLang v11 클라우드 실제 CLI 호출 예제
+;; Phase 58 P2: aws-cli / gcloud / az 필요
+
+;; ── AWS S3 실제 호출 ──────────────────────────────────────────
+
+;; S3 버킷 목록 (aws CLI 필요)
+(define list-result
+  (aws-s3-list "my-bucket" "logs/"))
+
+(println "=== AWS S3 List ===")
+(println list-result)
+
+;; S3 업로드 (로컬 파일 → S3)
+(define upload-result
+  (aws-s3-upload "my-bucket" "data/file.json" {"key" "value"}))
+
+(println "=== AWS S3 Upload ===")
+(println upload-result)
+
+;; S3 다운로드 (S3 → 로컬)
+(define download-result
+  (aws-s3-download "my-bucket" "data/file.json"))
+
+(println "=== AWS S3 Download ===")
+(println download-result)
+
+;; S3 삭제
+(define delete-result
+  (aws-s3-delete "my-bucket" "data/old-file.json"))
+
+(println "=== AWS S3 Delete ===")
+(println delete-result)
+
+;; ── AWS Lambda ──────────────────────────────────────────
+
+;; Lambda 함수 호출
+(define lambda-result
+  (aws-lambda-invoke "my-function" {"event" "test"}))
+
+(println "=== AWS Lambda Invoke ===")
+(println lambda-result)
+
+;; ── GCP Cloud Run ────────────────────────────────────────
+
+;; Cloud Run 서비스 배포 (gcloud 필요)
+(define gcp-deploy-result
+  (gcp-run-deploy "my-service" "gcr.io/my-project/my-service:1.0" "us-central1"))
+
+(println "=== GCP Cloud Run Deploy ===")
+(println gcp-deploy-result)
+
+;; Cloud Run 서비스 호출
+(define gcp-invoke-result
+  (gcp-run-invoke "my-service" {"message" "hello"} "us-central1"))
+
+(println "=== GCP Cloud Run Invoke ===")
+(println gcp-invoke-result)
+
+;; Cloud Run 서비스 목록
+(define gcp-list-result
+  (gcp-run-list "us-central1"))
+
+(println "=== GCP Cloud Run List ===")
+(println gcp-list-result)
+
+;; ── Azure Functions ─────────────────────────────────────
+
+;; Azure Function 호출 (az CLI 필요)
+(define azure-invoke-result
+  (azure-function-invoke "my-function" {"data" "test"}))
+
+(println "=== Azure Function Invoke ===")
+(println azure-invoke-result)
+
+;; Azure 웹 앱 배포
+(define azure-deploy-result
+  (azure-app-deploy "my-app" "myregistry.azurecr.io/my-app:1.0" "eastus"))
+
+(println "=== Azure App Deploy ===")
+(println azure-deploy-result)
+
+;; ── 클라우드 상태 체크 ────────────────────────────────────
+
+;; 각 클라우드 CLI 가용성 확인
+(define aws-health (cloud-health "aws"))
+(define gcp-health (cloud-health "gcp"))
+(define azure-health (cloud-health "azure"))
+
+(println "=== AWS Health ===")
+(println aws-health)
+
+(println "=== GCP Health ===")
+(println gcp-health)
+
+(println "=== Azure Health ===")
+(println azure-health)
+
+;; ── 인프라 블록으로 조합 ────────────────────────────────────
+
+;; AWS S3 인프라 블록
+(define s3-block-result
+  (aws-s3
+    :bucket "my-bucket"
+    :action "list"
+    :file "logs/"))
+
+(println "=== AWS-S3 Block ===")
+(println s3-block-result)
+
+;; GCP Cloud Run 인프라 블록
+(define gcp-block-result
+  (gcp-run
+    :service "my-service"
+    :image "gcr.io/my-project/my-service:1.0"
+    :region "us-central1"
+    :action "deploy"))
+
+(println "=== GCP-RUN Block ===")
+(println gcp-block-result)
+
+;; Azure Function 인프라 블록
+(define azure-block-result
+  (azure-function
+    :name "my-function"
+    :action "invoke"
+    :data {"test" "data"}))
+
+(println "=== AZURE-FUNCTION Block ===")
+(println azure-block-result)
+
+(println "\n✅ P2: CLI 기반 클라우드 호출 준비 완료")
+(println "   - AWS CLI 없으면: {status: 'cli_not_found'}")
+(println "   - GCP CLI (gcloud) 없으면: {status: 'cli_not_found'}")
+(println "   - Azure CLI (az) 없으면: {status: 'cli_not_found'}")

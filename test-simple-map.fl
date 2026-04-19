@@ -1,0 +1,4 @@
+[FUNC test-map :params []
+  :body {:x 1 :y 2}]
+
+(test-map)

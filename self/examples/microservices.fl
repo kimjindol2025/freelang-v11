@@ -1,0 +1,448 @@
+;; microservices.fl — FreeLang v11 마이크로서비스 예제
+;; Phase 59 P4-2: 서비스 분리 + API Gateway + Docker Compose 배포
+
+;; ──────────────────────────────────────────────────
+;; 개요
+;; ──────────────────────────────────────────────────
+;; 이 파일은 3개 마이크로서비스 아키텍처를 보여줍니다:
+;;
+;;  API Gateway (Port 3000)
+;;      ↓
+;;   ├─→ User Service (Port 3001)
+;;   ├─→ Product Service (Port 3002)
+;;   └─→ Order Service (Port 3003)
+;;
+;; 각 서비스는 독립적으로 실행되며, Gateway가 요청을 라우팅합니다.
+
+;; ──────────────────────────────────────────────────
+;; SERVICE 1: User Service (Port 3001)
+;; ──────────────────────────────────────────────────
+
+(println "🚀 User Service 준비중...")
+
+;; User 테이블
+(mariadb-exec
+  "CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    role VARCHAR(50) DEFAULT 'user'
+  )")
+
+;; GET /users — 모든 사용자
+(route-get "/users"
+  (fn [req]
+    (let [users (mariadb-query "SELECT id, name, email, role FROM users")]
+      (http-response
+        :status 200
+        :body (json-stringify {:success true :service "user-service" :data users})
+        :headers {:content-type "application/json"}))))
+
+;; GET /users/:id — 특정 사용자
+(route-get "/users/:id"
+  (fn [req]
+    (let [id (get req :params :id)
+          user (mariadb-query-one
+                 "SELECT id, name, email, role FROM users WHERE id = ?"
+                 [id])]
+      (if user
+        (http-response
+          :status 200
+          :body (json-stringify {:success true :data user})
+          :headers {:content-type "application/json"})
+        (http-response
+          :status 404
+          :body (json-stringify {:success false :error "User not found"})
+          :headers {:content-type "application/json"})))))
+
+;; POST /users — 새 사용자 생성
+(route-post "/users"
+  (fn [req]
+    (let [body (json-parse (get req :body))
+          name (get body :name)
+          email (get body :email)]
+      (mariadb-exec
+        "INSERT INTO users (name, email, role) VALUES (?, ?, 'user')"
+        [name email])
+      (http-response
+        :status 201
+        :body (json-stringify {:success true :message "User created"})
+        :headers {:content-type "application/json"}))))
+
+(println "✅ User Service (GET/POST /users)")
+
+;; ──────────────────────────────────────────────────
+;; SERVICE 2: Product Service (Port 3002)
+;; ──────────────────────────────────────────────────
+
+(println "🚀 Product Service 준비중...")
+
+;; Product 테이블
+(mariadb-exec
+  "CREATE TABLE IF NOT EXISTS products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    price DECIMAL(10, 2),
+    stock INT DEFAULT 0,
+    category VARCHAR(100)
+  )")
+
+;; GET /products — 모든 상품
+(route-get "/products"
+  (fn [req]
+    (let [category (get req :query :category)
+          query (if category
+                  "SELECT * FROM products WHERE category = ?"
+                  "SELECT * FROM products")
+          products (if category
+                     (mariadb-query query [category])
+                     (mariadb-query query))]
+      (http-response
+        :status 200
+        :body (json-stringify {:success true :service "product-service" :data products})
+        :headers {:content-type "application/json"}))))
+
+;; GET /products/:id — 특정 상품
+(route-get "/products/:id"
+  (fn [req]
+    (let [id (get req :params :id)
+          product (mariadb-query-one
+                    "SELECT * FROM products WHERE id = ?"
+                    [id])]
+      (if product
+        (http-response
+          :status 200
+          :body (json-stringify {:success true :data product})
+          :headers {:content-type "application/json"})
+        (http-response
+          :status 404
+          :body (json-stringify {:success false :error "Product not found"})
+          :headers {:content-type "application/json"})))))
+
+;; POST /products — 새 상품 추가
+(route-post "/products"
+  (fn [req]
+    (let [body (json-parse (get req :body))
+          name (get body :name)
+          price (get body :price)
+          category (get body :category)]
+      (mariadb-exec
+        "INSERT INTO products (name, price, stock, category) VALUES (?, ?, 0, ?)"
+        [name price category])
+      (http-response
+        :status 201
+        :body (json-stringify {:success true :message "Product created"})
+        :headers {:content-type "application/json"}))))
+
+(println "✅ Product Service (GET/POST /products)")
+
+;; ──────────────────────────────────────────────────
+;; SERVICE 3: Order Service (Port 3003)
+;; ──────────────────────────────────────────────────
+
+(println "🚀 Order Service 준비중...")
+
+;; Order 테이블
+(mariadb-exec
+  "CREATE TABLE IF NOT EXISTS orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT DEFAULT 1,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )")
+
+;; GET /orders — 모든 주문
+(route-get "/orders"
+  (fn [req]
+    (let [orders (mariadb-query "SELECT * FROM orders ORDER BY id DESC")]
+      (http-response
+        :status 200
+        :body (json-stringify {:success true :service "order-service" :data orders})
+        :headers {:content-type "application/json"}))))
+
+;; GET /orders/:id — 특정 주문
+(route-get "/orders/:id"
+  (fn [req]
+    (let [id (get req :params :id)
+          order (mariadb-query-one
+                  "SELECT * FROM orders WHERE id = ?"
+                  [id])]
+      (if order
+        (http-response
+          :status 200
+          :body (json-stringify {:success true :data order})
+          :headers {:content-type "application/json"})
+        (http-response
+          :status 404
+          :body (json-stringify {:success false :error "Order not found"})
+          :headers {:content-type "application/json"})))))
+
+;; POST /orders — 새 주문 생성
+(route-post "/orders"
+  (fn [req]
+    (let [body (json-parse (get req :body))
+          user_id (get body :user_id)
+          product_id (get body :product_id)
+          quantity (get body :quantity)]
+      (mariadb-exec
+        "INSERT INTO orders (user_id, product_id, quantity, status) VALUES (?, ?, ?, 'pending')"
+        [user_id product_id quantity])
+      (http-response
+        :status 201
+        :body (json-stringify {:success true :message "Order created"})
+        :headers {:content-type "application/json"}))))
+
+(println "✅ Order Service (GET/POST /orders)")
+
+;; ──────────────────────────────────────────────────
+;; API GATEWAY (Port 3000)
+;; ──────────────────────────────────────────────────
+
+(println "🚀 API Gateway 준비중...")
+
+;; 서비스 레지스트리
+(define service-registry {
+  :user-service "http://localhost:3001"
+  :product-service "http://localhost:3002"
+  :order-service "http://localhost:3003"
+})
+
+(println "✅ 서비스 레지스트리 등록")
+
+;; Gateway: /api/users/* → User Service
+(route-get "/api/users"
+  (fn [req]
+    (http-proxy-to "http://localhost:3001/users" req)))
+
+(route-get "/api/users/:id"
+  (fn [req]
+    (let [id (get req :params :id)]
+      (http-proxy-to (str "http://localhost:3001/users/" id) req))))
+
+(route-post "/api/users"
+  (fn [req]
+    (http-proxy-to "http://localhost:3001/users" req :method "POST" :body (get req :body))))
+
+;; Gateway: /api/products/* → Product Service
+(route-get "/api/products"
+  (fn [req]
+    (let [query-str (if (get req :query :category)
+                      (str "?category=" (get req :query :category))
+                      "")]
+      (http-proxy-to (str "http://localhost:3002/products" query-str) req))))
+
+(route-get "/api/products/:id"
+  (fn [req]
+    (let [id (get req :params :id)]
+      (http-proxy-to (str "http://localhost:3002/products/" id) req))))
+
+(route-post "/api/products"
+  (fn [req]
+    (http-proxy-to "http://localhost:3002/products" req :method "POST" :body (get req :body))))
+
+;; Gateway: /api/orders/* → Order Service
+(route-get "/api/orders"
+  (fn [req]
+    (http-proxy-to "http://localhost:3003/orders" req)))
+
+(route-get "/api/orders/:id"
+  (fn [req]
+    (let [id (get req :params :id)]
+      (http-proxy-to (str "http://localhost:3003/orders/" id) req))))
+
+(route-post "/api/orders"
+  (fn [req]
+    (http-proxy-to "http://localhost:3003/orders" req :method "POST" :body (get req :body))))
+
+(println "✅ API Gateway 라우트 등록")
+
+;; ──────────────────────────────────────────────────
+;; 서비스 상태 대시보드
+;; ──────────────────────────────────────────────────
+
+(route-get "/status"
+  (fn [req]
+    (http-response
+      :status 200
+      :body (json-stringify {
+        :gateway {:port 3000 :status "running"}
+        :services [
+          {:name "user-service" :port 3001 :url "http://localhost:3001"}
+          {:name "product-service" :port 3002 :url "http://localhost:3002"}
+          {:name "order-service" :port 3003 :url "http://localhost:3003"}
+        ]
+        :endpoints [
+          "GET /api/users"
+          "GET /api/users/:id"
+          "POST /api/users"
+          "GET /api/products"
+          "GET /api/products/:id"
+          "POST /api/products"
+          "GET /api/orders"
+          "GET /api/orders/:id"
+          "POST /api/orders"
+        ]
+      })
+      :headers {:content-type "application/json"})))
+
+(println "✅ 서비스 상태 대시보드")
+
+;; ──────────────────────────────────────────────────
+;; Docker Compose 자동 생성
+;; ──────────────────────────────────────────────────
+
+(define docker-compose-content
+  "version: '3.8'
+
+services:
+  # MariaDB 데이터베이스
+  db:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: microservices
+    ports:
+      - '3306:3306'
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 3306
+      SERVICE_PORT: 3001
+    ports:
+      - '3001:3001'
+    depends_on:
+      - db
+    command: node bootstrap.js serve --port 3001
+
+  # Product Service
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 3306
+      SERVICE_PORT: 3002
+    ports:
+      - '3002:3002'
+    depends_on:
+      - db
+    command: node bootstrap.js serve --port 3002
+
+  # Order Service
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 3306
+      SERVICE_PORT: 3003
+    ports:
+      - '3003:3003'
+    depends_on:
+      - db
+    command: node bootstrap.js serve --port 3003
+
+  # API Gateway
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 3306
+      SERVICE_PORT: 3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    command: node bootstrap.js serve --port 3000
+
+volumes:
+  db_data:
+")
+
+(file-write "docker-compose.yml" docker-compose-content)
+
+(println "✅ docker-compose.yml 생성됨")
+
+;; ──────────────────────────────────────────────────
+;; Kubernetes 배포 매니페스트 생성
+;; ──────────────────────────────────────────────────
+
+(dockerfile
+  :from "node:20-slim"
+  :workdir "/app"
+  :copy "*.fl" "."
+  :copy "bootstrap.js" "."
+  :copy "package.json" "."
+  :run "npm ci --only=production"
+  :expose "3000 3001 3002 3003"
+  :cmd "node bootstrap.js serve")
+
+(println "✅ Dockerfile 생성됨")
+
+;; ──────────────────────────────────────────────────
+;; 서버 시작 정보
+;; ──────────────────────────────────────────────────
+
+(println "\n🏗️ 마이크로서비스 아키텍처 준비 완료!")
+(println "\n📚 서비스 구조:")
+(println "   Gateway (Port 3000)")
+(println "   ├─ /api/users/* ——→ User Service (3001)")
+(println "   ├─ /api/products/* ——→ Product Service (3002)")
+(println "   └─ /api/orders/* ——→ Order Service (3003)")
+
+(println "\n🚀 실행 방법:")
+(println "\n   1️⃣ 각 서비스를 별도 터미널에서 실행:")
+(println "      # 터미널 1: User Service")
+(println "      PORT=3001 node bootstrap.js serve")
+(println "")
+(println "      # 터미널 2: Product Service")
+(println "      PORT=3002 node bootstrap.js serve")
+(println "")
+(println "      # 터미널 3: Order Service")
+(println "      PORT=3003 node bootstrap.js serve")
+(println "")
+(println "      # 터미널 4: Gateway")
+(println "      PORT=3000 node bootstrap.js serve")
+
+(println "\n   2️⃣ 또는 Docker Compose로 한 번에:")
+(println "      docker-compose up")
+
+(println "\n📡 테스트 예제:")
+(println "   # 사용자 생성")
+(println "   curl -X POST http://localhost:3000/api/users \\")
+(println "     -H 'Content-Type: application/json' \\")
+(println "     -d '{\"name\":\"김진돌\",\"email\":\"kim@example.com\"}'")
+(println "")
+(println "   # 상품 생성")
+(println "   curl -X POST http://localhost:3000/api/products \\")
+(println "     -H 'Content-Type: application/json' \\")
+(println "     -d '{\"name\":\"노트북\",\"price\":1500000,\"category\":\"electronics\"}'")
+(println "")
+(println "   # 주문 생성")
+(println "   curl -X POST http://localhost:3000/api/orders \\")
+(println "     -H 'Content-Type: application/json' \\")
+(println "     -d '{\"user_id\":1,\"product_id\":1,\"quantity\":2}'")
+
+(println "\n   # 서비스 상태 확인")
+(println "   curl http://localhost:3000/status")
+
+(println "\n✅ 마이크로서비스 예제 준비 완료!")

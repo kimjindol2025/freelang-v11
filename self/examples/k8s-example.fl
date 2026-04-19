@@ -1,0 +1,91 @@
+;; k8s-example.fl — Kubernetes 매니페스트 자동 생성 예제
+;; FreeLang v11 인프라 블록
+
+;; Deployment 예제 — Node.js 앱
+(define my-app-deployment
+  (deployment
+    :name "my-app"
+    :namespace "default"
+    :image "my-app:1.0.0"
+    :replicas 3
+    :port 3000
+    :containerPort 3000
+    :env {
+      :NODE_ENV "production"
+      :LOG_LEVEL "info"
+    }))
+
+(println "=== K8S Deployment ===")
+(println my-app-deployment)
+
+;; Service 예제 — 클러스터IP로 내부 노출
+(define my-app-service
+  (service
+    :name "my-app"
+    :namespace "default"
+    :port 80
+    :targetPort 3000
+    :type "ClusterIP"))
+
+(println "=== K8S Service ===")
+(println my-app-service)
+
+;; Service with LoadBalancer
+(define my-app-lb-service
+  (service
+    :name "my-app-lb"
+    :namespace "default"
+    :port 80
+    :targetPort 3000
+    :type "LoadBalancer"))
+
+(println "=== K8S LoadBalancer Service ===")
+(println my-app-lb-service)
+
+;; Ingress 예제 — 외부 HTTP 라우팅
+(define my-app-ingress
+  (ingress
+    :name "my-app"
+    :namespace "default"
+    :host "myapp.example.com"
+    :serviceName "my-app"
+    :servicePort 80
+    :path "/"))
+
+(println "=== K8S Ingress ===")
+(println my-app-ingress)
+
+;; 여러 경로를 가진 Ingress (응용)
+(define api-ingress
+  (ingress
+    :name "api-gateway"
+    :namespace "production"
+    :host "api.example.com"
+    :serviceName "api-service"
+    :servicePort 8080
+    :path "/api"))
+
+(println "=== K8S API Ingress ===")
+(println api-ingress)
+
+;; 포드 자동 스케일링 정책 (환경)
+(define autoscaler-config {
+  :minReplicas 2
+  :maxReplicas 10
+  :cpuTargetPercent 70
+})
+
+(println "=== Autoscaler Config (환경) ===")
+(println autoscaler-config)
+
+;; 전체 스택 정의
+(define full-k8s-stack
+  {
+    :deployment my-app-deployment
+    :service my-app-service
+    :ingress my-app-ingress
+    :autoscaler autoscaler-config
+  })
+
+(println "=== Full K8S Stack ===")
+(println full-k8s-stack)

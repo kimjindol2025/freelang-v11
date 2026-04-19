@@ -1,0 +1,253 @@
+;; rest-api.fl — FreeLang v11 REST API 예제
+;; Phase 59 P4-2: CRUD API 완전 구현 (User 리소스)
+
+;; ──────────────────────────────────────────────────
+;; DB 초기화
+;; ──────────────────────────────────────────────────
+
+(println "📦 REST API 서버 시작...")
+
+;; 테이블 생성 (존재하지 않으면)
+(mariadb-exec
+  "CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    age INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )")
+
+(println "✅ DB 테이블 준비 완료")
+
+;; ──────────────────────────────────────────────────
+;; GET /api/users — 모든 사용자 조회
+;; ──────────────────────────────────────────────────
+
+(route-get "/api/users"
+  (fn [req]
+    (let [users (mariadb-query "SELECT * FROM users ORDER BY id DESC")]
+      (http-response
+        :status 200
+        :body (json-stringify {
+          :success true
+          :count (length users)
+          :data users
+        })
+        :headers {:content-type "application/json"}))))
+
+(println "✅ GET /api/users")
+
+;; ──────────────────────────────────────────────────
+;; GET /api/users/:id — 특정 사용자 조회
+;; ──────────────────────────────────────────────────
+
+(route-get "/api/users/:id"
+  (fn [req]
+    (let [id (get req :params :id)
+          user (mariadb-query-one
+                 "SELECT * FROM users WHERE id = ?"
+                 [id])]
+      (if user
+        (http-response
+          :status 200
+          :body (json-stringify {
+            :success true
+            :data user
+          })
+          :headers {:content-type "application/json"})
+        (http-response
+          :status 404
+          :body (json-stringify {
+            :success false
+            :error "User not found"
+          })
+          :headers {:content-type "application/json"})))))
+
+(println "✅ GET /api/users/:id")
+
+;; ──────────────────────────────────────────────────
+;; POST /api/users — 새 사용자 생성
+;; ──────────────────────────────────────────────────
+
+(route-post "/api/users"
+  (fn [req]
+    (let [body (json-parse (get req :body))
+          name (get body :name)
+          email (get body :email)
+          age (get body :age)]
+
+      ;; 유효성 검사
+      (if (or (not name) (not email))
+        (http-response
+          :status 400
+          :body (json-stringify {
+            :success false
+            :error "name과 email은 필수입니다"
+          })
+          :headers {:content-type "application/json"})
+
+        ;; 삽입
+        (let [result (mariadb-exec
+                      "INSERT INTO users (name, email, age) VALUES (?, ?, ?)"
+                      [name email age])]
+          (http-response
+            :status 201
+            :body (json-stringify {
+              :success true
+              :message "사용자가 생성되었습니다"
+              :id (get result :insertId)
+              :data {
+                :id (get result :insertId)
+                :name name
+                :email email
+                :age age
+              }
+            })
+            :headers {:content-type "application/json"}))))))
+
+(println "✅ POST /api/users")
+
+;; ──────────────────────────────────────────────────
+;; PUT /api/users/:id — 사용자 정보 수정
+;; ──────────────────────────────────────────────────
+
+(route-put "/api/users/:id"
+  (fn [req]
+    (let [id (get req :params :id)
+          body (json-parse (get req :body))
+          name (get body :name)
+          email (get body :email)
+          age (get body :age)
+
+          ;; 현재 사용자 조회
+          user (mariadb-query-one
+                 "SELECT * FROM users WHERE id = ?"
+                 [id])]
+
+      (if (not user)
+        (http-response
+          :status 404
+          :body (json-stringify {
+            :success false
+            :error "User not found"
+          })
+          :headers {:content-type "application/json"})
+
+        ;; 업데이트
+        (let [result (mariadb-exec
+                      "UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?"
+                      [(or name (get user :name))
+                       (or email (get user :email))
+                       (or age (get user :age))
+                       id])]
+          (http-response
+            :status 200
+            :body (json-stringify {
+              :success true
+              :message "사용자 정보가 수정되었습니다"
+              :data {
+                :id id
+                :name (or name (get user :name))
+                :email (or email (get user :email))
+                :age (or age (get user :age))
+              }
+            })
+            :headers {:content-type "application/json"}))))))
+
+(println "✅ PUT /api/users/:id")
+
+;; ──────────────────────────────────────────────────
+;; DELETE /api/users/:id — 사용자 삭제
+;; ──────────────────────────────────────────────────
+
+(route-delete "/api/users/:id"
+  (fn [req]
+    (let [id (get req :params :id)
+          user (mariadb-query-one
+                 "SELECT * FROM users WHERE id = ?"
+                 [id])]
+
+      (if (not user)
+        (http-response
+          :status 404
+          :body (json-stringify {
+            :success false
+            :error "User not found"
+          })
+          :headers {:content-type "application/json"})
+
+        ;; 삭제
+        (let [result (mariadb-exec
+                      "DELETE FROM users WHERE id = ?"
+                      [id])]
+          (http-response
+            :status 200
+            :body (json-stringify {
+              :success true
+              :message "사용자가 삭제되었습니다"
+              :deleted_id id
+            })
+            :headers {:content-type "application/json"}))))))
+
+(println "✅ DELETE /api/users/:id")
+
+;; ──────────────────────────────────────────────────
+;; GET /api/users/search — 사용자 검색
+;; ──────────────────────────────────────────────────
+
+(route-get "/api/users/search"
+  (fn [req]
+    (let [query (get req :query :q)
+          results (if query
+                    (mariadb-query
+                      "SELECT * FROM users WHERE name LIKE ? OR email LIKE ?"
+                      [(str "%" query "%") (str "%" query "%")])
+                    [])]
+      (http-response
+        :status 200
+        :body (json-stringify {
+          :success true
+          :query query
+          :count (length results)
+          :data results
+        })
+        :headers {:content-type "application/json"}))))
+
+(println "✅ GET /api/users/search")
+
+;; ──────────────────────────────────────────────────
+;; 헬스 체크 엔드포인트
+;; ──────────────────────────────────────────────────
+
+(route-get "/health"
+  (fn [req]
+    (http-response
+      :status 200
+      :body (json-stringify {
+        :status "healthy"
+        :service "User API"
+        :version "1.0"
+        :timestamp (time-now)
+      })
+      :headers {:content-type "application/json"})))
+
+(println "✅ GET /health")
+
+;; ──────────────────────────────────────────────────
+;; 서버 시작
+;; ──────────────────────────────────────────────────
+
+(println "\n🚀 REST API 서버 시작!")
+(println "   📡 엔드포인트:")
+(println "      GET    /api/users           — 모든 사용자 조회")
+(println "      GET    /api/users/:id       — 특정 사용자 조회")
+(println "      GET    /api/users/search    — 사용자 검색")
+(println "      POST   /api/users           — 새 사용자 생성")
+(println "      PUT    /api/users/:id       — 사용자 정보 수정")
+(println "      DELETE /api/users/:id       — 사용자 삭제")
+(println "      GET    /health              — 헬스 체크")
+(println "\n   🧪 테스트 예제:")
+(println "      curl http://localhost:3000/api/users")
+(println "      curl -X POST http://localhost:3000/api/users \\")
+(println "        -H 'Content-Type: application/json' \\")
+(println "        -d '{\"name\":\"김진돌\",\"email\":\"kim@example.com\",\"age\":28}'")

@@ -1,0 +1,330 @@
+;; fullstack-app.fl — FreeLang v11 풀스택 예제
+;; Phase 59 P4-2: Backend (API) + Frontend (UI) + Style (CSS)
+
+;; ──────────────────────────────────────────────────
+;; PART 1: 디자인 시스템 (THEME + STYLE)
+;; ──────────────────────────────────────────────────
+
+;; 1-1. 디자인 토큰 정의
+(theme default
+  :tokens {
+    ;; 색상
+    :primary "#2563eb"
+    :primary-dark "#1d4ed8"
+    :secondary "#64748b"
+    :success "#10b981"
+    :error "#ef4444"
+    :warning "#f59e0b"
+    :text "#111827"
+    :text-light "#6b7280"
+    :bg "#ffffff"
+    :bg-light "#f9fafb"
+    :border "#e5e7eb"
+
+    ;; 공간
+    :space-xs "4px"
+    :space-sm "8px"
+    :space-md "16px"
+    :space-lg "24px"
+
+    ;; 반경
+    :radius-sm "4px"
+    :radius-md "8px"
+
+    ;; 글꼴
+    :font-size-sm "14px"
+    :font-size-md "16px"
+    :font-weight-normal "400"
+    :font-weight-bold "700"
+  })
+
+(println "✅ THEME: 25개 디자인 토큰 정의")
+
+;; 1-2. 컴포넌트 스타일
+(style container
+  :selector ".container"
+  :rules {
+    :max-width "1200px"
+    :m "0 auto"
+    :p "var(--space-lg)"
+  })
+
+(style header
+  :selector ".header"
+  :rules {
+    :bg "var(--primary)"
+    :color "white"
+    :p "var(--space-lg)"
+    :box-shadow "0 2px 4px rgba(0,0,0,0.1)"
+  })
+
+(style header-title
+  :selector ".header-title"
+  :rules {
+    :font-size "24px"
+    :fw "var(--font-weight-bold)"
+    :m "0"
+  })
+
+(style card
+  :selector ".card"
+  :rules {
+    :bg "var(--bg)"
+    :border "1px solid var(--border)"
+    :r "var(--radius-md)"
+    :p "var(--space-md)"
+    :margin-bottom "var(--space-md)"
+    :box-shadow "0 1px 3px rgba(0,0,0,0.05)"
+  })
+
+(style card-title
+  :selector ".card-title"
+  :rules {
+    :fs "18px"
+    :fw "var(--font-weight-bold)"
+    :color "var(--text)"
+    :margin-bottom "var(--space-sm)"
+  })
+
+(style card-body
+  :selector ".card-body"
+  :rules {
+    :color "var(--text-light)"
+    :line-height "1.6"
+  })
+
+(style btn
+  :selector ".btn"
+  :rules {
+    :display "inline-block"
+    :p "var(--space-sm) var(--space-md)"
+    :border "none"
+    :r "var(--radius-sm)"
+    :cursor "pointer"
+    :fw "var(--font-weight-bold)"
+    :transition "all 0.2s"
+    :fs "var(--font-size-md)"
+  })
+
+(style btn-primary
+  :selector ".btn-primary"
+  :rules {
+    :bg "var(--primary)"
+    :color "white"
+  })
+
+(style btn-primary-hover
+  :selector ".btn-primary:hover"
+  :rules {
+    :bg "var(--primary-dark)"
+    :transform "translateY(-2px)"
+    :box-shadow "0 4px 8px rgba(37, 99, 235, 0.3)"
+  })
+
+(style form-group
+  :selector ".form-group"
+  :rules {
+    :margin-bottom "var(--space-md)"
+  })
+
+(style form-label
+  :selector ".form-label"
+  :rules {
+    :display "block"
+    :fw "var(--font-weight-bold)"
+    :color "var(--text)"
+    :margin-bottom "var(--space-xs)"
+  })
+
+(style form-input
+  :selector ".form-input"
+  :rules {
+    :width "100%"
+    :p "var(--space-sm)"
+    :border "1px solid var(--border)"
+    :r "var(--radius-sm)"
+    :fs "var(--font-size-md)"
+    :box-sizing "border-box"
+  })
+
+(style grid
+  :selector ".grid"
+  :rules {
+    :display "grid"
+    :grid-template-columns "repeat(auto-fit, minmax(300px, 1fr))"
+    :gap "var(--space-md)"
+  })
+
+(println "✅ STYLE: 13개 컴포넌트 스타일 정의")
+
+;; ──────────────────────────────────────────────────
+;; PART 2: 백엔드 API
+;; ──────────────────────────────────────────────────
+
+;; DB 초기화
+(mariadb-exec
+  "CREATE TABLE IF NOT EXISTS posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    content TEXT,
+    author VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )")
+
+(println "✅ DB 초기화 완료")
+
+;; API: 모든 포스트 조회
+(route-get "/api/posts"
+  (fn [req]
+    (let [posts (mariadb-query "SELECT * FROM posts ORDER BY id DESC LIMIT 10")]
+      (http-response
+        :status 200
+        :body (json-stringify {:success true :data posts})
+        :headers {:content-type "application/json"}))))
+
+;; API: 새 포스트 생성
+(route-post "/api/posts"
+  (fn [req]
+    (let [body (json-parse (get req :body))
+          title (get body :title)
+          content (get body :content)
+          author (get body :author)]
+      (mariadb-exec
+        "INSERT INTO posts (title, content, author) VALUES (?, ?, ?)"
+        [title content author])
+      (http-response
+        :status 201
+        :body (json-stringify {:success true :message "포스트가 생성되었습니다"})
+        :headers {:content-type "application/json"}))))
+
+(println "✅ 백엔드 API 라우트 등록")
+
+;; ──────────────────────────────────────────────────
+;; PART 3: 프론트엔드 페이지
+;; ──────────────────────────────────────────────────
+
+;; 3-1. 레이아웃 (모든 페이지의 기본 구조)
+[layout root
+  :render (html
+    "<html lang='ko'>
+    <head>
+      <meta charset='UTF-8'>
+      <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+      <title>{title}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      </style>
+    </head>
+    <body>
+      <div class='header'>
+        <div class='container'>
+          <h1 class='header-title'>FreeLang 풀스택 예제</h1>
+        </div>
+      </div>
+      <div class='container'>
+        {content}
+      </div>
+    </body>
+    </html>")]
+
+(println "✅ 레이아웃 등록")
+
+;; 3-2. 홈 페이지 (포스트 목록)
+[page /
+  :title "홈"
+  :render (html
+    "<div>
+      <h2 class='card-title'>📚 최근 포스트</h2>
+      <div class='card'>
+        <p class='card-body'>포스트 목록이 여기에 표시됩니다.</p>
+        <p class='card-body' style='margin-top: 16px;'>
+          API 엔드포인트: <code>GET /api/posts</code>
+        </p>
+      </div>
+
+      <div class='card'>
+        <h3 class='card-title'>✏️ 새 포스트 작성</h3>
+        <form>
+          <div class='form-group'>
+            <label class='form-label'>제목</label>
+            <input class='form-input' type='text' placeholder='포스트 제목' name='title'>
+          </div>
+          <div class='form-group'>
+            <label class='form-label'>내용</label>
+            <textarea class='form-input' rows='5' placeholder='포스트 내용' name='content'></textarea>
+          </div>
+          <div class='form-group'>
+            <label class='form-label'>작성자</label>
+            <input class='form-input' type='text' placeholder='이름' name='author'>
+          </div>
+          <button type='submit' class='btn btn-primary'>📤 포스트 작성</button>
+        </form>
+      </div>
+    </div>")]
+
+(println "✅ 홈 페이지 등록")
+
+;; 3-3. 소개 페이지
+[page /about
+  :title "소개"
+  :render (html
+    "<div>
+      <h2 class='card-title'>🎯 FreeLang v11 풀스택 예제</h2>
+
+      <div class='grid'>
+        <div class='card'>
+          <h3 class='card-title'>⚙️ 백엔드</h3>
+          <p class='card-body'>
+            FreeLang 인터프리터 + 50개 stdlib<br>
+            REST API 라우팅<br>
+            MariaDB 데이터베이스<br>
+          </p>
+        </div>
+
+        <div class='card'>
+          <h3 class='card-title'>🎨 프론트엔드</h3>
+          <p class='card-body'>
+            SSR/ISR/SSG 웹 프레임워크<br>
+            파일시스템 기반 라우팅<br>
+            레이아웃 + 페이지 블록<br>
+          </p>
+        </div>
+
+        <div class='card'>
+          <h3 class='card-title'>🎭 스타일</h3>
+          <p class='card-body'>
+            THEME 디자인 토큰<br>
+            STYLE 컴포넌트 스타일<br>
+            CSS 변수 자동 주입<br>
+          </p>
+        </div>
+      </div>
+
+      <div class='card'>
+        <h3 class='card-title'>📌 핵심 특징</h3>
+        <p class='card-body'>
+          ✅ 한 언어로 완전한 풀스택 개발<br>
+          ✅ 선언형 API 라우팅<br>
+          ✅ 자동 CSS 주입<br>
+          ✅ 데이터베이스 직접 통합<br>
+        </p>
+      </div>
+    </div>")]
+
+(println "✅ 소개 페이지 등록")
+
+;; ──────────────────────────────────────────────────
+;; 서버 시작 메시지
+;; ──────────────────────────────────────────────────
+
+(println "\n🚀 풀스택 서버 시작!")
+(println "   🌐 페이지:")
+(println "      / — 홈 (포스트 목록, 작성 폼)")
+(println "      /about — 소개")
+(println "\n   📡 API:")
+(println "      GET /api/posts — 포스트 목록")
+(println "      POST /api/posts — 포스트 생성")
+(println "\n   🎨 스타일: 25개 토큰 + 13개 컴포넌트 자동 적용")
+(println "\n   🧪 브라우저에서 접속:")
+(println "      http://localhost:3000")

@@ -1,0 +1,67 @@
+;; docker-example.fl — Dockerfile 자동 생성 예제
+;; FreeLang v11 인프라 블록
+
+;; 기본 Node.js Dockerfile 생성
+(define simple-docker
+  (dockerfile
+    :from "node:20-slim"
+    :workdir "/app"
+    :copy "package.json package-lock.json ./"
+    :run "npm install"
+    :copy ". ."
+    :expose "3000"
+    :cmd "node server.js"))
+
+(println "=== Simple Node.js Docker ===")
+(println simple-docker)
+
+;; 멀티 스테이지 패턴 (명령형으로)
+(define multistage-docker
+  (let [base-image "node:20-slim"]
+    (dockerfile
+      :from base-image
+      :workdir "/app"
+      :env "NODE_ENV" "production"
+      :copy "package.json ./"
+      :run "npm ci --only=production"
+      :copy "src/ ./src/"
+      :expose "8080"
+      :cmd "npm start")))
+
+(println "=== Multistage Docker ===")
+(println multistage-docker)
+
+;; Python + pip 예제
+(define python-docker
+  (dockerfile
+    :from "python:3.11-slim"
+    :workdir "/app"
+    :run "pip install --upgrade pip"
+    :copy "requirements.txt ./"
+    :run "pip install -r requirements.txt"
+    :copy ". ."
+    :expose "5000"
+    :cmd "python app.py"))
+
+(println "=== Python Docker ===")
+(println python-docker)
+
+;; Docker Compose 예제 — Node + PostgreSQL
+(define app-compose
+  (docker-compose
+    :version "3.9"
+    :services {
+      :web {
+        :image "node:20-slim"
+        :port "3000"
+        :containerPort "3000"
+      }
+      :postgres {
+        :image "postgres:15"
+        :port "5432"
+        :containerPort "5432"
+      }
+    }))
+
+(println "=== Docker Compose ===")
+(println app-compose)

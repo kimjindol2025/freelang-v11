@@ -1,0 +1,9 @@
+;; 디버그: compiler-L3-FINAL.js에서 hello.fl의 lex/parse 결과 확인
+(let [[$src (file_read "self/bench/hello.fl")]
+      [$tokens (lex $src)]
+      [$ast (parse $tokens)]]
+  (do
+    (println (str "Tokens: " (length $tokens)))
+    (println (str "AST: " (length $ast)))
+    (if (> (length $ast) 0)
+      (println (str "First node: " (get (get $ast 0) "kind"))))))

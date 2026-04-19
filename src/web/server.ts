@@ -46,14 +46,8 @@ function generatePageHTML(route: Route, params: Record<string, string> = {}): st
 /**
  * 풀 HTML 페이지 생성
  */
-function generateHTML(title: string, content: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FreeLang v11 - ${title}</title>
-  <style>
+function generateHTML(title: string, content: string, extraCss: string = ""): string {
+  const defaultCss = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
@@ -77,7 +71,17 @@ function generateHTML(title: string, content: string): string {
     ul { margin-left: 20px; }
     li { margin-bottom: 10px; }
     a { color: #667eea; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    a:hover { text-decoration: underline; }`;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeLang v11 - ${title}</title>
+  <style>
+${defaultCss}
+${extraCss ? "\n" + extraCss : ""}
   </style>
 </head>
 <body>
