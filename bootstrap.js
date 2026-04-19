@@ -11558,14 +11558,6 @@ function evalBuiltin(interp, op, args2, expr) {
       return -1;
     case "last":
       return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
-    case "conj": {
-      if (Array.isArray(args2[0])) {
-        const arr = [...args2[0]];
-        for (let i = 1; i < args2.length; i++) arr.push(args2[i]);
-        return arr;
-      }
-      return [args2[0], ...args2.slice(1)];
-    }
     case "get": {
       let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
@@ -16286,6 +16278,7 @@ ${stepsStr}
     let bucket = "my-bucket";
     let action = "list";
     let file = "";
+    let data = null;
     let region = "us-east-1";
     for (let i = 0; i < expr.args.length; i++) {
       const arg = expr.args[i];
@@ -16303,6 +16296,9 @@ ${stepsStr}
             case "file":
               file = String(val);
               break;
+            case "data":
+              data = val;
+              break;
             case "region":
               region = String(val);
               break;
@@ -16311,13 +16307,31 @@ ${stepsStr}
         }
       }
     }
-    return { aws_s3: { bucket, action, file, region, status: "configured" } };
+    try {
+      switch (action.toLowerCase()) {
+        case "list":
+          return interp.callUserFunction("aws-s3-list", [bucket, file]);
+        case "upload":
+          return interp.callUserFunction("aws-s3-upload", [bucket, file, data]);
+        case "download":
+          return interp.callUserFunction("aws-s3-download", [bucket, file]);
+        case "delete":
+          return interp.callUserFunction("aws-s3-delete", [bucket, file]);
+        case "config":
+          return interp.callUserFunction("aws-s3-config", [bucket, region]);
+        default:
+          return { status: "unknown_action", action, bucket };
+      }
+    } catch (err4) {
+      return { status: "error", action, bucket, reason: err4.message };
+    }
   }
   if (op === "GCP-RUN" || op === "gcp-run") {
     let service = "my-service";
     let image = "gcr.io/my-project/my-service:latest";
     let region = "us-central1";
     let action = "deploy";
+    let data = null;
     for (let i = 0; i < expr.args.length; i++) {
       const arg = expr.args[i];
       if (arg.kind === "keyword") {
@@ -16337,18 +16351,36 @@ ${stepsStr}
             case "action":
               action = String(val);
               break;
+            case "data":
+              data = val;
+              break;
           }
           i++;
         }
       }
     }
-    return { gcp_run: { service, image, region, action, status: "configured" } };
+    try {
+      switch (action.toLowerCase()) {
+        case "deploy":
+          return interp.callUserFunction("gcp-run-deploy", [service, image, region]);
+        case "invoke":
+          return interp.callUserFunction("gcp-run-invoke", [service, data, region]);
+        case "list":
+          return interp.callUserFunction("gcp-run-list", [region]);
+        default:
+          return { status: "unknown_action", action, service };
+      }
+    } catch (err4) {
+      return { status: "error", action, service, reason: err4.message };
+    }
   }
   if (op === "AZURE-FUNCTION" || op === "azure-function") {
     let name = "my-function";
     let runtime = "node";
     let region = "eastus";
-    let action = "deploy";
+    let action = "invoke";
+    let data = null;
+    let image = "";
     for (let i = 0; i < expr.args.length; i++) {
       const arg = expr.args[i];
       if (arg.kind === "keyword") {
@@ -16368,12 +16400,31 @@ ${stepsStr}
             case "action":
               action = String(val);
               break;
+            case "data":
+              data = val;
+              break;
+            case "image":
+              image = String(val);
+              break;
           }
           i++;
         }
       }
     }
-    return { azure_function: { name, runtime, region, action, status: "configured" } };
+    try {
+      switch (action.toLowerCase()) {
+        case "invoke":
+          return interp.callUserFunction("azure-function-invoke", [name, data]);
+        case "create":
+          return interp.callUserFunction("azure-function-create", [name, runtime]);
+        case "deploy":
+          return interp.callUserFunction("azure-app-deploy", [name, image, region]);
+        default:
+          return { status: "unknown_action", action, name };
+      }
+    } catch (err4) {
+      return { status: "error", action, name, reason: err4.message };
+    }
   }
   throw new Error(`Unknown infra block: ${op}`);
 }
@@ -24459,257 +24510,293 @@ function createBlogModule() {
 }
 
 // src/stdlib-cloud.ts
+var import_child_process6 = require("child_process");
+var cliAvailable = {};
+function checkAwsCLI() {
+  if (cliAvailable.aws !== void 0) return cliAvailable.aws;
+  const result = (0, import_child_process6.spawnSync)("aws", ["--version"], { timeout: 3e3 });
+  cliAvailable.aws = !result.error && result.status === 0;
+  return cliAvailable.aws;
+}
+function checkGcloudCLI() {
+  if (cliAvailable.gcloud !== void 0) return cliAvailable.gcloud;
+  const result = (0, import_child_process6.spawnSync)("gcloud", ["--version"], { timeout: 3e3 });
+  cliAvailable.gcloud = !result.error && result.status === 0;
+  return cliAvailable.gcloud;
+}
+function checkAzCLI() {
+  if (cliAvailable.az !== void 0) return cliAvailable.az;
+  const result = (0, import_child_process6.spawnSync)("az", ["--version"], { timeout: 3e3 });
+  cliAvailable.az = !result.error && result.status === 0;
+  return cliAvailable.az;
+}
+function runAws(args2) {
+  if (!checkAwsCLI()) {
+    return { status: "cli_not_found", reason: "aws CLI not installed", details: "install aws-cli" };
+  }
+  try {
+    const result = (0, import_child_process6.spawnSync)("aws", args2, { timeout: 3e4, encoding: "utf-8" });
+    if (result.error) throw new Error(result.error.message);
+    if ((result.status ?? 1) !== 0) {
+      const stderr = result.stderr?.trim() ?? "";
+      throw new Error(`aws exited ${result.status}${stderr ? ": " + stderr : ""}`);
+    }
+    const stdout = result.stdout?.trim() ?? "";
+    return { status: "success", output: stdout, raw: stdout };
+  } catch (err4) {
+    return { status: "error", reason: err4.message };
+  }
+}
+function runGcloud(args2) {
+  if (!checkGcloudCLI()) {
+    return { status: "cli_not_found", reason: "gcloud CLI not installed", details: "install google-cloud-sdk" };
+  }
+  try {
+    const result = (0, import_child_process6.spawnSync)("gcloud", args2, { timeout: 3e4, encoding: "utf-8" });
+    if (result.error) throw new Error(result.error.message);
+    if ((result.status ?? 1) !== 0) {
+      const stderr = result.stderr?.trim() ?? "";
+      throw new Error(`gcloud exited ${result.status}${stderr ? ": " + stderr : ""}`);
+    }
+    const stdout = result.stdout?.trim() ?? "";
+    return { status: "success", output: stdout, raw: stdout };
+  } catch (err4) {
+    return { status: "error", reason: err4.message };
+  }
+}
+function runAz(args2) {
+  if (!checkAzCLI()) {
+    return { status: "cli_not_found", reason: "az CLI not installed", details: "install azure-cli" };
+  }
+  try {
+    const result = (0, import_child_process6.spawnSync)("az", args2, { timeout: 3e4, encoding: "utf-8" });
+    if (result.error) throw new Error(result.error.message);
+    if ((result.status ?? 1) !== 0) {
+      const stderr = result.stderr?.trim() ?? "";
+      throw new Error(`az exited ${result.status}${stderr ? ": " + stderr : ""}`);
+    }
+    const stdout = result.stdout?.trim() ?? "";
+    return { status: "success", output: stdout, raw: stdout };
+  } catch (err4) {
+    return { status: "error", reason: err4.message };
+  }
+}
 function createCloudModule() {
-  const cloudState = {
-    aws: { bucket: "default", region: "us-east-1" },
-    gcp: { projectId: "default-project", region: "us-central1" },
-    azure: { subscriptionId: "default-subscription", region: "eastus" }
-  };
   return {
     // ── AWS S3 ──────────────────────────────────────────────────
-    // aws-s3-upload bucket file data → { status: "uploaded", size, etag }
+    // aws-s3-upload bucket file → { status, location, size }
     "aws-s3-upload": (bucket, file, data) => {
-      const payload = typeof data === "string" ? data : JSON.stringify(data);
-      return {
-        status: "uploaded",
-        bucket,
-        file,
-        size: Buffer.byteLength(payload),
-        etag: `"${Buffer.from(payload).toString("base64").slice(0, 32)}"`,
-        location: `s3://${bucket}/${file}`
-      };
-    },
-    // aws-s3-download bucket file → { status, data, size } or null
-    "aws-s3-download": (bucket, file) => {
-      return {
-        status: "downloaded",
-        bucket,
-        file,
-        size: 0,
-        data: null,
-        location: `s3://${bucket}/${file}`
-      };
-    },
-    // aws-s3-list bucket prefix → { status, files: [name] }
-    "aws-s3-list": (bucket, prefix = "") => {
-      return {
-        status: "listed",
-        bucket,
-        prefix,
-        files: [],
-        count: 0
-      };
-    },
-    // aws-s3-delete bucket file → { status, bucket, file }
-    "aws-s3-delete": (bucket, file) => {
-      return {
-        status: "deleted",
-        bucket,
-        file,
-        location: `s3://${bucket}/${file}`
-      };
-    },
-    // aws-s3-config bucket region credentials → { status: "configured" }
-    "aws-s3-config": (bucket, region, credentials) => {
-      if (cloudState.aws) {
-        cloudState.aws.bucket = bucket;
-        cloudState.aws.region = region;
-        if (credentials) cloudState.aws.credentials = credentials;
+      const localFile = `/tmp/fl-upload-${Date.now()}.tmp`;
+      try {
+        if (data) {
+          const payload = typeof data === "string" ? data : JSON.stringify(data);
+          require("fs").writeFileSync(localFile, payload);
+        }
+        const res = runAws(["s3", "cp", localFile, `s3://${bucket}/${file}`]);
+        if (res.status === "cli_not_found") return res;
+        if (res.status === "error") return { status: "upload_failed", reason: res.reason, bucket, file };
+        return { status: "uploaded", bucket, file, location: `s3://${bucket}/${file}`, size: 0 };
+      } finally {
+        try {
+          require("fs").unlinkSync(localFile);
+        } catch {
+        }
       }
-      return { status: "configured", bucket, region };
+    },
+    // aws-s3-download bucket file → { status, data, location }
+    "aws-s3-download": (bucket, file) => {
+      const localFile = `/tmp/fl-download-${Date.now()}.tmp`;
+      try {
+        const res = runAws(["s3", "cp", `s3://${bucket}/${file}`, localFile]);
+        if (res.status === "cli_not_found") return res;
+        if (res.status === "error") return { status: "download_failed", reason: res.reason, bucket, file };
+        try {
+          const data = require("fs").readFileSync(localFile, "utf-8");
+          return { status: "downloaded", bucket, file, location: `s3://${bucket}/${file}`, data, size: data.length };
+        } catch (e) {
+          return { status: "read_failed", reason: e.message };
+        }
+      } finally {
+        try {
+          require("fs").unlinkSync(localFile);
+        } catch {
+        }
+      }
+    },
+    // aws-s3-list bucket prefix → { status, files: [name], count }
+    "aws-s3-list": (bucket, prefix = "") => {
+      const cmd2 = ["s3", "ls", `s3://${bucket}${prefix ? "/" + prefix : ""}`, "--recursive"];
+      const res = runAws(cmd2);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "list_failed", reason: res.reason, bucket, prefix };
+      const files = res.output.split("\n").filter((line) => line.trim()).map((line) => {
+        const parts = line.split(/\s+/);
+        return parts[parts.length - 1];
+      });
+      return { status: "listed", bucket, prefix, files, count: files.length };
+    },
+    // aws-s3-delete bucket file → { status, location }
+    "aws-s3-delete": (bucket, file) => {
+      const res = runAws(["s3", "rm", `s3://${bucket}/${file}`]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "delete_failed", reason: res.reason, bucket, file };
+      return { status: "deleted", bucket, file, location: `s3://${bucket}/${file}` };
+    },
+    // aws-s3-config bucket region → { status: "configured" }
+    "aws-s3-config": (bucket, region) => {
+      return { status: "configured", bucket, region, message: "AWS S3 credentials via environment variables" };
     },
     // ── AWS Lambda ──────────────────────────────────────────────
-    // aws-lambda-invoke function payload → { status, result, duration_ms }
+    // aws-lambda-invoke function payload → { status, output, duration_ms }
     "aws-lambda-invoke": (functionName, payload) => {
+      const payloadFile = `/tmp/fl-lambda-${Date.now()}.json`;
       const startTime = Date.now();
-      return {
-        status: "invoked",
-        functionName,
-        payload,
-        result: null,
-        duration_ms: Date.now() - startTime,
-        logGroupName: `/aws/lambda/${functionName}`
-      };
+      try {
+        const payloadStr = JSON.stringify(payload);
+        require("fs").writeFileSync(payloadFile, payloadStr);
+        const res = runAws(["lambda", "invoke", "--function-name", functionName, "--payload", `file://${payloadFile}`, "/tmp/response.json"]);
+        if (res.status === "cli_not_found") return res;
+        if (res.status === "error") return { status: "invoke_failed", reason: res.reason, functionName };
+        try {
+          const responseData = require("fs").readFileSync("/tmp/response.json", "utf-8");
+          return { status: "invoked", functionName, output: responseData, duration_ms: Date.now() - startTime };
+        } catch {
+          return { status: "invoked", functionName, output: null, duration_ms: Date.now() - startTime };
+        }
+      } finally {
+        try {
+          require("fs").unlinkSync(payloadFile);
+        } catch {
+        }
+      }
     },
-    // aws-lambda-create function handler runtime → { status, arn }
-    "aws-lambda-create": (functionName, handler, runtime = "nodejs20.x") => {
+    // aws-lambda-create function → { status, arn }
+    "aws-lambda-create": (functionName, handler = "index.handler", runtime = "nodejs20.x") => {
       return {
-        status: "created",
+        status: "create_via_cli",
+        message: "Use: aws lambda create-function --function-name <name> --handler <handler> --runtime <runtime>",
         functionName,
         handler,
-        runtime,
-        arn: `arn:aws:lambda:us-east-1:123456789012:function:${functionName}`
+        runtime
       };
     },
     // aws-lambda-delete function → { status }
     "aws-lambda-delete": (functionName) => {
-      return {
-        status: "deleted",
-        functionName
-      };
+      const res = runAws(["lambda", "delete-function", "--function-name", functionName]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "delete_failed", reason: res.reason };
+      return { status: "deleted", functionName };
     },
     // ── AWS RDS ──────────────────────────────────────────────
-    // aws-rds-query dbInstanceId sql → { status, rows: [] }
+    // aws-rds-query dbInstanceId sql → { status, rows }
     "aws-rds-query": (dbInstanceId, sql) => {
       return {
-        status: "executed",
+        status: "query_via_cli",
+        message: "Use: aws rds-data execute-statement --resource-arn <arn> --sql <sql>",
         dbInstanceId,
-        sql,
-        rows: [],
-        rowsAffected: 0
+        sql
       };
     },
-    // aws-rds-create dbInstanceId engine masterUsername → { status, endpoint }
-    "aws-rds-create": (dbInstanceId, engine, masterUsername) => {
+    // aws-rds-create dbInstanceId engine → { status }
+    "aws-rds-create": (dbInstanceId, engine = "mysql", masterUsername = "admin") => {
       return {
-        status: "creating",
+        status: "create_via_cli",
+        message: "Use: aws rds create-db-instance --db-instance-identifier <id> --engine <engine>",
         dbInstanceId,
         engine,
-        masterUsername,
-        endpoint: `${dbInstanceId}.123456789.us-east-1.rds.amazonaws.com`,
-        port: engine.includes("mysql") ? 3306 : engine.includes("postgres") ? 5432 : 1433
+        masterUsername
       };
     },
     // ── GCP Cloud Run ─────────────────────────────────────────
-    // gcp-run-deploy service image region → { status, url, region }
+    // gcp-run-deploy service image region → { status, url }
     "gcp-run-deploy": (serviceName, imageUri, region = "us-central1") => {
-      return {
-        status: "deploying",
-        serviceName,
-        imageUri,
-        region,
-        url: `https://${serviceName}-${region.split("-")[0]}xxxxx.a.run.app`,
-        projectId: cloudState.gcp?.projectId ?? "default-project"
-      };
+      const res = runGcloud(["run", "deploy", serviceName, "--image", imageUri, "--region", region, "--allow-unauthenticated"]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "deploy_failed", reason: res.reason, serviceName };
+      const urlMatch = res.output.match(/https:\/\/[^\s]+/);
+      const url2 = urlMatch ? urlMatch[0] : `https://${serviceName}-xxx.a.run.app`;
+      return { status: "deployed", serviceName, imageUri, region, url: url2 };
     },
-    // gcp-run-invoke service data region → { status, output, duration_ms }
+    // gcp-run-invoke service data region → { status, output }
     "gcp-run-invoke": (serviceName, data, region = "us-central1") => {
-      const startTime = Date.now();
-      return {
-        status: "invoked",
+      const dataJson = JSON.stringify(data);
+      const res = runGcloud([
+        "run",
+        "services",
+        "describe",
         serviceName,
-        data,
+        "--region",
         region,
-        output: null,
-        duration_ms: Date.now() - startTime,
-        url: `https://${serviceName}-${region.split("-")[0]}xxxxx.a.run.app`
-      };
+        "--format",
+        "get(status.url)"
+      ]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "invoke_failed", reason: res.reason, serviceName };
+      const url2 = res.output;
+      const curlResult = (0, import_child_process6.spawnSync)("curl", ["-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", dataJson, url2], { timeout: 1e4, encoding: "utf-8" });
+      const output = curlResult.stdout?.trim() ?? "";
+      return { status: "invoked", serviceName, url: url2, output };
     },
     // gcp-run-list region → { status, services: [] }
     "gcp-run-list": (region = "us-central1") => {
-      return {
-        status: "listed",
-        region,
-        services: [],
-        count: 0,
-        projectId: cloudState.gcp?.projectId ?? "default-project"
-      };
+      const res = runGcloud(["run", "services", "list", "--region", region, "--format", "value(metadata.name)"]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "list_failed", reason: res.reason };
+      const services = res.output.split("\n").filter((s) => s.trim());
+      return { status: "listed", region, services, count: services.length };
     },
     // ── Azure Functions ──────────────────────────────────────
-    // azure-function-invoke functionName data → { status, result, duration_ms }
+    // azure-function-invoke functionName data → { status, output }
     "azure-function-invoke": (functionName, data) => {
-      const startTime = Date.now();
-      return {
-        status: "invoked",
-        functionName,
-        data,
-        result: null,
-        duration_ms: Date.now() - startTime,
-        functionAppName: "default-function-app"
-      };
+      const dataJson = JSON.stringify(data);
+      const res = runAz(["functionapp", "function", "invoke", "--name", functionName, "--input", dataJson]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "invoke_failed", reason: res.reason, functionName };
+      return { status: "invoked", functionName, output: res.output };
     },
-    // azure-function-create functionName runtime → { status, id }
+    // azure-function-create functionName → { status }
     "azure-function-create": (functionName, runtime = "node") => {
       return {
-        status: "created",
+        status: "create_via_cli",
+        message: "Use: az functionapp create --resource-group <rg> --consumption-plan-location <location> --runtime <runtime>",
         functionName,
-        runtime,
-        id: `/subscriptions/${cloudState.azure?.subscriptionId}/resourceGroups/default/providers/Microsoft.Web/sites/${functionName}`
+        runtime
       };
     },
     // azure-app-deploy appName imageUri region → { status, url }
     "azure-app-deploy": (appName, imageUri, region = "eastus") => {
-      return {
-        status: "deploying",
-        appName,
-        imageUri,
-        region,
-        url: `https://${appName}.azurewebsites.net`,
-        resourceGroup: "default-resource-group"
-      };
+      const res = runAz(["webapp", "create", "--resource-group", "default", "--plan", "default", "--name", appName, "--image", imageUri]);
+      if (res.status === "cli_not_found") return res;
+      if (res.status === "error") return { status: "deploy_failed", reason: res.reason, appName };
+      return { status: "deployed", appName, imageUri, region, url: `https://${appName}.azurewebsites.net` };
     },
     // ── Common Cloud Utilities ──────────────────────────────────
-    // cloud-get-config provider → { aws?, gcp?, azure? }
-    "cloud-get-config": (provider) => {
-      if (provider === "aws") return cloudState.aws;
-      if (provider === "gcp") return cloudState.gcp;
-      if (provider === "azure") return cloudState.azure;
-      return cloudState;
-    },
-    // cloud-set-config provider config → { status: "configured" }
-    "cloud-set-config": (provider, config) => {
-      if (provider === "aws" && cloudState.aws) Object.assign(cloudState.aws, config);
-      if (provider === "gcp" && cloudState.gcp) Object.assign(cloudState.gcp, config);
-      if (provider === "azure" && cloudState.azure) Object.assign(cloudState.azure, config);
-      return { status: "configured", provider, config };
-    },
-    // cloud-health provider → { status, healthy: boolean }
+    // cloud-health provider → { status, healthy }
     "cloud-health": (provider) => {
-      const providers = {
-        aws: !!cloudState.aws,
-        gcp: !!cloudState.gcp,
-        azure: !!cloudState.azure
+      const healthChecks = {
+        aws: checkAwsCLI,
+        gcp: checkGcloudCLI,
+        azure: checkAzCLI
       };
+      const check = healthChecks[provider];
+      if (!check) return { status: "unknown_provider", provider };
+      const healthy = check();
       return {
         status: "checked",
         provider,
-        healthy: providers[provider] ?? false,
-        message: providers[provider] ? "Ready" : "Not configured"
+        healthy,
+        message: healthy ? `${provider} CLI available` : `${provider} CLI not found`
       };
     },
-    // ── Kubernetes (선택적, K8S API를 통해서는 아님) ─────────────
-    // k8s-apply manifest → { status, kind, name }
-    "k8s-apply": (manifest) => {
-      const kind = manifest?.kind ?? "Unknown";
-      const name = manifest?.metadata?.name ?? "unnamed";
-      return {
-        status: "applied",
-        kind,
-        name,
-        namespace: manifest?.metadata?.namespace ?? "default",
-        message: `${kind} '${name}' configured`
+    // cloud-get-config provider → object
+    "cloud-get-config": (provider) => {
+      if (!provider) return { aws: checkAwsCLI(), gcp: checkGcloudCLI(), azure: checkAzCLI() };
+      const checks = {
+        aws: checkAwsCLI(),
+        gcp: checkGcloudCLI(),
+        azure: checkAzCLI()
       };
-    },
-    // k8s-delete kind name namespace → { status }
-    "k8s-delete": (kind, name, namespace = "default") => {
-      return {
-        status: "deleted",
-        kind,
-        name,
-        namespace,
-        message: `${kind} '${name}' deleted`
-      };
-    },
-    // k8s-get kind namespace → { status, resources: [] }
-    "k8s-get": (kind, namespace = "default") => {
-      return {
-        status: "retrieved",
-        kind,
-        namespace,
-        resources: [],
-        count: 0
-      };
-    },
-    // k8s-exec pod command namespace → { status, output, exitCode }
-    "k8s-exec": (pod, command, namespace = "default") => {
-      return {
-        status: "executed",
-        pod,
-        command,
-        namespace,
-        output: "",
-        exitCode: 0
-      };
+      return { [provider]: checks[provider] ?? false };
     }
   };
 }

@@ -313,11 +313,12 @@ ${stepsStr}
     return { generated: outfile, bytes: yaml.length };
   }
 
-  // ── AWS / GCP / AZURE (기본 구현) ──────────────────────────────────────────────
+  // ── AWS / GCP / AZURE — 실제 CLI 호출 ──────────────────────────────────────────────
   if (op === "AWS-S3" || op === "aws-s3") {
     let bucket = "my-bucket";
     let action = "list";
     let file = "";
+    let data: any = null;
     let region = "us-east-1";
 
     for (let i = 0; i < expr.args.length; i++) {
@@ -330,6 +331,7 @@ ${stepsStr}
             case "bucket": bucket = String(val); break;
             case "action": action = String(val); break;
             case "file": file = String(val); break;
+            case "data": data = val; break;
             case "region": region = String(val); break;
           }
           i++;
@@ -337,7 +339,25 @@ ${stepsStr}
       }
     }
 
-    return { aws_s3: { bucket, action, file, region, status: "configured" } };
+    // 실제 stdlib-cloud 함수 호출
+    try {
+      switch (action.toLowerCase()) {
+        case "list":
+          return (interp as any).callUserFunction("aws-s3-list", [bucket, file]);
+        case "upload":
+          return (interp as any).callUserFunction("aws-s3-upload", [bucket, file, data]);
+        case "download":
+          return (interp as any).callUserFunction("aws-s3-download", [bucket, file]);
+        case "delete":
+          return (interp as any).callUserFunction("aws-s3-delete", [bucket, file]);
+        case "config":
+          return (interp as any).callUserFunction("aws-s3-config", [bucket, region]);
+        default:
+          return { status: "unknown_action", action, bucket };
+      }
+    } catch (err: any) {
+      return { status: "error", action, bucket, reason: err.message };
+    }
   }
 
   if (op === "GCP-RUN" || op === "gcp-run") {
@@ -345,6 +365,7 @@ ${stepsStr}
     let image = "gcr.io/my-project/my-service:latest";
     let region = "us-central1";
     let action = "deploy";
+    let data: any = null;
 
     for (let i = 0; i < expr.args.length; i++) {
       const arg = expr.args[i];
@@ -357,20 +378,37 @@ ${stepsStr}
             case "image": image = String(val); break;
             case "region": region = String(val); break;
             case "action": action = String(val); break;
+            case "data": data = val; break;
           }
           i++;
         }
       }
     }
 
-    return { gcp_run: { service, image, region, action, status: "configured" } };
+    // 실제 stdlib-cloud 함수 호출
+    try {
+      switch (action.toLowerCase()) {
+        case "deploy":
+          return (interp as any).callUserFunction("gcp-run-deploy", [service, image, region]);
+        case "invoke":
+          return (interp as any).callUserFunction("gcp-run-invoke", [service, data, region]);
+        case "list":
+          return (interp as any).callUserFunction("gcp-run-list", [region]);
+        default:
+          return { status: "unknown_action", action, service };
+      }
+    } catch (err: any) {
+      return { status: "error", action, service, reason: err.message };
+    }
   }
 
   if (op === "AZURE-FUNCTION" || op === "azure-function") {
     let name = "my-function";
     let runtime = "node";
     let region = "eastus";
-    let action = "deploy";
+    let action = "invoke";
+    let data: any = null;
+    let image = "";
 
     for (let i = 0; i < expr.args.length; i++) {
       const arg = expr.args[i];
@@ -383,13 +421,29 @@ ${stepsStr}
             case "runtime": runtime = String(val); break;
             case "region": region = String(val); break;
             case "action": action = String(val); break;
+            case "data": data = val; break;
+            case "image": image = String(val); break;
           }
           i++;
         }
       }
     }
 
-    return { azure_function: { name, runtime, region, action, status: "configured" } };
+    // 실제 stdlib-cloud 함수 호출
+    try {
+      switch (action.toLowerCase()) {
+        case "invoke":
+          return (interp as any).callUserFunction("azure-function-invoke", [name, data]);
+        case "create":
+          return (interp as any).callUserFunction("azure-function-create", [name, runtime]);
+        case "deploy":
+          return (interp as any).callUserFunction("azure-app-deploy", [name, image, region]);
+        default:
+          return { status: "unknown_action", action, name };
+      }
+    } catch (err: any) {
+      return { status: "error", action, name, reason: err.message };
+    }
   }
 
   throw new Error(`Unknown infra block: ${op}`);
