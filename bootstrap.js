@@ -375,8 +375,8 @@ function makeThrowExpression(argument) {
 function makePageNode(name, title, route, component, metadata, line) {
   return { kind: "page", name, title, route, component, metadata, line };
 }
-function makeRouteNode(name, path12, method, handler, middleware, validation, line) {
-  return { kind: "route", name, path: path12, method, handler, middleware, validation, line };
+function makeRouteNode(name, path13, method, handler, middleware, validation, line) {
+  return { kind: "route", name, path: path13, method, handler, middleware, validation, line };
 }
 function makeComponentNode(name, render, state, computed, watch2, methods, slots, line) {
   return { kind: "component", name, render, state, computed, watch: watch2, methods, slots, line };
@@ -2218,12 +2218,12 @@ var init_parser = __esm({
       }
       // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
       parsePage(name, fields, line) {
-        const path12 = this.extractStringField(fields, "path");
+        const path13 = this.extractStringField(fields, "path");
         const title = this.extractStringField(fields, "title");
         const render = this.extractStringField(fields, "render");
         const component = this.extractSymbolField(fields, "component");
         const metadata = this.extractMapField(fields, "metadata");
-        const pageNode = makePageNode(name, title, path12, component, metadata, line);
+        const pageNode = makePageNode(name, title, path13, component, metadata, line);
         if (render) {
           pageNode.fields = pageNode.fields || /* @__PURE__ */ new Map();
           pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
@@ -2232,12 +2232,12 @@ var init_parser = __esm({
       }
       // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
       parseRoute(name, fields, line) {
-        const path12 = this.extractStringField(fields, "path");
+        const path13 = this.extractStringField(fields, "path");
         const method = this.extractStringField(fields, "method");
         const handler = this.extractSymbolField(fields, "handler");
         const middleware = this.extractSymbolArrayField(fields, "middleware");
         const validation = this.extractSymbolField(fields, "validation");
-        return makeRouteNode(name, path12, method, handler, middleware, validation, line);
+        return makeRouteNode(name, path13, method, handler, middleware, validation, line);
       }
       // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
       parseComponent(name, fields, line) {
@@ -3159,15 +3159,15 @@ var require_stdlib_signatures = __commonJS({
 });
 
 // src/cli.ts
-var fs15 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs16 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 var readline = __toESM(require("readline"));
 init_lexer();
 init_parser();
 
 // src/interpreter.ts
-var fs9 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var fs10 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
 init_lexer();
 init_parser();
 init_ast();
@@ -10269,14 +10269,14 @@ var WorldModel = class {
     const visited = /* @__PURE__ */ new Set();
     const queue = [{ id: fromId, path: [fromId] }];
     while (queue.length > 0) {
-      const { id, path: path12 } = queue.shift();
+      const { id, path: path13 } = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
       for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path12, neighbor];
+        if (neighbor === toId) return [...path13, neighbor];
         if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path12, neighbor] });
+          queue.push({ id: neighbor, path: [...path13, neighbor] });
         }
       }
     }
@@ -11558,6 +11558,14 @@ function evalBuiltin(interp, op, args2, expr) {
       return -1;
     case "last":
       return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
+    case "conj": {
+      if (Array.isArray(args2[0])) {
+        const arr = [...args2[0]];
+        for (let i = 1; i < args2.length; i++) arr.push(args2[i]);
+        return arr;
+      }
+      return [args2[0], ...args2.slice(1)];
+    }
     case "get": {
       let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
@@ -15932,6 +15940,444 @@ function evalAiBlock(interp, op, expr) {
   throw new Error(`evalAiBlock: unknown op "${op}"`);
 }
 
+// src/eval-infra-blocks.ts
+var fs2 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var cwd = process.cwd();
+function evalInfraBlock(interp, op, expr) {
+  const ev = (node) => interp.eval(node);
+  if (op === "DOCKERFILE" || op === "dockerfile") {
+    let from = "node:20-slim";
+    let workdir = "/app";
+    let expose = [];
+    let copy = [];
+    let run2 = [];
+    let cmd2 = ["node", "server.js"];
+    let env = {};
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "from":
+              from = String(val);
+              break;
+            case "workdir":
+              workdir = String(val);
+              break;
+            case "expose":
+              expose.push(String(val));
+              break;
+            case "copy":
+              copy.push(String(val));
+              break;
+            case "run":
+              run2.push(String(val));
+              break;
+            case "cmd":
+              cmd2 = Array.isArray(val) ? val : [String(val)];
+              break;
+            case "env":
+              if (typeof val === "object") Object.assign(env, val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    let dockerfile = `FROM ${from}
+WORKDIR ${workdir}
+`;
+    Object.entries(env).forEach(([k, v]) => {
+      dockerfile += `ENV ${k}=${v}
+`;
+    });
+    copy.forEach((c) => {
+      dockerfile += `COPY ${c}
+`;
+    });
+    run2.forEach((r) => {
+      dockerfile += `RUN ${r}
+`;
+    });
+    expose.forEach((p) => {
+      dockerfile += `EXPOSE ${p}
+`;
+    });
+    dockerfile += `CMD [${cmd2.map((c) => `"${c}"`).join(", ")}]
+`;
+    const outfile = path2.join(cwd, "Dockerfile");
+    fs2.writeFileSync(outfile, dockerfile, "utf-8");
+    return { generated: "Dockerfile", bytes: dockerfile.length };
+  }
+  if (op === "K8S-DEPLOYMENT" || op === "deployment") {
+    let name = "my-app";
+    let namespace = "default";
+    let image = "my-app:latest";
+    let replicas = 1;
+    let port = 8080;
+    let containerPort = port;
+    let env = {};
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "namespace":
+              namespace = String(val);
+              break;
+            case "image":
+              image = String(val);
+              break;
+            case "replicas":
+              replicas = Number(val) || 1;
+              break;
+            case "port":
+              port = Number(val) || 8080;
+              break;
+            case "containerPort":
+              containerPort = Number(val) || port;
+              break;
+            case "env":
+              if (typeof val === "object") Object.assign(env, val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const yaml = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+spec:
+  replicas: ${replicas}
+  selector:
+    matchLabels:
+      app: ${name}
+  template:
+    metadata:
+      labels:
+        app: ${name}
+    spec:
+      containers:
+      - name: ${name}
+        image: ${image}
+        ports:
+        - containerPort: ${containerPort}
+${Object.entries(env).length > 0 ? `        env:
+${Object.entries(env).map(([k, v]) => `        - name: ${k}
+          value: "${v}"`).join("\n")}
+` : ""}`;
+    const outfile = path2.join(cwd, `${name}-deployment.yaml`);
+    fs2.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: `${name}-deployment.yaml`, bytes: yaml.length };
+  }
+  if (op === "K8S-SERVICE" || op === "service") {
+    let name = "my-app";
+    let namespace = "default";
+    let port = 8080;
+    let targetPort = port;
+    let type = "ClusterIP";
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "namespace":
+              namespace = String(val);
+              break;
+            case "port":
+              port = Number(val) || 8080;
+              break;
+            case "targetPort":
+              targetPort = Number(val) || port;
+              break;
+            case "type":
+              type = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const yaml = `apiVersion: v1
+kind: Service
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+spec:
+  type: ${type}
+  ports:
+  - port: ${port}
+    targetPort: ${targetPort}
+    protocol: TCP
+  selector:
+    app: ${name}
+`;
+    const outfile = path2.join(cwd, `${name}-service.yaml`);
+    fs2.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: `${name}-service.yaml`, bytes: yaml.length };
+  }
+  if (op === "K8S-INGRESS" || op === "ingress") {
+    let name = "my-app";
+    let namespace = "default";
+    let host = "app.example.com";
+    let serviceName = "my-app";
+    let servicePort = 8080;
+    let path_ = "/";
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "namespace":
+              namespace = String(val);
+              break;
+            case "host":
+              host = String(val);
+              break;
+            case "serviceName":
+              serviceName = String(val);
+              break;
+            case "servicePort":
+              servicePort = Number(val) || 8080;
+              break;
+            case "path":
+              path_ = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const yaml = `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+spec:
+  rules:
+  - host: ${host}
+    http:
+      paths:
+      - path: ${path_}
+        pathType: Prefix
+        backend:
+          service:
+            name: ${serviceName}
+            port:
+              number: ${servicePort}
+`;
+    const outfile = path2.join(cwd, `${name}-ingress.yaml`);
+    fs2.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: `${name}-ingress.yaml`, bytes: yaml.length };
+  }
+  if (op === "DOCKER-COMPOSE" || op === "docker-compose") {
+    let version = "3.8";
+    let services = {};
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "version":
+              version = String(val);
+              break;
+            case "services":
+              services = val || {};
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const serviceLines = Object.entries(services).map(([name, config]) => {
+      return `  ${name}:
+    image: ${config.image || name}
+    ports:
+      - "${config.port || 8080}:${config.containerPort || 8080}"`;
+    }).join("\n");
+    const yaml = `version: '${version}'
+services:
+${serviceLines}
+`;
+    const outfile = path2.join(cwd, "docker-compose.yml");
+    fs2.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: "docker-compose.yml", bytes: yaml.length };
+  }
+  if (op === "GITHUB-ACTIONS" || op === "github-actions" || op === "ci") {
+    let name = "CI";
+    let onEvents = ["push", "pull_request"];
+    let steps = [];
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "on":
+              onEvents = Array.isArray(val) ? val : [String(val)];
+              break;
+            case "test":
+              steps.push({ uses: "actions/checkout@v3" });
+              steps.push({ uses: "actions/setup-node@v3", with: { "node-version": "20" } });
+              steps.push({ run: String(val) });
+              break;
+            case "steps":
+              steps = Array.isArray(val) ? val : [val];
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const onStr = onEvents.map((e) => `    - ${e}`).join("\n");
+    const stepsStr = steps.map((s) => {
+      if (typeof s === "string") return `      - run: ${s}`;
+      if (s.uses) return `      - uses: ${s.uses}${s.with ? `
+        with:
+${Object.entries(s.with).map(([k, v]) => `          ${k}: "${v}"`).join("\n")}` : ""}`;
+      if (s.run) return `      - run: ${s.run}`;
+      return `      - ${JSON.stringify(s)}`;
+    }).join("\n");
+    const yaml = `name: ${name}
+
+on:
+${onStr}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+${stepsStr}
+`;
+    const workflowDir = path2.join(cwd, ".github", "workflows");
+    fs2.mkdirSync(workflowDir, { recursive: true });
+    const outfile = path2.join(workflowDir, `${name.toLowerCase().replace(/\\s+/g, "-")}.yml`);
+    fs2.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: outfile, bytes: yaml.length };
+  }
+  if (op === "AWS-S3" || op === "aws-s3") {
+    let bucket = "my-bucket";
+    let action = "list";
+    let file = "";
+    let region = "us-east-1";
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "bucket":
+              bucket = String(val);
+              break;
+            case "action":
+              action = String(val);
+              break;
+            case "file":
+              file = String(val);
+              break;
+            case "region":
+              region = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return { aws_s3: { bucket, action, file, region, status: "configured" } };
+  }
+  if (op === "GCP-RUN" || op === "gcp-run") {
+    let service = "my-service";
+    let image = "gcr.io/my-project/my-service:latest";
+    let region = "us-central1";
+    let action = "deploy";
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "service":
+              service = String(val);
+              break;
+            case "image":
+              image = String(val);
+              break;
+            case "region":
+              region = String(val);
+              break;
+            case "action":
+              action = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return { gcp_run: { service, image, region, action, status: "configured" } };
+  }
+  if (op === "AZURE-FUNCTION" || op === "azure-function") {
+    let name = "my-function";
+    let runtime = "node";
+    let region = "eastus";
+    let action = "deploy";
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "runtime":
+              runtime = String(val);
+              break;
+            case "region":
+              region = String(val);
+              break;
+            case "action":
+              action = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return { azure_function: { name, runtime, region, action, status: "configured" } };
+  }
+  throw new Error(`Unknown infra block: ${op}`);
+}
+
 // src/eval-special-forms.ts
 init_ast();
 
@@ -17053,8 +17499,8 @@ function handleReasoningBlock(interp, reasoningBlock) {
 }
 
 // src/eval-module-system.ts
-var fs2 = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
 init_ast();
 
 // src/errors.ts
@@ -17162,18 +17608,18 @@ function evalImportBlock(interp, importBlock) {
     if (!isFile) {
       const baseDir = (() => {
         try {
-          return fs2.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path2.dirname(interp.currentFilePath);
+          return fs3.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path3.dirname(interp.currentFilePath);
         } catch {
           return interp.currentFilePath;
         }
       })();
       const candidates = [
-        path2.resolve(baseDir, source + ".fl"),
-        path2.resolve(baseDir, source),
-        path2.resolve(process.cwd(), source + ".fl"),
-        path2.resolve(process.cwd(), source)
+        path3.resolve(baseDir, source + ".fl"),
+        path3.resolve(baseDir, source),
+        path3.resolve(process.cwd(), source + ".fl"),
+        path3.resolve(process.cwd(), source)
       ];
-      isFile = candidates.some((c) => fs2.existsSync(c));
+      isFile = candidates.some((c) => fs3.existsSync(c));
     }
     if (isFile) {
       interp.evalImportFromFile(source, moduleName, selective, alias);
@@ -17221,23 +17667,23 @@ function evalImportBlock(interp, importBlock) {
 function evalImportFromFile(interp, relPath, prefix, selective, alias) {
   const baseDir = (() => {
     try {
-      return fs2.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path2.dirname(interp.currentFilePath);
+      return fs3.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path3.dirname(interp.currentFilePath);
     } catch {
       return interp.currentFilePath;
     }
   })();
   const tryResolve = (candidate) => {
-    if (fs2.existsSync(candidate) && fs2.statSync(candidate).isFile()) return candidate;
-    if (!candidate.endsWith(".fl") && fs2.existsSync(candidate + ".fl")) return candidate + ".fl";
+    if (fs3.existsSync(candidate) && fs3.statSync(candidate).isFile()) return candidate;
+    if (!candidate.endsWith(".fl") && fs3.existsSync(candidate + ".fl")) return candidate + ".fl";
     return null;
   };
   const isRelative = relPath.startsWith("./") || relPath.startsWith("../") || relPath.startsWith("/");
   const candidates = [];
   if (isRelative) {
-    candidates.push(path2.resolve(baseDir, relPath));
+    candidates.push(path3.resolve(baseDir, relPath));
   } else {
-    candidates.push(path2.resolve(process.cwd(), relPath));
-    candidates.push(path2.resolve(baseDir, relPath));
+    candidates.push(path3.resolve(process.cwd(), relPath));
+    candidates.push(path3.resolve(baseDir, relPath));
   }
   let absPath = null;
   for (const c of candidates) {
@@ -17254,7 +17700,7 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
     return;
   }
   interp.importedFiles.add(absPath);
-  const src = fs2.readFileSync(absPath, "utf-8");
+  const src = fs3.readFileSync(absPath, "utf-8");
   const subInterp = new Interpreter();
   subInterp.currentFilePath = absPath;
   subInterp.importedFiles = interp.importedFiles;
@@ -17298,14 +17744,14 @@ function evalOpenBlock(interp, openBlock) {
 }
 
 // src/stdlib-file.ts
-var fs3 = __toESM(require("fs"));
-var path3 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
 function createFileModule() {
   return {
     // file_read filePath -> string (read file content)
     "file_read": (filePath) => {
       try {
-        return fs3.readFileSync(filePath, "utf-8");
+        return fs4.readFileSync(filePath, "utf-8");
       } catch (err4) {
         throw new Error(`file_read failed for '${filePath}': ${err4.message}`);
       }
@@ -17313,11 +17759,11 @@ function createFileModule() {
     // file_write filePath content -> boolean (write content to file)
     "file_write": (filePath, content) => {
       try {
-        const dir = path3.dirname(filePath);
-        if (dir !== "." && !fs3.existsSync(dir)) {
-          fs3.mkdirSync(dir, { recursive: true });
+        const dir = path4.dirname(filePath);
+        if (dir !== "." && !fs4.existsSync(dir)) {
+          fs4.mkdirSync(dir, { recursive: true });
         }
-        fs3.writeFileSync(filePath, content, "utf-8");
+        fs4.writeFileSync(filePath, content, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`file_write failed for '${filePath}': ${err4.message}`);
@@ -17325,13 +17771,13 @@ function createFileModule() {
     },
     // file_exists filePath -> boolean (check if file exists)
     "file_exists": (filePath) => {
-      return fs3.existsSync(filePath);
+      return fs4.existsSync(filePath);
     },
     // file_delete filePath -> boolean (delete file)
     "file_delete": (filePath) => {
       try {
-        if (fs3.existsSync(filePath)) {
-          fs3.unlinkSync(filePath);
+        if (fs4.existsSync(filePath)) {
+          fs4.unlinkSync(filePath);
           return true;
         }
         return false;
@@ -17342,11 +17788,11 @@ function createFileModule() {
     // file_append filePath content -> boolean (append content to file)
     "file_append": (filePath, content) => {
       try {
-        const dir = path3.dirname(filePath);
-        if (dir !== "." && !fs3.existsSync(dir)) {
-          fs3.mkdirSync(dir, { recursive: true });
+        const dir = path4.dirname(filePath);
+        if (dir !== "." && !fs4.existsSync(dir)) {
+          fs4.mkdirSync(dir, { recursive: true });
         }
-        fs3.appendFileSync(filePath, content, "utf-8");
+        fs4.appendFileSync(filePath, content, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`file_append failed for '${filePath}': ${err4.message}`);
@@ -17355,11 +17801,11 @@ function createFileModule() {
     // file_copy src dest -> boolean (copy file)
     "file_copy": (src, dest) => {
       try {
-        const dir = path3.dirname(dest);
-        if (dir !== "." && !fs3.existsSync(dir)) {
-          fs3.mkdirSync(dir, { recursive: true });
+        const dir = path4.dirname(dest);
+        if (dir !== "." && !fs4.existsSync(dir)) {
+          fs4.mkdirSync(dir, { recursive: true });
         }
-        fs3.copyFileSync(src, dest);
+        fs4.copyFileSync(src, dest);
         return true;
       } catch (err4) {
         throw new Error(`file_copy failed from '${src}' to '${dest}': ${err4.message}`);
@@ -17368,8 +17814,8 @@ function createFileModule() {
     // dir_create dirPath -> boolean (create directory)
     "dir_create": (dirPath) => {
       try {
-        if (!fs3.existsSync(dirPath)) {
-          fs3.mkdirSync(dirPath, { recursive: true });
+        if (!fs4.existsSync(dirPath)) {
+          fs4.mkdirSync(dirPath, { recursive: true });
         }
         return true;
       } catch (err4) {
@@ -17379,10 +17825,10 @@ function createFileModule() {
     // dir_list dirPath -> [string] (list directory contents)
     "dir_list": (dirPath) => {
       try {
-        if (!fs3.existsSync(dirPath)) {
+        if (!fs4.existsSync(dirPath)) {
           throw new Error(`Directory not found: '${dirPath}'`);
         }
-        return fs3.readdirSync(dirPath);
+        return fs4.readdirSync(dirPath);
       } catch (err4) {
         throw new Error(`dir_list failed for '${dirPath}': ${err4.message}`);
       }
@@ -17390,8 +17836,8 @@ function createFileModule() {
     // dir_delete dirPath -> boolean (delete directory - must be empty)
     "dir_delete": (dirPath) => {
       try {
-        if (fs3.existsSync(dirPath)) {
-          fs3.rmdirSync(dirPath);
+        if (fs4.existsSync(dirPath)) {
+          fs4.rmdirSync(dirPath);
           return true;
         }
         return false;
@@ -17402,7 +17848,7 @@ function createFileModule() {
     // file_size filePath -> number (get file size in bytes)
     "file_size": (filePath) => {
       try {
-        const stats = fs3.statSync(filePath);
+        const stats = fs4.statSync(filePath);
         return stats.size;
       } catch (err4) {
         throw new Error(`file_size failed for '${filePath}': ${err4.message}`);
@@ -17411,8 +17857,8 @@ function createFileModule() {
     // file_is_file filePath -> boolean (check if path is a file)
     "file_is_file": (filePath) => {
       try {
-        if (!fs3.existsSync(filePath)) return false;
-        return fs3.statSync(filePath).isFile();
+        if (!fs4.existsSync(filePath)) return false;
+        return fs4.statSync(filePath).isFile();
       } catch (err4) {
         return false;
       }
@@ -17420,8 +17866,8 @@ function createFileModule() {
     // file_is_dir filePath -> boolean (check if path is a directory)
     "file_is_dir": (filePath) => {
       try {
-        if (!fs3.existsSync(filePath)) return false;
-        return fs3.statSync(filePath).isDirectory();
+        if (!fs4.existsSync(filePath)) return false;
+        return fs4.statSync(filePath).isDirectory();
       } catch (err4) {
         return false;
       }
@@ -17429,7 +17875,7 @@ function createFileModule() {
     // file_mtime filePath -> number (get modification time as timestamp)
     "file_mtime": (filePath) => {
       try {
-        const stats = fs3.statSync(filePath);
+        const stats = fs4.statSync(filePath);
         return stats.mtimeMs;
       } catch (err4) {
         throw new Error(`file_mtime failed for '${filePath}': ${err4.message}`);
@@ -17438,7 +17884,7 @@ function createFileModule() {
     // file_ctime filePath -> number (get creation time as timestamp)
     "file_ctime": (filePath) => {
       try {
-        const stats = fs3.statSync(filePath);
+        const stats = fs4.statSync(filePath);
         return stats.ctimeMs;
       } catch (err4) {
         throw new Error(`file_ctime failed for '${filePath}': ${err4.message}`);
@@ -17683,8 +18129,8 @@ function createDataModule() {
   return {
     // ── JSON ──────────────────────────────────────────────────
     // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
-    "json_get": (obj, path12) => {
-      const parts = path12.split(".");
+    "json_get": (obj, path13) => {
+      const parts = path13.split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -17693,10 +18139,10 @@ function createDataModule() {
       return cur ?? null;
     },
     // json_set obj path value -> object (immutable update, returns new obj)
-    "json_set": (obj, path12, value) => {
+    "json_set": (obj, path13, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const clone = JSON.parse(JSON.stringify(parsed));
-      const parts = path12.split(".");
+      const parts = path13.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -18802,8 +19248,8 @@ function createResourceModule() {
       });
     },
     // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
-    "res_disk_usage": (path12) => {
-      const line = run(`df -BG --output=size,used,avail,pcent "${path12}" 2>/dev/null | tail -1`);
+    "res_disk_usage": (path13) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path13}" 2>/dev/null | tail -1`);
       if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
       const [total, used, avail, pct] = line.trim().split(/\s+/);
       return {
@@ -19147,13 +19593,13 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     const counter = ++requestCounter;
     return `req_${timestamp}_${counter}`;
   }
-  function logAccess(method, path12, status, duration, requestId) {
+  function logAccess(method, path13, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path12} ${status} ${duration}ms`);
+    console.log(`${icon} [${requestId}] ${method} ${path13} ${status} ${duration}ms`);
   }
-  function pathToRegex(path12) {
+  function pathToRegex(path13) {
     const params = [];
-    const pattern = path12.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+    const pattern = path13.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
       params.push(param);
       return "([^\\/]+)";
     });
@@ -19216,11 +19662,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       res.end(String(body ?? ""));
     }
   }
-  function createFlRequest(method, path12, query, headers, body, params, requestId) {
+  function createFlRequest(method, path13, query, headers, body, params, requestId) {
     return {
       __fl_request: true,
       method,
-      path: path12,
+      path: path13,
       query,
       headers,
       body: body || void 0,
@@ -19231,33 +19677,33 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   }
   return {
     // server_get path handlerName -> null
-    "server_get": (path12, handlerName) => {
-      const [pattern, params] = pathToRegex(path12);
-      routes.push({ method: "GET", path: path12, pattern, params, handler: handlerName });
+    "server_get": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "GET", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_post path handlerName -> null
-    "server_post": (path12, handlerName) => {
-      const [pattern, params] = pathToRegex(path12);
-      routes.push({ method: "POST", path: path12, pattern, params, handler: handlerName });
+    "server_post": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "POST", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_put path handlerName -> null
-    "server_put": (path12, handlerName) => {
-      const [pattern, params] = pathToRegex(path12);
-      routes.push({ method: "PUT", path: path12, pattern, params, handler: handlerName });
+    "server_put": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "PUT", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_patch path handlerName -> null
-    "server_patch": (path12, handlerName) => {
-      const [pattern, params] = pathToRegex(path12);
-      routes.push({ method: "PATCH", path: path12, pattern, params, handler: handlerName });
+    "server_patch": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "PATCH", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_delete path handlerName -> null
-    "server_delete": (path12, handlerName) => {
-      const [pattern, params] = pathToRegex(path12);
-      routes.push({ method: "DELETE", path: path12, pattern, params, handler: handlerName });
+    "server_delete": (path13, handlerName) => {
+      const [pattern, params] = pathToRegex(path13);
+      routes.push({ method: "DELETE", path: path13, pattern, params, handler: handlerName });
       return null;
     },
     // server_start port -> string
@@ -19274,7 +19720,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const requestId = generateRequestId();
         currentRequestId = requestId;
         const method = req.method || "GET";
-        const { path: path12, query } = parseUrl(req.url || "/");
+        const { path: path13, query } = parseUrl(req.url || "/");
         const headers = req.headers;
         const body = await readBody(req);
         res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19286,7 +19732,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           res.end();
           return;
         }
-        if (process.env.FL_DEV === "1" && path12 === "/__hot" && method === "GET") {
+        if (process.env.FL_DEV === "1" && path13 === "/__hot" && method === "GET") {
           res.writeHead(200, {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -19299,7 +19745,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
-          const match = route.pattern.exec(path12);
+          const match = route.pattern.exec(path13);
           if (!match) continue;
           matched = true;
           let status = 200;
@@ -19308,7 +19754,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
             for (let i = 0; i < route.params.length; i++) {
               params[route.params[i]] = match[i + 1];
             }
-            const flReq = createFlRequest(method, path12, query, headers, body, params, requestId);
+            const flReq = createFlRequest(method, path13, query, headers, body, params, requestId);
             let rawResult;
             if (typeof route.handler === "string") {
               rawResult = callFn(route.handler, [flReq]);
@@ -19356,20 +19802,20 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               }
             }
             const duration = Date.now() - requestStart;
-            logAccess(method, path12, status, duration, requestId);
+            logAccess(method, path13, status, duration, requestId);
           } catch (err4) {
             const status2 = 500;
             sendResponse(res, status2, { error: err4.message });
             const duration = Date.now() - requestStart;
-            logAccess(method, path12, status2, duration, requestId);
+            logAccess(method, path13, status2, duration, requestId);
           }
           return;
         }
         if (!matched) {
           const status = 404;
-          sendResponse(res, status, { error: "Not Found", path: path12 });
+          sendResponse(res, status, { error: "Not Found", path: path13 });
           const duration = Date.now() - requestStart;
-          logAccess(method, path12, status, duration, requestId);
+          logAccess(method, path13, status, duration, requestId);
         }
       });
       server.on("upgrade", (req, socket, head) => {
@@ -19670,8 +20116,8 @@ function createHttpServerModule(callFn, callFunctionValue2) {
 // src/stdlib-db.ts
 var import_child_process4 = require("child_process");
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
-function kimdbReq(method, path12, body) {
-  const url2 = `${KIMDB}${path12}`;
+function kimdbReq(method, path13, body) {
+  const url2 = `${KIMDB}${path13}`;
   const args2 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args2.push("-X", method);
@@ -19829,7 +20275,7 @@ var cachedSock = null;
 function resolveSocket() {
   if (cachedSock) return cachedSock;
   if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
-  const fs16 = require("fs");
+  const fs17 = require("fs");
   const candidates = [
     "/data/data/com.termux/files/usr/tmp/mysqld.sock",
     // Termux
@@ -19842,7 +20288,7 @@ function resolveSocket() {
   ];
   for (const s of candidates) {
     try {
-      if (fs16.existsSync(s)) return cachedSock = s;
+      if (fs17.existsSync(s)) return cachedSock = s;
     } catch {
     }
   }
@@ -20277,8 +20723,8 @@ function createPubSubModule(callFn) {
 }
 
 // src/stdlib-process.ts
-var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
 function createProcessModule() {
   let sigtermRegistered = false;
   const shutdownCallbacks = [];
@@ -20298,11 +20744,11 @@ function createProcessModule() {
   }
   return {
     "env_load": (envPath) => {
-      const filePath = envPath ? path4.resolve(envPath) : path4.resolve(process.cwd(), ".env");
+      const filePath = envPath ? path5.resolve(envPath) : path5.resolve(process.cwd(), ".env");
       const loaded = {};
       let content;
       try {
-        content = fs4.readFileSync(filePath, "utf-8");
+        content = fs5.readFileSync(filePath, "utf-8");
       } catch (err4) {
         if (err4.code === "ENOENT") return {};
         throw err4;
@@ -20502,9 +20948,9 @@ function createModuleSystem() {
   return {
     // module_load path -> {exports} | null
     // Load a module from file or registry
-    "module_load": (path12) => {
-      if (registry.has(path12)) {
-        return registry.get(path12);
+    "module_load": (path13) => {
+      if (registry.has(path13)) {
+        return registry.get(path13);
       }
       return null;
     },
@@ -20520,9 +20966,9 @@ function createModuleSystem() {
     },
     // module_require path -> {exports}
     // Require and return all exports from a module
-    "module_require": (path12) => {
-      if (registry.has(path12)) {
-        return registry.get(path12) || {};
+    "module_require": (path13) => {
+      if (registry.has(path13)) {
+        return registry.get(path13) || {};
       }
       return {};
     },
@@ -21082,8 +21528,8 @@ function createTestModule(callFn) {
 }
 
 // src/stdlib-compile.ts
-var fs5 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var fs6 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 init_lexer();
 init_parser();
 
@@ -21493,7 +21939,7 @@ function createCompileModule() {
     // Compile a single .fl file to JavaScript
     "fl_compile_file": (inputPath, outputPath) => {
       try {
-        const source = fs5.readFileSync(inputPath, "utf-8");
+        const source = fs6.readFileSync(inputPath, "utf-8");
         const tokens = lex(source);
         const ast = parse(tokens);
         const js = cg.generate(ast, {
@@ -21502,11 +21948,11 @@ function createCompileModule() {
           minify: false,
           target: "node"
         });
-        const dir = path5.dirname(outputPath);
-        if (dir !== "." && !fs5.existsSync(dir)) {
-          fs5.mkdirSync(dir, { recursive: true });
+        const dir = path6.dirname(outputPath);
+        if (dir !== "." && !fs6.existsSync(dir)) {
+          fs6.mkdirSync(dir, { recursive: true });
         }
-        fs5.writeFileSync(outputPath, js, "utf-8");
+        fs6.writeFileSync(outputPath, js, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`fl_compile_file failed for '${inputPath}': ${err4.message}`);
@@ -21516,16 +21962,16 @@ function createCompileModule() {
     // Compile all .fl files in a directory
     "fl_compile": (srcDir, distDir) => {
       try {
-        const absDir = path5.resolve(srcDir);
-        const absOut = path5.resolve(distDir);
-        const files = fs5.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path5.join(absDir, f));
+        const absDir = path6.resolve(srcDir);
+        const absOut = path6.resolve(distDir);
+        const files = fs6.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path6.join(absDir, f));
         let compiled = 0;
         let failed = 0;
         const errors = [];
         for (const file of files) {
-          const outFile = path5.join(absOut, path5.basename(file, ".fl") + ".js");
+          const outFile = path6.join(absOut, path6.basename(file, ".fl") + ".js");
           try {
-            const source = fs5.readFileSync(file, "utf-8");
+            const source = fs6.readFileSync(file, "utf-8");
             const tokens = lex(source);
             const ast = parse(tokens);
             const js = cg.generate(ast, {
@@ -21534,15 +21980,15 @@ function createCompileModule() {
               minify: false,
               target: "node"
             });
-            const dir = path5.dirname(outFile);
-            if (dir !== "." && !fs5.existsSync(dir)) {
-              fs5.mkdirSync(dir, { recursive: true });
+            const dir = path6.dirname(outFile);
+            if (dir !== "." && !fs6.existsSync(dir)) {
+              fs6.mkdirSync(dir, { recursive: true });
             }
-            fs5.writeFileSync(outFile, js, "utf-8");
+            fs6.writeFileSync(outFile, js, "utf-8");
             compiled++;
           } catch (err4) {
             failed++;
-            errors.push(`${path5.basename(file)}: ${err4.message}`);
+            errors.push(`${path6.basename(file)}: ${err4.message}`);
           }
         }
         return { compiled, failed, errors };
@@ -21625,8 +22071,8 @@ function httpRequest(method, url2, body) {
 }
 
 // src/stdlib-oci.ts
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 var crypto2 = __toESM(require("crypto"));
 function createOciModule() {
   const imageStore = /* @__PURE__ */ new Map();
@@ -21653,19 +22099,19 @@ function createOciModule() {
     "oci_create_layer": (dirPath) => {
       try {
         const { execSync: execSync2 } = require("child_process");
-        const resolvedPath = path6.resolve(dirPath);
-        if (!fs6.existsSync(resolvedPath)) {
+        const resolvedPath = path7.resolve(dirPath);
+        if (!fs7.existsSync(resolvedPath)) {
           throw new Error(`Directory not found: ${resolvedPath}`);
         }
-        const layerName = path6.basename(resolvedPath);
-        const layerFile = path6.join(path6.dirname(resolvedPath), `${layerName}-layer.tar.gz`);
-        const cmd2 = `cd "${path6.dirname(resolvedPath)}" && tar -czf "${path6.basename(layerFile)}" "${layerName}"`;
+        const layerName = path7.basename(resolvedPath);
+        const layerFile = path7.join(path7.dirname(resolvedPath), `${layerName}-layer.tar.gz`);
+        const cmd2 = `cd "${path7.dirname(resolvedPath)}" && tar -czf "${path7.basename(layerFile)}" "${layerName}"`;
         execSync2(cmd2, { encoding: "utf-8" });
-        if (!fs6.existsSync(layerFile)) {
+        if (!fs7.existsSync(layerFile)) {
           throw new Error(`Failed to create layer archive: ${layerFile}`);
         }
-        const stat = fs6.statSync(layerFile);
-        const content = fs6.readFileSync(layerFile);
+        const stat = fs7.statSync(layerFile);
+        const content = fs7.readFileSync(layerFile);
         const digest = "sha256:" + crypto2.createHash("sha256").update(content).digest("hex");
         return {
           path: layerFile,
@@ -21681,9 +22127,9 @@ function createOciModule() {
     "oci_build": (tag, layers) => {
       try {
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const imageDir = path6.resolve(".oci-images", tag);
-        if (!fs6.existsSync(imageDir)) {
-          fs6.mkdirSync(imageDir, { recursive: true });
+        const imageDir = path7.resolve(".oci-images", tag);
+        if (!fs7.existsSync(imageDir)) {
+          fs7.mkdirSync(imageDir, { recursive: true });
         }
         const manifest = {
           schemaVersion: 2,
@@ -21710,24 +22156,24 @@ function createOciModule() {
             created_by: "fl build --oci"
           }]
         };
-        fs6.writeFileSync(
-          path6.join(imageDir, "manifest.json"),
+        fs7.writeFileSync(
+          path7.join(imageDir, "manifest.json"),
           JSON.stringify(manifest, null, 2),
           "utf-8"
         );
-        fs6.writeFileSync(
-          path6.join(imageDir, "config.json"),
+        fs7.writeFileSync(
+          path7.join(imageDir, "config.json"),
           JSON.stringify(config, null, 2),
           "utf-8"
         );
-        fs6.writeFileSync(
-          path6.join(imageDir, "oci-layout"),
+        fs7.writeFileSync(
+          path7.join(imageDir, "oci-layout"),
           JSON.stringify({ imageLayoutVersion: "1.0.0" }),
           "utf-8"
         );
-        const blobsDir = path6.join(imageDir, "blobs", "sha256");
-        if (!fs6.existsSync(blobsDir)) {
-          fs6.mkdirSync(blobsDir, { recursive: true });
+        const blobsDir = path7.join(imageDir, "blobs", "sha256");
+        if (!fs7.existsSync(blobsDir)) {
+          fs7.mkdirSync(blobsDir, { recursive: true });
         }
         const indexJson = {
           schemaVersion: 2,
@@ -21740,8 +22186,8 @@ function createOciModule() {
             }
           }]
         };
-        fs6.writeFileSync(
-          path6.join(imageDir, "index.json"),
+        fs7.writeFileSync(
+          path7.join(imageDir, "index.json"),
           JSON.stringify(indexJson, null, 2),
           "utf-8"
         );
@@ -21840,9 +22286,9 @@ function createOciModule() {
           throw new Error(`Image not found: ${tag}`);
         }
         imageStore.delete(tag);
-        const imageDir = path6.resolve(".oci-images", tag);
-        if (fs6.existsSync(imageDir)) {
-          fs6.rmSync(imageDir, { recursive: true, force: true });
+        const imageDir = path7.resolve(".oci-images", tag);
+        if (fs7.existsSync(imageDir)) {
+          fs7.rmSync(imageDir, { recursive: true, force: true });
         }
         return true;
       } catch (err4) {
@@ -22416,13 +22862,13 @@ function createMiddlewareModule() {
 }
 
 // src/stdlib-table.ts
-var fs7 = __toESM(require("fs"));
+var fs8 = __toESM(require("fs"));
 function createTableModule() {
   return {
     // table_load_csv(path) → {headers, rows}
     "table_load_csv": (filePath) => {
       try {
-        const content = fs7.readFileSync(filePath, "utf-8");
+        const content = fs8.readFileSync(filePath, "utf-8");
         const lines = content.split("\n").filter((l) => l.trim());
         const headers = lines[0].split(",").map((h) => h.trim());
         const rows = lines.slice(1).map((line) => {
@@ -22442,7 +22888,7 @@ function createTableModule() {
     // table_load_json(path) → {headers, rows}
     "table_load_json": (filePath) => {
       try {
-        const content = fs7.readFileSync(filePath, "utf-8");
+        const content = fs8.readFileSync(filePath, "utf-8");
         const data = JSON.parse(content);
         if (!Array.isArray(data)) {
           throw new Error("JSON must be array of objects");
@@ -22462,7 +22908,7 @@ function createTableModule() {
             (row) => data.headers.map((h) => row[h] ?? "").join(",")
           )
         ].join("\n");
-        fs7.writeFileSync(filePath, csv, "utf-8");
+        fs8.writeFileSync(filePath, csv, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`table_save_csv failed: ${err4.message}`);
@@ -22736,7 +23182,7 @@ function createStatsModule() {
 }
 
 // src/stdlib-plot.ts
-var fs8 = __toESM(require("fs"));
+var fs9 = __toESM(require("fs"));
 function createPlotModule() {
   return {
     // plot_histogram(values, options) → ASCII chart string
@@ -22892,7 +23338,7 @@ function createPlotModule() {
     // plot_save(chart, path) → boolean
     "plot_save": (chart, filePath) => {
       try {
-        fs8.writeFileSync(filePath, chart, "utf-8");
+        fs9.writeFileSync(filePath, chart, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`plot_save failed: ${err4.message}`);
@@ -23848,9 +24294,9 @@ function createFeedModule() {
       out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
       out.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
       for (const r of routes || []) {
-        const path12 = typeof r === "string" ? r : r.loc;
+        const path13 = typeof r === "string" ? r : r.loc;
         out.push(`<url>`);
-        out.push(`<loc>${esc(base + (path12.startsWith("/") ? path12 : "/" + path12))}</loc>`);
+        out.push(`<loc>${esc(base + (path13.startsWith("/") ? path13 : "/" + path13))}</loc>`);
         if (typeof r !== "string") {
           if (r.lastmod) out.push(`<lastmod>${esc(r.lastmod)}</lastmod>`);
           if (r.changefreq) out.push(`<changefreq>${esc(r.changefreq)}</changefreq>`);
@@ -24012,6 +24458,262 @@ function createBlogModule() {
   };
 }
 
+// src/stdlib-cloud.ts
+function createCloudModule() {
+  const cloudState = {
+    aws: { bucket: "default", region: "us-east-1" },
+    gcp: { projectId: "default-project", region: "us-central1" },
+    azure: { subscriptionId: "default-subscription", region: "eastus" }
+  };
+  return {
+    // ── AWS S3 ──────────────────────────────────────────────────
+    // aws-s3-upload bucket file data → { status: "uploaded", size, etag }
+    "aws-s3-upload": (bucket, file, data) => {
+      const payload = typeof data === "string" ? data : JSON.stringify(data);
+      return {
+        status: "uploaded",
+        bucket,
+        file,
+        size: Buffer.byteLength(payload),
+        etag: `"${Buffer.from(payload).toString("base64").slice(0, 32)}"`,
+        location: `s3://${bucket}/${file}`
+      };
+    },
+    // aws-s3-download bucket file → { status, data, size } or null
+    "aws-s3-download": (bucket, file) => {
+      return {
+        status: "downloaded",
+        bucket,
+        file,
+        size: 0,
+        data: null,
+        location: `s3://${bucket}/${file}`
+      };
+    },
+    // aws-s3-list bucket prefix → { status, files: [name] }
+    "aws-s3-list": (bucket, prefix = "") => {
+      return {
+        status: "listed",
+        bucket,
+        prefix,
+        files: [],
+        count: 0
+      };
+    },
+    // aws-s3-delete bucket file → { status, bucket, file }
+    "aws-s3-delete": (bucket, file) => {
+      return {
+        status: "deleted",
+        bucket,
+        file,
+        location: `s3://${bucket}/${file}`
+      };
+    },
+    // aws-s3-config bucket region credentials → { status: "configured" }
+    "aws-s3-config": (bucket, region, credentials) => {
+      if (cloudState.aws) {
+        cloudState.aws.bucket = bucket;
+        cloudState.aws.region = region;
+        if (credentials) cloudState.aws.credentials = credentials;
+      }
+      return { status: "configured", bucket, region };
+    },
+    // ── AWS Lambda ──────────────────────────────────────────────
+    // aws-lambda-invoke function payload → { status, result, duration_ms }
+    "aws-lambda-invoke": (functionName, payload) => {
+      const startTime = Date.now();
+      return {
+        status: "invoked",
+        functionName,
+        payload,
+        result: null,
+        duration_ms: Date.now() - startTime,
+        logGroupName: `/aws/lambda/${functionName}`
+      };
+    },
+    // aws-lambda-create function handler runtime → { status, arn }
+    "aws-lambda-create": (functionName, handler, runtime = "nodejs20.x") => {
+      return {
+        status: "created",
+        functionName,
+        handler,
+        runtime,
+        arn: `arn:aws:lambda:us-east-1:123456789012:function:${functionName}`
+      };
+    },
+    // aws-lambda-delete function → { status }
+    "aws-lambda-delete": (functionName) => {
+      return {
+        status: "deleted",
+        functionName
+      };
+    },
+    // ── AWS RDS ──────────────────────────────────────────────
+    // aws-rds-query dbInstanceId sql → { status, rows: [] }
+    "aws-rds-query": (dbInstanceId, sql) => {
+      return {
+        status: "executed",
+        dbInstanceId,
+        sql,
+        rows: [],
+        rowsAffected: 0
+      };
+    },
+    // aws-rds-create dbInstanceId engine masterUsername → { status, endpoint }
+    "aws-rds-create": (dbInstanceId, engine, masterUsername) => {
+      return {
+        status: "creating",
+        dbInstanceId,
+        engine,
+        masterUsername,
+        endpoint: `${dbInstanceId}.123456789.us-east-1.rds.amazonaws.com`,
+        port: engine.includes("mysql") ? 3306 : engine.includes("postgres") ? 5432 : 1433
+      };
+    },
+    // ── GCP Cloud Run ─────────────────────────────────────────
+    // gcp-run-deploy service image region → { status, url, region }
+    "gcp-run-deploy": (serviceName, imageUri, region = "us-central1") => {
+      return {
+        status: "deploying",
+        serviceName,
+        imageUri,
+        region,
+        url: `https://${serviceName}-${region.split("-")[0]}xxxxx.a.run.app`,
+        projectId: cloudState.gcp?.projectId ?? "default-project"
+      };
+    },
+    // gcp-run-invoke service data region → { status, output, duration_ms }
+    "gcp-run-invoke": (serviceName, data, region = "us-central1") => {
+      const startTime = Date.now();
+      return {
+        status: "invoked",
+        serviceName,
+        data,
+        region,
+        output: null,
+        duration_ms: Date.now() - startTime,
+        url: `https://${serviceName}-${region.split("-")[0]}xxxxx.a.run.app`
+      };
+    },
+    // gcp-run-list region → { status, services: [] }
+    "gcp-run-list": (region = "us-central1") => {
+      return {
+        status: "listed",
+        region,
+        services: [],
+        count: 0,
+        projectId: cloudState.gcp?.projectId ?? "default-project"
+      };
+    },
+    // ── Azure Functions ──────────────────────────────────────
+    // azure-function-invoke functionName data → { status, result, duration_ms }
+    "azure-function-invoke": (functionName, data) => {
+      const startTime = Date.now();
+      return {
+        status: "invoked",
+        functionName,
+        data,
+        result: null,
+        duration_ms: Date.now() - startTime,
+        functionAppName: "default-function-app"
+      };
+    },
+    // azure-function-create functionName runtime → { status, id }
+    "azure-function-create": (functionName, runtime = "node") => {
+      return {
+        status: "created",
+        functionName,
+        runtime,
+        id: `/subscriptions/${cloudState.azure?.subscriptionId}/resourceGroups/default/providers/Microsoft.Web/sites/${functionName}`
+      };
+    },
+    // azure-app-deploy appName imageUri region → { status, url }
+    "azure-app-deploy": (appName, imageUri, region = "eastus") => {
+      return {
+        status: "deploying",
+        appName,
+        imageUri,
+        region,
+        url: `https://${appName}.azurewebsites.net`,
+        resourceGroup: "default-resource-group"
+      };
+    },
+    // ── Common Cloud Utilities ──────────────────────────────────
+    // cloud-get-config provider → { aws?, gcp?, azure? }
+    "cloud-get-config": (provider) => {
+      if (provider === "aws") return cloudState.aws;
+      if (provider === "gcp") return cloudState.gcp;
+      if (provider === "azure") return cloudState.azure;
+      return cloudState;
+    },
+    // cloud-set-config provider config → { status: "configured" }
+    "cloud-set-config": (provider, config) => {
+      if (provider === "aws" && cloudState.aws) Object.assign(cloudState.aws, config);
+      if (provider === "gcp" && cloudState.gcp) Object.assign(cloudState.gcp, config);
+      if (provider === "azure" && cloudState.azure) Object.assign(cloudState.azure, config);
+      return { status: "configured", provider, config };
+    },
+    // cloud-health provider → { status, healthy: boolean }
+    "cloud-health": (provider) => {
+      const providers = {
+        aws: !!cloudState.aws,
+        gcp: !!cloudState.gcp,
+        azure: !!cloudState.azure
+      };
+      return {
+        status: "checked",
+        provider,
+        healthy: providers[provider] ?? false,
+        message: providers[provider] ? "Ready" : "Not configured"
+      };
+    },
+    // ── Kubernetes (선택적, K8S API를 통해서는 아님) ─────────────
+    // k8s-apply manifest → { status, kind, name }
+    "k8s-apply": (manifest) => {
+      const kind = manifest?.kind ?? "Unknown";
+      const name = manifest?.metadata?.name ?? "unnamed";
+      return {
+        status: "applied",
+        kind,
+        name,
+        namespace: manifest?.metadata?.namespace ?? "default",
+        message: `${kind} '${name}' configured`
+      };
+    },
+    // k8s-delete kind name namespace → { status }
+    "k8s-delete": (kind, name, namespace = "default") => {
+      return {
+        status: "deleted",
+        kind,
+        name,
+        namespace,
+        message: `${kind} '${name}' deleted`
+      };
+    },
+    // k8s-get kind namespace → { status, resources: [] }
+    "k8s-get": (kind, namespace = "default") => {
+      return {
+        status: "retrieved",
+        kind,
+        namespace,
+        resources: [],
+        count: 0
+      };
+    },
+    // k8s-exec pod command namespace → { status, output, exitCode }
+    "k8s-exec": (pod, command, namespace = "default") => {
+      return {
+        status: "executed",
+        pod,
+        command,
+        namespace,
+        output: "",
+        exitCode: 0
+      };
+    }
+  };
+}
+
 // src/stdlib-loader.ts
 function loadAllStdlib(interp) {
   interp.registerModule(createFileModule());
@@ -24071,6 +24773,7 @@ function loadAllStdlib(interp) {
   interp.registerModule(createMarkdownModule());
   interp.registerModule(createFeedModule());
   interp.registerModule(createBlogModule());
+  interp.registerModule(createCloudModule());
 }
 
 // src/eval-pattern-match.ts
@@ -25895,9 +26598,9 @@ var Interpreter = class {
   // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
   loadFlStdlib() {
     try {
-      const stdlibPath = path7.join(__dirname, "freelang-stdlib.fl");
-      if (!fs9.existsSync(stdlibPath)) return;
-      const src = fs9.readFileSync(stdlibPath, "utf-8");
+      const stdlibPath = path8.join(__dirname, "freelang-stdlib.fl");
+      if (!fs10.existsSync(stdlibPath)) return;
+      const src = fs10.readFileSync(stdlibPath, "utf-8");
       this.interpret(parse(lex(src)));
     } catch {
     }
@@ -26741,7 +27444,7 @@ var Interpreter = class {
   }
   handleRouteBlock(block) {
     const method = this.getFieldValue(block, "method", "GET");
-    const path12 = this.getFieldValue(block, "path", "/");
+    const path13 = this.getFieldValue(block, "path", "/");
     const handler = block.fields.get("handler");
     if (!handler) {
       throw new Error(`[ROUTE ${block.name}] Missing :handler`);
@@ -26749,7 +27452,7 @@ var Interpreter = class {
     this.context.routes.set(block.name, {
       name: block.name,
       method: method.toLowerCase(),
-      path: path12,
+      path: path13,
       handler
     });
   }
@@ -26973,8 +27676,10 @@ var Interpreter = class {
       }
     }
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
+    const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
+    if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
     if (op === "REFLECT") {
       const interp = this;
@@ -27928,8 +28633,8 @@ function formatFL(src) {
 }
 
 // src/hot-reload.ts
-var fs10 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var fs11 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
 init_lexer();
 init_parser();
 function createDebounce(ms) {
@@ -27957,7 +28662,7 @@ var FileWatcher = class {
     const onReload = opts?.onReload;
     const onError = opts?.onError;
     const debounced = createDebounce(debounceMs);
-    const basename5 = path8.basename(file);
+    const basename5 = path9.basename(file);
     const handleChange = () => {
       debounced(() => {
         if (clearConsole) {
@@ -27980,14 +28685,14 @@ var FileWatcher = class {
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs10.statSync(file);
+      const st = fs11.statSync(file);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
     }
     const interval = setInterval(() => {
       try {
-        const st = fs10.statSync(file);
+        const st = fs11.statSync(file);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -28018,7 +28723,7 @@ var FileWatcher = class {
     const regex = new RegExp(ext.replace(".", "\\.") + "$");
     let watcher = null;
     try {
-      watcher = fs10.watch(dir, (_event, filename) => {
+      watcher = fs11.watch(dir, (_event, filename) => {
         if (!filename) return;
         if (!regex.test(filename)) return;
         debounced(() => {
@@ -28026,7 +28731,7 @@ var FileWatcher = class {
             process.stdout.write("\x1B[2J\x1B[0f");
           }
           console.log(`\x1B[36m[RELOAD]\x1B[0m ${filename} changed`);
-          const fullPath = path8.join(dir, filename);
+          const fullPath = path9.join(dir, filename);
           if (onReload) {
             try {
               onReload(fullPath);
@@ -28068,10 +28773,10 @@ var FileWatcher = class {
   }
 };
 function runWithWatch(file, opts) {
-  const absPath = path8.resolve(file);
+  const absPath = path9.resolve(file);
   function executeFile() {
     try {
-      const source = fs10.readFileSync(absPath, "utf-8");
+      const source = fs11.readFileSync(absPath, "utf-8");
       const tokens = lex(source);
       const ast = parse(tokens);
       const interp = new Interpreter();
@@ -28093,7 +28798,7 @@ function runWithWatch(file, opts) {
       if (opts?.onError) {
         opts.onError(file, e);
       } else {
-        console.error(`\x1B[31m[ERROR]\x1B[0m ${path8.basename(absPath)}: ${e.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m ${path9.basename(absPath)}: ${e.message}`);
       }
     }
   }
@@ -28105,7 +28810,7 @@ function runWithWatch(file, opts) {
       executeFile();
     }
   };
-  console.log(`\x1B[2m  watching ${path8.basename(absPath)}...\x1B[0m`);
+  console.log(`\x1B[2m  watching ${path9.basename(absPath)}...\x1B[0m`);
   watcher.watch(absPath, mergedOpts);
 }
 
@@ -28357,7 +29062,7 @@ function toAnchor(name) {
 }
 
 // src/ci-runner.ts
-var fs11 = __toESM(require("fs"));
+var fs12 = __toESM(require("fs"));
 init_linter();
 var CIPipeline = class {
   steps = [];
@@ -28444,8 +29149,8 @@ function createFmtCheckStep(files) {
       }
       const needsFormat = [];
       for (const f of files) {
-        if (!fs11.existsSync(f)) continue;
-        const src = fs11.readFileSync(f, "utf-8");
+        if (!fs12.existsSync(f)) continue;
+        const src = fs12.readFileSync(f, "utf-8");
         try {
           const formatted = formatFL(src);
           if (src !== formatted) {
@@ -28479,8 +29184,8 @@ function createLintStep(files) {
       const linter = createDefaultLinter();
       const errors = [];
       for (const f of files) {
-        if (!fs11.existsSync(f)) continue;
-        const src = fs11.readFileSync(f, "utf-8");
+        if (!fs12.existsSync(f)) continue;
+        const src = fs12.readFileSync(f, "utf-8");
         const diags = linter.lint(src);
         const errs = diags.filter((d) => d.severity === "error");
         for (const e of errs) {
@@ -28504,8 +29209,8 @@ function createTypeCheckStep() {
     run: () => timed(async () => {
       const { execSync: execSync2 } = require("child_process");
       try {
-        const cwd = process.cwd();
-        execSync2("npx tsc --noEmit", { cwd, stdio: "pipe" });
+        const cwd2 = process.cwd();
+        execSync2("npx tsc --noEmit", { cwd: cwd2, stdio: "pipe" });
         return { passed: true, output: "TypeScript \uD0C0\uC785 \uCCB4\uD06C OK" };
       } catch (err4) {
         const output = err4.stdout?.toString() ?? err4.stderr?.toString() ?? String(err4);
@@ -28523,8 +29228,8 @@ function createDefaultPipeline(files, opts = {}) {
 }
 
 // src/web/app-router.ts
-var fs12 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs13 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 var AppRouter = class {
   appDir;
   routes = [];
@@ -28544,8 +29249,8 @@ var AppRouter = class {
    */
   scanNotFound(dir) {
     try {
-      const notFoundPath = path9.join(dir, "not-found.fl");
-      if (fs12.existsSync(notFoundPath)) {
+      const notFoundPath = path10.join(dir, "not-found.fl");
+      if (fs13.existsSync(notFoundPath)) {
         this.notFoundHandler = notFoundPath;
         console.log(`approuter.not-found file=${notFoundPath}`);
       }
@@ -28556,7 +29261,7 @@ var AppRouter = class {
    * 파일시스템 스캔 시작
    */
   scan() {
-    if (!fs12.existsSync(this.appDir)) {
+    if (!fs13.existsSync(this.appDir)) {
       console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
       return;
     }
@@ -28575,9 +29280,9 @@ var AppRouter = class {
    */
   scanDirectory(dir, currentPath = "", phase = "page") {
     try {
-      const entries = fs12.readdirSync(dir, { withFileTypes: true });
+      const entries = fs13.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        const fullPath = path9.join(dir, entry.name);
+        const fullPath = path10.join(dir, entry.name);
         const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
         if (entry.isDirectory()) {
           const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
@@ -28725,7 +29430,7 @@ var AppRouter = class {
 };
 
 // src/web/fl-executor.ts
-var fs13 = __toESM(require("fs"));
+var fs14 = __toESM(require("fs"));
 var crypto4 = __toESM(require("crypto"));
 init_lexer();
 init_parser();
@@ -28759,7 +29464,7 @@ var FLExecutor = class {
     if (cached && now - cached.timestamp < this.cacheTimeout) {
       return cached.ast;
     }
-    const code = fs13.readFileSync(filePath, "utf-8");
+    const code = fs14.readFileSync(filePath, "utf-8");
     const tokens = lex(code);
     const ast = parse(tokens);
     this.cache.set(filePath, { ast, timestamp: now });
@@ -28790,7 +29495,7 @@ var FLExecutor = class {
    */
   async executePage(filePath, context) {
     try {
-      if (!fs13.existsSync(filePath)) {
+      if (!fs14.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -28838,7 +29543,7 @@ var FLExecutor = class {
    */
   async executeRoute(filePath, context) {
     try {
-      if (!fs13.existsSync(filePath)) {
+      if (!fs14.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -29131,8 +29836,8 @@ var FLExecutor = class {
 var fl_executor_default = FLExecutor;
 
 // src/web/page-renderer.ts
-var fs14 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var fs15 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
 var PageRenderer = class {
   executor;
   ssrCache = /* @__PURE__ */ new Map();
@@ -29212,13 +29917,13 @@ var PageRenderer = class {
    */
   async renderSSG(context) {
     const cacheKey = this.getCacheKey(context.filePath, context.params);
-    const outputPath = path10.join(
+    const outputPath = path11.join(
       this.buildOutputDir,
       cacheKey.replace(/\//g, "_") + ".html"
     );
-    if (fs14.existsSync(outputPath)) {
-      const html = fs14.readFileSync(outputPath, "utf-8");
-      const stat = fs14.statSync(outputPath);
+    if (fs15.existsSync(outputPath)) {
+      const html = fs15.readFileSync(outputPath, "utf-8");
+      const stat = fs15.statSync(outputPath);
       return {
         html,
         timestamp: stat.mtime.getTime(),
@@ -29227,10 +29932,10 @@ var PageRenderer = class {
       };
     }
     const result = await this.renderSSR(context);
-    if (!fs14.existsSync(this.buildOutputDir)) {
-      fs14.mkdirSync(this.buildOutputDir, { recursive: true });
+    if (!fs15.existsSync(this.buildOutputDir)) {
+      fs15.mkdirSync(this.buildOutputDir, { recursive: true });
     }
-    fs14.writeFileSync(outputPath, result.html, "utf-8");
+    fs15.writeFileSync(outputPath, result.html, "utf-8");
     return result;
   }
   /**
@@ -29720,7 +30425,7 @@ var WebServer = class {
 
 // src/cli.ts
 function formatError(err4, source, filePath) {
-  const fileName = filePath ? path11.basename(filePath) : "<stdin>";
+  const fileName = filePath ? path12.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
     lines.push(`
@@ -29749,7 +30454,7 @@ function checkSource(source, filePath) {
   try {
     const tokens = lex(source);
     parse(tokens);
-    const fileName = filePath ? path11.basename(filePath) : "<stdin>";
+    const fileName = filePath ? path12.basename(filePath) : "<stdin>";
     console.log(`\x1B[32m\u2713\x1B[0m  ${fileName}  \uBB38\uBC95 \uC774\uC0C1 \uC5C6\uC74C`);
     return true;
   } catch (err4) {
@@ -29758,13 +30463,13 @@ function checkSource(source, filePath) {
   }
 }
 function cmdRun(filePath, watch2, extraArgs = []) {
-  const absPath = path11.resolve(filePath);
-  if (!fs15.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   function execute() {
-    const source = fs15.readFileSync(absPath, "utf-8");
+    const source = fs16.readFileSync(absPath, "utf-8");
     let ctx;
     try {
       const tokens = lex(source);
@@ -29794,11 +30499,11 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   }
   execute();
   if (watch2) {
-    console.log(`\x1B[2m  watching ${path11.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
+    console.log(`\x1B[2m  watching ${path12.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs15.statSync(absPath);
+      const st = fs16.statSync(absPath);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
@@ -29806,7 +30511,7 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     let debounce = null;
     setInterval(() => {
       try {
-        const st = fs15.statSync(absPath);
+        const st = fs16.statSync(absPath);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -29823,12 +30528,12 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   }
 }
 function cmdCheck(filePath) {
-  const absPath = path11.resolve(filePath);
-  if (!fs15.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const source = fs15.readFileSync(absPath, "utf-8");
+  const source = fs16.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
 }
@@ -29839,13 +30544,13 @@ function cmdCodegen(args2) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
     process.exit(1);
   }
-  const absInput = path11.resolve(inputFile);
-  if (!fs15.existsSync(absInput)) {
+  const absInput = path12.resolve(inputFile);
+  if (!fs16.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs15.readFileSync(absInput, "utf-8");
+    const source = fs16.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -29862,7 +30567,7 @@ function cmdCodegen(args2) {
       }
     }
   } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs15.readFileSync(absInput, "utf-8"), absInput)}`);
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs16.readFileSync(absInput, "utf-8"), absInput)}`);
     process.exit(1);
   }
 }
@@ -29876,13 +30581,13 @@ function cmdCompile(args2) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
     process.exit(1);
   }
-  const absInput = path11.resolve(inputFile);
-  if (!fs15.existsSync(absInput)) {
+  const absInput = path12.resolve(inputFile);
+  if (!fs16.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs15.readFileSync(absInput, "utf-8");
+    const source = fs16.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -29893,18 +30598,18 @@ function cmdCompile(args2) {
       target: "node"
     });
     if (outputFile) {
-      const absOutput = path11.resolve(outputFile);
-      const dir = path11.dirname(absOutput);
-      if (dir !== "." && !fs15.existsSync(dir)) {
-        fs15.mkdirSync(dir, { recursive: true });
+      const absOutput = path12.resolve(outputFile);
+      const dir = path12.dirname(absOutput);
+      if (dir !== "." && !fs16.existsSync(dir)) {
+        fs16.mkdirSync(dir, { recursive: true });
       }
-      fs15.writeFileSync(absOutput, js, "utf-8");
-      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path11.basename(inputFile)} \u2192 ${outputFile}`);
+      fs16.writeFileSync(absOutput, js, "utf-8");
+      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path12.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(js);
     }
   } catch (err4) {
-    console.error(formatError(err4, fs15.readFileSync(absInput, "utf-8"), absInput));
+    console.error(formatError(err4, fs16.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);
   }
 }
@@ -29914,8 +30619,8 @@ function cmdRepl() {
   const historyPath = (() => {
     try {
       const os2 = require("os");
-      const path12 = require("path");
-      return path12.join(os2.homedir(), ".fl_history");
+      const path13 = require("path");
+      return path13.join(os2.homedir(), ".fl_history");
     } catch {
       return null;
     }
@@ -29923,9 +30628,9 @@ function cmdRepl() {
   let initialHistory = [];
   if (historyPath) {
     try {
-      const fs16 = require("fs");
-      if (fs16.existsSync(historyPath)) {
-        initialHistory = fs16.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
+      const fs17 = require("fs");
+      if (fs17.existsSync(historyPath)) {
+        initialHistory = fs17.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
       }
     } catch {
     }
@@ -30031,8 +30736,8 @@ function cmdRepl() {
     }
     if (historyPath && source) {
       try {
-        const fs16 = require("fs");
-        fs16.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
+        const fs17 = require("fs");
+        fs17.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
       } catch {
       }
     }
@@ -30122,32 +30827,32 @@ function cmdFmt(args2) {
   }
   let needsChange = false;
   for (const filePath of filePaths) {
-    const absPath = path11.resolve(filePath);
-    if (!fs15.existsSync(absPath)) {
+    const absPath = path12.resolve(filePath);
+    if (!fs16.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
       process.exit(1);
     }
-    const src = fs15.readFileSync(absPath, "utf-8");
+    const src = fs16.readFileSync(absPath, "utf-8");
     let formatted;
     try {
       formatted = formatFL(src);
     } catch (err4) {
-      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path11.basename(absPath)}: ${err4.message}`);
+      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path12.basename(absPath)}: ${err4.message}`);
       process.exit(1);
     }
     if (checkMode) {
       if (src !== formatted) {
-        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path11.basename(absPath)}`);
+        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path12.basename(absPath)}`);
         needsChange = true;
       } else {
-        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path11.basename(absPath)}`);
+        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path12.basename(absPath)}`);
       }
     } else {
       if (src !== formatted) {
-        fs15.writeFileSync(absPath, formatted, "utf-8");
-        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path11.basename(absPath)}`);
+        fs16.writeFileSync(absPath, formatted, "utf-8");
+        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path12.basename(absPath)}`);
       } else {
-        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path11.basename(absPath)}`);
+        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path12.basename(absPath)}`);
       }
     }
   }
@@ -30156,8 +30861,8 @@ function cmdFmt(args2) {
   }
 }
 function cmdDebug(filePath, stepMode) {
-  const absPath = path11.resolve(filePath);
-  if (!fs15.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
@@ -30165,11 +30870,11 @@ function cmdDebug(filePath, stepMode) {
   session.enabled = true;
   session.stepMode = stepMode;
   setGlobalDebugSession(session);
-  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path11.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
+  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path12.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
   console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   try {
-    const source = fs15.readFileSync(absPath, "utf-8");
+    const source = fs16.readFileSync(absPath, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const interp = new Interpreter();
@@ -30195,14 +30900,14 @@ async function cmdCi(ciArgs) {
   const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
   let targetFiles;
   if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path11.resolve(f)).filter((f) => fs15.existsSync(f));
+    targetFiles = filePaths.map((f) => path12.resolve(f)).filter((f) => fs16.existsSync(f));
     if (targetFiles.length === 0) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
   } else {
-    const cwd = process.cwd();
-    targetFiles = fs15.readdirSync(cwd).filter((f) => f.endsWith(".fl")).map((f) => path11.join(cwd, f));
+    const cwd2 = process.cwd();
+    targetFiles = fs16.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path12.join(cwd2, f));
   }
   console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
@@ -30227,27 +30932,27 @@ function cmdDoc(docArgs) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  --dir \uB4A4\uC5D0 \uB514\uB809\uD1A0\uB9AC \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
       process.exit(1);
     }
-    const absDir = path11.resolve(dirPath);
-    if (!fs15.existsSync(absDir) || !fs15.statSync(absDir).isDirectory()) {
+    const absDir = path12.resolve(dirPath);
+    if (!fs16.existsSync(absDir) || !fs16.statSync(absDir).isDirectory()) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       process.exit(1);
     }
-    const flFiles = fs15.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path11.join(absDir, f));
+    const flFiles = fs16.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path12.join(absDir, f));
     if (flFiles.length === 0) {
       console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       return;
     }
     const allEntries = [];
     for (const filePath2 of flFiles) {
-      const src2 = fs15.readFileSync(filePath2, "utf-8");
+      const src2 = fs16.readFileSync(filePath2, "utf-8");
       allEntries.push(...extractDocs(src2));
     }
-    const title2 = path11.basename(absDir) + " API \uBB38\uC11C";
+    const title2 = path12.basename(absDir) + " API \uBB38\uC11C";
     const md2 = renderMarkdown(allEntries, title2);
     const outIdx2 = docArgs.indexOf("-o");
     if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
-      const outPath = path11.resolve(docArgs[outIdx2 + 1]);
-      fs15.writeFileSync(outPath, md2, "utf-8");
+      const outPath = path12.resolve(docArgs[outIdx2 + 1]);
+      fs16.writeFileSync(outPath, md2, "utf-8");
       console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
     } else {
       process.stdout.write(md2);
@@ -30260,19 +30965,19 @@ function cmdDoc(docArgs) {
     process.exit(1);
   }
   const filePath = filePaths[0];
-  const absPath = path11.resolve(filePath);
-  if (!fs15.existsSync(absPath)) {
+  const absPath = path12.resolve(filePath);
+  if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const src = fs15.readFileSync(absPath, "utf-8");
+  const src = fs16.readFileSync(absPath, "utf-8");
   const entries = extractDocs(src);
-  const title = path11.basename(absPath, ".fl") + " API \uBB38\uC11C";
+  const title = path12.basename(absPath, ".fl") + " API \uBB38\uC11C";
   const md = renderMarkdown(entries, title);
   const outIdx = docArgs.indexOf("-o");
   if (outIdx !== -1 && docArgs[outIdx + 1]) {
-    const outPath = path11.resolve(docArgs[outIdx + 1]);
-    fs15.writeFileSync(outPath, md, "utf-8");
+    const outPath = path12.resolve(docArgs[outIdx + 1]);
+    fs16.writeFileSync(outPath, md, "utf-8");
     console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
   } else {
     process.stdout.write(md);
@@ -30283,11 +30988,11 @@ function cmdBuild(buildArgs2) {
   const isStatic = buildArgs2.includes("--static");
   if (isStatic) {
     let expandDynamicParams = function(dir, paramName) {
-      const paramsFile = path11.join(dir, "generate-static-params.fl");
-      if (!fs15.existsSync(paramsFile)) return [];
+      const paramsFile = path12.join(dir, "generate-static-params.fl");
+      if (!fs16.existsSync(paramsFile)) return [];
       try {
-        const cwdBootstrap2 = path11.resolve(process.cwd(), "bootstrap.js");
-        const bs = fs15.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path11.resolve(__dirname, "bootstrap.js");
+        const cwdBootstrap2 = path12.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs16.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path12.resolve(__dirname, "bootstrap.js");
         const { execSync: execSync2 } = require("child_process");
         const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
         const m = out.match(/\[[\s\S]*\]/);
@@ -30299,20 +31004,20 @@ function cmdBuild(buildArgs2) {
         return [];
       }
     }, walk = function(dir, routeBase) {
-      const entries = fs15.readdirSync(dir, { withFileTypes: true });
+      const entries = fs16.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
-        const full = path11.join(dir, e.name);
+        const full = path12.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
             const paramName = e.name.slice(1, -1);
             const params = expandDynamicParams(full, paramName);
-            const pageFile = path11.join(full, "page.fl");
+            const pageFile = path12.join(full, "page.fl");
             if (params.length === 0) {
-              console.log(`build.skip reason=dynamic_no_params path=/${path11.relative(absApp, full)} param=${paramName}`);
+              console.log(`build.skip reason=dynamic_no_params path=/${path12.relative(absApp, full)} param=${paramName}`);
               continue;
             }
-            if (!fs15.existsSync(pageFile)) {
-              console.log(`build.skip reason=dynamic_no_page path=/${path11.relative(absApp, full)}`);
+            if (!fs16.existsSync(pageFile)) {
+              console.log(`build.skip reason=dynamic_no_page path=/${path12.relative(absApp, full)}`);
               continue;
             }
             for (const p of params) {
@@ -30335,18 +31040,18 @@ function cmdBuild(buildArgs2) {
     const appDir = appIdx !== -1 ? buildArgs2[appIdx + 1] : "app";
     const outDir = outIdx !== -1 ? buildArgs2[outIdx + 1] : "dist";
     const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
-    const absApp = path11.resolve(appDir);
-    const absOut = path11.resolve(outDir);
-    if (!fs15.existsSync(absApp)) {
+    const absApp = path12.resolve(appDir);
+    const absOut = path12.resolve(outDir);
+    if (!fs16.existsSync(absApp)) {
       console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
     }
     console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
-    fs15.mkdirSync(absOut, { recursive: true });
+    fs16.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
-    const notFoundFile = path11.join(absApp, "not-found.fl");
-    if (fs15.existsSync(notFoundFile)) {
+    const notFoundFile = path12.join(absApp, "not-found.fl");
+    if (fs16.existsSync(notFoundFile)) {
       pages.push({ filePath: notFoundFile, route: "/__404__" });
     }
     if (pages.length === 0) {
@@ -30355,8 +31060,8 @@ function cmdBuild(buildArgs2) {
     }
     const { spawn } = require("child_process");
     const http3 = require("http");
-    const cwdBootstrap = path11.resolve(process.cwd(), "bootstrap.js");
-    const bootstrap = fs15.existsSync(cwdBootstrap) ? cwdBootstrap : path11.resolve(__dirname, "bootstrap.js");
+    const cwdBootstrap = path12.resolve(process.cwd(), "bootstrap.js");
+    const bootstrap = fs16.existsSync(cwdBootstrap) ? cwdBootstrap : path12.resolve(__dirname, "bootstrap.js");
     const serveProc = spawn(
       "node",
       [bootstrap, "serve", "--app", absApp, "--port", String(port)],
@@ -30447,10 +31152,10 @@ function cmdBuild(buildArgs2) {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = p.route === "/__404__" ? path11.join(absOut, "404.html") : path11.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-          fs15.mkdirSync(path11.dirname(outPath), { recursive: true });
-          fs15.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path11.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          const outPath = p.route === "/__404__" ? path12.join(absOut, "404.html") : path12.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          fs16.mkdirSync(path12.dirname(outPath), { recursive: true });
+          fs16.writeFileSync(outPath, html);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path12.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);
@@ -30480,20 +31185,20 @@ function cmdBuild(buildArgs2) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
       process.exit(1);
     }
-    const absPath = path11.resolve(appFile);
-    if (!fs15.existsSync(absPath)) {
+    const absPath = path12.resolve(appFile);
+    if (!fs16.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path11.basename(appFile)} \u2192 ${tag}`);
-    const ociScriptPath = path11.resolve(__dirname, "../vpm/v9-oci.fl");
-    if (!fs15.existsSync(ociScriptPath)) {
+    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path12.basename(appFile)} \u2192 ${tag}`);
+    const ociScriptPath = path12.resolve(__dirname, "../vpm/v9-oci.fl");
+    if (!fs16.existsSync(ociScriptPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
-      const cmd2 = registry ? `node ${path11.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path11.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
+      const cmd2 = registry ? `node ${path12.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path12.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
       console.log(`\x1B[2m  Command: ${cmd2}\x1B[0m`);
       execSync2(cmd2, { stdio: "inherit" });
       console.log(`\x1B[32m[OK]\x1B[0m  OCI \uBE4C\uB4DC \uC644\uB8CC: ${tag}`);
@@ -30520,15 +31225,15 @@ function cmdRegistry(registryArgs) {
     }
     console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
     console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
-    const registryPath = path11.resolve(__dirname, "../vpm/registry-server.fl");
-    if (!fs15.existsSync(registryPath)) {
+    const registryPath = path12.resolve(__dirname, "../vpm/registry-server.fl");
+    if (!fs16.existsSync(registryPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
       process.env.REGISTRY_PORT = String(port);
-      execSync2(`node ${path11.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
+      execSync2(`node ${path12.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
         stdio: "inherit",
         env: { ...process.env, REGISTRY_PORT: String(port) }
       });
@@ -30730,12 +31435,12 @@ switch (cmd) {
       process.exit(1);
     }
     const noClear = args.includes("--no-clear");
-    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path11.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
+    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path12.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
     runWithWatch(filePath, {
       clearConsole: !noClear,
       debounceMs: 300,
       onError: (file, err4) => {
-        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path11.basename(file)}: ${err4.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path12.basename(file)}: ${err4.message}`);
       }
     });
     break;
