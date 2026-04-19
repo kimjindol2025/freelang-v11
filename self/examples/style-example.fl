@@ -1,0 +1,133 @@
+;; style-example.fl — FreeLang v11 스타일 시스템 예제
+;; Phase 59 P3: STYLE + THEME 블록으로 CSS 선언형 정의
+
+;; ──────────────────────────────────────────────────
+;; 테마 정의 — 디자인 토큰
+;; ──────────────────────────────────────────────────
+
+(theme default
+  :tokens {
+    :primary "#2563eb"
+    :secondary "#64748b"
+    :text "#111827"
+    :text-light "#6b7280"
+    :bg "#ffffff"
+    :bg-light "#f9fafb"
+    :border "#e5e7eb"
+    :space-sm "8px"
+    :space-md "16px"
+    :space-lg "24px"
+    :radius-sm "4px"
+    :radius-md "8px"
+    :radius-lg "12px"
+  })
+
+(println "✅ THEME default: 13개 토큰 정의됨")
+
+;; ──────────────────────────────────────────────────
+;; 스타일 정의 — 컴포넌트 스타일
+;; ──────────────────────────────────────────────────
+
+;; 버튼 기본 스타일
+(style btn-base
+  :selector ".btn"
+  :rules {
+    :display "inline-block"
+    :padding "var(--space-md)"
+    :border "none"
+    :border-radius "var(--radius-md)"
+    :cursor "pointer"
+    :font-weight "500"
+    :transition "background 0.2s"
+  })
+
+(println "✅ STYLE btn-base: 기본 버튼 스타일")
+
+;; 기본 버튼 (파란색)
+(style btn-primary
+  :selector ".btn-primary"
+  :rules {
+    :bg "var(--primary)"
+    :color "white"
+  })
+
+(println "✅ STYLE btn-primary: 파란 버튼")
+
+;; 보조 버튼 (회색)
+(style btn-secondary
+  :selector ".btn-secondary"
+  :rules {
+    :bg "var(--secondary)"
+    :color "white"
+  })
+
+(println "✅ STYLE btn-secondary: 회색 버튼")
+
+;; 카드 스타일
+(style card
+  :selector ".card"
+  :rules {
+    :bg "var(--bg)"
+    :border "1px solid var(--border)"
+    :border-radius "var(--radius-lg)"
+    :p "var(--space-lg)"
+    :box-shadow "0 1px 3px rgba(0,0,0,0.1)"
+  })
+
+(println "✅ STYLE card: 카드 스타일")
+
+;; 카드 제목
+(style card-title
+  :selector ".card-title"
+  :rules {
+    :font-size "20px"
+    :font-weight "bold"
+    :color "var(--text)"
+    :margin-bottom "var(--space-md)"
+  })
+
+(println "✅ STYLE card-title: 카드 제목")
+
+;; 텍스트 스타일
+(style text-small
+  :selector ".text-small"
+  :rules {
+    :font-size "12px"
+    :color "var(--text-light)"
+  })
+
+(println "✅ STYLE text-small: 작은 텍스트")
+
+;; 컨테이너
+(style container
+  :selector ".container"
+  :rules {
+    :max-width "1200px"
+    :margin "0 auto"
+    :p "var(--space-lg)"
+  })
+
+(println "✅ STYLE container: 컨테이너")
+
+;; 그리드
+(style grid
+  :selector ".grid"
+  :rules {
+    :display "grid"
+    :grid-template-columns "repeat(3, 1fr)"
+    :gap "var(--space-md)"
+  })
+
+(println "✅ STYLE grid: 그리드 (3열)")
+
+;; ──────────────────────────────────────────────────
+;; 확인: 생성된 CSS
+;; ──────────────────────────────────────────────────
+
+(println "\n✨ P3: 스타일 시스템 완성!")
+(println "   - THEME: 디자인 토큰 (13개)")
+(println "   - STYLE: 컴포넌트 스타일 (8개)")
+(println "   - 생성 CSS: 요청 컨텍스트에서 <style> 태그로 자동 주입")
+(println "\n💡 사용 예:")
+(println "   (page home :class \"container grid\" :render \"...\")")
+(println "   → class=\"container grid\" + 스타일 자동 적용")

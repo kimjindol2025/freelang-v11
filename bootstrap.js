@@ -16429,6 +16429,185 @@ ${stepsStr}
   throw new Error(`Unknown infra block: ${op}`);
 }
 
+// src/style-registry.ts
+var StyleRegistry = class {
+  themes = [];
+  // :root { --token: value; }
+  styles = [];
+  // .selector { prop: value; }
+  /**
+   * THEME 블록 결과 추가
+   * CSS Variables: :root { --primary: #2563eb; ... }
+   */
+  addTheme(css) {
+    if (css.trim()) {
+      this.themes.push(css);
+    }
+  }
+  /**
+   * STYLE 블록 결과 추가
+   * 선택자 규칙: .selector { background: #fff; ... }
+   */
+  addStyle(css) {
+    if (css.trim()) {
+      this.styles.push(css);
+    }
+  }
+  /**
+   * 누적된 모든 CSS 반환 (THEME 먼저, 그 다음 STYLE)
+   * 반환 후 레지스트리 초기화 (요청 스코프)
+   */
+  flush() {
+    const allCss = [...this.themes, ...this.styles].join("\n");
+    this.themes = [];
+    this.styles = [];
+    return allCss;
+  }
+  /**
+   * 현재 CSS 크기 (디버그용)
+   */
+  size() {
+    return this.themes.length + this.styles.length;
+  }
+};
+var styleRegistry = new StyleRegistry();
+
+// src/eval-style-blocks.ts
+var cssKeyMap = {
+  // 색상
+  bg: "background",
+  fg: "color",
+  // 박스 모델
+  p: "padding",
+  m: "margin",
+  w: "width",
+  h: "height",
+  // 보더
+  r: "border-radius",
+  b: "border",
+  // 기타
+  fs: "font-size",
+  fw: "font-weight",
+  d: "display",
+  o: "opacity",
+  z: "z-index"
+};
+function normalizeCssKey(flKey) {
+  return cssKeyMap[flKey] || flKey;
+}
+function rulesToCss(rulesObj) {
+  if (typeof rulesObj !== "object" || rulesObj === null) {
+    return "";
+  }
+  const cssLines = [];
+  for (const [keyStr, value] of Object.entries(rulesObj)) {
+    let key = keyStr.startsWith(":") ? keyStr.slice(1) : keyStr;
+    key = normalizeCssKey(key);
+    const val = String(value).trim();
+    if (val) {
+      cssLines.push(`${key}: ${val}`);
+    }
+  }
+  return cssLines.join("; ");
+}
+function processThemeBlock(interp, name, tokens) {
+  if (typeof tokens !== "object" || tokens === null) {
+    return { status: "error", reason: "tokens must be object" };
+  }
+  const cssVars = [];
+  for (const [keyStr, value] of Object.entries(tokens)) {
+    let key = keyStr.startsWith(":") ? keyStr.slice(1) : keyStr;
+    const val = String(value).trim();
+    if (val) {
+      cssVars.push(`  --${key}: ${val}`);
+    }
+  }
+  if (cssVars.length === 0) {
+    return { status: "empty", name };
+  }
+  const css = `:root {
+${cssVars.join(";\n")};
+}`;
+  styleRegistry.addTheme(css);
+  return {
+    status: "theme_defined",
+    name,
+    tokens: Object.keys(tokens).length,
+    css
+  };
+}
+function processStyleBlock(interp, name, selector, rules) {
+  if (!selector || selector.trim() === "") {
+    return { status: "error", reason: "selector is required" };
+  }
+  const cssText = rulesToCss(rules);
+  if (!cssText) {
+    return { status: "empty", name, selector };
+  }
+  const css = `${selector} { ${cssText}; }`;
+  styleRegistry.addStyle(css);
+  return {
+    status: "style_defined",
+    name,
+    selector,
+    css
+  };
+}
+function evalStyleBlock(interp, op, expr) {
+  const ev = (node) => interp.eval(node);
+  if (op === "THEME" || op === "theme") {
+    let name = "default";
+    let tokens = {};
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "tokens":
+              tokens = typeof val === "object" ? val : {};
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return processThemeBlock(interp, name, tokens);
+  }
+  if (op === "STYLE" || op === "style") {
+    let name = "default";
+    let selector = "";
+    let rules = {};
+    for (let i = 0; i < expr.args.length; i++) {
+      const arg = expr.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr.args.length) {
+          const val = ev(expr.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "selector":
+              selector = String(val);
+              break;
+            case "rules":
+              rules = typeof val === "object" ? val : {};
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return processStyleBlock(interp, name, selector, rules);
+  }
+  throw new Error(`Unknown style block: ${op}`);
+}
+
 // src/eval-special-forms.ts
 init_ast();
 
@@ -27764,9 +27943,11 @@ var Interpreter = class {
     }
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
+    const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
     const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
+    if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
     if (op === "REFLECT") {
       const interp = this;
@@ -30123,14 +30304,8 @@ function generatePageHTML(route, params = {}) {
   }
   return generateHTML(title, content);
 }
-function generateHTML(title, content) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FreeLang v11 - ${title}</title>
-  <style>
+function generateHTML(title, content, extraCss = "") {
+  const defaultCss = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
@@ -30154,7 +30329,16 @@ function generateHTML(title, content) {
     ul { margin-left: 20px; }
     li { margin-bottom: 10px; }
     a { color: #667eea; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    a:hover { text-decoration: underline; }`;
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreeLang v11 - ${title}</title>
+  <style>
+${defaultCss}
+${extraCss ? "\n" + extraCss : ""}
   </style>
 </head>
 <body>
