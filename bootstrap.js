@@ -27150,6 +27150,15 @@ var Interpreter = class {
       const argsEval = expr.args.map((arg) => this.eval(arg));
       return evalBuiltin(this, op, argsEval, expr);
     }
+    // Bootstrap path: cg-map-entries receiving JS Map from parseMap()
+    if ((op === "cg-map-entries" || op === "cg_map_entries")) {
+      const argsEval = expr.args.map((arg) => this.eval(arg));
+      if (argsEval.length >= 1 && argsEval[0] instanceof Map) {
+        // For bootstrap: JS Map → convert to [[k,v],...] array
+        const mapEntries = [...argsEval[0].entries()];
+        return this.callUserFunction("cg-map-loop", [mapEntries, 0, ""]);
+      }
+    }
     const args2 = expr.args.map((arg) => this.eval(arg));
     if (args2.length >= 1 && typeof args2[0] === "string") {
       const qualifiedName = `${op}:${args2[0]}`;
