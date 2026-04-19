@@ -73,7 +73,7 @@ export class Interpreter {
   public callDepth = 0;
   public static readonly MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 100만 재귀 처리)
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
-  public tcoMode = false;
+  public tcoMode = false; // ← 기본값 유지 (TCO 라우팅은 내부용)
   // Phase 52: FL 파일 import 지원
   public importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();

@@ -1,0 +1,4 @@
+;; 디버그: full-compiler-fixed.fl의 codegen 함수 확인
+(let [[$lit-node {:kind "literal" :type "string" :value "hello"}]
+      [$result (cg $lit-node)]]
+  (println (str "cg(literal) = " $result)))

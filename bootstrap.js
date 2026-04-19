@@ -24504,6 +24504,9 @@ function propagateMutations(interp, capturedEnv, paramSet, savedStack) {
 }
 var MAX_CALL_DEPTH = 5e3;
 function callUserFunction(interp, name, args2) {
+  if (interp.tcoMode) {
+    return callUserFunctionTCO(interp, name, args2);
+  }
   let baseName = name;
   let typeArgs = null;
   const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
@@ -24603,6 +24606,9 @@ function callUserFunction(interp, name, args2) {
   }
 }
 function callFunctionValue(interp, fn, args2) {
+  if (interp.tcoMode) {
+    return callFunctionValueTCO(interp, fn, args2);
+  }
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
@@ -24743,35 +24749,41 @@ function callUserFunctionTCO(interp, name, args2) {
   }
 }
 function callFunctionValueTCO(interp, fn, args2) {
-  let currentFn = fn;
-  let currentArgs = args2;
-  for (let i = 0; i < 1e6; i++) {
-    if (currentFn.kind !== "function-value") {
-      throw new Error(`Expected function-value, got ${currentFn.kind}`);
-    }
-    const savedStack = interp.context.variables.saveStack();
-    let result;
-    try {
-      interp.context.variables.fromSnapshot(currentFn.capturedEnv);
-      for (let j = 0; j < currentFn.params.length; j++) {
-        interp.context.variables.set(currentFn.params[j], currentArgs[j]);
+  const prevTcoMode = interp.tcoMode;
+  interp.tcoMode = true;
+  try {
+    let currentFn = fn;
+    let currentArgs = args2;
+    for (let i = 0; i < 1e6; i++) {
+      if (currentFn.kind !== "function-value") {
+        throw new Error(`Expected function-value, got ${currentFn.kind}`);
       }
-      result = interp.eval(currentFn.body);
-    } finally {
-      interp.context.variables.restoreStack(savedStack);
-    }
-    if (isTailCall(result)) {
-      if (typeof result.fn === "string") {
-        return callUserFunctionTCO(interp, result.fn, result.args);
-      } else {
-        currentFn = result.fn;
-        currentArgs = result.args;
-        continue;
+      const savedStack = interp.context.variables.saveStack();
+      let result;
+      try {
+        interp.context.variables.fromSnapshot(currentFn.capturedEnv);
+        for (let j = 0; j < currentFn.params.length; j++) {
+          interp.context.variables.set(currentFn.params[j], currentArgs[j]);
+        }
+        result = interp.eval(currentFn.body);
+      } finally {
+        interp.context.variables.restoreStack(savedStack);
       }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          return callUserFunctionTCO(interp, result.fn, result.args);
+        } else {
+          currentFn = result.fn;
+          currentArgs = result.args;
+          continue;
+        }
+      }
+      return result;
     }
-    return result;
+    throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
+  } finally {
+    interp.tcoMode = prevTcoMode;
   }
-  throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
 }
 function callUserFunctionRaw(interp, name, args2) {
   const func = interp.context.functions.get(name);
@@ -25796,6 +25808,7 @@ var Interpreter = class {
   // Phase 61: 상향 (trampoline이 100만 재귀 처리)
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
   tcoMode = false;
+  // ← 기본값 유지 (TCO 라우팅은 내부용)
   // Phase 52: FL 파일 import 지원
   importedFiles = /* @__PURE__ */ new Set();
   currentFilePath = process.cwd();
@@ -27144,20 +27157,6 @@ var Interpreter = class {
     if (op === "map" && expr.args.length === 3) {
       const mapResult = evalSpecialForm(this, op, expr);
       if (mapResult !== void 0) return mapResult;
-    }
-    // compile-time builtin fallback: map_entries
-    if ((op === "map-entries" || op === "map_entries") && !this.context.functions.has(op)) {
-      const argsEval = expr.args.map((arg) => this.eval(arg));
-      return evalBuiltin(this, op, argsEval, expr);
-    }
-    // Bootstrap path: cg-map-entries receiving JS Map from parseMap()
-    if ((op === "cg-map-entries" || op === "cg_map_entries")) {
-      const argsEval = expr.args.map((arg) => this.eval(arg));
-      if (argsEval.length >= 1 && argsEval[0] instanceof Map) {
-        // For bootstrap: JS Map → convert to [[k,v],...] array
-        const mapEntries = [...argsEval[0].entries()];
-        return this.callUserFunction("cg-map-loop", [mapEntries, 0, ""]);
-      }
     }
     const args2 = expr.args.map((arg) => this.eval(arg));
     if (args2.length >= 1 && typeof args2[0] === "string") {
@@ -29765,31 +29764,7 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     process.exit(1);
   }
   function execute() {
-    let source = "";
-
-    // self/main.fl 실행 시 핵심 모듈 자동 로드
-    if (absPath.endsWith("self/main.fl")) {
-      const selfDir = path11.dirname(absPath);
-      const coreModules = [
-        path11.join(selfDir, "lexer.fl"),
-        path11.join(selfDir, "parser.fl"),
-        path11.join(selfDir, "codegen.fl"),
-      ];
-
-      for (const mod of coreModules) {
-        if (fs15.existsSync(mod)) {
-          const content = fs15.readFileSync(mod, "utf-8");
-          source += "\n;; === MODULE: " + path11.basename(mod) + " ===\n" + content + "\n";
-        }
-      }
-
-      // main.fl도 추가
-      source += "\n;; === MAIN: main.fl ===\n" + fs15.readFileSync(absPath, "utf-8");
-    } else {
-      // 일반 .fl 파일은 그냥 로드
-      source = fs15.readFileSync(absPath, "utf-8");
-    }
-
+    const source = fs15.readFileSync(absPath, "utf-8");
     let ctx;
     try {
       const tokens = lex(source);
@@ -29799,13 +29774,6 @@ function cmdRun(filePath, watch2, extraArgs = []) {
       if (extraArgs.length > 0) {
         interp.context.variables.set("$__argv__", extraArgs);
       }
-      // map_entries prelude 로드 (self-hosting compile-time builtin)
-      const preludeSrc = "(define map-entries (fn [m] (if (map? m) (fl-exec-op \"map-entries\" [m]) (fl-exec-op \"entries\" [m]))))";
-      try {
-        const preludeTokens = lex(preludeSrc);
-        const preludeAst = parse(preludeTokens);
-        interp.interpret(preludeAst);
-      } catch (e) { console.error("[prelude] error:", e.message); }
       ctx = interp.interpret(ast);
     } catch (err4) {
       console.error(formatError(err4, source, absPath));

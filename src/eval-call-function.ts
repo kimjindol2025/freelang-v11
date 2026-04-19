@@ -66,6 +66,11 @@ function propagateMutations(
 const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
 
 export function callUserFunction(interp: InterpreterLike, name: string, args: any[]): any {
+  // TCO 모드 활성화 시 trampoline으로 라우팅
+  if (interp.tcoMode) {
+    return callUserFunctionTCO(interp, name, args);
+  }
+
   let baseName = name;
   let typeArgs: TypeAnnotation[] | null = null;
 
@@ -184,6 +189,11 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
 }
 
 export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[]): any {
+  // TCO 모드 활성화 시 trampoline으로 라우팅
+  if (interp.tcoMode) {
+    return callFunctionValueTCO(interp, fn, args);
+  }
+
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
@@ -356,37 +366,44 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
  * callFunctionValueTCO: function-value (람다/클로저) 꼬리 재귀를 반복문으로
  */
 export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any[]): any {
-  let currentFn = fn;
-  let currentArgs = args;
+  const prevTcoMode = (interp as any).tcoMode;
+  (interp as any).tcoMode = true;  // ← eval 중에 TailCall 토큰 생성 가능
 
-  for (let i = 0; i < 1_000_000; i++) {
-    if (currentFn.kind !== "function-value") {
-      throw new Error(`Expected function-value, got ${currentFn.kind}`);
-    }
-    const savedStack = interp.context.variables.saveStack();
-    let result: any;
-    try {
-      interp.context.variables.fromSnapshot(currentFn.capturedEnv);
-      for (let j = 0; j < currentFn.params.length; j++) {
-        interp.context.variables.set(currentFn.params[j], currentArgs[j]);
-      }
-      result = interp.eval(currentFn.body);
-    } finally {
-      interp.context.variables.restoreStack(savedStack);
-    }
+  try {
+    let currentFn = fn;
+    let currentArgs = args;
 
-    if (isTailCall(result)) {
-      if (typeof result.fn === "string") {
-        return callUserFunctionTCO(interp, result.fn, result.args);
-      } else {
-        currentFn = result.fn;
-        currentArgs = result.args;
-        continue;
+    for (let i = 0; i < 1_000_000; i++) {
+      if (currentFn.kind !== "function-value") {
+        throw new Error(`Expected function-value, got ${currentFn.kind}`);
       }
+      const savedStack = interp.context.variables.saveStack();
+      let result: any;
+      try {
+        interp.context.variables.fromSnapshot(currentFn.capturedEnv);
+        for (let j = 0; j < currentFn.params.length; j++) {
+          interp.context.variables.set(currentFn.params[j], currentArgs[j]);
+        }
+        result = interp.eval(currentFn.body);
+      } finally {
+        interp.context.variables.restoreStack(savedStack);
+      }
+
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          return callUserFunctionTCO(interp, result.fn, result.args);
+        } else {
+          currentFn = result.fn;
+          currentArgs = result.args;
+          continue;
+        }
+      }
+      return result;
     }
-    return result;
+    throw new Error("TCO: 최대 반복(1,000,000) 초과 — function-value에서 무한 재귀 가능성");
+  } finally {
+    (interp as any).tcoMode = prevTcoMode;  // ← 복구
   }
-  throw new Error("TCO: 최대 반복(1,000,000) 초과 — function-value에서 무한 재귀 가능성");
 }
 
 /**
