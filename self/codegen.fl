@@ -207,12 +207,12 @@
   :body (cg-cond-loop $args 0)]
 
 [FUNC cg-cond-loop :params [$args $i]
-  :body (if (>= $i (length $args)) "null"
-          (let [[$clause (get $args $i)]
-                [$citems (get (get $clause :fields) "items")]
-                [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]
-                [$rest (cg-cond-loop $args (+ $i 1))]]
-            (str "(" $test "?" $result ":" $rest ")")))]
+  :body (loop [$j (- (length $args) 1) $acc "null"]
+          (if (< $j 0) $acc
+            (let [[$clause (get $args $j)]
+                  [$citems (get (get $clause :fields) "items")]
+                  [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]]
+              (recur (- $j 1) (str "(" $test "?" $result ":" $acc ")")))))]
 
 [FUNC cg-and :params [$args]
   :body (if (= (length $args) 0) "true"
