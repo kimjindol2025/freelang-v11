@@ -75,31 +75,34 @@
 ;; ──────────────────────────────────────
 
 [FUNC skip-comment :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
+  :body (loop [$cur $st]
+          (if (at-end? $cur) $cur
+            (let [[$c (peek $cur)]]
+              (if (= $c "\n") (advance $cur) (recur (advance $cur))))))]
 
 [FUNC skip-ws :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (cond
-              [(is-space? $c) (skip-ws (advance $st))]
-              [(= $c ";") (skip-ws (skip-comment $st))]
-              [true $st])))]
+  :body (loop [$cur $st]
+          (if (at-end? $cur) $cur
+            (let [[$c (peek $cur)]]
+              (cond
+                [(is-space? $c) (recur (advance $cur))]
+                [(= $c ";") (recur (skip-comment $cur))]
+                [true $cur]))))]
 
 ;; ──────────────────────────────────────
 ;; 숫자 (정수/실수/음수)
 ;; ──────────────────────────────────────
 
 [FUNC read-number-body :params [$st $acc $has-dot $line $col]
-  :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
-          (let [[$c (peek $st)]]
-            (cond
-              [(is-digit? $c)
-               (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
-              [(and (= $c ".") (not $has-dot))
-               (read-number-body (advance $st) (str $acc $c) true $line $col)]
-              [true (emit $st "Number" $acc $line $col)])))]
+  :body (loop [$cur $st $a $acc $d $has-dot]
+          (if (at-end? $cur) (emit $cur "Number" $a $line $col)
+            (let [[$c (peek $cur)]]
+              (cond
+                [(is-digit? $c)
+                 (recur (advance $cur) (str $a $c) $d)]
+                [(and (= $c ".") (not $d))
+                 (recur (advance $cur) (str $a $c) true)]
+                [true (emit $cur "Number" $a $line $col)]))))]
 
 [FUNC read-number :params [$st]
   :body (read-number-body $st "" false (get $st :line) (get $st :col))]
@@ -114,14 +117,15 @@
           [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
 
 [FUNC read-string-body :params [$st $acc $line $col]
-  :body (if (at-end? $st) (emit $st "String" $acc $line $col)
-          (let [[$c (peek $st)]]
-            (cond
-              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
-              [(= $c "\\")
-               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
-                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
-              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
+  :body (loop [$cur $st $a $acc]
+          (if (at-end? $cur) (emit $cur "String" $a $line $col)
+            (let [[$c (peek $cur)]]
+              (cond
+                [(= $c "\"") (emit (advance $cur) "String" $a $line $col)]
+                [(= $c "\\")
+                 (let [[$st2 (advance $cur)] [$c2 (peek $st2)]]
+                   (recur (advance $st2) (str $a (translate-esc $c2))))]
+                [true (recur (advance $cur) (str $a $c))]))))]
 
 [FUNC read-string :params [$st]
   :body (let [[$line (get $st :line)] [$col (get $st :col)]
@@ -133,11 +137,12 @@
 ;; ──────────────────────────────────────
 
 [FUNC read-symbol-body-kind :params [$st $acc $line $col $kind]
-  :body (if (at-end? $st) (emit $st $kind $acc $line $col)
-          (let [[$c (peek $st)]]
-            (if (is-symbol-char? $c)
-              (read-symbol-body-kind (advance $st) (str $acc $c) $line $col $kind)
-              (emit $st $kind $acc $line $col))))]
+  :body (loop [$cur $st $a $acc]
+          (if (at-end? $cur) (emit $cur $kind $a $line $col)
+            (let [[$c (peek $cur)]]
+              (if (is-symbol-char? $c)
+                (recur (advance $cur) (str $a $c))
+                (emit $cur $kind $a $line $col)))))]
 
 [FUNC read-symbol :params [$st]
   :body (read-symbol-body-kind $st "" (get $st :line) (get $st :col) "Symbol")]
@@ -181,10 +186,11 @@
 ;; ──────────────────────────────────────
 
 [FUNC lex-loop :params [$st]
-  :body (let [[$st1 (skip-ws $st)]]
-          (if (at-end? $st1)
-            (get $st1 :tokens)
-            (lex-loop (read-token $st1))))]
+  :body (loop [$cur $st]
+          (let [[$st1 (skip-ws $cur)]]
+            (if (at-end? $st1)
+              (get $st1 :tokens)
+              (recur (read-token $st1)))))]
 
 [FUNC lex :params [$src] :body (lex-loop (make-state $src))]
 
@@ -411,11 +417,12 @@
 ;; ──────────────────────────────────────
 
 [FUNC parse-all :params [$p]
-  :body (if (p-end? $p)
-          (get $p :ast)
-          (let [[$one (parse-expr $p)]
-                [$p2 (p-append-ast (get $one :p) (get $one :node))]]
-            (parse-all $p2)))]
+  :body (loop [$cur $p]
+          (if (p-end? $cur)
+            (get $cur :ast)
+            (let [[$one (parse-expr $cur)]
+                  [$p2 (p-append-ast (get $one :p) (get $one :node))]]
+              (recur $p2))))]
 
 [FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
 
