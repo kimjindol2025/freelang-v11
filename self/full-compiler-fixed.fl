@@ -68,7 +68,7 @@
   :body {:src (get $st :src) :idx (get $st :idx)
          :line (get $st :line) :col (get $st :col)
          :tokens (append (get $st :tokens)
-                         (list {:type $kind :value $value :line $sl :col $sc}))}]
+                         (list {:kind $kind :type $kind :value $value :line $sl :col $sc}))}]
 
 ;; ──────────────────────────────────────
 ;; 스킵 (whitespace + ; line comment)
