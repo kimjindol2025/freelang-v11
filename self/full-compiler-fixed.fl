@@ -611,60 +611,65 @@
           (str "((()=>{" $bindings $body-js "})())"))]
 
 [FUNC cg-let-1d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k-n (get $items $i)] [$v-n (get $items (+ $i 1))]
-                [$name (extract-name $k-n)] [$val (cg $v-n)]]
-            (cg-let-1d $items (+ $i 2) (str $acc "let " $name "=" $val ";"))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $items)) $result
+            (let [[$k-n (get $items $cur)] [$v-n (get $items (+ $cur 1))]
+                  [$name (extract-name $k-n)] [$val (cg $v-n)]]
+              (recur (+ $cur 2) (str $result "let " $name "=" $val ";")))))]
 
 [FUNC cg-let-2d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pitems (get (get $pair :fields) "items")]
-                [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
-                [$name (extract-name $k-n)] [$val (cg $v-n)]]
-            (cg-let-2d $items (+ $i 1) (str $acc "let " $name "=" $val ";"))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $items)) $result
+            (let [[$pair (get $items $cur)]
+                  [$pitems (get (get $pair :fields) "items")]
+                  [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
+                  [$name (extract-name $k-n)] [$val (cg $v-n)]]
+              (recur (+ $cur 1) (str $result "let " $name "=" $val ";")))))]
 
 [FUNC cg-do :params [$args]
   :body (if (= (length $args) 0) "null"
           (str "(()=>{" (cg-do-body $args 0 "") "})()"))]
 
 [FUNC cg-do-body :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$last (= $i (- (length $args) 1))]
-                [$c (cg (get $args $i))]
-                [$sep (if $last "return " "")]]
-            (cg-do-body $args (+ $i 1) (str $acc $sep $c ";"))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (let [[$last (= $cur (- (length $args) 1))]
+                  [$c (cg (get $args $cur))]
+                  [$sep (if $last "return " "")]]
+              (recur (+ $cur 1) (str $result $sep $c ";")))))]
 
 [FUNC cg-cond :params [$args]
   :body (cg-cond-loop $args 0)]
 
 [FUNC cg-cond-loop :params [$args $i]
-  :body (if (>= $i (length $args)) "null"
-          (let [[$clause (get $args $i)]
-                [$citems (get (get $clause :fields) "items")]
-                [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]
-                [$rest (cg-cond-loop $args (+ $i 1))]]
-            (str "(" $test "?" $result ":" $rest ")")))]
+  :body (loop [$j (- (length $args) 1) $acc "null"]
+          (if (< $j 0) $acc
+            (let [[$clause (get $args $j)]
+                  [$citems (get (get $clause :fields) "items")]
+                  [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]]
+              (recur (- $j 1) (str "(" $test "?" $result ":" $acc ")")))))]
 
 [FUNC cg-and :params [$args]
   :body (if (= (length $args) 0) "true"
           (str "(" (and-loop $args 0 "") ")")) ]
 
 [FUNC and-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (str (cg (get $args $i)))]]
-            (and-loop $args (+ $i 1)
-                      (if (= $i 0) $c (str $acc "&&" $c)))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (let [[$c (str (cg (get $args $cur)))]]
+              (recur (+ $cur 1)
+                     (if (= $cur 0) $c (str $result "&&" $c))))))]
 
 [FUNC cg-or :params [$args]
   :body (if (= (length $args) 0) "false"
           (str "(" (or-loop $args 0 "") ")")) ]
 
 [FUNC or-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (str (cg (get $args $i)))]]
-            (or-loop $args (+ $i 1)
-                     (if (= $i 0) $c (str $acc "||" $c)))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (let [[$c (str (cg (get $args $cur)))]]
+              (recur (+ $cur 1)
+                     (if (= $cur 0) $c (str $result "||" $c))))))]
 
 [FUNC cg-quote :params [$args]
   :body (if (= (length $args) 0) "null" (js-esc (str (cg (get $args 0)))))]
@@ -702,8 +707,9 @@
           (str "(()=>{while(" $cond "){" $body "}})()"))]
 
 [FUNC while-body :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (while-body $args (+ $i 1) (str $acc (cg (get $args $i)) ";")))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (recur (+ $cur 1) (str $result (cg (get $args $cur)) ";"))))]
 
 ;; (loop [[$i 0] [$acc 0]] body-with-recur)
 ;;   → mutable let + while(true) { const __r=...; if(__r?.__recur){[i,acc]=__r.a;continue;} return __r; }
@@ -776,19 +782,20 @@
 ;; 각 case: if (pattern-test) { bindings; if (guard) { return body; } }
 ;;   guard 가 binding 변수를 참조할 수 있어 bindings 를 먼저 실행
 [FUNC match-cases-loop :params [$cases $i $acc]
-  :body (if (>= $i (length $cases)) $acc
-          (let [[$c (get $cases $i)]
-                [$pat (get $c :pattern)]
-                [$body (cg (get $c :body))]
-                [$guard-n (get $c :guard)]
-                [$test (pattern-test $pat "__v")]
-                [$bind (pattern-bindings $pat "__v")]
-                [$guard-js (if (null? $guard-n) "true" (cg $guard-n))]
-                [$inner (if (null? $guard-n)
-                          (str $bind "return " $body ";")
-                          (str $bind "if(" $guard-js "){return " $body ";}"))]]
-            (match-cases-loop $cases (+ $i 1)
-              (str $acc "if(" $test "){" $inner "}"))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $cases)) $result
+            (let [[$c (get $cases $cur)]
+                  [$pat (get $c :pattern)]
+                  [$body (cg (get $c :body))]
+                  [$guard-n (get $c :guard)]
+                  [$test (pattern-test $pat "__v")]
+                  [$bind (pattern-bindings $pat "__v")]
+                  [$guard-js (if (null? $guard-n) "true" (cg $guard-n))]
+                  [$inner (if (null? $guard-n)
+                            (str $bind "return " $body ";")
+                            (str $bind "if(" $guard-js "){return " $body ";}"))]]
+              (recur (+ $cur 1)
+                     (str $result "if(" $test "){" $inner "}")))))]
 
 ;; pattern-test: JS expression that returns truthy if pat matches __v
 [FUNC pattern-test :params [$pat $v]
@@ -848,18 +855,18 @@
   :body (let [[$init (str (cg (get $args 0)))]]
           (thread-first-loop $args 1 $init))]
 [FUNC thread-first-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (thread-first-loop $args (+ $i 1)
-                             (thread-apply (get $args $i) $acc true))) ]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (recur (+ $cur 1) (thread-apply (get $args $cur) $result true))))]
 
 ;; (->> x step1 step2)  thread-last: step(args..., acc)
 [FUNC cg-thread-last :params [$args]
   :body (let [[$init (str (cg (get $args 0)))]]
           (thread-last-loop $args 1 $init))]
 [FUNC thread-last-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (thread-last-loop $args (+ $i 1)
-                            (thread-apply (get $args $i) $acc false))) ]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (recur (+ $cur 1) (thread-apply (get $args $cur) $result false))))]
 
 ;; thread-apply: step, acc, first? → new acc
 [FUNC thread-apply :params [$step $acc $fst]
@@ -913,20 +920,22 @@
 
 [FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
 [FUNC args-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (str (cg (get $args $i)))]]
-            (args-loop $args (+ $i 1)
-                       (if (= $i 0) $c (str $acc "," $c)))))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (let [[$c (str (cg (get $args $cur)))]]
+              (recur (+ $cur 1)
+                     (if (= $cur 0) $c (str $result "," $c))))))]
 
 [FUNC cg-binop :params [$args $op $zero]
   :body (cond [(= (length $args) 0) $zero]
               [(= (length $args) 1) (str (cg (get $args 0)))]
               [true (str "(" (binop-loop $args 0 "" $op) ")")])]
 [FUNC binop-loop :params [$args $i $acc $op]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (str (cg (get $args $i)))]]
-            (binop-loop $args (+ $i 1)
-                        (if (= $i 0) $c (str $acc $op $c)) $op)))]
+  :body (loop [$cur $i $result $acc]
+          (if (>= $cur (length $args)) $result
+            (let [[$c (str (cg (get $args $cur)))]]
+              (recur (+ $cur 1)
+                     (if (= $cur 0) $c (str $result $op $c))))))]
 
 [FUNC cg-pair :params [$args $op]
   :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
@@ -946,10 +955,11 @@
   :body (param-loop $items 0 "")]
 [FUNC param-loop :params [$items $i $acc]
   :body (if (null? $items) $acc
-          (if (>= $i (length $items)) $acc
-            (let [[$name (extract-name (get $items $i))]]
-              (param-loop $items (+ $i 1)
-                          (if (= $i 0) $name (str $acc "," $name))))))]
+          (loop [$cur $i $result $acc]
+            (if (>= $cur (length $items)) $result
+              (let [[$name (extract-name (get $items $cur))]]
+                (recur (+ $cur 1)
+                       (if (= $cur 0) $name (str $result "," $name)))))))]
 
 ;; ═══════ stdlib native → JS 매핑 ═══════
 
