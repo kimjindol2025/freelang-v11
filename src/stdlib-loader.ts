@@ -43,6 +43,7 @@ import { createMarkdownModule } from "./stdlib-markdown";  // Q2-1: Markdown (Co
 import { createFeedModule } from "./stdlib-feed";          // Q2-2/3/4: RSS/Atom/sitemap/robots/JSON-LD
 import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관련글/검색인덱스/페이지네이션
 import { createCloudModule } from "./stdlib-cloud";        // Phase 58: Cloud (AWS/GCP/Azure)
+import { createMatrixModule } from "./stdlib-matrix";      // Phase 99: Matrix/Vector + Parallel for GPT training
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -111,4 +112,5 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createFeedModule());       // Q2-2/3/4: rss_feed, atom_feed, sitemap_xml, robots_txt, jsonld_article/breadcrumb/organization
   interp.registerModule(createBlogModule());       // Q2-5: blog_all_tags, blog_posts_by_tag, blog_tag_counts, blog_related, blog_search_index, blog_search, blog_posts_sorted, blog_paginate
   interp.registerModule(createCloudModule());      // Phase 58: aws-s3-*, aws-lambda-*, gcp-run-*, azure-function-*
+  interp.registerModule(createMatrixModule());     // Phase 99: matrix_mul, vector_dot, vector_add, vector_scale, parallel_map for GPT
 }
