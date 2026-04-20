@@ -82,8 +82,8 @@
 ;; 25 Pattern matching
 ;; ──────────────────────────────────────
 
-[FUNC make-pattern-match :params [$subject $cases $line]
-  :body {:kind "pattern-match" :subject $subject :cases $cases :line $line}]
+[FUNC make-pattern-match :params [$value $cases $line]
+  :body {:kind "pattern-match" :value $value :cases $cases :line $line}]
 
 [FUNC make-match-case :params [$pattern $guard $body $line]
   :body {:kind "match-case" :pattern $pattern :guard $guard :body $body :line $line}]
