@@ -1,0 +1,24 @@
+(do
+  (set-meta! {:title "404 · 페이지를 찾을 수 없습니다 — FreeLang v11"
+              :description "요청하신 경로에 해당하는 페이지가 없습니다."})
+  "<section style=\"text-align:center; padding: 40px 0;\">
+    <h1 style=\"font-size: 72px; margin: 0 0 8px; color: var(--accent);\">404</h1>
+    <p class=\"lede\">요청하신 페이지를 찾을 수 없습니다.</p>
+    <div class=\"cta-row\" style=\"justify-content:center;\">
+      <a href=\"/\" class=\"btn btn-primary\">홈으로</a>
+      <a href=\"/examples\" class=\"btn btn-ghost\">예제 보기</a>
+      <a href=\"/docs\" class=\"btn btn-ghost\">문법 가이드</a>
+    </div>
+  </section>
+  <section>
+    <h2>혹시 이걸 찾으셨나요?</h2>
+    <ul>
+      <li><a href=\"/\">/ — 랜딩 페이지</a></li>
+      <li><a href=\"/examples\">/examples — 예제 갤러리</a></li>
+      <li><a href=\"/examples/hello\">/examples/hello</a></li>
+      <li><a href=\"/examples/fib\">/examples/fib</a></li>
+      <li><a href=\"/playground\">/playground</a></li>
+      <li><a href=\"/docs\">/docs</a></li>
+      <li><a href=\"/claude\">/claude</a></li>
+    </ul>
+  </section>")

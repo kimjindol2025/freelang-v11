@@ -410,7 +410,37 @@ export class WebServer {
       return;
     }
 
-    // 404
+    // 404 — app/not-found.fl 이 등록돼 있으면 그것을 실행해 body 로 사용
+    const notFoundFile = this.router.getNotFoundHandler();
+    if (notFoundFile && this.executor && this.renderer) {
+      try {
+        const result = await this.executor.executePage(notFoundFile, {
+          req: { method: req.method, path: urlPath },
+        });
+        if (result.success && typeof result.body === "string") {
+          let finalBody = result.body;
+          const rootLayouts = this.router.getLayoutsForRoute("/");
+          if (rootLayouts && rootLayouts.length > 0) {
+            try {
+              finalBody = await this.renderer.renderWithLayout(finalBody, rootLayouts);
+            } catch {
+              // layout 실패 시 body 단독 사용
+            }
+          }
+          if (result.meta) {
+            finalBody = this.injectMetaIntoHead(finalBody, result.meta);
+          }
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.writeHead(404);
+          res.end(finalBody);
+          return;
+        }
+      } catch {
+        // not-found.fl 실행 실패 → 기본 폴백
+      }
+    }
+
+    // 404 기본 폴백 (not-found.fl 없음 또는 실행 실패)
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.writeHead(404);
     res.end(

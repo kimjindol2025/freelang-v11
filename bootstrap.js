@@ -30768,6 +30768,32 @@ var WebServer = class {
       res.end(generateIndexHTML());
       return;
     }
+    const notFoundFile = this.router.getNotFoundHandler();
+    if (notFoundFile && this.executor && this.renderer) {
+      try {
+        const result = await this.executor.executePage(notFoundFile, {
+          req: { method: req.method, path: urlPath }
+        });
+        if (result.success && typeof result.body === "string") {
+          let finalBody = result.body;
+          const rootLayouts = this.router.getLayoutsForRoute("/");
+          if (rootLayouts && rootLayouts.length > 0) {
+            try {
+              finalBody = await this.renderer.renderWithLayout(finalBody, rootLayouts);
+            } catch {
+            }
+          }
+          if (result.meta) {
+            finalBody = this.injectMetaIntoHead(finalBody, result.meta);
+          }
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.writeHead(404);
+          res.end(finalBody);
+          return;
+        }
+      } catch {
+      }
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.writeHead(404);
     res.end(
