@@ -1,121 +1,60 @@
 (do
-  (set-meta! {:title "FreeLang v11 홈페이지" :description "v11 프론트엔드 완성"})
-  "<html>
-  <head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-    <title>FreeLang v11</title>
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-      .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-      h1 { color: #333; margin-bottom: 10px; }
-      .subtitle { color: #666; margin-bottom: 30px; font-size: 18px; }
-      .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 30px 0; }
-      .stat { background: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 4px solid #0066cc; }
-      .stat-number { font-size: 24px; font-weight: bold; color: #0066cc; }
-      .stat-label { color: #666; margin-top: 5px; font-size: 14px; }
-      .features { margin-top: 30px; }
-      .feature { display: flex; align-items: flex-start; margin-bottom: 15px; }
-      .feature-icon { font-size: 20px; margin-right: 10px; }
-      .feature-text { flex: 1; }
-      .feature-text strong { color: #333; }
-      .feature-text p { margin: 5px 0 0 0; color: #666; font-size: 14px; }
-      .info { background: #e3f2fd; padding: 15px; border-radius: 6px; margin-top: 30px; color: #1565c0; }
-      .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #999; font-size: 12px; }
-    </style>
-  </head>
-  <body>
-    <div class=\"container\">
-      <h1>🚀 FreeLang v11</h1>
-      <p class=\"subtitle\">AI-Native 풀스택 언어 · 의존성 제로 · 즉시 배포</p>
+  (set-meta! {:title "FreeLang v11 — AI-Native 풀스택 언어"
+              :description "Lisp 계열 S-식 문법, 자가 호스팅 fixed-point 달성, Node.js 단독 실행"})
+  "<section>
+    <h1>FreeLang v11 <span class=\"tag\">self-hosted</span></h1>
+    <p class=\"lede\">AI-Native 풀스택 언어 — Lisp 계열 S-식 문법, 자가 호스팅 fixed-point 달성, 외부 npm 패키지 0개 (Node.js 단독 실행).</p>
+    <div class=\"cta-row\">
+      <a href=\"/examples\" class=\"btn btn-primary\">예제 둘러보기</a>
+      <a href=\"/playground\" class=\"btn btn-ghost\">Playground 열기</a>
+      <a href=\"/docs\" class=\"btn btn-ghost\">문법 가이드</a>
+    </div>
+  </section>
 
-      <div class=\"stats\">
-        <div class=\"stat\">
-          <div class=\"stat-number\">637/637</div>
-          <div class=\"stat-label\">테스트 PASS</div>
-        </div>
-        <div class=\"stat\">
-          <div class=\"stat-number\">95%+</div>
-          <div class=\"stat-label\">Next.js 호환성</div>
-        </div>
-        <div class=\"stat\">
-          <div class=\"stat-number\">0</div>
-          <div class=\"stat-label\">의존성</div>
-        </div>
-        <div class=\"stat\">
-          <div class=\"stat-number\">1.1MB</div>
-          <div class=\"stat-label\">번들 크기</div>
-        </div>
+  <section>
+    <h2>한눈에 보기</h2>
+    <pre><code>(println \"Hello, FreeLang!\")
+(println (+ 1 2 3))
+
+[FUNC greet :params [$name]
+  :body (str \"안녕, \" $name \"!\")]
+
+(println (greet \"kim\"))</code></pre>
+  </section>
+
+  <section>
+    <h2>주요 특징</h2>
+    <div class=\"card-grid\">
+      <div class=\"card\">
+        <h3>자가 호스팅</h3>
+        <p>FreeLang으로 작성된 컴파일러가 자기 자신을 컴파일합니다. stage1 / stage2 / stage3 SHA256 완전 일치(fixed-point) 달성.</p>
       </div>
-
-      <div class=\"features\">
-        <h3>✨ Q3/Q4 완성 기능</h3>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">📝</div>
-          <div class=\"feature-text\">
-            <strong>Dynamic Metadata</strong>
-            <p>set-meta! 함수로 페이지 렌더링 중 메타데이터 동적 등록</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">🌐</div>
-          <div class=\"feature-text\">
-            <strong>Server-Side Data Fetching</strong>
-            <p>server-fetch로 외부 API/DB 호출 후 렌더링</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">🔒</div>
-          <div class=\"feature-text\">
-            <strong>Middleware</strong>
-            <p>middleware.fl로 요청 파이프라인 인증/검증</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">⚠️</div>
-          <div class=\"feature-text\">
-            <strong>Error Boundary</strong>
-            <p>error.fl/not-found.fl로 런타임 에러 처리</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">📦</div>
-          <div class=\"feature-text\">
-            <strong>getStaticPaths</strong>
-            <p>generate-static-params.fl로 동적 라우트 SSG</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">🖼️</div>
-          <div class=\"feature-text\">
-            <strong>Image Optimization</strong>
-            <p>ImageOptimizer로 WebP/AVIF 자동 변환</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">⚡</div>
-          <div class=\"feature-text\">
-            <strong>On-Demand ISR</strong>
-            <p>revalidateTag로 태그 기반 캐시 무효화</p>
-          </div>
-        </div>
-        <div class=\"feature\">
-          <div class=\"feature-icon\">⏱️</div>
-          <div class=\"feature-text\">
-            <strong>Cache-Control & ETag</strong>
-            <p>렌더링 모드별 캐싱 전략 + 304 Not Modified</p>
-          </div>
-        </div>
+      <div class=\"card\">
+        <h3>외부 의존성 0개</h3>
+        <p>npm 외부 패키지 없음. Node.js 표준 라이브러리(fs, http, crypto 등)만 사용. 브라우저/WASM 타겟 로드맵 진행 중.</p>
       </div>
-
-      <div class=\"info\">
-        💡 <strong>이 페이지는 v11으로 만들어졌습니다!</strong><br>
-        bootstrap.js를 사용한 완전 자립형 서버 실행 · npm 패키지 0개 · Node.js v25만 필요
+      <div class=\"card\">
+        <h3>Next.js 스타일 SSR</h3>
+        <p>파일 기반 라우팅(<code>app/&lt;route&gt;/page.fl</code>), 공유 레이아웃, 동적 라우트, SSG 정적 파라미터 지원.</p>
       </div>
-
-      <div class=\"footer\">
-        FreeLang v11 · 2026 · <a href=\"#\" style=\"color: #999;\">Gogs Repository</a>
+      <div class=\"card\">
+        <h3>Lisp 계열 S-식</h3>
+        <p>균일한 문법, 2-pass 함수 블록(<code>[FUNC ...]</code>)으로 상호재귀 허용, 패턴 매칭과 S-식 대칭성 유지.</p>
       </div>
     </div>
-  </body>
-  </html>")
+  </section>
+
+  <section>
+    <h2>현재 상태 (실측)</h2>
+    <dl class=\"kv\">
+      <dt>Tests</dt><dd><strong>643 / 643 PASS</strong> (기존 637 + 자가 호스팅 회귀 6)</dd>
+      <dt>Self-host</dt><dd>stage1 == stage2 == stage3 (SHA256 <code>6b81fef4…12f4a1</code>)</dd>
+      <dt>bootstrap.js</dt><dd>약 1.1 MB · Node.js 표준 모듈 11개 의존</dd>
+      <dt>런타임</dt><dd>Node.js v20+ (WASM 백엔드는 로드맵)</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>더 보기</h2>
+    <p>소스 저장소: <a href=\"https://gogs.dclub.kr/kim/freelang-v11\">gogs.dclub.kr/kim/freelang-v11</a></p>
+  </section>")
