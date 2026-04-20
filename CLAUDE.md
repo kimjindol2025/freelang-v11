@@ -134,17 +134,24 @@ Time:        21.097 s
   - TS 원본 재빌드 시 bootstrap.js 산출물 동일성 검증 (자동화)
   - Await/Throw 필드명 불일치 (`:argument` vs `:expr`) — async 코드 경로에서만 발현
 
-**2026-04-20 검증** (Tier 1+2 self-host corpus verification):
-- 스크립트: `scripts/verify-self-host.sh` (신규) — bootstrap 경유 compile vs stage1 경유 compile 의 실행 결과를 각 FL 파일에 대해 비교
-- 결과: **PASS 84 / FAIL 0 / SKIP 7** (known flaky, advisory)
-- 내역:
-  - Tier 1 실행형(examples/hello, factorial + self/bench/hello, tiny, fib30, test-time): **6/6 실행 결과 완전 동일**
-  - Tier 1 정의형(self/lexer, parser, ast, codegen, all): **5/5 산출 바이트 완전 동일**
-  - Tier 2 stdlib (`self/stdlib/*.fl`): **34/34 컴파일 성공**
-  - Tier 2 tests (`self/tests/*.fl`): **23/30 실행 일치, 7 known flaky**
-- Known flaky 7개 (`test-codegen-*`, `test-parser-full-debug`, `test-parser-lex-only`): 해당 테스트들이 **컴파일러 내부 표현을 출력하는 구조**라 bootstrap 쪽 결과와 stage1 쪽 결과가 버전 특성상 다름. self-hosting 결함이 아니라 **테스트가 특정 컴파일러 버전에 tight-coupled** 된 것. 실제 프로그램 동작에는 영향 없음 (stdlib 34/34 PASS 가 더 강력한 실증)
-- 부가 발견 (후속 조사 대상): `self/stdlib/{heap, resource, search, stack, tree}.fl` — bootstrap 컴파일 산출이 4,713 bytes(=prelude 만)로 고정, stage1 산출은 6000~6500 bytes 정상. **stage1 쪽이 오히려 더 완전하게 컴파일**함을 시사. 치명적이진 않으나 bootstrap codegen 미완성 가능성
-- 종합: "**모든 중요한 FL 프로그램을 self-compiled compiler 로 정상 동작시킬 수 있다**" 기준 실용 수준 도달 (컴파일러 핵심 · stdlib 전량 · 예제/벤치 · 실전 app 모두 커버)
+**2026-04-20 검증** (Tier 1+2 self-host corpus verification — 1차, 낙관적 오인):
+- 스크립트: `scripts/verify-self-host.sh` (신규) — bootstrap 경유 compile vs stage1 경유 compile 비교
+- 1차 보고: **PASS 84 / FAIL 0 / SKIP 7** (known flaky, advisory)
+- 그러나 **검증 로직 결함** 발견 (아래 정정):
+
+**2026-04-20 정정 검증** (스크립트 로직 교정 후):
+- 1차 보고 거짓 PASS 원인: `check_compile_only` 가 "양쪽 산출이 non-zero 크기" 만 확인. bootstrap 실행이 `Parsed: 0 nodes` 상황에서도 기본 prelude(4,713 bytes)는 나오므로 false-positive 성립
+- 스크립트 교정: 컴파일 로그에서 `Parsed: N nodes` 추출, `bootstrap Parsed=0 && stage1 Parsed>0` → 명시적 FAIL 처리. 기존 known-issue 들은 `KNOWN_BOOTSTRAP_GAP` 리스트로 이관해 SKIP.
+- 교정된 결과: **PASS 76 / FAIL 0 / SKIP 15**
+  - PASS 76: Tier 1 전원 + 정상 동작 stdlib 26개 + tests 24개 + bench/examples
+  - SKIP 15: known-issue (8 stdlib + 2 tests + 5 compiler-coupled tests)
+- SKIP 내역:
+  - **Bootstrap parser gap 10개** — `self/all.fl` 내 FL-written parser 가 특정 구문(try/catch, cond flat-pair 등) 미지원. `assert, async, build, heap, resource, search, stack, tree, test-parser-full-debug, test-parser-lex-only` 파일이 `Parsed=0`로 실패
+  - **Compiler-coupled tests 5개** — `test-codegen-builtins/ffi/fn/match/sf` — 테스트가 컴파일러 내부 출력을 비교하는 구조라 버전 차이 자연스러움
+- 부가 발견 유지: `self/stdlib/{heap, resource, search, stack, tree}.fl` 컴파일 격차 = bootstrap parser gap 의 하위 증상
+- **진단**: `bootstrap.js` 내장 lex/parse 는 FL 전체 문법을 지원하지만, `self/all.fl` 내 FL 로 작성된 self-parser 가 일부 구문 미구현. **stage1(self-compiled)이 오히려 bootstrap 경로보다 robust** 한 상황 — self-hosting 2단계 진입 신호
+- **핵심 원칙**: 언어 정의는 단 하나. bootstrap parser 와 self-parser 가 지원 구문 집합이 다른 상태는 용납 불가 (`feedback_language_unity_self_sovereignty.md`)
+- **후속 Phase A** (별도 세션): `self/all.fl` 내 parser 를 확장해 try/catch · cond flat-pair 등 지원 → 양 파서 문법 일원화 → SKIP 목록 제로화 목표
 
 ---
 

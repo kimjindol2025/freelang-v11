@@ -51,8 +51,6 @@ KNOWN_FLAKY=(
   "self/tests/test-codegen-fn.fl"
   "self/tests/test-codegen-match.fl"
   "self/tests/test-codegen-sf.fl"
-  "self/tests/test-parser-full-debug.fl"
-  "self/tests/test-parser-lex-only.fl"
 )
 is_known_flaky() {
   local f="$1"
@@ -60,6 +58,37 @@ is_known_flaky() {
     [ "$f" = "$k" ] && return 0
   done
   return 1
+}
+
+# Bootstrap 내장 FL-parser 가 지원하지 못해 Parsed=0 반환하는 파일.
+# (next Phase: self-parser 확장으로 근본 해결 예정. 그때까지 GAP 표시)
+# 2026-04-20: try/catch · cond flat-pair 등 미지원 구문 포함
+KNOWN_BOOTSTRAP_GAP=(
+  "self/stdlib/assert.fl"
+  "self/stdlib/async.fl"
+  "self/stdlib/build.fl"
+  "self/stdlib/heap.fl"
+  "self/stdlib/resource.fl"
+  "self/stdlib/search.fl"
+  "self/stdlib/stack.fl"
+  "self/stdlib/tree.fl"
+  "self/tests/test-parser-full-debug.fl"
+  "self/tests/test-parser-lex-only.fl"
+)
+is_known_gap() {
+  local f="$1"
+  for k in "${KNOWN_BOOTSTRAP_GAP[@]}"; do
+    [ "$f" = "$k" ] && return 0
+  done
+  return 1
+}
+
+# 컴파일 로그에서 Parsed 노드 수 추출 (없으면 -1)
+parsed_count() {
+  local log="$1"
+  local n
+  n=$(grep -oE "Parsed:\s*[0-9]+\s*nodes" "$log" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+  echo "${n:--1}"
 }
 
 bump_fail() {
@@ -80,19 +109,37 @@ check_run() {
   local s1="$WORK/s1_${tag}.js"
   local obs="$WORK/out_bs_${tag}"
   local os1="$WORK/out_s1_${tag}"
+  local bslog="$WORK/bs_${tag}.log"
+  local s1log="$WORK/s1_${tag}.log"
 
-  # bootstrap 경유 compile
-  if ! node --stack-size=8000 bootstrap.js run self/all.fl "$f" "$bs" > /dev/null 2>&1; then
+  # bootstrap 경유 compile (로그 캡처)
+  if ! node --stack-size=8000 bootstrap.js run self/all.fl "$f" "$bs" > "$bslog" 2>&1; then
     echo "❌ [RUN] $f — bootstrap compile 실패"
     bump_fail "$f [bs-compile]"
     return
   fi
   # stage1 경유 compile
-  if ! node --stack-size=8000 "$STAGE1" "$f" "$s1" > /dev/null 2>&1; then
+  if ! node --stack-size=8000 "$STAGE1" "$f" "$s1" > "$s1log" 2>&1; then
     echo "❌ [RUN] $f — stage1 compile 실패"
     bump_fail "$f [s1-compile]"
     return
   fi
+
+  # 파서 Parsed 노드 수 격차 감지 (Parsed=0 while stage1>0 → bootstrap parser gap)
+  local bp sp
+  bp=$(parsed_count "$bslog")
+  sp=$(parsed_count "$s1log")
+  if [ "$bp" = "0" ] && [ "$sp" != "0" ] && [ "$sp" != "-1" ]; then
+    if is_known_gap "$f"; then
+      echo "⚠️  [RUN] $f — KNOWN bootstrap-parser gap (bs Parsed=0 / s1 Parsed=$sp)"
+      SKIP=$((SKIP+1))
+      return
+    fi
+    echo "❌ [RUN] $f — bootstrap parser gap (bs Parsed=0 / s1 Parsed=$sp)"
+    bump_fail "$f [bs-parsed-zero]"
+    return
+  fi
+
   # 실행 (3초 타임아웃)
   timeout 3 node "$bs" > "$obs" 2>&1
   local rc_b=$?
@@ -108,7 +155,7 @@ check_run() {
     bump_fail "$f [run-diff]"
     return
   fi
-  echo "✅ [RUN] $f ($(wc -c < "$obs") bytes output)"
+  echo "✅ [RUN] $f (bs=$bp / s1=$sp nodes, $(wc -c < "$obs") bytes output)"
   PASS=$((PASS+1))
 }
 
@@ -117,17 +164,43 @@ check_compile_only() {
   local tag="$(safe "$f")"
   local bs="$WORK/bs_${tag}.js"
   local s1="$WORK/s1_${tag}.js"
-  if ! node --stack-size=8000 bootstrap.js run self/all.fl "$f" "$bs" > /dev/null 2>&1; then
-    echo "⚠️  [DEFS] $f — bootstrap 조차 compile 실패 (스킵)"
-    SKIP=$((SKIP+1)); return
+  local bslog="$WORK/bs_${tag}.log"
+  local s1log="$WORK/s1_${tag}.log"
+  if ! node --stack-size=8000 bootstrap.js run self/all.fl "$f" "$bs" > "$bslog" 2>&1; then
+    echo "❌ [DEFS] $f — bootstrap compile 실패"
+    bump_fail "$f [bs-compile-only]"
+    return
   fi
-  if ! node --stack-size=8000 "$STAGE1" "$f" "$s1" > /dev/null 2>&1; then
+  if ! node --stack-size=8000 "$STAGE1" "$f" "$s1" > "$s1log" 2>&1; then
     echo "❌ [DEFS] $f — stage1 compile 실패"
     bump_fail "$f [s1-compile-only]"
     return
   fi
-  # 크기 차이 허용, 존재만 확인
-  echo "✅ [DEFS] $f (bs $(wc -c < "$bs") / s1 $(wc -c < "$s1") bytes)"
+
+  # 파서 Parsed 노드 수 격차 감지
+  local bp sp
+  bp=$(parsed_count "$bslog")
+  sp=$(parsed_count "$s1log")
+  if [ "$bp" = "0" ] && [ "$sp" != "0" ] && [ "$sp" != "-1" ]; then
+    if is_known_gap "$f"; then
+      echo "⚠️  [DEFS] $f — KNOWN bootstrap-parser gap (bs Parsed=0 / s1 Parsed=$sp)"
+      SKIP=$((SKIP+1))
+      return
+    fi
+    echo "❌ [DEFS] $f — bootstrap parser gap (bs Parsed=0 / s1 Parsed=$sp)"
+    bump_fail "$f [bs-parsed-zero]"
+    return
+  fi
+
+  # 양쪽 Parsed 수 일치 or 근접 확인 (±2 허용)
+  if [ "$bp" != "-1" ] && [ "$sp" != "-1" ] && [ "$bp" -ne "$sp" ]; then
+    local diff_n=$(( bp > sp ? bp - sp : sp - bp ))
+    if [ "$diff_n" -gt 2 ]; then
+      echo "⚠️  [DEFS] $f — Parsed 노드 수 차이 bs=$bp / s1=$sp (계속 진행, advisory)"
+    fi
+  fi
+
+  echo "✅ [DEFS] $f (bs=$bp / s1=$sp nodes, bs $(wc -c < "$bs") / s1 $(wc -c < "$s1") bytes)"
   PASS=$((PASS+1))
 }
 
@@ -172,7 +245,7 @@ echo ""
 echo "=== 결과 ==="
 echo "PASS: $PASS"
 echo "FAIL: $FAIL   (Tier1: $T1_FAIL, Tier2: $T2_FAIL)"
-echo "SKIP: $SKIP   (known flaky 포함)"
+echo "SKIP: $SKIP   (known flaky + known bootstrap-parser gap)"
 if [ "$FAIL" -gt 0 ]; then
   echo ""
   echo "실패 목록:"
@@ -187,5 +260,10 @@ fi
 if [ "$T2_FAIL" -gt 0 ]; then
   echo ""
   echo "⚠️  Tier 2 일부 실패 (advisory; exit 0) — 조사 권장"
+fi
+if [ "$SKIP" -gt 0 ]; then
+  echo ""
+  echo "ℹ️  SKIP 항목은 known-issue 목록에서 관리 중. 언어 정의 단일화(A-phase)"
+  echo "   완료 후 이 목록이 비면 self-hosting 문법 일원화 완결."
 fi
 exit 0
