@@ -153,6 +153,25 @@ Time:        21.097 s
 - **핵심 원칙**: 언어 정의는 단 하나. bootstrap parser 와 self-parser 가 지원 구문 집합이 다른 상태는 용납 불가 (`feedback_language_unity_self_sovereignty.md`)
 - **후속 Phase A** (별도 세션): `self/all.fl` 내 parser 를 확장해 try/catch · cond flat-pair 등 지원 → 양 파서 문법 일원화 → SKIP 목록 제로화 목표
 
+**2026-04-20 투명 정정** (Phase A 진단 재조사 — 추가 뒤집힘):
+- 이전 진단(`self/all.fl` 내 self-parser 가 try/catch 미지원)은 **부정확**.
+- 실측 (stage1.js 를 라이브러리로 load 후 `lex`/`parse` 직접 호출):
+  - `parse(lex("(try 1 2)"))` → 정상 1 node (sexpr, op=try)
+  - `parse(lex("(throw 1)"))` → 정상 1 node
+  - `parse(lex("(catch 1 2)"))` → 정상 1 node
+- 즉 **FL-written parser 자체는 try/catch/cond-flat-pair 를 이미 처리**. stage1 이 정상 작동하는 이유.
+- 진짜 원인: `bootstrap.js run self/all.fl X Y` 호출 경로에서 bootstrap TS interpreter 가 FL 파서 코드를 AST 해석으로 실행할 때 **특정 경로에서 AST 0 node 반환** (재현 가능하나 정확한 지점은 추가 추적 필요)
+- 10개 문제 파일을 **stage1 로 직접 컴파일** 시도 결과:
+  - 8/8 stdlib + 2/2 tests = **10개 모두 파싱 성공** (Parsed 7~40 노드)
+  - 이 중 **7/8 stdlib 산출 JS 구문 유효** (`node --check` 통과)
+  - **async.fl 만 stage1 codegen 버그 2건** — `nil` 을 `null` 로 번역 안 함 + rest-args `[& $args]` 구문 처리 미완
+- 결론: "self-parser 구문 확장"이 아니라 **"bootstrap interp 의존 제거 + 소수 codegen 버그 수정"**이 진짜 Phase A 본질
+- **Phase A 전략 수정 (다음 세션)**:
+  - 우선순위 1: `verify-self-host.sh` 의 canonical path 를 **`bootstrap.js run self/all.fl ...` → stage1.js 직접 호출로 전환**. bootstrap 은 stage1 1회 생성 전용으로 축소
+  - 우선순위 2: stage1 codegen 의 `nil` · rest-args 처리 버그 수정 (async.fl 해금)
+  - 우선순위 3: verify 재실행, SKIP 목록 축소 확인
+- `feedback_phase_a_direction.md` 방향과 일치: **bootstrap 폐기 경로가 사실상 이미 가능**한 것으로 확인됨. self-parser 강화는 불필요, bootstrap 축소가 올바른 경로
+
 ---
 
 ## Canonical AST/Token Schema (2026-04-20 확정)
