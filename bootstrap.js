@@ -29931,6 +29931,8 @@ var FLExecutor = class {
       ctx.__method = context.method || "GET";
       ctx.__headers = context.headers || {};
       ctx.__query = context.query || {};
+      this.interpreter.context.variables.set("$__params", context.params || {});
+      this.interpreter.context.variables.set("$__query", context.query || {});
       ctx.__page_meta = {};
       ctx.__db_users = db.users;
       ctx.__db_projects = db.projects;

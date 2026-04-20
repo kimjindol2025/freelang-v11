@@ -140,6 +140,11 @@ export class FLExecutor {
       ctx.__headers = context.headers || {};
       ctx.__query = context.query || {};
 
+      // page.fl 내부에서 $__params / $__query 로 직접 접근 가능하게 FL 변수 스코프에도 주입
+      // (executeRoute 경로와 동일 관용을 dynamic 라우트 page.fl 에도 적용)
+      this.interpreter.context.variables.set("$__params", context.params || {});
+      this.interpreter.context.variables.set("$__query", context.query || {});
+
       // W1: 동적 메타데이터 저장소 초기화
       ctx.__page_meta = {};
 
