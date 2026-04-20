@@ -18413,6 +18413,19 @@ function createDataModule() {
       const o = typeof obj === "string" ? JSON.parse(obj) : obj;
       return Object.values(o);
     },
+    // map-entries m -> [[k,v], ...]  (JS Map 또는 plain object 모두 열거 가능)
+    // self-hosting 경로에서 bootstrap parser가 생성한 JS Map 형태의 AST fields를
+    // FL 코드가 순회할 수 있도록 노출하는 최소 introspection primitive.
+    "map-entries": (m) => {
+      if (m instanceof Map) return [...m.entries()].map(([k, v]) => [k, v]);
+      if (m && typeof m === "object" && !Array.isArray(m)) return Object.entries(m).map(([k, v]) => [k, v]);
+      return [];
+    },
+    "map_entries": (m) => {
+      if (m instanceof Map) return [...m.entries()].map(([k, v]) => [k, v]);
+      if (m && typeof m === "object" && !Array.isArray(m)) return Object.entries(m).map(([k, v]) => [k, v]);
+      return [];
+    },
     // json_parse str -> object (parse JSON string to object)
     "json_parse": (str) => {
       try {

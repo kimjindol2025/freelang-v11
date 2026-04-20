@@ -45,8 +45,9 @@ Time:        21.097 s
 |------|------|------|
 | FL 코드 → JS 변환 | ✅ 가능 | 4개 파일 컴파일 성공 |
 | 생성된 JS 실행 | ✅ 가능 | 모든 출력 일치 |
-| codegen.fl 자신 컴파일 | ❌ 불가능 | Stack overflow (line 54) |
-| Fixed-point 안정성 | ❌ 미검증 | 자가 컴파일 실패로 불가 |
+| codegen.fl 자신 컴파일 (stage1) | ✅ 가능 | `--stack-size=8000`로 `self/all.fl` → 45KB JS 산출 (2026-04-20) |
+| stage2 (self-compiled로 재컴파일) | ⚠️ 부분 | 산출은 되나 Lexed/Parsed 비정상 (번역 버그 잔존) |
+| Fixed-point 안정성 | ❌ 미달성 | stage2→stage3 시도 실패 |
 
 ### 웹 서버 (프로덕션)
 
@@ -76,7 +77,7 @@ Time:        21.097 s
 
 - [ ] 성능 벤치마크 (응답 시간 측정 안 함)
 - [ ] ISR/SSG 렌더링 (SSR만 확인)
-- [ ] 완전 자가 컴파일 (실패함 - Stack overflow)
+- [ ] 완전 자가 컴파일 fixed-point (stage1 성공, stage2+ 번역 버그 잔존)
 - [ ] 의존성 제로 (Node.js 여전히 필수)
 - [ ] 프로덕션 배포 프로세스
 
@@ -109,4 +110,20 @@ Time:        21.097 s
 **2026-04-18 검증**:
 - 과거 주장: "Phase 15 완성"
 - 실제: 부분 기능 작동, 완전성 미검증
+
+**2026-04-20 검증** (Phase 1 self-hosting 재조사):
+- 과거 주장: "codegen.fl 자신 컴파일 불가능 (Stack overflow line 54)"
+- 실제: Stack overflow는 **본질 원인이 아님**. `node --stack-size=8000` 증설 시 `self/all.fl` 자가 컴파일 자체는 가능.
+  진짜 블로커는 **bootstrap parser가 map-literal AST의 fields를 JS Map으로 저장하는데 FL 레벨에서 이를 열거할 introspection primitive가 없었던 것**.
+  모든 map 리터럴이 자가 컴파일 산출물에서 빈 객체 `({})` 로 번역되어 lex/parse 전체가 오염됨.
+- 조치: `data` stdlib 모듈에 `map-entries`/`map_entries` primitive 추가 (bootstrap.js + src/stdlib-data.ts 미러).
+  `self/all.fl`의 `cg-map-entries` bootstrap 분기 1단어 치환.
+- 결과:
+  - stage1 자가 컴파일: ✅ 45KB JS 산출 (이전 25KB에서 확장 — map 실제 값 포함)
+  - 회귀: Tests **637/637 PASS**
+  - stage2→stage3 fixed-point: ❌ 추가 번역 버그 잔존 (다음 작업 단위)
+- 후속 과제:
+  - hello.fl 재컴파일 시 Lexed=4 (비정상) 최소 재현
+  - stage2에서 Parsed=10635 (정상 156 대비) 팽창 원인 추적
+  - 재빌드 시 bootstrap.js 산출물 동일성 검증 (TS 원본 패치 지속성)
 

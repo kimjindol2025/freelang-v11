@@ -518,7 +518,7 @@
   :body (let [[$items-val (get $fields "items")]]
           (if (array? $items-val)
             (cg-map-flat-loop $items-val 0 "")
-            (cg-map-loop (list) 0 ""))) ]
+            (cg-map-loop (map-entries $fields) 0 ""))) ]
 
 [FUNC cg-map-loop-inner :params [$entries $i $acc $e]
   :body (let [[$k (get $e 0)]

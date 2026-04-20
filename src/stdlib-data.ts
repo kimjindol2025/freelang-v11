@@ -72,6 +72,20 @@ export function createDataModule() {
       return Object.values(o);
     },
 
+    // map-entries m -> [[k,v],...] (introspection primitive — JS Map/plain object 모두 열거)
+    // self-hosting 경로에서 bootstrap parser가 생성한 JS Map 형태의 AST fields를
+    // FL 코드가 순회할 수 있도록 노출. 기존 AST 구조 변경 없음, 관찰 인터페이스 추가.
+    "map-entries": (m: any): any[] => {
+      if (m instanceof Map) return [...m.entries()].map(([k, v]) => [k, v]);
+      if (m && typeof m === "object" && !Array.isArray(m)) return Object.entries(m).map(([k, v]) => [k, v]);
+      return [];
+    },
+    "map_entries": (m: any): any[] => {
+      if (m instanceof Map) return [...m.entries()].map(([k, v]) => [k, v]);
+      if (m && typeof m === "object" && !Array.isArray(m)) return Object.entries(m).map(([k, v]) => [k, v]);
+      return [];
+    },
+
     // json_parse str -> object (parse JSON string to object)
     "json_parse": (str: string): any => {
       try {
