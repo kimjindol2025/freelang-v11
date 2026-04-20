@@ -7,24 +7,27 @@
       (do
         (set-meta! {:title (str "404 · '" $slug "' 예제 없음 — FreeLang v11")
                     :description "요청한 slug에 해당하는 예제를 찾을 수 없습니다."})
-        (str "<section style=\"text-align:center; padding: 40px 0;\">"
-             "<h1 style=\"font-size: 56px; margin: 0 0 8px; color: var(--accent);\">404</h1>"
-             "<p class=\"lede\">예제 '" $slug "' 를 찾을 수 없습니다.</p>"
-             "<div class=\"cta-row\" style=\"justify-content:center;\">"
-             "<a href=\"/examples\" class=\"btn btn-primary\">예제 목록으로</a>"
-             "<a href=\"/\" class=\"btn btn-ghost\">홈</a>"
-             "</div>"
-             "</section>"
-             "<section>"
-             "<h2>등록된 예제</h2>"
-             "<ul>"
-             "<li><a href=\"/examples/hello\">hello</a></li>"
-             "<li><a href=\"/examples/arithmetic\">arithmetic</a></li>"
-             "<li><a href=\"/examples/func\">func</a></li>"
-             "<li><a href=\"/examples/map-filter\">map-filter</a></li>"
-             "<li><a href=\"/examples/fib\">fib</a></li>"
-             "</ul>"
-             "</section>"))
+        {:__fl_response true
+         :status 404
+         :contentType "text/html; charset=utf-8"
+         :body (str "<section style=\"text-align:center; padding: 40px 0;\">"
+                    "<h1 style=\"font-size: 56px; margin: 0 0 8px; color: var(--accent);\">404</h1>"
+                    "<p class=\"lede\">예제 '" $slug "' 를 찾을 수 없습니다.</p>"
+                    "<div class=\"cta-row\" style=\"justify-content:center;\">"
+                    "<a href=\"/examples\" class=\"btn btn-primary\">예제 목록으로</a>"
+                    "<a href=\"/\" class=\"btn btn-ghost\">홈</a>"
+                    "</div>"
+                    "</section>"
+                    "<section>"
+                    "<h2>등록된 예제</h2>"
+                    "<ul>"
+                    "<li><a href=\"/examples/hello\">hello</a></li>"
+                    "<li><a href=\"/examples/arithmetic\">arithmetic</a></li>"
+                    "<li><a href=\"/examples/func\">func</a></li>"
+                    "<li><a href=\"/examples/map-filter\">map-filter</a></li>"
+                    "<li><a href=\"/examples/fib\">fib</a></li>"
+                    "</ul>"
+                    "</section>")})
       (do
         (set-meta! {:title (str "Example: " $slug " — FreeLang v11")
                     :description (str "FreeLang 예제 '" $slug "' 의 소스 코드와 실행 결과")})
