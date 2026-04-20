@@ -130,6 +130,30 @@
       vertical-align: middle;
       margin-left: 6px;
     }
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      nav.site-nav {
+        padding: 12px 16px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      nav.site-nav .brand { flex-basis: 100%; margin-right: 0; margin-bottom: 4px; }
+      nav.site-nav a { font-size: 13px; }
+      main.site-main { padding: 20px 16px 48px; }
+      h1 { font-size: 26px; }
+      h2 { font-size: 18px; }
+      .lede { font-size: 15px; }
+      .kv {
+        grid-template-columns: 1fr;
+        gap: 2px 0;
+      }
+      .kv dt { font-size: 12px; margin-top: 8px; }
+      .card-grid { gap: 10px; }
+      .card { padding: 16px; }
+      pre { font-size: 12px; padding: 12px 14px; }
+      .cta-row { gap: 8px; }
+      .btn { padding: 9px 14px; font-size: 13px; }
+    }
   </style>
 </head>
 <body>
