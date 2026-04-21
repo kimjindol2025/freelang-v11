@@ -40,19 +40,49 @@ fi
 echo "   stage1 $(wc -c < "$STAGE1") bytes"
 
 echo ""
-echo "=== fixed-point 확인 (stage1 → stage2 → stage3 SHA 일치) ==="
-STAGE2="$WORK/stage2.js"
-STAGE3="$WORK/stage3.js"
-node --stack-size=8000 "$STAGE1" self/all.fl "$STAGE2" > /dev/null 2>&1
-node --stack-size=8000 "$STAGE2" self/all.fl "$STAGE3" > /dev/null 2>&1
-SH1=$(sha256sum "$STAGE1" | cut -c1-16)
-SH2=$(sha256sum "$STAGE2" | cut -c1-16)
-SH3=$(sha256sum "$STAGE3" | cut -c1-16)
-echo "   stage1 sha: $SH1"
-echo "   stage2 sha: $SH2"
-echo "   stage3 sha: $SH3"
-if [ "$SH1" = "$SH2" ] && [ "$SH2" = "$SH3" ]; then
-  echo "   ✅ fixed-point OK"
+echo "=== 결정론 확인 (Phase C: 같은 입력 2회 compile → SHA 동일) ==="
+# Phase C 증명 강화: 같은 소스를 다른 시각·별도 프로세스로 compile 해도
+# bit-identical 결과가 나오는지 확인. 시간·랜덤·해시 의존성이 없음을 증명.
+STAGE1B="$WORK/stage1b.js"
+sleep 1
+node --stack-size=8000 bootstrap.js run self/all.fl self/all.fl "$STAGE1B" > /dev/null 2>&1
+DET_A=$(sha256sum "$STAGE1" | cut -c1-16)
+DET_B=$(sha256sum "$STAGE1B" | cut -c1-16)
+echo "   1st run sha: $DET_A"
+echo "   2nd run sha: $DET_B"
+if [ "$DET_A" = "$DET_B" ]; then
+  echo "   ✅ 결정론 OK (bit-identical across time & separate process)"
+else
+  echo "   ❌ 결정론 실패 — compile 이 non-deterministic"
+  exit 1
+fi
+
+echo ""
+echo "=== fixed-point 확인 (다단계 SHA 체인, Phase C: stage1~5) ==="
+# Phase C 증명 강화: stage depth 를 3 → 5 로 확장.
+# 기준선이 "우연히" 3 단계만 일치가 아니라, 반복 compile 에도 불변임을 증명.
+STAGE_FILES=("$STAGE1")
+PREV="$STAGE1"
+for i in 2 3 4 5; do
+  CUR="$WORK/stage${i}.js"
+  node --stack-size=8000 "$PREV" self/all.fl "$CUR" > /dev/null 2>&1
+  if [ ! -s "$CUR" ]; then
+    echo "   ❌ stage${i}.js 생성 실패"
+    exit 1
+  fi
+  STAGE_FILES+=("$CUR")
+  PREV="$CUR"
+done
+FP_SHA=$(sha256sum "$STAGE1" | cut -c1-16)
+FP_OK=1
+for i in 1 2 3 4 5; do
+  idx=$((i-1))
+  SH=$(sha256sum "${STAGE_FILES[$idx]}" | cut -c1-16)
+  echo "   stage${i} sha: $SH"
+  [ "$SH" != "$FP_SHA" ] && FP_OK=0
+done
+if [ "$FP_OK" = "1" ]; then
+  echo "   ✅ fixed-point OK (5 단계 전원 일치)"
 else
   echo "   ❌ fixed-point 실패 — self-hosting 기준선 깨짐"
   exit 1
