@@ -71,10 +71,8 @@ T1_FAIL=0
 T2_FAIL=0
 
 # stage1 codegen 에서 현재 처리 못하는 구문이 들어 있는 파일 (Phase A 후속 수정 대상)
-# 2026-04-21 기준: nil → null 미번역, rest-args [& $args] 미구현
-KNOWN_STAGE1_CODEGEN_GAP=(
-  "self/stdlib/async.fl"
-)
+# 비어 있으면 완전 통과. 추후 새 gap 발견 시 여기에 추가.
+KNOWN_STAGE1_CODEGEN_GAP=()
 is_known_codegen_gap() {
   for k in "${KNOWN_STAGE1_CODEGEN_GAP[@]}"; do
     [ "$1" = "$k" ] && return 0
