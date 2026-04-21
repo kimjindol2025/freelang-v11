@@ -194,12 +194,14 @@ check_run() {
     return
   fi
   # 실행 — test-codegen-* 는 stage1 context wrapper 경유
+  # 일반 RUN 도 timeout 3→10 초로 확장 (codegen 계열 테스트는 내부에서
+  # child node 프로세스 spawn 하므로 3 초 간혹 부족. 일관성·안정성 우선).
   local rc=0
   if needs_stage1_context "$f"; then
     run_with_stage1_context "$s1" "$out"
     rc=$?
   else
-    timeout 3 node "$s1" > "$out" 2>&1
+    timeout 10 node "$s1" > "$out" 2>&1
     rc=$?
   fi
   if [ "$rc" -ne 0 ]; then

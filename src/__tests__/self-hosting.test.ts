@@ -103,4 +103,53 @@ describe("FreeLang v11 self-hosting", () => {
     expect(out).toContain("y=2");
     expect(out).toContain("z=hi");
   });
+
+  // Phase C-1: 결정론 — 같은 소스를 2 회 compile 해도 bit-identical
+  test("determinism: stage1 built twice yields identical SHA", () => {
+    const stage1b = join(WORK_DIR, "stage1b.js");
+    runNode([BOOTSTRAP, "run", SELF_ALL, SELF_ALL, stage1b]);
+    expect(sha256File(stage1b)).toBe(sha256File(stage1));
+  });
+
+  // Phase C-1: fixed-point 깊이 확장 — stage4, stage5 까지 SHA 불변
+  test("fixed-point depth: stage1..stage5 all identical", () => {
+    const stage4 = join(WORK_DIR, "stage4.js");
+    const stage5 = join(WORK_DIR, "stage5.js");
+    runNode([stage3, SELF_ALL, stage4]);
+    runNode([stage4, SELF_ALL, stage5]);
+    const h1 = sha256File(stage1);
+    expect(sha256File(stage4)).toBe(h1);
+    expect(sha256File(stage5)).toBe(h1);
+  });
+});
+
+// Phase C-4: 전체 verify-self-host.sh 를 Jest 에서 실행해 결과 집계 검증.
+// bash 스크립트 1 회 실행 = 전 파이프라인 (91 케이스) 검증.
+// fast config 에서 과도하게 오래 걸리지 않도록 별도 describe + 90s timeout.
+describe("FreeLang v11 full verify-self-host harness", () => {
+  test(
+    "scripts/verify-self-host.sh tier2 → PASS 91 / FAIL 0 / SKIP 0",
+    () => {
+      const script = join(REPO_ROOT, "scripts", "verify-self-host.sh");
+      const out = execSync(`bash ${JSON.stringify(script)} tier2`, {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        timeout: 120_000,
+      });
+      // 필수 섹션 존재 확인
+      expect(out).toContain("결정론 OK");
+      expect(out).toContain("fixed-point OK (5 단계 전원 일치)");
+      // 결과 수치
+      const passMatch = out.match(/^PASS:\s*(\d+)/m);
+      const failMatch = out.match(/^FAIL:\s*(\d+)/m);
+      const skipMatch = out.match(/^SKIP:\s*(\d+)/m);
+      expect(passMatch).not.toBeNull();
+      expect(failMatch).not.toBeNull();
+      expect(skipMatch).not.toBeNull();
+      expect(Number(passMatch![1])).toBe(91);
+      expect(Number(failMatch![1])).toBe(0);
+      expect(Number(skipMatch![1])).toBe(0);
+    },
+    120_000
+  );
 });
