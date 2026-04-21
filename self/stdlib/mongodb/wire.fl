@@ -1,0 +1,111 @@
+;; self/stdlib/mongodb/wire.fl — FreeLang v11 MongoDB Wire Protocol
+;; OP_MSG (opCode=2013) 빌더 & 파서
+;;
+;; 의존성: bson.fl, binary.fl, encoding.fl
+
+;; ─────────────────────────────────────────────────────────────────────
+;; 유틸: 32-bit LE 정수 변환
+;; ─────────────────────────────────────────────────────────────────────
+
+;; int32-to-hex-le : number → hex-string (8 chars, LE)
+;; 32-bit signed LE: b0(LE) b1 b2 b3
+[FUNC int32-to-hex-le :params [$n]
+  :body (let [[$n (floor $n)]
+              [$b0 (% $n 256)]
+              [$b1 (% (floor (/ $n 256)) 256)]
+              [$b2 (% (floor (/ $n 65536)) 256)]
+              [$b3 (% (floor (/ $n 16777216)) 256)]]
+    (str (to-hex $b0) (to-hex $b1) (to-hex $b2) (to-hex $b3)))]
+
+;; hex-le-to-int32 : hex-string (8 chars) → number (LE)
+[FUNC hex-le-to-int32 :params [$hex]
+  :body (let [[$b0 (hex-to-num (substring $hex 0 2))]
+              [$b1 (hex-to-num (substring $hex 2 4))]
+              [$b2 (hex-to-num (substring $hex 4 6))]
+              [$b3 (hex-to-num (substring $hex 6 8))]]
+    (+ $b0 (* $b1 256) (* $b2 65536) (* $b3 16777216)))]
+
+;; ─────────────────────────────────────────────────────────────────────
+;; OP_MSG 헤더 빌드
+;; ─────────────────────────────────────────────────────────────────────
+
+[VAR MONGO-OP-MSG 2013]
+[VAR MONGO-REQUEST-ID 1]
+
+;; wire-build-header : totalLen requestId → hex-string (16 bytes, 32 chars)
+;; Header format: [4:totalLen LE][4:requestId LE][4:responseTo=0][4:opCode=2013 LE]
+[FUNC wire-build-header :params [$totalLen $requestId]
+  :body (str ;; totalLen (4 bytes, LE)
+         (int32-to-hex-le $totalLen)
+         ;; requestId (4 bytes, LE)
+         (int32-to-hex-le $requestId)
+         ;; responseTo (4 bytes, LE, always 0)
+         (int32-to-hex-le 0)
+         ;; opCode (4 bytes, LE, 2013)
+         (int32-to-hex-le MONGO-OP-MSG))]
+
+;; wire-build-opmsg : command-bson → hex-string (full OP_MSG)
+;; OP_MSG = [16:header][4:flags][1:kind][BSON:command]
+[FUNC wire-build-opmsg :params [$commandHex]
+  :body (let [[$flags (int32-to-hex-le 0)]
+              [$kind "00"]  ;; kind=0 (single BSON document)
+              [$payload (str $flags $kind $commandHex)]
+              [$payload-len (hex-string-byte-count $payload)]
+              [$header-len (+ 16 $payload-len)]
+              [$header (wire-build-header $header-len MONGO-REQUEST-ID)]]
+    (str $header $payload))]
+
+;; wire-parse-header : hex-string → {totalLen, requestId, responseTo, opCode}
+[FUNC wire-parse-header :params [$hex]
+  :body (let [[$totalLen (hex-le-to-int32 (hex-substring $hex 0 8))]
+              [$requestId (hex-le-to-int32 (hex-substring $hex 8 16))]
+              [$responseTo (hex-le-to-int32 (hex-substring $hex 16 24))]
+              [$opCode (hex-le-to-int32 (hex-substring $hex 24 32))]]
+    {"totalLen" $totalLen
+     "requestId" $requestId
+     "responseTo" $responseTo
+     "opCode" $opCode})]
+
+;; wire-parse-opmsg : hex-string → {flags, kind, data}
+;; OP_MSG payload = [4:flags][1:kind][BSON:data]
+[FUNC wire-parse-opmsg :params [$hex]
+  :body (let [[$flags (hex-le-to-int32 (hex-substring $hex 0 8))]
+              [$kind (hex-to-num (hex-substring $hex 8 10))]]
+    ;; 바이너리 프로토콜이므로 BSON 디코딩은 v11에서 처리
+    {"flags" $flags
+     "kind" $kind
+     "bson-hex" (hex-substring $hex 10)})]
+
+;; ─────────────────────────────────────────────────────────────────────
+;; 유틸: 16진법 조작
+;; ─────────────────────────────────────────────────────────────────────
+
+;; hex-string-byte-count : hex-string → byte count
+;; 16진법 문자열 2자 = 1바이트
+[FUNC hex-string-byte-count :params [$hex]
+  :body (floor (/ (length $hex) 2))]
+
+;; hex-substring : hex-string start-char end-char → substring
+;; 문자 단위로 추출 (16진법 자체는 문자 단위)
+[FUNC hex-substring :params [$hex $start $end]
+  :body (substring $hex $start $end)]
+
+;; ─────────────────────────────────────────────────────────────────────
+;; High-level: MongoDB 명령 빌드 및 전송
+;; ─────────────────────────────────────────────────────────────────────
+
+;; wire-send-command : connId db cmd-dict → response-hex or null
+;; MongoDB Wire Protocol 명령 전송 및 응답 수신
+[FUNC wire-send-command :params [$connId $db $cmd]
+  :body (let [[$full-cmd (assoc $cmd "$db" $db)]
+              [$cmd-hex (bson-encode $full-cmd)]
+              [$opmsg-hex (wire-build-opmsg $cmd-hex)]]
+    (mongodb_sendrecv $connId $opmsg-hex))]
+
+;; wire-parse-response : response-hex → parsed-bson or null
+[FUNC wire-parse-response :params [$responseHex]
+  :body (if (nil? $responseHex) null
+    (let [[$parsed (wire-parse-opmsg $responseHex)]
+          [$bson-hex (get $parsed "bson-hex")]]
+      (if (nil? $bson-hex) null
+        (bson-decode $bson-hex)))))]
