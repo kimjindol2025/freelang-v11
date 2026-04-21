@@ -1,0 +1,19 @@
+; CLI 모드 테스트
+
+(define arg0 (env_get "FL_CLI_ARGV0"))
+(define arg1 (env_get "FL_CLI_ARGV1"))
+(define arg2 (env_get "FL_CLI_ARGV2"))
+
+(define is-cli-mode (not (= arg0 "")))
+
+(if is-cli-mode
+  (begin
+    (println "[INFO] CLI mode detected")
+    (println (str "[INFO] Mode: " arg0))
+    (println (str "[INFO] Epochs: " arg1))
+    (println (str "[INFO] LR: " arg2))
+    (println "[INFO] Training simulation...")
+    (println (str "Epoch 1/" arg1 " | loss=0.5234"))
+    (println "[INFO] Done"))
+  (begin
+    (println "[INFO] Server mode (no CLI args)")))

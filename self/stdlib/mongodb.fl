@@ -138,6 +138,44 @@
     (if (nil? $parsed) null
       (or (get $parsed "n") 0)))]
 
+;; mongo-aggregate : connId db coll pipeline → [documents] or null
+[FUNC mongo-aggregate :params [$connId $db $coll $pipeline]
+  :body (let [[$response (wire-send-command $connId (str $db)
+               {"aggregate" (str $coll) "pipeline" (or $pipeline [])})]
+              [$parsed (wire-parse-response $response)]]
+    (if (nil? $parsed) []
+      (or (get (get $parsed "cursor") "firstBatch")
+          (get $parsed "firstBatch")
+          [])))]
+
+;; mongo-create-index : connId db coll keys-dict [opts-dict] → indexName or null
+[FUNC mongo-create-index :params [$connId $db $coll $keys]
+  :body (let [[$response (wire-send-command $connId (str $db)
+               {"createIndexes" (str $coll)
+                "indexes" [{"key" $keys}]})]
+              [$parsed (wire-parse-response $response)]]
+    (if (nil? $parsed) null
+      (or (first (get $parsed "indexNames")) nil)))]
+
+;; mongo-list-collections : connId db → [collection-names] or null
+[FUNC mongo-list-collections :params [$connId $db]
+  :body (let [[$response (wire-send-command $connId (str $db)
+               {"listCollections" 1})]
+              [$parsed (wire-parse-response $response)]]
+    (if (nil? $parsed) []
+      (let [[$batch (or (get (get $parsed "cursor") "firstBatch")
+                        (get $parsed "firstBatch")
+                        [])]]
+        (map (fn [$doc] (get $doc "name")) $batch))))]
+
+;; mongo-drop-collection : connId db coll → boolean
+[FUNC mongo-drop-collection :params [$connId $db $coll]
+  :body (let [[$response (wire-send-command $connId (str $db)
+               {"drop" (str $coll)})]
+              [$parsed (wire-parse-response $response)]]
+    (if (nil? $parsed) false
+      (= (get $parsed "ok") 1)))]
+
 ;; ─────────────────────────────────────────────────────────────────────
 ;; Helper: Update operators
 ;; ─────────────────────────────────────────────────────────────────────

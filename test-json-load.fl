@@ -1,0 +1,32 @@
+; 테스트: JSONL 로드 + loss 계산
+
+(define DATA_FILE "/home/kimjin/kim/Desktop/kim/01_Active_Projects/FREELANG_Projects/freelang-gpt/data/qa_pairs_freelang_v9.jsonl")
+
+(defn load-qa []
+  (let [content (file_read DATA_FILE)]
+    (str_lines content)))
+
+(defn calc-loss [lines]
+  "줄 리스트에서 loss 계산"
+  (if (= (length lines) 0)
+    0.0
+    (let [parsed (map json_parse lines)
+          losses (map (fn [p]
+                        (let [q (or (get p "q") "")
+                              a (or (get p "a") "")
+                              q-len (length q)
+                              a-len (length a)
+                              diff (- q-len a-len)]
+                          (* diff diff)))
+                      parsed)]
+      ; 간단한 합계 계산
+      (loop [idx 0 total 0]
+        (if (>= idx (length losses))
+          (let [count (length parsed)]
+            (sqrt (/ total (max 1 count))))
+          (recur (+ idx 1) (+ total (get losses idx))))))))
+
+(let [lines (load-qa)
+      loss (calc-loss lines)]
+  (println (str "로드: " (length lines) "줄"))
+  (println (str "Loss: " loss)))
