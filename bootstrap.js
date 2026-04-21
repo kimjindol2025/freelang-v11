@@ -11329,6 +11329,23 @@ function evalBuiltin(interp2, op, args2, expr) {
   const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (op) {
+    case "load": {
+      const filePath = String(args2[0] ?? "");
+      const fs17 = require("fs");
+      const path14 = require("path");
+      try {
+        const resolvedPath = path14.resolve(process.cwd(), filePath);
+        const src = fs17.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        interp2.interpret(ast);
+        return null;
+      } catch (e) {
+        throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
     case "+":
       return args2.reduce((a, b) => a + b, 0);
     case "-":
@@ -28211,8 +28228,12 @@ var Interpreter = class {
   }
   evalSExpr(expr) {
     if (expr.line !== void 0) this.currentLine = expr.line;
-    const op = expr.op;
-    if (typeof op === "string" && op.includes(":")) {
+    let op = expr.op;
+    if (typeof op !== "string") {
+      op = op?.name ? op.name : String(op);
+    }
+    op = String(op).trim();
+    if (op.includes(":")) {
       const [className, methodName] = op.split(":");
       if (expr.args.length > 0) {
         const concreteValue = this.eval(expr.args[0]);

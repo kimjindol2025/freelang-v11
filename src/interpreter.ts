@@ -1547,10 +1547,16 @@ export class Interpreter {
 
   private evalSExpr(expr: SExpr): any {
     if (expr.line !== undefined) this.currentLine = expr.line;
-    const op = expr.op;
+    let op = expr.op;
+
+    // Phase L1: op MUST be normalized before any use
+    if (typeof op !== "string") {
+      op = (op as any)?.name ? (op as any).name : String(op);
+    }
+    op = String(op).trim();
 
     // Phase 5 Week 2: Method dispatch (ClassName:methodName pattern)
-    if (typeof op === "string" && op.includes(":")) {
+    if (op.includes(":")) {
       const [className, methodName] = op.split(":");
 
       // For now, assume the first argument is the concrete type value

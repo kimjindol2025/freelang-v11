@@ -471,6 +471,26 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   const toDisplay = (val: any) => (interp as any).toDisplayString(val);
 
   switch (op) {
+    // Phase L1: Module system
+    case "load": {
+      const filePath = String(args[0] ?? "");
+      const fs = require("fs");
+      const path = require("path");
+      try {
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+        const src = fs.readFileSync(resolvedPath, "utf-8");
+        const { lex } = require("./lexer");
+        const { parse } = require("./parser");
+        const tokens = lex(src, resolvedPath);
+        const ast = parse(tokens);
+        // Use interpret() not eval() for control blocks like [FUNC]
+        (interp as any).interpret(ast);
+        return null;
+      } catch (e: any) {
+        throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
+
     // Arithmetic
     case "+":
       return args.reduce((a: number, b: number) => a + b, 0);
