@@ -58,6 +58,50 @@ else
 fi
 
 echo ""
+echo "=== Phase C-4: 의미 보존 invariant (N 스니펫 × 2회 compile bit-identical) ==="
+# 결정론을 단일 파일(self/all.fl)이 아닌 다양한 FL 구문 스니펫으로 확장.
+# 문법 요소 별로 compile 결과가 시간·프로세스 독립적임을 증명.
+# 스니펫은 literal · sexpr · let · if · cond · fn · [FUNC] · map · throw
+# 등 주요 구문을 대표하도록 선정.
+RT_SNIPPETS=(
+  '(println "hello")'
+  '(+ 1 2 3)'
+  '(let [[$x 10]] (println $x))'
+  '(if (< 1 2) "yes" "no")'
+  '(cond [(= 1 1) "a"] [true "b"])'
+  '((fn [$x] (* $x 2)) 5)'
+  '[FUNC sq :params [$n] :body (* $n $n)]'
+  '{:name "kim" :age 30}'
+  '(map (fn [$x] (+ $x 1)) (list 1 2 3))'
+  '(throw "err")'
+)
+RT_OK=0
+RT_FAIL=0
+for i in "${!RT_SNIPPETS[@]}"; do
+  SRC="$WORK/rt_${i}.fl"
+  A="$WORK/rt_${i}_a.js"
+  B="$WORK/rt_${i}_b.js"
+  printf '%s\n' "${RT_SNIPPETS[$i]}" > "$SRC"
+  # 2회 compile, 다른 시각에 (stage1 canonical)
+  node --stack-size=8000 "$STAGE1" "$SRC" "$A" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
+  node --stack-size=8000 "$STAGE1" "$SRC" "$B" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
+  SA=$(sha256sum "$A" | cut -c1-16)
+  SB=$(sha256sum "$B" | cut -c1-16)
+  if [ "$SA" = "$SB" ]; then
+    RT_OK=$((RT_OK+1))
+  else
+    echo "   ❌ snippet $i 결정론 깨짐 ($SA vs $SB): ${RT_SNIPPETS[$i]}"
+    RT_FAIL=$((RT_FAIL+1))
+  fi
+done
+echo "   invariant OK=$RT_OK / FAIL=$RT_FAIL / total=${#RT_SNIPPETS[@]}"
+if [ "$RT_FAIL" -gt 0 ]; then
+  echo "   ❌ round-trip 결정론 실패 — 의미 보존 깨짐"
+  exit 1
+fi
+echo "   ✅ round-trip 결정론 OK (${#RT_SNIPPETS[@]} 스니펫 전원 bit-identical)"
+
+echo ""
 echo "=== fixed-point 확인 (다단계 SHA 체인, Phase C: stage1~5) ==="
 # Phase C 증명 강화: stage depth 를 3 → 5 로 확장.
 # 기준선이 "우연히" 3 단계만 일치가 아니라, 반복 compile 에도 불변임을 증명.
