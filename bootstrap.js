@@ -40,6 +40,10 @@ var init_token = __esm({
 });
 
 // src/lexer.ts
+var lexer_exports = {};
+__export(lexer_exports, {
+  lex: () => lex
+});
 function getKeywordTokenType(text) {
   return KEYWORDS.get(text) ?? null;
 }
@@ -375,8 +379,8 @@ function makeThrowExpression(argument) {
 function makePageNode(name, title, route, component, metadata, line) {
   return { kind: "page", name, title, route, component, metadata, line };
 }
-function makeRouteNode(name, path13, method, handler, middleware, validation, line) {
-  return { kind: "route", name, path: path13, method, handler, middleware, validation, line };
+function makeRouteNode(name, path14, method, handler, middleware, validation, line) {
+  return { kind: "route", name, path: path14, method, handler, middleware, validation, line };
 }
 function makeComponentNode(name, render, state, computed, watch2, methods, slots, line) {
   return { kind: "component", name, render, state, computed, watch: watch2, methods, slots, line };
@@ -439,6 +443,12 @@ var init_ast = __esm({
 });
 
 // src/parser.ts
+var parser_exports = {};
+__export(parser_exports, {
+  Parser: () => Parser,
+  ParserError: () => ParserError,
+  parse: () => parse
+});
 function parse(tokens) {
   const parser = new Parser(tokens);
   return parser.parse();
@@ -889,19 +899,23 @@ var init_parser = __esm({
         arrayFields.set("items", values);
         return makeBlock("Array", "$array", arrayFields);
       }
-      // Parse map literal: {:key1 value1 :key2 value2 ...}
+      // Parse map literal: {:key1 value1 :key2 value2 ...} or {"key1" value1 "key2" value2 ...}
       parseMap() {
         this.expect("LBrace" /* LBrace */);
         const mapFields = /* @__PURE__ */ new Map();
         while (!this.check("RBrace" /* RBrace */) && !this.isAtEnd()) {
-          if (!this.check("Colon" /* Colon */)) {
-            throw this.error(`Expected ':' keyword in map literal`, this.peek());
+          let key;
+          if (this.check("Colon" /* Colon */)) {
+            this.advance();
+            if (!this.check("Symbol" /* Symbol */)) {
+              throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+            }
+            key = this.advance().value;
+          } else if (this.check("String" /* String */)) {
+            key = this.advance().value;
+          } else {
+            throw this.error(`Map key must be :keyword or "string"`, this.peek());
           }
-          this.advance();
-          if (!this.check("Symbol" /* Symbol */)) {
-            throw this.error(`Expected symbol after ':' in map literal`, this.peek());
-          }
-          const key = this.advance().value;
           const value = this.parseValue();
           mapFields.set(key, value);
         }
@@ -2218,12 +2232,12 @@ var init_parser = __esm({
       }
       // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
       parsePage(name, fields, line) {
-        const path13 = this.extractStringField(fields, "path");
+        const path14 = this.extractStringField(fields, "path");
         const title = this.extractStringField(fields, "title");
         const render = this.extractStringField(fields, "render");
         const component = this.extractSymbolField(fields, "component");
         const metadata = this.extractMapField(fields, "metadata");
-        const pageNode = makePageNode(name, title, path13, component, metadata, line);
+        const pageNode = makePageNode(name, title, path14, component, metadata, line);
         if (render) {
           pageNode.fields = pageNode.fields || /* @__PURE__ */ new Map();
           pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
@@ -2232,12 +2246,12 @@ var init_parser = __esm({
       }
       // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
       parseRoute(name, fields, line) {
-        const path13 = this.extractStringField(fields, "path");
+        const path14 = this.extractStringField(fields, "path");
         const method = this.extractStringField(fields, "method");
         const handler = this.extractSymbolField(fields, "handler");
         const middleware = this.extractSymbolArrayField(fields, "middleware");
         const validation = this.extractSymbolField(fields, "validation");
-        return makeRouteNode(name, path13, method, handler, middleware, validation, line);
+        return makeRouteNode(name, path14, method, handler, middleware, validation, line);
       }
       // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
       parseComponent(name, fields, line) {
@@ -3160,14 +3174,14 @@ var require_stdlib_signatures = __commonJS({
 
 // src/cli.ts
 var fs16 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var path13 = __toESM(require("path"));
 var readline = __toESM(require("readline"));
 init_lexer();
 init_parser();
 
 // src/interpreter.ts
 var fs10 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 init_lexer();
 init_parser();
 init_ast();
@@ -10269,14 +10283,14 @@ var WorldModel = class {
     const visited = /* @__PURE__ */ new Set();
     const queue = [{ id: fromId, path: [fromId] }];
     while (queue.length > 0) {
-      const { id, path: path13 } = queue.shift();
+      const { id, path: path14 } = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
       for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path13, neighbor];
+        if (neighbor === toId) return [...path14, neighbor];
         if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path13, neighbor] });
+          queue.push({ id: neighbor, path: [...path14, neighbor] });
         }
       }
     }
@@ -11093,6 +11107,48 @@ function flExecOpNative(op, vals) {
       const specials = ["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"];
       return specials.includes(sop) ? sop : null;
     }
+    case "load": {
+      const filePath = String(v0 ?? "");
+      const fs17 = require("fs");
+      const path14 = require("path");
+      try {
+        const resolvedPath = path14.resolve(process.cwd(), filePath);
+        const src = fs17.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        for (const node of ast) {
+          interp.eval(node);
+        }
+        return null;
+      } catch (e) {
+        throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
+    case "file-mkdir":
+    case "file_mkdir": {
+      const dirPath = String(v0 ?? "");
+      const fs17 = require("fs");
+      try {
+        fs17.mkdirSync(dirPath, { recursive: true });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    case "file-append":
+    case "file_append": {
+      const filePath = String(v0 ?? "");
+      const content = String(v1 ?? "");
+      const fs17 = require("fs");
+      try {
+        fs17.appendFileSync(filePath, content);
+        return true;
+      } catch {
+        return false;
+      }
+    }
     default:
       return null;
   }
@@ -11266,12 +11322,12 @@ function flInterpSexpr(op, rawArgs, env) {
       return null;
   }
 }
-function evalBuiltin(interp, op, args2, expr) {
-  const ev = (node) => interp.eval(node);
-  const callFn = (fn, a) => interp.callFunction(fn, a);
-  const callUser = (name, a) => interp.callUserFunction(name, a);
-  const callFnVal = (fn, a) => interp.callFunctionValue(fn, a);
-  const toDisplay = (val) => interp.toDisplayString(val);
+function evalBuiltin(interp2, op, args2, expr) {
+  const ev = (node) => interp2.eval(node);
+  const callFn = (fn, a) => interp2.callFunction(fn, a);
+  const callUser = (name, a) => interp2.callUserFunction(name, a);
+  const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
+  const toDisplay = (val) => interp2.toDisplayString(val);
   switch (op) {
     case "+":
       return args2.reduce((a, b) => a + b, 0);
@@ -11413,7 +11469,7 @@ function evalBuiltin(interp, op, args2, expr) {
         kind: "function-value",
         params,
         body: expr.args[1],
-        capturedEnv: interp.context.variables.snapshot()
+        capturedEnv: interp2.context.variables.snapshot()
       };
     }
     case "reduce": {
@@ -11451,7 +11507,7 @@ function evalBuiltin(interp, op, args2, expr) {
     case "now":
       return (/* @__PURE__ */ new Date()).toISOString();
     case "server-uptime":
-      return Date.now() - interp.context.startTime;
+      return Date.now() - interp2.context.startTime;
     case "char-at":
       return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0][Math.floor(args2[1])] || "" : "";
     case "char-code":
@@ -12408,15 +12464,15 @@ function evalBuiltin(interp, op, args2, expr) {
       return maybeSelect(list);
     }
     default: {
-      if (interp.context.functions.has(op)) {
+      if (interp2.context.functions.has(op)) {
         return callUser(op, args2);
       }
       const bracketMatch = op.match(/^([\w\-]+)\[([^\]]+)\]$/);
-      if (bracketMatch && interp.context.functions.has(bracketMatch[1])) {
+      if (bracketMatch && interp2.context.functions.has(bracketMatch[1])) {
         return callUser(op, args2);
       }
-      if (interp.context.variables.has(op)) {
-        const fn = interp.context.variables.get(op);
+      if (interp2.context.variables.has(op)) {
+        const fn = interp2.context.variables.get(op);
         if (fn.kind === "builtin-function") {
           return fn.fn(args2.map((arg) => ev(arg)));
         } else if (typeof fn === "function" || fn.kind === "function-value") {
@@ -15776,8 +15832,8 @@ function evalWorldModel141(op, args2) {
 }
 
 // src/eval-ai-blocks.ts
-function evalAiBlock(interp, op, expr) {
-  const ev = (node) => interp.eval(node);
+function evalAiBlock(interp2, op, expr) {
+  const ev = (node) => interp2.eval(node);
   if (op === "search" || op === "fetch") {
     let query = "";
     let source = "web";
@@ -15814,7 +15870,7 @@ function evalAiBlock(interp, op, expr) {
     }
     if (op === "fetch") source = "api";
     const searchBlock = { kind: "search-block", query, source, cache, limit, name };
-    return interp.handleSearchBlock(searchBlock);
+    return interp2.handleSearchBlock(searchBlock);
   }
   if (op === "learn" || op === "recall" || op === "remember" || op === "forget") {
     let key = "";
@@ -15848,9 +15904,9 @@ function evalAiBlock(interp, op, expr) {
       }
     }
     if (op === "forget") {
-      if (!interp.context.learned) interp.context.learned = /* @__PURE__ */ new Map();
-      const found = interp.context.learned.has(key);
-      if (found) interp.context.learned.delete(key);
+      if (!interp2.context.learned) interp2.context.learned = /* @__PURE__ */ new Map();
+      const found = interp2.context.learned.has(key);
+      if (found) interp2.context.learned.delete(key);
       return { kind: "learn-result", operation: "forget", key, deleted: found };
     }
     if (op === "recall") data = null;
@@ -15862,7 +15918,7 @@ function evalAiBlock(interp, op, expr) {
       confidence,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     };
-    return interp.handleLearnBlock(learnBlock);
+    return interp2.handleLearnBlock(learnBlock);
   }
   if (op === "observe" || op === "analyze" || op === "decide" || op === "act" || op === "verify") {
     const stage = op;
@@ -15917,7 +15973,7 @@ function evalAiBlock(interp, op, expr) {
       verifications,
       metadata: { confidence, startTime: (/* @__PURE__ */ new Date()).toISOString() }
     };
-    return interp.handleReasoningBlock(reasoningBlock);
+    return interp2.handleReasoningBlock(reasoningBlock);
   }
   if (op === "await") {
     if (expr.args.length < 1) throw new Error(`await requires a Promise argument`);
@@ -15936,8 +15992,8 @@ function evalAiBlock(interp, op, expr) {
 var fs2 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
 var cwd = process.cwd();
-function evalInfraBlock(interp, op, expr) {
-  const ev = (node) => interp.eval(node);
+function evalInfraBlock(interp2, op, expr) {
+  const ev = (node) => interp2.eval(node);
   if (op === "DOCKERFILE" || op === "dockerfile") {
     let from = "node:20-slim";
     let workdir = "/app";
@@ -16310,15 +16366,15 @@ ${stepsStr}
     try {
       switch (action.toLowerCase()) {
         case "list":
-          return interp.callUserFunction("aws-s3-list", [bucket, file]);
+          return interp2.callUserFunction("aws-s3-list", [bucket, file]);
         case "upload":
-          return interp.callUserFunction("aws-s3-upload", [bucket, file, data]);
+          return interp2.callUserFunction("aws-s3-upload", [bucket, file, data]);
         case "download":
-          return interp.callUserFunction("aws-s3-download", [bucket, file]);
+          return interp2.callUserFunction("aws-s3-download", [bucket, file]);
         case "delete":
-          return interp.callUserFunction("aws-s3-delete", [bucket, file]);
+          return interp2.callUserFunction("aws-s3-delete", [bucket, file]);
         case "config":
-          return interp.callUserFunction("aws-s3-config", [bucket, region]);
+          return interp2.callUserFunction("aws-s3-config", [bucket, region]);
         default:
           return { status: "unknown_action", action, bucket };
       }
@@ -16362,11 +16418,11 @@ ${stepsStr}
     try {
       switch (action.toLowerCase()) {
         case "deploy":
-          return interp.callUserFunction("gcp-run-deploy", [service, image, region]);
+          return interp2.callUserFunction("gcp-run-deploy", [service, image, region]);
         case "invoke":
-          return interp.callUserFunction("gcp-run-invoke", [service, data, region]);
+          return interp2.callUserFunction("gcp-run-invoke", [service, data, region]);
         case "list":
-          return interp.callUserFunction("gcp-run-list", [region]);
+          return interp2.callUserFunction("gcp-run-list", [region]);
         default:
           return { status: "unknown_action", action, service };
       }
@@ -16414,11 +16470,11 @@ ${stepsStr}
     try {
       switch (action.toLowerCase()) {
         case "invoke":
-          return interp.callUserFunction("azure-function-invoke", [name, data]);
+          return interp2.callUserFunction("azure-function-invoke", [name, data]);
         case "create":
-          return interp.callUserFunction("azure-function-create", [name, runtime]);
+          return interp2.callUserFunction("azure-function-create", [name, runtime]);
         case "deploy":
-          return interp.callUserFunction("azure-app-deploy", [name, image, region]);
+          return interp2.callUserFunction("azure-app-deploy", [name, image, region]);
         default:
           return { status: "unknown_action", action, name };
       }
@@ -16510,7 +16566,7 @@ function rulesToCss(rulesObj) {
   }
   return cssLines.join("; ");
 }
-function processThemeBlock(interp, name, tokens) {
+function processThemeBlock(interp2, name, tokens) {
   if (typeof tokens !== "object" || tokens === null) {
     return { status: "error", reason: "tokens must be object" };
   }
@@ -16536,7 +16592,7 @@ ${cssVars.join(";\n")};
     css
   };
 }
-function processStyleBlock(interp, name, selector, rules) {
+function processStyleBlock(interp2, name, selector, rules) {
   if (!selector || selector.trim() === "") {
     return { status: "error", reason: "selector is required" };
   }
@@ -16553,8 +16609,8 @@ function processStyleBlock(interp, name, selector, rules) {
     css
   };
 }
-function evalStyleBlock(interp, op, expr) {
-  const ev = (node) => interp.eval(node);
+function evalStyleBlock(interp2, op, expr) {
+  const ev = (node) => interp2.eval(node);
   if (op === "THEME" || op === "theme") {
     let name = "default";
     let tokens = {};
@@ -16576,7 +16632,7 @@ function evalStyleBlock(interp, op, expr) {
         }
       }
     }
-    return processThemeBlock(interp, name, tokens);
+    return processThemeBlock(interp2, name, tokens);
   }
   if (op === "STYLE" || op === "style") {
     let name = "default";
@@ -16603,7 +16659,7 @@ function evalStyleBlock(interp, op, expr) {
         }
       }
     }
-    return processStyleBlock(interp, name, selector, rules);
+    return processStyleBlock(interp2, name, selector, rules);
   }
   throw new Error(`Unknown style block: ${op}`);
 }
@@ -16621,13 +16677,13 @@ function isTailCall(v) {
 }
 
 // src/eval-special-forms.ts
-function evalSpecialForm(interp, op, expr) {
-  const ev = (node) => interp.eval(node);
-  const callUser = (name, a) => interp.callUserFunction(name, a);
-  const callFnVal = (fn, a) => interp.callFunctionValue(fn, a);
-  const callAsyncFnVal = (fn, a) => interp.callAsyncFunctionValue(fn, a);
-  const callFn = (fn, a) => interp.callFunction(fn, a);
-  const ctx = interp.context;
+function evalSpecialForm(interp2, op, expr) {
+  const ev = (node) => interp2.eval(node);
+  const callUser = (name, a) => interp2.callUserFunction(name, a);
+  const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
+  const callAsyncFnVal = (fn, a) => interp2.callAsyncFunctionValue(fn, a);
+  const callFn = (fn, a) => interp2.callFunction(fn, a);
+  const ctx = interp2.context;
   if (op === "fn") {
     if (expr.args.length < 2) throw new Error(`fn requires at least 2 arguments (params and body)`);
     const paramsNode = expr.args[0];
@@ -16666,7 +16722,7 @@ function evalSpecialForm(interp, op, expr) {
     const bodyArgs = expr.args.slice(2);
     const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
     const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
-    const fnValue = interp.evalSExpr(fnExpr);
+    const fnValue = interp2.evalSExpr(fnExpr);
     ctx.variables.set("$" + name, fnValue);
     ctx.variables.set(name, fnValue);
     return fnValue;
@@ -16919,7 +16975,7 @@ function evalSpecialForm(interp, op, expr) {
     return pipeVal;
   }
   if (op === "let") {
-    return evalLet(interp, expr.args);
+    return evalLet(interp2, expr.args);
   }
   if (op === "set") {
     if (expr.args.length !== 2) throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
@@ -16936,11 +16992,11 @@ function evalSpecialForm(interp, op, expr) {
     const condition = ev(expr.args[0]);
     const branch = condition ? expr.args[1] : expr.args[2] || null;
     if (branch === null) return null;
-    if (interp.tcoMode && branch !== null) {
+    if (interp2.tcoMode && branch !== null) {
       const b = branch;
       if (b.kind === "sexpr") {
         const bop = b.op;
-        const ctx2 = interp.context;
+        const ctx2 = interp2.context;
         if (typeof bop === "string" && ctx2.functions.has(bop)) {
           const tailArgs = b.args.map((a) => ev(a));
           return tailCall(bop, tailArgs);
@@ -16950,13 +17006,13 @@ function evalSpecialForm(interp, op, expr) {
     return ev(branch);
   }
   if (op === "cond") {
-    return evalCond(interp, expr.args);
+    return evalCond(interp2, expr.args);
   }
   if (op === "do" || op === "begin" || op === "progn") {
     let result = null;
     for (const arg of expr.args) {
       if (isBlock(arg) && isControlBlock(arg)) {
-        interp.evalBlock(arg);
+        interp2.evalBlock(arg);
         result = null;
         continue;
       }
@@ -17312,11 +17368,11 @@ function evalSpecialForm(interp, op, expr) {
   }
   throw new Error(`evalSpecialForm: unknown op "${op}"`);
 }
-function evalLet(interp, args2) {
+function evalLet(interp2, args2) {
   if (args2.length < 2) throw new Error(`let requires at least 2 arguments`);
   const bindings = args2[0];
-  const ctx = interp.context;
-  const ev = (node) => interp.eval(node);
+  const ctx = interp2.context;
+  const ev = (node) => interp2.eval(node);
   const toVarName = (node) => {
     if (node?.kind === "variable") {
       const n = node.name;
@@ -17372,8 +17428,8 @@ function evalLet(interp, args2) {
   }
   return result;
 }
-function evalCond(interp, args2) {
-  const ev = (node) => interp.eval(node);
+function evalCond(interp2, args2) {
+  const ev = (node) => interp2.eval(node);
   for (const arg of args2) {
     let testNode = null;
     let bodyNodes = [];
@@ -17407,10 +17463,10 @@ function evalCond(interp, args2) {
 }
 
 // src/eval-reasoning-sequence.ts
-function handleReasoningSequence(interp, reasoningSeq) {
+function handleReasoningSequence(interp2, reasoningSeq) {
   const { stages, metadata, feedbackLoop } = reasoningSeq;
-  const logger = interp.logger;
-  const ctx = interp.context;
+  const logger = interp2.logger;
+  const ctx = interp2.context;
   if (!ctx.reasoning) ctx.reasoning = /* @__PURE__ */ new Map();
   const sequenceId = (/* @__PURE__ */ new Date()).getTime();
   const executionPath = [];
@@ -17442,7 +17498,7 @@ function handleReasoningSequence(interp, reasoningSeq) {
       if (stage.kind === "search-block") {
         const searchBlock = stage;
         logger.info(`  [${stageNum}/${currentStages.length}] \u{1F50E} SEARCH`);
-        const searchResult = interp.handleSearchBlock(searchBlock);
+        const searchResult = interp2.handleSearchBlock(searchBlock);
         if (!reasoningSeq.context) reasoningSeq.context = {};
         if (!reasoningSeq.context.searches) reasoningSeq.context.searches = /* @__PURE__ */ new Map();
         reasoningSeq.context.searches.set(`search_${i}`, searchResult);
@@ -17454,7 +17510,7 @@ function handleReasoningSequence(interp, reasoningSeq) {
       if (stage.kind === "learn-block") {
         const learnBlock = stage;
         logger.info(`  [${stageNum}/${currentStages.length}] \u{1F4DA} LEARN`);
-        const learnResult = interp.handleLearnBlock(learnBlock);
+        const learnResult = interp2.handleLearnBlock(learnBlock);
         if (!reasoningSeq.context) reasoningSeq.context = {};
         if (!reasoningSeq.context.learned) reasoningSeq.context.learned = /* @__PURE__ */ new Map();
         const learnKey = learnBlock.key || `learn_${i}`;
@@ -17471,7 +17527,7 @@ function handleReasoningSequence(interp, reasoningSeq) {
       const stageEmoji = { observe: "\u{1F440}", analyze: "\u{1F50D}", decide: "\u{1F3AF}", act: "\u26A1", verify: "\u2705" }[reasoningBlock.stage] || "\u2753";
       logger.info(`  [${stageNum}/${currentStages.length}] ${stageEmoji} ${reasoningBlock.stage.toUpperCase()}`);
       if (reasoningBlock.whenGuard) {
-        const guardCondition = evalCondition(interp, reasoningBlock.whenGuard);
+        const guardCondition = evalCondition(interp2, reasoningBlock.whenGuard);
         if (!guardCondition) {
           logger.info(`  \u23ED\uFE0F  SKIPPED (when guard condition false)`);
           continue;
@@ -17492,7 +17548,7 @@ function handleReasoningSequence(interp, reasoningSeq) {
       }
       let blockToHandle = adjustedStage;
       if (reasoningBlock.conditional) {
-        const conditionMet = evalCondition(interp, reasoningBlock.conditional.condition);
+        const conditionMet = evalCondition(interp2, reasoningBlock.conditional.condition);
         const selectedBlock = conditionMet ? reasoningBlock.conditional.thenBlock : reasoningBlock.conditional.elseBlock;
         if (selectedBlock) {
           blockToHandle = selectedBlock;
@@ -17509,14 +17565,14 @@ function handleReasoningSequence(interp, reasoningSeq) {
         let loopIteration = 0;
         while (loopIteration < loopMaxIter) {
           loopIteration++;
-          const conditionValue = evalCondition(interp, condition);
+          const conditionValue = evalCondition(interp2, condition);
           const shouldContinue = type === "repeat-until" ? !conditionValue : conditionValue;
           if (!shouldContinue && loopIteration > 1) break;
-          stageResult = interp.handleReasoningBlock(blockToHandle);
+          stageResult = interp2.handleReasoningBlock(blockToHandle);
           logger.info(`  \u{1F501} ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter}`);
         }
       } else {
-        stageResult = interp.handleReasoningBlock(blockToHandle);
+        stageResult = interp2.handleReasoningBlock(blockToHandle);
       }
       iterationResults.push(stageResult);
       executionPath.push(reasoningBlock.stage);
@@ -17524,7 +17580,7 @@ function handleReasoningSequence(interp, reasoningSeq) {
       if (reasoningBlock.transitions && reasoningBlock.transitions.length > 0) {
         for (const transition of reasoningBlock.transitions) {
           if (transition.condition) {
-            const conditionMet = interp.eval(transition.condition);
+            const conditionMet = interp2.eval(transition.condition);
             if (conditionMet && transition.to) logger.info(`    \u2193 Transition to: ${transition.to}`);
           }
         }
@@ -17532,7 +17588,7 @@ function handleReasoningSequence(interp, reasoningSeq) {
     }
     sequenceResults.push(...iterationResults);
     iterationHistory.push({ iteration, results: iterationResults, verifyConfidence: verifyResult?.metadata?.confidence });
-    const shouldContinueFeedback = feedbackLoop?.enabled && iteration < maxIterations && verifyResult && evalFeedbackCondition(interp, verifyResult, feedbackLoop);
+    const shouldContinueFeedback = feedbackLoop?.enabled && iteration < maxIterations && verifyResult && evalFeedbackCondition(interp2, verifyResult, feedbackLoop);
     if (shouldContinueFeedback) {
       logger.info(`\u21A9\uFE0F  FEEDBACK TRIGGERED: Returning to "${feedbackLoop.toStage}" stage`);
       const feedbackTargetIndex = currentStages.findIndex(
@@ -17558,22 +17614,22 @@ function handleReasoningSequence(interp, reasoningSeq) {
   logger.info(`\u2705 REASONING SEQUENCE COMPLETE (${stages.length} stages, ${iteration} iterations, confidence: ${(totalConfidence * 100).toFixed(0)}%)`);
   return sequenceResult;
 }
-function evalFeedbackCondition(interp, verifyResult, feedbackLoop) {
+function evalFeedbackCondition(interp2, verifyResult, feedbackLoop) {
   const defaultThreshold = 0.8;
   const confidence = verifyResult?.metadata?.confidence || 0;
   if (feedbackLoop.condition) {
     try {
-      return interp.eval(feedbackLoop.condition);
+      return interp2.eval(feedbackLoop.condition);
     } catch (e) {
       return confidence < defaultThreshold;
     }
   }
   return confidence < defaultThreshold;
 }
-function evalCondition(interp, conditionNode) {
+function evalCondition(interp2, conditionNode) {
   if (!conditionNode) return false;
   try {
-    const result = interp.eval(conditionNode);
+    const result = interp2.eval(conditionNode);
     if (typeof result === "boolean") return result;
     if (typeof result === "number") return result !== 0;
     if (typeof result === "string") return result.length > 0;
@@ -17585,11 +17641,11 @@ function evalCondition(interp, conditionNode) {
 }
 
 // src/eval-ai-handlers.ts
-function handleSearchBlock(interp, searchBlock) {
+function handleSearchBlock(interp2, searchBlock) {
   const { query, source = "web", cache = true, limit = 10, name } = searchBlock;
-  interp.logger.info(`\u{1F50E} SEARCH "${query}"`);
+  interp2.logger.info(`\u{1F50E} SEARCH "${query}"`);
   try {
-    const results = interp.searchAdapter.searchSync(query, { limit, cache });
+    const results = interp2.searchAdapter.searchSync(query, { limit, cache });
     const searchResult = {
       kind: "search-result",
       query,
@@ -17602,24 +17658,24 @@ function handleSearchBlock(interp, searchBlock) {
       count: results.length,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     };
-    if (!interp.context.cache) interp.context.cache = /* @__PURE__ */ new Map();
+    if (!interp2.context.cache) interp2.context.cache = /* @__PURE__ */ new Map();
     const cacheKey = name || `search_${Date.now()}`;
-    interp.context.cache.set(cacheKey, searchResult);
+    interp2.context.cache.set(cacheKey, searchResult);
     return searchResult;
   } catch (error) {
-    interp.logger.error(`\u274C Search failed: ${error.message}`);
+    interp2.logger.error(`\u274C Search failed: ${error.message}`);
     return { kind: "search-error", query, message: error.message, timestamp: (/* @__PURE__ */ new Date()).toISOString() };
   }
 }
-function handleLearnBlock(interp, learnBlock) {
+function handleLearnBlock(interp2, learnBlock) {
   const { key, data, source = "search", confidence = 0.85, timestamp } = learnBlock;
-  if (!interp.context.learned) interp.context.learned = /* @__PURE__ */ new Map();
+  if (!interp2.context.learned) interp2.context.learned = /* @__PURE__ */ new Map();
   try {
     if (data === null) {
-      const loadedFact = interp.learnedFactsStore.load(key);
+      const loadedFact = interp2.learnedFactsStore.load(key);
       if (loadedFact) {
-        interp.logger.info(`\u{1F4DA} LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
-        interp.context.learned.set(key, {
+        interp2.logger.info(`\u{1F4DA} LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
+        interp2.context.learned.set(key, {
           data: loadedFact.data,
           source: loadedFact.source,
           confidence: loadedFact.confidence,
@@ -17637,14 +17693,14 @@ function handleLearnBlock(interp, learnBlock) {
           accessCount: loadedFact.accessCount
         };
       } else {
-        interp.logger.info(`\u{1F4DA} LEARN (recall) "${key}" - not found`);
+        interp2.logger.info(`\u{1F4DA} LEARN (recall) "${key}" - not found`);
         return { kind: "learn-result", operation: "recall", key, data: null, found: false };
       }
     }
     if (confidence < 0 || confidence > 1) throw new Error(`Invalid confidence: ${confidence}.`);
-    interp.learnedFactsStore.save(key, data, { confidence, source, ttlDays: 30 });
-    interp.context.learned.set(key, { data, source, confidence, timestamp: timestamp ?? (/* @__PURE__ */ new Date()).toISOString() });
-    interp.logger.info(`  \u2713 Learned data stored in context (key: ${key})`);
+    interp2.learnedFactsStore.save(key, data, { confidence, source, ttlDays: 30 });
+    interp2.context.learned.set(key, { data, source, confidence, timestamp: timestamp ?? (/* @__PURE__ */ new Date()).toISOString() });
+    interp2.logger.info(`  \u2713 Learned data stored in context (key: ${key})`);
     return {
       kind: "learn-result",
       operation: "learn",
@@ -17656,13 +17712,13 @@ function handleLearnBlock(interp, learnBlock) {
       saved: "disk"
     };
   } catch (error) {
-    interp.logger.error(`\u274C Learn failed: ${error.message}`);
+    interp2.logger.error(`\u274C Learn failed: ${error.message}`);
     return { kind: "learn-error", key, message: error.message, timestamp: (/* @__PURE__ */ new Date()).toISOString() };
   }
 }
-function handleReasoningBlock(interp, reasoningBlock) {
+function handleReasoningBlock(interp2, reasoningBlock) {
   const { stage, data, observations, analysis, decisions, actions, verifications, metadata, transitions } = reasoningBlock;
-  if (!interp.context.reasoning) interp.context.reasoning = /* @__PURE__ */ new Map();
+  if (!interp2.context.reasoning) interp2.context.reasoning = /* @__PURE__ */ new Map();
   const reasoningState = {
     stage,
     data: Object.fromEntries(data),
@@ -17675,7 +17731,7 @@ function handleReasoningBlock(interp, reasoningBlock) {
     transitions: transitions || []
   };
   const stateKey = `${stage}-${(/* @__PURE__ */ new Date()).getTime()}`;
-  interp.context.reasoning.set(stateKey, reasoningState);
+  interp2.context.reasoning.set(stateKey, reasoningState);
   const stageEmoji = { observe: "\u{1F440}", analyze: "\u{1F50D}", decide: "\u{1F3AF}", act: "\u26A1", verify: "\u2705" };
   let logMessage = `${stageEmoji[stage] || "\u2753"} ${stage.toUpperCase()}`;
   switch (stage) {
@@ -17683,7 +17739,7 @@ function handleReasoningBlock(interp, reasoningBlock) {
       if (observations && observations.length > 0) logMessage += `: ${observations.length} observations`;
       break;
     case "analyze": {
-      const currentSearches = interp.context.currentSearches;
+      const currentSearches = interp2.context.currentSearches;
       if (currentSearches && currentSearches.size > 0) logMessage += ` [using ${currentSearches.size} search result(s)]`;
       const angles = data.get("angles");
       if (angles instanceof Map) logMessage += `: ${angles.size} angles analyzed`;
@@ -17692,7 +17748,7 @@ function handleReasoningBlock(interp, reasoningBlock) {
       break;
     }
     case "decide": {
-      const currentLearned = interp.context.currentLearned;
+      const currentLearned = interp2.context.currentLearned;
       if (currentLearned && currentLearned.size > 0) logMessage += ` [using ${currentLearned.size} learned fact(s)]`;
       const choice = data.get("choice");
       if (choice) logMessage += `: "${choice.value || choice}"`;
@@ -17712,7 +17768,7 @@ function handleReasoningBlock(interp, reasoningBlock) {
       break;
     }
   }
-  interp.logger.info(logMessage);
+  interp2.logger.info(logMessage);
   return {
     kind: "reasoning-result",
     stage,
@@ -17791,7 +17847,7 @@ function extractParamNames(params) {
 // src/eval-module-system.ts
 init_lexer();
 init_parser();
-function evalModuleBlock(interp, moduleBlock) {
+function evalModuleBlock(interp2, moduleBlock) {
   const moduleName = moduleBlock.name;
   const exports2 = moduleBlock.exports || [];
   const moduleBody = moduleBlock.body || [];
@@ -17824,10 +17880,10 @@ function evalModuleBlock(interp, moduleBlock) {
     exports: exports2,
     functions: moduleFunctions
   };
-  interp.getModules().set(moduleName, moduleInfo);
-  interp.logger.info(`\u2705 Module registered: ${moduleName} (exports: ${exports2.join(", ")})`);
+  interp2.getModules().set(moduleName, moduleInfo);
+  interp2.logger.info(`\u2705 Module registered: ${moduleName} (exports: ${exports2.join(", ")})`);
 }
-function evalImportBlock(interp, importBlock) {
+function evalImportBlock(interp2, importBlock) {
   const moduleName = importBlock.moduleName;
   const source = importBlock.source;
   const selective = importBlock.selective;
@@ -17838,9 +17894,9 @@ function evalImportBlock(interp, importBlock) {
     if (!isFile) {
       const baseDir = (() => {
         try {
-          return fs3.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path3.dirname(interp.currentFilePath);
+          return fs3.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path3.dirname(interp2.currentFilePath);
         } catch {
-          return interp.currentFilePath;
+          return interp2.currentFilePath;
         }
       })();
       const candidates = [
@@ -17852,11 +17908,11 @@ function evalImportBlock(interp, importBlock) {
       isFile = candidates.some((c) => fs3.existsSync(c));
     }
     if (isFile) {
-      interp.evalImportFromFile(source, moduleName, selective, alias);
+      interp2.evalImportFromFile(source, moduleName, selective, alias);
       return;
     }
   }
-  const module2 = interp.getModules().get(moduleName);
+  const module2 = interp2.getModules().get(moduleName);
   if (!module2) {
     throw new ModuleNotFoundError(moduleName, source);
   }
@@ -17867,7 +17923,7 @@ function evalImportBlock(interp, importBlock) {
     );
     selective.forEach((name) => {
       if (!module2.exports.includes(name)) {
-        interp.logger.warn(
+        interp2.logger.warn(
           `Function "${name}" not exported from module "${moduleName}"`
         );
       }
@@ -17880,26 +17936,26 @@ function evalImportBlock(interp, importBlock) {
     if (func) {
       if (alias) {
         const qualifiedName = `${alias}:${funcName}`;
-        interp.context.functions.set(qualifiedName, func);
+        interp2.context.functions.set(qualifiedName, func);
       } else {
         const qualifiedName = `${moduleName}:${funcName}`;
-        interp.context.functions.set(qualifiedName, func);
+        interp2.context.functions.set(qualifiedName, func);
       }
     }
   });
   const importedCount = functionsToImport.length;
   const aliasStr = alias ? ` as ${alias}` : "";
   const selectStr = selective ? ` (${selective.join(", ")})` : "";
-  interp.logger.info(
+  interp2.logger.info(
     `\u2705 Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`
   );
 }
-function evalImportFromFile(interp, relPath, prefix, selective, alias) {
+function evalImportFromFile(interp2, relPath, prefix, selective, alias) {
   const baseDir = (() => {
     try {
-      return fs3.statSync(interp.currentFilePath).isDirectory() ? interp.currentFilePath : path3.dirname(interp.currentFilePath);
+      return fs3.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path3.dirname(interp2.currentFilePath);
     } catch {
-      return interp.currentFilePath;
+      return interp2.currentFilePath;
     }
   })();
   const tryResolve = (candidate) => {
@@ -17926,14 +17982,14 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
   if (!absPath) {
     throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
   }
-  if (interp.importedFiles.has(absPath)) {
+  if (interp2.importedFiles.has(absPath)) {
     return;
   }
-  interp.importedFiles.add(absPath);
+  interp2.importedFiles.add(absPath);
   const src = fs3.readFileSync(absPath, "utf-8");
   const subInterp = new Interpreter();
   subInterp.currentFilePath = absPath;
-  subInterp.importedFiles = interp.importedFiles;
+  subInterp.importedFiles = interp2.importedFiles;
   const builtinFuncs = new Set(subInterp.context.functions.keys());
   subInterp.interpret(parse(lex(src)));
   if (process.env.FL_IMPORT_DEBUG === "1") {
@@ -17948,27 +18004,27 @@ function evalImportFromFile(interp, relPath, prefix, selective, alias) {
     if (builtinFuncs.has(funcName)) continue;
     if (selective && selective.length > 0) {
       if (selective.includes(funcName)) {
-        interp.context.functions.set(funcName, func);
+        interp2.context.functions.set(funcName, func);
       }
     } else {
-      interp.context.functions.set(`${effectivePrefix}:${funcName}`, func);
+      interp2.context.functions.set(`${effectivePrefix}:${funcName}`, func);
     }
   }
 }
-function evalOpenBlock(interp, openBlock) {
+function evalOpenBlock(interp2, openBlock) {
   const moduleName = openBlock.moduleName;
   const source = openBlock.source;
-  const module2 = interp.getModules().get(moduleName);
+  const module2 = interp2.getModules().get(moduleName);
   if (!module2) {
     throw new ModuleNotFoundError(moduleName, source);
   }
   module2.exports.forEach((funcName) => {
     const func = module2.functions.get(funcName);
     if (func) {
-      interp.context.functions.set(funcName, func);
+      interp2.context.functions.set(funcName, func);
     }
   });
-  interp.logger.info(
+  interp2.logger.info(
     `\u2705 Opened module "${moduleName}" (${module2.exports.length} function(s) available globally)`
   );
 }
@@ -18359,8 +18415,8 @@ function createDataModule() {
   return {
     // ── JSON ──────────────────────────────────────────────────
     // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
-    "json_get": (obj, path13) => {
-      const parts = path13.split(".");
+    "json_get": (obj, path14) => {
+      const parts = path14.split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -18369,10 +18425,10 @@ function createDataModule() {
       return cur ?? null;
     },
     // json_set obj path value -> object (immutable update, returns new obj)
-    "json_set": (obj, path13, value) => {
+    "json_set": (obj, path14, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const clone = JSON.parse(JSON.stringify(parsed));
-      const parts = path13.split(".");
+      const parts = path14.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -19492,8 +19548,8 @@ function createResourceModule() {
       });
     },
     // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
-    "res_disk_usage": (path13) => {
-      const line = run(`df -BG --output=size,used,avail,pcent "${path13}" 2>/dev/null | tail -1`);
+    "res_disk_usage": (path14) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path14}" 2>/dev/null | tail -1`);
       if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
       const [total, used, avail, pct] = line.trim().split(/\s+/);
       return {
@@ -19837,13 +19893,13 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     const counter = ++requestCounter;
     return `req_${timestamp}_${counter}`;
   }
-  function logAccess(method, path13, status, duration, requestId) {
+  function logAccess(method, path14, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path13} ${status} ${duration}ms`);
+    console.log(`${icon} [${requestId}] ${method} ${path14} ${status} ${duration}ms`);
   }
-  function pathToRegex(path13) {
+  function pathToRegex(path14) {
     const params = [];
-    const pattern = path13.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+    const pattern = path14.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
       params.push(param);
       return "([^\\/]+)";
     });
@@ -19906,11 +19962,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       res.end(String(body ?? ""));
     }
   }
-  function createFlRequest(method, path13, query, headers, body, params, requestId) {
+  function createFlRequest(method, path14, query, headers, body, params, requestId) {
     return {
       __fl_request: true,
       method,
-      path: path13,
+      path: path14,
       query,
       headers,
       body: body || void 0,
@@ -19921,33 +19977,33 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   }
   return {
     // server_get path handlerName -> null
-    "server_get": (path13, handlerName) => {
-      const [pattern, params] = pathToRegex(path13);
-      routes.push({ method: "GET", path: path13, pattern, params, handler: handlerName });
+    "server_get": (path14, handlerName) => {
+      const [pattern, params] = pathToRegex(path14);
+      routes.push({ method: "GET", path: path14, pattern, params, handler: handlerName });
       return null;
     },
     // server_post path handlerName -> null
-    "server_post": (path13, handlerName) => {
-      const [pattern, params] = pathToRegex(path13);
-      routes.push({ method: "POST", path: path13, pattern, params, handler: handlerName });
+    "server_post": (path14, handlerName) => {
+      const [pattern, params] = pathToRegex(path14);
+      routes.push({ method: "POST", path: path14, pattern, params, handler: handlerName });
       return null;
     },
     // server_put path handlerName -> null
-    "server_put": (path13, handlerName) => {
-      const [pattern, params] = pathToRegex(path13);
-      routes.push({ method: "PUT", path: path13, pattern, params, handler: handlerName });
+    "server_put": (path14, handlerName) => {
+      const [pattern, params] = pathToRegex(path14);
+      routes.push({ method: "PUT", path: path14, pattern, params, handler: handlerName });
       return null;
     },
     // server_patch path handlerName -> null
-    "server_patch": (path13, handlerName) => {
-      const [pattern, params] = pathToRegex(path13);
-      routes.push({ method: "PATCH", path: path13, pattern, params, handler: handlerName });
+    "server_patch": (path14, handlerName) => {
+      const [pattern, params] = pathToRegex(path14);
+      routes.push({ method: "PATCH", path: path14, pattern, params, handler: handlerName });
       return null;
     },
     // server_delete path handlerName -> null
-    "server_delete": (path13, handlerName) => {
-      const [pattern, params] = pathToRegex(path13);
-      routes.push({ method: "DELETE", path: path13, pattern, params, handler: handlerName });
+    "server_delete": (path14, handlerName) => {
+      const [pattern, params] = pathToRegex(path14);
+      routes.push({ method: "DELETE", path: path14, pattern, params, handler: handlerName });
       return null;
     },
     // server_start port -> string
@@ -19964,7 +20020,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const requestId = generateRequestId();
         currentRequestId = requestId;
         const method = req.method || "GET";
-        const { path: path13, query } = parseUrl(req.url || "/");
+        const { path: path14, query } = parseUrl(req.url || "/");
         const headers = req.headers;
         const body = await readBody(req);
         res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19976,7 +20032,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           res.end();
           return;
         }
-        if (process.env.FL_DEV === "1" && path13 === "/__hot" && method === "GET") {
+        if (process.env.FL_DEV === "1" && path14 === "/__hot" && method === "GET") {
           res.writeHead(200, {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -19989,7 +20045,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
-          const match = route.pattern.exec(path13);
+          const match = route.pattern.exec(path14);
           if (!match) continue;
           matched = true;
           let status = 200;
@@ -19998,7 +20054,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
             for (let i = 0; i < route.params.length; i++) {
               params[route.params[i]] = match[i + 1];
             }
-            const flReq = createFlRequest(method, path13, query, headers, body, params, requestId);
+            const flReq = createFlRequest(method, path14, query, headers, body, params, requestId);
             let rawResult;
             if (typeof route.handler === "string") {
               rawResult = callFn(route.handler, [flReq]);
@@ -20046,20 +20102,20 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               }
             }
             const duration = Date.now() - requestStart;
-            logAccess(method, path13, status, duration, requestId);
+            logAccess(method, path14, status, duration, requestId);
           } catch (err4) {
             const status2 = 500;
             sendResponse(res, status2, { error: err4.message });
             const duration = Date.now() - requestStart;
-            logAccess(method, path13, status2, duration, requestId);
+            logAccess(method, path14, status2, duration, requestId);
           }
           return;
         }
         if (!matched) {
           const status = 404;
-          sendResponse(res, status, { error: "Not Found", path: path13 });
+          sendResponse(res, status, { error: "Not Found", path: path14 });
           const duration = Date.now() - requestStart;
-          logAccess(method, path13, status, duration, requestId);
+          logAccess(method, path14, status, duration, requestId);
         }
       });
       server.on("upgrade", (req, socket, head) => {
@@ -20360,8 +20416,8 @@ function createHttpServerModule(callFn, callFunctionValue2) {
 // src/stdlib-db.ts
 var import_child_process4 = require("child_process");
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
-function kimdbReq(method, path13, body) {
-  const url2 = `${KIMDB}${path13}`;
+function kimdbReq(method, path14, body) {
+  const url2 = `${KIMDB}${path14}`;
   const args2 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args2.push("-X", method);
@@ -20625,6 +20681,87 @@ function createMariadbModule() {
     "mariadb_tables": (db) => {
       const rows = parseRows(runMariadb(db, "SHOW TABLES"));
       return rows.map((r) => Object.values(r)[0]);
+    }
+  };
+}
+
+// src/stdlib-mongodb.ts
+var import_child_process6 = require("child_process");
+var path5 = __toESM(require("path"));
+function createMongodbModule() {
+  const helperPath = path5.join(__dirname, "_mongodb_helper.js");
+  function callHelper(req) {
+    try {
+      const json = JSON.stringify(req);
+      const result = (0, import_child_process6.execFileSync)("node", [helperPath, json], {
+        timeout: 15e3,
+        encoding: "utf-8"
+      });
+      return JSON.parse(result);
+    } catch (err4) {
+      return {
+        ok: false,
+        error: err4.message || "Helper execution failed"
+      };
+    }
+  }
+  return {
+    // mongodb_connect host port → connId or null
+    "mongodb_connect": (host, port = 27017) => {
+      const result = callHelper({
+        method: "connect",
+        host,
+        port
+      });
+      if (result.ok) {
+        return `${host}:${port}`;
+      }
+      return null;
+    },
+    // mongodb_sendrecv connId hexData → hexResponse or null
+    // Wire Protocol 명령 전송 & 응답 수신
+    "mongodb_sendrecv": (connId, hexData, timeout = 1e4) => {
+      const [host, portStr] = connId.split(":");
+      const port = parseInt(portStr, 10);
+      const result = callHelper({
+        method: "sendrecv",
+        host,
+        port,
+        data: hexData,
+        timeout
+      });
+      if (result.ok && result.data) {
+        return result.data;
+      }
+      return null;
+    },
+    // mongodb_send connId hexData → boolean
+    "mongodb_send": (connId, hexData) => {
+      const [host, portStr] = connId.split(":");
+      const port = parseInt(portStr, 10);
+      const result = callHelper({
+        method: "send",
+        host,
+        port,
+        data: hexData
+      });
+      return result.ok === true;
+    },
+    // mongodb_close connId → boolean
+    "mongodb_close": (connId) => {
+      return true;
+    },
+    // mongodb_is_connected connId → boolean
+    "mongodb_is_connected": (connId) => {
+      const [host, portStr] = connId.split(":");
+      const port = parseInt(portStr, 10);
+      const result = callHelper({
+        method: "connect",
+        host,
+        port,
+        timeout: 1e3
+      });
+      return result.ok === true;
     }
   };
 }
@@ -20968,7 +21105,7 @@ function createPubSubModule(callFn) {
 
 // src/stdlib-process.ts
 var fs5 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var path6 = __toESM(require("path"));
 function createProcessModule() {
   let sigtermRegistered = false;
   const shutdownCallbacks = [];
@@ -20988,7 +21125,7 @@ function createProcessModule() {
   }
   return {
     "env_load": (envPath) => {
-      const filePath = envPath ? path5.resolve(envPath) : path5.resolve(process.cwd(), ".env");
+      const filePath = envPath ? path6.resolve(envPath) : path6.resolve(process.cwd(), ".env");
       const loaded = {};
       let content;
       try {
@@ -21192,9 +21329,9 @@ function createModuleSystem() {
   return {
     // module_load path -> {exports} | null
     // Load a module from file or registry
-    "module_load": (path13) => {
-      if (registry.has(path13)) {
-        return registry.get(path13);
+    "module_load": (path14) => {
+      if (registry.has(path14)) {
+        return registry.get(path14);
       }
       return null;
     },
@@ -21210,9 +21347,9 @@ function createModuleSystem() {
     },
     // module_require path -> {exports}
     // Require and return all exports from a module
-    "module_require": (path13) => {
-      if (registry.has(path13)) {
-        return registry.get(path13) || {};
+    "module_require": (path14) => {
+      if (registry.has(path14)) {
+        return registry.get(path14) || {};
       }
       return {};
     },
@@ -21773,7 +21910,7 @@ function createTestModule(callFn) {
 
 // src/stdlib-compile.ts
 var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var path7 = __toESM(require("path"));
 init_lexer();
 init_parser();
 
@@ -22192,7 +22329,7 @@ function createCompileModule() {
           minify: false,
           target: "node"
         });
-        const dir = path6.dirname(outputPath);
+        const dir = path7.dirname(outputPath);
         if (dir !== "." && !fs6.existsSync(dir)) {
           fs6.mkdirSync(dir, { recursive: true });
         }
@@ -22206,14 +22343,14 @@ function createCompileModule() {
     // Compile all .fl files in a directory
     "fl_compile": (srcDir, distDir) => {
       try {
-        const absDir = path6.resolve(srcDir);
-        const absOut = path6.resolve(distDir);
-        const files = fs6.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path6.join(absDir, f));
+        const absDir = path7.resolve(srcDir);
+        const absOut = path7.resolve(distDir);
+        const files = fs6.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path7.join(absDir, f));
         let compiled = 0;
         let failed = 0;
         const errors = [];
         for (const file of files) {
-          const outFile = path6.join(absOut, path6.basename(file, ".fl") + ".js");
+          const outFile = path7.join(absOut, path7.basename(file, ".fl") + ".js");
           try {
             const source = fs6.readFileSync(file, "utf-8");
             const tokens = lex(source);
@@ -22224,7 +22361,7 @@ function createCompileModule() {
               minify: false,
               target: "node"
             });
-            const dir = path6.dirname(outFile);
+            const dir = path7.dirname(outFile);
             if (dir !== "." && !fs6.existsSync(dir)) {
               fs6.mkdirSync(dir, { recursive: true });
             }
@@ -22232,7 +22369,7 @@ function createCompileModule() {
             compiled++;
           } catch (err4) {
             failed++;
-            errors.push(`${path6.basename(file)}: ${err4.message}`);
+            errors.push(`${path7.basename(file)}: ${err4.message}`);
           }
         }
         return { compiled, failed, errors };
@@ -22316,7 +22453,7 @@ function httpRequest(method, url2, body) {
 
 // src/stdlib-oci.ts
 var fs7 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var path8 = __toESM(require("path"));
 var crypto2 = __toESM(require("crypto"));
 function createOciModule() {
   const imageStore = /* @__PURE__ */ new Map();
@@ -22343,13 +22480,13 @@ function createOciModule() {
     "oci_create_layer": (dirPath) => {
       try {
         const { execSync: execSync2 } = require("child_process");
-        const resolvedPath = path7.resolve(dirPath);
+        const resolvedPath = path8.resolve(dirPath);
         if (!fs7.existsSync(resolvedPath)) {
           throw new Error(`Directory not found: ${resolvedPath}`);
         }
-        const layerName = path7.basename(resolvedPath);
-        const layerFile = path7.join(path7.dirname(resolvedPath), `${layerName}-layer.tar.gz`);
-        const cmd2 = `cd "${path7.dirname(resolvedPath)}" && tar -czf "${path7.basename(layerFile)}" "${layerName}"`;
+        const layerName = path8.basename(resolvedPath);
+        const layerFile = path8.join(path8.dirname(resolvedPath), `${layerName}-layer.tar.gz`);
+        const cmd2 = `cd "${path8.dirname(resolvedPath)}" && tar -czf "${path8.basename(layerFile)}" "${layerName}"`;
         execSync2(cmd2, { encoding: "utf-8" });
         if (!fs7.existsSync(layerFile)) {
           throw new Error(`Failed to create layer archive: ${layerFile}`);
@@ -22371,7 +22508,7 @@ function createOciModule() {
     "oci_build": (tag, layers) => {
       try {
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const imageDir = path7.resolve(".oci-images", tag);
+        const imageDir = path8.resolve(".oci-images", tag);
         if (!fs7.existsSync(imageDir)) {
           fs7.mkdirSync(imageDir, { recursive: true });
         }
@@ -22401,21 +22538,21 @@ function createOciModule() {
           }]
         };
         fs7.writeFileSync(
-          path7.join(imageDir, "manifest.json"),
+          path8.join(imageDir, "manifest.json"),
           JSON.stringify(manifest, null, 2),
           "utf-8"
         );
         fs7.writeFileSync(
-          path7.join(imageDir, "config.json"),
+          path8.join(imageDir, "config.json"),
           JSON.stringify(config, null, 2),
           "utf-8"
         );
         fs7.writeFileSync(
-          path7.join(imageDir, "oci-layout"),
+          path8.join(imageDir, "oci-layout"),
           JSON.stringify({ imageLayoutVersion: "1.0.0" }),
           "utf-8"
         );
-        const blobsDir = path7.join(imageDir, "blobs", "sha256");
+        const blobsDir = path8.join(imageDir, "blobs", "sha256");
         if (!fs7.existsSync(blobsDir)) {
           fs7.mkdirSync(blobsDir, { recursive: true });
         }
@@ -22431,7 +22568,7 @@ function createOciModule() {
           }]
         };
         fs7.writeFileSync(
-          path7.join(imageDir, "index.json"),
+          path8.join(imageDir, "index.json"),
           JSON.stringify(indexJson, null, 2),
           "utf-8"
         );
@@ -22530,7 +22667,7 @@ function createOciModule() {
           throw new Error(`Image not found: ${tag}`);
         }
         imageStore.delete(tag);
-        const imageDir = path7.resolve(".oci-images", tag);
+        const imageDir = path8.resolve(".oci-images", tag);
         if (fs7.existsSync(imageDir)) {
           fs7.rmSync(imageDir, { recursive: true, force: true });
         }
@@ -24538,9 +24675,9 @@ function createFeedModule() {
       out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
       out.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
       for (const r of routes || []) {
-        const path13 = typeof r === "string" ? r : r.loc;
+        const path14 = typeof r === "string" ? r : r.loc;
         out.push(`<url>`);
-        out.push(`<loc>${esc(base + (path13.startsWith("/") ? path13 : "/" + path13))}</loc>`);
+        out.push(`<loc>${esc(base + (path14.startsWith("/") ? path14 : "/" + path14))}</loc>`);
         if (typeof r !== "string") {
           if (r.lastmod) out.push(`<lastmod>${esc(r.lastmod)}</lastmod>`);
           if (r.changefreq) out.push(`<changefreq>${esc(r.changefreq)}</changefreq>`);
@@ -24703,23 +24840,23 @@ function createBlogModule() {
 }
 
 // src/stdlib-cloud.ts
-var import_child_process6 = require("child_process");
+var import_child_process7 = require("child_process");
 var cliAvailable = {};
 function checkAwsCLI() {
   if (cliAvailable.aws !== void 0) return cliAvailable.aws;
-  const result = (0, import_child_process6.spawnSync)("aws", ["--version"], { timeout: 3e3 });
+  const result = (0, import_child_process7.spawnSync)("aws", ["--version"], { timeout: 3e3 });
   cliAvailable.aws = !result.error && result.status === 0;
   return cliAvailable.aws;
 }
 function checkGcloudCLI() {
   if (cliAvailable.gcloud !== void 0) return cliAvailable.gcloud;
-  const result = (0, import_child_process6.spawnSync)("gcloud", ["--version"], { timeout: 3e3 });
+  const result = (0, import_child_process7.spawnSync)("gcloud", ["--version"], { timeout: 3e3 });
   cliAvailable.gcloud = !result.error && result.status === 0;
   return cliAvailable.gcloud;
 }
 function checkAzCLI() {
   if (cliAvailable.az !== void 0) return cliAvailable.az;
-  const result = (0, import_child_process6.spawnSync)("az", ["--version"], { timeout: 3e3 });
+  const result = (0, import_child_process7.spawnSync)("az", ["--version"], { timeout: 3e3 });
   cliAvailable.az = !result.error && result.status === 0;
   return cliAvailable.az;
 }
@@ -24728,7 +24865,7 @@ function runAws(args2) {
     return { status: "cli_not_found", reason: "aws CLI not installed", details: "install aws-cli" };
   }
   try {
-    const result = (0, import_child_process6.spawnSync)("aws", args2, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process7.spawnSync)("aws", args2, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -24745,7 +24882,7 @@ function runGcloud(args2) {
     return { status: "cli_not_found", reason: "gcloud CLI not installed", details: "install google-cloud-sdk" };
   }
   try {
-    const result = (0, import_child_process6.spawnSync)("gcloud", args2, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process7.spawnSync)("gcloud", args2, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -24762,7 +24899,7 @@ function runAz(args2) {
     return { status: "cli_not_found", reason: "az CLI not installed", details: "install azure-cli" };
   }
   try {
-    const result = (0, import_child_process6.spawnSync)("az", args2, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process7.spawnSync)("az", args2, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -24926,7 +25063,7 @@ function createCloudModule() {
       if (res.status === "cli_not_found") return res;
       if (res.status === "error") return { status: "invoke_failed", reason: res.reason, serviceName };
       const url2 = res.output;
-      const curlResult = (0, import_child_process6.spawnSync)("curl", ["-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", dataJson, url2], { timeout: 1e4, encoding: "utf-8" });
+      const curlResult = (0, import_child_process7.spawnSync)("curl", ["-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", dataJson, url2], { timeout: 1e4, encoding: "utf-8" });
       const output = curlResult.stdout?.trim() ?? "";
       return { status: "invoked", serviceName, url: url2, output };
     },
@@ -25131,120 +25268,121 @@ function createMatrixModule() {
 }
 
 // src/stdlib-loader.ts
-function loadAllStdlib(interp) {
-  interp.registerModule(createFileModule());
-  interp.registerModule(createErrorModule());
-  interp.registerModule(createHttpModule());
-  interp.registerModule(createShellModule());
-  interp.registerModule(createDataModule());
-  interp.registerModule(createCollectionModule());
-  interp.registerModule(createAgentModule());
-  interp.registerModule(createTimeModule());
-  interp.registerModule(createCryptoModule());
-  interp.registerModule(createWorkflowModule());
-  interp.registerModule(createResourceModule());
-  interp.registerModule(createHttpServerModule(
-    (n, a) => interp.callUserFunction(n, a),
-    (fnValue, a) => interp.callFunctionValue(fnValue, a)
+function loadAllStdlib(interp2) {
+  interp2.registerModule(createFileModule());
+  interp2.registerModule(createErrorModule());
+  interp2.registerModule(createHttpModule());
+  interp2.registerModule(createShellModule());
+  interp2.registerModule(createDataModule());
+  interp2.registerModule(createCollectionModule());
+  interp2.registerModule(createAgentModule());
+  interp2.registerModule(createTimeModule());
+  interp2.registerModule(createCryptoModule());
+  interp2.registerModule(createWorkflowModule());
+  interp2.registerModule(createResourceModule());
+  interp2.registerModule(createHttpServerModule(
+    (n, a) => interp2.callUserFunction(n, a),
+    (fnValue, a) => interp2.callFunctionValue(fnValue, a)
   ));
-  interp.registerModule(createDbModule());
-  interp.registerModule(createMariadbModule());
-  interp.registerModule(createAuthModule());
-  interp.registerModule(createCacheModule());
-  interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
-  interp.registerModule(createProcessModule());
-  interp.registerModule(createAsyncModule((n, a) => interp.callUserFunction(n, a)));
-  interp.registerModule(createModuleSystem());
-  interp.registerModule(createChannelModule());
-  interp.registerModule(createImmutableModule());
-  interp.registerModule(createAiNativeModule());
-  interp.registerModule(createTestModule(
+  interp2.registerModule(createDbModule());
+  interp2.registerModule(createMariadbModule());
+  interp2.registerModule(createMongodbModule());
+  interp2.registerModule(createAuthModule());
+  interp2.registerModule(createCacheModule());
+  interp2.registerModule(createPubSubModule((n, a) => interp2.callUserFunction(n, a)));
+  interp2.registerModule(createProcessModule());
+  interp2.registerModule(createAsyncModule((n, a) => interp2.callUserFunction(n, a)));
+  interp2.registerModule(createModuleSystem());
+  interp2.registerModule(createChannelModule());
+  interp2.registerModule(createImmutableModule());
+  interp2.registerModule(createAiNativeModule());
+  interp2.registerModule(createTestModule(
     // Phase 76: deftest, describe, assert-eq, ...
-    (fnValue, args2) => interp.callFunctionValue(fnValue, args2)
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
   ));
-  interp.registerModule(createMaybeModule(
+  interp2.registerModule(createMaybeModule(
     // Phase 91: 불확실성 타입 (maybe/none/confident)
-    (fnValue, args2) => interp.callFunctionValue(fnValue, args2),
-    (name, args2) => interp.callUserFunction(name, args2)
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2),
+    (name, args2) => interp2.callUserFunction(name, args2)
   ));
-  interp.registerModule(createCompileModule());
-  interp.registerModule(createRegistryModule());
-  interp.registerModule(createOciModule());
-  interp.registerModule(createOrmModule());
-  interp.registerModule(createValidationModule());
-  interp.registerModule(createMiddlewareModule());
-  interp.registerModule(createTableModule());
-  interp.registerModule(createStatsModule());
-  interp.registerModule(createPlotModule());
-  interp.registerModule(createTestEnhancedModule());
-  interp.registerModule(createServiceModule());
-  interp.registerModule(createWsModule(
+  interp2.registerModule(createCompileModule());
+  interp2.registerModule(createRegistryModule());
+  interp2.registerModule(createOciModule());
+  interp2.registerModule(createOrmModule());
+  interp2.registerModule(createValidationModule());
+  interp2.registerModule(createMiddlewareModule());
+  interp2.registerModule(createTableModule());
+  interp2.registerModule(createStatsModule());
+  interp2.registerModule(createPlotModule());
+  interp2.registerModule(createTestEnhancedModule());
+  interp2.registerModule(createServiceModule());
+  interp2.registerModule(createWsModule(
     // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
-    (n, a) => interp.callUserFunction(n, a)
+    (n, a) => interp2.callUserFunction(n, a)
   ));
-  interp.registerModule(createWscModule(
+  interp2.registerModule(createWscModule(
     // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
-    (n, a) => interp.callUserFunction(n, a)
+    (n, a) => interp2.callUserFunction(n, a)
   ));
-  interp.registerModule(createMarkdownModule());
-  interp.registerModule(createFeedModule());
-  interp.registerModule(createBlogModule());
-  interp.registerModule(createCloudModule());
-  interp.registerModule(createMatrixModule());
+  interp2.registerModule(createMarkdownModule());
+  interp2.registerModule(createFeedModule());
+  interp2.registerModule(createBlogModule());
+  interp2.registerModule(createCloudModule());
+  interp2.registerModule(createMatrixModule());
 }
 
 // src/eval-pattern-match.ts
-function evalPatternMatch(interp, match) {
-  const value = interp.eval(match.value);
+function evalPatternMatch(interp2, match) {
+  const value = interp2.eval(match.value);
   for (const caseItem of match.cases) {
-    const matchResult = matchPattern(interp, caseItem.pattern, value);
+    const matchResult = matchPattern(interp2, caseItem.pattern, value);
     if (matchResult.matched) {
-      interp.context.variables.push();
+      interp2.context.variables.push();
       for (const [varName] of matchResult.bindings) {
-        interp.context.variables.set("$" + varName, matchResult.bindings.get(varName));
+        interp2.context.variables.set("$" + varName, matchResult.bindings.get(varName));
       }
       if (matchResult.asBinding) {
-        interp.context.variables.set("$" + matchResult.asBinding, value);
+        interp2.context.variables.set("$" + matchResult.asBinding, value);
       }
       if (caseItem.guard) {
-        const guardResult = interp.eval(caseItem.guard);
+        const guardResult = interp2.eval(caseItem.guard);
         if (!guardResult) {
-          interp.context.variables.pop();
+          interp2.context.variables.pop();
           continue;
         }
       }
       try {
-        return interp.eval(caseItem.body);
+        return interp2.eval(caseItem.body);
       } finally {
-        interp.context.variables.pop();
+        interp2.context.variables.pop();
       }
     }
   }
   if (match.defaultCase) {
-    return interp.eval(match.defaultCase);
+    return interp2.eval(match.defaultCase);
   }
   throw new Error("Pattern match exhausted without matching case");
 }
-function evalTryBlock(interp, tryBlock) {
+function evalTryBlock(interp2, tryBlock) {
   let result;
   try {
-    result = interp.eval(tryBlock.body);
+    result = interp2.eval(tryBlock.body);
   } catch (error) {
     let handled = false;
     if (tryBlock.catchClauses && tryBlock.catchClauses.length > 0) {
       for (const catchClause of tryBlock.catchClauses) {
-        interp.context.variables.push();
+        interp2.context.variables.push();
         if (catchClause.variable) {
-          interp.context.variables.set("$" + catchClause.variable, error);
+          interp2.context.variables.set("$" + catchClause.variable, error);
         }
         try {
-          result = interp.eval(catchClause.handler);
+          result = interp2.eval(catchClause.handler);
           handled = true;
           break;
         } catch (innerError) {
           throw innerError;
         } finally {
-          interp.context.variables.pop();
+          interp2.context.variables.pop();
         }
       }
     }
@@ -25253,13 +25391,13 @@ function evalTryBlock(interp, tryBlock) {
     }
   } finally {
     if (tryBlock.finallyBlock) {
-      interp.eval(tryBlock.finallyBlock);
+      interp2.eval(tryBlock.finallyBlock);
     }
   }
   return result;
 }
-function evalThrow(interp, throwExpr) {
-  const error = interp.eval(throwExpr.argument);
+function evalThrow(interp2, throwExpr) {
+  const error = interp2.eval(throwExpr.argument);
   if (error instanceof Error) {
     throw error;
   } else if (typeof error === "string") {
@@ -25270,7 +25408,7 @@ function evalThrow(interp, throwExpr) {
     throw new Error(String(error));
   }
 }
-function matchPattern(interp, pattern, value) {
+function matchPattern(interp2, pattern, value) {
   const bindings = /* @__PURE__ */ new Map();
   if (pattern.kind === "literal-pattern") {
     const litPattern = pattern;
@@ -25295,7 +25433,7 @@ function matchPattern(interp, pattern, value) {
       if (i >= value.length) {
         return { matched: false, bindings };
       }
-      const elemResult = matchPattern(interp, elements[i], value[i]);
+      const elemResult = matchPattern(interp2, elements[i], value[i]);
       if (!elemResult.matched) {
         return { matched: false, bindings };
       }
@@ -25320,7 +25458,7 @@ function matchPattern(interp, pattern, value) {
     for (const [fieldName, fieldPattern] of structPattern.fields) {
       const key = fieldName.startsWith(":") ? fieldName.slice(1) : fieldName;
       const fieldValue = value[key] !== void 0 ? value[key] : value[fieldName];
-      const fieldResult = matchPattern(interp, fieldPattern, fieldValue);
+      const fieldResult = matchPattern(interp2, fieldPattern, fieldValue);
       if (!fieldResult.matched) {
         return { matched: false, bindings };
       }
@@ -25333,7 +25471,7 @@ function matchPattern(interp, pattern, value) {
   if (pattern.kind === "or-pattern") {
     const orPattern = pattern;
     for (const alternative of orPattern.alternatives) {
-      const altResult = matchPattern(interp, alternative, value);
+      const altResult = matchPattern(interp2, alternative, value);
       if (altResult.matched) {
         return altResult;
       }
@@ -25349,29 +25487,29 @@ function matchPattern(interp, pattern, value) {
 }
 
 // src/eval-type-classes.ts
-function registerBuiltinTypeClasses(interp) {
-  if (!interp.context.typeClasses || !interp.context.typeClassInstances) return;
+function registerBuiltinTypeClasses(interp2) {
+  if (!interp2.context.typeClasses || !interp2.context.typeClassInstances) return;
   const bindMonad = (monad, fn) => {
     if (monad?.kind === "Result") {
-      return monad.tag === "Ok" ? interp.callFunction(fn, [monad.value]) : monad;
+      return monad.tag === "Ok" ? interp2.callFunction(fn, [monad.value]) : monad;
     }
     if (monad?.kind === "Option") {
-      return monad.tag === "Some" ? interp.callFunction(fn, [monad.value]) : monad;
+      return monad.tag === "Some" ? interp2.callFunction(fn, [monad.value]) : monad;
     }
     return monad;
   };
   const bindList = (list, fn) => {
     let result = [];
     for (const item of list) {
-      const t = interp.callFunction(fn, [item]);
+      const t = interp2.callFunction(fn, [item]);
       result = result.concat(Array.isArray(t) ? t : [t]);
     }
     return result;
   };
-  const mapResult = (r, fn) => r?.tag === "Ok" ? { tag: "Ok", value: interp.callFunction(fn, [r.value]), kind: "Result" } : r;
-  const mapOption = (o, fn) => o?.tag === "Some" ? { tag: "Some", value: interp.callFunction(fn, [o.value]), kind: "Option" } : o;
-  const mapList = (list, fn) => list.map((item) => interp.callFunction(fn, [item]));
-  interp.context.typeClasses.set("Monad", {
+  const mapResult = (r, fn) => r?.tag === "Ok" ? { tag: "Ok", value: interp2.callFunction(fn, [r.value]), kind: "Result" } : r;
+  const mapOption = (o, fn) => o?.tag === "Some" ? { tag: "Some", value: interp2.callFunction(fn, [o.value]), kind: "Option" } : o;
+  const mapList = (list, fn) => list.map((item) => interp2.callFunction(fn, [item]));
+  interp2.context.typeClasses.set("Monad", {
     name: "Monad",
     typeParams: ["M"],
     methods: /* @__PURE__ */ new Map([
@@ -25380,12 +25518,12 @@ function registerBuiltinTypeClasses(interp) {
       ["map", "fn [m f] (M b)"]
     ])
   });
-  interp.context.typeClasses.set("Functor", {
+  interp2.context.typeClasses.set("Functor", {
     name: "Functor",
     typeParams: ["F"],
     methods: /* @__PURE__ */ new Map([["fmap", "fn [f a] (F a)"]])
   });
-  interp.context.typeClassInstances.set("Monad[Result]", {
+  interp2.context.typeClassInstances.set("Monad[Result]", {
     className: "Monad",
     concreteType: "Result",
     implementations: /* @__PURE__ */ new Map([
@@ -25394,7 +25532,7 @@ function registerBuiltinTypeClasses(interp) {
       ["map", mapResult]
     ])
   });
-  interp.context.typeClassInstances.set("Monad[Option]", {
+  interp2.context.typeClassInstances.set("Monad[Option]", {
     className: "Monad",
     concreteType: "Option",
     implementations: /* @__PURE__ */ new Map([
@@ -25403,7 +25541,7 @@ function registerBuiltinTypeClasses(interp) {
       ["map", mapOption]
     ])
   });
-  interp.context.typeClassInstances.set("Monad[List]", {
+  interp2.context.typeClassInstances.set("Monad[List]", {
     className: "Monad",
     concreteType: "List",
     implementations: /* @__PURE__ */ new Map([
@@ -25412,23 +25550,23 @@ function registerBuiltinTypeClasses(interp) {
       ["map", mapList]
     ])
   });
-  interp.context.typeClassInstances.set("Functor[Result]", {
+  interp2.context.typeClassInstances.set("Functor[Result]", {
     className: "Functor",
     concreteType: "Result",
     implementations: /* @__PURE__ */ new Map([["fmap", mapResult]])
   });
-  interp.context.typeClassInstances.set("Functor[Option]", {
+  interp2.context.typeClassInstances.set("Functor[Option]", {
     className: "Functor",
     concreteType: "Option",
     implementations: /* @__PURE__ */ new Map([["fmap", mapOption]])
   });
-  interp.context.typeClassInstances.set("Functor[List]", {
+  interp2.context.typeClassInstances.set("Functor[List]", {
     className: "Functor",
     concreteType: "List",
     implementations: /* @__PURE__ */ new Map([["fmap", mapList]])
   });
 }
-function evalTypeClass(interp, typeClass) {
+function evalTypeClass(interp2, typeClass) {
   const info = {
     name: typeClass.name,
     typeParams: typeClass.typeParams,
@@ -25439,17 +25577,17 @@ function evalTypeClass(interp, typeClass) {
       info.methods.set(methodName, methodName);
     });
   }
-  interp.context.typeClasses.set(typeClass.name, info);
-  interp.logger.info(
+  interp2.context.typeClasses.set(typeClass.name, info);
+  interp2.logger.info(
     `\u2705 Registered TYPECLASS "${typeClass.name}" with type params [${typeClass.typeParams.join(", ")}] and ${info.methods.size} method(s)`
   );
 }
-function evalInstance(interp, instance) {
+function evalInstance(interp2, instance) {
   const key = `${instance.className}[${instance.concreteType}]`;
   const implementations = /* @__PURE__ */ new Map();
   if (instance.implementations) {
     instance.implementations.forEach((value, methodName) => {
-      implementations.set(methodName, interp.eval(value));
+      implementations.set(methodName, interp2.eval(value));
     });
   }
   const info = {
@@ -25457,8 +25595,8 @@ function evalInstance(interp, instance) {
     concreteType: instance.concreteType,
     implementations
   };
-  interp.context.typeClassInstances.set(key, info);
-  interp.logger.info(
+  interp2.context.typeClassInstances.set(key, info);
+  interp2.logger.info(
     `\u2705 Registered INSTANCE of "${instance.className}" for type "${instance.concreteType}" with ${implementations.size} method(s)`
   );
 }
@@ -25606,8 +25744,8 @@ var Profiler = class {
 var globalProfiler = new Profiler();
 
 // src/eval-call-function.ts
-function propagateMutations(interp, capturedEnv, paramSet, savedStack) {
-  const finalState = interp.context.variables.snapshot();
+function propagateMutations(interp2, capturedEnv, paramSet, savedStack) {
+  const finalState = interp2.context.variables.snapshot();
   for (const [key, newVal] of finalState) {
     if (paramSet.has(key)) continue;
     if (!capturedEnv.has(key)) continue;
@@ -25623,9 +25761,9 @@ function propagateMutations(interp, capturedEnv, paramSet, savedStack) {
   }
 }
 var MAX_CALL_DEPTH = 5e3;
-function callUserFunction(interp, name, args2) {
-  if (interp.tcoMode) {
-    return callUserFunctionTCO(interp, name, args2);
+function callUserFunction(interp2, name, args2) {
+  if (interp2.tcoMode) {
+    return callUserFunctionTCO(interp2, name, args2);
   }
   let baseName = name;
   let typeArgs = null;
@@ -25638,15 +25776,15 @@ function callUserFunction(interp, name, args2) {
       name: t.trim()
     }));
   }
-  const func = interp.context.functions.get(baseName);
+  const func = interp2.context.functions.get(baseName);
   if (!func) {
-    const candidates = [...interp.context.functions.keys()];
+    const candidates = [...interp2.context.functions.keys()];
     const similar = suggestSimilar(baseName, candidates);
     const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
     throw new FunctionNotFoundError(
       baseName,
-      interp.currentFilePath,
-      interp.currentLine > 0 ? interp.currentLine : void 0,
+      interp2.currentFilePath,
+      interp2.currentLine > 0 ? interp2.currentLine : void 0,
       void 0,
       hint
     );
@@ -25656,16 +25794,16 @@ function callUserFunction(interp, name, args2) {
     if (!typeArgs) {
       throw new Error(`Generic function '${baseName}' requires type arguments, e.g., ${baseName}[int] or ${baseName}[int string]`);
     }
-    if (interp.context.typeChecker) {
-      const instantiation = interp.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
+    if (interp2.context.typeChecker) {
+      const instantiation = interp2.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
       if (!instantiation.valid) {
         throw new Error(`Cannot instantiate generic function '${baseName}': ${instantiation.message}`);
       }
     }
     isGenericCall = true;
   }
-  if (!isGenericCall && interp.context.runtimeTypeChecker) {
-    interp.context.runtimeTypeChecker.checkCall(baseName, args2);
+  if (!isGenericCall && interp2.context.runtimeTypeChecker) {
+    interp2.context.runtimeTypeChecker.checkCall(baseName, args2);
   }
   if (typeof func.body === "function") {
     return func.body(...args2);
@@ -25673,18 +25811,18 @@ function callUserFunction(interp, name, args2) {
   if (func.params.length > args2.length) {
     throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args2.length}`);
   }
-  if (interp.callDepth >= MAX_CALL_DEPTH) {
-    throw new Error(`FreeLang line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'`);
+  if (interp2.callDepth >= MAX_CALL_DEPTH) {
+    throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'`);
   }
   const prefixMatch = baseName.match(/^([^:]+):/);
   const tempAliases = [];
   if (prefixMatch) {
     const prefix = prefixMatch[1] + ":";
-    for (const [fname, fval] of interp.context.functions) {
+    for (const [fname, fval] of interp2.context.functions) {
       if (fname.startsWith(prefix)) {
         const unqualified = fname.slice(prefix.length);
-        if (!interp.context.functions.has(unqualified)) {
-          interp.context.functions.set(unqualified, fval);
+        if (!interp2.context.functions.has(unqualified)) {
+          interp2.context.functions.set(unqualified, fval);
           tempAliases.push(unqualified);
         }
       }
@@ -25692,78 +25830,78 @@ function callUserFunction(interp, name, args2) {
   }
   const exitProfiler = globalProfiler.enter(baseName);
   if (func.capturedEnv) {
-    const savedStack = interp.context.variables.saveStack();
+    const savedStack = interp2.context.variables.saveStack();
     const paramSet = new Set(func.params);
-    interp.callDepth++;
+    interp2.callDepth++;
     let result;
     try {
-      interp.context.variables.fromSnapshot(func.capturedEnv);
+      interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args2[i]);
       }
-      result = interp.eval(func.body);
-      propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
+      result = interp2.eval(func.body);
+      propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
     } finally {
-      interp.callDepth--;
-      interp.context.variables.restoreStack(savedStack);
-      for (const alias of tempAliases) interp.context.functions.delete(alias);
+      interp2.callDepth--;
+      interp2.context.variables.restoreStack(savedStack);
+      for (const alias of tempAliases) interp2.context.functions.delete(alias);
       exitProfiler();
     }
     return result;
   }
-  interp.context.variables.push();
-  interp.callDepth++;
+  interp2.context.variables.push();
+  interp2.callDepth++;
   try {
     for (let i = 0; i < func.params.length; i++) {
-      interp.context.variables.set(func.params[i], args2[i]);
+      interp2.context.variables.set(func.params[i], args2[i]);
     }
-    return interp.eval(func.body);
+    return interp2.eval(func.body);
   } finally {
-    interp.callDepth--;
-    interp.context.variables.pop();
-    for (const alias of tempAliases) interp.context.functions.delete(alias);
+    interp2.callDepth--;
+    interp2.context.variables.pop();
+    for (const alias of tempAliases) interp2.context.functions.delete(alias);
     exitProfiler();
   }
 }
-function callFunctionValue(interp, fn, args2) {
-  if (interp.tcoMode) {
-    return callFunctionValueTCO(interp, fn, args2);
+function callFunctionValue(interp2, fn, args2) {
+  if (interp2.tcoMode) {
+    return callFunctionValueTCO(interp2, fn, args2);
   }
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
-  if (interp.callDepth >= MAX_CALL_DEPTH) {
-    throw new Error(`FreeLang line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
+  if (interp2.callDepth >= MAX_CALL_DEPTH) {
+    throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
   }
-  const savedStack = interp.context.variables.saveStack();
+  const savedStack = interp2.context.variables.saveStack();
   const paramSet = new Set(fn.params);
-  interp.callDepth++;
+  interp2.callDepth++;
   let result;
   try {
-    interp.context.variables.fromSnapshot(fn.capturedEnv);
+    interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      interp.context.variables.set(fn.params[i], args2[i]);
+      interp2.context.variables.set(fn.params[i], args2[i]);
     }
-    result = interp.eval(fn.body);
-    propagateMutations(interp, fn.capturedEnv, paramSet, savedStack);
+    result = interp2.eval(fn.body);
+    propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
   } finally {
-    interp.callDepth--;
-    interp.context.variables.restoreStack(savedStack);
+    interp2.callDepth--;
+    interp2.context.variables.restoreStack(savedStack);
   }
   return result;
 }
-function callAsyncFunctionValue(interp, fn, args2) {
+function callAsyncFunctionValue(interp2, fn, args2) {
   if (fn.kind !== "async-function-value") {
     throw new Error(`Expected async-function-value, got ${fn.kind}`);
   }
   return new FreeLangPromise((resolve7, reject) => {
-    const savedStack = interp.context.variables.saveStack();
+    const savedStack = interp2.context.variables.saveStack();
     try {
-      interp.context.variables.fromSnapshot(fn.capturedEnv);
+      interp2.context.variables.fromSnapshot(fn.capturedEnv);
       for (let i = 0; i < fn.params.length; i++) {
-        interp.context.variables.set(fn.params[i], args2[i]);
+        interp2.context.variables.set(fn.params[i], args2[i]);
       }
-      const result = interp.eval(fn.body);
+      const result = interp2.eval(fn.body);
       if (result instanceof FreeLangPromise) {
         result.then((value) => resolve7(value)).catch((error) => reject(error));
       } else {
@@ -25772,41 +25910,41 @@ function callAsyncFunctionValue(interp, fn, args2) {
     } catch (error) {
       reject(error);
     } finally {
-      interp.context.variables.restoreStack(savedStack);
+      interp2.context.variables.restoreStack(savedStack);
     }
   });
 }
-function callFunction(interp, fn, args2) {
+function callFunction(interp2, fn, args2) {
   if (fn.kind === "builtin-function") {
-    return fn.fn(args2.map((arg) => interp.eval(arg)));
+    return fn.fn(args2.map((arg) => interp2.eval(arg)));
   } else if (fn.kind === "function-value") {
-    return callFunctionValue(interp, fn, args2);
+    return callFunctionValue(interp2, fn, args2);
   } else if (fn.kind === "async-function-value") {
-    return callAsyncFunctionValue(interp, fn, args2);
+    return callAsyncFunctionValue(interp2, fn, args2);
   } else if (typeof fn === "function") {
     return fn(...args2);
   } else if (fn.params && fn.body) {
-    return callUserFunction(interp, fn.name || "anonymous", args2);
+    return callUserFunction(interp2, fn.name || "anonymous", args2);
   } else {
     throw new Error(`Cannot call ${typeof fn}`);
   }
 }
-function callUserFunctionTCO(interp, name, args2) {
+function callUserFunctionTCO(interp2, name, args2) {
   let currentName = name;
   let currentArgs = args2;
-  const prevTcoMode = interp.tcoMode;
-  interp.tcoMode = true;
+  const prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
   try {
     for (let i = 0; i < 2e6; i++) {
       let baseName = currentName;
       const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch) baseName = bracketMatch[1];
-      const func = interp.context.functions.get(baseName);
+      const func = interp2.context.functions.get(baseName);
       if (!func) {
-        const candidates = [...interp.context.functions.keys()];
+        const candidates = [...interp2.context.functions.keys()];
         const similar = suggestSimilar(baseName, candidates);
         const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
-        throw new FunctionNotFoundError(baseName, interp.currentFilePath, interp.currentLine > 0 ? interp.currentLine : void 0, void 0, hint);
+        throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
       }
       if (typeof func.body === "function") {
         return func.body(...currentArgs);
@@ -25815,11 +25953,11 @@ function callUserFunctionTCO(interp, name, args2) {
       const tempAliases = [];
       if (prefixMatch) {
         const prefix = prefixMatch[1] + ":";
-        for (const [fname, fval] of interp.context.functions) {
+        for (const [fname, fval] of interp2.context.functions) {
           if (fname.startsWith(prefix)) {
             const unqualified = fname.slice(prefix.length);
-            if (!interp.context.functions.has(unqualified)) {
-              interp.context.functions.set(unqualified, fval);
+            if (!interp2.context.functions.has(unqualified)) {
+              interp2.context.functions.set(unqualified, fval);
               tempAliases.push(unqualified);
             }
           }
@@ -25828,29 +25966,29 @@ function callUserFunctionTCO(interp, name, args2) {
       let result;
       try {
         if (func.capturedEnv) {
-          const savedStack = interp.context.variables.saveStack();
+          const savedStack = interp2.context.variables.saveStack();
           try {
-            interp.context.variables.fromSnapshot(func.capturedEnv);
+            interp2.context.variables.fromSnapshot(func.capturedEnv);
             for (let j = 0; j < func.params.length; j++) {
-              interp.context.variables.set(func.params[j], currentArgs[j]);
+              interp2.context.variables.set(func.params[j], currentArgs[j]);
             }
-            result = interp.eval(func.body);
+            result = interp2.eval(func.body);
           } finally {
-            interp.context.variables.restoreStack(savedStack);
+            interp2.context.variables.restoreStack(savedStack);
           }
         } else {
-          interp.context.variables.push();
+          interp2.context.variables.push();
           try {
             for (let j = 0; j < func.params.length; j++) {
-              interp.context.variables.set(func.params[j], currentArgs[j]);
+              interp2.context.variables.set(func.params[j], currentArgs[j]);
             }
-            result = interp.eval(func.body);
+            result = interp2.eval(func.body);
           } finally {
-            interp.context.variables.pop();
+            interp2.context.variables.pop();
           }
         }
       } finally {
-        for (const alias of tempAliases) interp.context.functions.delete(alias);
+        for (const alias of tempAliases) interp2.context.functions.delete(alias);
       }
       if (isTailCall(result)) {
         if (typeof result.fn === "string") {
@@ -25858,19 +25996,19 @@ function callUserFunctionTCO(interp, name, args2) {
           currentArgs = result.args;
           continue;
         } else {
-          return callFunctionValueTCO(interp, result.fn, result.args);
+          return callFunctionValueTCO(interp2, result.fn, result.args);
         }
       }
       return result;
     }
     throw new Error(`TCO: \uCD5C\uB300 \uBC18\uBCF5(2,000,000) \uCD08\uACFC \u2014 '${currentName}'\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131`);
   } finally {
-    interp.tcoMode = prevTcoMode;
+    interp2.tcoMode = prevTcoMode;
   }
 }
-function callFunctionValueTCO(interp, fn, args2) {
-  const prevTcoMode = interp.tcoMode;
-  interp.tcoMode = true;
+function callFunctionValueTCO(interp2, fn, args2) {
+  const prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
   try {
     let currentFn = fn;
     let currentArgs = args2;
@@ -25878,20 +26016,20 @@ function callFunctionValueTCO(interp, fn, args2) {
       if (currentFn.kind !== "function-value") {
         throw new Error(`Expected function-value, got ${currentFn.kind}`);
       }
-      const savedStack = interp.context.variables.saveStack();
+      const savedStack = interp2.context.variables.saveStack();
       let result;
       try {
-        interp.context.variables.fromSnapshot(currentFn.capturedEnv);
+        interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
         for (let j = 0; j < currentFn.params.length; j++) {
-          interp.context.variables.set(currentFn.params[j], currentArgs[j]);
+          interp2.context.variables.set(currentFn.params[j], currentArgs[j]);
         }
-        result = interp.eval(currentFn.body);
+        result = interp2.eval(currentFn.body);
       } finally {
-        interp.context.variables.restoreStack(savedStack);
+        interp2.context.variables.restoreStack(savedStack);
       }
       if (isTailCall(result)) {
         if (typeof result.fn === "string") {
-          return callUserFunctionTCO(interp, result.fn, result.args);
+          return callUserFunctionTCO(interp2, result.fn, result.args);
         } else {
           currentFn = result.fn;
           currentArgs = result.args;
@@ -25902,49 +26040,49 @@ function callFunctionValueTCO(interp, fn, args2) {
     }
     throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
   } finally {
-    interp.tcoMode = prevTcoMode;
+    interp2.tcoMode = prevTcoMode;
   }
 }
-function callUserFunctionRaw(interp, name, args2) {
-  const func = interp.context.functions.get(name);
-  if (!func) throw new FunctionNotFoundError(name, interp.currentFilePath, interp.currentLine > 0 ? interp.currentLine : void 0);
+function callUserFunctionRaw(interp2, name, args2) {
+  const func = interp2.context.functions.get(name);
+  if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
   if (typeof func.body === "function") return func.body(...args2);
   let result;
   if (func.capturedEnv) {
-    const savedStack = interp.context.variables.saveStack();
+    const savedStack = interp2.context.variables.saveStack();
     try {
-      interp.context.variables.fromSnapshot(func.capturedEnv);
+      interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args2[i]);
       }
-      result = interp.eval(func.body);
+      result = interp2.eval(func.body);
     } finally {
-      interp.context.variables.restoreStack(savedStack);
+      interp2.context.variables.restoreStack(savedStack);
     }
   } else {
-    interp.context.variables.push();
+    interp2.context.variables.push();
     try {
       for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args2[i]);
       }
-      result = interp.eval(func.body);
+      result = interp2.eval(func.body);
     } finally {
-      interp.context.variables.pop();
+      interp2.context.variables.pop();
     }
   }
   return result;
 }
-function callFunctionValueRaw(interp, fn, args2) {
+function callFunctionValueRaw(interp2, fn, args2) {
   if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
-  const savedStack = interp.context.variables.saveStack();
+  const savedStack = interp2.context.variables.saveStack();
   try {
-    interp.context.variables.fromSnapshot(fn.capturedEnv);
+    interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      interp.context.variables.set(fn.params[i], args2[i]);
+      interp2.context.variables.set(fn.params[i], args2[i]);
     }
-    return interp.eval(fn.body);
+    return interp2.eval(fn.body);
   } finally {
-    interp.context.variables.restoreStack(savedStack);
+    interp2.context.variables.restoreStack(savedStack);
   }
 }
 
@@ -26857,7 +26995,7 @@ function evalAgentBlock(fields, evalFn, callFnVal) {
   } : void 0;
   return agent.run(stepFn);
 }
-function createAgentBuiltins(interp) {
+function createAgentBuiltins(interp2) {
   return {
     // (agent-new :goal "..." :max-steps 10)
     "agent-new": (...args2) => {
@@ -26875,7 +27013,7 @@ function createAgentBuiltins(interp) {
     "agent-run": (agent, stepFnVal) => {
       if (!stepFnVal) return agent.run();
       const stepFn = (state) => {
-        const r = interp.callFunctionValue(stepFnVal, [state]);
+        const r = interp2.callFunctionValue(stepFnVal, [state]);
         if (state.done) return null;
         if (r === null || r === void 0) return null;
         if (typeof r === "object" && "thought" in r) return r;
@@ -27015,7 +27153,7 @@ var Interpreter = class {
   // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
   loadFlStdlib() {
     try {
-      const stdlibPath = path8.join(__dirname, "freelang-stdlib.fl");
+      const stdlibPath = path9.join(__dirname, "freelang-stdlib.fl");
       if (!fs10.existsSync(stdlibPath)) return;
       const src = fs10.readFileSync(stdlibPath, "utf-8");
       this.interpret(parse(lex(src)));
@@ -27230,9 +27368,9 @@ var Interpreter = class {
   }
   // Phase 98: AGENT 블록 처리
   handleAgentBlock(block) {
-    const interp = this;
-    const ev = (node) => interp.eval(node);
-    const callFnVal = (fn, args2) => interp.callFunctionValue(fn, args2);
+    const interp2 = this;
+    const ev = (node) => interp2.eval(node);
+    const callFnVal = (fn, args2) => interp2.callFunctionValue(fn, args2);
     const state = evalAgentBlock(block.fields, ev, callFnVal);
     this.context.lastValue = state;
   }
@@ -27811,21 +27949,21 @@ var Interpreter = class {
       const outNode = block.fields.get("output");
       outputSchema = outNode?.kind === "keyword" ? outNode.name : outNode?.kind === "literal" ? String(outNode.value) : "any";
     }
-    const interp = this;
+    const interp2 = this;
     const toolDef = {
       name,
       description: String(desc || ""),
       inputSchema,
       outputSchema,
       execute: (args2) => {
-        interp.context.variables.push();
+        interp2.context.variables.push();
         try {
           for (const [k, v] of Object.entries(args2)) {
-            interp.context.variables.set(`$${k}`, v);
+            interp2.context.variables.set(`$${k}`, v);
           }
-          return interp.eval(bodyNode);
+          return interp2.eval(bodyNode);
         } finally {
-          interp.context.variables.pop();
+          interp2.context.variables.pop();
         }
       }
     };
@@ -27861,7 +27999,7 @@ var Interpreter = class {
   }
   handleRouteBlock(block) {
     const method = this.getFieldValue(block, "method", "GET");
-    const path13 = this.getFieldValue(block, "path", "/");
+    const path14 = this.getFieldValue(block, "path", "/");
     const handler = block.fields.get("handler");
     if (!handler) {
       throw new Error(`[ROUTE ${block.name}] Missing :handler`);
@@ -27869,7 +28007,7 @@ var Interpreter = class {
     this.context.routes.set(block.name, {
       name: block.name,
       method: method.toLowerCase(),
-      path: path13,
+      path: path14,
       handler
     });
   }
@@ -28101,9 +28239,9 @@ var Interpreter = class {
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
     if (op === "REFLECT") {
-      const interp = this;
-      const ev = (node) => interp.eval(node);
-      const callFnVal = (fn, args3) => interp.callFunctionValue(fn, args3);
+      const interp2 = this;
+      const ev = (node) => interp2.eval(node);
+      const callFnVal = (fn, args3) => interp2.callFunctionValue(fn, args3);
       let outputExpr = null;
       let criteriaExpr = null;
       let thresholdExpr = null;
@@ -28185,16 +28323,16 @@ var Interpreter = class {
       });
     }
     if (op === "COT") {
-      const interp = this;
+      const interp2 = this;
       const result = evalCotForm(
         expr.args,
-        (node) => interp.eval(node),
-        (name, value) => interp.context.variables.set(name, value),
-        (name) => interp.context.variables.get(name)
+        (node) => interp2.eval(node),
+        (name, value) => interp2.context.variables.set(name, value),
+        (name) => interp2.context.variables.get(name)
       );
       if (result.conclusion?.kind === "function-value") {
-        const stepsVar = interp.context.variables.get("$__cot_steps__");
-        result.conclusion = interp.callFunctionValue(result.conclusion, [stepsVar]);
+        const stepsVar = interp2.context.variables.get("$__cot_steps__");
+        result.conclusion = interp2.callFunctionValue(result.conclusion, [stepsVar]);
       }
       return result;
     }
@@ -28205,7 +28343,7 @@ var Interpreter = class {
         if (node.kind === "literal" && node.type === "string" && node.value === name) return true;
         return false;
       };
-      const interp = this;
+      const interp2 = this;
       const tot = new TreeOfThought();
       const args3 = expr.args;
       let i = 0;
@@ -28221,37 +28359,37 @@ var Interpreter = class {
           i++;
           const exprNode = args3[i];
           i++;
-          const hypo = String(interp.eval(hypoNode));
+          const hypo = String(interp2.eval(hypoNode));
           const capturedNode = exprNode;
-          tot.branch(hypo, () => interp.eval(capturedNode));
+          tot.branch(hypo, () => interp2.eval(capturedNode));
         } else if (isTotKeyword(arg, "eval")) {
           i++;
           scoreFnNode = args3[i];
           i++;
         } else if (isTotKeyword(arg, "prune")) {
           i++;
-          pruneThreshold = Number(interp.eval(args3[i]));
+          pruneThreshold = Number(interp2.eval(args3[i]));
           i++;
         } else if (isTotKeyword(arg, "select")) {
           i++;
-          const selVal = interp.eval(args3[i]);
+          const selVal = interp2.eval(args3[i]);
           i++;
           if (selVal === "top-k") selectStrategy = "top-k";
           else selectStrategy = "best";
         } else if (isTotKeyword(arg, "k")) {
           i++;
-          selectK = Number(interp.eval(args3[i]));
+          selectK = Number(interp2.eval(args3[i]));
           i++;
         } else {
           i++;
         }
       }
       if (scoreFnNode != null) {
-        const scoreFnVal = interp.eval(scoreFnNode);
+        const scoreFnVal = interp2.eval(scoreFnNode);
         tot.evaluate((result) => {
           if (typeof scoreFnVal === "function") return Number(scoreFnVal(result)) || 0;
           if (scoreFnVal?.kind === "function-value") {
-            return Number(interp.callFunctionValue(scoreFnVal, [result])) || 0;
+            return Number(interp2.callFunctionValue(scoreFnVal, [result])) || 0;
           }
           return 0.5;
         });
@@ -29053,7 +29191,7 @@ function formatFL(src) {
 
 // src/hot-reload.ts
 var fs11 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var path10 = __toESM(require("path"));
 init_lexer();
 init_parser();
 function createDebounce(ms) {
@@ -29081,7 +29219,7 @@ var FileWatcher = class {
     const onReload = opts?.onReload;
     const onError = opts?.onError;
     const debounced = createDebounce(debounceMs);
-    const basename5 = path9.basename(file);
+    const basename5 = path10.basename(file);
     const handleChange = () => {
       debounced(() => {
         if (clearConsole) {
@@ -29150,7 +29288,7 @@ var FileWatcher = class {
             process.stdout.write("\x1B[2J\x1B[0f");
           }
           console.log(`\x1B[36m[RELOAD]\x1B[0m ${filename} changed`);
-          const fullPath = path9.join(dir, filename);
+          const fullPath = path10.join(dir, filename);
           if (onReload) {
             try {
               onReload(fullPath);
@@ -29192,15 +29330,15 @@ var FileWatcher = class {
   }
 };
 function runWithWatch(file, opts) {
-  const absPath = path9.resolve(file);
+  const absPath = path10.resolve(file);
   function executeFile() {
     try {
       const source = fs11.readFileSync(absPath, "utf-8");
       const tokens = lex(source);
       const ast = parse(tokens);
-      const interp = new Interpreter();
-      interp.currentFilePath = absPath;
-      const ctx = interp.interpret(ast);
+      const interp2 = new Interpreter();
+      interp2.currentFilePath = absPath;
+      const ctx = interp2.interpret(ast);
       const val = ctx.lastValue;
       if (val !== null && val !== void 0) {
         if (typeof val === "object") {
@@ -29217,7 +29355,7 @@ function runWithWatch(file, opts) {
       if (opts?.onError) {
         opts.onError(file, e);
       } else {
-        console.error(`\x1B[31m[ERROR]\x1B[0m ${path9.basename(absPath)}: ${e.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m ${path10.basename(absPath)}: ${e.message}`);
       }
     }
   }
@@ -29229,7 +29367,7 @@ function runWithWatch(file, opts) {
       executeFile();
     }
   };
-  console.log(`\x1B[2m  watching ${path9.basename(absPath)}...\x1B[0m`);
+  console.log(`\x1B[2m  watching ${path10.basename(absPath)}...\x1B[0m`);
   watcher.watch(absPath, mergedOpts);
 }
 
@@ -29648,7 +29786,7 @@ function createDefaultPipeline(files, opts = {}) {
 
 // src/web/app-router.ts
 var fs13 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var path11 = __toESM(require("path"));
 var AppRouter = class {
   appDir;
   routes = [];
@@ -29668,7 +29806,7 @@ var AppRouter = class {
    */
   scanNotFound(dir) {
     try {
-      const notFoundPath = path10.join(dir, "not-found.fl");
+      const notFoundPath = path11.join(dir, "not-found.fl");
       if (fs13.existsSync(notFoundPath)) {
         this.notFoundHandler = notFoundPath;
         console.log(`approuter.not-found file=${notFoundPath}`);
@@ -29701,7 +29839,7 @@ var AppRouter = class {
     try {
       const entries = fs13.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        const fullPath = path10.join(dir, entry.name);
+        const fullPath = path11.join(dir, entry.name);
         const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
         if (entry.isDirectory()) {
           const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
@@ -30258,7 +30396,7 @@ var fl_executor_default = FLExecutor;
 
 // src/web/page-renderer.ts
 var fs15 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var path12 = __toESM(require("path"));
 var PageRenderer = class {
   executor;
   ssrCache = /* @__PURE__ */ new Map();
@@ -30338,7 +30476,7 @@ var PageRenderer = class {
    */
   async renderSSG(context) {
     const cacheKey = this.getCacheKey(context.filePath, context.params);
-    const outputPath = path11.join(
+    const outputPath = path12.join(
       this.buildOutputDir,
       cacheKey.replace(/\//g, "_") + ".html"
     );
@@ -30875,7 +31013,7 @@ var WebServer = class {
 
 // src/cli.ts
 function formatError(err4, source, filePath) {
-  const fileName = filePath ? path12.basename(filePath) : "<stdin>";
+  const fileName = filePath ? path13.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
     lines.push(`
@@ -30904,7 +31042,7 @@ function checkSource(source, filePath) {
   try {
     const tokens = lex(source);
     parse(tokens);
-    const fileName = filePath ? path12.basename(filePath) : "<stdin>";
+    const fileName = filePath ? path13.basename(filePath) : "<stdin>";
     console.log(`\x1B[32m\u2713\x1B[0m  ${fileName}  \uBB38\uBC95 \uC774\uC0C1 \uC5C6\uC74C`);
     return true;
   } catch (err4) {
@@ -30913,7 +31051,7 @@ function checkSource(source, filePath) {
   }
 }
 function cmdRun(filePath, watch2, extraArgs = []) {
-  const absPath = path12.resolve(filePath);
+  const absPath = path13.resolve(filePath);
   if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
@@ -30924,12 +31062,12 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     try {
       const tokens = lex(source);
       const ast = parse(tokens);
-      const interp = new Interpreter();
-      interp.currentFilePath = absPath;
+      const interp2 = new Interpreter();
+      interp2.currentFilePath = absPath;
       if (extraArgs.length > 0) {
-        interp.context.variables.set("$__argv__", extraArgs);
+        interp2.context.variables.set("$__argv__", extraArgs);
       }
-      ctx = interp.interpret(ast);
+      ctx = interp2.interpret(ast);
     } catch (err4) {
       console.error(formatError(err4, source, absPath));
       if (!watch2) process.exit(1);
@@ -30949,7 +31087,7 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   }
   execute();
   if (watch2) {
-    console.log(`\x1B[2m  watching ${path12.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
+    console.log(`\x1B[2m  watching ${path13.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
     let lastMtime = 0;
     let lastSize = -1;
     try {
@@ -30978,7 +31116,7 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   }
 }
 function cmdCheck(filePath) {
-  const absPath = path12.resolve(filePath);
+  const absPath = path13.resolve(filePath);
   if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
@@ -30994,7 +31132,7 @@ function cmdCodegen(args2) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
     process.exit(1);
   }
-  const absInput = path12.resolve(inputFile);
+  const absInput = path13.resolve(inputFile);
   if (!fs16.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
@@ -31031,7 +31169,7 @@ function cmdCompile(args2) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
     process.exit(1);
   }
-  const absInput = path12.resolve(inputFile);
+  const absInput = path13.resolve(inputFile);
   if (!fs16.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
@@ -31048,13 +31186,13 @@ function cmdCompile(args2) {
       target: "node"
     });
     if (outputFile) {
-      const absOutput = path12.resolve(outputFile);
-      const dir = path12.dirname(absOutput);
+      const absOutput = path13.resolve(outputFile);
+      const dir = path13.dirname(absOutput);
       if (dir !== "." && !fs16.existsSync(dir)) {
         fs16.mkdirSync(dir, { recursive: true });
       }
       fs16.writeFileSync(absOutput, js, "utf-8");
-      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path12.basename(inputFile)} \u2192 ${outputFile}`);
+      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path13.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(js);
     }
@@ -31069,8 +31207,8 @@ function cmdRepl() {
   const historyPath = (() => {
     try {
       const os2 = require("os");
-      const path13 = require("path");
-      return path13.join(os2.homedir(), ".fl_history");
+      const path14 = require("path");
+      return path14.join(os2.homedir(), ".fl_history");
     } catch {
       return null;
     }
@@ -31277,7 +31415,7 @@ function cmdFmt(args2) {
   }
   let needsChange = false;
   for (const filePath of filePaths) {
-    const absPath = path12.resolve(filePath);
+    const absPath = path13.resolve(filePath);
     if (!fs16.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
       process.exit(1);
@@ -31287,22 +31425,22 @@ function cmdFmt(args2) {
     try {
       formatted = formatFL(src);
     } catch (err4) {
-      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path12.basename(absPath)}: ${err4.message}`);
+      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path13.basename(absPath)}: ${err4.message}`);
       process.exit(1);
     }
     if (checkMode) {
       if (src !== formatted) {
-        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path12.basename(absPath)}`);
+        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path13.basename(absPath)}`);
         needsChange = true;
       } else {
-        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path12.basename(absPath)}`);
+        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path13.basename(absPath)}`);
       }
     } else {
       if (src !== formatted) {
         fs16.writeFileSync(absPath, formatted, "utf-8");
-        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path12.basename(absPath)}`);
+        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path13.basename(absPath)}`);
       } else {
-        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path12.basename(absPath)}`);
+        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path13.basename(absPath)}`);
       }
     }
   }
@@ -31311,7 +31449,7 @@ function cmdFmt(args2) {
   }
 }
 function cmdDebug(filePath, stepMode) {
-  const absPath = path12.resolve(filePath);
+  const absPath = path13.resolve(filePath);
   if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
@@ -31320,17 +31458,17 @@ function cmdDebug(filePath, stepMode) {
   session.enabled = true;
   session.stepMode = stepMode;
   setGlobalDebugSession(session);
-  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path12.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
+  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path13.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
   console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   try {
     const source = fs16.readFileSync(absPath, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
-    const interp = new Interpreter();
-    interp.currentFilePath = absPath;
-    interp.debugSession = session;
-    const ctx = interp.interpret(ast);
+    const interp2 = new Interpreter();
+    interp2.currentFilePath = absPath;
+    interp2.debugSession = session;
+    const ctx = interp2.interpret(ast);
     if (ctx.lastValue !== null && ctx.lastValue !== void 0) {
       if (typeof ctx.lastValue === "object") {
         console.log(JSON.stringify(ctx.lastValue, null, 2));
@@ -31350,14 +31488,14 @@ async function cmdCi(ciArgs) {
   const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
   let targetFiles;
   if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path12.resolve(f)).filter((f) => fs16.existsSync(f));
+    targetFiles = filePaths.map((f) => path13.resolve(f)).filter((f) => fs16.existsSync(f));
     if (targetFiles.length === 0) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
   } else {
     const cwd2 = process.cwd();
-    targetFiles = fs16.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path12.join(cwd2, f));
+    targetFiles = fs16.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path13.join(cwd2, f));
   }
   console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
@@ -31382,12 +31520,12 @@ function cmdDoc(docArgs) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  --dir \uB4A4\uC5D0 \uB514\uB809\uD1A0\uB9AC \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
       process.exit(1);
     }
-    const absDir = path12.resolve(dirPath);
+    const absDir = path13.resolve(dirPath);
     if (!fs16.existsSync(absDir) || !fs16.statSync(absDir).isDirectory()) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       process.exit(1);
     }
-    const flFiles = fs16.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path12.join(absDir, f));
+    const flFiles = fs16.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path13.join(absDir, f));
     if (flFiles.length === 0) {
       console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       return;
@@ -31397,11 +31535,11 @@ function cmdDoc(docArgs) {
       const src2 = fs16.readFileSync(filePath2, "utf-8");
       allEntries.push(...extractDocs(src2));
     }
-    const title2 = path12.basename(absDir) + " API \uBB38\uC11C";
+    const title2 = path13.basename(absDir) + " API \uBB38\uC11C";
     const md2 = renderMarkdown(allEntries, title2);
     const outIdx2 = docArgs.indexOf("-o");
     if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
-      const outPath = path12.resolve(docArgs[outIdx2 + 1]);
+      const outPath = path13.resolve(docArgs[outIdx2 + 1]);
       fs16.writeFileSync(outPath, md2, "utf-8");
       console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
     } else {
@@ -31415,18 +31553,18 @@ function cmdDoc(docArgs) {
     process.exit(1);
   }
   const filePath = filePaths[0];
-  const absPath = path12.resolve(filePath);
+  const absPath = path13.resolve(filePath);
   if (!fs16.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   const src = fs16.readFileSync(absPath, "utf-8");
   const entries = extractDocs(src);
-  const title = path12.basename(absPath, ".fl") + " API \uBB38\uC11C";
+  const title = path13.basename(absPath, ".fl") + " API \uBB38\uC11C";
   const md = renderMarkdown(entries, title);
   const outIdx = docArgs.indexOf("-o");
   if (outIdx !== -1 && docArgs[outIdx + 1]) {
-    const outPath = path12.resolve(docArgs[outIdx + 1]);
+    const outPath = path13.resolve(docArgs[outIdx + 1]);
     fs16.writeFileSync(outPath, md, "utf-8");
     console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
   } else {
@@ -31438,11 +31576,11 @@ function cmdBuild(buildArgs2) {
   const isStatic = buildArgs2.includes("--static");
   if (isStatic) {
     let expandDynamicParams = function(dir, paramName) {
-      const paramsFile = path12.join(dir, "generate-static-params.fl");
+      const paramsFile = path13.join(dir, "generate-static-params.fl");
       if (!fs16.existsSync(paramsFile)) return [];
       try {
-        const cwdBootstrap2 = path12.resolve(process.cwd(), "bootstrap.js");
-        const bs = fs16.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path12.resolve(__dirname, "bootstrap.js");
+        const cwdBootstrap2 = path13.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs16.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path13.resolve(__dirname, "bootstrap.js");
         const { execSync: execSync2 } = require("child_process");
         const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
         const m = out.match(/\[[\s\S]*\]/);
@@ -31456,18 +31594,18 @@ function cmdBuild(buildArgs2) {
     }, walk = function(dir, routeBase) {
       const entries = fs16.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
-        const full = path12.join(dir, e.name);
+        const full = path13.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
             const paramName = e.name.slice(1, -1);
             const params = expandDynamicParams(full, paramName);
-            const pageFile = path12.join(full, "page.fl");
+            const pageFile = path13.join(full, "page.fl");
             if (params.length === 0) {
-              console.log(`build.skip reason=dynamic_no_params path=/${path12.relative(absApp, full)} param=${paramName}`);
+              console.log(`build.skip reason=dynamic_no_params path=/${path13.relative(absApp, full)} param=${paramName}`);
               continue;
             }
             if (!fs16.existsSync(pageFile)) {
-              console.log(`build.skip reason=dynamic_no_page path=/${path12.relative(absApp, full)}`);
+              console.log(`build.skip reason=dynamic_no_page path=/${path13.relative(absApp, full)}`);
               continue;
             }
             for (const p of params) {
@@ -31490,8 +31628,8 @@ function cmdBuild(buildArgs2) {
     const appDir = appIdx !== -1 ? buildArgs2[appIdx + 1] : "app";
     const outDir = outIdx !== -1 ? buildArgs2[outIdx + 1] : "dist";
     const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
-    const absApp = path12.resolve(appDir);
-    const absOut = path12.resolve(outDir);
+    const absApp = path13.resolve(appDir);
+    const absOut = path13.resolve(outDir);
     if (!fs16.existsSync(absApp)) {
       console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
@@ -31500,7 +31638,7 @@ function cmdBuild(buildArgs2) {
     fs16.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
-    const notFoundFile = path12.join(absApp, "not-found.fl");
+    const notFoundFile = path13.join(absApp, "not-found.fl");
     if (fs16.existsSync(notFoundFile)) {
       pages.push({ filePath: notFoundFile, route: "/__404__" });
     }
@@ -31510,8 +31648,8 @@ function cmdBuild(buildArgs2) {
     }
     const { spawn } = require("child_process");
     const http3 = require("http");
-    const cwdBootstrap = path12.resolve(process.cwd(), "bootstrap.js");
-    const bootstrap = fs16.existsSync(cwdBootstrap) ? cwdBootstrap : path12.resolve(__dirname, "bootstrap.js");
+    const cwdBootstrap = path13.resolve(process.cwd(), "bootstrap.js");
+    const bootstrap = fs16.existsSync(cwdBootstrap) ? cwdBootstrap : path13.resolve(__dirname, "bootstrap.js");
     const serveProc = spawn(
       "node",
       [bootstrap, "serve", "--app", absApp, "--port", String(port)],
@@ -31602,10 +31740,10 @@ function cmdBuild(buildArgs2) {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = p.route === "/__404__" ? path12.join(absOut, "404.html") : path12.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-          fs16.mkdirSync(path12.dirname(outPath), { recursive: true });
+          const outPath = p.route === "/__404__" ? path13.join(absOut, "404.html") : path13.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          fs16.mkdirSync(path13.dirname(outPath), { recursive: true });
           fs16.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path12.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path13.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);
@@ -31635,20 +31773,20 @@ function cmdBuild(buildArgs2) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
       process.exit(1);
     }
-    const absPath = path12.resolve(appFile);
+    const absPath = path13.resolve(appFile);
     if (!fs16.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path12.basename(appFile)} \u2192 ${tag}`);
-    const ociScriptPath = path12.resolve(__dirname, "../vpm/v9-oci.fl");
+    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path13.basename(appFile)} \u2192 ${tag}`);
+    const ociScriptPath = path13.resolve(__dirname, "../vpm/v9-oci.fl");
     if (!fs16.existsSync(ociScriptPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
-      const cmd2 = registry ? `node ${path12.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path12.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
+      const cmd2 = registry ? `node ${path13.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path13.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
       console.log(`\x1B[2m  Command: ${cmd2}\x1B[0m`);
       execSync2(cmd2, { stdio: "inherit" });
       console.log(`\x1B[32m[OK]\x1B[0m  OCI \uBE4C\uB4DC \uC644\uB8CC: ${tag}`);
@@ -31675,7 +31813,7 @@ function cmdRegistry(registryArgs) {
     }
     console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
     console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
-    const registryPath = path12.resolve(__dirname, "../vpm/registry-server.fl");
+    const registryPath = path13.resolve(__dirname, "../vpm/registry-server.fl");
     if (!fs16.existsSync(registryPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
       process.exit(1);
@@ -31683,7 +31821,7 @@ function cmdRegistry(registryArgs) {
     const { execSync: execSync2 } = require("child_process");
     try {
       process.env.REGISTRY_PORT = String(port);
-      execSync2(`node ${path12.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
+      execSync2(`node ${path13.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
         stdio: "inherit",
         env: { ...process.env, REGISTRY_PORT: String(port) }
       });
@@ -31729,7 +31867,7 @@ function cmdRegistry(registryArgs) {
 }
 function cmdServe(args2) {
   let appDir = "app";
-  let port = 3e3;
+  let port = null;
   let renderMode = "ssr";
   let positionalIdx = 0;
   for (let i = 0; i < args2.length; i++) {
@@ -31749,9 +31887,26 @@ function cmdServe(args2) {
       positionalIdx++;
     }
   }
+  if (port === null) {
+    if (process.env.PORT) {
+      port = parseInt(process.env.PORT, 10);
+    } else {
+      try {
+        const fs17 = require("fs");
+        const path14 = require("path");
+        const configPath = path14.join(process.cwd(), "fl.config.json");
+        if (fs17.existsSync(configPath)) {
+          const cfg = JSON.parse(fs17.readFileSync(configPath, "utf-8"));
+          if (cfg.port) port = cfg.port;
+        }
+      } catch (_e) {
+      }
+      if (port === null) port = 3e3;
+    }
+  }
   const server = new WebServer({ appDir, port, renderMode });
-  const interp = new Interpreter();
-  server.setInterpreter(interp);
+  const interp2 = new Interpreter();
+  server.setInterpreter(interp2);
   server.start().then((msg) => {
     console.log(msg);
     setInterval(() => {
@@ -31885,12 +32040,12 @@ switch (cmd) {
       process.exit(1);
     }
     const noClear = args.includes("--no-clear");
-    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path12.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
+    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path13.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
     runWithWatch(filePath, {
       clearConsole: !noClear,
       debounceMs: 300,
       onError: (file, err4) => {
-        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path12.basename(file)}: ${err4.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path13.basename(file)}: ${err4.message}`);
       }
     });
     break;

@@ -238,6 +238,49 @@ function flExecOpNative(op: string, vals: any[]): any {
       const specials = ["if","let","do","begin","fn","and","or","not","null?","match","call","export","define","set!"];
       return specials.includes(sop) ? sop : null;
     }
+    // ── Phase L1: 모듈 시스템 + 파일 I/O ──
+    case "load": {
+      const filePath = String(v0 ?? "");
+      const fs = require("fs");
+      const path = require("path");
+      try {
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+        const src = fs.readFileSync(resolvedPath, "utf-8");
+        // Use lex and parse builtins that are already available
+        const { lex } = require("./lexer");
+        const { parse } = require("./parser");
+        const tokens = lex(src, resolvedPath);
+        const ast = parse(tokens);
+        // Evaluate each top-level form in current interpreter context
+        for (const node of ast) {
+          interp.eval(node);
+        }
+        return null;
+      } catch (e: any) {
+        throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
+    case "file-mkdir": case "file_mkdir": {
+      const dirPath = String(v0 ?? "");
+      const fs = require("fs");
+      try {
+        fs.mkdirSync(dirPath, { recursive: true });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    case "file-append": case "file_append": {
+      const filePath = String(v0 ?? "");
+      const content = String(v1 ?? "");
+      const fs = require("fs");
+      try {
+        fs.appendFileSync(filePath, content);
+        return true;
+      } catch {
+        return false;
+      }
+    }
     default: return null;
   }
 }

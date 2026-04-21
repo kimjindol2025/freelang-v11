@@ -1110,7 +1110,7 @@ function cmdRegistry(registryArgs: string[]): void {
 function cmdServe(args: string[]): void {
   // Phase 3: freelang serve [appDir] [--app app] [--port 3000] [--mode ssr|isr|ssg]
   let appDir = "app";
-  let port = 3000;
+  let port: number | null = null;
   let renderMode: "ssr" | "isr" | "ssg" = "ssr";
   let positionalIdx = 0;
 
@@ -1130,6 +1130,27 @@ function cmdServe(args: string[]): void {
         appDir = args[i];
       }
       positionalIdx++;
+    }
+  }
+
+  // 포트 우선순위: CLI --port > ENV PORT > fl.config.json > 기본값 3000
+  if (port === null) {
+    if (process.env.PORT) {
+      port = parseInt(process.env.PORT, 10);
+    } else {
+      // fl.config.json 읽기 시도
+      try {
+        const fs = require("fs") as typeof import("fs");
+        const path = require("path") as typeof import("path");
+        const configPath = path.join(process.cwd(), "fl.config.json");
+        if (fs.existsSync(configPath)) {
+          const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8")) as { port?: number };
+          if (cfg.port) port = cfg.port;
+        }
+      } catch (_e) {
+        // Silently ignore errors reading config file
+      }
+      if (port === null) port = 3000;
     }
   }
 

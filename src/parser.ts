@@ -653,22 +653,28 @@ export class Parser {
     return makeBlock("Array", "$array", arrayFields);
   }
 
-  // Parse map literal: {:key1 value1 :key2 value2 ...}
+  // Parse map literal: {:key1 value1 :key2 value2 ...} or {"key1" value1 "key2" value2 ...}
   private parseMap(): ASTNode {
     this.expect(T.LBrace);
     const mapFields = new Map<string, ASTNode>();
 
     while (!this.check(T.RBrace) && !this.isAtEnd()) {
-      // Expect a keyword as key (:key)
-      if (!this.check(T.Colon)) {
-        throw this.error(`Expected ':' keyword in map literal`, this.peek());
-      }
-      this.advance(); // consume ':'
+      let key: string;
 
-      if (!this.check(T.Symbol)) {
-        throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+      // Accept both keyword keys (:name) and string keys ("name")
+      if (this.check(T.Colon)) {
+        // Keyword key: :name
+        this.advance(); // consume ':'
+        if (!this.check(T.Symbol)) {
+          throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+        }
+        key = this.advance().value;
+      } else if (this.check(T.String)) {
+        // String key: "name" (includes MongoDB operators like "$set")
+        key = this.advance().value;
+      } else {
+        throw this.error(`Map key must be :keyword or "string"`, this.peek());
       }
-      const key = this.advance().value;
 
       // Parse the value
       const value = this.parseValue();
