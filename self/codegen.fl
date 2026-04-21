@@ -76,6 +76,7 @@
              (cond [(= $v "true") "true"]
                    [(= $v "false") "false"]
                    [(= $v "null") "null"]
+                   [(= $v "nil") "null"]
                    [true (js-name $v)])]
             [true "null"]))]
 
@@ -515,9 +516,18 @@
 [FUNC param-loop :params [$items $i $acc]
   :body (if (null? $items) $acc
           (if (>= $i (length $items)) $acc
-            (let [[$name (extract-name (get $items $i))]]
-              (param-loop $items (+ $i 1)
-                          (if (= $i 0) $name (str $acc "," $name))))))]
+            (let [[$cur (get $items $i)]
+                  [$cur-val (if (= (get $cur :kind) "literal") (get $cur :value) "")]]
+              (if (= $cur-val "&")
+                ;; rest-args: '&' 다음 항목 이름 앞에 '...' 붙여 emit, i+2 로 점프
+                (if (>= (+ $i 1) (length $items)) $acc
+                  (let [[$rest-name (extract-name (get $items (+ $i 1)))]
+                        [$entry (str "..." $rest-name)]]
+                    (param-loop $items (+ $i 2)
+                                (if (= $i 0) $entry (str $acc "," $entry)))))
+                (let [[$name (extract-name $cur)]]
+                  (param-loop $items (+ $i 1)
+                              (if (= $i 0) $name (str $acc "," $name))))))))]
 
 ;; ═══════ stdlib native → JS 매핑 ═══════
 

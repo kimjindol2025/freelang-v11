@@ -1,6 +1,10 @@
 ;; self/stdlib/time.fl — 시간 관련 stdlib (v12-candidate 호환)
+;;
+;; now-ms 는 prelude(JS runtime) 에서 이미 `const now_ms = () => Date.now()` 로
+;; 제공되므로 FL 에서 재정의하지 않는다. FL 코드에서 (now-ms) 호출 시
+;; codegen 이 `now_ms()` JS 로 번역 → prelude 정의로 해소됨.
+;; 재정의하면 `Identifier 'now_ms' has already been declared` SyntaxError.
 
-[FUNC now-ms :params [] :body (now)]
 [FUNC now-s :params [] :body (floor (/ (now) 1000))]
 
 [FUNC time-diff-ms :params [$t1 $t2] :body (- $t2 $t1)]
