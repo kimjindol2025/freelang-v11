@@ -91,6 +91,54 @@ bump_fail() {
   FAIL_LIST+=("$f")
 }
 
+# Phase B wrapper: test-codegen-* 는 stage1 의 parse/runtime_prelude 를
+# 실행 스코프에 필요로 함. stage1.js 본체 변형 없이, 실행 JS 를 아래 순서로
+# concat 한 임시 파일을 만들어 node 로 실행:
+#   1) stage1.js 원본 그대로
+#   2) 명시적 alias: fl_parse = parse;  PRELUDE = runtime_prelude();
+#   3) 실제 test JS
+# stage1 본체에 있는 `if __argv__ …` 자동 호출은 wrapper 실행 시 argv 가
+# 비어 있으므로 건너뜀. alias 외 어떤 런타임 변형도 하지 않음.
+needs_stage1_context() {
+  # Phase B wrapper 적용 대상 — FL parser/prelude 를 self-define 하지 않고
+  # 호출만 하는 5개 테스트. test-codegen-ext/run, test-real-stdlib,
+  # test-selfcompile 등은 자체 inline parser 를 정의하므로 wrapper 에
+  # 끼우면 심볼 중복 선언 충돌 발생 → 여기서는 제외.
+  case "$1" in
+    self/tests/test-codegen-builtins.fl) return 0 ;;
+    self/tests/test-codegen-ffi.fl) return 0 ;;
+    self/tests/test-codegen-fn.fl) return 0 ;;
+    self/tests/test-codegen-match.fl) return 0 ;;
+    self/tests/test-codegen-sf.fl) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+run_with_stage1_context() {
+  local test_js="$1"
+  local out_file="$2"
+  local merged="$WORK/merged_$(safe "$test_js")"
+  # stage1 원본 + alias + test 를 하나의 파일로 concat.
+  # test 본문은 IIFE 로 감싸 test 자체의 const/let 선언이 stage1 의 동일명
+  # 심볼(cg, js_esc 등) 과 top-level 에서 충돌하지 않도록 함.
+  # stage1 심볼은 IIFE 내부에서 outer scope 로 접근 가능.
+  {
+    cat "$STAGE1"
+    echo ""
+    echo "// ── Phase B wrapper: alias (stage1 변형 없음) ──"
+    echo "const fl_parse = parse;"
+    echo "const PRELUDE = runtime_prelude();"
+    echo ""
+    echo "// ── test body — IIFE 로 감싸 내부 const 가 top-level 에 leak 하지 않게 ──"
+    echo "(function(){"
+    cat "$test_js"
+    echo ""
+    echo "})();"
+  } > "$merged"
+  # wrapper 테스트는 내부에서 child node 프로세스를 여러 개 spawn 하는 경우가
+  # 있어 3 초 timeout 으로는 부족. 30 초로 확장.
+  timeout 30 node --stack-size=8000 "$merged" > "$out_file" 2>&1
+}
+
 check_run() {
   local f="$1"
   local tag="$(safe "$f")"
@@ -115,14 +163,24 @@ check_run() {
     bump_fail "$f [syntax]"
     return
   fi
-  # 실행 (3초 타임아웃)
-  if ! timeout 3 node "$s1" > "$out" 2>&1; then
-    echo "❌ [RUN] $f — 실행 실패"
+  # 실행 — test-codegen-* 는 stage1 context wrapper 경유
+  local rc=0
+  if needs_stage1_context "$f"; then
+    run_with_stage1_context "$s1" "$out"
+    rc=$?
+  else
+    timeout 3 node "$s1" > "$out" 2>&1
+    rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then
+    echo "❌ [RUN] $f — 실행 실패 (rc=$rc)"
     bump_fail "$f [runtime]"
     return
   fi
   local parsed=$(grep -oE "Parsed:\s*[0-9]+" "$log" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
-  echo "✅ [RUN] $f (parsed=${parsed:-?}, $(wc -c < "$out") bytes output)"
+  local ctx_tag=""
+  needs_stage1_context "$f" && ctx_tag=" (wrapper)"
+  echo "✅ [RUN] $f (parsed=${parsed:-?}, $(wc -c < "$out") bytes output)$ctx_tag"
   PASS=$((PASS+1))
 }
 
