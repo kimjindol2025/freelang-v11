@@ -11384,7 +11384,7 @@ function evalBuiltin(interp2, op, args2, expr) {
       const { spawnSync: spawnSync7 } = require("child_process");
       const inlineScript = `
 const net = require('net');
-const req = JSON.parse(process.argv[2]);
+const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
 const { host, port, data, timeout } = req;
 const buf = Buffer.from(data, 'hex');
 const sock = net.createConnection({ host, port });
@@ -11395,7 +11395,7 @@ sock.on('end', () => {
   process.stdout.write(Buffer.concat(chunks).toString('hex'));
   process.exit(0);
 });
-sock.on('error', (e) => { process.stderr.write(e.message); process.exit(1); });
+sock.on('error', (e) => { process.exit(1); });
 sock.setTimeout(timeout, () => {
   sock.destroy();
   if (chunks.length > 0) {
@@ -11408,8 +11408,8 @@ sock.setTimeout(timeout, () => {
       try {
         const r = spawnSync7(
           process.execPath,
-          ["-e", inlineScript, "--", reqJson],
-          { timeout: timeout + 1e3, encoding: "utf-8" }
+          ["-e", inlineScript],
+          { input: reqJson, timeout: timeout + 1e3, encoding: "utf-8" }
         );
         if (r.error || r.status !== 0) return null;
         const out = (r.stdout ?? "").trim();
@@ -11425,7 +11425,7 @@ sock.setTimeout(timeout, () => {
       const { spawnSync: spawnSync7 } = require("child_process");
       const inlineScript = `
 const net = require('net');
-const req = JSON.parse(process.argv[2]);
+const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
 const sock = net.createConnection({ host: req.host, port: req.port });
 sock.on('connect', () => { sock.destroy(); process.stdout.write('ok'); process.exit(0); });
 sock.on('error', () => { process.exit(1); });
@@ -11434,8 +11434,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       try {
         const r = spawnSync7(
           process.execPath,
-          ["-e", inlineScript, "--", JSON.stringify({ host, port, timeout })],
-          { timeout: timeout + 500, encoding: "utf-8" }
+          ["-e", inlineScript],
+          { input: JSON.stringify({ host, port, timeout }), timeout: timeout + 500, encoding: "utf-8" }
         );
         if (r.error || r.status !== 0) return null;
         return `${host}:${port}`;
