@@ -1,0 +1,43 @@
+;; self/verify.fl — Phase 28
+;; 자가호스팅 검증 (shell command 사용)
+
+(do
+  (println "════════════════════════════════════════════")
+  (println "  FL Self-Hosting Verification (Phase 28)")
+  (println "════════════════════════════════════════════")
+  (println "")
+
+  ;; stage1 compile stage2
+  (println "=== Compiling stage2 ===")
+  (let [$r1 (shell-capture "node stage1.js self/all.fl /tmp/stage2.js 2>&1")]
+    (if (= (get $r1 "code") 0)
+      (println "✅ stage1 → stage2 OK")
+      (do
+        (println "❌ stage1 → stage2 failed")
+        (println (get $r1 "stdout"))
+        (exit 1))))
+
+  ;; stage1 compile stage3
+  (println "=== Compiling stage3 ===")
+  (let [$r2 (shell-capture "node stage1.js self/all.fl /tmp/stage3.js 2>&1")]
+    (if (= (get $r2 "code") 0)
+      (println "✅ stage1 → stage3 OK")
+      (do
+        (println "❌ stage1 → stage3 failed")
+        (println (get $r2 "stdout"))
+        (exit 1))))
+
+  ;; determinism: stage2 == stage3
+  (println "")
+  (println "=== Determinism Check ===")
+  (let [$size-check (shell-capture "diff /tmp/stage2.js /tmp/stage3.js | wc -l")]
+    (if (= (trim (get $size-check "stdout")) "0")
+      (println "✅ Determinism OK: stage2 == stage3 (bit-identical)")
+      (do
+        (println "❌ Determinism FAILED: files differ")
+        (exit 1))))
+
+  (println "")
+  (println "════════════════════════════════════════════")
+  (println "✅ Self-hosting verification passed!")
+  (println "════════════════════════════════════════════"))
