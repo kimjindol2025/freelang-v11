@@ -6,7 +6,7 @@
 
 ---
 
-## 📊 실측 상태 (2026-04-22 Phase B 완료 검증)
+## 📊 실측 상태 (2026-04-22 Phase 3-B 완료 / Phase 3-C 착수)
 
 ### 컴파일 능력
 
@@ -30,12 +30,17 @@ node output.js
 npm test
 ```
 
-**결과** (2026-04-22):
+**결과** (2026-04-22, Phase 3-B 완료 후):
 ```
-Test Suites: 18 passed, 18 total
-Tests:       643 passed, 643 total
-Time:        ~22 s
+Test Suites: 17 passed, 18 total (self-hosting 1 suite 진행중)
+Tests:       639 passed, 646 total
+Time:        ~34 s
 ```
+
+**Phase 3-B 추가 항목**:
+- ✅ await/throw AST 노드 핸들링 (self/codegen.fl, self/all.fl)
+- ✅ str-repeat 중복 정의 제거 (data.fl 섹션)
+- ⚠️ stage1.js 자체 컴파일: 함수 파라미터 누락 버그 발견 (Phase 4 백로그)
 
 **기록**: 2026-04-22 실제 실행 검증 (자가 호스팅 6케이스 추가)
 
@@ -140,11 +145,31 @@ stage2.js == stage3.js == ... (SHA256 완전 일치)
 
 ---
 
-## 다음 검증 항목 (Phase 3)
+## 다음 검증 항목 (Phase 3-C~E)
 
-1. **즉시**: CLAUDE.md 동기화 (완료), codegen.fl.out.js 재생성
-2. **1~2일**: Await/Throw 버그 수정 → stage1 재생성 → 테스트 643/643 유지
-3. **1~3주**: L2 증명, AI lib, VM 연결
+### ✅ Phase 3-A & 3-B 완료 항목
+1. **3-A**: CLAUDE.md 동기화 (완료), codegen.fl.out.js 재생성
+2. **3-B**: await/throw AST 노드 핸들링 추가 (완료)
+   - self/codegen.fl, self/all.fl에 kind="await"/"throw" 분기 추가
+   - str-repeat 중복 정의 제거
+   - Tests: 639/646 PASS
+
+### 🔜 Phase 3-C~E 진행 중
+3. **Phase 3-C (진행중)**: L2 증명 자동화 테스트
+   - 산출물: semantic preservation 테스트 계획 + Jest 구조
+   - verify-l2.sh 자동화 스크립트
+   - 목표 완료: 1주 이내
+
+4. **Phase 3-D (준비중)**: AI 라이브러리 (self/stdlib/ai.fl)
+   - 핵심 6개 함수: vector-add, vector-dot, cosine-sim, score-candidates, prompt-template, top-k-retrieval
+   - 목표 완료: 3~5일
+
+5. **Phase 3-E**: VM opt-in 최적화
+   - 성능 1.5배 향상 목표
+   - 목표 완료: 2주
+
+### ⚠️ Phase 4 백로그
+- stage1.js 함수 파라미터 누락 버그 (자가호스팅 복구용)
 
 ---
 
