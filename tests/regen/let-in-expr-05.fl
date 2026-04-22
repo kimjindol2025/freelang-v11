@@ -1,0 +1,5 @@
+;; let-in-expr-05.fl — Case E: 복잡한 expression
+;; 기대: 고차 함수와 let 조합이 안전하게 처리
+
+(let [$nums [1 2 3]]
+  (reduce (fn [$a $b] (+ $a $b)) 0 (map (fn [$x] (* $x 2)) $nums)))
