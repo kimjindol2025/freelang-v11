@@ -1281,6 +1281,70 @@
     (compile-file (get $__argv__ 0)
                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
                       (str (get $__argv__ 0) ".out.js")))))
+
+;; self/stdlib/test-runner.fl — Phase 28
+;; FL 레벨 테스트 프레임워크 (Jest 불필요)
+;; 함수형 설계: 재현 가능, 결정론 보장
+
+[FUNC run-one-test :params [$t]
+  :body (do
+    ((get $t "fn"))
+    {:pass true :name (get $t "name")})]
+
+[FUNC print-test-result :params [$r]
+  :body (if (get $r "pass")
+    (println (str "  ✅ " (get $r "name")))
+    (println (str "  ❌ " (get $r "name") " — " (get $r "error"))))]
+
+[FUNC count-pass :params [$results]
+  :body (count (filter (fn [$r] (get $r "pass")) $results))]
+
+[FUNC count-fail :params [$results]
+  :body (count (filter (fn [$r] (not (get $r "pass"))) $results))]
+
+[FUNC run-tests :params [$suite-name $tests]
+  :body (do
+    (println (str "📋 " $suite-name))
+    (let [$results (map run-one-test $tests)]
+      (do
+        (map print-test-result $results)
+        (let [$p (count-pass $results)
+              $f (count-fail $results)
+              $total (+ $p $f)]
+          (do
+            (println (str "  Result: " $p "/" $total " passed"))
+            (if (= $f 0)
+              (println "✅ All tests passed")
+              (println (str "❌ " $f " test(s) failed")))
+            {:pass $p :fail $f :total $total})))))]
+
+[FUNC assert-eq :params [$actual $expected]
+  :body (if (= $actual $expected)
+    nil
+    (throw (str "expected " $expected " got " $actual)))]
+
+[FUNC assert-true :params [$value]
+  :body (if (= $value true)
+    nil
+    (throw (str "expected true got " $value)))]
+
+[FUNC assert-false :params [$value]
+  :body (if (= $value false)
+    nil
+    (throw (str "expected false got " $value)))]
+
+[FUNC assert-nil :params [$value]
+  :body (if (= $value nil)
+    nil
+    (throw (str "expected nil got " $value)))]
+
+[FUNC assert-not-nil :params [$value]
+  :body (if (not (= $value nil))
+    nil
+    (throw "expected non-nil value"))]
+
+;; assert-error: try/catch 미지원으로 제거
+
 ;; self/main.fl — FL-to-JS Self-Hosted Compiler
 
 (println "\n═══════════════════════════════════════════")
