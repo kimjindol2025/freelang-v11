@@ -94,18 +94,29 @@
 ;; High-level: MongoDB 명령 빌드 및 전송
 ;; ─────────────────────────────────────────────────────────────────────
 
+;; wire-parse-host : connId → host (extract from "host:port")
+[FUNC wire-parse-host :params [$connId]
+  :body (substring $connId 0 (index-of $connId ":"))]
+
+;; wire-parse-port : connId → port (extract from "host:port")
+[FUNC wire-parse-port :params [$connId]
+  :body (num (substring $connId (+ (index-of $connId ":") 1)))]
+
 ;; wire-send-command : connId db cmd-dict → response-hex or null
 ;; MongoDB Wire Protocol 명령 전송 및 응답 수신
+;; Phase TCP: net-sendrecv로 직접 TCP 호출 (외부 파일 의존 제거)
 [FUNC wire-send-command :params [$connId $db $cmd]
   :body (let [[$full-cmd (assoc $cmd "$db" $db)]
               [$cmd-hex (bson-encode $full-cmd)]
-              [$opmsg-hex (wire-build-opmsg $cmd-hex)]]
-    (mongodb_sendrecv $connId $opmsg-hex))]
+              [$opmsg-hex (wire-build-opmsg $cmd-hex)]
+              [$host (wire-parse-host $connId)]
+              [$port (wire-parse-port $connId)]]
+    (net-sendrecv $host $port $opmsg-hex 10000))]
 
 ;; wire-parse-response : response-hex → parsed-bson or null
 [FUNC wire-parse-response :params [$responseHex]
-  :body (if (nil? $responseHex) null
+  :body (if (= $responseHex null) null
     (let [[$parsed (wire-parse-opmsg $responseHex)]
           [$bson-hex (get $parsed "bson-hex")]]
-      (if (nil? $bson-hex) null
+      (if (= $bson-hex null) null
         (bson-decode $bson-hex)))))]
