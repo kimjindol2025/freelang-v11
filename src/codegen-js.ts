@@ -43,6 +43,90 @@ const BINARY_OPS: Record<string, string> = {
   "or": "||",
 };
 
+// FL 내장 함수 → JS 네이티브 바인딩 매핑 (semantic codegen)
+const BUILTIN_MAP: Record<string, string> = {
+  // 타입 체크
+  "null?": "_fl_null_q",
+  "true?": "_fl_true_q",
+  "false?": "_fl_false_q",
+  "string?": "_fl_string_q",
+  "number?": "_fl_number_q",
+  "list?": "_fl_list_q",
+  "array?": "_fl_array_q",
+  "map?": "_fl_map_q",
+  "fn?": "_fl_fn_q",
+  "empty?": "_fl_empty_q",
+
+  // 문자 검증 (lexer 헬퍼)
+  "is-digit?": "_fl_is_digit_q",
+  "is-alpha?": "_fl_is_alpha_q",
+  "is-alnum?": "_fl_is_alnum_q",
+  "is-space?": "_fl_is_space_q",
+  "is-symbol-char?": "_fl_is_symbol_char_q",
+
+  // 기본 연산
+  "map": "_fl_map",
+  "filter": "_fl_filter",
+  "reduce": "_fl_reduce",
+  "first": "_fl_first",
+  "last": "_fl_last",
+  "rest": "_fl_rest",
+  "append": "_fl_append",
+  "length": "_fl_length",
+
+  // 문자열
+  "str": "_fl_str",
+  "contains?": "_fl_contains_q",
+  "upper": "_fl_upper",
+  "lower": "_fl_lower",
+  "trim": "_fl_trim",
+
+  // 맵/객체
+  "get": "_fl_get",
+  "keys": "_fl_keys",
+  "map-set": "_fl_map_set",
+  "has-key?": "_fl_has_key_q",
+};
+
+// JavaScript 예약어 목록
+const JS_RESERVED = new Set([
+  "abstract", "arguments", "await", "boolean", "break", "byte", "case", "catch",
+  "char", "class", "const", "continue", "debugger", "default", "delete", "do",
+  "double", "else", "enum", "eval", "export", "extends", "false", "final",
+  "finally", "float", "for", "function", "goto", "if", "implements", "import",
+  "in", "instanceof", "int", "interface", "let", "long", "native", "new",
+  "null", "package", "private", "protected", "public", "return", "short", "static",
+  "super", "switch", "synchronized", "this", "throw", "throws", "transient",
+  "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
+]);
+
+// FL 심볼을 JS 유효 식별자로 인코딩
+function flNameToJs(name: string): string {
+  // BUILTIN_MAP에 있으면 직접 매핑
+  if (BUILTIN_MAP[name]) {
+    return BUILTIN_MAP[name];
+  }
+
+  // 일반 심볼 인코딩: 특수문자 → 안전한 이름
+  const encoded = name
+    .replace(/\?$/g, "_q")      // 끝의 ? → _q
+    .replace(/!/g, "_bang")     // ! → _bang
+    .replace(/>/g, "_gt")       // > → _gt
+    .replace(/</g, "_lt")       // < → _lt
+    .replace(/=/g, "_eq")       // = → _eq
+    .replace(/\+/g, "_plus")    // + → _plus
+    .replace(/\*/g, "_star")    // * → _star
+    .replace(/\//g, "_slash")   // / → _slash
+    .replace(/-/g, "_");        // - → _ (마지막에 처리)
+
+  // JavaScript 예약어 체크
+  if (JS_RESERVED.has(encoded)) {
+    return `_${encoded}`;
+  }
+
+  return encoded;
+}
+
 export class JSCodegen {
   private opts: CodegenOptions;
   private exportedNames: string[] = [];
@@ -143,8 +227,10 @@ export class JSCodegen {
   }
 
   private genVariable(node: Variable): string {
-    // $x → $x (그대로 유지)
-    return node.name;
+    // Variable.name: "cases-js" → "cases_js" (유효한 JS 식별자로 인코딩)
+    // $ 접두사는 이미 Bootstrap parser에서 제거됨
+    const cleanName = node.name.replace(/^\$/, ""); // $ 제거 (있으면)
+    return flNameToJs(cleanName);
   }
 
   private genKeyword(node: Keyword): string {
@@ -268,10 +354,11 @@ export class JSCodegen {
           .join("\n");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
       }
-      // 단순 let
+      // 단순 let (expression과 statement 양쪽에서 안전하게 동작하도록 IIFE로 래핑)
       const varName = this.extractVarName(args[0]);
       const value = args[1] ? this.genNode(args[1]) : "undefined";
-      return `let ${varName} = ${value};`;
+      // IIFE 형태로 래핑: statement와 expression 양쪽에서 작동
+      return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
 
     // 함수 호출 (일반)
@@ -303,8 +390,9 @@ export class JSCodegen {
 
   private genFuncCall(op: string, args: ASTNode[]): string {
     const argStrs = args.map((a) => this.genNode(a));
-    // $ 없는 함수명은 그대로, $로 시작하면 변수
-    return `${op}(${argStrs.join(", ")})`;
+    // semantic 매핑: builtin 또는 인코딩된 함수명 사용
+    const jsOp = flNameToJs(op);
+    return `${jsOp}(${argStrs.join(", ")})`;
   }
 
   genBlock(node: Block): string {
@@ -319,9 +407,53 @@ export class JSCodegen {
         return this.genModelBlock(node);
       case "CONTROLLER":
         return this.genControllerBlock(node);
+      case "MAP":
+      case "Map":
+        return this.genMapBlock(node);
+      case "ARRAY":
+      case "Array":
+        return this.genArrayBlock(node);
       default:
         return `/* unsupported block: ${node.type} */`;
     }
+  }
+
+  private genMapBlock(node: Block): string {
+    // Map 리터럴: {:key1 val1 :key2 val2 ...} → { key1: val1, key2: val2, ... }
+    const items = node.fields.get("items");
+    if (!items) return "{}";
+
+    const pairs: string[] = [];
+    if (Array.isArray(items)) {
+      // 키-값 쌍: [key1, val1, key2, val2, ...]
+      for (let i = 0; i < items.length; i += 2) {
+        const keyNode = items[i];
+        const valNode = items[i + 1];
+
+        // 키 추출 (문자열 또는 키워드)
+        let key: string;
+        if (keyNode.kind === "literal" && typeof keyNode.value === "string") {
+          key = keyNode.value;
+        } else if (keyNode.kind === "keyword") {
+          key = keyNode.name;
+        } else {
+          key = this.genNode(keyNode);
+        }
+
+        const val = this.genNode(valNode);
+        pairs.push(`${key}: ${val}`);
+      }
+    }
+
+    return `{ ${pairs.join(", ")} }`;
+  }
+
+  private genArrayBlock(node: Block): string {
+    // 배열 리터럴: [item1 item2 ...] → [ item1, item2, ... ]
+    const items = node.fields.get("items");
+    if (!items) return "[]";
+    const elements = (Array.isArray(items) ? items : [items]).map((item) => this.genNode(item as ASTNode));
+    return `[ ${elements.join(", ")} ]`;
   }
 
   private genFuncBlock(node: Block): string {
@@ -329,7 +461,13 @@ export class JSCodegen {
     const params = this.extractBlockParams(node);
     const body = node.fields.get("body");
     const bodyCode = body ? this.genNode(body as ASTNode) : "undefined";
-    return `function ${node.name}(${params.join(", ")}) { return ${bodyCode}; }`;
+    const jsName = this.flNameToJs(node.name);
+    return `function ${jsName}(${params.join(", ")}) { return ${bodyCode}; }`;
+  }
+
+  private flNameToJs(name: string): string {
+    // Global flNameToJs 함수에 위임 (예약어 + 특수문자 처리)
+    return flNameToJs(name);
   }
 
   private genModuleBlock(node: Block): string {

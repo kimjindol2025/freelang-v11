@@ -1,12 +1,21 @@
 #!/bin/bash
-# build-stage1.sh — self/all.fl 자동 빌드 스크립트
+# build-stage1.sh — self/all.fl 자동 빌드 스크립트 + stage1.js 안전 재생성
 # 모든 stdlib 파일을 순차적으로 concat해서 self/all.fl 생성 후 stage1.js 컴파일
+# 기존 stage1.js는 자동으로 백업 (.bak-<timestamp>로 저장)
 
 set -e
 
 echo "📦 FreeLang v11 Stage1 Builder"
 echo "================================"
 echo ""
+
+# 1. 기존 stage1.js 백업
+if [ -f "stage1.js" ]; then
+  BACKUP_FILE="stage1.js.bak-$(date +%s)"
+  cp stage1.js "$BACKUP_FILE"
+  echo "💾 기존 stage1.js 백업: $BACKUP_FILE"
+  echo ""
+fi
 
 # 1. 모든 stdlib 파일 순서대로 concat
 echo "🔧 Concatenating stdlib files..."

@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-22 12:22:52
+; 2026-04-22 13:24:27
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -419,6 +419,220 @@
             (parse-all $p2)))]
 
 [FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
+
+;; self/ast.fl — AST 노드 생성자 (Phase 02/21-30)
+;;
+;; v11 src/ast.ts (806 줄, 25+ 노드) 의 FL 재작성.
+;; 모든 노드는 plain map: {:kind "..." ...필드}
+;; 생성자는 [FUNC make-xxx :params [...] :body {:kind ...}]
+
+;; ──────────────────────────────────────
+;; 21 기본 원자 (Literal/Variable/Keyword/SExpr)
+;; ──────────────────────────────────────
+
+[FUNC make-literal :params [$type $value $line]
+  :body {:kind "literal" :type $type :value $value :line $line}]
+
+[FUNC make-variable :params [$name $line]
+  :body {:kind "variable" :name $name :line $line}]
+
+[FUNC make-keyword :params [$name $line]
+  :body {:kind "keyword" :name $name :line $line}]
+
+[FUNC make-sexpr :params [$op $args $line]
+  :body {:kind "sexpr" :op $op :args $args :line $line}]
+
+;; ──────────────────────────────────────
+;; 22 SExpr 편의 + 원시값 래퍼
+;; ──────────────────────────────────────
+
+[FUNC make-number :params [$v $line]
+  :body (make-literal "number" $v $line)]
+
+[FUNC make-string :params [$v $line]
+  :body (make-literal "string" $v $line)]
+
+[FUNC make-bool :params [$v $line]
+  :body (make-literal "boolean" $v $line)]
+
+[FUNC make-null :params [$line]
+  :body (make-literal "null" null $line)]
+
+[FUNC make-symbol :params [$v $line]
+  :body (make-literal "symbol" $v $line)]
+
+;; ──────────────────────────────────────
+;; 23 Block (Array/Map/Named)
+;; fields 는 items(list) 또는 named map. block 의 type 으로 구분.
+;; ──────────────────────────────────────
+
+[FUNC make-block :params [$type $name $fields $line]
+  :body {:kind "block" :type $type :name $name :fields $fields :line $line}]
+
+[FUNC make-array-block :params [$items $line]
+  :body (make-block "Array" null {:items $items} $line)]
+
+[FUNC make-map-block :params [$items $line]
+  :body (make-block "Map" null {:items $items} $line)]
+
+;; ──────────────────────────────────────
+;; 24 Pattern 7종
+;; ──────────────────────────────────────
+
+[FUNC make-pattern-literal :params [$value $line]
+  :body {:kind "pattern-literal" :value $value :line $line}]
+
+[FUNC make-pattern-variable :params [$name $line]
+  :body {:kind "pattern-variable" :name $name :line $line}]
+
+[FUNC make-pattern-wildcard :params [$line]
+  :body {:kind "pattern-wildcard" :line $line}]
+
+[FUNC make-pattern-list :params [$items $rest $line]
+  :body {:kind "pattern-list" :items $items :rest $rest :line $line}]
+
+[FUNC make-pattern-struct :params [$type-name $fields $line]
+  :body {:kind "pattern-struct" :type $type-name :fields $fields :line $line}]
+
+[FUNC make-pattern-or :params [$alternatives $line]
+  :body {:kind "pattern-or" :alternatives $alternatives :line $line}]
+
+[FUNC make-pattern-range :params [$start $end $line]
+  :body {:kind "pattern-range" :start $start :end $end :line $line}]
+
+;; ──────────────────────────────────────
+;; 25 Pattern matching
+;; ──────────────────────────────────────
+
+[FUNC make-pattern-match :params [$value $cases $line]
+  :body {:kind "pattern-match" :value $value :cases $cases :line $line}]
+
+[FUNC make-match-case :params [$pattern $guard $body $line]
+  :body {:kind "match-case" :pattern $pattern :guard $guard :body $body :line $line}]
+
+;; ──────────────────────────────────────
+;; 26 함수/타입
+;; ──────────────────────────────────────
+
+[FUNC make-function-value :params [$params $body $captured-env $name]
+  :body {:kind "function-value" :params $params :body $body
+         :capturedEnv $captured-env :name $name}]
+
+[FUNC make-type-class :params [$name $generics $methods $line]
+  :body {:kind "type-class" :name $name :generics $generics
+         :methods $methods :line $line}]
+
+[FUNC make-type-class-instance :params [$class-name $type-name $impls $line]
+  :body {:kind "type-class-instance" :class $class-name :type $type-name
+         :impls $impls :line $line}]
+
+;; ──────────────────────────────────────
+;; 27 Module / Import
+;; ──────────────────────────────────────
+
+[FUNC make-module-block :params [$name $exports $body $line]
+  :body {:kind "module" :name $name :exports $exports :body $body :line $line}]
+
+[FUNC make-import-block :params [$path $alias $names $line]
+  :body {:kind "import" :path $path :alias $alias :names $names :line $line}]
+
+[FUNC make-open-block :params [$module-name $line]
+  :body {:kind "open" :module $module-name :line $line}]
+
+;; ──────────────────────────────────────
+;; 28 AI 블록 (SearchBlock / LearnBlock / ReasoningBlock)
+;; ──────────────────────────────────────
+
+[FUNC make-search-block :params [$query $fields $line]
+  :body {:kind "search-block" :query $query :fields $fields :line $line}]
+
+[FUNC make-learn-block :params [$topic $fields $line]
+  :body {:kind "learn-block" :topic $topic :fields $fields :line $line}]
+
+[FUNC make-reasoning-block :params [$name $fields $line]
+  :body {:kind "reasoning-block" :name $name :fields $fields :line $line}]
+
+;; ──────────────────────────────────────
+;; 29 Async / Try
+;; ──────────────────────────────────────
+
+[FUNC make-async-function :params [$name $params $body $line]
+  :body {:kind "async-function" :name $name :params $params :body $body :line $line}]
+
+[FUNC make-await :params [$expr $line]
+  :body {:kind "await" :expr $expr :line $line}]
+
+[FUNC make-try :params [$body $catch $finally $line]
+  :body {:kind "try" :body $body :catch $catch :finally $finally :line $line}]
+
+[FUNC make-catch :params [$param $body $line]
+  :body {:kind "catch" :param $param :body $body :line $line}]
+
+[FUNC make-throw :params [$expr $line]
+  :body {:kind "throw" :expr $expr :line $line}]
+
+;; ──────────────────────────────────────
+;; 30 웹 노드 + deep-equal?
+;; ──────────────────────────────────────
+
+[FUNC make-page :params [$name $path $fields $line]
+  :body {:kind "page" :name $name :path $path :fields $fields :line $line}]
+
+[FUNC make-route :params [$method $path $handler $line]
+  :body {:kind "route" :method $method :path $path :handler $handler :line $line}]
+
+[FUNC make-component :params [$name $fields $line]
+  :body {:kind "component" :name $name :fields $fields :line $line}]
+
+[FUNC make-form :params [$name $fields $line]
+  :body {:kind "form" :name $name :fields $fields :line $line}]
+
+;; deep-equal? — 노드 비교 (line 무시)
+;; Map 이면 모든 키를 순회, list 면 원소별, 원시값은 =.
+
+[FUNC deep-equal? :params [$a $b]
+  :body (cond
+          [(and (null? $a) (null? $b)) true]
+          [(or  (null? $a) (null? $b)) false]
+          [(and (list? $a) (list? $b)) (deep-equal-list? $a $b 0)]
+          [(and (map? $a) (map? $b))   (deep-equal-map? $a $b)]
+          [true (= $a $b)])]
+
+[FUNC deep-equal-list? :params [$a $b $i]
+  :body (cond
+          [(not (= (length $a) (length $b))) false]
+          [(>= $i (length $a)) true]
+          [(not (deep-equal? (get $a $i) (get $b $i))) false]
+          [true (deep-equal-list? $a $b (+ $i 1))])]
+
+;; Map 비교: :line 은 무시. keys 정렬 후 각 키의 값 비교.
+[FUNC deep-equal-map? :params [$a $b]
+  :body (let [[$ka (keys-no-line $a)]
+              [$kb (keys-no-line $b)]]
+          (if (not (= (length $ka) (length $kb))) false
+            (deep-equal-map-keys? $a $b $ka 0)))]
+
+[FUNC keys-no-line :params [$m]
+  :body (filter (fn [$k] (not (= $k "line"))) (json_keys $m))]
+
+[FUNC deep-equal-map-keys? :params [$a $b $ks $i]
+  :body (cond
+          [(>= $i (length $ks)) true]
+          [(let [[$k (get $ks $i)]]
+             (not (deep-equal? (get $a $k) (get $b $k)))) false]
+          [true (deep-equal-map-keys? $a $b $ks (+ $i 1))])]
+
+;; 타입 감지 헬퍼 (FL 에 list?/map? 기본 없으면 대체)
+[FUNC list? :params [$v]
+  :body (if (null? $v) false
+          (= (str-to-num (str "[" $v)) null))]  ;; 플레이스홀더. 실제로는 런타임이 Array 타입 제공 필요.
+
+[FUNC map? :params [$v]
+  :body (if (null? $v) false
+          (not (null? (get $v :kind))))]  ;; kind 키가 있으면 AST map 으로 간주
+
+;; NOTE: list?/map? 의 robust 한 구현은 FL 런타임 지원 필요 (Phase 07 builtins/type 에서 교체).
+;; 현재는 AST 비교에 사용될 때만 동작하는 placeholder.
 
 ;; self/codegen.fl — FL AST → JS source (v2, Phase 10 확장)
 ;;
@@ -1342,6 +1556,14 @@
   :body (if (>= $i (length $lines)) $acc
           (csv-parse-loop $lines (+ $i 1)
             (append $acc (csv-parse-line (get $lines $i)))))]
+
+;; 문자열 반복
+[FUNC str-repeat :params [$s $n]
+  :body (if (<= $n 0) ""
+          (str-repeat-loop $s $n 0 ""))]
+[FUNC str-repeat-loop :params [$s $n $i $acc]
+  :body (if (>= $i $n) $acc
+          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
 
 ;; JSON 헬퍼 (json.fl 기반)
 [FUNC data-json-parse :params [$s]

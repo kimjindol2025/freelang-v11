@@ -22057,6 +22057,121 @@ var BINARY_OPS = {
   "and": "&&",
   "or": "||"
 };
+var BUILTIN_MAP = {
+  // 타입 체크
+  "null?": "_fl_null_q",
+  "true?": "_fl_true_q",
+  "false?": "_fl_false_q",
+  "string?": "_fl_string_q",
+  "number?": "_fl_number_q",
+  "list?": "_fl_list_q",
+  "array?": "_fl_array_q",
+  "map?": "_fl_map_q",
+  "fn?": "_fl_fn_q",
+  "empty?": "_fl_empty_q",
+  // 문자 검증 (lexer 헬퍼)
+  "is-digit?": "_fl_is_digit_q",
+  "is-alpha?": "_fl_is_alpha_q",
+  "is-alnum?": "_fl_is_alnum_q",
+  "is-space?": "_fl_is_space_q",
+  "is-symbol-char?": "_fl_is_symbol_char_q",
+  // 기본 연산
+  "map": "_fl_map",
+  "filter": "_fl_filter",
+  "reduce": "_fl_reduce",
+  "first": "_fl_first",
+  "last": "_fl_last",
+  "rest": "_fl_rest",
+  "append": "_fl_append",
+  "length": "_fl_length",
+  // 문자열
+  "str": "_fl_str",
+  "contains?": "_fl_contains_q",
+  "upper": "_fl_upper",
+  "lower": "_fl_lower",
+  "trim": "_fl_trim",
+  // 맵/객체
+  "get": "_fl_get",
+  "keys": "_fl_keys",
+  "map-set": "_fl_map_set",
+  "has-key?": "_fl_has_key_q"
+};
+var JS_RESERVED = /* @__PURE__ */ new Set([
+  "abstract",
+  "arguments",
+  "await",
+  "boolean",
+  "break",
+  "byte",
+  "case",
+  "catch",
+  "char",
+  "class",
+  "const",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "double",
+  "else",
+  "enum",
+  "eval",
+  "export",
+  "extends",
+  "false",
+  "final",
+  "finally",
+  "float",
+  "for",
+  "function",
+  "goto",
+  "if",
+  "implements",
+  "import",
+  "in",
+  "instanceof",
+  "int",
+  "interface",
+  "let",
+  "long",
+  "native",
+  "new",
+  "null",
+  "package",
+  "private",
+  "protected",
+  "public",
+  "return",
+  "short",
+  "static",
+  "super",
+  "switch",
+  "synchronized",
+  "this",
+  "throw",
+  "throws",
+  "transient",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "volatile",
+  "while",
+  "with",
+  "yield"
+]);
+function flNameToJs(name) {
+  if (BUILTIN_MAP[name]) {
+    return BUILTIN_MAP[name];
+  }
+  const encoded = name.replace(/\?$/g, "_q").replace(/!/g, "_bang").replace(/>/g, "_gt").replace(/</g, "_lt").replace(/=/g, "_eq").replace(/\+/g, "_plus").replace(/\*/g, "_star").replace(/\//g, "_slash").replace(/-/g, "_");
+  if (JS_RESERVED.has(encoded)) {
+    return `_${encoded}`;
+  }
+  return encoded;
+}
 var JSCodegen = class {
   opts;
   exportedNames = [];
@@ -22138,7 +22253,8 @@ ${exportsStr}
     }
   }
   genVariable(node) {
-    return node.name;
+    const cleanName = node.name.replace(/^\$/, "");
+    return flNameToJs(cleanName);
   }
   genKeyword(node) {
     return JSON.stringify(node.name);
@@ -22227,7 +22343,7 @@ ${exportsStr}
       }
       const varName = this.extractVarName(args2[0]);
       const value = args2[1] ? this.genNode(args2[1]) : "undefined";
-      return `let ${varName} = ${value};`;
+      return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
     const fnExpr = this.genFuncCall(op, args2);
     return fnExpr;
@@ -22249,7 +22365,8 @@ ${exportsStr}
   }
   genFuncCall(op, args2) {
     const argStrs = args2.map((a) => this.genNode(a));
-    return `${op}(${argStrs.join(", ")})`;
+    const jsOp = flNameToJs(op);
+    return `${jsOp}(${argStrs.join(", ")})`;
   }
   genBlock(node) {
     switch (node.type) {
@@ -22263,15 +22380,53 @@ ${exportsStr}
         return this.genModelBlock(node);
       case "CONTROLLER":
         return this.genControllerBlock(node);
+      case "MAP":
+      case "Map":
+        return this.genMapBlock(node);
+      case "ARRAY":
+      case "Array":
+        return this.genArrayBlock(node);
       default:
         return `/* unsupported block: ${node.type} */`;
     }
+  }
+  genMapBlock(node) {
+    const items = node.fields.get("items");
+    if (!items) return "{}";
+    const pairs = [];
+    if (Array.isArray(items)) {
+      for (let i = 0; i < items.length; i += 2) {
+        const keyNode = items[i];
+        const valNode = items[i + 1];
+        let key;
+        if (keyNode.kind === "literal" && typeof keyNode.value === "string") {
+          key = keyNode.value;
+        } else if (keyNode.kind === "keyword") {
+          key = keyNode.name;
+        } else {
+          key = this.genNode(keyNode);
+        }
+        const val = this.genNode(valNode);
+        pairs.push(`${key}: ${val}`);
+      }
+    }
+    return `{ ${pairs.join(", ")} }`;
+  }
+  genArrayBlock(node) {
+    const items = node.fields.get("items");
+    if (!items) return "[]";
+    const elements = (Array.isArray(items) ? items : [items]).map((item) => this.genNode(item));
+    return `[ ${elements.join(", ")} ]`;
   }
   genFuncBlock(node) {
     const params = this.extractBlockParams(node);
     const body = node.fields.get("body");
     const bodyCode = body ? this.genNode(body) : "undefined";
-    return `function ${node.name}(${params.join(", ")}) { return ${bodyCode}; }`;
+    const jsName = this.flNameToJs(node.name);
+    return `function ${jsName}(${params.join(", ")}) { return ${bodyCode}; }`;
+  }
+  flNameToJs(name) {
+    return flNameToJs(name);
   }
   genModuleBlock(node) {
     const body = node.fields.get("body");
