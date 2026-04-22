@@ -198,11 +198,20 @@ export class Parser {
       throw this.error(`Expected block type (symbol or keyword), got ${typeToken.type}`, typeToken);
     }
 
-    const nameToken = this.advance();
-    if (nameToken.type !== T.Symbol) {
-      throw this.error(`Expected block name (symbol), got ${nameToken.type}`, nameToken);
+    // Phase 12+: Support anonymous FUNC blocks for inline function definitions
+    // [FUNC :params [...] :body (...)] without explicit name
+    let blockName: string;
+    if (blockType === "FUNC" && (this.check(T.Colon) || this.check(T.Keyword))) {
+      // Anonymous FUNC: [FUNC :params [...] :body (...)]
+      // Generate unique internal name for this anonymous function
+      blockName = `__anon_func_${this.pos}`;
+    } else {
+      const nameToken = this.advance();
+      if (nameToken.type !== T.Symbol) {
+        throw this.error(`Expected block name (symbol), got ${nameToken.type}`, nameToken);
+      }
+      blockName = nameToken.value;
     }
-    const blockName = nameToken.value;
 
     const fields = new Map<string, ASTNode | ASTNode[]>();
     const typeAnnotations = new Map<string, TypeAnnotation>();
