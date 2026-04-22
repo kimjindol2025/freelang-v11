@@ -505,6 +505,120 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       }
     }
 
+    // Phase Step3: require function (module system)
+    case "require": {
+      const modulePath = String(args[0] ?? "");
+      const fs = require("fs");
+      const path = require("path");
+      try {
+        // Auto-add .fl extension if not present
+        let filePath = modulePath;
+        if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
+          filePath = filePath + ".fl";
+        }
+
+        // Resolve path (relative to current working directory or absolute)
+        const resolvedPath = path.isAbsolute(filePath)
+          ? filePath
+          : path.resolve(process.cwd(), filePath);
+
+        // Phase L1.5: Check module cache first (deterministic semantics)
+        if (MODULE_CACHE.has(resolvedPath)) {
+          return MODULE_CACHE.get(resolvedPath);
+        }
+
+        // Read and parse the module
+        const src = fs.readFileSync(resolvedPath, "utf-8");
+        const { lex } = require("./lexer");
+        const { parse } = require("./parser");
+        const tokens = lex(src, resolvedPath);
+        const ast = parse(tokens);
+
+        // Evaluate module and capture result
+        const result = (interp as any).interpret(ast);
+
+        // Cache the result for future requires of the same module
+        MODULE_CACHE.set(resolvedPath, result);
+        return result;
+      } catch (e: any) {
+        throw new Error(`require failed: '${modulePath}': ${e.message}`);
+      }
+    }
+
+    // Phase TCP: TCP Socket Support (synchronous via spawnSync)
+    case "net-sendrecv": {
+      const host = String(args[0] ?? "localhost");
+      const port = Number(args[1] ?? 27017);
+      const hexData = String(args[2] ?? "");
+      const timeout = Number(args[3] ?? 10000);
+
+      const { spawnSync } = require("child_process");
+
+      // Inline TCP script (동기식 처리, 외부 파일 불필요)
+      const inlineScript = `
+const net = require('net');
+const req = JSON.parse(process.argv[2]);
+const { host, port, data, timeout } = req;
+const buf = Buffer.from(data, 'hex');
+const sock = net.createConnection({ host, port });
+let chunks = [];
+sock.on('connect', () => { sock.write(buf); });
+sock.on('data', c => { chunks.push(c); });
+sock.on('end', () => {
+  process.stdout.write(Buffer.concat(chunks).toString('hex'));
+  process.exit(0);
+});
+sock.on('error', (e) => { process.stderr.write(e.message); process.exit(1); });
+sock.setTimeout(timeout, () => {
+  sock.destroy();
+  if (chunks.length > 0) {
+    process.stdout.write(Buffer.concat(chunks).toString('hex'));
+  }
+  process.exit(0);
+});
+`;
+      const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
+      try {
+        const r = spawnSync(
+          process.execPath,
+          ['-e', inlineScript, '--', reqJson],
+          { timeout: timeout + 1000, encoding: 'utf-8' as any }
+        );
+        if (r.error || r.status !== 0) return null;
+        const out = (r.stdout ?? '').trim();
+        return out.length > 0 ? out : null;
+      } catch (e: any) {
+        return null;
+      }
+    }
+
+    case "net-connect": {
+      const host = String(args[0] ?? "localhost");
+      const port = Number(args[1] ?? 27017);
+      const timeout = Number(args[2] ?? 5000);
+
+      const { spawnSync } = require("child_process");
+      const inlineScript = `
+const net = require('net');
+const req = JSON.parse(process.argv[2]);
+const sock = net.createConnection({ host: req.host, port: req.port });
+sock.on('connect', () => { sock.destroy(); process.stdout.write('ok'); process.exit(0); });
+sock.on('error', () => { process.exit(1); });
+sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
+`;
+      try {
+        const r = spawnSync(
+          process.execPath,
+          ['-e', inlineScript, '--', JSON.stringify({ host, port, timeout })],
+          { timeout: timeout + 500, encoding: 'utf-8' as any }
+        );
+        if (r.error || r.status !== 0) return null;
+        return `${host}:${port}`;
+      } catch (e: any) {
+        return null;
+      }
+    }
+
     // Arithmetic
     case "+":
       return args.reduce((a: number, b: number) => a + b, 0);

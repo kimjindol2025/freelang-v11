@@ -10871,6 +10871,7 @@ var globalPredictor = new Predictor();
 // src/eval-builtins.ts
 init_lexer();
 init_parser();
+var MODULE_CACHE = /* @__PURE__ */ new Map();
 function flEnvGet(env, name) {
   let e = env;
   while (e !== null && e !== void 0) {
@@ -11335,15 +11336,111 @@ function evalBuiltin(interp2, op, args2, expr) {
       const path14 = require("path");
       try {
         const resolvedPath = path14.resolve(process.cwd(), filePath);
+        if (MODULE_CACHE.has(resolvedPath)) {
+          return MODULE_CACHE.get(resolvedPath);
+        }
         const src = fs17.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
-        interp2.interpret(ast);
-        return null;
+        const result = interp2.interpret(ast);
+        MODULE_CACHE.set(resolvedPath, result);
+        return result;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
+    case "require": {
+      const modulePath = String(args2[0] ?? "");
+      const fs17 = require("fs");
+      const path14 = require("path");
+      try {
+        let filePath = modulePath;
+        if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
+          filePath = filePath + ".fl";
+        }
+        const resolvedPath = path14.isAbsolute(filePath) ? filePath : path14.resolve(process.cwd(), filePath);
+        if (MODULE_CACHE.has(resolvedPath)) {
+          return MODULE_CACHE.get(resolvedPath);
+        }
+        const src = fs17.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        const result = interp2.interpret(ast);
+        MODULE_CACHE.set(resolvedPath, result);
+        return result;
+      } catch (e) {
+        throw new Error(`require failed: '${modulePath}': ${e.message}`);
+      }
+    }
+    case "net-sendrecv": {
+      const host = String(args2[0] ?? "localhost");
+      const port = Number(args2[1] ?? 27017);
+      const hexData = String(args2[2] ?? "");
+      const timeout = Number(args2[3] ?? 1e4);
+      const { spawnSync: spawnSync7 } = require("child_process");
+      const inlineScript = `
+const net = require('net');
+const req = JSON.parse(process.argv[2]);
+const { host, port, data, timeout } = req;
+const buf = Buffer.from(data, 'hex');
+const sock = net.createConnection({ host, port });
+let chunks = [];
+sock.on('connect', () => { sock.write(buf); });
+sock.on('data', c => { chunks.push(c); });
+sock.on('end', () => {
+  process.stdout.write(Buffer.concat(chunks).toString('hex'));
+  process.exit(0);
+});
+sock.on('error', (e) => { process.stderr.write(e.message); process.exit(1); });
+sock.setTimeout(timeout, () => {
+  sock.destroy();
+  if (chunks.length > 0) {
+    process.stdout.write(Buffer.concat(chunks).toString('hex'));
+  }
+  process.exit(0);
+});
+`;
+      const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
+      try {
+        const r = spawnSync7(
+          process.execPath,
+          ["-e", inlineScript, "--", reqJson],
+          { timeout: timeout + 1e3, encoding: "utf-8" }
+        );
+        if (r.error || r.status !== 0) return null;
+        const out = (r.stdout ?? "").trim();
+        return out.length > 0 ? out : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    case "net-connect": {
+      const host = String(args2[0] ?? "localhost");
+      const port = Number(args2[1] ?? 27017);
+      const timeout = Number(args2[2] ?? 5e3);
+      const { spawnSync: spawnSync7 } = require("child_process");
+      const inlineScript = `
+const net = require('net');
+const req = JSON.parse(process.argv[2]);
+const sock = net.createConnection({ host: req.host, port: req.port });
+sock.on('connect', () => { sock.destroy(); process.stdout.write('ok'); process.exit(0); });
+sock.on('error', () => { process.exit(1); });
+sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
+`;
+      try {
+        const r = spawnSync7(
+          process.execPath,
+          ["-e", inlineScript, "--", JSON.stringify({ host, port, timeout })],
+          { timeout: timeout + 500, encoding: "utf-8" }
+        );
+        if (r.error || r.status !== 0) return null;
+        return `${host}:${port}`;
+      } catch (e) {
+        return null;
       }
     }
     case "+":
