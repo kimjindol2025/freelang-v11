@@ -1343,14 +1343,6 @@
           (csv-parse-loop $lines (+ $i 1)
             (append $acc (csv-parse-line (get $lines $i)))))]
 
-;; 문자열 반복
-[FUNC str-repeat :params [$s $n]
-  :body (if (<= $n 0) ""
-          (str-repeat-loop $s $n 0 ""))]
-[FUNC str-repeat-loop :params [$s $n $i $acc]
-  :body (if (>= $i $n) $acc
-          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
-
 ;; JSON 헬퍼 (json.fl 기반)
 [FUNC data-json-parse :params [$s]
   :body (json-parse $s)]
