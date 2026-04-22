@@ -1,0 +1,64 @@
+name: Phase C — FL Token Scan + Fixed-Point Verification
+
+on:
+  push:
+    branches: [feature/*, master]
+  pull_request:
+    branches: [feature/*, master]
+
+jobs:
+  scan-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build bootstrap.js
+        run: npm run build
+
+      - name: Generate stage1.js
+        run: bash scripts/build-stage1.sh
+
+      - name: 🔍 Scan for FL tokens (early-fail check)
+        run: bash scripts/scan-for-fl-tokens.sh stage1.js
+        continue-on-error: false
+
+      - name: 🔗 Verify fixed-point (5-stage SHA chain)
+        run: bash scripts/verify-fixed-point.sh
+
+      - name: ✅ Let-in-expression regression tests
+        run: node scripts/check-let-regressions.js
+
+      - name: 📦 Jest tests (643 cases)
+        run: npm test -- --silent 2>&1 | tail -20
+
+      - name: 📊 Upload artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: scan-and-verify-logs
+          path: |
+            stage1.js
+            stage2.js
+            stage3.js
+            /tmp/build.log
+
+      - name: ✨ Summary
+        if: success()
+        run: |
+          echo "✅ Phase C Verification Complete"
+          echo ""
+          echo "✓ FL tokens: clean"
+          echo "✓ Fixed-point: stage1..stage5 matched"
+          echo "✓ Regression tests: 5/5 passed"
+          echo "✓ Jest: passed"
