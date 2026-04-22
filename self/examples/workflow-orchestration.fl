@@ -1,0 +1,44 @@
+;; FreeLang Workflow Orchestration Example
+;; 멀티 스텝 워크플로우 선언형 정의 및 실행
+
+(println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+(println "Workflow Example: Data Pipeline")
+(println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+;; 워크플로우 정의 (단계 3개)
+(define step1 (workflow_step "load-data"
+  (fn [ctx] {:data [1 2 3 4 5]})))
+
+(define step2 (workflow_step "process-data"
+  (fn [ctx]
+    (let [input (get ctx "data")
+          doubled (map (fn [x] (* x 2)) input)]
+      {:processed doubled}))))
+
+(define step3 (workflow_step "finalize"
+  (fn [ctx]
+    {:count (length (get ctx "processed"))
+     :status "complete"})))
+
+;; 워크플로우 생성
+(define workflow (workflow_create "data-pipeline" [step1 step2 step3]))
+
+;; 실행
+(define result (workflow_run workflow {}))
+
+(println "")
+(println "Workflow Result:")
+(println (str "  Status: " (get result "status")))
+(println (str "  Steps OK: " (get result "steps_ok")))
+(println (str "  Steps Failed: " (get result "steps_failed")))
+(println (str "  Total ms: " (get result "total_ms")))
+
+(let [final-ctx (get result "context")]
+  (println "")
+  (println "Final Context:")
+  (println (str "  Data: " (get final-ctx "data")))
+  (println (str "  Processed: " (get final-ctx "processed")))
+  (println (str "  Count: " (get final-ctx "count"))))
+
+(println "")
+(println "✓ Workflow example completed")
