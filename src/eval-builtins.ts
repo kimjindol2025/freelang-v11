@@ -562,19 +562,44 @@ const { host, port, data, timeout } = req;
 const buf = Buffer.from(data, 'hex');
 const sock = net.createConnection({ host, port });
 let chunks = [];
+let done = false;
+
 sock.on('connect', () => { sock.write(buf); });
-sock.on('data', c => { chunks.push(c); });
-sock.on('end', () => {
-  process.stdout.write(Buffer.concat(chunks).toString('hex'));
-  process.exit(0);
+
+// Frame by messageLength: MongoDB Wire Protocol messages start with 4-byte length (little-endian)
+sock.on('data', c => {
+  chunks.push(c);
+  if (!done && chunks.length > 0) {
+    const total = Buffer.concat(chunks);
+    if (total.length >= 4) {
+      const msgLen = total.readInt32LE(0);
+      if (total.length >= msgLen) {
+        done = true;
+        sock.destroy();
+        process.stdout.write(total.slice(0, msgLen).toString('hex'));
+        process.exit(0);
+      }
+    }
+  }
 });
-sock.on('error', (e) => { process.exit(1); });
-sock.setTimeout(timeout, () => {
-  sock.destroy();
-  if (chunks.length > 0) {
+
+sock.on('end', () => {
+  if (!done && chunks.length > 0) {
     process.stdout.write(Buffer.concat(chunks).toString('hex'));
   }
   process.exit(0);
+});
+
+sock.on('error', (e) => { process.exit(1); });
+
+sock.setTimeout(timeout, () => {
+  if (!done) {
+    sock.destroy();
+    if (chunks.length > 0) {
+      process.stdout.write(Buffer.concat(chunks).toString('hex'));
+    }
+    process.exit(0);
+  }
 });
 `;
       const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
@@ -686,6 +711,112 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return args[0]?.toString().toLowerCase();
     case "length":
       return args[0]?.length || 0;
+
+    // Phase MongoDB: to-hex (number → 2-digit hex string)
+    case "to-hex": {
+      const n = Math.floor(Number(args[0])) & 0xFF;
+      return n.toString(16).padStart(2, '0');
+    }
+
+    // Phase MongoDB: bson-encode-native (FreeLang map → BSON hex)
+    case "bson-encode-native": {
+      const doc = args[0] as Record<string, any>;
+      if (!doc || typeof doc !== 'object') return "0c000000107069696e6700010000000000"; // fallback: ping
+
+      // BSON encoding helper
+      const int32ToHex = (n: number): string => {
+        const b0 = n & 0xFF;
+        const b1 = (n >> 8) & 0xFF;
+        const b2 = (n >> 16) & 0xFF;
+        const b3 = (n >> 24) & 0xFF;
+        return b0.toString(16).padStart(2, '0') +
+               b1.toString(16).padStart(2, '0') +
+               b2.toString(16).padStart(2, '0') +
+               b3.toString(16).padStart(2, '0');
+      };
+
+      const stringToHex = (s: string): string => {
+        let hex = '';
+        for (let i = 0; i < s.length; i++) {
+          hex += s.charCodeAt(i).toString(16).padStart(2, '0');
+        }
+        return hex;
+      };
+
+      // Encode each field
+      let elements = '';
+      for (const [key, val] of Object.entries(doc)) {
+        if (typeof val === 'number' && Number.isInteger(val)) {
+          // INT32: 0x10
+          elements += '10' + stringToHex(key) + '00' + int32ToHex(val);
+        } else if (typeof val === 'string') {
+          // STRING: 0x02
+          const strBytes = Buffer.from(val, 'utf-8');
+          const len = strBytes.length + 1; // +1 for null terminator
+          elements += '02' + stringToHex(key) + '00' + int32ToHex(len) + strBytes.toString('hex') + '00';
+        } else if (typeof val === 'boolean') {
+          // BOOL: 0x08
+          elements += '08' + stringToHex(key) + '00' + (val ? '01' : '00');
+        } else if (val === null) {
+          // NULL: 0x0A
+          elements += '0a' + stringToHex(key) + '00';
+        }
+      }
+
+      // Document: [size (4)] [elements] [0x00]
+      const size = 4 + elements.length / 2 + 1; // 4 (size field) + elements + 1 (null terminator)
+      const doc_hex = int32ToHex(size) + elements + '00';
+      return doc_hex;
+    }
+
+    // Phase MongoDB: bson-decode-native (BSON hex → FreeLang map)
+    case "bson-decode-native": {
+      const hex = String(args[0] || "");
+      if (hex.length < 8) return {}; // too short
+
+      const buf = Buffer.from(hex, 'hex');
+      const result: Record<string, any> = {};
+
+      // Read document size (first 4 bytes, little-endian)
+      const docSize = buf.readInt32LE(0);
+
+      let offset = 4; // skip size field
+
+      // Parse elements until null terminator
+      while (offset < buf.length - 1 && buf[offset] !== 0x00) {
+        const elemType = buf[offset];
+        offset++;
+
+        // Read field name (c-string)
+        let nameEnd = offset;
+        while (nameEnd < buf.length && buf[nameEnd] !== 0x00) nameEnd++;
+        const fieldName = buf.toString('utf-8', offset, nameEnd);
+        offset = nameEnd + 1; // skip null terminator
+
+        // Read value based on type
+        if (elemType === 0x10) { // INT32
+          const val = buf.readInt32LE(offset);
+          result[fieldName] = val;
+          offset += 4;
+        } else if (elemType === 0x02) { // STRING
+          const strLen = buf.readInt32LE(offset);
+          offset += 4;
+          const strVal = buf.toString('utf-8', offset, offset + strLen - 1); // -1 to skip null terminator
+          result[fieldName] = strVal;
+          offset += strLen;
+        } else if (elemType === 0x08) { // BOOL
+          result[fieldName] = buf[offset] !== 0;
+          offset++;
+        } else if (elemType === 0x0a) { // NULL
+          result[fieldName] = null;
+        } else {
+          // Unknown type, skip
+          offset++;
+        }
+      }
+
+      return result;
+    }
 
     // Array/Collection
     case "list":

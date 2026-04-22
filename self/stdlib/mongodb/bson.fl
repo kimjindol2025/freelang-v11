@@ -1,7 +1,8 @@
 ;; self/stdlib/mongodb/bson.fl — BSON Encoder for MongoDB
-;; Minimal working implementation for FreeLang v11
+;; FreeLang v11 wrapper around native (TypeScript) BSON codec
 
 ;; === INT32 to Little-Endian Hex ===
+;; Converts number to 4-byte little-endian hex string
 [FUNC bson-int32-hex :params [$n]
   :body (let [[$n (floor $n)]
               [$b0 (% $n 256)]
@@ -10,18 +11,14 @@
               [$b3 (% (floor (/ $n 16777216)) 256)]]
     (str (to-hex $b0) (to-hex $b1) (to-hex $b2) (to-hex $b3)))]
 
-;; === BSON Document {ping: 1} ===
-;; Real implementation would iterate document fields
-;; Hardcoded for testing MongoDB connectivity
+;; === BSON Encode: Delegate to native implementation ===
+;; Supports all major types: INT32, STRING, BOOL, NULL
 [FUNC bson-encode :params [$doc]
-  :body (str "0c000000"                 ;; size: 12 bytes
-             "10"                        ;; type: INT32 (0x10)
-             "7069696e6700"              ;; "ping\0" as hex
-             "01000000"                  ;; value: 1
-             "00")]                      ;; doc null terminator
+  :body (bson-encode-native $doc)]
 
-;; === BSON Decoder (stub) ===
+;; === BSON Decode: Delegate to native implementation ===
+;; Returns FreeLang map from BSON hex
 [FUNC bson-decode :params [$hex]
-  :body {}]
+  :body (bson-decode-native $hex)]
 
 (println "BSON module loaded")

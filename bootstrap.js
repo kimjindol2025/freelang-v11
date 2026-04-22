@@ -11389,19 +11389,44 @@ const { host, port, data, timeout } = req;
 const buf = Buffer.from(data, 'hex');
 const sock = net.createConnection({ host, port });
 let chunks = [];
+let done = false;
+
 sock.on('connect', () => { sock.write(buf); });
-sock.on('data', c => { chunks.push(c); });
-sock.on('end', () => {
-  process.stdout.write(Buffer.concat(chunks).toString('hex'));
-  process.exit(0);
+
+// Frame by messageLength: MongoDB Wire Protocol messages start with 4-byte length (little-endian)
+sock.on('data', c => {
+  chunks.push(c);
+  if (!done && chunks.length > 0) {
+    const total = Buffer.concat(chunks);
+    if (total.length >= 4) {
+      const msgLen = total.readInt32LE(0);
+      if (total.length >= msgLen) {
+        done = true;
+        sock.destroy();
+        process.stdout.write(total.slice(0, msgLen).toString('hex'));
+        process.exit(0);
+      }
+    }
+  }
 });
-sock.on('error', (e) => { process.exit(1); });
-sock.setTimeout(timeout, () => {
-  sock.destroy();
-  if (chunks.length > 0) {
+
+sock.on('end', () => {
+  if (!done && chunks.length > 0) {
     process.stdout.write(Buffer.concat(chunks).toString('hex'));
   }
   process.exit(0);
+});
+
+sock.on('error', (e) => { process.exit(1); });
+
+sock.setTimeout(timeout, () => {
+  if (!done) {
+    sock.destroy();
+    if (chunks.length > 0) {
+      process.stdout.write(Buffer.concat(chunks).toString('hex'));
+    }
+    process.exit(0);
+  }
 });
 `;
       const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
@@ -11500,6 +11525,80 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return args2[0]?.toString().toLowerCase();
     case "length":
       return args2[0]?.length || 0;
+    case "to-hex": {
+      const n = Math.floor(Number(args2[0])) & 255;
+      return n.toString(16).padStart(2, "0");
+    }
+    case "bson-encode-native": {
+      const doc = args2[0];
+      if (!doc || typeof doc !== "object") return "0c000000107069696e6700010000000000";
+      const int32ToHex = (n) => {
+        const b0 = n & 255;
+        const b1 = n >> 8 & 255;
+        const b2 = n >> 16 & 255;
+        const b3 = n >> 24 & 255;
+        return b0.toString(16).padStart(2, "0") + b1.toString(16).padStart(2, "0") + b2.toString(16).padStart(2, "0") + b3.toString(16).padStart(2, "0");
+      };
+      const stringToHex = (s) => {
+        let hex = "";
+        for (let i = 0; i < s.length; i++) {
+          hex += s.charCodeAt(i).toString(16).padStart(2, "0");
+        }
+        return hex;
+      };
+      let elements = "";
+      for (const [key, val] of Object.entries(doc)) {
+        if (typeof val === "number" && Number.isInteger(val)) {
+          elements += "10" + stringToHex(key) + "00" + int32ToHex(val);
+        } else if (typeof val === "string") {
+          const strBytes = Buffer.from(val, "utf-8");
+          const len = strBytes.length + 1;
+          elements += "02" + stringToHex(key) + "00" + int32ToHex(len) + strBytes.toString("hex") + "00";
+        } else if (typeof val === "boolean") {
+          elements += "08" + stringToHex(key) + "00" + (val ? "01" : "00");
+        } else if (val === null) {
+          elements += "0a" + stringToHex(key) + "00";
+        }
+      }
+      const size = 4 + elements.length / 2 + 1;
+      const doc_hex = int32ToHex(size) + elements + "00";
+      return doc_hex;
+    }
+    case "bson-decode-native": {
+      const hex = String(args2[0] || "");
+      if (hex.length < 8) return {};
+      const buf = Buffer.from(hex, "hex");
+      const result = {};
+      const docSize = buf.readInt32LE(0);
+      let offset = 4;
+      while (offset < buf.length - 1 && buf[offset] !== 0) {
+        const elemType = buf[offset];
+        offset++;
+        let nameEnd = offset;
+        while (nameEnd < buf.length && buf[nameEnd] !== 0) nameEnd++;
+        const fieldName = buf.toString("utf-8", offset, nameEnd);
+        offset = nameEnd + 1;
+        if (elemType === 16) {
+          const val = buf.readInt32LE(offset);
+          result[fieldName] = val;
+          offset += 4;
+        } else if (elemType === 2) {
+          const strLen = buf.readInt32LE(offset);
+          offset += 4;
+          const strVal = buf.toString("utf-8", offset, offset + strLen - 1);
+          result[fieldName] = strVal;
+          offset += strLen;
+        } else if (elemType === 8) {
+          result[fieldName] = buf[offset] !== 0;
+          offset++;
+        } else if (elemType === 10) {
+          result[fieldName] = null;
+        } else {
+          offset++;
+        }
+      }
+      return result;
+    }
     case "list":
       return args2;
     case "first":
