@@ -102,6 +102,92 @@ fi
 echo "   ✅ round-trip 결정론 OK (${#RT_SNIPPETS[@]} 스니펫 전원 bit-identical)"
 
 echo ""
+echo "=== Phase C-3: bounded grammar-aware fuzz (N=50, seed 고정, 재현 가능) ==="
+# 랜덤이 아니라 "구조화된 통제 랜덤". 고정 seed(RANDOM=12345) 로 매 실행 동일
+# 시퀀스 생성 → 재현 가능. bounded depth (≤3). grammar-aware (유효 구문만).
+#
+# 4-class 분류:
+#   OK          — compile 성공 + 2회 compile 결과 bit-identical
+#   expected-err— compile 실패이되 "FreeLang" / "실행 오류" / "파싱 오류"
+#                 라벨 붙은 명시적 에러 (정상)
+#   bit-diff    — compile 은 성공했으나 재컴파일 결과가 달라짐 (결정론 깨짐)
+#   crash       — 라벨 없는 예외·스택 오버플로·프로세스 abnormal exit
+#
+# 합격 기준: crash=0 && bit-diff=0. expected-err 는 허용.
+
+RANDOM=12345  # 고정 seed — 재현 가능
+
+gen_expr() {
+  local depth=$1
+  if [ "$depth" -le 0 ]; then
+    case $((RANDOM % 5)) in
+      0) printf '%d' $((RANDOM % 100)) ;;
+      1) printf '"hello"' ;;
+      2) printf 'true' ;;
+      3) printf 'false' ;;
+      4) printf 'nil' ;;
+    esac
+    return
+  fi
+  local d=$((depth - 1))
+  case $((RANDOM % 10)) in
+    0) printf '(+ '; gen_expr $d; printf ' '; gen_expr $d; printf ')' ;;
+    1) printf '(- '; gen_expr $d; printf ' '; gen_expr $d; printf ')' ;;
+    2) printf '(* '; gen_expr $d; printf ' '; gen_expr $d; printf ')' ;;
+    3) printf '(if true '; gen_expr $d; printf ' '; gen_expr $d; printf ')' ;;
+    4) printf '(str '; gen_expr $d; printf ' '; gen_expr $d; printf ')' ;;
+    5) printf '(println '; gen_expr $d; printf ')' ;;
+    6) printf '(let [[$x '; gen_expr $d; printf ']] $x)' ;;
+    7) printf '(list '; gen_expr $d; printf ' '; gen_expr $d; printf ')' ;;
+    8) printf '(cond [true '; gen_expr $d; printf '] [false '; gen_expr $d; printf '])' ;;
+    9) printf '((fn [$y] $y) '; gen_expr $d; printf ')' ;;
+  esac
+}
+
+FUZZ_N=50
+FUZZ_OK=0; FUZZ_ERR=0; FUZZ_DIFF=0; FUZZ_CRASH=0
+for i in $(seq 1 $FUZZ_N); do
+  SRC="$WORK/fuzz_${i}.fl"
+  gen_expr 3 > "$SRC"
+  echo >> "$SRC"   # trailing newline
+
+  JS1="$WORK/fuzz_${i}_1.js"
+  LOG1="$WORK/fuzz_${i}_1.log"
+  node --stack-size=8000 "$STAGE1" "$SRC" "$JS1" > "$LOG1" 2>&1
+  RC1=$?
+
+  if [ "$RC1" -ne 0 ]; then
+    if grep -qE "FreeLang|실행 오류|파싱 오류" "$LOG1"; then
+      FUZZ_ERR=$((FUZZ_ERR+1))
+    else
+      FUZZ_CRASH=$((FUZZ_CRASH+1))
+      echo "   ❌ CRASH #$i: $(cat "$SRC" | head -c 80)"
+      head -3 "$LOG1" | sed 's/^/       /'
+    fi
+    continue
+  fi
+
+  JS2="$WORK/fuzz_${i}_2.js"
+  node --stack-size=8000 "$STAGE1" "$SRC" "$JS2" > /dev/null 2>&1
+  S1=$(sha256sum "$JS1" | cut -c1-16)
+  S2=$(sha256sum "$JS2" | cut -c1-16)
+  if [ "$S1" = "$S2" ]; then
+    FUZZ_OK=$((FUZZ_OK+1))
+  else
+    FUZZ_DIFF=$((FUZZ_DIFF+1))
+    echo "   ❌ BIT-DIFF #$i: $(cat "$SRC" | head -c 80)"
+    echo "       $S1 vs $S2"
+  fi
+done
+
+echo "   classification: OK=$FUZZ_OK / expected-err=$FUZZ_ERR / bit-diff=$FUZZ_DIFF / crash=$FUZZ_CRASH / total=$FUZZ_N"
+if [ "$FUZZ_CRASH" -gt 0 ] || [ "$FUZZ_DIFF" -gt 0 ]; then
+  echo "   ❌ fuzz invariant 실패 (crash>0 or bit-diff>0)"
+  exit 1
+fi
+echo "   ✅ fuzz invariant OK (crash=0, bit-diff=0, expected-err 허용)"
+
+echo ""
 echo "=== fixed-point 확인 (다단계 SHA 체인, Phase C: stage1~5) ==="
 # Phase C 증명 강화: stage depth 를 3 → 5 로 확장.
 # 기준선이 "우연히" 3 단계만 일치가 아니라, 반복 compile 에도 불변임을 증명.

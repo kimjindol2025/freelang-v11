@@ -1,3 +1,6 @@
+; self/all.fl — Phase 28 (AUTO-GENERATED)
+; 2026-04-22 12:22:52
+
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
 ;; v11 defn 이 forward-ref 를 지원하지 않아 [FUNC] 블록 사용.
@@ -185,6 +188,7 @@
             (lex-loop (read-token $st1))))]
 
 [FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+
 ;; self/parser.fl — FL 로 작성된 Parser (Phase 03/31-45)
 ;;
 ;; 입력: tokens (lexer 출력)
@@ -415,6 +419,7 @@
             (parse-all $p2)))]
 
 [FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
+
 ;; self/codegen.fl — FL AST → JS source (v2, Phase 10 확장)
 ;;
 ;; 새로 추가:
@@ -481,6 +486,8 @@
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
+          [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
+          [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
           [true "null"])]
 
 [FUNC cg-literal :params [$n]
@@ -519,7 +526,7 @@
   :body (let [[$items-val (get $fields "items")]]
           (if (array? $items-val)
             (cg-map-flat-loop $items-val 0 "")
-            (cg-map-loop (map-entries $fields) 0 ""))) ]
+            (cg-map-loop (list) 0 ""))) ]
 
 [FUNC cg-map-loop-inner :params [$entries $i $acc $e]
   :body (let [[$k (get $e 0)]
@@ -625,12 +632,12 @@
   :body (cg-cond-loop $args 0)]
 
 [FUNC cg-cond-loop :params [$args $i]
-  :body (if (>= $i (length $args)) "null"
-          (let [[$clause (get $args $i)]
-                [$citems (get (get $clause :fields) "items")]
-                [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]
-                [$rest (cg-cond-loop $args (+ $i 1))]]
-            (str "(" $test "?" $result ":" $rest ")")))]
+  :body (loop [$j (- (length $args) 1) $acc "null"]
+          (if (< $j 0) $acc
+            (let [[$clause (get $args $j)]
+                  [$citems (get (get $clause :fields) "items")]
+                  [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]]
+              (recur (- $j 1) (str "(" $test "?" $result ":" $acc ")")))))]
 
 [FUNC cg-and :params [$args]
   :body (if (= (length $args) 0) "true"
@@ -1160,10 +1167,10 @@
             [true              (cg-native $op $args)]))]
 
 ;; ═══════ 런타임 prelude (생성 JS 앞에 삽입) ═══════
+;; 분할 구조: 각 부분을 따로 정의하여 stack overflow 방지
 
-[FUNC runtime-prelude :params []
+[FUNC prelude-string :params []
   :body (str
-    ;; String
     "const _fl_str = (...xs) => xs.map(x => x==null?'null':String(x)).join('');"
     "const _fl_length = (x) => (x==null ? 0 : x.length);"
     "const _fl_substring = (s, a, b) => (b==null ? s.slice(a) : s.slice(a, b));"
@@ -1178,8 +1185,10 @@
     "const _fl_upper = (s) => s.toUpperCase();"
     "const _fl_lower = (s) => s.toLowerCase();"
     "const _fl_repeat = (s, n) => s.repeat(n);"
-    "const _fl_index_of = (s, p) => s.indexOf(p);"
-    ;; List
+    "const _fl_index_of = (s, p) => s.indexOf(p);")]
+
+[FUNC prelude-list :params []
+  :body (str
     "const _fl_first = (l) => (l==null || l.length===0 ? null : l[0]);"
     "const _fl_last = (l) => (l==null || l.length===0 ? null : l[l.length-1]);"
     "const _fl_rest = (l) => (l==null || l.length===0 ? [] : l.slice(1));"
@@ -1197,8 +1206,10 @@
     "const _fl_distinct = (l) => [...new Set(l)];"
     "const _fl_range = (a, b, s) => { let r=[]; let step=s||1; for(let i=a;i<b;i+=step)r.push(i); return r; };"
     "const _fl_take = (n, l) => l.slice(0, n);"
-    "const _fl_drop = (n, l) => l.slice(n);"
-    ;; Map
+    "const _fl_drop = (n, l) => l.slice(n);")]
+
+[FUNC prelude-map :params []
+  :body (str
     "const _fl_get = (o, k) => (o==null ? null : (o[k]===undefined ? null : o[k]));"
     "const _fl_keys = (o) => (o==null ? [] : Object.keys(o));"
     "const _fl_values = (o) => (o==null ? [] : Object.values(o));"
@@ -1211,7 +1222,10 @@
     "const _fl_type_of = (x) => (x==null?'null':Array.isArray(x)?'list':typeof x);"
     "const map_entries = (m) => m instanceof Map ? [...m.entries()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.entries(m) : []);"
     "const map_keys = (m) => m instanceof Map ? [...m.keys()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m) : []);"
-    "const map_values = (m) => m instanceof Map ? [...m.values()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.values(m) : []);"
+    "const map_values = (m) => m instanceof Map ? [...m.values()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.values(m) : []);")]
+
+[FUNC prelude-time-regex :params []
+  :body (str
     "const now = () => Date.now();"
     "const now_ms = () => Date.now();"
     "const now_iso = () => new Date().toISOString();"
@@ -1222,17 +1236,19 @@
     "const regex_replace = (s, p, r) => s.replace(new RegExp(p, 'g'), r);"
     "const regex_split = (s, p) => s.split(new RegExp(p));"
     "const regex_count = (s, p) => (s.match(new RegExp(p, 'g')) || []).length;"
-    "const regex_extract = (s, p) => { const m = s.match(new RegExp(p)); return m ? m.slice(1) : []; };"
-    ;; I/O
+    "const regex_extract = (s, p) => { const m = s.match(new RegExp(p)); return m ? m.slice(1) : []; };")]
+
+[FUNC prelude-io-misc :params []
+  :body (str
     "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
     "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
     "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
-    ;; Common
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
-    ;; argv
-    "const __argv__ = process.argv.slice(2);"
-    ;; Database stubs (requires external connection mgmt)
+    "const __argv__ = process.argv.slice(2);")]
+
+[FUNC prelude-db-server :params []
+  :body (str
     "const _fl_pg_exec = (db,sql,...args) => null;"
     "const _fl_pg_query = (db,sql,...args) => [];"
     "const _fl_pg_connect = (cfg) => null;"
@@ -1241,7 +1257,6 @@
     "const _fl_mariadb_one = (db,sql,...args) => null;"
     "const _fl_db_query = (path,sql,...args) => [];"
     "const _fl_db_exec = (path,sql,...args) => null;"
-    ;; Server/HTTP stubs (requires global server state)
     "const _fl_server_post = (path,fn) => null;"
     "const _fl_server_get = (path,fn) => null;"
     "const _fl_server_put = (path,fn) => null;"
@@ -1252,17 +1267,21 @@
     "const _fl_http_post = (url,body) => '';"
     "const _fl_ws_send = (sid,data) => null;")]
 
+[FUNC prelude-parts :params []
+  :body [(prelude-string) (prelude-list) (prelude-map) (prelude-time-regex) (prelude-io-misc) (prelude-db-server)]]
+
+[FUNC runtime-prelude :params []
+  :body (reduce (fn [$acc $part] (str $acc $part)) "" (prelude-parts))]
+
 ;; ═══════ 최상위 ═══════
 
-[FUNC codegen-loop :params [$ast $i $acc]
-  :body (if (>= $i (length $ast)) $acc
-          (codegen-loop $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
-
 [FUNC fl->js-code :params [$ast]
-  :body (codegen-loop $ast 0 "")]
+  :body (reduce (fn [$acc $node] (str $acc (cg $node) ";\n")) "" $ast)]
 
 [FUNC fl->js-with-prelude :params [$ast]
-  :body (str (runtime-prelude) "\n" (codegen-loop $ast 0 ""))]
+  :body (let [[$p (runtime-prelude)]]
+          (let [[$c (fl->js-code $ast)]]
+            (str $p "\n" $c)))]
 
 ;; ═══════ driver ═══════
 ;; 사용법: node bootstrap.js run self/codegen.fl <input.fl> [<output.js>]
@@ -1282,68 +1301,267 @@
                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
                       (str (get $__argv__ 0) ".out.js")))))
 
-;; self/stdlib/test-runner.fl — Phase 28
-;; FL 레벨 테스트 프레임워크 (Jest 불필요)
-;; 함수형 설계: 재현 가능, 결정론 보장
+;; self/stdlib/data.fl — Phase 26
+;; 순수 데이터 변환 함수
 
-[FUNC run-one-test :params [$t]
-  :body (do
-    ((get $t "fn"))
-    {:pass true :name (get $t "name")})]
+;; 줄 분리
+[FUNC str-lines :params [$s]
+  :body (split $s "\n")]
 
-[FUNC print-test-result :params [$r]
-  :body (if (get $r "pass")
-    (println (str "  ✅ " (get $r "name")))
-    (println (str "  ❌ " (get $r "name") " — " (get $r "error"))))]
+;; 단어 분리
+[FUNC str-words :params [$s]
+  :body (split (trim $s) " ")]
 
-[FUNC count-pass :params [$results]
-  :body (count (filter (fn [$r] (get $r "pass")) $results))]
+;; 줄 합치기
+[FUNC str-join-lines :params [$lines]
+  :body (str-join-loop $lines 0 "")]
+[FUNC str-join-loop :params [$lst $i $acc]
+  :body (if (>= $i (length $lst)) $acc
+          (str-join-loop $lst (+ $i 1)
+            (if (= $i 0) (get $lst 0) (str $acc "\n" (get $lst $i)))))]
 
-[FUNC count-fail :params [$results]
-  :body (count (filter (fn [$r] (not (get $r "pass"))) $results))]
+;; 부분 문자열 출현 횟수
+[FUNC str-count :params [$s $sub]
+  :body (if (= (length $sub) 0) 0
+          (str-count-loop $s $sub 0 0))]
+[FUNC str-count-loop :params [$s $sub $pos $acc]
+  :body (let [[$rest (substring $s $pos (length $s))]
+              [$idx (index-of $rest $sub)]]
+          (if (< $idx 0) $acc
+            (str-count-loop $s $sub (+ $pos $idx (length $sub)) (+ $acc 1))))]
 
-[FUNC run-tests :params [$suite-name $tests]
-  :body (do
-    (println (str "📋 " $suite-name))
-    (let [$results (map run-one-test $tests)]
-      (do
-        (map print-test-result $results)
-        (let [$p (count-pass $results)
-              $f (count-fail $results)
-              $total (+ $p $f)]
-          (do
-            (println (str "  Result: " $p "/" $total " passed"))
-            (if (= $f 0)
-              (println "✅ All tests passed")
-              (println (str "❌ " $f " test(s) failed")))
-            {:pass $p :fail $f :total $total})))))]
+;; CSV 행 파싱 (간단한 버전, 따옴표 미지원)
+[FUNC csv-parse-line :params [$line]
+  :body (split $line ",")]
 
-[FUNC assert-eq :params [$actual $expected]
-  :body (if (= $actual $expected)
-    nil
-    (throw (str "expected " $expected " got " $actual)))]
+;; CSV 본문 파싱
+[FUNC csv-parse :params [$csv]
+  :body (let [[$lines (split $csv "\n")]]
+          (csv-parse-loop $lines 0 (list)))]
+[FUNC csv-parse-loop :params [$lines $i $acc]
+  :body (if (>= $i (length $lines)) $acc
+          (csv-parse-loop $lines (+ $i 1)
+            (append $acc (csv-parse-line (get $lines $i)))))]
 
-[FUNC assert-true :params [$value]
-  :body (if (= $value true)
-    nil
-    (throw (str "expected true got " $value)))]
+;; 문자열 반복
+[FUNC str-repeat :params [$s $n]
+  :body (if (<= $n 0) ""
+          (str-repeat-loop $s $n 0 ""))]
+[FUNC str-repeat-loop :params [$s $n $i $acc]
+  :body (if (>= $i $n) $acc
+          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
 
-[FUNC assert-false :params [$value]
-  :body (if (= $value false)
-    nil
-    (throw (str "expected false got " $value)))]
+;; JSON 헬퍼 (json.fl 기반)
+[FUNC data-json-parse :params [$s]
+  :body (json-parse $s)]
 
-[FUNC assert-nil :params [$value]
-  :body (if (= $value nil)
-    nil
-    (throw (str "expected nil got " $value)))]
+[FUNC data-json-str :params [$obj]
+  :body (json-stringify $obj)]
 
-[FUNC assert-not-nil :params [$value]
-  :body (if (not (= $value nil))
-    nil
-    (throw "expected non-nil value"))]
+[FUNC data-json-pretty :params [$obj]
+  :body (json-stringify $obj)]
 
-;; assert-error: try/catch 미지원으로 제거
+;; 객체를 쿼리 문자열로 변환
+[FUNC to-query-string :params [$obj]
+  :body (to-query-loop (keys $obj) $obj 0 (list))]
+[FUNC to-query-loop :params [$ks $obj $i $acc]
+  :body (if (>= $i (length $ks)) (join $acc "&")
+          (let [[$k (get $ks $i)]
+                [$v (get $obj $k)]]
+            (to-query-loop $ks $obj (+ $i 1)
+              (append $acc (str $k "=" $v)))))]
+
+;; self/stdlib/hash.fl — Phase 26 Part 3
+;; 해시 함수
+
+[FUNC hash-simple :params [$s]
+  :body (hash-simple-loop (str $s) 0 5381 0)]
+[FUNC hash-simple-loop :params [$s $i $hash $max]
+  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
+          (hash-simple-loop $s (+ $i 1)
+            (+ (* $hash 33) (char-code-at $s $i)) (+ $i 1)))]
+
+[FUNC hash-fnv1a :params [$s]
+  :body (let [[$fnv-offset 2166136261]
+              [$fnv-prime 16777619]]
+          (hash-fnv-loop (str $s) 0 $fnv-offset))]
+[FUNC hash-fnv-loop :params [$s $i $hash]
+  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
+          (hash-fnv-loop $s (+ $i 1)
+            (* (bit-xor $hash (char-code-at $s $i)) 16777619)))]
+
+[FUNC hash-djb2 :params [$s]
+  :body (hash-djb-loop (str $s) 0 5381)]
+[FUNC hash-djb-loop :params [$s $i $hash]
+  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
+          (hash-djb-loop $s (+ $i 1)
+            (+ (* $hash 33) (char-code-at $s $i))))]
+
+[FUNC hash-object :params [$obj]
+  :body (hash-simple (json-stringify $obj))]
+
+[FUNC hash-consistent :params [$s $seed]
+  :body (let [[$h (hash-simple $s)]]
+          (% (+ (* $h $seed) $seed) 2147483647))]
+
+;; self/stdlib/time.fl — 시간 관련 stdlib (v12-candidate 호환)
+;;
+;; now-ms 는 prelude(JS runtime) 에서 이미 `const now_ms = () => Date.now()` 로
+;; 제공되므로 FL 에서 재정의하지 않는다. FL 코드에서 (now-ms) 호출 시
+;; codegen 이 `now_ms()` JS 로 번역 → prelude 정의로 해소됨.
+;; 재정의하면 `Identifier 'now_ms' has already been declared` SyntaxError.
+
+[FUNC now-s :params [] :body (floor (/ (now) 1000))]
+
+[FUNC time-diff-ms :params [$t1 $t2] :body (- $t2 $t1)]
+[FUNC time-elapsed :params [$start] :body (- (now) $start)]
+
+[FUNC date-parts :params [$ts]
+  :body {:ts $ts :s (floor (/ $ts 1000))
+         :m (floor (/ $ts 60000))
+         :h (floor (/ $ts 3600000))
+         :d (floor (/ $ts 86400000))}]
+
+[FUNC ts-to-s :params [$ts] :body (floor (/ $ts 1000))]
+[FUNC s-to-ts :params [$s] :body (* $s 1000)]
+
+[FUNC time-ago :params [$ts]
+  :body (let [[$diff (- (now) $ts)]
+              [$s (floor (/ $diff 1000))]
+              [$m (floor (/ $s 60))]
+              [$h (floor (/ $m 60))]
+              [$d (floor (/ $h 24))]]
+          (cond [(< $s 60) (str $s "s ago")]
+                [(< $m 60) (str $m "m ago")]
+                [(< $h 24) (str $h "h ago")]
+                [true (str $d "d ago")]))]
+
+;; self/stdlib/string.fl — Phase 08/87
+
+[FUNC str-starts-with? :params [$s $prefix]
+  :body (if (> (length $prefix) (length $s)) false
+          (= (substring $s 0 (length $prefix)) $prefix))]
+
+[FUNC str-ends-with? :params [$s $suffix]
+  :body (if (> (length $suffix) (length $s)) false
+          (= (substring $s (- (length $s) (length $suffix)) (length $s)) $suffix))]
+
+[FUNC str-repeat :params [$s $n] :body (str-repeat-loop $s $n "")]
+[FUNC str-repeat-loop :params [$s $n $acc]
+  :body (if (<= $n 0) $acc (str-repeat-loop $s (- $n 1) (str $acc $s)))]
+
+[FUNC str-pad-left :params [$s $n $pad]
+  :body (let [[$diff (- $n (length $s))]]
+          (if (<= $diff 0) $s (str (str-repeat $pad $diff) $s)))]
+
+[FUNC str-pad-right :params [$s $n $pad]
+  :body (let [[$diff (- $n (length $s))]]
+          (if (<= $diff 0) $s (str $s (str-repeat $pad $diff))))]
+
+;; self/stdlib/file.fl — Phase 27
+;; 파일 I/O 연산 (native file_* builtin wrapper)
+
+[FUNC file-read :params [$path]
+  :body (file_read (str $path))]
+
+[FUNC file-write :params [$path $content]
+  :body (file_write (str $path) (str $content))]
+
+[FUNC file-append :params [$path $content]
+  :body (file_append (str $path) (str $content))]
+
+[FUNC file-exists? :params [$path]
+  :body (file_exists (str $path))]
+
+[FUNC file-delete :params [$path]
+  :body (file_delete (str $path))]
+
+[FUNC file-copy :params [$src $dest]
+  :body (file_copy (str $src) (str $dest))]
+
+[FUNC file-rename :params [$old $new]
+  :body (file_rename (str $old) (str $new))]
+
+[FUNC file-size :params [$path]
+  :body (file_size (str $path))]
+
+[FUNC file-modified :params [$path]
+  :body (file_modified (str $path))]
+
+[FUNC file-json :params [$path]
+  :body (json-parse (file_read (str $path)))]
+
+[FUNC file-json-write :params [$path $obj]
+  :body (file_write (str $path) (json-stringify $obj))]
+
+[FUNC file-lines :params [$path]
+  :body (str-lines (file_read (str $path)))]
+
+[FUNC file-mkdir :params [$path]
+  :body (file_mkdir (str $path))]
+
+[FUNC file-rmdir :params [$path]
+  :body (file_rmdir (str $path))]
+
+[FUNC file-list :params [$path]
+  :body (file_list (str $path))]
+
+[FUNC file-is-file? :params [$path]
+  :body (file_is_file (str $path))]
+
+[FUNC file-is-dir? :params [$path]
+  :body (file_is_dir (str $path))]
+
+;; self/stdlib/process.fl — Phase 27
+;; 프로세스/쉘 연산 (native process_* builtin wrapper)
+
+[FUNC process-run :params [$cmd]
+  :body (process_run (str $cmd))]
+
+[FUNC process-run-args :params [$cmd $args]
+  :body (process_run_args (str $cmd) $args)]
+
+[FUNC process-exec :params [$cmd]
+  :body (process_exec (str $cmd))]
+
+[FUNC process-exec-args :params [$cmd $args]
+  :body (process_exec_args (str $cmd) $args)]
+
+[FUNC process-spawn :params [$cmd $args]
+  :body (process_spawn (str $cmd) $args)]
+
+[FUNC process-kill :params [$pid]
+  :body (process_kill (floor $pid))]
+
+[FUNC process-exists? :params [$pid]
+  :body (process_exists (floor $pid))]
+
+[FUNC process-wait :params [$pid]
+  :body (process_wait (floor $pid))]
+
+[FUNC shell-run :params [$cmd]
+  :body (process_exec (str $cmd))]
+
+[FUNC shell-pipe :params [$cmd1 $cmd2]
+  :body (process_exec (str $cmd1 " | " $cmd2))]
+
+[FUNC env-get :params [$key]
+  :body (env_get (str $key))]
+
+[FUNC env-set :params [$key $value]
+  :body (env_set (str $key) (str $value))]
+
+[FUNC env-all :params []
+  :body (env_all)]
+
+[FUNC getcwd :params [] :body (process_getcwd)]
+
+[FUNC chdir :params [$path]
+  :body (process_chdir (str $path))]
+
+[FUNC pid :params [] :body (process_pid)]
+
+[FUNC pid-parent :params [] :body (process_ppid)]
 
 ;; self/main.fl — FL-to-JS Self-Hosted Compiler
 
@@ -1365,3 +1583,4 @@
               (println (str "   Generated: " (length $js) " bytes"))
               (file_write $output $js)
               (println "✨ Success!"))))))))
+
