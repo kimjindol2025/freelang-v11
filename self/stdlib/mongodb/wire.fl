@@ -10,14 +10,14 @@
 
 ;; === Helper: Build OP_MSG header ===
 ;; Returns: messageLength(4) + requestID(4) + responseTo(4) + opCode(4) + flags(4)
-;; opCode for OP_MSG = 2013
+;; opCode for OP_MSG = 2013 = 0x07dd (little-endian: dd 07 00 00)
 [FUNC wire-build-header :params [$msgLen $reqId]
   :body (let [[$len-hex (bson-int32-hex $msgLen)]
               [$id-hex (bson-int32-hex $reqId)]]
     (str $len-hex
          $id-hex                        ;; requestID
          "00000000"                     ;; responseTo = 0
-         "d9070000"                     ;; opCode = 2013 (OP_MSG)
+         "dd070000"                     ;; opCode = 2013 (OP_MSG) - FIXED!
          "00000000"))]                  ;; flags = 0
 
 ;; === Main: Send OP_MSG command ===
