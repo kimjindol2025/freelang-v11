@@ -2,6 +2,9 @@
 // Phase 58: interpreter.ts constructor에서 분리된 stdlib 모듈 등록 로직
 
 import { createFileModule } from "./stdlib-file";        // Phase 10: File I/O
+import { createFdModule } from "./stdlib-fd";            // Phase 11.5: File Descriptor (NEW)
+import { createBitsModule } from "./stdlib-bits";        // Phase 11.6: Bitwise Operations (NEW)
+import { createTimerModule } from "./stdlib-timer";      // Phase 11.7: Timer (NEW)
 import { createErrorModule } from "./stdlib-error";      // Phase 11: Error handling
 import { createHttpModule } from "./stdlib-http";        // Phase 12: HTTP Client
 import { createShellModule } from "./stdlib-shell";      // Phase 12: Shell execution
@@ -59,6 +62,9 @@ interface InterpreterLike {
  */
 export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createFileModule());
+  interp.registerModule(createFdModule());
+  interp.registerModule(createBitsModule());
+  interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
   interp.registerModule(createErrorModule());
   interp.registerModule(createHttpModule());
   interp.registerModule(createShellModule());
