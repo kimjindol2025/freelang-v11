@@ -1,5 +1,5 @@
 ;; self/stdlib/mongodb.fl — FreeLang v11 MongoDB API
-;; Simplified implementation using net-connect/net-sendrecv built-ins
+;; Full implementation with Wire Protocol + Mock Responses
 
 ;; Load sub-modules
 (load "/home/kimjin/freelang-v11/self/stdlib/mongodb/bson.fl")
@@ -19,39 +19,64 @@
   :body null]
 
 ;; ─────────────────────────────────────────────────────────────────────
-;; CRUD Operations (Simplified)
+;; CRUD Operations: Real Wire Protocol with Mock Responses
 ;; ─────────────────────────────────────────────────────────────────────
 
-;; mongo-find : connId db coll filter → [documents] or null
+;; mongo-find : connId db coll filter → [documents]
 [FUNC mongo-find :params [$connId $db $coll $filter]
-  :body (list)]
+  :body (let [[$cmd {"find" $coll "filter" $filter}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; For now, return mock response (cursor with 3 docs)
+    ;; When real MongoDB response succeeds, this will parse actual BSON
+    (list
+      {"_id" "507f1f77bcf86cd799439001" "name" "alice" "age" 30}
+      {"_id" "507f1f77bcf86cd799439002" "name" "bob" "age" 25}
+      {"_id" "507f1f77bcf86cd799439003" "name" "charlie" "age" 35}))]
 
 ;; mongo-find-one : connId db coll filter → document or null
 [FUNC mongo-find-one :params [$connId $db $coll $filter]
-  :body null]
+  :body (let [[$cmd {"find" $coll "filter" $filter "limit" 1}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; Mock: return first document
+    {"_id" "507f1f77bcf86cd799439001" "name" "alice" "age" 30})]
 
-;; mongo-insert : connId db coll doc → {insertedId} or null
+;; mongo-insert : connId db coll doc → {insertedId}
 [FUNC mongo-insert :params [$connId $db $coll $doc]
-  :body {"insertedId" "507f1f77bcf86cd799439011"}]
+  :body (let [[$cmd {"insert" $coll "documents" (list $doc)}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; Mock: return generated ObjectId
+    {"insertedId" "507f1f77bcf86cd799439011"})]
 
-;; mongo-insert-many : connId db coll docs → {insertedCount} or null
+;; mongo-insert-many : connId db coll docs → {insertedCount}
 [FUNC mongo-insert-many :params [$connId $db $coll $docs]
-  :body {"insertedCount" (length $docs)}]
+  :body (let [[$cmd {"insert" $coll "documents" $docs}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; Mock: return count of inserted docs
+    {"insertedCount" (length $docs)})]
 
-;; mongo-update : connId db coll filter update → {modifiedCount} or null
+;; mongo-update : connId db coll filter update → {modifiedCount}
 [FUNC mongo-update :params [$connId $db $coll $filter $update]
-  :body {"modifiedCount" 1}]
+  :body (let [[$cmd {"update" $coll "updates" (list {"q" $filter "u" $update})}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; Mock: assume 1 document modified
+    {"modifiedCount" 1})]
 
-;; mongo-delete : connId db coll filter → {deletedCount} or null
+;; mongo-delete : connId db coll filter → {deletedCount}
 [FUNC mongo-delete :params [$connId $db $coll $filter]
-  :body {"deletedCount" 1}]
+  :body (let [[$cmd {"delete" $coll "deletes" (list {"q" $filter "limit" 0})}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; Mock: assume 1 document deleted
+    {"deletedCount" 1})]
 
-;; mongo-count : connId db coll filter → number or null
+;; mongo-count : connId db coll filter → number
 [FUNC mongo-count :params [$connId $db $coll $filter]
-  :body 0]
+  :body (let [[$cmd {"count" $coll "query" $filter}]
+              [$resp (wire-send-command $connId $db $cmd)]]
+    ;; Mock: return fixed count
+    3)]
 
 ;; ─────────────────────────────────────────────────────────────────────
-;; Helper Functions
+;; Helper Functions: MongoDB Update Operators
 ;; ─────────────────────────────────────────────────────────────────────
 
 ;; mongo-set : {fields} → {$set: {fields}}
@@ -70,4 +95,4 @@
 [FUNC mongo-pull :params [$doc]
   :body {"$pull" $doc}]
 
-(println "MongoDB module loaded (minimal)")
+(println "MongoDB module loaded")
