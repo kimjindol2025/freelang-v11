@@ -16,6 +16,10 @@
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
+
+// Phase L1.5: Module Cache Layer
+// Ensures load() is deterministic and cacheable for DB systems
+const MODULE_CACHE = new Map<string, any>();
 import {
   lazySeq, isLazySeq, lazyHead, lazyTail,
   take, drop, iterate, rangeSeq, filterLazy, mapLazy, zipWithLazy, takeWhile,
@@ -478,14 +482,24 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const path = require("path");
       try {
         const resolvedPath = path.resolve(process.cwd(), filePath);
+
+        // Phase L1.5: Check module cache first (deterministic semantics)
+        if (MODULE_CACHE.has(resolvedPath)) {
+          return MODULE_CACHE.get(resolvedPath);
+        }
+
         const src = fs.readFileSync(resolvedPath, "utf-8");
         const { lex } = require("./lexer");
         const { parse } = require("./parser");
         const tokens = lex(src, resolvedPath);
         const ast = parse(tokens);
-        // Use interpret() not eval() for control blocks like [FUNC]
-        (interp as any).interpret(ast);
-        return null;
+
+        // Evaluate module (control blocks like [FUNC] allowed)
+        const result = (interp as any).interpret(ast);
+
+        // Cache the result for future loads of the same file
+        MODULE_CACHE.set(resolvedPath, result);
+        return result;
       } catch (e: any) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }
