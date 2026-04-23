@@ -1,0 +1,14 @@
+;; L2 Proof Case 11: Higher-Order Functions
+;; 고차 함수 (map filter reduce)
+
+(defun test-hof []
+  (let [[arr [1 2 3 4 5]]
+        [double (fn [x] (* x 2))]
+        [is-even (fn [x] (= 0 (% x 2)))]]
+    (console/log
+      (list
+        (length (filter is-even arr))  ; 2
+        (length arr)))))  ; 5
+)
+
+(test-hof)

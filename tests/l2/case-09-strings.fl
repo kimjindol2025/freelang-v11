@@ -1,0 +1,14 @@
+;; L2 Proof Case 9: String Operations
+;; 문자열 연산
+
+(defun test-strings []
+  (console/log
+    (list
+      (str "hello" " " "world")       ; "hello world"
+      (length "abc")                  ; 3
+      (str-upper "hello")             ; "HELLO"
+      (str-lower "WORLD")             ; "world"
+      (str-contains "hello" "ell"))))  ; true
+)
+
+(test-strings)

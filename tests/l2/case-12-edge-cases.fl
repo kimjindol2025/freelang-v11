@@ -1,0 +1,15 @@
+;; L2 Proof Case 12: Edge Cases
+;; 엣지 케이스 (null 처리, 빈 컬렉션 등)
+
+(defun test-edges []
+  (console/log
+    (list
+      (+ 0 0)              ; 0
+      (* 1 1)              ; 1
+      (get [] 0)           ; null
+      (get {} :x)          ; null
+      (length [])          ; 0
+      (length ""))))       ; 0
+)
+
+(test-edges)
