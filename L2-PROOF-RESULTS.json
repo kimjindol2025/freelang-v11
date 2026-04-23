@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-04-23T04:48:45Z",
-  "total": 12,
-  "passed": 12,
+  "timestamp": "2026-04-23T04:54:12Z",
+  "total": 16,
+  "passed": 16,
   "failed": 0,
   "pass_rate": 100,
   "cases": [
-    { "name": "case-01-arithmetic.fl", "status": "PASS" },{ "name": "case-02-comparisons.fl", "status": "PASS" },{ "name": "case-03-logic.fl", "status": "PASS" },{ "name": "case-04-control-flow.fl", "status": "PASS" },{ "name": "case-05-functions.fl", "status": "PASS" },{ "name": "case-06-collections.fl", "status": "PASS" },{ "name": "case-07-pattern-matching.fl", "status": "PASS" },{ "name": "case-08-recursion.fl", "status": "PASS" },{ "name": "case-09-strings.fl", "status": "PASS" },{ "name": "case-10-loops.fl", "status": "PASS" },{ "name": "case-11-higher-order.fl", "status": "PASS" },{ "name": "case-12-edge-cases.fl", "status": "PASS" }
+    { "name": "case-01-arithmetic.fl", "status": "PASS" },{ "name": "case-02-comparisons.fl", "status": "PASS" },{ "name": "case-03-logic.fl", "status": "PASS" },{ "name": "case-04-control-flow.fl", "status": "PASS" },{ "name": "case-05-functions.fl", "status": "PASS" },{ "name": "case-06-collections.fl", "status": "PASS" },{ "name": "case-07-pattern-matching.fl", "status": "PASS" },{ "name": "case-08-recursion.fl", "status": "PASS" },{ "name": "case-09-strings.fl", "status": "PASS" },{ "name": "case-10-loops.fl", "status": "PASS" },{ "name": "case-11-higher-order.fl", "status": "PASS" },{ "name": "case-12-edge-cases.fl", "status": "PASS" },{ "name": "case-13-ai-vector.fl", "status": "PASS" },{ "name": "case-14-ai-cosine.fl", "status": "PASS" },{ "name": "case-15-ai-template.fl", "status": "PASS" },{ "name": "case-16-ai-ranking.fl", "status": "PASS" }
   ]
 }

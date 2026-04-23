@@ -1,0 +1,23 @@
+;; L2 Test 15: AI Library - Prompt Template
+;; 프롬프트 템플릿 채우기
+
+(defun map-entries [m]
+  (map (fn [k] [k (get m k)]) (keys m)))
+
+(defun prompt-template [template vars]
+  (reduce (fn [acc [key val]]
+    (str-replace acc 
+                  (str "{" key "}")
+                  (str val)))
+   template
+   (map-entries vars)))
+
+(defun test-ai-template []
+  (console/log
+    (list
+      (prompt-template 
+        "User: {user}"
+        {:user "Alice"}))))
+)
+
+(test-ai-template)
