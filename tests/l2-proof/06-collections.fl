@@ -1,0 +1,27 @@
+; L2 Proof Test 06: Collections
+; array, map, get, length, append, map
+
+(defun test-arrays []
+  (let [[arr [1 2 3]]]
+    (list
+      (get arr 0)            ; 1
+      (get arr 1)            ; 2
+      (length arr)           ; 3
+      (append arr [4 5]))))  ; [1 2 3 4 5]
+
+(defun test-maps []
+  (let [[m {:x 10 :y 20}]]
+    (list
+      (get m :x)             ; 10
+      (get m :y)             ; 20
+      (get m :z))))          ; null
+
+(defun double-it [x]
+  (* x 2))
+
+(defun test-map-fn []
+  (map double-it [1 2 3]))   ; [2 4 6]
+
+(println (test-arrays))
+(println (test-maps))
+(println (test-map-fn))

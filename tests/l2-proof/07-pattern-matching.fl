@@ -1,0 +1,23 @@
+; L2 Proof Test 07: Pattern Matching
+; pattern matching with cond
+
+(defun classify-value [v]
+  (cond
+    [(null? v) "null"]
+    [(= v true) "true"]
+    [(= v false) "false"]
+    [(number? v) (str "number:" v)]
+    [(string? v) (str "string:" v)]
+    [(list? v) (str "list[" (length v) "]")]
+    [true "unknown"]))
+
+(defun test-patterns []
+  (list
+    (classify-value null)       ; "null"
+    (classify-value true)       ; "true"
+    (classify-value false)      ; "false"
+    (classify-value 42)         ; "number:42"
+    (classify-value "hello")    ; "string:hello"
+    (classify-value [1 2])))    ; "list[2]"
+
+(println (test-patterns))

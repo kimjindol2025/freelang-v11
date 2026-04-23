@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-04-23T04:16:34Z",
+  "total": 12,
+  "passed": 0,
+  "failed": 12,
+  "pass_rate": 0,
+  "cases": [
+    { "name": "case-01-arithmetic.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-02-comparisons.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-03-logic.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-04-control-flow.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-05-functions.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-06-collections.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-07-pattern-matching.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-08-recursion.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-09-strings.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-10-loops.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-11-higher-order.fl", "status": "FAIL", "reason": "stage1 compile" },{ "name": "case-12-edge-cases.fl", "status": "FAIL", "reason": "stage1 compile" }
+  ]
+}

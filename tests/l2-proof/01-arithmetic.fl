@@ -1,0 +1,15 @@
+; L2 Proof Test 01: Arithmetic Operations
+; 기본 산술: +, -, *, /, %, 음수
+
+(defun test-arithmetic []
+  (list
+    (+ 5 3)                  ; 8
+    (- 10 4)                 ; 6
+    (* 7 2)                  ; 14
+    (/ 15 3)                 ; 5
+    (% 17 5)                 ; 2
+    (- 42)                   ; -42
+    (+ 0 0)                  ; 0
+    (* 1 100)))              ; 100
+
+(println (test-arithmetic))

@@ -1,0 +1,17 @@
+; L2 Proof Test 08: Exception Handling
+; try/catch, throw
+
+(defun safe-divide [a b]
+  (try
+    (if (= b 0)
+      (throw "division by zero")
+      (/ a b))
+    (catch e
+      (str "error: " e))))
+
+(defun test-errors []
+  (list
+    (safe-divide 10 2)        ; 5
+    (safe-divide 10 0)))      ; "error: division by zero"
+
+(println (test-errors))

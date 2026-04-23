@@ -1,0 +1,17 @@
+; L2 Proof Test 10: Type Checking
+; null?, list?, map?, string?, number?
+
+(defun test-types []
+  (list
+    (null? null)              ; true
+    (null? 42)                ; false
+    (list? [1 2 3])           ; true
+    (list? {:a 1})            ; false
+    (map? {:a 1})             ; true
+    (map? [1 2])              ; false
+    (string? "hello")         ; true
+    (string? 42)              ; false
+    (number? 42)              ; true
+    (number? "42")))          ; false
+
+(println (test-types))

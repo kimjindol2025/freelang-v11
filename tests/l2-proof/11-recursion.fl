@@ -1,0 +1,21 @@
+; L2 Proof Test 11: Recursion
+; fibonacci, factorial
+
+(defun fib [n]
+  (if (<= n 1) n
+    (+ (fib (- n 1)) (fib (- n 2)))))
+
+(defun fact [n]
+  (if (<= n 1) 1
+    (* n (fact (- n 1)))))
+
+(defun test-recursion []
+  (list
+    (fib 0)                   ; 0
+    (fib 1)                   ; 1
+    (fib 6)                   ; 8
+    (fact 1)                  ; 1
+    (fact 5)                  ; 120
+    (fact 0)))                ; 1
+
+(println (test-recursion))

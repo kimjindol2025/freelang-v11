@@ -1,0 +1,24 @@
+; L2 Proof Test 04: Control Flow
+; if, cond, loop
+
+(defun test-if []
+  (list
+    (if true 10 20)          ; 10
+    (if false 10 20)))       ; 20
+
+(defun test-cond []
+  (cond
+    [(< 5 3) "a"]
+    [(> 5 3) "b"]
+    [true "c"]))             ; "b"
+
+(defun sum-loop [n acc]
+  (if (>= n 5) acc
+    (sum-loop (+ n 1) (+ acc n))))
+
+(defun test-loop []
+  (sum-loop 0 0))            ; 0+1+2+3+4 = 10
+
+(println (test-if))
+(println (test-cond))
+(println (test-loop))

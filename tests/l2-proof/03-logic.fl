@@ -1,0 +1,15 @@
+; L2 Proof Test 03: Logic Operations
+; and, or, not
+
+(defun test-logic []
+  (list
+    (and true true)          ; true
+    (and true false)         ; false
+    (and false false)        ; false
+    (or true false)          ; true
+    (or false false)         ; false
+    (or true true)           ; true
+    (not true)               ; false
+    (not false)))            ; true
+
+(println (test-logic))
