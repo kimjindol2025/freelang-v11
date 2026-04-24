@@ -19163,6 +19163,46 @@ function createDataModule() {
       }
       return count;
     },
+    // str_pad_left str len char -> string  ("42" 5 "0" -> "00042")
+    "str_pad_left": (str, len, ch = " ") => {
+      return String(str).padStart(len, ch);
+    },
+    // str_pad_right str len char -> string  ("hi" 5 "-" -> "hi---")
+    "str_pad_right": (str, len, ch = " ") => {
+      return String(str).padEnd(len, ch);
+    },
+    // str_replace str from to -> string  ("hello world" "world" "FL" -> "hello FL")
+    "str_replace": (str, from, to) => {
+      return String(str).split(from).join(to);
+    },
+    // str_starts str prefix -> boolean
+    "str_starts": (str, prefix) => {
+      return String(str).startsWith(prefix);
+    },
+    // str_ends str suffix -> boolean
+    "str_ends": (str, suffix) => {
+      return String(str).endsWith(suffix);
+    },
+    // str_includes str sub -> boolean
+    "str_includes": (str, sub) => {
+      return String(str).includes(sub);
+    },
+    // str_reverse str -> string  ("hello" -> "olleh")
+    "str_reverse": (str) => {
+      return String(str).split("").reverse().join("");
+    },
+    // str_upper str -> string  ("hello" -> "HELLO")
+    "str_upper": (str) => {
+      return String(str).toUpperCase();
+    },
+    // str_lower str -> string  ("HELLO" -> "hello")
+    "str_lower": (str) => {
+      return String(str).toLowerCase();
+    },
+    // str_slice str start end -> string  ("hello" 1 3 -> "el")
+    "str_slice": (str, start, end) => {
+      return String(str).slice(start, end);
+    },
     // ── Number formatting (accounting) ────────────────────────
     // number_format num decimals -> string  (1234567 0 -> "1,234,567")
     "number_format": (num, decimals = 0) => {
