@@ -97,6 +97,13 @@ export function createTimeModule() {
       return ts + n * mul[unit];
     },
 
+    // date_parse str -> number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)
+    "date_parse": (str: string): number => {
+      const ts = Date.parse(str);
+      if (isNaN(ts)) throw new Error(`date_parse: invalid date string "${str}"`);
+      return ts;
+    },
+
     // sleep_ms ms -> void  (synchronous spin-wait, short durations only)
     "sleep_ms": (ms: number): void => {
       const end = Date.now() + ms;

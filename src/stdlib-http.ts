@@ -82,5 +82,71 @@ export function createHttpModule() {
         throw new Error(`http_header failed for '${url}': ${err.message}`);
       }
     },
+
+    // http_request method url headers body -> string (일반 HTTP 요청)
+    "http_request": (method: string, url: string, headers: any, body: string): string => {
+      try {
+        const args: string[] = ["-s", "--max-time", "10", "-X", method];
+
+        // 헤더 추가 (객체로 전달됨)
+        if (headers && typeof headers === 'object') {
+          for (const [key, value] of Object.entries(headers)) {
+            args.push("-H", `${key}: ${value}`);
+          }
+        }
+
+        // 바디 추가
+        if (body && body.length > 0) {
+          args.push("-d", body);
+        }
+
+        args.push(url);
+        return curlRun(args);
+      } catch (err: any) {
+        throw new Error(`http_request failed for '${method} ${url}': ${err.message}`);
+      }
+    },
+
+    // http_get_json url headers -> object (헤더와 함께 GET)
+    "http_get_json": (url: string, headers: any): any => {
+      try {
+        const args: string[] = ["-s", "--max-time", "10"];
+
+        if (headers && typeof headers === 'object') {
+          for (const [key, value] of Object.entries(headers)) {
+            args.push("-H", `${key}: ${value}`);
+          }
+        }
+
+        args.push(url);
+        const body = curlRun(args);
+        return JSON.parse(body);
+      } catch (err: any) {
+        throw new Error(`http_get_json failed for '${url}': ${err.message}`);
+      }
+    },
+
+    // http_post_json url headers body -> object (헤더와 함께 POST)
+    "http_post_json": (url: string, headers: any, body: string): any => {
+      try {
+        const args: string[] = ["-s", "--max-time", "10", "-X", "POST"];
+
+        if (headers && typeof headers === 'object') {
+          for (const [key, value] of Object.entries(headers)) {
+            args.push("-H", `${key}: ${value}`);
+          }
+        }
+
+        if (body && body.length > 0) {
+          args.push("-d", body);
+        }
+
+        args.push(url);
+        const response = curlRun(args);
+        return JSON.parse(response);
+      } catch (err: any) {
+        throw new Error(`http_post_json failed for '${url}': ${err.message}`);
+      }
+    },
   };
 }

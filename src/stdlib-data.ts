@@ -213,5 +213,37 @@ export function createDataModule() {
       while ((pos = str.indexOf(sub, pos)) !== -1) { count++; pos += sub.length; }
       return count;
     },
+
+    // ── Number formatting (accounting) ────────────────────────
+
+    // number_format num decimals -> string  (1234567 0 -> "1,234,567")
+    "number_format": (num: number, decimals: number = 0): string => {
+      const n = Number(num);
+      if (isNaN(n)) return "0";
+      const fixed = n.toFixed(decimals);
+      const [intPart, decPart] = fixed.split(".");
+      const withComma = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return decPart ? `${withComma}.${decPart}` : withComma;
+    },
+
+    // to_fixed num decimals -> string  (3.14159 2 -> "3.14")
+    "to_fixed": (num: number, decimals: number = 2): string => {
+      const n = Number(num);
+      if (isNaN(n)) return "0";
+      return n.toFixed(decimals);
+    },
+
+    // format_currency num code -> string  (1234567 "KRW" -> "₩1,234,567")
+    "format_currency": (num: number, code: string = "KRW"): string => {
+      const n = Number(num);
+      if (isNaN(n)) return "0";
+      const symbol: Record<string, string> = { KRW: "₩", USD: "$", EUR: "€", JPY: "¥", CNY: "¥", GBP: "£" };
+      const decimals = code === "KRW" || code === "JPY" ? 0 : 2;
+      const fixed = n.toFixed(decimals);
+      const [intPart, decPart] = fixed.split(".");
+      const withComma = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      const sign = symbol[code] ?? code + " ";
+      return decPart ? `${sign}${withComma}.${decPart}` : `${sign}${withComma}`;
+    },
   };
 }

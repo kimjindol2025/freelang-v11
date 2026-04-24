@@ -317,7 +317,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
                   if (result.__fl_response === true) {
                     status = result.status ?? 200;
                     const contentType = result.contentType ?? "application/json";
-                    sendResponse(res, status, result.body ?? "", contentType);
+                    sendResponse(res, status, result.body ?? "", contentType, result.headers ?? {});
                   } else {
                     sendResponse(res, 200, result);
                   }
@@ -534,6 +534,51 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       };
     },
 
+    // server_html_cookie cookie html -> response (Set-Cookie 헤더 포함 HTML 응답)
+    "server_html_cookie": (cookie: string, html: string): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body: html,
+        headers: { "Set-Cookie": cookie },
+      };
+    },
+
+    // server_redirect url -> response (302 리다이렉트)
+    "server_redirect": (url: string): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 302,
+        contentType: "text/plain",
+        body: "",
+        headers: { "Location": url },
+      };
+    },
+
+    // server_redirect_cookie url cookie -> response (302 리다이렉트 + Set-Cookie)
+    "server_redirect_cookie": (url: string, cookie: string): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 302,
+        contentType: "text/plain",
+        body: "",
+        headers: { "Location": url, "Set-Cookie": cookie },
+      };
+    },
+
+    // server_req_cookie req name -> string | null (쿠키 값 읽기)
+    "server_req_cookie": (req: Request, name: string): string | null => {
+      const cookieHeader = req.headers["cookie"] as string;
+      if (!cookieHeader) return null;
+      const cookies = cookieHeader.split(";").map(c => c.trim());
+      for (const cookie of cookies) {
+        const [k, ...rest] = cookie.split("=");
+        if (k.trim() === name) return rest.join("=").trim();
+      }
+      return null;
+    },
+
     // server_wait_respond promise -> response object (비동기 응답 대기)
     "server_wait_respond": (promise: Promise<any>): Record<string, any> => {
       return {
@@ -567,6 +612,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     // server_req_param req name -> string
     "server_req_param": (req: Request, name: string): string | null => {
       return req.params[name] ?? null;
+    },
+
+    // server_req_params req -> object  (all URL params as an object)
+    "server_req_params": (req: Request): Record<string, string> => {
+      return req.params ?? {};
     },
 
     // server_req_method req -> string
