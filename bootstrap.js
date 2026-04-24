@@ -27319,8 +27319,660 @@ function createAgentBuiltins(interp2) {
   };
 }
 
+// src/vm-eligible.ts
+var VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
+  // 산술
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "mod",
+  // 비교
+  "=",
+  "==",
+  "!=",
+  "<",
+  ">",
+  "<=",
+  ">=",
+  // 논리
+  "and",
+  "or",
+  "not",
+  // 제어
+  "if",
+  "do",
+  // 데이터
+  "list",
+  "get",
+  ".",
+  // 정의
+  "define"
+]);
+function isVMEligible(node) {
+  if (!node || typeof node !== "object") {
+    return false;
+  }
+  const kind = node.kind;
+  switch (kind) {
+    case "literal":
+      return true;
+    case "variable":
+      return true;
+    case "sexpr": {
+      const sexpr = node;
+      if (!sexpr || !sexpr.op) {
+        return false;
+      }
+      if (!VM_SUPPORTED_OPS.has(sexpr.op)) {
+        return false;
+      }
+      if (!sexpr.args || !Array.isArray(sexpr.args)) {
+        return false;
+      }
+      return sexpr.args.every((arg) => isVMEligible(arg));
+    }
+    case "keyword":
+      return false;
+    case "block":
+      return false;
+    case "pattern-match":
+    case "try-block":
+    case "throw":
+    default:
+      return false;
+  }
+}
+
+// src/compiler.ts
+var BytecodeCompiler = class {
+  compile(node) {
+    const chunk = {
+      instructions: [],
+      constants: [],
+      name: "main"
+    };
+    this.compileExpr(node, chunk);
+    this.emit(chunk, 25 /* HALT */);
+    return chunk;
+  }
+  compileExpr(node, chunk) {
+    switch (node.kind) {
+      case "literal":
+        this.compileLiteral(node, chunk);
+        break;
+      case "variable":
+        this.compileVariable(node, chunk);
+        break;
+      case "sexpr":
+        this.compileSExpr(node, chunk);
+        break;
+      case "block":
+        this.compileBlock(node, chunk);
+        break;
+      default:
+        this.emit(chunk, 25 /* HALT */);
+        break;
+    }
+  }
+  compileLiteral(node, chunk) {
+    const idx = this.addConst(chunk, node.value);
+    this.emit(chunk, 0 /* PUSH_CONST */, idx);
+  }
+  compileVariable(node, chunk) {
+    this.emit(chunk, 1 /* PUSH_VAR */, node.name);
+  }
+  compileSExpr(node, chunk) {
+    const op = node.op;
+    switch (op) {
+      case "if":
+        this.compileIf(node, chunk);
+        return;
+      case "define":
+        this.compileDefine(node, chunk);
+        return;
+      case "do":
+        this.compileDo(node, chunk);
+        return;
+      case "list":
+        this.compileList(node, chunk);
+        return;
+      case "not":
+        if (node.args.length >= 1) {
+          this.compileExpr(node.args[0], chunk);
+          this.emit(chunk, 22 /* NOT */);
+        }
+        return;
+      case "and":
+        this.compileAnd(node, chunk);
+        return;
+      case "or":
+        this.compileOr(node, chunk);
+        return;
+      case "get":
+      case ".":
+        if (node.args.length >= 2) {
+          this.compileExpr(node.args[0], chunk);
+          const field = node.args[1];
+          if (field.kind === "literal") {
+            this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
+          } else {
+            this.emit(chunk, 25 /* HALT */);
+          }
+        }
+        return;
+    }
+    const binaryOps = {
+      "+": 9 /* ADD */,
+      "-": 10 /* SUB */,
+      "*": 11 /* MUL */,
+      "/": 12 /* DIV */,
+      "%": 13 /* MOD */,
+      "mod": 13 /* MOD */,
+      "==": 14 /* EQ */,
+      "=": 14 /* EQ */,
+      "!=": 19 /* NEQ */,
+      "<": 15 /* LT */,
+      ">": 16 /* GT */,
+      "<=": 17 /* LE */,
+      ">=": 18 /* GE */
+    };
+    if (binaryOps[op] !== void 0) {
+      if (node.args.length >= 2) {
+        this.compileExpr(node.args[0], chunk);
+        this.compileExpr(node.args[1], chunk);
+        this.emit(chunk, binaryOps[op]);
+      } else if (node.args.length === 1) {
+        if (op === "-") {
+          const zeroIdx = this.addConst(chunk, 0);
+          this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
+          this.compileExpr(node.args[0], chunk);
+          this.emit(chunk, 10 /* SUB */);
+        } else {
+          this.compileExpr(node.args[0], chunk);
+        }
+      }
+      return;
+    }
+    this.emit(chunk, 25 /* HALT */);
+  }
+  compileIf(node, chunk) {
+    if (node.args.length < 2) {
+      this.emit(chunk, 25 /* HALT */);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    const jumpIfFalseIdx = chunk.instructions.length;
+    this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
+    this.compileExpr(node.args[1], chunk);
+    const jumpIdx = chunk.instructions.length;
+    this.emit(chunk, 5 /* JUMP */, 0);
+    const elseStart = chunk.instructions.length;
+    chunk.instructions[jumpIfFalseIdx].arg = elseStart;
+    if (node.args.length >= 3) {
+      this.compileExpr(node.args[2], chunk);
+    } else {
+      const nullIdx = this.addConst(chunk, null);
+      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+    }
+    const end = chunk.instructions.length;
+    chunk.instructions[jumpIdx].arg = end;
+  }
+  compileDefine(node, chunk) {
+    if (node.args.length < 2) {
+      this.emit(chunk, 25 /* HALT */);
+      return;
+    }
+    const varNode = node.args[0];
+    const valNode = node.args[1];
+    this.compileExpr(valNode, chunk);
+    const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
+    this.emit(chunk, 2 /* SET_VAR */, name);
+    const nullIdx = this.addConst(chunk, null);
+    this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+  }
+  compileDo(node, chunk) {
+    if (node.args.length === 0) {
+      const nullIdx = this.addConst(chunk, null);
+      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+      return;
+    }
+    for (let i = 0; i < node.args.length; i++) {
+      this.compileExpr(node.args[i], chunk);
+      if (i < node.args.length - 1) {
+        this.emit(chunk, 7 /* POP */);
+      }
+    }
+  }
+  compileList(node, chunk) {
+    for (const arg of node.args) {
+      this.compileExpr(arg, chunk);
+    }
+    this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
+  }
+  compileAnd(node, chunk) {
+    if (node.args.length === 0) {
+      const idx = this.addConst(chunk, true);
+      this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      return;
+    }
+    if (node.args.length === 1) {
+      this.compileExpr(node.args[0], chunk);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    this.compileExpr(node.args[1], chunk);
+    this.emit(chunk, 20 /* AND */);
+  }
+  compileOr(node, chunk) {
+    if (node.args.length === 0) {
+      const idx = this.addConst(chunk, false);
+      this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      return;
+    }
+    if (node.args.length === 1) {
+      this.compileExpr(node.args[0], chunk);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    this.compileExpr(node.args[1], chunk);
+    this.emit(chunk, 21 /* OR */);
+  }
+  compileBlock(node, chunk) {
+    this.emit(chunk, 25 /* HALT */);
+  }
+  addConst(chunk, value) {
+    chunk.constants.push(value);
+    return chunk.constants.length - 1;
+  }
+  emit(chunk, op, arg) {
+    const instr = { op };
+    if (arg !== void 0) instr.arg = arg;
+    chunk.instructions.push(instr);
+  }
+};
+
+// src/vm.ts
+var VM = class {
+  stack = [];
+  vars = /* @__PURE__ */ new Map();
+  ip = 0;
+  run(chunk) {
+    this.stack = [];
+    this.vars = /* @__PURE__ */ new Map();
+    this.ip = 0;
+    while (this.ip < chunk.instructions.length) {
+      const instr = chunk.instructions[this.ip];
+      this.ip++;
+      switch (instr.op) {
+        case 0 /* PUSH_CONST */: {
+          const idx = instr.arg;
+          this.push(chunk.constants[idx]);
+          break;
+        }
+        case 1 /* PUSH_VAR */: {
+          const name = instr.arg;
+          if (!this.vars.has(name)) {
+            throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
+          }
+          this.push(this.vars.get(name));
+          break;
+        }
+        case 2 /* SET_VAR */: {
+          const name = instr.arg;
+          const val = this.pop();
+          this.vars.set(name, val);
+          break;
+        }
+        case 7 /* POP */: {
+          this.pop();
+          break;
+        }
+        case 8 /* DUP */: {
+          if (this.stack.length === 0) {
+            throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
+          }
+          this.push(this.stack[this.stack.length - 1]);
+          break;
+        }
+        case 9 /* ADD */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a + b);
+          break;
+        }
+        case 10 /* SUB */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a - b);
+          break;
+        }
+        case 11 /* MUL */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a * b);
+          break;
+        }
+        case 12 /* DIV */: {
+          const b = this.pop();
+          const a = this.pop();
+          if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
+          this.push(a / b);
+          break;
+        }
+        case 13 /* MOD */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a % b);
+          break;
+        }
+        case 14 /* EQ */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a === b);
+          break;
+        }
+        case 19 /* NEQ */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a !== b);
+          break;
+        }
+        case 15 /* LT */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a < b);
+          break;
+        }
+        case 16 /* GT */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a > b);
+          break;
+        }
+        case 17 /* LE */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a <= b);
+          break;
+        }
+        case 18 /* GE */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a >= b);
+          break;
+        }
+        case 20 /* AND */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(Boolean(a) && Boolean(b));
+          break;
+        }
+        case 21 /* OR */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(Boolean(a) || Boolean(b));
+          break;
+        }
+        case 22 /* NOT */: {
+          const a = this.pop();
+          this.push(!Boolean(a));
+          break;
+        }
+        case 5 /* JUMP */: {
+          this.ip = instr.arg;
+          break;
+        }
+        case 6 /* JUMP_IF_FALSE */: {
+          const cond = this.pop();
+          if (!Boolean(cond)) {
+            this.ip = instr.arg;
+          }
+          break;
+        }
+        case 23 /* MAKE_LIST */: {
+          const count = instr.arg;
+          if (this.stack.length < count) {
+            throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
+          }
+          const items = this.stack.splice(this.stack.length - count, count);
+          this.push(items);
+          break;
+        }
+        case 24 /* GET_FIELD */: {
+          const obj = this.pop();
+          const field = instr.arg;
+          if (obj !== null && typeof obj === "object") {
+            this.push(obj[field]);
+          } else {
+            throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
+          }
+          break;
+        }
+        case 3 /* CALL */: {
+          throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
+        }
+        case 4 /* RETURN */: {
+          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+        }
+        case 25 /* HALT */: {
+          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+        }
+        default: {
+          throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
+        }
+      }
+    }
+    return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+  }
+  push(val) {
+    this.stack.push(val);
+  }
+  pop() {
+    if (this.stack.length === 0) {
+      throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
+    }
+    return this.stack.pop();
+  }
+};
+
+// src/optimizer.ts
+function cloneChunk(chunk) {
+  return {
+    instructions: chunk.instructions.map((i) => ({ ...i })),
+    constants: [...chunk.constants],
+    name: chunk.name
+  };
+}
+var FOLDABLE_BINARY_OPS = /* @__PURE__ */ new Set([
+  9 /* ADD */,
+  10 /* SUB */,
+  11 /* MUL */,
+  12 /* DIV */,
+  13 /* MOD */,
+  14 /* EQ */,
+  19 /* NEQ */,
+  15 /* LT */,
+  16 /* GT */,
+  17 /* LE */,
+  18 /* GE */,
+  20 /* AND */,
+  21 /* OR */
+]);
+function applyBinaryOp(op, a, b) {
+  switch (op) {
+    case 9 /* ADD */:
+      return a + b;
+    case 10 /* SUB */:
+      return a - b;
+    case 11 /* MUL */:
+      return a * b;
+    case 12 /* DIV */:
+      return b === 0 ? null : a / b;
+    case 13 /* MOD */:
+      return a % b;
+    case 14 /* EQ */:
+      return a === b;
+    case 19 /* NEQ */:
+      return a !== b;
+    case 15 /* LT */:
+      return a < b;
+    case 16 /* GT */:
+      return a > b;
+    case 17 /* LE */:
+      return a <= b;
+    case 18 /* GE */:
+      return a >= b;
+    case 20 /* AND */:
+      return Boolean(a) && Boolean(b);
+    case 21 /* OR */:
+      return Boolean(a) || Boolean(b);
+    default:
+      return null;
+  }
+}
+var constantFoldingPass = {
+  name: "constant-folding",
+  run(chunk) {
+    const result = cloneChunk(chunk);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const instrs = result.instructions;
+      for (let i = 0; i + 2 < instrs.length; i++) {
+        const a = instrs[i];
+        const b = instrs[i + 1];
+        const op = instrs[i + 2];
+        if (a.op === 0 /* PUSH_CONST */ && b.op === 0 /* PUSH_CONST */ && FOLDABLE_BINARY_OPS.has(op.op)) {
+          const aVal = result.constants[a.arg];
+          const bVal = result.constants[b.arg];
+          if (op.op === 12 /* DIV */ && bVal === 0) continue;
+          const foldedVal = applyBinaryOp(op.op, aVal, bVal);
+          let newIdx = result.constants.indexOf(foldedVal);
+          if (newIdx === -1) {
+            newIdx = result.constants.length;
+            result.constants.push(foldedVal);
+          }
+          instrs.splice(i, 3, { op: 0 /* PUSH_CONST */, arg: newIdx });
+          for (let j = 0; j < instrs.length; j++) {
+            const instr = instrs[j];
+            if ((instr.op === 5 /* JUMP */ || instr.op === 6 /* JUMP_IF_FALSE */) && typeof instr.arg === "number") {
+              if (instr.arg > i + 2) {
+                instr.arg -= 2;
+              } else if (instr.arg > i) {
+                instr.arg = i;
+              }
+            }
+          }
+          changed = true;
+          break;
+        }
+      }
+    }
+    return result;
+  }
+};
+var deadCodeEliminationPass = {
+  name: "dead-code-elimination",
+  run(chunk) {
+    const result = cloneChunk(chunk);
+    const instrs = result.instructions;
+    const haltIdx = instrs.findIndex((i) => i.op === 25 /* HALT */);
+    if (haltIdx !== -1 && haltIdx < instrs.length - 1) {
+      result.instructions = instrs.slice(0, haltIdx + 1);
+    }
+    return result;
+  }
+};
+var pushPopEliminationPass = {
+  name: "push-pop-elimination",
+  run(chunk) {
+    const result = cloneChunk(chunk);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const instrs = result.instructions;
+      for (let i = 0; i + 1 < instrs.length; i++) {
+        const curr = instrs[i];
+        const next = instrs[i + 1];
+        if (curr.op === 0 /* PUSH_CONST */ && next.op === 7 /* POP */) {
+          instrs.splice(i, 2);
+          for (let j = 0; j < instrs.length; j++) {
+            const instr = instrs[j];
+            if ((instr.op === 5 /* JUMP */ || instr.op === 6 /* JUMP_IF_FALSE */) && typeof instr.arg === "number") {
+              if (instr.arg > i + 1) {
+                instr.arg -= 2;
+              } else if (instr.arg > i) {
+                instr.arg = i;
+              }
+            }
+          }
+          changed = true;
+          break;
+        }
+      }
+    }
+    return result;
+  }
+};
+var jumpOptimizationPass = {
+  name: "jump-optimization",
+  run(chunk) {
+    const result = cloneChunk(chunk);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const instrs = result.instructions;
+      for (let i = 0; i < instrs.length; i++) {
+        const instr = instrs[i];
+        if (instr.op === 5 /* JUMP */ && instr.arg === i + 1) {
+          instrs.splice(i, 1);
+          for (let j = 0; j < instrs.length; j++) {
+            const other = instrs[j];
+            if ((other.op === 5 /* JUMP */ || other.op === 6 /* JUMP_IF_FALSE */) && typeof other.arg === "number") {
+              if (other.arg > i) {
+                other.arg -= 1;
+              }
+            }
+          }
+          changed = true;
+          break;
+        }
+      }
+    }
+    return result;
+  }
+};
+var Optimizer = class {
+  passes = [];
+  stats = [];
+  addPass(pass) {
+    this.passes.push(pass);
+    return this;
+  }
+  optimize(chunk) {
+    this.stats = [];
+    let current = chunk;
+    for (const pass of this.passes) {
+      const before = current.instructions.length;
+      const after = pass.run(current);
+      const reduced = before - after.instructions.length;
+      this.stats.push({ passName: pass.name, reduced });
+      current = after;
+    }
+    return current;
+  }
+  getStats() {
+    return this.stats;
+  }
+};
+function createDefaultOptimizer() {
+  return new Optimizer().addPass(constantFoldingPass).addPass(deadCodeEliminationPass).addPass(pushPopEliminationPass).addPass(jumpOptimizationPass);
+}
+
 // src/interpreter.ts
-var Interpreter = class {
+var Interpreter = class _Interpreter {
   context;
   // Public for testing
   logger;
@@ -27336,6 +27988,11 @@ var Interpreter = class {
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
   tcoMode = false;
   // ← 기본값 유지 (TCO 라우팅은 내부용)
+  // Phase 3-E: VM opt-in 최적화
+  static _vmCompiler = new BytecodeCompiler();
+  static _vmOptimizer = createDefaultOptimizer();
+  static _vm = new VM();
+  static _vmEnabled = process.env.FL_VM === "1";
   // Phase 52: FL 파일 import 지원
   importedFiles = /* @__PURE__ */ new Set();
   currentFilePath = process.cwd();
@@ -28692,6 +29349,15 @@ var Interpreter = class {
     if (op === "map" && expr.args.length === 3) {
       const mapResult = evalSpecialForm(this, op, expr);
       if (mapResult !== void 0) return mapResult;
+    }
+    if (_Interpreter._vmEnabled && isVMEligible(expr)) {
+      try {
+        const chunk = _Interpreter._vmCompiler.compile(expr);
+        const optimized = _Interpreter._vmOptimizer.optimize(chunk);
+        const vmResult = _Interpreter._vm.run(optimized);
+        return vmResult;
+      } catch (_vmErr) {
+      }
     }
     const args2 = expr.args.map((arg) => this.eval(arg));
     if (args2.length >= 1 && typeof args2[0] === "string") {
