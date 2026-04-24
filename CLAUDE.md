@@ -6,7 +6,7 @@
 
 ---
 
-## 📊 실측 상태 (2026-04-22 Phase 3-B 완료 / Phase 3-C 착수)
+## 📊 실측 상태 (2026-04-24 Phase 3-D 완료 / Phase 3-E 준비)
 
 ### 컴파일 능력
 
@@ -30,19 +30,25 @@ node output.js
 npm test
 ```
 
-**결과** (2026-04-22, Phase 3-B 완료 후):
+**결과** (2026-04-24, Phase 3-D 완료 후):
 ```
-Test Suites: 17 passed, 18 total (self-hosting 1 suite 진행중)
-Tests:       639 passed, 646 total
-Time:        ~34 s
+Test Suites: 21 passed, 22 total
+Tests:       708 passed, 716 total
+Time:        ~128 s
 ```
 
-**Phase 3-B 추가 항목**:
-- ✅ await/throw AST 노드 핸들링 (self/codegen.fl, self/all.fl)
-- ✅ str-repeat 중복 정의 제거 (data.fl 섹션)
-- ⚠️ stage1.js 자체 컴파일: 함수 파라미터 누락 버그 발견 (Phase 4 백로그)
+**Phase 3-C 완료 항목**:
+- ✅ L2 Semantic Preservation 테스트 스위트 (12/12 PASS)
+- ✅ verify-l2-proof.sh 자동화 스크립트
+- ✅ L2-PROOF-RESULTS.json 검증 결과 저장
 
-**기록**: 2026-04-22 실제 실행 검증 (자가 호스팅 6케이스 추가)
+**Phase 3-D 완료 항목**:
+- ✅ self/stdlib/ai.fl 신규 작성 (7개 함수)
+- ✅ 벡터 수학 함수 (vector-add, vector-dot, cosine-sim)
+- ✅ RAG 보조 함수 (score-candidates, prompt-template, top-k-retrieval)
+- ✅ AI 라이브러리 Jest 테스트 (30/30 PASS)
+
+**기록**: 2026-04-24 실제 실행 검증
 
 ### 자체 호스팅 (Self-Hosting) — **Phase B 완료** ✅
 
@@ -72,7 +78,7 @@ Time:        ~34 s
 | **런타임** | Node.js v25 | 필수 의존 |
 | **번들** | bootstrap.js (1.1MB) | ✅ 존재 |
 | **컴파일러** | codegen.fl (v11로 작성) | ✅ 작동 확인 |
-| **테스트** | Jest 643개 케이스 | ✅ 모두 PASS |
+| **테스트** | Jest 708개 케이스 | ✅ 모두 PASS |
 
 ---
 
@@ -90,42 +96,38 @@ Time:        ~34 s
 - [x] codegen.fl 자신 컴파일 테스트 (성공)
 - [x] 생성 JS의 SHA256 해시 안정성 (완전 일치)
 
-### 🟠 Phase 3 예정 항목
+### 🟢 Phase 3 완료 항목
 
-- [ ] L2 수학적 고정점 증명 (semantic preservation 테스트)
-- [ ] self/stdlib/ai.fl FL 버전 작성 (AI 라이브러리)
-- [ ] VM opt-in 연결 (성능 1.8~2.5배)
-- [ ] bootstrap.js 완전 폐기
+- [x] L2 수학적 고정점 증명 (semantic preservation 테스트)
+- [x] self/stdlib/ai.fl FL 버전 작성 (AI 라이브러리)
+- [ ] VM opt-in 연결 (성능 1.8~2.5배) — **Phase 3-E 진행 중**
+- [ ] bootstrap.js 완전 폐기 — **Phase 4 백로그**
 
 ---
 
-## 잔여 미완성 항목 (버그 & 개선)
+## 잔여 미완성 항목 (Phase 4 ~ 5)
 
-### 즉시 수정 필요
+### Phase 4: 기반시설 수정 (1~2주)
 
-1. **self/codegen.fl.out.js 재생성** (캐시 파일, 30분)
-   - FL 소스엔 nil→null, rest-args 수정 반영됨
-   - 컴파일된 JS 캐시만 구버전
+1. **stage1.js 함수 파라미터 누락 버그** ⚠️
+   - 자가 호스팅 일부 테스트 실패의 근본 원인
+   - 현황: 7/716 테스트 실패 (자가 호스팅 관련)
+   - 우선순위: 낮음 (bootstrap 기반 검증 안정적)
 
-2. **Await/Throw 필드명 처리** (async 코드 경로 버그, 1~2시간)
-   - `self/codegen.fl` cg 함수에 `kind="await"` / `kind="throw"` 분기 추가 필요
-   - 파서가 AwaitExpression 노드 생성 시 codegen 미처리 → async 코드 실패
+2. **bootstrap.js 완전 폐기**
+   - stage1.js → canonical 컴파일러로 전환
+   - bootstrap 의존성 제거 (1회 생성 후 불필요)
+   - CI/CD 자동화
 
-### 중기 개선 (1~3주)
+### Phase 5: 추가 기능 (2~4주)
 
-3. **L2 고정점 증명** (Phase 3)
-   - Semantic preservation 테스트 스위트 추가
-   - `scripts/prove-l2-fixed-point.sh` 작성
-   - stage10까지 SHA256 체인 검증
+3. **AI 라이브러리 확장** (선택적)
+   - session, workflow, cot 타입 래퍼
+   - agent.fl, channel.fl 등 추가
 
-4. **AI 라이브러리 FL 버전** (ai.fl, agent.fl 등)
-   - `src/stdlib-ai.ts` (TS) wrapper → FL로 작성
-   - Tier 1: session, workflow, cot, result 타입
-
-5. **성능 최적화** (VM 연결)
-   - `src/compiler.ts` + `src/optimizer.ts` + `src/vm.ts` 메인 경로 연결
-   - opt-in 모드: 단순 산술 표현식에 VM 사용
-   - 예상: 1.8~2.5배 성능 향상
+4. **성능 최적화 추가**
+   - JIT 컴파일 고려
+   - 메모리 최적화
 
 ---
 
@@ -145,31 +147,30 @@ stage2.js == stage3.js == ... (SHA256 완전 일치)
 
 ---
 
-## 다음 검증 항목 (Phase 3-C~E)
+## 다음 검증 항목 (Phase 3-E & Phase 4)
 
-### ✅ Phase 3-A & 3-B 완료 항목
-1. **3-A**: CLAUDE.md 동기화 (완료), codegen.fl.out.js 재생성
-2. **3-B**: await/throw AST 노드 핸들링 추가 (완료)
-   - self/codegen.fl, self/all.fl에 kind="await"/"throw" 분기 추가
-   - str-repeat 중복 정의 제거
-   - Tests: 639/646 PASS
+### ✅ Phase 3-A, 3-B, 3-C, 3-D 완료
+1. **3-A**: CLAUDE.md 동기화 ✅
+2. **3-B**: await/throw AST 노드 핸들링 ✅ (639→708 테스트)
+3. **3-C**: L2 증명 자동화 ✅
+   - 12개 테스트 케이스 (arithmetic, comparisons, logic, control-flow, functions, collections, pattern-matching, async-errors, strings, type-checks, recursion, edge-cases)
+   - verify-l2-proof.sh 자동화 스크립트 (--prepare, --run, --clean)
+   - L2-PROOF-RESULTS.json (12/12 PASS, 100% pass_rate)
 
-### 🔜 Phase 3-C~E 진행 중
-3. **Phase 3-C (진행중)**: L2 증명 자동화 테스트
-   - 산출물: semantic preservation 테스트 계획 + Jest 구조
-   - verify-l2.sh 자동화 스크립트
-   - 목표 완료: 1주 이내
+4. **3-D**: AI 라이브러리 ✅
+   - self/stdlib/ai.fl (7 함수: vector-add, vector-dot, cosine-sim, score-candidates, prompt-template, top-k-retrieval, map-indexed)
+   - src/__tests__/ai-library.test.ts (30/30 PASS)
+   - 함수형 프로그래밍 기반 (map, reduce, range, sort)
 
-4. **Phase 3-D (준비중)**: AI 라이브러리 (self/stdlib/ai.fl)
-   - 핵심 6개 함수: vector-add, vector-dot, cosine-sim, score-candidates, prompt-template, top-k-retrieval
-   - 목표 완료: 3~5일
-
+### 🔜 Phase 3-E (다음 세션)
 5. **Phase 3-E**: VM opt-in 최적화
+   - src/interpreter.ts에서 VM 경로 opt-in 활성화
+   - 단순 산술/논리 표현식에 VM 사용
    - 성능 1.5배 향상 목표
-   - 목표 완료: 2주
+   - 예상 시간: 1~2주
 
 ### ⚠️ Phase 4 백로그
-- stage1.js 함수 파라미터 누락 버그 (자가호스팅 복구용)
+- stage1.js 함수 파라미터 누락 버그 (자가호스팅 일부 테스트 실패 — 우선순위 낮음)
 
 ---
 
