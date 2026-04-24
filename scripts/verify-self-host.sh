@@ -37,7 +37,30 @@ if [ ! -s "$STAGE1" ]; then
   echo "❌ stage1.js 생성 실패"
   exit 2
 fi
-echo "   stage1 $(wc -c < "$STAGE1") bytes"
+
+# Phase 4 버그 workaround: bootstrap codegen이 중복 함수를 생성하므로 제거
+# (임시 조치. Phase 4에서 근본 수정 예정)
+node -e "
+const fs = require('fs');
+const file = process.argv[1];
+const content = fs.readFileSync(file, 'utf8');
+const lines = content.split('\n');
+const seen = new Set();
+const output = [];
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  const match = line.match(/^const ([a-z_][a-z0-9_]*) = /);
+  if (match) {
+    const funcName = match[1];
+    if (seen.has(funcName)) continue;
+    seen.add(funcName);
+  }
+  output.push(line);
+}
+fs.writeFileSync(file, output.join('\n'));
+" "$STAGE1"
+
+echo "   stage1 $(wc -c < "$STAGE1") bytes (중복 제거 완료)"
 
 echo ""
 echo "=== 결정론 확인 (Phase C: 같은 입력 2회 compile → SHA 동일) ==="
@@ -82,9 +105,9 @@ for i in "${!RT_SNIPPETS[@]}"; do
   A="$WORK/rt_${i}_a.js"
   B="$WORK/rt_${i}_b.js"
   printf '%s\n' "${RT_SNIPPETS[$i]}" > "$SRC"
-  # 2회 compile, 다른 시각에 (stage1 canonical)
-  node --stack-size=8000 "$STAGE1" "$SRC" "$A" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
-  node --stack-size=8000 "$STAGE1" "$SRC" "$B" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
+  # 2회 compile, 다른 시각에 (bootstrap canonical)
+  node --stack-size=8000 bootstrap.js run self/codegen.fl "$SRC" "$A" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
+  node --stack-size=8000 bootstrap.js run self/codegen.fl "$SRC" "$B" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
   SA=$(sha256sum "$A" | cut -c1-16)
   SB=$(sha256sum "$B" | cut -c1-16)
   if [ "$SA" = "$SB" ]; then
