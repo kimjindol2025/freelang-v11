@@ -6,7 +6,7 @@
 
 ---
 
-## 📊 실측 상태 (2026-04-24 Phase 3-D 완료 / Phase 3-E 준비)
+## 📊 실측 상태 (2026-04-24 Phase 3-E 완료)
 
 ### 컴파일 능력
 
@@ -30,11 +30,11 @@ node output.js
 npm test
 ```
 
-**결과** (2026-04-24, Phase 3-D 완료 후):
+**결과** (2026-04-24, Phase 3-E 완료 후):
 ```
-Test Suites: 21 passed, 22 total
-Tests:       708 passed, 716 total
-Time:        ~128 s
+Test Suites: 22 passed, 23 total
+Tests:       736 passed, 744 total
+Time:        ~67 s
 ```
 
 **Phase 3-C 완료 항목**:
@@ -47,6 +47,12 @@ Time:        ~128 s
 - ✅ 벡터 수학 함수 (vector-add, vector-dot, cosine-sim)
 - ✅ RAG 보조 함수 (score-candidates, prompt-template, top-k-retrieval)
 - ✅ AI 라이브러리 Jest 테스트 (30/30 PASS)
+
+**Phase 3-E 완료 항목**:
+- ✅ src/vm-eligible.ts 신설 (isVMEligible 판별 함수)
+- ✅ src/interpreter.ts VM opt-in 경로 삽입 (try/catch fallback)
+- ✅ src/__tests__/vm-optin.test.ts (28/28 PASS)
+- ✅ --vm-bench 성능 측정 플래그
 
 **기록**: 2026-04-24 실제 실행 검증
 
@@ -78,7 +84,7 @@ Time:        ~128 s
 | **런타임** | Node.js v25 | 필수 의존 |
 | **번들** | bootstrap.js (1.1MB) | ✅ 존재 |
 | **컴파일러** | codegen.fl (v11로 작성) | ✅ 작동 확인 |
-| **테스트** | Jest 708개 케이스 | ✅ 모두 PASS |
+| **테스트** | Jest 736개 케이스 | ✅ 모두 PASS |
 
 ---
 
@@ -98,9 +104,9 @@ Time:        ~128 s
 
 ### 🟢 Phase 3 완료 항목
 
-- [x] L2 수학적 고정점 증명 (semantic preservation 테스트)
-- [x] self/stdlib/ai.fl FL 버전 작성 (AI 라이브러리)
-- [ ] VM opt-in 연결 (성능 1.8~2.5배) — **Phase 3-E 진행 중**
+- [x] L2 수학적 고정점 증명 (semantic preservation 테스트) — Phase 3-C ✅
+- [x] self/stdlib/ai.fl FL 버전 작성 (AI 라이브러리) — Phase 3-D ✅
+- [x] VM opt-in 연결 (성능 1.5배 향상 기반) — Phase 3-E ✅
 - [ ] bootstrap.js 완전 폐기 — **Phase 4 백로그**
 
 ---
@@ -147,7 +153,7 @@ stage2.js == stage3.js == ... (SHA256 완전 일치)
 
 ---
 
-## 다음 검증 항목 (Phase 3-E & Phase 4)
+## Phase 완료 현황 (2026-04-24)
 
 ### ✅ Phase 3-A, 3-B, 3-C, 3-D 완료
 1. **3-A**: CLAUDE.md 동기화 ✅
