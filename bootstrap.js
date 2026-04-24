@@ -19203,6 +19203,148 @@ function createDataModule() {
     "str_slice": (str, start, end) => {
       return String(str).slice(start, end);
     },
+    // str_capitalize str -> string  ("hello world" -> "Hello world")
+    "str_capitalize": (str) => {
+      const s = String(str);
+      return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    },
+    // str_title str -> string  ("hello world" -> "Hello World")
+    "str_title": (str) => {
+      return String(str).replace(/\b\w/g, (c) => c.toUpperCase());
+    },
+    // str_swapcase str -> string  ("Hello" -> "hELLO")
+    "str_swapcase": (str) => {
+      return String(str).split("").map((c) => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join("");
+    },
+    // str_center str width fillchar -> string  ("hi" 6 "-" -> "--hi--")
+    "str_center": (str, width, ch = " ") => {
+      const s = String(str);
+      const total = Math.max(0, width - s.length);
+      const left = Math.floor(total / 2);
+      const right = total - left;
+      return ch.repeat(left) + s + ch.repeat(right);
+    },
+    // str_find str sub -> number  ("hello" "ll" -> 2, -1 if not found)
+    "str_find": (str, sub) => {
+      return String(str).indexOf(sub);
+    },
+    // str_rfind str sub -> number  (search from right)
+    "str_rfind": (str, sub) => {
+      return String(str).lastIndexOf(sub);
+    },
+    // str_lstrip str -> string  ("  hello  " -> "hello  ")
+    "str_lstrip": (str) => {
+      return String(str).trimStart();
+    },
+    // str_rstrip str -> string  ("  hello  " -> "  hello")
+    "str_rstrip": (str) => {
+      return String(str).trimEnd();
+    },
+    // str_split str sep -> [string]  ("a,b,c" "," -> ["a","b","c"])
+    "str_split": (str, sep) => {
+      if (sep === undefined || sep === null) return String(str).trim().split(/\s+/);
+      return String(str).split(sep);
+    },
+    // str_rsplit str sep n -> [string]  split from right, max n splits
+    "str_rsplit": (str, sep, n) => {
+      const parts = String(str).split(sep);
+      if (n === undefined) return parts;
+      const tail = parts.slice(-(n + 1));
+      return [parts.slice(0, parts.length - n).join(sep), ...tail.slice(1)];
+    },
+    // str_partition str sep -> [before, sep, after]  ("hello world" " " -> ["hello"," ","world"])
+    "str_partition": (str, sep) => {
+      const s = String(str);
+      const idx = s.indexOf(sep);
+      if (idx === -1) return [s, "", ""];
+      return [s.slice(0, idx), sep, s.slice(idx + sep.length)];
+    },
+    // str_rpartition str sep -> [before, sep, after]  (from right)
+    "str_rpartition": (str, sep) => {
+      const s = String(str);
+      const idx = s.lastIndexOf(sep);
+      if (idx === -1) return ["", "", s];
+      return [s.slice(0, idx), sep, s.slice(idx + sep.length)];
+    },
+    // str_join str arr -> string  ("," ["a","b","c"] -> "a,b,c")
+    "str_join": (sep, arr) => {
+      if (!Array.isArray(arr)) return String(arr);
+      return arr.map(String).join(sep);
+    },
+    // str_zfill str width -> string  ("42" 5 -> "00042")
+    "str_zfill": (str, width) => {
+      return String(str).padStart(width, "0");
+    },
+    // str_removeprefix str prefix -> string  ("hello" "he" -> "llo")
+    "str_removeprefix": (str, prefix) => {
+      const s = String(str);
+      return s.startsWith(prefix) ? s.slice(prefix.length) : s;
+    },
+    // str_removesuffix str suffix -> string  ("hello" "lo" -> "hel")
+    "str_removesuffix": (str, suffix) => {
+      const s = String(str);
+      return s.endsWith(suffix) ? s.slice(0, -suffix.length) : s;
+    },
+    // str_isalpha str -> boolean  ("hello" -> true, "hello1" -> false)
+    "str_isalpha": (str) => {
+      return /^[a-zA-Z가-힣ᄀ-ᇿ]+$/.test(String(str));
+    },
+    // str_isdigit str -> boolean  ("123" -> true)
+    "str_isdigit": (str) => {
+      return /^\d+$/.test(String(str));
+    },
+    // str_isalnum str -> boolean  ("abc123" -> true)
+    "str_isalnum": (str) => {
+      return /^[a-zA-Z0-9가-힣]+$/.test(String(str));
+    },
+    // str_islower str -> boolean  ("hello" -> true)
+    "str_islower": (str) => {
+      const s = String(str);
+      return s === s.toLowerCase() && s !== s.toUpperCase();
+    },
+    // str_isupper str -> boolean  ("HELLO" -> true)
+    "str_isupper": (str) => {
+      const s = String(str);
+      return s === s.toUpperCase() && s !== s.toLowerCase();
+    },
+    // str_isspace str -> boolean  ("   " -> true)
+    "str_isspace": (str) => {
+      return /^\s+$/.test(String(str));
+    },
+    // str_istitle str -> boolean  ("Hello World" -> true)
+    "str_istitle": (str) => {
+      return String(str) === String(str).replace(/\b\w/g, (c) => c.toUpperCase());
+    },
+    // str_repeat str n -> string  ("ab" 3 -> "ababab")
+    "str_repeat": (str, n) => {
+      return String(str).repeat(Math.max(0, n));
+    },
+    // str_expandtabs str tabsize -> string  ("a\tb" 4 -> "a   b")
+    "str_expandtabs": (str, size = 8) => {
+      return String(str).replace(/\t/g, " ".repeat(size));
+    },
+    // str_index str sub -> number  (like str_find but throws if not found)
+    "str_index": (str, sub) => {
+      const idx = String(str).indexOf(sub);
+      if (idx === -1) throw new Error(`str_index: '${sub}' not found in '${str}'`);
+      return idx;
+    },
+    // str_encode_base64 str -> string  (base64 encoding)
+    "str_encode_base64": (str) => {
+      return Buffer.from(String(str), "utf8").toString("base64");
+    },
+    // str_decode_base64 str -> string  (base64 decoding)
+    "str_decode_base64": (str) => {
+      return Buffer.from(String(str), "base64").toString("utf8");
+    },
+    // str_encode_uri str -> string  (URL encoding)
+    "str_encode_uri": (str) => {
+      return encodeURIComponent(String(str));
+    },
+    // str_decode_uri str -> string  (URL decoding)
+    "str_decode_uri": (str) => {
+      return decodeURIComponent(String(str));
+    },
     // ── Number formatting (accounting) ────────────────────────
     // number_format num decimals -> string  (1234567 0 -> "1,234,567")
     "number_format": (num, decimals = 0) => {
