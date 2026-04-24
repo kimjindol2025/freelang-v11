@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FreeLang v11 — 브라우저 테스트</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #0d1117; color: #e2e8f0; padding: 24px; }
+    h1 { color: #38bdf8; margin-bottom: 8px; font-size: 20px; }
+    .badge { display: inline-block; background: #1e3a5f; color: #7dd3fc; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 24px; }
+    .card { background: #111827; border: 1px solid #1f2d3d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { color: #94a3b8; font-size: 13px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    textarea { width: 100%; background: #0a1628; border: 1px solid #1e3a5f; border-radius: 6px; color: #e2e8f0; padding: 12px; font-family: monospace; font-size: 13px; resize: vertical; }
+    button { background: #1d4ed8; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 8px; }
+    button:hover { background: #2563eb; }
+    #output { background: #0a1628; border: 1px solid #1e3a5f; border-radius: 6px; padding: 12px; min-height: 60px; font-size: 13px; color: #4ade80; white-space: pre-wrap; margin-top: 8px; }
+    #output.error { color: #f87171; }
+    .counter { font-size: 48px; font-weight: bold; color: #38bdf8; text-align: center; padding: 20px; }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    input[type=text] { background: #0a1628; border: 1px solid #1e3a5f; border-radius: 6px; color: #e2e8f0; padding: 8px 12px; font-size: 13px; width: 100%; margin-bottom: 8px; }
+    #todo-list { list-style: none; margin-top: 8px; }
+    #todo-list li { padding: 8px 12px; background: #0a1628; border: 1px solid #1e3a5f; border-radius: 4px; margin-bottom: 4px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<h1>FreeLang v11 — 브라우저 실행 테스트</h1>
+<span class="badge">platform: browser | DOM + Fetch 지원</span>
+
+<!-- 1. REPL -->
+<div class="card">
+  <h2>1. FL 코드 직접 실행 (REPL)</h2>
+  <textarea id="fl-code" rows="5">
+(define result (str_join ", " ["FreeLang" "v11" "브라우저" "실행" "성공!"]))
+(dom_set_text (dom_by_id "output") result)</textarea>
+  <button onclick="runFL()">실행 ▶</button>
+  <div id="output">결과가 여기 표시됩니다...</div>
+</div>
+
+<!-- 2. 카운터 (DOM 조작) -->
+<div class="card">
+  <h2>2. 카운터 — DOM 조작</h2>
+  <div id="counter-val" class="counter">0</div>
+  <div class="btn-row">
+    <button onclick="counterAction('inc')">+ 증가</button>
+    <button onclick="counterAction('dec')">- 감소</button>
+    <button onclick="counterAction('reset')">초기화</button>
+  </div>
+</div>
+
+<!-- 3. 할 일 목록 (데이터 관리) -->
+<div class="card">
+  <h2>3. 할 일 목록 — 데이터 관리</h2>
+  <input type="text" id="todo-input" placeholder="할 일을 입력하세요..." onkeydown="if(event.key==='Enter') addTodo()">
+  <button onclick="addTodo()">추가</button>
+  <ul id="todo-list"></ul>
+</div>
+
+<!-- 4. str_ 라이브러리 테스트 -->
+<div class="card">
+  <h2>4. str_ 표준 라이브러리</h2>
+  <textarea id="str-code" rows="4">
+(define s "  Hello, FreeLang World!  ")
+(str_join "\n" [
+  (str_trim s)
+  (str_upper (str_trim s))
+  (str_title (str_trim s))
+  (str_reverse "FreeLang")
+  (str_zfill "42" 8)
+])</textarea>
+  <button onclick="runStrTest()">실행 ▶</button>
+  <div id="str-output" style="background:#0a1628;border:1px solid #1e3a5f;border-radius:6px;padding:12px;margin-top:8px;color:#4ade80;white-space:pre-wrap;min-height:40px;font-size:13px;"></div>
+</div>
+
+<script src="../browser.js"></script>
+<script>
+  // FreeLang 인터프리터 인스턴스 (전역 공유)
+  const fl = FreeLang.FreeLang;
+
+  // 1. REPL
+  function runFL() {
+    const code = document.getElementById("fl-code").value;
+    const out = document.getElementById("output");
+    out.className = "";
+    try {
+      const result = fl.evaluate(code);
+      if (result !== null && result !== undefined) {
+        out.textContent = String(result);
+      }
+    } catch(e) {
+      out.className = "error";
+      out.textContent = e.message;
+    }
+  }
+
+  // 2. 카운터
+  let count = 0;
+  function counterAction(action) {
+    const code = `
+      (define cnt ${count})
+      (define new-cnt (${action === 'inc' ? '+ cnt 1' : action === 'dec' ? '- cnt 1' : '0'}))
+      (dom_set_text (dom_by_id "counter-val") (str new-cnt))
+      new-cnt
+    `;
+    count = fl.evaluate(code) ?? count;
+  }
+
+  // 3. 할 일
+  const todos = [];
+  function addTodo() {
+    const inp = document.getElementById("todo-input");
+    const val = inp.value.trim();
+    if (!val) return;
+    todos.push(val);
+    inp.value = "";
+    const code = `
+      (define items ${JSON.stringify(todos)})
+      (define html (str_join "" (map (fn [$t] (concat "<li>" $t "</li>")) items)))
+      (dom_set_html (dom_by_id "todo-list") html)
+      (length items)
+    `;
+    fl.evaluate(code);
+  }
+
+  // 4. str_ 테스트
+  function runStrTest() {
+    const code = document.getElementById("str-code").value;
+    const out = document.getElementById("str-output");
+    try {
+      const result = fl.evaluate(code);
+      out.textContent = result !== null && result !== undefined ? String(result) : "(완료)";
+    } catch(e) {
+      out.style.color = "#f87171";
+      out.textContent = e.message;
+    }
+  }
+
+  // 페이지 로드 시 자동 실행 확인
+  console.log("[FreeLang] 브라우저 로드 성공:", fl.version);
+</script>
+
+<!-- script type text/freelang 자동 실행 테스트 -->
+<script type="text/freelang">
+(dom_set_text (dom_by_id "output") "✅ FreeLang v11 브라우저 자동 실행 성공!")
+</script>
+
+</body>
+</html>
