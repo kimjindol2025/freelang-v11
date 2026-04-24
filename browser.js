@@ -18681,7 +18681,117 @@ ${cssVars.join(";\n")};
         const withComma = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
         const sign = symbol[code] ?? code + " ";
         return decPart ? `${sign}${withComma}.${decPart}` : `${sign}${withComma}`;
-      }
+      },
+      // ── str_ 확장 (Python str 47개 수준) ──────────────────────
+      "str_upper": (s) => String(s).toUpperCase(),
+      "str_lower": (s) => String(s).toLowerCase(),
+      "str_capitalize": (s) => {
+        const t = String(s);
+        return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+      },
+      "str_title": (s) => String(s).replace(/\b\w/g, (c) => c.toUpperCase()),
+      "str_swapcase": (s) => String(s).split("").map((c) => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join(""),
+      "str_reverse": (s) => String(s).split("").reverse().join(""),
+      "str_repeat": (s, n) => String(s).repeat(Number(n)),
+      "str_pad_left": (s, width, ch = " ") => String(s).padStart(Number(width), ch || " "),
+      "str_pad_right": (s, width, ch = " ") => String(s).padEnd(Number(width), ch || " "),
+      "str_center": (s, width, ch = " ") => {
+        const t = String(s);
+        const w = Number(width);
+        if (t.length >= w) return t;
+        const pad = w - t.length;
+        const left = Math.floor(pad / 2);
+        const right = pad - left;
+        return (ch || " ").repeat(left) + t + (ch || " ").repeat(right);
+      },
+      "str_zfill": (s, width) => String(s).padStart(Number(width), "0"),
+      "str_lstrip": (s, ch) => ch ? String(s).replace(new RegExp(`^[${ch.replace(/[-\\]]/g, "\\$&")}]+`), "") : String(s).trimStart(),
+      "str_rstrip": (s, ch) => ch ? String(s).replace(new RegExp(`[${ch.replace(/[-\\]]/g, "\\$&")}]+$`), "") : String(s).trimEnd(),
+      "str_replace": (s, old, rep, count) => {
+        let t = String(s);
+        const n = count !== void 0 ? Number(count) : Infinity;
+        let i = 0;
+        return t.replace(new RegExp(old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (m) => i++ < n ? rep : m);
+      },
+      "str_starts": (s, prefix) => String(s).startsWith(prefix),
+      "str_ends": (s, suffix) => String(s).endsWith(suffix),
+      "str_includes": (s, sub) => String(s).includes(sub),
+      "str_find": (s, sub, start = 0) => String(s).indexOf(sub, Number(start)),
+      "str_rfind": (s, sub) => String(s).lastIndexOf(sub),
+      "str_index": (s, sub, start = 0) => {
+        const i = String(s).indexOf(sub, Number(start));
+        if (i === -1) throw new Error(`str_index: substring "${sub}" not found`);
+        return i;
+      },
+      "str_split": (s, sep, maxsplit) => {
+        const t = String(s);
+        if (maxsplit !== void 0) {
+          const parts = [];
+          let i = 0, n = Number(maxsplit);
+          while (n-- > 0) {
+            const j = sep ? t.indexOf(sep, i) : i + 1;
+            if (j === -1) break;
+            parts.push(t.slice(i, j));
+            i = j + ((sep == null ? void 0 : sep.length) || 1);
+          }
+          parts.push(t.slice(i));
+          return parts;
+        }
+        return sep ? t.split(sep) : t.split("");
+      },
+      "str_rsplit": (s, sep, maxsplit) => {
+        const t = String(s);
+        if (maxsplit === void 0) return sep ? t.split(sep) : t.split("");
+        const parts = [];
+        let i = t.length;
+        let n = Number(maxsplit);
+        while (n-- > 0) {
+          const j = t.lastIndexOf(sep, i - 1);
+          if (j === -1) break;
+          parts.unshift(t.slice(j + sep.length, i));
+          i = j;
+        }
+        parts.unshift(t.slice(0, i));
+        return parts;
+      },
+      "str_join": (sep, arr) => (Array.isArray(arr) ? arr : []).join(String(sep)),
+      "str_partition": (s, sep) => {
+        const i = String(s).indexOf(sep);
+        if (i === -1) return [s, "", ""];
+        return [s.slice(0, i), sep, s.slice(i + sep.length)];
+      },
+      "str_rpartition": (s, sep) => {
+        const i = String(s).lastIndexOf(sep);
+        if (i === -1) return ["", "", s];
+        return [s.slice(0, i), sep, s.slice(i + sep.length)];
+      },
+      "str_slice": (s, start, end) => String(s).slice(Number(start), end !== void 0 ? Number(end) : void 0),
+      "str_removeprefix": (s, prefix) => {
+        const t = String(s);
+        return t.startsWith(prefix) ? t.slice(prefix.length) : t;
+      },
+      "str_removesuffix": (s, suffix) => {
+        const t = String(s);
+        return t.endsWith(suffix) ? t.slice(0, -suffix.length) : t;
+      },
+      "str_expandtabs": (s, tabsize = 8) => String(s).replace(/\t/g, " ".repeat(Number(tabsize))),
+      "str_isalpha": (s) => /^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ]+$/.test(String(s)),
+      "str_isdigit": (s) => /^\d+$/.test(String(s)),
+      "str_isalnum": (s) => /^[a-zA-Z0-9가-힣]+$/.test(String(s)),
+      "str_islower": (s) => {
+        const t = String(s);
+        return t === t.toLowerCase() && t !== t.toUpperCase();
+      },
+      "str_isupper": (s) => {
+        const t = String(s);
+        return t === t.toUpperCase() && t !== t.toLowerCase();
+      },
+      "str_isspace": (s) => /^\s+$/.test(String(s)),
+      "str_istitle": (s) => String(s) === String(s).replace(/\b\w/g, (c) => c.toUpperCase()),
+      "str_encode_base64": (s) => btoa(unescape(encodeURIComponent(s))),
+      "str_decode_base64": (s) => decodeURIComponent(escape(atob(s))),
+      "str_encode_uri": (s) => encodeURIComponent(String(s)),
+      "str_decode_uri": (s) => decodeURIComponent(String(s))
     };
   }
 
@@ -18849,7 +18959,24 @@ ${cssVars.join(";\n")};
         return result;
       },
       // repeat n value -> [value]  (array of n copies of value)
-      "repeat": (n, value) => Array(n).fill(value)
+      "repeat": (n, value) => Array(n).fill(value),
+      // arr_includes arr item -> boolean  (deep equality check)
+      "arr_includes": (arr, item) => {
+        if (!Array.isArray(arr)) return false;
+        return arr.some((x) => JSON.stringify(x) === JSON.stringify(item));
+      },
+      // arr_index_of arr item -> number  (-1 if not found)
+      "arr_index_of": (arr, item) => {
+        if (!Array.isArray(arr)) return -1;
+        return arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
+      },
+      // arr_remove arr item -> [any]  (remove first occurrence)
+      "arr_remove": (arr, item) => {
+        if (!Array.isArray(arr)) return [];
+        const idx = arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
+        if (idx === -1) return arr;
+        return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
+      }
     };
   }
 
@@ -20839,7 +20966,7 @@ ${cssVars.join(";\n")};
   init_child_process_stubs();
   init_path_stubs();
   function createMongodbModule() {
-    const helperPath = join(__dirname, "_mongodb_helper.js");
+    const helperPath = join("/", "_mongodb_helper.js");
     function callHelper(req) {
       try {
         const json = JSON.stringify(req);
@@ -27355,7 +27482,7 @@ ${exportsStr}
     // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
     loadFlStdlib() {
       try {
-        const stdlibPath = join(__dirname, "freelang-stdlib.fl");
+        const stdlibPath = join("/", "freelang-stdlib.fl");
         if (!existsSync(stdlibPath)) return;
         const src = readFileSync(stdlibPath, "utf-8");
         this.interpret(parse(lex(src)));
@@ -29209,7 +29336,8 @@ ${exportsStr}
   function evaluate(code) {
     const interp2 = createBrowserInterpreter();
     try {
-      return interp2.run(code);
+      const ctx = interp2.run(code);
+      return ctx.lastValue;
     } catch (e) {
       throw new Error(`FreeLang error: ${e.message}`);
     }

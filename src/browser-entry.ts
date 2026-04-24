@@ -37,7 +37,8 @@ function createBrowserInterpreter() {
 function evaluate(code: string): any {
   const interp = createBrowserInterpreter();
   try {
-    return interp.run(code);
+    const ctx = interp.run(code);
+    return ctx.lastValue;
   } catch (e: any) {
     throw new Error(`FreeLang error: ${e.message}`);
   }

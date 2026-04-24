@@ -192,5 +192,25 @@ export function createCollectionModule() {
 
     // repeat n value -> [value]  (array of n copies of value)
     "repeat": (n: number, value: any): any[] => Array(n).fill(value),
+
+    // arr_includes arr item -> boolean  (deep equality check)
+    "arr_includes": (arr: any[], item: any): boolean => {
+      if (!Array.isArray(arr)) return false;
+      return arr.some((x) => JSON.stringify(x) === JSON.stringify(item));
+    },
+
+    // arr_index_of arr item -> number  (-1 if not found)
+    "arr_index_of": (arr: any[], item: any): number => {
+      if (!Array.isArray(arr)) return -1;
+      return arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
+    },
+
+    // arr_remove arr item -> [any]  (remove first occurrence)
+    "arr_remove": (arr: any[], item: any): any[] => {
+      if (!Array.isArray(arr)) return [];
+      const idx = arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
+      if (idx === -1) return arr;
+      return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
+    },
   };
 }

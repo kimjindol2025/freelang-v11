@@ -58,6 +58,8 @@ const browserBuild = esbuild.build({
     "process.env.NODE_ENV": '"production"',
     "global": "globalThis",
     "process.env": "{}",
+    "__dirname": '"/"',
+    "__filename": '"browser.js"',
   },
   // Node.js 내장 모듈 → 브라우저 스텁으로 대체
   alias: {

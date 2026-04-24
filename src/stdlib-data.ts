@@ -245,5 +245,74 @@ export function createDataModule() {
       const sign = symbol[code] ?? code + " ";
       return decPart ? `${sign}${withComma}.${decPart}` : `${sign}${withComma}`;
     },
+
+    // ── str_ 확장 (Python str 47개 수준) ──────────────────────
+    "str_upper": (s: string) => String(s).toUpperCase(),
+    "str_lower": (s: string) => String(s).toLowerCase(),
+    "str_capitalize": (s: string) => { const t = String(s); return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase(); },
+    "str_title": (s: string) => String(s).replace(/\b\w/g, (c) => c.toUpperCase()),
+    "str_swapcase": (s: string) => String(s).split("").map((c) => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join(""),
+    "str_reverse": (s: string) => String(s).split("").reverse().join(""),
+    "str_repeat": (s: string, n: number) => String(s).repeat(Number(n)),
+    "str_pad_left": (s: string, width: number, ch: string = " ") => String(s).padStart(Number(width), ch || " "),
+    "str_pad_right": (s: string, width: number, ch: string = " ") => String(s).padEnd(Number(width), ch || " "),
+    "str_center": (s: string, width: number, ch: string = " ") => {
+      const t = String(s); const w = Number(width); if (t.length >= w) return t;
+      const pad = w - t.length; const left = Math.floor(pad / 2); const right = pad - left;
+      return (ch || " ").repeat(left) + t + (ch || " ").repeat(right);
+    },
+    "str_zfill": (s: string, width: number) => String(s).padStart(Number(width), "0"),
+    "str_lstrip": (s: string, ch?: string) => ch ? String(s).replace(new RegExp(`^[${ch.replace(/[-\\]]/g,"\\$&")}]+`), "") : String(s).trimStart(),
+    "str_rstrip": (s: string, ch?: string) => ch ? String(s).replace(new RegExp(`[${ch.replace(/[-\\]]/g,"\\$&")}]+$`), "") : String(s).trimEnd(),
+    "str_replace": (s: string, old: string, rep: string, count?: number) => {
+      let t = String(s); const n = count !== undefined ? Number(count) : Infinity; let i = 0;
+      return t.replace(new RegExp(old.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"), "g"), (m) => i++ < n ? rep : m);
+    },
+    "str_starts": (s: string, prefix: string) => String(s).startsWith(prefix),
+    "str_ends": (s: string, suffix: string) => String(s).endsWith(suffix),
+    "str_includes": (s: string, sub: string) => String(s).includes(sub),
+    "str_find": (s: string, sub: string, start: number = 0) => String(s).indexOf(sub, Number(start)),
+    "str_rfind": (s: string, sub: string) => String(s).lastIndexOf(sub),
+    "str_index": (s: string, sub: string, start: number = 0) => {
+      const i = String(s).indexOf(sub, Number(start));
+      if (i === -1) throw new Error(`str_index: substring "${sub}" not found`);
+      return i;
+    },
+    "str_split": (s: string, sep: string, maxsplit?: number) => {
+      const t = String(s); if (maxsplit !== undefined) { const parts = []; let i = 0, n = Number(maxsplit);
+        while (n-- > 0) { const j = sep ? t.indexOf(sep, i) : i + 1; if (j === -1) break; parts.push(t.slice(i, j)); i = j + (sep?.length || 1); }
+        parts.push(t.slice(i)); return parts; }
+      return sep ? t.split(sep) : t.split("");
+    },
+    "str_rsplit": (s: string, sep: string, maxsplit?: number) => {
+      const t = String(s); if (maxsplit === undefined) return sep ? t.split(sep) : t.split("");
+      const parts = []; let i = t.length; let n = Number(maxsplit);
+      while (n-- > 0) { const j = t.lastIndexOf(sep, i - 1); if (j === -1) break; parts.unshift(t.slice(j + sep.length, i)); i = j; }
+      parts.unshift(t.slice(0, i)); return parts;
+    },
+    "str_join": (sep: string, arr: string[]) => (Array.isArray(arr) ? arr : []).join(String(sep)),
+    "str_partition": (s: string, sep: string) => {
+      const i = String(s).indexOf(sep); if (i === -1) return [s, "", ""];
+      return [s.slice(0, i), sep, s.slice(i + sep.length)];
+    },
+    "str_rpartition": (s: string, sep: string) => {
+      const i = String(s).lastIndexOf(sep); if (i === -1) return ["", "", s];
+      return [s.slice(0, i), sep, s.slice(i + sep.length)];
+    },
+    "str_slice": (s: string, start: number, end?: number) => String(s).slice(Number(start), end !== undefined ? Number(end) : undefined),
+    "str_removeprefix": (s: string, prefix: string) => { const t = String(s); return t.startsWith(prefix) ? t.slice(prefix.length) : t; },
+    "str_removesuffix": (s: string, suffix: string) => { const t = String(s); return t.endsWith(suffix) ? t.slice(0, -suffix.length) : t; },
+    "str_expandtabs": (s: string, tabsize: number = 8) => String(s).replace(/\t/g, " ".repeat(Number(tabsize))),
+    "str_isalpha": (s: string) => /^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ]+$/.test(String(s)),
+    "str_isdigit": (s: string) => /^\d+$/.test(String(s)),
+    "str_isalnum": (s: string) => /^[a-zA-Z0-9가-힣]+$/.test(String(s)),
+    "str_islower": (s: string) => { const t = String(s); return t === t.toLowerCase() && t !== t.toUpperCase(); },
+    "str_isupper": (s: string) => { const t = String(s); return t === t.toUpperCase() && t !== t.toLowerCase(); },
+    "str_isspace": (s: string) => /^\s+$/.test(String(s)),
+    "str_istitle": (s: string) => String(s) === String(s).replace(/\b\w/g, (c) => c.toUpperCase()),
+    "str_encode_base64": (s: string) => btoa(unescape(encodeURIComponent(s))),
+    "str_decode_base64": (s: string) => decodeURIComponent(escape(atob(s))),
+    "str_encode_uri": (s: string) => encodeURIComponent(String(s)),
+    "str_decode_uri": (s: string) => decodeURIComponent(String(s)),
   };
 }
