@@ -1,0 +1,17 @@
+; L2 Proof Test 12: Edge Cases
+; null handling, empty collections, 0/1, negative numbers
+
+(defun test-edge-cases []
+  (list
+    (+ 0 0)                   ; 0
+    (* 1 1)                   ; 1
+    (- 0 1)                   ; -1
+    (get [] 0)                ; null
+    (get {} :x)               ; null
+    (length [])               ; 0
+    (length "")               ; 0
+    (str null)                ; "null"
+    (/ 0 1)                   ; 0
+    (null? (get [] 99))))     ; true
+
+(println (test-edge-cases))

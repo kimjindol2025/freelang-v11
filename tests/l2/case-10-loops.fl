@@ -1,0 +1,17 @@
+;; L2 Proof Case 10: Loop and Iteration
+;; 루프 및 반복
+
+(defun sum-n [n]
+  (loop [i 0 acc 0]
+    (if (>= i n) acc
+      (loop (+ i 1) (+ acc i)))))
+
+(defun test-loops []
+  (console/log
+    (list
+      (sum-n 0)   ; 0
+      (sum-n 1)   ; 0
+      (sum-n 5))))  ; 0+1+2+3+4 = 10
+)
+
+(test-loops)

@@ -1,0 +1,15 @@
+;; L2 Proof Case 1: Arithmetic Operations
+;; 기본 산술 연산 (+ - * / %)
+
+(defun test-arithmetic []
+  (console/log
+    (list
+      (+ 5 3)        ; 8
+      (- 10 4)       ; 6
+      (* 7 2)        ; 14
+      (/ 15 3)       ; 5
+      (% 17 5)       ; 2
+      (- 42))))      ; -42
+)
+
+(test-arithmetic)

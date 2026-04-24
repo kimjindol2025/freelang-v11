@@ -1,0 +1,15 @@
+;; L2 Proof Case 4: Control Flow
+;; 제어 흐름 (if cond)
+
+(defun test-control []
+  (console/log
+    (list
+      (if true 10 20)      ; 10
+      (if false 10 20)     ; 20
+      (cond
+        [(< 5 3) "a"]
+        [(> 5 3) "b"]
+        [true "c"]))))     ; "b"
+)
+
+(test-control)

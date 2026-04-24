@@ -1,0 +1,15 @@
+;; L2 Proof Case 3: Logic Operations
+;; 논리 연산 (and or not)
+
+(defun test-logic []
+  (console/log
+    (list
+      (and true true)      ; true
+      (and true false)     ; false
+      (or false false)     ; false
+      (or true false)      ; true
+      (not true)           ; false
+      (not false))))       ; true
+)
+
+(test-logic)

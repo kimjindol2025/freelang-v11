@@ -1,0 +1,73 @@
+;; AI 라이브러리 — 벡터 연산 + 프롬프트 + 순위 결정
+;; Phase 3-D: AI 에이전트 핵심 함수
+
+;; 1️⃣ vector-add — 벡터 덧셈
+;; [1 2 3] + [4 5 6] = [5 7 9]
+(defun vector-add [v1 v2]
+  (map (fn [i] (+ (get v1 i) (get v2 i)))
+       (range 0 (length v1))))
+
+;; 2️⃣ vector-dot — 내적 (dot product)
+;; [1 0 0] · [0 1 0] = 0
+;; [1 2 3] · [4 5 6] = 1*4 + 2*5 + 3*6 = 32
+(defun vector-dot [v1 v2]
+  (reduce (fn [acc i]
+    (+ acc (* (get v1 i) (get v2 i))))
+   0
+   (range 0 (length v1))))
+
+;; 3️⃣ vector-magnitude — 벡터 크기 (norm)
+;; |[3 4]| = sqrt(9 + 16) = 5
+(defun vector-magnitude [v]
+  (math-sqrt (vector-dot v v)))
+
+;; 4️⃣ cosine-sim — 코사인 유사도
+;; 범위: -1 (반대 방향) ~ 1 (같은 방향)
+;; 수직 벡터: 0
+(defun cosine-sim [v1 v2]
+  (let [[dot (vector-dot v1 v2)]
+        [mag1 (vector-magnitude v1)]
+        [mag2 (vector-magnitude v2)]]
+    (if (or (= mag1 0) (= mag2 0))
+      0  ; 크기가 0이면 유사도 0
+      (/ dot (* mag1 mag2)))))
+
+;; 5️⃣ score-candidates — 후보 점수 계산
+;; 결과: [{:idx 0 :score 0.95} {:idx 1 :score 0.87} ...]
+(defun score-candidates [query candidates]
+  (map-indexed (fn [idx cand]
+    {:idx idx :score (cosine-sim query cand)})
+   candidates))
+
+;; 6️⃣ prompt-template — 프롬프트 템플릿 채우기
+;; "Hello {name}, your query: {query}" + {:name "Alice" :query "help"}
+;; → "Hello Alice, your query: help"
+(defun prompt-template [template vars]
+  (reduce (fn [acc [key val]]
+    (str-replace acc 
+                  (str "{" key "}")
+                  (str val)))
+   template
+   (map-entries vars)))
+
+;; 7️⃣ top-k-retrieval — 상위 K개 반환 (점수 내림차순)
+;; 입력: [{:idx 0 :score 0.9} {:idx 1 :score 0.7} {:idx 2 :score 0.95}]
+;; K=2 → [{:idx 2 :score 0.95} {:idx 0 :score 0.9}]
+(defun top-k-retrieval [scored-list k]
+  (take k 
+    (reverse (sort scored-list 
+      (fn [a b] (< (get a :score) (get b :score)))))))
+
+;; ─────────────────────────────────────────────────────
+;; 유틸리티 함수
+;; ─────────────────────────────────────────────────────
+
+;; map-indexed — 인덱스와 함께 매핑
+(defun map-indexed [f lst]
+  (let [[indices (range 0 (length lst))]]
+    (map (fn [i] (f i (get lst i))) indices)))
+
+;; map-entries — 맵의 키-값 쌍 리스트로 변환
+;; {:a 1 :b 2} → [[:a 1] [:b 2]]
+(defun map-entries [m]
+  (map (fn [k] [k (get m k)]) (keys m)))

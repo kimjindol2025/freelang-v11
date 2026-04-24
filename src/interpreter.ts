@@ -39,6 +39,12 @@ import { evalReflectForm } from "./reflect"; // Phase 94: REFLECT 자기 평가/
 import { globalToolRegistry, ToolRegistry, type ToolDefinition } from "./tool-registry"; // Phase 97: Tool DSL
 import { evalAgentBlock, createAgentBuiltins, type AgentState, type AgentAction } from "./agent"; // Phase 98: AGENT 루프
 
+// Phase 3-E: VM opt-in 최적화
+import { isVMEligible } from "./vm-eligible";
+import { BytecodeCompiler } from "./compiler";
+import { VM } from "./vm";
+import { createDefaultOptimizer } from "./optimizer";
+
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
   ExecutionContext,
@@ -76,6 +82,13 @@ export class Interpreter {
   public static readonly MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 100만 재귀 처리)
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
   public tcoMode = false; // ← 기본값 유지 (TCO 라우팅은 내부용)
+
+  // Phase 3-E: VM opt-in 최적화
+  private static readonly _vmCompiler = new BytecodeCompiler();
+  private static readonly _vmOptimizer = createDefaultOptimizer();
+  private static readonly _vm = new VM();
+  private static readonly _vmEnabled = process.env.FL_VM === "1";
+
   // Phase 52: FL 파일 import 지원
   public importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();
@@ -1795,6 +1808,19 @@ export class Interpreter {
     if (op === "map" && expr.args.length === 3) {
       const mapResult = evalSpecialForm(this, op, expr);
       if (mapResult !== undefined) return mapResult;
+    }
+
+    // Phase 3-E: VM opt-in — FL_VM=1 환경 변수로 활성화
+    // isVMEligible() 통과 시 VM 경로 실행, 실패 시 기존 evalBuiltin으로 fallback
+    if (Interpreter._vmEnabled && isVMEligible(expr)) {
+      try {
+        const chunk = Interpreter._vmCompiler.compile(expr);
+        const optimized = Interpreter._vmOptimizer.optimize(chunk);
+        const vmResult = Interpreter._vm.run(optimized);
+        return vmResult;
+      } catch (_vmErr) {
+        // VM 실패 시 조용히 fallback — 기존 경로로 계속 진행
+      }
     }
 
     // Evaluate args for builtins

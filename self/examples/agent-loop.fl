@@ -1,0 +1,32 @@
+;; FreeLang Agent Loop Example
+;; 에이전트가 상태를 변경하면서 목표에 도달
+
+(println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+(println "Agent Loop Example: Counter Agent")
+(println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+;; 에이전트 초기화
+(define agent (agent_create "counter"))
+(define agent (agent_set agent "count" 0))
+(define agent (agent_set agent "target" 5))
+
+;; 에이전트 루프 실행
+;; goal-fn: 목표 달성 여부 확인
+;; step-fn: 한 스텝 실행 (count + 1)
+;; max-steps: 최대 100 스텝
+
+(define final (agent_loop
+  agent
+  (fn [state] (>= (get state "count") (get state "target")))
+  (fn [ag]
+    (agent_set ag "count" (+ (agent_get ag "count") 1)))
+  100))
+
+(println "")
+(println "Result:")
+(println (str "  Final count: " (agent_get final "count")))
+(println (str "  Steps taken: " (agent_steps final)))
+(println (str "  Status: " (agent_status final)))
+
+(println "")
+(println "✓ Agent example completed")

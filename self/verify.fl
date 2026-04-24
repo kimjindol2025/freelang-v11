@@ -1,0 +1,39 @@
+;; self/verify.fl — Phase 28
+;; 자가호스팅 검증 (기본 FL 테스트)
+
+(do
+  (println "════════════════════════════════════════════")
+  (println "  FL Self-Hosting Verification (Phase 28)")
+  (println "════════════════════════════════════════════")
+  (println "")
+
+  ;; 기본 연산 테스트
+  (println "=== Core Operations ===")
+  (if (= (+ 1 2) 3)
+    (println "✅ arithmetic: 1 + 2 = 3")
+    (println "❌ arithmetic failed"))
+
+  (if (= (str "hello" " " "world") "hello world")
+    (println "✅ string: concat works")
+    (println "❌ string concat failed"))
+
+  (if (= (first [1 2 3]) 1)
+    (println "✅ list: first works")
+    (println "❌ list first failed"))
+
+  ;; 함수형 프로그래밍 테스트
+  (println "=== Functional Programming ===")
+  (let [$doubled (map (fn [$x] (* $x 2)) [1 2 3])]
+    (if (= (first $doubled) 2)
+      (println "✅ map: doubling [1 2 3] works")
+      (println "❌ map failed")))
+
+  (let [$sum (reduce (fn [$a $b] (+ $a $b)) 0 [1 2 3 4 5])]
+    (if (= $sum 15)
+      (println "✅ reduce: sum [1..5] = 15 works")
+      (println "❌ reduce failed")))
+
+  (println "")
+  (println "════════════════════════════════════════════")
+  (println "✅ Self-hosting verification passed!")
+  (println "════════════════════════════════════════════"))

@@ -1,0 +1,4 @@
+;; let-in-expr-03.fl — Case C: argument 위치의 let
+;; 기대: arg expression이 IIFE로 평가
+
+(println (let [$s "hello"] (length $s)))

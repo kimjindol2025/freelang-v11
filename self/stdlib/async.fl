@@ -1,5 +1,6 @@
 ;; self/stdlib/async.fl — Phase 27
 ;; 비동기 연산 (Promise-like patterns)
+;; 단순화: self-parser 호환 버전
 
 [FUNC promise-new :params [$executor]
   :body (promise_new $executor)]
@@ -34,31 +35,14 @@
 [FUNC delay :params [$ms]
   :body (delay (floor $ms))]
 
-[FUNC retry :params [$fn $max-attempts]
-  :body (retry-loop $fn (floor $max-attempts) 0)]
-[FUNC retry-loop :params [$fn $max $attempt]
-  :body (if (>= $attempt $max) (throw "Max retries exceeded")
-          (try ($fn)
-            (catch e (retry-loop $fn $max (+ $attempt 1)))))]
-
 [FUNC once :params [$fn]
-  :body (let [[$called false] [$result nil]]
-          (fn [] (if $called $result
-                   (do (set (let [] $called) 0 true)
-                       (set (let [] $result) 0 ($fn))))))]
+  :body (once_impl $fn)]
 
 [FUNC debounce :params [$fn $ms]
-  :body (let [[$timer nil]]
-          (fn [& args] (if $timer (cancel-timer $timer))
-                       (set (let [] $timer) 0 (set-timeout $fn (floor $ms)))))]
+  :body (debounce_impl $fn (floor $ms))]
 
 [FUNC throttle :params [$fn $ms]
-  :body (let [[$last-call 0]]
-          (fn [& args]
-            (let [[$now (get-time-ms)]]
-              (if (>= (- $now $last-call) (floor $ms))
-                (do (set (let [] $last-call) 0 $now)
-                    ($fn))))))]
+  :body (throttle_impl $fn (floor $ms))]
 
-[FUNC queue-async :params [$fn]
-  :body (promise_then (timeout 0) (fn [] ($fn)))]
+[FUNC retry :params [$fn $max-attempts]
+  :body (retry_impl $fn (floor $max-attempts))]

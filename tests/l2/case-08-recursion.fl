@@ -1,0 +1,19 @@
+;; L2 Proof Case 8: Recursion
+;; 재귀 함수 (피보나치, 팩토리얼)
+
+(defun fib [n]
+  (if (<= n 1) n
+    (+ (fib (- n 1)) (fib (- n 2)))))
+
+(defun fact [n]
+  (if (<= n 1) 1
+    (* n (fact (- n 1)))))
+
+(defun test-recursion []
+  (console/log
+    (list
+      (fib 6)    ; 8
+      (fact 5))))  ; 120
+)
+
+(test-recursion)

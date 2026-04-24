@@ -1,0 +1,13 @@
+; L2 Proof Test 09: String Operations
+; str, substring, length, split, join
+
+(defun test-strings []
+  (list
+    (str "hello" " " "world")  ; "hello world"
+    (substring "hello" 1 4)    ; "ell"
+    (length "abc")             ; 3
+    (length "")                ; 0
+    (split "a,b,c" ",")        ; ["a" "b" "c"]
+    (join ["x" "y" "z"] "-"))) ; "x-y-z"
+
+(println (test-strings))

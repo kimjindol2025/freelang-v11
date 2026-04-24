@@ -1,0 +1,101 @@
+name: Phase 3-C — L2 Proof (Semantic Preservation)
+
+on:
+  push:
+    branches: [feature/phase-c-fuzz, feature/phase-3-c*]
+  pull_request:
+    branches: [feature/phase-c-fuzz, feature/phase-3-c*]
+
+jobs:
+  l2-semantic-preservation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: "📋 L2 Proof: 환경 준비 (bootstrap + stage1)"
+        id: prepare
+        run: bash scripts/verify-l2-proof.sh --prepare
+
+      - name: "🧪 L2 Proof: 테스트 실행 (12 cases)"
+        id: l2test
+        run: bash scripts/verify-l2-proof.sh --run
+        continue-on-error: true
+
+      - name: "📊 Jest 통합 L2 검증"
+        id: jest
+        run: npm test -- src/__tests__/l2-proof.test.ts --runInBand
+        continue-on-error: true
+
+      - name: "📦 L2 결과 저장"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l2-proof-results-${{ github.run_id }}
+          path: |
+            L2-PROOF-RESULTS.json
+          retention-days: 30
+
+      - name: "📈 L2 결과 요약"
+        if: always()
+        run: |
+          if [ -f L2-PROOF-RESULTS.json ]; then
+            echo "L2 Semantic Preservation Results:"
+            cat L2-PROOF-RESULTS.json | jq .
+          fi
+
+      - name: "✅ L2 Proof Slack Notify — Success"
+        if: steps.l2test.outcome == 'success' && steps.jest.outcome == 'success'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "channel": "#freelang-ci",
+              "icon_emoji": ":rocket:",
+              "text": "✅ Phase 3-C — L2 Proof PASSED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ L2 Semantic Preservation PASSED*\n_Branch:_ `${{ github.ref_name }}`\n_Run:_ <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>"
+                  }
+                }
+              ]
+            }
+
+      - name: "❌ L2 Proof Slack Notify — Failed"
+        if: steps.l2test.outcome == 'failure' || steps.jest.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "channel": "#freelang-ci",
+              "icon_emoji": ":warning:",
+              "text": "❌ Phase 3-C — L2 Proof FAILED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ L2 Semantic Preservation FAILED*\n_Branch:_ `${{ github.ref_name }}`\n_Action:_ Check artifacts and logs"
+                  }
+                }
+              ]
+            }
+
+      - name: "🧹 L2 정리"
+        if: always()
+        run: bash scripts/verify-l2-proof.sh --clean

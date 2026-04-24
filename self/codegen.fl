@@ -64,6 +64,8 @@
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
+          [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
+          [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
           [true "null"])]
 
 [FUNC cg-literal :params [$n]

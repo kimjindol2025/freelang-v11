@@ -1,0 +1,63 @@
+;; self/tests/test-core-fl.fl — Phase 28
+;; 핵심 기능 검증 (FL 테스트 프레임워크 데모)
+
+(define assert-eq
+  (fn [$actual $expected $label]
+    (if (= $actual $expected)
+      (println (str "  ✅ " $label))
+      (do
+        (println (str "  ❌ " $label " — expected " $expected " got " $actual))
+        (throw (str $label " failed"))))))
+
+(define assert-true
+  (fn [$value $label]
+    (if (= $value true)
+      (println (str "  ✅ " $label))
+      (do
+        (println (str "  ❌ " $label " — expected true"))
+        (throw (str $label " failed"))))))
+
+(define assert-false
+  (fn [$value $label]
+    (if (= $value false)
+      (println (str "  ✅ " $label))
+      (do
+        (println (str "  ❌ " $label " — expected false"))
+        (throw (str $label " failed"))))))
+
+;; 테스트 실행
+(do
+  (println "📋 Core Features")
+  (println "")
+
+  ;; arithmetic
+  (assert-eq (+ 1 2) 3 "add: 1 + 2 = 3")
+  (assert-eq (- 5 3) 2 "subtract: 5 - 3 = 2")
+  (assert-eq (* 3 4) 12 "multiply: 3 * 4 = 12")
+  (assert-eq (/ 10 2) 5 "divide: 10 / 2 = 5")
+
+  ;; string
+  (assert-eq (str "hello" " " "world") "hello world" "str: concat")
+  (assert-true (contains? "hello" "ell") "contains?: 'hello' contains 'ell'")
+  (assert-false (contains? "hello" "xyz") "not-contains?: 'hello' doesn't contain 'xyz'")
+  (assert-eq (upper "hello") "HELLO" "upper: uppercase 'hello'")
+  (assert-eq (lower "HELLO") "hello" "lower: lowercase 'HELLO'")
+
+  ;; list
+  (assert-eq (first [1 2 3]) 1 "first: first of [1 2 3]")
+  (assert-eq (last [1 2 3]) 3 "last: last of [1 2 3]")
+  (assert-eq (length [1 2 3 4 5]) 5 "length: length of [1 2 3 4 5]")
+  (assert-eq (first (map (fn [$x] (+ $x 1)) [1 2 3])) 2 "map: first result = 2")
+  (assert-eq (length (filter (fn [$x] (= (mod $x 2) 0)) [1 2 3 4 5])) 2 "filter: 2 evens")
+  (assert-eq (reduce (fn [$a $b] (+ $a $b)) 0 [1 2 3 4 5]) 15 "reduce: sum [1 2 3 4 5]")
+
+  ;; type checks
+  (assert-true (true? true) "true?")
+  (assert-true (false? false) "false?")
+  (assert-true (null? nil) "null?")
+  (assert-true (list? [1 2 3]) "list?: [1 2 3]")
+  (assert-true (string? "text") "string?: 'text'")
+  (assert-true (number? 42) "number?: 42")
+
+  (println "")
+  (println "✅ All tests passed!"))

@@ -97,6 +97,7 @@ function checkSource(source: string, filePath?: string): boolean {
 
 function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): void {
   const absPath = path.resolve(filePath);
+  const vmBench = extraArgs.includes("--vm-bench");
 
   if (!fs.existsSync(absPath)) {
     console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
@@ -137,6 +138,65 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
     // Enable dev mode BEFORE first execute: server_html will inject the
     // hot-reload client script, and /__hot SSE endpoint will be served.
     process.env.FL_DEV = "1";
+  }
+
+  // Phase 3-E: VM opt-in 성능 벤치마크
+  if (vmBench) {
+    console.log("\n\x1b[36m[vm-bench] 성능 측정 시작...\x1b[0m");
+    const ITERATIONS = 100;
+    const source = fs.readFileSync(absPath, "utf-8");
+
+    // 기존 경로 (VM 미사용)
+    const t0 = performance.now();
+    for (let i = 0; i < ITERATIONS; i++) {
+      delete process.env.FL_VM;
+      try {
+        const tokens = lex(source);
+        const ast = parse(tokens);
+        const interp = new Interpreter();
+        interp.currentFilePath = absPath;
+        if (extraArgs.length > 0) {
+          interp.context.variables.set("$__argv__", extraArgs.filter(a => a !== "--vm-bench"));
+        }
+        interp.interpret(ast);
+      } catch (_e) { /* ignore */ }
+    }
+    const interpMs = performance.now() - t0;
+
+    // VM 경로
+    const t1 = performance.now();
+    for (let i = 0; i < ITERATIONS; i++) {
+      process.env.FL_VM = "1";
+      try {
+        const tokens = lex(source);
+        const ast = parse(tokens);
+        const interp = new Interpreter();
+        interp.currentFilePath = absPath;
+        if (extraArgs.length > 0) {
+          interp.context.variables.set("$__argv__", extraArgs.filter(a => a !== "--vm-bench"));
+        }
+        interp.interpret(ast);
+      } catch (_e) { /* ignore */ }
+    }
+    const vmMs = performance.now() - t1;
+
+    // 결과 출력
+    delete process.env.FL_VM;
+    const speedup = interpMs / vmMs;
+    console.log(`\x1b[36m[vm-bench]\x1b[0m interpreter: ${interpMs.toFixed(1)}ms (${ITERATIONS} iter)`);
+    console.log(`\x1b[36m[vm-bench]\x1b[0m          vm: ${vmMs.toFixed(1)}ms (${ITERATIONS} iter)`);
+    console.log(`\x1b[36m[vm-bench]\x1b[0m    speedup: ${speedup.toFixed(2)}x`);
+
+    if (speedup < 1.0) {
+      console.log(`\x1b[33m⚠️  VM이 느림 (산술 집약 코드가 아닐 수 있음)\x1b[0m`);
+    } else if (speedup >= 1.5) {
+      console.log(`\x1b[32m✓ 목표 달성 (1.5배 이상)\x1b[0m`);
+    } else {
+      console.log(`\x1b[2m○ 1.0x ~ 1.5x 범위\x1b[0m`);
+    }
+    console.log("");
+
+    if (!watch) return; // watch가 아니면 여기서 종료
   }
 
   execute();

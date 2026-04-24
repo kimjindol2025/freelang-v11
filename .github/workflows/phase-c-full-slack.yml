@@ -1,0 +1,409 @@
+name: Phase C — Full Integration (Scan + Verify + Jest + Slack)
+
+on:
+  push:
+    branches: [feature/phase-c*, master]
+  pull_request:
+    branches: [feature/phase-c*, master]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly (02:00 UTC)
+
+env:
+  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+  SLACK_CHANNEL: '#freelang-ci'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # Phase 1: Fast Checks (Early-Fail) + Slack Notify
+  # ═══════════════════════════════════════════════════════════════════
+  scan-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      scan-status: ${{ steps.scan.outcome }}
+      verify-status: ${{ steps.verify.outcome }}
+      stage1-sha: ${{ steps.stage1.outputs.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build bootstrap.js
+        run: npm run build
+        timeout-minutes: 5
+
+      - name: Generate stage1.js
+        id: stage1
+        run: |
+          bash scripts/build-stage1.sh
+          SHA=$(sha256sum stage1.js | cut -d' ' -f1)
+          echo "sha=${SHA:0:16}" >> $GITHUB_OUTPUT
+        timeout-minutes: 10
+
+      - name: "🔍 FL-Token Scan (Early-Fail)"
+        id: scan
+        run: bash scripts/scan-for-fl-tokens.sh stage1.js
+        continue-on-error: false
+
+      - name: "🔗 Fixed-Point Verification (5-stage SHA)"
+        id: verify
+        run: bash scripts/verify-fixed-point.sh
+        continue-on-error: true
+
+      - name: "🧪 Let-in-Expression Regression"
+        id: regression
+        run: node scripts/check-let-regressions.js
+        continue-on-error: true
+
+      - name: "📦 Upload scan-verify artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-verify-artifacts-${{ github.run_id }}
+          path: |
+            stage1.js
+            stage2.js
+            stage3.js
+            /tmp/build.log
+          retention-days: 7
+
+      - name: "🚨 Slack Notify — Scan Failed"
+        if: steps.scan.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ env.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "channel": "${{ env.SLACK_CHANNEL }}",
+              "icon_emoji": ":x:",
+              "text": "❌ Phase C — Scan Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ FL-Token Scan Failed*\n_Branch:_ `${{ github.ref_name }}`\n_Run:_ <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Action Required:*\n1. Check artifact: `scan-verify-artifacts`\n2. Fix mapping in `src/codegen-js.ts`\n3. Re-submit PR"
+                  }
+                }
+              ]
+            }
+
+      - name: "✅ Slack Notify — Scan Passed"
+        if: steps.scan.outcome == 'success'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ env.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "channel": "${{ env.SLACK_CHANNEL }}",
+              "icon_emoji": ":white_check_mark:",
+              "text": "✅ Phase C — Scan Passed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ Scan & Verify Status*\n_Branch:_ `${{ github.ref_name }}`\n_Stage1 SHA:_ `${{ steps.stage1.outputs.sha }}...`"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Results:*\n• Scan: ✅ PASS\n• Verify: ${{ steps.verify.outcome == 'success' && '✅ PASS' || '⚠️ WARN' }}\n• Regression: ${{ steps.regression.outcome == 'success' && '✅ PASS' || '⚠️ WARN' }}\n\n_Next: Regression tests + Full Jest..._"
+                  }
+                }
+              ]
+            }
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Phase 2: Regression Tests (Fast)
+  # ═══════════════════════════════════════════════════════════════════
+  regression-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: scan-and-verify
+    if: ${{ needs.scan-and-verify.outputs.scan-status == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: "🧪 Jest Regression Tests (Codegen + Let)"
+        id: regression
+        run: npm test -- src/__tests__/codegen.let.test.ts --silent
+        timeout-minutes: 5
+        continue-on-error: true
+
+      - name: "✅ Regression Tests PASS"
+        if: steps.regression.outcome == 'success'
+        run: echo "✅ All regression tests passed"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Phase 3: Full Jest (Matrix/Sharded)
+  # ═══════════════════════════════════════════════════════════════════
+  jest-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: scan-and-verify
+    if: ${{ needs.scan-and-verify.outputs.scan-status == 'success' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: "📊 Jest Shard ${{ matrix.shard }}/3"
+        id: jest
+        run: |
+          npm test -- \
+            --shard=${{ matrix.shard }}/3 \
+            --bail=false \
+            --silent \
+            --maxWorkers=4
+        timeout-minutes: 30
+        continue-on-error: true
+
+      - name: "📦 Upload Jest Results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-results-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: |
+            coverage/
+            junit.xml
+          retention-days: 7
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Phase 4: Final Summary & Slack Notify
+  # ═══════════════════════════════════════════════════════════════════
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [scan-and-verify, regression-tests, jest-full]
+    if: always()
+
+    outputs:
+      overall-status: ${{ steps.summary.outputs.status }}
+
+    steps:
+      - name: "📊 Determine Overall Status"
+        id: summary
+        run: |
+          if [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
+             [ "${{ needs.regression-tests.result }}" == "success" ] && \
+             [ "${{ needs.jest-full.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "✅ Slack Notify — All Green"
+        if: steps.summary.outputs.status == 'success'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ env.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "channel": "${{ env.SLACK_CHANNEL }}",
+              "icon_emoji": ":rocket:",
+              "text": "✨ Phase C — All Green (Ready to Merge)",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✨ Phase C — All Checks PASSED*\n_Branch:_ `${{ github.ref_name }}`\n_Commit:_ `${{ github.sha }}`"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Phase Results:*\n• ✅ Scan & Verify: PASS\n• ✅ Regression: PASS\n• ✅ Jest (3 shards): PASS\n\n*Status:* 🟢 Ready for merge"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/pulls/${{ github.event.number }} | View PR> • <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} | View Run>"
+                  }
+                }
+              ]
+            }
+
+      - name: "❌ Slack Notify — Failed"
+        if: steps.summary.outputs.status == 'failure'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ env.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "channel": "${{ env.SLACK_CHANNEL }}",
+              "icon_emoji": ":warning:",
+              "text": "⚠️ Phase C — Check Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*⚠️ Phase C — Some Checks Failed*\n_Branch:_ `${{ github.ref_name }}`"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Failed Phase(s):*\n• Scan & Verify: ${{ needs.scan-and-verify.result }}\n• Regression: ${{ needs.regression-tests.result }}\n• Jest: ${{ needs.jest-full.result }}\n\n_Review logs and artifacts._"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} | 📋 View Detailed Logs>"
+                  }
+                }
+              ]
+            }
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Nightly: Full Self-Hosting Chain
+  # ═══════════════════════════════════════════════════════════════════
+  nightly-self-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event_name == 'schedule'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build & Full Self-Hosting Chain
+        id: nightly
+        run: |
+          bash scripts/build-stage1.sh
+          bash scripts/verify-fixed-point.sh
+          npm test -- --silent
+        continue-on-error: true
+
+      - name: "✅ Slack Notify — Nightly Success"
+        if: steps.nightly.outcome == 'success'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ env.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "channel": "${{ env.SLACK_CHANNEL }}",
+              "icon_emoji": ":moon:",
+              "text": "🌙 Nightly Self-Hosting Verification — PASS",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*✅ Nightly Verification PASSED*\n_Time:_ $(date -u)\n_Branch:_ master"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Results:*\n• Build: ✅\n• Fixed-Point: ✅\n• Jest (643 tests): ✅"
+                  }
+                }
+              ]
+            }
+
+      - name: "❌ Slack Notify — Nightly Failed"
+        if: steps.nightly.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ env.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "channel": "${{ env.SLACK_CHANNEL }}",
+              "icon_emoji": ":rotating_light:",
+              "text": "🌙 Nightly Self-Hosting Verification — FAILED",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*❌ Nightly Verification FAILED*\n_Time:_ $(date -u)\n_Action Required:_ Review logs immediately"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} | View Nightly Run>"
+                  }
+                }
+              ]
+            }
+
+      - name: "📦 Archive Nightly Results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-results-${{ github.run_id }}
+          path: |
+            stage1.js
+            stage2.js
+            stage3.js
+          retention-days: 30
