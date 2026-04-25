@@ -279,16 +279,18 @@ node bootstrap.js run -c '(fib 30)'
 
 ## 📚 완전한 가이드
 
-### 🌐 웹 프레임워크 (Express.fl)
+### 🤖 AI Agent Execution Engine
 | 가이드 | 내용 |
 |------|------|
-| [EXPRESS-COMPLETE.md](./src/EXPRESS-COMPLETE.md) | 전체 개요 (아키텍처, 벤치마크) |
-| [EXPRESS-README.md](./src/EXPRESS-README.md) | 기본 사용법 |
-| [EXPRESS-ADVANCED.md](./src/EXPRESS-ADVANCED.md) | 에러 처리, 미들웨어, DB |
-| [EXPRESS-WEBSOCKET.md](./src/EXPRESS-WEBSOCKET.md) | 실시간 통신 |
-| [EXPRESS-CACHE.md](./src/EXPRESS-CACHE.md) | 캐싱, PubSub |
-| [EXPRESS-AUTH.md](./src/EXPRESS-AUTH.md) | JWT, 암호화, RBAC |
-| [EXPRESS-TEST.md](./src/EXPRESS-TEST.md) | 단위/통합 테스트 |
+| [AGENT-DSL.md](./src/AGENT-DSL.md) | **필독**: Task/State/Workflow 프레임워크 |
+| [LOGGING-GUIDE.md](./src/LOGGING-GUIDE.md) | 결정론 로깅 (SHA256 검증) |
+| [STORAGE-GUIDE.md](./src/STORAGE-GUIDE.md) | 통합 저장소 (SQLite/MariaDB/JSON) |
+
+### 📡 HTTP 서버 (Express.fl)
+| 가이드 | 내용 |
+|------|------|
+| [echo-server-demo.fl](./src/echo-server-demo.fl) | 간단한 HTTP 에코 서버 예제 |
+| [express.fl](./src/express.fl) | 핵심 10개 함수 (축소 버전) |
 
 ### 🛠️ CLI 도구
 | 가이드 | 내용 |
