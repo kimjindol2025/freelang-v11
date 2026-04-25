@@ -1,0 +1,1 @@
+{"id":"T198_io_dir_check","category":"file-io","difficulty":"easy","prompt":"/tmp 디렉토리 존재 검증 (true).","validation":{"type":"stdout_contains","expected":"true"},"reference_solution":"(println (file_exists \"/tmp\"))","tags":["file_exists"]}

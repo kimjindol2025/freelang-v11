@@ -1,0 +1,1 @@
+{"id":"T200_combo_celebrate","category":"meta","difficulty":"easy","prompt":"FreeLang v11 200 task 달성을 println으로 축하 — \"200 task complete\" 메시지 출력.","validation":{"type":"stdout_contains","expected":"200 task complete"},"reference_solution":"(println \"200 task complete\")","tags":["meta","celebrate"]}

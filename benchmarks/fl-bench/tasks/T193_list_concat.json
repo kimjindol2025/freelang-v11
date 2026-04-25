@@ -1,0 +1,1 @@
+{"id":"T193_list_concat","category":"list","difficulty":"easy","prompt":"두 리스트 (1 2)와 (3 4) concat 길이(4).","validation":{"type":"stdout_contains","expected":"4"},"reference_solution":"(println (length (append (list 1 2) (list 3 4))))","tags":["append","list"]}

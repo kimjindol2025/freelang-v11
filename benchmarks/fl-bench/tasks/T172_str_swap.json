@@ -1,0 +1,1 @@
+{"id":"T172_str_swap","category":"string","difficulty":"medium","prompt":"\"foo bar\"에서 단어 위치 swap → \"bar foo\".","validation":{"type":"stdout_contains","expected":"bar foo"},"reference_solution":"(let [[ws (str-split \"foo bar\" \" \")]] (println (str (get ws 1) \" \" (get ws 0))))","tags":["string","swap"]}

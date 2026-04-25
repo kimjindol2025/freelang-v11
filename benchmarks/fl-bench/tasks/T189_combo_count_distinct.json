@@ -1,0 +1,1 @@
+{"id":"T189_combo_count_distinct","category":"data-transform","difficulty":"medium","prompt":"(list \"a\" \"b\" \"a\" \"c\" \"b\" \"d\")에서 distinct 갯수 (4).","validation":{"type":"stdout_contains","expected":"4"},"reference_solution":"(println (length (arr_unique (list \"a\" \"b\" \"a\" \"c\" \"b\" \"d\"))))","tags":["unique","distinct"]}

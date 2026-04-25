@@ -1,0 +1,1 @@
+{"id":"T197_str_trim_test","category":"string","difficulty":"easy","prompt":"\"   hello   \" trim 후 길이(5).","validation":{"type":"stdout_contains","expected":"5"},"reference_solution":"(println (length (trim \"   hello   \")))","tags":["trim","length"]}

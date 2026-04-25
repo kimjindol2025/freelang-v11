@@ -1,0 +1,1 @@
+{"id":"T183_algo_fizzbuzz_15","category":"algorithm","difficulty":"medium","prompt":"FizzBuzz 15 → \"FizzBuzz\".","validation":{"type":"stdout_contains","expected":"FizzBuzz"},"reference_solution":"(defn fb [n] (cond [(= 0 (% n 15)) \"FizzBuzz\"] [(= 0 (% n 3)) \"Fizz\"] [(= 0 (% n 5)) \"Buzz\"] [true (str n)]))\n(println (fb 15))","tags":["fizzbuzz"]}

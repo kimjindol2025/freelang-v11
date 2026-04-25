@@ -1,0 +1,1 @@
+{"id":"T158_io_temp_file","category":"file-io","difficulty":"easy","prompt":"임시 파일 \"/tmp/fl-t158.txt\"에 \"data\" 쓰고 읽어서 출력.","validation":{"type":"stdout_contains","expected":"data"},"reference_solution":"(file_write \"/tmp/fl-t158.txt\" \"data\")\n(println (file_read \"/tmp/fl-t158.txt\"))","tags":["file-io"]}

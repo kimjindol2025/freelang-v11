@@ -1,0 +1,1 @@
+{"id":"T181_map_get_default","category":"map","difficulty":"easy","prompt":"맵 {:a 1}에서 :missing 키 안전 조회 — 기본값 \"none\". 출력 \"none\".","validation":{"type":"stdout_contains","expected":"none"},"reference_solution":"(println (get-or {:a 1} :missing \"none\"))","tags":["get-or"]}

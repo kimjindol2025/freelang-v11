@@ -1,0 +1,1 @@
+{"id":"T155_async_seq","category":"async","difficulty":"medium","prompt":"3개 함수 (fn [] 1) (fn [] 2) (fn [] 3)를 순차 실행한 결과 합 (6).","validation":{"type":"stdout_contains","expected":"6"},"reference_solution":"(println (reduce + 0 (map (fn [f] (f)) (list (fn [] 1) (fn [] 2) (fn [] 3)))))","tags":["sequential","async"]}

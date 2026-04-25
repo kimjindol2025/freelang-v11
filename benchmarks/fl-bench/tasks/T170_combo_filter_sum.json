@@ -1,0 +1,1 @@
+{"id":"T170_combo_filter_sum","category":"data-transform","difficulty":"medium","prompt":"(range 1 11)에서 짝수 합 (30).","validation":{"type":"stdout_contains","expected":"30"},"reference_solution":"(println (reduce + 0 (filter (fn [x] (= 0 (% x 2))) (range 1 11))))","tags":["filter","reduce","range"]}

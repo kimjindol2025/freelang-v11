@@ -1,0 +1,1 @@
+{"id":"T186_map_filter_keys","category":"map","difficulty":"hard","prompt":"맵 {:age 25 :name \"a\" :score 80}의 모든 키 갯수(3).","validation":{"type":"stdout_contains","expected":"3"},"reference_solution":"(println (length (json_keys {:age 25 :name \"a\" :score 80})))","tags":["json_keys"]}

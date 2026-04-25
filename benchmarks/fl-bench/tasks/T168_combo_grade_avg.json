@@ -1,0 +1,1 @@
+{"id":"T168_combo_grade_avg","category":"data-transform","difficulty":"hard","prompt":"학생 [{:s 80} {:s 90} {:s 70}]의 평균 점수(80) 출력.","validation":{"type":"stdout_contains","expected":"80"},"reference_solution":"(let [[xs (list 80 90 70)]] (println (/ (reduce + 0 xs) (length xs))))","tags":["average","reduce"]}

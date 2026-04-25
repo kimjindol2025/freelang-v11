@@ -1,0 +1,1 @@
+{"id":"T179_pred_in_range","category":"list","difficulty":"easy","prompt":"(list 5 15 25 35)에서 10~30 범위 갯수(2).","validation":{"type":"stdout_contains","expected":"2"},"reference_solution":"(println (length (filter (fn [x] (and (>= x 10) (<= x 30))) (list 5 15 25 35))))","tags":["filter","range"]}

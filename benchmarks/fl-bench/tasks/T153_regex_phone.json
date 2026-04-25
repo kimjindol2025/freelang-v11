@@ -1,0 +1,1 @@
+{"id":"T153_regex_phone","category":"regex","difficulty":"medium","prompt":"전화번호 \"010-1234-5678\"이 \\\\d{3}-\\\\d{4}-\\\\d{4} 패턴 일치(true).","validation":{"type":"stdout_contains","expected":"true"},"reference_solution":"(println (regex_match \"010-1234-5678\" \"\\\\d{3}-\\\\d{4}-\\\\d{4}\"))","tags":["regex","phone"]}

@@ -1,0 +1,1 @@
+{"id":"T187_recur_gcd","category":"recursion","difficulty":"medium","prompt":"GCD(48, 18) = 6.","validation":{"type":"stdout_contains","expected":"6"},"reference_solution":"(defn gcd [a b] (if (= b 0) a (gcd b (% a b))))\n(println (gcd 48 18))","tags":["gcd","recursion"]}

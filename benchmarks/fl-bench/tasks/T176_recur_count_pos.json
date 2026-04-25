@@ -1,0 +1,1 @@
+{"id":"T176_recur_count_pos","category":"recursion","difficulty":"medium","prompt":"(list -1 2 -3 4 5)에서 양수 갯수(3).","validation":{"type":"stdout_contains","expected":"3"},"reference_solution":"(println (length (filter (fn [x] (> x 0)) (list -1 2 -3 4 5))))","tags":["filter","count"]}

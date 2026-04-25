@@ -1,0 +1,1 @@
+{"id":"T166_string_capitalize","category":"string","difficulty":"medium","prompt":"\"hello\" 첫글자 대문자 \"Hello\" 출력.","validation":{"type":"stdout_contains","expected":"Hello"},"reference_solution":"(let [[s \"hello\"]] (println (str (uppercase (substring s 0 1)) (substring s 1 (length s)))))","tags":["string","uppercase"]}

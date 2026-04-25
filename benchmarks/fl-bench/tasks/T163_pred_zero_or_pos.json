@@ -1,0 +1,1 @@
+{"id":"T163_pred_zero_or_pos","category":"list","difficulty":"easy","prompt":"(list -1 -2 0 1 2)에서 음수 아닌 갯수 (3: 0,1,2).","validation":{"type":"stdout_contains","expected":"3"},"reference_solution":"(println (length (filter (fn [x] (>= x 0)) (list -1 -2 0 1 2))))","tags":["filter","predicate"]}
