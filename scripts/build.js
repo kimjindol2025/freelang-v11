@@ -32,6 +32,13 @@ function extractSignatures() {
 
 extractSignatures();
 
+// AI 시스템 프롬프트 자동 갱신 (시그니처 추출 직후, AI-1 통합)
+try {
+  require(path.join(__dirname, "gen-ai-prompt.js"));
+} catch (e) {
+  console.warn(`ai_prompt=skipped (${e.message})`);
+}
+
 // Node.js 빌드
 const nodeBuild = esbuild.build({
   entryPoints: ["src/cli.ts"],
