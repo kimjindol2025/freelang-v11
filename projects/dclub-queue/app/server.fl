@@ -1,0 +1,63 @@
+;; server.fl — dclub-queue HTTP API (Phase X1)
+;;
+;; POST /q/:topic/publish  Bearer + body JSON → 메시지 발행
+;; GET  /q/:topic/stats    토픽별 status 통계
+;; GET  /health            서비스 상태
+
+(load "projects/dclub-queue/lib/queue.fl")
+(load "projects/dclub-queue/lib/topics.fl")
+(load "projects/dclub-queue/lib/config.fl")
+
+(define cfg (dclub-queue-config))
+(define DB (get $cfg "db"))
+
+(q-ensure-tables $DB)
+(topics-ensure-table $DB)
+
+;; 기본 토픽 등록 (idempotent)
+(q-register-topic $DB "test" "Echo test" "handle-test")
+(q-register-topic $DB "fail-test" "Backoff test" "handle-fail-test")
+(q-register-topic $DB "mail-send" "Mail delivery" "handle-mail-send")
+
+[FUNC handle-publish :params [$req]
+  :body (let [
+    topic (server_req_param $req "topic")
+    body-raw (server_req_body $req)
+    payload (if (string? $body-raw)
+              (if (= $body-raw "") {} (json_parse $body-raw))
+              $body-raw)
+  ]
+    (do
+      (q-publish $DB $topic $payload)
+      (server_json {:status "queued" :topic $topic})))]
+
+[FUNC handle-stats :params [$req]
+  :body (let [
+    topic (server_req_param $req "topic")
+    stats (q-stats $DB $topic)
+  ]
+    (server_json (assoc $stats "topic" $topic)))]
+
+[FUNC handle-list-topics :params [$req]
+  :body (server_json {:topics (q-list-topics $DB)})]
+
+[FUNC handle-q-health :params [$req]
+  :body (let [
+    tables (db_query $DB "SELECT name FROM sqlite_master WHERE type='table'" [])
+  ]
+    (server_json {
+      :status "ok"
+      :version "1.0.0"
+      :db $DB
+      :tables (length $tables)
+      :ts (now_ms)
+    }))]
+
+(server_post "/q/:topic/publish" "handle-publish")
+(server_get "/q/:topic/stats" "handle-stats")
+(server_get "/q/topics" "handle-list-topics")
+(server_get "/health" "handle-q-health")
+
+(println (str "[dclub-queue] db=" $DB))
+(println (str "[dclub-queue] listening on port " (get $cfg "port")))
+(server_start (get $cfg "port"))

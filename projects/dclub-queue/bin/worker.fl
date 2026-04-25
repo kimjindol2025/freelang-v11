@@ -1,0 +1,116 @@
+;; worker.fl — dclub-queue 폴링 워커 (Phase X1)
+;;
+;; 실행: node bootstrap.js run projects/dclub-queue/bin/worker.fl
+;; 또는 systemd dclub-queue-worker.service
+;;
+;; 단일 프로세스 / 단일 노드 / 1개 워커 가정.
+;; 다중 워커 필요 시 worker_id 환경변수 다르게 + 같은 DB 가리키면 자동 분산
+;; (queue_dequeue_atomic 가 race-free).
+;;
+;; ── 토픽 핸들러 디스패치 ────────────────────────
+;; FL 의 동적 함수 호출 제약 때문에 cond 로 명시 매칭.
+;; 새 토픽 추가 시 이 파일 수정 + handle-* 함수 작성.
+
+(load "projects/dclub-queue/lib/queue.fl")
+(load "projects/dclub-queue/lib/topics.fl")
+(load "projects/dclub-queue/lib/config.fl")
+
+;; 예제 핸들러 — 운영 시 실제 비즈니스 로직으로 교체
+[FUNC handle-test :params [$payload]
+  :body (do
+    (println (str "[handle-test] " (json_stringify $payload)))
+    nil)]
+
+[FUNC handle-fail-test :params [$payload]
+  :body (do
+    (println "[handle-fail-test] simulated failure")
+    {:ok false :error "intentional failure for backoff test"})]
+
+[FUNC handle-mail-send :params [$payload]
+  :body (let [
+    to (get $payload "to")
+    subject (get $payload "subject")
+    body (get $payload "body")
+  ]
+    (do
+      (println (str "[mail] -> " $to ": " $subject))
+      ;; 실 구현: dclub-auth 의 mail-send 또는 stdlib mail_outbox_write
+      nil))]
+
+;; dispatch — cond 로 토픽 매칭
+[FUNC q-dispatch :params [$msg]
+  :body (let [
+    topic (get $msg "topic")
+    payload-str (get $msg "payload")
+    payload (if (string? $payload-str) (json_parse $payload-str) $payload-str)
+  ]
+    (cond
+      [(= $topic "test")          (handle-test $payload)]
+      [(= $topic "fail-test")     (handle-fail-test $payload)]
+      [(= $topic "mail-send")     (handle-mail-send $payload)]
+      [true {:ok false :error (str "no handler for topic: " $topic)}]))]
+
+;; ── tick — 1회 폴링 ───────────────────────────────
+;; 등록된 모든 토픽에서 1건씩 dequeue 시도.
+
+[FUNC worker-tick :params [$db $worker-id]
+  :body (let [
+    topic-rows (q-list-topics $db)
+    processed (reduce (fn [acc topic-row]
+      (let [
+        topic (get topic-row "topic")
+        msg (q-dequeue $db $topic $worker-id)
+      ]
+        (if (= $msg nil)
+          $acc
+          (let [result (q-dispatch $msg)
+                ok (if (= $result nil) true (get $result "ok"))]
+            (do
+              (if (= $ok false)
+                (q-nack $db (get $msg "id") (get $result "error"))
+                (q-ack $db (get $msg "id")))
+              (+ $acc 1))))))
+      0 $topic-rows)
+  ]
+    $processed)]
+
+;; ── 부팅: 무한 루프 ──────────────────────────────
+(define cfg (dclub-queue-config))
+(define DB (get $cfg "db"))
+(define WORKER-ID (get $cfg "worker_id"))
+
+(q-ensure-tables $DB)
+(topics-ensure-table $DB)
+
+;; 기본 토픽 등록 (없으면)
+(q-register-topic $DB "test" "Echo test" "handle-test")
+(q-register-topic $DB "fail-test" "Backoff test" "handle-fail-test")
+(q-register-topic $DB "mail-send" "Mail delivery" "handle-mail-send")
+
+(println (str "[worker] starting id=" $WORKER-ID " db=" $DB))
+
+;; setInterval — FL stdlib timer 사용
+(define tick-fn
+  (fn []
+    (let [n (worker-tick $DB $WORKER-ID)]
+      (if (> $n 0)
+        (println (str "[worker] processed " $n " messages"))
+        nil))))
+
+(set_interval $tick-fn (get $cfg "poll_interval_ms"))
+
+;; recover 좀비 (60초 lock 만료) 매 30초
+(define recover-fn
+  (fn []
+    (let [n (queue_recover_stuck $DB 60)]
+      (if (> $n 0)
+        (println (str "[worker] recovered " $n " stuck messages"))
+        nil))))
+
+(set_interval $recover-fn 30000)
+
+;; 종료 처리
+(process_on_shutdown (fn []
+  (println "[worker] shutting down")))
+
+(println "[worker] running — Ctrl+C to stop")

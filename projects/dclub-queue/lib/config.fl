@@ -1,0 +1,13 @@
+;; config.fl — dclub-queue 설정
+
+[FUNC q-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-queue-config :params []
+  :body {
+    :db (q-config-get "DCLUB_QUEUE_DB" "/tmp/dclub-queue.db")
+    :port (* (q-config-get "DCLUB_QUEUE_PORT" "30110") 1)
+    :worker_id (q-config-get "DCLUB_QUEUE_WORKER_ID" "worker-1")
+    :poll_interval_ms (* (q-config-get "DCLUB_QUEUE_POLL_MS" "5000") 1)
+  }]

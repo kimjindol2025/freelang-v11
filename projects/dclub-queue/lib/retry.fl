@@ -1,0 +1,15 @@
+;; retry.fl — exponential backoff 정책 (Phase X1)
+;;
+;; attempt 1: 1분 후 재시도
+;; attempt 2: 5분
+;; attempt 3: 25분
+;; attempt 4: 2시간
+;; attempt 5+: dead-letter (재시도 안 함)
+
+[FUNC retry-backoff-ms :params [$attempt]
+  :body (cond
+    [(<= $attempt 1) 60000]              ; 1분
+    [(= $attempt 2) 300000]              ; 5분
+    [(= $attempt 3) 1500000]             ; 25분
+    [(= $attempt 4) 7200000]             ; 2시간
+    [true 43200000])]                    ; 12시간 (dead 직전)
