@@ -1,0 +1,12 @@
+[FUNC st-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-storage-config :params []
+  :body {
+    :db (st-config-get "DCLUB_STORAGE_DB" "/tmp/dclub-storage.db")
+    :data_dir (st-config-get "DCLUB_STORAGE_DATA" "/tmp/dclub-storage-data")
+    :port (* (st-config-get "DCLUB_STORAGE_PORT" "30140") 1)
+    :sign_secret (st-config-get "DCLUB_STORAGE_SIGN_SECRET" "change-me-in-prod")
+    :api_key (st-config-get "DCLUB_STORAGE_API_KEY" "test-key-CHANGE-ME")
+  }]

@@ -1,0 +1,86 @@
+;; storage-store.fl — bucket·object 메타 (Phase X4)
+
+[FUNC storage-ensure-tables :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS buckets (
+      name        TEXT PRIMARY KEY,
+      owner       TEXT NOT NULL,
+      policy      TEXT NOT NULL DEFAULT 'private',
+      created_at  TEXT NOT NULL
+    )")
+    (db_create $db "CREATE TABLE IF NOT EXISTS objects (
+      bucket      TEXT NOT NULL,
+      key         TEXT NOT NULL,
+      size        INTEGER NOT NULL,
+      content_type TEXT,
+      etag        TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL,
+      PRIMARY KEY (bucket, key)
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_objects_bucket ON objects(bucket, key)"))]
+
+;; ── bucket ───────────────────────────────────
+[FUNC bucket-create :params [$db $name $owner $policy]
+  :body (do
+    (db_delete_row $db "buckets" (str "name='" $name "'"))
+    (db_insert $db "buckets" {
+      :name $name
+      :owner $owner
+      :policy (if (= $policy nil) "private" $policy)
+      :created_at (now_iso)
+    })
+    true)]
+
+[FUNC bucket-find :params [$db $name]
+  :body (let [
+    rows (db_query $db
+      "SELECT name, owner, policy FROM buckets WHERE name=? LIMIT 1"
+      [$name])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC bucket-list :params [$db]
+  :body (db_query $db "SELECT name, owner, policy, created_at FROM buckets ORDER BY name" [])]
+
+;; ── object ───────────────────────────────────
+[FUNC object-put :params [$db $bucket $key $size $content-type $etag $storage-path]
+  :body (do
+    (db_delete_row $db "objects"
+      (str "bucket='" $bucket "' AND key='" $key "'"))
+    (db_insert $db "objects" {
+      :bucket $bucket
+      :key $key
+      :size $size
+      :content_type (if (= $content-type nil) "application/octet-stream" $content-type)
+      :etag $etag
+      :storage_path $storage-path
+      :created_at (now_iso)
+      :updated_at (now_iso)
+    })
+    true)]
+
+[FUNC object-find :params [$db $bucket $key]
+  :body (let [
+    rows (db_query $db
+      "SELECT bucket, key, size, content_type, etag, storage_path, created_at FROM objects WHERE bucket=? AND key=? LIMIT 1"
+      [$bucket $key])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC object-list :params [$db $bucket $prefix $limit]
+  :body (db_query $db
+    (str "SELECT key, size, content_type, etag, created_at FROM objects "
+         "WHERE bucket=? AND key LIKE ? ORDER BY key LIMIT " $limit)
+    [$bucket (str $prefix "%")])]
+
+[FUNC object-delete :params [$db $bucket $key]
+  :body (let [obj (object-find $db $bucket $key)]
+    (if (= $obj nil)
+      false
+      (do
+        (file_delete (get $obj "storage_path"))
+        (db_delete_row $db "objects"
+          (str "bucket='" $bucket "' AND key='" $key "'"))
+        true)))]

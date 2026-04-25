@@ -1,0 +1,155 @@
+;; server.fl — dclub-storage HTTP API (Phase X4 MVP)
+;;
+;; 인증:
+;;   X-API-Key 헤더 (간소화) — S3 v4 sig 는 Phase X4.2
+;;   또는 signed URL (GET 만, 시간 제한)
+;;
+;; 라우트:
+;;   PUT  /:bucket/:key      파일 업로드 (X-API-Key 필요)
+;;   GET  /:bucket/:key      다운로드 (public bucket 또는 signed URL 또는 API key)
+;;   DELETE /:bucket/:key    삭제 (X-API-Key 필요)
+;;   GET  /:bucket           list (X-API-Key 필요, ?prefix=&limit=)
+;;   POST /admin/buckets     bucket 생성
+;;   POST /admin/sign        signed URL 발급
+;;   GET  /health
+
+(load "projects/dclub-storage/lib/config.fl")
+(load "projects/dclub-storage/lib/storage-store.fl")
+(load "projects/dclub-storage/lib/signed-url.fl")
+
+(define cfg (dclub-storage-config))
+(define DB (get $cfg "db"))
+(define DATA-DIR (get $cfg "data_dir"))
+(define API-KEY (get $cfg "api_key"))
+(define SIGN-SECRET (get $cfg "sign_secret"))
+
+(storage-ensure-tables $DB)
+(shell (str "mkdir -p " $DATA-DIR))
+
+;; 기본 demo bucket
+(if (= (bucket-find $DB "demo") nil)
+  (bucket-create $DB "demo" "admin" "private")
+  nil)
+
+;; ── 인증 ─────────────────────────────────────
+[FUNC st-api-key-ok? :params [$req]
+  :body (let [
+    h (server_req_header $req "x-api-key")
+    h2 (if (= $h nil) (server_req_header $req "X-API-Key") $h)
+  ]
+    (= $h2 $API-KEY))]
+
+;; ── PUT /:bucket/:key ────────────────────────
+[FUNC handle-put-object :params [$req]
+  :body (if (not (st-api-key-ok? $req))
+    (server_status 401 {:error "unauthorized"})
+    (let [
+      bucket (server_req_param $req "bucket")
+      key (server_req_param $req "key")
+      body (server_req_body $req)
+      content-str (if (string? $body) $body (json_stringify $body))
+      etag (auth_sha256 $content-str)
+      storage-path (str $DATA-DIR "/" $bucket "/" (substring $etag 0 16))
+      content-type (server_req_header $req "content-type")
+    ]
+      (do
+        (shell (str "mkdir -p " $DATA-DIR "/" $bucket))
+        (file_write $storage-path $content-str)
+        (object-put $DB $bucket $key (length $content-str)
+                    (or $content-type "application/octet-stream")
+                    $etag $storage-path)
+        (server_json {:status "uploaded" :bucket $bucket :key $key
+                      :size (length $content-str) :etag $etag}))))]
+
+;; ── GET /:bucket/:key ────────────────────────
+;; 인증: X-API-Key 또는 signed URL (?expires=&sig=)
+[FUNC handle-get-object :params [$req]
+  :body (let [
+    bucket (server_req_param $req "bucket")
+    key (server_req_param $req "key")
+    bucket-row (bucket-find $DB $bucket)
+    is-public (and (not (= $bucket-row nil)) (= (get $bucket-row "policy") "public"))
+    api-ok (st-api-key-ok? $req)
+    expires (server_req_query $req "expires")
+    sig (server_req_query $req "sig")
+    sign-ok (if (or (= $expires nil) (= $sig nil) (= $expires "") (= $sig ""))
+              false
+              (let [v (sign-url-verify $SIGN-SECRET "GET" $bucket $key $expires $sig)]
+                (get $v "ok")))
+    authorized (or $is-public $api-ok $sign-ok)
+  ]
+    (if (not $authorized)
+      (server_status 403 {:error "forbidden"})
+      (let [obj (object-find $DB $bucket $key)]
+        (if (= $obj nil)
+          (server_status 404 {:error "not_found"})
+          (let [content (file_read (get $obj "storage_path"))]
+            (server_text $content))))))]
+
+;; ── DELETE /:bucket/:key ─────────────────────
+[FUNC handle-delete-object :params [$req]
+  :body (if (not (st-api-key-ok? $req))
+    (server_status 401 {:error "unauthorized"})
+    (let [
+      bucket (server_req_param $req "bucket")
+      key (server_req_param $req "key")
+      ok (object-delete $DB $bucket $key)
+    ]
+      (if $ok
+        (server_json {:status "deleted"})
+        (server_status 404 {:error "not_found"}))))]
+
+;; ── GET /:bucket (list) ──────────────────────
+[FUNC handle-list-bucket :params [$req]
+  :body (if (not (st-api-key-ok? $req))
+    (server_status 401 {:error "unauthorized"})
+    (let [
+      bucket (server_req_param $req "bucket")
+      prefix-q (server_req_query $req "prefix")
+      prefix (if (or (= $prefix-q nil) (= $prefix-q "")) "" $prefix-q)
+      limit-q (server_req_query $req "limit")
+      limit (if (or (= $limit-q nil) (= $limit-q "")) 100 (* $limit-q 1))
+      objects (object-list $DB $bucket $prefix $limit)
+    ]
+      (server_json {:bucket $bucket :prefix $prefix :objects $objects})))]
+
+;; ── POST /admin/buckets ──────────────────────
+[FUNC handle-create-bucket :params [$req]
+  :body (if (not (st-api-key-ok? $req))
+    (server_status 401 {:error "unauthorized"})
+    (let [
+      body-raw (server_req_body $req)
+      body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+    ]
+      (do
+        (bucket-create $DB (get $body "name") "admin" (or (get $body "policy") "private"))
+        (server_json {:status "created" :name (get $body "name")}))))]
+
+;; ── POST /admin/sign ─────────────────────────
+[FUNC handle-sign-url :params [$req]
+  :body (if (not (st-api-key-ok? $req))
+    (server_status 401 {:error "unauthorized"})
+    (let [
+      body-raw (server_req_body $req)
+      body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+      bucket (get $body "bucket")
+      key (get $body "key")
+      ttl (or (get $body "ttl_seconds") 3600)
+      url (sign-url-create $SIGN-SECRET "GET" $bucket $key $ttl)
+    ]
+      (server_json {:url $url :expires_in $ttl})))]
+
+[FUNC handle-storage-health :params [$req]
+  :body (server_json {:status "ok" :db $DB :data_dir $DATA-DIR :ts (now_ms)})]
+
+;; 더 구체적인 경로를 먼저 등록 (first-match-wins)
+(server_get "/health" "handle-storage-health")
+(server_post "/admin/buckets" "handle-create-bucket")
+(server_post "/admin/sign" "handle-sign-url")
+(server_put "/:bucket/:key" "handle-put-object")
+(server_get "/:bucket/:key" "handle-get-object")
+(server_delete "/:bucket/:key" "handle-delete-object")
+(server_get "/:bucket" "handle-list-bucket")
+
+(println (str "[dclub-storage] db=" $DB " data=" $DATA-DIR " port=" (get $cfg "port")))
+(server_start (get $cfg "port"))

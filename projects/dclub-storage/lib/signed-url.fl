@@ -1,0 +1,29 @@
+;; signed-url.fl — HMAC 기반 시간 제한 URL (Phase X4)
+;;
+;; 구글 Cloud Storage signed URL 와 유사 패턴 (간소화):
+;;   url = /{bucket}/{key}?expires=<unix>&sig=<hmac-sha256-hex>
+;;   string-to-sign = "GET\n{bucket}/{key}\n{expires}"
+;;   sig = hmac-sha256(secret, string-to-sign)
+
+[FUNC sign-url-string-to-sign :params [$method $bucket $key $expires]
+  :body (str $method "\n" $bucket "/" $key "\n" $expires)]
+
+[FUNC sign-url-create :params [$secret $method $bucket $key $ttl-seconds]
+  :body (let [
+    expires (+ (now_unix) $ttl-seconds)
+    sts (sign-url-string-to-sign $method $bucket $key $expires)
+    sig (auth_hmac $sts $secret)
+  ]
+    (str "/" $bucket "/" $key "?expires=" $expires "&sig=" $sig))]
+
+[FUNC sign-url-verify :params [$secret $method $bucket $key $expires-str $sig]
+  :body (let [
+    expires (* $expires-str 1)
+    now-unix (now_unix)
+    sts (sign-url-string-to-sign $method $bucket $key $expires)
+    expected-sig (auth_hmac $sts $secret)
+  ]
+    (cond
+      [(> $now-unix $expires) {:ok false :error "expired"}]
+      [(not (= $sig $expected-sig)) {:ok false :error "signature_mismatch"}]
+      [true {:ok true}]))]
