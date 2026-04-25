@@ -56,6 +56,10 @@ export function createCryptoModule() {
     "base64url_encode": (str: string): string =>
       Buffer.from(str, "utf8").toString("base64url"),
 
+    // base64url_decode str -> string (URL-safe Base64 → UTF-8)
+    "base64url_decode": (str: string): string =>
+      Buffer.from(str, "base64url").toString("utf8"),
+
     // hex_encode str -> string
     "hex_encode": (str: string): string =>
       Buffer.from(str, "utf8").toString("hex"),

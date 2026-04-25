@@ -1,0 +1,32 @@
+{
+  "label": "claude-test",
+  "provider": "claude-cli",
+  "timestamp": "2026-04-25T11:07:25.728Z",
+  "elapsed_seconds": 2.3,
+  "total": 1,
+  "passed": 0,
+  "score": 0,
+  "by_category": {
+    "arithmetic": {
+      "pass": 0,
+      "total": 1
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "pass": 0,
+      "total": 1
+    }
+  },
+  "results": [
+    {
+      "id": "T01_arithmetic_basic",
+      "category": "arithmetic",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "claude CLI exit 1: ",
+      "elapsed_ms": 2309,
+      "response_length": 0
+    }
+  ]
+}
