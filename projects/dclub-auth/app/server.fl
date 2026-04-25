@@ -21,6 +21,7 @@
 (load "projects/dclub-auth/lib/mail.fl")
 (load "projects/dclub-auth/lib/anomaly-store.fl")
 (load "projects/dclub-auth/lib/anomaly.fl")
+(load "projects/dclub-auth/lib/webauthn-store.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
 (load "projects/dclub-auth/app/authorize.fl")
@@ -32,6 +33,7 @@
 (load "projects/dclub-auth/app/password-reset.fl")
 (load "projects/dclub-auth/app/health.fl")
 (load "projects/dclub-auth/app/admin-security.fl")
+(load "projects/dclub-auth/app/webauthn.fl")
 
 ;; ── 부팅: 스키마 + 시드 ─────────────────────────────
 (define cfg (dclub-auth-config))
@@ -44,6 +46,8 @@
 (mfa-ensure-table $DB)
 (user-tokens-ensure-table $DB)
 (anomaly-ensure-table $DB)
+(webauthn-ensure-table $DB)
+(webauthn-pending-table $DB)
 (define demo-uid (users-seed-demo $DB))
 (define blog-cid (clients-seed-demo $DB))
 
@@ -76,6 +80,10 @@
 (server_post "/reset" "handle-reset")
 (server_get "/health" "handle-health")
 (server_get "/admin/security" "handle-admin-security")
+(server_post "/webauthn/register/begin" "handle-wa-register-begin")
+(server_post "/webauthn/register/complete" "handle-wa-register-complete")
+(server_post "/webauthn/auth/begin" "handle-wa-auth-begin")
+(server_post "/webauthn/auth/complete" "handle-wa-auth-complete")
 
 ;; ── 시작 ──────────────────────────────────────────
 (server_start (get $cfg "port"))
