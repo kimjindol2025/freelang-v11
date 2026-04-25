@@ -158,3 +158,47 @@
     (log-info (str (req-method $req) " " (req-path $req)))
     $req)
 ]
+
+;; ============ WebSocket 래퍼 ============
+
+[FUNC ws-start :params [$port]
+  :body (do
+    (log-info (str "🌐 WebSocket 서버 시작 → ws://localhost:" $port))
+    (ws_start $port))
+]
+
+[FUNC ws-send-all :params [$msg]
+  :body (let [count (ws_broadcast $msg)]
+    (do
+      (log-info (str "📢 브로드캐스트: " (str $count) "명에게 전송"))
+      $count))
+]
+
+[FUNC ws-send-json-all :params [$obj]
+  :body (ws_broadcast_json $obj)
+]
+
+[FUNC ws-send-to :params [$client-id $msg]
+  :body (let [ok (ws_send $client-id $msg)]
+    (if ok
+      (log-info (str "📤 클라이언트 " (str $client-id) "에게 전송"))
+      (log-error (str "❌ 전송 실패: " (str $client-id)))))
+]
+
+[FUNC ws-send-json-to :params [$client-id $obj]
+  :body (ws_send_json $client-id $obj)
+]
+
+[FUNC ws-close-conn :params [$client-id $code]
+  :body (do
+    (log-info (str "🔌 연결 종료: " (str $client-id)))
+    (ws_close $client-id (or $code 1000)))
+]
+
+[FUNC ws-client-count
+  :body (ws_count)
+]
+
+[FUNC ws-client-list
+  :body (ws_clients)
+]

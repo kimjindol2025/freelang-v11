@@ -1,0 +1,113 @@
+;; ============================================
+;; Express.fl WebSocket 채팅 예제
+;; ============================================
+;; 실시간 채팅 서버 (다대다 통신)
+;; 실행: node bootstrap.js run express-chat.fl
+
+(load "src/express.fl")
+
+;; ============ 상태 관리 ============
+
+(define *users* {})
+(define *messages* [])
+
+;; ============ 핸들러 함수들 ============
+
+[FUNC on-connect :params [$req]
+  :body (let [client-id (server_req_id)]
+    (do
+      (log-info (str "✅ 클라이언트 연결: " client-id))
+      (ws-send-json-to client-id {
+        :type "welcome"
+        :message "채팅방에 접속했습니다"
+        :client_id client-id
+        :users (ws-client-list)
+      })
+      nil))
+]
+
+[FUNC on-message :params [$req]
+  :body (let [
+    client-id (server_req_id)
+    msg (server_req_body $req)
+    data (json_parse $msg)
+    username (get $data "username")
+    text (get $data "text")
+  ]
+    (do
+      (if username
+        (set! *users* (json_set *users* client-id username)))
+      (if text
+        (let [entry {
+          :from username
+          :text text
+          :timestamp (now_iso)
+        }]
+          (do
+            (set! *messages* (append *messages* [entry]))
+            (ws-send-json-all entry))))
+      nil))
+]
+
+[FUNC on-close :params [$req]
+  :body (let [client-id (server_req_id)]
+    (do
+      (log-info (str "❌ 클라이언트 종료: " client-id))
+      (set! *users* (json_del *users* client-id))
+      (ws-send-json-all {
+        :type "user_left"
+        :client_id client-id
+        :message "사용자가 나갔습니다"
+      })
+      nil))
+]
+
+[FUNC get-messages :params [$req]
+  :body (res-json {
+    :success true
+    :messages *messages*
+  })
+]
+
+[FUNC get-users :params [$req]
+  :body (res-json {
+    :success true
+    :count (ws-client-count)
+    :users *users*
+  })
+]
+
+[FUNC health :params [$req]
+  :body (res-json {
+    :status "OK"
+    :service "Express.fl Chat Server"
+    :online_users (ws-client-count)
+    :timestamp (now_iso)
+  })
+]
+
+;; ============ 라우트 등록 ============
+
+(do
+  (log-info "🚀 Express.fl 채팅 서버 시작")
+
+  (app-get "/health" "health")
+  (app-get "/api/messages" "get-messages")
+  (app-get "/api/users" "get-users")
+
+  (ws_on_connect_fn "on-connect")
+  (ws_on_message_fn "on-message")
+  (ws_on_close_fn "on-close")
+
+  (log-info "✅ 라우트 등록 완료")
+  (println "")
+  (println "┌─────────────────────────────────────┐")
+  (println "│ 채팅 서버 준비 완료                  │")
+  (println "├─────────────────────────────────────┤")
+  (println "│ HTTP:      http://localhost:3000    │")
+  (println "│ WebSocket: ws://localhost:3000      │")
+  (println "└─────────────────────────────────────┘")
+  (println "")
+
+  (app-listen 3000)
+)
