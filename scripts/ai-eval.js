@@ -76,13 +76,16 @@ const providers = {
       // --append-system-prompt로 FreeLang 시스템 프롬프트 주입
       // --no-session-persistence: 세션 저장 안 함 (병렬 평가 시 오염 방지)
       // --max-budget-usd 1.0: 안전망 (실수로 50개 다 돌릴 때)
-      const r = spawnSync("claude", [
+      // --model 옵션 지원 (sonnet, haiku, opus, 또는 full model name)
+      const modelArg = process.argv.find((a) => a.startsWith("--model="))?.split("=")[1];
+      const args = [
         "-p",
         "--no-session-persistence",
         "--append-system-prompt", systemPrompt,
-        "--",                  // separator: prompt가 -로 시작해도 옵션으로 해석 X
-        userPrompt,
-      ], {
+      ];
+      if (modelArg) args.push("--model", modelArg);
+      args.push("--", userPrompt);
+      const r = spawnSync("claude", args, {
         encoding: "utf-8",
         timeout: 90000,
         maxBuffer: 10 * 1024 * 1024,
