@@ -1,0 +1,80 @@
+;; jwt-rs256.fl — RS256 JWT sign/verify/decode (RFC 7519, RFC 7515)
+;;
+;; Phase A.2 (dclub-auth) — 자체 OIDC IdP id_token 발급·검증.
+;; crypto_rsa_* primitive 위에 구축, 외부 의존 0.
+;;
+;; 토큰 구조: <header-b64url>.<payload-b64url>.<signature-b64url>
+;;   header  = {"alg":"RS256","typ":"JWT","kid":"..."}
+;;   payload = 사용자 claims + {iat, exp}
+;;   sig     = RSA-SHA256(privateKey, "<header>.<payload>") -> base64url
+
+;; ── 헤더 생성 ───────────────────────────────────────────────
+
+[FUNC jwt-rs256-header :params [$kid]
+  :body (json_stringify {:alg "RS256" :typ "JWT" :kid $kid})]
+
+;; ── 토큰 발급 ───────────────────────────────────────────────
+;; claims: 사용자 정의 클레임 맵 (sub, iss, aud, nonce 등 호출자 책임)
+;; private-pem: PKCS8 PEM 문자열
+;; kid: 키 식별자 (jwks 매칭용)
+;; expiry-seconds: 현재 시각으로부터 유효 기간 (초)
+
+[FUNC jwt-rs256-sign :params [$claims $private-pem $kid $expiry-seconds]
+  :body (let [
+    now (now_unix)
+    p1 (assoc $claims "iat" $now)
+    payload (assoc $p1 "exp" (+ $now $expiry-seconds))
+    header-json (jwt-rs256-header $kid)
+    payload-json (json_stringify $payload)
+    header-b64 (base64url_encode $header-json)
+    payload-b64 (base64url_encode $payload-json)
+    signing-input (str_join "." [$header-b64 $payload-b64])
+    sig (crypto_rsa_sign $private-pem $signing-input)
+  ]
+    (str_join "." [$header-b64 $payload-b64 $sig]))]
+
+;; ── 서명 검증 + 만료 검사 ──────────────────────────────────
+;; 반환: 유효 시 payload (Map), 무효/만료/형식오류 시 nil
+
+[FUNC jwt-rs256-verify :params [$token $public-pem]
+  :body (let [parts (str_split $token ".")]
+    (if (= (length $parts) 3)
+      (let [
+        header-b64 (get $parts 0)
+        payload-b64 (get $parts 1)
+        sig (get $parts 2)
+        signing-input (str_join "." [$header-b64 $payload-b64])
+        valid (crypto_rsa_verify $public-pem $signing-input $sig)
+      ]
+        (if $valid
+          (let [
+            payload (json_parse (base64url_decode $payload-b64))
+            now (now_unix)
+            exp (get $payload "exp")
+          ]
+            (if (and $exp (< $now $exp))
+              $payload
+              nil))
+          nil))
+      nil))]
+
+;; ── 디코드 (서명 검증 없음, 디버그·검사용) ─────────────────
+;; 외부에서 받은 토큰을 단순히 들여다볼 때 사용.
+;; 보안 결정에 직접 사용 금지 — 반드시 jwt-rs256-verify 통과 후에만 신뢰.
+
+[FUNC jwt-rs256-decode :params [$token]
+  :body (let [parts (str_split $token ".")]
+    (if (= (length $parts) 3)
+      {:header (json_parse (base64url_decode (get $parts 0)))
+       :payload (json_parse (base64url_decode (get $parts 1)))
+       :signature (get $parts 2)}
+      nil))]
+
+;; ── 헤더만 빠르게 추출 (kid 매칭용) ────────────────────────
+;; 토큰의 kid를 보고 jwks에서 올바른 키를 고르는 용도.
+
+[FUNC jwt-rs256-header-only :params [$token]
+  :body (let [parts (str_split $token ".")]
+    (if (= (length $parts) 3)
+      (json_parse (base64url_decode (get $parts 0)))
+      nil))]
