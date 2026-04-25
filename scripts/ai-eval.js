@@ -180,10 +180,15 @@ async function main() {
   const results = [];
   const t0 = Date.now();
 
+  // Y2 (2026-04-25): --retry=N 자가복구 — fail 시 ErrorCode/힌트로 AI 재시도
+  const RETRY_MAX = Number(process.argv.find(a => a.startsWith("--retry="))?.split("=")[1] ?? "0");
+
   for (let idx = 0; idx < tasks.length; idx++) {
     const task = tasks[idx];
     const tStart = Date.now();
     let response = null, code = null, verifyResult = null, pass = false, error = null;
+    let firstPass = false; // 1차 PASS 여부 (재시도 없이)
+    let retries = 0;
 
     try {
       response = await provider.ask(systemPrompt, task.prompt, task);
@@ -191,15 +196,44 @@ async function main() {
       if (!code) {
         error = "응답에서 .fl 코드 추출 실패";
       } else {
-        if (SOLUTIONS_OUT) {
-          fs.writeFileSync(path.join(SOLUTIONS_OUT, task.id + ".fl"), code, "utf-8");
-        }
         verifyResult = runWithVerify(code);
         if (verifyResult.status === "success") {
           pass = validate(verifyResult.stdout, task.validation);
+          firstPass = pass;
         } else {
           error = "실행 실패: " + (verifyResult.errorContext?.code ?? "unknown");
         }
+      }
+
+      // Y2: 자가복구 retry
+      while (!pass && retries < RETRY_MAX) {
+        retries++;
+        // 재요청 prompt: 원본 + 실패 정보 + ErrorCode/힌트
+        const errCode = verifyResult?.errorContext?.code ?? "FAIL";
+        const errMsg = verifyResult?.feedback?.hint ?? error ?? "이전 답이 task validation 통과 못함";
+        const stdout = verifyResult?.stdout ?? "";
+        const retryPrompt = task.prompt + "\n\n=== 이전 시도 실패 ===\n" +
+          "코드:\n```fl\n" + (code ?? "") + "\n```\n" +
+          "에러 코드: " + errCode + "\n" +
+          "힌트: " + errMsg + "\n" +
+          (stdout ? "stdout: " + stdout.slice(0, 200) + "\n" : "") +
+          "다시 시도하세요. 한 가지 정답만, 마크다운 1블록.";
+        try {
+          response = await provider.ask(systemPrompt, retryPrompt, task);
+          code = extractFLCode(response) ?? code;
+          verifyResult = runWithVerify(code);
+          if (verifyResult.status === "success") {
+            pass = validate(verifyResult.stdout, task.validation);
+          }
+        } catch (e) {
+          error = e.message?.slice(0, 200);
+          break;
+        }
+      }
+
+      // 최종 코드 저장 (성공 또는 마지막 시도)
+      if (SOLUTIONS_OUT && code) {
+        fs.writeFileSync(path.join(SOLUTIONS_OUT, task.id + ".fl"), code, "utf-8");
       }
     } catch (e) {
       error = e.message?.slice(0, 200);
@@ -207,8 +241,9 @@ async function main() {
 
     const elapsed = Date.now() - tStart;
     const icon = pass ? "✅" : "❌";
+    const retryTag = retries > 0 ? ` (retry x${retries}${firstPass ? "" : pass ? " 자가복구" : ""})` : "";
     const label = `[${idx + 1}/${tasks.length}]`;
-    console.log(`  ${icon} ${label} ${task.id} (${task.difficulty}) — ${pass ? "PASS" : "FAIL"} ${elapsed}ms`);
+    console.log(`  ${icon} ${label} ${task.id} (${task.difficulty}) — ${pass ? "PASS" : "FAIL"}${retryTag} ${elapsed}ms`);
     if (!pass && VERBOSE) {
       if (error) console.log(`     err: ${error}`);
       else if (verifyResult?.stdout) console.log(`     stdout: ${verifyResult.stdout.slice(0, 100)}`);
@@ -219,6 +254,8 @@ async function main() {
       category: task.category,
       difficulty: task.difficulty,
       pass,
+      first_pass: firstPass,    // Y2: 1차 PASS (재시도 없이)
+      retries,                  // Y2: 재시도 횟수
       error,
       elapsed_ms: elapsed,
       stdout: verifyResult?.stdout?.slice(-200),
@@ -228,7 +265,10 @@ async function main() {
 
   const total = results.length;
   const passed = results.filter(r => r.pass).length;
+  const firstPassed = results.filter(r => r.first_pass).length;  // Y2
+  const recovered = results.filter(r => r.pass && !r.first_pass).length;  // Y2: 자가복구
   const score = total > 0 ? ((passed / total) * 100).toFixed(1) : "0.0";
+  const firstScore = total > 0 ? ((firstPassed / total) * 100).toFixed(1) : "0.0";
   const totalElapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
   // 카테고리/난이도별 분석
@@ -244,6 +284,10 @@ async function main() {
   }
 
   console.log(`\n📊 결과: ${passed}/${total} PASS (${score}%) — ${totalElapsed}s`);
+  if (RETRY_MAX > 0) {
+    console.log(`   1차 PASS: ${firstPassed}/${total} (${firstScore}%) — 재시도 없이`);
+    console.log(`   자가복구: ${recovered}/${total} (${total > 0 ? ((recovered/total)*100).toFixed(1) : "0.0"}%) — fail → ErrorCode/힌트 → AI 재시도 후 PASS`);
+  }
   console.log(`\n  카테고리별:`);
   for (const [cat, s] of Object.entries(byCategory).sort()) {
     console.log(`    ${cat.padEnd(20)} ${s.pass}/${s.total} (${(s.pass/s.total*100).toFixed(0)}%)`);

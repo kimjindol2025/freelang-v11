@@ -1,0 +1,35 @@
+{
+  "label": "y2-test",
+  "provider": "mock",
+  "timestamp": "2026-04-25T16:47:55.874Z",
+  "elapsed_seconds": 0.5,
+  "total": 1,
+  "passed": 1,
+  "score": 100,
+  "by_category": {
+    "arithmetic": {
+      "pass": 1,
+      "total": 1
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "pass": 1,
+      "total": 1
+    }
+  },
+  "results": [
+    {
+      "id": "T01_arithmetic_basic",
+      "category": "arithmetic",
+      "difficulty": "easy",
+      "pass": true,
+      "first_pass": true,
+      "retries": 0,
+      "error": null,
+      "elapsed_ms": 486,
+      "stdout": "8\n",
+      "response_length": 54
+    }
+  ]
+}
