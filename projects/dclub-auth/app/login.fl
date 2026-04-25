@@ -1,0 +1,74 @@
+;; login.fl — POST /login
+;;
+;; /authorize 가 SSR한 폼의 제출 처리. 비밀번호 검증 후 authorization code
+;; 발급, redirect_uri 로 302 리다이렉트.
+
+(load "projects/dclub-auth/lib/users-store.fl")
+(load "projects/dclub-auth/lib/code-store.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+;; ── 폼 인코딩 파싱 (application/x-www-form-urlencoded) ───
+;; FreeLang server_req_body 는 raw body string 반환. 자체 파서 필요.
+
+;; URL decode 간이 구현 — `+` → space, `%xx` → byte
+;; PKCE challenge는 base64url(A-Z/a-z/0-9/-/_)이라 percent 안 나옴.
+;; scope의 공백(+)과 redirect_uri의 콜론·슬래시(%3A %2F)만 처리.
+[FUNC url-decode :params [$s]
+  :body (let [
+    s1 (regex_replace $s "\\+" " ")
+    s2 (regex_replace $s1 "%3A" ":")
+    s3 (regex_replace $s2 "%3a" ":")
+    s4 (regex_replace $s3 "%2F" "/")
+    s5 (regex_replace $s4 "%2f" "/")
+    s6 (regex_replace $s5 "%20" " ")
+  ]
+    $s6)]
+
+[FUNC parse-form-pair :params [$pair]
+  :body (let [
+    parts (str_split $pair "=" 2)
+  ]
+    (if (= (length $parts) 2)
+      [(get $parts 0) (url-decode (get $parts 1))]
+      [(get $parts 0) ""]))]
+
+(define parse-form
+  (fn [body]
+    (let [pairs (str_split body "&")]
+      (reduce
+        (fn [acc pair]
+          (let [kv (parse-form-pair pair)]
+            (assoc acc (get kv 0) (get kv 1))))
+        {}
+        pairs))))
+
+[FUNC handle-login :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    body (server_req_body $req)
+    form (parse-form $body)
+    username (or (get $form "username") "")
+    password (or (get $form "password") "")
+    client_id (or (get $form "client_id") "")
+    redirect_uri (or (get $form "redirect_uri") "")
+    scope (or (get $form "scope") "openid")
+    state (or (get $form "state") "")
+    nonce (or (get $form "nonce") "")
+    challenge (or (get $form "code_challenge") "")
+    method (or (get $form "code_challenge_method") "S256")
+  ]
+    (let [user (users-verify-password $db $username $password)]
+      (if (= $user nil)
+        (server_status 401
+          (str "<!DOCTYPE html><html><head><meta charset=utf-8></head><body>"
+               "<h1>로그인 실패</h1>"
+               "<p>사용자명 또는 비밀번호가 올바르지 않습니다.</p>"
+               "<a href=javascript:history.back()>뒤로</a></body></html>"))
+        (let [
+          uid (get $user "id")
+          lifetime (get $cfg "code_lifetime")
+          code (codes-issue $db $client_id $uid $redirect_uri $scope $nonce $challenge $method $lifetime)
+          loc (str $redirect_uri "?code=" code "&state=" $state)
+        ]
+          (server_redirect $loc)))))]

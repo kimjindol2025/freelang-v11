@@ -9,6 +9,7 @@ import {
   createSign,
   createVerify,
   createPublicKey,
+  createHash,
   KeyObject,
 } from "crypto";
 
@@ -55,6 +56,11 @@ export function createCryptoRsaModule() {
     },
 
     // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
+
+    // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
+    "pkce_s256": (verifier: string): string => {
+      return createHash("sha256").update(verifier, "utf8").digest("base64url");
+    },
 
     // crypto_rsa_public_to_jwk public_pem kid -> map (kty/n/e/kid/alg/use)
     "crypto_rsa_public_to_jwk": (
