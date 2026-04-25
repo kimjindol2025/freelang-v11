@@ -1,0 +1,52 @@
+;; server.fl — dclub-analytics HTTP API (Phase Y1)
+;;
+;; 라우트:
+;;   GET  /health
+;;   POST /track          (CORS — 외부 사이트에서 호출)
+;;   GET  /pixel.gif      (no-JS fallback)
+;;   GET  /sdk.js         (트래커 JS 정적 서빙)
+;;   GET  /dashboard?site=...
+;;   POST /sites          (인증 필요)
+;;   GET  /sites          (인증 필요)
+
+(load "projects/dclub-analytics/lib/config.fl")
+(load "projects/dclub-analytics/lib/sites-store.fl")
+(load "projects/dclub-analytics/lib/events-store.fl")
+(load "projects/dclub-analytics/app/track.fl")
+(load "projects/dclub-analytics/app/pixel.fl")
+(load "projects/dclub-analytics/app/dashboard.fl")
+(load "projects/dclub-analytics/app/sites.fl")
+
+(define cfg (dclub-analytics-config))
+(define DB (get $cfg "db"))
+(sites-ensure-table $DB)
+(events-ensure-table $DB)
+
+;; 데모용 기본 사이트 시드 (smoke 가 의존)
+(if (= (sites-find $DB "s_demo") nil)
+  (sites-create $DB "s_demo" "demo" "demo.local")
+  nil)
+
+[FUNC handle-an-health :params [$req]
+  :body (server_json {:status "ok"
+                      :db $DB
+                      :n_sites (length (db_query $DB "SELECT site_id FROM sites" []))
+                      :ts (now_ms)})]
+
+[FUNC handle-an-sdk :params [$req]
+  :body (let [
+    js-text (file_read "projects/dclub-analytics/sdk/analytics-client.js")
+  ]
+    (server_text $js-text))]
+
+;; 구체적 경로 먼저 등록 (first-match-wins)
+(server_get "/health" "handle-an-health")
+(server_get "/sdk.js" "handle-an-sdk")
+(server_get "/pixel.gif" "handle-pixel")
+(server_get "/dashboard" "handle-dashboard")
+(server_post "/track" "handle-track")
+(server_post "/sites" "handle-sites-create")
+(server_get "/sites" "handle-sites-list")
+
+(println (str "[dclub-analytics] db=" $DB " port=" (get $cfg "port")))
+(server_start (get $cfg "port"))

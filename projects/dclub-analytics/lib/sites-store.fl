@@ -1,0 +1,42 @@
+;; sites-store.fl — 사용자가 등록한 사이트 (site_id) 관리
+
+[FUNC sites-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS sites (
+      site_id     TEXT PRIMARY KEY,
+      owner       TEXT NOT NULL,
+      domain      TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_sites_owner ON sites(owner)"))]
+
+[FUNC sites-create :params [$db $site-id $owner $domain]
+  :body (do
+    (db_insert $db "sites" {
+      :site_id $site-id
+      :owner $owner
+      :domain $domain
+      :created_at (now_iso)
+    })
+    {:site_id $site-id :owner $owner :domain $domain})]
+
+[FUNC sites-find :params [$db $site-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT site_id, owner, domain, created_at FROM sites WHERE site_id=?"
+      [$site-id])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC sites-list-by-owner :params [$db $owner]
+  :body (db_query $db
+    "SELECT site_id, owner, domain, created_at FROM sites WHERE owner=? ORDER BY created_at DESC"
+    [$owner])]
+
+[FUNC sites-delete :params [$db $site-id $owner]
+  :body (db_delete_row $db "sites"
+    (str "site_id='" $site-id "' AND owner='" $owner "'"))]
+
+;; site-id 생성 — 짧은 random 토큰
+[FUNC sites-generate-id :params []
+  :body (str "s_" (substring (auth_sha256 (str (now_ms) "_" (now_unix))) 0 12))]

@@ -1,0 +1,49 @@
+;; track.fl — POST /track  (CORS 전체 허용 — server.ts 가 자동 추가)
+;;
+;; body 예:
+;;   {
+;;     "site_id": "s_abc",
+;;     "type": "pageview" | "event" | "session_start",
+;;     "page": "/post/123",
+;;     "referrer": "https://google.com",
+;;     "session_id": "se_xyz",
+;;     "name": "click_signup",  ;; type=event 일 때
+;;     "props": {...}
+;;   }
+
+(load "projects/dclub-analytics/lib/config.fl")
+(load "projects/dclub-analytics/lib/sites-store.fl")
+(load "projects/dclub-analytics/lib/events-store.fl")
+
+[FUNC handle-track :params [$req]
+  :body (let [
+    cfg (dclub-analytics-config)
+    db (get $cfg "db")
+    salt (get $cfg "ip_salt")
+    body-raw (server_req_body $req)
+    body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+    site-id (or (get $body "site_id") "")
+    site-row (sites-find $db $site-id)
+  ]
+    (if (= $site-row nil)
+      (server_status 404 {:error "unknown_site_id"})
+      (let [
+        ev-type (or (get $body "type") "pageview")
+        page (or (get $body "page") "/")
+        referrer (or (get $body "referrer") "")
+        session (or (get $body "session_id") "")
+        ua (server_req_header $req "user-agent")
+        xff (server_req_header $req "x-forwarded-for")
+        comma-idx (if (= $xff nil) -1 (str_find $xff ","))
+        ip (cond
+          [(= $xff nil) "127.0.0.1"]
+          [(< $comma-idx 0) $xff]
+          [true (substring $xff 0 $comma-idx)])
+        detail-map (cond
+          [(= $ev-type "event") {:name (or (get $body "name") "anon")
+                                  :props (or (get $body "props") {})}]
+          [true (or (get $body "props") {})])
+      ]
+        (do
+          (events-record $db $site-id $ev-type $page $referrer $ua $ip $session $detail-map $salt)
+          (server_json {:status "ok"})))))]

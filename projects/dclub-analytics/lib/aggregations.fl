@@ -1,0 +1,135 @@
+;; aggregations.fl — 대시보드용 집계 SQL
+
+;; 24h 페이지뷰 시간별 분포 (24개 bin)
+[FUNC agg-pageviews-hourly :params [$db $site-id]
+  :body (let [
+    cutoff (- (now_ms) (* 24 3600 1000))
+    rows (db_query $db
+      (str "SELECT ts_ms FROM events "
+           "WHERE site_id=? AND event_type='pageview' AND ts_ms > " $cutoff)
+      [$site-id])
+    now (now_ms)
+    bins (map (fn [i] 0) (range 0 24))
+  ]
+    ;; 각 row 의 ts_ms 를 bin index 로 변환 후 누적
+    (reduce
+      (fn [acc row]
+        (let [
+          delta-h (/ (- $now (get $row "ts_ms")) (* 3600 1000))
+          idx (- 23 (* delta-h 1))
+          idx-clamped (cond
+            [(< $idx 0) 0]
+            [(> $idx 23) 23]
+            [true $idx])
+        ]
+          (assoc $acc $idx-clamped (+ (get $acc $idx-clamped) 1))))
+      $bins
+      $rows))]
+
+;; 7일 일별 분포
+[FUNC agg-pageviews-daily :params [$db $site-id]
+  :body (let [
+    cutoff (- (now_ms) (* 7 86400 1000))
+    rows (db_query $db
+      (str "SELECT ts_ms FROM events "
+           "WHERE site_id=? AND event_type='pageview' AND ts_ms > " $cutoff)
+      [$site-id])
+    now (now_ms)
+    bins (map (fn [i] 0) (range 0 7))
+  ]
+    (reduce
+      (fn [acc row]
+        (let [
+          delta-d (/ (- $now (get $row "ts_ms")) (* 86400 1000))
+          idx (- 6 (* delta-d 1))
+          idx-clamped (cond
+            [(< $idx 0) 0]
+            [(> $idx 6) 6]
+            [true $idx])
+        ]
+          (assoc $acc $idx-clamped (+ (get $acc $idx-clamped) 1))))
+      $bins
+      $rows))]
+
+;; 상위 페이지 (24h)
+[FUNC agg-top-pages :params [$db $site-id $limit]
+  :body (let [cutoff (- (now_ms) (* 24 3600 1000))]
+    (db_query $db
+      (str "SELECT page, COUNT(*) as n FROM events "
+           "WHERE site_id=? AND event_type='pageview' AND ts_ms > " $cutoff
+           " GROUP BY page ORDER BY n DESC LIMIT " $limit)
+      [$site-id]))]
+
+;; 디바이스 분포 (24h)
+[FUNC agg-device-breakdown :params [$db $site-id]
+  :body (let [cutoff (- (now_ms) (* 24 3600 1000))]
+    (db_query $db
+      (str "SELECT device, COUNT(*) as n FROM events "
+           "WHERE site_id=? AND ts_ms > " $cutoff
+           " GROUP BY device ORDER BY n DESC")
+      [$site-id]))]
+
+;; 국가 분포 (24h)
+[FUNC agg-country-breakdown :params [$db $site-id]
+  :body (let [cutoff (- (now_ms) (* 24 3600 1000))]
+    (db_query $db
+      (str "SELECT country, COUNT(*) as n FROM events "
+           "WHERE site_id=? AND ts_ms > " $cutoff
+           " GROUP BY country ORDER BY n DESC LIMIT 20")
+      [$site-id]))]
+
+;; 레퍼러 (24h)
+[FUNC agg-referrers :params [$db $site-id $limit]
+  :body (let [cutoff (- (now_ms) (* 24 3600 1000))]
+    (db_query $db
+      (str "SELECT referrer, COUNT(*) as n FROM events "
+           "WHERE site_id=? AND event_type='pageview' AND referrer != '' AND ts_ms > " $cutoff
+           " GROUP BY referrer ORDER BY n DESC LIMIT " $limit)
+      [$site-id]))]
+
+;; 고유 세션 수 (24h)
+[FUNC agg-unique-sessions :params [$db $site-id]
+  :body (let [
+    cutoff (- (now_ms) (* 24 3600 1000))
+    rows (db_query $db
+      (str "SELECT COUNT(DISTINCT session_id) as n FROM events "
+           "WHERE site_id=? AND ts_ms > " $cutoff
+           " AND session_id != ''")
+      [$site-id])
+  ]
+    (if (= (length $rows) 0) 0 (get (get $rows 0) "n")))]
+
+;; 24h 총 페이지뷰
+[FUNC agg-total-pageviews :params [$db $site-id]
+  :body (let [
+    cutoff (- (now_ms) (* 24 3600 1000))
+    rows (db_query $db
+      (str "SELECT COUNT(*) as n FROM events "
+           "WHERE site_id=? AND event_type='pageview' AND ts_ms > " $cutoff)
+      [$site-id])
+  ]
+    (if (= (length $rows) 0) 0 (get (get $rows 0) "n")))]
+
+;; ── SVG sparkline 생성 ────────────────────────
+;; values 배열 → polyline svg 문자열
+[FUNC svg-sparkline :params [$values $width $height $color]
+  :body (let [
+    n (length $values)
+    max-v (if (= $n 0) 1
+            (let [m (reduce (fn [a v] (if (> $v $a) $v $a)) 0 $values)]
+              (if (= $m 0) 1 $m)))
+    step (if (<= $n 1) 0 (/ $width (- $n 1)))
+    points (str_join " "
+      (map (fn [i]
+        (let [
+          v (get $values $i)
+          x (* $i $step)
+          y (- $height (* (/ $v $max-v) (- $height 4)))
+        ]
+          (str $x "," $y)))
+        (range 0 $n)))
+  ]
+    (str "<svg width='" $width "' height='" $height
+         "' xmlns='http://www.w3.org/2000/svg' style='vertical-align:middle'>"
+         "<polyline fill='none' stroke='" $color "' stroke-width='2' points='" $points "'/>"
+         "</svg>"))]
