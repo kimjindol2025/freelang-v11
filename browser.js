@@ -6370,6 +6370,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   var createSign = rsaUnsupported;
   var createVerify = rsaUnsupported;
   var createPublicKey = rsaUnsupported;
+  var scryptSync = () => {
+    throw new Error("scryptSync unavailable in browser stub");
+  };
 
   // src/evolve.ts
   var EvolutionEngine = class {
@@ -19142,6 +19145,51 @@ ${cssVars.join(";\n")};
         const o = typeof obj === "string" ? JSON.parse(obj) : obj;
         return JSON.stringify(o, null, 2);
       },
+      // ── Hyphen alias (Phase 후속 — Claude 평가에서 발견된 자주 틀리는 함수명) ──
+      // AI가 Lisp 관례 따라 hyphen으로 작성하는 경우 호환
+      "json-parse": (str) => {
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          throw new Error(`json-parse: invalid JSON: ${e.message}`);
+        }
+      },
+      "json-stringify": (obj) => JSON.stringify(obj),
+      "json-str": (obj) => JSON.stringify(obj),
+      "json-pretty": (obj) => {
+        const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+        return JSON.stringify(o, null, 2);
+      },
+      "json-merge": (a, b) => {
+        const x = typeof a === "string" ? JSON.parse(a) : a;
+        const y = typeof b === "string" ? JSON.parse(b) : b;
+        return { ...x, ...y };
+      },
+      "json-get": (obj, path) => {
+        const parts = String(path).split(".");
+        let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
+        for (const p of parts) {
+          if (cur === null || cur === void 0) return null;
+          cur = Array.isArray(cur) ? cur[parseInt(p, 10)] : cur[p];
+        }
+        return cur ?? null;
+      },
+      "json-set": (obj, path, value) => {
+        const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
+        const clone = JSON.parse(JSON.stringify(parsed));
+        const parts = String(path).split(".");
+        let cur = clone;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const p = parts[i];
+          if (cur[p] === void 0 || cur[p] === null) cur[p] = {};
+          cur = cur[p];
+        }
+        cur[parts[parts.length - 1]] = value;
+        return clone;
+      },
+      "json-keys": (obj) => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.keys(obj) : [],
+      "json-vals": (obj) => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.values(obj) : [],
+      "json-values": (obj) => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.values(obj) : [],
       // json_has obj key -> boolean (check if key exists)
       "json_has": (obj, key) => {
         const o = typeof obj === "string" ? JSON.parse(obj) : obj;
@@ -20117,6 +20165,93 @@ ${cssVars.join(";\n")};
           alg: "RS256",
           use: "sig"
         };
+      }
+    };
+  }
+
+  // src/stdlib-totp.ts
+  init_define_process_env();
+  var BASE32_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  function base32Encode(buf) {
+    let bits = 0, value = 0, output = "";
+    for (let i = 0; i < buf.length; i++) {
+      value = value << 8 | buf[i];
+      bits += 8;
+      while (bits >= 5) {
+        output += BASE32_ALPHA[value >>> bits - 5 & 31];
+        bits -= 5;
+      }
+    }
+    if (bits > 0) output += BASE32_ALPHA[value << 5 - bits & 31];
+    return output;
+  }
+  function base32Decode(str) {
+    const clean = str.replace(/=+$/, "").toUpperCase();
+    let bits = 0, value = 0;
+    const out = [];
+    for (let i = 0; i < clean.length; i++) {
+      const idx = BASE32_ALPHA.indexOf(clean[i]);
+      if (idx === -1) throw new Error(`invalid base32 char: ${clean[i]}`);
+      value = value << 5 | idx;
+      bits += 5;
+      if (bits >= 8) {
+        out.push(value >>> bits - 8 & 255);
+        bits -= 8;
+      }
+    }
+    return Buffer.from(out);
+  }
+  function hotp(secret, counter, digits = 6) {
+    const ctrBuf = Buffer.alloc(8);
+    const high = Math.floor(counter / 4294967296);
+    const low = counter >>> 0;
+    ctrBuf.writeUInt32BE(high, 0);
+    ctrBuf.writeUInt32BE(low, 4);
+    const hmac = createHmac("sha1", secret).update(ctrBuf).digest();
+    const offset = hmac[hmac.length - 1] & 15;
+    const truncated = (hmac[offset] & 127) << 24 | (hmac[offset + 1] & 255) << 16 | (hmac[offset + 2] & 255) << 8 | hmac[offset + 3] & 255;
+    const code = truncated % Math.pow(10, digits);
+    return code.toString().padStart(digits, "0");
+  }
+  function totpCounter(unixSeconds, step = 30) {
+    return Math.floor(unixSeconds / step);
+  }
+  function createTotpModule() {
+    return {
+      // totp_secret_generate bytes -> string (base32, default 20 bytes = 160 bits = 32 chars)
+      "totp_secret_generate": (bytes = 20) => {
+        const buf = randomBytes(bytes);
+        return base32Encode(buf);
+      },
+      // totp_now secret_b32 -> string (현재 시각의 6자리 코드, 디버그·등록용)
+      "totp_now": (secretB32) => {
+        const secret = base32Decode(secretB32);
+        const counter = totpCounter(Math.floor(Date.now() / 1e3));
+        return hotp(secret, counter, 6);
+      },
+      // totp_verify secret_b32 code window_steps -> boolean
+      // window=1 → 현재 ±1 step (총 90초 윈도우) 허용 (시계 오차 보정)
+      "totp_verify": (secretB32, code, window2 = 1) => {
+        try {
+          if (!/^\d+$/.test(code)) return false;
+          const secret = base32Decode(secretB32);
+          const now = totpCounter(Math.floor(Date.now() / 1e3));
+          const expected = Buffer.from(code);
+          for (let i = -window2; i <= window2; i++) {
+            const candidate = Buffer.from(hotp(secret, now + i, code.length));
+            if (candidate.length === expected.length && timingSafeEqual(candidate, expected)) {
+              return true;
+            }
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      },
+      // totp_uri label issuer secret_b32 -> string (otpauth://totp/... QR 코드 표준)
+      "totp_uri": (label, issuer, secretB32) => {
+        const enc = (s) => encodeURIComponent(s);
+        return `otpauth://totp/${enc(issuer)}:${enc(label)}?secret=${secretB32}&issuer=${enc(issuer)}&algorithm=SHA1&digits=6&period=30`;
       }
     };
   }
@@ -21768,16 +21903,39 @@ ${cssVars.join(";\n")};
           ((_a = req == null ? void 0 : req.headers) == null ? void 0 : _a["x-api-key"]) ?? ((_b = req == null ? void 0 : req.query) == null ? void 0 : _b.api_key) ?? ((_c = req == null ? void 0 : req.body) == null ? void 0 : _c.api_key) ?? ""
         );
       },
-      // ── Password hashing (sha256 + random salt) ──────────────
-      // auth_hash_password password → "salt:hash"
+      // ── Password hashing ──────────────────────────────────
+      // v1: SHA256+salt (legacy, 빠른 단점)
+      // v2: scrypt (RFC 7914, memory-hard, 산업 표준급)
+      //
+      // 신규 비밀번호는 v2 사용. 기존 v1 해시는 verify 시 성공하면 v2로 자동 마이그레이션
+      // (호출 측에서 새 해시 받아 DB 업데이트).
+      //
+      // 형식:
+      //   v1: "salt_hex:sha256_hex"
+      //   v2: "$scrypt$N=16384,r=8,p=1$salt_b64$hash_b64"   (PHC 풍 식별자)
+      // auth_hash_password password → "$scrypt$..." (v2)
       "auth_hash_password": (password) => {
-        const salt = randomBytes(16).toString("hex");
-        const hash = createHash("sha256").update(salt + password).digest("hex");
-        return `${salt}:${hash}`;
+        const N = 16384, r = 8, p = 1, keyLen = 64;
+        const salt = randomBytes(16);
+        const hash = scryptSync(password, salt, keyLen, { N, r, p });
+        return `$scrypt$N=${N},r=${r},p=${p}$${salt.toString("base64")}$${hash.toString("base64")}`;
       },
       // auth_verify_password password stored → boolean
+      // 두 포맷 모두 자동 인식.
       "auth_verify_password": (password, stored) => {
         try {
+          if (stored.startsWith("$scrypt$")) {
+            const parts = stored.split("$");
+            if (parts.length !== 5) return false;
+            const params = Object.fromEntries(
+              parts[2].split(",").map((kv) => kv.split("=").map((s) => s.trim()))
+            );
+            const N = Number(params.N), r = Number(params.r), p = Number(params.p);
+            const salt2 = Buffer.from(parts[3], "base64");
+            const expected = Buffer.from(parts[4], "base64");
+            const computed2 = scryptSync(password, salt2, expected.length, { N, r, p });
+            return expected.length === computed2.length && timingSafeEqual(expected, computed2);
+          }
           const [salt, hash] = stored.split(":");
           const computed = createHash("sha256").update(salt + password).digest("hex");
           const a = Buffer.from(hash, "hex");
@@ -21786,6 +21944,11 @@ ${cssVars.join(";\n")};
         } catch {
           return false;
         }
+      },
+      // auth_password_needs_rehash stored → boolean
+      // true면 호출 측은 새로 hash 후 DB 업데이트 (점진적 v1→v2 마이그레이션)
+      "auth_password_needs_rehash": (stored) => {
+        return !stored.startsWith("$scrypt$");
       },
       // ── Tokens / HMAC ────────────────────────────────────────
       // auth_random_token bytes → hex string
@@ -26394,6 +26557,7 @@ ${exportsStr}
     interp2.registerModule(createTimeModule());
     interp2.registerModule(createCryptoModule());
     interp2.registerModule(createCryptoRsaModule());
+    interp2.registerModule(createTotpModule());
     interp2.registerModule(createWorkflowModule());
     interp2.registerModule(createResourceModule());
     interp2.registerModule(createHttpServerModule(
@@ -27274,10 +27438,17 @@ ${tail}` : "")
       return callAsyncFunctionValue(interp2, fn, args);
     } else if (typeof fn === "function") {
       return fn(...args);
-    } else if (fn.params && fn.body) {
+    } else if (typeof fn === "string") {
+      const wrappedArgs = args.map((v) => ({
+        kind: "literal",
+        value: v,
+        type: v === null ? "any" : Array.isArray(v) ? "list" : typeof v
+      }));
+      return interp2.eval({ kind: "sexpr", op: fn, args: wrappedArgs });
+    } else if (fn && fn.params && fn.body) {
       return callUserFunction(interp2, fn.name || "anonymous", args);
     } else {
-      throw new Error(`Cannot call ${typeof fn}`);
+      throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
     }
   }
   function callUserFunctionTCO(interp2, name, args) {
