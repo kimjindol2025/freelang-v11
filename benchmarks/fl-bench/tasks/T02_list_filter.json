@@ -1,0 +1,12 @@
+{
+  "id": "T02_list_filter",
+  "category": "list",
+  "difficulty": "easy",
+  "prompt": "정수 리스트 [1 2 3 4 5 6]에서 짝수만 골라 출력하는 FreeLang 코드를 작성하세요. 결과는 [2 4 6] 형태여야 합니다.",
+  "validation": {
+    "type": "stdout_regex",
+    "expected": "\\[\\s*2\\s+4\\s+6\\s*\\]|\\(2 4 6\\)|2,4,6|2.*4.*6"
+  },
+  "reference_solution": "(println (filter even? (list 1 2 3 4 5 6)))",
+  "tags": ["filter", "even?", "list"]
+}

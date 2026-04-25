@@ -1081,13 +1081,17 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 
     // Array Operations
     case "filter": {
-      if (!Array.isArray(args[0])) return [];
-      const filterFn = args[1];
-      if (typeof filterFn === "function") return args[0].filter(filterFn);
+      // 자동 인자 순서 감지: (filter fn list) 또는 (filter list fn) 모두 허용
+      // Lisp 관례 fn-first가 우선, list-first도 호환
+      let coll: any, filterFn: any;
+      if (Array.isArray(args[0])) { coll = args[0]; filterFn = args[1]; }
+      else if (Array.isArray(args[1])) { filterFn = args[0]; coll = args[1]; }
+      else return [];
+      if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && (filterFn as any).kind === "function-value") {
-        return args[0].filter((item: any) => callFnVal(filterFn, [item]));
+        return coll.filter((item: any) => callFnVal(filterFn, [item]));
       }
-      return args[0];
+      return coll;
     }
     case "find":
       if (Array.isArray(args[0])) {

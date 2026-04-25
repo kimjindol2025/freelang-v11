@@ -1,0 +1,45 @@
+{
+  "label": "reference-sanity",
+  "timestamp": "2026-04-25T10:28:01.328Z",
+  "total": 5,
+  "pass": 3,
+  "fail": 2,
+  "skip": 0,
+  "score": 60,
+  "results": [
+    {
+      "id": "T01_arithmetic_basic",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "arithmetic",
+      "stdout": "8\n"
+    },
+    {
+      "id": "T02_list_filter",
+      "status": "fail",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[]\n"
+    },
+    {
+      "id": "T03_string_reverse",
+      "status": "fail",
+      "reason": "execution failed",
+      "errorCode": "E_FN_NOT_FOUND"
+    },
+    {
+      "id": "T04_nil_safe_get",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "error-handling",
+      "stdout": "unknown\nunknown\nAlice\n"
+    },
+    {
+      "id": "T05_recursion_factorial",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "recursion",
+      "stdout": "120\n"
+    }
+  ]
+}

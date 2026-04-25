@@ -1,0 +1,12 @@
+{
+  "id": "T03_string_reverse",
+  "category": "string",
+  "difficulty": "medium",
+  "prompt": "문자열을 받아서 뒤집어 반환하는 reverse-str 함수를 FreeLang으로 정의하고, (reverse-str \"hello\")를 출력하세요. 결과는 olleh.",
+  "validation": {
+    "type": "stdout_contains",
+    "expected": "olleh"
+  },
+  "reference_solution": "(defn rev-helper [s i acc] (if (< i 0) acc (rev-helper s (- i 1) (str acc (char-at s i)))))\n(defn reverse-str [s] (rev-helper s (- (length s) 1) \"\"))\n(println (reverse-str \"hello\"))",
+  "tags": ["string", "defn", "stdlib-str"]
+}

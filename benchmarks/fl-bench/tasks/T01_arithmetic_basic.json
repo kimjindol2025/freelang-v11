@@ -1,0 +1,12 @@
+{
+  "id": "T01_arithmetic_basic",
+  "category": "arithmetic",
+  "difficulty": "easy",
+  "prompt": "두 숫자를 받아서 합을 반환하는 add 함수를 FreeLang으로 정의하고, (add 3 5)를 실행한 결과를 println으로 출력하세요.",
+  "validation": {
+    "type": "stdout_contains",
+    "expected": "8"
+  },
+  "reference_solution": "(defn add [a b] (+ a b))\n(println (add 3 5))",
+  "tags": ["defn", "arithmetic", "println"]
+}

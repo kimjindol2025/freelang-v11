@@ -11918,13 +11918,19 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "repeat":
       return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
     case "filter": {
-      if (!Array.isArray(args2[0])) return [];
-      const filterFn = args2[1];
-      if (typeof filterFn === "function") return args2[0].filter(filterFn);
+      let coll, filterFn;
+      if (Array.isArray(args2[0])) {
+        coll = args2[0];
+        filterFn = args2[1];
+      } else if (Array.isArray(args2[1])) {
+        filterFn = args2[0];
+        coll = args2[1];
+      } else return [];
+      if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && filterFn.kind === "function-value") {
-        return args2[0].filter((item) => callFnVal(filterFn, [item]));
+        return coll.filter((item) => callFnVal(filterFn, [item]));
       }
-      return args2[0];
+      return coll;
     }
     case "find":
       if (Array.isArray(args2[0])) {
