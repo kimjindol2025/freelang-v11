@@ -10,6 +10,7 @@
 (load "projects/dclub-auth/lib/user-tokens.fl")
 (load "projects/dclub-auth/lib/audit-log.fl")
 (load "projects/dclub-auth/lib/rate-limit.fl")
+(load "projects/dclub-auth/lib/mail.fl")
 (load "projects/dclub-auth/lib/config.fl")
 
 ;; nil-or-empty 는 login.fl 에 정의됨 (이 파일 후 server.fl에서 같이 로드).
@@ -128,7 +129,9 @@
                     {:email_verified 0}
                     (str "id='" $uid "'"))
                   (audit-log $db "user.signup" $uid nil $ip {:username $username :email $email})
-                  (println (str "[signup] verify URL for " $email ": " $verify-url))
+                  (mail-send $db $email
+                    "dclub-auth 이메일 인증"
+                    (str "안녕하세요 " $username ",\n\n아래 링크를 클릭해 이메일을 인증하세요 (24시간 유효):\n\n" $verify-url "\n\n--\ndclub-auth"))
                   (server_html (signup-success-html $verify-url)))))))]))]
 
 ;; ── GET /verify-email?token=X ──────────────────────
