@@ -1,0 +1,1 @@
+{"id":"T147_recur_power","category":"recursion","difficulty":"medium","prompt":"2의 8승(256)을 재귀 power 함수로 계산.","validation":{"type":"stdout_contains","expected":"256"},"reference_solution":"(defn power [b e] (if (= e 0) 1 (* b (power b (- e 1)))))\n(println (power 2 8))","tags":["recursion","power"]}

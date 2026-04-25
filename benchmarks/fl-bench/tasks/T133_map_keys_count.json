@@ -1,0 +1,1 @@
+{"id":"T133_map_keys_count","category":"map","difficulty":"easy","prompt":"맵 {:a 1 :b 2 :c 3 :d 4}의 키 갯수(4) 출력.","validation":{"type":"stdout_contains","expected":"4"},"reference_solution":"(println (length (json_keys {:a 1 :b 2 :c 3 :d 4})))","tags":["json_keys","length"]}

@@ -1,0 +1,1 @@
+{"id":"T135_sum_squares","category":"algorithm","difficulty":"medium","prompt":"1²+2²+3²+4²+5² = 55.","validation":{"type":"stdout_contains","expected":"55"},"reference_solution":"(println (reduce + 0 (map (fn [n] (* n n)) (range 1 6))))","tags":["sum-squares","reduce","map"]}

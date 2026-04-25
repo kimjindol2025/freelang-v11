@@ -1,0 +1,1 @@
+{"id":"T131_string_repeat_n","category":"string","difficulty":"easy","prompt":"\"=\"를 10번 반복.","validation":{"type":"stdout_contains","expected":"=========="},"reference_solution":"(println (str_repeat \"=\" 10))","tags":["str_repeat"]}

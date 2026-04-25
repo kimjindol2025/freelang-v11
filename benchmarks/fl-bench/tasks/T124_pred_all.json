@@ -1,0 +1,9 @@
+{
+  "id": "T124_pred_all",
+  "category": "list",
+  "difficulty": "medium",
+  "prompt": "(list 2 4 6 8) 모두 짝수인지 확인 (true). filter+length 또는 reduce.",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(println (= (length (list 2 4 6 8)) (length (filter (fn [x] (= 0 (% x 2))) (list 2 4 6 8)))))",
+  "tags": ["all?", "filter"]
+}

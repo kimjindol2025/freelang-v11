@@ -1,0 +1,9 @@
+{
+  "id": "T122_string_count_char",
+  "category": "string",
+  "difficulty": "medium",
+  "prompt": "문자열 \"hello world\" 안의 \"l\" 개수(3) 출력. (str-split + filter)",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(println (length (filter (fn [c] (= c \"l\")) (str-split \"hello world\" \"\"))))",
+  "tags": ["string", "filter", "count"]
+}

@@ -1,0 +1,1 @@
+{"id":"T134_higher_apply2","category":"higher-order","difficulty":"medium","prompt":"인자 두개를 받아 함수 적용. (apply2 (fn [a b] (* a b)) 3 4) → 12.","validation":{"type":"stdout_contains","expected":"12"},"reference_solution":"(defn apply2 [f a b] (f a b))\n(println (apply2 (fn [a b] (* a b)) 3 4))","tags":["higher-order"]}

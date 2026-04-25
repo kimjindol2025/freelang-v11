@@ -1,0 +1,1 @@
+{"id":"T132_list_double_each","category":"list","difficulty":"easy","prompt":"(range 1 6)의 각 요소를 두 배 [2 4 6 8 10] 첫 요소(2) 출력.","validation":{"type":"stdout_contains","expected":"2"},"reference_solution":"(println (first (map (fn [x] (* x 2)) (range 1 6))))","tags":["map","range"]}

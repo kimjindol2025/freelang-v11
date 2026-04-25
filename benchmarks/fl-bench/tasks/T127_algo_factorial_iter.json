@@ -1,0 +1,9 @@
+{
+  "id": "T127_algo_factorial_iter",
+  "category": "algorithm",
+  "difficulty": "medium",
+  "prompt": "5! = 120을 reduce + range로 반복 계산.",
+  "validation": { "type": "stdout_contains", "expected": "120" },
+  "reference_solution": "(println (reduce * 1 (range 1 6)))",
+  "tags": ["factorial", "reduce", "range"]
+}
