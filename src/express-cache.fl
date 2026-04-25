@@ -1,0 +1,224 @@
+;; ============================================
+;; Express.fl 캐싱 + 성능 최적화 예제
+;; ============================================
+;; 사용자 캐싱, 세션 관리, 실시간 알림
+;; 실행: node bootstrap.js run express-cache.fl
+
+(load "src/express.fl")
+
+;; ============ 상태 관리 ============
+
+(define *users-db* [
+  { :id 1 :name "홍길동" :email "hong@example.com" }
+  { :id 2 :name "김영희" :email "kim@example.com" }
+  { :id 3 :name "이순신" :email "lee@example.com" }
+])
+
+(define *sessions* {})
+
+;; ============ DB 모의 함수 (느린 작업 시뮬레이션) ============
+
+[FUNC slow-get-user :params [$id]
+  :body (let [
+    match-id (= (get (get *users-db* 0) "id") $id)
+  ]
+    (if match-id
+      (get *users-db* 0)
+      nil))
+]
+
+[FUNC slow-search-users :params [$query]
+  :body *users-db*
+]
+
+;; ============ 캐시된 API 함수 ============
+
+[FUNC get-user-cached :params [$id]
+  :body (let [
+    cache-key (str "user:" $id)
+    cached (cache-get $cache-key)
+  ]
+    (if cached
+      $cached
+      (let [user (slow-get-user $id)]
+        (do
+          (if user
+            (cache-set $cache-key user 300000))  ;; 5분 TTL
+          $user))))
+]
+
+[FUNC search-users-cached :params [$query]
+  :body (let [
+    cache-key (str "search:" $query)
+    cached (cache-get $cache-key)
+  ]
+    (if cached
+      $cached
+      (let [results (slow-search-users $query)]
+        (do
+          (cache-set $cache-key $results 600000)  ;; 10분 TTL
+          $results))))
+]
+
+;; ============ 세션 관리 ============
+
+[FUNC create-session :params [$user-id]
+  :body (let [
+    session-id (str "sess_" (now_ms))
+    session-data { :user_id $user-id :created_at (now_iso) }
+  ]
+    (do
+      (cache-set session-id $session-data 3600000)  ;; 1시간 TTL
+      (set! *sessions* (json_set *sessions* session-id $session-data))
+      session-id))
+]
+
+[FUNC get-session :params [$session-id]
+  :body (cache-get $session-id)
+]
+
+[FUNC invalidate-session :params [$session-id]
+  :body (do
+    (cache-del $session-id)
+    (set! *sessions* (json_del *sessions* $session-id)))
+]
+
+;; ============ 실시간 알림 (PubSub) ============
+
+[FUNC on-user-login :params [$data]
+  :body (do
+    (log-info (str "📢 로그인: " (get $data "username")))
+    (pubsub-publish "notifications" {
+      :type "user_login"
+      :username (get $data "username")
+      :timestamp (now_iso)
+    }))
+]
+
+[FUNC on-user-logout :params [$data]
+  :body (do
+    (log-info (str "📢 로그아웃: " (get $data "username")))
+    (pubsub-publish "notifications" {
+      :type "user_logout"
+      :username (get $data "username")
+      :timestamp (now_iso)
+    }))
+]
+
+;; ============ HTTP API 엔드포인트 ============
+
+[FUNC api-get-user :params [$req]
+  :body (let [
+    id (req-param $req "id")
+    user (get-user-cached (str-to-num id))
+  ]
+    (if user
+      (res-json { :success true :data $user })
+      (res-status 404 { :error "User not found" })))
+]
+
+[FUNC api-search-users :params [$req]
+  :body (let [
+    q (req-query $req "q")
+    results (if q (search-users-cached q) [])
+  ]
+    (res-json {
+      :success true
+      :query q
+      :results $results
+      :count 0
+    }))
+]
+
+[FUNC api-login :params [$req]
+  :body (let [
+    body (req-body $req)
+    username (get $body "username")
+    password (get $body "password")
+  ]
+    (if (and username password)
+      (let [session-id (create-session username)]
+        (do
+          (on-user-login { :username username })
+          (res-json {
+            :success true
+            :session_id session-id
+            :message "로그인 성공"
+          })))
+      (res-status 400 { :error "username과 password 필수" })))
+]
+
+[FUNC api-logout :params [$req]
+  :body (let [
+    session-id (req-header $req "X-Session-Id")
+  ]
+    (if session-id
+      (do
+        (invalidate-session session-id)
+        (on-user-logout { :username "user" })
+        (res-json { :success true :message "로그아웃 성공" }))
+      (res-status 400 { :error "X-Session-Id 헤더 필수" })))
+]
+
+[FUNC api-cache-info :params [$req]
+  :body (res-json {
+    :success true
+    :cache (cache-info)
+    :sessions 0
+  })
+]
+
+[FUNC api-cache-clear :params [$req]
+  :body (do
+    (cache-clear)
+    (res-json { :success true :message "캐시 전체 삭제" }))
+]
+
+[FUNC health :params [$req]
+  :body (res-json {
+    :status "OK"
+    :service "Express.fl Cache Performance"
+    :cache_size (cache_size)
+    :sessions 0
+    :timestamp (now_iso)
+  })
+]
+
+;; ============ 라우트 등록 ============
+
+(do
+  (log-info "🚀 캐싱 성능 최적화 서버 시작")
+
+  ;; 헬스 체크
+  (app-get "/health" "health")
+
+  ;; 캐시 관리
+  (app-get "/api/cache/info" "api-cache-info")
+  (app-post "/api/cache/clear" "api-cache-clear")
+
+  ;; 사용자 API (캐싱됨)
+  (app-get "/api/users/:id" "api-get-user")
+  (app-get "/api/users/search" "api-search-users")
+
+  ;; 세션 관리
+  (app-post "/api/login" "api-login")
+  (app-post "/api/logout" "api-logout")
+
+  ;; PubSub 구독 (선택)
+  (pubsub-subscribe "notifications" "log-info")
+
+  (log-info "✅ 라우트 등록 완료")
+  (println "")
+  (println "📊 캐싱 성능 최적화 서버")
+  (println "───────────────────────────────────")
+  (println "GET  /api/users/:id       - 캐시된 사용자 조회")
+  (println "GET  /api/users/search    - 캐시된 검색")
+  (println "POST /api/login           - 세션 생성")
+  (println "POST /api/logout          - 세션 제거")
+  (println "GET  /api/cache/info      - 캐시 통계")
+  (println "POST /api/cache/clear     - 캐시 초기화")
+  (println "───────────────────────────────────")
+  (println "")
+
+  (app-listen 3000)
+)

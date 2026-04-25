@@ -202,3 +202,71 @@
 [FUNC ws-client-list
   :body (ws_clients)
 ]
+
+;; ============ 캐싱 래퍼 ============
+
+[FUNC cache-set :params [$key $value $ttl]
+  :body (do
+    (cache_set $key $value (or $ttl 0))
+    (log-debug (str "💾 캐시 저장: " $key)))
+]
+
+[FUNC cache-get :params [$key]
+  :body (let [val (cache_get $key)]
+    (if val
+      (log-debug (str "✅ 캐시 히트: " $key))
+      (log-debug (str "❌ 캐시 미스: " $key)))
+    $val)
+]
+
+[FUNC cache-has :params [$key]
+  :body (cache_has $key)
+]
+
+[FUNC cache-del :params [$key]
+  :body (do
+    (cache_del $key)
+    (log-debug (str "🗑️ 캐시 삭제: " $key)))
+]
+
+[FUNC cache-clear :params []
+  :body (do
+    (cache_clear)
+    (log-info "🗑️ 캐시 전체 삭제"))
+]
+
+[FUNC cache-info
+  :body (let [size (cache_size)]
+    { :size size :timestamp (now_iso) })
+]
+
+;; ============ PubSub 래퍼 ============
+
+[FUNC pubsub-publish :params [$topic $data]
+  :body (let [count (pubsub_publish $topic $data)]
+    (do
+      (log-info (str "📡 발행: " $topic " → " (str count) "명 구독자"))
+      $count))
+]
+
+[FUNC pubsub-subscribe :params [$topic $handler-name]
+  :body (let [id (pubsub_subscribe $topic $handler-name)]
+    (do
+      (log-info (str "🔔 구독: " $topic))
+      $id))
+]
+
+[FUNC pubsub-unsubscribe :params [$subscription-id]
+  :body (let [ok (pubsub_unsubscribe $subscription-id)]
+    (do
+      (log-info (str "🔕 구독 해제"))
+      $ok))
+]
+
+[FUNC pubsub-topics
+  :body (pubsub_topics)
+]
+
+[FUNC pubsub-subscribers :params [$topic]
+  :body (pubsub_subscribers $topic)
+]
