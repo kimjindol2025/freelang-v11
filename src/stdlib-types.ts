@@ -86,7 +86,17 @@ export const BUILTIN_TYPE_SIGS: Record<string, BuiltinTypeSig> = {
   "println": { params: ["any"],              ret: "null" },
   "type-of": { params: ["any"],              ret: "string" },
   "null?":   { params: ["any"],              ret: "bool" },
+  "nil?":    { params: ["any"],              ret: "bool" },  // alias of null?
   "empty?":  { params: ["any"],              ret: "bool" },
+  "string?": { params: ["any"],              ret: "bool" },
+  "number?": { params: ["any"],              ret: "bool" },
+  "boolean?":{ params: ["any"],              ret: "bool" },
+  "bool?":   { params: ["any"],              ret: "bool" },  // alias of boolean?
+  "list?":   { params: ["any"],              ret: "bool" },
+  "array?":  { params: ["any"],              ret: "bool" },  // alias of list?
+  "map?":    { params: ["any"],              ret: "bool" },
+  "fn?":     { params: ["any"],              ret: "bool" },
+  "function?":{ params: ["any"],             ret: "bool" },  // alias of fn?
 };
 
 /**

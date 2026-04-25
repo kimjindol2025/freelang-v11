@@ -145,3 +145,31 @@ describe("Phase A — FLRuntimeError + ErrorCode", () => {
     expect(err.hint).toBeTruthy();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Phase B (2026-04-25): 타입 predicate alias
+// ─────────────────────────────────────────────────────────────
+describe("Phase B — 타입 predicate alias", () => {
+  test("nil? 는 null? 의 alias", () => {
+    expect(run("(nil? null)")).toBe(true);
+    expect(run("(nil? 42)")).toBe(false);
+    expect(run("(null? null)")).toBe(true);
+  });
+
+  test("array? 는 list? 와 동일", () => {
+    expect(run("(list? (list 1 2))")).toBe(true);
+    expect(run("(array? (list 1 2))")).toBe(true);
+    expect(run("(list? 42)")).toBe(false);
+  });
+
+  test("function? 는 fn? 의 alias", () => {
+    expect(run("(fn? 42)")).toBe(false);
+    expect(run("(function? 42)")).toBe(false);
+  });
+
+  test("bool? 는 boolean? 의 alias", () => {
+    expect(run("(bool? true)")).toBe(true);
+    expect(run("(boolean? true)")).toBe(true);
+    expect(run("(bool? 42)")).toBe(false);
+  });
+});

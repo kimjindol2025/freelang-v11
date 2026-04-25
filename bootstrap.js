@@ -10942,6 +10942,7 @@ function flExecOpNative(op, vals) {
       return v0 >= v1;
     case "not":
       return !v0;
+    case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
     case "true?":
@@ -11742,6 +11743,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "split":
     case "error":
       throw new Error(String(args2[0]));
+    case "nil?":
     case "null?":
       return args2[0] === null || args2[0] === void 0;
     case "zero?":
@@ -11758,10 +11760,15 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args2[0] === "string";
     case "number?":
       return typeof args2[0] === "number";
+    case "boolean?":
     case "bool?":
       return typeof args2[0] === "boolean";
+    case "list?":
     case "array?":
       return Array.isArray(args2[0]);
+    case "function?":
+    case "fn?":
+      return typeof args2[0] === "function";
     case "map?":
       return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
     case "json_keys":
