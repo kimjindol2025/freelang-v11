@@ -136,6 +136,117 @@ const INVARIANTS = [
   { id: "I020", name: "let-bound identity x === x",
     gen: () => randInt(0, 100),
     test: (x) => evalFL(`(let [[id (fn [v] v)]] (println (= ${x} (id ${x}))))`).out === "true" },
+
+  // ── 산술 결합/분배 ─────────────────────────
+  { id: "I021", name: "(+ (+ a b) c) === (+ a (+ b c))",
+    gen: () => [randInt(0, 50), randInt(0, 50), randInt(0, 50)],
+    test: ([a, b, c]) => evalFL(`(println (= (+ (+ ${a} ${b}) ${c}) (+ ${a} (+ ${b} ${c}))))`).out === "true" },
+  { id: "I022", name: "(* a (+ b c)) === (+ (* a b) (* a c)) (distributive)",
+    gen: () => [randInt(0, 20), randInt(0, 20), randInt(0, 20)],
+    test: ([a, b, c]) => evalFL(`(println (= (* ${a} (+ ${b} ${c})) (+ (* ${a} ${b}) (* ${a} ${c}))))`).out === "true" },
+  { id: "I023", name: "(- a b) === (+ a (- 0 b))",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (= (- ${a} ${b}) (+ ${a} (- 0 ${b}))))`).out === "true" },
+  { id: "I024", name: "(+ a 1) > a (양수 증가)",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (> (+ ${a} 1) ${a}))`).out === "true" },
+  { id: "I025", name: "(* 2 a) === (+ a a)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (= (* 2 ${a}) (+ ${a} ${a})))`).out === "true" },
+
+  // ── 비교 transitivity ─────────────────────────
+  { id: "I026", name: "(< a b) ∧ (< b c) → (< a c)",
+    gen: () => { const a = randInt(0, 30); return [a, a + randInt(1, 30), a + randInt(31, 100)]; },
+    test: ([a, b, c]) => evalFL(`(println (and (< ${a} ${b}) (< ${b} ${c}) (< ${a} ${c})))`).out === "true" },
+  { id: "I027", name: "(<= a a) → true (반사성)",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (<= ${a} ${a}))`).out === "true" },
+  { id: "I028", name: "(>= a a) → true (반사성)",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (>= ${a} ${a}))`).out === "true" },
+  { id: "I029", name: "(not (= a b)) === (or (< a b) (> a b))",
+    gen: () => [randInt(0, 50), randInt(0, 50)],
+    test: ([a, b]) => evalFL(`(println (= (not (= ${a} ${b})) (or (< ${a} ${b}) (> ${a} ${b}))))`).out === "true" },
+
+  // ── 논리 ─────────────────────────
+  { id: "I030", name: "(not (not x)) === x — true",
+    gen: () => 1,
+    test: () => evalFL(`(println (= true (not (not true))))`).out === "true" },
+  { id: "I031", name: "(not (not x)) === x — false",
+    gen: () => 0,
+    test: () => evalFL(`(println (= false (not (not false))))`).out === "true" },
+  { id: "I032", name: "(and true x) === x",
+    gen: () => randInt(1, 100),
+    test: (x) => evalFL(`(println (and true ${x}))`).out === String(x) },
+  { id: "I033", name: "(or false x) === x",
+    gen: () => randInt(1, 100),
+    test: (x) => evalFL(`(println (or false ${x}))`).out === String(x) },
+  { id: "I034", name: "(and false x) === false (단락)",
+    gen: () => randInt(1, 100),
+    test: (_) => evalFL(`(println (and false 999))`).out === "false" },
+
+  // ── if/cond ─────────────────────────
+  { id: "I035", name: "(if true a b) === a",
+    gen: () => [randInt(0, 100), randInt(101, 200)],
+    test: ([a, b]) => evalFL(`(println (if true ${a} ${b}))`).out === String(a) },
+  { id: "I036", name: "(if false a b) === b",
+    gen: () => [randInt(0, 100), randInt(101, 200)],
+    test: ([a, b]) => evalFL(`(println (if false ${a} ${b}))`).out === String(b) },
+  { id: "I037", name: "(if (= a a) 1 2) === 1",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (if (= ${a} ${a}) 1 2))`).out === "1" },
+
+  // ── list ─────────────────────────
+  { id: "I038", name: "(length (rest (list a b c))) === 2",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c]) => evalFL(`(println (length (rest (list ${a} ${b} ${c}))))`).out === "2" },
+  { id: "I039", name: "(last (list a b c)) === c",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c]) => evalFL(`(println (= ${c} (last (list ${a} ${b} ${c}))))`).out === "true" },
+  { id: "I040", name: "(length (append (list a) (list b))) === 2",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (length (append (list ${a}) (list ${b}))))`).out === "2" },
+  { id: "I041", name: "(first (reverse (list a b))) === b",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (= ${b} (first (reverse (list ${a} ${b})))))`).out === "true" },
+
+  // ── string ─────────────────────────
+  { id: "I042", name: "(str a) parse 가능",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (= "${a}" (str ${a})))`).out === "true" },
+  { id: "I043", name: "(length (str a b)) === sum",
+    gen: () => [randInt(0, 99), randInt(0, 99)],
+    test: ([a, b]) => {
+      const expected = String(a).length + String(b).length;
+      return Number(evalFL(`(println (length (str ${a} ${b})))`).out) === expected;
+    } },
+
+  // ── let scope ─────────────────────────
+  { id: "I044", name: "(let [[x N]] x) === N",
+    gen: () => randInt(0, 1000),
+    test: (n) => evalFL(`(println (let [[x ${n}]] x))`).out === String(n) },
+  { id: "I045", name: "let nested shadow",
+    gen: () => randInt(0, 100),
+    test: (n) => evalFL(`(println (let [[x 0]] (let [[x ${n}]] x)))`).out === String(n) },
+
+  // ── nil safety (P0-1 강화) ─────────────────────────
+  { id: "I046", name: "(if (or nil false) a b) → b",
+    gen: () => [randInt(0, 100), randInt(101, 200)],
+    test: ([a, b]) => evalFL(`(println (if (or nil false) ${a} ${b}))`).out === String(b) },
+  { id: "I047", name: "(if (and nil x) a b) → b",
+    gen: () => [randInt(0, 100), randInt(101, 200)],
+    test: ([a, b]) => evalFL(`(println (if (and nil 999) ${a} ${b}))`).out === String(b) },
+  { id: "I048", name: "(= nil nil) → true",
+    gen: () => 0,
+    test: () => evalFL(`(println (= nil nil))`).out === "true" },
+
+  // ── closure ─────────────────────────
+  { id: "I049", name: "let-bound add closure",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(let [[add (fn [x y] (+ x y))]] (println (add ${a} ${b})))`).out === String(a + b) },
+  { id: "I050", name: "let captured constant",
+    gen: () => randInt(0, 100),
+    test: (n) => evalFL(`(let [[k ${n}] [g (fn [] k)]] (println (g)))`).out === String(n) },
 ];
 
 // ─────────────────────────────────────────────────────────────
