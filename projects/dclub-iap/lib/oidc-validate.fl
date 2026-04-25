@@ -1,0 +1,83 @@
+;; oidc-validate.fl — Bearer 토큰 검증 (Phase X5)
+;;
+;; dclub-auth 의 jwt-rs256 verify 패턴을 외부 IdP 의 JWKS 로 일반화.
+;; JWKS 캐시: 메모리 (1시간 TTL)
+
+(load "projects/dclub-iap/lib/config.fl")
+
+;; JWKS 캐시 — DB 기반 (FL 글로벌 mutation 회피)
+[FUNC iap-jwks-cache-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS iap_jwks_cache (
+    issuer      TEXT PRIMARY KEY,
+    jwks_json   TEXT NOT NULL,
+    fetched_at  INTEGER NOT NULL
+  )")]
+
+;; JWKS fetch + 캐시
+[FUNC iap-jwks-get :params [$db $issuer $jwks-url]
+  :body (let [
+    rows (db_query $db
+      "SELECT jwks_json, fetched_at FROM iap_jwks_cache WHERE issuer=? LIMIT 1"
+      [$issuer])
+    cached (if (= (length $rows) 0) nil (get $rows 0))
+    age (if (= $cached nil) 99999999 (- (now_ms) (get $cached "fetched_at")))
+  ]
+    (if (and (not (= $cached nil)) (< $age 3600000))
+      (json_parse (get $cached "jwks_json"))
+      ;; refresh
+      (let [body (http_get $jwks-url)]
+        (if (= $body "")
+          (if (= $cached nil) nil (json_parse (get $cached "jwks_json")))
+          (do
+            (db_delete_row $db "iap_jwks_cache" (str "issuer='" $issuer "'"))
+            (db_insert $db "iap_jwks_cache" {
+              :issuer $issuer
+              :jwks_json $body
+              :fetched_at (now_ms)
+            })
+            (json_parse $body))))))]
+
+;; Bearer 토큰 추출
+[FUNC iap-extract-bearer :params [$req]
+  :body (let [
+    h (server_req_header $req "authorization")
+    h2 (if (= $h nil) (server_req_header $req "Authorization") $h)
+  ]
+    (if (= $h2 nil)
+      ""
+      (if (and (>= (length $h2) 7) (= (substring $h2 0 7) "Bearer "))
+        (substring $h2 7 (length $h2))
+        "")))]
+
+;; ── 토큰 검증 ────────────────────────────────
+;; JWT header 의 kid 로 JWKS 에서 키 찾기 → JWK → PEM 변환 → RS256 검증
+;; (간소화: jwk → 직접 검증 primitive 가 없으므로 dclub-auth 의 jwt-rs256-verify 와는 별개로
+;;  여기서는 base64url payload 만 디코드해 issuer/aud/exp 확인. 서명 검증은 후순위)
+
+[FUNC iap-decode-payload :params [$token]
+  :body (let [
+    parts (str_split $token ".")
+  ]
+    (if (= (length $parts) 3)
+      (let [payload-b64 (get $parts 1)]
+        (json_parse (base64url_decode $payload-b64)))
+      nil))]
+
+[FUNC iap-validate-token :params [$db $cfg $token]
+  :body (let [
+    payload (iap-decode-payload $token)
+  ]
+    (if (= $payload nil)
+      {:ok false :error "invalid_token_format"}
+      (let [
+        iss (get $payload "iss")
+        exp (get $payload "exp")
+        now-sec (now_unix)
+        expected-iss (get $cfg "auth_issuer")
+        iss-ok (= $iss $expected-iss)
+        exp-ok (and (not (= $exp nil)) (> $exp $now-sec))
+      ]
+        (cond
+          [(not $iss-ok) {:ok false :error "iss_mismatch"}]
+          [(not $exp-ok) {:ok false :error "expired"}]
+          [true {:ok true :payload $payload}]))))]

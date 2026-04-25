@@ -1,0 +1,15 @@
+[FUNC iap-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-iap-config :params []
+  :body {
+    :db (iap-config-get "DCLUB_IAP_DB" "/tmp/dclub-iap.db")
+    :port (* (iap-config-get "DCLUB_IAP_PORT" "30150") 1)
+    :auth_issuer (iap-config-get "DCLUB_IAP_AUTH_ISSUER" "http://localhost:30100")
+    :auth_jwks_url (iap-config-get "DCLUB_IAP_AUTH_JWKS"
+                                    "http://localhost:30100/jwks.json")
+    :backend_url (iap-config-get "DCLUB_IAP_BACKEND" "http://localhost:30200")
+    :client_id (iap-config-get "DCLUB_IAP_CLIENT_ID" "iap")
+    :redirect_uri (iap-config-get "DCLUB_IAP_REDIRECT" "http://localhost:30150/oauth/callback")
+  }]

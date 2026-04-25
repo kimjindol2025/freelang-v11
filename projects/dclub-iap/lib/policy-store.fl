@@ -1,0 +1,66 @@
+;; policy-store.fl — IAP 접근 정책 (Phase X5)
+
+[FUNC iap-policy-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS iap_policies (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      path_prefix     TEXT NOT NULL,
+      required_users  TEXT,
+      required_scope  TEXT,
+      created_at      TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_iap_prefix ON iap_policies(path_prefix)"))]
+
+[FUNC iap-policy-add :params [$db $path-prefix $required-users $required-scope]
+  :body (do
+    (db_insert $db "iap_policies" {
+      :path_prefix $path-prefix
+      :required_users (if (= $required-users nil) "" $required-users)
+      :required_scope (if (= $required-scope nil) "" $required-scope)
+      :created_at (now_iso)
+    })
+    true)]
+
+[FUNC iap-policy-list :params [$db]
+  :body (db_query $db
+    "SELECT id, path_prefix, required_users, required_scope FROM iap_policies ORDER BY length(path_prefix) DESC"
+    [])]
+
+;; 가장 구체적(긴) prefix 매칭 우선
+[FUNC iap-policy-match :params [$db $path]
+  :body (let [
+    rules (iap-policy-list $db)
+    matched (filter (fn [r]
+      (let [
+        prefix (get r "path_prefix")
+        plen (length prefix)
+      ]
+        (and (>= (length $path) plen)
+             (= (substring $path 0 plen) prefix))))
+      $rules)
+  ]
+    (if (= (length $matched) 0) nil (get $matched 0)))]
+
+;; 사용자가 정책 만족하는지
+[FUNC iap-policy-allows? :params [$policy $username $token-payload]
+  :body (let [
+    req-users (get $policy "required_users")
+    req-scope (get $policy "required_scope")
+    ;; required_users 빈 문자열이면 누구나
+    user-ok (if (or (= $req-users "") (= $req-users nil))
+              true
+              (let [allowed-list (str_split $req-users ",")]
+                (reduce (fn [acc u] (or acc (= (str_trim u) $username))) false $allowed-list)))
+    ;; required_scope 빈 문자열이면 통과
+    token-scope (or (get $token-payload "scope") "")
+    scope-ok (if (or (= $req-scope "") (= $req-scope nil))
+               true
+               (let [
+                 allowed-list (str_split $req-scope " ")
+                 token-list (str_split $token-scope " ")
+               ]
+                 (reduce (fn [acc s]
+                   (and acc (reduce (fn [a t] (or a (= t s))) false $token-list)))
+                   true $allowed-list)))
+  ]
+    (and $user-ok $scope-ok))]
