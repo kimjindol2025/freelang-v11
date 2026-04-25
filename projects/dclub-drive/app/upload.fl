@@ -1,0 +1,60 @@
+;; upload.fl — POST /drive/upload  (인증 필수)
+;;
+;; body: {"parent_path":"/", "name":"hello.txt", "content":"...", "mime":"text/plain"}
+;; 폴더 만들기: {"parent_path":"/", "name":"docs", "type":"folder"}
+
+(load "projects/dclub-drive/lib/config.fl")
+(load "projects/dclub-drive/lib/files-store.fl")
+(load "projects/dclub-drive/app/auth.fl")
+
+[FUNC drive-upload-write-file :params [$cfg $owner $key $content]
+  :body (let [
+    data-dir (get $cfg "data_dir")
+    user-dir (str $data-dir "/" $owner)
+    fpath (str $user-dir "/" $key)
+  ]
+    (do
+      (shell (str "mkdir -p " $user-dir))
+      (file_write $fpath $content)
+      $fpath))]
+
+[FUNC handle-upload :params [$req]
+  :body (let [
+    cfg (dclub-drive-config)
+    db (get $cfg "db")
+    uid (drive-extract-uid $req)
+  ]
+    (if (nil-or-empty? $uid)
+      (server_status 401 {:error "unauthorized"})
+      (drive-upload-do $db $cfg $req $uid)))]
+
+[FUNC drive-upload-do :params [$db $cfg $req $uid]
+  :body (let [
+    body-raw (server_req_body $req)
+    body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+    parent-path (or (get $body "parent_path") "/")
+    name (or (get $body "name") "")
+    type (or (get $body "type") "file")
+    content (or (get $body "content") "")
+    mime (or (get $body "mime") "application/octet-stream")
+  ]
+    (cond
+      [(= $name "") (server_status 400 {:error "name_required"})]
+      [(not (= (files-find $db $uid $parent-path $name) nil))
+        (server_status 409 {:error "already_exists"})]
+      [(= $type "folder")
+        (do
+          (files-create $db $uid $parent-path $name "folder" "" 0 "")
+          (server_json {:status "created" :type "folder" :name $name :parent_path $parent-path}))]
+      [true (drive-upload-store-file $db $cfg $uid $parent-path $name $content $mime)]))]
+
+[FUNC drive-upload-store-file :params [$db $cfg $uid $parent-path $name $content $mime]
+  :body (let [
+    storage-key (substring (auth_sha256 (str $uid "/" $parent-path "/" $name "/" (now_ms))) 0 24)
+    fpath (drive-upload-write-file $cfg $uid $storage-key $content)
+    size (length $content)
+  ]
+    (do
+      (files-create $db $uid $parent-path $name "file" $storage-key $size $mime)
+      (server_json {:status "uploaded" :type "file" :name $name
+                    :parent_path $parent-path :size $size :storage_key $storage-key})))]

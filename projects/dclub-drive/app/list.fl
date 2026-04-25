@@ -1,0 +1,18 @@
+;; list.fl — GET /drive/list?path=/docs
+
+(load "projects/dclub-drive/lib/config.fl")
+(load "projects/dclub-drive/lib/files-store.fl")
+(load "projects/dclub-drive/app/auth.fl")
+
+[FUNC handle-list :params [$req]
+  :body (let [
+    cfg (dclub-drive-config)
+    db (get $cfg "db")
+    uid (drive-extract-uid $req)
+    path (or (server_req_query $req "path") "/")
+    shared-q (or (server_req_query $req "shared") "")
+  ]
+    (cond
+      [(nil-or-empty? $uid) (server_status 401 {:error "unauthorized"})]
+      [(= $shared-q "1") (server_json {:path "shared" :files (files-list-shared $db $uid)})]
+      [true (server_json {:path $path :files (files-list-mine $db $uid $path)})]))]

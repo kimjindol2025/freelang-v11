@@ -1,0 +1,39 @@
+;; server.fl — dclub-drive HTTP API (Phase Y2)
+;;
+;; 라우트:
+;;   GET  /health
+;;   POST /drive/upload         (Bearer 필요)
+;;   GET  /drive/download?path= (Bearer 필요)
+;;   GET  /drive/list?path=     (Bearer 필요)
+;;   POST /drive/share          (Bearer 필요)
+;;   POST /drive/perms/grant    (Bearer 필요)
+;;   GET  /share/:token         (무인증 — 공유 링크)
+
+(load "projects/dclub-drive/lib/config.fl")
+(load "projects/dclub-drive/lib/files-store.fl")
+(load "projects/dclub-drive/app/auth.fl")
+(load "projects/dclub-drive/app/upload.fl")
+(load "projects/dclub-drive/app/download.fl")
+(load "projects/dclub-drive/app/list.fl")
+(load "projects/dclub-drive/app/share.fl")
+
+(define cfg (dclub-drive-config))
+(define DB (get $cfg "db"))
+(define DATA-DIR (get $cfg "data_dir"))
+(files-ensure-tables $DB)
+(shell (str "mkdir -p " $DATA-DIR))
+
+[FUNC handle-drive-health :params [$req]
+  :body (server_json {:status "ok" :db $DB :data_dir $DATA-DIR :ts (now_ms)})]
+
+;; first-match-wins 등록 — 구체 경로 먼저
+(server_get "/health" "handle-drive-health")
+(server_post "/drive/upload" "handle-upload")
+(server_get "/drive/download" "handle-download")
+(server_get "/drive/list" "handle-list")
+(server_post "/drive/share" "handle-share-create")
+(server_post "/drive/perms/grant" "handle-perms-grant")
+(server_get "/share/:token" "handle-share-get")
+
+(println (str "[dclub-drive] db=" $DB " data=" $DATA-DIR " port=" (get $cfg "port")))
+(server_start (get $cfg "port"))

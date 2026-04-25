@@ -1,0 +1,21 @@
+;; config.fl — dclub-drive 설정 (Phase Y2)
+
+[FUNC drive-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-drive-config :params []
+  :body {
+    :db (drive-config-get "DCLUB_DRIVE_DB" "/tmp/dclub-drive.db")
+    :data_dir (drive-config-get "DCLUB_DRIVE_DATA" "/tmp/dclub-drive-data")
+    :port (* (drive-config-get "DCLUB_DRIVE_PORT" "30170") 1)
+    :share_secret (drive-config-get "DCLUB_DRIVE_SHARE_SECRET" "drive-default-share-secret")
+  }]
+
+[FUNC nil-or-empty? :params [$v]
+  :body (cond
+    [(nil? $v) true]
+    [(= $v nil) true]
+    [(= $v "") true]
+    [(= $v "null") true]
+    [true false])]

@@ -1,0 +1,169 @@
+;; files-store.fl — files 테이블 + 객체 저장 + permissions
+
+[FUNC files-ensure-tables :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS files (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner       TEXT NOT NULL,
+      parent_path TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      type        TEXT NOT NULL,
+      storage_key TEXT,
+      size        INTEGER,
+      mime        TEXT,
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    )")
+    (db_create $db "CREATE UNIQUE INDEX IF NOT EXISTS idx_files_path ON files(owner, parent_path, name)")
+
+    (db_create $db "CREATE TABLE IF NOT EXISTS permissions (
+      file_id     INTEGER NOT NULL,
+      user_id     TEXT NOT NULL,
+      role        TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      PRIMARY KEY (file_id, user_id)
+    )")
+
+    (db_create $db "CREATE TABLE IF NOT EXISTS share_links (
+      token       TEXT PRIMARY KEY,
+      file_id     INTEGER NOT NULL,
+      role        TEXT NOT NULL DEFAULT 'reader',
+      expires_at  INTEGER,
+      created_by  TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_share_file ON share_links(file_id)"))]
+
+;; ── 파일/폴더 INSERT ─────────────────────────
+[FUNC files-create :params [$db $owner $parent-path $name $type $storage-key $size $mime]
+  :body (let [now (now_iso)]
+    (db_insert $db "files" {
+      :owner $owner
+      :parent_path $parent-path
+      :name $name
+      :type $type
+      :storage_key (or $storage-key "")
+      :size (or $size 0)
+      :mime (or $mime "")
+      :created_at $now
+      :updated_at $now
+    }))]
+
+;; ── 단건 조회 (owner + parent + name) ────────
+[FUNC files-find :params [$db $owner $parent-path $name]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, owner, parent_path, name, type, storage_key, size, mime, created_at, updated_at
+       FROM files WHERE owner=? AND parent_path=? AND name=?"
+      [$owner $parent-path $name])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC files-find-by-id :params [$db $id]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, owner, parent_path, name, type, storage_key, size, mime, created_at, updated_at
+       FROM files WHERE id=?"
+      [$id])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+;; ── 디렉터리 list (owner 본인 + 권한 부여된 항목) ─
+[FUNC files-list-mine :params [$db $owner $parent-path]
+  :body (db_query $db
+    "SELECT id, owner, parent_path, name, type, storage_key, size, mime, created_at, updated_at
+     FROM files WHERE owner=? AND parent_path=? ORDER BY type DESC, name ASC"
+    [$owner $parent-path])]
+
+;; 공유받은 항목 (permissions 에 user_id 가 등록된 file)
+[FUNC files-list-shared :params [$db $user-id]
+  :body (db_query $db
+    "SELECT f.id, f.owner, f.parent_path, f.name, f.type, f.storage_key, f.size, f.mime,
+            f.created_at, f.updated_at, p.role
+     FROM files f JOIN permissions p ON p.file_id = f.id
+     WHERE p.user_id=? ORDER BY f.updated_at DESC"
+    [$user-id])]
+
+[FUNC files-delete :params [$db $id $owner]
+  :body (do
+    (db_delete_row $db "permissions" (str "file_id=" $id))
+    (db_delete_row $db "share_links" (str "file_id=" $id))
+    (db_delete_row $db "files" (str "id=" $id " AND owner='" $owner "'")))]
+
+;; ── 권한 ─────────────────────────────────────
+[FUNC perms-grant :params [$db $file-id $user-id $role]
+  :body (do
+    (db_delete_row $db "permissions"
+      (str "file_id=" $file-id " AND user_id='" $user-id "'"))
+    (db_insert $db "permissions" {
+      :file_id $file-id
+      :user_id $user-id
+      :role $role
+      :created_at (now_iso)
+    }))]
+
+[FUNC perms-revoke :params [$db $file-id $user-id]
+  :body (db_delete_row $db "permissions"
+    (str "file_id=" $file-id " AND user_id='" $user-id "'"))]
+
+[FUNC perms-find :params [$db $file-id $user-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT role FROM permissions WHERE file_id=? AND user_id=?"
+      [$file-id $user-id])
+  ]
+    (if (= (length $rows) 0) nil (get (get $rows 0) "role")))]
+
+[FUNC perms-list :params [$db $file-id]
+  :body (db_query $db
+    "SELECT user_id, role, created_at FROM permissions WHERE file_id=?"
+    [$file-id])]
+
+;; ── 권한 판정 — owner OR 명시 부여 ─────────────
+[FUNC files-can-read? :params [$db $file-row $uid]
+  :body (cond
+    [(= $file-row nil) false]
+    [(= (get $file-row "owner") $uid) true]
+    [true (let [r (perms-find $db (get $file-row "id") $uid)]
+      (or (= $r "reader") (= $r "writer") (= $r "owner")))])]
+
+[FUNC files-can-write? :params [$db $file-row $uid]
+  :body (cond
+    [(= $file-row nil) false]
+    [(= (get $file-row "owner") $uid) true]
+    [true (let [r (perms-find $db (get $file-row "id") $uid)]
+      (or (= $r "writer") (= $r "owner")))])]
+
+;; ── 공유 링크 ────────────────────────────────
+[FUNC share-create :params [$db $file-id $created-by $role $ttl-seconds]
+  :body (let [
+    token (auth_sha256 (str (now_ms) "_" $file-id "_" (now_unix)))
+    short (substring $token 0 32)
+    expires (if (= $ttl-seconds 0) 0 (+ (now_unix) $ttl-seconds))
+  ]
+    (do
+      (db_insert $db "share_links" {
+        :token $short
+        :file_id $file-id
+        :role (or $role "reader")
+        :expires_at $expires
+        :created_by $created-by
+        :created_at (now_iso)
+      })
+      $short))]
+
+[FUNC share-find :params [$db $token]
+  :body (let [
+    rows (db_query $db
+      "SELECT token, file_id, role, expires_at, created_by, created_at
+       FROM share_links WHERE token=?"
+      [$token])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC share-valid? :params [$share-row]
+  :body (cond
+    [(= $share-row nil) false]
+    [(= (get $share-row "expires_at") 0) true]
+    [(> (get $share-row "expires_at") (now_unix)) true]
+    [true false])]
