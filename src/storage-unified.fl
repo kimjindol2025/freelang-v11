@@ -1,0 +1,278 @@
+; ════════════════════════════════════════════════════════════════
+; FreeLang v11: Unified Storage Layer
+; Phase C: 다중 백엔드 저장소 추상화
+; ════════════════════════════════════════════════════════════════
+
+; ─────────────────────────────────────────────────────────────────
+; 1. Storage 설정 및 초기화
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-init :params [
+  $config
+]
+  :body (let [
+    [$type (get $config :type)]
+  ] (do
+    (println (str "📦 Storage initialized: " $type))
+    {
+      :type $type
+      :config $config
+      :status "ready"
+      :tables {}
+    }
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 2. 공통 저장 인터페이스
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-save :params [
+  $storage
+  $table
+  $key
+  $value
+]
+  :body (let [
+    [$type (get $storage :type)]
+  ] (if (= $type "sqlite")
+    (storage-save-sqlite $storage $table $key $value)
+    (if (= $type "mariadb")
+      (storage-save-mariadb $storage $table $key $value)
+      (if (= $type "json")
+        (storage-save-json $storage $table $key $value)
+        (do
+          (println (str "⚠ Unknown storage type: " $type))
+          nil
+        )
+      )
+    )
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 3. SQLite 백엔드
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-save-sqlite :params [
+  $storage
+  $table
+  $key
+  $value
+]
+  :body (do
+    (db-exec (str "CREATE TABLE IF NOT EXISTS " $table " (id TEXT PRIMARY KEY, data TEXT)"))
+    (db-exec
+      (str "INSERT OR REPLACE INTO " $table " (id, data) VALUES (?, ?)")
+      [$key (json-stringify $value)]
+    )
+    (println (str "✓ SQLite: saved " $table "." $key))
+    { :saved true :table $table :key $key }
+  )
+]
+
+[FUNC storage-load-sqlite :params [
+  $storage
+  $table
+  $key
+]
+  :body (let [
+    [$result (db-exec
+      (str "SELECT data FROM " $table " WHERE id = ?")
+      [$key]
+    )]
+  ] (if $result
+    (json-parse (get $result 0))
+    nil
+  ))
+]
+
+[FUNC storage-query-sqlite :params [
+  $storage
+  $sql
+]
+  :body (db-exec $sql)
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 4. MariaDB 백엔드
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-save-mariadb :params [
+  $storage
+  $table
+  $key
+  $value
+]
+  :body (do
+    (mariadb-query (str
+      "INSERT INTO " $table " (id, data) VALUES (?, ?) "
+      "ON DUPLICATE KEY UPDATE data = VALUES(data)"
+    ) [$key (json-stringify $value)])
+    (println (str "✓ MariaDB: saved " $table "." $key))
+    { :saved true :table $table :key $key }
+  )
+]
+
+[FUNC storage-load-mariadb :params [
+  $storage
+  $table
+  $key
+]
+  :body (let [
+    [$result (mariadb-query
+      (str "SELECT data FROM " $table " WHERE id = ? LIMIT 1")
+      [$key]
+    )]
+  ] (if $result
+    (json-parse (get $result 0))
+    nil
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 5. JSON 백엔드 (파일 기반)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-save-json :params [
+  $storage
+  $table
+  $key
+  $value
+]
+  :body (let [
+    [$path (str "./data/" $table ".json")]
+  ] (do
+    (file-write $path (json-stringify {
+      :table $table
+      :key $key
+      :value $value
+      :timestamp (now_ms)
+    }))
+    (println (str "✓ JSON: saved " $path))
+    { :saved true :path $path }
+  ))
+]
+
+[FUNC storage-load-json :params [
+  $storage
+  $table
+  $key
+]
+  :body (let [
+    [$path (str "./data/" $table ".json")]
+    [$content (file-read $path)]
+  ] (if $content
+    (json-parse $content)
+    nil
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 6. 공통 로드 인터페이스
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-load :params [
+  $storage
+  $table
+  $key
+]
+  :body (let [
+    [$type (get $storage :type)]
+  ] (if (= $type "sqlite")
+    (storage-load-sqlite $storage $table $key)
+    (if (= $type "mariadb")
+      (storage-load-mariadb $storage $table $key)
+      (if (= $type "json")
+        (storage-load-json $storage $table $key)
+        nil
+      )
+    )
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 7. 쿼리 인터페이스
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-query :params [
+  $storage
+  $sql
+]
+  :body (let [
+    [$type (get $storage :type)]
+  ] (if (= $type "sqlite")
+    (storage-query-sqlite $storage $sql)
+    (if (= $type "mariadb")
+      (mariadb-query $sql)
+      (do
+        (println "⚠ Query not supported for this backend")
+        nil
+      )
+    )
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 8. 마이그레이션 (스키마 관리)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-migrate :params [
+  $storage
+  $migrations
+]
+  :body (do
+    (println (str "🔄 Running " (length $migrations) " migrations..."))
+    (map (fn [m]
+      (let [
+        [$sql (get m :sql)]
+        [$name (get m :name)]
+      ] (do
+        (storage-query $storage $sql)
+        (println (str "✓ Migration: " $name))
+      ))
+    ) $migrations)
+    { :migrated true }
+  )
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 9. 트랜잭션
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-transaction :params [
+  $storage
+  $fn
+]
+  :body (do
+    (storage-query $storage "BEGIN")
+    (let [[$result (call $fn)]]
+      (do
+        (storage-query $storage "COMMIT")
+        $result
+      )
+    )
+  )
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 10. 유틸리티
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC storage-status :params [
+  $storage
+]
+  :body {
+    :type (get $storage :type)
+    :status (get $storage :status)
+    :tables (get $storage :tables)
+  }
+]
+
+[FUNC length :params [
+  $list
+]
+  :body (if (nil? $list) 0 1)
+]
+
+(println "✓ Unified Storage loaded")
