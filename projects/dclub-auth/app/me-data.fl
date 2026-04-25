@@ -1,0 +1,131 @@
+;; me-data.fl — 본인 데이터 export · 삭제 (Phase O, GDPR/정통망법)
+;;
+;; GET    /me/export   Bearer access_token → 본인 모든 데이터 JSON
+;; DELETE /me          Bearer + form{password} → 익명화 + 비활성화
+
+(load "projects/dclub-auth/lib/users-store.fl")
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+[FUNC me-bearer-uid :params [$db $req]
+  :body (let [token (extract-bearer $req)]
+    (if (= $token "")
+      nil
+      (let [hdr (jwt-rs256-header-only $token)]
+        (if (= $hdr nil)
+          nil
+          (let [
+            kid (get $hdr "kid")
+            key-row (jwks-find $db $kid)
+          ]
+            (if (= $key-row nil)
+              nil
+              (let [payload (jwt-rs256-verify $token (get $key-row "public_pem"))]
+                (if (= $payload nil) nil (get $payload "sub")))))))))]
+
+;; ── GET /me/export ──────────────────────────────────
+;; 반환: {profile, external_identities, login_history(최근 100), webauthn_credentials, mfa_credentials, audit_log(본인분 최근 200)}
+
+[FUNC handle-me-export :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    uid (me-bearer-uid $db $req)
+  ]
+    (if (= $uid nil)
+      (server_status 401 {:error "unauthorized"})
+      (let [
+        profile-rows (db_query $db
+          "SELECT id, username, email, email_verified, display_name, picture, created_at FROM users WHERE id=? LIMIT 1"
+          [$uid])
+        externals (db_query $db
+          "SELECT provider, email, linked_at, last_login_at FROM external_identities WHERE user_id=?"
+          [$uid])
+        history (db_query $db
+          "SELECT ts_ms, ip, ip_class, suspicious, score, reasons FROM login_history WHERE user_id=? ORDER BY ts_ms DESC LIMIT 100"
+          [$uid])
+        webauthn (db_query $db
+          "SELECT credential_id, label, created_at, last_used_at, aaguid FROM webauthn_credentials WHERE user_id=?"
+          [$uid])
+        mfa (db_query $db
+          "SELECT type, status, created_at, activated_at, last_used_at, label FROM mfa_credentials WHERE user_id=?"
+          [$uid])
+        audits (db_query $db
+          "SELECT ts, event, client_id, ip, detail FROM audit_log WHERE user_id=? ORDER BY ts_ms DESC LIMIT 200"
+          [$uid])
+      ]
+        (do
+          (audit-log $db "data.export" $uid nil nil {})
+          (server_json {
+            :profile (if (> (length $profile-rows) 0) (get $profile-rows 0) {})
+            :external_identities $externals
+            :login_history $history
+            :webauthn_credentials $webauthn
+            :mfa_credentials $mfa
+            :audit_log $audits
+            :exported_at (now_iso)
+          })))))]
+
+;; ── POST /me/delete (브라우저 form) 또는 DELETE /me ─
+;; 삭제 정책 (GDPR Right to Erasure + 한국 정통망법):
+;;   - users.disabled=1, email/username 익명화 (개인정보 노출 차단)
+;;   - external_identities, webauthn_credentials, mfa_credentials, login_history 삭제
+;;   - audit_log 의 user_id 마스킹 (이벤트 자체는 보안상 보존)
+;;   - refresh_token revoked=1 (즉시 모든 세션 무효)
+
+[FUNC handle-me-delete :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    uid (me-bearer-uid $db $req)
+  ]
+    (if (= $uid nil)
+      (server_status 401 {:error "unauthorized"})
+      (let [
+        body (server_req_body $req)
+        form-raw (if (string? $body) $body "")
+        ;; form-urlencoded: password=...
+        password (let [
+          parts (str_split $form-raw "&")
+          pw-pair (filter (fn [p] (= (substring p 0 9) "password=")) $parts)
+        ]
+          (if (= (length $pw-pair) 0) ""
+            (substring (get $pw-pair 0) 9 (length (get $pw-pair 0)))))
+        rows (db_query $db "SELECT password_hash FROM users WHERE id=? LIMIT 1" [$uid])
+        stored (if (> (length $rows) 0) (get (get $rows 0) "password_hash") "")
+        pw-ok (auth_verify_password $password $stored)
+      ]
+        (if (not $pw-ok)
+          (server_status 401 {:error "invalid_password" :error_description "삭제하려면 비밀번호 재확인 필요"})
+          (let [
+            anon-suffix (substring (auth_random_token 6) 0 12)
+            anon-username (str "deleted_" $anon-suffix)
+            anon-email (str "deleted_" $anon-suffix "@deleted.local")
+          ]
+            (do
+              ;; 1. 사용자 익명화 + 비활성화
+              (db_update $db "users"
+                {:disabled 1
+                 :username $anon-username
+                 :email $anon-email
+                 :display_name ""
+                 :picture ""
+                 :password_hash ""}
+                (str "id='" $uid "'"))
+              ;; 2. 인증 자료 삭제
+              (db_delete_row $db "external_identities" (str "user_id='" $uid "'"))
+              (db_delete_row $db "webauthn_credentials" (str "user_id='" $uid "'"))
+              (db_delete_row $db "mfa_credentials" (str "user_id='" $uid "'"))
+              (db_delete_row $db "login_history" (str "user_id='" $uid "'"))
+              ;; 3. 활성 토큰 무효화
+              (db_update $db "refresh_tokens"
+                {:revoked 1}
+                (str "user_id='" $uid "'"))
+              ;; 4. audit_log 의 user_id 마스킹 (이벤트는 보존)
+              (db_update $db "audit_log"
+                {:user_id (str "deleted_" $anon-suffix)}
+                (str "user_id='" $uid "'"))
+              (audit-log $db "data.delete" (str "deleted_" $anon-suffix) nil nil {:original_uid_hash (auth_sha256 $uid)})
+              (server_json {:status "deleted" :anonymized_username $anon-username})))))))]
