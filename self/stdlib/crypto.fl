@@ -34,6 +34,12 @@
 [FUNC crypto-rsa-verify :params [$key $data $signature]
   :body (crypto_rsa_verify (str $key) (str $data) (str $signature))]
 
+[FUNC crypto-rsa-public-to-jwk :params [$pem $kid]
+  :body (crypto_rsa_public_to_jwk (str $pem) (str $kid))]
+
+[FUNC base64url-decode :params [$s]
+  :body (base64url_decode (str $s))]
+
 [FUNC crypto-jwt-sign :params [$payload $secret]
   :body (crypto_jwt_sign $payload (str $secret))]
 
