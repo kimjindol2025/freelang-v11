@@ -173,3 +173,52 @@ describe("Phase B — 타입 predicate alias", () => {
     expect(run("(bool? 42)")).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Phase C (2026-04-25): nil-safe wrapper + strict 모드
+// ─────────────────────────────────────────────────────────────
+describe("Phase C — nil-safe wrapper", () => {
+  test("get-or: nil coll → default 반환", () => {
+    expect(run("(get-or null :name \"unknown\")")).toBe("unknown");
+  });
+
+  test("get-or: 값이 있으면 그 값 반환", () => {
+    expect(run('(get-or {:name "Alice"} :name "default")')).toBe("Alice");
+  });
+
+  test("get-or: key 없으면 default", () => {
+    expect(run('(get-or {:age 30} :name "default")')).toBe("default");
+  });
+
+  test("first-or: nil/빈 배열 → default", () => {
+    expect(run("(first-or null 99)")).toBe(99);
+    expect(run("(first-or (list) 99)")).toBe(99);
+    expect(run("(first-or (list 1 2) 99)")).toBe(1);
+  });
+
+  test("last-or: nil/빈 배열 → default", () => {
+    expect(run("(last-or null 99)")).toBe(99);
+    expect(run("(last-or (list 1 2 3) 99)")).toBe(3);
+  });
+
+  test("last (기본): 빈 배열은 null", () => {
+    expect(run("(last (list))")).toBeNull();
+    expect(run("(last (list 1 2 3))")).toBe(3);
+  });
+
+  test("FL_STRICT 모드: get nil → E_TYPE_NIL throw", () => {
+    process.env.FL_STRICT = "1";
+    try {
+      const err: any = runExpectError("(get null :foo)");
+      expect(err.message).toContain("E_TYPE_NIL");
+      expect(err.code).toBe("E_TYPE_NIL");
+    } finally {
+      delete process.env.FL_STRICT;
+    }
+  });
+
+  test("FL_STRICT 모드 OFF: get nil → null (기본 동작)", () => {
+    delete process.env.FL_STRICT;
+    expect(run("(get null :foo)")).toBeNull();
+  });
+});

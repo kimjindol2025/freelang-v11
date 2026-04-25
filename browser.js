@@ -3665,6 +3665,73 @@ var FreeLang = (() => {
     });
   }
 
+  // src/errors.ts
+  init_define_process_env();
+  var ModuleError = class _ModuleError extends Error {
+    constructor(message, moduleName, file, line, col, hint) {
+      super(message);
+      this.moduleName = moduleName;
+      this.file = file;
+      this.line = line;
+      this.col = col;
+      this.hint = hint;
+      this.name = "ModuleError";
+      Object.setPrototypeOf(this, _ModuleError.prototype);
+    }
+  };
+  var ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
+    constructor(moduleName, source, file, line, col, hint) {
+      const sourceStr = source ? ` (from ${source})` : "";
+      super(`Module not found: ${moduleName}${sourceStr}`, moduleName, file, line, col, hint);
+      this.name = "ModuleNotFoundError";
+      Object.setPrototypeOf(this, _ModuleNotFoundError.prototype);
+    }
+  };
+  var FunctionNotFoundError = class _FunctionNotFoundError extends Error {
+    constructor(functionName, file, line, col, hint) {
+      const hintStr = hint ? ` ${hint}` : "";
+      super(`Function not found: ${functionName}${hintStr}`);
+      this.functionName = functionName;
+      this.file = file;
+      this.line = line;
+      this.col = col;
+      this.hint = hint;
+      this.name = "FunctionNotFoundError";
+      Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
+    }
+  };
+  var ErrorCodes = {
+    TYPE_NIL: "E_TYPE_NIL",
+    TYPE_MISMATCH: "E_TYPE_MISMATCH",
+    ARG_COUNT: "E_ARG_COUNT",
+    STACK_OVERFLOW: "E_STACK_OVERFLOW",
+    FN_NOT_FOUND: "E_FN_NOT_FOUND",
+    DIV_BY_ZERO: "E_DIV_BY_ZERO",
+    INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
+    INVALID_FORM: "E_INVALID_FORM",
+    RUNTIME: "E_RUNTIME"
+  };
+  var RECOVERY_HINTS = {
+    E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+    E_TYPE_MISMATCH: "\uAE30\uB300 \uD0C0\uC785\uACFC \uB2E4\uB985\uB2C8\uB2E4. (string? x) (number? x) \uB4F1\uC73C\uB85C \uC0AC\uC804 \uAC80\uC99D\uD558\uAC70\uB098 \uBCC0\uD658 \uD568\uC218\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.",
+    E_ARG_COUNT: "\uC778\uC790 \uAC2F\uC218\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
+    E_STACK_OVERFLOW: "\uC7AC\uADC0 \uAE4A\uC774 \uCD08\uACFC. \uC885\uB8CC \uC870\uAC74\uC774 \uC788\uB294\uC9C0, \uB610\uB294 loop/recur \uB610\uB294 reduce\uB85C \uBCC0\uD658 \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD558\uC138\uC694.",
+    E_FN_NOT_FOUND: "\uD568\uC218\uAC00 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBAA8\uB4C8 import \uB610\uB294 \uC624\uD0C0\uB97C \uD655\uC778\uD558\uC138\uC694.",
+    E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
+    E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+    E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
+    E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
+  };
+  var FLRuntimeError = class _FLRuntimeError extends ModuleError {
+    constructor(code, message, context = {}, file, line, col, hint) {
+      super(`[${code}] ${message}`, "runtime", file, line, col, hint ?? RECOVERY_HINTS[code]);
+      this.code = code;
+      this.context = context;
+      this.name = "FLRuntimeError";
+      Object.setPrototypeOf(this, _FLRuntimeError.prototype);
+    }
+  };
+
   // src/lazy-seq.ts
   init_define_process_env();
   var LAZY_SEQ = Symbol("LAZY_SEQ");
@@ -10409,6 +10476,13 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
       case "length":
         return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
       case "get": {
+        if ((v0 === null || v0 === void 0) && define_process_env_default.FL_STRICT === "1") {
+          throw new FLRuntimeError(
+            ErrorCodes.TYPE_NIL,
+            `(get nil ${typeof v1 === "string" ? '"' + v1 + '"' : String(v1)}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
+            { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
+          );
+        }
         let k = v1;
         if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
         if (Array.isArray(v0)) return v0[k] !== void 0 ? v0[k] : null;
@@ -10470,8 +10544,34 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
         return Array.isArray(v0) ? v0.length === 0 : typeof v0 === "string" ? v0.length === 0 : v0 === null || v0 === void 0;
       case "first":
         return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
+      case "last":
+        return Array.isArray(v0) ? v0.length > 0 ? v0[v0.length - 1] : null : null;
       case "rest":
         return Array.isArray(v0) ? v0.slice(1) : [];
+      case "get-or":
+      case "get_or": {
+        let k = v1;
+        if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
+        if (v0 === null || v0 === void 0) return v2 !== void 0 ? v2 : null;
+        if (Array.isArray(v0)) return v0[k] !== void 0 ? v0[k] : v2 !== void 0 ? v2 : null;
+        if (v0 instanceof Map) {
+          const r = v0.get(String(k).replace(/^:/, ""));
+          return r === void 0 ? v2 !== void 0 ? v2 : null : r;
+        }
+        if (typeof v0 === "object") {
+          const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+          if (v0[normalized] !== void 0) return v0[normalized];
+          if (typeof k === "string" && v0[k] !== void 0) return v0[k];
+          return v2 !== void 0 ? v2 : null;
+        }
+        return v2 !== void 0 ? v2 : null;
+      }
+      case "first-or":
+      case "first_or":
+        return Array.isArray(v0) && v0.length > 0 && v0[0] !== void 0 ? v0[0] : v1 !== void 0 ? v1 : null;
+      case "last-or":
+      case "last_or":
+        return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : v1 !== void 0 ? v1 : null;
       case "cons":
         return [v0, ...Array.isArray(v1) ? v1 : [v1]];
       case "reverse":
@@ -11293,7 +11393,42 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return -1;
       case "last":
         return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
+      case "first-or":
+      case "first_or":
+        return Array.isArray(args[0]) && args[0].length > 0 && args[0][0] !== void 0 ? args[0][0] : args[1] !== void 0 ? args[1] : null;
+      case "last-or":
+      case "last_or":
+        return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : args[1] !== void 0 ? args[1] : null;
+      case "get-or":
+      case "get_or": {
+        const def = args[2] !== void 0 ? args[2] : null;
+        let k = args[1];
+        if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
+        if (args[0] === null || args[0] === void 0) return def;
+        if (Array.isArray(args[0])) {
+          const idx = typeof k === "number" ? k : Number(k);
+          return Number.isFinite(idx) && args[0][idx] !== void 0 ? args[0][idx] : def;
+        }
+        if (args[0] instanceof Map) {
+          const r = args[0].get(String(k).replace(/^:/, ""));
+          return r === void 0 ? def : r;
+        }
+        if (typeof args[0] === "object") {
+          const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+          if (args[0][normalized] !== void 0) return args[0][normalized];
+          if (typeof k === "string" && args[0][k] !== void 0) return args[0][k];
+          return def;
+        }
+        return def;
+      }
       case "get": {
+        if ((args[0] === null || args[0] === void 0) && define_process_env_default.FL_STRICT === "1") {
+          throw new FLRuntimeError(
+            ErrorCodes.TYPE_NIL,
+            `(get nil ${typeof args[1] === "string" ? '"' + args[1] + '"' : String(args[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
+            { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
+          );
+        }
         let k = args[1];
         if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
         if (Array.isArray(args[0])) return typeof k === "number" ? args[0][k] ?? null : null;
@@ -16656,73 +16791,6 @@ ${cssVars.join(";\n")};
         return false;
     }
   }
-
-  // src/errors.ts
-  init_define_process_env();
-  var ModuleError = class _ModuleError extends Error {
-    constructor(message, moduleName, file, line, col, hint) {
-      super(message);
-      this.moduleName = moduleName;
-      this.file = file;
-      this.line = line;
-      this.col = col;
-      this.hint = hint;
-      this.name = "ModuleError";
-      Object.setPrototypeOf(this, _ModuleError.prototype);
-    }
-  };
-  var ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
-    constructor(moduleName, source, file, line, col, hint) {
-      const sourceStr = source ? ` (from ${source})` : "";
-      super(`Module not found: ${moduleName}${sourceStr}`, moduleName, file, line, col, hint);
-      this.name = "ModuleNotFoundError";
-      Object.setPrototypeOf(this, _ModuleNotFoundError.prototype);
-    }
-  };
-  var FunctionNotFoundError = class _FunctionNotFoundError extends Error {
-    constructor(functionName, file, line, col, hint) {
-      const hintStr = hint ? ` ${hint}` : "";
-      super(`Function not found: ${functionName}${hintStr}`);
-      this.functionName = functionName;
-      this.file = file;
-      this.line = line;
-      this.col = col;
-      this.hint = hint;
-      this.name = "FunctionNotFoundError";
-      Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
-    }
-  };
-  var ErrorCodes = {
-    TYPE_NIL: "E_TYPE_NIL",
-    TYPE_MISMATCH: "E_TYPE_MISMATCH",
-    ARG_COUNT: "E_ARG_COUNT",
-    STACK_OVERFLOW: "E_STACK_OVERFLOW",
-    FN_NOT_FOUND: "E_FN_NOT_FOUND",
-    DIV_BY_ZERO: "E_DIV_BY_ZERO",
-    INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
-    INVALID_FORM: "E_INVALID_FORM",
-    RUNTIME: "E_RUNTIME"
-  };
-  var RECOVERY_HINTS = {
-    E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
-    E_TYPE_MISMATCH: "\uAE30\uB300 \uD0C0\uC785\uACFC \uB2E4\uB985\uB2C8\uB2E4. (string? x) (number? x) \uB4F1\uC73C\uB85C \uC0AC\uC804 \uAC80\uC99D\uD558\uAC70\uB098 \uBCC0\uD658 \uD568\uC218\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.",
-    E_ARG_COUNT: "\uC778\uC790 \uAC2F\uC218\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
-    E_STACK_OVERFLOW: "\uC7AC\uADC0 \uAE4A\uC774 \uCD08\uACFC. \uC885\uB8CC \uC870\uAC74\uC774 \uC788\uB294\uC9C0, \uB610\uB294 loop/recur \uB610\uB294 reduce\uB85C \uBCC0\uD658 \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD558\uC138\uC694.",
-    E_FN_NOT_FOUND: "\uD568\uC218\uAC00 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBAA8\uB4C8 import \uB610\uB294 \uC624\uD0C0\uB97C \uD655\uC778\uD558\uC138\uC694.",
-    E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
-    E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
-    E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
-    E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
-  };
-  var FLRuntimeError = class _FLRuntimeError extends ModuleError {
-    constructor(code, message, context = {}, file, line, col, hint) {
-      super(`[${code}] ${message}`, "runtime", file, line, col, hint ?? RECOVERY_HINTS[code]);
-      this.code = code;
-      this.context = context;
-      this.name = "FLRuntimeError";
-      Object.setPrototypeOf(this, _FLRuntimeError.prototype);
-    }
-  };
 
   // src/eval-special-forms.ts
   var _vmCompiler = new BytecodeCompiler();

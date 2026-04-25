@@ -16,6 +16,7 @@
 import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
+import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase C: strict 모드
 
 // Phase L1.5: Module Cache Layer
 // Ensures load() is deterministic and cacheable for DB systems
@@ -161,6 +162,14 @@ function flExecOpNative(op: string, vals: any[]): any {
       //   - key가 "name" (string) → obj["name"] (그대로)
       //   - 둘 다 동일 결과. 사용자 편의대로 선택 가능.
       //   - key가 keyword AST 노드면 name 필드 추출.
+      // Phase C: FL_STRICT=1이면 nil 접근을 명시적 에러로 throw
+      if ((v0 === null || v0 === undefined) && process.env.FL_STRICT === "1") {
+        throw new FLRuntimeError(
+          ErrorCodes.TYPE_NIL,
+          `(get nil ${typeof v1 === "string" ? '"' + v1 + '"' : String(v1)}) — cannot access key on nil. Use (get-or coll key default).`,
+          { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
+        );
+      }
       let k: any = v1;
       if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
       if (Array.isArray(v0)) return v0[k as any] !== undefined ? v0[k as any] : null;
@@ -196,7 +205,29 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "ends-with?": return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
     case "empty?": return Array.isArray(v0) ? v0.length === 0 : typeof v0 === "string" ? v0.length === 0 : (v0 === null || v0 === undefined);
     case "first": return Array.isArray(v0) ? (v0[0] !== undefined ? v0[0] : null) : null;
+    case "last": return Array.isArray(v0) ? (v0.length > 0 ? v0[v0.length - 1] : null) : null;
     case "rest": return Array.isArray(v0) ? v0.slice(1) : [];
+    // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
+    case "get-or": case "get_or": {
+      // (get-or coll key default) — coll이 nil이거나 key가 없으면 default 반환
+      let k: any = v1;
+      if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
+      if (v0 === null || v0 === undefined) return v2 !== undefined ? v2 : null;
+      if (Array.isArray(v0)) return v0[k as any] !== undefined ? v0[k as any] : (v2 !== undefined ? v2 : null);
+      if (v0 instanceof Map) { const r = v0.get(String(k).replace(/^:/, "")); return r === undefined ? (v2 !== undefined ? v2 : null) : r; }
+      if (typeof v0 === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (v0[normalized] !== undefined) return v0[normalized];
+        if (typeof k === "string" && v0[k] !== undefined) return v0[k];
+        return v2 !== undefined ? v2 : null;
+      }
+      return v2 !== undefined ? v2 : null;
+    }
+    case "first-or": case "first_or":
+      // (first-or coll default)
+      return Array.isArray(v0) && v0.length > 0 && v0[0] !== undefined ? v0[0] : (v1 !== undefined ? v1 : null);
+    case "last-or": case "last_or":
+      return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : (v1 !== undefined ? v1 : null);
     case "cons": return [v0, ...(Array.isArray(v1) ? v1 : [v1])];
     case "reverse": return Array.isArray(v0) ? [...v0].reverse() : v0;
     case "sort": return Array.isArray(v0) ? [...v0].sort((a: any, b: any) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
@@ -1070,8 +1101,47 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return -1;
     case "last":
       return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
+    // Phase C: nil-safe wrapper들
+    case "first-or": case "first_or":
+      return Array.isArray(args[0]) && args[0].length > 0 && args[0][0] !== undefined
+        ? args[0][0]
+        : (args[1] !== undefined ? args[1] : null);
+    case "last-or": case "last_or":
+      return Array.isArray(args[0]) && args[0].length > 0
+        ? args[0][args[0].length - 1]
+        : (args[1] !== undefined ? args[1] : null);
+    case "get-or": case "get_or": {
+      // (get-or coll key default)
+      const def = args[2] !== undefined ? args[2] : null;
+      let k: any = args[1];
+      if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
+      if (args[0] === null || args[0] === undefined) return def;
+      if (Array.isArray(args[0])) {
+        const idx = typeof k === "number" ? k : Number(k);
+        return Number.isFinite(idx) && args[0][idx] !== undefined ? args[0][idx] : def;
+      }
+      if (args[0] instanceof Map) {
+        const r = args[0].get(String(k).replace(/^:/, ""));
+        return r === undefined ? def : r;
+      }
+      if (typeof args[0] === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (args[0][normalized] !== undefined) return args[0][normalized];
+        if (typeof k === "string" && args[0][k] !== undefined) return args[0][k];
+        return def;
+      }
+      return def;
+    }
     case "get": {
       // v11.2: 일관된 키 규칙 — keyword/string 동일 결과
+      // Phase C: FL_STRICT=1이면 nil 접근을 명시적 에러로 throw
+      if ((args[0] === null || args[0] === undefined) && process.env.FL_STRICT === "1") {
+        throw new FLRuntimeError(
+          ErrorCodes.TYPE_NIL,
+          `(get nil ${typeof args[1] === "string" ? '"' + args[1] + '"' : String(args[1])}) — cannot access key on nil. Use (get-or coll key default).`,
+          { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
+        );
+      }
       let k: any = args[1];
       if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
       if (Array.isArray(args[0])) return typeof k === "number" ? (args[0][k] ?? null) : null;
