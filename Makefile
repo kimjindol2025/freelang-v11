@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
+.PHONY: compile compile-self run verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -29,6 +29,10 @@ help:
 
 compile:
 	@$(NODE) $(STAGE1) $(FILE) $(OUT)
+
+# Y4 단계1 (Year 2): bootstrap.js 우회 — stage1.js로 compile + execute
+run:
+	@bash scripts/fl-run.sh $(FILE) $(ARGS)
 
 compile-self:
 	@$(NODE) $(STAGE1) self/all.fl stage1-new.js
