@@ -7,12 +7,14 @@
 (load "projects/dclub-queue/lib/queue.fl")
 (load "projects/dclub-queue/lib/topics.fl")
 (load "projects/dclub-queue/lib/config.fl")
+(load "projects/dclub-queue/lib/idempotency.fl")
 
 (define cfg (dclub-queue-config))
 (define DB (get $cfg "db"))
 
 (q-ensure-tables $DB)
 (topics-ensure-table $DB)
+(idem-ensure-table $DB)
 
 ;; 기본 토픽 등록 (idempotent)
 (q-register-topic $DB "test" "Echo test" "handle-test")
@@ -22,14 +24,25 @@
 [FUNC handle-publish :params [$req]
   :body (let [
     topic (server_req_param $req "topic")
+    idem-key (idem-extract-key $req)
     body-raw (server_req_body $req)
     payload (if (string? $body-raw)
               (if (= $body-raw "") {} (json_parse $body-raw))
               $body-raw)
+    scope (str "queue:" $topic)
+    cached (if (= $idem-key "") nil (idem-check $DB $scope $idem-key))
   ]
-    (do
-      (q-publish $DB $topic $payload)
-      (server_json {:status "queued" :topic $topic})))]
+    (if (not (= $cached nil))
+      ;; X-Idempotency-Key 매칭 — 첫 결과 그대로 반환 (재발행 차단)
+      (server_json (assoc $cached "idempotent" true))
+      ;; 새 publish
+      (let [
+        _ (q-publish $DB $topic $payload)
+        result {:status "queued" :topic $topic}
+      ]
+        (do
+          (if (= $idem-key "") nil (idem-store $DB $scope $idem-key $result))
+          (server_json $result)))))]
 
 [FUNC handle-stats :params [$req]
   :body (let [

@@ -1,0 +1,59 @@
+;; idempotency.fl — Idempotency-Key 헤더 처리 (AWS DynamoDB 패턴)
+;;
+;; 도입 (2026-04-25):
+;;   client 가 X-Idempotency-Key: <uuid> 헤더 보내면
+;;   24h 안에 같은 (scope, key) 재요청 → 첫 결과 그대로 반환.
+;;   네트워크 retry 시 중복 처리 0 보장.
+;;
+;; scope 는 서비스/엔드포인트 구분자 (예: "queue:topic-name").
+;; key 는 client 가 생성한 고유 식별자 (UUID v4 권장).
+
+[FUNC idem-ensure-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS idempotency_keys (
+    scope       TEXT NOT NULL,
+    key         TEXT NOT NULL,
+    result      TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    PRIMARY KEY (scope, key)
+  )")]
+
+;; (scope, key) 조회 — 만료 안 된 결과 있으면 반환, 없으면 nil
+[FUNC idem-check :params [$db $scope $key]
+  :body (let [
+    rows (db_query $db
+      "SELECT result FROM idempotency_keys WHERE scope=? AND key=? AND expires_at > ? LIMIT 1"
+      [$scope $key (now_ms)])
+  ]
+    (if (= (length $rows) 0)
+      nil
+      (json_parse (get (get $rows 0) "result"))))]
+
+;; 결과 저장 — TTL 기본 24h (86,400,000 ms)
+[FUNC idem-store :params [$db $scope $key $result]
+  :body (let [
+    now (now_ms)
+    expires (+ $now 86400000)
+    result-json (json_stringify $result)
+  ]
+    (db_insert $db "idempotency_keys" {
+      :scope $scope
+      :key $key
+      :result $result-json
+      :created_at $now
+      :expires_at $expires
+    }))]
+
+;; 만료된 키 일괄 정리 — daily cron 권장
+[FUNC idem-cleanup :params [$db]
+  :body (db_exec $db
+    "DELETE FROM idempotency_keys WHERE expires_at < ?"
+    [(now_ms)])]
+
+;; 헤더 추출 헬퍼 — X-Idempotency-Key 또는 x-idempotency-key 양쪽
+[FUNC idem-extract-key :params [$req]
+  :body (let [
+    h (server_req_header $req "X-Idempotency-Key")
+    h2 (if (= $h nil) (server_req_header $req "x-idempotency-key") $h)
+  ]
+    (if (= $h2 nil) "" $h2))]
