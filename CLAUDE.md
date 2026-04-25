@@ -6,7 +6,23 @@
 
 ---
 
-## 📊 실측 상태 (2026-04-25 Phase A~E AI 완성도 5단계 + Phase 4 self-host 회복 완료)
+## 📊 실측 상태 (2026-04-25 AI 1~5 + Phase A~E + Phase 4 self-host 회복 완료)
+
+### "AI가 FreeLang을 잘 쓰게 하기" — AI-1~5 완료
+
+언어 품질(Phase A~E)을 넘어 **AI가 안정적으로 FreeLang을 작성하도록** 도구화:
+
+- **AI-1**: `scripts/gen-ai-prompt.js` — 378개 stdlib 시그니처 → AI 시스템 프롬프트 자동 생성
+  · `docs/AI_SYSTEM_PROMPT.md` (full, 5,777 tokens) + `MINI.md` (1,351 tokens)
+  · `npm run build` 시 자동 갱신
+- **AI-2**: `docs/AI_QUICKSTART.md` — AI 5분 가이드 (10개 즉시 복사 템플릿 + 10가지 자주 틀리는 함정)
+- **AI-3**: `scripts/ai-validate.js` — AI 출력 자동 normalize + 검증 (defun→defn, ==→=, typo Levenshtein 제안, --fix 모드)
+- **AI-4**: `scripts/ai-self-verify.js` — AI 자가 검증 루프 (validate + 실행 + 실패 시 ErrorCode/힌트 구조화 출력 → AI 재요청 가능)
+- **AI-5**: `benchmarks/fl-bench/` — 5개 MVP task + 평가 실행기 + AI 모델별 점수 측정 인프라
+
+부수 발견: stdlib `filter` 인자 순서 자동 감지로 수정 → `(filter fn list)`/`(filter list fn)` 모두 허용
+
+
 
 ### Phase A~E 핵심 성과 — AI 완성도 78 → 87+
 
