@@ -1,0 +1,9 @@
+{
+  "id": "T63_list_take",
+  "category": "list",
+  "difficulty": "easy",
+  "prompt": "(range 0 100)에서 처음 3개를 take로 가져와 출력. [0, 1, 2].",
+  "validation": { "type": "stdout_regex", "expected": "0\\D+1\\D+2" },
+  "reference_solution": "(println (take 3 (range 0 100)))",
+  "tags": ["take", "range"]
+}

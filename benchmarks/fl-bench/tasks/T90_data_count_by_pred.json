@@ -1,0 +1,9 @@
+{
+  "id": "T90_data_count_by_pred",
+  "category": "data-transform",
+  "difficulty": "medium",
+  "prompt": "리스트 [10 20 30 40 50]에서 30 이상인 것의 갯수(3)를 출력.",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(println (length (filter (fn [x] (>= x 30)) (list 10 20 30 40 50))))",
+  "tags": ["filter", "length"]
+}

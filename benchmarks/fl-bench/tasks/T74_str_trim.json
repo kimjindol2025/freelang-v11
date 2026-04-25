@@ -1,0 +1,9 @@
+{
+  "id": "T74_str_trim",
+  "category": "string",
+  "difficulty": "easy",
+  "prompt": "\"  hello  \"의 앞뒤 공백을 제거한 결과 길이(5)를 출력.",
+  "validation": { "type": "stdout_contains", "expected": "5" },
+  "reference_solution": "(println (length (trim \"  hello  \")))",
+  "tags": ["trim", "length"]
+}

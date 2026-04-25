@@ -1,0 +1,9 @@
+{
+  "id": "T60_math_floor",
+  "category": "math",
+  "difficulty": "easy",
+  "prompt": "3.7의 floor(3)와 ceil(4)을 한 줄씩 출력.",
+  "validation": { "type": "stdout_regex", "expected": "3[\\s\\S]+4" },
+  "reference_solution": "(println (floor 3.7))\n(println (ceil 3.7))",
+  "tags": ["floor", "ceil"]
+}

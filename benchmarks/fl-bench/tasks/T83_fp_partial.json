@@ -1,0 +1,9 @@
+{
+  "id": "T83_fp_partial",
+  "category": "functional",
+  "difficulty": "medium",
+  "prompt": "make-multiplier는 factor를 받아서 (fn [x] (* factor x))를 반환. (map (make-multiplier 3) (list 1 2 3))의 합(18=3+6+9)을 출력.",
+  "validation": { "type": "stdout_contains", "expected": "18" },
+  "reference_solution": "(defn make-multiplier [factor] (fn [x] (* factor x)))\n(println (reduce (fn [a b] (+ a b)) 0 (map (make-multiplier 3) (list 1 2 3))))",
+  "tags": ["closure", "map", "reduce"]
+}

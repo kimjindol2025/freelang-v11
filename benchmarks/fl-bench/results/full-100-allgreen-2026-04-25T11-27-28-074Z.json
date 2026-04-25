@@ -1,0 +1,711 @@
+{
+  "label": "full-100-allgreen",
+  "timestamp": "2026-04-25T11:27:28.076Z",
+  "total": 100,
+  "pass": 100,
+  "fail": 0,
+  "skip": 0,
+  "score": 100,
+  "results": [
+    {
+      "id": "T01_arithmetic_basic",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "arithmetic",
+      "stdout": "8\n"
+    },
+    {
+      "id": "T02_list_filter",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[1, 2, 3, 4, 5, 6]\n"
+    },
+    {
+      "id": "T03_string_reverse",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "string",
+      "stdout": "olleh\n"
+    },
+    {
+      "id": "T04_nil_safe_get",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "error-handling",
+      "stdout": "unknown\nunknown\nAlice\n"
+    },
+    {
+      "id": "T05_recursion_factorial",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "recursion",
+      "stdout": "120\n"
+    },
+    {
+      "id": "T06_arithmetic_gcd",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "arithmetic",
+      "stdout": "6\n"
+    },
+    {
+      "id": "T07_arithmetic_fib",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "arithmetic",
+      "stdout": "55\n"
+    },
+    {
+      "id": "T08_arithmetic_power",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "arithmetic",
+      "stdout": "1024\n"
+    },
+    {
+      "id": "T09_arithmetic_sum_range",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "arithmetic",
+      "stdout": "5050\n"
+    },
+    {
+      "id": "T100_combo_full_pipeline",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "380\n"
+    },
+    {
+      "id": "T10_list_map_double",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[2, 4, 6]\n"
+    },
+    {
+      "id": "T11_list_reduce_max",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "list",
+      "stdout": "9\n"
+    },
+    {
+      "id": "T12_list_length",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T13_list_reverse",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[3, 2, 1]\n"
+    },
+    {
+      "id": "T14_list_first_last",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "10 50\n"
+    },
+    {
+      "id": "T15_list_count_even",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "list",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T16_string_upper",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "HELLO WORLD\n"
+    },
+    {
+      "id": "T17_string_split_count",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T18_string_concat",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "Hello, World!\n"
+    },
+    {
+      "id": "T19_string_starts_with",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "string",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T20_string_replace",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "hello FreeLang\n"
+    },
+    {
+      "id": "T21_map_get",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "map",
+      "stdout": "Alice\n"
+    },
+    {
+      "id": "T22_map_keys",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "map",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T23_json_stringify",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "json",
+      "stdout": "{\"name\":\"Bob\",\"age\":25}\n"
+    },
+    {
+      "id": "T24_json_parse",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "json",
+      "stdout": "42\n"
+    },
+    {
+      "id": "T25_map_values_sum",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "map",
+      "stdout": "60\n"
+    },
+    {
+      "id": "T26_file_write_read",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "file-io",
+      "stdout": "hello\n"
+    },
+    {
+      "id": "T27_file_exists",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "file-io",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T28_file_lines_count",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "file-io",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T29_file_append",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "file-io",
+      "stdout": "foobar\n"
+    },
+    {
+      "id": "T30_file_json",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "file-io",
+      "stdout": "FreeLang\n"
+    },
+    {
+      "id": "T31_error_try_catch",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "error-handling",
+      "stdout": "{code: UNKNOWN, message: my-error, category: runtime-error, context: null, hint: null, recoverable: false}\n"
+    },
+    {
+      "id": "T32_error_safe_divide",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "error-handling",
+      "stdout": "5\nerror\n"
+    },
+    {
+      "id": "T33_error_validation",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "error-handling",
+      "stdout": "positive\nnegative\nzero\n"
+    },
+    {
+      "id": "T34_error_default",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "error-handling",
+      "stdout": "empty\n"
+    },
+    {
+      "id": "T35_pattern_describe",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "pattern-match",
+      "stdout": "text\n"
+    },
+    {
+      "id": "T36_pattern_grade",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "pattern-match",
+      "stdout": "B\n"
+    },
+    {
+      "id": "T37_state_traffic",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "state-machine",
+      "stdout": "green\n"
+    },
+    {
+      "id": "T38_state_counter",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "state-machine",
+      "stdout": "1\n"
+    },
+    {
+      "id": "T39_higher_compose",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "higher-order",
+      "stdout": "8\n"
+    },
+    {
+      "id": "T40_threading_first",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "higher-order",
+      "stdout": "101\n"
+    },
+    {
+      "id": "T41_threading_last",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "higher-order",
+      "stdout": "6\n"
+    },
+    {
+      "id": "T42_higher_apply",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "higher-order",
+      "stdout": "7\n"
+    },
+    {
+      "id": "T43_let_binding",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "binding",
+      "stdout": "30\n"
+    },
+    {
+      "id": "T44_recursive_sum",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "recursion",
+      "stdout": "55\n"
+    },
+    {
+      "id": "T45_map_filter_chain",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "data-transform",
+      "stdout": "[4, 16]\n"
+    },
+    {
+      "id": "T46_users_filter",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "[Alice, Charlie]\n"
+    },
+    {
+      "id": "T47_avg_score",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "84\n"
+    },
+    {
+      "id": "T48_count_words",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "string",
+      "stdout": "4\n"
+    },
+    {
+      "id": "T49_use_module",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "module",
+      "stdout": "2\n"
+    },
+    {
+      "id": "T50_pipeline_complete",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "160\n"
+    },
+    {
+      "id": "T51_regex_match",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "regex",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T52_regex_extract",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "regex",
+      "stdout": "25\n"
+    },
+    {
+      "id": "T53_regex_replace",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "regex",
+      "stdout": "abcXdefX\n"
+    },
+    {
+      "id": "T54_regex_split",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "regex",
+      "stdout": "4\n"
+    },
+    {
+      "id": "T55_regex_email",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "regex",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T56_time_unix",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "time",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T57_math_abs",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "math",
+      "stdout": "7\n"
+    },
+    {
+      "id": "T58_math_min_max",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "math",
+      "stdout": "1\n9\n"
+    },
+    {
+      "id": "T59_math_sqrt",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "math",
+      "stdout": "12\n"
+    },
+    {
+      "id": "T60_math_floor",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "math",
+      "stdout": "3\n4\n"
+    },
+    {
+      "id": "T61_list_sort",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[1, 1, 2, 3, 4, 5, 6, 9]\n"
+    },
+    {
+      "id": "T62_list_unique",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "4\n"
+    },
+    {
+      "id": "T63_list_take",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[0, 1, 2]\n"
+    },
+    {
+      "id": "T64_list_chunk",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "list",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T65_list_flatten",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "list",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T66_map_merge",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "map",
+      "stdout": "2\n"
+    },
+    {
+      "id": "T67_map_entries",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "map",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T68_json_set",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "map",
+      "stdout": "99\n"
+    },
+    {
+      "id": "T69_map_count",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "map",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T70_map_lookup",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "map",
+      "stdout": "100\n"
+    },
+    {
+      "id": "T71_str_repeat",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "ababab\n"
+    },
+    {
+      "id": "T72_str_join",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "string",
+      "stdout": "a,b,c\n"
+    },
+    {
+      "id": "T73_str_lowercase",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "hello world\n"
+    },
+    {
+      "id": "T74_str_trim",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T75_str_index",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "string",
+      "stdout": "6\n"
+    },
+    {
+      "id": "T76_algo_fizzbuzz",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "algorithm",
+      "stdout": "FizzBuzz\n"
+    },
+    {
+      "id": "T77_algo_palindrome",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "algorithm",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T78_algo_isprime",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "algorithm",
+      "stdout": "true\nfalse\n"
+    },
+    {
+      "id": "T79_algo_count_digits",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "algorithm",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T80_algo_sum_digits",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "algorithm",
+      "stdout": "15\n"
+    },
+    {
+      "id": "T81_fp_closure",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "functional",
+      "stdout": "15\n"
+    },
+    {
+      "id": "T82_fp_repeat",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "functional",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T83_fp_partial",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "functional",
+      "stdout": "18\n"
+    },
+    {
+      "id": "T84_fp_compose_chain",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "functional",
+      "stdout": "50\n"
+    },
+    {
+      "id": "T85_fp_callback",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "functional",
+      "stdout": "10\n"
+    },
+    {
+      "id": "T86_data_distinct",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "data-transform",
+      "stdout": "2\n"
+    },
+    {
+      "id": "T87_data_max_by",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "b\n"
+    },
+    {
+      "id": "T88_data_sum_by",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "data-transform",
+      "stdout": "175\n"
+    },
+    {
+      "id": "T89_data_min_by",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "18\n"
+    },
+    {
+      "id": "T90_data_count_by_pred",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "data-transform",
+      "stdout": "3\n"
+    },
+    {
+      "id": "T91_state_door",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "state-machine",
+      "stdout": "opened\n"
+    },
+    {
+      "id": "T92_pattern_classify",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "pattern-match",
+      "stdout": "medium\n"
+    },
+    {
+      "id": "T93_state_session",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "state-machine",
+      "stdout": "alice\n"
+    },
+    {
+      "id": "T94_pattern_validate",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "pattern-match",
+      "stdout": "true\n"
+    },
+    {
+      "id": "T95_state_machine_count",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "state-machine",
+      "stdout": "2\n"
+    },
+    {
+      "id": "T96_combo_word_count",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "9\n"
+    },
+    {
+      "id": "T97_combo_average_in_range",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "5.5\n"
+    },
+    {
+      "id": "T98_combo_squares_sum",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "algorithm",
+      "stdout": "385\n"
+    },
+    {
+      "id": "T99_combo_event_log",
+      "status": "pass",
+      "difficulty": "hard",
+      "category": "data-transform",
+      "stdout": "2\n"
+    }
+  ]
+}

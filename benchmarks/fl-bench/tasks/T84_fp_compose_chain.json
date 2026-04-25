@@ -1,0 +1,9 @@
+{
+  "id": "T84_fp_compose_chain",
+  "category": "functional",
+  "difficulty": "medium",
+  "prompt": "->>로 (range 1 6)에서 1) 모두 제곱 2) 5보다 큰 것만 필터 3) 합 계산. (1,4,9,16,25 → 9,16,25 → 50). 결과 출력.",
+  "validation": { "type": "stdout_contains", "expected": "50" },
+  "reference_solution": "(println (->> (range 1 6) (map (fn [x] (* x x))) (filter (fn [x] (> x 5))) (reduce (fn [a b] (+ a b)) 0)))",
+  "tags": ["thread-last", "map", "filter", "reduce"]
+}

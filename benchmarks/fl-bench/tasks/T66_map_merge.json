@@ -1,0 +1,9 @@
+{
+  "id": "T66_map_merge",
+  "category": "map",
+  "difficulty": "easy",
+  "prompt": "{:a 1}과 {:b 2}를 merge한 후 :b 값(2)을 출력.",
+  "validation": { "type": "stdout_contains", "expected": "2" },
+  "reference_solution": "(println (get (json_merge {:a 1} {:b 2}) :b))",
+  "tags": ["json_merge", "get"]
+}

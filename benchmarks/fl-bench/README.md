@@ -103,29 +103,37 @@ node benchmarks/fl-bench/run.js --solution-dir=./my-output --label=claude-3.5
 - 카테고리별 약점 식별: "GPT-4는 nil-safe 22%만 통과"
 - FreeLang 자체 개선 우선순위: "T05 recursion fail rate 40% → 학습 자료 보강"
 
-## 현재 task (50개 — Phase 1 완료)
+## 현재 task (100개 — Phase 2 완료, 100% PASS)
 
 카테고리별 분포:
 
 | 카테고리 | 갯수 | 대표 task |
 |----------|------|----------|
-| arithmetic | 5 | T01, T05~T09 (gcd, fib, pow, factorial, sum) |
-| list | 7 | T02, T10~T15 (map, reduce, length, first, filter) |
-| string | 6 | T03, T16~T20, T48 (upper, split, concat, replace, words) |
-| map/json | 5 | T21~T25 (get, keys, json_stringify/parse, values) |
-| file-io | 5 | T26~T30 (read/write, exists, append, json) |
-| error-handling | 4 | T04, T31~T34 (fl-try, validation, default) |
-| pattern-match | 2 | T35~T36 (cond + predicate, grade) |
-| state-machine | 2 | T37~T38 (traffic light, counter) |
-| higher-order | 4 | T39~T42 (compose, threading ->/->>) |
-| recursion | 2 | T05, T44 (factorial, sum-to) |
-| binding | 1 | T43 (let) |
-| data-transform | 4 | T45~T47, T50 (chain, users, average, pipeline) |
-| module | 1 | T49 (use json) |
+| arithmetic | 5 | gcd, fib, pow, factorial, sum |
+| list | 12 | map, reduce, sort, take, chunk, flatten, unique |
+| string | 11 | upper/lower, split, concat, replace, repeat, trim, index-of, join |
+| map/json | 10 | get, keys, merge, set, entries, get-or |
+| file-io | 5 | read/write, exists, append, json round-trip |
+| error-handling | 4 | fl-try, safe-divide, sign, default |
+| pattern-match | 4 | describe, grade, classify, validate |
+| state-machine | 5 | traffic light, counter, door, session, event reduce |
+| higher-order | 4 | compose, threading ->/->> |
+| recursion | 2 | factorial, sum-to |
+| binding | 1 | let |
+| data-transform | 11 | chain, users, average, pipeline, distinct, max-by, sum-by |
+| module | 1 | use json |
+| **regex** | 5 | match, extract, replace, split, email |
+| **time** | 1 | now_unix |
+| **math** | 4 | abs, min/max, sqrt, floor/ceil |
+| **algorithm** | 5 | fizzbuzz, palindrome, prime, count-digits, sum-digits |
+| **functional** | 5 | closure, n-times, partial, compose-chain, callback |
 
-**난이도 분포**: easy 18 / medium 24 / hard 8
+**난이도 분포**: easy 28 / medium 51 / hard 21
 
-**전체 reference 검증**: 50/50 PASS (100%, `--label=reference`).
+**전체 reference 검증**: 100/100 PASS (100%, `--label=reference`).
+**카테고리**: 18종.
+
+기존 50개 (Phase 1) + 신규 50개 (Phase 2: regex, time, math, algorithm, functional + 고급 list/string/map 추가).
 
 **제외 카테고리** (외부 의존):
 - DB (sqlite/postgres/mariadb) — 환경 필요

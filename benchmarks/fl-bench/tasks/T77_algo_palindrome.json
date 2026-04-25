@@ -1,0 +1,9 @@
+{
+  "id": "T77_algo_palindrome",
+  "category": "algorithm",
+  "difficulty": "medium",
+  "prompt": "주어진 리스트가 palindrome(앞뒤 동일)인지 검사하는 함수. (palindrome? (list 1 2 3 2 1)) → true.",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(defn palindrome? [xs] (= (str xs) (str (reverse xs))))\n(println (palindrome? (list 1 2 3 2 1)))",
+  "tags": ["reverse", "palindrome"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T53_regex_replace",
+  "category": "regex",
+  "difficulty": "medium",
+  "prompt": "\"abc123def456\"에서 모든 숫자(\\\\d+)를 \"X\"로 치환해 출력 (abcXdefX).",
+  "validation": { "type": "stdout_contains", "expected": "abcXdefX" },
+  "reference_solution": "(println (regex_replace \"abc123def456\" \"\\\\d+\" \"X\"))",
+  "tags": ["regex_replace"]
+}

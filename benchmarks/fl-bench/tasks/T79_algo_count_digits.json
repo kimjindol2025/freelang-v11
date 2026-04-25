@@ -1,0 +1,9 @@
+{
+  "id": "T79_algo_count_digits",
+  "category": "algorithm",
+  "difficulty": "medium",
+  "prompt": "자연수 12345의 자릿수(5)를 출력. (재귀 또는 string 변환).",
+  "validation": { "type": "stdout_contains", "expected": "5" },
+  "reference_solution": "(println (length (str 12345)))",
+  "tags": ["str", "length"]
+}

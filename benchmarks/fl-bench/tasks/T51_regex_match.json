@@ -1,0 +1,9 @@
+{
+  "id": "T51_regex_match",
+  "category": "regex",
+  "difficulty": "easy",
+  "prompt": "문자열 \"hello123\"이 패턴 \"\\\\d+\" (숫자 1개 이상)을 포함하는지 검사하고 true/false 출력.",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(println (regex_match \"hello123\" \"\\\\d+\"))",
+  "tags": ["regex_match"]
+}

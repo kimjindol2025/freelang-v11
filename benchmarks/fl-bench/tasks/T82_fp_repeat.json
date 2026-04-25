@@ -1,0 +1,9 @@
+{
+  "id": "T82_fp_repeat",
+  "category": "functional",
+  "difficulty": "medium",
+  "prompt": "함수 f를 n번 적용한 결과 (n-times f n x). f(f(f(0)))이 (n-times inc 3 0) = 3이 되도록 정의. inc는 (fn [n] (+ n 1)).",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(defn n-times [f n x] (if (<= n 0) x (n-times f (- n 1) (f x))))\n(println (n-times (fn [n] (+ n 1)) 3 0))",
+  "tags": ["recursion", "higher-order"]
+}
