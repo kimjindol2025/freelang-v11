@@ -1,90 +1,70 @@
-; Agent DSL 예제 3: 상태 추적 및 결정론 로깅
-; 시나리오: 실행 흐름 기록 → 재현 가능한 로그 → SHA256 검증
+; Agent DSL 예제 3: 상태 추적 및 로깅
+; 실행: node bootstrap.js run src/agent-example-state-tracking.fl
 
 (load "src/agent-dsl.fl")
+(load "src/logging-deterministic.fl")
 
-(let [
-  [$state (agent-state)]
+(println "════════════════════════════════════════")
+(println "예제 3: 상태 추적 및 로깅")
+(println "════════════════════════════════════════")
+(println "")
 
-  ; Task 1: 초기 상태 설정
-  [$init-task {
-    :name "init-state"
-    :action (fn [$ctx] (do
-      (set! $state (agent-state-set $state "counter" 0))
-      (set! $state (agent-log $state 0 "Initialized" { :counter 0 }))
-      (println "✓ State initialized")
-      { :counter 0 }
-    ))
-    :depends []
-    :retry 1
-  }]
+; Agent 상태 초기화
+(let [$state (agent-state)]
+  (let [$log (execution-log)]
 
-  ; Task 2: 카운터 증가
-  [$increment-task {
-    :name "increment-counter"
-    :action (fn [$ctx] (let [
-      [$current (agent-state-get $state "counter")]
-      [$new-value (+ $current 5)]
-    ] (do
-      (set! $state (agent-state-set $state "counter" $new-value))
-      (set! $state (agent-log $state 1 "Incremented counter" {
-        :old-value $current
-        :new-value $new-value
-      }))
-      (println (str "✓ Counter: " $current " → " $new-value))
-      { :counter $new-value }
-    )))
-    :depends ["init-state"]
-    :retry 1
-  }]
+    ; Task 1: 초기화
+    (let [$task1 (make-task "init" (fn [$ctx]
+      (do
+        (println "→ Task 1: 상태 초기화")
+        (set! $state (agent-state-set $state "counter" 0))
+        (println "✓ 초기화 완료 (counter = 0)")
+        { :step 0 }
+      )
+    ))]
 
-  ; Task 3: 최종 상태 저장
-  [$save-state-task {
-    :name "save-final-state"
-    :action (fn [$ctx] (let [
-      [$final-counter (agent-state-get $state "counter")]
-      [$logs (get $state :logs)]
-    ] (do
-      (set! $state (agent-log $state 2 "State saved" {
-        :final-counter $final-counter
-        :total-logs (count $logs)
-        :deterministic-hash (sha256 (json-stringify $state))
-      }))
-      (println "✓ Final state saved")
-      {
-        :success true
-        :final-counter $final-counter
-        :logs-count (count $logs)
-      }
-    )))
-    :depends ["increment-counter"]
-    :retry 1
-  }]
-]
+      ; Task 2: 카운터 증가
+      (let [$task2 (make-task "increment" (fn [$ctx]
+        (let [[$current (agent-state-get $state "counter")]
+              [$new-value (+ $current 5)]]
+          (do
+            (println "→ Task 2: 카운터 증가")
+            (set! $state (agent-state-set $state "counter" $new-value))
+            (println (str "✓ 증가 완료 (counter = " $new-value ")"))
+            { :step 1 :counter $new-value }
+          )
+        )
+      ))]
+        (set! $task2 (assoc $task2 :depends ["init"]))
 
-  (let [
-    [$result (agent-run [$init-task $increment-task $save-state-task])]
-  ] (do
-    (println "")
-    (println (str "═══════════════════════════════"))
-    (println (str "State Tracking Complete"))
-    (println (str "Final Counter: " (agent-state-get $state "counter")))
-    (println (str "Total Logs: " (count (get $state :logs))))
-    (println (str "═══════════════════════════════"))
-    (println "")
-    (println "📋 Execution Log:")
-    (map (fn [log] (println (str
-      "  Step " (get log :step) ": "
-      (get log :message)
-      " @ " (get log :timestamp)
-    ))) (get $state :logs))
-    (println "")
-    (println "📊 State Snapshot:")
-    (json-stringify {
-      :agent-id (get $state :id)
-      :created-at (get $state :created-at)
-      :final-counter (agent-state-get $state "counter")
-      :log-count (count (get $state :logs))
-    })
-  ))
+        ; Task 3: 상태 저장
+        (let [$task3 (make-task "save-state" (fn [$ctx]
+          (let [[$counter (agent-state-get $state "counter")]]
+            (do
+              (println "→ Task 3: 상태 저장")
+              (println (str "✓ 저장 완료 (최종 counter = " $counter ")"))
+              { :step 2 :final-counter $counter }
+            )
+          )
+        ))]
+          (set! $task3 (assoc $task3 :depends ["increment"]))
+
+          ; 실행
+          (let [
+            [$result (agent-run [$task1 $task2 $task3])]
+          ] (do
+            (println "")
+            (println "════════════════════════════════════════")
+            (println "상태 추적 완료!")
+            (let [[$final-counter (agent-state-get $state "counter")]]
+              (println (str "최종 카운터: " $final-counter))
+            )
+            (println (str "상태: " (get $result :status)))
+            (println (str "총 단계: " (get $result :total-steps)))
+            (println "════════════════════════════════════════")
+          ))
+        )
+      )
+    )
+  )
 )

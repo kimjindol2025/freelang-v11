@@ -1,73 +1,66 @@
-; Agent DSL 예제 1: 순차 작업 (의존성 관리)
-; 시나리오: 데이터 수집 → 처리 → 저장
+; Agent DSL 예제 1: 순차 작업 실행
+; 실행: node bootstrap.js run src/agent-example-sequential.fl
 
 (load "src/agent-dsl.fl")
 
-; 작업 정의
-(let [
-  [$state (agent-state)]
+(println "════════════════════════════════════════")
+(println "예제 1: 순차 Task 실행 (의존성)")
+(println "════════════════════════════════════════")
+(println "")
 
-  ; Task 1: 데이터 수집
-  [$fetch-task {
-    :name "fetch-data"
-    :action (fn [$ctx] (let [
-      [$data [
-        { :id 1 :name "Alice" :score 95 }
-        { :id 2 :name "Bob" :score 87 }
-        { :id 3 :name "Charlie" :score 92 }
-      ]]
-    ] (do
-      (println "✓ Fetched 3 records")
-      $data
-    )))
-    :depends []
-    :retry 3
-    :on-success (fn [r] (println "✓ Fetch succeeded"))
-  }]
-
-  ; Task 2: 처리 (필터링: score >= 90)
-  [$process-task {
-    :name "process-data"
-    :action (fn [$ctx] (let [
-      [$data [
-        { :id 1 :name "Alice" :score 95 }
-        { :id 3 :name "Charlie" :score 92 }
-      ]]
-    ] (do
-      (println "✓ Filtered to 2 records (score >= 90)")
-      $data
-    )))
-    :depends ["fetch-data"]
-    :retry 1
-    :on-success (fn [r] (println "✓ Process succeeded"))
-  }]
-
-  ; Task 3: 저장
-  [$save-task {
-    :name "save-data"
-    :action (fn [$ctx] (let [
-      [$count 2]
-    ] (do
-      (println (str "✓ Saved " $count " records to database"))
-      { :saved-count $count :status "success" }
-    )))
-    :depends ["process-data"]
-    :retry 1
-    :on-success (fn [r] (println "✓ Save succeeded"))
-  }]
+; Task 1: 데이터 수집
+[FUNC action-fetch :params [$ctx]
+  :body (do
+    (println "→ Task 1: Fetching data...")
+    (println "✓ Fetched 3 records")
+    [
+      { :id 1 :name "Alice" :score 95 }
+      { :id 2 :name "Bob" :score 87 }
+      { :id 3 :name "Charlie" :score 92 }
+    ]
+  )
 ]
 
-  ; 에이전트 실행
+; Task 2: 데이터 필터링
+[FUNC action-process :params [$ctx]
+  :body (do
+    (println "→ Task 2: Processing data...")
+    (println "✓ Filtered to 2 records (score >= 90)")
+    [
+      { :id 1 :name "Alice" :score 95 }
+      { :id 3 :name "Charlie" :score 92 }
+    ]
+  )
+]
+
+; Task 3: 데이터 저장
+[FUNC action-save :params [$ctx]
+  :body (do
+    (println "→ Task 3: Saving data...")
+    (println "✓ Saved 2 records to database")
+    { :saved 2 :status "success" }
+  )
+]
+
+; 실행
+(let [
+  [$task1 (make-task "fetch-data" action-fetch)]
+  [$task2 (make-task "process-data" action-process)]
+  [$task3 (make-task "save-data" action-save)]
+]
   (let [
-    [$result (agent-run [$fetch-task $process-task $save-task])]
-  ] (do
-    (println "")
-    (println (str "═══════════════════════════════"))
-    (println (str "Agent Execution Complete"))
-    (println (str "Total Steps: " (get $result :total-steps)))
-    (println (str "Status: " (get $result :status)))
-    (println (str "Executed Tasks: " (count (get $result :executed))))
-    (println (str "═══════════════════════════════"))
-    (json-stringify $result)
-  ))
+    [$task2 (assoc $task2 :depends ["fetch-data"])]
+    [$task3 (assoc $task3 :depends ["process-data"])]
+  ]
+    (let [
+      [$result (agent-run [$task1 $task2 $task3])]
+    ] (do
+      (println "")
+      (println "════════════════════════════════════════")
+      (println "실행 완료!")
+      (println (str "상태: " (get $result :status)))
+      (println (str "총 단계: " (get $result :total-steps)))
+      (println "════════════════════════════════════════")
+    ))
+  )
 )

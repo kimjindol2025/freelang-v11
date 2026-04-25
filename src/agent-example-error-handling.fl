@@ -1,52 +1,51 @@
-; Agent DSL 예제 2: 에러 처리 및 재시도
-; 시나리오: 불안정한 API 호출 → 재시도 → 폴백
+; Agent DSL 예제 2: 간단한 작업 실행
+; 실행: node bootstrap.js run src/agent-example-error-handling.fl
 
 (load "src/agent-dsl.fl")
 
-(let [
-  [$attempt-count 0]
+(println "════════════════════════════════════════")
+(println "예제 2: 간단한 작업")
+(println "════════════════════════════════════════")
+(println "")
 
-  ; Task: 재시도 로직이 있는 API 호출
-  [$api-task {
-    :name "call-unstable-api"
-    :action (fn [$ctx] (do
-      (set! $attempt-count (+ $attempt-count 1))
-      (if (< $attempt-count 2)
-        ; 첫 시도: 실패
-        (throw "Connection timeout")
-        ; 두 번째 시도: 성공
-        { :status "success" :data "Result from API" }
+; Task 1: 첫 번째 작업
+(let [$task1 (make-task "task1" (fn [$ctx]
+  (do
+    (println "→ Task 1: 첫 번째 작업")
+    (println "✓ 완료")
+    { :result "task1-result" }
+  )
+))]
+
+  ; Task 2: 두 번째 작업
+  (let [$task2 (make-task "task2" (fn [$ctx]
+    (do
+      (println "→ Task 2: 두 번째 작업")
+      (println "✓ 완료")
+      { :result "task2-result" }
+    )
+  ))]
+
+    ; Task 3: 세 번째 작업
+    (let [$task3 (make-task "task3" (fn [$ctx]
+      (do
+        (println "→ Task 3: 세 번째 작업")
+        (println "✓ 완료")
+        { :result "task3-result" }
       )
-    ))
-    :depends []
-    :retry 3
-    :timeout 5000
-    :on-error (fn [err] (println (str "⚠ Error: " err ", retrying...")))
-    :on-success (fn [r] (println "✓ API call succeeded"))
-  }]
+    ))]
 
-  ; Task: 폴백 (API 실패 시)
-  [$fallback-task {
-    :name "fallback-response"
-    :action (fn [$ctx] (do
-      (println "📦 Using fallback data")
-      { :status "cached" :data "Cached response" }
-    ))
-    :depends ["call-unstable-api"]
-    :retry 0
-    :on-success (fn [r] (println "✓ Fallback succeeded"))
-  }]
-]
-
-  (let [
-    [$result (agent-run [$api-task $fallback-task])]
-  ] (do
-    (println "")
-    (println (str "═══════════════════════════════"))
-    (println (str "Error Handling Complete"))
-    (println (str "Attempts: " $attempt-count))
-    (println (str "Status: " (get $result :status)))
-    (println (str "═══════════════════════════════"))
-    (json-stringify $result)
-  ))
+      ; 실행
+      (let [
+        [$result (agent-run [$task1 $task2 $task3])]
+      ] (do
+        (println "")
+        (println "════════════════════════════════════════")
+        (println "작업 완료!")
+        (println (str "상태: " (get $result :status)))
+        (println (str "총 단계: " (get $result :total-steps)))
+        (println "════════════════════════════════════════")
+      ))
+    )
+  )
 )
