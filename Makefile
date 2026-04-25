@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self run serve property-test verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
+.PHONY: compile compile-self run serve repl property-test verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -37,6 +37,10 @@ run:
 # Y4 단계2 wrapper (현재는 bootstrap.js fallback. 산출물 self-contained 화는 별도 작업)
 serve:
 	@bash scripts/fl-serve.sh $(ARGS)
+
+# Y4 단계3 wrapper (현재는 bootstrap.js fallback. interpreter 분리 후 풀 이관 가능)
+repl:
+	@bash scripts/fl-repl.sh $(ARGS)
 
 # Y3 (Year 2): property-based testing — 50 invariant × N case
 property-test:
