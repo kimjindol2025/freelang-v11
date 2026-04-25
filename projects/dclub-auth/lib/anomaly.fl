@@ -1,0 +1,49 @@
+;; anomaly.fl — 룰 기반 로그인 이상 탐지 엔진 (Phase L)
+;;
+;; 4개 룰, 가중치 합산:
+;;   R1 (40점) — 처음 보는 IP (사용자 이력에 없음)
+;;   R2 (30점) — 처음 보는 IP class (다른 /8 블록 → 다른 ISP 가능성 큼)
+;;   R3 (20점) — 처음 보는 User-Agent (새 디바이스/브라우저)
+;;   R4 (40점) — 1시간 내 다른 IP 에서 로그인 (불가능한 이동)
+;;
+;; 임계: score ≥ 50 → suspicious 마크 + 알림.
+;;
+;; 첫 로그인은 history 비어있어 R1~R3 모두 발동 → score 90.
+;; 이를 대비해 첫 N(=3)회 로그인은 grace (score 0 으로 강제).
+
+(load "projects/dclub-auth/lib/anomaly-store.fl")
+
+(define list-contains-ip-class?
+  (fn [list val]
+    (reduce (fn [acc x] (or acc (= x val))) false list)))
+
+[FUNC anomaly-evaluate :params [$db $user-id $ip $ua]
+  :body (let [
+    history-count (length (anomaly-recent-by-user $db $user-id 100))
+  ]
+    (if (< $history-count 3)
+      ;; grace period: 첫 3회 로그인은 학습 기간
+      {:score 0 :suspicious 0 :reasons "grace_period"}
+      (let [
+        known-ips (anomaly-known-ips $db $user-id 50)
+        known-classes (anomaly-known-ip-classes $db $user-id 50)
+        known-uas (anomaly-known-uas $db $user-id 50)
+        ua-h (auth_sha256 (if (= $ua "") "unknown" $ua))
+        ip-class (first-octet $ip)
+
+        r1 (if (list-contains-ip-class? $known-ips $ip) 0 40)
+        r2 (if (list-contains-ip-class? $known-classes $ip-class) 0 30)
+        r3 (if (list-contains-ip-class? $known-uas $ua-h) 0 20)
+        r4 (if (anomaly-recent-different-ip? $db $user-id $ip) 40 0)
+
+        score (+ $r1 (+ $r2 (+ $r3 $r4)))
+        reasons-parts (filter (fn [s] (not (= s "")))
+          [(if (> $r1 0) "new_ip" "")
+           (if (> $r2 0) "new_ip_class" "")
+           (if (> $r3 0) "new_device" "")
+           (if (> $r4 0) "concurrent_different_ip" "")])
+        reasons (str_join "," $reasons-parts)
+      ]
+        {:score $score
+         :suspicious (if (>= $score 50) 1 0)
+         :reasons (if (= $reasons "") "normal" $reasons)})))]
