@@ -1,0 +1,9 @@
+{
+  "id": "T101_defstruct_simple",
+  "category": "defstruct",
+  "difficulty": "medium",
+  "prompt": "defstruct로 Point [x y]를 정의하고, (Point 3 4)의 :x 값(3)을 출력. 단순 형태 사용.",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(defstruct Point [x y])\n(println (get (Point 3 4) :x))",
+  "tags": ["defstruct", "get"]
+}

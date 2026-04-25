@@ -1,0 +1,93 @@
+;; userinfo.fl — GET /userinfo
+;;
+;; OIDC UserInfo 엔드포인트. Authorization: Bearer <access_token> 검증 후
+;; 사용자 프로필 클레임 반환. scope에 따라 노출 필드 가변.
+;;
+;; access_token 은 jwt-rs256-sign 으로 발급된 JWT.
+;; kid 로 jwks-store 에서 키 조회 → 서명 검증 → user_id 추출 → DB 조회.
+
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
+(load "projects/dclub-auth/lib/users-store.fl")
+(load "projects/dclub-auth/lib/clients-store.fl") ; list-has? 사용
+(load "projects/dclub-auth/lib/config.fl")
+
+;; ── Bearer 토큰 추출 ─────────────────────────────────
+;; Authorization: Bearer <token> 헤더에서 토큰만 잘라냄.
+[FUNC extract-bearer :params [$req]
+  :body (let [
+    h (server_req_header $req "authorization")
+    h2 (if (= $h nil) (server_req_header $req "Authorization") $h)
+  ]
+    (if (= $h2 nil)
+      ""
+      (if (and (>= (length $h2) 7) (= (substring $h2 0 7) "Bearer "))
+        (substring $h2 7 (length $h2))
+        "")))]
+
+;; ── access_token 검증 ────────────────────────────────
+;; 1. 헤더의 kid 추출
+;; 2. jwks-find 로 공개 PEM 조회 (revoked 제외)
+;; 3. jwt-rs256-verify 로 서명 + exp 검증
+;; 4. payload 반환
+[FUNC verify-access-token :params [$db $token]
+  :body (let [hdr (jwt-rs256-header-only $token)]
+    (if (= $hdr nil)
+      nil
+      (let [
+        kid (get $hdr "kid")
+        key-row (jwks-find $db $kid)
+      ]
+        (if (= $key-row nil)
+          nil
+          ;; jwks-store는 PEM 형식 private/public 모두 보관.
+          ;; 공개키 검증은 publicKey 필드의 PEM 사용 — 없으면 JWK에서 변환 필요.
+          ;; 현 구현에선 키 row에 public_pem 직접 컬럼이 없음 — 추가 필요.
+          (let [pub-pem (get $key-row "public_pem")]
+            (if (= $pub-pem nil)
+              nil
+              (jwt-rs256-verify $token $pub-pem)))))))]
+
+[FUNC handle-userinfo :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    token (extract-bearer $req)
+  ]
+    (if (= $token "")
+      (server_status 401 {:error "invalid_token" :error_description "Bearer 토큰 없음"})
+      (let [payload (verify-access-token $db $token)]
+        (if (= $payload nil)
+          (server_status 401 {:error "invalid_token" :error_description "토큰 검증 실패"})
+          (let [
+            user (users-find-by-id $db (get $payload "sub"))
+            scope (or (get $payload "scope") "")
+            scope-list (str_split $scope " ")
+          ]
+            (if (= $user nil)
+              (server_status 404 {:error "not_found" :error_description "사용자 없음"})
+              (server_json (build-userinfo-response $user $scope-list)))))))) ]
+
+;; ── scope 기반 클레임 가시성 ─────────────────────────
+[FUNC build-userinfo-response :params [$user $scope-list]
+  :body (let [
+    base {"sub" (get $user "id")}
+    has-profile (list-has? $scope-list "profile")
+    has-email (list-has? $scope-list "email")
+    with-profile (if $has-profile
+      (let [
+        b1 (assoc $base "name" (or (get $user "display_name") ""))
+        b2 (assoc $b1 "preferred_username" (get $user "username"))
+        b3 (assoc $b2 "picture" (or (get $user "picture") ""))
+      ]
+        $b3)
+      $base)
+    with-email (if $has-email
+      (let [
+        e1 (assoc $with-profile "email" (get $user "email"))
+        e2 (assoc $e1 "email_verified" (= (get $user "email_verified") 1))
+      ]
+        $e2)
+      $with-profile)
+  ]
+    $with-email)]

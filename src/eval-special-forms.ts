@@ -677,22 +677,52 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     if (fieldsNode.kind === "block" && fieldsNode.type === "Array") {
       const items = fieldsNode.fields.get("items");
       if (Array.isArray(items)) {
-        for (let i = 0; i < items.length; i += 2) {
-          const nameItem = items[i] as any;
-          const typeItem = items[i + 1] as any;
-          // 키워드 (:x) or 변수 (x)
-          const fieldName =
-            nameItem.kind === "keyword" ? nameItem.name
-            : nameItem.kind === "variable" ? nameItem.name
-            : nameItem.kind === "literal"  ? String(nameItem.value)
-            : "";
-          const fieldType =
-            typeItem === undefined            ? "any"
-            : typeItem.kind === "keyword"    ? typeItem.name
-            : typeItem.kind === "variable"   ? typeItem.name
-            : typeItem.kind === "literal"    ? String(typeItem.value)
-            : "any";
-          if (fieldName) fields.push({ name: fieldName, type: fieldType });
+        // Phase E 후속: 두 형태 모두 지원
+        // 1) 명시적 타입: [:x :int :y :int]  — 짝수 개수, item[i]=name, item[i+1]=type
+        // 2) 단순 형태:   [x y z] 또는 [:x :y :z] — type 모두 "any"
+        // 자동 감지: 모든 item이 keyword/variable이고 한 칸 건너 type일 가능성 없으면 단순 형태
+        const isSimpleForm = (() => {
+          // 짝수가 아니거나, item 사이에 type-like가 없으면 단순 형태
+          if (items.length % 2 !== 0) return true;
+          // type-keyword pattern check: item[i+1]이 :int :float :string :any 같은 type symbol이면 명시 형태
+          const TYPE_KW = new Set(["int","float","number","string","bool","boolean","any","list","array","map","fn","function"]);
+          for (let i = 1; i < items.length; i += 2) {
+            const it = items[i] as any;
+            const v = it?.kind === "keyword" ? it.name : it?.kind === "variable" ? it.name : it?.value;
+            if (TYPE_KW.has(String(v))) return false; // 명시 형태 확정
+          }
+          return true; // type-keyword 없으면 단순 형태
+        })();
+
+        if (isSimpleForm) {
+          // 단순: 모든 item이 field name (type=any)
+          for (const item of items) {
+            const it = item as any;
+            const fieldName =
+              it.kind === "keyword" ? it.name
+              : it.kind === "variable" ? it.name
+              : it.kind === "literal"  ? String(it.value)
+              : "";
+            if (fieldName) fields.push({ name: fieldName, type: "any" });
+          }
+        } else {
+          // 명시: name + type 페어
+          for (let i = 0; i < items.length; i += 2) {
+            const nameItem = items[i] as any;
+            const typeItem = items[i + 1] as any;
+            const fieldName =
+              nameItem.kind === "keyword" ? nameItem.name
+              : nameItem.kind === "variable" ? nameItem.name
+              : nameItem.kind === "literal"  ? String(nameItem.value)
+              : "";
+            const fieldType =
+              typeItem === undefined            ? "any"
+              : typeItem.kind === "keyword"    ? typeItem.name
+              : typeItem.kind === "variable"   ? typeItem.name
+              : typeItem.kind === "literal"    ? String(typeItem.value)
+              : "any";
+            if (fieldName) fields.push({ name: fieldName, type: fieldType });
+          }
         }
       }
     }

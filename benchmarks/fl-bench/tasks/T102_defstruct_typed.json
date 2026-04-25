@@ -1,0 +1,9 @@
+{
+  "id": "T102_defstruct_typed",
+  "category": "defstruct",
+  "difficulty": "medium",
+  "prompt": "defstruct로 User [:name :string :age :int] 정의 후 (User \"Bob\" 30)을 만들고 :age 값(30) 출력.",
+  "validation": { "type": "stdout_contains", "expected": "30" },
+  "reference_solution": "(defstruct User [:name :string :age :int])\n(println (get (User \"Bob\" 30) :age))",
+  "tags": ["defstruct", "typed"]
+}
