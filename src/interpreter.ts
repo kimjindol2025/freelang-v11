@@ -1601,7 +1601,7 @@ export class Interpreter {
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
     const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
     const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try"]);
+    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);

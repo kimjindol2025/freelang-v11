@@ -17358,6 +17358,49 @@ function evalSpecialForm(interp2, op, expr) {
   const callAsyncFnVal = (fn, a) => interp2.callAsyncFunctionValue(fn, a);
   const callFn = (fn, a) => interp2.callFunction(fn, a);
   const ctx = interp2.context;
+  if (op === "use") {
+    if (expr.args.length < 1) throwArgCount("use", ">=1", expr.args.length, expr.line);
+    const fs18 = require("fs");
+    const path14 = require("path");
+    let loadedAny = false;
+    for (const arg of expr.args) {
+      let name = null;
+      if (arg.kind === "literal") name = String(arg.value);
+      else if (arg.kind === "variable") name = String(arg.name).replace(/^\$/, "");
+      if (!name) throwInvalidForm("use", "module name must be symbol or string", expr.line);
+      const candidates = [
+        path14.resolve(process.cwd(), "self/stdlib", name + ".fl"),
+        path14.resolve(process.cwd(), name + ".fl"),
+        path14.resolve(process.cwd(), name)
+      ];
+      let absPath = null;
+      for (const c of candidates) {
+        if (fs18.existsSync(c) && fs18.statSync(c).isFile()) {
+          absPath = c;
+          break;
+        }
+      }
+      if (!absPath) {
+        throw new FLRuntimeError(
+          ErrorCodes.RUNTIME,
+          `(use ${name}): module not found. Tried: ${candidates.join(", ")}`,
+          { fn: "use", varName: name },
+          void 0,
+          expr.line
+        );
+      }
+      const importedSet = interp2.importedFiles ?? /* @__PURE__ */ new Set();
+      if (importedSet.has(absPath)) continue;
+      importedSet.add(absPath);
+      interp2.importedFiles = importedSet;
+      const src = fs18.readFileSync(absPath, "utf-8");
+      const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+      const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+      interp2.interpret(parse3(lex2(src, absPath)));
+      loadedAny = true;
+    }
+    return loadedAny;
+  }
   if (op === "fn") {
     if (expr.args.length < 2) throwArgCount("fn", ">=2", expr.args.length, expr.line);
     const paramsNode = expr.args[0];
@@ -17385,7 +17428,7 @@ function evalSpecialForm(interp2, op, expr) {
       name: void 0
     };
   }
-  if (op === "defn") {
+  if (op === "defn" || op === "defun") {
     if (expr.args.length < 3) throwArgCount("defn", ">=3", expr.args.length, expr.line);
     const nameNode = expr.args[0];
     let name;
@@ -30013,7 +30056,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr);

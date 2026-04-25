@@ -55,6 +55,53 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
   const ctx = interp.context;
 
+  // ── use ──────────────────────────────────────────────────────────
+  // Phase D: (use NAME) — self/stdlib/NAME.fl 자동 로드 (간소 import)
+  // 이미 import된 모듈은 cache로 skip (interp.importedFiles)
+  if (op === "use") {
+    if (expr.args.length < 1) throwArgCount("use", ">=1", expr.args.length, expr.line);
+    const fs = require("fs");
+    const path = require("path");
+    let loadedAny = false;
+    for (const arg of expr.args) {
+      // arg는 literal symbol 또는 string. value로 통일
+      let name: string | null = null;
+      if ((arg as any).kind === "literal") name = String((arg as any).value);
+      else if ((arg as any).kind === "variable") name = String((arg as any).name).replace(/^\$/, "");
+      if (!name) throwInvalidForm("use", "module name must be symbol or string", expr.line);
+      // 후보: self/stdlib/NAME.fl 우선, 없으면 NAME.fl 직접
+      const candidates = [
+        path.resolve(process.cwd(), "self/stdlib", name + ".fl"),
+        path.resolve(process.cwd(), name + ".fl"),
+        path.resolve(process.cwd(), name),
+      ];
+      let absPath: string | null = null;
+      for (const c of candidates) {
+        if (fs.existsSync(c) && fs.statSync(c).isFile()) { absPath = c; break; }
+      }
+      if (!absPath) {
+        throw new FLRuntimeError(
+          ErrorCodes.RUNTIME,
+          `(use ${name}): module not found. Tried: ${candidates.join(", ")}`,
+          { fn: "use", varName: name },
+          undefined, expr.line
+        );
+      }
+      // 이미 로드된 파일이면 skip
+      const importedSet: Set<string> = (interp as any).importedFiles ?? new Set();
+      if (importedSet.has(absPath)) continue;
+      importedSet.add(absPath);
+      (interp as any).importedFiles = importedSet;
+      // 파일 로드 + 평가
+      const src = fs.readFileSync(absPath, "utf-8");
+      const { lex } = require("./lexer");
+      const { parse } = require("./parser");
+      (interp as any).interpret(parse(lex(src, absPath)));
+      loadedAny = true;
+    }
+    return loadedAny;
+  }
+
   // ── fn ───────────────────────────────────────────────────────────
   if (op === "fn") {
     if (expr.args.length < 2) throwArgCount("fn", ">=2", expr.args.length, expr.line);
@@ -89,7 +136,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── defn (v11.1: Clojure 스타일 sugar) ───────────────────────────
   // (defn name [params...] body) → (define name (fn [params...] body))
-  if (op === "defn") {
+  if (op === "defn" || op === "defun") {
     if (expr.args.length < 3) throwArgCount("defn", ">=3", expr.args.length, expr.line);
     const nameNode = expr.args[0] as any;
     let name: string;
