@@ -17,6 +17,8 @@ import { createCryptoRsaModule } from "./stdlib-crypto-rsa"; // Phase A.1: RSA /
 import { createTotpModule } from "./stdlib-totp";          // Phase G: TOTP / RFC 6238 (dclub-auth MFA)
 import { createMailModule } from "./stdlib-mail";          // Phase I: mail outbox + SMTP TLS (dclub-auth)
 import { createWebauthnModule } from "./stdlib-webauthn";  // Phase J: WebAuthn / Passkey (dclub-auth)
+import { createQueueHelpersModule } from "./stdlib-queue-helpers"; // Phase X1: dclub-queue
+import { createCronModule } from "./stdlib-cron";          // Phase X3: dclub-tasks cron parser
 import { createQueueHelpersModule } from "./stdlib-queue-helpers"; // Phase X1: dclub-queue atomic dequeue
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
@@ -82,6 +84,8 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createTotpModule());      // Phase G: totp_secret_generate/verify/now/uri
   interp.registerModule(createMailModule());      // Phase I: mail_outbox_write/list/count, smtp_send_tls
   interp.registerModule(createWebauthnModule()); // Phase J: webauthn_challenge/parse_attestation/verify_assertion
+  interp.registerModule(createQueueHelpersModule()); // Phase X1: queue_dequeue_atomic/db_init/recover_stuck
+  interp.registerModule(createCronModule());      // Phase X3: cron_validate/match/next_match
   interp.registerModule(createQueueHelpersModule()); // Phase X1: queue_dequeue_atomic, queue_db_init, queue_recover_stuck
   interp.registerModule(createWorkflowModule());
   interp.registerModule(createResourceModule());

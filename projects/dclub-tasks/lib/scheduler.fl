@@ -1,0 +1,32 @@
+;; scheduler.fl — 매분 tick: due 작업 → dclub-queue publish (Phase X3)
+
+(load "projects/dclub-tasks/lib/tasks-store.fl")
+(load "projects/dclub-tasks/lib/config.fl")
+
+[FUNC scheduler-tick :params [$db]
+  :body (let [
+    cfg (dclub-tasks-config)
+    queue-url (get $cfg "queue_url")
+    now-ms (now_ms)
+    due-tasks (task-due $db $now-ms)
+  ]
+    (do
+      (if (> (length $due-tasks) 0)
+        (println (str "[scheduler] " (length $due-tasks) " due task(s)"))
+        nil)
+      (map (fn [t]
+        (let [
+          tid (get t "id")
+          tname (get t "name")
+          topic (get t "topic")
+          payload-str (get t "payload")
+          publish-url (str $queue-url "/q/" $topic "/publish")
+          publish-body (if (or (= $payload-str nil) (= $payload-str "")) "{}" $payload-str)
+          resp (http_post_form $publish-url $publish-body)
+        ]
+          (do
+            (task-mark-run $db $tid (get t "cron_expr"))
+            (task-run-record $db $tid $tname "published"
+              (str "topic=" $topic " resp_len=" (length $resp)))
+            (println (str "[scheduler] " $tname " → " $topic)))))
+        $due-tasks)))]
