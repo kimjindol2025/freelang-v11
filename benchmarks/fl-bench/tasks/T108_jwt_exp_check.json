@@ -1,0 +1,9 @@
+{
+  "id": "T108_jwt_exp_check",
+  "category": "oauth-jwt",
+  "difficulty": "medium",
+  "prompt": "JWT 만료 검사: token-exp(만료 시각, unix sec) 이 현재 시각보다 크면 valid. (jwt-valid? {:exp 9999999999})는 true. 결과 출력.",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(defn jwt-valid? [tok] (> (get tok :exp) (now_unix)))\n(println (jwt-valid? {:exp 9999999999}))",
+  "tags": ["jwt", "now_unix", "comparison"]
+}

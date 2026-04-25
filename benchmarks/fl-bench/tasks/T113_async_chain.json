@@ -1,0 +1,9 @@
+{
+  "id": "T113_async_chain",
+  "category": "async",
+  "difficulty": "medium",
+  "prompt": "값 5를 step1(+1) → step2(*2) → step3(+10) 체인 적용. 결과 22 출력. (->> 사용)",
+  "validation": { "type": "stdout_contains", "expected": "22" },
+  "reference_solution": "(println (->> 5 (+ 1) (* 2) (+ 10)))",
+  "tags": ["thread-last", "chain"]
+}

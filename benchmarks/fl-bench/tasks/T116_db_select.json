@@ -1,0 +1,9 @@
+{
+  "id": "T116_db_select",
+  "category": "db",
+  "difficulty": "medium",
+  "prompt": "in-memory \"테이블\" [{:id 1 :name \"a\"} {:id 2 :name \"b\"}]에서 :id=2인 row의 :name (\"b\") 출력.",
+  "validation": { "type": "stdout_contains", "expected": "b" },
+  "reference_solution": "(let [[rows (list {:id 1 :name \"a\"} {:id 2 :name \"b\"})]] (println (get (first (filter (fn [r] (= (get r :id) 2)) rows)) :name)))",
+  "tags": ["db-stub", "filter", "first"]
+}

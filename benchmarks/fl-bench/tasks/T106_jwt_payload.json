@@ -1,0 +1,9 @@
+{
+  "id": "T106_jwt_payload",
+  "category": "oauth-jwt",
+  "difficulty": "medium",
+  "prompt": "JWT payload 시뮬레이션: {:sub \"alice\" :exp 1234567890 :iss \"freelang\"}에서 :sub 값을 안전하게 추출 (get-or 사용, 기본값 \"anonymous\"). 결과 출력.",
+  "validation": { "type": "stdout_contains", "expected": "alice" },
+  "reference_solution": "(println (get-or {:sub \"alice\" :exp 1234567890 :iss \"freelang\"} :sub \"anonymous\"))",
+  "tags": ["jwt", "get-or", "map"]
+}

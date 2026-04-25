@@ -1,0 +1,9 @@
+{
+  "id": "T115_async_timeout",
+  "category": "async",
+  "difficulty": "medium",
+  "prompt": "Timeout 패턴 시뮬레이션: try-op는 op() 결과 또는 fallback. (try-op (fn [] 42) 0)는 42 출력.",
+  "validation": { "type": "stdout_contains", "expected": "42" },
+  "reference_solution": "(defn try-op [op f] (let [[r (op)]] (if (nil? r) f r)))\n(println (try-op (fn [] 42) 0))",
+  "tags": ["timeout", "fn-call"]
+}
