@@ -1,0 +1,9 @@
+{
+  "id": "T91_state_door",
+  "category": "state-machine",
+  "difficulty": "medium",
+  "prompt": "문 상태머신: closed + open → opened, opened + close → closed, opened + lock → opened (변화 없음). (transition \"closed\" \"open\") → \"opened\".",
+  "validation": { "type": "stdout_contains", "expected": "opened" },
+  "reference_solution": "(defn transition [s e] (cond [(and (= s \"closed\") (= e \"open\")) \"opened\"] [(and (= s \"opened\") (= e \"close\")) \"closed\"] [true s]))\n(println (transition \"closed\" \"open\"))",
+  "tags": ["cond", "and", "state-machine"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T87_data_max_by",
+  "category": "data-transform",
+  "difficulty": "hard",
+  "prompt": "사용자 [{:name \"a\" :score 80} {:name \"b\" :score 95} {:name \"c\" :score 70}]에서 score 최고인 사람의 이름(\"b\")을 출력.",
+  "validation": { "type": "stdout_contains", "expected": "b" },
+  "reference_solution": "(let [[users (list {:name \"a\" :score 80} {:name \"b\" :score 95} {:name \"c\" :score 70})]] (println (get (reduce (fn [a b] (if (> (get a :score) (get b :score)) a b)) (first users) users) :name)))",
+  "tags": ["reduce", "max", "let"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T96_combo_word_count",
+  "category": "data-transform",
+  "difficulty": "hard",
+  "prompt": "문장 \"the quick brown fox jumps over the lazy dog\"의 단어 갯수(9)를 출력. (split + length)",
+  "validation": { "type": "stdout_contains", "expected": "9" },
+  "reference_solution": "(println (length (str-split \"the quick brown fox jumps over the lazy dog\" \" \")))",
+  "tags": ["str-split", "length"]
+}

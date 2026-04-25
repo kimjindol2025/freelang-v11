@@ -1,0 +1,9 @@
+{
+  "id": "T67_map_entries",
+  "category": "map",
+  "difficulty": "medium",
+  "prompt": "{:a 1 :b 2 :c 3}의 entries [[k v] ...]에서 길이(3) 출력.",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(println (length (map_entries {:a 1 :b 2 :c 3})))",
+  "tags": ["map_entries"]
+}

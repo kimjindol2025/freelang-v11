@@ -1,0 +1,9 @@
+{
+  "id": "T64_list_chunk",
+  "category": "list",
+  "difficulty": "medium",
+  "prompt": "[1 2 3 4 5]을 2개씩 chunk로 나눈 후 청크 수(3)를 출력.",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(println (length (arr_chunk (list 1 2 3 4 5) 2)))",
+  "tags": ["arr_chunk"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T62_list_unique",
+  "category": "list",
+  "difficulty": "easy",
+  "prompt": "[1 2 2 3 3 3 4]에서 중복 제거 후 길이(4) 출력.",
+  "validation": { "type": "stdout_contains", "expected": "4" },
+  "reference_solution": "(println (length (arr_unique (list 1 2 2 3 3 3 4))))",
+  "tags": ["arr_unique"]
+}

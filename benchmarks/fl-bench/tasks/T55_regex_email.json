@@ -1,0 +1,9 @@
+{
+  "id": "T55_regex_email",
+  "category": "regex",
+  "difficulty": "hard",
+  "prompt": "이메일 형식 검증: \"foo@bar.com\"이 [\\\\w.]+@[\\\\w.]+ 패턴 일치하는지 true/false 출력.",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(println (regex_match \"foo@bar.com\" \"[\\\\w.]+@[\\\\w.]+\"))",
+  "tags": ["regex_match", "email"]
+}

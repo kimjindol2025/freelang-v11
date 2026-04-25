@@ -1,0 +1,9 @@
+{
+  "id": "T86_data_distinct",
+  "category": "data-transform",
+  "difficulty": "medium",
+  "prompt": "사용자 [{:name \"Alice\"} {:name \"Bob\"} {:name \"Alice\"}]에서 distinct 이름 갯수(2)를 출력.",
+  "validation": { "type": "stdout_contains", "expected": "2" },
+  "reference_solution": "(println (length (arr_unique (map (fn [u] (get u :name)) (list {:name \"Alice\"} {:name \"Bob\"} {:name \"Alice\"})))))",
+  "tags": ["map", "arr_unique"]
+}

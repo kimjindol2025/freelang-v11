@@ -1,0 +1,9 @@
+{
+  "id": "T92_pattern_classify",
+  "category": "pattern-match",
+  "difficulty": "medium",
+  "prompt": "n을 받아: 0 → \"zero\", 1~10 → \"small\", 11~100 → \"medium\", >100 → \"large\". (classify 50) → \"medium\".",
+  "validation": { "type": "stdout_contains", "expected": "medium" },
+  "reference_solution": "(defn classify [n] (cond [(= n 0) \"zero\"] [(<= n 10) \"small\"] [(<= n 100) \"medium\"] [true \"large\"]))\n(println (classify 50))",
+  "tags": ["cond"]
+}

@@ -1,0 +1,29 @@
+;; server.fl — dclub-auth IdP HTTP 서버 부트스트랩
+;;
+;; 실행:
+;;   node bootstrap.js run projects/dclub-auth/app/server.fl
+;;
+;; 기본 설정:
+;;   port=30100, db=/tmp/dclub-auth.db, issuer=http://localhost:30100
+;; 환경변수로 오버라이드: DCLUB_AUTH_{PORT,DB,ISSUER}
+
+(load "projects/dclub-auth/lib/config.fl")
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/app/jwks.fl")
+(load "projects/dclub-auth/app/discovery.fl")
+
+;; ── 부팅 시 키 자동 보장 ────────────────────────────
+(define cfg (dclub-auth-config))
+(define active-kid (jwks-init (get $cfg "db")))
+
+(println (str "[dclub-auth] issuer=" (get $cfg "issuer")))
+(println (str "[dclub-auth] db=" (get $cfg "db")))
+(println (str "[dclub-auth] active kid=" $active-kid))
+
+;; ── 라우트 등록 ────────────────────────────────────
+(server_get "/jwks.json" "handle-jwks")
+(server_get "/.well-known/openid-configuration" "handle-discovery")
+
+;; ── 시작 ──────────────────────────────────────────
+(server_start (get $cfg "port"))
+(println (str "[dclub-auth] listening on port " (get $cfg "port")))

@@ -1,0 +1,9 @@
+{
+  "id": "T65_list_flatten",
+  "category": "list",
+  "difficulty": "medium",
+  "prompt": "중첩 리스트 [[1 2] [3 4] [5]]을 flatten해서 길이(5)를 출력.",
+  "validation": { "type": "stdout_contains", "expected": "5" },
+  "reference_solution": "(println (length (arr_flatten (list (list 1 2) (list 3 4) (list 5)))))",
+  "tags": ["arr_flatten"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T75_str_index",
+  "category": "string",
+  "difficulty": "medium",
+  "prompt": "\"hello world\"에서 \"world\" 시작 위치(6)를 index-of로 찾아 출력.",
+  "validation": { "type": "stdout_contains", "expected": "6" },
+  "reference_solution": "(println (index-of \"hello world\" \"world\"))",
+  "tags": ["index-of"]
+}

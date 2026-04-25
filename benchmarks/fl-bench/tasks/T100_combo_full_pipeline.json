@@ -1,0 +1,9 @@
+{
+  "id": "T100_combo_full_pipeline",
+  "category": "data-transform",
+  "difficulty": "hard",
+  "prompt": "주문 [{:user \"a\" :amt 100} {:user \"b\" :amt 50} {:user \"a\" :amt 80} {:user \"c\" :amt 200}]에서 amt가 80 이상인 주문의 합(380=100+80+200)을 출력.",
+  "validation": { "type": "stdout_contains", "expected": "380" },
+  "reference_solution": "(let [[orders (list {:user \"a\" :amt 100} {:user \"b\" :amt 50} {:user \"a\" :amt 80} {:user \"c\" :amt 200})]] (println (->> orders (filter (fn [o] (>= (get o :amt) 80))) (map (fn [o] (get o :amt))) (reduce (fn [a b] (+ a b)) 0))))",
+  "tags": ["filter", "map", "reduce", "thread-last", "pipeline"]
+}

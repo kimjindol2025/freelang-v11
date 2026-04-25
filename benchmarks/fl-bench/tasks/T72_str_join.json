@@ -1,0 +1,9 @@
+{
+  "id": "T72_str_join",
+  "category": "string",
+  "difficulty": "medium",
+  "prompt": "리스트 [\"a\" \"b\" \"c\"]를 \",\"로 join한 결과 (a,b,c)를 출력.",
+  "validation": { "type": "stdout_contains", "expected": "a,b,c" },
+  "reference_solution": "(println (reduce (fn [acc x] (if (= acc \"\") x (str acc \",\" x))) \"\" (list \"a\" \"b\" \"c\")))",
+  "tags": ["reduce", "join"]
+}

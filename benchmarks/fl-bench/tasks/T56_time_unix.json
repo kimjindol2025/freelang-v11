@@ -1,0 +1,9 @@
+{
+  "id": "T56_time_unix",
+  "category": "time",
+  "difficulty": "easy",
+  "prompt": "현재 unix timestamp (초)가 양의 정수인지 검사하고 true 출력.",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(println (> (now_unix) 0))",
+  "tags": ["now_unix"]
+}

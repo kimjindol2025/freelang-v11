@@ -1,0 +1,9 @@
+{
+  "id": "T95_state_machine_count",
+  "category": "state-machine",
+  "difficulty": "hard",
+  "prompt": "이벤트 시퀀스 [:inc :inc :dec :inc]를 초기 0에 reduce로 적용. inc는 +1, dec는 -1. 결과(2) 출력.",
+  "validation": { "type": "stdout_contains", "expected": "2" },
+  "reference_solution": "(println (reduce (fn [s e] (cond [(= e :inc) (+ s 1)] [(= e :dec) (- s 1)] [true s])) 0 (list :inc :inc :dec :inc)))",
+  "tags": ["reduce", "cond", "state-machine"]
+}

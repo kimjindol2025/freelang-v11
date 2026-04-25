@@ -1,0 +1,9 @@
+{
+  "id": "T80_algo_sum_digits",
+  "category": "algorithm",
+  "difficulty": "hard",
+  "prompt": "자연수 12345의 모든 자릿수 합(1+2+3+4+5=15)을 출력.",
+  "validation": { "type": "stdout_contains", "expected": "15" },
+  "reference_solution": "(defn sum-digits [n] (if (< n 10) n (+ (% n 10) (sum-digits (floor (/ n 10))))))\n(println (sum-digits 12345))",
+  "tags": ["recursion", "modulo"]
+}

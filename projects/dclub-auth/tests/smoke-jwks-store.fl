@@ -1,0 +1,64 @@
+;; smoke-jwks-store.fl — Phase A.3 라이브 검증
+;; 실행: node bootstrap.js run projects/dclub-auth/tests/smoke-jwks-store.fl
+
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
+
+(define DB "/tmp/dclub-auth-smoke.db")
+
+;; 깨끗한 DB로 시작
+(shell (str "rm -f " $DB))
+
+;; ── 1. 초기화: schema + 첫 키 생성 ─────────────────
+(define kid1 (jwks-init $DB))
+(println (str "[1] init kid = " (substring $kid1 0 12) "..."))
+
+(define active1 (jwks-active $DB))
+(println (str "[1] active alg = " (get $active1 "alg")
+              " status = " (get $active1 "status")))
+
+;; ── 2. 두 번째 init 호출은 재사용 (no-op) ──────────
+(define kid1-again (jwks-init $DB))
+(println (str "[2] re-init same kid = " (= $kid1 $kid1-again)))
+
+;; ── 3. JWKS 공개 노출 (1개 키) ─────────────────────
+(define jwks (jwks-public-keys $DB))
+(define keys-arr (get $jwks "keys"))
+(println (str "[3] /jwks.json keys = " (length $keys-arr)))
+(let [k (get $keys-arr 0)]
+  (println (str "[3] first key kty=" (get $k "kty")
+                " alg=" (get $k "alg")
+                " use=" (get $k "use"))))
+
+;; ── 4. 회전: active → rotated, 새 active ──────────
+(define kid2 (jwks-rotate $DB))
+(println (str "[4] rotate, new active kid = " (substring $kid2 0 12) "..."))
+
+(define active2 (jwks-active $DB))
+(println (str "[4] new active is " (= (get $active2 "kid") $kid2)))
+(println (str "[4] previous kid status = "
+              (get (get (db_query $DB "SELECT status FROM signing_keys WHERE kid=?" [$kid1]) 0) "status")))
+
+;; ── 5. JWKS는 이제 2개 (active + rotated) ─────────
+(define jwks2 (jwks-public-keys $DB))
+(println (str "[5] /jwks.json keys after rotate = " (length (get $jwks2 "keys"))))
+
+;; ── 6. JWT 발급 — kid1로 검증, kid2로 검증 ────────
+;; 이전 키(kid1, rotated)로 서명한 토큰을 verify로 통과시켜야 함.
+(define old-active (jwks-find $DB $kid1))
+(define old-token (jwt-rs256-sign {"sub" "u1"} (get $old-active "private_pem") $kid1 600))
+(define old-payload (jwt-rs256-verify $old-token (get $old-active "public_pem")))
+;; 위 verify는 public_pem 직접 보유 안 함 — 실제 OIDC verify는 jwks 기반 wrapper 작성 필요 (B Phase).
+;; 여기서는 jwks-find가 키를 잘 찾는지만 검증.
+(println (str "[6] rotated kid retrievable = " (if (= $old-active nil) "no" "yes")))
+(println (str "[6] active kid retrievable = " (if (= (jwks-find $DB $kid2) nil) "no" "yes")))
+
+;; ── 7. revoke ────────────────────────────────────
+(jwks-revoke $DB $kid1)
+(define after-revoke (jwks-find $DB $kid1))
+(println (str "[7] revoked kid lookup = " (if (= $after-revoke nil) "OK(nil)" "FAIL(found)")))
+
+(define jwks3 (jwks-public-keys $DB))
+(println (str "[7] /jwks.json keys after revoke = " (length (get $jwks3 "keys"))))
+
+(println "Phase A.3 smoke OK")

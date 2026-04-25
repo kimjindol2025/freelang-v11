@@ -1,0 +1,9 @@
+{
+  "id": "T73_str_lowercase",
+  "category": "string",
+  "difficulty": "easy",
+  "prompt": "\"HELLO WORLD\"를 소문자로 변환해 출력.",
+  "validation": { "type": "stdout_contains", "expected": "hello world" },
+  "reference_solution": "(println (lowercase \"HELLO WORLD\"))",
+  "tags": ["lowercase"]
+}

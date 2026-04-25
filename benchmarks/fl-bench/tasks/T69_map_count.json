@@ -1,0 +1,9 @@
+{
+  "id": "T69_map_count",
+  "category": "map",
+  "difficulty": "medium",
+  "prompt": "리스트 [\"a\" \"b\" \"a\" \"c\" \"a\" \"b\"]에서 \"a\"의 갯수(3)를 reduce로 세어 출력.",
+  "validation": { "type": "stdout_contains", "expected": "3" },
+  "reference_solution": "(println (reduce (fn [acc x] (if (= x \"a\") (+ acc 1) acc)) 0 (list \"a\" \"b\" \"a\" \"c\" \"a\" \"b\")))",
+  "tags": ["reduce", "count"]
+}
