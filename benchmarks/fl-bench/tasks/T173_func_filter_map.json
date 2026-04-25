@@ -1,0 +1,1 @@
+{"id":"T173_func_filter_map","category":"functional","difficulty":"easy","prompt":"(list 1 2 3 4)에서 짝수 제곱 (4 16). 첫번째(4) 출력.","validation":{"type":"stdout_contains","expected":"4"},"reference_solution":"(println (first (map (fn [x] (* x x)) (filter (fn [x] (= 0 (% x 2))) (list 1 2 3 4)))))","tags":["filter","map"]}

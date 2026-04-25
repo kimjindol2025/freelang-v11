@@ -1,0 +1,1 @@
+{"id":"T167_data_pluck","category":"data-transform","difficulty":"medium","prompt":"users [{:n \"a\"} {:n \"b\"} {:n \"c\"}]에서 :n만 추출해 join. \"a,b,c\" 출력.","validation":{"type":"stdout_contains","expected":"a,b,c"},"reference_solution":"(println (str_join \",\" (map (fn [u] (get u :n)) (list {:n \"a\"} {:n \"b\"} {:n \"c\"}))))","tags":["pluck","map","str_join"]}

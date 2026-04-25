@@ -1,0 +1,1 @@
+{"id":"T191_higher_lazy_pipe","category":"higher-order","difficulty":"medium","prompt":"100을 (->) 사용 (- 50) (* 2) (+ 1) → ((100-50)*2+1) = 101.","validation":{"type":"stdout_contains","expected":"101"},"reference_solution":"(println (-> 100 (- 50) (* 2) (+ 1)))","tags":["thread-first","->"]}

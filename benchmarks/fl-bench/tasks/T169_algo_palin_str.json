@@ -1,0 +1,1 @@
+{"id":"T169_algo_palin_str","category":"algorithm","difficulty":"medium","prompt":"\"level\"이 회문인지 (true). (string reverse 비교)","validation":{"type":"stdout_contains","expected":"true"},"reference_solution":"(let [[s \"level\"] [chars (str-split s \"\")]] (println (= (str_join \"\" chars) (str_join \"\" (reverse chars)))))","tags":["palindrome","string"]}

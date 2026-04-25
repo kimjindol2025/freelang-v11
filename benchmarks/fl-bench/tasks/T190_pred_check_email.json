@@ -1,0 +1,1 @@
+{"id":"T190_pred_check_email","category":"regex","difficulty":"medium","prompt":"이메일 \"foo@bar.com\"에 @ 포함? true.","validation":{"type":"stdout_contains","expected":"true"},"reference_solution":"(println (not (= -1 (index-of \"foo@bar.com\" \"@\"))))","tags":["index-of","email"]}

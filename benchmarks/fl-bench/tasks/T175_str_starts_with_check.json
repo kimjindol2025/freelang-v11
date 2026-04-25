@@ -1,0 +1,1 @@
+{"id":"T175_str_starts_with_check","category":"string","difficulty":"easy","prompt":"\"https://example.com\"이 \"https\"로 시작? true.","validation":{"type":"stdout_contains","expected":"true"},"reference_solution":"(println (= \"https\" (substring \"https://example.com\" 0 5)))","tags":["substring","starts-with"]}
