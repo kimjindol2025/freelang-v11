@@ -1,0 +1,129 @@
+;; mfa-store.fl — TOTP 등록·검증 저장소 (Phase G, dclub-auth)
+;;
+;; 설계 결정: users 테이블 ALTER 대신 별도 mfa_credentials 테이블.
+;; - 향후 WebAuthn/Passkey 추가 시 같은 테이블에 type 컬럼으로 확장 가능
+;; - users 스키마 변경 없이 idempotent 하게 추가
+;;
+;; 상태:
+;;   pending  — secret 발급, 첫 코드 검증 전 (24시간 후 미확인 시 GC)
+;;   active   — 사용자가 첫 코드로 확인 완료, 로그인 시 강제
+;;   disabled — 사용자 또는 관리자가 해제
+
+(load "projects/dclub-auth/lib/audit-log.fl")
+
+[FUNC mfa-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS mfa_credentials (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     TEXT NOT NULL,
+      type        TEXT NOT NULL DEFAULT 'totp',
+      secret_b32  TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'pending',
+      created_at  TEXT NOT NULL,
+      activated_at TEXT,
+      last_used_at TEXT,
+      label       TEXT
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_mfa_user ON mfa_credentials(user_id, status)"))]
+
+;; ── 등록 1단계: pending secret 생성 ─────────────────
+;; 같은 사용자에 active 가 이미 있으면 nil 반환 (해제 후 재등록 강제).
+;; 기존 pending 은 새 것으로 교체 (UI에서 재시도 가능).
+
+[FUNC mfa-start-enrollment :params [$db $user-id $issuer $email]
+  :body (let [
+    actives (db_query $db
+      "SELECT id FROM mfa_credentials WHERE user_id=? AND status='active' LIMIT 1"
+      [$user-id])
+  ]
+    (if (> (length $actives) 0)
+      nil
+      (let [
+        secret (totp_secret_generate 20)
+        uri (totp_uri $email $issuer $secret)
+      ]
+        (do
+          ;; 기존 pending 제거 (같은 사용자)
+          (db_delete_row $db "mfa_credentials"
+            (str "user_id='" $user-id "' AND status='pending'"))
+          (db_insert $db "mfa_credentials" {
+            :user_id $user-id
+            :type "totp"
+            :secret_b32 $secret
+            :status "pending"
+            :created_at (now_iso)
+            :label $email
+          })
+          {:secret $secret :uri $uri}))))]
+
+;; ── 등록 2단계: pending → active 확인 ───────────────
+;; 사용자가 인증앱의 6자리 코드 제출 → 검증 통과 시 active 전환.
+
+[FUNC mfa-confirm-enrollment :params [$db $user-id $code]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, secret_b32 FROM mfa_credentials WHERE user_id=? AND status='pending' LIMIT 1"
+      [$user-id])
+  ]
+    (if (= (length $rows) 0)
+      false
+      (let [
+        row (get $rows 0)
+        secret (get $row "secret_b32")
+        ok (totp_verify $secret $code 1)
+      ]
+        (if $ok
+          (do
+            (db_update $db "mfa_credentials"
+              {:status "active" :activated_at (now_iso)}
+              (str "id=" (get $row "id")))
+            (audit-log $db "mfa.enroll" $user-id nil nil {:type "totp"})
+            true)
+          false))))]
+
+;; ── 활성 MFA 보유 여부 ──────────────────────────────
+
+[FUNC mfa-active-for? :params [$db $user-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT id FROM mfa_credentials WHERE user_id=? AND status='active' LIMIT 1"
+      [$user-id])
+  ]
+    (> (length $rows) 0))]
+
+;; ── 로그인 시 TOTP 코드 검증 ──────────────────────
+
+[FUNC mfa-verify :params [$db $user-id $code]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, secret_b32 FROM mfa_credentials WHERE user_id=? AND status='active' LIMIT 1"
+      [$user-id])
+  ]
+    (if (= (length $rows) 0)
+      false
+      (let [
+        row (get $rows 0)
+        ok (totp_verify (get $row "secret_b32") $code 1)
+      ]
+        (if $ok
+          (do
+            (db_update $db "mfa_credentials"
+              {:last_used_at (now_iso)}
+              (str "id=" (get $row "id")))
+            true)
+          false))))]
+
+;; ── 해제 (사용자 또는 관리자) ───────────────────────
+
+[FUNC mfa-disable :params [$db $user-id]
+  :body (do
+    (db_update $db "mfa_credentials"
+      {:status "disabled"}
+      (str "user_id='" $user-id "' AND status='active'"))
+    (audit-log $db "mfa.disable" $user-id nil nil {}))]
+
+;; ── 만료된 pending 정리 (24시간 이상) ──────────────
+
+[FUNC mfa-cleanup-pending :params [$db]
+  :body (db_delete_row $db "mfa_credentials"
+    "status='pending' AND created_at < datetime('now', '-1 day')")]

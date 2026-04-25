@@ -1,20 +1,23 @@
 ;; login.fl — POST /login
 ;;
-;; /authorize 가 SSR한 폼의 제출 처리. 비밀번호 검증 후 authorization code
-;; 발급, redirect_uri 로 302 리다이렉트.
+;; /authorize 가 SSR한 폼의 제출 처리.
+;; 흐름:
+;;   1단계: username + password 검증
+;;   2단계 (MFA 활성 사용자만): TOTP 6자리 코드 검증
+;;   완료: authorization code 발급, redirect_uri 로 302
+;;
+;; 구현 메모:
+;;   - 같은 /login 핸들러가 두 단계 모두 처리
+;;   - 2단계 진입 시 password 가 hidden field 로 다시 전송됨 (MVP).
+;;     향후 mfa_pending 토큰 방식으로 개선 예정 (password 재전송 제거).
 
 (load "projects/dclub-auth/lib/users-store.fl")
 (load "projects/dclub-auth/lib/code-store.fl")
 (load "projects/dclub-auth/lib/rate-limit.fl")
 (load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/mfa-store.fl")
 (load "projects/dclub-auth/lib/config.fl")
 
-;; ── 폼 인코딩 파싱 (application/x-www-form-urlencoded) ───
-;; FreeLang server_req_body 는 raw body string 반환. 자체 파서 필요.
-
-;; URL decode 간이 구현 — `+` → space, `%xx` → byte
-;; PKCE challenge는 base64url(A-Z/a-z/0-9/-/_)이라 percent 안 나옴.
-;; scope의 공백(+)과 redirect_uri의 콜론·슬래시(%3A %2F)만 처리.
 [FUNC url-decode :params [$s]
   :body (let [
     s1 (regex_replace $s "\\+" " ")
@@ -27,69 +30,120 @@
     $s6)]
 
 [FUNC parse-form-pair :params [$pair]
-  :body (let [
-    parts (str_split $pair "=" 2)
-  ]
+  :body (let [parts (str_split $pair "=" 2)]
     (if (= (length $parts) 2)
       [(get $parts 0) (url-decode (get $parts 1))]
       [(get $parts 0) ""]))]
 
+;; nil-safe 문자열 추출: nil 이면 "" 반환 (FL or 가 nil 도 truthy 라 안 통함).
+;; (get map "absent") 는 JS null 을 반환하지만 FL nil 리터럴과 다름.
+;; (nil? x) 는 JS null 을 true 로, FL nil 리터럴은 false 로 판단.
+[FUNC nil-or-empty :params [$x]
+  :body (if (nil? $x) "" (if (= $x nil) "" $x))]
+
 (define parse-form
   (fn [body]
-    (let [pairs (str_split body "&")]
-      (reduce
-        (fn [acc pair]
-          (let [kv (parse-form-pair pair)]
-            (assoc acc (get kv 0) (get kv 1))))
-        {}
-        pairs))))
+    (reduce
+      (fn [acc pair]
+        (let [kv (parse-form-pair pair)]
+          (assoc acc (get kv 0) (get kv 1))))
+      {}
+      (str_split body "&"))))
 
+;; ── HTML helpers ────────────────────────────────────
+[FUNC login-fail-html :params []
+  :body "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>로그인 실패</h1><p>사용자명 또는 비밀번호가 올바르지 않습니다.</p><a href=javascript:history.back()>뒤로</a></body></html>"]
+
+[FUNC login-locked-html :params []
+  :body "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>잠시 후 다시 시도하세요</h1><p>여러 차례 로그인 실패로 계정이 일시 잠겼습니다.</p></body></html>"]
+
+[FUNC totp-form-html :params [$form $err]
+  :body (str
+    "<!DOCTYPE html><html><head><meta charset=utf-8><title>2단계 인증</title>"
+    "<style>body{font-family:sans-serif;max-width:420px;margin:60px auto;padding:24px;background:#0f1419;color:#e6e6e6}"
+    "h1{font-size:20px;margin-bottom:8px}p.h{color:#888;margin-bottom:24px;font-size:14px}"
+    "input[name=totp_code]{width:100%;padding:14px;background:#1a2028;border:1px solid #2a323c;color:#e6e6e6;border-radius:4px;font-size:24px;text-align:center;letter-spacing:8px;font-family:monospace}"
+    "button{margin-top:20px;width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px}"
+    "button:hover{background:#2563eb}.err{color:#ef4444;font-size:13px;margin-bottom:12px}</style></head><body>"
+    "<h1>2단계 인증</h1>"
+    "<p class=h>인증 앱(Google Authenticator, Authy 등)의 6자리 코드를 입력하세요.</p>"
+    (if (= $err "") "" (str "<div class=err>" $err "</div>"))
+    "<form method=POST action=/login>"
+    "<input type=hidden name=username value=\"" (esc-html (nil-or-empty (get $form "username"))) "\">"
+    "<input type=hidden name=password value=\"" (esc-html (nil-or-empty (get $form "password"))) "\">"
+    "<input type=hidden name=client_id value=\"" (esc-html (nil-or-empty (get $form "client_id"))) "\">"
+    "<input type=hidden name=redirect_uri value=\"" (esc-html (nil-or-empty (get $form "redirect_uri"))) "\">"
+    "<input type=hidden name=scope value=\"" (esc-html (nil-or-empty (get $form "scope"))) "\">"
+    "<input type=hidden name=state value=\"" (esc-html (nil-or-empty (get $form "state"))) "\">"
+    "<input type=hidden name=nonce value=\"" (esc-html (nil-or-empty (get $form "nonce"))) "\">"
+    "<input type=hidden name=code_challenge value=\"" (esc-html (nil-or-empty (get $form "code_challenge"))) "\">"
+    "<input type=hidden name=code_challenge_method value=\"" (esc-html (nil-or-empty (get $form "code_challenge_method"))) "\">"
+    "<input type=hidden name=mfa_stage value=\"2\">"
+    "<input type=text name=totp_code maxlength=6 pattern=[0-9]{6} autofocus required inputmode=numeric autocomplete=one-time-code>"
+    "<button type=submit>확인</button>"
+    "</form></body></html>")]
+
+;; ── 메인 핸들러 ───────────────────────────────────
 [FUNC handle-login :params [$req]
   :body (let [
     cfg (dclub-auth-config)
     db (get $cfg "db")
     body (server_req_body $req)
     form (parse-form $body)
-    username (or (get $form "username") "")
-    password (or (get $form "password") "")
-    client_id (or (get $form "client_id") "")
-    redirect_uri (or (get $form "redirect_uri") "")
-    scope (or (get $form "scope") "openid")
-    state (or (get $form "state") "")
-    nonce (or (get $form "nonce") "")
-    challenge (or (get $form "code_challenge") "")
-    method (or (get $form "code_challenge_method") "S256")
+    username (nil-or-empty (get $form "username"))
+    password (nil-or-empty (get $form "password"))
+    client_id (nil-or-empty (get $form "client_id"))
+    redirect_uri (nil-or-empty (get $form "redirect_uri"))
+    scope-clean (nil-or-empty (get $form "scope"))
+    scope (if (= $scope-clean "") "openid" $scope-clean)
+    state (nil-or-empty (get $form "state"))
+    nonce (nil-or-empty (get $form "nonce"))
+    challenge (nil-or-empty (get $form "code_challenge"))
+    method-clean (nil-or-empty (get $form "code_challenge_method"))
+    method (if (= $method-clean "") "S256" $method-clean)
+    mfa-stage-clean (nil-or-empty (get $form "mfa_stage"))
+    mfa-stage (if (= $mfa-stage-clean "") "1" $mfa-stage-clean)
+    totp-code (nil-or-empty (get $form "totp_code"))
+    ip (nil-or-empty (server_req_header $req "x-forwarded-for"))
+    lock-key (str "user:" $username)
   ]
-    (let [
-      ip (or (server_req_header $req "x-forwarded-for") "unknown")
-      lock-key (str "user:" $username)
-    ]
-      (if (rate-locked? $db $lock-key)
-        (do
-          (audit-log $db "login.locked" nil $client_id $ip {:username $username})
-          (server_status 429
-            "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>잠시 후 다시 시도하세요</h1><p>여러 차례 로그인 실패로 계정이 일시 잠겼습니다.</p></body></html>"))
-        (let [user (users-verify-password $db $username $password)]
-          (if (= $user nil)
-            (do
-              (rate-record-fail $db $lock-key 5 900)
-              (audit-log $db "login.fail" nil $client_id $ip {:username $username})
-              (server_status 401
-                "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>로그인 실패</h1><p>사용자명 또는 비밀번호가 올바르지 않습니다.</p><a href=javascript:history.back()>뒤로</a></body></html>"))
-            (let [
-              uid (get $user "id")
-              lifetime (get $cfg "code_lifetime")
-              code (codes-issue $db $client_id $uid $redirect_uri $scope $nonce $challenge $method $lifetime)
-              loc (str $redirect_uri "?code=" code "&state=" $state)
-              stored-hash (get $user "password_hash")
-            ]
-              (do
-                (rate-reset-fail $db $lock-key)
-                (audit-log $db "login.ok" $uid $client_id $ip {:username $username})
-                ;; 점진적 v1→v2 마이그레이션
-                (if (auth_password_needs_rehash $stored-hash)
-                  (db_update $db "users"
-                    {:password_hash (auth_hash_password $password)}
-                    (str "id='" $uid "'"))
-                  nil)
-                (server_redirect $loc))))))))]
+    (if (rate-locked? $db $lock-key)
+      (do
+        (audit-log $db "login.locked" nil $client_id $ip {:username $username})
+        (server_status 429 (login-locked-html)))
+      (let [user (users-verify-password $db $username $password)]
+        (if (= $user nil)
+          (do
+            (rate-record-fail $db $lock-key 5 900)
+            (audit-log $db "login.fail" nil $client_id $ip {:username $username})
+            (server_status 401 (login-fail-html)))
+          (let [
+            uid (get $user "id")
+            mfa-active (mfa-active-for? $db $uid)
+            stored-hash (get $user "password_hash")
+          ]
+            (if (and $mfa-active (= $mfa-stage "1"))
+              ;; 2단계 진입: TOTP 폼 SSR
+              (server_html (totp-form-html $form ""))
+              (if (and $mfa-active (not (mfa-verify $db $uid $totp-code)))
+                ;; 2단계 실패: 카운트 + 재요청
+                (do
+                  (rate-record-fail $db $lock-key 5 900)
+                  (audit-log $db "login.mfa_fail" $uid $client_id $ip {:username $username})
+                  (server_status 401 (totp-form-html $form "코드가 틀렸거나 만료되었습니다.")))
+                ;; 모든 검증 통과 → code 발급
+                (let [
+                  lifetime (get $cfg "code_lifetime")
+                  code (codes-issue $db $client_id $uid $redirect_uri $scope $nonce $challenge $method $lifetime)
+                  loc (str $redirect_uri "?code=" code "&state=" $state)
+                ]
+                  (do
+                    (rate-reset-fail $db $lock-key)
+                    (audit-log $db "login.ok" $uid $client_id $ip
+                      {:username $username :mfa (if $mfa-active "totp" "none")})
+                    (if (auth_password_needs_rehash $stored-hash)
+                      (db_update $db "users"
+                        {:password_hash (auth_hash_password $password)}
+                        (str "id='" $uid "'"))
+                      nil)
+                    (server_redirect $loc))))))))))]

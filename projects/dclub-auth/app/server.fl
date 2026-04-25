@@ -16,12 +16,14 @@
 (load "projects/dclub-auth/lib/refresh-store.fl")
 (load "projects/dclub-auth/lib/rate-limit.fl")
 (load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/mfa-store.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
 (load "projects/dclub-auth/app/authorize.fl")
 (load "projects/dclub-auth/app/login.fl")
 (load "projects/dclub-auth/app/token.fl")
 (load "projects/dclub-auth/app/userinfo.fl")
+(load "projects/dclub-auth/app/mfa.fl")
 
 ;; ── 부팅: 스키마 + 시드 ─────────────────────────────
 (define cfg (dclub-auth-config))
@@ -31,6 +33,7 @@
 (refresh-ensure-table $DB)
 (rate-ensure-tables $DB)
 (audit-ensure-table $DB)
+(mfa-ensure-table $DB)
 (define demo-uid (users-seed-demo $DB))
 (define blog-cid (clients-seed-demo $DB))
 
@@ -50,6 +53,10 @@
 (server_post "/login" "handle-login")
 (server_post "/token" "handle-token")
 (server_get "/userinfo" "handle-userinfo")
+(server_get "/mfa/status" "handle-mfa-status")
+(server_post "/mfa/setup" "handle-mfa-setup")
+(server_post "/mfa/confirm" "handle-mfa-confirm")
+(server_post "/mfa/disable" "handle-mfa-disable")
 
 ;; ── 시작 ──────────────────────────────────────────
 (server_start (get $cfg "port"))

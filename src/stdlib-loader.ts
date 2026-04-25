@@ -14,6 +14,7 @@ import { createAgentModule } from "./stdlib-agent";      // Phase 15: AI Agent S
 import { createTimeModule } from "./stdlib-time";        // Phase 16: Time + Logging + Monitoring
 import { createCryptoModule } from "./stdlib-crypto";    // Phase 17: Crypto + UUID + Regex
 import { createCryptoRsaModule } from "./stdlib-crypto-rsa"; // Phase A.1: RSA / RS256 (dclub-auth)
+import { createTotpModule } from "./stdlib-totp";          // Phase G: TOTP / RFC 6238 (dclub-auth MFA)
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
 import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
@@ -75,6 +76,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createTimeModule());
   interp.registerModule(createCryptoModule());
   interp.registerModule(createCryptoRsaModule()); // Phase A.1: crypto_rsa_generate/sign/verify/public_to_jwk
+  interp.registerModule(createTotpModule());      // Phase G: totp_secret_generate/verify/now/uri
   interp.registerModule(createWorkflowModule());
   interp.registerModule(createResourceModule());
   // Phase 4a: Pure HTTP Server — callUserFunction/callFunctionValue 콜백 필요
