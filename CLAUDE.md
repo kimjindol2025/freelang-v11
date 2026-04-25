@@ -202,6 +202,21 @@ stage2.js == stage3.js == ... (SHA256 완전 일치)
       verify-self-host.sh도 stage1 기반 검증 (bootstrap 미사용)
 ```
 
+### npm scripts — 역할 분담 (#1 점진 폐기, 2026-04-25)
+
+| 명령 | 도구 | 비고 |
+|------|------|------|
+| `npm run compile X.fl Y.js` | **stage1.js** | canonical FL→JS 컴파일 |
+| `npm run compile:self` | stage1.js | self-host (stage1 → stage1-new) |
+| `npm run verify:fixed-point` | shell + stage1 | stage1~10 SHA256 chain |
+| `npm run verify:build-deterministic` | shell + esbuild | TS→bootstrap.js 결정론 |
+| `npm run verify:self-host` | shell + stage1 | tier2 (PASS 93+) |
+| `npm run dev / start / server` | bootstrap.js (cli) | 웹 서버 — bootstrap.js만 가능 |
+| `npm run repl / fl / freelang` | bootstrap.js (cli) | REPL/실행 — bootstrap.js만 |
+
+**완전 폐기 미가능**: webserver/repl 기능은 bootstrap.js의 src/cli.ts에 통합. stage1.js는 codegen만.
+**현재 위치**: 대부분 컴파일/검증은 stage1.js 사용 가능. cli interaction만 bootstrap.js 의존.
+
 ---
 
 ## Phase 완료 현황 (2026-04-24)

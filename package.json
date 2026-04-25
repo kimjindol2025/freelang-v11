@@ -21,6 +21,11 @@
   "scripts": {
     "build": "node scripts/build.js",
     "docs:gen": "node scripts/gen-stdlib-docs.js",
+    "compile": "node --stack-size=8000 stage1.js",
+    "compile:self": "node --stack-size=8000 stage1.js self/all.fl stage1-new.js",
+    "verify:fixed-point": "bash scripts/verify-fixed-point-deep.sh",
+    "verify:build-deterministic": "bash scripts/verify-build-deterministic.sh",
+    "verify:self-host": "bash scripts/verify-self-host.sh tier2",
     "test": "jest --config .config/jest.fast.config.js --passWithNoTests",
     "test:fast": "jest --config .config/jest.fast.config.js --passWithNoTests",
     "test:full": "jest --config .config/jest.config.js --passWithNoTests",
