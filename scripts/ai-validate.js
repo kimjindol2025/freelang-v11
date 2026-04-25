@@ -178,12 +178,13 @@ function checkUndefinedFnCall(src, stdlibFns) {
     const suggest = suggestSimilar(name, candidates);
     issues.push({
       line: src.slice(0, m.index).split("\n").length,
-      level: suggest ? "warn" : "info",
+      level: "info",
       code: "UNKNOWN_FN",
       msg: suggest
-        ? `미정의 함수 '${name}' — 혹시 '${suggest}'?`
+        ? `미정의 함수 '${name}' — 혹시 '${suggest}'? (자동 수정 안 함, 직접 확인)`
         : `미정의 함수 '${name}' — (use MODULE) import 누락 가능성`,
-      fix: suggest ? { search: new RegExp(`\\(\\s*${name.replace(/[?$+\-]/g, "\\$&")}\\b`, "g"), replace: `(${suggest}` } : null,
+      // fix 제거: 자동 수정은 위험 (의도 함수일 수도 있음)
+      fix: null,
     });
   }
   return issues;

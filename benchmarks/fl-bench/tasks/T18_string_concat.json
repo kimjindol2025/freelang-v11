@@ -1,0 +1,9 @@
+{
+  "id": "T18_string_concat",
+  "category": "string",
+  "difficulty": "easy",
+  "prompt": "이름을 받아서 \"Hello, {name}!\" 형태로 인사말을 반환하는 hello 함수를 정의하고, (hello \"World\") 결과 \"Hello, World!\"를 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "Hello, World!" },
+  "reference_solution": "(defn hello [name] (str \"Hello, \" name \"!\"))\n(println (hello \"World\"))",
+  "tags": ["str", "defn"]
+}

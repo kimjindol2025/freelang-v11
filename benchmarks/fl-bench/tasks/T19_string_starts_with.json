@@ -1,0 +1,9 @@
+{
+  "id": "T19_string_starts_with",
+  "category": "string",
+  "difficulty": "medium",
+  "prompt": "주어진 문자열 \"hello world\"에서 처음 5글자가 \"hello\"인지 검사하고 true/false를 출력하세요. (substring 사용 가능)",
+  "validation": { "type": "stdout_contains", "expected": "true" },
+  "reference_solution": "(println (= \"hello\" (substring \"hello world\" 0 5)))",
+  "tags": ["substring"]
+}

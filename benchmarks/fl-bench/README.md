@@ -103,14 +103,34 @@ node benchmarks/fl-bench/run.js --solution-dir=./my-output --label=claude-3.5
 - 카테고리별 약점 식별: "GPT-4는 nil-safe 22%만 통과"
 - FreeLang 자체 개선 우선순위: "T05 recursion fail rate 40% → 학습 자료 보강"
 
-## 현재 task (5개 MVP)
+## 현재 task (50개 — Phase 1 완료)
 
-| ID | 카테고리 | 난이도 | 핵심 |
-|----|---------|--------|------|
-| T01_arithmetic_basic | arithmetic | easy | defn + (+) |
-| T02_list_filter | list | easy | filter + even? |
-| T03_string_reverse | string | medium | string + recursion |
-| T04_nil_safe_get | error-handling | medium | get-or 활용 |
-| T05_recursion_factorial | recursion | medium | if + 재귀 |
+카테고리별 분포:
 
-추후 50개로 확장 (state machine / async / pattern match / DB 등).
+| 카테고리 | 갯수 | 대표 task |
+|----------|------|----------|
+| arithmetic | 5 | T01, T05~T09 (gcd, fib, pow, factorial, sum) |
+| list | 7 | T02, T10~T15 (map, reduce, length, first, filter) |
+| string | 6 | T03, T16~T20, T48 (upper, split, concat, replace, words) |
+| map/json | 5 | T21~T25 (get, keys, json_stringify/parse, values) |
+| file-io | 5 | T26~T30 (read/write, exists, append, json) |
+| error-handling | 4 | T04, T31~T34 (fl-try, validation, default) |
+| pattern-match | 2 | T35~T36 (cond + predicate, grade) |
+| state-machine | 2 | T37~T38 (traffic light, counter) |
+| higher-order | 4 | T39~T42 (compose, threading ->/->>) |
+| recursion | 2 | T05, T44 (factorial, sum-to) |
+| binding | 1 | T43 (let) |
+| data-transform | 4 | T45~T47, T50 (chain, users, average, pipeline) |
+| module | 1 | T49 (use json) |
+
+**난이도 분포**: easy 18 / medium 24 / hard 8
+
+**전체 reference 검증**: 50/50 PASS (100%, `--label=reference`).
+
+**제외 카테고리** (외부 의존):
+- DB (sqlite/postgres/mariadb) — 환경 필요
+- HTTP (실제 네트워크) — flaky
+- async/await — Promise 완전 검증 어려움
+- defstruct/match — 미검증 기능
+
+추후 확장 시: HTTP stub 활용, async parallel/race 단순 케이스, FSM 복잡 시나리오.

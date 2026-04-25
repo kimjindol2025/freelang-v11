@@ -1,0 +1,9 @@
+{
+  "id": "T35_pattern_describe",
+  "category": "pattern-match",
+  "difficulty": "medium",
+  "prompt": "값을 받아서 nil이면 \"nothing\", 문자열이면 \"text\", 숫자면 \"num\", 리스트면 \"list\"를 반환하는 describe 함수를 cond와 type-predicate로 정의하세요. (describe \"hi\")는 \"text\".",
+  "validation": { "type": "stdout_contains", "expected": "text" },
+  "reference_solution": "(defn describe [x] (cond [(nil? x) \"nothing\"] [(string? x) \"text\"] [(number? x) \"num\"] [(list? x) \"list\"] [true \"unknown\"]))\n(println (describe \"hi\"))",
+  "tags": ["cond", "predicate"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T42_higher_apply",
+  "category": "higher-order",
+  "difficulty": "easy",
+  "prompt": "함수를 인자로 받아 3과 4에 적용하는 apply2 함수를 정의하세요. (apply2 +) → 7. 결과 출력.",
+  "validation": { "type": "stdout_contains", "expected": "7" },
+  "reference_solution": "(defn apply2 [f] (f 3 4))\n(println (apply2 (fn [a b] (+ a b))))",
+  "tags": ["higher-order"]
+}

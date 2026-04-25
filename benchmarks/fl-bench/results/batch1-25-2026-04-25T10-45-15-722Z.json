@@ -1,0 +1,179 @@
+{
+  "label": "batch1-25",
+  "timestamp": "2026-04-25T10:45:15.723Z",
+  "total": 25,
+  "pass": 18,
+  "fail": 7,
+  "skip": 0,
+  "score": 72,
+  "results": [
+    {
+      "id": "T01_arithmetic_basic",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "arithmetic",
+      "stdout": "8\n"
+    },
+    {
+      "id": "T02_list_filter",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[1, 2, 3, 4, 5, 6]\n"
+    },
+    {
+      "id": "T03_string_reverse",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "string",
+      "stdout": "olleh\n"
+    },
+    {
+      "id": "T04_nil_safe_get",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "error-handling",
+      "stdout": "unknown\nunknown\nAlice\n"
+    },
+    {
+      "id": "T05_recursion_factorial",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "recursion",
+      "stdout": "120\n"
+    },
+    {
+      "id": "T06_arithmetic_gcd",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "arithmetic",
+      "stdout": "6\n"
+    },
+    {
+      "id": "T07_arithmetic_fib",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "arithmetic",
+      "stdout": "55\n"
+    },
+    {
+      "id": "T08_arithmetic_power",
+      "status": "fail",
+      "reason": "execution failed",
+      "errorCode": "E_FN_NOT_FOUND"
+    },
+    {
+      "id": "T09_arithmetic_sum_range",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "arithmetic",
+      "stdout": "5050\n"
+    },
+    {
+      "id": "T10_list_map_double",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[2, 4, 6]\n"
+    },
+    {
+      "id": "T11_list_reduce_max",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "list",
+      "stdout": "9\n"
+    },
+    {
+      "id": "T12_list_length",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "5\n"
+    },
+    {
+      "id": "T13_list_reverse",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "[3, 2, 1]\n"
+    },
+    {
+      "id": "T14_list_first_last",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "list",
+      "stdout": "10 50\n"
+    },
+    {
+      "id": "T15_list_count_even",
+      "status": "fail",
+      "difficulty": "medium",
+      "category": "list",
+      "stdout": "10\n"
+    },
+    {
+      "id": "T16_string_upper",
+      "status": "fail",
+      "reason": "execution failed",
+      "errorCode": "E_FN_NOT_FOUND"
+    },
+    {
+      "id": "T17_string_split_count",
+      "status": "fail",
+      "reason": "execution failed"
+    },
+    {
+      "id": "T18_string_concat",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "Hello, World!\n"
+    },
+    {
+      "id": "T19_string_starts_with",
+      "status": "fail",
+      "reason": "execution failed",
+      "errorCode": "E_FN_NOT_FOUND"
+    },
+    {
+      "id": "T20_string_replace",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "string",
+      "stdout": "hello FreeLang\n"
+    },
+    {
+      "id": "T21_map_get",
+      "status": "pass",
+      "difficulty": "easy",
+      "category": "map",
+      "stdout": "Alice\n"
+    },
+    {
+      "id": "T22_map_keys",
+      "status": "fail",
+      "reason": "execution failed",
+      "errorCode": "E_FN_NOT_FOUND"
+    },
+    {
+      "id": "T23_json_stringify",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "json",
+      "stdout": "{\"name\":\"Bob\",\"age\":25}\n"
+    },
+    {
+      "id": "T24_json_parse",
+      "status": "pass",
+      "difficulty": "medium",
+      "category": "json",
+      "stdout": "42\n"
+    },
+    {
+      "id": "T25_map_values_sum",
+      "status": "fail",
+      "reason": "execution failed",
+      "errorCode": "E_FN_NOT_FOUND"
+    }
+  ]
+}

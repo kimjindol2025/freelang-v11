@@ -1,0 +1,9 @@
+{
+  "id": "T36_pattern_grade",
+  "category": "pattern-match",
+  "difficulty": "medium",
+  "prompt": "점수를 받아 grade를 반환하는 grade 함수: 90+ → \"A\", 80+ → \"B\", 70+ → \"C\", 그 외 → \"F\". (grade 85)는 \"B\".",
+  "validation": { "type": "stdout_contains", "expected": "B" },
+  "reference_solution": "(defn grade [s] (cond [(>= s 90) \"A\"] [(>= s 80) \"B\"] [(>= s 70) \"C\"] [true \"F\"]))\n(println (grade 85))",
+  "tags": ["cond"]
+}
