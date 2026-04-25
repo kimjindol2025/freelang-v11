@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-04-25T17:14:51.620Z",
+  "timestamp": "2026-04-25T23:21:02.142Z",
   "seed": 12345,
   "n_per_invariant": 5,
   "total_invariants": 50,
   "total_cases": 250,
   "total_pass": 250,
   "score": 100,
-  "elapsed_seconds": 72,
+  "elapsed_seconds": 72.7,
   "results": [
     {
       "id": "I001",

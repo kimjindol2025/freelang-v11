@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self run serve repl property-test verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
+.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -45,6 +45,10 @@ repl:
 # Y3 (Year 2): property-based testing — 50 invariant × N case
 property-test:
 	@$(NODE) scripts/property-test.js $(ARGS)
+
+# Y4-2 풀 (단계A): self/runtime/*.js 빌드 (esbuild로 src/stdlib-*.ts 추출)
+build-runtime:
+	@bash scripts/build-runtime.sh
 
 compile-self:
 	@$(NODE) $(STAGE1) self/all.fl stage1-new.js
