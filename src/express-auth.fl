@@ -1,0 +1,217 @@
+;; ============================================
+;; Express.fl 인증 보안 예제
+;; ============================================
+;; JWT 토큰, 암호화, API 키, 미들웨어
+;; 실행: node bootstrap.js run express-auth.fl
+
+(load "src/express.fl")
+
+;; ============ 상수 ============
+
+(define *JWT-SECRET* "super-secret-key-change-in-production")
+(define *VALID-APIKEYS* ["key-123" "key-456"])
+
+;; ============ 사용자 DB (모의) ============
+
+(define *users-db* [
+  {
+    :id 1
+    :username "admin"
+    :password "hashed_password_here"
+    :email "admin@example.com"
+    :role "admin"
+  }
+  {
+    :id 2
+    :username "user"
+    :password "hashed_user_password"
+    :email "user@example.com"
+    :role "user"
+  }
+])
+
+;; ============ 인증 함수 ============
+
+[FUNC authenticate-user :params [$username $password]
+  :body (let [
+    user (get *users-db* 0)
+    username-match (= (get $user "username") $username)
+  ]
+    (if username-match
+      (if (auth-verify-password $password (get $user "password"))
+        $user
+        nil)
+      nil))
+]
+
+[FUNC create-jwt :params [$user]
+  :body (let [
+    payload {
+      :user_id (get $user "id")
+      :username (get $user "username")
+      :role (get $user "role")
+      :iat (now_ms)
+    }
+    token (auth-jwt-sign $payload *JWT-SECRET* 3600)
+  ]
+    $token)
+]
+
+[FUNC verify-jwt :params [$token]
+  :body (auth-jwt-verify $token *JWT-SECRET*)
+]
+
+[FUNC verify-api-key :params [$key]
+  :body (let [
+    valid-key (get *VALID-APIKEYS* 0)
+  ]
+    (= $key valid-key))
+]
+
+;; ============ 미들웨어 함수 ============
+
+[FUNC auth-guard :params [$req]
+  :body (let [
+    token (auth-extract-bearer $req)
+    payload (if token (verify-jwt $token) nil)
+  ]
+    (if payload
+      { :valid true :user $payload }
+      { :valid false }))
+]
+
+[FUNC apikey-guard :params [$req]
+  :body (let [
+    api-key (auth-get-apikey $req)
+    valid (verify-api-key $api-key)
+  ]
+    { :valid $valid })
+]
+
+;; ============ HTTP API 엔드포인트 ============
+
+;; 로그인 (JWT 발급)
+[FUNC api-login :params [$req]
+  :body (let [
+    body (req-body $req)
+    username (get $body "username")
+    password (get $body "password")
+    user (authenticate-user username password)
+  ]
+    (if user
+      (let [token (create-jwt user)]
+        (res-json {
+          :success true
+          :token $token
+          :user {
+            :id (get $user "id")
+            :username (get $user "username")
+            :role (get $user "role")
+          }
+        }))
+      (res-status 401 { :error "Invalid credentials" })))
+]
+
+;; 보호된 API (JWT 필수)
+[FUNC api-protected :params [$req]
+  :body (let [
+    auth (auth-guard $req)
+    valid (get $auth "valid")
+    payload (get $auth "user")
+  ]
+    (if valid
+      (res-json {
+        :success true
+        :message "Protected resource"
+        :user $payload
+      })
+      (res-status 401 { :error "Unauthorized - invalid token" })))
+]
+
+;; API 키 검증
+[FUNC api-with-apikey :params [$req]
+  :body (let [
+    check (apikey-guard $req)
+    valid (get $check "valid")
+  ]
+    (if valid
+      (res-json {
+        :success true
+        :message "API 키 인증 성공"
+      })
+      (res-status 403 { :error "Forbidden - invalid API key" })))
+]
+
+;; 토큰 검증 (디버그)
+[FUNC api-verify-token :params [$req]
+  :body (let [
+    token (auth-extract-bearer $req)
+    payload (if token (verify-jwt $token) nil)
+  ]
+    (if payload
+      (res-json {
+        :success true
+        :payload $payload
+      })
+      (res-status 401 { :error "Token invalid or expired" })))
+]
+
+;; 새 토큰 생성 (테스트용)
+[FUNC api-generate-token :params [$req]
+  :body (let [
+    user { :id 1 :username "test" :role "user" }
+    token (create-jwt user)
+  ]
+    (res-json {
+      :success true
+      :token $token
+      :expires_in 3600
+    }))
+]
+
+;; 헬스
+[FUNC health :params [$req]
+  :body (res-json {
+    :status "OK"
+    :service "Express.fl Auth System"
+    :endpoints {
+      :login "POST /auth/login"
+      :protected "GET /api/protected (JWT required)"
+      :apikey "GET /api/apikey (API Key required)"
+    }
+  })
+]
+
+;; ============ 라우트 등록 ============
+
+(do
+  (log-info "🚀 인증 보안 서버 시작")
+
+  ;; 헬스 체크
+  (app-get "/health" "health")
+
+  ;; 인증 (로그인)
+  (app-post "/auth/login" "api-login")
+
+  ;; 토큰 관리
+  (app-post "/auth/generate" "api-generate-token")
+  (app-get "/auth/verify" "api-verify-token")
+
+  ;; 보호된 API
+  (app-get "/api/protected" "api-protected")
+  (app-get "/api/apikey" "api-with-apikey")
+
+  (log-info "✅ 라우트 등록 완료")
+  (println "")
+  (println "🔐 인증 보안 서버")
+  (println "───────────────────────────────────")
+  (println "POST /auth/login              - JWT 토큰 발급")
+  (println "POST /auth/generate           - 테스트 토큰 생성")
+  (println "GET  /auth/verify             - 토큰 검증")
+  (println "GET  /api/protected           - JWT 필수")
+  (println "GET  /api/apikey              - API 키 필수")
+  (println "───────────────────────────────────")
+  (println "")
+
+  (app-listen 3000)
+)
