@@ -1,0 +1,9 @@
+{
+  "id": "T123_algo_max3",
+  "category": "algorithm",
+  "difficulty": "easy",
+  "prompt": "세 숫자 7, 3, 9에서 최대값(9)을 출력. (max 사용 또는 reduce)",
+  "validation": { "type": "stdout_contains", "expected": "9" },
+  "reference_solution": "(println (reduce (fn [a b] (if (> a b) a b)) 0 (list 7 3 9)))",
+  "tags": ["max", "reduce"]
+}

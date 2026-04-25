@@ -1,0 +1,1 @@
+{"id":"T142_list_distinct","category":"list","difficulty":"medium","prompt":"(list 1 2 2 3 3 3 4 4 4 4)에서 distinct 갯수(4).","validation":{"type":"stdout_contains","expected":"4"},"reference_solution":"(println (length (arr_unique (list 1 2 2 3 3 3 4 4 4 4))))","tags":["unique","distinct"]}

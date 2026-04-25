@@ -1,0 +1,1 @@
+{"id":"T146_format_phone","category":"string","difficulty":"medium","prompt":"전화번호 \"01012345678\"을 \"010-1234-5678\" 형태로 변환 출력.","validation":{"type":"stdout_contains","expected":"010-1234-5678"},"reference_solution":"(let [[s \"01012345678\"]] (println (str (substring s 0 3) \"-\" (substring s 3 7) \"-\" (substring s 7 11))))","tags":["substring","format"]}

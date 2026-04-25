@@ -215,6 +215,19 @@ node bootstrap.js run hello.fl
 (get m "name")         ;; ✅ string도 동작 (alias)
 ```
 
+### F7-scope. ⚠️ `let` 스코프 — `do` 블록 형제에서 안 보임
+
+```fl
+;; ❌ 문제: do 안 let 바인딩이 다음 형제에서 사라짐
+(do
+  (let [[$x 10]] (println $x))   ;; → 10
+  (println $x))                   ;; ❌ Undefined variable '$x'
+
+;; ✅ 해결: outer let으로 끌어올리기
+(let [[$x 10]]
+  (do (println $x) (println (* $x 2))))
+```
+
 ### F7. ✅ `let` 형식 — **두 형태 모두 작동** (2026-04-25 검증)
 ```fl
 ;; Clojure 스타일 (single bracket, 1차원 평탄) — 작동

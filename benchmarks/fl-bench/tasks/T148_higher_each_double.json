@@ -1,0 +1,1 @@
+{"id":"T148_higher_each_double","category":"higher-order","difficulty":"easy","prompt":"(list 1 2 3)에 (* x 2)를 적용한 합 (12).","validation":{"type":"stdout_contains","expected":"12"},"reference_solution":"(println (reduce + 0 (map (fn [x] (* x 2)) (list 1 2 3))))","tags":["map","reduce"]}

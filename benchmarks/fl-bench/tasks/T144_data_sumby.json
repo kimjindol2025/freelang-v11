@@ -1,0 +1,1 @@
+{"id":"T144_data_sumby","category":"data-transform","difficulty":"easy","prompt":"orders [{:price 100} {:price 50} {:price 200}]의 총 가격(350).","validation":{"type":"stdout_contains","expected":"350"},"reference_solution":"(println (reduce + 0 (map (fn [o] (get o :price)) (list {:price 100} {:price 50} {:price 200}))))","tags":["sum-by"]}

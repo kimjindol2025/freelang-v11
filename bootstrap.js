@@ -497,6 +497,8 @@ var init_parser = __esm({
     Parser = class {
       pos = 0;
       tokens;
+      // 자잘 #4 (2026-04-25): paren matching info — opening LParen 위치 추적
+      parenStack = [];
       constructor(tokens) {
         this.tokens = tokens;
       }
@@ -1327,16 +1329,37 @@ var init_parser = __esm({
       }
       expect(type) {
         if (this.check(type)) {
-          return this.advance();
+          const tok = this.advance();
+          if (type === "LParen" /* LParen */ || type === "LBracket" /* LBracket */ || type === "LBrace" /* LBrace */) {
+            this.parenStack.push({ type, line: tok.line, col: tok.col });
+          } else if (type === "RParen" /* RParen */ || type === "RBracket" /* RBracket */ || type === "RBrace" /* RBrace */) {
+            this.parenStack.pop();
+          }
+          return tok;
         }
         const token = this.peek();
-        throw this.error(`Expected ${type}, got ${token.type}`, token);
+        let extraHint = "";
+        if ((type === "RParen" /* RParen */ || type === "RBracket" /* RBracket */ || type === "RBrace" /* RBrace */) && this.parenStack.length > 0) {
+          const opening = this.parenStack[this.parenStack.length - 1];
+          const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
+          const wantSym = type === "RParen" /* RParen */ ? ")" : type === "RBracket" /* RBracket */ ? "]" : "}";
+          extraHint = ` (\uAC00\uC7A5 \uCD5C\uADFC opening '${openSym}' at line ${opening.line}:${opening.col} \u2014 '${wantSym}' \uB204\uB77D \uB610\uB294 \uC911\uCCA9 \uC624\uB958)`;
+        }
+        throw this.error(`Expected ${type}, got ${token.type}${extraHint}`, token);
       }
       isAtEnd() {
         return this.pos >= this.tokens.length;
       }
       error(message, token) {
-        const hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+        let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+        if (this.parenStack.length > 0 && (token.type === "EOF" /* EOF */ || message.includes("Expected R") || message.includes("Unexpected"))) {
+          const opening = this.parenStack[this.parenStack.length - 1];
+          const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
+          const wantSym = opening.type === "LParen" /* LParen */ ? ")" : opening.type === "LBracket" /* LBracket */ ? "]" : "}";
+          const parenHint = `\uC5EC\uB294 '${openSym}' at line ${opening.line}:${opening.col} \uAC00 \uB2EB\uD788\uC9C0 \uC54A\uC74C \u2014 '${wantSym}' \uB204\uB77D \uB610\uB294 \uC624\uD0C0`;
+          hint = hint ? `${hint}
+  ${parenHint}` : parenHint;
+        }
         let code = "E_PARSE_SYNTAX_ERROR";
         if (message.includes("Expected") || message.includes("Unexpected")) {
           code = "E_PARSE_UNEXPECTED_TOKEN";
@@ -21391,31 +21414,20 @@ function createQueueHelpersModule() {
       const t = escapeStr(topic);
       const w = escapeStr(workerId);
       const sql = `
-        BEGIN IMMEDIATE;
-        SELECT id, topic, payload, attempt, status, next_run_at
-        FROM q_messages
-        WHERE topic='${t}' AND status='queued' AND next_run_at <= ${now}
-        ORDER BY id ASC LIMIT 1;
+        UPDATE q_messages
+        SET status='in_flight',
+            locked_until=${lockUntil},
+            worker_id='${w}',
+            updated_at=datetime('now')
+        WHERE id = (
+          SELECT id FROM q_messages
+          WHERE topic='${t}' AND status='queued' AND next_run_at <= ${now}
+          ORDER BY id ASC LIMIT 1
+        )
+        RETURNING id, topic, payload, attempt, next_run_at;
       `;
       const rows = sqliteJson(dbPath, sql);
-      if (rows.length === 0) {
-        (0, import_child_process3.spawnSync)("sqlite3", [dbPath, "ROLLBACK"], { timeout: 5e3 });
-        return null;
-      }
-      const row = rows[0];
-      const updateSql = `
-        UPDATE q_messages
-        SET status='in_flight', locked_until=${lockUntil},
-            worker_id='${w}', updated_at=datetime('now')
-        WHERE id=${row.id};
-        COMMIT;
-      `;
-      const r = (0, import_child_process3.spawnSync)("sqlite3", [dbPath, updateSql], { timeout: 5e3, encoding: "utf-8" });
-      if ((r.status ?? 1) !== 0) {
-        (0, import_child_process3.spawnSync)("sqlite3", [dbPath, "ROLLBACK"], { timeout: 5e3 });
-        throw new Error(`dequeue update failed: ${r.stderr}`);
-      }
-      return row;
+      return rows.length === 0 ? null : rows[0];
     },
     // queue_db_init db_path -> bool  (WAL 모드 + busy_timeout 활성화)
     "queue_db_init": (dbPath) => {

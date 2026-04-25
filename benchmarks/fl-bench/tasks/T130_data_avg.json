@@ -1,0 +1,9 @@
+{
+  "id": "T130_data_avg",
+  "category": "data-transform",
+  "difficulty": "medium",
+  "prompt": "(list 80 90 70 85 95)의 평균(84) 출력.",
+  "validation": { "type": "stdout_contains", "expected": "84" },
+  "reference_solution": "(let [[xs (list 80 90 70 85 95)]] (println (/ (reduce + 0 xs) (length xs))))",
+  "tags": ["average", "reduce"]
+}

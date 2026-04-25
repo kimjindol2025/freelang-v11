@@ -1,0 +1,9 @@
+{
+  "id": "T129_string_pad",
+  "category": "string",
+  "difficulty": "easy",
+  "prompt": "숫자 5를 두 자리 \"05\" 형태로 출력 (padding).",
+  "validation": { "type": "stdout_contains", "expected": "05" },
+  "reference_solution": "(println (str (if (< 5 10) \"0\" \"\") 5))",
+  "tags": ["pad", "if"]
+}

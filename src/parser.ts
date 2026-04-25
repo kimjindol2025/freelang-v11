@@ -114,6 +114,8 @@ const ERROR_HINTS: Record<string, string> = {
 export class Parser {
   private pos = 0;
   private tokens: Token[];
+  // 자잘 #4 (2026-04-25): paren matching info — opening LParen 위치 추적
+  private parenStack: Array<{ type: string; line: number; col: number }> = [];
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
@@ -1206,10 +1208,25 @@ export class Parser {
 
   private expect(type: string): Token {
     if (this.check(type)) {
-      return this.advance();
+      const tok = this.advance();
+      // 자잘 #4 (2026-04-25): paren matching — opening 추적
+      if (type === T.LParen || type === T.LBracket || type === T.LBrace) {
+        this.parenStack.push({ type, line: tok.line, col: tok.col });
+      } else if (type === T.RParen || type === T.RBracket || type === T.RBrace) {
+        this.parenStack.pop();
+      }
+      return tok;
     }
     const token = this.peek();
-    throw this.error(`Expected ${type}, got ${token.type}`, token);
+    // 자잘 #4: paren matching info — RParen/RBracket/RBrace 누락 시 가장 최근 opening 위치 표시
+    let extraHint = "";
+    if ((type === T.RParen || type === T.RBracket || type === T.RBrace) && this.parenStack.length > 0) {
+      const opening = this.parenStack[this.parenStack.length - 1];
+      const openSym = opening.type === T.LParen ? "(" : opening.type === T.LBracket ? "[" : "{";
+      const wantSym = type === T.RParen ? ")" : type === T.RBracket ? "]" : "}";
+      extraHint = ` (가장 최근 opening '${openSym}' at line ${opening.line}:${opening.col} — '${wantSym}' 누락 또는 중첩 오류)`;
+    }
+    throw this.error(`Expected ${type}, got ${token.type}${extraHint}`, token);
   }
 
   private isAtEnd(): boolean {
@@ -1218,7 +1235,18 @@ export class Parser {
 
   private error(message: string, token: Token): ParserError {
     // 힌트 매칭: 메시지 앞부분으로 검색
-    const hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+    let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+
+    // 자잘 #4 (2026-04-25): paren matching info — 미닫힘 paren 위치 표시
+    // EOF 또는 Expected R* 에러 시 parenStack에서 가장 최근 opening 정보 추가
+    if (this.parenStack.length > 0 &&
+        (token.type === T.EOF || message.includes("Expected R") || message.includes("Unexpected"))) {
+      const opening = this.parenStack[this.parenStack.length - 1];
+      const openSym = opening.type === T.LParen ? "(" : opening.type === T.LBracket ? "[" : "{";
+      const wantSym = opening.type === T.LParen ? ")" : opening.type === T.LBracket ? "]" : "}";
+      const parenHint = `여는 '${openSym}' at line ${opening.line}:${opening.col} 가 닫히지 않음 — '${wantSym}' 누락 또는 오타`;
+      hint = hint ? `${hint}\n  ${parenHint}` : parenHint;
+    }
 
     // 메시지 패턴에 따라 에러 코드 결정
     let code = "E_PARSE_SYNTAX_ERROR";

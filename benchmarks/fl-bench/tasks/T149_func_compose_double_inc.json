@@ -1,0 +1,1 @@
+{"id":"T149_func_compose_double_inc","category":"functional","difficulty":"medium","prompt":"f = comp double inc. (f 5) → ((5+1)*2) = 12.","validation":{"type":"stdout_contains","expected":"12"},"reference_solution":"(let [[f (comp (fn [x] (* x 2)) (fn [x] (+ x 1)))]] (println (f 5)))","tags":["comp"]}

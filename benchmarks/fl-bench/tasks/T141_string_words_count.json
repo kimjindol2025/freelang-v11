@@ -1,0 +1,1 @@
+{"id":"T141_string_words_count","category":"string","difficulty":"easy","prompt":"\"the cat sat on the mat\" 단어 갯수(6).","validation":{"type":"stdout_contains","expected":"6"},"reference_solution":"(println (length (str-split \"the cat sat on the mat\" \" \")))","tags":["words","str-split"]}

@@ -1,0 +1,1 @@
+{"id":"T145_state_toggle","category":"state-machine","difficulty":"easy","prompt":"toggle: true → false, false → true. (toggle true)는 false.","validation":{"type":"stdout_contains","expected":"false"},"reference_solution":"(defn toggle [s] (not s))\n(println (toggle true))","tags":["toggle","not"]}

@@ -1,0 +1,1 @@
+{"id":"T139_recur_count_down","category":"recursion","difficulty":"medium","prompt":"5에서 0까지 카운트다운, str로 join. 결과: \"5,4,3,2,1,0\".","validation":{"type":"stdout_contains","expected":"5,4,3,2,1,0"},"reference_solution":"(defn cd [n] (if (< n 0) \"\" (str n (if (= n 0) \"\" \",\") (cd (- n 1)))))\n(println (cd 5))","tags":["recursion","str"]}
