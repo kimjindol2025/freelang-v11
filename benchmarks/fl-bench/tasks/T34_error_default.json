@@ -1,0 +1,9 @@
+{
+  "id": "T34_error_default",
+  "category": "error-handling",
+  "difficulty": "easy",
+  "prompt": "리스트의 첫 원소를 반환하되, 빈 리스트면 \"empty\"를 반환하는 함수를 first-or-default를 사용해 정의하세요. (safe-first (list)) → \"empty\". 결과 출력.",
+  "validation": { "type": "stdout_contains", "expected": "empty" },
+  "reference_solution": "(defn safe-first [xs] (first-or xs \"empty\"))\n(println (safe-first (list)))",
+  "tags": ["first-or", "nil-safe"]
+}

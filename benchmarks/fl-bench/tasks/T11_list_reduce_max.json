@@ -1,0 +1,9 @@
+{
+  "id": "T11_list_reduce_max",
+  "category": "list",
+  "difficulty": "medium",
+  "prompt": "리스트 [3 1 4 1 5 9 2 6]에서 최댓값(9)을 reduce로 찾아 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "9" },
+  "reference_solution": "(println (reduce (fn [acc x] (if (> x acc) x acc)) 0 (list 3 1 4 1 5 9 2 6)))",
+  "tags": ["reduce", "max"]
+}

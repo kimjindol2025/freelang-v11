@@ -1,0 +1,9 @@
+{
+  "id": "T43_let_binding",
+  "category": "binding",
+  "difficulty": "easy",
+  "prompt": "let으로 x=10, y=20을 바인딩하고 합(30)을 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "30" },
+  "reference_solution": "(let [[x 10] [y 20]] (println (+ x y)))",
+  "tags": ["let"]
+}

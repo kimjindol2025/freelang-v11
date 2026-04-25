@@ -1,0 +1,9 @@
+{
+  "id": "T44_recursive_sum",
+  "category": "recursion",
+  "difficulty": "medium",
+  "prompt": "1부터 n까지의 합을 재귀로 계산하는 sum-to 함수를 정의하세요. (sum-to 10) → 55. 결과 출력.",
+  "validation": { "type": "stdout_contains", "expected": "55" },
+  "reference_solution": "(defn sum-to [n] (if (<= n 0) 0 (+ n (sum-to (- n 1)))))\n(println (sum-to 10))",
+  "tags": ["recursion"]
+}

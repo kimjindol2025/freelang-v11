@@ -1,0 +1,9 @@
+{
+  "id": "T41_threading_last",
+  "category": "higher-order",
+  "difficulty": "medium",
+  "prompt": "->> 매크로(thread-last)로 (list 1 2 3 4 5)에서 짝수만 필터하고 sum하여 결과(6)를 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "6" },
+  "reference_solution": "(println (->> (list 1 2 3 4 5) (filter (fn [x] (= 0 (% x 2)))) (reduce (fn [a b] (+ a b)) 0)))",
+  "tags": ["thread-last", "filter", "reduce"]
+}

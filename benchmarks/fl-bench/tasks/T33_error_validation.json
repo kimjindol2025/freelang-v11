@@ -1,0 +1,9 @@
+{
+  "id": "T33_error_validation",
+  "category": "error-handling",
+  "difficulty": "medium",
+  "prompt": "주어진 값이 양수면 \"positive\", 음수면 \"negative\", 0이면 \"zero\"를 반환하는 sign 함수를 정의하세요. (sign 5), (sign -3), (sign 0)의 결과를 차례로 출력하세요.",
+  "validation": { "type": "stdout_regex", "expected": "positive[\\s\\S]*negative[\\s\\S]*zero" },
+  "reference_solution": "(defn sign [n] (cond [(> n 0) \"positive\"] [(< n 0) \"negative\"] [true \"zero\"]))\n(println (sign 5))\n(println (sign -3))\n(println (sign 0))",
+  "tags": ["cond", "defn"]
+}

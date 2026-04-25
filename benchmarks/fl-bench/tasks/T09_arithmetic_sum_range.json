@@ -1,0 +1,9 @@
+{
+  "id": "T09_arithmetic_sum_range",
+  "category": "arithmetic",
+  "difficulty": "medium",
+  "prompt": "1부터 100까지의 합(5050)을 reduce로 계산해 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "5050" },
+  "reference_solution": "(println (reduce (fn [acc x] (+ acc x)) 0 (range 1 101)))",
+  "tags": ["reduce", "list"]
+}

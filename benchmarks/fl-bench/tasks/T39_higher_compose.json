@@ -1,0 +1,9 @@
+{
+  "id": "T39_higher_compose",
+  "category": "higher-order",
+  "difficulty": "medium",
+  "prompt": "두 함수 (fn [x] (+ x 1))과 (fn [x] (* x 2))를 합성하여 inc-then-double을 만들고, (inc-then-double 3) → 8 출력. (inc 후 double: (3+1)*2=8)",
+  "validation": { "type": "stdout_contains", "expected": "8" },
+  "reference_solution": "(defn inc-then-double [x] (* (+ x 1) 2))\n(println (inc-then-double 3))",
+  "tags": ["function-composition"]
+}

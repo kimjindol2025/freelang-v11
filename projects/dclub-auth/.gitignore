@@ -1,0 +1,12 @@
+*.db
+*.db-journal
+db/*.db
+db/seed-local.sql
+*.pem
+*.key
+secrets/
+.env
+.env.local
+node_modules/
+dist/
+*.log

@@ -1,0 +1,9 @@
+{
+  "id": "T23_json_stringify",
+  "category": "json",
+  "difficulty": "medium",
+  "prompt": "맵 {:name \"Bob\" :age 25}을 JSON 문자열로 변환해 출력하세요. 결과에 name과 Bob이 포함되어야 합니다.",
+  "validation": { "type": "stdout_regex", "expected": "name.*Bob|Bob.*name" },
+  "reference_solution": "(println (json_stringify {:name \"Bob\" :age 25}))",
+  "tags": ["json_stringify"]
+}

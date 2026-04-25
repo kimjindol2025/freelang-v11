@@ -1,0 +1,9 @@
+{
+  "id": "T14_list_first_last",
+  "category": "list",
+  "difficulty": "easy",
+  "prompt": "리스트 [10 20 30 40 50]의 첫 원소(10)와 마지막 원소(50)를 한 줄에 출력하세요. 형태: 10 50",
+  "validation": { "type": "stdout_regex", "expected": "10\\D+50" },
+  "reference_solution": "(println (first (list 10 20 30 40 50)) (last (list 10 20 30 40 50)))",
+  "tags": ["first", "last"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T16_string_upper",
+  "category": "string",
+  "difficulty": "easy",
+  "prompt": "문자열 \"hello world\"를 모두 대문자로 변환해 출력하세요. \"HELLO WORLD\".",
+  "validation": { "type": "stdout_contains", "expected": "HELLO WORLD" },
+  "reference_solution": "(println (uppercase \"hello world\"))",
+  "tags": ["upper-case"]
+}

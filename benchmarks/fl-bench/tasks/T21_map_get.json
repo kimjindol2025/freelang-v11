@@ -1,0 +1,9 @@
+{
+  "id": "T21_map_get",
+  "category": "map",
+  "difficulty": "easy",
+  "prompt": "맵 {:name \"Alice\" :age 30}에서 :name 값을 출력하세요. \"Alice\".",
+  "validation": { "type": "stdout_contains", "expected": "Alice" },
+  "reference_solution": "(println (get {:name \"Alice\" :age 30} :name))",
+  "tags": ["get", "map", "keyword"]
+}

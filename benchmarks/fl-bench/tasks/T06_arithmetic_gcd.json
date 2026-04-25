@@ -1,0 +1,9 @@
+{
+  "id": "T06_arithmetic_gcd",
+  "category": "arithmetic",
+  "difficulty": "medium",
+  "prompt": "두 양의 정수의 최대공약수(GCD)를 유클리드 호제법으로 계산하는 gcd 함수를 정의하고, (gcd 48 18)의 결과 6을 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "6" },
+  "reference_solution": "(defn gcd [a b] (if (= b 0) a (gcd b (% a b))))\n(println (gcd 48 18))",
+  "tags": ["recursion", "modulo", "gcd"]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "T07_arithmetic_fib",
+  "category": "arithmetic",
+  "difficulty": "easy",
+  "prompt": "피보나치 수열의 n번째 항을 재귀로 계산하는 fib 함수를 정의하고, (fib 10) 의 결과 55를 출력하세요.",
+  "validation": { "type": "stdout_contains", "expected": "55" },
+  "reference_solution": "(defn fib [n] (if (<= n 1) n (+ (fib (- n 1)) (fib (- n 2)))))\n(println (fib 10))",
+  "tags": ["recursion", "fibonacci"]
+}

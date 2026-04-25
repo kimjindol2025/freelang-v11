@@ -1,0 +1,9 @@
+{
+  "id": "T08_arithmetic_power",
+  "category": "arithmetic",
+  "difficulty": "easy",
+  "prompt": "2의 10승을 계산해 출력하세요. 결과는 1024.",
+  "validation": { "type": "stdout_contains", "expected": "1024" },
+  "reference_solution": "(println (pow 2 10))",
+  "tags": ["math-pow"]
+}

@@ -944,15 +944,33 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 
     case "reduce": {
       // (reduce fn init arr) 또는 (reduce arr init fn) 모두 지원
-      let reduceFn: any, accumulator: any, arr: any[];
+      let reduceFn: any, accumulator: any, arr: any;
       if (Array.isArray(args[0])) {
         // 구형: (reduce arr init fn)
         arr = args[0]; accumulator = args[1]; reduceFn = args[2];
+      } else if (isLazySeq(args[0])) {
+        // lazy seq도 첫 인자로 허용 (range 등)
+        arr = args[0]; accumulator = args[1]; reduceFn = args[2];
       } else {
         // 표준: (reduce fn init arr)
-        reduceFn = args[0]; accumulator = args[1]; arr = args[2] || [];
+        reduceFn = args[0]; accumulator = args[1]; arr = args[2] ?? [];
       }
-      if (!Array.isArray(arr)) throw new Error(`reduce: 배열 인자가 필요합니다`);
+      // Phase B 후속: lazy seq 자동 강제 변환 (안전 limit 100k)
+      if (isLazySeq(arr)) {
+        const REDUCE_LAZY_LIMIT = 100000;
+        let cur: any = arr;
+        let count = 0;
+        while (cur && count < REDUCE_LAZY_LIMIT) {
+          accumulator = callFn(reduceFn, [accumulator, lazyHead(cur)]);
+          cur = lazyTail(cur);
+          count++;
+        }
+        if (count >= REDUCE_LAZY_LIMIT) {
+          throw new Error(`reduce: lazy seq가 ${REDUCE_LAZY_LIMIT}을 초과 (무한 시퀀스 가능성, take를 먼저 사용하세요)`);
+        }
+        return accumulator;
+      }
+      if (!Array.isArray(arr)) throw new Error(`reduce: 배열 인자가 필요합니다 (받은 타입: ${typeof arr})`);
       for (const item of arr) {
         accumulator = callFn(reduceFn, [accumulator, item]);
       }
@@ -1439,14 +1457,21 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 
     // (range n) → lazy [0..n-1], (range start end) → lazy [start..end-1]
     case "range": {
-      if (args.length === 0) {
-        // 무한 자연수
-        return rangeSeq(0);
-      } else if (args.length === 1) {
-        return rangeSeq(0, args[0]);
-      } else {
-        return rangeSeq(args[0], args[1]);
-      }
+      // 호환 정책 (Phase B 후속):
+      // - args.length 0: 무한 lazy seq (rangeSeq(0))
+      // - args.length 1: 0~N lazy seq (take 등 lazy 처리에 적합)
+      // - args.length 2+: eager array [start..end)
+      //   → reduce/map/filter와 즉시 호환 (가장 흔한 사용)
+      if (args.length === 0) return rangeSeq(0);
+      if (args.length === 1) return rangeSeq(0, args[0]);
+      // args.length >= 2: eager array
+      const start = Number(args[0]);
+      const end = Number(args[1]);
+      const step = args.length >= 3 ? Number(args[2]) : 1;
+      const out: number[] = [];
+      if (step > 0) for (let i = start; i < end; i += step) out.push(i);
+      else if (step < 0) for (let i = start; i > end; i += step) out.push(i);
+      return out;
     }
 
     // (take n seq) — lazy or array에서 n개 꺼냄
