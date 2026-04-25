@@ -587,9 +587,25 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       };
     },
 
-    // server_req_body req -> string
+    // server_req_body req -> string OR object (Content-Type 자동 가드)
+    // 자잘 마찰 #1 (2026-04-25): Content-Type=application/json이면 이미 객체이므로
+    // json_parse 두 번 하면 [object Object] 에러. (server_req_body req)는 string 보장.
     "server_req_body": (req: Request): string => {
-      return req.body ?? "";
+      const b = req.body;
+      if (b === null || b === undefined) return "";
+      // 이미 객체/배열로 파싱된 경우 → 다시 string으로 (사용자가 json_parse 안전)
+      if (typeof b === "object") return JSON.stringify(b);
+      return String(b);
+    },
+
+    // server_req_json req -> parsed object (자동 파싱, Content-Type 무관)
+    // 자잘 마찰 #1 (2026-04-25): 사용자 18세션에서 18군데 우회 헬퍼 작성
+    // (if (string? raw) (json_parse raw) raw) 대신 한 줄
+    "server_req_json": (req: Request): any => {
+      const b = req.body;
+      if (b === null || b === undefined) return null;
+      if (typeof b === "object") return b; // 이미 파싱됨
+      try { return JSON.parse(String(b)); } catch { return null; }
     },
 
     // server_req_query req [key] -> object or string
