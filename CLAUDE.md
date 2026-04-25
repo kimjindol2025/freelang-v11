@@ -6,7 +6,21 @@
 
 ---
 
-## 📊 실측 상태 (2026-04-25 Phase 4 self-host 회복 완료)
+## 📊 실측 상태 (2026-04-25 Phase A~E AI 완성도 5단계 + Phase 4 self-host 회복 완료)
+
+### Phase A~E 핵심 성과 — AI 완성도 78 → 87+
+
+**5단계 점수 향상**:
+- Phase A: 에러 메시지 enrichment (72 → 80) — `ErrorCodes`/`FLRuntimeError`/컨텍스트/자동 복구 힌트
+- Phase B: API 일관성 + 타입 predicate (75 → 82) — `nil?`/`array?`/`fn?` alias + `stdlib-type-predicates.ts` 단일 출처 + `STDLIB_NAMING_AUDIT.md`
+- Phase C: nil-safe wrapper + strict 모드 (68 → 75) — `get-or`/`first-or`/`last-or` + `FL_STRICT=1` 환경변수
+- Phase D: `(use NAME)` special form (65 → 78) — `self/stdlib/*.fl` 한 줄 import + `defun` Common Lisp alias
+- Phase E: callStack 추적 (70 → 82) — `interpreter.callStack` + `FL_TRACE=1` + stack overflow 호출 체인 dump
+
+**검증**:
+- 36개 새 테스트 케이스 추가 (errors.test.ts 누적 36/36 PASS)
+- self-hosting 보존: stage1==stage2==stage3 SHA256 일치 (`5877b9660e...`)
+- Breaking change 0
 
 ### Phase 4 핵심 성과 — Self-Host 회복
 
