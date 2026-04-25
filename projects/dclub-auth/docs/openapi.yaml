@@ -1,0 +1,394 @@
+openapi: 3.0.3
+info:
+  title: dclub-auth
+  description: |
+    OIDC IdP for dclub services and external SaaS customers.
+    100% FreeLang v11 implementation. RFC 6749/7519/7517/7636/6238 compliant.
+  version: 1.0.0
+  contact:
+    name: dclub-auth
+    url: https://blog.dclub.kr/
+servers:
+  - url: https://auth.dclub.kr
+    description: Production
+  - url: http://localhost:30100
+    description: Local development
+
+tags:
+  - name: Discovery
+    description: OIDC 자동 발견
+  - name: OAuth
+    description: 표준 OAuth 2.0 / OIDC 흐름
+  - name: User
+    description: 회원가입·이메일 검증·비밀번호 재설정
+  - name: MFA
+    description: 2단계 인증 (TOTP)
+
+paths:
+  /.well-known/openid-configuration:
+    get:
+      tags: [Discovery]
+      summary: OIDC discovery 메타데이터
+      responses:
+        '200':
+          description: 표준 OIDC 메타데이터
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Discovery'
+
+  /jwks.json:
+    get:
+      tags: [Discovery]
+      summary: JWKS 공개키 (RS256 검증용)
+      responses:
+        '200':
+          description: RFC 7517 JWK Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWKS'
+
+  /authorize:
+    get:
+      tags: [OAuth]
+      summary: 인증 시작 (Authorization Code + PKCE)
+      parameters:
+        - in: query
+          name: response_type
+          required: true
+          schema: { type: string, enum: [code] }
+        - in: query
+          name: client_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: redirect_uri
+          required: true
+          schema: { type: string, format: uri }
+        - in: query
+          name: scope
+          required: true
+          schema: { type: string, example: "openid profile email" }
+        - in: query
+          name: state
+          required: true
+          schema: { type: string }
+          description: CSRF 방어용 (클라이언트가 검증)
+        - in: query
+          name: nonce
+          schema: { type: string }
+          description: replay 방어 (id_token 클레임에 포함)
+        - in: query
+          name: code_challenge
+          required: true
+          schema: { type: string }
+          description: PKCE base64url(SHA256(verifier))
+        - in: query
+          name: code_challenge_method
+          required: true
+          schema: { type: string, enum: [S256] }
+      responses:
+        '200':
+          description: 로그인 폼 SSR (HTML)
+          content:
+            text/html: { schema: { type: string } }
+        '400':
+          description: 파라미터 오류
+
+  /login:
+    post:
+      tags: [OAuth]
+      summary: 로그인 폼 제출 → code 발급 + 302
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password, client_id, redirect_uri, code_challenge, code_challenge_method]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+                client_id: { type: string }
+                redirect_uri: { type: string }
+                scope: { type: string }
+                state: { type: string }
+                nonce: { type: string }
+                code_challenge: { type: string }
+                code_challenge_method: { type: string, enum: [S256] }
+                mfa_stage: { type: string, enum: ["1", "2"] }
+                totp_code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '302':
+          description: redirect_uri로 ?code=...&state=... 이동
+        '200':
+          description: 2단계 진입 (TOTP 폼 SSR)
+        '401':
+          description: 비밀번호 또는 TOTP 불일치
+        '429':
+          description: 잠금 (5회 실패)
+
+  /token:
+    post:
+      tags: [OAuth]
+      summary: code/refresh → token 교환
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/AuthCodeGrant'
+                - $ref: '#/components/schemas/RefreshGrant'
+      responses:
+        '200':
+          description: 토큰 발급 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400':
+          description: invalid_grant / invalid_request
+        '401':
+          description: invalid_client
+
+  /userinfo:
+    get:
+      tags: [OAuth]
+      summary: 사용자 프로필 (Bearer access_token)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: scope 기반 클레임
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInfo' }
+        '401':
+          description: 토큰 무효·만료
+
+  /signup:
+    get:
+      tags: [User]
+      summary: 회원가입 폼 SSR
+      responses: { '200': { description: HTML } }
+    post:
+      tags: [User]
+      summary: 가입 처리 + verify 토큰 발급
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, email, password, password_confirm]
+              properties:
+                username: { type: string, pattern: '^[a-zA-Z0-9_]{3,32}$' }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                password_confirm: { type: string, minLength: 8 }
+      responses:
+        '200': { description: 가입 완료 페이지 (verify URL 표시) }
+        '400': { description: 입력 검증 실패 }
+        '409': { description: 사용자명 중복 }
+        '429': { description: rate limit }
+
+  /verify-email:
+    get:
+      tags: [User]
+      summary: 이메일 검증 (토큰 클릭)
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 검증 완료 페이지 }
+        '400': { description: 토큰 만료 또는 사용됨 }
+
+  /forgot:
+    get:
+      tags: [User]
+      summary: 비밀번호 재설정 요청 폼
+      responses: { '200': { description: HTML } }
+    post:
+      tags: [User]
+      summary: reset 토큰 발급 (메일 발송)
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { description: 동일 응답 (계정 존재 노출 금지) }
+        '429': { description: rate limit }
+
+  /reset:
+    get:
+      tags: [User]
+      summary: 새 비밀번호 입력 폼
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+      responses: { '200': { description: HTML } }
+    post:
+      tags: [User]
+      summary: 토큰 검증 + 비밀번호 변경
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, password, password_confirm]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+                password_confirm: { type: string, minLength: 8 }
+      responses:
+        '200': { description: 변경 완료 페이지 }
+        '400': { description: 토큰 또는 입력 오류 }
+
+  /mfa/setup:
+    post:
+      tags: [MFA]
+      summary: TOTP 등록 시작 (secret + otpauth URI)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: secret 발급
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: pending }
+                  secret: { type: string, description: base32 encoded }
+                  otpauth_uri: { type: string, description: QR 코드 표준 URI }
+        '409': { description: 이미 활성 }
+
+  /mfa/confirm:
+    post:
+      tags: [MFA]
+      summary: TOTP 코드 확인 → 활성화
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200': { description: 활성화 완료 }
+        '400': { description: 코드 불일치 }
+
+  /mfa/disable:
+    post:
+      tags: [MFA]
+      summary: MFA 해제 (비밀번호 재확인)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200': { description: 해제 완료 }
+        '401': { description: 비밀번호 불일치 }
+
+  /mfa/status:
+    get:
+      tags: [MFA]
+      summary: 현재 사용자 MFA 활성 여부
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: string }
+                  totp_active: { type: boolean }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Discovery:
+      type: object
+      properties:
+        issuer: { type: string }
+        authorization_endpoint: { type: string }
+        token_endpoint: { type: string }
+        userinfo_endpoint: { type: string }
+        jwks_uri: { type: string }
+        response_types_supported: { type: array, items: { type: string } }
+        id_token_signing_alg_values_supported: { type: array, items: { type: string } }
+        code_challenge_methods_supported: { type: array, items: { type: string } }
+        scopes_supported: { type: array, items: { type: string } }
+
+    JWKS:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              kty: { type: string, example: RSA }
+              alg: { type: string, example: RS256 }
+              use: { type: string, example: sig }
+              kid: { type: string }
+              n: { type: string }
+              e: { type: string }
+
+    AuthCodeGrant:
+      type: object
+      required: [grant_type, code, redirect_uri, client_id, code_verifier]
+      properties:
+        grant_type: { type: string, enum: [authorization_code] }
+        code: { type: string }
+        redirect_uri: { type: string }
+        client_id: { type: string }
+        client_secret: { type: string }
+        code_verifier: { type: string, description: PKCE verifier (서버는 SHA256 후 챌린지 매칭) }
+
+    RefreshGrant:
+      type: object
+      required: [grant_type, refresh_token, client_id]
+      properties:
+        grant_type: { type: string, enum: [refresh_token] }
+        refresh_token: { type: string }
+        client_id: { type: string }
+        client_secret: { type: string }
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, example: 3600 }
+        refresh_token: { type: string }
+        id_token: { type: string }
+        scope: { type: string }
+
+    UserInfo:
+      type: object
+      properties:
+        sub: { type: string, description: 영구 사용자 ID (UUID v4) }
+        preferred_username: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        email_verified: { type: boolean }
+        picture: { type: string, format: uri }
