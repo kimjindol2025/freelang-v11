@@ -1440,6 +1440,9 @@ export class Interpreter {
         if (lit.value === "true")  return true;
         if (lit.value === "false") return false;
         if (lit.value === "null")  return null;
+        // P0-1 (2026-04-25): nil은 JS null과 동일 (Lisp/Clojure 관례)
+        // 사용자 평가 P0-1 — (if nil ...) → "yes" 잘못된 truthy 평가 해소
+        if (lit.value === "nil")   return null;
         const bareName = lit.value as string;
         const varName = "$" + bareName;
         if (this.context.variables.has(varName)) {

@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self verify-all verify-fixed-point verify-build verify-self-host bench ai-eval clean help
+.PHONY: compile compile-self verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -52,6 +52,9 @@ bench:
 
 ai-eval:
 	@$(NODE) scripts/ai-eval.js --provider=claude-cli --label=make-ai-eval
+
+lint-aliases:
+	@$(NODE) scripts/lint-stdlib-aliases.js
 
 clean:
 	@rm -f stage1-new.js /tmp/stage*.js /tmp/*-results.json

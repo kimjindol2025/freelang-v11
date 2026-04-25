@@ -32,6 +32,15 @@ function extractSignatures() {
 
 extractSignatures();
 
+// Phase P2: stdlib alias lint (advisory) — 빌드 시 누락 alias 정보성 출력
+try {
+  const { spawnSync } = require("child_process");
+  const r = spawnSync("node", [path.join(__dirname, "lint-stdlib-aliases.js"), "--quiet"], { encoding: "utf8" });
+  // exit code 0 (advisory)이라 빌드 막지 않음. 사용자가 make lint-aliases로 상세 확인.
+} catch (e) {
+  console.warn(`alias_lint=skipped (${e.message})`);
+}
+
 // AI 시스템 프롬프트 자동 갱신 (시그니처 추출 직후, AI-1 통합)
 try {
   require(path.join(__dirname, "gen-ai-prompt.js"));
