@@ -2413,6 +2413,124 @@ var init_parser = __esm({
   }
 });
 
+// src/errors.ts
+var errors_exports = {};
+__export(errors_exports, {
+  ErrorCodes: () => ErrorCodes,
+  FLRuntimeError: () => FLRuntimeError,
+  FunctionNotFoundError: () => FunctionNotFoundError,
+  FunctionRegistrationError: () => FunctionRegistrationError,
+  InvalidModuleStructureError: () => InvalidModuleStructureError,
+  ModuleError: () => ModuleError,
+  ModuleNotFoundError: () => ModuleNotFoundError,
+  RECOVERY_HINTS: () => RECOVERY_HINTS,
+  SelectiveImportError: () => SelectiveImportError
+});
+var ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError;
+var init_errors = __esm({
+  "src/errors.ts"() {
+    ModuleError = class _ModuleError extends Error {
+      constructor(message, moduleName, file, line, col, hint) {
+        super(message);
+        this.moduleName = moduleName;
+        this.file = file;
+        this.line = line;
+        this.col = col;
+        this.hint = hint;
+        this.name = "ModuleError";
+        Object.setPrototypeOf(this, _ModuleError.prototype);
+      }
+    };
+    ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
+      constructor(moduleName, source, file, line, col, hint) {
+        const sourceStr = source ? ` (from ${source})` : "";
+        super(`Module not found: ${moduleName}${sourceStr}`, moduleName, file, line, col, hint);
+        this.name = "ModuleNotFoundError";
+        Object.setPrototypeOf(this, _ModuleNotFoundError.prototype);
+      }
+    };
+    SelectiveImportError = class _SelectiveImportError extends ModuleError {
+      constructor(moduleName, functionName, file, line, col, hint) {
+        super(
+          `Function "${functionName}" not exported from module "${moduleName}"`,
+          moduleName,
+          file,
+          line,
+          col,
+          hint
+        );
+        this.name = "SelectiveImportError";
+        Object.setPrototypeOf(this, _SelectiveImportError.prototype);
+      }
+    };
+    InvalidModuleStructureError = class _InvalidModuleStructureError extends ModuleError {
+      constructor(moduleName, issue) {
+        super(`Invalid module structure in "${moduleName}": ${issue}`, moduleName);
+        this.name = "InvalidModuleStructureError";
+        Object.setPrototypeOf(this, _InvalidModuleStructureError.prototype);
+      }
+    };
+    FunctionRegistrationError = class _FunctionRegistrationError extends ModuleError {
+      constructor(moduleName, functionName, reason, file, line, col, hint) {
+        super(
+          `Failed to register function "${functionName}" in module "${moduleName}": ${reason}`,
+          moduleName,
+          file,
+          line,
+          col,
+          hint
+        );
+        this.name = "FunctionRegistrationError";
+        Object.setPrototypeOf(this, _FunctionRegistrationError.prototype);
+      }
+    };
+    FunctionNotFoundError = class _FunctionNotFoundError extends Error {
+      constructor(functionName, file, line, col, hint) {
+        const hintStr = hint ? ` ${hint}` : "";
+        super(`Function not found: ${functionName}${hintStr}`);
+        this.functionName = functionName;
+        this.file = file;
+        this.line = line;
+        this.col = col;
+        this.hint = hint;
+        this.name = "FunctionNotFoundError";
+        Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
+      }
+    };
+    ErrorCodes = {
+      TYPE_NIL: "E_TYPE_NIL",
+      TYPE_MISMATCH: "E_TYPE_MISMATCH",
+      ARG_COUNT: "E_ARG_COUNT",
+      STACK_OVERFLOW: "E_STACK_OVERFLOW",
+      FN_NOT_FOUND: "E_FN_NOT_FOUND",
+      DIV_BY_ZERO: "E_DIV_BY_ZERO",
+      INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
+      INVALID_FORM: "E_INVALID_FORM",
+      RUNTIME: "E_RUNTIME"
+    };
+    RECOVERY_HINTS = {
+      E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+      E_TYPE_MISMATCH: "\uAE30\uB300 \uD0C0\uC785\uACFC \uB2E4\uB985\uB2C8\uB2E4. (string? x) (number? x) \uB4F1\uC73C\uB85C \uC0AC\uC804 \uAC80\uC99D\uD558\uAC70\uB098 \uBCC0\uD658 \uD568\uC218\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.",
+      E_ARG_COUNT: "\uC778\uC790 \uAC2F\uC218\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
+      E_STACK_OVERFLOW: "\uC7AC\uADC0 \uAE4A\uC774 \uCD08\uACFC. \uC885\uB8CC \uC870\uAC74\uC774 \uC788\uB294\uC9C0, \uB610\uB294 loop/recur \uB610\uB294 reduce\uB85C \uBCC0\uD658 \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD558\uC138\uC694.",
+      E_FN_NOT_FOUND: "\uD568\uC218\uAC00 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBAA8\uB4C8 import \uB610\uB294 \uC624\uD0C0\uB97C \uD655\uC778\uD558\uC138\uC694.",
+      E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
+      E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+      E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
+      E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
+    };
+    FLRuntimeError = class _FLRuntimeError extends ModuleError {
+      constructor(code, message, context = {}, file, line, col, hint) {
+        super(`[${code}] ${message}`, "runtime", file, line, col, hint ?? RECOVERY_HINTS[code]);
+        this.code = code;
+        this.context = context;
+        this.name = "FLRuntimeError";
+        Object.setPrototypeOf(this, _FLRuntimeError.prototype);
+      }
+    };
+  }
+});
+
 // src/debugger.ts
 var debugger_exports = {};
 __export(debugger_exports, {
@@ -3550,8 +3668,11 @@ var RuntimeTypeChecker = class {
       if (expected === "any") continue;
       const actual = inferType(argValues[i]);
       if (!isCompatible(actual, expected)) {
-        throw new TypeError(
-          `[strict] Type error in '${name}': argument ${i + 1} expected ${expected}, got ${actual} (value: ${JSON.stringify(argValues[i])})`
+        const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
+        throw new FLRuntimeError2(
+          ErrorCodes2.TYPE_MISMATCH,
+          `'${name}': arg ${i + 1} expected ${expected}, got ${actual}`,
+          { fn: name, arg: i, expected, got: actual, value: argValues[i] }
         );
       }
     }
@@ -3565,8 +3686,11 @@ var RuntimeTypeChecker = class {
     if (!sig || sig.ret === "any") return;
     const actual = inferType(retValue);
     if (!isCompatible(actual, sig.ret)) {
-      throw new TypeError(
-        `[strict] Return type error in '${name}': expected ${sig.ret}, got ${actual} (value: ${JSON.stringify(retValue)})`
+      const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
+      throw new FLRuntimeError2(
+        ErrorCodes2.TYPE_MISMATCH,
+        `'${name}' return: expected ${sig.ret}, got ${actual}`,
+        { fn: name, expected: sig.ret, got: actual, value: retValue }
       );
     }
   }
@@ -4401,71 +4525,8 @@ function rejectedPromise(error) {
   });
 }
 
-// src/errors.ts
-var ModuleError = class _ModuleError extends Error {
-  constructor(message, moduleName, file, line, col, hint) {
-    super(message);
-    this.moduleName = moduleName;
-    this.file = file;
-    this.line = line;
-    this.col = col;
-    this.hint = hint;
-    this.name = "ModuleError";
-    Object.setPrototypeOf(this, _ModuleError.prototype);
-  }
-};
-var ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
-  constructor(moduleName, source, file, line, col, hint) {
-    const sourceStr = source ? ` (from ${source})` : "";
-    super(`Module not found: ${moduleName}${sourceStr}`, moduleName, file, line, col, hint);
-    this.name = "ModuleNotFoundError";
-    Object.setPrototypeOf(this, _ModuleNotFoundError.prototype);
-  }
-};
-var FunctionNotFoundError = class _FunctionNotFoundError extends Error {
-  constructor(functionName, file, line, col, hint) {
-    const hintStr = hint ? ` ${hint}` : "";
-    super(`Function not found: ${functionName}${hintStr}`);
-    this.functionName = functionName;
-    this.file = file;
-    this.line = line;
-    this.col = col;
-    this.hint = hint;
-    this.name = "FunctionNotFoundError";
-    Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
-  }
-};
-var ErrorCodes = {
-  TYPE_NIL: "E_TYPE_NIL",
-  TYPE_MISMATCH: "E_TYPE_MISMATCH",
-  ARG_COUNT: "E_ARG_COUNT",
-  STACK_OVERFLOW: "E_STACK_OVERFLOW",
-  FN_NOT_FOUND: "E_FN_NOT_FOUND",
-  DIV_BY_ZERO: "E_DIV_BY_ZERO",
-  INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
-  INVALID_FORM: "E_INVALID_FORM",
-  RUNTIME: "E_RUNTIME"
-};
-var RECOVERY_HINTS = {
-  E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
-  E_TYPE_MISMATCH: "\uAE30\uB300 \uD0C0\uC785\uACFC \uB2E4\uB985\uB2C8\uB2E4. (string? x) (number? x) \uB4F1\uC73C\uB85C \uC0AC\uC804 \uAC80\uC99D\uD558\uAC70\uB098 \uBCC0\uD658 \uD568\uC218\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.",
-  E_ARG_COUNT: "\uC778\uC790 \uAC2F\uC218\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
-  E_STACK_OVERFLOW: "\uC7AC\uADC0 \uAE4A\uC774 \uCD08\uACFC. \uC885\uB8CC \uC870\uAC74\uC774 \uC788\uB294\uC9C0, \uB610\uB294 loop/recur \uB610\uB294 reduce\uB85C \uBCC0\uD658 \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD558\uC138\uC694.",
-  E_FN_NOT_FOUND: "\uD568\uC218\uAC00 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBAA8\uB4C8 import \uB610\uB294 \uC624\uD0C0\uB97C \uD655\uC778\uD558\uC138\uC694.",
-  E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
-  E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
-  E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
-  E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
-};
-var FLRuntimeError = class _FLRuntimeError extends ModuleError {
-  constructor(code, message, context = {}, file, line, col, hint) {
-    super(`[${code}] ${message}`, "runtime", file, line, col, hint ?? RECOVERY_HINTS[code]);
-    this.code = code;
-    this.context = context;
-    this.name = "FLRuntimeError";
-    Object.setPrototypeOf(this, _FLRuntimeError.prototype);
-  }
-};
+// src/eval-builtins.ts
+init_errors();
 
 // src/lazy-seq.ts
 var LAZY_SEQ = Symbol("LAZY_SEQ");
@@ -17521,6 +17582,7 @@ function isVMEligible(node) {
 }
 
 // src/eval-special-forms.ts
+init_errors();
 var _vmCompiler = new BytecodeCompiler();
 function throwArgCount(fn, expected, got, line) {
   throw new FLRuntimeError(
@@ -18804,6 +18866,7 @@ function handleReasoningBlock(interp2, reasoningBlock) {
 var fs3 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 init_ast();
+init_errors();
 
 // src/ast-helpers.ts
 init_ast();
@@ -27862,6 +27925,7 @@ function evalInstance(interp2, instance) {
 }
 
 // src/error-formatter.ts
+init_errors();
 function levenshtein2(a, b) {
   const m = a.length;
   const n = b.length;
@@ -27893,6 +27957,9 @@ function suggestSimilar(name, candidates) {
   }
   return best;
 }
+
+// src/eval-call-function.ts
+init_errors();
 
 // src/profiler.ts
 var Profiler = class {

@@ -122,8 +122,12 @@ export class RuntimeTypeChecker {
 
       const actual = inferType(argValues[i]);
       if (!isCompatible(actual, expected)) {
-        throw new TypeError(
-          `[strict] Type error in '${name}': argument ${i + 1} expected ${expected}, got ${actual} (value: ${JSON.stringify(argValues[i])})`
+        // M1 (2026-04-25): Phase A FLRuntimeError 통합 — ErrorCode + 컨텍스트
+        const { FLRuntimeError, ErrorCodes } = require("./errors");
+        throw new FLRuntimeError(
+          ErrorCodes.TYPE_MISMATCH,
+          `'${name}': arg ${i + 1} expected ${expected}, got ${actual}`,
+          { fn: name, arg: i, expected, got: actual, value: argValues[i] }
         );
       }
     }
@@ -140,8 +144,11 @@ export class RuntimeTypeChecker {
 
     const actual = inferType(retValue);
     if (!isCompatible(actual, sig.ret)) {
-      throw new TypeError(
-        `[strict] Return type error in '${name}': expected ${sig.ret}, got ${actual} (value: ${JSON.stringify(retValue)})`
+      const { FLRuntimeError, ErrorCodes } = require("./errors");
+      throw new FLRuntimeError(
+        ErrorCodes.TYPE_MISMATCH,
+        `'${name}' return: expected ${sig.ret}, got ${actual}`,
+        { fn: name, expected: sig.ret, got: actual, value: retValue }
       );
     }
   }
