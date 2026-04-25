@@ -1,0 +1,63 @@
+;; results.fl — GET /forms/:slug/results  +  GET /forms/:slug/csv
+
+(load "projects/dclub-forms/lib/config.fl")
+(load "projects/dclub-forms/lib/forms-store.fl")
+(load "projects/dclub-forms/lib/csv-export.fl")
+(load "projects/dclub-forms/lib/stats.fl")
+(load "projects/dclub-forms/app/auth.fl")
+
+[FUNC handle-results-json :params [$req]
+  :body (let [
+    cfg (dclub-forms-config)
+    db (get $cfg "db")
+    uid (forms-extract-uid $req)
+    slug (or (server_req_param $req "slug") "")
+    form (forms-find $db $slug)
+  ]
+    (cond
+      [(nil-or-empty? $uid) (server_status 401 {:error "unauthorized"})]
+      [(= $form nil) (server_status 404 {:error "form_not_found"})]
+      [(not (= (get $form "owner") $uid)) (server_status 403 {:error "not_owner"})]
+      [true (results-render-json $db $form)]))]
+
+[FUNC results-render-json :params [$db $form]
+  :body (let [
+    fid (get $form "id")
+    qs (questions-list $db $fid)
+    rs (responses-list $db $fid)
+  ]
+    (server_json {
+      :form {:slug (get $form "slug") :title (get $form "title")
+             :description (get $form "description")}
+      :n_questions (length $qs)
+      :n_responses (length $rs)
+      :stats (stats-summary $qs $rs)
+      :responses (map (fn [r] {:id (get $r "id")
+                                :respondent (get $r "respondent")
+                                :answers (json_parse (get $r "answers"))
+                                :submitted_at (get $r "submitted_at")})
+                  $rs)
+    }))]
+
+[FUNC handle-results-csv :params [$req]
+  :body (let [
+    cfg (dclub-forms-config)
+    db (get $cfg "db")
+    uid (forms-extract-uid $req)
+    slug (or (server_req_param $req "slug") "")
+    form (forms-find $db $slug)
+  ]
+    (cond
+      [(nil-or-empty? $uid) (server_status 401 {:error "unauthorized"})]
+      [(= $form nil) (server_status 404 {:error "form_not_found"})]
+      [(not (= (get $form "owner") $uid)) (server_status 403 {:error "not_owner"})]
+      [true (results-render-csv $db $form)]))]
+
+[FUNC results-render-csv :params [$db $form]
+  :body (let [
+    fid (get $form "id")
+    qs (questions-list $db $fid)
+    rs (responses-list $db $fid)
+    csv-text (csv-build $qs $rs)
+  ]
+    (server_text $csv-text))]

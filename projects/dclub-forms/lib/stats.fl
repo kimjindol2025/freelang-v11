@@ -1,0 +1,59 @@
+;; stats.fl — 폼 응답 통계
+
+;; 질문별 분포: choice/multichoice 는 옵션별 카운트, text/long 은 응답 수만
+[FUNC stats-question-dist :params [$question $responses]
+  :body (let [
+    qid (str (get $question "id"))
+    qtype (get $question "type")
+    answered (filter (fn [r]
+      (let [ans (json_parse (get $r "answers"))]
+        (not (nil-or-empty? (get $ans $qid)))))
+      $responses)
+    n-answered (length $answered)
+  ]
+    (cond
+      [(or (= $qtype "choice") (= $qtype "rating"))
+        (stats-choice-dist $qid $answered)]
+      [(= $qtype "multichoice")
+        (stats-multichoice-dist $qid $answered)]
+      [true {:type $qtype :answered $n-answered}]))]
+
+[FUNC stats-choice-dist :params [$qid $answered]
+  :body (let [
+    counts (reduce (fn [acc resp]
+      (let [
+        ans (json_parse (get $resp "answers"))
+        v (str (get $ans $qid))
+        cur (or (get $acc $v) 0)
+      ]
+        (assoc $acc $v (+ $cur 1))))
+      {}
+      $answered)
+  ]
+    {:type "choice" :counts $counts :answered (length $answered)})]
+
+[FUNC stats-multichoice-dist :params [$qid $answered]
+  :body (let [
+    counts (reduce (fn [acc resp]
+      (let [
+        ans (json_parse (get $resp "answers"))
+        vs (get $ans $qid)
+        vlist (if (string? $vs) [$vs] (or $vs []))
+      ]
+        (reduce (fn [a v]
+          (assoc $a (str $v) (+ (or (get $a (str $v)) 0) 1)))
+          $acc
+          $vlist)))
+      {}
+      $answered)
+  ]
+    {:type "multichoice" :counts $counts :answered (length $answered)})]
+
+[FUNC stats-summary :params [$questions $responses]
+  :body {
+    :total_responses (length $responses)
+    :per_question (map (fn [q]
+      {:question_id (get $q "id") :label (get $q "label")
+       :type (get $q "type") :stats (stats-question-dist $q $responses)})
+      $questions)
+  }]

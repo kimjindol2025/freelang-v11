@@ -1,0 +1,108 @@
+;; forms-store.fl — forms / questions / responses
+
+[FUNC forms-ensure-tables :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS forms (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug        TEXT NOT NULL UNIQUE,
+      owner       TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      description TEXT,
+      is_open     INTEGER NOT NULL DEFAULT 1,
+      anonymous   INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_forms_owner ON forms(owner)")
+
+    (db_create $db "CREATE TABLE IF NOT EXISTS questions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id     INTEGER NOT NULL,
+      position    INTEGER NOT NULL,
+      type        TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      required    INTEGER NOT NULL DEFAULT 0,
+      options     TEXT
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_q_form ON questions(form_id, position)")
+
+    (db_create $db "CREATE TABLE IF NOT EXISTS responses (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id     INTEGER NOT NULL,
+      respondent  TEXT,
+      answers     TEXT NOT NULL,
+      submitted_at TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_resp_form ON responses(form_id, submitted_at DESC)"))]
+
+[FUNC forms-create :params [$db $slug $owner $title $description $anonymous]
+  :body (do
+    (db_insert $db "forms" {
+      :slug $slug
+      :owner $owner
+      :title $title
+      :description (or $description "")
+      :is_open 1
+      :anonymous (if $anonymous 1 0)
+      :created_at (now_iso)
+    })
+    (let [
+      rows (db_query $db "SELECT id FROM forms WHERE slug=?" [$slug])
+    ]
+      (if (= (length $rows) 0) nil (get (get $rows 0) "id"))))]
+
+[FUNC forms-find :params [$db $slug]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, slug, owner, title, description, is_open, anonymous, created_at
+       FROM forms WHERE slug=?"
+      [$slug])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC forms-list-by-owner :params [$db $owner]
+  :body (db_query $db
+    "SELECT id, slug, title, is_open, created_at FROM forms WHERE owner=?
+     ORDER BY created_at DESC"
+    [$owner])]
+
+[FUNC questions-add :params [$db $form-id $position $type $label $required $options]
+  :body (db_insert $db "questions" {
+    :form_id $form-id
+    :position $position
+    :type $type
+    :label $label
+    :required (if $required 1 0)
+    :options (or $options "")
+  })]
+
+[FUNC questions-list :params [$db $form-id]
+  :body (db_query $db
+    "SELECT id, form_id, position, type, label, required, options
+     FROM questions WHERE form_id=? ORDER BY position ASC"
+    [$form-id])]
+
+[FUNC responses-add :params [$db $form-id $respondent $answers-map]
+  :body (do
+    (db_insert $db "responses" {
+      :form_id $form-id
+      :respondent (or $respondent "")
+      :answers (json_stringify $answers-map)
+      :submitted_at (now_iso)
+    })
+    true)]
+
+[FUNC responses-list :params [$db $form-id]
+  :body (db_query $db
+    "SELECT id, form_id, respondent, answers, submitted_at
+     FROM responses WHERE form_id=? ORDER BY submitted_at DESC"
+    [$form-id])]
+
+[FUNC responses-count :params [$db $form-id]
+  :body (let [
+    rows (db_query $db "SELECT COUNT(*) as n FROM responses WHERE form_id=?" [$form-id])
+  ]
+    (if (= (length $rows) 0) 0 (get (get $rows 0) "n")))]
+
+;; ── slug 자동 생성 ──────────────────────────
+[FUNC forms-generate-slug :params []
+  :body (substring (auth_sha256 (str (now_ms) "_" (now_unix))) 0 10)]

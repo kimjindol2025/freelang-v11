@@ -1,0 +1,190 @@
+;; respond.fl — GET /f/:slug  (다크 SSR 폼)  +  POST /f/:slug/submit
+
+(load "projects/dclub-forms/lib/config.fl")
+(load "projects/dclub-forms/lib/forms-store.fl")
+(load "projects/dclub-forms/app/auth.fl")
+
+[FUNC respond-css :params []
+  :body (str
+    "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;"
+    "max-width:640px;margin:30px auto;padding:24px;"
+    "background:#0f1419;color:#e6e6e6}"
+    "h1{font-size:22px;margin-bottom:8px}"
+    "p.desc{color:#888;margin-bottom:24px}"
+    ".q{background:#1a2028;border:1px solid #2a323c;border-radius:8px;padding:16px;margin:12px 0}"
+    ".q label.lbl{font-weight:600;display:block;margin-bottom:8px}"
+    ".q input[type=text],.q textarea{"
+    "width:100%;padding:10px;background:#0f1419;color:#e6e6e6;"
+    "border:1px solid #2a323c;border-radius:6px;font-size:14px;font-family:inherit}"
+    ".q textarea{min-height:90px}"
+    ".q label.opt{display:block;padding:6px 0;cursor:pointer}"
+    ".q .req{color:#f87}"
+    "button{background:#7fb96c;color:#0f1419;border:0;border-radius:6px;"
+    "padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;margin-top:16px}"
+    "button:hover{background:#9fd98a}"
+    ".closed{color:#f87;padding:24px;text-align:center}"
+    "@media(max-width:680px){body{padding:16px}}")]
+
+[FUNC respond-render-question :params [$q]
+  :body (let [
+    qid (get $q "id")
+    qtype (get $q "type")
+    label (get $q "label")
+    req-mark (if (= (get $q "required") 1) " <span class=req>*</span>" "")
+    name-attr (str "q_" $qid)
+    opts-str (get $q "options")
+    opts (cond
+      [(or (= $opts-str "") (= $opts-str nil)) []]
+      [true (json_parse $opts-str)])
+  ]
+    (cond
+      [(= $qtype "long")
+        (str "<div class=q><label class=lbl>" $label $req-mark "</label>"
+             "<textarea name='" $name-attr "'></textarea></div>")]
+      [(or (= $qtype "choice") (= $qtype "rating"))
+        (str "<div class=q><label class=lbl>" $label $req-mark "</label>"
+             (str_join ""
+               (map (fn [o]
+                 (str "<label class=opt><input type=radio name='" $name-attr
+                      "' value='" $o "'> " $o "</label>"))
+                 $opts))
+             "</div>")]
+      [(= $qtype "multichoice")
+        (str "<div class=q><label class=lbl>" $label $req-mark "</label>"
+             (str_join ""
+               (map (fn [o]
+                 (str "<label class=opt><input type=checkbox name='" $name-attr
+                      "' value='" $o "'> " $o "</label>"))
+                 $opts))
+             "</div>")]
+      [true
+        (str "<div class=q><label class=lbl>" $label $req-mark "</label>"
+             "<input type=text name='" $name-attr "'></div>")]))]
+
+[FUNC handle-respond-page :params [$req]
+  :body (let [
+    cfg (dclub-forms-config)
+    db (get $cfg "db")
+    slug (or (server_req_param $req "slug") "")
+    form (forms-find $db $slug)
+  ]
+    (cond
+      [(= $form nil) (server_status 404 {:error "form_not_found"})]
+      [(= (get $form "is_open") 0) (respond-render-closed $form)]
+      [true (respond-render-page $db $form $slug)]))]
+
+[FUNC respond-render-closed :params [$form]
+  :body (server_html (str
+    "<!DOCTYPE html><html lang=ko><head><meta charset=utf-8>"
+    "<meta name=viewport content='width=device-width,initial-scale=1'>"
+    "<title>" (get $form "title") "</title>"
+    "<style>" (respond-css) "</style></head><body>"
+    "<div class=closed>이 설문은 마감되었습니다.</div>"
+    "</body></html>"))]
+
+[FUNC respond-render-page :params [$db $form $slug]
+  :body (let [
+    qs (questions-list $db (get $form "id"))
+    q-html (str_join "" (map (fn [q] (respond-render-question $q)) $qs))
+    form-action (str "/f/" $slug "/submit")
+  ]
+    (server_html (str
+      "<!DOCTYPE html><html lang=ko><head><meta charset=utf-8>"
+      "<meta name=viewport content='width=device-width,initial-scale=1'>"
+      "<title>" (get $form "title") "</title>"
+      "<style>" (respond-css) "</style></head><body>"
+      "<h1>" (get $form "title") "</h1>"
+      "<p class=desc>" (get $form "description") "</p>"
+      "<form method='POST' action='" $form-action "' enctype='application/x-www-form-urlencoded'>"
+      $q-html
+      "<button type=submit>제출</button>"
+      "</form>"
+      "</body></html>")))]
+
+;; ── url-decode (login.fl 패턴) ────────────────
+[FUNC respond-url-decode :params [$s]
+  :body (let [
+    s1 (str_replace $s "+" " ")
+  ]
+    (str_decode_uri $s1))]
+
+;; "k1=v1&k2=v2" → {k1: v1, k2: v2}
+[FUNC respond-parse-form :params [$body]
+  :body (reduce (fn [acc pair]
+    (let [
+      eq (str_find $pair "=")
+      k (if (< $eq 0) $pair (substring $pair 0 $eq))
+      v (if (< $eq 0) "" (substring $pair (+ $eq 1) (length $pair)))
+      kd (respond-url-decode $k)
+      vd (respond-url-decode $v)
+      cur (get $acc $kd)
+    ]
+      (cond
+        [(= $cur nil) (assoc $acc $kd $vd)]
+        [(string? $cur) (assoc $acc $kd [$cur $vd])]
+        [true (assoc $acc $kd (concat $cur [$vd]))])))
+    {}
+    (str_split $body "&"))]
+
+;; ── POST /f/:slug/submit ──────────────────────
+[FUNC handle-respond-submit :params [$req]
+  :body (let [
+    cfg (dclub-forms-config)
+    db (get $cfg "db")
+    slug (or (server_req_param $req "slug") "")
+    form (forms-find $db $slug)
+  ]
+    (cond
+      [(= $form nil) (server_status 404 {:error "form_not_found"})]
+      [(= (get $form "is_open") 0) (server_status 410 {:error "form_closed"})]
+      [true (respond-submit-do $db $cfg $req $form)]))]
+
+[FUNC respond-submit-do :params [$db $cfg $req $form]
+  :body (let [
+    body-raw (server_req_body $req)
+    body-str (if (string? $body-raw) $body-raw "")
+    parsed (if (= $body-str "") {} (respond-parse-form $body-str))
+    qs (questions-list $db (get $form "id"))
+    salt (get $cfg "ip_salt")
+    xff (server_req_header $req "x-forwarded-for")
+    ip (cond
+      [(= $xff nil) "127.0.0.1"]
+      [true (let [c (str_find $xff ",")]
+        (if (< $c 0) $xff (substring $xff 0 $c)))])
+    ip-hash (substring (auth_sha256 (str $ip "|" $salt)) 0 16)
+    uid-attempt (forms-extract-uid $req)
+    respondent (if (nil-or-empty? $uid-attempt) (str "anon_" $ip-hash) $uid-attempt)
+    answers (respond-collect-answers $qs $parsed)
+    missing (filter (fn [q]
+      (and (= (get $q "required") 1)
+           (nil-or-empty? (get $answers (str (get $q "id"))))))
+      $qs)
+  ]
+    (cond
+      [(> (length $missing) 0)
+        (server_status 400 {:error "required_missing"
+                             :missing (map (fn [q] (get $q "label")) $missing)})]
+      [true (do
+        (responses-add $db (get $form "id") $respondent $answers)
+        (server_html (respond-thank-you $form)))]))]
+
+[FUNC respond-collect-answers :params [$qs $parsed]
+  :body (reduce (fn [acc q]
+    (let [
+      qid (get $q "id")
+      key (str "q_" $qid)
+      v (get $parsed $key)
+    ]
+      (assoc $acc (str $qid) (if (= $v nil) "" $v))))
+    {}
+    $qs)]
+
+[FUNC respond-thank-you :params [$form]
+  :body (str
+    "<!DOCTYPE html><html lang=ko><head><meta charset=utf-8>"
+    "<meta name=viewport content='width=device-width,initial-scale=1'>"
+    "<title>제출 완료</title>"
+    "<style>" (respond-css) "</style></head><body>"
+    "<h1>제출 완료 ✅</h1>"
+    "<p class=desc>" (get $form "title") " 응답이 기록되었습니다.</p>"
+    "</body></html>")]
