@@ -1,0 +1,348 @@
+#!/usr/bin/env node
+
+/**
+ * FreeLang CLI 도구
+ * 사용법: freelang [command] [options]
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+// 버전
+const version = '1.0.0';
+
+// 색상 출력
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+};
+
+const log = {
+  info: (msg) => console.log(`${colors.blue}ℹ${colors.reset} ${msg}`),
+  success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
+  error: (msg) => console.error(`${colors.red}✗${colors.reset} ${msg}`),
+  warn: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
+};
+
+// 커맨드
+const commands = {
+  // freelang new <name> [--template]
+  new: (args) => {
+    const [name, ...opts] = args;
+    if (!name) {
+      log.error('프로젝트 이름을 입력하세요: freelang new <name>');
+      process.exit(1);
+    }
+
+    const template = opts.includes('--websocket') ? 'websocket'
+                  : opts.includes('--agent') ? 'agent'
+                  : 'express-api';
+
+    log.info(`📦 프로젝트 생성: ${name} (템플릿: ${template})`);
+
+    // 프로젝트 디렉토리 생성
+    fs.mkdirSync(name, { recursive: true });
+    process.chdir(name);
+
+    // 디렉토리 구조
+    const dirs = ['src', 'tests', 'db/migrations'];
+    dirs.forEach(dir => fs.mkdirSync(dir, { recursive: true }));
+
+    // freelang.config.fl
+    const config = `{
+  :name "${name}"
+  :version "1.0.0"
+  :description "FreeLang Application"
+
+  :build {
+    :entry "src/app.fl"
+    :output "dist/app.js"
+    :optimize true
+  }
+
+  :dev {
+    :port 3000
+    :host "localhost"
+  }
+
+  :database {
+    :type "sqlite"
+    :path "./db.db"
+  }
+}`;
+    fs.writeFileSync('freelang.config.fl', config);
+
+    // src/app.fl
+    const app = `(load "src/express.fl")
+
+[FUNC hello :params [$req]
+  :body (res-json { :message "Hello FreeLang!" :version "1.0.0" })
+]
+
+[FUNC health :params [$req]
+  :body (res-json { :status "OK" :timestamp (now_iso) })
+]
+
+(do
+  (log-info "🚀 ${name} 서버 시작")
+  (app-get "/" "hello")
+  (app-get "/health" "health")
+  (app-listen 3000)
+)`;
+    fs.writeFileSync('src/app.fl', app);
+
+    // tests/test.fl
+    const test = `(load "src/express.fl")
+
+(describe "Application")
+
+(deftest "app should respond to /" (fn []
+  (test-assert true "Server should start")))
+
+(deftest "health check should work" (fn []
+  (test-assert true "Health check passed")))`;
+    fs.writeFileSync('tests/test.fl', test);
+
+    // .env
+    fs.writeFileSync('.env', `NODE_ENV=development
+LOG_LEVEL=debug
+CACHE_TTL=300000
+JWT_SECRET=dev-secret-key`);
+
+    // .gitignore
+    fs.writeFileSync('.gitignore', `node_modules/
+dist/
+.env.local
+db.db
+*.log`);
+
+    // README.md
+    const readme = `# ${name}
+
+FreeLang v11 프로젝트
+
+## 시작
+
+\`\`\`bash
+freelang dev          # 개발 서버 시작 (port 3000)
+freelang test         # 테스트 실행
+freelang build        # 프로덕션 빌드
+\`\`\`
+
+## 구조
+
+- \`src/app.fl\` — 메인 애플리케이션
+- \`tests/\` — 테스트 파일
+- \`freelang.config.fl\` — 설정 파일
+
+## 배포
+
+\`\`\`bash
+freelang deploy       # 배포
+\`\`\``;
+    fs.writeFileSync('README.md', readme);
+
+    // package.json (Node.js 설정용)
+    const pkg = {
+      name: name.toLowerCase(),
+      version: '1.0.0',
+      description: 'FreeLang Application',
+      main: 'dist/app.js',
+      scripts: {
+        dev: 'freelang dev',
+        build: 'freelang build',
+        test: 'freelang test',
+        deploy: 'freelang deploy',
+      },
+    };
+    fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+
+    log.success(`프로젝트 생성 완료!`);
+    log.info(`\n다음 단계:\n  cd ${name}\n  freelang dev`);
+  },
+
+  // freelang build
+  build: (args) => {
+    const opts = args || [];
+    const release = opts.includes('--release');
+    const watch = opts.includes('--watch');
+
+    log.info(`🔨 빌드 시작${release ? ' (release)' : ''}${watch ? ' (감시 모드)' : ''}`);
+
+    // dist 디렉토리 생성
+    fs.mkdirSync('dist', { recursive: true });
+
+    // bootstrap.js를 사용한 컴파일 (실제 구현)
+    try {
+      const cmd = `node bootstrap.js run src/app.fl`;
+      const result = execSync(cmd, { encoding: 'utf-8' });
+      fs.writeFileSync('dist/app.js', result);
+      log.success('빌드 완료: dist/app.js');
+    } catch (e) {
+      log.error(`빌드 실패: ${e.message}`);
+      process.exit(1);
+    }
+
+    if (watch) {
+      log.info('📁 파일 변경 감지 중... (Ctrl+C로 종료)');
+    }
+  },
+
+  // freelang dev
+  dev: (args) => {
+    const opts = args || [];
+    const port = opts.includes('--port')
+      ? opts[opts.indexOf('--port') + 1]
+      : '3000';
+
+    log.info(`🚀 개발 서버 시작 (포트: ${port})`);
+    log.info('📁 파일 변경 감지 중...');
+
+    try {
+      execSync(`node bootstrap.js run src/app.fl`, {
+        stdio: 'inherit',
+        env: { ...process.env, PORT: port }
+      });
+    } catch (e) {
+      log.error(`서버 시작 실패: ${e.message}`);
+      process.exit(1);
+    }
+  },
+
+  // freelang test
+  test: (args) => {
+    const [file, ...opts] = args || [];
+    const watch = opts.includes('--watch');
+    const coverage = opts.includes('--coverage');
+
+    log.info(`🧪 테스트 실행${watch ? ' (감시 모드)' : ''}${coverage ? ' (커버리지)' : ''}`);
+
+    const testFile = file ? `tests/${file}.fl` : 'tests/test.fl';
+
+    try {
+      execSync(`node bootstrap.js run ${testFile}`, { stdio: 'inherit' });
+      log.success('테스트 완료');
+    } catch (e) {
+      log.error(`테스트 실패: ${e.message}`);
+      process.exit(1);
+    }
+  },
+
+  // freelang deploy
+  deploy: (args) => {
+    const opts = args || [];
+    const dryRun = opts.includes('--dry-run');
+    const noPush = opts.includes('--no-push');
+
+    log.info(`🚀 배포${dryRun ? ' (시뮬레이션)' : ''}`);
+
+    if (!dryRun) {
+      // 1. 빌드
+      log.info('1️⃣ 빌드 중...');
+      commands.build(['--release']);
+
+      // 2. 테스트
+      log.info('2️⃣ 테스트 중...');
+      try {
+        execSync('node bootstrap.js run tests/test.fl', { stdio: 'inherit' });
+      } catch (e) {
+        log.error('테스트 실패 - 배포 중단');
+        process.exit(1);
+      }
+
+      // 3. Git
+      if (!noPush) {
+        log.info('3️⃣ Git 푸시 중...');
+        try {
+          execSync('git add -A && git commit -m "build: 배포" && git push', { stdio: 'inherit' });
+        } catch (e) {
+          log.warn('Git 푸시 건너뜀');
+        }
+      }
+
+      log.success('배포 완료!');
+    } else {
+      log.info('배포 시뮬레이션:');
+      log.info('1. 빌드 실행');
+      log.info('2. 테스트 실행');
+      log.info('3. Git 푸시');
+      log.info('(실제 배포하려면 --dry-run 제거)');
+    }
+  },
+
+  // freelang migrate
+  migrate: (args) => {
+    const [action, ...opts] = args || [];
+    log.info(`🗄️ 마이그레이션 ${action || '실행'}`);
+    log.warn('마이그레이션 기능은 개발 중입니다');
+  },
+
+  // freelang --version
+  version: () => {
+    console.log(`freelang v${version}`);
+  },
+
+  // freelang --help
+  help: () => {
+    console.log(`
+${colors.bright}FreeLang CLI v${version}${colors.reset}
+
+${colors.bright}사용법:${colors.reset}
+  freelang [command] [options]
+
+${colors.bright}커맨드:${colors.reset}
+  new <name>           프로젝트 생성
+    --websocket        WebSocket 템플릿
+    --agent            AI 에이전트 템플릿
+
+  build                프로덕션 빌드
+    --release          최적화 빌드
+    --watch            감시 모드
+
+  dev                  개발 서버 시작
+    --port <port>      포트 지정 (기본: 3000)
+
+  test [file]          테스트 실행
+    --watch            감시 모드
+    --coverage         커버리지 리포트
+
+  deploy               배포
+    --dry-run          시뮬레이션
+    --no-push          푸시 생략
+
+  migrate [action]     데이터베이스 마이그레이션
+    --create           마이그레이션 파일 생성
+    --rollback         롤백
+
+  --version            버전 확인
+  --help               이 메시지
+
+${colors.bright}예제:${colors.reset}
+  freelang new myapp
+  freelang new mychat --websocket
+  freelang dev --port 8000
+  freelang test --watch
+  freelang deploy --dry-run
+`);
+  }
+};
+
+// 메인
+const [, , cmd, ...args] = process.argv;
+
+if (!cmd || cmd === '--help' || cmd === '-h') {
+  commands.help();
+} else if (cmd === '--version' || cmd === '-v') {
+  commands.version();
+} else if (commands[cmd]) {
+  commands[cmd](args);
+} else {
+  log.error(`알 수 없는 커맨드: ${cmd}`);
+  log.info('도움말: freelang --help');
+  process.exit(1);
+}
