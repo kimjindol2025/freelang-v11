@@ -80,6 +80,7 @@ const providers = {
         "-p",
         "--no-session-persistence",
         "--append-system-prompt", systemPrompt,
+        "--",                  // separator: prompt가 -로 시작해도 옵션으로 해석 X
         userPrompt,
       ], {
         encoding: "utf-8",
@@ -108,12 +109,19 @@ function getProvider(name) {
 
 function extractFLCode(response) {
   if (!response) return null;
-  // 1) ```fl ... ``` 블록 (가장 명확)
-  const flMatch = response.match(/```(?:fl|freelang|lisp)?\s*\n([\s\S]*?)```/i);
-  if (flMatch) return flMatch[1].trim();
-  // 2) ``` ... ``` (언어 미지정)
-  const anyMatch = response.match(/```\s*\n([\s\S]*?)```/);
-  if (anyMatch) return anyMatch[1].trim();
+  // 1) ```fl ... ``` 블록 (가장 명확) — 모든 매칭 수집해서 가장 큰 것 선택
+  const flBlocks = [...response.matchAll(/```(?:fl|freelang|lisp|clojure|scheme)?\s*\n?([\s\S]*?)```/gi)];
+  if (flBlocks.length > 0) {
+    // 가장 긴 코드 블록 선택 (educational 응답에서 마지막 정답이 보통 가장 자세함)
+    const best = flBlocks.reduce((a, b) => (b[1].length > a[1].length ? b : a));
+    return best[1].trim();
+  }
+  // 2) ``` ... ``` (언어 미지정, 같은 전략)
+  const anyBlocks = [...response.matchAll(/```\s*\n?([\s\S]*?)```/g)];
+  if (anyBlocks.length > 0) {
+    const best = anyBlocks.reduce((a, b) => (b[1].length > a[1].length ? b : a));
+    return best[1].trim();
+  }
   // 3) 코드 블록 없으면 (...)로 시작하는 줄들 모음 — heuristic
   const lines = response.split("\n").filter(l => l.trim().startsWith("(") || l.trim().startsWith("[FUNC"));
   if (lines.length > 0) return lines.join("\n");

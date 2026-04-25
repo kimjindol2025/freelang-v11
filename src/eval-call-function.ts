@@ -311,10 +311,19 @@ export function callFunction(interp: InterpreterLike, fn: any, args: any[]): any
     return callAsyncFunctionValue(interp, fn, args);
   } else if (typeof fn === "function") {
     return fn(...args);
-  } else if (fn.params && fn.body) {
+  } else if (typeof fn === "string") {
+    // Phase 후속 (Claude 평가에서 발견): (reduce + 0 list) 같은 패턴 지원
+    // operator 또는 함수명을 sexpr로 변환 후 eval (args는 이미 평가된 값)
+    const wrappedArgs = args.map((v: any) => ({
+      kind: "literal",
+      value: v,
+      type: v === null ? "any" : (Array.isArray(v) ? "list" : typeof v),
+    }));
+    return interp.eval({ kind: "sexpr", op: fn, args: wrappedArgs } as any);
+  } else if (fn && fn.params && fn.body) {
     return callUserFunction(interp, fn.name || "anonymous", args);
   } else {
-    throw new Error(`Cannot call ${typeof fn}`);
+    throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
   }
 }
 

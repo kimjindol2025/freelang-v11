@@ -112,6 +112,43 @@ export function createDataModule() {
       return JSON.stringify(o, null, 2);
     },
 
+    // ── Hyphen alias (Phase 후속 — Claude 평가에서 발견된 자주 틀리는 함수명) ──
+    // AI가 Lisp 관례 따라 hyphen으로 작성하는 경우 호환
+    "json-parse": (str: string): any => { try { return JSON.parse(str); } catch (e: any) { throw new Error(`json-parse: invalid JSON: ${e.message}`); } },
+    "json-stringify": (obj: any): string => JSON.stringify(obj),
+    "json-str": (obj: any): string => JSON.stringify(obj),
+    "json-pretty": (obj: any): string => { const o = typeof obj === "string" ? JSON.parse(obj) : obj; return JSON.stringify(o, null, 2); },
+    "json-merge": (a: any, b: any): any => {
+      const x = typeof a === "string" ? JSON.parse(a) : a;
+      const y = typeof b === "string" ? JSON.parse(b) : b;
+      return { ...x, ...y };
+    },
+    "json-get": (obj: any, path: string): any => {
+      const parts = String(path).split(".");
+      let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
+      for (const p of parts) {
+        if (cur === null || cur === undefined) return null;
+        cur = Array.isArray(cur) ? cur[parseInt(p, 10)] : cur[p];
+      }
+      return cur ?? null;
+    },
+    "json-set": (obj: any, path: string, value: any): any => {
+      const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
+      const clone = JSON.parse(JSON.stringify(parsed));
+      const parts = String(path).split(".");
+      let cur = clone;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i];
+        if (cur[p] === undefined || cur[p] === null) cur[p] = {};
+        cur = cur[p];
+      }
+      cur[parts[parts.length - 1]] = value;
+      return clone;
+    },
+    "json-keys": (obj: any): string[] => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.keys(obj) : [],
+    "json-vals": (obj: any): any[] => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.values(obj) : [],
+    "json-values": (obj: any): any[] => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.values(obj) : [],
+
     // json_has obj key -> boolean (check if key exists)
     "json_has": (obj: any, key: string): boolean => {
       const o = typeof obj === "string" ? JSON.parse(obj) : obj;

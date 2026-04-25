@@ -13,6 +13,7 @@
 (load "projects/dclub-auth/lib/users-store.fl")
 (load "projects/dclub-auth/lib/jwks-store.fl")
 (load "projects/dclub-auth/lib/jwt-rs256.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
 (load "projects/dclub-auth/lib/config.fl")
 
 ;; ── 폼 디코드 (login.fl 와 동일 로직, 모듈화 대상) ──────
@@ -120,14 +121,16 @@
     access-token (jwt-rs256-sign $access-claims $priv $kid $id-life)
     refresh-token (refresh-issue $db $client-id $user_id $scope $refresh-life)
   ]
-    (server_json {
-      :access_token $access-token
-      :token_type "Bearer"
-      :expires_in $id-life
-      :refresh_token $refresh-token
-      :id_token $id-token
-      :scope $scope
-    }))]
+    (do
+      (audit-log $db "token.issue" $user_id $client-id nil {:scope $scope :grant "code"})
+      (server_json {
+        :access_token $access-token
+        :token_type "Bearer"
+        :expires_in $id-life
+        :refresh_token $refresh-token
+        :id_token $id-token
+        :scope $scope
+      })))]
 
 ;; ── 토큰 발급 (refresh grant 용 — id_token 미포함) ────
 [FUNC issue-refresh-set :params [$db $cfg $rotated $client-id]
@@ -143,13 +146,15 @@
     access-claims {"iss" $iss "sub" $user_id "aud" $client-id "scope" $scope}
     access-token (jwt-rs256-sign $access-claims $priv $kid $id-life)
   ]
-    (server_json {
-      :access_token $access-token
-      :token_type "Bearer"
-      :expires_in $id-life
-      :refresh_token $new-rt
-      :scope $scope
-    }))]
+    (do
+      (audit-log $db "token.refresh" $user_id $client-id nil {:scope $scope})
+      (server_json {
+        :access_token $access-token
+        :token_type "Bearer"
+        :expires_in $id-life
+        :refresh_token $new-rt
+        :scope $scope
+      })))]
 
 ;; ── 메인 핸들러 ────────────────────────────────────────
 [FUNC handle-token :params [$req]

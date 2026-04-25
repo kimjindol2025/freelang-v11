@@ -9,6 +9,7 @@ export const generateKeyPairSync: any = rsaUnsupported;
 export const createSign: any = rsaUnsupported;
 export const createVerify: any = rsaUnsupported;
 export const createPublicKey: any = rsaUnsupported;
+export const scryptSync: any = () => { throw new Error("scryptSync unavailable in browser stub"); };
 export type KeyObject = any;
 export default { randomUUID, randomBytes, createHash, createHmac, timingSafeEqual,
-  generateKeyPairSync, createSign, createVerify, createPublicKey };
+  generateKeyPairSync, createSign, createVerify, createPublicKey, scryptSync };
