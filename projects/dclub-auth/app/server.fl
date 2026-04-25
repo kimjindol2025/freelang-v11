@@ -28,6 +28,7 @@
 (load "projects/dclub-auth/app/mfa.fl")
 (load "projects/dclub-auth/app/signup.fl")
 (load "projects/dclub-auth/app/password-reset.fl")
+(load "projects/dclub-auth/app/health.fl")
 
 ;; ── 부팅: 스키마 + 시드 ─────────────────────────────
 (define cfg (dclub-auth-config))
@@ -69,6 +70,7 @@
 (server_post "/forgot" "handle-forgot")
 (server_get "/reset" "handle-reset-form")
 (server_post "/reset" "handle-reset")
+(server_get "/health" "handle-health")
 
 ;; ── 시작 ──────────────────────────────────────────
 (server_start (get $cfg "port"))

@@ -1,0 +1,38 @@
+;; health.fl — GET /health (운영 모니터링)
+;;
+;; systemd watchdog · LB health check · uptime monitor 호환.
+;; 응답:
+;;   200 {status:"ok",  ...} — 정상
+;;   503 {status:"err", ...} — DB 또는 키 없음
+
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+[FUNC handle-health :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+  ]
+    (let [
+      tables-rows (db_query $db
+        "SELECT name FROM sqlite_master WHERE type='table'" [])
+      tables-count (length $tables-rows)
+      active (jwks-active $db)
+      key-ok (not (= $active nil))
+      now-ms (now_ms)
+    ]
+      (if (and (> $tables-count 5) $key-ok)
+        (server_json {
+          :status "ok"
+          :version "1.0.0"
+          :issuer (get $cfg "issuer")
+          :db_tables $tables-count
+          :active_kid (get $active "kid")
+          :ts $now-ms
+        })
+        (server_status 503 {
+          :status "err"
+          :db_tables $tables-count
+          :key_ok $key-ok
+          :ts $now-ms
+        }))))]
