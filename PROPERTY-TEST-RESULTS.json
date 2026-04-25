@@ -1,0 +1,172 @@
+{
+  "timestamp": "2026-04-25T17:03:24.777Z",
+  "seed": 12345,
+  "n_per_invariant": 10,
+  "total_invariants": 20,
+  "total_cases": 200,
+  "total_pass": 200,
+  "score": 100,
+  "elapsed_seconds": 62,
+  "results": [
+    {
+      "id": "I001",
+      "name": "(+ 0 x) === x",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I002",
+      "name": "(* 1 x) === x",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I003",
+      "name": "(- x x) === 0",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I004",
+      "name": "(* 0 x) === 0",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I005",
+      "name": "(+ a b) === (+ b a) (commutative)",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I006",
+      "name": "(* a b) === (* b a) (commutative)",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I007",
+      "name": "(= x x) → true",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I008",
+      "name": "(< x x) → false",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I009",
+      "name": "(length (list a b c)) === 3",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I010",
+      "name": "(reverse (reverse xs)) === xs",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I011",
+      "name": "(first (list x y z)) === x",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I012",
+      "name": "(length (str x)) > 0 for non-empty x",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I013",
+      "name": "같은 식 두 번 → 같은 결과",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I014",
+      "name": "(if nil x y) → y (P0-1)",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I015",
+      "name": "(= nil null) → true",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I016",
+      "name": "(or nil x) → x (P0-1 부수)",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I017",
+      "name": "(if (= nil x) d x) — nil 분기",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I018",
+      "name": "(reduce (fn [a b] (+ a b)) 0 (list)) === 0",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I019",
+      "name": "(reduce (fn [a b] (+ a b)) 0 (list a)) === a",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    },
+    {
+      "id": "I020",
+      "name": "let-bound identity x === x",
+      "pass": 10,
+      "fail": 0,
+      "total": 10,
+      "counterExample": null
+    }
+  ]
+}
