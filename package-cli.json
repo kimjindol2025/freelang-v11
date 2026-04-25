@@ -1,0 +1,38 @@
+{
+  "name": "freelang-cli",
+  "version": "1.0.0",
+  "description": "FreeLang v11 프로젝트 관리 CLI 도구",
+  "keywords": [
+    "freelang",
+    "cli",
+    "framework",
+    "dsl",
+    "ai",
+    "web"
+  ],
+  "author": "Kim Jin-Dol <bigwash2025a@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://gogs.dclub.kr/kim/freelang-v11.git"
+  },
+  "bin": {
+    "freelang": "./bin/freelang"
+  },
+  "main": "bin/freelang",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "scripts": {
+    "test": "node bin/freelang test",
+    "dev": "node bin/freelang dev",
+    "build": "node bin/freelang build",
+    "deploy": "node bin/freelang deploy"
+  },
+  "preferGlobal": true,
+  "files": [
+    "bin",
+    "src",
+    "templates"
+  ]
+}
