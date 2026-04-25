@@ -17181,8 +17181,101 @@ function isVMEligible(node) {
   }
 }
 
+// src/errors.ts
+var ModuleError = class _ModuleError extends Error {
+  constructor(message, moduleName, file, line, col, hint) {
+    super(message);
+    this.moduleName = moduleName;
+    this.file = file;
+    this.line = line;
+    this.col = col;
+    this.hint = hint;
+    this.name = "ModuleError";
+    Object.setPrototypeOf(this, _ModuleError.prototype);
+  }
+};
+var ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
+  constructor(moduleName, source, file, line, col, hint) {
+    const sourceStr = source ? ` (from ${source})` : "";
+    super(`Module not found: ${moduleName}${sourceStr}`, moduleName, file, line, col, hint);
+    this.name = "ModuleNotFoundError";
+    Object.setPrototypeOf(this, _ModuleNotFoundError.prototype);
+  }
+};
+var FunctionNotFoundError = class _FunctionNotFoundError extends Error {
+  constructor(functionName, file, line, col, hint) {
+    const hintStr = hint ? ` ${hint}` : "";
+    super(`Function not found: ${functionName}${hintStr}`);
+    this.functionName = functionName;
+    this.file = file;
+    this.line = line;
+    this.col = col;
+    this.hint = hint;
+    this.name = "FunctionNotFoundError";
+    Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
+  }
+};
+var ErrorCodes = {
+  TYPE_NIL: "E_TYPE_NIL",
+  TYPE_MISMATCH: "E_TYPE_MISMATCH",
+  ARG_COUNT: "E_ARG_COUNT",
+  STACK_OVERFLOW: "E_STACK_OVERFLOW",
+  FN_NOT_FOUND: "E_FN_NOT_FOUND",
+  DIV_BY_ZERO: "E_DIV_BY_ZERO",
+  INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
+  INVALID_FORM: "E_INVALID_FORM",
+  RUNTIME: "E_RUNTIME"
+};
+var RECOVERY_HINTS = {
+  E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+  E_TYPE_MISMATCH: "\uAE30\uB300 \uD0C0\uC785\uACFC \uB2E4\uB985\uB2C8\uB2E4. (string? x) (number? x) \uB4F1\uC73C\uB85C \uC0AC\uC804 \uAC80\uC99D\uD558\uAC70\uB098 \uBCC0\uD658 \uD568\uC218\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.",
+  E_ARG_COUNT: "\uC778\uC790 \uAC2F\uC218\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
+  E_STACK_OVERFLOW: "\uC7AC\uADC0 \uAE4A\uC774 \uCD08\uACFC. \uC885\uB8CC \uC870\uAC74\uC774 \uC788\uB294\uC9C0, \uB610\uB294 loop/recur \uB610\uB294 reduce\uB85C \uBCC0\uD658 \uAC00\uB2A5\uD55C\uC9C0 \uD655\uC778\uD558\uC138\uC694.",
+  E_FN_NOT_FOUND: "\uD568\uC218\uAC00 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uBAA8\uB4C8 import \uB610\uB294 \uC624\uD0C0\uB97C \uD655\uC778\uD558\uC138\uC694.",
+  E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
+  E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+  E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
+  E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
+};
+var FLRuntimeError = class _FLRuntimeError extends ModuleError {
+  constructor(code, message, context = {}, file, line, col, hint) {
+    super(`[${code}] ${message}`, "runtime", file, line, col, hint ?? RECOVERY_HINTS[code]);
+    this.code = code;
+    this.context = context;
+    this.name = "FLRuntimeError";
+    Object.setPrototypeOf(this, _FLRuntimeError.prototype);
+  }
+};
+
 // src/eval-special-forms.ts
 var _vmCompiler = new BytecodeCompiler();
+function throwArgCount(fn, expected, got, line) {
+  throw new FLRuntimeError(
+    ErrorCodes.ARG_COUNT,
+    `${fn}: expects ${expected} args, got ${got}`,
+    { fn, expected, got: String(got) },
+    void 0,
+    line
+  );
+}
+function throwInvalidForm(fn, msg, line) {
+  throw new FLRuntimeError(
+    ErrorCodes.INVALID_FORM,
+    `${fn}: ${msg}`,
+    { fn },
+    void 0,
+    line
+  );
+}
+function throwFnNotFound(fnName, line) {
+  throw new FLRuntimeError(
+    ErrorCodes.FN_NOT_FOUND,
+    `Function not found: ${fnName}`,
+    { fn: fnName },
+    void 0,
+    line
+  );
+}
 function evalSpecialForm(interp2, op, expr) {
   const ev = (node) => interp2.eval(node);
   const callUser = (name, a) => interp2.callUserFunction(name, a);
@@ -17191,7 +17284,7 @@ function evalSpecialForm(interp2, op, expr) {
   const callFn = (fn, a) => interp2.callFunction(fn, a);
   const ctx = interp2.context;
   if (op === "fn") {
-    if (expr.args.length < 2) throw new Error(`fn requires at least 2 arguments (params and body)`);
+    if (expr.args.length < 2) throwArgCount("fn", ">=2", expr.args.length, expr.line);
     const paramsNode = expr.args[0];
     const params = [];
     if (paramsNode.kind === "block" && paramsNode.type === "Array") {
@@ -17218,12 +17311,12 @@ function evalSpecialForm(interp2, op, expr) {
     };
   }
   if (op === "defn") {
-    if (expr.args.length < 3) throw new Error(`defn requires name, params, and body`);
+    if (expr.args.length < 3) throwArgCount("defn", ">=3", expr.args.length, expr.line);
     const nameNode = expr.args[0];
     let name;
     if (nameNode.kind === "variable") name = nameNode.name;
     else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value;
-    else throw new Error(`defn: first argument must be a symbol (function name)`);
+    else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr.line);
     const paramsNode = expr.args[1];
     const bodyArgs = expr.args.slice(2);
     const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
@@ -17275,7 +17368,7 @@ function evalSpecialForm(interp2, op, expr) {
     };
   }
   if (op === "set!") {
-    if (expr.args.length < 2) throw new Error(`set! requires a name and a value`);
+    if (expr.args.length < 2) throwArgCount("set!", ">=2", expr.args.length, expr.line);
     const nameNode = expr.args[0];
     if (nameNode.kind === "sexpr" && nameNode.op === "get") {
       const getArgs = nameNode.args;
@@ -17294,14 +17387,14 @@ function evalSpecialForm(interp2, op, expr) {
     } else if (nameNode.kind === "literal") {
       name = "$" + nameNode.value;
     } else {
-      throw new Error(`set!: first argument must be a symbol`);
+      throwInvalidForm("set!", "first argument must be a symbol", expr.line);
     }
     const value = ev(expr.args[1]);
     if (!ctx.variables.mutate(name, value)) ctx.variables.set(name, value);
     return value;
   }
   if (op === "define") {
-    if (expr.args.length < 2) throw new Error(`define requires a name and a value`);
+    if (expr.args.length < 2) throwArgCount("define", ">=2", expr.args.length, expr.line);
     const nameNode = expr.args[0];
     let name;
     if (nameNode.kind === "literal") {
@@ -17309,7 +17402,7 @@ function evalSpecialForm(interp2, op, expr) {
     } else if (nameNode.kind === "variable") {
       name = nameNode.name;
     } else {
-      throw new Error(`define: first argument must be a symbol or string`);
+      throwInvalidForm("define", "first argument must be a symbol or string", expr.line);
     }
     if (expr.args.length >= 3) {
       const paramsNode = expr.args[1];
@@ -17343,10 +17436,10 @@ function evalSpecialForm(interp2, op, expr) {
     }
   }
   if (op === "func-ref") {
-    if (expr.args.length < 1) throw new Error(`func-ref requires function name`);
+    if (expr.args.length < 1) throwArgCount("func-ref", ">=1", expr.args.length, expr.line);
     const funcName = expr.args[0].name || String(expr.args[0]);
     const func = ctx.functions.get(funcName);
-    if (!func) throw new Error(`Function not found: ${funcName}`);
+    if (!func) throwFnNotFound(funcName, expr.line);
     return {
       kind: "function-value",
       params: func.params,
@@ -17356,7 +17449,7 @@ function evalSpecialForm(interp2, op, expr) {
     };
   }
   if (op === "call") {
-    if (expr.args.length < 1) throw new Error(`call requires function as first argument`);
+    if (expr.args.length < 1) throwArgCount("call", ">=1", expr.args.length, expr.line);
     const fn = ev(expr.args[0]);
     const evaluatedArgs = expr.args.slice(1).map((a) => ev(a));
     if (fn.kind === "builtin-function") return fn.fn(evaluatedArgs);
@@ -17503,12 +17596,12 @@ function evalSpecialForm(interp2, op, expr) {
     return evalLet(interp2, expr.args);
   }
   if (op === "set") {
-    if (expr.args.length !== 2) throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
+    if (expr.args.length !== 2) throwArgCount("set", "exactly 2", expr.args.length, expr.line);
     const varNode = expr.args[0];
     let varName;
     if (varNode.kind === "variable") varName = varNode.name;
     else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + varNode.value;
-    else throw new Error(`set: first argument must be a variable`);
+    else throwInvalidForm("set", "first argument must be a variable", expr.line);
     const newValue = ev(expr.args[1]);
     if (!ctx.variables.mutate(varName, newValue)) throw new Error(`set: variable ${varName} not found in scope`);
     return newValue;
@@ -18313,41 +18406,6 @@ function handleReasoningBlock(interp2, reasoningBlock) {
 var fs3 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 init_ast();
-
-// src/errors.ts
-var ModuleError = class _ModuleError extends Error {
-  constructor(message, moduleName, file, line, col, hint) {
-    super(message);
-    this.moduleName = moduleName;
-    this.file = file;
-    this.line = line;
-    this.col = col;
-    this.hint = hint;
-    this.name = "ModuleError";
-    Object.setPrototypeOf(this, _ModuleError.prototype);
-  }
-};
-var ModuleNotFoundError = class _ModuleNotFoundError extends ModuleError {
-  constructor(moduleName, source, file, line, col, hint) {
-    const sourceStr = source ? ` (from ${source})` : "";
-    super(`Module not found: ${moduleName}${sourceStr}`, moduleName, file, line, col, hint);
-    this.name = "ModuleNotFoundError";
-    Object.setPrototypeOf(this, _ModuleNotFoundError.prototype);
-  }
-};
-var FunctionNotFoundError = class _FunctionNotFoundError extends Error {
-  constructor(functionName, file, line, col, hint) {
-    const hintStr = hint ? ` ${hint}` : "";
-    super(`Function not found: ${functionName}${hintStr}`);
-    this.functionName = functionName;
-    this.file = file;
-    this.line = line;
-    this.col = col;
-    this.hint = hint;
-    this.name = "FunctionNotFoundError";
-    Object.setPrototypeOf(this, _FunctionNotFoundError.prototype);
-  }
-};
 
 // src/ast-helpers.ts
 init_ast();

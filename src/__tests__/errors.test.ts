@@ -105,3 +105,43 @@ describe("에러 — set! 미정의 변수", () => {
     expect(() => run("(set! z 99)")).not.toThrow();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Phase A (2026-04-25): FLRuntimeError 통일 + ErrorCode + 컨텍스트
+// ─────────────────────────────────────────────────────────────
+describe("Phase A — FLRuntimeError + ErrorCode", () => {
+  test("E_ARG_COUNT: fn 인자 부족 시 에러 코드 + 컨텍스트", () => {
+    const err: any = runExpectError("(fn)");
+    expect(err.message).toContain("E_ARG_COUNT");
+    expect(err.message).toContain("fn");
+    expect(err.code).toBe("E_ARG_COUNT");
+    expect(err.context?.fn).toBe("fn");
+  });
+
+  test("E_ARG_COUNT: defn 인자 부족 시 코드 표시", () => {
+    const err: any = runExpectError("(defn foo)");
+    expect(err.message).toContain("E_ARG_COUNT");
+    expect(err.code).toBe("E_ARG_COUNT");
+    expect(err.context?.fn).toBe("defn");
+  });
+
+  test("E_INVALID_FORM: defn 첫 인자가 symbol 아님", () => {
+    const err: any = runExpectError("(defn 42 [] 1)");
+    expect(err.message).toContain("E_INVALID_FORM");
+    expect(err.code).toBe("E_INVALID_FORM");
+    expect(err.context?.fn).toBe("defn");
+  });
+
+  test("E_FN_NOT_FOUND: func-ref가 미정의 함수 참조", () => {
+    const err: any = runExpectError("(func-ref totally-undefined-fn)");
+    expect(err.message).toContain("E_FN_NOT_FOUND");
+    expect(err.code).toBe("E_FN_NOT_FOUND");
+  });
+
+  test("FLRuntimeError는 hint 자동 표시 (RECOVERY_HINTS 사용)", () => {
+    const err: any = runExpectError("(set 42 99)");
+    // set은 첫 인자가 variable이어야 함 → INVALID_FORM
+    expect(err.message).toContain("E_INVALID_FORM");
+    expect(err.hint).toBeTruthy();
+  });
+});

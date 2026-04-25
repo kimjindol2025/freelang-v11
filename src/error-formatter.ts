@@ -1,5 +1,8 @@
 // FreeLang v9: Error Formatter
 // Phase 59: 위치 정보 + 소스 강조 + 유사 함수 힌트
+// Phase A (2026-04-25): ErrorCode + context + 자동 복구 힌트
+
+import { RECOVERY_HINTS } from "./errors";
 
 export interface FreeLangError {
   message: string;
@@ -8,6 +11,8 @@ export interface FreeLangError {
   col?: number;
   source?: string;   // 전체 소스 코드 (줄 강조용)
   hint?: string;     // 수정 제안
+  code?: string;     // Phase A: ErrorCode (예: "E_TYPE_NIL")
+  context?: Record<string, any>;  // Phase A: throw 시점 컨텍스트
 }
 
 /**
@@ -104,9 +109,25 @@ export function formatError(err: FreeLangError): string {
   // 3) 에러 메시지
   lines.push(`오류: ${err.message}`);
 
-  // 4) 힌트
+  // 3.5) Phase A: 컨텍스트 (fn, arg, expected, got 등)
+  if (err.context && Object.keys(err.context).length > 0) {
+    const ctxParts: string[] = [];
+    if (err.context.fn) ctxParts.push(`fn=${err.context.fn}`);
+    if (err.context.arg != null) ctxParts.push(`arg=${err.context.arg}`);
+    if (err.context.expected) ctxParts.push(`expected=${err.context.expected}`);
+    if (err.context.got) ctxParts.push(`got=${err.context.got}`);
+    if (err.context.varName) ctxParts.push(`var=${err.context.varName}`);
+    if (ctxParts.length > 0) {
+      lines.push(`컨텍스트: ${ctxParts.join("  ")}`);
+    }
+  }
+
+  // 4) 힌트 — 명시적 hint 우선, 없으면 ErrorCode 기반 자동 복구 힌트
+  const autoHint = err.code && !err.hint ? RECOVERY_HINTS[err.code] : null;
   if (err.hint) {
     lines.push(`힌트: ${err.hint}`);
+  } else if (autoHint) {
+    lines.push(`힌트: ${autoHint}`);
   }
 
   return lines.join("\n");

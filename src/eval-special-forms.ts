@@ -15,8 +15,37 @@ import { StructRegistry } from "./struct-system"; // Phase 66
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
 import { registerVMFunction } from "./vm-eligible"; // Phase 3-E: VM 함수 등록
+import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase A: 통일 에러
 
 const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
+
+// ── Phase A: 통일 에러 helper ────────────────────────────────────
+function throwArgCount(fn: string, expected: string, got: number, line?: number): never {
+  throw new FLRuntimeError(
+    ErrorCodes.ARG_COUNT,
+    `${fn}: expects ${expected} args, got ${got}`,
+    { fn, expected, got: String(got) },
+    undefined, line
+  );
+}
+
+function throwInvalidForm(fn: string, msg: string, line?: number): never {
+  throw new FLRuntimeError(
+    ErrorCodes.INVALID_FORM,
+    `${fn}: ${msg}`,
+    { fn },
+    undefined, line
+  );
+}
+
+function throwFnNotFound(fnName: string, line?: number): never {
+  throw new FLRuntimeError(
+    ErrorCodes.FN_NOT_FOUND,
+    `Function not found: ${fnName}`,
+    { fn: fnName },
+    undefined, line
+  );
+}
 
 export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): any {
   const ev = (node: any) => (interp as any).eval(node);
@@ -28,7 +57,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── fn ───────────────────────────────────────────────────────────
   if (op === "fn") {
-    if (expr.args.length < 2) throw new Error(`fn requires at least 2 arguments (params and body)`);
+    if (expr.args.length < 2) throwArgCount("fn", ">=2", expr.args.length, expr.line);
     const paramsNode = expr.args[0];
     const params: string[] = [];
     if ((paramsNode as any).kind === "block" && (paramsNode as any).type === "Array") {
@@ -61,12 +90,12 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // ── defn (v11.1: Clojure 스타일 sugar) ───────────────────────────
   // (defn name [params...] body) → (define name (fn [params...] body))
   if (op === "defn") {
-    if (expr.args.length < 3) throw new Error(`defn requires name, params, and body`);
+    if (expr.args.length < 3) throwArgCount("defn", ">=3", expr.args.length, expr.line);
     const nameNode = expr.args[0] as any;
     let name: string;
     if (nameNode.kind === "variable") name = nameNode.name;
     else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value as string;
-    else throw new Error(`defn: first argument must be a symbol (function name)`);
+    else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr.line);
 
     const paramsNode = expr.args[1];
     const bodyArgs = expr.args.slice(2);
@@ -134,7 +163,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── set! ──────────────────────────────────────────────────────────
   if (op === "set!") {
-    if (expr.args.length < 2) throw new Error(`set! requires a name and a value`);
+    if (expr.args.length < 2) throwArgCount("set!", ">=2", expr.args.length, expr.line);
     const nameNode = expr.args[0];
 
     // (set! (get $obj "key") value) — map/array 프로퍼티 뮤테이션
@@ -156,7 +185,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     } else if ((nameNode as any).kind === "literal") {
       name = "$" + (nameNode as any).value;
     } else {
-      throw new Error(`set!: first argument must be a symbol`);
+      throwInvalidForm("set!", "first argument must be a symbol", expr.line);
     }
     const value = ev(expr.args[1]);
     if (!ctx.variables.mutate(name, value)) ctx.variables.set(name, value);
@@ -165,7 +194,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── define ────────────────────────────────────────────────────────
   if (op === "define") {
-    if (expr.args.length < 2) throw new Error(`define requires a name and a value`);
+    if (expr.args.length < 2) throwArgCount("define", ">=2", expr.args.length, expr.line);
     const nameNode = expr.args[0];
     let name: string;
     if ((nameNode as any).kind === "literal") {
@@ -173,7 +202,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     } else if ((nameNode as any).kind === "variable") {
       name = (nameNode as Variable).name;
     } else {
-      throw new Error(`define: first argument must be a symbol or string`);
+      throwInvalidForm("define", "first argument must be a symbol or string", expr.line);
     }
 
     // 3-arg form: (define name [params] body) → define function
@@ -218,10 +247,10 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── func-ref ──────────────────────────────────────────────────────
   if (op === "func-ref") {
-    if (expr.args.length < 1) throw new Error(`func-ref requires function name`);
+    if (expr.args.length < 1) throwArgCount("func-ref", ">=1", expr.args.length, expr.line);
     const funcName = (expr.args[0] as any).name || String(expr.args[0]);
     const func = ctx.functions.get(funcName);
-    if (!func) throw new Error(`Function not found: ${funcName}`);
+    if (!func) throwFnNotFound(funcName, expr.line);
     return {
       kind: "function-value",
       params: func.params,
@@ -233,7 +262,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── call ──────────────────────────────────────────────────────────
   if (op === "call") {
-    if (expr.args.length < 1) throw new Error(`call requires function as first argument`);
+    if (expr.args.length < 1) throwArgCount("call", ">=1", expr.args.length, expr.line);
     const fn = ev(expr.args[0]);
     const evaluatedArgs = expr.args.slice(1).map((a) => ev(a));
     if ((fn as any).kind === "builtin-function") return (fn as any).fn(evaluatedArgs);
@@ -403,12 +432,12 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── set ───────────────────────────────────────────────────────────
   if (op === "set") {
-    if (expr.args.length !== 2) throw new Error(`set requires exactly 2 arguments: (set $var new-value)`);
+    if (expr.args.length !== 2) throwArgCount("set", "exactly 2", expr.args.length, expr.line);
     const varNode = expr.args[0] as any;
     let varName: string;
     if (varNode.kind === "variable") varName = varNode.name;
     else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + varNode.value;
-    else throw new Error(`set: first argument must be a variable`);
+    else throwInvalidForm("set", "first argument must be a variable", expr.line);
     const newValue = ev(expr.args[1]);
     if (!ctx.variables.mutate(varName, newValue)) throw new Error(`set: variable ${varName} not found in scope`);
     return newValue;
