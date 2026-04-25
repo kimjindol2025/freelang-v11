@@ -142,6 +142,36 @@ node bootstrap.js run hello.fl
 ;; → ["hello" "world"]
 ```
 
+### T11. defstruct (타입이 있는 레코드)
+
+```fl
+;; 단순 형태 (모든 field type=any)
+(defstruct Point [x y])
+(let [[p (Point 3 4)]] (println (get p :x)))   ;; → 3
+
+;; 명시적 타입 형태
+(defstruct User [:name :string :age :int])
+(let [[u (User "Alice" 25)]] (println (get u :name)))   ;; → "Alice"
+
+;; 자동 술어 (Point? v) → true/false
+(println (Point? p))   ;; → true
+```
+
+### T12. match (패턴 매칭)
+
+```fl
+;; (match value (pattern body) ... (default body))
+(defn classify [n]
+  (match n
+    (0 "zero")
+    (1 "one")
+    (2 "two")
+    (default "many")))
+
+(println (classify 2))   ;; → "two"
+(println (classify 99))  ;; → "many"
+```
+
 ---
 
 ## 3. 자주 틀리는 10가지 (반드시 체크)

@@ -17927,12 +17927,30 @@ function evalSpecialForm(interp2, op, expr) {
     if (fieldsNode.kind === "block" && fieldsNode.type === "Array") {
       const items = fieldsNode.fields.get("items");
       if (Array.isArray(items)) {
-        for (let i = 0; i < items.length; i += 2) {
-          const nameItem = items[i];
-          const typeItem = items[i + 1];
-          const fieldName = nameItem.kind === "keyword" ? nameItem.name : nameItem.kind === "variable" ? nameItem.name : nameItem.kind === "literal" ? String(nameItem.value) : "";
-          const fieldType = typeItem === void 0 ? "any" : typeItem.kind === "keyword" ? typeItem.name : typeItem.kind === "variable" ? typeItem.name : typeItem.kind === "literal" ? String(typeItem.value) : "any";
-          if (fieldName) fields.push({ name: fieldName, type: fieldType });
+        const isSimpleForm = (() => {
+          if (items.length % 2 !== 0) return true;
+          const TYPE_KW = /* @__PURE__ */ new Set(["int", "float", "number", "string", "bool", "boolean", "any", "list", "array", "map", "fn", "function"]);
+          for (let i = 1; i < items.length; i += 2) {
+            const it = items[i];
+            const v = it?.kind === "keyword" ? it.name : it?.kind === "variable" ? it.name : it?.value;
+            if (TYPE_KW.has(String(v))) return false;
+          }
+          return true;
+        })();
+        if (isSimpleForm) {
+          for (const item of items) {
+            const it = item;
+            const fieldName = it.kind === "keyword" ? it.name : it.kind === "variable" ? it.name : it.kind === "literal" ? String(it.value) : "";
+            if (fieldName) fields.push({ name: fieldName, type: "any" });
+          }
+        } else {
+          for (let i = 0; i < items.length; i += 2) {
+            const nameItem = items[i];
+            const typeItem = items[i + 1];
+            const fieldName = nameItem.kind === "keyword" ? nameItem.name : nameItem.kind === "variable" ? nameItem.name : nameItem.kind === "literal" ? String(nameItem.value) : "";
+            const fieldType = typeItem === void 0 ? "any" : typeItem.kind === "keyword" ? typeItem.name : typeItem.kind === "variable" ? typeItem.name : typeItem.kind === "literal" ? String(typeItem.value) : "any";
+            if (fieldName) fields.push({ name: fieldName, type: fieldType });
+          }
         }
       }
     }
