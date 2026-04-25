@@ -1,0 +1,33 @@
+{
+  "label": "claude-batch5",
+  "provider": "claude-cli",
+  "timestamp": "2026-04-25T11:10:39.070Z",
+  "elapsed_seconds": 8.2,
+  "total": 1,
+  "passed": 1,
+  "score": 100,
+  "by_category": {
+    "recursion": {
+      "pass": 1,
+      "total": 1
+    }
+  },
+  "by_difficulty": {
+    "medium": {
+      "pass": 1,
+      "total": 1
+    }
+  },
+  "results": [
+    {
+      "id": "T05_recursion_factorial",
+      "category": "recursion",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 8158,
+      "stdout": "120\n",
+      "response_length": 108
+    }
+  ]
+}
