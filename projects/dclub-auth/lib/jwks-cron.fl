@@ -1,0 +1,60 @@
+;; jwks-cron.fl — 키 자동 회전 + 정리 (Phase F)
+;;
+;; 정책:
+;;   active 키가 ROTATE_DAYS 이상 되면 자동 회전 (기본 30일)
+;;   rotated 키가 GRACE_DAYS 이상 되면 정리 (기본 14일 — 그 동안 발급된 토큰은
+;;   id_token_lifetime 1시간이라 진작 만료됨)
+;;
+;; 사용:
+;;   부팅 시 1회 실행:  (jwks-cron-tick db 30 14)
+;;   crontab 또는 systemd timer 로 매일 1회 실행 권장.
+
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
+
+;; created_at(ISO 문자열) → ms 변환
+[FUNC iso-to-ms :params [$iso]
+  :body (let [
+    rows (db_query "/tmp/_iso_calc.db"
+      (str "SELECT CAST((julianday('" $iso "') - 2440587.5) * 86400000 AS INTEGER) AS ms")
+      [])
+  ]
+    (get (get $rows 0) "ms"))]
+
+[FUNC jwks-cron-tick :params [$db $rotate-days $grace-days]
+  :body (let [
+    now-ms (now_ms)
+    rotate-cutoff-ms (- $now-ms (* $rotate-days 86400 1000))
+    cleanup-cutoff-ms (- $now-ms (* $grace-days 86400 1000))
+  ]
+    (do
+      ;; 1. active 키가 너무 오래되면 회전
+      (let [
+        old-active (db_query $db
+          (str "SELECT kid, created_at FROM signing_keys WHERE status='active' AND CAST((julianday(created_at) - 2440587.5) * 86400000 AS INTEGER) < " $rotate-cutoff-ms)
+          [])
+      ]
+        (if (> (length $old-active) 0)
+          (let [
+            old-kid (get (get $old-active 0) "kid")
+            new-kid (jwks-rotate $db)
+          ]
+            (do
+              (audit-log $db "key.rotate" nil nil nil
+                {:from $old-kid :to $new-kid :reason "scheduled" :rotate_days $rotate-days})
+              (println (str "[jwks-cron] rotated " $old-kid " → " $new-kid))))
+          (println "[jwks-cron] no rotation needed")))
+      ;; 2. 너무 오래된 rotated/revoked 키 삭제
+      (let [
+        deletable (db_query $db
+          (str "SELECT kid FROM signing_keys WHERE status IN ('rotated','revoked') AND CAST((julianday(created_at) - 2440587.5) * 86400000 AS INTEGER) < " $cleanup-cutoff-ms)
+          [])
+      ]
+        (if (> (length $deletable) 0)
+          (do
+            (db_delete_row $db "signing_keys"
+              (str "status IN ('rotated','revoked') AND CAST((julianday(created_at) - 2440587.5) * 86400000 AS INTEGER) < " $cleanup-cutoff-ms))
+            (audit-log $db "key.cleanup" nil nil nil
+              {:deleted_count (length $deletable) :grace_days $grace-days})
+            (println (str "[jwks-cron] cleaned " (length $deletable) " expired keys")))
+          (println "[jwks-cron] no cleanup needed")))))]

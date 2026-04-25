@@ -1,7 +1,7 @@
 // FreeLang v9: Authentication Standard Library
 // Phase 21: JWT (native crypto), API key, password hashing, session tokens
 
-import { createHmac, createHash, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, createHash, randomBytes, timingSafeEqual, scryptSync } from "crypto";
 
 // ── JWT helpers (Node.js crypto only — no external deps) ─────────────────────
 
@@ -98,24 +98,54 @@ export function createAuthModule() {
       );
     },
 
-    // ── Password hashing (sha256 + random salt) ──────────────
+    // ── Password hashing ──────────────────────────────────
+    // v1: SHA256+salt (legacy, 빠른 단점)
+    // v2: scrypt (RFC 7914, memory-hard, 산업 표준급)
+    //
+    // 신규 비밀번호는 v2 사용. 기존 v1 해시는 verify 시 성공하면 v2로 자동 마이그레이션
+    // (호출 측에서 새 해시 받아 DB 업데이트).
+    //
+    // 형식:
+    //   v1: "salt_hex:sha256_hex"
+    //   v2: "$scrypt$N=16384,r=8,p=1$salt_b64$hash_b64"   (PHC 풍 식별자)
 
-    // auth_hash_password password → "salt:hash"
+    // auth_hash_password password → "$scrypt$..." (v2)
     "auth_hash_password": (password: string): string => {
-      const salt = randomBytes(16).toString("hex");
-      const hash = createHash("sha256").update(salt + password).digest("hex");
-      return `${salt}:${hash}`;
+      const N = 16384, r = 8, p = 1, keyLen = 64;
+      const salt = randomBytes(16);
+      const hash = scryptSync(password, salt, keyLen, { N, r, p });
+      return `$scrypt$N=${N},r=${r},p=${p}$${salt.toString("base64")}$${hash.toString("base64")}`;
     },
 
     // auth_verify_password password stored → boolean
+    // 두 포맷 모두 자동 인식.
     "auth_verify_password": (password: string, stored: string): boolean => {
       try {
+        if (stored.startsWith("$scrypt$")) {
+          const parts = stored.split("$"); // ["", "scrypt", "N=...,r=...,p=...", saltB64, hashB64]
+          if (parts.length !== 5) return false;
+          const params = Object.fromEntries(
+            parts[2].split(",").map((kv) => kv.split("=").map((s) => s.trim()))
+          );
+          const N = Number(params.N), r = Number(params.r), p = Number(params.p);
+          const salt = Buffer.from(parts[3], "base64");
+          const expected = Buffer.from(parts[4], "base64");
+          const computed = scryptSync(password, salt, expected.length, { N, r, p });
+          return expected.length === computed.length && timingSafeEqual(expected, computed);
+        }
+        // v1 legacy
         const [salt, hash] = stored.split(":");
         const computed = createHash("sha256").update(salt + password).digest("hex");
         const a = Buffer.from(hash, "hex");
         const b = Buffer.from(computed, "hex");
         return a.length === b.length && timingSafeEqual(a, b);
       } catch { return false; }
+    },
+
+    // auth_password_needs_rehash stored → boolean
+    // true면 호출 측은 새로 hash 후 DB 업데이트 (점진적 v1→v2 마이그레이션)
+    "auth_password_needs_rehash": (stored: string): boolean => {
+      return !stored.startsWith("$scrypt$");
     },
 
     // ── Tokens / HMAC ────────────────────────────────────────

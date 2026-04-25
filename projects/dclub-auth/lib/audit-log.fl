@@ -1,0 +1,70 @@
+;; audit-log.fl — 감사 로그 (모든 인증 이벤트 영속)
+;;
+;; 표준 이벤트 코드:
+;;   login.ok, login.fail, login.locked
+;;   token.issue, token.refresh, token.revoke, token.invalid
+;;   key.rotate, key.revoke
+;;   client.use
+;;   user.signup, user.password_change
+;;
+;; 검색·통계 인덱스: ts(시간), event(코드), user_id, client_id, ip
+
+[FUNC audit-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS audit_log (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts        TEXT NOT NULL,
+      ts_ms     INTEGER NOT NULL,
+      event     TEXT NOT NULL,
+      user_id   TEXT,
+      client_id TEXT,
+      ip        TEXT,
+      detail    TEXT
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts_ms DESC)")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_log(event, ts_ms DESC)")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id, ts_ms DESC)"))]
+
+;; ── 단일 이벤트 기록 ─────────────────────────────────
+;; detail-map: 자유 형식 추가 정보 (json_stringify 직렬화)
+
+[FUNC audit-log :params [$db $event $user-id $client-id $ip $detail-map]
+  :body (db_insert $db "audit_log" {
+    :ts (now_iso)
+    :ts_ms (now_ms)
+    :event $event
+    :user_id (if (= $user-id nil) "" $user-id)
+    :client_id (if (= $client-id nil) "" $client-id)
+    :ip (if (= $ip nil) "" $ip)
+    :detail (json_stringify $detail-map)
+  })]
+
+;; ── 최근 N개 조회 (운영 대시보드용) ──────────────────
+
+[FUNC audit-recent :params [$db $limit]
+  :body (db_query $db
+    (str "SELECT ts, event, user_id, client_id, ip, detail FROM audit_log ORDER BY ts_ms DESC LIMIT " $limit)
+    [])]
+
+;; ── 사용자별 활동 ────────────────────────────────────
+
+[FUNC audit-by-user :params [$db $user-id $limit]
+  :body (db_query $db
+    (str "SELECT ts, event, client_id, ip, detail FROM audit_log WHERE user_id=? ORDER BY ts_ms DESC LIMIT " $limit)
+    [$user-id])]
+
+;; ── 이벤트 통계 (지난 24시간 기본) ──────────────────
+
+[FUNC audit-stats :params [$db $hours-back]
+  :body (let [
+    cutoff (- (now_ms) (* $hours-back 3600 1000))
+  ]
+    (db_query $db
+      "SELECT event, COUNT(*) as cnt FROM audit_log WHERE ts_ms > ? GROUP BY event ORDER BY cnt DESC"
+      [$cutoff]))]
+
+;; ── 보존 정책: 90일 이상 정리 ──────────────────────
+
+[FUNC audit-cleanup :params [$db $days]
+  :body (db_delete_row $db "audit_log"
+    (str "ts_ms < " (- (now_ms) (* $days 86400 1000))))]

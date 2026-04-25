@@ -1,0 +1,90 @@
+;; rate-limit.fl — sliding window rate limiter + brute-force lockout
+;;
+;; 두 표 운영:
+;;   rate_events     — 시도 이벤트 (now_ms 단위, 슬라이딩 윈도우)
+;;   account_locks   — 5회 연속 실패 시 잠금 (15분 default)
+;;
+;; 사용:
+;;   (rate-allow? db "login:demo" 5 60)        — 60초 내 5회까지 허용
+;;   (rate-record-fail db username)            — 실패 시 카운트, 임계 도달 시 자동 lock
+;;   (rate-reset-fail db username)             — 성공 시 카운트 초기화
+
+[FUNC rate-ensure-tables :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS rate_events (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      key       TEXT NOT NULL,
+      ts_ms     INTEGER NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_rate_key_ts ON rate_events(key, ts_ms)")
+    (db_create $db "CREATE TABLE IF NOT EXISTS account_locks (
+      key            TEXT PRIMARY KEY,
+      fail_count     INTEGER NOT NULL DEFAULT 0,
+      locked_until   INTEGER NOT NULL DEFAULT 0,
+      last_fail_at   INTEGER NOT NULL DEFAULT 0
+    )"))]
+
+;; ── sliding window 허용 여부 ──────────────────────────
+;; key: 식별자(예 "login:demo:ip-1.2.3.4")
+;; max-events: 윈도우 내 허용 횟수
+;; window-seconds: 윈도우 길이
+;; 반환: true=허용, false=거부
+
+[FUNC rate-allow? :params [$db $key $max-events $window-seconds]
+  :body (let [
+    now-ms (now_ms)
+    cutoff (- $now-ms (* $window-seconds 1000))
+    rows (db_query $db
+      "SELECT COUNT(*) as cnt FROM rate_events WHERE key=? AND ts_ms > ?"
+      [$key $cutoff])
+    cnt (get (get $rows 0) "cnt")
+  ]
+    (if (>= $cnt $max-events)
+      false
+      (do
+        (db_insert $db "rate_events" {:key $key :ts_ms $now-ms})
+        true)))]
+
+;; ── 만료된 이벤트 정리 (호출자 주기적 실행) ────────────
+[FUNC rate-gc :params [$db $window-seconds]
+  :body (db_delete_row $db "rate_events"
+    (str "ts_ms < " (- (now_ms) (* $window-seconds 1000))))]
+
+;; ── 계정 잠금 ─────────────────────────────────────────
+;; 임계 (default 5) 회 연속 실패 시 lock-seconds (default 900) 잠금.
+
+[FUNC rate-locked? :params [$db $key]
+  :body (let [
+    rows (db_query $db
+      "SELECT locked_until FROM account_locks WHERE key=? LIMIT 1"
+      [$key])
+  ]
+    (if (= (length $rows) 0)
+      false
+      (> (get (get $rows 0) "locked_until") (now_ms))))]
+
+[FUNC rate-record-fail :params [$db $key $threshold $lock-seconds]
+  :body (let [
+    now-ms (now_ms)
+    rows (db_query $db
+      "SELECT fail_count FROM account_locks WHERE key=? LIMIT 1"
+      [$key])
+  ]
+    (if (= (length $rows) 0)
+      (db_insert $db "account_locks"
+        {:key $key :fail_count 1 :locked_until 0 :last_fail_at $now-ms})
+      (let [
+        cur (get (get $rows 0) "fail_count")
+        new-count (+ $cur 1)
+        new-lock (if (>= $new-count $threshold)
+          (+ $now-ms (* $lock-seconds 1000))
+          0)
+      ]
+        (db_update $db "account_locks"
+          {:fail_count $new-count :locked_until $new-lock :last_fail_at $now-ms}
+          (str "key='" $key "'")))))]
+
+[FUNC rate-reset-fail :params [$db $key]
+  :body (db_update $db "account_locks"
+    {:fail_count 0 :locked_until 0}
+    (str "key='" $key "'"))]

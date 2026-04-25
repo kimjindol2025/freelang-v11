@@ -5,6 +5,8 @@
 
 (load "projects/dclub-auth/lib/users-store.fl")
 (load "projects/dclub-auth/lib/code-store.fl")
+(load "projects/dclub-auth/lib/rate-limit.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
 (load "projects/dclub-auth/lib/config.fl")
 
 ;; ── 폼 인코딩 파싱 (application/x-www-form-urlencoded) ───
@@ -58,17 +60,36 @@
     challenge (or (get $form "code_challenge") "")
     method (or (get $form "code_challenge_method") "S256")
   ]
-    (let [user (users-verify-password $db $username $password)]
-      (if (= $user nil)
-        (server_status 401
-          (str "<!DOCTYPE html><html><head><meta charset=utf-8></head><body>"
-               "<h1>로그인 실패</h1>"
-               "<p>사용자명 또는 비밀번호가 올바르지 않습니다.</p>"
-               "<a href=javascript:history.back()>뒤로</a></body></html>"))
-        (let [
-          uid (get $user "id")
-          lifetime (get $cfg "code_lifetime")
-          code (codes-issue $db $client_id $uid $redirect_uri $scope $nonce $challenge $method $lifetime)
-          loc (str $redirect_uri "?code=" code "&state=" $state)
-        ]
-          (server_redirect $loc)))))]
+    (let [
+      ip (or (server_req_header $req "x-forwarded-for") "unknown")
+      lock-key (str "user:" $username)
+    ]
+      (if (rate-locked? $db $lock-key)
+        (do
+          (audit-log $db "login.locked" nil $client_id $ip {:username $username})
+          (server_status 429
+            "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>잠시 후 다시 시도하세요</h1><p>여러 차례 로그인 실패로 계정이 일시 잠겼습니다.</p></body></html>"))
+        (let [user (users-verify-password $db $username $password)]
+          (if (= $user nil)
+            (do
+              (rate-record-fail $db $lock-key 5 900)
+              (audit-log $db "login.fail" nil $client_id $ip {:username $username})
+              (server_status 401
+                "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>로그인 실패</h1><p>사용자명 또는 비밀번호가 올바르지 않습니다.</p><a href=javascript:history.back()>뒤로</a></body></html>"))
+            (let [
+              uid (get $user "id")
+              lifetime (get $cfg "code_lifetime")
+              code (codes-issue $db $client_id $uid $redirect_uri $scope $nonce $challenge $method $lifetime)
+              loc (str $redirect_uri "?code=" code "&state=" $state)
+              stored-hash (get $user "password_hash")
+            ]
+              (do
+                (rate-reset-fail $db $lock-key)
+                (audit-log $db "login.ok" $uid $client_id $ip {:username $username})
+                ;; 점진적 v1→v2 마이그레이션
+                (if (auth_password_needs_rehash $stored-hash)
+                  (db_update $db "users"
+                    {:password_hash (auth_hash_password $password)}
+                    (str "id='" $uid "'"))
+                  nil)
+                (server_redirect $loc))))))))]

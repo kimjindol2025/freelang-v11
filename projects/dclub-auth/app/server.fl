@@ -9,10 +9,13 @@
 
 (load "projects/dclub-auth/lib/config.fl")
 (load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/jwks-cron.fl")
 (load "projects/dclub-auth/lib/users-store.fl")
 (load "projects/dclub-auth/lib/clients-store.fl")
 (load "projects/dclub-auth/lib/code-store.fl")
 (load "projects/dclub-auth/lib/refresh-store.fl")
+(load "projects/dclub-auth/lib/rate-limit.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
 (load "projects/dclub-auth/app/authorize.fl")
@@ -26,8 +29,13 @@
 (define active-kid (jwks-init $DB))
 (codes-ensure-table $DB)
 (refresh-ensure-table $DB)
+(rate-ensure-tables $DB)
+(audit-ensure-table $DB)
 (define demo-uid (users-seed-demo $DB))
 (define blog-cid (clients-seed-demo $DB))
+
+;; 부팅 시 키 회전 cron 1회 (30일 이상 된 active 키 자동 회전)
+(jwks-cron-tick $DB 30 14)
 
 (println (str "[dclub-auth] issuer=" (get $cfg "issuer")))
 (println (str "[dclub-auth] db=" $DB))
