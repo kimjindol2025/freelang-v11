@@ -25,6 +25,8 @@
 (load "projects/dclub-auth/lib/external-providers.fl")
 (load "projects/dclub-auth/lib/external-store.fl")
 (load "projects/dclub-auth/lib/retention.fl")
+(load "projects/dclub-auth/lib/sessions-store.fl")
+(load "projects/dclub-auth/lib/bcl.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
 (load "projects/dclub-auth/app/authorize.fl")
@@ -39,6 +41,7 @@
 (load "projects/dclub-auth/app/webauthn.fl")
 (load "projects/dclub-auth/app/external-auth.fl")
 (load "projects/dclub-auth/app/me-data.fl")
+(load "projects/dclub-auth/app/end-session.fl")
 
 ;; ── 부팅: 스키마 + 시드 ─────────────────────────────
 (define cfg (dclub-auth-config))
@@ -57,6 +60,8 @@
 (ext-pending-table $DB)
 (define demo-uid (users-seed-demo $DB))
 (define blog-cid (clients-seed-demo $DB))
+(sessions-ensure-table $DB)
+(clients-add-bcl-column $DB)
 
 ;; 부팅 시 키 회전 cron 1회 (30일 이상 된 active 키 자동 회전)
 (jwks-cron-tick $DB 30 14)
@@ -95,6 +100,8 @@
 (server_get "/auth/external/:provider/callback" "handle-ext-callback")
 (server_get "/me/export" "handle-me-export")
 (server_post "/me/delete" "handle-me-delete")
+(server_get "/end-session" "handle-end-session")
+(server_post "/end-session" "handle-end-session")
 
 ;; ── 시작 ──────────────────────────────────────────
 (server_start (get $cfg "port"))

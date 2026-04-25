@@ -5,14 +5,15 @@
 
 [FUNC clients-ensure-table :params [$db]
   :body (db_create $db "CREATE TABLE IF NOT EXISTS clients (
-    client_id        TEXT PRIMARY KEY,
-    client_secret    TEXT,
-    name             TEXT NOT NULL,
-    redirect_uris    TEXT NOT NULL,
-    allowed_scopes   TEXT NOT NULL,
-    is_public        INTEGER NOT NULL DEFAULT 0,
-    require_consent  INTEGER NOT NULL DEFAULT 0,
-    created_at       TEXT NOT NULL
+    client_id              TEXT PRIMARY KEY,
+    client_secret          TEXT,
+    name                   TEXT NOT NULL,
+    redirect_uris          TEXT NOT NULL,
+    allowed_scopes         TEXT NOT NULL,
+    is_public              INTEGER NOT NULL DEFAULT 0,
+    require_consent        INTEGER NOT NULL DEFAULT 0,
+    backchannel_logout_uri TEXT,
+    created_at             TEXT NOT NULL
   )")]
 
 [FUNC clients-register :params [$db $client-id $secret $name $redirect-uris-csv $scopes-csv $is-public]
@@ -32,7 +33,7 @@
 [FUNC clients-find :params [$db $client-id]
   :body (let [
     rows (db_query $db
-      "SELECT client_id, client_secret, name, redirect_uris, allowed_scopes, is_public, require_consent FROM clients WHERE client_id=? LIMIT 1"
+      "SELECT client_id, client_secret, name, redirect_uris, allowed_scopes, is_public, require_consent, backchannel_logout_uri FROM clients WHERE client_id=? LIMIT 1"
       [$client-id])
   ]
     (if (= (length $rows) 0) nil (get $rows 0)))]

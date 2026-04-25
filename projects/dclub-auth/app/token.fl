@@ -14,6 +14,7 @@
 (load "projects/dclub-auth/lib/jwks-store.fl")
 (load "projects/dclub-auth/lib/jwt-rs256.fl")
 (load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/sessions-store.fl")
 (load "projects/dclub-auth/lib/config.fl")
 
 ;; ── 폼 디코드 (login.fl 와 동일 로직, 모듈화 대상) ──────
@@ -115,7 +116,9 @@
     active (jwks-active $db)
     kid (get $active "kid")
     priv (get $active "private_pem")
-    id-claims (build-id-token-claims $iss $user_id $client-id $nonce)
+    sid (sessions-issue $db $user_id $client-id $refresh-life)
+    id-claims-base (build-id-token-claims $iss $user_id $client-id $nonce)
+    id-claims (assoc $id-claims-base "sid" $sid)
     id-token (jwt-rs256-sign $id-claims $priv $kid $id-life)
     access-claims {"iss" $iss "sub" $user_id "aud" $client-id "scope" $scope}
     access-token (jwt-rs256-sign $access-claims $priv $kid $id-life)
