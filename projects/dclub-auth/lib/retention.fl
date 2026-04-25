@@ -1,0 +1,80 @@
+;; retention.fl — 데이터 보존 정책 cron (Phase O, GDPR/정통망법)
+;;
+;; 정책:
+;;   login_history       6개월 (180일) 보존 후 삭제
+;;   audit_log           1년 (365일) 보존 후 삭제 (단 침해 의혹 이벤트는 따로 백업)
+;;   비활성 사용자       1년 미로그인 → 자동 익명화 (휴면 처리)
+;;   만료된 user_tokens  자동 삭제 (24h 만료 + used)
+;;   만료된 auth_codes   자동 삭제
+;;   만료된 webauthn_pending / external_pending  자동 삭제
+
+(load "projects/dclub-auth/lib/audit-log.fl")
+
+[FUNC retention-tick :params [$db]
+  :body (do
+    (println "[retention] cleanup start")
+
+    ;; 1. login_history 180일+ 삭제
+    (let [
+      cutoff (- (now_ms) (* 180 86400 1000))
+      r (db_delete_row $db "login_history" (str "ts_ms < " $cutoff))
+    ]
+      (println (str "[retention] login_history older than 180d cleaned")))
+
+    ;; 2. audit_log 365일+ 삭제 (login.suspicious / data.delete 등 보안 이벤트는 따로 보존 권장 — 운영자 backup)
+    (let [
+      cutoff (- (now_ms) (* 365 86400 1000))
+      r (db_delete_row $db "audit_log" (str "ts_ms < " $cutoff))
+    ]
+      (println (str "[retention] audit_log older than 365d cleaned")))
+
+    ;; 3. 만료된 user_tokens
+    (db_delete_row $db "user_tokens"
+      (str "expires_at < " (now_ms) " OR used=1"))
+
+    ;; 4. 만료된 auth_codes
+    (db_delete_row $db "auth_codes"
+      (str "expires_at < " (now_ms) " OR used=1"))
+
+    ;; 5. 만료된 webauthn_pending
+    (db_delete_row $db "webauthn_pending"
+      (str "expires_at < " (now_ms)))
+
+    ;; 6. 만료된 external_pending
+    (db_delete_row $db "external_pending"
+      (str "expires_at < " (now_ms)))
+
+    ;; 7. revoked + 만료된 refresh_tokens 정리
+    (db_delete_row $db "refresh_tokens"
+      (str "revoked=1 AND expires_at < " (now_ms)))
+
+    ;; 8. 휴면 처리: 1년 미로그인 사용자 자동 익명화
+    (let [
+      cutoff (- (now_ms) (* 365 86400 1000))
+      candidates (db_query $db
+        (str "SELECT u.id FROM users u "
+             "WHERE u.disabled=0 AND NOT EXISTS ("
+             "  SELECT 1 FROM login_history lh WHERE lh.user_id=u.id AND lh.ts_ms > " $cutoff
+             ") AND CAST((julianday(u.created_at) - 2440587.5) * 86400000 AS INTEGER) < " $cutoff)
+        [])
+    ]
+      (if (> (length $candidates) 0)
+        (do
+          (println (str "[retention] dormant users to anonymize: " (length $candidates)))
+          (map (fn [r]
+            (let [
+              uid (get r "id")
+              suffix (substring (auth_random_token 6) 0 12)
+            ]
+              (do
+                (db_update $db "users"
+                  {:disabled 1
+                   :username (str "dormant_" $suffix)
+                   :email (str "dormant_" $suffix "@deleted.local")
+                   :display_name ""
+                   :password_hash ""}
+                  (str "id='" $uid "'"))
+                (audit-log $db "user.dormant_anonymized" $uid nil nil {})))) $candidates))
+        (println "[retention] no dormant users")))
+
+    (println "[retention] cleanup done"))]
