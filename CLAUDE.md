@@ -6,7 +6,24 @@
 
 ---
 
-## 📊 실측 상태 (2026-04-24 Phase 3-E 완료)
+## 📊 실측 상태 (2026-04-25 Phase 4 self-host 회복 완료)
+
+### Phase 4 핵심 성과 — Self-Host 회복
+
+**진단 (2026-04-25)**: 자동 에이전트의 helper 분리 작업 중 `cg-native-dispatch` line 716 fallback이 `[true (cg-call $op $args)]` → `[true "null"]`로 변경되며 **모든 user-defined function call이 null로 컴파일**되는 회귀 발생.
+
+**수정**:
+- `self/codegen.fl`, `self/all.fl`의 `cg-native-dispatch` fallback 복원: `[true (str (js-name (...)) "(" $as ")")]`
+- 9개 lexer/parser/stdlib 함수에 helper 분리 패턴 일관 적용 (skip-ws-inner, read-token-inner, parse-atom-dispatch 등)
+- `(let [...] (cond ...))` 패턴이 broken JS 생성하는 codegen 결함 우회
+
+**검증** (2026-04-25):
+- ✅ stage1 == stage2 == stage3 SHA256 3단 일치 (`5877b966...`)
+- ✅ verify-self-host.sh tier2: PASS 91 (이전 Phase B 수치 유지)
+- ✅ npm test: 751 PASS (이전 736 +15)
+- FAIL 6개는 자동 에이전트의 mongodb/binary 추가분 (advisory, Phase 4 무관)
+
+
 
 ### 컴파일 능력
 
