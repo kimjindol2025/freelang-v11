@@ -1,0 +1,73 @@
+;; users-store.fl — 사용자 계정 관리 (Phase B, dclub-auth)
+;;
+;; ⚠️ FreeLang 주의: nil은 (if ...)에서 truthy. 호출 측은 (= x nil) 사용.
+;;
+;; 비밀번호: SHA256 + salt (Phase F에서 argon2id 강화 예정)
+;; sub: 영구 고유 ID (UUID v4) — 사용자명 변경에도 보존
+
+[FUNC users-ensure-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS users (
+    id              TEXT PRIMARY KEY,
+    username        TEXT NOT NULL UNIQUE,
+    email           TEXT NOT NULL UNIQUE,
+    email_verified  INTEGER NOT NULL DEFAULT 0,
+    password_hash   TEXT NOT NULL,
+    display_name    TEXT,
+    picture         TEXT,
+    created_at      TEXT NOT NULL,
+    disabled        INTEGER NOT NULL DEFAULT 0
+  )")]
+
+[FUNC users-create :params [$db $username $email $password $display-name]
+  :body (let [
+    id (uuid_v4)
+    pw-hash (auth_hash_password $password)
+    now (now_iso)
+  ]
+    (do
+      (db_insert $db "users" {
+        :id $id
+        :username $username
+        :email $email
+        :email_verified 1
+        :password_hash $pw-hash
+        :display_name $display-name
+        :picture ""
+        :created_at $now
+      })
+      $id))]
+
+[FUNC users-find-by-username :params [$db $username]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, username, email, email_verified, password_hash, display_name, picture FROM users WHERE username=? AND disabled=0 LIMIT 1"
+      [$username])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC users-find-by-id :params [$db $id]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, username, email, email_verified, display_name, picture FROM users WHERE id=? AND disabled=0 LIMIT 1"
+      [$id])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC users-verify-password :params [$db $username $password]
+  :body (let [u (users-find-by-username $db $username)]
+    (if (= $u nil)
+      nil
+      (if (auth_verify_password $password (get $u "password_hash"))
+        $u
+        nil)))]
+
+;; ── 데모 시드 ────────────────────────────────────────────
+;; 첫 부팅 시 기본 계정 생성. 이미 있으면 no-op.
+
+[FUNC users-seed-demo :params [$db]
+  :body (do
+    (users-ensure-table $db)
+    (let [existing (users-find-by-username $db "demo")]
+      (if (= $existing nil)
+        (users-create $db "demo" "demo@dclub.kr" "demo1234" "Demo User")
+        (get $existing "id"))))]

@@ -114,7 +114,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 378개 함수, 21 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 384개 함수, 22 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -244,7 +244,7 @@ parallel race with-timeout fl-try use`
 - `(arr_index_of arr item)` → number  (-1 if not found)
 - `(arr_remove arr item)` → [any]  (remove first occurrence)
 
-### crypto (35개)
+### crypto (36개)
 
 - `(sha256 str)` → string (hex digest)
 - `(sha256_short str)` → string (first 8 chars, useful as short ID)
@@ -255,6 +255,7 @@ parallel race with-timeout fl-try use`
 - `(base64_encode str)` → string
 - `(base64_decode str)` → string
 - `(base64url_encode str)` → string (URL-safe, no padding)
+- `(base64url_decode str)` → string (URL-safe Base64 → UTF-8)
 - `(hex_encode str)` → string
 - `(hex_decode hex)` → string
 - `(random_bytes n)` → string (hex, n bytes of randomness)
@@ -281,6 +282,14 @@ parallel race with-timeout fl-try use`
 - `(extract_numbers str)` → [number]
 - `(is_email str)` → boolean
 - `(is_url str)` → boolean
+
+### crypto-rsa (5개)
+
+- `(crypto_rsa_generate bits)` → map (publicKey/privateKey PEM)
+- `(crypto_rsa_sign private_pem data)` → string (base64url 서명)
+- `(crypto_rsa_verify public_pem data signature_b64url)` → boolean
+- `(pkce_s256 verifier)` → string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
+- `(crypto_rsa_public_to_jwk public_pem kid)` → map (kty/n/e/kid/alg/use)
 
 ### data (27개)
 
@@ -574,4 +583,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-25T10:18:54.914Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-25T11:40:52.626Z

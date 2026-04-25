@@ -18,6 +18,24 @@ import { SExpr, Literal } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase C: strict 모드
 
+// Phase 후속: list/map 깊은 동등성 (T77 palindrome에서 발견된 한계 해결)
+function flDeepEq(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
+    return true;
+  }
+  if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
+    return true;
+  }
+  return false;
+}
+
 // Phase L1.5: Module Cache Layer
 // Ensures load() is deterministic and cacheable for DB systems
 const MODULE_CACHE = new Map<string, any>();
@@ -689,7 +707,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 
     // Comparison
     case "=":
-      return args[0] === args[1];
+      // Phase 후속: list/map 자동 deep-equal (T77 palindrome 발견)
+      return flDeepEq(args[0], args[1]);
     case "<":
       return args[0] < args[1];
     case ">":
@@ -856,6 +875,34 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : (args[0]?.[0] ?? null);
     case "rest":
       return args[0]?.slice(1);
+    // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
+    case "keys":
+    case "json_keys":
+      return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.keys(args[0]) : [];
+    case "values":
+    case "json_vals":
+      return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.values(args[0]) : [];
+    case "upper-case":
+    case "uppercase":
+    case "upper":
+      return typeof args[0] === "string" ? args[0].toUpperCase() : args[0];
+    case "lower-case":
+    case "lowercase":
+    case "lower":
+      return typeof args[0] === "string" ? args[0].toLowerCase() : args[0];
+    case "trim":
+      return typeof args[0] === "string" ? args[0].trim() : args[0];
+    case "starts-with?":
+    case "str-starts-with?":
+      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
+    case "ends-with?":
+    case "str-ends-with?":
+      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].endsWith(args[1]) : false;
+    case "char-at":
+    case "str-char-at":
+      return typeof args[0] === "string" ? (args[0][Number(args[1])] ?? null) : null;
+    case "math-pow":
+      return Math.pow(Number(args[0]), Number(args[1]));
     case "append":
       if (Array.isArray(args[0]) && args.length === 2 && Array.isArray(args[1])) {
         return [...args[0], ...args[1]];

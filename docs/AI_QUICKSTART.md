@@ -249,12 +249,43 @@ FL_TRACE=1 node bootstrap.js run my-code.fl       # 호출 trace
 
 ---
 
+## 새 alias (2026-04-25 추가)
+
+메인 dispatch에 누락되었던 함수들이 통합되었습니다 — AI가 어느 형태로 작성해도 작동:
+
+| Alias | Canonical | 효과 |
+|-------|-----------|------|
+| `keys` ⟷ `json_keys` | 둘 다 작동 | map의 키 추출 |
+| `values` ⟷ `json_vals` | 둘 다 작동 | map의 값 추출 |
+| `upper-case` / `uppercase` / `upper` | 모두 동작 | 대문자 변환 |
+| `lower-case` / `lowercase` / `lower` | 모두 동작 | 소문자 변환 |
+| `starts-with?` / `str-starts-with?` | 둘 다 작동 | prefix 검사 |
+| `ends-with?` / `str-ends-with?` | 둘 다 작동 | suffix 검사 |
+| `char-at` / `str-char-at` | 둘 다 작동 | 인덱스로 글자 |
+| `pow` / `math-pow` | 둘 다 작동 | 거듭제곱 |
+| `nil?` / `null?` | 둘 다 작동 | nil 체크 |
+| `array?` / `list?` | 둘 다 작동 | 배열 검사 |
+| `bool?` / `boolean?` | 둘 다 작동 | bool 검사 |
+| `function?` / `fn?` | 둘 다 작동 | 함수 검사 |
+| `defun` / `defn` | 둘 다 작동 | 함수 정의 (Lisp 호환) |
+
+또한 **list/map deep-equal**: `(= (list 1 2 3) (list 1 2 3))` → `true`
+
+## FL-Bench로 본 AI 모델 평가 가능
+
+100개 표준 task로 AI 모델 점수 측정:
+```bash
+node benchmarks/fl-bench/run.js --reference                    # 참조 100/100
+node scripts/ai-eval.js --provider=claude-cli --label=opus-4.7 # 실제 모델 평가
+```
+
 ## 다음 단계
 
 - **2~3h 심화**: `docs/AI_LEARNING_PATH.md` (전체 학습 경로)
 - **시스템 프롬프트**: `docs/AI_SYSTEM_PROMPT_MINI.md` (1,351 토큰, 매 conversation 컨텍스트로)
-- **stdlib 전체 참조**: `docs/AI_SYSTEM_PROMPT.md` (378 함수, 5,777 토큰)
+- **stdlib 전체 참조**: `docs/AI_SYSTEM_PROMPT.md` (384 함수, 5,888 토큰)
 - **명명 규칙 audit**: `docs/STDLIB_NAMING_AUDIT.md`
+- **FL-Bench 100 task**: `benchmarks/fl-bench/README.md`
 
 ---
 

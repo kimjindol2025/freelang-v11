@@ -1,0 +1,78 @@
+;; clients-store.fl — OIDC 클라이언트 등록·조회 (Phase B, dclub-auth)
+;;
+;; 등록 클라이언트 = blog/FSM/v9/gogs/freelang-saas 등 dclub 산하 서비스.
+;; redirect_uris는 콤마로 구분된 문자열로 저장 (간소화).
+
+[FUNC clients-ensure-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS clients (
+    client_id        TEXT PRIMARY KEY,
+    client_secret    TEXT,
+    name             TEXT NOT NULL,
+    redirect_uris    TEXT NOT NULL,
+    allowed_scopes   TEXT NOT NULL,
+    is_public        INTEGER NOT NULL DEFAULT 0,
+    require_consent  INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
+  )")]
+
+[FUNC clients-register :params [$db $client-id $secret $name $redirect-uris-csv $scopes-csv $is-public]
+  :body (do
+    (db_insert $db "clients" {
+      :client_id $client-id
+      :client_secret $secret
+      :name $name
+      :redirect_uris $redirect-uris-csv
+      :allowed_scopes $scopes-csv
+      :is_public $is-public
+      :require_consent 0
+      :created_at (now_iso)
+    })
+    $client-id)]
+
+[FUNC clients-find :params [$db $client-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT client_id, client_secret, name, redirect_uris, allowed_scopes, is_public, require_consent FROM clients WHERE client_id=? LIMIT 1"
+      [$client-id])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+;; redirect_uri가 등록된 목록(csv)에 있는지 정확 매칭.
+;; CSRF/Open redirect 방어를 위해 prefix 매칭 금지, 완전 일치만.
+
+;; 리스트에 정확히 일치하는 원소가 있는지 (boolean) — stdlib contains? 의존 회피.
+;; ⚠️ 고차 함수는 (define f (fn ...)) 형태로 정의해야 lambda 파라미터를 함수로 호출 가능.
+;;    [FUNC ... :params [$pred]] 의 $pred는 Variable이라 (pred x) 호출 불가.
+
+(define list-has?
+  (fn [lst item]
+    (reduce (fn [acc x] (or acc (= x item))) false lst)))
+
+(define list-every?
+  (fn [lst pred]
+    (reduce (fn [acc x] (and acc (pred x))) true lst)))
+
+[FUNC clients-redirect-allowed? :params [$client $redirect-uri]
+  :body (list-has?
+    (str_split (get $client "redirect_uris") ",")
+    $redirect-uri)]
+
+[FUNC clients-scope-allowed? :params [$client $scope]
+  :body (let [
+    allowed (str_split (get $client "allowed_scopes") " ")
+    requested (str_split $scope " ")
+  ]
+    (list-every? $requested (fn [s] (list-has? allowed s))))]
+
+;; ── 데모 시드 ────────────────────────────────────────────
+
+[FUNC clients-seed-demo :params [$db]
+  :body (do
+    (clients-ensure-table $db)
+    (let [existing (clients-find $db "blog")]
+      (if (= $existing nil)
+        (clients-register $db "blog" "blog-secret-CHANGE-ME"
+          "blog.dclub.kr"
+          "http://localhost:30200/cb,http://localhost:30200/oauth/callback"
+          "openid profile email" 0)
+        "blog")))]

@@ -1,0 +1,108 @@
+;; refresh-store.fl — Refresh Token 회전 + family 추적 (Phase B, dclub-auth)
+;;
+;; 회전(rotate): 사용된 refresh_token은 즉시 폐기, 새 토큰 발급.
+;; family: 한 로그인 세션의 회전 체인. 재사용 탐지 시 family 전체 무효.
+;;
+;; DB에는 token_hash(SHA256)만 저장. 평문 토큰은 클라이언트만 보유.
+
+[FUNC refresh-ensure-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS refresh_tokens (
+    token_hash       TEXT PRIMARY KEY,
+    family_id        TEXT NOT NULL,
+    client_id        TEXT NOT NULL,
+    user_id          TEXT NOT NULL,
+    scope            TEXT NOT NULL,
+    expires_at       INTEGER NOT NULL,
+    rotated_to       TEXT,
+    revoked          INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
+  )")]
+
+;; ── 발급: 신규 family (로그인 시) ─────────────────────
+[FUNC refresh-issue :params [$db $client-id $user-id $scope $lifetime-seconds]
+  :body (let [
+    token (auth_random_token 48)
+    family (uuid_v4)
+    now-ms (now_ms)
+    expires (+ $now-ms (* $lifetime-seconds 1000))
+  ]
+    (do
+      (db_insert $db "refresh_tokens" {
+        :token_hash (auth_sha256 $token)
+        :family_id $family
+        :client_id $client-id
+        :user_id $user-id
+        :scope $scope
+        :expires_at $expires
+        :rotated_to ""
+        :revoked 0
+        :created_at (now_iso)
+      })
+      $token))]
+
+;; ── 회전: family 보존, 새 토큰 발급, 이전 토큰 rotated_to 채움 ─
+;; 반환: 새 토큰 또는 nil(재사용/만료/폐기)
+[FUNC refresh-rotate :params [$db $client-id $old-token $lifetime-seconds]
+  :body (let [
+    old-hash (auth_sha256 $old-token)
+    rows (db_query $db
+      "SELECT family_id, client_id, user_id, scope, expires_at, rotated_to, revoked FROM refresh_tokens WHERE token_hash=? LIMIT 1"
+      [$old-hash])
+  ]
+    (if (= (length $rows) 0)
+      nil
+      (let [
+        row (get $rows 0)
+        family (get $row "family_id")
+        revoked (get $row "revoked")
+        rotated-to (get $row "rotated_to")
+        expires (get $row "expires_at")
+        stored-client (get $row "client_id")
+        now-ms (now_ms)
+      ]
+        (if (or (= $revoked 1)
+                (> $now-ms $expires)
+                (not (= $client-id $stored-client)))
+          nil
+          (if (not (= $rotated-to ""))
+            ;; 이미 회전된 토큰의 재사용 — family 전체 무효
+            (do
+              (db_update $db "refresh_tokens"
+                {:revoked 1}
+                (str "family_id='" $family "'"))
+              nil)
+            ;; 정상 회전
+            (let [
+              new-token (auth_random_token 48)
+              new-hash (auth_sha256 $new-token)
+              new-expires (+ $now-ms (* $lifetime-seconds 1000))
+              uid (get $row "user_id")
+              scp (get $row "scope")
+            ]
+              (do
+                (db_insert $db "refresh_tokens" {
+                  :token_hash $new-hash
+                  :family_id $family
+                  :client_id $client-id
+                  :user_id $uid
+                  :scope $scp
+                  :expires_at $new-expires
+                  :rotated_to ""
+                  :revoked 0
+                  :created_at (now_iso)
+                })
+                (db_update $db "refresh_tokens"
+                  {:rotated_to $new-hash}
+                  (str "token_hash='" $old-hash "'"))
+                {:token $new-token :user_id $uid :scope $scp :family_id $family})))))))]
+
+;; ── family 무효화 (로그아웃·침해 대응) ───────────────
+[FUNC refresh-revoke-family :params [$db $family-id]
+  :body (db_update $db "refresh_tokens"
+    {:revoked 1}
+    (str "family_id='" $family-id "'"))]
+
+;; ── 만료 정리 ────────────────────────────────────────
+[FUNC refresh-gc :params [$db]
+  :body (db_delete_row $db "refresh_tokens"
+    (str "expires_at < " (now_ms) " AND revoked=1"))]

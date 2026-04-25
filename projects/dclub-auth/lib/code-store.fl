@@ -1,0 +1,101 @@
+;; code-store.fl — Authorization Code 저장·소비 (Phase B, dclub-auth)
+;;
+;; PKCE (RFC 7636): code_challenge_method=S256
+;;   code_challenge = base64url(SHA256(code_verifier))
+;;   /token 호출 시 code_verifier 받아서 SHA256 후 base64url 비교
+;;
+;; code: 일회용, 60초 만료, 사용 후 used=1
+
+[FUNC codes-ensure-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS auth_codes (
+    code             TEXT PRIMARY KEY,
+    client_id        TEXT NOT NULL,
+    user_id          TEXT NOT NULL,
+    redirect_uri     TEXT NOT NULL,
+    scope            TEXT NOT NULL,
+    nonce            TEXT,
+    code_challenge   TEXT NOT NULL,
+    challenge_method TEXT NOT NULL,
+    expires_at       INTEGER NOT NULL,
+    used             INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
+  )")]
+
+;; ── 발급: 인증 후 호출 ─────────────────────────────────
+[FUNC codes-issue :params [$db $client-id $user-id $redirect-uri $scope $nonce $challenge $method $lifetime]
+  :body (let [
+    code (auth_random_token 32)
+    now-ms (now_ms)
+    expires (+ $now-ms (* $lifetime 1000))
+  ]
+    (do
+      (db_insert $db "auth_codes" {
+        :code $code
+        :client_id $client-id
+        :user_id $user-id
+        :redirect_uri $redirect-uri
+        :scope $scope
+        :nonce (if (= $nonce nil) "" $nonce)
+        :code_challenge $challenge
+        :challenge_method $method
+        :expires_at $expires
+        :used 0
+        :created_at (now_iso)
+      })
+      $code))]
+
+;; ── 조회 (검증 전, 정보 확인용) ───────────────────────
+[FUNC codes-find :params [$db $code]
+  :body (let [
+    rows (db_query $db
+      "SELECT code, client_id, user_id, redirect_uri, scope, nonce, code_challenge, challenge_method, expires_at, used FROM auth_codes WHERE code=? LIMIT 1"
+      [$code])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+;; ── 소비: PKCE 검증 + 일회용 + 만료 + redirect_uri 매칭 ─
+;; 성공 시 row 반환 후 used=1 처리, 실패 시 nil.
+[FUNC codes-consume :params [$db $code $verifier $client-id $redirect-uri]
+  :body (let [row (codes-find $db $code)]
+    (if (= $row nil)
+      nil
+      (let [
+        used (get $row "used")
+        expires (get $row "expires_at")
+        now-ms (now_ms)
+        expected-challenge (base64url_encode-bytes-of-sha256 $verifier)
+        stored-challenge (get $row "code_challenge")
+        stored-client (get $row "client_id")
+        stored-redirect (get $row "redirect_uri")
+        method (get $row "challenge_method")
+      ]
+        (if (or (= $used 1)
+                (> $now-ms $expires)
+                (not (= $client-id $stored-client))
+                (not (= $redirect-uri $stored-redirect))
+                (not (= $method "S256"))
+                (not (= $expected-challenge $stored-challenge)))
+          nil
+          (do
+            (db_update $db "auth_codes"
+              {:used 1}
+              (str "code='" $code "'"))
+            $row)))))]
+
+;; PKCE S256 챌린지 계산: base64url(SHA256(verifier_bytes))
+;; auth_sha256 가 hex를 반환하므로 hex → bytes → base64url 변환 우회 필요.
+;; 방법: Node primitive로 직접 계산. crypto-rsa 모듈에 추가하지 않고
+;;       기존 base64url_encode + sha256 hex 결과를 다른 방식으로 처리.
+;;
+;; 간단 우회: PKCE에서 verifier는 base64url 문자열, challenge도 base64url.
+;; SHA256 결과(32 bytes)를 base64url 인코딩해야 함.
+;; 현재 base64url_encode는 utf-8 string만 처리.
+;; 따라서 native primitive 추가 필요: pkce_s256(verifier) → base64url 문자열.
+
+[FUNC base64url_encode-bytes-of-sha256 :params [$verifier]
+  :body (pkce_s256 $verifier)]
+
+;; ── GC ─────────────────────────────────────────────────
+[FUNC codes-gc :params [$db]
+  :body (db_delete_row $db "auth_codes"
+    (str "expires_at < " (now_ms) " OR used=1"))]

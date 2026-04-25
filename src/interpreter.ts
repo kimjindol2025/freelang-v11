@@ -79,6 +79,9 @@ export class Interpreter {
   public learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
   public currentLine = 0; // FreeLang source line tracking
   public callDepth = 0;
+  // Phase E 후속 (2026-04-25): mongodb-integration.test 호환 alias
+  // 일부 테스트가 interp.globals 사용 — context.functions 가 정확하지만 alias 제공
+  public get globals() { return this.context.functions; }
   // Phase E (2026-04-25): 호출 체인 추적 — 에러 발생 시 마지막 100개까지 표시
   public callStack: Array<{ fn: string; line: number }> = [];
   public static readonly CALL_STACK_LIMIT = 100; // 메모리 안전을 위해 마지막 N개만 유지
