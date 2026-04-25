@@ -1,6 +1,6 @@
-# FreeLang v11 — AI-Native Language + Web Framework
+# FreeLang v11 — AI Agent Execution Engine
 
-> AI 에이전트가 안정적으로 쓰고, 재현 가능하게 실행되는 언어. Express.js 스타일 웹 프레임워크 포함.
+> AI 에이전트가 안정적으로 쓰고, 재현 가능하게 실행되는 언어. Task/State/Workflow 기반 에이전트 프레임워크 포함.
 
 [![Tests](https://img.shields.io/badge/tests-744%2F744%20PASS-brightgreen)](./src/__tests__/)
 [![Self-Host](https://img.shields.io/badge/self--host-fixed--point%20verified-blue)](./CLAUDE.md)
@@ -111,10 +111,11 @@ FreeLang은 AI가 **안심하고 쓸 수 있게** 설계했다.
 | **테스트** | ✅ 744/744 PASS |
 | **자가 컴파일** | ✅ Fixed-point 달성 |
 | **결정론 보증** | ✅ SHA256 검증 완료 |
+| **Agent DSL** | ✅ Task/State/Workflow |
+| **Deterministic Logging** | ✅ SHA256 기반 재현성 |
+| **Unified Storage** | ✅ SQLite/MariaDB/JSON |
+| **Express.fl** | ✅ 간단한 HTTP 에코 서버 |
 | **표준 라이브러리** | ✅ 85+ 함수 |
-| **Express.fl** | ✅ 완전한 웹 프레임워크 |
-| **CLI 도구** | ✅ npm 패키지 배포 |
-| **에이전트 패턴** | ✅ Task/State/Workflow |
 
 ---
 

@@ -1,10 +1,11 @@
-;; ============================================
-;; FreeLang v11 Express.js 스타일 프레임워크
-;; ============================================
-;; 내장 server_* 함수들을 감싸는 고수준 API
-;; 사용법: (load "express.fl")
+; ════════════════════════════════════════════════════════════════
+; FreeLang v11: Simple HTTP Echo Server (데모용)
+; Phase D: Express.fl → 최소 기능 유지
+; ════════════════════════════════════════════════════════════════
 
-;; ============ 응답 헬퍼 함수 ============
+; ─────────────────────────────────────────────────────────────────
+; 1. 응답 헬퍼 (기본만)
+; ─────────────────────────────────────────────────────────────────
 
 [FUNC res-json :params [$obj]
   :body (server_json $obj)
@@ -14,374 +15,77 @@
   :body (server_text $text)
 ]
 
-[FUNC res-html :params [$body]
-  :body (server_html $body)
-]
-
 [FUNC res-status :params [$code $body]
   :body (server_status $code $body)
 ]
 
-;; ============ 요청 헬퍼 함수 ============
+; ─────────────────────────────────────────────────────────────────
+; 2. 요청 헬퍼 (기본만)
+; ─────────────────────────────────────────────────────────────────
 
-[FUNC req-param :params [$req $name]
-  :body (server_req_param $req $name)
-]
-
-[FUNC req-body :params [$req]
-  :body (let [raw (server_req_body $req)]
-    (if (or (= raw "") (= raw nil))
-      {}
-      (json_parse raw)))
-]
-
-[FUNC req-query :params [$req $key]
-  :body (server_req_query $req $key)
-]
-
-[FUNC req-header :params [$req $name]
-  :body (server_req_header $req $name)
+[FUNC req-path :params [$req]
+  :body (server_req_path $req)
 ]
 
 [FUNC req-method :params [$req]
   :body (server_req_method $req)
 ]
 
-[FUNC req-path :params [$req]
-  :body (server_req_path $req)
+[FUNC req-body :params [$req]
+  :body (let [raw (server_req_body $req)]
+    (if (or (= raw "") (nil? raw))
+      {}
+      (json-parse raw)))
 ]
 
-;; ============ 라우터 함수 ============
+; ─────────────────────────────────────────────────────────────────
+; 3. 기본 라우팅
+; ─────────────────────────────────────────────────────────────────
 
-[FUNC app-get :params [$path $handler]
-  :body (server_get $path $handler)
+[FUNC app-get :params [$path $handler-name]
+  :body (server_get $path $handler-name)
 ]
 
-[FUNC app-post :params [$path $handler]
-  :body (server_post $path $handler)
+[FUNC app-post :params [$path $handler-name]
+  :body (server_post $path $handler-name)
 ]
 
-[FUNC app-put :params [$path $handler]
-  :body (server_put $path $handler)
-]
-
-[FUNC app-patch :params [$path $handler]
-  :body (server_patch $path $handler)
-]
-
-[FUNC app-delete :params [$path $handler]
-  :body (server_delete $path $handler)
-]
-
-;; ============ 서버 제어 ============
+; ─────────────────────────────────────────────────────────────────
+; 4. 서버 시작
+; ─────────────────────────────────────────────────────────────────
 
 [FUNC app-listen :params [$port]
   :body (do
-    (println (str "🚀 Express.fl 서버 시작 → http://localhost:" $port))
+    (println (str "🚀 HTTP Echo Server started on port " $port))
     (server_start $port)
   )
 ]
 
-[FUNC app-stop
-  :body (server_stop)
-]
+; ─────────────────────────────────────────────────────────────────
+; 5. 간단한 에코 핸들러 예제
+; ─────────────────────────────────────────────────────────────────
 
-;; ============ 에러 핸들링 ============
-
-;; safe-result 는 미사용 — try/catch를 핸들러에서 직접 사용
-
-;; ============ 미들웨어 (선택사항) ============
-
-[FUNC app-use :params [$middleware-name]
-  :body (middleware_add_to_chain "express-chain" $middleware-name)
-]
-
-[FUNC app-cors :params []
-  :body (middleware_define "cors" nil (middleware_cors) nil)
-]
-
-[FUNC app-logging :params []
-  :body (middleware_define "logging" nil (middleware_logging) nil)
-]
-
-[FUNC app-auth :params [$token]
-  :body (middleware_define "auth" (middleware_auth_check $token)
-    (fn [$_] nil)
-    (fn [$e] (res-status 401 { :error "UNAUTHORIZED" })))
-]
-
-[FUNC app-rate-limit :params [$limit $window]
-  :body (middleware_define "rate-limit"
-    (middleware_rate_limit $limit $window)
-    (fn [$_] nil)
-    (fn [$e] (res-status 429 { :error "TOO_MANY_REQUESTS" })))
-]
-
-;; ============ 데이터베이스 래퍼 ============
-
-[FUNC db-query-sqlite :params [$db-path $sql $params]
-  :body (db_query $db-path $sql (or $params []))
-]
-
-[FUNC db-exec-sqlite :params [$db-path $sql $params]
-  :body (db_exec $db-path $sql (or $params []))
-]
-
-[FUNC db-insert :params [$db-path $table $data]
-  :body (db_insert $db-path $table $data)
-]
-
-[FUNC db-update :params [$db-path $table $data $where]
-  :body (db_update $db-path $table $data $where)
-]
-
-[FUNC db-delete :params [$db-path $table $where]
-  :body (db_delete_row $db-path $table $where)
-]
-
-;; ============ 로깅 및 디버깅 ============
-
-[FUNC log-info :params [$msg]
-  :body (println (str "[INFO] " (now_iso) " " $msg))
-]
-
-[FUNC log-error :params [$msg]
-  :body (println (str "[ERROR] " (now_iso) " " $msg))
-]
-
-[FUNC log-debug :params [$msg]
-  :body (println (str "[DEBUG] " (now_iso) " " $msg))
-]
-
-[FUNC req-log :params [$req]
-  :body (do
-    (log-info (str (req-method $req) " " (req-path $req)))
-    $req)
-]
-
-;; ============ WebSocket 래퍼 ============
-
-[FUNC ws-start :params [$port]
-  :body (do
-    (log-info (str "🌐 WebSocket 서버 시작 → ws://localhost:" $port))
-    (ws_start $port))
-]
-
-[FUNC ws-send-all :params [$msg]
-  :body (let [count (ws_broadcast $msg)]
-    (do
-      (log-info (str "📢 브로드캐스트: " (str $count) "명에게 전송"))
-      $count))
-]
-
-[FUNC ws-send-json-all :params [$obj]
-  :body (ws_broadcast_json $obj)
-]
-
-[FUNC ws-send-to :params [$client-id $msg]
-  :body (let [ok (ws_send $client-id $msg)]
-    (if ok
-      (log-info (str "📤 클라이언트 " (str $client-id) "에게 전송"))
-      (log-error (str "❌ 전송 실패: " (str $client-id)))))
-]
-
-[FUNC ws-send-json-to :params [$client-id $obj]
-  :body (ws_send_json $client-id $obj)
-]
-
-[FUNC ws-close-conn :params [$client-id $code]
-  :body (do
-    (log-info (str "🔌 연결 종료: " (str $client-id)))
-    (ws_close $client-id (or $code 1000)))
-]
-
-[FUNC ws-client-count
-  :body (ws_count)
-]
-
-[FUNC ws-client-list
-  :body (ws_clients)
-]
-
-;; ============ 캐싱 래퍼 ============
-
-[FUNC cache-set :params [$key $value $ttl]
-  :body (do
-    (cache_set $key $value (or $ttl 0))
-    (log-debug (str "💾 캐시 저장: " $key)))
-]
-
-[FUNC cache-get :params [$key]
-  :body (let [val (cache_get $key)]
-    (if val
-      (log-debug (str "✅ 캐시 히트: " $key))
-      (log-debug (str "❌ 캐시 미스: " $key)))
-    $val)
-]
-
-[FUNC cache-has :params [$key]
-  :body (cache_has $key)
-]
-
-[FUNC cache-del :params [$key]
-  :body (do
-    (cache_del $key)
-    (log-debug (str "🗑️ 캐시 삭제: " $key)))
-]
-
-[FUNC cache-clear :params []
-  :body (do
-    (cache_clear)
-    (log-info "🗑️ 캐시 전체 삭제"))
-]
-
-[FUNC cache-info
-  :body (let [size (cache_size)]
-    { :size size :timestamp (now_iso) })
-]
-
-;; ============ PubSub 래퍼 ============
-
-[FUNC pubsub-publish :params [$topic $data]
-  :body (let [count (pubsub_publish $topic $data)]
-    (do
-      (log-info (str "📡 발행: " $topic " → " (str count) "명 구독자"))
-      $count))
-]
-
-[FUNC pubsub-subscribe :params [$topic $handler-name]
-  :body (let [id (pubsub_subscribe $topic $handler-name)]
-    (do
-      (log-info (str "🔔 구독: " $topic))
-      $id))
-]
-
-[FUNC pubsub-unsubscribe :params [$subscription-id]
-  :body (let [ok (pubsub_unsubscribe $subscription-id)]
-    (do
-      (log-info (str "🔕 구독 해제"))
-      $ok))
-]
-
-[FUNC pubsub-topics
-  :body (pubsub_topics)
-]
-
-[FUNC pubsub-subscribers :params [$topic]
-  :body (pubsub_subscribers $topic)
-]
-
-;; ============ 인증 래퍼 (JWT) ============
-
-[FUNC auth-jwt-sign :params [$payload $secret $ttl]
+[FUNC echo-handler :params [$req]
   :body (let [
-    token (auth_jwt_sign $payload $secret (or $ttl 3600))
-  ]
-    (do
-      (log-debug (str "🔐 JWT 토큰 생성"))
-      $token))
+    [$path (req-path $req)]
+    [$method (req-method $req)]
+  ] (res-json {
+    :method $method
+    :path $path
+    :timestamp (now_ms)
+    :message "Echo server is running"
+  }))
 ]
 
-[FUNC auth-jwt-verify :params [$token $secret]
-  :body (let [
-    payload (auth_jwt_verify $token $secret)
-  ]
-    (if payload
-      (do
-        (log-debug "✅ JWT 검증 성공")
-        $payload)
-      (do
-        (log-warn "❌ JWT 검증 실패")
-        nil)))
+; ─────────────────────────────────────────────────────────────────
+; 6. 헬스체크 핸들러
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC health-handler :params [$req]
+  :body (res-json {
+    :status "ok"
+    :uptime (now_ms)
+  })
 ]
 
-[FUNC auth-jwt-decode :params [$token]
-  :body (auth_jwt_decode $token)
-]
-
-;; ============ 인증 래퍼 (암호화) ============
-
-[FUNC auth-hash-password :params [$password]
-  :body (auth_hash_password $password)
-]
-
-[FUNC auth-verify-password :params [$password $stored]
-  :body (auth_verify_password $password $stored)
-]
-
-[FUNC auth-random-token :params [$bytes]
-  :body (auth_random_token (or $bytes 32))
-]
-
-;; ============ 인증 래퍼 (API Key) ============
-
-[FUNC auth-extract-bearer :params [$req]
-  :body (let [
-    token (server_req_header $req "Authorization")
-  ]
-    (if token
-      (str-trim (str-split token " " 2))
-      nil))
-]
-
-[FUNC auth-get-apikey :params [$req]
-  :body (let [
-    key (or
-      (server_req_header $req "X-API-Key")
-      (server_req_query $req "api_key"))
-  ]
-    (if key key ""))
-]
-
-;; ============ 인증 미들웨어 ============
-
-[FUNC auth-middleware-jwt :params [$secret]
-  :body (middleware_auth_check nil)
-]
-
-[FUNC require-auth :params [$req]
-  :body (let [
-    token (auth-extract-bearer $req)
-  ]
-    (if token
-      { :authenticated true }
-      { :authenticated false}))
-]
-
-;; ============ 테스트 래퍼 (stdlib-test) ============
-
-[FUNC test-describe :params [$name $fn]
-  :body (let [
-    result (describe $name $fn)
-  ]
-    result)
-]
-
-[FUNC test-deftest :params [$name $fn]
-  :body (let [
-    result (deftest $name $fn)
-  ]
-    result)
-]
-
-[FUNC test-assert :params [$val $msg]
-  :body (assert $val (or $msg "Assertion failed"))
-]
-
-[FUNC test-assert-eq :params [$a $b $msg]
-  :body (assert-eq $a $b (or $msg (str "Expected " $b ", got " $a)))
-]
-
-[FUNC test-assert-neq :params [$a $b $msg]
-  :body (assert-neq $a $b (or $msg (str "Values should differ")))
-]
-
-[FUNC test-assert-throws :params [$fn $msg]
-  :body (assert-throws $fn (or $msg "Expected exception"))
-]
-
-[FUNC test-run :params []
-  :body (do
-    (log-info "🧪 테스트 실행")
-  )
-]
+(println "✓ Simple HTTP Echo Server loaded")
