@@ -32,5 +32,15 @@ echo "[build-runtime] http-server.js"
   --external:http --external:url --external:crypto \
   --log-level=warning
 
+echo "[build-runtime] interpreter.js (Y4-3 단계A — Interpreter+lex+parse 단일 번들)"
+"$ESBUILD" "$REPO/src/runtime-entry.ts" \
+  --bundle --platform=node --format=cjs \
+  --outfile="$REPO/self/runtime/interpreter.js" \
+  --external:fs --external:path --external:http --external:url \
+  --external:crypto --external:readline --external:os --external:child_process \
+  --external:net --external:tls --external:buffer --external:util \
+  --external:stream --external:events --external:zlib --external:querystring \
+  --log-level=error
+
 ls -la "$REPO/self/runtime/"
 echo "✅ self/runtime/ 빌드 완료"
