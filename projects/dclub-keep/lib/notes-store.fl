@@ -1,0 +1,105 @@
+;; notes-store.fl — notes + FTS5 가상 테이블 + 동기 트리거
+
+[FUNC notes-ensure-tables :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS notes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner       TEXT NOT NULL,
+      title       TEXT,
+      content     TEXT NOT NULL,
+      color       TEXT DEFAULT '#1a2028',
+      pinned      INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner, updated_at DESC)")
+
+    ;; FTS5 — owner 도 포함시켜 owner 별 격리 검색 가능
+    (db_create $db "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+      title, content, owner UNINDEXED,
+      content='notes', content_rowid='id'
+    )")
+    ;; AFTER INSERT 트리거
+    (db_create $db "CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes
+      BEGIN INSERT INTO notes_fts(rowid, title, content, owner)
+            VALUES (new.id, new.title, new.content, new.owner); END")
+    ;; AFTER DELETE
+    (db_create $db "CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes
+      BEGIN INSERT INTO notes_fts(notes_fts, rowid, title, content, owner)
+            VALUES('delete', old.id, old.title, old.content, old.owner); END")
+    ;; AFTER UPDATE
+    (db_create $db "CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes
+      BEGIN INSERT INTO notes_fts(notes_fts, rowid, title, content, owner)
+            VALUES('delete', old.id, old.title, old.content, old.owner);
+            INSERT INTO notes_fts(rowid, title, content, owner)
+            VALUES (new.id, new.title, new.content, new.owner); END"))]
+
+[FUNC notes-create :params [$db $owner $title $content $color]
+  :body (let [now (now_iso)]
+    (do
+      (db_insert $db "notes" {
+        :owner $owner
+        :title (or $title "")
+        :content $content
+        :color (or $color "#1a2028")
+        :pinned 0
+        :created_at $now
+        :updated_at $now
+      })
+      (let [
+        rows (db_query $db
+          "SELECT id FROM notes WHERE owner=? ORDER BY id DESC LIMIT 1"
+          [$owner])
+      ]
+        (if (= (length $rows) 0) nil (get (get $rows 0) "id")))))]
+
+[FUNC notes-find :params [$db $id $owner]
+  :body (let [
+    rows (db_query $db
+      "SELECT id, owner, title, content, color, pinned, created_at, updated_at
+       FROM notes WHERE id=? AND owner=?"
+      [$id $owner])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC notes-list :params [$db $owner]
+  :body (db_query $db
+    "SELECT id, owner, title, content, color, pinned, created_at, updated_at
+     FROM notes WHERE owner=?
+     ORDER BY pinned DESC, updated_at DESC LIMIT 200"
+    [$owner])]
+
+[FUNC notes-update :params [$db $id $owner $title $content $color $pinned]
+  :body (let [
+    found (notes-find $db $id $owner)
+  ]
+    (if (= $found nil)
+      false
+      (do
+        (db_update $db "notes" {
+          :title (or $title (get $found "title"))
+          :content (or $content (get $found "content"))
+          :color (or $color (get $found "color"))
+          :pinned (if (= $pinned nil) (get $found "pinned") $pinned)
+          :updated_at (now_iso)
+        } (str "id=" $id " AND owner='" $owner "'"))
+        true)))]
+
+[FUNC notes-delete :params [$db $id $owner]
+  :body (let [
+    found (notes-find $db $id $owner)
+  ]
+    (if (= $found nil)
+      false
+      (do
+        (db_delete_row $db "notes" (str "id=" $id " AND owner='" $owner "'"))
+        true)))]
+
+;; FTS5 검색 — owner 격리
+[FUNC notes-search :params [$db $owner $query]
+  :body (db_query $db
+    "SELECT n.id, n.owner, n.title, n.content, n.color, n.pinned,
+            n.created_at, n.updated_at
+     FROM notes n JOIN notes_fts f ON n.id = f.rowid
+     WHERE notes_fts MATCH ? AND n.owner=? ORDER BY rank LIMIT 50"
+    [$query $owner])]
