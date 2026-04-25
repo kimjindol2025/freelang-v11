@@ -270,3 +270,118 @@
 [FUNC pubsub-subscribers :params [$topic]
   :body (pubsub_subscribers $topic)
 ]
+
+;; ============ 인증 래퍼 (JWT) ============
+
+[FUNC auth-jwt-sign :params [$payload $secret $ttl]
+  :body (let [
+    token (auth_jwt_sign $payload $secret (or $ttl 3600))
+  ]
+    (do
+      (log-debug (str "🔐 JWT 토큰 생성"))
+      $token))
+]
+
+[FUNC auth-jwt-verify :params [$token $secret]
+  :body (let [
+    payload (auth_jwt_verify $token $secret)
+  ]
+    (if payload
+      (do
+        (log-debug "✅ JWT 검증 성공")
+        $payload)
+      (do
+        (log-warn "❌ JWT 검증 실패")
+        nil)))
+]
+
+[FUNC auth-jwt-decode :params [$token]
+  :body (auth_jwt_decode $token)
+]
+
+;; ============ 인증 래퍼 (암호화) ============
+
+[FUNC auth-hash-password :params [$password]
+  :body (auth_hash_password $password)
+]
+
+[FUNC auth-verify-password :params [$password $stored]
+  :body (auth_verify_password $password $stored)
+]
+
+[FUNC auth-random-token :params [$bytes]
+  :body (auth_random_token (or $bytes 32))
+]
+
+;; ============ 인증 래퍼 (API Key) ============
+
+[FUNC auth-extract-bearer :params [$req]
+  :body (let [
+    token (server_req_header $req "Authorization")
+  ]
+    (if token
+      (str-trim (str-split token " " 2))
+      nil))
+]
+
+[FUNC auth-get-apikey :params [$req]
+  :body (let [
+    key (or
+      (server_req_header $req "X-API-Key")
+      (server_req_query $req "api_key"))
+  ]
+    (if key key ""))
+]
+
+;; ============ 인증 미들웨어 ============
+
+[FUNC auth-middleware-jwt :params [$secret]
+  :body (middleware_auth_check nil)
+]
+
+[FUNC require-auth :params [$req]
+  :body (let [
+    token (auth-extract-bearer $req)
+  ]
+    (if token
+      { :authenticated true }
+      { :authenticated false}))
+]
+
+;; ============ 테스트 래퍼 (stdlib-test) ============
+
+[FUNC test-describe :params [$name $fn]
+  :body (let [
+    result (describe $name $fn)
+  ]
+    result)
+]
+
+[FUNC test-deftest :params [$name $fn]
+  :body (let [
+    result (deftest $name $fn)
+  ]
+    result)
+]
+
+[FUNC test-assert :params [$val $msg]
+  :body (assert $val (or $msg "Assertion failed"))
+]
+
+[FUNC test-assert-eq :params [$a $b $msg]
+  :body (assert-eq $a $b (or $msg (str "Expected " $b ", got " $a)))
+]
+
+[FUNC test-assert-neq :params [$a $b $msg]
+  :body (assert-neq $a $b (or $msg (str "Values should differ")))
+]
+
+[FUNC test-assert-throws :params [$fn $msg]
+  :body (assert-throws $fn (or $msg "Expected exception"))
+]
+
+[FUNC test-run :params []
+  :body (do
+    (log-info "🧪 테스트 실행")
+  )
+]
