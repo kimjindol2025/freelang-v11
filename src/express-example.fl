@@ -1,0 +1,103 @@
+;; ============================================
+;; Express.fl 사용 예제
+;; ============================================
+;; 실행: node bootstrap.js run express-example.fl
+;; 테스트:
+;;   curl http://localhost:3000/
+;;   curl http://localhost:3000/api/users/123
+;;   curl -X POST http://localhost:3000/api/users
+
+(load "src/express.fl")
+
+;; ============ 핸들러 함수 정의 ============
+
+[FUNC home :params [$req]
+  :body (res-json {
+    :message "Hello FreeLang Express!"
+    :version "1.0.0"
+    :timestamp (now_ms)
+  })
+]
+
+[FUNC get-users :params [$req]
+  :body (res-json {
+    :users [
+      { :id 1 :name "홍길동" :role "admin" }
+      { :id 2 :name "김영희" :role "user" }
+      { :id 3 :name "이순신" :role "user" }
+    ]
+  })
+]
+
+[FUNC get-user :params [$req]
+  :body (let [id (req-param $req "id")]
+    (res-json {
+      :id id
+      :name (str "사용자" id)
+      :email (str "user" id "@example.com")
+    }))
+]
+
+[FUNC create-user :params [$req]
+  :body (let [body (req-body $req)]
+    (res-status 201 {
+      :id 4
+      :name (get body "name")
+      :email (get body "email")
+      :created true
+    }))
+]
+
+[FUNC update-user :params [$req]
+  :body (let [
+    id (req-param $req "id")
+    body (req-body $req)
+  ]
+    (res-json {
+      :id id
+      :updated true
+      :data $body
+    }))
+]
+
+[FUNC delete-user :params [$req]
+  :body (let [id (req-param $req "id")]
+    (res-json {
+      :id id
+      :deleted true
+      :message (str "사용자 " id "가 삭제되었습니다")
+    }))
+]
+
+[FUNC health :params [$req]
+  :body (res-json {
+    :status "OK"
+    :server "Express.fl"
+    :time (now_ms)
+  })
+]
+
+;; ============ 라우트 등록 ============
+
+(do
+  (println "📝 라우트 등록 중...")
+
+  ;; 헬스 체크
+  (app-get "/health" "health")
+
+  ;; 홈
+  (app-get "/" "home")
+
+  ;; 사용자 API
+  (app-get "/api/users" "get-users")
+  (app-get "/api/users/:id" "get-user")
+  (app-post "/api/users" "create-user")
+  (app-put "/api/users/:id" "update-user")
+  (app-delete "/api/users/:id" "delete-user")
+
+  (println "✅ 라우트 등록 완료")
+  (println "")
+
+  ;; 서버 시작
+  (app-listen 3000)
+)
