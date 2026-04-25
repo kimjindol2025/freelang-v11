@@ -1,0 +1,1102 @@
+{
+  "label": "claude-haiku-4.5",
+  "provider": "claude-cli",
+  "timestamp": "2026-04-25T14:46:56.956Z",
+  "elapsed_seconds": 1639.3,
+  "total": 103,
+  "passed": 62,
+  "score": 60.2,
+  "by_category": {
+    "arithmetic": {
+      "pass": 4,
+      "total": 5
+    },
+    "list": {
+      "pass": 9,
+      "total": 12
+    },
+    "string": {
+      "pass": 7,
+      "total": 12
+    },
+    "error-handling": {
+      "pass": 4,
+      "total": 5
+    },
+    "recursion": {
+      "pass": 2,
+      "total": 2
+    },
+    "data-transform": {
+      "pass": 6,
+      "total": 13
+    },
+    "defstruct": {
+      "pass": 2,
+      "total": 2
+    },
+    "pattern-match": {
+      "pass": 1,
+      "total": 5
+    },
+    "map": {
+      "pass": 7,
+      "total": 8
+    },
+    "json": {
+      "pass": 2,
+      "total": 2
+    },
+    "file-io": {
+      "pass": 2,
+      "total": 5
+    },
+    "state-machine": {
+      "pass": 2,
+      "total": 5
+    },
+    "higher-order": {
+      "pass": 1,
+      "total": 4
+    },
+    "binding": {
+      "pass": 1,
+      "total": 1
+    },
+    "module": {
+      "pass": 1,
+      "total": 1
+    },
+    "regex": {
+      "pass": 0,
+      "total": 5
+    },
+    "time": {
+      "pass": 1,
+      "total": 1
+    },
+    "math": {
+      "pass": 4,
+      "total": 4
+    },
+    "algorithm": {
+      "pass": 2,
+      "total": 6
+    },
+    "functional": {
+      "pass": 4,
+      "total": 5
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "pass": 25,
+      "total": 34
+    },
+    "medium": {
+      "pass": 29,
+      "total": 55
+    },
+    "hard": {
+      "pass": 8,
+      "total": 14
+    }
+  },
+  "results": [
+    {
+      "id": "T01_arithmetic_basic",
+      "category": "arithmetic",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10847,
+      "stdout": "8\n",
+      "response_length": 197
+    },
+    {
+      "id": "T02_list_filter",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 17321,
+      "stdout": "[\n  2,\n  4,\n  6\n]\n",
+      "response_length": 142
+    },
+    {
+      "id": "T03_string_reverse",
+      "category": "string",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14904,
+      "stdout": "olleh\n",
+      "response_length": 210
+    },
+    {
+      "id": "T04_nil_safe_get",
+      "category": "error-handling",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11946,
+      "stdout": "unknown\nunknown\nAlice\n",
+      "response_length": 264
+    },
+    {
+      "id": "T05_recursion_factorial",
+      "category": "recursion",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11934,
+      "stdout": "120\n",
+      "response_length": 311
+    },
+    {
+      "id": "T06_arithmetic_gcd",
+      "category": "arithmetic",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 13018,
+      "response_length": 260
+    },
+    {
+      "id": "T07_arithmetic_fib",
+      "category": "arithmetic",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12273,
+      "stdout": "55\n",
+      "response_length": 221
+    },
+    {
+      "id": "T08_arithmetic_power",
+      "category": "arithmetic",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 18148,
+      "stdout": "1024\n",
+      "response_length": 169
+    },
+    {
+      "id": "T09_arithmetic_sum_range",
+      "category": "arithmetic",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12575,
+      "stdout": "5050\n",
+      "response_length": 149
+    },
+    {
+      "id": "T100_combo_full_pipeline",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": false,
+      "error": "실행 실패: E_PARSE_UNEXPECTED_TOKEN",
+      "elapsed_ms": 14495,
+      "response_length": 458
+    },
+    {
+      "id": "T101_defstruct_simple",
+      "category": "defstruct",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14115,
+      "stdout": "3\n",
+      "response_length": 185
+    },
+    {
+      "id": "T102_defstruct_typed",
+      "category": "defstruct",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14612,
+      "stdout": "30\n",
+      "response_length": 155
+    },
+    {
+      "id": "T103_match_basic",
+      "category": "pattern-match",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_PARSE_UNEXPECTED_TOKEN",
+      "elapsed_ms": 14714,
+      "response_length": 186
+    },
+    {
+      "id": "T10_list_map_double",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12782,
+      "stdout": "[2, 4, 6]\n",
+      "response_length": 102
+    },
+    {
+      "id": "T11_list_reduce_max",
+      "category": "list",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 20922,
+      "stdout": "9\n",
+      "response_length": 152
+    },
+    {
+      "id": "T12_list_length",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13973,
+      "stdout": "5\n",
+      "response_length": 93
+    },
+    {
+      "id": "T13_list_reverse",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10946,
+      "stdout": "[3, 2, 1]\n",
+      "response_length": 193
+    },
+    {
+      "id": "T14_list_first_last",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 17801,
+      "stdout": "10 50\n",
+      "response_length": 167
+    },
+    {
+      "id": "T15_list_count_even",
+      "category": "list",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 18702,
+      "response_length": 195
+    },
+    {
+      "id": "T16_string_upper",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 12010,
+      "response_length": 111
+    },
+    {
+      "id": "T17_string_split_count",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": false,
+      "error": null,
+      "elapsed_ms": 11608,
+      "stdout": "1\n",
+      "response_length": 198
+    },
+    {
+      "id": "T18_string_concat",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10093,
+      "stdout": "Hello, World!\n",
+      "response_length": 339
+    },
+    {
+      "id": "T19_string_starts_with",
+      "category": "string",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11086,
+      "stdout": "true\n",
+      "response_length": 212
+    },
+    {
+      "id": "T20_string_replace",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 9192,
+      "response_length": 92
+    },
+    {
+      "id": "T21_map_get",
+      "category": "map",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11610,
+      "stdout": "Alice\n",
+      "response_length": 149
+    },
+    {
+      "id": "T22_map_keys",
+      "category": "map",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14042,
+      "stdout": "3\n",
+      "response_length": 117
+    },
+    {
+      "id": "T23_json_stringify",
+      "category": "json",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13892,
+      "stdout": "{\"name\":\"Bob\",\"age\":25}\n",
+      "response_length": 192
+    },
+    {
+      "id": "T24_json_parse",
+      "category": "json",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12039,
+      "stdout": "42\n",
+      "response_length": 116
+    },
+    {
+      "id": "T25_map_values_sum",
+      "category": "map",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 15201,
+      "response_length": 209
+    },
+    {
+      "id": "T26_file_write_read",
+      "category": "file-io",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 24005,
+      "response_length": 317
+    },
+    {
+      "id": "T27_file_exists",
+      "category": "file-io",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "응답에서 .fl 코드 추출 실패",
+      "elapsed_ms": 21282,
+      "response_length": 43
+    },
+    {
+      "id": "T28_file_lines_count",
+      "category": "file-io",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 19490,
+      "stdout": "3\n",
+      "response_length": 353
+    },
+    {
+      "id": "T29_file_append",
+      "category": "file-io",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "응답에서 .fl 코드 추출 실패",
+      "elapsed_ms": 27286,
+      "response_length": 62
+    },
+    {
+      "id": "T30_file_json",
+      "category": "file-io",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 15996,
+      "stdout": "FreeLang\n",
+      "response_length": 312
+    },
+    {
+      "id": "T31_error_try_catch",
+      "category": "error-handling",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 24715,
+      "response_length": 597
+    },
+    {
+      "id": "T32_error_safe_divide",
+      "category": "error-handling",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13441,
+      "stdout": "5\nerror\n",
+      "response_length": 269
+    },
+    {
+      "id": "T33_error_validation",
+      "category": "error-handling",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11058,
+      "stdout": "positive\nnegative\nzero\n",
+      "response_length": 287
+    },
+    {
+      "id": "T34_error_default",
+      "category": "error-handling",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 23612,
+      "stdout": "empty\n1\n",
+      "response_length": 445
+    },
+    {
+      "id": "T35_pattern_describe",
+      "category": "pattern-match",
+      "difficulty": "medium",
+      "pass": false,
+      "error": null,
+      "elapsed_ms": 13376,
+      "stdout": "$array\",\n        \"fields\": {}\n      },\n      {\n        \"kind\": \"block\",\n        \"type\": \"Array\",\n        \"name\": \"$array\",\n        \"fields\": {}\n      }\n    ],\n    \"line\": 2\n  },\n  \"capturedEnv\": {}\n}\n",
+      "response_length": 356
+    },
+    {
+      "id": "T36_pattern_grade",
+      "category": "pattern-match",
+      "difficulty": "medium",
+      "pass": false,
+      "error": null,
+      "elapsed_ms": 11020,
+      "stdout": "$array\",\n        \"fields\": {}\n      },\n      {\n        \"kind\": \"block\",\n        \"type\": \"Array\",\n        \"name\": \"$array\",\n        \"fields\": {}\n      }\n    ],\n    \"line\": 2\n  },\n  \"capturedEnv\": {}\n}\n",
+      "response_length": 177
+    },
+    {
+      "id": "T37_state_traffic",
+      "category": "state-machine",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14115,
+      "stdout": "green\nyellow\nred\n",
+      "response_length": 359
+    },
+    {
+      "id": "T38_state_counter",
+      "category": "state-machine",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 17278,
+      "response_length": 418
+    },
+    {
+      "id": "T39_higher_compose",
+      "category": "higher-order",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_ARG_COUNT",
+      "elapsed_ms": 16933,
+      "response_length": 260
+    },
+    {
+      "id": "T40_threading_first",
+      "category": "higher-order",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12320,
+      "stdout": "101\n",
+      "response_length": 127
+    },
+    {
+      "id": "T41_threading_last",
+      "category": "higher-order",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 13751,
+      "response_length": 354
+    },
+    {
+      "id": "T42_higher_apply",
+      "category": "higher-order",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 11167,
+      "response_length": 185
+    },
+    {
+      "id": "T43_let_binding",
+      "category": "binding",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 9785,
+      "stdout": "30\n",
+      "response_length": 97
+    },
+    {
+      "id": "T44_recursive_sum",
+      "category": "recursion",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13410,
+      "stdout": "55\n",
+      "response_length": 203
+    },
+    {
+      "id": "T45_map_filter_chain",
+      "category": "data-transform",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 17476,
+      "response_length": 335
+    },
+    {
+      "id": "T46_users_filter",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14838,
+      "stdout": "[Alice, Charlie]\n",
+      "response_length": 265
+    },
+    {
+      "id": "T47_avg_score",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14933,
+      "stdout": "84\n",
+      "response_length": 299
+    },
+    {
+      "id": "T48_count_words",
+      "category": "string",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13450,
+      "stdout": "4\n",
+      "response_length": 106
+    },
+    {
+      "id": "T49_use_module",
+      "category": "module",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13564,
+      "stdout": "2\n",
+      "response_length": 333
+    },
+    {
+      "id": "T50_pipeline_complete",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 15888,
+      "response_length": 396
+    },
+    {
+      "id": "T51_regex_match",
+      "category": "regex",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 30852,
+      "response_length": 379
+    },
+    {
+      "id": "T52_regex_extract",
+      "category": "regex",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 11901,
+      "response_length": 192
+    },
+    {
+      "id": "T53_regex_replace",
+      "category": "regex",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 25641,
+      "response_length": 337
+    },
+    {
+      "id": "T54_regex_split",
+      "category": "regex",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 37181,
+      "response_length": 509
+    },
+    {
+      "id": "T55_regex_email",
+      "category": "regex",
+      "difficulty": "hard",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 49745,
+      "response_length": 654
+    },
+    {
+      "id": "T56_time_unix",
+      "category": "time",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 17373,
+      "stdout": "true\n",
+      "response_length": 290
+    },
+    {
+      "id": "T57_math_abs",
+      "category": "math",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10149,
+      "stdout": "7\n",
+      "response_length": 66
+    },
+    {
+      "id": "T58_math_min_max",
+      "category": "math",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 21218,
+      "stdout": "1\n9\n",
+      "response_length": 241
+    },
+    {
+      "id": "T59_math_sqrt",
+      "category": "math",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 9902,
+      "stdout": "12\n",
+      "response_length": 50
+    },
+    {
+      "id": "T60_math_floor",
+      "category": "math",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14573,
+      "stdout": "3\n4\n",
+      "response_length": 123
+    },
+    {
+      "id": "T61_list_sort",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 17351,
+      "response_length": 214
+    },
+    {
+      "id": "T62_list_unique",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 17048,
+      "stdout": "4\n",
+      "response_length": 385
+    },
+    {
+      "id": "T63_list_take",
+      "category": "list",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10822,
+      "stdout": "[0, 1, 2]\n",
+      "response_length": 43
+    },
+    {
+      "id": "T64_list_chunk",
+      "category": "list",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 24411,
+      "response_length": 500
+    },
+    {
+      "id": "T65_list_flatten",
+      "category": "list",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 36098,
+      "stdout": "5\n",
+      "response_length": 377
+    },
+    {
+      "id": "T66_map_merge",
+      "category": "map",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10980,
+      "stdout": "2\n",
+      "response_length": 251
+    },
+    {
+      "id": "T67_map_entries",
+      "category": "map",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 15689,
+      "stdout": "3\n",
+      "response_length": 257
+    },
+    {
+      "id": "T68_json_set",
+      "category": "map",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13737,
+      "stdout": "99\n",
+      "response_length": 115
+    },
+    {
+      "id": "T69_map_count",
+      "category": "map",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11864,
+      "stdout": "3\n",
+      "response_length": 182
+    },
+    {
+      "id": "T70_map_lookup",
+      "category": "map",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10815,
+      "stdout": "100\n",
+      "response_length": 205
+    },
+    {
+      "id": "T71_str_repeat",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 15370,
+      "response_length": 269
+    },
+    {
+      "id": "T72_str_join",
+      "category": "string",
+      "difficulty": "medium",
+      "pass": false,
+      "error": null,
+      "elapsed_ms": 10656,
+      "stdout": "\n",
+      "response_length": 112
+    },
+    {
+      "id": "T73_str_lowercase",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12050,
+      "stdout": "hello world\n",
+      "response_length": 122
+    },
+    {
+      "id": "T74_str_trim",
+      "category": "string",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 13930,
+      "stdout": "5\n",
+      "response_length": 133
+    },
+    {
+      "id": "T75_str_index",
+      "category": "string",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10553,
+      "stdout": "6\n",
+      "response_length": 137
+    },
+    {
+      "id": "T76_algo_fizzbuzz",
+      "category": "algorithm",
+      "difficulty": "medium",
+      "pass": false,
+      "error": null,
+      "elapsed_ms": 10803,
+      "stdout": "$array\",\n        \"fields\": {}\n      },\n      {\n        \"kind\": \"block\",\n        \"type\": \"Array\",\n        \"name\": \"$array\",\n        \"fields\": {}\n      }\n    ],\n    \"line\": 2\n  },\n  \"capturedEnv\": {}\n}\n",
+      "response_length": 208
+    },
+    {
+      "id": "T77_algo_palindrome",
+      "category": "algorithm",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 30779,
+      "response_length": 484
+    },
+    {
+      "id": "T78_algo_isprime",
+      "category": "algorithm",
+      "difficulty": "hard",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 17811,
+      "response_length": 463
+    },
+    {
+      "id": "T79_algo_count_digits",
+      "category": "algorithm",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14848,
+      "stdout": "5\n",
+      "response_length": 128
+    },
+    {
+      "id": "T80_algo_sum_digits",
+      "category": "algorithm",
+      "difficulty": "hard",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 10944,
+      "response_length": 383
+    },
+    {
+      "id": "T81_fp_closure",
+      "category": "functional",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11310,
+      "stdout": "15\n",
+      "response_length": 233
+    },
+    {
+      "id": "T82_fp_repeat",
+      "category": "functional",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 15069,
+      "stdout": "3\n",
+      "response_length": 309
+    },
+    {
+      "id": "T83_fp_partial",
+      "category": "functional",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 15285,
+      "stdout": "18\n",
+      "response_length": 283
+    },
+    {
+      "id": "T84_fp_compose_chain",
+      "category": "functional",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 15366,
+      "response_length": 316
+    },
+    {
+      "id": "T85_fp_callback",
+      "category": "functional",
+      "difficulty": "easy",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11134,
+      "stdout": "10\n",
+      "response_length": 216
+    },
+    {
+      "id": "T86_data_distinct",
+      "category": "data-transform",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 16817,
+      "response_length": 317
+    },
+    {
+      "id": "T87_data_max_by",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 46084,
+      "stdout": "b\n",
+      "response_length": 446
+    },
+    {
+      "id": "T88_data_sum_by",
+      "category": "data-transform",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 12785,
+      "response_length": 266
+    },
+    {
+      "id": "T89_data_min_by",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": false,
+      "error": "실행 실패: E_FN_NOT_FOUND",
+      "elapsed_ms": 16238,
+      "response_length": 205
+    },
+    {
+      "id": "T90_data_count_by_pred",
+      "category": "data-transform",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: unknown",
+      "elapsed_ms": 17542,
+      "response_length": 173
+    },
+    {
+      "id": "T91_state_door",
+      "category": "state-machine",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "응답에서 .fl 코드 추출 실패",
+      "elapsed_ms": 11687,
+      "response_length": 165
+    },
+    {
+      "id": "T92_pattern_classify",
+      "category": "pattern-match",
+      "difficulty": "medium",
+      "pass": false,
+      "error": null,
+      "elapsed_ms": 12185,
+      "stdout": "$array\",\n        \"fields\": {}\n      },\n      {\n        \"kind\": \"block\",\n        \"type\": \"Array\",\n        \"name\": \"$array\",\n        \"fields\": {}\n      }\n    ],\n    \"line\": 2\n  },\n  \"capturedEnv\": {}\n}\n",
+      "response_length": 191
+    },
+    {
+      "id": "T93_state_session",
+      "category": "state-machine",
+      "difficulty": "medium",
+      "pass": false,
+      "error": "실행 실패: E_PARSE_UNEXPECTED_TOKEN",
+      "elapsed_ms": 12037,
+      "response_length": 379
+    },
+    {
+      "id": "T94_pattern_validate",
+      "category": "pattern-match",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 10725,
+      "stdout": "true\n",
+      "response_length": 263
+    },
+    {
+      "id": "T95_state_machine_count",
+      "category": "state-machine",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 14718,
+      "stdout": "2\n",
+      "response_length": 368
+    },
+    {
+      "id": "T96_combo_word_count",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 11526,
+      "stdout": "9\n",
+      "response_length": 149
+    },
+    {
+      "id": "T97_combo_average_in_range",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 15010,
+      "stdout": "5.5\n",
+      "response_length": 289
+    },
+    {
+      "id": "T98_combo_squares_sum",
+      "category": "algorithm",
+      "difficulty": "medium",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 12652,
+      "stdout": "385\n",
+      "response_length": 191
+    },
+    {
+      "id": "T99_combo_event_log",
+      "category": "data-transform",
+      "difficulty": "hard",
+      "pass": true,
+      "error": null,
+      "elapsed_ms": 15060,
+      "stdout": "2\n",
+      "response_length": 320
+    }
+  ]
+}

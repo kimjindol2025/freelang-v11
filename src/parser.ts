@@ -773,6 +773,11 @@ export class Parser {
       if (exprs.length === 1) return exprs[0] as SExpr;
       // Multiple exprs: wrap in "do" S-expr
       return { kind: "sexpr" as const, op: "do", args: exprs } as SExpr;
+    } else if (opToken.type === T.Variable) {
+      // P0-2 후속 (2026-04-25): Variable도 sexpr op으로 허용 — 사용자 #3 함정 해소
+      // 예: [FUNC f :params [$pred] :body ($pred 5)]
+      // op = "$pred" → evalSExpr → callFunction → variables fallback (P0-2 fix가 처리)
+      op = opToken.value.startsWith("$") ? opToken.value : "$" + opToken.value;
     } else if (opToken.type !== T.Symbol) {
       throw this.error(`Expected operator (symbol or keyword) in S-expression, got ${opToken.type}`, opToken);
     } else {
