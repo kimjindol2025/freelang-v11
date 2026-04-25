@@ -15,4 +15,6 @@
     :access_token_lifetime 3600
     :code_lifetime 60
     :refresh_lifetime 2592000
+    :mail_outbox (config-get "DCLUB_AUTH_MAIL_OUTBOX" "/tmp/dclub-auth-outbox")
+    :mail_from (config-get "DCLUB_AUTH_MAIL_FROM" "no-reply@dclub.kr")
   }]

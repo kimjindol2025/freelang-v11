@@ -18,6 +18,7 @@
 (load "projects/dclub-auth/lib/audit-log.fl")
 (load "projects/dclub-auth/lib/mfa-store.fl")
 (load "projects/dclub-auth/lib/user-tokens.fl")
+(load "projects/dclub-auth/lib/mail.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
 (load "projects/dclub-auth/app/authorize.fl")
