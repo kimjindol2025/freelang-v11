@@ -868,6 +868,50 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return result;
     }
 
+    // P3 (2026-04-25): 작은 함수형 stdlib — AI가 자연스럽게 짜는 패턴
+    case "identity":
+      return args[0];
+    case "comp": {
+      // (comp f g h) → (fn [x] (f (g (h x))))
+      const fns = args.filter(a => a != null);
+      const callOne = (fn: any, callArgs: any[]) => {
+        if (typeof fn === "function") return fn(...callArgs);
+        if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
+        return null;
+      };
+      return (...callArgs: any[]) => {
+        if (fns.length === 0) return callArgs[0];
+        let result = callOne(fns[fns.length - 1], callArgs);
+        for (let i = fns.length - 2; i >= 0; i--) result = callOne(fns[i], [result]);
+        return result;
+      };
+    }
+    case "juxt": {
+      // (juxt f g h) → (fn [x] [(f x) (g x) (h x)])
+      const fns = args.filter(a => a != null);
+      const callOne = (fn: any, callArgs: any[]) => {
+        if (typeof fn === "function") return fn(...callArgs);
+        if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
+        return null;
+      };
+      return (...callArgs: any[]) => fns.map(fn => callOne(fn, callArgs));
+    }
+    case "constantly": {
+      // (constantly v) → (fn [...args] v) — 인자 무시하고 v 반환
+      const v = args[0];
+      return (..._callArgs: any[]) => v;
+    }
+    case "complement": {
+      // (complement pred) → (fn [x] (not (pred x)))
+      const pred = args[0];
+      const callOne = (fn: any, callArgs: any[]) => {
+        if (typeof fn === "function") return fn(...callArgs);
+        if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
+        return null;
+      };
+      return (...callArgs: any[]) => !callOne(pred, callArgs);
+    }
+
     // Array/Collection
     case "list":
       return args;

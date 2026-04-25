@@ -1,0 +1,67 @@
+[Unit]
+Description=dclub-auth — FreeLang OIDC IdP
+Documentation=https://gogs.dclub.kr/kim/freelang-v11
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dclub-auth
+Group=dclub-auth
+
+# 환경 파일 (운영자가 /etc/dclub-auth/env 에 배포)
+EnvironmentFile=/etc/dclub-auth/env
+
+# 작업 디렉터리 — bootstrap.js 가 있는 경로
+WorkingDirectory=/opt/dclub-auth
+
+# 실행 명령
+ExecStart=/usr/bin/node /opt/dclub-auth/bootstrap.js run /opt/dclub-auth/projects/dclub-auth/app/server.fl
+
+# 종료 시 정상 종료 시도, 5초 후 강제
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=5
+
+# 자동 재시작 (크래시 / OOM)
+Restart=on-failure
+RestartSec=3
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# 로그 — journald + 파일
+StandardOutput=append:/var/log/dclub-auth/server.log
+StandardError=append:/var/log/dclub-auth/error.log
+SyslogIdentifier=dclub-auth
+
+# ── 보안 강화 ────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+# 쓰기 가능 경로
+ReadWritePaths=/var/lib/dclub-auth /var/log/dclub-auth /tmp
+
+# 자원 제한
+LimitNOFILE=8192
+MemoryMax=512M
+TasksMax=256
+
+# 네트워크 — 30100 포트만 listen (nginx가 외부 노출)
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

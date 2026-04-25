@@ -477,6 +477,72 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return evalLet(interp, expr.args);
   }
 
+  // ── if-let / when-let / when / unless (P3, 2026-04-25) ──────────────
+  // (if-let [[x expr]] then else?) — expr 평가해서 truthy면 x 바인딩 + then, 아니면 else
+  // (when-let [[x expr]] body...) — truthy면 x 바인딩 + body, 아니면 nil
+  // (when cond body...) — cond truthy면 body 실행, 아니면 nil
+  // (unless cond body...) — cond falsy면 body 실행
+  if (op === "if-let" || op === "when-let") {
+    if (expr.args.length < 2) throwArgCount(op, ">=2", expr.args.length, expr.line);
+    const bindingsNode = expr.args[0] as any;
+    const items: any[] =
+      bindingsNode.kind === "block" && bindingsNode.type === "Array"
+        ? bindingsNode.fields?.get("items") ?? []
+        : [];
+    if (items.length < 1) throwInvalidForm(op, "binding 형태가 [[var expr]] 이어야 함", expr.line);
+    // 첫 번째 binding만 사용
+    const firstPair = items[0] as any;
+    const pairItems: any[] =
+      firstPair.kind === "block" && firstPair.type === "Array"
+        ? firstPair.fields?.get("items") ?? []
+        : [];
+    if (pairItems.length < 2) throwInvalidForm(op, "[[var expr]] 형태가 잘못됨", expr.line);
+    const varName = pairItems[0].kind === "variable" ? pairItems[0].name
+      : pairItems[0].kind === "literal" ? String(pairItems[0].value) : "";
+    const value = ev(pairItems[1]);
+    const truthy = value !== null && value !== undefined && value !== false;
+    if (truthy) {
+      interp.context.variables.push();
+      try {
+        interp.context.variables.set(varName, value);
+        if (op === "if-let") {
+          // (if-let [[x expr]] then else?)
+          return ev(expr.args[1]);
+        } else {
+          // (when-let [[x expr]] body...) — body는 args[1..]
+          let result: any = null;
+          for (let i = 1; i < expr.args.length; i++) result = ev(expr.args[i]);
+          return result;
+        }
+      } finally {
+        interp.context.variables.pop();
+      }
+    } else {
+      if (op === "if-let" && expr.args.length >= 3) return ev(expr.args[2]);
+      return null;
+    }
+  }
+  if (op === "when") {
+    if (expr.args.length < 2) throwArgCount("when", ">=2", expr.args.length, expr.line);
+    const c = ev(expr.args[0]);
+    if (c !== null && c !== undefined && c !== false) {
+      let result: any = null;
+      for (let i = 1; i < expr.args.length; i++) result = ev(expr.args[i]);
+      return result;
+    }
+    return null;
+  }
+  if (op === "unless") {
+    if (expr.args.length < 2) throwArgCount("unless", ">=2", expr.args.length, expr.line);
+    const c = ev(expr.args[0]);
+    if (c === null || c === undefined || c === false) {
+      let result: any = null;
+      for (let i = 1; i < expr.args.length; i++) result = ev(expr.args[i]);
+      return result;
+    }
+    return null;
+  }
+
   // ── set ───────────────────────────────────────────────────────────
   if (op === "set") {
     if (expr.args.length !== 2) throwArgCount("set", "exactly 2", expr.args.length, expr.line);
@@ -1119,6 +1185,31 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
 // ── Helper: evalCond ──────────────────────────────────────────────
 function evalCond(interp: Interpreter, args: ASTNode[]): any {
   const ev = (node: any) => (interp as any).eval(node);
+
+  // P1-1 (2026-04-25): flat-pair 자동 감지
+  // (cond test1 result1 test2 result2 default)  ← Common Lisp 스타일
+  // 분류 규칙: 첫 인자가 block(Array) 또는 sexpr op="do"이면 기존 bracketed
+  //          그 외는 flat-pair (test/result 2개씩)
+  const firstArg = args[0] as any;
+  const isBracketed =
+    (firstArg?.kind === "block" && firstArg?.type === "Array") ||
+    (firstArg?.kind === "sexpr" && firstArg?.op === "do");
+  if (args.length >= 2 && !isBracketed) {
+    // flat-pair 모드: 2개씩 (test, result), 마지막 홀수면 default
+    let i = 0;
+    while (i < args.length - 1) {
+      const test = ev(args[i]);
+      if (test !== null && test !== undefined && test !== false) {
+        return ev(args[i + 1]);
+      }
+      i += 2;
+    }
+    // 홀수개 남았으면 마지막을 default로
+    if (i < args.length) return ev(args[i]);
+    return null;
+  }
+
+  // 기존 로직: bracketed pair [test result] 형식
   for (const arg of args) {
     let testNode: any = null;
     let bodyNodes: any[] = [];

@@ -19,6 +19,8 @@
 (load "projects/dclub-auth/lib/mfa-store.fl")
 (load "projects/dclub-auth/lib/user-tokens.fl")
 (load "projects/dclub-auth/lib/mail.fl")
+(load "projects/dclub-auth/lib/anomaly-store.fl")
+(load "projects/dclub-auth/lib/anomaly.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
 (load "projects/dclub-auth/app/authorize.fl")
@@ -28,6 +30,8 @@
 (load "projects/dclub-auth/app/mfa.fl")
 (load "projects/dclub-auth/app/signup.fl")
 (load "projects/dclub-auth/app/password-reset.fl")
+(load "projects/dclub-auth/app/health.fl")
+(load "projects/dclub-auth/app/admin-security.fl")
 
 ;; ── 부팅: 스키마 + 시드 ─────────────────────────────
 (define cfg (dclub-auth-config))
@@ -39,6 +43,7 @@
 (audit-ensure-table $DB)
 (mfa-ensure-table $DB)
 (user-tokens-ensure-table $DB)
+(anomaly-ensure-table $DB)
 (define demo-uid (users-seed-demo $DB))
 (define blog-cid (clients-seed-demo $DB))
 
@@ -69,6 +74,8 @@
 (server_post "/forgot" "handle-forgot")
 (server_get "/reset" "handle-reset-form")
 (server_post "/reset" "handle-reset")
+(server_get "/health" "handle-health")
+(server_get "/admin/security" "handle-admin-security")
 
 ;; ── 시작 ──────────────────────────────────────────
 (server_start (get $cfg "port"))

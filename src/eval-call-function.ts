@@ -124,7 +124,21 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     }));
   }
 
-  const func = interp.context.functions.get(baseName);
+  let func = interp.context.functions.get(baseName);
+  // P0-2 (2026-04-25): Variable lookup으로 fallback — let-binding된 함수 호출 지원
+  // 예: (let [[f (fn [x] (* x 2))]] (f 5)) → 10
+  // (defn apply-pred [pred x] (pred x))도 같은 경로
+  if (!func) {
+    const v = interp.context.variables.get(baseName) ?? interp.context.variables.get("$" + baseName);
+    if (v && (v.kind === "function-value" || v.kind === "async-function-value" || typeof v === "function" || (v.params && v.body))) {
+      // function-value면 callFunctionValue 사용
+      if (v.kind === "function-value") return callFunctionValue(interp, v, args);
+      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp, v, args);
+      if (typeof v === "function") return v(...args);
+      // user function 형태
+      func = v;
+    }
+  }
   if (!func) {
     const candidates = [...interp.context.functions.keys()];
     const similar = suggestSimilar(baseName, candidates);
