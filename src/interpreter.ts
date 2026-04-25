@@ -79,6 +79,9 @@ export class Interpreter {
   public learnedFactsStore: LearnedFactsStore; // Phase 9b: Learning persistence
   public currentLine = 0; // FreeLang source line tracking
   public callDepth = 0;
+  // Phase E (2026-04-25): 호출 체인 추적 — 에러 발생 시 마지막 100개까지 표시
+  public callStack: Array<{ fn: string; line: number }> = [];
+  public static readonly CALL_STACK_LIMIT = 100; // 메모리 안전을 위해 마지막 N개만 유지
   public static readonly MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 100만 재귀 처리)
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
   public tcoMode = false; // ← 기본값 유지 (TCO 라우팅은 내부용)

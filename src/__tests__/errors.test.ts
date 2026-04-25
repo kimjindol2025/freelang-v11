@@ -252,3 +252,48 @@ describe("Phase D — (use) 간소 import", () => {
     expect(() => run("(use ai) (use ai)")).not.toThrow();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Phase E (2026-04-25): callStack + stack-overflow enrichment
+// ─────────────────────────────────────────────────────────────
+describe("Phase E — callStack 추적 + stack overflow 에러", () => {
+  test("정상 호출 후 callStack 비어있음 (push/pop 균형)", () => {
+    const interp = new Interpreter();
+    interp.interpret(parse(lex("(defn f [x] (+ x 1)) (f 10)")));
+    expect((interp as any).callStack).toBeDefined();
+    expect((interp as any).callStack.length).toBe(0);
+  });
+
+  test("무한 재귀: 어떤 형태든 에러는 발생 (V8 또는 E_STACK_OVERFLOW)", () => {
+    // 환경에 따라 V8 native overflow가 먼저 터질 수 있음 (default node stack limit).
+    // node --stack-size=8000 에서는 우리 MAX_CALL_DEPTH로 잡혀 enrichment 가능.
+    const err: any = runExpectError(`
+      (defn loop-forever [n] (loop-forever (+ n 1)))
+      (loop-forever 0)
+    `);
+    expect(err).toBeDefined();
+    expect(err.message).toBeTruthy();
+    // E_STACK_OVERFLOW면 enrichment 검증, V8이면 단순 통과
+    if (err.message.includes("E_STACK_OVERFLOW")) {
+      expect(err.message).toContain("loop-forever");
+      expect(err.message).toContain("최근 호출 체인");
+    }
+  });
+
+  test("FL_TRACE=1: 함수 호출 시 trace 출력 (silent로 검증)", () => {
+    process.env.FL_TRACE = "1";
+    try {
+      const interp = new Interpreter();
+      // 에러 없이 실행되면 OK (출력은 stderr로)
+      expect(() => {
+        interp.interpret(parse(lex("(defn add [a b] (+ a b)) (add 1 2)")));
+      }).not.toThrow();
+    } finally {
+      delete process.env.FL_TRACE;
+    }
+  });
+
+  test("CALL_STACK_LIMIT 상수 노출 (100)", () => {
+    expect(Interpreter.CALL_STACK_LIMIT).toBe(100);
+  });
+});

@@ -168,7 +168,13 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   }
 
   if (interp.callDepth >= MAX_CALL_DEPTH) {
-    throw new Error(`FreeLang line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'`);
+    // Phase E: callStack 마지막 10개 dump
+    const _stack: Array<{fn:string;line:number}> = (interp as any).callStack ?? [];
+    const tail = _stack.slice(-10).map((s, i) => `  #${_stack.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    throw new Error(
+      `[E_STACK_OVERFLOW] line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) — possible infinite recursion in '${baseName}'\n` +
+      (tail ? `최근 호출 체인:\n${tail}` : "")
+    );
   }
 
   // Phase 54: For namespaced functions (list:mean), temporarily expose same-prefix functions
@@ -190,11 +196,20 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // Phase 82: Profiler 연동 (enabled=false 시 no-op)
   const exitProfiler = globalProfiler.enter(baseName);
 
+  // Phase E: 호출 체인 추적 + FL_TRACE
+  const _callStack: Array<{ fn: string; line: number }> = (interp as any).callStack ?? [];
+  const _stackEntry = { fn: baseName, line: interp.currentLine };
+  if (process.env.FL_TRACE === "1") {
+    console.error(`[trace] ${"  ".repeat(Math.min(interp.callDepth, 20))}→ ${baseName} (line ${interp.currentLine})`);
+  }
+
   // 클로저: capturedEnv가 있으면 해당 환경에서 실행
   if (func.capturedEnv) {
     const savedStack = interp.context.variables.saveStack();
     const paramSet = new Set<string>(func.params);
     interp.callDepth++;
+    _callStack.push(_stackEntry);
+    if (_callStack.length > 100) _callStack.shift(); // CALL_STACK_LIMIT
     let result: any;
     try {
       interp.context.variables.fromSnapshot(func.capturedEnv);
@@ -205,6 +220,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
       propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
     } finally {
       interp.callDepth--;
+      _callStack.pop();
       interp.context.variables.restoreStack(savedStack);
       for (const alias of tempAliases) interp.context.functions.delete(alias);
       exitProfiler();
@@ -215,6 +231,8 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // 일반 함수: 새 렉시컬 스코프
   interp.context.variables.push();
   interp.callDepth++;
+  _callStack.push(_stackEntry);
+  if (_callStack.length > 100) _callStack.shift();
   try {
     for (let i = 0; i < func.params.length; i++) {
       interp.context.variables.set(func.params[i], args[i]);
@@ -222,6 +240,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     return interp.eval(func.body);
   } finally {
     interp.callDepth--;
+    _callStack.pop();
     interp.context.variables.pop();
     for (const alias of tempAliases) interp.context.functions.delete(alias);
     exitProfiler();

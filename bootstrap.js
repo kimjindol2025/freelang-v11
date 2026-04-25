@@ -27432,7 +27432,13 @@ function callUserFunction(interp2, name, args2) {
     throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args2.length}`);
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
-    throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'`);
+    const _stack = interp2.callStack ?? [];
+    const tail = _stack.slice(-10).map((s, i) => `  #${_stack.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    throw new Error(
+      `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
+` + (tail ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
+${tail}` : "")
+    );
   }
   const prefixMatch = baseName.match(/^([^:]+):/);
   const tempAliases = [];
@@ -27449,10 +27455,17 @@ function callUserFunction(interp2, name, args2) {
     }
   }
   const exitProfiler = globalProfiler.enter(baseName);
+  const _callStack = interp2.callStack ?? [];
+  const _stackEntry = { fn: baseName, line: interp2.currentLine };
+  if (process.env.FL_TRACE === "1") {
+    console.error(`[trace] ${"  ".repeat(Math.min(interp2.callDepth, 20))}\u2192 ${baseName} (line ${interp2.currentLine})`);
+  }
   if (func.capturedEnv) {
     const savedStack = interp2.context.variables.saveStack();
     const paramSet = new Set(func.params);
     interp2.callDepth++;
+    _callStack.push(_stackEntry);
+    if (_callStack.length > 100) _callStack.shift();
     let result;
     try {
       interp2.context.variables.fromSnapshot(func.capturedEnv);
@@ -27463,6 +27476,7 @@ function callUserFunction(interp2, name, args2) {
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
     } finally {
       interp2.callDepth--;
+      _callStack.pop();
       interp2.context.variables.restoreStack(savedStack);
       for (const alias of tempAliases) interp2.context.functions.delete(alias);
       exitProfiler();
@@ -27471,6 +27485,8 @@ function callUserFunction(interp2, name, args2) {
   }
   interp2.context.variables.push();
   interp2.callDepth++;
+  _callStack.push(_stackEntry);
+  if (_callStack.length > 100) _callStack.shift();
   try {
     for (let i = 0; i < func.params.length; i++) {
       interp2.context.variables.set(func.params[i], args2[i]);
@@ -27478,6 +27494,7 @@ function callUserFunction(interp2, name, args2) {
     return interp2.eval(func.body);
   } finally {
     interp2.callDepth--;
+    _callStack.pop();
     interp2.context.variables.pop();
     for (const alias of tempAliases) interp2.context.functions.delete(alias);
     exitProfiler();
@@ -28876,6 +28893,10 @@ var Interpreter = class _Interpreter {
   currentLine = 0;
   // FreeLang source line tracking
   callDepth = 0;
+  // Phase E (2026-04-25): 호출 체인 추적 — 에러 발생 시 마지막 100개까지 표시
+  callStack = [];
+  static CALL_STACK_LIMIT = 100;
+  // 메모리 안전을 위해 마지막 N개만 유지
   static MAX_CALL_DEPTH = 5e3;
   // Phase 61: 상향 (trampoline이 100만 재귀 처리)
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
