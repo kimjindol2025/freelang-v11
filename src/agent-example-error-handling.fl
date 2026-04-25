@@ -1,0 +1,52 @@
+; Agent DSL 예제 2: 에러 처리 및 재시도
+; 시나리오: 불안정한 API 호출 → 재시도 → 폴백
+
+(load "src/agent-dsl.fl")
+
+(let [
+  [$attempt-count 0]
+
+  ; Task: 재시도 로직이 있는 API 호출
+  [$api-task {
+    :name "call-unstable-api"
+    :action (fn [$ctx] (do
+      (set! $attempt-count (+ $attempt-count 1))
+      (if (< $attempt-count 2)
+        ; 첫 시도: 실패
+        (throw "Connection timeout")
+        ; 두 번째 시도: 성공
+        { :status "success" :data "Result from API" }
+      )
+    ))
+    :depends []
+    :retry 3
+    :timeout 5000
+    :on-error (fn [err] (println (str "⚠ Error: " err ", retrying...")))
+    :on-success (fn [r] (println "✓ API call succeeded"))
+  }]
+
+  ; Task: 폴백 (API 실패 시)
+  [$fallback-task {
+    :name "fallback-response"
+    :action (fn [$ctx] (do
+      (println "📦 Using fallback data")
+      { :status "cached" :data "Cached response" }
+    ))
+    :depends ["call-unstable-api"]
+    :retry 0
+    :on-success (fn [r] (println "✓ Fallback succeeded"))
+  }]
+]
+
+  (let [
+    [$result (agent-run [$api-task $fallback-task])]
+  ] (do
+    (println "")
+    (println (str "═══════════════════════════════"))
+    (println (str "Error Handling Complete"))
+    (println (str "Attempts: " $attempt-count))
+    (println (str "Status: " (get $result :status)))
+    (println (str "═══════════════════════════════"))
+    (json-stringify $result)
+  ))
+)

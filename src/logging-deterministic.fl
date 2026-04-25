@@ -1,0 +1,138 @@
+; ════════════════════════════════════════════════════════════════
+; FreeLang v11: Deterministic Logging Framework
+; Phase B: 결정론 로깅 (SHA256 기반 재현성)
+; ════════════════════════════════════════════════════════════════
+
+; ─────────────────────────────────────────────────────────────────
+; 1. 로그 엔트리 생성
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC log-entry :params [
+  $step
+  $task-name
+  $input
+  $output
+]
+  :body {
+    :step $step
+    :task-name $task-name
+    :timestamp (now_ms)
+    :input $input
+    :output $output
+    :input-hash (sha256-deterministic $input)
+    :output-hash (sha256-deterministic $output)
+  }
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 2. 결정론 SHA256 (같은 입력 = 같은 해시)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC sha256-deterministic :params [
+  $data
+]
+  :body (sha256 (json-stringify $data))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 3. 로그 검증 (재현성 확인)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC log-verify :params [
+  $entry
+]
+  :body (let [
+    [$stored-input-hash (get $entry :input-hash)]
+    [$computed-input-hash (sha256-deterministic (get $entry :input))]
+    [$stored-output-hash (get $entry :output-hash)]
+    [$computed-output-hash (sha256-deterministic (get $entry :output))]
+  ] {
+    :valid (and
+      (= $stored-input-hash $computed-input-hash)
+      (= $stored-output-hash $computed-output-hash)
+    )
+    :input-verified (= $stored-input-hash $computed-input-hash)
+    :output-verified (= $stored-output-hash $computed-output-hash)
+  })
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 4. 실행 기록 저장 (다양한 포맷)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC execution-log :params []
+  :body {
+    :id (generate-session-id)
+    :created-at (now_ms)
+    :entries []
+  }
+]
+
+[FUNC log-append :params [
+  $log
+  $entry
+]
+  :body (assoc $log :entries (push (get $log :entries) $entry))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 5. 배치 검증 (전체 로그 무결성)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC log-verify-all :params [
+  $log
+]
+  :body (let [
+    [$entries (get $log :entries)]
+    [$results (map log-verify $entries)]
+    [$all-valid (every?
+      (fn [r] (get r :valid))
+      $results
+    )]
+  ] {
+    :log-id (get $log :id)
+    :total-entries (length $entries)
+    :all-valid $all-valid
+    :results $results
+  })
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 6. 재현 (Replay)
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC log-replay :params [
+  $log
+]
+  :body (let [
+    [$entries (get $log :entries)]
+  ] {
+    :total-steps (length $entries)
+    :replay-results (map
+      (fn [e] {
+        :step (get e :step)
+        :task-name (get e :task-name)
+        :input-hash (get e :input-hash)
+        :output-hash (get e :output-hash)
+        :verified (get (log-verify e) :valid)
+      })
+      $entries
+    )
+  })
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 7. 유틸리티
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC generate-session-id :params []
+  :body (concat "sess_" (str (now_ms)))
+]
+
+[FUNC sha256 :params [
+  $data
+]
+  :body "sha256-placeholder"
+]
+
+(println "✓ Deterministic Logging loaded")

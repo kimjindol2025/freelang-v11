@@ -1,5 +1,5 @@
 /**
- * Phase 3-E: VM Eligible Checker
+ * Phase 3-E: VM Eligible Checker & Function Registry
  * 주어진 AST 노드가 VM으로 처리 가능한지 판별하는 헬퍼 모듈
  *
  * VM이 처리 가능한 표현식:
@@ -9,13 +9,26 @@
  * - 제어: if, do
  * - 데이터: list, get, .
  * - 정의: define (제약 있음)
+ * - 함수 호출: defn으로 정의된 VM 함수
  *
  * VM이 처리 불가능한 경우:
- * - 함수 호출 (CALL 미구현)
+ * - 등록되지 않은 함수 호출
  * - 외부 변수 참조 (런타임 오류 → fallback)
  */
 
 import { ASTNode, SExpr } from "./ast";
+
+export const vmFunctionRegistry = new Map<string, any>();
+
+export function registerVMFunction(name: string, vmFunc?: any): void {
+  if (vmFunc) {
+    vmFunctionRegistry.set(name, vmFunc);
+  }
+}
+
+export function clearVMFunctions(): void {
+  vmFunctionRegistry.clear();
+}
 
 const VM_SUPPORTED_OPS = new Set([
   // 산술

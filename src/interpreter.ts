@@ -1816,7 +1816,8 @@ export class Interpreter {
       try {
         const chunk = Interpreter._vmCompiler.compile(expr);
         const optimized = Interpreter._vmOptimizer.optimize(chunk);
-        const vmResult = Interpreter._vm.run(optimized);
+        const initialVars = this.context.variables.snapshot();
+        const vmResult = Interpreter._vm.run(optimized, initialVars);
         return vmResult;
       } catch (_vmErr) {
         // VM 실패 시 조용히 fallback — 기존 경로로 계속 진행

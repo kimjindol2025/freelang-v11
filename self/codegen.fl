@@ -68,30 +68,35 @@
           [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
           [true "null"])]
 
+[FUNC cg-literal-dispatch :params [$t $v]
+  :body (cond
+          [(= $t "number") $v]
+          [(= $t "string") (js-esc $v)]
+          [(= $t "boolean") (if $v "true" "false")]
+          [(= $t "symbol")
+           (cond [(= $v "true") "true"]
+                 [(= $v "false") "false"]
+                 [(= $v "null") "null"]
+                 [(= $v "nil") "null"]
+                 [true (js-name $v)])]
+          [true "null"])]
+
 [FUNC cg-literal :params [$n]
-  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
-          (cond
-            [(= $t "number") $v]
-            [(= $t "string") (js-esc $v)]
-            [(= $t "boolean") (if $v "true" "false")]
-            [(= $t "symbol")
-             (cond [(= $v "true") "true"]
-                   [(= $v "false") "false"]
-                   [(= $v "null") "null"]
-                   [(= $v "nil") "null"]
-                   [true (js-name $v)])]
-            [true "null"]))]
+  :body (cg-literal-dispatch (get $n :type) (get $n :value))]
+
+[FUNC cg-block-dispatch :params [$t $fields]
+  :body (cond
+          [(= $t "Array")
+           (str "[" (cg-args (get $fields "items")) "]")]
+          [(= $t "Map")
+           (str "({" (cg-map-entries $fields) "})")]
+          [true "null"])]
 
 [FUNC cg-block :params [$n]
-  :body (let [[$t (get $n :type)]]
-          (cond
-            [(= $t "Array")
-             (str "[" (cg-args (get (get $n :fields) "items")) "]")]
-            [(= $t "Map")
-             (str "({" (cg-map-entries (get $n :fields)) "})")]
-            [(= $t "FUNC")
-             (cg-func-block $n)]
-            [true "null"]))]
+  :body (let [[$t (get $n :type)] [$fields (get $n :fields)]]
+          (if (= $t "FUNC")
+            (cg-func-block $n)
+            (cg-block-dispatch $t $fields)))]
 
 ;; Map literal: 두 AST 형태 지원
 ;;   1) bootstrap parser: fields = JS Map, map_entries 로 [[k,v] ...]
@@ -100,11 +105,16 @@
 ;;   bootstrap: JS Map{"key1"→node, "key2"→node, ...}
 ;;   self-parser: plain obj {items: [kw-node1, val-node1, kw-node2, val-node2, ...]}
 ;;   자기참조 bootstrap 형태에서 "items" 키가 있어도 그 값은 단일 node 이지 list 아님.
+[FUNC cg-map-entries-dispatch :params [$items-val $fields]
+  :body (if (array? $items-val)
+          ;; self-parser: items = [key-node val-node key-node val-node ...]
+          (cg-map-flat-loop $items-val 0 "")
+          ;; bootstrap parser: fields = Map{key -> val-node}
+          ;; map-entries 를 호출해서 [[k,v], [k,v], ...] 변환 후 처리
+          (cg-map-loop (map-entries $fields) 0 ""))]
+
 [FUNC cg-map-entries :params [$fields]
-  :body (let [[$items-val (get $fields "items")]]
-          (if (array? $items-val)
-            (cg-map-flat-loop $items-val 0 "")
-            (cg-map-loop (list) 0 ""))) ]
+  :body (cg-map-entries-dispatch (get $fields "items") $fields)]
 
 [FUNC cg-map-loop-inner :params [$entries $i $acc $e]
   :body (let [[$k (get $e 0)]
@@ -206,6 +216,12 @@
                 [$sep (if $last "return " "")]]
             (cg-do-body $args (+ $i 1) (str $acc $sep $c ";"))))]
 
+[FUNC get-clause-items :params [$clause]
+  :body (let [[$fields (get $clause :fields)]
+              [$items (get $fields "items")]]
+          (if (array? $items) $items
+            (list (get $fields 0) (get $fields 1))))]
+
 [FUNC cg-cond :params [$args]
   :body (cg-cond-loop $args 0)]
 
@@ -213,7 +229,7 @@
   :body (loop [$j (- (length $args) 1) $acc "null"]
           (if (< $j 0) $acc
             (let [[$clause (get $args $j)]
-                  [$citems (get (get $clause :fields) "items")]
+                  [$citems (get-clause-items $clause)]
                   [$test (cg (get $citems 0))] [$result (cg (get $citems 1))]]
               (recur (- $j 1) (str "(" $test "?" $result ":" $acc ")")))))]
 
@@ -362,17 +378,19 @@
               (str $acc "if(" $test "){" $inner "}"))))]
 
 ;; pattern-test: JS expression that returns truthy if pat matches __v
+[FUNC pattern-test-dispatch :params [$k $pat $v]
+  :body (cond
+          [(= $k "wildcard-pattern") "true"]
+          [(= $k "variable-pattern") "true"]
+          [(= $k "literal-pattern")
+           (str "(" $v "===" (literal-to-js (get $pat :type) (get $pat :value)) ")")]
+          [(= $k "or-pattern") (or-pattern-test (get $pat :patterns) $v 0 "")]
+          [(= $k "range-pattern")
+           (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
+          [true "false"])]
+
 [FUNC pattern-test :params [$pat $v]
-  :body (let [[$k (get $pat :kind)]]
-          (cond
-            [(= $k "wildcard-pattern") "true"]
-            [(= $k "variable-pattern") "true"]
-            [(= $k "literal-pattern")
-             (str "(" $v "===" (literal-to-js (get $pat :type) (get $pat :value)) ")")]
-            [(= $k "or-pattern") (or-pattern-test (get $pat :patterns) $v 0 "")]
-            [(= $k "range-pattern")
-             (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
-            [true "false"]))]
+  :body (pattern-test-dispatch (get $pat :kind) $pat $v)]
 
 [FUNC literal-to-js :params [$t $v]
   :body (cond [(= $t "number") $v]
@@ -389,11 +407,13 @@
               (if (= (length $acc) 0) $t (str $acc "||" $t))))) ]
 
 ;; pattern-bindings: JS statement that binds pattern variables from __v
+[FUNC pattern-bindings-dispatch :params [$k $pat $v]
+  :body (cond
+          [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
+          [true ""])]
+
 [FUNC pattern-bindings :params [$pat $v]
-  :body (let [[$k (get $pat :kind)]]
-          (cond
-            [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
-            [true ""]))]
+  :body (pattern-bindings-dispatch (get $pat :kind) $pat $v)]
 
 ;; (compose f g h) → ((__x)=>f(g(h(__x))))  right-to-left
 ;;   마지막 arg (h) 먼저 적용, 맨 처음 (f) 가 바깥
@@ -533,9 +553,8 @@
 
 ;; ═══════ stdlib native → JS 매핑 ═══════
 
-[FUNC cg-native :params [$op $args]
-  :body (let [[$as (cg-args $args)]]
-          (cond
+[FUNC cg-native-dispatch :params [$op $as]
+  :body (cond
             ;; ─── String (15) ───
             [(= $op "str") (str "_fl_str(" $as ")")]
             [(= $op "concat") (str "_fl_str(" $as ")")]
@@ -694,7 +713,10 @@
             [(= $op "http_post") (str "_fl_http_post(" $as ")")]
             [(= $op "ws_send") (str "_fl_ws_send(" $as ")")]
 
-            [true (cg-call $op $args)]))]
+            [true (str (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op)) "(" $as ")")])]
+
+[FUNC cg-native :params [$op $args]
+  :body (cg-native-dispatch $op (cg-args $args))]
 
 [FUNC cg-call :params [$op $args]
   :body (let [[$fn-name (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op))]]
@@ -702,47 +724,49 @@
 
 ;; ═══════ sexpr 메인 dispatch ═══════
 
+[FUNC cg-sexpr-dispatch :params [$op $args]
+  :body (cond
+          [(= $op "if")      (cg-if $args)]
+          [(= $op "fn")      (cg-fn $args)]
+          [(= $op "defn")    (cg-defn $args)]
+          [(= $op "define")  (cg-define $args)]
+          [(= $op "let")     (cg-let $args)]
+          [(= $op "do")      (cg-do $args)]
+          [(= $op "begin")   (cg-do $args)]
+          [(= $op "cond")    (cg-cond $args)]
+          [(= $op "and")     (cg-and $args)]
+          [(= $op "or")      (cg-or $args)]
+          [(= $op "quote")   (cg-quote $args)]
+          [(= $op "set!")    (cg-set! $args)]
+          [(= $op "throw")   (cg-throw $args)]
+          [(= $op "try")     (cg-try $args)]
+          [(= $op "while")   (cg-while $args)]
+          [(= $op "loop")    (cg-loop $args)]
+          [(= $op "recur")   (cg-recur $args)]
+          [(= $op "defstruct") (cg-defstruct $args)]
+          [(= $op "compose") (cg-compose $args)]
+          [(= $op "pipe")    (cg-pipe $args)]
+          [(= $op "->")      (cg-thread-first $args)]
+          [(= $op "->>")     (cg-thread-last $args)]
+          [(= $op "|>")      (cg-thread-first $args)]
+          [(= $op "call")    (cg-call-form $args)]
+          [(= $op "async")   (cg-async $args)]
+          [(= $op "await")   (cg-await $args)]
+          [(= $op "+")       (cg-binop $args "+" "0")]
+          [(= $op "-")       (cg-sub $args)]
+          [(= $op "*")       (cg-binop $args "*" "1")]
+          [(= $op "/")       (cg-pair $args "/")]
+          [(= $op "%")       (cg-pair $args "%")]
+          [(= $op "<")       (cg-pair $args "<")]
+          [(= $op ">")       (cg-pair $args ">")]
+          [(= $op "<=")      (cg-pair $args "<=")]
+          [(= $op ">=")      (cg-pair $args ">=")]
+          [(= $op "=")       (cg-pair $args "===")]
+          [(= $op "!=")      (cg-pair $args "!==")]
+          [true              (cg-native $op $args)])]
+
 [FUNC cg-sexpr :params [$n]
-  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
-          (cond
-            [(= $op "if")      (cg-if $args)]
-            [(= $op "fn")      (cg-fn $args)]
-            [(= $op "defn")    (cg-defn $args)]
-            [(= $op "define")  (cg-define $args)]
-            [(= $op "let")     (cg-let $args)]
-            [(= $op "do")      (cg-do $args)]
-            [(= $op "begin")   (cg-do $args)]
-            [(= $op "cond")    (cg-cond $args)]
-            [(= $op "and")     (cg-and $args)]
-            [(= $op "or")      (cg-or $args)]
-            [(= $op "quote")   (cg-quote $args)]
-            [(= $op "set!")    (cg-set! $args)]
-            [(= $op "throw")   (cg-throw $args)]
-            [(= $op "try")     (cg-try $args)]
-            [(= $op "while")   (cg-while $args)]
-            [(= $op "loop")    (cg-loop $args)]
-            [(= $op "recur")   (cg-recur $args)]
-            [(= $op "defstruct") (cg-defstruct $args)]
-            [(= $op "compose") (cg-compose $args)]
-            [(= $op "pipe")    (cg-pipe $args)]
-            [(= $op "->")      (cg-thread-first $args)]
-            [(= $op "->>")     (cg-thread-last $args)]
-            [(= $op "|>")      (cg-thread-first $args)]
-            [(= $op "call")    (cg-call-form $args)]
-            [(= $op "async")   (cg-async $args)]
-            [(= $op "await")   (cg-await $args)]
-            [(= $op "+")       (cg-binop $args "+" "0")]
-            [(= $op "-")       (cg-sub $args)]
-            [(= $op "*")       (cg-binop $args "*" "1")]
-            [(= $op "/")       (cg-pair $args "/")]
-            [(= $op "%")       (cg-pair $args "%")]
-            [(= $op "<")       (cg-pair $args "<")]
-            [(= $op ">")       (cg-pair $args ">")]
-            [(= $op "<=")      (cg-pair $args "<=")]
-            [(= $op ">=")      (cg-pair $args ">=")]
-            [(= $op "=")       (cg-pair $args "===")]
-            [(= $op "!=")      (cg-pair $args "!==")]
-            [true              (cg-native $op $args)]))]
+  :body (cg-sexpr-dispatch (get $n :op) (get $n :args))]
 
 ;; ═══════ 런타임 prelude (생성 JS 앞에 삽입) ═══════
 ;; 분할 구조: 각 부분을 따로 정의하여 stack overflow 방지

@@ -37,6 +37,15 @@ export class BytecodeCompiler {
   }
 
   private compileLiteral(node: Literal, chunk: Chunk): void {
+    // Phase 3-E: symbol bareword을 변수 참조로 처리 (interpreter와 미러링)
+    if (node.type === "symbol" && typeof node.value === "string") {
+      const bareName = node.value as string;
+      // 예약어 제외
+      if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
+        this.emit(chunk, OpCode.PUSH_VAR, "$" + bareName);
+        return;
+      }
+    }
     const idx = this.addConst(chunk, node.value);
     this.emit(chunk, OpCode.PUSH_CONST, idx);
   }

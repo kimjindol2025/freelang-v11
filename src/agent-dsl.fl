@@ -1,0 +1,168 @@
+; ════════════════════════════════════════════════════════════════
+; FreeLang v11: AI Agent Execution Engine (DSL)
+; Phase A: Task/State/Workflow 통합 프레임워크
+; ════════════════════════════════════════════════════════════════
+
+; ─────────────────────────────────────────────────────────────────
+; 1. Task 정의 및 패턴
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC make-task :params [
+  $name
+  $action
+]
+  :body {
+    :name $name
+    :action $action
+    :depends []
+    :retry 3
+    :timeout 30000
+    :on-error nil
+    :on-success nil
+    :status "pending"
+    :result nil
+    :error nil
+  }
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 2. Task 실행
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC task-execute :params [
+  $task
+  $context
+]
+  :body (let [
+    [$action (get $task :action)]
+    [$result (call $action $context)]
+  ] {
+    :status "done"
+    :result $result
+    :error nil
+  })
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 3. Task 의존성 해석
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC ready-tasks :params [
+  $pending
+  $executed
+]
+  :body (filter
+    (fn [t] (let [
+      [$deps (get t :depends)]
+    ] (every? (fn [d] (in? (keys $executed) d)) $deps)))
+    $pending
+  )
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 4. Agent 실행 엔진
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC agent-run :params [
+  $task-list
+]
+  :body (let [
+    [$context {}]
+    [$executed {}]
+  ] (do
+    (map (fn [t] (let [
+      [$name (get t :name)]
+      [$result (task-execute t $context)]
+    ] (set! $executed (assoc $executed $name $result))))
+    $task-list)
+    {
+      :status "done"
+      :executed $executed
+      :total-steps 3
+    }
+  ))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 5. 상태 관리
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC agent-state :params []
+  :body {
+    :id (generate-id)
+    :created-at (time-iso)
+    :steps {}
+    :logs []
+  }
+]
+
+[FUNC agent-log :params [
+  $state
+  $step
+  $message
+  $data
+]
+  :body (let [
+    [$entry {
+      :timestamp (time-iso)
+      :step $step
+      :message $message
+      :data $data
+    }]
+  ] (assoc $state :logs (push (get $state :logs) $entry)))
+]
+
+[FUNC agent-state-set :params [
+  $state
+  $key
+  $value
+]
+  :body (assoc $state :steps (assoc (get $state :steps) $key $value))
+]
+
+[FUNC agent-state-get :params [
+  $state
+  $key
+]
+  :body (get (get $state :steps) $key)
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 6. 데이터 처리 Task
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC task-map :params [
+  $fn
+  $data
+]
+  :body (fn [$ctx] (map $fn $data))
+]
+
+[FUNC task-filter :params [
+  $fn
+  $data
+]
+  :body (fn [$ctx] (filter $fn $data))
+]
+
+[FUNC task-reduce :params [
+  $fn
+  $init
+  $data
+]
+  :body (fn [$ctx] (reduce $fn $init $data))
+]
+
+; ─────────────────────────────────────────────────────────────────
+; 7. 유틸리티
+; ─────────────────────────────────────────────────────────────────
+
+[FUNC generate-id :params []
+  :body (concat "agent_" (str (now_ms)))
+]
+
+[FUNC time-iso :params []
+  :body (str (now_ms))
+]
+
+(println "✓ Agent DSL loaded")

@@ -13,6 +13,10 @@ import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
+import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
+import { registerVMFunction } from "./vm-eligible"; // Phase 3-E: VM 함수 등록
+
+const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
 
 export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): any {
   const ev = (node: any) => (interp as any).eval(node);
@@ -73,6 +77,31 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     // (fn [params] body) 를 synth → 현재 scope에서 eval하여 function-value 획득
     const fnExpr: any = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
     const fnValue = (interp as any).evalSExpr(fnExpr);
+
+    // Phase 3-E: VM 함수 컴파일 및 등록
+    try {
+      const funcChunk = _vmCompiler.compileFunctionBody(fnValue.params, fnValue.body, name);
+      const vmFuncObj = {
+        _isVMFunc: true,
+        _chunk: funcChunk,
+        _params: fnValue.params,
+        _closure: fnValue.capturedEnv ? [...fnValue.capturedEnv.entries()] : []
+      };
+      registerVMFunction(name, vmFuncObj);
+    } catch {
+      // 컴파일 실패 시 이름만 등록 (fallback)
+      registerVMFunction(name);
+    }
+
+    // functions에도 등록 (callUserFunction 경로 지원)
+    const funcDef = {
+      name,
+      params: fnValue.params,
+      body: fnValue.body,
+      capturedEnv: fnValue.capturedEnv,
+    };
+    ctx.functions.set(name, funcDef);
+
     // name을 set → bare symbol/variable 둘 다로 접근 가능하게 저장
     ctx.variables.set("$" + name, fnValue);
     ctx.variables.set(name, fnValue);

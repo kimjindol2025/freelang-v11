@@ -16894,7 +16894,295 @@ function isTailCall(v) {
   return v !== null && typeof v === "object" && v[TAIL_CALL] === true;
 }
 
+// src/compiler.ts
+var BytecodeCompiler = class {
+  compile(node) {
+    const chunk = {
+      instructions: [],
+      constants: [],
+      name: "main"
+    };
+    this.compileExpr(node, chunk);
+    this.emit(chunk, 25 /* HALT */);
+    return chunk;
+  }
+  compileExpr(node, chunk) {
+    switch (node.kind) {
+      case "literal":
+        this.compileLiteral(node, chunk);
+        break;
+      case "variable":
+        this.compileVariable(node, chunk);
+        break;
+      case "sexpr":
+        this.compileSExpr(node, chunk);
+        break;
+      case "block":
+        this.compileBlock(node, chunk);
+        break;
+      default:
+        this.emit(chunk, 25 /* HALT */);
+        break;
+    }
+  }
+  compileLiteral(node, chunk) {
+    if (node.type === "symbol" && typeof node.value === "string") {
+      const bareName = node.value;
+      if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
+        this.emit(chunk, 1 /* PUSH_VAR */, "$" + bareName);
+        return;
+      }
+    }
+    const idx = this.addConst(chunk, node.value);
+    this.emit(chunk, 0 /* PUSH_CONST */, idx);
+  }
+  compileVariable(node, chunk) {
+    this.emit(chunk, 1 /* PUSH_VAR */, node.name);
+  }
+  compileSExpr(node, chunk) {
+    const op = node.op;
+    switch (op) {
+      case "if":
+        this.compileIf(node, chunk);
+        return;
+      case "define":
+        this.compileDefine(node, chunk);
+        return;
+      case "do":
+        this.compileDo(node, chunk);
+        return;
+      case "list":
+        this.compileList(node, chunk);
+        return;
+      case "not":
+        if (node.args.length >= 1) {
+          this.compileExpr(node.args[0], chunk);
+          this.emit(chunk, 22 /* NOT */);
+        }
+        return;
+      case "and":
+        this.compileAnd(node, chunk);
+        return;
+      case "or":
+        this.compileOr(node, chunk);
+        return;
+      case "get":
+      case ".":
+        if (node.args.length >= 2) {
+          this.compileExpr(node.args[0], chunk);
+          const field = node.args[1];
+          if (field.kind === "literal") {
+            this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
+          } else {
+            this.emit(chunk, 25 /* HALT */);
+          }
+        }
+        return;
+    }
+    const binaryOps = {
+      "+": 9 /* ADD */,
+      "-": 10 /* SUB */,
+      "*": 11 /* MUL */,
+      "/": 12 /* DIV */,
+      "%": 13 /* MOD */,
+      "mod": 13 /* MOD */,
+      "==": 14 /* EQ */,
+      "=": 14 /* EQ */,
+      "!=": 19 /* NEQ */,
+      "<": 15 /* LT */,
+      ">": 16 /* GT */,
+      "<=": 17 /* LE */,
+      ">=": 18 /* GE */
+    };
+    if (binaryOps[op] !== void 0) {
+      if (node.args.length >= 2) {
+        this.compileExpr(node.args[0], chunk);
+        this.compileExpr(node.args[1], chunk);
+        this.emit(chunk, binaryOps[op]);
+      } else if (node.args.length === 1) {
+        if (op === "-") {
+          const zeroIdx = this.addConst(chunk, 0);
+          this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
+          this.compileExpr(node.args[0], chunk);
+          this.emit(chunk, 10 /* SUB */);
+        } else {
+          this.compileExpr(node.args[0], chunk);
+        }
+      }
+      return;
+    }
+    this.emit(chunk, 25 /* HALT */);
+  }
+  compileIf(node, chunk) {
+    if (node.args.length < 2) {
+      this.emit(chunk, 25 /* HALT */);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    const jumpIfFalseIdx = chunk.instructions.length;
+    this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
+    this.compileExpr(node.args[1], chunk);
+    const jumpIdx = chunk.instructions.length;
+    this.emit(chunk, 5 /* JUMP */, 0);
+    const elseStart = chunk.instructions.length;
+    chunk.instructions[jumpIfFalseIdx].arg = elseStart;
+    if (node.args.length >= 3) {
+      this.compileExpr(node.args[2], chunk);
+    } else {
+      const nullIdx = this.addConst(chunk, null);
+      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+    }
+    const end = chunk.instructions.length;
+    chunk.instructions[jumpIdx].arg = end;
+  }
+  compileDefine(node, chunk) {
+    if (node.args.length < 2) {
+      this.emit(chunk, 25 /* HALT */);
+      return;
+    }
+    const varNode = node.args[0];
+    const valNode = node.args[1];
+    this.compileExpr(valNode, chunk);
+    const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
+    this.emit(chunk, 2 /* SET_VAR */, name);
+    const nullIdx = this.addConst(chunk, null);
+    this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+  }
+  compileDo(node, chunk) {
+    if (node.args.length === 0) {
+      const nullIdx = this.addConst(chunk, null);
+      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+      return;
+    }
+    for (let i = 0; i < node.args.length; i++) {
+      this.compileExpr(node.args[i], chunk);
+      if (i < node.args.length - 1) {
+        this.emit(chunk, 7 /* POP */);
+      }
+    }
+  }
+  compileList(node, chunk) {
+    for (const arg of node.args) {
+      this.compileExpr(arg, chunk);
+    }
+    this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
+  }
+  compileAnd(node, chunk) {
+    if (node.args.length === 0) {
+      const idx = this.addConst(chunk, true);
+      this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      return;
+    }
+    if (node.args.length === 1) {
+      this.compileExpr(node.args[0], chunk);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    this.compileExpr(node.args[1], chunk);
+    this.emit(chunk, 20 /* AND */);
+  }
+  compileOr(node, chunk) {
+    if (node.args.length === 0) {
+      const idx = this.addConst(chunk, false);
+      this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      return;
+    }
+    if (node.args.length === 1) {
+      this.compileExpr(node.args[0], chunk);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    this.compileExpr(node.args[1], chunk);
+    this.emit(chunk, 21 /* OR */);
+  }
+  compileBlock(node, chunk) {
+    this.emit(chunk, 25 /* HALT */);
+  }
+  addConst(chunk, value) {
+    chunk.constants.push(value);
+    return chunk.constants.length - 1;
+  }
+  emit(chunk, op, arg) {
+    const instr = { op };
+    if (arg !== void 0) instr.arg = arg;
+    chunk.instructions.push(instr);
+  }
+};
+
+// src/vm-eligible.ts
+var vmFunctionRegistry = /* @__PURE__ */ new Map();
+function registerVMFunction(name, vmFunc) {
+  if (vmFunc) {
+    vmFunctionRegistry.set(name, vmFunc);
+  }
+}
+var VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
+  // 산술
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "mod",
+  // 비교
+  "=",
+  "==",
+  "!=",
+  "<",
+  ">",
+  "<=",
+  ">=",
+  // 논리
+  "and",
+  "or",
+  "not",
+  // 제어
+  "if",
+  "do",
+  // 데이터
+  "list",
+  "get",
+  ".",
+  // 정의
+  "define"
+]);
+function isVMEligible(node) {
+  if (!node || typeof node !== "object") {
+    return false;
+  }
+  const kind = node.kind;
+  switch (kind) {
+    case "literal":
+      return true;
+    case "variable":
+      return true;
+    case "sexpr": {
+      const sexpr = node;
+      if (!sexpr || !sexpr.op) {
+        return false;
+      }
+      if (!VM_SUPPORTED_OPS.has(sexpr.op)) {
+        return false;
+      }
+      if (!sexpr.args || !Array.isArray(sexpr.args)) {
+        return false;
+      }
+      return sexpr.args.every((arg) => isVMEligible(arg));
+    }
+    case "keyword":
+      return false;
+    case "block":
+      return false;
+    case "pattern-match":
+    case "try-block":
+    case "throw":
+    default:
+      return false;
+  }
+}
+
 // src/eval-special-forms.ts
+var _vmCompiler = new BytecodeCompiler();
 function evalSpecialForm(interp2, op, expr) {
   const ev = (node) => interp2.eval(node);
   const callUser = (name, a) => interp2.callUserFunction(name, a);
@@ -16941,6 +17229,25 @@ function evalSpecialForm(interp2, op, expr) {
     const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
     const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
     const fnValue = interp2.evalSExpr(fnExpr);
+    try {
+      const funcChunk = _vmCompiler.compileFunctionBody(fnValue.params, fnValue.body, name);
+      const vmFuncObj = {
+        _isVMFunc: true,
+        _chunk: funcChunk,
+        _params: fnValue.params,
+        _closure: fnValue.capturedEnv ? [...fnValue.capturedEnv.entries()] : []
+      };
+      registerVMFunction(name, vmFuncObj);
+    } catch {
+      registerVMFunction(name);
+    }
+    const funcDef = {
+      name,
+      params: fnValue.params,
+      body: fnValue.body,
+      capturedEnv: fnValue.capturedEnv
+    };
+    ctx.functions.set(name, funcDef);
     ctx.variables.set("$" + name, fnValue);
     ctx.variables.set(name, fnValue);
     return fnValue;
@@ -26670,7 +26977,192 @@ var Profiler = class {
 };
 var globalProfiler = new Profiler();
 
+// src/vm.ts
+var VM = class {
+  stack = [];
+  vars = /* @__PURE__ */ new Map();
+  ip = 0;
+  run(chunk) {
+    this.stack = [];
+    this.vars = /* @__PURE__ */ new Map();
+    this.ip = 0;
+    while (this.ip < chunk.instructions.length) {
+      const instr = chunk.instructions[this.ip];
+      this.ip++;
+      switch (instr.op) {
+        case 0 /* PUSH_CONST */: {
+          const idx = instr.arg;
+          this.push(chunk.constants[idx]);
+          break;
+        }
+        case 1 /* PUSH_VAR */: {
+          const name = instr.arg;
+          if (!this.vars.has(name)) {
+            throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
+          }
+          this.push(this.vars.get(name));
+          break;
+        }
+        case 2 /* SET_VAR */: {
+          const name = instr.arg;
+          const val = this.pop();
+          this.vars.set(name, val);
+          break;
+        }
+        case 7 /* POP */: {
+          this.pop();
+          break;
+        }
+        case 8 /* DUP */: {
+          if (this.stack.length === 0) {
+            throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
+          }
+          this.push(this.stack[this.stack.length - 1]);
+          break;
+        }
+        case 9 /* ADD */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a + b);
+          break;
+        }
+        case 10 /* SUB */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a - b);
+          break;
+        }
+        case 11 /* MUL */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a * b);
+          break;
+        }
+        case 12 /* DIV */: {
+          const b = this.pop();
+          const a = this.pop();
+          if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
+          this.push(a / b);
+          break;
+        }
+        case 13 /* MOD */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a % b);
+          break;
+        }
+        case 14 /* EQ */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a === b);
+          break;
+        }
+        case 19 /* NEQ */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a !== b);
+          break;
+        }
+        case 15 /* LT */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a < b);
+          break;
+        }
+        case 16 /* GT */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a > b);
+          break;
+        }
+        case 17 /* LE */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a <= b);
+          break;
+        }
+        case 18 /* GE */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(a >= b);
+          break;
+        }
+        case 20 /* AND */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(Boolean(a) && Boolean(b));
+          break;
+        }
+        case 21 /* OR */: {
+          const b = this.pop();
+          const a = this.pop();
+          this.push(Boolean(a) || Boolean(b));
+          break;
+        }
+        case 22 /* NOT */: {
+          const a = this.pop();
+          this.push(!Boolean(a));
+          break;
+        }
+        case 5 /* JUMP */: {
+          this.ip = instr.arg;
+          break;
+        }
+        case 6 /* JUMP_IF_FALSE */: {
+          const cond = this.pop();
+          if (!Boolean(cond)) {
+            this.ip = instr.arg;
+          }
+          break;
+        }
+        case 23 /* MAKE_LIST */: {
+          const count = instr.arg;
+          if (this.stack.length < count) {
+            throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
+          }
+          const items = this.stack.splice(this.stack.length - count, count);
+          this.push(items);
+          break;
+        }
+        case 24 /* GET_FIELD */: {
+          const obj = this.pop();
+          const field = instr.arg;
+          if (obj !== null && typeof obj === "object") {
+            this.push(obj[field]);
+          } else {
+            throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
+          }
+          break;
+        }
+        case 3 /* CALL */: {
+          throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
+        }
+        case 4 /* RETURN */: {
+          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+        }
+        case 25 /* HALT */: {
+          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+        }
+        default: {
+          throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
+        }
+      }
+    }
+    return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+  }
+  push(val) {
+    this.stack.push(val);
+  }
+  pop() {
+    if (this.stack.length === 0) {
+      throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
+    }
+    return this.stack.pop();
+  }
+};
+
 // src/eval-call-function.ts
+var _callVM = new VM();
 function propagateMutations(interp2, capturedEnv, paramSet, savedStack) {
   const finalState = interp2.context.variables.snapshot();
   for (const [key, newVal] of finalState) {
@@ -26691,6 +27183,31 @@ var MAX_CALL_DEPTH = 5e3;
 function callUserFunction(interp2, name, args2) {
   if (interp2.tcoMode) {
     return callUserFunctionTCO(interp2, name, args2);
+  }
+  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    try {
+      const vmFunc = vmFunctionRegistry.get(name);
+      const initialVars = /* @__PURE__ */ new Map();
+      if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+        for (const [k, v] of vmFunc._closure) {
+          initialVars.set(k, v);
+        }
+      } else {
+        const snapshot = interp2.context.variables.snapshot();
+        for (const [k, v] of snapshot) {
+          initialVars.set(k, v);
+        }
+      }
+      for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+        initialVars.set("$" + vmName, vmFuncObj);
+        initialVars.set(vmName, vmFuncObj);
+      }
+      for (let i = 0; i < vmFunc._params.length; i++) {
+        initialVars.set(vmFunc._params[i], args2[i] ?? null);
+      }
+      return _callVM.run(vmFunc._chunk, initialVars);
+    } catch {
+    }
   }
   let baseName = name;
   let typeArgs = null;
@@ -27976,464 +28493,6 @@ function createAgentBuiltins(interp2) {
     "agent-continue": (state) => agentContinue(state)
   };
 }
-
-// src/vm-eligible.ts
-var VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
-  // 산술
-  "+",
-  "-",
-  "*",
-  "/",
-  "%",
-  "mod",
-  // 비교
-  "=",
-  "==",
-  "!=",
-  "<",
-  ">",
-  "<=",
-  ">=",
-  // 논리
-  "and",
-  "or",
-  "not",
-  // 제어
-  "if",
-  "do",
-  // 데이터
-  "list",
-  "get",
-  ".",
-  // 정의
-  "define"
-]);
-function isVMEligible(node) {
-  if (!node || typeof node !== "object") {
-    return false;
-  }
-  const kind = node.kind;
-  switch (kind) {
-    case "literal":
-      return true;
-    case "variable":
-      return true;
-    case "sexpr": {
-      const sexpr = node;
-      if (!sexpr || !sexpr.op) {
-        return false;
-      }
-      if (!VM_SUPPORTED_OPS.has(sexpr.op)) {
-        return false;
-      }
-      if (!sexpr.args || !Array.isArray(sexpr.args)) {
-        return false;
-      }
-      return sexpr.args.every((arg) => isVMEligible(arg));
-    }
-    case "keyword":
-      return false;
-    case "block":
-      return false;
-    case "pattern-match":
-    case "try-block":
-    case "throw":
-    default:
-      return false;
-  }
-}
-
-// src/compiler.ts
-var BytecodeCompiler = class {
-  compile(node) {
-    const chunk = {
-      instructions: [],
-      constants: [],
-      name: "main"
-    };
-    this.compileExpr(node, chunk);
-    this.emit(chunk, 25 /* HALT */);
-    return chunk;
-  }
-  compileExpr(node, chunk) {
-    switch (node.kind) {
-      case "literal":
-        this.compileLiteral(node, chunk);
-        break;
-      case "variable":
-        this.compileVariable(node, chunk);
-        break;
-      case "sexpr":
-        this.compileSExpr(node, chunk);
-        break;
-      case "block":
-        this.compileBlock(node, chunk);
-        break;
-      default:
-        this.emit(chunk, 25 /* HALT */);
-        break;
-    }
-  }
-  compileLiteral(node, chunk) {
-    const idx = this.addConst(chunk, node.value);
-    this.emit(chunk, 0 /* PUSH_CONST */, idx);
-  }
-  compileVariable(node, chunk) {
-    this.emit(chunk, 1 /* PUSH_VAR */, node.name);
-  }
-  compileSExpr(node, chunk) {
-    const op = node.op;
-    switch (op) {
-      case "if":
-        this.compileIf(node, chunk);
-        return;
-      case "define":
-        this.compileDefine(node, chunk);
-        return;
-      case "do":
-        this.compileDo(node, chunk);
-        return;
-      case "list":
-        this.compileList(node, chunk);
-        return;
-      case "not":
-        if (node.args.length >= 1) {
-          this.compileExpr(node.args[0], chunk);
-          this.emit(chunk, 22 /* NOT */);
-        }
-        return;
-      case "and":
-        this.compileAnd(node, chunk);
-        return;
-      case "or":
-        this.compileOr(node, chunk);
-        return;
-      case "get":
-      case ".":
-        if (node.args.length >= 2) {
-          this.compileExpr(node.args[0], chunk);
-          const field = node.args[1];
-          if (field.kind === "literal") {
-            this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
-          } else {
-            this.emit(chunk, 25 /* HALT */);
-          }
-        }
-        return;
-    }
-    const binaryOps = {
-      "+": 9 /* ADD */,
-      "-": 10 /* SUB */,
-      "*": 11 /* MUL */,
-      "/": 12 /* DIV */,
-      "%": 13 /* MOD */,
-      "mod": 13 /* MOD */,
-      "==": 14 /* EQ */,
-      "=": 14 /* EQ */,
-      "!=": 19 /* NEQ */,
-      "<": 15 /* LT */,
-      ">": 16 /* GT */,
-      "<=": 17 /* LE */,
-      ">=": 18 /* GE */
-    };
-    if (binaryOps[op] !== void 0) {
-      if (node.args.length >= 2) {
-        this.compileExpr(node.args[0], chunk);
-        this.compileExpr(node.args[1], chunk);
-        this.emit(chunk, binaryOps[op]);
-      } else if (node.args.length === 1) {
-        if (op === "-") {
-          const zeroIdx = this.addConst(chunk, 0);
-          this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
-          this.compileExpr(node.args[0], chunk);
-          this.emit(chunk, 10 /* SUB */);
-        } else {
-          this.compileExpr(node.args[0], chunk);
-        }
-      }
-      return;
-    }
-    this.emit(chunk, 25 /* HALT */);
-  }
-  compileIf(node, chunk) {
-    if (node.args.length < 2) {
-      this.emit(chunk, 25 /* HALT */);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    const jumpIfFalseIdx = chunk.instructions.length;
-    this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
-    this.compileExpr(node.args[1], chunk);
-    const jumpIdx = chunk.instructions.length;
-    this.emit(chunk, 5 /* JUMP */, 0);
-    const elseStart = chunk.instructions.length;
-    chunk.instructions[jumpIfFalseIdx].arg = elseStart;
-    if (node.args.length >= 3) {
-      this.compileExpr(node.args[2], chunk);
-    } else {
-      const nullIdx = this.addConst(chunk, null);
-      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-    }
-    const end = chunk.instructions.length;
-    chunk.instructions[jumpIdx].arg = end;
-  }
-  compileDefine(node, chunk) {
-    if (node.args.length < 2) {
-      this.emit(chunk, 25 /* HALT */);
-      return;
-    }
-    const varNode = node.args[0];
-    const valNode = node.args[1];
-    this.compileExpr(valNode, chunk);
-    const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
-    this.emit(chunk, 2 /* SET_VAR */, name);
-    const nullIdx = this.addConst(chunk, null);
-    this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-  }
-  compileDo(node, chunk) {
-    if (node.args.length === 0) {
-      const nullIdx = this.addConst(chunk, null);
-      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-      return;
-    }
-    for (let i = 0; i < node.args.length; i++) {
-      this.compileExpr(node.args[i], chunk);
-      if (i < node.args.length - 1) {
-        this.emit(chunk, 7 /* POP */);
-      }
-    }
-  }
-  compileList(node, chunk) {
-    for (const arg of node.args) {
-      this.compileExpr(arg, chunk);
-    }
-    this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
-  }
-  compileAnd(node, chunk) {
-    if (node.args.length === 0) {
-      const idx = this.addConst(chunk, true);
-      this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      return;
-    }
-    if (node.args.length === 1) {
-      this.compileExpr(node.args[0], chunk);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    this.compileExpr(node.args[1], chunk);
-    this.emit(chunk, 20 /* AND */);
-  }
-  compileOr(node, chunk) {
-    if (node.args.length === 0) {
-      const idx = this.addConst(chunk, false);
-      this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      return;
-    }
-    if (node.args.length === 1) {
-      this.compileExpr(node.args[0], chunk);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    this.compileExpr(node.args[1], chunk);
-    this.emit(chunk, 21 /* OR */);
-  }
-  compileBlock(node, chunk) {
-    this.emit(chunk, 25 /* HALT */);
-  }
-  addConst(chunk, value) {
-    chunk.constants.push(value);
-    return chunk.constants.length - 1;
-  }
-  emit(chunk, op, arg) {
-    const instr = { op };
-    if (arg !== void 0) instr.arg = arg;
-    chunk.instructions.push(instr);
-  }
-};
-
-// src/vm.ts
-var VM = class {
-  stack = [];
-  vars = /* @__PURE__ */ new Map();
-  ip = 0;
-  run(chunk) {
-    this.stack = [];
-    this.vars = /* @__PURE__ */ new Map();
-    this.ip = 0;
-    while (this.ip < chunk.instructions.length) {
-      const instr = chunk.instructions[this.ip];
-      this.ip++;
-      switch (instr.op) {
-        case 0 /* PUSH_CONST */: {
-          const idx = instr.arg;
-          this.push(chunk.constants[idx]);
-          break;
-        }
-        case 1 /* PUSH_VAR */: {
-          const name = instr.arg;
-          if (!this.vars.has(name)) {
-            throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
-          }
-          this.push(this.vars.get(name));
-          break;
-        }
-        case 2 /* SET_VAR */: {
-          const name = instr.arg;
-          const val = this.pop();
-          this.vars.set(name, val);
-          break;
-        }
-        case 7 /* POP */: {
-          this.pop();
-          break;
-        }
-        case 8 /* DUP */: {
-          if (this.stack.length === 0) {
-            throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
-          }
-          this.push(this.stack[this.stack.length - 1]);
-          break;
-        }
-        case 9 /* ADD */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a + b);
-          break;
-        }
-        case 10 /* SUB */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a - b);
-          break;
-        }
-        case 11 /* MUL */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a * b);
-          break;
-        }
-        case 12 /* DIV */: {
-          const b = this.pop();
-          const a = this.pop();
-          if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
-          this.push(a / b);
-          break;
-        }
-        case 13 /* MOD */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a % b);
-          break;
-        }
-        case 14 /* EQ */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a === b);
-          break;
-        }
-        case 19 /* NEQ */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a !== b);
-          break;
-        }
-        case 15 /* LT */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a < b);
-          break;
-        }
-        case 16 /* GT */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a > b);
-          break;
-        }
-        case 17 /* LE */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a <= b);
-          break;
-        }
-        case 18 /* GE */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a >= b);
-          break;
-        }
-        case 20 /* AND */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(Boolean(a) && Boolean(b));
-          break;
-        }
-        case 21 /* OR */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(Boolean(a) || Boolean(b));
-          break;
-        }
-        case 22 /* NOT */: {
-          const a = this.pop();
-          this.push(!Boolean(a));
-          break;
-        }
-        case 5 /* JUMP */: {
-          this.ip = instr.arg;
-          break;
-        }
-        case 6 /* JUMP_IF_FALSE */: {
-          const cond = this.pop();
-          if (!Boolean(cond)) {
-            this.ip = instr.arg;
-          }
-          break;
-        }
-        case 23 /* MAKE_LIST */: {
-          const count = instr.arg;
-          if (this.stack.length < count) {
-            throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
-          }
-          const items = this.stack.splice(this.stack.length - count, count);
-          this.push(items);
-          break;
-        }
-        case 24 /* GET_FIELD */: {
-          const obj = this.pop();
-          const field = instr.arg;
-          if (obj !== null && typeof obj === "object") {
-            this.push(obj[field]);
-          } else {
-            throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
-          }
-          break;
-        }
-        case 3 /* CALL */: {
-          throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
-        }
-        case 4 /* RETURN */: {
-          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-        }
-        case 25 /* HALT */: {
-          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-        }
-        default: {
-          throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
-        }
-      }
-    }
-    return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-  }
-  push(val) {
-    this.stack.push(val);
-  }
-  pop() {
-    if (this.stack.length === 0) {
-      throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
-    }
-    return this.stack.pop();
-  }
-};
 
 // src/optimizer.ts
 function cloneChunk(chunk) {
@@ -30012,7 +30071,8 @@ var Interpreter = class _Interpreter {
       try {
         const chunk = _Interpreter._vmCompiler.compile(expr);
         const optimized = _Interpreter._vmOptimizer.optimize(chunk);
-        const vmResult = _Interpreter._vm.run(optimized);
+        const initialVars = this.context.variables.snapshot();
+        const vmResult = _Interpreter._vm.run(optimized, initialVars);
         return vmResult;
       } catch (_vmErr) {
       }

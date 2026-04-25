@@ -1,6 +1,7 @@
 // FreeLang v9: Function Call Evaluation
 // Phase 58: interpreter.ts에서 분리된 함수 호출 로직
 // Phase 61: TCO (Tail Call Optimization) 추가
+// Phase 3-E: VM 함수 호출 경로 추가
 
 import { TypeAnnotation } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
@@ -8,6 +9,10 @@ import { suggestSimilar } from "./error-formatter";
 import { FunctionNotFoundError } from "./errors";
 import { isTailCall } from "./tco";
 import { globalProfiler } from "./profiler";
+import { vmFunctionRegistry } from "./vm-eligible"; // Phase 3-E
+import { VM } from "./vm"; // Phase 3-E
+
+const _callVM = new VM(); // Phase 3-E
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -69,6 +74,41 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // TCO 모드 활성화 시 trampoline으로 라우팅
   if (interp.tcoMode) {
     return callUserFunctionTCO(interp, name, args);
+  }
+
+  // Phase 3-E: VM 함수 호출
+  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    try {
+      const vmFunc = vmFunctionRegistry.get(name)!;
+      const initialVars = new Map<string, any>();
+
+      // closure가 있으면 사용, 없으면 현재 변수 스냅샷
+      if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+        for (const [k, v] of vmFunc._closure) {
+          initialVars.set(k, v);
+        }
+      } else {
+        const snapshot = interp.context.variables.snapshot();
+        for (const [k, v] of snapshot) {
+          initialVars.set(k, v);
+        }
+      }
+
+      // 모든 VM 함수를 변수로 포함 (재귀 호출 지원)
+      for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+        initialVars.set("$" + vmName, vmFuncObj);
+        initialVars.set(vmName, vmFuncObj); // op 위치에서 직접 참조
+      }
+
+      // 파라미터 바인딩: fnValue.params는 $ 없는 형태 (fn의 params 정규화 참고)
+      for (let i = 0; i < vmFunc._params.length; i++) {
+        initialVars.set(vmFunc._params[i], args[i] ?? null);
+      }
+
+      return _callVM.run(vmFunc._chunk, initialVars);
+    } catch {
+      // fallback to interpreter path
+    }
   }
 
   let baseName = name;

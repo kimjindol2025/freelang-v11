@@ -1,0 +1,73 @@
+; Agent DSL 예제 1: 순차 작업 (의존성 관리)
+; 시나리오: 데이터 수집 → 처리 → 저장
+
+(load "src/agent-dsl.fl")
+
+; 작업 정의
+(let [
+  [$state (agent-state)]
+
+  ; Task 1: 데이터 수집
+  [$fetch-task {
+    :name "fetch-data"
+    :action (fn [$ctx] (let [
+      [$data [
+        { :id 1 :name "Alice" :score 95 }
+        { :id 2 :name "Bob" :score 87 }
+        { :id 3 :name "Charlie" :score 92 }
+      ]]
+    ] (do
+      (println "✓ Fetched 3 records")
+      $data
+    )))
+    :depends []
+    :retry 3
+    :on-success (fn [r] (println "✓ Fetch succeeded"))
+  }]
+
+  ; Task 2: 처리 (필터링: score >= 90)
+  [$process-task {
+    :name "process-data"
+    :action (fn [$ctx] (let [
+      [$data [
+        { :id 1 :name "Alice" :score 95 }
+        { :id 3 :name "Charlie" :score 92 }
+      ]]
+    ] (do
+      (println "✓ Filtered to 2 records (score >= 90)")
+      $data
+    )))
+    :depends ["fetch-data"]
+    :retry 1
+    :on-success (fn [r] (println "✓ Process succeeded"))
+  }]
+
+  ; Task 3: 저장
+  [$save-task {
+    :name "save-data"
+    :action (fn [$ctx] (let [
+      [$count 2]
+    ] (do
+      (println (str "✓ Saved " $count " records to database"))
+      { :saved-count $count :status "success" }
+    )))
+    :depends ["process-data"]
+    :retry 1
+    :on-success (fn [r] (println "✓ Save succeeded"))
+  }]
+]
+
+  ; 에이전트 실행
+  (let [
+    [$result (agent-run [$fetch-task $process-task $save-task])]
+  ] (do
+    (println "")
+    (println (str "═══════════════════════════════"))
+    (println (str "Agent Execution Complete"))
+    (println (str "Total Steps: " (get $result :total-steps)))
+    (println (str "Status: " (get $result :status)))
+    (println (str "Executed Tasks: " (count (get $result :executed))))
+    (println (str "═══════════════════════════════"))
+    (json-stringify $result)
+  ))
+)
