@@ -1,38 +1,47 @@
 {
-  "name": "freelang-cli",
-  "version": "1.0.0",
-  "description": "FreeLang v11 프로젝트 관리 CLI 도구",
+  "name": "freelang-v11",
+  "version": "11.0.0",
+  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). v9와 v9-frontend 통합.",
   "keywords": [
-    "freelang",
-    "cli",
-    "framework",
-    "dsl",
     "ai",
-    "web"
+    "language",
+    "freelang",
+    "s-expression",
+    "ai-native",
+    "claude",
+    "agent"
   ],
-  "author": "Kim Jin-Dol <bigwash2025a@gmail.com>",
+  "author": "Claude Code (Anthropic)",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://gogs.dclub.kr/kim/freelang-v11.git"
-  },
+  "homepage": "https://gogs.dclub.kr/kim/freelang-v11",
+  "main": "dist/index.js",
   "bin": {
-    "freelang": "./bin/freelang"
-  },
-  "main": "bin/freelang",
-  "engines": {
-    "node": ">=14.0.0"
+    "v9": "dist/cli.js"
   },
   "scripts": {
-    "test": "node bin/freelang test",
-    "dev": "node bin/freelang dev",
-    "build": "node bin/freelang build",
-    "deploy": "node bin/freelang deploy"
+    "build": "node scripts/build.js",
+    "docs:gen": "node scripts/gen-stdlib-docs.js",
+    "test": "jest --config .config/jest.fast.config.js --passWithNoTests",
+    "test:fast": "jest --config .config/jest.fast.config.js --passWithNoTests",
+    "test:full": "jest --config .config/jest.config.js --passWithNoTests",
+    "test:watch": "jest --config .config/jest.fast.config.js --watch",
+    "test:coverage": "jest --config .config/jest.config.js --coverage",
+    "test:ci": "jest --config .config/jest.config.js --ci --coverage --maxWorkers=2",
+    "benchmark": "node scripts/benchmark.js",
+    "dev": "node bootstrap.js run app/page.fl",
+    "start": "node bootstrap.js serve app/",
+    "server": "node bootstrap.js serve app/",
+    "freelang": "node bootstrap.js run",
+    "fl": "node bootstrap.js run",
+    "repl": "node bootstrap.js repl"
   },
-  "preferGlobal": true,
-  "files": [
-    "bin",
-    "src",
-    "templates"
-  ]
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.19.37",
+    "esbuild": "^0.21.5",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  }
 }
