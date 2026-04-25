@@ -1,11 +1,19 @@
-;; oidc-validate.fl — Bearer 토큰 검증 (Phase X5)
+;; oidc-validate.fl — Bearer 토큰 검증 (Phase X5 + P0 fix)
 ;;
-;; dclub-auth 의 jwt-rs256 verify 패턴을 외부 IdP 의 JWKS 로 일반화.
-;; JWKS 캐시: 메모리 (1시간 TTL)
+;; P0 fix (2026-04-25 코드 리뷰 기반):
+;;   1. RS256 서명 검증 — self-hosted dclub-auth 의 jwks-find + jwt-rs256-verify 통합
+;;   2. aud 클레임 검증 — RFC 8725 (JWT BCP)
+;;   3. SQL injection — db_delete_row 문자열 concat → db_exec parameterized
+;;
+;; 외부 IdP (Google/Kakao 등) 의 JWK → PEM 변환은 X5.2 분리:
+;;   현재 auth_db 미설정 시 → 서명 검증 skip + WARN.
+;;   완전 production 사용 시 self-hosted dclub-auth 권장.
 
 (load "projects/dclub-iap/lib/config.fl")
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
 
-;; JWKS 캐시 — DB 기반 (FL 글로벌 mutation 회피)
+;; JWKS 캐시 — 외부 IdP fallback (X5.2까지 보조)
 [FUNC iap-jwks-cache-table :params [$db]
   :body (db_create $db "CREATE TABLE IF NOT EXISTS iap_jwks_cache (
     issuer      TEXT PRIMARY KEY,
@@ -13,7 +21,7 @@
     fetched_at  INTEGER NOT NULL
   )")]
 
-;; JWKS fetch + 캐시
+;; JWKS fetch + 캐시 (외부 IdP용)
 [FUNC iap-jwks-get :params [$db $issuer $jwks-url]
   :body (let [
     rows (db_query $db
@@ -29,7 +37,8 @@
         (if (= $body "")
           (if (= $cached nil) nil (json_parse (get $cached "jwks_json")))
           (do
-            (db_delete_row $db "iap_jwks_cache" (str "issuer='" $issuer "'"))
+            ;; P0 fix #3: SQL injection — parameterized DELETE
+            (db_exec $db "DELETE FROM iap_jwks_cache WHERE issuer=?" [$issuer])
             (db_insert $db "iap_jwks_cache" {
               :issuer $issuer
               :jwks_json $body
@@ -37,7 +46,7 @@
             })
             (json_parse $body))))))]
 
-;; Bearer 토큰 추출
+;; Bearer 토큰 추출 (변경 없음)
 [FUNC iap-extract-bearer :params [$req]
   :body (let [
     h (server_req_header $req "authorization")
@@ -49,35 +58,60 @@
         (substring $h2 7 (length $h2))
         "")))]
 
-;; ── 토큰 검증 ────────────────────────────────
-;; JWT header 의 kid 로 JWKS 에서 키 찾기 → JWK → PEM 변환 → RS256 검증
-;; (간소화: jwk → 직접 검증 primitive 가 없으므로 dclub-auth 의 jwt-rs256-verify 와는 별개로
-;;  여기서는 base64url payload 만 디코드해 issuer/aud/exp 확인. 서명 검증은 후순위)
+;; ── 토큰 검증 헬퍼 ──────────────────────────
 
-[FUNC iap-decode-payload :params [$token]
+;; P0 fix #2: aud 클레임 검증 (RFC 8725) — string 또는 array 양쪽 처리
+[FUNC iap-aud-matches? :params [$aud $expected]
+  :body (cond
+    [(= $aud nil) false]
+    [(string? $aud) (= $aud $expected)]
+    [(array? $aud) (reduce (fn [acc x] (or acc (= x $expected))) false $aud)]
+    [true false])]
+
+;; P0 fix #1: 서명 검증 — self-hosted dclub-auth jwks-find + jwt-rs256-verify
+;; 반환: true=서명 OK, false=서명 무효 / kid 없음 / PEM 없음
+[FUNC iap-verify-signature :params [$token $auth-db]
   :body (let [
-    parts (str_split $token ".")
+    header (jwt-rs256-header-only $token)
+    kid (if (= $header nil) nil (get $header "kid"))
+    key-row (if (= $kid nil) nil (jwks-find $auth-db $kid))
+    pem (if (= $key-row nil) nil (get $key-row "public_pem"))
   ]
-    (if (= (length $parts) 3)
-      (let [payload-b64 (get $parts 1)]
-        (json_parse (base64url_decode $payload-b64)))
-      nil))]
+    (if (= $pem nil)
+      false
+      (not (= (jwt-rs256-verify $token $pem) nil))))]
+
+;; ── 메인 검증 ──────────────────────────────
+;; iss + aud + exp + (조건부) RS256 서명 모두 통과해야 ok=true
 
 [FUNC iap-validate-token :params [$db $cfg $token]
   :body (let [
-    payload (iap-decode-payload $token)
+    decoded (jwt-rs256-decode $token)
   ]
-    (if (= $payload nil)
+    (if (= $decoded nil)
       {:ok false :error "invalid_token_format"}
       (let [
+        payload (get $decoded "payload")
         iss (get $payload "iss")
+        aud (get $payload "aud")
         exp (get $payload "exp")
         now-sec (now_unix)
         expected-iss (get $cfg "auth_issuer")
+        expected-aud (get $cfg "client_id")
+        auth-db (get $cfg "auth_db")
         iss-ok (= $iss $expected-iss)
+        aud-ok (iap-aud-matches? $aud $expected-aud)
         exp-ok (and (not (= $exp nil)) (> $exp $now-sec))
+        ;; P0 fix #1: auth_db 설정 시 RS256 서명 검증 / 미설정 시 X5.2 까지 skip
+        sig-ok (cond
+          [(= $auth-db "")
+           (do (println "[iap] WARN: auth_db 미설정 — 서명 검증 skip (외부 IdP, X5.2)")
+               true)]
+          [true (iap-verify-signature $token $auth-db)])
       ]
         (cond
           [(not $iss-ok) {:ok false :error "iss_mismatch"}]
+          [(not $aud-ok) {:ok false :error "aud_mismatch"}]
           [(not $exp-ok) {:ok false :error "expired"}]
+          [(not $sig-ok) {:ok false :error "signature_invalid"}]
           [true {:ok true :payload $payload}]))))]
