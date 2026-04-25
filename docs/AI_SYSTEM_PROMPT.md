@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 387개 함수, 23 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 393개 함수, 25 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -426,10 +426,12 @@ parallel race with-timeout fl-try use`
 - `(file_mtime filePath)` → number (get modification time as timestamp)
 - `(file_ctime filePath)` → number (get creation time as timestamp)
 
-### http (10개)
+### http (12개)
 
 - `(http_get url)` → string
 - `(http_post url body)` → string
+- `(http_post_form url form_body)` → string  (application/x-www-form-urlencoded)
+- `(http_get_bearer url token)` → string  (Authorization: Bearer ...)
 - `(http_put url body)` → string
 - `(http_delete url)` → string
 - `(http_status url)` → number
@@ -472,6 +474,12 @@ parallel race with-timeout fl-try use`
 - `(ws_send_to_client sessionId data [isBinary])` → boolean
 - `(ws_close_client sessionId [code])` → null
 - `(server_req_session_id req)` → string | null
+
+### mail (3개)
+
+- `(mail_outbox_write dir to subject body)` → string (파일 경로)
+- `(mail_outbox_list dir)` → array (JSON 배열, 큐된 메시지)
+- `(mail_outbox_count dir)` → number
 
 ### mariadb (6개)
 
@@ -596,6 +604,10 @@ parallel race with-timeout fl-try use`
 - `(totp_now secret_b32)` → string (현재 시각의 6자리 코드, 디버그·등록용)
 - `(totp_uri label issuer secret_b32)` → string (otpauth://totp/... QR 코드 표준)
 
+### webauthn (1개)
+
+- `(webauthn_challenge bytes)` → base64url string (32 bytes)
+
 ### workflow (14개)
 
 - `(workflow_create name steps)` → Workflow object
@@ -630,4 +642,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-25T12:23:26.507Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-25T14:48:17.489Z
