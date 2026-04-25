@@ -86,16 +86,75 @@
   :body (server_stop)
 ]
 
+;; ============ 에러 핸들링 ============
+
+;; safe-result 는 미사용 — try/catch를 핸들러에서 직접 사용
+
 ;; ============ 미들웨어 (선택사항) ============
 
 [FUNC app-use :params [$middleware-name]
   :body (middleware_add_to_chain "express-chain" $middleware-name)
 ]
 
-[FUNC app-cors
-  :body (middleware_define "cors" true (middleware_cors) (fn [_] null))
+[FUNC app-cors :params []
+  :body (middleware_define "cors" nil (middleware_cors) nil)
 ]
 
-[FUNC app-logging
-  :body (middleware_define "logging" true (middleware_logging) (fn [_] null))
+[FUNC app-logging :params []
+  :body (middleware_define "logging" nil (middleware_logging) nil)
+]
+
+[FUNC app-auth :params [$token]
+  :body (middleware_define "auth" (middleware_auth_check $token)
+    (fn [$_] nil)
+    (fn [$e] (res-status 401 { :error "UNAUTHORIZED" })))
+]
+
+[FUNC app-rate-limit :params [$limit $window]
+  :body (middleware_define "rate-limit"
+    (middleware_rate_limit $limit $window)
+    (fn [$_] nil)
+    (fn [$e] (res-status 429 { :error "TOO_MANY_REQUESTS" })))
+]
+
+;; ============ 데이터베이스 래퍼 ============
+
+[FUNC db-query-sqlite :params [$db-path $sql $params]
+  :body (db_query $db-path $sql (or $params []))
+]
+
+[FUNC db-exec-sqlite :params [$db-path $sql $params]
+  :body (db_exec $db-path $sql (or $params []))
+]
+
+[FUNC db-insert :params [$db-path $table $data]
+  :body (db_insert $db-path $table $data)
+]
+
+[FUNC db-update :params [$db-path $table $data $where]
+  :body (db_update $db-path $table $data $where)
+]
+
+[FUNC db-delete :params [$db-path $table $where]
+  :body (db_delete_row $db-path $table $where)
+]
+
+;; ============ 로깅 및 디버깅 ============
+
+[FUNC log-info :params [$msg]
+  :body (println (str "[INFO] " (now_iso) " " $msg))
+]
+
+[FUNC log-error :params [$msg]
+  :body (println (str "[ERROR] " (now_iso) " " $msg))
+]
+
+[FUNC log-debug :params [$msg]
+  :body (println (str "[DEBUG] " (now_iso) " " $msg))
+]
+
+[FUNC req-log :params [$req]
+  :body (do
+    (log-info (str (req-method $req) " " (req-path $req)))
+    $req)
 ]

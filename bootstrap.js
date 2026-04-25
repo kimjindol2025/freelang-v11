@@ -32649,6 +32649,7 @@ function checkSource(source, filePath) {
 }
 function cmdRun(filePath, watch2, extraArgs = []) {
   const absPath = path13.resolve(filePath);
+  const vmBench = extraArgs.includes("--vm-bench");
   if (!fs17.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
@@ -32681,6 +32682,57 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   }
   if (watch2) {
     process.env.FL_DEV = "1";
+  }
+  if (vmBench) {
+    console.log("\n\x1B[36m[vm-bench] \uC131\uB2A5 \uCE21\uC815 \uC2DC\uC791...\x1B[0m");
+    const ITERATIONS = 100;
+    const source = fs17.readFileSync(absPath, "utf-8");
+    const t0 = performance.now();
+    for (let i = 0; i < ITERATIONS; i++) {
+      delete process.env.FL_VM;
+      try {
+        const tokens = lex(source);
+        const ast = parse(tokens);
+        const interp2 = new Interpreter();
+        interp2.currentFilePath = absPath;
+        if (extraArgs.length > 0) {
+          interp2.context.variables.set("$__argv__", extraArgs.filter((a) => a !== "--vm-bench"));
+        }
+        interp2.interpret(ast);
+      } catch (_e) {
+      }
+    }
+    const interpMs = performance.now() - t0;
+    const t1 = performance.now();
+    for (let i = 0; i < ITERATIONS; i++) {
+      process.env.FL_VM = "1";
+      try {
+        const tokens = lex(source);
+        const ast = parse(tokens);
+        const interp2 = new Interpreter();
+        interp2.currentFilePath = absPath;
+        if (extraArgs.length > 0) {
+          interp2.context.variables.set("$__argv__", extraArgs.filter((a) => a !== "--vm-bench"));
+        }
+        interp2.interpret(ast);
+      } catch (_e) {
+      }
+    }
+    const vmMs = performance.now() - t1;
+    delete process.env.FL_VM;
+    const speedup = interpMs / vmMs;
+    console.log(`\x1B[36m[vm-bench]\x1B[0m interpreter: ${interpMs.toFixed(1)}ms (${ITERATIONS} iter)`);
+    console.log(`\x1B[36m[vm-bench]\x1B[0m          vm: ${vmMs.toFixed(1)}ms (${ITERATIONS} iter)`);
+    console.log(`\x1B[36m[vm-bench]\x1B[0m    speedup: ${speedup.toFixed(2)}x`);
+    if (speedup < 1) {
+      console.log(`\x1B[33m\u26A0\uFE0F  VM\uC774 \uB290\uB9BC (\uC0B0\uC220 \uC9D1\uC57D \uCF54\uB4DC\uAC00 \uC544\uB2D0 \uC218 \uC788\uC74C)\x1B[0m`);
+    } else if (speedup >= 1.5) {
+      console.log(`\x1B[32m\u2713 \uBAA9\uD45C \uB2EC\uC131 (1.5\uBC30 \uC774\uC0C1)\x1B[0m`);
+    } else {
+      console.log(`\x1B[2m\u25CB 1.0x ~ 1.5x \uBC94\uC704\x1B[0m`);
+    }
+    console.log("");
+    if (!watch2) return;
   }
   execute();
   if (watch2) {
