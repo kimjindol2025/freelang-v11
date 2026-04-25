@@ -1,0 +1,109 @@
+;; 패턴 5: API 통합 (REST API)
+;; AI가 외부 API를 호출할 때 사용
+
+;; 패턴 A: 기본 GET 요청
+(defun fetch-users []
+  (try
+    (let [response (await (http-get "https://api.example.com/users"))]
+      response)
+    (catch err
+      (println "API 호출 실패:" err)
+      nil)))
+
+;; 패턴 B: 쿼리 파라미터와 함께 GET
+(defun fetch-users-by-age [min-age max-age]
+  (try
+    (let [url (str "https://api.example.com/users?min_age=" min-age "&max_age=" max-age)
+          response (await (http-get url))]
+      response)
+    (catch err
+      (println "조회 실패:" err)
+      [])))
+
+;; 패턴 C: 헤더와 함께 GET (인증 등)
+(defun fetch-user [user-id auth-token]
+  (try
+    (let [response (await (http-get
+      (str "https://api.example.com/users/" user-id)
+      {:headers {:Authorization (str "Bearer " auth-token)}}))]
+      response)
+    (catch err
+      (println "인증된 요청 실패:" err)
+      nil)))
+
+;; 패턴 D: POST 요청 (데이터 생성)
+(defun create-user [name email age]
+  (try
+    (let [payload {:name name :email email :age age}
+          response (await (http-post
+            "https://api.example.com/users"
+            payload
+            {:headers {:content-type "application/json"}}))]
+      response)
+    (catch err
+      (println "사용자 생성 실패:" err)
+      nil)))
+
+;; 패턴 E: 복잡한 API 플로우 (다중 호출)
+(defun get-user-with-posts [user-id]
+  (try
+    (let [user (await (http-get (str "https://api.example.com/users/" user-id)))
+          posts (await (http-get (str "https://api.example.com/users/" user-id "/posts")))]
+      (merge user {:posts posts}))
+    (catch err
+      (println "사용자/게시물 조회 실패:" err)
+      nil)))
+
+;; 패턴 F: 재시도 로직 (Retry)
+(defun fetch-with-retry [url max-retries]
+  (defun retry-helper [attempt]
+    (if (> attempt max-retries)
+      (throw "Max retries exceeded")
+      (try
+        (await (http-get url))
+        (catch err
+          (do
+            (println "재시도" attempt "실패, 다시 시도 중...")
+            (retry-helper (+ attempt 1)))))))
+  (try
+    (retry-helper 1)
+    (catch err
+      (println "최종 실패:" err)
+      nil)))
+
+;; 패턴 G: 병렬 API 호출
+(defun fetch-multiple [user-ids]
+  (let [promises (map (fn [id]
+    (http-get (str "https://api.example.com/users/" id)))
+    user-ids)]
+    ;; Promise.all 같은 효과
+    (map (fn [p] (await p)) promises)))
+
+;; 패턴 H: API 응답 처리 & 검증
+(defun fetch-and-validate [url]
+  (try
+    (let [response (await (http-get url))
+          status (get response :status)
+          body (get response :body)]
+      ;; 상태 코드 확인
+      (if (not (= status 200))
+        (throw (str "API returned status " status)))
+      ;; 응답 본문 검증
+      (if (nil? body)
+        (throw "Response body is empty"))
+      body)
+    (catch err
+      (println "API 응답 처리 실패:" err)
+      nil)))
+
+;; 패턴 I: 배치 처리 (여러 항목)
+(defun batch-create-users [user-list]
+  (let [results (map (fn [user]
+    (try
+      (await (http-post
+        "https://api.example.com/users"
+        user))
+      (catch err
+        (merge user {:error (str err)}))))
+    user-list)]
+    results))

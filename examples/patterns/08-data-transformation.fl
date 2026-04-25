@@ -1,0 +1,103 @@
+;; 패턴 8: 데이터 변환 (Data Transformation)
+;; AI가 한 형식에서 다른 형식으로 데이터를 변환할 때 사용
+
+;; 패턴 A: 배열 → 맵 (인덱싱)
+(let [items ["apple" "banana" "cherry"]
+      indexed (reduce (fn [acc item]
+        (let [idx (length acc)]
+          (merge acc {(str idx) item})))
+        {}
+        items)]
+  (println indexed))
+;; → {:0 "apple" :1 "banana" :2 "cherry"}
+
+;; 패턴 B: 맵 → 배열 (값 추출)
+(let [user-map {:name "Alice" :age 25 :city "Seoul"}
+      values (values user-map)]
+  (println values))
+;; → ["Alice" 25 "Seoul"]
+
+;; 패턴 C: 중첩 구조 평탄화 (Flatten)
+(defun flatten-one-level [nested]
+  (reduce (fn [acc item]
+    (if (array? item)
+      (+ acc item)
+      (+ acc [item])))
+   []
+   nested))
+
+(println (flatten-one-level [1 [2 3] 4 [5 6]]))
+;; → [1 2 3 4 5 6]
+
+;; 패턴 D: 그룹핑 (Group By)
+(defun group-by-field [items field]
+  (reduce (fn [acc item]
+    (let [key (get item field)
+          group (get acc (str key) [])]
+      (merge acc {(str key) (+ group [item])})))
+   {}
+   items))
+
+(let [users [{:id 1 :name "Alice" :dept "eng"}
+             {:id 2 :name "Bob" :dept "sales"}
+             {:id 3 :name "Charlie" :dept "eng"}]]
+  (println (group-by-field users :dept)))
+
+;; 패턴 E: 데이터 병합 (Merge)
+(defun merge-user-data [user profile]
+  (merge user profile))
+
+(let [user {:id 1 :name "Alice"}
+      profile {:age 25 :city "Seoul"}
+      merged (merge-user-data user profile)]
+  (println merged))
+;; → {:id 1 :name "Alice" :age 25 :city "Seoul"}
+
+;; 패턴 F: 필드 선택 (Pick)
+(defun pick-fields [obj fields]
+  (reduce (fn [acc field]
+    (merge acc {(str field) (get obj field)}))
+   {}
+   fields))
+
+(let [user {:id 1 :name "Alice" :age 25 :email "alice@example.com" :password "secret"}
+      selected (pick-fields user [:id :name :email])]
+  (println selected))
+;; → {:id 1 :name "Alice" :email "alice@example.com"}
+
+;; 패턴 G: 필드 제외 (Omit)
+(defun omit-fields [obj fields]
+  (let [all-keys (keys obj)
+        keep-keys (filter (fn [k]
+          (not (in-array k fields)))
+          all-keys)]
+    (pick-fields obj keep-keys)))
+
+;; 패턴 H: 데이터 정규화 (Normalize)
+(defun normalize-user [raw-user]
+  {:id (get raw-user :id)
+   :name (str-trim (get raw-user :name))
+   :email (str-lower (str-trim (get raw-user :email)))
+   :age (parse-number (get raw-user :age))
+   :is-active (if (get raw-user :status) true false)})
+
+;; 패턴 I: 조건부 변환
+(defun apply-discount [products discount-rate]
+  (map (fn [product]
+    (let [original-price (get product :price)]
+      (merge product {
+        :original-price original-price
+        :discounted-price (* original-price (- 1 discount-rate))
+        :discount-amount (* original-price discount-rate)})))
+   products))
+
+(let [products [{:id 1 :name "Apple" :price 100}
+                {:id 2 :name "Banana" :price 200}]]
+  (println (apply-discount products 0.1)))
+
+;; 패턴 J: 요약 (Summary)
+(defun summarize-users [users]
+  {:total (length users)
+   :average-age (/ (reduce (fn [acc u] (+ acc (get u :age))) 0 users) (length users))
+   :names (map (fn [u] (get u :name)) users)
+   :by-city (group-by-field users :city)})

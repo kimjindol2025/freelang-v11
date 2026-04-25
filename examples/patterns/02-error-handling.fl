@@ -1,0 +1,79 @@
+;; 패턴 2: 에러 처리 (try-catch)
+;; AI가 네트워크, 파일, 데이터베이스 작업할 때 필수
+
+;; 패턴 A: 기본 에러 처리
+(let [result (try
+  (/ 10 0)  ;; 에러 발생
+  (catch err
+    (println "에러 발생:" err)
+    -1))]  ;; 에러 발생 시 -1 반환
+  (println "결과:" result))
+;; → 에러 발생: Error: ...
+;; → 결과: -1
+
+;; 패턴 B: 중첩된 에러 처리
+(let [data {:status 200 :body "ok"}]
+  (try
+    (let [status (get data :status)
+          body (get data :body)]
+      (if (< status 200)
+        (throw "Bad status")
+        (println "성공:" body)))
+    (catch err
+      (println "실패:" err))))
+;; → 성공: ok
+
+;; 패턴 C: 에러를 무시하고 기본값 반환
+(defun safe-get-age [user]
+  (try
+    (let [age (get user :age)]
+      (if (number? age) age (throw "Invalid age")))
+    (catch err
+      (println "나이 파싱 실패, 기본값 0 사용")
+      0)))
+
+(println (safe-get-age {:name "Alice" :age 25}))
+;; → 25
+
+(println (safe-get-age {:name "Bob"}))
+;; → 나이 파싱 실패, 기본값 0 사용
+;; → 0
+
+;; 패턴 D: 명시적 검증 + 에러 발생
+(defun process-user [user]
+  (if (nil? user)
+    (throw "User cannot be nil"))
+  (if (not (string? (get user :name)))
+    (throw "User name must be string"))
+  (if (not (number? (get user :age)))
+    (throw "User age must be number"))
+  ;; 검증 통과 후 처리
+  (merge user {:processed-at (now-ms)}))
+
+(try
+  (process-user {:name "Alice" :age 25})
+  (catch err
+    (println "처리 실패:" err)))
+;; → 처리 성공
+
+(try
+  (process-user {:name "Bob" :age "thirty"})
+  (catch err
+    (println "처리 실패:" err)))
+;; → 처리 실패: User age must be number
+
+;; 패턴 E: Promise 기반 비동기 에러 처리
+(defun fetch-user-safe [user-id]
+  (try
+    (await (http-get (str "https://api.example.com/users/" user-id)))
+    (catch err
+      (println "API 호출 실패:" err)
+      nil)))
+
+;; 패턴 F: 다중 에러 처리
+(let [operations [
+  (try (/ 10 2) (catch e -1))
+  (try (/ 10 0) (catch e -1))
+  (try (/ 20 5) (catch e -1))]]
+  (println "연산 결과:" operations))
+;; → [5 -1 4]

@@ -1,0 +1,101 @@
+;; 패턴 7: 문자열 처리 (String Processing)
+;; AI가 텍스트 데이터를 분석하고 변환할 때 사용
+
+;; 패턴 A: 기본 문자열 연결
+(let [first-name "John"
+      last-name "Doe"
+      full-name (str first-name " " last-name)]
+  (println "이름:" full-name))
+;; → John Doe
+
+;; 패턴 B: 문자열 분할 및 처리
+(let [csv-line "Alice,25,alice@example.com"
+      parts (str-split csv-line ",")
+      name (get parts 0)
+      age (get parts 1)
+      email (get parts 2)]
+  (println (str "이름: " name ", 나이: " age ", 이메일: " email)))
+
+;; 패턴 C: 문자열 검색 및 치환
+(let [text "Hello World, Hello Universe"
+      updated (str-replace text "Hello" "Hi")]
+  (println updated))
+;; → Hi World, Hello Universe (첫 번째만 치환)
+
+;; 패턴 D: 문자열 변환 (대소문자)
+(let [name "JoHn DoE"
+      lower (str-lower name)
+      upper (str-upper name)
+      title-case (str-upper (get (str-split name " ") 0))]
+  (println lower)
+  (println upper))
+;; → john doe
+;; → JOHN DOE
+
+;; 패턴 E: 문자열 트림 (공백 제거)
+(let [email-with-spaces "  alice@example.com  "
+      clean-email (str-trim email-with-spaces)]
+  (println (str "|" clean-email "|")))
+;; → |alice@example.com|
+
+;; 패턴 F: 문자열 검사 (포함 여부)
+(defun is-valid-email [email]
+  (and
+    (str-includes email "@")
+    (str-includes email ".")
+    (> (str-split email "@") 1)))
+
+(println (is-valid-email "alice@example.com"))
+;; → true
+
+(println (is-valid-email "alice-example.com"))
+;; → false
+
+;; 패턴 G: 복합 문자열 처리 (파싱)
+(defun parse-csv-line [line]
+  (let [parts (str-split line ",")]
+    {:name (str-trim (get parts 0))
+     :age (parse-number (str-trim (get parts 1)))
+     :email (str-trim (get parts 2))}))
+
+(println (parse-csv-line "Alice, 25, alice@example.com"))
+;; → {:name "Alice" :age 25 :email "alice@example.com"}
+
+;; 패턴 H: 문자열 템플릿
+(defun format-greeting [name age city]
+  (str "안녕하세요, " name "님! "
+       "나이는 " age "이고 " city "에 거주 중이신가요?"))
+
+(println (format-greeting "Alice" 25 "Seoul"))
+;; → 안녕하세요, Alice님! 나이는 25이고 Seoul에 거주 중이신가요?
+
+;; 패턴 I: 문자열 유효성 검사
+(defun is-numeric-string [s]
+  (try
+    (do
+      (parse-number s)
+      true)
+    (catch err false)))
+
+(println (is-numeric-string "123"))
+;; → true
+
+(println (is-numeric-string "abc"))
+;; → false
+
+;; 패턴 J: 문자열 분류 (카테고리)
+(defun categorize-string [s]
+  (case true
+    ((str-includes s "@") "email")
+    ((str-includes s "http") "url")
+    ((is-numeric-string s) "number")
+    (true "text")))
+
+(println (categorize-string "alice@example.com"))
+;; → email
+
+(println (categorize-string "https://example.com"))
+;; → url
+
+(println (categorize-string "12345"))
+;; → number

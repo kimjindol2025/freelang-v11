@@ -1,0 +1,130 @@
+;; 패턴 9: 의사결정 로직 (Decision Logic)
+;; AI가 조건부 처리와 분기를 할 때 사용
+
+;; 패턴 A: 기본 if-else
+(defun get-grade [score]
+  (if (>= score 90)
+    "A"
+    (if (>= score 80)
+      "B"
+      (if (>= score 70)
+        "C"
+        "F"))))
+
+(println (get-grade 85))
+;; → B
+
+;; 패턴 B: 다중 조건 (and/or)
+(defun is-eligible [age income employed]
+  (and
+    (>= age 18)
+    (>= income 30000)
+    (= employed true)))
+
+(println (is-eligible 25 50000 true))
+;; → true
+
+;; 패턴 C: case 문 (switch)
+(defun process-status [status]
+  (case status
+    "pending" "대기 중입니다"
+    "approved" "승인되었습니다"
+    "rejected" "거절되었습니다"
+    "unknown" "상태를 알 수 없습니다"))
+
+(println (process-status "approved"))
+;; → 승인되었습니다
+
+;; 패턴 D: 중첩된 조건
+(defun calculate-shipping-cost [weight destination]
+  (if (<= weight 5)
+    (if (= destination "domestic")
+      5000
+      10000)
+    (if (= destination "domestic")
+      (+ 5000 (* (- weight 5) 500))
+      (+ 10000 (* (- weight 5) 1000)))))
+
+(println (calculate-shipping-cost 3 "domestic"))
+;; → 5000
+
+(println (calculate-shipping-cost 10 "international"))
+;; → 15000
+
+;; 패턴 E: 기본값 처리
+(defun get-user-info [user field default-value]
+  (let [value (get user field)]
+    (if (nil? value)
+      default-value
+      value)))
+
+(println (get-user-info {:name "Alice"} :name "Unknown"))
+;; → Alice
+
+(println (get-user-info {:name "Bob"} :age 0))
+;; → 0
+
+;; 패턴 F: 조건부 필터링
+(defun filter-by-criteria [items min-age max-age status]
+  (filter (fn [item]
+    (and
+      (>= (get item :age) min-age)
+      (<= (get item :age) max-age)
+      (if (nil? status)
+        true
+        (= (get item :status) status))))
+   items))
+
+;; 패턴 G: 조건부 변환
+(defun classify-user [user]
+  (let [age (get user :age)
+        income (get user :income)]
+    (merge user {
+      :category (case true
+        ((< age 18) "minor")
+        ((>= age 65) "senior")
+        (true "adult"))
+      :income-level (case true
+        ((< income 30000) "low")
+        ((< income 100000) "medium")
+        (true "high"))})))
+
+(println (classify-user {:age 25 :income 50000}))
+;; → {...:category "adult" :income-level "medium"}
+
+;; 패턴 H: 우선순위 기반 선택
+(defun select-best-offer [offers]
+  (reduce (fn [best offer]
+    (if (> (get offer :value) (get best :value))
+      offer
+      best))
+   (get offers 0)
+   (drop 1 offers)))
+
+;; 패턴 I: 조건부 액션
+(defun process-order [order]
+  (let [total (get order :total)
+        status (if (> total 100000)
+         "requires-approval"
+         (if (> total 50000)
+          "needs-review"
+          "auto-approve"))]
+    (merge order {:process-status status})))
+
+;; 패턴 J: early return (throw 사용)
+(defun validate-user [user]
+  ;; 각 조건을 순차적으로 확인
+  (if (nil? user)
+    (throw "User is required"))
+  (if (nil? (get user :name))
+    (throw "Name is required"))
+  (if (< (get user :age) 18)
+    (throw "User must be 18 or older"))
+  (if (nil? (get user :email))
+    (throw "Email is required"))
+  ;; 모든 검증 통과
+  user)
+
+(try
+  (validate-user {:name "Alice" :age 25 :email "alice@example.com"})
+  (catch err (println "검증 실패:" err)))

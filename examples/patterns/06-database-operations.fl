@@ -1,0 +1,116 @@
+;; 패턴 6: 데이터베이스 작업 (Database)
+;; AI가 데이터를 쿼리하고 수정할 때 사용
+
+;; 패턴 A: 기본 SELECT (조회)
+(defun get-all-users []
+  (try
+    (db-query "SELECT * FROM users")
+    (catch err
+      (println "조회 실패:" err)
+      [])))
+
+;; 패턴 B: WHERE 조건과 함께 조회
+(defun get-users-by-age [min-age max-age]
+  (try
+    (db-query
+      "SELECT * FROM users WHERE age >= ? AND age <= ?"
+      [min-age max-age])
+    (catch err
+      (println "조건부 조회 실패:" err)
+      [])))
+
+;; 패턴 C: INSERT (데이터 삽입)
+(defun create-user [name email age]
+  (try
+    (db-exec
+      "INSERT INTO users (name, email, age) VALUES (?, ?, ?)"
+      [name email age])
+    (catch err
+      (println "사용자 생성 실패:" err)
+      -1)))
+
+;; 패턴 D: UPDATE (데이터 수정)
+(defun update-user [user-id name email]
+  (try
+    (db-exec
+      "UPDATE users SET name = ?, email = ? WHERE id = ?"
+      [name email user-id])
+    (catch err
+      (println "사용자 수정 실패:" err)
+      0)))
+
+;; 패턴 E: DELETE (데이터 삭제)
+(defun delete-user [user-id]
+  (try
+    (db-exec "DELETE FROM users WHERE id = ?" [user-id])
+    (catch err
+      (println "사용자 삭제 실패:" err)
+      0)))
+
+;; 패턴 F: 트랜잭션 (여러 쿼리)
+(defun transfer-points [from-user-id to-user-id points]
+  (try
+    (do
+      ;; 1단계: from 사용자 포인트 감소
+      (db-exec
+        "UPDATE users SET points = points - ? WHERE id = ?"
+        [points from-user-id])
+      ;; 2단계: to 사용자 포인트 증가
+      (db-exec
+        "UPDATE users SET points = points + ? WHERE id = ?"
+        [points to-user-id])
+      ;; 3단계: 로그 기록
+      (db-exec
+        "INSERT INTO transfer_logs (from_id, to_id, points) VALUES (?, ?, ?)"
+        [from-user-id to-user-id points])
+      true)
+    (catch err
+      (println "포인트 전송 실패:" err)
+      false)))
+
+;; 패턴 G: 집계 함수 (COUNT, SUM, AVG)
+(defun get-user-stats []
+  (try
+    (let [result (db-query
+      "SELECT COUNT(*) as count, AVG(age) as avg_age, SUM(points) as total_points FROM users")]
+      (get result 0))  ;; 첫 번째 행
+    (catch err
+      (println "통계 조회 실패:" err)
+      nil)))
+
+;; 패턴 H: 정렬 및 페이지네이션
+(defun get-users-paginated [page page-size]
+  (try
+    (let [offset (* (- page 1) page-size)]
+      (db-query
+        "SELECT * FROM users ORDER BY id DESC LIMIT ? OFFSET ?"
+        [page-size offset]))
+    (catch err
+      (println "페이지 조회 실패:" err)
+      [])))
+
+;; 패턴 I: 조인 쿼리
+(defun get-user-with-orders [user-id]
+  (try
+    (db-query
+      "SELECT u.*, o.* FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.id = ?"
+      [user-id])
+    (catch err
+      (println "조인 조회 실패:" err)
+      [])))
+
+;; 패턴 J: 쿼리 결과 가공 (응답 매핑)
+(defun get-users-formatted []
+  (try
+    (let [raw-users (db-query "SELECT * FROM users")
+          formatted (map (fn [user]
+            {:id (get user :id)
+             :name (str-upper (get user :name))
+             :email (get user :email)
+             :is-adult (>= (get user :age) 18)
+             :created-at (now-iso)})
+            raw-users)]
+      formatted)
+    (catch err
+      (println "포맷팅 실패:" err)
+      [])))

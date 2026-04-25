@@ -1,0 +1,200 @@
+;; 패턴 10: 에이전트 오케스트레이션 (Agent Orchestration)
+;; AI 에이전트가 복잡한 작업을 조화롭게 실행할 때 사용
+
+;; ========================================
+;; 에이전트 상태 정의
+;; ========================================
+(let [agent-state {
+  :id "agent-001"
+  :status "idle"           ;; idle, executing, completed, failed
+  :current-task nil
+  :task-queue []
+  :completed-tasks []
+  :failed-tasks []
+  :context {}
+  :metadata {:started-at nil :last-updated-at nil}}]
+
+  ;; ========================================
+  ;; 패턴 A: 작업 큐 관리
+  ;; ========================================
+  (defun enqueue-task [state task]
+    (merge state {
+      :task-queue (+ (get state :task-queue) [task])}))
+
+  (defun dequeue-task [state]
+    (let [queue (get state :task-queue)]
+      (if (> (length queue) 0)
+        {:state (merge state {:task-queue (drop 1 queue)
+                             :current-task (get queue 0)})
+         :task (get queue 0)}
+        {:state state :task nil})))
+
+  ;; ========================================
+  ;; 패턴 B: 작업 실행 엔진
+  ;; ========================================
+  (defun execute-task [state task]
+    (try
+      (let [task-type (get task :type)
+            task-data (get task :data)
+            result (case task-type
+              "fetch-data"
+                (await (http-get (get task-data :url)))
+
+              "process-data"
+                (map (fn [item]
+                  (merge item {:processed true}))
+                (get task-data :items))
+
+              "save-data"
+                (file-write (get task-data :path)
+                           (str (get task-data :content)))
+
+              "query-db"
+                (db-query (get task-data :sql)
+                         (get task-data :params))
+
+              (throw (str "Unknown task type: " task-type)))]
+        ;; 작업 성공
+        (merge state {
+          :completed-tasks (+ (get state :completed-tasks)
+                            [{:task task :result result :completed-at (now-ms)}])
+          :current-task nil
+          :context (merge (get state :context) {:last-result result})}))
+      (catch err
+        ;; 작업 실패
+        (merge state {
+          :failed-tasks (+ (get state :failed-tasks)
+                          [{:task task :error (str err) :failed-at (now-ms)}])
+          :current-task nil
+          :status "failed"}))))
+
+  ;; ========================================
+  ;; 패턴 C: 조건부 작업 흐름
+  ;; ========================================
+  (defun should-continue [state]
+    (let [status (get state :status)]
+      (and (not (= status "failed"))
+           (> (length (get state :task-queue)) 0))))
+
+  ;; ========================================
+  ;; 패턴 D: 에이전트 실행 루프
+  ;; ========================================
+  (defun run-agent [initial-state]
+    (defun execute-loop [state]
+      (if (should-continue state)
+        (let [dequeued (dequeue-task state)
+              next-state (get dequeued :state)
+              task (get dequeued :task)]
+          (if (nil? task)
+            next-state
+            (let [executed-state (execute-task next-state task)]
+              (execute-loop (merge executed-state {
+                :metadata (merge (get executed-state :metadata)
+                               {:last-updated-at (now-ms)})})))))
+        state))
+    (execute-loop initial-state))
+
+  ;; ========================================
+  ;; 패턴 E: 컨텍스트 관리
+  ;; ========================================
+  (defun save-context [state key value]
+    (merge state {
+      :context (merge (get state :context) {(str key) value})}))
+
+  (defun get-context [state key]
+    (get (get state :context) (str key)))
+
+  ;; ========================================
+  ;; 패턴 F: 결과 수집
+  ;; ========================================
+  (defun get-execution-summary [state]
+    {:total-tasks (+ (length (get state :completed-tasks))
+                    (length (get state :failed-tasks)))
+     :completed (length (get state :completed-tasks))
+     :failed (length (get state :failed-tasks))
+     :success-rate (if (= (+ (length (get state :completed-tasks))
+                           (length (get state :failed-tasks))) 0)
+                   0
+                   (/ (length (get state :completed-tasks))
+                     (+ (length (get state :completed-tasks))
+                       (length (get state :failed-tasks)))))
+     :status (get state :status)
+     :context (get state :context)})
+
+  ;; ========================================
+  ;; 패턴 G: 병렬 작업 (간단한 버전)
+  ;; ========================================
+  (defun execute-tasks-in-parallel [state tasks]
+    (let [results (map (fn [task]
+      (try
+        (execute-task state task)
+        (catch err {:error (str err) :task task})))
+      tasks)]
+      results))
+
+  ;; ========================================
+  ;; 실행 예제
+  ;; ========================================
+  (let [initial-state agent-state
+        ;; 작업 큐에 추가
+        state1 (enqueue-task initial-state
+          {:type "fetch-data" :data {:url "https://api.example.com/users"}})
+        state2 (enqueue-task state1
+          {:type "process-data" :data {:items []}})
+        state3 (enqueue-task state2
+          {:type "save-data" :data {:path "output.json" :content "results"}})
+
+        ;; 에이전트 실행
+        final-state (run-agent (merge state3 {:status "executing"}))
+
+        ;; 결과 요약
+        summary (get-execution-summary final-state)]
+
+    (println "에이전트 실행 완료")
+    (println summary)))
+
+;; ========================================
+;; 패턴 H: 에러 복구 전략
+;; ========================================
+(defun execute-with-retry [state task max-attempts]
+  (defun retry-helper [attempt]
+    (if (> attempt max-attempts)
+      (throw (str "Task failed after " max-attempts " attempts"))
+      (try
+        (execute-task state task)
+        (catch err
+          (do
+            (println "재시도 " attempt "실패, 다시 시도 중...")
+            (retry-helper (+ attempt 1)))))))
+  (retry-helper 1))
+
+;; ========================================
+;; 패턴 I: 작업 의존성 관리
+;; ========================================
+(defun execute-with-dependencies [state task dependencies]
+  ;; 모든 의존 작업 완료 확인
+  (let [completed-task-ids (map (fn [t]
+    (get t :task-id))
+    (get state :completed-tasks))
+        all-deps-met (reduce (fn [acc dep]
+          (and acc (in-array dep completed-task-ids)))
+         true
+         dependencies)]
+    (if all-deps-met
+      (execute-task state task)
+      (throw "Dependencies not met"))))
+
+;; ========================================
+;; 패턴 J: 에이전트 모니터링
+;; ========================================
+(defun get-agent-health [state]
+  (let [total-tasks (+ (length (get state :completed-tasks))
+                      (length (get state :failed-tasks)))
+        completed (length (get state :completed-tasks))
+        failed (length (get state :failed-tasks))
+        success-rate (if (= total-tasks 0) 0 (/ completed total-tasks))]
+    {:healthy (and (= failed 0) (> success-rate 0.9))
+     :status (get state :status)
+     :task-count total-tasks
+     :success-rate success-rate
+     :failed-count failed}))
