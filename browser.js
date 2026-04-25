@@ -6363,6 +6363,13 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   var createHash = (alg) => ({ update: (d) => ({ digest: (enc) => btoa(d) }) });
   var createHmac = (alg, key) => ({ update: (d) => ({ digest: (enc) => btoa(key + d) }) });
   var timingSafeEqual = (a, b) => String(a) === String(b);
+  var rsaUnsupported = () => {
+    throw new Error("RSA primitives unavailable in browser stub");
+  };
+  var generateKeyPairSync = rsaUnsupported;
+  var createSign = rsaUnsupported;
+  var createVerify = rsaUnsupported;
+  var createPublicKey = rsaUnsupported;
 
   // src/evolve.ts
   var EvolutionEngine = class {
@@ -11251,12 +11258,30 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
           arr = args[0];
           accumulator = args[1];
           reduceFn = args[2];
+        } else if (isLazySeq(args[0])) {
+          arr = args[0];
+          accumulator = args[1];
+          reduceFn = args[2];
         } else {
           reduceFn = args[0];
           accumulator = args[1];
-          arr = args[2] || [];
+          arr = args[2] ?? [];
         }
-        if (!Array.isArray(arr)) throw new Error(`reduce: \uBC30\uC5F4 \uC778\uC790\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4`);
+        if (isLazySeq(arr)) {
+          const REDUCE_LAZY_LIMIT = 1e5;
+          let cur = arr;
+          let count = 0;
+          while (cur && count < REDUCE_LAZY_LIMIT) {
+            accumulator = callFn(reduceFn, [accumulator, lazyHead(cur)]);
+            cur = lazyTail(cur);
+            count++;
+          }
+          if (count >= REDUCE_LAZY_LIMIT) {
+            throw new Error(`reduce: lazy seq\uAC00 ${REDUCE_LAZY_LIMIT}\uC744 \uCD08\uACFC (\uBB34\uD55C \uC2DC\uD000\uC2A4 \uAC00\uB2A5\uC131, take\uB97C \uBA3C\uC800 \uC0AC\uC6A9\uD558\uC138\uC694)`);
+          }
+          return accumulator;
+        }
+        if (!Array.isArray(arr)) throw new Error(`reduce: \uBC30\uC5F4 \uC778\uC790\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uD0C0\uC785: ${typeof arr})`);
         for (const item of arr) {
           accumulator = callFn(reduceFn, [accumulator, item]);
         }
@@ -11758,13 +11783,15 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return makeIter(initVal);
       }
       case "range": {
-        if (args.length === 0) {
-          return rangeSeq(0);
-        } else if (args.length === 1) {
-          return rangeSeq(0, args[0]);
-        } else {
-          return rangeSeq(args[0], args[1]);
-        }
+        if (args.length === 0) return rangeSeq(0);
+        if (args.length === 1) return rangeSeq(0, args[0]);
+        const start = Number(args[0]);
+        const end = Number(args[1]);
+        const step = args.length >= 3 ? Number(args[2]) : 1;
+        const out = [];
+        if (step > 0) for (let i = start; i < end; i += step) out.push(i);
+        else if (step < 0) for (let i = start; i > end; i += step) out.push(i);
+        return out;
       }
       case "take": {
         const n = args[0];
@@ -19856,6 +19883,8 @@ ${cssVars.join(";\n")};
       "base64_decode": (str) => Buffer.from(str, "base64").toString("utf8"),
       // base64url_encode str -> string (URL-safe, no padding)
       "base64url_encode": (str) => Buffer.from(str, "utf8").toString("base64url"),
+      // base64url_decode str -> string (URL-safe Base64 → UTF-8)
+      "base64url_decode": (str) => Buffer.from(str, "base64url").toString("utf8"),
       // hex_encode str -> string
       "hex_encode": (str) => Buffer.from(str, "utf8").toString("hex"),
       // hex_decode hex -> string
@@ -19971,6 +20000,58 @@ ${cssVars.join(";\n")};
         } catch {
           return false;
         }
+      }
+    };
+  }
+
+  // src/stdlib-crypto-rsa.ts
+  init_define_process_env();
+  function createCryptoRsaModule() {
+    return {
+      // ── RSA 키 생성 ────────────────────────────────────────────
+      // crypto_rsa_generate bits -> map (publicKey/privateKey PEM)
+      "crypto_rsa_generate": (bits = 2048) => {
+        const size = bits >= 2048 ? bits : 2048;
+        const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+          modulusLength: size,
+          publicKeyEncoding: { type: "spki", format: "pem" },
+          privateKeyEncoding: { type: "pkcs8", format: "pem" }
+        });
+        return { publicKey, privateKey };
+      },
+      // ── RS256 서명 / 검증 ─────────────────────────────────────
+      // crypto_rsa_sign private_pem data -> string (base64url 서명)
+      "crypto_rsa_sign": (privateKeyPem, data) => {
+        const signer = createSign("RSA-SHA256");
+        signer.update(data);
+        signer.end();
+        return signer.sign(privateKeyPem).toString("base64url");
+      },
+      // crypto_rsa_verify public_pem data signature_b64url -> boolean
+      "crypto_rsa_verify": (publicKeyPem, data, sigB64Url) => {
+        try {
+          const verifier = createVerify("RSA-SHA256");
+          verifier.update(data);
+          verifier.end();
+          const sigBuf = Buffer.from(sigB64Url, "base64url");
+          return verifier.verify(publicKeyPem, sigBuf);
+        } catch {
+          return false;
+        }
+      },
+      // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
+      // crypto_rsa_public_to_jwk public_pem kid -> map (kty/n/e/kid/alg/use)
+      "crypto_rsa_public_to_jwk": (publicKeyPem, kid) => {
+        const key = createPublicKey(publicKeyPem);
+        const jwk = key.export({ format: "jwk" });
+        return {
+          kty: jwk.kty,
+          n: jwk.n,
+          e: jwk.e,
+          kid,
+          alg: "RS256",
+          use: "sig"
+        };
       }
     };
   }
@@ -26247,6 +26328,7 @@ ${exportsStr}
     interp2.registerModule(createAgentModule());
     interp2.registerModule(createTimeModule());
     interp2.registerModule(createCryptoModule());
+    interp2.registerModule(createCryptoRsaModule());
     interp2.registerModule(createWorkflowModule());
     interp2.registerModule(createResourceModule());
     interp2.registerModule(createHttpServerModule(
