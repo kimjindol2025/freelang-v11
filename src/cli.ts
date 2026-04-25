@@ -421,6 +421,11 @@ function cmdRepl(): void {
         "  :q / :quit    종료",
         "  :clear        버퍼 초기화",
         "  :help         이 도움말",
+        "  :ls           정의된 함수 목록",
+        "  :stack        callStack 출력 (최근 20개)",
+        "  :locals       현재 변수 dump",
+        "  :debug        debugger ON/OFF toggle",
+        "  :step         step 모드 toggle",
         "",
         "  예제:",
         "    (+ 1 2)",
@@ -442,6 +447,68 @@ function cmdRepl(): void {
       buffer = "";
       sessionInterp = new Interpreter();
       console.log("  세션 초기화됨 (모든 변수/함수 제거).");
+      rl.prompt();
+      return;
+    }
+
+    // S1 (2026-04-25): 디버거 + introspection 명령
+    if (trimmed === ":ls") {
+      const fns = [...sessionInterp.context.functions.keys()];
+      console.log(fns.length === 0 ? "(함수 없음)" : fns.slice(0, 50).join("  "));
+      if (fns.length > 50) console.log(`  ... 외 ${fns.length - 50}개`);
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":stack") {
+      const stack: Array<{fn: string; line: number}> = (sessionInterp as any).callStack ?? [];
+      if (stack.length === 0) console.log("  (callStack 비어있음 — 호출 중일 때만 표시)");
+      else {
+        const tail = stack.slice(-20);
+        for (let i = 0; i < tail.length; i++) {
+          console.log(`  #${stack.length - tail.length + i}: ${tail[i].fn} (line ${tail[i].line})`);
+        }
+      }
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":locals") {
+      const vars: Map<string, any> = (sessionInterp.context.variables as any).snapshot?.() ?? new Map();
+      if (vars.size === 0) console.log("  (변수 없음)");
+      else {
+        let count = 0;
+        for (const [k, v] of vars) {
+          if (count++ >= 30) { console.log(`  ... ${vars.size - 30}개 더`); break; }
+          const valStr = typeof v === "function" ? "<function>"
+            : v?.kind === "function-value" ? "<fn-value>"
+            : (() => { try { return JSON.stringify(v)?.slice(0, 60); } catch { return "<unserializable>"; } })();
+          console.log(`  ${k} = ${valStr}`);
+        }
+      }
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":debug") {
+      try {
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.enabled = !sess.enabled;
+        console.log(`  debugger: ${sess.enabled ? "ON" : "OFF"}`);
+      } catch (e: any) {
+        console.log(`  debug 모듈 로드 실패: ${e.message}`);
+      }
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":step") {
+      try {
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.enabled = true;
+        sess.stepMode = !sess.stepMode;
+        console.log(`  step 모드: ${sess.stepMode ? "ON (모든 줄에서 break)" : "OFF"}`);
+      } catch (e: any) {
+        console.log(`  debug 모듈 로드 실패: ${e.message}`);
+      }
       rl.prompt();
       return;
     }

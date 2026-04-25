@@ -2413,6 +2413,95 @@ var init_parser = __esm({
   }
 });
 
+// src/debugger.ts
+var debugger_exports = {};
+__export(debugger_exports, {
+  DebugSession: () => DebugSession,
+  getGlobalDebugSession: () => getGlobalDebugSession,
+  handleBreak: () => handleBreak,
+  setGlobalDebugSession: () => setGlobalDebugSession
+});
+function getGlobalDebugSession() {
+  if (!_globalSession) {
+    _globalSession = new DebugSession();
+  }
+  return _globalSession;
+}
+function setGlobalDebugSession(session) {
+  _globalSession = session;
+}
+function handleBreak(session, loc, env) {
+  if (!session.enabled) return;
+  session.onBreak(loc, env);
+}
+var DebugSession, _globalSession;
+var init_debugger = __esm({
+  "src/debugger.ts"() {
+    DebugSession = class _DebugSession {
+      /** 중단점 집합 — "file:line" 형태 */
+      breakpoints = /* @__PURE__ */ new Set();
+      /** step 모드 — true면 모든 줄에서 break */
+      stepMode = false;
+      /** 디버그 모드 활성화 여부 */
+      enabled = false;
+      /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
+      onBreakCallback = null;
+      /** 소스맵 (선택적) */
+      sourceMap = null;
+      /** 브레이크 이벤트 로그 (테스트 검증용) */
+      breakLog = [];
+      static _key(file, line) {
+        return `${file}:${line}`;
+      }
+      /** 중단점 추가 */
+      addBreakpoint(file, line) {
+        this.breakpoints.add(_DebugSession._key(file, line));
+      }
+      /** 중단점 제거 */
+      removeBreakpoint(file, line) {
+        this.breakpoints.delete(_DebugSession._key(file, line));
+      }
+      /** 해당 위치가 중단점인지 확인 */
+      isBreakpoint(file, line) {
+        return this.breakpoints.has(_DebugSession._key(file, line));
+      }
+      /**
+       * 중단점 도달 시 처리:
+       * - 콘솔에 "[BREAK] file:line:col" 출력
+       * - 환경 변수 스냅샷 기록
+       * - 콜백 실행
+       */
+      onBreak(loc, env) {
+        if (!this.enabled) return;
+        const event = { loc, env: { ...env } };
+        this.breakLog.push(event);
+        const locStr = `${loc.file}:${loc.line}:${loc.col}`;
+        console.log(`[BREAK] ${locStr}`);
+        const entries = Object.entries(env).slice(0, 10);
+        if (entries.length > 0) {
+          console.log(`  env:`);
+          for (const [k, v] of entries) {
+            const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+            console.log(`    ${k} = ${display.slice(0, 80)}`);
+          }
+        }
+        if (this.onBreakCallback) {
+          this.onBreakCallback(event);
+        }
+      }
+      /** 중단점 모두 제거 */
+      clearBreakpoints() {
+        this.breakpoints.clear();
+      }
+      /** 중단점 개수 */
+      breakpointCount() {
+        return this.breakpoints.size;
+      }
+    };
+    _globalSession = null;
+  }
+});
+
 // src/lint-rules.ts
 var lint_rules_exports = {};
 __export(lint_rules_exports, {
@@ -28796,82 +28885,8 @@ var StructRegistry = class {
   }
 };
 
-// src/debugger.ts
-var DebugSession = class _DebugSession {
-  /** 중단점 집합 — "file:line" 형태 */
-  breakpoints = /* @__PURE__ */ new Set();
-  /** step 모드 — true면 모든 줄에서 break */
-  stepMode = false;
-  /** 디버그 모드 활성화 여부 */
-  enabled = false;
-  /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
-  onBreakCallback = null;
-  /** 소스맵 (선택적) */
-  sourceMap = null;
-  /** 브레이크 이벤트 로그 (테스트 검증용) */
-  breakLog = [];
-  static _key(file, line) {
-    return `${file}:${line}`;
-  }
-  /** 중단점 추가 */
-  addBreakpoint(file, line) {
-    this.breakpoints.add(_DebugSession._key(file, line));
-  }
-  /** 중단점 제거 */
-  removeBreakpoint(file, line) {
-    this.breakpoints.delete(_DebugSession._key(file, line));
-  }
-  /** 해당 위치가 중단점인지 확인 */
-  isBreakpoint(file, line) {
-    return this.breakpoints.has(_DebugSession._key(file, line));
-  }
-  /**
-   * 중단점 도달 시 처리:
-   * - 콘솔에 "[BREAK] file:line:col" 출력
-   * - 환경 변수 스냅샷 기록
-   * - 콜백 실행
-   */
-  onBreak(loc, env) {
-    if (!this.enabled) return;
-    const event = { loc, env: { ...env } };
-    this.breakLog.push(event);
-    const locStr = `${loc.file}:${loc.line}:${loc.col}`;
-    console.log(`[BREAK] ${locStr}`);
-    const entries = Object.entries(env).slice(0, 10);
-    if (entries.length > 0) {
-      console.log(`  env:`);
-      for (const [k, v] of entries) {
-        const display = typeof v === "object" ? JSON.stringify(v) : String(v);
-        console.log(`    ${k} = ${display.slice(0, 80)}`);
-      }
-    }
-    if (this.onBreakCallback) {
-      this.onBreakCallback(event);
-    }
-  }
-  /** 중단점 모두 제거 */
-  clearBreakpoints() {
-    this.breakpoints.clear();
-  }
-  /** 중단점 개수 */
-  breakpointCount() {
-    return this.breakpoints.size;
-  }
-};
-var _globalSession = null;
-function getGlobalDebugSession() {
-  if (!_globalSession) {
-    _globalSession = new DebugSession();
-  }
-  return _globalSession;
-}
-function setGlobalDebugSession(session) {
-  _globalSession = session;
-}
-function handleBreak(session, loc, env) {
-  if (!session.enabled) return;
-  session.onBreak(loc, env);
-}
+// src/interpreter.ts
+init_debugger();
 
 // src/cot.ts
 var ChainOfThought = class {
@@ -31826,6 +31841,9 @@ function formatFL(src) {
   return new FLFormatter().format(src);
 }
 
+// src/cli.ts
+init_debugger();
+
 // src/hot-reload.ts
 var fs13 = __toESM(require("fs"));
 var path11 = __toESM(require("path"));
@@ -33956,6 +33974,11 @@ function cmdRepl() {
         "  :q / :quit    \uC885\uB8CC",
         "  :clear        \uBC84\uD37C \uCD08\uAE30\uD654",
         "  :help         \uC774 \uB3C4\uC6C0\uB9D0",
+        "  :ls           \uC815\uC758\uB41C \uD568\uC218 \uBAA9\uB85D",
+        "  :stack        callStack \uCD9C\uB825 (\uCD5C\uADFC 20\uAC1C)",
+        "  :locals       \uD604\uC7AC \uBCC0\uC218 dump",
+        "  :debug        debugger ON/OFF toggle",
+        "  :step         step \uBAA8\uB4DC toggle",
         "",
         "  \uC608\uC81C:",
         "    (+ 1 2)",
@@ -33977,6 +34000,73 @@ function cmdRepl() {
       buffer = "";
       sessionInterp = new Interpreter();
       console.log("  \uC138\uC158 \uCD08\uAE30\uD654\uB428 (\uBAA8\uB4E0 \uBCC0\uC218/\uD568\uC218 \uC81C\uAC70).");
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":ls") {
+      const fns = [...sessionInterp.context.functions.keys()];
+      console.log(fns.length === 0 ? "(\uD568\uC218 \uC5C6\uC74C)" : fns.slice(0, 50).join("  "));
+      if (fns.length > 50) console.log(`  ... \uC678 ${fns.length - 50}\uAC1C`);
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":stack") {
+      const stack = sessionInterp.callStack ?? [];
+      if (stack.length === 0) console.log("  (callStack \uBE44\uC5B4\uC788\uC74C \u2014 \uD638\uCD9C \uC911\uC77C \uB54C\uB9CC \uD45C\uC2DC)");
+      else {
+        const tail = stack.slice(-20);
+        for (let i = 0; i < tail.length; i++) {
+          console.log(`  #${stack.length - tail.length + i}: ${tail[i].fn} (line ${tail[i].line})`);
+        }
+      }
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":locals") {
+      const vars = sessionInterp.context.variables.snapshot?.() ?? /* @__PURE__ */ new Map();
+      if (vars.size === 0) console.log("  (\uBCC0\uC218 \uC5C6\uC74C)");
+      else {
+        let count = 0;
+        for (const [k, v] of vars) {
+          if (count++ >= 30) {
+            console.log(`  ... ${vars.size - 30}\uAC1C \uB354`);
+            break;
+          }
+          const valStr = typeof v === "function" ? "<function>" : v?.kind === "function-value" ? "<fn-value>" : (() => {
+            try {
+              return JSON.stringify(v)?.slice(0, 60);
+            } catch {
+              return "<unserializable>";
+            }
+          })();
+          console.log(`  ${k} = ${valStr}`);
+        }
+      }
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":debug") {
+      try {
+        const { getGlobalDebugSession: getGlobalDebugSession2 } = (init_debugger(), __toCommonJS(debugger_exports));
+        const sess = getGlobalDebugSession2();
+        sess.enabled = !sess.enabled;
+        console.log(`  debugger: ${sess.enabled ? "ON" : "OFF"}`);
+      } catch (e) {
+        console.log(`  debug \uBAA8\uB4C8 \uB85C\uB4DC \uC2E4\uD328: ${e.message}`);
+      }
+      rl.prompt();
+      return;
+    }
+    if (trimmed === ":step") {
+      try {
+        const { getGlobalDebugSession: getGlobalDebugSession2 } = (init_debugger(), __toCommonJS(debugger_exports));
+        const sess = getGlobalDebugSession2();
+        sess.enabled = true;
+        sess.stepMode = !sess.stepMode;
+        console.log(`  step \uBAA8\uB4DC: ${sess.stepMode ? "ON (\uBAA8\uB4E0 \uC904\uC5D0\uC11C break)" : "OFF"}`);
+      } catch (e) {
+        console.log(`  debug \uBAA8\uB4C8 \uB85C\uB4DC \uC2E4\uD328: ${e.message}`);
+      }
       rl.prompt();
       return;
     }

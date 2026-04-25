@@ -57,6 +57,14 @@ export class FreeLangReplCore {
           "  :load <파일>   — .fl 파일 로드",
           "  :hist          — 히스토리 출력",
           "  :quit / :exit  — 종료",
+          "",
+          "디버거 (S1, 2026-04-25):",
+          "  :break <fn>    — 함수에 break point 설정",
+          "  :step          — step 모드 toggle (모든 줄에서 break)",
+          "  :continue      — break 해제 + 계속 실행",
+          "  :stack         — 현재 callStack 출력",
+          "  :locals        — 현재 변수 dump",
+          "  :debug         — debugger enabled toggle",
         ].join("\n");
 
       case "ls": {
@@ -126,6 +134,69 @@ export class FreeLangReplCore {
       case "quit":
       case "exit":
         process.exit(0);
+
+      // ── S1 (2026-04-25): 디버거 명령 ──────────────────
+      case "break": {
+        const fnName = args[0];
+        if (!fnName) return "사용법: :break <함수명> 또는 :break <파일:라인>";
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.enabled = true;
+        // 함수명만 주면 그 함수 정의의 line에 break
+        if (!fnName.includes(":")) {
+          const fn = this.interp.context.functions.get(fnName);
+          if (!fn) return `함수 '${fnName}' 없음`;
+          const line = (fn as any).line ?? 0;
+          sess.addBreakpoint("<repl>", line);
+          return `break point 설정: ${fnName} (line ${line})`;
+        }
+        // file:line 형식
+        const [file, lineStr] = fnName.split(":");
+        sess.addBreakpoint(file, Number(lineStr));
+        return `break point 설정: ${file}:${lineStr}`;
+      }
+      case "step": {
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.enabled = true;
+        sess.stepMode = !sess.stepMode;
+        return `step 모드: ${sess.stepMode ? "ON" : "OFF"}`;
+      }
+      case "continue": {
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.stepMode = false;
+        return "step 모드 해제 (continue)";
+      }
+      case "stack": {
+        const stack: Array<{fn: string; line: number}> = (this.interp as any).callStack ?? [];
+        if (stack.length === 0) return "(callStack 비어있음)";
+        return stack.slice(-20).map((s, i) =>
+          `  #${stack.length - 20 + i}: ${s.fn} (line ${s.line})`
+        ).join("\n");
+      }
+      case "locals": {
+        // 현재 scope의 모든 변수 dump
+        const vars: Map<string, any> = (this.interp.context.variables as any).snapshot?.()
+          ?? new Map();
+        if (vars.size === 0) return "(변수 없음)";
+        const out: string[] = [];
+        let count = 0;
+        for (const [k, v] of vars) {
+          if (count++ >= 30) { out.push(`  ... (${vars.size - 30}개 더)`); break; }
+          const valStr = typeof v === "function" ? "<function>"
+            : v?.kind === "function-value" ? "<fn-value>"
+            : JSON.stringify(v)?.slice(0, 60);
+          out.push(`  ${k} = ${valStr}`);
+        }
+        return out.join("\n");
+      }
+      case "debug": {
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.enabled = !sess.enabled;
+        return `debugger: ${sess.enabled ? "ON" : "OFF"}`;
+      }
 
       default:
         return `알 수 없는 명령어: :${name} (:help 참조)`;
