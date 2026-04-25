@@ -82,6 +82,26 @@
 | `function?` | `fn?` | `eval-builtins.ts` line 992 (신규) |
 | `fn?` | (canonical) | `eval-builtins.ts` line 992 (신규) |
 
+## 4.5. Phase E (2026-04-25): 메인 dispatch alias 통합
+
+기존: 작은 dispatch (line 140)에만 등록되어 메인 evalBuiltin (line 500+)에서 인식 안 됨.
+수정: 메인 dispatch에 alias case fall-through 추가 → 어디서 호출해도 동작.
+
+| Alias 그룹 | 구현 |
+|------------|------|
+| `keys` / `json_keys` | Object.keys() |
+| `values` / `json_vals` | Object.values() |
+| `upper-case` / `uppercase` / `upper` | toUpperCase() |
+| `lower-case` / `lowercase` / `lower` | toLowerCase() |
+| `trim` | string trim |
+| `starts-with?` / `str-starts-with?` | startsWith() |
+| `ends-with?` / `str-ends-with?` | endsWith() |
+| `char-at` / `str-char-at` | string[i] |
+| `math-pow` (alias of `pow`) | Math.pow() |
+| `defun` (alias of `defn`) | special-form fall-through |
+
+**또한**: `(= a b)` 가 list/map에 대해 **deep equality** 작동 (T77 palindrome 발견).
+
 검증: `npm test` (4 신규 케이스 PASS)
 
 ---

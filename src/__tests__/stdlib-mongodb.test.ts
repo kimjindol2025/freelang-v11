@@ -1,7 +1,7 @@
 // Test suite for MongoDB stdlib
 // Phase 1: BSON roundtrip tests
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+// jest globals — describe/it/expect/beforeAll/afterAll 자동 제공 (import 불필요)
 
 // Import BSON functions (need to extract these from stdlib-mongodb.ts)
 // For now, we'll implement inline test versions

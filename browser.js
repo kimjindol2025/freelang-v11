@@ -10403,6 +10403,22 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/eval-builtins.ts
   init_lexer();
   init_parser();
+  function flDeepEq(a, b) {
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
+      return true;
+    }
+    if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+      const ka = Object.keys(a), kb = Object.keys(b);
+      if (ka.length !== kb.length) return false;
+      for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
+      return true;
+    }
+    return false;
+  }
   var MODULE_CACHE = /* @__PURE__ */ new Map();
   function flEnvGet(env, name) {
     let e = env;
@@ -11046,7 +11062,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       case "%":
         return args[0] % args[1];
       case "=":
-        return args[0] === args[1];
+        return flDeepEq(args[0], args[1]);
       case "<":
         return args[0] < args[1];
       case ">":
@@ -11172,6 +11188,33 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : ((_d = args[0]) == null ? void 0 : _d[0]) ?? null;
       case "rest":
         return (_e = args[0]) == null ? void 0 : _e.slice(1);
+      case "keys":
+      case "json_keys":
+        return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.keys(args[0]) : [];
+      case "values":
+      case "json_vals":
+        return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.values(args[0]) : [];
+      case "upper-case":
+      case "uppercase":
+      case "upper":
+        return typeof args[0] === "string" ? args[0].toUpperCase() : args[0];
+      case "lower-case":
+      case "lowercase":
+      case "lower":
+        return typeof args[0] === "string" ? args[0].toLowerCase() : args[0];
+      case "trim":
+        return typeof args[0] === "string" ? args[0].trim() : args[0];
+      case "starts-with?":
+      case "str-starts-with?":
+        return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
+      case "ends-with?":
+      case "str-ends-with?":
+        return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].endsWith(args[1]) : false;
+      case "char-at":
+      case "str-char-at":
+        return typeof args[0] === "string" ? args[0][Number(args[1])] ?? null : null;
+      case "math-pow":
+        return Math.pow(Number(args[0]), Number(args[1]));
       case "append":
         if (Array.isArray(args[0]) && args.length === 2 && Array.isArray(args[1])) {
           return [...args[0], ...args[1]];
@@ -20040,6 +20083,10 @@ ${cssVars.join(";\n")};
         }
       },
       // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
+      // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
+      "pkce_s256": (verifier) => {
+        return createHash("sha256").update(verifier, "utf8").digest("base64url");
+      },
       // crypto_rsa_public_to_jwk public_pem kid -> map (kty/n/e/kid/alg/use)
       "crypto_rsa_public_to_jwk": (publicKeyPem, kid) => {
         const key = createPublicKey(publicKeyPem);
@@ -28548,6 +28595,11 @@ ${tail}` : "")
     currentLine = 0;
     // FreeLang source line tracking
     callDepth = 0;
+    // Phase E 후속 (2026-04-25): mongodb-integration.test 호환 alias
+    // 일부 테스트가 interp.globals 사용 — context.functions 가 정확하지만 alias 제공
+    get globals() {
+      return this.context.functions;
+    }
     // Phase E (2026-04-25): 호출 체인 추적 — 에러 발생 시 마지막 100개까지 표시
     callStack = [];
     // Phase 61: 상향 (trampoline이 100만 재귀 처리)
