@@ -327,7 +327,18 @@ export function createDataModule() {
       while (n-- > 0) { const j = t.lastIndexOf(sep, i - 1); if (j === -1) break; parts.unshift(t.slice(j + sep.length, i)); i = j; }
       parts.unshift(t.slice(0, i)); return parts;
     },
-    "str_join": (sep: string, arr: string[]) => (Array.isArray(arr) ? arr : []).join(String(sep)),
+    "str_join": (a: any, b: any) => {
+      // P0 자잘 #5 (2026-04-25): 인자 순서 자동 감지 (filter 패턴과 동일)
+      // (str_join sep arr) 또는 (str_join arr sep) 모두 허용
+      if (Array.isArray(a)) return a.join(String(b ?? ""));
+      if (Array.isArray(b)) return b.join(String(a ?? ""));
+      return "";
+    },
+    "str-join": (a: any, b: any) => {
+      if (Array.isArray(a)) return a.join(String(b ?? ""));
+      if (Array.isArray(b)) return b.join(String(a ?? ""));
+      return "";
+    },
     "str_partition": (s: string, sep: string) => {
       const i = String(s).indexOf(sep); if (i === -1) return [s, "", ""];
       return [s.slice(0, i), sep, s.slice(i + sep.length)];

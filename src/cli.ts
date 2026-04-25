@@ -460,12 +460,13 @@ function cmdRepl(): void {
       return;
     }
     if (trimmed === ":stack") {
-      const stack: Array<{fn: string; line: number}> = (sessionInterp as any).callStack ?? [];
+      const stack: Array<{fn: string; line: number; args?: any[]}> = (sessionInterp as any).callStack ?? [];
       if (stack.length === 0) console.log("  (callStack 비어있음 — 호출 중일 때만 표시)");
       else {
         const tail = stack.slice(-20);
         for (let i = 0; i < tail.length; i++) {
-          console.log(`  #${stack.length - tail.length + i}: ${tail[i].fn} (line ${tail[i].line})`);
+          const argsStr = tail[i].args ? `(${tail[i].args!.join(", ")})` : "";
+          console.log(`  #${stack.length - tail.length + i}: ${tail[i].fn}${argsStr} (line ${tail[i].line})`);
         }
       }
       rl.prompt();

@@ -210,11 +210,19 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // Phase 82: Profiler 연동 (enabled=false 시 no-op)
   const exitProfiler = globalProfiler.enter(baseName);
 
-  // Phase E: 호출 체인 추적 + FL_TRACE
-  const _callStack: Array<{ fn: string; line: number }> = (interp as any).callStack ?? [];
-  const _stackEntry = { fn: baseName, line: interp.currentLine };
+  // Phase E + 자잘 #3 (2026-04-25): 호출 체인 추적 + 변수 값/타입 dump
+  const _callStack: Array<{ fn: string; line: number; args?: any[] }> = (interp as any).callStack ?? [];
+  const _argsBrief = args.slice(0, 5).map(a =>
+    a === null ? "nil"
+    : Array.isArray(a) ? `[${a.length}]`
+    : typeof a === "object" ? "{obj}"
+    : typeof a === "function" ? "<fn>"
+    : typeof a === "string" ? (a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"`)
+    : String(a)
+  );
+  const _stackEntry = { fn: baseName, line: interp.currentLine, args: _argsBrief };
   if (process.env.FL_TRACE === "1") {
-    console.error(`[trace] ${"  ".repeat(Math.min(interp.callDepth, 20))}→ ${baseName} (line ${interp.currentLine})`);
+    console.error(`[trace] ${"  ".repeat(Math.min(interp.callDepth, 20))}→ ${baseName}(${_argsBrief.join(", ")}) (line ${interp.currentLine})`);
   }
 
   // 클로저: capturedEnv가 있으면 해당 환경에서 실행
