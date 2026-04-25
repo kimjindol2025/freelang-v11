@@ -3,6 +3,10 @@
 ;; Phase A.2 (dclub-auth) — 자체 OIDC IdP id_token 발급·검증.
 ;; crypto_rsa_* primitive 위에 구축, 외부 의존 0.
 ;;
+;; ⚠️ FreeLang 주의: `nil`은 `(if ...)`에서 truthy로 평가됨.
+;; verify 함수가 무효 토큰에 대해 nil을 반환하므로
+;; 호출 측은 반드시 `(= result nil)` 형태로 검사할 것.
+;;
 ;; 토큰 구조: <header-b64url>.<payload-b64url>.<signature-b64url>
 ;;   header  = {"alg":"RS256","typ":"JWT","kid":"..."}
 ;;   payload = 사용자 claims + {iat, exp}
