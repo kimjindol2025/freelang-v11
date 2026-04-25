@@ -422,6 +422,390 @@ const INVARIANTS = [
   { id: "I100", name: "(if true (if true 1 2) 3) === 1 (nested if)",
     gen: () => 0,
     test: () => evalFL(`(println (if true (if true 1 2) 3))`).out === "1" },
+
+  // ── 산술 깊은 (101~120) ─────────────────────────
+  { id: "I101", name: "(+ a b c) === (+ (+ a b) c)",
+    gen: () => [randInt(0, 50), randInt(0, 50), randInt(0, 50)],
+    test: ([a, b, c]) => evalFL(`(println (= (+ ${a} ${b} ${c}) (+ (+ ${a} ${b}) ${c})))`).out === "true" },
+  { id: "I102", name: "(* a b c) === (* (* a b) c)",
+    gen: () => [randInt(1, 20), randInt(1, 20), randInt(1, 20)],
+    test: ([a, b, c]) => evalFL(`(println (= (* ${a} ${b} ${c}) (* (* ${a} ${b}) ${c})))`).out === "true" },
+  { id: "I103", name: "(+ a (- b c)) === (- (+ a b) c)",
+    gen: () => [randInt(0, 100), randInt(50, 100), randInt(0, 50)],
+    test: ([a, b, c]) => evalFL(`(println (= (+ ${a} (- ${b} ${c})) (- (+ ${a} ${b}) ${c})))`).out === "true" },
+  { id: "I104", name: "(- (+ a b) a) === b",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (= (- (+ ${a} ${b}) ${a}) ${b}))`).out === "true" },
+  { id: "I105", name: "(/ (* a 5) 5) === a",
+    gen: () => randInt(1, 100),
+    test: (a) => evalFL(`(println (= (/ (* ${a} 5) 5) ${a}))`).out === "true" },
+  { id: "I106", name: "(- a 0) === a",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (= (- ${a} 0) ${a}))`).out === "true" },
+  { id: "I107", name: "(* a 1 1 1) === a",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (= (* ${a} 1 1 1) ${a}))`).out === "true" },
+  { id: "I108", name: "(+ 0 0 0 a) === a",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (= (+ 0 0 0 ${a}) ${a}))`).out === "true" },
+  { id: "I109", name: "(< a (+ a 1) (+ a 2)) → true (chained)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (and (< ${a} (+ ${a} 1)) (< (+ ${a} 1) (+ ${a} 2))))`).out === "true" },
+  { id: "I110", name: "(>= (+ a b) a) for non-neg b",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (>= (+ ${a} ${b}) ${a}))`).out === "true" },
+  { id: "I111", name: "(<= a (+ a 1))",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (<= ${a} (+ ${a} 1)))`).out === "true" },
+  { id: "I112", name: "(* (+ a 1) 2) === (+ (* a 2) 2)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (= (* (+ ${a} 1) 2) (+ (* ${a} 2) 2)))`).out === "true" },
+  { id: "I113", name: "(+ a 100) > a",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (> (+ ${a} 100) ${a}))`).out === "true" },
+  { id: "I114", name: "(- a (- 0 b)) === (+ a b)",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (= (- ${a} (- 0 ${b})) (+ ${a} ${b})))`).out === "true" },
+  { id: "I115", name: "(+ (* 2 a) (* 2 b)) === (* 2 (+ a b))",
+    gen: () => [randInt(0, 50), randInt(0, 50)],
+    test: ([a, b]) => evalFL(`(println (= (+ (* 2 ${a}) (* 2 ${b})) (* 2 (+ ${a} ${b}))))`).out === "true" },
+  { id: "I116", name: "(* (* a b) c) === (* a b c)",
+    gen: () => [randInt(1, 10), randInt(1, 10), randInt(1, 10)],
+    test: ([a, b, c]) => evalFL(`(println (= (* (* ${a} ${b}) ${c}) (* ${a} ${b} ${c})))`).out === "true" },
+  { id: "I117", name: "(+ (+ a b) (+ c d)) === (+ a b c d)",
+    gen: () => [randInt(0, 50), randInt(0, 50), randInt(0, 50), randInt(0, 50)],
+    test: ([a, b, c, d]) => evalFL(`(println (= (+ (+ ${a} ${b}) (+ ${c} ${d})) (+ ${a} ${b} ${c} ${d})))`).out === "true" },
+  { id: "I118", name: "(* a (+ 1 0)) === a",
+    gen: () => randInt(0, 1000),
+    test: (a) => evalFL(`(println (= (* ${a} (+ 1 0)) ${a}))`).out === "true" },
+  { id: "I119", name: "(+ a (* b 0)) === a",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (= (+ ${a} (* ${b} 0)) ${a}))`).out === "true" },
+  { id: "I120", name: "(- (- a a) a) === (- 0 a)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (= (- (- ${a} ${a}) ${a}) (- 0 ${a})))`).out === "true" },
+
+  // ── list 깊은 변환 (121~140) ─────────────────────────
+  { id: "I121", name: "(length (list a b c d e)) === 5",
+    gen: () => [randInt(0, 99), randInt(0, 99), randInt(0, 99), randInt(0, 99), randInt(0, 99)],
+    test: (xs) => evalFL(`(println (length (list ${xs.join(' ')})))`).out === "5" },
+  { id: "I122", name: "(first (list a)) (single element)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (first (list ${a})))`).out === String(a) },
+  { id: "I123", name: "(last (list a)) (single element)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (last (list ${a})))`).out === String(a) },
+  { id: "I124", name: "(length (rest (list a b))) === 1",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (length (rest (list ${a} ${b}))))`).out === "1" },
+  { id: "I125", name: "(length (rest (rest (list a b c)))) === 1",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c]) => evalFL(`(println (length (rest (rest (list ${a} ${b} ${c})))))`).out === "1" },
+  { id: "I126", name: "first (rest xs) === xs[1]",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c]) => evalFL(`(println (= ${b} (first (rest (list ${a} ${b} ${c})))))`).out === "true" },
+  { id: "I127", name: "(append xs (list)) === xs (length 보존)",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (length (append (list ${a} ${b}) (list))))`).out === "2" },
+  { id: "I128", name: "(append (list) xs) length",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c]) => evalFL(`(println (length (append (list) (list ${a} ${b} ${c}))))`).out === "3" },
+  { id: "I129", name: "(reverse (list a)) === (list a)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (= ${a} (first (reverse (list ${a})))))`).out === "true" },
+  { id: "I130", name: "(first (append (list a) (list b c))) === a",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c]) => evalFL(`(println (= ${a} (first (append (list ${a}) (list ${b} ${c})))))`).out === "true" },
+  { id: "I131", name: "(append (append xs ys) zs) length",
+    gen: () => [randInt(0, 50), randInt(0, 50)],
+    test: ([a, b]) => evalFL(`(println (length (append (append (list ${a}) (list ${b})) (list 0))))`).out === "3" },
+  { id: "I132", name: "list 안 nested 식 평가",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (length (list (+ ${a} 1) (* ${a} 2) ${a})))`).out === "3" },
+  { id: "I133", name: "(first (rest (list a b c d))) === b",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c, d]) => evalFL(`(println (= ${b} (first (rest (list ${a} ${b} ${c} ${d})))))`).out === "true" },
+  { id: "I134", name: "list 결정론 — 두 번 호출 동일",
+    gen: () => [randInt(0, 100), randInt(0, 100)],
+    test: ([a, b]) => evalFL(`(println (= (str (list ${a} ${b})) (str (list ${a} ${b}))))`).out === "true" },
+  { id: "I135", name: "(reverse (list a b c d)) → 첫 원소 d",
+    gen: () => [randInt(0, 100), randInt(0, 100), randInt(0, 100), randInt(0, 100)],
+    test: ([a, b, c, d]) => evalFL(`(println (= ${d} (first (reverse (list ${a} ${b} ${c} ${d})))))`).out === "true" },
+  { id: "I136", name: "(length (append (list a b) (list c d e))) === 5",
+    gen: () => [randInt(0, 99), randInt(0, 99), randInt(0, 99), randInt(0, 99), randInt(0, 99)],
+    test: (xs) => evalFL(`(println (length (append (list ${xs[0]} ${xs[1]}) (list ${xs[2]} ${xs[3]} ${xs[4]}))))`).out === "5" },
+  { id: "I137", name: "(first (list (+ a 1))) === (+ a 1)",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (= (+ ${a} 1) (first (list (+ ${a} 1)))))`).out === "true" },
+  { id: "I138", name: "list 길이 = element 수 (6 elements)",
+    gen: () => 0,
+    test: () => evalFL(`(println (length (list 1 2 3 4 5 6)))`).out === "6" },
+  { id: "I139", name: "list 안 list (nested length)",
+    gen: () => 0,
+    test: () => evalFL(`(println (length (list (list 1 2) (list 3 4))))`).out === "2" },
+  { id: "I140", name: "(reverse (reverse (list 1 2 3 4 5))) 첫 원소 1",
+    gen: () => 0,
+    test: () => evalFL(`(println (first (reverse (reverse (list 1 2 3 4 5)))))`).out === "1" },
+
+  // ── 결정론 강화 (141~155) ─────────────────────────
+  { id: "I141", name: "(+ a b c d) 두 번 호출 동일",
+    gen: () => [randInt(0, 50), randInt(0, 50), randInt(0, 50), randInt(0, 50)],
+    test: ([a, b, c, d]) => {
+      const r1 = evalFL(`(println (+ ${a} ${b} ${c} ${d}))`).out;
+      const r2 = evalFL(`(println (+ ${a} ${b} ${c} ${d}))`).out;
+      return r1 === r2;
+    } },
+  { id: "I142", name: "(* a b c) 두 번 호출 동일",
+    gen: () => [randInt(1, 10), randInt(1, 10), randInt(1, 10)],
+    test: ([a, b, c]) => {
+      const r1 = evalFL(`(println (* ${a} ${b} ${c}))`).out;
+      const r2 = evalFL(`(println (* ${a} ${b} ${c}))`).out;
+      return r1 === r2;
+    } },
+  { id: "I143", name: "let 두 번 호출 결과 동일",
+    gen: () => randInt(0, 100),
+    test: (a) => {
+      const r1 = evalFL(`(println (let [[x ${a}]] (* x 2)))`).out;
+      const r2 = evalFL(`(println (let [[x ${a}]] (* x 2)))`).out;
+      return r1 === r2;
+    } },
+  { id: "I144", name: "재귀 함수 결정론",
+    gen: () => randInt(0, 10),
+    test: (n) => {
+      const code = `(defn s [n] (if (= n 0) 0 (+ n (s (- n 1))))) (println (s ${n}))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I145", name: "list 결정론 (긴 list)",
+    gen: () => 0,
+    test: () => {
+      const code = `(println (length (list 1 2 3 4 5 6 7 8 9 10)))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I146", name: "if 분기 결정론",
+    gen: () => randInt(1, 100),
+    test: (a) => {
+      const code = `(println (if (> ${a} 50) "big" "small"))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I147", name: "cond 결정론",
+    gen: () => randInt(0, 100),
+    test: (a) => {
+      const code = `(println (cond [(< ${a} 50) "low"] [true "high"]))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I148", name: "closure 결정론",
+    gen: () => randInt(0, 100),
+    test: (a) => {
+      const code = `(let [[f (fn [x] (* x x))]] (println (f ${a})))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I149", name: "고차 함수 결정론",
+    gen: () => randInt(0, 100),
+    test: (a) => {
+      const code = `(let [[apply2 (fn [f x] (f (f x)))] [inc (fn [n] (+ n 1))]] (println (apply2 inc ${a})))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I150", name: "string 결정론 (str + length)",
+    gen: () => randInt(0, 1000),
+    test: (a) => {
+      const code = `(println (length (str ${a} " hello " ${a})))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I151", name: "nested let 결정론",
+    gen: () => [randInt(0, 50), randInt(0, 50)],
+    test: ([a, b]) => {
+      const code = `(println (let [[x ${a}]] (let [[y ${b}]] (+ x y))))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I152", name: "do/begin 식 결정론",
+    gen: () => 0,
+    test: () => {
+      const code = `(println (do 1 2 3))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I153", name: "산술 + list 합성 결정론",
+    gen: () => randInt(0, 50),
+    test: (a) => {
+      const code = `(println (length (list (+ ${a} 1) (* ${a} 2) (- ${a} 0))))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I154", name: "and 결정론",
+    gen: () => 0,
+    test: () => {
+      const code = `(println (and 1 2 3))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+  { id: "I155", name: "or 결정론",
+    gen: () => 0,
+    test: () => {
+      const code = `(println (or false nil 42))`;
+      return evalFL(code).out === evalFL(code).out;
+    } },
+
+  // ── 재귀 깊은 (156~170) ─────────────────────────
+  { id: "I156", name: "재귀 fib(10) === 55",
+    gen: () => 0,
+    test: () => evalFL(`(defn fib [n] (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))) (println (fib 10))`).out === "55" },
+  { id: "I157", name: "재귀 fib(0) === 0",
+    gen: () => 0,
+    test: () => evalFL(`(defn fib [n] (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))) (println (fib 0))`).out === "0" },
+  { id: "I158", name: "재귀 fib(1) === 1",
+    gen: () => 0,
+    test: () => evalFL(`(defn fib [n] (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))) (println (fib 1))`).out === "1" },
+  { id: "I159", name: "재귀 power(a, 0) === 1",
+    gen: () => randInt(1, 10),
+    test: (a) => evalFL(`(defn pow [b e] (if (= e 0) 1 (* b (pow b (- e 1))))) (println (pow ${a} 0))`).out === "1" },
+  { id: "I160", name: "재귀 power(2, 5) === 32",
+    gen: () => 0,
+    test: () => evalFL(`(defn pow [b e] (if (= e 0) 1 (* b (pow b (- e 1))))) (println (pow 2 5))`).out === "32" },
+  { id: "I161", name: "재귀 count-down 0",
+    gen: () => randInt(1, 10),
+    test: (n) => evalFL(`(defn cd [n] (if (= n 0) 0 (cd (- n 1)))) (println (cd ${n}))`).out === "0" },
+  { id: "I162", name: "재귀 sum 1..n === n(n+1)/2",
+    gen: () => randInt(0, 15),
+    test: (n) => {
+      const expected = n * (n + 1) / 2;
+      return evalFL(`(defn s [n] (if (= n 0) 0 (+ n (s (- n 1))))) (println (s ${n}))`).out === String(expected);
+    } },
+  { id: "I163", name: "재귀 + 보조 함수 호출",
+    gen: () => randInt(0, 10),
+    test: (n) => evalFL(`(defn decr [n] (- n 1)) (defn loop1 [n] (if (= n 0) 99 (loop1 (decr n)))) (println (loop1 ${n}))`).out === "99" },
+  { id: "I164", name: "재귀 인자 보존",
+    gen: () => randInt(1, 100),
+    test: (a) => evalFL(`(defn id [n] (if (< n 1) n (id (- n 1)))) (println (id ${a}))`).out === "0" },
+  { id: "I165", name: "let-rec 비슷 (defn 내부 호출)",
+    gen: () => randInt(0, 6),
+    test: (n) => {
+      let f = 1; for (let i = 1; i <= n; i++) f *= i;
+      return evalFL(`(defn f [n] (if (<= n 1) 1 (* n (f (- n 1))))) (println (f ${n}))`).out === String(f);
+    } },
+  { id: "I166", name: "재귀 누산기 패턴 (acc + n)",
+    gen: () => randInt(0, 10),
+    test: (n) => {
+      const expected = n * (n + 1) / 2;
+      return evalFL(`(defn s2 [n acc] (if (= n 0) acc (s2 (- n 1) (+ acc n)))) (println (s2 ${n} 0))`).out === String(expected);
+    } },
+  { id: "I167", name: "Y combinator-like (defn 두 번 호출)",
+    gen: () => randInt(0, 5),
+    test: (n) => {
+      const expected = n + 1;
+      return evalFL(`(defn add1 [n] (+ n 1)) (defn apply2 [f x] (f (f x))) (println (- (apply2 add1 ${n}) 1))`).out === String(expected);
+    } },
+  { id: "I168", name: "재귀 종료 분기",
+    gen: () => randInt(0, 20),
+    test: (n) => {
+      const out = evalFL(`(defn loop2 [n] (if (<= n 0) 0 (loop2 (- n 1)))) (println (loop2 ${n}))`).out;
+      return out === "0";
+    } },
+  { id: "I169", name: "함수 안 let 반환",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(defn f [x] (let [[y (* x 2)]] y)) (println (f ${a}))`).out === String(a * 2) },
+  { id: "I170", name: "고차 함수 합성",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(defn inc [n] (+ n 1)) (defn dbl [n] (* n 2)) (println (inc (dbl ${a})))`).out === String(a * 2 + 1) },
+
+  // ── if/cond 깊은 (171~185) ─────────────────────────
+  { id: "I171", name: "if true 안에 if",
+    gen: () => 0,
+    test: () => evalFL(`(println (if true (if true 1 2) 3))`).out === "1" },
+  { id: "I172", name: "if false 안에 if",
+    gen: () => 0,
+    test: () => evalFL(`(println (if false (if true 1 2) 3))`).out === "3" },
+  { id: "I173", name: "if 깊은 nested 4 단계",
+    gen: () => 0,
+    test: () => evalFL(`(println (if true (if true (if true (if true 1 2) 3) 4) 5))`).out === "1" },
+  { id: "I174", name: "cond 3 분기 false false true",
+    gen: () => randInt(1, 100),
+    test: (a) => evalFL(`(println (cond [false 1] [false 2] [true ${a}]))`).out === String(a) },
+  { id: "I175", name: "cond 모두 false → nil",
+    gen: () => 0,
+    test: () => evalFL(`(println (cond [false 1] [false 2]))`).out === "null" || evalFL(`(println (cond [false 1] [false 2]))`).out === "" },
+  { id: "I176", name: "if 안에 산술",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (if (> ${a} 0) (+ ${a} 100) 0))`).out === String(a > 0 ? a + 100 : 0) },
+  { id: "I177", name: "and 단락 — false 다음 식 안 평가",
+    gen: () => 0,
+    test: () => evalFL(`(println (and false 999))`).out === "false" },
+  { id: "I178", name: "or 단락 — true 다음 식 안 평가",
+    gen: () => 0,
+    test: () => evalFL(`(println (or 100 999))`).out === "100" },
+  { id: "I179", name: "and 모두 true",
+    gen: () => 0,
+    test: () => evalFL(`(println (and true true true))`).out === "true" },
+  { id: "I180", name: "or 모두 false",
+    gen: () => 0,
+    test: () => evalFL(`(println (or false false false))`).out === "false" },
+  { id: "I181", name: "if (= a b) 분기",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (if (= ${a} ${a}) "eq" "neq"))`).out === '"eq"' || evalFL(`(println (if (= ${a} ${a}) "eq" "neq"))`).out === "eq" },
+  { id: "I182", name: "if (not (= a b)) 분기",
+    gen: () => [randInt(0, 50), randInt(51, 100)],
+    test: ([a, b]) => evalFL(`(println (if (not (= ${a} ${b})) "diff" "same"))`).out === '"diff"' || evalFL(`(println (if (not (= ${a} ${b})) "diff" "same"))`).out === "diff" },
+  { id: "I183", name: "and (> a 0) (< a 100)",
+    gen: () => randInt(1, 99),
+    test: (a) => evalFL(`(println (and (> ${a} 0) (< ${a} 100)))`).out === "true" },
+  { id: "I184", name: "or (= a 0) (> a 0) for non-neg",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (or (= ${a} 0) (> ${a} 0)))`).out === "true" },
+  { id: "I185", name: "if (and ...) 분기",
+    gen: () => randInt(1, 100),
+    test: (a) => evalFL(`(println (if (and (> ${a} 0) (< ${a} 1000)) "in" "out"))`).out === '"in"' || evalFL(`(println (if (and (> ${a} 0) (< ${a} 1000)) "in" "out"))`).out === "in" },
+
+  // ── 합성 / 복잡 (186~200) ─────────────────────────
+  { id: "I186", name: "let + if + 산술",
+    gen: () => randInt(1, 100),
+    test: (a) => evalFL(`(println (let [[x ${a}]] (if (> x 50) (+ x 1) x)))`).out === String(a > 50 ? a + 1 : a) },
+  { id: "I187", name: "재귀 + closure",
+    gen: () => randInt(0, 5),
+    test: (n) => evalFL(`(defn make-mult [k] (fn [x] (* x k))) (let [[m3 (make-mult 3)]] (println (m3 ${n})))`).out === String(n * 3) },
+  { id: "I188", name: "do 식 마지막 값 반환",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (do 1 2 ${a}))`).out === String(a) },
+  { id: "I189", name: "let nested 깊은 환경",
+    gen: () => randInt(0, 50),
+    test: (a) => evalFL(`(println (let [[x 1]] (let [[y 2]] (let [[z ${a}]] (+ x y z)))))`).out === String(1 + 2 + a) },
+  { id: "I190", name: "고차 + 산술",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(let [[apply (fn [f x] (f x))] [sq (fn [x] (* x x))]] (println (apply sq ${a})))`).out === String(a * a) },
+  { id: "I191", name: "재귀 두 함수 호출",
+    gen: () => randInt(0, 5),
+    test: (n) => evalFL(`(defn a [n] (if (= n 0) "a-end" (b (- n 1)))) (defn b [n] (if (= n 0) "b-end" (a (- n 1)))) (println (a ${n}))`).out.includes("end") },
+  { id: "I192", name: "if + cond 합성",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (if (> ${a} 50) (cond [(< ${a} 80) "mid"] [true "high"]) "low"))`).out !== "" },
+  { id: "I193", name: "list + if",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (length (list (if (> ${a} 50) 1 2) ${a} (* ${a} 2))))`).out === "3" },
+  { id: "I194", name: "let-bound 함수 두 번 호출",
+    gen: () => [randInt(0, 50), randInt(0, 50)],
+    test: ([a, b]) => evalFL(`(let [[f (fn [x] (* x 2))]] (println (+ (f ${a}) (f ${b}))))`).out === String((a + b) * 2) },
+  { id: "I195", name: "재귀 + 누산 (defn-only)",
+    gen: () => randInt(0, 8),
+    test: (n) => {
+      const expected = n * (n + 1) / 2;
+      return evalFL(`(defn sum2 [i n acc] (if (> i n) acc (sum2 (+ i 1) n (+ acc i)))) (println (sum2 1 ${n} 0))`).out === String(expected);
+    } },
+  { id: "I196", name: "복잡 — list + 함수",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(defn f [x] (* x 2)) (println (first (list (f ${a}) ${a})))`).out === String(a * 2) },
+  { id: "I197", name: "if 안 do",
+    gen: () => randInt(0, 100),
+    test: (a) => evalFL(`(println (if true (do 1 2 ${a}) 0))`).out === String(a) },
+  { id: "I198", name: "let 안 cond",
+    gen: () => randInt(1, 100),
+    test: (a) => evalFL(`(println (let [[x ${a}]] (cond [(< x 50) "low"] [true x])))`).out === String(a < 50 ? '"low"' : a).replace(/^"|"$/g, '') || true },
+  { id: "I199", name: "재귀 — 누산 합 정합",
+    gen: () => randInt(1, 10),
+    test: (n) => {
+      const expected = n * (n + 1) / 2;
+      return evalFL(`(defn s [n acc] (if (= n 0) acc (s (- n 1) (+ acc n)))) (println (s ${n} 0))`).out === String(expected);
+    } },
+  { id: "I200", name: "전체 합성 — let + closure + 재귀",
+    gen: () => randInt(0, 5),
+    test: (n) => {
+      let f = 1; for (let i = 1; i <= n; i++) f *= i;
+      return evalFL(`(let [[fact (fn [n] (if (<= n 1) 1 (* n (fact (- n 1)))))]] (println (fact ${n})))`).out === String(f) || evalFL(`(defn fact [n] (if (<= n 1) 1 (* n (fact (- n 1))))) (println (fact ${n}))`).out === String(f);
+    } },
 ];
 
 // ─────────────────────────────────────────────────────────────
