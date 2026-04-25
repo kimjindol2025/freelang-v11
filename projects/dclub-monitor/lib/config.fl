@@ -1,0 +1,13 @@
+;; config.fl — dclub-monitor 설정
+
+[FUNC mon-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-monitor-config :params []
+  :body {
+    :db (mon-config-get "DCLUB_MONITOR_DB" "/tmp/dclub-monitor.db")
+    :port (* (mon-config-get "DCLUB_MONITOR_PORT" "30120") 1)
+    :collect_interval_s (* (mon-config-get "DCLUB_MONITOR_COLLECT_S" "60") 1)
+    :retention_days (* (mon-config-get "DCLUB_MONITOR_RETENTION_D" "30") 1)
+  }]

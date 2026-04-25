@@ -1,0 +1,96 @@
+;; metrics-store.fl — 시계열 저장 (Phase X2)
+;; audit-log + login_history 패턴 재사용
+
+[FUNC metrics-ensure-tables :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS metrics (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      service     TEXT NOT NULL,
+      metric      TEXT NOT NULL,
+      value       REAL NOT NULL,
+      labels      TEXT,
+      ts_ms       INTEGER NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_m_metric_ts ON metrics(metric, ts_ms DESC)")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_m_service_ts ON metrics(service, ts_ms DESC)")
+
+    (db_create $db "CREATE TABLE IF NOT EXISTS scrape_targets (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      service     TEXT NOT NULL UNIQUE,
+      url         TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      last_scrape INTEGER,
+      last_status TEXT,
+      created_at  TEXT NOT NULL
+    )")
+
+    (db_create $db "CREATE TABLE IF NOT EXISTS alert_rules (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL UNIQUE,
+      metric      TEXT NOT NULL,
+      threshold   REAL NOT NULL,
+      comparator  TEXT NOT NULL,
+      duration_s  INTEGER NOT NULL DEFAULT 60,
+      notify_topic TEXT,
+      enabled     INTEGER NOT NULL DEFAULT 1,
+      last_fired  INTEGER,
+      created_at  TEXT NOT NULL
+    )"))]
+
+[FUNC metrics-record :params [$db $service $metric $value $labels-map]
+  :body (db_insert $db "metrics" {
+    :service $service
+    :metric $metric
+    :value $value
+    :labels (if (= $labels-map nil) "" (json_stringify $labels-map))
+    :ts_ms (now_ms)
+  })]
+
+;; ── 조회 — 최근 N분 시계열 ─────────────────────
+[FUNC metrics-recent :params [$db $metric $minutes]
+  :body (let [cutoff (- (now_ms) (* $minutes 60 1000))]
+    (db_query $db
+      (str "SELECT service, value, labels, ts_ms FROM metrics "
+           "WHERE metric=? AND ts_ms > " $cutoff
+           " ORDER BY ts_ms DESC LIMIT 500")
+      [$metric]))]
+
+[FUNC metrics-latest :params [$db $service $metric]
+  :body (let [
+    rows (db_query $db
+      "SELECT value, ts_ms FROM metrics WHERE service=? AND metric=? ORDER BY ts_ms DESC LIMIT 1"
+      [$service $metric])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC metrics-aggregate :params [$db $metric $minutes]
+  :body (let [cutoff (- (now_ms) (* $minutes 60 1000))]
+    (db_query $db
+      (str "SELECT service, AVG(value) as avg_v, MAX(value) as max_v, MIN(value) as min_v, COUNT(*) as n "
+           "FROM metrics WHERE metric=? AND ts_ms > " $cutoff
+           " GROUP BY service")
+      [$metric]))]
+
+;; ── 보존 정책 ────────────────────────────────
+[FUNC metrics-cleanup :params [$db $days]
+  :body (let [cutoff (- (now_ms) (* $days 86400 1000))]
+    (db_delete_row $db "metrics" (str "ts_ms < " $cutoff)))]
+
+;; ── scrape target ────────────────────────────
+[FUNC scrape-register :params [$db $service $url]
+  :body (do
+    (db_delete_row $db "scrape_targets" (str "service='" $service "'"))
+    (db_insert $db "scrape_targets" {
+      :service $service :url $url :enabled 1 :created_at (now_iso)
+    })
+    true)]
+
+[FUNC scrape-list :params [$db]
+  :body (db_query $db
+    "SELECT service, url, enabled, last_scrape, last_status FROM scrape_targets WHERE enabled=1"
+    [])]
+
+[FUNC scrape-mark :params [$db $service $status]
+  :body (db_update $db "scrape_targets"
+    {:last_scrape (now_ms) :last_status $status}
+    (str "service='" $service "'"))]

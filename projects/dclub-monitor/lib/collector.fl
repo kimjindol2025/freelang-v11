@@ -1,0 +1,37 @@
+;; collector.fl — periodic /metrics scrape (Phase X2)
+
+(load "projects/dclub-monitor/lib/metrics-store.fl")
+(load "projects/dclub-monitor/lib/prom-format.fl")
+
+[FUNC scrape-once :params [$db $target]
+  :body (let [
+    svc (get $target "service")
+    src (get $target "url")
+    body (try-fetch $src)
+  ]
+    (if (= $body nil)
+      (do
+        (scrape-mark $db $svc "fail")
+        {:ok false :service $svc :error "fetch failed"})
+      (let [entries (prom-parse $body)]
+        (do
+          (map (fn [e]
+            (metrics-record $db $svc (get e "metric") (get e "value") (get e "labels")))
+            $entries)
+          (scrape-mark $db $svc "ok")
+          {:ok true :service $svc :count (length $entries)}))))]
+
+;; HTTP fetch — 실패 시 nil
+[FUNC try-fetch :params [$url]
+  :body (let [body (http_get $url)]
+    (if (= $body "") nil $body))]
+
+;; collector tick: 등록된 모든 target 스크레이프
+[FUNC collector-tick :params [$db]
+  :body (let [
+    targets (scrape-list $db)
+    results (map (fn [t] (scrape-once $db t)) $targets)
+  ]
+    (do
+      (println (str "[collector] scraped " (length $results) " targets"))
+      $results))]

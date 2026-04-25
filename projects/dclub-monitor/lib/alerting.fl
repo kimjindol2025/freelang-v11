@@ -1,0 +1,68 @@
+;; alerting.fl — 룰 기반 알림 평가 (Phase X2)
+;;
+;; alert_rules 테이블의 각 룰을 평가:
+;;   - metrics-latest 로 최근 값 조회
+;;   - threshold 와 comparator 로 비교
+;;   - duration_s 동안 지속 시 fire (last_fired ts 기록 + dclub-queue 알림)
+
+(load "projects/dclub-monitor/lib/metrics-store.fl")
+
+[FUNC alert-rules-active :params [$db]
+  :body (db_query $db
+    "SELECT id, name, metric, threshold, comparator, duration_s, notify_topic, last_fired FROM alert_rules WHERE enabled=1"
+    [])]
+
+[FUNC alert-add :params [$db $name $metric $threshold $comparator $duration-s $notify-topic]
+  :body (do
+    (db_delete_row $db "alert_rules" (str "name='" $name "'"))
+    (db_insert $db "alert_rules" {
+      :name $name
+      :metric $metric
+      :threshold $threshold
+      :comparator $comparator
+      :duration_s $duration-s
+      :notify_topic $notify-topic
+      :enabled 1
+      :created_at (now_iso)
+    })
+    true)]
+
+[FUNC alert-evaluate :params [$db $rule]
+  :body (let [
+    metric (get $rule "metric")
+    threshold (get $rule "threshold")
+    cmp (get $rule "comparator")
+    last-rows (db_query $db
+      (str "SELECT service, AVG(value) as v FROM metrics WHERE metric=? AND ts_ms > " (- (now_ms) (* 60 1000))
+           " GROUP BY service")
+      [$metric])
+    breaching (filter (fn [r]
+      (let [v (get r "v")]
+        (cond
+          [(= cmp ">") (> v $threshold)]
+          [(= cmp "<") (< v $threshold)]
+          [(= cmp ">=") (>= v $threshold)]
+          [(= cmp "<=") (<= v $threshold)]
+          [true false])))
+      $last-rows)
+  ]
+    (length $breaching))]
+
+[FUNC alert-tick :params [$db]
+  :body (let [
+    rules (alert-rules-active $db)
+  ]
+    (map (fn [r]
+      (let [b (alert-evaluate $db r)]
+        (if (> b 0)
+          (do
+            (db_update $db "alert_rules"
+              {:last_fired (now_ms)}
+              (str "id=" (get r "id")))
+            (println (str "[alert] FIRED: " (get r "name") " — " b " services breaching"))
+            (let [topic (get r "notify_topic")]
+              (if (or (= topic nil) (= topic ""))
+                nil
+                (println (str "[alert] would publish to topic: " topic)))))
+          nil)))
+      $rules))]

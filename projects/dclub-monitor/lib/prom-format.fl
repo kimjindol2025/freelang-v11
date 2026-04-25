@@ -1,0 +1,88 @@
+;; prom-format.fl — Prometheus exposition format parse + serialize (Phase X2)
+;;
+;; 형식 예 (RFC 0001 OpenMetrics 단순 부분집합):
+;;   # HELP login_total Login attempts
+;;   # TYPE login_total counter
+;;   login_total{result="ok"} 1234 1700000000000
+;;   login_total{result="fail"} 56
+;;
+;; 우리는 line 별 파싱 (counter/gauge 만, histogram 미지원).
+
+;; ── 파싱: text → [{metric, labels, value, ts_ms?}, ...] ──
+[FUNC prom-parse :params [$text]
+  :body (let [
+    lines (str_split $text "\n")
+    ;; # HELP / # TYPE / 빈 줄 / 주석은 skip
+    data-lines (filter (fn [line]
+      (let [trimmed (str_trim $line)]
+        (and (not (= $trimmed ""))
+             (not (= (substring $trimmed 0 1) "#")))))
+      $lines)
+  ]
+    (map prom-parse-line $data-lines))]
+
+;; 한 줄 파싱: "name{k=\"v\",k2=\"v2\"} value [ts]"
+[FUNC prom-parse-line :params [$line]
+  :body (let [
+    ;; { 위치 찾기 (있으면 라벨 있음)
+    has-labels (regex_match $line ".*\\{.*\\}.*")
+  ]
+    (if $has-labels
+      (let [
+        ;; "name{labels} value ts" 분해
+        m (regex_extract $line "([^\\s\\{]+)\\{([^\\}]*)\\}\\s+(\\S+)\\s*(\\d*)")
+      ]
+        (if (= (length $m) 4)
+          {:metric (get $m 0)
+           :labels (parse-labels (get $m 1))
+           :value (* (get $m 2) 1)
+           :ts_ms (if (= (get $m 3) "") 0 (* (get $m 3) 1))}
+          {:metric "" :labels {} :value 0}))
+      ;; 라벨 없음
+      (let [
+        parts (str_split (str_trim $line) " ")
+      ]
+        {:metric (get $parts 0)
+         :labels {}
+         :value (if (>= (length $parts) 2) (* (get $parts 1) 1) 0)
+         :ts_ms (if (>= (length $parts) 3) (* (get $parts 2) 1) 0)})))]
+
+;; "k1=\"v1\",k2=\"v2\"" → {k1: v1, k2: v2}
+(define parse-labels
+  (fn [s]
+    (if (= s "")
+      {}
+      (let [pairs (str_split s ",")]
+        (reduce (fn [acc pair]
+          (let [
+            kv (str_split (str_trim pair) "=")
+            k (get kv 0)
+            v-quoted (if (>= (length kv) 2) (get kv 1) "")
+            v (regex_replace $v-quoted "\"" "")
+          ]
+            (assoc acc k v)))
+          {} pairs)))))
+
+;; ── 직렬화: [{metric, labels, value}, ...] → text ──
+[FUNC prom-serialize :params [$entries]
+  :body (str_join "\n"
+    (map (fn [e]
+      (let [
+        labels (get e "labels")
+        labels-str (serialize-labels labels)
+        line (if (= labels-str "")
+               (str (get e "metric") " " (get e "value"))
+               (str (get e "metric") "{" labels-str "} " (get e "value")))
+      ]
+        line))
+      $entries))]
+
+(define serialize-labels
+  (fn [m]
+    (if (= m nil)
+      ""
+      (let [ks (keys m)]
+        (if (= (length ks) 0)
+          ""
+          (str_join ","
+            (map (fn [k] (str k "=\"" (get m k) "\"")) ks)))))))
