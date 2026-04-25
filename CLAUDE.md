@@ -154,6 +154,10 @@ Time:        ~67 s
 - [x] L2 수학적 고정점 증명 (semantic preservation 테스트) — Phase 3-C ✅
 - [x] self/stdlib/ai.fl FL 버전 작성 (AI 라이브러리) — Phase 3-D ✅
 - [x] VM opt-in 연결 (성능 1.5배 향상 기반) — Phase 3-E ✅
+- [x] **Deep fixed-point 자동화 — stage1~10 SHA256 chain (2026-04-25)** ✅
+  - `scripts/verify-fixed-point-deep.sh` (depth 인자, JSON 출력)
+  - `src/__tests__/self-hosting.test.ts` deep fixed-point 케이스
+  - `L2-PROOF-DEEP-RESULTS.json` 결과 저장
 - [ ] bootstrap.js 완전 폐기 — **Phase 4 백로그**
 
 ---

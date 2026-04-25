@@ -121,6 +121,23 @@ describe("FreeLang v11 self-hosting", () => {
     expect(sha256File(stage4)).toBe(h1);
     expect(sha256File(stage5)).toBe(h1);
   });
+
+  // Phase 후속 (#4): deep fixed-point — stage6..stage10까지 SHA 불변
+  // self-hosting 결정론을 더 강하게 증명 (10단계 chain)
+  test(
+    "deep fixed-point: stage1..stage10 all identical (10-stage chain)",
+    () => {
+      const h1 = sha256File(stage1);
+      let prev = stage1;
+      for (let i = 2; i <= 10; i++) {
+        const next = join(WORK_DIR, `stage${i}.js`);
+        runNode([prev, SELF_ALL, next]);
+        expect(sha256File(next)).toBe(h1);
+        prev = next;
+      }
+    },
+    120_000
+  );
 });
 
 // Phase C-4: 전체 verify-self-host.sh 를 Jest 에서 실행해 결과 집계 검증.

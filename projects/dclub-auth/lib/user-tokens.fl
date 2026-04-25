@@ -1,0 +1,95 @@
+;; user-tokens.fl — 이메일 검증·비번 재설정 공용 토큰 저장소 (Phase H, dclub-auth)
+;;
+;; 두 흐름 공통 패턴:
+;;   - 만료 24시간, 일회용 (used=1 후 재사용 거부)
+;;   - 평문은 클라이언트(URL)에만, DB 에는 SHA256 해시만 저장
+;;   - type 으로 분리: "verify_email" | "password_reset"
+;;
+;; 보안:
+;;   - 토큰 길이 32 bytes (256 bits) — 무차별 추정 불가
+;;   - timing-safe 비교는 SHA256 해시 매칭으로 자연 보장
+
+(load "projects/dclub-auth/lib/audit-log.fl")
+
+[FUNC user-tokens-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS user_tokens (
+      token_hash    TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      type          TEXT NOT NULL,
+      expires_at    INTEGER NOT NULL,
+      used          INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_tokens_user ON user_tokens(user_id, type)"))]
+
+;; ── 발급: 평문 토큰 반환 (DB에는 hash만) ──────────────
+;; type: "verify_email" 또는 "password_reset"
+;; lifetime-seconds: 만료까지 (24*3600 권장)
+;; 같은 사용자·type 의 미사용 토큰은 자동 무효화 (가장 최근 1개만 유효).
+
+[FUNC user-tokens-issue :params [$db $user-id $type $lifetime-seconds]
+  :body (let [
+    token (auth_random_token 32)
+    hash (auth_sha256 $token)
+    now-ms (now_ms)
+    expires (+ $now-ms (* $lifetime-seconds 1000))
+  ]
+    (do
+      ;; 같은 user/type 의 기존 미사용 토큰 무효화
+      (db_update $db "user_tokens"
+        {:used 1}
+        (str "user_id='" $user-id "' AND type='" $type "' AND used=0"))
+      (db_insert $db "user_tokens" {
+        :token_hash $hash
+        :user_id $user-id
+        :type $type
+        :expires_at $expires
+        :used 0
+        :created_at (now_iso)
+      })
+      $token))]
+
+;; ── 소비: 토큰 검증 후 user_id 반환 (실패 시 nil) ───────
+
+[FUNC user-tokens-consume :params [$db $token $expected-type]
+  :body (let [
+    hash (auth_sha256 $token)
+    rows (db_query $db
+      "SELECT user_id, type, expires_at, used FROM user_tokens WHERE token_hash=? LIMIT 1"
+      [$hash])
+  ]
+    (if (= (length $rows) 0)
+      nil
+      (let [
+        row (get $rows 0)
+        type (get $row "type")
+        expires (get $row "expires_at")
+        used (get $row "used")
+        now-ms (now_ms)
+      ]
+        (if (or (= $used 1)
+                (> $now-ms $expires)
+                (not (= $type $expected-type)))
+          nil
+          (do
+            (db_update $db "user_tokens"
+              {:used 1}
+              (str "token_hash='" $hash "'"))
+            (get $row "user_id"))))))]
+
+;; ── 단순 조회 (사용 처리 없음, 디버그용) ──────────────
+
+[FUNC user-tokens-find :params [$db $token]
+  :body (let [
+    rows (db_query $db
+      "SELECT user_id, type, expires_at, used FROM user_tokens WHERE token_hash=? LIMIT 1"
+      [(auth_sha256 $token)])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+;; ── 만료 정리 ─────────────────────────────────────────
+
+[FUNC user-tokens-cleanup :params [$db]
+  :body (db_delete_row $db "user_tokens"
+    (str "expires_at < " (now_ms) " OR used=1"))]
