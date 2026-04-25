@@ -9,20 +9,39 @@
 
 (load "projects/dclub-auth/lib/config.fl")
 (load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/users-store.fl")
+(load "projects/dclub-auth/lib/clients-store.fl")
+(load "projects/dclub-auth/lib/code-store.fl")
+(load "projects/dclub-auth/lib/refresh-store.fl")
 (load "projects/dclub-auth/app/jwks.fl")
 (load "projects/dclub-auth/app/discovery.fl")
+(load "projects/dclub-auth/app/authorize.fl")
+(load "projects/dclub-auth/app/login.fl")
+(load "projects/dclub-auth/app/token.fl")
+(load "projects/dclub-auth/app/userinfo.fl")
 
-;; ── 부팅 시 키 자동 보장 ────────────────────────────
+;; ── 부팅: 스키마 + 시드 ─────────────────────────────
 (define cfg (dclub-auth-config))
-(define active-kid (jwks-init (get $cfg "db")))
+(define DB (get $cfg "db"))
+(define active-kid (jwks-init $DB))
+(codes-ensure-table $DB)
+(refresh-ensure-table $DB)
+(define demo-uid (users-seed-demo $DB))
+(define blog-cid (clients-seed-demo $DB))
 
 (println (str "[dclub-auth] issuer=" (get $cfg "issuer")))
-(println (str "[dclub-auth] db=" (get $cfg "db")))
+(println (str "[dclub-auth] db=" $DB))
 (println (str "[dclub-auth] active kid=" $active-kid))
+(println (str "[dclub-auth] demo user id=" $demo-uid))
+(println (str "[dclub-auth] blog client=" $blog-cid))
 
-;; ── 라우트 등록 ────────────────────────────────────
-(server_get "/jwks.json" "handle-jwks")
+;; ── 라우트 ──────────────────────────────────────────
 (server_get "/.well-known/openid-configuration" "handle-discovery")
+(server_get "/jwks.json" "handle-jwks")
+(server_get "/authorize" "handle-authorize")
+(server_post "/login" "handle-login")
+(server_post "/token" "handle-token")
+(server_get "/userinfo" "handle-userinfo")
 
 ;; ── 시작 ──────────────────────────────────────────
 (server_start (get $cfg "port"))

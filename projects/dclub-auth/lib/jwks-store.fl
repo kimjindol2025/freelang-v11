@@ -21,6 +21,7 @@
     kid          TEXT PRIMARY KEY,
     alg          TEXT NOT NULL,
     public_jwk   TEXT NOT NULL,
+    public_pem   TEXT NOT NULL,
     private_pem  TEXT NOT NULL,
     status       TEXT NOT NULL,
     created_at   TEXT NOT NULL,
@@ -45,6 +46,7 @@
         :kid $kid
         :alg "RS256"
         :public_jwk $jwk-json
+        :public_pem $pub-pem
         :private_pem $priv-pem
         :status $status
         :created_at $now
@@ -71,7 +73,7 @@
 [FUNC jwks-active :params [$db-path]
   :body (let [
     rows (db_query $db-path
-      "SELECT kid, alg, public_jwk, private_pem, status, created_at FROM signing_keys WHERE status='active' LIMIT 1" [])
+      "SELECT kid, alg, public_jwk, public_pem, private_pem, status, created_at FROM signing_keys WHERE status='active' LIMIT 1" [])
   ]
     (if (= (length $rows) 0)
       nil
@@ -83,7 +85,7 @@
 [FUNC jwks-find :params [$db-path $kid]
   :body (let [
     rows (db_query $db-path
-      "SELECT kid, alg, public_jwk, private_pem, status, created_at FROM signing_keys WHERE kid=? AND status!='revoked' LIMIT 1"
+      "SELECT kid, alg, public_jwk, public_pem, private_pem, status, created_at FROM signing_keys WHERE kid=? AND status!='revoked' LIMIT 1"
       [$kid])
   ]
     (if (= (length $rows) 0)
