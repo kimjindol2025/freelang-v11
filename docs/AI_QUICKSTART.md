@@ -215,11 +215,19 @@ node bootstrap.js run hello.fl
 (get m "name")         ;; ✅ string도 동작 (alias)
 ```
 
-### F7. ❌ `let` 형식
+### F7. ✅ `let` 형식 — **두 형태 모두 작동** (2026-04-25 검증)
 ```fl
-(let [x 10] (+ x 1))           ;; ❌ Clojure 스타일 (single binding 형태)
-(let [[x 10]] (+ x 1))         ;; ✅ FreeLang은 [[k v] [k v]] 형태
-(let [[x 10] [y 20]] (+ x y))  ;; ✅ 다중 binding
+;; Clojure 스타일 (single bracket, 1차원 평탄) — 작동
+(let [x 10] (+ x 1))
+(let [x 10 y 20] (+ x y))
+(let [a 1 b 2 c 3] (+ a b c))
+
+;; FreeLang 전통 (2차원, [[k v]] [[k v]]) — 작동
+(let [[x 10]] (+ x 1))
+(let [[x 10] [y 20]] (+ x y))
+
+;; 주의: 한 form 안에 1차원/2차원 혼합 ❌
+(let [[x 10] y 20] ...)        ;; ❌ "바인딩 형식이 일관되지 않음"
 ```
 
 ### F8. ❌ list literal vs Array block

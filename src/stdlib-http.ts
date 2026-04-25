@@ -35,6 +35,26 @@ export function createHttpModule() {
       }
     },
 
+    // http_post_form url form_body -> string  (application/x-www-form-urlencoded)
+    "http_post_form": (url: string, body: string): string => {
+      try {
+        return curlRun(["-s", "--max-time", "10", "-X", "POST",
+          "-H", "Content-Type: application/x-www-form-urlencoded", "-d", body, url]);
+      } catch (err: any) {
+        throw new Error(`http_post_form failed for '${url}': ${err.message}`);
+      }
+    },
+
+    // http_get_bearer url token -> string  (Authorization: Bearer ...)
+    "http_get_bearer": (url: string, token: string): string => {
+      try {
+        return curlRun(["-s", "--max-time", "10",
+          "-H", `Authorization: Bearer ${token}`, url]);
+      } catch (err: any) {
+        throw new Error(`http_get_bearer failed for '${url}': ${err.message}`);
+      }
+    },
+
     // http_put url body -> string
     "http_put": (url: string, body: string): string => {
       try {

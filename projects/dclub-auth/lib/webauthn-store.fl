@@ -1,0 +1,108 @@
+;; webauthn-store.fl — Passkey credential 저장 (Phase J, dclub-auth)
+;;
+;; 한 사용자가 여러 Passkey 등록 가능 (폰·노트북·yubikey 등 각각 별도 row).
+;; sign_count 는 각 사용 후 단조 증가 — replay 방어.
+
+(load "projects/dclub-auth/lib/audit-log.fl")
+
+[FUNC webauthn-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS webauthn_credentials (
+      credential_id  TEXT PRIMARY KEY,
+      user_id        TEXT NOT NULL,
+      public_jwk     TEXT NOT NULL,
+      sign_count     INTEGER NOT NULL DEFAULT 0,
+      aaguid         TEXT,
+      transports     TEXT,
+      label          TEXT,
+      created_at     TEXT NOT NULL,
+      last_used_at   TEXT
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_wa_user ON webauthn_credentials(user_id)"))]
+
+;; 등록 챌린지 임시 저장
+[FUNC webauthn-pending-table :params [$db]
+  :body (db_create $db "CREATE TABLE IF NOT EXISTS webauthn_pending (
+    challenge   TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    purpose     TEXT NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+  )")]
+
+[FUNC webauthn-pending-issue :params [$db $user-id $purpose]
+  :body (let [
+    challenge (webauthn_challenge 32)
+    expires (+ (now_ms) 300000)
+  ]
+    (do
+      (db_insert $db "webauthn_pending" {
+        :challenge $challenge
+        :user_id $user-id
+        :purpose $purpose
+        :expires_at $expires
+        :created_at (now_iso)
+      })
+      $challenge))]
+
+[FUNC webauthn-pending-consume :params [$db $challenge $purpose]
+  :body (let [
+    rows (db_query $db
+      "SELECT user_id, expires_at FROM webauthn_pending WHERE challenge=? AND purpose=? LIMIT 1"
+      [$challenge $purpose])
+  ]
+    (if (= (length $rows) 0)
+      nil
+      (let [
+        row (get $rows 0)
+        expires (get $row "expires_at")
+        now-ms (now_ms)
+      ]
+        (if (> $now-ms $expires)
+          nil
+          (do
+            (db_delete_row $db "webauthn_pending"
+              (str "challenge='" $challenge "'"))
+            (get $row "user_id"))))))]
+
+;; ── credential 저장 ───────────────────────────────────
+[FUNC webauthn-credential-store :params [$db $user-id $cred-id $jwk-json $sign-count $aaguid $label]
+  :body (do
+    (db_insert $db "webauthn_credentials" {
+      :credential_id $cred-id
+      :user_id $user-id
+      :public_jwk $jwk-json
+      :sign_count $sign-count
+      :aaguid $aaguid
+      :transports ""
+      :label (if (= $label "") "Passkey" $label)
+      :created_at (now_iso)
+    })
+    (audit-log $db "webauthn.register" $user-id nil nil
+      {:credential_id (substring $cred-id 0 16) :aaguid $aaguid}))]
+
+[FUNC webauthn-credential-find :params [$db $cred-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT credential_id, user_id, public_jwk, sign_count, aaguid, label FROM webauthn_credentials WHERE credential_id=? LIMIT 1"
+      [$cred-id])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC webauthn-update-sign-count :params [$db $cred-id $new-count]
+  :body (db_update $db "webauthn_credentials"
+    {:sign_count $new-count :last_used_at (now_iso)}
+    (str "credential_id='" $cred-id "'"))]
+
+[FUNC webauthn-credentials-by-user :params [$db $user-id]
+  :body (db_query $db
+    "SELECT credential_id, label, created_at, last_used_at FROM webauthn_credentials WHERE user_id=? ORDER BY created_at DESC"
+    [$user-id])]
+
+[FUNC webauthn-active-for? :params [$db $user-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT credential_id FROM webauthn_credentials WHERE user_id=? LIMIT 1"
+      [$user-id])
+  ]
+    (> (length $rows) 0))]

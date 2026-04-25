@@ -1,0 +1,189 @@
+;; webauthn.fl — WebAuthn / Passkey 4 라우트 (Phase J, dclub-auth)
+;;
+;; POST /webauthn/register/begin    Bearer 인증 → challenge + RP info
+;; POST /webauthn/register/complete Bearer + clientDataJSON + attestationObject → 저장
+;; POST /webauthn/auth/begin        username → challenge + allowCredentials
+;; POST /webauthn/auth/complete     credentialId + clientDataJSON + authenticatorData + signature → 검증
+;;
+;; 모두 application/json 본문.
+
+(load "projects/dclub-auth/lib/webauthn-store.fl")
+(load "projects/dclub-auth/lib/users-store.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+[FUNC wa-bearer-uid :params [$db $req]
+  :body (let [token (extract-bearer $req)]
+    (if (= $token "")
+      nil
+      (let [hdr (jwt-rs256-header-only $token)]
+        (if (= $hdr nil)
+          nil
+          (let [
+            kid (get $hdr "kid")
+            key-row (jwks-find $db $kid)
+          ]
+            (if (= $key-row nil)
+              nil
+              (let [payload (jwt-rs256-verify $token (get $key-row "public_pem"))]
+                (if (= $payload nil) nil (get $payload "sub")))))))))]
+
+;; RP id 추출 (issuer URL 의 호스트)
+[FUNC wa-rp-id :params [$cfg]
+  :body (let [
+    iss (get $cfg "issuer")
+    no-proto (regex_replace $iss "https?://" "")
+    no-path (get (str_split $no-proto "/") 0)
+    no-port (get (str_split $no-path ":") 0)
+  ]
+    $no-port)]
+
+;; ── POST /webauthn/register/begin ─────────────────────
+[FUNC handle-wa-register-begin :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    uid (wa-bearer-uid $db $req)
+  ]
+    (if (= $uid nil)
+      (server_status 401 {:error "unauthorized"})
+      (let [
+        user (users-find-by-id $db $uid)
+        challenge (webauthn-pending-issue $db $uid "register")
+        rp-id (wa-rp-id $cfg)
+      ]
+        (server_json {
+          :challenge $challenge
+          :rp {:id $rp-id :name "dclub-auth"}
+          :user {:id $uid :name (get $user "username") :displayName (or (get $user "display_name") (get $user "username"))}
+          :pubKeyCredParams [{:type "public-key" :alg -7}]
+          :timeout 60000
+          :attestation "none"
+          :authenticatorSelection {:userVerification "preferred" :residentKey "preferred"}
+        }))))]
+
+;; ── POST /webauthn/register/complete ─────────────────
+;; body JSON: { challenge, attestationObject_b64url, label? }
+[FUNC handle-wa-register-complete :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    uid (wa-bearer-uid $db $req)
+  ]
+    (if (= $uid nil)
+      (server_status 401 {:error "unauthorized"})
+      (let [
+        body-raw (server_req_body $req)
+    body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+        challenge (nil-or-empty (get $body "challenge"))
+        att-b64 (nil-or-empty (get $body "attestationObject"))
+        label (nil-or-empty (get $body "label"))
+        verified-uid (webauthn-pending-consume $db $challenge "register")
+      ]
+        (if (or (= $verified-uid nil) (not (= $verified-uid $uid)))
+          (server_status 400 {:error "invalid_challenge"})
+          (let [parsed (webauthn_parse_attestation $att-b64)]
+            (do
+              (webauthn-credential-store $db $uid
+                (get $parsed "credential_id")
+                (json_stringify (get $parsed "public_jwk"))
+                (get $parsed "sign_count")
+                (get $parsed "aaguid_hex")
+                $label)
+              (server_json {:status "registered"
+                            :credential_id (get $parsed "credential_id")
+                            :fmt (get $parsed "fmt")})))))))]
+
+;; ── POST /webauthn/auth/begin ─────────────────────────
+;; body JSON: { username }
+[FUNC handle-wa-auth-begin :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    body-raw (server_req_body $req)
+    body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+    username (nil-or-empty (get $body "username"))
+    user (users-find-by-username $db $username)
+  ]
+    (if (= $user nil)
+      ;; 사용자 정보 노출 금지 — 항상 동일 응답 (random challenge)
+      (server_json {
+        :challenge (webauthn_challenge 32)
+        :allowCredentials []
+        :timeout 60000
+        :rpId (wa-rp-id $cfg)
+        :userVerification "preferred"
+      })
+      (let [
+        uid (get $user "id")
+        challenge (webauthn-pending-issue $db $uid "auth")
+        creds (webauthn-credentials-by-user $db $uid)
+        allow (map (fn [c] {:type "public-key"
+                            :id (get c "credential_id")
+                            :transports ["internal" "hybrid" "usb"]}) $creds)
+      ]
+        (server_json {
+          :challenge $challenge
+          :allowCredentials $allow
+          :timeout 60000
+          :rpId (wa-rp-id $cfg)
+          :userVerification "preferred"
+        }))))]
+
+;; ── POST /webauthn/auth/complete ──────────────────────
+;; body JSON: { challenge, credential_id, clientDataJSON_b64url, authenticatorData_b64url, signature_b64url }
+;; 반환: {ok:true, user_id, username} 또는 {ok:false, error}
+[FUNC handle-wa-auth-complete :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    body-raw (server_req_body $req)
+    body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+    challenge (nil-or-empty (get $body "challenge"))
+    cred-id (nil-or-empty (get $body "credential_id"))
+    cd-b64 (nil-or-empty (get $body "clientDataJSON"))
+    ad-b64 (nil-or-empty (get $body "authenticatorData"))
+    sig-b64 (nil-or-empty (get $body "signature"))
+  ]
+    (let [
+      uid-of-challenge (webauthn-pending-consume $db $challenge "auth")
+      cred-row (webauthn-credential-find $db $cred-id)
+    ]
+      (if (or (= $uid-of-challenge nil) (= $cred-row nil))
+        (server_status 400 {:error "invalid_credential_or_challenge"})
+        (if (not (= $uid-of-challenge (get $cred-row "user_id")))
+          (server_status 400 {:error "credential_user_mismatch"})
+          (let [
+            jwk (json_parse (get $cred-row "public_jwk"))
+            prev-count (get $cred-row "sign_count")
+            iss (get $cfg "issuer")
+            origin $iss
+            rp-id (wa-rp-id $cfg)
+            result (webauthn_verify_assertion {
+              :jwk $jwk
+              :authenticator_data_b64url $ad-b64
+              :client_data_json_b64url $cd-b64
+              :signature_b64url $sig-b64
+              :expected_challenge $challenge
+              :expected_origin $origin
+              :expected_rp_id $rp-id
+              :prev_sign_count $prev-count
+            })
+            ok (get $result "ok")
+            uid (get $cred-row "user_id")
+          ]
+            (if (not $ok)
+              (do
+                (audit-log $db "webauthn.auth_fail" $uid nil nil
+                  {:reason (get $result "error") :credential_id (substring $cred-id 0 16)})
+                (server_status 401 {:ok false :error (get $result "error")}))
+              (let [user (users-find-by-id $db $uid)]
+                (do
+                  (webauthn-update-sign-count $db $cred-id (get $result "sign_count"))
+                  (audit-log $db "webauthn.auth_ok" $uid nil nil
+                    {:credential_id (substring $cred-id 0 16)})
+                  (server_json {:ok true
+                                :user_id $uid
+                                :username (get $user "username")})))))))))]
