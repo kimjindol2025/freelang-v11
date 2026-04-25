@@ -1,0 +1,18 @@
+;; config.fl — dclub-auth IdP 설정
+;;
+;; 환경변수로 오버라이드: DCLUB_AUTH_DB / DCLUB_AUTH_ISSUER / DCLUB_AUTH_PORT
+
+[FUNC config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-auth-config :params []
+  :body {
+    :issuer (config-get "DCLUB_AUTH_ISSUER" "http://localhost:30100")
+    :db (config-get "DCLUB_AUTH_DB" "/tmp/dclub-auth.db")
+    :port (* (config-get "DCLUB_AUTH_PORT" "30100") 1)
+    :id_token_lifetime 3600
+    :access_token_lifetime 3600
+    :code_lifetime 60
+    :refresh_lifetime 2592000
+  }]

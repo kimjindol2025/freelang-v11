@@ -1,0 +1,14 @@
+;; jwks.fl — GET /jwks.json (RFC 7517)
+;;
+;; 등록된 active + rotated 키의 공개 JWK 배열 응답.
+;; 클라이언트가 RS256 id_token 서명을 자체 검증하기 위한 공개키 배포.
+
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+[FUNC handle-jwks :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    jwks (jwks-public-keys (get $cfg "db"))
+  ]
+    (server_json $jwks))]

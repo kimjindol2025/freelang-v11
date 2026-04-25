@@ -1,0 +1,27 @@
+;; discovery.fl — GET /.well-known/openid-configuration (OIDC Discovery 1.0)
+;;
+;; OIDC 클라이언트가 IdP의 모든 엔드포인트를 자동 발견하는 메타데이터.
+;; 표준 필드: issuer, *_endpoint, jwks_uri, scopes_supported, ...
+
+(load "projects/dclub-auth/lib/config.fl")
+
+[FUNC handle-discovery :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    iss (get $cfg "issuer")
+  ]
+    (server_json {
+      :issuer $iss
+      :authorization_endpoint (str $iss "/authorize")
+      :token_endpoint (str $iss "/token")
+      :userinfo_endpoint (str $iss "/userinfo")
+      :jwks_uri (str $iss "/jwks.json")
+      :response_types_supported ["code"]
+      :subject_types_supported ["public"]
+      :id_token_signing_alg_values_supported ["RS256"]
+      :scopes_supported ["openid" "profile" "email"]
+      :token_endpoint_auth_methods_supported ["client_secret_post" "client_secret_basic" "none"]
+      :code_challenge_methods_supported ["S256"]
+      :grant_types_supported ["authorization_code" "refresh_token"]
+      :claims_supported ["sub" "iss" "aud" "exp" "iat" "nonce" "name" "email" "email_verified" "picture"]
+    }))]
