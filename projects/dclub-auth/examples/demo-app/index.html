@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>dclub-auth 데모 앱</title>
+<style>
+  body{font-family:sans-serif;max-width:560px;margin:60px auto;padding:24px;background:#0f1419;color:#e6e6e6}
+  h1{font-size:22px;margin-bottom:8px}.h{color:#888;margin-bottom:24px;font-size:14px}
+  button{padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;margin-right:8px}
+  button:hover{background:#2563eb}button.danger{background:#ef4444}button.danger:hover{background:#dc2626}
+  .card{background:#1a2028;padding:16px;border-radius:6px;margin-top:16px}
+  pre{font-size:12px;white-space:pre-wrap;word-break:break-all;color:#a3e635}
+  .label{color:#888;font-size:12px}.val{color:#e6e6e6;font-weight:bold}
+  .row{margin:8px 0}
+</style>
+</head>
+<body>
+<h1>dclub-auth 데모</h1>
+<p class="h">이 페이지는 SDK 약 300줄 + HTML 약 60줄로 OIDC 로그인을 구현합니다.</p>
+
+<div id="logged-out" style="display:none">
+  <button id="signin">dclub-auth로 로그인</button>
+</div>
+
+<div id="logged-in" style="display:none">
+  <div class="card">
+    <div class="row"><span class="label">로그인됨:</span> <span class="val" id="username">-</span></div>
+    <div class="row"><span class="label">이메일:</span> <span class="val" id="email">-</span></div>
+    <div class="row"><span class="label">검증 여부:</span> <span class="val" id="verified">-</span></div>
+    <div class="row"><span class="label">sub:</span> <span class="val" id="sub" style="font-family:monospace;font-size:11px">-</span></div>
+  </div>
+  <div style="margin-top:16px">
+    <button id="refresh">사용자 정보 새로고침</button>
+    <button id="signout" class="danger">로그아웃</button>
+  </div>
+  <details style="margin-top:24px">
+    <summary style="cursor:pointer;color:#888">id_token 디코드</summary>
+    <pre id="idtoken-decoded"></pre>
+  </details>
+</div>
+
+<script src="../../sdk/dclub-auth-client.js"></script>
+<script>
+const { createClient } = window.DclubAuth;
+
+const auth = createClient({
+  issuer: "http://localhost:30100",
+  clientId: "blog",
+  clientSecret: "blog-secret-CHANGE-ME",
+  redirectUri: window.location.origin + window.location.pathname,
+  scope: "openid profile email",
+});
+
+// 콜백 처리 (URL 에 ?code=... 가 있으면)
+(async () => {
+  if (new URL(window.location.href).searchParams.has("code")) {
+    try {
+      await auth.handleCallback();
+      history.replaceState({}, "", window.location.pathname);
+    } catch (e) {
+      alert("로그인 실패: " + e.message);
+    }
+  }
+  await render();
+})();
+
+async function render() {
+  if (auth.isAuthenticated()) {
+    const user = await auth.getUser();
+    document.getElementById("username").textContent = user.preferred_username || user.name || "(이름 없음)";
+    document.getElementById("email").textContent = user.email || "-";
+    document.getElementById("verified").textContent = user.email_verified ? "✓ 검증됨" : "✗ 미검증";
+    document.getElementById("sub").textContent = user.sub;
+    // id_token decode
+    const idToken = sessionStorage.getItem("dclub-auth:id_token");
+    if (idToken) {
+      const parts = idToken.split(".");
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/") + "==="));
+      document.getElementById("idtoken-decoded").textContent = JSON.stringify(payload, null, 2);
+    }
+    document.getElementById("logged-out").style.display = "none";
+    document.getElementById("logged-in").style.display = "block";
+  } else {
+    document.getElementById("logged-out").style.display = "block";
+    document.getElementById("logged-in").style.display = "none";
+  }
+}
+
+document.getElementById("signin").onclick = () => auth.signIn();
+document.getElementById("signout").onclick = () => { auth.signOut(); render(); };
+document.getElementById("refresh").onclick = render;
+</script>
+</body>
+</html>
