@@ -32,7 +32,7 @@
   "preferGlobal": true,
   "files": [
     "bin",
-    "src",
-    "templates"
+    "src/CLI.md",
+    "src/CLI-DEPLOYMENT.md"
   ]
 }
