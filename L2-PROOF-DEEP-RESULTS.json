@@ -1,20 +1,20 @@
 {
   "depth": 10,
-  "pass": 10,
-  "fail": 0,
-  "elapsed_seconds": 93,
-  "baseline_sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0",
-  "timestamp": "2026-04-26T07:50:09Z",
+  "pass": 1,
+  "fail": 9,
+  "elapsed_seconds": 7,
+  "baseline_sha256": "dd10b3d207191834a3e806ad2ec56cd5f69f096be9bc7f6970fd36f73dc8e398",
+  "timestamp": "2026-04-26T11:05:38Z",
   "stages": [
-    {"stage": 1, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 2, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 3, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 4, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 5, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 6, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 7, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 8, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 9, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true},
-    {"stage": 10, "sha256": "0aab7ab146cb8e7beecc9e14b8af723bd1d44a79dadcaace86086aa339a5a0e0", "match": true}
+    {"stage": 1, "sha256": "dd10b3d207191834a3e806ad2ec56cd5f69f096be9bc7f6970fd36f73dc8e398", "match": true},
+    {"stage": 2, "sha256": "null", "match": false},
+    {"stage": 3, "sha256": "null", "match": false},
+    {"stage": 4, "sha256": "null", "match": false},
+    {"stage": 5, "sha256": "null", "match": false},
+    {"stage": 6, "sha256": "null", "match": false},
+    {"stage": 7, "sha256": "null", "match": false},
+    {"stage": 8, "sha256": "null", "match": false},
+    {"stage": 9, "sha256": "null", "match": false},
+    {"stage": 10, "sha256": "null", "match": false}
   ]
 }

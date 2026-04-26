@@ -132,7 +132,7 @@ const cg_map_loop = (entries,i,acc)=>((i>=_fl_length(entries))?acc:cg_map_loop_i
 const cg_map_flat_loop_inner = (items,i,acc,k_n,v_n)=>((()=>{let k_str=cg_keyword_key(k_n);let v_js=_fl_str(cg(v_n));let pair=_fl_str(k_str,":",v_js);return cg_map_flat_loop(items,(i+2),((i===0)?pair:_fl_str(acc,",",pair)));})());;
 const cg_map_flat_loop = (items,i,acc)=>((i>=_fl_length(items))?acc:cg_map_flat_loop_inner(items,i,acc,_fl_get(items,i),_fl_get(items,(i+1))));;
 const cg_keyword_key = (n)=>((_fl_get(n,"kind")==="keyword")?js_esc(_fl_get(n,"name")):((_fl_get(n,"kind")==="literal")?js_esc(_fl_str(_fl_get(n,"value"))):(true?"\"_anon\"":null)));;
-const cg_func_block_inner = (name,fields,pnode,body)=>((()=>{let pitems=((pnode==null)?[]:_fl_get(_fl_get(pnode,"fields"),"items"));let ps=extract_params(pitems);return _fl_str("const ",name," = (",ps,")=>",cg(body),";");})());;
+const cg_func_block_inner = (name,fields,pnode,body)=>((()=>{let f=((pnode==null)?null:_fl_get(pnode,"fields"));let pitems=(((pnode==null)||nil_q(f))?[]:_fl_get(f,"items"));let ps=extract_params(pitems);return _fl_str("const ",name," = (",ps,")=>",cg(body),";");})());;
 const cg_func_block = (n)=>((()=>{let name=js_name(_fl_get(n,"name"));let fields=_fl_get(n,"fields");return cg_func_block_inner(name,fields,_fl_get(fields,"params"),_fl_get(fields,"body"));})());;
 const cg_if = (args)=>_fl_str("(",cg(_fl_get(args,0)),"?",cg(_fl_get(args,1)),":",((_fl_length(args)>=3)?cg(_fl_get(args,2)):"null"),")");;
 const cg_fn = (args)=>((()=>{let pnode=_fl_get(args,0);let body=_fl_get(args,1);let ps=extract_params(_fl_get(_fl_get(pnode,"fields"),"items"));return _fl_str("((",ps,")=>",cg(body),")");})());;

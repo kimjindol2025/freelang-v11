@@ -34909,6 +34909,52 @@ function cmdInstall(args2) {
     process.exit(1);
   }
 }
+function cmdPublish(args2) {
+  const filePath = args2[0];
+  if (!filePath) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: publish <plugin-file.fl>`);
+    process.exit(1);
+  }
+  if (!fs18.existsSync(filePath)) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
+    process.exit(1);
+  }
+  const content = fs18.readFileSync(filePath, "utf-8");
+  const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
+  const versionMatch = content.match(/^;; version:\s*(.+)$/m);
+  if (!nameMatch) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uBA54\uD0C0 \uBE14\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uD30C\uC77C \uC0C1\uB2E8\uC5D0 \uB2E4\uC74C\uC744 \uCD94\uAC00\uD558\uC138\uC694:`);
+    console.log(`  ;; plugin: <name>`);
+    console.log(`  ;; version: 1.0.0`);
+    console.log(`  ;; depends:`);
+    process.exit(1);
+  }
+  const pluginName = nameMatch[1].trim();
+  const version = versionMatch ? versionMatch[1].trim() : "1.0.0";
+  console.log(`\x1B[36m[Y5]\x1B[0m  \uBC30\uD3EC \uC911: ${pluginName} (v${version})`);
+  try {
+    const { execSync: execSync2 } = require("child_process");
+    const tmpDir = path14.resolve("/tmp", `fl-publish-${Date.now()}`);
+    fs18.mkdirSync(tmpDir, { recursive: true });
+    execSync2("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
+      cwd: tmpDir,
+      stdio: "pipe"
+    });
+    fs18.copyFileSync(filePath, path14.resolve(tmpDir, `${pluginName}.fl`));
+    execSync2(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
+    execSync2(
+      `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
+      { cwd: tmpDir, stdio: "pipe" }
+    );
+    execSync2("git push origin master", { cwd: tmpDir, stdio: "pipe" });
+    console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 '${pluginName}' \uAC8C\uC2DC \uC644\uB8CC`);
+    console.log(`\x1B[2m  \uC800\uC7A5\uC18C: https://gogs.dclub.kr/kim/fl-plugins\x1B[0m`);
+    fs18.rmSync(tmpDir, { recursive: true, force: true });
+  } catch (err4) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uBC30\uD3EC \uC2E4\uD328: ${err4.message}`);
+    process.exit(1);
+  }
+}
 function cmdServe(args2) {
   let appDir = "app";
   let port = null;
@@ -35115,6 +35161,10 @@ switch (cmd) {
   }
   case "install": {
     cmdInstall(args.slice(1));
+    break;
+  }
+  case "publish": {
+    cmdPublish(args.slice(1));
     break;
   }
   case "serve": {
