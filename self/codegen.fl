@@ -25,6 +25,15 @@
 [FUNC js-esc :params [$s]
   :body (str "\"" (js-esc-inner $s) "\"")]
 
+;; FL 예약 특수폼 (defn에서 검증)
+[FUNC fl-reserved? :params [$n]
+  :body (or (= $n "loop") (= $n "recur") (= $n "fn") (= $n "defn") (= $n "defun")
+            (= $n "if") (= $n "cond") (= $n "do") (= $n "begin") (= $n "progn")
+            (= $n "while") (= $n "and") (= $n "or") (= $n "let") (= $n "set!")
+            (= $n "define") (= $n "async") (= $n "await") (= $n "try")
+            (= $n "catch") (= $n "finally") (= $n "throw") (= $n "quote")
+            (= $n "compose") (= $n "pipe") (= $n "->") (= $n "->>") (= $n "|>"))]
+
 ;; JS 예약어 회피: let/const/default/class/etc → 뒤에 _ 추가
 [FUNC js-reserved? :params [$n]
   :body (or (= $n "default") (= $n "class") (= $n "const") (= $n "let")
@@ -171,8 +180,9 @@
 [FUNC cg-defn :params [$args]
   :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
               [$name (extract-name $name-n)]
-              [$ps (extract-params (get (get $pnode :fields) "items"))]]
-          (str "const " $name " = (" $ps ")=>" (cg $body)))]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]
+              [$warning (if (fl-reserved? $name) (str "// ⚠️  RESERVED NAME: " $name) "")]]
+          (str $warning (if (fl-reserved? $name) "\n" "") "const " $name " = (" $ps ")=>" (cg $body)))]
 
 [FUNC cg-define :params [$args]
   :body (if (= (length $args) 2)
