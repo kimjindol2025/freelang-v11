@@ -398,7 +398,7 @@
           [(= $k "range-pattern")
            (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
           [(= $k "struct-pattern")
-           (struct-pattern-test (get $pat :fields) $v 0 "")]
+           (struct-pattern-test (get $pat :fields) $v 0 nil "")]
           [true "false"])]
 
 [FUNC pattern-test :params [$pat $v]
@@ -419,45 +419,43 @@
               (if (= (length $acc) 0) $t (str $acc "||" $t))))) ]
 
 ;; struct-pattern-test: Test all fields match
-;; fields는 entries(키-패턴 쌍의 리스트)
-[FUNC struct-pattern-test :params [$fields $v $i $acc]
-  :body (if (nil-or-empty? $fields)
-          (if (= (length $acc) 0) (str "(" $v "!==null&&typeof " $v "===\"object\")")
+;; fields는 {key: pattern, ...} 형태의 객체
+[FUNC struct-pattern-test :params [$fields $v $i $keys $acc]
+  :body (if (nil? $keys)
+          (let [[$ks (json_keys $fields)]]
+            (struct-pattern-test $fields $v 0 $ks ""))
+          (if (>= $i (length $keys))
+            (if (= (length $acc) 0)
+              (str "(" $v "!==null&&typeof " $v "===\"object\")")
               (str "(" $v "!==null&&typeof " $v "===\"object\"&&" $acc ")"))
-          (let [[$entries (json_entries $fields)]
-                [$entry (if (>= $i (length $entries)) nil (get $entries $i))]
-                [$key (if (null? $entry) nil (first $entry))]
-                [$pat (if (null? $entry) nil (second $entry))]]
-            (if (null? $entry)
-              (if (= (length $acc) 0) (str "(" $v "!==null&&typeof " $v "===\"object\")")
-                  (str "(" $v "!==null&&typeof " $v "===\"object\"&&" $acc ")"))
-              (let [[$key-js (if (starts-with? $key ":") (js-esc (substring $key 1)) (js-esc $key))]
-                    [$t (pattern-test $pat (str $v "[" $key-js "]"))]]
-                (struct-pattern-test $fields $v (+ $i 1)
-                  (if (= (length $acc) 0) $t (str $acc "&&" $t)))))))]
+            (let [[$k (get $keys $i)]
+                  [$pat (get $fields $k)]
+                  [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                  [$t (pattern-test $pat (str $v "[" (js-esc $k-clean) "]"))]]
+              (struct-pattern-test $fields $v (+ $i 1) $keys
+                (if (= (length $acc) 0) $t (str $acc "&&" $t))))))]
 
 ;; pattern-bindings: JS statement that binds pattern variables from __v
 [FUNC pattern-bindings-dispatch :params [$k $pat $v]
   :body (cond
           [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
           [(= $k "struct-pattern")
-           (struct-pattern-bindings (get $pat :fields) $v 0 "")]
+           (struct-pattern-bindings (get $pat :fields) $v 0 nil "")]
           [true ""])]
 
 ;; struct-pattern-bindings: Collect bindings from all fields
-[FUNC struct-pattern-bindings :params [$fields $v $i $acc]
-  :body (if (nil-or-empty? $fields)
-          $acc
-          (let [[$entries (json_entries $fields)]
-                [$entry (if (>= $i (length $entries)) nil (get $entries $i))]
-                [$key (if (null? $entry) nil (first $entry))]
-                [$pat (if (null? $entry) nil (second $entry))]]
-            (if (null? $entry)
-              $acc
-              (let [[$key-js (if (starts-with? $key ":") (substring $key 1) $key)]
-                    [$field-bindings (pattern-bindings $pat (str $v "[" (js-esc $key-js) "]"))]]
-                (struct-pattern-bindings $fields $v (+ $i 1)
-                  (str $acc $field-bindings))))))]
+[FUNC struct-pattern-bindings :params [$fields $v $i $keys $acc]
+  :body (if (nil? $keys)
+          (let [[$ks (json_keys $fields)]]
+            (struct-pattern-bindings $fields $v 0 $ks ""))
+          (if (>= $i (length $keys))
+            $acc
+            (let [[$k (get $keys $i)]
+                  [$pat (get $fields $k)]
+                  [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                  [$field-bindings (pattern-bindings $pat (str $v "[" (js-esc $k-clean) "]"))]]
+              (struct-pattern-bindings $fields $v (+ $i 1) $keys
+                (str $acc $field-bindings)))))]
 
 [FUNC pattern-bindings :params [$pat $v]
   :body (pattern-bindings-dispatch (get $pat :kind) $pat $v)]
