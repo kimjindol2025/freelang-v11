@@ -1235,6 +1235,57 @@ function cmdRegistry(registryArgs: string[]): void {
   }
 }
 
+// Y5: 플러그인 설치 커맨드
+function cmdInstall(args: string[]): void {
+  const pluginName = args[0];
+  if (!pluginName) {
+    console.error(`\x1b[31m오류\x1b[0m  플러그인 이름을 지정하세요: install <plugin-name>`);
+    process.exit(1);
+  }
+
+  const homeDir = require("os").homedir();
+  const pluginsDir = path.resolve(homeDir, ".fl", "plugins");
+
+  // ~/.fl/plugins 디렉토리 생성
+  if (!fs.existsSync(pluginsDir)) {
+    fs.mkdirSync(pluginsDir, { recursive: true });
+    console.log(`\x1b[36m[Y5]\x1b[0m  플러그인 디렉토리 생성: ${pluginsDir}`);
+  }
+
+  // 현재 프로젝트에서 plugins/NAME.fl 찾기 또는 내장 stdlib에서 찾기
+  const localPath = path.resolve(process.cwd(), "plugins", pluginName + ".fl");
+  const stdlibPath = path.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
+  const installedPath = path.resolve(pluginsDir, pluginName + ".fl");
+
+  let sourceFile: string | null = null;
+
+  if (fs.existsSync(localPath)) {
+    sourceFile = localPath;
+    console.log(`\x1b[36m[Y5]\x1b[0m  로컬 플러그인 찾음: ${localPath}`);
+  } else if (fs.existsSync(stdlibPath)) {
+    sourceFile = stdlibPath;
+    console.log(`\x1b[36m[Y5]\x1b[0m  내장 stdlib 플러그인 찾음: ${stdlibPath}`);
+  } else {
+    // TODO: 원격 레지스트리에서 다운로드
+    console.error(`\x1b[31m오류\x1b[0m  플러그인을 찾을 수 없습니다: ${pluginName}`);
+    console.log(`  시도한 경로:`);
+    console.log(`    - ${localPath}`);
+    console.log(`    - ${stdlibPath}`);
+    process.exit(1);
+  }
+
+  // 플러그인 복사
+  try {
+    const content = fs.readFileSync(sourceFile, "utf-8");
+    fs.writeFileSync(installedPath, content, "utf-8");
+    console.log(`\x1b[32m✓\x1b[0m  플러그인 설치 완료: ${installedPath}`);
+    console.log(`\x1b[2m  사용: (use ${pluginName})\x1b[0m`);
+  } catch (err: any) {
+    console.error(`\x1b[31m오류\x1b[0m  설치 실패: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 function cmdServe(args: string[]): void {
   // Phase 3: freelang serve [appDir] [--app app] [--port 3000] [--mode ssr|isr|ssg]
   let appDir = "app";
@@ -1448,6 +1499,11 @@ switch (cmd) {
   case "registry": {
     // Phase 7: freelang registry start [--port 4873] | status
     cmdRegistry(args.slice(1));
+    break;
+  }
+  case "install": {
+    // Y5: freelang install <plugin-name>
+    cmdInstall(args.slice(1));
     break;
   }
   case "serve": {

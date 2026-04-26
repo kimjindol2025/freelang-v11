@@ -69,8 +69,15 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       if ((arg as any).kind === "literal") name = String((arg as any).value);
       else if ((arg as any).kind === "variable") name = String((arg as any).name).replace(/^\$/, "");
       if (!name) throwInvalidForm("use", "module name must be symbol or string", expr.line);
-      // 후보: self/stdlib/NAME.fl 우선, 없으면 NAME.fl 직접
+      // Y5: 플러그인 탐색 경로 (우선순위)
+      // 1. ./plugins/NAME.fl (로컬)
+      // 2. ~/.fl/plugins/NAME.fl (글로벌)
+      // 3. self/stdlib/NAME.fl (내장)
+      // 4. NAME.fl (프로젝트)
+      const homeDir = require("os").homedir();
       const candidates = [
+        path.resolve(process.cwd(), "plugins", name + ".fl"),
+        path.resolve(homeDir, ".fl", "plugins", name + ".fl"),
         path.resolve(process.cwd(), "self/stdlib", name + ".fl"),
         path.resolve(process.cwd(), name + ".fl"),
         path.resolve(process.cwd(), name),
