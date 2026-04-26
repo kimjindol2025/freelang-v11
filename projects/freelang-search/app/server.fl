@@ -9,6 +9,7 @@
 (load "projects/freelang-search/lib/config.fl")
 (load "projects/freelang-search/lib/index-store.fl")
 (load "projects/freelang-search/lib/searcher.fl")
+(load "projects/freelang-search/lib/indexer.fl")
 
 (define cfg (freelang-search-config))
 (define DB (get $cfg "db"))
@@ -65,6 +66,18 @@
 [FUNC handle-fs-stats :params [$req]
   :body (server_json (fs-stats $DB))]
 
+;; 단일 source 재인덱싱 — POST /reindex/:source
+[FUNC handle-fs-reindex-one :params [$req]
+  :body (let [
+    source (server_req_param $req "source")
+    result (fs-reindex-source $DB $cfg $source)
+  ]
+    (server_json $result))]
+
+;; 전체 재인덱싱 — POST /reindex
+[FUNC handle-fs-reindex-all :params [$req]
+  :body (server_json (fs-reindex-all $DB $cfg))]
+
 [FUNC handle-fs-health :params [$req]
   :body (server_json {:status "ok" :db $DB :ts (now_ms)})]
 
@@ -73,6 +86,8 @@
 (server_get "/doc/:id" "handle-fs-doc")
 (server_get "/stats" "handle-fs-stats")
 (server_get "/health" "handle-fs-health")
+(server_post "/reindex" "handle-fs-reindex-all")
+(server_post "/reindex/:source" "handle-fs-reindex-one")
 
 (println (str "[freelang-search] db=" $DB " port=" (get $cfg "port")))
 (server_start (get $cfg "port"))

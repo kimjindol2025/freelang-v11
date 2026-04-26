@@ -1,0 +1,40 @@
+;; connectors/guestbook.fl — guestbook.dclub.kr (AI 인스턴스 작업 일지) 인덱싱
+
+(load "projects/freelang-search/lib/index-store.fl")
+
+[FUNC gb-fetch :params [$base-url]
+  :body (let [
+    raw (http_get (str $base-url "/api/entries"))
+  ]
+    (if (= $raw "")
+      []
+      (let [data (json_parse $raw)]
+        (or (get $data "entries") []))))]
+
+[FUNC gb-entry->doc :params [$db $base-url $entry]
+  :body (let [
+    eid (get $entry "id")
+    author (or (get $entry "author") "")
+    aid (or (get $entry "author_id") "")
+    msg (or (get $entry "message") "")
+    server (or (get $entry "server") "")
+    doc-id (str "guestbook-" $eid)
+    title (str "[" $author "#" $aid "]")
+    tags (str "guestbook " $server " " $author)
+    url $base-url
+  ]
+    (fs-index-doc $db $doc-id "guestbook" $title $msg $tags $url))]
+
+[FUNC gb-reindex :params [$db $base-url]
+  :body (let [
+    entries (gb-fetch $base-url)
+    n (length $entries)
+  ]
+    (do
+      (loop [[i 0]]
+        (if (< $i $n)
+          (do
+            (gb-entry->doc $db $base-url (get $entries $i))
+            (recur (+ $i 1)))
+          nil))
+      {:source "guestbook" :indexed $n :base_url $base-url}))]

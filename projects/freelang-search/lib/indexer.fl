@@ -1,0 +1,28 @@
+;; indexer.fl — 모든 connector 통합 wrapper
+
+(load "projects/freelang-search/lib/connectors/blog.fl")
+(load "projects/freelang-search/lib/connectors/guestbook.fl")
+(load "projects/freelang-search/lib/connectors/audit.fl")
+
+;; 단일 source 재인덱싱 (이름으로 dispatch)
+[FUNC fs-reindex-source :params [$db $cfg $source]
+  :body (cond
+    [(= $source "blog")
+      (blog-reindex $db (get $cfg "blog_url"))]
+    [(= $source "guestbook")
+      (gb-reindex $db (get $cfg "guestbook_url"))]
+    [(= $source "audit")
+      (audit-reindex $db (get $cfg "auth_db") (get $cfg "audit_limit"))]
+    [true {:error "unknown_source" :source $source}])]
+
+;; 전체 재인덱싱
+[FUNC fs-reindex-all :params [$db $cfg]
+  :body (let [
+    r1 (blog-reindex $db (get $cfg "blog_url"))
+    r2 (gb-reindex $db (get $cfg "guestbook_url"))
+    r3 (audit-reindex $db (get $cfg "auth_db") (get $cfg "audit_limit"))
+  ]
+    {:results [$r1 $r2 $r3]
+     :total (+ (or (get $r1 "indexed") 0)
+               (+ (or (get $r2 "indexed") 0)
+                  (or (get $r3 "indexed") 0)))})]
