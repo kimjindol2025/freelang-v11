@@ -6,6 +6,44 @@
 
 ---
 
+## 🛠️ CLI 도구 — freelang-v11-cli
+
+### 파일 위치
+| 파일 | 설명 |
+|---|---|
+| `bin/freelang` | 실행 진입점 (Node.js CJS) |
+| `package-cli.json` | npm 패키지 메타 (`freelang-cli@1.0.0`) |
+| `freelang-cli-1.0.0.tgz` | npm pack 결과물 (11.1kB) |
+| `src/CLI.md` | CLI 설계 및 사용법 문서 |
+| `src/CLI-DEPLOYMENT.md` | npm 배포 가이드 |
+
+### 지원 커맨드 (모두 동작 검증 완료)
+```bash
+freelang new myapp            # 프로젝트 생성 (express-api 기본)
+freelang new myapp --websocket # WebSocket 템플릿
+freelang new myapp --agent    # AI 에이전트 템플릿
+freelang dev                  # 개발 서버 + hot reload
+freelang build                # 프로덕션 빌드
+freelang test                 # 테스트 실행
+freelang deploy               # gogs 푸시 + 배포
+freelang migrate              # DB 스키마 마이그레이션
+```
+
+### 설치
+```bash
+# tgz 로컬 설치
+npm install -g ./freelang-cli-1.0.0.tgz
+
+# npm 글로벌 (배포 후)
+npm install -g freelang-cli
+```
+
+### 특이사항
+- `templates/` 디렉터리 없음 — `new` 커맨드가 파일 내용을 인라인으로 보유
+- `package-cli.json` 을 `package.json` 으로 복사 후 `npm publish`
+
+---
+
 ## 📊 Year 2 라운드 1 진척 (2026-04-26)
 
 **점수**: 87.5 → **95/100 (A+)** 도달.
