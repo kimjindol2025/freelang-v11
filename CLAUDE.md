@@ -6,6 +6,37 @@
 
 ---
 
+## 📊 Year 2 라운드 1 진척 (2026-04-26)
+
+**점수**: 87.5 → **95/100 (A+)** 도달.
+
+**자체호스팅 진척**:
+- **Y4-1**: `make run` (`scripts/fl-run.sh`) — bootstrap 우회 stage1 직접 실행 ✅
+- **Y4-2 단계A**: `self/runtime/http-server.js` (23KB CJS bundle, esbuild) ✅
+- **Y4-3 단계A**: `self/runtime/interpreter.js` (1.1MB, Interpreter+lex+parse 단일 번들) ✅
+- **Y4-3 단계B**: `self/runtime/repl.js` + `make repl` — **bootstrap 의존 제거 완료** ✅
+- 빌드: `make build-runtime` → `scripts/build-runtime.sh` (esbuild)
+
+**property-based testing** (Y3++++): **200 invariant × N case** 검증 인프라 ✅
+- `scripts/property-test.js`, `make property-test ARGS=--n=10`
+- KPI 1000 의 20% 도달, P0-1 nil 회귀 가드 (I014, I048, I078, I086, I090)
+
+**미해결 (별도 PR)**:
+- Y4-2 단계B: stage1 codegen prelude 변경 → SHA256 재baseline
+- 4건 codegen 개선 후보: `docs/CODEGEN_IMPROVEMENTS.md` (C1~C4)
+- Y5 plugin 시스템 (3주 설계 시점)
+
+**검증 명령**:
+```bash
+make verify-all                    # 4 검증 통합 (~3.8분)
+make property-test ARGS=--n=10     # 200 invariant × 10 = 2000 case
+make build-runtime                 # self/runtime/ 재빌드
+make repl                          # self/runtime/repl.js 직접 실행
+sha256sum stage1.js                # 5877b966... 보존 확인
+```
+
+---
+
 ## 📊 실측 상태 (2026-04-25 AI 1~5 + Phase A~E + Phase 4 self-host 회복 완료)
 
 ### "AI가 FreeLang을 잘 쓰게 하기" — AI-1~5 완료
