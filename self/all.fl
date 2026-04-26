@@ -1243,6 +1243,8 @@
 
             ;; ─── Type predicates (10) ───
             [(= $op "null?") (str "(" $as "==null)")]
+            [(= $op "nil?") (str "_fl_nil_q(" $as ")")]
+            [(= $op "nil-or-empty?") (str "_fl_nil_or_empty_q(" $as ")")]
             [(= $op "not") (str "(!" $as ")")]
             [(= $op "empty?") (str "_fl_empty_q(" $as ")")]
             [(= $op "true?") (str "(" $as "===true)")]
@@ -1476,6 +1478,8 @@
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
     "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
+    "const _fl_nil_q = (x) => (x == null || x === undefined);"
+    "const _fl_nil_or_empty_q = (x) => (x == null || x === undefined || (x && x.length === 0));"
     "const __argv__ = process.argv.slice(2);")]
 
 [FUNC prelude-db-server :params []
@@ -1502,7 +1506,7 @@
   :body [(prelude-string) (prelude-list) (prelude-map) (prelude-time-regex) (prelude-io-misc) (prelude-db-server)]]
 
 [FUNC runtime-prelude :params []
-  :body (reduce (fn [$acc $part] (str $acc $part)) "" (prelude-parts))]
+  :body (str "const nil = null;" (reduce (fn [$acc $part] (str $acc $part)) "" (prelude-parts)))]
 
 ;; ═══════ 최상위 ═══════
 
