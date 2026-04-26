@@ -151,7 +151,7 @@ describe("v11.1 — function styles", () => {
 
 describe("v11.1 — Strict variable resolution", () => {
   test("undefined $var throws", () => {
-    expect(() => run("(+ $undefined_x 1)")).toThrow(/Undefined variable/);
+    expect(() => run("(+ $undefined_x 1)")).toThrow(/E_UNDEFINED_VAR|Undefined variable/);
   });
   test("defined $var works", () => {
     expect(run("(define $x 42) (+ $x 0)")).toBe(42);
