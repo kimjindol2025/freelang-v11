@@ -251,15 +251,59 @@ function renderStdlibMini(groups) {
 // 메인
 // ─────────────────────────────────────────────────────────────
 
+// Y5: 플러그인 함수 스캔
+function scanPlugins() {
+  const homeDir = require("os").homedir();
+  const pluginsDir = path.resolve(homeDir, ".fl", "plugins");
+
+  const pluginSigs = [];
+  if (!fs.existsSync(pluginsDir)) {
+    return pluginSigs; // 플러그인 디렉토리 없으면 빈 배열
+  }
+
+  try {
+    const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith(".fl"));
+    for (const file of files) {
+      const filePath = path.join(pluginsDir, file);
+      const content = fs.readFileSync(filePath, "utf-8");
+
+      // [FUNC plugin/name :params [...] :body ...]에서 함수 추출
+      const funcRegex = /\[FUNC\s+(\w+\/[\w-]+)\s+:params\s*\[(.*?)\]/g;
+      let match;
+      while ((match = funcRegex.exec(content)) !== null) {
+        const funcName = match[1];
+        const params = match[2].trim();
+        pluginSigs.push({
+          name: funcName,
+          params: params || undefined,
+          returns: "any",
+          module: funcName.split("/")[0], // 플러그인명
+          isPlugin: true
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️  플러그인 스캔 실패: ${err.message}`);
+  }
+
+  return pluginSigs;
+}
+
 function generate(mode) {
   if (!fs.existsSync(SIGS_PATH)) {
     console.error(`❌ ${SIGS_PATH} not found. Run \`npm run build\` first.`);
     process.exit(1);
   }
   const sigs = JSON.parse(fs.readFileSync(SIGS_PATH, "utf-8"));
-  const groups = groupByModule(sigs);
+
+  // Y5: 플러그인 함수 추가
+  const pluginSigs = scanPlugins();
+  const allSigs = [...sigs, ...pluginSigs];
+
+  const groups = groupByModule(allSigs);
   const moduleCount = groups.size;
-  const fnCount = sigs.length;
+  const fnCount = allSigs.length;
+  const pluginCount = pluginSigs.length;
 
   const isMini = mode === "mini" || mode === "minimal";
   const stdlibSection = isMini ? renderStdlibMini(groups) : renderStdlibFull(groups);
@@ -268,14 +312,21 @@ function generate(mode) {
     .replace("M_MODULES", String(moduleCount));
 
   const generatedAt = new Date().toISOString();
-  const content = HEADER + stdlibHeader + stdlibSection + FOOTER.replace("GENERATED_AT", generatedAt);
+  let content = HEADER + stdlibHeader + stdlibSection + FOOTER.replace("GENERATED_AT", generatedAt);
+
+  // Y5: 플러그인 섹션 추가
+  if (pluginCount > 0) {
+    const pluginSection = `\n\n## Y5: 플러그인 (${pluginCount}개)\n\nFreeLang 플러그인 시스템(Y5)에서 제공하는 추가 함수들:\n`;
+    const pluginFuncs = pluginSigs.map(s => `- \`(${s.name}${s.params ? " " + s.params : ""})\``).join("\n");
+    content = content.replace(FOOTER.replace("GENERATED_AT", generatedAt), pluginSection + pluginFuncs + "\n\n" + FOOTER.replace("GENERATED_AT", generatedAt));
+  }
 
   const outPath = isMini ? OUT_MINI : OUT_FULL;
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, content, "utf-8");
 
   const tokenEstimate = Math.ceil(content.length / 4);
-  console.log(`ai_prompt=${isMini ? "mini" : "full"} bytes=${content.length} tokens~${tokenEstimate} fns=${fnCount} mods=${moduleCount}`);
+  console.log(`ai_prompt=${isMini ? "mini" : "full"} bytes=${content.length} tokens~${tokenEstimate} fns=${fnCount}(+${pluginCount} plugins) mods=${moduleCount}`);
 }
 
 function main() {

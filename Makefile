@@ -79,3 +79,17 @@ lint-aliases:
 clean:
 	@rm -f stage1-new.js /tmp/stage*.js /tmp/*-results.json
 	@echo "임시 파일 정리 완료"
+
+# Y5: 플러그인 설치 + AI 프롬프트 갱신
+install-plugin:
+	@if [ -z "$(NAME)" ]; then \
+		echo "사용: make install-plugin NAME=<plugin-name>"; \
+		exit 1; \
+	fi
+	@$(NODE) bin/freelang install $(NAME)
+	@$(MAKE) gen-ai-prompt
+	@echo "✓ 플러그인 '$(NAME)' 설치 + AI 프롬프트 갱신 완료"
+
+# Y5: AI 시스템 프롬프트 생성 (stdlib + plugins)
+gen-ai-prompt:
+	@$(NODE) scripts/gen-ai-prompt.js
