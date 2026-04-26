@@ -1286,6 +1286,107 @@ function cmdInstall(args: string[]): void {
   }
 }
 
+async function cmdPublish(args: string[]): Promise<void> {
+  const filePath = args[0];
+  if (!filePath) {
+    console.error(`\x1b[31m오류\x1b[0m  플러그인 파일을 지정하세요: publish <plugin-file.fl>`);
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(filePath)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+    process.exit(1);
+  }
+
+  // 파일 읽기 및 메타 파싱
+  const content = fs.readFileSync(filePath, "utf-8");
+  const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
+  const versionMatch = content.match(/^;; version:\s*(.+)$/m);
+
+  if (!nameMatch) {
+    console.error(`\x1b[31m오류\x1b[0m  플러그인 메타 블록이 없습니다. 파일 상단에 다음을 추가하세요:`);
+    console.log(`  ;; plugin: <name>`);
+    console.log(`  ;; version: 1.0.0`);
+    console.log(`  ;; depends:`);
+    process.exit(1);
+  }
+
+  const pluginName = nameMatch[1].trim();
+  const version = versionMatch ? versionMatch[1].trim() : "1.0.0";
+
+  console.log(`\x1b[36m[Y5]\x1b[0m  배포 중: ${pluginName} (v${version})`);
+
+  // gogs API로 업로드
+  try {
+    const gitCredsPath = path.resolve(require("os").homedir(), ".git-credentials");
+    const gitCreds = fs.readFileSync(gitCredsPath, "utf-8");
+    const gogsLine = gitCreds.split("\n").find(line => line.includes("gogs.dclub.kr"));
+    const tokenMatch = gogsLine ? gogsLine.match(/kim:(.+)@/) : null;
+    if (!tokenMatch) {
+      throw new Error("gogs 토큰을 찾을 수 없습니다");
+    }
+    const token = tokenMatch[1];
+
+    const https = require("https");
+    const contentB64 = Buffer.from(content).toString("base64");
+
+    const data = JSON.stringify({
+      message: `Add plugin: ${pluginName} v${version}`,
+      content: contentB64,
+      author: {
+        name: "FreeLang CLI",
+        email: "cli@freelang.dev",
+      },
+    });
+
+    const url = new URL(
+      `/api/v1/repos/kim/fl-plugins/contents/${pluginName}.fl`,
+      "https://gogs.dclub.kr"
+    );
+
+    const req = https.request(url, {
+      method: "PUT",
+      headers: {
+        "Authorization": `token ${token}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(data),
+      },
+    });
+
+    req.on("response", (res: any) => {
+      let responseData = "";
+      res.on("data", (chunk: any) => {
+        responseData += chunk;
+      });
+      res.on("end", () => {
+        if (res.statusCode === 200 || res.statusCode === 201) {
+          console.log(`\x1b[32m✓\x1b[0m  플러그인 '${pluginName}' 게시 완료`);
+          console.log(
+            `\x1b[2m  저장소: https://gogs.dclub.kr/kim/fl-plugins/blob/master/${pluginName}.fl\x1b[0m`
+          );
+        } else {
+          console.error(
+            `\x1b[31m오류\x1b[0m  gogs API 응답 오류 (${res.statusCode})`
+          );
+          console.error(responseData);
+          process.exit(1);
+        }
+      });
+    });
+
+    req.on("error", (err: any) => {
+      console.error(`\x1b[31m오류\x1b[0m  업로드 실패: ${err.message}`);
+      process.exit(1);
+    });
+
+    req.write(data);
+    req.end();
+  } catch (err: any) {
+    console.error(`\x1b[31m오류\x1b[0m  배포 실패: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 function cmdServe(args: string[]): void {
   // Phase 3: freelang serve [appDir] [--app app] [--port 3000] [--mode ssr|isr|ssg]
   let appDir = "app";
@@ -1504,6 +1605,14 @@ switch (cmd) {
   case "install": {
     // Y5: freelang install <plugin-name>
     cmdInstall(args.slice(1));
+    break;
+  }
+  case "publish": {
+    // Y5: freelang publish <plugin-file.fl>
+    cmdPublish(args.slice(1)).catch((err) => {
+      console.error(`\x1b[31m오류\x1b[0m  ${err.message}`);
+      process.exit(1);
+    });
     break;
   }
   case "serve": {
