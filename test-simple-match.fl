@@ -1,0 +1,4 @@
+;; 가장 간단한 match 테스트
+(match 42
+  (42 "forty-two")
+  (_ "other"))
