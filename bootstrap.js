@@ -11202,6 +11202,8 @@ function flExecOpNative(op, vals) {
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
+    case "nil-or-empty?":
+      return v0 === null || v0 === void 0 || v0 && v0.length === 0;
     case "true?":
       return v0 === true;
     case "false?":
@@ -12119,6 +12121,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "nil?":
     case "null?":
       return args2[0] === null || args2[0] === void 0;
+    case "nil-or-empty?":
+      return args2[0] === null || args2[0] === void 0 || args2[0] && args2[0].length === 0;
     case "zero?":
       return args2[0] === 0;
     case "pos?":
