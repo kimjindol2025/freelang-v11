@@ -1286,7 +1286,7 @@ function cmdInstall(args: string[]): void {
   }
 }
 
-async function cmdPublish(args: string[]): Promise<void> {
+function cmdPublish(args: string[]): void {
   const filePath = args[0];
   if (!filePath) {
     console.error(`\x1b[31m오류\x1b[0m  플러그인 파일을 지정하세요: publish <plugin-file.fl>`);
@@ -1298,7 +1298,6 @@ async function cmdPublish(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // 파일 읽기 및 메타 파싱
   const content = fs.readFileSync(filePath, "utf-8");
   const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
   const versionMatch = content.match(/^;; version:\s*(.+)$/m);
@@ -1316,71 +1315,33 @@ async function cmdPublish(args: string[]): Promise<void> {
 
   console.log(`\x1b[36m[Y5]\x1b[0m  배포 중: ${pluginName} (v${version})`);
 
-  // gogs API로 업로드
   try {
-    const gitCredsPath = path.resolve(require("os").homedir(), ".git-credentials");
-    const gitCreds = fs.readFileSync(gitCredsPath, "utf-8");
-    const gogsLine = gitCreds.split("\n").find(line => line.includes("gogs.dclub.kr"));
-    const tokenMatch = gogsLine ? gogsLine.match(/kim:(.+)@/) : null;
-    if (!tokenMatch) {
-      throw new Error("gogs 토큰을 찾을 수 없습니다");
-    }
-    const token = tokenMatch[1];
+    const { execSync } = require("child_process");
+    const tmpDir = path.resolve("/tmp", `fl-publish-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
 
-    const https = require("https");
-    const contentB64 = Buffer.from(content).toString("base64");
-
-    const data = JSON.stringify({
-      message: `Add plugin: ${pluginName} v${version}`,
-      content: contentB64,
-      author: {
-        name: "FreeLang CLI",
-        email: "cli@freelang.dev",
-      },
+    // 저장소 clone
+    execSync("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
+      cwd: tmpDir,
+      stdio: "pipe",
     });
 
-    const url = new URL(
-      `/api/v1/repos/kim/fl-plugins/contents/${pluginName}.fl`,
-      "https://gogs.dclub.kr"
+    // 플러그인 파일 복사
+    fs.copyFileSync(filePath, path.resolve(tmpDir, `${pluginName}.fl`));
+
+    // git add, commit, push
+    execSync(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
+    execSync(
+      `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
+      { cwd: tmpDir, stdio: "pipe" }
     );
+    execSync("git push origin master", { cwd: tmpDir, stdio: "pipe" });
 
-    const req = https.request(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `token ${token}`,
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(data),
-      },
-    });
+    console.log(`\x1b[32m✓\x1b[0m  플러그인 '${pluginName}' 게시 완료`);
+    console.log(`\x1b[2m  저장소: https://gogs.dclub.kr/kim/fl-plugins\x1b[0m`);
 
-    req.on("response", (res: any) => {
-      let responseData = "";
-      res.on("data", (chunk: any) => {
-        responseData += chunk;
-      });
-      res.on("end", () => {
-        if (res.statusCode === 200 || res.statusCode === 201) {
-          console.log(`\x1b[32m✓\x1b[0m  플러그인 '${pluginName}' 게시 완료`);
-          console.log(
-            `\x1b[2m  저장소: https://gogs.dclub.kr/kim/fl-plugins/blob/master/${pluginName}.fl\x1b[0m`
-          );
-        } else {
-          console.error(
-            `\x1b[31m오류\x1b[0m  gogs API 응답 오류 (${res.statusCode})`
-          );
-          console.error(responseData);
-          process.exit(1);
-        }
-      });
-    });
-
-    req.on("error", (err: any) => {
-      console.error(`\x1b[31m오류\x1b[0m  업로드 실패: ${err.message}`);
-      process.exit(1);
-    });
-
-    req.write(data);
-    req.end();
+    // 임시 디렉토리 정리
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   } catch (err: any) {
     console.error(`\x1b[31m오류\x1b[0m  배포 실패: ${err.message}`);
     process.exit(1);
@@ -1609,10 +1570,7 @@ switch (cmd) {
   }
   case "publish": {
     // Y5: freelang publish <plugin-file.fl>
-    cmdPublish(args.slice(1)).catch((err) => {
-      console.error(`\x1b[31m오류\x1b[0m  ${err.message}`);
-      process.exit(1);
-    });
+    cmdPublish(args.slice(1));
     break;
   }
   case "serve": {

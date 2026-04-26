@@ -17651,7 +17651,10 @@ function evalSpecialForm(interp2, op, expr) {
       if (arg.kind === "literal") name = String(arg.value);
       else if (arg.kind === "variable") name = String(arg.name).replace(/^\$/, "");
       if (!name) throwInvalidForm("use", "module name must be symbol or string", expr.line);
+      const homeDir = require("os").homedir();
       const candidates = [
+        path15.resolve(process.cwd(), "plugins", name + ".fl"),
+        path15.resolve(homeDir, ".fl", "plugins", name + ".fl"),
         path15.resolve(process.cwd(), "self/stdlib", name + ".fl"),
         path15.resolve(process.cwd(), name + ".fl"),
         path15.resolve(process.cwd(), name)
@@ -34867,6 +34870,45 @@ function cmdRegistry(registryArgs) {
     process.exit(1);
   }
 }
+function cmdInstall(args2) {
+  const pluginName = args2[0];
+  if (!pluginName) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC774\uB984\uC744 \uC9C0\uC815\uD558\uC138\uC694: install <plugin-name>`);
+    process.exit(1);
+  }
+  const homeDir = require("os").homedir();
+  const pluginsDir = path14.resolve(homeDir, ".fl", "plugins");
+  if (!fs18.existsSync(pluginsDir)) {
+    fs18.mkdirSync(pluginsDir, { recursive: true });
+    console.log(`\x1B[36m[Y5]\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uB514\uB809\uD1A0\uB9AC \uC0DD\uC131: ${pluginsDir}`);
+  }
+  const localPath = path14.resolve(process.cwd(), "plugins", pluginName + ".fl");
+  const stdlibPath = path14.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
+  const installedPath = path14.resolve(pluginsDir, pluginName + ".fl");
+  let sourceFile = null;
+  if (fs18.existsSync(localPath)) {
+    sourceFile = localPath;
+    console.log(`\x1B[36m[Y5]\x1B[0m  \uB85C\uCEEC \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${localPath}`);
+  } else if (fs18.existsSync(stdlibPath)) {
+    sourceFile = stdlibPath;
+    console.log(`\x1B[36m[Y5]\x1B[0m  \uB0B4\uC7A5 stdlib \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${stdlibPath}`);
+  } else {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${pluginName}`);
+    console.log(`  \uC2DC\uB3C4\uD55C \uACBD\uB85C:`);
+    console.log(`    - ${localPath}`);
+    console.log(`    - ${stdlibPath}`);
+    process.exit(1);
+  }
+  try {
+    const content = fs18.readFileSync(sourceFile, "utf-8");
+    fs18.writeFileSync(installedPath, content, "utf-8");
+    console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC124\uCE58 \uC644\uB8CC: ${installedPath}`);
+    console.log(`\x1B[2m  \uC0AC\uC6A9: (use ${pluginName})\x1B[0m`);
+  } catch (err4) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC124\uCE58 \uC2E4\uD328: ${err4.message}`);
+    process.exit(1);
+  }
+}
 function cmdServe(args2) {
   let appDir = "app";
   let port = null;
@@ -35069,6 +35111,10 @@ switch (cmd) {
   }
   case "registry": {
     cmdRegistry(args.slice(1));
+    break;
+  }
+  case "install": {
+    cmdInstall(args.slice(1));
     break;
   }
   case "serve": {
