@@ -3151,6 +3151,9 @@ function buildLintContext(ast, source) {
   const builtins = [
     "print",
     "println",
+    "help",
+    "fns",
+    "fns-all",
     "+",
     "-",
     "*",
@@ -3282,6 +3285,9 @@ function buildLintContext(ast, source) {
     "sqrt": 1,
     "print": 1,
     "println": 1,
+    "help": 1,
+    "fns": 1,
+    "fns-all": 0,
     "+": 2,
     "-": 2,
     "*": 2,
@@ -11257,6 +11263,48 @@ function flExecOpNative(op, vals) {
     case "println":
       console.log(...vals.map((v) => v === null ? "null" : String(v)));
       return null;
+    case "help": {
+      const sigs = require("/home/kimjin/freelang-v11/src/_stdlib-signatures.json");
+      const q = String(v0 ?? "").toLowerCase();
+      if (!q) {
+        console.log("사용법: (help \"함수명\")  (fns \"접두어\")  (fns-all)");
+        return null;
+      }
+      const hits = sigs.filter((s) => s.name.toLowerCase() === q || s.name.toLowerCase().includes(q));
+      if (hits.length === 0) {
+        console.log(`[help] '${q}' 에 해당하는 함수를 찾을 수 없습니다.`);
+        return null;
+      }
+      for (const s of hits) {
+        console.log(`\x1b[36m${s.name}\x1b[0m \x1b[90m[${s.module}]\x1b[0m`);
+        console.log(`  인자: (${s.name} ${s.params})`);
+        console.log(`  반환: ${s.returns}`);
+      }
+      return null;
+    }
+    case "fns": {
+      const sigs = require("/home/kimjin/freelang-v11/src/_stdlib-signatures.json");
+      const prefix = String(v0 ?? "").toLowerCase();
+      const hits = sigs.filter((s) => s.name.toLowerCase().startsWith(prefix));
+      if (hits.length === 0) { console.log(`[fns] '${prefix}' 로 시작하는 함수 없음`); return null; }
+      const cols = hits.map((s) => `\x1b[36m${s.name}\x1b[0m`).join("  ");
+      console.log(cols);
+      console.log(`\x1b[90m총 ${hits.length}개\x1b[0m`);
+      return hits.map((s) => s.name);
+    }
+    case "fns-all": {
+      const sigs = require("/home/kimjin/freelang-v11/src/_stdlib-signatures.json");
+      const byMod = {};
+      for (const s of sigs) {
+        if (!byMod[s.module]) byMod[s.module] = [];
+        byMod[s.module].push(s.name);
+      }
+      for (const [mod, names] of Object.entries(byMod)) {
+        console.log(`\x1b[33m[${mod}]\x1b[0m ${names.join("  ")}`);
+      }
+      console.log(`\x1b[90m총 ${sigs.length}개\x1b[0m`);
+      return null;
+    }
     case "substring":
       return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== void 0 ? Number(v2) : void 0) : "";
     case "char-at":
@@ -13109,6 +13157,39 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return maybeSelect(list);
     }
     default: {
+      // ── help / fns / fns-all ────────────────────────────────
+      if (op === "help" || op === "fns" || op === "fns-all") {
+        const path2 = require("path");
+        const sigPath = path2.resolve(__dirname || "/home/kimjin/freelang-v11", "src/_stdlib-signatures.json");
+        let sigs = [];
+        try { sigs = require(sigPath); } catch (_) {}
+        if (op === "help") {
+          const q = String(args2[0] ?? "").toLowerCase();
+          if (!q) { console.log("사용법: (help \"함수명\")  (fns \"접두어\")  (fns-all)"); return null; }
+          const hits = sigs.filter((s) => s.name.toLowerCase() === q || s.name.toLowerCase().includes(q));
+          if (!hits.length) { console.log(`\x1b[31m[help]\x1b[0m '${q}' 없음`); return null; }
+          for (const s of hits) {
+            console.log(`\x1b[36m${s.name}\x1b[0m  \x1b[90m[${s.module}]\x1b[0m`);
+            console.log(`  \x1b[33m(${s.name} ${s.params})\x1b[0m  →  ${s.returns}`);
+          }
+          return null;
+        }
+        if (op === "fns") {
+          const prefix = String(args2[0] ?? "").toLowerCase();
+          const hits = sigs.filter((s) => s.name.toLowerCase().startsWith(prefix));
+          if (!hits.length) { console.log(`\x1b[31m[fns]\x1b[0m '${prefix}' 로 시작하는 함수 없음`); return null; }
+          console.log(hits.map((s) => `\x1b[36m${s.name}\x1b[0m`).join("  "));
+          console.log(`\x1b[90m총 ${hits.length}개\x1b[0m`);
+          return hits.map((s) => s.name);
+        }
+        if (op === "fns-all") {
+          const byMod = {};
+          for (const s of sigs) { if (!byMod[s.module]) byMod[s.module] = []; byMod[s.module].push(s.name); }
+          for (const [mod, names] of Object.entries(byMod)) console.log(`\x1b[33m[${mod}]\x1b[0m ${names.join("  ")}`);
+          console.log(`\x1b[90m총 ${sigs.length}개\x1b[0m`);
+          return null;
+        }
+      }
       if (interp2.context.functions.has(op)) {
         return callUser(op, args2);
       }
