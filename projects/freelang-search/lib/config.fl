@@ -1,0 +1,11 @@
+;; config.fl — freelang-search 설정 (env-based)
+
+[FUNC fs-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC freelang-search-config :params []
+  :body {
+    :db (fs-config-get "FREELANG_SEARCH_DB" "/tmp/freelang-search.db")
+    :port (* (fs-config-get "FREELANG_SEARCH_PORT" "30180") 1)
+  }]

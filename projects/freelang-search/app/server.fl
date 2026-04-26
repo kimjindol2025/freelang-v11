@@ -1,0 +1,78 @@
+;; server.fl — freelang-search HTTP API (S0 MVP)
+;;
+;; GET  /search?q=...&limit=20[&source=blog]   통합/소스 한정 검색
+;; POST /index                                  단일 doc 인덱싱
+;; GET  /doc/:id                                doc detail
+;; GET  /stats                                  인덱스 상태
+;; GET  /health                                 서비스 상태
+
+(load "projects/freelang-search/lib/config.fl")
+(load "projects/freelang-search/lib/index-store.fl")
+(load "projects/freelang-search/lib/searcher.fl")
+
+(define cfg (freelang-search-config))
+(define DB (get $cfg "db"))
+
+(fs-ensure-table $DB)
+
+[FUNC handle-fs-search :params [$req]
+  :body (let [
+    q (server_req_query $req "q")
+    limit-raw (server_req_query $req "limit")
+    source (server_req_query $req "source")
+    limit (if (or (= $limit-raw nil) (= $limit-raw "")) 20 (* $limit-raw 1))
+  ]
+    (if (or (= $q nil) (= $q ""))
+      (server_status 400 {:error "q parameter required"})
+      (if (or (= $source nil) (= $source ""))
+        (server_json (fs-search $DB $q $limit))
+        (server_json (fs-search-by-source $DB $source $q $limit)))))]
+
+[FUNC handle-fs-index :params [$req]
+  :body (let [
+    body-raw (server_req_body $req)
+    body (if (string? $body-raw)
+           (if (= $body-raw "") {} (json_parse $body-raw))
+           $body-raw)
+    doc-id (get $body "doc_id")
+    source (get $body "source")
+    title (get $body "title")
+    content (get $body "content")
+    tags (get $body "tags")
+    url (get $body "url")
+  ]
+    (cond
+      [(or (= $doc-id nil) (= $doc-id ""))
+        (server_status 400 {:error "doc_id required"})]
+      [(or (= $source nil) (= $source ""))
+        (server_status 400 {:error "source required"})]
+      [(or (= $content nil) (= $content ""))
+        (server_status 400 {:error "content required"})]
+      [true
+        (do
+          (fs-index-doc $DB $doc-id $source $title $content $tags $url)
+          (server_json {:status "indexed" :doc_id $doc-id}))]))]
+
+[FUNC handle-fs-doc :params [$req]
+  :body (let [
+    doc-id (server_req_param $req "id")
+    doc (fs-get-doc $DB $doc-id)
+  ]
+    (if (= $doc nil)
+      (server_status 404 {:error "not_found" :doc_id $doc-id})
+      (server_json $doc)))]
+
+[FUNC handle-fs-stats :params [$req]
+  :body (server_json (fs-stats $DB))]
+
+[FUNC handle-fs-health :params [$req]
+  :body (server_json {:status "ok" :db $DB :ts (now_ms)})]
+
+(server_get "/search" "handle-fs-search")
+(server_post "/index" "handle-fs-index")
+(server_get "/doc/:id" "handle-fs-doc")
+(server_get "/stats" "handle-fs-stats")
+(server_get "/health" "handle-fs-health")
+
+(println (str "[freelang-search] db=" $DB " port=" (get $cfg "port")))
+(server_start (get $cfg "port"))
