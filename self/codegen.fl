@@ -770,77 +770,6 @@
   :body (let [[$fn-name (js-name (if (= (char-at $op 0) "$") (substring $op 1 (length $op)) $op))]]
           (str $fn-name "(" (cg-args $args) ")"))]
 
-;; ═══════ match S-expr → pattern-match AST 변환 ═══════
-;; (match value (pat body) ...) 형태를 pattern-match 노드로 변환
-;; map literal {:k v} → struct-pattern 자동 변환
-
-[FUNC node-to-pattern :params [$node]
-  :body (cond
-          [(= (get $node :kind) "literal")
-           {:kind "literal-pattern" :type (get $node :type) :value (get $node :value)}]
-          [(= (get $node :kind) "variable")
-           {:kind "variable-pattern" :name (get $node :name)}]
-          [(= (get $node :kind) "keyword")
-           (let [[$v (get $node :value)]]
-             (if (starts-with? $v ":")
-               (let [[$clean (substring $v 1)]]
-                 (if (= $clean "_")
-                   {:kind "wildcard-pattern"}
-                   {:kind "literal-pattern" :type "symbol" :value $clean}))
-               (if (= $v "_")
-                 {:kind "wildcard-pattern"}
-                 {:kind "literal-pattern" :type "symbol" :value $v})))]
-          [(= (get $node :kind) "block")
-           (if (= (get $node :type) "Map")
-             (map-block-to-struct-pattern $node)
-             {:kind "wildcard-pattern"})]
-          [true {:kind "wildcard-pattern"}])]
-
-[FUNC map-block-to-struct-pattern :params [$node]
-  :body (let [[$items (get (get $node :fields) :items)]]
-    (let [[$fields (map-items-to-fields $items 0 {})]]
-      {:kind "struct-pattern" :fields $fields :line (get $node :line)}))]
-
-[FUNC map-items-to-fields :params [$items $i $acc]
-  :body (if (>= $i (length $items))
-    $acc
-    (if (>= (+ $i 1) (length $items))
-      $acc
-      (let [[$key-node (get $items $i)]
-            [$val-node (get $items (+ $i 1))]
-            [$key-val (get $key-node :value)]
-            [$key (if (and (not (nil? $key-val))
-                           (starts-with? (str $key-val) ":"))
-                    (substring (str $key-val) 1)
-                    (str $key-val))]
-            [$pat (node-to-pattern $val-node)]]
-        (map-items-to-fields $items (+ $i 2) (json_set $acc $key $pat))))))
-
-[FUNC process-match-cases :params [$cases $i $acc-cases $default]
-  :body (if (>= $i (length $cases))
-    [[$acc-cases $default]]
-    (let [[$c (get $cases $i)]
-          [$is-array-pair (and (= (get $c :kind) "block")
-                               (= (get $c :type) "Array")
-                               (let [[$items (get (get $c :fields) :items)]]
-                                 (or (= (length $items) 2) (= (length $items) 3))))]]
-      (if (not $is-array-pair)
-        (process-match-cases $cases (+ $i 1) $acc-cases $default)
-        (let [[$items (get (get $c :fields) :items)]
-              [$pat (node-to-pattern (get $items 0))]
-              [$body (if (= (length $items) 3) (get $items 2) (get $items 1))]]
-          (process-match-cases $cases (+ $i 1)
-            (append $acc-cases (list (make-match-case $pat nil $body)))
-            $default))))))
-
-[FUNC cg-match-sexpr :params [$args]
-  :body (if (< (length $args) 1)
-    "null"
-    (let [[$value (get $args 0)]
-          [$cases-raw (slice $args 1 (length $args))]
-          [$processed (process-match-cases $cases-raw 0 [] nil)]]
-      (cg (make-pattern-match $value (get $processed 0) (get $processed 1)))))]
-
 ;; ═══════ sexpr 메인 dispatch ═══════
 
 [FUNC cg-sexpr-dispatch :params [$op $args]
@@ -855,7 +784,6 @@
           [(= $op "cond")    (cg-cond $args)]
           [(= $op "and")     (cg-and $args)]
           [(= $op "or")      (cg-or $args)]
-          [(= $op "match")   (cg-match-sexpr $args)]
           [(= $op "quote")   (cg-quote $args)]
           [(= $op "set!")    (cg-set! $args)]
           [(= $op "throw")   (cg-throw $args)]
