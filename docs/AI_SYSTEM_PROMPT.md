@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 393개 함수, 25 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 394개 함수, 26 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -426,7 +426,7 @@ parallel race with-timeout fl-try use`
 - `(file_mtime filePath)` → number (get modification time as timestamp)
 - `(file_ctime filePath)` → number (get creation time as timestamp)
 
-### http (12개)
+### http (13개)
 
 - `(http_get url)` → string
 - `(http_post url body)` → string
@@ -438,10 +438,11 @@ parallel race with-timeout fl-try use`
 - `(http_json url)` → object
 - `(http_header url header)` → string
 - `(http_request method url headers body)` → string (일반 HTTP 요청)
+- `(http_req_status method url headers body)` → number (HTTP 상태코드만 반환)
 - `(http_get_json url headers)` → object (헤더와 함께 GET)
 - `(http_post_json url headers body)` → object (헤더와 함께 POST)
 
-### http-server (31개)
+### http-server (30개)
 
 - `(server_get path handlerName)` → null
 - `(server_post path handlerName)` → null
@@ -458,7 +459,6 @@ parallel race with-timeout fl-try use`
 - `(server_redirect_cookie url cookie)` → response (302 리다이렉트 + Set-Cookie)
 - `(server_req_cookie req name)` → string | null (쿠키 값 읽기)
 - `(server_wait_respond promise)` → response object (비동기 응답 대기)
-- `(server_req_body req)` → string
 - `(server_req_query req [key])` → object or string
 - `(server_req_header req name)` → string
 - `(server_req_param req name)` → string
@@ -507,6 +507,10 @@ parallel race with-timeout fl-try use`
 - `(vector_norm v)` → number  (Euclidean norm / L2 norm)
 - `(matrix_zeros rows cols)` → [[number]]  (create zero matrix)
 - `(vector_zeros n)` → [number]  (create zero vector)
+
+### queue-helpers (1개)
+
+- `(queue_db_init db_path)` → bool  (WAL 모드 + busy_timeout 활성화)
 
 ### resource (29개)
 
@@ -642,4 +646,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-25T14:48:17.489Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-26T00:05:19.616Z

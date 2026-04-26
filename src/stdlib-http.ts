@@ -127,6 +127,25 @@ export function createHttpModule() {
       }
     },
 
+    // http_req_status method url headers body -> number (HTTP 상태코드만 반환)
+    "http_req_status": (method: string, url: string, headers: any, body: string): number => {
+      try {
+        const args: string[] = ["-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10", "-X", method];
+        if (headers && typeof headers === 'object') {
+          for (const [key, value] of Object.entries(headers)) {
+            args.push("-H", `${key}: ${value}`);
+          }
+        }
+        if (body && body.length > 0) {
+          args.push("-d", body);
+        }
+        args.push(url);
+        return parseInt(curlRun(args).trim(), 10);
+      } catch (err: any) {
+        throw new Error(`http_req_status failed for '${method} ${url}': ${err.message}`);
+      }
+    },
+
     // http_get_json url headers -> object (헤더와 함께 GET)
     "http_get_json": (url: string, headers: any): any => {
       try {

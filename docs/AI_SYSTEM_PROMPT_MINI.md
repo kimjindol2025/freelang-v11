@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 393개 함수, 25 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 394개 함수, 26 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### data
 
@@ -232,4 +232,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-25T14:48:17.492Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-26T00:05:19.621Z
