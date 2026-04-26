@@ -160,17 +160,31 @@ node bootstrap.js run hello.fl
 ### T12. match (패턴 매칭)
 
 ```fl
-;; (match value (pattern body) ... (default body))
-(defn classify [n]
-  (match n
-    (0 "zero")
-    (1 "one")
-    (2 "two")
-    (default "many")))
+;; ✅ 반드시 소괄호 () — 대괄호 [] 사용 금지
+;; (match value (pattern body) ... (_ default))
 
-(println (classify 2))   ;; → "two"
-(println (classify 99))  ;; → "many"
+;; 리터럴 매칭
+(define n 2)
+(print (match n
+  (0 "zero")
+  (1 "one")
+  (2 "two")
+  (_ "many")))   ; → "two"
+
+;; 변수 캡처
+(define x 42)
+(print (match x
+  ($n (concat "값: " (str $n)))))   ; → "값: 42"
+
+;; map 구조분해 (Phase 5 신규) — HTTP 응답 처리에 유용
+(define resp {:status "ok" :data "FreeLang"})
+(print (match resp
+  ({:status "ok" :data $d} (concat "성공: " $d))
+  ({:status "error" :msg $m} (concat "실패: " $m))
+  (_ "알 수 없음")))   ; → "성공: FreeLang"
 ```
+
+> ⚠️ **AI 주의**: match 케이스는 반드시 `()` 소괄호. `[]` 대괄호 사용 시 파싱 오류 발생.
 
 ---
 
