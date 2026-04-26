@@ -70,7 +70,7 @@ make verify-all                    # 4 검증 통합 (~3.8분)
 make property-test ARGS=--n=10     # 200 invariant × 10 = 2000 case
 make build-runtime                 # self/runtime/ 재빌드
 make repl                          # self/runtime/repl.js 직접 실행
-sha256sum stage1.js                # 5877b966... 보존 확인
+sha256sum stage1.js                # 0aab7ab1... 보존 확인
 ```
 
 ---
@@ -104,7 +104,7 @@ sha256sum stage1.js                # 5877b966... 보존 확인
 
 **검증**:
 - 36개 새 테스트 케이스 추가 (errors.test.ts 누적 36/36 PASS)
-- self-hosting 보존: stage1==stage2==stage3 SHA256 일치 (`5877b9660e...`)
+- self-hosting 보존: stage1==stage2==stage3 SHA256 일치 (`0aab7ab10e...`)
 - Breaking change 0
 
 ### Phase 4 핵심 성과 — Self-Host 회복
@@ -117,7 +117,7 @@ sha256sum stage1.js                # 5877b966... 보존 확인
 - `(let [...] (cond ...))` 패턴이 broken JS 생성하는 codegen 결함 우회
 
 **검증** (2026-04-25):
-- ✅ stage1 == stage2 == stage3 SHA256 3단 일치 (`5877b966...`)
+- ✅ stage1 == stage2 == stage3 SHA256 3단 일치 (`0aab7ab1...`)
 - ✅ verify-self-host.sh tier2: PASS 91 (이전 Phase B 수치 유지)
 - ✅ npm test: 751 PASS (이전 736 +15)
 - FAIL 6개는 자동 에이전트의 mongodb/binary 추가분 (advisory, Phase 4 무관)
