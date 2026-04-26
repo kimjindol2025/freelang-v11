@@ -190,6 +190,27 @@ node bootstrap.js run hello.fl
 
 ## 3. 자주 틀리는 10가지 (반드시 체크)
 
+### F0. ⚠️ 함수 정의 — 두 문법 중 하나만 써라 (혼용 금지)
+
+```fl
+;; ✅ 권장: defn (간결, AI 오류 최소)
+;; 파라미터는 반드시 $ prefix 통일
+(defn add [$a $b] (+ $a $b))
+(defn greet [$name]
+  (concat "안녕 " $name))
+
+;; ✅ 타입 지정 필요할 때만: [FUNC]
+[FUNC add :params [[$a int] [$b int]] :return int
+  :body (+ $a $b)
+]
+
+;; ❌ 파라미터 혼용 금지
+(defn bad [a $b] ...)   ;; ❌ $ 없이/있이 혼용
+(defn bad [a b] ...)    ;; ❌ $ 없이 (동작은 하나 혼란)
+```
+
+> **AI 규칙**: 기본은 `defn`. 파라미터는 항상 `$` prefix. 타입 선언 필요시만 `[FUNC]`.
+
 ### F1. ❌ `defn`을 `def`로 잘못 씀
 ```fl
 (def greet [n] ...)   ;; ❌ def는 변수 정의
