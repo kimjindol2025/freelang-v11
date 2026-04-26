@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-04-26T07:22:18Z",
-  "elapsed_seconds": 608,
+  "timestamp": "2026-04-26T12:33:59Z",
+  "elapsed_seconds": 291,
   "pass": 3,
   "fail": 1,
   "checks": [
-    {"name": "build_deterministic",   "status": "ok", "elapsed_s": 9},
-    {"name": "deep_fixed_point",      "status": "fail", "elapsed_s": 100},
-    {"name": "tier2_verify_self_host", "status": "ok", "elapsed_s": 258},
-    {"name": "fl_bench_reference",   "status": "ok", "elapsed_s": 241}
+    {"name": "build_deterministic",   "status": "ok", "elapsed_s": 2},
+    {"name": "deep_fixed_point",      "status": "fail", "elapsed_s": 34},
+    {"name": "tier2_verify_self_host", "status": "ok", "elapsed_s": 146},
+    {"name": "fl_bench_reference",   "status": "ok", "elapsed_s": 109}
   ]
 }

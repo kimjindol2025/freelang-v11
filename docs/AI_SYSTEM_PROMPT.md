@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 396개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 404개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -431,21 +431,29 @@ parallel race with-timeout fl-try use`
 - `(greet/hello $name)` → any
 - `(greet/goodbye $name)` → any
 
-### http (13개)
+### http (21개)
 
-- `(http_get url)` → string
-- `(http_post url body)` → string
-- `(http_post_form url form_body)` → string  (application/x-www-form-urlencoded)
-- `(http_get_bearer url token)` → string  (Authorization: Bearer ...)
-- `(http_put url body)` → string
-- `(http_delete url)` → string
-- `(http_status url)` → number
-- `(http_json url)` → object
-- `(http_header url header)` → string
-- `(http_request method url headers body)` → string (일반 HTTP 요청)
-- `(http_req_status method url headers body)` → number (HTTP 상태코드만 반환)
-- `(http_get_json url headers)` → object (헤더와 함께 GET)
-- `(http_post_json url headers body)` → object (헤더와 함께 POST)
+- `(http_get url)` → {:status 200 :body "..."}
+- `(http_post url body)` → {:status 200 :body "..."}
+- `(http_post_form url body)` → {:status 200 :body "..."}
+- `(http_get_bearer url token)` → {:status 200 :body "..."}
+- `(http_put url body)` → {:status 200 :body "..."}
+- `(http_patch url body)` → {:status 200 :body "..."}
+- `(http_delete url)` → {:status 200 :body "..."}
+- `(http_head url)` → {:status 200 :body ""}
+- `(http_status url)` → number (상태코드만)
+- `(http_json url)` → {:status 200 :data {...} :error nil}
+- `(http_header url header)` → string (특정 헤더만)
+- `(http_with_timeout url timeout)` → {:status 200 :body "..."}
+- `(http_post_json url data)` → {:status 200 :data {...}}
+- `(http_put_json url data)` → {:status 200 :data {...}}
+- `(http_request method url headers body)` → {:status 200 :body "..."}
+- `(http_req_status method url headers body)` → number
+- `(http_get_json url headers)` → {:status 200 :data {...}}
+- `(http_get_json_bearer url token)` → {:status 200 :data {...}}
+- `(is_http_success status)` → boolean
+- `(is_http_redirect status)` → boolean
+- `(is_http_error status)` → boolean
 
 ### http-server (30개)
 
@@ -659,4 +667,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-26T12:29:09.956Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-26T12:38:36.707Z
