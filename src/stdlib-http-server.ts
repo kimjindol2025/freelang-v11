@@ -447,12 +447,15 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
         socket.on('error', () => { wsPublicMap.delete(sessionId); });
 
         // FreeLang upgrade 핸들러 호출
+        const _wsUrl = new URL(req.url || '/', 'http://localhost');
+        const _wsQuery: Record<string, string> = {};
+        _wsUrl.searchParams.forEach((v, k) => { _wsQuery[k] = v; });
         const upgradeReq = {
           __fl_request: true,
           method: 'WS_UPGRADE',
           path: req.url || '/',
           headers: req.headers,
-          query: {},
+          query: _wsQuery,
           body: '',
           params: {},
           session_id: sessionId,
