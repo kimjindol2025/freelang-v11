@@ -1455,7 +1455,7 @@ export class Interpreter {
         // 기본은 permissive (하위 호환). AI-first 프로젝트는 FL_STRICT=1 권장.
         if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
           const line = (lit as any).line;
-          throw new Error(`Unresolved symbol: '${bareName}'${line ? ` (line ${line})` : ""} — set FL_STRICT=0 to silence`);
+          throw new Error(`[E_UNRESOLVED_SYMBOL] '${bareName}' at line ${line || this.currentLine}, col 0 — set FL_STRICT=0 to silence`);
         }
       }
       return lit.value;
@@ -1478,7 +1478,7 @@ export class Interpreter {
           ? this.context.variables.get("$" + parts[0])
           : this.context.variables.get(parts[0]);
         if (obj === undefined && !this.context.variables.has("$" + parts[0]) && !this.context.variables.has(parts[0])) {
-          throw new Error(`Undefined variable: '$${parts[0]}' (accessed via '${varName}')${locSuffix}`);
+          throw new Error(`[E_UNDEFINED_VAR] '$${parts[0]}' (accessed via '${varName}') at line ${line || this.currentLine}${locSuffix}`);
         }
         for (let p = 1; p < parts.length; p++) {
           if (obj === null || obj === undefined) return null;
@@ -1493,7 +1493,7 @@ export class Interpreter {
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
       }
-      throw new Error(`Undefined variable: '$${varName}'${locSuffix}`);
+      throw new Error(`[E_UNDEFINED_VAR] '$${varName}' at line ${line || this.currentLine}${locSuffix}`);
     }
 
     // Keywords
@@ -1864,7 +1864,27 @@ export class Interpreter {
       return nativeFn(...args);
     }
 
-    return evalBuiltin(this, op, args, expr);
+    try {
+      return evalBuiltin(this, op, args, expr);
+    } catch (err: any) {
+      // Task #4: 에러 줄번호 보장 — callStack과 함께 에러 정보 강화
+      const line = expr.line ?? this.currentLine;
+      const col = (expr as any).col ?? 0;
+      const stack = this.callStack.length > 0
+        ? "\n최근 호출 체인:\n  " + this.callStack.slice(-5).map(s => `${s.fn} (line ${s.line})`).join("\n  ")
+        : "";
+      const enhancedMsg = err.message.includes(`(at line ${line}`)
+        ? err.message  // 이미 줄 정보가 있으면 그대로 사용
+        : `${err.message} (at line ${line}, col ${col})${stack}`;
+
+      if (err.code || err.name === "FLRuntimeError") {
+        err.message = enhancedMsg;
+        throw err;
+      } else {
+        const errCode = err.message.match(/\[E_\w+\]/) ? err.message : `[E_RUNTIME_ERROR] ${err.message}`;
+        throw new Error(enhancedMsg);
+      }
+    }
   }
 
   // Phase 64: 프로토콜 메서드 호출 — $self + 나머지 인자 바인딩

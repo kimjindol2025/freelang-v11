@@ -31059,7 +31059,7 @@ var Interpreter = class _Interpreter {
         }
         if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
           const line = lit.line;
-          throw new Error(`Unresolved symbol: '${bareName}'${line ? ` (line ${line})` : ""} \u2014 set FL_STRICT=0 to silence`);
+          throw new Error(`[E_UNRESOLVED_SYMBOL] '${bareName}' at line ${line || this.currentLine}, col 0 \u2014 set FL_STRICT=0 to silence`);
         }
       }
       return lit.value;
@@ -31073,7 +31073,7 @@ var Interpreter = class _Interpreter {
         const parts = varName.split(".");
         let obj = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
         if (obj === void 0 && !this.context.variables.has("$" + parts[0]) && !this.context.variables.has(parts[0])) {
-          throw new Error(`Undefined variable: '$${parts[0]}' (accessed via '${varName}')${locSuffix}`);
+          throw new Error(`[E_UNDEFINED_VAR] '$${parts[0]}' (accessed via '${varName}') at line ${line || this.currentLine}${locSuffix}`);
         }
         for (let p = 1; p < parts.length; p++) {
           if (obj === null || obj === void 0) return null;
@@ -31087,7 +31087,7 @@ var Interpreter = class _Interpreter {
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
       }
-      throw new Error(`Undefined variable: '$${varName}'${locSuffix}`);
+      throw new Error(`[E_UNDEFINED_VAR] '$${varName}' at line ${line || this.currentLine}${locSuffix}`);
     }
     if (node.kind === "keyword") {
       return node.name;
@@ -31382,7 +31382,21 @@ var Interpreter = class _Interpreter {
       const nativeFn = this.context[nativeKey];
       return nativeFn(...args2);
     }
-    return evalBuiltin(this, op, args2, expr);
+    try {
+      return evalBuiltin(this, op, args2, expr);
+    } catch (err4) {
+      const line = expr.line ?? this.currentLine;
+      const col = expr.col ?? 0;
+      const stack = this.callStack.length > 0 ? "\n\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:\n  " + this.callStack.slice(-5).map((s) => `${s.fn} (line ${s.line})`).join("\n  ") : "";
+      const enhancedMsg = err4.message.includes(`(at line ${line}`) ? err4.message : `${err4.message} (at line ${line}, col ${col})${stack}`;
+      if (err4.code || err4.name === "FLRuntimeError") {
+        err4.message = enhancedMsg;
+        throw err4;
+      } else {
+        const errCode = err4.message.match(/\[E_\w+\]/) ? err4.message : `[E_RUNTIME_ERROR] ${err4.message}`;
+        throw new Error(enhancedMsg);
+      }
+    }
   }
   // Phase 64: 프로토콜 메서드 호출 — $self + 나머지 인자 바인딩
   callProtocolMethod(methodDef, selfVal, restArgs) {
