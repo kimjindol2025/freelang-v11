@@ -169,6 +169,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case ">=": return v0 >= v1;
     case "not": return !v0;
     case "nil?": case "null?": return v0 === null || v0 === undefined;
+    case "nil-or-empty?": return v0 === null || v0 === undefined || (v0 && v0.length === 0);
     case "true?": return v0 === true;
     case "false?": return v0 === false;
     case "and": return !!(v0 && v1);
@@ -1113,6 +1114,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "nil?":
     case "null?":
       return args[0] === null || args[0] === undefined;
+    case "nil-or-empty?":
+      return args[0] === null || args[0] === undefined || (args[0] && args[0].length === 0);
     case "zero?":
       return args[0] === 0;
     case "pos?":

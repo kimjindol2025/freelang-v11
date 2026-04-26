@@ -33,6 +33,29 @@ const log = {
 const commands = {
   // freelang new <name> [--template]
   new: (args) => {
+    if (args.includes('--plugin')) {
+      const name = args.find((a) => !a.startsWith('--'));
+      if (!name) {
+        log.error('플러그인 이름을 입력하세요: freelang new <name> --plugin');
+        process.exit(1);
+      }
+      fs.mkdirSync('plugins', { recursive: true });
+      const pluginTemplate = `;; plugin: ${name}
+;; version: 1.0.0
+;; depends:
+
+[FUNC ${name}/hello :params [$x]
+  :body (str "hello: " $x)
+]
+
+[FUNC ${name}/version :params []
+  :body "1.0.0"
+]`;
+      fs.writeFileSync(`plugins/${name}.fl`, pluginTemplate);
+      log.success(`플러그인 생성 완료: plugins/${name}.fl`);
+      return;
+    }
+
     const [name, ...opts] = args;
     if (!name) {
       log.error('프로젝트 이름을 입력하세요: freelang new <name>');
@@ -345,6 +368,68 @@ freelang deploy       # 배포
     log.warn('마이그레이션 기능은 개발 중입니다');
   },
 
+  // freelang publish <plugin-file.fl>
+  publish: (args) => {
+    const [filePath] = args || [];
+    if (!filePath) {
+      log.error('플러그인 파일을 지정하세요: freelang publish <plugin-file.fl>');
+      process.exit(1);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      log.error(`파일을 찾을 수 없습니다: ${filePath}`);
+      process.exit(1);
+    }
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
+    const versionMatch = content.match(/^;; version:\s*(.+)$/m);
+
+    if (!nameMatch) {
+      log.error('플러그인 메타 블록이 없습니다. 파일 상단에 다음을 추가하세요:');
+      console.log('  ;; plugin: <name>');
+      console.log('  ;; version: 1.0.0');
+      console.log('  ;; depends:');
+      process.exit(1);
+    }
+
+    const pluginName = nameMatch[1].trim();
+    const version = versionMatch ? versionMatch[1].trim() : '1.0.0';
+
+    log.info(`📦 배포 중: ${pluginName} (v${version})`);
+
+    try {
+      const tmpDir = path.resolve('/tmp', `fl-publish-${Date.now()}`);
+      fs.mkdirSync(tmpDir, { recursive: true });
+
+      // 저장소 clone
+      execSync('git clone https://gogs.dclub.kr/kim/fl-plugins.git .', {
+        cwd: tmpDir,
+        stdio: 'pipe',
+      });
+
+      // 플러그인 파일 복사
+      fs.copyFileSync(filePath, path.resolve(tmpDir, `${pluginName}.fl`));
+
+      // git add, commit, push
+      execSync(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: 'pipe' });
+      execSync(`git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`, {
+        cwd: tmpDir,
+        stdio: 'pipe',
+      });
+      execSync('git push origin master', { cwd: tmpDir, stdio: 'pipe' });
+
+      log.success(`플러그인 '${pluginName}' 게시 완료`);
+      console.log(`📍 저장소: https://gogs.dclub.kr/kim/fl-plugins`);
+
+      // 임시 디렉토리 정리
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (err) {
+      log.error(`배포 실패: ${err.message}`);
+      process.exit(1);
+    }
+  },
+
   // freelang --version
   version: () => {
     console.log(`freelang v${version}`);
@@ -362,6 +447,7 @@ ${colors.bright}커맨드:${colors.reset}
   new <name>           프로젝트 생성
     --websocket        WebSocket 템플릿
     --agent            AI 에이전트 템플릿
+    --plugin           플러그인 템플릿
 
   build                프로덕션 빌드
     --release          최적화 빌드
@@ -373,6 +459,9 @@ ${colors.bright}커맨드:${colors.reset}
   test [file]          테스트 실행
     --watch            감시 모드
     --coverage         커버리지 리포트
+
+  publish <file>       플러그인 배포
+                       (gogs 레지스트리에 등록)
 
   deploy               배포
     --dry-run          시뮬레이션
@@ -387,7 +476,8 @@ ${colors.bright}커맨드:${colors.reset}
 
 ${colors.bright}예제:${colors.reset}
   freelang new myapp
-  freelang new mychat --websocket
+  freelang new weather --plugin
+  freelang publish plugins/weather.fl
   freelang dev --port 8000
   freelang test --watch
   freelang deploy --dry-run

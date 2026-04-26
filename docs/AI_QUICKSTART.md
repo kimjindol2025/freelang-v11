@@ -228,20 +228,21 @@ node bootstrap.js run hello.fl
   (do (println $x) (println (* $x 2))))
 ```
 
-### F7. ✅ `let` 형식 — **두 형태 모두 작동** (2026-04-25 검증)
+### F7. ✅ `let` 형식 — **canonical [[k v]] 형식 권장** (Phase 5-3 표준화)
 ```fl
-;; Clojure 스타일 (single bracket, 1차원 평탄) — 작동
-(let [x 10] (+ x 1))
-(let [x 10 y 20] (+ x y))
-(let [a 1 b 2 c 3] (+ a b c))
-
-;; FreeLang 전통 (2차원, [[k v]] [[k v]]) — 작동
-(let [[x 10]] (+ x 1))
+;; ✅ 권장 (canonical): 각 바인딩을 [k v] 쌍으로
+(let [[x 10]]        (+ x 1))
 (let [[x 10] [y 20]] (+ x y))
 
-;; 주의: 한 form 안에 1차원/2차원 혼합 ❌
-(let [[x 10] y 20] ...)        ;; ❌ "바인딩 형식이 일관되지 않음"
+;; ⚠️  작동하지만 권장 안 함 (deprecated warning 예정):
+(let [x 10] ...)                    ;; 1차원 형식
+(let [$x 10] ...)                   ;; $ prefix
+
+;; ❌ 오류: 혼합 형식
+(let [[x 10] y 20] ...)             ;; 형식 일관성 필요
 ```
+
+**AI 에이전트용**: 항상 `(let [[var value]] ...)` 형식 사용. 다른 형식은 무시.
 
 ### F8. ❌ list literal vs Array block
 ```fl

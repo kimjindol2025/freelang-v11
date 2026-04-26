@@ -1286,6 +1286,68 @@ function cmdInstall(args: string[]): void {
   }
 }
 
+function cmdPublish(args: string[]): void {
+  const filePath = args[0];
+  if (!filePath) {
+    console.error(`\x1b[31m오류\x1b[0m  플러그인 파일을 지정하세요: publish <plugin-file.fl>`);
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(filePath)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(filePath, "utf-8");
+  const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
+  const versionMatch = content.match(/^;; version:\s*(.+)$/m);
+
+  if (!nameMatch) {
+    console.error(`\x1b[31m오류\x1b[0m  플러그인 메타 블록이 없습니다. 파일 상단에 다음을 추가하세요:`);
+    console.log(`  ;; plugin: <name>`);
+    console.log(`  ;; version: 1.0.0`);
+    console.log(`  ;; depends:`);
+    process.exit(1);
+  }
+
+  const pluginName = nameMatch[1].trim();
+  const version = versionMatch ? versionMatch[1].trim() : "1.0.0";
+
+  console.log(`\x1b[36m[Y5]\x1b[0m  배포 중: ${pluginName} (v${version})`);
+
+  try {
+    const { execSync } = require("child_process");
+    const tmpDir = path.resolve("/tmp", `fl-publish-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    // 저장소 clone
+    execSync("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
+      cwd: tmpDir,
+      stdio: "pipe",
+    });
+
+    // 플러그인 파일 복사
+    fs.copyFileSync(filePath, path.resolve(tmpDir, `${pluginName}.fl`));
+
+    // git add, commit, push
+    execSync(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
+    execSync(
+      `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
+      { cwd: tmpDir, stdio: "pipe" }
+    );
+    execSync("git push origin master", { cwd: tmpDir, stdio: "pipe" });
+
+    console.log(`\x1b[32m✓\x1b[0m  플러그인 '${pluginName}' 게시 완료`);
+    console.log(`\x1b[2m  저장소: https://gogs.dclub.kr/kim/fl-plugins\x1b[0m`);
+
+    // 임시 디렉토리 정리
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch (err: any) {
+    console.error(`\x1b[31m오류\x1b[0m  배포 실패: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 function cmdServe(args: string[]): void {
   // Phase 3: freelang serve [appDir] [--app app] [--port 3000] [--mode ssr|isr|ssg]
   let appDir = "app";
@@ -1504,6 +1566,11 @@ switch (cmd) {
   case "install": {
     // Y5: freelang install <plugin-name>
     cmdInstall(args.slice(1));
+    break;
+  }
+  case "publish": {
+    // Y5: freelang publish <plugin-file.fl>
+    cmdPublish(args.slice(1));
     break;
   }
   case "serve": {
