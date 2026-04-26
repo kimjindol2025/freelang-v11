@@ -14,4 +14,13 @@
     ;; audit_log SQLite 경로 — dclub-auth 가 같은 박스에 있을 때만 활성
     :auth_db (fs-config-get "FREELANG_SEARCH_AUTH_DB" "")
     :audit_limit (* (fs-config-get "FREELANG_SEARCH_AUDIT_LIMIT" "5000") 1)
+    ;; memory connector — Claude 메모리 디렉토리 경로
+    :memory_path (fs-config-get "FREELANG_SEARCH_MEMORY_PATH"
+                                 "/root/.claude/projects/-root/memory")
+    ;; gogs connector
+    :gogs_url (fs-config-get "FREELANG_SEARCH_GOGS_URL" "https://gogs.dclub.kr")
+    :gogs_owner (fs-config-get "FREELANG_SEARCH_GOGS_OWNER" "kim")
+    :gogs_repo (fs-config-get "FREELANG_SEARCH_GOGS_REPO" "freelang-v11")
+    ;; cron 자동 재인덱싱 주기 (default 1h = 3600000 ms)
+    :cron_ms (* (fs-config-get "FREELANG_SEARCH_CRON_MS" "3600000") 1)
   }]

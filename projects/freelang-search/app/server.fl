@@ -10,6 +10,8 @@
 (load "projects/freelang-search/lib/index-store.fl")
 (load "projects/freelang-search/lib/searcher.fl")
 (load "projects/freelang-search/lib/indexer.fl")
+(load "projects/freelang-search/lib/cron.fl")
+(load "projects/freelang-search/lib/llm-context.fl")
 
 (define cfg (freelang-search-config))
 (define DB (get $cfg "db"))
@@ -81,6 +83,22 @@
 [FUNC handle-fs-health :params [$req]
   :body (server_json {:status "ok" :db $DB :ts (now_ms)})]
 
+;; LLM 사전 처리기 — GET /context?q=...&max_results=5
+;; 응답: markdown 단일 텍스트 (LLM system prompt 용)
+[FUNC handle-fs-context :params [$req]
+  :body (let [
+    q (server_req_query $req "q")
+    max-raw (server_req_query $req "max_results")
+    max (if (or (= $max-raw nil) (= $max-raw "")) 5 (* $max-raw 1))
+  ]
+    (if (or (= $q nil) (= $q ""))
+      (server_status 400 {:error "q parameter required"})
+      (server_text (fs-llm-context $DB $q $max))))]
+
+;; cron 핸들러 (set_interval 호출)
+[FUNC fs-cron-handler :params []
+  :body (fs-cron-tick $DB $cfg)]
+
 (server_get "/search" "handle-fs-search")
 (server_post "/index" "handle-fs-index")
 (server_get "/doc/:id" "handle-fs-doc")
@@ -88,6 +106,10 @@
 (server_get "/health" "handle-fs-health")
 (server_post "/reindex" "handle-fs-reindex-all")
 (server_post "/reindex/:source" "handle-fs-reindex-one")
+(server_get "/context" "handle-fs-context")
+
+;; 자동 재인덱싱 — set_interval (cron_ms 주기)
+(set_interval (get $cfg "cron_ms") "fs-cron-handler")
 
 (println (str "[freelang-search] db=" $DB " port=" (get $cfg "port")))
 (server_start (get $cfg "port"))

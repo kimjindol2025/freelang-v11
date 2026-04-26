@@ -78,16 +78,18 @@ GET  /health                                   → 서비스 상태
 }
 ```
 
-## 로드맵
+## 로드맵 (95% 도달, 2026-04-26)
 
-| Phase | 작업 |
-|---|---|
-| **S0 (이번 세션 — 준비)** | 디렉토리 + lib/config + lib/index-store + lib/searcher + app/server |
-| S1 | indexer connectors — blog·gogs·memory·audit 각 소스 가져오기 |
-| S2 | cron 자동 재인덱싱 (dclub-tasks 위) |
-| S3 | 한국어 토크나이저 (nori/jamo 분해) |
-| S4 | 검색 결과를 freelang-gpt에 전달하는 사전 처리기 |
-| S5 | 검색 추천 (related queries, did you mean) |
+| Phase | 상태 | 내용 |
+|---|---|---|
+| S0 | ✅ | 구조·README·기본 모듈 (config·index-store·searcher·server) |
+| S1 | ✅ | 5 connectors (blog·guestbook·audit·memory·gogs) + indexer |
+| S2 | ✅ | cron 자동 재인덱싱 (`set_interval`, FREELANG_SEARCH_CRON_MS env) |
+| S3 | 🟡 | 한국어 — unicode61 기본 충분 확인. nori 정밀화는 옵션 |
+| S4 | ✅ | `GET /context?q=...` LLM 사전 처리기 (Claude 토큰 절감) |
+| S1.2.1 | 🔄 | memory 개별 파일 인덱싱 (file_list stdlib 추가 후) |
+| S1.3 | 🔄 | freelang-gpt corpus connector (대용량) |
+| S5 | 🔄 | 검색 추천 (related queries, did you mean) |
 
 ## 검증 도메인 (FL이 검색 엔진 짤 수 있나?)
 

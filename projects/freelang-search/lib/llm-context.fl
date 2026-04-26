@@ -1,0 +1,39 @@
+;; llm-context.fl — 검색 결과 → LLM 친화 단일 텍스트 (S4)
+;;
+;; freelang-gpt 또는 외부 LLM (Claude/GPT) 의 사전 처리기 인터페이스.
+;; 사용 흐름:
+;;   사용자 질문 → freelang-search /context?q=... 호출
+;;     → 검색 결과를 단일 markdown 블록 응답
+;;     → 그것을 system prompt 로 LLM 호출
+;;     → LLM 호출 토큰 1/N 절감
+
+(load "projects/freelang-search/lib/searcher.fl")
+
+;; 단일 검색 결과 → markdown 섹션 한 블록
+[FUNC fs-format-result :params [$idx $r]
+  :body (let [
+    src (or (get $r "source") "?")
+    title (or (get $r "title") "")
+    excerpt (or (get $r "excerpt") "")
+    url (or (get $r "url") "")
+    url-line (if (= $url "") "" (str "URL: " $url "\n"))
+  ]
+    (str "## " (+ $idx 1) ". [" $src "] " $title "\n"
+         $excerpt "\n"
+         $url-line "\n"))]
+
+;; reduce 로 results 를 fold — 단일 텍스트 누적
+[FUNC fs-llm-context :params [$db $query $max-results]
+  :body (let [
+    sr (fs-search $db $query $max-results)
+    results (or (get $sr "results") [])
+    n (length $results)
+    header (str "# Search Context — query: " $query "\n"
+                "matched: " $n " results, source: freelang-search\n\n")
+    body (reduce
+      (fn [acc r]
+        (str $acc (fs-format-result 0 $r)))
+      ""
+      $results)
+  ]
+    (str $header $body))]

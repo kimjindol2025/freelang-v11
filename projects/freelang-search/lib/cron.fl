@@ -1,0 +1,15 @@
+;; cron.fl — set_interval 기반 자동 재인덱싱 (S2)
+;;
+;; dclub-tasks 의존 없이 server.fl 자체 timer.
+;; 환경변수 FREELANG_SEARCH_CRON_MS (default 3600000=1h) 로 주기 제어.
+
+(load "projects/freelang-search/lib/indexer.fl")
+
+[FUNC fs-cron-tick :params [$db $cfg]
+  :body (do
+    (println (str "[fs-cron] tick @ " (now_iso)
+                  " — reindex-all 시작"))
+    (let [r (fs-reindex-all $db $cfg)]
+      (println (str "[fs-cron] 완료 — total="
+                    (or (get $r "total") 0)))
+      $r))]
