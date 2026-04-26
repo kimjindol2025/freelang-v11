@@ -1,1611 +1,1611 @@
 {
-  "timestamp": "2026-04-25T23:57:38.328Z",
+  "timestamp": "2026-04-26T05:05:18.917Z",
   "seed": 12345,
-  "n_per_invariant": 3,
+  "n_per_invariant": 10,
   "total_invariants": 200,
-  "total_cases": 600,
-  "total_pass": 600,
+  "total_cases": 2000,
+  "total_pass": 2000,
   "score": 100,
-  "elapsed_seconds": 188.9,
+  "elapsed_seconds": 900.9,
   "results": [
     {
       "id": "I001",
       "name": "(+ 0 x) === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I002",
       "name": "(* 1 x) === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I003",
       "name": "(- x x) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I004",
       "name": "(* 0 x) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I005",
       "name": "(+ a b) === (+ b a) (commutative)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I006",
       "name": "(* a b) === (* b a) (commutative)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I007",
       "name": "(= x x) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I008",
       "name": "(< x x) → false",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I009",
       "name": "(length (list a b c)) === 3",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I010",
       "name": "(reverse (reverse xs)) === xs",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I011",
       "name": "(first (list x y z)) === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I012",
       "name": "(length (str x)) > 0 for non-empty x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I013",
       "name": "같은 식 두 번 → 같은 결과",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I014",
       "name": "(if nil x y) → y (P0-1)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I015",
       "name": "(= nil null) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I016",
       "name": "(or nil x) → x (P0-1 부수)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I017",
       "name": "(if (= nil x) d x) — nil 분기",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I018",
       "name": "(reduce (fn [a b] (+ a b)) 0 (list)) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I019",
       "name": "(reduce (fn [a b] (+ a b)) 0 (list a)) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I020",
       "name": "let-bound identity x === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I021",
       "name": "(+ (+ a b) c) === (+ a (+ b c))",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I022",
       "name": "(* a (+ b c)) === (+ (* a b) (* a c)) (distributive)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I023",
       "name": "(- a b) === (+ a (- 0 b))",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I024",
       "name": "(+ a 1) > a (양수 증가)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I025",
       "name": "(* 2 a) === (+ a a)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I026",
       "name": "(< a b) ∧ (< b c) → (< a c)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I027",
       "name": "(<= a a) → true (반사성)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I028",
       "name": "(>= a a) → true (반사성)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I029",
       "name": "(not (= a b)) === (or (< a b) (> a b))",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I030",
       "name": "(not (not x)) === x — true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I031",
       "name": "(not (not x)) === x — false",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I032",
       "name": "(and true x) === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I033",
       "name": "(or false x) === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I034",
       "name": "(and false x) === false (단락)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I035",
       "name": "(if true a b) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I036",
       "name": "(if false a b) === b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I037",
       "name": "(if (= a a) 1 2) === 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I038",
       "name": "(length (rest (list a b c))) === 2",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I039",
       "name": "(last (list a b c)) === c",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I040",
       "name": "(length (append (list a) (list b))) === 2",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I041",
       "name": "(first (reverse (list a b))) === b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I042",
       "name": "(str a) parse 가능",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I043",
       "name": "(length (str a b)) === sum",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I044",
       "name": "(let [[x N]] x) === N",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I045",
       "name": "let nested shadow",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I046",
       "name": "(if (or nil false) a b) → b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I047",
       "name": "(if (and nil x) a b) → b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I048",
       "name": "(= nil nil) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I049",
       "name": "let-bound add closure",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I050",
       "name": "let captured constant",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I051",
       "name": "(/ a 1) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I052",
       "name": "(* a a) >= 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I053",
       "name": "(+ a a a) === (* 3 a)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I054",
       "name": "(- (+ a b) b) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I055",
       "name": "(* a 0) === 0 (zero element)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I056",
       "name": "(+ a a) === (* a 2)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I057",
       "name": "(< 0 (+ a 1)) for non-neg a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I058",
       "name": "(= (+ a 1) (+ 1 a))",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I059",
       "name": "double inversion (- (- a)) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I060",
       "name": "(+ a (- 0 a)) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I061",
       "name": "(length (list)) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I062",
       "name": "(length (list a)) === 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I063",
       "name": "(first (list a)) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I064",
       "name": "(rest (list a)) === (list)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I065",
       "name": "(length (append xs ys)) === sum",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I066",
       "name": "reverse 2회 항등 (5 elements)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I067",
       "name": "(length (reverse xs)) === (length xs)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I068",
       "name": "(first (append (list a) xs)) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I069",
       "name": "(last (append xs (list y))) === y",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I070",
       "name": "(first (reverse (list a b c))) === c",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I071",
       "name": "(str a) === (str a)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I072",
       "name": "(length \"\") === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I073",
       "name": "(length (str a)) > 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I074",
       "name": "(= (str a) (str a)) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I075",
       "name": "(length (str a b)) === |a|+|b|",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I076",
       "name": "(number? N) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I077",
       "name": "(string? \"x\") → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I078",
       "name": "(= nil nil) → true (nil 동치)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I079",
       "name": "(= nil N) → false",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I080",
       "name": "(number? \"x\") → false",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I081",
       "name": "cond 첫 true 분기",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I082",
       "name": "cond 두번째 분기 true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I083",
       "name": "(if true a nil) → a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I084",
       "name": "(if false 999 nil) → null",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I085",
       "name": "(if (not false) a nil) → a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I086",
       "name": "(if (= nil nil) a b) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I087",
       "name": "(or nil nil x) === x",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I088",
       "name": "(and 1 1 1) → 1 (모두 truthy)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I089",
       "name": "(if 0 a b) — 0이 falsy인지 검증",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I090",
       "name": "(not nil) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I091",
       "name": "재귀 sum 0..n",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I092",
       "name": "재귀 fact 0..6",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I093",
       "name": "let 함수 즉시 호출",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I094",
       "name": "고차 함수 — 람다 인자 호출",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I095",
       "name": "closure 환경 보존",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I096",
       "name": "(+ 1 (- 0 1)) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I097",
       "name": "큰 수 (10000) 보존",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I098",
       "name": "(< 0 999999) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I099",
       "name": "(> 1000000 1) → true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I100",
       "name": "(if true (if true 1 2) 3) === 1 (nested if)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I101",
       "name": "(+ a b c) === (+ (+ a b) c)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I102",
       "name": "(* a b c) === (* (* a b) c)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I103",
       "name": "(+ a (- b c)) === (- (+ a b) c)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I104",
       "name": "(- (+ a b) a) === b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I105",
       "name": "(/ (* a 5) 5) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I106",
       "name": "(- a 0) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I107",
       "name": "(* a 1 1 1) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I108",
       "name": "(+ 0 0 0 a) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I109",
       "name": "(< a (+ a 1) (+ a 2)) → true (chained)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I110",
       "name": "(>= (+ a b) a) for non-neg b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I111",
       "name": "(<= a (+ a 1))",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I112",
       "name": "(* (+ a 1) 2) === (+ (* a 2) 2)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I113",
       "name": "(+ a 100) > a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I114",
       "name": "(- a (- 0 b)) === (+ a b)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I115",
       "name": "(+ (* 2 a) (* 2 b)) === (* 2 (+ a b))",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I116",
       "name": "(* (* a b) c) === (* a b c)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I117",
       "name": "(+ (+ a b) (+ c d)) === (+ a b c d)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I118",
       "name": "(* a (+ 1 0)) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I119",
       "name": "(+ a (* b 0)) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I120",
       "name": "(- (- a a) a) === (- 0 a)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I121",
       "name": "(length (list a b c d e)) === 5",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I122",
       "name": "(first (list a)) (single element)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I123",
       "name": "(last (list a)) (single element)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I124",
       "name": "(length (rest (list a b))) === 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I125",
       "name": "(length (rest (rest (list a b c)))) === 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I126",
       "name": "first (rest xs) === xs[1]",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I127",
       "name": "(append xs (list)) === xs (length 보존)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I128",
       "name": "(append (list) xs) length",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I129",
       "name": "(reverse (list a)) === (list a)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I130",
       "name": "(first (append (list a) (list b c))) === a",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I131",
       "name": "(append (append xs ys) zs) length",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I132",
       "name": "list 안 nested 식 평가",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I133",
       "name": "(first (rest (list a b c d))) === b",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I134",
       "name": "list 결정론 — 두 번 호출 동일",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I135",
       "name": "(reverse (list a b c d)) → 첫 원소 d",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I136",
       "name": "(length (append (list a b) (list c d e))) === 5",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I137",
       "name": "(first (list (+ a 1))) === (+ a 1)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I138",
       "name": "list 길이 = element 수 (6 elements)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I139",
       "name": "list 안 list (nested length)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I140",
       "name": "(reverse (reverse (list 1 2 3 4 5))) 첫 원소 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I141",
       "name": "(+ a b c d) 두 번 호출 동일",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I142",
       "name": "(* a b c) 두 번 호출 동일",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I143",
       "name": "let 두 번 호출 결과 동일",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I144",
       "name": "재귀 함수 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I145",
       "name": "list 결정론 (긴 list)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I146",
       "name": "if 분기 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I147",
       "name": "cond 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I148",
       "name": "closure 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I149",
       "name": "고차 함수 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I150",
       "name": "string 결정론 (str + length)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I151",
       "name": "nested let 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I152",
       "name": "do/begin 식 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I153",
       "name": "산술 + list 합성 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I154",
       "name": "and 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I155",
       "name": "or 결정론",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I156",
       "name": "재귀 fib(10) === 55",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I157",
       "name": "재귀 fib(0) === 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I158",
       "name": "재귀 fib(1) === 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I159",
       "name": "재귀 power(a, 0) === 1",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I160",
       "name": "재귀 power(2, 5) === 32",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I161",
       "name": "재귀 count-down 0",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I162",
       "name": "재귀 sum 1..n === n(n+1)/2",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I163",
       "name": "재귀 + 보조 함수 호출",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I164",
       "name": "재귀 인자 보존",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I165",
       "name": "let-rec 비슷 (defn 내부 호출)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I166",
       "name": "재귀 누산기 패턴 (acc + n)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I167",
       "name": "Y combinator-like (defn 두 번 호출)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I168",
       "name": "재귀 종료 분기",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I169",
       "name": "함수 안 let 반환",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I170",
       "name": "고차 함수 합성",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I171",
       "name": "if true 안에 if",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I172",
       "name": "if false 안에 if",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I173",
       "name": "if 깊은 nested 4 단계",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I174",
       "name": "cond 3 분기 false false true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I175",
       "name": "cond 모두 false → nil",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I176",
       "name": "if 안에 산술",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I177",
       "name": "and 단락 — false 다음 식 안 평가",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I178",
       "name": "or 단락 — true 다음 식 안 평가",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I179",
       "name": "and 모두 true",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I180",
       "name": "or 모두 false",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I181",
       "name": "if (= a b) 분기",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I182",
       "name": "if (not (= a b)) 분기",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I183",
       "name": "and (> a 0) (< a 100)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I184",
       "name": "or (= a 0) (> a 0) for non-neg",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I185",
       "name": "if (and ...) 분기",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I186",
       "name": "let + if + 산술",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I187",
       "name": "재귀 + closure",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I188",
       "name": "do 식 마지막 값 반환",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I189",
       "name": "let nested 깊은 환경",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I190",
       "name": "고차 + 산술",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I191",
       "name": "재귀 두 함수 호출",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I192",
       "name": "if + cond 합성",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I193",
       "name": "list + if",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I194",
       "name": "let-bound 함수 두 번 호출",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I195",
       "name": "재귀 + 누산 (defn-only)",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I196",
       "name": "복잡 — list + 함수",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I197",
       "name": "if 안 do",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I198",
       "name": "let 안 cond",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I199",
       "name": "재귀 — 누산 합 정합",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     },
     {
       "id": "I200",
       "name": "전체 합성 — let + closure + 재귀",
-      "pass": 3,
+      "pass": 10,
       "fail": 0,
-      "total": 3,
+      "total": 10,
       "counterExample": null
     }
   ]

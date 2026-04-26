@@ -523,8 +523,9 @@
   :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
 
 [FUNC cg-sub :params [$args]
-  :body (if (= (length $args) 1) (str "(-" (cg (get $args 0)) ")")
-          (str "(" (cg (get $args 0)) "-" (cg (get $args 1)) ")"))]
+  :body (cond [(= (length $args) 0) "0"]
+              [(= (length $args) 1) (str "(-" (cg (get $args 0)) ")")]
+              [true (str "(" (binop-loop $args 0 "" "-") ")")])]
 
 ;; ═══════ 파라미터/이름 추출 ═══════
 
