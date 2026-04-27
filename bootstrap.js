@@ -18393,6 +18393,39 @@ function createFileModule() {
       } catch (err4) {
         throw new Error(`file_ctime failed for '${filePath}': ${err4.message}`);
       }
+    },
+    // shell_exec cmd [cwd] -> {stdout, stderr, code, ok}
+    "shell_exec": (cmd, cwd2) => {
+      const { execSync } = require("child_process");
+      try {
+        const opts = { encoding: "utf-8", timeout: 10000 };
+        if (cwd2) opts.cwd = cwd2;
+        const stdout = execSync(cmd, opts);
+        return { stdout: stdout.trim(), stderr: "", code: 0, ok: true };
+      } catch (e) {
+        return {
+          stdout: (e.stdout || "").trim(),
+          stderr: (e.stderr || e.message || "").trim(),
+          code: e.status ?? 1,
+          ok: false
+        };
+      }
+    },
+    // shell_exec_async cmd [cwd] -> Promise<{stdout, stderr, code, ok}>
+    "shell_exec_async": async (cmd, cwd2) => {
+      const { exec } = require("child_process");
+      return new Promise((resolve7) => {
+        const opts = { timeout: 30000 };
+        if (cwd2) opts.cwd = cwd2;
+        exec(cmd, opts, (err4, stdout, stderr) => {
+          resolve7({
+            stdout: (stdout || "").trim(),
+            stderr: (stderr || "").trim(),
+            code: err4 ? (err4.code ?? 1) : 0,
+            ok: !err4
+          });
+        });
+      });
     }
   };
 }
