@@ -13,16 +13,38 @@
 import { createTimeModule } from "./stdlib-time";
 import { createAgentModule } from "./stdlib-agent";
 import { createCryptoModule } from "./stdlib-crypto";
+import { CheckpointData, saveCheckpoint, loadCheckpoint, deleteCheckpoint, getCheckpointPath } from "./stdlib-checkpoint";
 
 const T = createTimeModule();
 const A = createAgentModule();
 const X = createCryptoModule();
+
+// P0-4: Error categorization helper
+function categorizeError(message: string): string {
+  const msg = message.toLowerCase();
+  if (msg.includes("timeout")) return "TIMEOUT";
+  if (msg.includes("enoent") || msg.includes("not found")) return "NOT_FOUND";
+  if (msg.includes("eacces") || msg.includes("permission")) return "PERMISSION";
+  if (msg.includes("econnrefused") || msg.includes("connection refused")) return "CONNECTION";
+  if (msg.includes("econnreset") || msg.includes("connection reset")) return "CONNECTION";
+  if (msg.includes("parse") || msg.includes("json")) return "PARSE_ERROR";
+  if (msg.includes("type") || msg.includes("typeof")) return "TYPE_ERROR";
+  if (msg.includes("null") || msg.includes("undefined")) return "NULL_ERROR";
+  if (msg.includes("network") || msg.includes("http")) return "NETWORK";
+  if (msg.includes("io error")) return "IO_ERROR";
+  return "UNKNOWN";
+}
 
 export interface WorkflowStep {
   name: string;
   fn: (ctx: Record<string, any>) => Record<string, any>;
   retry?: number;       // retry count on failure (default 0)
   required?: boolean;   // if false, failure is skipped (default true)
+  on_error?: (err: any) => any;  // error handler (called on failure)
+  on_timeout?: () => any;        // timeout handler
+  fallback?: any | (() => any);  // fallback value if all retries fail
+  timeout_ms?: number;           // timeout in milliseconds
+  if?: (ctx: Record<string, any>) => boolean;  // conditional execution (P0-2)
 }
 
 export interface WorkflowResult {
@@ -34,7 +56,14 @@ export interface WorkflowResult {
   steps_ok: number;
   steps_failed: number;
   total_ms: number;
-  log: Array<{ step: string; status: string; ms: number; error?: string }>;
+  log: Array<{
+    step: string;
+    status: string;
+    ms: number;
+    error?: string;
+    category?: string;      // P0-4: 에러 카테고리 (IO, TIMEOUT, TYPE_ERROR, ...)
+    attempted?: number;     // P0-4: 재시도 횟수
+  }>;
   errors: string[];
 }
 
@@ -50,43 +79,111 @@ export function createWorkflowModule() {
       created_at: T.now(),
     }),
 
-    // workflow_step name fn -> WorkflowStep  (helper for defining steps)
+    // workflow_step name fn options -> WorkflowStep  (helper for defining steps)
     "workflow_step": (
       name: string,
       fn: (ctx: Record<string, any>) => Record<string, any>,
-      options: { retry?: number; required?: boolean } = {}
+      options: {
+        retry?: number;
+        required?: boolean;
+        on_error?: (err: any) => any;
+        on_timeout?: () => any;
+        fallback?: any | (() => any);
+        timeout_ms?: number;
+        if?: (ctx: Record<string, any>) => boolean;
+      } = {}
     ): WorkflowStep => ({
       name,
       fn,
       retry: options.retry ?? 0,
       required: options.required ?? true,
+      on_error: options.on_error,
+      on_timeout: options.on_timeout,
+      fallback: options.fallback,
+      timeout_ms: options.timeout_ms,
+      if: options.if,
     }),
 
     // ── Workflow Execution ────────────────────────────────────
 
-    // workflow_run workflow initial_ctx -> WorkflowResult
+    // workflow_run workflow initial_ctx options -> WorkflowResult
+    // options: {checkpoint_path, checkpoint_every, auto_resume}
     "workflow_run": (
       workflow: Record<string, any>,
-      initialCtx: Record<string, any> = {}
+      initialCtx: Record<string, any> = {},
+      options?: {
+        checkpoint_path?: string;
+        checkpoint_every?: number;
+        auto_resume?: boolean;
+      }
     ): WorkflowResult => {
       const startMs = T.now();
       const runId = X.uuid_short();
+      const checkpointPath = options?.checkpoint_path;
+      const checkpointEvery = options?.checkpoint_every ?? 0;
+      const autoResume = options?.auto_resume ?? true;
+
+      // P0-3: Load checkpoint if available
+      let startFromStep = 0;
       let ctx = { ...initialCtx, _workflow: workflow.name, _run_id: runId };
+
+      if (autoResume && checkpointPath) {
+        const checkpoint = loadCheckpoint(checkpointPath);
+        if (checkpoint && checkpoint.workflow_id === workflow.id) {
+          startFromStep = checkpoint.step_index;
+          ctx = { ...checkpoint.context, _workflow: workflow.name, _run_id: runId };
+          console.log(`[Checkpoint] Resuming from step ${startFromStep} (${checkpoint.step_names.length} completed)`);
+        }
+      }
+
       const log: WorkflowResult["log"] = [];
       const errors: string[] = [];
       let stepsOk = 0;
       let stepsFailed = 0;
 
-      for (const step of workflow.steps as WorkflowStep[]) {
+      const steps = workflow.steps as WorkflowStep[];
+      const completedStepNames: string[] = [];
+
+      for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
+        const step = steps[stepIndex];
+        // P0-2: Check conditional execution
+        if (step.if !== undefined) {
+          try {
+            const shouldRun = step.if(ctx);
+            if (!shouldRun) {
+              log.push({ step: step.name, status: "skipped", ms: 0 });
+              continue;  // Skip this step
+            }
+          } catch (condErr: any) {
+            errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
+            if (step.required !== false) {
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors,
+              };
+            }
+            continue;
+          }
+        }
+
         const stepStart = T.now();
         let success = false;
         let lastErr = "";
         const maxAttempts = (step.retry ?? 0) + 1;
+        let stepResult: any = undefined;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
-            const result = step.fn(ctx);
-            ctx = { ...ctx, ...result };
+            stepResult = step.fn(ctx);
+            ctx = { ...ctx, ...stepResult };
             success = true;
             break;
           } catch (err: any) {
@@ -104,34 +201,115 @@ export function createWorkflowModule() {
 
         if (success) {
           stepsOk++;
+          completedStepNames.push(step.name);
           log.push({ step: step.name, status: "ok", ms: stepMs });
           (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+
+          // P0-3: Periodic checkpoint save
+          if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
+            const checkpoint: CheckpointData = {
+              workflow_id: workflow.id,
+              workflow_name: workflow.name,
+              step_index: stepIndex + 1,
+              context: ctx,
+              timestamp: T.now(),
+              step_names: completedStepNames,
+              steps_completed: completedStepNames.length,
+            };
+            saveCheckpoint(checkpointPath, checkpoint);
+          }
         } else {
           stepsFailed++;
-          errors.push(`[${step.name}] ${lastErr}`);
-          log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr });
+          let fallbackValue: any = undefined;
+          const errorCategory = categorizeError(lastErr);  // P0-4: 에러 카테고리 판단
 
-          if (step.required !== false) {
-            // Required step failed — abort workflow
-            return {
-              id: runId,
-              name: workflow.name,
-              status: "failed",
-              context: ctx,
-              steps_run: stepsOk + stepsFailed,
-              steps_ok: stepsOk,
-              steps_failed: stepsFailed,
-              total_ms: T.now() - startMs,
-              log,
-              errors,
-            };
+          // Handle error with on_error callback
+          if (step.on_error) {
+            try {
+              fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
+              ctx = { ...ctx, ...fallbackValue };
+              success = true;
+              errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
+              log.push({
+                step: step.name,
+                status: "error_handled",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,       // P0-4: 카테고리
+                attempted: maxAttempts,        // P0-4: 재시도 횟수
+              });
+              stepsOk++;
+              stepsFailed--;
+              (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+              continue;
+            } catch (handlerErr: any) {
+              errors.push(`[${step.name}] ${lastErr} → on_error handler also failed: ${handlerErr.message}`);
+            }
           }
-          // Optional step failed — continue
+
+          // Use fallback if provided
+          if (step.fallback !== undefined) {
+            try {
+              fallbackValue = typeof step.fallback === 'function' ? step.fallback() : step.fallback;
+              ctx = { ...ctx, ...fallbackValue };
+              success = true;
+              errors.push(`[${step.name}] ${lastErr} (fallback used)`);
+              log.push({
+                step: step.name,
+                status: "fallback_used",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,       // P0-4: 카테고리
+                attempted: maxAttempts,        // P0-4: 재시도 횟수
+              });
+              stepsOk++;
+              stepsFailed--;
+              (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+              continue;
+            } catch (fallbackErr: any) {
+              errors.push(`[${step.name}] ${lastErr} → fallback also failed: ${fallbackErr.message}`);
+            }
+          }
+
+          if (!success) {
+            errors.push(`[${step.name}] ${lastErr}`);
+            log.push({
+              step: step.name,
+              status: "failed",
+              ms: stepMs,
+              error: lastErr,
+              category: errorCategory,         // P0-4: 카테고리
+              attempted: maxAttempts,          // P0-4: 재시도 횟수
+            });
+
+            if (step.required !== false) {
+              // Required step failed — abort workflow
+              // P0-3: Keep checkpoint for resume on retry
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors,
+              };
+            }
+            // Optional step failed — continue
+          }
         }
       }
 
       const totalMs = T.now() - startMs;
       const status = stepsFailed === 0 ? "success" : "partial";
+
+      // P0-3: Delete checkpoint on successful completion
+      if ((status === "success" || status === "partial") && checkpointPath) {
+        deleteCheckpoint(checkpointPath);
+      }
 
       return {
         id: runId,
@@ -146,6 +324,34 @@ export function createWorkflowModule() {
         errors,
       };
     },
+
+    // ── P0-1: Error Handling Helpers ──────────────────────────
+
+    // step-with-error step handler-fn -> WorkflowStep (add error handler)
+    "step-with-error": (step: WorkflowStep, handler: (err: any) => any): WorkflowStep => ({
+      ...step,
+      on_error: handler,
+    }),
+
+    // step-with-fallback step value-or-fn -> WorkflowStep (add fallback)
+    "step-with-fallback": (step: WorkflowStep, value: any): WorkflowStep => ({
+      ...step,
+      fallback: value,
+    }),
+
+    // step-with-timeout step ms -> WorkflowStep (add timeout)
+    "step-with-timeout": (step: WorkflowStep, ms: number): WorkflowStep => ({
+      ...step,
+      timeout_ms: ms,
+    }),
+
+    // ── P0-2: Conditional Execution Helpers ──────────────────
+
+    // step-when step condition-fn -> WorkflowStep (add conditional)
+    "step-when": (step: WorkflowStep, condition: (ctx: Record<string, any>) => boolean): WorkflowStep => ({
+      ...step,
+      if: condition,
+    }),
 
     // ── Result Inspection ─────────────────────────────────────
 

@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.0.0",
-  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). v9와 v9-frontend 통합.",
+  "version": "11.1.0",
+  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). v9와 v9-frontend 통합. [v11.1: P0 Agent Reliability Features]",
   "keywords": [
     "ai",
     "language",
