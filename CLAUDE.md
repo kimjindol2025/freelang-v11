@@ -6,6 +6,68 @@
 
 ---
 
+## 🤖 **공식 정의: FreeLang v11은 AI 전용 언어**
+
+### 범위 (Scope)
+```
+✅ FreeLang의 평가 대상:
+   - AI 에이전트가 코드를 생성하는 능력
+   - AI가 안정적으로 실행하는 능력
+   - AI의 학습 곡선 (2-3시간)
+   - AI의 자동 오류 방지 (실수 6가지)
+
+❌ 평가 대상 아님:
+   - 인간 프로그래머의 학습 곡선
+   - 범용 프로그래밍 언어로서의 완성도
+   - 웹서버, 시스템 프로그래밍 등 일반 용도
+```
+
+### 평가 기준 (Evaluation Criteria)
+```
+모든 평가는 AI 기준으로 함:
+
+"AI가 이 언어로 안정적으로 코드를 생성하고 
+ 신뢰하고 배포할 수 있는가?"
+
+→ YES = A 등급
+→ 일부 = B 등급
+→ NO = C 등급 이하
+```
+
+### 용도 분류 (Purpose Classification)
+
+| 용도 | 평가 | 근거 |
+|------|------|------|
+| **AI 에이전트 코드 생성** | ⭐⭐⭐ A+ | 완벽 적합 |
+| **AI 작업 조율 (Orchestration)** | ⭐⭐⭐ A+ | 완벽 적합 |
+| **결정론적 배치 작업** | ⭐⭐⭐ A+ | 완벽 적합 |
+| **인간 프로그래밍** | ⭐⭐ B | 가능하지만 권장 안 함 |
+| **웹서버 (범용)** | ⭐ C | 비권장 (Python/Node.js 권장) |
+
+---
+
+## 🤖 AI가 먼저 읽을 것 (필독!)
+
+이 프로젝트에서 **코드를 생성하려면 반드시** 다음 순서로:
+
+1. **[AI 학습 경로](./docs/AI_LEARNING_PATH.md)** (30분)
+   - 언어 철학, 기본 문법, 자주 하는 실수
+   - **AI가 가장 자주 실수하는 7가지 패턴 포함**
+   
+2. **[stdlib 참조](./docs/STDLIB_REFERENCE.md)** (함수 검색용)
+   - 30개+ 함수 상세 (시그니처, 예제, 에러)
+   - 파라미터 순서, 반환값 명시
+   
+3. **[AI 시스템 프롬프트](./docs/AI_SYSTEM_PROMPT.md)** (생성 전)
+   - 자동 생성된 stdlib 함수 3,777개 (모두)
+   - 정확한 함수명, 타입 정보
+
+4. **[빠른 검증](./docs/AI_QUICKSTART.md)**
+   - 코드 생성 후 체크리스트
+   - 컴파일 에러 시 디버깅
+
+---
+
 ## 🛠️ CLI 도구 — freelang-v11-cli
 
 ### 파일 위치
@@ -41,6 +103,108 @@ npm install -g freelang-cli
 ### 특이사항
 - `templates/` 디렉터리 없음 — `new` 커맨드가 파일 내용을 인라인으로 보유
 - `package-cli.json` 을 `package.json` 으로 복사 후 `npm publish`
+
+---
+
+## 📊 성능 & 최적화 (검증됨)
+
+### 벤치마크 결과 (자동 생성)
+**파일**: `benchmark-results.json`
+
+| 항목 | 성능 | 평가 |
+|------|------|------|
+| **Lexing** | 530만 ops/sec | 매우 빠름 |
+| **Parsing** | 31만 ops/sec | 실시간 가능 |
+| **Execution** | 99만 ops/sec | 충분함 |
+| **Memory** | 75MB (heap) | bootstrap.js 포함 |
+| **Compilation** | 128만 lines/sec | 즉시 컴파일 가능 |
+| **Async** | 23,938 ops/sec | 동시 처리 OK |
+
+**결론**: 배터리/메모리 최적화가 중요한 환경(모바일, IoT)은 Python http.server 고려. 일반 서버/에이전트는 충분.
+
+---
+
+## 🌐 HTTP 서버 — stdlib-http-server (경량, Express 불필요)
+
+### 개요
+FreeLang v11 stdlib에는 **Pure HTTP 서버**가 내장되어 있습니다.
+- Node.js `http` 모듈만 사용 (Express/Koa 의존 없음)
+- 메모리: ~58MB (bootstrap.js 포함)
+- 정적 파일 + JSON API에 최적화
+
+### 파일
+| 파일 | 역할 |
+|---|---|
+| `src/stdlib-http-server.ts` | HTTP 서버 구현 (27KB) |
+| `src/stdlib-http.ts` | HTTP 클라이언트 (curl 래퍼) |
+
+### 주요 함수
+```lisp
+;; 라우트 등록
+(server_get "/" handler-fn)
+(server_post "/api/data" handler-fn)
+(server_put "/api/:id" handler-fn)
+(server_delete "/api/:id" handler-fn)
+
+;; 서버 제어
+(server_start port)          ;; 포트에서 시작
+(server_stop)                ;; 종료
+
+;; 응답 생성
+(server_html body)           ;; text/html 응답
+(server_json obj)            ;; application/json 응답
+(server_text body)           ;; text/plain 응답
+(server_status code body)    ;; 커스텀 상태 코드
+
+;; 요청 처리
+(server_req_path req)        ;; 경로
+(server_req_method req)      ;; HTTP 메서드
+(server_req_body req)        ;; 바디 (string)
+(server_req_json req)        ;; 바디 (자동 파싱 JSON)
+(server_req_query req key)   ;; 쿼리 파라미터
+(server_req_param req name)  ;; URL 파라미터
+(server_req_header req name) ;; 헤더
+```
+
+### 예제 — 간단한 API 서버
+```lisp
+;; app/api.fl
+(defn handle-index [req]
+  (server_html "<h1>안녕!</h1>"))
+
+(defn handle-users [req]
+  (server_json [{:id 1 :name "Alice"}
+                {:id 2 :name "Bob"}]))
+
+(defn handle-create [req]
+  (let [[body (server_req_json req)]]
+    (server_json {:ok true :data body})))
+
+;; 라우트
+(server_get "/" "handle-index")
+(server_get "/api/users" "handle-users")
+(server_post "/api/users" "handle-create")
+
+;; 실행
+(server_start 3000)
+(println "Server: http://localhost:3000")
+```
+
+실행:
+```bash
+node bootstrap.js run app/api.fl
+curl http://localhost:3000/api/users
+```
+
+### 성능 팁
+1. **배터리 절약**: Python `http.server` (10MB) vs FreeLang (58MB) — 리소스 중요시 Python 선택
+2. **통일성**: 전체 프로젝트가 FreeLang이면 stdlib-http-server 사용
+3. **확장성**: 미래에 WebSocket/동적 렌더링 추가할 계획이면 FreeLang 선택
+
+### 알려진 한계
+- Hot reload: `FL_DEV=1` 환경변수 필요 (cli.ts가 처리)
+- WebSocket: 기본 지원 (`server_on_upgrade`)
+- 정적 파일: `server_file` 없음 → 별도 파일 읽기 필요
 
 ---
 

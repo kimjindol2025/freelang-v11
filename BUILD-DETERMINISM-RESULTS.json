@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-04-26T12:55:45Z",
+  "timestamp": "2026-04-27T04:46:49Z",
   "pass": 2,
   "fail": 0,
-  "build1_seconds": 1,
-  "build2_seconds": 1,
+  "build1_seconds": 6,
+  "build2_seconds": 5,
   "artifacts": [
     {"file": "bootstrap.js", "build1_sha256": "6f8118948b5356d1d8943e8ad23a2fc78ff3bb3b21461b950ef508afedfc7c8a", "build2_sha256": "6f8118948b5356d1d8943e8ad23a2fc78ff3bb3b21461b950ef508afedfc7c8a", "match": true},
     {"file": "browser.js", "build1_sha256": "a642f742ca2a50c1e44ac4fadb16e15d855411efdc42a2b33fe8239fe9058cce", "build2_sha256": "a642f742ca2a50c1e44ac4fadb16e15d855411efdc42a2b33fe8239fe9058cce", "match": true}

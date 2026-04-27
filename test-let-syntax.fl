@@ -1,0 +1,2 @@
+;; Test new let syntax
+(let [[x 10]] x)

@@ -1,0 +1,8 @@
+;; node-to-pattern 직접 테스트
+;; map literal node를 struct-pattern으로 변환하는지 확인
+
+;; Test: map block을 패턴으로 변환
+(define test-map-node {:kind "block" :type "Map" :fields {:items [{:kind "keyword" :name "status"} {:kind "literal" :type "string" :value "ok"}]}})
+(define pat (node-to-pattern test-map-node))
+(println "Pattern kind:" (get pat :kind))
+(println "Pattern type:" (get pat :type))
