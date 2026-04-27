@@ -940,7 +940,7 @@ var init_parser = __esm({
         const peekPos = this.pos + 1;
         if (peekPos >= this.tokens.length) return false;
         const nextToken = this.tokens[peekPos];
-        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */;
+        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */ || nextToken.type === "LBrace" /* LBrace */ || nextToken.type === "LParen" /* LParen */;
       }
       // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
       // Also handles match expressions: (match value (pattern body) ...)
