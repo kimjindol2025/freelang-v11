@@ -32715,29 +32715,40 @@ var WebServer = class {
 };
 
 // src/cli.ts
-function formatError(err4, source, filePath) {
+function formatError(err4, source, filePath, runtimeLine) {
   const fileName = filePath ? path13.basename(filePath) : "<stdin>";
   const lines = [];
-  if (err4 instanceof ParserError) {
-    lines.push(`
-\x1B[31m\uD30C\uC2F1 \uC624\uB958\x1B[0m  ${fileName}:${err4.line}:${err4.col}`);
-    if (source) {
-      const srcLines = source.split("\n");
-      const lineIdx = err4.line - 1;
-      if (lineIdx >= 0 && lineIdx < srcLines.length) {
-        const lineNum = String(err4.line).padStart(4, " ");
-        lines.push(`  ${lineNum} \u2502 ${srcLines[lineIdx]}`);
-        lines.push(`       ${"\u2500".repeat(err4.col - 1)}^`);
-      }
+  function showSourceLine(lineNo) {
+    if (!source || !lineNo || lineNo < 1) return;
+    const srcLines = source.split("\n");
+    const lineIdx = lineNo - 1;
+    if (lineIdx >= 0 && lineIdx < srcLines.length) {
+      const lineNum = String(lineNo).padStart(4, " ");
+      const codeLine = srcLines[lineIdx];
+      lines.push(`  ${lineNum} \u2502 ${codeLine}`);
+      const m = codeLine.match(/^\s*/);
+      const indent = m ? m[0].length : 0;
+      lines.push(`       ${"─".repeat(indent)}^`);
     }
+  }
+  if (err4 instanceof ParserError) {
+    lines.push(`\n\x1B[31m\uD30C\uC2F1 \uC624\uB958\x1B[0m  ${fileName}:${err4.line}:${err4.col}`);
+    showSourceLine(err4.line);
     lines.push(`  ${err4.message}`);
   } else if (err4 instanceof Error) {
-    lines.push(`
-\x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}`);
-    lines.push(`  ${err4.message}`);
+    const line = runtimeLine || err4._flLine;
+    const loc = line ? `:${line}` : "";
+    lines.push(`\n\x1B[31m\uB7F0\uD0C0\uC784 \uC624\uB958\x1B[0m  ${fileName}${loc}`);
+    showSourceLine(line);
+    let msg = err4.message || String(err4);
+    if (msg === "[object Object]" || msg === "{}") {
+      msg = "\uC54C \uC218 \uC5C6\uB294 \uAC1D\uCCB4 \uC624\uB958 (throw\uB41C \uAC12\uC774 \uBB38\uC790\uC5F4\uC774 \uC544\uB2D8) \u2014 throw \uC5F0\uC0B0\uC790\uB97C \uD655\uC778\uD558\uC138\uC694";
+    }
+    lines.push(`  ${msg}`);
+    if (err4.hint && !msg.includes(err4.hint)) lines.push(`  \ud78c\ud2b8: ${err4.hint}`);
   } else {
-    lines.push(`
-\x1B[31m\uC624\uB958\x1B[0m  ${String(err4)}`);
+    const raw = typeof err4 === "object" ? JSON.stringify(err4) : String(err4);
+    lines.push(`\n\x1B[31m\uC624\uB958\x1B[0m  ${raw}`);
   }
   return lines.join("\n");
 }
@@ -32762,17 +32773,19 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   function execute() {
     const source = fs17.readFileSync(absPath, "utf-8");
     let ctx;
+    let interp2 = null;
     try {
       const tokens = lex(source);
       const ast = parse(tokens);
-      const interp2 = new Interpreter();
+      interp2 = new Interpreter();
       interp2.currentFilePath = absPath;
       if (extraArgs.length > 0) {
         interp2.context.variables.set("$__argv__", extraArgs);
       }
       ctx = interp2.interpret(ast);
     } catch (err4) {
-      console.error(formatError(err4, source, absPath));
+      const runtimeLine = interp2 ? interp2.currentLine : null;
+      console.error(formatError(err4, source, absPath, runtimeLine));
       if (!watch2) process.exit(1);
       return;
     }
