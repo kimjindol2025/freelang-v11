@@ -225,10 +225,11 @@
       [(and (= $kind "block") (= $type "Array"))
        ;; array pattern: 배열 값에서 첫 항목을 추출해서 패턴과 매칭
        (let [[$items (get (get $pat-node :fields) "items")]
-             [$first-pat (if (null? $items) nil (get $items 0))]]
+             [$first-pat (if (null? $items) nil (get $items 0))]
+             [$tmpvar-next (str $tmpvar "_inner")]]
          (if (null? $first-pat) ""
            (str "let " $tmpvar "=" $val-js "[0];"
-             (cg-let-binding $first-pat $tmpvar $tmpvar))))]
+             (cg-let-binding $first-pat $tmpvar $tmpvar-next))))]
       [true
        (str "let " (extract-name $pat-node) "=" $val-js ";")]))]
 
@@ -507,7 +508,7 @@
                 [$access (str $v "[" (js-esc $k-clean) "]")]
                 [$binding (pattern-bindings-dispatch (get $pat :kind) $pat $access)]]
             (cg-map-pattern-bindings-from-entries $entries $v (+ $i 1)
-              (str $acc $binding)))))]
+              (str $acc $binding))))]
 
 ;; struct-pattern-bindings: Collect bindings from all fields
 ;; bootstrap parser: fields = Map{...} → map-entries로 변환
@@ -515,7 +516,7 @@
 [FUNC struct-pattern-bindings :params [$fields $v $i $keys $acc]
   :body (if (nil? $keys)
           (let [[$ks (json_keys $fields)]]
-            (if (nil-or-empty? $ks)
+            (if (empty? $ks)
               ;; Map인 경우: json_keys가 빈 배열 반환 → map-entries 사용
               (struct-pattern-bindings-from-entries (map-entries $fields) $v 0 "")
               ;; plain object인 경우: json_keys로 계속 진행
