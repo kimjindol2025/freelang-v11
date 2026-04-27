@@ -63,6 +63,9 @@
 (json_set m "age" 31)                         ;; 새 map 반환
 (json_keys m)                                 ;; ["name","age"]
 (map-entries m)                               ;; [["name","kim"],...]
+(obj_merge {:a 1} {:b 2})                    ;; {:a 1 :b 2}
+(obj_pick m ["name"])                         ;; {:name "kim"}
+(obj_omit m ["age"])                          ;; {:name "kim"}
 ```
 
 ---
@@ -236,11 +239,12 @@
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
-| 2026-04-27 | `server_static` — 정적 파일 서빙 | ✅ bootstrap.js |
+| 2026-04-28 | 런타임 에러 소스 라인+포인터 표시 | ✅ bootstrap.js |
+| 2026-04-28 | `obj_merge` `obj_pick` `obj_omit` 추가 | ✅ bootstrap.js |
+| 2026-04-27 | `file_mkdir` `file_rmdir` `get_env` `get_env_or` 추가 | ✅ bootstrap.js |
+| 2026-04-27 | `server_req_body` JSON 자동파싱 | ✅ bootstrap.js |
+| 2026-04-27 | `shell_exec` / `server_static` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | Map 패턴 매칭 `{:key $var}` | ✅ bootstrap.js |
-| 2026-04-27 | `(help)` `(fns)` `(fns-all)` REPL 함수 조회 | ✅ |
-| 2026-04-26 | `plugins/auth.fl` JWT 플러그인 | ✅ |
-| 2026-04-26 | `(use NAME)` 플러그인 로드 | ✅ |
 
 ---
 
