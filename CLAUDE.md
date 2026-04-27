@@ -1,587 +1,243 @@
-# FreeLang v11 — 실측 현황 보고서
+# FreeLang v11 — Claude 빠른 레퍼런스
 
-> **규칙**: 이 문서는 **실제 검증한 내용만** 기록합니다.  
-> 미검증 주장은 "관측 안 됨" 또는 "미검증"으로 표기합니다.  
-> [`TRUTH_POLICY.md`](./TRUTH_POLICY.md) 를 준수합니다.
+> **읽는 시간**: 5분 | **목적**: Claude가 FreeLang 코드를 즉시 작성할 수 있도록
+> **런타임**: `node bootstrap.js run <file.fl>` | **PM2**: `pm2 restart <name>`
 
 ---
 
-## 🤖 **공식 정의: FreeLang v11은 AI 전용 언어**
+## ⚠️ 자주 틀리는 것 (먼저 읽기)
 
-### 범위 (Scope)
-```
-✅ FreeLang의 평가 대상:
-   - AI 에이전트가 코드를 생성하는 능력
-   - AI가 안정적으로 실행하는 능력
-   - AI의 학습 곡선 (2-3시간)
-   - AI의 자동 오류 방지 (실수 6가지)
-
-❌ 평가 대상 아님:
-   - 인간 프로그래머의 학습 곡선
-   - 범용 프로그래밍 언어로서의 완성도
-   - 웹서버, 시스템 프로그래밍 등 일반 용도
+```fl
+;; ❌ → ✅
+(map [1 2 3] fn)        → (map fn [1 2 3])          ;; map: fn 먼저
+(filter fn arr)         → (filter arr fn)            ;; filter: array 먼저
+(server_listen 3000)    → (server_start 3000)
+(get-or m k d)          → 직접 정의 필요 (내장 없음)
+{a 1}                   → {:a 1}                     ;; 키워드 필수
+(= x null)              → (nil? x)
+(console.log x)         → (println x)
+(str-to-int "42")       → (parse-int "42")
 ```
 
-### 평가 기준 (Evaluation Criteria)
+---
+
+## 🔤 기본 문법
+
+```fl
+;; 변수
+(define x 42)
+
+;; 함수 (두 가지)
+[FUNC add :params [$a $b] :body (+ $a $b)]
+(defn add [$a $b] (+ $a $b))
+
+;; 조건
+(if (> x 0) "양수" "음수")
+(cond [(= x 1) "하나"] [(= x 2) "둘"] [true "기타"])
+
+;; let
+(let [[$x 10] [$y 20]] (+ $x $y))
+
+;; do 블록
+(do (define a 1) (define b 2) (+ a b))
 ```
-모든 평가는 AI 기준으로 함:
 
-"AI가 이 언어로 안정적으로 코드를 생성하고 
- 신뢰하고 배포할 수 있는가?"
+---
 
-→ YES = A 등급
-→ 일부 = B 등급
-→ NO = C 등급 이하
+## 📋 컬렉션
+
+```fl
+;; 배열
+(get arr 0)                                   ;; 인덱스 접근
+(length arr)                                  ;; 길이
+(append arr 6)                                ;; 추가 (불변)
+(slice arr 1 3)                               ;; 슬라이스
+(map fn arr)                                  ;; ※ fn 먼저!
+(filter arr fn)                               ;; ※ array 먼저!
+(reduce fn init arr)
+(join arr ", ")
+
+;; map/object
+(define m {:name "kim" :age 30})
+(get m "name")                                ;; "kim"
+(json_set m "age" 31)                         ;; 새 map 반환
+(json_keys m)                                 ;; ["name","age"]
+(map-entries m)                               ;; [["name","kim"],...]
 ```
 
-### 용도 분류 (Purpose Classification)
+---
 
-| 용도 | 평가 | 근거 |
+## 🌐 HTTP 서버
+
+```fl
+;; 라우트 등록 — 핸들러는 반드시 문자열
+(server_get    "/path"     "handler-name")
+(server_post   "/api/data" "handle-post")
+(server_put    "/api/:id"  "handle-put")
+(server_delete "/api/:id"  "handle-delete")
+(server_start 40100)
+
+;; 요청
+(server_req_params $req)         ;; URL 파라미터 {:id "1"}
+(server_req_query  $req "key")   ;; ?key=val
+(server_req_body   $req)         ;; body (JSON 자동 파싱)
+(server_req_cookie $req "name")  ;; 쿠키
+(server_req_header $req "Authorization")
+
+;; 응답
+(server_html   "<h1>안녕</h1>")
+(server_json   {:ok true :data result})
+(server_text   "plain text")
+(server_status 404 {:error "Not Found"})
+(server_redirect "/login")
+(server_static "public/app.css")   ;; ✨ NEW — MIME 자동, 바이너리 OK
+
+;; 쿠키 포함
+(server_html_cookie     "sid=abc; Path=/; HttpOnly" "<html>...")
+(server_redirect_cookie "/home" "sid=; Path=/; Max-Age=0")
+```
+
+---
+
+## 🗄️ MariaDB
+
+```fl
+(define DB (mariadb_connect {:host "localhost" :user "root"
+                              :password "" :database "mydb"}))
+
+(mariadb_query DB "SELECT * FROM users" [])            ;; → 배열
+(mariadb_one   DB "SELECT * FROM users WHERE id=1" []) ;; → row or null
+(mariadb_exec  DB "INSERT INTO t (name) VALUES (?)" ["kim"])
+
+;; SQL 이스케이프 (내장 esc 함수 사용)
+(str "SELECT * FROM users WHERE name=" (esc username))
+```
+
+---
+
+## 🔐 인증
+
+```fl
+(auth_hash_password "test1234")           ;; → "salt:hash"
+(auth_verify_password "입력값" "salt:hash") ;; → true/false
+(auth_random_token 32)                    ;; → 64자 hex
+
+(auth_jwt_sign   {:user_id 1} "secret" 3600)
+(auth_jwt_verify token "secret")          ;; → payload or null
+(auth_jwt_expired token)                  ;; → true/false
+(auth_sha256 "data")
+(auth_hmac "data" "secret")
+```
+
+---
+
+## 🎯 패턴 매칭 ✨ 2026-04-27 완성
+
+```fl
+;; 기본
+(match value
+  (42    "마흔둘")
+  ("ok"  "성공")
+  (_     "기타"))
+
+;; Map 패턴 — 변수 캡처
+(match {:status "ok" :data 42}
+  ({:status "ok"    :data $d} (str "성공: " $d))
+  ({:status "error" :msg  $m} (str "에러: " $m))
+  (_ "미상"))
+
+;; 중첩 + 다중 캡처
+(match {:user {:name "kim"} :role "admin"}
+  ({:user {:name $n} :role "admin"} (str $n " 관리자"))
+  (_ "일반"))
+```
+
+---
+
+## 📁 파일
+
+```fl
+(file_read   "path/file.txt")
+(file_write  "path/file.txt" "내용")
+(file_append "log.txt" "한 줄\n")
+(file_exists "path")            ;; → true/false
+(file_mkdir  "dir/path")
+(file_delete "file.txt")
+```
+
+---
+
+## 🤖 AI
+
+```fl
+;; ANTHROPIC_API_KEY 환경변수 필요
+(ai-call "claude-sonnet-4-6" "질문")
+(ai-call "claude-sonnet-4-6" {:prompt "질문" :max-tokens 2048})
+
+;; 에이전트
+(define a (agent_create "agent"))
+(define a (agent_set a "goal" "목표"))
+(agent_run_until a
+  (fn [$a] (agent_done $a))
+  (fn [$a] (agent_set $a "status" "done")))
+```
+
+---
+
+## 🏗️ 전체 서버 앱 패턴
+
+```fl
+(define DB (mariadb_connect {:host "localhost" :user "root"
+                              :password "" :database "mydb"}))
+
+;; 세션 헬퍼
+[FUNC get-session :params [$req]
+  :body (
+    (define sid (server_req_cookie $req "app_sid"))
+    (if (= sid null) null
+      (mariadb_one DB
+        (str "SELECT * FROM sessions WHERE session_id='" sid
+             "' AND expires_at > NOW()") []))
+  )
+]
+
+;; 인증 핸들러
+[FUNC handle-get-users :params [$req]
+  :body (
+    (define sess (get-session $req))
+    (if (= sess null)
+      (server_status 401 {:ok false :error "인증 필요"})
+      (server_json {:ok true
+                    :data (mariadb_query DB "SELECT * FROM users" [])}))
+  )
+]
+
+(server_get "/api/users" "handle-get-users")
+(server_start 40100)
+```
+
+---
+
+## 📦 최신 변경 이력
+
+| 날짜 | 기능 | 상태 |
 |------|------|------|
-| **AI 에이전트 코드 생성** | ⭐⭐⭐ A+ | 완벽 적합 |
-| **AI 작업 조율 (Orchestration)** | ⭐⭐⭐ A+ | 완벽 적합 |
-| **결정론적 배치 작업** | ⭐⭐⭐ A+ | 완벽 적합 |
-| **인간 프로그래밍** | ⭐⭐ B | 가능하지만 권장 안 함 |
-| **웹서버 (범용)** | ⭐ C | 비권장 (Python/Node.js 권장) |
+| 2026-04-27 | `server_static` — 정적 파일 서빙 | ✅ bootstrap.js |
+| 2026-04-27 | Map 패턴 매칭 `{:key $var}` | ✅ bootstrap.js |
+| 2026-04-27 | `(help)` `(fns)` `(fns-all)` REPL 함수 조회 | ✅ |
+| 2026-04-26 | `plugins/auth.fl` JWT 플러그인 | ✅ |
+| 2026-04-26 | `(use NAME)` 플러그인 로드 | ✅ |
 
 ---
 
-## 🤖 AI가 먼저 읽을 것 (필독!)
-
-이 프로젝트에서 **코드를 생성하려면 반드시** 다음 순서로:
-
-1. **[AI 학습 경로](./docs/AI_LEARNING_PATH.md)** (30분)
-   - 언어 철학, 기본 문법, 자주 하는 실수
-   - **AI가 가장 자주 실수하는 7가지 패턴 포함**
-   
-2. **[stdlib 참조](./docs/STDLIB_REFERENCE.md)** (함수 검색용)
-   - 30개+ 함수 상세 (시그니처, 예제, 에러)
-   - 파라미터 순서, 반환값 명시
-   
-3. **[AI 시스템 프롬프트](./docs/AI_SYSTEM_PROMPT.md)** (생성 전)
-   - 자동 생성된 stdlib 함수 3,777개 (모두)
-   - 정확한 함수명, 타입 정보
-
-4. **[빠른 검증](./docs/AI_QUICKSTART.md)**
-   - 코드 생성 후 체크리스트
-   - 컴파일 에러 시 디버깅
-
----
-
-## 🛠️ CLI 도구 — freelang-v11-cli
-
-### 파일 위치
-| 파일 | 설명 |
-|---|---|
-| `bin/freelang` | 실행 진입점 (Node.js CJS) |
-| `package-cli.json` | npm 패키지 메타 (`freelang-cli@1.0.0`) |
-| `freelang-cli-1.0.0.tgz` | npm pack 결과물 (11.1kB) |
-| `src/CLI.md` | CLI 설계 및 사용법 문서 |
-| `src/CLI-DEPLOYMENT.md` | npm 배포 가이드 |
-
-### 지원 커맨드 (모두 동작 검증 완료)
-```bash
-freelang new myapp            # 프로젝트 생성 (express-api 기본)
-freelang new myapp --websocket # WebSocket 템플릿
-freelang new myapp --agent    # AI 에이전트 템플릿
-freelang dev                  # 개발 서버 + hot reload
-freelang build                # 프로덕션 빌드
-freelang test                 # 테스트 실행
-freelang deploy               # gogs 푸시 + 배포
-freelang migrate              # DB 스키마 마이그레이션
-```
-
-### 설치
-```bash
-# tgz 로컬 설치
-npm install -g ./freelang-cli-1.0.0.tgz
-
-# npm 글로벌 (배포 후)
-npm install -g freelang-cli
-```
-
-### 특이사항
-- `templates/` 디렉터리 없음 — `new` 커맨드가 파일 내용을 인라인으로 보유
-- `package-cli.json` 을 `package.json` 으로 복사 후 `npm publish`
-
----
-
-## 📊 성능 & 최적화 (검증됨)
-
-### 벤치마크 결과 (자동 생성)
-**파일**: `benchmark-results.json`
-
-| 항목 | 성능 | 평가 |
-|------|------|------|
-| **Lexing** | 530만 ops/sec | 매우 빠름 |
-| **Parsing** | 31만 ops/sec | 실시간 가능 |
-| **Execution** | 99만 ops/sec | 충분함 |
-| **Memory** | 75MB (heap) | bootstrap.js 포함 |
-| **Compilation** | 128만 lines/sec | 즉시 컴파일 가능 |
-| **Async** | 23,938 ops/sec | 동시 처리 OK |
-
-**결론**: 배터리/메모리 최적화가 중요한 환경(모바일, IoT)은 Python http.server 고려. 일반 서버/에이전트는 충분.
-
----
-
-## 🌐 HTTP 서버 — stdlib-http-server (경량, Express 불필요)
-
-### 개요
-FreeLang v11 stdlib에는 **Pure HTTP 서버**가 내장되어 있습니다.
-- Node.js `http` 모듈만 사용 (Express/Koa 의존 없음)
-- 메모리: ~58MB (bootstrap.js 포함)
-- 정적 파일 + JSON API에 최적화
-
-### 파일
-| 파일 | 역할 |
-|---|---|
-| `src/stdlib-http-server.ts` | HTTP 서버 구현 (27KB) |
-| `src/stdlib-http.ts` | HTTP 클라이언트 (curl 래퍼) |
-
-### 주요 함수
-```lisp
-;; 라우트 등록
-(server_get "/" handler-fn)
-(server_post "/api/data" handler-fn)
-(server_put "/api/:id" handler-fn)
-(server_delete "/api/:id" handler-fn)
-
-;; 서버 제어
-(server_start port)          ;; 포트에서 시작
-(server_stop)                ;; 종료
-
-;; 응답 생성
-(server_html body)           ;; text/html 응답
-(server_json obj)            ;; application/json 응답
-(server_text body)           ;; text/plain 응답
-(server_status code body)    ;; 커스텀 상태 코드
-
-;; 요청 처리
-(server_req_path req)        ;; 경로
-(server_req_method req)      ;; HTTP 메서드
-(server_req_body req)        ;; 바디 (string)
-(server_req_json req)        ;; 바디 (자동 파싱 JSON)
-(server_req_query req key)   ;; 쿼리 파라미터
-(server_req_param req name)  ;; URL 파라미터
-(server_req_header req name) ;; 헤더
-```
-
-### 예제 — 간단한 API 서버
-```lisp
-;; app/api.fl
-(defn handle-index [req]
-  (server_html "<h1>안녕!</h1>"))
-
-(defn handle-users [req]
-  (server_json [{:id 1 :name "Alice"}
-                {:id 2 :name "Bob"}]))
-
-(defn handle-create [req]
-  (let [[body (server_req_json req)]]
-    (server_json {:ok true :data body})))
-
-;; 라우트
-(server_get "/" "handle-index")
-(server_get "/api/users" "handle-users")
-(server_post "/api/users" "handle-create")
-
-;; 실행
-(server_start 3000)
-(println "Server: http://localhost:3000")
-```
-
-실행:
-```bash
-node bootstrap.js run app/api.fl
-curl http://localhost:3000/api/users
-```
-
-### 성능 팁
-1. **배터리 절약**: Python `http.server` (10MB) vs FreeLang (58MB) — 리소스 중요시 Python 선택
-2. **통일성**: 전체 프로젝트가 FreeLang이면 stdlib-http-server 사용
-3. **확장성**: 미래에 WebSocket/동적 렌더링 추가할 계획이면 FreeLang 선택
-
-### 알려진 한계
-- Hot reload: `FL_DEV=1` 환경변수 필요 (cli.ts가 처리)
-- WebSocket: 기본 지원 (`server_on_upgrade`)
-- 정적 파일: `server_file` 없음 → 별도 파일 읽기 필요
-
----
-
-## 📊 Year 2 라운드 1 진척 (2026-04-26)
-
-**점수**: 87.5 → **95/100 (A+)** 도달.
-
-**자체호스팅 진척**:
-- **Y4-1**: `make run` (`scripts/fl-run.sh`) — bootstrap 우회 stage1 직접 실행 ✅
-- **Y4-2 단계A**: `self/runtime/http-server.js` (23KB CJS bundle, esbuild) ✅
-- **Y4-3 단계A**: `self/runtime/interpreter.js` (1.1MB, Interpreter+lex+parse 단일 번들) ✅
-- **Y4-3 단계B**: `self/runtime/repl.js` + `make repl` — **bootstrap 의존 제거 완료** ✅
-- 빌드: `make build-runtime` → `scripts/build-runtime.sh` (esbuild)
-
-**property-based testing** (Y3++++): **200 invariant × N case** 검증 인프라 ✅
-- `scripts/property-test.js`, `make property-test ARGS=--n=10`
-- KPI 1000 의 20% 도달, P0-1 nil 회귀 가드 (I014, I048, I078, I086, I090)
-
-**미해결 (별도 PR)**:
-- Y4-2 단계B: stage1 codegen prelude 변경 → SHA256 재baseline
-- 4건 codegen 개선 후보: `docs/CODEGEN_IMPROVEMENTS.md` (C1~C4)
-- Y5 plugin 시스템 (3주 설계 시점)
-
-**검증 명령**:
-```bash
-make verify-all                    # 4 검증 통합 (~3.8분)
-make property-test ARGS=--n=10     # 200 invariant × 10 = 2000 case
-make build-runtime                 # self/runtime/ 재빌드
-make repl                          # self/runtime/repl.js 직접 실행
-sha256sum stage1.js                # 0aab7ab1... 보존 확인
-```
-
----
-
-## 📊 실측 상태 (2026-04-25 AI 1~5 + Phase A~E + Phase 4 self-host 회복 완료)
-
-### "AI가 FreeLang을 잘 쓰게 하기" — AI-1~5 완료
-
-언어 품질(Phase A~E)을 넘어 **AI가 안정적으로 FreeLang을 작성하도록** 도구화:
-
-- **AI-1**: `scripts/gen-ai-prompt.js` — 378개 stdlib 시그니처 → AI 시스템 프롬프트 자동 생성
-  · `docs/AI_SYSTEM_PROMPT.md` (full, 5,777 tokens) + `MINI.md` (1,351 tokens)
-  · `npm run build` 시 자동 갱신
-- **AI-2**: `docs/AI_QUICKSTART.md` — AI 5분 가이드 (10개 즉시 복사 템플릿 + 10가지 자주 틀리는 함정)
-- **AI-3**: `scripts/ai-validate.js` — AI 출력 자동 normalize + 검증 (defun→defn, ==→=, typo Levenshtein 제안, --fix 모드)
-- **AI-4**: `scripts/ai-self-verify.js` — AI 자가 검증 루프 (validate + 실행 + 실패 시 ErrorCode/힌트 구조화 출력 → AI 재요청 가능)
-- **AI-5**: `benchmarks/fl-bench/` — 5개 MVP task + 평가 실행기 + AI 모델별 점수 측정 인프라
-
-부수 발견: stdlib `filter` 인자 순서 자동 감지로 수정 → `(filter fn list)`/`(filter list fn)` 모두 허용
-
-
-
-### Phase A~E 핵심 성과 — AI 완성도 78 → 87+
-
-**5단계 점수 향상**:
-- Phase A: 에러 메시지 enrichment (72 → 80) — `ErrorCodes`/`FLRuntimeError`/컨텍스트/자동 복구 힌트
-- Phase B: API 일관성 + 타입 predicate (75 → 82) — `nil?`/`array?`/`fn?` alias + `stdlib-type-predicates.ts` 단일 출처 + `STDLIB_NAMING_AUDIT.md`
-- Phase C: nil-safe wrapper + strict 모드 (68 → 75) — `get-or`/`first-or`/`last-or` + `FL_STRICT=1` 환경변수
-- Phase D: `(use NAME)` special form (65 → 78) — `self/stdlib/*.fl` 한 줄 import + `defun` Common Lisp alias
-- Phase E: callStack 추적 (70 → 82) — `interpreter.callStack` + `FL_TRACE=1` + stack overflow 호출 체인 dump
-
-**검증**:
-- 36개 새 테스트 케이스 추가 (errors.test.ts 누적 36/36 PASS)
-- self-hosting 보존: stage1==stage2==stage3 SHA256 일치 (`0aab7ab10e...`)
-- Breaking change 0
-
-### Phase 4 핵심 성과 — Self-Host 회복
-
-**진단 (2026-04-25)**: 자동 에이전트의 helper 분리 작업 중 `cg-native-dispatch` line 716 fallback이 `[true (cg-call $op $args)]` → `[true "null"]`로 변경되며 **모든 user-defined function call이 null로 컴파일**되는 회귀 발생.
-
-**수정**:
-- `self/codegen.fl`, `self/all.fl`의 `cg-native-dispatch` fallback 복원: `[true (str (js-name (...)) "(" $as ")")]`
-- 9개 lexer/parser/stdlib 함수에 helper 분리 패턴 일관 적용 (skip-ws-inner, read-token-inner, parse-atom-dispatch 등)
-- `(let [...] (cond ...))` 패턴이 broken JS 생성하는 codegen 결함 우회
-
-**검증** (2026-04-25):
-- ✅ stage1 == stage2 == stage3 SHA256 3단 일치 (`0aab7ab1...`)
-- ✅ verify-self-host.sh tier2: PASS 91 (이전 Phase B 수치 유지)
-- ✅ npm test: 751 PASS (이전 736 +15)
-- FAIL 6개는 자동 에이전트의 mongodb/binary 추가분 (advisory, Phase 4 무관)
-
-
-
-### 컴파일 능력
-
-| 파일 | 컴파일 | 실행 | 결과 |
-|------|--------|------|------|
-| `self/bench/hello.fl` | ✅ | ✅ | "hello" 출력 |
-| `self/bench/tiny.fl` | ✅ | ✅ | "42" 출력 |
-| `self/bench/fib30.fl` | ✅ | ✅ | "832040" 출력 |
-| `self/bench/test-time.fl` | ✅ | ✅ | "now_ms/iso/unix" 확인 |
-
-**검증 명령어**:
-```bash
-cd /home/kimjin/freelang-v11
-node bootstrap.js run self/codegen.fl self/bench/hello.fl output.js
-node output.js
-```
-
-### 테스트 결과
+## ⚙️ 실행
 
 ```bash
-npm test
+node /home/kimjin/freelang-v11/bootstrap.js run app.fl
+pm2 restart <name>
+pm2 logs <name>
+FL_DEV=1 node bootstrap.js run app.fl   # 개발 모드
 ```
 
-**결과** (2026-04-24, Phase 3-E 완료 후):
-```
-Test Suites: 22 passed, 23 total
-Tests:       736 passed, 744 total
-Time:        ~67 s
-```
-
-**Phase 3-C 완료 항목**:
-- ✅ L2 Semantic Preservation 테스트 스위트 (12/12 PASS)
-- ✅ verify-l2-proof.sh 자동화 스크립트
-- ✅ L2-PROOF-RESULTS.json 검증 결과 저장
-
-**Phase 3-D 완료 항목**:
-- ✅ self/stdlib/ai.fl 신규 작성 (7개 함수)
-- ✅ 벡터 수학 함수 (vector-add, vector-dot, cosine-sim)
-- ✅ RAG 보조 함수 (score-candidates, prompt-template, top-k-retrieval)
-- ✅ AI 라이브러리 Jest 테스트 (30/30 PASS)
-
-**Phase 3-E 완료 항목**:
-- ✅ src/vm-eligible.ts 신설 (isVMEligible 판별 함수)
-- ✅ src/interpreter.ts VM opt-in 경로 삽입 (try/catch fallback)
-- ✅ src/__tests__/vm-optin.test.ts (28/28 PASS)
-- ✅ --vm-bench 성능 측정 플래그
-
-**기록**: 2026-04-24 실제 실행 검증
-
-### 자체 호스팅 (Self-Hosting) — **Phase B 완료** ✅
-
-| 항목 | 상태 | 근거 |
-|------|------|------|
-| FL 코드 → JS 변환 | ✅ 완전 | `self/` 전 파일 컴파일 성공 |
-| 생성된 JS 실행 | ✅ 완전 | 모든 출력 일치 |
-| codegen.fl 자신 컴파일 (stage1) | ✅ 완전 | SHA256 `6b81fef4...` 달성 |
-| stage2 (self-compiled로 재컴파일) | ✅ 완전 | stage1 == stage2 == stage3 == stage4 == stage5 |
-| Fixed-point 안정성 | ✅ **달성** | **SHA256 5단계 체인 완전 일치** |
-
-### 웹 서버 (프로덕션)
-
-| 항목 | 상태 | 근거 |
-|------|------|------|
-| 서버 구동 | ✅ 가능 | 포트 30011에서 성공 |
-| HTTP 응답 | ✅ 가능 | `curl http://localhost:30011/` HTML 응답 |
-| 라우팅 | ✅ 작동 | app/page.fl 자동 발견 및 등록 |
-| SSR 렌더링 | ✅ 작동 | HTML 페이지 생성 |
-
----
-
-## 🔧 기술 스택
-
-| 계층 | 기술 | 상태 |
-|------|------|------|
-| **런타임** | Node.js v25 | 필수 의존 |
-| **번들** | bootstrap.js (1.1MB) | ✅ 존재 |
-| **컴파일러** | codegen.fl (v11로 작성) | ✅ 작동 확인 |
-| **테스트** | Jest 736개 케이스 | ✅ 모두 PASS |
-
----
-
----
-
-## 검증 현황 (2026-04-22 Phase B 완료)
-
-### ✅ 완료된 항목
-
-- [x] 성능 벤치마크 (`benchmark-results.json`)
-- [x] ISR/SSG 렌더링 (SSR만)
-- [x] **완전 자가 컴파일 fixed-point** (stage1~5 SHA256 일치)
-- [x] 의존성 (Node.js 필수, 설계상 정상)
-- [x] 모든 `self/bench/` 파일 컴파일
-- [x] codegen.fl 자신 컴파일 테스트 (성공)
-- [x] 생성 JS의 SHA256 해시 안정성 (완전 일치)
-
-### 🟢 Phase 3 완료 항목
-
-- [x] L2 수학적 고정점 증명 (semantic preservation 테스트) — Phase 3-C ✅
-- [x] self/stdlib/ai.fl FL 버전 작성 (AI 라이브러리) — Phase 3-D ✅
-- [x] VM opt-in 연결 (성능 1.5배 향상 기반) — Phase 3-E ✅
-- [x] **Deep fixed-point 자동화 — stage1~10 SHA256 chain (2026-04-25)** ✅
-  - `scripts/verify-fixed-point-deep.sh` (depth 인자, JSON 출력)
-  - `src/__tests__/self-hosting.test.ts` deep fixed-point 케이스
-  - `L2-PROOF-DEEP-RESULTS.json` 결과 저장
-- [ ] bootstrap.js 완전 폐기 — **Phase 4 백로그**
-
----
-
-## 잔여 미완성 항목 (Phase 4 ~ 5)
-
-### Phase 4: 기반시설 수정 (1~2주)
-
-1. **stage1.js 함수 파라미터 누락 버그** ⚠️
-   - 자가 호스팅 일부 테스트 실패의 근본 원인
-   - 현황: 7/716 테스트 실패 (자가 호스팅 관련)
-   - 우선순위: 낮음 (bootstrap 기반 검증 안정적)
-
-2. **bootstrap.js 완전 폐기**
-   - stage1.js → canonical 컴파일러로 전환
-   - bootstrap 의존성 제거 (1회 생성 후 불필요)
-   - CI/CD 자동화
-
-### Phase 5: 추가 기능 (2~4주)
-
-3. **AI 라이브러리 확장** (선택적)
-   - session, workflow, cot 타입 래퍼
-   - agent.fl, channel.fl 등 추가
-
-4. **성능 최적화 추가**
-   - JIT 컴파일 고려
-   - 메모리 최적화
-
----
-
-## Canonical 컴파일러 경로 (2026-04-22 확정)
-
-```
-bootstrap.js (TS 구현)
-  ↓ (1회 생성 전용)
-stage1.js (FL로 작성)
-  ↓ (이후 canonical 경로)
-stage2.js == stage3.js == ... (SHA256 완전 일치)
-
-주의: bootstrap.js는 stage1.js 1회 생성 후 역할 종료
-      모든 후속 컴파일은 stage1.js 사용
-      verify-self-host.sh도 stage1 기반 검증 (bootstrap 미사용)
-```
-
-### npm scripts — 역할 분담 (#1 점진 폐기, 2026-04-25)
-
-| 명령 | 도구 | 비고 |
-|------|------|------|
-| `npm run compile X.fl Y.js` | **stage1.js** | canonical FL→JS 컴파일 |
-| `npm run compile:self` | stage1.js | self-host (stage1 → stage1-new) |
-| `npm run verify:fixed-point` | shell + stage1 | stage1~10 SHA256 chain |
-| `npm run verify:build-deterministic` | shell + esbuild | TS→bootstrap.js 결정론 |
-| `npm run verify:self-host` | shell + stage1 | tier2 (PASS 93+) |
-| `npm run dev / start / server` | bootstrap.js (cli) | 웹 서버 — bootstrap.js만 가능 |
-| `npm run repl / fl / freelang` | bootstrap.js (cli) | REPL/실행 — bootstrap.js만 |
-
-**완전 폐기 미가능**: webserver/repl 기능은 bootstrap.js의 src/cli.ts에 통합. stage1.js는 codegen만.
-**현재 위치**: 대부분 컴파일/검증은 stage1.js 사용 가능. cli interaction만 bootstrap.js 의존.
-
----
-
-## Phase 완료 현황 (2026-04-24)
-
-### ✅ Phase 3-A, 3-B, 3-C, 3-D 완료
-1. **3-A**: CLAUDE.md 동기화 ✅
-2. **3-B**: await/throw AST 노드 핸들링 ✅ (639→708 테스트)
-3. **3-C**: L2 증명 자동화 ✅
-   - 12개 테스트 케이스 (arithmetic, comparisons, logic, control-flow, functions, collections, pattern-matching, async-errors, strings, type-checks, recursion, edge-cases)
-   - verify-l2-proof.sh 자동화 스크립트 (--prepare, --run, --clean)
-   - L2-PROOF-RESULTS.json (12/12 PASS, 100% pass_rate)
-
-4. **3-D**: AI 라이브러리 ✅
-   - self/stdlib/ai.fl (7 함수: vector-add, vector-dot, cosine-sim, score-candidates, prompt-template, top-k-retrieval, map-indexed)
-   - src/__tests__/ai-library.test.ts (30/30 PASS)
-   - 함수형 프로그래밍 기반 (map, reduce, range, sort)
-
-### 🔜 Phase 3-E (다음 세션)
-5. **Phase 3-E**: VM opt-in 최적화
-   - src/interpreter.ts에서 VM 경로 opt-in 활성화
-   - 단순 산술/논리 표현식에 VM 사용
-   - 성능 1.5배 향상 목표
-   - 예상 시간: 1~2주
-
-### ⚠️ Phase 4 백로그
-- stage1.js 함수 파라미터 누락 버그 (자가호스팅 일부 테스트 실패 — 우선순위 낮음)
-
----
-
-## 정정 기록
-
-**2026-04-18 검증**:
-- 과거 주장: "Tests 583/583 PASS"
-- 실제: **Tests 637/637 PASS**
-- 차이: +54개 테스트 (미기록)
-
-**2026-04-18 검증**:
-- 과거 주장: "Phase 15 완성"
-- 실제: 부분 기능 작동, 완전성 미검증
-
-**2026-04-20 검증** (Phase 1 self-hosting 재조사 + 완결):
-- 과거 주장: "codegen.fl 자신 컴파일 불가능 (Stack overflow line 54)"
-- 실제: Stack overflow는 **본질 원인이 아님**. 실제 블로커는 **2개의 독립 버그**였음.
-  - 버그 A: bootstrap parser가 map-literal AST fields를 JS Map으로 저장하는데 FL 레벨 열거 primitive 부재
-  - 버그 B: `self/lexer.fl` (및 `self/all.fl`의 동일 구문) `emit` 함수가 토큰을 `{:type $kind ...}` 로 생성해
-           `(get $t :kind)` 에서 `null`을 반환 → stage1 산출물이 모든 토큰을 `unknown` atom으로 파싱 →
-           Parsed 팽창 / 빈 출력 / stage3 실패
-- 조치:
-  - 버그 A: `data` stdlib 모듈에 `map-entries`/`map_entries` primitive 추가 (`bootstrap.js` + `src/stdlib-data.ts` 미러).
-    `self/all.fl`의 `cg-map-entries` bootstrap 분기 1단어 치환.
-  - 버그 B: `self/all.fl` + `self/lexer.fl` 의 `emit` 함수 토큰 필드 `:type $kind` → `:kind $kind :type $kind`
-    (alias 유지하여 하위호환 보장).
-  - 부수 정리: `self/ast.fl`의 `make-pattern-match`가 사용하던 `:subject` 필드를 canonical `:value`로 통일.
-- 결과:
-  - stage1/stage2/stage3 자가 컴파일 **SHA256 완전 일치** — `6b81fef4fd9a992983390ddae85adb4e7f61c326501d43dc160d22e15d12f4a1`
-  - Parsed=156 / 45,343 bytes 산출 (stage1 == stage2 == stage3)
-  - hello.fl 재컴파일 → bootstrap 직접 컴파일 결과와 동일한 `console.log("hello");` 생성
-  - 회귀: Tests **643/643 PASS** (기존 637 + 신규 자가 호스팅 6)
-  - 신규 회귀: `src/__tests__/self-hosting.test.ts` 추가하여 이후 자가 호스팅 깨짐 즉시 감지 가능
-- 후속 과제 (별도 세션):
-  - TS 원본 재빌드 시 bootstrap.js 산출물 동일성 검증 (자동화)
-  - Await/Throw 필드명 불일치 (`:argument` vs `:expr`) — async 코드 경로에서만 발현
-
-**2026-04-20 검증** (Tier 1+2 self-host corpus verification — 1차, 낙관적 오인):
-- 스크립트: `scripts/verify-self-host.sh` (신규) — bootstrap 경유 compile vs stage1 경유 compile 비교
-- 1차 보고: **PASS 84 / FAIL 0 / SKIP 7** (known flaky, advisory)
-- 그러나 **검증 로직 결함** 발견 (아래 정정):
-
-**2026-04-20 정정 검증** (스크립트 로직 교정 후):
-- 1차 보고 거짓 PASS 원인: `check_compile_only` 가 "양쪽 산출이 non-zero 크기" 만 확인. bootstrap 실행이 `Parsed: 0 nodes` 상황에서도 기본 prelude(4,713 bytes)는 나오므로 false-positive 성립
-- 스크립트 교정: 컴파일 로그에서 `Parsed: N nodes` 추출, `bootstrap Parsed=0 && stage1 Parsed>0` → 명시적 FAIL 처리. 기존 known-issue 들은 `KNOWN_BOOTSTRAP_GAP` 리스트로 이관해 SKIP.
-- 교정된 결과: **PASS 76 / FAIL 0 / SKIP 15**
-  - PASS 76: Tier 1 전원 + 정상 동작 stdlib 26개 + tests 24개 + bench/examples
-  - SKIP 15: known-issue (8 stdlib + 2 tests + 5 compiler-coupled tests)
-- SKIP 내역:
-  - **Bootstrap parser gap 10개** — `self/all.fl` 내 FL-written parser 가 특정 구문(try/catch, cond flat-pair 등) 미지원. `assert, async, build, heap, resource, search, stack, tree, test-parser-full-debug, test-parser-lex-only` 파일이 `Parsed=0`로 실패
-  - **Compiler-coupled tests 5개** — `test-codegen-builtins/ffi/fn/match/sf` — 테스트가 컴파일러 내부 출력을 비교하는 구조라 버전 차이 자연스러움
-- 부가 발견 유지: `self/stdlib/{heap, resource, search, stack, tree}.fl` 컴파일 격차 = bootstrap parser gap 의 하위 증상
-- **진단**: `bootstrap.js` 내장 lex/parse 는 FL 전체 문법을 지원하지만, `self/all.fl` 내 FL 로 작성된 self-parser 가 일부 구문 미구현. **stage1(self-compiled)이 오히려 bootstrap 경로보다 robust** 한 상황 — self-hosting 2단계 진입 신호
-- **핵심 원칙**: 언어 정의는 단 하나. bootstrap parser 와 self-parser 가 지원 구문 집합이 다른 상태는 용납 불가 (`feedback_language_unity_self_sovereignty.md`)
-- **후속 Phase A** (별도 세션): `self/all.fl` 내 parser 를 확장해 try/catch · cond flat-pair 등 지원 → 양 파서 문법 일원화 → SKIP 목록 제로화 목표
-
-**2026-04-20 투명 정정** (Phase A 진단 재조사 — 추가 뒤집힘):
-- 이전 진단(`self/all.fl` 내 self-parser 가 try/catch 미지원)은 **부정확**.
-- 실측 (stage1.js 를 라이브러리로 load 후 `lex`/`parse` 직접 호출):
-  - `parse(lex("(try 1 2)"))` → 정상 1 node (sexpr, op=try)
-  - `parse(lex("(throw 1)"))` → 정상 1 node
-  - `parse(lex("(catch 1 2)"))` → 정상 1 node
-- 즉 **FL-written parser 자체는 try/catch/cond-flat-pair 를 이미 처리**. stage1 이 정상 작동하는 이유.
-- 진짜 원인: `bootstrap.js run self/all.fl X Y` 호출 경로에서 bootstrap TS interpreter 가 FL 파서 코드를 AST 해석으로 실행할 때 **특정 경로에서 AST 0 node 반환** (재현 가능하나 정확한 지점은 추가 추적 필요)
-- 10개 문제 파일을 **stage1 로 직접 컴파일** 시도 결과:
-  - 8/8 stdlib + 2/2 tests = **10개 모두 파싱 성공** (Parsed 7~40 노드)
-  - 이 중 **7/8 stdlib 산출 JS 구문 유효** (`node --check` 통과)
-  - **async.fl 만 stage1 codegen 버그 2건** — `nil` 을 `null` 로 번역 안 함 + rest-args `[& $args]` 구문 처리 미완
-- 결론: "self-parser 구문 확장"이 아니라 **"bootstrap interp 의존 제거 + 소수 codegen 버그 수정"**이 진짜 Phase A 본질
-- **Phase A 전략 수정 (다음 세션)**:
-  - 우선순위 1: `verify-self-host.sh` 의 canonical path 를 **`bootstrap.js run self/all.fl ...` → stage1.js 직접 호출로 전환**. bootstrap 은 stage1 1회 생성 전용으로 축소
-  - 우선순위 2: stage1 codegen 의 `nil` · rest-args 처리 버그 수정 (async.fl 해금)
-  - 우선순위 3: verify 재실행, SKIP 목록 축소 확인
-- `feedback_phase_a_direction.md` 방향과 일치: **bootstrap 폐기 경로가 사실상 이미 가능**한 것으로 확인됨. self-parser 강화는 불필요, bootstrap 축소가 올바른 경로
-
----
-
-## Canonical AST/Token Schema (2026-04-20 확정)
-
-**Token**:
-```
-{:kind  "LParen"|"RParen"|"LBracket"|"RBracket"|"LBrace"|"RBrace"|
-        "Number"|"String"|"Symbol"|"Variable"|"Keyword"|"Unknown"
- :type  (= :kind — 하위호환 alias)
- :value <raw-string>
- :line  <number>
- :col   <number>}
-```
-
-**AST Node**:
-```
-{:kind  "literal"|"variable"|"keyword"|"sexpr"|"block"|"pattern-match"
- :type  "number"|"string"|"boolean"|"symbol"  ;; literal 전용
- :value <raw> | <match-대상-노드>              ;; literal / pattern-match 공용 필드명
- :name  <string>                               ;; variable/keyword
- :op    <string>  :args [nodes]               ;; sexpr
- :fields {items: [nodes]}                      ;; block (Array/Map/FUNC)
- :cases [match-case nodes]  :defaultCase? node ;; pattern-match
- :pattern <pat> :guard? node :body node        ;; match-case
- :line <number>}
-```
-
-**규칙**:
-- `:value`는 literal의 원문 값 **또는** pattern-match의 match 대상. 용법은 `:kind`로 구분.
-- Map literal 필드는 양쪽 포맷 공존 — bootstrap parser: JS Map (`(map-entries $fields)` 로 접근),
-  self-parser: `{items: [k,v,k,v,...]}` (평탄 페어 리스트, `cg-map-flat-loop` 경로).
-  `cg-map-entries` 내부에서 runtime 분기 `(array? (get $fields "items"))` 로 자동 판별.
-- 새 노드 종류 추가 시 위 스키마에 먼저 편입 → bootstrap/self-parser 양쪽 동시 반영 필수.
-
+**경로**: `/home/kimjin/freelang-v11/bootstrap.js`
+**포트**: 신규 40000-43000 | v10 보호 43000-49999
