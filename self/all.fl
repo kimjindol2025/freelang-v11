@@ -995,46 +995,44 @@
   :body (if (array? $items-val)
     ;; self-parser format: items is already [kw-node val-node ...]
     $items-val
-    ;; bootstrap format: fields is JS Map, iterate keys
-    (let [[$keys-list (keys $fields)]]
-      (map-items-from-bootstrap-keys $fields $keys-list 0 [])))]
-
-[FUNC map-items-from-bootstrap-keys :params [$fields $keys $idx $acc]
-  :body (if (>= $idx (length $keys)) $acc
-    (let [[$k (get $keys $idx)]
-          [$v (get $fields $k)]
-          [$kw-node {:kind "keyword" :name $k}]]
-      (map-items-from-bootstrap-keys $fields $keys (+ $idx 1)
-        (append $acc [$kw-node $v]))))]
+    ;; bootstrap format: fields is JS Map
+    ;; map-entries returns [[k,v], [k,v], ...], convert to [kw-node val-node ...]
+    (flatten-map-entries (map-entries $fields) 0 []))]
 
 ;; flatten-map-entries: [[k,v], [k,v], ...] → [kw-node val-node kw-node val-node ...]
 [FUNC flatten-map-entries :params [$entries $i $acc]
-  :body (if (>= $i (length $entries)) $acc
-    (let [[$e (get $entries $i)]
-          [$k (get $e 0)]
-          [$v (get $e 1)]
-          ;; Create a keyword node to match the self-parser format
-          [$kw-node {:kind "keyword" :name $k}]]
-      (flatten-map-entries $entries (+ $i 1) (append $acc [$kw-node $v]))))]
+  :body (if (or (null? $entries) (>= $i (length $entries))) $acc
+    (let [[$e (get $entries $i)]]
+      (if (null? $e)
+        $acc
+        (let [[$k (get $e 0)]
+              [$v (get $e 1)]
+              [$kw-node {:kind "keyword" :name $k}]]
+          (flatten-map-entries $entries (+ $i 1) (append $acc [$kw-node $v]))))))]
 
 ;; node-to-pattern: AST node를 pattern node로 변환
 [FUNC node-to-pattern :params [$node]
-  :body (cond
-    [(= (get $node :kind) "variable")
+  :body (let [[$kind (get $node :kind)]]
+    (cond
+    [(= $kind "variable")
      (let [[$name (get $node :name)]]
        (if (starts-with? $name "$")
          (make-variable-pattern (substring $name 1))
          (if (= $name "_")
            (make-wildcard-pattern)
            (make-variable-pattern $name))))]
-    [(= (get $node :kind) "literal")
+    [(= $kind "literal")
      (make-literal-pattern (get $node :type) (get $node :value))]
-    [(= (get $node :kind) "block")
+    [(= $kind "block")
      (if (= (get $node :type) "Map")
-       (let [[$items (map-items-from-fields (get $node :fields))]]
+       (let [[$fields (get $node :fields)]
+             [$items (map-items-from-fields $fields)]]
+         ;; Log: 어떤 필드가 추출되었나?
+         (if (and false (= (length $items) 0))
+           (println (str "DEBUG: Empty fields from Map node")))
          (make-struct-pattern (map-items-to-fields $items 0 [])))
        (make-wildcard-pattern))]
-    [true (make-wildcard-pattern)])]
+    [true (make-wildcard-pattern)]))]
 
 ;; map-items-to-fields: map literal items를 struct-pattern fields로 변환
 [FUNC map-items-to-fields :params [$items $i $acc]
@@ -1077,8 +1075,12 @@
   :body (if (>= $i (length $cases)) $acc
     (let [[$c (get $cases $i)]
           [$is-sexpr (= (get $c :kind) "sexpr")]
-          [$pat-node (if $is-sexpr (node-to-pattern (get $c :op)) (node-to-pattern (get (get (get $c :fields) :items) 0)))]
-          [$body (if $is-sexpr (get (get $c :args) 0) (get (get (get $c :fields) :items) 1))]
+          [$pat-node (if $is-sexpr
+                      (node-to-pattern (get (get $c :args) 0))  ;; sexpr: first arg is pattern
+                      (node-to-pattern (get (get (get $c :fields) :items) 0)))]  ;; array: first item
+          [$body (if $is-sexpr
+                  (get (get $c :args) 1)  ;; sexpr: second arg is body
+                  (get (get (get $c :fields) :items) 1))]  ;; array: second item
           [$match-case (make-match-case $pat-node nil $body)]]
       (sexpr-cases-to-match-cases $cases (+ $i 1) (append $acc [$match-case]))))]
 
