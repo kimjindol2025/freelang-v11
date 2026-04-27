@@ -587,11 +587,10 @@ var init_parser = __esm({
           const startToken = this.peek();
           if (this.check("Colon" /* Colon */)) {
             this.advance();
-            const _kt = this.peek();
-            if (_kt.type !== "Symbol" /* Symbol */ && getKeywordTokenType(_kt.value) === void 0) {
+            if (!this.check("Symbol" /* Symbol */)) {
               throw this.error(
-                `Expected symbol after ':', got ${_kt.type}`,
-                _kt
+                `Expected symbol after ':', got ${this.peek().type}`,
+                this.peek()
               );
             }
             const keyToken = this.advance();
@@ -915,10 +914,8 @@ var init_parser = __esm({
           let key;
           if (this.check("Colon" /* Colon */)) {
             this.advance();
-            // Allow reserved keywords (if, let, do, etc.) as map keys after ':'
-            const nextTok = this.peek();
-            if (nextTok.type !== "Symbol" /* Symbol */ && getKeywordTokenType(nextTok.value) === void 0) {
-              throw this.error(`Expected symbol after ':' in map literal`, nextTok);
+            if (!this.check("Symbol" /* Symbol */)) {
+              throw this.error(`Expected symbol after ':' in map literal`, this.peek());
             }
             key = this.advance().value;
           } else if (this.check("String" /* String */)) {
@@ -940,7 +937,7 @@ var init_parser = __esm({
         const peekPos = this.pos + 1;
         if (peekPos >= this.tokens.length) return false;
         const nextToken = this.tokens[peekPos];
-        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */ || nextToken.type === "LBrace" /* LBrace */ || nextToken.type === "LParen" /* LParen */;
+        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */;
       }
       // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
       // Also handles match expressions: (match value (pattern body) ...)
@@ -21602,16 +21599,7 @@ function categorizeError(message) {
   if (msg.includes("io error")) return "IO_ERROR";
   return "UNKNOWN";
 }
-function createWorkflowModule(callFnVal, callUserFn) {
-  // Unified caller: JS fn / FreeLang fn-value / FreeLang named fn (string)
-  function callFl(fn, args) {
-    if (typeof fn === "function") return fn(...args);
-    if (typeof fn === "string" && typeof callUserFn === "function") return callUserFn(fn, args);
-    if (fn && (fn.kind === "function-value" || fn.params !== void 0)) {
-      if (typeof callFnVal === "function") return callFnVal(fn, args);
-    }
-    return null;
-  }
+function createWorkflowModule() {
   return {
     // ── Workflow Definition ───────────────────────────────────
     // workflow_create name steps -> Workflow object
@@ -21632,11 +21620,12 @@ function createWorkflowModule(callFnVal, callUserFn) {
       fallback: options.fallback,
       timeout_ms: options.timeout_ms,
       if: options.if,
-      depends: options.depends || []
+      parallel_tasks: options.parallel_tasks,
+      merge_strategy: options.merge_strategy
     }),
     // ── Workflow Execution ────────────────────────────────────
-    // workflow_run workflow initial_ctx options -> WorkflowResult
-    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    // workflow_run workflow initial_ctx options -> WorkflowResult (P0, no parallel support)
+    // Use workflow_run_async for P1-1 parallel task support
     "workflow_run": (workflow, initialCtx = {}, options) => {
       const startMs = T.now();
       const runId = X.uuid_short();
@@ -21661,9 +21650,23 @@ function createWorkflowModule(callFnVal, callUserFn) {
       const completedStepNames = [];
       for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
         const step = steps[stepIndex];
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          return {
+            id: runId,
+            name: workflow.name,
+            status: "failed",
+            context: ctx,
+            steps_run: stepsOk + stepsFailed,
+            steps_ok: stepsOk,
+            steps_failed: stepsFailed,
+            total_ms: T.now() - startMs,
+            log,
+            errors: ["Parallel tasks detected. Use workflow_run_async() instead of workflow_run()"]
+          };
+        }
         if (step.if !== void 0) {
           try {
-            const shouldRun = callFl(step.if, [ctx]);
+            const shouldRun = step.if(ctx);
             if (!shouldRun) {
               log.push({ step: step.name, status: "skipped", ms: 0 });
               continue;
@@ -21694,7 +21697,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
         let stepResult = void 0;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
-            stepResult = callFl(step.fn, [ctx]);
+            stepResult = step.fn(ctx);
             ctx = { ...ctx, ...stepResult };
             success = true;
             break;
@@ -21732,7 +21735,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
           const errorCategory = categorizeError(lastErr);
           if (step.on_error) {
             try {
-              fallbackValue = callFl(step.on_error, [{ error: lastErr, attempts: maxAttempts, step_name: step.name }]);
+              fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
@@ -21742,9 +21745,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
                 ms: stepMs,
                 error: lastErr,
                 category: errorCategory,
-                // P0-4: 카테고리
                 attempted: maxAttempts
-                // P0-4: 재시도 횟수
               });
               stepsOk++;
               stepsFailed--;
@@ -21756,7 +21757,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
           }
           if (step.fallback !== void 0) {
             try {
-              fallbackValue = (typeof step.fallback === "function" || (step.fallback && step.fallback.kind === "function-value")) ? callFl(step.fallback, []) : step.fallback;
+              fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (fallback used)`);
@@ -21766,9 +21767,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
                 ms: stepMs,
                 error: lastErr,
                 category: errorCategory,
-                // P0-4: 카테고리
                 attempted: maxAttempts
-                // P0-4: 재시도 횟수
               });
               stepsOk++;
               stepsFailed--;
@@ -21786,9 +21785,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
               ms: stepMs,
               error: lastErr,
               category: errorCategory,
-              // P0-4: 카테고리
               attempted: maxAttempts
-              // P0-4: 재시도 횟수
             });
             if (step.required !== false) {
               return {
@@ -21803,6 +21800,298 @@ function createWorkflowModule(callFnVal, callUserFn) {
                 log,
                 errors
               };
+            }
+          }
+        }
+      }
+      const totalMs = T.now() - startMs;
+      const status = stepsFailed === 0 ? "success" : "partial";
+      if ((status === "success" || status === "partial") && checkpointPath) {
+        deleteCheckpoint(checkpointPath);
+      }
+      return {
+        id: runId,
+        name: workflow.name,
+        status,
+        context: ctx,
+        steps_run: stepsOk + stepsFailed,
+        steps_ok: stepsOk,
+        steps_failed: stepsFailed,
+        total_ms: totalMs,
+        log,
+        errors
+      };
+    },
+    // workflow_run_async workflow initial_ctx options -> Promise<WorkflowResult>
+    // P1-1 async version supporting parallel tasks
+    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    "workflow_run_async": async (workflow, initialCtx = {}, options) => {
+      const startMs = T.now();
+      const runId = X.uuid_short();
+      const checkpointPath = options?.checkpoint_path;
+      const checkpointEvery = options?.checkpoint_every ?? 0;
+      const autoResume = options?.auto_resume ?? true;
+      let startFromStep = 0;
+      let ctx = { ...initialCtx, _workflow: workflow.name, _run_id: runId };
+      if (autoResume && checkpointPath) {
+        const checkpoint = loadCheckpoint(checkpointPath);
+        if (checkpoint && checkpoint.workflow_id === workflow.id) {
+          startFromStep = checkpoint.step_index;
+          ctx = { ...checkpoint.context, _workflow: workflow.name, _run_id: runId };
+          console.log(`[Checkpoint] Resuming from step ${startFromStep} (${checkpoint.step_names.length} completed)`);
+        }
+      }
+      const log = [];
+      const errors = [];
+      let stepsOk = 0;
+      let stepsFailed = 0;
+      const steps = workflow.steps;
+      const completedStepNames = [];
+      const executeStep = async (step, currentCtx) => {
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        const maxAttempts = (step.retry ?? 0) + 1;
+        let stepResult = void 0;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            stepResult = step.fn(currentCtx);
+            success = true;
+            break;
+          } catch (err4) {
+            lastErr = err4.message;
+            if (attempt < maxAttempts - 1) {
+              const wait = 50 * (attempt + 1);
+              const end = Date.now() + wait;
+              while (Date.now() < end) {
+              }
+            }
+          }
+        }
+        const stepMs = T.now() - stepStart;
+        return { success, result: stepResult, error: lastErr, ms: stepMs };
+      };
+      const executeParallelTasks = async (parallelTasks, mergeStrategy, currentCtx) => {
+        const taskExecutions = parallelTasks.map((task) => executeStep(task, currentCtx));
+        const taskResults = await Promise.all(taskExecutions);
+        const mergedResults = {};
+        const taskErrors = [];
+        let allSuccess = true;
+        let anySuccess = false;
+        taskResults.forEach((result, index) => {
+          const taskName = parallelTasks[index].name;
+          if (result.success) {
+            mergedResults[taskName] = result.result;
+            anySuccess = true;
+          } else {
+            taskErrors.push(`${taskName}: ${result.error}`);
+            allSuccess = false;
+          }
+        });
+        let strategySuccess = false;
+        if (mergeStrategy === "all-success") {
+          strategySuccess = allSuccess;
+        } else if (mergeStrategy === "first-success") {
+          strategySuccess = anySuccess;
+        } else if (mergeStrategy === "any-partial") {
+          strategySuccess = true;
+        } else {
+          strategySuccess = allSuccess;
+        }
+        return { success: strategySuccess, results: mergedResults, errors: taskErrors };
+      };
+      for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
+        const step = steps[stepIndex];
+        if (step.if !== void 0) {
+          try {
+            const shouldRun = step.if(ctx);
+            if (!shouldRun) {
+              log.push({ step: step.name, status: "skipped", ms: 0 });
+              continue;
+            }
+          } catch (condErr) {
+            errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
+            if (step.required !== false) {
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors
+              };
+            }
+            continue;
+          }
+        }
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        let stepResult = void 0;
+        let stepMs = 0;
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          const mergeStrategy = step.merge_strategy ?? "all-success";
+          const parallelResult = await executeParallelTasks(step.parallel_tasks, mergeStrategy, ctx);
+          stepMs = T.now() - stepStart;
+          if (parallelResult.success) {
+            success = true;
+            stepResult = { [step.name]: parallelResult.results };
+            ctx = { ...ctx, ...stepResult };
+            stepsOk++;
+            completedStepNames.push(step.name);
+            log.push({ step: step.name, status: "ok", ms: stepMs });
+            ctx[`_step_${step.name}_ms`] = stepMs;
+          } else {
+            stepsFailed++;
+            lastErr = parallelResult.errors.join("; ");
+            const errorCategory = categorizeError(lastErr);
+            if (step.fallback !== void 0) {
+              try {
+                const fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] Parallel tasks failed (fallback used)`);
+                log.push({ step: step.name, status: "fallback_used", ms: stepMs, error: lastErr, category: errorCategory });
+                stepsOk++;
+                stepsFailed--;
+                ctx[`_step_${step.name}_ms`] = stepMs;
+              } catch (fallbackErr) {
+                errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+                log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: errorCategory });
+                if (step.required !== false) {
+                  return {
+                    id: runId,
+                    name: workflow.name,
+                    status: "failed",
+                    context: ctx,
+                    steps_run: stepsOk + stepsFailed,
+                    steps_ok: stepsOk,
+                    steps_failed: stepsFailed,
+                    total_ms: T.now() - startMs,
+                    log,
+                    errors
+                  };
+                }
+              }
+            } else {
+              errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+              log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: categorizeError(lastErr) });
+              if (step.required !== false) {
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors
+                };
+              }
+            }
+          }
+        } else {
+          const execResult = await executeStep(step, ctx);
+          stepMs = execResult.ms;
+          success = execResult.success;
+          lastErr = execResult.error;
+          stepResult = execResult.result;
+          if (success) {
+            stepsOk++;
+            completedStepNames.push(step.name);
+            log.push({ step: step.name, status: "ok", ms: stepMs });
+            ctx = { ...ctx, ...stepResult };
+            ctx[`_step_${step.name}_ms`] = stepMs;
+            if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
+              const checkpoint = {
+                workflow_id: workflow.id,
+                workflow_name: workflow.name,
+                step_index: stepIndex + 1,
+                context: ctx,
+                timestamp: T.now(),
+                step_names: completedStepNames,
+                steps_completed: completedStepNames.length
+              };
+              saveCheckpoint(checkpointPath, checkpoint);
+            }
+          } else {
+            stepsFailed++;
+            let fallbackValue = void 0;
+            const errorCategory = categorizeError(lastErr);
+            if (step.on_error) {
+              try {
+                fallbackValue = step.on_error({ error: lastErr, attempts: 1, step_name: step.name });
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
+                log.push({
+                  step: step.name,
+                  status: "error_handled",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1
+                });
+                stepsOk++;
+                stepsFailed--;
+                ctx[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (handlerErr) {
+                errors.push(`[${step.name}] ${lastErr} \u2192 on_error handler also failed: ${handlerErr.message}`);
+              }
+            }
+            if (step.fallback !== void 0) {
+              try {
+                fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (fallback used)`);
+                log.push({
+                  step: step.name,
+                  status: "fallback_used",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1
+                });
+                stepsOk++;
+                stepsFailed--;
+                ctx[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (fallbackErr) {
+                errors.push(`[${step.name}] ${lastErr} \u2192 fallback also failed: ${fallbackErr.message}`);
+              }
+            }
+            if (!success) {
+              errors.push(`[${step.name}] ${lastErr}`);
+              log.push({
+                step: step.name,
+                status: "failed",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,
+                attempted: 1
+              });
+              if (step.required !== false) {
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors
+                };
+              }
             }
           }
         }
@@ -21919,286 +22208,6 @@ function createWorkflowModule(callFnVal, callUserFn) {
       sections: [...report.sections, { name: sectionName, data }]
     }),
     // report_render report -> string  (formatted text report)
-    // ── P1: 병렬 실행 ────────────────────────────────────────────
-    // workflow_parallel steps ctx -> {ok, results, errors, total_ms}
-    // 모든 step을 독립 실행 (실패해도 계속), 결과 모두 수집
-    "workflow_parallel": (steps, ctx = {}) => {
-      const start = Date.now();
-      const results = [];
-      const errors = [];
-      for (const step of steps) {
-        const t0 = Date.now();
-        try {
-          if (step.if !== void 0) {
-            const ok = callFl(step.if, [ctx]);
-            if (!ok) {
-              results.push({ name: step.name, status: "skipped", ms: 0 });
-              continue;
-            }
-          }
-          const r = callFl(step.fn, [ctx]);
-          ctx = { ...ctx, ...r };
-          results.push({ name: step.name, status: "ok", result: r, ms: Date.now() - t0 });
-        } catch (e) {
-          errors.push({ name: step.name, error: e.message });
-          results.push({ name: step.name, status: "failed", error: e.message, ms: Date.now() - t0 });
-        }
-      }
-      const allOk = errors.length === 0;
-      return { ok: allOk, results, errors, context: ctx, total_ms: Date.now() - start };
-    },
-    // workflow_parallel_any steps ctx -> {ok, name, result, ms}
-    // 최초 성공 step 결과 반환 (나머지 건너뜀)
-    "workflow_parallel_any": (steps, ctx = {}) => {
-      for (const step of steps) {
-        const t0 = Date.now();
-        try {
-          const r = callFl(step.fn, [ctx]);
-          return { ok: true, name: step.name, result: r, ms: Date.now() - t0 };
-        } catch (_) {}
-      }
-      return { ok: false, error: "All steps failed" };
-    },
-    // ── P1: 보상 트랜잭션 (Saga) ─────────────────────────────────
-    // saga_run steps -> {ok, results, compensated, error}
-    // step: {name, action fn(ctx)->ctx, compensate fn(result)->void}
-    "saga_run": (steps, ctx = {}) => {
-      const done = [];
-      for (const step of steps) {
-        try {
-          const result = callFl(step.action, [ctx]);
-          if (result && typeof result === "object") ctx = { ...ctx, ...result };
-          done.push({ name: step.name, result });
-        } catch (e) {
-          // 역순 보상 실행
-          const compensated = [];
-          for (let i = done.length - 1; i >= 0; i--) {
-            if (done[i] && step !== done[i] && done[i].name) {
-              const doneStep = steps.find((s) => s.name === done[i].name);
-              if (doneStep && doneStep.compensate) {
-                try { callFl(doneStep.compensate, [done[i].result]); } catch (_) {}
-                compensated.push(done[i].name);
-              }
-            }
-          }
-          return {
-            ok: false,
-            error: e.message,
-            failed_step: step.name,
-            compensated,
-            results: done
-          };
-        }
-      }
-      return { ok: true, results: done };
-    },
-    // ── P1: 배치/분산 처리 ───────────────────────────────────────
-    // batch_map arr batchSize fn -> {ok, results, total, batches, errors}
-    "batch_map": (arr, batchSize, fn) => {
-      const results = [];
-      const errors = [];
-      let batches = 0;
-      for (let i = 0; i < arr.length; i += batchSize) {
-        const batch = arr.slice(i, i + batchSize);
-        batches++;
-        try {
-          const r = callFl(fn, [batch]);
-          if (Array.isArray(r)) results.push(...r);
-          else results.push(r);
-        } catch (e) {
-          errors.push({ batch: batches, error: e.message });
-        }
-      }
-      return { ok: errors.length === 0, results, total: arr.length, batches, errors };
-    },
-    // distribute items workers fn -> {ok, results, worker_results}
-    // items를 workers 수로 나눠 각각 처리 (단일 프로세스 내 배치 분산)
-    "distribute": (items, workers, fn) => {
-      const n = Math.max(1, Array.isArray(workers) ? workers.length : workers);
-      const batchSize = Math.ceil(items.length / n);
-      const workerResults = [];
-      const results = [];
-      for (let w = 0; w < n; w++) {
-        const batch = items.slice(w * batchSize, (w + 1) * batchSize);
-        if (batch.length === 0) break;
-        try {
-          const r = callFl(fn, [batch, w]);
-          const out = Array.isArray(r) ? r : [r];
-          results.push(...out);
-          workerResults.push({ worker: w, ok: true, count: batch.length, result: r });
-        } catch (e) {
-          workerResults.push({ worker: w, ok: false, error: e.message });
-        }
-      }
-      return { ok: workerResults.every((w) => w.ok), results, worker_results: workerResults };
-    },
-    // ── P1: 관찰성 (Observability) ───────────────────────────────
-    // time_exec fn -> {ok, result, ms}
-    "time_exec": (fn) => {
-      const t0 = Date.now();
-      try {
-        const result = callFl(fn, []);
-        return { ok: true, result, ms: Date.now() - t0 };
-      } catch (e) {
-        return { ok: false, error: e.message, ms: Date.now() - t0 };
-      }
-    },
-    // span label fn -> {label, ok, result, ms}
-    "span": (label, fn) => {
-      const t0 = Date.now();
-      try {
-        const result = callFl(fn, []);
-        const ms = Date.now() - t0;
-        process.stderr.write(`[SPAN] ${label}: ${ms}ms ok\n`);
-        return { label, ok: true, result, ms };
-      } catch (e) {
-        const ms = Date.now() - t0;
-        process.stderr.write(`[SPAN] ${label}: ${ms}ms FAILED — ${e.message}\n`);
-        return { label, ok: false, error: e.message, ms };
-      }
-    },
-    // log_trace label value -> value (passthrough with trace log)
-    "log_trace": (label, value) => {
-      process.stderr.write(`[TRACE] ${label}: ${JSON.stringify(value)}\n`);
-      return value;
-    },
-    // ── P2: 보안 Sandbox ──────────────────────────────────────────
-    // sandbox_run fn options -> {ok, result, error, ms, calls}
-    // options: {:timeout N :max_calls N}
-    "sandbox_run": (fn, options = {}) => {
-      const timeout = options.timeout ?? 5000;
-      const maxCalls = options.max_calls ?? 1000;
-      const t0 = Date.now();
-      let calls = 0;
-      // Wrap callFl to count calls
-      const limitedCallFl = (f, args) => {
-        calls++;
-        if (calls > maxCalls) throw new Error(`sandbox: max_calls(${maxCalls}) 초과`);
-        if (Date.now() - t0 > timeout) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
-        return callFl(f, args);
-      };
-      try {
-        // Use deadline check via synchronous polling
-        const deadline = t0 + timeout;
-        const result = (() => {
-          if (Date.now() > deadline) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
-          return callFl(fn, []);
-        })();
-        return { ok: true, result, ms: Date.now() - t0, calls };
-      } catch (e) {
-        return { ok: false, error: e.message, ms: Date.now() - t0, calls };
-      }
-    },
-    // ── P2: 성능 최적화 ───────────────────────────────────────────
-    // memoize fn maxSize -> memo-id (전역 레지스트리에 fn+cache 저장)
-    // memo_call memo-id ...args -> result
-    "memoize": (fn, maxSize = 0) => {
-      const id = `_m${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      createWorkflowModule._reg = createWorkflowModule._reg || {};
-      createWorkflowModule._reg[id] = { fn, cache: {}, size: 0, max: maxSize };
-      return id;
-    },
-    "memo_call": (memoId, ...args) => {
-      const store = (createWorkflowModule._reg || {})[memoId];
-      if (!store) throw new Error("invalid memo id");
-      const key = JSON.stringify(args);
-      if (key in store.cache) return store.cache[key];
-      const result = callFl(store.fn, args);
-      if (store.max > 0 && store.size >= store.max) {
-        delete store.cache[Object.keys(store.cache)[0]];
-        store.size--;
-      }
-      store.cache[key] = result;
-      store.size++;
-      return result;
-    },
-    "memo_size": (memoId) => {
-      const store = (createWorkflowModule._reg || {})[memoId];
-      return store ? store.size : 0;
-    },
-    "memo_clear": (memoId) => {
-      const store = (createWorkflowModule._reg || {})[memoId];
-      if (store) { store.cache = {}; store.size = 0; }
-      return memoId;
-    },
-    // rate_limit fn maxCalls windowMs -> rl-id
-    // rl_call rl-id ...args -> result
-    "rate_limit": (fn, maxCalls, windowMs = 1000) => {
-      const id = `_rl${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      createWorkflowModule._reg = createWorkflowModule._reg || {};
-      createWorkflowModule._reg[id] = { fn, calls: [], max: maxCalls, win: windowMs };
-      return id;
-    },
-    "rl_call": (rlId, ...args) => {
-      const store = (createWorkflowModule._reg || {})[rlId];
-      if (!store) throw new Error("invalid rate_limit id");
-      const now = Date.now();
-      store.calls = store.calls.filter((t) => t >= now - store.win);
-      if (store.calls.length >= store.max) {
-        throw new Error(`rate_limit: ${store.max}회/${store.win}ms 초과`);
-      }
-      store.calls.push(now);
-      return callFl(store.fn, args);
-    },
-    // ── P2: DAG 실행 ──────────────────────────────────────────────
-    // workflow_dag steps ctx -> {ok, context, results, errors, order}
-    // step: workflow_step + :depends [name ...] (위상정렬 후 실행)
-    "workflow_dag": (steps, ctx = {}) => {
-      const start = Date.now();
-      // 위상정렬 (Kahn's algorithm)
-      const nameMap = new Map(steps.map((s) => [s.name, s]));
-      const inDeg = new Map(steps.map((s) => [s.name, 0]));
-      const adj = new Map(steps.map((s) => [s.name, []]));
-      for (const s of steps) {
-        for (const dep of (s.depends || [])) {
-          if (adj.has(dep)) adj.get(dep).push(s.name);
-          inDeg.set(s.name, (inDeg.get(s.name) || 0) + 1);
-        }
-      }
-      const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([n]) => n);
-      const order = [];
-      while (queue.length > 0) {
-        const n = queue.shift();
-        order.push(n);
-        for (const next of (adj.get(n) || [])) {
-          const d = inDeg.get(next) - 1;
-          inDeg.set(next, d);
-          if (d === 0) queue.push(next);
-        }
-      }
-      if (order.length < steps.length) {
-        return { ok: false, error: "workflow_dag: 순환 의존성 감지됨", order };
-      }
-      // 순서대로 실행
-      const results = [];
-      const errors = [];
-      for (const name of order) {
-        const step = nameMap.get(name);
-        const t0 = Date.now();
-        try {
-          if (step.if !== void 0 && !callFl(step.if, [ctx])) {
-            results.push({ name, status: "skipped", ms: 0 });
-            continue;
-          }
-          const r = callFl(step.fn, [ctx]);
-          if (r && typeof r === "object") ctx = { ...ctx, ...r };
-          results.push({ name, status: "ok", result: r, ms: Date.now() - t0 });
-        } catch (e) {
-          errors.push({ name, error: e.message });
-          results.push({ name, status: "failed", error: e.message, ms: Date.now() - t0 });
-          if (step.required !== false) break;
-        }
-      }
-      return {
-        ok: errors.length === 0,
-        context: ctx,
-        results,
-        errors,
-        order,
-        total_ms: Date.now() - start
-      };
-    },
-    // report_render report -> string
     "report_render": (report) => {
       const divider = "\u2500".repeat(50);
       const lines = [
@@ -28311,10 +28320,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createMailModule());
   interp2.registerModule(createWebauthnModule());
   interp2.registerModule(createQueueHelpersModule());
-  interp2.registerModule(createWorkflowModule(
-    (fn, args) => interp2.callFunctionValue(fn, args),
-    (name, args) => interp2.callUserFunction(name, args)
-  ));
+  interp2.registerModule(createWorkflowModule());
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),
@@ -29160,6 +29166,7 @@ function callFunctionValue(interp2, fn, args2) {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
       interp2.context.variables.set(fn.params[i], args2[i]);
+      interp2.context.variables.set("$" + fn.params[i], args2[i]);
     }
     result = interp2.eval(fn.body);
     propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
@@ -29308,6 +29315,7 @@ function callFunctionValueTCO(interp2, fn, args2) {
         interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
         for (let j = 0; j < currentFn.params.length; j++) {
           interp2.context.variables.set(currentFn.params[j], currentArgs[j]);
+          interp2.context.variables.set("$" + currentFn.params[j], currentArgs[j]);
         }
         result = interp2.eval(currentFn.body);
       } finally {
@@ -31552,14 +31560,13 @@ var Interpreter = class _Interpreter {
         if (this.context.variables.has(bareName)) {
           return this.context.variables.get(bareName);
         }
-        // fn-value가 context.functions에 등록된 경우 → 함수 참조 객체로 반환
         if (this.context.functions.has(bareName)) {
           const _fn = this.context.functions.get(bareName);
           if (_fn && _fn.params !== void 0 && _fn.body !== void 0) {
-            return { kind: "function-value", params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: bareName };
+            return { kind: 'function-value', params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: bareName };
           }
         }
-        if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
+        if (process.env.FL_STRICT === "1") {
           const line = lit.line;
           throw new Error(`[E_UNRESOLVED_SYMBOL] '${bareName}' at line ${line || this.currentLine}, col 0 \u2014 set FL_STRICT=0 to silence`);
         }
