@@ -29110,7 +29110,7 @@ ${tail}` : "")
   }
   if (func.capturedEnv) {
     const savedStack = interp2.context.variables.saveStack();
-    const paramSet = new Set(func.params);
+    const paramSet = new Set([...func.params, ...func.params.map((p) => p.startsWith("$") ? p : "$" + p)]);
     interp2.callDepth++;
     _callStack.push(_stackEntry);
     if (_callStack.length > 100) _callStack.shift();
@@ -29119,6 +29119,7 @@ ${tail}` : "")
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
         interp2.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i].startsWith("$") ? func.params[i] : "$" + func.params[i], args2[i]);
       }
       result = interp2.eval(func.body);
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
@@ -29138,6 +29139,7 @@ ${tail}` : "")
   try {
     for (let i = 0; i < func.params.length; i++) {
       interp2.context.variables.set(func.params[i], args2[i]);
+      interp2.context.variables.set(func.params[i].startsWith("$") ? func.params[i] : "$" + func.params[i], args2[i]);
     }
     return interp2.eval(func.body);
   } finally {
