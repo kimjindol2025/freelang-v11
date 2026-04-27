@@ -19055,6 +19055,28 @@ function createDataModule() {
       const b = typeof obj2 === "string" ? JSON.parse(obj2) : obj2;
       return { ...a, ...b };
     },
+    // obj_merge obj1 obj2 -> object (alias for json_merge, more intuitive name)
+    "obj_merge": (obj1, obj2) => {
+      const a = typeof obj1 === "string" ? JSON.parse(obj1) : (obj1 || {});
+      const b = typeof obj2 === "string" ? JSON.parse(obj2) : (obj2 || {});
+      return { ...a, ...b };
+    },
+    // obj_pick obj keys -> object (keep only specified keys)
+    "obj_pick": (obj, keys) => {
+      const o = typeof obj === "string" ? JSON.parse(obj) : (obj || {});
+      const ks = Array.isArray(keys) ? keys : [keys];
+      const result = {};
+      for (const k of ks) { if (k in o) result[k] = o[k]; }
+      return result;
+    },
+    // obj_omit obj keys -> object (remove specified keys)
+    "obj_omit": (obj, keys) => {
+      const o = typeof obj === "string" ? JSON.parse(obj) : (obj || {});
+      const ks = new Set(Array.isArray(keys) ? keys : [keys]);
+      const result = {};
+      for (const k of Object.keys(o)) { if (!ks.has(k)) result[k] = o[k]; }
+      return result;
+    },
     // json_deep_merge obj1 obj2 -> object (deep recursive merge)
     "json_deep_merge": (obj1, obj2) => {
       const a = typeof obj1 === "string" ? JSON.parse(obj1) : obj1;
