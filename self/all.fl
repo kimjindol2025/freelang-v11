@@ -812,9 +812,15 @@
   :body (let [[$bnode (get $args 0)]
               [$items (get (get $bnode :fields) "items")]
               [$first-item (if (null? $items) null (get $items 0))]
-              [$nested (if (null? $first-item) false
-                         (and (= (get $first-item :kind) "block")
-                              (= (get $first-item :type) "Array")))]
+              [$inner-items (if (null? $first-item) null
+                               (if (and (= (get $first-item :kind) "block")
+                                        (= (get $first-item :type) "Array"))
+                                 (get (get $first-item :fields) "items")
+                                 null))]
+              [$nested (and (not (null? $inner-items))
+                           (> (length $inner-items) 0)
+                           (= (get (get $inner-items 0) :kind) "block")
+                           (= (get (get $inner-items 0) :type) "Array"))]
               [$bindings (if $nested (cg-let-2d $items 0 "" 0) (cg-let-1d $items 0 "" 0))]
               [$body-args (slice $args 1 (length $args))]
               [$body-js (cg-do-body $body-args 0 "")]]
@@ -827,14 +833,21 @@
       [(= $kind "variable")
        (str "let " (js-name (get $pat-node :name)) "=" $val-js ";")]
       [(and (= $kind "block") (= $type "Map"))
-       ;; bootstrap Map: map-entries로 [[k,v],...] 변환 후 처리
-       (let [[$entries (map-entries (get $pat-node :fields))]]
-         (str "let " $tmpvar "=" $val-js ";" (cg-let-binding-loop $entries 0 "" $tmpvar)))]
+       ;; Map 패턴: 필드들을 순회하며 바인딩 생성
+       ;; $val-js와 $tmpvar이 같으면 (배열에서 추출됨) 다시 선언하지 않음
+       (let [[$pat-fields (get $pat-node :fields)]
+             [$pat-entries (map-entries $pat-fields)]
+             [$pat-bindings (cg-map-pattern-bindings-from-entries $pat-entries $tmpvar 0 "")]]
+         (str
+           (if (= $val-js $tmpvar) "" (str "let " $tmpvar "=" $val-js ";"))
+           $pat-bindings))]
       [(and (= $kind "block") (= $type "Array"))
-       ;; array pattern: 첫 항목만 처리
-       (let [[$items (get (get $pat-node :fields) "items")]]
-         (if (null? $items) ""
-           (cg-let-binding (get $items 0) $val-js $tmpvar)))]
+       ;; array pattern: 배열 값에서 첫 항목을 추출해서 패턴과 매칭
+       (let [[$items (get (get $pat-node :fields) "items")]
+             [$first-pat (if (null? $items) nil (get $items 0))]]
+         (if (null? $first-pat) ""
+           (str "let " $tmpvar "=" $val-js "[0];"
+             (cg-let-binding $first-pat $tmpvar $tmpvar))))]
       [true
        (str "let " (extract-name $pat-node) "=" $val-js ";")]))]
 
@@ -853,7 +866,7 @@
                    (let [[$v_next (str $v "_" $i)]]
                      (str "let " $v_next "=" $access ";" (cg-let-binding-loop (map-entries (get $pat :fields)) 0 "" $v_next)))]
                   [true ""])]
-                [$bind (if (empty? $bind-code) "" $bind-code)]]
+                [$bind (if (nil-or-empty? $bind-code) "" $bind-code)]]
             (cg-let-binding-loop $entries (+ $i 1) (str $acc $bind) $v)))]
 
 [FUNC cg-let-1d :params [$items $i $acc $counter]
@@ -1183,6 +1196,18 @@
       (struct-pattern-test $fields $v (+ $i 1)
         (if (= (length $acc) 0) $t (str $acc "&&" $t)))))]
 
+;; cg-map-pattern-bindings-from-entries: entries 형태의 패턴 필드들을 처리
+[FUNC cg-map-pattern-bindings-from-entries :params [$entries $v $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (let [[$e (get $entries $i)]
+                [$k (get $e 0)]
+                [$pat (get $e 1)]
+                [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                [$access (str $v "[" (js-esc $k-clean) "]")]
+                [$binding (pattern-bindings-dispatch (get $pat :kind) $pat $access)]]
+            (cg-map-pattern-bindings-from-entries $entries $v (+ $i 1)
+              (str $acc $binding)))))]
+
 ;; struct-pattern-bindings: bind pattern variables from object fields
 [FUNC struct-pattern-bindings :params [$fields $v $i $acc]
   :body (if (>= $i (length $fields)) $acc
@@ -1196,8 +1221,10 @@
 ;; pattern-bindings: JS statement that binds pattern variables from __v
 [FUNC pattern-bindings-dispatch :params [$k $pat $v]
   :body (cond
-          [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
-          [(= $k "struct-pattern") (struct-pattern-bindings (get $pat :fields) $v 0 "")]
+          [(or (= $k "variable-pattern") (= $k "variable"))
+           (str "let " (js-name (get $pat :name)) "=" $v ";")]
+          [(or (= $k "struct-pattern") (= $k "block"))
+           (struct-pattern-bindings (get $pat :fields) $v 0 "")]
           [true ""])]
 
 [FUNC pattern-bindings :params [$pat $v]
