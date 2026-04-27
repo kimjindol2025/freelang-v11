@@ -201,44 +201,52 @@
 
 ---
 
-## 🔄 워크플로우 / :if 조건부 실행 (2026-04-28)
+## 🔄 워크플로우 / Saga / 병렬 (2026-04-28)
 
 ```fl
-;; workflow — 단계별 retry + 실패 처리
-(define result (workflow
-  [{:name "fetch"   :action (fn [$p] {:data [1 2 3]}) :retry 0}
-   {:name "process" :action (fn [$p] {:count (length (get $p "data"))}) :retry 3}
-   {:name "save"    :action (fn [$p] {:ok true}) :retry 0}]
-  :on-error (fn [$err $step $idx] (println (str "실패: " $step)))))
-;; → {:ok true :results [...] :last {...}}
-;; → {:ok false :error "..." :failed_step "step-name" :results [...]}
-
-;; saga — 보상 트랜잭션 (실패 시 역순 롤백)
-(define r (saga
-  [{:name "db-insert" :action (fn [$p] {:id 1}) :compensate (fn [$r] (println "롤백"))}
-   {:name "email"     :action (fn [$p] (error "SMTP 오류")) :compensate (fn [$r] nil)}]))
-;; → {:ok false :error "SMTP 오류" :compensated ["db-insert"]}
-
-;; parallel_tasks — 모든 태스크 실행 (실패도 수집)
-(define results (parallel_tasks
-  [["task-a" (fn [] (http_get "..."))]
-   ["task-b" (fn [] (db_query ...))]]))
-;; → [{:ok true :name "task-a" :result {...}} {:ok false :name "task-b" :error "..."}]
-
-;; workflow_step — :if 조건부 실행 (2026-04-28 완성)
+;; ── workflow_run ─────────────────────────────────────────────────
 (define step (workflow_step "process"
-  (fn [$ctx] {:done true})
-  {:if     (fn [$ctx] (> (length (get $ctx "data")) 0))  ;; 조건 false → skip
-   :retry  2
-   :on_error (fn [$e] {:fallback true})}))
-(define wf (workflow_create "my-wf" [$step]))
-(define r  (workflow_run wf {}))
-(println (workflow_ok r))           ;; true/false
-(println (workflow_get r "done"))   ;; context 값
-(println (workflow_summary r))      ;; {:steps_run :steps_ok :total_ms}
+  (fn [$ctx] {:count (length (get $ctx "data"))})
+  {:if (fn [$ctx] (> (length (get $ctx "data")) 0))
+   :retry 2 :on_error (fn [$e] {:fallback true})}))
+(define r (workflow_run (workflow_create "wf" [$step]) {:data [1 2 3]}))
+(workflow_ok r)           ;; true/false
+(workflow_get r "count")  ;; context 값
+(workflow_summary r)      ;; 텍스트 요약
 
-;; ※ 예약어 map 키 허용 (2026-04-28 파서 수정)
-;; {:if fn :let 1 :do "x"} — 예약어도 :키 형식 사용 가능
+;; ── saga_run — 보상 트랜잭션 ─────────────────────────────────────
+(saga_run
+  [{:name "db"    :action (fn [$c] {:id 1}) :compensate (fn [$r] (println "롤백"))}
+   {:name "email" :action (fn [$c] (error "SMTP")) :compensate (fn [$r] nil)}]
+  {})
+;; → {:ok false :failed_step "email" :compensated ["db"] :results [...]}
+
+;; ── workflow_parallel — best-effort 병렬 ──────────────────────────
+(workflow_parallel
+  [(workflow_step "a" (fn [$c] {:a 1}) {})
+   (workflow_step "b" (fn [$c] {:b 2}) {})
+   (workflow_step "x" (fn [$c] (error "fail")) {:required false})]
+  {})
+;; → {:ok false :results [4개] :errors [1개] :context {:a 1 :b 2}}
+
+;; ── workflow_parallel_any — 최초 성공 반환 ────────────────────────
+(workflow_parallel_any [(workflow_step "a" (fn [$c] {:v 1}) {})] {})
+;; → {:ok true :name "a" :result {:v 1} :ms N}
+
+;; ── batch_map — 배치 처리 ─────────────────────────────────────────
+(batch_map [1 2 3 4 5 6] 2 (fn [$b] (map (fn [$x] (* $x 10)) $b)))
+;; → {:ok true :results [10 20 30 40 50 60] :total 6 :batches 3}
+
+;; ── distribute — N 워커 분산 ──────────────────────────────────────
+(distribute [1 2 3 4 5 6] 3 (fn [$batch $w] (map (fn [$x] (+ $x $w)) $batch)))
+;; → {:ok true :results [...] :worker_results [{:worker 0 :ok true}...]}
+
+;; ── 관찰성 ────────────────────────────────────────────────────────
+(time_exec (fn [] (+ 1 2)))        ;; → {:ok true :result 3 :ms N}
+(span "my-op" (fn [] 42))         ;; → {:label "my-op" :result 42 :ms N}
+(log_trace "users" {:count 42})   ;; stderr 출력, 원본 값 반환
+
+;; ※ 예약어 map 키 허용: {:if fn :let 1 :do "x"}
 ```
 
 ---

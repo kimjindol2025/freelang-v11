@@ -21917,6 +21917,150 @@ function createWorkflowModule(callFnVal) {
       sections: [...report.sections, { name: sectionName, data }]
     }),
     // report_render report -> string  (formatted text report)
+    // ── P1: 병렬 실행 ────────────────────────────────────────────
+    // workflow_parallel steps ctx -> {ok, results, errors, total_ms}
+    // 모든 step을 독립 실행 (실패해도 계속), 결과 모두 수집
+    "workflow_parallel": (steps, ctx = {}) => {
+      const start = Date.now();
+      const results = [];
+      const errors = [];
+      for (const step of steps) {
+        const t0 = Date.now();
+        try {
+          if (step.if !== void 0) {
+            const ok = callFl(step.if, [ctx]);
+            if (!ok) {
+              results.push({ name: step.name, status: "skipped", ms: 0 });
+              continue;
+            }
+          }
+          const r = callFl(step.fn, [ctx]);
+          ctx = { ...ctx, ...r };
+          results.push({ name: step.name, status: "ok", result: r, ms: Date.now() - t0 });
+        } catch (e) {
+          errors.push({ name: step.name, error: e.message });
+          results.push({ name: step.name, status: "failed", error: e.message, ms: Date.now() - t0 });
+        }
+      }
+      const allOk = errors.length === 0;
+      return { ok: allOk, results, errors, context: ctx, total_ms: Date.now() - start };
+    },
+    // workflow_parallel_any steps ctx -> {ok, name, result, ms}
+    // 최초 성공 step 결과 반환 (나머지 건너뜀)
+    "workflow_parallel_any": (steps, ctx = {}) => {
+      for (const step of steps) {
+        const t0 = Date.now();
+        try {
+          const r = callFl(step.fn, [ctx]);
+          return { ok: true, name: step.name, result: r, ms: Date.now() - t0 };
+        } catch (_) {}
+      }
+      return { ok: false, error: "All steps failed" };
+    },
+    // ── P1: 보상 트랜잭션 (Saga) ─────────────────────────────────
+    // saga_run steps -> {ok, results, compensated, error}
+    // step: {name, action fn(ctx)->ctx, compensate fn(result)->void}
+    "saga_run": (steps, ctx = {}) => {
+      const done = [];
+      for (const step of steps) {
+        try {
+          const result = callFl(step.action, [ctx]);
+          if (result && typeof result === "object") ctx = { ...ctx, ...result };
+          done.push({ name: step.name, result });
+        } catch (e) {
+          // 역순 보상 실행
+          const compensated = [];
+          for (let i = done.length - 1; i >= 0; i--) {
+            if (done[i] && step !== done[i] && done[i].name) {
+              const doneStep = steps.find((s) => s.name === done[i].name);
+              if (doneStep && doneStep.compensate) {
+                try { callFl(doneStep.compensate, [done[i].result]); } catch (_) {}
+                compensated.push(done[i].name);
+              }
+            }
+          }
+          return {
+            ok: false,
+            error: e.message,
+            failed_step: step.name,
+            compensated,
+            results: done
+          };
+        }
+      }
+      return { ok: true, results: done };
+    },
+    // ── P1: 배치/분산 처리 ───────────────────────────────────────
+    // batch_map arr batchSize fn -> {ok, results, total, batches, errors}
+    "batch_map": (arr, batchSize, fn) => {
+      const results = [];
+      const errors = [];
+      let batches = 0;
+      for (let i = 0; i < arr.length; i += batchSize) {
+        const batch = arr.slice(i, i + batchSize);
+        batches++;
+        try {
+          const r = callFl(fn, [batch]);
+          if (Array.isArray(r)) results.push(...r);
+          else results.push(r);
+        } catch (e) {
+          errors.push({ batch: batches, error: e.message });
+        }
+      }
+      return { ok: errors.length === 0, results, total: arr.length, batches, errors };
+    },
+    // distribute items workers fn -> {ok, results, worker_results}
+    // items를 workers 수로 나눠 각각 처리 (단일 프로세스 내 배치 분산)
+    "distribute": (items, workers, fn) => {
+      const n = Math.max(1, Array.isArray(workers) ? workers.length : workers);
+      const batchSize = Math.ceil(items.length / n);
+      const workerResults = [];
+      const results = [];
+      for (let w = 0; w < n; w++) {
+        const batch = items.slice(w * batchSize, (w + 1) * batchSize);
+        if (batch.length === 0) break;
+        try {
+          const r = callFl(fn, [batch, w]);
+          const out = Array.isArray(r) ? r : [r];
+          results.push(...out);
+          workerResults.push({ worker: w, ok: true, count: batch.length, result: r });
+        } catch (e) {
+          workerResults.push({ worker: w, ok: false, error: e.message });
+        }
+      }
+      return { ok: workerResults.every((w) => w.ok), results, worker_results: workerResults };
+    },
+    // ── P1: 관찰성 (Observability) ───────────────────────────────
+    // time_exec fn -> {ok, result, ms}
+    "time_exec": (fn) => {
+      const t0 = Date.now();
+      try {
+        const result = callFl(fn, []);
+        return { ok: true, result, ms: Date.now() - t0 };
+      } catch (e) {
+        return { ok: false, error: e.message, ms: Date.now() - t0 };
+      }
+    },
+    // span label fn -> {label, ok, result, ms}
+    "span": (label, fn) => {
+      const t0 = Date.now();
+      try {
+        const result = callFl(fn, []);
+        const ms = Date.now() - t0;
+        process.stderr.write(`[SPAN] ${label}: ${ms}ms ok\n`);
+        return { label, ok: true, result, ms };
+      } catch (e) {
+        const ms = Date.now() - t0;
+        process.stderr.write(`[SPAN] ${label}: ${ms}ms FAILED — ${e.message}\n`);
+        return { label, ok: false, error: e.message, ms };
+      }
+    },
+    // log_trace label value -> value (passthrough with trace log)
+    "log_trace": (label, value) => {
+      process.stderr.write(`[TRACE] ${label}: ${JSON.stringify(value)}\n`);
+      return value;
+    },
+    // report_render report -> string
     "report_render": (report) => {
       const divider = "\u2500".repeat(50);
       const lines = [
