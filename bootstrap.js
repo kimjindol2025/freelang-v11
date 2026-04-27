@@ -935,7 +935,7 @@ var init_parser = __esm({
         const peekPos = this.pos + 1;
         if (peekPos >= this.tokens.length) return false;
         const nextToken = this.tokens[peekPos];
-        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */;
+        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */ || nextToken.type === "LBrace" /* LBrace map literal */ || nextToken.type === "LParen" /* LParen sexpr */;
       }
       // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
       // Also handles match expressions: (match value (pattern body) ...)
@@ -20059,6 +20059,168 @@ function createCryptoModule() {
 var T = createTimeModule();
 var A = createAgentModule();
 var X = createCryptoModule();
+function createAgentWorkflowModule(callFnVal) {
+  // Helper: call a FreeLang fn-value or plain JS fn with args
+  function callFn(fn, args) {
+    if (fn === null || fn === undefined) return null;
+    if (typeof fn === "function") return fn(...args);
+    // FreeLang function-value object
+    if (fn && (fn.kind === "function-value" || fn.params !== undefined)) {
+      return callFnVal(fn, args);
+    }
+    return null;
+  }
+
+  return {
+    // workflow steps opts -> {ok, results, last, error, failed_step, step_index}
+    // steps: [[name fn] ...] — fn receives previous result as first arg
+    // opts: :retry n  :on-error fn  :checkpoint "path.ckpt"
+    "workflow": (steps, ...kvPairs) => {
+      const opts = {};
+      for (let i = 0; i + 1 < kvPairs.length; i += 2) {
+        const k = String(kvPairs[i]).replace(/^:/, "");
+        opts[k] = kvPairs[i + 1];
+      }
+      const globalRetry = Number(opts.retry || 0);
+      const onError = opts["on-error"] || opts["on_error"] || null;
+      const checkpointPath = opts.checkpoint || null;
+
+      // Load checkpoint
+      let startFrom = 0;
+      const results = [];
+      if (checkpointPath) {
+        try {
+          const ckpt = JSON.parse(require("fs").readFileSync(checkpointPath, "utf-8"));
+          if (ckpt.completed && Array.isArray(ckpt.completed)) {
+            startFrom = ckpt.completed.length;
+            results.push(...ckpt.completed.map(c => c.result));
+          }
+        } catch (_) {}
+      }
+
+      const stepList = Array.isArray(steps) ? steps : [];
+
+      for (let si = startFrom; si < stepList.length; si++) {
+        const step = stepList[si];
+        let name, action, stepRetry, stepOnError;
+
+        if (Array.isArray(step)) {
+          [name, action] = step;
+          stepRetry = globalRetry;
+          stepOnError = onError;
+        } else if (typeof step === "object" && step !== null) {
+          name = step.name || step[":name"] || ("step-" + si);
+          action = step.action || step[":action"];
+          stepRetry = Number(step.retry || step[":retry"] || globalRetry);
+          stepOnError = step["on-error"] || step[":on-error"] || onError;
+        } else {
+          continue;
+        }
+
+        const prevResult = results.length > 0 ? results[results.length - 1] : null;
+        let stepResult = null;
+        let lastErr = null;
+        let succeeded = false;
+
+        for (let attempt = 0; attempt <= stepRetry; attempt++) {
+          try {
+            stepResult = callFn(action, [prevResult]);
+            succeeded = true;
+            break;
+          } catch (e) {
+            lastErr = e;
+            if (attempt < stepRetry) {
+              const backoff = Math.min(100 * Math.pow(2, attempt), 2000);
+              const end = Date.now() + backoff;
+              while (Date.now() < end) {}
+            }
+          }
+        }
+
+        if (!succeeded) {
+          const errMsg = lastErr && lastErr.message ? lastErr.message : String(lastErr);
+          if (stepOnError) {
+            try { callFn(stepOnError, [lastErr, name, si]); } catch (_) {}
+          }
+          return { ok: false, error: errMsg, failed_step: name, step_index: si, results };
+        }
+
+        results.push(stepResult);
+
+        if (checkpointPath) {
+          try {
+            const ckptData = {
+              completed: stepList.slice(0, si + 1).map((s, idx) => ({
+                name: Array.isArray(s) ? s[0] : (s.name || ("step-" + idx)),
+                result: results[idx]
+              })),
+              timestamp: new Date().toISOString()
+            };
+            require("fs").writeFileSync(checkpointPath, JSON.stringify(ckptData, null, 2));
+          } catch (_) {}
+        }
+      }
+
+      if (checkpointPath) { try { require("fs").unlinkSync(checkpointPath); } catch (_) {} }
+      return { ok: true, results, last: results[results.length - 1] || null };
+    },
+
+    // saga steps -> {ok, results, last} or {ok: false, error, failed_step, compensated}
+    // steps: [{:action fn :compensate fn :name "str"} ...]
+    // On failure: runs compensations in reverse (Saga pattern)
+    "saga": (steps) => {
+      const stepList = Array.isArray(steps) ? steps : [];
+      const completed = [];
+      const results = [];
+      process.stderr.write("[saga-debug] stepList.length=" + stepList.length + "\n");
+      if (stepList[0]) process.stderr.write("[saga-debug] step[0]=" + JSON.stringify(Object.keys(stepList[0])) + "\n");
+
+      for (let si = 0; si < stepList.length; si++) {
+        const step = stepList[si];
+        const action = step.action || step[":action"];
+        const compensate = step.compensate || step[":compensate"];
+        const name = step.name || step[":name"] || ("step-" + si);
+        const prevResult = results.length > 0 ? results[results.length - 1] : null;
+
+        try {
+          const result = callFn(action, [prevResult]);
+          results.push(result);
+          completed.push({ name, compensate, result });
+        } catch (e) {
+          const compensated = [];
+          for (let ci = completed.length - 1; ci >= 0; ci--) {
+            try {
+              if (completed[ci].compensate) callFn(completed[ci].compensate, [completed[ci].result]);
+              compensated.push(completed[ci].name);
+            } catch (ce) {
+              compensated.push(completed[ci].name + "(보상실패:" + (ce.message || ce) + ")");
+            }
+          }
+          return { ok: false, error: e.message || String(e), failed_step: name, step_index: si, compensated };
+        }
+      }
+
+      return { ok: true, results, last: results[results.length - 1] || null };
+    },
+
+    // parallel_tasks tasks -> [{ok, name, result, error}]
+    // tasks: [[name fn] ...] — all run, results collected (best-effort, sequential execution)
+    "parallel_tasks": (tasks) => {
+      const taskList = Array.isArray(tasks) ? tasks : [];
+      return taskList.map(task => {
+        const [name, fn] = Array.isArray(task) ? task : [String(task), null];
+        if (!fn) return { ok: false, name, error: "fn 없음", result: null };
+        try {
+          const result = callFn(fn, [null]);
+          return { ok: true, name, result, error: null };
+        } catch (e) {
+          return { ok: false, name, error: e.message || String(e), result: null };
+        }
+      });
+    },
+  };
+}
+
 function createWorkflowModule() {
   return {
     // ── Workflow Definition ───────────────────────────────────
@@ -26334,6 +26496,9 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
   interp2.registerModule(createWorkflowModule());
+  interp2.registerModule(createAgentWorkflowModule(
+    (fn, args) => interp2.callFunctionValue(fn, args)
+  ));
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),
