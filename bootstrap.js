@@ -29159,7 +29159,7 @@ function callFunctionValue(interp2, fn, args2) {
     throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
   }
   const savedStack = interp2.context.variables.saveStack();
-  const paramSet = new Set(fn.params);
+  const paramSet = new Set([...fn.params, ...fn.params.map((p) => "$" + p)]);
   interp2.callDepth++;
   let result;
   try {
