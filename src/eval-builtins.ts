@@ -212,10 +212,10 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "print": process.stdout.write(vals.map((v: any) => v === null ? "null" : String(v)).join("")); return null;
     case "println": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
     case "substring": return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== undefined ? Number(v2) : undefined) : "";
-    case "char-at": return typeof v0 === "string" ? (v0[Number(v1)] ?? null) : null;
+    case "char-at": return typeof v0 === "string" ? (v0[Number(v1)] ?? "") : "";
     case "index-of": return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
     case "split": return typeof v0 === "string" ? v0.split(String(v1 ?? "")) : [];
-    case "trim": return typeof v0 === "string" ? v0.trim() : v0;
+    case "trim": return typeof v0 === "string" ? v0.trim() : "";
     case "upper-case": return typeof v0 === "string" ? v0.toUpperCase() : v0;
     case "lower-case": return typeof v0 === "string" ? v0.toLowerCase() : v0;
     case "strlen": return typeof v0 === "string" ? v0.length : 0;
@@ -936,7 +936,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "lower":
       return typeof args[0] === "string" ? args[0].toLowerCase() : args[0];
     case "trim":
-      return typeof args[0] === "string" ? args[0].trim() : args[0];
+      return typeof args[0] === "string" ? args[0].trim() : "";
     case "starts-with?":
     case "str-starts-with?":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
@@ -945,7 +945,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].endsWith(args[1]) : false;
     case "char-at":
     case "str-char-at":
-      return typeof args[0] === "string" ? (args[0][Number(args[1])] ?? null) : null;
+      return typeof args[0] === "string" ? (args[0][Number(args[1])] ?? "") : "";
     case "math-pow":
       return Math.pow(Number(args[0]), Number(args[1]));
     case "append":
