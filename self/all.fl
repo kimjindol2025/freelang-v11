@@ -987,6 +987,29 @@
 [FUNC make-literal-pattern :params [$type $value] :body {:kind "literal-pattern" :type $type :value $value}]
 [FUNC make-struct-pattern :params [$fields] :body {:kind "struct-pattern" :fields $fields}]
 
+;; map-items-from-fields: Bootstrap Map 또는 self-parser items를 items array로 정규화
+[FUNC map-items-from-fields :params [$fields]
+  :body (if (null? $fields)
+    []
+    (let [[$items-val (get $fields "items")]]
+      (if (array? $items-val)
+        $items-val
+        ;; bootstrap format: use map-entries to get [[k,v], [k,v], ...]
+        (let [[$pairs (map-entries $fields)]]
+          (if (array? $pairs)
+            (flatten-map-entries $pairs 0 [])
+            [])))))]
+
+;; flatten-map-entries: [[k,v], [k,v], ...] → [kw-node val-node kw-node val-node ...]
+[FUNC flatten-map-entries :params [$entries $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+    (let [[$e (get $entries $i)]
+          [$k (get $e 0)]
+          [$v (get $e 1)]
+          ;; Create a keyword node to match the self-parser format
+          [$kw-node {:kind "keyword" :name $k}]]
+      (flatten-map-entries $entries (+ $i 1) (append $acc [$kw-node $v]))))]
+
 ;; node-to-pattern: AST node를 pattern node로 변환
 [FUNC node-to-pattern :params [$node]
   :body (cond
@@ -1001,7 +1024,8 @@
      (make-literal-pattern (get $node :type) (get $node :value))]
     [(= (get $node :kind) "block")
      (if (= (get $node :type) "Map")
-       (make-struct-pattern (map-items-to-fields (get (get $node :fields) :items) 0 []))
+       (let [[$items (map-items-from-fields (get $node :fields))]]
+         (make-struct-pattern (map-items-to-fields $items 0 [])))
        (make-wildcard-pattern))]
     [true (make-wildcard-pattern)])]
 
@@ -1010,9 +1034,15 @@
   :body (if (>= $i (length $items)) $acc
     (let [[$key-node (get $items $i)]
           [$val-node (if (< (+ $i 1) (length $items)) (get $items (+ $i 1)) nil)]
-          [$key (if (= (get $key-node :kind) "keyword")
-                  (get $key-node :name)
-                  (str (get $key-node :value)))]]
+          [$debug-kind (if (null? $key-node) "null" (get $key-node :kind))]
+          [$key (if (= $debug-kind "keyword")
+                  (let [[$kn (get $key-node :name)]]
+                    (if (string? $kn)
+                      (if (starts-with? $kn ":")
+                        (substring $kn 1 (length $kn))
+                        $kn)
+                      $kn))
+                  (if (null? $key-node) "null" (str (get $key-node :value))))]]
       (if (null? $val-node)
         $acc
         (let [[$pat (node-to-pattern $val-node)]]
