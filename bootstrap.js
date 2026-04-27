@@ -18277,6 +18277,20 @@ function createFileModule() {
     "file_exists": (filePath) => {
       return fs4.existsSync(filePath);
     },
+    // file_mkdir dirPath -> boolean (create directory recursively)
+    "file_mkdir": (dirPath) => {
+      try {
+        fs4.mkdirSync(dirPath, { recursive: true });
+        return true;
+      } catch (e) { return false; }
+    },
+    // file_rmdir dirPath -> boolean (remove directory recursively)
+    "file_rmdir": (dirPath) => {
+      try {
+        fs4.rmSync(dirPath, { recursive: true, force: true });
+        return true;
+      } catch (e) { return false; }
+    },
     // file_delete filePath -> boolean (delete file)
     "file_delete": (filePath) => {
       try {
@@ -18995,10 +19009,11 @@ function createShellModule() {
       const result = (0, import_child_process2.spawnSync)("which", [program], { timeout: 5e3 });
       return (result.status ?? 1) === 0;
     },
-    // shell_env varname -> string (get environment variable)
-    "shell_env": (varname) => {
-      return process.env[varname] ?? "";
-    },
+    // shell_env / get_env varname -> string (get environment variable)
+    "shell_env": (varname) => process.env[varname] ?? "",
+    "get_env":   (varname) => process.env[varname] ?? "",
+    // get_env_or varname default -> string
+    "get_env_or": (varname, def2) => process.env[varname] ?? def2,
     // shell_cwd -> string (current working directory)
     "shell_cwd": () => {
       return process.cwd();
@@ -21136,9 +21151,21 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         promise
       };
     },
-    // server_req_body req -> string
+    // server_req_body req -> object | string
+    // Content-Type: application/json → 자동 파싱된 object 반환
+    // 그 외 → string 반환 (form-urlencoded 등은 JS fetch+JSON 사용 권장)
     "server_req_body": (req) => {
-      return req.body ?? "";
+      const body = req.body;
+      if (body === undefined || body === null) return {};
+      if (typeof body === "object") return body;
+      if (typeof body === "string") {
+        const s = body.trim();
+        if (s.startsWith("{") || s.startsWith("[")) {
+          try { return JSON.parse(s); } catch (_) {}
+        }
+        return s;
+      }
+      return body;
     },
     // server_req_query req [key] -> object or string
     "server_req_query": (req, key) => {
