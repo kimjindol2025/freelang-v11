@@ -201,19 +201,31 @@
               [$body-js (cg-do-body $body-args 0 "")]]
           (str "((()=>{" $bindings $body-js "})())"))]
 
+[FUNC cg-let-binding :params [$pat-node $val-js]
+  :body (let [[$kind (get $pat-node :kind)]
+              [$type (get $pat-node :type)]]
+    (cond
+      [(= $kind "variable")
+       (str "let " (js-name (get $pat-node :name)) "=" $val-js ";")]
+      [(and (= $kind "block") (= $type "Map"))
+       ;; bootstrap Map: map-entries로 [[k,v],...] 변환 후 처리
+       (str "let __v=" $val-js ";" (struct-pattern-bindings-from-entries (map-entries (get $pat-node :fields)) "__v" 0 ""))]
+      [true
+       (str "let " (extract-name $pat-node) "=" $val-js ";")]))]
+
 [FUNC cg-let-1d :params [$items $i $acc]
   :body (if (>= $i (length $items)) $acc
-          (let [[$k-n (get $items $i)] [$v-n (get $items (+ $i 1))]
-                [$name (extract-name $k-n)] [$val (cg $v-n)]]
-            (cg-let-1d $items (+ $i 2) (str $acc "let " $name ";" $name "=" $val ";"))))]
+          (let [[$pat-n (get $items $i)] [$v-n (get $items (+ $i 1))]
+                [$val (cg $v-n)]]
+            (cg-let-1d $items (+ $i 2) (str $acc (cg-let-binding $pat-n $val)))))]
 
 [FUNC cg-let-2d :params [$items $i $acc]
   :body (if (>= $i (length $items)) $acc
           (let [[$pair (get $items $i)]
                 [$pitems (get (get $pair :fields) "items")]
                 [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
-                [$name (extract-name $k-n)] [$val (cg $v-n)]]
-            (cg-let-2d $items (+ $i 1) (str $acc "let " $name ";" $name "=" $val ";"))))]
+                [$val (cg $v-n)]]
+            (cg-let-2d $items (+ $i 1) (str $acc (cg-let-binding $k-n $val)))))]
 
 [FUNC cg-do :params [$args]
   :body (if (= (length $args) 0) "null"
@@ -443,11 +455,36 @@
            (struct-pattern-bindings (get $pat :fields) $v 0 nil "")]
           [true ""])]
 
+;; bootstrap Map 지원: map-entries 호출해서 [[k,v], ...] 형태로 변환
+[FUNC struct-pattern-bindings-from-entries :params [$entries $v $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (let [[$e (get $entries $i)]
+                [$k (get $e 0)]
+                [$pat (get $e 1)]
+                [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                [$access (str $v "[" (js-esc $k-clean) "]")]
+                [$pat-kind (get $pat :kind)]
+                [$binding (cond
+                  [(= $pat-kind "variable")
+                   (str "let " (js-name (get $pat :name)) "=" $access ";")]
+                  [(= $pat-kind "block")
+                   (str "let __v2=" $access ";" (struct-pattern-bindings-from-entries (map-entries (get $pat :fields)) "__v2" 0 ""))]
+                  [true
+                   (str "let _p=" $access ";")])]]
+            (struct-pattern-bindings-from-entries $entries $v (+ $i 1)
+              (str $acc $binding))))]
+
 ;; struct-pattern-bindings: Collect bindings from all fields
+;; bootstrap parser: fields = Map{...} → map-entries로 변환
+;; self-parser: fields = plain obj {field: pattern, ...} → json_keys로 처리
 [FUNC struct-pattern-bindings :params [$fields $v $i $keys $acc]
   :body (if (nil? $keys)
           (let [[$ks (json_keys $fields)]]
-            (struct-pattern-bindings $fields $v 0 $ks ""))
+            (if (empty? $ks)
+              ;; Map인 경우: json_keys가 빈 배열 반환 → map-entries 사용
+              (struct-pattern-bindings-from-entries (map-entries $fields) $v 0 "")
+              ;; plain object인 경우: json_keys로 계속 진행
+              (struct-pattern-bindings $fields $v 0 $ks "")))
           (if (>= $i (length $keys))
             $acc
             (let [[$k (get $keys $i)]

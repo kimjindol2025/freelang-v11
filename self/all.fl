@@ -820,19 +820,49 @@
               [$body-js (cg-do-body $body-args 0 "")]]
           (str "((()=>{" $bindings $body-js "})())"))]
 
+[FUNC cg-let-binding :params [$pat-node $val-js]
+  :body (let [[$kind (get $pat-node :kind)]
+              [$type (get $pat-node :type)]]
+    (cond
+      [(= $kind "variable")
+       (str "let " (js-name (get $pat-node :name)) "=" $val-js ";")]
+      [(and (= $kind "block") (= $type "Map"))
+       ;; bootstrap Map: map-entries로 [[k,v],...] 변환 후 처리
+       (let [[$entries (map-entries (get $pat-node :fields))]]
+         (str "let __v=" $val-js ";" (cg-let-binding-loop $entries 0 "" "__v")))]
+      [true
+       (str "let " (extract-name $pat-node) "=" $val-js ";")]))]
+
+[FUNC cg-let-binding-loop :params [$entries $i $acc $v]
+  :body (if (>= $i (length $entries)) $acc
+          (let [[$e (get $entries $i)]
+                [$k (get $e 0)]
+                [$pat (get $e 1)]
+                [$k-clean (if (starts-with? $k ":") (substring $k 1) $k)]
+                [$access (str $v "[" (js-esc $k-clean) "]")]
+                [$pat-kind (get $pat :kind)]
+                [$bind (cond
+                  [(= $pat-kind "variable")
+                   (str "let " (js-name (get $pat :name)) "=" $access ";")]
+                  [(= $pat-kind "block")
+                   (str "let __v2=" $access ";" (cg-let-binding-loop (map-entries (get $pat :fields)) 0 "" "__v2"))]
+                  [true
+                   (str "let _p=" $access ";")])]]
+            (cg-let-binding-loop $entries (+ $i 1) (str $acc $bind) $v)))]
+
 [FUNC cg-let-1d :params [$items $i $acc]
   :body (if (>= $i (length $items)) $acc
-          (let [[$k-n (get $items $i)] [$v-n (get $items (+ $i 1))]
-                [$name (extract-name $k-n)] [$val (cg $v-n)]]
-            (cg-let-1d $items (+ $i 2) (str $acc "let " $name "=" $val ";"))))]
+          (let [[$pat-n (get $items $i)] [$v-n (get $items (+ $i 1))]
+                [$val (cg $v-n)]]
+            (cg-let-1d $items (+ $i 2) (str $acc (cg-let-binding $pat-n $val)))))]
 
 [FUNC cg-let-2d :params [$items $i $acc]
   :body (if (>= $i (length $items)) $acc
           (let [[$pair (get $items $i)]
                 [$pitems (get (get $pair :fields) "items")]
                 [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
-                [$name (extract-name $k-n)] [$val (cg $v-n)]]
-            (cg-let-2d $items (+ $i 1) (str $acc "let " $name "=" $val ";"))))]
+                [$val (cg $v-n)]]
+            (cg-let-2d $items (+ $i 1) (str $acc (cg-let-binding $k-n $val)))))]
 
 [FUNC cg-do :params [$args]
   :body (if (= (length $args) 0) "null"
