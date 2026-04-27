@@ -31552,6 +31552,13 @@ var Interpreter = class _Interpreter {
         if (this.context.variables.has(bareName)) {
           return this.context.variables.get(bareName);
         }
+        // fn-value가 context.functions에 등록된 경우 → 함수 참조 객체로 반환
+        if (this.context.functions.has(bareName)) {
+          const _fn = this.context.functions.get(bareName);
+          if (_fn && _fn.params !== void 0 && _fn.body !== void 0) {
+            return { kind: "function-value", params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: bareName };
+          }
+        }
         if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
           const line = lit.line;
           throw new Error(`[E_UNRESOLVED_SYMBOL] '${bareName}' at line ${line || this.currentLine}, col 0 \u2014 set FL_STRICT=0 to silence`);
