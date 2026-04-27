@@ -21602,10 +21602,11 @@ function categorizeError(message) {
   if (msg.includes("io error")) return "IO_ERROR";
   return "UNKNOWN";
 }
-function createWorkflowModule(callFnVal) {
-  // Unified caller: handles both plain JS functions and FreeLang function-value objects
+function createWorkflowModule(callFnVal, callUserFn) {
+  // Unified caller: JS fn / FreeLang fn-value / FreeLang named fn (string)
   function callFl(fn, args) {
     if (typeof fn === "function") return fn(...args);
+    if (typeof fn === "string" && typeof callUserFn === "function") return callUserFn(fn, args);
     if (fn && (fn.kind === "function-value" || fn.params !== void 0)) {
       if (typeof callFnVal === "function") return callFnVal(fn, args);
     }
@@ -21630,7 +21631,8 @@ function createWorkflowModule(callFnVal) {
       on_timeout: options.on_timeout,
       fallback: options.fallback,
       timeout_ms: options.timeout_ms,
-      if: options.if
+      if: options.if,
+      depends: options.depends || []
     }),
     // ── Workflow Execution ────────────────────────────────────
     // workflow_run workflow initial_ctx options -> WorkflowResult
@@ -22059,6 +22061,142 @@ function createWorkflowModule(callFnVal) {
     "log_trace": (label, value) => {
       process.stderr.write(`[TRACE] ${label}: ${JSON.stringify(value)}\n`);
       return value;
+    },
+    // ── P2: 보안 Sandbox ──────────────────────────────────────────
+    // sandbox_run fn options -> {ok, result, error, ms, calls}
+    // options: {:timeout N :max_calls N}
+    "sandbox_run": (fn, options = {}) => {
+      const timeout = options.timeout ?? 5000;
+      const maxCalls = options.max_calls ?? 1000;
+      const t0 = Date.now();
+      let calls = 0;
+      // Wrap callFl to count calls
+      const limitedCallFl = (f, args) => {
+        calls++;
+        if (calls > maxCalls) throw new Error(`sandbox: max_calls(${maxCalls}) 초과`);
+        if (Date.now() - t0 > timeout) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
+        return callFl(f, args);
+      };
+      try {
+        // Use deadline check via synchronous polling
+        const deadline = t0 + timeout;
+        const result = (() => {
+          if (Date.now() > deadline) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
+          return callFl(fn, []);
+        })();
+        return { ok: true, result, ms: Date.now() - t0, calls };
+      } catch (e) {
+        return { ok: false, error: e.message, ms: Date.now() - t0, calls };
+      }
+    },
+    // ── P2: 성능 최적화 ───────────────────────────────────────────
+    // memoize fn maxSize -> memo-id (전역 레지스트리에 fn+cache 저장)
+    // memo_call memo-id ...args -> result
+    "memoize": (fn, maxSize = 0) => {
+      const id = `_m${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      createWorkflowModule._reg = createWorkflowModule._reg || {};
+      createWorkflowModule._reg[id] = { fn, cache: {}, size: 0, max: maxSize };
+      return id;
+    },
+    "memo_call": (memoId, ...args) => {
+      const store = (createWorkflowModule._reg || {})[memoId];
+      if (!store) throw new Error("invalid memo id");
+      const key = JSON.stringify(args);
+      if (key in store.cache) return store.cache[key];
+      const result = callFl(store.fn, args);
+      if (store.max > 0 && store.size >= store.max) {
+        delete store.cache[Object.keys(store.cache)[0]];
+        store.size--;
+      }
+      store.cache[key] = result;
+      store.size++;
+      return result;
+    },
+    "memo_size": (memoId) => {
+      const store = (createWorkflowModule._reg || {})[memoId];
+      return store ? store.size : 0;
+    },
+    "memo_clear": (memoId) => {
+      const store = (createWorkflowModule._reg || {})[memoId];
+      if (store) { store.cache = {}; store.size = 0; }
+      return memoId;
+    },
+    // rate_limit fn maxCalls windowMs -> rl-id
+    // rl_call rl-id ...args -> result
+    "rate_limit": (fn, maxCalls, windowMs = 1000) => {
+      const id = `_rl${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      createWorkflowModule._reg = createWorkflowModule._reg || {};
+      createWorkflowModule._reg[id] = { fn, calls: [], max: maxCalls, win: windowMs };
+      return id;
+    },
+    "rl_call": (rlId, ...args) => {
+      const store = (createWorkflowModule._reg || {})[rlId];
+      if (!store) throw new Error("invalid rate_limit id");
+      const now = Date.now();
+      store.calls = store.calls.filter((t) => t >= now - store.win);
+      if (store.calls.length >= store.max) {
+        throw new Error(`rate_limit: ${store.max}회/${store.win}ms 초과`);
+      }
+      store.calls.push(now);
+      return callFl(store.fn, args);
+    },
+    // ── P2: DAG 실행 ──────────────────────────────────────────────
+    // workflow_dag steps ctx -> {ok, context, results, errors, order}
+    // step: workflow_step + :depends [name ...] (위상정렬 후 실행)
+    "workflow_dag": (steps, ctx = {}) => {
+      const start = Date.now();
+      // 위상정렬 (Kahn's algorithm)
+      const nameMap = new Map(steps.map((s) => [s.name, s]));
+      const inDeg = new Map(steps.map((s) => [s.name, 0]));
+      const adj = new Map(steps.map((s) => [s.name, []]));
+      for (const s of steps) {
+        for (const dep of (s.depends || [])) {
+          if (adj.has(dep)) adj.get(dep).push(s.name);
+          inDeg.set(s.name, (inDeg.get(s.name) || 0) + 1);
+        }
+      }
+      const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([n]) => n);
+      const order = [];
+      while (queue.length > 0) {
+        const n = queue.shift();
+        order.push(n);
+        for (const next of (adj.get(n) || [])) {
+          const d = inDeg.get(next) - 1;
+          inDeg.set(next, d);
+          if (d === 0) queue.push(next);
+        }
+      }
+      if (order.length < steps.length) {
+        return { ok: false, error: "workflow_dag: 순환 의존성 감지됨", order };
+      }
+      // 순서대로 실행
+      const results = [];
+      const errors = [];
+      for (const name of order) {
+        const step = nameMap.get(name);
+        const t0 = Date.now();
+        try {
+          if (step.if !== void 0 && !callFl(step.if, [ctx])) {
+            results.push({ name, status: "skipped", ms: 0 });
+            continue;
+          }
+          const r = callFl(step.fn, [ctx]);
+          if (r && typeof r === "object") ctx = { ...ctx, ...r };
+          results.push({ name, status: "ok", result: r, ms: Date.now() - t0 });
+        } catch (e) {
+          errors.push({ name, error: e.message });
+          results.push({ name, status: "failed", error: e.message, ms: Date.now() - t0 });
+          if (step.required !== false) break;
+        }
+      }
+      return {
+        ok: errors.length === 0,
+        context: ctx,
+        results,
+        errors,
+        order,
+        total_ms: Date.now() - start
+      };
     },
     // report_render report -> string
     "report_render": (report) => {
@@ -28173,7 +28311,10 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createMailModule());
   interp2.registerModule(createWebauthnModule());
   interp2.registerModule(createQueueHelpersModule());
-  interp2.registerModule(createWorkflowModule((fn, args) => interp2.callFunctionValue(fn, args)));
+  interp2.registerModule(createWorkflowModule(
+    (fn, args) => interp2.callFunctionValue(fn, args),
+    (name, args) => interp2.callUserFunction(name, args)
+  ));
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),
