@@ -587,10 +587,11 @@ var init_parser = __esm({
           const startToken = this.peek();
           if (this.check("Colon" /* Colon */)) {
             this.advance();
-            if (!this.check("Symbol" /* Symbol */)) {
+            const _kt = this.peek();
+            if (_kt.type !== "Symbol" /* Symbol */ && getKeywordTokenType(_kt.value) === void 0) {
               throw this.error(
-                `Expected symbol after ':', got ${this.peek().type}`,
-                this.peek()
+                `Expected symbol after ':', got ${_kt.type}`,
+                _kt
               );
             }
             const keyToken = this.advance();
@@ -914,8 +915,10 @@ var init_parser = __esm({
           let key;
           if (this.check("Colon" /* Colon */)) {
             this.advance();
-            if (!this.check("Symbol" /* Symbol */)) {
-              throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+            // Allow reserved keywords (if, let, do, etc.) as map keys after ':'
+            const nextTok = this.peek();
+            if (nextTok.type !== "Symbol" /* Symbol */ && getKeywordTokenType(nextTok.value) === void 0) {
+              throw this.error(`Expected symbol after ':' in map literal`, nextTok);
             }
             key = this.advance().value;
           } else if (this.check("String" /* String */)) {
@@ -11260,13 +11263,13 @@ function flExecOpNative(op, vals) {
     case "substring":
       return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== void 0 ? Number(v2) : void 0) : "";
     case "char-at":
-      return typeof v0 === "string" ? v0[Number(v1)] ?? null : null;
+      return typeof v0 === "string" ? v0[Number(v1)] ?? "" : "";
     case "index-of":
       return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
     case "split":
       return typeof v0 === "string" ? v0.split(String(v1 ?? "")) : [];
     case "trim":
-      return typeof v0 === "string" ? v0.trim() : v0;
+      return typeof v0 === "string" ? v0.trim() : "";
     case "upper-case":
       return typeof v0 === "string" ? v0.toUpperCase() : v0;
     case "lower-case":
@@ -11956,7 +11959,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "lower":
       return typeof args2[0] === "string" ? args2[0].toLowerCase() : args2[0];
     case "trim":
-      return typeof args2[0] === "string" ? args2[0].trim() : args2[0];
+      return typeof args2[0] === "string" ? args2[0].trim() : "";
     case "starts-with?":
     case "str-starts-with?":
       return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
@@ -11965,7 +11968,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].endsWith(args2[1]) : false;
     case "char-at":
     case "str-char-at":
-      return typeof args2[0] === "string" ? args2[0][Number(args2[1])] ?? null : null;
+      return typeof args2[0] === "string" ? args2[0][Number(args2[1])] ?? "" : "";
     case "math-pow":
       return Math.pow(Number(args2[0]), Number(args2[1]));
     case "append":
@@ -19989,27 +19992,6 @@ function createDataModule() {
       }
       return deepMerge(a, b);
     },
-    // obj_merge obj1 obj2 -> object (shallow merge)
-    "obj_merge": (obj1, obj2) => {
-      const a = typeof obj1 === "string" ? JSON.parse(obj1) : obj1;
-      const b = typeof obj2 === "string" ? JSON.parse(obj2) : obj2;
-      return { ...a, ...b };
-    },
-    // obj_pick obj keys -> object (keep only specified keys)
-    "obj_pick": (obj, keys) => {
-      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const result = {};
-      for (const k of keys) { if (k in o) result[k] = o[k]; }
-      return result;
-    },
-    // obj_omit obj keys -> object (remove specified keys)
-    "obj_omit": (obj, keys) => {
-      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const result = {};
-      const skip = new Set(keys);
-      for (const k of Object.keys(o)) { if (!skip.has(k)) result[k] = o[k]; }
-      return result;
-    },
     // json_keys obj -> [string] (get keys of object)
     "json_keys": (obj) => {
       const o = typeof obj === "string" ? JSON.parse(obj) : obj;
@@ -21620,7 +21602,15 @@ function categorizeError(message) {
   if (msg.includes("io error")) return "IO_ERROR";
   return "UNKNOWN";
 }
-function createWorkflowModule() {
+function createWorkflowModule(callFnVal) {
+  // Unified caller: handles both plain JS functions and FreeLang function-value objects
+  function callFl(fn, args) {
+    if (typeof fn === "function") return fn(...args);
+    if (fn && (fn.kind === "function-value" || fn.params !== void 0)) {
+      if (typeof callFnVal === "function") return callFnVal(fn, args);
+    }
+    return null;
+  }
   return {
     // ── Workflow Definition ───────────────────────────────────
     // workflow_create name steps -> Workflow object
@@ -21671,7 +21661,7 @@ function createWorkflowModule() {
         const step = steps[stepIndex];
         if (step.if !== void 0) {
           try {
-            const shouldRun = step.if(ctx);
+            const shouldRun = callFl(step.if, [ctx]);
             if (!shouldRun) {
               log.push({ step: step.name, status: "skipped", ms: 0 });
               continue;
@@ -21702,7 +21692,7 @@ function createWorkflowModule() {
         let stepResult = void 0;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
-            stepResult = step.fn(ctx);
+            stepResult = callFl(step.fn, [ctx]);
             ctx = { ...ctx, ...stepResult };
             success = true;
             break;
@@ -21740,7 +21730,7 @@ function createWorkflowModule() {
           const errorCategory = categorizeError(lastErr);
           if (step.on_error) {
             try {
-              fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
+              fallbackValue = callFl(step.on_error, [{ error: lastErr, attempts: maxAttempts, step_name: step.name }]);
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
@@ -21764,7 +21754,7 @@ function createWorkflowModule() {
           }
           if (step.fallback !== void 0) {
             try {
-              fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+              fallbackValue = (typeof step.fallback === "function" || (step.fallback && step.fallback.kind === "function-value")) ? callFl(step.fallback, []) : step.fallback;
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (fallback used)`);
@@ -28039,7 +28029,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createMailModule());
   interp2.registerModule(createWebauthnModule());
   interp2.registerModule(createQueueHelpersModule());
-  interp2.registerModule(createWorkflowModule());
+  interp2.registerModule(createWorkflowModule((fn, args) => interp2.callFunctionValue(fn, args)));
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),

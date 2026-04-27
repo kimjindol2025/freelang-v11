@@ -201,7 +201,7 @@
 
 ---
 
-## 🔄 워크플로우 / Saga (2026-04-28)
+## 🔄 워크플로우 / :if 조건부 실행 (2026-04-28)
 
 ```fl
 ;; workflow — 단계별 retry + 실패 처리
@@ -224,6 +224,21 @@
   [["task-a" (fn [] (http_get "..."))]
    ["task-b" (fn [] (db_query ...))]]))
 ;; → [{:ok true :name "task-a" :result {...}} {:ok false :name "task-b" :error "..."}]
+
+;; workflow_step — :if 조건부 실행 (2026-04-28 완성)
+(define step (workflow_step "process"
+  (fn [$ctx] {:done true})
+  {:if     (fn [$ctx] (> (length (get $ctx "data")) 0))  ;; 조건 false → skip
+   :retry  2
+   :on_error (fn [$e] {:fallback true})}))
+(define wf (workflow_create "my-wf" [$step]))
+(define r  (workflow_run wf {}))
+(println (workflow_ok r))           ;; true/false
+(println (workflow_get r "done"))   ;; context 값
+(println (workflow_summary r))      ;; {:steps_run :steps_ok :total_ms}
+
+;; ※ 예약어 map 키 허용 (2026-04-28 파서 수정)
+;; {:if fn :let 1 :do "x"} — 예약어도 :키 형식 사용 가능
 ```
 
 ---
