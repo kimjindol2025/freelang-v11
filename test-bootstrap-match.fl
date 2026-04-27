@@ -1,0 +1,5 @@
+;; bootstrap match 정확한 문법 테스트
+(match 42
+  (42 "matched 42")
+  (99 "matched 99")
+  (_ "other"))

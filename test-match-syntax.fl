@@ -1,0 +1,5 @@
+;; bootstrap match 문법 테스트
+;; 1. array pair 형태 (일반적인 match)
+(match 42
+  ([42 "literal"])
+  ([_ "wildcard"]))

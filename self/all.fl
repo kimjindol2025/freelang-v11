@@ -981,6 +981,43 @@
 ;;     return <default>;
 ;;   })(value)
 
+;; Pattern node constructors
+[FUNC make-wildcard-pattern :params [] :body {:kind "wildcard-pattern"}]
+[FUNC make-variable-pattern :params [$name] :body {:kind "variable-pattern" :name $name}]
+[FUNC make-literal-pattern :params [$type $value] :body {:kind "literal-pattern" :type $type :value $value}]
+[FUNC make-struct-pattern :params [$fields] :body {:kind "struct-pattern" :fields $fields}]
+
+;; node-to-pattern: AST node를 pattern node로 변환
+[FUNC node-to-pattern :params [$node]
+  :body (cond
+    [(= (get $node :kind) "variable")
+     (let [[$name (get $node :name)]]
+       (if (starts-with? $name "$")
+         (make-variable-pattern (substring $name 1))
+         (if (= $name "_")
+           (make-wildcard-pattern)
+           (make-variable-pattern $name))))]
+    [(= (get $node :kind) "literal")
+     (make-literal-pattern (get $node :type) (get $node :value))]
+    [(= (get $node :kind) "block")
+     (if (= (get $node :type) "Map")
+       (make-struct-pattern (map-items-to-fields (get (get $node :fields) :items) 0 []))
+       (make-wildcard-pattern))]
+    [true (make-wildcard-pattern)])]
+
+;; map-items-to-fields: map literal items를 struct-pattern fields로 변환
+[FUNC map-items-to-fields :params [$items $i $acc]
+  :body (if (>= $i (length $items)) $acc
+    (let [[$key-node (get $items $i)]
+          [$val-node (if (< (+ $i 1) (length $items)) (get $items (+ $i 1)) nil)]
+          [$key (if (= (get $key-node :kind) "keyword")
+                  (get $key-node :name)
+                  (str (get $key-node :value)))]]
+      (if (null? $val-node)
+        $acc
+        (let [[$pat (node-to-pattern $val-node)]]
+          (map-items-to-fields $items (+ $i 2) (append $acc [[$key $pat]]))))))]
+
 [FUNC cg-match :params [$n]
   :body (let [[$val (cg (get $n :value))]
               [$cases (get $n :cases)]
@@ -988,6 +1025,25 @@
               [$default (if (null? $default-n) "null" (cg $default-n))]
               [$cases-js (match-cases-loop $cases 0 "")]]
           (str "((__v)=>{" $cases-js "return " $default ";})(" $val ")"))]
+
+;; cg-match-sexpr: (match value (pat1 body1) (pat2 body2) ...) → pattern-match node → cg-match
+[FUNC cg-match-sexpr :params [$args]
+  :body (if (< (length $args) 1)
+    "null"
+    (let [[$value (get $args 0)]
+          [$cases-raw (slice $args 1 (length $args))]
+          [$cases (sexpr-cases-to-match-cases $cases-raw 0 [])]]
+      (cg (make-pattern-match $value $cases nil))))]
+
+;; sexpr-cases-to-match-cases: sexpr case nodes를 match-case nodes로 변환
+[FUNC sexpr-cases-to-match-cases :params [$cases $i $acc]
+  :body (if (>= $i (length $cases)) $acc
+    (let [[$c (get $cases $i)]
+          [$is-sexpr (= (get $c :kind) "sexpr")]
+          [$pat-node (if $is-sexpr (node-to-pattern (get $c :op)) (node-to-pattern (get (get (get $c :fields) :items) 0)))]
+          [$body (if $is-sexpr (get (get $c :args) 0) (get (get (get $c :fields) :items) 1))]
+          [$match-case (make-match-case $pat-node nil $body)]]
+      (sexpr-cases-to-match-cases $cases (+ $i 1) (append $acc [$match-case]))))]
 
 ;; 각 case: if (pattern-test) { bindings; if (guard) { return body; } }
 ;;   guard 가 binding 변수를 참조할 수 있어 bindings 를 먼저 실행
@@ -1017,26 +1073,12 @@
           [(= $k "range-pattern")
            (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
           [(= $k "struct-pattern")
-           (struct-pattern-test (get $pat :fields) $v 0 "")]
+           (str "(" $v "!==null&&typeof " $v "===\"object\"&&"
+             (struct-pattern-test (get $pat :fields) $v 0 "") ")")]
           [true "false"])]
 
 [FUNC pattern-test :params [$pat $v]
   :body (pattern-test-dispatch (get $pat :kind) $pat $v)]
-
-;; struct-pattern-test: Test if object fields match struct pattern
-;; fields format: [[key1 pat1] [key2 pat2] ...]
-[FUNC struct-pattern-test :params [$fields $v $i $acc]
-  :body (if (>= $i (length $fields))
-    (if (= (length $acc) 0)
-      (str "(" $v "!==null&&typeof " $v "===\"object\")")
-      (str "(" $v "!==null&&typeof " $v "===\"object\"&&" $acc ")"))
-    (let [[$pair (get $fields $i)]
-          [$key (get $pair 0)]
-          [$pat (get $pair 1)]
-          [$k-clean (if (starts-with? $key ":") (substring $key 1) $key)]
-          [$t (pattern-test $pat (str $v "[" (js-esc $k-clean) "]"))]]
-      (struct-pattern-test $fields $v (+ $i 1)
-        (if (= (length $acc) 0) $t (str $acc "&&" $t))))))]
 
 [FUNC literal-to-js :params [$t $v]
   :body (cond [(= $t "number") $v]
@@ -1052,24 +1094,33 @@
             (or-pattern-test $pats $v (+ $i 1)
               (if (= (length $acc) 0) $t (str $acc "||" $t))))) ]
 
-;; pattern-bindings: JS statement that binds pattern variables from __v
-;; struct-pattern-bindings: Extract bindings from struct pattern fields
-;; fields format: [[key1 pat1] [key2 pat2] ...]
-[FUNC struct-pattern-bindings :params [$fields $v $i $acc]
+;; struct-pattern-test: test object fields, 필드별로 &&로 연결
+[FUNC struct-pattern-test :params [$fields $v $i $acc]
   :body (if (>= $i (length $fields))
-    $acc
+    (if (= (length $acc) 0) "true" $acc)
     (let [[$pair (get $fields $i)]
           [$key (get $pair 0)]
           [$pat (get $pair 1)]
           [$k-clean (if (starts-with? $key ":") (substring $key 1) $key)]
-          [$b (pattern-bindings $pat (str $v "[" (js-esc $k-clean) "]"))]]
-      (struct-pattern-bindings $fields $v (+ $i 1) (str $acc $b))))]
+          [$t (pattern-test $pat (str $v "[" (js-esc $k-clean) "]"))]]
+      (struct-pattern-test $fields $v (+ $i 1)
+        (if (= (length $acc) 0) $t (str $acc "&&" $t)))))]
 
+;; struct-pattern-bindings: bind pattern variables from object fields
+[FUNC struct-pattern-bindings :params [$fields $v $i $acc]
+  :body (if (>= $i (length $fields)) $acc
+    (let [[$pair (get $fields $i)]
+          [$key (get $pair 0)]
+          [$pat (get $pair 1)]
+          [$k-clean (if (starts-with? $key ":") (substring $key 1) $key)]
+          [$bind (pattern-bindings $pat (str $v "[" (js-esc $k-clean) "]"))]]
+      (struct-pattern-bindings $fields $v (+ $i 1) (str $acc $bind))))]
+
+;; pattern-bindings: JS statement that binds pattern variables from __v
 [FUNC pattern-bindings-dispatch :params [$k $pat $v]
   :body (cond
           [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
-          [(= $k "struct-pattern")
-           (struct-pattern-bindings (get $pat :fields) $v 0 "")]
+          [(= $k "struct-pattern") (struct-pattern-bindings (get $pat :fields) $v 0 "")]
           [true ""])]
 
 [FUNC pattern-bindings :params [$pat $v]
@@ -1385,77 +1436,11 @@
           (str $fn-name "(" (cg-args $args) ")"))]
 
 ;; ═══════ sexpr 메인 dispatch ═══════
-;; ═══════ match S-expr → pattern-match AST 변환 ═══════
-;; (match value (pat body) ...) 형태를 pattern-match 노드로 변환
-;; map literal {:k v} → struct-pattern 자동 변환
-
-[FUNC node-to-pattern :params [$node]
-  :body (cond
-          [(= (get $node :kind) "literal")
-           {:kind "literal-pattern" :type (get $node :type) :value (get $node :value)}]
-          [(= (get $node :kind) "variable")
-           {:kind "variable-pattern" :name (get $node :name)}]
-          [(= (get $node :kind) "keyword")
-           (let [[$v (get $node :value)]]
-             (if (starts-with? $v ":")
-               {:kind "literal-pattern" :type "symbol" :value (substring $v 1)}
-               (if (= $v "_")
-                 {:kind "wildcard-pattern"}
-                 {:kind "literal-pattern" :type "symbol" :value $v})))]
-          [(= (get $node :kind) "block")
-           (if (= (get $node :type) "Map")
-             (map-block-to-struct-pattern $node)
-             {:kind "wildcard-pattern"})]
-          [true {:kind "wildcard-pattern"}])]
-
-[FUNC map-block-to-struct-pattern :params [$node]
-  :body (let [[$items (get (get $node :fields) :items)]]
-    (let [[$fields (map-items-to-fields $items 0 [])]]
-      {:kind "struct-pattern" :fields $fields :line (get $node :line)}))]
-
-[FUNC map-items-to-fields :params [$items $i $acc]
-  :body (if (>= $i (length $items))
-    $acc
-    (if (>= (+ $i 1) (length $items))
-      $acc
-      (let [[$key-node (get $items $i)]
-            [$val-node (get $items (+ $i 1))]
-            [$key-val (get $key-node :value)]
-            [$key (if (and (not (nil? $key-val))
-                           (starts-with? (str $key-val) ":"))
-                    (substring (str $key-val) 1)
-                    (str $key-val))]
-            [$pat (node-to-pattern $val-node)]]
-        (map-items-to-fields $items (+ $i 2) (append $acc [[$key $pat]]))))
-
-[FUNC process-match-cases :params [$cases $i $acc-cases $default]
-  :body (if (>= $i (length $cases))
-    [[$acc-cases $default]]
-    (let [[$c (get $cases $i)]
-          [$is-array-pair (and (= (get $c :kind) "block")
-                               (= (get $c :type) "Array")
-                               (let [[$items (get (get $c :fields) :items)]]
-                                 (or (= (length $items) 2) (= (length $items) 3))))]]
-      (if (not $is-array-pair)
-        (process-match-cases $cases (+ $i 1) $acc-cases $default)
-        (let [[$items (get (get $c :fields) :items)]
-              [$pat (node-to-pattern (get $items 0))]
-              [$body (if (= (length $items) 3) (get $items 2) (get $items 1))]]
-          (process-match-cases $cases (+ $i 1)
-            (append $acc-cases (list (make-match-case $pat nil $body)))
-            $default))))))
-
-[FUNC cg-match-sexpr :params [$args]
-  :body (if (< (length $args) 1)
-    "null"
-    (let [[$value (get $args 0)]
-          [$cases-raw (slice $args 1 (length $args))]
-          [$processed (process-match-cases $cases-raw 0 [] nil)]]
-      (cg (make-pattern-match $value (get $processed 0) (get $processed 1)))))]
 
 [FUNC cg-sexpr-dispatch :params [$op $args]
   :body (cond
           [(= $op "if")      (cg-if $args)]
+          [(= $op "match")   (cg-match-sexpr $args)]
           [(= $op "fn")      (cg-fn $args)]
           [(= $op "defn")    (cg-defn $args)]
           [(= $op "define")  (cg-define $args)]
@@ -1465,7 +1450,6 @@
           [(= $op "cond")    (cg-cond $args)]
           [(= $op "and")     (cg-and $args)]
           [(= $op "or")      (cg-or $args)]
-          [(= $op "match")   (cg-match-sexpr $args)]
           [(= $op "quote")   (cg-quote $args)]
           [(= $op "set!")    (cg-set! $args)]
           [(= $op "throw")   (cg-throw $args)]
