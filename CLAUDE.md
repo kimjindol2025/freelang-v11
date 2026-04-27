@@ -251,6 +251,46 @@
 
 ---
 
+## 🔒 P2: 보안 / 성능 / DAG (2026-04-28)
+
+```fl
+;; ── sandbox_run — 격리 실행 ──────────────────────────────────────
+(sandbox_run (fn [] (+ 1 2 3)) {:timeout 5000})
+;; → {:ok true :result 6 :ms N :calls N}
+(sandbox_run (fn [] (error "위험")) {:timeout 1000})
+;; → {:ok false :error "위험" :ms N}
+
+;; ── memoize — LRU 캐싱 ───────────────────────────────────────────
+(define square (fn [$x] (* $x $x)))   ;; 기명 함수도 직접 전달 가능
+(define m (memoize square 128))       ;; LRU maxSize=128 (0=무제한)
+(memo_call m 5)   ;; → 25 (계산)
+(memo_call m 5)   ;; → 25 (캐시 적중)
+(memo_size m)     ;; → 1
+(memo_clear m)    ;; 캐시 초기화
+
+;; ── rate_limit — 호출 빈도 제한 ──────────────────────────────────
+(define rl (rate_limit square 10 1000)) ;; 10회/1초
+(rl_call rl 5)   ;; → 25 (정상)
+;; 11번째 호출 → error: "rate_limit: 10회/1000ms 초과"
+
+;; ── workflow_dag — 의존성 그래프 실행 ────────────────────────────
+;; :depends [names] → 위상정렬 후 실행, 순환 감지
+(workflow_dag
+  [(workflow_step "a" (fn [$c] {:x 1}) {})
+   (workflow_step "b" (fn [$c] {:y (get $c "x")}) {:depends ["a"]})
+   (workflow_step "c" (fn [$c] {:z (+ (get $c "x") (get $c "y"))}) {:depends ["a" "b"]})]
+  {})
+;; → {:ok true :order ["a" "b" "c"] :context {:x 1 :y 1 :z 2}}
+
+;; ── ※ 기명 함수 → 고차함수 직접 전달 (2026-04-28 인터프리터 수정) ─
+;; (define f (fn [$x] ...)) 후 f를 fn-value 객체로 전달 가능
+(map square [1 2 3])          ;; → [1 4 9]
+(workflow_step "s" square {}) ;; fn 자리에 기명 함수
+(saga_run [{:action square :compensate square}] {})
+```
+
+---
+
 ## 🏗️ 전체 서버 앱 패턴
 
 ```fl
@@ -289,9 +329,11 @@
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
-| 2026-04-28 | `workflow` / `saga` / `parallel_tasks` — AI Agent P0 | ✅ bootstrap.js |
-| 2026-04-28 | 파서 수정: `[{...}]` 배열 리터럴 제너릭 오인 방지 | ✅ bootstrap.js |
-| 2026-04-28 | 런타임 에러 소스 라인+포인터 표시 | ✅ bootstrap.js |
+| 2026-04-28 | **기명 함수 → fn-value 전달 (인터프리터 근본 수정)** | ✅ bootstrap.js |
+| 2026-04-28 | P2: `sandbox_run` `memoize/memo_call` `rate_limit/rl_call` `workflow_dag` | ✅ bootstrap.js |
+| 2026-04-28 | P1: `saga_run` `workflow_parallel` `batch_map` `distribute` `time_exec` `span` | ✅ bootstrap.js |
+| 2026-04-28 | P0: `workflow_run` `:if` 조건부 실행, `:on_error`, `:fallback`, 체크포인트 | ✅ bootstrap.js |
+| 2026-04-28 | 파서: `[{...}]` 배열 제너릭 오인 방지, 예약어 map 키 허용 | ✅ bootstrap.js |
 | 2026-04-28 | `obj_merge` `obj_pick` `obj_omit` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | `file_mkdir` `file_rmdir` `get_env` `get_env_or` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | `server_req_body` JSON 자동파싱 | ✅ bootstrap.js |
