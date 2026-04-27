@@ -201,6 +201,33 @@
 
 ---
 
+## 🔄 워크플로우 / Saga (2026-04-28)
+
+```fl
+;; workflow — 단계별 retry + 실패 처리
+(define result (workflow
+  [{:name "fetch"   :action (fn [$p] {:data [1 2 3]}) :retry 0}
+   {:name "process" :action (fn [$p] {:count (length (get $p "data"))}) :retry 3}
+   {:name "save"    :action (fn [$p] {:ok true}) :retry 0}]
+  :on-error (fn [$err $step $idx] (println (str "실패: " $step)))))
+;; → {:ok true :results [...] :last {...}}
+;; → {:ok false :error "..." :failed_step "step-name" :results [...]}
+
+;; saga — 보상 트랜잭션 (실패 시 역순 롤백)
+(define r (saga
+  [{:name "db-insert" :action (fn [$p] {:id 1}) :compensate (fn [$r] (println "롤백"))}
+   {:name "email"     :action (fn [$p] (error "SMTP 오류")) :compensate (fn [$r] nil)}]))
+;; → {:ok false :error "SMTP 오류" :compensated ["db-insert"]}
+
+;; parallel_tasks — 모든 태스크 실행 (실패도 수집)
+(define results (parallel_tasks
+  [["task-a" (fn [] (http_get "..."))]
+   ["task-b" (fn [] (db_query ...))]]))
+;; → [{:ok true :name "task-a" :result {...}} {:ok false :name "task-b" :error "..."}]
+```
+
+---
+
 ## 🏗️ 전체 서버 앱 패턴
 
 ```fl
@@ -239,6 +266,8 @@
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
+| 2026-04-28 | `workflow` / `saga` / `parallel_tasks` — AI Agent P0 | ✅ bootstrap.js |
+| 2026-04-28 | 파서 수정: `[{...}]` 배열 리터럴 제너릭 오인 방지 | ✅ bootstrap.js |
 | 2026-04-28 | 런타임 에러 소스 라인+포인터 표시 | ✅ bootstrap.js |
 | 2026-04-28 | `obj_merge` `obj_pick` `obj_omit` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | `file_mkdir` `file_rmdir` `get_env` `get_env_or` 추가 | ✅ bootstrap.js |
