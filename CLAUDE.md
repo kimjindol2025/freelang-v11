@@ -154,15 +154,29 @@
 
 ---
 
-## 📁 파일
+## 📁 파일 / 환경
 
 ```fl
+;; 파일
 (file_read   "path/file.txt")
 (file_write  "path/file.txt" "내용")
 (file_append "log.txt" "한 줄\n")
-(file_exists "path")            ;; → true/false
-(file_mkdir  "dir/path")
+(file_exists "path")             ;; → true/false
+(file_mkdir  "dir/sub")          ;; 재귀 생성
+(file_rmdir  "dir")              ;; 재귀 삭제
 (file_delete "file.txt")
+(file_size   "file.txt")         ;; → bytes
+(file_is_dir "path")
+(dir_list    "path")             ;; → [string]
+
+;; 환경변수
+(get_env     "PORT")             ;; → string | ""
+(get_env_or  "PORT" "3000")     ;; → string (없으면 기본값)
+(shell_env   "HOME")             ;; get_env와 동일
+
+;; 쉘
+(shell_exec "git log --oneline -3" "/path/to/repo")
+;; → {:stdout "..." :stderr "..." :code 0 :ok true}
 ```
 
 ---
