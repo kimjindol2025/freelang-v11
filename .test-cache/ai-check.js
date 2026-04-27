@@ -2,9 +2,9 @@ const nil = null;const _fl_str = (...xs) => xs.map(x => x==null?'null':String(x)
 defun(vector_add,[v1,v2],_fl_map(((i)=>(_fl_get(v1,i)+_fl_get(v2,i))),_fl_range(0,_fl_length(v1))));
 defun(vector_dot,[v1,v2],_fl_reduce(((acc,i)=>(acc+(_fl_get(v1,i)*_fl_get(v2,i)))),0,_fl_range(0,_fl_length(v1))));
 defun(vector_magnitude,[v],math_sqrt(vector_dot(v,v)));
-defun(cosine_sim,[v1,v2],((()=>{let dot;dot=vector_dot(v1,v2);let mag1;mag1=vector_magnitude(v1);let mag2;mag2=vector_magnitude(v2);return (((mag1===0)||(mag2===0))?0:(dot/(mag1*mag2)));})()));
+defun(cosine_sim,[v1,v2],((()=>{let __v=[mag1,vector_magnitude(v1)][0];let dot=__v;let __v1=null[0];let mag2=__v1;return (((mag1===0)||(mag2===0))?0:(dot/(mag1*mag2)));})()));
 defun(score_candidates,[query,candidates],map_indexed(((idx,cand)=>({"idx":idx,"score":cosine_sim(query,cand)})),candidates));
 defun(prompt_template,[template,vars],_fl_reduce(((acc,_anon)=>str_replace(acc,_fl_str("{",key,"}"),_fl_str(val))),template,map_entries(vars)));
 defun(top_k_retrieval,[scored_list,k],_fl_take(k,_fl_reverse(_fl_sort(scored_list,((a,b)=>(_fl_get(a,"score")<_fl_get(b,"score")))))));
-defun(map_indexed,[f,lst],((()=>{let indices;indices=_fl_range(0,_fl_length(lst));return _fl_map(((i)=>f(i,_fl_get(lst,i))),indices);})()));
+defun(map_indexed,[f,lst],((()=>{let __v=null[0];let indices=__v;return _fl_map(((i)=>f(i,_fl_get(lst,i))),indices);})()));
 defun(map_entries,[m],_fl_map(((k)=>[k,_fl_get(m,k)]),_fl_keys(m)));

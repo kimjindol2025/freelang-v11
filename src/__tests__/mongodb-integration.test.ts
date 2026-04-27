@@ -21,7 +21,7 @@ describe("MongoDB Phase 4: Integration Tests", () => {
       type: "sexp",
       op: "load",
       args: [
-        { type: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb/bson.fl" },
+        { type: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/bson.fl" },
       ],
     });
 
@@ -41,7 +41,7 @@ describe("MongoDB Phase 4: Integration Tests", () => {
       type: "sexp",
       op: "load",
       args: [
-        { type: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb/wire.fl" },
+        { type: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/wire.fl" },
       ],
     });
 
@@ -56,7 +56,7 @@ describe("MongoDB Phase 4: Integration Tests", () => {
       type: "sexp",
       op: "load",
       args: [
-        { type: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" },
+        { type: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" },
       ],
     });
 
@@ -104,7 +104,7 @@ describe("MongoDB Phase 4: CRUD Operations (Mock)", () => {
     interp.eval({
       type: "sexp",
       op: "load",
-      args: [{ type: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" }],
+      args: [{ type: "literal", value: "/home/kimjin/freelang-v11//root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
     });
   });
 
@@ -165,7 +165,7 @@ describe("MongoDB Phase 4: Completeness Check", () => {
     interp.eval({
       type: "sexp",
       op: "load",
-      args: [{ type: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" }],
+      args: [{ type: "literal", value: "/home/kimjin/freelang-v11//root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
     });
 
     const functions = [
@@ -196,7 +196,7 @@ describe("MongoDB Phase 4: Completeness Check", () => {
     interp.eval({
       type: "sexp",
       op: "load",
-      args: [{ type: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" }],
+      args: [{ type: "literal", value: "/home/kimjin/freelang-v11//root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
     });
 
     const helpers = [

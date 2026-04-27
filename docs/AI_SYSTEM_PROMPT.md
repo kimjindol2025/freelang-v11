@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 404개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 411개 함수, 28 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -183,6 +183,13 @@ parallel race with-timeout fl-try use`
 - `(summarize context)` → string (human/AI readable summary of context)
 - `(context_create)` → {} (empty context)
 - `(context_merge ctx1 ctx2)` → context
+
+### ai-workflow (4개)
+
+- `(ai-stream prompt onChunk [model])` → null  (콜백으로 청크 전달)
+- `(ollama prompt [model])` → string  (로컬 LLM 직접 호출)
+- `(ollama-models)` → [string]  (설치된 모델 목록)
+- `(ai-render template vars)` → string
 
 ### bits (13개)
 
@@ -625,11 +632,14 @@ parallel race with-timeout fl-try use`
 
 - `(webauthn_challenge bytes)` → base64url string (32 bytes)
 
-### workflow (14개)
+### workflow (17개)
 
 - `(workflow_create name steps)` → Workflow object
-- `(workflow_step name fn)` → WorkflowStep  (helper for defining steps)
-- `(workflow_run workflow initial_ctx)` → WorkflowResult
+- `(workflow_step name fn options)` → WorkflowStep  (helper for defining steps)
+- `(step-with-error step handler-fn)` → WorkflowStep (add error handler)
+- `(step-with-fallback step value-or-fn)` → WorkflowStep (add fallback)
+- `(step-with-timeout step ms)` → WorkflowStep (add timeout)
+- `(step-when step condition-fn)` → WorkflowStep (add conditional)
 - `(workflow_ok result)` → boolean
 - `(workflow_get result key)` → any  (get value from result context)
 - `(workflow_summary result)` → string  (human/AI readable summary)
@@ -667,4 +677,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-27T07:44:11.715Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-27T23:54:30.942Z
