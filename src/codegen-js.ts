@@ -237,9 +237,12 @@ export class JSCodegen {
 
   private genTemplateString(node: any): string {
     const value = node.value;
-    // Escape backticks and backslashes for JS template literal
-    const escaped = value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
-    return `\`${escaped}\``;
+    // Template literal containing ${ must use double quotes to avoid JS parsing errors
+    // ${...} substitution not yet implemented - treat as literal string
+    const escaped = value
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"');
+    return `"${escaped}"`;
   }
 
   private genVariable(node: Variable): string {
