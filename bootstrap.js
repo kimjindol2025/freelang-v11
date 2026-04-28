@@ -11643,8 +11643,8 @@ function evalBuiltin(interp2, op, args2, expr) {
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
         const result = interp2.interpret(ast);
-        MODULE_CACHE.set(resolvedPath, result);
-        return result;
+        MODULE_CACHE.set(resolvedPath, null);
+        return null;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }

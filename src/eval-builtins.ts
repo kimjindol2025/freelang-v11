@@ -547,9 +547,9 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         // Evaluate module (control blocks like [FUNC] allowed)
         const result = (interp as any).interpret(ast);
 
-        // Cache the result for future loads of the same file
-        MODULE_CACHE.set(resolvedPath, result);
-        return result;
+        // Cache the result for future loads of the same file (but return null)
+        MODULE_CACHE.set(resolvedPath, null);
+        return null;
       } catch (e: any) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }

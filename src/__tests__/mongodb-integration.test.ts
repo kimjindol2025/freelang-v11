@@ -18,12 +18,12 @@ describe("MongoDB Phase 4: Integration Tests", () => {
   // Test 1: BSON Roundtrip (Phase 1)
   it("BSON encode/decode roundtrip", () => {
     const result = interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "load",
       args: [
-        { type: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/bson.fl" },
+        { kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/bson.fl" },
       ],
-    });
+    } as any);
 
     // Load should return null (defines functions)
     expect(result).toBeNull();
@@ -38,12 +38,12 @@ describe("MongoDB Phase 4: Integration Tests", () => {
   // Test 2: Wire Protocol (Phase 2)
   it("Wire protocol module loads", () => {
     const result = interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "load",
       args: [
-        { type: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/wire.fl" },
+        { kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/wire.fl" },
       ],
-    });
+    } as any);
 
     expect(result).toBeNull();
     expect(interp.globals.get("wire-send-command")).toBeDefined();
@@ -53,12 +53,12 @@ describe("MongoDB Phase 4: Integration Tests", () => {
   // Test 3: MongoDB Wrapper (Phase 3)
   it("MongoDB wrapper module loads", () => {
     const result = interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "load",
       args: [
-        { type: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" },
+        { kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" },
       ],
-    });
+    } as any);
 
     expect(result).toBeNull();
     expect(interp.globals.get("mongo-connect")).toBeDefined();
@@ -72,10 +72,10 @@ describe("MongoDB Phase 4: Integration Tests", () => {
     // For CI/testing without MongoDB, it should skip or mock
 
     const connId = interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "mongo-connect",
-      args: [{ type: "literal", value: "mongodb://localhost:27017/testdb" }],
-    });
+      args: [{ kind: "literal", value: "mongodb://localhost:27017/testdb" }],
+    } as any);
 
     // Connection might fail if MongoDB not running - that's OK for this test
     // If it succeeds: connId should be a string like "localhost:27017"
@@ -88,10 +88,10 @@ describe("MongoDB Phase 4: Integration Tests", () => {
   it("Native MongoDB functions are registered", () => {
     // Check stdlib-mongodb functions
     expect(interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "typeof",
-      args: [{ type: "sexp", op: "mongodb_connect", args: [] }],
-    })).toBeDefined();
+      args: [{ kind: "sexpr", op: "mongodb_connect", args: [] }],
+    } as any)).toBeDefined();
   });
 });
 
@@ -102,33 +102,27 @@ describe("MongoDB Phase 4: CRUD Operations (Mock)", () => {
     interp = new Interpreter();
     // Load all modules
     interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "load",
-      args: [{ type: "literal", value: "/home/kimjin/freelang-v11//root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
-    });
+      args: [{ kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
+    } as any);
   });
 
   // Test: mongo-set helper
   it("mongo-set operator creates correct structure", () => {
     const result = interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "mongo-set",
       args: [
         {
-          type: "sexp",
-          op: "quote",
-          args: [
-            {
-              type: "map",
-              value: {
-                name: { type: "literal", value: "alice" },
-                age: { type: "literal", value: 30 },
-              },
-            },
-          ],
+          kind: "map",
+          fields: new Map([
+            ["name", { kind: "literal", value: "alice" }],
+            ["age", { kind: "literal", value: 30 }],
+          ]),
         },
       ],
-    });
+    } as any);
 
     // Result should be {"$set": {"name": "alice", "age": 30}}
     expect(typeof result === "object").toBe(true);
@@ -137,23 +131,17 @@ describe("MongoDB Phase 4: CRUD Operations (Mock)", () => {
   // Test: mongo-inc helper
   it("mongo-inc operator creates correct structure", () => {
     const result = interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "mongo-inc",
       args: [
         {
-          type: "sexp",
-          op: "quote",
-          args: [
-            {
-              type: "map",
-              value: {
-                count: { type: "literal", value: 1 },
-              },
-            },
-          ],
+          kind: "map",
+          fields: new Map([
+            ["count", { kind: "literal", value: 1 }],
+          ]),
         },
       ],
-    });
+    } as any);
 
     expect(typeof result === "object").toBe(true);
   });
@@ -163,10 +151,10 @@ describe("MongoDB Phase 4: Completeness Check", () => {
   it("All 15 main functions are defined", () => {
     const interp = new Interpreter();
     interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "load",
-      args: [{ type: "literal", value: "/home/kimjin/freelang-v11//root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
-    });
+      args: [{ kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
+    } as any);
 
     const functions = [
       "mongo-connect",
@@ -194,10 +182,10 @@ describe("MongoDB Phase 4: Completeness Check", () => {
   it("All helper functions are defined", () => {
     const interp = new Interpreter();
     interp.eval({
-      type: "sexp",
+      kind: "sexpr",
       op: "load",
-      args: [{ type: "literal", value: "/home/kimjin/freelang-v11//root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
-    });
+      args: [{ kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
+    } as any);
 
     const helpers = [
       "mongo-set",
