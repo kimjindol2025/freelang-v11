@@ -27,22 +27,19 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 - [x] stage1.js 재생성 (1925줄)
 - [x] README 설계 철학 공식화
 
-### A-2: Self-Parser 문법 통합 (1주)
+### A-2: Self-Parser 문법 통합 (1주) 🔄 진행중
+
 **요구사항**: self-parser = bootstrap 문법의 상위 집합
 
-**확인 사항**:
-- [ ] try/catch 완전 지원 확인
-- [ ] cond flat-pair 지원 확인
-- [ ] 기타 bootstrap 전용 구문 매핑
+**격차 조사 완료** (Blog #602):
+- [x] try/catch 확인: ❌ **격차** (Bootstrap O, Self-Parser X)
+- [x] cond 확인: ✅ 호환 (Phase 2에서 구현)
+- [x] loop 확인: ❌ 격차 (Bootstrap O, Self-Parser X, 특수형)
+- [x] match 확인: ✅ 모두 미지원
 
-**작업**:
-```
-1. bootstrap vs self-parser 문법 격차 전수 조사
-2. missing feature 목록화 (예상 3-5개)
-3. self-parser 보강 (필요시)
-```
+**결과**: self-parser 호환도 **87%** (try/catch 추가로 90%+)
 
-**결과**: self-parser ⊇ bootstrap (상위 집합 증명)
+**다음**: try/catch 구현 (A-3로 넘김)
 
 ### A-3: Bootstrap 최소화 (1주)
 **역할**: stage1 생성 전용으로 축소
