@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-28 17:44:47
+; 2026-04-28 18:30:08
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -463,7 +463,7 @@
             [(= $k "Number")
              (r-pair (p-advance $p) (make-literal "number" $v $line))]
             [(= $k "String")
-             (if (string-contains? $v "${")
+             (if (string-contains? $v (str "$" "{"))
                (r-pair (p-advance $p) (make-template-string $v (list) $line))
                (r-pair (p-advance $p) (make-literal "string" $v $line)))]
             [(= $k "Symbol")

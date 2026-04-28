@@ -55,7 +55,7 @@
             [(= $k "Number")
              (r-pair (p-advance $p) (make-literal "number" $v $line))]
             [(= $k "String")
-             (if (string-contains? $v "${")
+             (if (string-contains? $v (str "$" "{"))
                (r-pair (p-advance $p) (make-template-string $v (list) $line))
                (r-pair (p-advance $p) (make-literal "string" $v $line)))]
             [(= $k "Symbol")

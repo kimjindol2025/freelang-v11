@@ -1,41 +1,3 @@
-
-// ===== FreeLang Runtime Helpers =====
-function _fl_null_q(x) { return x === null || x === undefined; }
-function _fl_true_q(x) { return x === true; }
-function _fl_false_q(x) { return x === false; }
-function _fl_number_q(x) { return typeof x === 'number'; }
-function _fl_string_q(x) { return typeof x === 'string'; }
-function _fl_list_q(x) { return Array.isArray(x); }
-function _fl_array_q(x) { return Array.isArray(x); }
-function _fl_map_q(x) { return x !== null && typeof x === 'object' && !Array.isArray(x); }
-function _fl_fn_q(x) { return typeof x === 'function' || (x && x.kind === 'function-value'); }
-function _fl_empty_q(x) { return x === null || x === undefined || (Array.isArray(x) ? x.length === 0 : typeof x === 'object' ? Object.keys(x).length === 0 : typeof x === 'string' ? x.length === 0 : false); }
-function _fl_length(x) { return x && typeof x.length === 'number' ? x.length : Array.isArray(x) ? x.length : 0; }
-function _fl_get(obj, key) { return obj && obj[key] !== undefined ? obj[key] : null; }
-function _fl_str(...parts) { return parts.map(p => p === null || p === undefined ? '' : String(p)).join(''); }
-function _fl_first(arr) { return Array.isArray(arr) && arr.length > 0 ? arr[0] : null; }
-function _fl_last(arr) { return Array.isArray(arr) && arr.length > 0 ? arr[arr.length - 1] : null; }
-function _fl_rest(arr) { return Array.isArray(arr) ? arr.slice(1) : []; }
-function _fl_append(arr, ...items) { return Array.isArray(arr) ? [...arr, ...items] : [arr, ...items]; }
-function _fl_map(fn, arr) { return Array.isArray(arr) ? arr.map(x => typeof fn === 'function' ? fn(x) : null) : []; }
-function _fl_filter(arr, fn) { return Array.isArray(arr) ? arr.filter(x => typeof fn === 'function' ? fn(x) : false) : []; }
-function _fl_reduce(fn, init, arr) { return Array.isArray(arr) ? arr.reduce((acc, x) => typeof fn === 'function' ? fn(acc, x) : acc, init) : init; }
-function _fl_contains_q(arr, item) { return Array.isArray(arr) ? arr.includes(item) : false; }
-function _fl_keys(obj) { return obj && typeof obj === 'object' ? Object.keys(obj) : []; }
-function _fl_has_key_q(obj, key) { return obj && obj.hasOwnProperty(key); }
-function _fl_map_set(obj, key, val) { return Object.assign({}, obj, { [key]: val }); }
-function _fl_upper(s) { return typeof s === 'string' ? s.toUpperCase() : String(s); }
-function _fl_lower(s) { return typeof s === 'string' ? s.toLowerCase() : String(s); }
-function _fl_trim(s) { return typeof s === 'string' ? s.trim() : String(s); }
-function _fl_is_digit_q(c) { return c && c >= '0' && c <= '9'; }
-function _fl_is_alpha_q(c) { return c && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')); }
-function _fl_is_alnum_q(c) { return _fl_is_digit_q(c) || _fl_is_alpha_q(c); }
-function _fl_is_space_q(c) { return c === ' ' || c === '\t' || c === '\n' || c === '\r'; }
-function _fl_is_symbol_char_q(c) { return c && /[a-zA-Z0-9_\-?!\/<>=+*%&|^~.]/.test(c); }
-function _fl_print(...args) { console.log(...args); return null; }
-// ===== End Runtime Helpers =====
-
-
 function _fl_is_digit_q() { return (_fl_null_q(c) ? false : ((c >= "0") && (c <= "9"))); }
 function _fl_is_alpha_q() { return (_fl_null_q(c) ? false : (((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z")))); }
 function _fl_is_alnum_q() { return (_fl_is_digit_q(c) || _fl_is_alpha_q(c)); }
@@ -117,7 +79,7 @@ function p_with_ast() { return {}; }
 function p_append_ast() { return p_with_ast(p, _fl_append(_fl_get(p, "ast"), [node])); }
 function r_pair() { return {}; }
 function string_contains_q() { return (!(_1 === str_index_of(s, substr))); }
-function parse_atom() { return (() => { let t = p_peek(p); let k = _fl_get(t, "kind"); let v = _fl_get(t, "value"); let line = _fl_get(t, "line"); return cond([ (k === "Number"), r_pair(p_advance(p), make_literal("number", v, line)) ], [ (k === "String"), (string_contains_q(v, _fl_str("$", "{")) ? r_pair(p_advance(p), make_template_string(v, [], line)) : r_pair(p_advance(p), make_literal("string", v, line))) ], [ (k === "Symbol"), r_pair(p_advance(p), make_literal("symbol", v, line)) ], [ (k === "Variable"), r_pair(p_advance(p), make_variable(v, line)) ], [ (k === "Keyword"), r_pair(p_advance(p), make_keyword(v, line)) ], [ true, r_pair(p_advance(p), make_literal("unknown", v, line)) ]); })(); }
+function parse_atom() { return (() => { let t = p_peek(p); let k = _fl_get(t, "kind"); let v = _fl_get(t, "value"); let line = _fl_get(t, "line"); return cond([ (k === "Number"), r_pair(p_advance(p), make_literal("number", v, line)) ], [ (k === "String"), (string_contains_q(v, "${") ? r_pair(p_advance(p), make_template_string(v, [], line)) : r_pair(p_advance(p), make_literal("string", v, line))) ], [ (k === "Symbol"), r_pair(p_advance(p), make_literal("symbol", v, line)) ], [ (k === "Variable"), r_pair(p_advance(p), make_variable(v, line)) ], [ (k === "Keyword"), r_pair(p_advance(p), make_keyword(v, line)) ], [ true, r_pair(p_advance(p), make_literal("unknown", v, line)) ]); })(); }
 function parse_expr() { return (() => { let t = p_peek(p); let k = _fl_get(t, "kind"); return cond([ (k === "LParen"), parse_sexpr(p) ], [ (k === "LBracket"), parse_bracket(p) ], [ (k === "LBrace"), parse_map(p) ], [ true, parse_atom(p) ]); })(); }
 function parse_sexpr() { return (() => { let start_tok = p_peek(p); let line = _fl_get(start_tok, "line"); let p1 = p_advance(p); let _fl_first = parse_args(p1, [  ]); let p2 = _fl_get(_fl_first, "p"); let args = _fl_get(_fl_first, "node"); return ((_fl_length(args) === 0) ? r_pair(parse_consume_rparen(p2), make_sexpr("", [], line)) : (() => { let op_node = _fl_get(args, 0); let op = ((_fl_get(op_node, "kind") === "literal") ? _fl_get(op_node, "value") : ((_fl_get(op_node, "kind") === "variable") ? _fl_str("$", _fl_get(op_node, "name")) : "unknown")); let _fl_rest = slice(args, 1, _fl_length(args)); return ((op === "try") ? (() => { let body = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let catch_clause = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); let finally_clause = ((_fl_length(_fl_rest) > 2) ? _fl_get(_fl_rest, 2) : null); return r_pair(parse_consume_rparen(p2), make_try(body, catch_clause, finally_clause, line)); })() : r_pair(parse_consume_rparen(p2), make_sexpr(op, _fl_rest, line))); })()); })(); }
 function parse_consume_rparen() { return (() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RParen")) ? p_advance(p) : p); })(); }

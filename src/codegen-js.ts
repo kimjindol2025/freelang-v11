@@ -2,6 +2,7 @@
 // FL AST를 JavaScript 코드로 변환해 Node.js나 브라우저에서 실행 가능한 파일 생성
 
 import { ASTNode, Block, Literal, TemplateString, Variable, SExpr, Keyword } from "./ast";
+import { generateRuntimePreamble } from "./runtime-helpers";
 
 export interface CodegenOptions {
   module: "commonjs" | "esm"; // 기본 "commonjs"
@@ -141,7 +142,11 @@ export class JSCodegen {
 
     const parts: string[] = [];
 
-    // 런타임 인라인 포함
+    // 런타임 헬퍼 함수 프리앰블 (항상 포함 - self-hosting 지원)
+    parts.push(generateRuntimePreamble());
+    parts.push("");
+
+    // 추가 런타임 인라인 포함 (레거시)
     if (this.opts.runtime) {
       parts.push(FL_RUNTIME);
       parts.push("");
