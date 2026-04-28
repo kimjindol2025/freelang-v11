@@ -15042,6 +15042,48 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         const r145 = evalExplain_PHASE145(op, args2, callFnVal);
         if (r145 !== null) return r145;
       }
+      switch (op) {
+        case "file-mkdir":
+        case "file_mkdir": {
+          const dirPath = String(args2[0] ?? "");
+          const fs20 = require("fs");
+          try {
+            fs20.mkdirSync(dirPath, { recursive: true });
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        case "http-get":
+        case "http_get": {
+          const url2 = String(args2[0] ?? "");
+          try {
+            const { execSync: execSync2 } = require("child_process");
+            const escapedUrl = url2.replace(/'/g, "'\\''");
+            const cmd2 = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
+            const result = execSync2(cmd2, { encoding: "utf-8", timeout: 1e4 });
+            const lines = result.split("\n");
+            const status = parseInt(lines[lines.length - 1], 10) || 0;
+            const body = lines.slice(0, -1).join("\n");
+            return {
+              status,
+              body,
+              headers: {}
+            };
+          } catch (e) {
+            return {
+              status: 0,
+              body: "",
+              headers: {},
+              error: e.message
+            };
+          }
+        }
+        case "now-iso":
+        case "now_iso": {
+          return (/* @__PURE__ */ new Date()).toISOString();
+        }
+      }
       return callUser(op, args2);
     }
   }

@@ -4448,6 +4448,47 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         if (r145 !== null) return r145;
       }
 
+      // === Phase A-2: File/HTTP builtins ===
+      switch (op) {
+        case "file-mkdir": case "file_mkdir": {
+          const dirPath = String(args[0] ?? "");
+          const fs = require("fs");
+          try {
+            fs.mkdirSync(dirPath, { recursive: true });
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        case "http-get": case "http_get": {
+          const url = String(args[0] ?? "");
+          try {
+            const { execSync } = require("child_process");
+            const escapedUrl = url.replace(/'/g, "'\\''");
+            const cmd = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
+            const result = execSync(cmd, { encoding: "utf-8", timeout: 10000 });
+            const lines = result.split("\n");
+            const status = parseInt(lines[lines.length - 1], 10) || 0;
+            const body = lines.slice(0, -1).join("\n");
+            return {
+              status: status,
+              body: body,
+              headers: {}
+            };
+          } catch (e: any) {
+            return {
+              status: 0,
+              body: "",
+              headers: {},
+              error: e.message
+            };
+          }
+        }
+        case "now-iso": case "now_iso": {
+          return new Date().toISOString();
+        }
+      }
+
       // Phase 59: callUserFunction을 통해 FunctionNotFoundError(유사 함수 힌트 포함) 발생
       return callUser(op, args);
     }

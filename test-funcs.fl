@@ -1,0 +1,11 @@
+;; file_mkdir
+(file_mkdir "test-dir-123")
+(println "file_mkdir: " (file_exists "test-dir-123"))
+
+;; http_get  
+(define r (http_get "https://example.com"))
+(println "http_get status: " (get r "status"))
+
+;; now_iso
+(define t (now_iso))
+(println "now_iso: " (substring t 0 10))
