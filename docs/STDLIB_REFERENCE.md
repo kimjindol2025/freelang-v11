@@ -64,7 +64,7 @@
 
 ---
 
-### `(defun name [params...] body)`
+### `(defn name [params...] body)`
 함수 정의.
 
 **파라미터**:
@@ -76,13 +76,13 @@
 
 **예제**:
 ```lisp
-(defun greet [name]
+(defn greet [name]
   (println (+ "Hello, " name "!")))
 
 (greet "Claude")
 ;; 출력: Hello, Claude!
 
-(defun add [a b]
+(defn add [a b]
   (+ a b))
 
 (add 2 3)
@@ -116,23 +116,23 @@
 
 ---
 
-### `(let [bindings...] body)`
+### `(let [[symbol value ...] ...] body)`
 로컬 바인딩 (변수 정의).
 
 **파라미터**:
-- `bindings` ([symbol value ...]) — 이름-값 쌍 (평탄 리스트)
+- `bindings` ([[symbol value] ...]) — 이름-값 쌍 배열
 - `body` (expr) — 바인딩 내에서 실행
 
 **반환값**: `body`의 결과
 
 **예제**:
 ```lisp
-(let [x 5 y 10]
+(let [[x 5] [y 10]]
   (+ x y))
 ;; → 15
 
-(let [name "Alice"
-      greeting (+ "Hello, " name)]
+(let [[name "Alice"]
+      [greeting (+ "Hello, " name)]]
   (println greeting))
 ;; 출력: Hello, Alice
 ```
@@ -168,30 +168,6 @@
 **주의**:
 - `false`, `nil`, `0` 제외 모두 truthy
 - 3번째 인자 없으면 else는 `nil`
-
----
-
-### `(case value case1 result1 case2 result2 ... default)`
-다중 조건 분기 (switch).
-
-**파라미터**:
-- `value` (expr) — 비교할 값
-- `caseN` (literal) — 매칭할 값
-- `resultN` (expr) — 매칭했을 때 반환값
-- `default` (expr) — 모두 불일치 시 반환값 (마지막 인자, 선택사항)
-
-**반환값**: 매칭된 결과
-
-**예제**:
-```lisp
-(case status
-  "active" "운영 중"
-  "inactive" "중단됨"
-  "pending" "대기 중"
-  "상태 불명")  ;; 기본값
-
-;; status = "active" → "운영 중"
-```
 
 ---
 
@@ -337,7 +313,7 @@
 
 ---
 
-### `(merge map1 map2 ...)`
+### `(obj_merge map1 map2 ...)`
 여러 맵 병합.
 
 **파라미터**:
@@ -347,10 +323,10 @@
 
 **예제**:
 ```lisp
-(merge {:a 1} {:b 2} {:c 3})
+(obj_merge {:a 1} {:b 2} {:c 3})
 ;; → {:a 1 :b 2 :c 3}
 
-(merge {:name "Alice"} {:age 25})
+(obj_merge {:name "Alice"} {:age 25})
 ;; → {:name "Alice" :age 25}
 ```
 
@@ -506,7 +482,7 @@
 
 ---
 
-### `(str-replace string search replacement)`
+### `(replace string search replacement)`
 문자열에서 부분 문자열 치환.
 
 **파라미터**:
@@ -546,7 +522,7 @@
 
 ---
 
-### `(str-lower string)`
+### `(lower string)`
 문자열을 소문자로 변환.
 
 **파라미터**:
@@ -562,7 +538,7 @@
 
 ---
 
-### `(str-upper string)`
+### `(upper string)`
 문자열을 대문자로 변환.
 
 **파라미터**:

@@ -24705,7 +24705,11 @@ ${exportsStr}
     } else if (node.type === "null") {
       return "null";
     } else if (node.type === "symbol") {
-      return JSON.stringify(node.value);
+      if (node.value === "nil" || node.value === "null") {
+        return "null";
+      }
+      const cleanName = String(node.value).replace(/^\$/, "");
+      return flNameToJs(cleanName);
     } else {
       return String(node.value);
     }
@@ -25001,12 +25005,13 @@ ${exportsStr}
   }
   extractVarName(node) {
     if (node.kind === "variable") {
-      return node.name;
+      const name = node.name.replace(/^\$/, "");
+      return flNameToJs(name);
     }
     if (node.kind === "literal" && typeof node.value === "string") {
-      return `$${node.value}`;
+      return flNameToJs(node.value);
     }
-    return "$unknown";
+    return "unknown";
   }
   extractParamList(node) {
     if (!node) return [];
