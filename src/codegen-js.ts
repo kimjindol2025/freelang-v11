@@ -218,8 +218,13 @@ export class JSCodegen {
     } else if (node.type === "null") {
       return "null";
     } else if (node.type === "symbol") {
-      // symbol은 문자열로 처리
-      return JSON.stringify(node.value);
+      // nil/null 특수 처리
+      if (node.value === "nil" || node.value === "null") {
+        return "null";
+      }
+      // 다른 심볼은 변수 참조로 취급
+      const cleanName = String(node.value).replace(/^\$/, "");
+      return flNameToJs(cleanName);
     } else {
       // number
       return String(node.value);
@@ -608,12 +613,13 @@ export class JSCodegen {
 
   private extractVarName(node: ASTNode): string {
     if (node.kind === "variable") {
-      return node.name; // $x 그대로
+      const name = node.name.replace(/^\$/, "");
+      return flNameToJs(name); // $x → x
     }
     if (node.kind === "literal" && typeof node.value === "string") {
-      return `$${node.value}`;
+      return flNameToJs(node.value); // x 그대로 ($ 추가 금지)
     }
-    return "$unknown";
+    return "unknown";
   }
 
   private extractParamList(node: ASTNode): string[] {
