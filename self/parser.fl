@@ -96,8 +96,15 @@
                            (str "$" (get $op-node :name))
                            "unknown"))]
                   [$rest (slice $args 1 (length $args))]]
-              (r-pair (parse-consume-rparen $p2)
-                      (make-sexpr $op $rest $line)))))]
+              (if (= $op "try")
+                ;; try-catch-finally: (try body (catch param body) (finally body))
+                (let [[$body (if (> (length $rest) 0) (get $rest 0) null)]
+                      [$catch-clause (if (> (length $rest) 1) (get $rest 1) null)]
+                      [$finally-clause (if (> (length $rest) 2) (get $rest 2) null)]]
+                  (r-pair (parse-consume-rparen $p2)
+                          (make-try $body $catch-clause $finally-clause $line)))
+                (r-pair (parse-consume-rparen $p2)
+                        (make-sexpr $op $rest $line))))))]
 
 [FUNC parse-consume-rparen :params [$p]
   :body (let [[$t (p-peek $p)]]

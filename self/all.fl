@@ -505,8 +505,15 @@
                            (str "$" (get $op-node :name))
                            "unknown"))]
                   [$rest (slice $args 1 (length $args))]]
-              (r-pair (parse-consume-rparen $p2)
-                      (make-sexpr $op $rest $line)))))]
+              (if (= $op "try")
+                ;; try-catch-finally: (try body (catch param body) (finally body))
+                (let [[$body (if (> (length $rest) 0) (get $rest 0) null)]
+                      [$catch-clause (if (> (length $rest) 1) (get $rest 1) null)]
+                      [$finally-clause (if (> (length $rest) 2) (get $rest 2) null)]]
+                  (r-pair (parse-consume-rparen $p2)
+                          (make-try $body $catch-clause $finally-clause $line)))
+                (r-pair (parse-consume-rparen $p2)
+                        (make-sexpr $op $rest $line))))))]
 
 [FUNC parse-consume-rparen :params [$p]
   :body (let [[$t (p-peek $p)]]
@@ -694,6 +701,7 @@
           [(= (get $n :kind) "variable") (js-name (get $n :name))]
           [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
           [(= (get $n :kind) "template-string") (cg-template-string $n)]
+          [(= (get $n :kind) "try") (cg-try $n)]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
@@ -707,6 +715,31 @@
 
 [FUNC cg-template-string :params [$n]
   :body (str "`" (js-esc-for-template (get $n :value)) "`")]
+
+[FUNC cg-try :params [$n]
+  :body (let [[$body (get $n :body)]
+              [$catch-node (get $n :catch)]
+              [$finally-node (get $n :finally)]
+              [$body-code (cg $body)]
+              [$catch-code (if (null? $catch-node) "" (cg-catch-clause $catch-node))]
+              [$finally-code (if (null? $finally-node) "" (str "finally{" (cg $finally-node) "}"))]
+              ]
+          (str "(()=>{try{return " $body-code "}catch(err){" $catch-code "}" $finally-code "})()"))]
+
+[FUNC cg-catch-clause :params [$catch-node]
+  :body (let [[$param (if (= (get $catch-node :kind) "sexpr")
+                         (let [[$args (get $catch-node :args)]]
+                           (if (> (length $args) 0)
+                             (js-name (str (get (get $args 0) :name)))
+                             "err"))
+                         "err")]
+              [$body (if (= (get $catch-node :kind) "sexpr")
+                       (let [[$args (get $catch-node :args)]]
+                         (if (> (length $args) 1)
+                           (cg (get $args 1))
+                           "null"))
+                       (cg $catch-node))]]
+          (str "let " $param "=err;return " $body ";"))]
 
 [FUNC cg-literal-dispatch :params [$t $v]
   :body (cond
@@ -939,22 +972,6 @@
 [FUNC cg-throw :params [$args]
   :body (let [[$m (if (= (length $args) 0) "\"error\"" (cg (get $args 0)))]]
           (str "(()=>{throw new Error(String(" $m "))})()"))]
-
-;; (try body (catch err handler))
-;;   → (()=>{try{return body;}catch($err){return handler;}})()
-[FUNC cg-try :params [$args]
-  :body (let [[$body (cg (get $args 0))]
-              [$catch-node (if (>= (length $args) 2) (get $args 1) null)]
-              [$catch-info (if (null? $catch-node) null (extract-catch $catch-node))]
-              [$evar (if (null? $catch-info) "_err" (get $catch-info :evar))]
-              [$ebody (if (null? $catch-info) "null" (get $catch-info :ebody))]]
-          (str "(()=>{try{return " $body ";}catch(" $evar "){return " $ebody ";}})()"))]
-
-[FUNC extract-catch :params [$n]
-  :body (let [[$args (get $n :args)]
-              [$ev (extract-name (get $args 0))]
-              [$handler (cg (get $args 1))]]
-          {:evar $ev :ebody $handler})]
 
 ;; (while cond body...) → (()=>{while(cond){body;}})()
 [FUNC cg-while :params [$args]
