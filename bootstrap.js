@@ -11133,7 +11133,6 @@ function flDeepEq(a, b) {
   }
   return false;
 }
-var MODULE_CACHE = /* @__PURE__ */ new Map();
 function flEnvGet(env, name) {
   let e = env;
   while (e !== null && e !== void 0) {
@@ -11634,16 +11633,12 @@ function evalBuiltin(interp2, op, args2, expr) {
       const path16 = require("path");
       try {
         const resolvedPath = path16.resolve(process.cwd(), filePath);
-        if (MODULE_CACHE.has(resolvedPath)) {
-          return MODULE_CACHE.get(resolvedPath);
-        }
         const src = fs20.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
         const result = interp2.interpret(ast);
-        MODULE_CACHE.set(resolvedPath, null);
         return null;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
