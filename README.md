@@ -2,6 +2,8 @@
 
 > AI 에이전트가 안정적으로 쓰고, 재현 가능하게 실행되는 언어. Task/State/Workflow 기반 에이전트 프레임워크 포함.
 
+> **Phase A-3 (2026-04): Bootstrap 최소화** — bootstrap.js는 빌드 도구일 뿐, 자체호스팅 stage1.js가 primary compiler. 모든 사용자는 stage1.js 사용 권장.
+
 [![Tests](https://img.shields.io/badge/tests-744%2F744%20PASS-brightgreen)](./src/__tests__/)
 [![Self-Host](https://img.shields.io/badge/self--host-fixed--point%20verified-blue)](./CLAUDE.md)
 [![Express.fl](https://img.shields.io/badge/web-Express.fl%20완료-green)](./src/EXPRESS-COMPLETE.md)

@@ -1,0 +1,3 @@
+(* (* (cond [true "hello"] [false "hello"]) (- nil "hello")) 
+   (let [[$x (cond [true "x"])]] 
+     $x))
