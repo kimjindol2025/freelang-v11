@@ -1,0 +1,7 @@
+;; bootstrap으로 try/catch 테스트
+(define test-fn
+  (try
+    (error "테스트")
+    (catch [e] "에러 캡처됨")))
+
+(println test-fn)
