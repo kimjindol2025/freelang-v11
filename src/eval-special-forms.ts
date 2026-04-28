@@ -606,9 +606,14 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   }
 
   // ── loop ──────────────────────────────────────────────────────────
+  // Phase B-1: Two syntax variants supported:
+  // 1. Classic: (loop [var1 val1 var2 val2...] body...) with (recur new-vals...)
+  // 2. Modern: (loop [($var init) condition update] body...)
   if (op === "loop") {
     const bindingsNode = expr.args[0];
     const bodyNodes = expr.args.slice(1);
+
+    // Get array items
     const bindingItems: any[] =
       (bindingsNode as any).kind === "array"
         ? (bindingsNode as any).items || []
@@ -616,6 +621,43 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
           ? (bindingsNode as any).fields?.get?.("items") || []
           : [];
 
+    // Detect modern syntax: [($var init) condition update]
+    const isModernSyntax = bindingItems.length === 3 &&
+      (bindingItems[0] as any).kind === "sexpr";
+
+    if (isModernSyntax) {
+      // Modern syntax: (loop [($var init) condition update] body)
+      const initExpr = bindingItems[0];
+      const condExpr = bindingItems[1];
+      const updateExpr = bindingItems[2];
+
+      // Extract variable name from ($var init)
+      const varName = (initExpr as any).op || "$i";
+      const initVal = ev((initExpr as any).args[0]);
+
+      ctx.variables.push();
+      ctx.variables.set(varName, initVal);
+
+      let result: any = null;
+      try {
+        while (true) {
+          const condVal = ev(condExpr);
+          const isTruthy = condVal !== null && condVal !== undefined && condVal !== false;
+          if (!isTruthy) break;
+
+          for (const bodyNode of bodyNodes) {
+            result = ev(bodyNode);
+          }
+          const newVal = ev(updateExpr);
+          ctx.variables.set(varName, newVal);
+        }
+        return result;
+      } finally {
+        ctx.variables.pop();
+      }
+    }
+
+    // Classic syntax: (loop [var1 val1 var2 val2...] body...) with (recur...)
     const loopVars: string[] = [];
     const loopInits: any[] = [];
     for (let i = 0; i < bindingItems.length; i += 2) {

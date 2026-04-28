@@ -1080,11 +1080,6 @@ var init_parser = __esm({
           this.expect("RParen" /* RParen */);
           return throwExpr;
         }
-        if (op === "loop") {
-          const loopExpr = this.parseLoopExpression();
-          this.expect("RParen" /* RParen */);
-          return loopExpr;
-        }
         if (op === "match") {
           const matchExpr = this.parsePatternMatch();
           this.expect("RParen" /* RParen */);
@@ -18219,6 +18214,32 @@ function evalSpecialForm(interp2, op, expr) {
     const bindingsNode = expr.args[0];
     const bodyNodes = expr.args.slice(1);
     const bindingItems = bindingsNode.kind === "array" ? bindingsNode.items || [] : bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get?.("items") || [] : [];
+    const isModernSyntax = bindingItems.length === 3 && bindingItems[0].kind === "sexpr";
+    if (isModernSyntax) {
+      const initExpr = bindingItems[0];
+      const condExpr = bindingItems[1];
+      const updateExpr = bindingItems[2];
+      const varName = initExpr.op || "$i";
+      const initVal = ev(initExpr.args[0]);
+      ctx.variables.push();
+      ctx.variables.set(varName, initVal);
+      let result2 = null;
+      try {
+        while (true) {
+          const condVal = ev(condExpr);
+          const isTruthy = condVal !== null && condVal !== void 0 && condVal !== false;
+          if (!isTruthy) break;
+          for (const bodyNode of bodyNodes) {
+            result2 = ev(bodyNode);
+          }
+          const newVal = ev(updateExpr);
+          ctx.variables.set(varName, newVal);
+        }
+        return result2;
+      } finally {
+        ctx.variables.pop();
+      }
+    }
     const loopVars = [];
     const loopInits = [];
     for (let i = 0; i < bindingItems.length; i += 2) {
@@ -32047,12 +32068,18 @@ var Interpreter = class _Interpreter {
   }
   // Loop special form (Phase B-1)
   evalLoop(loopNode) {
+    if (!loopNode) {
+      throw new Error("Loop node is null");
+    }
     const init = loopNode.init;
     const condition = loopNode.condition;
     const update = loopNode.update;
     const body = loopNode.body;
-    if (!init || init.kind !== "sexpr") {
-      throw new Error("Loop init must be a S-expression: ($var init-value)");
+    if (!init || !condition || !update || !body) {
+      throw new Error(`Loop parts missing: init=${!!init} condition=${!!condition} update=${!!update} body=${!!body}`);
+    }
+    if (init.kind !== "sexpr") {
+      throw new Error(`Loop init must be sexpr, got: ${init.kind}`);
     }
     const op = init.op;
     const args2 = init.args || [];

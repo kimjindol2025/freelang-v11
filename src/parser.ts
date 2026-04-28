@@ -885,12 +885,9 @@ export class Parser {
       return throwExpr;
     }
 
-    // Special case: loop expressions (Phase B-1)
-    if (op === "loop") {
-      const loopExpr = this.parseLoopExpression();
-      this.expect(T.RParen);
-      return loopExpr;
-    }
+    // Note: Loop handled as regular S-expr for now (Phase B-1 delayed)
+    // Parser sees: (loop [...] body) as normal function call
+    // Runtime: evalSExpr will route to evalLoop when op === "loop"
 
     // Special case: match expressions
     if (op === "match") {
