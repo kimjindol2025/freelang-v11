@@ -1,0 +1,56 @@
+;; v11-optimizer: 코드 최적화 패턴 감지 및 재작성
+;; 간단한 최적화: (do (expr)) → expr
+
+(defn remove-redundant-do [$src]
+  (do
+    (println "🔧 Pass 1: 불필요한 do 제거")
+    (let [[$result (str_replace $src "(do (" "(")]]
+      (let [[$reduction (- (length $src) (length $result))]]
+        (do
+          (println (str "  크기 감소: " $reduction " 문자"))
+          {:pass "remove-do"
+           :original-len (length $src)
+           :result-len (length $result)
+           :reduction $reduction})))))
+
+(defn optimize-string-concat [$src]
+  (do
+    (println "🔧 Pass 2: 문자열 최적화")
+    (let [[$result (str_replace $src "(str (str" "(str")]]
+      (let [[$reduction (- (length $src) (length $result))]]
+        (do
+          (println (str "  크기 감소: " $reduction " 문자"))
+          {:pass "optimize-str"
+           :original-len (length $src)
+           :result-len (length $result)
+           :reduction $reduction})))))
+
+(defn apply-optimizations [$src]
+  (do
+    (println "\n📝 최적화 시작")
+    (let [[$pass1 (remove-redundant-do $src)]]
+      (let [[$pass2 (optimize-string-concat $src)]]
+        (do
+          (println "\n✅ 최적화 완료")
+          (let [[$total-reduction (+ (get $pass1 "reduction") (get $pass2 "reduction"))]]
+            {:original-size (length $src)
+             :optimized-size (- (length $src) $total-reduction)
+             :total-reduction $total-reduction
+             :reduction-pct (* 100 (/ $total-reduction (length $src)))
+             :passes [$pass1 $pass2]}))))))
+
+;; 메인 진입점
+(do
+  (println "🚀 v11-optimizer 시작\n")
+  (let [[$src (file_read "/root/kim/freelang-v11/self/all.fl")]]
+    (do
+      (println (str "원본 크기: " (length $src) " 문자\n"))
+      (let [[$result (apply-optimizations $src)]]
+        (do
+          (println (str "\n📊 최적화 결과:"))
+          (println (str "  원본: " (get $result "original-size") " 문자"))
+          (println (str "  최적화 후: " (get $result "optimized-size") " 문자"))
+          (println (str "  감소: " (get $result "total-reduction") " 문자"))
+          (file_write "/root/kim/freelang-v11/self-evolve/logs/optimizer.log"
+            (str "최적화 결과: " (str $result) "\n"))
+          $result)))))

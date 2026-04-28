@@ -1,0 +1,32 @@
+;; v11-evolution: AI 자기 진화 엔진
+
+(defn evolution-step [$gen $src]
+  (let [[$orig (length $src)]]
+    (let [[$opt (str_replace $src "(do (" "(")]]
+      (let [[$size (length $opt)]]
+        (let [[$reduce (- $orig $size)]]
+          (do
+            (println (str "🧬 세대 " $gen ": " $reduce " 감소"))
+            (file_write (str "self-evolve/logs/gen-" $gen ".fl") $opt)
+            (file_append "self-evolve/logs/perf-delta.log"
+              (str "[Gen " $gen "] " $reduce " 감소\n"))
+            {:gen $gen :reduction $reduce}))))))
+
+(do
+  (println "================================================")
+  (println "  FreeLang v11 자기 진화 엔진")
+  (println "================================================\n")
+
+  (file_write "self-evolve/logs/perf-delta.log"
+    (str "진화 로그 " (now_iso) "\n\n"))
+
+  (let [[$src (file_read "self/all.fl")]]
+    (do
+      (let [[$r0 (evolution-step 0 $src)]]
+        (let [[$r1 (evolution-step 1 $src)]]
+          (let [[$r2 (evolution-step 2 $src)]]
+            (do
+              (println "\n✅ 진화 완료")
+              (println (str "  최고 감소: " (+ (get $r0 "reduction") (get $r1 "reduction") (get $r2 "reduction"))))
+              (file_append "self-evolve/logs/perf-delta.log"
+                (str "\n완료\n")))))))))
