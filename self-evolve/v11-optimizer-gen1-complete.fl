@@ -91,13 +91,14 @@
           ;; do-elimination: (do single) → single
           (if (= (length $args) 1)
             (optimize-node (get $args 0))
-            ;; 자식 재귀 + 최적화
-            (let [[$new-args (map optimize-node $args)]]
+            ;; 자식 재귀 + dead-expr elimination
+            ;; 람다로 감싸기 (기명함수 직접 전달 버그 회피)
+            (let [[$new-args (map (fn [$n] (optimize-node $n)) $args)]]
               (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
-                ;; dead-expr elimination + (이후는 no-op)
                 (elim-dead-expr $new-node))))
           ;; do 아니면 자식 재귀 + constant-fold
-          (let [[$new-args (map optimize-node $args)]]
+          ;; 람다로 감싸기 (기명함수 직접 전달 버그 회피)
+          (let [[$new-args (map (fn [$n] (optimize-node $n)) $args)]]
             (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
               ;; constant folding
               (fold-constant $new-node))))))
@@ -106,7 +107,7 @@
 
 (defn optimize-ast [$ast]
   ;; AST 배열 전체 최적화
-  (map optimize-node $ast))
+  (map (fn [$n] (optimize-node $n)) $ast))
 
 (do
   (println "================================================")
