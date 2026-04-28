@@ -31578,6 +31578,9 @@ var Interpreter = class _Interpreter {
     if (node.kind === "throw") {
       return this.evalThrow(node);
     }
+    if (node.kind === "loop") {
+      return this.evalLoop(node);
+    }
     return null;
   }
   evalSExpr(expr) {
@@ -32013,6 +32016,33 @@ var Interpreter = class _Interpreter {
   }
   evalThrow(throwExpr) {
     return evalThrow(this, throwExpr);
+  }
+  // Loop special form (Phase B-1)
+  evalLoop(loopNode) {
+    const init = loopNode.init;
+    const condition = loopNode.condition;
+    const update = loopNode.update;
+    const body = loopNode.body;
+    if (!init || init.kind !== "sexpr" || !init.args || init.args.length < 2) {
+      throw new Error("Loop init must be [($var init-value) ...]");
+    }
+    const varNode = init.args[0];
+    const initVal = this.eval(init.args[1]);
+    const varName = varNode.kind === "variable" ? varNode.name : String(varNode);
+    const loopScope = /* @__PURE__ */ new Map();
+    loopScope.set(varName, initVal);
+    this.scopes.push(loopScope);
+    try {
+      let result = null;
+      while (this.isTruthy(this.eval(condition))) {
+        result = this.eval(body);
+        const updatedVal = this.eval(update);
+        loopScope.set(varName, updatedVal);
+      }
+      return result;
+    } finally {
+      this.scopes.pop();
+    }
   }
   matchPattern(pattern, value) {
     return matchPattern(this, pattern, value);

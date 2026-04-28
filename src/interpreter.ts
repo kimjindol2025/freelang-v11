@@ -1570,6 +1570,11 @@ export class Interpreter {
       return this.evalThrow(node as ThrowExpression);
     }
 
+    // Loop blocks (Phase B-1)
+    if ((node as any).kind === "loop") {
+      return this.evalLoop(node as any);
+    }
+
     return null;
   }
 
@@ -2063,6 +2068,47 @@ export class Interpreter {
   public evalPatternMatch(match: PatternMatch): any { return _evalPatternMatch(this, match); }
   public evalTryBlock(tryBlock: TryBlock): any { return _evalTryBlock(this, tryBlock); }
   public evalThrow(throwExpr: ThrowExpression): any { return _evalThrow(this, throwExpr); }
+
+  // Loop special form (Phase B-1)
+  public evalLoop(loopNode: any): any {
+    const init = loopNode.init;      // [$var val]
+    const condition = loopNode.condition; // condition expr
+    const update = loopNode.update;      // update expr
+    const body = loopNode.body;          // body expr
+
+    // 초기화: [$var val]에서 변수 추출
+    if (!init || init.kind !== "sexpr" || !init.args || init.args.length < 2) {
+      throw new Error("Loop init must be [($var init-value) ...]");
+    }
+
+    const varNode = init.args[0];
+    const initVal = this.eval(init.args[1]);
+    const varName = varNode.kind === "variable" ? varNode.name : String(varNode);
+
+    // 새 스코프에서 루프 실행
+    const loopScope = new Map<string, any>();
+    loopScope.set(varName, initVal);
+    this.scopes.push(loopScope);
+
+    try {
+      let result = null;
+
+      // 조건 확인 및 루프 실행
+      while (this.isTruthy(this.eval(condition))) {
+        // 본문 실행
+        result = this.eval(body);
+
+        // 업데이트 식 평가
+        const updatedVal = this.eval(update);
+        loopScope.set(varName, updatedVal);
+      }
+
+      return result;
+    } finally {
+      this.scopes.pop();
+    }
+  }
+
   public matchPattern(pattern: Pattern, value: any): { matched: boolean; bindings: Map<string, any> } {
     return _matchPattern(this, pattern, value);
   }
