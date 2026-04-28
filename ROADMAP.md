@@ -71,11 +71,18 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 
 **검증**: stage1만으로 전체 빌드 가능 확인
 
-### A-4: Phase A 완료 선언 (2주 말)
+### A-4: Phase A 완료 선언 (2주 말) 🟢 준비중
+**상태** (2026-04-29):
+- A-1: ✅ 기초 정리 완료
+- A-2: ✅ Try-Catch + Template Literal 완료 (Loop defer)
+- A-3: ⏳ Bootstrap 최소화 (자체호스팅 완성 후)
+- A-4: 🔄 v11.1.0-alpha 선언 준비
+
+**다음 작업**:
 ```
-✅ Commit: "Phase A: Bootstrap deprecated, stage1 primary"
-✅ Blog: "Phase A 완료 — Self-Hosting 안정화"
-✅ Version: v11.1.0-alpha (bootstrap-free)
+[ ] A-4 커밋: "Phase A: Try-Catch & Template Literal 완료"
+[ ] A-4 블로그: "Phase A-2 완료 — AI 에이전트 안정 기능"
+[ ] A-4 버전: v11.1.0-alpha (bootstrap.js 안정)
 ```
 
 ---
@@ -112,11 +119,11 @@ Option 2: Phase B 스킵 (권장)
   - 임시 해결: cg-let-1d/2d에 null check 추가 (2026-04-29)
   - 우선순위: 자체호스팅 안정화 후 (phase1 이후)
 
-**다음**:
-- [ ] C3 해결 (또는 official 미루기)
-- [ ] C5 근본 원인 진단 (Parser fields 추출 확인)
-- [ ] Property test 완료
-- [ ] Phase C 완료 선언
+**결정** (2026-04-29 Session 3):
+- [x] C3 미루기: loop 식별자 충돌 (v12+ 모듈 시스템 시점)
+- [x] C5 미루기: Let Block Fields (자체호스팅 phase2 시점)
+- [ ] Property test: examples/patterns/ 검증 (다음 단계)
+- [ ] Phase C 완료 선언 (C5 제외)
 
 ---
 
