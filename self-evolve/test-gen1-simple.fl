@@ -1,0 +1,67 @@
+;; Gen1 단순 테스트
+
+(defn is-constant [$node]
+  (if (nil? $node) false
+    (let [[$kind (get $node "kind")]]
+      (if (= $kind "literal")
+        (let [[$type (get $node "type")]]
+          (if (= $type "symbol") false true))
+        false))))
+
+(defn is-arithmetic-op [$op]
+  (if (= $op "+") true
+    (if (= $op "-") true
+      (if (= $op "*") true
+        (if (= $op "/") true false)))))
+
+(defn all-constant? [$args]
+  (if (= (length $args) 0) true
+    (let [[$first (get $args 0)]]
+      (let [[$rest (slice $args 1 (length $args))]]
+        (if (is-constant $first)
+          (all-constant? $rest)
+          false)))))
+
+(defn evaluate-arithmetic [$op $args]
+  (let [[$v0 (get (get $args 0) "value")]]
+    (let [[$v1 (get (get $args 1) "value")]]
+      (if (= $op "+") (+ $v0 $v1)
+        (if (= $op "-") (- $v0 $v1)
+          (if (= $op "*") (* $v0 $v1)
+            (if (= $op "/") (/ $v0 $v1) nil)))))))
+
+(defn make-literal [$value]
+  {:kind "literal" :type "number" :value $value :line nil})
+
+(defn fold-constant [$node]
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (let [[$args (get $node "args")]]
+        (if (is-arithmetic-op $op)
+          (if (all-constant? $args)
+            (make-literal (evaluate-arithmetic $op $args))
+            $node)
+          $node)))
+    $node))
+
+(defn optimize-node [$node]
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (let [[$args (get $node "args")]]
+        ;; 람다로 감싸기 (기명함수 직접 전달 버그 회피)
+        (let [[$new-args (map (fn [$n] (optimize-node $n)) $args)]]
+          (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
+            (fold-constant $new-node)))))
+    $node))
+
+(do
+  (println "테스트: (+ 1 2)")
+  (let [[$ast (parse (lex "(+ 1 2)"))]]
+    (println (str "  원본: " (get $ast 0)))
+    (println (str "  최적: " (optimize-node (get $ast 0)))))
+
+  (println "\n테스트: (+ (+ 1 2) 3)")
+  (let [[$ast (parse (lex "(+ (+ 1 2) 3)"))]]
+    (let [[$node (get $ast 0)]]
+      (println (str "  원본: " $node))
+      (println (str "  최적: " (optimize-node $node))))))

@@ -237,12 +237,38 @@ export class JSCodegen {
 
   private genTemplateString(node: any): string {
     const value = node.value;
-    // Template literal containing ${ must use double quotes to avoid JS parsing errors
-    // ${...} substitution not yet implemented - treat as literal string
-    const escaped = value
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"');
-    return `"${escaped}"`;
+    // Convert FreeLang template ${...} to JavaScript template `...${...}`
+    // Parse and transform: "Hello ${name}" → `Hello ${name}`
+    // Also handle variable extraction: ensure variables are properly JS-named
+
+    let jsCode = "`";
+    let i = 0;
+    while (i < value.length) {
+      // Check for ${...} pattern
+      if (value[i] === "$" && value[i + 1] === "{") {
+        const start = i + 2;
+        const end = value.indexOf("}", start);
+        if (end > start) {
+          const expr = value.slice(start, end).trim();
+          // Translate FreeLang variable/expression to JavaScript
+          const jsExpr = this.genNode({ kind: "variable", name: expr });
+          jsCode += "${" + jsExpr + "}";
+          i = end + 1;
+          continue;
+        }
+      }
+      // Handle escape sequences and special characters in template
+      if (value[i] === "`") {
+        jsCode += "\\`"; // Escape backticks in template literals
+      } else if (value[i] === "\\") {
+        jsCode += "\\\\";
+      } else {
+        jsCode += value[i];
+      }
+      i++;
+    }
+    jsCode += "`";
+    return jsCode;
   }
 
   private genVariable(node: Variable): string {

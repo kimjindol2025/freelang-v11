@@ -24816,8 +24816,31 @@ ${exportsStr}
   }
   genTemplateString(node) {
     const value = node.value;
-    const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    return `"${escaped}"`;
+    let jsCode = "`";
+    let i = 0;
+    while (i < value.length) {
+      if (value[i] === "$" && value[i + 1] === "{") {
+        const start = i + 2;
+        const end = value.indexOf("}", start);
+        if (end > start) {
+          const expr = value.slice(start, end).trim();
+          const jsExpr = this.genNode({ kind: "variable", name: expr });
+          jsCode += "${" + jsExpr + "}";
+          i = end + 1;
+          continue;
+        }
+      }
+      if (value[i] === "`") {
+        jsCode += "\\`";
+      } else if (value[i] === "\\") {
+        jsCode += "\\\\";
+      } else {
+        jsCode += value[i];
+      }
+      i++;
+    }
+    jsCode += "`";
+    return jsCode;
   }
   genVariable(node) {
     const cleanName = node.name.replace(/^\$/, "");
@@ -31466,6 +31489,10 @@ var Interpreter = class _Interpreter {
     if (node.kind === "type-class-instance") {
       return this.evalInstance(node);
     }
+    if (node.kind === "template-string") {
+      const templateNode = node;
+      return this.interpolateString(templateNode.value);
+    }
     if (node.kind === "try-block") {
       return this.evalTryBlock(node);
     }
@@ -31758,6 +31785,40 @@ var Interpreter = class _Interpreter {
     let result = "";
     let i = 0;
     while (i < template.length) {
+      if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
+        const start = i + 2;
+        const end = template.indexOf("}", start);
+        if (end > start) {
+          const content = template.slice(start, end).trim();
+          let val;
+          if (content.includes("(")) {
+            try {
+              const tokens = lex("(" + content + ")");
+              const ast = parse(tokens);
+              val = ast.length > 0 ? this.eval(ast[0]) : null;
+            } catch {
+              val = null;
+            }
+          } else {
+            if (content.includes(".")) {
+              const parts = content.split(".");
+              val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
+              for (let p = 1; p < parts.length; p++) {
+                if (val === null || val === void 0) {
+                  val = null;
+                  break;
+                }
+                val = typeof val === "object" ? val[parts[p]] : null;
+              }
+            } else {
+              val = this.context.variables.has("$" + content) ? this.context.variables.get("$" + content) : this.context.variables.get(content);
+            }
+          }
+          result += val === null || val === void 0 ? "" : String(val);
+          i = end + 1;
+          continue;
+        }
+      }
       if (template[i] === "{" && i + 1 < template.length) {
         const next = template[i + 1];
         if (next === "$") {

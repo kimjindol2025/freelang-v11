@@ -1554,6 +1554,12 @@ export class Interpreter {
       return this.evalInstance(node as TypeClassInstance);
     }
 
+    // Template strings (Phase A-2: "Hello ${name}")
+    if ((node as any).kind === "template-string") {
+      const templateNode = node as TemplateString;
+      return this.interpolateString(templateNode.value);
+    }
+
     // Try-catch-finally blocks (Phase 11)
     if ((node as any).kind === "try-block") {
       return this.evalTryBlock(node as TryBlock);
@@ -1912,6 +1918,48 @@ export class Interpreter {
     let result = "";
     let i = 0;
     while (i < template.length) {
+      // Pattern 1: ${varName} or ${expr} (preferred syntax)
+      if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
+        const start = i + 2;
+        const end = template.indexOf("}", start);
+        if (end > start) {
+          const content = template.slice(start, end).trim();
+          let val: any;
+
+          // Try to evaluate as variable or expression
+          if (content.includes("(")) {
+            // ${(expr)} — evaluate as expression
+            try {
+              const tokens = lex("(" + content + ")");
+              const ast = parse(tokens);
+              val = ast.length > 0 ? this.eval(ast[0]) : null;
+            } catch {
+              val = null;
+            }
+          } else {
+            // ${varName} — evaluate as variable
+            if (content.includes(".")) {
+              const parts = content.split(".");
+              val = this.context.variables.has("$" + parts[0])
+                ? this.context.variables.get("$" + parts[0])
+                : this.context.variables.get(parts[0]);
+              for (let p = 1; p < parts.length; p++) {
+                if (val === null || val === undefined) { val = null; break; }
+                val = typeof val === "object" ? val[parts[p]] : null;
+              }
+            } else {
+              val = this.context.variables.has("$" + content)
+                ? this.context.variables.get("$" + content)
+                : this.context.variables.get(content);
+            }
+          }
+          result += val === null || val === undefined ? "" : String(val);
+          i = end + 1;
+          continue;
+        }
+      }
+
+      // Pattern 2: {$varName} (legacy syntax for backward compatibility)
       if (template[i] === "{" && i + 1 < template.length) {
         const next = template[i + 1];
         if (next === "$") {
@@ -1962,6 +2010,7 @@ export class Interpreter {
           }
         }
       }
+
       result += template[i];
       i++;
     }
