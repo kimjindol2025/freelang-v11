@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-28 18:30:08
+; 2026-04-28 18:44:15
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -1674,11 +1674,14 @@
           (file_write $output $js)
           (println (str "compiled " $input " -> " $output " size=" (length $js))))]
 
-(if (null? $__argv__) null
-  (if (= (length $__argv__) 0) null
-    (compile-file (get $__argv__ 0)
-                  (if (>= (length $__argv__) 2) (get $__argv__ 1)
-                      (str (get $__argv__ 0) ".out.js")))))
+;; Phase A-3: __argv__ CLI 처리는 src/codegen-js.ts에서 수행
+;; Self-hosting 시 bootstrap 위에서만 실행되는 코드이므로 제거
+;; (자체호스팅 이후 단계에서 필요시 복원)
+;; (if (null? $__argv__) null
+;;   (if (= (length $__argv__) 0) null
+;;     (compile-file (get $__argv__ 0)
+;;                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
+;;                       (str (get $__argv__ 0) ".out.js")))))
 
 ;; self/stdlib/data.fl — Phase 26
 ;; 순수 데이터 변환 함수
@@ -1942,24 +1945,6 @@
 
 [FUNC pid-parent :params [] :body (process_ppid)]
 
-;; self/main.fl — FL-to-JS Self-Hosted Compiler
-
-(println "\n═══════════════════════════════════════════")
-(println "  FL Self-Hosted Compiler (Phase 28)")
-(println "═══════════════════════════════════════════\n")
-
-(let [[$input (get __argv__ 0)] [$output (get __argv__ 1)]]
-  (if (or (null? $input) (null? $output))
-    (println "Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>")
-    (let [[$src (file_read $input)]]
-      (let [[$tokens (lex $src)]]
-        (let [[$ast (parse $tokens)]]
-          (let [[$js (fl->js-with-prelude $ast)]]
-            (do
-              (println (str "📖 " $input " → " $output))
-              (println (str "   Lexed: " (length $tokens) " tokens"))
-              (println (str "   Parsed: " (length $ast) " nodes"))
-              (println (str "   Generated: " (length $js) " bytes"))
-              (file_write $output $js)
-              (println "✨ Success!"))))))))
+;; self/main.fl — Phase A-3: CLI 인터페이스 (향후 작업)
+;; 현재는 src/codegen-js.ts의 require.main===module 핸들러에서 처리됨
 

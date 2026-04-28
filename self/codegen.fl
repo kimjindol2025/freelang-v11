@@ -1045,8 +1045,11 @@
           (file_write $output $js)
           (println (str "compiled " $input " -> " $output " size=" (length $js))))]
 
-(if (null? $__argv__) null
-  (if (= (length $__argv__) 0) null
-    (compile-file (get $__argv__ 0)
-                  (if (>= (length $__argv__) 2) (get $__argv__ 1)
-                      (str (get $__argv__ 0) ".out.js")))))
+;; Phase A-3: __argv__ CLI 처리는 src/codegen-js.ts에서 수행
+;; Self-hosting 시 bootstrap 위에서만 실행되는 코드이므로 제거
+;; (자체호스팅 이후 단계에서 필요시 복원)
+;; (if (null? $__argv__) null
+;;   (if (= (length $__argv__) 0) null
+;;     (compile-file (get $__argv__ 0)
+;;                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
+;;                       (str (get $__argv__ 0) ".out.js")))))

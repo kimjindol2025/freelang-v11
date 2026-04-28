@@ -194,6 +194,11 @@ export class JSCodegen {
       }
     }
 
+    // ===== Phase A-3: CLI 지원 (향후 작업) =====
+    // Stage1.js는 현재 라이브러리로만 사용
+    // CLI 지원은 Phase B 완료 후 재검토 예정
+    // (자체호스팅 codegen 함수가 필요하므로 bootstrap.js 의존성 유지)
+
     const result = parts.join("\n");
     return this.opts.minify ? this.minify(result) : result;
   }

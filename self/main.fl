@@ -1,20 +1,2 @@
-;; self/main.fl — FL-to-JS Self-Hosted Compiler
-
-(println "\n═══════════════════════════════════════════")
-(println "  FL Self-Hosted Compiler (Phase 28)")
-(println "═══════════════════════════════════════════\n")
-
-(let [[$input (get __argv__ 0)] [$output (get __argv__ 1)]]
-  (if (or (null? $input) (null? $output))
-    (println "Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>")
-    (let [[$src (file_read $input)]]
-      (let [[$tokens (lex $src)]]
-        (let [[$ast (parse $tokens)]]
-          (let [[$js (fl->js-with-prelude $ast)]]
-            (do
-              (println (str "📖 " $input " → " $output))
-              (println (str "   Lexed: " (length $tokens) " tokens"))
-              (println (str "   Parsed: " (length $ast) " nodes"))
-              (println (str "   Generated: " (length $js) " bytes"))
-              (file_write $output $js)
-              (println "✨ Success!"))))))))
+;; self/main.fl — Phase A-3: CLI 인터페이스 (향후 작업)
+;; 현재는 src/codegen-js.ts의 require.main===module 핸들러에서 처리됨

@@ -251,7 +251,6 @@ function fl__gtjs_code() { return __fl_reduce((() => _fl_str(acc, cg(node), ";\n
 function fl__gtjs_with_prelude() { return (() => { let p = runtime_prelude(); return (() => { let c = fl__gtjs_code(ast); return _fl_str(p, "\n", c); })(); })(); }
 function compile_file() { return (() => { let src = file_read(input); let tokens = lex(src); let ast = parse(tokens); let js = fl__gtjs_with_prelude(ast); return file_write(output, js)
 __fl_print(_fl_str("compiled ", input, " -> ", output, " size=", _fl_length(js))); })(); }
-(_fl_null_q(__argv__) ? null : ((_fl_length(__argv__) === 0) ? null : compile_file(_fl_get(__argv__, 0), ((_fl_length(__argv__) >= 2) ? _fl_get(__argv__, 1) : _fl_str(_fl_get(__argv__, 0), ".out.js")))))
 function str_lines() { return split(s, "\n"); }
 function str_words() { return split(_fl_trim(s), " "); }
 function str_join_lines() { return str_join_loop(lines, 0, ""); }
@@ -323,10 +322,6 @@ function getcwd() { return process_getcwd(); }
 function chdir() { return process_chdir(_fl_str(path)); }
 function pid() { return process_pid(); }
 function pid_parent() { return process_ppid(); }
-__fl_print("\n═══════════════════════════════════════════")
-__fl_print("  FL Self-Hosted Compiler (Phase 28)")
-__fl_print("═══════════════════════════════════════════\n")
-(() => { let input = _fl_get(__argv__, 0); let output = _fl_get(__argv__, 1); return ((_fl_null_q(input) || _fl_null_q(output)) ? __fl_print("Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>") : (() => { let src = file_read(input); return (() => { let tokens = lex(src); return (() => { let ast = parse(tokens); return (() => { let js = fl__gtjs_with_prelude(ast); return (() => { __fl_print(_fl_str("📖 ", input, " → ", output)); __fl_print(_fl_str("   Lexed: ", _fl_length(tokens), " tokens")); __fl_print(_fl_str("   Parsed: ", _fl_length(ast), " nodes")); __fl_print(_fl_str("   Generated: ", _fl_length(js), " bytes")); file_write(output, js); return __fl_print("✨ Success!"); })(); })(); })(); })(); })()); })()
 module.exports = {
   _fl_is_digit_q: _fl_is_digit_q,
   _fl_is_alpha_q: _fl_is_alpha_q,
