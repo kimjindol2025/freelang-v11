@@ -1237,15 +1237,31 @@ export class Parser {
     // 힌트 매칭: 메시지 앞부분으로 검색
     let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
 
-    // 자잘 #4 (2026-04-25): paren matching info — 미닫힘 paren 위치 표시
-    // EOF 또는 Expected R* 에러 시 parenStack에서 가장 최근 opening 정보 추가
+    // Priority 4 (2026-04-28): 전체 열린 괄호 스택 표시 — AI가 자동 검증 가능하도록
+    // EOF 또는 Expected R* 에러 시 parenStack 전체 정보 표시
     if (this.parenStack.length > 0 &&
         (token.type === T.EOF || message.includes("Expected R") || message.includes("Unexpected"))) {
-      const opening = this.parenStack[this.parenStack.length - 1];
-      const openSym = opening.type === T.LParen ? "(" : opening.type === T.LBracket ? "[" : "{";
-      const wantSym = opening.type === T.LParen ? ")" : opening.type === T.LBracket ? "]" : "}";
-      const parenHint = `여는 '${openSym}' at line ${opening.line}:${opening.col} 가 닫히지 않음 — '${wantSym}' 누락 또는 오타`;
-      hint = hint ? `${hint}\n  ${parenHint}` : parenHint;
+
+      // 1. 전체 스택 정보 (깊이, 심볼, 위치)
+      const stackInfo = this.parenStack.map((opening, idx) => {
+        const openSym = opening.type === T.LParen ? "(" : opening.type === T.LBracket ? "[" : "{";
+        const depth = idx + 1;
+        return `  [${depth}] '${openSym}' at line ${opening.line}:${opening.col}`;
+      }).join("\n");
+
+      // 2. 필요한 닫는 괄호 시퀀스 (역순)
+      const closeSeq = this.parenStack
+        .map(o => o.type === T.LParen ? ")" : o.type === T.LBracket ? "]" : "}")
+        .reverse()
+        .join("");
+
+      // 3. 다음 예상 닫는 괄호 (가장 최근 열린 괄호)
+      const nextOpening = this.parenStack[this.parenStack.length - 1];
+      const nextExpected = nextOpening.type === T.LParen ? ")" : nextOpening.type === T.LBracket ? "]" : "}";
+
+      // 4. 힌트 메시지
+      const parenHint = `미닫힘 괄호 스택 (깊이: ${this.parenStack.length}):\n${stackInfo}\n\n필요한 닫힘 괄호 시퀀스: ${closeSeq}\n\n다음 토큰을 예상: '${nextExpected}'`;
+      hint = hint ? `${hint}\n\n${parenHint}` : parenHint;
     }
 
     // 메시지 패턴에 따라 에러 코드 결정

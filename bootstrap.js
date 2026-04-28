@@ -1353,12 +1353,23 @@ var init_parser = __esm({
       error(message, token) {
         let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
         if (this.parenStack.length > 0 && (token.type === "EOF" /* EOF */ || message.includes("Expected R") || message.includes("Unexpected"))) {
-          const opening = this.parenStack[this.parenStack.length - 1];
-          const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
-          const wantSym = opening.type === "LParen" /* LParen */ ? ")" : opening.type === "LBracket" /* LBracket */ ? "]" : "}";
-          const parenHint = `\uC5EC\uB294 '${openSym}' at line ${opening.line}:${opening.col} \uAC00 \uB2EB\uD788\uC9C0 \uC54A\uC74C \u2014 '${wantSym}' \uB204\uB77D \uB610\uB294 \uC624\uD0C0`;
+          const stackInfo = this.parenStack.map((opening, idx) => {
+            const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
+            const depth = idx + 1;
+            return `  [${depth}] '${openSym}' at line ${opening.line}:${opening.col}`;
+          }).join("\n");
+          const closeSeq = this.parenStack.map((o) => o.type === "LParen" /* LParen */ ? ")" : o.type === "LBracket" /* LBracket */ ? "]" : "}").reverse().join("");
+          const nextOpening = this.parenStack[this.parenStack.length - 1];
+          const nextExpected = nextOpening.type === "LParen" /* LParen */ ? ")" : nextOpening.type === "LBracket" /* LBracket */ ? "]" : "}";
+          const parenHint = `\uBBF8\uB2EB\uD798 \uAD04\uD638 \uC2A4\uD0DD (\uAE4A\uC774: ${this.parenStack.length}):
+${stackInfo}
+
+\uD544\uC694\uD55C \uB2EB\uD798 \uAD04\uD638 \uC2DC\uD000\uC2A4: ${closeSeq}
+
+\uB2E4\uC74C \uD1A0\uD070\uC744 \uC608\uC0C1: '${nextExpected}'`;
           hint = hint ? `${hint}
-  ${parenHint}` : parenHint;
+
+${parenHint}` : parenHint;
         }
         let code = "E_PARSE_SYNTAX_ERROR";
         if (message.includes("Expected") || message.includes("Unexpected")) {
