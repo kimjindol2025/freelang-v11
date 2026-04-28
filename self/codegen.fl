@@ -72,6 +72,7 @@
           [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
           [(= (get $n :kind) "template-string") (cg-template-string $n)]
           [(= (get $n :kind) "try") (cg-try $n)]
+          [(= (get $n :kind) "loop") (cg-loop $n)]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
@@ -110,6 +111,28 @@
                            "null"))
                        (cg $catch-node))]]
           (str "let " $param "=err;return " $body ";"))]
+
+[FUNC cg-loop :params [$n]
+  :body (let [[$init (get $n :init)]
+              [$condition (get $n :condition)]
+              [$update (get $n :update)]
+              [$body (get $n :body)]
+              ;; init 처리: [$var val]
+              [$init-binding (if (= (get $init :kind) "sexpr")
+                               (let [[$args (get $init :args)]]
+                                 (if (>= (length $args) 2)
+                                   (let [[$var-node (get $args 0)]
+                                         [$val-node (get $args 1)]]
+                                     [(js-name (str (get $var-node :name))) (cg $val-node)])
+                                   ["i" "0"]))
+                               ["i" "0"])]
+              [$loop-var (get $init-binding 0)]
+              [$loop-init (get $init-binding 1)]
+              [$condition-code (cg $condition)]
+              [$update-code (cg $update)]
+              [$body-code (cg $body)]]
+          (str "(()=>{for(let " $loop-var "=" $loop-init ";!_fl_false_q(" $condition-code ");"
+               $loop-var "=" $update-code "){" $body-code "}})()"))]
 
 [FUNC cg-literal-dispatch :params [$t $v]
   :body (cond

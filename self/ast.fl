@@ -152,6 +152,9 @@
 [FUNC make-template-string :params [$parts $expressions $line]
   :body {:kind "template-string" :parts $parts :expressions $expressions :line $line}]
 
+[FUNC make-loop :params [$init $condition $update $body $line]
+  :body {:kind "loop" :init $init :condition $condition :update $update :body $body :line $line}]
+
 ;; ──────────────────────────────────────
 ;; 30 웹 노드 + deep-equal?
 ;; ──────────────────────────────────────
