@@ -337,6 +337,31 @@ function flExecOpNative(op: string, vals: any[]): any {
         return false;
       }
     }
+    case "http-get": case "http_get": {
+      // (http-get url) → {:status code :body string :headers map}
+      const url = String(v0 ?? "");
+      try {
+        const { execSync } = require("child_process");
+        const escapedUrl = url.replace(/'/g, "'\\''");
+        const cmd = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
+        const result = execSync(cmd, { encoding: "utf-8", timeout: 10000 });
+        const lines = result.split("\n");
+        const status = parseInt(lines[lines.length - 1], 10) || 0;
+        const body = lines.slice(0, -1).join("\n");
+        return {
+          status: status,
+          body: body,
+          headers: {}
+        };
+      } catch (e: any) {
+        return {
+          status: 0,
+          body: "",
+          headers: {},
+          error: e.message
+        };
+      }
+    }
     default: return null;
   }
 }

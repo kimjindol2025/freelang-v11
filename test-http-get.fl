@@ -1,0 +1,3 @@
+(define result (http_get "https://example.com"))
+(println "Status: " (get result "status"))
+(println "Body length: " (length (get result "body")))

@@ -11458,6 +11458,31 @@ function flExecOpNative(op, vals) {
         return false;
       }
     }
+    case "http-get":
+    case "http_get": {
+      const url2 = String(v0 ?? "");
+      try {
+        const { execSync: execSync2 } = require("child_process");
+        const escapedUrl = url2.replace(/'/g, "'\\''");
+        const cmd2 = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
+        const result = execSync2(cmd2, { encoding: "utf-8", timeout: 1e4 });
+        const lines = result.split("\n");
+        const status = parseInt(lines[lines.length - 1], 10) || 0;
+        const body = lines.slice(0, -1).join("\n");
+        return {
+          status,
+          body,
+          headers: {}
+        };
+      } catch (e) {
+        return {
+          status: 0,
+          body: "",
+          headers: {},
+          error: e.message
+        };
+      }
+    }
     default:
       return null;
   }
