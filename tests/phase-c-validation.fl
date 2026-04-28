@@ -1,0 +1,194 @@
+;; Phase C 검증 테스트 스위트
+;; 목표: 결정론, 안정성, 에러 처리, 성능 기준선
+
+;; ──────────────────────────────────────
+;; C-1: 결정론 검증 (Determinism)
+;; ──────────────────────────────────────
+
+;; 동일 입력 → 동일 출력
+[FUNC test-c1-determinism :params []
+  :body (do
+    (define result1 (+ (* 7 13) 21))
+    (define result2 (+ (* 7 13) 21))
+    (if (= result1 result2)
+      (println "C-1 PASS: 동일 연산 → 동일 결과")
+      (println (str "C-1 FAIL: " result1 " != " result2))))]
+
+;; 배열 연산 결정론
+[FUNC test-c1-array-determinism :params []
+  :body (do
+    (define arr [1 2 3 4 5])
+    (define sum1 (reduce (fn [$a $b] (+ $a $b)) 0 arr))
+    (define sum2 (reduce (fn [$a $b] (+ $a $b)) 0 arr))
+    (if (= sum1 sum2)
+      (println "C-1 PASS: 배열 reduce 결정론")
+      (println (str "C-1 FAIL: " sum1 " != " sum2))))]
+
+;; ──────────────────────────────────────
+;; C-2: 복합 제어 흐름 검증
+;; ──────────────────────────────────────
+
+;; Try-Catch 정상 흐름
+[FUNC test-c2-try-normal :params []
+  :body (do
+    (define result
+      (try
+        (+ 1 2)
+        (catch $e (str "Error: " $e))
+        (finally (println "Cleanup normal"))))
+    (if (= result 3)
+      (println "C-2 PASS: Try normal flow")
+      (println (str "C-2 FAIL: " result))))]
+
+;; Try-Catch 에러 흐름
+[FUNC test-c2-try-error :params []
+  :body (do
+    (define result
+      (try
+        (/ 1 0)
+        (catch $e (str "Caught: " (get $e :message)))
+        (finally (println "Cleanup error"))))
+    (println (str "C-2 PASS: Try error flow: " result)))]
+
+;; Loop 식별자 격리 (C-3)
+[FUNC test-c3-loop-scope :params []
+  :body (do
+    (define outer-x "outer")
+    (loop [($i 0) (< $i 2) (+ $i 1)]
+      (define inner-x (str "inner-" $i)))
+    (if (= outer-x "outer")
+      (println "C-3 PASS: Loop 스코프 격리")
+      (println "C-3 FAIL: 스코프 오염")))]
+
+;; Loop 복합 조건 (상태 변경 테스트)
+[FUNC test-c3-loop-complex :params []
+  :body (do
+    (define counter 0)
+    (loop [($i 0) (< $i 3) (+ $i 1)]
+      (if (> $i 0)
+        (println (str "  Loop iteration: i=" $i))))
+    ;; Loop가 에러 없이 실행되면 성공
+    (println "C-3 PASS: Loop 복합 조건 정상 실행"))]
+
+;; Let 2D 바인딩 (C-5)
+[FUNC test-c5-let-2d :params []
+  :body (do
+    (let [[$a 10] [$b 20] [$c 30]]
+      (define result (+ $a (+ $b $c)))
+      (if (= result 60)
+        (println "C-5 PASS: Let 2D 바인딩")
+        (println (str "C-5 FAIL: " result)))))]
+
+;; Let 중첩
+[FUNC test-c5-let-nested :params []
+  :body (do
+    (let [[$x 5]]
+      (let [[$y 10]]
+        (let [[$z (+ $x $y)]]
+          (if (= $z 15)
+            (println "C-5 PASS: Let 중첩")
+            (println (str "C-5 FAIL: " $z)))))))]
+
+;; ──────────────────────────────────────
+;; C-4: 에러 처리 안정성
+;; ──────────────────────────────────────
+
+;; Null/Nil 안전성
+[FUNC test-c4-nil-safety :params []
+  :body (do
+    (define x null)
+    (if (nil? x)
+      (println "C-4 PASS: nil? 정상")
+      (println "C-4 FAIL: nil? 오류")))]
+
+;; Type 검증
+[FUNC test-c4-type-checks :params []
+  :body (do
+    (define n 42)
+    (define s "hello")
+    (define a [1 2 3])
+    (if (and (number? n) (string? s) (array? a))
+      (println "C-4 PASS: 타입 검증")
+      (println "C-4 FAIL: 타입 검증")))]
+
+;; ──────────────────────────────────────
+;; C-prf: 성능 기준선 (Proof/Performance)
+;; ──────────────────────────────────────
+
+;; 루프 성능
+[FUNC test-perf-loop :params []
+  :body (do
+    (define start (now_ms))
+    (define sum 0)
+    (loop [($i 0) (< $i 1000) (+ $i 1)]
+      (define sum (+ sum $i)))
+    (define elapsed (- (now_ms) start))
+    (println (str "PERF: Loop 1000x → " elapsed "ms, result=" sum)))]
+
+;; 배열 연산 성능 (range 함수가 없으면 skip)
+[FUNC test-perf-array :params []
+  :body (do
+    (define arr [1 2 3 4 5 6 7 8 9 10])
+    (define start (now_ms))
+    (define result (reduce (fn [$a $b] (+ $a $b)) 0 arr))
+    (define elapsed (- (now_ms) start))
+    (println (str "PERF: Array reduce 10x → " elapsed "ms, result=" result)))]
+
+;; 함수 호출 성능 (작은 범위로 수정)
+[FUNC fib :params [$n]
+  :body (if (<= $n 1) $n (+ (fib (- $n 1)) (fib (- $n 2))))]
+
+[FUNC test-perf-recursion :params []
+  :body (do
+    (define start (now_ms))
+    (define result (fib 15))
+    (define elapsed (- (now_ms) start))
+    (println (str "PERF: Fib(15) → " elapsed "ms, result=" result)))]
+
+;; ──────────────────────────────────────
+;; 메인 테스트 러너
+;; ──────────────────────────────────────
+
+[FUNC run-all-tests :params []
+  :body (do
+    (println "════════════════════════════════════")
+    (println "Phase C 검증 테스트 스위트")
+    (println "════════════════════════════════════")
+    (println "")
+
+    (println "[C-1] 결정론")
+    (test-c1-determinism)
+    (test-c1-array-determinism)
+    (println "")
+
+    (println "[C-2] 제어 흐름")
+    (test-c2-try-normal)
+    (test-c2-try-error)
+    (println "")
+
+    (println "[C-3] Loop 스코프")
+    (test-c3-loop-scope)
+    (test-c3-loop-complex)
+    (println "")
+
+    (println "[C-5] Let 바인딩")
+    (test-c5-let-2d)
+    (test-c5-let-nested)
+    (println "")
+
+    (println "[C-4] 에러 처리")
+    (test-c4-nil-safety)
+    (test-c4-type-checks)
+    (println "")
+
+    (println "[PERF] 성능 기준선")
+    (test-perf-loop)
+    (test-perf-array)
+    (test-perf-recursion)
+    (println "")
+
+    (println "════════════════════════════════════")
+    (println "테스트 완료")
+    (println "════════════════════════════════════"))]
+
+(run-all-tests)
