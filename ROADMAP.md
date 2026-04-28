@@ -39,13 +39,18 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 
 **결과**: self-parser 호환도 **87%** (try/catch 추가로 90%+)
 
-**현재 진행** (2026-04-28):
-- [ ] **Try-Catch 구현** (A-2-1) ← 우선순위 1
-  - Parser: try-catch-finally 문법 추가
-  - Codegen: JS try-catch로 변환
-  - 테스트: 패턴 파일 실행 검증
+**현재 진행** (2026-04-29):
+- [x] **Try-Catch 구현** (A-2-1) ✅ 완료
+  - [x] src/parser.ts: TS 형식 + self-hosted 호환 파싱
+  - [x] src/codegen-js.ts: Try-Catch 코드젠
+  - [x] bootstrap.js 검증 ✅ (모든 형식 작동)
+  - [ ] Self-hosted 검증 (stage1 재생성 대기)
 - [ ] Template Literal (완료 but 미검증)
 - [ ] Loop 특수형 (A-2-2, 미루기)
+- [ ] **Let Block Fields 버그** (A-2-3, 발견)
+  - 근본 원인: Array block fields가 null/비어있음
+  - 임시 해결: cg-let-1d/2d에 null check 추가
+  - 상태: Phase C-5로 분류 (자체호스팅 안정화 후 처리)
 
 ### A-3: Bootstrap 최소화 (1주)
 **역할**: stage1 생성 전용으로 축소
@@ -90,14 +95,20 @@ Option 2: Phase B 스킵 (권장)
 
 ## ✨ Phase C: 증명 강화 (진행 중)
 
-**현황** (2026-04-26):
+**현황** (2026-04-29):
 - C1: - 연산자 가변인자 ✅
 - C2: append 가변인자 ✅
 - C3: loop 식별자 충돌 🟠 (미루기)
 - C4: let-rec 패턴 ✅
+- **C5: Let Block Fields 버그** 🔴 (발견, 임시 해결)
+  - 문제: Array block의 fields가 null/비어있음 → codegen 실패
+  - 근본 원인: Parser (parseArray) vs Interpreter 호환성 미정
+  - 임시 해결: cg-let-1d/2d에 null check 추가 (2026-04-29)
+  - 우선순위: 자체호스팅 안정화 후 (phase1 이후)
 
 **다음**:
 - [ ] C3 해결 (또는 official 미루기)
+- [ ] C5 근본 원인 진단 (Parser fields 추출 확인)
 - [ ] Property test 완료
 - [ ] Phase C 완료 선언
 
