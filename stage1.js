@@ -27,38 +27,6 @@ function make_literal() { return {}; }
 function make_variable() { return {}; }
 function make_keyword() { return {}; }
 function make_sexpr() { return {}; }
-function make_array_block() { return {}; }
-function make_map_block() { return {}; }
-function make_block() { return {}; }
-function p_make() { return {}; }
-function p_peek() { return (() => { let unknown = ((i >= _fl_length(t)) ? null : _fl_get(t, i)); return unknown; })(); }
-function p_peek_at() { return (() => { let unknown = ((i >= _fl_length(t)) ? null : _fl_get(t, i)); return unknown; })(); }
-function p_end_q() { return (_fl_get(p, "idx") >= _fl_length(_fl_get(p, "tokens"))); }
-function p_advance() { return {}; }
-function p_with_ast() { return {}; }
-function p_append_ast() { return p_with_ast(p, _fl_append(_fl_get(p, "ast"), [node])); }
-function r_pair() { return {}; }
-function parse_atom() { return (() => { let unknown = cond([ (k === "Number"), r_pair(p_advance(p), make_literal("number", v, line)) ], [ (k === "String"), r_pair(p_advance(p), make_literal("string", v, line)) ], [ (k === "Symbol"), r_pair(p_advance(p), make_literal("symbol", v, line)) ], [ (k === "Variable"), r_pair(p_advance(p), make_variable(v, line)) ], [ (k === "Keyword"), r_pair(p_advance(p), make_keyword(v, line)) ], [ true, r_pair(p_advance(p), make_literal("unknown", v, line)) ]); return unknown; })(); }
-function parse_expr() { return (() => { let unknown = cond([ (k === "LParen"), parse_sexpr(p) ], [ (k === "LBracket"), parse_bracket(p) ], [ (k === "LBrace"), parse_map(p) ], [ true, parse_atom(p) ]); return unknown; })(); }
-function parse_sexpr() { return (() => { let unknown = ((_fl_length(args) === 0) ? r_pair(parse_consume_rparen(p2), make_sexpr("", [], line)) : (() => { let unknown = r_pair(parse_consume_rparen(p2), make_sexpr(op, _fl_rest, line)); return unknown; })()); return unknown; })(); }
-function parse_consume_rparen() { return (() => { let unknown = (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RParen")) ? p_advance(p) : p); return unknown; })(); }
-function parse_args() { return (() => { let unknown = cond([ _fl_null_q(t), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RParen"), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RBracket"), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RBrace"), r_pair(p, acc) ], [ true, (() => { let unknown = parse_args(_fl_get(one, "p"), _fl_append(acc, [_fl_get(one, "node")])); return unknown; })() ]); return unknown; })(); }
-function parse_bracket() { return (() => { let unknown = (and((!_fl_null_q(next)), (_fl_get(next, "kind") === "Symbol"), is_block_type_q(_fl_get(next, "value")), (_fl_get(next, "value") === upper_case(_fl_get(next, "value")))) ? parse_named_block(p1, line) : parse_array(p1, line)); return unknown; })(); }
-function is_block_type_q() { return (() => { let unknown = ((c >= "A") && (c <= "Z")); return unknown; })(); }
-function upper_case() { return s; }
-function parse_array() { return (() => { let unknown = r_pair(parse_consume_rbracket(p2), make_array_block(items, line)); return unknown; })(); }
-function parse_consume_rbracket() { return (() => { let unknown = (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBracket")) ? p_advance(p) : p); return unknown; })(); }
-function parse_named_block() { return (() => { let unknown = r_pair(parse_consume_rbracket(p3), make_block(type, name, fields, line)); return unknown; })(); }
-function parse_optional_name() { return (() => { let unknown = (and((!_fl_null_q(t)), (_fl_get(t, "kind") === "Symbol"), (!(char_at(_fl_get(t, "value"), 0) === ":"))) ? r_pair(p_advance(p), _fl_get(t, "value")) : r_pair(p, null)); return unknown; })(); }
-function parse_block_fields() { return (() => { let unknown = cond([ _fl_null_q(t), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RBracket"), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "Keyword"), (() => { let unknown = parse_block_fields(p2, json_set(acc, key, v)); return unknown; })() ], [ true, r_pair(p_advance(p), acc) ]); return unknown; })(); }
-function parse_map() { return (() => { let unknown = r_pair(parse_consume_rbrace(p2), make_map_block(items, line)); return unknown; })(); }
-function parse_consume_rbrace() { return (() => { let unknown = (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBrace")) ? p_advance(p) : p); return unknown; })(); }
-function parse_all() { return (p_end_q(p) ? _fl_get(p, "ast") : (() => { let unknown = parse_all(p2); return unknown; })()); }
-function parse() { return parse_all(p_make(tokens)); }
-function make_literal() { return {}; }
-function make_variable() { return {}; }
-function make_keyword() { return {}; }
-function make_sexpr() { return {}; }
 function make_number() { return make_literal("number", v, line); }
 function make_string() { return make_literal("string", v, line); }
 function make_bool() { return make_literal("boolean", v, line); }
@@ -101,6 +69,31 @@ function keys_no_line() { return __fl_filter((() => (!(k === "line"))), json_key
 function deep_equal_map_keys_q() { return cond([ (i >= _fl_length(ks)), true ], [ (() => { let unknown = (!deep_equal_q(_fl_get(a, k), _fl_get(b, k))); return unknown; })(), false ], [ true, deep_equal_map_keys_q(a, b, ks, (i + 1)) ]); }
 function _fl_list_q() { return (_fl_null_q(v) ? false : (str_to_num(_fl_str("[", v)) === null)); }
 function _fl_map_q() { return (_fl_null_q(v) ? false : (!_fl_null_q(_fl_get(v, "kind")))); }
+function p_make() { return {}; }
+function p_peek() { return (() => { let unknown = ((i >= _fl_length(t)) ? null : _fl_get(t, i)); return unknown; })(); }
+function p_peek_at() { return (() => { let unknown = ((i >= _fl_length(t)) ? null : _fl_get(t, i)); return unknown; })(); }
+function p_end_q() { return (_fl_get(p, "idx") >= _fl_length(_fl_get(p, "tokens"))); }
+function p_advance() { return {}; }
+function p_with_ast() { return {}; }
+function p_append_ast() { return p_with_ast(p, _fl_append(_fl_get(p, "ast"), [node])); }
+function r_pair() { return {}; }
+function parse_atom() { return (() => { let unknown = cond([ (k === "Number"), r_pair(p_advance(p), make_literal("number", v, line)) ], [ (k === "String"), r_pair(p_advance(p), make_literal("string", v, line)) ], [ (k === "Symbol"), r_pair(p_advance(p), make_literal("symbol", v, line)) ], [ (k === "Variable"), r_pair(p_advance(p), make_variable(v, line)) ], [ (k === "Keyword"), r_pair(p_advance(p), make_keyword(v, line)) ], [ true, r_pair(p_advance(p), make_literal("unknown", v, line)) ]); return unknown; })(); }
+function parse_expr() { return (() => { let unknown = cond([ (k === "LParen"), parse_sexpr(p) ], [ (k === "LBracket"), parse_bracket(p) ], [ (k === "LBrace"), parse_map(p) ], [ true, parse_atom(p) ]); return unknown; })(); }
+function parse_sexpr() { return (() => { let unknown = ((_fl_length(args) === 0) ? r_pair(parse_consume_rparen(p2), make_sexpr("", [], line)) : (() => { let unknown = r_pair(parse_consume_rparen(p2), make_sexpr(op, _fl_rest, line)); return unknown; })()); return unknown; })(); }
+function parse_consume_rparen() { return (() => { let unknown = (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RParen")) ? p_advance(p) : p); return unknown; })(); }
+function parse_args() { return (() => { let unknown = cond([ _fl_null_q(t), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RParen"), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RBracket"), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RBrace"), r_pair(p, acc) ], [ true, (() => { let unknown = parse_args(_fl_get(one, "p"), _fl_append(acc, [_fl_get(one, "node")])); return unknown; })() ]); return unknown; })(); }
+function parse_bracket() { return (() => { let unknown = (and((!_fl_null_q(next)), (_fl_get(next, "kind") === "Symbol"), is_block_type_q(_fl_get(next, "value")), (_fl_get(next, "value") === upper_case(_fl_get(next, "value")))) ? parse_named_block(p1, line) : parse_array(p1, line)); return unknown; })(); }
+function is_block_type_q() { return (() => { let unknown = ((c >= "A") && (c <= "Z")); return unknown; })(); }
+function upper_case() { return s; }
+function parse_array() { return (() => { let unknown = r_pair(parse_consume_rbracket(p2), make_array_block(items, line)); return unknown; })(); }
+function parse_consume_rbracket() { return (() => { let unknown = (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBracket")) ? p_advance(p) : p); return unknown; })(); }
+function parse_named_block() { return (() => { let unknown = r_pair(parse_consume_rbracket(p3), make_block(type, name, fields, line)); return unknown; })(); }
+function parse_optional_name() { return (() => { let unknown = (and((!_fl_null_q(t)), (_fl_get(t, "kind") === "Symbol"), (!(char_at(_fl_get(t, "value"), 0) === ":"))) ? r_pair(p_advance(p), _fl_get(t, "value")) : r_pair(p, null)); return unknown; })(); }
+function parse_block_fields() { return (() => { let unknown = cond([ _fl_null_q(t), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "RBracket"), r_pair(p, acc) ], [ (_fl_get(t, "kind") === "Keyword"), (() => { let unknown = parse_block_fields(p2, json_set(acc, key, v)); return unknown; })() ], [ true, r_pair(p_advance(p), acc) ]); return unknown; })(); }
+function parse_map() { return (() => { let unknown = r_pair(parse_consume_rbrace(p2), make_map_block(items, line)); return unknown; })(); }
+function parse_consume_rbrace() { return (() => { let unknown = (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBrace")) ? p_advance(p) : p); return unknown; })(); }
+function parse_all() { return (p_end_q(p) ? _fl_get(p, "ast") : (() => { let unknown = parse_all(p2); return unknown; })()); }
+function parse() { return parse_all(p_make(tokens)); }
 function esc_1() { return replace(s, "\\", "\\\\"); }
 function esc_2() { return replace(s, "\"", "\\\""); }
 function esc_3() { return replace(s, "\n", "\\n"); }
@@ -321,38 +314,6 @@ module.exports = {
   make_variable: make_variable,
   make_keyword: make_keyword,
   make_sexpr: make_sexpr,
-  make_array_block: make_array_block,
-  make_map_block: make_map_block,
-  make_block: make_block,
-  p_make: p_make,
-  p_peek: p_peek,
-  p_peek_at: p_peek_at,
-  p_end_q: p_end_q,
-  p_advance: p_advance,
-  p_with_ast: p_with_ast,
-  p_append_ast: p_append_ast,
-  r_pair: r_pair,
-  parse_atom: parse_atom,
-  parse_expr: parse_expr,
-  parse_sexpr: parse_sexpr,
-  parse_consume_rparen: parse_consume_rparen,
-  parse_args: parse_args,
-  parse_bracket: parse_bracket,
-  is_block_type_q: is_block_type_q,
-  upper_case: upper_case,
-  parse_array: parse_array,
-  parse_consume_rbracket: parse_consume_rbracket,
-  parse_named_block: parse_named_block,
-  parse_optional_name: parse_optional_name,
-  parse_block_fields: parse_block_fields,
-  parse_map: parse_map,
-  parse_consume_rbrace: parse_consume_rbrace,
-  parse_all: parse_all,
-  parse: parse,
-  make_literal: make_literal,
-  make_variable: make_variable,
-  make_keyword: make_keyword,
-  make_sexpr: make_sexpr,
   make_number: make_number,
   make_string: make_string,
   make_bool: make_bool,
@@ -395,6 +356,31 @@ module.exports = {
   deep_equal_map_keys_q: deep_equal_map_keys_q,
   _fl_list_q: _fl_list_q,
   _fl_map_q: _fl_map_q,
+  p_make: p_make,
+  p_peek: p_peek,
+  p_peek_at: p_peek_at,
+  p_end_q: p_end_q,
+  p_advance: p_advance,
+  p_with_ast: p_with_ast,
+  p_append_ast: p_append_ast,
+  r_pair: r_pair,
+  parse_atom: parse_atom,
+  parse_expr: parse_expr,
+  parse_sexpr: parse_sexpr,
+  parse_consume_rparen: parse_consume_rparen,
+  parse_args: parse_args,
+  parse_bracket: parse_bracket,
+  is_block_type_q: is_block_type_q,
+  upper_case: upper_case,
+  parse_array: parse_array,
+  parse_consume_rbracket: parse_consume_rbracket,
+  parse_named_block: parse_named_block,
+  parse_optional_name: parse_optional_name,
+  parse_block_fields: parse_block_fields,
+  parse_map: parse_map,
+  parse_consume_rbrace: parse_consume_rbrace,
+  parse_all: parse_all,
+  parse: parse,
   esc_1: esc_1,
   esc_2: esc_2,
   esc_3: esc_3,

@@ -45,16 +45,18 @@ echo "; $(date '+%Y-%m-%d %H:%M:%S')" >> "$TEMP_ALL"
 echo "" >> "$TEMP_ALL"
 
 # 기본 구성 모듈
+# Phase A 정정 (2026-04-28): ast.fl을 parser.fl 앞에 배치
+# 이유: parser.fl이 make-literal 등 ast 함수를 참조하므로
 echo "  - Adding lexer.fl..."
 cat self/lexer.fl >> "$TEMP_ALL"
 echo "" >> "$TEMP_ALL"
 
-echo "  - Adding parser.fl..."
-cat self/parser.fl >> "$TEMP_ALL"
-echo "" >> "$TEMP_ALL"
-
 echo "  - Adding ast.fl..."
 cat self/ast.fl >> "$TEMP_ALL"
+echo "" >> "$TEMP_ALL"
+
+echo "  - Adding parser.fl..."
+cat self/parser.fl >> "$TEMP_ALL"
 echo "" >> "$TEMP_ALL"
 
 echo "  - Adding codegen.fl..."
