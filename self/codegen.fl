@@ -269,19 +269,26 @@
 
 [FUNC cg-let-1d :params [$items $i $acc $counter]
   :body (if (>= $i (length $items)) $acc
-          (let [[$pat-n (get $items $i)] [$v-n (get $items (+ $i 1))]
-                [$val (cg $v-n)]
-                [$tmpvar (str "__v" (if (= $counter 0) "" $counter))]]
-            (cg-let-1d $items (+ $i 2) (str $acc (cg-let-binding $pat-n $val $tmpvar)) (+ $counter 1))))]
+          (let [[$pat-n (if (< $i (length $items)) (get $items $i) nil)]
+                [$v-n (if (< (+ $i 1) (length $items)) (get $items (+ $i 1)) nil)]]
+            (if (or (null? $pat-n) (null? $v-n))
+              (cg-let-1d $items (+ $i 2) $acc (+ $counter 1))
+              (let [[$val (cg $v-n)]
+                    [$tmpvar (str "__v" (if (= $counter 0) "" $counter))]]
+                (cg-let-1d $items (+ $i 2) (str $acc (cg-let-binding $pat-n $val $tmpvar)) (+ $counter 1))))))]
 
 [FUNC cg-let-2d :params [$items $i $acc $counter]
   :body (if (>= $i (length $items)) $acc
           (let [[$pair (get $items $i)]
-                [$pitems (get (get $pair :fields) "items")]
-                [$k-n (get $pitems 0)] [$v-n (get $pitems 1)]
-                [$val (cg $v-n)]
-                [$tmpvar (str "__v" (if (= $counter 0) "" $counter))]]
-            (cg-let-2d $items (+ $i 1) (str $acc (cg-let-binding $k-n $val $tmpvar)) (+ $counter 1))))]
+                [$pair-fields (if (null? $pair) null (get $pair :fields))]
+                [$pitems (if (null? $pair-fields) null (get $pair-fields "items"))]
+                [$k-n (if (and (not (null? $pitems)) (> (length $pitems) 0)) (get $pitems 0) nil)]
+                [$v-n (if (and (not (null? $pitems)) (> (length $pitems) 1)) (get $pitems 1) nil)]]
+            (if (or (null? $k-n) (null? $v-n))
+              (cg-let-2d $items (+ $i 1) $acc (+ $counter 1))
+              (let [[$val (cg $v-n)]
+                    [$tmpvar (str "__v" (if (= $counter 0) "" $counter))]]
+                (cg-let-2d $items (+ $i 1) (str $acc (cg-let-binding $k-n $val $tmpvar)) (+ $counter 1))))))]
 
 [FUNC cg-do :params [$args]
   :body (if (= (length $args) 0) "null"

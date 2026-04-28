@@ -363,6 +363,12 @@ export class JSCodegen {
         if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
           const block = bindingsArg as Block;
           const items = block.fields.get("items");
+          // DEBUG: Check if items is being extracted correctly
+          if (!Array.isArray(items)) {
+            console.error("DEBUG let: block.fields.get('items') returned:", items);
+            console.error("DEBUG let: block.fields keys:", Array.from(block.fields.keys()));
+            console.error("DEBUG let: block object:", block);
+          }
           bindings = Array.isArray(items) ? items : [];
         } else if (bindingsArg.kind === "sexpr") {
           bindings = (bindingsArg as SExpr).args;
