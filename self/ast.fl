@@ -149,6 +149,9 @@
 [FUNC make-throw :params [$expr $line]
   :body {:kind "throw" :expr $expr :line $line}]
 
+[FUNC make-template-string :params [$parts $expressions $line]
+  :body {:kind "template-string" :parts $parts :expressions $expressions :line $line}]
+
 ;; ──────────────────────────────────────
 ;; 30 웹 노드 + deep-equal?
 ;; ──────────────────────────────────────

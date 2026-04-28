@@ -6,6 +6,7 @@ import {
   ASTNode,
   Block,
   Literal,
+  TemplateString,
   Variable,
   SExpr,
   Keyword,
@@ -36,6 +37,7 @@ import {
   FormNode,
   makeBlock,
   makeLiteral,
+  makeTemplateString,
   makeVariable,
   makeSExpr,
   makeKeyword,
@@ -545,9 +547,12 @@ export class Parser {
       return makeLiteral("number", parseFloat(token.value));
     }
 
-    // Check for literal string
+    // Check for literal string (or template string with ${...})
     if (this.check(T.String)) {
       const token = this.advance();
+      if (token.value.includes("${")) {
+        return makeTemplateString(token.value);
+      }
       return makeLiteral("string", token.value);
     }
 

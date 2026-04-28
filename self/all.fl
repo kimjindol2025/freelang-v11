@@ -1,5 +1,6 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-28 16:02:27
+; $(date)
+
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -340,6 +341,9 @@
 [FUNC make-throw :params [$expr $line]
   :body {:kind "throw" :expr $expr :line $line}]
 
+[FUNC make-template-string :params [$parts $expressions $line]
+  :body {:kind "template-string" :parts $parts :expressions $expressions :line $line}]
+
 ;; ──────────────────────────────────────
 ;; 30 웹 노드 + deep-equal?
 ;; ──────────────────────────────────────
@@ -451,13 +455,18 @@
 ;; 32 parseAtom — number/string/symbol/keyword/variable
 ;; ──────────────────────────────────────
 
+[FUNC string-contains? :params [$s $substr]
+  :body (not (= -1 (str-index-of $s $substr)))]
+
 [FUNC parse-atom :params [$p]
   :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$line (get $t :line)]]
           (cond
             [(= $k "Number")
              (r-pair (p-advance $p) (make-literal "number" $v $line))]
             [(= $k "String")
-             (r-pair (p-advance $p) (make-literal "string" $v $line))]
+             (if (string-contains? $v "${")
+               (r-pair (p-advance $p) (make-template-string $v (list) $line))
+               (r-pair (p-advance $p) (make-literal "string" $v $line)))]
             [(= $k "Symbol")
              (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
             [(= $k "Variable")
@@ -684,12 +693,20 @@
           [(= (get $n :kind) "literal") (cg-literal $n)]
           [(= (get $n :kind) "variable") (js-name (get $n :name))]
           [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
+          [(= (get $n :kind) "template-string") (cg-template-string $n)]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
           [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
           [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
           [true "null"])]
+
+[FUNC js-esc-for-template :params [$s]
+  :body (let [[$s1 (replace $s "\\" "\\\\")]]
+          (replace $s1 "`" "\`"))]
+
+[FUNC cg-template-string :params [$n]
+  :body (str "`" (js-esc-for-template (get $n :value)) "`")]
 
 [FUNC cg-literal-dispatch :params [$t $v]
   :body (cond
@@ -1639,287 +1656,3 @@
     (compile-file (get $__argv__ 0)
                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
                       (str (get $__argv__ 0) ".out.js")))))
-
-;; self/stdlib/data.fl — Phase 26
-;; 순수 데이터 변환 함수
-
-;; 줄 분리
-[FUNC str-lines :params [$s]
-  :body (split $s "\n")]
-
-;; 단어 분리
-[FUNC str-words :params [$s]
-  :body (split (trim $s) " ")]
-
-;; 줄 합치기
-[FUNC str-join-lines :params [$lines]
-  :body (str-join-loop $lines 0 "")]
-[FUNC str-join-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (str-join-loop $lst (+ $i 1)
-            (if (= $i 0) (get $lst 0) (str $acc "\n" (get $lst $i)))))]
-
-;; 부분 문자열 출현 횟수
-[FUNC str-count :params [$s $sub]
-  :body (if (= (length $sub) 0) 0
-          (str-count-loop $s $sub 0 0))]
-[FUNC str-count-loop :params [$s $sub $pos $acc]
-  :body (let [[$rest (substring $s $pos (length $s))]
-              [$idx (index-of $rest $sub)]]
-          (if (< $idx 0) $acc
-            (str-count-loop $s $sub (+ $pos $idx (length $sub)) (+ $acc 1))))]
-
-;; CSV 행 파싱 (간단한 버전, 따옴표 미지원)
-[FUNC csv-parse-line :params [$line]
-  :body (split $line ",")]
-
-;; CSV 본문 파싱
-[FUNC csv-parse :params [$csv]
-  :body (let [[$lines (split $csv "\n")]]
-          (csv-parse-loop $lines 0 (list)))]
-[FUNC csv-parse-loop :params [$lines $i $acc]
-  :body (if (>= $i (length $lines)) $acc
-          (csv-parse-loop $lines (+ $i 1)
-            (append $acc (csv-parse-line (get $lines $i)))))]
-
-;; 문자열 반복
-[FUNC str-repeat :params [$s $n]
-  :body (if (<= $n 0) ""
-          (str-repeat-loop $s $n 0 ""))]
-[FUNC str-repeat-loop :params [$s $n $i $acc]
-  :body (if (>= $i $n) $acc
-          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
-
-;; JSON 헬퍼 (json.fl 기반)
-[FUNC data-json-parse :params [$s]
-  :body (json-parse $s)]
-
-[FUNC data-json-str :params [$obj]
-  :body (json-stringify $obj)]
-
-[FUNC data-json-pretty :params [$obj]
-  :body (json-stringify $obj)]
-
-;; 객체를 쿼리 문자열로 변환
-[FUNC to-query-string :params [$obj]
-  :body (to-query-loop (keys $obj) $obj 0 (list))]
-[FUNC to-query-loop :params [$ks $obj $i $acc]
-  :body (if (>= $i (length $ks)) (join $acc "&")
-          (let [[$k (get $ks $i)]
-                [$v (get $obj $k)]]
-            (to-query-loop $ks $obj (+ $i 1)
-              (append $acc (str $k "=" $v)))))]
-
-;; self/stdlib/hash.fl — Phase 26 Part 3
-;; 해시 함수
-
-[FUNC hash-simple :params [$s]
-  :body (hash-simple-loop (str $s) 0 5381 0)]
-[FUNC hash-simple-loop :params [$s $i $hash $max]
-  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
-          (hash-simple-loop $s (+ $i 1)
-            (+ (* $hash 33) (char-code-at $s $i)) (+ $i 1)))]
-
-[FUNC hash-fnv1a :params [$s]
-  :body (let [[$fnv-offset 2166136261]
-              [$fnv-prime 16777619]]
-          (hash-fnv-loop (str $s) 0 $fnv-offset))]
-[FUNC hash-fnv-loop :params [$s $i $hash]
-  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
-          (hash-fnv-loop $s (+ $i 1)
-            (* (bit-xor $hash (char-code-at $s $i)) 16777619)))]
-
-[FUNC hash-djb2 :params [$s]
-  :body (hash-djb-loop (str $s) 0 5381)]
-[FUNC hash-djb-loop :params [$s $i $hash]
-  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
-          (hash-djb-loop $s (+ $i 1)
-            (+ (* $hash 33) (char-code-at $s $i))))]
-
-[FUNC hash-object :params [$obj]
-  :body (hash-simple (json-stringify $obj))]
-
-[FUNC hash-consistent :params [$s $seed]
-  :body (let [[$h (hash-simple $s)]]
-          (% (+ (* $h $seed) $seed) 2147483647))]
-
-;; self/stdlib/time.fl — 시간 관련 stdlib (v12-candidate 호환)
-;;
-;; now-ms 는 prelude(JS runtime) 에서 이미 `const now_ms = () => Date.now()` 로
-;; 제공되므로 FL 에서 재정의하지 않는다. FL 코드에서 (now-ms) 호출 시
-;; codegen 이 `now_ms()` JS 로 번역 → prelude 정의로 해소됨.
-;; 재정의하면 `Identifier 'now_ms' has already been declared` SyntaxError.
-
-[FUNC now-s :params [] :body (floor (/ (now) 1000))]
-
-[FUNC time-diff-ms :params [$t1 $t2] :body (- $t2 $t1)]
-[FUNC time-elapsed :params [$start] :body (- (now) $start)]
-
-[FUNC date-parts :params [$ts]
-  :body {:ts $ts :s (floor (/ $ts 1000))
-         :m (floor (/ $ts 60000))
-         :h (floor (/ $ts 3600000))
-         :d (floor (/ $ts 86400000))}]
-
-[FUNC ts-to-s :params [$ts] :body (floor (/ $ts 1000))]
-[FUNC s-to-ts :params [$s] :body (* $s 1000)]
-
-[FUNC time-ago :params [$ts]
-  :body (let [[$diff (- (now) $ts)]
-              [$s (floor (/ $diff 1000))]
-              [$m (floor (/ $s 60))]
-              [$h (floor (/ $m 60))]
-              [$d (floor (/ $h 24))]]
-          (cond [(< $s 60) (str $s "s ago")]
-                [(< $m 60) (str $m "m ago")]
-                [(< $h 24) (str $h "h ago")]
-                [true (str $d "d ago")]))]
-
-;; self/stdlib/string.fl — Phase 08/87
-
-[FUNC str-starts-with? :params [$s $prefix]
-  :body (if (> (length $prefix) (length $s)) false
-          (= (substring $s 0 (length $prefix)) $prefix))]
-
-[FUNC str-ends-with? :params [$s $suffix]
-  :body (if (> (length $suffix) (length $s)) false
-          (= (substring $s (- (length $s) (length $suffix)) (length $s)) $suffix))]
-
-[FUNC str-repeat :params [$s $n] :body (str-repeat-loop $s $n "")]
-[FUNC str-repeat-loop :params [$s $n $acc]
-  :body (if (<= $n 0) $acc (str-repeat-loop $s (- $n 1) (str $acc $s)))]
-
-[FUNC str-pad-left :params [$s $n $pad]
-  :body (let [[$diff (- $n (length $s))]]
-          (if (<= $diff 0) $s (str (str-repeat $pad $diff) $s)))]
-
-[FUNC str-pad-right :params [$s $n $pad]
-  :body (let [[$diff (- $n (length $s))]]
-          (if (<= $diff 0) $s (str $s (str-repeat $pad $diff))))]
-
-;; self/stdlib/file.fl — Phase 27
-;; 파일 I/O 연산 (native file_* builtin wrapper)
-
-[FUNC file-read :params [$path]
-  :body (file_read (str $path))]
-
-[FUNC file-write :params [$path $content]
-  :body (file_write (str $path) (str $content))]
-
-[FUNC file-append :params [$path $content]
-  :body (file_append (str $path) (str $content))]
-
-[FUNC file-exists? :params [$path]
-  :body (file_exists (str $path))]
-
-[FUNC file-delete :params [$path]
-  :body (file_delete (str $path))]
-
-[FUNC file-copy :params [$src $dest]
-  :body (file_copy (str $src) (str $dest))]
-
-[FUNC file-rename :params [$old $new]
-  :body (file_rename (str $old) (str $new))]
-
-[FUNC file-size :params [$path]
-  :body (file_size (str $path))]
-
-[FUNC file-modified :params [$path]
-  :body (file_modified (str $path))]
-
-[FUNC file-json :params [$path]
-  :body (json-parse (file_read (str $path)))]
-
-[FUNC file-json-write :params [$path $obj]
-  :body (file_write (str $path) (json-stringify $obj))]
-
-[FUNC file-lines :params [$path]
-  :body (str-lines (file_read (str $path)))]
-
-[FUNC file-mkdir :params [$path]
-  :body (file_mkdir (str $path))]
-
-[FUNC file-rmdir :params [$path]
-  :body (file_rmdir (str $path))]
-
-[FUNC file-list :params [$path]
-  :body (file_list (str $path))]
-
-[FUNC file-is-file? :params [$path]
-  :body (file_is_file (str $path))]
-
-[FUNC file-is-dir? :params [$path]
-  :body (file_is_dir (str $path))]
-
-;; self/stdlib/process.fl — Phase 27
-;; 프로세스/쉘 연산 (native process_* builtin wrapper)
-
-[FUNC process-run :params [$cmd]
-  :body (process_run (str $cmd))]
-
-[FUNC process-run-args :params [$cmd $args]
-  :body (process_run_args (str $cmd) $args)]
-
-[FUNC process-exec :params [$cmd]
-  :body (process_exec (str $cmd))]
-
-[FUNC process-exec-args :params [$cmd $args]
-  :body (process_exec_args (str $cmd) $args)]
-
-[FUNC process-spawn :params [$cmd $args]
-  :body (process_spawn (str $cmd) $args)]
-
-[FUNC process-kill :params [$pid]
-  :body (process_kill (floor $pid))]
-
-[FUNC process-exists? :params [$pid]
-  :body (process_exists (floor $pid))]
-
-[FUNC process-wait :params [$pid]
-  :body (process_wait (floor $pid))]
-
-[FUNC shell-run :params [$cmd]
-  :body (process_exec (str $cmd))]
-
-[FUNC shell-pipe :params [$cmd1 $cmd2]
-  :body (process_exec (str $cmd1 " | " $cmd2))]
-
-[FUNC env-get :params [$key]
-  :body (env_get (str $key))]
-
-[FUNC env-set :params [$key $value]
-  :body (env_set (str $key) (str $value))]
-
-[FUNC env-all :params []
-  :body (env_all)]
-
-[FUNC getcwd :params [] :body (process_getcwd)]
-
-[FUNC chdir :params [$path]
-  :body (process_chdir (str $path))]
-
-[FUNC pid :params [] :body (process_pid)]
-
-[FUNC pid-parent :params [] :body (process_ppid)]
-
-;; self/main.fl — FL-to-JS Self-Hosted Compiler
-
-(println "\n═══════════════════════════════════════════")
-(println "  FL Self-Hosted Compiler (Phase 28)")
-(println "═══════════════════════════════════════════\n")
-
-(let [[$input (get __argv__ 0)] [$output (get __argv__ 1)]]
-  (if (or (null? $input) (null? $output))
-    (println "Usage: node bootstrap.js run self/main.fl <input.fl> <output.js>")
-    (let [[$src (file_read $input)]]
-      (let [[$tokens (lex $src)]]
-        (let [[$ast (parse $tokens)]]
-          (let [[$js (fl->js-with-prelude $ast)]]
-            (do
-              (println (str "📖 " $input " → " $output))
-              (println (str "   Lexed: " (length $tokens) " tokens"))
-              (println (str "   Parsed: " (length $ast) " nodes"))
-              (println (str "   Generated: " (length $js) " bytes"))
-              (file_write $output $js)
-              (println "✨ Success!"))))))))
-

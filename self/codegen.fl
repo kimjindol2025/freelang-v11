@@ -70,12 +70,20 @@
           [(= (get $n :kind) "literal") (cg-literal $n)]
           [(= (get $n :kind) "variable") (js-name (get $n :name))]
           [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
+          [(= (get $n :kind) "template-string") (cg-template-string $n)]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
           [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
           [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
           [true "null"])]
+
+[FUNC js-esc-for-template :params [$s]
+  :body (let [[$s1 (replace $s "\\" "\\\\")]]
+          (replace $s1 "`" "\`"))]
+
+[FUNC cg-template-string :params [$n]
+  :body (str "`" (js-esc-for-template (get $n :value)) "`")]
 
 [FUNC cg-literal-dispatch :params [$t $v]
   :body (cond

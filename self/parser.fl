@@ -46,13 +46,18 @@
 ;; 32 parseAtom — number/string/symbol/keyword/variable
 ;; ──────────────────────────────────────
 
+[FUNC string-contains? :params [$s $substr]
+  :body (not (= -1 (str-index-of $s $substr)))]
+
 [FUNC parse-atom :params [$p]
   :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$line (get $t :line)]]
           (cond
             [(= $k "Number")
              (r-pair (p-advance $p) (make-literal "number" $v $line))]
             [(= $k "String")
-             (r-pair (p-advance $p) (make-literal "string" $v $line))]
+             (if (string-contains? $v "${")
+               (r-pair (p-advance $p) (make-template-string $v (list) $line))
+               (r-pair (p-advance $p) (make-literal "string" $v $line)))]
             [(= $k "Symbol")
              (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
             [(= $k "Variable")

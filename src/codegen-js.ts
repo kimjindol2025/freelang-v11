@@ -1,7 +1,7 @@
 // FreeLang v9: Phase 85 — FL AST → JavaScript 코드 생성기
 // FL AST를 JavaScript 코드로 변환해 Node.js나 브라우저에서 실행 가능한 파일 생성
 
-import { ASTNode, Block, Literal, Variable, SExpr, Keyword } from "./ast";
+import { ASTNode, Block, Literal, TemplateString, Variable, SExpr, Keyword } from "./ast";
 
 export interface CodegenOptions {
   module: "commonjs" | "esm"; // 기본 "commonjs"
@@ -197,6 +197,8 @@ export class JSCodegen {
     switch (node.kind) {
       case "literal":
         return this.genLiteral(node);
+      case "template-string":
+        return this.genTemplateString(node);
       case "variable":
         return this.genVariable(node);
       case "sexpr":
@@ -229,6 +231,13 @@ export class JSCodegen {
       // number
       return String(node.value);
     }
+  }
+
+  private genTemplateString(node: any): string {
+    const value = node.value;
+    // Escape backticks and backslashes for JS template literal
+    const escaped = value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+    return `\`${escaped}\``;
   }
 
   private genVariable(node: Variable): string {

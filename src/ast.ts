@@ -3,6 +3,7 @@
 export type ASTNode =
   | Block
   | Literal
+  | TemplateString
   | Variable
   | SExpr
   | Keyword
@@ -45,6 +46,12 @@ export interface Literal {
   kind: "literal";
   type: "number" | "string" | "symbol" | "boolean" | "null";
   value: string | number | boolean | null;
+}
+
+// Template string with ${expr} placeholders
+export interface TemplateString {
+  kind: "template-string";
+  value: string;
 }
 
 // $varname
@@ -432,6 +439,10 @@ export interface ParserState {
 // Helpers
 export function makeLiteral(type: "number" | "string" | "symbol" | "boolean" | "null", value: any, line?: number): Literal {
   return { kind: "literal", type, value, line } as any;
+}
+
+export function makeTemplateString(value: string, line?: number): TemplateString {
+  return { kind: "template-string", value, line } as any;
 }
 
 export function makeVariable(name: string, line?: number): Variable {

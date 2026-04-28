@@ -319,6 +319,9 @@ var init_lexer = __esm({
 function makeLiteral(type, value, line) {
   return { kind: "literal", type, value, line };
 }
+function makeTemplateString(value, line) {
+  return { kind: "template-string", value, line };
+}
 function makeVariable(name, line) {
   return { kind: "variable", name, line };
 }
@@ -828,6 +831,9 @@ var init_parser = __esm({
         }
         if (this.check("String" /* String */)) {
           const token = this.advance();
+          if (token.value.includes("${")) {
+            return makeTemplateString(token.value);
+          }
           return makeLiteral("string", token.value);
         }
         if (this.check("Variable" /* Variable */)) {
@@ -24763,6 +24769,8 @@ ${exportsStr}
     switch (node.kind) {
       case "literal":
         return this.genLiteral(node);
+      case "template-string":
+        return this.genTemplateString(node);
       case "variable":
         return this.genVariable(node);
       case "sexpr":
@@ -24791,6 +24799,11 @@ ${exportsStr}
     } else {
       return String(node.value);
     }
+  }
+  genTemplateString(node) {
+    const value = node.value;
+    const escaped = value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+    return `\`${escaped}\``;
   }
   genVariable(node) {
     const cleanName = node.name.replace(/^\$/, "");
