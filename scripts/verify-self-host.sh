@@ -69,6 +69,26 @@ echo "=== 결정론 확인 (Phase C: 같은 입력 2회 compile → SHA 동일) 
 STAGE1B="$WORK/stage1b.js"
 sleep 1
 node --stack-size=8000 bootstrap.js run self/all.fl self/all.fl "$STAGE1B" > /dev/null 2>&1
+# STAGE1B도 중복 제거 (STAGE1과 동일 처리)
+node -e "
+const fs = require('fs');
+const file = process.argv[1];
+const content = fs.readFileSync(file, 'utf8');
+const lines = content.split('\n');
+const seen = new Set();
+const output = [];
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  const match = line.match(/^const ([a-z_][a-z0-9_]*) = /);
+  if (match) {
+    const funcName = match[1];
+    if (seen.has(funcName)) continue;
+    seen.add(funcName);
+  }
+  output.push(line);
+}
+fs.writeFileSync(file, output.join('\n'));
+" "$STAGE1B"
 DET_A=$(sha256sum "$STAGE1" | cut -c1-16)
 DET_B=$(sha256sum "$STAGE1B" | cut -c1-16)
 echo "   1st run sha: $DET_A"
