@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-04-28T14:27:14Z",
+  "timestamp": "2026-04-28T14:30:25Z",
   "pass": 2,
   "fail": 0,
-  "build1_seconds": 1,
+  "build1_seconds": 2,
   "build2_seconds": 1,
   "artifacts": [
     {"file": "bootstrap.js", "build1_sha256": "4b2c589ff454fdc22bd20c3eb277f558f65a8d3935f28ca8faa71fa014466e59", "build2_sha256": "4b2c589ff454fdc22bd20c3eb277f558f65a8d3935f28ca8faa71fa014466e59", "match": true},

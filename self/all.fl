@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-22 13:24:27
+; 2026-04-28 14:29:26
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -80,31 +80,27 @@
           (let [[$c (peek $st)]]
             (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
 
-[FUNC skip-ws-inner :params [$st $c]
-  :body (cond
-          [(is-space? $c) (skip-ws (advance $st))]
-          [(= $c ";") (skip-ws (skip-comment $st))]
-          [true $st])]
-
 [FUNC skip-ws :params [$st]
   :body (if (at-end? $st) $st
-          (skip-ws-inner $st (peek $st)))]
+          (let [[$c (peek $st)]]
+            (cond
+              [(is-space? $c) (skip-ws (advance $st))]
+              [(= $c ";") (skip-ws (skip-comment $st))]
+              [true $st])))]
 
 ;; ──────────────────────────────────────
 ;; 숫자 (정수/실수/음수)
 ;; ──────────────────────────────────────
 
-[FUNC read-number-body-inner :params [$st $acc $has-dot $line $col $c]
-  :body (cond
-          [(is-digit? $c)
-           (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
-          [(and (= $c ".") (not $has-dot))
-           (read-number-body (advance $st) (str $acc $c) true $line $col)]
-          [true (emit $st "Number" $acc $line $col)])]
-
 [FUNC read-number-body :params [$st $acc $has-dot $line $col]
   :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
-          (read-number-body-inner $st $acc $has-dot $line $col (peek $st)))]
+          (let [[$c (peek $st)]]
+            (cond
+              [(is-digit? $c)
+               (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
+              [(and (= $c ".") (not $has-dot))
+               (read-number-body (advance $st) (str $acc $c) true $line $col)]
+              [true (emit $st "Number" $acc $line $col)])))]
 
 [FUNC read-number :params [$st]
   :body (read-number-body $st "" false (get $st :line) (get $st :col))]
@@ -118,17 +114,15 @@
           [(= $c "n") "\n"] [(= $c "t") "\t"] [(= $c "r") "\r"]
           [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
 
-[FUNC read-string-body-inner :params [$st $acc $line $col $c]
-  :body (cond
-          [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
-          [(= $c "\\")
-           (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
-             (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
-          [true (read-string-body (advance $st) (str $acc $c) $line $col)])]
-
 [FUNC read-string-body :params [$st $acc $line $col]
   :body (if (at-end? $st) (emit $st "String" $acc $line $col)
-          (read-string-body-inner $st $acc $line $col (peek $st)))]
+          (let [[$c (peek $st)]]
+            (cond
+              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
+              [(= $c "\\")
+               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
+                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
+              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
 
 [FUNC read-string :params [$st]
   :body (let [[$line (get $st :line)] [$col (get $st :col)]
@@ -163,27 +157,25 @@
 ;; 토큰 하나 읽기
 ;; ──────────────────────────────────────
 
-[FUNC read-token-inner :params [$st1 $c $line $col]
-  :body (cond
-          [(= $c "(") (emit (advance $st1) "LParen"   $c $line $col)]
-          [(= $c ")") (emit (advance $st1) "RParen"   $c $line $col)]
-          [(= $c "[") (emit (advance $st1) "LBracket" $c $line $col)]
-          [(= $c "]") (emit (advance $st1) "RBracket" $c $line $col)]
-          [(= $c "{") (emit (advance $st1) "LBrace"   $c $line $col)]
-          [(= $c "}") (emit (advance $st1) "RBrace"   $c $line $col)]
-          [(= $c "\"") (read-string $st1)]
-          [(= $c "$") (read-variable $st1)]
-          [(= $c ":") (read-keyword $st1)]
-          [(is-digit? $c) (read-number $st1)]
-          [(and (= $c "-") (is-digit? (peek-at $st1 1)))
-           (read-number-body (advance $st1) "-" false $line $col)]
-          [(is-symbol-char? $c) (read-symbol $st1)]
-          [true (emit (advance $st1) "Unknown" $c $line $col)])]
-
 [FUNC read-token :params [$st]
   :body (let [[$st1 (skip-ws $st)]]
           (if (at-end? $st1) $st1
-            (read-token-inner $st1 (peek $st1) (get $st1 :line) (get $st1 :col))))]
+            (let [[$c (peek $st1)] [$line (get $st1 :line)] [$col (get $st1 :col)]]
+              (cond
+                [(= $c "(") (emit (advance $st1) "LParen"   $c $line $col)]
+                [(= $c ")") (emit (advance $st1) "RParen"   $c $line $col)]
+                [(= $c "[") (emit (advance $st1) "LBracket" $c $line $col)]
+                [(= $c "]") (emit (advance $st1) "RBracket" $c $line $col)]
+                [(= $c "{") (emit (advance $st1) "LBrace"   $c $line $col)]
+                [(= $c "}") (emit (advance $st1) "RBrace"   $c $line $col)]
+                [(= $c "\"") (read-string $st1)]
+                [(= $c "$") (read-variable $st1)]
+                [(= $c ":") (read-keyword $st1)]
+                [(is-digit? $c) (read-number $st1)]
+                [(and (= $c "-") (is-digit? (peek-at $st1 1)))
+                 (read-number-body (advance $st1) "-" false $line $col)]
+                [(is-symbol-char? $c) (read-symbol $st1)]
+                [true (emit (advance $st1) "Unknown" $c $line $col)]))))]
 
 ;; ──────────────────────────────────────
 ;; 메인 루프 — 모든 토큰 수집
@@ -196,6 +188,237 @@
             (lex-loop (read-token $st1))))]
 
 [FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+
+;; self/parser.fl — FL 로 작성된 Parser (Phase 03/31-45)
+;;
+;; 입력: tokens (lexer 출력)
+;; 출력: AST nodes (list of ast nodes)
+;;
+;; 모든 함수 [FUNC] 블록. 파서 상태 = {:tokens :idx}.
+;; node 생성자는 self/ast.fl 정의 재사용. 테스트 단독 실행 위해 여기에도 복제.
+
+;; ──────────────────────────────────────
+;; AST 생성자 (ast.fl 과 동일)
+;; ──────────────────────────────────────
+
+[FUNC make-literal :params [$type $value $line]
+  :body {:kind "literal" :type $type :value $value :line $line}]
+
+[FUNC make-variable :params [$name $line]
+  :body {:kind "variable" :name $name :line $line}]
+
+[FUNC make-keyword :params [$name $line]
+  :body {:kind "keyword" :name $name :line $line}]
+
+[FUNC make-sexpr :params [$op $args $line]
+  :body {:kind "sexpr" :op $op :args $args :line $line}]
+
+[FUNC make-array-block :params [$items $line]
+  :body {:kind "block" :type "Array" :name null
+         :fields {:items $items} :line $line}]
+
+[FUNC make-map-block :params [$items $line]
+  :body {:kind "block" :type "Map" :name null
+         :fields {:items $items} :line $line}]
+
+[FUNC make-block :params [$type $name $fields $line]
+  :body {:kind "block" :type $type :name $name :fields $fields :line $line}]
+
+;; ──────────────────────────────────────
+;; 31 파서 상태 + peek/advance/expect
+;; ──────────────────────────────────────
+
+[FUNC p-make :params [$tokens]
+  :body {:tokens $tokens :idx 0 :ast []}]
+
+[FUNC p-peek :params [$p]
+  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
+          (if (>= $i (length $t)) null (get $t $i)))]
+
+[FUNC p-peek-at :params [$p $offset]
+  :body (let [[$i (+ (get $p :idx) $offset)] [$t (get $p :tokens)]]
+          (if (>= $i (length $t)) null (get $t $i)))]
+
+[FUNC p-end? :params [$p]
+  :body (>= (get $p :idx) (length (get $p :tokens)))]
+
+[FUNC p-advance :params [$p]
+  :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1) :ast (get $p :ast)}]
+
+[FUNC p-with-ast :params [$p $ast]
+  :body {:tokens (get $p :tokens) :idx (get $p :idx) :ast $ast}]
+
+[FUNC p-append-ast :params [$p $node]
+  :body (p-with-ast $p (append (get $p :ast) (list $node)))]
+
+;; 2-tuple 반환용 map {:p p' :node n}
+[FUNC r-pair :params [$p $node]
+  :body {:p $p :node $node}]
+
+;; ──────────────────────────────────────
+;; 32 parseAtom — number/string/symbol/keyword/variable
+;; ──────────────────────────────────────
+
+[FUNC parse-atom :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$line (get $t :line)]]
+          (cond
+            [(= $k "Number")
+             (r-pair (p-advance $p) (make-literal "number" $v $line))]
+            [(= $k "String")
+             (r-pair (p-advance $p) (make-literal "string" $v $line))]
+            [(= $k "Symbol")
+             (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
+            [(= $k "Variable")
+             (r-pair (p-advance $p) (make-variable $v $line))]
+            [(= $k "Keyword")
+             (r-pair (p-advance $p) (make-keyword $v $line))]
+            [true (r-pair (p-advance $p) (make-literal "unknown" $v $line))]))]
+
+;; ──────────────────────────────────────
+;; 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
+;; ──────────────────────────────────────
+
+[FUNC parse-expr :params [$p]
+  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+          (cond
+            [(= $k "LParen")   (parse-sexpr $p)]
+            [(= $k "LBracket") (parse-bracket $p)]
+            [(= $k "LBrace")   (parse-map $p)]
+            [true (parse-atom $p)]))]
+
+;; ──────────────────────────────────────
+;; 33 parse-sexpr (parens)
+;; ──────────────────────────────────────
+
+[FUNC parse-sexpr :params [$p]
+  :body (let [[$start-tok (p-peek $p)] [$line (get $start-tok :line)]
+              [$p1 (p-advance $p)]                          ;; consume (
+              [$first (parse-args $p1 [])]                  ;; collect until )
+              [$p2 (get $first :p)] [$args (get $first :node)]]
+          (if (= (length $args) 0)
+            (r-pair (parse-consume-rparen $p2) (make-sexpr "" (list) $line))
+            (let [[$op-node (get $args 0)]
+                  [$op (if (= (get $op-node :kind) "literal")
+                         (get $op-node :value)
+                         (if (= (get $op-node :kind) "variable")
+                           (str "$" (get $op-node :name))
+                           "unknown"))]
+                  [$rest (slice $args 1 (length $args))]]
+              (r-pair (parse-consume-rparen $p2)
+                      (make-sexpr $op $rest $line)))))]
+
+[FUNC parse-consume-rparen :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t)) (= (get $t :kind) "RParen"))
+            (p-advance $p)
+            $p))]
+
+;; args 수집 (재귀): RParen 만나면 중단
+[FUNC parse-args :params [$p $acc]
+  :body (let [[$t (p-peek $p)]]
+          (cond
+            [(null? $t)                              (r-pair $p $acc)]
+            [(= (get $t :kind) "RParen")             (r-pair $p $acc)]
+            [(= (get $t :kind) "RBracket")           (r-pair $p $acc)]
+            [(= (get $t :kind) "RBrace")             (r-pair $p $acc)]
+            [true
+             (let [[$one (parse-expr $p)]]
+               (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+
+;; ──────────────────────────────────────
+;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
+;; ──────────────────────────────────────
+
+[FUNC parse-bracket :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
+              [$p1 (p-advance $p)]                ;; consume [
+              [$next (p-peek $p1)]]
+          (if (and (not (null? $next))
+                   (= (get $next :kind) "Symbol")
+                   (is-block-type? (get $next :value))
+                   (= (get $next :value) (upper-case (get $next :value))))
+            (parse-named-block $p1 $line)
+            (parse-array $p1 $line)))]
+
+[FUNC is-block-type? :params [$s]
+  :body (let [[$c (char-at $s 0)]]
+          (and (>= $c "A") (<= $c "Z")))]
+
+[FUNC upper-case :params [$s] :body $s]   ;; FL stdlib 기본 upper-case 가 없으면 identity. 판별엔 첫글자만 본다.
+
+[FUNC parse-array :params [$p $line]
+  :body (let [[$collected (parse-args $p [])]
+              [$p2 (get $collected :p)] [$items (get $collected :node)]]
+          (r-pair (parse-consume-rbracket $p2) (make-array-block $items $line)))]
+
+[FUNC parse-consume-rbracket :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t)) (= (get $t :kind) "RBracket"))
+            (p-advance $p)
+            $p))]
+
+;; [TYPE name? :k v :k v ...]  Named block (FUNC/ROUTE/PAGE 등)
+[FUNC parse-named-block :params [$p $line]
+  :body (let [[$type-tok (p-peek $p)] [$type (get $type-tok :value)]
+              [$p1 (p-advance $p)]
+              [$name-info (parse-optional-name $p1)]
+              [$p2 (get $name-info :p)] [$name (get $name-info :node)]
+              [$fields-info (parse-block-fields $p2 {})]
+              [$p3 (get $fields-info :p)] [$fields (get $fields-info :node)]]
+          (r-pair (parse-consume-rbracket $p3)
+                  (make-block $type $name $fields $line)))]
+
+[FUNC parse-optional-name :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t))
+                   (= (get $t :kind) "Symbol")
+                   (not (= (char-at (get $t :value) 0) ":")))
+            (r-pair (p-advance $p) (get $t :value))
+            (r-pair $p null)))]
+
+;; :k v :k v ... 반복. RBracket 만나면 중단.
+[FUNC parse-block-fields :params [$p $acc]
+  :body (let [[$t (p-peek $p)]]
+          (cond
+            [(null? $t) (r-pair $p $acc)]
+            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
+            [(= (get $t :kind) "Keyword")
+             (let [[$key (get $t :value)]
+                   [$p1 (p-advance $p)]
+                   [$val (parse-expr $p1)]
+                   [$p2 (get $val :p)] [$v (get $val :node)]]
+               (parse-block-fields $p2 (json_set $acc $key $v)))]
+            [true (r-pair (p-advance $p) $acc)]))]
+
+;; ──────────────────────────────────────
+;; 35 parse-map — {:k v :k v ...}
+;; ──────────────────────────────────────
+
+[FUNC parse-map :params [$p]
+  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
+              [$p1 (p-advance $p)]
+              [$collected (parse-args $p1 [])]
+              [$p2 (get $collected :p)] [$items (get $collected :node)]]
+          (r-pair (parse-consume-rbrace $p2) (make-map-block $items $line)))]
+
+[FUNC parse-consume-rbrace :params [$p]
+  :body (let [[$t (p-peek $p)]]
+          (if (and (not (null? $t)) (= (get $t :kind) "RBrace"))
+            (p-advance $p)
+            $p))]
+
+;; ──────────────────────────────────────
+;; 40/44 공개 API: parse(tokens) → ast list
+;; ──────────────────────────────────────
+
+[FUNC parse-all :params [$p]
+  :body (if (p-end? $p)
+          (get $p :ast)
+          (let [[$one (parse-expr $p)]
+                [$p2 (p-append-ast (get $one :p) (get $one :node))]]
+            (parse-all $p2)))]
+
+[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
 
 ;; self/ast.fl — AST 노드 생성자 (Phase 02/21-30)
 ;;
@@ -411,222 +634,6 @@
 ;; NOTE: list?/map? 의 robust 한 구현은 FL 런타임 지원 필요 (Phase 07 builtins/type 에서 교체).
 ;; 현재는 AST 비교에 사용될 때만 동작하는 placeholder.
 
-;; self/parser.fl — FL 로 작성된 Parser (Phase 03/31-45)
-;;
-;; 입력: tokens (lexer 출력)
-;; 출력: AST nodes (list of ast nodes)
-;;
-;; 모든 함수 [FUNC] 블록. 파서 상태 = {:tokens :idx}.
-;; node 생성자는 self/ast.fl 정의 재사용. 테스트 단독 실행 위해 여기에도 복제.
-
-
-;; ──────────────────────────────────────
-;; 31 파서 상태 + peek/advance/expect
-;; ──────────────────────────────────────
-
-[FUNC p-make :params [$tokens]
-  :body {:tokens $tokens :idx 0 :ast []}]
-
-[FUNC p-peek :params [$p]
-  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
-          (if (>= $i (length $t)) null (get $t $i)))]
-
-[FUNC p-peek-at :params [$p $offset]
-  :body (let [[$i (+ (get $p :idx) $offset)] [$t (get $p :tokens)]]
-          (if (>= $i (length $t)) null (get $t $i)))]
-
-[FUNC p-end? :params [$p]
-  :body (>= (get $p :idx) (length (get $p :tokens)))]
-
-[FUNC p-advance :params [$p]
-  :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1) :ast (get $p :ast)}]
-
-[FUNC p-with-ast :params [$p $ast]
-  :body {:tokens (get $p :tokens) :idx (get $p :idx) :ast $ast}]
-
-[FUNC p-append-ast :params [$p $node]
-  :body (p-with-ast $p (append (get $p :ast) (list $node)))]
-
-;; 2-tuple 반환용 map {:p p' :node n}
-[FUNC r-pair :params [$p $node]
-  :body {:p $p :node $node}]
-
-;; ──────────────────────────────────────
-;; 32 parseAtom — number/string/symbol/keyword/variable
-;; ──────────────────────────────────────
-
-[FUNC parse-atom-dispatch :params [$p $k $v $line]
-  :body (cond
-          [(= $k "Number")
-           (r-pair (p-advance $p) (make-literal "number" $v $line))]
-          [(= $k "String")
-           (r-pair (p-advance $p) (make-literal "string" $v $line))]
-          [(= $k "Symbol")
-           (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
-          [(= $k "Variable")
-           (r-pair (p-advance $p) (make-variable $v $line))]
-          [(= $k "Keyword")
-           (r-pair (p-advance $p) (make-keyword $v $line))]
-          [true (r-pair (p-advance $p) (make-literal "unknown" $v $line))])]
-
-[FUNC parse-atom :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (parse-atom-dispatch $p (get $t :kind) (get $t :value) (get $t :line)))]
-
-;; ──────────────────────────────────────
-;; 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
-;; ──────────────────────────────────────
-
-[FUNC parse-expr-dispatch :params [$p $k]
-  :body (cond
-          [(= $k "LParen")   (parse-sexpr $p)]
-          [(= $k "LBracket") (parse-bracket $p)]
-          [(= $k "LBrace")   (parse-map $p)]
-          [true (parse-atom $p)])]
-
-[FUNC parse-expr :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (parse-expr-dispatch $p (get $t :kind)))]
-
-;; ──────────────────────────────────────
-;; 33 parse-sexpr (parens)
-;; ──────────────────────────────────────
-
-[FUNC parse-sexpr :params [$p]
-  :body (let [[$start-tok (p-peek $p)] [$line (get $start-tok :line)]
-              [$p1 (p-advance $p)]                          ;; consume (
-              [$first (parse-args $p1 [])]                  ;; collect until )
-              [$p2 (get $first :p)] [$args (get $first :node)]]
-          (if (= (length $args) 0)
-            (r-pair (parse-consume-rparen $p2) (make-sexpr "" (list) $line))
-            (let [[$op-node (get $args 0)]
-                  [$op (if (= (get $op-node :kind) "literal")
-                         (get $op-node :value)
-                         (if (= (get $op-node :kind) "variable")
-                           (str "$" (get $op-node :name))
-                           "unknown"))]
-                  [$rest (slice $args 1 (length $args))]]
-              (r-pair (parse-consume-rparen $p2)
-                      (make-sexpr $op $rest $line)))))]
-
-[FUNC parse-consume-rparen :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RParen"))
-            (p-advance $p)
-            $p))]
-
-;; args 수집 (재귀): RParen 만나면 중단
-[FUNC parse-args-dispatch :params [$p $acc $t $k]
-  :body (cond
-          [(null? $t)        (r-pair $p $acc)]
-          [(= $k "RParen")   (r-pair $p $acc)]
-          [(= $k "RBracket") (r-pair $p $acc)]
-          [(= $k "RBrace")   (r-pair $p $acc)]
-          [true
-           (let [[$one (parse-expr $p)]]
-             (parse-args (get $one :p) (append $acc (list (get $one :node)))))])]
-
-[FUNC parse-args :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
-          (parse-args-dispatch $p $acc $t (if (null? $t) null (get $t :kind))))]
-
-;; ──────────────────────────────────────
-;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
-;; ──────────────────────────────────────
-
-[FUNC parse-bracket :params [$p]
-  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
-              [$p1 (p-advance $p)]                ;; consume [
-              [$next (p-peek $p1)]]
-          (if (and (not (null? $next))
-                   (= (get $next :kind) "Symbol")
-                   (is-block-type? (get $next :value))
-                   (= (get $next :value) (upper-case (get $next :value))))
-            (parse-named-block $p1 $line)
-            (parse-array $p1 $line)))]
-
-[FUNC is-block-type? :params [$s]
-  :body (let [[$c (char-at $s 0)]]
-          (and (>= $c "A") (<= $c "Z")))]
-
-[FUNC upper-case :params [$s] :body $s]   ;; FL stdlib 기본 upper-case 가 없으면 identity. 판별엔 첫글자만 본다.
-
-[FUNC parse-array :params [$p $line]
-  :body (let [[$collected (parse-args $p [])]
-              [$p2 (get $collected :p)] [$items (get $collected :node)]]
-          (r-pair (parse-consume-rbracket $p2) (make-array-block $items $line)))]
-
-[FUNC parse-consume-rbracket :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RBracket"))
-            (p-advance $p)
-            $p))]
-
-;; [TYPE name? :k v :k v ...]  Named block (FUNC/ROUTE/PAGE 등)
-[FUNC parse-named-block :params [$p $line]
-  :body (let [[$type-tok (p-peek $p)] [$type (get $type-tok :value)]
-              [$p1 (p-advance $p)]
-              [$name-info (parse-optional-name $p1)]
-              [$p2 (get $name-info :p)] [$name (get $name-info :node)]
-              [$fields-info (parse-block-fields $p2 {})]
-              [$p3 (get $fields-info :p)] [$fields (get $fields-info :node)]]
-          (r-pair (parse-consume-rbracket $p3)
-                  (make-block $type $name $fields $line)))]
-
-[FUNC parse-optional-name :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t))
-                   (= (get $t :kind) "Symbol")
-                   (not (= (char-at (get $t :value) 0) ":")))
-            (r-pair (p-advance $p) (get $t :value))
-            (r-pair $p null)))]
-
-;; :k v :k v ... 반복. RBracket 만나면 중단.
-[FUNC parse-block-fields-dispatch :params [$p $acc $t $k]
-  :body (cond
-          [(null? $t) (r-pair $p $acc)]
-          [(= $k "RBracket") (r-pair $p $acc)]
-          [(= $k "Keyword")
-           (let [[$key (get $t :value)]
-                 [$p1 (p-advance $p)]
-                 [$val (parse-expr $p1)]
-                 [$p2 (get $val :p)] [$v (get $val :node)]]
-             (parse-block-fields $p2 (json_set $acc $key $v)))]
-          [true (r-pair (p-advance $p) $acc)])]
-
-[FUNC parse-block-fields :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
-          (parse-block-fields-dispatch $p $acc $t (if (null? $t) null (get $t :kind))))]
-
-;; ──────────────────────────────────────
-;; 35 parse-map — {:k v :k v ...}
-;; ──────────────────────────────────────
-
-[FUNC parse-map :params [$p]
-  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
-              [$p1 (p-advance $p)]
-              [$collected (parse-args $p1 [])]
-              [$p2 (get $collected :p)] [$items (get $collected :node)]]
-          (r-pair (parse-consume-rbrace $p2) (make-map-block $items $line)))]
-
-[FUNC parse-consume-rbrace :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RBrace"))
-            (p-advance $p)
-            $p))]
-
-;; ──────────────────────────────────────
-;; 40/44 공개 API: parse(tokens) → ast list
-;; ──────────────────────────────────────
-
-[FUNC parse-all :params [$p]
-  :body (if (p-end? $p)
-          (get $p :ast)
-          (let [[$one (parse-expr $p)]
-                [$p2 (p-append-ast (get $one :p) (get $one :node))]]
-            (parse-all $p2)))]
-
-[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
 ;; self/codegen.fl — FL AST → JS source (v2, Phase 10 확장)
 ;;
 ;; 새로 추가:
@@ -653,6 +660,15 @@
 
 [FUNC js-esc :params [$s]
   :body (str "\"" (js-esc-inner $s) "\"")]
+
+;; FL 예약 특수폼 (defn에서 검증)
+[FUNC fl-reserved? :params [$n]
+  :body (or (= $n "loop") (= $n "recur") (= $n "fn") (= $n "defn") (= $n "defun")
+            (= $n "if") (= $n "cond") (= $n "do") (= $n "begin") (= $n "progn")
+            (= $n "while") (= $n "and") (= $n "or") (= $n "let") (= $n "set!")
+            (= $n "define") (= $n "async") (= $n "await") (= $n "try")
+            (= $n "catch") (= $n "finally") (= $n "throw") (= $n "quote")
+            (= $n "compose") (= $n "pipe") (= $n "->") (= $n "->>") (= $n "|>"))]
 
 ;; JS 예약어 회피: let/const/default/class/etc → 뒤에 _ 추가
 [FUNC js-reserved? :params [$n]
@@ -800,8 +816,9 @@
 [FUNC cg-defn :params [$args]
   :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
               [$name (extract-name $name-n)]
-              [$ps (extract-params (get (get $pnode :fields) "items"))]]
-          (str "const " $name " = (" $ps ")=>" (cg $body)))]
+              [$ps (extract-params (get (get $pnode :fields) "items"))]
+              [$warning (if (fl-reserved? $name) (str "// ⚠️  RESERVED NAME: " $name) "")]]
+          (str $warning (if (fl-reserved? $name) "\n" "") "const " $name " = (" $ps ")=>" (cg $body)))]
 
 [FUNC cg-define :params [$args]
   :body (if (= (length $args) 2)
@@ -833,9 +850,14 @@
       [(= $kind "variable")
        (str "let " (js-name (get $pat-node :name)) "=" $val-js ";")]
       [(and (= $kind "block") (= $type "Map"))
-       ;; bootstrap Map: map-entries로 [[k,v],...] 변환 후 처리
-       (let [[$entries (map-entries (get $pat-node :fields))]]
-         (str "let " $tmpvar "=" $val-js ";" (cg-let-binding-loop $entries 0 "" $tmpvar)))]
+       ;; Map 패턴: 필드들을 순회하며 바인딩 생성
+       ;; $val-js와 $tmpvar이 같으면 (배열에서 추출됨) 다시 선언하지 않음
+       (let [[$pat-fields (get $pat-node :fields)]
+             [$pat-entries (map-entries $pat-fields)]
+             [$pat-bindings (cg-map-pattern-bindings-from-entries $pat-entries $tmpvar 0 "")]]
+         (str
+           (if (= $val-js $tmpvar) "" (str "let " $tmpvar "=" $val-js ";"))
+           $pat-bindings))]
       [(and (= $kind "block") (= $type "Array"))
        ;; array pattern: 배열 값에서 첫 항목을 추출해서 패턴과 매칭
        (let [[$items (get (get $pat-node :fields) "items")]
@@ -846,24 +868,6 @@
              (cg-let-binding $first-pat $tmpvar $tmpvar-next))))]
       [true
        (str "let " (extract-name $pat-node) "=" $val-js ";")]))]
-
-[FUNC cg-let-binding-loop :params [$entries $i $acc $v]
-  :body (if (>= $i (length $entries)) $acc
-          (let [[$e (get $entries $i)]
-                [$k (get $e 0)]
-                [$pat (get $e 1)]
-                [$k-clean (if (starts-with? $k ":") (substring $k 1) $k)]
-                [$access (str $v "[" (js-esc $k-clean) "]")]
-                [$pat-kind (get $pat :kind)]
-                [$bind-code (cond
-                  [(= $pat-kind "variable")
-                   (str "let " (js-name (get $pat :name)) "=" $access ";")]
-                  [(= $pat-kind "block")
-                   (let [[$v_next (str $v "_" $i)]]
-                     (str "let " $v_next "=" $access ";" (cg-let-binding-loop (map-entries (get $pat :fields)) 0 "" $v_next)))]
-                  [true ""])]
-                [$bind (if (= (length $bind-code) 0) "" $bind-code)]]
-            (cg-let-binding-loop $entries (+ $i 1) (str $acc $bind) $v)))]
 
 [FUNC cg-let-1d :params [$items $i $acc $counter]
   :body (if (>= $i (length $items)) $acc
@@ -1028,78 +1032,6 @@
 ;;     return <default>;
 ;;   })(value)
 
-;; Pattern node constructors
-[FUNC make-wildcard-pattern :params [] :body {:kind "wildcard-pattern"}]
-[FUNC make-variable-pattern :params [$name] :body {:kind "variable-pattern" :name $name}]
-[FUNC make-literal-pattern :params [$type $value] :body {:kind "literal-pattern" :type $type :value $value}]
-[FUNC make-struct-pattern :params [$fields] :body {:kind "struct-pattern" :fields $fields}]
-
-;; map-items-from-fields: Bootstrap Map 또는 self-parser items를 items array로 정규화
-[FUNC map-items-from-fields :params [$fields]
-  :body (map-items-from-fields-dispatch (get $fields "items") $fields)]
-
-[FUNC map-items-from-fields-dispatch :params [$items-val $fields]
-  :body (if (array? $items-val)
-    ;; self-parser format: items is already [kw-node val-node ...]
-    $items-val
-    ;; bootstrap format: fields is JS Map
-    ;; map-entries returns [[k,v], [k,v], ...], convert to [kw-node val-node ...]
-    (flatten-map-entries (map-entries $fields) 0 []))]
-
-;; flatten-map-entries: [[k,v], [k,v], ...] → [kw-node val-node kw-node val-node ...]
-[FUNC flatten-map-entries :params [$entries $i $acc]
-  :body (if (or (null? $entries) (>= $i (length $entries))) $acc
-    (let [[$e (get $entries $i)]]
-      (if (null? $e)
-        $acc
-        (let [[$k (get $e 0)]
-              [$v (get $e 1)]
-              [$kw-node {:kind "keyword" :name $k}]]
-          (flatten-map-entries $entries (+ $i 1) (append $acc [$kw-node $v]))))))]
-
-;; node-to-pattern: AST node를 pattern node로 변환
-[FUNC node-to-pattern :params [$node]
-  :body (let [[$kind (get $node :kind)]]
-    (cond
-    [(= $kind "variable")
-     (let [[$name (get $node :name)]]
-       (if (starts-with? $name "$")
-         (make-variable-pattern (substring $name 1))
-         (if (= $name "_")
-           (make-wildcard-pattern)
-           (make-variable-pattern $name))))]
-    [(= $kind "literal")
-     (make-literal-pattern (get $node :type) (get $node :value))]
-    [(= $kind "block")
-     (if (= (get $node :type) "Map")
-       (let [[$fields (get $node :fields)]
-             [$items (map-items-from-fields $fields)]]
-         ;; Log: 어떤 필드가 추출되었나?
-         (if (and false (= (length $items) 0))
-           (println (str "DEBUG: Empty fields from Map node")))
-         (make-struct-pattern (map-items-to-fields $items 0 [])))
-       (make-wildcard-pattern))]
-    [true (make-wildcard-pattern)]))]
-
-;; map-items-to-fields: map literal items를 struct-pattern fields로 변환
-[FUNC map-items-to-fields :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-    (let [[$key-node (get $items $i)]
-          [$val-node (if (< (+ $i 1) (length $items)) (get $items (+ $i 1)) nil)]
-          [$debug-kind (if (null? $key-node) "null" (get $key-node :kind))]
-          [$key (if (= $debug-kind "keyword")
-                  (let [[$kn (get $key-node :name)]]
-                    (if (string? $kn)
-                      (if (starts-with? $kn ":")
-                        (substring $kn 1 (length $kn))
-                        $kn)
-                      $kn))
-                  (if (null? $key-node) "null" (str (get $key-node :value))))]]
-      (if (null? $val-node)
-        $acc
-        (let [[$pat (node-to-pattern $val-node)]]
-          (map-items-to-fields $items (+ $i 2) (append $acc [[$key $pat]]))))))]
-
 [FUNC cg-match :params [$n]
   :body (let [[$val (cg (get $n :value))]
               [$cases (get $n :cases)]
@@ -1107,29 +1039,6 @@
               [$default (if (null? $default-n) "null" (cg $default-n))]
               [$cases-js (match-cases-loop $cases 0 "")]]
           (str "((__v)=>{" $cases-js "return " $default ";})(" $val ")"))]
-
-;; cg-match-sexpr: (match value (pat1 body1) (pat2 body2) ...) → pattern-match node → cg-match
-[FUNC cg-match-sexpr :params [$args]
-  :body (if (< (length $args) 1)
-    "null"
-    (let [[$value (get $args 0)]
-          [$cases-raw (slice $args 1 (length $args))]
-          [$cases (sexpr-cases-to-match-cases $cases-raw 0 [])]]
-      (cg (make-pattern-match $value $cases nil))))]
-
-;; sexpr-cases-to-match-cases: sexpr case nodes를 match-case nodes로 변환
-[FUNC sexpr-cases-to-match-cases :params [$cases $i $acc]
-  :body (if (>= $i (length $cases)) $acc
-    (let [[$c (get $cases $i)]
-          [$is-sexpr (= (get $c :kind) "sexpr")]
-          [$pat-node (if $is-sexpr
-                      (node-to-pattern (get (get $c :args) 0))  ;; sexpr: first arg is pattern
-                      (node-to-pattern (get (get (get $c :fields) :items) 0)))]  ;; array: first item
-          [$body (if $is-sexpr
-                  (get (get $c :args) 1)  ;; sexpr: second arg is body
-                  (get (get (get $c :fields) :items) 1))]  ;; array: second item
-          [$match-case (make-match-case $pat-node nil $body)]]
-      (sexpr-cases-to-match-cases $cases (+ $i 1) (append $acc [$match-case]))))]
 
 ;; 각 case: if (pattern-test) { bindings; if (guard) { return body; } }
 ;;   guard 가 binding 변수를 참조할 수 있어 bindings 를 먼저 실행
@@ -1159,8 +1068,7 @@
           [(= $k "range-pattern")
            (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
           [(= $k "struct-pattern")
-           (str "(" $v "!==null&&typeof " $v "===\"object\"&&"
-             (struct-pattern-test (get $pat :fields) $v 0 "") ")")]
+           (struct-pattern-test (get $pat :fields) $v 0 nil "")]
           [true "false"])]
 
 [FUNC pattern-test :params [$pat $v]
@@ -1180,27 +1088,22 @@
             (or-pattern-test $pats $v (+ $i 1)
               (if (= (length $acc) 0) $t (str $acc "||" $t))))) ]
 
-;; struct-pattern-test: test object fields, 필드별로 &&로 연결
-[FUNC struct-pattern-test :params [$fields $v $i $acc]
-  :body (if (>= $i (length $fields))
-    (if (= (length $acc) 0) "true" $acc)
-    (let [[$pair (get $fields $i)]
-          [$key (get $pair 0)]
-          [$pat (get $pair 1)]
-          [$k-clean (if (starts-with? $key ":") (substring $key 1) $key)]
-          [$t (pattern-test $pat (str $v "[" (js-esc $k-clean) "]"))]]
-      (struct-pattern-test $fields $v (+ $i 1)
-        (if (= (length $acc) 0) $t (str $acc "&&" $t)))))]
-
-;; struct-pattern-bindings: bind pattern variables from object fields
-[FUNC struct-pattern-bindings :params [$fields $v $i $acc]
-  :body (if (>= $i (length $fields)) $acc
-    (let [[$pair (get $fields $i)]
-          [$key (get $pair 0)]
-          [$pat (get $pair 1)]
-          [$k-clean (if (starts-with? $key ":") (substring $key 1) $key)]
-          [$bind (pattern-bindings $pat (str $v "[" (js-esc $k-clean) "]"))]]
-      (struct-pattern-bindings $fields $v (+ $i 1) (str $acc $bind))))]
+;; struct-pattern-test: Test all fields match
+;; fields는 {key: pattern, ...} 형태의 객체
+[FUNC struct-pattern-test :params [$fields $v $i $keys $acc]
+  :body (if (nil? $keys)
+          (let [[$ks (json_keys $fields)]]
+            (struct-pattern-test $fields $v 0 $ks ""))
+          (if (>= $i (length $keys))
+            (if (= (length $acc) 0)
+              (str "(" $v "!==null&&typeof " $v "===\"object\")")
+              (str "(" $v "!==null&&typeof " $v "===\"object\"&&" $acc ")"))
+            (let [[$k (get $keys $i)]
+                  [$pat (get $fields $k)]
+                  [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                  [$t (pattern-test $pat (str $v "[" (js-esc $k-clean) "]"))]]
+              (struct-pattern-test $fields $v (+ $i 1) $keys
+                (if (= (length $acc) 0) $t (str $acc "&&" $t))))))]
 
 ;; pattern-bindings: JS statement that binds pattern variables from __v
 [FUNC pattern-bindings-dispatch :params [$k $pat $v]
@@ -1208,8 +1111,60 @@
           [(or (= $k "variable-pattern") (= $k "variable"))
            (str "let " (js-name (get $pat :name)) "=" $v ";")]
           [(or (= $k "struct-pattern") (= $k "block"))
-           (struct-pattern-bindings (get $pat :fields) $v 0 "")]
+           (struct-pattern-bindings (get $pat :fields) $v 0 nil "")]
           [true ""])]
+
+;; bootstrap Map 지원: map-entries 호출해서 [[k,v], ...] 형태로 변환
+[FUNC struct-pattern-bindings-from-entries :params [$entries $v $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (let [[$e (get $entries $i)]
+                [$k (get $e 0)]
+                [$pat (get $e 1)]
+                [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                [$access (str $v "[" (js-esc $k-clean) "]")]
+                [$pat-kind (get $pat :kind)]
+                [$binding (cond
+                  [(= $pat-kind "variable")
+                   (str "let " (js-name (get $pat :name)) "=" $access ";")]
+                  [(= $pat-kind "block")
+                   (let [[$v_next (str $v "_" $i)]]
+                     (str "let " $v_next "=" $access ";" (struct-pattern-bindings-from-entries (map-entries (get $pat :fields)) $v_next 0 "")))]
+                  [true ""])]
+                [$binding (if (= (length $binding) 0) "" $binding)]]
+            (struct-pattern-bindings-from-entries $entries $v (+ $i 1)
+              (str $acc $binding))))]
+
+;; cg-map-pattern-bindings-from-entries: entries 형태의 패턴 필드들을 처리
+[FUNC cg-map-pattern-bindings-from-entries :params [$entries $v $i $acc]
+  :body (if (>= $i (length $entries)) $acc
+          (let [[$e (get $entries $i)]
+                [$k (get $e 0)]
+                [$pat (get $e 1)]
+                [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                [$access (str $v "[" (js-esc $k-clean) "]")]
+                [$binding (pattern-bindings-dispatch (get $pat :kind) $pat $access)]]
+            (cg-map-pattern-bindings-from-entries $entries $v (+ $i 1)
+              (str $acc $binding))))]
+
+;; struct-pattern-bindings: Collect bindings from all fields
+;; bootstrap parser: fields = Map{...} → map-entries로 변환
+;; self-parser: fields = plain obj {field: pattern, ...} → json_keys로 처리
+[FUNC struct-pattern-bindings :params [$fields $v $i $keys $acc]
+  :body (if (nil? $keys)
+          (let [[$ks (json_keys $fields)]]
+            (if (empty? $ks)
+              ;; Map인 경우: json_keys가 빈 배열 반환 → map-entries 사용
+              (struct-pattern-bindings-from-entries (map-entries $fields) $v 0 "")
+              ;; plain object인 경우: json_keys로 계속 진행
+              (struct-pattern-bindings $fields $v 0 $ks "")))
+          (if (>= $i (length $keys))
+            $acc
+            (let [[$k (get $keys $i)]
+                  [$pat (get $fields $k)]
+                  [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
+                  [$field-bindings (pattern-bindings $pat (str $v "[" (js-esc $k-clean) "]"))]]
+              (struct-pattern-bindings $fields $v (+ $i 1) $keys
+                (str $acc $field-bindings)))))]
 
 [FUNC pattern-bindings :params [$pat $v]
   :body (pattern-bindings-dispatch (get $pat :kind) $pat $v)]
@@ -1322,8 +1277,9 @@
   :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
 
 [FUNC cg-sub :params [$args]
-  :body (if (= (length $args) 1) (str "(-" (cg (get $args 0)) ")")
-          (str "(" (cg (get $args 0)) "-" (cg (get $args 1)) ")"))]
+  :body (cond [(= (length $args) 0) "0"]
+              [(= (length $args) 1) (str "(-" (cg (get $args 0)) ")")]
+              [true (str "(" (binop-loop $args 0 "" "-") ")")])]
 
 ;; ═══════ 파라미터/이름 추출 ═══════
 
@@ -1528,7 +1484,6 @@
 [FUNC cg-sexpr-dispatch :params [$op $args]
   :body (cond
           [(= $op "if")      (cg-if $args)]
-          [(= $op "match")   (cg-match-sexpr $args)]
           [(= $op "fn")      (cg-fn $args)]
           [(= $op "defn")    (cg-defn $args)]
           [(= $op "define")  (cg-define $args)]
@@ -1596,7 +1551,7 @@
     "const _fl_first = (l) => (l==null || l.length===0 ? null : l[0]);"
     "const _fl_last = (l) => (l==null || l.length===0 ? null : l[l.length-1]);"
     "const _fl_rest = (l) => (l==null || l.length===0 ? [] : l.slice(1));"
-    "const _fl_append = (...xs) => (xs.length === 0 ? [] : (xs.length === 1 ? xs[0] : xs.reduce((a, b) => Array.isArray(b) ? [...a, ...b] : [...a, b])));"
+    "const _fl_append = (...xs) => xs.reduce((acc, x) => Array.isArray(x) ? [...acc, ...x] : [...acc, x], []);"
     "const _fl_slice = (l, a, b) => l.slice(a, b);"
     "const _fl_map = (f, l) => l.map(x => f(x));"
     "const _fl_filter = (f, l) => l.filter(x => f(x));"
@@ -1831,19 +1786,16 @@
 [FUNC ts-to-s :params [$ts] :body (floor (/ $ts 1000))]
 [FUNC s-to-ts :params [$s] :body (* $s 1000)]
 
-[FUNC time-ago-dispatch :params [$s $m $h $d]
-  :body (cond [(< $s 60) (str $s "s ago")]
-              [(< $m 60) (str $m "m ago")]
-              [(< $h 24) (str $h "h ago")]
-              [true (str $d "d ago")])]
-
 [FUNC time-ago :params [$ts]
   :body (let [[$diff (- (now) $ts)]
               [$s (floor (/ $diff 1000))]
               [$m (floor (/ $s 60))]
               [$h (floor (/ $m 60))]
               [$d (floor (/ $h 24))]]
-          (time-ago-dispatch $s $m $h $d))]
+          (cond [(< $s 60) (str $s "s ago")]
+                [(< $m 60) (str $m "m ago")]
+                [(< $h 24) (str $h "h ago")]
+                [true (str $d "d ago")]))]
 
 ;; self/stdlib/string.fl — Phase 08/87
 
@@ -1854,6 +1806,10 @@
 [FUNC str-ends-with? :params [$s $suffix]
   :body (if (> (length $suffix) (length $s)) false
           (= (substring $s (- (length $s) (length $suffix)) (length $s)) $suffix))]
+
+[FUNC str-repeat :params [$s $n] :body (str-repeat-loop $s $n "")]
+[FUNC str-repeat-loop :params [$s $n $acc]
+  :body (if (<= $n 0) $acc (str-repeat-loop $s (- $n 1) (str $acc $s)))]
 
 [FUNC str-pad-left :params [$s $n $pad]
   :body (let [[$diff (- $n (length $s))]]
