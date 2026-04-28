@@ -207,6 +207,8 @@ export class JSCodegen {
         return this.genBlock(node);
       case "keyword":
         return this.genKeyword(node as Keyword);
+      case "try-block":
+        return this.genTryBlock(node as any);
       default:
         return `/* unsupported: ${(node as any).kind} */`;
     }
@@ -352,26 +354,43 @@ export class JSCodegen {
 
     // let → let 선언 (변수명 = 값)
     if (op === "let") {
-      // (let [$x val] body) 형태
-      if (args.length >= 2 && args[0].kind === "sexpr") {
-        // 바인딩 목록
-        const bindings = args[0].args;
-        const bindingStmts: string[] = [];
-        for (let i = 0; i < bindings.length; i += 2) {
-          const varName = this.extractVarName(bindings[i]);
-          const value = this.genNode(bindings[i + 1]);
-          bindingStmts.push(`let ${varName} = ${value};`);
+      // (let [[$x 10] [$y 20]] body) 또는 (let [[x val]] body)
+      if (args.length >= 2) {
+        const bindingsArg = args[0];
+        let bindings: ASTNode[] = [];
+
+        // bindings이 Array 블록이면 items 추출, sexpr이면 args 사용
+        if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
+          const block = bindingsArg as Block;
+          const items = block.fields.get("items");
+          bindings = Array.isArray(items) ? items : [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = (bindingsArg as SExpr).args;
         }
+
+        // 2D 형식: [[$x 10] [$y 20]] → 각 pair는 Array 블록
+        const bindingStmts: string[] = [];
+        for (const binding of bindings) {
+          if (binding.kind === "block" && (binding as Block).type === "Array") {
+            // 2D: [[$x 10]]
+            const pairItems = (binding as Block).fields.get("items");
+            if (Array.isArray(pairItems) && pairItems.length >= 2) {
+              const varName = this.extractVarName(pairItems[0]);
+              const value = this.genNode(pairItems[1]);
+              bindingStmts.push(`let ${varName} = ${value};`);
+            }
+          }
+        }
+
         const bodyStmts = args
           .slice(1)
           .map((a) => this.genNode(a))
           .join("\n");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
       }
-      // 단순 let (expression과 statement 양쪽에서 안전하게 동작하도록 IIFE로 래핑)
+      // 단순 let (fallback)
       const varName = this.extractVarName(args[0]);
       const value = args[1] ? this.genNode(args[1]) : "undefined";
-      // IIFE 형태로 래핑: statement와 expression 양쪽에서 작동
       return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
 
@@ -618,6 +637,30 @@ export class JSCodegen {
       ``,
       routeCode,
     ].join("\n");
+  }
+
+  private genTryBlock(node: any): string {
+    // node: {kind: "try-block", body: ASTNode, catchClauses?: CatchClause[], finallyBlock?: ASTNode}
+    const body = this.genNode(node.body);
+    const parts: string[] = [`(()=>{try{return ${body};}`];
+
+    // catch clauses
+    if (node.catchClauses && node.catchClauses.length > 0) {
+      for (const catchClause of node.catchClauses) {
+        const param = catchClause.variable || "err";
+        const handler = this.genNode(catchClause.handler);
+        parts.push(`catch(${param}){return ${handler};}`);
+      }
+    }
+
+    // finally block
+    if (node.finallyBlock) {
+      const finallyCode = this.genNode(node.finallyBlock);
+      parts.push(`finally{${finallyCode};}`);
+    }
+
+    parts.push(`})()`);
+    return parts.join("");
   }
 
   private extractVarName(node: ASTNode): string {

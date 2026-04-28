@@ -1982,7 +1982,7 @@ export class Parser {
           let variable: string | undefined;
 
           if (this.check(T.LBracket)) {
-            // Pattern specified: (catch [ErrorType] handler) or (catch [err] handler)
+            // Format 1: (catch [ErrorType] handler) or (catch [err] handler)
             this.advance(); // consume '['
             if (this.check(T.Symbol)) {
               const patternName = this.advance().value;
@@ -1991,6 +1991,11 @@ export class Parser {
               pattern = makeVariablePattern(patternName);
             }
             this.expect(T.RBracket);
+          } else if (this.check(T.Symbol) || this.check(T.Variable)) {
+            // Format 2 (self-hosted): (catch param body) - bare param without brackets
+            const paramToken = this.advance();
+            variable = paramToken.value;
+            pattern = makeVariablePattern(paramToken.value);
           }
 
           // Parse catch handler
