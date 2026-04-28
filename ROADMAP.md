@@ -39,18 +39,22 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 
 **결과**: self-parser 호환도 **87%** (try/catch 추가로 90%+)
 
-**현재 진행** (2026-04-29):
+**현재 진행** (2026-04-29 Session 2):
 - [x] **Try-Catch 구현** (A-2-1) ✅ 완료
   - [x] src/parser.ts: TS 형식 + self-hosted 호환 파싱
   - [x] src/codegen-js.ts: Try-Catch 코드젠
-  - [x] bootstrap.js 검증 ✅ (모든 형식 작동)
+  - [x] Catch 핸들러 다중 식 지원 (수정)
+  - [x] Bootstrap.js 검증 ✅ (패턴 A-E 작동)
   - [ ] Self-hosted 검증 (stage1 재생성 대기)
-- [ ] Template Literal (완료 but 미검증)
-- [ ] Loop 특수형 (A-2-2, 미루기)
-- [ ] **Let Block Fields 버그** (A-2-3, 발견)
-  - 근본 원인: Array block fields가 null/비어있음
-  - 임시 해결: cg-let-1d/2d에 null check 추가
-  - 상태: Phase C-5로 분류 (자체호스팅 안정화 후 처리)
+  - 🟠 알려진 문제: throw 메시지 전달 미완
+- [ ] **Template Literal** (A-2-2, 미검증)
+  - [ ] ${...} 평가 미작동 (구현 필요)
+  - 우선순위: Try-Catch 완료 후
+- [ ] Loop 특수형 (A-2-3, 미루기)
+- [ ] **Let Block Fields 버그** (Phase C-5)
+  - 근본 원인: Array block fields 부재
+  - 임시 해결: cg-let-1d/2d null check ✅
+  - 상태: 자체호스팅 안정화 후 처리
 
 ### A-3: Bootstrap 최소화 (1주)
 **역할**: stage1 생성 전용으로 축소

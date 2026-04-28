@@ -1998,14 +1998,22 @@ export class Parser {
             pattern = makeVariablePattern(paramToken.value);
           }
 
-          // Parse catch handler
-          const handler = this.parseValue();
+          // Parse catch handler (can be multiple expressions)
+          const handlerExprs: ASTNode[] = [];
+          while (!this.check(T.RParen) && !this.isAtEnd()) {
+            handlerExprs.push(this.parseValue());
+          }
+          const handler = handlerExprs.length === 1 ? handlerExprs[0] : makeSExpr("do", handlerExprs);
           catchClauses.push(makeCatchClause(handler, pattern, variable));
           this.expect(T.RParen);
         } else if (nextToken.type === T.Symbol && nextToken.value === "finally") {
           this.advance(); // consume '('
           this.advance(); // consume 'finally'
-          finallyBlock = this.parseValue();
+          const finallyExprs: ASTNode[] = [];
+          while (!this.check(T.RParen) && !this.isAtEnd()) {
+            finallyExprs.push(this.parseValue());
+          }
+          finallyBlock = finallyExprs.length === 1 ? finallyExprs[0] : makeSExpr("do", finallyExprs);
           this.expect(T.RParen);
           break; // finally must be last
         } else {
