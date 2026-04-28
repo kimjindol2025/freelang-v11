@@ -1,0 +1,54 @@
+;; v11-semantic-test.fl: 의미 검증 테스트 (간단 버전)
+;; run-code는 다음 단계에서 구현
+
+(defn trim [$s]
+  ;; 공백/개행 정규화
+  (let [[$p1 (str_replace $s "\n" "")]]
+    (let [[$p2 (str_replace $p1 "\r" "")]]
+      (let [[$p3 (str_replace $p2 " " "")]]
+        $p3))))
+
+(defn semantic-equal-check [$name $src1 $src2 $expected]
+  ;; 두 코드가 같은 결과를 내는가?
+  ;; 지금은 expected로 수동 입력
+  (do
+    (println (str "Test: " $name))
+    (println (str "  원본: " $src1))
+    (println (str "  최적: " $src2))
+    (println (str "  예상: " $expected))
+    (println "  상태: 🔄 run-code 대기\n")
+    true))
+
+(do
+  (println "================================================")
+  (println "  의미 검증 테스트 (Semantic Test Suite)")
+  (println "================================================\n")
+
+  ;; Test 1: let-inline (상수)
+  (semantic-equal-check
+    "let-inline (constant)"
+    "(let [[$a 1]] (+ $a 2))"
+    "(+ 1 2)"
+    "3")
+
+  ;; Test 2: let-flatten
+  (semantic-equal-check
+    "let-flatten"
+    "(let [[$a 1]] (let [[$b 2]] (+ $a $b)))"
+    "(let [[$a 1][$b 2]] (+ $a $b))"
+    "3")
+
+  ;; Test 3: do-elimination
+  (semantic-equal-check
+    "do-elimination"
+    "(do (+ 1 2))"
+    "(+ 1 2)"
+    "3")
+
+  (println "================================================")
+  (println "✅ 테스트 프레임워크 준비 완료")
+  (println "\n다음 단계:")
+  (println "1. run-code 함수 구현 (shell_exec 또는 대체 방안)")
+  (println "2. 실제 실행 결과로 검증")
+  (println "3. 3가지 테스트 모두 PASS 확인"))
+

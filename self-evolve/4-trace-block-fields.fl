@@ -1,0 +1,23 @@
+;; 4-trace-block-fields.fl: block의 모든 필드 추적 (단순)
+
+(let [[$src "(let [[$a 1]] (+ $a $a))"]]
+  (let [[$ast (parse (lex $src))]]
+    (let [[$block (get (get (get $ast 0) "args") 0)]]
+      (do
+        (println "Block 구조:")
+        (println (str $block))
+        (println "\n")
+        (println "json_keys:")
+        (println (str (json_keys $block)))
+        (println "\n")
+        (println "각 값:")
+        (println (str "  kind: " (get $block "kind")))
+        (println (str "  type: " (get $block "type")))
+        (println (str "  name: " (get $block "name")))
+        (println (str "  fields: " (get $block "fields")))
+        (println (str "  line: " (get $block "line")))
+        (println "\n다른 가능성:")
+        (println (str "  bindings: " (get $block "bindings")))
+        (println (str "  values: " (get $block "values")))
+        (println (str "  params: " (get $block "params")))
+        ))))

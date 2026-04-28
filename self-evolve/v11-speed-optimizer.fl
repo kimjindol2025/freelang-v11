@@ -1,0 +1,79 @@
+;; v11-speed-optimizer.fl: 안정화된 코드 변환기
+;; 핵심: 변환 후 반드시 파싱 검증 (깨진 코드 방지)
+
+(defn optimize-pass-1 [$src]
+  ;; Pass 1: whitespace 정규화 (다중 공백 → 단일)
+  (let [[$p1 (str_replace $src "  " " ")]]
+    (let [[$p2 (str_replace $p1 "\n\n" "\n")]]
+      $p2)))
+
+(defn optimize-pass-2 [$src]
+  ;; Pass 2: str 최적화 (str (str a b) c) → (str a b c)
+  ;; ⚠️ 위험: 구조를 모르고 치환 → 나중에 AST 기반으로 전환 필수
+  (str_replace $src "(str (str" "(str"))
+
+(defn count-ast-nodes [$src]
+  ;; AST 노드 수 = parse 결과 배열 길이
+  (let [[$tokens (lex $src)]]
+    (let [[$ast (parse $tokens)]]
+      (length $ast))))
+
+(defn is-valid-code [$src]
+  ;; 코드가 유효한가? → parse 성공 = 유효
+  (let [[$tokens (lex $src)]]
+    (let [[$ast (parse $tokens)]]
+      (> (length $ast) 0))))
+
+(defn optimize-all [$src]
+  ;; 모든 pass 적용
+  (let [[$p1 (optimize-pass-1 $src)]]
+    (let [[$p2 (optimize-pass-2 $p1)]]
+      {:original $src
+       :optimized $p2
+       :orig-size (length $src)
+       :new-size (length $p2)
+       :size-delta (- (length $src) (length $p2))
+       :orig-ast (count-ast-nodes $src)
+       :new-ast (count-ast-nodes $p2)
+       :ast-delta (- (count-ast-nodes $src) (count-ast-nodes $p2))
+       :valid (is-valid-code $p2)})))
+
+(do
+  (println "================================================")
+  (println "  속도 최적화기 v1 (검증 포함)")
+  (println "================================================\n")
+
+  ;; self/all.fl 읽기
+  (let [[$src (file_read "self/all.fl")]]
+    (do
+      (println (str "원본 크기: " (length $src) "B"))
+      (println (str "원본 AST: " (count-ast-nodes $src) " 노드\n"))
+
+      ;; 최적화 실행
+      (let [[$result (optimize-all $src)]]
+        (do
+          ;; 결과 출력
+          (println (str "최적화 후:"))
+          (println (str "  크기: " (get $result "new-size") "B (감소: " (get $result "size-delta") "B)"))
+          (println (str "  AST: " (get $result "new-ast") " 노드 (감소: " (get $result "ast-delta") ")\n"))
+
+          ;; ⚠️ 검증 단계: 코드가 유효한가?
+          (if (get $result "valid")
+            (do
+              (println "✅ 코드 유효성 검증 PASS")
+              ;; 최적화본 저장
+              (file_write "self-evolve/logs/speed-gen-0.fl" (get $result "optimized"))
+
+              ;; 로그 기록
+              (file_write "self-evolve/logs/speed-delta.log"
+                (str "속도 최적화 " (now_iso) "\n\n"
+                     "## Gen 0\n"
+                     "- 크기: " (get $result "orig-size") "B → " (get $result "new-size") "B (-" (get $result "size-delta") "B)\n"
+                     "- AST: " (get $result "orig-ast") " → " (get $result "new-ast") " (-" (get $result "ast-delta") ")\n"
+                     "- 상태: VALID ✅\n\n"))
+
+              (println "\n✅ 최적화 완료 (안전함)"))
+            (do
+              (println "❌ 코드 유효성 검증 FAIL")
+              (println "   변환된 코드가 깨졌습니다. 저장하지 않음.")
+              (println "   → AST 기반 변환으로 전환 필요"))))))))

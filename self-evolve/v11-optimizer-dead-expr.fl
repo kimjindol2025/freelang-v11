@@ -1,0 +1,111 @@
+;; v11-optimizer-dead-expr.fl: Dead Expression Elimination (Gen1)
+;; 범위: (do val1 val2 val3) → val3 (모두 constant면 마지막만 유지)
+
+(defn is-constant [$node]
+  ;; literal number/string/boolean인가? (symbol 제외!)
+  (if (nil? $node)
+    false
+    (let [[$kind (get $node "kind")]]
+      (if (= $kind "literal")
+        (let [[$type (get $node "type")]]
+          (if (= $type "symbol") false true))
+        false))))
+
+(defn all-constant? [$args]
+  ;; args 모두 constant인가?
+  (if (= (length $args) 0)
+    true
+    (let [[$first (get $args 0)]]
+      (let [[$rest (slice $args 1 (length $args))]]
+        (if (is-constant $first)
+          (all-constant? $rest)
+          false)))))
+
+(defn elim-dead-expr [$node]
+  ;; (do const const const ...) → 마지막 const만 유지
+  ;; 부작용이 없는 상수 리터럴만 해당
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (if (= $op "do")
+        (let [[$args (get $node "args")]]
+          (if (all-constant? $args)
+            ;; 모두 constant면 마지막만 반환
+            (if (= (length $args) 0)
+              {:kind "nil" :line (get $node "line")}
+              (get $args (- (length $args) 1)))
+            ;; 아니면 그대로
+            $node))
+        ;; do가 아니면 그대로
+        $node))
+    ;; sexpr이 아니면 그대로
+    $node))
+
+(defn optimize-node-dead-expr [$node]
+  ;; 노드 최적화 (do-elim + const-fold + dead-expr)
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (let [[$args (get $node "args")]]
+        (if (= $op "do")
+          ;; do-elimination: (do single) → single
+          (if (= (length $args) 1)
+            (optimize-node-dead-expr (get $args 0))
+            ;; 자식 재귀 + dead-expr elimination
+            (let [[$new-args (map optimize-node-dead-expr $args)]]
+              (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
+                (elim-dead-expr $new-node))))
+          ;; do 아니면 자식 재귀만
+          (let [[$new-args (map optimize-node-dead-expr $args)]]
+            {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}))))
+    ;; sexpr 아님
+    $node))
+
+(defn optimize-ast-dead-expr [$ast]
+  ;; AST 배열 전체 최적화
+  (map optimize-node-dead-expr $ast))
+
+(do
+  (println "================================================")
+  (println "  Dead Expression Elimination (Gen1)")
+  (println "================================================\n")
+
+  ;; 테스트 1: (do 1)
+  (let [[$code "(do 1)"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast-dead-expr $ast)]]
+        (do
+          (println "테스트 1: (do 1)")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 2: (do 1 2 3)
+  (let [[$code "(do 1 2 3)"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast-dead-expr $ast)]]
+        (do
+          (println "테스트 2: (do 1 2 3)")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 3: (do 1 2 x) - x는 symbol이므로 제거 불가
+  (let [[$code "(do 1 2 x)"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast-dead-expr $ast)]]
+        (do
+          (println "테스트 3: (do 1 2 x) - 제거 불가")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 4: (do (+ 1 2) (+ 3 4)) - sexpr이므로 제거 불가
+  (let [[$code "(do (+ 1 2) (+ 3 4))"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast-dead-expr $ast)]]
+        (do
+          (println "테스트 4: (do (+ 1 2) (+ 3 4)) - 제거 불가")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  (println "✅ dead-expr-elimination 테스트 완료"))

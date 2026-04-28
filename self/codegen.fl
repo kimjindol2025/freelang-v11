@@ -512,14 +512,14 @@
                 [$k-clean (if (= (char-at $k 0) ":") (substring $k 1) $k)]
                 [$access (str $v "[" (js-esc $k-clean) "]")]
                 [$pat-kind (get $pat :kind)]
-                [$binding (cond
+                [$binding-raw (cond
                   [(= $pat-kind "variable")
                    (str "let " (js-name (get $pat :name)) "=" $access ";")]
                   [(= $pat-kind "block")
                    (let [[$v_next (str $v "_" $i)]]
                      (str "let " $v_next "=" $access ";" (struct-pattern-bindings-from-entries (map-entries (get $pat :fields)) $v_next 0 "")))]
                   [true ""])]
-                [$binding (if (= (length $binding) 0) "" $binding)]]
+                [$binding (if (= (length $binding-raw) 0) "" $binding-raw)]]
             (struct-pattern-bindings-from-entries $entries $v (+ $i 1)
               (str $acc $binding))))]
 

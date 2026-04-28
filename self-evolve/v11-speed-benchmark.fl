@@ -1,0 +1,106 @@
+;; v11-speed-benchmark.fl: 속도 측정 (warmup 제외, 통계 포함)
+
+(defn make-range [$n]
+  (if (= $n 0)
+    []
+    (append (make-range (- $n 1)) (- $n 1))))
+
+(defn bench-parse-once [$file]
+  (let [[$start (now_ms)]]
+    (let [[$src (file_read $file)]]
+      (let [[$tokens (lex $src)]]
+        (let [[$ast (parse $tokens)]]
+          (- (now_ms) $start))))))
+
+(defn bench-parse-repeated [$file $runs]
+  ;; runs회 반복, 각 시간 기록
+  (map (fn [$_] (bench-parse-once $file)) (make-range $runs)))
+
+(defn calc-avg [$arr]
+  (let [[$sum (reduce (fn [$a $b] (+ $a $b)) 0 $arr)]]
+    (if (= (length $arr) 0)
+      0
+      (/ $sum (length $arr)))))
+
+(defn calc-min [$arr]
+  (reduce (fn [$a $b] (if (< $b $a) $b $a)) 999999 $arr))
+
+(defn calc-max [$arr]
+  (reduce (fn [$a $b] (if (> $b $a) $b $a)) 0 $arr))
+
+(defn bench-file [$file-path]
+  (do
+    (println (str "⏱️  벤치마크: " $file-path))
+    (println "  20회 반복 (warmup 5회 제외, 실측 15회)\n")
+
+    (let [[$times (bench-parse-repeated $file-path 20)]]
+      (let [[$warmup (slice $times 0 5)]]
+        (let [[$measured (slice $times 5 20)]]
+          (let [[$avg (calc-avg $measured)]]
+            (let [[$min (calc-min $measured)]]
+              (let [[$max (calc-max $measured)]]
+                (do
+                  (println (str "  Warmup (5회): " (calc-avg $warmup) "ms"))
+                  (println (str "  평균: " $avg "ms"))
+                  (println (str "  범위: " $min "ms ~ " $max "ms"))
+                  (println (str "  편차: ±" (- $max $min) "ms\n"))
+                  {:file $file-path
+                   :total-runs 20
+                   :measured-runs 15
+                   :warmup-avg (calc-avg $warmup)
+                   :avg-ms $avg
+                   :min-ms $min
+                   :max-ms $max
+                   :range-ms (- $max $min)}))))))))
+
+(defn compare-results [$orig $optimized]
+  ;; 원본 vs 최적화본 비교
+  (let [[$orig-avg (get $orig "avg-ms")]]
+    (let [[$opt-avg (get $optimized "avg-ms")]]
+      (let [[$delta (- $orig-avg $opt-avg)]]
+        (let [[$pct (if (= $orig-avg 0) 0 (/ (* 100 $delta) $orig-avg))]]
+          (do
+            (println "📊 비교 결과:")
+            (println (str "  원본: " $orig-avg "ms (범위: " (get $orig "min-ms") "~" (get $orig "max-ms") ")"))
+            (println (str "  최적: " $opt-avg "ms (범위: " (get $optimized "min-ms") "~" (get $optimized "max-ms") ")"))
+            (println (str "  개선: " $delta "ms (" $pct "%)"))
+            (if (>= (- $orig-avg $opt-avg) 2.5)
+              (println "  ✅ 유의미한 개선 (≥2.5ms, 10%이상)")
+              (println "  ⚠️  개선 미미 (<2.5ms 또는 <10%)"))
+            (println "")
+            {:baseline-avg $orig-avg
+             :optimized-avg $opt-avg
+             :delta-ms $delta
+             :delta-pct $pct
+             :significant (>= (- $orig-avg $opt-avg) 2.5)}))))))
+
+(do
+  (println "================================================")
+  (println "  속도 벤치마크 (통계 포함)")
+  (println "================================================\n")
+
+  (file_write "self-evolve/logs/speed-delta.log"
+    (str "속도 벤치마크 " (now_iso) "\n\n"))
+
+  ;; 원본 벤치마크
+  (let [[$orig (bench-file "self/all.fl")]]
+    (do
+      ;; 최적화본 벤치마크
+      (let [[$opt (bench-file "self-evolve/logs/speed-gen-0.fl")]]
+        (do
+          ;; 비교
+          (let [[$comparison (compare-results $orig $opt)]]
+            (do
+              (file_append "self-evolve/logs/speed-delta.log"
+                (str "## 벤치마크 결과\n\n"
+                     "원본 (self/all.fl):\n"
+                     "- 평균: " (get $orig "avg-ms") "ms\n"
+                     "- 범위: " (get $orig "min-ms") "~" (get $orig "max-ms") "ms\n"
+                     "- 편차: " (get $orig "range-ms") "ms\n\n"
+                     "최적화 (speed-gen-0.fl):\n"
+                     "- 평균: " (get $opt "avg-ms") "ms\n"
+                     "- 범위: " (get $opt "min-ms") "~" (get $opt "max-ms") "ms\n"
+                     "- 편차: " (get $opt "range-ms") "ms\n\n"
+                     "개선: " (get $comparison "delta-ms") "ms (" (get $comparison "delta-pct") "%)\n"
+                     "유의미: " (if (get $comparison "significant") "YES" "NO") "\n\n"))
+              (println "✅ 벤치마크 완료")))))))

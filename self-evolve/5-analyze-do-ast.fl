@@ -1,0 +1,29 @@
+;; 5-analyze-do-ast.fl: do 노드 AST 구조 분석
+
+(do
+  (println "================================================")
+  (println "  do 노드 구조 분석")
+  (println "================================================\n")
+
+  ;; 패턴 1: (do expr)
+  (println "패턴 1: (do (+ 1 2))\n")
+  (let [[$ast (parse (lex "(do (+ 1 2))"))]]
+    (let [[$node (get $ast 0)]]
+      (do
+        (println (str "노드: " $node))
+        (println (str "op: " (get $node "op")))
+        (println (str "args 길이: " (length (get $node "args"))))
+        (println (str "args: " (get $node "args"))))))
+
+  (println "\n\n패턴 2: (do 1 2 3)\n")
+  (let [[$ast (parse (lex "(do 1 2 3)"))]]
+    (let [[$node (get $ast 0)]]
+      (do
+        (println (str "노드: " $node))
+        (println (str "op: " (get $node "op")))
+        (println (str "args 길이: " (length (get $node "args"))))
+        (println (str "args[0]: " (get (get $node "args") 0)))
+        (println (str "args[1]: " (get (get $node "args") 1)))
+        (println (str "args[2]: " (get (get $node "args") 2))))))
+
+  (println "\n✅ do 구조 분석 완료"))

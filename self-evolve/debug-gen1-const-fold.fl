@@ -1,0 +1,57 @@
+;; 상수 폴딩 디버그
+
+(defn is-constant [$node]
+  (if (nil? $node)
+    false
+    (let [[$kind (get $node "kind")]]
+      (if (= $kind "literal")
+        (let [[$type (get $node "type")]]
+          (if (= $type "symbol") false true))
+        false))))
+
+(defn all-constant? [$args]
+  (if (= (length $args) 0)
+    true
+    (let [[$first (get $args 0)]]
+      (let [[$rest (slice $args 1 (length $args))]]
+        (if (is-constant $first)
+          (all-constant? $rest)
+          false)))))
+
+(do
+  ;; 테스트: literal(3) 2개가 constant인가?
+  (define lit3 {:kind "literal" :type "number" :value 3})
+  (define lit3b {:kind "literal" :type "number" :value 3})
+
+  (println "lit3이 constant인가?")
+  (println (str "  " (is-constant lit3)))
+
+  (println "lit3b도 constant인가?")
+  (println (str "  " (is-constant lit3b)))
+
+  (println "둘 다 constant인가?")
+  (let [[$arr [lit3 lit3b]]]
+    (println (str "  " (all-constant? $arr))))
+
+  ;; 이제 실제로 (+ 1 2)를 최적화해보기
+  (define code1 "(+ 1 2)")
+  (define ast1 (parse (lex code1)))
+  (define node1 (get ast1 0))
+
+  (println "\nnode1: (+ 1 2)")
+  (println (str "  " node1))
+
+  ;; 자식들 확인
+  (define args1 (get node1 "args"))
+  (println "\nargs1:")
+  (println (str "  " args1))
+
+  (println "\nargs[0] is constant?")
+  (println (str "  " (is-constant (get args1 0))))
+
+  (println "args[1] is constant?")
+  (println (str "  " (is-constant (get args1 1))))
+
+  (println "\nall constant?")
+  (println (str "  " (all-constant? args1)))
+)

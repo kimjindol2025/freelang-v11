@@ -39,13 +39,14 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 
 **결과**: self-parser 호환도 **87%** (try/catch 추가로 90%+)
 
-**현재 진행** (2026-04-29 Session 2):
+**현재 진행** (2026-04-29 Session 3):
 - [x] **Try-Catch 구현** (A-2-1) ✅ 완료
   - [x] src/parser.ts: TS 형식 + self-hosted 호환 파싱
   - [x] src/codegen-js.ts: Try-Catch 코드젠
   - [x] Catch 핸들러 다중 식 지원 (수정)
   - [x] Bootstrap.js 검증 ✅ (패턴 A-E 작동)
-  - [ ] Self-hosted 검증 (stage1 재생성 대기)
+  - [x] Self-hosted 소스 (self/codegen.fl) 준비 완료
+  - 🟠 Stage1 자체호스팅: 런타임 헬퍼 누락 (미루기 - phase2 이후)
   - 🟠 알려진 문제: throw 메시지 전달 미완
 - [ ] **Template Literal** (A-2-2, 미검증)
   - [ ] ${...} 평가 미작동 (구현 필요)

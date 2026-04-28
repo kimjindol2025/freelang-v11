@@ -1,0 +1,179 @@
+;; v11-optimizer-gen1-complete.fl: Gen1 완성본 (do-elim + const-fold + dead-expr)
+
+(defn is-constant [$node]
+  ;; literal number/string/boolean인가? (symbol 제외!)
+  (if (nil? $node)
+    false
+    (let [[$kind (get $node "kind")]]
+      (if (= $kind "literal")
+        (let [[$type (get $node "type")]]
+          (if (= $type "symbol") false true))
+        false))))
+
+(defn is-arithmetic-op [$op]
+  ;; +, -, *, / 인가?
+  (if (= $op "+") true
+    (if (= $op "-") true
+      (if (= $op "*") true
+        (if (= $op "/") true false)))))
+
+(defn all-constant? [$args]
+  ;; args 모두 constant인가?
+  (if (= (length $args) 0)
+    true
+    (let [[$first (get $args 0)]]
+      (let [[$rest (slice $args 1 (length $args))]]
+        (if (is-constant $first)
+          (all-constant? $rest)
+          false)))))
+
+(defn evaluate-arithmetic [$op $args]
+  ;; 산술 연산 계산
+  (let [[$v0 (get (get $args 0) "value")]]
+    (let [[$v1 (get (get $args 1) "value")]]
+      (if (= $op "+")
+        (+ $v0 $v1)
+        (if (= $op "-")
+          (- $v0 $v1)
+          (if (= $op "*")
+            (* $v0 $v1)
+            (if (= $op "/")
+              (/ $v0 $v1)
+              nil)))))))
+
+(defn make-literal [$value]
+  ;; 상수 노드 생성
+  {:kind "literal" :type "number" :value $value :line nil})
+
+(defn fold-constant [$node]
+  ;; 노드가 상수 폴딩 가능한가?
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (let [[$args (get $node "args")]]
+        (if (is-arithmetic-op $op)
+          (if (all-constant? $args)
+            ;; 폴딩 가능
+            (make-literal (evaluate-arithmetic $op $args))
+            ;; 폴딩 불가능
+            $node)
+          ;; 산술연산 아님
+          $node)))
+    ;; sexpr 아님
+    $node))
+
+(defn elim-dead-expr [$node]
+  ;; (do const const const ...) → 마지막 const만 유지
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (if (= $op "do")
+        (let [[$args (get $node "args")]]
+          (if (all-constant? $args)
+            ;; 모두 constant면 마지막만 반환
+            (if (= (length $args) 0)
+              {:kind "nil" :line (get $node "line")}
+              (get $args (- (length $args) 1)))
+            ;; 아니면 그대로
+            $node))
+        ;; do가 아니면 그대로
+        $node))
+    ;; sexpr이 아니면 그대로
+    $node))
+
+(defn optimize-node [$node]
+  ;; Pass 1: do-elimination (do expr) → expr
+  ;; Pass 2: 자식 재귀
+  ;; Pass 3: constant-folding
+  ;; Pass 4: dead-expr elimination
+  (if (= (get $node "kind") "sexpr")
+    (let [[$op (get $node "op")]]
+      (let [[$args (get $node "args")]]
+        (if (= $op "do")
+          ;; do-elimination: (do single) → single
+          (if (= (length $args) 1)
+            (optimize-node (get $args 0))
+            ;; 자식 재귀 + 최적화
+            (let [[$new-args (map optimize-node $args)]]
+              (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
+                ;; dead-expr elimination + (이후는 no-op)
+                (elim-dead-expr $new-node))))
+          ;; do 아니면 자식 재귀 + constant-fold
+          (let [[$new-args (map optimize-node $args)]]
+            (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
+              ;; constant folding
+              (fold-constant $new-node))))))
+    ;; sexpr 아님
+    $node))
+
+(defn optimize-ast [$ast]
+  ;; AST 배열 전체 최적화
+  (map optimize-node $ast))
+
+(do
+  (println "================================================")
+  (println "  Gen1 완성본 최적화기")
+  (println "  - do-elimination")
+  (println "  - constant-folding")
+  (println "  - dead-expr elimination")
+  (println "================================================\n")
+
+  ;; 테스트 1: do-elimination
+  (let [[$code "(do (+ 1 2))"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast $ast)]]
+        (do
+          (println "테스트 1: do-elimination")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 2: nested do-elimination
+  (let [[$code "(do (do (+ 1 2)))"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast $ast)]]
+        (do
+          (println "테스트 2: nested do-elimination")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 3: constant-folding nested
+  (let [[$code "(+ (+ 1 2) 3)"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast $ast)]]
+        (do
+          (println "테스트 3: constant-folding nested")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 4: multiple constant-fold
+  (let [[$code "(* (+ 1 2) (- 5 3))"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast $ast)]]
+        (do
+          (println "테스트 4: multiple constant-fold")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 5: dead-expr elimination
+  (let [[$code "(do 1 2 (+ 3 4))"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast $ast)]]
+        (do
+          (println "테스트 5: dead-expr elimination")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  ;; 테스트 6: combined optimizations
+  (let [[$code "(do (do (+ 1 2)) (- 10 5))"]]
+    (let [[$ast (parse (lex $code))]]
+      (let [[$opt (optimize-ast $ast)]]
+        (do
+          (println "테스트 6: combined optimizations")
+          (println (str "  원본: " (get $ast 0)))
+          (println (str "  최적: " (get $opt 0)))
+          (println "")))))
+
+  (println "✅ Gen1 완성본 테스트 완료"))

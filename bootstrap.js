@@ -1945,14 +1945,26 @@ ${parenHint}` : parenHint;
                   pattern = makeVariablePattern(patternName);
                 }
                 this.expect("RBracket" /* RBracket */);
+              } else if (this.check("Symbol" /* Symbol */) || this.check("Variable" /* Variable */)) {
+                const paramToken = this.advance();
+                variable = paramToken.value;
+                pattern = makeVariablePattern(paramToken.value);
               }
-              const handler = this.parseValue();
+              const handlerExprs = [];
+              while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
+                handlerExprs.push(this.parseValue());
+              }
+              const handler = handlerExprs.length === 1 ? handlerExprs[0] : makeSExpr("do", handlerExprs);
               catchClauses.push(makeCatchClause(handler, pattern, variable));
               this.expect("RParen" /* RParen */);
             } else if (nextToken.type === "Symbol" /* Symbol */ && nextToken.value === "finally") {
               this.advance();
               this.advance();
-              finallyBlock = this.parseValue();
+              const finallyExprs = [];
+              while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
+                finallyExprs.push(this.parseValue());
+              }
+              finallyBlock = finallyExprs.length === 1 ? finallyExprs[0] : makeSExpr("do", finallyExprs);
               this.expect("RParen" /* RParen */);
               break;
             } else {
@@ -24779,6 +24791,8 @@ ${exportsStr}
         return this.genBlock(node);
       case "keyword":
         return this.genKeyword(node);
+      case "try-block":
+        return this.genTryBlock(node);
       default:
         return `/* unsupported: ${node.kind} */`;
     }
@@ -24802,8 +24816,8 @@ ${exportsStr}
   }
   genTemplateString(node) {
     const value = node.value;
-    const escaped = value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
-    return `\`${escaped}\``;
+    const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `"${escaped}"`;
   }
   genVariable(node) {
     const cleanName = node.name.replace(/^\$/, "");
@@ -24883,13 +24897,31 @@ ${exportsStr}
       return "";
     }
     if (op === "let") {
-      if (args2.length >= 2 && args2[0].kind === "sexpr") {
-        const bindings = args2[0].args;
+      if (args2.length >= 2) {
+        const bindingsArg = args2[0];
+        let bindings = [];
+        if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
+          const block = bindingsArg;
+          const items = block.fields.get("items");
+          if (!Array.isArray(items)) {
+            console.error("DEBUG let: block.fields.get('items') returned:", items);
+            console.error("DEBUG let: block.fields keys:", Array.from(block.fields.keys()));
+            console.error("DEBUG let: block object:", block);
+          }
+          bindings = Array.isArray(items) ? items : [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = bindingsArg.args;
+        }
         const bindingStmts = [];
-        for (let i = 0; i < bindings.length; i += 2) {
-          const varName2 = this.extractVarName(bindings[i]);
-          const value2 = this.genNode(bindings[i + 1]);
-          bindingStmts.push(`let ${varName2} = ${value2};`);
+        for (const binding of bindings) {
+          if (binding.kind === "block" && binding.type === "Array") {
+            const pairItems = binding.fields.get("items");
+            if (Array.isArray(pairItems) && pairItems.length >= 2) {
+              const varName2 = this.extractVarName(pairItems[0]);
+              const value2 = this.genNode(pairItems[1]);
+              bindingStmts.push(`let ${varName2} = ${value2};`);
+            }
+          }
         }
         const bodyStmts = args2.slice(1).map((a) => this.genNode(a)).join("\n");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
@@ -25093,6 +25125,23 @@ ${exportsStr}
       ``,
       routeCode
     ].join("\n");
+  }
+  genTryBlock(node) {
+    const body = this.genNode(node.body);
+    const parts = [`(()=>{try{return ${body};}`];
+    if (node.catchClauses && node.catchClauses.length > 0) {
+      for (const catchClause of node.catchClauses) {
+        const param = catchClause.variable || "err";
+        const handler = this.genNode(catchClause.handler);
+        parts.push(`catch(${param}){return ${handler};}`);
+      }
+    }
+    if (node.finallyBlock) {
+      const finallyCode = this.genNode(node.finallyBlock);
+      parts.push(`finally{${finallyCode};}`);
+    }
+    parts.push(`})()`);
+    return parts.join("");
   }
   extractVarName(node) {
     if (node.kind === "variable") {

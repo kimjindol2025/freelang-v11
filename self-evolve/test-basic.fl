@@ -1,0 +1,19 @@
+;; 간단한 테스트: lex + parse 동작 확인
+
+(do
+  (println "테스트 1: lex 함수")
+  (let [[$src "(+ 1 2)"]]
+    (let [[$tokens (lex $src)]]
+      (println (str "토큰 수: " (length $tokens)))))
+
+  (println "\n테스트 2: parse 함수")
+  (let [[$src "(+ 1 2)"]]
+    (let [[$tokens (lex $src)]]
+      (let [[$ast (parse $tokens)]]
+        (println (str "AST 노드 수: " (length $ast))))))
+
+  (println "\n테스트 3: self/all.fl 읽기")
+  (let [[$src (file_read "self/all.fl")]]
+    (println (str "파일 크기: " (length $src) "B")))
+
+  (println "\n✅ 모든 기본 함수 동작 확인"))
