@@ -1,0 +1,137 @@
+;; Phase C 심화: Property Testing
+;; 기본 구조로 시작 (복잡한 루프 회피)
+
+;; ──────────────────────────────────────
+;; 1. 기본 난수 생성
+;; ──────────────────────────────────────
+
+(define next-seed (fn [$seed]
+  (% (+ (* $seed 1103515245) 12345) 2147483648)))
+
+(define random-int (fn [$seed $min $max]
+  (do
+    (define s (next-seed $seed))
+    (define val (% s (+ (- $max $min) 1)))
+    (define result (+ $min $val))
+    {:seed $s :value $result})))
+
+;; ──────────────────────────────────────
+;; 2. 불변식: 산술 성질
+;; ──────────────────────────────────────
+
+;; 결정론: (+ a b) = (+ a b)
+(define test-det-1 (fn []
+  (do
+    (define a 42)
+    (define b 17)
+    (define r1 (+ $a $b))
+    (define r2 (+ $a $b))
+    (= $r1 $r2))))
+
+;; 결정론: 배열 길이 불변
+(define test-det-2 (fn []
+  (do
+    (define arr [1 2 3 4 5])
+    (define len1 (length $arr))
+    (define len2 (length $arr))
+    (= $len1 $len2))))
+
+;; 가환성: (+ a b) = (+ b a)
+(define test-commutativity-add (fn []
+  (do
+    (define a 15)
+    (define b 28)
+    (define ab (+ $a $b))
+    (define ba (+ $b $a))
+    (= $ab $ba))))
+
+;; 가환성: (* a b) = (* b a)
+(define test-commutativity-mul (fn []
+  (do
+    (define a 12)
+    (define b 7)
+    (define ab (* $a $b))
+    (define ba (* $b $a))
+    (= $ab $ba))))
+
+;; 결합법칙: ((a+b)+c) = (a+(b+c))
+(define test-associativity (fn []
+  (do
+    (define a 10)
+    (define b 20)
+    (define c 30)
+    (define left (+ (+ $a $b) $c))
+    (define right (+ $a (+ $b $c)))
+    (= $left $right))))
+
+;; 항등원: (+ 0 a) = a
+(define test-identity-add (fn []
+  (do
+    (define a 42)
+    (define result (+ 0 $a))
+    (= $result $a))))
+
+;; 항등원: (* 1 a) = a
+(define test-identity-mul (fn []
+  (do
+    (define a 42)
+    (define result (* 1 $a))
+    (= $result $a))))
+
+;; 배열 불변성: 원본 변경 없음
+(define test-array-immutability (fn []
+  (do
+    (define arr [1 2 3])
+    (define _ (append $arr 4))
+    (define after (length $arr))
+    (= $after 3))))
+
+;; 비교 결정론
+(define test-comparison-det (fn []
+  (do
+    (define a 10)
+    (define b 20)
+    (define c1 (> $a $b))
+    (define c2 (> $a $b))
+    (= $c1 $c2))))
+
+;; ──────────────────────────────────────
+;; 3. 테스트 실행 & 보고
+;; ──────────────────────────────────────
+
+(define run-test (fn [$name $fn]
+  (do
+    (define result (try
+      (call $fn)
+      (catch $e false)))
+    (if $result
+      (println (str "✅ " $name))
+      (println (str "❌ " $name))))))
+
+(define run-all-tests (fn []
+  (do
+    (println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    (println "Phase C 심화: Property Testing")
+    (println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    (println "")
+    (println "■ 결정론 (Determinism)")
+    (run-test "동일 입력 → 동일 덧셈" test-det-1)
+    (run-test "배열 길이 불변" test-det-2)
+    (run-test "비교 연산 결정론" test-comparison-det)
+    (println "")
+    (println "■ 가환성 (Commutativity)")
+    (run-test "(a+b) = (b+a)" test-commutativity-add)
+    (run-test "(a*b) = (b*a)" test-commutativity-mul)
+    (println "")
+    (println "■ 결합법칙 & 항등원")
+    (run-test "((a+b)+c) = (a+(b+c))" test-associativity)
+    (run-test "(0+a) = a" test-identity-add)
+    (run-test "(1*a) = a" test-identity-mul)
+    (println "")
+    (println "■ 불변성 (Immutability)")
+    (run-test "배열 append 후 원본 길이" test-array-immutability)
+    (println "")
+    (println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    (println "✨ Property Testing 완료"))))
+
+(run-all-tests)
