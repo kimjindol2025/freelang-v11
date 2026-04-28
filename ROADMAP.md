@@ -27,7 +27,7 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 - [x] stage1.js 재생성 (1925줄)
 - [x] README 설계 철학 공식화
 
-### A-2: Self-Parser 문법 통합 (2주) 🔄 진행중
+### A-2: Self-Parser 문법 통합 (2주) 🟢 거의 완료
 
 **요구사항**: self-parser = bootstrap 문법의 상위 집합
 
@@ -39,7 +39,7 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 
 **결과**: self-parser 호환도 **87%** (try/catch 추가로 90%+)
 
-**현재 진행** (2026-04-29 Session 3):
+**진행 현황** (2026-04-29 Session 3 최종):
 - [x] **Try-Catch 구현** (A-2-1) ✅ 완료
   - [x] src/parser.ts: TS 형식 + self-hosted 호환 파싱
   - [x] src/codegen-js.ts: Try-Catch 코드젠
@@ -48,9 +48,10 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
   - [x] Self-hosted 소스 (self/codegen.fl) 준비 완료
   - 🟠 Stage1 자체호스팅: 런타임 헬퍼 누락 (미루기 - phase2 이후)
   - 🟠 알려진 문제: throw 메시지 전달 미완
-- [ ] **Template Literal** (A-2-2, 미검증)
-  - [ ] ${...} 평가 미작동 (구현 필요)
-  - 우선순위: Try-Catch 완료 후
+- [x] **Template Literal** (A-2-2) ✅ 완료
+  - [x] ${varName} 변수 치환
+  - [x] ${(expr)} 표현식 평가
+  - [x] 코드젠 JavaScript 템플릿 리터럴 생성
 - [ ] Loop 특수형 (A-2-3, 미루기)
 - [ ] **Let Block Fields 버그** (Phase C-5)
   - 근본 원인: Array block fields 부재
