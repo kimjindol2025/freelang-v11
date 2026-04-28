@@ -885,6 +885,13 @@ export class Parser {
       return throwExpr;
     }
 
+    // Special case: loop expressions (Phase B-1)
+    if (op === "loop") {
+      const loopExpr = this.parseLoopExpression();
+      this.expect(T.RParen);
+      return loopExpr;
+    }
+
     // Special case: match expressions
     if (op === "match") {
       const matchExpr = this.parsePatternMatch();
@@ -2033,6 +2040,44 @@ export class Parser {
     // 'throw' keyword already consumed by parseSExpr
     const argument = this.parseValue();
     return makeThrowExpression(argument);
+  }
+
+  // Phase B-1: Parse loop expressions
+  // (loop [($var init) condition update] body)
+  private parseLoopExpression(): any {
+    // 'loop' keyword already consumed by parseSExpr
+    const startLine = this.peek().line || 0;
+
+    // Parse loop header: [($var val) condition update]
+    this.expect(T.LBracket);
+
+    // Parse init: ($var val)
+    const init = this.parseValue();
+
+    // Parse condition
+    const condition = this.parseValue();
+
+    // Parse update
+    const update = this.parseValue();
+
+    this.expect(T.RBracket);
+
+    // Parse body (one or more expressions)
+    const bodyExprs: ASTNode[] = [];
+    while (!this.check(T.RParen) && !this.isAtEnd()) {
+      bodyExprs.push(this.parseValue());
+    }
+
+    const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
+
+    return {
+      kind: "loop",
+      init,
+      condition,
+      update,
+      body,
+      line: startLine,
+    };
   }
 
   // Phase 9c: Internal helper for parsing reasoning expressions (used by parseReasoningExpression and parseReasoningSequenceExpression)

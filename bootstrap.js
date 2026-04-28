@@ -1080,6 +1080,11 @@ var init_parser = __esm({
           this.expect("RParen" /* RParen */);
           return throwExpr;
         }
+        if (op === "loop") {
+          const loopExpr = this.parseLoopExpression();
+          this.expect("RParen" /* RParen */);
+          return loopExpr;
+        }
         if (op === "match") {
           const matchExpr = this.parsePatternMatch();
           this.expect("RParen" /* RParen */);
@@ -1981,6 +1986,29 @@ ${parenHint}` : parenHint;
       parseThrowExpression() {
         const argument = this.parseValue();
         return makeThrowExpression(argument);
+      }
+      // Phase B-1: Parse loop expressions
+      // (loop [($var init) condition update] body)
+      parseLoopExpression() {
+        const startLine = this.peek().line || 0;
+        this.expect("LBracket" /* LBracket */);
+        const init = this.parseValue();
+        const condition = this.parseValue();
+        const update = this.parseValue();
+        this.expect("RBracket" /* RBracket */);
+        const bodyExprs = [];
+        while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
+          bodyExprs.push(this.parseValue());
+        }
+        const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
+        return {
+          kind: "loop",
+          init,
+          condition,
+          update,
+          body,
+          line: startLine
+        };
       }
       // Phase 9c: Internal helper for parsing reasoning expressions (used by parseReasoningExpression and parseReasoningSequenceExpression)
       parseReasoningExpressionInternal(stage) {
@@ -32023,12 +32051,16 @@ var Interpreter = class _Interpreter {
     const condition = loopNode.condition;
     const update = loopNode.update;
     const body = loopNode.body;
-    if (!init || init.kind !== "sexpr" || !init.args || init.args.length < 2) {
-      throw new Error("Loop init must be [($var init-value) ...]");
+    if (!init || init.kind !== "sexpr") {
+      throw new Error("Loop init must be a S-expression: ($var init-value)");
     }
-    const varNode = init.args[0];
-    const initVal = this.eval(init.args[1]);
-    const varName = varNode.kind === "variable" ? varNode.name : String(varNode);
+    const op = init.op;
+    const args2 = init.args || [];
+    if (!op || args2.length < 1) {
+      throw new Error("Loop init must be ($var val)");
+    }
+    const varName = String(op);
+    const initVal = this.eval(args2[0]);
     const loopScope = /* @__PURE__ */ new Map();
     loopScope.set(varName, initVal);
     this.scopes.push(loopScope);

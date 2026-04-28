@@ -2071,19 +2071,29 @@ export class Interpreter {
 
   // Loop special form (Phase B-1)
   public evalLoop(loopNode: any): any {
-    const init = loopNode.init;      // [$var val]
+    const init = loopNode.init;      // ($var val) — S-expr
     const condition = loopNode.condition; // condition expr
     const update = loopNode.update;      // update expr
     const body = loopNode.body;          // body expr
 
-    // 초기화: [$var val]에서 변수 추출
-    if (!init || init.kind !== "sexpr" || !init.args || init.args.length < 2) {
-      throw new Error("Loop init must be [($var init-value) ...]");
+    // 초기화: ($var val)에서 변수 추출
+    if (!init || (init as any).kind !== "sexpr") {
+      throw new Error("Loop init must be a S-expression: ($var init-value)");
     }
 
-    const varNode = init.args[0];
-    const initVal = this.eval(init.args[1]);
-    const varName = varNode.kind === "variable" ? varNode.name : String(varNode);
+    // S-expr 형식: { kind: 'sexpr', op: '$var', args: [val], line }
+    const op = (init as any).op;  // "$i"
+    const args = (init as any).args || [];
+
+    if (!op || args.length < 1) {
+      throw new Error("Loop init must be ($var val)");
+    }
+
+    // op에서 변수명 추출 ("$i" → "$i" 유지, interpreter는 $ 포함 이름으로 관리)
+    const varName = String(op);  // "$i" 유지
+
+    // 초기값 평가
+    const initVal = this.eval(args[0]);
 
     // 새 스코프에서 루프 실행
     const loopScope = new Map<string, any>();
