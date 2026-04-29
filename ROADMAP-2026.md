@@ -41,21 +41,25 @@
 
 #### 진행 중 (C-7, C-8, C-9)
 
-##### **C-7: L2 Proof 완전 통과** (진행 중)
-**목표:** Semantic preservation 증명 (모든 test case pass)
+##### **C-7: Bootstrap 직접 일관성 검증** (진행 중)
+**목표:** 2회 컴파일 결과 일치성 검증 (bootstrap.js 직접 사용)
 
 | 작업 | 상태 | 예상 완료 |
 |------|------|----------|
-| L2-01~16 test case 디버깅 | 🔄 | 2026-05-02 |
-| JS 생성 코드 검증 | ⏳ | 2026-05-02 |
-| 결정론적 일관성 확인 | ⏳ | 2026-05-03 |
+| Test case 2회 컴파일 | 🔄 | 2026-05-02 |
+| JS 생성 코드 일치성 | ⏳ | 2026-05-02 |
+| 결정론적 실행 검증 | ⏳ | 2026-05-03 |
 | **C-7 완료** | **⏳** | **2026-05-03** |
 
 **활동:**
-- L2 Proof "bootstrap run1 JS 문법 오류" 해결
-  - template literal backtick 이스케이프 정정
-  - test case호환성 (defun → defn 완료)
-  - JS syntax validation
+- bootstrap.js 직접 컴파일 (자체호스팅 제외)
+  - test case 2회 컴파일 SHA256 비교
+  - JS 생성 코드 안정성
+  - 실행 결과 일관성 확인
+  
+**발견:** bootstrap.js가 자체호스팅 형식 미지원
+- `node bootstrap.js run compiler.fl input.fl output.js` → 미지원
+- L2 Proof (자체호스팅)는 차기 Phase로 분리
 
 ---
 
@@ -88,6 +92,22 @@
 | Fuzzing 테스트 (QuickCheck 스타일) | ⏳ | 2026-05-08 |
 | Error recovery 개선 | ⏳ | 2026-05-09 |
 | **C-9 완료** | **⏳** | **2026-05-09** |
+
+##### **C-L2: L2 Proof (자체호스팅 검증)** (차기 Phase)
+**목표:** 자체호스팅 컴파일러를 이용한 semantic preservation 증명
+
+| 작업 | 상태 | 예상 완료 |
+|------|------|----------|
+| bootstrap.js run 커맨드 확장 | ⏳ | 2026-05-10 |
+| self/codegen.fl 런타임 실행 | ⏳ | 2026-05-10 |
+| L2-01~16 모두 PASS | ⏳ | 2026-05-12 |
+| **C-L2 완료** | **⏳** | **2026-05-12** |
+
+**활동:**
+- bootstrap.js run 커맨드 형식 확장
+  - `node bootstrap.js run compiler.fl input.fl output.js` 지원
+  - self/codegen.fl을 컴파일러로 사용
+  - 자체호스팅 체인 완성
 
 ---
 

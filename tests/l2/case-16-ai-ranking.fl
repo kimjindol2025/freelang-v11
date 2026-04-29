@@ -16,6 +16,5 @@
                  {:idx 2 :score 0.95}]]]
     (println
       (list (length (top-k-retrieval scores 2))))))  ; 2
-)
 
 (test-ai-ranking)

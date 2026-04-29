@@ -13,7 +13,7 @@
   (println
     (list
       (fib 6)    ; 8
-      (fact 5))))  ; 120
+      (fact 5)))  ; 120
 )
 
 (test-recursion)

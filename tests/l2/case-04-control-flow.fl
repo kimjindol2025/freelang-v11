@@ -9,7 +9,7 @@
       (cond
         [(< 5 3) "a"]
         [(> 5 3) "b"]
-        [true "c"]))))     ; "b"
+                [true "c"])))     ; "b"
 )
 
 (test-control)

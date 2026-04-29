@@ -9,7 +9,7 @@
       (or false false)     ; false
       (or true false)      ; true
       (not true)           ; false
-      (not false))))       ; true
+      (not false)))    ; true
 )
 
 (test-logic)

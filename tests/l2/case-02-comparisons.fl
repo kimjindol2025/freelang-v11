@@ -9,7 +9,7 @@
       (> 10 4)       ; true
       (<= 5 5)       ; true
       (>= 6 2)       ; true
-      (!= 3 3))))    ; false
+      (!= 3 3)))    ; false
 )
 
 (test-comparisons)

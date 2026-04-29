@@ -18,6 +18,6 @@
       (prompt-template 
         "User: {user}"
         {:user "Alice"}))))
-)
 
+)
 (test-ai-template)
