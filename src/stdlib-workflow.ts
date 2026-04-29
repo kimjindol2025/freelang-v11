@@ -51,6 +51,13 @@ export interface WorkflowStep {
   // P1-2: Compensation Transaction
   compensate?: (ctx: Record<string, any>) => any;  // rollback on failure
   on_partial?: (partial: any) => any;               // handle partial success
+  // P1-3: Distributed Execution
+  distributed?: {
+    enabled: boolean;
+    batch_size?: number;        // items per batch (default 1000)
+    max_parallel?: number;      // max parallel batches (default 4)
+    sync_interval_ms?: number;  // state sync interval (default 5000)
+  };
 }
 
 export interface WorkflowResult {
@@ -108,6 +115,12 @@ export function createWorkflowModule() {
         merge_strategy?: 'all-success' | 'first-success' | 'any-partial';
         compensate?: (ctx: Record<string, any>) => any;
         on_partial?: (partial: any) => any;
+        distributed?: {
+          enabled: boolean;
+          batch_size?: number;
+          max_parallel?: number;
+          sync_interval_ms?: number;
+        };
       } = {}
     ): WorkflowStep => ({
       name,
@@ -123,6 +136,7 @@ export function createWorkflowModule() {
       merge_strategy: options.merge_strategy,
       compensate: options.compensate,
       on_partial: options.on_partial,
+      distributed: options.distributed,
     }),
 
     // ── Workflow Execution ────────────────────────────────────

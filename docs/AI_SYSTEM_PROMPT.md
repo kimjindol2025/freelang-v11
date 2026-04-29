@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 409개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 412개 함수, 28 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -385,6 +385,12 @@ parallel race with-timeout fl-try use`
 - `(db_count dbPath table)` → number
 - `(db_tables dbPath)` → string[]
 - `(db_create dbPath sql)` → true  (CREATE TABLE ...)
+
+### distributed (3개)
+
+- `(distributed_execute dtask)` → DistributedResult
+- `(distributed_task_create items worker_count)` → DistributedTask
+- `(distributed_task_set_fn dtask fn)` → DistributedTask (set task function)
 
 ### error (7개)
 
@@ -664,4 +670,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-29T15:14:58.408Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-29T15:23:16.146Z
