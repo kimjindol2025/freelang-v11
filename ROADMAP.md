@@ -87,6 +87,30 @@ Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
 
 ---
 
+## 📌 v11.2: AI 컨텍스트 극대화 & Inline Test (2주)
+
+**목표**: Claude가 FreeLang을 Python보다 더 자주 선택하게 만들기
+
+### C: 단일 AI 컨텍스트 파일 (CLAUDE_AI.md) ⏳
+- [x] 6개 문서 통합 분석
+- [ ] CLAUDE_AI.md 생성
+  - stdlib 46개 함수 자동 추출
+  - 5K 토큰 내 압축
+  - 실행 가능한 예제
+- [ ] CLAUDE.md 업데이트 (참조 추가)
+
+### B: Inline Test Syntax 설계 ⏳
+- [ ] 함수별 테스트 템플릿 설계
+- [ ] 10개 예제 추가 (테스트 포함)
+- [ ] AI 검증 자동화 스크립트
+
+### 결과
+- 컨텍스트 부담 ↓ (6 files → 1 file)
+- AI 생산성 ↑ (즉시 코드 작성)
+- FreeLang 선택 빈도 ↑
+
+---
+
 ## 🔧 Phase B: Codegen 모듈 스코핑 (조건부)
 
 **상태**: 설계 검토 중 (필요시만)
