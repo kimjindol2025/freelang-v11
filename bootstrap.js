@@ -13032,48 +13032,48 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return id;
     }
     case "trace-add": {
-      const traceId = String(args2[0] ?? "");
+      const traceId2 = String(args2[0] ?? "");
       const nodeType = String(args2[1] ?? "thought");
       const nodeLabel = String(args2[2] ?? "");
       const nodeValue = args2.length >= 4 ? args2[3] : void 0;
-      const trace = getTrace(traceId);
+      const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.add(nodeType, nodeLabel, nodeValue);
       return null;
     }
     case "trace-enter": {
-      const traceId = String(args2[0] ?? "");
+      const traceId2 = String(args2[0] ?? "");
       const nodeType = String(args2[1] ?? "thought");
       const nodeLabel = String(args2[2] ?? "");
       const nodeValue = args2.length >= 4 ? args2[3] : void 0;
-      const trace = getTrace(traceId);
+      const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.enter(nodeType, nodeLabel, nodeValue);
       return null;
     }
     case "trace-exit": {
-      const traceId = String(args2[0] ?? "");
+      const traceId2 = String(args2[0] ?? "");
       const result = args2.length >= 2 ? args2[1] : void 0;
-      const trace = getTrace(traceId);
+      const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.exit(result);
       return null;
     }
     case "trace-markdown": {
-      const traceId = String(args2[0] ?? "");
-      const trace = getTrace(traceId);
+      const traceId2 = String(args2[0] ?? "");
+      const trace = getTrace(traceId2);
       if (!trace) return "";
       return trace.toMarkdown();
     }
     case "trace-tree": {
-      const traceId = String(args2[0] ?? "");
-      const trace = getTrace(traceId);
+      const traceId2 = String(args2[0] ?? "");
+      const trace = getTrace(traceId2);
       if (!trace) return "";
       return trace.toTree();
     }
     case "trace-node-count": {
-      const traceId = String(args2[0] ?? "");
-      const trace = getTrace(traceId);
+      const traceId2 = String(args2[0] ?? "");
+      const trace = getTrace(traceId2);
       if (!trace) return 0;
       return trace.nodeCount();
     }
@@ -21777,7 +21777,13 @@ function createWorkflowModule() {
           try {
             const shouldRun = step.if(ctx);
             if (!shouldRun) {
-              log.push({ step: step.name, status: "skipped", ms: 0 });
+              log.push({
+                step: step.name,
+                status: "skipped",
+                ms: 0,
+                trace_id: traceId,
+                metrics: { wall_time_ms: 0 }
+              });
               continue;
             }
           } catch (condErr) {
@@ -21933,10 +21939,12 @@ function createWorkflowModule() {
     },
     // workflow_run_async workflow initial_ctx options -> Promise<WorkflowResult>
     // P1-1 async version supporting parallel tasks
+    // P1-4: Enhanced observability with trace_id and metrics
     // options: {checkpoint_path, checkpoint_every, auto_resume}
     "workflow_run_async": async (workflow, initialCtx = {}, options) => {
       const startMs = T.now();
       const runId = X.uuid_short();
+      const traceId2 = X.uuid_short();
       const checkpointPath = options?.checkpoint_path;
       const checkpointEvery = options?.checkpoint_every ?? 0;
       const autoResume = options?.auto_resume ?? true;
@@ -22038,7 +22046,13 @@ function createWorkflowModule() {
           try {
             const shouldRun = step.if(ctx);
             if (!shouldRun) {
-              log.push({ step: step.name, status: "skipped", ms: 0 });
+              log.push({
+                step: step.name,
+                status: "skipped",
+                ms: 0,
+                trace_id: traceId2,
+                metrics: { wall_time_ms: 0 }
+              });
               continue;
             }
           } catch (condErr) {
@@ -22078,7 +22092,13 @@ function createWorkflowModule() {
             stepsOk++;
             completedStepNames.push(step.name);
             completedSteps.push(step);
-            log.push({ step: step.name, status: "ok", ms: stepMs });
+            log.push({
+              step: step.name,
+              status: "ok",
+              ms: stepMs,
+              trace_id: traceId2,
+              metrics: { wall_time_ms: stepMs }
+            });
             ctx[`_step_${step.name}_ms`] = stepMs;
           } else {
             stepsFailed++;
@@ -22146,7 +22166,13 @@ function createWorkflowModule() {
             stepsOk++;
             completedStepNames.push(step.name);
             completedSteps.push(step);
-            log.push({ step: step.name, status: "ok", ms: stepMs });
+            log.push({
+              step: step.name,
+              status: "ok",
+              ms: stepMs,
+              trace_id: traceId2,
+              metrics: { wall_time_ms: stepMs }
+            });
             ctx = { ...ctx, ...stepResult };
             ctx[`_step_${step.name}_ms`] = stepMs;
             if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
@@ -22246,6 +22272,14 @@ function createWorkflowModule() {
       if ((status === "success" || status === "partial") && checkpointPath) {
         deleteCheckpoint(checkpointPath);
       }
+      const normalizedLog = log.map((entry) => ({
+        ...entry,
+        trace_id: entry.trace_id || traceId2,
+        metrics: entry.metrics || { wall_time_ms: entry.ms || 0 }
+      }));
+      const parallelStepsCount = completedSteps.filter((s) => s.parallel_tasks && s.parallel_tasks.length > 0).length;
+      const totalSteps = stepsOk + stepsFailed;
+      const totalCompensations = compensations?.length ?? 0;
       return {
         id: runId,
         name: workflow.name,
@@ -22255,10 +22289,17 @@ function createWorkflowModule() {
         steps_ok: stepsOk,
         steps_failed: stepsFailed,
         total_ms: totalMs,
-        log,
+        log: normalizedLog,
         errors,
-        compensations
+        compensations,
         // P1-2: Include compensation results
+        // P1-4: Observability metrics
+        metrics: {
+          total_ms: totalMs,
+          parallel_ratio: totalSteps > 0 ? parallelStepsCount / totalSteps : 0,
+          error_ratio: totalSteps > 0 ? stepsFailed / totalSteps : 0,
+          compensation_ratio: totalSteps > 0 ? Math.min(totalCompensations / totalSteps, 1) : 0
+        }
       };
     },
     // ── P0-1: Error Handling Helpers ──────────────────────────
