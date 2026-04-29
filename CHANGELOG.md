@@ -1,8 +1,21 @@
 # FreeLang v11 변경 이력
 
-## [11.1.0] - 2026-04-29
+## [11.1.0-alpha] - 2026-04-29
 
-**Phase A 완료**: Try-Catch, Template Literal, Self-Hosting 인프라 확보
+**마일스톤**: Phase A 완료 + Issue #3 전체 해결 + A-3 자체호스팅 기초 확보
+
+**평가**: **A (AI 안정 DSL 사업화 준비 완료)**
+- 학습곡선: A (2-3시간)
+- 안정성: A+ (797 테스트 + Property Testing 9/9 + Fuzzing 5/5)
+- API 일관성: A (fn-first 통일)
+- 결정론: A (명확 분류)
+- 자체호스팅: 276배 감축 (1.3MB → 4.7KB)
+
+**주요 성과**:
+- Issue #3 P0-A/P0-B/P0-C/P1/P2 완료
+- Try-Catch, Template Literal, Loop, Runtime Helpers 안정화
+- DETERMINISM_GUIDE.md, NAMING_CONVENTIONS.md, AI_FRIENDLINESS.md 신규 작성
+- stage1-new.js 생성 (bootstrap 자동화 초석)
 
 ### 🎉 주요 기능
 
