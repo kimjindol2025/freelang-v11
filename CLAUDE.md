@@ -25,9 +25,8 @@
 (map [1 2 3] fn)        → (map fn [1 2 3])          ;; fn 먼저
 (reduce arr init fn)    → (reduce fn init arr)      ;; fn 먼저
 (filter arr fn)         → (filter fn arr)           ;; fn 먼저
-(file-read "path")      → (file_read "path")        ;; 파일 I/O는 snake_case
-(file-write "p" "c")   → (file_write "p" "c")      ;; 파일 I/O는 snake_case
-(file-exists "p")       → (file_exists "p")         ;; 파일 I/O는 snake_case
+;; ✅ snake_case ↔ kebab-case 양방향 모두 동작 (snake_case 권장)
+;; (file_read) = (file-read), (str_to_num) = (str-to-num)
 (json_keys m)           → (keys m)                  ;; 의미 중심 이름
 (server_listen 3000)    → (server_start 3000)
 {a 1}                   → {:a 1}                    ;; 키워드 필수
@@ -185,21 +184,19 @@
 ## 📁 파일 / 환경
 
 ```fl
+;; ※ AI-First #3: snake_case ↔ kebab-case 양방향 허용 (snake_case 표준)
 ;; 파일
-(file-read   "path/file.txt")
+(file_read   "path/file.txt")    ;; snake_case 표준
 (file_write  "path/file.txt" "내용")
 (file_append "log.txt" "한 줄\n")
 (file_exists "path")             ;; → true/false
 (file_mkdir  "dir/sub")          ;; 재귀 생성
-(file_rmdir  "dir")              ;; 재귀 삭제
 (file_delete "file.txt")
-(file_size   "file.txt")         ;; → bytes
-(file_is_dir "path")
 (dir_list    "path")             ;; → [string]
 
 ;; 환경변수 ※ shell_env만 실제 동작
-(shell_env  "PORT")              ;; → string | null  ✅ 실제 동작
-;; ❌ get_env, get_env_or, env — 미구현 (사용 금지)
+(shell_env  "PORT")              ;; → string | null  ✅
+;; ❌ get_env, get_env_or, env — 미구현
 
 ;; 쉘
 (shell_exec "git log --oneline -3" "/path/to/repo")

@@ -125,6 +125,11 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   }
 
   let func = interp.context.functions.get(baseName);
+  // AI-First #3: snake_case ↔ kebab-case 양방향 조회
+  if (!func) {
+    const alt = baseName.includes('_') ? baseName.replace(/_/g, '-') : baseName.replace(/-/g, '_');
+    if (alt !== baseName) func = interp.context.functions.get(alt);
+  }
   // P0-2 (2026-04-25): Variable lookup으로 fallback — let-binding된 함수 호출 지원
   // 예: (let [[f (fn [x] (* x 2))]] (f 5)) → 10
   // (defn apply-pred [pred x] (pred x))도 같은 경로
