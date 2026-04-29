@@ -29,7 +29,15 @@ import { WebServer } from "./web"; // Phase 3: Web Server
 // 에러 포맷터: 소스 줄 강조
 // ─────────────────────────────────────────
 
-function formatError(err: any, source?: string, filePath?: string): string {
+function formatCallStack(stack: Array<{fn: string; line: number; args?: any[]}>): string {
+  if (!stack || stack.length === 0) return "";
+  const frames = stack.slice().reverse().slice(0, 10);
+  return "\n\x1b[2m콜 스택:\x1b[0m\n" + frames.map((f, i) =>
+    `  \x1b[2m${i === 0 ? "→" : " "} ${f.fn} (line ${f.line})\x1b[0m`
+  ).join("\n");
+}
+
+function formatError(err: any, source?: string, filePath?: string, callStack?: Array<{fn: string; line: number; args?: any[]}>): string {
   const fileName = filePath ? path.basename(filePath) : "<stdin>";
   const lines: string[] = [];
 
@@ -48,6 +56,8 @@ function formatError(err: any, source?: string, filePath?: string): string {
   } else if (err instanceof Error) {
     lines.push(`\n\x1b[31m실행 오류\x1b[0m  ${fileName}`);
     lines.push(`  ${err.message}`);
+    const stack = callStack ?? (err as any).__flCallStack;
+    if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
     lines.push(`\n\x1b[31m오류\x1b[0m  ${String(err)}`);
   }
@@ -60,20 +70,16 @@ function formatError(err: any, source?: string, filePath?: string): string {
 // ─────────────────────────────────────────
 
 function runSource(source: string, filePath?: string): { ok: boolean; value: any } {
+  const interp = new Interpreter();
+  if (filePath) interp.currentFilePath = path.resolve(filePath);
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
-    // Phase 52: currentFilePath 전달 — import 상대경로 해석을 파일 기준으로
-    if (filePath) {
-      const interp = new Interpreter();
-      interp.currentFilePath = path.resolve(filePath);
-      const ctx = interp.interpret(ast);
-      return { ok: true, value: ctx.lastValue };
-    }
-    const ctx = interpret(ast);
+    const ctx = interp.interpret(ast);
     return { ok: true, value: ctx.lastValue };
   } catch (err: any) {
-    console.error(formatError(err, source, filePath));
+    const callStack: Array<{fn: string; line: number; args?: any[]}> = (interp as any).callStack ?? [];
+    console.error(formatError(err, source, filePath, callStack));
     return { ok: false, value: null };
   }
 }

@@ -30853,6 +30853,9 @@ var Interpreter = class _Interpreter {
       if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
         e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
       }
+      if (e instanceof Error && !e.__flCallStack && this.callStack.length > 0) {
+        e.__flCallStack = [...this.callStack];
+      }
       throw e;
     }
     return this.context;
@@ -32098,14 +32101,14 @@ var Interpreter = class _Interpreter {
     } catch (err4) {
       const line = expr.line ?? this.currentLine;
       const col = expr.col ?? 0;
-      const stack = this.callStack.length > 0 ? "\n\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:\n  " + this.callStack.slice(-5).map((s) => `${s.fn} (line ${s.line})`).join("\n  ") : "";
-      const enhancedMsg = err4.message.includes(`(at line ${line}`) ? err4.message : `${err4.message} (at line ${line}, col ${col})${stack}`;
+      const enhancedMsg = err4.message.includes("(at line ") ? err4.message : `${err4.message} (at line ${line}, col ${col})`;
       if (err4.code || err4.name === "FLRuntimeError") {
         err4.message = enhancedMsg;
         throw err4;
       } else {
-        const errCode = err4.message.match(/\[E_\w+\]/) ? err4.message : `[E_RUNTIME_ERROR] ${err4.message}`;
-        throw new Error(enhancedMsg);
+        const e2 = new Error(enhancedMsg);
+        e2.__flCallStack = err4.__flCallStack ?? (this.callStack.length > 0 ? [...this.callStack] : void 0);
+        throw e2;
       }
     }
   }
@@ -34751,7 +34754,14 @@ var WebServer = class {
 };
 
 // src/cli.ts
-function formatError(err4, source, filePath) {
+function formatCallStack(stack) {
+  if (!stack || stack.length === 0) return "";
+  const frames = stack.slice().reverse().slice(0, 10);
+  return "\n\x1B[2m\uCF5C \uC2A4\uD0DD:\x1B[0m\n" + frames.map(
+    (f, i) => `  \x1B[2m${i === 0 ? "\u2192" : " "} ${f.fn} (line ${f.line})\x1B[0m`
+  ).join("\n");
+}
+function formatError(err4, source, filePath, callStack) {
   const fileName = filePath ? path15.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
@@ -34771,6 +34781,8 @@ function formatError(err4, source, filePath) {
     lines.push(`
 \x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}`);
     lines.push(`  ${err4.message}`);
+    const stack = callStack ?? err4.__flCallStack;
+    if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
     lines.push(`
 \x1B[31m\uC624\uB958\x1B[0m  ${String(err4)}`);

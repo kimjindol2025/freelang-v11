@@ -283,6 +283,9 @@ export class Interpreter {
       if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
         e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
       }
+      if (e instanceof Error && !(e as any).__flCallStack && this.callStack.length > 0) {
+        (e as any).__flCallStack = [...this.callStack];
+      }
       throw e;
     }
 
@@ -1878,22 +1881,20 @@ export class Interpreter {
     try {
       return evalBuiltin(this, op, args, expr);
     } catch (err: any) {
-      // Task #4: 에러 줄번호 보장 — callStack과 함께 에러 정보 강화
       const line = expr.line ?? this.currentLine;
       const col = (expr as any).col ?? 0;
-      const stack = this.callStack.length > 0
-        ? "\n최근 호출 체인:\n  " + this.callStack.slice(-5).map(s => `${s.fn} (line ${s.line})`).join("\n  ")
-        : "";
-      const enhancedMsg = err.message.includes(`(at line ${line}`)
-        ? err.message  // 이미 줄 정보가 있으면 그대로 사용
-        : `${err.message} (at line ${line}, col ${col})${stack}`;
+      // 첫 번째 (at line ...) 만 유지 — 중복 방지
+      const enhancedMsg = err.message.includes("(at line ")
+        ? err.message
+        : `${err.message} (at line ${line}, col ${col})`;
 
       if (err.code || err.name === "FLRuntimeError") {
         err.message = enhancedMsg;
         throw err;
       } else {
-        const errCode = err.message.match(/\[E_\w+\]/) ? err.message : `[E_RUNTIME_ERROR] ${err.message}`;
-        throw new Error(enhancedMsg);
+        const e2 = new Error(enhancedMsg);
+        (e2 as any).__flCallStack = (err as any).__flCallStack ?? (this.callStack.length > 0 ? [...this.callStack] : undefined);
+        throw e2;
       }
     }
   }
