@@ -55,6 +55,7 @@ export class FLExecutor {
     this.injectDBHelpers();
     this.injectMetaHelpers(); // W1: 동적 메타데이터 헬퍼
     this.injectFetchHelpers(); // W2: 서버 데이터 페칭
+    this.injectHTTPServerHelpers(); // HTTP 응답 헬퍼 (server_json, server_html 등)
     this._helpersInjected = true;
   }
 
@@ -233,12 +234,14 @@ export class FLExecutor {
         try {
           result = this.interpreter.callFunctionValue(fnValue, [flRequest]);
         } catch (err: any) {
+          console.error(`[executeRoute] 핸들러 실행 오류 (${method}): ${err.message}`, err.stack);
           return { success: false, status: 500, error: err.message, stack: err.stack };
         }
       }
 
       return this.processResult(result);
     } catch (err: any) {
+      console.error(`[executeRoute] 파일 실행 오류: ${err.message}`, err.stack);
       return {
         success: false,
         status: 500,
@@ -589,6 +592,63 @@ export class FLExecutor {
     ctx["set-meta!"] = setMetaFn;
     this.interpreter.context.variables.set("$set-meta!", setMetaFn);
     this.interpreter.context.variables.set("set-meta!", setMetaFn);
+  }
+
+  /**
+   * HTTP 서버 응답 헬퍼 주입 (server_json, server_html 등)
+   */
+  private injectHTTPServerHelpers(): void {
+    const ctx = this.interpreter.context as any;
+
+    // server_json: JSON 응답 반환
+    ctx["server_json"] = (body: any): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 200,
+        contentType: "application/json",
+        body,
+      };
+    };
+
+    // server_html: HTML 응답 반환
+    ctx["server_html"] = (body: string): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body,
+      };
+    };
+
+    // server_text: Plain text 응답 반환
+    ctx["server_text"] = (body: string): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 200,
+        contentType: "text/plain",
+        body,
+      };
+    };
+
+    // server_status: 상태 코드와 함께 응답 반환
+    ctx["server_status"] = (code: number, body: any): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: code,
+        contentType: "application/json",
+        body,
+      };
+    };
+
+    // variables에도 저장 ($ prefix 버전)
+    this.interpreter.context.variables.set("$server_json", ctx["server_json"]);
+    this.interpreter.context.variables.set("server_json", ctx["server_json"]);
+    this.interpreter.context.variables.set("$server_html", ctx["server_html"]);
+    this.interpreter.context.variables.set("server_html", ctx["server_html"]);
+    this.interpreter.context.variables.set("$server_text", ctx["server_text"]);
+    this.interpreter.context.variables.set("server_text", ctx["server_text"]);
+    this.interpreter.context.variables.set("$server_status", ctx["server_status"]);
+    this.interpreter.context.variables.set("server_status", ctx["server_status"]);
   }
 }
 

@@ -459,6 +459,29 @@ export function createWorkflowModule() {
         return { success: strategySuccess, results: mergedResults, errors: taskErrors };
       };
 
+      // P1-2: Helper to apply compensations (rollback)
+      const applyCompensations = async (completedSteps: WorkflowStep[], currentCtx: Record<string, any>): Promise<void> => {
+        for (let i = completedSteps.length - 1; i >= 0; i--) {
+          const step = completedSteps[i];
+          if (step.compensate) {
+            try {
+              const compensationResult = await step.compensate(currentCtx);
+              compensations.push({
+                step: step.name,
+                action: 'applied',
+                result: compensationResult,
+              });
+            } catch (compErr: any) {
+              compensations.push({
+                step: step.name,
+                action: 'pending',
+                error: compErr.message,
+              });
+            }
+          }
+        }
+      };
+
       for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
         const step = steps[stepIndex];
         // P0-2: Check conditional execution
@@ -472,6 +495,7 @@ export function createWorkflowModule() {
           } catch (condErr: any) {
             errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
             if (step.required !== false) {
+              await applyCompensations(completedSteps, ctx);
               return {
                 id: runId,
                 name: workflow.name,
@@ -483,6 +507,7 @@ export function createWorkflowModule() {
                 total_ms: T.now() - startMs,
                 log,
                 errors,
+                compensations,
               };
             }
             continue;
@@ -507,6 +532,7 @@ export function createWorkflowModule() {
             ctx = { ...ctx, ...stepResult };
             stepsOk++;
             completedStepNames.push(step.name);
+            completedSteps.push(step);  // P1-2: Track for compensation
             log.push({ step: step.name, status: "ok", ms: stepMs });
             (ctx as any)[`_step_${step.name}_ms`] = stepMs;
           } else {
@@ -523,11 +549,13 @@ export function createWorkflowModule() {
                 log.push({ step: step.name, status: "fallback_used", ms: stepMs, error: lastErr, category: errorCategory });
                 stepsOk++;
                 stepsFailed--;
+                completedSteps.push(step);  // P1-2: Track even with fallback
                 (ctx as any)[`_step_${step.name}_ms`] = stepMs;
               } catch (fallbackErr: any) {
                 errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
                 log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: errorCategory });
                 if (step.required !== false) {
+                  await applyCompensations(completedSteps, ctx);
                   return {
                     id: runId,
                     name: workflow.name,
@@ -539,6 +567,7 @@ export function createWorkflowModule() {
                     total_ms: T.now() - startMs,
                     log,
                     errors,
+                    compensations,
                   };
                 }
               }
@@ -546,6 +575,7 @@ export function createWorkflowModule() {
               errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
               log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: categorizeError(lastErr) });
               if (step.required !== false) {
+                await applyCompensations(completedSteps, ctx);
                 return {
                   id: runId,
                   name: workflow.name,
@@ -557,6 +587,7 @@ export function createWorkflowModule() {
                   total_ms: T.now() - startMs,
                   log,
                   errors,
+                  compensations,
                 };
               }
             }
@@ -572,6 +603,7 @@ export function createWorkflowModule() {
           if (success) {
             stepsOk++;
             completedStepNames.push(step.name);
+            completedSteps.push(step);  // P1-2: Track for compensation
             log.push({ step: step.name, status: "ok", ms: stepMs });
             ctx = { ...ctx, ...stepResult };
             (ctx as any)[`_step_${step.name}_ms`] = stepMs;
@@ -609,6 +641,7 @@ export function createWorkflowModule() {
                 });
                 stepsOk++;
                 stepsFailed--;
+                completedSteps.push(step);  // P1-2: Track after error handling
                 (ctx as any)[`_step_${step.name}_ms`] = stepMs;
                 continue;
               } catch (handlerErr: any) {
@@ -632,6 +665,7 @@ export function createWorkflowModule() {
                 });
                 stepsOk++;
                 stepsFailed--;
+                completedSteps.push(step);  // P1-2: Track after fallback
                 (ctx as any)[`_step_${step.name}_ms`] = stepMs;
                 continue;
               } catch (fallbackErr: any) {
@@ -651,6 +685,7 @@ export function createWorkflowModule() {
               });
 
               if (step.required !== false) {
+                await applyCompensations(completedSteps, ctx);
                 return {
                   id: runId,
                   name: workflow.name,
@@ -662,6 +697,7 @@ export function createWorkflowModule() {
                   total_ms: T.now() - startMs,
                   log,
                   errors,
+                  compensations,
                 };
               }
             }
@@ -687,6 +723,7 @@ export function createWorkflowModule() {
         total_ms: totalMs,
         log,
         errors,
+        compensations,  // P1-2: Include compensation results
       };
     },
 
