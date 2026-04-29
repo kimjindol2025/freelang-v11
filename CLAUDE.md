@@ -9,13 +9,16 @@
 
 ```fl
 ;; ❌ → ✅
-(map [1 2 3] fn)        → (map fn [1 2 3])          ;; map: fn 먼저
+(map [1 2 3] fn)        → (map fn [1 2 3])          ;; fn 먼저
+(reduce arr init fn)    → (reduce fn init arr)      ;; fn 먼저
+(filter arr fn)         → (filter fn arr)           ;; fn 먼저
+(file_read "path")      → (file-read "path")        ;; kebab-case 표준
+(json_keys m)           → (keys m)                  ;; 의미 중심 이름
 (server_listen 3000)    → (server_start 3000)
-(get-or m k d)          → 직접 정의 필요 (내장 없음)
-{a 1}                   → {:a 1}                     ;; 키워드 필수
+{a 1}                   → {:a 1}                    ;; 키워드 필수
 (= x null)              → (nil? x)
 (console.log x)         → (println x)
-(str-to-int "42")       → (parse-int "42")
+(str-to-int "42")       → (str-to-num "42")         ;; kebab-case
 ```
 
 ---
