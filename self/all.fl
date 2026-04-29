@@ -926,9 +926,7 @@
                                  (get (get $first-item :fields) "items")
                                  null))]
               [$nested (and (not (null? $inner-items))
-                           (> (length $inner-items) 0)
-                           (= (get (get $inner-items 0) :kind) "block")
-                           (= (get (get $inner-items 0) :type) "Array"))]
+                           (> (length $inner-items) 0))]
               [$bindings (if $nested (cg-let-2d $items 0 "" 0) (cg-let-1d $items 0 "" 0))]
               [$body-args (slice $args 1 (length $args))]
               [$body-js (cg-do-body $body-args 0 "")]]
@@ -1057,7 +1055,7 @@
 ;; (loop [[$i 0] [$acc 0]] body-with-recur)
 ;;   → mutable let + while(true) { const __r=...; if(__r?.__recur){[i,acc]=__r.a;continue;} return __r; }
 ;; recur 는 { __recur:true, a:[v1,v2,...] } 를 반환
-[FUNC cg-loop :params [$args]
+[FUNC cg-loop-sexpr :params [$args]
   :body (let [[$bnode (get $args 0)]
               [$items (get (get $bnode :fields) "items")]
               [$first (if (null? $items) null (get $items 0))]
@@ -1568,41 +1566,6 @@
 
 ;; ═══════ sexpr 메인 dispatch ═══════
 
-
-[FUNC cg-and :params [$args]
-  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " && ") ")")]
-
-[FUNC cg-or :params [$args]
-  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " || ") ")")]
-
-[FUNC cg-cond :params [$args]
-  :body (let [[$n (length $args)]]
-          (if (= $n 0) "null"
-            (let [[$last-idx (- $n 1)]
-                  [$loop (fn [$i $acc]
-                           (if (< $i 0) $acc
-                             (let [[$pair (get $args $i)]
-                                   [$items (if (and (= (get $pair :kind) "block") (= (get $pair :type) "Array"))
-                                              (get (get $pair :fields) "items")
-                                              $pair)]
-                                   [$test (cg (get $items 0))]
-                                   [$body (cg (get $items 1))]]
-                               ($loop (- $i 1) (str "(" $test " ? " $body " : " $acc ")")))))]]
-              ($loop $last-idx "null"))))]
-
-[FUNC cg-while :params [$args]
-  :body (str "(() => { while(" (cg (get $args 0)) ") { " (join (map (fn [$a] (cg $a)) (rest $args)) "; ") " } })()")]
-
-[FUNC cg-loop :params [$args]
-  :body (let [[$bindings (get (get (get $args 0) :fields) "items")]
-              [$body-exprs (rest $args)]
-              [$inits (fn [$i $acc]
-                        (if (>= $i (length $bindings)) $acc
-                          (let [[$name (js-name (get (get $bindings $i) :name))]
-                                [$val (cg (get $bindings (+ $i 1)))]]
-                            ($inits (+ $i 2) (str $acc "let " $name " = " $val "; ")))))]]
-          (str "(() => { " ($inits 0 "") "while(true) { " (join (map (fn [$a] (cg $a)) $body-exprs) "; ") "; break; } })()"))]
-
 [FUNC cg-sexpr-dispatch :params [$op $args]
   :body (cond
           [(= $op "if")      (cg-if $args)]
@@ -1620,7 +1583,7 @@
           [(= $op "throw")   (cg-throw $args)]
           [(= $op "try")     (cg-try $args)]
           [(= $op "while")   (cg-while $args)]
-          [(= $op "loop")    (cg-loop $args)]
+          [(= $op "loop")    (cg-loop-sexpr $args)]
           [(= $op "recur")   (cg-recur $args)]
           [(= $op "defstruct") (cg-defstruct $args)]
           [(= $op "compose") (cg-compose $args)]
@@ -1951,41 +1914,7 @@
   :body (let [[$diff (- $n (length $s))]]
           (if (<= $diff 0) $s (str $s (str-repeat $pad $diff))))]
 
-;; self/stdlib/file.fl — Phase 27
-;; 파일 I/O 연산 (native file_* builtin wrapper)
-
-[FUNC file-read :params [$path]
-  :body (file_read (str $path))]
-
-[FUNC file-write :params [$path $content]
-  :body (file_write (str $path) (str $content))]
-
-[FUNC file-append :params [$path $content]
-  :body (file_append (str $path) (str $content))]
-
-[FUNC file-exists? :params [$path]
-  :body (file_exists (str $path))]
-
-[FUNC file-delete :params [$path]
-  :body (file_delete (str $path))]
-
-[FUNC file-copy :params [$src $dest]
-  :body (file_copy (str $src) (str $dest))]
-
-[FUNC file-rename :params [$old $new]
-  :body (file_rename (str $old) (str $new))]
-
-[FUNC file-size :params [$path]
-  :body (file_size (str $path))]
-
-[FUNC file-modified :params [$path]
-  :body (file_modified (str $path))]
-
-[FUNC file-json :params [$path]
-  :body (json-parse (file_read (str $path)))]
-
-[FUNC file-json-write :params [$path $obj]
-  :body (file_write (str $path) (json-stringify $obj))]
+;; file I/O: use file_read, file_write, file_exists, etc. directly (native)
 
 [FUNC file-lines :params [$path]
   :body (str-lines (file_read (str $path)))]
@@ -2057,19 +1986,15 @@
 [FUNC pid-parent :params [] :body (process_ppid)]
 
 
-[FUNC cli-main :params []
-  :body (let [[$argv (cli-args)]]
-          (if (null? $argv) null
-            (if (= (length $argv) 0) null
-              (let [[$cmd (get $argv 0)]]
-                (if (= $cmd "run")
-                  (let [[$input (get $argv 1)]
-                        [$output (if (>= (length $argv) 3) (get $argv 2) (str $input ".out.js"))]]
-                    (compile-file $input $output))
-                  (let [[$input (get $argv 0)]
-                        [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
-                    (compile-file $input $output)))))))]
-
-;; Entry point trigger
-(cli-main)
+;; Entry point: $__argv__ is set by bootstrap.js as extra CLI args
+(if (nil? $__argv__) null
+  (if (= (length $__argv__) 0) null
+    (let [[$cmd (get $__argv__ 0)]]
+      (if (= $cmd "run")
+        (let [[$input (get $__argv__ 1)]
+              [$output (if (>= (length $__argv__) 3) (get $__argv__ 2) (str $input ".out.js"))]]
+          (compile-file $input $output))
+        (let [[$input (get $__argv__ 0)]
+              [$output (if (>= (length $__argv__) 2) (get $__argv__ 1) (str $input ".out.js"))]]
+          (compile-file $input $output))))))
 
