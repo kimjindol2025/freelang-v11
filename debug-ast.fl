@@ -1,4 +1,4 @@
-(let [[$src (file_read "self/bench/hello.fl")]
+(let [[$src (file-read "self/bench/hello.fl")]
       [$tokens (lex $src)]
       [$ast (parse $tokens)]
       [$first (get $ast 0)]]

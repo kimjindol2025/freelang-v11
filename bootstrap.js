@@ -11338,8 +11338,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.length > 0 ? v0[v0.length - 1] : null : null;
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
-    case "get-or":
-    case "get_or": {
+    case "get-or": {
       let k = v1;
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
       if (v0 === null || v0 === void 0) return v2 !== void 0 ? v2 : null;
@@ -11398,14 +11397,12 @@ function flExecOpNative(op, vals) {
     case "block-items":
       return flBlockItems(v0);
     case "read-file":
-    case "file_read":
       try {
         return require("fs").readFileSync(String(v0), "utf-8");
       } catch {
         return null;
       }
     case "write-file":
-    case "file_write":
       try {
         require("fs").writeFileSync(String(v0), String(v1 ?? ""));
         return true;
@@ -11413,7 +11410,6 @@ function flExecOpNative(op, vals) {
         return false;
       }
     case "file-exists?":
-    case "file_exists":
       try {
         return require("fs").existsSync(String(v0));
       } catch {
@@ -12014,14 +12010,10 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "rest":
       return args2[0]?.slice(1);
     case "keys":
-    case "json_keys":
       return args2[0] && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.keys(args2[0]) : [];
     case "values":
-    case "json_vals":
       return args2[0] && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.values(args2[0]) : [];
     case "upper-case":
-    case "uppercase":
-    case "upper":
       return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0];
     case "lower-case":
     case "lowercase":
@@ -12209,15 +12201,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args2[0] === "function";
     case "map?":
       return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
-    case "json_keys":
-      return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.keys(args2[0]) : [];
     case "num-to-str":
-    case "num->str":
       return String(args2[0]);
     case "str-to-num":
-    case "str->num":
-    case "string->number":
-    case "string-to-number":
       return parseFloat(String(args2[0]));
     case "map-set":
       if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
@@ -12284,8 +12270,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "last-or":
     case "last_or":
       return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : args2[1] !== void 0 ? args2[1] : null;
-    case "get-or":
-    case "get_or": {
+    case "get-or": {
       const def = args2[2] !== void 0 ? args2[2] : null;
       let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
@@ -12411,14 +12396,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         case "number?":
           return typeof v0 === "number";
         case "read-file":
-        case "file_read":
           try {
             return require("fs").readFileSync(String(v0), "utf-8");
           } catch {
             return null;
           }
         case "write-file":
-        case "file_write":
           try {
             require("fs").writeFileSync(String(v0), String(v1 ?? ""));
             return true;
@@ -12426,14 +12409,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
             return false;
           }
         case "file-exists?":
-        case "file_exists":
           try {
             return require("fs").existsSync(String(v0));
           } catch {
             return false;
           }
         case "file-append":
-        case "file_append":
           try {
             require("fs").appendFileSync(String(v0), String(v1 ?? ""));
             return true;
@@ -12441,7 +12422,6 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
             return false;
           }
         case "dir-list":
-        case "dir_list":
           try {
             return require("fs").readdirSync(String(v0));
           } catch {

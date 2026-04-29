@@ -388,7 +388,7 @@
             (deep-equal-map-keys? $a $b $ka 0)))]
 
 [FUNC keys-no-line :params [$m]
-  :body (filter (fn [$k] (not (= $k "line"))) (json_keys $m))]
+  :body (filter (fn [$k] (not (= $k "line"))) (keys $m))]
 
 [FUNC deep-equal-map-keys? :params [$a $b $ks $i]
   :body (cond
@@ -619,7 +619,7 @@
                    [$p1 (p-advance $p)]
                    [$val (parse-expr $p1)]
                    [$p2 (get $val :p)] [$v (get $val :node)]]
-               (parse-block-fields $p2 (json_set $acc $key $v)))]
+               (parse-block-fields $p2 (map-set $acc $key $v)))]
             [true (r-pair (p-advance $p) $acc)]))]
 
 ;; ──────────────────────────────────────
@@ -1158,7 +1158,7 @@
 ;; fields는 {key: pattern, ...} 형태의 객체
 [FUNC struct-pattern-test :params [$fields $v $i $keys $acc]
   :body (if (nil? $keys)
-          (let [[$ks (json_keys $fields)]]
+          (let [[$ks (keys $fields)]]
             (struct-pattern-test $fields $v 0 $ks ""))
           (if (>= $i (length $keys))
             (if (= (length $acc) 0)
@@ -1214,14 +1214,14 @@
 
 ;; struct-pattern-bindings: Collect bindings from all fields
 ;; bootstrap parser: fields = Map{...} → map-entries로 변환
-;; self-parser: fields = plain obj {field: pattern, ...} → json_keys로 처리
+;; self-parser: fields = plain obj {field: pattern, ...} → keys로 처리
 [FUNC struct-pattern-bindings :params [$fields $v $i $keys $acc]
   :body (if (nil? $keys)
-          (let [[$ks (json_keys $fields)]]
+          (let [[$ks (keys $fields)]]
             (if (empty? $ks)
-              ;; Map인 경우: json_keys가 빈 배열 반환 → map-entries 사용
+              ;; Map인 경우: keys가 빈 배열 반환 → map-entries 사용
               (struct-pattern-bindings-from-entries (map-entries $fields) $v 0 "")
-              ;; plain object인 경우: json_keys로 계속 진행
+              ;; plain object인 경우: keys로 계속 진행
               (struct-pattern-bindings $fields $v 0 $ks "")))
           (if (>= $i (length $keys))
             $acc
@@ -1425,7 +1425,7 @@
             [(= $op "map-set") (str "_fl_map_set(" $as ")")]
             [(= $op "map-delete") (str "_fl_map_delete(" $as ")")]
             [(= $op "merge") (str "_fl_merge(" $as ")")]
-            [(= $op "json_set") (str "_fl_map_set(" $as ")")]
+            [(= $op "map-set") (str "_fl_map_set(" $as ")")]
 
             ;; ─── JSON (4) ───
             [(= $op "json-parse") (str "JSON.parse(" $as ")")]
@@ -1473,8 +1473,8 @@
             ;; ─── I/O (7) ───
             [(= $op "println") (str "console.log(" $as ")")]
             [(= $op "print") (str "process.stdout.write(String(" $as "))")]
-            [(= $op "file_read") (str "_fl_file_read(" $as ")")]
-            [(= $op "file_write") (str "_fl_file_write(" $as ")")]
+            [(= $op "file-read") (str "_fl_file-read(" $as ")")]
+            [(= $op "file-write") (str "_fl_file-write(" $as ")")]
             [(= $op "file_exists") (str "_fl_file_exists(" $as ")")]
             [(= $op "exit") (str "process.exit(" $as ")")]
             [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
@@ -1665,8 +1665,8 @@
 
 [FUNC prelude-io-misc :params []
   :body (str
-    "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
-    "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
+    "const _fl_file-read = (p) => require('fs').readFileSync(p, 'utf8');"
+    "const _fl_file-write = (p, c) => require('fs').writeFileSync(p, c);"
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
     "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
@@ -1715,11 +1715,11 @@
 ;; 인자 없이 실행하면 FUNC 등록만 하고 종료.
 
 [FUNC compile-file :params [$input $output]
-  :body (let [[$src    (file_read $input)]
+  :body (let [[$src    (file-read $input)]
               [$tokens (lex $src)]
               [$ast    (parse $tokens)]
               [$js     (fl->js-with-prelude $ast)]]
-          (file_write $output $js)
+          (file-write $output $js)
           (println (str "compiled " $input " -> " $output " size=" (length $js))))]
 
 ;; Phase A-3: __argv__ CLI 처리는 src/codegen-js.ts에서 수행
@@ -1892,10 +1892,10 @@
 ;; 파일 I/O 연산 (native file_* builtin wrapper)
 
 [FUNC file-read :params [$path]
-  :body (file_read (str $path))]
+  :body (file-read (str $path))]
 
 [FUNC file-write :params [$path $content]
-  :body (file_write (str $path) (str $content))]
+  :body (file-write (str $path) (str $content))]
 
 [FUNC file-append :params [$path $content]
   :body (file_append (str $path) (str $content))]
@@ -1919,13 +1919,13 @@
   :body (file_modified (str $path))]
 
 [FUNC file-json :params [$path]
-  :body (json-parse (file_read (str $path)))]
+  :body (json-parse (file-read (str $path)))]
 
 [FUNC file-json-write :params [$path $obj]
-  :body (file_write (str $path) (json-stringify $obj))]
+  :body (file-write (str $path) (json-stringify $obj))]
 
 [FUNC file-lines :params [$path]
-  :body (str-lines (file_read (str $path)))]
+  :body (str-lines (file-read (str $path)))]
 
 [FUNC file-mkdir :params [$path]
   :body (file_mkdir (str $path))]

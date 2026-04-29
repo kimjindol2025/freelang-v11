@@ -156,8 +156,8 @@ describe("filter/map/reduce (고차 함수)", () => {
 });
 
 describe("변환 함수", () => {
-  test("num-to-str", () => expect(run("(num->str 42)")).toBe("42"));
-  test("str-to-num", () => expect(run("(str->num \"3.14\")")).toBeCloseTo(3.14));
+  test("num-to-str", () => expect(run("(num-to-str 42)")).toBe("42"));
+  test("str-to-num", () => expect(run("(str-to-num \"3.14\")")).toBeCloseTo(3.14));
   test("typeof 숫자", () => expect(run("(typeof 42)")).toBe("number"));
   test("typeof 문자", () => expect(run("(typeof \"hi\")")).toBe("string"));
 });

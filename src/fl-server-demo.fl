@@ -34,7 +34,7 @@
 ; DELETE /todos/:id → 특정 TODO 삭제
 [FUNC handle-delete-todo :params [$req]
   :body (
-    (define tid (str->num (get (server_req_params $req) "id")))
+    (define tid (str-to-num (get (server_req_params $req) "id")))
     (set! FILTER-TID tid)
     (set! TODOS (fl-filter $TODOS not-filter-tid))
     (server_json {:ok true})
@@ -60,7 +60,7 @@
 
 [FUNC handle-patch-todo :params [$req]
   :body (
-    (define tid (str->num (get (server_req_params $req) "id")))
+    (define tid (str-to-num (get (server_req_params $req) "id")))
     (set! TODOS (update-todo-done tid $TODOS 0 []))
     (server_json {:ok true})
   )

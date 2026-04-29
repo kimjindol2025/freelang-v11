@@ -59,8 +59,8 @@
 ;; map/object
 (define m {:name "kim" :age 30})
 (get m "name")                                ;; "kim"
-(json_set m "age" 31)                         ;; 새 map 반환
-(json_keys m)                                 ;; ["name","age"]
+(map-set m "age" 31)                         ;; 새 map 반환
+(keys m)                                      ;; ["name","age"]
 (map-entries m)                               ;; [["name","kim"],...]
 (obj_merge {:a 1} {:b 2})                    ;; {:a 1 :b 2}
 (obj_pick m ["name"])                         ;; {:name "kim"}
@@ -160,7 +160,7 @@
 
 ```fl
 ;; 파일
-(file_read   "path/file.txt")
+(file-read   "path/file.txt")
 (file_write  "path/file.txt" "내용")
 (file_append "log.txt" "한 줄\n")
 (file_exists "path")             ;; → true/false

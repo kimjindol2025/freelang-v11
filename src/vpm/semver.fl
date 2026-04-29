@@ -11,9 +11,9 @@
       ]
       {
         :original $version_str
-        :major (if (>= (length $parts) 1) (string-to-number (get $parts 0)) 0)
-        :minor (if (>= (length $parts) 2) (string-to-number (get $parts 1)) 0)
-        :patch (if (>= (length $parts) 3) (string-to-number (get $parts 2)) 0)
+        :major (if (>= (length $parts) 1) (str-to-num (get $parts 0)) 0)
+        :minor (if (>= (length $parts) 2) (str-to-num (get $parts 1)) 0)
+        :patch (if (>= (length $parts) 3) (str-to-num (get $parts 2)) 0)
       }
     )
   )
@@ -135,7 +135,7 @@
 [FUNC string-includes? :params [$s $sub] :body (string-includes $s $sub)]
 [FUNC string-starts-with? :params [$s $prefix] :body (= (substring $s 0 (length $prefix)) $prefix)]
 [FUNC string-split :params [$s $sep] :body (split $s $sep)]
-[FUNC string-to-number :params [$s] :body (int $s)]
+[FUNC str-to-num :params [$s] :body (int $s)]
 
 { :parse-version parse-version
   :compare-versions compare-versions

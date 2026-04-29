@@ -75,7 +75,7 @@ describe("loop 기반 — FizzBuzz", () => {
         [(= (% $n 15) 0) "FizzBuzz"]
         [(= (% $n 3) 0) "Fizz"]
         [(= (% $n 5) 0) "Buzz"]
-        [true (num->str $n)])))
+        [true (num-to-str $n)])))
   `;
 
   test("fizzbuzz 15는 FizzBuzz", () => {

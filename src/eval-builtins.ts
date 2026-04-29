@@ -229,7 +229,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "last": return Array.isArray(v0) ? (v0.length > 0 ? v0[v0.length - 1] : null) : null;
     case "rest": return Array.isArray(v0) ? v0.slice(1) : [];
     // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
-    case "get-or": case "get_or": {
+    case "get-or": {
       // (get-or coll key default) — coll이 nil이거나 key가 없으면 default 반환
       let k: any = v1;
       if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
@@ -266,9 +266,9 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "mod": return v0 % v1;
     case "closure?": return v0 !== null && v0 !== undefined && typeof v0 === "object" && v0.kind === "closure";
     case "block-items": return flBlockItems(v0);
-    case "read-file": case "file_read": try { return require("fs").readFileSync(String(v0), "utf-8"); } catch { return null; }
-    case "write-file": case "file_write": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
-    case "file-exists?": case "file_exists": try { return require("fs").existsSync(String(v0)); } catch { return false; }
+    case "read-file": try { return require("fs").readFileSync(String(v0), "utf-8"); } catch { return null; }
+    case "write-file": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
+    case "file-exists?": try { return require("fs").existsSync(String(v0)); } catch { return false; }
     // ── 셀프 호스팅 native builtins (native fl-interp 내부에서 호출 가능) ──
     case "fl-interp": return flInterpNative(v0, v1);
     case "lex": try { return _flLex(String(v0 ?? "")); } catch { return []; }
@@ -942,14 +942,10 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return args[0]?.slice(1);
     // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
     case "keys":
-    case "json_keys":
       return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.keys(args[0]) : [];
     case "values":
-    case "json_vals":
       return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.values(args[0]) : [];
     case "upper-case":
-    case "uppercase":
-    case "upper":
       return typeof args[0] === "string" ? args[0].toUpperCase() : args[0];
     case "lower-case":
     case "lowercase":
@@ -1153,15 +1149,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args[0] === "function";
     case "map?":
       return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]);
-    case "json_keys":
-      return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.keys(args[0]) : [];
     case "num-to-str":
-    case "num->str":
       return String(args[0]);
     case "str-to-num":
-    case "str->num":
-    case "string->number":
-    case "string-to-number":
       return parseFloat(String(args[0]));
     case "map-set":
       if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
@@ -1236,7 +1226,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return Array.isArray(args[0]) && args[0].length > 0
         ? args[0][args[0].length - 1]
         : (args[1] !== undefined ? args[1] : null);
-    case "get-or": case "get_or": {
+    case "get-or": {
       // (get-or coll key default)
       const def = args[2] !== undefined ? args[2] : null;
       let k: any = args[1];
@@ -1347,16 +1337,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         case "array?": return Array.isArray(v0);
         case "string?": return typeof v0 === "string";
         case "number?": return typeof v0 === "number";
-        case "read-file":
-        case "file_read": try { return require("fs").readFileSync(String(v0), "utf-8"); } catch { return null; }
-        case "write-file":
-        case "file_write": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
-        case "file-exists?":
-        case "file_exists": try { return require("fs").existsSync(String(v0)); } catch { return false; }
-        case "file-append":
-        case "file_append": try { require("fs").appendFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
-        case "dir-list":
-        case "dir_list": try { return require("fs").readdirSync(String(v0)); } catch { return []; }
+        case "read-file": try { return require("fs").readFileSync(String(v0), "utf-8"); } catch { return null; }
+        case "write-file": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
+        case "file-exists?": try { return require("fs").existsSync(String(v0)); } catch { return false; }
+        case "file-append": try { require("fs").appendFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
+        case "dir-list": try { return require("fs").readdirSync(String(v0)); } catch { return []; }
         default: return null;
       }
     }
