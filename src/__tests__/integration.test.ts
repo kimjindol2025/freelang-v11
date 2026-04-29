@@ -99,14 +99,14 @@ describe("고차 함수 — reduce 파이프라인", () => {
   test("reduce 합산", () => {
     expect(run(`
       (define numbers (list 1 2 3 4 5 6 7 8 9 10))
-      (reduce $numbers 0 (fn [$acc $x] (+ $acc $x)))
+      (reduce (fn [$acc $x] (+ $acc $x)) 0 $numbers)
     `)).toBe(55);
   });
 
   test("reduce 짝수 합 (조건 포함)", () => {
     expect(run(`
       (define numbers (list 1 2 3 4 5 6 7 8 9 10))
-      (reduce $numbers 0 (fn [$acc $x] (if (even? $x) (+ $acc $x) $acc)))
+      (reduce (fn [$acc $x] (if (even? $x) (+ $acc $x) $acc)) 0 $numbers)
     `)).toBe(30);
   });
 
@@ -122,14 +122,14 @@ describe("고차 함수 — reduce 파이프라인", () => {
   test("reduce로 최대값 찾기", () => {
     expect(run(`
       (define nums (list 3 1 4 1 5 9 2 6))
-      (reduce $nums (first $nums) (fn [$acc $x] (if (> $x $acc) $x $acc)))
+      (reduce (fn [$acc $x] (if (> $x $acc) $x $acc)) (first $nums) $nums)
     `)).toBe(9);
   });
 
   test("reduce로 문자열 빌더", () => {
     expect(run(`
       (define words (list "hello" " " "world"))
-      (reduce $words "" (fn [$acc $x] (concat $acc $x)))
+      (reduce (fn [$acc $x] (concat $acc $x)) "" $words)
     `)).toBe("hello world");
   });
 });
@@ -213,7 +213,7 @@ describe("데이터 변환", () => {
     expect(run(`
       (define nested (list (list 1 2) (list 3 4) (list 5)))
       (define flat (flatten $nested))
-      (reduce $flat 0 (fn [$acc $x] (+ $acc $x)))
+      (reduce (fn [$acc $x] (+ $acc $x)) 0 $flat)
     `)).toBe(15);
   });
 });

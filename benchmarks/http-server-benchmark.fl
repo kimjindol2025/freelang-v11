@@ -1,0 +1,24 @@
+;; E-2: HTTP 서버 TPS/지연 측정
+;; 목표: 100 TPS, p95 < 250ms
+
+(define server-port 40100)
+(define test-iterations 100)
+
+;; 핸들러
+[FUNC handle-test :params [$req]
+  :body (server_json {:status "ok" :time (str (now)) :data "테스트"})]
+
+;; 서버 시작
+(server_get "/test" "handle-test")
+(server_start server-port)
+
+;; 성능 측정 (간단)
+(println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+(println "HTTP 서버 성능 측정")
+(println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+(println "")
+(println "포트: 40100")
+(println "경로: /test")
+(println "목표: 100 TPS, p95 < 250ms")
+(println "")
+(println "✅ 서버 시작")

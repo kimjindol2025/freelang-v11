@@ -23,7 +23,7 @@ describe("Phase 151: v9 자기진화 [EVOLVE]", () => {
     },
     {
       name: "insertion_sort_v1",
-      code: "(fn [arr] (filter arr (fn [$x] (> $x 0))))",
+      code: "(fn [arr] (filter (fn [$x] (> $x 0)) arr))",
       complexity: 1,
     },
     {

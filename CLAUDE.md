@@ -10,7 +10,6 @@
 ```fl
 ;; ❌ → ✅
 (map [1 2 3] fn)        → (map fn [1 2 3])          ;; map: fn 먼저
-(filter fn arr)         → (filter arr fn)            ;; filter: array 먼저
 (server_listen 3000)    → (server_start 3000)
 (get-or m k d)          → 직접 정의 필요 (내장 없음)
 {a 1}                   → {:a 1}                     ;; 키워드 필수

@@ -488,8 +488,8 @@ describe("eval-builtins — 추가 케이스 2", () => {
   });
 
   test("filter 비함수 → 원본 반환", () => {
-    // filter의 두 번째 인자가 함수 아니면 원본 배열 반환
-    expect(run("(filter (list 1 2 3) null)")).toEqual([1, 2, 3]);
+    // filter의 첫 번째 인자가 함수 아니면 원본 배열 반환
+    expect(run("(filter null (list 1 2 3))")).toEqual([1, 2, 3]);
   });
 
   test("find 비배열 → -1", () => {

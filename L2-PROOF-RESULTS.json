@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-04-28T15:09:38Z",
+  "timestamp": "2026-04-29T00:56:30Z",
   "total": 16,
-  "passed": 16,
-  "failed": 0,
-  "pass_rate": 100,
+  "passed": 0,
+  "failed": 16,
+  "pass_rate": 0,
   "cases": [
-    { "name": "case-01-arithmetic.fl", "status": "PASS" },{ "name": "case-02-comparisons.fl", "status": "PASS" },{ "name": "case-03-logic.fl", "status": "PASS" },{ "name": "case-04-control-flow.fl", "status": "PASS" },{ "name": "case-05-functions.fl", "status": "PASS" },{ "name": "case-06-collections.fl", "status": "PASS" },{ "name": "case-07-pattern-matching.fl", "status": "PASS" },{ "name": "case-08-recursion.fl", "status": "PASS" },{ "name": "case-09-strings.fl", "status": "PASS" },{ "name": "case-10-loops.fl", "status": "PASS" },{ "name": "case-11-higher-order.fl", "status": "PASS" },{ "name": "case-12-edge-cases.fl", "status": "PASS" },{ "name": "case-13-ai-vector.fl", "status": "PASS" },{ "name": "case-14-ai-cosine.fl", "status": "PASS" },{ "name": "case-15-ai-template.fl", "status": "PASS" },{ "name": "case-16-ai-ranking.fl", "status": "PASS" }
+    { "name": "case-01-arithmetic.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-02-comparisons.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-03-logic.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-04-control-flow.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-05-functions.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-06-collections.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-07-pattern-matching.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-08-recursion.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-09-strings.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-10-loops.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-11-higher-order.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-12-edge-cases.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-13-ai-vector.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-14-ai-cosine.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-15-ai-template.fl", "status": "FAIL", "reason": "invalid JS 1" },{ "name": "case-16-ai-ranking.fl", "status": "FAIL", "reason": "invalid JS 1" }
   ]
 }

@@ -1055,19 +1055,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     }
 
     case "reduce": {
-      // (reduce fn init arr) 또는 (reduce arr init fn) 모두 지원
-      let reduceFn: any, accumulator: any, arr: any;
-      if (Array.isArray(args[0])) {
-        // 구형: (reduce arr init fn)
-        arr = args[0]; accumulator = args[1]; reduceFn = args[2];
-      } else if (isLazySeq(args[0])) {
-        // lazy seq도 첫 인자로 허용 (range 등)
-        arr = args[0]; accumulator = args[1]; reduceFn = args[2];
-      } else {
-        // 표준: (reduce fn init arr)
-        reduceFn = args[0]; accumulator = args[1]; arr = args[2] ?? [];
-      }
-      // Phase B 후속: lazy seq 자동 강제 변환 (안전 limit 100k)
+      // fn-first 고정: (reduce fn init arr)
+      const reduceFn = args[0];
+      let accumulator = args[1];
+      let arr = args[2] ?? [];
+      // lazy seq 지원 (범위 제한 100k)
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 100000;
         let cur: any = arr;
@@ -1213,12 +1205,10 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 
     // Array Operations
     case "filter": {
-      // 자동 인자 순서 감지: (filter fn list) 또는 (filter list fn) 모두 허용
-      // Lisp 관례 fn-first가 우선, list-first도 호환
-      let coll: any, filterFn: any;
-      if (Array.isArray(args[0])) { coll = args[0]; filterFn = args[1]; }
-      else if (Array.isArray(args[1])) { filterFn = args[0]; coll = args[1]; }
-      else return [];
+      // fn-first 고정: (filter fn arr)
+      const filterFn = args[0];
+      const coll = args[1];
+      if (!Array.isArray(coll)) return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && (filterFn as any).kind === "function-value") {
         return coll.filter((item: any) => callFnVal(filterFn, [item]));

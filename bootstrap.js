@@ -12121,20 +12121,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       };
     }
     case "reduce": {
-      let reduceFn, accumulator, arr;
-      if (Array.isArray(args2[0])) {
-        arr = args2[0];
-        accumulator = args2[1];
-        reduceFn = args2[2];
-      } else if (isLazySeq(args2[0])) {
-        arr = args2[0];
-        accumulator = args2[1];
-        reduceFn = args2[2];
-      } else {
-        reduceFn = args2[0];
-        accumulator = args2[1];
-        arr = args2[2] ?? [];
-      }
+      const reduceFn = args2[0];
+      let accumulator = args2[1];
+      let arr = args2[2] ?? [];
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
         let cur = arr;
@@ -12268,14 +12257,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "repeat":
       return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
     case "filter": {
-      let coll, filterFn;
-      if (Array.isArray(args2[0])) {
-        coll = args2[0];
-        filterFn = args2[1];
-      } else if (Array.isArray(args2[1])) {
-        filterFn = args2[0];
-        coll = args2[1];
-      } else return [];
+      const filterFn = args2[0];
+      const coll = args2[1];
+      if (!Array.isArray(coll)) return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && filterFn.kind === "function-value") {
         return coll.filter((item) => callFnVal(filterFn, [item]));
@@ -24634,79 +24618,65 @@ init_parser();
 // src/runtime-helpers.ts
 function generateRuntimePreamble() {
   return `
-// ===== FreeLang Runtime Helpers =====
-function _fl_null_q(x) { return x === null || x === undefined; }
-function _fl_true_q(x) { return x === true; }
-function _fl_false_q(x) { return x === false; }
-function _fl_number_q(x) { return typeof x === 'number'; }
-function _fl_string_q(x) { return typeof x === 'string'; }
-function _fl_list_q(x) { return Array.isArray(x); }
-function _fl_array_q(x) { return Array.isArray(x); }
-function _fl_map_q(x) { return x !== null && typeof x === 'object' && !Array.isArray(x); }
-function _fl_fn_q(x) { return typeof x === 'function' || (x && x.kind === 'function-value'); }
-function _fl_empty_q(x) { return x === null || x === undefined || (Array.isArray(x) ? x.length === 0 : typeof x === 'object' ? Object.keys(x).length === 0 : typeof x === 'string' ? x.length === 0 : false); }
-function _fl_length(x) { return x && typeof x.length === 'number' ? x.length : Array.isArray(x) ? x.length : 0; }
-function _fl_get(obj, key) { return obj && obj[key] !== undefined ? obj[key] : null; }
-function _fl_str(...parts) { return parts.map(p => p === null || p === undefined ? '' : String(p)).join(''); }
-function _fl_first(arr) { return Array.isArray(arr) && arr.length > 0 ? arr[0] : null; }
-function _fl_last(arr) { return Array.isArray(arr) && arr.length > 0 ? arr[arr.length - 1] : null; }
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+// \u2500 \uD0C0\uC785 \uCCB4\uD06C (9\uAC1C) \u2500
+function _fl_null_q(v) { return v === null || v === undefined; }
+function _fl_true_q(v) { return v === true; }
+function _fl_false_q(v) { return v === false; }
+function _fl_number_q(v) { return typeof v === 'number'; }
+function _fl_string_q(v) { return typeof v === 'string'; }
+function _fl_list_q(v) { return Array.isArray(v); }
+function _fl_array_q(v) { return Array.isArray(v); }
+function _fl_map_q(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+function _fl_fn_q(v) { return typeof v === 'function'; }
+
+// \u2500 \uBC30\uC5F4 \uC870\uC791 (8\uAC1C) \u2500
+function _fl_length(arr) { return Array.isArray(arr) ? arr.length : (typeof arr === 'string' ? arr.length : 0); }
+function _fl_first(arr) { return Array.isArray(arr) ? arr[0] : null; }
+function _fl_last(arr) { return Array.isArray(arr) ? arr[arr.length - 1] : null; }
 function _fl_rest(arr) { return Array.isArray(arr) ? arr.slice(1) : []; }
-function _fl_append(arr, ...items) { return Array.isArray(arr) ? [...arr, ...items] : [arr, ...items]; }
-function _fl_map(fn, arr) { return Array.isArray(arr) ? arr.map(x => typeof fn === 'function' ? fn(x) : null) : []; }
-function _fl_filter(arr, fn) { return Array.isArray(arr) ? arr.filter(x => typeof fn === 'function' ? fn(x) : false) : []; }
-function _fl_reduce(fn, init, arr) { return Array.isArray(arr) ? arr.reduce((acc, x) => typeof fn === 'function' ? fn(acc, x) : acc, init) : init; }
-function _fl_contains_q(arr, item) { return Array.isArray(arr) ? arr.includes(item) : false; }
-function _fl_keys(obj) { return obj && typeof obj === 'object' ? Object.keys(obj) : []; }
-function _fl_has_key_q(obj, key) { return obj && obj.hasOwnProperty(key); }
-function _fl_map_set(obj, key, val) { return Object.assign({}, obj, { [key]: val }); }
-function _fl_upper(s) { return typeof s === 'string' ? s.toUpperCase() : String(s); }
-function _fl_lower(s) { return typeof s === 'string' ? s.toLowerCase() : String(s); }
-function _fl_trim(s) { return typeof s === 'string' ? s.trim() : String(s); }
-function _fl_is_digit_q(c) { return c && c >= '0' && c <= '9'; }
-function _fl_is_alpha_q(c) { return c && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')); }
-function _fl_is_alnum_q(c) { return _fl_is_digit_q(c) || _fl_is_alpha_q(c); }
-function _fl_is_space_q(c) { return c === ' ' || c === '\\t' || c === '\\n' || c === '\\r'; }
-function _fl_is_symbol_char_q(c) { return c && /[a-zA-Z0-9_\\-?!\\/<>=+*%&|^~.]/.test(c); }
-function _fl_print(...args) { console.log(...args); return null; }
-// ===== End Runtime Helpers =====
-`;
+function _fl_append(arr, item) { return Array.isArray(arr) ? [...arr, item] : [item]; }
+function _fl_get(obj, key, dflt) {
+  if (Array.isArray(obj) && typeof key === 'number') return obj[key] !== undefined ? obj[key] : (dflt || null);
+  if (typeof obj === 'object' && obj !== null) return obj[String(key)] !== undefined ? obj[String(key)] : (dflt || null);
+  return dflt || null;
 }
-var HELPER_FUNCTIONS = [
-  "_fl_null_q",
-  "_fl_true_q",
-  "_fl_false_q",
-  "_fl_number_q",
-  "_fl_string_q",
-  "_fl_list_q",
-  "_fl_array_q",
-  "_fl_map_q",
-  "_fl_fn_q",
-  "_fl_empty_q",
-  "_fl_length",
-  "_fl_get",
-  "_fl_str",
-  "_fl_first",
-  "_fl_last",
-  "_fl_rest",
-  "_fl_append",
-  "_fl_map",
-  "_fl_filter",
-  "_fl_reduce",
-  "_fl_contains_q",
-  "_fl_keys",
-  "_fl_has_key_q",
-  "_fl_map_set",
-  "_fl_upper",
-  "_fl_lower",
-  "_fl_trim",
-  "_fl_is_digit_q",
-  "_fl_is_alpha_q",
-  "_fl_is_alnum_q",
-  "_fl_is_space_q",
-  "_fl_is_symbol_char_q",
-  "_fl_print"
-];
-var HELPER_COUNT = HELPER_FUNCTIONS.length;
+function _fl_map_set(obj, key, val) { return { ...obj, [String(key)]: val }; }
+function _fl_keys(obj) { return typeof obj === 'object' && obj !== null ? Object.keys(obj) : []; }
+
+// \u2500 \uBB38\uC790\uC5F4 \uC870\uC791 (5\uAC1C) \u2500
+function _fl_str(...args) { return args.map(v => v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(''); }
+function _fl_lower(s) { return String(s).toLowerCase(); }
+function _fl_upper(s) { return String(s).toUpperCase(); }
+function _fl_trim(s) { return String(s).trim(); }
+function _fl_contains_q(s, sub) { return String(s).includes(String(sub)); }
+
+// \u2500 \uBB38\uC790 \uBD84\uB958 (5\uAC1C) \u2500
+function _fl_is_alpha_q(c) { const ch = String(c)[0]; return /[a-zA-Z]/.test(ch); }
+function _fl_is_digit_q(c) { const ch = String(c)[0]; return /[0-9]/.test(ch); }
+function _fl_is_alnum_q(c) { const ch = String(c)[0]; return /[a-zA-Z0-9]/.test(ch); }
+function _fl_is_space_q(c) { const ch = String(c)[0]; return /\\s/.test(ch); }
+function _fl_is_symbol_char_q(c) { const ch = String(c)[0]; return /[!@#$%^&*\\-_+=]/.test(ch); }
+
+// \u2500 \uACE0\uCC28 \uD568\uC218 (3\uAC1C) \u2500
+function _fl_map(fn, arr) { return arr.map(item => fn([item])); }
+function _fl_filter(arr, fn) { return arr.filter(item => { const res = fn([item]); return res !== false && res !== null; }); }
+function _fl_reduce(fn, init, arr) { return arr.reduce((acc, item) => fn([acc, item]), init); }
+
+// \u2500 \uC870\uAC74\uBD80 & I/O (4\uAC1C) \u2500
+function _fl_empty_q(v) { if (v === null || v === undefined) return true; if (Array.isArray(v)) return v.length === 0; if (typeof v === 'object') return Object.keys(v).length === 0; return v === ''; }
+function _fl_has_key_q(obj, key) { return typeof obj === 'object' && obj !== null && String(key) in obj; }
+function _fl_print(msg) { console.log(msg); return msg; }
+function _fl_request(obj) { return obj; }
+function _fl_response(obj) { return obj; }
+function _fl_wait_and_respond(fn) { return fn([]); }
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+`.trim();
+}
 
 // src/codegen-js.ts
 var DEFAULT_OPTIONS = {
