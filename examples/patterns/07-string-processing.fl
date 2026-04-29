@@ -2,51 +2,36 @@
 ;; AI가 텍스트 데이터를 분석하고 변환할 때 사용
 
 ;; 패턴 A: 기본 문자열 연결
-(let [first-name "John"
-      last-name "Doe"
-      full-name (str first-name " " last-name)]
-  (println "이름:" full-name))
-;; → John Doe
+(define join-names (fn [first-name last-name]
+  (str first-name " " last-name)))
 
-;; 패턴 B: 문자열 분할 및 처리
-(let [csv-line "Alice,25,alice@example.com"
-      parts (str-split csv-line ",")
-      name (get parts 0)
-      age (get parts 1)
-      email (get parts 2)]
-  (println (str "이름: " name ", 나이: " age ", 이메일: " email)))
+;;; TEST: (join-names "John" "Doe") => "John Doe"
 
-;; 패턴 C: 문자열 검색 및 치환
-(let [text "Hello World, Hello Universe"
-      updated (str-replace text "Hello" "Hi")]
-  (println updated))
-;; → Hi World, Hello Universe (첫 번째만 치환)
-
-;; 패턴 D: 문자열 변환 (대소문자)
-(let [name "JoHn DoE"
-      lower (lower-case name)
-      upper (upper-case name)
-      title-case (upper-case (get (str-split name " ") 0))]
-  (println lower)
-  (println upper))
-;; → john doe
-;; → JOHN DOE
-
-;; 패턴 E: 문자열 트림 (공백 제거)
-(let [email-with-spaces "  alice@example.com  "
-      clean-email (trim email-with-spaces)]
-  (println (str "|" clean-email "|")))
-;; → |alice@example.com|
-
-;; 패턴 F: 문자열 검사 (포함 여부)
-(defun is-valid-email [email]
+;; 패턴 B: 문자열 대소문자 변환
+(define test-case-transform (fn []
   (and
-    (str-includes email "@")
-    (str-includes email ".")
-    (> (str-split email "@") 1)))
+    (= (upper-case "hello") "HELLO")
+    (= (lower-case "WORLD") "world"))))
 
-(println (is-valid-email "alice@example.com"))
-;; → true
+;;; TEST: (test-case-transform) => true
+
+;; 패턴 C: 문자열 트림
+(define clean-email (fn [email]
+  (trim email)))
+
+;;; TEST: (clean-email "  alice@example.com  ") => "alice@example.com"
+
+;; 패턴 D: 문자열 길이
+(define text-length (fn [text]
+  (length text)))
+
+;;; TEST: (text-length "hello") => 5
+
+;; 패턴 E: 부분 문자열 추출
+(define substring (fn [text start end]
+  (slice text start end)))
+
+;;; TEST: (substring "hello" 0 3) => "hel"
 
 (println (is-valid-email "alice-example.com"))
 ;; → false

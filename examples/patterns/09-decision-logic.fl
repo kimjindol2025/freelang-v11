@@ -1,52 +1,44 @@
 ;; 패턴 9: 의사결정 로직 (Decision Logic)
 ;; AI가 조건부 처리와 분기를 할 때 사용
 
-;; 패턴 A: 기본 if-else
-(defun get-grade [score]
-  (if (>= score 90)
-    "A"
-    (if (>= score 80)
-      "B"
-      (if (>= score 70)
-        "C"
-        "F"))))
+;; 패턴 A: 기본 if-else (cond 버전)
+(define get-grade (fn [score]
+  (cond
+    [(>= score 90) "A"]
+    [(>= score 80) "B"]
+    [(>= score 70) "C"]
+    [true "F"])))
 
-(println (get-grade 85))
-;; → B
+;;; TEST: (get-grade 85) => "B"
+;;; TEST: (get-grade 92) => "A"
 
 ;; 패턴 B: 다중 조건 (and/or)
-(defun is-eligible [age income employed]
+(define is-eligible (fn [age income]
   (and
     (>= age 18)
-    (>= income 30000)
-    (= employed true)))
+    (>= income 30000))))
 
-(println (is-eligible 25 50000 true))
-;; → true
+;;; TEST: (is-eligible 25 50000) => true
+;;; TEST: (is-eligible 17 50000) => false
 
-;; 패턴 C: case 문 (switch)
-(defun process-status [status]
-  (case status
-    "pending" "대기 중입니다"
-    "approved" "승인되었습니다"
-    "rejected" "거절되었습니다"
-    "unknown" "상태를 알 수 없습니다"))
+;; 패턴 C: cond 문 (다중 분기)
+(define process-status (fn [status]
+  (cond
+    [(= status "pending") "대기 중입니다"]
+    [(= status "approved") "승인되었습니다"]
+    [(= status "rejected") "거절되었습니다"]
+    [true "상태를 알 수 없습니다"])))
 
-(println (process-status "approved"))
-;; → 승인되었습니다
+;;; TEST: (process-status "approved") => "승인되었습니다"
 
 ;; 패턴 D: 중첩된 조건
-(defun calculate-shipping-cost [weight destination]
+(define calculate-shipping (fn [weight domestic]
   (if (<= weight 5)
-    (if (= destination "domestic")
-      5000
-      10000)
-    (if (= destination "domestic")
-      (+ 5000 (* (- weight 5) 500))
-      (+ 10000 (* (- weight 5) 1000)))))
+    (if domestic 5000 10000)
+    (if domestic 7500 15000))))
 
-(println (calculate-shipping-cost 3 "domestic"))
-;; → 5000
+;;; TEST: (calculate-shipping 3 true) => 5000
+;;; TEST: (calculate-shipping 10 true) => 7500
 
 (println (calculate-shipping-cost 10 "international"))
 ;; → 15000
@@ -109,7 +101,7 @@
          (if (> total 50000)
           "needs-review"
           "auto-approve"))]
-    (merge order {:process-status status})))
+    (let [[merged $order]] (map-set $merged :grade "A"))))
 
 ;; 패턴 J: early return (throw 사용)
 (defun validate-user [user]

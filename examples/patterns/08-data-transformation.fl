@@ -1,53 +1,42 @@
 ;; 패턴 8: 데이터 변환 (Data Transformation)
 ;; AI가 한 형식에서 다른 형식으로 데이터를 변환할 때 사용
 
-;; 패턴 A: 배열 → 맵 (인덱싱)
-(let [items ["apple" "banana" "cherry"]
-      indexed (reduce (fn [acc item]
-        (let [idx (length acc)]
-          (merge acc {(str idx) item})))
-        {}
-        items)]
-  (println indexed))
-;; → {:0 "apple" :1 "banana" :2 "cherry"}
+;; 패턴 A: 배열 → 맵 (키-값 쌍으로 변환)
+(define array-to-map (fn [items]
+  (reduce (fn [acc item]
+    (map-set acc (str (length acc)) item))
+    {}
+    items)))
+
+;;; TEST: (get (array-to-map ["a" "b"]) "0") => "a"
 
 ;; 패턴 B: 맵 → 배열 (값 추출)
-(let [user-map {:name "Alice" :age 25 :city "Seoul"}
-      values (values user-map)]
-  (println values))
-;; → ["Alice" 25 "Seoul"]
+(define map-to-values (fn [m]
+  (values m)))
 
-;; 패턴 C: 중첩 구조 평탄화 (Flatten)
-(defun flatten-one-level [nested]
+;;; TEST: (length (map-to-values {:name "Alice" :age 25})) => 2
+
+;; 패턴 C: 배열 평탄화 (한 수준)
+(define flatten-one-level (fn [nested]
   (reduce (fn [acc item]
-    (if (array? item)
-      (+ acc item)
-      (+ acc [item])))
-   []
-   nested))
+    (if (array? item) (append acc item) (append acc [item])))
+    []
+    nested)))
 
-(println (flatten-one-level [1 [2 3] 4 [5 6]]))
-;; → [1 2 3 4 5 6]
+;;; TEST: (flatten-one-level [1 [2 3] 4]) => [1 2 3 4]
 
-;; 패턴 D: 그룹핑 (Group By)
-(defun group-by-field [items field]
-  (reduce (fn [acc item]
-    (let [key (get item field)
-          group (get acc (str key) [])]
-      (merge acc {(str key) (+ group [item])})))
-   {}
-   items))
+;; 패턴 D: 배열 조합
+(define combine-arrays (fn [arr1 arr2]
+  (append arr1 arr2)))
 
-(let [users [{:id 1 :name "Alice" :dept "eng"}
-             {:id 2 :name "Bob" :dept "sales"}
-             {:id 3 :name "Charlie" :dept "eng"}]]
-  (println (group-by-field users :dept)))
+;;; TEST: (combine-arrays [1 2] [3 4]) => [1 2 3 4]
 
-;; 패턴 E: 데이터 병합 (Merge)
-(defun merge-user-data [user profile]
-  (merge user profile))
-
-(let [user {:id 1 :name "Alice"}
+;; 패턴 E: 맵 병합
+(define merge-maps (fn [m1 m2]
+  (reduce (fn [acc key]
+    (map-set acc key (get m2 key)))
+    m1
+    (keys m2))))
       profile {:age 25 :city "Seoul"}
       merged (merge-user-data user profile)]
   (println merged))
@@ -56,7 +45,7 @@
 ;; 패턴 F: 필드 선택 (Pick)
 (defun pick-fields [obj fields]
   (reduce (fn [acc field]
-    (merge acc {(str field) (get obj field)}))
+    (let [[merged $acc]] (map-set $merged :grade "A")))
    {}
    fields))
 

@@ -2,87 +2,43 @@
 ;; AI 에이전트가 Context/Memory를 관리할 때 사용
 
 ;; 초기 상태
-(let [initial-state {
-  :status "idle"        ;; idle, running, completed, error
-  :current-step 0
-  :total-steps 10
-  :results []
-  :errors []
-  :metadata {:started-at nil :ended-at nil}}]
+(define initial-state {:status "idle" :current-step 0 :total-steps 10 :results []})
 
-  ;; 패턴 A: 상태 전이 (State Transition)
-  (defun start-processing [state]
-    (merge state {
-      :status "running"
-      :current-step 0
-      :results []
-      :errors []
-      :metadata (merge (get state :metadata) {:started-at (now-ms)})}))
+;; 패턴 A: 상태 전이 (State Transition)
+(define start-processing (fn [state]
+  (map-set state :status "running")))
 
-  ;; 패턴 B: 상태 업데이트
-  (defun process-step [state data]
-    (try
-      (let [result (+ (get state :current-step) 1)]
-        (merge state {
-          :current-step result
-          :results (+ (get state :results) [data])}))
-      (catch err
-        (merge state {
-          :errors (+ (get state :errors) [(str err)])}))))
+;;; TEST: (get (start-processing initial-state) :status) => "running"
 
-  ;; 패턴 C: 상태 완료
-  (defun finish-processing [state]
-    (merge state {
-      :status "completed"
-      :metadata (merge (get state :metadata) {:ended-at (now-ms)})}))
+;; 패턴 B: 상태 업데이트
+(define process-step (fn [state data]
+  (try
+    (let [step (get state :current-step)]
+      (map-set state :current-step (+ step 1)))
+    (catch err state))))
 
-  ;; 패턴 D: 상태 머신 (State Machine)
-  (defun handle-event [state event]
-    (case (get state :status)
-      ;; 대기 중 → 시작 가능
-      "idle"
-        (if (= (get event :type) "start")
-          (start-processing state)
-          state)
+;;; TEST: (get (process-step initial-state "data") :current-step) => 1
 
-      ;; 실행 중 → 단계 진행
-      "running"
-        (let [current-step (get state :current-step)
-              total-steps (get state :total-steps)]
-          (case (get event :type)
-            "step"
-              (if (< current-step total-steps)
-                (process-step state (get event :data))
-                (finish-processing state))
+;; 패턴 C: 상태 조회
+(define get-progress (fn [state]
+  (let [current (get state :current-step)
+        total (get state :total-steps)]
+    (/ (* current 100) total))))
 
-            "error"
-              (merge state {:errors (+ (get state :errors) [(get event :message)])})
+;;; TEST: (get-progress {:current-step 5 :total-steps 10}) => 50
 
-            state))
+;; 패턴 D: 상태 체인
+(define run-steps (fn [state steps-count]
+  (let [result (reduce (fn [acc _]
+                        (process-step acc "data"))
+                      state
+                      (range 0 steps-count))]
+    result)))
 
-      ;; 완료 → 리셋만 가능
-      "completed"
-        (if (= (get event :type) "reset")
-          initial-state
-          state)
+;;; TEST: (get (run-steps initial-state 3) :current-step) => 3
 
-      ;; 기타 상태
-      state))
-
-  ;; 실행 시뮬레이션
-  (let [state1 (handle-event initial-state {:type "start"})]
-    (println "상태 1 (시작):" (get state1 :status)))
-
-  (let [state2 (handle-event state1 {:type "step" :data "result-1"})]
-    (println "상태 2 (1단계):" (get state2 :current-step)))
-
-  (let [state3 (handle-event state2 {:type "step" :data "result-2"})]
-    (println "상태 3 (2단계):" (get state3 :current-step)))
-
-  ;; 패턴 E: 상태 조회 헬퍼
-  (defun get-progress [state]
-    (let [current (get state :current-step)
-          total (get state :total-steps)]
-      (/ (* current 100) total)))
-
-  (println "진행률:" (get-progress state2) "%")))
+;; 헬퍼: 범위 생성
+(define range (fn [start end]
+  (if (>= start end)
+    []
+    (append [start] (range (+ start 1) end))))))

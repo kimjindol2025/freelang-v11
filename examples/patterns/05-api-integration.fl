@@ -1,55 +1,41 @@
-;; 패턴 5: API 통합 (REST API)
+;; 패턴 5: API URL 생성 및 요청 구축
 ;; AI가 외부 API를 호출할 때 사용
 
-;; 패턴 A: 기본 GET 요청
-(defun fetch-users []
-  (try
-    (let [response (await (http-get "https://api.example.com/users"))]
-      response)
-    (catch err
-      (println "API 호출 실패:" err)
-      nil)))
+;; 패턴 A: 기본 URL 생성
+(define build-user-url (fn [base-url user-id]
+  (str base-url "/users/" user-id)))
 
-;; 패턴 B: 쿼리 파라미터와 함께 GET
-(defun fetch-users-by-age [min-age max-age]
-  (try
-    (let [url (str "https://api.example.com/users?min_age=" min-age "&max_age=" max-age)
-          response (await (http-get url))]
-      response)
-    (catch err
-      (println "조회 실패:" err)
-      [])))
+;;; TEST: (build-user-url "https://api.example.com" 123) => "https://api.example.com/users/123"
 
-;; 패턴 C: 헤더와 함께 GET (인증 등)
-(defun fetch-user [user-id auth-token]
-  (try
-    (let [response (await (http-get
-      (str "https://api.example.com/users/" user-id)
-      {:headers {:Authorization (str "Bearer " auth-token)}}))]
-      response)
-    (catch err
-      (println "인증된 요청 실패:" err)
-      nil)))
+;; 패턴 B: 쿼리 파라미터 생성
+(define build-query-url (fn [base-url params]
+  (let [min-age (get params :min-age)
+        max-age (get params :max-age)]
+    (str base-url "/users?min_age=" min-age "&max_age=" max-age))))
 
-;; 패턴 D: POST 요청 (데이터 생성)
-(defun create-user [name email age]
-  (try
-    (let [payload {:name name :email email :age age}
-          response (await (http-post
-            "https://api.example.com/users"
-            payload
-            {:headers {:content-type "application/json"}}))]
-      response)
-    (catch err
-      (println "사용자 생성 실패:" err)
-      nil)))
+;;; TEST: (build-query-url "https://api.example.com" {:min-age 18 :max-age 65}) => "https://api.example.com/users?min_age=18&max_age=65"
 
-;; 패턴 E: 복잡한 API 플로우 (다중 호출)
-(defun get-user-with-posts [user-id]
+;; 패턴 C: 요청 헤더 생성
+(define build-auth-header (fn [token]
+  {:Authorization (str "Bearer " token)}))
+
+;;; TEST: (get (build-auth-header "abc123") :Authorization) => "Bearer abc123"
+
+;; 패턴 D: 요청 본문 생성
+(define build-user-payload (fn [name email age]
+  {:name name :email email :age age}))
+
+;;; TEST: (get (build-user-payload "Alice" "alice@example.com" 25) :name) => "Alice"
+
+;; 패턴 E: 응답 검증
+(define validate-response (fn [response]
   (try
-    (let [user (await (http-get (str "https://api.example.com/users/" user-id)))
+    (if (nil? response) (throw "Response is nil"))
+    (if (not (map? response)) (throw "Response is not a map"))
+    true
+    (catch err false))))
           posts (await (http-get (str "https://api.example.com/users/" user-id "/posts")))]
-      (merge user {:posts posts}))
+      (let [[merged $user]] (map-set $merged :grade "A")))
     (catch err
       (println "사용자/게시물 조회 실패:" err)
       nil)))
@@ -104,6 +90,6 @@
         "https://api.example.com/users"
         user))
       (catch err
-        (merge user {:error (str err)}))))
+        (let [[merged $user]] (map-set $merged :grade "A")))))
     user-list)]
     results))

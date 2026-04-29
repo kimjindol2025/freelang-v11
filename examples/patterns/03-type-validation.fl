@@ -2,105 +2,56 @@
 ;; AI가 외부 입력을 처리할 때 필수
 
 ;; 패턴 A: 기본 타입 검증
-(defun calculate-discount [price discount-percent]
-  (if (not (number? price))
-    (throw "Price must be number"))
-  (if (not (number? discount-percent))
-    (throw "Discount must be number"))
-  (if (< price 0)
-    (throw "Price cannot be negative"))
-  (if (or (< discount-percent 0) (> discount-percent 100))
-    (throw "Discount must be 0-100"))
-  ;; 검증 통과 후 계산
-  (* price (- 1 (/ discount-percent 100))))
+(define calculate-discount (fn [price discount-percent]
+  (if (not (number? price)) (throw "Price must be number"))
+  (if (not (number? discount-percent)) (throw "Discount must be number"))
+  (if (< price 0) (throw "Price cannot be negative"))
+  (if (or (< discount-percent 0) (> discount-percent 100)) (throw "Discount must be 0-100"))
+  (* price (- 1 (/ discount-percent 100)))))
 
-(println (calculate-discount 100 20))
-;; → 80
+;;; TEST: (calculate-discount 100 20) => 80
 
 ;; 패턴 B: 복합 타입 검증
-(defun process-user-list [users]
-  ;; 타입 검증
-  (if (not (array? users))
-    (throw "Users must be array"))
-  ;; 각 요소 검증
-  (let [validated (map (fn [user]
-    (if (not (map? user))
-      (throw "Each user must be map"))
-    (if (not (string? (get user :name)))
-      (throw "User name must be string"))
-    (if (not (number? (get user :age)))
-      (throw "User age must be number"))
+(define process-user-list (fn [users]
+  (if (not (array? users)) (throw "Users must be array"))
+  (map (fn [user]
+    (if (not (map? user)) (throw "Each user must be map"))
+    (if (not (string? (get user :name))) (throw "User name must be string"))
+    (if (not (number? (get user :age))) (throw "User age must be number"))
     user)
-    users)]
-    validated))
+    users)))
+
+;;; TEST: (length (process-user-list [{:name "Alice" :age 25}])) => 1
 
 ;; 패턴 C: nil 안전 처리 (Optional)
-(defun get-user-email [user]
-  ;; nil 체크
+(define get-user-email (fn [user]
   (if (nil? user)
-    nil)
-  ;; 필드 존재 여부 확인
-  (let [email (get user :email)]
-    (if (nil? email)
-      "no-email@example.com"
-      email)))
+    nil
+    (let [email (get user :email)]
+      (if (nil? email)
+        "no-email@example.com"
+        email)))))
 
-(println (get-user-email {:name "Alice" :email "alice@example.com"}))
-;; → alice@example.com
-
-(println (get-user-email {:name "Bob"}))
-;; → no-email@example.com
-
-(println (get-user-email nil))
-;; → nil
+;;; TEST: (get-user-email {:name "Alice" :email "alice@example.com"}) => "alice@example.com"
+;;; TEST: (get-user-email {:name "Bob"}) => "no-email@example.com"
+;;; TEST: (get-user-email nil) => nil
 
 ;; 패턴 D: 조건부 타입 검증
-(defun convert-to-number [value]
+(define convert-to-number (fn [value]
   (cond
-    ((number? value) value)
-    ((string? value)
-      (try
-        (let [n (parse-number value)]
-          (if (nil? n) 0 n))
-        (catch e 0)))
-    (true 0)))  ;; 기본값
+    [(number? value) value]
+    [(string? value) (try (str-to-num value) (catch e 0))]
+    [true 0])))
 
-(println (convert-to-number 42))
-;; → 42
-
-(println (convert-to-number "100"))
-;; → 100
-
-(println (convert-to-number "abc"))
-;; → 0
-
-;; 패턴 E: 타입 어서션 (assertion)
-(defun assert-string [value field-name]
-  (if (not (string? value))
-    (throw (str field-name " must be string, got " (type-of value)))))
-
-(defun create-user [name email]
-  (assert-string name "Name")
-  (assert-string email "Email")
-  {:name name :email email :created-at (now-ms)})
+;;; TEST: (convert-to-number 42) => 42
+;;; TEST: (convert-to-number "100") => 100
+;;; TEST: (convert-to-number "abc") => 0
 
 ;; 패턴 F: 배열 요소 타입 검증
-(defun sum-numbers [numbers]
-  (if (not (array? numbers))
-    (throw "Input must be array"))
-  (let [validated (filter (fn [n]
-    (if (not (number? n))
-      (do
-        (println "경고: " n " is not a number, skipping")
-        false)
-      true))
-    numbers)]
-    (reduce (fn [acc n] (+ acc n)) 0 validated)))
+(define sum-numbers (fn [numbers]
+  (if (not (array? numbers)) (throw "Input must be array"))
+  (let [valid (filter (fn [n] (number? n)) numbers)]
+    (reduce (fn [acc n] (+ acc n)) 0 valid))))
 
-(println (sum-numbers [1 2 3 4 5]))
-;; → 15
-
-(println (sum-numbers [1 "two" 3 "four" 5]))
-;; → 경고: "two" is not a number, skipping
-;; → 경고: "four" is not a number, skipping
-;; → 9
+;;; TEST: (sum-numbers [1 2 3 4 5]) => 15
+;;; TEST: (sum-numbers [1 "two" 3 "four" 5]) => 9

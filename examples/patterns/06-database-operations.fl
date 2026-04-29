@@ -1,43 +1,40 @@
-;; 패턴 6: 데이터베이스 작업 (Database)
-;; AI가 데이터를 쿼리하고 수정할 때 사용
+;; 패턴 6: 데이터 쿼리 및 변환 (Database-like Operations)
+;; AI가 배열 데이터에서 SELECT, UPDATE, DELETE 연산을 할 때 사용
 
-;; 패턴 A: 기본 SELECT (조회)
-(defun get-all-users []
-  (try
-    (db-query "SELECT * FROM users")
-    (catch err
-      (println "조회 실패:" err)
-      [])))
+;; 샘플 데이터
+(define users [{:id 1 :name "Alice" :age 25} {:id 2 :name "Bob" :age 30}])
 
-;; 패턴 B: WHERE 조건과 함께 조회
-(defun get-users-by-age [min-age max-age]
-  (try
-    (db-query
-      "SELECT * FROM users WHERE age >= ? AND age <= ?"
-      [min-age max-age])
-    (catch err
-      (println "조건부 조회 실패:" err)
-      [])))
+;; 패턴 A: 기본 필터 (SELECT)
+(define get-all-users (fn [] users))
 
-;; 패턴 C: INSERT (데이터 삽입)
-(defun create-user [name email age]
-  (try
-    (db-exec
-      "INSERT INTO users (name, email, age) VALUES (?, ?, ?)"
-      [name email age])
-    (catch err
-      (println "사용자 생성 실패:" err)
-      -1)))
+;;; TEST: (length (get-all-users)) => 2
 
-;; 패턴 D: UPDATE (데이터 수정)
-(defun update-user [user-id name email]
-  (try
-    (db-exec
-      "UPDATE users SET name = ?, email = ? WHERE id = ?"
-      [name email user-id])
-    (catch err
-      (println "사용자 수정 실패:" err)
-      0)))
+;; 패턴 B: 조건부 필터 (WHERE)
+(define get-users-by-age (fn [min-age max-age]
+  (filter (fn [u] (and (>= (get u :age) min-age) (<= (get u :age) max-age)))
+          users)))
+
+;;; TEST: (length (get-users-by-age 25 30)) => 2
+;;; TEST: (length (get-users-by-age 26 30)) => 1
+
+;; 패턴 C: 데이터 추가
+(define add-user (fn [users name age]
+  (append users {:id (+ (length users) 1) :name name :age age})))
+
+;;; TEST: (length (add-user users "Charlie" 35)) => 3
+
+;; 패턴 D: 데이터 변경
+(define update-user (fn [users user-id name]
+  (map (fn [u] (if (= (get u :id) user-id) (map-set u :name name) u))
+       users)))
+
+;;; TEST: (get (first (update-user users 1 "Alicia")) :name) => "Alicia"
+
+;; 패턴 E: 데이터 삭제
+(define remove-user (fn [users user-id]
+  (filter (fn [u] (!= (get u :id) user-id)) users)))
+
+;;; TEST: (length (remove-user users 1)) => 1
 
 ;; 패턴 E: DELETE (데이터 삭제)
 (defun delete-user [user-id]

@@ -1,56 +1,50 @@
 ;; 패턴 1: map, filter, reduce 기본 사용법
 ;; AI가 데이터 처리할 때 가장 자주 사용하는 패턴
 
-;; 예제 데이터
-(let [users [{:id 1 :name "Alice" :age 25 :score 95}
-             {:id 2 :name "Bob" :age 17 :score 87}
-             {:id 3 :name "Charlie" :age 30 :score 92}
-             {:id 4 :name "Diana" :age 22 :score 78}]]
+;; 테스트 데이터
+(define test-users [{:id 1 :name "Alice" :age 25 :score 95}
+                     {:id 2 :name "Bob" :age 17 :score 87}
+                     {:id 3 :name "Charlie" :age 30 :score 92}
+                     {:id 4 :name "Diana" :age 22 :score 78}])
 
-  ;; 패턴 A: map — 데이터 변환
-  ;; 모든 사용자의 이름을 대문자로 변환
-  (let [names-upper (map (fn [user]
-    (upper-case (get user :name)))
-    users)]
-    (println "대문자 이름:" names-upper))
-  ;; → ALICE, BOB, CHARLIE, DIANA
+;; 패턴 A: map — 데이터 변환
+(define test-map-upper (fn []
+  (map (fn [user] (upper-case (get user :name))) test-users)))
 
-  ;; 패턴 B: filter — 조건에 맞는 항목만 선택
-  ;; 성인(18세 이상)만 필터링
-  (let [adults (filter (fn [user]
-    (>= (get user :age) 18))
-    users)]
-    (println "성인 수:" (length adults)))
-  ;; → 3명
+;;; TEST: (test-map-upper) => ["ALICE" "BOB" "CHARLIE" "DIANA"]
 
-  ;; 패턴 C: reduce — 누적 계산
-  ;; 모든 사용자의 평균 점수 계산
-  (let [total-score (reduce (fn [acc user]
-    (+ acc (get user :score)))
-    0
-    users)
-        avg-score (/ total-score (length users))]
-    (println "평균 점수:" avg-score))
-  ;; → 88
+;; 패턴 B: filter — 조건에 맞는 항목만 선택
+(define test-filter-adults (fn []
+  (filter (fn [user] (>= (get user :age) 18)) test-users)))
 
-  ;; 패턴 D: 조합 (map + filter)
-  ;; 성인의 이름 목록만 추출
-  (let [adult-names (map (fn [user]
-    (get user :name))
-    (filter (fn [user] (>= (get user :age) 18)) users))]
-    (println "성인 이름:" adult-names))
-  ;; → [Alice Charlie Diana]
+;;; TEST: (length (test-filter-adults)) => 3
 
-  ;; 패턴 E: 고급 map
-  ;; 각 사용자에 대해 점수 등급 추가
-  (let [users-with-grade (map (fn [user]
-    (let [score (get user :score)
-          grade (cond
-                  [(>= score 90) "A"]
-                  [(>= score 80) "B"]
-                  [(>= score 70) "C"]
-                  [true "F"])]
-      (merge user {:grade grade})))
-    users)]
-    (println "등급 추가:" users-with-grade)))
+;; 패턴 C: reduce — 누적 계산
+(define test-reduce-avg (fn []
+  (let [total (reduce (fn [acc user] (+ acc (get user :score))) 0 test-users)]
+    (/ total (length test-users)))))
+
+;;; TEST: (test-reduce-avg) => 88
+
+;; 패턴 D: 조합 (map + filter)
+(define test-combined (fn []
+  (map (fn [user] (get user :name))
+       (filter (fn [user] (>= (get user :age) 18)) test-users))))
+
+;;; TEST: (test-combined) => ["Alice" "Charlie" "Diana"]
+
+;; 패턴 E: 고급 map with cond
+(define test-map-grade (fn []
+  (map (fn [user]
+         (let [score (get user :score)
+               grade (cond
+                       [(>= score 90) "A"]
+                       [(>= score 80) "B"]
+                       [(>= score 70) "C"]
+                       [true "F"])]
+           (map-set user :grade grade)))
+       test-users)))
+
+;;; TEST: (get (first (test-map-grade)) :grade) => "A"
+;;; TEST: (get (get test-users 1) :score) => 87
 ;; → [{:id 1 :name "Alice" :age 25 :score 95 :grade "A"} ...]
