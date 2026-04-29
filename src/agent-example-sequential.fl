@@ -9,7 +9,7 @@
 (println "")
 
 ; Task 1: 데이터 수집
-[FUNC action-fetch :params [$ctx]
+[FUNC action-fetch :params [ctx]
   :body (do
     (println "→ Task 1: Fetching data...")
     (println "✓ Fetched 3 records")
@@ -22,7 +22,7 @@
 ]
 
 ; Task 2: 데이터 필터링
-[FUNC action-process :params [$ctx]
+[FUNC action-process :params [ctx]
   :body (do
     (println "→ Task 2: Processing data...")
     (println "✓ Filtered to 2 records (score >= 90)")
@@ -34,7 +34,7 @@
 ]
 
 ; Task 3: 데이터 저장
-[FUNC action-save :params [$ctx]
+[FUNC action-save :params [ctx]
   :body (do
     (println "→ Task 3: Saving data...")
     (println "✓ Saved 2 records to database")
@@ -44,22 +44,22 @@
 
 ; 실행
 (let [
-  [$task1 (make-task "fetch-data" action-fetch)]
-  [$task2 (make-task "process-data" action-process)]
-  [$task3 (make-task "save-data" action-save)]
+  [task1 (make-task "fetch-data" action-fetch)]
+  [task2 (make-task "process-data" action-process)]
+  [task3 (make-task "save-data" action-save)]
 ]
   (let [
-    [$task2 (assoc $task2 :depends ["fetch-data"])]
-    [$task3 (assoc $task3 :depends ["process-data"])]
+    [task2 (assoc task2 :depends ["fetch-data"])]
+    [task3 (assoc task3 :depends ["process-data"])]
   ]
     (let [
-      [$result (agent-run [$task1 $task2 $task3])]
+      [result (agent-run [task1 task2 task3])]
     ] (do
       (println "")
       (println "════════════════════════════════════════")
       (println "실행 완료!")
-      (println (str "상태: " (get $result :status)))
-      (println (str "총 단계: " (get $result :total-steps)))
+      (println (str "상태: " (get result :status)))
+      (println (str "총 단계: " (get result :total-steps)))
       (println "════════════════════════════════════════")
     ))
   )

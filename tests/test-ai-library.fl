@@ -4,33 +4,33 @@
 (require :ai "self/stdlib/ai.fl")
 
 ;; vector-add 테스트
-(let [$result (vector-add [1 2 3] [4 5 6])]
-  (println (str "vector-add [1,2,3] [4,5,6] = " $result)))
+(let [result (vector-add [1 2 3] [4 5 6])]
+  (println (str "vector-add [1,2,3] [4,5,6] = " result)))
 
 ;; vector-dot 테스트
-(let [$result (vector-dot [1 2 3] [4 5 6])]
-  (println (str "vector-dot [1,2,3] [4,5,6] = " $result " (expected: 32)")))
+(let [result (vector-dot [1 2 3] [4 5 6])]
+  (println (str "vector-dot [1,2,3] [4,5,6] = " result " (expected: 32)")))
 
 ;; cosine-sim 테스트 (동일 벡터 = 1.0)
-(let [$result (cosine-sim [1 0 0] [1 0 0])]
-  (println (str "cosine-sim [1,0,0] [1,0,0] = " $result " (expected: 1.0)")))
+(let [result (cosine-sim [1 0 0] [1 0 0])]
+  (println (str "cosine-sim [1,0,0] [1,0,0] = " result " (expected: 1.0)")))
 
 ;; score-candidates 테스트
-(let [$result (score-candidates
+(let [result (score-candidates
                [{:text "a" :score 0.5}
                 {:text "b" :score 0.9}
                 {:text "c" :score 0.7}])]
-  (println (str "score-candidates sorted = " (map $result (fn [$x] (get $x :text))))))
+  (println (str "score-candidates sorted = " (map result (fn [x] (get x :text))))))
 
 ;; prompt-template 테스트
-(let [$result (prompt-template "Hello {{name}}, you are {{role}}"
+(let [result (prompt-template "Hello {{name}}, you are {{role}}"
                                {:name "Alice" :role "Engineer"})]
-  (println (str "prompt-template = " $result)))
+  (println (str "prompt-template = " result)))
 
 ;; top-k-retrieval 테스트
-(let [$result (top-k-retrieval
+(let [result (top-k-retrieval
                [{:score 0.9 :content "first"}
                 {:score 0.7 :content "second"}
                 {:score 0.5 :content "third"}]
                2)]
-  (println (str "top-k-retrieval (k=2) count = " (length $result))))
+  (println (str "top-k-retrieval (k=2) count = " (length result))))

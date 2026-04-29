@@ -51,6 +51,13 @@ export interface WorkflowStep {
   // P1-2: Compensation Transaction
   compensate?: (ctx: Record<string, any>) => any;  // rollback on failure
   on_partial?: (partial: any) => any;               // handle partial success
+  // P1-3: Distributed Execution
+  distributed?: {
+    enabled: boolean;
+    batch_size?: number;        // items per batch (default 1000)
+    max_parallel?: number;      // max parallel batches (default 4)
+    sync_interval_ms?: number;  // state sync interval (default 5000)
+  };
 }
 
 export interface WorkflowResult {
@@ -69,6 +76,13 @@ export interface WorkflowResult {
     error?: string;
     category?: string;      // P0-4: 에러 카테고리 (IO, TIMEOUT, TYPE_ERROR, ...)
     attempted?: number;     // P0-4: 재시도 횟수
+    // P1-4: Observability
+    trace_id?: string;      // 분산 추적 ID
+    worker_id?: string;     // 실행 워커 ID (분산 실행 시)
+    metrics?: {
+      wall_time_ms: number;     // 전체 실행 시간
+      parallel_tasks?: number;  // 병렬 task 개수
+    };
   }>;
   errors: string[];
   // P1-2: Compensation Transaction
@@ -78,6 +92,13 @@ export interface WorkflowResult {
     result?: any;
     error?: string;
   }>;
+  // P1-4: Observability
+  metrics?: {
+    total_ms: number;
+    parallel_ratio: number;     // 병렬 task 사용 비율 (0.0~1.0)
+    compensation_ratio: number; // 보상 실행 비율 (0.0~1.0)
+    error_ratio: number;        // 에러 발생 비율 (0.0~1.0)
+  };
 }
 
 export function createWorkflowModule() {
@@ -108,6 +129,12 @@ export function createWorkflowModule() {
         merge_strategy?: 'all-success' | 'first-success' | 'any-partial';
         compensate?: (ctx: Record<string, any>) => any;
         on_partial?: (partial: any) => any;
+        distributed?: {
+          enabled: boolean;
+          batch_size?: number;
+          max_parallel?: number;
+          sync_interval_ms?: number;
+        };
       } = {}
     ): WorkflowStep => ({
       name,
@@ -123,6 +150,7 @@ export function createWorkflowModule() {
       merge_strategy: options.merge_strategy,
       compensate: options.compensate,
       on_partial: options.on_partial,
+      distributed: options.distributed,
     }),
 
     // ── Workflow Execution ────────────────────────────────────
@@ -189,7 +217,13 @@ export function createWorkflowModule() {
           try {
             const shouldRun = step.if(ctx);
             if (!shouldRun) {
-              log.push({ step: step.name, status: "skipped", ms: 0 });
+              log.push({
+                step: step.name,
+                status: "skipped",
+                ms: 0,
+                trace_id: traceId,
+                metrics: { wall_time_ms: 0 },
+              });
               continue;
             }
           } catch (condErr: any) {
@@ -357,6 +391,7 @@ export function createWorkflowModule() {
 
     // workflow_run_async workflow initial_ctx options -> Promise<WorkflowResult>
     // P1-1 async version supporting parallel tasks
+    // P1-4: Enhanced observability with trace_id and metrics
     // options: {checkpoint_path, checkpoint_every, auto_resume}
     "workflow_run_async": async (
       workflow: Record<string, any>,
@@ -369,6 +404,7 @@ export function createWorkflowModule() {
     ): Promise<WorkflowResult> => {
       const startMs = T.now();
       const runId = X.uuid_short();
+      const traceId = X.uuid_short();  // P1-4: Trace ID for distributed tracing
       const checkpointPath = options?.checkpoint_path;
       const checkpointEvery = options?.checkpoint_every ?? 0;
       const autoResume = options?.auto_resume ?? true;
@@ -459,6 +495,29 @@ export function createWorkflowModule() {
         return { success: strategySuccess, results: mergedResults, errors: taskErrors };
       };
 
+      // P1-2: Helper to apply compensations (rollback)
+      const applyCompensations = async (completedSteps: WorkflowStep[], currentCtx: Record<string, any>): Promise<void> => {
+        for (let i = completedSteps.length - 1; i >= 0; i--) {
+          const step = completedSteps[i];
+          if (step.compensate) {
+            try {
+              const compensationResult = await step.compensate(currentCtx);
+              compensations.push({
+                step: step.name,
+                action: 'applied',
+                result: compensationResult,
+              });
+            } catch (compErr: any) {
+              compensations.push({
+                step: step.name,
+                action: 'pending',
+                error: compErr.message,
+              });
+            }
+          }
+        }
+      };
+
       for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
         const step = steps[stepIndex];
         // P0-2: Check conditional execution
@@ -466,12 +525,19 @@ export function createWorkflowModule() {
           try {
             const shouldRun = step.if(ctx);
             if (!shouldRun) {
-              log.push({ step: step.name, status: "skipped", ms: 0 });
+              log.push({
+                step: step.name,
+                status: "skipped",
+                ms: 0,
+                trace_id: traceId,
+                metrics: { wall_time_ms: 0 },
+              });
               continue;
             }
           } catch (condErr: any) {
             errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
             if (step.required !== false) {
+              await applyCompensations(completedSteps, ctx);
               return {
                 id: runId,
                 name: workflow.name,
@@ -483,6 +549,7 @@ export function createWorkflowModule() {
                 total_ms: T.now() - startMs,
                 log,
                 errors,
+                compensations,
               };
             }
             continue;
@@ -507,7 +574,14 @@ export function createWorkflowModule() {
             ctx = { ...ctx, ...stepResult };
             stepsOk++;
             completedStepNames.push(step.name);
-            log.push({ step: step.name, status: "ok", ms: stepMs });
+            completedSteps.push(step);  // P1-2: Track for compensation
+            log.push({
+              step: step.name,
+              status: "ok",
+              ms: stepMs,
+              trace_id: traceId,
+              metrics: { wall_time_ms: stepMs },
+            });
             (ctx as any)[`_step_${step.name}_ms`] = stepMs;
           } else {
             stepsFailed++;
@@ -523,11 +597,13 @@ export function createWorkflowModule() {
                 log.push({ step: step.name, status: "fallback_used", ms: stepMs, error: lastErr, category: errorCategory });
                 stepsOk++;
                 stepsFailed--;
+                completedSteps.push(step);  // P1-2: Track even with fallback
                 (ctx as any)[`_step_${step.name}_ms`] = stepMs;
               } catch (fallbackErr: any) {
                 errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
                 log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: errorCategory });
                 if (step.required !== false) {
+                  await applyCompensations(completedSteps, ctx);
                   return {
                     id: runId,
                     name: workflow.name,
@@ -539,6 +615,7 @@ export function createWorkflowModule() {
                     total_ms: T.now() - startMs,
                     log,
                     errors,
+                    compensations,
                   };
                 }
               }
@@ -546,6 +623,7 @@ export function createWorkflowModule() {
               errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
               log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: categorizeError(lastErr) });
               if (step.required !== false) {
+                await applyCompensations(completedSteps, ctx);
                 return {
                   id: runId,
                   name: workflow.name,
@@ -557,6 +635,7 @@ export function createWorkflowModule() {
                   total_ms: T.now() - startMs,
                   log,
                   errors,
+                  compensations,
                 };
               }
             }
@@ -572,7 +651,14 @@ export function createWorkflowModule() {
           if (success) {
             stepsOk++;
             completedStepNames.push(step.name);
-            log.push({ step: step.name, status: "ok", ms: stepMs });
+            completedSteps.push(step);  // P1-2: Track for compensation
+            log.push({
+              step: step.name,
+              status: "ok",
+              ms: stepMs,
+              trace_id: traceId,
+              metrics: { wall_time_ms: stepMs },
+            });
             ctx = { ...ctx, ...stepResult };
             (ctx as any)[`_step_${step.name}_ms`] = stepMs;
 
@@ -609,6 +695,7 @@ export function createWorkflowModule() {
                 });
                 stepsOk++;
                 stepsFailed--;
+                completedSteps.push(step);  // P1-2: Track after error handling
                 (ctx as any)[`_step_${step.name}_ms`] = stepMs;
                 continue;
               } catch (handlerErr: any) {
@@ -632,6 +719,7 @@ export function createWorkflowModule() {
                 });
                 stepsOk++;
                 stepsFailed--;
+                completedSteps.push(step);  // P1-2: Track after fallback
                 (ctx as any)[`_step_${step.name}_ms`] = stepMs;
                 continue;
               } catch (fallbackErr: any) {
@@ -651,6 +739,7 @@ export function createWorkflowModule() {
               });
 
               if (step.required !== false) {
+                await applyCompensations(completedSteps, ctx);
                 return {
                   id: runId,
                   name: workflow.name,
@@ -662,6 +751,7 @@ export function createWorkflowModule() {
                   total_ms: T.now() - startMs,
                   log,
                   errors,
+                  compensations,
                 };
               }
             }
@@ -676,6 +766,18 @@ export function createWorkflowModule() {
         deleteCheckpoint(checkpointPath);
       }
 
+      // P1-4: Normalize log entries with trace_id and metrics
+      const normalizedLog = log.map(entry => ({
+        ...entry,
+        trace_id: entry.trace_id || traceId,
+        metrics: entry.metrics || { wall_time_ms: entry.ms || 0 },
+      }));
+
+      // P1-4: Calculate workflow-level metrics
+      const parallelStepsCount = completedSteps.filter(s => s.parallel_tasks && s.parallel_tasks.length > 0).length;
+      const totalSteps = stepsOk + stepsFailed;
+      const totalCompensations = compensations?.length ?? 0;
+
       return {
         id: runId,
         name: workflow.name,
@@ -685,8 +787,16 @@ export function createWorkflowModule() {
         steps_ok: stepsOk,
         steps_failed: stepsFailed,
         total_ms: totalMs,
-        log,
+        log: normalizedLog,
         errors,
+        compensations,  // P1-2: Include compensation results
+        // P1-4: Observability metrics
+        metrics: {
+          total_ms: totalMs,
+          parallel_ratio: totalSteps > 0 ? parallelStepsCount / totalSteps : 0,
+          error_ratio: totalSteps > 0 ? stepsFailed / totalSteps : 0,
+          compensation_ratio: totalSteps > 0 ? Math.min(totalCompensations / totalSteps, 1) : 0,
+        },
       };
     },
 

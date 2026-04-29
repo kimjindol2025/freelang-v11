@@ -1,30 +1,30 @@
 ;; self/stdlib/binary.fl — Phase 26 Part 3
 ;; 비트 연산
 
-[FUNC bit-and :params [$a $b] :body (bit-and-op $a $b)]
-[FUNC bit-and-op :params [$a $b] :body (floor (/ (mod (* $a $b) 256) 1))]
+[FUNC bit-and :params [a b] :body (bit-and-op a b)]
+[FUNC bit-and-op :params [a b] :body (floor (/ (mod (* a b) 256) 1))]
 
-[FUNC bit-or :params [$a $b] :body (floor (+ (- $a (bit-and $a $b)) (- $b (bit-and $a $b))))]
+[FUNC bit-or :params [a b] :body (floor (+ (- a (bit-and a b)) (- b (bit-and a b))))]
 
-[FUNC bit-xor :params [$a $b] :body (floor (+ (bit-and $a (bit-or 255 (- $b 1))) (bit-and $b (bit-or 255 (- $a 1)))))]
+[FUNC bit-xor :params [a b] :body (floor (+ (bit-and a (bit-or 255 (- b 1))) (bit-and b (bit-or 255 (- a 1)))))]
 
-[FUNC bit-not :params [$a] :body (- 255 (mod (floor $a) 256))]
+[FUNC bit-not :params [a] :body (- 255 (mod (floor a) 256))]
 
-[FUNC bit-shift-left :params [$n $bits] :body (* $n (pow 2 $bits))]
+[FUNC bit-shift-left :params [n bits] :body (* n (pow 2 bits))]
 
-[FUNC bit-shift-right :params [$n $bits] :body (floor (/ $n (pow 2 $bits)))]
+[FUNC bit-shift-right :params [n bits] :body (floor (/ n (pow 2 bits)))]
 
-[FUNC bit-count-ones :params [$n]
-  :body (bit-count-loop (mod (floor $n) 256) 0 0)]
-[FUNC bit-count-loop :params [$n $i $count]
-  :body (if (>= $i 8) $count
-          (bit-count-loop (floor (/ $n 2)) (+ $i 1)
-            (+ $count (mod $n 2))))]
+[FUNC bit-count-ones :params [n]
+  :body (bit-count-loop (mod (floor n) 256) 0 0)]
+[FUNC bit-count-loop :params [n i count]
+  :body (if (>= i 8) count
+          (bit-count-loop (floor (/ n 2)) (+ i 1)
+            (+ count (mod n 2))))]
 
-[FUNC bytes-to-hex :params [$bytes]
-  :body (bytes-hex-loop $bytes 0 "")]
-[FUNC bytes-hex-loop :params [$bytes $i $acc]
-  :body (if (>= $i (length $bytes)) $acc
-          (let [[$byte (get $bytes $i)]
-                [$hex (pad-zero (floor (% $byte 256)) 2)]]
-            (bytes-hex-loop $bytes (+ $i 1) (str $acc $hex))))]
+[FUNC bytes-to-hex :params [bytes]
+  :body (bytes-hex-loop bytes 0 "")]
+[FUNC bytes-hex-loop :params [bytes i acc]
+  :body (if (>= i (length bytes)) acc
+          (let [[byte (get bytes i)]
+                [hex (pad-zero (floor (% byte 256)) 2)]]
+            (bytes-hex-loop bytes (+ i 1) (str acc hex))))]

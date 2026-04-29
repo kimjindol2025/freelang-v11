@@ -1,66 +1,66 @@
 ;; self/stdlib/metadata.fl — Phase 29
 ;; 메타데이터 추출 및 관리 (frontmatter, SEO 등)
 
-[FUNC extract-frontmatter :params [$content]
-  :body (extract-fm-loop (str $content) 0 "" (list))]
-[FUNC extract-fm-loop :params [$content $i $line $acc]
-  :body (if (>= $i (length $content)) (list (list) $content)
-          (let [[$char (char-at $content $i)]]
-            (if (= $char "\n")
-              (if (= $line "---")
-                (if (> (length $acc) 0)
-                  (extract-fm-parse (substring $content (+ $i 1)))
-                  (extract-fm-loop $content (+ $i 1) "" $acc))
-                (extract-fm-loop $content (+ $i 1) "" (append $acc (list $line))))
-              (extract-fm-loop $content (+ $i 1) (str $line $char) $acc))))]
+[FUNC extract-frontmatter :params [content]
+  :body (extract-fm-loop (str content) 0 "" (list))]
+[FUNC extract-fm-loop :params [content i line acc]
+  :body (if (>= i (length content)) (list (list) content)
+          (let [[char (char-at content i)]]
+            (if (= char "\n")
+              (if (= line "---")
+                (if (> (length acc) 0)
+                  (extract-fm-parse (substring content (+ i 1)))
+                  (extract-fm-loop content (+ i 1) "" acc))
+                (extract-fm-loop content (+ i 1) "" (append acc (list line))))
+              (extract-fm-loop content (+ i 1) (str line char) acc))))]
 
-[FUNC extract-fm-parse :params [$content]
-  :body (let [[$idx (index-of $content "---")]]
-          (if (< $idx 0) (list (list) $content)
-            (let [[$fm-str (substring $content 0 $idx)]
-                  [$body (substring $content (+ $idx 3))]]
-              (list (parse-yaml $fm-str) (trim $body)))))]
+[FUNC extract-fm-parse :params [content]
+  :body (let [[idx (index-of content "---")]]
+          (if (< idx 0) (list (list) content)
+            (let [[fm-str (substring content 0 idx)]
+                  [body (substring content (+ idx 3))]]
+              (list (parse-yaml fm-str) (trim body)))))]
 
-[FUNC parse-yaml :params [$yaml]
-  :body (parse-yaml-loop (split (str $yaml) "\n") 0 (map))]
-[FUNC parse-yaml-loop :params [$lines $i $acc]
-  :body (if (>= $i (length $lines)) $acc
-          (let [[$line (get $lines $i)]
-                [$idx (index-of $line ":")]]
-            (if (< $idx 0) (parse-yaml-loop $lines (+ $i 1) $acc)
-              (let [[$key (trim (substring $line 0 $idx))]
-                    [$val (trim (substring $line (+ $idx 1)))]]
-                (parse-yaml-loop $lines (+ $i 1)
-                  (set $acc $key (trim (replace (str $val) "\"" ""))))))))]
+[FUNC parse-yaml :params [yaml]
+  :body (parse-yaml-loop (split (str yaml) "\n") 0 (map))]
+[FUNC parse-yaml-loop :params [lines i acc]
+  :body (if (>= i (length lines)) acc
+          (let [[line (get lines i)]
+                [idx (index-of line ":")]]
+            (if (< idx 0) (parse-yaml-loop lines (+ i 1) acc)
+              (let [[key (trim (substring line 0 idx))]
+                    [val (trim (substring line (+ idx 1)))]]
+                (parse-yaml-loop lines (+ i 1)
+                  (set acc key (trim (replace (str val) "\"" ""))))))))]
 
-[FUNC metadata-title :params [$meta]
-  :body (get $meta "title" "Untitled")]
+[FUNC metadata-title :params [meta]
+  :body (get meta "title" "Untitled")]
 
-[FUNC metadata-description :params [$meta]
-  :body (get $meta "description" "")]
+[FUNC metadata-description :params [meta]
+  :body (get meta "description" "")]
 
-[FUNC metadata-tags :params [$meta]
-  :body (split (get $meta "tags" "") ",")]
+[FUNC metadata-tags :params [meta]
+  :body (split (get meta "tags" "") ",")]
 
-[FUNC metadata-author :params [$meta]
-  :body (get $meta "author" "Unknown")]
+[FUNC metadata-author :params [meta]
+  :body (get meta "author" "Unknown")]
 
-[FUNC metadata-date :params [$meta]
-  :body (get $meta "date" "")]
+[FUNC metadata-date :params [meta]
+  :body (get meta "date" "")]
 
-[FUNC generate-seo-meta :params [$meta]
+[FUNC generate-seo-meta :params [meta]
   :body (list
-    (str "<meta name=\"title\" content=\"" (get $meta "title" "") "\">")
-    (str "<meta name=\"description\" content=\"" (get $meta "description" "") "\">")
-    (str "<meta name=\"keywords\" content=\"" (get $meta "tags" "") "\">")
-    (str "<meta name=\"author\" content=\"" (get $meta "author" "") "\">"))]
+    (str "<meta name=\"title\" content=\"" (get meta "title" "") "\">")
+    (str "<meta name=\"description\" content=\"" (get meta "description" "") "\">")
+    (str "<meta name=\"keywords\" content=\"" (get meta "tags" "") "\">")
+    (str "<meta name=\"author\" content=\"" (get meta "author" "") "\">"))]
 
-[FUNC generate-og-meta :params [$meta $url]
+[FUNC generate-og-meta :params [meta url]
   :body (list
-    (str "<meta property=\"og:title\" content=\"" (get $meta "title" "") "\">")
-    (str "<meta property=\"og:description\" content=\"" (get $meta "description" "") "\">")
-    (str "<meta property=\"og:url\" content=\"" $url "\">")
-    (str "<meta property=\"og:image\" content=\"" (get $meta "image" "") "\">"))]
+    (str "<meta property=\"og:title\" content=\"" (get meta "title" "") "\">")
+    (str "<meta property=\"og:description\" content=\"" (get meta "description" "") "\">")
+    (str "<meta property=\"og:url\" content=\"" url "\">")
+    (str "<meta property=\"og:image\" content=\"" (get meta "image" "") "\">"))]
 
-[FUNC build-meta-tags :params [$meta]
-  :body (append (generate-seo-meta $meta) (generate-og-meta $meta "/"))]
+[FUNC build-meta-tags :params [meta]
+  :body (append (generate-seo-meta meta) (generate-og-meta meta "/"))]

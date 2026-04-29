@@ -1,4 +1,4 @@
 (println (str "lex function: " (type-of lex)))
 
-(let [[$result (lex ":name")]]
-  (println (str "raw result: " $result)))
+(let [[result (lex ":name")]]
+  (println (str "raw result: " result)))

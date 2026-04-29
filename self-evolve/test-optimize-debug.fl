@@ -1,63 +1,63 @@
 ;; optimize-node의 map 동작 디버그
 
-(defn is-constant [$node]
-  (if (nil? $node) false
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "literal")
-        (let [[$type (get $node "type")]]
-          (if (= $type "symbol") false true))
+(defn is-constant [node]
+  (if (nil? node) false
+    (let [[kind (get node "kind")]]
+      (if (= kind "literal")
+        (let [[type (get node "type")]]
+          (if (= type "symbol") false true))
         false))))
 
-(defn all-constant? [$args]
-  (if (= (length $args) 0) true
-    (let [[$first (get $args 0)]]
-      (let [[$rest (slice $args 1 (length $args))]]
-        (if (is-constant $first) (all-constant? $rest) false)))))
+(defn all-constant? [args]
+  (if (= (length args) 0) true
+    (let [[first (get args 0)]]
+      (let [[rest (slice args 1 (length args))]]
+        (if (is-constant first) (all-constant? rest) false)))))
 
-(defn evaluate-arithmetic [$op $args]
-  (let [[$v0 (get (get $args 0) "value")]]
-    (let [[$v1 (get (get $args 1) "value")]]
-      (if (= $op "+") (+ $v0 $v1)
-        (if (= $op "-") (- $v0 $v1)
-          (if (= $op "*") (* $v0 $v1)
-            (if (= $op "/") (/ $v0 $v1) nil)))))))
+(defn evaluate-arithmetic [op args]
+  (let [[v0 (get (get args 0) "value")]]
+    (let [[v1 (get (get args 1) "value")]]
+      (if (= op "+") (+ v0 v1)
+        (if (= op "-") (- v0 v1)
+          (if (= op "*") (* v0 v1)
+            (if (= op "/") (/ v0 v1) nil)))))))
 
-(defn make-literal [$value]
-  {:kind "literal" :type "number" :value $value :line nil})
+(defn make-literal [value]
+  {:kind "literal" :type "number" :value value :line nil})
 
-(defn fold-constant [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (= $op "+")
-          (if (all-constant? $args)
-            (make-literal (evaluate-arithmetic $op $args))
-            $node)
-          $node)))
-    $node))
+(defn fold-constant [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (= op "+")
+          (if (all-constant? args)
+            (make-literal (evaluate-arithmetic op args))
+            node)
+          node)))
+    node))
 
-(defn optimize-node [$node $depth]
-  (println (str (str (+ $depth 1)) ". optimize-node called"))
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (println (str "   op=" $op))
-      (let [[$args (get $node "args")]]
-        (println (str "   args length=" (length $args)))
-        (let [[$new-args (map (fn [$arg] (optimize-node $arg (+ $depth 1))) $args)]]
-          (println (str "   new-args length=" (length $new-args)))
-          (println (str "   new-args[0] kind=" (get (get $new-args 0) "kind")))
-          (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
-            (let [[$result (fold-constant $new-node)]]
-              (println (str "   result kind=" (get $result "kind")))
-              $result)))))
+(defn optimize-node [node depth]
+  (println (str (str (+ depth 1)) ". optimize-node called"))
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (println (str "   op=" op))
+      (let [[args (get node "args")]]
+        (println (str "   args length=" (length args)))
+        (let [[new-args (map (fn [arg] (optimize-node arg (+ depth 1))) args)]]
+          (println (str "   new-args length=" (length new-args)))
+          (println (str "   new-args[0] kind=" (get (get new-args 0) "kind")))
+          (let [[new-node {:kind "sexpr" :op op :args new-args :line (get node "line")}]]
+            (let [[result (fold-constant new-node)]]
+              (println (str "   result kind=" (get result "kind")))
+              result)))))
     (do
       (println (str "   literal, returning as-is"))
-      $node)))
+      node)))
 
 (do
   (println "테스트: (+ (+ 1 2) 3)")
-  (let [[$ast (parse (lex "(+ (+ 1 2) 3)"))]]
-    (let [[$node (get $ast 0)]]
-      (println (str "원본 kind: " (get $node "kind")))
-      (let [[$result (optimize-node $node 0)]]
-        (println (str "최종 kind: " (get $result "kind")))))))
+  (let [[ast (parse (lex "(+ (+ 1 2) 3)"))]]
+    (let [[node (get ast 0)]]
+      (println (str "원본 kind: " (get node "kind")))
+      (let [[result (optimize-node node 0)]]
+        (println (str "최종 kind: " (get result "kind")))))))

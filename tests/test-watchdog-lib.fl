@@ -6,14 +6,14 @@
     (println "=== Test 1: health-check-port ===")
 
     ;; 테스트 1.1: 정상 응답 (httpbin.org)
-    (let [[$result (http_get "https://httpbin.org/status/200")]]
-      (if $result
+    (let [[result (http_get "https://httpbin.org/status/200")]]
+      (if result
         (println "✅ Test 1.1 PASS: HTTP GET 성공")
         (println "❌ Test 1.1 FAIL: HTTP GET 실패")))
 
     ;; 테스트 1.2: 잘못된 포트
-    (let [[$result (http_get "http://localhost:99999/health")]]
-      (if (= $result nil)
+    (let [[result (http_get "http://localhost:99999/health")]]
+      (if (= result nil)
         (println "✅ Test 1.2 PASS: 잘못된 포트 감지")
         (println "❌ Test 1.2 FAIL: 잘못된 포트 미감지")))))
 
@@ -25,10 +25,10 @@
     (file_mkdir "/tmp/test-watchdog-logs")
 
     ;; 테스트 2.1: 장애 로그
-    (let [[$timestamp (now_iso)]]
+    (let [[timestamp (now_iso)]]
       (do
         (file_append "/tmp/test-watchdog-logs/failures.log"
-          (str "[" $timestamp "] test-service FAILED: timeout\n"))
+          (str "[" timestamp "] test-service FAILED: timeout\n"))
         (println "✅ Test 2.1 PASS: 장애 로그 저장")))))
 
 ;; 3. 배치 처리 테스트
@@ -37,9 +37,9 @@
     (println "=== Test 3: Batch Processing ===")
 
     ;; 테스트 3.1: 3개 항목 처리
-    (let [[$items [1 2 3]]]
-      (let [[$results (map (fn [$x] (* $x 2)) $items)]]
-        (if (= (length $results) 3)
+    (let [[items [1 2 3]]]
+      (let [[results (map (fn [x] (* x 2)) items)]]
+        (if (= (length results) 3)
           (println "✅ Test 3.1 PASS: 배치 처리 성공")
           (println "❌ Test 3.1 FAIL: 배치 처리 실패"))))))
 
@@ -48,9 +48,9 @@
   (do
     (println "=== Test 4: Timestamp ===")
 
-    (let [[$ts (now_iso)]]
-      (if (> (length $ts) 0)
-        (println (str "✅ Test 4 PASS: ISO 타임스탬프 " $ts))
+    (let [[ts (now_iso)]]
+      (if (> (length ts) 0)
+        (println (str "✅ Test 4 PASS: ISO 타임스탬프 " ts))
         (println "❌ Test 4 FAIL: 타임스탬프 생성 실패")))))
 
 ;; 모든 테스트 실행

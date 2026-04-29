@@ -1,57 +1,57 @@
 ;; self/stdlib/tree.fl — Phase 26 Part 4
 ;; 트리 자료구조 연산
 
-[FUNC tree-node :params [$value $children]
-  :body (list $value (if (nil? $children) (list) $children))]
+[FUNC tree-node :params [value children]
+  :body (list value (if (nil? children) (list) children))]
 
-[FUNC tree-value :params [$node] :body (get $node 0)]
+[FUNC tree-value :params [node] :body (get node 0)]
 
-[FUNC tree-children :params [$node] :body (get $node 1)]
+[FUNC tree-children :params [node] :body (get node 1)]
 
-[FUNC tree-is-leaf? :params [$node]
-  :body (= (length (tree-children $node)) 0)]
+[FUNC tree-is-leaf? :params [node]
+  :body (= (length (tree-children node)) 0)]
 
-[FUNC tree-depth :params [$node]
-  :body (if (tree-is-leaf? $node) 0
-          (+ 1 (tree-depth-loop (tree-children $node) 0)))]
-[FUNC tree-depth-loop :params [$children $max]
-  :body (if (= (length $children) 0) $max
-          (let [[$child-depth (tree-depth (get $children 0))]]
-            (tree-depth-loop (rest $children)
-              (if (> $child-depth $max) $child-depth $max))))]
+[FUNC tree-depth :params [node]
+  :body (if (tree-is-leaf? node) 0
+          (+ 1 (tree-depth-loop (tree-children node) 0)))]
+[FUNC tree-depth-loop :params [children max]
+  :body (if (= (length children) 0) max
+          (let [[child-depth (tree-depth (get children 0))]]
+            (tree-depth-loop (rest children)
+              (if (> child-depth max) child-depth max))))]
 
-[FUNC tree-count :params [$node]
-  :body (+ 1 (tree-count-loop (tree-children $node) 0))]
-[FUNC tree-count-loop :params [$children $acc]
-  :body (if (= (length $children) 0) $acc
-          (tree-count-loop (rest $children)
-            (+ $acc (tree-count (get $children 0)))))]
+[FUNC tree-count :params [node]
+  :body (+ 1 (tree-count-loop (tree-children node) 0))]
+[FUNC tree-count-loop :params [children acc]
+  :body (if (= (length children) 0) acc
+          (tree-count-loop (rest children)
+            (+ acc (tree-count (get children 0)))))]
 
-[FUNC tree-map :params [$fn $node]
-  :body (list ($fn (tree-value $node))
-              (tree-map-loop $fn (tree-children $node)))]
-[FUNC tree-map-loop :params [$fn $children]
-  :body (if (= (length $children) 0) (list)
-          (cons (tree-map $fn (get $children 0))
-                (tree-map-loop $fn (rest $children))))]
+[FUNC tree-map :params [fn node]
+  :body (list (fn (tree-value node))
+              (tree-map-loop fn (tree-children node)))]
+[FUNC tree-map-loop :params [fn children]
+  :body (if (= (length children) 0) (list)
+          (cons (tree-map fn (get children 0))
+                (tree-map-loop fn (rest children))))]
 
-[FUNC tree-filter :params [$pred $node]
-  :body (if ($pred (tree-value $node))
-          (list (tree-value $node)
-                (tree-filter-loop $pred (tree-children $node)))
+[FUNC tree-filter :params [pred node]
+  :body (if (pred (tree-value node))
+          (list (tree-value node)
+                (tree-filter-loop pred (tree-children node)))
           nil)]
-[FUNC tree-filter-loop :params [$pred $children]
-  :body (if (= (length $children) 0) (list)
-          (let [[$filtered (tree-filter $pred (get $children 0))]]
-            (if (nil? $filtered)
-              (tree-filter-loop $pred (rest $children))
-              (cons $filtered (tree-filter-loop $pred (rest $children))))))]
+[FUNC tree-filter-loop :params [pred children]
+  :body (if (= (length children) 0) (list)
+          (let [[filtered (tree-filter pred (get children 0))]]
+            (if (nil? filtered)
+              (tree-filter-loop pred (rest children))
+              (cons filtered (tree-filter-loop pred (rest children))))))]
 
-[FUNC tree-collect :params [$node]
-  :body (tree-collect-loop (list $node) (list))]
-[FUNC tree-collect-loop :params [$queue $acc]
-  :body (if (= (length $queue) 0) (reverse $acc)
-          (let [[$node (get $queue 0)]]
+[FUNC tree-collect :params [node]
+  :body (tree-collect-loop (list node) (list))]
+[FUNC tree-collect-loop :params [queue acc]
+  :body (if (= (length queue) 0) (reverse acc)
+          (let [[node (get queue 0)]]
             (tree-collect-loop
-              (append (rest $queue) (tree-children $node))
-              (append $acc (list (tree-value $node))))))]
+              (append (rest queue) (tree-children node))
+              (append acc (list (tree-value node))))))]

@@ -3,22 +3,22 @@
   (println "=== Phase 19: Complete Stdlib Integration ===")
   
   ;; String ops
-  (let [[$s "hello world"]]
+  (let [[s "hello world"]]
     (do
-      (println (str "string: " (upper $s) " / " (lower $s)))
-      (println (str "split: " (split $s " ")))))
+      (println (str "string: " (upper s) " / " (lower s)))
+      (println (str "split: " (split s " ")))))
   
   ;; List ops
-  (let [[$nums (list 5 2 8 1 9 3)]]
+  (let [[nums (list 5 2 8 1 9 3)]]
     (do
-      (println (str "list ops: sort=" (sort $nums)))
-      (println (str "list ops: reverse=" (reverse (sort $nums))))))
+      (println (str "list ops: sort=" (sort nums)))
+      (println (str "list ops: reverse=" (reverse (sort nums))))))
   
   ;; Time
-  (let [[$t (now_ms)]
-        [$iso (now_iso)]]
+  (let [[t (now_ms)]
+        [iso (now_iso)]]
     (do
-      (println (str "time: now_ms=" (number? $t)))
-      (println (str "time: now_iso=" (string? $iso)))))
+      (println (str "time: now_ms=" (number? t)))
+      (println (str "time: now_iso=" (string? iso)))))
   
   (println "✓ All stdlib modules verified"))

@@ -1,2 +1,2 @@
-[FUNC myfn :params [$x] :body (* $x 2)]
+[FUNC myfn :params [x] :body (* x 2)]
 (println (myfn 21))

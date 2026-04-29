@@ -5,7 +5,7 @@
 (define test-iterations 100)
 
 ;; 핸들러
-[FUNC handle-test :params [$req]
+[FUNC handle-test :params [req]
   :body (server_json {:status "ok" :time (str (now)) :data "테스트"})]
 
 ;; 서버 시작

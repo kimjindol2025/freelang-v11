@@ -1,10 +1,10 @@
-(let [[$tokens (list {:kind "Number" :value "42"} 
+(let [[tokens (list {:kind "Number" :value "42"} 
                      {:kind "Symbol" :value "foo"})]]
   (do
-    (println (str "tokens: " $tokens))
-    (println (str "first token: " (first $tokens)))
-    (println (str "first kind: " (get (first $tokens) :kind)))
-    (let [[$result (reduce (fn [$acc $t] 
-                            (str $acc (get $t :kind) ":" (get $t :value) " "))
-                          "" $tokens)]]
-      (println (str "result: " $result)))))
+    (println (str "tokens: " tokens))
+    (println (str "first token: " (first tokens)))
+    (println (str "first kind: " (get (first tokens) :kind)))
+    (let [[result (reduce (fn [acc t] 
+                            (str acc (get t :kind) ":" (get t :value) " "))
+                          "" tokens)]]
+      (println (str "result: " result)))))

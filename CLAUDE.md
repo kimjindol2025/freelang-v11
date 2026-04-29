@@ -25,13 +25,22 @@
 (map [1 2 3] fn)        → (map fn [1 2 3])          ;; fn 먼저
 (reduce arr init fn)    → (reduce fn init arr)      ;; fn 먼저
 (filter arr fn)         → (filter fn arr)           ;; fn 먼저
-(file_read "path")      → (file-read "path")        ;; kebab-case 표준
+(file-read "path")      → (file_read "path")        ;; 파일 I/O는 snake_case
+(file-write "p" "c")   → (file_write "p" "c")      ;; 파일 I/O는 snake_case
+(file-exists "p")       → (file_exists "p")         ;; 파일 I/O는 snake_case
 (json_keys m)           → (keys m)                  ;; 의미 중심 이름
 (server_listen 3000)    → (server_start 3000)
 {a 1}                   → {:a 1}                    ;; 키워드 필수
-(= x null)              → (nil? x)
+(= x null)              → (nil? x)                  ;; nil? 정상 동작
 (console.log x)         → (println x)
 (str-to-int "42")       → (str-to-num "42")         ;; kebab-case
+(get_env "KEY")         → (shell_env "KEY")         ;; get_env 미구현
+(env "KEY")             → (shell_env "KEY")         ;; env 미구현
+(obj_merge a b)         → (assoc a "k" v)           ;; obj_merge 미구현
+(obj_pick m ["k"])      → (get m "k") 등 직접 처리  ;; obj_pick 미구현
+(obj_omit m ["k"])      → (dissoc m "k")            ;; obj_omit 미구현, dissoc 사용
+(now-ms)                → (now_ms)                  ;; now_ms snake_case
+(mariadb_all db sql p)  → (mariadb_query db sql p)  ;; mariadb_all 미구현
 ```
 
 ---
@@ -43,8 +52,9 @@
 (define x 42)
 
 ;; 함수 (두 가지)
-[FUNC add :params [$a $b] :body (+ $a $b)]
-(defn add [$a $b] (+ $a $b))
+[FUNC add :params [a b] :body (+ a b)]
+(defn add [a b] (+ a b))
+;; ※ $ 접두사 불필요 — (defn f [a b] ...) 가 표준
 
 ;; 조건
 (if (> x 0) "양수" "음수")
@@ -187,10 +197,9 @@
 (file_is_dir "path")
 (dir_list    "path")             ;; → [string]
 
-;; 환경변수
-(get_env     "PORT")             ;; → string | ""
-(get_env_or  "PORT" "3000")     ;; → string (없으면 기본값)
-(shell_env   "HOME")             ;; get_env와 동일
+;; 환경변수 ※ shell_env만 실제 동작
+(shell_env  "PORT")              ;; → string | null  ✅ 실제 동작
+;; ❌ get_env, get_env_or, env — 미구현 (사용 금지)
 
 ;; 쉘
 (shell_exec "git log --oneline -3" "/path/to/repo")
@@ -349,8 +358,9 @@
 | 2026-04-28 | P1: `saga_run` `workflow_parallel` `batch_map` `distribute` `time_exec` `span` | ✅ bootstrap.js |
 | 2026-04-28 | P0: `workflow_run` `:if` 조건부 실행, `:on_error`, `:fallback`, 체크포인트 | ✅ bootstrap.js |
 | 2026-04-28 | 파서: `[{...}]` 배열 제너릭 오인 방지, 예약어 map 키 허용 | ✅ bootstrap.js |
-| 2026-04-28 | `obj_merge` `obj_pick` `obj_omit` 추가 | ✅ bootstrap.js |
-| 2026-04-27 | `file_mkdir` `file_rmdir` `get_env` `get_env_or` 추가 | ✅ bootstrap.js |
+| 2026-04-28 | `obj_merge` `obj_pick` `obj_omit` 추가 선언 | ⚠️ 미구현 → `assoc`/`dissoc` 사용 |
+| 2026-04-27 | `get_env` `get_env_or` 추가 선언 | ⚠️ 미구현 → `shell_env` 사용 |
+| 2026-04-27 | `file_mkdir` `file_rmdir` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | `server_req_body` JSON 자동파싱 | ✅ bootstrap.js |
 | 2026-04-27 | `shell_exec` / `server_static` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | Map 패턴 매칭 `{:key $var}` | ✅ bootstrap.js |

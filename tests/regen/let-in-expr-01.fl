@@ -1,5 +1,5 @@
 ;; let-in-expr-01.fl — Case A: return 내부 let
-;; 기대: return (()=>{ let $x = 1; return $x + 2; })();
+;; 기대: return (()=>{ let x = 1; return x + 2; })();
 
 (fn peek-at []
-  (return (let [$x 1] (+ $x 2))))
+  (return (let [x 1] (+ x 2))))

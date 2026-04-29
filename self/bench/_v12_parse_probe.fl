@@ -1,4 +1,4 @@
-(define toks (lex "[FUNC f :params [$n] :body 1]"))
+(define toks (lex "[FUNC f :params [n] :body 1]"))
 (println "toks-len:" (length toks))
 (define ast (parse toks))
 (println "ast-len:" (length ast))

@@ -9,68 +9,68 @@
 ;; (render-image "/img/hero.jpg" "Hero" :width 1200 :height 630)
 ;; → <img src="..." alt="..." width="..." height="..." loading="lazy" decoding="async" srcset="...">
 
-[FUNC render-image :params [$src $alt :width 0 :height 0 :loading "lazy" :decoding "async" :class "" :srcset ""]
+[FUNC render-image :params [src alt :width 0 :height 0 :loading "lazy" :decoding "async" :class "" :srcset ""]
   :doc "최적화된 <img> 태그 생성 (lazy + async decode + srcset)"
   :body (let [
-      $w-attr (if (> $width 0) (str " width=\"" $width "\"") "")
-      $h-attr (if (> $height 0) (str " height=\"" $height "\"") "")
-      $class-attr (if (not (= $class "")) (str " class=\"" $class "\"") "")
-      $srcset-attr (if (not (= $srcset "")) (str " srcset=\"" $srcset "\"") "")
+      w-attr (if (> width 0) (str " width=\"" width "\"") "")
+      h-attr (if (> height 0) (str " height=\"" height "\"") "")
+      class-attr (if (not (= class "")) (str " class=\"" class "\"") "")
+      srcset-attr (if (not (= srcset "")) (str " srcset=\"" srcset "\"") "")
     ]
-    (str "<img src=\"" (escape-attr $src) "\" alt=\"" (escape-attr $alt) "\""
-         $w-attr $h-attr $class-attr $srcset-attr
-         " loading=\"" $loading "\" decoding=\"" $decoding "\">"))]
+    (str "<img src=\"" (escape-attr src) "\" alt=\"" (escape-attr alt) "\""
+         w-attr h-attr class-attr srcset-attr
+         " loading=\"" loading "\" decoding=\"" decoding "\">"))]
 
 ;; ── 반응형 srcset 헬퍼 ──────────────────────────────────
 ;; (srcset-for "/img/hero" [320 640 1024 1920])
 ;; → "/img/hero-320w.webp 320w, /img/hero-640w.webp 640w, ..."
 
-[FUNC srcset-for :params [$base $widths :ext "webp"]
+[FUNC srcset-for :params [base widths :ext "webp"]
   :doc "지정된 너비들로 srcset 문자열 생성"
   :body (reduce
-          (fn [$acc $w]
-            (let [$entry (str $base "-" $w "w." $ext " " $w "w")]
-              (if (= $acc "") $entry (str $acc ", " $entry))))
+          (fn [acc w]
+            (let [entry (str base "-" w "w." ext " " w "w")]
+              (if (= acc "") entry (str acc ", " entry))))
           ""
-          $widths)]
+          widths)]
 
 ;; ── 반응형 picture 요소 ─────────────────────────────────
 ;; (render-picture "/img/hero" "Hero" [320 640 1024] :avif-fallback "webp")
 
-[FUNC render-picture :params [$base $alt $widths :width 0 :height 0 :class "" :sizes "100vw"]
+[FUNC render-picture :params [base alt widths :width 0 :height 0 :class "" :sizes "100vw"]
   :doc "<picture> with AVIF + WebP + JPG fallback"
   :body (let [
-      $avif (srcset-for $base $widths :ext "avif")
-      $webp (srcset-for $base $widths :ext "webp")
-      $jpg-src (str $base ".jpg")
-      $w-attr (if (> $width 0) (str " width=\"" $width "\"") "")
-      $h-attr (if (> $height 0) (str " height=\"" $height "\"") "")
-      $class-attr (if (not (= $class "")) (str " class=\"" $class "\"") "")
+      avif (srcset-for base widths :ext "avif")
+      webp (srcset-for base widths :ext "webp")
+      jpg-src (str base ".jpg")
+      w-attr (if (> width 0) (str " width=\"" width "\"") "")
+      h-attr (if (> height 0) (str " height=\"" height "\"") "")
+      class-attr (if (not (= class "")) (str " class=\"" class "\"") "")
     ]
     (str "<picture>"
-         "<source type=\"image/avif\" srcset=\"" $avif "\" sizes=\"" $sizes "\">"
-         "<source type=\"image/webp\" srcset=\"" $webp "\" sizes=\"" $sizes "\">"
-         "<img src=\"" $jpg-src "\" alt=\"" $alt "\""
-         $w-attr $h-attr $class-attr
+         "<source type=\"image/avif\" srcset=\"" avif "\" sizes=\"" sizes "\">"
+         "<source type=\"image/webp\" srcset=\"" webp "\" sizes=\"" sizes "\">"
+         "<img src=\"" jpg-src "\" alt=\"" alt "\""
+         w-attr h-attr class-attr
          " loading=\"lazy\" decoding=\"async\"></picture>"))]
 
 ;; ── 외부 이미지 프록시 헬퍼 (플레이스홀더) ──────────────
 ;; v11 자체에 이미지 변환기가 없으므로 외부 CDN (Cloudflare Images, imgix)
 ;; 또는 사전 생성된 파일을 사용. 이 헬퍼는 URL 구성만.
 
-[FUNC cdn-url :params [$src :width 0 :quality 80 :format "auto"]
+[FUNC cdn-url :params [src :width 0 :quality 80 :format "auto"]
   :doc "Cloudflare/imgix 스타일 이미지 CDN URL 생성"
   :body (let [
-      $w-q (if (> $width 0) (str "&w=" $width) "")
-      $q-q (str "&q=" $quality)
-      $f-q (str "&f=" $format)
+      w-q (if (> width 0) (str "&w=" width) "")
+      q-q (str "&q=" quality)
+      f-q (str "&f=" format)
     ]
-    (str $src "?cdn=1" $w-q $q-q $f-q))]
+    (str src "?cdn=1" w-q q-q f-q))]
 
 ;; ── priority 이미지 (LCP 최적화) ────────────────────────
 
-[FUNC render-image-priority :params [$src $alt :width 0 :height 0 :class ""]
+[FUNC render-image-priority :params [src alt :width 0 :height 0 :class ""]
   :doc "LCP(Largest Contentful Paint) 이미지 — eager 로드 + 높은 우선순위"
-  :body (render-image $src $alt :width $width :height $height :loading "eager" :decoding "sync" :class $class)]
+  :body (render-image src alt :width width :height height :loading "eager" :decoding "sync" :class class)]
 
 [EXPORT render-image srcset-for render-picture cdn-url render-image-priority]

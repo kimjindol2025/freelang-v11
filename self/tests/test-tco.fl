@@ -1,16 +1,16 @@
 ;; TCO 실측. 깊이별 stack 한계.
 
 (println (str "count-down 1k:    "
-              (loop [$i 1000] (if (<= $i 0) "done" (recur (- $i 1))))))
+              (loop [i 1000] (if (<= i 0) "done" (recur (- i 1))))))
 
 (println (str "count-down 10k:   "
-              (loop [$i 10000] (if (<= $i 0) "done" (recur (- $i 1))))))
+              (loop [i 10000] (if (<= i 0) "done" (recur (- i 1))))))
 
 (println (str "count-down 100k:  "
-              (loop [$i 100000] (if (<= $i 0) "done" (recur (- $i 1))))))
+              (loop [i 100000] (if (<= i 0) "done" (recur (- i 1))))))
 
 (println (str "sum 1..100:       "
-              (loop [$i 0 $acc 0] (if (> $i 100) $acc (recur (+ $i 1) (+ $acc $i))))))
+              (loop [i 0 acc 0] (if (> i 100) acc (recur (+ i 1) (+ acc i))))))
 
 (println (str "sum 1..10000:     "
-              (loop [$i 0 $acc 0] (if (> $i 10000) $acc (recur (+ $i 1) (+ $acc $i))))))
+              (loop [i 0 acc 0] (if (> i 10000) acc (recur (+ i 1) (+ acc i))))))

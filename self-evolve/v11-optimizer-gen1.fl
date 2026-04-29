@@ -1,34 +1,34 @@
 ;; v11-optimizer-gen1.fl: Gen1 최적화기 (do-elimination)
 
-(defn is-do-single [$node]
+(defn is-do-single [node]
   ;; do 노드이고 args가 1개인가?
-  (if (= (get $node "kind") "sexpr")
-    (if (= (get $node "op") "do")
-      (= (length (get $node "args")) 1)
+  (if (= (get node "kind") "sexpr")
+    (if (= (get node "op") "do")
+      (= (length (get node "args")) 1)
       false)
     false))
 
-(defn optimize-node [$node]
+(defn optimize-node [node]
   ;; 단일 노드 최적화 (recursive)
-  (if (is-do-single $node)
+  (if (is-do-single node)
     ;; (do expr) → expr 재귀
-    (optimize-node (get (get $node "args") 0))
+    (optimize-node (get (get node "args") 0))
     ;; sexpr면 자식 재귀, 아니면 그대로
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "sexpr")
-        (let [[$args (get $node "args")]]
-          (let [[$new-args (map optimize-node $args)]]
+    (let [[kind (get node "kind")]]
+      (if (= kind "sexpr")
+        (let [[args (get node "args")]]
+          (let [[new-args (map optimize-node args)]]
             ;; sexpr 노드 재생성
             {:kind "sexpr"
-             :op (get $node "op")
-             :args $new-args
-             :line (get $node "line")}))
+             :op (get node "op")
+             :args new-args
+             :line (get node "line")}))
         ;; sexpr 아니면 그대로 반환
-        $node))))
+        node))))
 
-(defn optimize-ast [$ast]
+(defn optimize-ast [ast]
   ;; AST 배열 전체 최적화
-  (map optimize-node $ast))
+  (map optimize-node ast))
 
 (do
   (println "================================================")
@@ -36,33 +36,33 @@
   (println "================================================\n")
 
   ;; 테스트 1: (do (+ 1 2))
-  (let [[$src1 "(do (+ 1 2))"]]
-    (let [[$ast1-orig (parse (lex $src1))]]
-      (let [[$ast1-opt (optimize-ast $ast1-orig)]]
+  (let [[src1 "(do (+ 1 2))"]]
+    (let [[ast1-orig (parse (lex src1))]]
+      (let [[ast1-opt (optimize-ast ast1-orig)]]
         (do
           (println "테스트 1: (do (+ 1 2))")
-          (println (str "  원본: " $ast1-orig))
-          (println (str "  최적: " $ast1-opt))
+          (println (str "  원본: " ast1-orig))
+          (println (str "  최적: " ast1-opt))
           (println "")))))
 
   ;; 테스트 2: (do (do (+ 1 2))) — 중첩
-  (let [[$src2 "(do (do (+ 1 2)))"]]
-    (let [[$ast2-orig (parse (lex $src2))]]
-      (let [[$ast2-opt (optimize-ast $ast2-orig)]]
+  (let [[src2 "(do (do (+ 1 2)))"]]
+    (let [[ast2-orig (parse (lex src2))]]
+      (let [[ast2-opt (optimize-ast ast2-orig)]]
         (do
           (println "테스트 2: (do (do (+ 1 2)))")
-          (println (str "  원본: " $ast2-orig))
-          (println (str "  최적: " $ast2-opt))
+          (println (str "  원본: " ast2-orig))
+          (println (str "  최적: " ast2-opt))
           (println "")))))
 
   ;; 테스트 3: (+ (do 1) 2) — 중첩된 do
-  (let [[$src3 "(+ (do 1) 2)"]]
-    (let [[$ast3-orig (parse (lex $src3))]]
-      (let [[$ast3-opt (optimize-ast $ast3-orig)]]
+  (let [[src3 "(+ (do 1) 2)"]]
+    (let [[ast3-orig (parse (lex src3))]]
+      (let [[ast3-opt (optimize-ast ast3-orig)]]
         (do
           (println "테스트 3: (+ (do 1) 2)")
-          (println (str "  원본: " $ast3-orig))
-          (println (str "  최적: " $ast3-opt))
+          (println (str "  원본: " ast3-orig))
+          (println (str "  최적: " ast3-opt))
           (println "")))))
 
   (println "✅ do-elimination 테스트 완료"))

@@ -4,19 +4,19 @@
 (load "src/express.fl")
 
 ; 에코 핸들러
-[FUNC handle-echo :params [$req]
+[FUNC handle-echo :params [req]
   :body (let [
-    [$path (req-path $req)]
-    [$method (req-method $req)]
+    [path (req-path req)]
+    [method (req-method req)]
   ] (res-json {
     :echo "Hello from FreeLang!"
-    :method $method
-    :path $path
+    :method method
+    :path path
   }))
 ]
 
 ; 헬스 체크
-[FUNC handle-health :params [$req]
+[FUNC handle-health :params [req]
   :body (res-json { :status "healthy" })
 ]
 

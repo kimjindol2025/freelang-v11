@@ -2,11 +2,11 @@
 ; Semantic Versioning Parser 검증
 
 ; Helper function: assert
-[FUNC assert :params [$condition $message]
+[FUNC assert :params [condition message]
   :body (do
-    (if (not $condition)
-      (println (concat "❌ FAIL: " $message))
-      (println (concat "✅ PASS: " $message))
+    (if (not condition)
+      (println (concat "❌ FAIL: " message))
+      (println (concat "✅ PASS: " message))
     )
   )
 ]
@@ -16,26 +16,26 @@
   :body (do
     (println "\n=== Test: parse_semver ===")
 
-    (let [[$result (parse_semver "1.2.3")]]
+    (let [[result (parse_semver "1.2.3")]]
       (do
-        (assert (= (get $result "major") 1) "parse_semver: major version")
-        (assert (= (get $result "minor") 2) "parse_semver: minor version")
-        (assert (= (get $result "patch") 3) "parse_semver: patch version")
+        (assert (= (get result "major") 1) "parse_semver: major version")
+        (assert (= (get result "minor") 2) "parse_semver: minor version")
+        (assert (= (get result "patch") 3) "parse_semver: patch version")
       )
     )
 
-    (let [[$result (parse_semver "0.0.1")]]
+    (let [[result (parse_semver "0.0.1")]]
       (do
-        (assert (= (get $result "major") 0) "parse_semver: zero major")
-        (assert (= (get $result "patch") 1) "parse_semver: zero minor")
+        (assert (= (get result "major") 0) "parse_semver: zero major")
+        (assert (= (get result "patch") 1) "parse_semver: zero minor")
       )
     )
 
-    (let [[$result (parse_semver "10.20.30")]]
+    (let [[result (parse_semver "10.20.30")]]
       (do
-        (assert (= (get $result "major") 10) "parse_semver: two-digit major")
-        (assert (= (get $result "minor") 20) "parse_semver: two-digit minor")
-        (assert (= (get $result "patch") 30) "parse_semver: two-digit patch")
+        (assert (= (get result "major") 10) "parse_semver: two-digit major")
+        (assert (= (get result "minor") 20) "parse_semver: two-digit minor")
+        (assert (= (get result "patch") 30) "parse_semver: two-digit patch")
       )
     )
   )
@@ -146,11 +146,11 @@
   :body (do
     (println "\n=== Test: find_matching_version ===")
 
-    (let [[$versions ["1.0.0" "1.1.0" "1.2.0" "2.0.0"]]]
+    (let [[versions ["1.0.0" "1.1.0" "1.2.0" "2.0.0"]]]
       (do
-        (assert (= (find_matching_version $versions "^1.0.0") "1.2.0") "find: caret picks latest compatible")
-        (assert (= (find_matching_version $versions "~1.1.0") "1.1.0") "find: tilde picks exact patch match")
-        (assert (= (find_matching_version $versions "=2.0.0") "2.0.0") "find: exact match")
+        (assert (= (find_matching_version versions "^1.0.0") "1.2.0") "find: caret picks latest compatible")
+        (assert (= (find_matching_version versions "~1.1.0") "1.1.0") "find: tilde picks exact patch match")
+        (assert (= (find_matching_version versions "=2.0.0") "2.0.0") "find: exact match")
       )
     )
   )

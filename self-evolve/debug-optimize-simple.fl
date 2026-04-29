@@ -1,95 +1,95 @@
 ;; optimize-node 테스트 (간단한 경우)
 
-(defn is-constant [$node]
-  (if (nil? $node)
+(defn is-constant [node]
+  (if (nil? node)
     false
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "literal")
-        (let [[$type (get $node "type")]]
-          (if (= $type "symbol") false true))
+    (let [[kind (get node "kind")]]
+      (if (= kind "literal")
+        (let [[type (get node "type")]]
+          (if (= type "symbol") false true))
         false))))
 
-(defn is-arithmetic-op [$op]
-  (if (= $op "+") true
-    (if (= $op "-") true
-      (if (= $op "*") true
-        (if (= $op "/") true false)))))
+(defn is-arithmetic-op [op]
+  (if (= op "+") true
+    (if (= op "-") true
+      (if (= op "*") true
+        (if (= op "/") true false)))))
 
-(defn all-constant? [$args]
-  (if (= (length $args) 0)
+(defn all-constant? [args]
+  (if (= (length args) 0)
     true
-    (let [[$first (get $args 0)]]
-      (let [[$rest (slice $args 1 (length $args))]]
-        (if (is-constant $first)
-          (all-constant? $rest)
+    (let [[first (get args 0)]]
+      (let [[rest (slice args 1 (length args))]]
+        (if (is-constant first)
+          (all-constant? rest)
           false)))))
 
-(defn evaluate-arithmetic [$op $args]
-  (let [[$v0 (get (get $args 0) "value")]]
-    (let [[$v1 (get (get $args 1) "value")]]
-      (if (= $op "+")
-        (+ $v0 $v1)
-        (if (= $op "-")
-          (- $v0 $v1)
-          (if (= $op "*")
-            (* $v0 $v1)
-            (if (= $op "/")
-              (/ $v0 $v1)
+(defn evaluate-arithmetic [op args]
+  (let [[v0 (get (get args 0) "value")]]
+    (let [[v1 (get (get args 1) "value")]]
+      (if (= op "+")
+        (+ v0 v1)
+        (if (= op "-")
+          (- v0 v1)
+          (if (= op "*")
+            (* v0 v1)
+            (if (= op "/")
+              (/ v0 v1)
               nil)))))))
 
-(defn make-literal [$value]
-  {:kind "literal" :type "number" :value $value :line nil})
+(defn make-literal [value]
+  {:kind "literal" :type "number" :value value :line nil})
 
-(defn fold-constant [$node]
-  (println (str "fold-constant called with: " (get $node "op")))
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (println (str "  op: " $op))
-      (let [[$args (get $node "args")]]
-        (println (str "  is-arithmetic? " (is-arithmetic-op $op)))
-        (println (str "  all-constant? " (all-constant? $args)))
-        (if (is-arithmetic-op $op)
-          (if (all-constant? $args)
-            (let [[$result (evaluate-arithmetic $op $args)]]
-              (println (str "  folded to: " $result))
-              (make-literal $result))
+(defn fold-constant [node]
+  (println (str "fold-constant called with: " (get node "op")))
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (println (str "  op: " op))
+      (let [[args (get node "args")]]
+        (println (str "  is-arithmetic? " (is-arithmetic-op op)))
+        (println (str "  all-constant? " (all-constant? args)))
+        (if (is-arithmetic-op op)
+          (if (all-constant? args)
+            (let [[result (evaluate-arithmetic op args)]]
+              (println (str "  folded to: " result))
+              (make-literal result))
             (do
               (println "  not all constant, returning node")
-              $node))
+              node))
           (do
             (println "  not arithmetic, returning node")
-            $node))))
+            node))))
     (do
       (println "  not sexpr, returning node")
-      $node)))
+      node)))
 
-(defn optimize-node [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (= $op "do")
-          (if (= (length $args) 1)
-            (optimize-node (get $args 0))
-            $node)  ;; 간단하게 하기 위해 do 처리는 스킵
-          (let [[$new-args (map optimize-node $args)]]
-            (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
-              (fold-constant $new-node))))))
-    $node))
+(defn optimize-node [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (= op "do")
+          (if (= (length args) 1)
+            (optimize-node (get args 0))
+            node)  ;; 간단하게 하기 위해 do 처리는 스킵
+          (let [[new-args (map optimize-node args)]]
+            (let [[new-node {:kind "sexpr" :op op :args new-args :line (get node "line")}]]
+              (fold-constant new-node))))))
+    node))
 
 (do
   ;; 테스트: (+ 1 2)
   (println "테스트: (+ 1 2)")
-  (let [[$code "(+ 1 2)"]]
-    (let [[$ast (parse (lex $code))]]
-      (let [[$node (get $ast 0)]]
-        (println (str "원본: " $node))
-        (let [[$opt (optimize-node $node)]]
-          (println (str "최적: " $opt))))))
+  (let [[code "(+ 1 2)"]]
+    (let [[ast (parse (lex code))]]
+      (let [[node (get ast 0)]]
+        (println (str "원본: " node))
+        (let [[opt (optimize-node node)]]
+          (println (str "최적: " opt))))))
 
   (println "\n\n테스트: (+ (+ 1 2) 3)")
-  (let [[$code "(+ (+ 1 2) 3)"]]
-    (let [[$ast (parse (lex $code))]]
-      (let [[$node (get $ast 0)]]
-        (println (str "원본: " $node))
-        (let [[$opt (optimize-node $node)]]
-          (println (str "최적: " $opt)))))))
+  (let [[code "(+ (+ 1 2) 3)"]]
+    (let [[ast (parse (lex code))]]
+      (let [[node (get ast 0)]]
+        (println (str "원본: " node))
+        (let [[opt (optimize-node node)]]
+          (println (str "최적: " opt)))))))

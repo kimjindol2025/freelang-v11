@@ -1,5 +1,5 @@
 ;; v12-candidate 내부적으로 self-parser 로 파싱 검증
-(define src "[FUNC f :params [$x] :body (* $x 2)]")
+(define src "[FUNC f :params [x] :body (* x 2)]")
 (define toks (lex src))
 (println "toks-len:" (length toks))
 (define ast (parse toks))

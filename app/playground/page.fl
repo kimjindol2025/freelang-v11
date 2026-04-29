@@ -20,8 +20,8 @@
       </div>
       <div class=\"card\">
         <h3>3) <a href=\"/examples/map-filter\">map-filter</a></h3>
-        <pre><code>(reduce + (map (fn [$x] (* $x $x))
-  (filter (fn [$x] (= (mod $x 2) 0)) xs)))</code></pre>
+        <pre><code>(reduce + (map (fn [x] (* x x))
+  (filter (fn [x] (= (mod x 2) 0)) xs)))</code></pre>
         <p><strong>Output:</strong> <code>220</code> (xs=1..10)</p>
       </div>
       <div class=\"card\">

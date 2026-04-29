@@ -5,7 +5,7 @@
 ;; pop-scope: 첫번째 제거.
 ;; set: 최상위 scope 에 기록.
 ;; get: top → ... → global 순 탐색.
-;; $x 정규화: "x" 또는 "$x" 둘 다 같은 key 로 저장/조회.
+;; x 정규화: "x" 또는 "x" 둘 다 같은 key 로 저장/조회.
 
 ;; ──────────────────────────────────────
 ;; 46 make-scope / push / pop
@@ -13,68 +13,68 @@
 
 [FUNC make-scope :params [] :body (list {})]
 
-[FUNC push-scope :params [$s]
-  :body (append (list {}) $s)]
+[FUNC push-scope :params [s]
+  :body (append (list {}) s)]
 
-[FUNC pop-scope :params [$s]
-  :body (if (= (length $s) 0) $s (slice $s 1 (length $s)))]
+[FUNC pop-scope :params [s]
+  :body (if (= (length s) 0) s (slice s 1 (length s)))]
 
 ;; ──────────────────────────────────────
 ;; 47 $ 접두사 정규화
 ;; ──────────────────────────────────────
 
-[FUNC norm-key :params [$k]
-  :body (if (null? $k) ""
-          (if (and (>= (length $k) 1) (= (char-at $k 0) "$"))
-            (substring $k 1 (length $k))
-            $k))]
+[FUNC norm-key :params [k]
+  :body (if (null? k) ""
+          (if (and (>= (length k) 1) (= (char-at k 0) "$"))
+            (substring k 1 (length k))
+            k))]
 
 ;; ──────────────────────────────────────
 ;; 48 has? / get / set
 ;; ──────────────────────────────────────
 
 ;; scope chain 에서 키 탐색. first match return.
-[FUNC has-key? :params [$s $k]
-  :body (has-key-loop $s (norm-key $k) 0)]
+[FUNC has-key? :params [s k]
+  :body (has-key-loop s (norm-key k) 0)]
 
-[FUNC has-key-loop :params [$s $k $i]
+[FUNC has-key-loop :params [s k i]
   :body (cond
-          [(>= $i (length $s)) false]
-          [(not (null? (get (get $s $i) $k))) true]
-          [true (has-key-loop $s $k (+ $i 1))])]
+          [(>= i (length s)) false]
+          [(not (null? (get (get s i) k))) true]
+          [true (has-key-loop s k (+ i 1))])]
 
-[FUNC scope-get :params [$s $k]
-  :body (scope-get-loop $s (norm-key $k) 0)]
+[FUNC scope-get :params [s k]
+  :body (scope-get-loop s (norm-key k) 0)]
 
-[FUNC scope-get-loop :params [$s $k $i]
+[FUNC scope-get-loop :params [s k i]
   :body (cond
-          [(>= $i (length $s)) null]
-          [(not (null? (get (get $s $i) $k))) (get (get $s $i) $k)]
-          [true (scope-get-loop $s $k (+ $i 1))])]
+          [(>= i (length s)) null]
+          [(not (null? (get (get s i) k))) (get (get s i) k)]
+          [true (scope-get-loop s k (+ i 1))])]
 
 ;; 최상위 scope 에 set. 새 scope 반환.
-[FUNC scope-set :params [$s $k $v]
-  :body (let [[$nk (norm-key $k)]
-              [$top (get $s 0)]
-              [$rest (slice $s 1 (length $s))]
-              [$top2 (json_set $top $nk $v)]]
-          (append (list $top2) $rest))]
+[FUNC scope-set :params [s k v]
+  :body (let [[nk (norm-key k)]
+              [top (get s 0)]
+              [rest (slice s 1 (length s))]
+              [top2 (json_set top nk v)]]
+          (append (list top2) rest))]
 
 ;; ──────────────────────────────────────
 ;; 49 snapshot (closure capture)
 ;; ──────────────────────────────────────
 
-[FUNC scope-snapshot :params [$s] :body $s]
+[FUNC scope-snapshot :params [s] :body s]
 
 ;; ──────────────────────────────────────
 ;; 50 restore (rollback 은 pop 의 alias)
 ;; ──────────────────────────────────────
 
-[FUNC scope-restore :params [$old $new] :body $old]
+[FUNC scope-restore :params [old new] :body old]
 
 ;; ──────────────────────────────────────
 ;; 52 test helpers — (다중 스코프 시퀀스 재현)
 ;; ──────────────────────────────────────
 
-[FUNC scope-debug :params [$s]
-  :body (str "scope-depth=" (length $s)))
+[FUNC scope-debug :params [s]
+  :body (str "scope-depth=" (length s)))

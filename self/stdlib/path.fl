@@ -1,72 +1,72 @@
 ;; self/stdlib/path.fl — Phase 26 Part 4
 ;; 경로 조작 (순수 문자열)
 
-[FUNC path-join :params [$parts]
-  :body (path-join-loop $parts 0 "")]
-[FUNC path-join-loop :params [$parts $i $acc]
-  :body (if (>= $i (length $parts)) (if (starts-with? $acc "/") $acc (str "/" $acc))
-          (let [[$part (get $parts $i)]]
-            (path-join-loop $parts (+ $i 1)
-              (str (if (= $acc "") "" (str $acc "/"))
-                   (replace (str $part) "/" "")))))]
+[FUNC path-join :params [parts]
+  :body (path-join-loop parts 0 "")]
+[FUNC path-join-loop :params [parts i acc]
+  :body (if (>= i (length parts)) (if (starts-with? acc "/") acc (str "/" acc))
+          (let [[part (get parts i)]]
+            (path-join-loop parts (+ i 1)
+              (str (if (= acc "") "" (str acc "/"))
+                   (replace (str part) "/" "")))))]
 
-[FUNC path-dirname :params [$p]
-  :body (let [[$idx (index-of (reverse-str (str $p)) "/")]]
-          (if (< $idx 0) "."
-            (substring (str $p) 0 (- (length (str $p)) $idx 1))))]
+[FUNC path-dirname :params [p]
+  :body (let [[idx (index-of (reverse-str (str p)) "/")]]
+          (if (< idx 0) "."
+            (substring (str p) 0 (- (length (str p)) idx 1))))]
 
-[FUNC path-basename :params [$p]
-  :body (let [[$idx (index-of (reverse-str (str $p)) "/")]]
-          (if (< $idx 0) (str $p)
-            (substring (str $p) (- (length (str $p)) $idx))))]
+[FUNC path-basename :params [p]
+  :body (let [[idx (index-of (reverse-str (str p)) "/")]]
+          (if (< idx 0) (str p)
+            (substring (str p) (- (length (str p)) idx))))]
 
-[FUNC path-extname :params [$p]
-  :body (let [[$bn (path-basename $p)]
-              [$idx (index-of (reverse-str $bn) ".")]]
-          (if (< $idx 0) ""
-            (substring $bn (- (length $bn) $idx))))]
+[FUNC path-extname :params [p]
+  :body (let [[bn (path-basename p)]
+              [idx (index-of (reverse-str bn) ".")]]
+          (if (< idx 0) ""
+            (substring bn (- (length bn) idx))))]
 
-[FUNC path-normalize :params [$p]
-  :body (let [[$parts (split (str $p) "/")]]
-          (path-normalize-loop $parts 0 (list)))]
-[FUNC path-normalize-loop :params [$parts $i $acc]
-  :body (if (>= $i (length $parts)) (path-join $acc)
-          (let [[$part (get $parts $i)]]
-            (path-normalize-loop $parts (+ $i 1)
+[FUNC path-normalize :params [p]
+  :body (let [[parts (split (str p) "/")]]
+          (path-normalize-loop parts 0 (list)))]
+[FUNC path-normalize-loop :params [parts i acc]
+  :body (if (>= i (length parts)) (path-join acc)
+          (let [[part (get parts i)]]
+            (path-normalize-loop parts (+ i 1)
               (cond
-                (= $part "") $acc
-                (= $part ".") $acc
-                (= $part "..") (if (> (length $acc) 0) (slice $acc 0 (- (length $acc) 1)) $acc)
-                true (append $acc $part)))))]
+                (= part "") acc
+                (= part ".") acc
+                (= part "..") (if (> (length acc) 0) (slice acc 0 (- (length acc) 1)) acc)
+                true (append acc part)))))]
 
-[FUNC path-resolve :params [$base $rel]
-  :body (let [[$base-parts (split (str $base) "/")]
-              [$rel-parts (split (str $rel) "/")]]
-          (path-resolve-loop $base-parts $rel-parts))]
-[FUNC path-resolve-loop :params [$base $rel]
-  :body (path-normalize (str (path-join $base) "/" (path-join $rel)))]
+[FUNC path-resolve :params [base rel]
+  :body (let [[base-parts (split (str base) "/")]
+              [rel-parts (split (str rel) "/")]]
+          (path-resolve-loop base-parts rel-parts))]
+[FUNC path-resolve-loop :params [base rel]
+  :body (path-normalize (str (path-join base) "/" (path-join rel)))]
 
-[FUNC path-relative :params [$from $to]
-  :body (let [[$from-parts (split (str $from) "/")]
-              [$to-parts (split (str $to) "/")]]
-          (path-relative-loop $from-parts $to-parts 0))]
-[FUNC path-relative-loop :params [$from $to $i]
-  :body (if (or (>= $i (length $from)) (>= $i (length $to)))
-          (let [[$ups (- (length $from) $i)]
-                [$downs (drop $i $to)]]
-            (str (repeat-str "../" $ups) (path-join $downs)))
-          (if (= (get $from $i) (get $to $i))
-            (path-relative-loop $from $to (+ $i 1))
-            (path-relative-loop $from $to (length $from))))]
+[FUNC path-relative :params [from to]
+  :body (let [[from-parts (split (str from) "/")]
+              [to-parts (split (str to) "/")]]
+          (path-relative-loop from-parts to-parts 0))]
+[FUNC path-relative-loop :params [from to i]
+  :body (if (or (>= i (length from)) (>= i (length to)))
+          (let [[ups (- (length from) i)]
+                [downs (drop i to)]]
+            (str (repeat-str "../" ups) (path-join downs)))
+          (if (= (get from i) (get to i))
+            (path-relative-loop from to (+ i 1))
+            (path-relative-loop from to (length from))))]
 
-[FUNC repeat-str :params [$s $n]
-  :body (repeat-str-loop $s $n 0 "")]
-[FUNC repeat-str-loop :params [$s $n $i $acc]
-  :body (if (>= $i $n) $acc
-          (repeat-str-loop $s $n (+ $i 1) (str $acc $s)))]
+[FUNC repeat-str :params [s n]
+  :body (repeat-str-loop s n 0 "")]
+[FUNC repeat-str-loop :params [s n i acc]
+  :body (if (>= i n) acc
+          (repeat-str-loop s n (+ i 1) (str acc s)))]
 
-[FUNC reverse-str :params [$s]
-  :body (reverse-str-loop (str $s) (- (length $s) 1) "")]
-[FUNC reverse-str-loop :params [$s $i $acc]
-  :body (if (< $i 0) $acc
-          (reverse-str-loop $s (- $i 1) (str $acc (char-at $s $i))))]
+[FUNC reverse-str :params [s]
+  :body (reverse-str-loop (str s) (- (length s) 1) "")]
+[FUNC reverse-str-loop :params [s i acc]
+  :body (if (< i 0) acc
+          (reverse-str-loop s (- i 1) (str acc (char-at s i))))]

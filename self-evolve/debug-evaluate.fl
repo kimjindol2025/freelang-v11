@@ -1,24 +1,24 @@
 ;; evaluate-arithmetic 테스트
 
-(defn evaluate-arithmetic [$op $args]
+(defn evaluate-arithmetic [op args]
   ;; 산술 연산 계산
-  (let [[$v0 (get (get $args 0) "value")]]
-    (let [[$v1 (get (get $args 1) "value")]]
-      (if (= $op "+")
-        (+ $v0 $v1)
-        (if (= $op "-")
-          (- $v0 $v1)
-          (if (= $op "*")
-            (* $v0 $v1)
-            (if (= $op "/")
-              (/ $v0 $v1)
+  (let [[v0 (get (get args 0) "value")]]
+    (let [[v1 (get (get args 1) "value")]]
+      (if (= op "+")
+        (+ v0 v1)
+        (if (= op "-")
+          (- v0 v1)
+          (if (= op "*")
+            (* v0 v1)
+            (if (= op "/")
+              (/ v0 v1)
               nil)))))))
 
 (do
   (define lit3 {:kind "literal" :type "number" :value 3})
   (define lit5 {:kind "literal" :type "number" :value 5})
 
-  (let [[$args [lit3 lit5]]]
+  (let [[args [lit3 lit5]]]
     (println "evaluate-arithmetic(\"+\", [lit3, lit5]):")
-    (println (str "  " (evaluate-arithmetic "+" $args))))
+    (println (str "  " (evaluate-arithmetic "+" args))))
 )

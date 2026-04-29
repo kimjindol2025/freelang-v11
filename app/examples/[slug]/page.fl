@@ -1,18 +1,18 @@
 (do
-  (let [[$slug (get $__params "slug")]
-        [$known (or (= $slug "hello") (= $slug "arithmetic")
-                    (= $slug "func")  (= $slug "map-filter")
-                    (= $slug "fib"))]]
-    (if (not $known)
+  (let [[slug (get __params "slug")]
+        [known (or (= slug "hello") (= slug "arithmetic")
+                    (= slug "func")  (= slug "map-filter")
+                    (= slug "fib"))]]
+    (if (not known)
       (do
-        (set-meta! {:title (str "404 · '" $slug "' 예제 없음 — FreeLang v11")
+        (set-meta! {:title (str "404 · '" slug "' 예제 없음 — FreeLang v11")
                     :description "요청한 slug에 해당하는 예제를 찾을 수 없습니다."})
         {:__fl_response true
          :status 404
          :contentType "text/html; charset=utf-8"
          :body (str "<section style=\"text-align:center; padding: 40px 0;\">"
                     "<h1 style=\"font-size: 56px; margin: 0 0 8px; color: var(--accent);\">404</h1>"
-                    "<p class=\"lede\">예제 '" $slug "' 를 찾을 수 없습니다.</p>"
+                    "<p class=\"lede\">예제 '" slug "' 를 찾을 수 없습니다.</p>"
                     "<div class=\"cta-row\" style=\"justify-content:center;\">"
                     "<a href=\"/examples\" class=\"btn btn-primary\">예제 목록으로</a>"
                     "<a href=\"/\" class=\"btn btn-ghost\">홈</a>"
@@ -29,59 +29,59 @@
                     "</ul>"
                     "</section>")})
       (do
-        (set-meta! {:title (str "Example: " $slug " — FreeLang v11")
-                    :description (str "FreeLang 예제 '" $slug "' 의 소스 코드와 실행 결과")})
-        (let [[$title
+        (set-meta! {:title (str "Example: " slug " — FreeLang v11")
+                    :description (str "FreeLang 예제 '" slug "' 의 소스 코드와 실행 결과")})
+        (let [[title
                (cond
-                 [(= $slug "hello") "Hello"]
-                 [(= $slug "arithmetic") "Arithmetic"]
-                 [(= $slug "func") "Function block"]
-                 [(= $slug "map-filter") "Map · Filter · Reduce"]
-                 [(= $slug "fib") "Recursive Fibonacci"])]
-              [$description
+                 [(= slug "hello") "Hello"]
+                 [(= slug "arithmetic") "Arithmetic"]
+                 [(= slug "func") "Function block"]
+                 [(= slug "map-filter") "Map · Filter · Reduce"]
+                 [(= slug "fib") "Recursive Fibonacci"])]
+              [description
                (cond
-                 [(= $slug "hello") "문자열 하나를 출력하는 가장 단순한 예제."]
-                 [(= $slug "arithmetic") "가변 인자 산술 연산과 중첩 표현식."]
-                 [(= $slug "func") "[FUNC] 블록은 2-pass 등록으로 상호재귀를 허용합니다."]
-                 [(= $slug "map-filter") "리스트 고차 함수를 조합한 파이프라인."]
-                 [(= $slug "fib") "재귀 호출만으로 피보나치 수를 계산."])]
-              [$source
+                 [(= slug "hello") "문자열 하나를 출력하는 가장 단순한 예제."]
+                 [(= slug "arithmetic") "가변 인자 산술 연산과 중첩 표현식."]
+                 [(= slug "func") "[FUNC] 블록은 2-pass 등록으로 상호재귀를 허용합니다."]
+                 [(= slug "map-filter") "리스트 고차 함수를 조합한 파이프라인."]
+                 [(= slug "fib") "재귀 호출만으로 피보나치 수를 계산."])]
+              [source
                (cond
-                 [(= $slug "hello")
+                 [(= slug "hello")
                   "(println \"Hello from FL!\")\n(println (+ 1 2 3))"]
-                 [(= $slug "arithmetic")
+                 [(= slug "arithmetic")
                   "(println (+ 1 2 3 4 5))\n(println (* (+ 2 3) (- 10 4)))\n(println (/ 100 (+ 2 3)))"]
-                 [(= $slug "func")
-                  "[FUNC even? :params [$n]\n  :body (if (= $n 0) true (odd? (- $n 1)))]\n\n[FUNC odd? :params [$n]\n  :body (if (= $n 0) false (even? (- $n 1)))]\n\n(println (even? 10))\n(println (odd? 7))"]
-                 [(= $slug "map-filter")
-                  "(let [[$xs (list 1 2 3 4 5 6 7 8 9 10)]]\n  (println\n    (reduce +\n      (map (fn [$x] (* $x $x))\n        (filter (fn [$x] (= (mod $x 2) 0)) $xs)))))\n"]
-                 [(= $slug "fib")
-                  "[FUNC fib :params [$n]\n  :body (if (< $n 2) $n (+ (fib (- $n 1)) (fib (- $n 2))))]\n\n(println (fib 30))"])]
-              [$output
+                 [(= slug "func")
+                  "[FUNC even? :params [n]\n  :body (if (= n 0) true (odd? (- n 1)))]\n\n[FUNC odd? :params [n]\n  :body (if (= n 0) false (even? (- n 1)))]\n\n(println (even? 10))\n(println (odd? 7))"]
+                 [(= slug "map-filter")
+                  "(let [[xs (list 1 2 3 4 5 6 7 8 9 10)]]\n  (println\n    (reduce +\n      (map (fn [x] (* x x))\n        (filter (fn [x] (= (mod x 2) 0)) xs)))))\n"]
+                 [(= slug "fib")
+                  "[FUNC fib :params [n]\n  :body (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))]\n\n(println (fib 30))"])]
+              [output
                (cond
-                 [(= $slug "hello") "Hello from FL!\n6"]
-                 [(= $slug "arithmetic") "15\n30\n20"]
-                 [(= $slug "func") "true\ntrue"]
-                 [(= $slug "map-filter") "220"]
-                 [(= $slug "fib") "832040"])]]
+                 [(= slug "hello") "Hello from FL!\n6"]
+                 [(= slug "arithmetic") "15\n30\n20"]
+                 [(= slug "func") "true\ntrue"]
+                 [(= slug "map-filter") "220"]
+                 [(= slug "fib") "832040"])]]
           (str "<section>"
                "<p><a href=\"/examples\">← Examples</a></p>"
-               "<h1>" $title "</h1>"
-               "<p class=\"lede\">" $description "</p>"
+               "<h1>" title "</h1>"
+               "<p class=\"lede\">" description "</p>"
                "</section>"
                "<section>"
-               "<h2>Source (" $slug ".fl)</h2>"
-               "<pre><code>" $source "</code></pre>"
+               "<h2>Source (" slug ".fl)</h2>"
+               "<pre><code>" source "</code></pre>"
                "</section>"
                "<section>"
                "<h2>Expected Output</h2>"
-               "<pre><code>" $output "</code></pre>"
+               "<pre><code>" output "</code></pre>"
                "</section>"
                "<section>"
                "<h2>직접 실행</h2>"
                "<pre><code>"
-               "# " $slug ".fl 로 저장 후\n"
-               "node --stack-size=8000 bootstrap.js run " $slug ".fl"
+               "# " slug ".fl 로 저장 후\n"
+               "node --stack-size=8000 bootstrap.js run " slug ".fl"
                "</code></pre>"
                "</section>"
                "<section>"

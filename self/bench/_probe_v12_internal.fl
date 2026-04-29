@@ -1,5 +1,5 @@
 ;; 자가 lex+parse 로 FUNC 한 줄을 파싱
-(define src "[FUNC myfn :params [$x] :body (* $x 2)]")
+(define src "[FUNC myfn :params [x] :body (* x 2)]")
 (define toks (lex src))
 (define ast (parse toks))
 (define n (get ast 0))

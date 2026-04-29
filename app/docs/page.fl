@@ -11,8 +11,8 @@
     <p>모든 표현식은 S-식(괄호로 감싼 리스트)입니다. 첫 원소는 연산자·함수, 이후는 인자.</p>
     <pre><code>(println \"hi\")           ;; 함수 호출
 (+ 1 2 3)                  ;; 가변 인자 산술
-(if (&lt; $x 0) \"neg\" \"pos\")  ;; 조건식
-(let [[$x 10] [$y 20]] (+ $x $y))   ;; 지역 바인딩
+(if (&lt; x 0) \"neg\" \"pos\")  ;; 조건식
+(let [[x 10] [y 20]] (+ x y))   ;; 지역 바인딩
 (list 1 2 3)               ;; 리스트
 {:name \"kim\" :age 30}     ;; 맵 (키는 :keyword)</code></pre>
   </section>
@@ -20,11 +20,11 @@
   <section>
     <h2>함수 정의</h2>
     <p>블록 형식 <code>[FUNC ...]</code> 는 파일 상단에 모아 두 번의 패스로 등록 — 상호재귀 OK.</p>
-    <pre><code>[FUNC square :params [$x]
-  :body (* $x $x)]
+    <pre><code>[FUNC square :params [x]
+  :body (* x x)]
 
-[FUNC sum-squares :params [$xs]
-  :body (reduce + (map square $xs))]
+[FUNC sum-squares :params [xs]
+  :body (reduce + (map square xs))]
 
 (println (sum-squares (list 1 2 3 4)))  ;; 30</code></pre>
   </section>

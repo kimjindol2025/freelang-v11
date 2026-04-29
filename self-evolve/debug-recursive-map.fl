@@ -1,23 +1,23 @@
 ;; 재귀적 map 테스트
 
-(defn process-node [$node $depth]
-  (println (str "process-node called, depth=" $depth))
-  (if (= (get $node "kind") "sexpr")
-    (let [[$args (get $node "args")]]
-      (println (str "  sexpr with " (length $args) " args"))
-      (let [[$new-args (map (fn [$n] (process-node $n (+ $depth 1))) $args)]]
+(defn process-node [node depth]
+  (println (str "process-node called, depth=" depth))
+  (if (= (get node "kind") "sexpr")
+    (let [[args (get node "args")]]
+      (println (str "  sexpr with " (length args) " args"))
+      (let [[new-args (map (fn [n] (process-node n (+ depth 1))) args)]]
         (println (str "  map completed, returning literal"))
         {:kind "literal" :value 999}))
     (do
       (println (str "  literal, returning as-is"))
-      $node)))
+      node)))
 
 (do
   (println "테스트: 재귀 맵")
-  (let [[$code "(+ (+ 1 2) 3)"]]
-    (let [[$ast (parse (lex $code))]]
-      (let [[$node (get $ast 0)]]
-        (println (str "원본: " $node))
+  (let [[code "(+ (+ 1 2) 3)"]]
+    (let [[ast (parse (lex code))]]
+      (let [[node (get ast 0)]]
+        (println (str "원본: " node))
         (println "")
-        (let [[$result (process-node $node 0)]]
-          (println (str "\n최종 결과: " $result)))))))
+        (let [[result (process-node node 0)]]
+          (println (str "\n최종 결과: " result)))))))

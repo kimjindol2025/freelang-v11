@@ -6,14 +6,14 @@
     (println "=== Test 1: Market Data Fetch ===")
 
     ;; 테스트 1.1: 유효한 API 응답
-    (let [[$result (http_get "https://httpbin.org/json")]]
-      (if $result
+    (let [[result (http_get "https://httpbin.org/json")]]
+      (if result
         (println "✅ Test 1.1 PASS: API 데이터 수집 성공")
         (println "❌ Test 1.1 FAIL: API 데이터 수집 실패")))
 
     ;; 테스트 1.2: 실패 API 응답 (HTTP 에러 코드)
-    (let [[$result (http_get "https://httpbin.org/status/404")]]
-      (if (= $result nil)
+    (let [[result (http_get "https://httpbin.org/status/404")]]
+      (if (= result nil)
         (println "✅ Test 1.2 PASS: 에러 응답 감지")
         (println "⚠️  Test 1.2 INFO: HTTP 404도 응답 반환 (예상된 동작)")))))
 
@@ -23,26 +23,26 @@
     (println "=== Test 2: Simple MA Strategy ===")
 
     ;; 테스트 2.1: 상승 추세 (BUY)
-    (let [[$decision (let [[$change (- 50000 49500)]]
-                       (let [[$pct (/ $change 49500)]]
-                         (if (> $pct 0.01) "BUY" "HOLD")))]]
-      (if (= $decision "BUY")
+    (let [[decision (let [[change (- 50000 49500)]]
+                       (let [[pct (/ change 49500)]]
+                         (if (> pct 0.01) "BUY" "HOLD")))]]
+      (if (= decision "BUY")
         (println "✅ Test 2.1 PASS: 상승 추세 감지 (BUY)")
         (println "❌ Test 2.1 FAIL: 상승 추세 미감지")))
 
     ;; 테스트 2.2: 하락 추세 (SELL)
-    (let [[$decision (let [[$change (- 49000 50000)]]
-                       (let [[$pct (/ $change 50000)]]
-                         (if (< $pct -0.01) "SELL" "HOLD")))]]
-      (if (= $decision "SELL")
+    (let [[decision (let [[change (- 49000 50000)]]
+                       (let [[pct (/ change 50000)]]
+                         (if (< pct -0.01) "SELL" "HOLD")))]]
+      (if (= decision "SELL")
         (println "✅ Test 2.2 PASS: 하락 추세 감지 (SELL)")
         (println "❌ Test 2.2 FAIL: 하락 추세 미감지")))
 
     ;; 테스트 2.3: 중립 (HOLD)
-    (let [[$decision (let [[$change (- 50000 49980)]]
-                       (let [[$pct (/ $change 49980)]]
-                         (if (> $pct 0.01) "BUY" (if (< $pct -0.01) "SELL" "HOLD"))))]]
-      (if (= $decision "HOLD")
+    (let [[decision (let [[change (- 50000 49980)]]
+                       (let [[pct (/ change 49980)]]
+                         (if (> pct 0.01) "BUY" (if (< pct -0.01) "SELL" "HOLD"))))]]
+      (if (= decision "HOLD")
         (println "✅ Test 2.3 PASS: 중립 상태 감지 (HOLD)")
         (println "❌ Test 2.3 FAIL: 중립 상태 미감지")))))
 
@@ -54,10 +54,10 @@
     (file_mkdir "/tmp/test-quant-logs")
 
     ;; 테스트 3.1: 거래 기록 저장
-    (let [[$timestamp (now_iso)]]
+    (let [[timestamp (now_iso)]]
       (do
         (file_append "/tmp/test-quant-logs/decisions.log"
-          (str "[" $timestamp "] BTC → BUY @ $50000\n"))
+          (str "[" timestamp "] BTC → BUY @ $50000\n"))
         (println "✅ Test 3.1 PASS: 거래 기록 저장")))))
 
 ;; 4. 타임스탬프 테스트
@@ -65,9 +65,9 @@
   (do
     (println "=== Test 4: ISO Timestamp ===")
 
-    (let [[$ts (now_iso)]]
-      (if (> (length $ts) 0)
-        (println (str "✅ Test 4 PASS: ISO 타임스탬프 " $ts))
+    (let [[ts (now_iso)]]
+      (if (> (length ts) 0)
+        (println (str "✅ Test 4 PASS: ISO 타임스탬프 " ts))
         (println "❌ Test 4 FAIL: 타임스탬프 생성 실패")))))
 
 ;; 5. 배치 처리 테스트
@@ -76,9 +76,9 @@
     (println "=== Test 5: Batch Processing ===")
 
     ;; 테스트 5.1: 가격 배열 처리
-    (let [[$prices [50000 50100 49900 50050 49950]]]
-      (let [[$results (map (fn [$p] (- $p 50000)) $prices)]]
-        (if (= (length $results) 5)
+    (let [[prices [50000 50100 49900 50050 49950]]]
+      (let [[results (map (fn [p] (- p 50000)) prices)]]
+        (if (= (length results) 5)
           (println "✅ Test 5.1 PASS: 배치 처리 성공")
           (println "❌ Test 5.1 FAIL: 배치 처리 실패"))))))
 
@@ -89,8 +89,8 @@
 
     (file_mkdir "/tmp/test-quant-final")
 
-    (let [[$exists (file_exists "/tmp/test-quant-final")]]
-      (if $exists
+    (let [[exists (file_exists "/tmp/test-quant-final")]]
+      (if exists
         (println "✅ Test 6 PASS: 로그 디렉터리 생성")
         (println "❌ Test 6 FAIL: 디렉터리 생성 실패")))))
 

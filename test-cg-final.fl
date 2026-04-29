@@ -1,5 +1,5 @@
 ;; Load full-compiler-fixed.fl to define cg
-(let [[$compiler-src (file_read "self/full-compiler-fixed.fl")]]
+(let [[compiler-src (file_read "self/full-compiler-fixed.fl")]]
   ;; Note: can't easily eval the whole thing, just test manually
   ;; Instead: use compiler-L3-FINAL.js directly
   (println "compiler-L3-FINAL.js ready"))

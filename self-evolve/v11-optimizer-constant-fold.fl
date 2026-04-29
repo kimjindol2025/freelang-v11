@@ -1,90 +1,90 @@
 ;; v11-optimizer-constant-fold.fl: Constant Folding (Gen1)
 ;; 범위: (+ 1 2) → 3 / (- 5 3) → 2 / (* 2 3) → 6 / (/ 6 2) → 3
 
-(defn is-constant [$node]
+(defn is-constant [node]
   ;; literal number/string/boolean인가? (symbol 제외!)
-  (if (nil? $node)
+  (if (nil? node)
     false
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "literal")
+    (let [[kind (get node "kind")]]
+      (if (= kind "literal")
         ;; literal이더라도 symbol이면 아님
-        (let [[$type (get $node "type")]]
-          (if (= $type "symbol") false true))
+        (let [[type (get node "type")]]
+          (if (= type "symbol") false true))
         false))))
 
-(defn is-arithmetic-op [$op]
+(defn is-arithmetic-op [op]
   ;; +, -, *, / 인가?
-  (if (= $op "+") true
-    (if (= $op "-") true
-      (if (= $op "*") true
-        (if (= $op "/") true false)))))
+  (if (= op "+") true
+    (if (= op "-") true
+      (if (= op "*") true
+        (if (= op "/") true false)))))
 
-(defn all-constant? [$args]
+(defn all-constant? [args]
   ;; args 모두 constant인가?
-  (if (= (length $args) 0)
+  (if (= (length args) 0)
     true
-    (let [[$first (get $args 0)]]
-      (let [[$rest (slice $args 1 (length $args))]]
-        (if (is-constant $first)
-          (all-constant? $rest)
+    (let [[first (get args 0)]]
+      (let [[rest (slice args 1 (length args))]]
+        (if (is-constant first)
+          (all-constant? rest)
           false)))))
 
-(defn evaluate-arithmetic [$op $args]
+(defn evaluate-arithmetic [op args]
   ;; 산술 연산 계산
   ;; args = [number, number, ...]
-  (let [[$v0 (get (get $args 0) "value")]]
-    (let [[$v1 (get (get $args 1) "value")]]
-      (if (= $op "+")
-        (+ $v0 $v1)
-        (if (= $op "-")
-          (- $v0 $v1)
-          (if (= $op "*")
-            (* $v0 $v1)
-            (if (= $op "/")
-              (/ $v0 $v1)
+  (let [[v0 (get (get args 0) "value")]]
+    (let [[v1 (get (get args 1) "value")]]
+      (if (= op "+")
+        (+ v0 v1)
+        (if (= op "-")
+          (- v0 v1)
+          (if (= op "*")
+            (* v0 v1)
+            (if (= op "/")
+              (/ v0 v1)
               nil)))))))
 
-(defn make-literal [$value]
+(defn make-literal [value]
   ;; 상수 노드 생성
-  {:kind "literal" :type "number" :value $value :line nil})
+  {:kind "literal" :type "number" :value value :line nil})
 
-(defn fold-constant [$node]
+(defn fold-constant [node]
   ;; 노드가 상수 폴딩 가능한가?
   ;; node = {op: "+", args: [literal, literal]}
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (is-arithmetic-op $op)
-          (if (all-constant? $args)
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (is-arithmetic-op op)
+          (if (all-constant? args)
             ;; 폴딩 가능
-            (make-literal (evaluate-arithmetic $op $args))
+            (make-literal (evaluate-arithmetic op args))
             ;; 폴딩 불가능
-            $node)
+            node)
           ;; 산술연산 아님
-          $node)))
+          node)))
     ;; sexpr 아님
-    $node))
+    node))
 
-(defn optimize-node-fold [$node]
+(defn optimize-node-fold [node]
   ;; 노드 최적화 (do-elim + constant-fold)
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (= $op "do")
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (= op "do")
           ;; do-elimination
-          (if (= (length $args) 1)
-            (optimize-node-fold (get $args 0))
-            $node)
+          (if (= (length args) 1)
+            (optimize-node-fold (get args 0))
+            node)
           ;; 자식 재귀 + folding
-          (let [[$new-args (map optimize-node-fold $args)]]
-            (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
-              (fold-constant $new-node))))))
+          (let [[new-args (map optimize-node-fold args)]]
+            (let [[new-node {:kind "sexpr" :op op :args new-args :line (get node "line")}]]
+              (fold-constant new-node))))))
     ;; sexpr 아님
-    $node))
+    node))
 
-(defn optimize-ast-fold [$ast]
+(defn optimize-ast-fold [ast]
   ;; AST 배열 전체 최적화
-  (map optimize-node-fold $ast))
+  (map optimize-node-fold ast))
 
 (do
   (println "================================================")
@@ -92,33 +92,33 @@
   (println "================================================\n")
 
   ;; 테스트 1: (+ 1 2)
-  (let [[$code "(+ 1 2)"]]
-    (let [[$ast (parse (lex $code))]]
-      (let [[$opt (optimize-ast-fold $ast)]]
+  (let [[code "(+ 1 2)"]]
+    (let [[ast (parse (lex code))]]
+      (let [[opt (optimize-ast-fold ast)]]
         (do
           (println "테스트 1: (+ 1 2)")
-          (println (str "  원본: " (get $ast 0)))
-          (println (str "  최적: " (get $opt 0)))
+          (println (str "  원본: " (get ast 0)))
+          (println (str "  최적: " (get opt 0)))
           (println "")))))
 
   ;; 테스트 2: (* 2 3)
-  (let [[$code "(* 2 3)"]]
-    (let [[$ast (parse (lex $code))]]
-      (let [[$opt (optimize-ast-fold $ast)]]
+  (let [[code "(* 2 3)"]]
+    (let [[ast (parse (lex code))]]
+      (let [[opt (optimize-ast-fold ast)]]
         (do
           (println "테스트 2: (* 2 3)")
-          (println (str "  원본: " (get $ast 0)))
-          (println (str "  최적: " (get $opt 0)))
+          (println (str "  원본: " (get ast 0)))
+          (println (str "  최적: " (get opt 0)))
           (println "")))))
 
   ;; 테스트 3: (+ 1 x) - constant 아님
-  (let [[$code "(+ 1 x)"]]
-    (let [[$ast (parse (lex $code))]]
-      (let [[$opt (optimize-ast-fold $ast)]]
+  (let [[code "(+ 1 x)"]]
+    (let [[ast (parse (lex code))]]
+      (let [[opt (optimize-ast-fold ast)]]
         (do
           (println "테스트 3: (+ 1 x) - 폴딩 불가")
-          (println (str "  원본: " (get $ast 0)))
-          (println (str "  최적: " (get $opt 0)))
+          (println (str "  원본: " (get ast 0)))
+          (println (str "  최적: " (get opt 0)))
           (println "")))))
 
   (println "✅ constant folding 테스트 완료"))

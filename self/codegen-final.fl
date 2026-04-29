@@ -104,32 +104,32 @@
   :body [(prelude-string) (prelude-list) (prelude-map) (prelude-time-regex) (prelude-io-misc) (prelude-db-server)]]
 
 [FUNC runtime-prelude :params []
-  :body (reduce (fn [$acc $part] (str $acc $part)) "" (prelude-parts))]
+  :body (reduce (fn [acc part] (str acc part)) "" (prelude-parts))]
 
 ;; ═══════ 최상위 ═══════
 
-[FUNC fl->js-code :params [$ast]
-  :body (reduce (fn [$acc $node] (str $acc (cg $node) ";\n")) "" $ast)]
+[FUNC fl->js-code :params [ast]
+  :body (reduce (fn [acc node] (str acc (cg node) ";\n")) "" ast)]
 
-[FUNC fl->js-with-prelude :params [$ast]
-  :body (let [[$p (runtime-prelude)]]
-          (let [[$c (fl->js-code $ast)]]
-            (str $p "\n" $c)))]
+[FUNC fl->js-with-prelude :params [ast]
+  :body (let [[p (runtime-prelude)]]
+          (let [[c (fl->js-code ast)]]
+            (str p "\n" c)))]
 
 ;; ═══════ driver ═══════
 ;; 사용법: node bootstrap.js run self/codegen.fl <input.fl> [<output.js>]
 ;; 인자 없이 실행하면 FUNC 등록만 하고 종료.
 
-[FUNC compile-file :params [$input $output]
-  :body (let [[$src    (file_read $input)]
-              [$tokens (lex $src)]
-              [$ast    (parse $tokens)]
-              [$js     (fl->js-with-prelude $ast)]]
-          (file_write $output $js)
-          (println (str "compiled " $input " -> " $output " size=" (length $js))))]
+[FUNC compile-file :params [input output]
+  :body (let [[src    (file_read input)]
+              [tokens (lex src)]
+              [ast    (parse tokens)]
+              [js     (fl->js-with-prelude ast)]]
+          (file_write output js)
+          (println (str "compiled " input " -> " output " size=" (length js))))]
 
-(if (null? $__argv__) null
-  (if (= (length $__argv__) 0) null
-    (compile-file (get $__argv__ 0)
-                  (if (>= (length $__argv__) 2) (get $__argv__ 1)
-                      (str (get $__argv__ 0) ".out.js")))))
+(if (null? __argv__) null
+  (if (= (length __argv__) 0) null
+    (compile-file (get __argv__ 0)
+                  (if (>= (length __argv__) 2) (get __argv__ 1)
+                      (str (get __argv__ 0) ".out.js")))))

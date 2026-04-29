@@ -1,22 +1,22 @@
 ;; Phase C 심화: Fuzzing
 ;; 목표: 변형된 입력으로 에러 복구 능력 검증
 
-(define safe-eval (fn [$code]
+(define safe-eval (fn [code]
   (try
-    (eval $code)
-    (catch $e {:error true :msg (str $e)}))))
+    (eval code)
+    (catch e {:error true :msg (str e)}))))
 
 ;; 1. 기본 변형 함수들
 
-(define replace-string (fn [$str $old $new]
+(define replace-string (fn [str old new]
   ;; 간단한 구현 (완전한 string-replace 대신)
-  $str))
+  str))
 
-(define string-split (fn [$str $delim]
+(define string-split (fn [str delim]
   ;; 문자 배열로 반환
   []))
 
-(define contains? (fn [$str $substr]
+(define contains? (fn [str substr]
   ;; substring 체크
   false))
 
@@ -37,7 +37,7 @@
 (define test-undefined-var (fn []
   (do
     ;; 정의되지 않은 변수
-    (define result (safe-eval "(+ $undefined 1)"))
+    (define result (safe-eval "(+ undefined 1)"))
     (get result :error))))
 
 (define test-type-mismatch (fn []
@@ -65,22 +65,22 @@
 
     (println "■ Parse Error 복구")
     (define e1 (test-parse-error))
-    (println (str "  미닫힘 괄호 복구: " (if $e1 "✅" "❌")))
+    (println (str "  미닫힘 괄호 복구: " (if e1 "✅" "❌")))
 
     (println "■ Invalid Syntax 복구")
     (define e2 (test-invalid-syntax))
-    (println (str "  빈 리스트 처리: " (if $e2 "✅" "❌")))
+    (println (str "  빈 리스트 처리: " (if e2 "✅" "❌")))
 
     (println "■ Runtime Error 복구")
     (define e3 (test-undefined-var))
-    (println (str "  undefined var: " (if $e3 "✅" "❌")))
+    (println (str "  undefined var: " (if e3 "✅" "❌")))
 
     (define e4 (test-type-mismatch))
-    (println (str "  type mismatch: " (if $e4 "✅" "❌")))
+    (println (str "  type mismatch: " (if e4 "✅" "❌")))
 
     (println "■ Valid Code 실행")
     (define v1 (test-valid-code))
-    (println (str "  유효한 코드: " (if $v1 "✅" "❌")))
+    (println (str "  유효한 코드: " (if v1 "✅" "❌")))
 
     (println "")
     (println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

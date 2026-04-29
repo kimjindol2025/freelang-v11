@@ -35,7 +35,7 @@
     true
     (catch err false))))
           posts (await (http-get (str "https://api.example.com/users/" user-id "/posts")))]
-      (let [[merged $user]] (map-set $merged :grade "A")))
+      (let [[merged user]] (map-set merged :grade "A")))
     (catch err
       (println "사용자/게시물 조회 실패:" err)
       nil)))
@@ -90,6 +90,6 @@
         "https://api.example.com/users"
         user))
       (catch err
-        (let [[merged $user]] (map-set $merged :grade "A")))))
+        (let [[merged user]] (map-set merged :grade "A")))))
     user-list)]
     results))

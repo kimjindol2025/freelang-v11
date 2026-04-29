@@ -1,4 +1,4 @@
-[FUNC test-func :params [$node]
-  :body (let [[$items (get $node :items)]]
-    (let [[$fields (+ 1 2)]]
-      $fields))]
+[FUNC test-func :params [node]
+  :body (let [[items (get node :items)]]
+    (let [[fields (+ 1 2)]]
+      fields))]

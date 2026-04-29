@@ -2,36 +2,36 @@
 ;; 직접 FL runtime 에서 실행 (self-interp 경유 X) — TCO 필요 없음.
 
 ;; collection
-[FUNC coll-reverse :params [$lst] :body (reverse-loop $lst 0 (list))]
-[FUNC reverse-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (reverse-loop $lst (+ $i 1) (append (list (get $lst $i)) $acc)))]
+[FUNC coll-reverse :params [lst] :body (reverse-loop lst 0 (list))]
+[FUNC reverse-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc
+          (reverse-loop lst (+ i 1) (append (list (get lst i)) acc)))]
 
-[FUNC coll-range :params [$s $e] :body (range-loop $s $e (list))]
-[FUNC range-loop :params [$s $e $acc]
-  :body (if (>= $s $e) $acc (range-loop (+ $s 1) $e (append $acc (list $s))))]
+[FUNC coll-range :params [s e] :body (range-loop s e (list))]
+[FUNC range-loop :params [s e acc]
+  :body (if (>= s e) acc (range-loop (+ s 1) e (append acc (list s))))]
 
-[FUNC coll-sum :params [$lst] :body (sum-loop $lst 0 0)]
-[FUNC sum-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc (sum-loop $lst (+ $i 1) (+ $acc (get $lst $i))))]
+[FUNC coll-sum :params [lst] :body (sum-loop lst 0 0)]
+[FUNC sum-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc (sum-loop lst (+ i 1) (+ acc (get lst i))))]
 
-[FUNC coll-take :params [$lst $n] :body (if (>= $n (length $lst)) $lst (slice $lst 0 $n))]
-[FUNC coll-drop :params [$lst $n] :body (if (>= $n (length $lst)) (list) (slice $lst $n (length $lst)))]
+[FUNC coll-take :params [lst n] :body (if (>= n (length lst)) lst (slice lst 0 n))]
+[FUNC coll-drop :params [lst n] :body (if (>= n (length lst)) (list) (slice lst n (length lst)))]
 
 ;; math
-[FUNC math-gcd :params [$a $b] :body (if (= $b 0) $a (math-gcd $b (% $a $b)))]
+[FUNC math-gcd :params [a b] :body (if (= b 0) a (math-gcd b (% a b)))]
 
 ;; string
-[FUNC str-starts-with? :params [$s $p]
-  :body (if (> (length $p) (length $s)) false (= (substring $s 0 (length $p)) $p))]
-[FUNC str-repeat :params [$s $n] :body (str-repeat-loop $s $n "")]
-[FUNC str-repeat-loop :params [$s $n $acc]
-  :body (if (<= $n 0) $acc (str-repeat-loop $s (- $n 1) (str $acc $s)))]
+[FUNC str-starts-with? :params [s p]
+  :body (if (> (length p) (length s)) false (= (substring s 0 (length p)) p))]
+[FUNC str-repeat :params [s n] :body (str-repeat-loop s n "")]
+[FUNC str-repeat-loop :params [s n acc]
+  :body (if (<= n 0) acc (str-repeat-loop s (- n 1) (str acc s)))]
 
 ;; smoke
-[FUNC check :params [$l $a $e]
-  :body (if (= $a $e) (println (str "pass " $l "=" $a))
-          (println (str "fail " $l " expected=" $e " got=" $a)))]
+[FUNC check :params [l a e]
+  :body (if (= a e) (println (str "pass " l "=" a))
+          (println (str "fail " l " expected=" e " got=" a)))]
 
 (check "reverse"     (coll-sum (coll-reverse (list 1 2 3 4 5)))  15)
 (check "range-len"   (length (coll-range 0 10))                   10)

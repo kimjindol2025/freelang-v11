@@ -4,88 +4,88 @@
 ; === Error Functions (from error.fl) ===
 
 [FUNC make-error :params [
-  $code
-  $stage
-  $message
-  $symbol
-  $file
-  $line
-  $column
-  $cause
-  $hint
+  code
+  stage
+  message
+  symbol
+  file
+  line
+  column
+  cause
+  hint
 ]
   :body {
-    :code $code
-    :stage $stage
-    :message $message
-    :symbol $symbol
-    :file $file
-    :line $line
-    :column $column
-    :cause $cause
-    :hint $hint
+    :code code
+    :stage stage
+    :message message
+    :symbol symbol
+    :file file
+    :line line
+    :column column
+    :cause cause
+    :hint hint
   }
 ]
 
-[FUNC analysis-error :params [$code $message $symbol $file $line $hint]
-  :body (make-error $code "analysis" $message $symbol $file $line nil nil $hint)
+[FUNC analysis-error :params [code message symbol file line hint]
+  :body (make-error code "analysis" message symbol file line nil nil hint)
 ]
 
-[FUNC runtime-error :params [$code $message $symbol $cause $hint]
-  :body (make-error $code "runtime" $message $symbol nil nil nil $cause $hint)
+[FUNC runtime-error :params [code message symbol cause hint]
+  :body (make-error code "runtime" message symbol nil nil nil cause hint)
 ]
 
-[FUNC package-resolve-error :params [$package $constraint $available]
+[FUNC package-resolve-error :params [package constraint available]
   :body (make-error
     "E_PACKAGE_VERSION_CONFLICT"
     "package_resolve"
-    (concat "Cannot resolve " $package " with constraint " $constraint)
-    $package
+    (concat "Cannot resolve " package " with constraint " constraint)
+    package
     nil nil nil
     nil
-    (concat "Available versions: " (get $available 0))
+    (concat "Available versions: " (get available 0))
   )
 ]
 
-[FUNC package-verify-error :params [$package $version $expected_hash $actual_hash]
+[FUNC package-verify-error :params [package version expected_hash actual_hash]
   :body (make-error
     "E_PACKAGE_VERIFY_CHECKSUM_FAILED"
     "package_verify"
-    (concat "Checksum mismatch for " $package "@" $version)
-    $package
+    (concat "Checksum mismatch for " package "@" version)
+    package
     nil nil nil
-    (concat "Expected: " $expected_hash ", Got: " $actual_hash)
+    (concat "Expected: " expected_hash ", Got: " actual_hash)
     "Package may be corrupted. Re-fetch recommended."
   )
 ]
 
-[FUNC format-error-human :params [$err]
+[FUNC format-error-human :params [err]
   :body (do
     (let [
-        [$code (get $err "code")]
-        [$stage (get $err "stage")]
-        [$msg (get $err "message")]
-        [$line (get $err "line")]
-        [$col (get $err "column")]
-        [$file (get $err "file")]
-        [$hint (get $err "hint")]
+        [code (get err "code")]
+        [stage (get err "stage")]
+        [msg (get err "message")]
+        [line (get err "line")]
+        [col (get err "column")]
+        [file (get err "file")]
+        [hint (get err "hint")]
       ]
       (concat
-        "❌ [" $stage ":" $code "]" "\n"
-        "  " $msg "\n"
-        (if (and $file $line) (concat "  at " $file ":" (int-to-str $line) ":" (int-to-str $col) "\n") "")
-        (if $hint (concat "  hint: " $hint "\n") "")
+        "❌ [" stage ":" code "]" "\n"
+        "  " msg "\n"
+        (if (and file line) (concat "  at " file ":" (int-to-str line) ":" (int-to-str col) "\n") "")
+        (if hint (concat "  hint: " hint "\n") "")
       )
     )
   )
 ]
 
-[FUNC format-error-json :params [$err]
-  :body (concat "JSON: " (get $err "code") " | " (get $err "stage") " | " (get $err "message"))
+[FUNC format-error-json :params [err]
+  :body (concat "JSON: " (get err "code") " | " (get err "stage") " | " (get err "message"))
 ]
 
-[FUNC int-to-str :params [$n]
-  :body (concat "" $n)
+[FUNC int-to-str :params [n]
+  :body (concat "" n)
 ]
 
 ; === Tests ===
@@ -95,7 +95,7 @@
     (println "\n=== Test: make-error ===")
 
     ; Parse error
-    (let [[$err (make-error
+    (let [[err (make-error
       "E_PARSE_UNEXPECTED_TOKEN"
       "parse"
       "Unexpected token: Expected RParen"
@@ -107,11 +107,11 @@
       "Check closing parenthesis"
     )]]
       (do
-        (println (concat "Code: " (get $err "code")))
-        (println (concat "Stage: " (get $err "stage")))
-        (println (concat "Message: " (get $err "message")))
-        (println (concat "Line: " (int-to-str (get $err "line"))))
-        (println (concat "Column: " (int-to-str (get $err "column"))))
+        (println (concat "Code: " (get err "code")))
+        (println (concat "Stage: " (get err "stage")))
+        (println (concat "Message: " (get err "message")))
+        (println (concat "Line: " (int-to-str (get err "line"))))
+        (println (concat "Column: " (int-to-str (get err "column"))))
       )
     )
   )
@@ -122,13 +122,13 @@
     (println "\n=== Test: package-resolve-error ===")
 
     (let [
-        [$err (package-resolve-error "lodash" "^4.0.0" ["3.10.1" "4.17.15" "4.17.21"])]
+        [err (package-resolve-error "lodash" "^4.0.0" ["3.10.1" "4.17.15" "4.17.21"])]
       ]
       (do
-        (println (concat "Code: " (get $err "code")))
-        (println (concat "Stage: " (get $err "stage")))
-        (println (concat "Message: " (get $err "message")))
-        (println (concat "Symbol: " (get $err "symbol")))
+        (println (concat "Code: " (get err "code")))
+        (println (concat "Stage: " (get err "stage")))
+        (println (concat "Message: " (get err "message")))
+        (println (concat "Symbol: " (get err "symbol")))
       )
     )
   )
@@ -139,7 +139,7 @@
     (println "\n=== Test: package-verify-error ===")
 
     (let [
-        [$err (package-verify-error
+        [err (package-verify-error
           "react"
           "18.2.0"
           "sha256:abc123def456..."
@@ -147,9 +147,9 @@
         )]
       ]
       (do
-        (println (concat "Code: " (get $err "code")))
-        (println (concat "Stage: " (get $err "stage")))
-        (println "Cause: " (get $err "cause"))
+        (println (concat "Code: " (get err "code")))
+        (println (concat "Stage: " (get err "stage")))
+        (println "Cause: " (get err "cause"))
       )
     )
   )
@@ -160,7 +160,7 @@
     (println "\n=== Test: format-error-human ===")
 
     (let [
-        [$err (analysis-error
+        [err (analysis-error
           "E_RUNTIME_UNBOUND_SYMBOL"
           "Variable 'foo' is not defined"
           "foo"
@@ -169,7 +169,7 @@
           "Define 'foo' before using it"
         )]
       ]
-      (println (format-error-human $err))
+      (println (format-error-human err))
     )
   )
 ]
@@ -179,7 +179,7 @@
     (println "\n=== Test: format-error-json ===")
 
     (let [
-        [$err (runtime-error
+        [err (runtime-error
           "E_RUNTIME_TYPE_ERROR"
           "Cannot call non-function"
           "my-var"
@@ -187,7 +187,7 @@
           "Ensure the variable is a function"
         )]
       ]
-      (println (format-error-json $err))
+      (println (format-error-json err))
     )
   )
 ]
@@ -204,8 +204,8 @@
   )
 ]
 
-[FUNC int-to-str :params [$n]
-  :body (concat "" $n)
+[FUNC int-to-str :params [n]
+  :body (concat "" n)
 ]
 
 (run-all-tests)

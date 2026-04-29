@@ -1,139 +1,139 @@
 ;; match + defstruct codegen 검증
 ;; 인라인 minimal codegen: match / defstruct / literal / variable / call / get
 
-[FUNC js-esc :params [$s]
-  :body (let [[$a (replace $s "\\" "\\\\")] [$b (replace $a "\"" "\\\"")]]
-          (str "\"" $b "\""))]
-[FUNC js-name :params [$n]
-  :body (if (null? $n) "_"
-          (let [[$a (replace $n "-" "_")] [$b (replace $a "?" "_q")] [$c (replace $b "!" "_x")]]
-            $c))]
-[FUNC extract-name :params [$n]
-  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+[FUNC js-esc :params [s]
+  :body (let [[a (replace s "\\" "\\\\")] [b (replace a "\"" "\\\"")]]
+          (str "\"" b "\""))]
+[FUNC js-name :params [n]
+  :body (if (null? n) "_"
+          (let [[a (replace n "-" "_")] [b (replace a "?" "_q")] [c (replace b "!" "_x")]]
+            c))]
+[FUNC extract-name :params [n]
+  :body (cond [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "literal") (js-name (get n :value))]
               [true "_anon"])]
 
-[FUNC cg :params [$n]
-  :body (cond [(null? $n) "null"]
-              [(= (get $n :kind) "literal") (cg-literal $n)]
-              [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
-              [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
-              [(= (get $n :kind) "pattern-match") (cg-match $n)]
+[FUNC cg :params [n]
+  :body (cond [(null? n) "null"]
+              [(= (get n :kind) "literal") (cg-literal n)]
+              [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "keyword") (js-esc (get n :name))]
+              [(= (get n :kind) "sexpr") (cg-sexpr n)]
+              [(= (get n :kind) "pattern-match") (cg-match n)]
               [true "null"])]
 
-[FUNC cg-literal :params [$n]
-  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
-          (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
-                [(= $t "symbol")
-                 (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
-                       [true (js-name $v)])]
+[FUNC cg-literal :params [n]
+  :body (let [[t (get n :type)] [v (get n :value)]]
+          (cond [(= t "number") v] [(= t "string") (js-esc v)]
+                [(= t "symbol")
+                 (cond [(= v "true") "true"] [(= v "false") "false"] [(= v "null") "null"]
+                       [true (js-name v)])]
                 [true "null"]))]
 
-[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
-[FUNC args-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (args-loop $args (+ $i 1)
-            (if (= $i 0) (str (cg (get $args $i)))
-                         (str $acc "," (cg (get $args $i))))))]
+[FUNC cg-args :params [args] :body (args-loop args 0 "")]
+[FUNC args-loop :params [args i acc]
+  :body (if (>= i (length args)) acc
+          (args-loop args (+ i 1)
+            (if (= i 0) (str (cg (get args i)))
+                         (str acc "," (cg (get args i))))))]
 
-[FUNC cg-pair :params [$args $op] :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+[FUNC cg-pair :params [args op] :body (str "(" (cg (get args 0)) op (cg (get args 1)) ")")]
 
-[FUNC cg-sexpr :params [$n]
-  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+[FUNC cg-sexpr :params [n]
+  :body (let [[op (get n :op)] [args (get n :args)]]
           (cond
-            [(= $op "defstruct") (cg-defstruct $args)]
-            [(= $op "define") (str "const " (extract-name (get $args 0)) "=" (cg (get $args 1)))]
-            [(= $op "+") (cg-pair $args "+")]
-            [(= $op "=") (cg-pair $args "===")]
-            [(= $op "get") (str "_fl_get(" (cg-args $args) ")")]
-            [(= $op "println") (str "console.log(" (cg-args $args) ")")]
-            [true (str (js-name $op) "(" (cg-args $args) ")")]))]
+            [(= op "defstruct") (cg-defstruct args)]
+            [(= op "define") (str "const " (extract-name (get args 0)) "=" (cg (get args 1)))]
+            [(= op "+") (cg-pair args "+")]
+            [(= op "=") (cg-pair args "===")]
+            [(= op "get") (str "_fl_get(" (cg-args args) ")")]
+            [(= op "println") (str "console.log(" (cg-args args) ")")]
+            [true (str (js-name op) "(" (cg-args args) ")")]))]
 
 ;; ═══════ defstruct codegen ═══════
-[FUNC cg-defstruct :params [$args]
-  :body (let [[$name (extract-name (get $args 0))]
-              [$fields (slice $args 1 (length $args))]
-              [$params (sfield-list $fields 0 "")]]
-          (str "const " $name "=(" $params ")=>({__struct:\"" $name "\"," $params "})"))]
+[FUNC cg-defstruct :params [args]
+  :body (let [[name (extract-name (get args 0))]
+              [fields (slice args 1 (length args))]
+              [params (sfield-list fields 0 "")]]
+          (str "const " name "=(" params ")=>({__struct:\"" name "\"," params "})"))]
 
-[FUNC sfield-list :params [$fs $i $acc]
-  :body (if (>= $i (length $fs)) $acc
-          (let [[$n (extract-name (get $fs $i))]]
-            (sfield-list $fs (+ $i 1)
-                         (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+[FUNC sfield-list :params [fs i acc]
+  :body (if (>= i (length fs)) acc
+          (let [[n (extract-name (get fs i))]]
+            (sfield-list fs (+ i 1)
+                         (if (= (length acc) 0) n (str acc "," n)))))]
 
 ;; ═══════ match codegen ═══════
-[FUNC literal-to-js :params [$t $v]
-  :body (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
-              [(= $t "symbol")
-               (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
-                     [true (js-esc $v)])]
+[FUNC literal-to-js :params [t v]
+  :body (cond [(= t "number") v] [(= t "string") (js-esc v)]
+              [(= t "symbol")
+               (cond [(= v "true") "true"] [(= v "false") "false"] [(= v "null") "null"]
+                     [true (js-esc v)])]
               [true "null"])]
 
-[FUNC or-pattern-test :params [$pats $v $i $acc]
-  :body (if (>= $i (length $pats)) (if (= (length $acc) 0) "false" (str "(" $acc ")"))
-          (let [[$t (pattern-test (get $pats $i) $v)]]
-            (or-pattern-test $pats $v (+ $i 1)
-              (if (= (length $acc) 0) $t (str $acc "||" $t))))) ]
+[FUNC or-pattern-test :params [pats v i acc]
+  :body (if (>= i (length pats)) (if (= (length acc) 0) "false" (str "(" acc ")"))
+          (let [[t (pattern-test (get pats i) v)]]
+            (or-pattern-test pats v (+ i 1)
+              (if (= (length acc) 0) t (str acc "||" t))))) ]
 
-[FUNC pattern-test :params [$pat $v]
-  :body (let [[$k (get $pat :kind)]]
+[FUNC pattern-test :params [pat v]
+  :body (let [[k (get pat :kind)]]
           (cond
-            [(= $k "wildcard-pattern") "true"]
-            [(= $k "variable-pattern") "true"]
-            [(= $k "literal-pattern")
-             (str "(" $v "===" (literal-to-js (get $pat :type) (get $pat :value)) ")")]
-            [(= $k "or-pattern") (or-pattern-test (get $pat :patterns) $v 0 "")]
-            [(= $k "range-pattern")
-             (str "(" $v ">=" (get $pat :min) "&&" $v "<=" (get $pat :max) ")")]
+            [(= k "wildcard-pattern") "true"]
+            [(= k "variable-pattern") "true"]
+            [(= k "literal-pattern")
+             (str "(" v "===" (literal-to-js (get pat :type) (get pat :value)) ")")]
+            [(= k "or-pattern") (or-pattern-test (get pat :patterns) v 0 "")]
+            [(= k "range-pattern")
+             (str "(" v ">=" (get pat :min) "&&" v "<=" (get pat :max) ")")]
             [true "false"]))]
 
-[FUNC pattern-bindings :params [$pat $v]
-  :body (let [[$k (get $pat :kind)]]
-          (cond [(= $k "variable-pattern") (str "let " (js-name (get $pat :name)) "=" $v ";")]
+[FUNC pattern-bindings :params [pat v]
+  :body (let [[k (get pat :kind)]]
+          (cond [(= k "variable-pattern") (str "let " (js-name (get pat :name)) "=" v ";")]
                 [true ""]))]
 
-[FUNC match-cases-loop :params [$cases $i $acc]
-  :body (if (>= $i (length $cases)) $acc
-          (let [[$c (get $cases $i)]
-                [$pat (get $c :pattern)]
-                [$body (cg (get $c :body))]
-                [$guard-n (get $c :guard)]
-                [$test (pattern-test $pat "__v")]
-                [$bind (pattern-bindings $pat "__v")]
-                [$guard-js (if (null? $guard-n) "true" (cg $guard-n))]
-                [$cond (str "(" $test ")&&(" $guard-js ")")]]
-            (match-cases-loop $cases (+ $i 1)
-              (str $acc "if(" $cond "){" $bind "return " $body ";}"))))]
+[FUNC match-cases-loop :params [cases i acc]
+  :body (if (>= i (length cases)) acc
+          (let [[c (get cases i)]
+                [pat (get c :pattern)]
+                [body (cg (get c :body))]
+                [guard-n (get c :guard)]
+                [test (pattern-test pat "__v")]
+                [bind (pattern-bindings pat "__v")]
+                [guard-js (if (null? guard-n) "true" (cg guard-n))]
+                [cond (str "(" test ")&&(" guard-js ")")]]
+            (match-cases-loop cases (+ i 1)
+              (str acc "if(" cond "){" bind "return " body ";}"))))]
 
-[FUNC cg-match :params [$n]
-  :body (let [[$val (cg (get $n :value))]
-              [$cases (get $n :cases)]
-              [$default-n (get $n :defaultCase)]
-              [$default (if (null? $default-n) "null" (cg $default-n))]
-              [$cases-js (match-cases-loop $cases 0 "")]]
-          (str "((__v)=>{" $cases-js "return " $default ";})(" $val ")"))]
+[FUNC cg-match :params [n]
+  :body (let [[val (cg (get n :value))]
+              [cases (get n :cases)]
+              [default-n (get n :defaultCase)]
+              [default (if (null? default-n) "null" (cg default-n))]
+              [cases-js (match-cases-loop cases 0 "")]]
+          (str "((__v)=>{" cases-js "return " default ";})(" val ")"))]
 
 ;; ═══════ 실행 + 검증 ═══════
-[FUNC compile-all :params [$ast $i $acc]
-  :body (if (>= $i (length $ast)) $acc
-          (compile-all $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+[FUNC compile-all :params [ast i acc]
+  :body (if (>= i (length ast)) acc
+          (compile-all ast (+ i 1) (str acc (cg (get ast i)) ";\n")))]
 
 (define PRELUDE
   "const _fl_get=(o,k)=>(o==null?null:(o[k]===undefined?null:o[k]));\n")
 
-[FUNC run-js :params [$label $fl $expected]
-  :body (let [[$ast (fl-parse $fl)]
-              [$js (str PRELUDE (compile-all $ast 0 ""))]
-              [$file (str "self/bench/_mt_" $label ".js")]]
-          (file_write $file $js)
-          (let [[$r (shell_capture (str "node " $file))]
-                [$out (get $r :stdout)]
-                [$trim (if (null? $out) "" (replace $out "\n" ""))]]
-            (if (= $trim $expected)
-              (println (str "pass " $label "=" $trim))
-              (println (str "fail " $label " expected=\"" $expected "\" got=\"" $trim "\"")))))]
+[FUNC run-js :params [label fl expected]
+  :body (let [[ast (fl-parse fl)]
+              [js (str PRELUDE (compile-all ast 0 ""))]
+              [file (str "self/bench/_mt_" label ".js")]]
+          (file_write file js)
+          (let [[r (shell_capture (str "node " file))]
+                [out (get r :stdout)]
+                [trim (if (null? out) "" (replace out "\n" ""))]]
+            (if (= trim expected)
+              (println (str "pass " label "=" trim))
+              (println (str "fail " label " expected=\"" expected "\" got=\"" trim "\"")))))]
 
 ;; ─── match ───
 (run-js "match-num"

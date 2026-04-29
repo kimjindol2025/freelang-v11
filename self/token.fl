@@ -10,7 +10,7 @@
 ;;   "LBrace"   "{"
 ;;   "RBrace"   "}"
 ;;   "Symbol"   식별자 (fn, defn, +, -, ...)
-;;   "Variable" $x
+;;   "Variable" x
 ;;   "Keyword"  :name
 ;;   "Number"   42, 3.14, -7
 ;;   "String"   "hello"

@@ -1,54 +1,54 @@
 ;; self/stdlib/search.fl — Phase 26 Part 3
 ;; 검색 알고리즘
 
-[FUNC binary-search :params [$lst $target]
-  :body (binary-search-loop $lst $target 0 (- (length $lst) 1))]
-[FUNC binary-search-loop :params [$lst $target $left $right]
-  :body (if (> $left $right) (- 1)
-          (let [[$mid (floor (/ (+ $left $right) 2))]
-                [$mid-val (get $lst $mid)]]
+[FUNC binary-search :params [lst target]
+  :body (binary-search-loop lst target 0 (- (length lst) 1))]
+[FUNC binary-search-loop :params [lst target left right]
+  :body (if (> left right) (- 1)
+          (let [[mid (floor (/ (+ left right) 2))]
+                [mid-val (get lst mid)]]
             (cond
-              (= $mid-val $target) $mid
-              (< $mid-val $target) (binary-search-loop $lst $target (+ $mid 1) $right)
-              true (binary-search-loop $lst $target $left (- $mid 1)))))]
+              (= mid-val target) mid
+              (< mid-val target) (binary-search-loop lst target (+ mid 1) right)
+              true (binary-search-loop lst target left (- mid 1)))))]
 
-[FUNC linear-search :params [$lst $target]
-  :body (linear-search-loop $lst $target 0)]
-[FUNC linear-search-loop :params [$lst $target $i]
-  :body (if (>= $i (length $lst)) (- 1)
-          (if (= (get $lst $i) $target) $i
-            (linear-search-loop $lst $target (+ $i 1))))]
+[FUNC linear-search :params [lst target]
+  :body (linear-search-loop lst target 0)]
+[FUNC linear-search-loop :params [lst target i]
+  :body (if (>= i (length lst)) (- 1)
+          (if (= (get lst i) target) i
+            (linear-search-loop lst target (+ i 1))))]
 
-[FUNC find-index :params [$lst $predicate]
-  :body (find-index-loop $lst $predicate 0)]
-[FUNC find-index-loop :params [$lst $pred $i]
-  :body (if (>= $i (length $lst)) (- 1)
-          (if ($pred (get $lst $i)) $i
-            (find-index-loop $lst $pred (+ $i 1))))]
+[FUNC find-index :params [lst predicate]
+  :body (find-index-loop lst predicate 0)]
+[FUNC find-index-loop :params [lst pred i]
+  :body (if (>= i (length lst)) (- 1)
+          (if (pred (get lst i)) i
+            (find-index-loop lst pred (+ i 1))))]
 
-[FUNC find-all-indices :params [$lst $value]
-  :body (find-all-indices-loop $lst $value 0 (list))]
-[FUNC find-all-indices-loop :params [$lst $value $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (find-all-indices-loop $lst $value (+ $i 1)
-            (if (= (get $lst $i) $value)
-              (append $acc $i)
-              $acc)))]
+[FUNC find-all-indices :params [lst value]
+  :body (find-all-indices-loop lst value 0 (list))]
+[FUNC find-all-indices-loop :params [lst value i acc]
+  :body (if (>= i (length lst)) acc
+          (find-all-indices-loop lst value (+ i 1)
+            (if (= (get lst i) value)
+              (append acc i)
+              acc)))]
 
-[FUNC lower-bound :params [$lst $value]
-  :body (lower-bound-loop $lst $value 0 (length $lst))]
-[FUNC lower-bound-loop :params [$lst $value $left $right]
-  :body (if (= $left $right) $left
-          (let [[$mid (floor (/ (+ $left $right) 2))]]
-            (if (< (get $lst $mid) $value)
-              (lower-bound-loop $lst $value (+ $mid 1) $right)
-              (lower-bound-loop $lst $value $left $mid))))]
+[FUNC lower-bound :params [lst value]
+  :body (lower-bound-loop lst value 0 (length lst))]
+[FUNC lower-bound-loop :params [lst value left right]
+  :body (if (= left right) left
+          (let [[mid (floor (/ (+ left right) 2))]]
+            (if (< (get lst mid) value)
+              (lower-bound-loop lst value (+ mid 1) right)
+              (lower-bound-loop lst value left mid))))]
 
-[FUNC upper-bound :params [$lst $value]
-  :body (upper-bound-loop $lst $value 0 (length $lst))]
-[FUNC upper-bound-loop :params [$lst $value $left $right]
-  :body (if (= $left $right) $left
-          (let [[$mid (floor (/ (+ $left $right) 2))]]
-            (if (<= (get $lst $mid) $value)
-              (upper-bound-loop $lst $value (+ $mid 1) $right)
-              (upper-bound-loop $lst $value $left $mid))))]
+[FUNC upper-bound :params [lst value]
+  :body (upper-bound-loop lst value 0 (length lst))]
+[FUNC upper-bound-loop :params [lst value left right]
+  :body (if (= left right) left
+          (let [[mid (floor (/ (+ left right) 2))]]
+            (if (<= (get lst mid) value)
+              (upper-bound-loop lst value (+ mid 1) right)
+              (upper-bound-loop lst value left mid))))]

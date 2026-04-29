@@ -129,7 +129,7 @@
           {:type "save-data" :data {:path "output.json" :content "results"}})
 
         ;; 에이전트 실행
-        final-state (run-agent (let [[merged $state3]] (map-set $merged :grade "A")))
+        final-state (run-agent (let [[merged state3]] (map-set merged :grade "A")))
 
         ;; 결과 요약
         summary (get-execution-summary final-state)]

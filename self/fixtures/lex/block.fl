@@ -1,1 +1,1 @@
-[FUNC add :params [$a $b] :body (+ $a $b)]
+[FUNC add :params [a b] :body (+ a b)]

@@ -1,47 +1,47 @@
 ;; self/stdlib/http.fl — Phase 27
 ;; HTTP 클라이언트 (native http_* builtin wrapper)
 
-[FUNC http-get :params [$url]
-  :body (http_get (str $url))]
+[FUNC http-get :params [url]
+  :body (http_get (str url))]
 
-[FUNC http-post :params [$url $body]
-  :body (http_post (str $url) (str $body))]
+[FUNC http-post :params [url body]
+  :body (http_post (str url) (str body))]
 
-[FUNC http-put :params [$url $body]
-  :body (http_put (str $url) (str $body))]
+[FUNC http-put :params [url body]
+  :body (http_put (str url) (str body))]
 
-[FUNC http-patch :params [$url $body]
-  :body (http_patch (str $url) (str $body))]
+[FUNC http-patch :params [url body]
+  :body (http_patch (str url) (str body))]
 
-[FUNC http-delete :params [$url]
-  :body (http_delete (str $url))]
+[FUNC http-delete :params [url]
+  :body (http_delete (str url))]
 
-[FUNC http-head :params [$url]
-  :body (http_head (str $url))]
+[FUNC http-head :params [url]
+  :body (http_head (str url))]
 
-[FUNC http-status :params [$url]
-  :body (http_status (str $url))]
+[FUNC http-status :params [url]
+  :body (http_status (str url))]
 
-[FUNC http-json :params [$url]
-  :body (json-parse (http_get (str $url)))]
+[FUNC http-json :params [url]
+  :body (json-parse (http_get (str url)))]
 
-[FUNC http-header :params [$url $header]
-  :body (http_header (str $url) (str $header))]
+[FUNC http-header :params [url header]
+  :body (http_header (str url) (str header))]
 
-[FUNC http-with-timeout :params [$url $timeout]
-  :body (http_get (str $url))]
+[FUNC http-with-timeout :params [url timeout]
+  :body (http_get (str url))]
 
-[FUNC http-post-json :params [$url $data]
-  :body (http_post (str $url) (json-stringify $data))]
+[FUNC http-post-json :params [url data]
+  :body (http_post (str url) (json-stringify data))]
 
-[FUNC http-put-json :params [$url $data]
-  :body (http_put (str $url) (json-stringify $data))]
+[FUNC http-put-json :params [url data]
+  :body (http_put (str url) (json-stringify data))]
 
-[FUNC is-http-success? :params [$status]
-  :body (and (>= $status 200) (< $status 300))]
+[FUNC is-http-success? :params [status]
+  :body (and (>= status 200) (< status 300))]
 
-[FUNC is-http-redirect? :params [$status]
-  :body (and (>= $status 300) (< $status 400))]
+[FUNC is-http-redirect? :params [status]
+  :body (and (>= status 300) (< status 400))]
 
-[FUNC is-http-error? :params [$status]
-  :body (>= $status 400)]
+[FUNC is-http-error? :params [status]
+  :body (>= status 400)]

@@ -10,26 +10,26 @@
 (define test-l1-sha-consistency (fn []
   (do
     (define code "(+ 1 2)")
-    (define r1 (try (eval $code) (catch $e {:value 3})))
-    (define r2 (try (eval $code) (catch $e {:value 3})))
-    (define r3 (try (eval $code) (catch $e {:value 3})))
+    (define r1 (try (eval code) (catch e {:value 3})))
+    (define r2 (try (eval code) (catch e {:value 3})))
+    (define r3 (try (eval code) (catch e {:value 3})))
 
     (define pass (and
-      (= $r1 $r2)
-      (= $r2 $r3)))
+      (= r1 r2)
+      (= r2 r3)))
 
-    (println (str "  L1.1: (+ 1 2) 3회 일관성: " (if $pass "✅" "❌")))
+    (println (str "  L1.1: (+ 1 2) 3회 일관성: " (if pass "✅" "❌")))
 
     (define pass2 true)
-    (loop [$i 0]
-      (if (>= $i 5)
+    (loop [i 0]
+      (if (>= i 5)
         pass2
         (do
           (define result (try
             (+ (* 7 13) 21)
-            (catch $e 0)))
-          (if (= $result 112)
-            (recur (+ $i 1))
+            (catch e 0)))
+          (if (= result 112)
+            (recur (+ i 1))
             false)))))))
 
 ;; ──────────────────────────────────────
@@ -40,21 +40,21 @@
   (do
     ;; 100회 동일 계산 = 100회 동일 결과
     (define passes 0)
-    (loop [$i 0]
-      (if (>= $i 10)
+    (loop [i 0]
+      (if (>= i 10)
         (do
-          (println (str "  L2.1: 10회 반복 실행: " $passes "/10 PASS"))
+          (println (str "  L2.1: 10회 반복 실행: " passes "/10 PASS"))
           true)
         (do
           (define result (try
             (* (+ 5 3) (- 10 2))
-            (catch $e 0)))
+            (catch e 0)))
 
-          (if (= $result 104)
+          (if (= result 104)
             (do
-              (define passes (+ $passes 1))
-              (recur (+ $i 1)))
-            (recur (+ $i 1)))))))))
+              (define passes (+ passes 1))
+              (recur (+ i 1)))
+            (recur (+ i 1)))))))))
 
 ;; ──────────────────────────────────────
 ;; L3: 구조적 불변성
@@ -64,28 +64,28 @@
   (do
     (println "  L3.1: 배열 구조 불변성")
     (define arr [1 2 3 4 5])
-    (define len1 (length $arr))
-    (define _ (map (fn [$x] (* $x 2)) $arr))
-    (define len2 (length $arr))
-    (println (str "    원본 길이 5 → 5: " (if (= $len2 5) "✅" "❌")))
+    (define len1 (length arr))
+    (define _ (map (fn [x] (* x 2)) arr))
+    (define len2 (length arr))
+    (println (str "    원본 길이 5 → 5: " (if (= len2 5) "✅" "❌")))
 
     (println "  L3.2: Map 구조 불변성")
     (define m {:a 1 :b 2 :c 3})
-    (define keys1 (json_keys $m))
-    (define _ (json_set $m "d" 4))
-    (define keys2 (json_keys $m))
-    (println (str "    키 개수 3 → 3: " (if (= (length $keys2) 3) "✅" "❌")))
+    (define keys1 (json_keys m))
+    (define _ (json_set m "d" 4))
+    (define keys2 (json_keys m))
+    (println (str "    키 개수 3 → 3: " (if (= (length keys2) 3) "✅" "❌")))
 
     (println "  L3.3: 함수 호출 안정성")
-    (define fn-calls (loop [$i 0 $count 0]
-      (if (>= $i 3)
-        $count
+    (define fn-calls (loop [i 0 count 0]
+      (if (>= i 3)
+        count
         (do
           (define result (+ 1 2 3))
-          (if (= $result 6)
-            (recur (+ $i 1) (+ $count 1))
-            (recur (+ $i 1) $count))))))
-    (println (str "    3회 호출 결과: " $fn-calls "/3 성공")))))
+          (if (= result 6)
+            (recur (+ i 1) (+ count 1))
+            (recur (+ i 1) count))))))
+    (println (str "    3회 호출 결과: " fn-calls "/3 성공")))))
 
 ;; ──────────────────────────────────────
 ;; 통합 검증

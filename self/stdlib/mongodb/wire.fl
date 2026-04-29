@@ -2,44 +2,44 @@
 ;; Simplified for FreeLang v11
 
 ;; === Helper: Parse connection ID ===
-[FUNC wire-parse-host :params [$connId]
-  :body (substring $connId 0 (index-of $connId ":"))]
+[FUNC wire-parse-host :params [connId]
+  :body (substring connId 0 (index-of connId ":"))]
 
-[FUNC wire-parse-port :params [$connId]
-  :body (num (substring $connId (+ (index-of $connId ":") 1)))]
+[FUNC wire-parse-port :params [connId]
+  :body (num (substring connId (+ (index-of connId ":") 1)))]
 
 ;; === Helper: Build OP_MSG header ===
 ;; Returns: messageLength(4) + requestID(4) + responseTo(4) + opCode(4) + flags(4)
 ;; opCode for OP_MSG = 2013 = 0x07dd (little-endian: dd 07 00 00)
-[FUNC wire-build-header :params [$msgLen $reqId]
-  :body (let [[$len-hex (bson-int32-hex $msgLen)]
-              [$id-hex (bson-int32-hex $reqId)]]
-    (str $len-hex
-         $id-hex                        ;; requestID
+[FUNC wire-build-header :params [msgLen reqId]
+  :body (let [[len-hex (bson-int32-hex msgLen)]
+              [id-hex (bson-int32-hex reqId)]]
+    (str len-hex
+         id-hex                        ;; requestID
          "00000000"                     ;; responseTo = 0
          "dd070000"                     ;; opCode = 2013 (OP_MSG) - FIXED!
          "00000000"))]                  ;; flags = 0
 
 ;; === Main: Send OP_MSG command ===
-[FUNC wire-send-command :params [$connId $db $cmd]
-  :body (let [[$host (wire-parse-host $connId)]
-              [$port (wire-parse-port $connId)]
-              [$bson (bson-encode-native $cmd)]
-              [$section (str "00" $bson)]
-              [$bson-size (/ (length $bson) 2)]
-              [$header-payload-size (+ 4 1 $bson-size)]  ;; 4(flags) + 1(section type) + bson
-              [$header (wire-build-header (+ 20 $header-payload-size) 1)]
-              [$opmsg (str $header "00" $bson)]]
-    (net-sendrecv $host $port $opmsg 5000))]
+[FUNC wire-send-command :params [connId db cmd]
+  :body (let [[host (wire-parse-host connId)]
+              [port (wire-parse-port connId)]
+              [bson (bson-encode-native cmd)]
+              [section (str "00" bson)]
+              [bson-size (/ (length bson) 2)]
+              [header-payload-size (+ 4 1 bson-size)]  ;; 4(flags) + 1(section type) + bson
+              [header (wire-build-header (+ 20 header-payload-size) 1)]
+              [opmsg (str header "00" bson)]]
+    (net-sendrecv host port opmsg 5000))]
 
 ;; === Response parser: Extract BSON from OP_MSG response ===
 ;; OP_MSG Response: header(20) + flags(4) + sectionType(1) + BSON
 ;; In hex: offset 42 (= 20*2 + 4*2) = header + flags
 ;; Then skip 1 byte (2 hex chars) for sectionType → offset 44
-[FUNC wire-parse-response :params [$responseHex]
-  :body (if (= $responseHex null)
+[FUNC wire-parse-response :params [responseHex]
+  :body (if (= responseHex null)
     null
-    (let [[$bson-hex (substring $responseHex 44)]]  ;; Skip header(40) + flags(4) + sectionType(2)
-      (bson-decode-native $bson-hex)))]
+    (let [[bson-hex (substring responseHex 44)]]  ;; Skip header(40) + flags(4) + sectionType(2)
+      (bson-decode-native bson-hex)))]
 
 (println "Wire Protocol module loaded")

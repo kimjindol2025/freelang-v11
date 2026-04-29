@@ -20,59 +20,59 @@
 
 ;; ============ 핸들러 함수들 ============
 
-[FUNC list-users :params [$req]
+[FUNC list-users :params [req]
   :body (let [rows (db_query "./users.db"
     "SELECT id, name, email FROM users" [])]
-    (res-json { :success true :count 0 :data $rows }))
+    (res-json { :success true :count 0 :data rows }))
 ]
 
-[FUNC get-user :params [$req]
+[FUNC get-user :params [req]
   :body (let [
-    id (req-param $req "id")
+    id (req-param req "id")
     result (db_query "./users.db"
-      "SELECT id, name, email FROM users WHERE id = ?" [$id])
+      "SELECT id, name, email FROM users WHERE id = ?" [id])
   ]
     (if result
-      (res-json { :success true :data (get $result 0) })
+      (res-json { :success true :data (get result 0) })
       (res-status 404 { :error "User not found" })))
 ]
 
-[FUNC create-user :params [$req]
+[FUNC create-user :params [req]
   :body (let [
-    body (req-body $req)
-    name (get $body "name")
-    email (get $body "email")
+    body (req-body req)
+    name (get body "name")
+    email (get body "email")
   ]
     (if (and name email)
       (do
         (db_exec "./users.db"
-          "INSERT INTO users (name, email) VALUES (?, ?)" [$name $email])
+          "INSERT INTO users (name, email) VALUES (?, ?)" [name email])
         (res-status 201 { :success true :message "User created" }))
       (res-status 400 { :error "name and email required" })))
 ]
 
-[FUNC update-user :params [$req]
+[FUNC update-user :params [req]
   :body (let [
-    id (req-param $req "id")
-    body (req-body $req)
-    name (get $body "name")
+    id (req-param req "id")
+    body (req-body req)
+    name (get body "name")
   ]
     (if name
       (do
         (db_exec "./users.db"
-          "UPDATE users SET name = ? WHERE id = ?" [$name $id])
+          "UPDATE users SET name = ? WHERE id = ?" [name id])
         (res-json { :success true :message "User updated" }))
       (res-status 400 { :error "name required" })))
 ]
 
-[FUNC delete-user :params [$req]
-  :body (let [id (req-param $req "id")]
+[FUNC delete-user :params [req]
+  :body (let [id (req-param req "id")]
     (do
-      (db_exec "./users.db" "DELETE FROM users WHERE id = ?" [$id])
+      (db_exec "./users.db" "DELETE FROM users WHERE id = ?" [id])
       (res-json { :success true :message "User deleted" })))
 ]
 
-[FUNC health :params [$req]
+[FUNC health :params [req]
   :body (res-json {
     :status "OK"
     :server "Express.fl (Advanced)"

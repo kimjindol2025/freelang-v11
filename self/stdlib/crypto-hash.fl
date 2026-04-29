@@ -1,29 +1,29 @@
 ;; self/stdlib/crypto-hash.fl — Phase 26 Part 3
 ;; 암호화 해시 함수 (native wrapper)
 
-[FUNC sha256 :params [$data]
-  :body (crypto-hash "sha256" (str $data))]
+[FUNC sha256 :params [data]
+  :body (crypto-hash "sha256" (str data))]
 
-[FUNC sha1 :params [$data]
-  :body (crypto-hash "sha1" (str $data))]
+[FUNC sha1 :params [data]
+  :body (crypto-hash "sha1" (str data))]
 
-[FUNC md5 :params [$data]
-  :body (crypto-hash "md5" (str $data))]
+[FUNC md5 :params [data]
+  :body (crypto-hash "md5" (str data))]
 
-[FUNC sha512 :params [$data]
-  :body (crypto-hash "sha512" (str $data))]
+[FUNC sha512 :params [data]
+  :body (crypto-hash "sha512" (str data))]
 
-[FUNC hmac-sha256 :params [$key $data]
-  :body (crypto-hmac "sha256" (str $key) (str $data))]
+[FUNC hmac-sha256 :params [key data]
+  :body (crypto-hmac "sha256" (str key) (str data))]
 
-[FUNC hmac-sha1 :params [$key $data]
-  :body (crypto-hmac "sha1" (str $key) (str $data))]
+[FUNC hmac-sha1 :params [key data]
+  :body (crypto-hmac "sha1" (str key) (str data))]
 
-[FUNC hmac-md5 :params [$key $data]
-  :body (crypto-hmac "md5" (str $key) (str $data))]
+[FUNC hmac-md5 :params [key data]
+  :body (crypto-hmac "md5" (str key) (str data))]
 
-[FUNC hash-password :params [$password $rounds]
-  :body (crypto-pbkdf2 (str $password) (crypto-random-bytes 16) $rounds 32 "sha256")]
+[FUNC hash-password :params [password rounds]
+  :body (crypto-pbkdf2 (str password) (crypto-random-bytes 16) rounds 32 "sha256")]
 
-[FUNC verify-password :params [$password $hash]
-  :body (= (crypto-pbkdf2 (str $password) (substring $hash 0 16) 1000 32 "sha256") (substring $hash 16))]
+[FUNC verify-password :params [password hash]
+  :body (= (crypto-pbkdf2 (str password) (substring hash 0 16) 1000 32 "sha256") (substring hash 16))]

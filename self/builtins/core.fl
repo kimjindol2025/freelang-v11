@@ -3,8 +3,8 @@
 ;; native-call 가 위임할 ~60 개 핵심 빌트인.
 ;; self-interp 은 이 함수들을 고정된 cond 분기로 호출.
 ;;
-;; 각 함수는 [FUNC native-<op> :params [$vs] :body ...]
-;; $vs = 평가된 인자 리스트.
+;; 각 함수는 [FUNC native-<op> :params [vs] :body ...]
+;; vs = 평가된 인자 리스트.
 ;;
 ;; 모든 함수는 FL 런타임의 primitive 를 최종적으로 사용 (실제 산술).
 ;; 즉 "파서/인터프리터는 100% FL, 최종 연산만 runtime primitive".
@@ -12,139 +12,139 @@
 
 ;; ═══════════════ 산술 (~12) ═══════════════
 
-[FUNC bi-add :params [$vs]
-  :body (add-loop $vs 0 0)]
-[FUNC add-loop :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc (add-loop $vs (+ $i 1) (+ $acc (get $vs $i))))]
+[FUNC bi-add :params [vs]
+  :body (add-loop vs 0 0)]
+[FUNC add-loop :params [vs i acc]
+  :body (if (>= i (length vs)) acc (add-loop vs (+ i 1) (+ acc (get vs i))))]
 
-[FUNC bi-sub :params [$vs]
-  :body (if (= (length $vs) 1) (- 0 (get $vs 0))
-          (- (get $vs 0) (add-loop $vs 1 0)))]
+[FUNC bi-sub :params [vs]
+  :body (if (= (length vs) 1) (- 0 (get vs 0))
+          (- (get vs 0) (add-loop vs 1 0)))]
 
-[FUNC bi-mul :params [$vs]
-  :body (mul-loop $vs 0 1)]
-[FUNC mul-loop :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc (mul-loop $vs (+ $i 1) (* $acc (get $vs $i))))]
+[FUNC bi-mul :params [vs]
+  :body (mul-loop vs 0 1)]
+[FUNC mul-loop :params [vs i acc]
+  :body (if (>= i (length vs)) acc (mul-loop vs (+ i 1) (* acc (get vs i))))]
 
-[FUNC bi-div :params [$vs] :body (/ (get $vs 0) (get $vs 1))]
-[FUNC bi-mod :params [$vs] :body (% (get $vs 0) (get $vs 1))]
-[FUNC bi-abs :params [$vs] :body (let [[$v (get $vs 0)]] (if (< $v 0) (- 0 $v) $v))]
+[FUNC bi-div :params [vs] :body (/ (get vs 0) (get vs 1))]
+[FUNC bi-mod :params [vs] :body (% (get vs 0) (get vs 1))]
+[FUNC bi-abs :params [vs] :body (let [[v (get vs 0)]] (if (< v 0) (- 0 v) v))]
 
-[FUNC bi-min :params [$vs] :body (min-loop $vs 1 (get $vs 0))]
-[FUNC min-loop :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc
-          (let [[$x (get $vs $i)]]
-            (min-loop $vs (+ $i 1) (if (< $x $acc) $x $acc))))]
+[FUNC bi-min :params [vs] :body (min-loop vs 1 (get vs 0))]
+[FUNC min-loop :params [vs i acc]
+  :body (if (>= i (length vs)) acc
+          (let [[x (get vs i)]]
+            (min-loop vs (+ i 1) (if (< x acc) x acc))))]
 
-[FUNC bi-max :params [$vs] :body (max-loop $vs 1 (get $vs 0))]
-[FUNC max-loop :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc
-          (let [[$x (get $vs $i)]]
-            (max-loop $vs (+ $i 1) (if (> $x $acc) $x $acc))))]
+[FUNC bi-max :params [vs] :body (max-loop vs 1 (get vs 0))]
+[FUNC max-loop :params [vs i acc]
+  :body (if (>= i (length vs)) acc
+          (let [[x (get vs i)]]
+            (max-loop vs (+ i 1) (if (> x acc) x acc))))]
 
 ;; ═══════════════ 비교 (~10) ═══════════════
 
-[FUNC bi-lt :params [$vs] :body (< (get $vs 0) (get $vs 1))]
-[FUNC bi-gt :params [$vs] :body (> (get $vs 0) (get $vs 1))]
-[FUNC bi-le :params [$vs] :body (<= (get $vs 0) (get $vs 1))]
-[FUNC bi-ge :params [$vs] :body (>= (get $vs 0) (get $vs 1))]
-[FUNC bi-eq :params [$vs] :body (= (get $vs 0) (get $vs 1))]
-[FUNC bi-ne :params [$vs] :body (not (= (get $vs 0) (get $vs 1)))]
+[FUNC bi-lt :params [vs] :body (< (get vs 0) (get vs 1))]
+[FUNC bi-gt :params [vs] :body (> (get vs 0) (get vs 1))]
+[FUNC bi-le :params [vs] :body (<= (get vs 0) (get vs 1))]
+[FUNC bi-ge :params [vs] :body (>= (get vs 0) (get vs 1))]
+[FUNC bi-eq :params [vs] :body (= (get vs 0) (get vs 1))]
+[FUNC bi-ne :params [vs] :body (not (= (get vs 0) (get vs 1)))]
 
 ;; ═══════════════ 논리 (5) ═══════════════
 
-[FUNC bi-not :params [$vs] :body (not (get $vs 0))]
-[FUNC bi-null? :params [$vs] :body (null? (get $vs 0))]
-[FUNC bi-empty? :params [$vs]
-  :body (let [[$v (get $vs 0)]]
-          (cond [(null? $v) true]
-                [(= (length $v) 0) true]
+[FUNC bi-not :params [vs] :body (not (get vs 0))]
+[FUNC bi-null? :params [vs] :body (null? (get vs 0))]
+[FUNC bi-empty? :params [vs]
+  :body (let [[v (get vs 0)]]
+          (cond [(null? v) true]
+                [(= (length v) 0) true]
                 [true false]))]
 
 ;; ═══════════════ 문자열 (~10) ═══════════════
 
-[FUNC bi-str :params [$vs] :body (str-loop $vs 0 "")]
-[FUNC str-loop :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc
-          (str-loop $vs (+ $i 1) (str $acc (get $vs $i))))]
+[FUNC bi-str :params [vs] :body (str-loop vs 0 "")]
+[FUNC str-loop :params [vs i acc]
+  :body (if (>= i (length vs)) acc
+          (str-loop vs (+ i 1) (str acc (get vs i))))]
 
-[FUNC bi-length :params [$vs] :body (length (get $vs 0))]
-[FUNC bi-substring :params [$vs]
-  :body (if (>= (length $vs) 3)
-          (substring (get $vs 0) (get $vs 1) (get $vs 2))
-          (substring (get $vs 0) (get $vs 1)))]
-[FUNC bi-char-at :params [$vs] :body (char-at (get $vs 0) (get $vs 1))]
-[FUNC bi-replace :params [$vs]
-  :body (replace (get $vs 0) (get $vs 1) (get $vs 2))]
-[FUNC bi-str-to-num :params [$vs] :body (str-to-num (get $vs 0))]
-[FUNC bi-num-to-str :params [$vs] :body (str (get $vs 0))]
+[FUNC bi-length :params [vs] :body (length (get vs 0))]
+[FUNC bi-substring :params [vs]
+  :body (if (>= (length vs) 3)
+          (substring (get vs 0) (get vs 1) (get vs 2))
+          (substring (get vs 0) (get vs 1)))]
+[FUNC bi-char-at :params [vs] :body (char-at (get vs 0) (get vs 1))]
+[FUNC bi-replace :params [vs]
+  :body (replace (get vs 0) (get vs 1) (get vs 2))]
+[FUNC bi-str-to-num :params [vs] :body (str-to-num (get vs 0))]
+[FUNC bi-num-to-str :params [vs] :body (str (get vs 0))]
 
 ;; ═══════════════ 리스트 (~15) ═══════════════
 
-[FUNC bi-list :params [$vs] :body $vs]
-[FUNC bi-first :params [$vs]
-  :body (let [[$l (get $vs 0)]] (if (null? $l) null (get $l 0)))]
-[FUNC bi-last :params [$vs]
-  :body (let [[$l (get $vs 0)]]
-          (if (null? $l) null
-            (if (= (length $l) 0) null (get $l (- (length $l) 1)))))]
-[FUNC bi-rest :params [$vs]
-  :body (let [[$l (get $vs 0)]]
-          (if (or (null? $l) (= (length $l) 0)) (list)
-            (slice $l 1 (length $l))))]
-[FUNC bi-append :params [$vs] :body (append (get $vs 0) (get $vs 1))]
-[FUNC bi-get :params [$vs] :body (get (get $vs 0) (get $vs 1))]
-[FUNC bi-slice :params [$vs]
-  :body (slice (get $vs 0) (get $vs 1) (get $vs 2))]
+[FUNC bi-list :params [vs] :body vs]
+[FUNC bi-first :params [vs]
+  :body (let [[l (get vs 0)]] (if (null? l) null (get l 0)))]
+[FUNC bi-last :params [vs]
+  :body (let [[l (get vs 0)]]
+          (if (null? l) null
+            (if (= (length l) 0) null (get l (- (length l) 1)))))]
+[FUNC bi-rest :params [vs]
+  :body (let [[l (get vs 0)]]
+          (if (or (null? l) (= (length l) 0)) (list)
+            (slice l 1 (length l))))]
+[FUNC bi-append :params [vs] :body (append (get vs 0) (get vs 1))]
+[FUNC bi-get :params [vs] :body (get (get vs 0) (get vs 1))]
+[FUNC bi-slice :params [vs]
+  :body (slice (get vs 0) (get vs 1) (get vs 2))]
 
 ;; ═══════════════ I/O ═══════════════
 
-[FUNC bi-println :params [$vs] :body (println (if (= (length $vs) 0) "" (get $vs 0)))]
-[FUNC bi-print :params [$vs] :body (println (if (= (length $vs) 0) "" (get $vs 0)))]
+[FUNC bi-println :params [vs] :body (println (if (= (length vs) 0) "" (get vs 0)))]
+[FUNC bi-print :params [vs] :body (println (if (= (length vs) 0) "" (get vs 0)))]
 
 ;; ═══════════════ 디스패처 ═══════════════
 ;; native-call "+" vals → bi-add vals
 
-[FUNC native-dispatch :params [$op $vs]
+[FUNC native-dispatch :params [op vs]
   :body (cond
           ;; 산술
-          [(= $op "+")         (bi-add $vs)]
-          [(= $op "-")         (bi-sub $vs)]
-          [(= $op "*")         (bi-mul $vs)]
-          [(= $op "/")         (bi-div $vs)]
-          [(= $op "%")         (bi-mod $vs)]
-          [(= $op "abs")       (bi-abs $vs)]
-          [(= $op "min")       (bi-min $vs)]
-          [(= $op "max")       (bi-max $vs)]
+          [(= op "+")         (bi-add vs)]
+          [(= op "-")         (bi-sub vs)]
+          [(= op "*")         (bi-mul vs)]
+          [(= op "/")         (bi-div vs)]
+          [(= op "%")         (bi-mod vs)]
+          [(= op "abs")       (bi-abs vs)]
+          [(= op "min")       (bi-min vs)]
+          [(= op "max")       (bi-max vs)]
           ;; 비교
-          [(= $op "<")         (bi-lt $vs)]
-          [(= $op ">")         (bi-gt $vs)]
-          [(= $op "<=")        (bi-le $vs)]
-          [(= $op ">=")        (bi-ge $vs)]
-          [(= $op "=")         (bi-eq $vs)]
-          [(= $op "!=")        (bi-ne $vs)]
+          [(= op "<")         (bi-lt vs)]
+          [(= op ">")         (bi-gt vs)]
+          [(= op "<=")        (bi-le vs)]
+          [(= op ">=")        (bi-ge vs)]
+          [(= op "=")         (bi-eq vs)]
+          [(= op "!=")        (bi-ne vs)]
           ;; 논리
-          [(= $op "not")       (bi-not $vs)]
-          [(= $op "null?")     (bi-null? $vs)]
-          [(= $op "empty?")    (bi-empty? $vs)]
+          [(= op "not")       (bi-not vs)]
+          [(= op "null?")     (bi-null? vs)]
+          [(= op "empty?")    (bi-empty? vs)]
           ;; 문자열
-          [(= $op "str")       (bi-str $vs)]
-          [(= $op "concat")    (bi-str $vs)]
-          [(= $op "length")    (bi-length $vs)]
-          [(= $op "substring") (bi-substring $vs)]
-          [(= $op "char-at")   (bi-char-at $vs)]
-          [(= $op "replace")   (bi-replace $vs)]
-          [(= $op "str-to-num") (bi-str-to-num $vs)]
-          [(= $op "num-to-str") (bi-num-to-str $vs)]
+          [(= op "str")       (bi-str vs)]
+          [(= op "concat")    (bi-str vs)]
+          [(= op "length")    (bi-length vs)]
+          [(= op "substring") (bi-substring vs)]
+          [(= op "char-at")   (bi-char-at vs)]
+          [(= op "replace")   (bi-replace vs)]
+          [(= op "str-to-num") (bi-str-to-num vs)]
+          [(= op "num-to-str") (bi-num-to-str vs)]
           ;; 리스트
-          [(= $op "list")      (bi-list $vs)]
-          [(= $op "first")     (bi-first $vs)]
-          [(= $op "last")      (bi-last $vs)]
-          [(= $op "rest")      (bi-rest $vs)]
-          [(= $op "append")    (bi-append $vs)]
-          [(= $op "get")       (bi-get $vs)]
-          [(= $op "slice")     (bi-slice $vs)]
+          [(= op "list")      (bi-list vs)]
+          [(= op "first")     (bi-first vs)]
+          [(= op "last")      (bi-last vs)]
+          [(= op "rest")      (bi-rest vs)]
+          [(= op "append")    (bi-append vs)]
+          [(= op "get")       (bi-get vs)]
+          [(= op "slice")     (bi-slice vs)]
           ;; I/O
-          [(= $op "println")   (bi-println $vs)]
-          [(= $op "print")     (bi-print $vs)]
-          [true (error (str "native-dispatch unknown: " $op))])]
+          [(= op "println")   (bi-println vs)]
+          [(= op "print")     (bi-print vs)]
+          [true (error (str "native-dispatch unknown: " op))])]

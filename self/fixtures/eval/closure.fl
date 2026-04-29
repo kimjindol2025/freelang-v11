@@ -1,1 +1,1 @@
-(define make-add (fn [$n] (fn [$x] (+ $x $n)))) ((make-add 10) 5)
+(define make-add (fn [n] (fn [x] (+ x n)))) ((make-add 10) 5)

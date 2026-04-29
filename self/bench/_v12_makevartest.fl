@@ -1,6 +1,6 @@
 ;; make-variable 직접 테스트
-[FUNC make-variable :params [$n $l]
-  :body {:kind "variable" :name $n :line $l}]
+[FUNC make-variable :params [n l]
+  :body {:kind "variable" :name n :line l}]
 
 (define v (make-variable "src" 1))
 (println "v:" v)

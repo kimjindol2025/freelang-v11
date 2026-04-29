@@ -1,27 +1,27 @@
 ;; self/stdlib/time-extra.fl — Phase 26
 ;; 시간 함수 확장
 
-[FUNC ms-to-sec :params [$ms] :body (/ $ms 1000)]
-[FUNC sec-to-ms :params [$s] :body (* $s 1000)]
-[FUNC ms-to-min :params [$ms] :body (/ $ms 60000)]
-[FUNC min-to-ms :params [$m] :body (* $m 60000)]
-[FUNC sec-to-min :params [$s] :body (/ $s 60)]
-[FUNC min-to-sec :params [$m] :body (* $m 60)]
+[FUNC ms-to-sec :params [ms] :body (/ ms 1000)]
+[FUNC sec-to-ms :params [s] :body (* s 1000)]
+[FUNC ms-to-min :params [ms] :body (/ ms 60000)]
+[FUNC min-to-ms :params [m] :body (* m 60000)]
+[FUNC sec-to-min :params [s] :body (/ s 60)]
+[FUNC min-to-sec :params [m] :body (* m 60)]
 
-[FUNC elapsed :params [$start-ms]
-  :body (- (now) $start-ms)]
+[FUNC elapsed :params [start-ms]
+  :body (- (now) start-ms)]
 
-[FUNC elapsed-sec :params [$start-ms]
-  :body (ms-to-sec (elapsed $start-ms))]
+[FUNC elapsed-sec :params [start-ms]
+  :body (ms-to-sec (elapsed start-ms))]
 
-[FUNC deadline :params [$ms-from-now]
-  :body (+ (now) $ms-from-now)]
+[FUNC deadline :params [ms-from-now]
+  :body (+ (now) ms-from-now)]
 
-[FUNC is-expired :params [$deadline-ms]
-  :body (> (now) $deadline-ms)]
+[FUNC is-expired :params [deadline-ms]
+  :body (> (now) deadline-ms)]
 
-[FUNC time-until :params [$deadline-ms]
-  :body (- $deadline-ms (now))]
+[FUNC time-until :params [deadline-ms]
+  :body (- deadline-ms (now))]
 
-[FUNC format-duration :params [$ms]
-  :body (str (floor (/ $ms 1000)) "s")]
+[FUNC format-duration :params [ms]
+  :body (str (floor (/ ms 1000)) "s")]

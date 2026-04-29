@@ -1,26 +1,26 @@
 ;; v11-evolution-real: 진정한 자기 진화
 ;; 최적화본 → 다음 세대 입력 (누적 개선)
 
-(defn optimize-pass [$src]
-  (let [[$p1 (str_replace $src "(do (" "(")]]
-    (let [[$p2 (str_replace $p1 "(str (str" "(str")]]
-      (let [[$p3 (str_replace $p2 "  " " ")]]
-        (let [[$reduce (- (length $src) (length $p3))]]
-          {:size (length $src)
-           :optimized $p3
-           :reduction $reduce})))))
+(defn optimize-pass [src]
+  (let [[p1 (str_replace src "(do (" "(")]]
+    (let [[p2 (str_replace p1 "(str (str" "(str")]]
+      (let [[p3 (str_replace p2 "  " " ")]]
+        (let [[reduce (- (length src) (length p3))]]
+          {:size (length src)
+           :optimized p3
+           :reduction reduce})))))
 
-(defn gen-step [$n $src]
+(defn gen-step [n src]
   (do
-    (println (str "\n🧬 세대 " $n))
-    (println (str "  입력: " (length $src) "B"))
-    (let [[$opt (optimize-pass $src)]]
+    (println (str "\n🧬 세대 " n))
+    (println (str "  입력: " (length src) "B"))
+    (let [[opt (optimize-pass src)]]
       (do
-        (println (str "  감소: " (get $opt "reduction") "B"))
-        (file_write (str "self-evolve/logs/gen-" $n ".fl") (get $opt "optimized"))
+        (println (str "  감소: " (get opt "reduction") "B"))
+        (file_write (str "self-evolve/logs/gen-" n ".fl") (get opt "optimized"))
         (file_append "self-evolve/logs/perf-delta.log"
-          (str "[Gen" $n "] " (get $opt "reduction") "B\n"))
-        (get $opt "optimized")))))
+          (str "[Gen" n "] " (get opt "reduction") "B\n"))
+        (get opt "optimized")))))
 
 (do
   (println "================================================")
@@ -30,16 +30,16 @@
   (file_write "self-evolve/logs/perf-delta.log"
     (str "누적 진화 " (now_iso) "\n\n"))
 
-  (let [[$src0 (file_read "self/all.fl")]]
+  (let [[src0 (file_read "self/all.fl")]]
     (do
-      (println (str "원본: " (length $src0) "B\n"))
-      (let [[$src1 (gen-step 0 $src0)]]
-        (let [[$src2 (gen-step 1 $src1)]]
-          (let [[$src3 (gen-step 2 $src2)]]
+      (println (str "원본: " (length src0) "B\n"))
+      (let [[src1 (gen-step 0 src0)]]
+        (let [[src2 (gen-step 1 src1)]]
+          (let [[src3 (gen-step 2 src2)]]
             (do
               (println "\n✅ 진화 완료")
-              (println (str "원본: " (length $src0) "B"))
-              (println (str "최종: " (length $src3) "B"))
-              (println (str "총감소: " (- (length $src0) (length $src3)) "B"))
+              (println (str "원본: " (length src0) "B"))
+              (println (str "최종: " (length src3) "B"))
+              (println (str "총감소: " (- (length src0) (length src3)) "B"))
               (file_append "self-evolve/logs/perf-delta.log"
-                (str "\n최종: " (- (length $src0) (length $src3)) "B감소\n")))))))))
+                (str "\n최종: " (- (length src0) (length src3)) "B감소\n")))))))))

@@ -1,49 +1,49 @@
 ;; self/stdlib/process.fl — Phase 27
 ;; 프로세스/쉘 연산 (native process_* builtin wrapper)
 
-[FUNC process-run :params [$cmd]
-  :body (process_run (str $cmd))]
+[FUNC process-run :params [cmd]
+  :body (process_run (str cmd))]
 
-[FUNC process-run-args :params [$cmd $args]
-  :body (process_run_args (str $cmd) $args)]
+[FUNC process-run-args :params [cmd args]
+  :body (process_run_args (str cmd) args)]
 
-[FUNC process-exec :params [$cmd]
-  :body (process_exec (str $cmd))]
+[FUNC process-exec :params [cmd]
+  :body (process_exec (str cmd))]
 
-[FUNC process-exec-args :params [$cmd $args]
-  :body (process_exec_args (str $cmd) $args)]
+[FUNC process-exec-args :params [cmd args]
+  :body (process_exec_args (str cmd) args)]
 
-[FUNC process-spawn :params [$cmd $args]
-  :body (process_spawn (str $cmd) $args)]
+[FUNC process-spawn :params [cmd args]
+  :body (process_spawn (str cmd) args)]
 
-[FUNC process-kill :params [$pid]
-  :body (process_kill (floor $pid))]
+[FUNC process-kill :params [pid]
+  :body (process_kill (floor pid))]
 
-[FUNC process-exists? :params [$pid]
-  :body (process_exists (floor $pid))]
+[FUNC process-exists? :params [pid]
+  :body (process_exists (floor pid))]
 
-[FUNC process-wait :params [$pid]
-  :body (process_wait (floor $pid))]
+[FUNC process-wait :params [pid]
+  :body (process_wait (floor pid))]
 
-[FUNC shell-run :params [$cmd]
-  :body (process_exec (str $cmd))]
+[FUNC shell-run :params [cmd]
+  :body (process_exec (str cmd))]
 
-[FUNC shell-pipe :params [$cmd1 $cmd2]
-  :body (process_exec (str $cmd1 " | " $cmd2))]
+[FUNC shell-pipe :params [cmd1 cmd2]
+  :body (process_exec (str cmd1 " | " cmd2))]
 
-[FUNC env-get :params [$key]
-  :body (env_get (str $key))]
+[FUNC env-get :params [key]
+  :body (env_get (str key))]
 
-[FUNC env-set :params [$key $value]
-  :body (env_set (str $key) (str $value))]
+[FUNC env-set :params [key value]
+  :body (env_set (str key) (str value))]
 
 [FUNC env-all :params []
   :body (env_all)]
 
 [FUNC getcwd :params [] :body (process_getcwd)]
 
-[FUNC chdir :params [$path]
-  :body (process_chdir (str $path))]
+[FUNC chdir :params [path]
+  :body (process_chdir (str path))]
 
 [FUNC pid :params [] :body (process_pid)]
 

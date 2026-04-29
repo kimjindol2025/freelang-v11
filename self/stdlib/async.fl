@@ -2,47 +2,47 @@
 ;; 비동기 연산 (Promise-like patterns)
 ;; 단순화: self-parser 호환 버전
 
-[FUNC promise-new :params [$executor]
-  :body (promise_new $executor)]
+[FUNC promise-new :params [executor]
+  :body (promise_new executor)]
 
-[FUNC promise-resolve :params [$value]
-  :body (promise_resolve $value)]
+[FUNC promise-resolve :params [value]
+  :body (promise_resolve value)]
 
-[FUNC promise-reject :params [$reason]
-  :body (promise_reject $reason)]
+[FUNC promise-reject :params [reason]
+  :body (promise_reject reason)]
 
-[FUNC promise-then :params [$promise $handler]
-  :body (promise_then $promise $handler)]
+[FUNC promise-then :params [promise handler]
+  :body (promise_then promise handler)]
 
-[FUNC promise-catch :params [$promise $handler]
-  :body (promise_catch $promise $handler)]
+[FUNC promise-catch :params [promise handler]
+  :body (promise_catch promise handler)]
 
-[FUNC promise-finally :params [$promise $handler]
-  :body (promise_finally $promise $handler)]
+[FUNC promise-finally :params [promise handler]
+  :body (promise_finally promise handler)]
 
-[FUNC promise-all :params [$promises]
-  :body (promise_all $promises)]
+[FUNC promise-all :params [promises]
+  :body (promise_all promises)]
 
-[FUNC promise-race :params [$promises]
-  :body (promise_race $promises)]
+[FUNC promise-race :params [promises]
+  :body (promise_race promises)]
 
-[FUNC promise-any :params [$promises]
-  :body (promise_any $promises)]
+[FUNC promise-any :params [promises]
+  :body (promise_any promises)]
 
-[FUNC timeout :params [$ms]
-  :body (timeout (floor $ms))]
+[FUNC timeout :params [ms]
+  :body (timeout (floor ms))]
 
-[FUNC delay :params [$ms]
-  :body (delay (floor $ms))]
+[FUNC delay :params [ms]
+  :body (delay (floor ms))]
 
-[FUNC once :params [$fn]
-  :body (once_impl $fn)]
+[FUNC once :params [fn]
+  :body (once_impl fn)]
 
-[FUNC debounce :params [$fn $ms]
-  :body (debounce_impl $fn (floor $ms))]
+[FUNC debounce :params [fn ms]
+  :body (debounce_impl fn (floor ms))]
 
-[FUNC throttle :params [$fn $ms]
-  :body (throttle_impl $fn (floor $ms))]
+[FUNC throttle :params [fn ms]
+  :body (throttle_impl fn (floor ms))]
 
-[FUNC retry :params [$fn $max-attempts]
-  :body (retry_impl $fn (floor $max-attempts))]
+[FUNC retry :params [fn max-attempts]
+  :body (retry_impl fn (floor max-attempts))]

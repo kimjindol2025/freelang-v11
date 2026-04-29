@@ -1,1 +1,1 @@
-$ctx.user.id
+ctx.user.id

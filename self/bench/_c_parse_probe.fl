@@ -14,177 +14,177 @@
 ;; char predicates
 ;; ──────────────────────────────────────
 
-[FUNC is-digit? :params [$c]
-  :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
+[FUNC is-digit? :params [c]
+  :body (if (null? c) false (and (>= c "0") (<= c "9")))]
 
-[FUNC is-alpha? :params [$c]
-  :body (if (null? $c) false
-          (or (and (>= $c "a") (<= $c "z"))
-              (and (>= $c "A") (<= $c "Z"))))]
+[FUNC is-alpha? :params [c]
+  :body (if (null? c) false
+          (or (and (>= c "a") (<= c "z"))
+              (and (>= c "A") (<= c "Z"))))]
 
-[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
+[FUNC is-alnum? :params [c] :body (or (is-digit? c) (is-alpha? c))]
 
-[FUNC is-space? :params [$c]
-  :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
+[FUNC is-space? :params [c]
+  :body (or (= c " ") (= c "\t") (= c "\n") (= c "\r"))]
 
-[FUNC is-symbol-char? :params [$c]
-  :body (if (null? $c) false
-          (or (is-alnum? $c)
-              (= $c "-") (= $c "_") (= $c "?") (= $c "!")
-              (= $c "/") (= $c ".") (= $c "<") (= $c ">")
-              (= $c "=") (= $c "+") (= $c "*") (= $c "%")
-              (= $c "&") (= $c "|") (= $c "^") (= $c "~")))]
+[FUNC is-symbol-char? :params [c]
+  :body (if (null? c) false
+          (or (is-alnum? c)
+              (= c "-") (= c "_") (= c "?") (= c "!")
+              (= c "/") (= c ".") (= c "<") (= c ">")
+              (= c "=") (= c "+") (= c "*") (= c "%")
+              (= c "&") (= c "|") (= c "^") (= c "~")))]
 
 ;; ──────────────────────────────────────
 ;; state = {:src :idx :line :col :tokens}
 ;; ──────────────────────────────────────
 
-[FUNC make-state :params [$src]
-  :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
+[FUNC make-state :params [src]
+  :body {:src src :idx 0 :line 1 :col 1 :tokens []}]
 
-[FUNC peek-at :params [$st $offset]
-  :body (let [[$src (get $st :src)]
-              [$i (+ (get $st :idx) $offset)]]
-          (if (>= $i (length $src)) null (char-at $src $i)))]
+[FUNC peek-at :params [st offset]
+  :body (let [[src (get st :src)]
+              [i (+ (get st :idx) offset)]]
+          (if (>= i (length src)) null (char-at src i)))]
 
-[FUNC peek :params [$st] :body (peek-at $st 0)]
+[FUNC peek :params [st] :body (peek-at st 0)]
 
-[FUNC at-end? :params [$st]
-  :body (>= (get $st :idx) (length (get $st :src)))]
+[FUNC at-end? :params [st]
+  :body (>= (get st :idx) (length (get st :src)))]
 
-[FUNC advance :params [$st]
-  :body (let [[$c (peek $st)]]
-          (if (= $c "\n")
-            {:src (get $st :src) :idx (+ (get $st :idx) 1)
-             :line (+ (get $st :line) 1) :col 1
-             :tokens (get $st :tokens)}
-            {:src (get $st :src) :idx (+ (get $st :idx) 1)
-             :line (get $st :line) :col (+ (get $st :col) 1)
-             :tokens (get $st :tokens)}))]
+[FUNC advance :params [st]
+  :body (let [[c (peek st)]]
+          (if (= c "\n")
+            {:src (get st :src) :idx (+ (get st :idx) 1)
+             :line (+ (get st :line) 1) :col 1
+             :tokens (get st :tokens)}
+            {:src (get st :src) :idx (+ (get st :idx) 1)
+             :line (get st :line) :col (+ (get st :col) 1)
+             :tokens (get st :tokens)}))]
 
-[FUNC emit :params [$st $kind $value $sl $sc]
-  :body {:src (get $st :src) :idx (get $st :idx)
-         :line (get $st :line) :col (get $st :col)
-         :tokens (append (get $st :tokens)
-                         (list {:kind $kind :value $value :line $sl :col $sc}))}]
+[FUNC emit :params [st kind value sl sc]
+  :body {:src (get st :src) :idx (get st :idx)
+         :line (get st :line) :col (get st :col)
+         :tokens (append (get st :tokens)
+                         (list {:kind kind :value value :line sl :col sc}))}]
 
 ;; ──────────────────────────────────────
 ;; 스킵 (whitespace + ; line comment)
 ;; ──────────────────────────────────────
 
-[FUNC skip-comment :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
+[FUNC skip-comment :params [st]
+  :body (if (at-end? st) st
+          (let [[c (peek st)]]
+            (if (= c "\n") (advance st) (skip-comment (advance st)))))]
 
-[FUNC skip-ws :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
+[FUNC skip-ws :params [st]
+  :body (if (at-end? st) st
+          (let [[c (peek st)]]
             (cond
-              [(is-space? $c) (skip-ws (advance $st))]
-              [(= $c ";") (skip-ws (skip-comment $st))]
-              [true $st])))]
+              [(is-space? c) (skip-ws (advance st))]
+              [(= c ";") (skip-ws (skip-comment st))]
+              [true st])))]
 
 ;; ──────────────────────────────────────
 ;; 숫자 (정수/실수/음수)
 ;; ──────────────────────────────────────
 
-[FUNC read-number-body :params [$st $acc $has-dot $line $col]
-  :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
-          (let [[$c (peek $st)]]
+[FUNC read-number-body :params [st acc has-dot line col]
+  :body (if (at-end? st) (emit st "Number" acc line col)
+          (let [[c (peek st)]]
             (cond
-              [(is-digit? $c)
-               (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
-              [(and (= $c ".") (not $has-dot))
-               (read-number-body (advance $st) (str $acc $c) true $line $col)]
-              [true (emit $st "Number" $acc $line $col)])))]
+              [(is-digit? c)
+               (read-number-body (advance st) (str acc c) has-dot line col)]
+              [(and (= c ".") (not has-dot))
+               (read-number-body (advance st) (str acc c) true line col)]
+              [true (emit st "Number" acc line col)])))]
 
-[FUNC read-number :params [$st]
-  :body (read-number-body $st "" false (get $st :line) (get $st :col))]
+[FUNC read-number :params [st]
+  :body (read-number-body st "" false (get st :line) (get st :col))]
 
 ;; ──────────────────────────────────────
 ;; 문자열 (escape \n \t \r \" \\)
 ;; ──────────────────────────────────────
 
-[FUNC translate-esc :params [$c]
+[FUNC translate-esc :params [c]
   :body (cond
-          [(= $c "n") "\n"] [(= $c "t") "\t"] [(= $c "r") "\r"]
-          [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
+          [(= c "n") "\n"] [(= c "t") "\t"] [(= c "r") "\r"]
+          [(= c "\"") "\""] [(= c "\\") "\\"] [true c])]
 
-[FUNC read-string-body :params [$st $acc $line $col]
-  :body (if (at-end? $st) (emit $st "String" $acc $line $col)
-          (let [[$c (peek $st)]]
+[FUNC read-string-body :params [st acc line col]
+  :body (if (at-end? st) (emit st "String" acc line col)
+          (let [[c (peek st)]]
             (cond
-              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
-              [(= $c "\\")
-               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
-                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
-              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
+              [(= c "\"") (emit (advance st) "String" acc line col)]
+              [(= c "\\")
+               (let [[st2 (advance st)] [c2 (peek st2)]]
+                 (read-string-body (advance st2) (str acc (translate-esc c2)) line col))]
+              [true (read-string-body (advance st) (str acc c) line col)])))]
 
-[FUNC read-string :params [$st]
-  :body (let [[$line (get $st :line)] [$col (get $st :col)]
-              [$st1 (advance $st)]]
-          (read-string-body $st1 "" $line $col))]
+[FUNC read-string :params [st]
+  :body (let [[line (get st :line)] [col (get st :col)]
+              [st1 (advance st)]]
+          (read-string-body st1 "" line col))]
 
 ;; ──────────────────────────────────────
 ;; 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
 ;; ──────────────────────────────────────
 
-[FUNC read-symbol-body-kind :params [$st $acc $line $col $kind]
-  :body (if (at-end? $st) (emit $st $kind $acc $line $col)
-          (let [[$c (peek $st)]]
-            (if (is-symbol-char? $c)
-              (read-symbol-body-kind (advance $st) (str $acc $c) $line $col $kind)
-              (emit $st $kind $acc $line $col))))]
+[FUNC read-symbol-body-kind :params [st acc line col kind]
+  :body (if (at-end? st) (emit st kind acc line col)
+          (let [[c (peek st)]]
+            (if (is-symbol-char? c)
+              (read-symbol-body-kind (advance st) (str acc c) line col kind)
+              (emit st kind acc line col))))]
 
-[FUNC read-symbol :params [$st]
-  :body (read-symbol-body-kind $st "" (get $st :line) (get $st :col) "Symbol")]
+[FUNC read-symbol :params [st]
+  :body (read-symbol-body-kind st "" (get st :line) (get st :col) "Symbol")]
 
-[FUNC read-variable :params [$st]
-  :body (let [[$line (get $st :line)] [$col (get $st :col)]
-              [$st1 (advance $st)]]
-          (read-symbol-body-kind $st1 "" $line $col "Variable"))]
+[FUNC read-variable :params [st]
+  :body (let [[line (get st :line)] [col (get st :col)]
+              [st1 (advance st)]]
+          (read-symbol-body-kind st1 "" line col "Variable"))]
 
-[FUNC read-keyword :params [$st]
-  :body (let [[$line (get $st :line)] [$col (get $st :col)]
-              [$st1 (advance $st)]]
-          (read-symbol-body-kind $st1 "" $line $col "Keyword"))]
+[FUNC read-keyword :params [st]
+  :body (let [[line (get st :line)] [col (get st :col)]
+              [st1 (advance st)]]
+          (read-symbol-body-kind st1 "" line col "Keyword"))]
 
 ;; ──────────────────────────────────────
 ;; 토큰 하나 읽기
 ;; ──────────────────────────────────────
 
-[FUNC read-token :params [$st]
-  :body (let [[$st1 (skip-ws $st)]]
-          (if (at-end? $st1) $st1
-            (let [[$c (peek $st1)] [$line (get $st1 :line)] [$col (get $st1 :col)]]
+[FUNC read-token :params [st]
+  :body (let [[st1 (skip-ws st)]]
+          (if (at-end? st1) st1
+            (let [[c (peek st1)] [line (get st1 :line)] [col (get st1 :col)]]
               (cond
-                [(= $c "(") (emit (advance $st1) "LParen"   $c $line $col)]
-                [(= $c ")") (emit (advance $st1) "RParen"   $c $line $col)]
-                [(= $c "[") (emit (advance $st1) "LBracket" $c $line $col)]
-                [(= $c "]") (emit (advance $st1) "RBracket" $c $line $col)]
-                [(= $c "{") (emit (advance $st1) "LBrace"   $c $line $col)]
-                [(= $c "}") (emit (advance $st1) "RBrace"   $c $line $col)]
-                [(= $c "\"") (read-string $st1)]
-                [(= $c "$") (read-variable $st1)]
-                [(= $c ":") (read-keyword $st1)]
-                [(is-digit? $c) (read-number $st1)]
-                [(and (= $c "-") (is-digit? (peek-at $st1 1)))
-                 (read-number-body (advance $st1) "-" false $line $col)]
-                [(is-symbol-char? $c) (read-symbol $st1)]
-                [true (emit (advance $st1) "Unknown" $c $line $col)]))))]
+                [(= c "(") (emit (advance st1) "LParen"   c line col)]
+                [(= c ")") (emit (advance st1) "RParen"   c line col)]
+                [(= c "[") (emit (advance st1) "LBracket" c line col)]
+                [(= c "]") (emit (advance st1) "RBracket" c line col)]
+                [(= c "{") (emit (advance st1) "LBrace"   c line col)]
+                [(= c "}") (emit (advance st1) "RBrace"   c line col)]
+                [(= c "\"") (read-string st1)]
+                [(= c "$") (read-variable st1)]
+                [(= c ":") (read-keyword st1)]
+                [(is-digit? c) (read-number st1)]
+                [(and (= c "-") (is-digit? (peek-at st1 1)))
+                 (read-number-body (advance st1) "-" false line col)]
+                [(is-symbol-char? c) (read-symbol st1)]
+                [true (emit (advance st1) "Unknown" c line col)]))))]
 
 ;; ──────────────────────────────────────
 ;; 메인 루프 — 모든 토큰 수집
 ;; ──────────────────────────────────────
 
-[FUNC lex-loop :params [$st]
-  :body (let [[$st1 (skip-ws $st)]]
-          (if (at-end? $st1)
-            (get $st1 :tokens)
-            (lex-loop (read-token $st1))))]
+[FUNC lex-loop :params [st]
+  :body (let [[st1 (skip-ws st)]]
+          (if (at-end? st1)
+            (get st1 :tokens)
+            (lex-loop (read-token st1))))]
 
-[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+[FUNC lex :params [src] :body (lex-loop (make-state src))]
 ;; self/parser.fl — FL 로 작성된 Parser (Phase 03/31-45)
 ;;
 ;; 입력: tokens (lexer 출력)
@@ -197,225 +197,225 @@
 ;; AST 생성자 (ast.fl 과 동일)
 ;; ──────────────────────────────────────
 
-[FUNC make-literal :params [$type $value $line]
-  :body {:kind "literal" :type $type :value $value :line $line}]
+[FUNC make-literal :params [type value line]
+  :body {:kind "literal" :type type :value value :line line}]
 
-[FUNC make-variable :params [$name $line]
-  :body {:kind "variable" :name $name :line $line}]
+[FUNC make-variable :params [name line]
+  :body {:kind "variable" :name name :line line}]
 
-[FUNC make-keyword :params [$name $line]
-  :body {:kind "keyword" :name $name :line $line}]
+[FUNC make-keyword :params [name line]
+  :body {:kind "keyword" :name name :line line}]
 
-[FUNC make-sexpr :params [$op $args $line]
-  :body {:kind "sexpr" :op $op :args $args :line $line}]
+[FUNC make-sexpr :params [op args line]
+  :body {:kind "sexpr" :op op :args args :line line}]
 
-[FUNC make-array-block :params [$items $line]
+[FUNC make-array-block :params [items line]
   :body {:kind "block" :type "Array" :name null
-         :fields {:items $items} :line $line}]
+         :fields {:items items} :line line}]
 
-[FUNC make-map-block :params [$items $line]
+[FUNC make-map-block :params [items line]
   :body {:kind "block" :type "Map" :name null
-         :fields {:items $items} :line $line}]
+         :fields {:items items} :line line}]
 
-[FUNC make-block :params [$type $name $fields $line]
-  :body {:kind "block" :type $type :name $name :fields $fields :line $line}]
+[FUNC make-block :params [type name fields line]
+  :body {:kind "block" :type type :name name :fields fields :line line}]
 
 ;; ──────────────────────────────────────
 ;; 31 파서 상태 + peek/advance/expect
 ;; ──────────────────────────────────────
 
-[FUNC p-make :params [$tokens]
-  :body {:tokens $tokens :idx 0 :ast []}]
+[FUNC p-make :params [tokens]
+  :body {:tokens tokens :idx 0 :ast []}]
 
-[FUNC p-peek :params [$p]
-  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
-          (if (>= $i (length $t)) null (get $t $i)))]
+[FUNC p-peek :params [p]
+  :body (let [[i (get p :idx)] [t (get p :tokens)]]
+          (if (>= i (length t)) null (get t i)))]
 
-[FUNC p-peek-at :params [$p $offset]
-  :body (let [[$i (+ (get $p :idx) $offset)] [$t (get $p :tokens)]]
-          (if (>= $i (length $t)) null (get $t $i)))]
+[FUNC p-peek-at :params [p offset]
+  :body (let [[i (+ (get p :idx) offset)] [t (get p :tokens)]]
+          (if (>= i (length t)) null (get t i)))]
 
-[FUNC p-end? :params [$p]
-  :body (>= (get $p :idx) (length (get $p :tokens)))]
+[FUNC p-end? :params [p]
+  :body (>= (get p :idx) (length (get p :tokens)))]
 
-[FUNC p-advance :params [$p]
-  :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1) :ast (get $p :ast)}]
+[FUNC p-advance :params [p]
+  :body {:tokens (get p :tokens) :idx (+ (get p :idx) 1) :ast (get p :ast)}]
 
-[FUNC p-with-ast :params [$p $ast]
-  :body {:tokens (get $p :tokens) :idx (get $p :idx) :ast $ast}]
+[FUNC p-with-ast :params [p ast]
+  :body {:tokens (get p :tokens) :idx (get p :idx) :ast ast}]
 
-[FUNC p-append-ast :params [$p $node]
-  :body (p-with-ast $p (append (get $p :ast) (list $node)))]
+[FUNC p-append-ast :params [p node]
+  :body (p-with-ast p (append (get p :ast) (list node)))]
 
 ;; 2-tuple 반환용 map {:p p' :node n}
-[FUNC r-pair :params [$p $node]
-  :body {:p $p :node $node}]
+[FUNC r-pair :params [p node]
+  :body {:p p :node node}]
 
 ;; ──────────────────────────────────────
 ;; 32 parseAtom — number/string/symbol/keyword/variable
 ;; ──────────────────────────────────────
 
-[FUNC parse-atom :params [$p]
-  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$line (get $t :line)]]
+[FUNC parse-atom :params [p]
+  :body (let [[t (p-peek p)] [k (get t :kind)] [v (get t :value)] [line (get t :line)]]
           (cond
-            [(= $k "Number")
-             (r-pair (p-advance $p) (make-literal "number" $v $line))]
-            [(= $k "String")
-             (r-pair (p-advance $p) (make-literal "string" $v $line))]
-            [(= $k "Symbol")
-             (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
-            [(= $k "Variable")
-             (r-pair (p-advance $p) (make-variable $v $line))]
-            [(= $k "Keyword")
-             (r-pair (p-advance $p) (make-keyword $v $line))]
-            [true (r-pair (p-advance $p) (make-literal "unknown" $v $line))]))]
+            [(= k "Number")
+             (r-pair (p-advance p) (make-literal "number" v line))]
+            [(= k "String")
+             (r-pair (p-advance p) (make-literal "string" v line))]
+            [(= k "Symbol")
+             (r-pair (p-advance p) (make-literal "symbol" v line))]
+            [(= k "Variable")
+             (r-pair (p-advance p) (make-variable v line))]
+            [(= k "Keyword")
+             (r-pair (p-advance p) (make-keyword v line))]
+            [true (r-pair (p-advance p) (make-literal "unknown" v line))]))]
 
 ;; ──────────────────────────────────────
 ;; 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
 ;; ──────────────────────────────────────
 
-[FUNC parse-expr :params [$p]
-  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+[FUNC parse-expr :params [p]
+  :body (let [[t (p-peek p)] [k (get t :kind)]]
           (cond
-            [(= $k "LParen")   (parse-sexpr $p)]
-            [(= $k "LBracket") (parse-bracket $p)]
-            [(= $k "LBrace")   (parse-map $p)]
-            [true (parse-atom $p)]))]
+            [(= k "LParen")   (parse-sexpr p)]
+            [(= k "LBracket") (parse-bracket p)]
+            [(= k "LBrace")   (parse-map p)]
+            [true (parse-atom p)]))]
 
 ;; ──────────────────────────────────────
 ;; 33 parse-sexpr (parens)
 ;; ──────────────────────────────────────
 
-[FUNC parse-sexpr :params [$p]
-  :body (let [[$start-tok (p-peek $p)] [$line (get $start-tok :line)]
-              [$p1 (p-advance $p)]                          ;; consume (
-              [$first (parse-args $p1 [])]                  ;; collect until )
-              [$p2 (get $first :p)] [$args (get $first :node)]]
-          (if (= (length $args) 0)
-            (r-pair (parse-consume-rparen $p2) (make-sexpr "" (list) $line))
-            (let [[$op-node (get $args 0)]
-                  [$op (if (= (get $op-node :kind) "literal")
-                         (get $op-node :value)
-                         (if (= (get $op-node :kind) "variable")
-                           (str "$" (get $op-node :name))
+[FUNC parse-sexpr :params [p]
+  :body (let [[start-tok (p-peek p)] [line (get start-tok :line)]
+              [p1 (p-advance p)]                          ;; consume (
+              [first (parse-args p1 [])]                  ;; collect until )
+              [p2 (get first :p)] [args (get first :node)]]
+          (if (= (length args) 0)
+            (r-pair (parse-consume-rparen p2) (make-sexpr "" (list) line))
+            (let [[op-node (get args 0)]
+                  [op (if (= (get op-node :kind) "literal")
+                         (get op-node :value)
+                         (if (= (get op-node :kind) "variable")
+                           (str "$" (get op-node :name))
                            "unknown"))]
-                  [$rest (slice $args 1 (length $args))]]
-              (r-pair (parse-consume-rparen $p2)
-                      (make-sexpr $op $rest $line)))))]
+                  [rest (slice args 1 (length args))]]
+              (r-pair (parse-consume-rparen p2)
+                      (make-sexpr op rest line)))))]
 
-[FUNC parse-consume-rparen :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RParen"))
-            (p-advance $p)
-            $p))]
+[FUNC parse-consume-rparen :params [p]
+  :body (let [[t (p-peek p)]]
+          (if (and (not (null? t)) (= (get t :kind) "RParen"))
+            (p-advance p)
+            p))]
 
 ;; args 수집 (재귀): RParen 만나면 중단
-[FUNC parse-args :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
+[FUNC parse-args :params [p acc]
+  :body (let [[t (p-peek p)]]
           (cond
-            [(null? $t)                              (r-pair $p $acc)]
-            [(= (get $t :kind) "RParen")             (r-pair $p $acc)]
-            [(= (get $t :kind) "RBracket")           (r-pair $p $acc)]
-            [(= (get $t :kind) "RBrace")             (r-pair $p $acc)]
+            [(null? t)                              (r-pair p acc)]
+            [(= (get t :kind) "RParen")             (r-pair p acc)]
+            [(= (get t :kind) "RBracket")           (r-pair p acc)]
+            [(= (get t :kind) "RBrace")             (r-pair p acc)]
             [true
-             (let [[$one (parse-expr $p)]]
-               (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+             (let [[one (parse-expr p)]]
+               (parse-args (get one :p) (append acc (list (get one :node)))))]))]
 
 ;; ──────────────────────────────────────
 ;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
 ;; ──────────────────────────────────────
 
-[FUNC parse-bracket :params [$p]
-  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
-              [$p1 (p-advance $p)]                ;; consume [
-              [$next (p-peek $p1)]]
-          (if (and (not (null? $next))
-                   (= (get $next :kind) "Symbol")
-                   (is-block-type? (get $next :value))
-                   (= (get $next :value) (upper-case (get $next :value))))
-            (parse-named-block $p1 $line)
-            (parse-array $p1 $line)))]
+[FUNC parse-bracket :params [p]
+  :body (let [[tok (p-peek p)] [line (get tok :line)]
+              [p1 (p-advance p)]                ;; consume [
+              [next (p-peek p1)]]
+          (if (and (not (null? next))
+                   (= (get next :kind) "Symbol")
+                   (is-block-type? (get next :value))
+                   (= (get next :value) (upper-case (get next :value))))
+            (parse-named-block p1 line)
+            (parse-array p1 line)))]
 
-[FUNC is-block-type? :params [$s]
-  :body (let [[$c (char-at $s 0)]]
-          (and (>= $c "A") (<= $c "Z")))]
+[FUNC is-block-type? :params [s]
+  :body (let [[c (char-at s 0)]]
+          (and (>= c "A") (<= c "Z")))]
 
-[FUNC upper-case :params [$s] :body $s]   ;; FL stdlib 기본 upper-case 가 없으면 identity. 판별엔 첫글자만 본다.
+[FUNC upper-case :params [s] :body s]   ;; FL stdlib 기본 upper-case 가 없으면 identity. 판별엔 첫글자만 본다.
 
-[FUNC parse-array :params [$p $line]
-  :body (let [[$collected (parse-args $p [])]
-              [$p2 (get $collected :p)] [$items (get $collected :node)]]
-          (r-pair (parse-consume-rbracket $p2) (make-array-block $items $line)))]
+[FUNC parse-array :params [p line]
+  :body (let [[collected (parse-args p [])]
+              [p2 (get collected :p)] [items (get collected :node)]]
+          (r-pair (parse-consume-rbracket p2) (make-array-block items line)))]
 
-[FUNC parse-consume-rbracket :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RBracket"))
-            (p-advance $p)
-            $p))]
+[FUNC parse-consume-rbracket :params [p]
+  :body (let [[t (p-peek p)]]
+          (if (and (not (null? t)) (= (get t :kind) "RBracket"))
+            (p-advance p)
+            p))]
 
 ;; [TYPE name? :k v :k v ...]  Named block (FUNC/ROUTE/PAGE 등)
-[FUNC parse-named-block :params [$p $line]
-  :body (let [[$type-tok (p-peek $p)] [$type (get $type-tok :value)]
-              [$p1 (p-advance $p)]
-              [$name-info (parse-optional-name $p1)]
-              [$p2 (get $name-info :p)] [$name (get $name-info :node)]
-              [$fields-info (parse-block-fields $p2 {})]
-              [$p3 (get $fields-info :p)] [$fields (get $fields-info :node)]]
-          (r-pair (parse-consume-rbracket $p3)
-                  (make-block $type $name $fields $line)))]
+[FUNC parse-named-block :params [p line]
+  :body (let [[type-tok (p-peek p)] [type (get type-tok :value)]
+              [p1 (p-advance p)]
+              [name-info (parse-optional-name p1)]
+              [p2 (get name-info :p)] [name (get name-info :node)]
+              [fields-info (parse-block-fields p2 {})]
+              [p3 (get fields-info :p)] [fields (get fields-info :node)]]
+          (r-pair (parse-consume-rbracket p3)
+                  (make-block type name fields line)))]
 
-[FUNC parse-optional-name :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t))
-                   (= (get $t :kind) "Symbol")
-                   (not (= (char-at (get $t :value) 0) ":")))
-            (r-pair (p-advance $p) (get $t :value))
-            (r-pair $p null)))]
+[FUNC parse-optional-name :params [p]
+  :body (let [[t (p-peek p)]]
+          (if (and (not (null? t))
+                   (= (get t :kind) "Symbol")
+                   (not (= (char-at (get t :value) 0) ":")))
+            (r-pair (p-advance p) (get t :value))
+            (r-pair p null)))]
 
 ;; :k v :k v ... 반복. RBracket 만나면 중단.
-[FUNC parse-block-fields :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
+[FUNC parse-block-fields :params [p acc]
+  :body (let [[t (p-peek p)]]
           (cond
-            [(null? $t) (r-pair $p $acc)]
-            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
-            [(= (get $t :kind) "Keyword")
-             (let [[$key (get $t :value)]
-                   [$p1 (p-advance $p)]
-                   [$val (parse-expr $p1)]
-                   [$p2 (get $val :p)] [$v (get $val :node)]]
-               (parse-block-fields $p2 (json_set $acc $key $v)))]
-            [true (r-pair (p-advance $p) $acc)]))]
+            [(null? t) (r-pair p acc)]
+            [(= (get t :kind) "RBracket") (r-pair p acc)]
+            [(= (get t :kind) "Keyword")
+             (let [[key (get t :value)]
+                   [p1 (p-advance p)]
+                   [val (parse-expr p1)]
+                   [p2 (get val :p)] [v (get val :node)]]
+               (parse-block-fields p2 (json_set acc key v)))]
+            [true (r-pair (p-advance p) acc)]))]
 
 ;; ──────────────────────────────────────
 ;; 35 parse-map — {:k v :k v ...}
 ;; ──────────────────────────────────────
 
-[FUNC parse-map :params [$p]
-  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)]
-              [$p1 (p-advance $p)]
-              [$collected (parse-args $p1 [])]
-              [$p2 (get $collected :p)] [$items (get $collected :node)]]
-          (r-pair (parse-consume-rbrace $p2) (make-map-block $items $line)))]
+[FUNC parse-map :params [p]
+  :body (let [[tok (p-peek p)] [line (get tok :line)]
+              [p1 (p-advance p)]
+              [collected (parse-args p1 [])]
+              [p2 (get collected :p)] [items (get collected :node)]]
+          (r-pair (parse-consume-rbrace p2) (make-map-block items line)))]
 
-[FUNC parse-consume-rbrace :params [$p]
-  :body (let [[$t (p-peek $p)]]
-          (if (and (not (null? $t)) (= (get $t :kind) "RBrace"))
-            (p-advance $p)
-            $p))]
+[FUNC parse-consume-rbrace :params [p]
+  :body (let [[t (p-peek p)]]
+          (if (and (not (null? t)) (= (get t :kind) "RBrace"))
+            (p-advance p)
+            p))]
 
 ;; ──────────────────────────────────────
 ;; 40/44 공개 API: parse(tokens) → ast list
 ;; ──────────────────────────────────────
 
-[FUNC parse-all :params [$p]
-  :body (if (p-end? $p)
-          (get $p :ast)
-          (let [[$one (parse-expr $p)]
-                [$p2 (p-append-ast (get $one :p) (get $one :node))]]
-            (parse-all $p2)))]
+[FUNC parse-all :params [p]
+  :body (if (p-end? p)
+          (get p :ast)
+          (let [[one (parse-expr p)]
+                [p2 (p-append-ast (get one :p) (get one :node))]]
+            (parse-all p2)))]
 
-[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens))]
-(define toks (lex "[FUNC f :params [$n] :body 1]"))
+[FUNC parse :params [tokens] :body (parse-all (p-make tokens))]
+(define toks (lex "[FUNC f :params [n] :body 1]"))
 (println "toks-len:" (length toks))
 (define ast (parse toks))
 (println "ast-len:" (length ast))

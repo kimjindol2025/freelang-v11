@@ -1,52 +1,52 @@
 ;; self/stdlib/ws.fl — Phase 27
 ;; WebSocket 연산 (native ws_* builtin wrapper)
 
-[FUNC ws-server :params [$port]
-  :body (ws_server (floor $port))]
+[FUNC ws-server :params [port]
+  :body (ws_server (floor port))]
 
-[FUNC ws-server-on-connect :params [$server $handler]
-  :body (ws_server_on_connect $server $handler)]
+[FUNC ws-server-on-connect :params [server handler]
+  :body (ws_server_on_connect server handler)]
 
-[FUNC ws-server-on-message :params [$server $handler]
-  :body (ws_server_on_message $server $handler)]
+[FUNC ws-server-on-message :params [server handler]
+  :body (ws_server_on_message server handler)]
 
-[FUNC ws-server-on-close :params [$server $handler]
-  :body (ws_server_on_close $server $handler)]
+[FUNC ws-server-on-close :params [server handler]
+  :body (ws_server_on_close server handler)]
 
-[FUNC ws-server-send :params [$server $client $msg]
-  :body (ws_server_send $server $client (str $msg))]
+[FUNC ws-server-send :params [server client msg]
+  :body (ws_server_send server client (str msg))]
 
-[FUNC ws-server-broadcast :params [$server $msg]
-  :body (ws_server_broadcast $server (str $msg))]
+[FUNC ws-server-broadcast :params [server msg]
+  :body (ws_server_broadcast server (str msg))]
 
-[FUNC ws-server-close :params [$server]
-  :body (ws_server_close $server)]
+[FUNC ws-server-close :params [server]
+  :body (ws_server_close server)]
 
-[FUNC ws-client :params [$url]
-  :body (ws_client (str $url))]
+[FUNC ws-client :params [url]
+  :body (ws_client (str url))]
 
-[FUNC ws-client-send :params [$client $msg]
-  :body (ws_client_send $client (str $msg))]
+[FUNC ws-client-send :params [client msg]
+  :body (ws_client_send client (str msg))]
 
-[FUNC ws-client-on-message :params [$client $handler]
-  :body (ws_client_on_message $client $handler)]
+[FUNC ws-client-on-message :params [client handler]
+  :body (ws_client_on_message client handler)]
 
-[FUNC ws-client-on-open :params [$client $handler]
-  :body (ws_client_on_open $client $handler)]
+[FUNC ws-client-on-open :params [client handler]
+  :body (ws_client_on_open client handler)]
 
-[FUNC ws-client-on-close :params [$client $handler]
-  :body (ws_client_on_close $client $handler)]
+[FUNC ws-client-on-close :params [client handler]
+  :body (ws_client_on_close client handler)]
 
-[FUNC ws-client-on-error :params [$client $handler]
-  :body (ws_client_on_error $client $handler)]
+[FUNC ws-client-on-error :params [client handler]
+  :body (ws_client_on_error client handler)]
 
-[FUNC ws-client-close :params [$client]
-  :body (ws_client_close $client)]
+[FUNC ws-client-close :params [client]
+  :body (ws_client_close client)]
 
-[FUNC ws-ready? :params [$ws]
-  :body (ws_ready $ws)]
+[FUNC ws-ready? :params [ws]
+  :body (ws_ready ws)]
 
-[FUNC ws-url-parse :params [$url]
-  :body (let [[$u (str $url)]]
-          (list (substring $u 0 (index-of $u "://"))
-                (substring $u (+ (index-of $u "://") 3))))]
+[FUNC ws-url-parse :params [url]
+  :body (let [[u (str url)]]
+          (list (substring u 0 (index-of u "://"))
+                (substring u (+ (index-of u "://") 3))))]

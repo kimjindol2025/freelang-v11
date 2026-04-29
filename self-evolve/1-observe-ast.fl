@@ -7,22 +7,22 @@
   (println "================================================\n")
 
   ;; 패턴 1: 단순 let (1개 binding, 상수)
-  (println "패턴 1: (let [[$a 1]] (+ $a $a))\n")
-  (let [[$src "(let [[$a 1]] (+ $a $a))"]]
-    (let [[$tokens (lex $src)]]
-      (let [[$ast (parse $tokens)]]
-        (println (str $ast)))))
+  (println "패턴 1: (let [[a 1]] (+ a a))\n")
+  (let [[src "(let [[a 1]] (+ a a))"]]
+    (let [[tokens (lex src)]]
+      (let [[ast (parse tokens)]]
+        (println (str ast)))))
 
   (println "\n\n================================================")
   (println "패턴 2: (+ 1 1)\n")
-  (let [[$src "(+ 1 1)"]]
-    (let [[$tokens (lex $src)]]
-      (let [[$ast (parse $tokens)]]
-        (println (str $ast)))))
+  (let [[src "(+ 1 1)"]]
+    (let [[tokens (lex src)]]
+      (let [[ast (parse tokens)]]
+        (println (str ast)))))
 
   (println "\n\n================================================")
-  (println "패턴 3: (let [[$a 1]] (let [[$b 2]] (+ $a $b)))\n")
-  (let [[$src "(let [[$a 1]] (let [[$b 2]] (+ $a $b)))"]]
-    (let [[$tokens (lex $src)]]
-      (let [[$ast (parse $tokens)]]
-        (println (str $ast))))))
+  (println "패턴 3: (let [[a 1]] (let [[b 2]] (+ a b)))\n")
+  (let [[src "(let [[a 1]] (let [[b 2]] (+ a b)))"]]
+    (let [[tokens (lex src)]]
+      (let [[ast (parse tokens)]]
+        (println (str ast))))))

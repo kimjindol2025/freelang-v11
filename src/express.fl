@@ -7,32 +7,32 @@
 ; 1. 응답 헬퍼 (기본만)
 ; ─────────────────────────────────────────────────────────────────
 
-[FUNC res-json :params [$obj]
-  :body (server_json $obj)
+[FUNC res-json :params [obj]
+  :body (server_json obj)
 ]
 
-[FUNC res-send :params [$text]
-  :body (server_text $text)
+[FUNC res-send :params [text]
+  :body (server_text text)
 ]
 
-[FUNC res-status :params [$code $body]
-  :body (server_status $code $body)
+[FUNC res-status :params [code body]
+  :body (server_status code body)
 ]
 
 ; ─────────────────────────────────────────────────────────────────
 ; 2. 요청 헬퍼 (기본만)
 ; ─────────────────────────────────────────────────────────────────
 
-[FUNC req-path :params [$req]
-  :body (server_req_path $req)
+[FUNC req-path :params [req]
+  :body (server_req_path req)
 ]
 
-[FUNC req-method :params [$req]
-  :body (server_req_method $req)
+[FUNC req-method :params [req]
+  :body (server_req_method req)
 ]
 
-[FUNC req-body :params [$req]
-  :body (let [raw (server_req_body $req)]
+[FUNC req-body :params [req]
+  :body (let [raw (server_req_body req)]
     (if (or (= raw "") (nil? raw))
       {}
       (json-parse raw)))
@@ -42,22 +42,22 @@
 ; 3. 기본 라우팅
 ; ─────────────────────────────────────────────────────────────────
 
-[FUNC app-get :params [$path $handler-name]
-  :body (server_get $path $handler-name)
+[FUNC app-get :params [path handler-name]
+  :body (server_get path handler-name)
 ]
 
-[FUNC app-post :params [$path $handler-name]
-  :body (server_post $path $handler-name)
+[FUNC app-post :params [path handler-name]
+  :body (server_post path handler-name)
 ]
 
 ; ─────────────────────────────────────────────────────────────────
 ; 4. 서버 시작
 ; ─────────────────────────────────────────────────────────────────
 
-[FUNC app-listen :params [$port]
+[FUNC app-listen :params [port]
   :body (do
-    (println (str "🚀 HTTP Echo Server started on port " $port))
-    (server_start $port)
+    (println (str "🚀 HTTP Echo Server started on port " port))
+    (server_start port)
   )
 ]
 
@@ -65,13 +65,13 @@
 ; 5. 간단한 에코 핸들러 예제
 ; ─────────────────────────────────────────────────────────────────
 
-[FUNC echo-handler :params [$req]
+[FUNC echo-handler :params [req]
   :body (let [
-    [$path (req-path $req)]
-    [$method (req-method $req)]
+    [path (req-path req)]
+    [method (req-method req)]
   ] (res-json {
-    :method $method
-    :path $path
+    :method method
+    :path path
     :timestamp (now_ms)
     :message "Echo server is running"
   }))
@@ -81,7 +81,7 @@
 ; 6. 헬스체크 핸들러
 ; ─────────────────────────────────────────────────────────────────
 
-[FUNC health-handler :params [$req]
+[FUNC health-handler :params [req]
   :body (res-json {
     :status "ok"
     :uptime (now_ms)

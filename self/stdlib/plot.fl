@@ -2,55 +2,55 @@
 ;; ASCII 그래프 생성 함수
 
 ;; 최댓값 추출 (stats.fl에서 재사용)
-[FUNC coll-max-num :params [$lst]
-  :body (if (= (length $lst) 0) 1
-          (coll-max-loop $lst 1 (get $lst 0)))]
-[FUNC coll-max-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (coll-max-loop $lst (+ $i 1) (max $acc (get $lst $i))))]
+[FUNC coll-max-num :params [lst]
+  :body (if (= (length lst) 0) 1
+          (coll-max-loop lst 1 (get lst 0)))]
+[FUNC coll-max-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc
+          (coll-max-loop lst (+ i 1) (max acc (get lst i))))]
 
 ;; 문자열 반복 (data.fl에서 사용 가능)
-[FUNC str-repeat :params [$s $n]
-  :body (if (<= $n 0) ""
-          (str-repeat-loop $s $n 0 ""))]
-[FUNC str-repeat-loop :params [$s $n $i $acc]
-  :body (if (>= $i $n) $acc
-          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
+[FUNC str-repeat :params [s n]
+  :body (if (<= n 0) ""
+          (str-repeat-loop s n 0 ""))]
+[FUNC str-repeat-loop :params [s n i acc]
+  :body (if (>= i n) acc
+          (str-repeat-loop s n (+ i 1) (str acc s)))]
 
 ;; 막대 그래프 (bar chart)
-[FUNC plot-bar :params [$labels $values $title]
-  :body (let [[$mx (coll-max-num $values)]]
-          (str $title "\n" (plot-bar-rows $labels $values $mx 0 "")))]
-[FUNC plot-bar-rows :params [$lbls $vals $mx $i $acc]
-  :body (if (>= $i (length $lbls)) $acc
-          (let [[$val (get $vals $i)]
-                [$bar-len (floor (* (/ $val $mx) 30))]
-                [$bar (str-repeat "█" $bar-len)]]
-            (plot-bar-rows $lbls $vals $mx (+ $i 1)
-              (str $acc (get $lbls $i) " │ " $bar " " $val "\n"))))]
+[FUNC plot-bar :params [labels values title]
+  :body (let [[mx (coll-max-num values)]]
+          (str title "\n" (plot-bar-rows labels values mx 0 "")))]
+[FUNC plot-bar-rows :params [lbls vals mx i acc]
+  :body (if (>= i (length lbls)) acc
+          (let [[val (get vals i)]
+                [bar-len (floor (* (/ val mx) 30))]
+                [bar (str-repeat "█" bar-len)]]
+            (plot-bar-rows lbls vals mx (+ i 1)
+              (str acc (get lbls i) " │ " bar " " val "\n"))))]
 
 ;; 히스토그램
-[FUNC plot-histogram :params [$data $bins $title]
-  :body (str $title "\n(bin count simplified)")] ;; 간단한 버전
+[FUNC plot-histogram :params [data bins title]
+  :body (str title "\n(bin count simplified)")] ;; 간단한 버전
 
 ;; 선 그래프 (간단한 ASCII)
-[FUNC plot-line :params [$xs $ys $title]
-  :body (str $title "\n(line plot simplified)")] ;; 간단한 버전
+[FUNC plot-line :params [xs ys title]
+  :body (str title "\n(line plot simplified)")] ;; 간단한 버전
 
 ;; 산점도
-[FUNC plot-scatter :params [$xs $ys $title]
-  :body (str $title "\n(scatter plot simplified)")]
+[FUNC plot-scatter :params [xs ys title]
+  :body (str title "\n(scatter plot simplified)")]
 
 ;; 히트맵
-[FUNC plot-heatmap :params [$grid $title]
-  :body (str $title "\n(heatmap simplified)")]
+[FUNC plot-heatmap :params [grid title]
+  :body (str title "\n(heatmap simplified)")]
 
 ;; 간단한 분포도
-[FUNC plot-distribution :params [$values]
-  :body (let [[$min (get values 0)]
-              [$max (coll-max-num $values)]]
-          (plot-distribution-rows $values $min $max 0 ""))]
-[FUNC plot-distribution-rows :params [$vals $min $max $i $acc]
-  :body (if (>= $i (length $vals)) $acc
-          (plot-distribution-rows $vals $min $max (+ $i 1)
-            (str $acc "*\n")))]
+[FUNC plot-distribution :params [values]
+  :body (let [[min (get values 0)]
+              [max (coll-max-num values)]]
+          (plot-distribution-rows values min max 0 ""))]
+[FUNC plot-distribution-rows :params [vals min max i acc]
+  :body (if (>= i (length vals)) acc
+          (plot-distribution-rows vals min max (+ i 1)
+            (str acc "*\n")))]

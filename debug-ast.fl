@@ -1,10 +1,10 @@
-(let [[$src (file-read "self/bench/hello.fl")]
-      [$tokens (lex $src)]
-      [$ast (parse $tokens)]
-      [$first (get $ast 0)]]
+(let [[src (file-read "self/bench/hello.fl")]
+      [tokens (lex src)]
+      [ast (parse tokens)]
+      [first (get ast 0)]]
   (do
-    (println (str "Node kind: " (get $first "kind")))
-    (println (str "Node op: " (get $first "op")))
-    (println (str "Args length: " (length (get $first "args"))))
-    (if (> (length (get $first "args")) 0)
-      (println (str "First arg: " (get (get (get $first "args") 0) "kind"))))))
+    (println (str "Node kind: " (get first "kind")))
+    (println (str "Node op: " (get first "op")))
+    (println (str "Args length: " (length (get first "args"))))
+    (if (> (length (get first "args")) 0)
+      (println (str "First arg: " (get (get (get first "args") 0) "kind"))))))
