@@ -76,8 +76,8 @@
 ;; 패턴 H: 데이터 정규화 (Normalize)
 (defun normalize-user [raw-user]
   {:id (get raw-user :id)
-   :name (str-trim (get raw-user :name))
-   :email (str-lower (str-trim (get raw-user :email)))
+   :name (trim (get raw-user :name))
+   :email (lower-case (trim (get raw-user :email)))
    :age (parse-number (get raw-user :age))
    :is-active (if (get raw-user :status) true false)})
 

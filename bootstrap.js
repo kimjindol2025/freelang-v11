@@ -18587,12 +18587,14 @@ function evalLet(interp2, args2) {
     const items = bindings.fields.get("items");
     if (Array.isArray(items) && items.length > 0) {
       const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
-      for (let i = 1; i < items.length; i++) {
-        const cur = items[i]?.kind === "block" && items[i]?.type === "Array";
-        if (cur !== isNested) {
-          ctx.variables.pop();
-          throw new Error(`let: \uBC14\uC778\uB529 \uD615\uC2DD\uC774 \uC77C\uAD00\uB418\uC9C0 \uC54A\uC74C (2\uCC28\uC6D0 [[$x ...]] \uC640 1\uCC28\uC6D0 [$x ...] \uD63C\uD569 \uBD88\uAC00, index=${i})`);
+      if (isNested) {
+        for (let i = 0; i < items.length; i += 2) {
+          if (!(items[i]?.kind === "block" && items[i]?.type === "Array")) {
+            ctx.variables.pop();
+            throw new Error(`let: 2\uCC28\uC6D0 \uBC14\uC778\uB529\uC5D0\uC11C \uC6D0\uC18C ${i}\uAC00 \uBC30\uC5F4\uC774 \uC544\uB2D8`);
+          }
         }
+      } else {
       }
       if (isNested) {
         for (const item of items) {

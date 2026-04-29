@@ -10,7 +10,7 @@
   ;; 패턴 A: map — 데이터 변환
   ;; 모든 사용자의 이름을 대문자로 변환
   (let [names-upper (map (fn [user]
-    (str-upper (get user :name)))
+    (upper-case (get user :name)))
     users)]
     (println "대문자 이름:" names-upper))
   ;; → ALICE, BOB, CHARLIE, DIANA
@@ -45,11 +45,11 @@
   ;; 각 사용자에 대해 점수 등급 추가
   (let [users-with-grade (map (fn [user]
     (let [score (get user :score)
-          grade (case true
-                  (>= score 90) "A"
-                  (>= score 80) "B"
-                  (>= score 70) "C"
-                  "F")]
+          grade (cond
+                  [(>= score 90) "A"]
+                  [(>= score 80) "B"]
+                  [(>= score 70) "C"]
+                  [true "F"])]
       (merge user {:grade grade})))
     users)]
     (println "등급 추가:" users-with-grade)))

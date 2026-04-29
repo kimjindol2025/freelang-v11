@@ -105,7 +105,7 @@
     (let [raw-users (db-query "SELECT * FROM users")
           formatted (map (fn [user]
             {:id (get user :id)
-             :name (str-upper (get user :name))
+             :name (upper-case (get user :name))
              :email (get user :email)
              :is-adult (>= (get user :age) 18)
              :created-at (now-iso)})

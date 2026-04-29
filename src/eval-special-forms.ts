@@ -1186,13 +1186,20 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
       //       그렇지 않으면 1차원 ([$x expr $y expr] or [x expr y expr])
       const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
 
-      // v11.10: 혼합 감지 — 모든 원소가 동일한 구조여야 함
-      for (let i = 1; i < items.length; i++) {
-        const cur = items[i]?.kind === "block" && items[i]?.type === "Array";
-        if (cur !== isNested) {
-          ctx.variables.pop();
-          throw new Error(`let: 바인딩 형식이 일관되지 않음 (2차원 [[$x ...]] 와 1차원 [$x ...] 혼합 불가, index=${i})`);
+      // v11.10: 혼합 감지 개선
+      // 2차원: 모든 짝수 위치 (0,2,4...) 원소가 Array block
+      // 1차원: 변수-값 쌍이 평탄하게 배열됨 (첫 원소가 Array block이 아니면 1차원)
+      if (isNested) {
+        // 2차원이면 모든 짝수 위치가 Array block이어야 함
+        for (let i = 0; i < items.length; i += 2) {
+          if (!(items[i]?.kind === "block" && items[i]?.type === "Array")) {
+            ctx.variables.pop();
+            throw new Error(`let: 2차원 바인딩에서 원소 ${i}가 배열이 아님`);
+          }
         }
+      } else {
+        // 1차원이면 짝수 개여야 함 (변수-값 쌍)
+        // 이미 위에서 확인함
       }
 
       if (isNested) {

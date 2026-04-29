@@ -24,9 +24,9 @@
 
 ;; 패턴 D: 문자열 변환 (대소문자)
 (let [name "JoHn DoE"
-      lower (str-lower name)
-      upper (str-upper name)
-      title-case (str-upper (get (str-split name " ") 0))]
+      lower (lower-case name)
+      upper (upper-case name)
+      title-case (upper-case (get (str-split name " ") 0))]
   (println lower)
   (println upper))
 ;; → john doe
@@ -34,7 +34,7 @@
 
 ;; 패턴 E: 문자열 트림 (공백 제거)
 (let [email-with-spaces "  alice@example.com  "
-      clean-email (str-trim email-with-spaces)]
+      clean-email (trim email-with-spaces)]
   (println (str "|" clean-email "|")))
 ;; → |alice@example.com|
 
@@ -54,9 +54,9 @@
 ;; 패턴 G: 복합 문자열 처리 (파싱)
 (defun parse-csv-line [line]
   (let [parts (str-split line ",")]
-    {:name (str-trim (get parts 0))
-     :age (parse-number (str-trim (get parts 1)))
-     :email (str-trim (get parts 2))}))
+    {:name (trim (get parts 0))
+     :age (parse-number (trim (get parts 1)))
+     :email (trim (get parts 2))}))
 
 (println (parse-csv-line "Alice, 25, alice@example.com"))
 ;; → {:name "Alice" :age 25 :email "alice@example.com"}
