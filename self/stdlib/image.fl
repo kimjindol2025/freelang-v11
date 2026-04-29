@@ -1,45 +1,45 @@
 ;; self/stdlib/image.fl — Phase 29
 ;; 이미지 처리 (메타데이터, 변환, 최적화)
 
-[FUNC image-read-metadata :params [$path]
-  :body (let [[$data (file_read (str $path))]]
-          (list (length $data) (get-image-format (str $path))))]
+[FUNC image-read-metadata :params [path]
+  :body (let [[data (file_read (str path))]]
+          (list (length data) (get-image-format (str path))))]
 
-[FUNC get-image-format :params [$path]
-  :body (let [[$ext (path-extname (str $path))]]
-          (lower (substring $ext 1)))]
+[FUNC get-image-format :params [path]
+  :body (let [[ext (path-extname (str path))]]
+          (lower (substring ext 1)))]
 
-[FUNC image-optimize :params [$path $quality]
-  :body (image_optimize (str $path) (floor $quality))]
+[FUNC image-optimize :params [path quality]
+  :body (image_optimize (str path) (floor quality))]
 
-[FUNC image-resize :params [$path $width $height]
-  :body (image_resize (str $path) (floor $width) (floor $height))]
+[FUNC image-resize :params [path width height]
+  :body (image_resize (str path) (floor width) (floor height))]
 
-[FUNC image-crop :params [$path $x $y $width $height]
-  :body (image_crop (str $path) (floor $x) (floor $y) (floor $width) (floor $height))]
+[FUNC image-crop :params [path x y width height]
+  :body (image_crop (str path) (floor x) (floor y) (floor width) (floor height))]
 
-[FUNC image-rotate :params [$path $degrees]
-  :body (image_rotate (str $path) (floor $degrees))]
+[FUNC image-rotate :params [path degrees]
+  :body (image_rotate (str path) (floor degrees))]
 
-[FUNC image-convert :params [$path $format]
-  :body (image_convert (str $path) (str $format))]
+[FUNC image-convert :params [path format]
+  :body (image_convert (str path) (str format))]
 
-[FUNC image-blur :params [$path $radius]
-  :body (image_blur (str $path) (floor $radius))]
+[FUNC image-blur :params [path radius]
+  :body (image_blur (str path) (floor radius))]
 
-[FUNC image-sharpen :params [$path $amount]
-  :body (image_sharpen (str $path) (floor $amount))]
+[FUNC image-sharpen :params [path amount]
+  :body (image_sharpen (str path) (floor amount))]
 
-[FUNC image-grayscale :params [$path]
-  :body (image_grayscale (str $path))]
+[FUNC image-grayscale :params [path]
+  :body (image_grayscale (str path))]
 
-[FUNC image-dimensions :params [$path]
-  :body (image_get_dimensions (str $path))]
+[FUNC image-dimensions :params [path]
+  :body (image_get_dimensions (str path))]
 
-[FUNC is-image-file? :params [$path]
+[FUNC is-image-file? :params [path]
   :body (contains? (list "jpg" "jpeg" "png" "gif" "webp" "svg")
-                  (get-image-format (str $path)))]
+                  (get-image-format (str path)))]
 
-[FUNC generate-thumbnail :params [$src $dest $size]
-  :body (do (image_resize (str $src) (floor $size) (floor $size))
-            (file_write (str $dest) (file_read (str $src))))]
+[FUNC generate-thumbnail :params [src dest size]
+  :body (do (image_resize (str src) (floor size) (floor size))
+            (file_write (str dest) (file_read (str src))))]

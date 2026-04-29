@@ -18,8 +18,8 @@
 [FUNC test-c1-array-determinism :params []
   :body (do
     (define arr [1 2 3 4 5])
-    (define sum1 (reduce (fn [$a $b] (+ $a $b)) 0 arr))
-    (define sum2 (reduce (fn [$a $b] (+ $a $b)) 0 arr))
+    (define sum1 (reduce (fn [a b] (+ a b)) 0 arr))
+    (define sum2 (reduce (fn [a b] (+ a b)) 0 arr))
     (if (= sum1 sum2)
       (println "C-1 PASS: 배열 reduce 결정론")
       (println (str "C-1 FAIL: " sum1 " != " sum2))))]
@@ -34,7 +34,7 @@
     (define result
       (try
         (+ 1 2)
-        (catch $e (str "Error: " $e))
+        (catch e (str "Error: " e))
         (finally (println "Cleanup normal"))))
     (if (= result 3)
       (println "C-2 PASS: Try normal flow")
@@ -46,7 +46,7 @@
     (define result
       (try
         (/ 1 0)
-        (catch $e (str "Caught: " (get $e :message)))
+        (catch e (str "Caught: " (get e :message)))
         (finally (println "Cleanup error"))))
     (println (str "C-2 PASS: Try error flow: " result)))]
 
@@ -54,8 +54,8 @@
 [FUNC test-c3-loop-scope :params []
   :body (do
     (define outer-x "outer")
-    (loop [($i 0) (< $i 2) (+ $i 1)]
-      (define inner-x (str "inner-" $i)))
+    (loop [(i 0) (< i 2) (+ i 1)]
+      (define inner-x (str "inner-" i)))
     (if (= outer-x "outer")
       (println "C-3 PASS: Loop 스코프 격리")
       (println "C-3 FAIL: 스코프 오염")))]
@@ -64,17 +64,17 @@
 [FUNC test-c3-loop-complex :params []
   :body (do
     (define counter 0)
-    (loop [($i 0) (< $i 3) (+ $i 1)]
-      (if (> $i 0)
-        (println (str "  Loop iteration: i=" $i))))
+    (loop [(i 0) (< i 3) (+ i 1)]
+      (if (> i 0)
+        (println (str "  Loop iteration: i=" i))))
     ;; Loop가 에러 없이 실행되면 성공
     (println "C-3 PASS: Loop 복합 조건 정상 실행"))]
 
 ;; Let 2D 바인딩 (C-5)
 [FUNC test-c5-let-2d :params []
   :body (do
-    (let [[$a 10] [$b 20] [$c 30]]
-      (define result (+ $a (+ $b $c)))
+    (let [[a 10] [b 20] [c 30]]
+      (define result (+ a (+ b c)))
       (if (= result 60)
         (println "C-5 PASS: Let 2D 바인딩")
         (println (str "C-5 FAIL: " result)))))]
@@ -82,12 +82,12 @@
 ;; Let 중첩
 [FUNC test-c5-let-nested :params []
   :body (do
-    (let [[$x 5]]
-      (let [[$y 10]]
-        (let [[$z (+ $x $y)]]
-          (if (= $z 15)
+    (let [[x 5]]
+      (let [[y 10]]
+        (let [[z (+ x y)]]
+          (if (= z 15)
             (println "C-5 PASS: Let 중첩")
-            (println (str "C-5 FAIL: " $z)))))))]
+            (println (str "C-5 FAIL: " z)))))))]
 
 ;; ──────────────────────────────────────
 ;; C-4: 에러 처리 안정성
@@ -120,8 +120,8 @@
   :body (do
     (define start (now_ms))
     (define sum 0)
-    (loop [($i 0) (< $i 1000) (+ $i 1)]
-      (define sum (+ sum $i)))
+    (loop [(i 0) (< i 1000) (+ i 1)]
+      (define sum (+ sum i)))
     (define elapsed (- (now_ms) start))
     (println (str "PERF: Loop 1000x → " elapsed "ms, result=" sum)))]
 
@@ -130,13 +130,13 @@
   :body (do
     (define arr [1 2 3 4 5 6 7 8 9 10])
     (define start (now_ms))
-    (define result (reduce (fn [$a $b] (+ $a $b)) 0 arr))
+    (define result (reduce (fn [a b] (+ a b)) 0 arr))
     (define elapsed (- (now_ms) start))
     (println (str "PERF: Array reduce 10x → " elapsed "ms, result=" result)))]
 
 ;; 함수 호출 성능 (작은 범위로 수정)
-[FUNC fib :params [$n]
-  :body (if (<= $n 1) $n (+ (fib (- $n 1)) (fib (- $n 2))))]
+[FUNC fib :params [n]
+  :body (if (<= n 1) n (+ (fib (- n 1)) (fib (- n 2))))]
 
 [FUNC test-perf-recursion :params []
   :body (do

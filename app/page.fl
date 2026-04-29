@@ -16,8 +16,8 @@
     <pre><code>(println \"Hello, FreeLang!\")
 (println (+ 1 2 3))
 
-[FUNC greet :params [$name]
-  :body (str \"안녕, \" $name \"!\")]
+[FUNC greet :params [name]
+  :body (str \"안녕, \" name \"!\")]
 
 (println (greet \"kim\"))</code></pre>
   </section>

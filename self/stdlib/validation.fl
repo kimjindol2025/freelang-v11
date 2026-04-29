@@ -3,40 +3,40 @@
 ;; regex_match, length 조건 분기로 구현
 
 ;; 이메일 검증 (간단한 정규식)
-[FUNC validate-email :params [$s]
-  :body (if (not (string? $s)) false
-          (regex_match $s "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))]
+[FUNC validate-email :params [s]
+  :body (if (not (string? s)) false
+          (regex_match s "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))]
 
 ;; 문자열 길이 범위 검증
-[FUNC validate-string :params [$s $min $max]
-  :body (if (not (string? $s)) false
-          (let [[$len (length $s)]]
-            (and (>= $len $min) (<= $len $max))))]
+[FUNC validate-string :params [s min max]
+  :body (if (not (string? s)) false
+          (let [[len (length s)]]
+            (and (>= len min) (<= len max))))]
 
 ;; 숫자 범위 검증
-[FUNC validate-number :params [$v $min $max]
-  :body (if (not (number? $v)) false
-          (and (>= $v $min) (<= $v $max)))]
+[FUNC validate-number :params [v min max]
+  :body (if (not (number? v)) false
+          (and (>= v min) (<= v max)))]
 
 ;; 정규식 검증
-[FUNC validate-regex :params [$v $pat]
-  :body (regex_match (str $v) $pat)]
+[FUNC validate-regex :params [v pat]
+  :body (regex_match (str v) pat)]
 
 ;; 빈 문자열 검증
-[FUNC validate-nonempty :params [$s]
-  :body (and (string? $s) (> (length $s) 0))]
+[FUNC validate-nonempty :params [s]
+  :body (and (string? s) (> (length s) 0))]
 
 ;; URL 검증 (http/https로 시작하는 URL)
-[FUNC validate-url :params [$s]
-  :body (if (not (string? $s)) false
-          (regex_match $s "^https?://"))]
+[FUNC validate-url :params [s]
+  :body (if (not (string? s)) false
+          (regex_match s "^https?://"))]
 
 ;; UUID 검증
-[FUNC validate-uuid :params [$s]
-  :body (if (not (string? $s)) false
-          (regex_match $s "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))]
+[FUNC validate-uuid :params [s]
+  :body (if (not (string? s)) false
+          (regex_match s "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))]
 
 ;; 전화번호 검증 (간단한 형식)
-[FUNC validate-phone :params [$s]
-  :body (if (not (string? $s)) false
-          (regex_match $s "^\\d{10,15}$"))]
+[FUNC validate-phone :params [s]
+  :body (if (not (string? s)) false
+          (regex_match s "^\\d{10,15}$"))]

@@ -1,1 +1,1 @@
-(try (risky) (catch $e (log $e)))
+(try (risky) (catch e (log e)))

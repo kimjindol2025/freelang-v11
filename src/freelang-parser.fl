@@ -7,9 +7,9 @@
 ;   - 구조적 재귀 (parse-value ↔ parse-sexpr/array/map) 은 유지
 ;     (표현식 중첩 깊이에 바인딩 → 실용 범위에서 스택 안전)
 
-[FUNC parse :params [$tokens]
+[FUNC parse :params [tokens]
   :body (
-    (let [[len (length $tokens)]]
+    (let [[len (length tokens)]]
       (define pos 0)
       (define nodes [])
 
@@ -18,7 +18,7 @@
       (define cur []
         (if (>= pos len)
           {:type "EOF" :value "" :line 0}
-          (get $tokens pos)
+          (get tokens pos)
         )
       )
 
@@ -51,7 +51,7 @@
       )
 
       (define check [type]
-        (= (peek-type) $type)
+        (= (peek-type) type)
       )
 
       (define at-end []
@@ -59,9 +59,9 @@
       )
 
       (define expect [type]
-        (if (check $type)
+        (if (check type)
           (advance)
-          (error (concat (loc) " SyntaxError: expected '" $type
+          (error (concat (loc) " SyntaxError: expected '" type
                          "' but got '" (peek-type) "'"
                          (if (> (length (peek-val)) 0)
                            (concat " (\"" (peek-val) "\")")
@@ -73,14 +73,14 @@
 
       (define parse-literal []
         (let [[tok (advance)]
-              [ln  (get $tok :line)]]
-          (match (get $tok :type)
-            ("NUMBER" {:kind "literal" :type "number"  :value (str-to-num (get $tok :value)) :line $ln})
-            ("STRING" {:kind "literal" :type "string"  :value (get $tok :value) :line $ln})
-            ("BOOL"   {:kind "literal" :type "boolean" :value (= (get $tok :value) "true") :line $ln})
-            ("NULL"   {:kind "literal" :type "null"    :value null :line $ln})
-            ("SYMBOL" {:kind "literal" :type "symbol"  :value (get $tok :value) :line $ln})
-            (_ (error (concat "[" (num-to-str (get $tok :line)) ":" (num-to-str (get $tok :col)) "] ParseError: unexpected token type '" (get $tok :type) "' in literal position")))
+              [ln  (get tok :line)]]
+          (match (get tok :type)
+            ("NUMBER" {:kind "literal" :type "number"  :value (str-to-num (get tok :value)) :line ln})
+            ("STRING" {:kind "literal" :type "string"  :value (get tok :value) :line ln})
+            ("BOOL"   {:kind "literal" :type "boolean" :value (= (get tok :value) "true") :line ln})
+            ("NULL"   {:kind "literal" :type "null"    :value null :line ln})
+            ("SYMBOL" {:kind "literal" :type "symbol"  :value (get tok :value) :line ln})
+            (_ (error (concat "[" (num-to-str (get tok :line)) ":" (num-to-str (get tok :col)) "] ParseError: unexpected token type '" (get tok :type) "' in literal position")))
           )
         )
       )
@@ -89,7 +89,7 @@
 
       (define parse-variable []
         (let [[tok (expect "VARIABLE")]]
-          {:kind "variable" :name (get $tok :value) :line (get $tok :line)}
+          {:kind "variable" :name (get tok :value) :line (get tok :line)}
         )
       )
 
@@ -98,14 +98,14 @@
       (define parse-keyword []
         (if (check "KEYWORD")
           (let [[tok (advance)]]
-            {:kind "keyword" :name (get $tok :value) :line (get $tok :line)}
+            {:kind "keyword" :name (get tok :value) :line (get tok :line)}
           )
           ; 구식 COLON + SYMBOL 형태도 처리
           (do
             (let [[ln (cur-line)]]
               (expect "COLON")
               (let [[sym (expect "SYMBOL")]]
-                {:kind "keyword" :name (get $sym :value) :line $ln}
+                {:kind "keyword" :name (get sym :value) :line ln}
               )
             )
           )
@@ -119,7 +119,7 @@
           (expect "LBRACE")
           (define pairs {})
           (define read-pairs []
-            (loop [[$_ 0]]
+            (loop [[_ 0]]
               (if (or (check "RBRACE") (at-end))
                 pairs
                 (let [[key-tok (if (or (check "KEYWORD") (check "COLON"))
@@ -127,10 +127,10 @@
                                  (parse-value))]]
                   (let [[val (parse-value)]]
                     (set! pairs (assoc pairs
-                      (if (= (get $key-tok :kind) "keyword")
-                        (get $key-tok :name)
-                        (get $key-tok :value))
-                      $val))
+                      (if (= (get key-tok :kind) "keyword")
+                        (get key-tok :name)
+                        (get key-tok :value))
+                      val))
                     (recur 0)
                   )
                 )
@@ -139,7 +139,7 @@
           )
           (read-pairs)
           (expect "RBRACE")
-          {:kind "map-literal" :pairs pairs :line $ln}
+          {:kind "map-literal" :pairs pairs :line ln}
         )
       )
 
@@ -150,7 +150,7 @@
           (expect "LBRACKET")
           (define items [])
           (define read-items []
-            (loop [[$_ 0]]
+            (loop [[_ 0]]
               (if (or (check "RBRACKET") (at-end))
                 items
                 (do
@@ -162,7 +162,7 @@
           )
           (read-items)
           (expect "RBRACKET")
-          {:kind "array" :items items :line $ln}
+          {:kind "array" :items items :line ln}
         )
       )
 
@@ -178,7 +178,7 @@
               (do
                 (define do-exprs [])
                 (define read-do []
-                  (loop [[$_ 0]]
+                  (loop [[_ 0]]
                     (if (or (check "RPAREN") (at-end))
                       do-exprs
                       (do
@@ -192,14 +192,14 @@
                 (expect "RPAREN")
                 (if (= (length do-exprs) 1)
                   (get do-exprs 0)
-                  {:kind "sexpr" :op "do" :args do-exprs :line $ln}
+                  {:kind "sexpr" :op "do" :args do-exprs :line ln}
                 )
               )
               ; 일반 S-expression: (op arg1 arg2 ...)
               (let [[op-tok (advance)]]
                 (define args [])
                 (define read-args []
-                  (loop [[$_ 0]]
+                  (loop [[_ 0]]
                     (if (or (check "RPAREN") (at-end))
                       args
                       (do
@@ -212,9 +212,9 @@
                 (read-args)
                 (expect "RPAREN")
                 {:kind "sexpr"
-                 :op   (get $op-tok :value)
+                 :op   (get op-tok :value)
                  :args args
-                 :line $ln}
+                 :line ln}
               )
             )
           )
@@ -226,14 +226,14 @@
       (define parse-fields []
         (define fields {})
         (define read-fields []
-          (loop [[$_ 0]]
+          (loop [[_ 0]]
             (if (or (check "RBRACKET") (at-end))
               fields
               (if (or (check "KEYWORD") (check "COLON"))
                 (let [[kw (parse-keyword)]
-                      [key (get $kw :name)]]
+                      [key (get kw :name)]]
                   (let [[val (parse-value)]]
-                    (set! fields (assoc fields $key $val))
+                    (set! fields (assoc fields key val))
                     (recur 0)
                   )
                 )
@@ -256,7 +256,7 @@
           (if (not (check "SYMBOL"))
             (error (concat (loc) " ParseError: expected block type (FUNC/MODULE/...) but got '" (peek-type) "'"))
             (let [[type-tok (advance)]
-                  [btype    (get $type-tok :value)]]
+                  [btype    (get type-tok :value)]]
 
               ; import/open 은 이름 없이 즉시 필드
               (if (or (= btype "import") (= btype "open") (= btype "module"))
@@ -266,17 +266,17 @@
                           "")]]
                   (let [[fields (parse-fields)]]
                     (expect "RBRACKET")
-                    {:kind "block" :type btype :name $name-or-first :fields fields :line $ln}
+                    {:kind "block" :type btype :name name-or-first :fields fields :line ln}
                   )
                 )
                 ; 일반 블록: TYPE name :fields ...
                 (let [[name-tok (if (or (check "SYMBOL") (check "VARIABLE"))
                                   (advance)
                                   {:value ""})]
-                      [bname    (get $name-tok :value)]]
+                      [bname    (get name-tok :value)]]
                   (let [[fields (parse-fields)]]
                     (expect "RBRACKET")
-                    {:kind "block" :type btype :name $bname :fields fields :line $ln}
+                    {:kind "block" :type btype :name bname :fields fields :line ln}
                   )
                 )
               )
@@ -310,7 +310,7 @@
       ; ── 최상위 루프 (loop/recur TCO) ─────────────────────
 
       (define parse-top []
-        (loop [[$_ 0]]
+        (loop [[_ 0]]
           (if (at-end)
             nodes
             (do
@@ -337,11 +337,11 @@
 
 ; ── 유틸 ──────────────────────────────────────────────────────
 
-[FUNC str-to-num :params [$s]
+[FUNC str-to-num :params [s]
   :body (
-    (if (contains? $s ".")
-      (parse-float $s)
-      (parse-int $s)
+    (if (contains? s ".")
+      (parse-float s)
+      (parse-int s)
     )
   )
 ]

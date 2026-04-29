@@ -10,26 +10,26 @@
 ;; ─────────────────────────────────────────────────────────────────────
 
 ;; mongo-connect : uri → connId or null
-[FUNC mongo-connect :params [$uri]
-  :body (let [[$conn (net-connect "localhost" 27017 5000)]]
-    (if (= $conn null) null $conn))]
+[FUNC mongo-connect :params [uri]
+  :body (let [[conn (net-connect "localhost" 27017 5000)]]
+    (if (= conn null) null conn))]
 
 ;; mongo-close : connId → null
-[FUNC mongo-close :params [$connId]
+[FUNC mongo-close :params [connId]
   :body null]
 
 ;; mongo-is-connected : connId → boolean
-[FUNC mongo-is-connected :params [$connId]
-  :body (if (= $connId null) false true)]
+[FUNC mongo-is-connected :params [connId]
+  :body (if (= connId null) false true)]
 
 ;; ─────────────────────────────────────────────────────────────────────
 ;; CRUD Operations: Real Wire Protocol with Mock Responses
 ;; ─────────────────────────────────────────────────────────────────────
 
 ;; mongo-find : connId db coll filter → [documents]
-[FUNC mongo-find :params [$connId $db $coll $filter]
-  :body (let [[$cmd {"find" $coll "filter" $filter}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-find :params [connId db coll filter]
+  :body (let [[cmd {"find" coll "filter" filter}]
+              [resp (wire-send-command connId db cmd)]]
     ;; For now, return mock response (cursor with 3 docs)
     ;; When real MongoDB response succeeds, this will parse actual BSON
     (list
@@ -38,79 +38,79 @@
       {"_id" "507f1f77bcf86cd799439003" "name" "charlie" "age" 35}))]
 
 ;; mongo-find-one : connId db coll filter → document or null
-[FUNC mongo-find-one :params [$connId $db $coll $filter]
-  :body (let [[$cmd {"find" $coll "filter" $filter "limit" 1}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-find-one :params [connId db coll filter]
+  :body (let [[cmd {"find" coll "filter" filter "limit" 1}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return first document
     {"_id" "507f1f77bcf86cd799439001" "name" "alice" "age" 30})]
 
 ;; mongo-insert : connId db coll doc → {insertedId}
-[FUNC mongo-insert :params [$connId $db $coll $doc]
-  :body (let [[$cmd {"insert" $coll "documents" (list $doc)}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-insert :params [connId db coll doc]
+  :body (let [[cmd {"insert" coll "documents" (list doc)}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return generated ObjectId
     {"insertedId" "507f1f77bcf86cd799439011"})]
 
 ;; mongo-insert-many : connId db coll docs → {insertedCount}
-[FUNC mongo-insert-many :params [$connId $db $coll $docs]
-  :body (let [[$cmd {"insert" $coll "documents" $docs}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-insert-many :params [connId db coll docs]
+  :body (let [[cmd {"insert" coll "documents" docs}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return count of inserted docs
-    {"insertedCount" (length $docs)})]
+    {"insertedCount" (length docs)})]
 
 ;; mongo-update : connId db coll filter update → {modifiedCount}
-[FUNC mongo-update :params [$connId $db $coll $filter $update]
-  :body (let [[$cmd {"update" $coll "updates" (list {"q" $filter "u" $update})}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-update :params [connId db coll filter update]
+  :body (let [[cmd {"update" coll "updates" (list {"q" filter "u" update})}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: assume 1 document modified
     {"modifiedCount" 1})]
 
 ;; mongo-update-many : connId db coll filter update → {modifiedCount}
-[FUNC mongo-update-many :params [$connId $db $coll $filter $update]
-  :body (let [[$cmd {"update" $coll "updates" (list {"q" $filter "u" $update "multi" true})}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-update-many :params [connId db coll filter update]
+  :body (let [[cmd {"update" coll "updates" (list {"q" filter "u" update "multi" true})}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return count
     {"modifiedCount" 0})]
 
 ;; mongo-delete : connId db coll filter → {deletedCount}
-[FUNC mongo-delete :params [$connId $db $coll $filter]
-  :body (let [[$cmd {"delete" $coll "deletes" (list {"q" $filter "limit" 0})}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-delete :params [connId db coll filter]
+  :body (let [[cmd {"delete" coll "deletes" (list {"q" filter "limit" 0})}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: assume 1 document deleted
     {"deletedCount" 1})]
 
 ;; mongo-delete-many : connId db coll filter → {deletedCount}
-[FUNC mongo-delete-many :params [$connId $db $coll $filter]
-  :body (let [[$cmd {"delete" $coll "deletes" (list {"q" $filter "limit" 0})}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-delete-many :params [connId db coll filter]
+  :body (let [[cmd {"delete" coll "deletes" (list {"q" filter "limit" 0})}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return count
     {"deletedCount" 0})]
 
 ;; mongo-count : connId db coll filter → number
-[FUNC mongo-count :params [$connId $db $coll $filter]
-  :body (let [[$cmd {"count" $coll "query" $filter}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-count :params [connId db coll filter]
+  :body (let [[cmd {"count" coll "query" filter}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return fixed count
     3)]
 
 ;; mongo-aggregate : connId db coll pipeline → [results]
-[FUNC mongo-aggregate :params [$connId $db $coll $pipeline]
-  :body (let [[$cmd {"aggregate" $coll "pipeline" $pipeline}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-aggregate :params [connId db coll pipeline]
+  :body (let [[cmd {"aggregate" coll "pipeline" pipeline}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return empty array
     [])]
 
 ;; mongo-create-index : connId db coll keys options → {success}
-[FUNC mongo-create-index :params [$connId $db $coll $keys $options]
-  :body (let [[$cmd {"createIndex" $coll "key" $keys}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-create-index :params [connId db coll keys options]
+  :body (let [[cmd {"createIndex" coll "key" keys}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return success
     {"success" true})]
 
 ;; mongo-list-collections : connId db → [names]
-[FUNC mongo-list-collections :params [$connId $db]
-  :body (let [[$cmd {"listCollections" 1}]
-              [$resp (wire-send-command $connId $db $cmd)]]
+[FUNC mongo-list-collections :params [connId db]
+  :body (let [[cmd {"listCollections" 1}]
+              [resp (wire-send-command connId db cmd)]]
     ;; Mock: return empty array
     [])]
 
@@ -118,24 +118,24 @@
 ;; Helper Functions: MongoDB Update Operators
 ;; ─────────────────────────────────────────────────────────────────────
 
-;; mongo-set : {fields} → {$set: {fields}}
-[FUNC mongo-set :params [$doc]
-  :body {"$set" $doc}]
+;; mongo-set : {fields} → {set: {fields}}
+[FUNC mongo-set :params [doc]
+  :body {"set" doc}]
 
-;; mongo-inc : {fields} → {$inc: {fields}}
-[FUNC mongo-inc :params [$doc]
-  :body {"$inc" $doc}]
+;; mongo-inc : {fields} → {inc: {fields}}
+[FUNC mongo-inc :params [doc]
+  :body {"inc" doc}]
 
-;; mongo-push : {fields} → {$push: {fields}}
-[FUNC mongo-push :params [$doc]
-  :body {"$push" $doc}]
+;; mongo-push : {fields} → {push: {fields}}
+[FUNC mongo-push :params [doc]
+  :body {"push" doc}]
 
-;; mongo-pull : {fields} → {$pull: {fields}}
-[FUNC mongo-pull :params [$doc]
-  :body {"$pull" $doc}]
+;; mongo-pull : {fields} → {pull: {fields}}
+[FUNC mongo-pull :params [doc]
+  :body {"pull" doc}]
 
 ;; mongo-parse-uri : uri → {host port db}
-[FUNC mongo-parse-uri :params [$uri]
+[FUNC mongo-parse-uri :params [uri]
   :body {"host" "localhost" "port" 27017 "db" "testdb"}]
 
 (println "MongoDB module loaded")

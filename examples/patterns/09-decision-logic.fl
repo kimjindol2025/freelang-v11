@@ -101,7 +101,7 @@
          (if (> total 50000)
           "needs-review"
           "auto-approve"))]
-    (let [[merged $order]] (map-set $merged :grade "A"))))
+    (let [[merged order]] (map-set merged :grade "A"))))
 
 ;; 패턴 J: early return (throw 사용)
 (defun validate-user [user]

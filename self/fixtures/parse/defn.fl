@@ -1,1 +1,1 @@
-(defn sq [$x] (* $x $x))
+(defn sq [x] (* x x))

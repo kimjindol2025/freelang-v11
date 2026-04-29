@@ -32,107 +32,107 @@
 
 ;; ============ 인증 함수 ============
 
-[FUNC authenticate-user :params [$username $password]
+[FUNC authenticate-user :params [username password]
   :body (let [
     user (get *users-db* 0)
-    username-match (= (get $user "username") $username)
+    username-match (= (get user "username") username)
   ]
     (if username-match
-      (if (auth-verify-password $password (get $user "password"))
-        $user
+      (if (auth-verify-password password (get user "password"))
+        user
         nil)
       nil))
 ]
 
-[FUNC create-jwt :params [$user]
+[FUNC create-jwt :params [user]
   :body (let [
     payload {
-      :user_id (get $user "id")
-      :username (get $user "username")
-      :role (get $user "role")
+      :user_id (get user "id")
+      :username (get user "username")
+      :role (get user "role")
       :iat (now_ms)
     }
-    token (auth-jwt-sign $payload *JWT-SECRET* 3600)
+    token (auth-jwt-sign payload *JWT-SECRET* 3600)
   ]
-    $token)
+    token)
 ]
 
-[FUNC verify-jwt :params [$token]
-  :body (auth-jwt-verify $token *JWT-SECRET*)
+[FUNC verify-jwt :params [token]
+  :body (auth-jwt-verify token *JWT-SECRET*)
 ]
 
-[FUNC verify-api-key :params [$key]
+[FUNC verify-api-key :params [key]
   :body (let [
     valid-key (get *VALID-APIKEYS* 0)
   ]
-    (= $key valid-key))
+    (= key valid-key))
 ]
 
 ;; ============ 미들웨어 함수 ============
 
-[FUNC auth-guard :params [$req]
+[FUNC auth-guard :params [req]
   :body (let [
-    token (auth-extract-bearer $req)
-    payload (if token (verify-jwt $token) nil)
+    token (auth-extract-bearer req)
+    payload (if token (verify-jwt token) nil)
   ]
     (if payload
-      { :valid true :user $payload }
+      { :valid true :user payload }
       { :valid false }))
 ]
 
-[FUNC apikey-guard :params [$req]
+[FUNC apikey-guard :params [req]
   :body (let [
-    api-key (auth-get-apikey $req)
-    valid (verify-api-key $api-key)
+    api-key (auth-get-apikey req)
+    valid (verify-api-key api-key)
   ]
-    { :valid $valid })
+    { :valid valid })
 ]
 
 ;; ============ HTTP API 엔드포인트 ============
 
 ;; 로그인 (JWT 발급)
-[FUNC api-login :params [$req]
+[FUNC api-login :params [req]
   :body (let [
-    body (req-body $req)
-    username (get $body "username")
-    password (get $body "password")
+    body (req-body req)
+    username (get body "username")
+    password (get body "password")
     user (authenticate-user username password)
   ]
     (if user
       (let [token (create-jwt user)]
         (res-json {
           :success true
-          :token $token
+          :token token
           :user {
-            :id (get $user "id")
-            :username (get $user "username")
-            :role (get $user "role")
+            :id (get user "id")
+            :username (get user "username")
+            :role (get user "role")
           }
         }))
       (res-status 401 { :error "Invalid credentials" })))
 ]
 
 ;; 보호된 API (JWT 필수)
-[FUNC api-protected :params [$req]
+[FUNC api-protected :params [req]
   :body (let [
-    auth (auth-guard $req)
-    valid (get $auth "valid")
-    payload (get $auth "user")
+    auth (auth-guard req)
+    valid (get auth "valid")
+    payload (get auth "user")
   ]
     (if valid
       (res-json {
         :success true
         :message "Protected resource"
-        :user $payload
+        :user payload
       })
       (res-status 401 { :error "Unauthorized - invalid token" })))
 ]
 
 ;; API 키 검증
-[FUNC api-with-apikey :params [$req]
+[FUNC api-with-apikey :params [req]
   :body (let [
-    check (apikey-guard $req)
-    valid (get $check "valid")
+    check (apikey-guard req)
+    valid (get check "valid")
   ]
     (if valid
       (res-json {
@@ -143,34 +143,34 @@
 ]
 
 ;; 토큰 검증 (디버그)
-[FUNC api-verify-token :params [$req]
+[FUNC api-verify-token :params [req]
   :body (let [
-    token (auth-extract-bearer $req)
-    payload (if token (verify-jwt $token) nil)
+    token (auth-extract-bearer req)
+    payload (if token (verify-jwt token) nil)
   ]
     (if payload
       (res-json {
         :success true
-        :payload $payload
+        :payload payload
       })
       (res-status 401 { :error "Token invalid or expired" })))
 ]
 
 ;; 새 토큰 생성 (테스트용)
-[FUNC api-generate-token :params [$req]
+[FUNC api-generate-token :params [req]
   :body (let [
     user { :id 1 :username "test" :role "user" }
     token (create-jwt user)
   ]
     (res-json {
       :success true
-      :token $token
+      :token token
       :expires_in 3600
     }))
 ]
 
 ;; 헬스
-[FUNC health :params [$req]
+[FUNC health :params [req]
   :body (res-json {
     :status "OK"
     :service "Express.fl Auth System"

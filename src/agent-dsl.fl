@@ -8,12 +8,12 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC make-task :params [
-  $name
-  $action
+  name
+  action
 ]
   :body {
-    :name $name
-    :action $action
+    :name name
+    :action action
     :depends []
     :retry 3
     :timeout 30000
@@ -30,15 +30,15 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC task-execute :params [
-  $task
-  $context
+  task
+  context
 ]
   :body (let [
-    [$action (get $task :action)]
-    [$result (call $action $context)]
+    [action (get task :action)]
+    [result (call action context)]
   ] {
     :status "done"
-    :result $result
+    :result result
     :error nil
   })
 ]
@@ -48,14 +48,14 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC ready-tasks :params [
-  $pending
-  $executed
+  pending
+  executed
 ]
   :body (filter
     (fn [t] (let [
-      [$deps (get t :depends)]
-    ] (every? (fn [d] (in? (keys $executed) d)) $deps)))
-    $pending
+      [deps (get t :depends)]
+    ] (every? (fn [d] (in? (keys executed) d)) deps)))
+    pending
   )
 ]
 
@@ -64,20 +64,20 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC agent-run :params [
-  $task-list
+  task-list
 ]
   :body (let [
-    [$context {}]
-    [$executed {}]
+    [context {}]
+    [executed {}]
   ] (do
     (map (fn [t] (let [
-      [$name (get t :name)]
-      [$result (task-execute t $context)]
-    ] (set! $executed (assoc $executed $name $result))))
-    $task-list)
+      [name (get t :name)]
+      [result (task-execute t context)]
+    ] (set! executed (assoc executed name result))))
+    task-list)
     {
       :status "done"
-      :executed $executed
+      :executed executed
       :total-steps 3
     }
   ))
@@ -97,34 +97,34 @@
 ]
 
 [FUNC agent-log :params [
-  $state
-  $step
-  $message
-  $data
+  state
+  step
+  message
+  data
 ]
   :body (let [
-    [$entry {
+    [entry {
       :timestamp (time-iso)
-      :step $step
-      :message $message
-      :data $data
+      :step step
+      :message message
+      :data data
     }]
-  ] (assoc $state :logs (push (get $state :logs) $entry)))
+  ] (assoc state :logs (push (get state :logs) entry)))
 ]
 
 [FUNC agent-state-set :params [
-  $state
-  $key
-  $value
+  state
+  key
+  value
 ]
-  :body (assoc $state :steps (assoc (get $state :steps) $key $value))
+  :body (assoc state :steps (assoc (get state :steps) key value))
 ]
 
 [FUNC agent-state-get :params [
-  $state
-  $key
+  state
+  key
 ]
-  :body (get (get $state :steps) $key)
+  :body (get (get state :steps) key)
 ]
 
 ; ─────────────────────────────────────────────────────────────────
@@ -132,25 +132,25 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC task-map :params [
-  $fn
-  $data
+  fn
+  data
 ]
-  :body (fn [$ctx] (map $fn $data))
+  :body (fn [ctx] (map fn data))
 ]
 
 [FUNC task-filter :params [
-  $fn
-  $data
+  fn
+  data
 ]
-  :body (fn [$ctx] (filter $fn $data))
+  :body (fn [ctx] (filter fn data))
 ]
 
 [FUNC task-reduce :params [
-  $fn
-  $init
-  $data
+  fn
+  init
+  data
 ]
-  :body (fn [$ctx] (reduce $fn $init $data))
+  :body (fn [ctx] (reduce fn init data))
 ]
 
 ; ─────────────────────────────────────────────────────────────────

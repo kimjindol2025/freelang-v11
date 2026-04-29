@@ -1,33 +1,33 @@
 ;; self/stdlib/url.fl — Phase 26
 ;; URL 조작 함수
 
-[FUNC url-encode :params [$s]
-  :body (replace (replace (replace (replace (str $s)
+[FUNC url-encode :params [s]
+  :body (replace (replace (replace (replace (str s)
     " " "%20") "&" "%26") "=" "%3D") "#" "%23")]
 
-[FUNC url-decode :params [$s]
-  :body (replace (replace (replace (replace (str $s)
+[FUNC url-decode :params [s]
+  :body (replace (replace (replace (replace (str s)
     "%20" " ") "%26" "&") "%3D" "=") "%23" "#")]
 
-[FUNC url-add-param :params [$url $key $val]
-  :body (if (contains? $url "?")
-          (str $url "&" $key "=" (url-encode (str $val)))
-          (str $url "?" $key "=" (url-encode (str $val))))]
+[FUNC url-add-param :params [url key val]
+  :body (if (contains? url "?")
+          (str url "&" key "=" (url-encode (str val)))
+          (str url "?" key "=" (url-encode (str val))))]
 
-[FUNC url-add-params :params [$url $params]
-  :body (url-add-params-loop $url (keys $params) 0)]
-[FUNC url-add-params-loop :params [$url $ks $i]
-  :body (if (>= $i (length $ks)) $url
-          (url-add-params-loop (url-add-param $url (get $ks $i) (get-params (get $ks $i)))
-                               $ks (+ $i 1)))]
+[FUNC url-add-params :params [url params]
+  :body (url-add-params-loop url (keys params) 0)]
+[FUNC url-add-params-loop :params [url ks i]
+  :body (if (>= i (length ks)) url
+          (url-add-params-loop (url-add-param url (get ks i) (get-params (get ks i)))
+                               ks (+ i 1)))]
 
-[FUNC url-get-domain :params [$url]
-  :body (let [[$start (if (starts-with? $url "https://") 8 7)]]
-          (substring $url $start (index-of (substring $url $start) "/")))]
+[FUNC url-get-domain :params [url]
+  :body (let [[start (if (starts-with? url "https://") 8 7)]]
+          (substring url start (index-of (substring url start) "/")))]
 
-[FUNC url-get-path :params [$url]
-  :body (let [[$idx (index-of (substring $url 8) "/")]]
-          (if (< $idx 0) "/" (substring $url (+ 8 $idx))))]
+[FUNC url-get-path :params [url]
+  :body (let [[idx (index-of (substring url 8) "/")]]
+          (if (< idx 0) "/" (substring url (+ 8 idx))))]
 
-[FUNC is-absolute-url :params [$s]
-  :body (or (starts-with? $s "http://") (starts-with? $s "https://"))]
+[FUNC is-absolute-url :params [s]
+  :body (or (starts-with? s "http://") (starts-with? s "https://"))]

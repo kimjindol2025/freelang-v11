@@ -45,7 +45,7 @@
 ;; 패턴 F: 필드 선택 (Pick)
 (defun pick-fields [obj fields]
   (reduce (fn [acc field]
-    (let [[merged $acc]] (map-set $merged :grade "A")))
+    (let [[merged acc]] (map-set merged :grade "A")))
    {}
    fields))
 

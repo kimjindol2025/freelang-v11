@@ -1,21 +1,21 @@
 ;; v11-benchmark: 원본 vs 최적화본 성능 비교
 ;; 간단한 파싱 성능 테스트
 
-(defn simple-benchmark [$file-path]
+(defn simple-benchmark [file-path]
   (do
-    (println (str "⏱️  벤치마크: " $file-path))
-    (let [[$start (now_ms)]]
+    (println (str "⏱️  벤치마크: " file-path))
+    (let [[start (now_ms)]]
       (do
-        (let [[$src (file_read $file-path)]]
-          (let [[$tokens (lex $src)]]
-            (let [[$ast (parse $tokens)]]
-              (let [[$elapsed (- (now_ms) $start)]]
+        (let [[src (file_read file-path)]]
+          (let [[tokens (lex src)]]
+            (let [[ast (parse tokens)]]
+              (let [[elapsed (- (now_ms) start)]]
                 (do
-                  (println (str "  ✅ 완료: " $elapsed " ms"))
-                  {:file $file-path
-                   :elapsed-ms $elapsed
-                   :lines (length (str-split $src "\n"))
-                   :tokens (length $tokens)
+                  (println (str "  ✅ 완료: " elapsed " ms"))
+                  {:file file-path
+                   :elapsed-ms elapsed
+                   :lines (length (str-split src "\n"))
+                   :tokens (length tokens)
                    :timestamp (now_iso)})))))))))
 
 (defn run-benchmark []
@@ -23,19 +23,19 @@
     (println "🚀 v11-benchmark 시작\n")
 
     ;; 원본 분석
-    (let [[$result (simple-benchmark "/root/kim/freelang-v11/self/all.fl")]]
+    (let [[result (simple-benchmark "/root/kim/freelang-v11/self/all.fl")]]
       (do
         (println "\n📊 벤치마크 결과:")
-        (println (str "  파일: " (get $result "file")))
-        (println (str "  라인: " (get $result "lines")))
-        (println (str "  토큰: " (get $result "tokens")))
-        (println (str "  소요 시간: " (get $result "elapsed-ms") " ms"))
+        (println (str "  파일: " (get result "file")))
+        (println (str "  라인: " (get result "lines")))
+        (println (str "  토큰: " (get result "tokens")))
+        (println (str "  소요 시간: " (get result "elapsed-ms") " ms"))
 
         (file_write "/root/kim/freelang-v11/self-evolve/logs/benchmark.log"
-          (str "벤치마크 결과: " (str $result) "\n"))
+          (str "벤치마크 결과: " (str result) "\n"))
 
         (println "\n✅ 벤치마크 완료")
-        $result))))
+        result))))
 
 ;; 메인 진입점
 (do

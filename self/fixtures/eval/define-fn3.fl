@@ -1,1 +1,1 @@
-(define tri [$x] (* $x 3)) (tri 4)
+(define tri [x] (* x 3)) (tri 4)

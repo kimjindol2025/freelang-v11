@@ -1,11 +1,11 @@
 ;; cg-func-block 의 과정을 수동 검증
-[FUNC js-name :params [$n]
-  :body (if (null? $n) "_"
-          (let [[$a (replace $n "-" "_")]]
-            $a))]
-[FUNC extract-name :params [$n]
-  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+[FUNC js-name :params [n]
+  :body (if (null? n) "_"
+          (let [[a (replace n "-" "_")]]
+            a))]
+[FUNC extract-name :params [n]
+  :body (cond [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "literal") (js-name (get n :value))]
               [true "_anon"])]
 
 (define v {:kind "variable" :name "src" :line 1})

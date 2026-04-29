@@ -1,40 +1,40 @@
 ;; v11-analyzer: FreeLang 코드 분석기
 ;; 대상 파일(all.fl)을 읽고 기본 메트릭 계산
 
-(defn analyze-fl-code [$file-path]
+(defn analyze-fl-code [file-path]
   (do
-    (println (str "📊 분석 시작: " $file-path))
-    (let [[$src (file_read $file-path)]]
+    (println (str "📊 분석 시작: " file-path))
+    (let [[src (file_read file-path)]]
       (do
-        (let [[$lines (str-split $src "\n")]
-              [$line-count (length $lines)]
-              [$char-count (length $src)]]
+        (let [[lines (str-split src "\n")]
+              [line-count (length lines)]
+              [char-count (length src)]]
           (do
-            (println (str "✅ 소스 로드: " $char-count " 문자, " $line-count " 라인"))
-            (let [[$tokens (lex $src)]]
+            (println (str "✅ 소스 로드: " char-count " 문자, " line-count " 라인"))
+            (let [[tokens (lex src)]]
               (do
-                (println (str "✅ Lexing 완료: " (length $tokens) " 토큰"))
-                (let [[$ast (parse $tokens)]]
+                (println (str "✅ Lexing 완료: " (length tokens) " 토큰"))
+                (let [[ast (parse tokens)]]
                   (do
-                    (println (str "✅ Parsing 완료: " (length $ast) " 노드"))
+                    (println (str "✅ Parsing 완료: " (length ast) " 노드"))
                     (println "\n📈 메트릭:")
-                    (println (str "  - 총 라인: " $line-count))
-                    (println (str "  - 총 문자: " $char-count))
-                    (println (str "  - 토큰: " (length $tokens)))
-                    (println (str "  - AST 노드: " (length $ast)))
-                    {:file $file-path
+                    (println (str "  - 총 라인: " line-count))
+                    (println (str "  - 총 문자: " char-count))
+                    (println (str "  - 토큰: " (length tokens)))
+                    (println (str "  - AST 노드: " (length ast)))
+                    {:file file-path
                      :timestamp (now_iso)
-                     :lines $line-count
-                     :chars $char-count
-                     :tokens (length $tokens)
-                     :ast-nodes (length $ast)}))))))))))
+                     :lines line-count
+                     :chars char-count
+                     :tokens (length tokens)
+                     :ast-nodes (length ast)}))))))))))
 
 ;; 메인 진입점
 (do
   (println "🚀 v11-analyzer 시작")
-  (let [[$result (analyze-fl-code "/root/kim/freelang-v11/self/all.fl")]]
+  (let [[result (analyze-fl-code "/root/kim/freelang-v11/self/all.fl")]]
     (do
       (println "\n✅ 분석 완료")
       (file_write "/root/kim/freelang-v11/self-evolve/logs/analysis.log"
         (str "분석 결과: OK\n"))
-      $result)))
+      result)))

@@ -1,30 +1,30 @@
 ;; self/stdlib/assert.fl — Phase 26 Part 3
 ;; 고급 assertion 함수
 
-[FUNC assert-matches :params [$val $pattern]
-  :body (if (regex-match $pattern (str $val)) true
-          (throw (str "assert-matches failed: " $val " does not match " $pattern)))]
+[FUNC assert-matches :params [val pattern]
+  :body (if (regex-match pattern (str val)) true
+          (throw (str "assert-matches failed: " val " does not match " pattern)))]
 
-[FUNC assert-includes :params [$list $item]
-  :body (if (contains? $list $item) true
-          (throw (str "assert-includes failed: " $item " not in " $list)))]
+[FUNC assert-includes :params [list item]
+  :body (if (contains? list item) true
+          (throw (str "assert-includes failed: " item " not in " list)))]
 
-[FUNC assert-excludes :params [$list $item]
-  :body (if (not (contains? $list $item)) true
-          (throw (str "assert-excludes failed: " $item " found in " $list)))]
+[FUNC assert-excludes :params [list item]
+  :body (if (not (contains? list item)) true
+          (throw (str "assert-excludes failed: " item " found in " list)))]
 
-[FUNC assert-length :params [$coll $len]
-  :body (if (= (length $coll) $len) true
-          (throw (str "assert-length failed: expected " $len " got " (length $coll))))]
+[FUNC assert-length :params [coll len]
+  :body (if (= (length coll) len) true
+          (throw (str "assert-length failed: expected " len " got " (length coll))))]
 
-[FUNC assert-range :params [$val $min $max]
-  :body (if (and (>= $val $min) (<= $val $max)) true
-          (throw (str "assert-range failed: " $val " not in [" $min "," $max "]")))]
+[FUNC assert-range :params [val min max]
+  :body (if (and (>= val min) (<= val max)) true
+          (throw (str "assert-range failed: " val " not in [" min "," max "]")))]
 
-[FUNC assert-type :params [$val $type]
-  :body (if (= (typeof $val) $type) true
-          (throw (str "assert-type failed: expected " $type " got " (typeof $val))))]
+[FUNC assert-type :params [val type]
+  :body (if (= (typeof val) type) true
+          (throw (str "assert-type failed: expected " type " got " (typeof val))))]
 
-[FUNC assert-throws :params [$fn]
-  :body (try (do ($fn) false)
+[FUNC assert-throws :params [fn]
+  :body (try (do (fn) false)
           (catch e true))]

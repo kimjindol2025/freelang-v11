@@ -7,7 +7,7 @@
 ;
 ; [이슈 1] define + 심볼 참조 함정
 ;   (define x 42) x  →  "x"   ← x는 심볼 리터럴, 변수가 아님!
-;   (define $x 42) $x →  42   ← $x로 참조해야 변수
+;   (define x 42) x →  42   ← x로 참조해야 변수
 ;   FreeLang에서 $가 없으면 심볼(문자열). Scheme 문법과 다름.
 ;   Stage 1(TS 직접)에서는 우연히 동작하는 것처럼 보여서 더 함정.
 ;
@@ -26,48 +26,48 @@
 
 [FUNC env-new :params []
   :body (
-    (let [[$e {:vars [] :parent null}]]
-      $e
+    (let [[e {:vars [] :parent null}]]
+      e
     )
   )
 ]
 
-[FUNC env-child :params [$parent]
+[FUNC env-child :params [parent]
   :body (
-    (let [[$e {:vars [] :parent $parent}]]
-      $e
+    (let [[e {:vars [] :parent parent}]]
+      e
     )
   )
 ]
 
 ; 네이티브 builtin으로 env 조회 (재귀 스택오버플로우 방지)
-[FUNC env-lookup :params [$env $name]
+[FUNC env-lookup :params [env name]
   :body (
-    (fl-env-get $env $name)
+    (fl-env-get env name)
   )
 ]
 
 ; 환경에 바인딩 추가
 ; ⚠️ 설계: 새 env 객체 반환 (비뮤테이션) — 기존 env 절대 수정 안 함
-; 새 vars에 [$name $val]을 prepend → 가장 최근 바인딩이 먼저 검색됨 (섀도잉 지원)
+; 새 vars에 [name val]을 prepend → 가장 최근 바인딩이 먼저 검색됨 (섀도잉 지원)
 ; parent는 원본 env의 parent 그대로 — 체인이 아니라 플랫 복사!
-[FUNC env-bind :params [$env $name $val]
+[FUNC env-bind :params [env name val]
   :body (
-    (let [[$new-vars (append [[$name $val]] (get $env :vars))]
-          [$e {:vars $new-vars :parent (get $env :parent)}]]
-      $e
+    (let [[new-vars (append [[name val]] (get env :vars))]
+          [e {:vars new-vars :parent (get env :parent)}]]
+      e
     )
   )
 ]
 
 ; 이름 목록 + 값 목록을 환경에 등록
-[FUNC env-bind-all :params [$env $names $vals $i]
+[FUNC env-bind-all :params [env names vals i]
   :body (
-    (if (>= $i (length $names))
-      $env
+    (if (>= i (length names))
+      env
       (env-bind-all
-        (env-bind $env (get $names $i) (get $vals $i))
-        $names $vals (+ $i 1)
+        (env-bind env (get names i) (get vals i))
+        names vals (+ i 1)
       )
     )
   )
@@ -75,83 +75,83 @@
 
 ; ── 클로저 ────────────────────────────────────────────────────
 
-[FUNC make-closure :params [$params $body $cenv]
+[FUNC make-closure :params [params body cenv]
   :body (
-    (let [[$c {:kind "closure" :params $params :body $body :closure-env $cenv}]]
-      $c
+    (let [[c {:kind "closure" :params params :body body :closure-env cenv}]]
+      c
     )
   )
 ]
 
-[FUNC closure? :params [$v]
+[FUNC closure? :params [v]
   :body (
     (and
-      (not (null? $v))
-      (= (get $v :kind) "closure")
+      (not (null? v))
+      (= (get v :kind) "closure")
     )
   )
 ]
 
 ; ── 파라미터 이름 추출 ────────────────────────────────────────
 
-[FUNC param-name :params [$p]
+[FUNC param-name :params [p]
   :body (
-    (if (= (get $p :kind) "variable")
-      (get $p :name)
-      (get $p :value)
+    (if (= (get p :kind) "variable")
+      (get p :name)
+      (get p :value)
     )
   )
 ]
 
-[FUNC extract-params :params [$items $i $acc]
+[FUNC extract-params :params [items i acc]
   :body (
-    (if (>= $i (length $items))
-      $acc
-      (let [[$p (get $items $i)]]
-        (if (and (= (get $p :kind) "literal") (= (get $p :value) "&"))
-          $acc
-          (extract-params $items (+ $i 1) (append $acc [(param-name $p)]))
+    (if (>= i (length items))
+      acc
+      (let [[p (get items i)]]
+        (if (and (= (get p :kind) "literal") (= (get p :value) "&"))
+          acc
+          (extract-params items (+ i 1) (append acc [(param-name p)]))
         )
       )
     )
   )
 ]
 
-[FUNC get-param-names :params [$params-node]
+[FUNC get-param-names :params [params-node]
   :body (
-    (extract-params (block-items $params-node) 0 [])
+    (extract-params (block-items params-node) 0 [])
   )
 ]
 
 ; ── 메인 평가기 ───────────────────────────────────────────────
 ; fl-eval → native fl-interp 위임: 재귀 스택오버플로우 방지
 
-[FUNC fl-eval :params [$node $env]
+[FUNC fl-eval :params [node env]
   :body (
-    (fl-interp $node $env)
+    (fl-interp node env)
   )
 ]
 
 ; 배열 아이템 평가
-[FUNC fl-eval-array :params [$items $env $i $acc]
+[FUNC fl-eval-array :params [items env i acc]
   :body (
-    (if (>= $i (length $items))
-      $acc
+    (if (>= i (length items))
+      acc
       (fl-eval-array
-        $items $env (+ $i 1)
-        (append $acc [(fl-eval (get $items $i) $env)])
+        items env (+ i 1)
+        (append acc [(fl-eval (get items i) env)])
       )
     )
   )
 ]
 
 ; FUNC 블록 → 클로저
-[FUNC fl-eval-block :params [$node $env]
+[FUNC fl-eval-block :params [node env]
   :body (
-    (if (= (get $node :type) "FUNC")
-      (let [[$fields (get $node :fields)]
-            [$names (get-param-names (get $fields :params))]]
-        (make-closure $names [(get $fields :body)] $env)
+    (if (= (get node :type) "FUNC")
+      (let [[fields (get node :fields)]
+            [names (get-param-names (get fields :params))]]
+        (make-closure names [(get fields :body)] env)
       )
       null
     )
@@ -163,53 +163,53 @@
 ; match args: [subject-expr, clause1, clause2, ...]
 ; clause: {kind:"sexpr", op:"패턴", args:[result-expr]}
 ; 패턴 "_" = wildcard
-[FUNC fl-eval-match :params [$args $env]
+[FUNC fl-eval-match :params [args env]
   :body (
-    (let [[$subject (fl-eval (get $args 0) $env)]
-          [$clauses (slice $args 1 (length $args))]]
-      (fl-match-clauses $clauses $subject $env 0)
+    (let [[subject (fl-eval (get args 0) env)]
+          [clauses (slice args 1 (length args))]]
+      (fl-match-clauses clauses subject env 0)
     )
   )
 ]
 
-[FUNC fl-match-clauses :params [$clauses $subject $env $i]
+[FUNC fl-match-clauses :params [clauses subject env i]
   :body (
-    (if (>= $i (length $clauses))
+    (if (>= i (length clauses))
       null
-      (let [[$clause (get $clauses $i)]
-            [$result (fl-match-clause $clause $subject $env)]]
-        (if (= (get $result :matched) true)
-          (get $result :value)
-          (fl-match-clauses $clauses $subject $env (+ $i 1))
+      (let [[clause (get clauses i)]
+            [result (fl-match-clause clause subject env)]]
+        (if (= (get result :matched) true)
+          (get result :value)
+          (fl-match-clauses clauses subject env (+ i 1))
         )
       )
     )
   )
 ]
 
-[FUNC fl-match-clause :params [$clause $subject $env]
+[FUNC fl-match-clause :params [clause subject env]
   :body (
-    (let [[$pat-op (get $clause :op)]
-          [$result-expr (get (get $clause :args) 0)]]
-      (if (= $pat-op "_")
-        (let [[$r {:matched true :value (fl-eval $result-expr $env)}]] $r)
-        (let [[$matched
-                (if (= $pat-op "null")
-                  (null? $subject)
-                  (if (= $pat-op "true")
-                    (= $subject true)
-                    (if (= $pat-op "false")
-                      (= $subject false)
-                      (if (= $subject $pat-op)
+    (let [[pat-op (get clause :op)]
+          [result-expr (get (get clause :args) 0)]]
+      (if (= pat-op "_")
+        (let [[r {:matched true :value (fl-eval result-expr env)}]] r)
+        (let [[matched
+                (if (= pat-op "null")
+                  (null? subject)
+                  (if (= pat-op "true")
+                    (= subject true)
+                    (if (= pat-op "false")
+                      (= subject false)
+                      (if (= subject pat-op)
                         true
-                        (= $subject (str-to-num $pat-op))
+                        (= subject (str-to-num pat-op))
                       )
                     )
                   )
                 )]]
-          (if $matched
-            (let [[$r {:matched true :value (fl-eval $result-expr $env)}]] $r)
-            (let [[$r {:matched false :value null}]] $r)
+          (if matched
+            (let [[r {:matched true :value (fl-eval result-expr env)}]] r)
+            (let [[r {:matched false :value null}]] r)
           )
         )
       )
@@ -220,126 +220,126 @@
 ; ── S-expression 평가 ─────────────────────────────────────────
 ; fl-special-op? 네이티브 빌트인으로 12중첩 if 제거
 
-[FUNC fl-eval-sexpr :params [$op $args $env]
+[FUNC fl-eval-sexpr :params [op args env]
   :body (
-    (let [[$sop (fl-special-op? $op)]]
-      (if (= $sop "if")     (fl-eval-if $args $env)
-      (if (= $sop "let")    (fl-eval-let $args $env)
-      (if (or (= $sop "do") (= $sop "begin"))  (fl-eval-body $args $env)
-      (if (= $sop "fn")     (fl-eval-fn $args $env)
-      (if (= $sop "and")    (fl-eval-and $args $env)
-      (if (= $sop "or")     (fl-eval-or $args $env)
-      (if (= $sop "not")    (not (fl-eval (get $args 0) $env))
-      (if (= $sop "null?")  (null? (fl-eval (get $args 0) $env))
-      (if (= $sop "match")  (fl-eval-match $args $env)
-      (if (= $sop "call")   (fl-eval-call-fn $args $env)
-      (if (null? $sop)
-        (fl-eval-call $op $args $env)
+    (let [[sop (fl-special-op? op)]]
+      (if (= sop "if")     (fl-eval-if args env)
+      (if (= sop "let")    (fl-eval-let args env)
+      (if (or (= sop "do") (= sop "begin"))  (fl-eval-body args env)
+      (if (= sop "fn")     (fl-eval-fn args env)
+      (if (= sop "and")    (fl-eval-and args env)
+      (if (= sop "or")     (fl-eval-or args env)
+      (if (= sop "not")    (not (fl-eval (get args 0) env))
+      (if (= sop "null?")  (null? (fl-eval (get args 0) env))
+      (if (= sop "match")  (fl-eval-match args env)
+      (if (= sop "call")   (fl-eval-call-fn args env)
+      (if (null? sop)
+        (fl-eval-call op args env)
         null
       )))))))))))
     )
   )
 ]
 
-; (call $fn arg1 arg2...) — 클로저를 동적으로 호출
-[FUNC fl-eval-call-fn :params [$args $env]
+; (call fn arg1 arg2...) — 클로저를 동적으로 호출
+[FUNC fl-eval-call-fn :params [args env]
   :body (
-    (let [[$fn-raw (fl-eval (get $args 0) $env)]
-          [$fn (if (closure? $fn-raw)
-                 $fn-raw
-                 (env-lookup $env $fn-raw))]
-          [$vals (fl-eval-args (slice $args 1 (length $args)) $env 0 [])]]
-      (if (closure? $fn)
-        (fl-apply $fn $vals $env)
+    (let [[fn-raw (fl-eval (get args 0) env)]
+          [fn (if (closure? fn-raw)
+                 fn-raw
+                 (env-lookup env fn-raw))]
+          [vals (fl-eval-args (slice args 1 (length args)) env 0 [])]]
+      (if (closure? fn)
+        (fl-apply fn vals env)
         null
       )
     )
   )
 ]
 
-[FUNC fl-eval-if :params [$args $env]
+[FUNC fl-eval-if :params [args env]
   :body (
-    (if (fl-eval (get $args 0) $env)
-      (fl-eval (get $args 1) $env)
-      (if (>= (length $args) 3)
-        (fl-eval (get $args 2) $env)
+    (if (fl-eval (get args 0) env)
+      (fl-eval (get args 1) env)
+      (if (>= (length args) 3)
+        (fl-eval (get args 2) env)
         null
       )
     )
   )
 ]
 
-[FUNC fl-eval-and :params [$args $env]
+[FUNC fl-eval-and :params [args env]
   :body (
-    (if (= (length $args) 0)
+    (if (= (length args) 0)
       true
-      (if (fl-eval (get $args 0) $env)
-        (fl-eval-and (slice $args 1 (length $args)) $env)
+      (if (fl-eval (get args 0) env)
+        (fl-eval-and (slice args 1 (length args)) env)
         false
       )
     )
   )
 ]
 
-[FUNC fl-eval-or :params [$args $env]
+[FUNC fl-eval-or :params [args env]
   :body (
-    (if (= (length $args) 0)
+    (if (= (length args) 0)
       false
-      (if (fl-eval (get $args 0) $env)
+      (if (fl-eval (get args 0) env)
         true
-        (fl-eval-or (slice $args 1 (length $args)) $env)
+        (fl-eval-or (slice args 1 (length args)) env)
       )
     )
   )
 ]
 
-; let [[$a expr] [$b expr]] body...
-[FUNC fl-eval-let-bindings :params [$items $env $i]
+; let [[a expr] [b expr]] body...
+[FUNC fl-eval-let-bindings :params [items env i]
   :body (
-    (if (>= $i (length $items))
-      $env
-      (let [[$pair (get $items $i)]
-            [$pair-items (block-items $pair)]
-            [$name-node (get $pair-items 0)]
-            [$val (fl-eval (get $pair-items 1) $env)]
-            [$nm (if (= (get $name-node :kind) "variable")
-                   (get $name-node :name)
-                   (get $name-node :value))]]
-        (fl-eval-let-bindings $items (env-bind $env $nm $val) (+ $i 1))
+    (if (>= i (length items))
+      env
+      (let [[pair (get items i)]
+            [pair-items (block-items pair)]
+            [name-node (get pair-items 0)]
+            [val (fl-eval (get pair-items 1) env)]
+            [nm (if (= (get name-node :kind) "variable")
+                   (get name-node :name)
+                   (get name-node :value))]]
+        (fl-eval-let-bindings items (env-bind env nm val) (+ i 1))
       )
     )
   )
 ]
 
-[FUNC fl-eval-let :params [$args $env]
+[FUNC fl-eval-let :params [args env]
   :body (
-    (let [[$bindings (block-items (get $args 0))]
-          [$new-env (fl-eval-let-bindings $bindings $env 0)]]
-      (fl-eval-body (slice $args 1 (length $args)) $new-env)
+    (let [[bindings (block-items (get args 0))]
+          [new-env (fl-eval-let-bindings bindings env 0)]]
+      (fl-eval-body (slice args 1 (length args)) new-env)
     )
   )
 ]
 
 ; fn 익명 함수
-[FUNC fl-eval-fn :params [$args $env]
+[FUNC fl-eval-fn :params [args env]
   :body (
-    (let [[$names (get-param-names (get $args 0))]
-          [$body (slice $args 1 (length $args))]]
-      (make-closure $names $body $env)
+    (let [[names (get-param-names (get args 0))]
+          [body (slice args 1 (length args))]]
+      (make-closure names body env)
     )
   )
 ]
 
 ; 순차 실행, 마지막 값 반환
-[FUNC fl-eval-body :params [$nodes $env]
+[FUNC fl-eval-body :params [nodes env]
   :body (
-    (if (= (length $nodes) 0)
+    (if (= (length nodes) 0)
       null
-      (if (= (length $nodes) 1)
-        (fl-eval (get $nodes 0) $env)
+      (if (= (length nodes) 1)
+        (fl-eval (get nodes 0) env)
         (do
-          (fl-eval (get $nodes 0) $env)
-          (fl-eval-body (slice $nodes 1 (length $nodes)) $env)
+          (fl-eval (get nodes 0) env)
+          (fl-eval-body (slice nodes 1 (length nodes)) env)
         )
       )
     )
@@ -348,38 +348,38 @@
 
 ; ── 함수 호출 ─────────────────────────────────────────────────
 
-[FUNC fl-eval-args :params [$args $env $i $acc]
+[FUNC fl-eval-args :params [args env i acc]
   :body (
-    (if (>= $i (length $args))
-      $acc
-      (fl-eval-args $args $env (+ $i 1)
-        (append $acc [(fl-eval (get $args $i) $env)])
+    (if (>= i (length args))
+      acc
+      (fl-eval-args args env (+ i 1)
+        (append acc [(fl-eval (get args i) env)])
       )
     )
   )
 ]
 
-[FUNC fl-apply :params [$fn $vals $env]
+[FUNC fl-apply :params [fn vals env]
   :body (
-    (if (closure? $fn)
-      (let [[$call-env (env-bind-all
-                         (env-child $env)
-                         (get $fn :params)
-                         $vals 0)]]
-        (fl-eval-body (get $fn :body) $call-env)
+    (if (closure? fn)
+      (let [[call-env (env-bind-all
+                         (env-child env)
+                         (get fn :params)
+                         vals 0)]]
+        (fl-eval-body (get fn :body) call-env)
       )
       null
     )
   )
 ]
 
-[FUNC fl-eval-call :params [$op $args $env]
+[FUNC fl-eval-call :params [op args env]
   :body (
-    (let [[$vals (fl-eval-args $args $env 0 [])]
-          [$fn (env-lookup $env $op)]]
-      (if (closure? $fn)
-        (fl-apply $fn $vals $env)
-        (fl-eval-builtin $op $vals)
+    (let [[vals (fl-eval-args args env 0 [])]
+          [fn (env-lookup env op)]]
+      (if (closure? fn)
+        (fl-apply fn vals env)
+        (fl-eval-builtin op vals)
       )
     )
   )
@@ -388,9 +388,9 @@
 ; ── 내장 함수 ─────────────────────────────────────────────────
 ; 네이티브 fl-exec-op 빌트인 사용 — 29중첩 if 스택오버플로우 제거
 
-[FUNC fl-eval-builtin :params [$op $vals]
+[FUNC fl-eval-builtin :params [op vals]
   :body (
-    (fl-exec-op $op $vals)
+    (fl-exec-op op vals)
   )
 ]
 
@@ -400,16 +400,16 @@
 ; ⚠️ 함정: 클로저 생성 시점에 env가 아직 미완성!
 ; fact를 등록할 때 fact 자신이 env에 없으므로 closure-env에 자기 자신이 없음.
 ; → fl-fix-env로 전체 로드 후 사후 패치. 이 함수만 믿으면 자기재귀도 안 됨.
-[FUNC fl-load-funcs :params [$nodes $env $i]
+[FUNC fl-load-funcs :params [nodes env i]
   :body (
-    (if (>= $i (length $nodes))
-      $env
-      (let [[$node (get $nodes $i)]]
-        (if (and (= (get $node :kind) "block") (= (get $node :type) "FUNC"))
-          (let [[$fn (fl-eval-block $node $env)]]
-            (fl-load-funcs $nodes (env-bind $env (get $node :name) $fn) (+ $i 1))
+    (if (>= i (length nodes))
+      env
+      (let [[node (get nodes i)]]
+        (if (and (= (get node :kind) "block") (= (get node :type) "FUNC"))
+          (let [[fn (fl-eval-block node env)]]
+            (fl-load-funcs nodes (env-bind env (get node :name) fn) (+ i 1))
           )
-          (fl-load-funcs $nodes $env (+ $i 1))
+          (fl-load-funcs nodes env (+ i 1))
         )
       )
     )
@@ -418,16 +418,16 @@
 
 ; 비-FUNC 노드들 실행
 ; ⚠️ FUNC 블록은 스킵 — fl-load-funcs가 이미 처리했음 (중복 생성 방지)
-; ⚠️ env는 불변으로 전달 — top-level (define $x v)은 native측에서 뮤테이션으로 처리
+; ⚠️ env는 불변으로 전달 — top-level (define x v)은 native측에서 뮤테이션으로 처리
 ; ⚠️ Stage 3(2중 FL)에서 재귀 함수 실행 시 3겹 스택 소모 → 깊은 재귀는 --stack-size 필요
-[FUNC fl-run-nodes :params [$nodes $env $i $last]
+[FUNC fl-run-nodes :params [nodes env i last]
   :body (
-    (if (>= $i (length $nodes))
-      $last
-      (let [[$node (get $nodes $i)]]
-        (if (= (get $node :kind) "block")
-          (fl-run-nodes $nodes $env (+ $i 1) $last)
-          (fl-run-nodes $nodes $env (+ $i 1) (fl-eval $node $env))
+    (if (>= i (length nodes))
+      last
+      (let [[node (get nodes i)]]
+        (if (= (get node :kind) "block")
+          (fl-run-nodes nodes env (+ i 1) last)
+          (fl-run-nodes nodes env (+ i 1) (fl-eval node env))
         )
       )
     )
@@ -437,45 +437,45 @@
 ; 메인 진입점: AST 배열 → 마지막 평가값
 ; ⚠️ 임계적 순서: fl-load-funcs → fl-fix-env → fl-run-nodes
 ; 이 순서 바꾸면 상호재귀 깨짐. fl-fix-env 빠뜨리면 자기재귀도 깨짐.
-[FUNC interpret :params [$ast]
+[FUNC interpret :params [ast]
   :body (
-    (let [[$env (fl-fix-env (fl-load-funcs $ast (env-new) 0))]]
-      (fl-run-nodes $ast $env 0 null)
+    (let [[env (fl-fix-env (fl-load-funcs ast (env-new) 0))]]
+      (fl-run-nodes ast env 0 null)
     )
   )
 ]
 
 ; ── 파일 실행 ─────────────────────────────────────────────────
 ; fl-parse: 소스 문자열 → AST (native builtin)
-; interpret-file-with-argv: 파일 실행 + $__argv__ FL env 바인딩 (셀프 호스팅 핵심)
+; interpret-file-with-argv: 파일 실행 + __argv__ FL env 바인딩 (셀프 호스팅 핵심)
 
-[FUNC interpret-file-with-argv :params [$path $argv]
+[FUNC interpret-file-with-argv :params [path argv]
   :body (
-    (let [[$src (file_read $path)]]
-      (if (null? $src)
-        (do (println "오류: 파일을 읽을 수 없습니다:" $path) null)
-        (let [[$ast (fl-parse $src)]
-              [$base-env (fl-fix-env (fl-load-funcs $ast (env-new) 0))]
-              [$env (env-bind $base-env "__argv__" $argv)]]
-          (fl-run-nodes $ast $env 0 null)
+    (let [[src (file_read path)]]
+      (if (null? src)
+        (do (println "오류: 파일을 읽을 수 없습니다:" path) null)
+        (let [[ast (fl-parse src)]
+              [base-env (fl-fix-env (fl-load-funcs ast (env-new) 0))]
+              [env (env-bind base-env "__argv__" argv)]]
+          (fl-run-nodes ast env 0 null)
         )
       )
     )
   )
 ]
 
-[FUNC interpret-file :params [$path]
+[FUNC interpret-file :params [path]
   :body (
-    (interpret-file-with-argv $path [])
+    (interpret-file-with-argv path [])
   )
 ]
 
-; ── 메인 실행: $__argv__[0]이 있으면 해당 파일 실행 ───────────────────────
-; $__argv__ = 나머지 인수들 (0번째 = 대상 파일, 1번~= 대상에 전달할 argv)
-(if (not (null? $__argv__))
+; ── 메인 실행: __argv__[0]이 있으면 해당 파일 실행 ───────────────────────
+; __argv__ = 나머지 인수들 (0번째 = 대상 파일, 1번~= 대상에 전달할 argv)
+(if (not (null? __argv__))
   (interpret-file-with-argv
-    (get $__argv__ 0)
-    (slice $__argv__ 1 (length $__argv__))
+    (get __argv__ 0)
+    (slice __argv__ 1 (length __argv__))
   )
   null
 )

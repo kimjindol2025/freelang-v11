@@ -3,108 +3,108 @@
 ;; collection.fl의 coll-sum, coll-max-num 등을 재활용
 
 ;; 합계 (collection.fl에서 재활용)
-[FUNC coll-sum :params [$lst]
-  :body (coll-sum-loop $lst 0 0)]
-[FUNC coll-sum-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (coll-sum-loop $lst (+ $i 1) (+ $acc (get $lst $i))))]
+[FUNC coll-sum :params [lst]
+  :body (coll-sum-loop lst 0 0)]
+[FUNC coll-sum-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc
+          (coll-sum-loop lst (+ i 1) (+ acc (get lst i))))]
 
 ;; 평균
-[FUNC stats-mean :params [$lst]
-  :body (if (= (length $lst) 0) 0
-          (/ (coll-sum $lst) (length $lst)))]
+[FUNC stats-mean :params [lst]
+  :body (if (= (length lst) 0) 0
+          (/ (coll-sum lst) (length lst)))]
 
 ;; 최솟값
-[FUNC stats-min :params [$lst]
-  :body (if (= (length $lst) 0) null
-          (stats-min-loop $lst 1 (get $lst 0)))]
-[FUNC stats-min-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (stats-min-loop $lst (+ $i 1) (min $acc (get $lst $i))))]
+[FUNC stats-min :params [lst]
+  :body (if (= (length lst) 0) null
+          (stats-min-loop lst 1 (get lst 0)))]
+[FUNC stats-min-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc
+          (stats-min-loop lst (+ i 1) (min acc (get lst i))))]
 
 ;; 최댓값
-[FUNC stats-max :params [$lst]
-  :body (if (= (length $lst) 0) null
-          (stats-max-loop $lst 1 (get $lst 0)))]
-[FUNC stats-max-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (stats-max-loop $lst (+ $i 1) (max $acc (get $lst $i))))]
+[FUNC stats-max :params [lst]
+  :body (if (= (length lst) 0) null
+          (stats-max-loop lst 1 (get lst 0)))]
+[FUNC stats-max-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc
+          (stats-max-loop lst (+ i 1) (max acc (get lst i))))]
 
 ;; 범위 (max - min)
-[FUNC stats-range :params [$lst]
-  :body (let [[$mn (stats-min $lst)]
-              [$mx (stats-max $lst)]]
-          (if (or (null? $mn) (null? $mx)) null
-            (- $mx $mn)))]
+[FUNC stats-range :params [lst]
+  :body (let [[mn (stats-min lst)]
+              [mx (stats-max lst)]]
+          (if (or (null? mn) (null? mx)) null
+            (- mx mn)))]
 
 ;; 중앙값 (median)
-[FUNC stats-median :params [$lst]
-  :body (if (= (length $lst) 0) null
-          (let [[$s (sort $lst)]
-                [$n (length $s)]
-                [$mid (floor (/ $n 2))]]
-            (if (= (% $n 2) 1)
-              (get $s $mid)
-              (/ (+ (get $s (- $mid 1)) (get $s $mid)) 2))))]
+[FUNC stats-median :params [lst]
+  :body (if (= (length lst) 0) null
+          (let [[s (sort lst)]
+                [n (length s)]
+                [mid (floor (/ n 2))]]
+            (if (= (% n 2) 1)
+              (get s mid)
+              (/ (+ (get s (- mid 1)) (get s mid)) 2))))]
 
 ;; 분산 (variance)
-[FUNC stats-variance :params [$lst]
-  :body (if (= (length $lst) 0) 0
-          (let [[$m (stats-mean $lst)]]
-            (/ (stats-sq-sum $lst $m 0 0) (length $lst))))]
-[FUNC stats-sq-sum :params [$lst $m $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (let [[$d (- (get $lst $i) $m)]]
-            (stats-sq-sum $lst $m (+ $i 1) (+ $acc (* $d $d)))))]
+[FUNC stats-variance :params [lst]
+  :body (if (= (length lst) 0) 0
+          (let [[m (stats-mean lst)]]
+            (/ (stats-sq-sum lst m 0 0) (length lst))))]
+[FUNC stats-sq-sum :params [lst m i acc]
+  :body (if (>= i (length lst)) acc
+          (let [[d (- (get lst i) m)]]
+            (stats-sq-sum lst m (+ i 1) (+ acc (* d d)))))]
 
 ;; 표준편차 (standard deviation)
-[FUNC stats-stddev :params [$lst]
-  :body (sqrt (stats-variance $lst))]
+[FUNC stats-stddev :params [lst]
+  :body (sqrt (stats-variance lst))]
 
 ;; 정규화 (normalize to 0-1)
-[FUNC stats-normalize :params [$lst]
-  :body (let [[$mn (stats-min $lst)]
-              [$mx (stats-max $lst)]
-              [$r (- $mx $mn)]]
-          (if (<= $r 0) $lst
-            (stats-norm-loop $lst $mn $r 0 (list))))]
-[FUNC stats-norm-loop :params [$lst $min $range $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (let [[$norm (/ (- (get $lst $i) $min) $range)]]
-            (stats-norm-loop $lst $min $range (+ $i 1) (append $acc $norm))))]
+[FUNC stats-normalize :params [lst]
+  :body (let [[mn (stats-min lst)]
+              [mx (stats-max lst)]
+              [r (- mx mn)]]
+          (if (<= r 0) lst
+            (stats-norm-loop lst mn r 0 (list))))]
+[FUNC stats-norm-loop :params [lst min range i acc]
+  :body (if (>= i (length lst)) acc
+          (let [[norm (/ (- (get lst i) min) range)]]
+            (stats-norm-loop lst min range (+ i 1) (append acc norm))))]
 
 ;; Z-score 정규화
-[FUNC stats-zscore :params [$lst]
-  :body (let [[$m (stats-mean $lst)]
-              [$sd (stats-stddev $lst)]]
-          (if (= $sd 0) $lst
-            (stats-zscore-loop $lst $m $sd 0 (list))))]
-[FUNC stats-zscore-loop :params [$lst $mean $sd $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (let [[$z (/ (- (get $lst $i) $mean) $sd)]]
-            (stats-zscore-loop $lst $mean $sd (+ $i 1) (append $acc $z))))]
+[FUNC stats-zscore :params [lst]
+  :body (let [[m (stats-mean lst)]
+              [sd (stats-stddev lst)]]
+          (if (= sd 0) lst
+            (stats-zscore-loop lst m sd 0 (list))))]
+[FUNC stats-zscore-loop :params [lst mean sd i acc]
+  :body (if (>= i (length lst)) acc
+          (let [[z (/ (- (get lst i) mean) sd)]]
+            (stats-zscore-loop lst mean sd (+ i 1) (append acc z))))]
 
 ;; 백분위수 (percentile)
-[FUNC stats-percentile :params [$lst $p]
-  :body (if (= (length $lst) 0) null
-          (let [[$s (sort $lst)]
-                [$idx (floor (* (/ $p 100) (length $s)))]]
-            (get $s (min $idx (- (length $s) 1)))))]
+[FUNC stats-percentile :params [lst p]
+  :body (if (= (length lst) 0) null
+          (let [[s (sort lst)]
+                [idx (floor (* (/ p 100) (length s)))]]
+            (get s (min idx (- (length s) 1)))))]
 
 ;; 사분위수 (quartile)
-[FUNC stats-q1 :params [$lst] :body (stats-percentile $lst 25)]
-[FUNC stats-q2 :params [$lst] :body (stats-percentile $lst 50)]
-[FUNC stats-q3 :params [$lst] :body (stats-percentile $lst 75)]
+[FUNC stats-q1 :params [lst] :body (stats-percentile lst 25)]
+[FUNC stats-q2 :params [lst] :body (stats-percentile lst 50)]
+[FUNC stats-q3 :params [lst] :body (stats-percentile lst 75)]
 
 ;; 사분위수 범위 (IQR)
-[FUNC stats-iqr :params [$lst]
-  :body (let [[$q1 (stats-q1 $lst)]
-              [$q3 (stats-q3 $lst)]]
-          (if (or (null? $q1) (null? $q3)) null
-            (- $q3 $q1)))]
+[FUNC stats-iqr :params [lst]
+  :body (let [[q1 (stats-q1 lst)]
+              [q3 (stats-q3 lst)]]
+          (if (or (null? q1) (null? q3)) null
+            (- q3 q1)))]
 
 ;; 합계 (sum)
-[FUNC stats-sum :params [$lst] :body (coll-sum $lst)]
+[FUNC stats-sum :params [lst] :body (coll-sum lst)]
 
 ;; 개수 (count)
-[FUNC stats-count :params [$lst] :body (length $lst)]
+[FUNC stats-count :params [lst] :body (length lst)]

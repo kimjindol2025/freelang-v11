@@ -1,21 +1,21 @@
 ;; 상수 폴딩 디버그
 
-(defn is-constant [$node]
-  (if (nil? $node)
+(defn is-constant [node]
+  (if (nil? node)
     false
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "literal")
-        (let [[$type (get $node "type")]]
-          (if (= $type "symbol") false true))
+    (let [[kind (get node "kind")]]
+      (if (= kind "literal")
+        (let [[type (get node "type")]]
+          (if (= type "symbol") false true))
         false))))
 
-(defn all-constant? [$args]
-  (if (= (length $args) 0)
+(defn all-constant? [args]
+  (if (= (length args) 0)
     true
-    (let [[$first (get $args 0)]]
-      (let [[$rest (slice $args 1 (length $args))]]
-        (if (is-constant $first)
-          (all-constant? $rest)
+    (let [[first (get args 0)]]
+      (let [[rest (slice args 1 (length args))]]
+        (if (is-constant first)
+          (all-constant? rest)
           false)))))
 
 (do
@@ -30,8 +30,8 @@
   (println (str "  " (is-constant lit3b)))
 
   (println "둘 다 constant인가?")
-  (let [[$arr [lit3 lit3b]]]
-    (println (str "  " (all-constant? $arr))))
+  (let [[arr [lit3 lit3b]]]
+    (println (str "  " (all-constant? arr))))
 
   ;; 이제 실제로 (+ 1 2)를 최적화해보기
   (define code1 "(+ 1 2)")

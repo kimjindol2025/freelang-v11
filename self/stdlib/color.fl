@@ -1,35 +1,35 @@
 ;; self/stdlib/color.fl — Phase 26
 ;; 색상 변환 함수
 
-[FUNC hex-to-rgb :params [$hex]
-  :body (let [[$h (substring $hex 1 7)]]
-          (list (str-to-num (substring $h 0 2) 16)
-                (str-to-num (substring $h 2 4) 16)
-                (str-to-num (substring $h 4 6) 16)))]
+[FUNC hex-to-rgb :params [hex]
+  :body (let [[h (substring hex 1 7)]]
+          (list (str-to-num (substring h 0 2) 16)
+                (str-to-num (substring h 2 4) 16)
+                (str-to-num (substring h 4 6) 16)))]
 
-[FUNC rgb-to-hex :params [$r $g $b]
-  :body (str "#" (pad-zero $r 2) (pad-zero $g 2) (pad-zero $b 2))]
+[FUNC rgb-to-hex :params [r g b]
+  :body (str "#" (pad-zero r 2) (pad-zero g 2) (pad-zero b 2))]
 
-[FUNC rgb-to-string :params [$r $g $b]
-  :body (str "rgb(" $r "," $g "," $b ")")]
+[FUNC rgb-to-string :params [r g b]
+  :body (str "rgb(" r "," g "," b ")")]
 
-[FUNC hsl-to-rgb :params [$h $s $l]
-  :body (list (floor (* 255 (hsl-component $h $s $l 0)))
-              (floor (* 255 (hsl-component $h $s $l 120)))
-              (floor (* 255 (hsl-component $h $s $l 240))))]
+[FUNC hsl-to-rgb :params [h s l]
+  :body (list (floor (* 255 (hsl-component h s l 0)))
+              (floor (* 255 (hsl-component h s l 120)))
+              (floor (* 255 (hsl-component h s l 240))))]
 
-[FUNC hsl-component :params [$h $s $l $n]
-  :body (let [[$h2 (% (+ $h $n) 360)]
-              [$c (* $l (min 1 (- 1 (abs (- (* 2 $l) 1)))) $s)]]
-          (+ (* $l (- 1 (/ $c 2)))
-             (* $c (if (< (abs (- (% $h2 60) 30)) 30) 1 0))))]
+[FUNC hsl-component :params [h s l n]
+  :body (let [[h2 (% (+ h n) 360)]
+              [c (* l (min 1 (- 1 (abs (- (* 2 l) 1)))) s)]]
+          (+ (* l (- 1 (/ c 2)))
+             (* c (if (< (abs (- (% h2 60) 30)) 30) 1 0))))]
 
-[FUNC lighten :params [$hex $amount]
-  :body (let [[$rgb (hex-to-rgb $hex)]
-              [$new-r (min 255 (+ (get $rgb 0) $amount))]
-              [$new-g (min 255 (+ (get $rgb 1) $amount))]
-              [$new-b (min 255 (+ (get $rgb 2) $amount))]]
-          (rgb-to-hex (floor $new-r) (floor $new-g) (floor $new-b)))]
+[FUNC lighten :params [hex amount]
+  :body (let [[rgb (hex-to-rgb hex)]
+              [new-r (min 255 (+ (get rgb 0) amount))]
+              [new-g (min 255 (+ (get rgb 1) amount))]
+              [new-b (min 255 (+ (get rgb 2) amount))]]
+          (rgb-to-hex (floor new-r) (floor new-g) (floor new-b)))]
 
-[FUNC darken :params [$hex $amount]
-  :body (lighten $hex (- $amount))]
+[FUNC darken :params [hex amount]
+  :body (lighten hex (- amount))]

@@ -3,52 +3,52 @@
 
 [FUNC stack-new :params [] :body (list)]
 
-[FUNC stack-push :params [$s $item]
-  :body (append (list $item) $s)]
+[FUNC stack-push :params [s item]
+  :body (append (list item) s)]
 
-[FUNC stack-pop :params [$s]
-  :body (rest $s)]
+[FUNC stack-pop :params [s]
+  :body (rest s)]
 
-[FUNC stack-top :params [$s]
-  :body (if (> (length $s) 0) (get $s 0) nil)]
+[FUNC stack-top :params [s]
+  :body (if (> (length s) 0) (get s 0) nil)]
 
-[FUNC stack-peek :params [$s]
-  :body (stack-top $s)]
+[FUNC stack-peek :params [s]
+  :body (stack-top s)]
 
-[FUNC stack-size :params [$s] :body (length $s)]
+[FUNC stack-size :params [s] :body (length s)]
 
-[FUNC stack-empty? :params [$s]
-  :body (= (length $s) 0)]
+[FUNC stack-empty? :params [s]
+  :body (= (length s) 0)]
 
-[FUNC stack-is-empty? :params [$s]
-  :body (stack-empty? $s)]
+[FUNC stack-is-empty? :params [s]
+  :body (stack-empty? s)]
 
-[FUNC stack-clear :params [$s] :body (list)]
+[FUNC stack-clear :params [s] :body (list)]
 
-[FUNC stack-contains? :params [$s $item]
-  :body (contains? $s $item)]
+[FUNC stack-contains? :params [s item]
+  :body (contains? s item)]
 
-[FUNC stack-to-list :params [$s] :body $s]
+[FUNC stack-to-list :params [s] :body s]
 
-[FUNC stack-from-list :params [$lst]
-  :body (reverse $lst)]
+[FUNC stack-from-list :params [lst]
+  :body (reverse lst)]
 
-[FUNC stack-balanced-parens? :params [$str]
-  :body (stack-balanced-loop (str $str) (list) 0)]
-[FUNC stack-balanced-loop :params [$str $s $i]
-  :body (if (>= $i (length $str)) (stack-empty? $s)
-          (let [[$ch (char-at $str $i)]]
+[FUNC stack-balanced-parens? :params [str]
+  :body (stack-balanced-loop (str str) (list) 0)]
+[FUNC stack-balanced-loop :params [str s i]
+  :body (if (>= i (length str)) (stack-empty? s)
+          (let [[ch (char-at str i)]]
             (cond
-              (= $ch "(") (stack-balanced-loop $str (stack-push $s "(") (+ $i 1))
-              (= $ch ")") (if (= (stack-top $s) "(")
-                            (stack-balanced-loop $str (stack-pop $s) (+ $i 1))
+              (= ch "(") (stack-balanced-loop str (stack-push s "(") (+ i 1))
+              (= ch ")") (if (= (stack-top s) "(")
+                            (stack-balanced-loop str (stack-pop s) (+ i 1))
                             false)
-              (= $ch "[") (stack-balanced-loop $str (stack-push $s "[") (+ $i 1))
-              (= $ch "]") (if (= (stack-top $s) "[")
-                            (stack-balanced-loop $str (stack-pop $s) (+ $i 1))
+              (= ch "[") (stack-balanced-loop str (stack-push s "[") (+ i 1))
+              (= ch "]") (if (= (stack-top s) "[")
+                            (stack-balanced-loop str (stack-pop s) (+ i 1))
                             false)
-              (= $ch "{") (stack-balanced-loop $str (stack-push $s "{") (+ $i 1))
-              (= $ch "}") (if (= (stack-top $s) "{")
-                            (stack-balanced-loop $str (stack-pop $s) (+ $i 1))
+              (= ch "{") (stack-balanced-loop str (stack-push s "{") (+ i 1))
+              (= ch "}") (if (= (stack-top s) "{")
+                            (stack-balanced-loop str (stack-pop s) (+ i 1))
                             false)
-              true (stack-balanced-loop $str $s (+ $i 1))))))]
+              true (stack-balanced-loop str s (+ i 1))))))]

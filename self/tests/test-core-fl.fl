@@ -2,28 +2,28 @@
 ;; 핵심 기능 검증 (FL 테스트 프레임워크 데모)
 
 (define assert-eq
-  (fn [$actual $expected $label]
-    (if (= $actual $expected)
-      (println (str "  ✅ " $label))
+  (fn [actual expected label]
+    (if (= actual expected)
+      (println (str "  ✅ " label))
       (do
-        (println (str "  ❌ " $label " — expected " $expected " got " $actual))
-        (throw (str $label " failed"))))))
+        (println (str "  ❌ " label " — expected " expected " got " actual))
+        (throw (str label " failed"))))))
 
 (define assert-true
-  (fn [$value $label]
-    (if (= $value true)
-      (println (str "  ✅ " $label))
+  (fn [value label]
+    (if (= value true)
+      (println (str "  ✅ " label))
       (do
-        (println (str "  ❌ " $label " — expected true"))
-        (throw (str $label " failed"))))))
+        (println (str "  ❌ " label " — expected true"))
+        (throw (str label " failed"))))))
 
 (define assert-false
-  (fn [$value $label]
-    (if (= $value false)
-      (println (str "  ✅ " $label))
+  (fn [value label]
+    (if (= value false)
+      (println (str "  ✅ " label))
       (do
-        (println (str "  ❌ " $label " — expected false"))
-        (throw (str $label " failed"))))))
+        (println (str "  ❌ " label " — expected false"))
+        (throw (str label " failed"))))))
 
 ;; 테스트 실행
 (do
@@ -47,9 +47,9 @@
   (assert-eq (first [1 2 3]) 1 "first: first of [1 2 3]")
   (assert-eq (last [1 2 3]) 3 "last: last of [1 2 3]")
   (assert-eq (length [1 2 3 4 5]) 5 "length: length of [1 2 3 4 5]")
-  (assert-eq (first (map (fn [$x] (+ $x 1)) [1 2 3])) 2 "map: first result = 2")
-  (assert-eq (length (filter (fn [$x] (= (mod $x 2) 0)) [1 2 3 4 5])) 2 "filter: 2 evens")
-  (assert-eq (reduce (fn [$a $b] (+ $a $b)) 0 [1 2 3 4 5]) 15 "reduce: sum [1 2 3 4 5]")
+  (assert-eq (first (map (fn [x] (+ x 1)) [1 2 3])) 2 "map: first result = 2")
+  (assert-eq (length (filter (fn [x] (= (mod x 2) 0)) [1 2 3 4 5])) 2 "filter: 2 evens")
+  (assert-eq (reduce (fn [a b] (+ a b)) 0 [1 2 3 4 5]) 15 "reduce: sum [1 2 3 4 5]")
 
   ;; type checks
   (assert-true (true? true) "true?")

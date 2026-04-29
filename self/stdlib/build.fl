@@ -1,69 +1,69 @@
 ;; self/stdlib/build.fl — Phase 29
 ;; 빌드 시스템 (정적 생성, 번들링, 최적화)
 
-[FUNC build-static :params [$input-dir $output-dir]
-  :body (build-static-recursive (str $input-dir) (str $output-dir) (file_list (str $input-dir)))]
-[FUNC build-static-recursive :params [$input $output $files]
-  :body (if (= (length $files) 0) (str "Built to " $output)
-          (let [[$file (get $files 0)]]
-            (do (build-static-file (str $input "/" $file) (str $output "/" $file))
-                (build-static-recursive $input $output (rest $files)))))]
+[FUNC build-static :params [input-dir output-dir]
+  :body (build-static-recursive (str input-dir) (str output-dir) (file_list (str input-dir)))]
+[FUNC build-static-recursive :params [input output files]
+  :body (if (= (length files) 0) (str "Built to " output)
+          (let [[file (get files 0)]]
+            (do (build-static-file (str input "/" file) (str output "/" file))
+                (build-static-recursive input output (rest files)))))]
 
-[FUNC build-static-file :params [$src $dest]
-  :body (if (ends-with? (str $src) ".fl")
-          (do (file_write (str $dest)
-                         (node bootstrap.js run (str $src)))
-              (str "✅ " $src " → " $dest))
-          (file_copy (str $src) (str $dest)))]
+[FUNC build-static-file :params [src dest]
+  :body (if (ends-with? (str src) ".fl")
+          (do (file_write (str dest)
+                         (node bootstrap.js run (str src)))
+              (str "✅ " src " → " dest))
+          (file_copy (str src) (str dest)))]
 
-[FUNC bundle-assets :params [$dir]
-  :body (bundle-assets-loop (file_list (str $dir)) (str $dir) (list))]
-[FUNC bundle-assets-loop :params [$files $dir $acc]
-  :body (if (= (length $files) 0) $acc
-          (let [[$file (get $files 0)]
-                [$path (str $dir "/" $file)]]
-            (bundle-assets-loop (rest $files) $dir
-              (if (is-asset-file? $path)
-                (append $acc (list $path))
-                $acc))))]
+[FUNC bundle-assets :params [dir]
+  :body (bundle-assets-loop (file_list (str dir)) (str dir) (list))]
+[FUNC bundle-assets-loop :params [files dir acc]
+  :body (if (= (length files) 0) acc
+          (let [[file (get files 0)]
+                [path (str dir "/" file)]]
+            (bundle-assets-loop (rest files) dir
+              (if (is-asset-file? path)
+                (append acc (list path))
+                acc))))]
 
-[FUNC is-asset-file? :params [$path]
-  :body (let [[$ext (lower (path-extname (str $path)))]]
+[FUNC is-asset-file? :params [path]
+  :body (let [[ext (lower (path-extname (str path)))]]
           (contains? (list ".css" ".js" ".png" ".jpg" ".svg" ".webp")
-                    $ext))]
+                    ext))]
 
-[FUNC minify-html :params [$html]
-  :body (let [[$content (str $html)]]
-          (replace (replace (replace $content "\n" " ") "  " " ") "  " " "))]
+[FUNC minify-html :params [html]
+  :body (let [[content (str html)]]
+          (replace (replace (replace content "\n" " ") "  " " ") "  " " "))]
 
-[FUNC minify-css :params [$css]
-  :body (replace (replace (str $css) "\n" "") " { " "{"))]
+[FUNC minify-css :params [css]
+  :body (replace (replace (str css) "\n" "") " { " "{"))]
 
-[FUNC minify-js :params [$js]
-  :body (str $js)]
+[FUNC minify-js :params [js]
+  :body (str js)]
 
-[FUNC optimize-images :params [$dir]
-  :body (optimize-images-loop (file_list (str $dir)) (str $dir))]
-[FUNC optimize-images-loop :params [$files $dir]
-  :body (if (= (length $files) 0) (str "Images optimized in " $dir)
-          (let [[$file (get $files 0)]
-                [$path (str $dir "/" $file)]]
-            (do (if (is-image-file? $path)
-                  (image_optimize $path 80))
-                (optimize-images-loop (rest $files) $dir))))]
+[FUNC optimize-images :params [dir]
+  :body (optimize-images-loop (file_list (str dir)) (str dir))]
+[FUNC optimize-images-loop :params [files dir]
+  :body (if (= (length files) 0) (str "Images optimized in " dir)
+          (let [[file (get files 0)]
+                [path (str dir "/" file)]]
+            (do (if (is-image-file? path)
+                  (image_optimize path 80))
+                (optimize-images-loop (rest files) dir))))]
 
-[FUNC generate-sitemap :params [$pages $domain]
+[FUNC generate-sitemap :params [pages domain]
   :body (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
              "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
-             (generate-sitemap-entries $pages (str $domain))
+             (generate-sitemap-entries pages (str domain))
              "</urlset>")]
-[FUNC generate-sitemap-entries :params [$pages $domain]
-  :body (if (= (length $pages) 0) ""
-          (str "<url><loc>" $domain "/" (get $pages 0) "</loc></url>"
-               (generate-sitemap-entries (rest $pages) $domain)))]
+[FUNC generate-sitemap-entries :params [pages domain]
+  :body (if (= (length pages) 0) ""
+          (str "<url><loc>" domain "/" (get pages 0) "</loc></url>"
+               (generate-sitemap-entries (rest pages) domain)))]
 
-[FUNC build-report :params [$build-time $file-count $total-size]
+[FUNC build-report :params [build-time file-count total-size]
   :body (list
-    (str "Build Time: " $build-time "ms")
-    (str "Files: " $file-count)
-    (str "Total Size: " (/ $total-size 1024) "KB"))]
+    (str "Build Time: " build-time "ms")
+    (str "Files: " file-count)
+    (str "Total Size: " (/ total-size 1024) "KB"))]

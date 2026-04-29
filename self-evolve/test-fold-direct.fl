@@ -1,44 +1,44 @@
 ;; fold-constant 직접 테스트
 
-(defn is-constant [$node]
-  (if (nil? $node) false
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "literal")
-        (let [[$type (get $node "type")]]
-          (if (= $type "symbol") false true))
+(defn is-constant [node]
+  (if (nil? node) false
+    (let [[kind (get node "kind")]]
+      (if (= kind "literal")
+        (let [[type (get node "type")]]
+          (if (= type "symbol") false true))
         false))))
 
-(defn all-constant? [$args]
-  (if (= (length $args) 0) true
-    (let [[$first (get $args 0)]]
-      (let [[$rest (slice $args 1 (length $args))]]
-        (if (is-constant $first)
-          (all-constant? $rest)
+(defn all-constant? [args]
+  (if (= (length args) 0) true
+    (let [[first (get args 0)]]
+      (let [[rest (slice args 1 (length args))]]
+        (if (is-constant first)
+          (all-constant? rest)
           false)))))
 
-(defn evaluate-arithmetic [$op $args]
-  (let [[$v0 (get (get $args 0) "value")]]
-    (let [[$v1 (get (get $args 1) "value")]]
-      (if (= $op "+") (+ $v0 $v1)
-        (if (= $op "-") (- $v0 $v1)
-          (if (= $op "*") (* $v0 $v1)
-            (if (= $op "/") (/ $v0 $v1) nil)))))))
+(defn evaluate-arithmetic [op args]
+  (let [[v0 (get (get args 0) "value")]]
+    (let [[v1 (get (get args 1) "value")]]
+      (if (= op "+") (+ v0 v1)
+        (if (= op "-") (- v0 v1)
+          (if (= op "*") (* v0 v1)
+            (if (= op "/") (/ v0 v1) nil)))))))
 
-(defn make-literal [$value]
-  {:kind "literal" :type "number" :value $value :line nil})
+(defn make-literal [value]
+  {:kind "literal" :type "number" :value value :line nil})
 
-(defn fold-constant [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (= $op "+")
-          (if (all-constant? $args)
-            (make-literal (evaluate-arithmetic $op $args))
+(defn fold-constant [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (= op "+")
+          (if (all-constant? args)
+            (make-literal (evaluate-arithmetic op args))
             (do
               (println (str "  fold-constant: 모두 constant이 아님"))
-              $node))
-          $node)))
-    $node))
+              node))
+          node)))
+    node))
 
 (do
   ;; 테스트: literal(3) 두 개
@@ -46,15 +46,15 @@
   (define lit3b {:kind "literal" :type "number" :value 3})
 
   (println "테스트 1: 두 literal을 sexpr(+)로 감싸기")
-  (let [[$node {:kind "sexpr" :op "+" :args [lit3 lit3b] :line nil}]]
-    (let [[$args [lit3 lit3b]]]
-      (println (str "  입력: " $node))
-      (println (str "  all-constant? " (all-constant? $args)))
-      (println (str "  결과: " (fold-constant $node)))))
+  (let [[node {:kind "sexpr" :op "+" :args [lit3 lit3b] :line nil}]]
+    (let [[args [lit3 lit3b]]]
+      (println (str "  입력: " node))
+      (println (str "  all-constant? " (all-constant? args)))
+      (println (str "  결과: " (fold-constant node)))))
 
   (println "\n테스트 2: sexpr(+, 1, 2)를 직접 만들기")
-  (let [[$lit1 {:kind "literal" :type "number" :value 1}]
-        [$lit2 {:kind "literal" :type "number" :value 2}]
-        [$node {:kind "sexpr" :op "+" :args [$lit1 $lit2] :line nil}]]
-    (println (str "  입력: " $node))
-    (println (str "  결과: " (fold-constant $node)))))
+  (let [[lit1 {:kind "literal" :type "number" :value 1}]
+        [lit2 {:kind "literal" :type "number" :value 2}]
+        [node {:kind "sexpr" :op "+" :args [lit1 lit2] :line nil}]]
+    (println (str "  입력: " node))
+    (println (str "  결과: " (fold-constant node)))))

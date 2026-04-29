@@ -9,7 +9,7 @@
 (println "")
 
 ; Task 1: 첫 번째 작업
-(let [$task1 (make-task "task1" (fn [$ctx]
+(let [task1 (make-task "task1" (fn [ctx]
   (do
     (println "→ Task 1: 첫 번째 작업")
     (println "✓ 완료")
@@ -18,7 +18,7 @@
 ))]
 
   ; Task 2: 두 번째 작업
-  (let [$task2 (make-task "task2" (fn [$ctx]
+  (let [task2 (make-task "task2" (fn [ctx]
     (do
       (println "→ Task 2: 두 번째 작업")
       (println "✓ 완료")
@@ -27,7 +27,7 @@
   ))]
 
     ; Task 3: 세 번째 작업
-    (let [$task3 (make-task "task3" (fn [$ctx]
+    (let [task3 (make-task "task3" (fn [ctx]
       (do
         (println "→ Task 3: 세 번째 작업")
         (println "✓ 완료")
@@ -37,13 +37,13 @@
 
       ; 실행
       (let [
-        [$result (agent-run [$task1 $task2 $task3])]
+        [result (agent-run [task1 task2 task3])]
       ] (do
         (println "")
         (println "════════════════════════════════════════")
         (println "작업 완료!")
-        (println (str "상태: " (get $result :status)))
-        (println (str "총 단계: " (get $result :total-steps)))
+        (println (str "상태: " (get result :status)))
+        (println (str "총 단계: " (get result :total-steps)))
         (println "════════════════════════════════════════")
       ))
     )

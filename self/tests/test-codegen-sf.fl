@@ -2,261 +2,261 @@
 ;; test-real-stdlib.fl 의 embedded codegen 에 7 개 특수폼 추가.
 
 ;; ═══════ 유틸 ═══════
-[FUNC js-esc :params [$s]
-  :body (let [[$a (replace $s "\\" "\\\\")] [$b (replace $a "\"" "\\\"")]]
-          (str "\"" $b "\""))]
-[FUNC js-name :params [$n]
-  :body (if (null? $n) "_"
-          (let [[$a (replace $n "-" "_")] [$b (replace $a "?" "_q")] [$c (replace $b "!" "_x")]]
-            $c))]
+[FUNC js-esc :params [s]
+  :body (let [[a (replace s "\\" "\\\\")] [b (replace a "\"" "\\\"")]]
+          (str "\"" b "\""))]
+[FUNC js-name :params [n]
+  :body (if (null? n) "_"
+          (let [[a (replace n "-" "_")] [b (replace a "?" "_q")] [c (replace b "!" "_x")]]
+            c))]
 
 ;; ═══════ cg 메인 ═══════
-[FUNC cg :params [$n]
-  :body (cond [(null? $n) "null"]
-              [(= (get $n :kind) "literal") (cg-literal $n)]
-              [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
-              [(= (get $n :kind) "block") (cg-block $n)]
+[FUNC cg :params [n]
+  :body (cond [(null? n) "null"]
+              [(= (get n :kind) "literal") (cg-literal n)]
+              [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "sexpr") (cg-sexpr n)]
+              [(= (get n :kind) "block") (cg-block n)]
               [true "null"])]
 
-[FUNC cg-literal :params [$n]
-  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
-          (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
-                [(= $t "symbol")
-                 (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
-                       [true (js-name $v)])]
+[FUNC cg-literal :params [n]
+  :body (let [[t (get n :type)] [v (get n :value)]]
+          (cond [(= t "number") v] [(= t "string") (js-esc v)]
+                [(= t "symbol")
+                 (cond [(= v "true") "true"] [(= v "false") "false"] [(= v "null") "null"]
+                       [true (js-name v)])]
                 [true "null"]))]
 
-[FUNC cg-block :params [$n]
-  :body (cond [(= (get $n :type) "Array")
-               (str "[" (cg-args (get (get $n :fields) "items")) "]")]
-              [(= (get $n :type) "FUNC") (cg-func-block $n)]
+[FUNC cg-block :params [n]
+  :body (cond [(= (get n :type) "Array")
+               (str "[" (cg-args (get (get n :fields) "items")) "]")]
+              [(= (get n :type) "FUNC") (cg-func-block n)]
               [true "null"])]
 
-[FUNC extract-name :params [$n]
-  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+[FUNC extract-name :params [n]
+  :body (cond [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "literal") (js-name (get n :value))]
               [true "_anon"])]
 
-[FUNC extract-params :params [$items] :body (param-loop $items 0 "")]
-[FUNC param-loop :params [$items $i $acc]
-  :body (if (null? $items) $acc
-          (if (>= $i (length $items)) $acc
-            (let [[$name (extract-name (get $items $i))]]
-              (param-loop $items (+ $i 1)
-                          (if (= (length $acc) 0) $name (str $acc "," $name))))))]
+[FUNC extract-params :params [items] :body (param-loop items 0 "")]
+[FUNC param-loop :params [items i acc]
+  :body (if (null? items) acc
+          (if (>= i (length items)) acc
+            (let [[name (extract-name (get items i))]]
+              (param-loop items (+ i 1)
+                          (if (= (length acc) 0) name (str acc "," name))))))]
 
-[FUNC cg-func-block :params [$n]
-  :body (let [[$name (js-name (get $n :name))]
-              [$fields (get $n :fields)]
-              [$pnode (get $fields "params")]
-              [$body (get $fields "body")]
-              [$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
-              [$ps (extract-params $pitems)]]
-          (str "const " $name " = (" $ps ")=>" (cg $body) ";"))]
+[FUNC cg-func-block :params [n]
+  :body (let [[name (js-name (get n :name))]
+              [fields (get n :fields)]
+              [pnode (get fields "params")]
+              [body (get fields "body")]
+              [pitems (if (null? pnode) (list) (get (get pnode :fields) "items"))]
+              [ps (extract-params pitems)]]
+          (str "const " name " = (" ps ")=>" (cg body) ";"))]
 
-[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
-[FUNC args-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (cg (get $args $i))]]
-            (args-loop $args (+ $i 1) (if (= (length $acc) 0) $c (str $acc "," $c)))))]
+[FUNC cg-args :params [args] :body (args-loop args 0 "")]
+[FUNC args-loop :params [args i acc]
+  :body (if (>= i (length args)) acc
+          (let [[c (cg (get args i))]]
+            (args-loop args (+ i 1) (if (= (length acc) 0) c (str acc "," c)))))]
 
-[FUNC cg-binop :params [$args $op $zero]
-  :body (cond [(= (length $args) 0) $zero] [(= (length $args) 1) (cg (get $args 0))]
-              [true (str "(" (binop-loop $args 0 "" $op) ")")])]
-[FUNC binop-loop :params [$args $i $acc $op]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (cg (get $args $i))]]
-            (binop-loop $args (+ $i 1) (if (= (length $acc) 0) $c (str $acc $op $c)) $op)))]
-[FUNC cg-pair :params [$args $op] :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
-[FUNC cg-sub :params [$args]
-  :body (if (= (length $args) 1) (str "(-" (cg (get $args 0)) ")")
-          (str "(" (cg (get $args 0)) "-" (cg (get $args 1)) ")"))]
+[FUNC cg-binop :params [args op zero]
+  :body (cond [(= (length args) 0) zero] [(= (length args) 1) (cg (get args 0))]
+              [true (str "(" (binop-loop args 0 "" op) ")")])]
+[FUNC binop-loop :params [args i acc op]
+  :body (if (>= i (length args)) acc
+          (let [[c (cg (get args i))]]
+            (binop-loop args (+ i 1) (if (= (length acc) 0) c (str acc op c)) op)))]
+[FUNC cg-pair :params [args op] :body (str "(" (cg (get args 0)) op (cg (get args 1)) ")")]
+[FUNC cg-sub :params [args]
+  :body (if (= (length args) 1) (str "(-" (cg (get args 0)) ")")
+          (str "(" (cg (get args 0)) "-" (cg (get args 1)) ")"))]
 
-[FUNC cg-if :params [$args]
-  :body (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":"
-             (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
+[FUNC cg-if :params [args]
+  :body (str "(" (cg (get args 0)) "?" (cg (get args 1)) ":"
+             (if (>= (length args) 3) (cg (get args 2)) "null") ")")]
 
-[FUNC cg-let-1d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k (get $items $i)] [$v (get $items (+ $i 1))]]
-            (cg-let-1d $items (+ $i 2) (str $acc "let " (extract-name $k) "=" (cg $v) ";"))))]
-[FUNC cg-let-2d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pit (get (get $pair :fields) "items")]]
-            (cg-let-2d $items (+ $i 1)
-                       (str $acc "let " (extract-name (get $pit 0)) "=" (cg (get $pit 1)) ";"))))]
-[FUNC cg-do-body :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$last (= $i (- (length $args) 1))]]
-            (cg-do-body $args (+ $i 1)
-                        (str $acc (if $last "return " "") (cg (get $args $i)) ";"))))]
-[FUNC cg-let :params [$args]
-  :body (let [[$bnode (get $args 0)] [$items (get (get $bnode :fields) "items")]
-              [$first (if (null? $items) null (get $items 0))]
-              [$nested (if (null? $first) false
-                         (and (= (get $first :kind) "block") (= (get $first :type) "Array")))]
-              [$bindings (if $nested (cg-let-2d $items 0 "") (cg-let-1d $items 0 ""))]
-              [$body (cg-do-body (slice $args 1 (length $args)) 0 "")]]
-          (str "((()=>{" $bindings $body "})())"))]
-[FUNC cg-cond-loop :params [$args $i]
-  :body (if (>= $i (length $args)) "null"
-          (let [[$c (get $args $i)] [$it (get (get $c :fields) "items")]]
-            (str "(" (cg (get $it 0)) "?" (cg (get $it 1)) ":"
-                 (cg-cond-loop $args (+ $i 1)) ")")))]
+[FUNC cg-let-1d :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[k (get items i)] [v (get items (+ i 1))]]
+            (cg-let-1d items (+ i 2) (str acc "let " (extract-name k) "=" (cg v) ";"))))]
+[FUNC cg-let-2d :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[pair (get items i)]
+                [pit (get (get pair :fields) "items")]]
+            (cg-let-2d items (+ i 1)
+                       (str acc "let " (extract-name (get pit 0)) "=" (cg (get pit 1)) ";"))))]
+[FUNC cg-do-body :params [args i acc]
+  :body (if (>= i (length args)) acc
+          (let [[last (= i (- (length args) 1))]]
+            (cg-do-body args (+ i 1)
+                        (str acc (if last "return " "") (cg (get args i)) ";"))))]
+[FUNC cg-let :params [args]
+  :body (let [[bnode (get args 0)] [items (get (get bnode :fields) "items")]
+              [first (if (null? items) null (get items 0))]
+              [nested (if (null? first) false
+                         (and (= (get first :kind) "block") (= (get first :type) "Array")))]
+              [bindings (if nested (cg-let-2d items 0 "") (cg-let-1d items 0 ""))]
+              [body (cg-do-body (slice args 1 (length args)) 0 "")]]
+          (str "((()=>{" bindings body "})())"))]
+[FUNC cg-cond-loop :params [args i]
+  :body (if (>= i (length args)) "null"
+          (let [[c (get args i)] [it (get (get c :fields) "items")]]
+            (str "(" (cg (get it 0)) "?" (cg (get it 1)) ":"
+                 (cg-cond-loop args (+ i 1)) ")")))]
 
 ;; ═══════ 신규 특수폼 ═══════
-[FUNC cg-set! :params [$args]
-  :body (str "(" (extract-name (get $args 0)) "=" (cg (get $args 1)) ")")]
+[FUNC cg-set! :params [args]
+  :body (str "(" (extract-name (get args 0)) "=" (cg (get args 1)) ")")]
 
-[FUNC cg-throw :params [$args]
-  :body (let [[$m (if (= (length $args) 0) "\"error\"" (cg (get $args 0)))]]
-          (str "(()=>{throw new Error(String(" $m "))})()"))]
+[FUNC cg-throw :params [args]
+  :body (let [[m (if (= (length args) 0) "\"error\"" (cg (get args 0)))]]
+          (str "(()=>{throw new Error(String(" m "))})()"))]
 
-[FUNC cg-try :params [$args]
-  :body (let [[$body (cg (get $args 0))]
-              [$cn (if (>= (length $args) 2) (get $args 1) null)]
-              [$ev (if (null? $cn) "_err" (extract-name (get (get $cn :args) 0)))]
-              [$eb (if (null? $cn) "null" (cg (get (get $cn :args) 1)))]]
-          (str "(()=>{try{return " $body ";}catch(" $ev "){return " $eb ";}})()"))]
+[FUNC cg-try :params [args]
+  :body (let [[body (cg (get args 0))]
+              [cn (if (>= (length args) 2) (get args 1) null)]
+              [ev (if (null? cn) "_err" (extract-name (get (get cn :args) 0)))]
+              [eb (if (null? cn) "null" (cg (get (get cn :args) 1)))]]
+          (str "(()=>{try{return " body ";}catch(" ev "){return " eb ";}})()"))]
 
-[FUNC while-body :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (while-body $args (+ $i 1) (str $acc (cg (get $args $i)) ";")))]
-[FUNC cg-while :params [$args]
-  :body (let [[$c (cg (get $args 0))]
-              [$b (while-body (slice $args 1 (length $args)) 0 "")]]
-          (str "(()=>{while(" $c "){" $b "}})()"))]
+[FUNC while-body :params [args i acc]
+  :body (if (>= i (length args)) acc
+          (while-body args (+ i 1) (str acc (cg (get args i)) ";")))]
+[FUNC cg-while :params [args]
+  :body (let [[c (cg (get args 0))]
+              [b (while-body (slice args 1 (length args)) 0 "")]]
+          (str "(()=>{while(" c "){" b "}})()"))]
 
-[FUNC loop-inits-1d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k (get $items $i)] [$v (get $items (+ $i 1))]]
-            (loop-inits-1d $items (+ $i 2)
-                           (str $acc "let " (extract-name $k) "=" (cg $v) ";"))))]
-[FUNC loop-inits-2d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pit (get (get $pair :fields) "items")]]
-            (loop-inits-2d $items (+ $i 1)
-                           (str $acc "let " (extract-name (get $pit 0)) "=" (cg (get $pit 1)) ";"))))]
-[FUNC loop-names-1d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k (get $items $i)] [$n (extract-name $k)]]
-            (loop-names-1d $items (+ $i 2)
-                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
-[FUNC loop-names-2d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pit (get (get $pair :fields) "items")]
-                [$n (extract-name (get $pit 0))]]
-            (loop-names-2d $items (+ $i 1)
-                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+[FUNC loop-inits-1d :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[k (get items i)] [v (get items (+ i 1))]]
+            (loop-inits-1d items (+ i 2)
+                           (str acc "let " (extract-name k) "=" (cg v) ";"))))]
+[FUNC loop-inits-2d :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[pair (get items i)]
+                [pit (get (get pair :fields) "items")]]
+            (loop-inits-2d items (+ i 1)
+                           (str acc "let " (extract-name (get pit 0)) "=" (cg (get pit 1)) ";"))))]
+[FUNC loop-names-1d :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[k (get items i)] [n (extract-name k)]]
+            (loop-names-1d items (+ i 2)
+                           (if (= (length acc) 0) n (str acc "," n)))))]
+[FUNC loop-names-2d :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[pair (get items i)]
+                [pit (get (get pair :fields) "items")]
+                [n (extract-name (get pit 0))]]
+            (loop-names-2d items (+ i 1)
+                           (if (= (length acc) 0) n (str acc "," n)))))]
 
-[FUNC cg-loop :params [$args]
-  :body (let [[$bnode (get $args 0)]
-              [$items (get (get $bnode :fields) "items")]
-              [$first (if (null? $items) null (get $items 0))]
-              [$nested (if (null? $first) false
-                         (and (= (get $first :kind) "block") (= (get $first :type) "Array")))]
-              [$bindings (if $nested (loop-inits-2d $items 0 "") (loop-inits-1d $items 0 ""))]
-              [$names    (if $nested (loop-names-2d $items 0 "") (loop-names-1d $items 0 ""))]
-              [$body-args (slice $args 1 (length $args))]
-              [$body-js (cg-do-body $body-args 0 "")]]
-          (str "((()=>{" $bindings
-               "while(true){let __r=(()=>{" $body-js "})();"
-               "if(__r&&__r.__recur){[" $names "]=__r.a;continue;}"
+[FUNC cg-loop :params [args]
+  :body (let [[bnode (get args 0)]
+              [items (get (get bnode :fields) "items")]
+              [first (if (null? items) null (get items 0))]
+              [nested (if (null? first) false
+                         (and (= (get first :kind) "block") (= (get first :type) "Array")))]
+              [bindings (if nested (loop-inits-2d items 0 "") (loop-inits-1d items 0 ""))]
+              [names    (if nested (loop-names-2d items 0 "") (loop-names-1d items 0 ""))]
+              [body-args (slice args 1 (length args))]
+              [body-js (cg-do-body body-args 0 "")]]
+          (str "((()=>{" bindings
+               "while(true){let __r=(()=>{" body-js "})();"
+               "if(__r&&__r.__recur){[" names "]=__r.a;continue;}"
                "return __r;}})())"))]
 
-[FUNC cg-recur :params [$args]
-  :body (str "{__recur:true,a:[" (cg-args $args) "]}")]
+[FUNC cg-recur :params [args]
+  :body (str "{__recur:true,a:[" (cg-args args) "]}")]
 
 ;; ═══════ sexpr dispatch ═══════
-[FUNC cg-sexpr :params [$n]
-  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+[FUNC cg-sexpr :params [n]
+  :body (let [[op (get n :op)] [args (get n :args)]]
           (cond
-            [(= $op "if")    (cg-if $args)]
-            [(= $op "let")   (cg-let $args)]
-            [(= $op "cond")  (cg-cond-loop $args 0)]
-            [(= $op "set!")  (cg-set! $args)]
-            [(= $op "throw") (cg-throw $args)]
-            [(= $op "try")   (cg-try $args)]
-            [(= $op "while") (cg-while $args)]
-            [(= $op "loop")  (cg-loop $args)]
-            [(= $op "recur") (cg-recur $args)]
-            [(= $op "define") (str "let " (extract-name (get $args 0)) "=" (cg (get $args 1)))]
-            [(= $op "+") (cg-binop $args "+" "0")]
-            [(= $op "-") (cg-sub $args)]
-            [(= $op "*") (cg-binop $args "*" "1")]
-            [(= $op "/") (cg-pair $args "/")]
-            [(= $op "%") (cg-pair $args "%")]
-            [(= $op "<") (cg-pair $args "<")]
-            [(= $op ">") (cg-pair $args ">")]
-            [(= $op "<=") (cg-pair $args "<=")]
-            [(= $op ">=") (cg-pair $args ">=")]
-            [(= $op "=") (cg-pair $args "===")]
-            [(= $op "!=") (cg-pair $args "!==")]
-            [(= $op "println") (str "console.log(" (cg-args $args) ")")]
-            [(= $op "str") (str "String(" (cg-args $args) ")")]
-            [true (str (js-name $op) "(" (cg-args $args) ")")]))]
+            [(= op "if")    (cg-if args)]
+            [(= op "let")   (cg-let args)]
+            [(= op "cond")  (cg-cond-loop args 0)]
+            [(= op "set!")  (cg-set! args)]
+            [(= op "throw") (cg-throw args)]
+            [(= op "try")   (cg-try args)]
+            [(= op "while") (cg-while args)]
+            [(= op "loop")  (cg-loop args)]
+            [(= op "recur") (cg-recur args)]
+            [(= op "define") (str "let " (extract-name (get args 0)) "=" (cg (get args 1)))]
+            [(= op "+") (cg-binop args "+" "0")]
+            [(= op "-") (cg-sub args)]
+            [(= op "*") (cg-binop args "*" "1")]
+            [(= op "/") (cg-pair args "/")]
+            [(= op "%") (cg-pair args "%")]
+            [(= op "<") (cg-pair args "<")]
+            [(= op ">") (cg-pair args ">")]
+            [(= op "<=") (cg-pair args "<=")]
+            [(= op ">=") (cg-pair args ">=")]
+            [(= op "=") (cg-pair args "===")]
+            [(= op "!=") (cg-pair args "!==")]
+            [(= op "println") (str "console.log(" (cg-args args) ")")]
+            [(= op "str") (str "String(" (cg-args args) ")")]
+            [true (str (js-name op) "(" (cg-args args) ")")]))]
 
-[FUNC codegen-loop :params [$ast $i $acc]
-  :body (if (>= $i (length $ast)) $acc
-          (codegen-loop $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+[FUNC codegen-loop :params [ast i acc]
+  :body (if (>= i (length ast)) acc
+          (codegen-loop ast (+ i 1) (str acc (cg (get ast i)) ";\n")))]
 
-[FUNC fl->js :params [$src]
-  :body (codegen-loop (fl-parse $src) 0 "")]
+[FUNC fl->js :params [src]
+  :body (codegen-loop (fl-parse src) 0 "")]
 
 ;; ═══════ 실행 + 검증 ═══════
-[FUNC run-js :params [$label $fl $expected]
-  :body (let [[$js (fl->js $fl)]
-              [$file (str "self/bench/_sf_" $label ".js")]]
-          (file_write $file $js)
-          (let [[$r (shell_capture (str "node " $file))]
-                [$out (get $r :stdout)]
-                [$trim (if (null? $out) "" (replace $out "\n" ""))]]
-            (if (= $trim $expected)
-              (println (str "pass " $label "=" $trim))
-              (println (str "fail " $label " expected=\"" $expected "\" got=\"" $trim "\"")))))]
+[FUNC run-js :params [label fl expected]
+  :body (let [[js (fl->js fl)]
+              [file (str "self/bench/_sf_" label ".js")]]
+          (file_write file js)
+          (let [[r (shell_capture (str "node " file))]
+                [out (get r :stdout)]
+                [trim (if (null? out) "" (replace out "\n" ""))]]
+            (if (= trim expected)
+              (println (str "pass " label "=" trim))
+              (println (str "fail " label " expected=\"" expected "\" got=\"" trim "\"")))))]
 
 ;; ─── try/throw (AST 직접 생성 — fl-parse 가 try 를 다르게 처리하므로) ───
 ;; 생성 JS: try { throw new Error("boom"); } catch(e) { return "caught"; }
 [FUNC sf-throw-catch :params []
-  :body (let [[$throw-sexpr {:kind "sexpr" :op "throw"
+  :body (let [[throw-sexpr {:kind "sexpr" :op "throw"
                              :args [{:kind "literal" :type "string" :value "boom" :line null}] :line null}]
-              [$catch-sexpr {:kind "sexpr" :op "catch"
+              [catch-sexpr {:kind "sexpr" :op "catch"
                              :args [{:kind "variable" :name "e" :line null}
                                     {:kind "literal" :type "string" :value "caught" :line null}]
                              :line null}]
-              [$try-sexpr {:kind "sexpr" :op "try" :args [$throw-sexpr $catch-sexpr] :line null}]
-              [$print-sexpr {:kind "sexpr" :op "println" :args [$try-sexpr] :line null}]
-              [$js (cg $print-sexpr)]
-              [$file "self/bench/_sf_throw-catch.js"]]
-          (file_write $file $js)
-          (let [[$r (shell_capture (str "node " $file))]
-                [$out (get $r :stdout)]
-                [$trim (if (null? $out) "" (replace $out "\n" ""))]]
-            (if (= $trim "caught")
-              (println (str "pass throw-catch=" $trim))
-              (println (str "fail throw-catch expected=\"caught\" got=\"" $trim "\"")))))]
+              [try-sexpr {:kind "sexpr" :op "try" :args [throw-sexpr catch-sexpr] :line null}]
+              [print-sexpr {:kind "sexpr" :op "println" :args [try-sexpr] :line null}]
+              [js (cg print-sexpr)]
+              [file "self/bench/_sf_throw-catch.js"]]
+          (file_write file js)
+          (let [[r (shell_capture (str "node " file))]
+                [out (get r :stdout)]
+                [trim (if (null? out) "" (replace out "\n" ""))]]
+            (if (= trim "caught")
+              (println (str "pass throw-catch=" trim))
+              (println (str "fail throw-catch expected=\"caught\" got=\"" trim "\"")))))]
 (sf-throw-catch)
 
 ;; ─── set! ───
 (run-js "set-x"
-  "(define $x 10) (set! $x 42) (println $x)"
+  "(define x 10) (set! x 42) (println x)"
   "42")
 
 ;; ─── while ───
 (run-js "while-5"
-  "(define $i 0) (while (< $i 5) (set! $i (+ $i 1))) (println $i)"
+  "(define i 0) (while (< i 5) (set! i (+ i 1))) (println i)"
   "5")
 
 ;; ─── loop/recur with 2D bindings — 10k iteration TCO via while ───
 (run-js "loop-sum-10k"
-  "(println (loop [[$i 0] [$acc 0]] (if (>= $i 10001) $acc (recur (+ $i 1) (+ $acc $i)))))"
+  "(println (loop [[i 0] [acc 0]] (if (>= i 10001) acc (recur (+ i 1) (+ acc i)))))"
   "50005000")
 
 ;; ─── loop/recur 1D ───
 (run-js "loop-fact-10"
-  "(println (loop [$n 10 $p 1] (if (= $n 0) $p (recur (- $n 1) (* $p $n)))))"
+  "(println (loop [n 10 p 1] (if (= n 0) p (recur (- n 1) (* p n)))))"
   "3628800")

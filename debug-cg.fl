@@ -1,8 +1,8 @@
-(let [[$src (file-read "self/bench/hello.fl")]
-      [$tokens (lex $src)]
-      [$ast (parse $tokens)]
-      [$first (get $ast 0)]
-      [$generated (cg $first)]]
+(let [[src (file-read "self/bench/hello.fl")]
+      [tokens (lex src)]
+      [ast (parse tokens)]
+      [first (get ast 0)]
+      [generated (cg first)]]
   (do
-    (println (str "cg() output: '" $generated "'"))
-    (println (str "Length: " (length $generated)))))
+    (println (str "cg() output: '" generated "'"))
+    (println (str "Length: " (length generated)))))

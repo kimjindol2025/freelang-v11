@@ -1,1 +1,1 @@
-(println (fl-parse "(try (throw \"x\") (catch $e \"caught\"))"))
+(println (fl-parse "(try (throw \"x\") (catch e \"caught\"))"))

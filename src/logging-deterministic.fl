@@ -8,19 +8,19 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC log-entry :params [
-  $step
-  $task-name
-  $input
-  $output
+  step
+  task-name
+  input
+  output
 ]
   :body {
-    :step $step
-    :task-name $task-name
+    :step step
+    :task-name task-name
     :timestamp (now_ms)
-    :input $input
-    :output $output
-    :input-hash (sha256-deterministic $input)
-    :output-hash (sha256-deterministic $output)
+    :input input
+    :output output
+    :input-hash (sha256-deterministic input)
+    :output-hash (sha256-deterministic output)
   }
 ]
 
@@ -29,9 +29,9 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC sha256-deterministic :params [
-  $data
+  data
 ]
-  :body (sha256 (json-stringify $data))
+  :body (sha256 (json-stringify data))
 ]
 
 ; ─────────────────────────────────────────────────────────────────
@@ -39,20 +39,20 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC log-verify :params [
-  $entry
+  entry
 ]
   :body (let [
-    [$stored-input-hash (get $entry :input-hash)]
-    [$computed-input-hash (sha256-deterministic (get $entry :input))]
-    [$stored-output-hash (get $entry :output-hash)]
-    [$computed-output-hash (sha256-deterministic (get $entry :output))]
+    [stored-input-hash (get entry :input-hash)]
+    [computed-input-hash (sha256-deterministic (get entry :input))]
+    [stored-output-hash (get entry :output-hash)]
+    [computed-output-hash (sha256-deterministic (get entry :output))]
   ] {
     :valid (and
-      (= $stored-input-hash $computed-input-hash)
-      (= $stored-output-hash $computed-output-hash)
+      (= stored-input-hash computed-input-hash)
+      (= stored-output-hash computed-output-hash)
     )
-    :input-verified (= $stored-input-hash $computed-input-hash)
-    :output-verified (= $stored-output-hash $computed-output-hash)
+    :input-verified (= stored-input-hash computed-input-hash)
+    :output-verified (= stored-output-hash computed-output-hash)
   })
 ]
 
@@ -69,10 +69,10 @@
 ]
 
 [FUNC log-append :params [
-  $log
-  $entry
+  log
+  entry
 ]
-  :body (assoc $log :entries (push (get $log :entries) $entry))
+  :body (assoc log :entries (push (get log :entries) entry))
 ]
 
 ; ─────────────────────────────────────────────────────────────────
@@ -80,20 +80,20 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC log-verify-all :params [
-  $log
+  log
 ]
   :body (let [
-    [$entries (get $log :entries)]
-    [$results (map log-verify $entries)]
-    [$all-valid (every?
+    [entries (get log :entries)]
+    [results (map log-verify entries)]
+    [all-valid (every?
       (fn [r] (get r :valid))
-      $results
+      results
     )]
   ] {
-    :log-id (get $log :id)
-    :total-entries (length $entries)
-    :all-valid $all-valid
-    :results $results
+    :log-id (get log :id)
+    :total-entries (length entries)
+    :all-valid all-valid
+    :results results
   })
 ]
 
@@ -102,12 +102,12 @@
 ; ─────────────────────────────────────────────────────────────────
 
 [FUNC log-replay :params [
-  $log
+  log
 ]
   :body (let [
-    [$entries (get $log :entries)]
+    [entries (get log :entries)]
   ] {
-    :total-steps (length $entries)
+    :total-steps (length entries)
     :replay-results (map
       (fn [e] {
         :step (get e :step)
@@ -116,7 +116,7 @@
         :output-hash (get e :output-hash)
         :verified (get (log-verify e) :valid)
       })
-      $entries
+      entries
     )
   })
 ]
@@ -130,7 +130,7 @@
 ]
 
 [FUNC sha256 :params [
-  $data
+  data
 ]
   :body "sha256-placeholder"
 ]

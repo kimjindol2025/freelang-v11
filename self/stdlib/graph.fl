@@ -3,70 +3,70 @@
 
 [FUNC graph-new :params [] :body (map)]
 
-[FUNC graph-add-vertex :params [$g $vertex]
-  :body (set $g $vertex (list))]
+[FUNC graph-add-vertex :params [g vertex]
+  :body (set g vertex (list))]
 
-[FUNC graph-add-edge :params [$g $from $to $weight]
-  :body (let [[$edges (get $g $from (list))]]
-          (set $g $from (append $edges (list (list $to $weight)))))]
+[FUNC graph-add-edge :params [g from to weight]
+  :body (let [[edges (get g from (list))]]
+          (set g from (append edges (list (list to weight)))))]
 
-[FUNC graph-neighbors :params [$g $vertex]
-  :body (get $g $vertex (list))]
+[FUNC graph-neighbors :params [g vertex]
+  :body (get g vertex (list))]
 
-[FUNC graph-dfs :params [$g $start]
-  :body (let [[$visited (map)]]
-          (graph-dfs-loop $g $start $visited (list)))]
-[FUNC graph-dfs-loop :params [$g $vertex $visited $acc]
-  :body (if (get $visited $vertex)
-          $acc
-          (let [[$new-visited (set $visited $vertex true)]
-                [$neighbors (graph-neighbors $g $vertex)]]
-            (graph-dfs-neighbors $g $neighbors $new-visited (append $acc (list $vertex)))))]
-[FUNC graph-dfs-neighbors :params [$g $neighbors $visited $acc]
-  :body (if (= (length $neighbors) 0) $acc
-          (let [[$next-vertex (get (get $neighbors 0) 0)]]
-            (graph-dfs-neighbors $g (rest $neighbors) $visited
-              (graph-dfs-loop $g $next-vertex $visited $acc))))]
+[FUNC graph-dfs :params [g start]
+  :body (let [[visited (map)]]
+          (graph-dfs-loop g start visited (list)))]
+[FUNC graph-dfs-loop :params [g vertex visited acc]
+  :body (if (get visited vertex)
+          acc
+          (let [[new-visited (set visited vertex true)]
+                [neighbors (graph-neighbors g vertex)]]
+            (graph-dfs-neighbors g neighbors new-visited (append acc (list vertex)))))]
+[FUNC graph-dfs-neighbors :params [g neighbors visited acc]
+  :body (if (= (length neighbors) 0) acc
+          (let [[next-vertex (get (get neighbors 0) 0)]]
+            (graph-dfs-neighbors g (rest neighbors) visited
+              (graph-dfs-loop g next-vertex visited acc))))]
 
-[FUNC graph-bfs :params [$g $start]
-  :body (graph-bfs-loop $g (list $start) (map) (list))]
-[FUNC graph-bfs-loop :params [$g $queue $visited $acc]
-  :body (if (= (length $queue) 0) $acc
-          (let [[$vertex (get $queue 0)]
-                [$rest-queue (rest $queue)]]
-            (if (get $visited $vertex)
-              (graph-bfs-loop $g $rest-queue $visited $acc)
-              (let [[$new-visited (set $visited $vertex true)]
-                    [$neighbors (graph-neighbors $g $vertex)]
-                    [$next-vertices (graph-bfs-get-neighbors $neighbors 0 (list))]]
-                (graph-bfs-loop $g (append $rest-queue $next-vertices) $new-visited
-                  (append $acc (list $vertex)))))))]
-[FUNC graph-bfs-get-neighbors :params [$edges $i $acc]
-  :body (if (>= $i (length $edges)) $acc
-          (graph-bfs-get-neighbors $edges (+ $i 1)
-            (append $acc (list (get (get $edges $i) 0)))))]
+[FUNC graph-bfs :params [g start]
+  :body (graph-bfs-loop g (list start) (map) (list))]
+[FUNC graph-bfs-loop :params [g queue visited acc]
+  :body (if (= (length queue) 0) acc
+          (let [[vertex (get queue 0)]
+                [rest-queue (rest queue)]]
+            (if (get visited vertex)
+              (graph-bfs-loop g rest-queue visited acc)
+              (let [[new-visited (set visited vertex true)]
+                    [neighbors (graph-neighbors g vertex)]
+                    [next-vertices (graph-bfs-get-neighbors neighbors 0 (list))]]
+                (graph-bfs-loop g (append rest-queue next-vertices) new-visited
+                  (append acc (list vertex)))))))]
+[FUNC graph-bfs-get-neighbors :params [edges i acc]
+  :body (if (>= i (length edges)) acc
+          (graph-bfs-get-neighbors edges (+ i 1)
+            (append acc (list (get (get edges i) 0)))))]
 
-[FUNC graph-shortest-path :params [$g $from $to]
-  :body (let [[$distances (map)]
-              [$current (list $from)]]
-          (graph-dijkstra $g $from $to $distances (list) $current))]
-[FUNC graph-dijkstra :params [$g $from $to $distances $visited $queue]
-  :body (if (= (length $queue) 0) (get $distances $to)
-          (let [[$vertex (get $queue 0)]]
-            (if (contains? $visited $vertex)
-              (graph-dijkstra $g $from $to $distances $visited (rest $queue))
-              (let [[$new-visited (append $visited (list $vertex))]
-                    [$neighbors (graph-neighbors $g $vertex)]]
-                (graph-dijkstra $g $from $to
-                  (graph-dijkstra-update-distances $distances $vertex $neighbors)
-                  $new-visited
-                  (append (rest $queue) (graph-bfs-get-neighbors $neighbors 0 (list))))))))]
-[FUNC graph-dijkstra-update-distances :params [$distances $vertex $edges]
-  :body (if (= (length $edges) 0) $distances
-          (let [[$edge (get $edges 0)]
-                [$neighbor (get $edge 0)]
-                [$weight (get $edge 1)]]
+[FUNC graph-shortest-path :params [g from to]
+  :body (let [[distances (map)]
+              [current (list from)]]
+          (graph-dijkstra g from to distances (list) current))]
+[FUNC graph-dijkstra :params [g from to distances visited queue]
+  :body (if (= (length queue) 0) (get distances to)
+          (let [[vertex (get queue 0)]]
+            (if (contains? visited vertex)
+              (graph-dijkstra g from to distances visited (rest queue))
+              (let [[new-visited (append visited (list vertex))]
+                    [neighbors (graph-neighbors g vertex)]]
+                (graph-dijkstra g from to
+                  (graph-dijkstra-update-distances distances vertex neighbors)
+                  new-visited
+                  (append (rest queue) (graph-bfs-get-neighbors neighbors 0 (list))))))))]
+[FUNC graph-dijkstra-update-distances :params [distances vertex edges]
+  :body (if (= (length edges) 0) distances
+          (let [[edge (get edges 0)]
+                [neighbor (get edge 0)]
+                [weight (get edge 1)]]
             (graph-dijkstra-update-distances
-              (set $distances $neighbor
-                (+ (get $distances $vertex 0) $weight))
-              $vertex (rest $edges))))]
+              (set distances neighbor
+                (+ (get distances vertex 0) weight))
+              vertex (rest edges))))]

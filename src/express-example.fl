@@ -11,7 +11,7 @@
 
 ;; ============ 핸들러 함수 정의 ============
 
-[FUNC home :params [$req]
+[FUNC home :params [req]
   :body (res-json {
     :message "Hello FreeLang Express!"
     :version "1.0.0"
@@ -19,7 +19,7 @@
   })
 ]
 
-[FUNC get-users :params [$req]
+[FUNC get-users :params [req]
   :body (res-json {
     :users [
       { :id 1 :name "홍길동" :role "admin" }
@@ -29,8 +29,8 @@
   })
 ]
 
-[FUNC get-user :params [$req]
-  :body (let [id (req-param $req "id")]
+[FUNC get-user :params [req]
+  :body (let [id (req-param req "id")]
     (res-json {
       :id id
       :name (str "사용자" id)
@@ -38,8 +38,8 @@
     }))
 ]
 
-[FUNC create-user :params [$req]
-  :body (let [body (req-body $req)]
+[FUNC create-user :params [req]
+  :body (let [body (req-body req)]
     (res-status 201 {
       :id 4
       :name (get body "name")
@@ -48,20 +48,20 @@
     }))
 ]
 
-[FUNC update-user :params [$req]
+[FUNC update-user :params [req]
   :body (let [
-    id (req-param $req "id")
-    body (req-body $req)
+    id (req-param req "id")
+    body (req-body req)
   ]
     (res-json {
       :id id
       :updated true
-      :data $body
+      :data body
     }))
 ]
 
-[FUNC delete-user :params [$req]
-  :body (let [id (req-param $req "id")]
+[FUNC delete-user :params [req]
+  :body (let [id (req-param req "id")]
     (res-json {
       :id id
       :deleted true
@@ -69,7 +69,7 @@
     }))
 ]
 
-[FUNC health :params [$req]
+[FUNC health :params [req]
   :body (res-json {
     :status "OK"
     :server "Express.fl"

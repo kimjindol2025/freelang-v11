@@ -1,10 +1,10 @@
 ;; 3-full-ast-json.fl: 전체 AST를 JSON으로 출력
 
 (do
-  (println "패턴: (let [[$a 1]] (+ $a $a))\n")
+  (println "패턴: (let [[a 1]] (+ a a))\n")
 
-  (let [[$src "(let [[$a 1]] (+ $a $a))"]]
-    (let [[$tokens (lex $src)]]
-      (let [[$ast (parse $tokens)]]
-        (let [[$json (str $ast)]]
-          (println $json))))))
+  (let [[src "(let [[a 1]] (+ a a))"]]
+    (let [[tokens (lex src)]]
+      (let [[ast (parse tokens)]]
+        (let [[json (str ast)]]
+          (println json))))))

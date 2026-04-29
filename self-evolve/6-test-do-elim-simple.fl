@@ -1,11 +1,11 @@
 ;; 6-test-do-elim-simple.fl: do-elim 단순 테스트
 
-(let [[$code1 "(do (+ 1 2))"]]
-  (let [[$code2 "(+ 1 2)"]]
+(let [[code1 "(do (+ 1 2))"]]
+  (let [[code2 "(+ 1 2)"]]
     (do
       (println "do-elimination 의미 검증:\n")
-      (println (str "원본: " $code1))
-      (println (str "최적: " $code2))
+      (println (str "원본: " code1))
+      (println (str "최적: " code2))
       (println "")
 
       ;; 실행 결과 비교

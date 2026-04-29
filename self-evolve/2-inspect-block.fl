@@ -5,31 +5,31 @@
   (println "  block 구조 상세 분석")
   (println "================================================\n")
 
-  (let [[$src "(let [[$a 1]] (+ $a $a))"]]
-    (let [[$tokens (lex $src)]]
-      (let [[$ast (parse $tokens)]]
+  (let [[src "(let [[a 1]] (+ a a))"]]
+    (let [[tokens (lex src)]]
+      (let [[ast (parse tokens)]]
         (do
           ;; AST 배열의 첫 번째 노드
-          (let [[$node (get $ast 0)]]
+          (let [[node (get ast 0)]]
             (do
               (println "node 전체:")
-              (println (str $node))
+              (println (str node))
               (println "\n")
 
               ;; node.args 확인
-              (let [[$args (get $node "args")]]
+              (let [[args (get node "args")]]
                 (do
-                  (println (str "args 길이: " (length $args)))
-                  (println (str "args[0]: " (get $args 0)))
-                  (println (str "args[1]: " (get $args 1)))
+                  (println (str "args 길이: " (length args)))
+                  (println (str "args[0]: " (get args 0)))
+                  (println (str "args[1]: " (get args 1)))
                   (println "\n")
 
                   ;; block 상세
-                  (let [[$block (get $args 0)]]
+                  (let [[block (get args 0)]]
                     (do
                       (println "block 상세:")
-                      (println (str "  kind: " (get $block "kind")))
-                      (println (str "  type: " (get $block "type")))
-                      (println (str "  name: " (get $block "name")))
-                      (println (str "  fields: " (get $block "fields")))
-                      (println (str "  fields 길이: " (length (get $block "fields")))))))))))))))
+                      (println (str "  kind: " (get block "kind")))
+                      (println (str "  type: " (get block "type")))
+                      (println (str "  name: " (get block "name")))
+                      (println (str "  fields: " (get block "fields")))
+                      (println (str "  fields 길이: " (length (get block "fields")))))))))))))))

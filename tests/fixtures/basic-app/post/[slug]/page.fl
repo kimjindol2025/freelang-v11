@@ -1,1 +1,1 @@
-[PAGE post-slug :render (server_html (str "<h1>Post</h1><p>slug=" $slug "</p>"))]
+[PAGE post-slug :render (server_html (str "<h1>Post</h1><p>slug=" slug "</p>"))]

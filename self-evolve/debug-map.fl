@@ -1,15 +1,15 @@
 ;; map과 기명 함수 테스트
 
-(defn double-it [$x]
-  (* 2 $x))
+(defn double-it [x]
+  (* 2 x))
 
 (do
   (println "test 1: (map double-it [1 2 3])")
-  (let [[$arr [1 2 3]]]
-    (println (str "  " (map double-it $arr))))
+  (let [[arr [1 2 3]]]
+    (println (str "  " (map double-it arr))))
 
   (println "test 2: 함수 리터럴 테스트")
   (define f double-it)
-  (let [[$arr [1 2 3]]]
-    (println (str "  " (map f $arr))))
+  (let [[arr [1 2 3]]]
+    (println (str "  " (map f arr))))
 )

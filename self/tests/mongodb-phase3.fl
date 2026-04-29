@@ -8,41 +8,41 @@
 ;; ─────────────────────────────────────────────────────────────────────
 
 (defn test-uri-parser-basic
-  (let [[$uri "mongodb://localhost/mydb"]
-        [$parsed (mongo-parse-uri $uri)]]
-    (assert-eq (get $parsed "host") "localhost" "Host should be localhost")
-    (assert-eq (get $parsed "port") 27017 "Default port should be 27017")
-    (assert-eq (get $parsed "db") "mydb" "DB should be mydb")))
+  (let [[uri "mongodb://localhost/mydb"]
+        [parsed (mongo-parse-uri uri)]]
+    (assert-eq (get parsed "host") "localhost" "Host should be localhost")
+    (assert-eq (get parsed "port") 27017 "Default port should be 27017")
+    (assert-eq (get parsed "db") "mydb" "DB should be mydb")))
 
 (defn test-uri-parser-with-port
-  (let [[$uri "mongodb://localhost:27018/testdb"]
-        [$parsed (mongo-parse-uri $uri)]]
-    (assert-eq (get $parsed "port") 27018 "Port should be 27018")))
+  (let [[uri "mongodb://localhost:27018/testdb"]
+        [parsed (mongo-parse-uri uri)]]
+    (assert-eq (get parsed "port") 27018 "Port should be 27018")))
 
 (defn test-uri-parser-with-auth
-  (let [[$uri "mongodb://user:pass@localhost/admin"]
-        [$parsed (mongo-parse-uri $uri)]]
-    (assert-eq (get $parsed "user") "user" "User should be set")
-    (assert-eq (get $parsed "pass") "pass" "Password should be set")))
+  (let [[uri "mongodb://user:pass@localhost/admin"]
+        [parsed (mongo-parse-uri uri)]]
+    (assert-eq (get parsed "user") "user" "User should be set")
+    (assert-eq (get parsed "pass") "pass" "Password should be set")))
 
 ;; ─────────────────────────────────────────────────────────────────────
 ;; Unit Tests: Update Operators
 ;; ─────────────────────────────────────────────────────────────────────
 
 (defn test-mongo-set-operator
-  (let [[$op (mongo-set {"name" "alice" "age" 30})]
-        [$set-dict (get $op "$set")]]
-    (assert-eq (get $set-dict "name") "alice" "$set operator should work")))
+  (let [[op (mongo-set {"name" "alice" "age" 30})]
+        [set-dict (get op "set")]]
+    (assert-eq (get set-dict "name") "alice" "set operator should work")))
 
 (defn test-mongo-inc-operator
-  (let [[$op (mongo-inc {"score" 10})]
-        [$inc-dict (get $op "$inc")]]
-    (assert-eq (get $inc-dict "score") 10 "$inc operator should work")))
+  (let [[op (mongo-inc {"score" 10})]
+        [inc-dict (get op "inc")]]
+    (assert-eq (get inc-dict "score") 10 "inc operator should work")))
 
 (defn test-mongo-push-operator
-  (let [[$op (mongo-push {"tags" "new-tag"})]
-        [$push-dict (get $op "$push")]]
-    (assert-eq (get $push-dict "tags") "new-tag" "$push operator should work")))
+  (let [[op (mongo-push {"tags" "new-tag"})]
+        [push-dict (get op "push")]]
+    (assert-eq (get push-dict "tags") "new-tag" "push operator should work")))
 
 ;; ─────────────────────────────────────────────────────────────────────
 ;; Unit Tests: Command Building
@@ -52,12 +52,12 @@
 
 (defn test-find-command-structure
   ;; This would be the command sent to MongoDB
-  ;; {"find": "users", "filter": {"name": "alice"}, "$db": "test"}
-  (println "Find command would be: {find: users, filter: {...}, $db: test}"))
+  ;; {"find": "users", "filter": {"name": "alice"}, "db": "test"}
+  (println "Find command would be: {find: users, filter: {...}, db: test}"))
 
 (defn test-insert-command-structure
-  ;; {"insert": "users", "documents": [{...}], "$db": "test"}
-  (println "Insert command would be: {insert: users, documents: [...], $db: test}"))
+  ;; {"insert": "users", "documents": [{...}], "db": "test"}
+  (println "Insert command would be: {insert: users, documents: [...], db: test}"))
 
 ;; ─────────────────────────────────────────────────────────────────────
 ;; Run Tests

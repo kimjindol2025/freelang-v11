@@ -2,137 +2,137 @@
 ;; self/codegen.fl 의 cg-native + runtime-prelude 를 직접 적재해 사용.
 
 ;; ═══════ 인라인 최소 codegen (cg-native 부분만 실측) ═══════
-[FUNC js-esc :params [$s]
-  :body (let [[$a (replace $s "\\" "\\\\")] [$b (replace $a "\"" "\\\"")]]
-          (str "\"" $b "\""))]
-[FUNC js-name :params [$n]
-  :body (if (null? $n) "_"
-          (let [[$a (replace $n "-" "_")] [$b (replace $a "?" "_q")] [$c (replace $b "!" "_x")]]
-            $c))]
+[FUNC js-esc :params [s]
+  :body (let [[a (replace s "\\" "\\\\")] [b (replace a "\"" "\\\"")]]
+          (str "\"" b "\""))]
+[FUNC js-name :params [n]
+  :body (if (null? n) "_"
+          (let [[a (replace n "-" "_")] [b (replace a "?" "_q")] [c (replace b "!" "_x")]]
+            c))]
 
-[FUNC cg :params [$n]
-  :body (cond [(null? $n) "null"]
-              [(= (get $n :kind) "literal") (cg-literal $n)]
-              [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
-              [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
-              [(= (get $n :kind) "block") (cg-block $n)]
+[FUNC cg :params [n]
+  :body (cond [(null? n) "null"]
+              [(= (get n :kind) "literal") (cg-literal n)]
+              [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "keyword") (js-esc (get n :name))]
+              [(= (get n :kind) "sexpr") (cg-sexpr n)]
+              [(= (get n :kind) "block") (cg-block n)]
               [true "null"])]
 
-[FUNC cg-block :params [$n]
-  :body (let [[$t (get $n :type)]]
-          (cond [(= $t "Array")
-                 (str "[" (cg-args (get (get $n :fields) "items")) "]")]
-                [(= $t "Map")
-                 (str "{" (cg-map-fields (get $n :fields)) "}")]
+[FUNC cg-block :params [n]
+  :body (let [[t (get n :type)]]
+          (cond [(= t "Array")
+                 (str "[" (cg-args (get (get n :fields) "items")) "]")]
+                [(= t "Map")
+                 (str "{" (cg-map-fields (get n :fields)) "}")]
                 [true "null"]))]
 
 ;; Map fields: JS Map → object literal
 ;; 현재 iteration 불가 → 하드코딩 대안으로 get all keys via keys(fields) if available
 ;; fallback: 이 테스트에서 map-literal 사용 안 하고 list 로 대체
-[FUNC cg-map-fields :params [$f] :body ""]
+[FUNC cg-map-fields :params [f] :body ""]
 
-[FUNC cg-literal :params [$n]
-  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
-          (cond [(= $t "number") $v] [(= $t "string") (js-esc $v)]
-                [(= $t "symbol")
-                 (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"]
-                       [true (js-name $v)])]
+[FUNC cg-literal :params [n]
+  :body (let [[t (get n :type)] [v (get n :value)]]
+          (cond [(= t "number") v] [(= t "string") (js-esc v)]
+                [(= t "symbol")
+                 (cond [(= v "true") "true"] [(= v "false") "false"] [(= v "null") "null"]
+                       [true (js-name v)])]
                 [true "null"]))]
 
-[FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
-[FUNC args-loop :params [$args $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (str (cg (get $args $i)))]]
-            (args-loop $args (+ $i 1) (if (= $i 0) $c (str $acc "," $c)))))]
+[FUNC cg-args :params [args] :body (args-loop args 0 "")]
+[FUNC args-loop :params [args i acc]
+  :body (if (>= i (length args)) acc
+          (let [[c (str (cg (get args i)))]]
+            (args-loop args (+ i 1) (if (= i 0) c (str acc "," c)))))]
 
-[FUNC cg-pair :params [$args $op]
-  :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+[FUNC cg-pair :params [args op]
+  :body (str "(" (cg (get args 0)) op (cg (get args 1)) ")")]
 
-[FUNC cg-sexpr :params [$n]
-  :body (let [[$op (get $n :op)] [$args (get $n :args)] [$as (cg-args $args)]]
+[FUNC cg-sexpr :params [n]
+  :body (let [[op (get n :op)] [args (get n :args)] [as (cg-args args)]]
           (cond
             ;; 산술
-            [(= $op "+") (cg-pair $args "+")]
-            [(= $op "-") (cg-pair $args "-")]
-            [(= $op "*") (cg-pair $args "*")]
-            [(= $op "=") (cg-pair $args "===")]
-            [(= $op "<") (cg-pair $args "<")]
-            [(= $op ">") (cg-pair $args ">")]
-            [(= $op "println") (str "console.log(" $as ")")]
+            [(= op "+") (cg-pair args "+")]
+            [(= op "-") (cg-pair args "-")]
+            [(= op "*") (cg-pair args "*")]
+            [(= op "=") (cg-pair args "===")]
+            [(= op "<") (cg-pair args "<")]
+            [(= op ">") (cg-pair args ">")]
+            [(= op "println") (str "console.log(" as ")")]
             ;; String
-            [(= $op "str") (str "_fl_str(" $as ")")]
-            [(= $op "length") (str "_fl_length(" $as ")")]
-            [(= $op "substring") (str "_fl_substring(" $as ")")]
-            [(= $op "char-at") (str "_fl_char_at(" $as ")")]
-            [(= $op "replace") (str "_fl_replace(" $as ")")]
-            [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
-            [(= $op "ends-with?") (str "_fl_ends_with(" $as ")")]
-            [(= $op "contains?") (str "_fl_contains(" $as ")")]
-            [(= $op "split") (str "_fl_split(" $as ")")]
-            [(= $op "join") (str "_fl_join(" $as ")")]
-            [(= $op "trim") (str "_fl_trim(" $as ")")]
-            [(= $op "upper") (str "_fl_upper(" $as ")")]
-            [(= $op "lower") (str "_fl_lower(" $as ")")]
-            [(= $op "repeat") (str "_fl_repeat(" $as ")")]
-            [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+            [(= op "str") (str "_fl_str(" as ")")]
+            [(= op "length") (str "_fl_length(" as ")")]
+            [(= op "substring") (str "_fl_substring(" as ")")]
+            [(= op "char-at") (str "_fl_char_at(" as ")")]
+            [(= op "replace") (str "_fl_replace(" as ")")]
+            [(= op "starts-with?") (str "_fl_starts_with(" as ")")]
+            [(= op "ends-with?") (str "_fl_ends_with(" as ")")]
+            [(= op "contains?") (str "_fl_contains(" as ")")]
+            [(= op "split") (str "_fl_split(" as ")")]
+            [(= op "join") (str "_fl_join(" as ")")]
+            [(= op "trim") (str "_fl_trim(" as ")")]
+            [(= op "upper") (str "_fl_upper(" as ")")]
+            [(= op "lower") (str "_fl_lower(" as ")")]
+            [(= op "repeat") (str "_fl_repeat(" as ")")]
+            [(= op "index-of") (str "_fl_index_of(" as ")")]
             ;; List
-            [(= $op "first") (str "_fl_first(" $as ")")]
-            [(= $op "last") (str "_fl_last(" $as ")")]
-            [(= $op "rest") (str "_fl_rest(" $as ")")]
-            [(= $op "append") (str "_fl_append(" $as ")")]
-            [(= $op "slice") (str "_fl_slice(" $as ")")]
-            [(= $op "list") (str "[" $as "]")]
-            [(= $op "map") (str "_fl_map(" $as ")")]
-            [(= $op "filter") (str "_fl_filter(" $as ")")]
-            [(= $op "reduce") (str "_fl_reduce(" $as ")")]
-            [(= $op "sort") (str "_fl_sort(" $as ")")]
-            [(= $op "reverse") (str "_fl_reverse(" $as ")")]
-            [(= $op "distinct") (str "_fl_distinct(" $as ")")]
-            [(= $op "range") (str "_fl_range(" $as ")")]
-            [(= $op "take") (str "_fl_take(" $as ")")]
-            [(= $op "drop") (str "_fl_drop(" $as ")")]
-            [(= $op "flatten") (str "_fl_flatten(" $as ")")]
+            [(= op "first") (str "_fl_first(" as ")")]
+            [(= op "last") (str "_fl_last(" as ")")]
+            [(= op "rest") (str "_fl_rest(" as ")")]
+            [(= op "append") (str "_fl_append(" as ")")]
+            [(= op "slice") (str "_fl_slice(" as ")")]
+            [(= op "list") (str "[" as "]")]
+            [(= op "map") (str "_fl_map(" as ")")]
+            [(= op "filter") (str "_fl_filter(" as ")")]
+            [(= op "reduce") (str "_fl_reduce(" as ")")]
+            [(= op "sort") (str "_fl_sort(" as ")")]
+            [(= op "reverse") (str "_fl_reverse(" as ")")]
+            [(= op "distinct") (str "_fl_distinct(" as ")")]
+            [(= op "range") (str "_fl_range(" as ")")]
+            [(= op "take") (str "_fl_take(" as ")")]
+            [(= op "drop") (str "_fl_drop(" as ")")]
+            [(= op "flatten") (str "_fl_flatten(" as ")")]
             ;; Map
-            [(= $op "get") (str "_fl_get(" $as ")")]
-            [(= $op "keys") (str "_fl_keys(" $as ")")]
-            [(= $op "values") (str "_fl_values(" $as ")")]
-            [(= $op "has-key?") (str "_fl_has_key(" $as ")")]
-            [(= $op "merge") (str "_fl_merge(" $as ")")]
+            [(= op "get") (str "_fl_get(" as ")")]
+            [(= op "keys") (str "_fl_keys(" as ")")]
+            [(= op "values") (str "_fl_values(" as ")")]
+            [(= op "has-key?") (str "_fl_has_key(" as ")")]
+            [(= op "merge") (str "_fl_merge(" as ")")]
             ;; JSON
-            [(= $op "json-parse") (str "JSON.parse(" $as ")")]
-            [(= $op "json-stringify") (str "JSON.stringify(" $as ")")]
+            [(= op "json-parse") (str "JSON.parse(" as ")")]
+            [(= op "json-stringify") (str "JSON.stringify(" as ")")]
             ;; Type
-            [(= $op "null?") (str "(" $as "==null)")]
-            [(= $op "string?") (str "(typeof " $as "===\"string\")")]
-            [(= $op "number?") (str "(typeof " $as "===\"number\")")]
-            [(= $op "list?") (str "Array.isArray(" $as ")")]
-            [(= $op "type-of") (str "_fl_type_of(" $as ")")]
+            [(= op "null?") (str "(" as "==null)")]
+            [(= op "string?") (str "(typeof " as "===\"string\")")]
+            [(= op "number?") (str "(typeof " as "===\"number\")")]
+            [(= op "list?") (str "Array.isArray(" as ")")]
+            [(= op "type-of") (str "_fl_type_of(" as ")")]
             ;; Math
-            [(= $op "abs") (str "Math.abs(" $as ")")]
-            [(= $op "max") (str "Math.max(" $as ")")]
-            [(= $op "min") (str "Math.min(" $as ")")]
-            [(= $op "floor") (str "Math.floor(" $as ")")]
-            [(= $op "ceil") (str "Math.ceil(" $as ")")]
-            [(= $op "mod") (cg-pair $args "%")]
-            [(= $op "define") (str "const " (js-name (get (get $args 0) :value)) "=" (cg (get $args 1)))]
-            [(= $op "fn")
-             (str "((" (fn-params (get (get $args 0) :fields)) ")=>" (cg (get $args 1)) ")")]
-            [true (str (js-name $op) "(" $as ")")]))]
+            [(= op "abs") (str "Math.abs(" as ")")]
+            [(= op "max") (str "Math.max(" as ")")]
+            [(= op "min") (str "Math.min(" as ")")]
+            [(= op "floor") (str "Math.floor(" as ")")]
+            [(= op "ceil") (str "Math.ceil(" as ")")]
+            [(= op "mod") (cg-pair args "%")]
+            [(= op "define") (str "const " (js-name (get (get args 0) :value)) "=" (cg (get args 1)))]
+            [(= op "fn")
+             (str "((" (fn-params (get (get args 0) :fields)) ")=>" (cg (get args 1)) ")")]
+            [true (str (js-name op) "(" as ")")]))]
 
-[FUNC extract-name :params [$n]
-  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "literal") (js-name (get $n :value))]
+[FUNC extract-name :params [n]
+  :body (cond [(= (get n :kind) "variable") (js-name (get n :name))]
+              [(= (get n :kind) "literal") (js-name (get n :value))]
               [true "_anon"])]
 
-[FUNC fn-params :params [$fields]
-  :body (let [[$items (get $fields "items")]]
-          (fn-params-loop $items 0 ""))]
-[FUNC fn-params-loop :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$jn (extract-name (get $items $i))]]
-            (fn-params-loop $items (+ $i 1)
-                            (if (= $i 0) $jn (str $acc "," $jn))))) ]
+[FUNC fn-params :params [fields]
+  :body (let [[items (get fields "items")]]
+          (fn-params-loop items 0 ""))]
+[FUNC fn-params-loop :params [items i acc]
+  :body (if (>= i (length items)) acc
+          (let [[jn (extract-name (get items i))]]
+            (fn-params-loop items (+ i 1)
+                            (if (= i 0) jn (str acc "," jn))))) ]
 
 ;; ═══════ runtime prelude (동일 — self/codegen.fl 과 중복) ═══════
 (define PRELUDE
@@ -176,21 +176,21 @@
     "const _fl_type_of = (x) => (x==null?'null':Array.isArray(x)?'list':typeof x);"
     "\n"))
 
-[FUNC compile-all :params [$ast $i $acc]
-  :body (if (>= $i (length $ast)) $acc
-          (compile-all $ast (+ $i 1) (str $acc (cg (get $ast $i)) ";\n")))]
+[FUNC compile-all :params [ast i acc]
+  :body (if (>= i (length ast)) acc
+          (compile-all ast (+ i 1) (str acc (cg (get ast i)) ";\n")))]
 
-[FUNC run-js :params [$label $fl $expected]
-  :body (let [[$ast (fl-parse $fl)]
-              [$js (str PRELUDE (compile-all $ast 0 ""))]
-              [$file (str "self/bench/_bi_" $label ".js")]]
-          (file_write $file $js)
-          (let [[$r (shell_capture (str "node " $file))]
-                [$out (get $r :stdout)]
-                [$trim (if (null? $out) "" (replace $out "\n" ""))]]
-            (if (= $trim $expected)
-              (println (str "pass " $label "=" $trim))
-              (println (str "fail " $label " expected=\"" $expected "\" got=\"" $trim "\"")))))]
+[FUNC run-js :params [label fl expected]
+  :body (let [[ast (fl-parse fl)]
+              [js (str PRELUDE (compile-all ast 0 ""))]
+              [file (str "self/bench/_bi_" label ".js")]]
+          (file_write file js)
+          (let [[r (shell_capture (str "node " file))]
+                [out (get r :stdout)]
+                [trim (if (null? out) "" (replace out "\n" ""))]]
+            (if (= trim expected)
+              (println (str "pass " label "=" trim))
+              (println (str "fail " label " expected=\"" expected "\" got=\"" trim "\"")))))]
 
 ;; ─── String (10) ───
 (run-js "str-starts" "(println (starts-with? \"hello world\" \"hello\"))" "true")

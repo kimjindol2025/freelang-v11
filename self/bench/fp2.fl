@@ -1,3 +1,3 @@
-[FUNC fact :params [$n] :body (if (= $n 0) 1 (* $n (fact (- $n 1))))]
+[FUNC fact :params [n] :body (if (= n 0) 1 (* n (fact (- n 1))))]
 (println (fact 10))
 (println (fact 15))

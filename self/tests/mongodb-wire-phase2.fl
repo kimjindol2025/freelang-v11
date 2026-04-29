@@ -5,35 +5,35 @@
 (load "stdlib/mongodb/wire.fl")
 
 (defn test-header-build
-  (let [[$header (wire-build-header 100 42)]]
+  (let [[header (wire-build-header 100 42)]]
     ;; 16 bytes = 32 hex chars
-    (assert-eq (length $header) 32 "Header should be 32 hex chars")))
+    (assert-eq (length header) 32 "Header should be 32 hex chars")))
 
 (defn test-int32-to-hex-le
-  (let [[$hex (int32-to-hex-le 0)]]
-    (assert-eq $hex "00000000" "int32(0) should be 00000000"))
-  (let [[$hex (int32-to-hex-le 256)]]
-    (assert-eq $hex "00010000" "int32(256) LE should be 00010000")))
+  (let [[hex (int32-to-hex-le 0)]]
+    (assert-eq hex "00000000" "int32(0) should be 00000000"))
+  (let [[hex (int32-to-hex-le 256)]]
+    (assert-eq hex "00010000" "int32(256) LE should be 00010000")))
 
 (defn test-hex-le-to-int32
-  (let [[$num (hex-le-to-int32 "00000000")]]
-    (assert-eq $num 0 "hex 00000000 should be 0"))
-  (let [[$num (hex-le-to-int32 "00010000")]]
-    (assert-eq $num 256 "hex 00010000 LE should be 256")))
+  (let [[num (hex-le-to-int32 "00000000")]]
+    (assert-eq num 0 "hex 00000000 should be 0"))
+  (let [[num (hex-le-to-int32 "00010000")]]
+    (assert-eq num 256 "hex 00010000 LE should be 256")))
 
 (defn test-opmsg-build
   ;; Simple BSON: {hello: 1}
-  (let [[$cmd-bson (bson-encode {"hello" 1})]
-        [$opmsg (wire-build-opmsg $cmd-bson)]]
+  (let [[cmd-bson (bson-encode {"hello" 1})]
+        [opmsg (wire-build-opmsg cmd-bson)]]
     ;; OP_MSG = header(32) + flags(8) + kind(2) + bson
-    (assert-true (> (length $opmsg) 42) "OP_MSG should be at least 42 chars")))
+    (assert-true (> (length opmsg) 42) "OP_MSG should be at least 42 chars")))
 
 (defn test-header-parse
   ;; Build then parse
-  (let [[$built (wire-build-header 256 10)]
-        [$parsed (wire-parse-header $built)]]
-    (assert-eq (get $parsed "totalLen") 256 "Parsed totalLen should match")
-    (assert-eq (get $parsed "requestId") 10 "Parsed requestId should match")))
+  (let [[built (wire-build-header 256 10)]
+        [parsed (wire-parse-header built)]]
+    (assert-eq (get parsed "totalLen") 256 "Parsed totalLen should match")
+    (assert-eq (get parsed "requestId") 10 "Parsed requestId should match")))
 
 ;; Run all tests
 (println "Testing Wire Protocol Phase 2...")

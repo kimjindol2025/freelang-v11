@@ -1,35 +1,35 @@
 ;; self/stdlib/set-extra.fl — Phase 26 Part 3
 ;; 집합 연산 (list 기반)
 
-[FUNC set-from-list :params [$lst] :body (distinct $lst)]
+[FUNC set-from-list :params [lst] :body (distinct lst)]
 
-[FUNC set-union :params [$a $b]
-  :body (distinct (append $a $b))]
+[FUNC set-union :params [a b]
+  :body (distinct (append a b))]
 
-[FUNC set-intersection :params [$a $b]
-  :body (set-intersection-loop $a $b 0 (list))]
-[FUNC set-intersection-loop :params [$a $b $i $acc]
-  :body (if (>= $i (length $a)) $acc
-          (let [[$item (get $a $i)]]
-            (set-intersection-loop $a $b (+ $i 1)
-              (if (contains? $b $item)
-                (append $acc $item)
-                $acc))))]
+[FUNC set-intersection :params [a b]
+  :body (set-intersection-loop a b 0 (list))]
+[FUNC set-intersection-loop :params [a b i acc]
+  :body (if (>= i (length a)) acc
+          (let [[item (get a i)]]
+            (set-intersection-loop a b (+ i 1)
+              (if (contains? b item)
+                (append acc item)
+                acc))))]
 
-[FUNC set-difference :params [$a $b]
-  :body (set-difference-loop $a $b 0 (list))]
-[FUNC set-difference-loop :params [$a $b $i $acc]
-  :body (if (>= $i (length $a)) $acc
-          (let [[$item (get $a $i)]]
-            (set-difference-loop $a $b (+ $i 1)
-              (if (not (contains? $b $item))
-                (append $acc $item)
-                $acc))))]
+[FUNC set-difference :params [a b]
+  :body (set-difference-loop a b 0 (list))]
+[FUNC set-difference-loop :params [a b i acc]
+  :body (if (>= i (length a)) acc
+          (let [[item (get a i)]]
+            (set-difference-loop a b (+ i 1)
+              (if (not (contains? b item))
+                (append acc item)
+                acc))))]
 
-[FUNC set-subset? :params [$a $b]
-  :body (set-subset-loop $a $b 0)]
-[FUNC set-subset-loop :params [$a $b $i]
-  :body (if (>= $i (length $a)) true
-          (if (contains? $b (get $a $i))
-            (set-subset-loop $a $b (+ $i 1))
+[FUNC set-subset? :params [a b]
+  :body (set-subset-loop a b 0)]
+[FUNC set-subset-loop :params [a b i]
+  :body (if (>= i (length a)) true
+          (if (contains? b (get a i))
+            (set-subset-loop a b (+ i 1))
             false))]

@@ -5,79 +5,79 @@
 
 ; ── 문자 분류 헬퍼 ───────────────────────────────────────────
 
-[FUNC is-ws :params [$ch]
-  :body (match $ch
+[FUNC is-ws :params [ch]
+  :body (match ch
     (" " true) ("\t" true) ("\n" true)
     (_ false)
 )]
 
-[FUNC is-digit :params [$ch]
-  :body (and (>= (char-code $ch) 48) (<= (char-code $ch) 57))
+[FUNC is-digit :params [ch]
+  :body (and (>= (char-code ch) 48) (<= (char-code ch) 57))
 ]
 
 ; 심볼 시작 문자: a-z A-Z _
-[FUNC is-alpha :params [$ch]
+[FUNC is-alpha :params [ch]
   :body (or
-    (and (>= (char-code $ch) 97)  (<= (char-code $ch) 122))
-    (and (>= (char-code $ch) 65)  (<= (char-code $ch) 90))
-    (= $ch "_")
+    (and (>= (char-code ch) 97)  (<= (char-code ch) 122))
+    (and (>= (char-code ch) 65)  (<= (char-code ch) 90))
+    (= ch "_")
   )
 ]
 
 ; 심볼 계속 문자: alpha | digit | - | ? | ! | / | *
-[FUNC is-sym-cont :params [$ch]
+[FUNC is-sym-cont :params [ch]
   :body (or
-    (is-alpha $ch)
-    (is-digit $ch)
-    (= $ch "-")
-    (= $ch "?")
-    (= $ch "!")
-    (= $ch "/")
-    (= $ch "*")
-    (= $ch "+")
-    (= $ch "<")
-    (= $ch ">")
-    (= $ch "=")
+    (is-alpha ch)
+    (is-digit ch)
+    (= ch "-")
+    (= ch "?")
+    (= ch "!")
+    (= ch "/")
+    (= ch "*")
+    (= ch "+")
+    (= ch "<")
+    (= ch ">")
+    (= ch "=")
   )
 ]
 
 ; 변수 계속 문자: alpha | digit | - | _ | . (dot-access)
-[FUNC is-var-cont :params [$ch]
+[FUNC is-var-cont :params [ch]
   :body (or
-    (is-alpha $ch)
-    (is-digit $ch)
-    (= $ch "-")
-    (= $ch "_")
-    (= $ch ".")
+    (is-alpha ch)
+    (is-digit ch)
+    (= ch "-")
+    (= ch "_")
+    (= ch ".")
   )
 ]
 
 ; ── 메인 렉서 ───────────────────────────────────────────────
 
-[FUNC lex :params [$src]
+[FUNC lex :params [src]
   :body (
-    (let [[len (length $src)]]
+    (let [[len (length src)]]
       (define tokens [])
       (define i 0)
       (define line 1)
       (define col 1)
       (define sc 1)    ; start-col: 현재 토큰의 시작 컬럼
 
-      (define ch [] (get $src i))
+      (define ch [] (get src i))
 
       (define peek-ch [offset]
         (if (< (+ i offset) len)
-          (get $src (+ i offset))
+          (get src (+ i offset))
           "")
       )
 
       (define emit [type val]
-        (set! tokens (append tokens [{:type $type :value $val :line line :col sc}]))
+        (set! tokens (append tokens [{:type type :value val :line line :col sc}]))
       )
 
       ; ── 메인 스캔 루프 (loop/recur TCO) ─────────────────
       (define scan []
-        (loop [[$_ 0]]
+        (loop [[_ 0]]
           (if (>= i len)
             tokens
 
@@ -105,7 +105,7 @@
                   (set! i (+ i 1))
                   (set! col (+ col 1))
                   (define skip-comment []
-                    (loop [[$_ 0]]
+                    (loop [[_ 0]]
                       (if (and (< i len) (not (= (ch) "\n")))
                         (do
                           (set! i (+ i 1))
@@ -125,7 +125,7 @@
                   (set! col (+ col 1))
                   (define s "")
                   (define read-str []
-                    (loop [[$_ 0]]
+                    (loop [[_ 0]]
                       (if (>= i len)
                         (error (concat "Unterminated string at line " (num-to-str line) ":" (num-to-str sc)))
                         (let [[sc2 (ch)]]
@@ -189,7 +189,7 @@
                   (set! col (+ col 1))
                   (define kw "")
                   (define read-kw []
-                    (loop [[$_ 0]]
+                    (loop [[_ 0]]
                       (if (and (< i len) (is-sym-cont (ch)))
                         (do
                           (set! kw (concat kw (ch)))
@@ -208,13 +208,13 @@
                   (recur 0)
                 ]
 
-                ; ── 변수: $name 또는 $name.field ───────────
+                ; ── 변수: name 또는 name.field ───────────
                 [(= c "$")
                   (set! i (+ i 1))
                   (set! col (+ col 1))
                   (define vn "")
                   (define read-var []
-                    (loop [[$_ 0]]
+                    (loop [[_ 0]]
                       (if (and (< i len) (is-var-cont (ch)))
                         (do
                           (set! vn (concat vn (ch)))
@@ -234,7 +234,7 @@
                 [(or (is-digit c) (and (= c "-") (< (+ i 1) len) (is-digit (peek-ch 1))))
                   (define ns "")
                   (define read-num []
-                    (loop [[$_ 0]]
+                    (loop [[_ 0]]
                       (if (and (< i len) (or (is-digit (ch)) (= (ch) ".")))
                         (do
                           (set! ns (concat ns (ch)))
@@ -257,7 +257,7 @@
                 [(is-alpha c)
                   (define sv "")
                   (define read-sym []
-                    (loop [[$_ 0]]
+                    (loop [[_ 0]]
                       (if (and (< i len) (is-sym-cont (ch)))
                         (do
                           (set! sv (concat sv (ch)))

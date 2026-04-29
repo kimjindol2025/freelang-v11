@@ -1,6 +1,6 @@
 ;; let-in-expr-04.fl — Case D: 중첩 let
 ;; 기대: nested let이 안전하게 IIFE로 변환
 
-(let [$a 1]
-  (let [$b (+ $a 1)]
-    (+ $a $b)))
+(let [a 1]
+  (let [b (+ a 1)]
+    (+ a b)))

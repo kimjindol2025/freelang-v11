@@ -2,219 +2,219 @@
 ;; lexer + parser + scope + interp 인라인. 작은 케이스만.
 
 ;; ═══════════════ Lexer ═══════════════
-[FUNC is-digit? :params [$c] :body (if (null? $c) false (and (>= $c "0") (<= $c "9")))]
-[FUNC is-alpha? :params [$c]
-  :body (if (null? $c) false
-          (or (and (>= $c "a") (<= $c "z")) (and (>= $c "A") (<= $c "Z"))))]
-[FUNC is-alnum? :params [$c] :body (or (is-digit? $c) (is-alpha? $c))]
-[FUNC is-space? :params [$c] :body (or (= $c " ") (= $c "\t") (= $c "\n") (= $c "\r"))]
-[FUNC is-symbol-char? :params [$c]
-  :body (if (null? $c) false
-          (or (is-alnum? $c) (= $c "-") (= $c "_") (= $c "?") (= $c "!")
-              (= $c "/") (= $c ".") (= $c "<") (= $c ">") (= $c "=")
-              (= $c "+") (= $c "*") (= $c "%") (= $c "&") (= $c "|") (= $c "^")))]
-[FUNC make-state :params [$src] :body {:src $src :idx 0 :line 1 :col 1 :tokens []}]
-[FUNC peek-at :params [$st $o]
-  :body (let [[$s (get $st :src)] [$i (+ (get $st :idx) $o)]]
-          (if (>= $i (length $s)) null (char-at $s $i)))]
-[FUNC peek :params [$st] :body (peek-at $st 0)]
-[FUNC at-end? :params [$st] :body (>= (get $st :idx) (length (get $st :src)))]
-[FUNC advance :params [$st]
-  :body (let [[$c (peek $st)]]
-          (if (= $c "\n")
-            {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (+ (get $st :line) 1) :col 1 :tokens (get $st :tokens)}
-            {:src (get $st :src) :idx (+ (get $st :idx) 1) :line (get $st :line) :col (+ (get $st :col) 1) :tokens (get $st :tokens)}))]
-[FUNC emit :params [$st $k $v $sl $sc]
-  :body {:src (get $st :src) :idx (get $st :idx) :line (get $st :line) :col (get $st :col)
-         :tokens (append (get $st :tokens) (list {:kind $k :value $v :line $sl :col $sc}))}]
-[FUNC skip-comment :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
-[FUNC skip-ws :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (cond [(is-space? $c) (skip-ws (advance $st))]
-                  [(= $c ";") (skip-ws (skip-comment $st))]
-                  [true $st])))]
-[FUNC read-number-body :params [$st $a $d $l $c]
-  :body (if (at-end? $st) (emit $st "Number" $a $l $c)
-          (let [[$ch (peek $st)]]
-            (cond [(is-digit? $ch) (read-number-body (advance $st) (str $a $ch) $d $l $c)]
-                  [(and (= $ch ".") (not $d)) (read-number-body (advance $st) (str $a $ch) true $l $c)]
-                  [true (emit $st "Number" $a $l $c)])))]
-[FUNC read-number :params [$st] :body (read-number-body $st "" false (get $st :line) (get $st :col))]
-[FUNC read-sym-body :params [$st $a $l $c $k]
-  :body (if (at-end? $st) (emit $st $k $a $l $c)
-          (let [[$ch (peek $st)]]
-            (if (is-symbol-char? $ch) (read-sym-body (advance $st) (str $a $ch) $l $c $k)
-              (emit $st $k $a $l $c))))]
-[FUNC read-symbol :params [$st] :body (read-sym-body $st "" (get $st :line) (get $st :col) "Symbol")]
-[FUNC read-variable :params [$st]
-  :body (let [[$l (get $st :line)] [$c (get $st :col)] [$s1 (advance $st)]]
-          (read-sym-body $s1 "" $l $c "Variable"))]
-[FUNC read-token :params [$st]
-  :body (let [[$s1 (skip-ws $st)]]
-          (if (at-end? $s1) $s1
-            (let [[$c (peek $s1)] [$l (get $s1 :line)] [$col (get $s1 :col)]]
+[FUNC is-digit? :params [c] :body (if (null? c) false (and (>= c "0") (<= c "9")))]
+[FUNC is-alpha? :params [c]
+  :body (if (null? c) false
+          (or (and (>= c "a") (<= c "z")) (and (>= c "A") (<= c "Z"))))]
+[FUNC is-alnum? :params [c] :body (or (is-digit? c) (is-alpha? c))]
+[FUNC is-space? :params [c] :body (or (= c " ") (= c "\t") (= c "\n") (= c "\r"))]
+[FUNC is-symbol-char? :params [c]
+  :body (if (null? c) false
+          (or (is-alnum? c) (= c "-") (= c "_") (= c "?") (= c "!")
+              (= c "/") (= c ".") (= c "<") (= c ">") (= c "=")
+              (= c "+") (= c "*") (= c "%") (= c "&") (= c "|") (= c "^")))]
+[FUNC make-state :params [src] :body {:src src :idx 0 :line 1 :col 1 :tokens []}]
+[FUNC peek-at :params [st o]
+  :body (let [[s (get st :src)] [i (+ (get st :idx) o)]]
+          (if (>= i (length s)) null (char-at s i)))]
+[FUNC peek :params [st] :body (peek-at st 0)]
+[FUNC at-end? :params [st] :body (>= (get st :idx) (length (get st :src)))]
+[FUNC advance :params [st]
+  :body (let [[c (peek st)]]
+          (if (= c "\n")
+            {:src (get st :src) :idx (+ (get st :idx) 1) :line (+ (get st :line) 1) :col 1 :tokens (get st :tokens)}
+            {:src (get st :src) :idx (+ (get st :idx) 1) :line (get st :line) :col (+ (get st :col) 1) :tokens (get st :tokens)}))]
+[FUNC emit :params [st k v sl sc]
+  :body {:src (get st :src) :idx (get st :idx) :line (get st :line) :col (get st :col)
+         :tokens (append (get st :tokens) (list {:kind k :value v :line sl :col sc}))}]
+[FUNC skip-comment :params [st]
+  :body (if (at-end? st) st
+          (let [[c (peek st)]]
+            (if (= c "\n") (advance st) (skip-comment (advance st)))))]
+[FUNC skip-ws :params [st]
+  :body (if (at-end? st) st
+          (let [[c (peek st)]]
+            (cond [(is-space? c) (skip-ws (advance st))]
+                  [(= c ";") (skip-ws (skip-comment st))]
+                  [true st])))]
+[FUNC read-number-body :params [st a d l c]
+  :body (if (at-end? st) (emit st "Number" a l c)
+          (let [[ch (peek st)]]
+            (cond [(is-digit? ch) (read-number-body (advance st) (str a ch) d l c)]
+                  [(and (= ch ".") (not d)) (read-number-body (advance st) (str a ch) true l c)]
+                  [true (emit st "Number" a l c)])))]
+[FUNC read-number :params [st] :body (read-number-body st "" false (get st :line) (get st :col))]
+[FUNC read-sym-body :params [st a l c k]
+  :body (if (at-end? st) (emit st k a l c)
+          (let [[ch (peek st)]]
+            (if (is-symbol-char? ch) (read-sym-body (advance st) (str a ch) l c k)
+              (emit st k a l c))))]
+[FUNC read-symbol :params [st] :body (read-sym-body st "" (get st :line) (get st :col) "Symbol")]
+[FUNC read-variable :params [st]
+  :body (let [[l (get st :line)] [c (get st :col)] [s1 (advance st)]]
+          (read-sym-body s1 "" l c "Variable"))]
+[FUNC read-token :params [st]
+  :body (let [[s1 (skip-ws st)]]
+          (if (at-end? s1) s1
+            (let [[c (peek s1)] [l (get s1 :line)] [col (get s1 :col)]]
               (cond
-                [(= $c "(") (emit (advance $s1) "LParen" $c $l $col)]
-                [(= $c ")") (emit (advance $s1) "RParen" $c $l $col)]
-                [(= $c "[") (emit (advance $s1) "LBracket" $c $l $col)]
-                [(= $c "]") (emit (advance $s1) "RBracket" $c $l $col)]
-                [(= $c "$") (read-variable $s1)]
-                [(is-digit? $c) (read-number $s1)]
-                [(and (= $c "-") (is-digit? (peek-at $s1 1)))
-                 (read-number-body (advance $s1) "-" false $l $col)]
-                [(is-symbol-char? $c) (read-symbol $s1)]
-                [true (emit (advance $s1) "Unknown" $c $l $col)]))))]
-[FUNC lex-loop :params [$st]
-  :body (let [[$s1 (skip-ws $st)]]
-          (if (at-end? $s1) (get $s1 :tokens) (lex-loop (read-token $s1))))]
-[FUNC lex :params [$src] :body (lex-loop (make-state $src))]
+                [(= c "(") (emit (advance s1) "LParen" c l col)]
+                [(= c ")") (emit (advance s1) "RParen" c l col)]
+                [(= c "[") (emit (advance s1) "LBracket" c l col)]
+                [(= c "]") (emit (advance s1) "RBracket" c l col)]
+                [(= c "$") (read-variable s1)]
+                [(is-digit? c) (read-number s1)]
+                [(and (= c "-") (is-digit? (peek-at s1 1)))
+                 (read-number-body (advance s1) "-" false l col)]
+                [(is-symbol-char? c) (read-symbol s1)]
+                [true (emit (advance s1) "Unknown" c l col)]))))]
+[FUNC lex-loop :params [st]
+  :body (let [[s1 (skip-ws st)]]
+          (if (at-end? s1) (get s1 :tokens) (lex-loop (read-token s1))))]
+[FUNC lex :params [src] :body (lex-loop (make-state src))]
 
 ;; ═══════════════ AST / Parser ═══════════════
-[FUNC make-literal :params [$t $v $l] :body {:kind "literal" :type $t :value $v :line $l}]
-[FUNC make-variable :params [$n $l] :body {:kind "variable" :name $n :line $l}]
-[FUNC make-sexpr :params [$op $args $l] :body {:kind "sexpr" :op $op :args $args :line $l}]
+[FUNC make-literal :params [t v l] :body {:kind "literal" :type t :value v :line l}]
+[FUNC make-variable :params [n l] :body {:kind "variable" :name n :line l}]
+[FUNC make-sexpr :params [op args l] :body {:kind "sexpr" :op op :args args :line l}]
 
-[FUNC p-make :params [$tokens] :body {:tokens $tokens :idx 0}]
-[FUNC p-peek :params [$p]
-  :body (let [[$i (get $p :idx)] [$t (get $p :tokens)]]
-          (if (>= $i (length $t)) null (get $t $i)))]
-[FUNC p-end? :params [$p] :body (>= (get $p :idx) (length (get $p :tokens)))]
-[FUNC p-advance :params [$p] :body {:tokens (get $p :tokens) :idx (+ (get $p :idx) 1)}]
-[FUNC r-pair :params [$p $n] :body {:p $p :node $n}]
+[FUNC p-make :params [tokens] :body {:tokens tokens :idx 0}]
+[FUNC p-peek :params [p]
+  :body (let [[i (get p :idx)] [t (get p :tokens)]]
+          (if (>= i (length t)) null (get t i)))]
+[FUNC p-end? :params [p] :body (>= (get p :idx) (length (get p :tokens)))]
+[FUNC p-advance :params [p] :body {:tokens (get p :tokens) :idx (+ (get p :idx) 1)}]
+[FUNC r-pair :params [p n] :body {:p p :node n}]
 
-[FUNC parse-atom :params [$p]
-  :body (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)] [$l (get $t :line)]]
+[FUNC parse-atom :params [p]
+  :body (let [[t (p-peek p)] [k (get t :kind)] [v (get t :value)] [l (get t :line)]]
           (cond
-            [(= $k "Number") (r-pair (p-advance $p) (make-literal "number" $v $l))]
-            [(= $k "Symbol") (r-pair (p-advance $p) (make-literal "symbol" $v $l))]
-            [(= $k "Variable") (r-pair (p-advance $p) (make-variable $v $l))]
-            [true (r-pair (p-advance $p) (make-literal "unknown" $v $l))]))]
+            [(= k "Number") (r-pair (p-advance p) (make-literal "number" v l))]
+            [(= k "Symbol") (r-pair (p-advance p) (make-literal "symbol" v l))]
+            [(= k "Variable") (r-pair (p-advance p) (make-variable v l))]
+            [true (r-pair (p-advance p) (make-literal "unknown" v l))]))]
 
-[FUNC parse-expr :params [$p]
-  :body (let [[$t (p-peek $p)] [$k (get $t :kind)]]
-          (cond [(= $k "LParen") (parse-sexpr $p)]
-                [true (parse-atom $p)]))]
+[FUNC parse-expr :params [p]
+  :body (let [[t (p-peek p)] [k (get t :kind)]]
+          (cond [(= k "LParen") (parse-sexpr p)]
+                [true (parse-atom p)]))]
 
-[FUNC parse-args :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
-          (cond [(null? $t) (r-pair $p $acc)]
-                [(= (get $t :kind) "RParen") (r-pair $p $acc)]
-                [true (let [[$one (parse-expr $p)]]
-                        (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+[FUNC parse-args :params [p acc]
+  :body (let [[t (p-peek p)]]
+          (cond [(null? t) (r-pair p acc)]
+                [(= (get t :kind) "RParen") (r-pair p acc)]
+                [true (let [[one (parse-expr p)]]
+                        (parse-args (get one :p) (append acc (list (get one :node)))))]))]
 
-[FUNC parse-sexpr :params [$p]
-  :body (let [[$tok (p-peek $p)] [$line (get $tok :line)] [$p1 (p-advance $p)]
-              [$coll (parse-args $p1 [])] [$p2 (get $coll :p)] [$args (get $coll :node)]
-              [$p3 (if (and (not (null? (p-peek $p2))) (= (get (p-peek $p2) :kind) "RParen"))
-                     (p-advance $p2) $p2)]]
-          (if (= (length $args) 0) (r-pair $p3 (make-sexpr "" (list) $line))
-            (let [[$op-n (get $args 0)]
-                  [$op (cond [(= (get $op-n :kind) "literal") (get $op-n :value)]
-                             [(= (get $op-n :kind) "variable") (str "$" (get $op-n :name))]
+[FUNC parse-sexpr :params [p]
+  :body (let [[tok (p-peek p)] [line (get tok :line)] [p1 (p-advance p)]
+              [coll (parse-args p1 [])] [p2 (get coll :p)] [args (get coll :node)]
+              [p3 (if (and (not (null? (p-peek p2))) (= (get (p-peek p2) :kind) "RParen"))
+                     (p-advance p2) p2)]]
+          (if (= (length args) 0) (r-pair p3 (make-sexpr "" (list) line))
+            (let [[op-n (get args 0)]
+                  [op (cond [(= (get op-n :kind) "literal") (get op-n :value)]
+                             [(= (get op-n :kind) "variable") (str "$" (get op-n :name))]
                              [true "unknown"])]
-                  [$rest (slice $args 1 (length $args))]]
-              (r-pair $p3 (make-sexpr $op $rest $line)))))]
+                  [rest (slice args 1 (length args))]]
+              (r-pair p3 (make-sexpr op rest line)))))]
 
-[FUNC parse-all :params [$p $acc]
-  :body (if (p-end? $p) $acc
-          (let [[$one (parse-expr $p)]]
-            (parse-all (get $one :p) (append $acc (list (get $one :node))))))]
+[FUNC parse-all :params [p acc]
+  :body (if (p-end? p) acc
+          (let [[one (parse-expr p)]]
+            (parse-all (get one :p) (append acc (list (get one :node))))))]
 
-[FUNC parse :params [$tokens] :body (parse-all (p-make $tokens) [])]
+[FUNC parse :params [tokens] :body (parse-all (p-make tokens) [])]
 
 ;; ═══════════════ Scope ═══════════════
 [FUNC make-scope :params [] :body (list {})]
-[FUNC push-scope :params [$s] :body (append (list {}) $s)]
-[FUNC norm-key :params [$k]
-  :body (if (null? $k) ""
-          (if (and (>= (length $k) 1) (= (char-at $k 0) "$"))
-            (substring $k 1 (length $k)) $k))]
-[FUNC scope-get-loop :params [$s $k $i]
-  :body (cond [(>= $i (length $s)) null]
-              [(not (null? (get (get $s $i) $k))) (get (get $s $i) $k)]
-              [true (scope-get-loop $s $k (+ $i 1))])]
-[FUNC scope-get :params [$s $k] :body (scope-get-loop $s (norm-key $k) 0)]
-[FUNC scope-set :params [$s $k $v]
-  :body (let [[$nk (norm-key $k)] [$top (get $s 0)] [$rest (slice $s 1 (length $s))]]
-          (append (list (json_set $top $nk $v)) $rest))]
+[FUNC push-scope :params [s] :body (append (list {}) s)]
+[FUNC norm-key :params [k]
+  :body (if (null? k) ""
+          (if (and (>= (length k) 1) (= (char-at k 0) "$"))
+            (substring k 1 (length k)) k))]
+[FUNC scope-get-loop :params [s k i]
+  :body (cond [(>= i (length s)) null]
+              [(not (null? (get (get s i) k))) (get (get s i) k)]
+              [true (scope-get-loop s k (+ i 1))])]
+[FUNC scope-get :params [s k] :body (scope-get-loop s (norm-key k) 0)]
+[FUNC scope-set :params [s k v]
+  :body (let [[nk (norm-key k)] [top (get s 0)] [rest (slice s 1 (length s))]]
+          (append (list (json_set top nk v)) rest))]
 
 ;; ═══════════════ Interpreter (축소 — +, -, *, if, let, define) ═══════════════
-[FUNC truthy? :params [$v]
-  :body (cond [(null? $v) false] [(= $v false) false] [(= $v 0) false] [(= $v "") false] [true true])]
+[FUNC truthy? :params [v]
+  :body (cond [(null? v) false] [(= v false) false] [(= v 0) false] [(= v "") false] [true true])]
 
-[FUNC strip-dollar :params [$s]
-  :body (if (null? $s) $s
-          (if (and (>= (length $s) 1) (= (char-at $s 0) "$"))
-            (substring $s 1 (length $s)) $s))]
+[FUNC strip-dollar :params [s]
+  :body (if (null? s) s
+          (if (and (>= (length s) 1) (= (char-at s 0) "$"))
+            (substring s 1 (length s)) s))]
 
-[FUNC apply-add :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc (apply-add $vs (+ $i 1) (+ $acc (get $vs $i))))]
-[FUNC apply-mul :params [$vs $i $acc]
-  :body (if (>= $i (length $vs)) $acc (apply-mul $vs (+ $i 1) (* $acc (get $vs $i))))]
-[FUNC apply-sub :params [$vs]
-  :body (- (get $vs 0) (if (= (length $vs) 1) 0 (apply-add $vs 1 0)))]
+[FUNC apply-add :params [vs i acc]
+  :body (if (>= i (length vs)) acc (apply-add vs (+ i 1) (+ acc (get vs i))))]
+[FUNC apply-mul :params [vs i acc]
+  :body (if (>= i (length vs)) acc (apply-mul vs (+ i 1) (* acc (get vs i))))]
+[FUNC apply-sub :params [vs]
+  :body (- (get vs 0) (if (= (length vs) 1) 0 (apply-add vs 1 0)))]
 
-[FUNC self-eval :params [$node $scope]
+[FUNC self-eval :params [node scope]
   :body (cond
-          [(null? $node) null]
-          [(= (get $node :kind) "literal") (eval-literal $node $scope)]
-          [(= (get $node :kind) "variable") (eval-variable $node $scope)]
-          [(= (get $node :kind) "sexpr") (eval-sexpr $node $scope)]
+          [(null? node) null]
+          [(= (get node :kind) "literal") (eval-literal node scope)]
+          [(= (get node :kind) "variable") (eval-variable node scope)]
+          [(= (get node :kind) "sexpr") (eval-sexpr node scope)]
           [true null])]
 
-[FUNC eval-literal :params [$n $scope]
-  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+[FUNC eval-literal :params [n scope]
+  :body (let [[t (get n :type)] [v (get n :value)]]
           (cond
-            [(= $t "number") (str-to-num $v)]
-            [(= $t "string") $v]
-            [(= $t "symbol")
-             (let [[$rv (scope-get $scope $v)]]
-               (if (null? $rv) $v $rv))]
-            [true $v]))]
+            [(= t "number") (str-to-num v)]
+            [(= t "string") v]
+            [(= t "symbol")
+             (let [[rv (scope-get scope v)]]
+               (if (null? rv) v rv))]
+            [true v]))]
 
-[FUNC eval-variable :params [$n $scope]
-  :body (let [[$name (get $n :name)] [$v (scope-get $scope $name)]]
-          (if (null? $v)
-            (error (str "Undefined variable: $" $name))
-            $v))]
+[FUNC eval-variable :params [n scope]
+  :body (let [[name (get n :name)] [v (scope-get scope name)]]
+          (if (null? v)
+            (error (str "Undefined variable: $" name))
+            v))]
 
-[FUNC eval-args-list :params [$args $scope $i $acc]
-  :body (if (>= $i (length $args)) $acc
-          (eval-args-list $args $scope (+ $i 1)
-                          (append $acc (list (self-eval (get $args $i) $scope)))))]
+[FUNC eval-args-list :params [args scope i acc]
+  :body (if (>= i (length args)) acc
+          (eval-args-list args scope (+ i 1)
+                          (append acc (list (self-eval (get args i) scope)))))]
 
-[FUNC eval-sexpr :params [$n $scope]
-  :body (let [[$op (get $n :op)] [$args (get $n :args)]]
+[FUNC eval-sexpr :params [n scope]
+  :body (let [[op (get n :op)] [args (get n :args)]]
           (cond
-            [(= $op "if")
-             (if (truthy? (self-eval (get $args 0) $scope))
-               (self-eval (get $args 1) $scope)
-               (if (>= (length $args) 3) (self-eval (get $args 2) $scope) null))]
+            [(= op "if")
+             (if (truthy? (self-eval (get args 0) scope))
+               (self-eval (get args 1) scope)
+               (if (>= (length args) 3) (self-eval (get args 2) scope) null))]
             [true
-             (let [[$clean (strip-dollar $op)]
-                   [$vs (eval-args-list $args $scope 0 (list))]]
+             (let [[clean (strip-dollar op)]
+                   [vs (eval-args-list args scope 0 (list))]]
                (cond
-                 [(= $clean "+") (apply-add $vs 0 0)]
-                 [(= $clean "-") (apply-sub $vs)]
-                 [(= $clean "*") (apply-mul $vs 0 1)]
-                 [(= $clean "<") (< (get $vs 0) (get $vs 1))]
-                 [(= $clean ">") (> (get $vs 0) (get $vs 1))]
-                 [(= $clean "=") (= (get $vs 0) (get $vs 1))]
-                 [(= $clean "println") (println (if (= (length $vs) 0) "" (get $vs 0)))]
-                 [true (error (str "Unknown op: " $clean))]))]))]
+                 [(= clean "+") (apply-add vs 0 0)]
+                 [(= clean "-") (apply-sub vs)]
+                 [(= clean "*") (apply-mul vs 0 1)]
+                 [(= clean "<") (< (get vs 0) (get vs 1))]
+                 [(= clean ">") (> (get vs 0) (get vs 1))]
+                 [(= clean "=") (= (get vs 0) (get vs 1))]
+                 [(= clean "println") (println (if (= (length vs) 0) "" (get vs 0)))]
+                 [true (error (str "Unknown op: " clean))]))]))]
 
-[FUNC self-run :params [$src]
-  :body (self-eval (get (parse (lex $src)) 0) (make-scope))]
+[FUNC self-run :params [src]
+  :body (self-eval (get (parse (lex src)) 0) (make-scope))]
 
 ;; ═══════════════ smoke ═══════════════
-[FUNC check :params [$label $actual $expected]
-  :body (if (= $actual $expected)
-          (println (str "pass " $label "=" $actual))
-          (println (str "fail " $label " expected=" $expected " got=" $actual)))]
+[FUNC check :params [label actual expected]
+  :body (if (= actual expected)
+          (println (str "pass " label "=" actual))
+          (println (str "fail " label " expected=" expected " got=" actual)))]
 
 (check "add"       (self-run "(+ 1 2)")        3)
 (check "mul"       (self-run "(* 3 4)")        12)

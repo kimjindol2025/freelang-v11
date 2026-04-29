@@ -1,87 +1,87 @@
 ;; Gen1 검증: 원본 vs 최적화 숫자 비교
 
-(defn is-constant [$node]
-  (if (nil? $node) false
-    (let [[$kind (get $node "kind")]]
-      (if (= $kind "literal")
-        (let [[$type (get $node "type")]]
-          (if (= $type "symbol") false true))
+(defn is-constant [node]
+  (if (nil? node) false
+    (let [[kind (get node "kind")]]
+      (if (= kind "literal")
+        (let [[type (get node "type")]]
+          (if (= type "symbol") false true))
         false))))
 
-(defn is-arithmetic-op [$op]
-  (if (= $op "+") true
-    (if (= $op "-") true
-      (if (= $op "*") true
-        (if (= $op "/") true false)))))
+(defn is-arithmetic-op [op]
+  (if (= op "+") true
+    (if (= op "-") true
+      (if (= op "*") true
+        (if (= op "/") true false)))))
 
-(defn all-constant? [$args]
-  (if (= (length $args) 0) true
-    (let [[$first (get $args 0)]]
-      (let [[$rest (slice $args 1 (length $args))]]
-        (if (is-constant $first) (all-constant? $rest) false)))))
+(defn all-constant? [args]
+  (if (= (length args) 0) true
+    (let [[first (get args 0)]]
+      (let [[rest (slice args 1 (length args))]]
+        (if (is-constant first) (all-constant? rest) false)))))
 
-(defn evaluate-arithmetic [$op $args]
-  (let [[$v0 (get (get $args 0) "value")]]
-    (let [[$v1 (get (get $args 1) "value")]]
-      (if (= $op "+") (+ $v0 $v1)
-        (if (= $op "-") (- $v0 $v1)
-          (if (= $op "*") (* $v0 $v1)
-            (if (= $op "/") (/ $v0 $v1) nil)))))))
+(defn evaluate-arithmetic [op args]
+  (let [[v0 (get (get args 0) "value")]]
+    (let [[v1 (get (get args 1) "value")]]
+      (if (= op "+") (+ v0 v1)
+        (if (= op "-") (- v0 v1)
+          (if (= op "*") (* v0 v1)
+            (if (= op "/") (/ v0 v1) nil)))))))
 
-(defn make-literal [$value]
-  {:kind "literal" :type "number" :value $value :line nil})
+(defn make-literal [value]
+  {:kind "literal" :type "number" :value value :line nil})
 
-(defn fold-constant [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (is-arithmetic-op $op)
-          (if (all-constant? $args)
-            (make-literal (evaluate-arithmetic $op $args))
-            $node)
-          $node)))
-    $node))
+(defn fold-constant [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (is-arithmetic-op op)
+          (if (all-constant? args)
+            (make-literal (evaluate-arithmetic op args))
+            node)
+          node)))
+    node))
 
-(defn elim-dead-expr [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (if (= $op "do")
-        (let [[$args (get $node "args")]]
-          (if (all-constant? $args)
-            (if (= (length $args) 0)
-              {:kind "nil" :line (get $node "line")}
-              (get $args (- (length $args) 1)))
-            $node))
-        $node))
-    $node))
+(defn elim-dead-expr [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (if (= op "do")
+        (let [[args (get node "args")]]
+          (if (all-constant? args)
+            (if (= (length args) 0)
+              {:kind "nil" :line (get node "line")}
+              (get args (- (length args) 1)))
+            node))
+        node))
+    node))
 
-(defn optimize-node [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$op (get $node "op")]]
-      (let [[$args (get $node "args")]]
-        (if (= $op "do")
-          (if (= (length $args) 1)
-            (optimize-node (get $args 0))
-            (let [[$new-args (map (fn [$n] (optimize-node $n)) $args)]]
-              (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
-                (elim-dead-expr $new-node))))
-          (let [[$new-args (map (fn [$n] (optimize-node $n)) $args)]]
-            (let [[$new-node {:kind "sexpr" :op $op :args $new-args :line (get $node "line")}]]
-              (fold-constant $new-node))))))
-    $node))
+(defn optimize-node [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[op (get node "op")]]
+      (let [[args (get node "args")]]
+        (if (= op "do")
+          (if (= (length args) 1)
+            (optimize-node (get args 0))
+            (let [[new-args (map (fn [n] (optimize-node n)) args)]]
+              (let [[new-node {:kind "sexpr" :op op :args new-args :line (get node "line")}]]
+                (elim-dead-expr new-node))))
+          (let [[new-args (map (fn [n] (optimize-node n)) args)]]
+            (let [[new-node {:kind "sexpr" :op op :args new-args :line (get node "line")}]]
+              (fold-constant new-node))))))
+    node))
 
-(defn optimize-ast [$ast]
-  (map (fn [$n] (optimize-node $n)) $ast))
+(defn optimize-ast [ast]
+  (map (fn [n] (optimize-node n)) ast))
 
-(defn count-ast-nodes [$node]
-  (if (= (get $node "kind") "sexpr")
-    (let [[$args (get $node "args")]]
-      (let [[$child-count (reduce (fn [$a $b] (+ $a (count-ast-nodes $b))) 0 $args)]]
-        (+ 1 $child-count)))
+(defn count-ast-nodes [node]
+  (if (= (get node "kind") "sexpr")
+    (let [[args (get node "args")]]
+      (let [[child-count (reduce (fn [a b] (+ a (count-ast-nodes b))) 0 args)]]
+        (+ 1 child-count)))
     1))
 
-(defn count-all-nodes [$ast]
-  (reduce (fn [$a $b] (+ $a (count-ast-nodes $b))) 0 $ast))
+(defn count-all-nodes [ast]
+  (reduce (fn [a b] (+ a (count-ast-nodes b))) 0 ast))
 
 (do
   (println "================================================")
@@ -89,68 +89,68 @@
   (println "================================================\n")
 
   ;; 테스트 1
-  (let [[$code "(+ 1 2)"]]
-    (let [[$ast-orig (parse (lex $code))]]
-      (let [[$ast-opt (optimize-ast $ast-orig)]]
+  (let [[code "(+ 1 2)"]]
+    (let [[ast-orig (parse (lex code))]]
+      (let [[ast-opt (optimize-ast ast-orig)]]
         (do
           (println "테스트 1: 단순 상수 폴딩")
-          (println (str "  코드: " $code))
-          (println (str "  원본 크기: " (length $code) "B"))
-          (println (str "  원본 토큰: " (length (lex $code))))
-          (println (str "  원본 AST: " (count-all-nodes $ast-orig)))
-          (println (str "  최적화 후: " (get $ast-opt 0)))
+          (println (str "  코드: " code))
+          (println (str "  원본 크기: " (length code) "B"))
+          (println (str "  원본 토큰: " (length (lex code))))
+          (println (str "  원본 AST: " (count-all-nodes ast-orig)))
+          (println (str "  최적화 후: " (get ast-opt 0)))
           (println "")))))
 
   ;; 테스트 2
-  (let [[$code "(+ (+ 1 2) (+ 3 4))"]]
-    (let [[$ast-orig (parse (lex $code))]]
-      (let [[$ast-opt (optimize-ast $ast-orig)]]
+  (let [[code "(+ (+ 1 2) (+ 3 4))"]]
+    (let [[ast-orig (parse (lex code))]]
+      (let [[ast-opt (optimize-ast ast-orig)]]
         (do
           (println "테스트 2: 중첩 상수 폴딩")
-          (println (str "  코드: " $code))
-          (println (str "  원본 크기: " (length $code) "B"))
-          (println (str "  원본 토큰: " (length (lex $code))))
-          (println (str "  원본 AST: " (count-all-nodes $ast-orig)))
-          (println (str "  최적화 후: " (get $ast-opt 0)))
+          (println (str "  코드: " code))
+          (println (str "  원본 크기: " (length code) "B"))
+          (println (str "  원본 토큰: " (length (lex code))))
+          (println (str "  원본 AST: " (count-all-nodes ast-orig)))
+          (println (str "  최적화 후: " (get ast-opt 0)))
           (println "")))))
 
   ;; 테스트 3
-  (let [[$code "(do (+ 1 2))"]]
-    (let [[$ast-orig (parse (lex $code))]]
-      (let [[$ast-opt (optimize-ast $ast-orig)]]
+  (let [[code "(do (+ 1 2))"]]
+    (let [[ast-orig (parse (lex code))]]
+      (let [[ast-opt (optimize-ast ast-orig)]]
         (do
           (println "테스트 3: do-elimination + 폴딩")
-          (println (str "  코드: " $code))
-          (println (str "  원본 크기: " (length $code) "B"))
-          (println (str "  원본 토큰: " (length (lex $code))))
-          (println (str "  원본 AST: " (count-all-nodes $ast-orig)))
-          (println (str "  최적화 후: " (get $ast-opt 0)))
+          (println (str "  코드: " code))
+          (println (str "  원본 크기: " (length code) "B"))
+          (println (str "  원본 토큰: " (length (lex code))))
+          (println (str "  원본 AST: " (count-all-nodes ast-orig)))
+          (println (str "  최적화 후: " (get ast-opt 0)))
           (println "")))))
 
   ;; 테스트 4
-  (let [[$code "(do (do (+ 1 2)))"]]
-    (let [[$ast-orig (parse (lex $code))]]
-      (let [[$ast-opt (optimize-ast $ast-orig)]]
+  (let [[code "(do (do (+ 1 2)))"]]
+    (let [[ast-orig (parse (lex code))]]
+      (let [[ast-opt (optimize-ast ast-orig)]]
         (do
           (println "테스트 4: 중첩 do-elimination")
-          (println (str "  코드: " $code))
-          (println (str "  원본 크기: " (length $code) "B"))
-          (println (str "  원본 토큰: " (length (lex $code))))
-          (println (str "  원본 AST: " (count-all-nodes $ast-orig)))
-          (println (str "  최적화 후: " (get $ast-opt 0)))
+          (println (str "  코드: " code))
+          (println (str "  원본 크기: " (length code) "B"))
+          (println (str "  원본 토큰: " (length (lex code))))
+          (println (str "  원본 AST: " (count-all-nodes ast-orig)))
+          (println (str "  최적화 후: " (get ast-opt 0)))
           (println "")))))
 
   ;; 테스트 5
-  (let [[$code "(do 1 2 (+ 3 4))"]]
-    (let [[$ast-orig (parse (lex $code))]]
-      (let [[$ast-opt (optimize-ast $ast-orig)]]
+  (let [[code "(do 1 2 (+ 3 4))"]]
+    (let [[ast-orig (parse (lex code))]]
+      (let [[ast-opt (optimize-ast ast-orig)]]
         (do
           (println "테스트 5: dead-expr elimination")
-          (println (str "  코드: " $code))
-          (println (str "  원본 크기: " (length $code) "B"))
-          (println (str "  원본 토큰: " (length (lex $code))))
-          (println (str "  원본 AST: " (count-all-nodes $ast-orig)))
-          (println (str "  최적화 후: " (get $ast-opt 0)))
+          (println (str "  코드: " code))
+          (println (str "  원본 크기: " (length code) "B"))
+          (println (str "  원본 토큰: " (length (lex code))))
+          (println (str "  원본 AST: " (count-all-nodes ast-orig)))
+          (println (str "  최적화 후: " (get ast-opt 0)))
           (println "")))))
 
   (println "================================================")

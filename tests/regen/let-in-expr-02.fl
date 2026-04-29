@@ -1,6 +1,6 @@
 ;; let-in-expr-02.fl — Case B: if 조건에서 let
 ;; 기대: condition이 IIFE로 boolean 평가
 
-(if (let [$x 1] (> $x 0))
+(if (let [x 1] (> x 0))
   (println "positive")
   (println "non-positive"))

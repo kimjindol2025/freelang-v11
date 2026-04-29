@@ -1,2 +1,2 @@
-[FUNC double :params [$x] :body (* $x 2)]
+[FUNC double :params [x] :body (* x 2)]
 (println (double 21))
