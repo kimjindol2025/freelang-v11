@@ -138,20 +138,20 @@ describe("filter/map/reduce (고차 함수)", () => {
   test("reduce로 짝수만 필터", () => {
     const result = run(`
       (define nums (list 1 2 3 4 5))
-      (reduce $nums (list) (fn [$acc $x]
+      (reduce (fn [$acc $x]
         (if (even? $x)
           (push $acc $x)
-          $acc)))
+          $acc)) (list) $nums)
     `);
     expect(result).toEqual([2, 4]);
   });
 
   test("reduce 합산", () => {
-    expect(run("(reduce (list 1 2 3 4 5) 0 (fn [$acc $x] (+ $acc $x)))")).toBe(15);
+    expect(run("(reduce (fn [$acc $x] (+ $acc $x)) 0 (list 1 2 3 4 5))")).toBe(15);
   });
 
   test("reduce 곱", () => {
-    expect(run("(reduce (list 1 2 3 4 5) 1 (fn [$acc $x] (* $acc $x)))")).toBe(120);
+    expect(run("(reduce (fn [$acc $x] (* $acc $x)) 1 (list 1 2 3 4 5))")).toBe(120);
   });
 });
 

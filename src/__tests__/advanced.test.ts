@@ -184,7 +184,7 @@ describe("내장 함수 — 배열 상세", () => {
   test("reduce로 배열 → 맵 변환", () => {
     expect(run(`
       (define pairs (list "a" "b" "c"))
-      (reduce $pairs 0 (fn [$acc $x] (+ $acc 1)))
+      (reduce (fn [$acc $x] (+ $acc 1)) 0 $pairs)
     `)).toBe(3);
   });
 });
@@ -252,7 +252,7 @@ describe("인터프리터 — 고급 패턴", () => {
   test("메모이제이션 패턴 (map 활용)", () => {
     expect(run(`
       (define double-all (fn [$nums]
-        (reduce $nums (list) (fn [$acc $x] (push $acc (* $x 2)))))
+        (reduce (fn [$acc $x] (push $acc (* $x 2))) (list) $nums))
       )
       (double-all (list 1 2 3 4 5))
     `)).toEqual([2, 4, 6, 8, 10]);
