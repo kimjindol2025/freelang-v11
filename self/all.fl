@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-29 15:26:40
+; 2026-04-29 15:42:47
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -750,7 +750,7 @@
 
 [FUNC js-esc-for-template :params [$s]
   :body (let [[$s1 (replace $s "\\" "\\\\")]]
-          (replace $s1 "`" "\`"))]
+          (replace $s1 "`" "\\`"))]
 
 [FUNC cg-template-string :params [$n]
   :body (str "`" (js-esc-for-template (get $n :value)) "`")]

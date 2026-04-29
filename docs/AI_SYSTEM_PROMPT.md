@@ -677,4 +677,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-29T15:37:46.101Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-04-29T15:42:47.436Z

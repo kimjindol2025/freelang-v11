@@ -84,7 +84,7 @@
 
 [FUNC js-esc-for-template :params [$s]
   :body (let [[$s1 (replace $s "\\" "\\\\")]]
-          (replace $s1 "`" "\`"))]
+          (replace $s1 "`" "\\`"))]
 
 [FUNC cg-template-string :params [$n]
   :body (str "`" (js-esc-for-template (get $n :value)) "`")]
