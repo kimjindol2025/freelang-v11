@@ -319,9 +319,6 @@ var init_lexer = __esm({
 function makeLiteral(type, value, line) {
   return { kind: "literal", type, value, line };
 }
-function makeTemplateString(value, line) {
-  return { kind: "template-string", value, line };
-}
 function makeVariable(name, line) {
   return { kind: "variable", name, line };
 }
@@ -831,9 +828,6 @@ var init_parser = __esm({
         }
         if (this.check("String" /* String */)) {
           const token = this.advance();
-          if (token.value.includes("${")) {
-            return makeTemplateString(token.value);
-          }
           return makeLiteral("string", token.value);
         }
         if (this.check("Variable" /* Variable */)) {
@@ -920,8 +914,9 @@ var init_parser = __esm({
           let key;
           if (this.check("Colon" /* Colon */)) {
             this.advance();
-            if (!this.check("Symbol" /* Symbol */)) {
-              throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+            const _ntok = this.peek();
+            if (_ntok.type !== "Symbol" && getKeywordTokenType(_ntok.value) === void 0) {
+              throw this.error(`Expected symbol after ':' in map literal`, _ntok);
             }
             key = this.advance().value;
           } else if (this.check("String" /* String */)) {
@@ -943,7 +938,7 @@ var init_parser = __esm({
         const peekPos = this.pos + 1;
         if (peekPos >= this.tokens.length) return false;
         const nextToken = this.tokens[peekPos];
-        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */;
+        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */ || nextToken.type === "LBrace" /* LBrace */ || nextToken.type === "LParen" /* LParen */;
       }
       // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
       // Also handles match expressions: (match value (pattern body) ...)
@@ -1359,23 +1354,12 @@ var init_parser = __esm({
       error(message, token) {
         let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
         if (this.parenStack.length > 0 && (token.type === "EOF" /* EOF */ || message.includes("Expected R") || message.includes("Unexpected"))) {
-          const stackInfo = this.parenStack.map((opening, idx) => {
-            const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
-            const depth = idx + 1;
-            return `  [${depth}] '${openSym}' at line ${opening.line}:${opening.col}`;
-          }).join("\n");
-          const closeSeq = this.parenStack.map((o) => o.type === "LParen" /* LParen */ ? ")" : o.type === "LBracket" /* LBracket */ ? "]" : "}").reverse().join("");
-          const nextOpening = this.parenStack[this.parenStack.length - 1];
-          const nextExpected = nextOpening.type === "LParen" /* LParen */ ? ")" : nextOpening.type === "LBracket" /* LBracket */ ? "]" : "}";
-          const parenHint = `\uBBF8\uB2EB\uD798 \uAD04\uD638 \uC2A4\uD0DD (\uAE4A\uC774: ${this.parenStack.length}):
-${stackInfo}
-
-\uD544\uC694\uD55C \uB2EB\uD798 \uAD04\uD638 \uC2DC\uD000\uC2A4: ${closeSeq}
-
-\uB2E4\uC74C \uD1A0\uD070\uC744 \uC608\uC0C1: '${nextExpected}'`;
+          const opening = this.parenStack[this.parenStack.length - 1];
+          const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
+          const wantSym = opening.type === "LParen" /* LParen */ ? ")" : opening.type === "LBracket" /* LBracket */ ? "]" : "}";
+          const parenHint = `\uC5EC\uB294 '${openSym}' at line ${opening.line}:${opening.col} \uAC00 \uB2EB\uD788\uC9C0 \uC54A\uC74C \u2014 '${wantSym}' \uB204\uB77D \uB610\uB294 \uC624\uD0C0`;
           hint = hint ? `${hint}
-
-${parenHint}` : parenHint;
+  ${parenHint}` : parenHint;
         }
         let code = "E_PARSE_SYNTAX_ERROR";
         if (message.includes("Expected") || message.includes("Unexpected")) {
@@ -1945,26 +1929,14 @@ ${parenHint}` : parenHint;
                   pattern = makeVariablePattern(patternName);
                 }
                 this.expect("RBracket" /* RBracket */);
-              } else if (this.check("Symbol" /* Symbol */) || this.check("Variable" /* Variable */)) {
-                const paramToken = this.advance();
-                variable = paramToken.value;
-                pattern = makeVariablePattern(paramToken.value);
               }
-              const handlerExprs = [];
-              while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
-                handlerExprs.push(this.parseValue());
-              }
-              const handler = handlerExprs.length === 1 ? handlerExprs[0] : makeSExpr("do", handlerExprs);
+              const handler = this.parseValue();
               catchClauses.push(makeCatchClause(handler, pattern, variable));
               this.expect("RParen" /* RParen */);
             } else if (nextToken.type === "Symbol" /* Symbol */ && nextToken.value === "finally") {
               this.advance();
               this.advance();
-              const finallyExprs = [];
-              while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
-                finallyExprs.push(this.parseValue());
-              }
-              finallyBlock = finallyExprs.length === 1 ? finallyExprs[0] : makeSExpr("do", finallyExprs);
+              finallyBlock = this.parseValue();
               this.expect("RParen" /* RParen */);
               break;
             } else {
@@ -1981,29 +1953,6 @@ ${parenHint}` : parenHint;
       parseThrowExpression() {
         const argument = this.parseValue();
         return makeThrowExpression(argument);
-      }
-      // Phase B-1: Parse loop expressions
-      // (loop [($var init) condition update] body)
-      parseLoopExpression() {
-        const startLine = this.peek().line || 0;
-        this.expect("LBracket" /* LBracket */);
-        const init = this.parseValue();
-        const condition = this.parseValue();
-        const update = this.parseValue();
-        this.expect("RBracket" /* RBracket */);
-        const bodyExprs = [];
-        while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
-          bodyExprs.push(this.parseValue());
-        }
-        const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
-        return {
-          kind: "loop",
-          init,
-          condition,
-          update,
-          body,
-          line: startLine
-        };
       }
       // Phase 9c: Internal helper for parsing reasoning expressions (used by parseReasoningExpression and parseReasoningSequenceExpression)
       parseReasoningExpressionInternal(stage) {
@@ -11171,6 +11120,7 @@ init_lexer();
 init_parser();
 function flDeepEq(a, b) {
   if (a === b) return true;
+  if (a == null && b == null) return true;
   if (a == null || b == null) return false;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
@@ -11185,6 +11135,7 @@ function flDeepEq(a, b) {
   }
   return false;
 }
+var MODULE_CACHE = /* @__PURE__ */ new Map();
 function flEnvGet(env, name) {
   let e = env;
   while (e !== null && e !== void 0) {
@@ -11237,7 +11188,7 @@ function flExecOpNative(op, vals) {
     case "%":
       return v0 % v1;
     case "=":
-      return v0 === v1;
+      return (v0 == null && v1 == null) ? true : v0 === v1;
     case "!=":
       return v0 !== v1;
     case "<":
@@ -11338,7 +11289,8 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.length > 0 ? v0[v0.length - 1] : null : null;
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
-    case "get-or": {
+    case "get-or":
+    case "get_or": {
       let k = v1;
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
       if (v0 === null || v0 === void 0) return v2 !== void 0 ? v2 : null;
@@ -11397,12 +11349,14 @@ function flExecOpNative(op, vals) {
     case "block-items":
       return flBlockItems(v0);
     case "read-file":
+    case "file_read":
       try {
         return require("fs").readFileSync(String(v0), "utf-8");
       } catch {
         return null;
       }
     case "write-file":
+    case "file_write":
       try {
         require("fs").writeFileSync(String(v0), String(v1 ?? ""));
         return true;
@@ -11410,6 +11364,7 @@ function flExecOpNative(op, vals) {
         return false;
       }
     case "file-exists?":
+    case "file_exists":
       try {
         return require("fs").existsSync(String(v0));
       } catch {
@@ -11459,14 +11414,17 @@ function flExecOpNative(op, vals) {
       const path16 = require("path");
       try {
         const resolvedPath = path16.resolve(process.cwd(), filePath);
+        console.log(`[LOAD DEBUG v1] Called with ${resolvedPath}`);
         const src = fs20.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
+        console.log(`[LOAD DEBUG v1] AST nodes: ${ast.length}`);
         for (const node of ast) {
           interp.eval(node);
         }
+        console.log(`[LOAD DEBUG v1] Functions after eval: ${interp.globals.size}`);
         return null;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
@@ -11493,31 +11451,6 @@ function flExecOpNative(op, vals) {
         return true;
       } catch {
         return false;
-      }
-    }
-    case "http-get":
-    case "http_get": {
-      const url2 = String(v0 ?? "");
-      try {
-        const { execSync: execSync2 } = require("child_process");
-        const escapedUrl = url2.replace(/'/g, "'\\''");
-        const cmd2 = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
-        const result = execSync2(cmd2, { encoding: "utf-8", timeout: 1e4 });
-        const lines = result.split("\n");
-        const status = parseInt(lines[lines.length - 1], 10) || 0;
-        const body = lines.slice(0, -1).join("\n");
-        return {
-          status,
-          body,
-          headers: {}
-        };
-      } catch (e) {
-        return {
-          status: 0,
-          body: "",
-          headers: {},
-          error: e.message
-        };
       }
     }
     default:
@@ -11706,13 +11639,22 @@ function evalBuiltin(interp2, op, args2, expr) {
       const path16 = require("path");
       try {
         const resolvedPath = path16.resolve(process.cwd(), filePath);
+        if (MODULE_CACHE.has(resolvedPath)) {
+          return MODULE_CACHE.get(resolvedPath);
+        }
         const src = fs20.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
+        console.log(`[LOAD DEBUG] Loaded ${resolvedPath}, AST nodes: ${ast.length}`);
+        console.log(`[LOAD DEBUG] AST types: ${ast.map((n) => n.kind || n.type).join(", ").substring(0, 100)}`);
+        console.log(`[LOAD DEBUG] Functions before interpret: ${interp2.globals.size}`);
         const result = interp2.interpret(ast);
-        return null;
+        console.log(`[LOAD DEBUG] Functions after interpret: ${interp2.globals.size}`);
+        console.log(`[LOAD DEBUG] bson-encode exists: ${interp2.globals.has("bson-encode")}`);
+        MODULE_CACHE.set(resolvedPath, result);
+        return result;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }
@@ -12010,10 +11952,14 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "rest":
       return args2[0]?.slice(1);
     case "keys":
+    case "json_keys":
       return args2[0] && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.keys(args2[0]) : [];
     case "values":
+    case "json_vals":
       return args2[0] && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.values(args2[0]) : [];
     case "upper-case":
+    case "uppercase":
+    case "upper":
       return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0];
     case "lower-case":
     case "lowercase":
@@ -12113,9 +12059,20 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       };
     }
     case "reduce": {
-      const reduceFn = args2[0];
-      let accumulator = args2[1];
-      let arr = args2[2] ?? [];
+      let reduceFn, accumulator, arr;
+      if (Array.isArray(args2[0])) {
+        arr = args2[0];
+        accumulator = args2[1];
+        reduceFn = args2[2];
+      } else if (isLazySeq(args2[0])) {
+        arr = args2[0];
+        accumulator = args2[1];
+        reduceFn = args2[2];
+      } else {
+        reduceFn = args2[0];
+        accumulator = args2[1];
+        arr = args2[2] ?? [];
+      }
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
         let cur = arr;
@@ -12201,9 +12158,15 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args2[0] === "function";
     case "map?":
       return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
+    case "json_keys":
+      return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.keys(args2[0]) : [];
     case "num-to-str":
+    case "num->str":
       return String(args2[0]);
     case "str-to-num":
+    case "str->num":
+    case "string->number":
+    case "string-to-number":
       return parseFloat(String(args2[0]));
     case "map-set":
       if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
@@ -12243,9 +12206,14 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "repeat":
       return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
     case "filter": {
-      const filterFn = args2[0];
-      const coll = args2[1];
-      if (!Array.isArray(coll)) return [];
+      let coll, filterFn;
+      if (Array.isArray(args2[0])) {
+        coll = args2[0];
+        filterFn = args2[1];
+      } else if (Array.isArray(args2[1])) {
+        filterFn = args2[0];
+        coll = args2[1];
+      } else return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && filterFn.kind === "function-value") {
         return coll.filter((item) => callFnVal(filterFn, [item]));
@@ -12270,7 +12238,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "last-or":
     case "last_or":
       return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : args2[1] !== void 0 ? args2[1] : null;
-    case "get-or": {
+    case "get-or":
+    case "get_or": {
       const def = args2[2] !== void 0 ? args2[2] : null;
       let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
@@ -12396,12 +12365,14 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         case "number?":
           return typeof v0 === "number";
         case "read-file":
+        case "file_read":
           try {
             return require("fs").readFileSync(String(v0), "utf-8");
           } catch {
             return null;
           }
         case "write-file":
+        case "file_write":
           try {
             require("fs").writeFileSync(String(v0), String(v1 ?? ""));
             return true;
@@ -12409,12 +12380,14 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
             return false;
           }
         case "file-exists?":
+        case "file_exists":
           try {
             return require("fs").existsSync(String(v0));
           } catch {
             return false;
           }
         case "file-append":
+        case "file_append":
           try {
             require("fs").appendFileSync(String(v0), String(v1 ?? ""));
             return true;
@@ -12422,6 +12395,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
             return false;
           }
         case "dir-list":
+        case "dir_list":
           try {
             return require("fs").readdirSync(String(v0));
           } catch {
@@ -15046,48 +15020,6 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       if (op.startsWith("explain-")) {
         const r145 = evalExplain_PHASE145(op, args2, callFnVal);
         if (r145 !== null) return r145;
-      }
-      switch (op) {
-        case "file-mkdir":
-        case "file_mkdir": {
-          const dirPath = String(args2[0] ?? "");
-          const fs20 = require("fs");
-          try {
-            fs20.mkdirSync(dirPath, { recursive: true });
-            return true;
-          } catch {
-            return false;
-          }
-        }
-        case "http-get":
-        case "http_get": {
-          const url2 = String(args2[0] ?? "");
-          try {
-            const { execSync: execSync2 } = require("child_process");
-            const escapedUrl = url2.replace(/'/g, "'\\''");
-            const cmd2 = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
-            const result = execSync2(cmd2, { encoding: "utf-8", timeout: 1e4 });
-            const lines = result.split("\n");
-            const status = parseInt(lines[lines.length - 1], 10) || 0;
-            const body = lines.slice(0, -1).join("\n");
-            return {
-              status,
-              body,
-              headers: {}
-            };
-          } catch (e) {
-            return {
-              status: 0,
-              body: "",
-              headers: {},
-              error: e.message
-            };
-          }
-        }
-        case "now-iso":
-        case "now_iso": {
-          return (/* @__PURE__ */ new Date()).toISOString();
-        }
       }
       return callUser(op, args2);
     }
@@ -18178,32 +18110,6 @@ function evalSpecialForm(interp2, op, expr) {
     const bindingsNode = expr.args[0];
     const bodyNodes = expr.args.slice(1);
     const bindingItems = bindingsNode.kind === "array" ? bindingsNode.items || [] : bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get?.("items") || [] : [];
-    const isModernSyntax = bindingItems.length === 3 && bindingItems[0].kind === "sexpr";
-    if (isModernSyntax) {
-      const initExpr = bindingItems[0];
-      const condExpr = bindingItems[1];
-      const updateExpr = bindingItems[2];
-      const varName = initExpr.op || "$i";
-      const initVal = ev(initExpr.args[0]);
-      ctx.variables.push();
-      ctx.variables.set(varName, initVal);
-      let result2 = null;
-      try {
-        while (true) {
-          const condVal = ev(condExpr);
-          const isTruthy = condVal !== null && condVal !== void 0 && condVal !== false;
-          if (!isTruthy) break;
-          for (const bodyNode of bodyNodes) {
-            result2 = ev(bodyNode);
-          }
-          const newVal = ev(updateExpr);
-          ctx.variables.set(varName, newVal);
-        }
-        return result2;
-      } finally {
-        ctx.variables.pop();
-      }
-    }
     const loopVars = [];
     const loopInits = [];
     for (let i = 0; i < bindingItems.length; i += 2) {
@@ -18587,14 +18493,12 @@ function evalLet(interp2, args2) {
     const items = bindings.fields.get("items");
     if (Array.isArray(items) && items.length > 0) {
       const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
-      if (isNested) {
-        for (let i = 0; i < items.length; i += 2) {
-          if (!(items[i]?.kind === "block" && items[i]?.type === "Array")) {
-            ctx.variables.pop();
-            throw new Error(`let: 2\uCC28\uC6D0 \uBC14\uC778\uB529\uC5D0\uC11C \uC6D0\uC18C ${i}\uAC00 \uBC30\uC5F4\uC774 \uC544\uB2D8`);
-          }
+      for (let i = 1; i < items.length; i++) {
+        const cur = items[i]?.kind === "block" && items[i]?.type === "Array";
+        if (cur !== isNested) {
+          ctx.variables.pop();
+          throw new Error(`let: \uBC14\uC778\uB529 \uD615\uC2DD\uC774 \uC77C\uAD00\uB418\uC9C0 \uC54A\uC74C (2\uCC28\uC6D0 [[$x ...]] \uC640 1\uCC28\uC6D0 [$x ...] \uD63C\uD569 \uBD88\uAC00, index=${i})`);
         }
-      } else {
       }
       if (isNested) {
         for (const item of items) {
@@ -21705,7 +21609,15 @@ function categorizeError(message) {
   if (msg.includes("io error")) return "IO_ERROR";
   return "UNKNOWN";
 }
-function createWorkflowModule() {
+function createWorkflowModule(callFnVal, callUserFn) {
+  function callFl(fn, args) {
+    if (typeof fn === "function") return fn(...args);
+    if (typeof fn === "string" && typeof callUserFn === "function") return callUserFn(fn, args);
+    if (fn && (fn.kind === "function-value" || fn.params !== void 0)) {
+      if (typeof callFnVal === "function") return callFnVal(fn, args);
+    }
+    return null;
+  }
   return {
     // ── Workflow Definition ───────────────────────────────────
     // workflow_create name steps -> Workflow object
@@ -21756,7 +21668,7 @@ function createWorkflowModule() {
         const step = steps[stepIndex];
         if (step.if !== void 0) {
           try {
-            const shouldRun = step.if(ctx);
+            const shouldRun = callFl(step.if, [ctx]);
             if (!shouldRun) {
               log.push({ step: step.name, status: "skipped", ms: 0 });
               continue;
@@ -21787,7 +21699,7 @@ function createWorkflowModule() {
         let stepResult = void 0;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
-            stepResult = step.fn(ctx);
+            stepResult = callFl(step.fn, [ctx]);
             ctx = { ...ctx, ...stepResult };
             success = true;
             break;
@@ -21825,7 +21737,7 @@ function createWorkflowModule() {
           const errorCategory = categorizeError(lastErr);
           if (step.on_error) {
             try {
-              fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
+              fallbackValue = callFl(step.on_error, [{ error: lastErr, attempts: maxAttempts, step_name: step.name }]);
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
@@ -21849,7 +21761,7 @@ function createWorkflowModule() {
           }
           if (step.fallback !== void 0) {
             try {
-              fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+              fallbackValue = typeof step.fallback === "function" ? callFl(step.fallback, []) : step.fallback;
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (fallback used)`);
@@ -21942,6 +21854,284 @@ function createWorkflowModule() {
     }),
     // ── Result Inspection ─────────────────────────────────────
     // workflow_ok result -> boolean
+// workflow_parallel steps ctx -> {ok, results, errors, total_ms}
+    // 모든 step을 독립 실행 (실패해도 계속), 결과 모두 수집
+    "workflow_parallel": (steps, ctx = {}) => {
+      const start = Date.now();
+      const results = [];
+      const errors = [];
+      for (const step of steps) {
+        const t0 = Date.now();
+        try {
+          if (step.if !== void 0) {
+            const ok = callFl(step.if, [ctx]);
+            if (!ok) {
+              results.push({ name: step.name, status: "skipped", ms: 0 });
+              continue;
+            }
+          }
+          const r = callFl(step.fn, [ctx]);
+          ctx = { ...ctx, ...r };
+          results.push({ name: step.name, status: "ok", result: r, ms: Date.now() - t0 });
+        } catch (e) {
+          errors.push({ name: step.name, error: e.message });
+          results.push({ name: step.name, status: "failed", error: e.message, ms: Date.now() - t0 });
+        }
+      }
+      const allOk = errors.length === 0;
+      return { ok: allOk, results, errors, context: ctx, total_ms: Date.now() - start };
+    },
+    // workflow_parallel_any steps ctx -> {ok, name, result, ms}
+    // 최초 성공 step 결과 반환 (나머지 건너뜀)
+    "workflow_parallel_any": (steps, ctx = {}) => {
+      for (const step of steps) {
+        const t0 = Date.now();
+        try {
+          const r = callFl(step.fn, [ctx]);
+          return { ok: true, name: step.name, result: r, ms: Date.now() - t0 };
+        } catch (_) {}
+      }
+      return { ok: false, error: "All steps failed" };
+    },
+    // ── P1: 보상 트랜잭션 (Saga) ─────────────────────────────────
+    // saga_run steps -> {ok, results, compensated, error}
+    // step: {name, action fn(ctx)->ctx, compensate fn(result)->void}
+    "saga_run": (steps, ctx = {}) => {
+      const done = [];
+      for (const step of steps) {
+        try {
+          const result = callFl(step.action, [ctx]);
+          if (result && typeof result === "object") ctx = { ...ctx, ...result };
+          done.push({ name: step.name, result });
+        } catch (e) {
+          // 역순 보상 실행
+          const compensated = [];
+          for (let i = done.length - 1; i >= 0; i--) {
+            if (done[i] && step !== done[i] && done[i].name) {
+              const doneStep = steps.find((s) => s.name === done[i].name);
+              if (doneStep && doneStep.compensate) {
+                try { callFl(doneStep.compensate, [done[i].result]); } catch (_) {}
+                compensated.push(done[i].name);
+              }
+            }
+          }
+          return {
+            ok: false,
+            error: e.message,
+            failed_step: step.name,
+            compensated,
+            results: done
+          };
+        }
+      }
+      return { ok: true, results: done };
+    },
+    // ── P1: 배치/분산 처리 ───────────────────────────────────────
+    // batch_map arr batchSize fn -> {ok, results, total, batches, errors}
+    "batch_map": (arr, batchSize, fn) => {
+      const results = [];
+      const errors = [];
+      let batches = 0;
+      for (let i = 0; i < arr.length; i += batchSize) {
+        const batch = arr.slice(i, i + batchSize);
+        batches++;
+        try {
+          const r = callFl(fn, [batch]);
+          if (Array.isArray(r)) results.push(...r);
+          else results.push(r);
+        } catch (e) {
+          errors.push({ batch: batches, error: e.message });
+        }
+      }
+      return { ok: errors.length === 0, results, total: arr.length, batches, errors };
+    },
+    // distribute items workers fn -> {ok, results, worker_results}
+    // items를 workers 수로 나눠 각각 처리 (단일 프로세스 내 배치 분산)
+    "distribute": (items, workers, fn) => {
+      const n = Math.max(1, Array.isArray(workers) ? workers.length : workers);
+      const batchSize = Math.ceil(items.length / n);
+      const workerResults = [];
+      const results = [];
+      for (let w = 0; w < n; w++) {
+        const batch = items.slice(w * batchSize, (w + 1) * batchSize);
+        if (batch.length === 0) break;
+        try {
+          const r = callFl(fn, [batch, w]);
+          const out = Array.isArray(r) ? r : [r];
+          results.push(...out);
+          workerResults.push({ worker: w, ok: true, count: batch.length, result: r });
+        } catch (e) {
+          workerResults.push({ worker: w, ok: false, error: e.message });
+        }
+      }
+      return { ok: workerResults.every((w) => w.ok), results, worker_results: workerResults };
+    },
+    // ── P1: 관찰성 (Observability) ───────────────────────────────
+    // time_exec fn -> {ok, result, ms}
+    "time_exec": (fn) => {
+      const t0 = Date.now();
+      try {
+        const result = callFl(fn, []);
+        return { ok: true, result, ms: Date.now() - t0 };
+      } catch (e) {
+        return { ok: false, error: e.message, ms: Date.now() - t0 };
+      }
+    },
+    // span label fn -> {label, ok, result, ms}
+    "span": (label, fn) => {
+      const t0 = Date.now();
+      try {
+        const result = callFl(fn, []);
+        const ms = Date.now() - t0;
+        process.stderr.write(`[SPAN] ${label}: ${ms}ms ok\n`);
+        return { label, ok: true, result, ms };
+      } catch (e) {
+        const ms = Date.now() - t0;
+        process.stderr.write(`[SPAN] ${label}: ${ms}ms FAILED — ${e.message}\n`);
+        return { label, ok: false, error: e.message, ms };
+      }
+    },
+    // log_trace label value -> value (passthrough with trace log)
+    "log_trace": (label, value) => {
+      process.stderr.write(`[TRACE] ${label}: ${JSON.stringify(value)}\n`);
+      return value;
+    },
+    // ── P2: 보안 Sandbox ──────────────────────────────────────────
+    // sandbox_run fn options -> {ok, result, error, ms, calls}
+    // options: {:timeout N :max_calls N}
+    "sandbox_run": (fn, options = {}) => {
+      const timeout = options.timeout ?? 5000;
+      const maxCalls = options.max_calls ?? 1000;
+      const t0 = Date.now();
+      let calls = 0;
+      // Wrap callFl to count calls
+      const limitedCallFl = (f, args) => {
+        calls++;
+        if (calls > maxCalls) throw new Error(`sandbox: max_calls(${maxCalls}) 초과`);
+        if (Date.now() - t0 > timeout) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
+        return callFl(f, args);
+      };
+      try {
+        // Use deadline check via synchronous polling
+        const deadline = t0 + timeout;
+        const result = (() => {
+          if (Date.now() > deadline) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
+          return callFl(fn, []);
+        })();
+        return { ok: true, result, ms: Date.now() - t0, calls };
+      } catch (e) {
+        return { ok: false, error: e.message, ms: Date.now() - t0, calls };
+      }
+    },
+    // ── P2: 성능 최적화 ───────────────────────────────────────────
+    // memoize fn maxSize -> memo-id (전역 레지스트리에 fn+cache 저장)
+    // memo_call memo-id ...args -> result
+    "memoize": (fn, maxSize = 0) => {
+      const id = `_m${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      createWorkflowModule._reg = createWorkflowModule._reg || {};
+      createWorkflowModule._reg[id] = { fn, cache: {}, size: 0, max: maxSize };
+      return id;
+    },
+    "memo_call": (memoId, ...args) => {
+      const store = (createWorkflowModule._reg || {})[memoId];
+      if (!store) throw new Error("invalid memo id");
+      const key = JSON.stringify(args);
+      if (key in store.cache) return store.cache[key];
+      const result = callFl(store.fn, args);
+      if (store.max > 0 && store.size >= store.max) {
+        delete store.cache[Object.keys(store.cache)[0]];
+        store.size--;
+      }
+      store.cache[key] = result;
+      store.size++;
+      return result;
+    },
+    "memo_size": (memoId) => {
+      const store = (createWorkflowModule._reg || {})[memoId];
+      return store ? store.size : 0;
+    },
+    "memo_clear": (memoId) => {
+      const store = (createWorkflowModule._reg || {})[memoId];
+      if (store) { store.cache = {}; store.size = 0; }
+      return memoId;
+    },
+    // rate_limit fn maxCalls windowMs -> rl-id
+    // rl_call rl-id ...args -> result
+    "rate_limit": (fn, maxCalls, windowMs = 1000) => {
+      const id = `_rl${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      createWorkflowModule._reg = createWorkflowModule._reg || {};
+      createWorkflowModule._reg[id] = { fn, calls: [], max: maxCalls, win: windowMs };
+      return id;
+    },
+    "rl_call": (rlId, ...args) => {
+      const store = (createWorkflowModule._reg || {})[rlId];
+      if (!store) throw new Error("invalid rate_limit id");
+      const now = Date.now();
+      store.calls = store.calls.filter((t) => t >= now - store.win);
+      if (store.calls.length >= store.max) {
+        throw new Error(`rate_limit: ${store.max}회/${store.win}ms 초과`);
+      }
+      store.calls.push(now);
+      return callFl(store.fn, args);
+    },
+    // ── P2: DAG 실행 ──────────────────────────────────────────────
+    // workflow_dag steps ctx -> {ok, context, results, errors, order}
+    // step: workflow_step + :depends [name ...] (위상정렬 후 실행)
+    "workflow_dag": (steps, ctx = {}) => {
+      const start = Date.now();
+      // 위상정렬 (Kahn's algorithm)
+      const nameMap = new Map(steps.map((s) => [s.name, s]));
+      const inDeg = new Map(steps.map((s) => [s.name, 0]));
+      const adj = new Map(steps.map((s) => [s.name, []]));
+      for (const s of steps) {
+        for (const dep of (s.depends || [])) {
+          if (adj.has(dep)) adj.get(dep).push(s.name);
+          inDeg.set(s.name, (inDeg.get(s.name) || 0) + 1);
+        }
+      }
+      const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([n]) => n);
+      const order = [];
+      while (queue.length > 0) {
+        const n = queue.shift();
+        order.push(n);
+        for (const next of (adj.get(n) || [])) {
+          const d = inDeg.get(next) - 1;
+          inDeg.set(next, d);
+          if (d === 0) queue.push(next);
+        }
+      }
+      if (order.length < steps.length) {
+        return { ok: false, error: "workflow_dag: 순환 의존성 감지됨", order };
+      }
+      // 순서대로 실행
+      const results = [];
+      const errors = [];
+      for (const name of order) {
+        const step = nameMap.get(name);
+        const t0 = Date.now();
+        try {
+          if (step.if !== void 0 && !callFl(step.if, [ctx])) {
+            results.push({ name, status: "skipped", ms: 0 });
+            continue;
+          }
+          const r = callFl(step.fn, [ctx]);
+          if (r && typeof r === "object") ctx = { ...ctx, ...r };
+          results.push({ name, status: "ok", result: r, ms: Date.now() - t0 });
+        } catch (e) {
+          errors.push({ name, error: e.message });
+          results.push({ name, status: "failed", error: e.message, ms: Date.now() - t0 });
+          if (step.required !== false) break;
+        }
+      }
+      return {
+        ok: errors.length === 0,
+        context: ctx,
+        results,
+        errors,
+        order,
+        total_ms: Date.now() - start
+      };
+    },
     "workflow_ok": (result) => result.status !== "failed",
     // workflow_get result key -> any  (get value from result context)
     "workflow_get": (result, key) => result.context[key] ?? null,
@@ -24597,69 +24787,6 @@ var path9 = __toESM(require("path"));
 init_lexer();
 init_parser();
 
-// src/runtime-helpers.ts
-function generateRuntimePreamble() {
-  return `
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-// FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-
-// \u2500 \uD0C0\uC785 \uCCB4\uD06C (9\uAC1C) \u2500
-function _fl_null_q(v) { return v === null || v === undefined; }
-function _fl_true_q(v) { return v === true; }
-function _fl_false_q(v) { return v === false; }
-function _fl_number_q(v) { return typeof v === 'number'; }
-function _fl_string_q(v) { return typeof v === 'string'; }
-function _fl_list_q(v) { return Array.isArray(v); }
-function _fl_array_q(v) { return Array.isArray(v); }
-function _fl_map_q(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
-function _fl_fn_q(v) { return typeof v === 'function'; }
-
-// \u2500 \uBC30\uC5F4 \uC870\uC791 (8\uAC1C) \u2500
-function _fl_length(arr) { return Array.isArray(arr) ? arr.length : (typeof arr === 'string' ? arr.length : 0); }
-function _fl_first(arr) { return Array.isArray(arr) ? arr[0] : null; }
-function _fl_last(arr) { return Array.isArray(arr) ? arr[arr.length - 1] : null; }
-function _fl_rest(arr) { return Array.isArray(arr) ? arr.slice(1) : []; }
-function _fl_append(arr, item) { return Array.isArray(arr) ? [...arr, item] : [item]; }
-function _fl_get(obj, key, dflt) {
-  if (Array.isArray(obj) && typeof key === 'number') return obj[key] !== undefined ? obj[key] : (dflt || null);
-  if (typeof obj === 'object' && obj !== null) return obj[String(key)] !== undefined ? obj[String(key)] : (dflt || null);
-  return dflt || null;
-}
-function _fl_map_set(obj, key, val) { return { ...obj, [String(key)]: val }; }
-function _fl_keys(obj) { return typeof obj === 'object' && obj !== null ? Object.keys(obj) : []; }
-
-// \u2500 \uBB38\uC790\uC5F4 \uC870\uC791 (5\uAC1C) \u2500
-function _fl_str(...args) { return args.map(v => v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(''); }
-function _fl_lower(s) { return String(s).toLowerCase(); }
-function _fl_upper(s) { return String(s).toUpperCase(); }
-function _fl_trim(s) { return String(s).trim(); }
-function _fl_contains_q(s, sub) { return String(s).includes(String(sub)); }
-
-// \u2500 \uBB38\uC790 \uBD84\uB958 (5\uAC1C) \u2500
-function _fl_is_alpha_q(c) { const ch = String(c)[0]; return /[a-zA-Z]/.test(ch); }
-function _fl_is_digit_q(c) { const ch = String(c)[0]; return /[0-9]/.test(ch); }
-function _fl_is_alnum_q(c) { const ch = String(c)[0]; return /[a-zA-Z0-9]/.test(ch); }
-function _fl_is_space_q(c) { const ch = String(c)[0]; return /\\s/.test(ch); }
-function _fl_is_symbol_char_q(c) { const ch = String(c)[0]; return /[!@#$%^&*\\-_+=]/.test(ch); }
-
-// \u2500 \uACE0\uCC28 \uD568\uC218 (3\uAC1C) \u2500
-function _fl_map(fn, arr) { return arr.map(item => fn([item])); }
-function _fl_filter(arr, fn) { return arr.filter(item => { const res = fn([item]); return res !== false && res !== null; }); }
-function _fl_reduce(fn, init, arr) { return arr.reduce((acc, item) => fn([acc, item]), init); }
-
-// \u2500 \uC870\uAC74\uBD80 & I/O (4\uAC1C) \u2500
-function _fl_empty_q(v) { if (v === null || v === undefined) return true; if (Array.isArray(v)) return v.length === 0; if (typeof v === 'object') return Object.keys(v).length === 0; return v === ''; }
-function _fl_has_key_q(obj, key) { return typeof obj === 'object' && obj !== null && String(key) in obj; }
-function _fl_print(msg) { console.log(msg); return msg; }
-function _fl_request(obj) { return obj; }
-function _fl_response(obj) { return obj; }
-function _fl_wait_and_respond(fn) { return fn([]); }
-
-// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-`.trim();
-}
-
 // src/codegen-js.ts
 var DEFAULT_OPTIONS = {
   module: "commonjs",
@@ -24814,8 +24941,6 @@ var JSCodegen = class {
     this.opts = { ...DEFAULT_OPTIONS, ...opts };
     this.exportedNames = [];
     const parts = [];
-    parts.push(generateRuntimePreamble());
-    parts.push("");
     if (this.opts.runtime) {
       parts.push(FL_RUNTIME);
       parts.push("");
@@ -24861,8 +24986,6 @@ ${exportsStr}
     switch (node.kind) {
       case "literal":
         return this.genLiteral(node);
-      case "template-string":
-        return this.genTemplateString(node);
       case "variable":
         return this.genVariable(node);
       case "sexpr":
@@ -24871,8 +24994,6 @@ ${exportsStr}
         return this.genBlock(node);
       case "keyword":
         return this.genKeyword(node);
-      case "try-block":
-        return this.genTryBlock(node);
       default:
         return `/* unsupported: ${node.kind} */`;
     }
@@ -24885,42 +25006,10 @@ ${exportsStr}
     } else if (node.type === "null") {
       return "null";
     } else if (node.type === "symbol") {
-      if (node.value === "nil" || node.value === "null") {
-        return "null";
-      }
-      const cleanName = String(node.value).replace(/^\$/, "");
-      return flNameToJs(cleanName);
+      return JSON.stringify(node.value);
     } else {
       return String(node.value);
     }
-  }
-  genTemplateString(node) {
-    const value = node.value;
-    let jsCode = "`";
-    let i = 0;
-    while (i < value.length) {
-      if (value[i] === "$" && value[i + 1] === "{") {
-        const start = i + 2;
-        const end = value.indexOf("}", start);
-        if (end > start) {
-          const expr = value.slice(start, end).trim();
-          const jsExpr = this.genNode({ kind: "variable", name: expr });
-          jsCode += "${" + jsExpr + "}";
-          i = end + 1;
-          continue;
-        }
-      }
-      if (value[i] === "`") {
-        jsCode += "\\`";
-      } else if (value[i] === "\\") {
-        jsCode += "\\\\";
-      } else {
-        jsCode += value[i];
-      }
-      i++;
-    }
-    jsCode += "`";
-    return jsCode;
   }
   genVariable(node) {
     const cleanName = node.name.replace(/^\$/, "");
@@ -25000,31 +25089,13 @@ ${exportsStr}
       return "";
     }
     if (op === "let") {
-      if (args2.length >= 2) {
-        const bindingsArg = args2[0];
-        let bindings = [];
-        if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
-          const block = bindingsArg;
-          const items = block.fields.get("items");
-          if (!Array.isArray(items)) {
-            console.error("DEBUG let: block.fields.get('items') returned:", items);
-            console.error("DEBUG let: block.fields keys:", Array.from(block.fields.keys()));
-            console.error("DEBUG let: block object:", block);
-          }
-          bindings = Array.isArray(items) ? items : [];
-        } else if (bindingsArg.kind === "sexpr") {
-          bindings = bindingsArg.args;
-        }
+      if (args2.length >= 2 && args2[0].kind === "sexpr") {
+        const bindings = args2[0].args;
         const bindingStmts = [];
-        for (const binding of bindings) {
-          if (binding.kind === "block" && binding.type === "Array") {
-            const pairItems = binding.fields.get("items");
-            if (Array.isArray(pairItems) && pairItems.length >= 2) {
-              const varName2 = this.extractVarName(pairItems[0]);
-              const value2 = this.genNode(pairItems[1]);
-              bindingStmts.push(`let ${varName2} = ${value2};`);
-            }
-          }
+        for (let i = 0; i < bindings.length; i += 2) {
+          const varName2 = this.extractVarName(bindings[i]);
+          const value2 = this.genNode(bindings[i + 1]);
+          bindingStmts.push(`let ${varName2} = ${value2};`);
         }
         const bodyStmts = args2.slice(1).map((a) => this.genNode(a)).join("\n");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
@@ -25229,32 +25300,14 @@ ${exportsStr}
       routeCode
     ].join("\n");
   }
-  genTryBlock(node) {
-    const body = this.genNode(node.body);
-    const parts = [`(()=>{try{return ${body};}`];
-    if (node.catchClauses && node.catchClauses.length > 0) {
-      for (const catchClause of node.catchClauses) {
-        const param = catchClause.variable || "err";
-        const handler = this.genNode(catchClause.handler);
-        parts.push(`catch(${param}){return ${handler};}`);
-      }
-    }
-    if (node.finallyBlock) {
-      const finallyCode = this.genNode(node.finallyBlock);
-      parts.push(`finally{${finallyCode};}`);
-    }
-    parts.push(`})()`);
-    return parts.join("");
-  }
   extractVarName(node) {
     if (node.kind === "variable") {
-      const name = node.name.replace(/^\$/, "");
-      return flNameToJs(name);
+      return node.name;
     }
     if (node.kind === "literal" && typeof node.value === "string") {
-      return flNameToJs(node.value);
+      return `$${node.value}`;
     }
-    return "unknown";
+    return "$unknown";
   }
   extractParamList(node) {
     if (!node) return [];
@@ -28261,7 +28314,10 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createMailModule());
   interp2.registerModule(createWebauthnModule());
   interp2.registerModule(createQueueHelpersModule());
-  interp2.registerModule(createWorkflowModule());
+  interp2.registerModule(createWorkflowModule(
+    (fn, args) => interp2.callFunctionValue(fn, args),
+    (name, args) => interp2.callUserFunction(name, args)
+  ));
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),
@@ -29051,7 +29107,7 @@ ${tail}` : "")
   }
   if (func.capturedEnv) {
     const savedStack = interp2.context.variables.saveStack();
-    const paramSet = new Set(func.params);
+    const paramSet = new Set([...func.params, ...func.params.map((p) => p.startsWith("$") ? p : "$" + p)]);
     interp2.callDepth++;
     _callStack.push(_stackEntry);
     if (_callStack.length > 100) _callStack.shift();
@@ -29060,6 +29116,7 @@ ${tail}` : "")
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
         interp2.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i].startsWith("$") ? func.params[i] : "$" + func.params[i], args2[i]);
       }
       result = interp2.eval(func.body);
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
@@ -29079,6 +29136,7 @@ ${tail}` : "")
   try {
     for (let i = 0; i < func.params.length; i++) {
       interp2.context.variables.set(func.params[i], args2[i]);
+      interp2.context.variables.set(func.params[i].startsWith("$") ? func.params[i] : "$" + func.params[i], args2[i]);
     }
     return interp2.eval(func.body);
   } finally {
@@ -29100,13 +29158,14 @@ function callFunctionValue(interp2, fn, args2) {
     throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
   }
   const savedStack = interp2.context.variables.saveStack();
-  const paramSet = new Set(fn.params);
+  const paramSet = new Set([...fn.params, ...fn.params.map((p) => "$" + p)]);
   interp2.callDepth++;
   let result;
   try {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
       interp2.context.variables.set(fn.params[i], args2[i]);
+      interp2.context.variables.set("$" + fn.params[i], args2[i]);
     }
     result = interp2.eval(fn.body);
     propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
@@ -29255,6 +29314,7 @@ function callFunctionValueTCO(interp2, fn, args2) {
         interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
         for (let j = 0; j < currentFn.params.length; j++) {
           interp2.context.variables.set(currentFn.params[j], currentArgs[j]);
+          interp2.context.variables.set("$" + currentFn.params[j], currentArgs[j]);
         }
         result = interp2.eval(currentFn.body);
       } finally {
@@ -31481,6 +31541,7 @@ var Interpreter = class _Interpreter {
   }
   eval(node) {
     if (!node) return null;
+    if (node.op === "load") console.log("[EVAL] eval() called with load op");
     if (node.kind === "literal") {
       const lit = node;
       if (lit.type === "string" && typeof lit.value === "string" && (lit.value.includes("{$") || lit.value.includes("{("))) {
@@ -31498,6 +31559,12 @@ var Interpreter = class _Interpreter {
         }
         if (this.context.variables.has(bareName)) {
           return this.context.variables.get(bareName);
+        }
+        if (this.context.functions.has(bareName)) {
+          const _fn = this.context.functions.get(bareName);
+          if (_fn && _fn.params !== void 0 && _fn.body !== void 0) {
+            return { kind: "function-value", params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: bareName };
+          }
         }
         if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
           const line = lit.line;
@@ -31528,6 +31595,12 @@ var Interpreter = class _Interpreter {
       }
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
+      }
+      if (this.context.functions.has(varName)) {
+        const _fn = this.context.functions.get(varName);
+        if (_fn && _fn.params !== void 0 && _fn.body !== void 0) {
+          return { kind: "function-value", params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: varName };
+        }
       }
       throw new Error(`[E_UNDEFINED_VAR] '$${varName}' at line ${line || this.currentLine}${locSuffix}`);
     }
@@ -31569,22 +31642,16 @@ var Interpreter = class _Interpreter {
     if (node.kind === "type-class-instance") {
       return this.evalInstance(node);
     }
-    if (node.kind === "template-string") {
-      const templateNode = node;
-      return this.interpolateString(templateNode.value);
-    }
     if (node.kind === "try-block") {
       return this.evalTryBlock(node);
     }
     if (node.kind === "throw") {
       return this.evalThrow(node);
     }
-    if (node.kind === "loop") {
-      return this.evalLoop(node);
-    }
     return null;
   }
   evalSExpr(expr) {
+    if (expr.op === "load") console.log("[EVAL] SExpr load called with:", expr.args?.[0]?.value);
     if (expr.line !== void 0) this.currentLine = expr.line;
     let op = expr.op;
     if (typeof op !== "string") {
@@ -31868,40 +31935,6 @@ var Interpreter = class _Interpreter {
     let result = "";
     let i = 0;
     while (i < template.length) {
-      if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
-        const start = i + 2;
-        const end = template.indexOf("}", start);
-        if (end > start) {
-          const content = template.slice(start, end).trim();
-          let val;
-          if (content.includes("(")) {
-            try {
-              const tokens = lex("(" + content + ")");
-              const ast = parse(tokens);
-              val = ast.length > 0 ? this.eval(ast[0]) : null;
-            } catch {
-              val = null;
-            }
-          } else {
-            if (content.includes(".")) {
-              const parts = content.split(".");
-              val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
-              for (let p = 1; p < parts.length; p++) {
-                if (val === null || val === void 0) {
-                  val = null;
-                  break;
-                }
-                val = typeof val === "object" ? val[parts[p]] : null;
-              }
-            } else {
-              val = this.context.variables.has("$" + content) ? this.context.variables.get("$" + content) : this.context.variables.get(content);
-            }
-          }
-          result += val === null || val === void 0 ? "" : String(val);
-          i = end + 1;
-          continue;
-        }
-      }
       if (template[i] === "{" && i + 1 < template.length) {
         const next = template[i + 1];
         if (next === "$") {
@@ -32017,43 +32050,6 @@ var Interpreter = class _Interpreter {
   }
   evalThrow(throwExpr) {
     return evalThrow(this, throwExpr);
-  }
-  // Loop special form (Phase B-1)
-  evalLoop(loopNode) {
-    if (!loopNode) {
-      throw new Error("Loop node is null");
-    }
-    const init = loopNode.init;
-    const condition = loopNode.condition;
-    const update = loopNode.update;
-    const body = loopNode.body;
-    if (!init || !condition || !update || !body) {
-      throw new Error(`Loop parts missing: init=${!!init} condition=${!!condition} update=${!!update} body=${!!body}`);
-    }
-    if (init.kind !== "sexpr") {
-      throw new Error(`Loop init must be sexpr, got: ${init.kind}`);
-    }
-    const op = init.op;
-    const args2 = init.args || [];
-    if (!op || args2.length < 1) {
-      throw new Error("Loop init must be ($var val)");
-    }
-    const varName = String(op);
-    const initVal = this.eval(args2[0]);
-    const loopScope = /* @__PURE__ */ new Map();
-    loopScope.set(varName, initVal);
-    this.scopes.push(loopScope);
-    try {
-      let result = null;
-      while (this.isTruthy(this.eval(condition))) {
-        result = this.eval(body);
-        const updatedVal = this.eval(update);
-        loopScope.set(varName, updatedVal);
-      }
-      return result;
-    } finally {
-      this.scopes.pop();
-    }
   }
   matchPattern(pattern, value) {
     return matchPattern(this, pattern, value);

@@ -45,6 +45,12 @@ export interface WorkflowStep {
   fallback?: any | (() => any);  // fallback value if all retries fail
   timeout_ms?: number;           // timeout in milliseconds
   if?: (ctx: Record<string, any>) => boolean;  // conditional execution (P0-2)
+  // P1-1: Parallel Task Execution
+  parallel_tasks?: WorkflowStep[];
+  merge_strategy?: 'all-success' | 'first-success' | 'any-partial';
+  // P1-2: Compensation Transaction
+  compensate?: (ctx: Record<string, any>) => any;  // rollback on failure
+  on_partial?: (partial: any) => any;               // handle partial success
 }
 
 export interface WorkflowResult {
@@ -65,6 +71,13 @@ export interface WorkflowResult {
     attempted?: number;     // P0-4: 재시도 횟수
   }>;
   errors: string[];
+  // P1-2: Compensation Transaction
+  compensations?: Array<{
+    step: string;
+    action: 'applied' | 'pending' | 'skipped';
+    result?: any;
+    error?: string;
+  }>;
 }
 
 export function createWorkflowModule() {
@@ -91,6 +104,10 @@ export function createWorkflowModule() {
         fallback?: any | (() => any);
         timeout_ms?: number;
         if?: (ctx: Record<string, any>) => boolean;
+        parallel_tasks?: WorkflowStep[];
+        merge_strategy?: 'all-success' | 'first-success' | 'any-partial';
+        compensate?: (ctx: Record<string, any>) => any;
+        on_partial?: (partial: any) => any;
       } = {}
     ): WorkflowStep => ({
       name,
@@ -102,12 +119,16 @@ export function createWorkflowModule() {
       fallback: options.fallback,
       timeout_ms: options.timeout_ms,
       if: options.if,
+      parallel_tasks: options.parallel_tasks,
+      merge_strategy: options.merge_strategy,
+      compensate: options.compensate,
+      on_partial: options.on_partial,
     }),
 
     // ── Workflow Execution ────────────────────────────────────
 
-    // workflow_run workflow initial_ctx options -> WorkflowResult
-    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    // workflow_run workflow initial_ctx options -> WorkflowResult (P0, no parallel support)
+    // Use workflow_run_async for P1-1 parallel task support
     "workflow_run": (
       workflow: Record<string, any>,
       initialCtx: Record<string, any> = {},
@@ -146,13 +167,30 @@ export function createWorkflowModule() {
 
       for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
         const step = steps[stepIndex];
+
+        // P1-1: Reject if parallel_tasks detected (use workflow_run_async instead)
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          return {
+            id: runId,
+            name: workflow.name,
+            status: "failed",
+            context: ctx,
+            steps_run: stepsOk + stepsFailed,
+            steps_ok: stepsOk,
+            steps_failed: stepsFailed,
+            total_ms: T.now() - startMs,
+            log,
+            errors: ["Parallel tasks detected. Use workflow_run_async() instead of workflow_run()"],
+          };
+        }
+
         // P0-2: Check conditional execution
         if (step.if !== undefined) {
           try {
             const shouldRun = step.if(ctx);
             if (!shouldRun) {
               log.push({ step: step.name, status: "skipped", ms: 0 });
-              continue;  // Skip this step
+              continue;
             }
           } catch (condErr: any) {
             errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
@@ -189,7 +227,6 @@ export function createWorkflowModule() {
           } catch (err: any) {
             lastErr = err.message;
             if (attempt < maxAttempts - 1) {
-              // backoff between retries
               const wait = 50 * (attempt + 1);
               const end = Date.now() + wait;
               while (Date.now() < end) { /* spin */ }
@@ -205,7 +242,6 @@ export function createWorkflowModule() {
           log.push({ step: step.name, status: "ok", ms: stepMs });
           (ctx as any)[`_step_${step.name}_ms`] = stepMs;
 
-          // P0-3: Periodic checkpoint save
           if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
             const checkpoint: CheckpointData = {
               workflow_id: workflow.id,
@@ -221,9 +257,8 @@ export function createWorkflowModule() {
         } else {
           stepsFailed++;
           let fallbackValue: any = undefined;
-          const errorCategory = categorizeError(lastErr);  // P0-4: 에러 카테고리 판단
+          const errorCategory = categorizeError(lastErr);
 
-          // Handle error with on_error callback
           if (step.on_error) {
             try {
               fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
@@ -235,8 +270,8 @@ export function createWorkflowModule() {
                 status: "error_handled",
                 ms: stepMs,
                 error: lastErr,
-                category: errorCategory,       // P0-4: 카테고리
-                attempted: maxAttempts,        // P0-4: 재시도 횟수
+                category: errorCategory,
+                attempted: maxAttempts,
               });
               stepsOk++;
               stepsFailed--;
@@ -247,7 +282,6 @@ export function createWorkflowModule() {
             }
           }
 
-          // Use fallback if provided
           if (step.fallback !== undefined) {
             try {
               fallbackValue = typeof step.fallback === 'function' ? step.fallback() : step.fallback;
@@ -259,8 +293,8 @@ export function createWorkflowModule() {
                 status: "fallback_used",
                 ms: stepMs,
                 error: lastErr,
-                category: errorCategory,       // P0-4: 카테고리
-                attempted: maxAttempts,        // P0-4: 재시도 횟수
+                category: errorCategory,
+                attempted: maxAttempts,
               });
               stepsOk++;
               stepsFailed--;
@@ -278,13 +312,11 @@ export function createWorkflowModule() {
               status: "failed",
               ms: stepMs,
               error: lastErr,
-              category: errorCategory,         // P0-4: 카테고리
-              attempted: maxAttempts,          // P0-4: 재시도 횟수
+              category: errorCategory,
+              attempted: maxAttempts,
             });
 
             if (step.required !== false) {
-              // Required step failed — abort workflow
-              // P0-3: Keep checkpoint for resume on retry
               return {
                 id: runId,
                 name: workflow.name,
@@ -298,7 +330,6 @@ export function createWorkflowModule() {
                 errors,
               };
             }
-            // Optional step failed — continue
           }
         }
       }
@@ -306,7 +337,341 @@ export function createWorkflowModule() {
       const totalMs = T.now() - startMs;
       const status = stepsFailed === 0 ? "success" : "partial";
 
-      // P0-3: Delete checkpoint on successful completion
+      if ((status === "success" || status === "partial") && checkpointPath) {
+        deleteCheckpoint(checkpointPath);
+      }
+
+      return {
+        id: runId,
+        name: workflow.name,
+        status,
+        context: ctx,
+        steps_run: stepsOk + stepsFailed,
+        steps_ok: stepsOk,
+        steps_failed: stepsFailed,
+        total_ms: totalMs,
+        log,
+        errors,
+      };
+    },
+
+    // workflow_run_async workflow initial_ctx options -> Promise<WorkflowResult>
+    // P1-1 async version supporting parallel tasks
+    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    "workflow_run_async": async (
+      workflow: Record<string, any>,
+      initialCtx: Record<string, any> = {},
+      options?: {
+        checkpoint_path?: string;
+        checkpoint_every?: number;
+        auto_resume?: boolean;
+      }
+    ): Promise<WorkflowResult> => {
+      const startMs = T.now();
+      const runId = X.uuid_short();
+      const checkpointPath = options?.checkpoint_path;
+      const checkpointEvery = options?.checkpoint_every ?? 0;
+      const autoResume = options?.auto_resume ?? true;
+
+      // P0-3: Load checkpoint if available
+      let startFromStep = 0;
+      let ctx = { ...initialCtx, _workflow: workflow.name, _run_id: runId };
+
+      if (autoResume && checkpointPath) {
+        const checkpoint = loadCheckpoint(checkpointPath);
+        if (checkpoint && checkpoint.workflow_id === workflow.id) {
+          startFromStep = checkpoint.step_index;
+          ctx = { ...checkpoint.context, _workflow: workflow.name, _run_id: runId };
+          console.log(`[Checkpoint] Resuming from step ${startFromStep} (${checkpoint.step_names.length} completed)`);
+        }
+      }
+
+      const log: WorkflowResult["log"] = [];
+      const errors: string[] = [];
+      let stepsOk = 0;
+      let stepsFailed = 0;
+
+      const steps = workflow.steps as WorkflowStep[];
+      const completedStepNames: string[] = [];
+      const completedSteps: WorkflowStep[] = [];  // P1-2: Track completed steps for compensation
+      const compensations: WorkflowResult["compensations"] = [];  // P1-2: Track compensation results
+
+      // P1-1: Helper to execute a single step (with retry, error handling, etc)
+      const executeStep = async (step: WorkflowStep, currentCtx: Record<string, any>): Promise<{ success: boolean; result: any; error: string; ms: number }> => {
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        const maxAttempts = (step.retry ?? 0) + 1;
+        let stepResult: any = undefined;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            stepResult = step.fn(currentCtx);
+            success = true;
+            break;
+          } catch (err: any) {
+            lastErr = err.message;
+            if (attempt < maxAttempts - 1) {
+              const wait = 50 * (attempt + 1);
+              const end = Date.now() + wait;
+              while (Date.now() < end) { /* spin */ }
+            }
+          }
+        }
+
+        const stepMs = T.now() - stepStart;
+        return { success, result: stepResult, error: lastErr, ms: stepMs };
+      };
+
+      // P1-1: Helper to execute parallel tasks
+      const executeParallelTasks = async (parallelTasks: WorkflowStep[], mergeStrategy: string, currentCtx: Record<string, any>): Promise<{ success: boolean; results: Record<string, any>; errors: string[] }> => {
+        const taskExecutions = parallelTasks.map(task => executeStep(task, currentCtx));
+        const taskResults = await Promise.all(taskExecutions);
+
+        const mergedResults: Record<string, any> = {};
+        const taskErrors: string[] = [];
+        let allSuccess = true;
+        let anySuccess = false;
+
+        taskResults.forEach((result, index) => {
+          const taskName = parallelTasks[index].name;
+          if (result.success) {
+            mergedResults[taskName] = result.result;
+            anySuccess = true;
+          } else {
+            taskErrors.push(`${taskName}: ${result.error}`);
+            allSuccess = false;
+          }
+        });
+
+        // Determine success based on merge_strategy
+        let strategySuccess = false;
+        if (mergeStrategy === "all-success") {
+          strategySuccess = allSuccess;
+        } else if (mergeStrategy === "first-success") {
+          strategySuccess = anySuccess;
+        } else if (mergeStrategy === "any-partial") {
+          strategySuccess = true;  // Always succeed
+        } else {
+          strategySuccess = allSuccess;  // Default to all-success
+        }
+
+        return { success: strategySuccess, results: mergedResults, errors: taskErrors };
+      };
+
+      for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
+        const step = steps[stepIndex];
+        // P0-2: Check conditional execution
+        if (step.if !== undefined) {
+          try {
+            const shouldRun = step.if(ctx);
+            if (!shouldRun) {
+              log.push({ step: step.name, status: "skipped", ms: 0 });
+              continue;
+            }
+          } catch (condErr: any) {
+            errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
+            if (step.required !== false) {
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors,
+              };
+            }
+            continue;
+          }
+        }
+
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        let stepResult: any = undefined;
+        let stepMs = 0;
+
+        // P1-1: Check for parallel tasks
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          const mergeStrategy = step.merge_strategy ?? "all-success";
+          const parallelResult = await executeParallelTasks(step.parallel_tasks, mergeStrategy, ctx);
+          stepMs = T.now() - stepStart;
+
+          if (parallelResult.success) {
+            success = true;
+            stepResult = { [step.name]: parallelResult.results };
+            ctx = { ...ctx, ...stepResult };
+            stepsOk++;
+            completedStepNames.push(step.name);
+            log.push({ step: step.name, status: "ok", ms: stepMs });
+            (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+          } else {
+            stepsFailed++;
+            lastErr = parallelResult.errors.join("; ");
+            const errorCategory = categorizeError(lastErr);
+
+            if (step.fallback !== undefined) {
+              try {
+                const fallbackValue = typeof step.fallback === 'function' ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] Parallel tasks failed (fallback used)`);
+                log.push({ step: step.name, status: "fallback_used", ms: stepMs, error: lastErr, category: errorCategory });
+                stepsOk++;
+                stepsFailed--;
+                (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+              } catch (fallbackErr: any) {
+                errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+                log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: errorCategory });
+                if (step.required !== false) {
+                  return {
+                    id: runId,
+                    name: workflow.name,
+                    status: "failed",
+                    context: ctx,
+                    steps_run: stepsOk + stepsFailed,
+                    steps_ok: stepsOk,
+                    steps_failed: stepsFailed,
+                    total_ms: T.now() - startMs,
+                    log,
+                    errors,
+                  };
+                }
+              }
+            } else {
+              errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+              log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: categorizeError(lastErr) });
+              if (step.required !== false) {
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors,
+                };
+              }
+            }
+          }
+        } else {
+          // Regular step execution (P0 behavior)
+          const execResult = await executeStep(step, ctx);
+          stepMs = execResult.ms;
+          success = execResult.success;
+          lastErr = execResult.error;
+          stepResult = execResult.result;
+
+          if (success) {
+            stepsOk++;
+            completedStepNames.push(step.name);
+            log.push({ step: step.name, status: "ok", ms: stepMs });
+            ctx = { ...ctx, ...stepResult };
+            (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+
+            if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
+              const checkpoint: CheckpointData = {
+                workflow_id: workflow.id,
+                workflow_name: workflow.name,
+                step_index: stepIndex + 1,
+                context: ctx,
+                timestamp: T.now(),
+                step_names: completedStepNames,
+                steps_completed: completedStepNames.length,
+              };
+              saveCheckpoint(checkpointPath, checkpoint);
+            }
+          } else {
+            stepsFailed++;
+            let fallbackValue: any = undefined;
+            const errorCategory = categorizeError(lastErr);
+
+            if (step.on_error) {
+              try {
+                fallbackValue = step.on_error({ error: lastErr, attempts: 1, step_name: step.name });
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
+                log.push({
+                  step: step.name,
+                  status: "error_handled",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1,
+                });
+                stepsOk++;
+                stepsFailed--;
+                (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (handlerErr: any) {
+                errors.push(`[${step.name}] ${lastErr} → on_error handler also failed: ${handlerErr.message}`);
+              }
+            }
+
+            if (step.fallback !== undefined) {
+              try {
+                fallbackValue = typeof step.fallback === 'function' ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (fallback used)`);
+                log.push({
+                  step: step.name,
+                  status: "fallback_used",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1,
+                });
+                stepsOk++;
+                stepsFailed--;
+                (ctx as any)[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (fallbackErr: any) {
+                errors.push(`[${step.name}] ${lastErr} → fallback also failed: ${fallbackErr.message}`);
+              }
+            }
+
+            if (!success) {
+              errors.push(`[${step.name}] ${lastErr}`);
+              log.push({
+                step: step.name,
+                status: "failed",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,
+                attempted: 1,
+              });
+
+              if (step.required !== false) {
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors,
+                };
+              }
+            }
+          }
+        }
+      }
+
+      const totalMs = T.now() - startMs;
+      const status = stepsFailed === 0 ? "success" : "partial";
+
       if ((status === "success" || status === "partial") && checkpointPath) {
         deleteCheckpoint(checkpointPath);
       }
