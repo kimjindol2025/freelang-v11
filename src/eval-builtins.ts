@@ -213,6 +213,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "type-of": return typeof v0;
     case "print": process.stdout.write(vals.map((v: any) => v === null ? "null" : String(v)).join("")); return null;
     case "println": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
+
     case "substring": return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== undefined ? Number(v2) : undefined) : "";
     case "char-at": return typeof v0 === "string" ? (v0[Number(v1)] ?? "") : "";
     case "index-of": return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
@@ -4464,6 +4465,39 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         }
         case "now-iso": case "now_iso": {
           return new Date().toISOString();
+        }
+        // AI-First #5: (help "keyword") — 런타임 함수 검색
+        case "help": {
+          const query = String(args[0] ?? "").toLowerCase();
+          let sigs: Array<{module:string;name:string;params:string;returns:string}> = [];
+          try { sigs = require("./_stdlib-signatures.json"); } catch { sigs = []; }
+          if (sigs.length === 0) {
+            console.log("⚠️  stdlib 시그니처 없음 — npm run build 실행 필요");
+            return null;
+          }
+          if (!query) {
+            const modules = [...new Set(sigs.map((s:any) => s.module))].sort();
+            console.log(`\x1b[36m[help]\x1b[0m 카테고리: ${modules.join(", ")}`);
+            console.log(`사용법: (help "keyword")  예: (help "server"), (help "file"), (help "str")`);
+            return null;
+          }
+          const exact = sigs.filter((s:any) => s.name === query || s.name.replace(/-/g,"_") === query);
+          const partial = sigs.filter((s:any) =>
+            s.name !== query &&
+            s.name.replace(/-/g,"_") !== query &&
+            (s.name.toLowerCase().includes(query) || s.module.toLowerCase().includes(query))
+          ).slice(0, 15);
+          const results = [...exact, ...partial];
+          if (results.length === 0) {
+            console.log(`\x1b[33m[help]\x1b[0m '${query}' 검색 결과 없음`);
+            return null;
+          }
+          console.log(`\x1b[36m[help]\x1b[0m '${query}' 검색 결과 ${results.length}개:`);
+          for (const s of results) {
+            const tag = exact.includes(s) ? "\x1b[32m●\x1b[0m" : " ";
+            console.log(`  ${tag} \x1b[1m${s.name}\x1b[0m (${s.params || "-"}) → ${s.returns || "any"}`);
+          }
+          return null;
         }
       }
 
