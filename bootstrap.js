@@ -21996,6 +21996,46 @@ function createWorkflowModule(callFnVal, callUserFn) {
       process.stderr.write(`[TRACE] ${label}: ${JSON.stringify(value)}\n`);
       return value;
     },
+    // ── P2-1: Observability — Trace/Span 수집 ────────────────────
+    // trace_new () -> trace_id
+    "trace_new": () => {
+      const tid = `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`;
+      createWorkflowModule._traces = createWorkflowModule._traces || new Map();
+      createWorkflowModule._traces.set(tid, { id: tid, spans: [], start: Date.now() });
+      return tid;
+    },
+    // span_run trace_id label fn -> {label, ok, result, ms, trace_id}
+    "span_run": (traceId, label, fn) => {
+      const t0 = Date.now();
+      const traces = createWorkflowModule._traces || new Map();
+      let result, ok = true, error;
+      try {
+        result = callFl(fn, []);
+      } catch (e) {
+        ok = false; error = e.message;
+      }
+      const ms = Date.now() - t0;
+      const spanData = { label, ok, ms, ...(ok ? { result } : { error }) };
+      if (traces.has(traceId)) traces.get(traceId).spans.push(spanData);
+      process.stderr.write(`[SPAN:${traceId}] ${label}: ${ms}ms ${ok ? "✓" : "✗"}\n`);
+      if (!ok) throw new Error(error);
+      return { ...spanData, trace_id: traceId };
+    },
+    // trace_collect trace_id -> {trace_id, spans, total_ms, ok, failed}
+    "trace_collect": (traceId) => {
+      const traces = createWorkflowModule._traces || new Map();
+      const t = traces.get(traceId);
+      if (!t) return { ok: false, error: `trace not found: ${traceId}` };
+      const total_ms = Date.now() - t.start;
+      const failed = t.spans.filter(s => !s.ok).length;
+      return { trace_id: traceId, spans: t.spans, total_ms, ok: failed === 0, failed };
+    },
+    // trace_clear trace_id -> true
+    "trace_clear": (traceId) => {
+      const traces = createWorkflowModule._traces || new Map();
+      traces.delete(traceId);
+      return true;
+    },
     // ── P2: 보안 Sandbox ──────────────────────────────────────────
     // sandbox_run fn options -> {ok, result, error, ms, calls}
     // options: {:timeout N :max_calls N}
@@ -28297,6 +28337,7 @@ function createMatrixModule() {
 
 // src/stdlib-loader.ts
 function loadAllStdlib(interp2) {
+  // ── Eager (핵심 모듈: 항상 로드) ────────────────────────────
   interp2.registerModule(createFileModule());
   interp2.registerModule(createFdModule());
   interp2.registerModule(createBitsModule());
@@ -28309,65 +28350,59 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
-  interp2.registerModule(createCryptoRsaModule());
-  interp2.registerModule(createTotpModule());
-  interp2.registerModule(createMailModule());
-  interp2.registerModule(createWebauthnModule());
-  interp2.registerModule(createQueueHelpersModule());
-  interp2.registerModule(createWorkflowModule(
-    (fn, args) => interp2.callFunctionValue(fn, args),
-    (name, args) => interp2.callUserFunction(name, args)
-  ));
+  interp2.registerModule(createAuthModule());
+  interp2.registerModule(createProcessModule());
+  interp2.registerModule(createAsyncModule((n, a) => interp2.callUserFunction(n, a)));
+  interp2.registerModule(createModuleSystem());
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),
     (fnValue, a) => interp2.callFunctionValue(fnValue, a)
   ));
-  interp2.registerModule(createDbModule());
-  interp2.registerModule(createMariadbModule());
-  interp2.registerModule(createMongodbModule());
-  interp2.registerModule(createAuthModule());
+  interp2.registerModule(createWorkflowModule(
+    (fn, args) => interp2.callFunctionValue(fn, args),
+    (name, args) => interp2.callUserFunction(name, args)
+  ));
   interp2.registerModule(createCacheModule());
   interp2.registerModule(createPubSubModule((n, a) => interp2.callUserFunction(n, a)));
-  interp2.registerModule(createProcessModule());
-  interp2.registerModule(createAsyncModule((n, a) => interp2.callUserFunction(n, a)));
-  interp2.registerModule(createModuleSystem());
+  interp2.registerModule(createValidationModule());
   interp2.registerModule(createChannelModule());
   interp2.registerModule(createImmutableModule());
-  interp2.registerModule(createAiNativeModule());
-  interp2.registerModule(createTestModule(
-    // Phase 76: deftest, describe, assert-eq, ...
-    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
-  ));
-  interp2.registerModule(createMaybeModule(
-    // Phase 91: 불확실성 타입 (maybe/none/confident)
+
+  // ── Lazy (무거운 모듈: 첫 호출 시 로드) ─────────────────────
+  interp2.registerLazyModule("mariadb_", () => createMariadbModule());
+  interp2.registerLazyModule("mongodb_", () => createMongodbModule());
+  interp2.registerLazyModule("db_", () => createDbModule());
+  interp2.registerLazyModule("orm_", () => createOrmModule());
+  interp2.registerLazyModule("crypto_rsa_", () => createCryptoRsaModule());
+  interp2.registerLazyModule("totp_", () => createTotpModule());
+  interp2.registerLazyModule("mail_", () => createMailModule());
+  interp2.registerLazyModule("webauthn_", () => createWebauthnModule());
+  interp2.registerLazyModule("queue_", () => createQueueHelpersModule());
+  interp2.registerLazyModule("ws_", () => createWsModule((n, a) => interp2.callUserFunction(n, a)));
+  interp2.registerLazyModule("wsc_", () => createWscModule((n, a) => interp2.callUserFunction(n, a)));
+  interp2.registerLazyModule("ai_", () => createAiNativeModule());
+  interp2.registerLazyModule("stats_", () => createStatsModule());
+  interp2.registerLazyModule("plot_", () => createPlotModule());
+  interp2.registerLazyModule("table_", () => createTableModule());
+  interp2.registerLazyModule("middleware_", () => createMiddlewareModule());
+  interp2.registerLazyModule("service_", () => createServiceModule());
+  interp2.registerLazyModule("compile_", () => createCompileModule());
+  interp2.registerLazyModule("registry_", () => createRegistryModule());
+  interp2.registerLazyModule("oci_", () => createOciModule());
+  interp2.registerLazyModule("cloud_", () => createCloudModule());
+  interp2.registerLazyModule("matrix_", () => createMatrixModule());
+  interp2.registerLazyModule("markdown_", () => createMarkdownModule());
+  interp2.registerLazyModule("feed_", () => createFeedModule());
+  interp2.registerLazyModule("blog_", () => createBlogModule());
+  interp2.registerLazyModule("maybe_", () => createMaybeModule(
     (fnValue, args2) => interp2.callFunctionValue(fnValue, args2),
     (name, args2) => interp2.callUserFunction(name, args2)
   ));
-  interp2.registerModule(createCompileModule());
-  interp2.registerModule(createRegistryModule());
-  interp2.registerModule(createOciModule());
-  interp2.registerModule(createOrmModule());
-  interp2.registerModule(createValidationModule());
-  interp2.registerModule(createMiddlewareModule());
-  interp2.registerModule(createTableModule());
-  interp2.registerModule(createStatsModule());
-  interp2.registerModule(createPlotModule());
-  interp2.registerModule(createTestEnhancedModule());
-  interp2.registerModule(createServiceModule());
-  interp2.registerModule(createWsModule(
-    // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
-    (n, a) => interp2.callUserFunction(n, a)
+  interp2.registerLazyModule("deftest", () => createTestModule(
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
   ));
-  interp2.registerModule(createWscModule(
-    // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
-    (n, a) => interp2.callUserFunction(n, a)
-  ));
-  interp2.registerModule(createMarkdownModule());
-  interp2.registerModule(createFeedModule());
-  interp2.registerModule(createBlogModule());
-  interp2.registerModule(createCloudModule());
-  interp2.registerModule(createMatrixModule());
+  interp2.registerLazyModule("test_", () => createTestEnhancedModule());
 }
 
 // src/eval-pattern-match.ts
@@ -29040,16 +29075,22 @@ function callUserFunction(interp2, name, args2) {
     }
   }
   if (!func) {
-    const candidates = [...interp2.context.functions.keys()];
-    const similar = suggestSimilar(baseName, candidates);
-    const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
-    throw new FunctionNotFoundError(
-      baseName,
-      interp2.currentFilePath,
-      interp2.currentLine > 0 ? interp2.currentLine : void 0,
-      void 0,
-      hint
-    );
+    // lazy 모듈 체크: prefix 매칭 모듈 로드 후 재시도
+    if (interp2._loadLazyModule && interp2._loadLazyModule(baseName)) {
+      func = interp2.context.functions.get(baseName);
+    }
+    if (!func) {
+      const candidates = [...interp2.context.functions.keys()];
+      const similar = suggestSimilar(baseName, candidates);
+      const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+      throw new FunctionNotFoundError(
+        baseName,
+        interp2.currentFilePath,
+        interp2.currentLine > 0 ? interp2.currentLine : void 0,
+        void 0,
+        hint
+      );
+    }
   }
   let isGenericCall = false;
   if (func.generics && func.generics.length > 0) {
@@ -30613,6 +30654,23 @@ var Interpreter = class _Interpreter {
         this.context.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
       }
     }
+  }
+  // Lazy module: factory() 는 해당 prefix 함수가 처음 호출될 때만 실행
+  registerLazyModule(prefix, factory) {
+    if (!this._lazyModules) this._lazyModules = new Map();
+    this._lazyModules.set(prefix, factory);
+  }
+  _loadLazyModule(funcName) {
+    if (!this._lazyModules) return false;
+    for (const [prefix, factory] of this._lazyModules) {
+      if (funcName.startsWith(prefix)) {
+        const module2 = factory();
+        this.registerModule(module2);
+        this._lazyModules.delete(prefix); // 한 번만 로드
+        return true;
+      }
+    }
+    return false;
   }
   interpret(blocks) {
     try {
