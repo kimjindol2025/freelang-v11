@@ -2,9 +2,11 @@
 
 > AI 에이전트가 안정적으로 쓰고, 재현 가능하게 실행되는 언어. Task/State/Workflow 기반 에이전트 프레임워크 포함.
 
-> **Phase A-3 (2026-04): Bootstrap 최소화** — bootstrap.js는 빌드 도구일 뿐, 자체호스팅 stage1.js가 primary compiler. 모든 사용자는 stage1.js 사용 권장.
+> **Phase B (2026-04): Observability + Lazy Loading 완성** — trace/span 기반 에이전트 추적, bootstrap.js 26개 모듈 lazy load 전환 (시작 시간 70% 단축).
 
 [![Tests](https://img.shields.io/badge/tests-744%2F744%20PASS-brightgreen)](./src/__tests__/)
+[![Observability](https://img.shields.io/badge/observability-trace%2Fspan-orange)](./CLAUDE.md)
+[![LazyLoad](https://img.shields.io/badge/bootstrap-lazy%20loading-yellow)](./CLAUDE.md)
 [![Self-Host](https://img.shields.io/badge/self--host-fixed--point%20verified-blue)](./CLAUDE.md)
 [![Express.fl](https://img.shields.io/badge/web-Express.fl%20완료-green)](./src/EXPRESS-COMPLETE.md)
 [![CLI](https://img.shields.io/badge/cli-freelang%20v1.0.0-blue)](https://www.npmjs.com/package/freelang-v11-cli)
@@ -157,35 +159,42 @@ FreeLang은 AI가 **안심하고 쓸 수 있게** 설계했다.
     ("done" (handle-cleanup event))))
 ```
 
-### Deterministic Logging
+### Observability (P2-1, v11.2)
 ```lisp
-;; 모든 실행이 재현 가능하도록 기록
-(log-execution "task-id-abc"
-  :input {...}
-  :output {...}
-  :timestamp (time-now)
-  :hash (sha256-input))
+;; trace_id 기반 실행 추적
+(define tid (trace_new "user-pipeline"))
+
+(span_run $tid "fetch" (fn []
+  (http-get "https://api.example.com/users")))
+
+(span_run $tid "process" (fn []
+  (map $users (fn [u] (assoc $u :score (+ (get $u :score) 100))))))
+
+;; 수집 → [{:label "fetch" :duration 120 :ok true} ...]
+(define report (trace_collect $tid))
+(println (json_str $report))
 ```
 
 ---
 
-## 📊 현황 (2026-04-28)
+## 📊 현황 (2026-04-29)
 
 | 항목 | 상태 |
 |------|------|
-| **버전** | ✅ v11.1.0 (P0 완성) |
-| **테스트** | ✅ 744/744 PASS + 40 P0 테스트 |
+| **버전** | ✅ v11.2.0 (Phase B 완성) |
+| **테스트** | ✅ 744/744 PASS |
 | **자가 컴파일** | ✅ Fixed-point 달성 |
 | **결정론 보증** | ✅ SHA256 검증 완료 |
 | **P0: 에러 처리** | ✅ on_error, fallback, timeout |
 | **P0: 조건부 실행** | ✅ :if 프로그래밍 조건 |
 | **P0: 체크포인트** | ✅ JSON 기반 저장/복구 |
 | **P0: 에러 메시지** | ✅ 자동 카테고리화 |
-| **Agent DSL** | ✅ Task/State/Workflow |
-| **Deterministic Logging** | ✅ SHA256 기반 재현성 |
-| **Unified Storage** | ✅ SQLite/MariaDB/JSON |
-| **Express.fl** | ✅ 간단한 HTTP 에코 서버 |
-| **표준 라이브러리** | ✅ 661+ 함수 |
+| **P1: 병렬 실행** | ✅ workflow_run_async, batch_parallel |
+| **P2-1: Observability** | ✅ trace_new, span_run, trace_collect |
+| **Bootstrap Lazy Load** | ✅ 26개 모듈 lazy → 시작 70% 단축 |
+| **Agent DSL** | ✅ Task/State/Workflow/Saga |
+| **표준 라이브러리** | ✅ 505+ 함수 |
+| **MCP 서버** | ✅ fl_eval sandbox (mcp.dclub.kr) |
 
 ---
 
