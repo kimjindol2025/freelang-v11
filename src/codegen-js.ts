@@ -20,10 +20,10 @@ const DEFAULT_OPTIONS: CodegenOptions = {
 
 // FL Runtime 최소 헬퍼 함수 셋
 const FL_RUNTIME = `
-function __fl_map(arr, fn) { return arr.map(fn); }
-function __fl_filter(arr, fn) { return arr.filter(fn); }
-function __fl_reduce(arr, fn, init) { return arr.reduce(fn, init); }
-function __fl_print(v) { console.log(v); return v; }
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
 `.trim();
 
 // 이항 연산자 매핑
@@ -48,6 +48,12 @@ const BINARY_OPS: Record<string, string> = {
 const BUILTIN_MAP: Record<string, string> = {
   // 타입 체크
   "null?": "_fl_null_q",
+  "cli-args": "_fl_get_argv",
+  "file_read": "_fl_file_read",
+  "file_write": "_fl_file_write",
+  "char_at": "_fl_char_at",
+  "char-at": "_fl_char_at",
+  "substring": "_fl_substring",
   "true?": "_fl_true_q",
   "false?": "_fl_false_q",
   "string?": "_fl_string_q",
@@ -72,7 +78,7 @@ const BUILTIN_MAP: Record<string, string> = {
   "first": "_fl_first",
   "last": "_fl_last",
   "rest": "_fl_rest",
-  "append": "_fl_append",
+  "append": "_fl_append", "slice": "_fl_slice",
   "length": "_fl_length",
 
   // 문자열
@@ -85,7 +91,7 @@ const BUILTIN_MAP: Record<string, string> = {
   // 맵/객체
   "get": "_fl_get",
   "keys": "_fl_keys",
-  "map-set": "_fl_map_set",
+  "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",
   "has-key?": "_fl_has_key_q",
 };
 
@@ -194,11 +200,6 @@ export class JSCodegen {
       }
     }
 
-    // ===== Phase A-3: CLI 지원 (향후 작업) =====
-    // Stage1.js는 현재 라이브러리로만 사용
-    // CLI 지원은 Phase B 완료 후 재검토 예정
-    // (자체호스팅 codegen 함수가 필요하므로 bootstrap.js 의존성 유지)
-
     const result = parts.join("\n");
     return this.opts.minify ? this.minify(result) : result;
   }
@@ -232,44 +233,34 @@ export class JSCodegen {
     } else if (node.type === "null") {
       return "null";
     } else if (node.type === "symbol") {
-      // nil/null 특수 처리
       if (node.value === "nil" || node.value === "null") {
         return "null";
       }
-      // 다른 심볼은 변수 참조로 취급
       const cleanName = String(node.value).replace(/^\$/, "");
       return flNameToJs(cleanName);
     } else {
-      // number
       return String(node.value);
     }
   }
 
   private genTemplateString(node: any): string {
     const value = node.value;
-    // Convert FreeLang template ${...} to JavaScript template `...${...}`
-    // Parse and transform: "Hello ${name}" → `Hello ${name}`
-    // Also handle variable extraction: ensure variables are properly JS-named
-
     let jsCode = "`";
     let i = 0;
     while (i < value.length) {
-      // Check for ${...} pattern
       if (value[i] === "$" && value[i + 1] === "{") {
         const start = i + 2;
         const end = value.indexOf("}", start);
         if (end > start) {
           const expr = value.slice(start, end).trim();
-          // Translate FreeLang variable/expression to JavaScript
-          const jsExpr = this.genNode({ kind: "variable", name: expr });
+          const jsExpr = this.genNode({ kind: "variable", name: expr } as any);
           jsCode += "${" + jsExpr + "}";
           i = end + 1;
           continue;
         }
       }
-      // Handle escape sequences and special characters in template
       if (value[i] === "`") {
-        jsCode += "\\`"; // Escape backticks in template literals
+        jsCode += "\\`";
       } else if (value[i] === "\\") {
         jsCode += "\\\\";
       } else {
@@ -282,9 +273,7 @@ export class JSCodegen {
   }
 
   private genVariable(node: Variable): string {
-    // Variable.name: "cases-js" → "cases_js" (유효한 JS 식별자로 인코딩)
-    // $ 접두사는 이미 Bootstrap parser에서 제거됨
-    const cleanName = node.name.replace(/^\$/, ""); // $ 제거 (있으면)
+    const cleanName = node.name.replace(/^\$/, "");
     return flNameToJs(cleanName);
   }
 
@@ -295,19 +284,22 @@ export class JSCodegen {
   genSExpr(node: SExpr): string {
     const { op, args } = node;
 
-    // 이항 연산자
+    if (op === "and") return "(" + args.map(a => this.genNode(a)).join(" && ") + ")";
+    if (op === "or") return "(" + args.map(a => this.genNode(a)).join(" || ") + ")";
+    if (op === "cond") return this.genCond(args);
+    if (op === "while") return this.genWhile(args);
+    if (op === "loop") return this.genLoop(args);
+
     if (op in BINARY_OPS && args.length === 2) {
       const left = this.genNode(args[0]);
       const right = this.genNode(args[1]);
       return `(${left} ${BINARY_OPS[op]} ${right})`;
     }
 
-    // 단항 연산자
     if (op === "not" && args.length === 1) {
       return `(!${this.genNode(args[0])})`;
     }
 
-    // if → 삼항 연산자
     if (op === "if") {
       const cond = this.genNode(args[0]);
       const thenExpr = this.genNode(args[1]);
@@ -315,71 +307,40 @@ export class JSCodegen {
       return `(${cond} ? ${thenExpr} : ${elseExpr})`;
     }
 
-    // define → let 선언
     if (op === "define") {
       const varName = this.extractVarName(args[0]);
       const value = this.genNode(args[1]);
       return `let ${varName} = ${value};`;
     }
 
-    // set! → 할당
     if (op === "set!") {
       const varName = this.extractVarName(args[0]);
       const value = this.genNode(args[1]);
-      return `${varName} = ${value};`;
+      return `(${varName} = ${value})`;
     }
 
-    // fn → 화살표 함수
-    if (op === "fn") {
-      return this.genFn(args);
-    }
+    if (op === "fn") return this.genFn(args);
+    if (op === "do") return this.genDo(args);
 
-    // do → IIFE (즉시 실행 함수)
-    if (op === "do") {
-      return this.genDo(args);
-    }
-
-    // list → 배열 리터럴
     if (op === "list") {
       const elements = args.map((a) => this.genNode(a));
       return `[${elements.join(", ")}]`;
     }
 
-    // str-concat → 문자열 연결
     if (op === "str-concat") {
       const parts = args.map((a) => this.genNode(a));
       return `('' + ${parts.join(" + ")})`;
     }
 
-    // print / println → console.log
     if (op === "print" || op === "println") {
       const arg = args.length > 0 ? this.genNode(args[0]) : '""';
-      return `__fl_print(${arg})`;
+      return `_fl_print(${arg})`;
     }
 
-    // map → __fl_map
-    if (op === "map") {
-      const arr = this.genNode(args[0]);
-      const fn = this.genNode(args[1]);
-      return `__fl_map(${arr}, ${fn})`;
-    }
+    if (op === "map") return `_fl_map(${this.genNode(args[1])}, ${this.genNode(args[0])})`;
+    if (op === "filter") return `_fl_filter(${this.genNode(args[1])}, ${this.genNode(args[0])})`;
+    if (op === "reduce") return `_fl_reduce(${this.genNode(args[2])}, ${this.genNode(args[0])}, ${this.genNode(args[1])})`;
 
-    // filter → __fl_filter
-    if (op === "filter") {
-      const arr = this.genNode(args[0]);
-      const fn = this.genNode(args[1]);
-      return `__fl_filter(${arr}, ${fn})`;
-    }
-
-    // reduce → __fl_reduce
-    if (op === "reduce") {
-      const arr = this.genNode(args[0]);
-      const fn = this.genNode(args[1]);
-      const init = args[2] ? this.genNode(args[2]) : "undefined";
-      return `__fl_reduce(${arr}, ${fn}, ${init})`;
-    }
-
-    // export → 내보내기 목록에 추가
     if (op === "export") {
       for (const arg of args) {
         if (arg.kind === "variable") {
@@ -391,35 +352,21 @@ export class JSCodegen {
       return "";
     }
 
-    // let → let 선언 (변수명 = 값)
     if (op === "let") {
-      // (let [[$x 10] [$y 20]] body) 또는 (let [[x val]] body)
       if (args.length >= 2) {
         const bindingsArg = args[0];
         let bindings: ASTNode[] = [];
-
-        // bindings이 Array 블록이면 items 추출, sexpr이면 args 사용
         if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
-          const block = bindingsArg as Block;
-          const items = block.fields.get("items");
-          // DEBUG: Check if items is being extracted correctly
-          if (!Array.isArray(items)) {
-            console.error("DEBUG let: block.fields.get('items') returned:", items);
-            console.error("DEBUG let: block.fields keys:", Array.from(block.fields.keys()));
-            console.error("DEBUG let: block object:", block);
-          }
-          bindings = Array.isArray(items) ? items : [];
+          bindings = (bindingsArg as Block).fields.get("items") as any || [];
         } else if (bindingsArg.kind === "sexpr") {
           bindings = (bindingsArg as SExpr).args;
         }
 
-        // 2D 형식: [[$x 10] [$y 20]] → 각 pair는 Array 블록
         const bindingStmts: string[] = [];
         for (const binding of bindings) {
           if (binding.kind === "block" && (binding as Block).type === "Array") {
-            // 2D: [[$x 10]]
-            const pairItems = (binding as Block).fields.get("items");
-            if (Array.isArray(pairItems) && pairItems.length >= 2) {
+            const pairItems = (binding as Block).fields.get("items") as any || [];
+            if (pairItems.length >= 2) {
               const varName = this.extractVarName(pairItems[0]);
               const value = this.genNode(pairItems[1]);
               bindingStmts.push(`let ${varName} = ${value};`);
@@ -427,115 +374,108 @@ export class JSCodegen {
           }
         }
 
-        const bodyStmts = args
-          .slice(1)
-          .map((a) => this.genNode(a))
-          .join("\n");
+        const bodyStmts = args.slice(1).map((a) => this.genNode(a)).join("; ");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
       }
-      // 단순 let (fallback)
       const varName = this.extractVarName(args[0]);
       const value = args[1] ? this.genNode(args[1]) : "undefined";
       return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
 
-    // 함수 호출 (일반)
-    const fnExpr = this.genFuncCall(op, args);
-    return fnExpr;
+    return this.genFuncCall(op, args);
+  }
+
+  private genCond(args: any[]): string {
+    if (args.length === 0) return "null";
+    const clauses = args.map(arg => {
+      if (arg.kind === "block" && arg.type === "Array") return arg.fields.get("items") || [];
+      return Array.isArray(arg) ? arg : [arg];
+    });
+    let res = "null";
+    for (let i = clauses.length - 1; i >= 0; i--) {
+      const pair = clauses[i];
+      const test = this.genNode(pair[0]);
+      const body = pair[1] ? this.genNode(pair[1]) : "null";
+      res = "(" + test + " ? " + body + " : " + res + ")";
+    }
+    return res;
+  }
+
+  private genWhile(args: any[]): string {
+    const cond = this.genNode(args[0]);
+    const body = args.slice(1).map(a => this.genNode(a)).join("; ");
+    return "(() => { while(" + cond + ") { " + body + " } })()";
+  }
+
+  private genLoop(args: any[]): string {
+    const bindingsBlock = args[0];
+    const bodyExprs = args.slice(1);
+    let items = [];
+    if (bindingsBlock.kind === "block" && bindingsBlock.type === "Array") items = bindingsBlock.fields.get("items") || [];
+    const inits = [];
+    for (let i = 0; i < items.length; i += 2) {
+      const name = items[i].name ? items[i].name.replace(/^\$/, "") : "p";
+      const val = this.genNode(items[i+1]);
+      inits.push("let " + name + " = " + val);
+    }
+    const bodyCode = bodyExprs.map(e => this.genNode(e)).join("; ");
+    return "(() => { " + inits.join("; ") + "; while(true) { " + bodyCode + "; break; } })()";
   }
 
   private genFn(args: ASTNode[]): string {
-    // (fn [$x $y] body)
-    // args[0] = params 리스트 (SExpr 또는 배열)
-    // args[1] = body
     const params = this.extractParamList(args[0]);
     const body = args[1] ? this.genNode(args[1]) : "undefined";
     return `((${params.join(", ")}) => ${body})`;
   }
 
   private genDo(args: ASTNode[]): string {
-    // (do e1 e2 ... eN) → (() => { e1; e2; return eN; })()
     if (args.length === 0) return "(() => undefined)()";
     if (args.length === 1) return `(() => ${this.genNode(args[0])})()`;
-
     const stmts = args.slice(0, -1).map((a) => {
-      const code = this.genNode(a);
-      return code.endsWith(";") ? code : `${code};`;
-    });
+      const c = this.genNode(a).trim();
+      return (c === "" || c.endsWith(";")) ? c : c + ";";
+    }).filter(s => s !== "");
     const last = this.genNode(args[args.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
   }
 
   private genFuncCall(op: string, args: ASTNode[]): string {
     const argStrs = args.map((a) => this.genNode(a));
-    // semantic 매핑: builtin 또는 인코딩된 함수명 사용
     const jsOp = flNameToJs(op);
     return `${jsOp}(${argStrs.join(", ")})`;
   }
 
   genBlock(node: Block): string {
     switch (node.type) {
-      case "FUNC":
-        return this.genFuncBlock(node);
-      case "MODULE":
-        return this.genModuleBlock(node);
-      case "SERVICE":
-        return this.genServiceBlock(node);
-      case "MODEL":
-        return this.genModelBlock(node);
-      case "CONTROLLER":
-        return this.genControllerBlock(node);
-      case "MAP":
-      case "Map":
-        return this.genMapBlock(node);
-      case "ARRAY":
-      case "Array":
-        return this.genArrayBlock(node);
-      default:
-        return `/* unsupported block: ${node.type} */`;
+      case "FUNC": return this.genFuncBlock(node);
+      case "MODULE": return this.genModuleBlock(node);
+      case "SERVICE": return this.genServiceBlock(node);
+      case "MODEL": return this.genModelBlock(node);
+      case "CONTROLLER": return this.genControllerBlock(node);
+      case "MAP": case "Map": return this.genMapBlock(node);
+      case "ARRAY": case "Array": return this.genArrayBlock(node);
+      default: return `/* unsupported block: ${node.type} */`;
     }
   }
 
   private genMapBlock(node: Block): string {
-    // Map 리터럴: {:key1 val1 :key2 val2 ...} → { key1: val1, key2: val2, ... }
-    const items = node.fields.get("items");
-    if (!items) return "{}";
-
     const pairs: string[] = [];
-    if (Array.isArray(items)) {
-      // 키-값 쌍: [key1, val1, key2, val2, ...]
-      for (let i = 0; i < items.length; i += 2) {
-        const keyNode = items[i];
-        const valNode = items[i + 1];
-
-        // 키 추출 (문자열 또는 키워드)
-        let key: string;
-        if (keyNode.kind === "literal" && typeof keyNode.value === "string") {
-          key = keyNode.value;
-        } else if (keyNode.kind === "keyword") {
-          key = keyNode.name;
-        } else {
-          key = this.genNode(keyNode);
-        }
-
-        const val = this.genNode(valNode);
-        pairs.push(`${key}: ${val}`);
-      }
-    }
-
-    return `{ ${pairs.join(", ")} }`;
+    node.fields.forEach((val, key) => {
+      if (key === "items" && node.type === "Map") return;
+      const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
+      pairs.push(jsKey + ": " + this.genNode(val as any));
+    });
+    return "{ " + pairs.join(", ") + " }";
   }
 
   private genArrayBlock(node: Block): string {
-    // 배열 리터럴: [item1 item2 ...] → [ item1, item2, ... ]
     const items = node.fields.get("items");
-    if (!items) return "[]";
-    const elements = (Array.isArray(items) ? items : [items]).map((item) => this.genNode(item as ASTNode));
-    return `[ ${elements.join(", ")} ]`;
+    let pNodes = Array.isArray(items) ? items : ((items as any) && (items as any).kind === "block" ? (items as any).fields.get("items") : []);
+    const elements = (pNodes || []).map((a: any) => this.genNode(a));
+    return "[" + elements.join(", ") + "]";
   }
 
   private genFuncBlock(node: Block): string {
-    // [FUNC name :params [$a $b] :body body]
     const params = this.extractBlockParams(node);
     const body = node.fields.get("body");
     const bodyCode = body ? this.genNode(body as ASTNode) : "undefined";
@@ -544,16 +484,13 @@ export class JSCodegen {
   }
 
   private flNameToJs(name: string): string {
-    // Global flNameToJs 함수에 위임 (예약어 + 특수문자 처리)
     return flNameToJs(name);
   }
 
   private genModuleBlock(node: Block): string {
     const body = node.fields.get("body");
     if (!body) return "";
-    if (Array.isArray(body)) {
-      return body.map((n) => this.genNode(n)).join("\n");
-    }
+    if (Array.isArray(body)) return body.map((n) => this.genNode(n)).join("\n");
     return this.genNode(body as ASTNode);
   }
 
@@ -561,199 +498,86 @@ export class JSCodegen {
     const name = node.name;
     const methods = node.fields.get("methods");
     const inject = node.fields.get("inject");
-
-    const injectParams = inject
-      ? Array.isArray(inject)
-        ? (inject as any[])
-            .map((dep: any) => {
-              const depName =
-                dep.kind === "variable" ? dep.name : dep.kind === "literal" ? String(dep.value) : String(dep);
-              return `private ${depName}: ${depName}`;
-            })
-            .join(", ")
-        : ""
-      : "";
-
+    const injectParams = inject ? (Array.isArray(inject) ? (inject as any[]).map((dep: any) => `private ${dep.name || dep}: ${dep.name || dep}`).join(", ") : "") : "";
     let methodsCode = "";
     if (methods && methods.kind === "sexpr") {
-      const sExpr = methods as SExpr;
-      methodsCode = sExpr.args
-        .map((arg) => {
-          if (arg.kind === "sexpr" && arg.op === "fn") {
-            const fnExpr = arg as SExpr;
-            const fnNameArg = fnExpr.args[0];
-            const fnParamsArg = fnExpr.args[1];
-            const fnBodyArg = fnExpr.args[2];
-
-            const fnName =
-              fnNameArg.kind === "variable" ? fnNameArg.name.replace(/^\$/, "") : fnNameArg.kind === "literal" ? String((fnNameArg as any).value) : "method";
-            const fnParams = this.extractParamList(fnParamsArg)
-              .map((p) => p.replace(/^\$/, ""))
-              .join(", ");
-            const fnBody = fnBodyArg ? this.genNode(fnBodyArg) : "undefined";
-
-            return `  ${fnName}(${fnParams}) { return ${fnBody}; }`;
-          }
-          return "";
-        })
-        .filter(Boolean)
-        .join("\n");
+      methodsCode = (methods as SExpr).args.map((arg) => {
+        if (arg.kind === "sexpr" && arg.op === "fn") {
+          const fnExpr = arg as SExpr;
+          const fnName = (fnExpr.args[0] as any).name || (fnExpr.args[0] as any).value || "method";
+          const fnParams = this.extractParamList(fnExpr.args[1]).map((p) => p.replace(/^\$/, "")).join(", ");
+          const fnBody = fnExpr.args[2] ? this.genNode(fnExpr.args[2]) : "undefined";
+          return `  ${fnName}(${fnParams}) { return ${fnBody}; }`;
+        }
+        return "";
+      }).filter(Boolean).join("\n");
     }
-
-    return [
-      `// Generated by FreeLang v11 — SERVICE block`,
-      `export class ${name} {`,
-      injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`,
-      methodsCode,
-      `}`,
-    ].join("\n");
+    return [`export class ${name} {`, injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`, methodsCode, `}`].join("\n");
   }
 
   private genModelBlock(node: Block): string {
     const name = node.name;
     const table = node.fields.get("table") || name.toLowerCase() + "s";
     const fields = node.fields.get("fields");
-
     let sqlColumns = "  id SERIAL PRIMARY KEY";
-    let tsInterface = `export interface ${name} {\n  id: number;`;
-
     if (fields && fields.kind === "sexpr") {
-      const sExpr = fields as SExpr;
-      for (const arg of sExpr.args) {
+      for (const arg of (fields as SExpr).args) {
         if (arg.kind === "sexpr") {
-          const fieldExpr = arg as SExpr;
-          const fieldName =
-            fieldExpr.op.startsWith("$") || fieldExpr.op.startsWith(":") ? fieldExpr.op : String((fieldExpr.args[0] as any).value || fieldExpr.op);
-          const cleanFieldName = fieldName.replace(/^[\$:]/, "").replace(/-/g, "_");
-
-          sqlColumns += `,\n  ${cleanFieldName} VARCHAR(255)`;
-          tsInterface += `\n  ${cleanFieldName.replace(/_/g, "")}: string;`;
+          const fName = (arg as SExpr).op.replace(/^[\$:]/, "").replace(/-/g, "_");
+          sqlColumns += `,\n  ${fName} VARCHAR(255)`;
         }
       }
     }
-
-    tsInterface += `\n  createdAt: Date;\n  updatedAt: Date;\n}`;
-
-    return [
-      `-- Generated by FreeLang v11 — MODEL block (SQL)`,
-      `CREATE TABLE IF NOT EXISTS ${table} (`,
-      sqlColumns,
-      `,\n  created_at TIMESTAMP DEFAULT NOW(),`,
-      `\n  updated_at TIMESTAMP DEFAULT NOW()`,
-      `\n);`,
-      ``,
-      `// TypeScript interface`,
-      tsInterface,
-    ].join("\n");
+    return [`CREATE TABLE IF NOT EXISTS ${table} (`, sqlColumns, `,\n  created_at TIMESTAMP DEFAULT NOW(),\n  updated_at TIMESTAMP DEFAULT NOW()\n);`].join("\n");
   }
 
   private genControllerBlock(node: Block): string {
     const prefix = node.fields.get("prefix") || "/";
     const routes = node.fields.get("routes");
-
     let routeCode = "";
     if (routes && routes.kind === "sexpr") {
       const sExpr = routes as SExpr;
-      for (let i = 0; i < sExpr.args.length; i += 2) {
-        const methodLit = sExpr.args[i];
-        const routeLit = sExpr.args[i + 1];
-        const handlerLit = sExpr.args[i + 2];
-
-        const method = methodLit.kind === "literal" ? String((methodLit as any).value) : "GET";
-        const route = routeLit.kind === "literal" ? String((routeLit as any).value) : "/";
-        const fullRoute = prefix === "/" ? route : `${prefix}${route}`;
-
-        routeCode += `router.${method.toLowerCase()}("${fullRoute}", async (req, res) => {
-  try {
-    // TODO: Execute handler
-    res.json({ status: 200 });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-`;
+      for (let i = 0; i < sExpr.args.length; i += 3) {
+        const method = String((sExpr.args[i] as any).value || "GET").toLowerCase();
+        const route = String((sExpr.args[i+1] as any).value || "/");
+        routeCode += `router.${method}("${prefix === "/" ? route : prefix + route}", async (req, res) => { res.json({ status: 200 }); });\n`;
       }
     }
-
-    return [
-      `// Generated by FreeLang v11 — CONTROLLER block`,
-      `import { Router } from "express";`,
-      `export const router = Router();`,
-      ``,
-      routeCode,
-    ].join("\n");
+    return [`import { Router } from "express";`, `export const router = Router();`, routeCode].join("\n");
   }
 
   private genTryBlock(node: any): string {
-    // node: {kind: "try-block", body: ASTNode, catchClauses?: CatchClause[], finallyBlock?: ASTNode}
     const body = this.genNode(node.body);
     const parts: string[] = [`(()=>{try{return ${body};}`];
-
-    // catch clauses
-    if (node.catchClauses && node.catchClauses.length > 0) {
-      for (const catchClause of node.catchClauses) {
-        const param = catchClause.variable || "err";
-        const handler = this.genNode(catchClause.handler);
-        parts.push(`catch(${param}){return ${handler};}`);
+    if (node.catchClauses) {
+      for (const cc of node.catchClauses) {
+        parts.push(`catch(${cc.variable || "err"}){return ${this.genNode(cc.handler)};}`);
       }
     }
-
-    // finally block
-    if (node.finallyBlock) {
-      const finallyCode = this.genNode(node.finallyBlock);
-      parts.push(`finally{${finallyCode};}`);
-    }
-
-    parts.push(`})()`);
-    return parts.join("");
+    if (node.finallyBlock) parts.push(`finally{${this.genNode(node.finallyBlock)};}`);
+    return parts.join("") + "})()";
   }
 
   private extractVarName(node: ASTNode): string {
-    if (node.kind === "variable") {
-      const name = node.name.replace(/^\$/, "");
-      return flNameToJs(name); // $x → x
-    }
-    if (node.kind === "literal" && typeof node.value === "string") {
-      return flNameToJs(node.value); // x 그대로 ($ 추가 금지)
-    }
+    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
+    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
     return "unknown";
   }
 
   private extractParamList(node: ASTNode): string[] {
     if (!node) return [];
-    if (node.kind === "sexpr") {
-      // (list $x $y ...) 형태
-      return node.args.map((a) => {
-        if (a.kind === "variable") return a.name;
-        if (a.kind === "literal") return `$${a.value}`;
-        return "$p";
-      });
-    }
-    // 단일 파라미터
-    if (node.kind === "variable") return [node.name];
-    return [];
+    let pNodes = (node as any).kind === "block" && (node as any).type === "Array" ? (node as any).fields.get("items") : (node.kind === "sexpr" ? node.args : [node]);
+    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
   }
 
   private extractBlockParams(node: Block): string[] {
     const params = node.fields.get("params");
     if (!params) return [];
-    if (Array.isArray(params)) {
-      return params.map((p) => {
-        if (p.kind === "variable") return p.name;
-        if (p.kind === "literal") return `$${p.value}`;
-        return "$p";
-      });
-    }
-    // 단일 노드
-    const p = params as ASTNode;
-    if (p.kind === "variable") return [p.name];
-    return [];
+    let pNodes = Array.isArray(params) ? params : ((params as any).kind === "block" && (params as any).type === "Array" ? (params as any).fields.get("items") : [params]);
+    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
   }
 
   private minify(code: string): string {
-    return code
-      .replace(/\/\/[^\n]*/g, "") // 주석 제거
-      .replace(/\s+/g, " ")       // 공백 정규화
-      .trim();
+    return code.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ").trim();
   }
 }

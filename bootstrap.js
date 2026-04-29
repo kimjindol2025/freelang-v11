@@ -319,6 +319,9 @@ var init_lexer = __esm({
 function makeLiteral(type, value, line) {
   return { kind: "literal", type, value, line };
 }
+function makeTemplateString(value, line) {
+  return { kind: "template-string", value, line };
+}
 function makeVariable(name, line) {
   return { kind: "variable", name, line };
 }
@@ -828,6 +831,9 @@ var init_parser = __esm({
         }
         if (this.check("String" /* String */)) {
           const token = this.advance();
+          if (token.value.includes("${")) {
+            return makeTemplateString(token.value);
+          }
           return makeLiteral("string", token.value);
         }
         if (this.check("Variable" /* Variable */)) {
@@ -914,9 +920,8 @@ var init_parser = __esm({
           let key;
           if (this.check("Colon" /* Colon */)) {
             this.advance();
-            const _ntok = this.peek();
-            if (_ntok.type !== "Symbol" && getKeywordTokenType(_ntok.value) === void 0) {
-              throw this.error(`Expected symbol after ':' in map literal`, _ntok);
+            if (!this.check("Symbol" /* Symbol */)) {
+              throw this.error(`Expected symbol after ':' in map literal`, this.peek());
             }
             key = this.advance().value;
           } else if (this.check("String" /* String */)) {
@@ -938,7 +943,7 @@ var init_parser = __esm({
         const peekPos = this.pos + 1;
         if (peekPos >= this.tokens.length) return false;
         const nextToken = this.tokens[peekPos];
-        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */ || nextToken.type === "LBrace" /* LBrace */ || nextToken.type === "LParen" /* LParen */;
+        return nextToken.type === "Variable" /* Variable */ || nextToken.type === "Number" /* Number */ || nextToken.type === "String" /* String */ || nextToken.type === "RBracket" /* RBracket */ || nextToken.type === "LBracket" /* LBracket */;
       }
       // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions
       // Also handles match expressions: (match value (pattern body) ...)
@@ -1354,12 +1359,23 @@ var init_parser = __esm({
       error(message, token) {
         let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
         if (this.parenStack.length > 0 && (token.type === "EOF" /* EOF */ || message.includes("Expected R") || message.includes("Unexpected"))) {
-          const opening = this.parenStack[this.parenStack.length - 1];
-          const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
-          const wantSym = opening.type === "LParen" /* LParen */ ? ")" : opening.type === "LBracket" /* LBracket */ ? "]" : "}";
-          const parenHint = `\uC5EC\uB294 '${openSym}' at line ${opening.line}:${opening.col} \uAC00 \uB2EB\uD788\uC9C0 \uC54A\uC74C \u2014 '${wantSym}' \uB204\uB77D \uB610\uB294 \uC624\uD0C0`;
+          const stackInfo = this.parenStack.map((opening, idx) => {
+            const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
+            const depth = idx + 1;
+            return `  [${depth}] '${openSym}' at line ${opening.line}:${opening.col}`;
+          }).join("\n");
+          const closeSeq = this.parenStack.map((o) => o.type === "LParen" /* LParen */ ? ")" : o.type === "LBracket" /* LBracket */ ? "]" : "}").reverse().join("");
+          const nextOpening = this.parenStack[this.parenStack.length - 1];
+          const nextExpected = nextOpening.type === "LParen" /* LParen */ ? ")" : nextOpening.type === "LBracket" /* LBracket */ ? "]" : "}";
+          const parenHint = `\uBBF8\uB2EB\uD798 \uAD04\uD638 \uC2A4\uD0DD (\uAE4A\uC774: ${this.parenStack.length}):
+${stackInfo}
+
+\uD544\uC694\uD55C \uB2EB\uD798 \uAD04\uD638 \uC2DC\uD000\uC2A4: ${closeSeq}
+
+\uB2E4\uC74C \uD1A0\uD070\uC744 \uC608\uC0C1: '${nextExpected}'`;
           hint = hint ? `${hint}
-  ${parenHint}` : parenHint;
+
+${parenHint}` : parenHint;
         }
         let code = "E_PARSE_SYNTAX_ERROR";
         if (message.includes("Expected") || message.includes("Unexpected")) {
@@ -1929,14 +1945,26 @@ var init_parser = __esm({
                   pattern = makeVariablePattern(patternName);
                 }
                 this.expect("RBracket" /* RBracket */);
+              } else if (this.check("Symbol" /* Symbol */) || this.check("Variable" /* Variable */)) {
+                const paramToken = this.advance();
+                variable = paramToken.value;
+                pattern = makeVariablePattern(paramToken.value);
               }
-              const handler = this.parseValue();
+              const handlerExprs = [];
+              while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
+                handlerExprs.push(this.parseValue());
+              }
+              const handler = handlerExprs.length === 1 ? handlerExprs[0] : makeSExpr("do", handlerExprs);
               catchClauses.push(makeCatchClause(handler, pattern, variable));
               this.expect("RParen" /* RParen */);
             } else if (nextToken.type === "Symbol" /* Symbol */ && nextToken.value === "finally") {
               this.advance();
               this.advance();
-              finallyBlock = this.parseValue();
+              const finallyExprs = [];
+              while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
+                finallyExprs.push(this.parseValue());
+              }
+              finallyBlock = finallyExprs.length === 1 ? finallyExprs[0] : makeSExpr("do", finallyExprs);
               this.expect("RParen" /* RParen */);
               break;
             } else {
@@ -1953,6 +1981,29 @@ var init_parser = __esm({
       parseThrowExpression() {
         const argument = this.parseValue();
         return makeThrowExpression(argument);
+      }
+      // Phase B-1: Parse loop expressions
+      // (loop [($var init) condition update] body)
+      parseLoopExpression() {
+        const startLine = this.peek().line || 0;
+        this.expect("LBracket" /* LBracket */);
+        const init = this.parseValue();
+        const condition = this.parseValue();
+        const update = this.parseValue();
+        this.expect("RBracket" /* RBracket */);
+        const bodyExprs = [];
+        while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
+          bodyExprs.push(this.parseValue());
+        }
+        const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
+        return {
+          kind: "loop",
+          init,
+          condition,
+          update,
+          body,
+          line: startLine
+        };
       }
       // Phase 9c: Internal helper for parsing reasoning expressions (used by parseReasoningExpression and parseReasoningSequenceExpression)
       parseReasoningExpressionInternal(stage) {
@@ -11120,7 +11171,6 @@ init_lexer();
 init_parser();
 function flDeepEq(a, b) {
   if (a === b) return true;
-  if (a == null && b == null) return true;
   if (a == null || b == null) return false;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
@@ -11135,7 +11185,6 @@ function flDeepEq(a, b) {
   }
   return false;
 }
-var MODULE_CACHE = /* @__PURE__ */ new Map();
 function flEnvGet(env, name) {
   let e = env;
   while (e !== null && e !== void 0) {
@@ -11188,7 +11237,7 @@ function flExecOpNative(op, vals) {
     case "%":
       return v0 % v1;
     case "=":
-      return (v0 == null && v1 == null) ? true : v0 === v1;
+      return v0 === v1;
     case "!=":
       return v0 !== v1;
     case "<":
@@ -11289,8 +11338,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.length > 0 ? v0[v0.length - 1] : null : null;
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
-    case "get-or":
-    case "get_or": {
+    case "get-or": {
       let k = v1;
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
       if (v0 === null || v0 === void 0) return v2 !== void 0 ? v2 : null;
@@ -11349,14 +11397,12 @@ function flExecOpNative(op, vals) {
     case "block-items":
       return flBlockItems(v0);
     case "read-file":
-    case "file_read":
       try {
         return require("fs").readFileSync(String(v0), "utf-8");
       } catch {
         return null;
       }
     case "write-file":
-    case "file_write":
       try {
         require("fs").writeFileSync(String(v0), String(v1 ?? ""));
         return true;
@@ -11364,7 +11410,6 @@ function flExecOpNative(op, vals) {
         return false;
       }
     case "file-exists?":
-    case "file_exists":
       try {
         return require("fs").existsSync(String(v0));
       } catch {
@@ -11414,17 +11459,14 @@ function flExecOpNative(op, vals) {
       const path16 = require("path");
       try {
         const resolvedPath = path16.resolve(process.cwd(), filePath);
-        console.log(`[LOAD DEBUG v1] Called with ${resolvedPath}`);
         const src = fs20.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
-        console.log(`[LOAD DEBUG v1] AST nodes: ${ast.length}`);
         for (const node of ast) {
           interp.eval(node);
         }
-        console.log(`[LOAD DEBUG v1] Functions after eval: ${interp.globals.size}`);
         return null;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
@@ -11451,6 +11493,31 @@ function flExecOpNative(op, vals) {
         return true;
       } catch {
         return false;
+      }
+    }
+    case "http-get":
+    case "http_get": {
+      const url2 = String(v0 ?? "");
+      try {
+        const { execSync: execSync2 } = require("child_process");
+        const escapedUrl = url2.replace(/'/g, "'\\''");
+        const cmd2 = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
+        const result = execSync2(cmd2, { encoding: "utf-8", timeout: 1e4 });
+        const lines = result.split("\n");
+        const status = parseInt(lines[lines.length - 1], 10) || 0;
+        const body = lines.slice(0, -1).join("\n");
+        return {
+          status,
+          body,
+          headers: {}
+        };
+      } catch (e) {
+        return {
+          status: 0,
+          body: "",
+          headers: {},
+          error: e.message
+        };
       }
     }
     default:
@@ -11639,22 +11706,13 @@ function evalBuiltin(interp2, op, args2, expr) {
       const path16 = require("path");
       try {
         const resolvedPath = path16.resolve(process.cwd(), filePath);
-        if (MODULE_CACHE.has(resolvedPath)) {
-          return MODULE_CACHE.get(resolvedPath);
-        }
         const src = fs20.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
         const ast = parse3(tokens);
-        console.log(`[LOAD DEBUG] Loaded ${resolvedPath}, AST nodes: ${ast.length}`);
-        console.log(`[LOAD DEBUG] AST types: ${ast.map((n) => n.kind || n.type).join(", ").substring(0, 100)}`);
-        console.log(`[LOAD DEBUG] Functions before interpret: ${interp2.globals.size}`);
         const result = interp2.interpret(ast);
-        console.log(`[LOAD DEBUG] Functions after interpret: ${interp2.globals.size}`);
-        console.log(`[LOAD DEBUG] bson-encode exists: ${interp2.globals.has("bson-encode")}`);
-        MODULE_CACHE.set(resolvedPath, result);
-        return result;
+        return null;
       } catch (e) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }
@@ -11952,14 +12010,10 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "rest":
       return args2[0]?.slice(1);
     case "keys":
-    case "json_keys":
       return args2[0] && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.keys(args2[0]) : [];
     case "values":
-    case "json_vals":
       return args2[0] && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.values(args2[0]) : [];
     case "upper-case":
-    case "uppercase":
-    case "upper":
       return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0];
     case "lower-case":
     case "lowercase":
@@ -12059,20 +12113,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       };
     }
     case "reduce": {
-      let reduceFn, accumulator, arr;
-      if (Array.isArray(args2[0])) {
-        arr = args2[0];
-        accumulator = args2[1];
-        reduceFn = args2[2];
-      } else if (isLazySeq(args2[0])) {
-        arr = args2[0];
-        accumulator = args2[1];
-        reduceFn = args2[2];
-      } else {
-        reduceFn = args2[0];
-        accumulator = args2[1];
-        arr = args2[2] ?? [];
-      }
+      const reduceFn = args2[0];
+      let accumulator = args2[1];
+      let arr = args2[2] ?? [];
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
         let cur = arr;
@@ -12158,15 +12201,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return typeof args2[0] === "function";
     case "map?":
       return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
-    case "json_keys":
-      return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? Object.keys(args2[0]) : [];
     case "num-to-str":
-    case "num->str":
       return String(args2[0]);
     case "str-to-num":
-    case "str->num":
-    case "string->number":
-    case "string-to-number":
       return parseFloat(String(args2[0]));
     case "map-set":
       if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
@@ -12206,14 +12243,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "repeat":
       return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
     case "filter": {
-      let coll, filterFn;
-      if (Array.isArray(args2[0])) {
-        coll = args2[0];
-        filterFn = args2[1];
-      } else if (Array.isArray(args2[1])) {
-        filterFn = args2[0];
-        coll = args2[1];
-      } else return [];
+      const filterFn = args2[0];
+      const coll = args2[1];
+      if (!Array.isArray(coll)) return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && filterFn.kind === "function-value") {
         return coll.filter((item) => callFnVal(filterFn, [item]));
@@ -12238,8 +12270,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "last-or":
     case "last_or":
       return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : args2[1] !== void 0 ? args2[1] : null;
-    case "get-or":
-    case "get_or": {
+    case "get-or": {
       const def = args2[2] !== void 0 ? args2[2] : null;
       let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
@@ -12365,14 +12396,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         case "number?":
           return typeof v0 === "number";
         case "read-file":
-        case "file_read":
           try {
             return require("fs").readFileSync(String(v0), "utf-8");
           } catch {
             return null;
           }
         case "write-file":
-        case "file_write":
           try {
             require("fs").writeFileSync(String(v0), String(v1 ?? ""));
             return true;
@@ -12380,14 +12409,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
             return false;
           }
         case "file-exists?":
-        case "file_exists":
           try {
             return require("fs").existsSync(String(v0));
           } catch {
             return false;
           }
         case "file-append":
-        case "file_append":
           try {
             require("fs").appendFileSync(String(v0), String(v1 ?? ""));
             return true;
@@ -12395,7 +12422,6 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
             return false;
           }
         case "dir-list":
-        case "dir_list":
           try {
             return require("fs").readdirSync(String(v0));
           } catch {
@@ -15020,6 +15046,48 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       if (op.startsWith("explain-")) {
         const r145 = evalExplain_PHASE145(op, args2, callFnVal);
         if (r145 !== null) return r145;
+      }
+      switch (op) {
+        case "file-mkdir":
+        case "file_mkdir": {
+          const dirPath = String(args2[0] ?? "");
+          const fs20 = require("fs");
+          try {
+            fs20.mkdirSync(dirPath, { recursive: true });
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        case "http-get":
+        case "http_get": {
+          const url2 = String(args2[0] ?? "");
+          try {
+            const { execSync: execSync2 } = require("child_process");
+            const escapedUrl = url2.replace(/'/g, "'\\''");
+            const cmd2 = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
+            const result = execSync2(cmd2, { encoding: "utf-8", timeout: 1e4 });
+            const lines = result.split("\n");
+            const status = parseInt(lines[lines.length - 1], 10) || 0;
+            const body = lines.slice(0, -1).join("\n");
+            return {
+              status,
+              body,
+              headers: {}
+            };
+          } catch (e) {
+            return {
+              status: 0,
+              body: "",
+              headers: {},
+              error: e.message
+            };
+          }
+        }
+        case "now-iso":
+        case "now_iso": {
+          return (/* @__PURE__ */ new Date()).toISOString();
+        }
       }
       return callUser(op, args2);
     }
@@ -18110,6 +18178,32 @@ function evalSpecialForm(interp2, op, expr) {
     const bindingsNode = expr.args[0];
     const bodyNodes = expr.args.slice(1);
     const bindingItems = bindingsNode.kind === "array" ? bindingsNode.items || [] : bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get?.("items") || [] : [];
+    const isModernSyntax = bindingItems.length === 3 && bindingItems[0].kind === "sexpr";
+    if (isModernSyntax) {
+      const initExpr = bindingItems[0];
+      const condExpr = bindingItems[1];
+      const updateExpr = bindingItems[2];
+      const varName = initExpr.op || "$i";
+      const initVal = ev(initExpr.args[0]);
+      ctx.variables.push();
+      ctx.variables.set(varName, initVal);
+      let result2 = null;
+      try {
+        while (true) {
+          const condVal = ev(condExpr);
+          const isTruthy = condVal !== null && condVal !== void 0 && condVal !== false;
+          if (!isTruthy) break;
+          for (const bodyNode of bodyNodes) {
+            result2 = ev(bodyNode);
+          }
+          const newVal = ev(updateExpr);
+          ctx.variables.set(varName, newVal);
+        }
+        return result2;
+      } finally {
+        ctx.variables.pop();
+      }
+    }
     const loopVars = [];
     const loopInits = [];
     for (let i = 0; i < bindingItems.length; i += 2) {
@@ -18493,12 +18587,14 @@ function evalLet(interp2, args2) {
     const items = bindings.fields.get("items");
     if (Array.isArray(items) && items.length > 0) {
       const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
-      for (let i = 1; i < items.length; i++) {
-        const cur = items[i]?.kind === "block" && items[i]?.type === "Array";
-        if (cur !== isNested) {
-          ctx.variables.pop();
-          throw new Error(`let: \uBC14\uC778\uB529 \uD615\uC2DD\uC774 \uC77C\uAD00\uB418\uC9C0 \uC54A\uC74C (2\uCC28\uC6D0 [[$x ...]] \uC640 1\uCC28\uC6D0 [$x ...] \uD63C\uD569 \uBD88\uAC00, index=${i})`);
+      if (isNested) {
+        for (let i = 0; i < items.length; i += 2) {
+          if (!(items[i]?.kind === "block" && items[i]?.type === "Array")) {
+            ctx.variables.pop();
+            throw new Error(`let: 2\uCC28\uC6D0 \uBC14\uC778\uB529\uC5D0\uC11C \uC6D0\uC18C ${i}\uAC00 \uBC30\uC5F4\uC774 \uC544\uB2D8`);
+          }
         }
+      } else {
       }
       if (isNested) {
         for (const item of items) {
@@ -21609,15 +21705,7 @@ function categorizeError(message) {
   if (msg.includes("io error")) return "IO_ERROR";
   return "UNKNOWN";
 }
-function createWorkflowModule(callFnVal, callUserFn) {
-  function callFl(fn, args) {
-    if (typeof fn === "function") return fn(...args);
-    if (typeof fn === "string" && typeof callUserFn === "function") return callUserFn(fn, args);
-    if (fn && (fn.kind === "function-value" || fn.params !== void 0)) {
-      if (typeof callFnVal === "function") return callFnVal(fn, args);
-    }
-    return null;
-  }
+function createWorkflowModule() {
   return {
     // ── Workflow Definition ───────────────────────────────────
     // workflow_create name steps -> Workflow object
@@ -21637,11 +21725,15 @@ function createWorkflowModule(callFnVal, callUserFn) {
       on_timeout: options.on_timeout,
       fallback: options.fallback,
       timeout_ms: options.timeout_ms,
-      if: options.if
+      if: options.if,
+      parallel_tasks: options.parallel_tasks,
+      merge_strategy: options.merge_strategy,
+      compensate: options.compensate,
+      on_partial: options.on_partial
     }),
     // ── Workflow Execution ────────────────────────────────────
-    // workflow_run workflow initial_ctx options -> WorkflowResult
-    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    // workflow_run workflow initial_ctx options -> WorkflowResult (P0, no parallel support)
+    // Use workflow_run_async for P1-1 parallel task support
     "workflow_run": (workflow, initialCtx = {}, options) => {
       const startMs = T.now();
       const runId = X.uuid_short();
@@ -21666,9 +21758,23 @@ function createWorkflowModule(callFnVal, callUserFn) {
       const completedStepNames = [];
       for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
         const step = steps[stepIndex];
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          return {
+            id: runId,
+            name: workflow.name,
+            status: "failed",
+            context: ctx,
+            steps_run: stepsOk + stepsFailed,
+            steps_ok: stepsOk,
+            steps_failed: stepsFailed,
+            total_ms: T.now() - startMs,
+            log,
+            errors: ["Parallel tasks detected. Use workflow_run_async() instead of workflow_run()"]
+          };
+        }
         if (step.if !== void 0) {
           try {
-            const shouldRun = callFl(step.if, [ctx]);
+            const shouldRun = step.if(ctx);
             if (!shouldRun) {
               log.push({ step: step.name, status: "skipped", ms: 0 });
               continue;
@@ -21699,7 +21805,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
         let stepResult = void 0;
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
-            stepResult = callFl(step.fn, [ctx]);
+            stepResult = step.fn(ctx);
             ctx = { ...ctx, ...stepResult };
             success = true;
             break;
@@ -21737,7 +21843,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
           const errorCategory = categorizeError(lastErr);
           if (step.on_error) {
             try {
-              fallbackValue = callFl(step.on_error, [{ error: lastErr, attempts: maxAttempts, step_name: step.name }]);
+              fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
@@ -21747,9 +21853,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
                 ms: stepMs,
                 error: lastErr,
                 category: errorCategory,
-                // P0-4: 카테고리
                 attempted: maxAttempts
-                // P0-4: 재시도 횟수
               });
               stepsOk++;
               stepsFailed--;
@@ -21761,7 +21865,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
           }
           if (step.fallback !== void 0) {
             try {
-              fallbackValue = typeof step.fallback === "function" ? callFl(step.fallback, []) : step.fallback;
+              fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
               ctx = { ...ctx, ...fallbackValue };
               success = true;
               errors.push(`[${step.name}] ${lastErr} (fallback used)`);
@@ -21771,9 +21875,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
                 ms: stepMs,
                 error: lastErr,
                 category: errorCategory,
-                // P0-4: 카테고리
                 attempted: maxAttempts
-                // P0-4: 재시도 횟수
               });
               stepsOk++;
               stepsFailed--;
@@ -21791,9 +21893,7 @@ function createWorkflowModule(callFnVal, callUserFn) {
               ms: stepMs,
               error: lastErr,
               category: errorCategory,
-              // P0-4: 카테고리
               attempted: maxAttempts
-              // P0-4: 재시도 횟수
             });
             if (step.required !== false) {
               return {
@@ -21808,6 +21908,300 @@ function createWorkflowModule(callFnVal, callUserFn) {
                 log,
                 errors
               };
+            }
+          }
+        }
+      }
+      const totalMs = T.now() - startMs;
+      const status = stepsFailed === 0 ? "success" : "partial";
+      if ((status === "success" || status === "partial") && checkpointPath) {
+        deleteCheckpoint(checkpointPath);
+      }
+      return {
+        id: runId,
+        name: workflow.name,
+        status,
+        context: ctx,
+        steps_run: stepsOk + stepsFailed,
+        steps_ok: stepsOk,
+        steps_failed: stepsFailed,
+        total_ms: totalMs,
+        log,
+        errors
+      };
+    },
+    // workflow_run_async workflow initial_ctx options -> Promise<WorkflowResult>
+    // P1-1 async version supporting parallel tasks
+    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    "workflow_run_async": async (workflow, initialCtx = {}, options) => {
+      const startMs = T.now();
+      const runId = X.uuid_short();
+      const checkpointPath = options?.checkpoint_path;
+      const checkpointEvery = options?.checkpoint_every ?? 0;
+      const autoResume = options?.auto_resume ?? true;
+      let startFromStep = 0;
+      let ctx = { ...initialCtx, _workflow: workflow.name, _run_id: runId };
+      if (autoResume && checkpointPath) {
+        const checkpoint = loadCheckpoint(checkpointPath);
+        if (checkpoint && checkpoint.workflow_id === workflow.id) {
+          startFromStep = checkpoint.step_index;
+          ctx = { ...checkpoint.context, _workflow: workflow.name, _run_id: runId };
+          console.log(`[Checkpoint] Resuming from step ${startFromStep} (${checkpoint.step_names.length} completed)`);
+        }
+      }
+      const log = [];
+      const errors = [];
+      let stepsOk = 0;
+      let stepsFailed = 0;
+      const steps = workflow.steps;
+      const completedStepNames = [];
+      const completedSteps = [];
+      const compensations = [];
+      const executeStep = async (step, currentCtx) => {
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        const maxAttempts = (step.retry ?? 0) + 1;
+        let stepResult = void 0;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            stepResult = step.fn(currentCtx);
+            success = true;
+            break;
+          } catch (err4) {
+            lastErr = err4.message;
+            if (attempt < maxAttempts - 1) {
+              const wait = 50 * (attempt + 1);
+              const end = Date.now() + wait;
+              while (Date.now() < end) {
+              }
+            }
+          }
+        }
+        const stepMs = T.now() - stepStart;
+        return { success, result: stepResult, error: lastErr, ms: stepMs };
+      };
+      const executeParallelTasks = async (parallelTasks, mergeStrategy, currentCtx) => {
+        const taskExecutions = parallelTasks.map((task) => executeStep(task, currentCtx));
+        const taskResults = await Promise.all(taskExecutions);
+        const mergedResults = {};
+        const taskErrors = [];
+        let allSuccess = true;
+        let anySuccess = false;
+        taskResults.forEach((result, index) => {
+          const taskName = parallelTasks[index].name;
+          if (result.success) {
+            mergedResults[taskName] = result.result;
+            anySuccess = true;
+          } else {
+            taskErrors.push(`${taskName}: ${result.error}`);
+            allSuccess = false;
+          }
+        });
+        let strategySuccess = false;
+        if (mergeStrategy === "all-success") {
+          strategySuccess = allSuccess;
+        } else if (mergeStrategy === "first-success") {
+          strategySuccess = anySuccess;
+        } else if (mergeStrategy === "any-partial") {
+          strategySuccess = true;
+        } else {
+          strategySuccess = allSuccess;
+        }
+        return { success: strategySuccess, results: mergedResults, errors: taskErrors };
+      };
+      for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
+        const step = steps[stepIndex];
+        if (step.if !== void 0) {
+          try {
+            const shouldRun = step.if(ctx);
+            if (!shouldRun) {
+              log.push({ step: step.name, status: "skipped", ms: 0 });
+              continue;
+            }
+          } catch (condErr) {
+            errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
+            if (step.required !== false) {
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors
+              };
+            }
+            continue;
+          }
+        }
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        let stepResult = void 0;
+        let stepMs = 0;
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          const mergeStrategy = step.merge_strategy ?? "all-success";
+          const parallelResult = await executeParallelTasks(step.parallel_tasks, mergeStrategy, ctx);
+          stepMs = T.now() - stepStart;
+          if (parallelResult.success) {
+            success = true;
+            stepResult = { [step.name]: parallelResult.results };
+            ctx = { ...ctx, ...stepResult };
+            stepsOk++;
+            completedStepNames.push(step.name);
+            log.push({ step: step.name, status: "ok", ms: stepMs });
+            ctx[`_step_${step.name}_ms`] = stepMs;
+          } else {
+            stepsFailed++;
+            lastErr = parallelResult.errors.join("; ");
+            const errorCategory = categorizeError(lastErr);
+            if (step.fallback !== void 0) {
+              try {
+                const fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] Parallel tasks failed (fallback used)`);
+                log.push({ step: step.name, status: "fallback_used", ms: stepMs, error: lastErr, category: errorCategory });
+                stepsOk++;
+                stepsFailed--;
+                ctx[`_step_${step.name}_ms`] = stepMs;
+              } catch (fallbackErr) {
+                errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+                log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: errorCategory });
+                if (step.required !== false) {
+                  return {
+                    id: runId,
+                    name: workflow.name,
+                    status: "failed",
+                    context: ctx,
+                    steps_run: stepsOk + stepsFailed,
+                    steps_ok: stepsOk,
+                    steps_failed: stepsFailed,
+                    total_ms: T.now() - startMs,
+                    log,
+                    errors
+                  };
+                }
+              }
+            } else {
+              errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+              log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: categorizeError(lastErr) });
+              if (step.required !== false) {
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors
+                };
+              }
+            }
+          }
+        } else {
+          const execResult = await executeStep(step, ctx);
+          stepMs = execResult.ms;
+          success = execResult.success;
+          lastErr = execResult.error;
+          stepResult = execResult.result;
+          if (success) {
+            stepsOk++;
+            completedStepNames.push(step.name);
+            log.push({ step: step.name, status: "ok", ms: stepMs });
+            ctx = { ...ctx, ...stepResult };
+            ctx[`_step_${step.name}_ms`] = stepMs;
+            if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
+              const checkpoint = {
+                workflow_id: workflow.id,
+                workflow_name: workflow.name,
+                step_index: stepIndex + 1,
+                context: ctx,
+                timestamp: T.now(),
+                step_names: completedStepNames,
+                steps_completed: completedStepNames.length
+              };
+              saveCheckpoint(checkpointPath, checkpoint);
+            }
+          } else {
+            stepsFailed++;
+            let fallbackValue = void 0;
+            const errorCategory = categorizeError(lastErr);
+            if (step.on_error) {
+              try {
+                fallbackValue = step.on_error({ error: lastErr, attempts: 1, step_name: step.name });
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
+                log.push({
+                  step: step.name,
+                  status: "error_handled",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1
+                });
+                stepsOk++;
+                stepsFailed--;
+                ctx[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (handlerErr) {
+                errors.push(`[${step.name}] ${lastErr} \u2192 on_error handler also failed: ${handlerErr.message}`);
+              }
+            }
+            if (step.fallback !== void 0) {
+              try {
+                fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (fallback used)`);
+                log.push({
+                  step: step.name,
+                  status: "fallback_used",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1
+                });
+                stepsOk++;
+                stepsFailed--;
+                ctx[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (fallbackErr) {
+                errors.push(`[${step.name}] ${lastErr} \u2192 fallback also failed: ${fallbackErr.message}`);
+              }
+            }
+            if (!success) {
+              errors.push(`[${step.name}] ${lastErr}`);
+              log.push({
+                step: step.name,
+                status: "failed",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,
+                attempted: 1
+              });
+              if (step.required !== false) {
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors
+                };
+              }
             }
           }
         }
@@ -21854,324 +22248,6 @@ function createWorkflowModule(callFnVal, callUserFn) {
     }),
     // ── Result Inspection ─────────────────────────────────────
     // workflow_ok result -> boolean
-// workflow_parallel steps ctx -> {ok, results, errors, total_ms}
-    // 모든 step을 독립 실행 (실패해도 계속), 결과 모두 수집
-    "workflow_parallel": (steps, ctx = {}) => {
-      const start = Date.now();
-      const results = [];
-      const errors = [];
-      for (const step of steps) {
-        const t0 = Date.now();
-        try {
-          if (step.if !== void 0) {
-            const ok = callFl(step.if, [ctx]);
-            if (!ok) {
-              results.push({ name: step.name, status: "skipped", ms: 0 });
-              continue;
-            }
-          }
-          const r = callFl(step.fn, [ctx]);
-          ctx = { ...ctx, ...r };
-          results.push({ name: step.name, status: "ok", result: r, ms: Date.now() - t0 });
-        } catch (e) {
-          errors.push({ name: step.name, error: e.message });
-          results.push({ name: step.name, status: "failed", error: e.message, ms: Date.now() - t0 });
-        }
-      }
-      const allOk = errors.length === 0;
-      return { ok: allOk, results, errors, context: ctx, total_ms: Date.now() - start };
-    },
-    // workflow_parallel_any steps ctx -> {ok, name, result, ms}
-    // 최초 성공 step 결과 반환 (나머지 건너뜀)
-    "workflow_parallel_any": (steps, ctx = {}) => {
-      for (const step of steps) {
-        const t0 = Date.now();
-        try {
-          const r = callFl(step.fn, [ctx]);
-          return { ok: true, name: step.name, result: r, ms: Date.now() - t0 };
-        } catch (_) {}
-      }
-      return { ok: false, error: "All steps failed" };
-    },
-    // ── P1: 보상 트랜잭션 (Saga) ─────────────────────────────────
-    // saga_run steps -> {ok, results, compensated, error}
-    // step: {name, action fn(ctx)->ctx, compensate fn(result)->void}
-    "saga_run": (steps, ctx = {}) => {
-      const done = [];
-      for (const step of steps) {
-        try {
-          const result = callFl(step.action, [ctx]);
-          if (result && typeof result === "object") ctx = { ...ctx, ...result };
-          done.push({ name: step.name, result });
-        } catch (e) {
-          // 역순 보상 실행
-          const compensated = [];
-          for (let i = done.length - 1; i >= 0; i--) {
-            if (done[i] && step !== done[i] && done[i].name) {
-              const doneStep = steps.find((s) => s.name === done[i].name);
-              if (doneStep && doneStep.compensate) {
-                try { callFl(doneStep.compensate, [done[i].result]); } catch (_) {}
-                compensated.push(done[i].name);
-              }
-            }
-          }
-          return {
-            ok: false,
-            error: e.message,
-            failed_step: step.name,
-            compensated,
-            results: done
-          };
-        }
-      }
-      return { ok: true, results: done };
-    },
-    // ── P1: 배치/분산 처리 ───────────────────────────────────────
-    // batch_map arr batchSize fn -> {ok, results, total, batches, errors}
-    "batch_map": (arr, batchSize, fn) => {
-      const results = [];
-      const errors = [];
-      let batches = 0;
-      for (let i = 0; i < arr.length; i += batchSize) {
-        const batch = arr.slice(i, i + batchSize);
-        batches++;
-        try {
-          const r = callFl(fn, [batch]);
-          if (Array.isArray(r)) results.push(...r);
-          else results.push(r);
-        } catch (e) {
-          errors.push({ batch: batches, error: e.message });
-        }
-      }
-      return { ok: errors.length === 0, results, total: arr.length, batches, errors };
-    },
-    // distribute items workers fn -> {ok, results, worker_results}
-    // items를 workers 수로 나눠 각각 처리 (단일 프로세스 내 배치 분산)
-    "distribute": (items, workers, fn) => {
-      const n = Math.max(1, Array.isArray(workers) ? workers.length : workers);
-      const batchSize = Math.ceil(items.length / n);
-      const workerResults = [];
-      const results = [];
-      for (let w = 0; w < n; w++) {
-        const batch = items.slice(w * batchSize, (w + 1) * batchSize);
-        if (batch.length === 0) break;
-        try {
-          const r = callFl(fn, [batch, w]);
-          const out = Array.isArray(r) ? r : [r];
-          results.push(...out);
-          workerResults.push({ worker: w, ok: true, count: batch.length, result: r });
-        } catch (e) {
-          workerResults.push({ worker: w, ok: false, error: e.message });
-        }
-      }
-      return { ok: workerResults.every((w) => w.ok), results, worker_results: workerResults };
-    },
-    // ── P1: 관찰성 (Observability) ───────────────────────────────
-    // time_exec fn -> {ok, result, ms}
-    "time_exec": (fn) => {
-      const t0 = Date.now();
-      try {
-        const result = callFl(fn, []);
-        return { ok: true, result, ms: Date.now() - t0 };
-      } catch (e) {
-        return { ok: false, error: e.message, ms: Date.now() - t0 };
-      }
-    },
-    // span label fn -> {label, ok, result, ms}
-    "span": (label, fn) => {
-      const t0 = Date.now();
-      try {
-        const result = callFl(fn, []);
-        const ms = Date.now() - t0;
-        process.stderr.write(`[SPAN] ${label}: ${ms}ms ok\n`);
-        return { label, ok: true, result, ms };
-      } catch (e) {
-        const ms = Date.now() - t0;
-        process.stderr.write(`[SPAN] ${label}: ${ms}ms FAILED — ${e.message}\n`);
-        return { label, ok: false, error: e.message, ms };
-      }
-    },
-    // log_trace label value -> value (passthrough with trace log)
-    "log_trace": (label, value) => {
-      process.stderr.write(`[TRACE] ${label}: ${JSON.stringify(value)}\n`);
-      return value;
-    },
-    // ── P2-1: Observability — Trace/Span 수집 ────────────────────
-    // trace_new () -> trace_id
-    "trace_new": () => {
-      const tid = `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`;
-      createWorkflowModule._traces = createWorkflowModule._traces || new Map();
-      createWorkflowModule._traces.set(tid, { id: tid, spans: [], start: Date.now() });
-      return tid;
-    },
-    // span_run trace_id label fn -> {label, ok, result, ms, trace_id}
-    "span_run": (traceId, label, fn) => {
-      const t0 = Date.now();
-      const traces = createWorkflowModule._traces || new Map();
-      let result, ok = true, error;
-      try {
-        result = callFl(fn, []);
-      } catch (e) {
-        ok = false; error = e.message;
-      }
-      const ms = Date.now() - t0;
-      const spanData = { label, ok, ms, ...(ok ? { result } : { error }) };
-      if (traces.has(traceId)) traces.get(traceId).spans.push(spanData);
-      process.stderr.write(`[SPAN:${traceId}] ${label}: ${ms}ms ${ok ? "✓" : "✗"}\n`);
-      if (!ok) throw new Error(error);
-      return { ...spanData, trace_id: traceId };
-    },
-    // trace_collect trace_id -> {trace_id, spans, total_ms, ok, failed}
-    "trace_collect": (traceId) => {
-      const traces = createWorkflowModule._traces || new Map();
-      const t = traces.get(traceId);
-      if (!t) return { ok: false, error: `trace not found: ${traceId}` };
-      const total_ms = Date.now() - t.start;
-      const failed = t.spans.filter(s => !s.ok).length;
-      return { trace_id: traceId, spans: t.spans, total_ms, ok: failed === 0, failed };
-    },
-    // trace_clear trace_id -> true
-    "trace_clear": (traceId) => {
-      const traces = createWorkflowModule._traces || new Map();
-      traces.delete(traceId);
-      return true;
-    },
-    // ── P2: 보안 Sandbox ──────────────────────────────────────────
-    // sandbox_run fn options -> {ok, result, error, ms, calls}
-    // options: {:timeout N :max_calls N}
-    "sandbox_run": (fn, options = {}) => {
-      const timeout = options.timeout ?? 5000;
-      const maxCalls = options.max_calls ?? 1000;
-      const t0 = Date.now();
-      let calls = 0;
-      // Wrap callFl to count calls
-      const limitedCallFl = (f, args) => {
-        calls++;
-        if (calls > maxCalls) throw new Error(`sandbox: max_calls(${maxCalls}) 초과`);
-        if (Date.now() - t0 > timeout) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
-        return callFl(f, args);
-      };
-      try {
-        // Use deadline check via synchronous polling
-        const deadline = t0 + timeout;
-        const result = (() => {
-          if (Date.now() > deadline) throw new Error(`sandbox: timeout(${timeout}ms) 초과`);
-          return callFl(fn, []);
-        })();
-        return { ok: true, result, ms: Date.now() - t0, calls };
-      } catch (e) {
-        return { ok: false, error: e.message, ms: Date.now() - t0, calls };
-      }
-    },
-    // ── P2: 성능 최적화 ───────────────────────────────────────────
-    // memoize fn maxSize -> memo-id (전역 레지스트리에 fn+cache 저장)
-    // memo_call memo-id ...args -> result
-    "memoize": (fn, maxSize = 0) => {
-      const id = `_m${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      createWorkflowModule._reg = createWorkflowModule._reg || {};
-      createWorkflowModule._reg[id] = { fn, cache: {}, size: 0, max: maxSize };
-      return id;
-    },
-    "memo_call": (memoId, ...args) => {
-      const store = (createWorkflowModule._reg || {})[memoId];
-      if (!store) throw new Error("invalid memo id");
-      const key = JSON.stringify(args);
-      if (key in store.cache) return store.cache[key];
-      const result = callFl(store.fn, args);
-      if (store.max > 0 && store.size >= store.max) {
-        delete store.cache[Object.keys(store.cache)[0]];
-        store.size--;
-      }
-      store.cache[key] = result;
-      store.size++;
-      return result;
-    },
-    "memo_size": (memoId) => {
-      const store = (createWorkflowModule._reg || {})[memoId];
-      return store ? store.size : 0;
-    },
-    "memo_clear": (memoId) => {
-      const store = (createWorkflowModule._reg || {})[memoId];
-      if (store) { store.cache = {}; store.size = 0; }
-      return memoId;
-    },
-    // rate_limit fn maxCalls windowMs -> rl-id
-    // rl_call rl-id ...args -> result
-    "rate_limit": (fn, maxCalls, windowMs = 1000) => {
-      const id = `_rl${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      createWorkflowModule._reg = createWorkflowModule._reg || {};
-      createWorkflowModule._reg[id] = { fn, calls: [], max: maxCalls, win: windowMs };
-      return id;
-    },
-    "rl_call": (rlId, ...args) => {
-      const store = (createWorkflowModule._reg || {})[rlId];
-      if (!store) throw new Error("invalid rate_limit id");
-      const now = Date.now();
-      store.calls = store.calls.filter((t) => t >= now - store.win);
-      if (store.calls.length >= store.max) {
-        throw new Error(`rate_limit: ${store.max}회/${store.win}ms 초과`);
-      }
-      store.calls.push(now);
-      return callFl(store.fn, args);
-    },
-    // ── P2: DAG 실행 ──────────────────────────────────────────────
-    // workflow_dag steps ctx -> {ok, context, results, errors, order}
-    // step: workflow_step + :depends [name ...] (위상정렬 후 실행)
-    "workflow_dag": (steps, ctx = {}) => {
-      const start = Date.now();
-      // 위상정렬 (Kahn's algorithm)
-      const nameMap = new Map(steps.map((s) => [s.name, s]));
-      const inDeg = new Map(steps.map((s) => [s.name, 0]));
-      const adj = new Map(steps.map((s) => [s.name, []]));
-      for (const s of steps) {
-        for (const dep of (s.depends || [])) {
-          if (adj.has(dep)) adj.get(dep).push(s.name);
-          inDeg.set(s.name, (inDeg.get(s.name) || 0) + 1);
-        }
-      }
-      const queue = [...inDeg.entries()].filter(([, d]) => d === 0).map(([n]) => n);
-      const order = [];
-      while (queue.length > 0) {
-        const n = queue.shift();
-        order.push(n);
-        for (const next of (adj.get(n) || [])) {
-          const d = inDeg.get(next) - 1;
-          inDeg.set(next, d);
-          if (d === 0) queue.push(next);
-        }
-      }
-      if (order.length < steps.length) {
-        return { ok: false, error: "workflow_dag: 순환 의존성 감지됨", order };
-      }
-      // 순서대로 실행
-      const results = [];
-      const errors = [];
-      for (const name of order) {
-        const step = nameMap.get(name);
-        const t0 = Date.now();
-        try {
-          if (step.if !== void 0 && !callFl(step.if, [ctx])) {
-            results.push({ name, status: "skipped", ms: 0 });
-            continue;
-          }
-          const r = callFl(step.fn, [ctx]);
-          if (r && typeof r === "object") ctx = { ...ctx, ...r };
-          results.push({ name, status: "ok", result: r, ms: Date.now() - t0 });
-        } catch (e) {
-          errors.push({ name, error: e.message });
-          results.push({ name, status: "failed", error: e.message, ms: Date.now() - t0 });
-          if (step.required !== false) break;
-        }
-      }
-      return {
-        ok: errors.length === 0,
-        context: ctx,
-        results,
-        errors,
-        order,
-        total_ms: Date.now() - start
-      };
-    },
     "workflow_ok": (result) => result.status !== "failed",
     // workflow_get result key -> any  (get value from result context)
     "workflow_get": (result, key) => result.context[key] ?? null,
@@ -24827,6 +24903,94 @@ var path9 = __toESM(require("path"));
 init_lexer();
 init_parser();
 
+// src/runtime-helpers.ts
+function generateRuntimePreamble() {
+  return `
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+// \u2500 \uD0C0\uC785 \uCCB4\uD06C \u2500
+function _fl_null_q(v) { return v === null || v === undefined; }
+function _fl_true_q(v) { return v === true; }
+function _fl_false_q(v) { return v === false; }
+function _fl_number_q(v) { return typeof v === 'number'; }
+function _fl_string_q(v) { return typeof v === 'string'; }
+function _fl_list_q(v) { return Array.isArray(v); }
+function _fl_array_q(v) { return Array.isArray(v); }
+function _fl_map_q(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+function _fl_fn_q(v) { return typeof v === 'function'; }
+
+// \u2500 \uB370\uC774\uD130 \uC811\uADFC \uBC0F \uC870\uC791 \u2500
+function _fl_length(v) { if(v==null) return 0; return v.length !== undefined ? v.length : 0; }
+function _fl_get(obj, key, dflt) {
+  if (obj === null || obj === undefined) return dflt || null;
+  if (obj instanceof Map) return obj.has(key) ? obj.get(key) : (dflt || null);
+  
+  let k = (typeof key === "object" && key !== null) ? (key.name || key.value || String(key)) : String(key);
+  if (k.startsWith(":")) k = k.slice(1);
+
+  if (Array.isArray(obj)) {
+    if (typeof key === "number") return obj[key] !== undefined ? obj[key] : (dflt || null);
+    if (k === "length") return obj.length;
+    // \uC778\uB371\uC2A4\uAC00 \uC22B\uC790\uAC00 \uC544\uB2D0 \uB54C (\uBB38\uC790\uC5F4\uB85C \uB4E4\uC5B4\uC628 \uACBD\uC6B0) \uCC98\uB9AC
+    let idx = parseInt(k);
+    if (!isNaN(idx)) return obj[idx] !== undefined ? obj[idx] : (dflt || null);
+  }
+  
+  if (typeof obj === "object") {
+    if (obj[k] !== undefined) return obj[k];
+    // \uD639\uC2DC\uB77C\uB3C4 \uCF5C\uB860\uC774 \uD3EC\uD568\uB41C \uD0A4\uB85C \uC800\uC7A5\uB418\uC5B4 \uC788\uC744 \uACBD\uC6B0 \uB300\uBE44
+    if (obj[":" + k] !== undefined) return obj[":" + k];
+  }
+  return dflt || null;
+}
+function _fl_first(l) { return (l && l.length > 0) ? l[0] : null; }
+function _fl_last(l) { return (l && l.length > 0) ? l[l.length - 1] : null; }
+function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
+function _fl_append(l, x) { return [...(l || []), x]; }
+function _fl_keys(o) { return o ? Object.keys(o) : []; }
+function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
+function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
+
+// \u2500 \uBB38\uC790\uC5F4 \uC870\uC791 \u2500
+function _fl_str(...xs) { return xs.map(x => x === null || x === undefined ? "" : (typeof x === "object" ? JSON.stringify(x) : String(x))).join(""); }
+function _fl_char_at(s, i) { return (s && s[i]) || null; }
+function _fl_substring(s, a, b) { return s ? (b === undefined ? s.slice(a) : s.slice(a, b)) : ""; }
+function _fl_lower(s) { return String(s || "").toLowerCase(); }
+function _fl_upper(s) { return String(s || "").toUpperCase(); }
+function _fl_trim(s) { return String(s || "").trim(); }
+
+// \u2500 \uACE0\uCC28 \uD568\uC218 (Null-safe & Spread) \u2500
+function _fl_map(arr, fn) { return (arr || []).map(x => fn(x)); }
+function _fl_filter(arr, fn) { return (arr || []).filter(x => { const r = fn(x); return r !== false && r !== null; }); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce((a, x) => fn(a, x), init); }
+
+// \u2500 \uB370\uC774\uD130 \uC811\uADFC \uBC0F \uC870\uC791 \uBCF4\uC870 \u2500
+function _fl_slice(l, a, b) { return (l || []).slice(a, b); }
+
+// \u2500 \uC2DC\uC2A4\uD15C \uBC0F I/O \u2500
+function _fl_print(v) { console.log(v); return v; }
+function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.slice(2) : []); }
+function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
+function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
+function _fl_file_exists(p) { return require("fs").existsSync(p); }
+function _fl_shell_capture(cmd) {
+  try {
+    const {execSync} = require("child_process");
+    return {stdout: execSync(cmd, {encoding: "utf8"}), stderr: "", code: 0, ok: true};
+  } catch(e) {
+    return {stdout: "", stderr: String(e), code: 1, ok: false};
+  }
+}
+
+// \u2500 \uAE30\uD0C0 \u2500
+function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+`.trim();
+}
+
 // src/codegen-js.ts
 var DEFAULT_OPTIONS = {
   module: "commonjs",
@@ -24835,10 +24999,10 @@ var DEFAULT_OPTIONS = {
   target: "node"
 };
 var FL_RUNTIME = `
-function __fl_map(arr, fn) { return arr.map(fn); }
-function __fl_filter(arr, fn) { return arr.filter(fn); }
-function __fl_reduce(arr, fn, init) { return arr.reduce(fn, init); }
-function __fl_print(v) { console.log(v); return v; }
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
 `.trim();
 var BINARY_OPS = {
   "+": "+",
@@ -24859,6 +25023,12 @@ var BINARY_OPS = {
 var BUILTIN_MAP = {
   // 타입 체크
   "null?": "_fl_null_q",
+  "cli-args": "_fl_get_argv",
+  "file_read": "_fl_file_read",
+  "file_write": "_fl_file_write",
+  "char_at": "_fl_char_at",
+  "char-at": "_fl_char_at",
+  "substring": "_fl_substring",
   "true?": "_fl_true_q",
   "false?": "_fl_false_q",
   "string?": "_fl_string_q",
@@ -24882,6 +25052,7 @@ var BUILTIN_MAP = {
   "last": "_fl_last",
   "rest": "_fl_rest",
   "append": "_fl_append",
+  "slice": "_fl_slice",
   "length": "_fl_length",
   // 문자열
   "str": "_fl_str",
@@ -24893,6 +25064,8 @@ var BUILTIN_MAP = {
   "get": "_fl_get",
   "keys": "_fl_keys",
   "map-set": "_fl_map_set",
+  "json-set": "_fl_map_set",
+  "json_set": "_fl_map_set",
   "has-key?": "_fl_has_key_q"
 };
 var JS_RESERVED = /* @__PURE__ */ new Set([
@@ -24981,6 +25154,8 @@ var JSCodegen = class {
     this.opts = { ...DEFAULT_OPTIONS, ...opts };
     this.exportedNames = [];
     const parts = [];
+    parts.push(generateRuntimePreamble());
+    parts.push("");
     if (this.opts.runtime) {
       parts.push(FL_RUNTIME);
       parts.push("");
@@ -25026,6 +25201,8 @@ ${exportsStr}
     switch (node.kind) {
       case "literal":
         return this.genLiteral(node);
+      case "template-string":
+        return this.genTemplateString(node);
       case "variable":
         return this.genVariable(node);
       case "sexpr":
@@ -25034,6 +25211,8 @@ ${exportsStr}
         return this.genBlock(node);
       case "keyword":
         return this.genKeyword(node);
+      case "try-block":
+        return this.genTryBlock(node);
       default:
         return `/* unsupported: ${node.kind} */`;
     }
@@ -25046,10 +25225,42 @@ ${exportsStr}
     } else if (node.type === "null") {
       return "null";
     } else if (node.type === "symbol") {
-      return JSON.stringify(node.value);
+      if (node.value === "nil" || node.value === "null") {
+        return "null";
+      }
+      const cleanName = String(node.value).replace(/^\$/, "");
+      return flNameToJs(cleanName);
     } else {
       return String(node.value);
     }
+  }
+  genTemplateString(node) {
+    const value = node.value;
+    let jsCode = "`";
+    let i = 0;
+    while (i < value.length) {
+      if (value[i] === "$" && value[i + 1] === "{") {
+        const start = i + 2;
+        const end = value.indexOf("}", start);
+        if (end > start) {
+          const expr = value.slice(start, end).trim();
+          const jsExpr = this.genNode({ kind: "variable", name: expr });
+          jsCode += "${" + jsExpr + "}";
+          i = end + 1;
+          continue;
+        }
+      }
+      if (value[i] === "`") {
+        jsCode += "\\`";
+      } else if (value[i] === "\\") {
+        jsCode += "\\\\";
+      } else {
+        jsCode += value[i];
+      }
+      i++;
+    }
+    jsCode += "`";
+    return jsCode;
   }
   genVariable(node) {
     const cleanName = node.name.replace(/^\$/, "");
@@ -25060,6 +25271,11 @@ ${exportsStr}
   }
   genSExpr(node) {
     const { op, args: args2 } = node;
+    if (op === "and") return "(" + args2.map((a) => this.genNode(a)).join(" && ") + ")";
+    if (op === "or") return "(" + args2.map((a) => this.genNode(a)).join(" || ") + ")";
+    if (op === "cond") return this.genCond(args2);
+    if (op === "while") return this.genWhile(args2);
+    if (op === "loop") return this.genLoop(args2);
     if (op in BINARY_OPS && args2.length === 2) {
       const left = this.genNode(args2[0]);
       const right = this.genNode(args2[1]);
@@ -25082,14 +25298,10 @@ ${exportsStr}
     if (op === "set!") {
       const varName = this.extractVarName(args2[0]);
       const value = this.genNode(args2[1]);
-      return `${varName} = ${value};`;
+      return `(${varName} = ${value})`;
     }
-    if (op === "fn") {
-      return this.genFn(args2);
-    }
-    if (op === "do") {
-      return this.genDo(args2);
-    }
+    if (op === "fn") return this.genFn(args2);
+    if (op === "do") return this.genDo(args2);
     if (op === "list") {
       const elements = args2.map((a) => this.genNode(a));
       return `[${elements.join(", ")}]`;
@@ -25100,24 +25312,11 @@ ${exportsStr}
     }
     if (op === "print" || op === "println") {
       const arg = args2.length > 0 ? this.genNode(args2[0]) : '""';
-      return `__fl_print(${arg})`;
+      return `_fl_print(${arg})`;
     }
-    if (op === "map") {
-      const arr = this.genNode(args2[0]);
-      const fn = this.genNode(args2[1]);
-      return `__fl_map(${arr}, ${fn})`;
-    }
-    if (op === "filter") {
-      const arr = this.genNode(args2[0]);
-      const fn = this.genNode(args2[1]);
-      return `__fl_filter(${arr}, ${fn})`;
-    }
-    if (op === "reduce") {
-      const arr = this.genNode(args2[0]);
-      const fn = this.genNode(args2[1]);
-      const init = args2[2] ? this.genNode(args2[2]) : "undefined";
-      return `__fl_reduce(${arr}, ${fn}, ${init})`;
-    }
+    if (op === "map") return `_fl_map(${this.genNode(args2[1])}, ${this.genNode(args2[0])})`;
+    if (op === "filter") return `_fl_filter(${this.genNode(args2[1])}, ${this.genNode(args2[0])})`;
+    if (op === "reduce") return `_fl_reduce(${this.genNode(args2[2])}, ${this.genNode(args2[0])}, ${this.genNode(args2[1])})`;
     if (op === "export") {
       for (const arg of args2) {
         if (arg.kind === "variable") {
@@ -25129,23 +25328,67 @@ ${exportsStr}
       return "";
     }
     if (op === "let") {
-      if (args2.length >= 2 && args2[0].kind === "sexpr") {
-        const bindings = args2[0].args;
-        const bindingStmts = [];
-        for (let i = 0; i < bindings.length; i += 2) {
-          const varName2 = this.extractVarName(bindings[i]);
-          const value2 = this.genNode(bindings[i + 1]);
-          bindingStmts.push(`let ${varName2} = ${value2};`);
+      if (args2.length >= 2) {
+        const bindingsArg = args2[0];
+        let bindings = [];
+        if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
+          bindings = bindingsArg.fields.get("items") || [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = bindingsArg.args;
         }
-        const bodyStmts = args2.slice(1).map((a) => this.genNode(a)).join("\n");
+        const bindingStmts = [];
+        for (const binding of bindings) {
+          if (binding.kind === "block" && binding.type === "Array") {
+            const pairItems = binding.fields.get("items") || [];
+            if (pairItems.length >= 2) {
+              const varName2 = this.extractVarName(pairItems[0]);
+              const value2 = this.genNode(pairItems[1]);
+              bindingStmts.push(`let ${varName2} = ${value2};`);
+            }
+          }
+        }
+        const bodyStmts = args2.slice(1).map((a) => this.genNode(a)).join("; ");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
       }
       const varName = this.extractVarName(args2[0]);
       const value = args2[1] ? this.genNode(args2[1]) : "undefined";
       return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
-    const fnExpr = this.genFuncCall(op, args2);
-    return fnExpr;
+    return this.genFuncCall(op, args2);
+  }
+  genCond(args2) {
+    if (args2.length === 0) return "null";
+    const clauses = args2.map((arg) => {
+      if (arg.kind === "block" && arg.type === "Array") return arg.fields.get("items") || [];
+      return Array.isArray(arg) ? arg : [arg];
+    });
+    let res = "null";
+    for (let i = clauses.length - 1; i >= 0; i--) {
+      const pair = clauses[i];
+      const test = this.genNode(pair[0]);
+      const body = pair[1] ? this.genNode(pair[1]) : "null";
+      res = "(" + test + " ? " + body + " : " + res + ")";
+    }
+    return res;
+  }
+  genWhile(args2) {
+    const cond = this.genNode(args2[0]);
+    const body = args2.slice(1).map((a) => this.genNode(a)).join("; ");
+    return "(() => { while(" + cond + ") { " + body + " } })()";
+  }
+  genLoop(args2) {
+    const bindingsBlock = args2[0];
+    const bodyExprs = args2.slice(1);
+    let items = [];
+    if (bindingsBlock.kind === "block" && bindingsBlock.type === "Array") items = bindingsBlock.fields.get("items") || [];
+    const inits = [];
+    for (let i = 0; i < items.length; i += 2) {
+      const name = items[i].name ? items[i].name.replace(/^\$/, "") : "p";
+      const val = this.genNode(items[i + 1]);
+      inits.push("let " + name + " = " + val);
+    }
+    const bodyCode = bodyExprs.map((e) => this.genNode(e)).join("; ");
+    return "(() => { " + inits.join("; ") + "; while(true) { " + bodyCode + "; break; } })()";
   }
   genFn(args2) {
     const params = this.extractParamList(args2[0]);
@@ -25156,9 +25399,9 @@ ${exportsStr}
     if (args2.length === 0) return "(() => undefined)()";
     if (args2.length === 1) return `(() => ${this.genNode(args2[0])})()`;
     const stmts = args2.slice(0, -1).map((a) => {
-      const code = this.genNode(a);
-      return code.endsWith(";") ? code : `${code};`;
-    });
+      const c = this.genNode(a).trim();
+      return c === "" || c.endsWith(";") ? c : c + ";";
+    }).filter((s) => s !== "");
     const last = this.genNode(args2[args2.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
   }
@@ -25190,32 +25433,19 @@ ${exportsStr}
     }
   }
   genMapBlock(node) {
-    const items = node.fields.get("items");
-    if (!items) return "{}";
     const pairs = [];
-    if (Array.isArray(items)) {
-      for (let i = 0; i < items.length; i += 2) {
-        const keyNode = items[i];
-        const valNode = items[i + 1];
-        let key;
-        if (keyNode.kind === "literal" && typeof keyNode.value === "string") {
-          key = keyNode.value;
-        } else if (keyNode.kind === "keyword") {
-          key = keyNode.name;
-        } else {
-          key = this.genNode(keyNode);
-        }
-        const val = this.genNode(valNode);
-        pairs.push(`${key}: ${val}`);
-      }
-    }
-    return `{ ${pairs.join(", ")} }`;
+    node.fields.forEach((val, key) => {
+      if (key === "items" && node.type === "Map") return;
+      const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
+      pairs.push(jsKey + ": " + this.genNode(val));
+    });
+    return "{ " + pairs.join(", ") + " }";
   }
   genArrayBlock(node) {
     const items = node.fields.get("items");
-    if (!items) return "[]";
-    const elements = (Array.isArray(items) ? items : [items]).map((item) => this.genNode(item));
-    return `[ ${elements.join(", ")} ]`;
+    let pNodes = Array.isArray(items) ? items : items && items.kind === "block" ? items.fields.get("items") : [];
+    const elements = (pNodes || []).map((a) => this.genNode(a));
+    return "[" + elements.join(", ") + "]";
   }
   genFuncBlock(node) {
     const params = this.extractBlockParams(node);
@@ -25230,83 +25460,47 @@ ${exportsStr}
   genModuleBlock(node) {
     const body = node.fields.get("body");
     if (!body) return "";
-    if (Array.isArray(body)) {
-      return body.map((n) => this.genNode(n)).join("\n");
-    }
+    if (Array.isArray(body)) return body.map((n) => this.genNode(n)).join("\n");
     return this.genNode(body);
   }
   genServiceBlock(node) {
     const name = node.name;
     const methods = node.fields.get("methods");
     const inject = node.fields.get("inject");
-    const injectParams = inject ? Array.isArray(inject) ? inject.map((dep) => {
-      const depName = dep.kind === "variable" ? dep.name : dep.kind === "literal" ? String(dep.value) : String(dep);
-      return `private ${depName}: ${depName}`;
-    }).join(", ") : "" : "";
+    const injectParams = inject ? Array.isArray(inject) ? inject.map((dep) => `private ${dep.name || dep}: ${dep.name || dep}`).join(", ") : "" : "";
     let methodsCode = "";
     if (methods && methods.kind === "sexpr") {
-      const sExpr = methods;
-      methodsCode = sExpr.args.map((arg) => {
+      methodsCode = methods.args.map((arg) => {
         if (arg.kind === "sexpr" && arg.op === "fn") {
           const fnExpr = arg;
-          const fnNameArg = fnExpr.args[0];
-          const fnParamsArg = fnExpr.args[1];
-          const fnBodyArg = fnExpr.args[2];
-          const fnName = fnNameArg.kind === "variable" ? fnNameArg.name.replace(/^\$/, "") : fnNameArg.kind === "literal" ? String(fnNameArg.value) : "method";
-          const fnParams = this.extractParamList(fnParamsArg).map((p) => p.replace(/^\$/, "")).join(", ");
-          const fnBody = fnBodyArg ? this.genNode(fnBodyArg) : "undefined";
+          const fnName = fnExpr.args[0].name || fnExpr.args[0].value || "method";
+          const fnParams = this.extractParamList(fnExpr.args[1]).map((p) => p.replace(/^\$/, "")).join(", ");
+          const fnBody = fnExpr.args[2] ? this.genNode(fnExpr.args[2]) : "undefined";
           return `  ${fnName}(${fnParams}) { return ${fnBody}; }`;
         }
         return "";
       }).filter(Boolean).join("\n");
     }
-    return [
-      `// Generated by FreeLang v11 \u2014 SERVICE block`,
-      `export class ${name} {`,
-      injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`,
-      methodsCode,
-      `}`
-    ].join("\n");
+    return [`export class ${name} {`, injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`, methodsCode, `}`].join("\n");
   }
   genModelBlock(node) {
     const name = node.name;
     const table = node.fields.get("table") || name.toLowerCase() + "s";
     const fields = node.fields.get("fields");
     let sqlColumns = "  id SERIAL PRIMARY KEY";
-    let tsInterface = `export interface ${name} {
-  id: number;`;
     if (fields && fields.kind === "sexpr") {
-      const sExpr = fields;
-      for (const arg of sExpr.args) {
+      for (const arg of fields.args) {
         if (arg.kind === "sexpr") {
-          const fieldExpr = arg;
-          const fieldName = fieldExpr.op.startsWith("$") || fieldExpr.op.startsWith(":") ? fieldExpr.op : String(fieldExpr.args[0].value || fieldExpr.op);
-          const cleanFieldName = fieldName.replace(/^[\$:]/, "").replace(/-/g, "_");
+          const fName = arg.op.replace(/^[\$:]/, "").replace(/-/g, "_");
           sqlColumns += `,
-  ${cleanFieldName} VARCHAR(255)`;
-          tsInterface += `
-  ${cleanFieldName.replace(/_/g, "")}: string;`;
+  ${fName} VARCHAR(255)`;
         }
       }
     }
-    tsInterface += `
-  createdAt: Date;
-  updatedAt: Date;
-}`;
-    return [
-      `-- Generated by FreeLang v11 \u2014 MODEL block (SQL)`,
-      `CREATE TABLE IF NOT EXISTS ${table} (`,
-      sqlColumns,
-      `,
-  created_at TIMESTAMP DEFAULT NOW(),`,
-      `
-  updated_at TIMESTAMP DEFAULT NOW()`,
-      `
-);`,
-      ``,
-      `// TypeScript interface`,
-      tsInterface
-    ].join("\n");
+    return [`CREATE TABLE IF NOT EXISTS ${table} (`, sqlColumns, `,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);`].join("\n");
   }
   genControllerBlock(node) {
     const prefix = node.fields.get("prefix") || "/";
@@ -25314,66 +25508,41 @@ ${exportsStr}
     let routeCode = "";
     if (routes && routes.kind === "sexpr") {
       const sExpr = routes;
-      for (let i = 0; i < sExpr.args.length; i += 2) {
-        const methodLit = sExpr.args[i];
-        const routeLit = sExpr.args[i + 1];
-        const handlerLit = sExpr.args[i + 2];
-        const method = methodLit.kind === "literal" ? String(methodLit.value) : "GET";
-        const route = routeLit.kind === "literal" ? String(routeLit.value) : "/";
-        const fullRoute = prefix === "/" ? route : `${prefix}${route}`;
-        routeCode += `router.${method.toLowerCase()}("${fullRoute}", async (req, res) => {
-  try {
-    // TODO: Execute handler
-    res.json({ status: 200 });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
+      for (let i = 0; i < sExpr.args.length; i += 3) {
+        const method = String(sExpr.args[i].value || "GET").toLowerCase();
+        const route = String(sExpr.args[i + 1].value || "/");
+        routeCode += `router.${method}("${prefix === "/" ? route : prefix + route}", async (req, res) => { res.json({ status: 200 }); });
 `;
       }
     }
-    return [
-      `// Generated by FreeLang v11 \u2014 CONTROLLER block`,
-      `import { Router } from "express";`,
-      `export const router = Router();`,
-      ``,
-      routeCode
-    ].join("\n");
+    return [`import { Router } from "express";`, `export const router = Router();`, routeCode].join("\n");
+  }
+  genTryBlock(node) {
+    const body = this.genNode(node.body);
+    const parts = [`(()=>{try{return ${body};}`];
+    if (node.catchClauses) {
+      for (const cc of node.catchClauses) {
+        parts.push(`catch(${cc.variable || "err"}){return ${this.genNode(cc.handler)};}`);
+      }
+    }
+    if (node.finallyBlock) parts.push(`finally{${this.genNode(node.finallyBlock)};}`);
+    return parts.join("") + "})()";
   }
   extractVarName(node) {
-    if (node.kind === "variable") {
-      return node.name;
-    }
-    if (node.kind === "literal" && typeof node.value === "string") {
-      return `$${node.value}`;
-    }
-    return "$unknown";
+    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
+    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
+    return "unknown";
   }
   extractParamList(node) {
     if (!node) return [];
-    if (node.kind === "sexpr") {
-      return node.args.map((a) => {
-        if (a.kind === "variable") return a.name;
-        if (a.kind === "literal") return `$${a.value}`;
-        return "$p";
-      });
-    }
-    if (node.kind === "variable") return [node.name];
-    return [];
+    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
+    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
   extractBlockParams(node) {
     const params = node.fields.get("params");
     if (!params) return [];
-    if (Array.isArray(params)) {
-      return params.map((p2) => {
-        if (p2.kind === "variable") return p2.name;
-        if (p2.kind === "literal") return `$${p2.value}`;
-        return "$p";
-      });
-    }
-    const p = params;
-    if (p.kind === "variable") return [p.name];
-    return [];
+    let pNodes = Array.isArray(params) ? params : params.kind === "block" && params.type === "Array" ? params.fields.get("items") : [params];
+    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
   minify(code) {
     return code.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ").trim();
@@ -28337,7 +28506,6 @@ function createMatrixModule() {
 
 // src/stdlib-loader.ts
 function loadAllStdlib(interp2) {
-  // ── Eager (핵심 모듈: 항상 로드) ────────────────────────────
   interp2.registerModule(createFileModule());
   interp2.registerModule(createFdModule());
   interp2.registerModule(createBitsModule());
@@ -28350,59 +28518,62 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
-  interp2.registerModule(createAuthModule());
-  interp2.registerModule(createProcessModule());
-  interp2.registerModule(createAsyncModule((n, a) => interp2.callUserFunction(n, a)));
-  interp2.registerModule(createModuleSystem());
+  interp2.registerModule(createCryptoRsaModule());
+  interp2.registerModule(createTotpModule());
+  interp2.registerModule(createMailModule());
+  interp2.registerModule(createWebauthnModule());
+  interp2.registerModule(createQueueHelpersModule());
+  interp2.registerModule(createWorkflowModule());
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
     (n, a) => interp2.callUserFunction(n, a),
     (fnValue, a) => interp2.callFunctionValue(fnValue, a)
   ));
-  interp2.registerModule(createWorkflowModule(
-    (fn, args) => interp2.callFunctionValue(fn, args),
-    (name, args) => interp2.callUserFunction(name, args)
-  ));
+  interp2.registerModule(createDbModule());
+  interp2.registerModule(createMariadbModule());
+  interp2.registerModule(createMongodbModule());
+  interp2.registerModule(createAuthModule());
   interp2.registerModule(createCacheModule());
   interp2.registerModule(createPubSubModule((n, a) => interp2.callUserFunction(n, a)));
-  interp2.registerModule(createValidationModule());
+  interp2.registerModule(createProcessModule());
+  interp2.registerModule(createAsyncModule((n, a) => interp2.callUserFunction(n, a)));
+  interp2.registerModule(createModuleSystem());
   interp2.registerModule(createChannelModule());
   interp2.registerModule(createImmutableModule());
-
-  // ── Lazy (무거운 모듈: 첫 호출 시 로드) ─────────────────────
-  interp2.registerLazyModule("mariadb_", () => createMariadbModule());
-  interp2.registerLazyModule("mongodb_", () => createMongodbModule());
-  interp2.registerLazyModule("db_", () => createDbModule());
-  interp2.registerLazyModule("orm_", () => createOrmModule());
-  interp2.registerLazyModule("crypto_rsa_", () => createCryptoRsaModule());
-  interp2.registerLazyModule("totp_", () => createTotpModule());
-  interp2.registerLazyModule("mail_", () => createMailModule());
-  interp2.registerLazyModule("webauthn_", () => createWebauthnModule());
-  interp2.registerLazyModule("queue_", () => createQueueHelpersModule());
-  interp2.registerLazyModule("ws_", () => createWsModule((n, a) => interp2.callUserFunction(n, a)));
-  interp2.registerLazyModule("wsc_", () => createWscModule((n, a) => interp2.callUserFunction(n, a)));
-  interp2.registerLazyModule("ai_", () => createAiNativeModule());
-  interp2.registerLazyModule("stats_", () => createStatsModule());
-  interp2.registerLazyModule("plot_", () => createPlotModule());
-  interp2.registerLazyModule("table_", () => createTableModule());
-  interp2.registerLazyModule("middleware_", () => createMiddlewareModule());
-  interp2.registerLazyModule("service_", () => createServiceModule());
-  interp2.registerLazyModule("compile_", () => createCompileModule());
-  interp2.registerLazyModule("registry_", () => createRegistryModule());
-  interp2.registerLazyModule("oci_", () => createOciModule());
-  interp2.registerLazyModule("cloud_", () => createCloudModule());
-  interp2.registerLazyModule("matrix_", () => createMatrixModule());
-  interp2.registerLazyModule("markdown_", () => createMarkdownModule());
-  interp2.registerLazyModule("feed_", () => createFeedModule());
-  interp2.registerLazyModule("blog_", () => createBlogModule());
-  interp2.registerLazyModule("maybe_", () => createMaybeModule(
+  interp2.registerModule(createAiNativeModule());
+  interp2.registerModule(createTestModule(
+    // Phase 76: deftest, describe, assert-eq, ...
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
+  ));
+  interp2.registerModule(createMaybeModule(
+    // Phase 91: 불확실성 타입 (maybe/none/confident)
     (fnValue, args2) => interp2.callFunctionValue(fnValue, args2),
     (name, args2) => interp2.callUserFunction(name, args2)
   ));
-  interp2.registerLazyModule("deftest", () => createTestModule(
-    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
+  interp2.registerModule(createCompileModule());
+  interp2.registerModule(createRegistryModule());
+  interp2.registerModule(createOciModule());
+  interp2.registerModule(createOrmModule());
+  interp2.registerModule(createValidationModule());
+  interp2.registerModule(createMiddlewareModule());
+  interp2.registerModule(createTableModule());
+  interp2.registerModule(createStatsModule());
+  interp2.registerModule(createPlotModule());
+  interp2.registerModule(createTestEnhancedModule());
+  interp2.registerModule(createServiceModule());
+  interp2.registerModule(createWsModule(
+    // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
+    (n, a) => interp2.callUserFunction(n, a)
   ));
-  interp2.registerLazyModule("test_", () => createTestEnhancedModule());
+  interp2.registerModule(createWscModule(
+    // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
+    (n, a) => interp2.callUserFunction(n, a)
+  ));
+  interp2.registerModule(createMarkdownModule());
+  interp2.registerModule(createFeedModule());
+  interp2.registerModule(createBlogModule());
+  interp2.registerModule(createCloudModule());
+  interp2.registerModule(createMatrixModule());
 }
 
 // src/eval-pattern-match.ts
@@ -29075,22 +29246,16 @@ function callUserFunction(interp2, name, args2) {
     }
   }
   if (!func) {
-    // lazy 모듈 체크: prefix 매칭 모듈 로드 후 재시도
-    if (interp2._loadLazyModule && interp2._loadLazyModule(baseName)) {
-      func = interp2.context.functions.get(baseName);
-    }
-    if (!func) {
-      const candidates = [...interp2.context.functions.keys()];
-      const similar = suggestSimilar(baseName, candidates);
-      const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
-      throw new FunctionNotFoundError(
-        baseName,
-        interp2.currentFilePath,
-        interp2.currentLine > 0 ? interp2.currentLine : void 0,
-        void 0,
-        hint
-      );
-    }
+    const candidates = [...interp2.context.functions.keys()];
+    const similar = suggestSimilar(baseName, candidates);
+    const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+    throw new FunctionNotFoundError(
+      baseName,
+      interp2.currentFilePath,
+      interp2.currentLine > 0 ? interp2.currentLine : void 0,
+      void 0,
+      hint
+    );
   }
   let isGenericCall = false;
   if (func.generics && func.generics.length > 0) {
@@ -29148,7 +29313,7 @@ ${tail}` : "")
   }
   if (func.capturedEnv) {
     const savedStack = interp2.context.variables.saveStack();
-    const paramSet = new Set([...func.params, ...func.params.map((p) => p.startsWith("$") ? p : "$" + p)]);
+    const paramSet = new Set(func.params);
     interp2.callDepth++;
     _callStack.push(_stackEntry);
     if (_callStack.length > 100) _callStack.shift();
@@ -29157,7 +29322,6 @@ ${tail}` : "")
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
         interp2.context.variables.set(func.params[i], args2[i]);
-        interp2.context.variables.set(func.params[i].startsWith("$") ? func.params[i] : "$" + func.params[i], args2[i]);
       }
       result = interp2.eval(func.body);
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
@@ -29177,7 +29341,6 @@ ${tail}` : "")
   try {
     for (let i = 0; i < func.params.length; i++) {
       interp2.context.variables.set(func.params[i], args2[i]);
-      interp2.context.variables.set(func.params[i].startsWith("$") ? func.params[i] : "$" + func.params[i], args2[i]);
     }
     return interp2.eval(func.body);
   } finally {
@@ -29199,14 +29362,13 @@ function callFunctionValue(interp2, fn, args2) {
     throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
   }
   const savedStack = interp2.context.variables.saveStack();
-  const paramSet = new Set([...fn.params, ...fn.params.map((p) => "$" + p)]);
+  const paramSet = new Set(fn.params);
   interp2.callDepth++;
   let result;
   try {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
       interp2.context.variables.set(fn.params[i], args2[i]);
-      interp2.context.variables.set("$" + fn.params[i], args2[i]);
     }
     result = interp2.eval(fn.body);
     propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
@@ -29355,7 +29517,6 @@ function callFunctionValueTCO(interp2, fn, args2) {
         interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
         for (let j = 0; j < currentFn.params.length; j++) {
           interp2.context.variables.set(currentFn.params[j], currentArgs[j]);
-          interp2.context.variables.set("$" + currentFn.params[j], currentArgs[j]);
         }
         result = interp2.eval(currentFn.body);
       } finally {
@@ -30655,23 +30816,6 @@ var Interpreter = class _Interpreter {
       }
     }
   }
-  // Lazy module: factory() 는 해당 prefix 함수가 처음 호출될 때만 실행
-  registerLazyModule(prefix, factory) {
-    if (!this._lazyModules) this._lazyModules = new Map();
-    this._lazyModules.set(prefix, factory);
-  }
-  _loadLazyModule(funcName) {
-    if (!this._lazyModules) return false;
-    for (const [prefix, factory] of this._lazyModules) {
-      if (funcName.startsWith(prefix)) {
-        const module2 = factory();
-        this.registerModule(module2);
-        this._lazyModules.delete(prefix); // 한 번만 로드
-        return true;
-      }
-    }
-    return false;
-  }
   interpret(blocks) {
     try {
       for (const node of blocks) {
@@ -31599,7 +31743,6 @@ var Interpreter = class _Interpreter {
   }
   eval(node) {
     if (!node) return null;
-    if (node.op === "load") console.log("[EVAL] eval() called with load op");
     if (node.kind === "literal") {
       const lit = node;
       if (lit.type === "string" && typeof lit.value === "string" && (lit.value.includes("{$") || lit.value.includes("{("))) {
@@ -31617,12 +31760,6 @@ var Interpreter = class _Interpreter {
         }
         if (this.context.variables.has(bareName)) {
           return this.context.variables.get(bareName);
-        }
-        if (this.context.functions.has(bareName)) {
-          const _fn = this.context.functions.get(bareName);
-          if (_fn && _fn.params !== void 0 && _fn.body !== void 0) {
-            return { kind: "function-value", params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: bareName };
-          }
         }
         if (process.env.FL_STRICT === "1" && !this.context.functions.has(bareName)) {
           const line = lit.line;
@@ -31653,12 +31790,6 @@ var Interpreter = class _Interpreter {
       }
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
-      }
-      if (this.context.functions.has(varName)) {
-        const _fn = this.context.functions.get(varName);
-        if (_fn && _fn.params !== void 0 && _fn.body !== void 0) {
-          return { kind: "function-value", params: _fn.params, body: _fn.body, capturedEnv: _fn.capturedEnv, name: varName };
-        }
       }
       throw new Error(`[E_UNDEFINED_VAR] '$${varName}' at line ${line || this.currentLine}${locSuffix}`);
     }
@@ -31700,16 +31831,22 @@ var Interpreter = class _Interpreter {
     if (node.kind === "type-class-instance") {
       return this.evalInstance(node);
     }
+    if (node.kind === "template-string") {
+      const templateNode = node;
+      return this.interpolateString(templateNode.value);
+    }
     if (node.kind === "try-block") {
       return this.evalTryBlock(node);
     }
     if (node.kind === "throw") {
       return this.evalThrow(node);
     }
+    if (node.kind === "loop") {
+      return this.evalLoop(node);
+    }
     return null;
   }
   evalSExpr(expr) {
-    if (expr.op === "load") console.log("[EVAL] SExpr load called with:", expr.args?.[0]?.value);
     if (expr.line !== void 0) this.currentLine = expr.line;
     let op = expr.op;
     if (typeof op !== "string") {
@@ -31993,6 +32130,40 @@ var Interpreter = class _Interpreter {
     let result = "";
     let i = 0;
     while (i < template.length) {
+      if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
+        const start = i + 2;
+        const end = template.indexOf("}", start);
+        if (end > start) {
+          const content = template.slice(start, end).trim();
+          let val;
+          if (content.includes("(")) {
+            try {
+              const tokens = lex("(" + content + ")");
+              const ast = parse(tokens);
+              val = ast.length > 0 ? this.eval(ast[0]) : null;
+            } catch {
+              val = null;
+            }
+          } else {
+            if (content.includes(".")) {
+              const parts = content.split(".");
+              val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
+              for (let p = 1; p < parts.length; p++) {
+                if (val === null || val === void 0) {
+                  val = null;
+                  break;
+                }
+                val = typeof val === "object" ? val[parts[p]] : null;
+              }
+            } else {
+              val = this.context.variables.has("$" + content) ? this.context.variables.get("$" + content) : this.context.variables.get(content);
+            }
+          }
+          result += val === null || val === void 0 ? "" : String(val);
+          i = end + 1;
+          continue;
+        }
+      }
       if (template[i] === "{" && i + 1 < template.length) {
         const next = template[i + 1];
         if (next === "$") {
@@ -32108,6 +32279,43 @@ var Interpreter = class _Interpreter {
   }
   evalThrow(throwExpr) {
     return evalThrow(this, throwExpr);
+  }
+  // Loop special form (Phase B-1)
+  evalLoop(loopNode) {
+    if (!loopNode) {
+      throw new Error("Loop node is null");
+    }
+    const init = loopNode.init;
+    const condition = loopNode.condition;
+    const update = loopNode.update;
+    const body = loopNode.body;
+    if (!init || !condition || !update || !body) {
+      throw new Error(`Loop parts missing: init=${!!init} condition=${!!condition} update=${!!update} body=${!!body}`);
+    }
+    if (init.kind !== "sexpr") {
+      throw new Error(`Loop init must be sexpr, got: ${init.kind}`);
+    }
+    const op = init.op;
+    const args2 = init.args || [];
+    if (!op || args2.length < 1) {
+      throw new Error("Loop init must be ($var val)");
+    }
+    const varName = String(op);
+    const initVal = this.eval(args2[0]);
+    const loopScope = /* @__PURE__ */ new Map();
+    loopScope.set(varName, initVal);
+    this.scopes.push(loopScope);
+    try {
+      let result = null;
+      while (this.isTruthy(this.eval(condition))) {
+        result = this.eval(body);
+        const updatedVal = this.eval(update);
+        loopScope.set(varName, updatedVal);
+      }
+      return result;
+    } finally {
+      this.scopes.pop();
+    }
   }
   matchPattern(pattern, value) {
     return matchPattern(this, pattern, value);

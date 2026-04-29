@@ -1,8 +1,8 @@
 ;; L2 Proof Case 2: Comparison Operations
 ;; 비교 연산 (= < > <= >= !=)
 
-(defun test-comparisons []
-  (console/log
+(defn test-comparisons []
+  (println
     (list
       (= 5 5)        ; true
       (< 3 7)        ; true

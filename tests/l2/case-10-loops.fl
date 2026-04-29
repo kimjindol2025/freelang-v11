@@ -1,13 +1,13 @@
 ;; L2 Proof Case 10: Loop and Iteration
 ;; 루프 및 반복
 
-(defun sum-n [n]
+(defn sum-n [n]
   (loop [i 0 acc 0]
     (if (>= i n) acc
       (loop (+ i 1) (+ acc i)))))
 
-(defun test-loops []
-  (console/log
+(defn test-loops []
+  (println
     (list
       (sum-n 0)   ; 0
       (sum-n 1)   ; 0

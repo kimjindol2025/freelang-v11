@@ -123,10 +123,10 @@
                                            (if (= (length $body-exprs) 1)
                                              (get $body-exprs 0)
                                              (make-sexpr "do" $body-exprs $line))
-                                           $line))))))))]
+                                           $line))))))]
                 [true
                  (r-pair (parse-consume-rparen $p2)
-                         (make-sexpr $op $rest $line))]))))))]
+                         (make-sexpr $op $rest $line))]))))]
 
 [FUNC parse-consume-rparen :params [$p]
   :body (let [[$t (p-peek $p)]]
@@ -198,21 +198,20 @@
             (r-pair $p null)))]
 
 ;; :k v :k v ... 반복. RBracket 만나면 중단.
-[FUNC parse-block-fields :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
-          (cond
-            [(null? $t) (r-pair $p $acc)]
-            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
-            [(= (get $t :kind) "Keyword")
-             (let [[$key (get $t :value)]
-                   [$p1 (p-advance $p)]
-                   [$val (parse-expr $p1)]
-                   [$p2 (get $val :p)] [$v (get $val :node)]]
-               (parse-block-fields $p2 (json_set $acc $key $v)))]
-            [true (r-pair (p-advance $p) $acc)]))]
-
-;; ──────────────────────────────────────
-;; 35 parse-map — {:k v :k v ...}
+  [FUNC parse-block-fields :params [$p $acc]
+    :body (let [[$cur $p] [$res_acc $acc] [$running true]]
+            (do
+              (while (and (not (p-end? $cur)) $running)
+                (let [[$t (p-peek $cur)]]
+                  (if (= (get $t :kind) "Keyword")
+                    (let [[$key (get $t :value)]
+                          [$p1 (p-advance $cur)]
+                          [$val (parse-expr $p1)]]
+                      (do
+                        (set! $res_acc (_fl_map_set $res_acc $key (get $val :node)))
+                        (set! $cur (get $val :p))))
+                    (set! $running false))))
+              (r-pair $cur $res_acc)))]
 ;; ──────────────────────────────────────
 
 [FUNC parse-map :params [$p]

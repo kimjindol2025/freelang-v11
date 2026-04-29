@@ -1,20 +1,20 @@
 ;; L2 Test 16: AI Library - Top-K Ranking
 ;; 상위 K개 순위 결정
 
-(defun map-indexed [f lst]
+(defn map-indexed [f lst]
   (let [[indices (range 0 (length lst))]]
     (map (fn [i] (f i (get lst i))) indices)))
 
-(defun top-k-retrieval [scored-list k]
+(defn top-k-retrieval [scored-list k]
   (take k 
     (reverse (sort scored-list 
       (fn [a b] (< (get a :score) (get b :score)))))))
 
-(defun test-ai-ranking []
+(defn test-ai-ranking []
   (let [[scores [{:idx 0 :score 0.9}
                  {:idx 1 :score 0.7}
                  {:idx 2 :score 0.95}]]]
-    (console/log
+    (println
       (list (length (top-k-retrieval scores 2))))))  ; 2
 )
 

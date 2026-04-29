@@ -75,6 +75,8 @@
           [(= (get $n :kind) "loop") (cg-loop $n)]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
+          [(= (get $n :kind) "and") (str "(" (join (map (fn [$a] (cg $a)) (get $n :args)) " && ") ")")]
+          [(= (get $n :kind) "or") (str "(" (join (map (fn [$a] (cg $a)) (get $n :args)) " || ") ")")]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
           [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
           [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
@@ -160,9 +162,11 @@
 
 [FUNC cg-block :params [$n]
   :body (let [[$t (get $n :type)] [$fields (get $n :fields)]]
-          (if (= $t "FUNC")
-            (cg-func-block $n)
-            (cg-block-dispatch $t $fields)))]
+          (cond
+            [(= $t "FUNC") (cg-func-block $n)]
+            [(= $t "Map") (str "({" (cg-map-entries $fields) "})")]
+            [(= $t "Array") (str "[" (cg-args (get $fields "items")) "]")]
+            [true (cg-block-dispatch $t $fields)]))]
 
 ;; Map literal: 두 AST 형태 지원
 ;;   1) bootstrap parser: fields = JS Map, map_entries 로 [[k,v] ...]
@@ -836,6 +840,11 @@
             [(= $op "timer_start") (str "{__timer:{label:" $as ",start:Date.now(),laps:[]}}")]
             [(= $op "timer_elapsed") (str "((t)=>Date.now()-t.__timer.start)(" $as ")")]
             [(= $op "timer_lap") (str "((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(" $as ")")]
+            [(= $op "cli-args") "(typeof process !== \"undefined\" ? process.argv.slice(2) : [])"]
+            [(= $op "json-parse") (str "JSON.parse(" $as ")")]
+            [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
+            
+            
 
             ;; ─── String 추가 (starts-with?, ends-with?, contains?, split, join, trim, upper, lower, repeat, index-of) ───
             [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
@@ -892,6 +901,41 @@
           (str $fn-name "(" (cg-args $args) ")"))]
 
 ;; ═══════ sexpr 메인 dispatch ═══════
+
+
+[FUNC cg-and :params [$args]
+  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " && ") ")")]
+
+[FUNC cg-or :params [$args]
+  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " || ") ")")]
+
+[FUNC cg-cond :params [$args]
+  :body (let [[$n (length $args)]]
+          (if (= $n 0) "null"
+            (let [[$last-idx (- $n 1)]
+                  [$loop (fn [$i $acc]
+                           (if (< $i 0) $acc
+                             (let [[$pair (get $args $i)]
+                                   [$items (if (and (= (get $pair :kind) "block") (= (get $pair :type) "Array"))
+                                              (get (get $pair :fields) "items")
+                                              $pair)]
+                                   [$test (cg (get $items 0))]
+                                   [$body (cg (get $items 1))]]
+                               ($loop (- $i 1) (str "(" $test " ? " $body " : " $acc ")")))))]]
+              ($loop $last-idx "null"))))]
+
+[FUNC cg-while :params [$args]
+  :body (str "(() => { while(" (cg (get $args 0)) ") { " (join (map (fn [$a] (cg $a)) (rest $args)) "; ") " } })()")]
+
+[FUNC cg-loop :params [$args]
+  :body (let [[$bindings (get (get (get $args 0) :fields) "items")]
+              [$body-exprs (rest $args)]
+              [$inits (fn [$i $acc]
+                        (if (>= $i (length $bindings)) $acc
+                          (let [[$name (js-name (get (get $bindings $i) :name))]
+                                [$val (cg (get $bindings (+ $i 1)))]]
+                            ($inits (+ $i 2) (str $acc "let " $name " = " $val "; ")))))]]
+          (str "(() => { " ($inits 0 "") "while(true) { " (join (map (fn [$a] (cg $a)) $body-exprs) "; ") "; break; } })()"))]
 
 [FUNC cg-sexpr-dispatch :params [$op $args]
   :body (cond
@@ -1018,7 +1062,7 @@
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
     "const _fl_nil_q = (x) => (x == null || x === undefined);"
     "const _fl_nil_or_empty_q = (x) => (x == null || x === undefined || (x && x.length === 0));"
-    "const __argv__ = process.argv.slice(2);")]
+    "const __argv__ = () => process.argv.slice(2);")]
 
 [FUNC prelude-db-server :params []
   :body (str
@@ -1065,14 +1109,21 @@
               [$tokens (lex $src)]
               [$ast    (parse $tokens)]
               [$js     (fl->js-with-prelude $ast)]]
-          (file_write $output $js)
-          (println (str "compiled " $input " -> " $output " size=" (length $js))))]
+          (do
+            (println (str "DEBUG: read src len=" (length $src)))
+            (println (str "DEBUG: tokens count=" (length $tokens)))
+            (println (str "DEBUG: ast nodes=" (length $ast)))
+            (file_write $output $js)
+            (println (str "compiled " $input " -> " $output " size=" (length $js)))))]
 
 ;; Phase A-3: __argv__ CLI 처리는 src/codegen-js.ts에서 수행
 ;; Self-hosting 시 bootstrap 위에서만 실행되는 코드이므로 제거
 ;; (자체호스팅 이후 단계에서 필요시 복원)
-;; (if (null? $__argv__) null
-;;   (if (= (length $__argv__) 0) null
-;;     (compile-file (get $__argv__ 0)
-;;                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
-;;                       (str (get $__argv__ 0) ".out.js")))))
+
+;; Phase A-3: CLI Entry Point
+;; process.argv.slice(2)를 이용해 런타임 인자를 가져옴
+
+;; Since we cannot directly evaluate _native at top level before prelude definitions are loaded, 
+;; we just emit a top level JS call that gets executed.
+
+

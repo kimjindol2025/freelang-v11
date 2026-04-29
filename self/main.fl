@@ -1,2 +1,16 @@
-;; self/main.fl — Phase A-3: CLI 인터페이스 (향후 작업)
-;; 현재는 src/codegen-js.ts의 require.main===module 핸들러에서 처리됨
+
+[FUNC cli-main :params []
+  :body (let [[$argv (cli-args)]]
+          (if (null? $argv) null
+            (if (= (length $argv) 0) null
+              (let [[$cmd (get $argv 0)]]
+                (if (= $cmd "run")
+                  (let [[$input (get $argv 1)]
+                        [$output (if (>= (length $argv) 3) (get $argv 2) (str $input ".out.js"))]]
+                    (compile-file $input $output))
+                  (let [[$input (get $argv 0)]
+                        [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
+                    (compile-file $input $output)))))))]
+
+;; Entry point trigger
+(cli-main)

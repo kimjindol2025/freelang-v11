@@ -1,8 +1,8 @@
 ;; L2 Proof Case 7: Type Checking & Predicates
 ;; 타입 검사 (null? list? map? string? number?)
 
-(defun test-types []
-  (console/log
+(defn test-types []
+  (println
     (list
       (null? null)          ; true
       (list? [1 2 3])       ; true

@@ -66,38 +66,44 @@
   :body {:src (get $st :src) :idx (get $st :idx)
          :line (get $st :line) :col (get $st :col)
          :tokens (append (get $st :tokens)
-                         (list {:kind $kind :type $kind :value $value :line $sl :col $sc}))}]
+                         {:kind $kind :type $kind :value $value :line $sl :col $sc})}]
 
 ;; ──────────────────────────────────────
 ;; 스킵 (whitespace + ; line comment)
 ;; ──────────────────────────────────────
 
 [FUNC skip-comment :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
+  :body (let [[$cur $st]]
+          (do
+            (while (and (not (at-end? $cur)) (not (= (peek $cur) "\n")))
+              (set! $cur (advance $cur)))
+            (if (at-end? $cur) $cur (advance $cur))))]
 
 [FUNC skip-ws :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (cond
-              [(is-space? $c) (skip-ws (advance $st))]
-              [(= $c ";") (skip-ws (skip-comment $st))]
-              [true $st])))]
+  :body (let [[$cur $st] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (cond
+                  [(is-space? $c) (set! $cur (advance $cur))]
+                  [(= $c ";") (set! $cur (skip-comment $cur))]
+                  [true (set! $running false)])))
+            $cur))]
 
 ;; ──────────────────────────────────────
 ;; 숫자 (정수/실수/음수)
 ;; ──────────────────────────────────────
 
 [FUNC read-number-body :params [$st $acc $has-dot $line $col]
-  :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
-          (let [[$c (peek $st)]]
-            (cond
-              [(is-digit? $c)
-               (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
-              [(and (= $c ".") (not $has-dot))
-               (read-number-body (advance $st) (str $acc $c) true $line $col)]
-              [true (emit $st "Number" $acc $line $col)])))]
+  :body (let [[$cur $st] [$res_acc $acc] [$dot $has-dot] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (cond
+                  [(is-digit? $c) (do (set! $res_acc (str $res_acc $c)) (set! $cur (advance $cur)))]
+                  [(and (= $c ".") (not $dot)) (do (set! $res_acc (str $res_acc $c)) (set! $dot true) (set! $cur (advance $cur)))]
+                  [true (set! $running false)])))
+            (emit $cur "Number" $res_acc $line $col)))]
 
 [FUNC read-number :params [$st]
   :body (read-number-body $st "" false (get $st :line) (get $st :col))]
@@ -112,14 +118,17 @@
           [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
 
 [FUNC read-string-body :params [$st $acc $line $col]
-  :body (if (at-end? $st) (emit $st "String" $acc $line $col)
-          (let [[$c (peek $st)]]
-            (cond
-              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
-              [(= $c "\\")
-               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
-                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
-              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
+  :body (let [[$cur $st] [$res_acc $acc] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (cond
+                  [(= $c "\"") (do (set! $cur (advance $cur)) (set! $running false))]
+                  [(= $c "\\")
+                   (let [[$st2 (advance $cur)] [$c2 (peek $st2)]]
+                     (do (set! $res_acc (str $res_acc (translate-esc $c2))) (set! $cur (advance $st2))))]
+                  [true (do (set! $res_acc (str $res_acc $c)) (set! $cur (advance $cur)))])))
+            (emit $cur "String" $res_acc $line $col)))]
 
 [FUNC read-string :params [$st]
   :body (let [[$line (get $st :line)] [$col (get $st :col)]
@@ -131,11 +140,14 @@
 ;; ──────────────────────────────────────
 
 [FUNC read-symbol-body-kind :params [$st $acc $line $col $kind]
-  :body (if (at-end? $st) (emit $st $kind $acc $line $col)
-          (let [[$c (peek $st)]]
-            (if (is-symbol-char? $c)
-              (read-symbol-body-kind (advance $st) (str $acc $c) $line $col $kind)
-              (emit $st $kind $acc $line $col))))]
+  :body (let [[$cur $st] [$res_acc $acc] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (if (is-symbol-char? $c)
+                  (do (set! $res_acc (str $res_acc $c)) (set! $cur (advance $cur)))
+                  (set! $running false))))
+            (emit $cur $kind $res_acc $line $col)))]
 
 [FUNC read-symbol :params [$st]
   :body (read-symbol-body-kind $st "" (get $st :line) (get $st :col) "Symbol")]
@@ -178,10 +190,11 @@
 ;; 메인 루프 — 모든 토큰 수집
 ;; ──────────────────────────────────────
 
-[FUNC lex-loop :params [$st]
-  :body (let [[$st1 (skip-ws $st)]]
-          (if (at-end? $st1)
-            (get $st1 :tokens)
-            (lex-loop (read-token $st1))))]
+  [FUNC lex-loop :params [$st]
+    :body (let [[$cur $st]]
+            (do
+              (while (not (at-end? (skip-ws $cur)))
+                (set! $cur (read-token $cur)))
+              (get $cur :tokens)))]
 
 [FUNC lex :params [$src] :body (lex-loop (make-state $src))]

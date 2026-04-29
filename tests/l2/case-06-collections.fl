@@ -1,10 +1,10 @@
 ;; L2 Proof Case 6: Collections (Array & Map)
 ;; 배열 및 맵 연산
 
-(defun test-collections []
+(defn test-collections []
   (let [[arr [1 2 3]]
         [m {:x 10 :y 20}]]
-    (console/log
+    (println
       (list
         (get arr 0)           ; 1
         (get m :x)            ; 10

@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-28 18:53:53
+; 2026-04-29 15:26:40
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -69,38 +69,44 @@
   :body {:src (get $st :src) :idx (get $st :idx)
          :line (get $st :line) :col (get $st :col)
          :tokens (append (get $st :tokens)
-                         (list {:kind $kind :type $kind :value $value :line $sl :col $sc}))}]
+                         {:kind $kind :type $kind :value $value :line $sl :col $sc})}]
 
 ;; ──────────────────────────────────────
 ;; 스킵 (whitespace + ; line comment)
 ;; ──────────────────────────────────────
 
 [FUNC skip-comment :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (if (= $c "\n") (advance $st) (skip-comment (advance $st)))))]
+  :body (let [[$cur $st]]
+          (do
+            (while (and (not (at-end? $cur)) (not (= (peek $cur) "\n")))
+              (set! $cur (advance $cur)))
+            (if (at-end? $cur) $cur (advance $cur))))]
 
 [FUNC skip-ws :params [$st]
-  :body (if (at-end? $st) $st
-          (let [[$c (peek $st)]]
-            (cond
-              [(is-space? $c) (skip-ws (advance $st))]
-              [(= $c ";") (skip-ws (skip-comment $st))]
-              [true $st])))]
+  :body (let [[$cur $st] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (cond
+                  [(is-space? $c) (set! $cur (advance $cur))]
+                  [(= $c ";") (set! $cur (skip-comment $cur))]
+                  [true (set! $running false)])))
+            $cur))]
 
 ;; ──────────────────────────────────────
 ;; 숫자 (정수/실수/음수)
 ;; ──────────────────────────────────────
 
 [FUNC read-number-body :params [$st $acc $has-dot $line $col]
-  :body (if (at-end? $st) (emit $st "Number" $acc $line $col)
-          (let [[$c (peek $st)]]
-            (cond
-              [(is-digit? $c)
-               (read-number-body (advance $st) (str $acc $c) $has-dot $line $col)]
-              [(and (= $c ".") (not $has-dot))
-               (read-number-body (advance $st) (str $acc $c) true $line $col)]
-              [true (emit $st "Number" $acc $line $col)])))]
+  :body (let [[$cur $st] [$res_acc $acc] [$dot $has-dot] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (cond
+                  [(is-digit? $c) (do (set! $res_acc (str $res_acc $c)) (set! $cur (advance $cur)))]
+                  [(and (= $c ".") (not $dot)) (do (set! $res_acc (str $res_acc $c)) (set! $dot true) (set! $cur (advance $cur)))]
+                  [true (set! $running false)])))
+            (emit $cur "Number" $res_acc $line $col)))]
 
 [FUNC read-number :params [$st]
   :body (read-number-body $st "" false (get $st :line) (get $st :col))]
@@ -115,14 +121,17 @@
           [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c])]
 
 [FUNC read-string-body :params [$st $acc $line $col]
-  :body (if (at-end? $st) (emit $st "String" $acc $line $col)
-          (let [[$c (peek $st)]]
-            (cond
-              [(= $c "\"") (emit (advance $st) "String" $acc $line $col)]
-              [(= $c "\\")
-               (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
-                 (read-string-body (advance $st2) (str $acc (translate-esc $c2)) $line $col))]
-              [true (read-string-body (advance $st) (str $acc $c) $line $col)])))]
+  :body (let [[$cur $st] [$res_acc $acc] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (cond
+                  [(= $c "\"") (do (set! $cur (advance $cur)) (set! $running false))]
+                  [(= $c "\\")
+                   (let [[$st2 (advance $cur)] [$c2 (peek $st2)]]
+                     (do (set! $res_acc (str $res_acc (translate-esc $c2))) (set! $cur (advance $st2))))]
+                  [true (do (set! $res_acc (str $res_acc $c)) (set! $cur (advance $cur)))])))
+            (emit $cur "String" $res_acc $line $col)))]
 
 [FUNC read-string :params [$st]
   :body (let [[$line (get $st :line)] [$col (get $st :col)]
@@ -134,11 +143,14 @@
 ;; ──────────────────────────────────────
 
 [FUNC read-symbol-body-kind :params [$st $acc $line $col $kind]
-  :body (if (at-end? $st) (emit $st $kind $acc $line $col)
-          (let [[$c (peek $st)]]
-            (if (is-symbol-char? $c)
-              (read-symbol-body-kind (advance $st) (str $acc $c) $line $col $kind)
-              (emit $st $kind $acc $line $col))))]
+  :body (let [[$cur $st] [$res_acc $acc] [$running true]]
+          (do
+            (while (and (not (at-end? $cur)) $running)
+              (let [[$c (peek $cur)]]
+                (if (is-symbol-char? $c)
+                  (do (set! $res_acc (str $res_acc $c)) (set! $cur (advance $cur)))
+                  (set! $running false))))
+            (emit $cur $kind $res_acc $line $col)))]
 
 [FUNC read-symbol :params [$st]
   :body (read-symbol-body-kind $st "" (get $st :line) (get $st :col) "Symbol")]
@@ -181,11 +193,12 @@
 ;; 메인 루프 — 모든 토큰 수집
 ;; ──────────────────────────────────────
 
-[FUNC lex-loop :params [$st]
-  :body (let [[$st1 (skip-ws $st)]]
-          (if (at-end? $st1)
-            (get $st1 :tokens)
-            (lex-loop (read-token $st1))))]
+  [FUNC lex-loop :params [$st]
+    :body (let [[$cur $st]]
+            (do
+              (while (not (at-end? (skip-ws $cur)))
+                (set! $cur (read-token $cur)))
+              (get $cur :tokens)))]
 
 [FUNC lex :params [$src] :body (lex-loop (make-state $src))]
 
@@ -388,7 +401,7 @@
             (deep-equal-map-keys? $a $b $ka 0)))]
 
 [FUNC keys-no-line :params [$m]
-  :body (filter (fn [$k] (not (= $k "line"))) (keys $m))]
+  :body (filter (fn [$k] (not (= $k "line"))) (json_keys $m))]
 
 [FUNC deep-equal-map-keys? :params [$a $b $ks $i]
   :body (cond
@@ -534,10 +547,10 @@
                                            (if (= (length $body-exprs) 1)
                                              (get $body-exprs 0)
                                              (make-sexpr "do" $body-exprs $line))
-                                           $line))))))))]
+                                           $line))))))]
                 [true
                  (r-pair (parse-consume-rparen $p2)
-                         (make-sexpr $op $rest $line))]))))))]
+                         (make-sexpr $op $rest $line))]))))]
 
 [FUNC parse-consume-rparen :params [$p]
   :body (let [[$t (p-peek $p)]]
@@ -609,21 +622,20 @@
             (r-pair $p null)))]
 
 ;; :k v :k v ... 반복. RBracket 만나면 중단.
-[FUNC parse-block-fields :params [$p $acc]
-  :body (let [[$t (p-peek $p)]]
-          (cond
-            [(null? $t) (r-pair $p $acc)]
-            [(= (get $t :kind) "RBracket") (r-pair $p $acc)]
-            [(= (get $t :kind) "Keyword")
-             (let [[$key (get $t :value)]
-                   [$p1 (p-advance $p)]
-                   [$val (parse-expr $p1)]
-                   [$p2 (get $val :p)] [$v (get $val :node)]]
-               (parse-block-fields $p2 (map-set $acc $key $v)))]
-            [true (r-pair (p-advance $p) $acc)]))]
-
-;; ──────────────────────────────────────
-;; 35 parse-map — {:k v :k v ...}
+  [FUNC parse-block-fields :params [$p $acc]
+    :body (let [[$cur $p] [$res_acc $acc] [$running true]]
+            (do
+              (while (and (not (p-end? $cur)) $running)
+                (let [[$t (p-peek $cur)]]
+                  (if (= (get $t :kind) "Keyword")
+                    (let [[$key (get $t :value)]
+                          [$p1 (p-advance $cur)]
+                          [$val (parse-expr $p1)]]
+                      (do
+                        (set! $res_acc (_fl_map_set $res_acc $key (get $val :node)))
+                        (set! $cur (get $val :p))))
+                    (set! $running false))))
+              (r-pair $cur $res_acc)))]
 ;; ──────────────────────────────────────
 
 [FUNC parse-map :params [$p]
@@ -729,6 +741,8 @@
           [(= (get $n :kind) "loop") (cg-loop $n)]
           [(= (get $n :kind) "sexpr") (cg-sexpr $n)]
           [(= (get $n :kind) "block") (cg-block $n)]
+          [(= (get $n :kind) "and") (str "(" (join (map (fn [$a] (cg $a)) (get $n :args)) " && ") ")")]
+          [(= (get $n :kind) "or") (str "(" (join (map (fn [$a] (cg $a)) (get $n :args)) " || ") ")")]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
           [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
           [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
@@ -814,9 +828,11 @@
 
 [FUNC cg-block :params [$n]
   :body (let [[$t (get $n :type)] [$fields (get $n :fields)]]
-          (if (= $t "FUNC")
-            (cg-func-block $n)
-            (cg-block-dispatch $t $fields)))]
+          (cond
+            [(= $t "FUNC") (cg-func-block $n)]
+            [(= $t "Map") (str "({" (cg-map-entries $fields) "})")]
+            [(= $t "Array") (str "[" (cg-args (get $fields "items")) "]")]
+            [true (cg-block-dispatch $t $fields)]))]
 
 ;; Map literal: 두 AST 형태 지원
 ;;   1) bootstrap parser: fields = JS Map, map_entries 로 [[k,v] ...]
@@ -1158,7 +1174,7 @@
 ;; fields는 {key: pattern, ...} 형태의 객체
 [FUNC struct-pattern-test :params [$fields $v $i $keys $acc]
   :body (if (nil? $keys)
-          (let [[$ks (keys $fields)]]
+          (let [[$ks (json_keys $fields)]]
             (struct-pattern-test $fields $v 0 $ks ""))
           (if (>= $i (length $keys))
             (if (= (length $acc) 0)
@@ -1214,14 +1230,14 @@
 
 ;; struct-pattern-bindings: Collect bindings from all fields
 ;; bootstrap parser: fields = Map{...} → map-entries로 변환
-;; self-parser: fields = plain obj {field: pattern, ...} → keys로 처리
+;; self-parser: fields = plain obj {field: pattern, ...} → json_keys로 처리
 [FUNC struct-pattern-bindings :params [$fields $v $i $keys $acc]
   :body (if (nil? $keys)
-          (let [[$ks (keys $fields)]]
+          (let [[$ks (json_keys $fields)]]
             (if (empty? $ks)
-              ;; Map인 경우: keys가 빈 배열 반환 → map-entries 사용
+              ;; Map인 경우: json_keys가 빈 배열 반환 → map-entries 사용
               (struct-pattern-bindings-from-entries (map-entries $fields) $v 0 "")
-              ;; plain object인 경우: keys로 계속 진행
+              ;; plain object인 경우: json_keys로 계속 진행
               (struct-pattern-bindings $fields $v 0 $ks "")))
           (if (>= $i (length $keys))
             $acc
@@ -1425,7 +1441,7 @@
             [(= $op "map-set") (str "_fl_map_set(" $as ")")]
             [(= $op "map-delete") (str "_fl_map_delete(" $as ")")]
             [(= $op "merge") (str "_fl_merge(" $as ")")]
-            [(= $op "map-set") (str "_fl_map_set(" $as ")")]
+            [(= $op "json_set") (str "_fl_map_set(" $as ")")]
 
             ;; ─── JSON (4) ───
             [(= $op "json-parse") (str "JSON.parse(" $as ")")]
@@ -1473,8 +1489,8 @@
             ;; ─── I/O (7) ───
             [(= $op "println") (str "console.log(" $as ")")]
             [(= $op "print") (str "process.stdout.write(String(" $as "))")]
-            [(= $op "file-read") (str "_fl_file-read(" $as ")")]
-            [(= $op "file-write") (str "_fl_file-write(" $as ")")]
+            [(= $op "file_read") (str "_fl_file_read(" $as ")")]
+            [(= $op "file_write") (str "_fl_file_write(" $as ")")]
             [(= $op "file_exists") (str "_fl_file_exists(" $as ")")]
             [(= $op "exit") (str "process.exit(" $as ")")]
             [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
@@ -1490,6 +1506,11 @@
             [(= $op "timer_start") (str "{__timer:{label:" $as ",start:Date.now(),laps:[]}}")]
             [(= $op "timer_elapsed") (str "((t)=>Date.now()-t.__timer.start)(" $as ")")]
             [(= $op "timer_lap") (str "((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(" $as ")")]
+            [(= $op "cli-args") "(typeof process !== \"undefined\" ? process.argv.slice(2) : [])"]
+            [(= $op "json-parse") (str "JSON.parse(" $as ")")]
+            [(= $op "shell_capture") (str "_fl_shell_capture(" $as ")")]
+            
+            
 
             ;; ─── String 추가 (starts-with?, ends-with?, contains?, split, join, trim, upper, lower, repeat, index-of) ───
             [(= $op "starts-with?") (str "_fl_starts_with(" $as ")")]
@@ -1546,6 +1567,41 @@
           (str $fn-name "(" (cg-args $args) ")"))]
 
 ;; ═══════ sexpr 메인 dispatch ═══════
+
+
+[FUNC cg-and :params [$args]
+  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " && ") ")")]
+
+[FUNC cg-or :params [$args]
+  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " || ") ")")]
+
+[FUNC cg-cond :params [$args]
+  :body (let [[$n (length $args)]]
+          (if (= $n 0) "null"
+            (let [[$last-idx (- $n 1)]
+                  [$loop (fn [$i $acc]
+                           (if (< $i 0) $acc
+                             (let [[$pair (get $args $i)]
+                                   [$items (if (and (= (get $pair :kind) "block") (= (get $pair :type) "Array"))
+                                              (get (get $pair :fields) "items")
+                                              $pair)]
+                                   [$test (cg (get $items 0))]
+                                   [$body (cg (get $items 1))]]
+                               ($loop (- $i 1) (str "(" $test " ? " $body " : " $acc ")")))))]]
+              ($loop $last-idx "null"))))]
+
+[FUNC cg-while :params [$args]
+  :body (str "(() => { while(" (cg (get $args 0)) ") { " (join (map (fn [$a] (cg $a)) (rest $args)) "; ") " } })()")]
+
+[FUNC cg-loop :params [$args]
+  :body (let [[$bindings (get (get (get $args 0) :fields) "items")]
+              [$body-exprs (rest $args)]
+              [$inits (fn [$i $acc]
+                        (if (>= $i (length $bindings)) $acc
+                          (let [[$name (js-name (get (get $bindings $i) :name))]
+                                [$val (cg (get $bindings (+ $i 1)))]]
+                            ($inits (+ $i 2) (str $acc "let " $name " = " $val "; ")))))]]
+          (str "(() => { " ($inits 0 "") "while(true) { " (join (map (fn [$a] (cg $a)) $body-exprs) "; ") "; break; } })()"))]
 
 [FUNC cg-sexpr-dispatch :params [$op $args]
   :body (cond
@@ -1665,14 +1721,14 @@
 
 [FUNC prelude-io-misc :params []
   :body (str
-    "const _fl_file-read = (p) => require('fs').readFileSync(p, 'utf8');"
-    "const _fl_file-write = (p, c) => require('fs').writeFileSync(p, c);"
+    "const _fl_file_read = (p) => require('fs').readFileSync(p, 'utf8');"
+    "const _fl_file_write = (p, c) => require('fs').writeFileSync(p, c);"
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
     "const _fl_shell_capture = (cmd) => { try { const {execSync}=require('child_process'); return {stdout:execSync(cmd,{encoding:'utf8'}),stderr:'',code:0}; } catch(e) { return {stdout:'',stderr:String(e),code:1}; } };"
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
     "const _fl_nil_q = (x) => (x == null || x === undefined);"
     "const _fl_nil_or_empty_q = (x) => (x == null || x === undefined || (x && x.length === 0));"
-    "const __argv__ = process.argv.slice(2);")]
+    "const __argv__ = () => process.argv.slice(2);")]
 
 [FUNC prelude-db-server :params []
   :body (str
@@ -1715,21 +1771,28 @@
 ;; 인자 없이 실행하면 FUNC 등록만 하고 종료.
 
 [FUNC compile-file :params [$input $output]
-  :body (let [[$src    (file-read $input)]
+  :body (let [[$src    (file_read $input)]
               [$tokens (lex $src)]
               [$ast    (parse $tokens)]
               [$js     (fl->js-with-prelude $ast)]]
-          (file-write $output $js)
-          (println (str "compiled " $input " -> " $output " size=" (length $js))))]
+          (do
+            (println (str "DEBUG: read src len=" (length $src)))
+            (println (str "DEBUG: tokens count=" (length $tokens)))
+            (println (str "DEBUG: ast nodes=" (length $ast)))
+            (file_write $output $js)
+            (println (str "compiled " $input " -> " $output " size=" (length $js)))))]
 
 ;; Phase A-3: __argv__ CLI 처리는 src/codegen-js.ts에서 수행
 ;; Self-hosting 시 bootstrap 위에서만 실행되는 코드이므로 제거
 ;; (자체호스팅 이후 단계에서 필요시 복원)
-;; (if (null? $__argv__) null
-;;   (if (= (length $__argv__) 0) null
-;;     (compile-file (get $__argv__ 0)
-;;                   (if (>= (length $__argv__) 2) (get $__argv__ 1)
-;;                       (str (get $__argv__ 0) ".out.js")))))
+
+;; Phase A-3: CLI Entry Point
+;; process.argv.slice(2)를 이용해 런타임 인자를 가져옴
+
+;; Since we cannot directly evaluate _native at top level before prelude definitions are loaded, 
+;; we just emit a top level JS call that gets executed.
+
+
 
 ;; self/stdlib/data.fl — Phase 26
 ;; 순수 데이터 변환 함수
@@ -1892,10 +1955,10 @@
 ;; 파일 I/O 연산 (native file_* builtin wrapper)
 
 [FUNC file-read :params [$path]
-  :body (file-read (str $path))]
+  :body (file_read (str $path))]
 
 [FUNC file-write :params [$path $content]
-  :body (file-write (str $path) (str $content))]
+  :body (file_write (str $path) (str $content))]
 
 [FUNC file-append :params [$path $content]
   :body (file_append (str $path) (str $content))]
@@ -1919,13 +1982,13 @@
   :body (file_modified (str $path))]
 
 [FUNC file-json :params [$path]
-  :body (json-parse (file-read (str $path)))]
+  :body (json-parse (file_read (str $path)))]
 
 [FUNC file-json-write :params [$path $obj]
-  :body (file-write (str $path) (json-stringify $obj))]
+  :body (file_write (str $path) (json-stringify $obj))]
 
 [FUNC file-lines :params [$path]
-  :body (str-lines (file-read (str $path)))]
+  :body (str-lines (file_read (str $path)))]
 
 [FUNC file-mkdir :params [$path]
   :body (file_mkdir (str $path))]
@@ -1993,6 +2056,20 @@
 
 [FUNC pid-parent :params [] :body (process_ppid)]
 
-;; self/main.fl — Phase A-3: CLI 인터페이스 (향후 작업)
-;; 현재는 src/codegen-js.ts의 require.main===module 핸들러에서 처리됨
+
+[FUNC cli-main :params []
+  :body (let [[$argv (cli-args)]]
+          (if (null? $argv) null
+            (if (= (length $argv) 0) null
+              (let [[$cmd (get $argv 0)]]
+                (if (= $cmd "run")
+                  (let [[$input (get $argv 1)]
+                        [$output (if (>= (length $argv) 3) (get $argv 2) (str $input ".out.js"))]]
+                    (compile-file $input $output))
+                  (let [[$input (get $argv 0)]
+                        [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
+                    (compile-file $input $output)))))))]
+
+;; Entry point trigger
+(cli-main)
 

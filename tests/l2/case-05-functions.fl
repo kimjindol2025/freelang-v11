@@ -1,10 +1,10 @@
 ;; L2 Proof Case 5: Function Definition and Closure
 ;; 함수 정의 및 클로저
 
-(defun test-functions []
+(defn test-functions []
   (let [[add (fn [a b] (+ a b))]
         [double (fn [x] (* x 2))]]
-    (console/log
+    (println
       (list
         (add 3 4)           ; 7
         (double 5)          ; 10
