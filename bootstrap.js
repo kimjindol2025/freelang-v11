@@ -28945,6 +28945,61 @@ function levenshtein2(a, b) {
   }
   return dp[m][n];
 }
+var KNOWN_ALIASES = {
+  // 환경변수
+  "env": { correct: "shell_env", usage: '(shell_env "KEY")' },
+  "get_env": { correct: "shell_env", usage: '(shell_env "KEY")' },
+  "get-env": { correct: "shell_env", usage: '(shell_env "KEY")' },
+  "get_env_or": { correct: "shell_env", usage: '(or (shell_env "KEY") "default")' },
+  // 맵 조작
+  "obj_merge": { correct: "assoc", usage: '(assoc map "key" value)' },
+  "obj-merge": { correct: "assoc", usage: '(assoc map "key" value)' },
+  "merge": { correct: "assoc", usage: '(assoc map "key" value)' },
+  "obj_omit": { correct: "dissoc", usage: '(dissoc map "key")' },
+  "obj-omit": { correct: "dissoc", usage: '(dissoc map "key")' },
+  "obj_pick": { correct: "get", usage: '(get map "key")' },
+  "dict": { correct: "map-set", usage: '(map-set {} "key" value)' },
+  // 문자열
+  "str_length": { correct: "length", usage: '(length "hello")' },
+  "string_length": { correct: "length", usage: '(length "hello")' },
+  "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
+  "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
+  "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
+  "int_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
+  "to_string": { correct: "str", usage: "(str value)" },
+  "to_str": { correct: "str", usage: "(str value)" },
+  // 타입 체크
+  "is_null": { correct: "nil?", usage: "(nil? value)" },
+  "is_nil": { correct: "nil?", usage: "(nil? value)" },
+  "null?": { correct: "nil?", usage: "(nil? value)" },
+  "is_array": { correct: "array?", usage: "(array? value)" },
+  "is_string": { correct: "string?", usage: "(string? value)" },
+  "is_number": { correct: "number?", usage: "(number? value)" },
+  // 배열
+  "push": { correct: "append", usage: "(append arr item)" },
+  "list_append": { correct: "append", usage: "(append arr item)" },
+  "array_push": { correct: "append", usage: "(append arr item)" },
+  "array_length": { correct: "length", usage: "(length arr)" },
+  "first": { correct: "get", usage: "(get arr 0)" },
+  "head": { correct: "get", usage: "(get arr 0)" },
+  // 출력
+  "console_log": { correct: "println", usage: "(println value)" },
+  "console.log": { correct: "println", usage: "(println value)" },
+  "print": { correct: "println", usage: "(println value)" },
+  "log": { correct: "println", usage: "(println value)" },
+  // DB
+  "mariadb_all": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  "db_query": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  // HTTP
+  "http_post": { correct: "http_get", usage: '(http_get url {:method "POST" :body data})' },
+  "fetch": { correct: "http_get", usage: "(http_get url)" },
+  // 서버
+  "server_listen": { correct: "server_start", usage: "(server_start 40000)" },
+  "listen": { correct: "server_start", usage: "(server_start 40000)" },
+  // 에러
+  "raise": { correct: "error", usage: '(error "\uBA54\uC2DC\uC9C0")' },
+  "panic": { correct: "error", usage: '(error "\uBA54\uC2DC\uC9C0")' }
+};
 function suggestSimilar(name, candidates) {
   let best = null;
   let bestDist = Infinity;
@@ -29330,8 +29385,15 @@ function callUserFunction(interp2, name, args2) {
   }
   if (!func) {
     const candidates = [...interp2.context.functions.keys()];
-    const similar = suggestSimilar(baseName, candidates);
-    const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+    const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, "_")] ?? KNOWN_ALIASES[baseName.replace(/_/g, "-")];
+    let hint;
+    if (alias) {
+      hint = `'${baseName}'\uB294 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 '${alias.correct}'\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
+  \uC0AC\uC6A9\uBC95: ${alias.usage}`;
+    } else {
+      const similar = suggestSimilar(baseName, candidates);
+      hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+    }
     throw new FunctionNotFoundError(
       baseName,
       interp2.currentFilePath,

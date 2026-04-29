@@ -44,6 +44,63 @@ export function levenshtein(a: string, b: string): number {
  * @param candidates 후보 목록
  * @returns 가장 가까운 후보 또는 null
  */
+// AI-First #4: 알려진 잘못된 이름 → 정답 + 사용법 매핑
+export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> = {
+  // 환경변수
+  "env":              { correct: "shell_env",    usage: '(shell_env "KEY")' },
+  "get_env":          { correct: "shell_env",    usage: '(shell_env "KEY")' },
+  "get-env":          { correct: "shell_env",    usage: '(shell_env "KEY")' },
+  "get_env_or":       { correct: "shell_env",    usage: '(or (shell_env "KEY") "default")' },
+  // 맵 조작
+  "obj_merge":        { correct: "assoc",        usage: '(assoc map "key" value)' },
+  "obj-merge":        { correct: "assoc",        usage: '(assoc map "key" value)' },
+  "merge":            { correct: "assoc",        usage: '(assoc map "key" value)' },
+  "obj_omit":         { correct: "dissoc",       usage: '(dissoc map "key")' },
+  "obj-omit":         { correct: "dissoc",       usage: '(dissoc map "key")' },
+  "obj_pick":         { correct: "get",          usage: '(get map "key")' },
+  "dict":             { correct: "map-set",      usage: '(map-set {} "key" value)' },
+  // 문자열
+  "str_length":       { correct: "length",       usage: '(length "hello")' },
+  "string_length":    { correct: "length",       usage: '(length "hello")' },
+  "str_concat":       { correct: "str",          usage: '(str "a" "b" "c")' },
+  "str_to_int":       { correct: "str_to_num",   usage: '(str_to_num "42")' },
+  "parse_int":        { correct: "str_to_num",   usage: '(str_to_num "42")' },
+  "int_to_str":       { correct: "num_to_str",   usage: '(num_to_str 42)' },
+  "to_string":        { correct: "str",          usage: '(str value)' },
+  "to_str":           { correct: "str",          usage: '(str value)' },
+  // 타입 체크
+  "is_null":          { correct: "nil?",         usage: '(nil? value)' },
+  "is_nil":           { correct: "nil?",         usage: '(nil? value)' },
+  "null?":            { correct: "nil?",         usage: '(nil? value)' },
+  "is_array":         { correct: "array?",       usage: '(array? value)' },
+  "is_string":        { correct: "string?",      usage: '(string? value)' },
+  "is_number":        { correct: "number?",      usage: '(number? value)' },
+  // 배열
+  "push":             { correct: "append",       usage: '(append arr item)' },
+  "list_append":      { correct: "append",       usage: '(append arr item)' },
+  "array_push":       { correct: "append",       usage: '(append arr item)' },
+  "array_length":     { correct: "length",       usage: '(length arr)' },
+  "first":            { correct: "get",          usage: '(get arr 0)' },
+  "head":             { correct: "get",          usage: '(get arr 0)' },
+  // 출력
+  "console_log":      { correct: "println",      usage: '(println value)' },
+  "console.log":      { correct: "println",      usage: '(println value)' },
+  "print":            { correct: "println",      usage: '(println value)' },
+  "log":              { correct: "println",      usage: '(println value)' },
+  // DB
+  "mariadb_all":      { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  "db_query":         { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  // HTTP
+  "http_post":        { correct: "http_get",     usage: '(http_get url {:method "POST" :body data})' },
+  "fetch":            { correct: "http_get",     usage: '(http_get url)' },
+  // 서버
+  "server_listen":    { correct: "server_start", usage: '(server_start 40000)' },
+  "listen":           { correct: "server_start", usage: '(server_start 40000)' },
+  // 에러
+  "raise":            { correct: "error",        usage: '(error "메시지")' },
+  "panic":            { correct: "error",        usage: '(error "메시지")' },
+};
+
 export function suggestSimilar(name: string, candidates: string[]): string | null {
   let best: string | null = null;
   let bestDist = Infinity;

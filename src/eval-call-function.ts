@@ -5,7 +5,7 @@
 
 import { TypeAnnotation } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
-import { suggestSimilar } from "./error-formatter";
+import { suggestSimilar, KNOWN_ALIASES } from "./error-formatter";
 import { FunctionNotFoundError } from "./errors";
 import { isTailCall } from "./tco";
 import { globalProfiler } from "./profiler";
@@ -146,10 +146,17 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   }
   if (!func) {
     const candidates = [...interp.context.functions.keys()];
-    const similar = suggestSimilar(baseName, candidates);
-    const hint = similar
-      ? `'${baseName}'를 찾을 수 없습니다. 혹시 '${similar}'를 말씀하신 건가요?`
-      : `'${baseName}'를 찾을 수 없습니다. 함수가 정의되어 있는지 확인하세요.`;
+    // AI-First #4: 알려진 aliases 먼저 체크 (정확한 매핑)
+    const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, '_')] ?? KNOWN_ALIASES[baseName.replace(/_/g, '-')];
+    let hint: string;
+    if (alias) {
+      hint = `'${baseName}'는 없습니다. 대신 '${alias.correct}'를 사용하세요.\n  사용법: ${alias.usage}`;
+    } else {
+      const similar = suggestSimilar(baseName, candidates);
+      hint = similar
+        ? `'${baseName}'를 찾을 수 없습니다. 혹시 '${similar}'를 말씀하신 건가요?`
+        : `'${baseName}'를 찾을 수 없습니다. 함수가 정의되어 있는지 확인하세요.`;
+    }
     throw new FunctionNotFoundError(
       baseName,
       interp.currentFilePath,
