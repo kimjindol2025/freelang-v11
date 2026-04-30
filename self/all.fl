@@ -483,7 +483,7 @@
                (r-pair (p-advance $p) (make-template-string $v (list) $line))
                (r-pair (p-advance $p) (make-literal "string" $v $line)))]
             [(= $k "Symbol")
-             (r-pair (p-advance $p) (make-literal "symbol" $v $line))]
+             (r-pair (p-advance $p) {:kind "symbol" :value $v :line $line})]
             [(= $k "Variable")
              (r-pair (p-advance $p) (make-variable $v $line))]
             [(= $k "Keyword")
@@ -514,11 +514,13 @@
           (if (= (length $args) 0)
             (r-pair (parse-consume-rparen $p2) (make-sexpr "" (list) $line))
             (let [[$op-node (get $args 0)]
-                  [$op (if (= (get $op-node :kind) "literal")
+                  [$op (if (= (get $op-node :kind) "symbol")
                          (get $op-node :value)
-                         (if (= (get $op-node :kind) "variable")
-                           (str "$" (get $op-node :name))
-                           "unknown"))]
+                         (if (= (get $op-node :kind) "literal")
+                           (get $op-node :value)
+                           (if (= (get $op-node :kind) "variable")
+                             (str "$" (get $op-node :name))
+                             "unknown")))]
                   [$rest (slice $args 1 (length $args))]]
               (cond
                 [(= $op "try")
@@ -567,8 +569,10 @@
             [(= (get $t :kind) "RBracket")           (r-pair $p $acc)]
             [(= (get $t :kind) "RBrace")             (r-pair $p $acc)]
             [true
-             (let [[$one (parse-expr $p)]]
-               (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+             (let [[$one (parse-expr $p)]
+                   [$node (get $one :node)]
+                   [$new-acc (append $acc $node)]]
+               (parse-args (get $one :p) $new-acc))]))]
 
 ;; ──────────────────────────────────────
 ;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
