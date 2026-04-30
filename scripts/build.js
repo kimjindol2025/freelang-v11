@@ -56,6 +56,7 @@ const nodeBuild = esbuild.build({
   target: "node18",
   outfile: "bootstrap.js",
   loader: { ".json": "json" },
+  external: ["better-sqlite3", "sqlite3"],
   logLevel: "info",
 }).then(() => console.log("bootstrap=built"))
   .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });

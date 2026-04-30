@@ -47,6 +47,8 @@ function _fl_last(l) { return (l && l.length > 0) ? l[l.length - 1] : null; }
 function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
 function _fl_append(l, x) { return [...(l || []), x]; }
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
+function _fl_values(o) { return o ? Object.values(o) : []; }
+function _fl_entries(o) { return o ? Object.entries(o).map(([k,v])=>[k,v]) : []; }
 function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 
@@ -60,6 +62,9 @@ function _fl_trim(s) { return String(s || "").trim(); }
 function _fl_replace(s, a, b) { return String(s || "").split(a).join(b); }
 function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
 function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
+function _fl_join(arr, sep) { return (arr || []).join(sep !== undefined ? sep : ""); }
+function _fl_split(s, sep) { return (s || "").split(sep !== undefined ? sep : ""); }
+function _fl_repeat(s, n) { return (s || "").repeat(n || 0); }
 function _fl_range(a, b, s) { let r = []; let start = b === undefined ? 0 : a; let end = b === undefined ? a : b; let step = s || 1; if (step > 0) { for (let i = start; i < end; i += step) r.push(i); } else { for (let i = start; i > end; i += step) r.push(i); } return r; }
 
 // ─ 고차 함수 (Null-safe & Spread) ─

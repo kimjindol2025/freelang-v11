@@ -295,6 +295,58 @@ function flExecOpNative(op: string, vals: any[]): any {
       const specials = ["if","let","do","begin","fn","and","or","not","null?","match","call","export","define","set!"];
       return specials.includes(sop) ? sop : null;
     }
+    case "import": {
+      const filePath = String(v0 ?? "");
+      const fs = require("fs");
+      const path = require("path");
+      try {
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+        const src = fs.readFileSync(resolvedPath, "utf-8");
+        const { lex } = require("./lexer");
+        const { parse } = require("./parser");
+        const tokens = lex(src, resolvedPath);
+        const ast = parse(tokens);
+        
+        // Track call stack
+        if ((interp as any).callStack) {
+          (interp as any).callStack.push({ fn: `(import "${filePath}")`, line: expr.line });
+        }
+        
+        // Save current variable context
+        const savedVars = interp.context.variables.saveStack();
+        const moduleScope = new Map<string, any>();
+        try {
+          // Empty scope stack for pure module isolation, keeping only global/stdlib if it was at index 0
+          // Wait, just let it use a new push so definitions stay isolated
+          interp.context.variables.push(); 
+          
+          for (const node of ast) {
+            interp.eval(node);
+          }
+          
+          // Get the scope that was just pushed
+          const currentTopScope = (interp.context.variables as any).stack[(interp.context.variables as any).stack.length - 1];
+          for (const [k, v] of currentTopScope) {
+            moduleScope.set(k, v);
+          }
+        } finally {
+          // Restore previous variable scope completely
+          interp.context.variables.restoreStack(savedVars);
+          if ((interp as any).callStack) {
+            (interp as any).callStack.pop();
+          }
+        }
+        
+        // Return a plain object dictionary of exported module bindings
+        const moduleObj: Record<string, any> = {};
+        for (const [k, v] of moduleScope) {
+          moduleObj[k] = v;
+        }
+        return moduleObj;
+      } catch (e: any) {
+        throw new Error(`import failed: '${filePath}': ${e.message}`);
+      }
+    }
     // ── Phase L1: 모듈 시스템 + 파일 I/O ──
     case "load": {
       const filePath = String(v0 ?? "");
@@ -308,9 +360,19 @@ function flExecOpNative(op: string, vals: any[]): any {
         const { parse } = require("./parser");
         const tokens = lex(src, resolvedPath);
         const ast = parse(tokens);
-        // Evaluate each top-level form in current interpreter context
-        for (const node of ast) {
-          interp.eval(node);
+        // Track call stack for module load
+        if ((interp as any).callStack) {
+          (interp as any).callStack.push({ fn: `(load "${filePath}")`, line: expr.line });
+        }
+        try {
+          // Evaluate each top-level form in current interpreter context
+          for (const node of ast) {
+            interp.eval(node);
+          }
+        } finally {
+          if ((interp as any).callStack) {
+            (interp as any).callStack.pop();
+          }
         }
         return null;
       } catch (e: any) {
@@ -1413,6 +1475,18 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     // Type/Utility
     case "typeof":
       return typeof args[0];
+    case "assert-type": {
+      const val = args[0];
+      const typeStr = String(args[1]);
+      let actualType = typeof val;
+      if (Array.isArray(val)) actualType = "array";
+      else if (val === null) actualType = "null";
+      else if (val instanceof Map) actualType = "map";
+      if (actualType !== typeStr) {
+        throw new Error(`Type assertion failed: expected '${typeStr}', got '${actualType}' (value: ${JSON.stringify(val)})`);
+      }
+      return val;
+    }
     case "num":
       return Number(args[0]);
     case "bool":

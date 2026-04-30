@@ -95,6 +95,9 @@ const BUILTIN_MAP: Record<string, string> = {
   "replace": "_fl_replace",
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
+  "join": "_fl_join",
+  "split": "_fl_split",
+  "repeat": "_fl_repeat",
 
   // 맵/객체
   "get": "_fl_get",
@@ -104,6 +107,11 @@ const BUILTIN_MAP: Record<string, string> = {
   "json_stringify": "JSON.stringify",
   "keys": "_fl_keys",
   "json_keys": "_fl_keys",
+  "values": "_fl_values",
+  "entries": "_fl_entries",
+  "map-keys": "_fl_keys",
+  "map-values": "_fl_values",
+  "map-entries": "_fl_entries",
   "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",
   "has-key?": "_fl_has_key_q",
 };
@@ -127,8 +135,11 @@ function flNameToJs(name: string): string {
     return BUILTIN_MAP[name];
   }
 
+  // $ 접두사 제거 (FL 변수 관습)
+  const cleanName = name.replace(/^\$/, "");
+
   // 일반 심볼 인코딩: 특수문자 → 안전한 이름
-  const encoded = name
+  const encoded = cleanName
     .replace(/\?$/g, "_q")      // 끝의 ? → _q
     .replace(/!/g, "_bang")     // ! → _bang
     .replace(/>/g, "_gt")       // > → _gt
@@ -301,7 +312,41 @@ export class JSCodegen {
     if (op === "or") return "(" + args.map(a => this.genNode(a)).join(" || ") + ")";
     if (op === "cond") return this.genCond(args);
     if (op === "while") return this.genWhile(args);
-    if (op === "loop") return this.genLoop(args);
+    if (op === "recur") {
+      const argStrs = args.map(a => this.genNode(a));
+      return `{ __recur: true, a: [${argStrs.join(", ")}] }`;
+    }
+
+    if (op === "loop") {
+      const bindingsArg = args[0];
+      const bodyExprs = args.slice(1);
+      let items: ASTNode[] = [];
+      if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
+        items = (bindingsArg as Block).fields.get("items") as any || [];
+      }
+
+      const inits: string[] = [];
+      const names: string[] = [];
+      for (let i = 0; i < items.length; i += 2) {
+        const name = this.extractVarName(items[i]);
+        const val = this.genNode(items[i+1]);
+        inits.push(`let ${name} = ${val};`);
+        names.push(name);
+      }
+
+      const bodyCode = bodyExprs.map(e => this.genNode(e)).join("; ");
+      return `(() => {
+        ${inits.join(" ")}
+        while (true) {
+          const __r = (() => { return ${bodyCode}; })();
+          if (__r && __r.__recur) {
+            [${names.join(", ")}] = __r.a;
+            continue;
+          }
+          return __r;
+        }
+      })()`;
+    }
 
     if (op in BINARY_OPS && args.length === 2) {
       const left = this.genNode(args[0]);
