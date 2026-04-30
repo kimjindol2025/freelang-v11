@@ -18,30 +18,13 @@ OUTPUT_FILE="$DIST_DIR/stage1-new.js"
 echo "1️⃣ Compiling runtime-helpers.ts..."
 npx tsc --outDir "$DIST_DIR" --declaration --module commonjs "$SELF_DIR/runtime-helpers.ts" 2>&1 | head -20
 
-# Step 2: stage1 프리앰블 생성 (자동)
-echo "2️⃣ Generating stage1 preamble..."
-cat > "$DIST_DIR/stage1-preamble.js" << 'PREAMBLE'
-// Auto-generated preamble for stage1.js (2026-04-29)
-// Contains runtime helpers for self-hosting
+# Step 2: self/all.fl 컴파일 (bootstrap.js 사용)
+echo "2️⃣ Compiling self/all.fl using bootstrap.js..."
+node bootstrap.js compile "$SELF_DIR/all.fl" -o "$DIST_DIR/compiled-all.js"
 
-const RUNTIME_HELPERS = require('./runtime-helpers.js').default;
-const codegen = (ast) => {
-  // Placeholder: actual codegen from src/codegen.ts
-  return 'placeholder';
-};
-
-module.exports = { RUNTIME_HELPERS, codegen };
-PREAMBLE
-
-# Step 3: esbuild 번들링
-echo "3️⃣ Bundling with esbuild..."
-npx esbuild \
-  "$DIST_DIR/stage1-preamble.js" \
-  --bundle \
-  --platform=node \
-  --target=node18 \
-  --outfile="$OUTPUT_FILE" \
-  2>&1 | head -10
+# Step 3: 모든 구성요소 연결
+echo "3️⃣ Concatenating prelude, runtime helpers, and compiled all.js..."
+cat "$SELF_DIR/prelude.js" "$DIST_DIR/runtime-helpers.js" "$DIST_DIR/compiled-all.js" > "$OUTPUT_FILE"
 
 # Step 4: SHA256 비교
 echo "4️⃣ Verifying SHA256..."

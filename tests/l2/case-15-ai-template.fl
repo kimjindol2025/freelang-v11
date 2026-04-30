@@ -19,5 +19,4 @@
         "User: {user}"
         {:user "Alice"}))))
 
-)
 (test-ai-template)

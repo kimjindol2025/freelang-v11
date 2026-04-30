@@ -4,7 +4,7 @@
 (defn sum-n [n]
   (loop [i 0 acc 0]
     (if (>= i n) acc
-      (loop (+ i 1) (+ acc i)))))
+      (recur (+ i 1) (+ acc i)))))
 
 (defn test-loops []
   (println

@@ -308,9 +308,19 @@ function flExecOpNative(op: string, vals: any[]): any {
         const { parse } = require("./parser");
         const tokens = lex(src, resolvedPath);
         const ast = parse(tokens);
-        // Evaluate each top-level form in current interpreter context
-        for (const node of ast) {
-          interp.eval(node);
+        // Track call stack for module load
+        if ((interp as any).callStack) {
+          (interp as any).callStack.push({ fn: `(load "${filePath}")`, line: expr.line });
+        }
+        try {
+          // Evaluate each top-level form in current interpreter context
+          for (const node of ast) {
+            interp.eval(node);
+          }
+        } finally {
+          if ((interp as any).callStack) {
+            (interp as any).callStack.pop();
+          }
         }
         return null;
       } catch (e: any) {
@@ -557,6 +567,7 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
 
   switch (op) {
     // Phase L1: Module system
+
     case "load": {
       const filePath = String(args[0] ?? "");
       const fs = require("fs");
@@ -1413,6 +1424,18 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     // Type/Utility
     case "typeof":
       return typeof args[0];
+    case "assert-type": {
+      const val = args[0];
+      const typeStr = String(args[1]);
+      let actualType = typeof val;
+      if (Array.isArray(val)) actualType = "array";
+      else if (val === null) actualType = "null";
+      else if (val instanceof Map) actualType = "map";
+      if (actualType !== typeStr) {
+        throw new Error(`Type assertion failed: expected '${typeStr}', got '${actualType}' (value: ${JSON.stringify(val)})`);
+      }
+      return val;
+    }
     case "num":
       return Number(args[0]);
     case "bool":

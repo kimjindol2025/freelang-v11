@@ -153,7 +153,7 @@ export function evalImportBlock(interp: Interpreter, importBlock: ImportBlock): 
   }
 
   // Phase 52: FL 파일에서 함수를 가져와 현재 context에 등록
-export function evalImportFromFile(interp: Interpreter, relPath: string, prefix: string, selective: string[] | undefined, alias: string | undefined): void {
+  export function evalImportFromFile(interp: Interpreter, relPath: string, prefix: string, selective: string[] | undefined, alias: string | undefined): void {
     // Path resolution rules:
     // 1. Starts with "./" "../" "/": relative to importing file's directory (baseDir)
     // 2. Bare (e.g. "stdlib/web/metadata"): project root first, then baseDir fallback
@@ -205,8 +205,11 @@ export function evalImportFromFile(interp: Interpreter, relPath: string, prefix:
     subInterp.currentFilePath = absPath;
     subInterp.importedFiles = interp.importedFiles; // 순환 방지 공유
 
-    // stdlib 로드 전 함수 목록 스냅샷 (내장 함수 제외용)
+    // stdlib 로드 전 함수 목록 스냅샷 (내장  함수 제외용)
     const builtinFuncs = new Set<string>(subInterp.context.functions.keys());
+
+    // We also want to capture the initial variables, but normally they are none.
+
     subInterp.interpret(parse(lex(src)));
     if (process.env.FL_IMPORT_DEBUG === "1") {
       const userDefined: string[] = [];
@@ -216,7 +219,7 @@ export function evalImportFromFile(interp: Interpreter, relPath: string, prefix:
       console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
     }
 
-    // 사용자 정의 함수만 추출 (stdlib 내장 제외)
+    // 사용자 정의 함수 추출 (stdlib 내장 제외)
     const effectivePrefix = alias ?? prefix;
     for (const [funcName, func] of subInterp.context.functions) {
       if (builtinFuncs.has(funcName)) continue; // 내장 함수 skip
@@ -230,6 +233,19 @@ export function evalImportFromFile(interp: Interpreter, relPath: string, prefix:
         // prefix:funcName 형식으로 등록
         interp.context.functions.set(`${effectivePrefix}:${funcName}`, func);
       }
+    }
+
+    // 모듈 변수 추출: get top-level bindings from subInterp's global scope
+    const globalVars = subInterp.context.variables.snapshot();
+    for (const [varName, varVal] of globalVars) {
+        if (selective && selective.length > 0) {
+            if (selective.includes(varName)) {
+                interp.context.variables.setGlobal(varName, varVal);
+            }
+        } else {
+            // Register as prefix:varName
+            interp.context.variables.setGlobal(`${effectivePrefix}:${varName}`, varVal);
+        }
     }
   }
 

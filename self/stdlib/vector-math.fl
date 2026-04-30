@@ -1,0 +1,52 @@
+;; Vector Math Functions (Phase C-9)
+;; vector-add, vector-dot, vector-magnitude, math-sqrt
+
+[FUNC vector-add :params [$v1 $v2]
+  :body (map (fn [$i]
+    (+ (get $v1 $i) (get $v2 $i)))
+    (range 0 (length $v1)))]
+
+[FUNC vector-dot :params [$v1 $v2]
+  :body (reduce (fn [$acc $i]
+    (+ $acc (* (get $v1 $i) (get $v2 $i))))
+    0
+    (range 0 (length $v1)))]
+
+[FUNC vector-magnitude :params [$v]
+  :body (math-sqrt
+    (reduce (fn [$acc $x]
+      (+ $acc (* $x $x)))
+      0
+      $v))]
+
+[FUNC math-sqrt :params [$n]
+  :body (if (< $n 0)
+    (error "sqrt of negative number")
+    (let [[$x (/ $n 2)]]
+      (if (= $x 0)
+        0
+        (let [[$next (/ (+ $x (/ $n $x)) 2)]]
+          (if (< (- $x $next) 0.0001)
+            $next
+            (math-sqrt-iter $n $next))))))]
+
+[FUNC math-sqrt-iter :params [$n $guess]
+  :body (let [[$next (/ (+ $guess (/ $n $guess)) 2)]]
+          (if (< (- $guess $next) 0.0001)
+            $next
+            (math-sqrt-iter $n $next)))]
+
+[FUNC math-pow :params [$base $exp]
+  :body (if (= $exp 0)
+    1
+    (if (< $exp 0)
+      (/ 1 (math-pow $base (- 0 $exp)))
+      (* $base (math-pow $base (- $exp 1)))))]
+
+[FUNC cosine-sim :params [$v1 $v2]
+  :body (let [[$dot (vector-dot $v1 $v2)]
+              [$mag1 (vector-magnitude $v1)]
+              [$mag2 (vector-magnitude $v2)]]
+    (if (or (= $mag1 0) (= $mag2 0))
+      0
+      (/ $dot (* $mag1 $mag2))))]

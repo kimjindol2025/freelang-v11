@@ -8,7 +8,6 @@
     (println
       (list
         (length (filter is-even arr))  ; 2
-        (length arr)))  ; 5
-)
+        (length arr)))))  ; 5
 
 (test-hof)

@@ -10,7 +10,7 @@ const KEYWORDS: Map<string, T> = new Map([
   ["MODULE", T.Module],
   ["TYPECLASS", T.TypeClass],
   ["INSTANCE", T.Instance],
-  ["import", T.Import],
+  // import는 일반 함수로 처리 (파서 등록 불필요)
   ["open", T.Open],
   // Phase 9a: Search functionality keywords
   ["search", T.Search],
@@ -258,10 +258,15 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    // Number: digits with optional decimal
-    if (/\d/.test(ch)) {
+    // Number: digits with optional decimal (Phase 11: Added negative number support)
+    if (/\d/.test(ch) || (ch === "-" && i + 1 < source.length && /\d/.test(source[i+1]))) {
       const start = i;
       const startCol = col;
+
+      if (ch === "-") {
+        i++;
+        col++;
+      }
 
       while (i < source.length && /[\d.]/.test(source[i])) {
         i++;

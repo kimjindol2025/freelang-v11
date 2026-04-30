@@ -2,6 +2,7 @@
 // Phase 20: kimdb REST API + SQLite CLI driver
 
 import { spawnSync } from "child_process";
+import Database from "better-sqlite3";
 
 // ── kimdb helper ─────────────────────────────────────────────────────────────
 
@@ -26,35 +27,13 @@ function kimdbReq(method: string, path: string, body?: any): any {
 
 // ── SQLite helper ─────────────────────────────────────────────────────────────
 
-function sqliteExec(dbPath: string, sql: string): string {
-  const r = spawnSync("sqlite3", [dbPath, sql], { timeout: 10000, encoding: "utf-8" });
-  if (r.error) throw new Error(`sqlite3 error: ${r.error.message}`);
-  if ((r.status ?? 1) !== 0) {
-    const stderr = r.stderr?.trim() ?? "";
-    throw new Error(`sqlite3 exit ${r.status}${stderr ? ": " + stderr : ""}`);
-  }
-  return r.stdout?.trim() ?? "";
-}
+const dbConnections = new Map<string, Database.Database>();
 
-function sqliteJson(dbPath: string, sql: string): any[] {
-  const r = spawnSync("sqlite3", ["-json", dbPath, sql], { timeout: 10000, encoding: "utf-8" });
-  if (r.error) throw new Error(`sqlite3 error: ${r.error.message}`);
-  if ((r.status ?? 1) !== 0) {
-    const stderr = r.stderr?.trim() ?? "";
-    throw new Error(`sqlite3 exit ${r.status}${stderr ? ": " + stderr : ""}`);
+function getDb(dbPath: string): Database.Database {
+  if (!dbConnections.has(dbPath)) {
+    dbConnections.set(dbPath, new Database(dbPath));
   }
-  const raw = r.stdout?.trim() ?? "";
-  if (!raw) return [];
-  try { return JSON.parse(raw); } catch { return []; }
-}
-
-// Bind positional ? params (basic escaping — for simple string/number values)
-function bindParams(sql: string, params: any[]): string {
-  return params.reduce(
-    (s: string, p: any) =>
-      s.replace("?", typeof p === "number" ? String(p) : `'${String(p).replace(/'/g, "''")}'`),
-    sql
-  );
+  return dbConnections.get(dbPath)!;
 }
 
 // ── Module ───────────────────────────────────────────────────────────────────
@@ -114,55 +93,74 @@ export function createDbModule() {
 
     // db_query dbPath sql params -> rows (JSON array)
     "db_query": (dbPath: string, sql: string, params: any[] = []): any[] => {
-      return sqliteJson(dbPath, bindParams(sql, params));
+      const db = getDb(dbPath);
+      return db.prepare(sql).all(params);
     },
 
     // db_exec dbPath sql [params] -> stdout string
     "db_exec": (dbPath: string, sql: string, params: any[] = []): string => {
-      return sqliteExec(dbPath, params.length > 0 ? bindParams(sql, params) : sql);
+      const db = getDb(dbPath);
+      db.prepare(sql).run(params);
+      return "";
     },
 
     // db_insert dbPath table data -> true
     "db_insert": (dbPath: string, table: string, data: Record<string, any>): boolean => {
+      const db = getDb(dbPath);
       const keys = Object.keys(data);
-      const vals = Object.values(data).map(v =>
-        typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`
-      );
-      sqliteExec(dbPath, `INSERT INTO ${table} (${keys.join(",")}) VALUES (${vals.join(",")});`);
+      const placeholders = keys.map(() => '?').join(',');
+      const vals = Object.values(data);
+      db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${placeholders})`).run(vals);
       return true;
     },
 
     // db_update dbPath table data where -> true
     "db_update": (dbPath: string, table: string, data: Record<string, any>, where: string): boolean => {
-      const sets = Object.entries(data).map(([k, v]) =>
-        `${k}=${typeof v === "number" ? v : `'${String(v).replace(/'/g, "''")}'`}`
-      ).join(", ");
-      sqliteExec(dbPath, `UPDATE ${table} SET ${sets} WHERE ${where};`);
+      const db = getDb(dbPath);
+      const keys = Object.keys(data);
+      const sets = keys.map(k => `${k}=?`).join(", ");
+      const vals = Object.values(data);
+      // Assuming 'where' doesn't need parameter binding for this simple helper, though it's a risk.
+      // Better way would be to support where params, but keeping it compatible with existing sig.
+      db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(vals);
       return true;
     },
 
     // db_delete_row dbPath table where -> true
     "db_delete_row": (dbPath: string, table: string, where: string): boolean => {
-      sqliteExec(dbPath, `DELETE FROM ${table} WHERE ${where};`);
+      const db = getDb(dbPath);
+      db.prepare(`DELETE FROM ${table} WHERE ${where}`).run();
       return true;
     },
 
     // db_count dbPath table -> number
     "db_count": (dbPath: string, table: string): number => {
-      const rows = sqliteJson(dbPath, `SELECT COUNT(*) as cnt FROM ${table}`);
-      return Number(rows[0]?.cnt ?? 0);
+      const db = getDb(dbPath);
+      const row = db.prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get() as {cnt: number};
+      return Number(row?.cnt ?? 0);
     },
 
     // db_tables dbPath -> string[]
     "db_tables": (dbPath: string): string[] => {
-      const rows = sqliteJson(dbPath, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
-      return rows.map((r: any) => r.name);
+      const db = getDb(dbPath);
+      const rows = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as {name: string}[];
+      return rows.map(r => r.name);
     },
 
     // db_create dbPath sql -> true  (CREATE TABLE ...)
     "db_create": (dbPath: string, sql: string): boolean => {
-      sqliteExec(dbPath, sql);
+      const db = getDb(dbPath);
+      db.exec(sql); // exec can run multiple statements
       return true;
     },
+    
+    // db_close dbPath -> true
+    "db_close": (dbPath: string): boolean => {
+      if (dbConnections.has(dbPath)) {
+        dbConnections.get(dbPath)!.close();
+        dbConnections.delete(dbPath);
+      }
+      return true;
+    }
   };
 }

@@ -1584,6 +1584,16 @@ switch (cmd) {
     cmdServe(args.slice(1));
     break;
   }
+  case "version":
+  case "-v":
+  case "--version":
+    console.log("FreeLang v11.1.0");
+    break;
+  case "help":
+  case "-h":
+  case "--help":
+    printUsage();
+    break;
   default:
     printUsage();
     if (cmd) {

@@ -1,0 +1,3 @@
+(server_get "/" "index")
+(defn index [req] "Hello from Self-Hosted FreeLang!")
+(server_start 40040)

@@ -9,7 +9,6 @@
         (get arr 0)           ; 1
         (get m :x)            ; 10
         (length arr)          ; 3
-        (length (keys m)))  ; 2
-)
+        (length (keys m))))))  ; 2
 
 (test-collections)

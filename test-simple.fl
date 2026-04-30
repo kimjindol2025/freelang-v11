@@ -1,5 +1,1 @@
-(defn add [a b]
-  (+ a b))
-
-(defn main []
-  (add 2 3))
+(println (str "Hello " (- 10 1)))

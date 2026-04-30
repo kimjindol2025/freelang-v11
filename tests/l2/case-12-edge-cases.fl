@@ -9,7 +9,6 @@
       (get [] 0)           ; null
       (get {} :x)          ; null
       (length [])          ; 0
-      (length ""))       ; 0
-)
+      (length ""))))       ; 0
 
 (test-edges)

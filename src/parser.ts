@@ -728,9 +728,8 @@ export class Parser {
     // Phase 6: Handle import/open keyword tokens
     // Phase 9a: Handle search keyword token
     // Phase 9b: Handle learn/recall keyword tokens
-    if (opToken.type === T.Import) {
-      op = "import";
-    } else if (opToken.type === T.Open) {
+    // NOTE: import는 이제 Symbol로 처리되므로 T.Import 체크 제거
+    if (opToken.type === T.Open) {
       op = "open";
     } else if (opToken.type === T.Search) {
       op = "search";
@@ -791,7 +790,8 @@ export class Parser {
       op = opToken.value;
     }
 
-    // Special case: import expressions
+    // Special case: import expressions (Module System only - with :from clause)
+    // NOTE: import now parses module name next, then optionally :from etc.
     if (op === "import") {
       const importBlock = this.parseImportExpression();
       this.expect(T.RParen);
