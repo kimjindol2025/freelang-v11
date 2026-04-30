@@ -23535,10 +23535,13 @@ function sqliteJson2(dbPath, sql) {
   }
 }
 function bindParams(sql, params) {
-  return params.reduce(
-    (s, p) => s.replace("?", typeof p === "number" ? String(p) : `'${String(p).replace(/'/g, "''")}'`),
-    sql
-  );
+  const parts = sql.split("?");
+  return parts.map((part, i) => {
+    if (i >= params.length) return part;
+    const p = params[i];
+    const val = typeof p === "number" ? String(p) : `'${String(p).replace(/'/g, "''")}'`;
+    return part + val;
+  }).join("");
 }
 function createDbModule() {
   return {

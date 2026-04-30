@@ -536,7 +536,8 @@
                    (if (null? $loop-array)
                      (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
                      (if (not (= (get $loop-array :kind) "array"))
-                       (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
+                       ;; 새 형식 (loop/recur): [k v ...] 블록 — sexpr로 전달
+                       (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" $rest $line))
                        (let [[$items (get $loop-array :items)]
                              [$init (if (> (length $items) 0) (get $items 0) null)]
                              [$condition (if (> (length $items) 1) (get $items 1) null)]
@@ -1407,6 +1408,7 @@
             [(= $op "lower") (str "_fl_lower(" $as ")")]
             [(= $op "repeat") (str "_fl_repeat(" $as ")")]
             [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+            [(= $op "str-index-of") (str "_fl_index_of(" $as ")")]
 
             ;; ─── List (15) ───
             [(= $op "first") (str "_fl_first(" $as ")")]
@@ -1521,6 +1523,7 @@
             [(= $op "lower") (str "_fl_lower(" $as ")")]
             [(= $op "repeat") (str "_fl_repeat(" $as ")")]
             [(= $op "index-of") (str "_fl_index_of(" $as ")")]
+            [(= $op "str-index-of") (str "_fl_index_of(" $as ")")]
 
             ;; ─── List 추가 (map, filter, reduce, find, every?, some?, sort, reverse, flatten, distinct, range, take, drop, count) ───
             [(= $op "map") (str "_fl_map(" $as ")")]
@@ -1691,7 +1694,7 @@
     "const _fl_empty_q = (x) => (x==null || x.length===0);"
     "const _fl_nil_q = (x) => (x == null || x === undefined);"
     "const _fl_nil_or_empty_q = (x) => (x == null || x === undefined || (x && x.length === 0));"
-    "const __argv__ = () => process.argv.slice(2);")]
+    "const __argv__ = (typeof process !== 'undefined') ? process.argv.slice(2) : [];")]
 
 [FUNC prelude-db-server :params []
   :body (str
@@ -1739,9 +1742,7 @@
               [$ast    (parse $tokens)]
               [$js     (fl->js-with-prelude $ast)]]
           (do
-            (println (str "DEBUG: read src len=" (length $src)))
-            (println (str "DEBUG: tokens count=" (length $tokens)))
-            (println (str "DEBUG: ast nodes=" (length $ast)))
+            (println (str "Parsed: " (length $ast) " nodes"))
             (file_write $output $js)
             (println (str "compiled " $input " -> " $output " size=" (length $js)))))]
 
@@ -1798,14 +1799,6 @@
   :body (if (>= $i (length $lines)) $acc
           (csv-parse-loop $lines (+ $i 1)
             (append $acc (csv-parse-line (get $lines $i)))))]
-
-;; 문자열 반복
-[FUNC str-repeat :params [$s $n]
-  :body (if (<= $n 0) ""
-          (str-repeat-loop $s $n 0 ""))]
-[FUNC str-repeat-loop :params [$s $n $i $acc]
-  :body (if (>= $i $n) $acc
-          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
 
 ;; JSON 헬퍼 (json.fl 기반)
 [FUNC data-json-parse :params [$s]
@@ -1990,11 +1983,15 @@
 (if (nil? $__argv__) null
   (if (= (length $__argv__) 0) null
     (let [[$cmd (get $__argv__ 0)]]
-      (if (= $cmd "run")
+      (if (= $cmd "compile")
         (let [[$input (get $__argv__ 1)]
-              [$output (if (>= (length $__argv__) 3) (get $__argv__ 2) (str $input ".out.js"))]]
+              [$output (if (>= (length $__argv__) 4) (get $__argv__ 3) (str $input ".out.js"))]]
           (compile-file $input $output))
-        (let [[$input (get $__argv__ 0)]
-              [$output (if (>= (length $__argv__) 2) (get $__argv__ 1) (str $input ".out.js"))]]
-          (compile-file $input $output))))))
+        (if (= $cmd "run")
+          (let [[$input (get $__argv__ 1)]
+                [$output (if (>= (length $__argv__) 3) (get $__argv__ 2) (str $input ".out.js"))]]
+            (compile-file $input $output))
+          (let [[$input (get $__argv__ 0)]
+                [$output (if (>= (length $__argv__) 2) (get $__argv__ 1) (str $input ".out.js"))]]
+            (compile-file $input $output)))))))
 
