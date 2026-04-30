@@ -460,7 +460,7 @@
   :body {:tokens (get $p :tokens) :idx (get $p :idx) :ast $ast}]
 
 [FUNC p-append-ast :params [$p $node]
-  :body (p-with-ast $p (append (get $p :ast) (list $node)))]
+  :body (p-with-ast $p (append (get $p :ast) $node))]
 
 ;; 2-tuple 반환용 map {:p p' :node n}
 [FUNC r-pair :params [$p $node]
@@ -568,7 +568,7 @@
             [(= (get $t :kind) "RBrace")             (r-pair $p $acc)]
             [true
              (let [[$one (parse-expr $p)]]
-               (parse-args (get $one :p) (append $acc (list (get $one :node)))))]))]
+               (parse-args (get $one :p) (append $acc (get $one :node))))]))]
 
 ;; ──────────────────────────────────────
 ;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
@@ -746,7 +746,7 @@
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
           [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
           [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
-          [true "null"])]
+          [true "null"]) ]
 
 [FUNC js-esc-for-template :params [$s]
   :body (let [[$s1 (replace $s "\\" "\\\\")]]
@@ -1975,7 +1975,7 @@
   :body (let [[$idx (str-index-of $s $old)]]
           (if (= $idx -1)
             $s
-            (str (str-slice $s 0 $idx) $new (str-slice $s (+ $idx (length $old)) (length $s))))))]
+            (str (str-slice $s 0 $idx) $new (str-slice $s (+ $idx (length $old)) (length $s)))))]
 
 ;; self/stdlib/file.fl — Phase 27
 ;; 파일 I/O 연산 (native file_* builtin wrapper)
@@ -2136,18 +2136,66 @@
       (/ $dot (* $mag1 $mag2))))]
 
 
+[FUNC parse-options :params [$argv]
+  :body (parse-options-loop $argv 0 [] {})]
+
+[FUNC parse-options-loop :params [$argv $idx $args $opts]
+  :body (if (>= $idx (length $argv))
+          {:args $args :opts $opts}
+          (let [[$arg (get $argv $idx)]]
+            (cond
+              [(or (= $arg "-o") (= $arg "--output"))
+               (parse-options-loop $argv (+ $idx 2) $args (map-set $opts "output" (get $argv (+ $idx 1))))]
+              [(str-starts-with? $arg "--")
+               (parse-options-loop $argv (+ $idx 1) $args (map-set $opts (substring $arg 2 (length $arg)) true))]
+              [(str-starts-with? $arg "-")
+               (parse-options-loop $argv (+ $idx 1) $args (map-set $opts (substring $arg 1 (length $arg)) true))]
+              [true
+               (parse-options-loop $argv (+ $idx 1) (append $args $arg) $opts)])))]
+
+[FUNC print-usage :params []
+  :body (println (str
+    "\nFreeLang v11.2 (Self-hosted Compiler)\n\n"
+    "Usage:\n"
+    "  fl compile <input.fl> [-o <output.js>] [--runtime]\n"
+    "  fl version\n"
+    "  fl help\n\n"
+    "Options:\n"
+    "  -o, --output <file>  Specify output file\n"
+    "  --runtime           Include runtime helpers in output\n"
+    "  -h, --help          Show this help message\n"))]
+
+[FUNC do-compile :params [$args $opts]
+  :body (let [[$input (first $args)]
+              [$output (get $opts "output")]]
+          (if (null? $input)
+            (print-usage)
+            (let [[$final-out (if (null? $output) (str $input ".out.js") $output)]]
+              (compile-file $input $final-out $opts))))]
+
+[FUNC compile-file :params [$input $output $opts]
+  :body (let [[$src    (file_read $input)]
+              [$tokens (lex $src)]
+              [$ast    (parse $tokens)]
+              [$with-rt (get $opts "runtime")]
+              [$js     (if $with-rt (fl->js-with-prelude $ast) (fl->js-code $ast))]]
+          (do
+            (file_write $output $js)
+            (println (str "✓ Compiled " $input " -> " $output))))]
+
 [FUNC cli-main :params []
   :body (let [[$argv (cli-args)]]
-          (if (null? $argv) null
-            (if (= (length $argv) 0) null
-              (let [[$cmd (get $argv 0)]]
-                (if (= $cmd "run")
-                  (let [[$input (get $argv 1)]
-                        [$output (if (>= (length $argv) 3) (get $argv 2) (str $input ".out.js"))]]
-                    (compile-file $input $output))
-                  (let [[$input (get $argv 0)]
-                        [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
-                    (compile-file $input $output)))))))]
+          (if (or (null? $argv) (= (length $argv) 0))
+            (print-usage)
+            (let [[$parsed (parse-options $argv)]
+                  [$cmd (first (get $parsed :args))]
+                  [$opts (get $parsed :opts)]
+                  [$remaining (rest (get $parsed :args))]]
+              (cond
+                [(or (= $cmd "help") (get $opts "help") (get $opts "h")) (print-usage)]
+                [(= $cmd "version") (println "FreeLang v11.2-RC1 (Self-hosted)")]
+                [(= $cmd "compile") (do-compile $remaining $opts)]
+                [true (do-compile (get $parsed :args) $opts)]))))]
 
 ;; Entry point trigger
 (cli-main)

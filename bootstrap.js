@@ -25077,6 +25077,7 @@ function _fl_substring(s, a, b) { return s ? (b === undefined ? s.slice(a) : s.s
 function _fl_lower(s) { return String(s || "").toLowerCase(); }
 function _fl_upper(s) { return String(s || "").toUpperCase(); }
 function _fl_trim(s) { return String(s || "").trim(); }
+function _fl_replace(s, a, b) { return String(s || "").split(a).join(b); }
 function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
 function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
 function _fl_range(a, b, s) { let r = []; let start = b === undefined ? 0 : a; let end = b === undefined ? a : b; let step = s || 1; if (step > 0) { for (let i = start; i < end; i += step) r.push(i); } else { for (let i = start; i > end; i += step) r.push(i); } return r; }
@@ -25188,10 +25189,15 @@ var BUILTIN_MAP = {
   "lower": "_fl_lower",
   "str-lower": "_fl_lower",
   "trim": "_fl_trim",
+  "replace": "_fl_replace",
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
   // 맵/객체
   "get": "_fl_get",
+  "json-parse": "JSON.parse",
+  "json-stringify": "JSON.stringify",
+  "json_parse": "JSON.parse",
+  "json_stringify": "JSON.stringify",
   "keys": "_fl_keys",
   "json_keys": "_fl_keys",
   "map-set": "_fl_map_set",

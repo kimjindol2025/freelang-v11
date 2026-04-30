@@ -92,12 +92,16 @@ const BUILTIN_MAP: Record<string, string> = {
   "lower": "_fl_lower",
   "str-lower": "_fl_lower",
   "trim": "_fl_trim",
-
+  "replace": "_fl_replace",
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
 
   // 맵/객체
   "get": "_fl_get",
+  "json-parse": "JSON.parse",
+  "json-stringify": "JSON.stringify",
+  "json_parse": "JSON.parse",
+  "json_stringify": "JSON.stringify",
   "keys": "_fl_keys",
   "json_keys": "_fl_keys",
   "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",

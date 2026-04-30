@@ -52,7 +52,10 @@ function _fl_substring(s, a, b) { return s ? (b === undefined ? s.slice(a) : s.s
 function _fl_lower(s) { return String(s || "").toLowerCase(); }
 function _fl_upper(s) { return String(s || "").toUpperCase(); }
 function _fl_trim(s) { return String(s || "").trim(); }
+function _fl_replace(s, a, b) { return String(s || "").split(a).join(b); }
 function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
+function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
+function _fl_range(a, b, s) { let r = []; let start = b === undefined ? 0 : a; let end = b === undefined ? a : b; let step = s || 1; if (step > 0) { for (let i = start; i < end; i += step) r.push(i); } else { for (let i = start; i > end; i += step) r.push(i); } return r; }
 
 // ─ 고차 함수 (Null-safe & Spread) ─
 function _fl_map(arr, fn) { return (arr || []).map(x => fn(x)); }
@@ -84,6 +87,11 @@ function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 let __argv__ = _fl_get_argv();
 
 // ═══════════════════════════════════════════════════════
+
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
 
 function _fl_is_digit_q(c) { return (_fl_null_q(c) ? false : ((c >= "0") && (c <= "9"))); }
 function _fl_is_alpha_q(c) { return (_fl_null_q(c) ? false : (((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z")))); }
@@ -164,14 +172,14 @@ function p_peek_at(p, offset) { return (() => { let i = (_fl_get(p, "idx") + off
 function p_end_q(p) { return (_fl_get(p, "idx") >= _fl_length(_fl_get(p, "tokens"))); }
 function p_advance(p) { return { tokens: _fl_get(p, "tokens"), idx: (_fl_get(p, "idx") + 1), ast: _fl_get(p, "ast") }; }
 function p_with_ast(p, ast) { return { tokens: _fl_get(p, "tokens"), idx: _fl_get(p, "idx"), ast: ast }; }
-function p_append_ast(p, node) { return p_with_ast(p, _fl_append(_fl_get(p, "ast"), [node])); }
+function p_append_ast(p, node) { return p_with_ast(p, _fl_append(_fl_get(p, "ast"), node)); }
 function r_pair(p, node) { return { p: p, node: node }; }
 function string_contains_q(s, substr) { return (!(-1 === _fl_str_index_of(s, substr))); }
 function parse_atom(p) { return (() => { let t = p_peek(p); let k = _fl_get(t, "kind"); let v = _fl_get(t, "value"); let line = _fl_get(t, "line"); return ((k === "Number") ? r_pair(p_advance(p), make_literal("number", v, line)) : ((k === "String") ? (string_contains_q(v, _fl_str("$", "{")) ? r_pair(p_advance(p), make_template_string(v, [], line)) : r_pair(p_advance(p), make_literal("string", v, line))) : ((k === "Symbol") ? r_pair(p_advance(p), make_literal("symbol", v, line)) : ((k === "Variable") ? r_pair(p_advance(p), make_variable(v, line)) : ((k === "Keyword") ? r_pair(p_advance(p), make_keyword(v, line)) : (true ? r_pair(p_advance(p), make_literal("unknown", v, line)) : null)))))); })(); }
 function parse_expr(p) { return (() => { let t = p_peek(p); let k = _fl_get(t, "kind"); return ((k === "LParen") ? parse_sexpr(p) : ((k === "LBracket") ? parse_bracket(p) : ((k === "LBrace") ? parse_map(p) : (true ? parse_atom(p) : null)))); })(); }
 function parse_sexpr(p) { return (() => { let start_tok = p_peek(p); let line = _fl_get(start_tok, "line"); let p1 = p_advance(p); let _fl_first = parse_args(p1, []); let p2 = _fl_get(_fl_first, "p"); let args = _fl_get(_fl_first, "node"); return ((_fl_length(args) === 0) ? r_pair(parse_consume_rparen(p2), make_sexpr("", [], line)) : (() => { let op_node = _fl_get(args, 0); let op = ((_fl_get(op_node, "kind") === "literal") ? _fl_get(op_node, "value") : ((_fl_get(op_node, "kind") === "variable") ? _fl_str("$", _fl_get(op_node, "name")) : "unknown")); let _fl_rest = _fl_slice(args, 1, _fl_length(args)); return ((op === "try") ? (() => { let body = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let catch_clause = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); let finally_clause = ((_fl_length(_fl_rest) > 2) ? _fl_get(_fl_rest, 2) : null); return r_pair(parse_consume_rparen(p2), make_try(body, catch_clause, finally_clause, line)); })() : ((op === "loop") ? (() => { let loop_array = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let body_start = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); return (_fl_null_q(loop_array) ? r_pair(parse_consume_rparen(p2), make_sexpr("loop", [], line)) : ((!(_fl_get(loop_array, "kind") === "array")) ? r_pair(parse_consume_rparen(p2), make_sexpr("loop", [], line)) : (() => { let items = _fl_get(loop_array, "items"); let init = ((_fl_length(items) > 0) ? _fl_get(items, 0) : null); let condition = ((_fl_length(items) > 1) ? _fl_get(items, 1) : null); let update = ((_fl_length(items) > 2) ? _fl_get(items, 2) : null); let body_exprs = _fl_slice(_fl_rest, 1, _fl_length(_fl_rest)); return r_pair(parse_consume_rparen(p2), make_loop(init, condition, update, ((_fl_length(body_exprs) === 1) ? _fl_get(body_exprs, 0) : make_sexpr("do", body_exprs, line)), line)); })())); })() : (true ? r_pair(parse_consume_rparen(p2), make_sexpr(op, _fl_rest, line)) : null))); })()); })(); }
 function parse_consume_rparen(p) { return (() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RParen")) ? p_advance(p) : p); })(); }
-function parse_args(p, acc) { return (() => { let t = p_peek(p); return (_fl_null_q(t) ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RParen") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBracket") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBrace") ? r_pair(p, acc) : (true ? (() => { let one = parse_expr(p); return parse_args(_fl_get(one, "p"), _fl_append(acc, [_fl_get(one, "node")])); })() : null))))); })(); }
+function parse_args(p, acc) { return (() => { let t = p_peek(p); return (_fl_null_q(t) ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RParen") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBracket") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBrace") ? r_pair(p, acc) : (true ? (() => { let one = parse_expr(p); return parse_args(_fl_get(one, "p"), _fl_append(acc, _fl_get(one, "node"))); })() : null))))); })(); }
 function parse_bracket(p) { return (() => { let tok = p_peek(p); let line = _fl_get(tok, "line"); let p1 = p_advance(p); let next = p_peek(p1); return (((!_fl_null_q(next)) && (_fl_get(next, "kind") === "Symbol") && is_block_type_q(_fl_get(next, "value")) && (_fl_get(next, "value") === upper_case(_fl_get(next, "value")))) ? parse_named_block(p1, line) : parse_array(p1, line)); })(); }
 function is_block_type_q(s) { return (() => { let c = _fl_char_at(s, 0); return ((c >= "A") && (c <= "Z")); })(); }
 function upper_case(s) { return s; }
@@ -184,26 +192,26 @@ function parse_map(p) { return (() => { let tok = p_peek(p); let line = _fl_get(
 function parse_consume_rbrace(p) { return (() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBrace")) ? p_advance(p) : p); })(); }
 function parse_all(p) { return (p_end_q(p) ? _fl_get(p, "ast") : (() => { let one = parse_expr(p); let p2 = p_append_ast(_fl_get(one, "p"), _fl_get(one, "node")); return parse_all(p2); })()); }
 function parse(tokens) { return parse_all(p_make(tokens)); }
-function esc_1(s) { return replace(s, "\\", "\\\\"); }
-function esc_2(s) { return replace(s, "\"", "\\\""); }
-function esc_3(s) { return replace(s, "\n", "\\n"); }
-function esc_4(s) { return replace(s, "\r", "\\r"); }
-function esc_5(s) { return replace(s, "\t", "\\t"); }
+function esc_1(s) { return _fl_replace(s, "\\", "\\\\"); }
+function esc_2(s) { return _fl_replace(s, "\"", "\\\""); }
+function esc_3(s) { return _fl_replace(s, "\n", "\\n"); }
+function esc_4(s) { return _fl_replace(s, "\r", "\\r"); }
+function esc_5(s) { return _fl_replace(s, "\t", "\\t"); }
 function js_esc_inner(s) { return esc_5(esc_4(esc_3(esc_2(esc_1(s))))); }
 function js_esc(s) { return _fl_str("\"", js_esc_inner(s), "\""); }
 function fl_reserved_q(n) { return ((n === "loop") || (n === "recur") || (n === "fn") || (n === "defn") || (n === "defun") || (n === "if") || (n === "cond") || (n === "do") || (n === "begin") || (n === "progn") || (n === "while") || (n === "and") || (n === "or") || (n === "let") || (n === "set!") || (n === "define") || (n === "async") || (n === "await") || (n === "try") || (n === "catch") || (n === "finally") || (n === "throw") || (n === "quote") || (n === "compose") || (n === "pipe") || (n === "->") || (n === "->>") || (n === "|>")); }
 function js_reserved_q(n) { return ((n === "default") || (n === "class") || (n === "const") || (n === "let") || (n === "if") || (n === "else") || (n === "switch") || (n === "case") || (n === "break") || (n === "continue") || (n === "for") || (n === "while") || (n === "function") || (n === "return") || (n === "throw") || (n === "try") || (n === "catch") || (n === "new") || (n === "delete") || (n === "typeof") || (n === "instanceof") || (n === "var") || (n === "in") || (n === "of") || (n === "this") || (n === "super") || (n === "void") || (n === "yield") || (n === "async") || (n === "await") || (n === "import") || (n === "export") || (n === "enum") || (n === "do") || (n === "with") || (n === "finally") || (n === "null") || (n === "true") || (n === "false")); }
-function rename_1(n) { return replace(n, "-", "_"); }
-function rename_2(n) { return replace(n, "?", "_q"); }
-function rename_3(n) { return replace(n, "!", "_x"); }
-function rename_4(n) { return replace(n, ">", "_gt"); }
-function rename_5(n) { return replace(n, "<", "_lt"); }
-function rename_6(n) { return replace(n, "*", "_st"); }
-function rename_7(n) { return replace(n, "+", "_pl"); }
+function rename_1(n) { return _fl_replace(n, "-", "_"); }
+function rename_2(n) { return _fl_replace(n, "?", "_q"); }
+function rename_3(n) { return _fl_replace(n, "!", "_x"); }
+function rename_4(n) { return _fl_replace(n, ">", "_gt"); }
+function rename_5(n) { return _fl_replace(n, "<", "_lt"); }
+function rename_6(n) { return _fl_replace(n, "*", "_st"); }
+function rename_7(n) { return _fl_replace(n, "+", "_pl"); }
 function js_name_inner(n) { return (() => { let g = rename_7(rename_6(rename_5(rename_4(rename_3(rename_2(rename_1(n))))))); return (js_reserved_q(g) ? _fl_str(g, "_") : g); })(); }
 function js_name(n) { return (_fl_null_q(n) ? "_" : js_name_inner(n)); }
 function cg(n) { return (_fl_null_q(n) ? "null" : ((_fl_get(n, "kind") === "literal") ? cg_literal(n) : ((_fl_get(n, "kind") === "variable") ? js_name(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "keyword") ? js_esc(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "template-string") ? cg_template_string(n) : ((_fl_get(n, "kind") === "try") ? cg_try(n) : ((_fl_get(n, "kind") === "loop") ? cg_loop(n) : ((_fl_get(n, "kind") === "sexpr") ? cg_sexpr(n) : ((_fl_get(n, "kind") === "block") ? cg_block(n) : ((_fl_get(n, "kind") === "and") ? _fl_str("(", join(_fl_map(_fl_get(n, "args"), ((a) => cg(a))), " && "), ")") : ((_fl_get(n, "kind") === "or") ? _fl_str("(", join(_fl_map(_fl_get(n, "args"), ((a) => cg(a))), " || "), ")") : ((_fl_get(n, "kind") === "pattern-match") ? cg_match(n) : ((_fl_get(n, "kind") === "await") ? _fl_str("(await ", cg(_fl_get(n, "argument")), ")") : ((_fl_get(n, "kind") === "throw") ? _fl_str("(()=>{throw new Error(String(", cg(_fl_get(n, "argument")), "))})()") : (true ? "null" : null))))))))))))))); }
-function js_esc_for_template(s) { return (() => { let s1 = replace(s, "\\", "\\\\"); return replace(s1, "`", "\\`"); })(); }
+function js_esc_for_template(s) { return (() => { let s1 = _fl_replace(s, "\\", "\\\\"); return _fl_replace(s1, "`", "\\`"); })(); }
 function cg_template_string(n) { return _fl_str("`", js_esc_for_template(_fl_get(n, "value")), "`"); }
 function cg_try(n) { return (() => { let body = _fl_get(n, "body"); let catch_node = _fl_get(n, "catch"); let finally_node = _fl_get(n, "finally"); let body_code = cg(body); let catch_code = (_fl_null_q(catch_node) ? "" : cg_catch_clause(catch_node)); let finally_code = (_fl_null_q(finally_node) ? "" : _fl_str("finally{", cg(finally_node), "}")); return _fl_str("(()=>{try{return ", body_code, "}catch(err){", catch_code, "}", finally_code, "})()"); })(); }
 function cg_catch_clause(catch_node) { return (() => { let param = ((_fl_get(catch_node, "kind") === "sexpr") ? (() => { let args = _fl_get(catch_node, "args"); return ((_fl_length(args) > 0) ? js_name(_fl_str(_fl_get(_fl_get(args, 0), "name"))) : "err"); })() : "err"); let body = ((_fl_get(catch_node, "kind") === "sexpr") ? (() => { let args = _fl_get(catch_node, "args"); return ((_fl_length(args) > 1) ? cg(_fl_get(args, 1)) : "null"); })() : cg(catch_node)); return _fl_str("let ", param, "=err;return ", body, ";"); })(); }
@@ -225,7 +233,7 @@ function cg_if(args) { return _fl_str("(", cg(_fl_get(args, 0)), "?", cg(_fl_get
 function cg_fn(args) { return (() => { let pnode = _fl_get(args, 0); let body = _fl_get(args, 1); let ps = extract_params(_fl_get(_fl_get(pnode, "fields"), "items")); return _fl_str("((", ps, ")=>", cg(body), ")"); })(); }
 function cg_defn(args) { return (() => { let name_n = _fl_get(args, 0); let pnode = _fl_get(args, 1); let body = _fl_get(args, 2); let name = extract_name(name_n); let ps = extract_params(_fl_get(_fl_get(pnode, "fields"), "items")); let warning = (fl_reserved_q(name) ? _fl_str("// ⚠️  RESERVED NAME: ", name) : ""); return _fl_str(warning, (fl_reserved_q(name) ? "\n" : ""), "const ", name, " = (", ps, ")=>", cg(body)); })(); }
 function cg_define(args) { return ((_fl_length(args) === 2) ? _fl_str("const ", extract_name(_fl_get(args, 0)), " = ", cg(_fl_get(args, 1))) : cg_defn(args)); }
-function cg_let(args) { return (() => { let bnode = _fl_get(args, 0); let items = _fl_get(_fl_get(bnode, "fields"), "items"); let first_item = (_fl_null_q(items) ? null : _fl_get(items, 0)); let inner_items = (_fl_null_q(first_item) ? null : (((_fl_get(first_item, "kind") === "block") && (_fl_get(first_item, "type") === "Array")) ? _fl_get(_fl_get(first_item, "fields"), "items") : null)); let nested = ((!_fl_null_q(inner_items)) && (_fl_length(inner_items) > 0)); let bindings = (nested ? cg_let_2d(items, 0, "", 0) : cg_let_1d(items, 0, "", 0)); let body_args = _fl_slice(args, 1, _fl_length(args)); let body_js = cg_do_body(body_args, 0, ""); return _fl_str("((()=>{", bindings, body_js, "})())"); })(); }
+function cg_let(args) { return (() => { let bnode = _fl_get(args, 0); let items = _fl_get(_fl_get(bnode, "fields"), "items"); let first_item = (_fl_null_q(items) ? null : _fl_get(items, 0)); let inner_items = (_fl_null_q(first_item) ? null : (((_fl_get(first_item, "kind") === "block") && (_fl_get(first_item, "type") === "Array")) ? _fl_get(_fl_get(first_item, "fields"), "items") : null)); let nested = ((!_fl_null_q(inner_items)) && (_fl_length(inner_items) > 0) && (_fl_get(_fl_get(inner_items, 0), "kind") === "block") && (_fl_get(_fl_get(inner_items, 0), "type") === "Array")); let bindings = (nested ? cg_let_2d(items, 0, "", 0) : cg_let_1d(items, 0, "", 0)); let body_args = _fl_slice(args, 1, _fl_length(args)); let body_js = cg_do_body(body_args, 0, ""); return _fl_str("((()=>{", bindings, body_js, "})())"); })(); }
 function cg_let_binding(pat_node, val_js, tmpvar) { return (() => { let kind = _fl_get(pat_node, "kind"); let type = _fl_get(pat_node, "type"); return ((kind === "variable") ? _fl_str("let ", js_name(_fl_get(pat_node, "name")), "=", val_js, ";") : (((kind === "block") && (type === "Map")) ? (() => { let pat_fields = _fl_get(pat_node, "fields"); let pat_entries = map_entries(pat_fields); let pat_bindings = cg_map_pattern_bindings_from_entries(pat_entries, tmpvar, 0, ""); return _fl_str(((val_js === tmpvar) ? "" : _fl_str("let ", tmpvar, "=", val_js, ";")), pat_bindings); })() : (((kind === "block") && (type === "Array")) ? (() => { let items = _fl_get(_fl_get(pat_node, "fields"), "items"); let first_pat = (_fl_null_q(items) ? null : _fl_get(items, 0)); let tmpvar_next = _fl_str(tmpvar, "_inner"); return (_fl_null_q(first_pat) ? "" : _fl_str("let ", tmpvar, "=", val_js, "[0];", cg_let_binding(first_pat, tmpvar, tmpvar_next))); })() : (true ? _fl_str("let ", extract_name(pat_node), "=", val_js, ";") : null)))); })(); }
 function cg_let_1d(items, i, acc, counter) { return ((i >= _fl_length(items)) ? acc : (() => { let pat_n = ((i < _fl_length(items)) ? _fl_get(items, i) : null); let v_n = (((i + 1) < _fl_length(items)) ? _fl_get(items, (i + 1)) : null); return ((_fl_null_q(pat_n) || _fl_null_q(v_n)) ? cg_let_1d(items, (i + 2), acc, (counter + 1)) : (() => { let val = cg(v_n); let tmpvar = _fl_str("__v", ((counter === 0) ? "" : counter)); return cg_let_1d(items, (i + 2), _fl_str(acc, cg_let_binding(pat_n, val, tmpvar)), (counter + 1)); })()); })()); }
 function cg_let_2d(items, i, acc, counter) { return ((i >= _fl_length(items)) ? acc : (() => { let pair = _fl_get(items, i); let pair_fields = (_fl_null_q(pair) ? null : _fl_get(pair, "fields")); let pitems = (_fl_null_q(pair_fields) ? null : _fl_get(pair_fields, "items")); let k_n = (((!_fl_null_q(pitems)) && (_fl_length(pitems) > 0)) ? _fl_get(pitems, 0) : null); let v_n = (((!_fl_null_q(pitems)) && (_fl_length(pitems) > 1)) ? _fl_get(pitems, 1) : null); return ((_fl_null_q(k_n) || _fl_null_q(v_n)) ? cg_let_2d(items, (i + 1), acc, (counter + 1)) : (() => { let val = cg(v_n); let tmpvar = _fl_str("__v", ((counter === 0) ? "" : counter)); return cg_let_2d(items, (i + 1), _fl_str(acc, cg_let_binding(k_n, val, tmpvar)), (counter + 1)); })()); })()); }
@@ -243,7 +251,7 @@ function cg_set_bang(args) { return _fl_str("(", extract_name(_fl_get(args, 0)),
 function cg_throw(args) { return (() => { let m = ((_fl_length(args) === 0) ? "\"error\"" : cg(_fl_get(args, 0))); return _fl_str("(()=>{throw new Error(String(", m, "))})()"); })(); }
 function cg_while(args) { return (() => { let cond = cg(_fl_get(args, 0)); let body_args = _fl_slice(args, 1, _fl_length(args)); let body = while_body(body_args, 0, ""); return _fl_str("(()=>{while(", cond, "){", body, "}})()"); })(); }
 function while_body(args, i, acc) { return ((i >= _fl_length(args)) ? acc : while_body(args, (i + 1), _fl_str(acc, cg(_fl_get(args, i)), ";"))); }
-function cg_loop_sexpr(args) { return (() => { let bnode = _fl_get(args, 0); let items = _fl_get(_fl_get(bnode, "fields"), "items"); let _fl_first = (_fl_null_q(items) ? null : _fl_get(items, 0)); let nested = (_fl_null_q(_fl_first) ? false : ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array"))); let bindings = (nested ? loop_inits_2d(items, 0, "") : loop_inits_1d(items, 0, "")); let names = (nested ? loop_names_2d(items, 0, "") : loop_names_1d(items, 0, "")); let body_args = _fl_slice(args, 1, _fl_length(args)); let body_js = cg_do_body(body_args, 0, ""); return _fl_str("((()=>{", bindings, "while(true){let __r=(()=>{", body_js, "})();", "if(__r&&__r.__recur){[", names, "]=__r.a;continue;}", "return __r;}})())"); })(); }
+function cg_loop(args) { return (() => { let bnode = _fl_get(args, 0); let items = _fl_get(_fl_get(bnode, "fields"), "items"); let _fl_first = (_fl_null_q(items) ? null : _fl_get(items, 0)); let nested = (_fl_null_q(_fl_first) ? false : ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array"))); let bindings = (nested ? loop_inits_2d(items, 0, "") : loop_inits_1d(items, 0, "")); let names = (nested ? loop_names_2d(items, 0, "") : loop_names_1d(items, 0, "")); let body_args = _fl_slice(args, 1, _fl_length(args)); let body_js = cg_do_body(body_args, 0, ""); return _fl_str("((()=>{", bindings, "while(true){let __r=(()=>{", body_js, "})();", "if(__r&&__r.__recur){[", names, "]=__r.a;continue;}", "return __r;}})())"); })(); }
 function loop_inits_1d(items, i, acc) { return ((i >= _fl_length(items)) ? acc : (() => { let k = _fl_get(items, i); let v = _fl_get(items, (i + 1)); return loop_inits_1d(items, (i + 2), _fl_str(acc, "let ", extract_name(k), "=", cg(v), ";")); })()); }
 function loop_inits_2d(items, i, acc) { return ((i >= _fl_length(items)) ? acc : (() => { let pair = _fl_get(items, i); let pit = _fl_get(_fl_get(pair, "fields"), "items"); return loop_inits_2d(items, (i + 1), _fl_str(acc, "let ", extract_name(_fl_get(pit, 0)), "=", cg(_fl_get(pit, 1)), ";")); })()); }
 function loop_names_1d(items, i, acc) { return ((i >= _fl_length(items)) ? acc : (() => { let k = _fl_get(items, i); let n = extract_name(k); return loop_names_1d(items, (i + 2), ((_fl_length(acc) === 0) ? n : _fl_str(acc, ",", n))); })()); }
@@ -288,7 +296,12 @@ function param_loop(items, i, acc) { return (_fl_null_q(items) ? acc : ((i >= _f
 function cg_native_dispatch(op, as) { return ((op === "str") ? _fl_str("_fl_str(", as, ")") : ((op === "concat") ? _fl_str("_fl_str(", as, ")") : ((op === "length") ? _fl_str("_fl_length(", as, ")") : ((op === "substring") ? _fl_str("_fl_substring(", as, ")") : ((op === "char-at") ? _fl_str("_fl_char_at(", as, ")") : ((op === "replace") ? _fl_str("_fl_replace(", as, ")") : ((op === "starts-with?") ? _fl_str("_fl_starts_with(", as, ")") : ((op === "ends-with?") ? _fl_str("_fl_ends_with(", as, ")") : ((op === "contains?") ? _fl_str("_fl_contains(", as, ")") : ((op === "split") ? _fl_str("_fl_split(", as, ")") : ((op === "join") ? _fl_str("_fl_join(", as, ")") : ((op === "trim") ? _fl_str("_fl_trim(", as, ")") : ((op === "upper") ? _fl_str("_fl_upper(", as, ")") : ((op === "lower") ? _fl_str("_fl_lower(", as, ")") : ((op === "repeat") ? _fl_str("_fl_repeat(", as, ")") : ((op === "index-of") ? _fl_str("_fl_index_of(", as, ")") : ((op === "first") ? _fl_str("_fl_first(", as, ")") : ((op === "last") ? _fl_str("_fl_last(", as, ")") : ((op === "rest") ? _fl_str("_fl_rest(", as, ")") : ((op === "append") ? _fl_str("_fl_append(", as, ")") : ((op === "slice") ? _fl_str("_fl_slice(", as, ")") : ((op === "list") ? _fl_str("[", as, "]") : ((op === "map") ? _fl_str("_fl_map(", as, ")") : ((op === "filter") ? _fl_str("_fl_filter(", as, ")") : ((op === "reduce") ? _fl_str("_fl_reduce(", as, ")") : ((op === "find") ? _fl_str("_fl_find(", as, ")") : ((op === "every?") ? _fl_str("_fl_every(", as, ")") : ((op === "some?") ? _fl_str("_fl_some(", as, ")") : ((op === "sort") ? _fl_str("_fl_sort(", as, ")") : ((op === "reverse") ? _fl_str("_fl_reverse(", as, ")") : ((op === "flatten") ? _fl_str("_fl_flatten(", as, ")") : ((op === "distinct") ? _fl_str("_fl_distinct(", as, ")") : ((op === "range") ? _fl_str("_fl_range(", as, ")") : ((op === "take") ? _fl_str("_fl_take(", as, ")") : ((op === "drop") ? _fl_str("_fl_drop(", as, ")") : ((op === "count") ? _fl_str("_fl_length(", as, ")") : ((op === "get") ? _fl_str("_fl_get(", as, ")") : ((op === "keys") ? _fl_str("_fl_keys(", as, ")") : ((op === "values") ? _fl_str("_fl_values(", as, ")") : ((op === "entries") ? _fl_str("_fl_entries(", as, ")") : ((op === "has-key?") ? _fl_str("_fl_has_key(", as, ")") : ((op === "map-set") ? _fl_str("_fl_map_set(", as, ")") : ((op === "map-delete") ? _fl_str("_fl_map_delete(", as, ")") : ((op === "merge") ? _fl_str("_fl_merge(", as, ")") : ((op === "json_set") ? _fl_str("_fl_map_set(", as, ")") : ((op === "json-parse") ? _fl_str("JSON.parse(", as, ")") : ((op === "json-stringify") ? _fl_str("JSON.stringify(", as, ")") : ((op === "json_parse") ? _fl_str("JSON.parse(", as, ")") : ((op === "json_stringify") ? _fl_str("JSON.stringify(", as, ")") : ((op === "null?") ? _fl_str("(", as, "==null)") : ((op === "nil?") ? _fl_str("_fl_nil_q(", as, ")") : ((op === "nil-or-empty?") ? _fl_str("_fl_nil_or_empty_q(", as, ")") : ((op === "not") ? _fl_str("(!", as, ")") : ((op === "empty?") ? _fl_str("_fl_empty_q(", as, ")") : ((op === "true?") ? _fl_str("(", as, "===true)") : ((op === "false?") ? _fl_str("(", as, "===false)") : ((op === "string?") ? _fl_str("(typeof ", as, "===\"string\")") : ((op === "number?") ? _fl_str("(typeof ", as, "===\"number\")") : ((op === "list?") ? _fl_str("Array.isArray(", as, ")") : ((op === "array?") ? _fl_str("Array.isArray(", as, ")") : ((op === "map?") ? _fl_str("_fl_is_map(", as, ")") : ((op === "fn?") ? _fl_str("(typeof ", as, "===\"function\")") : ((op === "boolean?") ? _fl_str("(typeof ", as, "===\"boolean\")") : ((op === "type-of") ? _fl_str("_fl_type_of(", as, ")") : ((op === "min") ? _fl_str("Math.min(", as, ")") : ((op === "max") ? _fl_str("Math.max(", as, ")") : ((op === "abs") ? _fl_str("Math.abs(", as, ")") : ((op === "sqrt") ? _fl_str("Math.sqrt(", as, ")") : ((op === "pow") ? _fl_str("Math.pow(", as, ")") : ((op === "floor") ? _fl_str("Math.floor(", as, ")") : ((op === "ceil") ? _fl_str("Math.ceil(", as, ")") : ((op === "round") ? _fl_str("Math.round(", as, ")") : ((op === "mod") ? cg_pair(args, "%") : ((op === "neg") ? _fl_str("(-", as, ")") : ((op === "sign") ? _fl_str("Math.sign(", as, ")") : ((op === "random") ? _fl_str("Math.random()") : ((op === "log") ? _fl_str("Math.log(", as, ")") : ((op === "exp") ? _fl_str("Math.exp(", as, ")") : ((op === "sin") ? _fl_str("Math.sin(", as, ")") : ((op === "cos") ? _fl_str("Math.cos(", as, ")") : ((op === "str-to-num") ? _fl_str("Number(", as, ")") : ((op === "num-to-str") ? _fl_str("String(", as, ")") : ((op === "println") ? _fl_str("console.log(", as, ")") : ((op === "print") ? _fl_str("process.stdout.write(String(", as, "))") : ((op === "file_read") ? _fl_str("_fl_file_read(", as, ")") : ((op === "file_write") ? _fl_str("_fl_file_write(", as, ")") : ((op === "file_exists") ? _fl_str("_fl_file_exists(", as, ")") : ((op === "exit") ? _fl_str("process.exit(", as, ")") : ((op === "shell_capture") ? _fl_str("_fl_shell_capture(", as, ")") : ((op === "now") ? _fl_str("now()") : ((op === "now_ms") ? _fl_str("now_ms()") : ((op === "now_iso") ? _fl_str("now_iso()") : ((op === "now_unix") ? _fl_str("now_unix()") : ((op === "time_diff") ? _fl_str("((t1,t2)=>t2-t1)(", as, ")") : ((op === "time_since") ? _fl_str("((ts)=>Date.now()-ts)(", as, ")") : ((op === "sleep_ms") ? _fl_str("((ms)=>{const start=Date.now();while(Date.now()-start<ms){}})(", as, ")") : ((op === "timer_start") ? _fl_str("{__timer:{label:", as, ",start:Date.now(),laps:[]}}") : ((op === "timer_elapsed") ? _fl_str("((t)=>Date.now()-t.__timer.start)(", as, ")") : ((op === "timer_lap") ? _fl_str("((t,l)=>{t.__timer.laps.push({label:l,ms:Date.now()-t.__timer.start});return t;})(", as, ")") : ((op === "cli-args") ? "(typeof process !== \"undefined\" ? process.argv.slice(2) : [])" : ((op === "json-parse") ? _fl_str("JSON.parse(", as, ")") : ((op === "shell_capture") ? _fl_str("_fl_shell_capture(", as, ")") : ((op === "starts-with?") ? _fl_str("_fl_starts_with(", as, ")") : ((op === "ends-with?") ? _fl_str("_fl_ends_with(", as, ")") : ((op === "contains?") ? _fl_str("_fl_contains(", as, ")") : ((op === "split") ? _fl_str("_fl_split(", as, ")") : ((op === "join") ? _fl_str("_fl_join(", as, ")") : ((op === "trim") ? _fl_str("_fl_trim(", as, ")") : ((op === "upper") ? _fl_str("_fl_upper(", as, ")") : ((op === "lower") ? _fl_str("_fl_lower(", as, ")") : ((op === "repeat") ? _fl_str("_fl_repeat(", as, ")") : ((op === "index-of") ? _fl_str("_fl_index_of(", as, ")") : ((op === "map") ? _fl_str("_fl_map(", as, ")") : ((op === "filter") ? _fl_str("_fl_filter(", as, ")") : ((op === "reduce") ? _fl_str("_fl_reduce(", as, ")") : ((op === "find") ? _fl_str("_fl_find(", as, ")") : ((op === "every?") ? _fl_str("_fl_every(", as, ")") : ((op === "some?") ? _fl_str("_fl_some(", as, ")") : ((op === "sort") ? _fl_str("_fl_sort(", as, ")") : ((op === "reverse") ? _fl_str("_fl_reverse(", as, ")") : ((op === "flatten") ? _fl_str("_fl_flatten(", as, ")") : ((op === "distinct") ? _fl_str("_fl_distinct(", as, ")") : ((op === "pg_exec") ? _fl_str("_fl_pg_exec(", as, ")") : ((op === "pg_query") ? _fl_str("_fl_pg_query(", as, ")") : ((op === "pg_connect") ? _fl_str("_fl_pg_connect(", as, ")") : ((op === "mariadb_exec") ? _fl_str("_fl_mariadb_exec(", as, ")") : ((op === "mariadb_query") ? _fl_str("_fl_mariadb_query(", as, ")") : ((op === "mariadb_one") ? _fl_str("_fl_mariadb_one(", as, ")") : ((op === "db_query") ? _fl_str("_fl_db_query(", as, ")") : ((op === "db_exec") ? _fl_str("_fl_db_exec(", as, ")") : ((op === "server_post") ? _fl_str("_fl_server_post(", as, ")") : ((op === "server_get") ? _fl_str("_fl_server_get(", as, ")") : ((op === "server_put") ? _fl_str("_fl_server_put(", as, ")") : ((op === "server_delete") ? _fl_str("_fl_server_delete(", as, ")") : ((op === "server_start") ? _fl_str("_fl_server_start(", as, ")") : ((op === "server_stop") ? _fl_str("_fl_server_stop(", as, ")") : ((op === "http_get") ? _fl_str("_fl_http_get(", as, ")") : ((op === "http_post") ? _fl_str("_fl_http_post(", as, ")") : ((op === "ws_send") ? _fl_str("_fl_ws_send(", as, ")") : (true ? _fl_str(js_name(((_fl_char_at(op, 0) === "$") ? _fl_substring(op, 1, _fl_length(op)) : op)), "(", as, ")") : null)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }
 function cg_native(op, args) { return cg_native_dispatch(op, cg_args(args)); }
 function cg_call(op, args) { return (() => { let fn_name = js_name(((_fl_char_at(op, 0) === "$") ? _fl_substring(op, 1, _fl_length(op)) : op)); return _fl_str(fn_name, "(", cg_args(args), ")"); })(); }
-function cg_sexpr_dispatch(op, args) { return ((op === "if") ? cg_if(args) : ((op === "fn") ? cg_fn(args) : ((op === "defn") ? cg_defn(args) : ((op === "define") ? cg_define(args) : ((op === "let") ? cg_let(args) : ((op === "do") ? cg_do(args) : ((op === "begin") ? cg_do(args) : ((op === "cond") ? cg_cond(args) : ((op === "and") ? cg_and(args) : ((op === "or") ? cg_or(args) : ((op === "quote") ? cg_quote(args) : ((op === "set!") ? cg_set_bang(args) : ((op === "throw") ? cg_throw(args) : ((op === "try") ? cg_try(args) : ((op === "while") ? cg_while(args) : ((op === "loop") ? cg_loop_sexpr(args) : ((op === "recur") ? cg_recur(args) : ((op === "defstruct") ? cg_defstruct(args) : ((op === "compose") ? cg_compose(args) : ((op === "pipe") ? cg_pipe(args) : ((op === "->") ? cg_thread_first(args) : ((op === "->>") ? cg_thread_last(args) : ((op === "|>") ? cg_thread_first(args) : ((op === "call") ? cg_call_form(args) : ((op === "async") ? cg_async(args) : ((op === "await") ? cg_await(args) : ((op === "+") ? cg_binop(args, "+", "0") : ((op === "-") ? cg_sub(args) : ((op === "*") ? cg_binop(args, "*", "1") : ((op === "/") ? cg_pair(args, "/") : ((op === "%") ? cg_pair(args, "%") : ((op === "<") ? cg_pair(args, "<") : ((op === ">") ? cg_pair(args, ">") : ((op === "<=") ? cg_pair(args, "<=") : ((op === ">=") ? cg_pair(args, ">=") : ((op === "=") ? cg_pair(args, "===") : ((op === "!=") ? cg_pair(args, "!==") : (true ? cg_native(op, args) : null)))))))))))))))))))))))))))))))))))))); }
+function cg_and(args) { return _fl_str("(", join(_fl_map(args, ((a) => cg(a))), " && "), ")"); }
+function cg_or(args) { return _fl_str("(", join(_fl_map(args, ((a) => cg(a))), " || "), ")"); }
+function cg_cond(args) { return (() => { let n = _fl_length(args); return ((n === 0) ? "null" : (() => { let last_idx = (n - 1); let loop = ((i, acc) => ((i < 0) ? acc : (() => { let pair = _fl_get(args, i); let items = (((_fl_get(pair, "kind") === "block") && (_fl_get(pair, "type") === "Array")) ? _fl_get(_fl_get(pair, "fields"), "items") : pair); let test = cg(_fl_get(items, 0)); let body = cg(_fl_get(items, 1)); return $loop((i - 1), _fl_str("(", test, " ? ", body, " : ", acc, ")")); })())); return $loop(last_idx, "null"); })()); })(); }
+function cg_while(args) { return _fl_str("(() => { while(", cg(_fl_get(args, 0)), ") { ", join(_fl_map(_fl_rest(args), ((a) => cg(a))), "; "), " } })()"); }
+function cg_loop(args) { return (() => { let bindings = _fl_get(_fl_get(_fl_get(args, 0), "fields"), "items"); let body_exprs = _fl_rest(args); let inits = ((i, acc) => ((i >= _fl_length(bindings)) ? acc : (() => { let name = js_name(_fl_get(_fl_get(bindings, i), "name")); let val = cg(_fl_get(bindings, (i + 1))); return $inits((i + 2), _fl_str(acc, "let ", name, " = ", val, "; ")); })())); return _fl_str("(() => { ", $inits(0, ""), "while(true) { ", join(_fl_map(body_exprs, ((a) => cg(a))), "; "), "; break; } })()"); })(); }
+function cg_sexpr_dispatch(op, args) { return ((op === "if") ? cg_if(args) : ((op === "fn") ? cg_fn(args) : ((op === "defn") ? cg_defn(args) : ((op === "define") ? cg_define(args) : ((op === "let") ? cg_let(args) : ((op === "do") ? cg_do(args) : ((op === "begin") ? cg_do(args) : ((op === "cond") ? cg_cond(args) : ((op === "and") ? cg_and(args) : ((op === "or") ? cg_or(args) : ((op === "quote") ? cg_quote(args) : ((op === "set!") ? cg_set_bang(args) : ((op === "throw") ? cg_throw(args) : ((op === "try") ? cg_try(args) : ((op === "while") ? cg_while(args) : ((op === "loop") ? cg_loop(args) : ((op === "recur") ? cg_recur(args) : ((op === "defstruct") ? cg_defstruct(args) : ((op === "compose") ? cg_compose(args) : ((op === "pipe") ? cg_pipe(args) : ((op === "->") ? cg_thread_first(args) : ((op === "->>") ? cg_thread_last(args) : ((op === "|>") ? cg_thread_first(args) : ((op === "call") ? cg_call_form(args) : ((op === "async") ? cg_async(args) : ((op === "await") ? cg_await(args) : ((op === "+") ? cg_binop(args, "+", "0") : ((op === "-") ? cg_sub(args) : ((op === "*") ? cg_binop(args, "*", "1") : ((op === "/") ? cg_pair(args, "/") : ((op === "%") ? cg_pair(args, "%") : ((op === "<") ? cg_pair(args, "<") : ((op === ">") ? cg_pair(args, ">") : ((op === "<=") ? cg_pair(args, "<=") : ((op === ">=") ? cg_pair(args, ">=") : ((op === "=") ? cg_pair(args, "===") : ((op === "!=") ? cg_pair(args, "!==") : (true ? cg_native(op, args) : null)))))))))))))))))))))))))))))))))))))); }
 function cg_sexpr(n) { return cg_sexpr_dispatch(_fl_get(n, "op"), _fl_get(n, "args")); }
 function prelude_string() { return _fl_str("const _fl_str = (...xs) => xs.map(x => x==null?'null':String(x)).join('');", "const _fl_length = (x) => (x==null ? 0 : x.length);", "const _fl_substring = (s, a, b) => (b==null ? s.slice(a) : s.slice(a, b));", "const _fl_char_at = (s, i) => (s[i] || null);", "const _fl_replace = (s, a, b) => s.split(a).join(b);", "const _fl_starts_with = (s, p) => s.startsWith(p);", "const _fl_ends_with = (s, p) => s.endsWith(p);", "const _fl_contains = (s, p) => s.includes(p);", "const _fl_split = (s, sep) => s.split(sep);", "const _fl_join = (l, sep) => l.join(sep==null?'':sep);", "const _fl_trim = (s) => s.trim();", "const _fl_upper = (s) => s.toUpperCase();", "const _fl_lower = (s) => s.toLowerCase();", "const _fl_repeat = (s, n) => s.repeat(n);", "const _fl_index_of = (s, p) => s.indexOf(p);"); }
 function prelude_list() { return _fl_str("const _fl_first = (l) => (l==null || l.length===0 ? null : l[0]);", "const _fl_last = (l) => (l==null || l.length===0 ? null : l[l.length-1]);", "const _fl_rest = (l) => (l==null || l.length===0 ? [] : l.slice(1));", "const _fl_append = (...xs) => xs.reduce((acc, x) => Array.isArray(x) ? [...acc, ...x] : [...acc, x], []);", "const _fl_slice = (l, a, b) => l.slice(a, b);", "const _fl_map = (f, l) => l.map(x => f(x));", "const _fl_filter = (f, l) => l.filter(x => f(x));", "const _fl_reduce = (f, init, l) => l.reduce((acc, x) => f(acc, x), init);", "const _fl_find = (f, l) => (l.find(x => f(x)) ?? null);", "const _fl_every = (f, l) => l.every(x => f(x));", "const _fl_some = (f, l) => l.some(x => f(x));", "const _fl_sort = (l, cmp) => [...l].sort(cmp || ((a,b)=>a<b?-1:a>b?1:0));", "const _fl_reverse = (l) => [...l].reverse();", "const _fl_flatten = (l) => l.flat(Infinity);", "const _fl_distinct = (l) => [...new Set(l)];", "const _fl_range = (a, b, s) => { let r=[]; let step=s||1; for(let i=a;i<b;i+=step)r.push(i); return r; };", "const _fl_take = (n, l) => l.slice(0, n);", "const _fl_drop = (n, l) => l.slice(n);"); }
@@ -312,9 +325,9 @@ function csv_parse(csv) { return (() => { let lines = split(csv, "\n"); return c
 function csv_parse_loop(lines, i, acc) { return ((i >= _fl_length(lines)) ? acc : csv_parse_loop(lines, (i + 1), _fl_append(acc, csv_parse_line(_fl_get(lines, i))))); }
 function str_repeat(s, n) { return ((n <= 0) ? "" : str_repeat_loop(s, n, 0, "")); }
 function str_repeat_loop(s, n, i, acc) { return ((i >= n) ? acc : str_repeat_loop(s, n, (i + 1), _fl_str(acc, s))); }
-function data_json_parse(s) { return json_parse(s); }
-function data_json_str(obj) { return json_stringify(obj); }
-function data_json_pretty(obj) { return json_stringify(obj); }
+function data_json_parse(s) { return JSON.parse(s); }
+function data_json_str(obj) { return JSON.stringify(obj); }
+function data_json_pretty(obj) { return JSON.stringify(obj); }
 function to_query_string(obj) { return to_query_loop(_fl_keys(obj), obj, 0, []); }
 function to_query_loop(ks, obj, i, acc) { return ((i >= _fl_length(ks)) ? join(acc, "&") : (() => { let k = _fl_get(ks, i); let v = _fl_get(obj, k); return to_query_loop(ks, obj, (i + 1), _fl_append(acc, _fl_str(k, "=", v))); })()); }
 function hash_simple(s) { return hash_simple_loop(_fl_str(s), 0, 5381, 0); }
@@ -323,7 +336,7 @@ function hash_fnv1a(s) { return (() => { let fnv_offset = 2166136261; let fnv_pr
 function hash_fnv_loop(s, i, hash) { return ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_fnv_loop(s, (i + 1), (bit_xor(hash, char_code_at(s, i)) * 16777619))); }
 function hash_djb2(s) { return hash_djb_loop(_fl_str(s), 0, 5381); }
 function hash_djb_loop(s, i, hash) { return ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_djb_loop(s, (i + 1), ((hash * 33) + char_code_at(s, i)))); }
-function hash_object(obj) { return hash_simple(json_stringify(obj)); }
+function hash_object(obj) { return hash_simple(JSON.stringify(obj)); }
 function hash_consistent(s, seed) { return (() => { let h = hash_simple(s); return (((h * seed) + seed) % 2147483647); })(); }
 function now_s() { return floor((now() / 1000)); }
 function time_diff_ms(t1, t2) { return (t2 - t1); }
@@ -338,6 +351,21 @@ function str_repeat(s, n) { return str_repeat_loop(s, n, ""); }
 function str_repeat_loop(s, n, acc) { return ((n <= 0) ? acc : str_repeat_loop(s, (n - 1), _fl_str(acc, s))); }
 function str_pad_left(s, n, pad) { return (() => { let diff = (n - _fl_length(s)); return ((diff <= 0) ? s : _fl_str(str_repeat(pad, diff), s)); })(); }
 function str_pad_right(s, n, pad) { return (() => { let diff = (n - _fl_length(s)); return ((diff <= 0) ? s : _fl_str(s, str_repeat(pad, diff))); })(); }
+function _fl_upper(s) { return (() => { let chars = str_split(s, ""); return str_join(_fl_map(chars, ((c) => (((char_code_at(c, 0) >= 97) && (char_code_at(c, 0) <= 122)) ? from_char_code((char_code_at(c, 0) - 32)) : c))), ""); })(); }
+function _fl_lower(s) { return (() => { let chars = str_split(s, ""); return str_join(_fl_map(chars, ((c) => (((char_code_at(c, 0) >= 65) && (char_code_at(c, 0) <= 90)) ? from_char_code((char_code_at(c, 0) + 32)) : c))), ""); })(); }
+function _fl_contains_q(s, substr) { return (!(-1 === _fl_str_index_of(s, substr))); }
+function str_replace(s, old, _new) { return (() => { let idx = _fl_str_index_of(s, old); return ((idx === -1) ? s : _fl_str(str_slice(s, 0, idx), _new, str_slice(s, (idx + _fl_length(old)), _fl_length(s)))); })(); }
+function file_read(path) { return _fl_file_read(_fl_str(path)); }
+function file_write(path, content) { return _fl_file_write(_fl_str(path), _fl_str(content)); }
+function file_append(path, content) { return file_append(_fl_str(path), _fl_str(content)); }
+function file_exists_q(path) { return file_exists(_fl_str(path)); }
+function file_delete(path) { return file_delete(_fl_str(path)); }
+function file_copy(src, dest) { return file_copy(_fl_str(src), _fl_str(dest)); }
+function file_rename(old, _new) { return file_rename(_fl_str(old), _fl_str(_new)); }
+function file_size(path) { return file_size(_fl_str(path)); }
+function file_modified(path) { return file_modified(_fl_str(path)); }
+function file_json(path) { return JSON.parse(_fl_file_read(_fl_str(path))); }
+function file_json_write(path, obj) { return _fl_file_write(_fl_str(path), JSON.stringify(obj)); }
 function file_lines(path) { return str_lines(_fl_file_read(_fl_str(path))); }
 function file_mkdir(path) { return file_mkdir(_fl_str(path)); }
 function file_rmdir(path) { return file_rmdir(_fl_str(path)); }
@@ -361,7 +389,20 @@ function getcwd() { return process_getcwd(); }
 function chdir(path) { return process_chdir(_fl_str(path)); }
 function pid() { return process_pid(); }
 function pid_parent() { return process_ppid(); }
-(_fl_null_q(__argv__) ? null : ((_fl_length(__argv__) === 0) ? null : (() => { let cmd = _fl_get(__argv__, 0); return ((cmd === "run") ? (() => { let input = _fl_get(__argv__, 1); let output = ((_fl_length(__argv__) >= 3) ? _fl_get(__argv__, 2) : _fl_str(input, ".out.js")); return compile_file(input, output); })() : (() => { let input = _fl_get(__argv__, 0); let output = ((_fl_length(__argv__) >= 2) ? _fl_get(__argv__, 1) : _fl_str(input, ".out.js")); return compile_file(input, output); })()); })()))
+function vector_add(v1, v2) { return _fl_map(_fl_range(0, _fl_length(v1)), ((i) => (_fl_get(v1, i) + _fl_get(v2, i)))); }
+function vector_dot(v1, v2) { return _fl_reduce(_fl_range(0, _fl_length(v1)), ((acc, i) => (acc + (_fl_get(v1, i) * _fl_get(v2, i)))), 0); }
+function vector_magnitude(v) { return math_sqrt(_fl_reduce(v, ((acc, x) => (acc + (x * x))), 0)); }
+function math_sqrt(n) { return ((n < 0) ? error("sqrt of negative number") : (() => { let x = (n / 2); return ((x === 0) ? 0 : (() => { let next = ((x + (n / x)) / 2); return (((x - next) < 0.0001) ? next : math_sqrt_iter(n, next)); })()); })()); }
+function math_sqrt_iter(n, guess) { return (() => { let next = ((guess + (n / guess)) / 2); return (((guess - next) < 0.0001) ? next : math_sqrt_iter(n, next)); })(); }
+function math_pow(base, exp) { return ((exp === 0) ? 1 : ((exp < 0) ? (1 / math_pow(base, (0 - exp))) : (base * math_pow(base, (exp - 1))))); }
+function cosine_sim(v1, v2) { return (() => { let dot = vector_dot(v1, v2); let mag1 = vector_magnitude(v1); let mag2 = vector_magnitude(v2); return (((mag1 === 0) || (mag2 === 0)) ? 0 : (dot / (mag1 * mag2))); })(); }
+function parse_options(argv) { return parse_options_loop(argv, 0, [], {  }); }
+function parse_options_loop(argv, idx, args, opts) { return ((idx >= _fl_length(argv)) ? { args: args, opts: opts } : (() => { let arg = _fl_get(argv, idx); return (((arg === "-o") || (arg === "--output")) ? parse_options_loop(argv, (idx + 2), args, _fl_map_set(opts, "output", _fl_get(argv, (idx + 1)))) : (str_starts_with_q(arg, "--") ? parse_options_loop(argv, (idx + 1), args, _fl_map_set(opts, _fl_substring(arg, 2, _fl_length(arg)), true)) : (str_starts_with_q(arg, "-") ? parse_options_loop(argv, (idx + 1), args, _fl_map_set(opts, _fl_substring(arg, 1, _fl_length(arg)), true)) : (true ? parse_options_loop(argv, (idx + 1), _fl_append(args, arg), opts) : null)))); })()); }
+function print_usage() { return _fl_print(_fl_str("\nFreeLang v11.2 (Self-hosted Compiler)\n\n", "Usage:\n", "  fl compile <input.fl> [-o <output.js>] [--runtime]\n", "  fl version\n", "  fl help\n\n", "Options:\n", "  -o, --output <file>  Specify output file\n", "  --runtime           Include runtime helpers in output\n", "  -h, --help          Show this help message\n")); }
+function do_compile(args, opts) { return (() => { let input = _fl_first(args); let output = _fl_get(opts, "output"); return (_fl_null_q(input) ? print_usage() : (() => { let final_out = (_fl_null_q(output) ? _fl_str(input, ".out.js") : output); return compile_file(input, final_out, opts); })()); })(); }
+function compile_file(input, output, opts) { return (() => { let src = _fl_file_read(input); let tokens = lex(src); let ast = parse(tokens); let with_rt = _fl_get(opts, "runtime"); let js = (with_rt ? fl__gtjs_with_prelude(ast) : fl__gtjs_code(ast)); return (() => { _fl_file_write(output, js); return _fl_print(_fl_str("✓ Compiled ", input, " -> ", output)); })(); })(); }
+function cli_main() { return (() => { let argv = _fl_get_argv(); return ((_fl_null_q(argv) || (_fl_length(argv) === 0)) ? print_usage() : (() => { let parsed = parse_options(argv); let cmd = _fl_first(_fl_get(parsed, "args")); let opts = _fl_get(parsed, "opts"); let remaining = _fl_rest(_fl_get(parsed, "args")); return (((cmd === "help") || _fl_get(opts, "help") || _fl_get(opts, "h")) ? print_usage() : ((cmd === "version") ? _fl_print("FreeLang v11.2-RC1 (Self-hosted)") : ((cmd === "compile") ? do_compile(remaining, opts) : (true ? do_compile(_fl_get(parsed, "args"), opts) : null)))); })()); })(); }
+cli_main()
 module.exports = {
   _fl_is_digit_q: _fl_is_digit_q,
   _fl_is_alpha_q: _fl_is_alpha_q,
@@ -521,7 +562,7 @@ module.exports = {
   cg_throw: cg_throw,
   cg_while: cg_while,
   while_body: while_body,
-  cg_loop_sexpr: cg_loop_sexpr,
+  cg_loop: cg_loop,
   loop_inits_1d: loop_inits_1d,
   loop_inits_2d: loop_inits_2d,
   loop_names_1d: loop_names_1d,
@@ -566,6 +607,11 @@ module.exports = {
   cg_native_dispatch: cg_native_dispatch,
   cg_native: cg_native,
   cg_call: cg_call,
+  cg_and: cg_and,
+  cg_or: cg_or,
+  cg_cond: cg_cond,
+  cg_while: cg_while,
+  cg_loop: cg_loop,
   cg_sexpr_dispatch: cg_sexpr_dispatch,
   cg_sexpr: cg_sexpr,
   prelude_string: prelude_string,
@@ -616,6 +662,21 @@ module.exports = {
   str_repeat_loop: str_repeat_loop,
   str_pad_left: str_pad_left,
   str_pad_right: str_pad_right,
+  _fl_upper: _fl_upper,
+  _fl_lower: _fl_lower,
+  _fl_contains_q: _fl_contains_q,
+  str_replace: str_replace,
+  file_read: file_read,
+  file_write: file_write,
+  file_append: file_append,
+  file_exists_q: file_exists_q,
+  file_delete: file_delete,
+  file_copy: file_copy,
+  file_rename: file_rename,
+  file_size: file_size,
+  file_modified: file_modified,
+  file_json: file_json,
+  file_json_write: file_json_write,
   file_lines: file_lines,
   file_mkdir: file_mkdir,
   file_rmdir: file_rmdir,
@@ -638,5 +699,18 @@ module.exports = {
   getcwd: getcwd,
   chdir: chdir,
   pid: pid,
-  pid_parent: pid_parent
+  pid_parent: pid_parent,
+  vector_add: vector_add,
+  vector_dot: vector_dot,
+  vector_magnitude: vector_magnitude,
+  math_sqrt: math_sqrt,
+  math_sqrt_iter: math_sqrt_iter,
+  math_pow: math_pow,
+  cosine_sim: cosine_sim,
+  parse_options: parse_options,
+  parse_options_loop: parse_options_loop,
+  print_usage: print_usage,
+  do_compile: do_compile,
+  compile_file: compile_file,
+  cli_main: cli_main
 };
