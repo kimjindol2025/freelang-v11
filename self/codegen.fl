@@ -410,30 +410,10 @@
 ;; ═══════ Prelude ═══════
 
 [FUNC prelude-parts :params []
-  :body (list
-    "const _fl_str = (...xs) => xs.map(x => x==null?'':String(x)).join('');"
-    "const _fl_length = (x) => (x?x.length:0);"
-    "const _fl_get = (o, k) => {"
-    "  if(o==null) return null;"
-    "  const ks = String(k).startsWith(':') ? k.slice(1) : k;"
-    "  const res = o[ks] !== undefined ? o[ks] : o[k];"
-    "  return res === undefined ? null : res;"
-    "};"
-    "const _fl_some = (f, l) => l.some(x => f(x));"
-    "const some_q = _fl_some;"
-    "const __fl_routes = [];"
-    "const _fl_server_get = (path, fn) => { __fl_routes.push({method:'GET', path, fn}); };"
-    "const _fl_server_start = (port) => {"
-    "  const http = require('http');"
-    "  http.createServer(async (req, res) => {"
-    "    const r = __fl_routes.find(r => r.method===req.method && r.path===require('url').parse(req.url).pathname);"
-    "    if(r){ const result = await (typeof r.fn==='string'?eval(r.fn):r.fn)(req); res.end(String(result)); }"
-    "    else { res.statusCode=404; res.end('Not Found'); }"
-    "  }).listen(port); console.log('Server on ' + port);"
-    "};")]
+  :body (list)]
 
 [FUNC runtime-prelude :params []
-  :body (str "const nil = null;" (reduce (fn [acc p] (str acc p)) "" (prelude-parts)))]
+  :body ""]
 
 [FUNC fl->js-code :params [$ast]
   :body (reduce (fn [acc n] (str acc (cg n) ";\n")) "" $ast)]
