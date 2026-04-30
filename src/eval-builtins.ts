@@ -316,14 +316,11 @@ function flExecOpNative(op: string, vals: any[]): any {
         const savedVars = interp.context.variables.saveStack();
         const moduleScope = new Map<string, any>();
         try {
-          // Empty scope stack for pure module isolation, keeping only global/stdlib if it was at index 0
-          // Wait, just let it use a new push so definitions stay isolated
-          interp.context.variables.push(); 
-          
-          for (const node of ast) {
-            interp.eval(node);
-          }
-          
+          interp.context.variables.push();
+
+          // Use interpret() to properly handle control blocks like [FUNC]
+          (interp as any).interpret(ast);
+
           // Get the scope that was just pushed
           const currentTopScope = (interp.context.variables as any).stack[(interp.context.variables as any).stack.length - 1];
           for (const [k, v] of currentTopScope) {
@@ -619,6 +616,56 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
 
   switch (op) {
     // Phase L1: Module system
+    case "import": {
+      const filePath = String(args[0] ?? "");
+      const fs = require("fs");
+      const path = require("path");
+      try {
+        const resolvedPath = path.resolve(process.cwd(), filePath);
+        const src = fs.readFileSync(resolvedPath, "utf-8");
+        const { lex } = require("./lexer");
+        const { parse } = require("./parser");
+        const tokens = lex(src, resolvedPath);
+        const ast = parse(tokens);
+
+        // Track call stack
+        if ((interp as any).callStack) {
+          (interp as any).callStack.push({ fn: `(import "${filePath}")`, line: -1 });
+        }
+
+        // Save current variable context
+        const savedVars = interp.context.variables.saveStack();
+        const moduleScope = new Map<string, any>();
+        try {
+          interp.context.variables.push();
+
+          // Use interpret() to properly handle control blocks like [FUNC]
+          (interp as any).interpret(ast);
+
+          // Get the scope that was just pushed
+          const currentTopScope = (interp.context.variables as any).stack[(interp.context.variables as any).stack.length - 1];
+          for (const [k, v] of currentTopScope) {
+            moduleScope.set(k, v);
+          }
+        } finally {
+          // Restore previous variable scope completely
+          interp.context.variables.restoreStack(savedVars);
+          if ((interp as any).callStack) {
+            (interp as any).callStack.pop();
+          }
+        }
+
+        // Return a plain object dictionary of exported module bindings
+        const moduleObj: Record<string, any> = {};
+        for (const [k, v] of moduleScope) {
+          moduleObj[k] = v;
+        }
+        return moduleObj;
+      } catch (e: any) {
+        throw new Error(`import failed: '${filePath}': ${e.message}`);
+      }
+    }
+
     case "load": {
       const filePath = String(args[0] ?? "");
       const fs = require("fs");

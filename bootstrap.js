@@ -231,7 +231,7 @@ var init_lexer = __esm({
       ["MODULE", "Module" /* Module */],
       ["TYPECLASS", "TypeClass" /* TypeClass */],
       ["INSTANCE", "Instance" /* Instance */],
-      ["import", "Import" /* Import */],
+      // import는 일반 함수로 처리 (파서 등록 불필요)
       ["open", "Open" /* Open */],
       // Phase 9a: Search functionality keywords
       ["search", "Search" /* Search */],
@@ -958,9 +958,7 @@ var init_parser = __esm({
         this.expect("LParen" /* LParen */);
         let op;
         const opToken = this.advance();
-        if (opToken.type === "Import" /* Import */) {
-          op = "import";
-        } else if (opToken.type === "Open" /* Open */) {
+        if (opToken.type === "Open" /* Open */) {
           op = "open";
         } else if (opToken.type === "Search" /* Search */) {
           op = "search";
@@ -1014,7 +1012,7 @@ var init_parser = __esm({
         } else {
           op = opToken.value;
         }
-        if (op === "import") {
+        if (op === "import" && this.check("Colon" /* Colon */)) {
           const importBlock = this.parseImportExpression();
           this.expect("RParen" /* RParen */);
           return importBlock;
@@ -11475,9 +11473,7 @@ function flExecOpNative(op, vals) {
         const moduleScope = /* @__PURE__ */ new Map();
         try {
           interp.context.variables.push();
-          for (const node of ast) {
-            interp.eval(node);
-          }
+          interp.interpret(ast);
           const currentTopScope = interp.context.variables.stack[interp.context.variables.stack.length - 1];
           for (const [k, v] of currentTopScope) {
             moduleScope.set(k, v);
@@ -11754,6 +11750,44 @@ function evalBuiltin(interp2, op, args2, expr2) {
   const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (op) {
+    case "import": {
+      const filePath = String(args2[0] ?? "");
+      const fs20 = require("fs");
+      const path16 = require("path");
+      try {
+        const resolvedPath = path16.resolve(process.cwd(), filePath);
+        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        if (interp2.callStack) {
+          interp2.callStack.push({ fn: `(import "${filePath}")`, line: -1 });
+        }
+        const savedVars = interp2.context.variables.saveStack();
+        const moduleScope = /* @__PURE__ */ new Map();
+        try {
+          interp2.context.variables.push();
+          interp2.interpret(ast);
+          const currentTopScope = interp2.context.variables.stack[interp2.context.variables.stack.length - 1];
+          for (const [k, v] of currentTopScope) {
+            moduleScope.set(k, v);
+          }
+        } finally {
+          interp2.context.variables.restoreStack(savedVars);
+          if (interp2.callStack) {
+            interp2.callStack.pop();
+          }
+        }
+        const moduleObj = {};
+        for (const [k, v] of moduleScope) {
+          moduleObj[k] = v;
+        }
+        return moduleObj;
+      } catch (e) {
+        throw new Error(`import failed: '${filePath}': ${e.message}`);
+      }
+    }
     case "load": {
       const filePath = String(args2[0] ?? "");
       const fs20 = require("fs");

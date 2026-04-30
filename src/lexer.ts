@@ -10,7 +10,7 @@ const KEYWORDS: Map<string, T> = new Map([
   ["MODULE", T.Module],
   ["TYPECLASS", T.TypeClass],
   ["INSTANCE", T.Instance],
-  ["import", T.Import],
+  // import는 일반 함수로 처리 (파서 등록 불필요)
   ["open", T.Open],
   // Phase 9a: Search functionality keywords
   ["search", T.Search],
