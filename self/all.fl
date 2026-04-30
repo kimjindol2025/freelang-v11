@@ -1456,15 +1456,19 @@
       (/ $dot (* $mag1 $mag2))))]
 
 
+[FUNC do-run :params [$input]
+  :body (let [[$output (str "/tmp/fl-run-" (now-ms) ".js")]]
+          (do
+            (compile-file $input $output)
+            (shell-exec (str "node " $output) "")))]
+
 [FUNC cli-main :params []
   :body (let [[$argv (cli-args)]]
           (if (null? $argv) null
             (if (= (length $argv) 0) null
               (let [[$cmd (get $argv 0)]]
                 (if (= $cmd "run")
-                  (let [[$input (get $argv 1)]
-                        [$output (if (>= (length $argv) 3) (get $argv 2) (str $input ".out.js"))]]
-                    (compile-file $input $output))
+                  (do-run (get $argv 1))
                   (let [[$input (get $argv 0)]
                         [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
                     (compile-file $input $output)))))))]

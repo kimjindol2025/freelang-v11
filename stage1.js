@@ -87,6 +87,7 @@ function _fl_shell_capture(cmd) {
 
 // ─ 기타 ─
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
+function now_ms() { return Date.now(); }
 
 // ─ 글로벌 바인딩 ─
 let __argv__ = _fl_get_argv();
@@ -346,7 +347,8 @@ function math_sqrt(n) { return ((n < 0) ? error("sqrt of negative number") : (()
 function math_sqrt_iter(n, guess) { return (() => { let next = ((guess + (n / guess)) / 2); return (((guess - next) < 0.0001) ? next : math_sqrt_iter(n, next)); })(); }
 function math_pow(base, exp) { return ((exp === 0) ? 1 : ((exp < 0) ? (1 / math_pow(base, (0 - exp))) : (base * math_pow(base, (exp - 1))))); }
 function cosine_sim(v1, v2) { return (() => { let dot = vector_dot(v1, v2); let mag1 = vector_magnitude(v1); let mag2 = vector_magnitude(v2); return (((mag1 === 0) || (mag2 === 0)) ? 0 : (dot / (mag1 * mag2))); })(); }
-function cli_main() { return (() => { let argv = _fl_get_argv(); return (_fl_null_q(argv) ? null : ((_fl_length(argv) === 0) ? null : (() => { let cmd = _fl_get(argv, 0); return ((cmd === "run") ? (() => { let input = _fl_get(argv, 1); let output = ((_fl_length(argv) >= 3) ? _fl_get(argv, 2) : _fl_str(input, ".out.js")); return compile_file(input, output); })() : (() => { let input = _fl_get(argv, 0); let output = ((_fl_length(argv) >= 2) ? _fl_get(argv, 1) : _fl_str(input, ".out.js")); return compile_file(input, output); })()); })())); })(); }
+function do_run(input) { return (() => { let output = _fl_str("/tmp/fl-run-", now_ms(), ".js"); return (() => { compile_file(input, output); return shell_exec(_fl_str("node ", output), ""); })(); })(); }
+function cli_main() { return (() => { let argv = _fl_get_argv(); return (_fl_null_q(argv) ? null : ((_fl_length(argv) === 0) ? null : (() => { let cmd = _fl_get(argv, 0); return ((cmd === "run") ? do_run(_fl_get(argv, 1)) : (() => { let input = _fl_get(argv, 0); let output = ((_fl_length(argv) >= 2) ? _fl_get(argv, 1) : _fl_str(input, ".out.js")); return compile_file(input, output); })()); })())); })(); }
 cli_main()
 module.exports = {
   _fl_is_digit_q: _fl_is_digit_q,
@@ -602,5 +604,11 @@ module.exports = {
   math_sqrt_iter: math_sqrt_iter,
   math_pow: math_pow,
   cosine_sim: cosine_sim,
+  do_run: do_run,
   cli_main: cli_main
 };
+
+// CLI Entry Point
+if (require.main === module) {
+  module.exports.cli_main();
+}
