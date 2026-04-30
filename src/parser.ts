@@ -791,8 +791,8 @@ export class Parser {
     }
 
     // Special case: import expressions (Module System only - with :from clause)
-    // NOTE: Symbol "import"는 함수 호출 (import "/path") - eval-builtins의 normalCall 처리
-    if (op === "import" && this.check(T.Colon)) {
+    // NOTE: import now parses module name next, then optionally :from etc.
+    if (op === "import") {
       const importBlock = this.parseImportExpression();
       this.expect(T.RParen);
       return importBlock;

@@ -1012,7 +1012,7 @@ var init_parser = __esm({
         } else {
           op = opToken.value;
         }
-        if (op === "import" && this.check("Colon" /* Colon */)) {
+        if (op === "import") {
           const importBlock = this.parseImportExpression();
           this.expect("RParen" /* RParen */);
           return importBlock;
@@ -11455,44 +11455,6 @@ function flExecOpNative(op, vals) {
       const specials = ["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"];
       return specials.includes(sop) ? sop : null;
     }
-    case "import": {
-      const filePath = String(v0 ?? "");
-      const fs20 = require("fs");
-      const path16 = require("path");
-      try {
-        const resolvedPath = path16.resolve(process.cwd(), filePath);
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
-        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
-        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
-        const tokens = lex2(src, resolvedPath);
-        const ast = parse3(tokens);
-        if (interp.callStack) {
-          interp.callStack.push({ fn: `(import "${filePath}")`, line: expr.line });
-        }
-        const savedVars = interp.context.variables.saveStack();
-        const moduleScope = /* @__PURE__ */ new Map();
-        try {
-          interp.context.variables.push();
-          interp.interpret(ast);
-          const currentTopScope = interp.context.variables.stack[interp.context.variables.stack.length - 1];
-          for (const [k, v] of currentTopScope) {
-            moduleScope.set(k, v);
-          }
-        } finally {
-          interp.context.variables.restoreStack(savedVars);
-          if (interp.callStack) {
-            interp.callStack.pop();
-          }
-        }
-        const moduleObj = {};
-        for (const [k, v] of moduleScope) {
-          moduleObj[k] = v;
-        }
-        return moduleObj;
-      } catch (e) {
-        throw new Error(`import failed: '${filePath}': ${e.message}`);
-      }
-    }
     case "load": {
       const filePath = String(v0 ?? "");
       const fs20 = require("fs");
@@ -11750,44 +11712,6 @@ function evalBuiltin(interp2, op, args2, expr2) {
   const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (op) {
-    case "import": {
-      const filePath = String(args2[0] ?? "");
-      const fs20 = require("fs");
-      const path16 = require("path");
-      try {
-        const resolvedPath = path16.resolve(process.cwd(), filePath);
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
-        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
-        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
-        const tokens = lex2(src, resolvedPath);
-        const ast = parse3(tokens);
-        if (interp2.callStack) {
-          interp2.callStack.push({ fn: `(import "${filePath}")`, line: -1 });
-        }
-        const savedVars = interp2.context.variables.saveStack();
-        const moduleScope = /* @__PURE__ */ new Map();
-        try {
-          interp2.context.variables.push();
-          interp2.interpret(ast);
-          const currentTopScope = interp2.context.variables.stack[interp2.context.variables.stack.length - 1];
-          for (const [k, v] of currentTopScope) {
-            moduleScope.set(k, v);
-          }
-        } finally {
-          interp2.context.variables.restoreStack(savedVars);
-          if (interp2.callStack) {
-            interp2.callStack.pop();
-          }
-        }
-        const moduleObj = {};
-        for (const [k, v] of moduleScope) {
-          moduleObj[k] = v;
-        }
-        return moduleObj;
-      } catch (e) {
-        throw new Error(`import failed: '${filePath}': ${e.message}`);
-      }
-    }
     case "load": {
       const filePath = String(args2[0] ?? "");
       const fs20 = require("fs");
