@@ -1,0 +1,32 @@
+;; L2 Case 17: Extended Stdlib & AI Operations
+;; 목표: 신규 추가된 stdlib 알리아스 및 벡터 연산 검증
+
+(defn vector-add [v1 v2]
+  (map (fn [i] (+ (get v1 i) (get v2 i)))
+       (range (length v1))))
+
+(defn vector-dot [v1 v2]
+  (reduce (fn [acc i] (+ acc (* (get v1 i) (get v2 i))))
+          0
+          (range (length v1))))
+
+(defn test-extended []
+  (do
+    (println "--- String Aliases ---")
+    (println (str-upper "hello"))      ; "HELLO"
+    (println (str-lower "WORLD"))      ; "world"
+    (println (str-contains "abcde" "bcd")) ; true
+    
+    (println "--- Range ---")
+    (println (range 5))               ; [0 1 2 3 4]
+    (println (range 2 5))             ; [2 3 4]
+    
+    (println "--- Vector Math ---")
+    (let [[v1 [1 2 3]]
+          [v2 [4 5 6]]]
+      (do
+        (println (vector-add v1 v2))   ; [5 7 9]
+        (println (vector-dot v1 v2)))) ; 32
+))
+
+(test-extended)

@@ -258,10 +258,15 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    // Number: digits with optional decimal
-    if (/\d/.test(ch)) {
+    // Number: digits with optional decimal (Phase 11: Added negative number support)
+    if (/\d/.test(ch) || (ch === "-" && i + 1 < source.length && /\d/.test(source[i+1]))) {
       const start = i;
       const startCol = col;
+
+      if (ch === "-") {
+        i++;
+        col++;
+      }
 
       while (i < source.length && /[\d.]/.test(source[i])) {
         i++;

@@ -190,9 +190,13 @@ function lex(source) {
       tokens.push({ type: "Variable" /* Variable */, value: varname, line, col: startCol });
       continue;
     }
-    if (/\d/.test(ch)) {
+    if (/\d/.test(ch) || ch === "-" && i + 1 < source.length && /\d/.test(source[i + 1])) {
       const start = i;
       const startCol = col;
+      if (ch === "-") {
+        i++;
+        col++;
+      }
       while (i < source.length && /[\d.]/.test(source[i])) {
         i++;
         col++;
@@ -25073,6 +25077,9 @@ function _fl_substring(s, a, b) { return s ? (b === undefined ? s.slice(a) : s.s
 function _fl_lower(s) { return String(s || "").toLowerCase(); }
 function _fl_upper(s) { return String(s || "").toUpperCase(); }
 function _fl_trim(s) { return String(s || "").trim(); }
+function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
+function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
+function _fl_range(a, b, s) { let r = []; let start = b === undefined ? 0 : a; let end = b === undefined ? a : b; let step = s || 1; if (step > 0) { for (let i = start; i < end; i += step) r.push(i); } else { for (let i = start; i > end; i += step) r.push(i); } return r; }
 
 // \u2500 \uACE0\uCC28 \uD568\uC218 (Null-safe & Spread) \u2500
 function _fl_map(arr, fn) { return (arr || []).map(x => fn(x)); }
@@ -25099,6 +25106,9 @@ function _fl_shell_capture(cmd) {
 
 // \u2500 \uAE30\uD0C0 \u2500
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
+
+// \u2500 \uAE00\uB85C\uBC8C \uBC14\uC778\uB529 \u2500
+let __argv__ = _fl_get_argv();
 
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 `.trim();
@@ -25136,6 +25146,7 @@ var BINARY_OPS = {
 var BUILTIN_MAP = {
   // 타입 체크
   "null?": "_fl_null_q",
+  "nil?": "_fl_null_q",
   "cli-args": "_fl_get_argv",
   "file_read": "_fl_file_read",
   "file_write": "_fl_file_write",
@@ -25167,15 +25178,22 @@ var BUILTIN_MAP = {
   "append": "_fl_append",
   "slice": "_fl_slice",
   "length": "_fl_length",
+  "range": "_fl_range",
   // 문자열
   "str": "_fl_str",
   "contains?": "_fl_contains_q",
+  "str-contains": "_fl_contains_q",
   "upper": "_fl_upper",
+  "str-upper": "_fl_upper",
   "lower": "_fl_lower",
+  "str-lower": "_fl_lower",
   "trim": "_fl_trim",
+  "str-index-of": "_fl_str_index_of",
+  "str_index_of": "_fl_str_index_of",
   // 맵/객체
   "get": "_fl_get",
   "keys": "_fl_keys",
+  "json_keys": "_fl_keys",
   "map-set": "_fl_map_set",
   "json-set": "_fl_map_set",
   "json_set": "_fl_map_set",
@@ -25394,6 +25412,9 @@ ${exportsStr}
       const right = this.genNode(args2[1]);
       return `(${left} ${BINARY_OPS[op]} ${right})`;
     }
+    if (op === "-" && args2.length === 1) {
+      return `(-${this.genNode(args2[0])})`;
+    }
     if (op === "not" && args2.length === 1) {
       return `(!${this.genNode(args2[0])})`;
     }
@@ -25412,6 +25433,12 @@ ${exportsStr}
       const varName = this.extractVarName(args2[0]);
       const value = this.genNode(args2[1]);
       return `(${varName} = ${value})`;
+    }
+    if (op === "defn" || op === "defun") {
+      const name = this.extractVarName(args2[0]);
+      const params = this.extractParamList(args2[1]);
+      const body = args2[2] ? this.genNode(args2[2]) : "undefined";
+      return `function ${name}(${params.join(", ")}) { return ${body}; }`;
     }
     if (op === "fn") return this.genFn(args2);
     if (op === "do") return this.genDo(args2);

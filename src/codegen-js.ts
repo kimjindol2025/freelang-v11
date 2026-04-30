@@ -48,6 +48,7 @@ const BINARY_OPS: Record<string, string> = {
 const BUILTIN_MAP: Record<string, string> = {
   // 타입 체크
   "null?": "_fl_null_q",
+  "nil?": "_fl_null_q",
   "cli-args": "_fl_get_argv",
   "file_read": "_fl_file_read",
   "file_write": "_fl_file_write",
@@ -80,17 +81,25 @@ const BUILTIN_MAP: Record<string, string> = {
   "rest": "_fl_rest",
   "append": "_fl_append", "slice": "_fl_slice",
   "length": "_fl_length",
+  "range": "_fl_range",
 
   // 문자열
   "str": "_fl_str",
   "contains?": "_fl_contains_q",
+  "str-contains": "_fl_contains_q",
   "upper": "_fl_upper",
+  "str-upper": "_fl_upper",
   "lower": "_fl_lower",
+  "str-lower": "_fl_lower",
   "trim": "_fl_trim",
+
+  "str-index-of": "_fl_str_index_of",
+  "str_index_of": "_fl_str_index_of",
 
   // 맵/객체
   "get": "_fl_get",
   "keys": "_fl_keys",
+  "json_keys": "_fl_keys",
   "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",
   "has-key?": "_fl_has_key_q",
 };
@@ -296,6 +305,10 @@ export class JSCodegen {
       return `(${left} ${BINARY_OPS[op]} ${right})`;
     }
 
+    if (op === "-" && args.length === 1) {
+      return `(-${this.genNode(args[0])})`;
+    }
+
     if (op === "not" && args.length === 1) {
       return `(!${this.genNode(args[0])})`;
     }
@@ -317,6 +330,13 @@ export class JSCodegen {
       const varName = this.extractVarName(args[0]);
       const value = this.genNode(args[1]);
       return `(${varName} = ${value})`;
+    }
+
+    if (op === "defn" || op === "defun") {
+      const name = this.extractVarName(args[0]);
+      const params = this.extractParamList(args[1]);
+      const body = args[2] ? this.genNode(args[2]) : "undefined";
+      return `function ${name}(${params.join(", ")}) { return ${body}; }`;
     }
 
     if (op === "fn") return this.genFn(args);

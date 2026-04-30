@@ -1,8 +1,3 @@
-// FreeLang v11 Runtime Helpers
-// 자가 호스팅 및 런타임 실행을 위한 필수 JS 함수들
-
-export function generateRuntimePreamble(): string {
-  return `
 // ═══════════════════════════════════════════════════════
 // FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
 // ═══════════════════════════════════════════════════════
@@ -91,6 +86,13 @@ function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 let __argv__ = _fl_get_argv();
 
 // ═══════════════════════════════════════════════════════
-`.trim();
-}
 
+function vector_add(v1, v2) { return _fl_map(_fl_range(_fl_length(v1)), ((i) => (_fl_get(v1, i) + _fl_get(v2, i)))); }
+function vector_dot(v1, v2) { return _fl_reduce(_fl_range(_fl_length(v1)), ((acc, i) => (acc + (_fl_get(v1, i) * _fl_get(v2, i)))), 0); }
+function test_extended() { return (() => { _fl_print("--- String Aliases ---"); _fl_print(_fl_upper("hello")); _fl_print(_fl_lower("WORLD")); _fl_print(_fl_contains_q("abcde", "bcd")); _fl_print("--- Range ---"); _fl_print(_fl_range(5)); _fl_print(_fl_range(2, 5)); _fl_print("--- Vector Math ---"); return (() => { let v1 = [1, 2, 3]; let v2 = [4, 5, 6]; return (() => { _fl_print(vector_add(v1, v2)); return _fl_print(vector_dot(v1, v2)); })(); })(); })(); }
+test_extended()
+module.exports = {
+  vector_add: vector_add,
+  vector_dot: vector_dot,
+  test_extended: test_extended
+};

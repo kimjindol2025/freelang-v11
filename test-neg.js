@@ -1,8 +1,3 @@
-// FreeLang v11 Runtime Helpers
-// 자가 호스팅 및 런타임 실행을 위한 필수 JS 함수들
-
-export function generateRuntimePreamble(): string {
-  return `
 // ═══════════════════════════════════════════════════════
 // FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
 // ═══════════════════════════════════════════════════════
@@ -58,8 +53,6 @@ function _fl_lower(s) { return String(s || "").toLowerCase(); }
 function _fl_upper(s) { return String(s || "").toUpperCase(); }
 function _fl_trim(s) { return String(s || "").trim(); }
 function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
-function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
-function _fl_range(a, b, s) { let r = []; let start = b === undefined ? 0 : a; let end = b === undefined ? a : b; let step = s || 1; if (step > 0) { for (let i = start; i < end; i += step) r.push(i); } else { for (let i = start; i > end; i += step) r.push(i); } return r; }
 
 // ─ 고차 함수 (Null-safe & Spread) ─
 function _fl_map(arr, fn) { return (arr || []).map(x => fn(x)); }
@@ -91,6 +84,5 @@ function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 let __argv__ = _fl_get_argv();
 
 // ═══════════════════════════════════════════════════════
-`.trim();
-}
 
+_fl_print((-1))

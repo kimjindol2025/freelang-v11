@@ -1,0 +1,25 @@
+;; Extended String Functions (Phase C-9)
+;; str-upper, str-lower, str-contains 등
+
+[FUNC str-upper :params [$s]
+  :body (let [[$chars (str-split $s "")]]
+          (str-join (map (fn [c]
+            (if (and (>= (char-code-at c 0) 97) (<= (char-code-at c 0) 122))
+              (from-char-code (- (char-code-at c 0) 32))
+              c)) $chars) ""))]
+
+[FUNC str-lower :params [$s]
+  :body (let [[$chars (str-split $s "")]]
+          (str-join (map (fn [c]
+            (if (and (>= (char-code-at c 0) 65) (<= (char-code-at c 0) 90))
+              (from-char-code (+ (char-code-at c 0) 32))
+              c)) $chars) ""))]
+
+[FUNC str-contains :params [$s $substr]
+  :body (not (= -1 (str-index-of $s $substr)))]
+
+[FUNC str-replace :params [$s $old $new]
+  :body (let [[$idx (str-index-of $s $old)]]
+          (if (= $idx -1)
+            $s
+            (str (str-slice $s 0 $idx) $new (str-slice $s (+ $idx (length $old)) (length $s))))))]

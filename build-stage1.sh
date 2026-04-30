@@ -25,9 +25,11 @@ STDLIB_ORDER=(
   "self/stdlib/hash.fl"
   "self/stdlib/time.fl"
   "self/stdlib/string.fl"
+  "self/stdlib/string-extended.fl"
   "self/stdlib/list.fl"
   "self/stdlib/file.fl"
   "self/stdlib/process.fl"
+  "self/stdlib/vector-math.fl"
   # try/catch가 있는 파일들은 제외 (self-parser 미지원)
   # "self/stdlib/test-runner.fl"
   # "self/stdlib/assert.fl"

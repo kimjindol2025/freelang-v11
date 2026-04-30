@@ -8,7 +8,6 @@
       (length "abc")                  ; 3
       (str-upper "hello")             ; "HELLO"
       (str-lower "WORLD")             ; "world"
-      (str-contains "hello" "ell"))      ; true
-)
+      (str-contains "hello" "ell"))))      ; true
 
 (test-strings)

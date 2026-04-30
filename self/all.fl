@@ -1,5 +1,5 @@
 ; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-04-29 15:42:47
+; 2026-04-30 08:50:29
 
 ;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
 ;;
@@ -212,212 +212,212 @@
 ;; 21 기본 원자 (Literal/Variable/Keyword/SExpr)
 ;; ──────────────────────────────────────
 
-[FUNC make-literal :params [$type $value $line]
-  :body {:kind "literal" :type $type :value $value :line $line}]
+[FUNC make-literal :params [type value line]
+  :body {:kind "literal" :type type :value value :line line}]
 
-[FUNC make-variable :params [$name $line]
-  :body {:kind "variable" :name $name :line $line}]
+[FUNC make-variable :params [name line]
+  :body {:kind "variable" :name name :line line}]
 
-[FUNC make-keyword :params [$name $line]
-  :body {:kind "keyword" :name $name :line $line}]
+[FUNC make-keyword :params [name line]
+  :body {:kind "keyword" :name name :line line}]
 
-[FUNC make-sexpr :params [$op $args $line]
-  :body {:kind "sexpr" :op $op :args $args :line $line}]
+[FUNC make-sexpr :params [op args line]
+  :body {:kind "sexpr" :op op :args args :line line}]
 
 ;; ──────────────────────────────────────
 ;; 22 SExpr 편의 + 원시값 래퍼
 ;; ──────────────────────────────────────
 
-[FUNC make-number :params [$v $line]
-  :body (make-literal "number" $v $line)]
+[FUNC make-number :params [v line]
+  :body (make-literal "number" v line)]
 
-[FUNC make-string :params [$v $line]
-  :body (make-literal "string" $v $line)]
+[FUNC make-string :params [v line]
+  :body (make-literal "string" v line)]
 
-[FUNC make-bool :params [$v $line]
-  :body (make-literal "boolean" $v $line)]
+[FUNC make-bool :params [v line]
+  :body (make-literal "boolean" v line)]
 
-[FUNC make-null :params [$line]
-  :body (make-literal "null" null $line)]
+[FUNC make-null :params [line]
+  :body (make-literal "null" null line)]
 
-[FUNC make-symbol :params [$v $line]
-  :body (make-literal "symbol" $v $line)]
+[FUNC make-symbol :params [v line]
+  :body (make-literal "symbol" v line)]
 
 ;; ──────────────────────────────────────
 ;; 23 Block (Array/Map/Named)
 ;; fields 는 items(list) 또는 named map. block 의 type 으로 구분.
 ;; ──────────────────────────────────────
 
-[FUNC make-block :params [$type $name $fields $line]
-  :body {:kind "block" :type $type :name $name :fields $fields :line $line}]
+[FUNC make-block :params [type name fields line]
+  :body {:kind "block" :type type :name name :fields fields :line line}]
 
-[FUNC make-array-block :params [$items $line]
-  :body (make-block "Array" null {:items $items} $line)]
+[FUNC make-array-block :params [items line]
+  :body (make-block "Array" null {:items items} line)]
 
-[FUNC make-map-block :params [$items $line]
-  :body (make-block "Map" null {:items $items} $line)]
+[FUNC make-map-block :params [items line]
+  :body (make-block "Map" null {:items items} line)]
 
 ;; ──────────────────────────────────────
 ;; 24 Pattern 7종
 ;; ──────────────────────────────────────
 
-[FUNC make-pattern-literal :params [$value $line]
-  :body {:kind "pattern-literal" :value $value :line $line}]
+[FUNC make-pattern-literal :params [value line]
+  :body {:kind "pattern-literal" :value value :line line}]
 
-[FUNC make-pattern-variable :params [$name $line]
-  :body {:kind "pattern-variable" :name $name :line $line}]
+[FUNC make-pattern-variable :params [name line]
+  :body {:kind "pattern-variable" :name name :line line}]
 
-[FUNC make-pattern-wildcard :params [$line]
-  :body {:kind "pattern-wildcard" :line $line}]
+[FUNC make-pattern-wildcard :params [line]
+  :body {:kind "pattern-wildcard" :line line}]
 
-[FUNC make-pattern-list :params [$items $rest $line]
-  :body {:kind "pattern-list" :items $items :rest $rest :line $line}]
+[FUNC make-pattern-list :params [items rest line]
+  :body {:kind "pattern-list" :items items :rest rest :line line}]
 
-[FUNC make-pattern-struct :params [$type-name $fields $line]
-  :body {:kind "pattern-struct" :type $type-name :fields $fields :line $line}]
+[FUNC make-pattern-struct :params [type-name fields line]
+  :body {:kind "pattern-struct" :type type-name :fields fields :line line}]
 
-[FUNC make-pattern-or :params [$alternatives $line]
-  :body {:kind "pattern-or" :alternatives $alternatives :line $line}]
+[FUNC make-pattern-or :params [alternatives line]
+  :body {:kind "pattern-or" :alternatives alternatives :line line}]
 
-[FUNC make-pattern-range :params [$start $end $line]
-  :body {:kind "pattern-range" :start $start :end $end :line $line}]
+[FUNC make-pattern-range :params [start end line]
+  :body {:kind "pattern-range" :start start :end end :line line}]
 
 ;; ──────────────────────────────────────
 ;; 25 Pattern matching
 ;; ──────────────────────────────────────
 
-[FUNC make-pattern-match :params [$value $cases $line]
-  :body {:kind "pattern-match" :value $value :cases $cases :line $line}]
+[FUNC make-pattern-match :params [value cases line]
+  :body {:kind "pattern-match" :value value :cases cases :line line}]
 
-[FUNC make-match-case :params [$pattern $guard $body $line]
-  :body {:kind "match-case" :pattern $pattern :guard $guard :body $body :line $line}]
+[FUNC make-match-case :params [pattern guard body line]
+  :body {:kind "match-case" :pattern pattern :guard guard :body body :line line}]
 
 ;; ──────────────────────────────────────
 ;; 26 함수/타입
 ;; ──────────────────────────────────────
 
-[FUNC make-function-value :params [$params $body $captured-env $name]
-  :body {:kind "function-value" :params $params :body $body
-         :capturedEnv $captured-env :name $name}]
+[FUNC make-function-value :params [params body captured-env name]
+  :body {:kind "function-value" :params params :body body
+         :capturedEnv captured-env :name name}]
 
-[FUNC make-type-class :params [$name $generics $methods $line]
-  :body {:kind "type-class" :name $name :generics $generics
-         :methods $methods :line $line}]
+[FUNC make-type-class :params [name generics methods line]
+  :body {:kind "type-class" :name name :generics generics
+         :methods methods :line line}]
 
-[FUNC make-type-class-instance :params [$class-name $type-name $impls $line]
-  :body {:kind "type-class-instance" :class $class-name :type $type-name
-         :impls $impls :line $line}]
+[FUNC make-type-class-instance :params [class-name type-name impls line]
+  :body {:kind "type-class-instance" :class class-name :type type-name
+         :impls impls :line line}]
 
 ;; ──────────────────────────────────────
 ;; 27 Module / Import
 ;; ──────────────────────────────────────
 
-[FUNC make-module-block :params [$name $exports $body $line]
-  :body {:kind "module" :name $name :exports $exports :body $body :line $line}]
+[FUNC make-module-block :params [name exports body line]
+  :body {:kind "module" :name name :exports exports :body body :line line}]
 
-[FUNC make-import-block :params [$path $alias $names $line]
-  :body {:kind "import" :path $path :alias $alias :names $names :line $line}]
+[FUNC make-import-block :params [path alias names line]
+  :body {:kind "import" :path path :alias alias :names names :line line}]
 
-[FUNC make-open-block :params [$module-name $line]
-  :body {:kind "open" :module $module-name :line $line}]
+[FUNC make-open-block :params [module-name line]
+  :body {:kind "open" :module module-name :line line}]
 
 ;; ──────────────────────────────────────
 ;; 28 AI 블록 (SearchBlock / LearnBlock / ReasoningBlock)
 ;; ──────────────────────────────────────
 
-[FUNC make-search-block :params [$query $fields $line]
-  :body {:kind "search-block" :query $query :fields $fields :line $line}]
+[FUNC make-search-block :params [query fields line]
+  :body {:kind "search-block" :query query :fields fields :line line}]
 
-[FUNC make-learn-block :params [$topic $fields $line]
-  :body {:kind "learn-block" :topic $topic :fields $fields :line $line}]
+[FUNC make-learn-block :params [topic fields line]
+  :body {:kind "learn-block" :topic topic :fields fields :line line}]
 
-[FUNC make-reasoning-block :params [$name $fields $line]
-  :body {:kind "reasoning-block" :name $name :fields $fields :line $line}]
+[FUNC make-reasoning-block :params [name fields line]
+  :body {:kind "reasoning-block" :name name :fields fields :line line}]
 
 ;; ──────────────────────────────────────
 ;; 29 Async / Try
 ;; ──────────────────────────────────────
 
-[FUNC make-async-function :params [$name $params $body $line]
-  :body {:kind "async-function" :name $name :params $params :body $body :line $line}]
+[FUNC make-async-function :params [name params body line]
+  :body {:kind "async-function" :name name :params params :body body :line line}]
 
-[FUNC make-await :params [$expr $line]
-  :body {:kind "await" :expr $expr :line $line}]
+[FUNC make-await :params [expr line]
+  :body {:kind "await" :expr expr :line line}]
 
-[FUNC make-try :params [$body $catch $finally $line]
-  :body {:kind "try" :body $body :catch $catch :finally $finally :line $line}]
+[FUNC make-try :params [body catch finally line]
+  :body {:kind "try" :body body :catch catch :finally finally :line line}]
 
-[FUNC make-catch :params [$param $body $line]
-  :body {:kind "catch" :param $param :body $body :line $line}]
+[FUNC make-catch :params [param body line]
+  :body {:kind "catch" :param param :body body :line line}]
 
-[FUNC make-throw :params [$expr $line]
-  :body {:kind "throw" :expr $expr :line $line}]
+[FUNC make-throw :params [expr line]
+  :body {:kind "throw" :expr expr :line line}]
 
-[FUNC make-template-string :params [$parts $expressions $line]
-  :body {:kind "template-string" :parts $parts :expressions $expressions :line $line}]
+[FUNC make-template-string :params [parts expressions line]
+  :body {:kind "template-string" :parts parts :expressions expressions :line line}]
 
-[FUNC make-loop :params [$init $condition $update $body $line]
-  :body {:kind "loop" :init $init :condition $condition :update $update :body $body :line $line}]
+[FUNC make-loop :params [init condition update body line]
+  :body {:kind "loop" :init init :condition condition :update update :body body :line line}]
 
 ;; ──────────────────────────────────────
 ;; 30 웹 노드 + deep-equal?
 ;; ──────────────────────────────────────
 
-[FUNC make-page :params [$name $path $fields $line]
-  :body {:kind "page" :name $name :path $path :fields $fields :line $line}]
+[FUNC make-page :params [name path fields line]
+  :body {:kind "page" :name name :path path :fields fields :line line}]
 
-[FUNC make-route :params [$method $path $handler $line]
-  :body {:kind "route" :method $method :path $path :handler $handler :line $line}]
+[FUNC make-route :params [method path handler line]
+  :body {:kind "route" :method method :path path :handler handler :line line}]
 
-[FUNC make-component :params [$name $fields $line]
-  :body {:kind "component" :name $name :fields $fields :line $line}]
+[FUNC make-component :params [name fields line]
+  :body {:kind "component" :name name :fields fields :line line}]
 
-[FUNC make-form :params [$name $fields $line]
-  :body {:kind "form" :name $name :fields $fields :line $line}]
+[FUNC make-form :params [name fields line]
+  :body {:kind "form" :name name :fields fields :line line}]
 
 ;; deep-equal? — 노드 비교 (line 무시)
 ;; Map 이면 모든 키를 순회, list 면 원소별, 원시값은 =.
 
-[FUNC deep-equal? :params [$a $b]
+[FUNC deep-equal? :params [a b]
   :body (cond
-          [(and (null? $a) (null? $b)) true]
-          [(or  (null? $a) (null? $b)) false]
-          [(and (list? $a) (list? $b)) (deep-equal-list? $a $b 0)]
-          [(and (map? $a) (map? $b))   (deep-equal-map? $a $b)]
-          [true (= $a $b)])]
+          [(and (null? a) (null? b)) true]
+          [(or  (null? a) (null? b)) false]
+          [(and (list? a) (list? b)) (deep-equal-list? a b 0)]
+          [(and (map? a) (map? b))   (deep-equal-map? a b)]
+          [true (= a b)])]
 
-[FUNC deep-equal-list? :params [$a $b $i]
+[FUNC deep-equal-list? :params [a b i]
   :body (cond
-          [(not (= (length $a) (length $b))) false]
-          [(>= $i (length $a)) true]
-          [(not (deep-equal? (get $a $i) (get $b $i))) false]
-          [true (deep-equal-list? $a $b (+ $i 1))])]
+          [(not (= (length a) (length b))) false]
+          [(>= i (length a)) true]
+          [(not (deep-equal? (get a i) (get b i))) false]
+          [true (deep-equal-list? a b (+ i 1))])]
 
 ;; Map 비교: :line 은 무시. keys 정렬 후 각 키의 값 비교.
-[FUNC deep-equal-map? :params [$a $b]
-  :body (let [[$ka (keys-no-line $a)]
-              [$kb (keys-no-line $b)]]
-          (if (not (= (length $ka) (length $kb))) false
-            (deep-equal-map-keys? $a $b $ka 0)))]
+[FUNC deep-equal-map? :params [a b]
+  :body (let [[ka (keys-no-line a)]
+              [kb (keys-no-line b)]]
+          (if (not (= (length ka) (length kb))) false
+            (deep-equal-map-keys? a b ka 0)))]
 
-[FUNC keys-no-line :params [$m]
-  :body (filter (fn [$k] (not (= $k "line"))) (json_keys $m))]
+[FUNC keys-no-line :params [m]
+  :body (filter (fn [k] (not (= k "line"))) (json_keys m))]
 
-[FUNC deep-equal-map-keys? :params [$a $b $ks $i]
+[FUNC deep-equal-map-keys? :params [a b ks i]
   :body (cond
-          [(>= $i (length $ks)) true]
-          [(let [[$k (get $ks $i)]]
-             (not (deep-equal? (get $a $k) (get $b $k)))) false]
-          [true (deep-equal-map-keys? $a $b $ks (+ $i 1))])]
+          [(>= i (length ks)) true]
+          [(let [[k (get ks i)]]
+             (not (deep-equal? (get a k) (get b k)))) false]
+          [true (deep-equal-map-keys? a b ks (+ i 1))])]
 
 ;; 타입 감지 헬퍼 (FL 에 list?/map? 기본 없으면 대체)
-[FUNC list? :params [$v]
-  :body (if (null? $v) false
-          (= (str-to-num (str "[" $v)) null))]  ;; 플레이스홀더. 실제로는 런타임이 Array 타입 제공 필요.
+[FUNC list? :params [v]
+  :body (if (null? v) false
+          (= (str-to-num (str "[" v)) null))]  ;; 플레이스홀더. 실제로는 런타임이 Array 타입 제공 필요.
 
-[FUNC map? :params [$v]
-  :body (if (null? $v) false
-          (not (null? (get $v :kind))))]  ;; kind 키가 있으면 AST map 으로 간주
+[FUNC map? :params [v]
+  :body (if (null? v) false
+          (not (null? (get v :kind))))]  ;; kind 키가 있으면 AST map 으로 간주
 
 ;; NOTE: list?/map? 의 robust 한 구현은 FL 런타임 지원 필요 (Phase 07 builtins/type 에서 교체).
 ;; 현재는 AST 비교에 사용될 때만 동작하는 placeholder.
@@ -926,7 +926,9 @@
                                  (get (get $first-item :fields) "items")
                                  null))]
               [$nested (and (not (null? $inner-items))
-                           (> (length $inner-items) 0))]
+                           (> (length $inner-items) 0)
+                           (= (get (get $inner-items 0) :kind) "block")
+                           (= (get (get $inner-items 0) :type) "Array"))]
               [$bindings (if $nested (cg-let-2d $items 0 "" 0) (cg-let-1d $items 0 "" 0))]
               [$body-args (slice $args 1 (length $args))]
               [$body-js (cg-do-body $body-args 0 "")]]
@@ -1055,7 +1057,7 @@
 ;; (loop [[$i 0] [$acc 0]] body-with-recur)
 ;;   → mutable let + while(true) { const __r=...; if(__r?.__recur){[i,acc]=__r.a;continue;} return __r; }
 ;; recur 는 { __recur:true, a:[v1,v2,...] } 를 반환
-[FUNC cg-loop-sexpr :params [$args]
+[FUNC cg-loop :params [$args]
   :body (let [[$bnode (get $args 0)]
               [$items (get (get $bnode :fields) "items")]
               [$first (if (null? $items) null (get $items 0))]
@@ -1566,6 +1568,41 @@
 
 ;; ═══════ sexpr 메인 dispatch ═══════
 
+
+[FUNC cg-and :params [$args]
+  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " && ") ")")]
+
+[FUNC cg-or :params [$args]
+  :body (str "(" (join (map (fn [$a] (cg $a)) $args) " || ") ")")]
+
+[FUNC cg-cond :params [$args]
+  :body (let [[$n (length $args)]]
+          (if (= $n 0) "null"
+            (let [[$last-idx (- $n 1)]
+                  [$loop (fn [$i $acc]
+                           (if (< $i 0) $acc
+                             (let [[$pair (get $args $i)]
+                                   [$items (if (and (= (get $pair :kind) "block") (= (get $pair :type) "Array"))
+                                              (get (get $pair :fields) "items")
+                                              $pair)]
+                                   [$test (cg (get $items 0))]
+                                   [$body (cg (get $items 1))]]
+                               ($loop (- $i 1) (str "(" $test " ? " $body " : " $acc ")")))))]]
+              ($loop $last-idx "null"))))]
+
+[FUNC cg-while :params [$args]
+  :body (str "(() => { while(" (cg (get $args 0)) ") { " (join (map (fn [$a] (cg $a)) (rest $args)) "; ") " } })()")]
+
+[FUNC cg-loop :params [$args]
+  :body (let [[$bindings (get (get (get $args 0) :fields) "items")]
+              [$body-exprs (rest $args)]
+              [$inits (fn [$i $acc]
+                        (if (>= $i (length $bindings)) $acc
+                          (let [[$name (js-name (get (get $bindings $i) :name))]
+                                [$val (cg (get $bindings (+ $i 1)))]]
+                            ($inits (+ $i 2) (str $acc "let " $name " = " $val "; ")))))]]
+          (str "(() => { " ($inits 0 "") "while(true) { " (join (map (fn [$a] (cg $a)) $body-exprs) "; ") "; break; } })()"))]
+
 [FUNC cg-sexpr-dispatch :params [$op $args]
   :body (cond
           [(= $op "if")      (cg-if $args)]
@@ -1583,7 +1620,7 @@
           [(= $op "throw")   (cg-throw $args)]
           [(= $op "try")     (cg-try $args)]
           [(= $op "while")   (cg-while $args)]
-          [(= $op "loop")    (cg-loop-sexpr $args)]
+          [(= $op "loop")    (cg-loop $args)]
           [(= $op "recur")   (cg-recur $args)]
           [(= $op "defstruct") (cg-defstruct $args)]
           [(= $op "compose") (cg-compose $args)]
@@ -1761,104 +1798,104 @@
 ;; 순수 데이터 변환 함수
 
 ;; 줄 분리
-[FUNC str-lines :params [$s]
-  :body (split $s "\n")]
+[FUNC str-lines :params [s]
+  :body (split s "\n")]
 
 ;; 단어 분리
-[FUNC str-words :params [$s]
-  :body (split (trim $s) " ")]
+[FUNC str-words :params [s]
+  :body (split (trim s) " ")]
 
 ;; 줄 합치기
-[FUNC str-join-lines :params [$lines]
-  :body (str-join-loop $lines 0 "")]
-[FUNC str-join-loop :params [$lst $i $acc]
-  :body (if (>= $i (length $lst)) $acc
-          (str-join-loop $lst (+ $i 1)
-            (if (= $i 0) (get $lst 0) (str $acc "\n" (get $lst $i)))))]
+[FUNC str-join-lines :params [lines]
+  :body (str-join-loop lines 0 "")]
+[FUNC str-join-loop :params [lst i acc]
+  :body (if (>= i (length lst)) acc
+          (str-join-loop lst (+ i 1)
+            (if (= i 0) (get lst 0) (str acc "\n" (get lst i)))))]
 
 ;; 부분 문자열 출현 횟수
-[FUNC str-count :params [$s $sub]
-  :body (if (= (length $sub) 0) 0
-          (str-count-loop $s $sub 0 0))]
-[FUNC str-count-loop :params [$s $sub $pos $acc]
-  :body (let [[$rest (substring $s $pos (length $s))]
-              [$idx (index-of $rest $sub)]]
-          (if (< $idx 0) $acc
-            (str-count-loop $s $sub (+ $pos $idx (length $sub)) (+ $acc 1))))]
+[FUNC str-count :params [s sub]
+  :body (if (= (length sub) 0) 0
+          (str-count-loop s sub 0 0))]
+[FUNC str-count-loop :params [s sub pos acc]
+  :body (let [[rest (substring s pos (length s))]
+              [idx (index-of rest sub)]]
+          (if (< idx 0) acc
+            (str-count-loop s sub (+ pos idx (length sub)) (+ acc 1))))]
 
 ;; CSV 행 파싱 (간단한 버전, 따옴표 미지원)
-[FUNC csv-parse-line :params [$line]
-  :body (split $line ",")]
+[FUNC csv-parse-line :params [line]
+  :body (split line ",")]
 
 ;; CSV 본문 파싱
-[FUNC csv-parse :params [$csv]
-  :body (let [[$lines (split $csv "\n")]]
-          (csv-parse-loop $lines 0 (list)))]
-[FUNC csv-parse-loop :params [$lines $i $acc]
-  :body (if (>= $i (length $lines)) $acc
-          (csv-parse-loop $lines (+ $i 1)
-            (append $acc (csv-parse-line (get $lines $i)))))]
+[FUNC csv-parse :params [csv]
+  :body (let [[lines (split csv "\n")]]
+          (csv-parse-loop lines 0 (list)))]
+[FUNC csv-parse-loop :params [lines i acc]
+  :body (if (>= i (length lines)) acc
+          (csv-parse-loop lines (+ i 1)
+            (append acc (csv-parse-line (get lines i)))))]
 
 ;; 문자열 반복
-[FUNC str-repeat :params [$s $n]
-  :body (if (<= $n 0) ""
-          (str-repeat-loop $s $n 0 ""))]
-[FUNC str-repeat-loop :params [$s $n $i $acc]
-  :body (if (>= $i $n) $acc
-          (str-repeat-loop $s $n (+ $i 1) (str $acc $s)))]
+[FUNC str-repeat :params [s n]
+  :body (if (<= n 0) ""
+          (str-repeat-loop s n 0 ""))]
+[FUNC str-repeat-loop :params [s n i acc]
+  :body (if (>= i n) acc
+          (str-repeat-loop s n (+ i 1) (str acc s)))]
 
 ;; JSON 헬퍼 (json.fl 기반)
-[FUNC data-json-parse :params [$s]
-  :body (json-parse $s)]
+[FUNC data-json-parse :params [s]
+  :body (json-parse s)]
 
-[FUNC data-json-str :params [$obj]
-  :body (json-stringify $obj)]
+[FUNC data-json-str :params [obj]
+  :body (json-stringify obj)]
 
-[FUNC data-json-pretty :params [$obj]
-  :body (json-stringify $obj)]
+[FUNC data-json-pretty :params [obj]
+  :body (json-stringify obj)]
 
 ;; 객체를 쿼리 문자열로 변환
-[FUNC to-query-string :params [$obj]
-  :body (to-query-loop (keys $obj) $obj 0 (list))]
-[FUNC to-query-loop :params [$ks $obj $i $acc]
-  :body (if (>= $i (length $ks)) (join $acc "&")
-          (let [[$k (get $ks $i)]
-                [$v (get $obj $k)]]
-            (to-query-loop $ks $obj (+ $i 1)
-              (append $acc (str $k "=" $v)))))]
+[FUNC to-query-string :params [obj]
+  :body (to-query-loop (keys obj) obj 0 (list))]
+[FUNC to-query-loop :params [ks obj i acc]
+  :body (if (>= i (length ks)) (join acc "&")
+          (let [[k (get ks i)]
+                [v (get obj k)]]
+            (to-query-loop ks obj (+ i 1)
+              (append acc (str k "=" v)))))]
 
 ;; self/stdlib/hash.fl — Phase 26 Part 3
 ;; 해시 함수
 
-[FUNC hash-simple :params [$s]
-  :body (hash-simple-loop (str $s) 0 5381 0)]
-[FUNC hash-simple-loop :params [$s $i $hash $max]
-  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
-          (hash-simple-loop $s (+ $i 1)
-            (+ (* $hash 33) (char-code-at $s $i)) (+ $i 1)))]
+[FUNC hash-simple :params [s]
+  :body (hash-simple-loop (str s) 0 5381 0)]
+[FUNC hash-simple-loop :params [s i hash max]
+  :body (if (>= i (length s)) (% (abs hash) 2147483647)
+          (hash-simple-loop s (+ i 1)
+            (+ (* hash 33) (char-code-at s i)) (+ i 1)))]
 
-[FUNC hash-fnv1a :params [$s]
-  :body (let [[$fnv-offset 2166136261]
-              [$fnv-prime 16777619]]
-          (hash-fnv-loop (str $s) 0 $fnv-offset))]
-[FUNC hash-fnv-loop :params [$s $i $hash]
-  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
-          (hash-fnv-loop $s (+ $i 1)
-            (* (bit-xor $hash (char-code-at $s $i)) 16777619)))]
+[FUNC hash-fnv1a :params [s]
+  :body (let [[fnv-offset 2166136261]
+              [fnv-prime 16777619]]
+          (hash-fnv-loop (str s) 0 fnv-offset))]
+[FUNC hash-fnv-loop :params [s i hash]
+  :body (if (>= i (length s)) (% (abs hash) 2147483647)
+          (hash-fnv-loop s (+ i 1)
+            (* (bit-xor hash (char-code-at s i)) 16777619)))]
 
-[FUNC hash-djb2 :params [$s]
-  :body (hash-djb-loop (str $s) 0 5381)]
-[FUNC hash-djb-loop :params [$s $i $hash]
-  :body (if (>= $i (length $s)) (% (abs $hash) 2147483647)
-          (hash-djb-loop $s (+ $i 1)
-            (+ (* $hash 33) (char-code-at $s $i))))]
+[FUNC hash-djb2 :params [s]
+  :body (hash-djb-loop (str s) 0 5381)]
+[FUNC hash-djb-loop :params [s i hash]
+  :body (if (>= i (length s)) (% (abs hash) 2147483647)
+          (hash-djb-loop s (+ i 1)
+            (+ (* hash 33) (char-code-at s i))))]
 
-[FUNC hash-object :params [$obj]
-  :body (hash-simple (json-stringify $obj))]
+[FUNC hash-object :params [obj]
+  :body (hash-simple (json-stringify obj))]
 
-[FUNC hash-consistent :params [$s $seed]
-  :body (let [[$h (hash-simple $s)]]
-          (% (+ (* $h $seed) $seed) 2147483647))]
+[FUNC hash-consistent :params [s seed]
+  :body (let [[h (hash-simple s)]]
+          (% (+ (* h seed) seed) 2147483647))]
 
 ;; self/stdlib/time.fl — 시간 관련 stdlib (v12-candidate 호환)
 ;;
@@ -1869,132 +1906,249 @@
 
 [FUNC now-s :params [] :body (floor (/ (now) 1000))]
 
-[FUNC time-diff-ms :params [$t1 $t2] :body (- $t2 $t1)]
-[FUNC time-elapsed :params [$start] :body (- (now) $start)]
+[FUNC time-diff-ms :params [t1 t2] :body (- t2 t1)]
+[FUNC time-elapsed :params [start] :body (- (now) start)]
 
-[FUNC date-parts :params [$ts]
-  :body {:ts $ts :s (floor (/ $ts 1000))
-         :m (floor (/ $ts 60000))
-         :h (floor (/ $ts 3600000))
-         :d (floor (/ $ts 86400000))}]
+[FUNC date-parts :params [ts]
+  :body {:ts ts :s (floor (/ ts 1000))
+         :m (floor (/ ts 60000))
+         :h (floor (/ ts 3600000))
+         :d (floor (/ ts 86400000))}]
 
-[FUNC ts-to-s :params [$ts] :body (floor (/ $ts 1000))]
-[FUNC s-to-ts :params [$s] :body (* $s 1000)]
+[FUNC ts-to-s :params [ts] :body (floor (/ ts 1000))]
+[FUNC s-to-ts :params [s] :body (* s 1000)]
 
-[FUNC time-ago :params [$ts]
-  :body (let [[$diff (- (now) $ts)]
-              [$s (floor (/ $diff 1000))]
-              [$m (floor (/ $s 60))]
-              [$h (floor (/ $m 60))]
-              [$d (floor (/ $h 24))]]
-          (cond [(< $s 60) (str $s "s ago")]
-                [(< $m 60) (str $m "m ago")]
-                [(< $h 24) (str $h "h ago")]
-                [true (str $d "d ago")]))]
+[FUNC time-ago :params [ts]
+  :body (let [[diff (- (now) ts)]
+              [s (floor (/ diff 1000))]
+              [m (floor (/ s 60))]
+              [h (floor (/ m 60))]
+              [d (floor (/ h 24))]]
+          (cond [(< s 60) (str s "s ago")]
+                [(< m 60) (str m "m ago")]
+                [(< h 24) (str h "h ago")]
+                [true (str d "d ago")]))]
 
 ;; self/stdlib/string.fl — Phase 08/87
 
-[FUNC str-starts-with? :params [$s $prefix]
-  :body (if (> (length $prefix) (length $s)) false
-          (= (substring $s 0 (length $prefix)) $prefix))]
+[FUNC str-starts-with? :params [s prefix]
+  :body (if (> (length prefix) (length s)) false
+          (= (substring s 0 (length prefix)) prefix))]
 
-[FUNC str-ends-with? :params [$s $suffix]
-  :body (if (> (length $suffix) (length $s)) false
-          (= (substring $s (- (length $s) (length $suffix)) (length $s)) $suffix))]
+[FUNC str-ends-with? :params [s suffix]
+  :body (if (> (length suffix) (length s)) false
+          (= (substring s (- (length s) (length suffix)) (length s)) suffix))]
 
-[FUNC str-repeat :params [$s $n] :body (str-repeat-loop $s $n "")]
-[FUNC str-repeat-loop :params [$s $n $acc]
-  :body (if (<= $n 0) $acc (str-repeat-loop $s (- $n 1) (str $acc $s)))]
+[FUNC str-repeat :params [s n] :body (str-repeat-loop s n "")]
+[FUNC str-repeat-loop :params [s n acc]
+  :body (if (<= n 0) acc (str-repeat-loop s (- n 1) (str acc s)))]
 
-[FUNC str-pad-left :params [$s $n $pad]
-  :body (let [[$diff (- $n (length $s))]]
-          (if (<= $diff 0) $s (str (str-repeat $pad $diff) $s)))]
+[FUNC str-pad-left :params [s n pad]
+  :body (let [[diff (- n (length s))]]
+          (if (<= diff 0) s (str (str-repeat pad diff) s)))]
 
-[FUNC str-pad-right :params [$s $n $pad]
-  :body (let [[$diff (- $n (length $s))]]
-          (if (<= $diff 0) $s (str $s (str-repeat $pad $diff))))]
+[FUNC str-pad-right :params [s n pad]
+  :body (let [[diff (- n (length s))]]
+          (if (<= diff 0) s (str s (str-repeat pad diff))))]
 
-;; file I/O: use file_read, file_write, file_exists, etc. directly (native)
+;; Extended String Functions (Phase C-9)
+;; str-upper, str-lower, str-contains 등
 
-[FUNC file-lines :params [$path]
-  :body (str-lines (file_read (str $path)))]
+[FUNC str-upper :params [$s]
+  :body (let [[$chars (str-split $s "")]]
+          (str-join (map (fn [c]
+            (if (and (>= (char-code-at c 0) 97) (<= (char-code-at c 0) 122))
+              (from-char-code (- (char-code-at c 0) 32))
+              c)) $chars) ""))]
 
-[FUNC file-mkdir :params [$path]
-  :body (file_mkdir (str $path))]
+[FUNC str-lower :params [$s]
+  :body (let [[$chars (str-split $s "")]]
+          (str-join (map (fn [c]
+            (if (and (>= (char-code-at c 0) 65) (<= (char-code-at c 0) 90))
+              (from-char-code (+ (char-code-at c 0) 32))
+              c)) $chars) ""))]
 
-[FUNC file-rmdir :params [$path]
-  :body (file_rmdir (str $path))]
+[FUNC str-contains :params [$s $substr]
+  :body (not (= -1 (str-index-of $s $substr)))]
 
-[FUNC file-list :params [$path]
-  :body (file_list (str $path))]
+[FUNC str-replace :params [$s $old $new]
+  :body (let [[$idx (str-index-of $s $old)]]
+          (if (= $idx -1)
+            $s
+            (str (str-slice $s 0 $idx) $new (str-slice $s (+ $idx (length $old)) (length $s))))))]
 
-[FUNC file-is-file? :params [$path]
-  :body (file_is_file (str $path))]
+;; self/stdlib/file.fl — Phase 27
+;; 파일 I/O 연산 (native file_* builtin wrapper)
 
-[FUNC file-is-dir? :params [$path]
-  :body (file_is_dir (str $path))]
+[FUNC file-read :params [path]
+  :body (file_read (str path))]
+
+[FUNC file-write :params [path content]
+  :body (file_write (str path) (str content))]
+
+[FUNC file-append :params [path content]
+  :body (file_append (str path) (str content))]
+
+[FUNC file-exists? :params [path]
+  :body (file_exists (str path))]
+
+[FUNC file-delete :params [path]
+  :body (file_delete (str path))]
+
+[FUNC file-copy :params [src dest]
+  :body (file_copy (str src) (str dest))]
+
+[FUNC file-rename :params [old new]
+  :body (file_rename (str old) (str new))]
+
+[FUNC file-size :params [path]
+  :body (file_size (str path))]
+
+[FUNC file-modified :params [path]
+  :body (file_modified (str path))]
+
+[FUNC file-json :params [path]
+  :body (json-parse (file_read (str path)))]
+
+[FUNC file-json-write :params [path obj]
+  :body (file_write (str path) (json-stringify obj))]
+
+[FUNC file-lines :params [path]
+  :body (str-lines (file_read (str path)))]
+
+[FUNC file-mkdir :params [path]
+  :body (file_mkdir (str path))]
+
+[FUNC file-rmdir :params [path]
+  :body (file_rmdir (str path))]
+
+[FUNC file-list :params [path]
+  :body (file_list (str path))]
+
+[FUNC file-is-file? :params [path]
+  :body (file_is_file (str path))]
+
+[FUNC file-is-dir? :params [path]
+  :body (file_is_dir (str path))]
 
 ;; self/stdlib/process.fl — Phase 27
 ;; 프로세스/쉘 연산 (native process_* builtin wrapper)
 
-[FUNC process-run :params [$cmd]
-  :body (process_run (str $cmd))]
+[FUNC process-run :params [cmd]
+  :body (process_run (str cmd))]
 
-[FUNC process-run-args :params [$cmd $args]
-  :body (process_run_args (str $cmd) $args)]
+[FUNC process-run-args :params [cmd args]
+  :body (process_run_args (str cmd) args)]
 
-[FUNC process-exec :params [$cmd]
-  :body (process_exec (str $cmd))]
+[FUNC process-exec :params [cmd]
+  :body (process_exec (str cmd))]
 
-[FUNC process-exec-args :params [$cmd $args]
-  :body (process_exec_args (str $cmd) $args)]
+[FUNC process-exec-args :params [cmd args]
+  :body (process_exec_args (str cmd) args)]
 
-[FUNC process-spawn :params [$cmd $args]
-  :body (process_spawn (str $cmd) $args)]
+[FUNC process-spawn :params [cmd args]
+  :body (process_spawn (str cmd) args)]
 
-[FUNC process-kill :params [$pid]
-  :body (process_kill (floor $pid))]
+[FUNC process-kill :params [pid]
+  :body (process_kill (floor pid))]
 
-[FUNC process-exists? :params [$pid]
-  :body (process_exists (floor $pid))]
+[FUNC process-exists? :params [pid]
+  :body (process_exists (floor pid))]
 
-[FUNC process-wait :params [$pid]
-  :body (process_wait (floor $pid))]
+[FUNC process-wait :params [pid]
+  :body (process_wait (floor pid))]
 
-[FUNC shell-run :params [$cmd]
-  :body (process_exec (str $cmd))]
+[FUNC shell-run :params [cmd]
+  :body (process_exec (str cmd))]
 
-[FUNC shell-pipe :params [$cmd1 $cmd2]
-  :body (process_exec (str $cmd1 " | " $cmd2))]
+[FUNC shell-pipe :params [cmd1 cmd2]
+  :body (process_exec (str cmd1 " | " cmd2))]
 
-[FUNC env-get :params [$key]
-  :body (env_get (str $key))]
+[FUNC env-get :params [key]
+  :body (env_get (str key))]
 
-[FUNC env-set :params [$key $value]
-  :body (env_set (str $key) (str $value))]
+[FUNC env-set :params [key value]
+  :body (env_set (str key) (str value))]
 
 [FUNC env-all :params []
   :body (env_all)]
 
 [FUNC getcwd :params [] :body (process_getcwd)]
 
-[FUNC chdir :params [$path]
-  :body (process_chdir (str $path))]
+[FUNC chdir :params [path]
+  :body (process_chdir (str path))]
 
 [FUNC pid :params [] :body (process_pid)]
 
 [FUNC pid-parent :params [] :body (process_ppid)]
 
+;; Vector Math Functions (Phase C-9)
+;; vector-add, vector-dot, vector-magnitude, math-sqrt
 
-;; Entry point: $__argv__ is set by bootstrap.js as extra CLI args
-(if (nil? $__argv__) null
-  (if (= (length $__argv__) 0) null
-    (let [[$cmd (get $__argv__ 0)]]
-      (if (= $cmd "run")
-        (let [[$input (get $__argv__ 1)]
-              [$output (if (>= (length $__argv__) 3) (get $__argv__ 2) (str $input ".out.js"))]]
-          (compile-file $input $output))
-        (let [[$input (get $__argv__ 0)]
-              [$output (if (>= (length $__argv__) 2) (get $__argv__ 1) (str $input ".out.js"))]]
-          (compile-file $input $output))))))
+[FUNC vector-add :params [$v1 $v2]
+  :body (map (fn [$i]
+    (+ (get $v1 $i) (get $v2 $i)))
+    (range 0 (length $v1)))]
+
+[FUNC vector-dot :params [$v1 $v2]
+  :body (reduce (fn [$acc $i]
+    (+ $acc (* (get $v1 $i) (get $v2 $i))))
+    0
+    (range 0 (length $v1)))]
+
+[FUNC vector-magnitude :params [$v]
+  :body (math-sqrt
+    (reduce (fn [$acc $x]
+      (+ $acc (* $x $x)))
+      0
+      $v))]
+
+[FUNC math-sqrt :params [$n]
+  :body (if (< $n 0)
+    (error "sqrt of negative number")
+    (let [[$x (/ $n 2)]]
+      (if (= $x 0)
+        0
+        (let [[$next (/ (+ $x (/ $n $x)) 2)]]
+          (if (< (- $x $next) 0.0001)
+            $next
+            (math-sqrt-iter $n $next))))))]
+
+[FUNC math-sqrt-iter :params [$n $guess]
+  :body (let [[$next (/ (+ $guess (/ $n $guess)) 2)]]
+          (if (< (- $guess $next) 0.0001)
+            $next
+            (math-sqrt-iter $n $next)))]
+
+[FUNC math-pow :params [$base $exp]
+  :body (if (= $exp 0)
+    1
+    (if (< $exp 0)
+      (/ 1 (math-pow $base (- 0 $exp)))
+      (* $base (math-pow $base (- $exp 1)))))]
+
+[FUNC cosine-sim :params [$v1 $v2]
+  :body (let [[$dot (vector-dot $v1 $v2)]
+              [$mag1 (vector-magnitude $v1)]
+              [$mag2 (vector-magnitude $v2)]]
+    (if (or (= $mag1 0) (= $mag2 0))
+      0
+      (/ $dot (* $mag1 $mag2))))]
+
+
+[FUNC cli-main :params []
+  :body (let [[$argv (cli-args)]]
+          (if (null? $argv) null
+            (if (= (length $argv) 0) null
+              (let [[$cmd (get $argv 0)]]
+                (if (= $cmd "run")
+                  (let [[$input (get $argv 1)]
+                        [$output (if (>= (length $argv) 3) (get $argv 2) (str $input ".out.js"))]]
+                    (compile-file $input $output))
+                  (let [[$input (get $argv 0)]
+                        [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
+                    (compile-file $input $output)))))))]
+
+;; Entry point trigger
+(cli-main)
 
