@@ -48,6 +48,15 @@ cg-*.js
 # Documentation artifacts
 BEAUTY_APP_ROADMAP.md
 PROJECT_TEMPLATE.md
+
+# Test files (exclude from gogs push)
+**/*.test.js
+**/*.test.fl
+**/*.spec.js
+**/test-*.js
+/test/
+/tests/
+__tests__/
 ROADMAP_PHASES_8_15.md
 SELF_HOSTING_*.md
 VERIFICATION_REPORT_*.md
