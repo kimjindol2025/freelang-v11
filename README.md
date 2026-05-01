@@ -143,6 +143,7 @@ src/*.ts  →  npm run build  →  npm test  →  git push
 | `npm run verify:fixed-point` | self-hosting 고정점 검증 | ~2m |
 | `npm run verify:build-deterministic` | 빌드 결정론 체크 | ~1m |
 | `bash scripts/verify-all.sh` | 통합 검증 대시보드 | ~5m |
+| `python3 scripts/check-parens.py app/*.fl` | 괄호 균형 검증 (line:col) | 즉시 |
 
 > `bootstrap.js` 직접 수정 금지 — 빌드 시 덮어씌워짐
 
