@@ -979,10 +979,17 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "rest":
       return args[0]?.slice(1);
     // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
-    case "keys":
-      return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.keys(args[0]) : [];
-    case "values":
-      return args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) ? Object.values(args[0]) : [];
+    case "keys": {
+      const kObj = args[0];
+      if (kObj instanceof Map) return Array.from(kObj.keys());
+      return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
+    }
+    case "vals":
+    case "values": {
+      const vObj = args[0];
+      if (vObj instanceof Map) return Array.from(vObj.values());
+      return vObj && typeof vObj === "object" && !Array.isArray(vObj) ? Object.values(vObj) : [];
+    }
     case "upper-case":
       return typeof args[0] === "string" ? args[0].toUpperCase() : args[0];
     case "lower-case":
@@ -1155,6 +1162,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     case "is-symbol?":
       return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args[0]));
     case "split":
+      return typeof args[0] === "string" ? args[0].split(String(args[1] ?? "")) : [];
     case "error":
       throw new Error(String(args[0]));
     case "nil?":

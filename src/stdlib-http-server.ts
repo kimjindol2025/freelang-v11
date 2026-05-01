@@ -513,10 +513,10 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     },
 
     // server_status code body -> response object
-    "server_status": (code: number, body: any): Record<string, any> => {
+    "server_status": (code: any, body: any): Record<string, any> => {
       return {
         __fl_response: true,
-        status: code,
+        status: Number(code),
         contentType: "application/json",
         body,
       };
