@@ -148,6 +148,27 @@ export function createHttpModule() {
       };
     },
 
+    // http_get_key url api-key -> {:status 200 :body "..."}
+    "http_get_key": (url: string, apiKey: string): any => {
+      const result = curlGetStatusAndBody(url, "GET", { "X-API-Key": apiKey });
+      return {
+        status: result.status,
+        body: result.body,
+        ...(result.error && { error: result.error })
+      };
+    },
+
+    // http_post_key url body api-key -> {:status 200 :body "..."}
+    "http_post_key": (url: string, body: string, apiKey: string): any => {
+      const result = curlGetStatusAndBody(url, "POST",
+        { "Content-Type": "application/json", "X-API-Key": apiKey }, body);
+      return {
+        status: result.status,
+        body: result.body,
+        ...(result.error && { error: result.error })
+      };
+    },
+
     // http_status url -> number (상태코드만)
     "http_status": (url: string): number => {
       const result = curlGetStatusAndBody(url, "GET");

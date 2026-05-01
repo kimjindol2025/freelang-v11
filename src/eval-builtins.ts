@@ -381,6 +381,29 @@ function flExecOpNative(op: string, vals: any[]): any {
         };
       }
     }
+    // atom: 변경 가능한 참조 컨테이너 (전역 상태 관리용)
+    case "atom": {
+      const ref = { value: v0 !== undefined ? v0 : null };
+      return ref;
+    }
+    case "deref": {
+      if (v0 && typeof v0 === "object" && "value" in v0) return v0.value;
+      return v0;
+    }
+    case "reset!": {
+      if (v0 && typeof v0 === "object" && "value" in v0) { v0.value = v1; return v1; }
+      return v1;
+    }
+    case "swap!": {
+      // (swap! atom-ref fn ...extra-args)
+      if (v0 && typeof v0 === "object" && "value" in v0 && v1) {
+        const extraArgs = args.slice(2);
+        const newVal = flApplyNative(v1, [v0.value, ...extraArgs]);
+        v0.value = newVal;
+        return newVal;
+      }
+      return null;
+    }
     default: return null;
   }
 }
@@ -574,6 +597,30 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   const toDisplay = (val: any) => (interp as any).toDisplayString(val);
 
   switch (normalizedOp) {
+    // atom: 변경 가능한 참조 컨테이너
+    case "atom": {
+      return { value: args[0] !== undefined ? args[0] : null };
+    }
+    case "deref": {
+      const ref = args[0];
+      if (ref && typeof ref === "object" && "value" in ref) return ref.value;
+      return ref;
+    }
+    case "reset!": {
+      const ref = args[0];
+      if (ref && typeof ref === "object" && "value" in ref) { ref.value = args[1]; return args[1]; }
+      return args[1];
+    }
+    case "swap!": {
+      const ref = args[0]; const fn = args[1]; const extra = args.slice(2);
+      if (ref && typeof ref === "object" && "value" in ref && fn) {
+        const newVal = callFnVal(fn, [ref.value, ...extra]);
+        ref.value = newVal;
+        return newVal;
+      }
+      return null;
+    }
+
     // Phase L1: Module system
 
     case "load": {

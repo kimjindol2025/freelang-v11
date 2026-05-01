@@ -329,8 +329,8 @@ function makeTemplateString(value, line) {
 function makeVariable(name, line) {
   return { kind: "variable", name, line };
 }
-function makeSExpr(op, args2, line) {
-  return { kind: "sexpr", op, args: args2, line };
+function makeSExpr(op, args3, line) {
+  return { kind: "sexpr", op, args: args3, line };
 }
 function makeKeyword(name) {
   return { kind: "keyword", name };
@@ -1124,12 +1124,12 @@ var init_parser = __esm({
             op = `${op}[${typeArgs.join(", ")}]`;
           }
         }
-        const args2 = [];
+        const args3 = [];
         while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
-          args2.push(this.parseValue());
+          args3.push(this.parseValue());
         }
         this.expect("RParen" /* RParen */);
-        return makeSExpr(op, args2, opToken.line);
+        return makeSExpr(op, args3, opToken.line);
       }
       // Parse type annotation: int, string, bool, array<T>, map<K,V>, T?
       parseTypeAnnotation() {
@@ -2612,7 +2612,7 @@ var init_errors = __esm({
 // src/_stdlib-signatures.json
 var require_stdlib_signatures = __commonJS({
   "src/_stdlib-signatures.json"(exports2, module2) {
-    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: "stdout string" }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_update", params: "dbPath table data where", returns: "true" }, { module: "db", name: "db_delete_row", params: "dbPath table where", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true  (CREATE TABLE ...)" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_start", params: "port", returns: "string" }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_json", params: "obj", returns: "response object" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_header", params: "url header", returns: "string (\uD2B9\uC815 \uD5E4\uB354\uB9CC)" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "mariadb", name: "mariadb_exec", params: "db sql [params]", returns: "raw output string (INSERT/UPDATE/DELETE/CREATE)" }, { module: "mariadb", name: "mariadb_query", params: "db sql [params]", returns: "rows[] (SELECT)" }, { module: "mariadb", name: "mariadb_one", params: "db sql [params]", returns: "first row or null" }, { module: "mariadb", name: "mariadb_health", params: "", returns: "true if server reachable" }, { module: "mariadb", name: "mariadb_databases", params: "", returns: "list of database names" }, { module: "mariadb", name: "mariadb_tables", params: "db", returns: "list of table names in given db" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string (get environment variable)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
+    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: "stdout string" }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_update", params: "dbPath table data where", returns: "true" }, { module: "db", name: "db_delete_row", params: "dbPath table where", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true  (CREATE TABLE ...)" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_start", params: "port", returns: "string" }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_json", params: "obj", returns: "response object" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_header", params: "url header", returns: "string (\uD2B9\uC815 \uD5E4\uB354\uB9CC)" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "mariadb", name: "mariadb_exec", params: "db sql [params]", returns: "raw output string (INSERT/UPDATE/DELETE/CREATE)" }, { module: "mariadb", name: "mariadb_query", params: "db sql [params]", returns: "rows[] (SELECT)" }, { module: "mariadb", name: "mariadb_one", params: "db sql [params]", returns: "first row or null" }, { module: "mariadb", name: "mariadb_health", params: "", returns: "true if server reachable" }, { module: "mariadb", name: "mariadb_databases", params: "", returns: "list of database names" }, { module: "mariadb", name: "mariadb_tables", params: "db", returns: "list of table names in given db" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string (get environment variable)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
   }
 });
 
@@ -4899,13 +4899,13 @@ var ToolRegistry = class {
     return Array.from(this.tools.values());
   }
   /** 비동기 도구 실행 */
-  async execute(name, args2) {
+  async execute(name, args3) {
     const start = Date.now();
     const tool = this.tools.get(name);
     if (!tool) {
       return {
         tool: name,
-        input: args2,
+        input: args3,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -4914,14 +4914,14 @@ var ToolRegistry = class {
     }
     const timeout = tool.timeout ?? 5e3;
     try {
-      const resultPromise = Promise.resolve(tool.execute(args2));
+      const resultPromise = Promise.resolve(tool.execute(args3));
       const timeoutPromise = new Promise(
         (_, reject) => setTimeout(() => reject(new Error(`Tool timeout: ${name} (${timeout}ms)`)), timeout)
       );
       const output = await Promise.race([resultPromise, timeoutPromise]);
       return {
         tool: name,
-        input: args2,
+        input: args3,
         output,
         durationMs: Date.now() - start,
         success: true
@@ -4929,7 +4929,7 @@ var ToolRegistry = class {
     } catch (e) {
       return {
         tool: name,
-        input: args2,
+        input: args3,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -4938,13 +4938,13 @@ var ToolRegistry = class {
     }
   }
   /** 동기 도구 실행 (비동기 도구는 await 없이 실행) */
-  executeSync(name, args2) {
+  executeSync(name, args3) {
     const start = Date.now();
     const tool = this.tools.get(name);
     if (!tool) {
       return {
         tool: name,
-        input: args2,
+        input: args3,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -4952,10 +4952,10 @@ var ToolRegistry = class {
       };
     }
     try {
-      const output = tool.execute(args2);
+      const output = tool.execute(args3);
       return {
         tool: name,
-        input: args2,
+        input: args3,
         output,
         durationMs: Date.now() - start,
         success: true
@@ -4963,7 +4963,7 @@ var ToolRegistry = class {
     } catch (e) {
       return {
         tool: name,
-        input: args2,
+        input: args3,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -5642,43 +5642,43 @@ function getTrace(id) {
 
 // src/prompt-compiler.ts
 var BLOCK_TEMPLATES = {
-  COT: (args2) => ({
+  COT: (args3) => ({
     name: "chain-of-thought",
     priority: 1,
     content: `Think step by step:
-${(args2.steps ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${(args3.steps ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n")}
 Then provide your conclusion.`
   }),
-  TOT: (args2) => ({
+  TOT: (args3) => ({
     name: "tree-of-thought",
     priority: 1,
     content: `Explore multiple approaches:
-${(args2.branches ?? []).map((b) => `- ${b}`).join("\n")}
+${(args3.branches ?? []).map((b) => `- ${b}`).join("\n")}
 Evaluate each and select the best.`
   }),
-  REFLECT: (args2) => ({
+  REFLECT: (args3) => ({
     name: "self-reflection",
     priority: 0.5,
     content: `After responding, reflect on:
-${(args2.criteria ?? ["accuracy", "completeness"]).map((c) => `- ${c}`).join("\n")}
-Score each criterion (0-10) and revise if below ${(args2.threshold ?? 0.7) * 10}.`
+${(args3.criteria ?? ["accuracy", "completeness"]).map((c) => `- ${c}`).join("\n")}
+Score each criterion (0-10) and revise if below ${(args3.threshold ?? 0.7) * 10}.`
   }),
-  AGENT: (args2) => ({
+  AGENT: (args3) => ({
     name: "agent-loop",
     priority: 1,
-    content: `Goal: ${args2.goal ?? "Complete the task"}
-Max steps: ${args2.maxSteps ?? 5}
+    content: `Goal: ${args3.goal ?? "Complete the task"}
+Max steps: ${args3.maxSteps ?? 5}
 For each step: observe \u2192 think \u2192 act \u2192 verify.`
   }),
-  CONTEXT: (args2) => ({
+  CONTEXT: (args3) => ({
     name: "context",
     priority: 1,
-    content: `Context window: ${args2.maxTokens ?? 4096} tokens. Strategy: ${args2.strategy ?? "sliding"}.`
+    content: `Context window: ${args3.maxTokens ?? 4096} tokens. Strategy: ${args3.strategy ?? "sliding"}.`
   }),
-  "SELF-IMPROVE": (args2) => ({
+  "SELF-IMPROVE": (args3) => ({
     name: "self-improvement",
     priority: 0.5,
-    content: `Iterations: ${args2.iterations ?? 3}. After each response, evaluate and improve until satisfied.`
+    content: `Iterations: ${args3.iterations ?? 3}. After each response, evaluate and improve until satisfied.`
   })
 };
 var PromptCompiler = class {
@@ -5687,10 +5687,10 @@ var PromptCompiler = class {
     this.target = target;
   }
   // FL 블록 정보 → 프롬프트 섹션
-  compileBlock(blockType, args2 = {}) {
+  compileBlock(blockType, args3 = {}) {
     const template = BLOCK_TEMPLATES[blockType];
     if (!template) return null;
-    return template(args2);
+    return template(args3);
   }
   // 여러 섹션 → 최종 프롬프트
   compile(sections, userInstruction) {
@@ -5759,8 +5759,8 @@ var FLCodeBuilder = class {
     this.lines.push(`(defn ${name} [${params.map((p) => "$" + p).join(" ")}] ${body})`);
     return this;
   }
-  call(fn, ...args2) {
-    this.lines.push(`(${fn} ${args2.join(" ")})`);
+  call(fn, ...args3) {
+    this.lines.push(`(${fn} ${args3.join(" ")})`);
     return this;
   }
   // AI 블록
@@ -5946,13 +5946,13 @@ function combine(a, b, fn) {
   return reason !== void 0 ? maybe(combinedConfidence, combinedValue, reason) : maybe(combinedConfidence, combinedValue);
 }
 function createMaybeModule(callFunctionValue2, callUserFunction2) {
-  function callFn(fn, args2) {
-    if (typeof fn === "function") return fn(...args2);
+  function callFn(fn, args3) {
+    if (typeof fn === "function") return fn(...args3);
     if (fn && fn.kind === "function-value" && callFunctionValue2) {
-      return callFunctionValue2(fn, args2);
+      return callFunctionValue2(fn, args3);
     }
     if (typeof fn === "string" && callUserFunction2) {
-      return callUserFunction2(fn, args2);
+      return callUserFunction2(fn, args3);
     }
     throw new Error(`fn is not a function`);
   }
@@ -11541,6 +11541,30 @@ function flExecOpNative(op, vals) {
         };
       }
     }
+    case "atom": {
+      const ref = { value: v0 !== void 0 ? v0 : null };
+      return ref;
+    }
+    case "deref": {
+      if (v0 && typeof v0 === "object" && "value" in v0) return v0.value;
+      return v0;
+    }
+    case "reset!": {
+      if (v0 && typeof v0 === "object" && "value" in v0) {
+        v0.value = v1;
+        return v1;
+      }
+      return v1;
+    }
+    case "swap!": {
+      if (v0 && typeof v0 === "object" && "value" in v0 && v1) {
+        const extraArgs = args.slice(2);
+        const newVal = flApplyNative(v1, [v0.value, ...extraArgs]);
+        v0.value = newVal;
+        return newVal;
+      }
+      return null;
+    }
     default:
       return null;
   }
@@ -11714,7 +11738,7 @@ function flInterpSexpr(op, rawArgs, env) {
       return null;
   }
 }
-function evalBuiltin(interp2, op, args2, expr2) {
+function evalBuiltin(interp2, op, args3, expr2) {
   const normalizedOp2 = op.replace(/_/g, "-");
   const ev = (node) => interp2.eval(node);
   const callFn = (fn, a) => interp2.callFunction(fn, a);
@@ -11722,8 +11746,35 @@ function evalBuiltin(interp2, op, args2, expr2) {
   const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
+    case "atom": {
+      return { value: args3[0] !== void 0 ? args3[0] : null };
+    }
+    case "deref": {
+      const ref = args3[0];
+      if (ref && typeof ref === "object" && "value" in ref) return ref.value;
+      return ref;
+    }
+    case "reset!": {
+      const ref = args3[0];
+      if (ref && typeof ref === "object" && "value" in ref) {
+        ref.value = args3[1];
+        return args3[1];
+      }
+      return args3[1];
+    }
+    case "swap!": {
+      const ref = args3[0];
+      const fn = args3[1];
+      const extra = args3.slice(2);
+      if (ref && typeof ref === "object" && "value" in ref && fn) {
+        const newVal = callFnVal(fn, [ref.value, ...extra]);
+        ref.value = newVal;
+        return newVal;
+      }
+      return null;
+    }
     case "load": {
-      const filePath = String(args2[0] ?? "");
+      const filePath = String(args3[0] ?? "");
       const fs20 = require("fs");
       const path16 = require("path");
       try {
@@ -11740,15 +11791,15 @@ function evalBuiltin(interp2, op, args2, expr2) {
       }
     }
     case "cli-args": {
-      const args3 = process.argv.slice(2);
-      if (args3[0] === "run" || args3[0] === "debug") {
-        return args3.slice(2);
+      const args4 = process.argv.slice(2);
+      if (args4[0] === "run" || args4[0] === "debug") {
+        return args4.slice(2);
       }
-      return args3;
+      return args4;
     }
     case "shell-exec": {
       const { execSync: execSync2 } = require("child_process");
-      const cmd2 = String(args2[0] ?? "");
+      const cmd2 = String(args3[0] ?? "");
       try {
         return execSync2(cmd2, { encoding: "utf-8" });
       } catch (e) {
@@ -11756,7 +11807,7 @@ function evalBuiltin(interp2, op, args2, expr2) {
       }
     }
     case "require": {
-      const modulePath = String(args2[0] ?? "");
+      const modulePath = String(args3[0] ?? "");
       const fs20 = require("fs");
       const path16 = require("path");
       try {
@@ -11781,10 +11832,10 @@ function evalBuiltin(interp2, op, args2, expr2) {
       }
     }
     case "net-sendrecv": {
-      const host = String(args2[0] ?? "localhost");
-      const port = Number(args2[1] ?? 27017);
-      const hexData = String(args2[2] ?? "");
-      const timeout = Number(args2[3] ?? 1e4);
+      const host = String(args3[0] ?? "localhost");
+      const port = Number(args3[1] ?? 27017);
+      const hexData = String(args3[2] ?? "");
+      const timeout = Number(args3[3] ?? 1e4);
       const { spawnSync: spawnSync8 } = require("child_process");
       const inlineScript = `
 const net = require('net');
@@ -11848,9 +11899,9 @@ sock.setTimeout(timeout, () => {
       }
     }
     case "net-connect": {
-      const host = String(args2[0] ?? "localhost");
-      const port = Number(args2[1] ?? 27017);
-      const timeout = Number(args2[2] ?? 5e3);
+      const host = String(args3[0] ?? "localhost");
+      const port = Number(args3[1] ?? 27017);
+      const timeout = Number(args3[2] ?? 5e3);
       const { spawnSync: spawnSync8 } = require("child_process");
       const inlineScript = `
 const net = require('net');
@@ -11873,68 +11924,68 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
     }
     case "+":
-      return args2.reduce((a, b) => a + b, 0);
+      return args3.reduce((a, b) => a + b, 0);
     case "-":
-      return args2.length === 1 ? -args2[0] : args2.reduce((a, b) => a - b);
+      return args3.length === 1 ? -args3[0] : args3.reduce((a, b) => a - b);
     case "*":
-      return args2.reduce((a, b) => a * b, 1);
+      return args3.reduce((a, b) => a * b, 1);
     case "/":
-      return args2.length === 1 ? 1 / args2[0] : args2.reduce((a, b) => a / b);
+      return args3.length === 1 ? 1 / args3[0] : args3.reduce((a, b) => a / b);
     case "%":
-      return args2[0] % args2[1];
+      return args3[0] % args3[1];
     case "=":
-      return flDeepEq(args2[0], args2[1]);
+      return flDeepEq(args3[0], args3[1]);
     case "<":
-      return args2[0] < args2[1];
+      return args3[0] < args3[1];
     case ">":
-      return args2[0] > args2[1];
+      return args3[0] > args3[1];
     case "<=":
-      return args2[0] <= args2[1];
+      return args3[0] <= args3[1];
     case ">=":
-      return args2[0] >= args2[1];
+      return args3[0] >= args3[1];
     case "!=":
-      return args2[0] !== args2[1];
+      return args3[0] !== args3[1];
     case "and":
-      return args2.every((a) => a);
+      return args3.every((a) => a);
     case "or":
-      return args2.some((a) => a);
+      return args3.some((a) => a);
     case "not":
-      return !args2[0];
+      return !args3[0];
     case "print":
-      process.stdout.write(args2.map((a) => toDisplay(a)).join(" "));
+      process.stdout.write(args3.map((a) => toDisplay(a)).join(" "));
       return null;
     case "println":
     case "echo":
-      console.log(...args2.map((a) => toDisplay(a)));
+      console.log(...args3.map((a) => toDisplay(a)));
       return null;
     case "print-err":
-      process.stderr.write(args2.map((a) => toDisplay(a)).join(" ") + "\n");
+      process.stderr.write(args3.map((a) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args2.map((a) => toDisplay(a)).join("");
+      return args3.map((a) => toDisplay(a)).join("");
     case "repr":
-      return JSON.stringify(args2[0], null, 2);
+      return JSON.stringify(args3[0], null, 2);
     case "inspect": {
-      const inspected = toDisplay(args2[0]);
+      const inspected = toDisplay(args3[0]);
       console.log(inspected);
-      return args2[0];
+      return args3[0];
     }
     case "concat":
-      if (!Array.isArray(args2[0])) return args2.join("");
-      if (!Array.isArray(args2[1])) return args2[0] || [];
-      return args2[0].concat(args2[1]);
+      if (!Array.isArray(args3[0])) return args3.join("");
+      if (!Array.isArray(args3[1])) return args3[0] || [];
+      return args3[0].concat(args3[1]);
     case "upper":
-      return args2[0]?.toString().toUpperCase();
+      return args3[0]?.toString().toUpperCase();
     case "lower":
-      return args2[0]?.toString().toLowerCase();
+      return args3[0]?.toString().toLowerCase();
     case "length":
-      return args2[0]?.length || 0;
+      return args3[0]?.length || 0;
     case "to-hex": {
-      const n = Math.floor(Number(args2[0])) & 255;
+      const n = Math.floor(Number(args3[0])) & 255;
       return n.toString(16).padStart(2, "0");
     }
     case "bson-encode-native": {
-      const doc = args2[0];
+      const doc = args3[0];
       if (!doc || typeof doc !== "object") return "0c000000107069696e6700010000000000";
       const int32ToHex = (n) => {
         const b0 = n & 255;
@@ -11969,7 +12020,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return doc_hex;
     }
     case "bson-decode-native": {
-      const hex = String(args2[0] || "");
+      const hex = String(args3[0] || "");
       if (hex.length < 8) return {};
       const buf = Buffer.from(hex, "hex");
       const result = {};
@@ -12004,9 +12055,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return result;
     }
     case "identity":
-      return args2[0];
+      return args3[0];
     case "comp": {
-      const fns = args2.filter((a) => a != null);
+      const fns = args3.filter((a) => a != null);
       const callOne = (fn, callArgs) => {
         if (typeof fn === "function") return fn(...callArgs);
         if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
@@ -12020,7 +12071,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       };
     }
     case "juxt": {
-      const fns = args2.filter((a) => a != null);
+      const fns = args3.filter((a) => a != null);
       const callOne = (fn, callArgs) => {
         if (typeof fn === "function") return fn(...callArgs);
         if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
@@ -12029,11 +12080,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return (...callArgs) => fns.map((fn) => callOne(fn, callArgs));
     }
     case "constantly": {
-      const v = args2[0];
+      const v = args3[0];
       return (..._callArgs) => v;
     }
     case "complement": {
-      const pred = args2[0];
+      const pred = args3[0];
       const callOne = (fn, callArgs) => {
         if (typeof fn === "function") return fn(...callArgs);
         if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
@@ -12042,52 +12093,52 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return (...callArgs) => !callOne(pred, callArgs);
     }
     case "list":
-      return args2;
+      return args3;
     case "first":
-      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][0] : args2[0]?.[0] ?? null;
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : args3[0]?.[0] ?? null;
     case "rest":
-      return args2[0]?.slice(1);
+      return args3[0]?.slice(1);
     case "keys": {
-      const kObj = args2[0];
+      const kObj = args3[0];
       if (kObj instanceof Map) return Array.from(kObj.keys());
       return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
     }
     case "vals":
     case "values": {
-      const vObj = args2[0];
+      const vObj = args3[0];
       if (vObj instanceof Map) return Array.from(vObj.values());
       return vObj && typeof vObj === "object" && !Array.isArray(vObj) ? Object.values(vObj) : [];
     }
     case "upper-case":
-      return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0];
+      return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0];
     case "lower-case":
     case "lowercase":
     case "lower":
-      return typeof args2[0] === "string" ? args2[0].toLowerCase() : args2[0];
+      return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0];
     case "trim":
-      return typeof args2[0] === "string" ? args2[0].trim() : "";
+      return typeof args3[0] === "string" ? args3[0].trim() : "";
     case "starts-with?":
     case "str-starts-with?":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
     case "ends-with?":
     case "str-ends-with?":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].endsWith(args2[1]) : false;
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
     case "char-at":
     case "str-char-at":
-      return typeof args2[0] === "string" ? args2[0][Number(args2[1])] ?? "" : "";
+      return typeof args3[0] === "string" ? args3[0][Number(args3[1])] ?? "" : "";
     case "math-pow":
-      return Math.pow(Number(args2[0]), Number(args2[1]));
+      return Math.pow(Number(args3[0]), Number(args3[1]));
     case "append":
-      if (Array.isArray(args2[0]) && args2.length === 2 && Array.isArray(args2[1])) {
-        return [...args2[0], ...args2[1]];
+      if (Array.isArray(args3[0]) && args3.length === 2 && Array.isArray(args3[1])) {
+        return [...args3[0], ...args3[1]];
       }
-      return [...args2[0] || [], ...args2.slice(1)];
+      return [...args3[0] || [], ...args3.slice(1)];
     case "reverse":
-      if (Array.isArray(args2[0])) return [...args2[0]].reverse();
-      return [...args2[0] || []].reverse();
+      if (Array.isArray(args3[0])) return [...args3[0]].reverse();
+      return [...args3[0] || []].reverse();
     case "map": {
-      const mapFn = args2[0];
-      const mapArr = Array.isArray(args2[1]) ? args2[1] : [];
+      const mapFn = args3[0];
+      const mapArr = Array.isArray(args3[1]) ? args3[1] : [];
       if (typeof mapFn === "function") {
         return mapArr.map(mapFn);
       } else if (mapFn && (mapFn.kind === "function-value" || mapFn.kind === "async-function-value")) {
@@ -12158,9 +12209,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       };
     }
     case "reduce": {
-      const reduceFn = args2[0];
-      let accumulator = args2[1];
-      let arr = args2[2] ?? [];
+      const reduceFn = args3[0];
+      let accumulator = args3[1];
+      let arr = args3[2] ?? [];
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
         let cur = arr;
@@ -12182,115 +12233,115 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return accumulator;
     }
     case "json-response":
-      if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) return args2[0];
-      if (Array.isArray(args2[0])) {
+      if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) return args3[0];
+      if (Array.isArray(args3[0])) {
         const obj = {};
-        for (let i = 0; i < args2[0].length; i += 2) {
-          let key = args2[0][i];
-          const value = args2[0][i + 1];
+        for (let i = 0; i < args3[0].length; i += 2) {
+          let key = args3[0][i];
+          const value = args3[0][i + 1];
           if (typeof key === "string" && key.startsWith(":")) key = key.substring(1);
           if (typeof key === "string") obj[key] = value;
         }
         return obj;
       }
-      return args2[0];
+      return args3[0];
     case "html-response":
-      return { html: args2[0] };
+      return { html: args3[0] };
     case "now":
       return (/* @__PURE__ */ new Date()).toISOString();
     case "server-uptime":
       return Date.now() - interp2.context.startTime;
     case "char-at":
-      return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0][Math.floor(args2[1])] || "" : "";
+      return typeof args3[0] === "string" && typeof args3[1] === "number" ? args3[0][Math.floor(args3[1])] || "" : "";
     case "char-code":
-      if (typeof args2[0] === "string" && args2[0].length > 0) return args2[0].charCodeAt(0);
+      if (typeof args3[0] === "string" && args3[0].length > 0) return args3[0].charCodeAt(0);
       throw new Error(`char-code expects non-empty string`);
     case "substring":
-      return typeof args2[0] === "string" ? args2[0].substring(Math.floor(args2[1] || 0), Math.floor(args2[2] || args2[0].length)) : "";
+      return typeof args3[0] === "string" ? args3[0].substring(Math.floor(args3[1] || 0), Math.floor(args3[2] || args3[0].length)) : "";
     case "is-whitespace?":
-      return /^\s$/.test(String(args2[0]));
+      return /^\s$/.test(String(args3[0]));
     case "is-digit?":
-      return /^\d$/.test(String(args2[0]));
+      return /^\d$/.test(String(args3[0]));
     case "is-symbol?":
-      return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args2[0]));
+      return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args3[0]));
     case "split":
-      return typeof args2[0] === "string" ? args2[0].split(String(args2[1] ?? "")) : [];
+      return typeof args3[0] === "string" ? args3[0].split(String(args3[1] ?? "")) : [];
     case "error":
-      throw new Error(String(args2[0]));
+      throw new Error(String(args3[0]));
     case "nil?":
     case "null?":
-      return args2[0] === null || args2[0] === void 0;
+      return args3[0] === null || args3[0] === void 0;
     case "nil-or-empty?":
-      return args2[0] === null || args2[0] === void 0 || args2[0] && args2[0].length === 0;
+      return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
     case "zero?":
-      return args2[0] === 0;
+      return args3[0] === 0;
     case "pos?":
-      return typeof args2[0] === "number" && args2[0] > 0;
+      return typeof args3[0] === "number" && args3[0] > 0;
     case "neg?":
-      return typeof args2[0] === "number" && args2[0] < 0;
+      return typeof args3[0] === "number" && args3[0] < 0;
     case "even?":
-      return typeof args2[0] === "number" && args2[0] % 2 === 0;
+      return typeof args3[0] === "number" && args3[0] % 2 === 0;
     case "odd?":
-      return typeof args2[0] === "number" && args2[0] % 2 !== 0;
+      return typeof args3[0] === "number" && args3[0] % 2 !== 0;
     case "string?":
-      return typeof args2[0] === "string";
+      return typeof args3[0] === "string";
     case "number?":
-      return typeof args2[0] === "number";
+      return typeof args3[0] === "number";
     case "boolean?":
     case "bool?":
-      return typeof args2[0] === "boolean";
+      return typeof args3[0] === "boolean";
     case "list?":
     case "array?":
-      return Array.isArray(args2[0]);
+      return Array.isArray(args3[0]);
     case "function?":
     case "fn?":
-      return typeof args2[0] === "function";
+      return typeof args3[0] === "function";
     case "map?":
-      return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
+      return args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]);
     case "num-to-str":
-      return String(args2[0]);
+      return String(args3[0]);
     case "str-to-num":
-      return parseFloat(String(args2[0]));
+      return parseFloat(String(args3[0]));
     case "map-set":
-      if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
-        const k = typeof args2[1] === "string" && args2[1].startsWith(":") ? args2[1].slice(1) : String(args2[1]);
-        return { ...args2[0], [k]: args2[2] };
+      if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
+        const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
+        return { ...args3[0], [k]: args3[2] };
       }
-      return args2[0];
+      return args3[0];
     case "slice":
-      if (Array.isArray(args2[0])) return args2[0].slice(args2[1], args2[2]);
-      if (typeof args2[0] === "string") return args2[0].slice(args2[1], args2[2]);
+      if (Array.isArray(args3[0])) return args3[0].slice(args3[1], args3[2]);
+      if (typeof args3[0] === "string") return args3[0].slice(args3[1], args3[2]);
       return [];
     case "str-split":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].split(args2[1]) : [];
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].split(args3[1]) : [];
     case "join":
     case "str-join":
-      return Array.isArray(args2[0]) ? args2[0].join(args2[1] || "") : "";
+      return Array.isArray(args3[0]) ? args3[0].join(args3[1] || "") : "";
     case "trim":
     case "string_trim":
     case "str_trim":
-      return typeof args2[0] === "string" ? args2[0].trim() : "";
+      return typeof args3[0] === "string" ? args3[0].trim() : "";
     case "uppercase":
-      return typeof args2[0] === "string" ? args2[0].toUpperCase() : "";
+      return typeof args3[0] === "string" ? args3[0].toUpperCase() : "";
     case "lowercase":
-      return typeof args2[0] === "string" ? args2[0].toLowerCase() : "";
+      return typeof args3[0] === "string" ? args3[0].toLowerCase() : "";
     case "contains?":
-      if (typeof args2[0] === "string" && typeof args2[1] === "string") return args2[0].includes(args2[1]);
-      if (Array.isArray(args2[0])) return args2[0].includes(args2[1]);
+      if (typeof args3[0] === "string" && typeof args3[1] === "string") return args3[0].includes(args3[1]);
+      if (Array.isArray(args3[0])) return args3[0].includes(args3[1]);
       return false;
     case "starts-with?":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
     case "ends-with?":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].endsWith(args2[1]) : false;
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
     case "index-of":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].indexOf(args2[1]) : -1;
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].indexOf(args3[1]) : -1;
     case "replace":
-      return typeof args2[0] === "string" && typeof args2[1] === "string" && typeof args2[2] === "string" ? args2[0].split(args2[1]).join(args2[2]) : "";
+      return typeof args3[0] === "string" && typeof args3[1] === "string" && typeof args3[2] === "string" ? args3[0].split(args3[1]).join(args3[2]) : "";
     case "repeat":
-      return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
+      return typeof args3[0] === "string" && typeof args3[1] === "number" ? args3[0].repeat(args3[1]) : "";
     case "filter": {
-      const filterFn = args2[0];
-      const coll = args2[1];
+      const filterFn = args3[0];
+      const coll = args3[1];
       if (!Array.isArray(coll)) return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && filterFn.kind === "function-value") {
@@ -12299,74 +12350,74 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return coll;
     }
     case "find":
-      if (Array.isArray(args2[0])) {
-        const findFn = args2[1];
-        if (typeof findFn === "function") return args2[0].find(findFn) ?? null;
+      if (Array.isArray(args3[0])) {
+        const findFn = args3[1];
+        if (typeof findFn === "function") return args3[0].find(findFn) ?? null;
         if (findFn && findFn.kind === "function-value") {
-          return args2[0].find((item) => callFnVal(findFn, [item])) ?? null;
+          return args3[0].find((item) => callFnVal(findFn, [item])) ?? null;
         }
-        return args2[0].indexOf(findFn);
+        return args3[0].indexOf(findFn);
       }
       return -1;
     case "last":
-      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "first-or":
     case "first_or":
-      return Array.isArray(args2[0]) && args2[0].length > 0 && args2[0][0] !== void 0 ? args2[0][0] : args2[1] !== void 0 ? args2[1] : null;
+      return Array.isArray(args3[0]) && args3[0].length > 0 && args3[0][0] !== void 0 ? args3[0][0] : args3[1] !== void 0 ? args3[1] : null;
     case "last-or":
     case "last_or":
-      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : args2[1] !== void 0 ? args2[1] : null;
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : args3[1] !== void 0 ? args3[1] : null;
     case "get-or": {
-      const def = args2[2] !== void 0 ? args2[2] : null;
-      let k = args2[1];
+      const def = args3[2] !== void 0 ? args3[2] : null;
+      let k = args3[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
-      if (args2[0] === null || args2[0] === void 0) return def;
-      if (Array.isArray(args2[0])) {
+      if (args3[0] === null || args3[0] === void 0) return def;
+      if (Array.isArray(args3[0])) {
         const idx = typeof k === "number" ? k : Number(k);
-        return Number.isFinite(idx) && args2[0][idx] !== void 0 ? args2[0][idx] : def;
+        return Number.isFinite(idx) && args3[0][idx] !== void 0 ? args3[0][idx] : def;
       }
-      if (args2[0] instanceof Map) {
-        const r = args2[0].get(String(k).replace(/^:/, ""));
+      if (args3[0] instanceof Map) {
+        const r = args3[0].get(String(k).replace(/^:/, ""));
         return r === void 0 ? def : r;
       }
-      if (typeof args2[0] === "object") {
+      if (typeof args3[0] === "object") {
         const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
-        if (args2[0][normalized] !== void 0) return args2[0][normalized];
-        if (typeof k === "string" && args2[0][k] !== void 0) return args2[0][k];
+        if (args3[0][normalized] !== void 0) return args3[0][normalized];
+        if (typeof k === "string" && args3[0][k] !== void 0) return args3[0][k];
         return def;
       }
       return def;
     }
     case "get": {
-      if ((args2[0] === null || args2[0] === void 0) && process.env.FL_STRICT === "1") {
+      if ((args3[0] === null || args3[0] === void 0) && process.env.FL_STRICT === "1") {
         throw new FLRuntimeError(
           ErrorCodes.TYPE_NIL,
-          `(get nil ${typeof args2[1] === "string" ? '"' + args2[1] + '"' : String(args2[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
+          `(get nil ${typeof args3[1] === "string" ? '"' + args3[1] + '"' : String(args3[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
           { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
         );
       }
-      let k = args2[1];
+      let k = args3[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
-      if (Array.isArray(args2[0])) return typeof k === "number" ? args2[0][k] ?? null : null;
-      if (typeof args2[0] === "string") return typeof k === "number" ? args2[0][k] ?? null : null;
-      if (args2[0] instanceof Map) return args2[0].get(String(k).replace(/^:/, "")) ?? null;
-      if (args2[0] !== null && typeof args2[0] === "object") {
+      if (Array.isArray(args3[0])) return typeof k === "number" ? args3[0][k] ?? null : null;
+      if (typeof args3[0] === "string") return typeof k === "number" ? args3[0][k] ?? null : null;
+      if (args3[0] instanceof Map) return args3[0].get(String(k).replace(/^:/, "")) ?? null;
+      if (args3[0] !== null && typeof args3[0] === "object") {
         const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
-        if (args2[0][normalized] !== void 0) return args2[0][normalized];
-        if (typeof k === "string" && args2[0][k] !== void 0) return args2[0][k];
+        if (args3[0][normalized] !== void 0) return args3[0][normalized];
+        if (typeof k === "string" && args3[0][k] !== void 0) return args3[0][k];
         return null;
       }
       return null;
     }
     case "block-items":
-      if (args2[0] && typeof args2[0] === "object" && args2[0].kind === "block" && args2[0].type === "Array") {
-        return args2[0].fields instanceof Map ? args2[0].fields.get("items") ?? [] : [];
+      if (args3[0] && typeof args3[0] === "object" && args3[0].kind === "block" && args3[0].type === "Array") {
+        return args3[0].fields instanceof Map ? args3[0].fields.get("items") ?? [] : [];
       }
-      if (Array.isArray(args2[0])) return args2[0];
+      if (Array.isArray(args3[0])) return args3[0];
       return [];
     case "fl-env-get": {
-      let flenv = args2[0];
-      const fname = String(args2[1]);
+      let flenv = args3[0];
+      const fname = String(args3[1]);
       while (flenv !== null && flenv !== void 0) {
         const vars = flenv.vars;
         if (Array.isArray(vars)) {
@@ -12380,13 +12431,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return null;
     }
     case "fl-special-op?": {
-      const sop = String(args2[0]);
+      const sop = String(args3[0]);
       const specials = ["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"];
       return specials.includes(sop) ? sop : null;
     }
     case "fl-exec-op": {
-      const op2 = String(args2[0]);
-      const vals = Array.isArray(args2[1]) ? args2[1] : [];
+      const op2 = String(args3[0]);
+      const vals = Array.isArray(args3[1]) ? args3[1] : [];
       const v0 = vals[0], v1 = vals[1], v2 = vals[2];
       switch (normalizedOp2) {
         case "+":
@@ -12478,28 +12529,28 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
     }
     case "fl-interp":
-      return flInterpNative(args2[0], args2[1]);
+      return flInterpNative(args3[0], args3[1]);
     case "lex":
       try {
-        return lex(String(args2[0] ?? ""));
+        return lex(String(args3[0] ?? ""));
       } catch {
         return [];
       }
     case "parse":
       try {
-        return parse(Array.isArray(args2[0]) ? args2[0] : []);
+        return parse(Array.isArray(args3[0]) ? args3[0] : []);
       } catch {
         return [];
       }
     case "fl-parse": {
       try {
-        return parse(lex(String(args2[0] ?? "")));
+        return parse(lex(String(args3[0] ?? "")));
       } catch {
         return [];
       }
     }
     case "fl-fix-env": {
-      const finalEnv = args2[0];
+      const finalEnv = args3[0];
       if (!finalEnv || !Array.isArray(finalEnv.vars)) return finalEnv;
       for (const pair of finalEnv.vars) {
         if (Array.isArray(pair) && pair[1] && typeof pair[1] === "object" && pair[1].kind === "closure") {
@@ -12509,47 +12560,47 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return finalEnv;
     }
     case "assoc": {
-      let base = args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? { ...args2[0] } : {};
-      for (let i = 1; i + 1 < args2.length; i += 2) {
-        base[args2[i]] = args2[i + 1];
+      let base = args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]) ? { ...args3[0] } : {};
+      for (let i = 1; i + 1 < args3.length; i += 2) {
+        base[args3[i]] = args3[i + 1];
       }
       return base;
     }
     case "dissoc": {
-      if (args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0])) {
-        const { [args2[1]]: _, ...rest } = args2[0];
+      if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
+        const { [args3[1]]: _, ...rest } = args3[0];
         return rest;
       }
-      return args2[0] ?? {};
+      return args3[0] ?? {};
     }
     case "flatten": {
-      if (!Array.isArray(args2[0])) return [];
+      if (!Array.isArray(args3[0])) return [];
       const flatten = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
-      return flatten(args2[0]);
+      return flatten(args3[0]);
     }
     case "unique":
-      return Array.isArray(args2[0]) ? [...new Set(args2[0])] : [];
+      return Array.isArray(args3[0]) ? [...new Set(args3[0])] : [];
     case "sort":
-      if (!Array.isArray(args2[0])) return [];
-      return [...args2[0]].sort((a, b) => {
+      if (!Array.isArray(args3[0])) return [];
+      return [...args3[0]].sort((a, b) => {
         if (typeof a === "number" && typeof b === "number") return a - b;
         return String(a).localeCompare(String(b));
       });
     case "push":
-      if (!Array.isArray(args2[0])) return [args2[1]];
-      return [...args2[0], args2[1]];
+      if (!Array.isArray(args3[0])) return [args3[1]];
+      return [...args3[0], args3[1]];
     case "pop":
-      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "shift":
-      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][0] : null;
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : null;
     case "unshift":
-      if (!Array.isArray(args2[0])) return [args2[1]];
-      return [args2[1], ...args2[0]];
+      if (!Array.isArray(args3[0])) return [args3[1]];
+      return [args3[1], ...args3[0]];
     case "typeof":
-      return typeof args2[0];
+      return typeof args3[0];
     case "assert-type": {
-      const val = args2[0];
-      const typeStr = String(args2[1]);
+      const val = args3[0];
+      const typeStr = String(args3[1]);
       let actualType = typeof val;
       if (Array.isArray(val)) actualType = "array";
       else if (val === null) actualType = "null";
@@ -12560,75 +12611,75 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return val;
     }
     case "num":
-      return Number(args2[0]);
+      return Number(args3[0]);
     case "bool":
-      return Boolean(args2[0]);
+      return Boolean(args3[0]);
     case "math-abs":
     case "math_abs":
     case "abs":
-      return Math.abs(args2[0]);
+      return Math.abs(args3[0]);
     case "min":
-      return Math.min(...args2);
+      return Math.min(...args3);
     case "max":
-      return Math.max(...args2);
+      return Math.max(...args3);
     case "floor":
-      return Math.floor(args2[0]);
+      return Math.floor(args3[0]);
     case "ceil":
-      return Math.ceil(args2[0]);
+      return Math.ceil(args3[0]);
     case "round":
-      return Math.round(args2[0]);
+      return Math.round(args3[0]);
     case "math-sqrt":
     case "math_sqrt":
     case "sqrt":
-      return Math.sqrt(args2[0]);
+      return Math.sqrt(args3[0]);
     case "pow":
-      return Math.pow(args2[0], args2[1]);
+      return Math.pow(args3[0], args3[1]);
     case "log":
-      return Math.log(args2[0]);
+      return Math.log(args3[0]);
     case "exp":
-      return Math.exp(args2[0]);
+      return Math.exp(args3[0]);
     case "sin":
-      return Math.sin(args2[0]);
+      return Math.sin(args3[0]);
     case "cos":
-      return Math.cos(args2[0]);
+      return Math.cos(args3[0]);
     case "tan":
-      return Math.tan(args2[0]);
+      return Math.tan(args3[0]);
     case "random":
       return Math.random();
     case "clamp":
-      return Math.max(args2[1], Math.min(args2[2], args2[0]));
+      return Math.max(args3[1], Math.min(args3[2], args3[0]));
     case "ok":
-      return ok(args2[0]);
+      return ok(args3[0]);
     case "err": {
-      if (args2.length >= 2) {
-        const code96 = String(args2[0] ?? "ERR");
-        const message96 = String(args2[1] ?? "");
-        const category96 = args2[2];
+      if (args3.length >= 2) {
+        const code96 = String(args3[0] ?? "ERR");
+        const message96 = String(args3[1] ?? "");
+        const category96 = args3[2];
         return err(code96, message96, category96 ? { category: category96 } : void 0);
       }
-      return err("ERR", String(args2[0] ?? ""));
+      return err("ERR", String(args3[0] ?? ""));
     }
     case "some":
-      return { tag: "Some", value: args2[0], kind: "Option" };
+      return { tag: "Some", value: args3[0], kind: "Option" };
     case "none":
       return { tag: "None", value: null, kind: "Option" };
     case "pure":
-      return { tag: "Pure", value: args2[0], kind: "Monad" };
+      return { tag: "Pure", value: args3[0], kind: "Monad" };
     case "left":
-      return { tag: "Left", value: args2[0], kind: "Either" };
+      return { tag: "Left", value: args3[0], kind: "Either" };
     case "right":
-      return { tag: "Right", value: args2[0], kind: "Either" };
+      return { tag: "Right", value: args3[0], kind: "Either" };
     case "failure": {
-      const errors = Array.isArray(args2[0]) ? args2[0] : [args2[0]];
+      const errors = Array.isArray(args3[0]) ? args3[0] : [args3[0]];
       return { tag: "Failure", value: errors, kind: "Validation" };
     }
     case "success":
-      return { tag: "Success", value: args2[0], kind: "Validation" };
+      return { tag: "Success", value: args3[0], kind: "Validation" };
     case "tell":
-      return { kind: "Writer", value: null, log: String(args2[0]) };
+      return { kind: "Writer", value: null, log: String(args3[0]) };
     case "return-writer":
     case "pure-writer":
-      return { kind: "Writer", value: args2[0], log: "" };
+      return { kind: "Writer", value: args3[0], log: "" };
     case "bind": {
       if (expr2.args.length < 2) throw new Error(`bind requires monad and transform function`);
       const monad = ev(expr2.args[0]);
@@ -12669,42 +12720,42 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       throw new Error(`bind: unsupported monad type`);
     }
     case "lazy-seq": {
-      const hVal = args2[0];
-      const tVal = args2.length > 1 ? args2[1] : null;
+      const hVal = args3[0];
+      const tVal = args3.length > 1 ? args3[1] : null;
       return lazySeq(() => hVal, () => isLazySeq(tVal) ? tVal : null);
     }
     case "iterate": {
-      const fn = args2[0];
-      const initVal = args2[1];
+      const fn = args3[0];
+      const initVal = args3[1];
       const applyFn = (v) => callFn(fn, [v]);
       const makeIter = (cur) => lazySeq(() => cur, () => makeIter(applyFn(cur)));
       return makeIter(initVal);
     }
     case "range": {
-      if (args2.length === 0) return rangeSeq(0);
-      if (args2.length === 1) return rangeSeq(0, args2[0]);
-      const start = Number(args2[0]);
-      const end = Number(args2[1]);
-      const step = args2.length >= 3 ? Number(args2[2]) : 1;
+      if (args3.length === 0) return rangeSeq(0);
+      if (args3.length === 1) return rangeSeq(0, args3[0]);
+      const start = Number(args3[0]);
+      const end = Number(args3[1]);
+      const step = args3.length >= 3 ? Number(args3[2]) : 1;
       const out = [];
       if (step > 0) for (let i = start; i < end; i += step) out.push(i);
       else if (step < 0) for (let i = start; i > end; i += step) out.push(i);
       return out;
     }
     case "take": {
-      const n = args2[0];
-      const seq = args2[1];
+      const n = args3[0];
+      const seq = args3[1];
       return take(n, isLazySeq(seq) ? seq : Array.isArray(seq) ? seq : null);
     }
     case "drop": {
-      const n = args2[0];
-      const seq = args2[1];
+      const n = args3[0];
+      const seq = args3[1];
       if (Array.isArray(seq)) return seq.slice(n);
       return drop(n, isLazySeq(seq) ? seq : null);
     }
     case "filter-lazy": {
-      const pred = args2[0];
-      const seq = args2[1];
+      const pred = args3[0];
+      const seq = args3[1];
       const applyPred = (v) => Boolean(callFn(pred, [v]));
       const doFilter = (s) => {
         if (!s) return null;
@@ -12718,8 +12769,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return doFilter(isLazySeq(seq) ? seq : null);
     }
     case "map-lazy": {
-      const f2 = args2[0];
-      const seq2 = args2[1];
+      const f2 = args3[0];
+      const seq2 = args3[1];
       const doMap = (s) => {
         if (!s) return null;
         const h = lazyHead(s);
@@ -12728,8 +12779,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return doMap(isLazySeq(seq2) ? seq2 : null);
     }
     case "take-while": {
-      const pred = args2[0];
-      const seq = args2[1];
+      const pred = args3[0];
+      const seq = args3[1];
       if (Array.isArray(seq)) {
         const result = [];
         for (const v of seq) {
@@ -12752,27 +12803,27 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return doTakeWhile(isLazySeq(seq) ? seq : null);
     }
     case "lazy-head": {
-      return isLazySeq(args2[0]) ? lazyHead(args2[0]) : null;
+      return isLazySeq(args3[0]) ? lazyHead(args3[0]) : null;
     }
     case "lazy-tail": {
-      return isLazySeq(args2[0]) ? lazyTail(args2[0]) : null;
+      return isLazySeq(args3[0]) ? lazyTail(args3[0]) : null;
     }
     case "lazy?": {
-      return isLazySeq(args2[0]);
+      return isLazySeq(args3[0]);
     }
     case "ctx-new": {
-      const maxTokens = typeof args2[0] === "number" ? args2[0] : 4096;
+      const maxTokens = typeof args3[0] === "number" ? args3[0] : 4096;
       return new ContextManager(maxTokens);
     }
     case "ctx-add": {
-      const ctx = args2[0];
-      const content = args2[1];
+      const ctx = args3[0];
+      const content = args3[1];
       const opts = {};
       for (let i = 2; i < expr2.args.length - 1; i++) {
         const raw = expr2.args[i];
         if (raw.kind === "keyword") {
           const kw = raw.name;
-          const val = args2[i];
+          const val = args3[i];
           if (kw === "priority") opts.priority = Number(val);
           else if (kw === "tags") opts.tags = Array.isArray(val) ? val : [String(val)];
           else if (kw === "tokens") opts.tokens = Number(val);
@@ -12781,105 +12832,105 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return ctx.add(content, opts);
     }
     case "ctx-get": {
-      const ctx = args2[0];
-      return ctx.get(String(args2[1])) ?? null;
+      const ctx = args3[0];
+      return ctx.get(String(args3[1])) ?? null;
     }
     case "ctx-remove": {
-      const ctx = args2[0];
-      ctx.remove(String(args2[1]));
+      const ctx = args3[0];
+      ctx.remove(String(args3[1]));
       return null;
     }
     case "ctx-trim": {
-      const ctx = args2[0];
+      const ctx = args3[0];
       return ctx.trim();
     }
     case "ctx-stats": {
-      const ctx = args2[0];
+      const ctx = args3[0];
       return ctx.stats();
     }
     case "ctx-has-room?": {
-      const ctx = args2[0];
-      return ctx.hasRoom(Number(args2[1]));
+      const ctx = args3[0];
+      return ctx.hasRoom(Number(args3[1]));
     }
     case "ctx-all": {
-      const ctx = args2[0];
-      const tag = args2.length > 1 ? String(args2[1]) : void 0;
+      const ctx = args3[0];
+      const tag = args3.length > 1 ? String(args3[1]) : void 0;
       return ctx.getAll(tag);
     }
     case "ok?":
-      return isOk(args2[0]);
+      return isOk(args3[0]);
     case "err?":
-      return isErr(args2[0]);
+      return isErr(args3[0]);
     case "unwrap":
-      return unwrap(args2[0]);
+      return unwrap(args3[0]);
     case "unwrap-or":
-      return unwrapOr(args2[0], args2[1]);
+      return unwrapOr(args3[0], args3[1]);
     case "map-ok": {
-      const r = args2[0];
-      const fn = args2[1];
+      const r = args3[0];
+      const fn = args3[1];
       return mapOk(r, (v) => callFn(fn, [v]));
     }
     case "map-err": {
-      const r = args2[0];
-      const fn = args2[1];
+      const r = args3[0];
+      const fn = args3[1];
       return mapErr(r, (e) => callFn(fn, [e]));
     }
     case "flat-map": {
-      const r = args2[0];
-      const fn = args2[1];
+      const r = args3[0];
+      const fn = args3[1];
       return flatMap(r, (v) => callFn(fn, [v]));
     }
     case "recover": {
-      const r = args2[0];
-      const fn = args2[1];
+      const r = args3[0];
+      const fn = args3[1];
       return recover(r, (e) => callFn(fn, [e]));
     }
     case "result-explain": {
-      const e = args2[0];
+      const e = args3[0];
       if (!isErr(e)) return "(Ok \uAC12 \u2014 \uC5D0\uB7EC \uC5C6\uC74C)";
       return defaultErrorSystem.explain(e);
     }
     case "result-classify": {
-      const raw = args2[0];
+      const raw = args3[0];
       if (raw instanceof Error) return defaultErrorSystem.classify(raw);
       if (typeof raw === "string") return defaultErrorSystem.classify(new Error(raw));
       return raw;
     }
     case "mem-remember": {
-      const key = String(args2[0]);
-      const value = args2[1];
+      const key = String(args3[0]);
+      const value = args3[1];
       globalMemory.remember(key, value, { scope: "long-term", ttl: "forever" });
       return null;
     }
     case "mem-remember-short": {
-      const key = String(args2[0]);
-      const value = args2[1];
-      const ttl = typeof args2[2] === "number" ? args2[2] : 6e4;
+      const key = String(args3[0]);
+      const value = args3[1];
+      const ttl = typeof args3[2] === "number" ? args3[2] : 6e4;
       globalMemory.remember(key, value, { scope: "short-term", ttl });
       return null;
     }
     case "mem-recall": {
-      const key = String(args2[0]);
-      const fallback = args2.length > 1 ? args2[1] : null;
+      const key = String(args3[0]);
+      const fallback = args3.length > 1 ? args3[1] : null;
       return globalMemory.recall(key, fallback);
     }
     case "mem-forget": {
-      const key = String(args2[0]);
+      const key = String(args3[0]);
       return globalMemory.forget(key);
     }
     case "mem-episode": {
-      const id = String(args2[0]);
-      const what = String(args2[1]);
-      const context = args2[2] ?? {};
-      const outcome = args2[3];
+      const id = String(args3[0]);
+      const what = String(args3[1]);
+      const context = args3[2] ?? {};
+      const outcome = args3[3];
       return globalMemory.recordEpisode(id, what, context, outcome);
     }
     case "mem-search-episodes": {
-      const query = String(args2[0]);
+      const query = String(args3[0]);
       return globalMemory.searchEpisodes(query);
     }
     case "mem-working-set": {
-      globalMemory.setWorking(args2[0]);
+      globalMemory.setWorking(args3[0]);
       return null;
     }
     case "mem-working-get": {
@@ -12890,7 +12941,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return null;
     }
     case "mem-keys": {
-      const scope = args2.length > 0 ? String(args2[0]) : void 0;
+      const scope = args3.length > 0 ? String(args3[0]) : void 0;
       return globalMemory.keys(scope);
     }
     case "mem-stats": {
@@ -12900,12 +12951,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return globalMemory.purgeExpired();
     }
     case "mem-search-tag": {
-      const tag = String(args2[0]);
+      const tag = String(args3[0]);
       return globalMemory.searchByTag(tag);
     }
     case "use-tool": {
-      const toolName = String(args2[0]);
-      const toolArgs = args2[1] && typeof args2[1] === "object" && !Array.isArray(args2[1]) ? args2[1] : {};
+      const toolName = String(args3[0]);
+      const toolArgs = args3[1] && typeof args3[1] === "object" && !Array.isArray(args3[1]) ? args3[1] : {};
       const result = globalToolRegistry.executeSync(toolName, toolArgs);
       if (!result.success) throw new Error(result.error || `Tool failed: ${toolName}`);
       return result.output;
@@ -12914,21 +12965,21 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return globalToolRegistry.listAll().map((t) => t.name);
     }
     case "rag-add": {
-      const id = String(args2[0]);
-      const content = String(args2[1]);
-      const metadata = args2[2] && typeof args2[2] === "object" ? args2[2] : void 0;
+      const id = String(args3[0]);
+      const content = String(args3[1]);
+      const metadata = args3[2] && typeof args3[2] === "object" ? args3[2] : void 0;
       globalRAG.add({ id, content, metadata });
       return true;
     }
     case "rag-retrieve": {
-      const query = String(args2[0]);
-      const topK = typeof args2[1] === "number" ? args2[1] : 3;
+      const query = String(args3[0]);
+      const topK = typeof args3[1] === "number" ? args3[1] : 3;
       const results = globalRAG.retrieve(query, topK);
       return results.map((d) => ({ id: d.id, content: d.content, score: d.score ?? 0 }));
     }
     case "rag-query": {
-      const query = String(args2[0]);
-      const topK = typeof args2[1] === "number" ? args2[1] : 3;
+      const query = String(args3[0]);
+      const topK = typeof args3[1] === "number" ? args3[1] : 3;
       const result = globalRAG.query(query, { topK });
       return result.augmented;
     }
@@ -12936,34 +12987,34 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return globalRAG.size();
     }
     case "rag-remove": {
-      const id = String(args2[0]);
+      const id = String(args3[0]);
       return globalRAG.remove(id);
     }
     case "agent-spawn": {
-      const agentId = String(args2[0]);
-      const handlerFn = args2[1];
+      const agentId = String(args3[0]);
+      const handlerFn = args3[1];
       const handler = (msg, bus) => {
         return callFn(handlerFn, [msg, bus]);
       };
       return globalBus.spawn(agentId, handler);
     }
     case "agent-send": {
-      const from = String(args2[0]);
-      const to = String(args2[1]);
-      const content = args2[2];
+      const from = String(args3[0]);
+      const to = String(args3[1]);
+      const content = args3[2];
       return globalBus.send(from, to, content);
     }
     case "agent-broadcast": {
-      const from = String(args2[0]);
-      const content = args2[1];
+      const from = String(args3[0]);
+      const content = args3[1];
       return globalBus.broadcast(from, content);
     }
     case "agent-recv": {
-      const agentId = String(args2[0]);
+      const agentId = String(args3[0]);
       return globalBus.recv(agentId);
     }
     case "agent-process": {
-      const agentId = String(args2[0]);
+      const agentId = String(args3[0]);
       return globalBus.process(agentId);
     }
     case "agent-list": {
@@ -12973,11 +13024,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return globalBus.history();
     }
     case "agent-inbox-size": {
-      const agentId = String(args2[0]);
+      const agentId = String(args3[0]);
       return globalBus.inboxSize(agentId);
     }
     case "try-reason": {
-      const attemptsList = args2[0];
+      const attemptsList = args3[0];
       if (!Array.isArray(attemptsList)) {
         throw new Error("try-reason: attempts must be a list");
       }
@@ -12995,19 +13046,19 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return tryReasonBuiltin(attempts);
     }
     case "quality-check": {
-      const output = args2[0];
-      const threshold = args2.length > 1 ? Number(args2[1]) : 0.7;
+      const output = args3[0];
+      const threshold = args3.length > 1 ? Number(args3[1]) : 0.7;
       const result = evaluateQuality(output, defaultCriteria, threshold);
       return result.score;
     }
     case "quality-passed?": {
-      const output = args2[0];
-      const threshold = args2.length > 1 ? Number(args2[1]) : 0.7;
+      const output = args3[0];
+      const threshold = args3.length > 1 ? Number(args3[1]) : 0.7;
       const result = evaluateQuality(output, defaultCriteria, threshold);
       return result.passed;
     }
     case "quality-feedback": {
-      const output = args2[0];
+      const output = args3[0];
       const result = evaluateQuality(output, defaultCriteria, 0.7);
       return result.feedback;
     }
@@ -13016,58 +13067,58 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return id;
     }
     case "stream-write": {
-      const streamId = String(args2[0]);
-      const content = String(args2[1] ?? "");
+      const streamId = String(args3[0]);
+      const content = String(args3[1] ?? "");
       const s105a = getStream(streamId);
       if (!s105a) throw new Error(`stream-write: stream not found: ${streamId}`);
       s105a.write(content);
       return null;
     }
     case "stream-end": {
-      const streamId = String(args2[0]);
+      const streamId = String(args3[0]);
       const s105b = getStream(streamId);
       if (!s105b) throw new Error(`stream-end: stream not found: ${streamId}`);
       s105b.end();
       return null;
     }
     case "stream-collect": {
-      const streamId = String(args2[0]);
+      const streamId = String(args3[0]);
       const s105c = getStream(streamId);
       if (!s105c) throw new Error(`stream-collect: stream not found: ${streamId}`);
       return s105c.collect();
     }
     case "stream-done?": {
-      const streamId = String(args2[0]);
+      const streamId = String(args3[0]);
       const s105d = getStream(streamId);
       if (!s105d) return true;
       return s105d.isDone();
     }
     case "stream-chunks": {
-      const streamId = String(args2[0]);
+      const streamId = String(args3[0]);
       const s105e = getStream(streamId);
       if (!s105e) throw new Error(`stream-chunks: stream not found: ${streamId}`);
       return s105e.getChunks();
     }
     case "stream-chunk-count": {
-      const streamId = String(args2[0]);
+      const streamId = String(args3[0]);
       const s105f = getStream(streamId);
       if (!s105f) throw new Error(`stream-chunk-count: stream not found: ${streamId}`);
       return s105f.chunkCount();
     }
     case "stream-text": {
-      const streamId = String(args2[0]);
-      const text = String(args2[1] ?? "");
+      const streamId = String(args3[0]);
+      const text = String(args3[1] ?? "");
       const s105g = getStream(streamId);
       if (!s105g) throw new Error(`stream-text: stream not found: ${streamId}`);
       return streamText(s105g, text, 0);
     }
     case "stream-delete": {
-      const streamId = String(args2[0]);
+      const streamId = String(args3[0]);
       return deleteStream(streamId);
     }
     case "try-with-fallback": {
-      const fn = args2[0];
-      const fallback = args2[1];
+      const fn = args3[0];
+      const fallback = args3[1];
       const wrappedFn = () => {
         if (typeof fn === "function") return fn();
         if (fn && fn.kind === "function-value") return callFn(fn, []);
@@ -13076,11 +13127,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return tryWithFallback(wrappedFn, fallback);
     }
     case "fl-learn": {
-      const concept = String(args2[0] ?? "");
+      const concept = String(args3[0] ?? "");
       return globalTutor.lessonMarkdown(concept);
     }
     case "fl-examples": {
-      const tag = String(args2[0] ?? "");
+      const tag = String(args3[0] ?? "");
       const examples = globalTutor.findByTag(tag);
       return examples.map((e) => `${e.concept}: ${e.description}`).join("\n");
     }
@@ -13091,76 +13142,76 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return globalTutor.concepts().join(" ");
     }
     case "trace-create": {
-      const label = String(args2[0] ?? "trace");
+      const label = String(args3[0] ?? "trace");
       const { id } = createTrace(label);
       return id;
     }
     case "trace-add": {
-      const traceId2 = String(args2[0] ?? "");
-      const nodeType = String(args2[1] ?? "thought");
-      const nodeLabel = String(args2[2] ?? "");
-      const nodeValue = args2.length >= 4 ? args2[3] : void 0;
+      const traceId2 = String(args3[0] ?? "");
+      const nodeType = String(args3[1] ?? "thought");
+      const nodeLabel = String(args3[2] ?? "");
+      const nodeValue = args3.length >= 4 ? args3[3] : void 0;
       const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.add(nodeType, nodeLabel, nodeValue);
       return null;
     }
     case "trace-enter": {
-      const traceId2 = String(args2[0] ?? "");
-      const nodeType = String(args2[1] ?? "thought");
-      const nodeLabel = String(args2[2] ?? "");
-      const nodeValue = args2.length >= 4 ? args2[3] : void 0;
+      const traceId2 = String(args3[0] ?? "");
+      const nodeType = String(args3[1] ?? "thought");
+      const nodeLabel = String(args3[2] ?? "");
+      const nodeValue = args3.length >= 4 ? args3[3] : void 0;
       const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.enter(nodeType, nodeLabel, nodeValue);
       return null;
     }
     case "trace-exit": {
-      const traceId2 = String(args2[0] ?? "");
-      const result = args2.length >= 2 ? args2[1] : void 0;
+      const traceId2 = String(args3[0] ?? "");
+      const result = args3.length >= 2 ? args3[1] : void 0;
       const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.exit(result);
       return null;
     }
     case "trace-markdown": {
-      const traceId2 = String(args2[0] ?? "");
+      const traceId2 = String(args3[0] ?? "");
       const trace = getTrace(traceId2);
       if (!trace) return "";
       return trace.toMarkdown();
     }
     case "trace-tree": {
-      const traceId2 = String(args2[0] ?? "");
+      const traceId2 = String(args3[0] ?? "");
       const trace = getTrace(traceId2);
       if (!trace) return "";
       return trace.toTree();
     }
     case "trace-node-count": {
-      const traceId2 = String(args2[0] ?? "");
+      const traceId2 = String(args3[0] ?? "");
       const trace = getTrace(traceId2);
       if (!trace) return 0;
       return trace.nodeCount();
     }
     case "prompt-compile": {
-      const blockType = String(args2[0] ?? "COT");
-      const instruction = String(args2[1] ?? "");
+      const blockType = String(args3[0] ?? "COT");
+      const instruction = String(args3[1] ?? "");
       const section = globalCompiler.compileBlock(blockType, {});
       const sections = section ? [section] : [{ name: "default", content: "", priority: 0.5 }];
       const result = globalCompiler.compile(sections, instruction);
       return result.prompt;
     }
     case "prompt-tokens": {
-      const text = String(args2[0] ?? "");
+      const text = String(args3[0] ?? "");
       return Math.ceil(text.length / 4);
     }
     case "prompt-target": {
-      const target = String(args2[0] ?? "claude");
+      const target = String(args3[0] ?? "claude");
       globalCompiler.setTarget(target);
       return target;
     }
     case "prompt-from-code": {
-      const flCode = String(args2[0] ?? "");
-      const instruction = String(args2[1] ?? "");
+      const flCode = String(args3[0] ?? "");
+      const instruction = String(args3[1] ?? "");
       const result = globalCompiler.compileFromCode(flCode, instruction);
       return result.prompt;
     }
@@ -13171,61 +13222,61 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return [...sdk.features];
     }
     case "sdk-supports": {
-      const feature = String(args2[0] ?? "");
+      const feature = String(args3[0] ?? "");
       return sdk.supports(feature);
     }
     case "sdk-snippet": {
-      const concept = String(args2[0] ?? "");
+      const concept = String(args3[0] ?? "");
       return sdk.snippet(concept);
     }
     case "sdk-validate": {
-      const code = String(args2[0] ?? "");
+      const code = String(args3[0] ?? "");
       const result = sdk.validate(code);
       return result.valid;
     }
     case "maybe-map": {
-      const [m, fn] = args2;
+      const [m, fn] = args3;
       return maybeMap(m, (v) => callFnVal(fn, [v]));
     }
     case "maybe-bind": {
-      const [m, fn] = args2;
+      const [m, fn] = args3;
       return maybeBind(m, (v) => callFnVal(fn, [v]));
     }
     case "maybe-chain": {
-      const [maybes, fn] = args2;
+      const [maybes, fn] = args3;
       const list = Array.isArray(maybes) ? maybes : [maybes];
       return maybeChain(list, (...vals) => callFnVal(fn, vals));
     }
     case "maybe-filter": {
-      const [m, pred] = args2;
+      const [m, pred] = args3;
       return maybeFilter(m, (v) => callFnVal(pred, [v]));
     }
     case "maybe-combine": {
-      const [a, b, fn] = args2;
+      const [a, b, fn] = args3;
       return maybeCombine(a, b, (x, y) => callFnVal(fn, [x, y]));
     }
     case "maybe-select": {
-      const list = Array.isArray(args2[0]) ? args2[0] : args2;
+      const list = Array.isArray(args3[0]) ? args3[0] : args3;
       return maybeSelect(list);
     }
     default: {
       if (interp2.context.functions.has(op)) {
-        return callUser(op, args2);
+        return callUser(op, args3);
       }
       const bracketMatch = op.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch && interp2.context.functions.has(bracketMatch[1])) {
-        return callUser(op, args2);
+        return callUser(op, args3);
       }
       if (interp2.context.variables.has(op)) {
         const fn = interp2.context.variables.get(op);
         if (fn.kind === "builtin-function") {
-          return fn.fn(args2.map((arg) => ev(arg)));
+          return fn.fn(args3.map((arg) => ev(arg)));
         } else if (typeof fn === "function" || fn.kind === "function-value") {
-          return callFn(fn, args2);
+          return callFn(fn, args3);
         }
       }
       if (op === "hypothesis") {
-        const [claim, testFn, evalFn] = args2;
+        const [claim, testFn, evalFn] = args3;
         const config = {
           claim: String(claim),
           test: (attempt) => {
@@ -13243,7 +13294,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.verdict;
       }
       if (op === "hypothesis-confidence") {
-        const [claim, testFn, evalFn] = args2;
+        const [claim, testFn, evalFn] = args3;
         const config = {
           claim: String(claim),
           test: (attempt) => {
@@ -13261,7 +13312,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.confidence;
       }
       if (op === "hypothesis-compete") {
-        const hypoList = args2[0];
+        const hypoList = args3[0];
         if (!Array.isArray(hypoList) || hypoList.length === 0) return null;
         const configs = hypoList.map((h) => {
           const [claim, testFn, evalFn] = Array.isArray(h) ? h : [h, () => null, () => 0];
@@ -13283,7 +13334,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return winner.claim;
       }
       if (op === "debate") {
-        const [proposition, proFn, conFn] = args2;
+        const [proposition, proFn, conFn] = args3;
         const result = globalDebater.debate({
           proposition: String(proposition),
           pro: (round, conArgs) => {
@@ -13300,7 +13351,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.winner;
       }
       if (op === "debate-score") {
-        const [proposition, proFn, conFn] = args2;
+        const [proposition, proFn, conFn] = args3;
         const result = globalDebater.debate({
           proposition: String(proposition),
           pro: (round, conArgs) => {
@@ -13317,7 +13368,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return { pro: result.proScore, con: result.conScore };
       }
       if (op === "debate-conclusion") {
-        const [proposition, proFn, conFn] = args2;
+        const [proposition, proFn, conFn] = args3;
         const result = globalDebater.debate({
           proposition: String(proposition),
           pro: (round, conArgs) => {
@@ -13334,16 +13385,16 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.conclusion;
       }
       if (op === "cp-save") {
-        const [name, state] = args2;
+        const [name, state] = args3;
         globalCheckpoint.save(String(name), state);
         return null;
       }
       if (op === "cp-restore") {
-        const [name] = args2;
+        const [name] = args3;
         return globalCheckpoint.restore(String(name));
       }
       if (op === "cp-branch") {
-        const [name, state, fn] = args2;
+        const [name, state, fn] = args3;
         const result = globalCheckpoint.branch(String(name), state, (s) => {
           if (typeof fn === "function") return fn(s);
           if (typeof fn === "string") return callUser(fn, [s]);
@@ -13357,23 +13408,23 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.restored;
       }
       if (op === "cp-drop") {
-        const [name] = args2;
+        const [name] = args3;
         return globalCheckpoint.drop(String(name));
       }
       if (op === "cp-list") {
         return globalCheckpoint.list();
       }
       if (op === "cp-versions") {
-        const [name] = args2;
+        const [name] = args3;
         return globalCheckpoint.versions(String(name));
       }
       if (op === "meta-reason") {
-        const problem = String(args2[0] ?? "");
+        const problem = String(args3[0] ?? "");
         const result = globalMetaReasoner.analyze(problem);
         return result.selected;
       }
       if (op === "meta-reason-scores") {
-        const problem = String(args2[0] ?? "");
+        const problem = String(args3[0] ?? "");
         const result = globalMetaReasoner.analyze(problem);
         const scoreMap = {};
         for (const s of result.scores) {
@@ -13382,32 +13433,32 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return scoreMap;
       }
       if (op === "meta-reason-rationale") {
-        const problem = String(args2[0] ?? "");
+        const problem = String(args3[0] ?? "");
         const result = globalMetaReasoner.analyze(problem);
         return result.rationale;
       }
       if (op === "belief-set") {
-        const [claim, confidence] = args2;
+        const [claim, confidence] = args3;
         globalBeliefs.set(String(claim), Number(confidence));
         return null;
       }
       if (op === "belief-get") {
-        const [claim] = args2;
+        const [claim] = args3;
         return globalBeliefs.get(String(claim));
       }
       if (op === "belief-update") {
-        const [claim, evidence] = args2;
+        const [claim, evidence] = args3;
         return globalBeliefs.update(String(claim), Number(evidence));
       }
       if (op === "belief-negate") {
-        const [claim] = args2;
+        const [claim] = args3;
         return globalBeliefs.negate(String(claim));
       }
       if (op === "belief-list") {
         return globalBeliefs.list();
       }
       if (op === "belief-certain") {
-        const threshold = args2.length > 0 ? Number(args2[0]) : 0.8;
+        const threshold = args3.length > 0 ? Number(args3[0]) : 0.8;
         return globalBeliefs.certain(threshold);
       }
       if (op === "belief-strongest") {
@@ -13415,35 +13466,35 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return b ? b.claim : null;
       }
       if (op === "belief-forget") {
-        const [claim] = args2;
+        const [claim] = args3;
         return globalBeliefs.forget(String(claim));
       }
       if (op === "belief-size") {
         return globalBeliefs.size();
       }
       if (op === "analogy-store") {
-        const [desc, solution, tagsRaw] = args2;
+        const [desc, solution, tagsRaw] = args3;
         const tags = Array.isArray(tagsRaw) ? tagsRaw.map(String) : [];
         const p = globalAnalogy.store(String(desc), solution, tags);
         return p.id;
       }
       if (op === "analogy-find") {
-        const [problem, topK] = args2;
+        const [problem, topK] = args3;
         const results = globalAnalogy.find(String(problem), topK != null ? Number(topK) : 3);
         return results.map((p) => p.description);
       }
       if (op === "analogy-best") {
-        const [problem] = args2;
+        const [problem] = args3;
         const p = globalAnalogy.best(String(problem));
         return p ? p.solution : null;
       }
       if (op === "analogy-by-tag") {
-        const [tag] = args2;
+        const [tag] = args3;
         const results = globalAnalogy.byTag(String(tag));
         return results.map((p) => p.description);
       }
       if (op === "analogy-popular") {
-        const [n] = args2;
+        const [n] = args3;
         const results = globalAnalogy.popular(n != null ? Number(n) : 3);
         return results.map((p) => p.description);
       }
@@ -13454,27 +13505,27 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalAnalogy.all().map((p) => p.description);
       }
       if (op === "critique") {
-        const [output] = args2;
+        const [output] = args3;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.approved;
       }
       if (op === "critique-points") {
-        const [output] = args2;
+        const [output] = args3;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.points.map((p) => p.description);
       }
       if (op === "critique-risk") {
-        const [output] = args2;
+        const [output] = args3;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.overallRisk;
       }
       if (op === "critique-summary") {
-        const [output] = args2;
+        const [output] = args3;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.summary;
       }
       if (op === "compose-reason") {
-        const [stepsList, input] = args2;
+        const [stepsList, input] = args3;
         if (!Array.isArray(stepsList)) return input;
         const steps = stepsList.map((s) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
@@ -13490,7 +13541,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.output;
       }
       if (op === "compose-history") {
-        const [stepsList, input] = args2;
+        const [stepsList, input] = args3;
         if (!Array.isArray(stepsList)) return [];
         const steps = stepsList.map((s) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
@@ -13506,7 +13557,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.history.map((h) => h.name);
       }
       if (op === "compose-steps") {
-        const [stepsList, input] = args2;
+        const [stepsList, input] = args3;
         if (!Array.isArray(stepsList)) return 0;
         const steps = stepsList.map((s) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
@@ -13522,7 +13573,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.steps;
       }
       if (op === "cognition-solve") {
-        const [problem, solverFn] = args2;
+        const [problem, solverFn] = args3;
         const result = globalCognition.solve(String(problem), (strategy, prob) => {
           if (typeof solverFn === "function") return solverFn(strategy, prob);
           if (solverFn?.kind === "function-value") return callFn(solverFn, [strategy, prob]);
@@ -13544,17 +13595,17 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "cognition-meta") {
-        const [problem] = args2;
+        const [problem] = args3;
         const result = globalCognition.meta.analyze(String(problem));
         return result.selected;
       }
       if (op === "cognition-believe") {
-        const [claim, confidence] = args2;
+        const [claim, confidence] = args3;
         globalCognition.beliefs.set(String(claim), Number(confidence));
         return null;
       }
       if (op === "cognition-recall") {
-        const [pattern] = args2;
+        const [pattern] = args3;
         const p = globalCognition.analogies.best(String(pattern));
         return p ? p.solution : null;
       }
@@ -13569,23 +13620,23 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
           });
         };
         if (op === "consensus-majority") {
-          const votes = parseVotes(args2[0]);
+          const votes = parseVotes(args3[0]);
           const result = globalConsensus.majority(votes);
           return result.answer;
         }
         if (op === "consensus-weighted") {
-          const votes = parseVotes(args2[0]);
+          const votes = parseVotes(args3[0]);
           const result = globalConsensus.weighted(votes);
           return result.answer;
         }
         if (op === "consensus-threshold") {
-          const votes = parseVotes(args2[0]);
-          const threshold = args2[1] !== void 0 ? Number(args2[1]) : 0.7;
+          const votes = parseVotes(args3[0]);
+          const threshold = args3[1] !== void 0 ? Number(args3[1]) : 0.7;
           const result = globalConsensus.threshold(votes, threshold);
           return result ? result.answer : null;
         }
         if (op === "consensus-agreement") {
-          const votes = parseVotes(args2[0]);
+          const votes = parseVotes(args3[0]);
           return globalConsensus.agreement(votes);
         }
       }
@@ -13606,32 +13657,32 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
           return [];
         };
         if (op === "vote-plurality") {
-          const ballots = parseBallots(args2[0]);
-          const candidates = parseCandidates(args2[1]);
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
           const result = globalVoting.plurality(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-approval") {
-          const ballots = parseBallots(args2[0]);
-          const candidates = parseCandidates(args2[1]);
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
           const result = globalVoting.approval(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-score") {
-          const ballots = parseBallots(args2[0]);
-          const candidates = parseCandidates(args2[1]);
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
           const result = globalVoting.score(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-tally") {
-          const ballots = parseBallots(args2[0]);
-          const candidates = parseCandidates(args2[1]);
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
           const t = globalVoting.tally(ballots, candidates);
           return new Map(Object.entries(t));
         }
       }
       if (op === "negotiate") {
-        const [raw] = args2;
+        const [raw] = args3;
         if (!Array.isArray(raw)) return false;
         const positions = raw.map((p) => {
           if (Array.isArray(p)) {
@@ -13643,7 +13694,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.agreed;
       }
       if (op === "negotiate-value") {
-        const [raw] = args2;
+        const [raw] = args3;
         if (!Array.isArray(raw)) return null;
         const positions = raw.map((p) => {
           if (Array.isArray(p)) {
@@ -13655,7 +13706,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.agreed ? result.value ?? null : null;
       }
       if (op === "negotiate-rounds") {
-        const [raw] = args2;
+        const [raw] = args3;
         if (!Array.isArray(raw)) return 0;
         const positions = raw.map((p) => {
           if (Array.isArray(p)) {
@@ -13667,7 +13718,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.rounds.length;
       }
       if (op === "swarm-optimize") {
-        const [fnArg, nArg, iterArg] = args2;
+        const [fnArg, nArg, iterArg] = args3;
         const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
         const result = globalSwarm.optimize({
           objective,
@@ -13677,7 +13728,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.bestPosition;
       }
       if (op === "swarm-best-score") {
-        const [fnArg, nArg, iterArg] = args2;
+        const [fnArg, nArg, iterArg] = args3;
         const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
         const result = globalSwarm.optimize({
           objective,
@@ -13687,13 +13738,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.bestScore;
       }
       if (op === "swarm-converged?") {
-        const [fnArg] = args2;
+        const [fnArg] = args3;
         const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
         const result = globalSwarm.optimize({ objective });
         return result.converged;
       }
       if (op === "compete-register") {
-        const [id, solveFn] = args2;
+        const [id, solveFn] = args3;
         const competitor = {
           id: String(id),
           solve: (problem) => callFn(solveFn, [problem])
@@ -13702,19 +13753,19 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "compete") {
-        const [problem, evalFn] = args2;
+        const [problem, evalFn] = args3;
         const evaluate = (output) => Number(callFn(evalFn, [output]));
         const result = globalCompetition.run(problem, evaluate);
         return result.winner?.agentId ?? null;
       }
       if (op === "compete-score") {
-        const [problem, evalFn] = args2;
+        const [problem, evalFn] = args3;
         const evaluate = (output) => Number(callFn(evalFn, [output]));
         const result = globalCompetition.run(problem, evaluate);
         return result.winner?.score ?? null;
       }
       if (op === "compete-all") {
-        const [problem, evalFn] = args2;
+        const [problem, evalFn] = args3;
         const evaluate = (output) => Number(callFn(evalFn, [output]));
         const result = globalCompetition.run(problem, evaluate);
         return result.allResults.map((r) => [r.agentId, r.score, r.rank]);
@@ -13723,7 +13774,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalCompetition.list();
       }
       if (op === "peer-review-add") {
-        const [idArg, fnArg] = args2;
+        const [idArg, fnArg] = args3;
         const reviewerId = String(idArg);
         const reviewer = {
           id: reviewerId,
@@ -13745,17 +13796,17 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "peer-review") {
-        const [targetId, output] = args2;
+        const [targetId, output] = args3;
         const result = globalPeerReview.review(String(targetId), output);
         return result.approved;
       }
       if (op === "peer-review-score") {
-        const [targetId, output] = args2;
+        const [targetId, output] = args3;
         const result = globalPeerReview.review(String(targetId), output);
         return result.averageScore;
       }
       if (op === "peer-review-comments") {
-        const [targetId, output] = args2;
+        const [targetId, output] = args3;
         const result = globalPeerReview.review(String(targetId), output);
         return result.comments;
       }
@@ -13763,7 +13814,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalPeerReview.list();
       }
       if (op === "chain-agents") {
-        const [rawAgents, input] = args2;
+        const [rawAgents, input] = args3;
         if (!Array.isArray(rawAgents)) return input;
         const agents = rawAgents.map((a) => {
           if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
@@ -13782,7 +13833,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.finalOutput;
       }
       if (op === "chain-links") {
-        const [rawAgents, input] = args2;
+        const [rawAgents, input] = args3;
         if (!Array.isArray(rawAgents)) return [];
         const agents = rawAgents.map((a) => {
           if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
@@ -13801,7 +13852,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.links.filter((l) => !l.skipped).map((l) => l.agentId);
       }
       if (op === "chain-steps") {
-        const [rawAgents, input] = args2;
+        const [rawAgents, input] = args3;
         if (!Array.isArray(rawAgents)) return 0;
         const agents = rawAgents.map((a) => {
           if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
@@ -13820,7 +13871,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return result.stepsCompleted;
       }
       if (op === "orchestrate-run") {
-        const [rawTasks] = args2;
+        const [rawTasks] = args3;
         if (!Array.isArray(rawTasks)) return {};
         const tasks = rawTasks.map((t) => {
           if (Array.isArray(t)) {
@@ -13831,7 +13882,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalOrchestrator.run(tasks).outputs;
       }
       if (op === "orchestrate-order") {
-        const [rawTasks] = args2;
+        const [rawTasks] = args3;
         if (!Array.isArray(rawTasks)) return [];
         const tasks = rawTasks.map((t) => {
           if (Array.isArray(t)) {
@@ -13842,7 +13893,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalOrchestrator.getOrder(tasks);
       }
       if (op === "hub-route") {
-        const [taskType, problem] = args2;
+        const [taskType, problem] = args3;
         const result = globalHub.route(String(taskType), problem, []);
         return result.result;
       }
@@ -13856,7 +13907,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalHub.taskTypes();
       }
       if (op === "delegate-register") {
-        const [id, caps, fn] = args2;
+        const [id, caps, fn] = args3;
         const capabilities = Array.isArray(caps) ? caps.map(String) : [];
         const agent = {
           id: String(id),
@@ -13871,7 +13922,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return String(id);
       }
       if (op === "delegate") {
-        const [desc, input, capability] = args2;
+        const [desc, input, capability] = args3;
         const task = {
           id: `task-${Date.now()}`,
           description: String(desc),
@@ -13888,7 +13939,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "delegate-all") {
-        const [taskList] = args2;
+        const [taskList] = args3;
         const tasks = Array.isArray(taskList) ? taskList.map((t, i) => ({
           id: t instanceof Map ? String(t.get("id") ?? `task-${i}`) : `task-${i}`,
           description: t instanceof Map ? String(t.get("description") ?? "") : String(t),
@@ -13913,7 +13964,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalDelegation.list();
       }
       if (op === "crossover-single") {
-        const [a, b] = args2;
+        const [a, b] = args3;
         const arrA = Array.isArray(a) ? a : [a];
         const arrB = Array.isArray(b) ? b : [b];
         const result = globalCrossover.singlePoint(arrA, arrB);
@@ -13927,7 +13978,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "crossover-two") {
-        const [a, b] = args2;
+        const [a, b] = args3;
         const arrA = Array.isArray(a) ? a : [a];
         const arrB = Array.isArray(b) ? b : [b];
         const result = globalCrossover.twoPoint(arrA, arrB);
@@ -13941,7 +13992,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "crossover-uniform") {
-        const [a, b] = args2;
+        const [a, b] = args3;
         const arrA = Array.isArray(a) ? a : [a];
         const arrB = Array.isArray(b) ? b : [b];
         const result = globalCrossover.uniform(arrA, arrB);
@@ -13955,7 +14006,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
       if (op === "crossover-arithmetic") {
         let alpha;
-        let cleanArgs = [...args2];
+        let cleanArgs = [...args3];
         const alphaIdx = cleanArgs.findIndex((v) => v === "alpha" || v === ":alpha");
         if (alphaIdx !== -1) {
           alpha = Number(cleanArgs[alphaIdx + 1]);
@@ -13974,7 +14025,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "crossover-strings") {
-        const [a, b] = args2;
+        const [a, b] = args3;
         const result = globalCrossover.crossoverStrings(String(a), String(b));
         return /* @__PURE__ */ new Map([
           ["parent1", result.parent1],
@@ -13986,7 +14037,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "crossover-objects") {
-        const [a, b] = args2;
+        const [a, b] = args3;
         const objA = a instanceof Map ? Object.fromEntries(a.entries()) : typeof a === "object" && a !== null ? a : {};
         const objB = b instanceof Map ? Object.fromEntries(b.entries()) : typeof b === "object" && b !== null ? b : {};
         const result = globalCrossover.crossoverObjects(objA, objB);
@@ -14000,7 +14051,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "crossover-children") {
-        const [result] = args2;
+        const [result] = args3;
         if (result instanceof Map) {
           return [result.get("child1"), result.get("child2")];
         }
@@ -14008,7 +14059,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
       if (op === "blend") {
         let alpha = 0.5;
-        let cleanArgs = [...args2];
+        let cleanArgs = [...args3];
         const alphaIdx = cleanArgs.findIndex((v) => v === "alpha" || v === ":alpha");
         if (alphaIdx !== -1) {
           alpha = Number(cleanArgs[alphaIdx + 1]);
@@ -14025,21 +14076,21 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return a;
       }
       if (op === "export") return null;
-      if (op === "call" && args2.length >= 1) {
-        const fnRef = ev(args2[0]);
-        const callArgs = args2.slice(1);
+      if (op === "call" && args3.length >= 1) {
+        const fnRef = ev(args3[0]);
+        const callArgs = args3.slice(1);
         if (typeof fnRef === "string") return callUser(fnRef, callArgs);
         if (typeof fnRef === "function" || fnRef?.kind === "function-value") return callFn(fnRef, callArgs);
         return null;
       }
       if (op === "evolve-numbers") {
-        const target = Array.isArray(args2[0]) ? args2[0].map(Number) : [0];
+        const target = Array.isArray(args3[0]) ? args3[0].map(Number) : [0];
         let popSize = 20;
         let maxGens = 50;
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const key = String(args2[i]);
-          if (key === ":pop") popSize = Number(args2[i + 1]);
-          if (key === ":gens") maxGens = Number(args2[i + 1]);
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]);
+          if (key === ":pop") popSize = Number(args3[i + 1]);
+          if (key === ":gens") maxGens = Number(args3[i + 1]);
         }
         const result = evolveNumbers(target, popSize, maxGens);
         return /* @__PURE__ */ new Map([
@@ -14059,13 +14110,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "evolve-strings") {
-        const target = String(args2[0] ?? "");
+        const target = String(args3[0] ?? "");
         let popSize = 30;
         let maxGens = 100;
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const key = String(args2[i]);
-          if (key === ":pop") popSize = Number(args2[i + 1]);
-          if (key === ":gens") maxGens = Number(args2[i + 1]);
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]);
+          if (key === ":pop") popSize = Number(args3[i + 1]);
+          if (key === ":gens") maxGens = Number(args3[i + 1]);
         }
         const result = evolveStrings(target, popSize, maxGens);
         return /* @__PURE__ */ new Map([
@@ -14090,13 +14141,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         let mutationRate = 0.1;
         let eliteRatio = 0.1;
         let fitnessGoal = null;
-        for (let i = 0; i < args2.length - 1; i += 2) {
-          const key = String(args2[i]);
-          if (key === ":pop") popSize = Number(args2[i + 1]);
-          if (key === ":gens") maxGens = Number(args2[i + 1]);
-          if (key === ":mutation") mutationRate = Number(args2[i + 1]);
-          if (key === ":elite") eliteRatio = Number(args2[i + 1]);
-          if (key === ":goal") fitnessGoal = Number(args2[i + 1]);
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]);
+          if (key === ":pop") popSize = Number(args3[i + 1]);
+          if (key === ":gens") maxGens = Number(args3[i + 1]);
+          if (key === ":mutation") mutationRate = Number(args3[i + 1]);
+          if (key === ":elite") eliteRatio = Number(args3[i + 1]);
+          if (key === ":goal") fitnessGoal = Number(args3[i + 1]);
         }
         return /* @__PURE__ */ new Map([
           ["populationSize", popSize],
@@ -14107,7 +14158,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "evolve-step") {
-        const engine = args2[0];
+        const engine = args3[0];
         if (engine instanceof EvolutionEngine) {
           const stepResult = engine.step();
           return /* @__PURE__ */ new Map([
@@ -14118,7 +14169,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "evolve-best") {
-        const engine = args2[0];
+        const engine = args3[0];
         if (engine instanceof EvolutionEngine) {
           const best = engine.getBest();
           if (!best) return null;
@@ -14132,7 +14183,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "evolve-population") {
-        const engine = args2[0];
+        const engine = args3[0];
         if (engine instanceof EvolutionEngine) {
           return engine.getPopulation().map((ind) => /* @__PURE__ */ new Map([
             ["genome", ind.genome],
@@ -14144,7 +14195,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return [];
       }
       if (op === "evolve-run") {
-        const engine = args2[0];
+        const engine = args3[0];
         if (engine instanceof EvolutionEngine) {
           const result = engine.run();
           return /* @__PURE__ */ new Map([
@@ -14166,7 +14217,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "evolve-history") {
-        const arg = args2[0];
+        const arg = args3[0];
         if (arg instanceof EvolutionEngine) {
           return arg.getHistory().map((h) => /* @__PURE__ */ new Map([
             ["gen", h.gen],
@@ -14182,9 +14233,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
       if (op === "mutate-config") {
         const config = {};
-        for (let i = 0; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -14196,11 +14247,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "mutate-numbers") {
-        const arr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+        const arr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
         const config = {};
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -14215,11 +14266,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "mutate-string") {
-        const s = String(args2[0] ?? "");
+        const s = String(args3[0] ?? "");
         const config = {};
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -14234,12 +14285,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "mutate-object") {
-        const raw = args2[0];
+        const raw = args3[0];
         const obj = raw instanceof Map ? Object.fromEntries(raw.entries()) : typeof raw === "object" && raw !== null ? raw : {};
         const config = {};
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -14255,11 +14306,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "mutate-swap") {
-        const arr = Array.isArray(args2[0]) ? args2[0] : [];
+        const arr = Array.isArray(args3[0]) ? args3[0] : [];
         const config = { type: "swap", rate: 0.3 };
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "rate") config.rate = Number(v);
         }
         const m = new Mutator(config);
@@ -14272,11 +14323,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "mutate-flip") {
-        const arr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+        const arr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
         const config = { type: "flip" };
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "rate") config.rate = Number(v);
         }
         const m = new Mutator(config);
@@ -14289,11 +14340,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "mutate-select") {
-        const rawList = Array.isArray(args2[0]) ? args2[0] : [];
+        const rawList = Array.isArray(args3[0]) ? args3[0] : [];
         let n = 1;
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "n") n = Number(v);
         }
         const candidates = rawList.map((item) => {
@@ -14308,12 +14359,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalMutator.select(candidates, n);
       }
       if (op === "mutation-count") {
-        const r = args2[0];
+        const r = args3[0];
         if (r instanceof Map) return r.get("mutations") ?? 0;
         return 0;
       }
       if (op === "generation-run") {
-        const [popArg, fitnessFnArg, nextGenFnArg, ...rest] = args2;
+        const [popArg, fitnessFnArg, nextGenFnArg, ...rest] = args3;
         const population = Array.isArray(popArg) ? popArg : [];
         const maxGen = rest.length >= 2 && rest[0] === "max" ? Number(rest[1]) : 50;
         const fitnessFunc = (item) => {
@@ -14354,7 +14405,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "generation-stats") {
-        const [arg] = args2;
+        const [arg] = args3;
         if (arg instanceof Map) {
           const history = arg.get("history");
           return Array.isArray(history) ? history : [];
@@ -14362,12 +14413,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return [];
       }
       if (op === "generation-best") {
-        const [arg] = args2;
+        const [arg] = args3;
         if (arg instanceof Map) return arg.get("best") ?? null;
         return null;
       }
       if (op === "generation-history") {
-        const [arg] = args2;
+        const [arg] = args3;
         if (arg instanceof Map) {
           const history = arg.get("history");
           return Array.isArray(history) ? history : [];
@@ -14375,7 +14426,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return [];
       }
       if (op === "generation-converged") {
-        const [arg] = args2;
+        const [arg] = args3;
         if (arg instanceof GenerationLoop) return arg.hasConverged();
         if (arg instanceof Map) {
           const history = arg.get("history") ?? [];
@@ -14390,44 +14441,44 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return false;
       }
       if (op === "generation-diversity") {
-        const [arr] = args2;
+        const [arr] = args3;
         const fitnesses = Array.isArray(arr) ? arr.map(Number) : [];
         const tmpLoop = new GenerationLoop({ maxGenerations: 1 });
         return tmpLoop.calculateDiversity(fitnesses);
       }
       if (op === "gen-improvement") {
-        const [arg] = args2;
+        const [arg] = args3;
         if (arg instanceof Map) return arg.get("improvementRatio") ?? 0;
         return 0;
       }
       if (op === "gen-termination") {
-        const [arg] = args2;
+        const [arg] = args3;
         if (arg instanceof Map) return arg.get("terminationReason") ?? "max-generations";
         return "max-generations";
       }
       if (op === "fitness-proximity") {
-        const fpValue = Number(args2[0]);
-        const fpTarget = Number(args2[1]);
-        const fpTol = args2[2] !== void 0 ? Number(args2[2]) : void 0;
+        const fpValue = Number(args3[0]);
+        const fpTarget = Number(args3[1]);
+        const fpTol = args3[2] !== void 0 ? Number(args3[2]) : void 0;
         const fpRes = globalFitness.proximity(fpValue, fpTarget, fpTol);
         return /* @__PURE__ */ new Map([["score", fpRes.score], ["rawScore", fpRes.rawScore], ["details", new Map(Object.entries(fpRes.details))]]);
       }
       if (op === "fitness-string") {
-        const fsA = String(args2[0] ?? "");
-        const fsB = String(args2[1] ?? "");
+        const fsA = String(args3[0] ?? "");
+        const fsB = String(args3[1] ?? "");
         const fsRes = globalFitness.stringSimilarity(fsA, fsB);
         return /* @__PURE__ */ new Map([["score", fsRes.score], ["rawScore", fsRes.rawScore], ["details", new Map(Object.entries(fsRes.details))]]);
       }
       if (op === "fitness-array") {
-        const faArr = Array.isArray(args2[0]) ? args2[0] : [];
-        const faTgt = Array.isArray(args2[1]) ? args2[1] : [];
+        const faArr = Array.isArray(args3[0]) ? args3[0] : [];
+        const faTgt = Array.isArray(args3[1]) ? args3[1] : [];
         const faRes = globalFitness.arrayMatch(faArr, faTgt);
         return /* @__PURE__ */ new Map([["score", faRes.score], ["rawScore", faRes.rawScore], ["details", new Map(Object.entries(faRes.details))]]);
       }
       if (op === "fitness-multi") {
-        const fmVMap = args2[0] instanceof Map ? args2[0] : /* @__PURE__ */ new Map();
-        const fmTMap = args2[1] instanceof Map ? args2[1] : /* @__PURE__ */ new Map();
-        const fmWMap = args2[2] instanceof Map ? args2[2] : void 0;
+        const fmVMap = args3[0] instanceof Map ? args3[0] : /* @__PURE__ */ new Map();
+        const fmTMap = args3[1] instanceof Map ? args3[1] : /* @__PURE__ */ new Map();
+        const fmWMap = args3[2] instanceof Map ? args3[2] : void 0;
         const fmV = {};
         const fmT = {};
         const fmW = fmWMap ? {} : void 0;
@@ -14444,8 +14495,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return /* @__PURE__ */ new Map([["score", fmRes.score], ["rawScore", fmRes.rawScore], ["details", new Map(Object.entries(fmRes.details))]]);
       }
       if (op === "fitness-constraint") {
-        const fcVal = args2[0];
-        const fcRaw = Array.isArray(args2[1]) ? args2[1] : [];
+        const fcVal = args3[0];
+        const fcRaw = Array.isArray(args3[1]) ? args3[1] : [];
         const fcFns = fcRaw.map((c) => {
           if (typeof c === "function") return c;
           if (c?.kind === "function-value") return (v) => callFn(c, [v]);
@@ -14460,8 +14511,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return /* @__PURE__ */ new Map([["score", fcRes.score], ["rawScore", fcRes.rawScore], ["details", new Map(Object.entries(fcRes.details))]]);
       }
       if (op === "fitness-rank") {
-        const frItems = Array.isArray(args2[0]) ? args2[0] : [];
-        const frScorer = args2[1];
+        const frItems = Array.isArray(args3[0]) ? args3[0] : [];
+        const frScorer = args3[1];
         const frFn = (item) => {
           if (typeof frScorer === "function") return frScorer(item);
           if (frScorer?.kind === "function-value") return callFn(frScorer, [item]);
@@ -14471,8 +14522,8 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return frRanked.map((r) => new Map(Object.entries(r)));
       }
       if (op === "fitness-pareto") {
-        const fpPItems = Array.isArray(args2[0]) ? args2[0] : [];
-        const fpObjs = (Array.isArray(args2[1]) ? args2[1] : []).map((f) => {
+        const fpPItems = Array.isArray(args3[0]) ? args3[0] : [];
+        const fpObjs = (Array.isArray(args3[1]) ? args3[1] : []).map((f) => {
           if (typeof f === "function") return f;
           if (f?.kind === "function-value") return (item) => callFn(f, [item]);
           return () => 0;
@@ -14480,13 +14531,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return globalFitness.paretoFront(fpPItems, fpObjs);
       }
       if (op === "fitness-score") {
-        const fsResult = args2[0];
+        const fsResult = args3[0];
         if (fsResult instanceof Map) return fsResult.get("score") ?? 0;
         if (typeof fsResult === "object" && fsResult !== null) return fsResult.score ?? 0;
         return Number(fsResult);
       }
       if (op === "prune-threshold") {
-        const [pItems, pScorerFn, ...pKw] = args2;
+        const [pItems, pScorerFn, ...pKw] = args3;
         const pThreshold = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
@@ -14499,7 +14550,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return pruneResultToMap(pruner1.pruneByThreshold(pArr1, pScorer1, pThreshold));
       }
       if (op === "prune-top-k") {
-        const [pItems, pScorerFn, ...pKw] = args2;
+        const [pItems, pScorerFn, ...pKw] = args3;
         const pK = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
@@ -14512,7 +14563,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return pruneResultToMap(pruner2.pruneToTopK(pArr2, pScorer2, pK));
       }
       if (op === "prune-top-percent") {
-        const [pItems, pScorerFn, ...pKw] = args2;
+        const [pItems, pScorerFn, ...pKw] = args3;
         const pPct = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":percent" || pKw[i] === "percent") return Number(pKw[i + 1]);
@@ -14525,7 +14576,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return pruneResultToMap(pruner3.pruneToTopPercent(pArr3, pScorer3, pPct));
       }
       if (op === "prune-diversity") {
-        const [pItems, pScorerFn, pSimFn, ...pKw] = args2;
+        const [pItems, pScorerFn, pSimFn, ...pKw] = args3;
         const pMinDiv = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
@@ -14539,21 +14590,21 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return pruneResultToMap(pruner4.pruneForDiversity(pArr4, pScorer4, pSim4, pMinDiv));
       }
       if (op === "prune-dedup") {
-        const [pItems, pKeyFn] = args2;
+        const [pItems, pKeyFn] = args3;
         const pArr5 = Array.isArray(pItems) ? pItems : [];
         const pruner5 = new Pruner();
         const pKeyFnWrapped = pKeyFn ? (item) => String(callFn(pKeyFn, [item])) : void 0;
         return pruneResultToMap(pruner5.dedup(pArr5, pKeyFnWrapped));
       }
       if (op === "prune-weak") {
-        const [pItems, pScorerFn] = args2;
+        const [pItems, pScorerFn] = args3;
         const pScorer6 = (item) => Number(callFn(pScorerFn, [item]));
         const pArr6 = Array.isArray(pItems) ? pItems : [];
         const pruner6 = new Pruner();
         return pruneResultToMap(pruner6.pruneWeak(pArr6, pScorer6));
       }
       if (op === "keep-best") {
-        const [pItems, pScorerFn, ...pKw] = args2;
+        const [pItems, pScorerFn, ...pKw] = args3;
         const pK7 = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
@@ -14565,24 +14616,24 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return keepBest(pArr7, pScorer7, pK7);
       }
       if (op === "prune-stats") {
-        const pRes = args2[0];
+        const pRes = args3[0];
         if (pRes instanceof Map && pRes.has("stats")) {
           return pRes.get("stats");
         }
         return null;
       }
       if (op.startsWith("refactor-")) {
-        const r137 = evalRefactorSelf(op, args2);
+        const r137 = evalRefactorSelf(op, args3);
         if (r137 !== null) return r137;
       }
       if (op === "version-snapshot") {
-        const data = args2[0] ?? null;
-        const description = String(args2[1] ?? "snapshot");
+        const data = args3[0] ?? null;
+        const description = String(args3[1] ?? "snapshot");
         const tags = [];
         let performance2;
-        for (let i = 2; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 2; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "tags" && Array.isArray(v)) tags.push(...v.map(String));
           if (k === "performance") performance2 = Number(v);
         }
@@ -14600,7 +14651,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "version-rollback") {
-        const id = String(args2[0] ?? "");
+        const id = String(args3[0] ?? "");
         const result = globalVersioning.rollback(id);
         return /* @__PURE__ */ new Map([
           ["success", result.success],
@@ -14619,12 +14670,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "version-diff") {
-        const id1 = String(args2[0] ?? "");
-        const id2 = String(args2[1] ?? "");
+        const id1 = String(args3[0] ?? "");
+        const id2 = String(args3[1] ?? "");
         return globalVersioning.diff(id1, id2);
       }
       if (op === "version-get") {
-        const id = String(args2[0] ?? "");
+        const id = String(args3[0] ?? "");
         const snap = globalVersioning.get(id);
         if (!snap) return null;
         return /* @__PURE__ */ new Map([
@@ -14664,12 +14715,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]));
       }
       if (op === "version-branch") {
-        const name = String(args2[0] ?? "");
-        const fromId = args2[1] ? String(args2[1]) : void 0;
+        const name = String(args3[0] ?? "");
+        const fromId = args3[1] ? String(args3[1]) : void 0;
         return globalVersioning.branch(name, fromId);
       }
       if (op === "version-checkout") {
-        const name = String(args2[0] ?? "");
+        const name = String(args3[0] ?? "");
         const snap = globalVersioning.checkout(name);
         if (!snap) return null;
         return /* @__PURE__ */ new Map([
@@ -14689,12 +14740,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "bench-measure") {
-        const bName = String(args2[0] ?? "unnamed");
-        const bFn = args2[1];
+        const bName = String(args3[0] ?? "unnamed");
+        const bFn = args3[1];
         let bRuns = 100;
-        for (let i = 2; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          if (k === "runs") bRuns = Number(args2[i + 1]);
+        for (let i = 2; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          if (k === "runs") bRuns = Number(args3[i + 1]);
         }
         const bCallable = () => typeof bFn === "function" ? bFn() : callFnVal(bFn, []);
         const bResult = globalBenchmark.measure(bName, bCallable, bRuns);
@@ -14713,12 +14764,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "bench-compare") {
-        const bcFn1 = args2[0];
-        const bcFn2 = args2[1];
+        const bcFn1 = args3[0];
+        const bcFn2 = args3[1];
         let bcRuns = 50;
-        for (let i = 2; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          if (k === "runs") bcRuns = Number(args2[i + 1]);
+        for (let i = 2; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          if (k === "runs") bcRuns = Number(args3[i + 1]);
         }
         const bcCallable1 = () => typeof bcFn1 === "function" ? bcFn1() : callFnVal(bcFn1, []);
         const bcCallable2 = () => typeof bcFn2 === "function" ? bcFn2() : callFnVal(bcFn2, []);
@@ -14743,13 +14794,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "bench-suite") {
-        const bsName = String(args2[0] ?? "suite");
+        const bsName = String(args3[0] ?? "suite");
         return new SelfBenchmark(bsName);
       }
       if (op === "bench-add") {
-        const baSuite = args2[0];
-        const baName = String(args2[1] ?? "test");
-        const baFn = args2[2];
+        const baSuite = args3[0];
+        const baName = String(args3[1] ?? "test");
+        const baFn = args3[2];
         if (baSuite instanceof SelfBenchmark) {
           const baCallable = () => typeof baFn === "function" ? baFn() : callFnVal(baFn, []);
           baSuite.add(baName, baCallable);
@@ -14758,11 +14809,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "bench-run") {
-        const brSuite = args2[0];
+        const brSuite = args3[0];
         let brRuns = 100;
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          if (k === "runs") brRuns = Number(args2[i + 1]);
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          if (k === "runs") brRuns = Number(args3[i + 1]);
         }
         if (brSuite instanceof SelfBenchmark) {
           const brResult = brSuite.run(brRuns);
@@ -14790,7 +14841,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return null;
       }
       if (op === "bench-report") {
-        const rpResult = args2[0];
+        const rpResult = args3[0];
         if (rpResult instanceof Map) {
           const r = {
             name: String(rpResult.get("name") ?? ""),
@@ -14810,14 +14861,14 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return "No benchmark result provided";
       }
       if (op === "bench-speedup") {
-        const spComp = args2[0];
+        const spComp = args3[0];
         if (spComp instanceof Map) {
           return Number(spComp.get("speedup") ?? 1);
         }
         return 1;
       }
       if (op === "bench-stats") {
-        const stResult = args2[0];
+        const stResult = args3[0];
         if (stResult instanceof Map) {
           return /* @__PURE__ */ new Map([
             ["avg", stResult.get("avgMs")],
@@ -14838,7 +14889,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "self-evolve") {
-        const [popArg, fitnessFnArg, mutateFnArg, crossoverFnArg, ...rest] = args2;
+        const [popArg, fitnessFnArg, mutateFnArg, crossoverFnArg, ...rest] = args3;
         const population = Array.isArray(popArg) ? popArg : [];
         const cfg = {};
         for (let i = 0; i < rest.length - 1; i += 2) {
@@ -14878,11 +14929,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "self-evolve-numbers") {
-        const target140 = Array.isArray(args2[0]) ? args2[0].map(Number) : [1, 2, 3];
+        const target140 = Array.isArray(args3[0]) ? args3[0].map(Number) : [1, 2, 3];
         const cfg140 = {};
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "gens" || k === "generations") cfg140.generations = Number(v);
           else if (k === "pop" || k === "populationSize") cfg140.populationSize = Number(v);
           else if (k === "rate" || k === "mutationRate") cfg140.mutationRate = Number(v);
@@ -14903,11 +14954,11 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "self-evolve-string") {
-        const target140s = String(args2[0] ?? "hello");
+        const target140s = String(args3[0] ?? "hello");
         const cfg140s = {};
-        for (let i = 1; i < args2.length - 1; i += 2) {
-          const k = String(args2[i]).replace(/^:/, "");
-          const v = args2[i + 1];
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
           if (k === "gens" || k === "generations") cfg140s.generations = Number(v);
           else if (k === "pop" || k === "populationSize") cfg140s.populationSize = Number(v);
           else if (k === "rate" || k === "mutationRate") cfg140s.mutationRate = Number(v);
@@ -14927,7 +14978,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "evolution-report") {
-        const rawResults140 = Array.isArray(args2[0]) ? args2[0] : [args2[0]].filter(Boolean);
+        const rawResults140 = Array.isArray(args3[0]) ? args3[0] : [args3[0]].filter(Boolean);
         const results140 = rawResults140.map((r) => {
           if (r instanceof Map) {
             return {
@@ -14955,7 +15006,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "self-improve") {
-        const rawCfg140 = args2[0];
+        const rawCfg140 = args3[0];
         const cfg140i = {};
         if (rawCfg140 instanceof Map) {
           const gens = rawCfg140.get("generations") ?? rawCfg140.get("gens");
@@ -14972,7 +15023,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "evolve-cycle") {
-        const [popArg140, fitnessFnArg140] = args2;
+        const [popArg140, fitnessFnArg140] = args3;
         const population140 = Array.isArray(popArg140) ? popArg140 : [];
         const fitnessFunc140c = (item) => {
           if (typeof fitnessFnArg140 === "function") return Number(fitnessFnArg140(item));
@@ -15006,32 +15057,32 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "evolution-best") {
-        const [arg140] = args2;
+        const [arg140] = args3;
         if (arg140 instanceof Map) return arg140.get("best") ?? null;
         return null;
       }
       if (op === "evolution-fitness") {
-        const [arg140f] = args2;
+        const [arg140f] = args3;
         if (arg140f instanceof Map) return arg140f.get("bestFitness") ?? 0;
         return 0;
       }
       if (op.startsWith("world-")) {
-        const r141 = evalWorldModel141(op, args2);
+        const r141 = evalWorldModel141(op, args3);
         if (r141 !== void 0) return r141;
       }
       if (op.startsWith("cf-")) {
-        const r143 = evalCounterfactual(op, args2, callFn);
+        const r143 = evalCounterfactual(op, args3, callFn);
         if (r143 !== null) return r143;
       }
       if (op.startsWith("align-")) {
-        const r146 = evalAlign(op, args2);
+        const r146 = evalAlign(op, args3);
         if (r146 !== null) return r146;
       }
       if (op === "causal-add-node") {
         const kw142 = {};
-        for (let i = 0; i < args2.length - 1; i += 2) {
-          const key = String(args2[i]).replace(/^:/, "");
-          kw142[key] = args2[i + 1];
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]).replace(/^:/, "");
+          kw142[key] = args3[i + 1];
         }
         const node142 = { id: String(kw142["id"] ?? ""), name: String(kw142["name"] ?? kw142["id"] ?? ""), description: String(kw142["desc"] ?? kw142["description"] ?? ""), value: kw142["value"] !== void 0 ? Number(kw142["value"]) : void 0 };
         globalCausal.addNode(node142);
@@ -15039,16 +15090,16 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
       if (op === "causal-add-edge") {
         const kw142e = {};
-        for (let i = 0; i < args2.length - 1; i += 2) {
-          const key = String(args2[i]).replace(/^:/, "");
-          kw142e[key] = args2[i + 1];
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]).replace(/^:/, "");
+          kw142e[key] = args3[i + 1];
         }
         const edge142 = { from: String(kw142e["from"] ?? ""), to: String(kw142e["to"] ?? ""), strength: Number(kw142e["strength"] ?? 1), confidence: Number(kw142e["confidence"] ?? 1), delay: kw142e["delay"] !== void 0 ? Number(kw142e["delay"]) : void 0, mechanism: kw142e["mechanism"] !== void 0 ? String(kw142e["mechanism"]) : void 0 };
         globalCausal.addEdge(edge142);
         return /* @__PURE__ */ new Map([["from", edge142.from], ["to", edge142.to], ["strength", edge142.strength], ["confidence", edge142.confidence]]);
       }
       if (op === "causal-explain") {
-        const expl142 = globalCausal.explain(String(args2[0] ?? ""));
+        const expl142 = globalCausal.explain(String(args3[0] ?? ""));
         return /* @__PURE__ */ new Map([
           ["effect", expl142.effect],
           ["primaryCause", expl142.primaryCause],
@@ -15067,20 +15118,20 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         ]);
       }
       if (op === "causal-chains") {
-        const ch142 = globalCausal.findCausalChains(String(args2[0] ?? ""), String(args2[1] ?? ""));
+        const ch142 = globalCausal.findCausalChains(String(args3[0] ?? ""), String(args3[1] ?? ""));
         return ch142.map((c) => /* @__PURE__ */ new Map([["path", c.path], ["totalStrength", c.totalStrength], ["explanation", c.explanation], ["confidence", c.confidence]]));
       }
       if (op === "causal-causes") {
-        return globalCausal.getDirectCauses(String(args2[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
+        return globalCausal.getDirectCauses(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
       }
       if (op === "causal-effects") {
-        return globalCausal.getDirectEffects(String(args2[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
+        return globalCausal.getDirectEffects(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
       }
       if (op === "causal-roots") {
-        return globalCausal.findRootCauses(String(args2[0] ?? ""));
+        return globalCausal.findRootCauses(String(args3[0] ?? ""));
       }
       if (op === "causal-simulate") {
-        const arg142 = args2[0];
+        const arg142 = args3[0];
         const iv142 = {};
         if (arg142 instanceof Map) {
           for (const [k, v] of arg142.entries()) iv142[String(k)] = Number(v);
@@ -15088,33 +15139,33 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return new Map(Object.entries(globalCausal.simulate(iv142)));
       }
       if (op === "causal-why") {
-        const chain142 = whyCaused(String(args2[0] ?? ""), String(args2[1] ?? ""));
+        const chain142 = whyCaused(String(args3[0] ?? ""), String(args3[1] ?? ""));
         if (chain142 === null) return null;
         return /* @__PURE__ */ new Map([["path", chain142.path], ["totalStrength", chain142.totalStrength], ["explanation", chain142.explanation], ["confidence", chain142.confidence]]);
       }
       if (op === "causal-summary") {
-        return globalCausal.summarize(String(args2[0] ?? ""));
+        return globalCausal.summarize(String(args3[0] ?? ""));
       }
       if (op.startsWith("predict-")) {
-        const r144 = evalPredict_PHASE144(op, args2);
+        const r144 = evalPredict_PHASE144(op, args3);
         if (r144 !== null) return r144;
       }
       if (op.startsWith("curiosity-")) {
-        const r148 = evalCuriosity(op, args2, callFn);
+        const r148 = evalCuriosity(op, args3, callFn);
         if (r148 !== null) return r148;
       }
       if (op.startsWith("wisdom-")) {
-        const r149 = evalWisdom(op, args2);
+        const r149 = evalWisdom(op, args3);
         if (r149 !== null) return r149;
       }
       if (op.startsWith("explain-")) {
-        const r145 = evalExplain_PHASE145(op, args2, callFnVal);
+        const r145 = evalExplain_PHASE145(op, args3, callFnVal);
         if (r145 !== null) return r145;
       }
       switch (normalizedOp2) {
         case "file-mkdir":
         case "file_mkdir": {
-          const dirPath = String(args2[0] ?? "");
+          const dirPath = String(args3[0] ?? "");
           const fs20 = require("fs");
           try {
             fs20.mkdirSync(dirPath, { recursive: true });
@@ -15125,7 +15176,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         }
         case "http-get":
         case "http_get": {
-          const url2 = String(args2[0] ?? "");
+          const url2 = String(args3[0] ?? "");
           try {
             const { execSync: execSync2 } = require("child_process");
             const escapedUrl = url2.replace(/'/g, "'\\''");
@@ -15153,7 +15204,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
           return (/* @__PURE__ */ new Date()).toISOString();
         }
         case "help": {
-          const query = String(args2[0] ?? "").toLowerCase();
+          const query = String(args3[0] ?? "").toLowerCase();
           let sigs = [];
           try {
             sigs = require_stdlib_signatures();
@@ -15187,7 +15238,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
           return null;
         }
       }
-      return callUser(op, args2);
+      return callUser(op, args3);
     }
   }
 }
@@ -15207,9 +15258,9 @@ function pruneResultToMap(result) {
     ["stats", statsMap]
   ]);
 }
-function evalRefactorSelf(op, args2) {
+function evalRefactorSelf(op, args3) {
   if (op === "refactor-analyze") {
-    const code = String(args2[0] ?? "");
+    const code = String(args3[0] ?? "");
     const result = globalRefactorer.refactor(code, true);
     return /* @__PURE__ */ new Map([
       ["suggestions", result.suggestions.map((s) => /* @__PURE__ */ new Map([
@@ -15230,7 +15281,7 @@ function evalRefactorSelf(op, args2) {
     ]);
   }
   if (op === "refactor-suggest") {
-    const code = String(args2[0] ?? "");
+    const code = String(args3[0] ?? "");
     return globalRefactorer.suggest(code).map((s) => /* @__PURE__ */ new Map([
       ["pattern", s.pattern],
       ["location", s.location],
@@ -15241,8 +15292,8 @@ function evalRefactorSelf(op, args2) {
     ]));
   }
   if (op === "refactor-apply") {
-    const code = String(args2[0] ?? "");
-    const rawSuggestions = Array.isArray(args2[1]) ? args2[1] : [];
+    const code = String(args3[0] ?? "");
+    const rawSuggestions = Array.isArray(args3[1]) ? args3[1] : [];
     const suggestions = rawSuggestions.map((s) => {
       if (s instanceof Map) return {
         pattern: s.get("pattern") ?? "extract-duplicate",
@@ -15265,16 +15316,16 @@ function evalRefactorSelf(op, args2) {
     ]);
   }
   if (op === "refactor-complexity") {
-    const code = String(args2[0] ?? "");
+    const code = String(args3[0] ?? "");
     const c = globalRefactorer.analyzeComplexity(code);
     return /* @__PURE__ */ new Map([["lines", c.lines], ["depth", c.depth], ["conditions", c.conditions], ["score", c.score]]);
   }
   if (op === "refactor-quality") {
-    const code = String(args2[0] ?? "");
+    const code = String(args3[0] ?? "");
     return globalRefactorer.qualityScore(code);
   }
   if (op === "refactor-naming") {
-    const code = String(args2[0] ?? "");
+    const code = String(args3[0] ?? "");
     const n = globalRefactorer.analyzeNaming(code);
     return /* @__PURE__ */ new Map([
       ["issues", n.issues.map((i) => /* @__PURE__ */ new Map([
@@ -15286,7 +15337,7 @@ function evalRefactorSelf(op, args2) {
     ]);
   }
   if (op === "refactor-duplicates") {
-    const code = String(args2[0] ?? "");
+    const code = String(args3[0] ?? "");
     return globalRefactorer.findDuplicates(code).map((s) => /* @__PURE__ */ new Map([
       ["pattern", s.pattern],
       ["location", s.location],
@@ -15297,7 +15348,7 @@ function evalRefactorSelf(op, args2) {
     ]));
   }
   if (op === "refactor-score") {
-    const r = args2[0];
+    const r = args3[0];
     if (r instanceof Map) {
       const score = r.get("score");
       if (score instanceof Map) return /* @__PURE__ */ new Map([
@@ -15310,9 +15361,9 @@ function evalRefactorSelf(op, args2) {
   }
   if (op === "causal-add-node") {
     const kw = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kw[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw[key] = args3[i + 1];
     }
     const node = {
       id: String(kw["id"] ?? ""),
@@ -15325,9 +15376,9 @@ function evalRefactorSelf(op, args2) {
   }
   if (op === "causal-add-edge") {
     const kw = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kw[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw[key] = args3[i + 1];
     }
     const edge = {
       from: String(kw["from"] ?? ""),
@@ -15341,7 +15392,7 @@ function evalRefactorSelf(op, args2) {
     return /* @__PURE__ */ new Map([["from", edge.from], ["to", edge.to], ["strength", edge.strength], ["confidence", edge.confidence]]);
   }
   if (op === "causal-explain") {
-    const effectId = String(args2[0] ?? "");
+    const effectId = String(args3[0] ?? "");
     const expl = globalCausal.explain(effectId);
     return /* @__PURE__ */ new Map([
       ["effect", expl.effect],
@@ -15361,8 +15412,8 @@ function evalRefactorSelf(op, args2) {
     ]);
   }
   if (op === "causal-chains") {
-    const causeId = String(args2[0] ?? "");
-    const effectId = String(args2[1] ?? "");
+    const causeId = String(args3[0] ?? "");
+    const effectId = String(args3[1] ?? "");
     const chains = globalCausal.findCausalChains(causeId, effectId);
     return chains.map((c) => /* @__PURE__ */ new Map([
       ["path", c.path],
@@ -15372,7 +15423,7 @@ function evalRefactorSelf(op, args2) {
     ]));
   }
   if (op === "causal-causes") {
-    const nodeId = String(args2[0] ?? "");
+    const nodeId = String(args3[0] ?? "");
     const causes = globalCausal.getDirectCauses(nodeId);
     return causes.map((e) => /* @__PURE__ */ new Map([
       ["from", e.from],
@@ -15382,7 +15433,7 @@ function evalRefactorSelf(op, args2) {
     ]));
   }
   if (op === "causal-effects") {
-    const nodeId = String(args2[0] ?? "");
+    const nodeId = String(args3[0] ?? "");
     const effects = globalCausal.getDirectEffects(nodeId);
     return effects.map((e) => /* @__PURE__ */ new Map([
       ["from", e.from],
@@ -15392,11 +15443,11 @@ function evalRefactorSelf(op, args2) {
     ]));
   }
   if (op === "causal-roots") {
-    const nodeId = String(args2[0] ?? "");
+    const nodeId = String(args3[0] ?? "");
     return globalCausal.findRootCauses(nodeId);
   }
   if (op === "causal-simulate") {
-    const arg = args2[0];
+    const arg = args3[0];
     const interventions = {};
     if (arg instanceof Map) {
       for (const [k, v] of arg.entries()) {
@@ -15407,8 +15458,8 @@ function evalRefactorSelf(op, args2) {
     return new Map(Object.entries(result));
   }
   if (op === "causal-why") {
-    const effectId = String(args2[0] ?? "");
-    const causeId = String(args2[1] ?? "");
+    const effectId = String(args3[0] ?? "");
+    const causeId = String(args3[1] ?? "");
     const chain = whyCaused(effectId, causeId);
     if (chain === null) return null;
     return /* @__PURE__ */ new Map([
@@ -15419,17 +15470,17 @@ function evalRefactorSelf(op, args2) {
     ]);
   }
   if (op === "causal-summary") {
-    const nodeId = String(args2[0] ?? "");
+    const nodeId = String(args3[0] ?? "");
     return globalCausal.summarize(nodeId);
   }
   return null;
 }
-function evalAlign(op, args2) {
+function evalAlign(op, args3) {
   if (op === "align-add-goal") {
     const kw = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kw[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw[key] = args3[i + 1];
     }
     const goal = {
       id: String(kw["id"] ?? `goal_${Date.now()}`),
@@ -15449,9 +15500,9 @@ function evalAlign(op, args2) {
   }
   if (op === "align-add-value") {
     const kw = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kw[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw[key] = args3[i + 1];
     }
     const value = {
       id: String(kw["id"] ?? `value_${Date.now()}`),
@@ -15468,7 +15519,7 @@ function evalAlign(op, args2) {
     ]);
   }
   if (op === "align-score") {
-    const actionRaw = args2[0];
+    const actionRaw = args3[0];
     const _getF = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _getEO = (obj) => {
       const eo = _getF(obj, "expectedOutcomes");
@@ -15494,7 +15545,7 @@ function evalAlign(op, args2) {
     ]);
   }
   if (op === "align-best") {
-    const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
+    const actionsList = Array.isArray(args3[0]) ? args3[0] : [];
     const _getF2 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _getEO2 = (obj) => {
       const eo = _getF2(obj, "expectedOutcomes");
@@ -15524,7 +15575,7 @@ function evalAlign(op, args2) {
     ]));
   }
   if (op === "align-plan") {
-    const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
+    const actionsList = Array.isArray(args3[0]) ? args3[0] : [];
     const _gFP = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _gEOP = (obj) => {
       const eo = _gFP(obj, "expectedOutcomes");
@@ -15546,7 +15597,7 @@ function evalAlign(op, args2) {
     ]);
   }
   if (op === "align-improve") {
-    const actionRaw3 = args2[0];
+    const actionRaw3 = args3[0];
     const _getF3 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _getEO3 = (obj) => {
       const eo = _getF3(obj, "expectedOutcomes");
@@ -15573,13 +15624,13 @@ function evalAlign(op, args2) {
   }
   return null;
 }
-function evalPredict_PHASE144(op, args2) {
+function evalPredict_PHASE144(op, args3) {
   if (op === "predict-linear") {
-    const data144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const data144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     let horizon144 = 1;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const k = String(args2[i]).replace(/^:/, "");
-      if (k === "horizon") horizon144 = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "horizon") horizon144 = Number(args3[i + 1]);
     }
     const p144 = globalPredictor.linearRegression(data144, horizon144);
     return /* @__PURE__ */ new Map([
@@ -15592,13 +15643,13 @@ function evalPredict_PHASE144(op, args2) {
     ]);
   }
   if (op === "predict-ma") {
-    const data144ma = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const data144ma = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     let window144 = 3;
     let horizon144ma = 1;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const k = String(args2[i]).replace(/^:/, "");
-      if (k === "window") window144 = Number(args2[i + 1]);
-      else if (k === "horizon") horizon144ma = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "window") window144 = Number(args3[i + 1]);
+      else if (k === "horizon") horizon144ma = Number(args3[i + 1]);
     }
     const pma = globalPredictor.movingAverage(data144ma, window144, horizon144ma);
     return /* @__PURE__ */ new Map([
@@ -15611,13 +15662,13 @@ function evalPredict_PHASE144(op, args2) {
     ]);
   }
   if (op === "predict-exp") {
-    const data144exp = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const data144exp = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     let alpha144 = 0.3;
     let horizon144exp = 1;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const k = String(args2[i]).replace(/^:/, "");
-      if (k === "alpha") alpha144 = Number(args2[i + 1]);
-      else if (k === "horizon") horizon144exp = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "alpha") alpha144 = Number(args3[i + 1]);
+      else if (k === "horizon") horizon144exp = Number(args3[i + 1]);
     }
     const pexp = globalPredictor.exponentialSmoothing(data144exp, alpha144, horizon144exp);
     return /* @__PURE__ */ new Map([
@@ -15630,11 +15681,11 @@ function evalPredict_PHASE144(op, args2) {
     ]);
   }
   if (op === "predict-forecast") {
-    const data144ts = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const data144ts = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     let steps144 = 3;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const k = String(args2[i]).replace(/^:/, "");
-      if (k === "steps") steps144 = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "steps") steps144 = Number(args3[i + 1]);
     }
     const tsResult = globalPredictor.forecastTimeSeries(data144ts, steps144);
     return /* @__PURE__ */ new Map([
@@ -15652,17 +15703,17 @@ function evalPredict_PHASE144(op, args2) {
     ]);
   }
   if (op === "predict-ci") {
-    const samples144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const samples144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     let conf144 = 0.95;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const k = String(args2[i]).replace(/^:/, "");
-      if (k === "confidence") conf144 = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "confidence") conf144 = Number(args3[i + 1]);
     }
     const ci = globalPredictor.confidenceInterval(samples144, conf144);
     return /* @__PURE__ */ new Map([["lower", ci.lower], ["upper", ci.upper]]);
   }
   if (op === "predict-classify") {
-    const rawFeatures = args2[0];
+    const rawFeatures = args3[0];
     const features144 = {};
     if (rawFeatures instanceof Map) {
       rawFeatures.forEach((v, k) => {
@@ -15673,7 +15724,7 @@ function evalPredict_PHASE144(op, args2) {
         features144[k.replace(/^:/, "")] = Number(v);
       });
     }
-    const rawTraining = Array.isArray(args2[1]) ? args2[1] : [];
+    const rawTraining = Array.isArray(args3[1]) ? args3[1] : [];
     const trainingData144 = rawTraining.map((item) => {
       if (item instanceof Map) {
         const rawF = item.get("features") ?? item.get(":features");
@@ -15696,8 +15747,8 @@ function evalPredict_PHASE144(op, args2) {
     ]);
   }
   if (op === "predict-evaluate") {
-    const preds144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-    const actuals144 = Array.isArray(args2[1]) ? args2[1].map(Number) : [];
+    const preds144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const actuals144 = Array.isArray(args3[1]) ? args3[1].map(Number) : [];
     const evalResult = globalPredictor.evaluate(preds144, actuals144);
     return /* @__PURE__ */ new Map([
       ["mae", evalResult.mae],
@@ -15706,23 +15757,23 @@ function evalPredict_PHASE144(op, args2) {
     ]);
   }
   if (op === "predict-trend") {
-    const data144tr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const data144tr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     return globalPredictor.detectTrend(data144tr);
   }
   return null;
 }
-function evalCuriosity(op, args2, callFn) {
+function evalCuriosity(op, args3, callFn) {
   if (op === "curiosity-score") {
-    const topic = String(args2[0] ?? "");
-    const knownFacts = Array.isArray(args2[1]) ? args2[1].map((f) => String(f)) : [];
+    const topic = String(args3[0] ?? "");
+    const knownFacts = Array.isArray(args3[1]) ? args3[1].map((f) => String(f)) : [];
     return globalCuriosity.computeCuriosity(topic, knownFacts);
   }
   if (op === "curiosity-next") {
     return globalCuriosity.selectNextTopic();
   }
   if (op === "curiosity-explore") {
-    const topic = String(args2[0] ?? "");
-    const fn = args2[1];
+    const topic = String(args3[0] ?? "");
+    const fn = args3[1];
     const explorerFunc = (t) => {
       const result = callFn ? callFn(fn, [t]) : typeof fn === "function" ? fn(t) : null;
       if (result instanceof Map) {
@@ -15743,8 +15794,8 @@ function evalCuriosity(op, args2, callFn) {
     ]);
   }
   if (op === "curiosity-gaps") {
-    const known = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
-    const all = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
+    const known = Array.isArray(args3[0]) ? args3[0].map((s) => String(s)) : [];
+    const all = Array.isArray(args3[1]) ? args3[1].map((s) => String(s)) : [];
     const gaps = globalCuriosity.identifyGaps(known, all);
     return gaps.map((g) => /* @__PURE__ */ new Map([
       ["topic", g.topic],
@@ -15755,12 +15806,12 @@ function evalCuriosity(op, args2, callFn) {
     ]));
   }
   if (op === "curiosity-questions") {
-    const topic = String(args2[0] ?? "");
-    const context = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
+    const topic = String(args3[0] ?? "");
+    const context = Array.isArray(args3[1]) ? args3[1].map((s) => String(s)) : [];
     return globalCuriosity.generateQuestions(topic, context);
   }
   if (op === "curiosity-prioritize") {
-    const topics = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
+    const topics = Array.isArray(args3[0]) ? args3[0].map((s) => String(s)) : [];
     return globalCuriosity.prioritize(topics);
   }
   if (op === "curiosity-analyze") {
@@ -15794,9 +15845,9 @@ function evalCuriosity(op, args2, callFn) {
   }
   if (op === "wisdom-add-exp") {
     const kwargs = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kwargs[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kwargs[key] = args3[i + 1];
     }
     const exp = globalWisdom.addExperience({
       situation: String(kwargs["situation"] ?? ""),
@@ -15820,7 +15871,7 @@ function evalCuriosity(op, args2, callFn) {
     ]);
   }
   if (op === "wisdom-judge") {
-    const situation = String(args2[0] ?? "");
+    const situation = String(args3[0] ?? "");
     const judgment = globalWisdom.judge(situation);
     return /* @__PURE__ */ new Map([
       ["situation", judgment.situation],
@@ -15871,8 +15922,8 @@ function evalCuriosity(op, args2, callFn) {
     ]));
   }
   if (op === "wisdom-relevant") {
-    const situation = String(args2[0] ?? "");
-    const limit = typeof args2[1] === "number" ? args2[1] : 5;
+    const situation = String(args3[0] ?? "");
+    const limit = typeof args3[1] === "number" ? args3[1] : 5;
     return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -15886,9 +15937,9 @@ function evalCuriosity(op, args2, callFn) {
   }
   if (op === "wisdom-lessons") {
     let domain;
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      if (key === "domain") domain = String(args2[i + 1]);
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args3[i + 1]);
     }
     return globalWisdom.getLessons(domain);
   }
@@ -15896,7 +15947,7 @@ function evalCuriosity(op, args2, callFn) {
     return globalWisdom.wisdomScore();
   }
   if (op === "wisdom-domain") {
-    const domain = String(args2[0] ?? "general");
+    const domain = String(args3[0] ?? "general");
     const summary = globalWisdom.summarizeDomain(domain);
     return /* @__PURE__ */ new Map([
       ["topLessons", summary.topLessons],
@@ -15911,7 +15962,7 @@ function evalCuriosity(op, args2, callFn) {
     ]);
   }
   if (op === "wisdom-valid?") {
-    const expMap = args2[0];
+    const expMap = args3[0];
     if (!(expMap instanceof Map)) return false;
     const exp = {
       id: String(expMap.get("id") ?? ""),
@@ -15927,7 +15978,7 @@ function evalCuriosity(op, args2, callFn) {
     return globalWisdom.isStillValid(exp);
   }
   if (op === "wisdom-similar") {
-    const situation = String(args2[0] ?? "");
+    const situation = String(args3[0] ?? "");
     return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -15941,12 +15992,12 @@ function evalCuriosity(op, args2, callFn) {
   }
   return null;
 }
-function evalCounterfactual(op, args2, callFn) {
+function evalCounterfactual(op, args3, callFn) {
   if (op === "cf-scenario") {
     const kw = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kw[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw[key] = args3[i + 1];
     }
     const id = String(kw["id"] ?? `s-${Date.now()}`);
     const name = String(kw["name"] ?? id);
@@ -15969,13 +16020,13 @@ function evalCounterfactual(op, args2, callFn) {
   if (op === "cf-what-if") {
     let variables = {};
     let change = {};
-    if (args2[0] instanceof Map) {
-      for (const [k, v] of args2[0]) variables[String(k).replace(/^:/, "")] = v;
+    if (args3[0] instanceof Map) {
+      for (const [k, v] of args3[0]) variables[String(k).replace(/^:/, "")] = v;
     }
-    if (args2[1] instanceof Map) {
-      for (const [k, v] of args2[1]) change[String(k).replace(/^:/, "")] = v;
+    if (args3[1] instanceof Map) {
+      for (const [k, v] of args3[1]) change[String(k).replace(/^:/, "")] = v;
     }
-    const fn = args2[2];
+    const fn = args3[2];
     const outcomeFunc = (vars) => callFn(fn, [new Map(Object.entries(vars))]);
     const cf = globalCounterfactual.whatIf(variables, change, outcomeFunc);
     return /* @__PURE__ */ new Map([
@@ -15988,10 +16039,10 @@ function evalCounterfactual(op, args2, callFn) {
     ]);
   }
   if (op === "cf-analyze") {
-    const scenarioId = String(args2[0] ?? "");
+    const scenarioId = String(args3[0] ?? "");
     const interventionsList = [];
-    if (Array.isArray(args2[1])) {
-      for (const iv of args2[1]) {
+    if (Array.isArray(args3[1])) {
+      for (const iv of args3[1]) {
         const obj = {};
         if (iv instanceof Map) {
           for (const [k, v] of iv) obj[String(k).replace(/^:/, "")] = v;
@@ -15999,7 +16050,7 @@ function evalCounterfactual(op, args2, callFn) {
         interventionsList.push(obj);
       }
     }
-    const fn = args2[2];
+    const fn = args3[2];
     const outcomeFunc = (vars) => callFn(fn, [new Map(Object.entries(vars))]);
     const analysis = globalCounterfactual.analyze(scenarioId, interventionsList, outcomeFunc);
     return /* @__PURE__ */ new Map([
@@ -16025,9 +16076,9 @@ function evalCounterfactual(op, args2, callFn) {
     ]);
   }
   if (op === "cf-minimal") {
-    const scenarioId = String(args2[0] ?? "");
-    const targetOutcome = args2[1];
-    const fn = args2[2];
+    const scenarioId = String(args3[0] ?? "");
+    const targetOutcome = args3[1];
+    const fn = args3[2];
     const outcomeFunc = (vars) => callFn(fn, [new Map(Object.entries(vars))]);
     const minimal = globalCounterfactual.findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc);
     if (minimal === null) return null;
@@ -16035,13 +16086,13 @@ function evalCounterfactual(op, args2, callFn) {
   }
   if (op === "cf-sensitivity") {
     let variables = {};
-    const rawVars = args2[0];
+    const rawVars = args3[0];
     if (rawVars instanceof Map) {
       for (const [k, v] of rawVars) variables[String(k).replace(/^:/, "")] = v;
     } else if (rawVars && typeof rawVars === "object" && !Array.isArray(rawVars)) {
       for (const [k, v] of Object.entries(rawVars)) variables[String(k).replace(/^:/, "")] = v;
     }
-    const fn = args2[1];
+    const fn = args3[1];
     const outcomeFunc = (vars) => {
       try {
         return Number(callFn(fn, [vars]));
@@ -16053,7 +16104,7 @@ function evalCounterfactual(op, args2, callFn) {
     return new Map(Object.entries(sens));
   }
   if (op === "cf-key-factors") {
-    const analysis = args2[0];
+    const analysis = args3[0];
     if (analysis instanceof Map) {
       const factors = analysis.get("keyFactors");
       if (Array.isArray(factors)) return factors;
@@ -16061,23 +16112,23 @@ function evalCounterfactual(op, args2, callFn) {
     return [];
   }
   if (op === "cf-best-alt") {
-    const analysis = args2[0];
+    const analysis = args3[0];
     if (analysis instanceof Map) {
       return analysis.get("mostLikelyAlternative") ?? null;
     }
     return null;
   }
   if (op === "cf-explain") {
-    const cf = args2[0];
+    const cf = args3[0];
     if (cf instanceof Map) {
       return cf.get("explanation") ?? "";
     }
     return "";
   }
   if (op === "explain-decision") {
-    const decision = args2[0];
-    const rawFactors = args2[1];
-    const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
+    const decision = args3[0];
+    const rawFactors = args3[1];
+    const context = args3[2] !== void 0 ? String(args3[2]) : void 0;
     const factors = {};
     if (rawFactors instanceof Map) {
       for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
@@ -16114,9 +16165,9 @@ function evalCounterfactual(op, args2, callFn) {
       }
       return result;
     };
-    const inputs145 = toRecord145(args2[0]);
-    const outputs145 = toRecord145(args2[1]);
-    const baseline145 = args2[2] !== void 0 ? toRecord145(args2[2]) : void 0;
+    const inputs145 = toRecord145(args3[0]);
+    const outputs145 = toRecord145(args3[1]);
+    const baseline145 = args3[2] !== void 0 ? toRecord145(args3[2]) : void 0;
     const features145 = globalExplainer.featureImportance(inputs145, outputs145, baseline145);
     return features145.map((f) => /* @__PURE__ */ new Map([
       ["feature", f.feature],
@@ -16126,9 +16177,9 @@ function evalCounterfactual(op, args2, callFn) {
     ]));
   }
   if (op === "explain-local") {
-    const rawInput145 = args2[0];
-    const output145 = args2[1];
-    const modelFn145 = args2[2];
+    const rawInput145 = args3[0];
+    const output145 = args3[1];
+    const modelFn145 = args3[2];
     const input145 = {};
     if (rawInput145 instanceof Map) {
       for (const [k, v] of rawInput145.entries()) input145[String(k).replace(/^:/, "")] = v;
@@ -16160,11 +16211,11 @@ function evalCounterfactual(op, args2, callFn) {
     ]);
   }
   if (op === "explain-natural") {
-    const rawExpl145 = args2[0];
+    const rawExpl145 = args3[0];
     let audience145 = "technical";
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      if (key === "audience") audience145 = String(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "audience") audience145 = String(args3[i + 1]);
     }
     if (!(rawExpl145 instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
     const featuresRaw145 = rawExpl145.get("features") ?? [];
@@ -16196,9 +16247,9 @@ function evalCounterfactual(op, args2, callFn) {
     return globalExplainer.toNaturalLanguage(explanation145n, audience145);
   }
   if (op === "explain-contrast") {
-    const decision145c = args2[0];
-    const alternative145c = args2[1];
-    const rawFactors145c = args2[2];
+    const decision145c = args3[0];
+    const alternative145c = args3[1];
+    const rawFactors145c = args3[2];
     const factors145c = {};
     if (rawFactors145c instanceof Map) {
       for (const [k, v] of rawFactors145c.entries()) factors145c[String(k).replace(/^:/, "")] = Number(v);
@@ -16208,7 +16259,7 @@ function evalCounterfactual(op, args2, callFn) {
     return globalExplainer.contrastiveExplain(decision145c, alternative145c, factors145c);
   }
   if (op === "explain-rules") {
-    const rawExamples145 = args2[0];
+    const rawExamples145 = args3[0];
     const examples145 = [];
     const toRecord145r = (v) => {
       const result = {};
@@ -16236,11 +16287,11 @@ function evalCounterfactual(op, args2, callFn) {
     ]));
   }
   if (op === "explain-top-factors") {
-    const rawExpl145tf = args2[0];
+    const rawExpl145tf = args3[0];
     let n145 = 3;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      if (key === "n") n145 = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "n") n145 = Number(args3[i + 1]);
     }
     let features145tf = [];
     if (rawExpl145tf instanceof Map) features145tf = rawExpl145tf.get("features") ?? [];
@@ -16248,18 +16299,18 @@ function evalCounterfactual(op, args2, callFn) {
     return features145tf.slice(0, n145);
   }
   if (op === "explain-summary") {
-    const rawExpl145s = args2[0];
+    const rawExpl145s = args3[0];
     if (rawExpl145s instanceof Map) return String(rawExpl145s.get("summary") ?? "");
     return "";
   }
   return null;
 }
-function evalWisdom(op, args2) {
+function evalWisdom(op, args3) {
   if (op === "wisdom-add-exp") {
     const kwargs = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      kwargs[key] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kwargs[key] = args3[i + 1];
     }
     const exp = globalWisdom.addExperience({
       situation: String(kwargs["situation"] ?? ""),
@@ -16283,7 +16334,7 @@ function evalWisdom(op, args2) {
     ]);
   }
   if (op === "wisdom-judge") {
-    const situation = String(args2[0] ?? "");
+    const situation = String(args3[0] ?? "");
     const judgment = globalWisdom.judge(situation);
     return /* @__PURE__ */ new Map([
       ["situation", judgment.situation],
@@ -16334,8 +16385,8 @@ function evalWisdom(op, args2) {
     ]));
   }
   if (op === "wisdom-relevant") {
-    const situation = String(args2[0] ?? "");
-    const limit = typeof args2[1] === "number" ? args2[1] : 5;
+    const situation = String(args3[0] ?? "");
+    const limit = typeof args3[1] === "number" ? args3[1] : 5;
     return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -16349,9 +16400,9 @@ function evalWisdom(op, args2) {
   }
   if (op === "wisdom-lessons") {
     let domain;
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      if (key === "domain") domain = String(args2[i + 1]);
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args3[i + 1]);
     }
     return globalWisdom.getLessons(domain);
   }
@@ -16359,7 +16410,7 @@ function evalWisdom(op, args2) {
     return globalWisdom.wisdomScore();
   }
   if (op === "wisdom-domain") {
-    const domain = String(args2[0] ?? "general");
+    const domain = String(args3[0] ?? "general");
     const summary = globalWisdom.summarizeDomain(domain);
     return /* @__PURE__ */ new Map([
       ["topLessons", summary.topLessons],
@@ -16374,7 +16425,7 @@ function evalWisdom(op, args2) {
     ]);
   }
   if (op === "wisdom-valid?") {
-    const expMap = args2[0];
+    const expMap = args3[0];
     if (!(expMap instanceof Map)) return false;
     const exp = {
       id: String(expMap.get("id") ?? ""),
@@ -16390,7 +16441,7 @@ function evalWisdom(op, args2) {
     return globalWisdom.isStillValid(exp);
   }
   if (op === "wisdom-similar") {
-    const situation = String(args2[0] ?? "");
+    const situation = String(args3[0] ?? "");
     return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -16404,11 +16455,11 @@ function evalWisdom(op, args2) {
   }
   return null;
 }
-function evalExplain_PHASE145(op, args2, callFnVal) {
+function evalExplain_PHASE145(op, args3, callFnVal) {
   if (op === "explain-decision") {
-    const decision = args2[0];
-    const rawFactors = args2[1];
-    const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
+    const decision = args3[0];
+    const rawFactors = args3[1];
+    const context = args3[2] !== void 0 ? String(args3[2]) : void 0;
     const factors = {};
     if (rawFactors instanceof Map) {
       for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
@@ -16445,7 +16496,7 @@ function evalExplain_PHASE145(op, args2, callFnVal) {
       }
       return result;
     };
-    const features = globalExplainer.featureImportance(toRecord(args2[0]), toRecord(args2[1]), args2[2] !== void 0 ? toRecord(args2[2]) : void 0);
+    const features = globalExplainer.featureImportance(toRecord(args3[0]), toRecord(args3[1]), args3[2] !== void 0 ? toRecord(args3[2]) : void 0);
     return features.map((f) => /* @__PURE__ */ new Map([
       ["feature", f.feature],
       ["importance", f.importance],
@@ -16454,9 +16505,9 @@ function evalExplain_PHASE145(op, args2, callFnVal) {
     ]));
   }
   if (op === "explain-local") {
-    const rawInput = args2[0];
-    const output = args2[1];
-    const modelFn = args2[2];
+    const rawInput = args3[0];
+    const output = args3[1];
+    const modelFn = args3[2];
     const input = {};
     if (rawInput instanceof Map) {
       for (const [k, v] of rawInput.entries()) input[String(k).replace(/^:/, "")] = v;
@@ -16488,11 +16539,11 @@ function evalExplain_PHASE145(op, args2, callFnVal) {
     ]);
   }
   if (op === "explain-natural") {
-    const rawExpl = args2[0];
+    const rawExpl = args3[0];
     let audience = "technical";
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      const key = String(args2[i]).replace(/^:/, "");
-      if (key === "audience") audience = String(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "audience") audience = String(args3[i + 1]);
     }
     if (!(rawExpl instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
     const featuresRaw = rawExpl.get("features") ?? [];
@@ -16525,13 +16576,13 @@ function evalExplain_PHASE145(op, args2, callFnVal) {
   }
   if (op === "explain-contrast") {
     const factors = {};
-    const rawF = args2[2];
+    const rawF = args3[2];
     if (rawF instanceof Map) {
       for (const [k, v] of rawF.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
     } else if (rawF && typeof rawF === "object") {
       for (const [k, v] of Object.entries(rawF)) factors[String(k).replace(/^:/, "")] = Number(v);
     }
-    return globalExplainer.contrastiveExplain(args2[0], args2[1], factors);
+    return globalExplainer.contrastiveExplain(args3[0], args3[1], factors);
   }
   if (op === "explain-rules") {
     const examples = [];
@@ -16544,8 +16595,8 @@ function evalExplain_PHASE145(op, args2, callFnVal) {
       }
       return r;
     };
-    if (Array.isArray(args2[0])) {
-      for (const ex of args2[0]) {
+    if (Array.isArray(args3[0])) {
+      for (const ex of args3[0]) {
         if (ex instanceof Map) examples.push({ input: toRec(ex.get("input")), output: ex.get("output") });
         else if (ex && typeof ex === "object") examples.push({ input: toRec(ex.input), output: ex.output });
       }
@@ -16558,27 +16609,27 @@ function evalExplain_PHASE145(op, args2, callFnVal) {
   }
   if (op === "explain-top-factors") {
     let n = 3;
-    for (let i = 1; i < args2.length - 1; i += 2) {
-      if (String(args2[i]).replace(/^:/, "") === "n") n = Number(args2[i + 1]);
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      if (String(args3[i]).replace(/^:/, "") === "n") n = Number(args3[i + 1]);
     }
-    const rawExpl = args2[0];
+    const rawExpl = args3[0];
     let features = [];
     if (rawExpl instanceof Map) features = rawExpl.get("features") ?? [];
     if (!Array.isArray(features)) features = [];
     return features.slice(0, n);
   }
   if (op === "explain-summary") {
-    const rawExpl = args2[0];
+    const rawExpl = args3[0];
     if (rawExpl instanceof Map) return String(rawExpl.get("summary") ?? "");
     return "";
   }
   return null;
 }
-function evalWorldModel141(op, args2) {
+function evalWorldModel141(op, args3) {
   if (op === "world-add-entity") {
     const kw = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      kw[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kw[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
     }
     const rawP = kw["props"] ?? kw["properties"] ?? {};
     const props = rawP instanceof Map ? Object.fromEntries(rawP.entries()) : typeof rawP === "object" && rawP !== null ? rawP : {};
@@ -16586,45 +16637,45 @@ function evalWorldModel141(op, args2) {
     return /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
   }
   if (op === "world-update-entity") {
-    const rawPu = args2[1] ?? {};
+    const rawPu = args3[1] ?? {};
     const propsu = rawPu instanceof Map ? Object.fromEntries(rawPu.entries()) : typeof rawPu === "object" && rawPu !== null ? rawPu : {};
-    const eu = globalWorldModel.updateEntity(String(args2[0] ?? ""), propsu);
+    const eu = globalWorldModel.updateEntity(String(args3[0] ?? ""), propsu);
     if (!eu) return null;
     return /* @__PURE__ */ new Map([["id", eu.id], ["type", eu.type], ["properties", new Map(Object.entries(eu.properties))], ["confidence", eu.confidence], ["lastUpdated", eu.lastUpdated.toISOString()]]);
   }
   if (op === "world-get-entity") {
-    const eg = globalWorldModel.getEntity(String(args2[0] ?? ""));
+    const eg = globalWorldModel.getEntity(String(args3[0] ?? ""));
     if (!eg) return null;
     return /* @__PURE__ */ new Map([["id", eg.id], ["type", eg.type], ["properties", new Map(Object.entries(eg.properties))], ["confidence", eg.confidence], ["lastUpdated", eg.lastUpdated.toISOString()]]);
   }
   if (op === "world-remove-entity") {
-    return globalWorldModel.removeEntity(String(args2[0] ?? ""));
+    return globalWorldModel.removeEntity(String(args3[0] ?? ""));
   }
   if (op === "world-add-relation") {
     const kwr = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      kwr[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kwr[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
     }
     const rel = globalWorldModel.addRelation({ from: String(kwr["from"] ?? ""), to: String(kwr["to"] ?? ""), type: String(kwr["type"] ?? "related"), strength: typeof kwr["strength"] === "number" ? kwr["strength"] : 1, bidirectional: kwr["bidirectional"] === true });
     return /* @__PURE__ */ new Map([["id", rel.id], ["from", rel.from], ["to", rel.to], ["type", rel.type], ["strength", rel.strength], ["bidirectional", rel.bidirectional]]);
   }
   if (op === "world-get-relations") {
-    return globalWorldModel.getRelations(String(args2[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
+    return globalWorldModel.getRelations(String(args3[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
   }
   if (op === "world-find-path") {
-    return globalWorldModel.findPath(String(args2[0] ?? ""), String(args2[1] ?? ""));
+    return globalWorldModel.findPath(String(args3[0] ?? ""), String(args3[1] ?? ""));
   }
   if (op === "world-set-fact") {
-    globalWorldModel.setFact(String(args2[0] ?? ""), args2[1]);
+    globalWorldModel.setFact(String(args3[0] ?? ""), args3[1]);
     return null;
   }
   if (op === "world-get-fact") {
-    return globalWorldModel.getFact(String(args2[0] ?? ""));
+    return globalWorldModel.getFact(String(args3[0] ?? ""));
   }
   if (op === "world-add-rule") {
     const kwrule = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      kwrule[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kwrule[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
     }
     const rule = globalWorldModel.addRule({ condition: String(kwrule["condition"] ?? ""), consequence: String(kwrule["consequence"] ?? ""), confidence: typeof kwrule["confidence"] === "number" ? kwrule["confidence"] : 0.8 });
     return /* @__PURE__ */ new Map([["id", rule.id], ["condition", rule.condition], ["consequence", rule.consequence], ["confidence", rule.confidence]]);
@@ -16634,8 +16685,8 @@ function evalWorldModel141(op, args2) {
   }
   if (op === "world-query") {
     const kwq = {};
-    for (let i = 0; i < args2.length - 1; i += 2) {
-      kwq[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kwq[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
     }
     return globalWorldModel.query(kwq["type"] !== void 0 ? String(kwq["type"]) : void 0, kwq["min-confidence"] !== void 0 ? Number(kwq["min-confidence"]) : void 0).map((e) => /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]));
   }
@@ -17490,8 +17541,8 @@ init_ast();
 
 // src/tco.ts
 var TAIL_CALL = Symbol("TAIL_CALL");
-function tailCall(fn, args2) {
-  return { [TAIL_CALL]: true, fn, args: args2 };
+function tailCall(fn, args3) {
+  return { [TAIL_CALL]: true, fn, args: args3 };
 }
 function isTailCall(v) {
   return v !== null && typeof v === "object" && v[TAIL_CALL] === true;
@@ -18664,9 +18715,9 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   throw new Error(`evalSpecialForm: unknown op "${op}"`);
 }
-function evalLet(interp2, args2) {
-  if (args2.length < 2) throw new Error(`let requires at least 2 arguments`);
-  const bindings = args2[0];
+function evalLet(interp2, args3) {
+  if (args3.length < 2) throw new Error(`let requires at least 2 arguments`);
+  const bindings = args3[0];
   const ctx = interp2.context;
   const ev = (node) => interp2.eval(node);
   const toVarName = (node) => {
@@ -18718,31 +18769,31 @@ function evalLet(interp2, args2) {
   }
   let result = null;
   try {
-    for (let bodyIdx = 1; bodyIdx < args2.length; bodyIdx++) {
-      result = ev(args2[bodyIdx]);
+    for (let bodyIdx = 1; bodyIdx < args3.length; bodyIdx++) {
+      result = ev(args3[bodyIdx]);
     }
   } finally {
     ctx.variables.pop();
   }
   return result;
 }
-function evalCond(interp2, args2) {
+function evalCond(interp2, args3) {
   const ev = (node) => interp2.eval(node);
-  const firstArg = args2[0];
+  const firstArg = args3[0];
   const isBracketed = firstArg?.kind === "block" && firstArg?.type === "Array" || firstArg?.kind === "sexpr" && firstArg?.op === "do";
-  if (args2.length >= 2 && !isBracketed) {
+  if (args3.length >= 2 && !isBracketed) {
     let i = 0;
-    while (i < args2.length - 1) {
-      const test = ev(args2[i]);
+    while (i < args3.length - 1) {
+      const test = ev(args3[i]);
       if (test !== null && test !== void 0 && test !== false) {
-        return ev(args2[i + 1]);
+        return ev(args3[i + 1]);
       }
       i += 2;
     }
-    if (i < args2.length) return ev(args2[i]);
+    if (i < args3.length) return ev(args3[i]);
     return null;
   }
-  for (const arg of args2) {
+  for (const arg of args3) {
     let testNode = null;
     let bodyNodes = [];
     if (arg.kind === "block" && arg.type === "Array") {
@@ -19840,17 +19891,17 @@ function createErrorModule() {
 var import_child_process = require("child_process");
 function curlGetStatusAndBody(url2, method = "GET", headers, body) {
   try {
-    const args2 = ["-s", "-w", "\n%{http_code}", "--max-time", "10", "-X", method];
+    const args3 = ["-s", "-w", "\n%{http_code}", "--max-time", "10", "-X", method];
     if (headers && typeof headers === "object") {
       for (const [key, value] of Object.entries(headers)) {
-        args2.push("-H", `${key}: ${value}`);
+        args3.push("-H", `${key}: ${value}`);
       }
     }
     if (body && body.length > 0) {
-      args2.push("-d", body);
+      args3.push("-d", body);
     }
-    args2.push(url2);
-    const result = (0, import_child_process.spawnSync)("curl", args2, { timeout: 15e3 });
+    args3.push(url2);
+    const result = (0, import_child_process.spawnSync)("curl", args3, { timeout: 15e3 });
     if (result.error) {
       return { status: 0, body: "", error: result.error.message };
     }
@@ -19959,6 +20010,29 @@ function createHttpModule() {
       return {
         status: result.status,
         body: "",
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_get_key url api-key -> {:status 200 :body "..."}
+    "http_get_key": (url2, apiKey) => {
+      const result = curlGetStatusAndBody(url2, "GET", { "X-API-Key": apiKey });
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_post_key url body api-key -> {:status 200 :body "..."}
+    "http_post_key": (url2, body, apiKey) => {
+      const result = curlGetStatusAndBody(
+        url2,
+        "POST",
+        { "Content-Type": "application/json", "X-API-Key": apiKey },
+        body
+      );
+      return {
+        status: result.status,
+        body: result.body,
         ...result.error && { error: result.error }
       };
     },
@@ -20668,10 +20742,10 @@ function createCollectionModule() {
     // memoize fn -> fn  (return memoized version of fn, keyed by JSON args)
     "memoize": (fn) => {
       const cache = /* @__PURE__ */ new Map();
-      return (...args2) => {
-        const key = JSON.stringify(args2);
+      return (...args3) => {
+        const key = JSON.stringify(args3);
         if (cache.has(key)) return cache.get(key);
-        const result = fn(...args2);
+        const result = fn(...args3);
         cache.set(key, result);
         return result;
       };
@@ -20679,10 +20753,10 @@ function createCollectionModule() {
     // once fn -> fn  (return version of fn that only executes once)
     "once": (fn) => {
       let called = false, result;
-      return (...args2) => {
+      return (...args3) => {
         if (!called) {
           called = true;
-          result = fn(...args2);
+          result = fn(...args3);
         }
         return result;
       };
@@ -20767,10 +20841,10 @@ function createAgentModule() {
       tools: { ...agent.tools, [toolName]: fn }
     }),
     // agent_call_tool agent toolName ...args -> any
-    "agent_call_tool": (agent, toolName, ...args2) => {
+    "agent_call_tool": (agent, toolName, ...args3) => {
       const tool = agent.tools[toolName];
       if (!tool) throw new Error(`Tool not found: "${toolName}". Available: ${Object.keys(agent.tools).join(", ")}`);
-      return tool(...args2);
+      return tool(...args3);
     },
     // agent_tools agent -> [string] (list registered tool names)
     "agent_tools": (agent) => Object.keys(agent.tools),
@@ -21651,22 +21725,22 @@ function createWebauthnModule() {
     // webauthn_verify_assertion args -> boolean
     //   args = {jwk, authenticator_data, client_data_json_b64url, signature_b64url, expected_challenge, expected_origin, expected_rp_id, prev_sign_count}
     // 반환: {ok, sign_count} 또는 {ok:false, error}
-    "webauthn_verify_assertion": (args2) => {
+    "webauthn_verify_assertion": (args3) => {
       try {
-        const jwk = args2.jwk;
-        const authenticatorData = Buffer.from(args2.authenticator_data_b64url, "base64url");
-        const clientDataJson = Buffer.from(args2.client_data_json_b64url, "base64url");
-        const signature = Buffer.from(args2.signature_b64url, "base64url");
+        const jwk = args3.jwk;
+        const authenticatorData = Buffer.from(args3.authenticator_data_b64url, "base64url");
+        const clientDataJson = Buffer.from(args3.client_data_json_b64url, "base64url");
+        const signature = Buffer.from(args3.signature_b64url, "base64url");
         const clientData = JSON.parse(clientDataJson.toString("utf8"));
         if (clientData.type !== "webauthn.get") return { ok: false, error: "type!=webauthn.get" };
-        if (clientData.challenge !== args2.expected_challenge) return { ok: false, error: "challenge mismatch" };
-        if (clientData.origin !== args2.expected_origin) return { ok: false, error: "origin mismatch" };
+        if (clientData.challenge !== args3.expected_challenge) return { ok: false, error: "challenge mismatch" };
+        if (clientData.origin !== args3.expected_origin) return { ok: false, error: "origin mismatch" };
         const auth = parseAuthData(authenticatorData);
-        const expectedRpHash = (0, import_crypto7.createHash)("sha256").update(args2.expected_rp_id).digest();
+        const expectedRpHash = (0, import_crypto7.createHash)("sha256").update(args3.expected_rp_id).digest();
         if (Buffer.compare(auth.rpIdHash, expectedRpHash) !== 0) return { ok: false, error: "rp_id_hash mismatch" };
         if (!(auth.flags & 1)) return { ok: false, error: "user not present" };
-        if (auth.signCount !== 0 && auth.signCount <= (args2.prev_sign_count ?? 0)) {
-          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args2.prev_sign_count})` };
+        if (auth.signCount !== 0 && auth.signCount <= (args3.prev_sign_count ?? 0)) {
+          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args3.prev_sign_count})` };
         }
         const cdHash = (0, import_crypto7.createHash)("sha256").update(clientDataJson).digest();
         const signedData = Buffer.concat([authenticatorData, cdHash]);
@@ -23601,15 +23675,15 @@ var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
 function kimdbReq(method, path16, body) {
   const url2 = `${KIMDB}${path16}`;
-  const args2 = ["-sf", "--max-time", "5"];
+  const args3 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
-    args2.push("-X", method);
+    args3.push("-X", method);
     if (body !== void 0) {
-      args2.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
+      args3.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
     }
   }
-  args2.push(url2);
-  const r = (0, import_child_process5.spawnSync)("curl", args2, { timeout: 6e3 });
+  args3.push(url2);
+  const r = (0, import_child_process5.spawnSync)("curl", args3, { timeout: 6e3 });
   if (r.error) throw new Error(`kimdb request failed: ${r.error.message}`);
   const raw = r.stdout?.toString().trim() ?? "";
   if (!raw) return null;
@@ -23776,17 +23850,17 @@ function buildArgs(db, sql) {
   const pass = process.env.MARIADB_PASS || "";
   const host = process.env.MARIADB_HOST;
   const port = process.env.MARIADB_PORT;
-  const args2 = ["-u", user];
+  const args3 = ["-u", user];
   if (host) {
-    args2.push("-h", host);
-    if (port) args2.push("-P", port);
+    args3.push("-h", host);
+    if (port) args3.push("-P", port);
   } else {
-    args2.push("--socket=" + sock);
+    args3.push("--socket=" + sock);
   }
-  if (pass) args2.push("-p" + pass);
-  if (db) args2.push(db);
-  args2.push("--batch", "-e", sql);
-  return args2;
+  if (pass) args3.push("-p" + pass);
+  if (db) args3.push(db);
+  args3.push("--batch", "-e", sql);
+  return args3;
 }
 function runMariadb(db, sql) {
   const r = (0, import_child_process6.spawnSync)("mariadb", buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8" });
@@ -23844,8 +23918,8 @@ function createMariadbModule() {
     "mariadb_health": () => {
       const sock = resolveSocket();
       const user = process.env.MARIADB_USER || "root";
-      const args2 = ["-u", user, "--socket=" + sock, "ping"];
-      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args2, { timeout: 3e3, encoding: "utf-8" });
+      const args3 = ["-u", user, "--socket=" + sock, "ping"];
+      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args3, { timeout: 3e3, encoding: "utf-8" });
       return (r.status ?? 1) === 0;
     },
     // mariadb_databases -> list of database names
@@ -24368,10 +24442,10 @@ function createProcessModule() {
     "process_exit": (code) => process.exit(code ?? 0),
     "process_argv": () => process.argv.slice(2),
     "process_argv_get": (key, defaultVal = null) => {
-      const args2 = process.argv.slice(2);
-      const idx = args2.indexOf(key);
-      if (idx === -1 || idx + 1 >= args2.length) return defaultVal;
-      return args2[idx + 1];
+      const args3 = process.argv.slice(2);
+      const idx = args3.indexOf(key);
+      if (idx === -1 || idx + 1 >= args3.length) return defaultVal;
+      return args3[idx + 1];
     }
   };
 }
@@ -24381,11 +24455,11 @@ function createAsyncModule(callFn) {
   return {
     // async_call fn_name args -> Promise
     // Call a function asynchronously and return a promise
-    "async_call": (fnName, args2 = []) => {
+    "async_call": (fnName, args3 = []) => {
       return new FreeLangPromise((resolve7, reject) => {
         setImmediate(() => {
           try {
-            const result = callFn(fnName, args2);
+            const result = callFn(fnName, args3);
             resolve7(result);
           } catch (e) {
             reject(new Error(`async_call error: ${e.message}`));
@@ -24468,7 +24542,7 @@ function createAsyncModule(callFn) {
     },
     // promise_timeout ms fn_name args -> Promise
     // Call function with timeout
-    "promise_timeout": (ms, fnName, args2 = []) => {
+    "promise_timeout": (ms, fnName, args3 = []) => {
       return new FreeLangPromise((resolve7, reject) => {
         let done = false;
         const timeout = setTimeout(() => {
@@ -24478,7 +24552,7 @@ function createAsyncModule(callFn) {
           }
         }, ms);
         try {
-          const result = callFn(fnName, args2);
+          const result = callFn(fnName, args3);
           done = true;
           clearTimeout(timeout);
           resolve7(result);
@@ -25595,18 +25669,18 @@ ${exportsStr}
     return JSON.stringify(node.name);
   }
   genSExpr(node) {
-    const { op, args: args2 } = node;
-    if (op === "and") return "(" + args2.map((a) => this.genNode(a)).join(" && ") + ")";
-    if (op === "or") return "(" + args2.map((a) => this.genNode(a)).join(" || ") + ")";
-    if (op === "cond") return this.genCond(args2);
-    if (op === "while") return this.genWhile(args2);
+    const { op, args: args3 } = node;
+    if (op === "and") return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
+    if (op === "or") return "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+    if (op === "cond") return this.genCond(args3);
+    if (op === "while") return this.genWhile(args3);
     if (op === "recur") {
-      const argStrs = args2.map((a) => this.genNode(a));
+      const argStrs = args3.map((a) => this.genNode(a));
       return `{ __recur: true, a: [${argStrs.join(", ")}] }`;
     }
     if (op === "loop") {
-      const bindingsArg = args2[0];
-      const bodyExprs = args2.slice(1);
+      const bindingsArg = args3[0];
+      const bodyExprs = args3.slice(1);
       let items = [];
       if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
         items = bindingsArg.fields.get("items") || [];
@@ -25632,58 +25706,58 @@ ${exportsStr}
         }
       })()`;
     }
-    if (op in BINARY_OPS && args2.length === 2) {
-      const left = this.genNode(args2[0]);
-      const right = this.genNode(args2[1]);
+    if (op in BINARY_OPS && args3.length === 2) {
+      const left = this.genNode(args3[0]);
+      const right = this.genNode(args3[1]);
       return `(${left} ${BINARY_OPS[op]} ${right})`;
     }
-    if (op === "-" && args2.length === 1) {
-      return `(-${this.genNode(args2[0])})`;
+    if (op === "-" && args3.length === 1) {
+      return `(-${this.genNode(args3[0])})`;
     }
-    if (op === "not" && args2.length === 1) {
-      return `(!${this.genNode(args2[0])})`;
+    if (op === "not" && args3.length === 1) {
+      return `(!${this.genNode(args3[0])})`;
     }
     if (op === "if") {
-      const cond = this.genNode(args2[0]);
-      const thenExpr = this.genNode(args2[1]);
-      const elseExpr = args2[2] ? this.genNode(args2[2]) : "undefined";
+      const cond = this.genNode(args3[0]);
+      const thenExpr = this.genNode(args3[1]);
+      const elseExpr = args3[2] ? this.genNode(args3[2]) : "undefined";
       return `(${cond} ? ${thenExpr} : ${elseExpr})`;
     }
     if (op === "define") {
-      const varName = this.extractVarName(args2[0]);
-      const value = this.genNode(args2[1]);
+      const varName = this.extractVarName(args3[0]);
+      const value = this.genNode(args3[1]);
       return `let ${varName} = ${value};`;
     }
     if (op === "set!") {
-      const varName = this.extractVarName(args2[0]);
-      const value = this.genNode(args2[1]);
+      const varName = this.extractVarName(args3[0]);
+      const value = this.genNode(args3[1]);
       return `(${varName} = ${value})`;
     }
     if (op === "defn" || op === "defun") {
-      const name = this.extractVarName(args2[0]);
-      const params = this.extractParamList(args2[1]);
-      const body = args2[2] ? this.genNode(args2[2]) : "undefined";
+      const name = this.extractVarName(args3[0]);
+      const params = this.extractParamList(args3[1]);
+      const body = args3[2] ? this.genNode(args3[2]) : "undefined";
       return `function ${name}(${params.join(", ")}) { return ${body}; }`;
     }
-    if (op === "fn") return this.genFn(args2);
-    if (op === "do") return this.genDo(args2);
+    if (op === "fn") return this.genFn(args3);
+    if (op === "do") return this.genDo(args3);
     if (op === "list") {
-      const elements = args2.map((a) => this.genNode(a));
+      const elements = args3.map((a) => this.genNode(a));
       return `[${elements.join(", ")}]`;
     }
     if (op === "str-concat") {
-      const parts = args2.map((a) => this.genNode(a));
+      const parts = args3.map((a) => this.genNode(a));
       return `('' + ${parts.join(" + ")})`;
     }
     if (op === "print" || op === "println") {
-      const arg = args2.length > 0 ? this.genNode(args2[0]) : '""';
+      const arg = args3.length > 0 ? this.genNode(args3[0]) : '""';
       return `_fl_print(${arg})`;
     }
-    if (op === "map") return `_fl_map(${this.genNode(args2[1])}, ${this.genNode(args2[0])})`;
-    if (op === "filter") return `_fl_filter(${this.genNode(args2[1])}, ${this.genNode(args2[0])})`;
-    if (op === "reduce") return `_fl_reduce(${this.genNode(args2[2])}, ${this.genNode(args2[0])}, ${this.genNode(args2[1])})`;
+    if (op === "map") return `_fl_map(${this.genNode(args3[1])}, ${this.genNode(args3[0])})`;
+    if (op === "filter") return `_fl_filter(${this.genNode(args3[1])}, ${this.genNode(args3[0])})`;
+    if (op === "reduce") return `_fl_reduce(${this.genNode(args3[2])}, ${this.genNode(args3[0])}, ${this.genNode(args3[1])})`;
     if (op === "export") {
-      for (const arg of args2) {
+      for (const arg of args3) {
         if (arg.kind === "variable") {
           this.exportedNames.push(arg.name);
         } else if (arg.kind === "literal" && typeof arg.value === "string") {
@@ -25693,8 +25767,8 @@ ${exportsStr}
       return "";
     }
     if (op === "let") {
-      if (args2.length >= 2) {
-        const bindingsArg = args2[0];
+      if (args3.length >= 2) {
+        const bindingsArg = args3[0];
         let bindings = [];
         if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
           bindings = bindingsArg.fields.get("items") || [];
@@ -25712,18 +25786,18 @@ ${exportsStr}
             }
           }
         }
-        const bodyStmts = args2.slice(1).map((a) => this.genNode(a)).join("; ");
+        const bodyStmts = args3.slice(1).map((a) => this.genNode(a)).join("; ");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
       }
-      const varName = this.extractVarName(args2[0]);
-      const value = args2[1] ? this.genNode(args2[1]) : "undefined";
+      const varName = this.extractVarName(args3[0]);
+      const value = args3[1] ? this.genNode(args3[1]) : "undefined";
       return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
-    return this.genFuncCall(op, args2);
+    return this.genFuncCall(op, args3);
   }
-  genCond(args2) {
-    if (args2.length === 0) return "null";
-    const clauses = args2.map((arg) => {
+  genCond(args3) {
+    if (args3.length === 0) return "null";
+    const clauses = args3.map((arg) => {
       if (arg.kind === "block" && arg.type === "Array") return arg.fields.get("items") || [];
       return Array.isArray(arg) ? arg : [arg];
     });
@@ -25736,14 +25810,14 @@ ${exportsStr}
     }
     return res;
   }
-  genWhile(args2) {
-    const cond = this.genNode(args2[0]);
-    const body = args2.slice(1).map((a) => this.genNode(a)).join("; ");
+  genWhile(args3) {
+    const cond = this.genNode(args3[0]);
+    const body = args3.slice(1).map((a) => this.genNode(a)).join("; ");
     return "(() => { while(" + cond + ") { " + body + " } })()";
   }
-  genLoop(args2) {
-    const bindingsBlock = args2[0];
-    const bodyExprs = args2.slice(1);
+  genLoop(args3) {
+    const bindingsBlock = args3[0];
+    const bodyExprs = args3.slice(1);
     let items = [];
     if (bindingsBlock.kind === "block" && bindingsBlock.type === "Array") items = bindingsBlock.fields.get("items") || [];
     const inits = [];
@@ -25755,23 +25829,23 @@ ${exportsStr}
     const bodyCode = bodyExprs.map((e) => this.genNode(e)).join("; ");
     return "(() => { " + inits.join("; ") + "; while(true) { " + bodyCode + "; break; } })()";
   }
-  genFn(args2) {
-    const params = this.extractParamList(args2[0]);
-    const body = args2[1] ? this.genNode(args2[1]) : "undefined";
+  genFn(args3) {
+    const params = this.extractParamList(args3[0]);
+    const body = args3[1] ? this.genNode(args3[1]) : "undefined";
     return `((${params.join(", ")}) => ${body})`;
   }
-  genDo(args2) {
-    if (args2.length === 0) return "(() => undefined)()";
-    if (args2.length === 1) return `(() => ${this.genNode(args2[0])})()`;
-    const stmts = args2.slice(0, -1).map((a) => {
+  genDo(args3) {
+    if (args3.length === 0) return "(() => undefined)()";
+    if (args3.length === 1) return `(() => ${this.genNode(args3[0])})()`;
+    const stmts = args3.slice(0, -1).map((a) => {
       const c = this.genNode(a).trim();
       return c === "" || c.endsWith(";") ? c : c + ";";
     }).filter((s) => s !== "");
-    const last = this.genNode(args2[args2.length - 1]);
+    const last = this.genNode(args3[args3.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
   }
-  genFuncCall(op, args2) {
-    const argStrs = args2.map((a) => this.genNode(a));
+  genFuncCall(op, args3) {
+    const argStrs = args3.map((a) => this.genNode(a));
     const jsOp = flNameToJs(op);
     return `${jsOp}(${argStrs.join(", ")})`;
   }
@@ -27593,9 +27667,9 @@ function createWsModule(callFn) {
   let onMessageFn = "ws_on_message";
   let onCloseFn = "ws_on_close";
   let onErrorFn = "ws_on_error";
-  function tryCall(fnName, args2) {
+  function tryCall(fnName, args3) {
     try {
-      callFn(fnName, args2);
+      callFn(fnName, args3);
     } catch {
     }
   }
@@ -27855,9 +27929,9 @@ function createWscModule(callFn) {
   let onMessageFn = "wsc_on_message";
   let onCloseFn = "wsc_on_close";
   let onErrorFn = "wsc_on_error";
-  function tryCall(fnName, args2) {
+  function tryCall(fnName, args3) {
     try {
-      callFn(fnName, args2);
+      callFn(fnName, args3);
     } catch {
     }
   }
@@ -28462,12 +28536,12 @@ function checkAzCLI() {
   cliAvailable.az = !result.error && result.status === 0;
   return cliAvailable.az;
 }
-function runAws(args2) {
+function runAws(args3) {
   if (!checkAwsCLI()) {
     return { status: "cli_not_found", reason: "aws CLI not installed", details: "install aws-cli" };
   }
   try {
-    const result = (0, import_child_process8.spawnSync)("aws", args2, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process8.spawnSync)("aws", args3, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -28479,12 +28553,12 @@ function runAws(args2) {
     return { status: "error", reason: err4.message };
   }
 }
-function runGcloud(args2) {
+function runGcloud(args3) {
   if (!checkGcloudCLI()) {
     return { status: "cli_not_found", reason: "gcloud CLI not installed", details: "install google-cloud-sdk" };
   }
   try {
-    const result = (0, import_child_process8.spawnSync)("gcloud", args2, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process8.spawnSync)("gcloud", args3, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -28496,12 +28570,12 @@ function runGcloud(args2) {
     return { status: "error", reason: err4.message };
   }
 }
-function runAz(args2) {
+function runAz(args3) {
   if (!checkAzCLI()) {
     return { status: "cli_not_found", reason: "az CLI not installed", details: "install azure-cli" };
   }
   try {
-    const result = (0, import_child_process8.spawnSync)("az", args2, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process8.spawnSync)("az", args3, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -28908,12 +28982,12 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createAiNativeModule());
   interp2.registerModule(createTestModule(
     // Phase 76: deftest, describe, assert-eq, ...
-    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
+    (fnValue, args3) => interp2.callFunctionValue(fnValue, args3)
   ));
   interp2.registerModule(createMaybeModule(
     // Phase 91: 불확실성 타입 (maybe/none/confident)
-    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2),
-    (name, args2) => interp2.callUserFunction(name, args2)
+    (fnValue, args3) => interp2.callFunctionValue(fnValue, args3),
+    (name, args3) => interp2.callUserFunction(name, args3)
   ));
   interp2.registerModule(createCompileModule());
   interp2.registerModule(createRegistryModule());
@@ -29667,9 +29741,9 @@ function propagateMutations(interp2, capturedEnv, paramSet, savedStack) {
   }
 }
 var MAX_CALL_DEPTH = 5e3;
-function callUserFunction(interp2, name, args2) {
+function callUserFunction(interp2, name, args3) {
   if (interp2.tcoMode) {
-    return callUserFunctionTCO(interp2, name, args2);
+    return callUserFunctionTCO(interp2, name, args3);
   }
   if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
     try {
@@ -29690,7 +29764,7 @@ function callUserFunction(interp2, name, args2) {
         initialVars.set(vmName, vmFuncObj);
       }
       for (let i = 0; i < vmFunc._params.length; i++) {
-        initialVars.set(vmFunc._params[i], args2[i] ?? null);
+        initialVars.set(vmFunc._params[i], args3[i] ?? null);
       }
       return _callVM.run(vmFunc._chunk, initialVars);
     } catch {
@@ -29715,9 +29789,9 @@ function callUserFunction(interp2, name, args2) {
   if (!func) {
     const v = interp2.context.variables.get(baseName) ?? interp2.context.variables.get("$" + baseName);
     if (v && (v.kind === "function-value" || v.kind === "async-function-value" || typeof v === "function" || v.params && v.body)) {
-      if (v.kind === "function-value") return callFunctionValue(interp2, v, args2);
-      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args2);
-      if (typeof v === "function") return v(...args2);
+      if (v.kind === "function-value") return callFunctionValue(interp2, v, args3);
+      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args3);
+      if (typeof v === "function") return v(...args3);
       func = v;
     }
   }
@@ -29754,13 +29828,13 @@ function callUserFunction(interp2, name, args2) {
     isGenericCall = true;
   }
   if (!isGenericCall && interp2.context.runtimeTypeChecker) {
-    interp2.context.runtimeTypeChecker.checkCall(baseName, args2);
+    interp2.context.runtimeTypeChecker.checkCall(baseName, args3);
   }
   if (typeof func.body === "function") {
-    return func.body(...args2);
+    return func.body(...args3);
   }
-  if (func.params.length > args2.length) {
-    throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args2.length}`);
+  if (func.params.length > args3.length) {
+    throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args3.length}`);
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
     const _stack = interp2.callStack ?? [];
@@ -29787,7 +29861,7 @@ ${tail}` : "")
   }
   const exitProfiler = globalProfiler.enter(baseName);
   const _callStack = interp2.callStack ?? [];
-  const _argsBrief = args2.slice(0, 5).map(
+  const _argsBrief = args3.slice(0, 5).map(
     (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
   );
   const _stackEntry = { fn: baseName, line: interp2.currentLine, args: _argsBrief };
@@ -29804,7 +29878,7 @@ ${tail}` : "")
     try {
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args3[i]);
       }
       result = interp2.eval(func.body);
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
@@ -29824,11 +29898,11 @@ ${tail}` : "")
   try {
     for (let recurIter = 0; recurIter < 2e6; recurIter++) {
       for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args3[i]);
       }
       const result = interp2.eval(func.body);
       if (result && typeof result === "object" && result.__FL_RECUR__) {
-        args2 = result.__args;
+        args3 = result.__args;
         continue;
       }
       return result;
@@ -29842,9 +29916,9 @@ ${tail}` : "")
     exitProfiler();
   }
 }
-function callFunctionValue(interp2, fn, args2) {
+function callFunctionValue(interp2, fn, args3) {
   if (interp2.tcoMode) {
-    return callFunctionValueTCO(interp2, fn, args2);
+    return callFunctionValueTCO(interp2, fn, args3);
   }
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
@@ -29859,7 +29933,7 @@ function callFunctionValue(interp2, fn, args2) {
   try {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      interp2.context.variables.set(fn.params[i], args2[i]);
+      interp2.context.variables.set(fn.params[i], args3[i]);
     }
     result = interp2.eval(fn.body);
     propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
@@ -29869,7 +29943,7 @@ function callFunctionValue(interp2, fn, args2) {
   }
   return result;
 }
-function callAsyncFunctionValue(interp2, fn, args2) {
+function callAsyncFunctionValue(interp2, fn, args3) {
   if (fn.kind !== "async-function-value") {
     throw new Error(`Expected async-function-value, got ${fn.kind}`);
   }
@@ -29878,7 +29952,7 @@ function callAsyncFunctionValue(interp2, fn, args2) {
     try {
       interp2.context.variables.fromSnapshot(fn.capturedEnv);
       for (let i = 0; i < fn.params.length; i++) {
-        interp2.context.variables.set(fn.params[i], args2[i]);
+        interp2.context.variables.set(fn.params[i], args3[i]);
       }
       const result = interp2.eval(fn.body);
       if (result instanceof FreeLangPromise) {
@@ -29893,31 +29967,31 @@ function callAsyncFunctionValue(interp2, fn, args2) {
     }
   });
 }
-function callFunction(interp2, fn, args2) {
+function callFunction(interp2, fn, args3) {
   if (fn.kind === "builtin-function") {
-    return fn.fn(args2.map((arg) => interp2.eval(arg)));
+    return fn.fn(args3.map((arg) => interp2.eval(arg)));
   } else if (fn.kind === "function-value") {
-    return callFunctionValue(interp2, fn, args2);
+    return callFunctionValue(interp2, fn, args3);
   } else if (fn.kind === "async-function-value") {
-    return callAsyncFunctionValue(interp2, fn, args2);
+    return callAsyncFunctionValue(interp2, fn, args3);
   } else if (typeof fn === "function") {
-    return fn(...args2);
+    return fn(...args3);
   } else if (typeof fn === "string") {
-    const wrappedArgs = args2.map((v) => ({
+    const wrappedArgs = args3.map((v) => ({
       kind: "literal",
       value: v,
       type: v === null ? "any" : Array.isArray(v) ? "list" : typeof v
     }));
     return interp2.eval({ kind: "sexpr", op: fn, args: wrappedArgs });
   } else if (fn && fn.params && fn.body) {
-    return callUserFunction(interp2, fn.name || "anonymous", args2);
+    return callUserFunction(interp2, fn.name || "anonymous", args3);
   } else {
     throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
   }
 }
-function callUserFunctionTCO(interp2, name, args2) {
+function callUserFunctionTCO(interp2, name, args3) {
   let currentName = name;
-  let currentArgs = args2;
+  let currentArgs = args3;
   const prevTcoMode = interp2.tcoMode;
   interp2.tcoMode = true;
   try {
@@ -29992,12 +30066,12 @@ function callUserFunctionTCO(interp2, name, args2) {
     interp2.tcoMode = prevTcoMode;
   }
 }
-function callFunctionValueTCO(interp2, fn, args2) {
+function callFunctionValueTCO(interp2, fn, args3) {
   const prevTcoMode = interp2.tcoMode;
   interp2.tcoMode = true;
   try {
     let currentFn = fn;
-    let currentArgs = args2;
+    let currentArgs = args3;
     for (let i = 0; i < 1e6; i++) {
       if (currentFn.kind !== "function-value") {
         throw new Error(`Expected function-value, got ${currentFn.kind}`);
@@ -30029,17 +30103,17 @@ function callFunctionValueTCO(interp2, fn, args2) {
     interp2.tcoMode = prevTcoMode;
   }
 }
-function callUserFunctionRaw(interp2, name, args2) {
+function callUserFunctionRaw(interp2, name, args3) {
   const func = interp2.context.functions.get(name);
   if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
-  if (typeof func.body === "function") return func.body(...args2);
+  if (typeof func.body === "function") return func.body(...args3);
   let result;
   if (func.capturedEnv) {
     const savedStack = interp2.context.variables.saveStack();
     try {
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args3[i]);
       }
       result = interp2.eval(func.body);
     } finally {
@@ -30049,7 +30123,7 @@ function callUserFunctionRaw(interp2, name, args2) {
     interp2.context.variables.push();
     try {
       for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args2[i]);
+        interp2.context.variables.set(func.params[i], args3[i]);
       }
       result = interp2.eval(func.body);
     } finally {
@@ -30058,13 +30132,13 @@ function callUserFunctionRaw(interp2, name, args2) {
   }
   return result;
 }
-function callFunctionValueRaw(interp2, fn, args2) {
+function callFunctionValueRaw(interp2, fn, args3) {
   if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
   const savedStack = interp2.context.variables.saveStack();
   try {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      interp2.context.variables.set(fn.params[i], args2[i]);
+      interp2.context.variables.set(fn.params[i], args3[i]);
     }
     return interp2.eval(fn.body);
   } finally {
@@ -30183,8 +30257,8 @@ var MacroExpander = class {
   astToString(node) {
     if (node.kind === "sexpr") {
       const s = node;
-      const args2 = s.args.map((a) => this.astToString(a)).join(" ");
-      return `(${s.op}${args2 ? " " + args2 : ""})`;
+      const args3 = s.args.map((a) => this.astToString(a)).join(" ");
+      return `(${s.op}${args3 ? " " + args3 : ""})`;
     }
     if (node.kind === "literal") {
       const l = node;
@@ -30309,15 +30383,15 @@ var StructRegistry = class {
   makeConstructor(name) {
     const def = this.structs.get(name);
     if (!def) throw new Error(`StructRegistry: unknown struct "${name}"`);
-    return (...args2) => {
-      if (args2.length !== def.fields.length) {
+    return (...args3) => {
+      if (args3.length !== def.fields.length) {
         throw new Error(
-          `${name} constructor: expected ${def.fields.length} arguments, got ${args2.length}`
+          `${name} constructor: expected ${def.fields.length} arguments, got ${args3.length}`
         );
       }
       const obj = { __type: name };
       for (let i = 0; i < def.fields.length; i++) {
-        obj[def.fields[i].name] = args2[i];
+        obj[def.fields[i].name] = args3[i];
       }
       return obj;
     };
@@ -30457,7 +30531,7 @@ var ChainOfThought = class {
     return this;
   }
 };
-function evalCotForm(args2, evalFn, setVar, getVar) {
+function evalCotForm(args3, evalFn, setVar, getVar) {
   const cot = new ChainOfThought();
   let concludeFn = null;
   function isKeyword(node, name) {
@@ -30467,12 +30541,12 @@ function evalCotForm(args2, evalFn, setVar, getVar) {
     return false;
   }
   let i = 0;
-  while (i < args2.length) {
-    const arg = args2[i];
+  while (i < args3.length) {
+    const arg = args3[i];
     if (isKeyword(arg, "step")) {
       i++;
-      if (i >= args2.length) throw new Error("COT :step requires a description string");
-      const descNode = args2[i];
+      if (i >= args3.length) throw new Error("COT :step requires a description string");
+      const descNode = args3[i];
       let desc;
       if (descNode?.kind === "literal" && typeof descNode.value === "string") {
         desc = descNode.value;
@@ -30480,14 +30554,14 @@ function evalCotForm(args2, evalFn, setVar, getVar) {
         desc = String(evalFn(descNode));
       }
       i++;
-      if (i >= args2.length) throw new Error(`COT :step "${desc}" requires an expression`);
-      const stepExpr = args2[i];
+      if (i >= args3.length) throw new Error(`COT :step "${desc}" requires an expression`);
+      const stepExpr = args3[i];
       i++;
       let confidence;
-      if (i < args2.length && isKeyword(args2[i], "confidence")) {
+      if (i < args3.length && isKeyword(args3[i], "confidence")) {
         i++;
-        if (i < args2.length) {
-          confidence = Number(evalFn(args2[i]));
+        if (i < args3.length) {
+          confidence = Number(evalFn(args3[i]));
           i++;
         }
       }
@@ -30499,8 +30573,8 @@ function evalCotForm(args2, evalFn, setVar, getVar) {
     }
     if (isKeyword(arg, "conclude")) {
       i++;
-      if (i >= args2.length) throw new Error("COT :conclude requires a function");
-      concludeFn = evalFn(args2[i]);
+      if (i >= args3.length) throw new Error("COT :conclude requires a function");
+      concludeFn = evalFn(args3[i]);
       i++;
       continue;
     }
@@ -30910,11 +30984,11 @@ function evalAgentBlock(fields, evalFn, callFnVal) {
 function createAgentBuiltins(interp2) {
   return {
     // (agent-new :goal "..." :max-steps 10)
-    "agent-new": (...args2) => {
+    "agent-new": (...args3) => {
       const opts = { goal: "unnamed" };
-      for (let i = 0; i < args2.length; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        const val = args2[i + 1];
+      for (let i = 0; i < args3.length; i += 2) {
+        const key = String(args3[i]).replace(/^:/, "");
+        const val = args3[i + 1];
         if (key === "goal") opts.goal = String(val);
         else if (key === "max-steps") opts.maxSteps = Number(val);
         else if (key === "tools") opts.tools = Array.isArray(val) ? val.map(String) : [];
@@ -31493,7 +31567,7 @@ var Interpreter = class _Interpreter {
   handleAgentBlock(block) {
     const interp2 = this;
     const ev = (node) => interp2.eval(node);
-    const callFnVal = (fn, args2) => interp2.callFunctionValue(fn, args2);
+    const callFnVal = (fn, args3) => interp2.callFunctionValue(fn, args3);
     const state = evalAgentBlock(block.fields, ev, callFnVal);
     this.context.lastValue = state;
   }
@@ -32078,10 +32152,10 @@ var Interpreter = class _Interpreter {
       description: String(desc || ""),
       inputSchema,
       outputSchema,
-      execute: (args2) => {
+      execute: (args3) => {
         interp2.context.variables.push();
         try {
-          for (const [k, v] of Object.entries(args2)) {
+          for (const [k, v] of Object.entries(args3)) {
             interp2.context.variables.set(`$${k}`, v);
           }
           return interp2.eval(bodyNode);
@@ -32096,7 +32170,7 @@ var Interpreter = class _Interpreter {
   // Phase 97: [USE-TOOL toolname :args {key val ...}]
   handleUseToolBlock(block) {
     const name = block.name;
-    const args2 = {};
+    const args3 = {};
     if (block.fields.has("args")) {
       const argsNode = block.fields.get("args");
       if (argsNode?.kind === "block" && argsNode?.type === "Map") {
@@ -32104,12 +32178,12 @@ var Interpreter = class _Interpreter {
         if (Array.isArray(entries)) {
           for (let i = 0; i < entries.length - 1; i += 2) {
             const key = entries[i]?.kind === "keyword" ? entries[i].name : entries[i]?.kind === "literal" ? String(entries[i].value) : String(entries[i]);
-            args2[key] = this.eval(entries[i + 1]);
+            args3[key] = this.eval(entries[i + 1]);
           }
         }
       }
     }
-    const result = globalToolRegistry.executeSync(name, args2);
+    const result = globalToolRegistry.executeSync(name, args3);
     return result.success ? result.output : (() => {
       throw new Error(result.error || `Tool failed: ${name}`);
     })();
@@ -32355,11 +32429,11 @@ var Interpreter = class _Interpreter {
         if (concreteType) {
           const method = this.resolveMethod(className, concreteType, methodName);
           if (method) {
-            const args3 = expr2.args.slice(1).map((arg) => this.eval(arg));
+            const args4 = expr2.args.slice(1).map((arg) => this.eval(arg));
             if (method.kind === "function-value") {
-              return this.callFunctionValue(method, [concreteValue, ...args3]);
+              return this.callFunctionValue(method, [concreteValue, ...args4]);
             } else if (typeof method === "function") {
-              return method(concreteValue, ...args3);
+              return method(concreteValue, ...args4);
             }
           }
         }
@@ -32376,7 +32450,7 @@ var Interpreter = class _Interpreter {
     if (op === "REFLECT") {
       const interp2 = this;
       const ev = (node) => interp2.eval(node);
-      const callFnVal = (fn, args3) => interp2.callFunctionValue(fn, args3);
+      const callFnVal = (fn, args4) => interp2.callFunctionValue(fn, args4);
       let outputExpr = null;
       let criteriaExpr = null;
       let thresholdExpr = null;
@@ -32480,40 +32554,40 @@ var Interpreter = class _Interpreter {
       };
       const interp2 = this;
       const tot = new TreeOfThought();
-      const args3 = expr2.args;
+      const args4 = expr2.args;
       let i = 0;
       let scoreFnNode = null;
       let pruneThreshold = null;
       let selectStrategy = "best";
       let selectK = 1;
-      while (i < args3.length) {
-        const arg = args3[i];
+      while (i < args4.length) {
+        const arg = args4[i];
         if (isTotKeyword(arg, "branch")) {
           i++;
-          const hypoNode = args3[i];
+          const hypoNode = args4[i];
           i++;
-          const exprNode = args3[i];
+          const exprNode = args4[i];
           i++;
           const hypo = String(interp2.eval(hypoNode));
           const capturedNode = exprNode;
           tot.branch(hypo, () => interp2.eval(capturedNode));
         } else if (isTotKeyword(arg, "eval")) {
           i++;
-          scoreFnNode = args3[i];
+          scoreFnNode = args4[i];
           i++;
         } else if (isTotKeyword(arg, "prune")) {
           i++;
-          pruneThreshold = Number(interp2.eval(args3[i]));
+          pruneThreshold = Number(interp2.eval(args4[i]));
           i++;
         } else if (isTotKeyword(arg, "select")) {
           i++;
-          const selVal = interp2.eval(args3[i]);
+          const selVal = interp2.eval(args4[i]);
           i++;
           if (selVal === "top-k") selectStrategy = "top-k";
           else selectStrategy = "best";
         } else if (isTotKeyword(arg, "k")) {
           i++;
-          selectK = Number(interp2.eval(args3[i]));
+          selectK = Number(interp2.eval(args4[i]));
           i++;
         } else {
           i++;
@@ -32565,30 +32639,30 @@ var Interpreter = class _Interpreter {
       } catch (_vmErr) {
       }
     }
-    const args2 = expr2.args.map((arg) => this.eval(arg));
-    if (args2.length >= 1 && typeof args2[0] === "string") {
-      const qualifiedName = `${op}:${args2[0]}`;
+    const args3 = expr2.args.map((arg) => this.eval(arg));
+    if (args3.length >= 1 && typeof args3[0] === "string") {
+      const qualifiedName = `${op}:${args3[0]}`;
       if (this.context.functions.has(qualifiedName)) {
-        return this.callUserFunction(qualifiedName, args2.slice(1));
+        return this.callUserFunction(qualifiedName, args3.slice(1));
       }
     }
     if (this.context.protocols.hasMethod(op)) {
-      if (args2.length >= 1) {
-        const selfVal = args2[0];
+      if (args3.length >= 1) {
+        const selfVal = args3[0];
         const impl = this.context.protocols.resolveMethod(op, selfVal);
         if (impl) {
           const methodDef = impl.methods.get(op);
-          return this.callProtocolMethod(methodDef, selfVal, args2.slice(1));
+          return this.callProtocolMethod(methodDef, selfVal, args3.slice(1));
         }
       }
     }
     const nativeKey = `__native_${op}`;
     if (this.context[nativeKey] !== void 0) {
       const nativeFn = this.context[nativeKey];
-      return nativeFn(...args2);
+      return nativeFn(...args3);
     }
     try {
-      return evalBuiltin(this, op, args2, expr2);
+      return evalBuiltin(this, op, args3, expr2);
     } catch (err4) {
       const line = expr2.line ?? this.currentLine;
       const col = expr2.col ?? 0;
@@ -32731,31 +32805,31 @@ var Interpreter = class _Interpreter {
     return String(val);
   }
   // Phase 58: 함수 호출 로직 eval-call-function.ts로 분리
-  callUserFunction(name, args2) {
-    return callUserFunction(this, name, args2);
+  callUserFunction(name, args3) {
+    return callUserFunction(this, name, args3);
   }
-  callFunctionValue(fn, args2) {
-    return callFunctionValue(this, fn, args2);
+  callFunctionValue(fn, args3) {
+    return callFunctionValue(this, fn, args3);
   }
-  callAsyncFunctionValue(fn, args2) {
-    return callAsyncFunctionValue(this, fn, args2);
+  callAsyncFunctionValue(fn, args3) {
+    return callAsyncFunctionValue(this, fn, args3);
   }
-  callFunction(fn, args2) {
-    return callFunction(this, fn, args2);
+  callFunction(fn, args3) {
+    return callFunction(this, fn, args3);
   }
   // Phase 61: TCO 메서드 — 꼬리 재귀를 반복문으로 (100만 재귀 스택 없이)
-  callUserFunctionTCO(name, args2) {
-    return callUserFunctionTCO(this, name, args2);
+  callUserFunctionTCO(name, args3) {
+    return callUserFunctionTCO(this, name, args3);
   }
-  callFunctionValueTCO(fn, args2) {
-    return callFunctionValueTCO(this, fn, args2);
+  callFunctionValueTCO(fn, args3) {
+    return callFunctionValueTCO(this, fn, args3);
   }
   // trampoline용 raw 메서드 (TailCall 토큰 그대로 반환)
-  callUserFunctionRaw(name, args2) {
-    return callUserFunctionRaw(this, name, args2);
+  callUserFunctionRaw(name, args3) {
+    return callUserFunctionRaw(this, name, args3);
   }
-  callFunctionValueRaw(fn, args2) {
-    return callFunctionValueRaw(this, fn, args2);
+  callFunctionValueRaw(fn, args3) {
+    return callFunctionValueRaw(this, fn, args3);
   }
   getFieldValue(block, key, defaultValue = null) {
     const field = block.fields.get(key);
@@ -32790,12 +32864,12 @@ var Interpreter = class _Interpreter {
       throw new Error(`Loop init must be sexpr, got: ${init.kind}`);
     }
     const op = init.op;
-    const args2 = init.args || [];
-    if (!op || args2.length < 1) {
+    const args3 = init.args || [];
+    if (!op || args3.length < 1) {
       throw new Error("Loop init must be ($var val)");
     }
     const varName = String(op);
-    const initVal = this.eval(args2[0]);
+    const initVal = this.eval(args3[0]);
     const loopScope = /* @__PURE__ */ new Map();
     loopScope.set(varName, initVal);
     this.scopes.push(loopScope);
@@ -33042,51 +33116,51 @@ var FLFormatter = class {
   // ───────────────────────────────────────
   formatSExpr(node, depth) {
     const op = node.op;
-    const args2 = node.args;
-    if (args2.length === 0) {
+    const args3 = node.args;
+    if (args3.length === 0) {
       return `(${op})`;
     }
     if (op === "fn" || op === "lambda") {
-      return this.formatFn(op, args2, depth);
+      return this.formatFn(op, args3, depth);
     }
     if (op === "define" || op === "def") {
-      return this.formatDefine(op, args2, depth);
+      return this.formatDefine(op, args3, depth);
     }
     if (op === "let") {
-      return this.formatLet(args2, depth);
+      return this.formatLet(args3, depth);
     }
     if (op === "if") {
-      return this.formatIf(args2, depth);
+      return this.formatIf(args3, depth);
     }
     if (op === "do" || op === "begin") {
-      return this.formatDo(op, args2, depth);
+      return this.formatDo(op, args3, depth);
     }
     if (op === "cond") {
-      return this.formatCond(args2, depth);
+      return this.formatCond(args3, depth);
     }
     if (op === "match") {
-      return this.formatMatch(args2, depth);
+      return this.formatMatch(args3, depth);
     }
-    const inlineArgs = args2.map((a) => this.formatNode(a, depth));
+    const inlineArgs = args3.map((a) => this.formatNode(a, depth));
     const inline = `(${op} ${inlineArgs.join(" ")})`;
     const indent = this.ind(depth);
     if (inline.length <= this.maxWidth - depth * 2) {
       return inline;
     }
     const innerIndent = this.ind(depth + 1);
-    const formatted = args2.map(
+    const formatted = args3.map(
       (a) => innerIndent + this.formatNode(a, depth + 1)
     );
     return `(${op}
 ${formatted.join("\n")})`;
   }
   // fn/lambda 포맷
-  formatFn(op, args2, depth) {
-    if (args2.length < 2) {
-      return `(${op} ${args2.map((a) => this.formatNode(a, depth)).join(" ")})`;
+  formatFn(op, args3, depth) {
+    if (args3.length < 2) {
+      return `(${op} ${args3.map((a) => this.formatNode(a, depth)).join(" ")})`;
     }
-    const params = this.formatNode(args2[0], depth);
-    const bodyParts = args2.slice(1).map((a) => this.formatNode(a, depth + 1));
+    const params = this.formatNode(args3[0], depth);
+    const bodyParts = args3.slice(1).map((a) => this.formatNode(a, depth + 1));
     const innerIndent = this.ind(depth + 1);
     const inline = `(${op} ${params} ${bodyParts.join(" ")})`;
     if (inline.length <= this.maxWidth - depth * 2) return inline;
@@ -33094,12 +33168,12 @@ ${formatted.join("\n")})`;
 ${bodyParts.map((b) => innerIndent + b).join("\n")})`;
   }
   // define/def 포맷
-  formatDefine(op, args2, depth) {
-    if (args2.length === 0) return `(${op})`;
-    const nameNode = args2[0];
+  formatDefine(op, args3, depth) {
+    if (args3.length === 0) return `(${op})`;
+    const nameNode = args3[0];
     const name = this.formatNode(nameNode, depth);
-    if (args2.length === 1) return `(${op} ${name})`;
-    const rest = args2.slice(1).map((a) => this.formatNode(a, depth + 1));
+    if (args3.length === 1) return `(${op} ${name})`;
+    const rest = args3.slice(1).map((a) => this.formatNode(a, depth + 1));
     const inline = `(${op} ${name} ${rest.join(" ")})`;
     if (inline.length <= this.maxWidth - depth * 2) return inline;
     const innerIndent = this.ind(depth + 1);
@@ -33107,10 +33181,10 @@ ${bodyParts.map((b) => innerIndent + b).join("\n")})`;
 ${rest.map((r) => innerIndent + r).join("\n")})`;
   }
   // let 포맷: (let [[$x val] ...] body)
-  formatLet(args2, depth) {
-    if (args2.length === 0) return "(let)";
-    const bindingsNode = args2[0];
-    const body = args2.slice(1).map((a) => this.formatNode(a, depth + 1));
+  formatLet(args3, depth) {
+    if (args3.length === 0) return "(let)";
+    const bindingsNode = args3[0];
+    const body = args3.slice(1).map((a) => this.formatNode(a, depth + 1));
     const bindings = this.formatNode(bindingsNode, depth + 1);
     const inline = `(let ${bindings} ${body.join(" ")})`;
     if (inline.length <= this.maxWidth - depth * 2) return inline;
@@ -33119,8 +33193,8 @@ ${rest.map((r) => innerIndent + r).join("\n")})`;
 ${body.map((b) => innerIndent + b).join("\n")})`;
   }
   // if 포맷
-  formatIf(args2, depth) {
-    const parts = args2.map((a) => this.formatNode(a, depth + 1));
+  formatIf(args3, depth) {
+    const parts = args3.map((a) => this.formatNode(a, depth + 1));
     const inline = `(if ${parts.join(" ")})`;
     if (inline.length <= this.maxWidth - depth * 2) return inline;
     const innerIndent = this.ind(depth + 1);
@@ -33128,25 +33202,25 @@ ${body.map((b) => innerIndent + b).join("\n")})`;
 ${parts.slice(1).map((p) => innerIndent + p).join("\n")})`;
   }
   // do/begin 포맷
-  formatDo(op, args2, depth) {
+  formatDo(op, args3, depth) {
     const innerIndent = this.ind(depth + 1);
-    const parts = args2.map((a) => innerIndent + this.formatNode(a, depth + 1));
+    const parts = args3.map((a) => innerIndent + this.formatNode(a, depth + 1));
     return `(${op}
 ${parts.join("\n")})`;
   }
   // cond 포맷
-  formatCond(args2, depth) {
+  formatCond(args3, depth) {
     const innerIndent = this.ind(depth + 1);
-    const parts = args2.map((a) => innerIndent + this.formatNode(a, depth + 1));
+    const parts = args3.map((a) => innerIndent + this.formatNode(a, depth + 1));
     return `(cond
 ${parts.join("\n")})`;
   }
   // match 포맷
-  formatMatch(args2, depth) {
-    if (args2.length === 0) return "(match)";
-    const subject = this.formatNode(args2[0], depth);
+  formatMatch(args3, depth) {
+    if (args3.length === 0) return "(match)";
+    const subject = this.formatNode(args3[0], depth);
     const innerIndent = this.ind(depth + 1);
-    const cases = args2.slice(1).map((a) => innerIndent + this.formatNode(a, depth + 1));
+    const cases = args3.slice(1).map((a) => innerIndent + this.formatNode(a, depth + 1));
     return `(match ${subject}
 ${cases.join("\n")})`;
   }
@@ -35468,9 +35542,9 @@ function cmdCheck(filePath) {
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
 }
-function cmdCodegen(args2) {
-  const inputFile = args2.find((a) => !a.startsWith("-") && a.endsWith(".fl"));
-  const target = args2.includes("--target") ? args2[args2.indexOf("--target") + 1] : "all";
+function cmdCodegen(args3) {
+  const inputFile = args3.find((a) => !a.startsWith("-") && a.endsWith(".fl"));
+  const target = args3.includes("--target") ? args3[args3.indexOf("--target") + 1] : "all";
   if (!inputFile) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
     process.exit(1);
@@ -35502,12 +35576,12 @@ function cmdCodegen(args2) {
     process.exit(1);
   }
 }
-function cmdCompile(args2) {
-  const outputIdx = args2.indexOf("-o");
-  const inputFile = args2.find((a) => !a.startsWith("-") && a !== args2[outputIdx + 1]);
-  const outputFile = outputIdx !== -1 ? args2[outputIdx + 1] : null;
-  const useEsm = args2.includes("--esm");
-  const withRuntime = args2.includes("--runtime");
+function cmdCompile(args3) {
+  const outputIdx = args3.indexOf("-o");
+  const inputFile = args3.find((a) => !a.startsWith("-") && a !== args3[outputIdx + 1]);
+  const outputFile = outputIdx !== -1 ? args3[outputIdx + 1] : null;
+  const useEsm = args3.includes("--esm");
+  const withRuntime = args3.includes("--runtime");
   if (!inputFile) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
     process.exit(1);
@@ -35805,8 +35879,8 @@ function levenshtein3(a, b) {
   }
   return prev[b.length];
 }
-function cmdFmt(args2) {
-  if (args2.includes("--stdin")) {
+function cmdFmt(args3) {
+  if (args3.includes("--stdin")) {
     let src = "";
     process.stdin.setEncoding("utf-8");
     process.stdin.on("data", (chunk) => {
@@ -35823,8 +35897,8 @@ function cmdFmt(args2) {
     });
     return;
   }
-  const checkMode = args2.includes("--check");
-  const filePaths = args2.filter((a) => !a.startsWith("--"));
+  const checkMode = args3.includes("--check");
+  const filePaths = args3.filter((a) => !a.startsWith("--"));
   if (filePaths.length === 0) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
     process.exit(1);
@@ -36281,8 +36355,8 @@ function cmdRegistry(registryArgs) {
     process.exit(1);
   }
 }
-function cmdInstall(args2) {
-  const pluginName = args2[0];
+function cmdInstall(args3) {
+  const pluginName = args3[0];
   if (!pluginName) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC774\uB984\uC744 \uC9C0\uC815\uD558\uC138\uC694: install <plugin-name>`);
     process.exit(1);
@@ -36320,8 +36394,8 @@ function cmdInstall(args2) {
     process.exit(1);
   }
 }
-function cmdPublish(args2) {
-  const filePath = args2[0];
+function cmdPublish(args3) {
+  const filePath = args3[0];
   if (!filePath) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: publish <plugin-file.fl>`);
     process.exit(1);
@@ -36366,24 +36440,24 @@ function cmdPublish(args2) {
     process.exit(1);
   }
 }
-function cmdServe(args2) {
+function cmdServe(args3) {
   let appDir = "app";
   let port = null;
   let renderMode = "ssr";
   let positionalIdx = 0;
-  for (let i = 0; i < args2.length; i++) {
-    if (args2[i] === "--app" && args2[i + 1]) {
-      appDir = args2[++i];
-    } else if (args2[i] === "--port" && args2[i + 1]) {
-      port = parseInt(args2[++i], 10);
-    } else if (args2[i] === "--mode" && args2[i + 1]) {
-      const m = args2[++i];
+  for (let i = 0; i < args3.length; i++) {
+    if (args3[i] === "--app" && args3[i + 1]) {
+      appDir = args3[++i];
+    } else if (args3[i] === "--port" && args3[i + 1]) {
+      port = parseInt(args3[++i], 10);
+    } else if (args3[i] === "--mode" && args3[i + 1]) {
+      const m = args3[++i];
       if (["ssr", "isr", "ssg"].includes(m)) {
         renderMode = m;
       }
-    } else if (!args2[i].startsWith("--")) {
+    } else if (!args3[i].startsWith("--")) {
       if (positionalIdx === 0) {
-        appDir = args2[i];
+        appDir = args3[i];
       }
       positionalIdx++;
     }
@@ -36466,23 +36540,23 @@ function printUsage() {
     ""
   ].join("\n"));
 }
-var args = process.argv.slice(2);
-var cmd = args[0];
+var args2 = process.argv.slice(2);
+var cmd = args2[0];
 switch (cmd) {
   case "run": {
-    const filePath = args[1];
+    const filePath = args2[1];
     if (!filePath) {
       printUsage();
       process.exit(1);
     }
-    const watch2 = args.includes("--watch") || args.includes("-w");
-    const ddIdx = args.indexOf("--");
-    const extraArgs = ddIdx >= 0 ? args.slice(ddIdx + 1) : args.slice(2).filter((a) => a !== "--watch" && a !== "-w");
+    const watch2 = args2.includes("--watch") || args2.includes("-w");
+    const ddIdx = args2.indexOf("--");
+    const extraArgs = ddIdx >= 0 ? args2.slice(ddIdx + 1) : args2.slice(2).filter((a) => a !== "--watch" && a !== "-w");
     cmdRun(filePath, watch2, extraArgs);
     break;
   }
   case "check": {
-    const filePath = args[1];
+    const filePath = args2[1];
     if (!filePath) {
       printUsage();
       process.exit(1);
@@ -36491,23 +36565,23 @@ switch (cmd) {
     break;
   }
   case "compile": {
-    if (args.length < 2) {
+    if (args2.length < 2) {
       printUsage();
       process.exit(1);
     }
-    cmdCompile(args.slice(1));
+    cmdCompile(args2.slice(1));
     break;
   }
   case "codegen": {
-    if (args.length < 2) {
+    if (args2.length < 2) {
       printUsage();
       process.exit(1);
     }
-    cmdCodegen(args.slice(1));
+    cmdCodegen(args2.slice(1));
     break;
   }
   case "fmt": {
-    cmdFmt(args.slice(1));
+    cmdFmt(args2.slice(1));
     break;
   }
   case "repl":
@@ -36515,7 +36589,7 @@ switch (cmd) {
     break;
   case "fn-doc":
   case "fl-doc": {
-    const query = args[1];
+    const query = args2[1];
     if (!query) {
       console.error("Usage: freelang fn-doc <name>");
       console.error("       (name can be exact or partial)");
@@ -36525,22 +36599,22 @@ switch (cmd) {
     break;
   }
   case "debug": {
-    const filePath = args[1];
+    const filePath = args2[1];
     if (!filePath) {
       printUsage();
       process.exit(1);
     }
-    const stepMode = args.includes("--step");
+    const stepMode = args2.includes("--step");
     cmdDebug(filePath, stepMode);
     break;
   }
   case "watch": {
-    const filePath = args[1];
+    const filePath = args2[1];
     if (!filePath) {
       printUsage();
       process.exit(1);
     }
-    const noClear = args.includes("--no-clear");
+    const noClear = args2.includes("--no-clear");
     console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path15.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
     runWithWatch(filePath, {
       clearConsole: !noClear,
@@ -36552,34 +36626,34 @@ switch (cmd) {
     break;
   }
   case "ci": {
-    cmdCi(args.slice(1)).catch((err4) => {
+    cmdCi(args2.slice(1)).catch((err4) => {
       console.error(`\x1B[31m[CI \uC624\uB958]\x1B[0m  ${err4.message}`);
       process.exit(1);
     });
     break;
   }
   case "doc": {
-    cmdDoc(args.slice(1));
+    cmdDoc(args2.slice(1));
     break;
   }
   case "build": {
-    cmdBuild(args.slice(1));
+    cmdBuild(args2.slice(1));
     break;
   }
   case "registry": {
-    cmdRegistry(args.slice(1));
+    cmdRegistry(args2.slice(1));
     break;
   }
   case "install": {
-    cmdInstall(args.slice(1));
+    cmdInstall(args2.slice(1));
     break;
   }
   case "publish": {
-    cmdPublish(args.slice(1));
+    cmdPublish(args2.slice(1));
     break;
   }
   case "serve": {
-    cmdServe(args.slice(1));
+    cmdServe(args2.slice(1));
     break;
   }
   case "version":
