@@ -19202,10 +19202,12 @@ function evalImportFromFile(interp2, relPath, prefix, selective, alias) {
   if (!absPath) {
     throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
   }
-  if (interp2.importedFiles.has(absPath)) {
+  const effectivePrefix2 = alias ?? prefix;
+  const importKey = `${absPath}::${effectivePrefix2}`;
+  if (interp2.importedFiles.has(importKey)) {
     return;
   }
-  interp2.importedFiles.add(absPath);
+  interp2.importedFiles.add(importKey);
   const src = fs3.readFileSync(absPath, "utf-8");
   const subInterp = new Interpreter();
   subInterp.currentFilePath = absPath;
@@ -19219,15 +19221,14 @@ function evalImportFromFile(interp2, relPath, prefix, selective, alias) {
     }
     console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
   }
-  const effectivePrefix = alias ?? prefix;
   for (const [funcName, func] of subInterp.context.functions) {
     if (builtinFuncs.has(funcName)) continue;
     if (selective && selective.length > 0) {
       if (selective.includes(funcName)) {
-        interp2.context.functions.set(funcName, func);
+        interp2.context.functions.set(`${effectivePrefix2}:${funcName}`, func);
       }
     } else {
-      interp2.context.functions.set(`${effectivePrefix}:${funcName}`, func);
+      interp2.context.functions.set(`${effectivePrefix2}:${funcName}`, func);
     }
   }
 }
