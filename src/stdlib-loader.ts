@@ -134,15 +134,26 @@ export function loadAllStdlib(interp: InterpreterLike): void {
 
   // 네이밍 alias: 자주 쓰는 함수들의 대체 이름
   const _aliases: Record<string, (...a: any[]) => any> = {
+    // 숫자 변환
     "mod":           (a: number, b: number) => a % b,
+    "number":        (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "to-number":     (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "to_number":     (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "parse-int":     (v: any, radix?: number) => { const n = parseInt(v, radix ?? 10); return isNaN(n) ? null : n; },
+    "parse_int":     (v: any, radix?: number) => { const n = parseInt(v, radix ?? 10); return isNaN(n) ? null : n; },
+    "parse-float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
+    "parse_float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
+    "number?":       (v: any) => typeof v === "number" && !isNaN(v),
+    // 문자열 포함
     "str-contains?": (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str-contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
-    "includes?":     (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
-    "number":        (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
-    "parse-int":     (v: any, radix?: number) => { const n = parseInt(v, radix ?? 10); return isNaN(n) ? null : n; },
-    "parse-float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
-    "to-number":     (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
-    "number?":       (v: any) => typeof v === "number" && !isNaN(v),
+    "str_contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "includes?":     (s: string, sub: string) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? (s as any[]).includes(sub) : false,
+    // crypto 별칭 (kebab ↔ snake)
+    "hash-sha256":   (v: string) => require("crypto").createHash("sha256").update(v, "utf8").digest("hex"),
+    "hmac-sha256":   (key: string, msg: string) => require("crypto").createHmac("sha256", key).update(msg, "utf8").digest("hex"),
+    "hash_md5":      (v: string) => require("crypto").createHash("md5").update(v, "utf8").digest("hex"),
+    "hash-md5":      (v: string) => require("crypto").createHash("md5").update(v, "utf8").digest("hex"),
   };
   for (const [name, fn] of Object.entries(_aliases)) {
     if (!interp.context.functions.has(name)) {

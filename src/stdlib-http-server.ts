@@ -576,6 +576,26 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       };
     },
 
+    // server_header response key value -> response (헤더 추가)
+    "server_header": (response: Record<string, any>, key: string, value: string): Record<string, any> => {
+      const existing = response.headers || {};
+      return { ...response, headers: { ...existing, [key]: value } };
+    },
+
+    // server_options response -> 204 No Content (CORS preflight 응답)
+    "server_options": (allowMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"): Record<string, any> => {
+      return {
+        __fl_response: true,
+        status: 204,
+        contentType: "text/plain",
+        body: "",
+        headers: {
+          "Access-Control-Allow-Methods": allowMethods,
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      };
+    },
+
     // server_req_cookie req name -> string | null (쿠키 값 읽기)
     "server_req_cookie": (req: Request, name: string): string | null => {
       const cookieHeader = req.headers["cookie"] as string;
