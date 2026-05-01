@@ -53,6 +53,7 @@ import { createFeedModule } from "./stdlib-feed";          // Q2-2/3/4: RSS/Atom
 import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관련글/검색인덱스/페이지네이션
 import { createCloudModule } from "./stdlib-cloud";        // Phase 58: Cloud (AWS/GCP/Azure)
 import { createMatrixModule } from "./stdlib-matrix";      // Phase 99: Matrix/Vector + Parallel for GPT training
+import { createAuditModule } from "./stdlib-audit";        // audit_log: 서비스 감사 로그 전송
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -131,6 +132,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createBlogModule());       // Q2-5: blog_all_tags, blog_posts_by_tag, blog_tag_counts, blog_related, blog_search_index, blog_search, blog_posts_sorted, blog_paginate
   interp.registerModule(createCloudModule());      // Phase 58: aws-s3-*, aws-lambda-*, gcp-run-*, azure-function-*
   interp.registerModule(createMatrixModule());     // Phase 99: matrix_mul, vector_dot, vector_add, vector_scale, parallel_map for GPT
+  interp.registerModule(createAuditModule());      // audit_log / audit_log_custom / audit_log_ok?
 
   // 네이밍 alias: 자주 쓰는 함수들의 대체 이름
   const _aliases: Record<string, (...a: any[]) => any> = {

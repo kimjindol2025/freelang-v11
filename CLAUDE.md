@@ -16,6 +16,28 @@
 
 ---
 
+## 📋 Audit Log
+
+```fl
+;; 환경변수 필수: AUDIT_URL, AUDIT_SERVICE_KEY
+;; 실패해도 nil 반환 — 본 작업 차단 없음
+
+;; 기본
+(audit_log "akl-accounting" $actor-id "create" "invoice/INV-001" "청구서 생성")
+
+;; actorId 없으면 serviceId로 자동 대체
+(audit_log "akl-accounting" nil "delete" "user/42" "사용자 삭제")
+
+;; 추가 필드 포함
+(audit_log_custom "akl-accounting" $actor-id "update" "invoice/1"
+                  "금액 수정" {:before 1000 :after 2000})
+
+;; 결과 확인 (선택)
+(if (audit_log_ok? (audit_log ...)) (println "기록됨") (println "실패"))
+```
+
+---
+
 ## ⚠️ 자주 틀리는 것 TOP 20 (먼저 읽기)
 
 > 전체 목록: `docs/MISTAKES-100.md` 참고
