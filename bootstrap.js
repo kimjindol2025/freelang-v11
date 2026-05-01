@@ -25100,6 +25100,66 @@ function _fl_shell_capture(cmd) {
   }
 }
 
+// \u2500 \uBB38\uC790\uC5F4 \uCD94\uAC00 \u2500
+function str_index_of(s, sub) { return (typeof s === 'string' && typeof sub === 'string') ? s.indexOf(sub) : -1; }
+function index_of(s, sub) { return str_index_of(s, sub); }
+function str_slice(s, a, b) { return s ? (b === undefined ? s.slice(a) : s.slice(a, b)) : ""; }
+function trim(s) { return String(s || "").trim(); }
+function split(s, sep) { return String(s || "").split(sep); }
+function str_join(arr, sep) { return (arr || []).join(sep === undefined ? "" : sep); }
+function join(arr, sep) { return str_join(arr, sep); }
+function replace(s, old_val, new_val) { if (s == null) return ""; const str = String(s); if (old_val instanceof RegExp) return str.replace(old_val, new_val == null ? "" : String(new_val)); return str.split(String(old_val)).join(new_val == null ? "" : String(new_val)); }
+function str_replace(s, old_val, new_val) { return replace(s, old_val, new_val); }
+function upper_case(s) { return String(s || "").toUpperCase(); }
+function lower_case(s) { return String(s || "").toLowerCase(); }
+function starts_with_q(s, prefix) { return String(s || "").startsWith(String(prefix || "")); }
+function ends_with_q(s, suffix) { return String(s || "").endsWith(String(suffix || "")); }
+function char_at(s, i) { return (s && s[i]) || null; }
+function substring(s, a, b) { return s ? (b === undefined ? s.slice(a) : s.slice(a, b)) : ""; }
+function number_q(v) { return typeof v === 'number'; }
+function string_q(v) { return typeof v === 'string'; }
+function not(v) { return !v; }
+function range(start, end_val) { const result = []; for (let i = start; i < end_val; i++) result.push(i); return result; }
+function concat(a, b) { return (Array.isArray(a) && Array.isArray(b)) ? [...a, ...b] : String(a||"") + String(b||""); }
+function error(msg) { throw new Error(String(msg)); }
+function now_ms() { return Date.now(); }
+function shell_exec(cmd, input_val) { try { const {execSync} = require("child_process"); const opts = {encoding: "utf8"}; if (input_val) opts.input = input_val; return execSync(cmd, opts); } catch(e) { return ""; } }
+function json_parse(s) { try { return JSON.parse(s); } catch(e) { return null; } }
+function json_stringify(v) { return JSON.stringify(v); }
+function cli_args() { return _fl_get_argv(); }
+function map_entries(m) { return m instanceof Map ? [...m.entries()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.entries(m) : []); }
+function map_keys(m) { return m instanceof Map ? [...m.keys()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m) : []); }
+function map_values(m) { return m instanceof Map ? [...m.values()] : (m && typeof m === 'object' && !Array.isArray(m) ? Object.values(m) : []); }
+function array_q(v) { return Array.isArray(v); }
+function null_q(v) { return v === null || v === undefined; }
+function string_contains_q(s, sub) { return str_index_of(s, sub) !== -1; }
+function char_code_at(s, i) { return typeof s === 'string' ? s.charCodeAt(i) : 0; }
+function abs(n) { return Math.abs(n); }
+function floor(n) { return Math.floor(n); }
+function ceil_val(n) { return Math.ceil(n); }
+function round(n) { return Math.round(n); }
+function max_val(a, b) { return a > b ? a : b; }
+function min_val(a, b) { return a < b ? a : b; }
+function push(arr, val) { return [...(arr || []), val]; }
+function pop(arr) { return (arr && arr.length > 0) ? arr.slice(0, -1) : []; }
+function reverse(arr) { return Array.isArray(arr) ? [...arr].reverse() : arr; }
+function sort(arr) { return Array.isArray(arr) ? [...arr].sort() : arr; }
+function sort_by(arr, fn) { return Array.isArray(arr) ? [...arr].sort((a, b) => fn(a) < fn(b) ? -1 : fn(a) > fn(b) ? 1 : 0) : arr; }
+function flat_map(arr, fn) { return (arr || []).flatMap(fn); }
+function some_q(f, l) { return (l || []).some(x => f(x)); }
+function every_q(f, l) { return (l || []).every(x => f(x)); }
+function get(o, k) { return _fl_get(o, k); }
+function keys(o) { return _fl_keys(o); }
+function has_key_q(o, k) { return _fl_has_key_q(o, k); }
+function merge(a, b) { return Object.assign({}, a, b); }
+function assoc(o, k, v) { const res = Object.assign({}, o); const key = typeof k === 'string' && k.startsWith(':') ? k.slice(1) : String(k); res[key] = v; return res; }
+function dissoc(o, k) { const res = Object.assign({}, o); const key = typeof k === 'string' && k.startsWith(':') ? k.slice(1) : String(k); delete res[key]; return res; }
+function file_read(p) { return _fl_file_read(p); }
+function file_write(p, c) { return _fl_file_write(p, c); }
+function file_exists_q(p) { return _fl_file_exists(p); }
+function print(v) { return _fl_print(v); }
+function println(v) { console.log(v == null ? "" : String(v)); return v; }
+
 // \u2500 \uAE30\uD0C0 \u2500
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 
@@ -25345,6 +25405,7 @@ ${exportsStr}
         return "null";
       }
       const cleanName = String(node.value).replace(/^\$/, "");
+      if (/^-\d+(\.\d+)?$/.test(cleanName)) return cleanName;
       return flNameToJs(cleanName);
     } else {
       return String(node.value);
@@ -25551,7 +25612,7 @@ ${exportsStr}
   genMapBlock(node) {
     const pairs = [];
     node.fields.forEach((val, key) => {
-      if (key === "items" && node.type === "Map") return;
+
       const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
       pairs.push(jsKey + ": " + this.genNode(val));
     });
