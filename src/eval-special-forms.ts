@@ -218,6 +218,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // ── set! ──────────────────────────────────────────────────────────
   if (op === "set!") {
     if (expr.args.length < 2) throwArgCount("set!", ">=2", expr.args.length, expr.line);
+    console.warn(`⚠️  [FreeLang] set! is deprecated (line ${expr.line ?? "?"}). Use (atom) + (swap! / reset!) instead.`);
     const nameNode = expr.args[0];
 
     // (set! (get $obj "key") value) — map/array 프로퍼티 뮤테이션
