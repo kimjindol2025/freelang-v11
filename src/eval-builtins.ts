@@ -265,10 +265,12 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "floor": return Math.floor(v0);
     case "ceil": return Math.ceil(v0);
     case "round": return Math.round(v0);
+    case "math-abs": case "math_abs":
     case "abs": return Math.abs(v0);
     case "max": return Math.max(...vals.filter((v: any) => typeof v === "number"));
     case "min": return Math.min(...vals.filter((v: any) => typeof v === "number"));
     case "pow": return Math.pow(v0, v1);
+    case "math-sqrt": case "math_sqrt":
     case "sqrt": return Math.sqrt(v0);
     case "mod": return v0 % v1;
     case "closure?": return v0 !== null && v0 !== undefined && typeof v0 === "object" && v0.kind === "closure";
@@ -1416,11 +1418,15 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
       return finalEnv;
     }
-    case "assoc":
-      if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
-        return { ...args[0], [args[1]]: args[2] };
+    case "assoc": {
+      let base = (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]))
+        ? { ...args[0] } : {};
+      // 멀티 쌍: (assoc map k1 v1 k2 v2 ...)
+      for (let i = 1; i + 1 < args.length; i += 2) {
+        base[args[i]] = args[i + 1];
       }
-      return { [args[1]]: args[2] };
+      return base;
+    }
     case "dissoc": {
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
         const { [args[1]]: _, ...rest } = args[0];
@@ -1473,6 +1479,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return Boolean(args[0]);
 
     // Math Functions
+    case "math-abs": case "math_abs":
     case "abs":
       return Math.abs(args[0]);
     case "min":
@@ -1485,6 +1492,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return Math.ceil(args[0]);
     case "round":
       return Math.round(args[0]);
+    case "math-sqrt": case "math_sqrt":
     case "sqrt":
       return Math.sqrt(args[0]);
     case "pow":
