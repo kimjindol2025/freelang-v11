@@ -18,29 +18,47 @@
 
 ---
 
-## ⚠️ 자주 틀리는 것 (먼저 읽기)
+## ⚠️ 자주 틀리는 것 TOP 20 (먼저 읽기)
+
+> 전체 목록: `docs/MISTAKES-100.md` 참고
 
 ```fl
-;; ❌ → ✅
-(map [1 2 3] fn)        → (map fn [1 2 3])          ;; fn 먼저
-(reduce arr init fn)    → (reduce fn init arr)      ;; fn 먼저
-(filter arr fn)         → (filter fn arr)           ;; fn 먼저
-;; ✅ snake_case ↔ kebab-case 양방향 모두 동작 (snake_case 권장)
-;; (file_read) = (file-read), (str_to_num) = (str-to-num)
-(json_keys m)           → (keys m)                  ;; 의미 중심 이름
-(server_listen 3000)    → (server_start 3000)
-;; 웹서버 버전 선택: 내부 API → server_* 직접 / 외부 노출 → (load "src/express.fl")
-{a 1}                   → {:a 1}                    ;; 키워드 필수
-(= x null)              → (nil? x)                  ;; nil? 정상 동작
-(console.log x)         → (println x)
-(str-to-int "42")       → (str-to-num "42")         ;; kebab-case
-(get_env "KEY")         → (shell_env "KEY")         ;; get_env 미구현
-(env "KEY")             → (shell_env "KEY")         ;; env 미구현
-(obj_merge a b)         → (assoc a "k" v)           ;; obj_merge 미구현
-(obj_pick m ["k"])      → (get m "k") 등 직접 처리  ;; obj_pick 미구현
-(obj_omit m ["k"])      → (dissoc m "k")            ;; obj_omit 미구현, dissoc 사용
-(now-ms)                → (now_ms)                  ;; now_ms snake_case
-(mariadb_all db sql p)  → (mariadb_query db sql p)  ;; mariadb_all 미구현
+;; ── 인자 순서 (가장 많이 틀림) ───────────────────────────────────
+(map [1 2 3] fn)        → (map fn [1 2 3])          ;; fn 먼저!
+(filter arr fn)         → (filter fn arr)           ;; fn 먼저!
+(reduce arr init fn)    → (reduce fn init arr)      ;; fn 먼저!
+
+;; ── HTTP 반환값 ───────────────────────────────────────────────────
+(json_parse (http_get url))          → (json_parse (get (http_get url) "body"))
+(http_post url body)                 ;; 반환: {:status N :body "..."} — body 꺼내야 함
+
+;; ── 전역 상태 변경 ───────────────────────────────────────────────
+(define count 0) (set! count 1)     → (define count (atom 0)) (swap! count + 1)
+
+;; ── let 문법 ─────────────────────────────────────────────────────
+(let [x 1 y 2] ...)                 → (let [[$x 1] [$y 2]] ...)
+
+;; ── 함수 선언 (v10 금지) ─────────────────────────────────────────
+[FUNC f :params [x] :body ...]      → (defn f [$x] ...)
+
+;; ── map 키 ───────────────────────────────────────────────────────
+{name "kim"}                        → {:name "kim"}
+(= x null)                          → (nil? x)
+
+;; ── 함수명 오류 ──────────────────────────────────────────────────
+(env "KEY") / (get_env "KEY")       → (shell_env "KEY")
+(server_listen 3000)                → (server_start 3000)
+(str-to-int "42")                   → (str-to-num "42")
+(console.log x)                     → (println x)
+(json_keys m)                       → (keys m)
+(now-ms)                            → (now_ms)
+(mariadb_all db sql p)              → (mariadb_query db sql p)
+(obj_merge a b)                     → 미구현 — (assoc a "k" v) 직접
+(obj_omit m ["k"])                  → (dissoc m "k")
+
+;; ── 웹서버 버전 선택 ─────────────────────────────────────────────
+;; 내부 API → server_* 직접 / 외부 노출 API → (load "src/express.fl")
+;; 혼용 금지: express.fl 로드 후 server_get 사용 ❌
 ```
 
 ---
