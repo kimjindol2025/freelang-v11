@@ -32,14 +32,7 @@ export function createTimerModule(interpreter: any) {
         // Create a wrapper that calls the FreeLang function
         const callback = () => {
           try {
-            // Look up and call the function from the interpreter environment
-            const fn = interpreter.env?.get(fnName);
-            if (typeof fn === "function") {
-              fn();
-            } else {
-              console.warn(`set_interval: function '${fnName}' not found or not callable`);
-              // Don't clear the interval, let user code handle it
-            }
+            interpreter.callUserFunction(fnName, []);
           } catch (err: any) {
             console.error(`set_interval callback error for '${fnName}':`, err.message);
           }
@@ -83,12 +76,7 @@ export function createTimerModule(interpreter: any) {
         // Create a wrapper that calls the FreeLang function once
         const callback = () => {
           try {
-            const fn = interpreter.env?.get(fnName);
-            if (typeof fn === "function") {
-              fn();
-            } else {
-              console.warn(`set_timeout: function '${fnName}' not found or not callable`);
-            }
+            interpreter.callUserFunction(fnName, []);
           } catch (err: any) {
             console.error(`set_timeout callback error for '${fnName}':`, err.message);
           }

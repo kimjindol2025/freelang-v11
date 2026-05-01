@@ -110,6 +110,9 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "str-contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str_contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?":     (s: string, sub: string) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? (s as any[]).includes(sub) : false,
+    // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
+    "inc":           (n: number) => (typeof n === "number" ? n + 1 : Number(n) + 1),
+    "dec":           (n: number) => (typeof n === "number" ? n - 1 : Number(n) - 1),
     // crypto 별칭 (kebab ↔ snake)
     "hash-sha256":   (v: string) => createHash("sha256").update(v, "utf8").digest("hex"),
     "hmac-sha256":   (key: string, msg: string) => createHmac("sha256", key).update(msg, "utf8").digest("hex"),

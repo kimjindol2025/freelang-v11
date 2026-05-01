@@ -605,7 +605,14 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   const ev = (node: any) => (interp as any).eval(node);
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
   const callUser = (name: string, a: any[]) => (interp as any).callUserFunction(name, a);
-  const callFnVal = (fn: any, a: any[]) => (interp as any).callFunctionValue(fn, a);
+  const callFnVal = (fn: any, a: any[]) => {
+    if (typeof fn === "string") return (interp as any).callUserFunction(fn, a);
+    if (fn?.kind === "function-value" || fn?.kind === "async-function-value") return (interp as any).callFunctionValue(fn, a);
+    if (typeof fn?.body === "function") return fn.body(...a);  // native stdlib (inc, dec 등)
+    if (fn?.params !== undefined && fn?.body !== undefined) return (interp as any).callUserFunction(fn.name ?? fn.id, a);
+    if (typeof fn === "function") return fn(...a);
+    return (interp as any).callFunctionValue(fn, a);
+  };
   const toDisplay = (val: any) => (interp as any).toDisplayString(val);
 
   switch (normalizedOp) {
