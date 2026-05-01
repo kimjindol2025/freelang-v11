@@ -11236,8 +11236,13 @@ function flExecOpNative(op, vals) {
       return vals.length === 1 ? 1 / v0 : vals.reduce((a, b) => a / b);
     case "%":
       return v0 % v1;
-    case "=":
+    case "=": {
+      const n0 = v0 === null || v0 === void 0;
+      const n1 = v1 === null || v1 === void 0;
+      if (n0 && n1) return true;
+      if (n0 || n1) return false;
       return v0 === v1;
+    }
     case "!=":
       return v0 !== v1;
     case "<":
@@ -19591,9 +19596,9 @@ function createTimerModule(interpreter) {
         const timerId = nextTimerId++;
         const callback = () => {
           try {
-            const fn = interpreter.env?.get(fnName);
-            if (typeof fn === "function") {
-              fn();
+            const fn = interpreter.context?.functions?.get(fnName);
+            if (fn !== undefined && fn !== null) {
+              interpreter.callFunction(fn, []);
             } else {
               console.warn(`set_interval: function '${fnName}' not found or not callable`);
             }
