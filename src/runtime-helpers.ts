@@ -1,11 +1,38 @@
-// FreeLang v11 Runtime Helpers
-// 자가 호스팅 및 런타임 실행을 위한 필수 JS 함수들
+/**
+ * src/runtime-helpers.ts
+ *
+ * Runtime helper functions for FreeLang
+ * Extracted and enhanced for self-hosting L2 Fixpoint
+ */
 
+/**
+ * 런타임 헬퍼 함수 프리앰블 생성
+ * Stage1.js 최상단에 주입되어 JavaScript 코드 실행 지원
+ */
 export function generateRuntimePreamble(): string {
   return `
 // ═══════════════════════════════════════════════════════
-// FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
+// FreeLang v11 Runtime Helpers (Enhanced 2026-04-30)
 // ═══════════════════════════════════════════════════════
+
+// ─ 산술 및 논리 연산자 (stdlib) ─
+function _plus(...args) { if (args.length === 0) return 0; if (args.length === 1) return args[0]; return args.reduce((a, b) => a + b); }
+function _minus(...args) { if (args.length === 0) return 0; if (args.length === 1) return -args[0]; return args.reduce((a, b) => a - b); }
+function _star(...args) { if (args.length === 0) return 1; if (args.length === 1) return args[0]; return args.reduce((a, b) => a * b); }
+function _slash(...args) { if (args.length === 0) return 1; if (args.length === 1) return 1/args[0]; return args.reduce((a, b) => a / b); }
+function _gt(a, b) { return a > b; }
+function _lt(a, b) { return a < b; }
+function _eq(a, b) { return a === b; }
+function _gt_eq(a, b) { return a >= b; }
+function _lt_eq(a, b) { return a <= b; }
+function _not(a) { return !a; }
+function _and(...args) { for(let a of args) if(!a) return false; return args.length > 0 ? args[args.length-1] : true; }
+function _or(...args) { for(let a of args) if(a) return a; return false; }
+function _concat(...args) { 
+  if (args.length === 0) return "";
+  if (Array.isArray(args[0])) return [].concat(...args);
+  return args.join("");
+}
 
 // ─ 타입 체크 ─
 function _fl_null_q(v) { return v === null || v === undefined; }
@@ -30,14 +57,12 @@ function _fl_get(obj, key, dflt) {
   if (Array.isArray(obj)) {
     if (typeof key === "number") return obj[key] !== undefined ? obj[key] : (dflt || null);
     if (k === "length") return obj.length;
-    // 인덱스가 숫자가 아닐 때 (문자열로 들어온 경우) 처리
     let idx = parseInt(k);
     if (!isNaN(idx)) return obj[idx] !== undefined ? obj[idx] : (dflt || null);
   }
   
   if (typeof obj === "object") {
     if (obj[k] !== undefined) return obj[k];
-    // 혹시라도 콜론이 포함된 키로 저장되어 있을 경우 대비
     if (obj[":" + k] !== undefined) return obj[":" + k];
   }
   return dflt || null;
@@ -100,3 +125,15 @@ let __argv__ = _fl_get_argv();
 `.trim();
 }
 
+/**
+ * 헬퍼 함수 목록
+ */
+export const HELPER_FUNCTIONS = [
+  '_plus', '_minus', '_star', '_slash', '_gt', '_lt', '_eq', '_gt_eq', '_lt_eq', '_not', '_and', '_or', '_concat',
+  '_fl_null_q', '_fl_true_q', '_fl_false_q', '_fl_number_q', '_fl_string_q', '_fl_list_q', '_fl_array_q', '_fl_map_q', '_fl_fn_q',
+  '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
+  '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
+  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture'
+];
+
+export const HELPER_COUNT = HELPER_FUNCTIONS.length;

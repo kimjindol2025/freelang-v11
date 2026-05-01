@@ -25047,8 +25047,27 @@ init_parser();
 function generateRuntimePreamble() {
   return `
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-// FreeLang v11 Runtime Helpers (auto-generated 2026-04-29)
+// FreeLang v11 Runtime Helpers (Enhanced 2026-04-30)
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+
+// \u2500 \uC0B0\uC220 \uBC0F \uB17C\uB9AC \uC5F0\uC0B0\uC790 (stdlib) \u2500
+function _plus(...args) { if (args.length === 0) return 0; if (args.length === 1) return args[0]; return args.reduce((a, b) => a + b); }
+function _minus(...args) { if (args.length === 0) return 0; if (args.length === 1) return -args[0]; return args.reduce((a, b) => a - b); }
+function _star(...args) { if (args.length === 0) return 1; if (args.length === 1) return args[0]; return args.reduce((a, b) => a * b); }
+function _slash(...args) { if (args.length === 0) return 1; if (args.length === 1) return 1/args[0]; return args.reduce((a, b) => a / b); }
+function _gt(a, b) { return a > b; }
+function _lt(a, b) { return a < b; }
+function _eq(a, b) { return a === b; }
+function _gt_eq(a, b) { return a >= b; }
+function _lt_eq(a, b) { return a <= b; }
+function _not(a) { return !a; }
+function _and(...args) { for(let a of args) if(!a) return false; return args.length > 0 ? args[args.length-1] : true; }
+function _or(...args) { for(let a of args) if(a) return a; return false; }
+function _concat(...args) { 
+  if (args.length === 0) return "";
+  if (Array.isArray(args[0])) return [].concat(...args);
+  return args.join("");
+}
 
 // \u2500 \uD0C0\uC785 \uCCB4\uD06C \u2500
 function _fl_null_q(v) { return v === null || v === undefined; }
@@ -25073,14 +25092,12 @@ function _fl_get(obj, key, dflt) {
   if (Array.isArray(obj)) {
     if (typeof key === "number") return obj[key] !== undefined ? obj[key] : (dflt || null);
     if (k === "length") return obj.length;
-    // \uC778\uB371\uC2A4\uAC00 \uC22B\uC790\uAC00 \uC544\uB2D0 \uB54C (\uBB38\uC790\uC5F4\uB85C \uB4E4\uC5B4\uC628 \uACBD\uC6B0) \uCC98\uB9AC
     let idx = parseInt(k);
     if (!isNaN(idx)) return obj[idx] !== undefined ? obj[idx] : (dflt || null);
   }
   
   if (typeof obj === "object") {
     if (obj[k] !== undefined) return obj[k];
-    // \uD639\uC2DC\uB77C\uB3C4 \uCF5C\uB860\uC774 \uD3EC\uD568\uB41C \uD0A4\uB85C \uC800\uC7A5\uB418\uC5B4 \uC788\uC744 \uACBD\uC6B0 \uB300\uBE44
     if (obj[":" + k] !== undefined) return obj[":" + k];
   }
   return dflt || null;
@@ -25142,6 +25159,65 @@ let __argv__ = _fl_get_argv();
 // \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 `.trim();
 }
+var HELPER_FUNCTIONS = [
+  "_plus",
+  "_minus",
+  "_star",
+  "_slash",
+  "_gt",
+  "_lt",
+  "_eq",
+  "_gt_eq",
+  "_lt_eq",
+  "_not",
+  "_and",
+  "_or",
+  "_concat",
+  "_fl_null_q",
+  "_fl_true_q",
+  "_fl_false_q",
+  "_fl_number_q",
+  "_fl_string_q",
+  "_fl_list_q",
+  "_fl_array_q",
+  "_fl_map_q",
+  "_fl_fn_q",
+  "_fl_length",
+  "_fl_get",
+  "_fl_first",
+  "_fl_last",
+  "_fl_rest",
+  "_fl_append",
+  "_fl_keys",
+  "_fl_values",
+  "_fl_entries",
+  "_fl_map_set",
+  "_fl_has_key_q",
+  "_fl_str",
+  "_fl_char_at",
+  "_fl_substring",
+  "_fl_lower",
+  "_fl_upper",
+  "_fl_trim",
+  "_fl_replace",
+  "_fl_str_index_of",
+  "_fl_contains_q",
+  "_fl_join",
+  "_fl_split",
+  "_fl_repeat",
+  "_fl_range",
+  "_fl_map",
+  "_fl_filter",
+  "_fl_reduce",
+  "_fl_slice",
+  "_fl_print",
+  "_fl_get_argv",
+  "_fl_file_read",
+  "_fl_file_write",
+  "_fl_file_exists",
+  "_fl_shell_capture"
+];
+var HELPER_COUNT = HELPER_FUNCTIONS.length;
 
 // src/codegen-js.ts
 var DEFAULT_OPTIONS = {
