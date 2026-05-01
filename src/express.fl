@@ -1,91 +1,92 @@
-; ════════════════════════════════════════════════════════════════
-; FreeLang v11: Simple HTTP Echo Server (데모용)
-; Phase D: Express.fl → 최소 기능 유지
-; ════════════════════════════════════════════════════════════════
+;; ════════════════════════════════════════════════════════════════
+;; FreeLang v11: Express.fl — HTTP 서버 래퍼 (무거운 버전 코어)
+;; ════════════════════════════════════════════════════════════════
 
-; ─────────────────────────────────────────────────────────────────
-; 1. 응답 헬퍼 (기본만)
-; ─────────────────────────────────────────────────────────────────
+;; ─────────────────────────────────────────────────────────────────
+;; 1. 응답 헬퍼
+;; ─────────────────────────────────────────────────────────────────
 
-[FUNC res-json :params [obj]
-  :body (server_json obj)
-]
+(defn res-json [$obj]
+  (server_json $obj))
 
-[FUNC res-send :params [text]
-  :body (server_text text)
-]
+(defn res-send [$text]
+  (server_text $text))
 
-[FUNC res-status :params [code body]
-  :body (server_status code body)
-]
+(defn res-status [$code $body]
+  (server_status $code $body))
 
-; ─────────────────────────────────────────────────────────────────
-; 2. 요청 헬퍼 (기본만)
-; ─────────────────────────────────────────────────────────────────
+;; ─────────────────────────────────────────────────────────────────
+;; 2. 요청 헬퍼
+;; ─────────────────────────────────────────────────────────────────
 
-[FUNC req-path :params [req]
-  :body (server_req_path req)
-]
+(defn req-path [$req]
+  (server_req_path $req))
 
-[FUNC req-method :params [req]
-  :body (server_req_method req)
-]
+(defn req-method [$req]
+  (server_req_method $req))
 
-[FUNC req-body :params [req]
-  :body (let [raw (server_req_body req)]
-    (if (or (= raw "") (nil? raw))
+(defn req-body [$req]
+  (let [[$raw (server_req_body $req)]]
+    (if (or (= $raw "") (nil? $raw))
       {}
-      (json-parse raw)))
-]
+      (json_parse $raw))))
 
-; ─────────────────────────────────────────────────────────────────
-; 3. 기본 라우팅
-; ─────────────────────────────────────────────────────────────────
+(defn req-param [$req $key]
+  (server_req_param $req $key))
 
-[FUNC app-get :params [path handler-name]
-  :body (server_get path handler-name)
-]
+(defn req-query [$req $key]
+  (server_req_query $req $key))
 
-[FUNC app-post :params [path handler-name]
-  :body (server_post path handler-name)
-]
+(defn req-header [$req $name]
+  (server_req_header $req $name))
 
-; ─────────────────────────────────────────────────────────────────
-; 4. 서버 시작
-; ─────────────────────────────────────────────────────────────────
+;; ─────────────────────────────────────────────────────────────────
+;; 3. 라우팅
+;; ─────────────────────────────────────────────────────────────────
 
-[FUNC app-listen :params [port]
-  :body (do
-    (println (str "🚀 HTTP Echo Server started on port " port))
-    (server_start port)
-  )
-]
+(defn app-get [$path $handler]
+  (server_get $path $handler))
 
-; ─────────────────────────────────────────────────────────────────
-; 5. 간단한 에코 핸들러 예제
-; ─────────────────────────────────────────────────────────────────
+(defn app-post [$path $handler]
+  (server_post $path $handler))
 
-[FUNC echo-handler :params [req]
-  :body (let [
-    [path (req-path req)]
-    [method (req-method req)]
-  ] (res-json {
-    :method method
-    :path path
-    :timestamp (now_ms)
-    :message "Echo server is running"
-  }))
-]
+(defn app-put [$path $handler]
+  (server_put $path $handler))
 
-; ─────────────────────────────────────────────────────────────────
-; 6. 헬스체크 핸들러
-; ─────────────────────────────────────────────────────────────────
+(defn app-delete [$path $handler]
+  (server_delete $path $handler))
 
-[FUNC health-handler :params [req]
-  :body (res-json {
-    :status "ok"
-    :uptime (now_ms)
-  })
-]
+;; ─────────────────────────────────────────────────────────────────
+;; 4. 로깅
+;; ─────────────────────────────────────────────────────────────────
 
-(println "✓ Simple HTTP Echo Server loaded")
+(defn log-info [$msg]
+  (println (str "[INFO] " $msg)))
+
+(defn log-error [$msg]
+  (println (str "[ERROR] " $msg)))
+
+;; ─────────────────────────────────────────────────────────────────
+;; 5. 서버 시작
+;; ─────────────────────────────────────────────────────────────────
+
+(defn app-listen [$port]
+  (do
+    (println (str "🚀 Express.fl started on port " $port))
+    (server_start $port)))
+
+;; ─────────────────────────────────────────────────────────────────
+;; 6. 기본 핸들러 예제
+;; ─────────────────────────────────────────────────────────────────
+
+(defn echo-handler [$req]
+  (res-json {:method    (req-method $req)
+             :path      (req-path $req)
+             :timestamp (now_ms)
+             :message   "Echo server is running"}))
+
+(defn health-handler [$req]
+  (res-json {:status "ok"
+             :uptime (now_ms)}))
+
+(println "✓ Express.fl v11 loaded")

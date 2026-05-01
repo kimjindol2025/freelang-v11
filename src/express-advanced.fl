@@ -1,98 +1,78 @@
 ;; ============================================
-;; Express.fl 고급 예제 — 간소화 버전
+;; Express.fl 고급 예제 — DB CRUD (v11)
 ;; ============================================
-;; 에러 핸들링, 미들웨어, 데이터베이스 포함
-;; 실행: node bootstrap.js run express-advanced.fl
+;; 에러 핸들링, SQLite DB 포함
+;; 실행: node bootstrap.js run src/express-advanced.fl
 
 (load "src/express.fl")
 
-;; ============ 데이터베이스 초기화 ============
+;; ── DB 초기화 ────────────────────────────────────────────────────
 
 (db_create "./users.db" "
   CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name  TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE
   )
 ")
-
 (println "✅ DB 준비됨")
 
-;; ============ 핸들러 함수들 ============
+;; ── 핸들러 ──────────────────────────────────────────────────────
 
-[FUNC list-users :params [req]
-  :body (let [rows (db_query "./users.db"
-    "SELECT id, name, email FROM users" [])]
-    (res-json { :success true :count 0 :data rows }))
-]
+(defn list-users [$req]
+  (let [[$rows (db_query "./users.db" "SELECT id, name, email FROM users" [])]]
+    (res-json {:success true :count (length $rows) :data $rows})))
 
-[FUNC get-user :params [req]
-  :body (let [
-    id (req-param req "id")
-    result (db_query "./users.db"
-      "SELECT id, name, email FROM users WHERE id = ?" [id])
-  ]
-    (if result
-      (res-json { :success true :data (get result 0) })
-      (res-status 404 { :error "User not found" })))
-]
+(defn get-user [$req]
+  (let [[$id     (req-param $req "id")]
+        [$result (db_query "./users.db"
+                   "SELECT id, name, email FROM users WHERE id = ?" [$id])]]
+    (if (> (length $result) 0)
+      (res-json {:success true :data (get $result 0)})
+      (res-status 404 {:error "User not found"}))))
 
-[FUNC create-user :params [req]
-  :body (let [
-    body (req-body req)
-    name (get body "name")
-    email (get body "email")
-  ]
-    (if (and name email)
+(defn create-user [$req]
+  (let [[$body  (req-body $req)]
+        [$name  (get $body "name")]
+        [$email (get $body "email")]]
+    (if (and $name $email)
       (do
         (db_exec "./users.db"
-          "INSERT INTO users (name, email) VALUES (?, ?)" [name email])
-        (res-status 201 { :success true :message "User created" }))
-      (res-status 400 { :error "name and email required" })))
-]
+          "INSERT INTO users (name, email) VALUES (?, ?)" [$name $email])
+        (res-status 201 {:success true :message "User created"}))
+      (res-status 400 {:error "name and email required"}))))
 
-[FUNC update-user :params [req]
-  :body (let [
-    id (req-param req "id")
-    body (req-body req)
-    name (get body "name")
-  ]
-    (if name
+(defn update-user [$req]
+  (let [[$id   (req-param $req "id")]
+        [$body (req-body $req)]
+        [$name (get $body "name")]]
+    (if $name
       (do
         (db_exec "./users.db"
-          "UPDATE users SET name = ? WHERE id = ?" [name id])
-        (res-json { :success true :message "User updated" }))
-      (res-status 400 { :error "name required" })))
-]
+          "UPDATE users SET name = ? WHERE id = ?" [$name $id])
+        (res-json {:success true :message "User updated"}))
+      (res-status 400 {:error "name required"}))))
 
-[FUNC delete-user :params [req]
-  :body (let [id (req-param req "id")]
+(defn delete-user [$req]
+  (let [[$id (req-param $req "id")]]
     (do
-      (db_exec "./users.db" "DELETE FROM users WHERE id = ?" [id])
-      (res-json { :success true :message "User deleted" })))
-]
+      (db_exec "./users.db" "DELETE FROM users WHERE id = ?" [$id])
+      (res-json {:success true :message "User deleted"}))))
 
-[FUNC health :params [req]
-  :body (res-json {
-    :status "OK"
-    :server "Express.fl (Advanced)"
-    :version "1.1.0"
-  })
-]
+(defn health [$req]
+  (res-json {:status  "OK"
+             :server  "Express.fl Advanced v11"
+             :version "2.0.0"}))
 
-;; ============ 라우트 등록 ============
+;; ── 라우트 등록 ─────────────────────────────────────────────────
 
 (do
   (log-info "라우트 등록 시작")
-
-  (app-get "/health" "health")
-  (app-get "/api/users" "list-users")
-  (app-get "/api/users/:id" "get-user")
-  (app-post "/api/users" "create-user")
-  (app-put "/api/users/:id" "update-user")
-  (app-delete "/api/users/:id" "delete-user")
-
+  (app-get    "/health"          "health")
+  (app-get    "/api/users"       "list-users")
+  (app-get    "/api/users/:id"   "get-user")
+  (app-post   "/api/users"       "create-user")
+  (app-put    "/api/users/:id"   "update-user")
+  (app-delete "/api/users/:id"   "delete-user")
   (log-info "✅ 라우트 등록 완료")
-  (println "")
-  (app-listen 3000)
-)
+  (app-listen 3000))

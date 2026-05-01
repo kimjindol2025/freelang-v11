@@ -1,27 +1,17 @@
-; 간단한 HTTP 에코 서버 데모
-; 실행: node bootstrap.js run echo-server-demo.fl
+;; 간단한 HTTP 에코 서버 데모 (v11)
+;; 실행: node bootstrap.js run src/echo-server-demo.fl
 
 (load "src/express.fl")
 
-; 에코 핸들러
-[FUNC handle-echo :params [req]
-  :body (let [
-    [path (req-path req)]
-    [method (req-method req)]
-  ] (res-json {
-    :echo "Hello from FreeLang!"
-    :method method
-    :path path
-  }))
-]
+(defn handle-echo [$req]
+  (res-json {:echo   "Hello from FreeLang!"
+             :method (req-method $req)
+             :path   (req-path $req)}))
 
-; 헬스 체크
-[FUNC handle-health :params [req]
-  :body (res-json { :status "healthy" })
-]
+(defn handle-health [$req]
+  (res-json {:status "healthy"}))
 
 (do
-  (app-get "/" "handle-echo")
+  (app-get "/"       "handle-echo")
   (app-get "/health" "handle-health")
-  (app-listen 3000)
-)
+  (app-listen 3000))

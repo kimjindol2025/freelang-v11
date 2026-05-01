@@ -1,104 +1,75 @@
 ;; ============================================
-;; Express.fl WebSocket 채팅 예제
+;; Express.fl WebSocket 채팅 서버 (v11)
 ;; ============================================
-;; 실시간 채팅 서버 (다대다 통신)
-;; 실행: node bootstrap.js run express-chat.fl
+;; 실행: node bootstrap.js run src/express-chat.fl
 
 (load "src/express.fl")
 
-;; ============ 상태 관리 ============
+;; ── 상태 ────────────────────────────────────────────────────────
 
-(define *users* {})
-(define *messages* [])
+(define users-map  (atom {}))
+(define messages   (atom []))
 
-;; ============ 핸들러 함수들 ============
+;; ── WebSocket 핸들러 ─────────────────────────────────────────────
 
-[FUNC on-connect :params [req]
-  :body (let [client-id (server_req_id)]
+(defn on-connect [$sid]
+  (do
+    (log-info (str "✅ 클라이언트 연결: " $sid))
+    (ws_send_json_to $sid {:type      "welcome"
+                           :message   "채팅방에 접속했습니다"
+                           :client_id $sid
+                           :users     (ws_client_list)})))
+
+(defn on-message [$sid $msg]
+  (let [[$data     (json_parse $msg)]
+        [$username (get $data "username")]
+        [$text     (get $data "text")]]
     (do
-      (log-info (str "✅ 클라이언트 연결: " client-id))
-      (ws-send-json-to client-id {
-        :type "welcome"
-        :message "채팅방에 접속했습니다"
-        :client_id client-id
-        :users (ws-client-list)
-      })
-      nil))
-]
-
-[FUNC on-message :params [req]
-  :body (let [
-    client-id (server_req_id)
-    msg (server_req_body req)
-    data (json_parse msg)
-    username (get data "username")
-    text (get data "text")
-  ]
-    (do
-      (if username
-        (set! *users* (json_set *users* client-id username)))
-      (if text
-        (let [entry {
-          :from username
-          :text text
-          :timestamp (now_iso)
-        }]
+      (if $username
+        (swap! users-map assoc $sid $username))
+      (if $text
+        (let [[$entry {:from      $username
+                       :text      $text
+                       :timestamp (now_iso)}]]
           (do
-            (set! *messages* (append *messages* [entry]))
-            (ws-send-json-all entry))))
-      nil))
-]
+            (swap! messages (fn [$m] (append $m [$entry])))
+            (ws_send_json_all $entry)))))))
 
-[FUNC on-close :params [req]
-  :body (let [client-id (server_req_id)]
-    (do
-      (log-info (str "❌ 클라이언트 종료: " client-id))
-      (set! *users* (json_del *users* client-id))
-      (ws-send-json-all {
-        :type "user_left"
-        :client_id client-id
-        :message "사용자가 나갔습니다"
-      })
-      nil))
-]
+(defn on-close [$sid]
+  (do
+    (log-info (str "❌ 클라이언트 종료: " $sid))
+    (swap! users-map dissoc $sid)
+    (ws_send_json_all {:type      "user_left"
+                       :client_id $sid
+                       :message   "사용자가 나갔습니다"})))
 
-[FUNC get-messages :params [req]
-  :body (res-json {
-    :success true
-    :messages *messages*
-  })
-]
+;; ── HTTP 엔드포인트 ──────────────────────────────────────────────
 
-[FUNC get-users :params [req]
-  :body (res-json {
-    :success true
-    :count (ws-client-count)
-    :users *users*
-  })
-]
+(defn get-messages [$req]
+  (res-json {:success  true
+             :messages (deref messages)}))
 
-[FUNC health :params [req]
-  :body (res-json {
-    :status "OK"
-    :service "Express.fl Chat Server"
-    :online_users (ws-client-count)
-    :timestamp (now_iso)
-  })
-]
+(defn get-users [$req]
+  (res-json {:success true
+             :count   (ws_client_count)
+             :users   (deref users-map)}))
 
-;; ============ 라우트 등록 ============
+(defn health [$req]
+  (res-json {:status       "OK"
+             :service      "Express.fl Chat v11"
+             :online_users (ws_client_count)
+             :timestamp    (now_iso)}))
+
+;; ── 라우트 등록 ─────────────────────────────────────────────────
 
 (do
-  (log-info "🚀 Express.fl 채팅 서버 시작")
-
-  (app-get "/health" "health")
+  (log-info "🚀 채팅 서버 시작")
+  (app-get "/health"       "health")
   (app-get "/api/messages" "get-messages")
-  (app-get "/api/users" "get-users")
-
-  (ws_on_connect_fn "on-connect")
-  (ws_on_message_fn "on-message")
-  (ws_on_close_fn "on-close")
-
+  (app-get "/api/users"    "get-users")
+  (ws_on_connect_fn  "on-connect")
+  (ws_on_message_fn  "on-message")
+  (ws_on_close_fn    "on-close")
   (log-info "✅ 라우트 등록 완료")
   (println "")
   (println "┌─────────────────────────────────────┐")
@@ -107,7 +78,4 @@
   (println "│ HTTP:      http://localhost:3000    │")
   (println "│ WebSocket: ws://localhost:3000      │")
   (println "└─────────────────────────────────────┘")
-  (println "")
-
-  (app-listen 3000)
-)
+  (app-listen 3000))
