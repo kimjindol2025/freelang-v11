@@ -307,21 +307,21 @@ function _fl_contains_q(s, substr) { return (!(-1 === _fl_str_index_of(s, substr
 function str_replace(s, old, _new) { return (() => { let idx = _fl_str_index_of(s, old); return ((idx === -1) ? s : _fl_str(str_slice(s, 0, idx), _new, str_slice(s, (idx + _fl_length(old)), _fl_length(s)))); })(); }
 function file_read(path) { return _fl_file_read(_fl_str(path)); }
 function file_write(path, content) { return _fl_file_write(_fl_str(path), _fl_str(content)); }
-function file_append(path, content) { return file_append(_fl_str(path), _fl_str(content)); }
+function file_append(path, content) { return _fl_file_append(_fl_str(path), _fl_str(content)); }
 function file_exists_q(path) { return file_exists(_fl_str(path)); }
 function file_delete(path) { return file_delete(_fl_str(path)); }
-function file_copy(src, dest) { return file_copy(_fl_str(src), _fl_str(dest)); }
+function file_copy(src, dest) { return _fl_file_copy(_fl_str(src), _fl_str(dest)); }
 function file_rename(old, _new) { return file_rename(_fl_str(old), _fl_str(_new)); }
-function file_size(path) { return file_size(_fl_str(path)); }
-function file_modified(path) { return file_modified(_fl_str(path)); }
+function file_size(path) { try { return _fl_file_stat(_fl_str(path)).size; } catch { return null; } }
+function file_modified(path) { try { return _fl_file_stat(_fl_str(path)).mtimeMs; } catch { return null; } }
 function file_json(path) { return JSON.parse(_fl_file_read(_fl_str(path))); }
 function file_json_write(path, obj) { return _fl_file_write(_fl_str(path), JSON.stringify(obj)); }
 function file_lines(path) { return str_lines(_fl_file_read(_fl_str(path))); }
 function file_mkdir(path) { return file_mkdir(_fl_str(path)); }
-function file_rmdir(path) { return file_rmdir(_fl_str(path)); }
-function file_list(path) { return file_list(_fl_str(path)); }
-function file_is_file_q(path) { return file_is_file(_fl_str(path)); }
-function file_is_dir_q(path) { return file_is_dir(_fl_str(path)); }
+function file_rmdir(path, recursive_q = false) { return _fl_file_rmdir(_fl_str(path), recursive_q); }
+function file_list(path) { return _fl_file_list(_fl_str(path)); }
+function file_is_file_q(path) { try { return _fl_file_stat(_fl_str(path)).isFile(); } catch { return false; } }
+function file_is_dir_q(path) { try { return _fl_file_stat(_fl_str(path)).isDirectory(); } catch { return false; } }
 function process_run(cmd) { return process_run(_fl_str(cmd)); }
 function process_run_args(cmd, args) { return process_run_args(_fl_str(cmd), args); }
 function process_exec(cmd) { return process_exec(_fl_str(cmd)); }
