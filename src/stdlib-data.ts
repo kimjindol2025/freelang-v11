@@ -362,5 +362,29 @@ export function createDataModule() {
     "str_decode_base64": (s: string) => decodeURIComponent(escape(atob(s))),
     "str_encode_uri": (s: string) => encodeURIComponent(String(s)),
     "str_decode_uri": (s: string) => decodeURIComponent(String(s)),
+
+    // str_fmt template map → 문자열 보간
+    // (str_fmt "안녕 {name}, {age}살" {:name "김진돌" :age 30})
+    // → "안녕 김진돌, 30살"
+    "str_fmt": (template: string, vars: any): string => {
+      if (typeof template !== "string") return String(template);
+      const get = (obj: any, key: string): any =>
+        obj instanceof Map ? (obj.get(key) ?? obj.get(":" + key)) : obj?.[key];
+      return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const v = get(vars, key);
+        return v !== undefined && v !== null ? String(v) : `{${key}}`;
+      });
+    },
+
+    // str/fmt alias
+    "str/fmt": (template: string, vars: any): string => {
+      if (typeof template !== "string") return String(template);
+      const get = (obj: any, key: string): any =>
+        obj instanceof Map ? (obj.get(key) ?? obj.get(":" + key)) : obj?.[key];
+      return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const v = get(vars, key);
+        return v !== undefined && v !== null ? String(v) : `{${key}}`;
+      });
+    },
   };
 }
