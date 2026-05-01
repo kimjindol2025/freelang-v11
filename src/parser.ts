@@ -679,10 +679,11 @@ export class Parser {
 
       // Accept both keyword keys (:name) and string keys ("name")
       if (this.check(T.Colon)) {
-        // Keyword key: :name
+        // Keyword key: :name — allow any token (Symbol or reserved keyword like :open :if :when)
         this.advance(); // consume ':'
-        if (!this.check(T.Symbol)) {
-          throw this.error(`Expected symbol after ':' in map literal`, this.peek());
+        const keyTok = this.peek();
+        if (keyTok.type === T.RBrace || this.isAtEnd()) {
+          throw this.error(`Expected key after ':' in map literal`, keyTok);
         }
         key = this.advance().value;
       } else if (this.check(T.String)) {
