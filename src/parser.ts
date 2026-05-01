@@ -575,11 +575,13 @@ export class Parser {
       return makeLiteral("symbol", token.value);
     }
 
-    // Phase 8+: :symbol (Colon + Symbol) used as keyword/string value in .fl files
-    // e.g. (get $parser :pos) → ":pos" as a string key
+    // Phase 8+: :symbol (Colon + Symbol/Keyword) used as keyword/string value in .fl files
+    // e.g. (get $parser :pos) → "pos"   (get $m :open) → "open"
     if (this.check(T.Colon)) {
       this.advance(); // consume ':'
-      if (this.check(T.Symbol)) {
+      const next = this.tokens[this.pos];
+      // Accept any token with an identifier-like value (Symbol, or any keyword like :open, :search, etc.)
+      if (next && next.value && /^[a-zA-Z_][a-zA-Z0-9_\-]*$/.test(next.value)) {
         const token = this.advance();
         return makeLiteral("string", token.value);
       }

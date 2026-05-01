@@ -244,7 +244,7 @@ export function lex(source: string): Token[] {
       col++;
 
       let varname = "";
-      while (i < source.length && /[a-zA-Z0-9_-]/.test(source[i])) {
+      while (i < source.length && /[a-zA-Z0-9_\-?]/.test(source[i])) {
         varname += source[i];
         i++;
         col++;
