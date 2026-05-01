@@ -488,3 +488,29 @@ FL_DEV=1 node bootstrap.js run app.fl   # 개발 모드
 
 **경로**: `/home/kimjin/freelang-v11/bootstrap.js`
 **포트**: 신규 40000-43000 | v10 보호 43000-49999
+
+---
+
+## 🔧 괄호 오류 / 문법 검사 (필수 커맨드)
+
+> **괄호 수가 틀릴 때 손으로 세지 말 것 — 아래 명령어로 한 번에 해결**
+
+```bash
+# 1. 문법 검사 — 오류 위치 + 라인 번호 출력
+node /home/kimjin/freelang-v11/bootstrap.js check 파일.fl
+
+# 2. 자동 포맷 — 들여쓰기 + 괄호 정렬 인플레이스 수정
+node /home/kimjin/freelang-v11/bootstrap.js fmt 파일.fl
+
+# 3. 포맷 확인만 (수정 없이) — CI용
+node /home/kimjin/freelang-v11/bootstrap.js fmt --check 파일.fl
+```
+
+**작업 순서**: `fmt` → `check` → 에러 없으면 실행
+
+```bash
+# 한 번에
+node /home/kimjin/freelang-v11/bootstrap.js fmt 파일.fl && \
+node /home/kimjin/freelang-v11/bootstrap.js check 파일.fl && \
+echo "✅ OK"
+```
