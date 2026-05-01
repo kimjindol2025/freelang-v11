@@ -29,6 +29,7 @@
 ;; (file_read) = (file-read), (str_to_num) = (str-to-num)
 (json_keys m)           → (keys m)                  ;; 의미 중심 이름
 (server_listen 3000)    → (server_start 3000)
+;; 웹서버 버전 선택: 내부 API → server_* 직접 / 외부 노출 → (load "src/express.fl")
 {a 1}                   → {:a 1}                    ;; 키워드 필수
 (= x null)              → (nil? x)                  ;; nil? 정상 동작
 (console.log x)         → (println x)
@@ -94,34 +95,108 @@
 
 ---
 
-## 🌐 HTTP 서버
+## 🌐 HTTP 서버 — 반드시 아래 기준으로 선택
+
+> ⚠️ **아무 방식이나 섞어 쓰면 안 됨. 프로젝트 시작 시 둘 중 하나를 선택하고 고정.**
+
+---
+
+### ✅ 선택 기준
+
+| 상황 | 사용 버전 |
+|------|----------|
+| 내부 API, 마이크로서비스, kimdb 클라이언트 | **가벼운 버전** (server_* 직접) |
+| 외부 노출 API, CRUD 앱, 인증/캐시 필요 | **무거운 버전** (express.fl 로드) |
+
+---
+
+### 🪶 가벼운 버전 (직접 server_* 사용)
 
 ```fl
-;; 라우트 등록 — 핸들러는 반드시 문자열
-(server_get    "/path"     "handler-name")
-(server_post   "/api/data" "handle-post")
-(server_put    "/api/:id"  "handle-put")
-(server_delete "/api/:id"  "handle-delete")
-(server_start 40100)
+;; 예제: src/api/server.fl 패턴
+(defn handle-health [$req]
+  (server_json {:status "ok"}))
 
-;; 요청
-(server_req_params $req)         ;; URL 파라미터 {:id "1"}
-(server_req_query  $req "key")   ;; ?key=val
-(server_req_body   $req)         ;; body (JSON 자동 파싱)
-(server_req_cookie $req "name")  ;; 쿠키
+(defn handle-get-item [$req]
+  (let [[$id (server_req_param $req "id")]]
+    (server_json {:id $id :data "..."})))
+
+(defn handle-post-item [$req]
+  (let [[$body (json_parse (server_req_body $req))]]
+    (server_json {:success true})))
+
+(server_get    "/health"      "handle-health")
+(server_get    "/api/:id"     "handle-get-item")
+(server_post   "/api"         "handle-post-item")
+(server_put    "/api/:id"     "handle-put-item")
+(server_delete "/api/:id"     "handle-delete-item")
+(server_start  40100)
+
+;; 요청 헬퍼
+(server_req_param  $req "id")          ;; URL :param
+(server_req_query  $req "key")         ;; ?key=val
+(server_req_body   $req)               ;; body 문자열
 (server_req_header $req "Authorization")
+(server_req_cookie $req "name")
 
-;; 응답
-(server_html   "<h1>안녕</h1>")
-(server_json   {:ok true :data result})
+;; 응답 헬퍼
+(server_json   {:ok true})
 (server_text   "plain text")
+(server_html   "<h1>OK</h1>")
 (server_status 404 {:error "Not Found"})
 (server_redirect "/login")
-(server_static "public/app.css")   ;; ✨ NEW — MIME 자동, 바이너리 OK
-
-;; 쿠키 포함
+(server_static "public/app.css")
 (server_html_cookie     "sid=abc; Path=/; HttpOnly" "<html>...")
 (server_redirect_cookie "/home" "sid=; Path=/; Max-Age=0")
+```
+
+---
+
+### 🏋️ 무거운 버전 (express.fl 로드)
+
+```fl
+;; 예제: src/api/server.fl 패턴
+(load "src/express.fl")   ;; ← 반드시 이 줄 먼저
+
+(defn handle-health [$req]
+  (res-json {:status "ok"}))
+
+(defn get-user [$req]
+  (let [[$id   (req-param $req "id")]
+        [$body (req-body  $req)]]
+    (res-json {:id $id})))
+
+(defn post-user [$req]
+  (let [[$body (req-body $req)]
+        [$name (get $body "name")]]
+    (if $name
+      (res-status 201 {:success true})
+      (res-status 400 {:error "name required"}))))
+
+(app-get    "/health"        "handle-health")
+(app-get    "/api/users/:id" "get-user")
+(app-post   "/api/users"     "post-user")
+(app-put    "/api/users/:id" "put-user")
+(app-delete "/api/users/:id" "delete-user")
+(app-listen 40100)
+
+;; express.fl 제공 함수
+;; 요청: req-param, req-query, req-body, req-header
+;; 응답: res-json, res-send, res-status
+;; 로그: log-info, log-error
+```
+
+---
+
+### ❌ 금지 패턴
+
+```fl
+;; 가벼운 + 무거운 혼용 금지
+(load "src/express.fl")
+(server_get "/path" "handler")   ;; ❌ — express.fl 로드했으면 app-get만 써야 함
+
+;; v10 [FUNC] 문법 금지
+[FUNC handler :params [req] :body ...]  ;; ❌ — v11에서 동작 안 함
 ```
 
 ---
