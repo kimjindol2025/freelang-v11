@@ -11238,8 +11238,13 @@ function flExecOpNative(op, vals) {
       return vals.length === 1 ? 1 / v0 : vals.reduce((a, b) => a / b);
     case "%":
       return v0 % v1;
-    case "=":
+    case "=": {
+      const n0 = v0 === null || v0 === void 0;
+      const n1 = v1 === null || v1 === void 0;
+      if (n0 && n1) return true;
+      if (n0 || n1) return false;
       return v0 === v1;
+    }
     case "!=":
       return v0 !== v1;
     case "<":
@@ -11730,7 +11735,11 @@ function evalBuiltin(interp2, op, args2, expr2) {
       }
     }
     case "cli-args": {
-      return process.argv.slice(2);
+      const args3 = process.argv.slice(2);
+      if (args3[0] === "run" || args3[0] === "debug") {
+        return args3.slice(2);
+      }
+      return args3;
     }
     case "shell-exec": {
       const { execSync: execSync2 } = require("child_process");
@@ -23145,11 +23154,10 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               }
             } else {
               if (result && typeof result === "object") {
-                // Map 객체: {:status :body :headers} 구조 감지
-                const getField = (obj, key) => obj instanceof Map ? (obj.get(key) ?? obj.get(":" + key)) : obj[key];
+                const getField = (obj, key) => obj instanceof Map ? obj.get(key) ?? obj.get(":" + key) : obj[key];
                 const resStatus = getField(result, "status");
                 const resBody = getField(result, "body");
-                if (result.__fl_response === true || (resStatus !== undefined && resBody !== undefined)) {
+                if (result.__fl_response === true || resStatus !== void 0 && resBody !== void 0) {
                   status = resStatus ?? 200;
                   const resHeaders = getField(result, "headers") ?? {};
                   const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
@@ -28887,15 +28895,27 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createCloudModule());
   interp2.registerModule(createMatrixModule());
   const _aliases = {
-    "mod":           (a, b) => a % b,
+    "mod": (a, b) => a % b,
     "str-contains?": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
-    "str-contains":  (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
-    "includes?":     (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
-    "number":        (v) => { const n = Number(v); return isNaN(n) ? null : n; },
-    "parse-int":     (v, radix) => { const n = parseInt(v, radix ?? 10); return isNaN(n) ? null : n; },
-    "parse-float":   (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
-    "to-number":     (v) => { const n = Number(v); return isNaN(n) ? null : n; },
-    "number?":       (v) => typeof v === "number" && !isNaN(v),
+    "str-contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "includes?": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "number": (v) => {
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    },
+    "parse-int": (v, radix) => {
+      const n = parseInt(v, radix ?? 10);
+      return isNaN(n) ? null : n;
+    },
+    "parse-float": (v) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    },
+    "to-number": (v) => {
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    },
+    "number?": (v) => typeof v === "number" && !isNaN(v)
   };
   for (const [name, fn] of Object.entries(_aliases)) {
     if (!interp2.context.functions.has(name)) {
@@ -28946,7 +28966,11 @@ function evalTryBlock(interp2, tryBlock) {
       for (const catchClause of tryBlock.catchClauses) {
         interp2.context.variables.push();
         if (catchClause.variable) {
-          interp2.context.variables.set("$" + catchClause.variable, error);
+          let errVal;
+          if (typeof error === "string") errVal = error;
+          else if (error instanceof Error) errVal = error.message;
+          else errVal = String(error);
+          interp2.context.variables.set("$" + catchClause.variable, errVal);
         }
         try {
           result = interp2.eval(catchClause.handler);
@@ -29733,10 +29757,18 @@ ${tail}` : "")
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
   try {
-    for (let i = 0; i < func.params.length; i++) {
-      interp2.context.variables.set(func.params[i], args2[i]);
+    for (let recurIter = 0; recurIter < 2e6; recurIter++) {
+      for (let i = 0; i < func.params.length; i++) {
+        interp2.context.variables.set(func.params[i], args2[i]);
+      }
+      const result = interp2.eval(func.body);
+      if (result && typeof result === "object" && result.__FL_RECUR__) {
+        args2 = result.__args;
+        continue;
+      }
+      return result;
     }
-    return interp2.eval(func.body);
+    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
   } finally {
     interp2.callDepth--;
     _callStack.pop();

@@ -268,10 +268,18 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
   try {
-    for (let i = 0; i < func.params.length; i++) {
-      interp.context.variables.set(func.params[i], args[i]);
+    for (let recurIter = 0; recurIter < 2_000_000; recurIter++) {
+      for (let i = 0; i < func.params.length; i++) {
+        interp.context.variables.set(func.params[i], args[i]);
+      }
+      const result = interp.eval(func.body);
+      if (result && typeof result === "object" && (result as any).__FL_RECUR__) {
+        args = (result as any).__args;
+        continue;
+      }
+      return result;
     }
-    return interp.eval(func.body);
+    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
   } finally {
     interp.callDepth--;
     _callStack.pop();

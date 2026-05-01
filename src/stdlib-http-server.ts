@@ -314,10 +314,16 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
                 }
               } else {
                 if (result && typeof result === "object") {
-                  if (result.__fl_response === true) {
-                    status = result.status ?? 200;
-                    const contentType = result.contentType ?? "application/json";
-                    sendResponse(res, status, result.body ?? "", contentType, result.headers ?? {});
+                  const getField = (obj: any, key: string) =>
+                    obj instanceof Map ? (obj.get(key) ?? obj.get(":" + key)) : obj[key];
+                  const resStatus = getField(result, "status");
+                  const resBody = getField(result, "body");
+                  if (result.__fl_response === true || (resStatus !== undefined && resBody !== undefined)) {
+                    status = resStatus ?? 200;
+                    const resHeaders = getField(result, "headers") ?? {};
+                    const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
+                    const contentType = headersObj["content-type"] ?? "application/json";
+                    sendResponse(res, status, resBody ?? "", contentType, headersObj);
                   } else {
                     sendResponse(res, 200, result);
                   }

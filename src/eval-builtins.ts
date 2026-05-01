@@ -157,13 +157,19 @@ function flGetParamNames(paramsNode: any): string[] {
 
 function flExecOpNative(op: string, vals: any[]): any {
   const v0 = vals[0], v1 = vals[1], v2 = vals[2];
-  switch (op) {
+  switch (normalizedOp) {
     case "+": return vals.reduce((a: number, b: number) => a + b, 0);
     case "-": return vals.length === 1 ? -v0 : vals.reduce((a: number, b: number) => a - b);
     case "*": return vals.reduce((a: number, b: number) => a * b, 1);
     case "/": return vals.length === 1 ? 1 / v0 : vals.reduce((a: number, b: number) => a / b);
     case "%": return v0 % v1;
-    case "=": return v0 === v1;
+    case "=": {
+      const n0 = v0 === null || v0 === undefined;
+      const n1 = v1 === null || v1 === undefined;
+      if (n0 && n1) return true;
+      if (n0 || n1) return false;
+      return v0 === v1;
+    }
     case "!=": return v0 !== v1;
     case "<": return v0 < v1;
     case ">": return v0 > v1;
@@ -460,7 +466,7 @@ function flInterpSexpr(op: any, rawArgs: any[], env: any): any {
     return flExecOpNative(op, vals);
   }
 
-  switch (op) {
+  switch (normalizedOp) {
     case "if": {
       const cond = flInterpNative(rawArgs[0], env);
       if (cond) return flInterpNative(rawArgs[1], env);
@@ -557,7 +563,7 @@ function flInterpSexpr(op: any, rawArgs: any[], env: any): any {
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환
-  op = op.replace(/_/g, '-');
+  const normalizedOp = op.replace(/_/g, '-');
   // interp.eval은 public이어야 하므로 (실제로는 public)
   const ev = (node: any) => (interp as any).eval(node);
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
@@ -565,7 +571,7 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   const callFnVal = (fn: any, a: any[]) => (interp as any).callFunctionValue(fn, a);
   const toDisplay = (val: any) => (interp as any).toDisplayString(val);
 
-  switch (op) {
+  switch (normalizedOp) {
     // Phase L1: Module system
 
     case "load": {
@@ -591,6 +597,23 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     }
 
     // Phase Step3: require function (module system)
+    case "cli-args": {
+      const args = process.argv.slice(2);
+      // skip 'run' command and the script name if present
+      if (args[0] === "run" || args[0] === "debug") {
+        return args.slice(2);
+      }
+      return args;
+    }
+    case "shell-exec": {
+      const { execSync } = require("child_process");
+      const cmd = String(args[0] ?? "");
+      try {
+        return execSync(cmd, { encoding: "utf-8" });
+      } catch (e: any) {
+        return null;
+      }
+    }
     case "require": {
       const modulePath = String(args[0] ?? "");
       const fs = require("fs");
@@ -1322,7 +1345,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       const op = String(args[0]);
       const vals: any[] = Array.isArray(args[1]) ? args[1] : [];
       const v0 = vals[0], v1 = vals[1], v2 = vals[2];
-      switch (op) {
+      switch (normalizedOp) {
         case "+": return vals.reduce((a: number, b: number) => a + b, 0);
         case "-": return vals.length === 1 ? -v0 : vals.reduce((a: number, b: number) => a - b);
         case "*": return vals.reduce((a: number, b: number) => a * b, 1);
@@ -4451,7 +4474,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
 
       // === Phase A-2: File/HTTP builtins ===
-      switch (op) {
+      switch (normalizedOp) {
         case "file-mkdir": case "file_mkdir": {
           const dirPath = String(args[0] ?? "");
           const fs = require("fs");

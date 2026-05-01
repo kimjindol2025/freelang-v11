@@ -68,7 +68,11 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
       for (const catchClause of tryBlock.catchClauses) {
         interp.context.variables.push();
         if (catchClause.variable) {
-          interp.context.variables.set("$" + catchClause.variable, error);
+          let errVal: any;
+          if (typeof error === "string") errVal = error;
+          else if (error instanceof Error) errVal = error.message;
+          else errVal = String(error);
+          interp.context.variables.set("$" + catchClause.variable, errVal);
         }
 
         try {

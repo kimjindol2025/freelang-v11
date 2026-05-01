@@ -131,4 +131,22 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createBlogModule());       // Q2-5: blog_all_tags, blog_posts_by_tag, blog_tag_counts, blog_related, blog_search_index, blog_search, blog_posts_sorted, blog_paginate
   interp.registerModule(createCloudModule());      // Phase 58: aws-s3-*, aws-lambda-*, gcp-run-*, azure-function-*
   interp.registerModule(createMatrixModule());     // Phase 99: matrix_mul, vector_dot, vector_add, vector_scale, parallel_map for GPT
+
+  // 네이밍 alias: 자주 쓰는 함수들의 대체 이름
+  const _aliases: Record<string, (...a: any[]) => any> = {
+    "mod":           (a: number, b: number) => a % b,
+    "str-contains?": (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "str-contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "includes?":     (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "number":        (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "parse-int":     (v: any, radix?: number) => { const n = parseInt(v, radix ?? 10); return isNaN(n) ? null : n; },
+    "parse-float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
+    "to-number":     (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "number?":       (v: any) => typeof v === "number" && !isNaN(v),
+  };
+  for (const [name, fn] of Object.entries(_aliases)) {
+    if (!interp.context.functions.has(name)) {
+      interp.context.functions.set(name, { name, params: [], body: fn });
+    }
+  }
 }
