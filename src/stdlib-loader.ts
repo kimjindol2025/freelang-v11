@@ -1,6 +1,7 @@
 // FreeLang v9: Stdlib Loader
 // Phase 58: interpreter.ts constructor에서 분리된 stdlib 모듈 등록 로직
 
+import { createHash, createHmac } from "crypto";         // Node.js crypto (static import — runtime require 충돌 방지)
 import { createFileModule } from "./stdlib-file";        // Phase 10: File I/O
 import { createFdModule } from "./stdlib-fd";            // Phase 11.5: File Descriptor (NEW)
 import { createBitsModule } from "./stdlib-bits";        // Phase 11.6: Bitwise Operations (NEW)
@@ -13,47 +14,21 @@ import { createCollectionModule } from "./stdlib-collection"; // Phase 14: Colle
 import { createAgentModule } from "./stdlib-agent";      // Phase 15: AI Agent State Machine
 import { createTimeModule } from "./stdlib-time";        // Phase 16: Time + Logging + Monitoring
 import { createCryptoModule } from "./stdlib-crypto";    // Phase 17: Crypto + UUID + Regex
-import { createCryptoRsaModule } from "./stdlib-crypto-rsa"; // Phase A.1: RSA / RS256 (dclub-auth)
-import { createTotpModule } from "./stdlib-totp";          // Phase G: TOTP / RFC 6238 (dclub-auth MFA)
-import { createMailModule } from "./stdlib-mail";          // Phase I: mail outbox + SMTP TLS (dclub-auth)
-import { createWebauthnModule } from "./stdlib-webauthn";  // Phase J: WebAuthn / Passkey (dclub-auth)
-import { createQueueHelpersModule } from "./stdlib-queue-helpers"; // Phase X1: dclub-queue atomic dequeue
-import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
+import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine (core)
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
-import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
-import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver
-import { createMariadbModule } from "./stdlib-mariadb";  // v11.5: MariaDB (mariadb CLI)
-import { createMongodbModule } from "./stdlib-mongodb";  // v11.6: MongoDB (Wire Protocol TCP)
+import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server
+import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver (SQLite)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process";  // Phase 22: Process (env + SIGTERM)
-import { createAsyncModule } from "./stdlib-async";      // Phase 23: Async/await primitives
 import { createModuleSystem } from "./stdlib-module";    // Phase 24: Module system
-import { createChannelModule } from "./stdlib-channel";  // Phase 67: 채널 기반 동시성
-import { createImmutableModule } from "./immutable";      // Phase 70: 이뮤터블 데이터 구조
-import { createAiNativeModule } from "./stdlib-ai-native"; // Phase 71: AI 네이티브 블록
-import { createTestModule } from "./stdlib-test";           // Phase 76: FL 네이티브 테스트 러너
-import { createMaybeModule } from "./maybe-type";           // Phase 91: 불확실성 타입
-import { createCompileModule } from "./stdlib-compile";    // Phase 6: .fl → .js 컴파일러
-import { createRegistryModule } from "./stdlib-registry";  // Phase 7: npm 호환 패키지 레지스트리
-import { createOciModule } from "./stdlib-oci";             // Phase 8: OCI 자동 빌드
-import { createOrmModule } from "./stdlib-orm";             // Phase 9: ORM (Model CRUD)
-import { createValidationModule } from "./stdlib-validation"; // Phase 9: 스키마 검증
-import { createMiddlewareModule } from "./stdlib-middleware";   // Phase 9: 미들웨어 체인
-import { createTableModule } from "./stdlib-table";         // Phase 10: 테이블 조작
-import { createStatsModule } from "./stdlib-stats";         // Phase 10: 통계 함수
-import { createPlotModule } from "./stdlib-plot";           // Phase 10: 시각화
-import { createTestEnhancedModule } from "./stdlib-test-enhanced"; // Phase 11: 테스트 강화
-import { createServiceModule } from "./stdlib-service";     // Phase 12: 마이크로서비스 (서비스/큐/Circuit Breaker/메트릭)
-import { createWsModule } from "./stdlib-ws";              // Phase 21: WebSocket 서버
-import { createWscModule } from "./stdlib-wsc";            // Phase 21: WebSocket 클라이언트
-import { createMarkdownModule } from "./stdlib-markdown";  // Q2-1: Markdown (CommonMark subset + frontmatter)
-import { createFeedModule } from "./stdlib-feed";          // Q2-2/3/4: RSS/Atom/sitemap/robots/JSON-LD
-import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관련글/검색인덱스/페이지네이션
-import { createCloudModule } from "./stdlib-cloud";        // Phase 58: Cloud (AWS/GCP/Azure)
-import { createMatrixModule } from "./stdlib-matrix";      // Phase 99: Matrix/Vector + Parallel for GPT training
-import { createAuditModule } from "./stdlib-audit";        // audit_log: 서비스 감사 로그 전송
+import { createTestModule } from "./stdlib-test";        // Phase 76: FL 테스트 러너
+import { createMaybeModule } from "./maybe-type";        // Phase 91: 불확실성 타입
+import { createTestEnhancedModule } from "./stdlib-test-enhanced";
+import { createWsModule } from "./stdlib-ws";            // WebSocket 서버
+import { createWscModule } from "./stdlib-wsc";          // WebSocket 클라이언트
+import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-lazy-registry"; // Lazy Loading
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -79,11 +54,6 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createAgentModule());
   interp.registerModule(createTimeModule());
   interp.registerModule(createCryptoModule());
-  interp.registerModule(createCryptoRsaModule()); // Phase A.1: crypto_rsa_generate/sign/verify/public_to_jwk
-  interp.registerModule(createTotpModule());      // Phase G: totp_secret_generate/verify/now/uri
-  interp.registerModule(createMailModule());      // Phase I: mail_outbox_write/list/count, smtp_send_tls
-  interp.registerModule(createWebauthnModule()); // Phase J: webauthn_challenge/parse_attestation/verify_assertion
-  interp.registerModule(createQueueHelpersModule()); // Phase X1: queue_dequeue_atomic, queue_db_init, queue_recover_stuck
   interp.registerModule(createWorkflowModule());
   interp.registerModule(createResourceModule());
   // Phase 4a: Pure HTTP Server — callUserFunction/callFunctionValue 콜백 필요
@@ -92,17 +62,11 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (fnValue: any, a: any[]) => interp.callFunctionValue(fnValue, a)
   ));
   interp.registerModule(createDbModule());
-  interp.registerModule(createMariadbModule());   // v11.5: mariadb_exec/query/one/health/databases/tables
-  interp.registerModule(createMongodbModule());   // v11.6: mongodb_connect/find/insert/update/delete
   interp.registerModule(createAuthModule());
   interp.registerModule(createCacheModule());
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
   interp.registerModule(createProcessModule());  // Phase 22: env_load, on_sigterm
-  interp.registerModule(createAsyncModule((n, a) => interp.callUserFunction(n, a))); // Phase 23: async_call, promise_*
   interp.registerModule(createModuleSystem());   // Phase 24: module_*, namespace_*
-  interp.registerModule(createChannelModule());  // Phase 67: chan, chan-send, chan-recv
-  interp.registerModule(createImmutableModule()); // Phase 70: imm-map, imm-vec, ...
-  interp.registerModule(createAiNativeModule());  // Phase 71: ai-call, rag-search, embed, similarity
   interp.registerModule(createTestModule(         // Phase 76: deftest, describe, assert-eq, ...
     (fnValue, args) => interp.callFunctionValue(fnValue, args)
   ));
@@ -110,29 +74,24 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (fnValue, args) => interp.callFunctionValue(fnValue, args),
     (name, args) => interp.callUserFunction(name, args)
   ));
-  interp.registerModule(createCompileModule());   // Phase 6: fl_compile, fl_compile_file (tsc 제거)
-  interp.registerModule(createRegistryModule());  // Phase 7: registry_publish, registry_search, registry_info, registry_delete, registry_start
-  interp.registerModule(createOciModule());       // Phase 8: oci_create_manifest, oci_create_layer, oci_build, oci_push, oci_sign, oci_list, oci_inspect, oci_remove
-  interp.registerModule(createOrmModule());       // Phase 9: orm_define_model, orm_create, orm_find, orm_update, orm_delete, orm_all, orm_count
-  interp.registerModule(createValidationModule()); // Phase 9: schema_define, schema_validate, schema_is_valid, validate_email, validate_string, validate_number, validate_regex
-  interp.registerModule(createMiddlewareModule()); // Phase 9: middleware_define, middleware_create_chain, middleware_apply_chain, middleware_auth_check, middleware_logging, middleware_rate_limit, middleware_cors
-  interp.registerModule(createTableModule());      // Phase 10: table_load_csv, table_select, table_filter, table_sort, table_group_by, table_aggregate, table_join
-  interp.registerModule(createStatsModule());      // Phase 10: stats_mean, stats_median, stats_stddev, stats_correlation, stats_normalize, stats_zscore
-  interp.registerModule(createPlotModule());       // Phase 10: plot_histogram, plot_bar, plot_line, plot_scatter, plot_heatmap, plot_save
-  interp.registerModule(createTestEnhancedModule()); // Phase 11: test_run_all, test_register, test_coverage, test_report
-  interp.registerModule(createServiceModule());    // Phase 12: service_define, service_start, service_stop, queue_create, circuit_breaker_define, observe_metric
-  interp.registerModule(createWsModule(            // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
+  interp.registerModule(createTestEnhancedModule());
+  interp.registerModule(createWsModule(
     (n: string, a: any[]) => interp.callUserFunction(n, a)
   ));
-  interp.registerModule(createWscModule(           // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
+  interp.registerModule(createWscModule(
     (n: string, a: any[]) => interp.callUserFunction(n, a)
   ));
-  interp.registerModule(createMarkdownModule());   // Q2-1: markdown_to_html, markdown_frontmatter, markdown_render_full
-  interp.registerModule(createFeedModule());       // Q2-2/3/4: rss_feed, atom_feed, sitemap_xml, robots_txt, jsonld_article/breadcrumb/organization
-  interp.registerModule(createBlogModule());       // Q2-5: blog_all_tags, blog_posts_by_tag, blog_tag_counts, blog_related, blog_search_index, blog_search, blog_posts_sorted, blog_paginate
-  interp.registerModule(createCloudModule());      // Phase 58: aws-s3-*, aws-lambda-*, gcp-run-*, azure-function-*
-  interp.registerModule(createMatrixModule());     // Phase 99: matrix_mul, vector_dot, vector_add, vector_scale, parallel_map for GPT
-  interp.registerModule(createAuditModule());      // audit_log / audit_log_custom / audit_log_ok?
+
+  // ── fl_require builtin 등록 ─────────────────────────────────────
+  // (fl_require "audit")   → audit_log 등 즉시 사용 가능
+  // (fl_require? "audit")  → 로드 여부 확인 (true/false)
+  // (fl_modules)           → 사용 가능 모듈 목록
+  // 주의: "require"는 Node.js 내장과 충돌 → fl_require 사용
+  interp.registerModule({
+    "fl_require":  (name: string): boolean => requireModule(name, interp as any),
+    "fl_require?": (name: string): boolean => isModuleLoaded(name),
+    "fl_modules":  (): string[] => getAvailableModules(),
+  });
 
   // 네이밍 alias: 자주 쓰는 함수들의 대체 이름
   const _aliases: Record<string, (...a: any[]) => any> = {
@@ -152,10 +111,10 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "str_contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?":     (s: string, sub: string) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? (s as any[]).includes(sub) : false,
     // crypto 별칭 (kebab ↔ snake)
-    "hash-sha256":   (v: string) => require("crypto").createHash("sha256").update(v, "utf8").digest("hex"),
-    "hmac-sha256":   (key: string, msg: string) => require("crypto").createHmac("sha256", key).update(msg, "utf8").digest("hex"),
-    "hash_md5":      (v: string) => require("crypto").createHash("md5").update(v, "utf8").digest("hex"),
-    "hash-md5":      (v: string) => require("crypto").createHash("md5").update(v, "utf8").digest("hex"),
+    "hash-sha256":   (v: string) => createHash("sha256").update(v, "utf8").digest("hex"),
+    "hmac-sha256":   (key: string, msg: string) => createHmac("sha256", key).update(msg, "utf8").digest("hex"),
+    "hash_md5":      (v: string) => createHash("md5").update(v, "utf8").digest("hex"),
+    "hash-md5":      (v: string) => createHash("md5").update(v, "utf8").digest("hex"),
   };
   for (const [name, fn] of Object.entries(_aliases)) {
     if (!interp.context.functions.has(name)) {
