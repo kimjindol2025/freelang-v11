@@ -11269,8 +11269,12 @@ function flExecOpNative(op, vals) {
       return v0 === false;
     case "and":
       return !!(v0 && v1);
-    case "or":
-      return !!(v0 || v1);
+    case "or": {
+      const flFalsy = (v) => v === null || v === void 0 || v === false;
+      if (!flFalsy(v0)) return v0;
+      if (!flFalsy(v1)) return v1;
+      return v1;
+    }
     case "length":
       return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
     case "get": {
@@ -11678,10 +11682,13 @@ function flInterpSexpr(op, rawArgs, env) {
       return true;
     }
     case "or": {
+      const flFalsy2 = (v) => v === null || v === void 0 || v === false;
+      let lastVal2 = null;
       for (const arg of rawArgs) {
-        if (flInterpNative(arg, env)) return true;
+        lastVal2 = flInterpNative(arg, env);
+        if (!flFalsy2(lastVal2)) return lastVal2;
       }
-      return false;
+      return lastVal2;
     }
     case "not":
       return !flInterpNative(rawArgs[0], env);
@@ -11947,8 +11954,13 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return args3[0] !== args3[1];
     case "and":
       return args3.every((a) => a);
-    case "or":
-      return args3.some((a) => a);
+    case "or": {
+      const flFalsy3 = (v) => v === null || v === void 0 || v === false;
+      for (const a of args3) {
+        if (!flFalsy3(a)) return a;
+      }
+      return args3.length > 0 ? args3[args3.length - 1] : null;
+    }
     case "not":
       return !args3[0];
     case "print":
@@ -18410,11 +18422,12 @@ function evalSpecialForm(interp2, op, expr2) {
     return result;
   }
   if (op === "or") {
+    let last = null;
     for (const arg of expr2.args) {
-      const result = ev(arg);
-      if (result) return result;
+      last = ev(arg);
+      if (last !== null && last !== void 0 && last !== false) return last;
     }
-    return false;
+    return last;
   }
   if (op === "map" && expr2.args.length === 3) {
     const arr = ev(expr2.args[0]);

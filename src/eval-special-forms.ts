@@ -726,12 +726,14 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   }
 
   // ── or (short-circuit) ────────────────────────────────────────────
+  // Lisp 표준: nil/false만 falsy. 0/""/[]/{} 는 truthy
   if (op === "or") {
+    let last: any = null;
     for (const arg of expr.args) {
-      const result = ev(arg);
-      if (result) return result;
+      last = ev(arg);
+      if (last !== null && last !== undefined && last !== false) return last;
     }
-    return false;
+    return last;
   }
 
   // ── map (inline comprehension, 3-arg form) ────────────────────────

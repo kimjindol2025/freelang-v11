@@ -181,7 +181,13 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "true?": return v0 === true;
     case "false?": return v0 === false;
     case "and": return !!(v0 && v1);
-    case "or": return !!(v0 || v1);
+    case "or": {
+      // Lisp 표준: nil/false만 falsy. 0/""/[]/{} 는 truthy
+      const flFalsy = (v: any) => v === null || v === undefined || v === false;
+      if (!flFalsy(v0)) return v0;
+      if (!flFalsy(v1)) return v1;
+      return v1; // 마지막 값 반환 (모두 falsy인 경우)
+    }
     case "length": return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
     case "get": {
       // v11.2 규칙 (get obj key):
@@ -526,8 +532,14 @@ function flInterpSexpr(op: any, rawArgs: any[], env: any): any {
       return true;
     }
     case "or": {
-      for (const arg of rawArgs) { if (flInterpNative(arg, env)) return true; }
-      return false;
+      // Lisp 표준: nil/false만 falsy, 0/""/[]/{} 는 truthy
+      const flFalsy2 = (v: any) => v === null || v === undefined || v === false;
+      let lastVal2: any = null;
+      for (const arg of rawArgs) {
+        lastVal2 = flInterpNative(arg, env);
+        if (!flFalsy2(lastVal2)) return lastVal2;
+      }
+      return lastVal2;
     }
     case "not": return !flInterpNative(rawArgs[0], env);
     case "null?": { const v = flInterpNative(rawArgs[0], env); return v === null || v === undefined; }
@@ -831,8 +843,12 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     // Logical (evaluated versions — unevaluated short-circuit is in eval-special-forms.ts)
     case "and":
       return args.every((a: any) => a);
-    case "or":
-      return args.some((a: any) => a);
+    case "or": {
+      // Lisp 표준: nil/false만 falsy
+      const flFalsy3 = (v: any) => v === null || v === undefined || v === false;
+      for (const a of args) { if (!flFalsy3(a)) return a; }
+      return args.length > 0 ? args[args.length - 1] : null;
+    }
     case "not":
       return !args[0];
 
