@@ -80,6 +80,34 @@ node bootstrap.js run app.fl
 
 ---
 
+## 개발 워크플로우
+
+```bash
+# 소스 수정 후 빌드 (esbuild, ~130ms)
+npm run build
+
+# 빠른 테스트
+npm test
+
+# 전체 검증 대시보드 (커밋 전 권장)
+bash scripts/verify-all.sh
+```
+
+| 스크립트 | 용도 |
+|---------|------|
+| `npm run build` | esbuild 번들 → bootstrap.js |
+| `npm test` | jest fast (일반 개발) |
+| `npm run test:full` | jest 전체 suite |
+| `npm run test:coverage` | 커버리지 포함 |
+| `npm run verify:fixed-point` | self-hosting 고정점 검증 |
+| `npm run verify:build-deterministic` | 빌드 결정론 체크 |
+| `bash scripts/verify-all.sh` | 통합 검증 대시보드 |
+
+> **규칙**: `src/*.ts` 수정 → `npm run build` → `npm test` → push  
+> `bootstrap.js` 직접 수정 금지 (빌드 시 덮어씌워짐)
+
+---
+
 ## AI-First 설계
 
 - **snake_case / kebab-case 모두 허용** — `file_read` = `file-read`
