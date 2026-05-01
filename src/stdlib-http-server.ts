@@ -654,6 +654,15 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return value as string | null;
     },
 
+    // server_req_headers req -> object (전체 헤더 맵)
+    "server_req_headers": (req: Request): Record<string, string> => {
+      const result: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) {
+        result[k] = Array.isArray(v) ? v[0] : (v as string) ?? "";
+      }
+      return result;
+    },
+
     // server_req_param req name -> string
     "server_req_param": (req: Request, name: string): string | null => {
       return req.params[name] ?? null;
