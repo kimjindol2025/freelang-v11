@@ -11227,7 +11227,7 @@ function flGetParamNames(paramsNode) {
 }
 function flExecOpNative(op, vals) {
   const v0 = vals[0], v1 = vals[1], v2 = vals[2];
-  switch (op) {
+  switch (normalizedOp) {
     case "+":
       return vals.reduce((a, b) => a + b, 0);
     case "-":
@@ -11606,7 +11606,7 @@ function flInterpSexpr(op, rawArgs, env) {
     if (fn && fn.kind === "closure") return flApplyNative(fn, vals);
     return flExecOpNative(op, vals);
   }
-  switch (op) {
+  switch (normalizedOp) {
     case "if": {
       const cond = flInterpNative(rawArgs[0], env);
       if (cond) return flInterpNative(rawArgs[1], env);
@@ -11705,13 +11705,13 @@ function flInterpSexpr(op, rawArgs, env) {
   }
 }
 function evalBuiltin(interp2, op, args2, expr2) {
-  op = op.replace(/_/g, "-");
+  const normalizedOp2 = op.replace(/_/g, "-");
   const ev = (node) => interp2.eval(node);
   const callFn = (fn, a) => interp2.callFunction(fn, a);
   const callUser = (name, a) => interp2.callUserFunction(name, a);
   const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
   const toDisplay = (val) => interp2.toDisplayString(val);
-  switch (op) {
+  switch (normalizedOp2) {
     case "load": {
       const filePath = String(args2[0] ?? "");
       const fs20 = require("fs");
@@ -12366,7 +12366,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       const op2 = String(args2[0]);
       const vals = Array.isArray(args2[1]) ? args2[1] : [];
       const v0 = vals[0], v1 = vals[1], v2 = vals[2];
-      switch (op2) {
+      switch (normalizedOp2) {
         case "+":
           return vals.reduce((a, b) => a + b, 0);
         case "-":
@@ -15083,7 +15083,7 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         const r145 = evalExplain_PHASE145(op, args2, callFnVal);
         if (r145 !== null) return r145;
       }
-      switch (op) {
+      switch (normalizedOp2) {
         case "file-mkdir":
         case "file_mkdir": {
           const dirPath = String(args2[0] ?? "");
@@ -21344,8 +21344,8 @@ function createTotpModule() {
 // src/stdlib-mail.ts
 var fs6 = __toESM(require("fs"));
 var path5 = __toESM(require("path"));
-var tls = __toESM(require("tls"));
 var import_crypto6 = require("crypto");
+var tls = require("tls");
 function createMailModule() {
   return {
     // mail_outbox_write dir to subject body -> string (파일 경로)
@@ -23145,10 +23145,16 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               }
             } else {
               if (result && typeof result === "object") {
-                if (result.__fl_response === true) {
-                  status = result.status ?? 200;
-                  const contentType = result.contentType ?? "application/json";
-                  sendResponse(res, status, result.body ?? "", contentType, result.headers ?? {});
+                // Map 객체: {:status :body :headers} 구조 감지
+                const getField = (obj, key) => obj instanceof Map ? (obj.get(key) ?? obj.get(":" + key)) : obj[key];
+                const resStatus = getField(result, "status");
+                const resBody = getField(result, "body");
+                if (result.__fl_response === true || (resStatus !== undefined && resBody !== undefined)) {
+                  status = resStatus ?? 200;
+                  const resHeaders = getField(result, "headers") ?? {};
+                  const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
+                  const contentType = headersObj["content-type"] ?? "application/json";
+                  sendResponse(res, status, resBody ?? "", contentType, headersObj);
                 } else {
                   sendResponse(res, 200, result);
                 }
@@ -28880,12 +28886,16 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createBlogModule());
   interp2.registerModule(createCloudModule());
   interp2.registerModule(createMatrixModule());
-  // 네이밍 alias: 자주 쓰는 함수들의 대체 이름 등록
   const _aliases = {
     "mod":           (a, b) => a % b,
     "str-contains?": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str-contains":  (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?":     (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
+    "number":        (v) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "parse-int":     (v, radix) => { const n = parseInt(v, radix ?? 10); return isNaN(n) ? null : n; },
+    "parse-float":   (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
+    "to-number":     (v) => { const n = Number(v); return isNaN(n) ? null : n; },
+    "number?":       (v) => typeof v === "number" && !isNaN(v),
   };
   for (const [name, fn] of Object.entries(_aliases)) {
     if (!interp2.context.functions.has(name)) {
@@ -28936,11 +28946,7 @@ function evalTryBlock(interp2, tryBlock) {
       for (const catchClause of tryBlock.catchClauses) {
         interp2.context.variables.push();
         if (catchClause.variable) {
-          let errVal;
-          if (typeof error === "string") errVal = error;
-          else if (error instanceof Error) errVal = error.message;
-          else errVal = String(error);
-          interp2.context.variables.set("$" + catchClause.variable, errVal);
+          interp2.context.variables.set("$" + catchClause.variable, error);
         }
         try {
           result = interp2.eval(catchClause.handler);
@@ -29727,18 +29733,10 @@ ${tail}` : "")
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
   try {
-    for (let recurIter = 0; recurIter < 2e6; recurIter++) {
-      for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args2[i]);
-      }
-      const result = interp2.eval(func.body);
-      if (result && typeof result === "object" && result.__FL_RECUR__) {
-        args2 = result.__args;
-        continue;
-      }
-      return result;
+    for (let i = 0; i < func.params.length; i++) {
+      interp2.context.variables.set(func.params[i], args2[i]);
     }
-    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
+    return interp2.eval(func.body);
   } finally {
     interp2.callDepth--;
     _callStack.pop();
