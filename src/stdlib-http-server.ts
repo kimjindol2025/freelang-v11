@@ -322,7 +322,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
                     status = resStatus ?? 200;
                     const resHeaders = getField(result, "headers") ?? {};
                     const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
-                    const contentType = headersObj["content-type"] ?? "application/json";
+                    const contentType = headersObj["content-type"] ?? getField(result, "contentType") ?? "application/json";
                     sendResponse(res, status, resBody ?? "", contentType, headersObj);
                   } else {
                     sendResponse(res, 200, result);
