@@ -4,6 +4,7 @@
 ;; Load sub-modules (절대경로)
 (load "/home/kimjin/freelang-v11/self/stdlib/mongodb/bson.fl")
 (load "/home/kimjin/freelang-v11/self/stdlib/mongodb/wire.fl")
+(load "/home/kimjin/freelang-v11/self/stdlib/mongodb/schema.fl")
 
 ;; ─────────────────────────────────────────────────────────────────────
 ;; Connection

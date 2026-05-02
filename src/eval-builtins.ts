@@ -820,6 +820,131 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       }
     }
 
+    // net-sendrecv-pool: persistent TCP connection pool via Worker Thread
+    // args: host port hexData timeout
+    // Returns hex response or null
+    case "net-sendrecv-pool": {
+      const host = String(args[0] ?? "localhost");
+      const port = Number(args[1] ?? 27017);
+      const hexData = String(args[2] ?? "");
+      const timeout = Number(args[3] ?? 10000);
+
+      // Lazy-initialize the net pool worker
+      if (!(globalThis as any).__netPoolWorker) {
+        const { Worker: NetWorker } = require("worker_threads");
+        const netCtrlBuf = new SharedArrayBuffer(4);
+        const netDataBuf = new SharedArrayBuffer(8 * 1024 * 1024); // 8MB
+        Atomics.store(new Int32Array(netCtrlBuf), 0, 0);
+        const netWorkerCode = `
+const { workerData } = require('worker_threads');
+const net = require('net');
+const control = new Int32Array(workerData.controlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const sockets = new Map(); // key=host:port, value=socket
+
+function getSocket(host, port) {
+  const key = host + ':' + port;
+  if (sockets.has(key)) {
+    const s = sockets.get(key);
+    if (!s.destroyed && s.writable) return Promise.resolve(s);
+    sockets.delete(key);
+  }
+  return new Promise((resolve, reject) => {
+    const sock = net.createConnection({ host, port });
+    sock.on('connect', () => {
+      sockets.set(key, sock);
+      resolve(sock);
+    });
+    sock.on('error', reject);
+    sock.on('close', () => sockets.delete(key));
+    setTimeout(() => reject(new Error('connect timeout')), 5000);
+  });
+}
+
+function sendRecv(host, port, hexPayload, timeout) {
+  return new Promise(async (resolve, reject) => {
+    let sock;
+    try { sock = await getSocket(host, port); } catch(e) { return reject(e); }
+    const buf = Buffer.from(hexPayload, 'hex');
+    let chunks = [];
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) { done = true; resolve(null); }
+    }, timeout);
+    const onData = (chunk) => {
+      chunks.push(chunk);
+      const total = Buffer.concat(chunks);
+      if (total.length >= 4) {
+        const msgLen = total.readInt32LE(0);
+        if (total.length >= msgLen) {
+          done = true;
+          clearTimeout(timer);
+          sock.removeListener('data', onData);
+          resolve(total.slice(0, msgLen).toString('hex'));
+        }
+      }
+    };
+    sock.on('data', onData);
+    sock.write(buf);
+  });
+}
+
+async function loop() {
+  while (true) {
+    Atomics.wait(control, 0, 0);
+    const flag = Atomics.load(control, 0);
+    if (flag === -1) break;
+    const reqLen = data.readInt32LE(0);
+    const reqStr = data.toString('utf8', 4, 4 + reqLen);
+    let resp;
+    try {
+      const req = JSON.parse(reqStr);
+      const hexResp = await sendRecv(req.host, req.port, req.data, req.timeout || 10000);
+      resp = { ok: true, data: hexResp };
+    } catch(e) {
+      resp = { ok: false, error: e.message };
+    }
+    const respStr = JSON.stringify(resp);
+    data.writeInt32LE(respStr.length, 0);
+    data.write(respStr, 4, 'utf8');
+    Atomics.store(control, 0, 2);
+    Atomics.notify(control, 0);
+    Atomics.wait(control, 0, 2); // wait for main thread to acknowledge
+  }
+}
+loop().catch(e => {
+  Atomics.store(control, 0, -2);
+  Atomics.notify(control, 0);
+});
+`;
+        const netWorker = new NetWorker(netWorkerCode, {
+          eval: true,
+          workerData: { controlBuf: netCtrlBuf, dataBuf: netDataBuf },
+        });
+        netWorker.on("error", (e: any) => {
+          (globalThis as any).__netPoolWorker = null;
+        });
+        (globalThis as any).__netPoolWorker = netWorker;
+        (globalThis as any).__netPoolCtrlBuf = netCtrlBuf;
+        (globalThis as any).__netPoolDataBuf = netDataBuf;
+      }
+
+      const netCtrl = new Int32Array((globalThis as any).__netPoolCtrlBuf);
+      const netData = Buffer.from((globalThis as any).__netPoolDataBuf);
+      const reqStr = JSON.stringify({ host, port, data: hexData, timeout });
+      netData.writeInt32LE(reqStr.length, 0);
+      netData.write(reqStr, 4, "utf8");
+      Atomics.store(netCtrl, 0, 1);
+      Atomics.notify(netCtrl, 0);
+      const waitResult = Atomics.wait(netCtrl, 0, 1, timeout + 2000);
+      if (waitResult === "timed-out") return null;
+      const respLen = netData.readInt32LE(0);
+      const resp = JSON.parse(netData.toString("utf8", 4, 4 + respLen));
+      Atomics.store(netCtrl, 0, 0); // acknowledge
+      if (!resp.ok) return null;
+      return resp.data;
+    }
+
     // Arithmetic
     case "+":
       return args.reduce((a: number, b: number) => a + b, 0);

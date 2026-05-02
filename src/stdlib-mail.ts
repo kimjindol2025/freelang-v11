@@ -160,5 +160,92 @@ export function createMailModule() {
         socket.setTimeout(15000, () => fail("timeout"));
       });
     },
+
+    // ── Mailgun API HTTP 메일 전송 ─────────────────────────
+    // mailgun_send api_key domain from to subject text -> {ok, id, error}
+    // Mailgun REST API v3 사용 (npm 0, Node https만 사용)
+
+    "mailgun_send": (
+      api_key: string,
+      domain: string,
+      from: string,
+      to: string,
+      subject: string,
+      text: string,
+    ): Promise<Record<string, any>> => {
+      return new Promise((resolve) => {
+        try {
+          const https = require("https");
+          const querystring = require("querystring");
+
+          // Basic Auth: api:key
+          const auth = Buffer.from(`api:${api_key}`).toString("base64");
+
+          // Form data
+          const postData = querystring.stringify({
+            from,
+            to,
+            subject,
+            text,
+          });
+
+          const options = {
+            hostname: "api.mailgun.net",
+            port: 443,
+            path: `/v3/${domain}/messages`,
+            method: "POST",
+            headers: {
+              "Authorization": `Basic ${auth}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Content-Length": Buffer.byteLength(postData),
+            },
+          };
+
+          const req = https.request(options, (res: any) => {
+            let data = "";
+            res.on("data", (chunk: any) => {
+              data += chunk;
+            });
+            res.on("end", () => {
+              try {
+                const json = JSON.parse(data);
+                if (res.statusCode === 200) {
+                  resolve({
+                    ok: true,
+                    id: json.id,
+                    message: "메일 전송 완료",
+                  });
+                } else {
+                  resolve({
+                    ok: false,
+                    error: json.message || "Mailgun API 오류",
+                  });
+                }
+              } catch (e: any) {
+                resolve({
+                  ok: false,
+                  error: `파싱 실패: ${e.message}`,
+                });
+              }
+            });
+          });
+
+          req.on("error", (e: any) => {
+            resolve({
+              ok: false,
+              error: `요청 실패: ${e.message}`,
+            });
+          });
+
+          req.write(postData);
+          req.end();
+        } catch (e: any) {
+          resolve({
+            ok: false,
+            error: `예외: ${e.message}`,
+          });
+        }
+      });
+    },
   };
 }
