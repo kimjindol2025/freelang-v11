@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 418개 함수, 28 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 412개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -508,15 +508,6 @@ parallel race with-timeout fl-try use`
 - `(mail_outbox_list dir)` → array (JSON 배열, 큐된 메시지)
 - `(mail_outbox_count dir)` → number
 
-### mariadb (6개)
-
-- `(mariadb_exec db sql [params])` → raw output string (INSERT/UPDATE/DELETE/CREATE)
-- `(mariadb_query db sql [params])` → rows[] (SELECT)
-- `(mariadb_one db sql [params])` → first row or null
-- `(mariadb_health)` → true if server reachable
-- `(mariadb_databases)` → list of database names
-- `(mariadb_tables db)` → list of table names in given db
-
 ### markdown (3개)
 
 - `(markdown_to_html md)` → html string
@@ -676,4 +667,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-02T06:15:00.498Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-02T06:29:04.394Z
