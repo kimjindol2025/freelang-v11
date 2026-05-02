@@ -3,12 +3,14 @@
 
 import { Interpreter } from "../interpreter";
 import { FreeLangPromise } from "../async-runtime";
+import { createMongodbModule } from "../stdlib-mongodb";
 
 describe("MongoDB Phase 4: Integration Tests", () => {
   let interp: Interpreter;
 
   beforeAll(() => {
     interp = new Interpreter();
+    interp.registerModule(createMongodbModule());
   });
 
   afterAll(() => {

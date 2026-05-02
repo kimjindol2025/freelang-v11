@@ -4,6 +4,7 @@
 import { lex } from "../lexer";
 import { Parser } from "../parser";
 import { Interpreter } from "../interpreter";
+import { createMariadbModule } from "../stdlib-mariadb";
 
 beforeAll(() => { jest.useFakeTimers(); });
 afterAll(() => { jest.useRealTimers(); });
@@ -139,8 +140,11 @@ describe("Function value passing", () => {
 
 describe("v11.6 MariaDB friendly errors (unit)", () => {
   test("mariadb_health returns boolean", () => {
-    // No server required — just check function exists & returns bool
-    const result = run("(mariadb_health)");
+    const tokens = lex("(mariadb_health)");
+    const ast = new Parser(tokens).parse();
+    const interp = new Interpreter();
+    interp.registerModule(createMariadbModule());
+    const result = interp.interpret(ast).lastValue;
     expect(typeof result).toBe("boolean");
   });
 });

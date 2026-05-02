@@ -1,5 +1,42 @@
 # FreeLang v11 변경 이력
 
+## [11.1.1-dev] - 2026-05-03
+
+**마일스톤**: AI-Native Phase 1~4 완료 + MongoDB + 보안 강화 + L2 버그 수정 진행
+
+**테스트**: 773/832 통과 (92.9%)
+
+### 🔧 버그 수정
+- **L2 case-15**: `extract-params-loop`에서 `kind="literal"` 파라미터 누락 버그 수정
+  - 일반 심볼 파라미터(`m`, `template`, `vars`)가 `"p"`로 잘못 컴파일되던 문제
+  - `all.fl` 조건문 수정: `(= $k "variable")` → `(or (= $k "variable") (= $k "literal"))`
+
+### ✨ 신규 기능
+- **`fl_load`**: 다른 `.fl` 파일을 현재 컨텍스트에 로드
+- **MongoDB stdlib**: Wire Protocol → 실제 npm `mongodb` 드라이버로 교체
+- **보안 강화 Phase 0**:
+  - Rate Limiting 미들웨어
+  - CSP (Content-Security-Policy) 헤더
+  - multipart 폼 처리
+  - 이미지 업로드/처리
+
+### 🤖 AI-Native Phase 1~4
+- **Phase 1**: `defn` 메타 맵 시스템 (`fn-meta` 조회)
+- **Phase 2**: `:effects` 추론 + 강제 적용
+- **Phase 3**: `^pure` 순수성 강제 (컴파일 에러)
+- **Phase 4**: `defprop` + property-based testing
+
+### 🐛 기타 수정
+- `_id` 표시 버그 수정
+- MongoDB `:$set` operator 파싱 수정
+- `$var?` 변수명 허용
+- `:open` 등 예약 키워드를 `:key` 인자로 사용 가능
+- `str_fmt` 문자열 보간 추가 (`{key}` 패턴)
+- `inc` / `dec` 함수 추가
+- `server_html` Content-Type 버그 수정
+
+---
+
 ## [11.1.0] - 2026-04-29
 
 **마일스톤**: Phase A 완료 + Issue #3 전체 해결 + A-3 자체호스팅 기초 + Phase C-4 검증 완료

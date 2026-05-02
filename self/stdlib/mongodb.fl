@@ -147,4 +147,25 @@
 (defn mongo-push [$doc] (assoc {} "$push" $doc))
 (defn mongo-pull [$doc] (assoc {} "$pull" $doc))
 
+;; mongo-parse-uri : "mongodb://host:port/db" → {:host :port :db} or nil
+(defn mongo-parse-uri [$uri]
+  (if (or (nil? $uri) (= $uri ""))
+    nil
+    (let [[$uri (if (str-contains $uri "://")
+                  (substring $uri (+ (index-of $uri "://") 3))
+                  $uri)]
+          [$db (if (str-contains $uri "/")
+                 (substring $uri (+ (index-of $uri "/") 1))
+                 "")]
+          [$hostport (if (str-contains $uri "/")
+                       (substring $uri 0 (index-of $uri "/"))
+                       $uri)]
+          [$host (if (str-contains $hostport ":")
+                   (substring $hostport 0 (index-of $hostport ":"))
+                   $hostport)]
+          [$port (if (str-contains $hostport ":")
+                   (str-to-num (substring $hostport (+ (index-of $hostport ":") 1)))
+                   27017)]]
+      {:host $host :port $port :db $db})))
+
 (println "MongoDB module loaded")

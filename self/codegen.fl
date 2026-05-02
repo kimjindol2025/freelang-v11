@@ -1,34 +1,7 @@
-;; self/codegen.fl — FL AST → JS source (v2.1, Production Ready & Optimized)
-;;
-;; 🚀 주요 개선 사항:
-;;   - Bootstrap 의존성 제거를 위한 실제 Runtime Prelude (HTTP/DB) 통합
-;;   - recur/loop 완벽 지원 (TCO 기반 루프 변환)
-;;   - 중복 코드 제거 및 구조 최적화
+;; self/codegen.fl — FL AST → JS source (v2.2, Clean & Consistent)
 
-;; ═══════ 유틸 ═══════
+;; ═══════ Utilities ═══════
 
-[FUNC esc-1 :params [$s] :body (replace $s "\\" "\\\\")]
-[FUNC esc-2 :params [$s] :body (replace $s "\"" "\\\"")]
-[FUNC esc-3 :params [$s] :body (replace $s "\n" "\\n")]
-[FUNC esc-4 :params [$s] :body (replace $s "\r" "\\r")]
-[FUNC esc-5 :params [$s] :body (replace $s "\t" "\\t")]
-
-[FUNC js-esc-inner :params [$s]
-  :body (esc-5 (esc-4 (esc-3 (esc-2 (esc-1 $s)))))]
-
-[FUNC js-esc :params [$s]
-  :body (str "\"" (js-esc-inner $s) "\"")]
-
-;; FL 예약 특수폼
-[FUNC fl-reserved? :params [$n]
-  :body (or (= $n "loop") (= $n "recur") (= $n "fn") (= $n "defn") (= $n "defun")
-            (= $n "if") (= $n "cond") (= $n "do") (= $n "begin") (= $n "progn")
-            (= $n "while") (= $n "and") (= $n "or") (= $n "let") (= $n "set!")
-            (= $n "define") (= $n "async") (= $n "await") (= $n "try")
-            (= $n "catch") (= $n "finally") (= $n "throw") (= $n "quote")
-            (= $n "compose") (= $n "pipe") (= $n "->") (= $n "->>") (= $n "|>"))]
-
-;; JS 예약어 회피
 [FUNC js-reserved? :params [$n]
   :body (or (= $n "default") (= $n "class") (= $n "const") (= $n "let")
             (= $n "if") (= $n "else") (= $n "switch") (= $n "case")
@@ -41,22 +14,26 @@
             (= $n "enum") (= $n "do") (= $n "with") (= $n "finally")
             (= $n "null") (= $n "true") (= $n "false"))]
 
-[FUNC rename-1 :params [$n] :body (replace $n "-" "_")]
-[FUNC rename-2 :params [$n] :body (replace $n "?" "_q")]
-[FUNC rename-3 :params [$n] :body (replace $n "!" "_x")]
-[FUNC rename-4 :params [$n] :body (replace $n ">" "_gt")]
-[FUNC rename-5 :params [$n] :body (replace $n "<" "_lt")]
-[FUNC rename-6 :params [$n] :body (replace $n "*" "_st")]
-[FUNC rename-7 :params [$n] :body (replace $n "+" "_pl")]
-
 [FUNC js-name-inner :params [$n]
-  :body (let [[$g (rename-7 (rename-6 (rename-5 (rename-4 (rename-3 (rename-2 (rename-1 $n)))))))]]
+  :body (let [[$g (str-replace (str-replace (str-replace (str-replace (str-replace (str-replace (str-replace $n "-" "_") "?" "_q") "!" "_x") ">" "_gt") "<" "_lt") "*" "_st") "+" "_pl")]]
           (if (js-reserved? $g) (str $g "_") $g))]
 
 [FUNC js-name :params [$n]
   :body (if (null? $n) "_" (js-name-inner $n))]
 
-;; ═══════ 디스패치 ═══════
+[FUNC js-esc-inner :params [$s]
+  :body (str-replace (str-replace (str-replace (str-replace (str-replace $s "\\" "\\\\") "\"" "\\\"") "\n" "\\n") "\r" "\\r") "\t" "\\t")]
+
+[FUNC js-esc :params [$s]
+  :body (str "\"" (js-esc-inner $s) "\"")]
+
+[FUNC get-block-items :params [$node]
+  :body (if (null? $node) (list)
+          (if (and (= (get $node :kind) "block") (= (get $node :type) "Array"))
+            (get (get $node :fields) "items")
+            $node))]
+
+;; ═══════ Code Generation ═══════
 
 [FUNC cg :params [$n]
   :body (cond
@@ -73,171 +50,122 @@
           [(= (get $n :kind) "or") (cg-or (get $n :args))]
           [(= (get $n :kind) "pattern-match") (cg-match $n)]
           [(= (get $n :kind) "await") (str "(await " (cg (get $n :argument)) ")")]
-          [(= (get $n :kind) "throw") (str "(()=>{throw new Error(String(" (cg (get $n :argument)) "))})()")]
+          [(= (get $n :kind) "throw") (str "((()=>{throw new Error(String(" (cg (get $n :argument)) "))})())")]
           [true "null"])]
-
-[FUNC js-esc-for-template :params [$s]
-  :body (let [[$s1 (replace $s "\\" "\\\\")]]
-          (replace $s1 "`" "\\`"))]
-
-[FUNC cg-template-string :params [$n]
-  :body (str "`" (js-esc-for-template (get $n :value)) "`")]
-
-[FUNC cg-try :params [$n]
-  :body (let [[$body (get $n :body)]
-              [$catch-node (get $n :catch)]
-              [$finally-node (get $n :finally)]
-              [$body-code (cg $body)]
-              [$catch-code (if (null? $catch-node) "" (cg-catch-clause $catch-node))]
-              [$finally-code (if (null? $finally-node) "" (str "finally{" (cg $finally-node) "}"))]
-              ]
-          (str "(()=>{try{return " $body-code "}catch(err){" $catch-code "}" $finally-code "})()"))]
-
-[FUNC cg-catch-clause :params [$catch-node]
-  :body (let [[$param (if (= (get $catch-node :kind) "sexpr")
-                         (let [[$args (get $catch-node :args)]]
-                           (if (> (length $args) 0)
-                             (js-name (str (get (get $args 0) :name)))
-                             "err"))
-                         "err")]
-              [$body (if (= (get $catch-node :kind) "sexpr")
-                       (let [[$args (get $catch-node :args)]]
-                         (if (> (length $args) 1)
-                           (cg (get $args 1))
-                           "null"))
-                       (cg $catch-node))]]
-          (str "let " $param "=err;return " $body ";"))]
 
 [FUNC cg-literal :params [$n]
-  :body (cg-literal-dispatch (get $n :type) (get $n :value))]
+  :body (let [[$t (get $n :type)] [$v (get $n :value)]]
+          (cond
+            [(= $t "number") (str $v)]
+            [(= $t "string") (js-esc $v)]
+            [(= $t "boolean") (if $v "true" "false")]
+            [(= $t "symbol") (cond [(= $v "true") "true"] [(= $v "false") "false"] [(= $v "null") "null"] [(= $v "nil") "null"] [true (js-name $v)])]
+            [true "null"]))]
 
-[FUNC cg-literal-dispatch :params [$t $v]
-  :body (cond
-          [(= $t "number") $v]
-          [(= $t "string") (js-esc $v)]
-          [(= $t "boolean") (if $v "true" "false")]
-          [(= $t "symbol")
-           (cond [(= $v "true") "true"]
-                 [(= $v "false") "false"]
-                 [(= $v "null") "null"]
-                 [(= $v "nil") "null"]
-                 [true (js-name $v)])]
-          [true "null"])]
+[FUNC cg-template-string :params [$n]
+  :body (str "`" (str-replace (str-replace (get $n :value) "\\" "\\\\") "`" "\\`") "`")]
+
+[FUNC cg-try :params [$n]
+  :body (let [[$body (cg (get $n :body))]
+              [$catch (get $n :catch)]
+              [$finally (get $n :finally)]
+              [$c-code (if (null? $catch) "" (cg-catch-clause $catch))]
+              [$f-code (if (null? $finally) "" (str "finally{" (cg $finally) "}"))]]
+          (str "(()=>{try{return " $body "}catch(err){" $c-code "}" $f-code "})()"))]
+
+[FUNC cg-catch-clause :params [$c]
+  :body (let [[$is-sexpr (= (get $c :kind) "sexpr")]
+              [$param (if $is-sexpr (js-name (get (get (get $c :args) 0) :name)) "err")]
+              [$body (if $is-sexpr (cg (get (get $c :args) 1)) (cg $c))]]
+          (str "let " $param "=err;return " $body ";"))]
 
 [FUNC cg-block :params [$n]
-  :body (let [[$t (get $n :type)] [$fields (get $n :fields)]]
+  :body (let [[$t (get $n :type)] [$f (get $n :fields)]]
           (cond
-            [(= $t "FUNC") (cg-func-block $n)]
-            [(= $t "Map") (str "({" (cg-map-entries $fields) "})")]
-            [(= $t "Array") (str "[" (cg-args (get $fields "items")) "]")]
-            [true (cg-block-dispatch $t $fields)]))]
+            [(= $t "Map") (str "({" (cg-map-entries $f) "})")]
+            [(= $t "Array") (str "[" (cg-args (get $f "items")) "]")]
+            [true "null"]))]
 
-[FUNC cg-block-dispatch :params [$t $fields]
-  :body (cond
-          [(= $t "Array") (str "[" (cg-args (get $fields "items")) "]")]
-          [(= $t "Map") (str "({" (cg-map-entries $fields) "})")]
-          [true "null"])]
-
-[FUNC cg-map-entries :params [$fields]
-  :body (let [[$items (get $fields "items")]]
-          (if (array? $items)
+[FUNC cg-map-entries :params [$f]
+  :body (let [[$items (get $f "items")]]
+          (if (Array.isArray $items)
             (cg-map-flat-loop $items 0 "")
-            (cg-map-loop (map-entries $fields) 0 "")))]
+            (cg-map-loop (map-entries $f) 0 "")))]
 
-[FUNC cg-map-loop :params [$entries $i $acc]
-  :body (if (>= $i (length $entries)) $acc
-          (let [[$e (get $entries $i)]
-                [$k (get $e 0)]
-                [$v (cg (get $e 1))]
-                [$pair (str (js-esc $k) ":" $v)]]
-            (cg-map-loop $entries (+ $i 1)
-                         (if (= $i 0) $pair (str $acc "," $pair)))))]
+[FUNC cg-map-loop :params [$e $i $acc]
+  :body (if (>= $i (length $e)) $acc
+          (let [[$pair (str (js-esc (get (get $e $i) 0)) ":" (cg (get (get $e $i) 1)))]]
+            (cg-map-loop $e (+ $i 1) (if (= $i 0) $pair (str $acc "," $pair)))))]
 
-[FUNC cg-map-flat-loop :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k-n (get $items $i)]
-                [$v-n (get $items (+ $i 1))]
-                [$k-str (cg-keyword-key $k-n)]
-                [$v-js (cg $v-n)]
-                [$pair (str $k-str ":" $v-js)]]
-            (cg-map-flat-loop $items (+ $i 2)
-                              (if (= $i 0) $pair (str $acc "," $pair)))))]
+[FUNC cg-map-flat-loop :params [$it $i $acc]
+  :body (if (>= $i (length $it)) $acc
+          (let [[$k (get $it $i)] [$v (get $it (+ $i 1))]
+                [$key (cond [(= (get $k :kind) "keyword") (js-esc (get $k :name))] [(= (get $k :kind) "literal") (js-esc (str (get $k :value)))] [true "\"_anon\""])]
+                [$pair (str $key ":" (cg $v))]]
+            (cg-map-flat-loop $it (+ $i 2) (if (= $i 0) $pair (str $acc "," $pair)))))]
 
-[FUNC cg-keyword-key :params [$n]
-  :body (cond [(= (get $n :kind) "keyword") (js-esc (get $n :name))]
-              [(= (get $n :kind) "literal") (js-esc (str (get $n :value)))]
-              [true "\"_anon\""])]
+;; ═══════ Special Forms ═══════
 
-[FUNC cg-func-block :params [$n]
-  :body (let [[$name (js-name (get $n :name))]
-              [$fields (get $n :fields)]
-              [$pnode (get $fields "params")]
-              [$pitems (if (null? $pnode) (list) (get (get $pnode :fields) "items"))]
-              [$ps (extract-params $pitems)]
-              [$body (get $fields "body")]]
-          (str "const " $name " = (" $ps ")=>" (cg $body) ";"))]
+[FUNC string? :params [$x] :body (= (type-of $x) "string")]
+[FUNC array? :params [$x] :body (= (type-of $x) "list")]
 
-;; ═══════ 특수폼 ═══════
+[FUNC cg-sexpr :params [$n]
+  :body (let [[$op (get $n :op)]]
+          (if (string? $op)
+            (cg-sexpr-dispatch $op (get $n :args))
+            (str "(" (cg $op) ")(" (cg-args (get $n :args)) ")")))]
 
-[FUNC cg-if :params [$args]
-  :body (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":"
-             (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
+[FUNC cg-sexpr-dispatch :params [$op $args]
+  :body (cond
+          [(= $op "if") (str "(" (cg (get $args 0)) "?" (cg (get $args 1)) ":" (if (>= (length $args) 3) (cg (get $args 2)) "null") ")")]
+          [(= $op "fn") (cg-fn $args)]
+          [(= $op "defn") (cg-defn $args)]
+          [(= $op "let") (cg-let $args)]
+          [(= $op "do") (str "(()=>{" (cg-do-body $args 0 "") "})()")]
+          [(= $op "cond") (cg-cond $args)]
+          [(= $op "loop") (cg-loop $args)]
+          [(= $op "recur") (str "{__recur:true,a:[" (cg-args $args) "]}")]
+          [(= $op "and") (str "(" (join (map (fn [$a] (cg $a)) $args) "&&") ")")]
+          [(= $op "or") (str "(" (join (map (fn [$a] (cg $a)) $args) "||") ")")]
+          [(= $op "+") (if (= (length $args) 0) "0" (str "(" (binop-loop $args 0 "" "+") ")"))]
+          [(= $op "-") (cg-sub $args)]
+          [(= $op "*") (if (= (length $args) 0) "1" (str "(" (binop-loop $args 0 "" "*") ")"))]
+          [(= $op "/") (str "(" (cg (get $args 0)) "/" (cg (get $args 1)) ")")]
+          [(= $op "=") (str "(" (cg (get $args 0)) "===" (cg (get $args 1)) ")")]
+          [(= $op "<") (str "(" (cg (get $args 0)) "<" (cg (get $args 1)) ")")]
+          [(= $op ">") (str "(" (cg (get $args 0)) ">" (cg (get $args 1)) ")")]
+          [true (cg-native-dispatch $op (cg-args $args))])]
 
 [FUNC cg-fn :params [$args]
-  :body (let [[$pnode (get $args 0)] [$body (get $args 1)]
-              [$ps (extract-params (get (get $pnode :fields) "items"))]]
-          (str "((" $ps ")=>" (cg $body) ")"))]
+  :body (let [[$ps-info (extract-params (get-block-items (get $args 0)))]
+              [$body (cg (get $args 1))]
+              [$pre (get $ps-info :preamble)]
+              [$final-body (if (= (length $pre) 0) $body (str "((() => { " $pre " return " $body "; })())"))]]
+          (str "((" (get $ps-info :params) ") => " $final-body ")"))]
 
 [FUNC cg-defn :params [$args]
-  :body (let [[$name-n (get $args 0)] [$pnode (get $args 1)] [$body (get $args 2)]
-              [$name (extract-name $name-n)]
-              [$ps (extract-params (get (get $pnode :fields) "items"))]]
-          (str "const " $name " = (" $ps ")=>" (cg $body)))]
-
-[FUNC cg-define :params [$args]
-  :body (if (= (length $args) 2)
-          (str "const " (extract-name (get $args 0)) " = " (cg (get $args 1)))
-          (cg-defn $args))]
+  :body (let [[$ps-info (extract-params (get-block-items (get $args 1)))]
+              [$body (cg (get $args 2))]
+              [$pre (get $ps-info :preamble)]
+              [$final-body (if (= (length $pre) 0) $body (str "((() => { " $pre " return " $body "; })())"))]]
+          (str "const " (extract-name (get $args 0)) " = (" (get $ps-info :params) ") => " $final-body))]
 
 [FUNC cg-let :params [$args]
-  :body (let [[$bnode (get $args 0)]
-              [$items (get (get $bnode :fields) "items")]
-              [$first-item (if (null? $items) null (get $items 0))]
-              [$nested (if (null? $first-item) false
-                         (and (= (get $first-item :kind) "block")
-                              (= (get $first-item :type) "Array")))]
-              [$bindings (if $nested (cg-let-2d $items 0 "" 0) (cg-let-1d $items 0 "" 0))]
-              [$body-args (slice $args 1 (length $args))]
-              [$body-js (cg-do-body $body-args 0 "")]]
-          (str "((()=>{" $bindings $body-js "})())"))]
+  :body (let [[$items (get-block-items (get $args 0))]
+              [$first (get $items 0)]
+              [$nested (array? $first)]
+              [$bindings (if $nested (cg-let-2d $items 0 "") (cg-let-1d $items 0 ""))]
+              [$body (cg-do-body (slice $args 1 (length $args)) 0 "")]]
+          (str "((()=>{" $bindings $body "})())"))]
 
-[FUNC cg-let-1d :params [$items $i $acc $counter]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pat-n (get $items $i)]
-                [$v-n (get $items (+ $i 1))]
-                [$val (cg $v-n)]
-                [$tmpvar (str "__v" $counter)]]
-            (cg-let-1d $items (+ $i 2) (str $acc (cg-let-binding $pat-n $val $tmpvar)) (+ $counter 1))))]
+[FUNC cg-let-1d :params [$it $i $acc]
+  :body (if (>= $i (length $it)) $acc
+          (cg-let-1d $it (+ $i 2) (str $acc "let " (extract-name (get $it $i)) "=" (cg (get $it (+ $i 1))) ";")))]
 
-[FUNC cg-let-2d :params [$items $i $acc $counter]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pitems (get (get $pair :fields) "items")]
-                [$k-n (get $pitems 0)]
-                [$v-n (get $pitems 1)]
-                [$val (cg $v-n)]
-                [$tmpvar (str "__v" $counter)]]
-            (cg-let-2d $items (+ $i 1) (str $acc (cg-let-binding $k-n $val $tmpvar)) (+ $counter 1))))]
-
-[FUNC cg-let-binding :params [$pat-node $val-js $tmpvar]
-  :body (let [[$kind (get $pat-node :kind)]]
-          (if (= $kind "variable")
-            (str "let " (js-name (get $pat-node :name)) "=" $val-js ";")
-            (str "let " (extract-name $pat-node) "=" $val-js ";")))]
-
-[FUNC cg-do :params [$args]
-  :body (if (= (length $args) 0) "null"
-          (str "(()=>{" (cg-do-body $args 0 "") "})()"))]
+[FUNC cg-let-2d :params [$it $i $acc]
+  :body (if (>= $i (length $it)) $acc
+          (let [[$p (get-block-items (get $it $i))]]
+            (cg-let-2d $it (+ $i 1) (str $acc "let " (extract-name (get $p 0)) "=" (cg (get $p 1)) ";"))))]
 
 [FUNC cg-do-body :params [$args $i $acc]
   :body (if (>= $i (length $args)) $acc
@@ -247,173 +175,183 @@
             (cg-do-body $args (+ $i 1) (str $acc $sep $c ";"))))]
 
 [FUNC cg-cond :params [$args]
-  :body (let [[$n (length $args)]]
-          (if (= $n 0) "null"
-            (let [[$loop (fn [$i $acc]
-                           (if (< $i 0) $acc
-                             (let [[$clause (get $args $i)]
-                                   [$citems (get (get $clause :fields) "items")]
-                                   [$test (cg (get $citems 0))]
-                                   [$body (cg (get $citems 1))]]
-                               ($loop (- $i 1) (str "(" $test "?" $result ":" $acc ")")))))]]
-              "null")))] ;; FIXME: cond implementation is complex
+  :body (if (= (length $args) 0) "null"
+          (let [[$first (get $args 0)]
+                [$nested (array? $first)]]
+            (if $nested
+              (cg-cond-nested $args (- (length $args) 1) "null")
+              (cg-cond-flat $args 0 "null"))))]
 
-[FUNC cg-and :params [$args]
-  :body (if (= (length $args) 0) "true"
-          (str "(" (join (map (fn [$a] (cg $a)) $args) "&&") ")"))]
+[FUNC cg-cond-nested :params [$args $i $acc]
+  :body (if (< $i 0) $acc
+          (let [[$items (get-block-items (get $args $i))]]
+            (cg-cond-nested $args (- $i 1) (str "(" (cg (get $items 0)) "?" (cg (get $items 1)) ":" $acc ")"))))]
 
-[FUNC cg-or :params [$args]
-  :body (if (= (length $args) 0) "false"
-          (str "(" (join (map (fn [$a] (cg $a)) $args) "||") ")"))]
+[FUNC cg-cond-flat :params [$args $i $acc]
+  :body (let [[$len (length $args)]]
+          (if (>= $i $len) $acc
+            (if (= $i (- $len 1)) (str "(" (cg (get $args $i)) ")")
+              (str "(" (cg (get $args $i)) "?" (cg (get $args (+ $i 1))) ":" (cg-cond-flat $args (+ $i 2) $acc) ")"))))]
 
-[FUNC cg-quote :params [$args]
-  :body (if (= (length $args) 0) "null" (js-esc (str (cg (get $args 0)))))]
-
-[FUNC cg-set! :params [$args]
-  :body (str "(" (extract-name (get $args 0)) "=" (cg (get $args 1)) ")")]
-
-[FUNC cg-while :params [$args]
-  :body (str "(() => { while(" (cg (get $args 0)) ") { " (join (map (fn [$a] (cg $a)) (rest $args)) "; ") " } })()")]
-
-;; (loop [[i 0]] (if (< i 10) (recur (+ i 1)) i))
 [FUNC cg-loop :params [$args]
-  :body (let [[$bnode (get $args 0)]
-              [$items (get (get $bnode :fields) "items")]
-              [$first (if (null? $items) null (get $items 0))]
-              [$nested (if (null? $first) false
-                         (and (= (get $first :kind) "block")
-                              (= (get $first :type) "Array")))]
-              [$bindings (if $nested (loop-inits-2d $items 0 "") (loop-inits-1d $items 0 ""))]
-              [$names    (if $nested (loop-names-2d $items 0 "") (loop-names-1d $items 0 ""))]
-              [$body-args (slice $args 1 (length $args))]
-              [$body-js (cg-do-body $body-args 0 "")]]
-          (str "((()=>{" $bindings
-               "while(true){let __r=(()=>{" $body-js "})();"
-               "if(__r&&__r.__recur){" (if (= (length $names) 0) "" (str "[" $names "]=__r.a;")) "continue;}"
-               "return __r;}})())"))]
+  :body (let [[$items (get-block-items (get $args 0))]
+              [$first (get $items 0)]
+              [$nested (array? $first)]
+              [$inits (if $nested (loop-inits-2d $items 0 "") (loop-inits-1d $items 0 ""))]
+              [$names (if $nested (loop-names-2d $items 0 "") (loop-names-1d $items 0 ""))]
+              [$body (cg-do-body (slice $args 1 (length $args)) 0 "")]]
+          (str "((()=>{" $inits "while(true){let __r=(()=>{" $body "})();if(__r&&__r.__recur){" (if (= (length $names) 0) "" (str "[" $names "]=__r.a;")) "continue;}return __r;}})())"))]
 
-[FUNC loop-inits-1d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k (get $items $i)] [$v (get $items (+ $i 1))]]
-            (loop-inits-1d $items (+ $i 2)
-                           (str $acc "let " (extract-name $k) "=" (cg $v) ";"))))]
-[FUNC loop-inits-2d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pit (get (get $pair :fields) "items")]]
-            (loop-inits-2d $items (+ $i 1)
-                           (str $acc "let " (extract-name (get $pit 0)) "=" (cg (get $pit 1)) ";"))))]
+[FUNC loop-inits-1d :params [$it $i $acc] :body (if (>= $i (length $it)) $acc (loop-inits-1d $it (+ $i 2) (str $acc "let " (extract-name (get $it $i)) "=" (cg (get $it (+ $i 1))) ";")))]
+[FUNC loop-inits-2d :params [$it $i $acc] :body (if (>= $i (length $it)) $acc (let [[$p (get-block-items (get $it $i))]] (loop-inits-2d $it (+ $i 1) (str $acc "let " (extract-name (get $p 0)) "=" (cg (get $p 1)) ";"))))]
+[FUNC loop-names-1d :params [$it $i $acc] :body (if (>= $i (length $it)) $acc (let [[$n (extract-name (get $it $i))]] (loop-names-1d $it (+ $i 2) (if (= (length $acc) 0) $n (str $acc "," $n)))))]
+[FUNC loop-names-2d :params [$it $i $acc] :body (if (>= $i (length $it)) $acc (let [[$p (get-block-items (get $it $i))] [$n (extract-name (get $p 0))]] (loop-names-2d $it (+ $i 1) (if (= (length $acc) 0) $n (str $acc "," $n)))))]
 
-[FUNC loop-names-1d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$k (get $items $i)] [$n (extract-name $k)]]
-            (loop-names-1d $items (+ $i 2)
-                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
-[FUNC loop-names-2d :params [$items $i $acc]
-  :body (if (>= $i (length $items)) $acc
-          (let [[$pair (get $items $i)]
-                [$pit (get (get $pair :fields) "items")]
-                [$n (extract-name (get $pit 0))]]
-            (loop-names-2d $items (+ $i 1)
-                           (if (= (length $acc) 0) $n (str $acc "," $n)))))]
-
-[FUNC cg-recur :params [$args]
-  :body (str "{__recur:true,a:[" (cg-args $args) "]}")]
-
-;; ═══════ 연산/인자 ═══════
+;; ═══════ Arguments & Params ═══════
 
 [FUNC cg-args :params [$args] :body (args-loop $args 0 "")]
-[FUNC args-loop :params [$args $i $acc]
-  :body (if (null? $args) $acc
-          (if (>= $i (length $args)) $acc
-            (let [[$c (str (cg (get $args $i)))]]
-              (args-loop $args (+ $i 1)
-                         (if (= $i 0) $c (str $acc "," $c))))))]
+[FUNC args-loop :params [$args $i $acc] :body (if (or (null? $args) (>= $i (length $args))) $acc (let [[$c (cg (get $args $i))]] (args-loop $args (+ $i 1) (if (= $i 0) $c (str $acc "," $c)))))]
 
-[FUNC cg-binop :params [$args $op $zero]
-  :body (cond [(= (length $args) 0) $zero]
-              [(= (length $args) 1) (str (cg (get $args 0)))]
-              [true (str "(" (binop-loop $args 0 "" $op) ")")])]
+[FUNC binop-loop :params [$args $i $acc $op] :body (if (>= $i (length $args)) $acc (let [[$c (cg (get $args $i))]] (binop-loop $args (+ $i 1) (if (= $i 0) $c (str $acc $op $c)) $op)))]
 
-[FUNC binop-loop :params [$args $i $acc $op]
-  :body (if (>= $i (length $args)) $acc
-          (let [[$c (str (cg (get $args $i)))]]
-            (binop-loop $args (+ $i 1)
-                        (if (= $i 0) $c (str $acc $op $c)) $op)))]
+[FUNC extract-name :params [$n] :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))] [(= (get $n :kind) "literal") (js-name (get $n :value))] [true "_anon"])]
 
-[FUNC cg-pair :params [$args $op]
-  :body (str "(" (cg (get $args 0)) $op (cg (get $args 1)) ")")]
+[FUNC extract-params :params [$it] :body (extract-params-loop $it 0 "" "" 0)]
+[FUNC extract-params-loop :params [$it $i $ps $pre $tc]
+  :body (if (or (null? $it) (>= $i (length $it))) {:params $ps :preamble $pre}
+          (let [[$c (get $it $i)] [$k (get $c :kind)]]
+            (if (= $k "variable") (extract-params-loop $it (+ $i 1) (if (= (length $ps) 0) (extract-name $c) (str $ps "," (extract-name $c))) $pre $tc)
+              (if (and (= $k "block") (= (get $c :type) "Array"))
+                (let [[$t (str "_arg" $tc)] [$sub (get (get $c :fields) "items")]]
+                  (extract-params-loop $it (+ $i 1) (if (= (length $ps) 0) $t (str $ps "," $t)) (str $pre (destructure-loop $sub $t 0)) (+ $tc 1)))
+                (extract-params-loop $it (+ $i 1) (if (= (length $ps) 0) "p" (str $ps ",p")) $pre $tc)))))]
 
-[FUNC cg-sub :params [$args]
-  :body (cond [(= (length $args) 0) "0"]
-              [(= (length $args) 1) (str "(-" (cg (get $args 0)) ")")]
-              [true (str "(" (binop-loop $args 0 "" "-") ")")])]
-
-[FUNC extract-name :params [$n]
-  :body (cond [(= (get $n :kind) "variable") (js-name (get $n :name))]
-              [(= (get $n :kind) "literal") (js-name (get $n :value))]
-              [true "_anon"])]
-
-[FUNC extract-params :params [$items]
-  :body (param-loop $items 0 "")]
-[FUNC param-loop :params [$items $i $acc]
-  :body (if (null? $items) $acc
-          (if (>= $i (length $items)) $acc
-            (let [[$cur (get $items $i)]
-                  [$name (extract-name $cur)]]
-              (param-loop $items (+ $i 1)
-                          (if (= $i 0) $name (str $acc "," $name))))))]
-
-;; ═══════ Native Mapping ═══════
-
-[FUNC cg-sexpr :params [$n]
-  :body (cg-sexpr-dispatch (get $n :op) (get $n :args))]
-
-[FUNC cg-sexpr-dispatch :params [$op $args]
-  :body (cond
-          [(= $op "if")      (cg-if $args)]
-          [(= $op "fn")      (cg-fn $args)]
-          [(= $op "defn")    (cg-defn $args)]
-          [(= $op "define")  (cg-define $args)]
-          [(= $op "let")     (cg-let $args)]
-          [(= $op "do")      (cg-do $args)]
-          [(= $op "cond")    (cg-cond $args)]
-          [(= $op "loop")    (cg-loop $args)]
-          [(= $op "recur")   (cg-recur $args)]
-          [(= $op "async")   (cg-async $args)]
-          [(= $op "await")   (cg-await $args)]
-          [(= $op "+")       (cg-binop $args "+" "0")]
-          [(= $op "-")       (cg-sub $args)]
-          [(= $op "*")       (cg-binop $args "*" "1")]
-          [(= $op "/")       (cg-pair $args "/")]
-          [(= $op "=")       (cg-pair $args "===")]
-          [(= $op "<")       (cg-pair $args "<")]
-          [(= $op ">")       (cg-pair $args ">")]
-          [(= $op "<=")      (cg-pair $args "<=")]
-          [(= $op ">=")      (cg-pair $args ">=")]
-          [true              (cg-native $op $args)])]
-
-[FUNC cg-native :params [$op $args]
-  :body (cg-native-dispatch $op (cg-args $args))]
+[FUNC destructure-loop :params [$it $t $i] :body (if (>= $i (length $it)) "" (str "let " (extract-name (get $it $i)) "=" $t "[" $i "]; " (destructure-loop $it $t (+ $i 1))))]
 
 [FUNC cg-native-dispatch :params [$op $as]
   :body (cond
             [(= $op "str") (str "_fl_str(" $as ")")]
             [(= $op "length") (str "_fl_length(" $as ")")]
-            [(= $op "println") (str "console.log(" $as ")")]
+            [(= $op "println") (str "_fl_print(" $as ")")]
             [(= $op "print") (str "_fl_print(" $as ")")]
-            [(= $op "server_get") (str "_fl_server_get(" $as ")")]
-            [(= $op "server_start") (str "_fl_server_start(" $as ")")]
-            [(= $op "mariadb_query") (str "_fl_mariadb_query(" $as ")")]
             [true (str (js-name $op) "(" $as ")")])]
 
 ;; ═══════ Prelude ═══════
 
 [FUNC prelude-parts :params []
-  :body (list)]
+  :body (list 
+    "const _fl_str = (...xs) => xs.map(x => x==null?'':String(x)).join('');"
+    "const _fl_length = (x) => (x?x.length:0);"
+    "const _fl_get = (o,k,d) => { if(o==null)return d||null; let ks=String(k).startsWith(':')?k.slice(1):String(k); if(Array.isArray(o)){let idx=parseInt(ks);if(!isNaN(idx))return o[idx]!==undefined?o[idx]:(d||null);if(ks==='length')return o.length;} if(typeof o==='object'){if(o[ks]!==undefined)return o[ks];} return d||null; }"
+    "const _fl_null_q = (v) => v===null||v===undefined;"
+    "const _fl_keys = (o) => o?Object.keys(o):[];"
+    "const _fl_map_set = (o,k,v) => ({...o,[k]:v});"
+    "const _fl_has_key_q = (o,k) => o?(String(k) in o):false;"
+    "const _fl_append = (l,x) => [...(l||[]),x];"
+    "const list = (...args) => [...args];"
+    "const append = (l,x) => [...(l||[]),x];"
+    "const _fl_first = (l) => (l&&l.length>0)?l[0]:null;"
+    "const _fl_last = (l) => (l&&l.length>0)?l[l.length-1]:null;"
+    "const _fl_rest = (l) => (l&&l.length>0)?l.slice(1):[];"
+    "const _fl_slice = (l,a,b) => (l||[]).slice(a,b);"
+    "const _fl_map = (arr,fn) => (arr||[]).map(x=>fn(x));"
+    "const _fl_filter = (arr,fn) => (arr||[]).filter(x=>{const r=fn(x);return r!==false&&r!==null;});"
+    "const _fl_reduce = (arr,fn,init) => (arr||[]).reduce((a,x)=>fn(a,x),init);"
+    "const _fl_some = (f,l) => (l||[]).some(x=>f(x));"
+    "const _fl_every = (f,l) => (l||[]).every(x=>f(x));"
+    "const _fl_file_read = (p) => require('fs').readFileSync(p,'utf8');"
+    "const _fl_file_write = (p,c) => require('fs').writeFileSync(p,c);"
+    "const _fl_file_exists = (p) => require('fs').existsSync(p);"
+    "const _fl_get_argv = () => (typeof process!=='undefined'?process.argv.slice(2):[]);"
+    "const _fl_print = (v) => { console.log(v); return v; }"
+    "const null_q = _fl_null_q;"
+    "const some_q = _fl_some;"
+    "const every_q = _fl_every;"
+    "const cli_args = _fl_get_argv;"
+    "const get = _fl_get;"
+    "const keys = _fl_keys;"
+    "const has_key_q = _fl_has_key_q;"
+    "const slice = _fl_slice;"
+    "const first = _fl_first;"
+    "const last = _fl_last;"
+    "const rest = _fl_rest;"
+    "const map = (fn,arr) => (arr||[]).map(x=>fn(x));"
+    "const filter = (fn,arr) => (arr||[]).filter(x=>{const r=fn(x);return r!==false&&r!==null;});"
+    "const reduce = (fn,init,arr) => (arr||[]).reduce((a,x)=>fn(a,x),init);"
+    "const print = _fl_print;"
+    "const println = (v) => { console.log(v==null?'':String(v)); return v; }"
+    "const str_replace = (s,ov,nv) => { if(s==null)return ''; const st=String(s); return st.split(String(ov)).join(nv==null?'':String(nv)); };"
+    "const str_index_of = (s,sub) => (typeof s==='string'&&typeof sub==='string')?s.indexOf(sub):-1;"
+    "const index_of = str_index_of;"
+    "const str_slice = (s,a,b) => s?(b===undefined?s.slice(a):s.slice(a,b)):'';"
+    "const substring = str_slice;"
+    "const char_at = (s,i) => (s&&s[i])||null;"
+    "const char_code_at = (s,i) => typeof s==='string'?s.charCodeAt(i):0;"
+    "const trim = (s) => String(s||'').trim();"
+    "const starts_with_q = (s,p) => String(s||'').startsWith(String(p||''));"
+    "const ends_with_q = (s,sf) => String(s||'').endsWith(String(sf||''));"
+    "const replace = (s,ov,nv) => { if(s==null)return ''; const st=String(s); if(ov instanceof RegExp)return st.replace(ov,nv==null?'':String(nv)); return st.split(String(ov)).join(nv==null?'':String(nv)); };"
+    "const split = (s,sep) => String(s||'').split(sep);"
+    "const str_join = (arr,sep) => (arr||[]).join(sep===undefined?'':sep);"
+    "const join = str_join;"
+    "const concat = (a,b) => (Array.isArray(a)&&Array.isArray(b))?[...a,...b]:String(a||'')+String(b||'');"
+    "const push = (arr,v) => [...(arr||[]),v];"
+    "const pop = (arr) => (arr&&arr.length>0)?arr.slice(0,-1):[];"
+    "const reverse = (arr) => Array.isArray(arr)?[...arr].reverse():arr;"
+    "const sort_by = (arr,fn) => Array.isArray(arr)?[...arr].sort((a,b)=>fn(a)<fn(b)?-1:fn(a)>fn(b)?1:0):arr;"
+    "const flat_map = (arr,fn) => (arr||[]).flatMap(fn);"
+    "const range = (s,e) => { const r=[]; let st=e===undefined?0:s; let en=e===undefined?s:e; for(let i=st;i<en;i++)r.push(i); return r; };"
+    "const merge = (a,b) => Object.assign({},a,b);"
+    "const assoc = (o,k,v) => { const r=Object.assign({},o); const key=typeof k==='string'&&k.startsWith(':')?k.slice(1):String(k); r[key]=v; return r; };"
+    "const dissoc = (o,k) => { const r=Object.assign({},o); const key=typeof k==='string'&&k.startsWith(':')?k.slice(1):String(k); delete r[key]; return r; };"
+    "var map_entries = (m) => m instanceof Map?[...m.entries()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.entries(m):[]);"
+    "var map_keys = (m) => m instanceof Map?[...m.keys()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.keys(m):[]);"
+    "var map_values = (m) => m instanceof Map?[...m.values()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.values(m):[]);"
+    "const array_q = (v) => Array.isArray(v);"
+    "var list_q = (v) => Array.isArray(v);"
+    "var map_q = (v) => v!==null&&typeof v==='object'&&!Array.isArray(v);"
+    "var fn_q = (v) => typeof v==='function';"
+    "const number_q = (v) => typeof v==='number';"
+    "const string_q = (v) => typeof v==='string';"
+    "var str_upper = (s) => String(s||'').toUpperCase();"
+    "var str_lower = (s) => String(s||'').toLowerCase();"
+    "var str_contains = (s,sub) => String(s||'').includes(String(sub||''));"
+    "var str_starts_with = (s,p) => String(s||'').startsWith(String(p||''));"
+    "var str_ends_with = (s,sf) => String(s||'').endsWith(String(sf||''));"
+    "var str_trim = (s) => String(s||'').trim();"
+    "var str_length = (s) => String(s||'').length;"
+    "var str_split = (s,sep) => String(s||'').split(sep);"
+    "var take = (n,arr) => (arr||[]).slice(0,n);"
+    "var drop = (n,arr) => (arr||[]).slice(n);"
+    "var zip = (a,b) => { const r=[]; const l=Math.min((a||[]).length,(b||[]).length); for(let i=0;i<l;i++)r.push([a[i],b[i]]); return r; };"
+    "var flatten = (arr) => (arr||[]).flat();"
+    "var sort = (arr,fn) => fn?[...(arr||[])].sort((a,b)=>fn(a,b)?-1:1):[...(arr||[])].sort();"
+    "var math_sqrt = (n) => Math.sqrt(n);"
+    "var math_pi = Math.PI;"
+    "var unknown = (...a) => a[a.length-1];"
+    "const not = (v) => !v;"
+    "const abs = (n) => Math.abs(n);"
+    "const floor = (n) => Math.floor(n);"
+    "const ceil_val = (n) => Math.ceil(n);"
+    "const round = (n) => Math.round(n);"
+    "const max_val = (a,b) => a>b?a:b;"
+    "const min_val = (a,b) => a<b?a:b;"
+    "const error = (msg) => { throw new Error(String(msg)); };"
+    "const now_ms = () => Date.now();"
+    "const now_iso = () => new Date().toISOString();"
+    "const now_unix = () => Math.floor(Date.now()/1000);"
+    "const json_parse = (s) => { try{return JSON.parse(s);}catch(e){return null;} };"
+    "const json_stringify = (v) => JSON.stringify(v);"
+    "const shell_exec = (cmd,inp) => { try{const {execSync}=require('child_process');const opts={encoding:'utf8'};if(inp)opts.input=inp;return execSync(cmd,opts);}catch(e){return '';} };"
+    "const __fl_routes = [];"
+    "const _fl_server_get = (path,fn) => { __fl_routes.push({method:'GET',path,fn}); };"
+    "const _fl_server_start = (port) => { const http=require('http'); http.createServer(async(req,res)=>{ const r=__fl_routes.find(r=>r.method===req.method&&r.path===require('url').parse(req.url).pathname); if(r){const result=await(typeof r.fn==='string'?eval(r.fn):r.fn)(req);res.end(String(result));}else{res.statusCode=404;res.end('Not Found');} }).listen(port);console.log('Server on '+port); };"
+    "const server_get = _fl_server_get;"
+    "const server_start = _fl_server_start;"
+  )]
 
 [FUNC runtime-prelude :params []
-  :body ""]
+  :body (join (prelude-parts) "\n")]
 
 [FUNC fl->js-code :params [$ast]
   :body (reduce (fn [acc n] (str acc (cg n) ";\n")) "" $ast)]

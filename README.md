@@ -12,8 +12,9 @@
 | 문법 | Lisp S-expression (snake_case / kebab-case 모두 허용) |
 | 런타임 | Node.js 기반, esbuild 번들 단일 파일(`bootstrap.js`) |
 | 표준 라이브러리 | 500+ 함수 (HTTP, DB, File, Crypto, AI, WebSocket 등) |
-| 테스트 | 797/832 PASS (jest) |
+| 테스트 | 773/832 PASS (jest) |
 | 자가 컴파일 | Fixed-point SHA256 검증 ✅ |
+| L2 증명 | 16/17 케이스 통과 (수정 진행 중) |
 | MCP 서버 | `mcp.dclub.kr` — `fl_eval` 샌드박스 실행 |
 
 ---

@@ -1,16 +1,3 @@
-/**
- * src/runtime-helpers.ts
- *
- * Runtime helper functions for FreeLang
- * Extracted and enhanced for self-hosting L2 Fixpoint
- */
-
-/**
- * 런타임 헬퍼 함수 프리앰블 생성
- * Stage1.js 최상단에 주입되어 JavaScript 코드 실행 지원
- */
-export function generateRuntimePreamble(): string {
-  return `
 // ═══════════════════════════════════════════════════════
 // FreeLang v11 Runtime Helpers (Enhanced 2026-04-30)
 // ═══════════════════════════════════════════════════════
@@ -115,9 +102,6 @@ function _fl_shell_capture(cmd) {
   }
 }
 
-// ─ 타입 ─
-function _fl_type_of(v) { if (v === null || v === undefined) return "nil"; if (Array.isArray(v)) return "list"; return typeof v; }
-
 // ─ 기타 ─
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 
@@ -135,14 +119,13 @@ var math_pow = (a, b) => Math.pow(a, b);
 var math_pi = Math.PI;
 
 // ─ 컬렉션 확장 ─
-function _fl_take(n, arr) { return (arr || []).slice(0, n); }
-function _fl_drop(n, arr) { return (arr || []).slice(n); }
-function _fl_zip(a, b) { const r = []; const l = Math.min((a || []).length, (b || []).length); for (let i = 0; i < l; i++) r.push([a[i], b[i]]); return r; }
-function _fl_flatten(arr) { return (arr || []).flat(); }
-function _fl_reverse(arr) { return Array.isArray(arr) ? [...arr].reverse() : arr; }
-function _fl_sort(arr, fn) { return fn ? [...(arr || [])].sort((a, b) => fn(a, b) ? -1 : 1) : [...(arr || [])].sort(); }
+var take = (n, arr) => (arr || []).slice(0, n);
+var drop = (n, arr) => (arr || []).slice(n);
+var zip = (a, b) => { const r = []; const l = Math.min((a || []).length, (b || []).length); for (let i = 0; i < l; i++) r.push([a[i], b[i]]); return r; };
+var flatten = (arr) => (arr || []).flat();
+var sort = (arr, fn) => fn ? [...(arr || [])].sort((a, b) => fn(a, b) ? -1 : 1) : [...(arr || [])].sort();
 
-// ─ 문자열 공개 별칭 ─
+// ─ 문자열 확장 ─
 var str_upper = (s) => String(s || "").toUpperCase();
 var str_lower = (s) => String(s || "").toLowerCase();
 var str_contains = (s, sub) => String(s || "").includes(String(sub || ""));
@@ -165,19 +148,13 @@ var unknown = (...a) => a[a.length - 1];
 let __argv__ = _fl_get_argv();
 
 // ═══════════════════════════════════════════════════════
-`.trim();
-}
 
-/**
- * 헬퍼 함수 목록
- */
-export const HELPER_FUNCTIONS = [
-  '_plus', '_minus', '_star', '_slash', '_gt', '_lt', '_eq', '_gt_eq', '_lt_eq', '_not', '_and', '_or', '_concat',
-  '_fl_null_q', '_fl_true_q', '_fl_false_q', '_fl_number_q', '_fl_string_q', '_fl_list_q', '_fl_array_q', '_fl_map_q', '_fl_fn_q',
-  '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
-  '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
-  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture',
-  '_fl_take', '_fl_drop', '_fl_zip', '_fl_flatten', '_fl_reverse', '_fl_sort'
-];
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
 
-export const HELPER_COUNT = HELPER_FUNCTIONS.length;
+const map_entries = (p) => _fl_map(_fl_keys(m), ((p) => [k, _fl_get(m, k)]))
+const prompt_template = (p, p) => _fl_reduce(map_entries(vars), ((p, _arg0) => _fl_replace(acc, _fl_str("{", key, "}"), _fl_str(val))), template)
+const test_ai_template = () => _fl_print([prompt_template("User: {user}", ({ user: "Alice" }))])
+test_ai_template()

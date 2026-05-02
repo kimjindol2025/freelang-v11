@@ -55,6 +55,7 @@ const BUILTIN_MAP: Record<string, string> = {
   "char_at": "_fl_char_at",
   "char-at": "_fl_char_at",
   "substring": "_fl_substring",
+  "str-slice": "_fl_substring",
   "true?": "_fl_true_q",
   "false?": "_fl_false_q",
   "string?": "_fl_string_q",
@@ -63,6 +64,8 @@ const BUILTIN_MAP: Record<string, string> = {
   "array?": "_fl_array_q",
   "map?": "_fl_map_q",
   "fn?": "_fl_fn_q",
+  "boolean?": "_fl_boolean_q",
+  "type-of": "_fl_type_of",
   "empty?": "_fl_empty_q",
 
   // 문자 검증 (lexer 헬퍼)
@@ -80,6 +83,9 @@ const BUILTIN_MAP: Record<string, string> = {
   "last": "_fl_last",
   "rest": "_fl_rest",
   "append": "_fl_append", "slice": "_fl_slice",
+  "take": "_fl_take", "drop": "_fl_drop",
+  "zip": "_fl_zip", "flatten": "_fl_flatten",
+  "reverse": "_fl_reverse", "sort": "_fl_sort",
   "length": "_fl_length",
   "range": "_fl_range",
 
@@ -93,6 +99,7 @@ const BUILTIN_MAP: Record<string, string> = {
   "str-lower": "_fl_lower",
   "trim": "_fl_trim",
   "replace": "_fl_replace",
+  "str-replace": "_fl_replace",
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
   "join": "_fl_join",
@@ -108,10 +115,8 @@ const BUILTIN_MAP: Record<string, string> = {
   "keys": "_fl_keys",
   "json_keys": "_fl_keys",
   "values": "_fl_values",
-  "entries": "_fl_entries",
   "map-keys": "_fl_keys",
   "map-values": "_fl_values",
-  "map-entries": "_fl_entries",
   "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",
   "has-key?": "_fl_has_key_q",
 };
@@ -308,8 +313,14 @@ export class JSCodegen {
   genSExpr(node: SExpr): string {
     const { op, args } = node;
 
-    if (op === "and") return "(" + args.map(a => this.genNode(a)).join(" && ") + ")";
-    if (op === "or") return "(" + args.map(a => this.genNode(a)).join(" || ") + ")";
+    if (op === "and") {
+      if (args.length === 0) return "true";
+      return "(" + args.map(a => this.genNode(a)).join(" && ") + ")";
+    }
+    if (op === "or") {
+      if (args.length === 0) return "false";
+      return "(" + args.map(a => this.genNode(a)).join(" || ") + ")";
+    }
     if (op === "cond") return this.genCond(args);
     if (op === "while") return this.genWhile(args);
     if (op === "recur") {
@@ -328,25 +339,85 @@ export class JSCodegen {
       const inits: string[] = [];
       const names: string[] = [];
       for (let i = 0; i < items.length; i += 2) {
-        const name = this.extractVarName(items[i]);
-        const val = this.genNode(items[i+1]);
+        const nameNode = items[i];
+        const valNode = items[i+1];
+        if (!nameNode) continue;
+        const name = this.extractVarName(nameNode);
+        const val = valNode ? this.genNode(valNode) : "null";
         inits.push(`let ${name} = ${val};`);
         names.push(name);
       }
 
-      const bodyCode = bodyExprs.map(e => this.genNode(e)).join("; ");
-      return `(() => {
-        ${inits.join(" ")}
-        while (true) {
-          const __r = (() => { return ${bodyCode}; })();
-          if (__r && __r.__recur) {
-            [${names.join(", ")}] = __r.a;
-            continue;
-          }
-          return __r;
-        }
-      })()`;
+      const bodyParts = bodyExprs.map(e => this.genNode(e).trim()).filter(s => s !== "");
+      let bodyCode = "";
+      if (bodyParts.length === 0) {
+        bodyCode = "return null;";
+      } else if (bodyParts.length === 1) {
+        bodyCode = `return ${bodyParts[0]};`;
+      } else {
+        const stmts = bodyParts.slice(0, -1).map(s => s.endsWith(";") ? s : s + ";");
+        bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+      }
+
+      return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
     }
+
+    if (op === "let") {
+      if (args.length >= 2) {
+        const bindingsArg = args[0];
+        let bindings: ASTNode[] = [];
+        if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
+          bindings = (bindingsArg as Block).fields.get("items") as any || [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = (bindingsArg as SExpr).args;
+        }
+
+        const bindingStmts: string[] = [];
+        // Detect nested vs flat: [[x 1] [y 2]] vs [x 1 y 2]
+        const isNested = bindings.length > 0 && bindings[0].kind === "block" && (bindings[0] as Block).type === "Array";
+        
+        if (isNested) {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && (binding as Block).type === "Array") {
+              const pairItems = (binding as Block).fields.get("items") as any || [];
+              if (pairItems.length >= 2) {
+                const varName = this.extractVarName(pairItems[0]);
+                const value = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName} = ${value};`);
+              }
+            }
+          }
+        } else {
+          for (let i = 0; i < bindings.length; i += 2) {
+            if (!bindings[i]) continue;
+            const varName = this.extractVarName(bindings[i]);
+            const value = bindings[i+1] ? this.genNode(bindings[i+1]) : "null";
+            bindingStmts.push(`let ${varName} = ${value};`);
+          }
+        }
+
+        const bodyParts = args.slice(1).map((a) => this.genNode(a).trim()).filter(s => s !== "");
+        let bodyCode = "";
+        if (bodyParts.length === 0) {
+          bodyCode = "return null;";
+        } else if (bodyParts.length === 1) {
+          bodyCode = `return ${bodyParts[0]};`;
+        } else {
+          const stmts = bodyParts.slice(0, -1).map(s => s.endsWith(";") ? s : s + ";");
+          bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+        }
+        return `((() => { ${bindingStmts.join(" ")} ${bodyCode} })())`;
+      }
+      return "(() => null)()";
+    }
+
+    if (op === "do") return this.genDo(args);
+
+    const BINARY_OPS: Record<string, string> = {
+      "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+      "<": "<", ">": ">", "<=": "<=", ">=": ">=", "==": "===", "!=": "!==",
+      "=": "==="
+    };
 
     if (op in BINARY_OPS && args.length === 2) {
       const left = this.genNode(args[0]);
@@ -372,7 +443,7 @@ export class JSCodegen {
     if (op === "define") {
       const varName = this.extractVarName(args[0]);
       const value = this.genNode(args[1]);
-      return `let ${varName} = ${value};`;
+      return `const ${varName} = ${value};`;
     }
 
     if (op === "set!") {
@@ -383,13 +454,14 @@ export class JSCodegen {
 
     if (op === "defn" || op === "defun") {
       const name = this.extractVarName(args[0]);
-      const params = this.extractParamList(args[1]);
-      const body = args[2] ? this.genNode(args[2]) : "undefined";
-      return `function ${name}(${params.join(", ")}) { return ${body}; }`;
+      const { params, preamble } = this.extractParamListWithDestructuring(args[1]);
+      const bodyNode = args[2];
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+      return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
     }
 
     if (op === "fn") return this.genFn(args);
-    if (op === "do") return this.genDo(args);
 
     if (op === "list") {
       const elements = args.map((a) => this.genNode(a));
@@ -432,13 +504,23 @@ export class JSCodegen {
         }
 
         const bindingStmts: string[] = [];
-        for (const binding of bindings) {
-          if (binding.kind === "block" && (binding as Block).type === "Array") {
-            const pairItems = (binding as Block).fields.get("items") as any || [];
-            if (pairItems.length >= 2) {
-              const varName = this.extractVarName(pairItems[0]);
-              const value = this.genNode(pairItems[1]);
-              bindingStmts.push(`let ${varName} = ${value};`);
+        // flat binding: [x 1 y 2] — bindings의 첫 요소가 Array 블록이 아닌 경우
+        const isFlat = bindings.length > 0 && !(bindings[0].kind === "block" && (bindings[0] as Block).type === "Array");
+        if (isFlat) {
+          for (let i = 0; i < bindings.length - 1; i += 2) {
+            const varName = this.extractVarName(bindings[i]);
+            const value = this.genNode(bindings[i + 1]);
+            bindingStmts.push(`let ${varName} = ${value};`);
+          }
+        } else {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && (binding as Block).type === "Array") {
+              const pairItems = (binding as Block).fields.get("items") as any || [];
+              if (pairItems.length >= 2) {
+                const varName = this.extractVarName(pairItems[0]);
+                const value = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName} = ${value};`);
+              }
             }
           }
         }
@@ -454,50 +536,7 @@ export class JSCodegen {
     return this.genFuncCall(op, args);
   }
 
-  private genCond(args: any[]): string {
-    if (args.length === 0) return "null";
-    const clauses = args.map(arg => {
-      if (arg.kind === "block" && arg.type === "Array") return arg.fields.get("items") || [];
-      return Array.isArray(arg) ? arg : [arg];
-    });
-    let res = "null";
-    for (let i = clauses.length - 1; i >= 0; i--) {
-      const pair = clauses[i];
-      const test = this.genNode(pair[0]);
-      const body = pair[1] ? this.genNode(pair[1]) : "null";
-      res = "(" + test + " ? " + body + " : " + res + ")";
-    }
-    return res;
-  }
-
-  private genWhile(args: any[]): string {
-    const cond = this.genNode(args[0]);
-    const body = args.slice(1).map(a => this.genNode(a)).join("; ");
-    return "(() => { while(" + cond + ") { " + body + " } })()";
-  }
-
-  private genLoop(args: any[]): string {
-    const bindingsBlock = args[0];
-    const bodyExprs = args.slice(1);
-    let items = [];
-    if (bindingsBlock.kind === "block" && bindingsBlock.type === "Array") items = bindingsBlock.fields.get("items") || [];
-    const inits = [];
-    for (let i = 0; i < items.length; i += 2) {
-      const name = items[i].name ? items[i].name.replace(/^\$/, "") : "p";
-      const val = this.genNode(items[i+1]);
-      inits.push("let " + name + " = " + val);
-    }
-    const bodyCode = bodyExprs.map(e => this.genNode(e)).join("; ");
-    return "(() => { " + inits.join("; ") + "; while(true) { " + bodyCode + "; break; } })()";
-  }
-
-  private genFn(args: ASTNode[]): string {
-    const params = this.extractParamList(args[0]);
-    const body = args[1] ? this.genNode(args[1]) : "undefined";
-    return `((${params.join(", ")}) => ${body})`;
-  }
-
-  private genDo(args: ASTNode[]): string {
+  genDo(args: ASTNode[]): string {
     if (args.length === 0) return "(() => undefined)()";
     if (args.length === 1) return `(() => ${this.genNode(args[0])})()`;
     const stmts = args.slice(0, -1).map((a) => {
@@ -506,6 +545,120 @@ export class JSCodegen {
     }).filter(s => s !== "");
     const last = this.genNode(args[args.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
+  }
+
+  private genCond(args: any[]): string {
+    if (args.length === 0) return "null";
+    
+    // Detect nested vs flat: [[test result] ...] vs [test result test result ...]
+    let isNested = false;
+    if (args[0].kind === "block" && args[0].type === "Array") {
+      const items = args[0].fields.get("items");
+      if (Array.isArray(items) && items.length >= 1) {
+        isNested = true;
+      }
+    }
+
+    let pairs: [any, any][];
+    if (isNested) {
+      pairs = args.map(arg => {
+        if (arg.kind === "block" && arg.type === "Array") {
+          const items = arg.fields.get("items") || [];
+          return [items[0], items[1]] as [any, any];
+        }
+        return [arg, null];
+      });
+    } else {
+      // flat: test1 result1 test2 result2 ...
+      pairs = [];
+      for (let i = 0; i < args.length - 1; i += 2) {
+        pairs.push([args[i], args[i + 1]]);
+      }
+      // Odd number of arguments: last one is default result
+      if (args.length % 2 === 1) {
+        // use true as test for default case
+        pairs.push([{ kind: "literal", type: "boolean", value: true }, args[args.length - 1]]);
+      }
+    }
+
+    let res = "null";
+    for (let i = pairs.length - 1; i >= 0; i--) {
+      const [testNode, bodyNode] = pairs[i];
+      if (!testNode) continue;
+      const test = this.genNode(testNode);
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      res = "(" + test + " ? " + body + " : " + res + ")";
+    }
+    return res;
+  }
+
+  private genWhile(args: any[]): string {
+    const cond = this.genNode(args[0]);
+    const bodyParts = args.slice(1).map(a => this.genNode(a).trim()).filter(s => s !== "");
+    const bodyCode = bodyParts.map(s => s.endsWith(";") ? s : s + ";").join(" ");
+    return "(() => { while(" + cond + ") { " + bodyCode + " } })()";
+  }
+
+  private genFn(args: ASTNode[]): string {
+    const { params, preamble } = this.extractParamListWithDestructuring(args[0]);
+    const bodyNode = args[1];
+    const body = bodyNode ? this.genNode(bodyNode) : "undefined";
+    const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+    return `((${params.join(", ")}) => ${finalBody})`;
+  }
+
+  private extractParamListWithDestructuring(node: ASTNode): { params: string[], preamble: string } {
+    if (!node) return { params: [], preamble: "" };
+    let pNodes = (node as any).kind === "block" && (node as any).type === "Array" ? (node as any).fields.get("items") : (node.kind === "sexpr" ? node.args : [node]);
+
+    const params: string[] = [];
+    const bindingStmts: string[] = [];
+    let tmpCount = 0;
+
+    for (const p of (pNodes || [])) {
+      if (p.kind === "variable") {
+        params.push(flNameToJs(p.name.replace(/^\$/, "")));
+      } else if (p.kind === "literal" && (p.type === "symbol" || typeof p.value === "string")) {
+        params.push(flNameToJs(String(p.value).replace(/^\$/, "")));
+      } else if (p.kind === "block" && p.type === "Array") {
+        const tmpName = `_arg${tmpCount++}`;
+        params.push(tmpName);
+        const subItems = p.fields.get("items") || [];
+        for (let i = 0; i < subItems.length; i++) {
+          const sub = subItems[i];
+          if (sub.kind === "variable") {
+            const varName = flNameToJs(sub.name.replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          } else if (sub.kind === "literal" && (sub.type === "symbol" || typeof sub.value === "string")) {
+            const varName = flNameToJs(String(sub.value).replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          }
+        }
+      } else {
+        params.push("p");
+      }
+    }
+
+    return { params, preamble: bindingStmts.join(" ") };
+  }
+
+  private extractVarName(node: ASTNode): string {
+    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
+    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
+    return "unknown";
+  }
+
+  private extractParamList(node: ASTNode): string[] {
+    if (!node) return [];
+    let pNodes = (node as any).kind === "block" && (node as any).type === "Array" ? (node as any).fields.get("items") : (node.kind === "sexpr" ? node.args : [node]);
+    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
+  }
+
+  private extractBlockParams(node: Block): string[] {
+    const params = node.fields.get("params");
+    if (!params) return [];
+    let pNodes = Array.isArray(params) ? params : ((params as any).kind === "block" && (params as any).type === "Array" ? (params as any).fields.get("items") : [params]);
+    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
   }
 
   private genFuncCall(op: string, args: ASTNode[]): string {
@@ -530,11 +683,10 @@ export class JSCodegen {
   private genMapBlock(node: Block): string {
     const pairs: string[] = [];
     node.fields.forEach((val, key) => {
-      if (key === "items" && node.type === "Map") return;
       const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
       pairs.push(jsKey + ": " + this.genNode(val as any));
     });
-    return "{ " + pairs.join(", ") + " }";
+    return "({ " + pairs.join(", ") + " })";
   }
 
   private genArrayBlock(node: Block): string {
@@ -625,25 +777,6 @@ export class JSCodegen {
     }
     if (node.finallyBlock) parts.push(`finally{${this.genNode(node.finallyBlock)};}`);
     return parts.join("") + "})()";
-  }
-
-  private extractVarName(node: ASTNode): string {
-    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
-    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
-    return "unknown";
-  }
-
-  private extractParamList(node: ASTNode): string[] {
-    if (!node) return [];
-    let pNodes = (node as any).kind === "block" && (node as any).type === "Array" ? (node as any).fields.get("items") : (node.kind === "sexpr" ? node.args : [node]);
-    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
-  }
-
-  private extractBlockParams(node: Block): string[] {
-    const params = node.fields.get("params");
-    if (!params) return [];
-    let pNodes = Array.isArray(params) ? params : ((params as any).kind === "block" && (params as any).type === "Array" ? (params as any).fields.get("items") : [params]);
-    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
   }
 
   private minify(code: string): string {

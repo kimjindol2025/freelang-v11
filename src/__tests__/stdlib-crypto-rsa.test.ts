@@ -6,6 +6,7 @@
 import { lex } from "../lexer";
 import { Parser } from "../parser";
 import { Interpreter } from "../interpreter";
+import { createCryptoRsaModule } from "../stdlib-crypto-rsa";
 import {
   createSign,
   createVerify,
@@ -15,7 +16,9 @@ import {
 function run(source: string): any {
   const tokens = lex(source);
   const ast = new Parser(tokens).parse();
-  return new Interpreter().interpret(ast).lastValue;
+  const interp = new Interpreter();
+  interp.registerModule(createCryptoRsaModule());
+  return interp.interpret(ast).lastValue;
 }
 
 describe("stdlib-crypto-rsa (RS256)", () => {

@@ -26474,7 +26474,7 @@ function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
 function _fl_append(l, x) { return [...(l || []), x]; }
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
 function _fl_values(o) { return o ? Object.values(o) : []; }
-function _fl_entries(o) { return o ? Object.entries(o).map(([k,v])=>[k,v]) : []; }
+var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
 function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 
@@ -26516,6 +26516,9 @@ function _fl_shell_capture(cmd) {
   }
 }
 
+// \u2500 \uD0C0\uC785 \u2500
+function _fl_type_of(v) { if (v === null || v === undefined) return "nil"; if (Array.isArray(v)) return "list"; return typeof v; }
+
 // \u2500 \uAE30\uD0C0 \u2500
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 
@@ -26526,6 +26529,38 @@ const now_unix = () => Math.floor(Date.now() / 1000);
 
 // \u2500 \uC178 \uC2E4\uD589 \u2500
 const shell_exec = (cmd, inp) => { try { const {execSync} = require("child_process"); const opts = {encoding: "utf8"}; if (inp) opts["input"] = inp; return execSync(cmd, opts); } catch(e) { return ""; } };
+
+// \u2500 \uC218\uD559 \u2500
+var math_sqrt = (n) => Math.sqrt(n);
+var math_pow = (a, b) => Math.pow(a, b);
+var math_pi = Math.PI;
+
+// \u2500 \uCEEC\uB809\uC158 \uD655\uC7A5 \u2500
+function _fl_take(n, arr) { return (arr || []).slice(0, n); }
+function _fl_drop(n, arr) { return (arr || []).slice(n); }
+function _fl_zip(a, b) { const r = []; const l = Math.min((a || []).length, (b || []).length); for (let i = 0; i < l; i++) r.push([a[i], b[i]]); return r; }
+function _fl_flatten(arr) { return (arr || []).flat(); }
+function _fl_reverse(arr) { return Array.isArray(arr) ? [...arr].reverse() : arr; }
+function _fl_sort(arr, fn) { return fn ? [...(arr || [])].sort((a, b) => fn(a, b) ? -1 : 1) : [...(arr || [])].sort(); }
+
+// \u2500 \uBB38\uC790\uC5F4 \uACF5\uAC1C \uBCC4\uCE6D \u2500
+var str_upper = (s) => String(s || "").toUpperCase();
+var str_lower = (s) => String(s || "").toLowerCase();
+var str_contains = (s, sub) => String(s || "").includes(String(sub || ""));
+var str_replace = (s, a, b) => { if (s == null) return ""; return String(s).split(String(a || "")).join(String(b || "")); };
+var str_starts_with = (s, p) => String(s || "").startsWith(String(p || ""));
+var str_ends_with = (s, sf) => String(s || "").endsWith(String(sf || ""));
+var str_trim = (s) => String(s || "").trim();
+var str_length = (s) => String(s || "").length;
+var str_split = (s, sep) => String(s || "").split(sep);
+
+// \u2500 \uD0C0\uC785 \uD655\uC7A5 \u2500
+var list_q = (v) => Array.isArray(v);
+var map_q = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var fn_q = (v) => typeof v === "function";
+
+// \u2500 IIFE \uD3F4\uBC31 \u2500
+var unknown = (...a) => a[a.length - 1];
 
 // \u2500 \uAE00\uB85C\uBC8C \uBC14\uC778\uB529 \u2500
 let __argv__ = _fl_get_argv();
@@ -26589,7 +26624,13 @@ var HELPER_FUNCTIONS = [
   "_fl_file_read",
   "_fl_file_write",
   "_fl_file_exists",
-  "_fl_shell_capture"
+  "_fl_shell_capture",
+  "_fl_take",
+  "_fl_drop",
+  "_fl_zip",
+  "_fl_flatten",
+  "_fl_reverse",
+  "_fl_sort"
 ];
 var HELPER_COUNT = HELPER_FUNCTIONS.length;
 
@@ -26606,22 +26647,6 @@ function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
 function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
 function _fl_print(v) { console.log(v); return v; }
 `.trim();
-var BINARY_OPS = {
-  "+": "+",
-  "-": "-",
-  "*": "*",
-  "/": "/",
-  "%": "%",
-  "=": "===",
-  "==": "===",
-  "!=": "!==",
-  "<": "<",
-  ">": ">",
-  "<=": "<=",
-  ">=": ">=",
-  "and": "&&",
-  "or": "||"
-};
 var BUILTIN_MAP = {
   // 타입 체크
   "null?": "_fl_null_q",
@@ -26632,6 +26657,7 @@ var BUILTIN_MAP = {
   "char_at": "_fl_char_at",
   "char-at": "_fl_char_at",
   "substring": "_fl_substring",
+  "str-slice": "_fl_substring",
   "true?": "_fl_true_q",
   "false?": "_fl_false_q",
   "string?": "_fl_string_q",
@@ -26640,6 +26666,8 @@ var BUILTIN_MAP = {
   "array?": "_fl_array_q",
   "map?": "_fl_map_q",
   "fn?": "_fl_fn_q",
+  "boolean?": "_fl_boolean_q",
+  "type-of": "_fl_type_of",
   "empty?": "_fl_empty_q",
   // 문자 검증 (lexer 헬퍼)
   "is-digit?": "_fl_is_digit_q",
@@ -26656,6 +26684,12 @@ var BUILTIN_MAP = {
   "rest": "_fl_rest",
   "append": "_fl_append",
   "slice": "_fl_slice",
+  "take": "_fl_take",
+  "drop": "_fl_drop",
+  "zip": "_fl_zip",
+  "flatten": "_fl_flatten",
+  "reverse": "_fl_reverse",
+  "sort": "_fl_sort",
   "length": "_fl_length",
   "range": "_fl_range",
   // 문자열
@@ -26668,6 +26702,7 @@ var BUILTIN_MAP = {
   "str-lower": "_fl_lower",
   "trim": "_fl_trim",
   "replace": "_fl_replace",
+  "str-replace": "_fl_replace",
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
   "join": "_fl_join",
@@ -26682,10 +26717,8 @@ var BUILTIN_MAP = {
   "keys": "_fl_keys",
   "json_keys": "_fl_keys",
   "values": "_fl_values",
-  "entries": "_fl_entries",
   "map-keys": "_fl_keys",
   "map-values": "_fl_values",
-  "map-entries": "_fl_entries",
   "map-set": "_fl_map_set",
   "json-set": "_fl_map_set",
   "json_set": "_fl_map_set",
@@ -26895,8 +26928,14 @@ ${exportsStr}
   }
   genSExpr(node) {
     const { op, args: args3 } = node;
-    if (op === "and") return args3.length === 0 ? "true" : "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
-    if (op === "or") return args3.length === 0 ? "false" : "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+    if (op === "and") {
+      if (args3.length === 0) return "true";
+      return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
+    }
+    if (op === "or") {
+      if (args3.length === 0) return "false";
+      return "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+    }
     if (op === "cond") return this.genCond(args3);
     if (op === "while") return this.genWhile(args3);
     if (op === "recur") {
@@ -26913,25 +26952,85 @@ ${exportsStr}
       const inits = [];
       const names = [];
       for (let i = 0; i < items.length; i += 2) {
-        const name = this.extractVarName(items[i]);
-        const val = this.genNode(items[i + 1]);
+        const nameNode = items[i];
+        const valNode = items[i + 1];
+        if (!nameNode) continue;
+        const name = this.extractVarName(nameNode);
+        const val = valNode ? this.genNode(valNode) : "null";
         inits.push(`let ${name} = ${val};`);
         names.push(name);
       }
-      const bodyParts = bodyExprs.map((e) => this.genNode(e));
-      const bodyCode = bodyParts.length === 1 ? `return ${bodyParts[0]};` : bodyParts.slice(0, -1).map((s) => `${s};`).join(" ") + ` return ${bodyParts[bodyParts.length - 1]};`;
-      return `(() => {
-        ${inits.join(" ")}
-        while (true) {
-          const __r = (() => { ${bodyCode} })();
-          if (__r && __r.__recur) {
-            [${names.join(", ")}] = __r.a;
-            continue;
-          }
-          return __r;
-        }
-      })()`;
+      const bodyParts = bodyExprs.map((e) => this.genNode(e).trim()).filter((s) => s !== "");
+      let bodyCode = "";
+      if (bodyParts.length === 0) {
+        bodyCode = "return null;";
+      } else if (bodyParts.length === 1) {
+        bodyCode = `return ${bodyParts[0]};`;
+      } else {
+        const stmts = bodyParts.slice(0, -1).map((s) => s.endsWith(";") ? s : s + ";");
+        bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+      }
+      return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
     }
+    if (op === "let") {
+      if (args3.length >= 2) {
+        const bindingsArg = args3[0];
+        let bindings = [];
+        if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
+          bindings = bindingsArg.fields.get("items") || [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = bindingsArg.args;
+        }
+        const bindingStmts = [];
+        const isNested = bindings.length > 0 && bindings[0].kind === "block" && bindings[0].type === "Array";
+        if (isNested) {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && binding.type === "Array") {
+              const pairItems = binding.fields.get("items") || [];
+              if (pairItems.length >= 2) {
+                const varName = this.extractVarName(pairItems[0]);
+                const value = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName} = ${value};`);
+              }
+            }
+          }
+        } else {
+          for (let i = 0; i < bindings.length; i += 2) {
+            if (!bindings[i]) continue;
+            const varName = this.extractVarName(bindings[i]);
+            const value = bindings[i + 1] ? this.genNode(bindings[i + 1]) : "null";
+            bindingStmts.push(`let ${varName} = ${value};`);
+          }
+        }
+        const bodyParts = args3.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
+        let bodyCode = "";
+        if (bodyParts.length === 0) {
+          bodyCode = "return null;";
+        } else if (bodyParts.length === 1) {
+          bodyCode = `return ${bodyParts[0]};`;
+        } else {
+          const stmts = bodyParts.slice(0, -1).map((s) => s.endsWith(";") ? s : s + ";");
+          bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+        }
+        return `((() => { ${bindingStmts.join(" ")} ${bodyCode} })())`;
+      }
+      return "(() => null)()";
+    }
+    if (op === "do") return this.genDo(args3);
+    const BINARY_OPS = {
+      "+": "+",
+      "-": "-",
+      "*": "*",
+      "/": "/",
+      "%": "%",
+      "<": "<",
+      ">": ">",
+      "<=": "<=",
+      ">=": ">=",
+      "==": "===",
+      "!=": "!==",
+      "=": "==="
+    };
     if (op in BINARY_OPS && args3.length === 2) {
       const left = this.genNode(args3[0]);
       const right = this.genNode(args3[1]);
@@ -26952,7 +27051,7 @@ ${exportsStr}
     if (op === "define") {
       const varName = this.extractVarName(args3[0]);
       const value = this.genNode(args3[1]);
-      return `let ${varName} = ${value};`;
+      return `const ${varName} = ${value};`;
     }
     if (op === "set!") {
       const varName = this.extractVarName(args3[0]);
@@ -26961,12 +27060,13 @@ ${exportsStr}
     }
     if (op === "defn" || op === "defun") {
       const name = this.extractVarName(args3[0]);
-      const params = this.extractParamList(args3[1]);
-      const body = args3[2] ? this.genNode(args3[2]) : "undefined";
-      return `function ${name}(${params.join(", ")}) { return ${body}; }`;
+      const { params, preamble } = this.extractParamListWithDestructuring(args3[1]);
+      const bodyNode = args3[2];
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+      return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
     }
     if (op === "fn") return this.genFn(args3);
-    if (op === "do") return this.genDo(args3);
     if (op === "list") {
       const elements = args3.map((a) => this.genNode(a));
       return `[${elements.join(", ")}]`;
@@ -27030,57 +27130,6 @@ ${exportsStr}
     }
     return this.genFuncCall(op, args3);
   }
-  genCond(args3) {
-    if (args3.length === 0) return "null";
-    const firstIsClause = args3[0].kind === "block" && args3[0].type === "Array";
-    let pairs;
-    if (firstIsClause) {
-      pairs = args3.map((arg) => {
-        const items = arg.kind === "block" && arg.type === "Array" ? arg.fields.get("items") || [] : [arg];
-        return [items[0], items[1]];
-      });
-    } else {
-      pairs = [];
-      for (let i = 0; i < args3.length - 1; i += 2) {
-        pairs.push([args3[i], args3[i + 1]]);
-      }
-      if (args3.length % 2 === 1) {
-        pairs.push([{ kind: "literal", value: true }, args3[args3.length - 1]]);
-      }
-    }
-    let res = "null";
-    for (let i = pairs.length - 1; i >= 0; i--) {
-      const [testNode, bodyNode] = pairs[i];
-      const test = this.genNode(testNode);
-      const body = bodyNode ? this.genNode(bodyNode) : "null";
-      res = "(" + test + " ? " + body + " : " + res + ")";
-    }
-    return res;
-  }
-  genWhile(args3) {
-    const cond = this.genNode(args3[0]);
-    const body = args3.slice(1).map((a) => this.genNode(a)).join("; ");
-    return "(() => { while(" + cond + ") { " + body + " } })()";
-  }
-  genLoop(args3) {
-    const bindingsBlock = args3[0];
-    const bodyExprs = args3.slice(1);
-    let items = [];
-    if (bindingsBlock.kind === "block" && bindingsBlock.type === "Array") items = bindingsBlock.fields.get("items") || [];
-    const inits = [];
-    for (let i = 0; i < items.length; i += 2) {
-      const name = items[i].name ? items[i].name.replace(/^\$/, "") : "p";
-      const val = this.genNode(items[i + 1]);
-      inits.push("let " + name + " = " + val);
-    }
-    const bodyCode = bodyExprs.map((e) => this.genNode(e)).join("; ");
-    return "(() => { " + inits.join("; ") + "; while(true) { " + bodyCode + "; break; } })()";
-  }
-  genFn(args3) {
-    const params = this.extractParamList(args3[0]);
-    const body = args3[1] ? this.genNode(args3[1]) : "undefined";
-    return `((${params.join(", ")}) => ${body})`;
-  }
   genDo(args3) {
     if (args3.length === 0) return "(() => undefined)()";
     if (args3.length === 1) return `(() => ${this.genNode(args3[0])})()`;
@@ -27090,6 +27139,103 @@ ${exportsStr}
     }).filter((s) => s !== "");
     const last = this.genNode(args3[args3.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
+  }
+  genCond(args3) {
+    if (args3.length === 0) return "null";
+    let isNested = false;
+    if (args3[0].kind === "block" && args3[0].type === "Array") {
+      const items = args3[0].fields.get("items");
+      if (Array.isArray(items) && items.length >= 1) {
+        isNested = true;
+      }
+    }
+    let pairs;
+    if (isNested) {
+      pairs = args3.map((arg) => {
+        if (arg.kind === "block" && arg.type === "Array") {
+          const items = arg.fields.get("items") || [];
+          return [items[0], items[1]];
+        }
+        return [arg, null];
+      });
+    } else {
+      pairs = [];
+      for (let i = 0; i < args3.length - 1; i += 2) {
+        pairs.push([args3[i], args3[i + 1]]);
+      }
+      if (args3.length % 2 === 1) {
+        pairs.push([{ kind: "literal", type: "boolean", value: true }, args3[args3.length - 1]]);
+      }
+    }
+    let res = "null";
+    for (let i = pairs.length - 1; i >= 0; i--) {
+      const [testNode, bodyNode] = pairs[i];
+      if (!testNode) continue;
+      const test = this.genNode(testNode);
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      res = "(" + test + " ? " + body + " : " + res + ")";
+    }
+    return res;
+  }
+  genWhile(args3) {
+    const cond = this.genNode(args3[0]);
+    const bodyParts = args3.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
+    const bodyCode = bodyParts.map((s) => s.endsWith(";") ? s : s + ";").join(" ");
+    return "(() => { while(" + cond + ") { " + bodyCode + " } })()";
+  }
+  genFn(args3) {
+    const { params, preamble } = this.extractParamListWithDestructuring(args3[0]);
+    const bodyNode = args3[1];
+    const body = bodyNode ? this.genNode(bodyNode) : "undefined";
+    const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+    return `((${params.join(", ")}) => ${finalBody})`;
+  }
+  extractParamListWithDestructuring(node) {
+    if (!node) return { params: [], preamble: "" };
+    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
+    const params = [];
+    const bindingStmts = [];
+    let tmpCount = 0;
+    for (const p of pNodes || []) {
+      if (p.kind === "variable") {
+        params.push(flNameToJs(p.name.replace(/^\$/, "")));
+      } else if (p.kind === "literal" && (p.type === "symbol" || typeof p.value === "string")) {
+        params.push(flNameToJs(String(p.value).replace(/^\$/, "")));
+      } else if (p.kind === "block" && p.type === "Array") {
+        const tmpName = `_arg${tmpCount++}`;
+        params.push(tmpName);
+        const subItems = p.fields.get("items") || [];
+        for (let i = 0; i < subItems.length; i++) {
+          const sub = subItems[i];
+          if (sub.kind === "variable") {
+            const varName = flNameToJs(sub.name.replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          } else if (sub.kind === "literal" && (sub.type === "symbol" || typeof sub.value === "string")) {
+            const varName = flNameToJs(String(sub.value).replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          }
+        }
+      } else {
+        params.push("p");
+      }
+    }
+    return { params, preamble: bindingStmts.join(" ") };
+  }
+  extractVarName(node) {
+    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
+    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
+    return "unknown";
+  }
+  extractParamList(node) {
+    if (!node) return [];
+    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
+    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
+  }
+  extractBlockParams(node) {
+    const params = node.fields.get("params");
+    if (!params) return [];
+    let pNodes = Array.isArray(params) ? params : params.kind === "block" && params.type === "Array" ? params.fields.get("items") : [params];
+    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
   genFuncCall(op, args3) {
     const argStrs = args3.map((a) => this.genNode(a));
@@ -27212,22 +27358,6 @@ ${exportsStr}
     }
     if (node.finallyBlock) parts.push(`finally{${this.genNode(node.finallyBlock)};}`);
     return parts.join("") + "})()";
-  }
-  extractVarName(node) {
-    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
-    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
-    return "unknown";
-  }
-  extractParamList(node) {
-    if (!node) return [];
-    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
-    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
-  }
-  extractBlockParams(node) {
-    const params = node.fields.get("params");
-    if (!params) return [];
-    let pNodes = Array.isArray(params) ? params : params.kind === "block" && params.type === "Array" ? params.fields.get("items") : [params];
-    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
   minify(code) {
     return code.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ").trim();
