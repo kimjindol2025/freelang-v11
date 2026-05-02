@@ -14,7 +14,7 @@
 | 표준 라이브러리 | 500+ 함수 (HTTP, DB, File, Crypto, AI, WebSocket 등) |
 | 테스트 | 773/832 PASS (jest) |
 | 자가 컴파일 | Fixed-point SHA256 검증 ✅ |
-| L2 증명 | 16/17 케이스 통과 (수정 진행 중) |
+| L2 증명 | 17/17 케이스 PASS ✅ (수정 진행 중) |
 | MCP 서버 | `mcp.dclub.kr` — `fl_eval` 샌드박스 실행 |
 
 ---

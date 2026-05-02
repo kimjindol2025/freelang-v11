@@ -37,7 +37,7 @@
 
 ### Tier 2: 프로덕션 (권장)
 - ✅ 자가호스팅 (L1 완전)
-- 🔧 L2 고정점 증명 (16/17 — case-15 수정 중)
+- ✅ L2 고정점 증명 (17/17 완전 통과)
 - ✅ AI-Native: defn 메타, :effects, ^pure, defprop
 - ✅ MongoDB 드라이버
 - ✅ 보안 미들웨어 (Rate Limiting, CSP)
