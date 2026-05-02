@@ -31,6 +31,7 @@ import { fnMetaRegistry } from "./eval-special-forms";   // AI-Native Phase 1
 import { propRegistry, runProp, createPropertyModule } from "./stdlib-property"; // AI-Native Phase 4
 import { createWscModule } from "./stdlib-wsc";          // WebSocket 클라이언트
 import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-lazy-registry"; // Lazy Loading
+import { createImageModule } from "./stdlib-image"; // Phase A: Image Processing
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -83,6 +84,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createWscModule(
     (n: string, a: any[]) => interp.callUserFunction(n, a)
   ));
+  interp.registerModule(createImageModule()); // Phase A: image_info/resize/thumbnail/convert/watermark/crop
 
   // ── fl_require builtin 등록 ─────────────────────────────────────
   // (fl_require "audit")   → audit_log 등 즉시 사용 가능

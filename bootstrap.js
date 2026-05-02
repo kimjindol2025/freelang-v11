@@ -399,8 +399,8 @@ function makeThrowExpression(argument) {
 function makePageNode(name, title, route, component, metadata, line) {
   return { kind: "page", name, title, route, component, metadata, line };
 }
-function makeRouteNode(name, path16, method, handler, middleware, validation, line) {
-  return { kind: "route", name, path: path16, method, handler, middleware, validation, line };
+function makeRouteNode(name, path18, method, handler, middleware, validation, line) {
+  return { kind: "route", name, path: path18, method, handler, middleware, validation, line };
 }
 function makeComponentNode(name, render, state, computed, watch2, methods, slots, line) {
   return { kind: "component", name, render, state, computed, watch: watch2, methods, slots, line };
@@ -2345,12 +2345,12 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
       parsePage(name, fields, line) {
-        const path16 = this.extractStringField(fields, "path");
+        const path18 = this.extractStringField(fields, "path");
         const title = this.extractStringField(fields, "title");
         const render = this.extractStringField(fields, "render");
         const component = this.extractSymbolField(fields, "component");
         const metadata = this.extractMapField(fields, "metadata");
-        const pageNode = makePageNode(name, title, path16, component, metadata, line);
+        const pageNode = makePageNode(name, title, path18, component, metadata, line);
         if (render) {
           pageNode.fields = pageNode.fields || /* @__PURE__ */ new Map();
           pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
@@ -2359,12 +2359,12 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
       parseRoute(name, fields, line) {
-        const path16 = this.extractStringField(fields, "path");
+        const path18 = this.extractStringField(fields, "path");
         const method = this.extractStringField(fields, "method");
         const handler = this.extractSymbolField(fields, "handler");
         const middleware = this.extractSymbolArrayField(fields, "middleware");
         const validation = this.extractSymbolField(fields, "validation");
-        return makeRouteNode(name, path16, method, handler, middleware, validation, line);
+        return makeRouteNode(name, path18, method, handler, middleware, validation, line);
       }
       // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
       parseComponent(name, fields, line) {
@@ -3495,15 +3495,15 @@ var init_linter = __esm({
 });
 
 // src/cli.ts
-var fs19 = __toESM(require("fs"));
-var path15 = __toESM(require("path"));
+var fs21 = __toESM(require("fs"));
+var path17 = __toESM(require("path"));
 var readline = __toESM(require("readline"));
 init_lexer();
 init_parser();
 
 // src/interpreter.ts
-var fs13 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs15 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
 init_lexer();
 init_parser();
 init_ast();
@@ -10614,14 +10614,14 @@ var WorldModel = class {
     const visited = /* @__PURE__ */ new Set();
     const queue = [{ id: fromId, path: [fromId] }];
     while (queue.length > 0) {
-      const { id, path: path16 } = queue.shift();
+      const { id, path: path18 } = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
       for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path16, neighbor];
+        if (neighbor === toId) return [...path18, neighbor];
         if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path16, neighbor] });
+          queue.push({ id: neighbor, path: [...path18, neighbor] });
         }
       }
     }
@@ -11501,11 +11501,11 @@ function flExecOpNative(op, vals) {
     }
     case "load": {
       const filePath = String(v0 ?? "");
-      const fs20 = require("fs");
-      const path16 = require("path");
+      const fs22 = require("fs");
+      const path18 = require("path");
       try {
-        const resolvedPath = path16.resolve(process.cwd(), filePath);
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const resolvedPath = path18.resolve(process.cwd(), filePath);
+        const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -11530,9 +11530,9 @@ function flExecOpNative(op, vals) {
     case "file-mkdir":
     case "file_mkdir": {
       const dirPath = String(v0 ?? "");
-      const fs20 = require("fs");
+      const fs22 = require("fs");
       try {
-        fs20.mkdirSync(dirPath, { recursive: true });
+        fs22.mkdirSync(dirPath, { recursive: true });
         return true;
       } catch {
         return false;
@@ -11542,9 +11542,9 @@ function flExecOpNative(op, vals) {
     case "file_append": {
       const filePath = String(v0 ?? "");
       const content = String(v1 ?? "");
-      const fs20 = require("fs");
+      const fs22 = require("fs");
       try {
-        fs20.appendFileSync(filePath, content);
+        fs22.appendFileSync(filePath, content);
         return true;
       } catch {
         return false;
@@ -11819,11 +11819,11 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     case "load": {
       const filePath = String(args3[0] ?? "");
-      const fs20 = require("fs");
-      const path16 = require("path");
+      const fs22 = require("fs");
+      const path18 = require("path");
       try {
-        const resolvedPath = path16.resolve(process.cwd(), filePath);
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const resolvedPath = path18.resolve(process.cwd(), filePath);
+        const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -11852,18 +11852,18 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     case "require": {
       const modulePath = String(args3[0] ?? "");
-      const fs20 = require("fs");
-      const path16 = require("path");
+      const fs22 = require("fs");
+      const path18 = require("path");
       try {
         let filePath = modulePath;
         if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
           filePath = filePath + ".fl";
         }
-        const resolvedPath = path16.isAbsolute(filePath) ? filePath : path16.resolve(process.cwd(), filePath);
+        const resolvedPath = path18.isAbsolute(filePath) ? filePath : path18.resolve(process.cwd(), filePath);
         if (MODULE_CACHE.has(resolvedPath)) {
           return MODULE_CACHE.get(resolvedPath);
         }
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -11880,7 +11880,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const port = Number(args3[1] ?? 27017);
       const hexData = String(args3[2] ?? "");
       const timeout = Number(args3[3] ?? 1e4);
-      const { spawnSync: spawnSync9 } = require("child_process");
+      const { spawnSync: spawnSync10 } = require("child_process");
       const inlineScript = `
 const net = require('net');
 const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -11930,7 +11930,7 @@ sock.setTimeout(timeout, () => {
 `;
       const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
       try {
-        const r = spawnSync9(
+        const r = spawnSync10(
           process.execPath,
           ["-e", inlineScript],
           { input: reqJson, timeout: timeout + 1e3, encoding: "utf-8" }
@@ -11946,7 +11946,7 @@ sock.setTimeout(timeout, () => {
       const host = String(args3[0] ?? "localhost");
       const port = Number(args3[1] ?? 27017);
       const timeout = Number(args3[2] ?? 5e3);
-      const { spawnSync: spawnSync9 } = require("child_process");
+      const { spawnSync: spawnSync10 } = require("child_process");
       const inlineScript = `
 const net = require('net');
 const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -11956,7 +11956,7 @@ sock.on('error', () => { process.exit(1); });
 sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 `;
       try {
-        const r = spawnSync9(
+        const r = spawnSync10(
           process.execPath,
           ["-e", inlineScript],
           { input: JSON.stringify({ host, port, timeout }), timeout: timeout + 500, encoding: "utf-8" }
@@ -12034,14 +12034,22 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       return n.toString(16).padStart(2, "0");
     }
     case "bson-encode-native": {
-      const doc = args3[0];
-      if (!doc || typeof doc !== "object") return "0c000000107069696e6700010000000000";
       const int32ToHex = (n) => {
         const b0 = n & 255;
         const b1 = n >> 8 & 255;
         const b2 = n >> 16 & 255;
         const b3 = n >> 24 & 255;
         return b0.toString(16).padStart(2, "0") + b1.toString(16).padStart(2, "0") + b2.toString(16).padStart(2, "0") + b3.toString(16).padStart(2, "0");
+      };
+      const int64ToHex = (n) => {
+        const lo = n >>> 0;
+        const hi = Math.floor(n / 4294967296) >>> 0;
+        return int32ToHex(lo) + int32ToHex(hi);
+      };
+      const float64ToHex = (n) => {
+        const buf = Buffer.allocUnsafe(8);
+        buf.writeDoubleLE(n, 0);
+        return buf.toString("hex");
       };
       const stringToHex = (s) => {
         let hex = "";
@@ -12050,57 +12058,96 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         }
         return hex;
       };
-      let elements = "";
-      for (const [key, val] of Object.entries(doc)) {
-        if (typeof val === "number" && Number.isInteger(val)) {
-          elements += "10" + stringToHex(key) + "00" + int32ToHex(val);
-        } else if (typeof val === "string") {
-          const strBytes = Buffer.from(val, "utf-8");
-          const len = strBytes.length + 1;
-          elements += "02" + stringToHex(key) + "00" + int32ToHex(len) + strBytes.toString("hex") + "00";
-        } else if (typeof val === "boolean") {
-          elements += "08" + stringToHex(key) + "00" + (val ? "01" : "00");
-        } else if (val === null) {
-          elements += "0a" + stringToHex(key) + "00";
+      const encodeDoc = (d) => {
+        if (!d || typeof d !== "object") return int32ToHex(5) + "00";
+        let elements = "";
+        const entries = Array.isArray(d) ? d.map((v, i) => [String(i), v]) : Object.entries(d);
+        for (const [key, val] of entries) {
+          const k = stringToHex(key) + "00";
+          if (Array.isArray(val)) {
+            const subdoc = encodeDoc(val);
+            elements += "04" + k + subdoc;
+          } else if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+            const subdoc = encodeDoc(val);
+            elements += "03" + k + subdoc;
+          } else if (typeof val === "number" && Number.isInteger(val) && val >= -2147483648 && val <= 2147483647) {
+            elements += "10" + k + int32ToHex(val);
+          } else if (typeof val === "number") {
+            elements += "01" + k + float64ToHex(val);
+          } else if (typeof val === "string") {
+            const strBytes = Buffer.from(val, "utf-8");
+            const len = strBytes.length + 1;
+            elements += "02" + k + int32ToHex(len) + strBytes.toString("hex") + "00";
+          } else if (typeof val === "boolean") {
+            elements += "08" + k + (val ? "01" : "00");
+          } else if (val === null || val === void 0) {
+            elements += "0a" + k;
+          }
         }
-      }
-      const size = 4 + elements.length / 2 + 1;
-      const doc_hex = int32ToHex(size) + elements + "00";
-      return doc_hex;
+        const size = 4 + elements.length / 2 + 1;
+        return int32ToHex(size) + elements + "00";
+      };
+      const doc = args3[0];
+      if (!doc || typeof doc !== "object") return "0c000000107069696e6700010000000000";
+      return encodeDoc(doc);
     }
     case "bson-decode-native": {
       const hex = String(args3[0] || "");
       if (hex.length < 8) return {};
       const buf = Buffer.from(hex, "hex");
-      const result = {};
-      const docSize = buf.readInt32LE(0);
-      let offset = 4;
-      while (offset < buf.length - 1 && buf[offset] !== 0) {
-        const elemType = buf[offset];
-        offset++;
-        let nameEnd = offset;
-        while (nameEnd < buf.length && buf[nameEnd] !== 0) nameEnd++;
-        const fieldName = buf.toString("utf-8", offset, nameEnd);
-        offset = nameEnd + 1;
-        if (elemType === 16) {
-          const val = buf.readInt32LE(offset);
-          result[fieldName] = val;
-          offset += 4;
-        } else if (elemType === 2) {
-          const strLen = buf.readInt32LE(offset);
-          offset += 4;
-          const strVal = buf.toString("utf-8", offset, offset + strLen - 1);
-          result[fieldName] = strVal;
-          offset += strLen;
-        } else if (elemType === 8) {
-          result[fieldName] = buf[offset] !== 0;
+      const decodeDoc = (buf2, startOffset) => {
+        if (startOffset + 4 > buf2.length) return [{}, startOffset];
+        const docSize = buf2.readInt32LE(startOffset);
+        const endOffset = startOffset + docSize;
+        const result2 = {};
+        let offset = startOffset + 4;
+        while (offset < endOffset - 1 && buf2[offset] !== 0) {
+          const elemType = buf2[offset];
           offset++;
-        } else if (elemType === 10) {
-          result[fieldName] = null;
-        } else {
-          offset++;
+          let nameEnd = offset;
+          while (nameEnd < buf2.length && buf2[nameEnd] !== 0) nameEnd++;
+          const fieldName = buf2.toString("utf-8", offset, nameEnd);
+          offset = nameEnd + 1;
+          if (elemType === 1) {
+            result2[fieldName] = buf2.readDoubleLE(offset);
+            offset += 8;
+          } else if (elemType === 2) {
+            const strLen = buf2.readInt32LE(offset);
+            offset += 4;
+            result2[fieldName] = buf2.toString("utf-8", offset, offset + strLen - 1);
+            offset += strLen;
+          } else if (elemType === 3) {
+            const [subdoc, newOffset] = decodeDoc(buf2, offset);
+            result2[fieldName] = subdoc;
+            offset = newOffset;
+          } else if (elemType === 4) {
+            const [subdoc, newOffset] = decodeDoc(buf2, offset);
+            result2[fieldName] = Object.values(subdoc);
+            offset = newOffset;
+          } else if (elemType === 7) {
+            result2[fieldName] = buf2.toString("hex", offset, offset + 12);
+            offset += 12;
+          } else if (elemType === 8) {
+            result2[fieldName] = buf2[offset] !== 0;
+            offset++;
+          } else if (elemType === 9) {
+            result2[fieldName] = buf2.readBigInt64LE(offset);
+            offset += 8;
+          } else if (elemType === 10) {
+            result2[fieldName] = null;
+          } else if (elemType === 16) {
+            result2[fieldName] = buf2.readInt32LE(offset);
+            offset += 4;
+          } else if (elemType === 18) {
+            result2[fieldName] = Number(buf2.readBigInt64LE(offset));
+            offset += 8;
+          } else {
+            break;
+          }
         }
-      }
+        return [result2, endOffset];
+      };
+      const [result] = decodeDoc(buf, 0);
       return result;
     }
     case "identity":
@@ -15235,9 +15282,9 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         case "file-mkdir":
         case "file_mkdir": {
           const dirPath = String(args3[0] ?? "");
-          const fs20 = require("fs");
+          const fs22 = require("fs");
           try {
-            fs20.mkdirSync(dirPath, { recursive: true });
+            fs22.mkdirSync(dirPath, { recursive: true });
             return true;
           } catch {
             return false;
@@ -18154,8 +18201,8 @@ function evalSpecialForm(interp2, op, expr2) {
   const ctx = interp2.context;
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
-    const fs20 = require("fs");
-    const path16 = require("path");
+    const fs22 = require("fs");
+    const path18 = require("path");
     let loadedAny = false;
     for (const arg of expr2.args) {
       let name = null;
@@ -18164,15 +18211,15 @@ function evalSpecialForm(interp2, op, expr2) {
       if (!name) throwInvalidForm("use", "module name must be symbol or string", expr2.line);
       const homeDir = require("os").homedir();
       const candidates = [
-        path16.resolve(process.cwd(), "plugins", name + ".fl"),
-        path16.resolve(homeDir, ".fl", "plugins", name + ".fl"),
-        path16.resolve(process.cwd(), "self/stdlib", name + ".fl"),
-        path16.resolve(process.cwd(), name + ".fl"),
-        path16.resolve(process.cwd(), name)
+        path18.resolve(process.cwd(), "plugins", name + ".fl"),
+        path18.resolve(homeDir, ".fl", "plugins", name + ".fl"),
+        path18.resolve(process.cwd(), "self/stdlib", name + ".fl"),
+        path18.resolve(process.cwd(), name + ".fl"),
+        path18.resolve(process.cwd(), name)
       ];
       let absPath = null;
       for (const c of candidates) {
-        if (fs20.existsSync(c) && fs20.statSync(c).isFile()) {
+        if (fs22.existsSync(c) && fs22.statSync(c).isFile()) {
           absPath = c;
           break;
         }
@@ -18190,7 +18237,7 @@ function evalSpecialForm(interp2, op, expr2) {
       if (importedSet.has(absPath)) continue;
       importedSet.add(absPath);
       interp2.importedFiles = importedSet;
-      const src = fs20.readFileSync(absPath, "utf-8");
+      const src = fs22.readFileSync(absPath, "utf-8");
       const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
       const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
       interp2.interpret(parse3(lex2(src, absPath)));
@@ -20644,8 +20691,8 @@ function createDataModule() {
   return {
     // ── JSON ──────────────────────────────────────────────────
     // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
-    "json_get": (obj, path16) => {
-      const parts = path16.split(".");
+    "json_get": (obj, path18) => {
+      const parts = path18.split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -20654,10 +20701,10 @@ function createDataModule() {
       return cur ?? null;
     },
     // json_set obj path value -> object (immutable update, returns new obj)
-    "json_set": (obj, path16, value) => {
+    "json_set": (obj, path18, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const clone = JSON.parse(JSON.stringify(parsed));
-      const parts = path16.split(".");
+      const parts = path18.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -20753,8 +20800,8 @@ function createDataModule() {
       const y = typeof b === "string" ? JSON.parse(b) : b;
       return { ...x, ...y };
     },
-    "json-get": (obj, path16) => {
-      const parts = String(path16).split(".");
+    "json-get": (obj, path18) => {
+      const parts = String(path18).split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -20762,10 +20809,10 @@ function createDataModule() {
       }
       return cur ?? null;
     },
-    "json-set": (obj, path16, value) => {
+    "json-set": (obj, path18, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const clone = JSON.parse(JSON.stringify(parsed));
-      const parts = String(path16).split(".");
+      const parts = String(path18).split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -22597,8 +22644,8 @@ function createResourceModule() {
       });
     },
     // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
-    "res_disk_usage": (path16) => {
-      const line = run(`df -BG --output=size,used,avail,pcent "${path16}" 2>/dev/null | tail -1`);
+    "res_disk_usage": (path18) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path18}" 2>/dev/null | tail -1`);
       if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
       const [total, used, avail, pct] = line.trim().split(/\s+/);
       return {
@@ -22925,6 +22972,9 @@ function createResourceModule() {
 var http = __toESM(require("http"));
 var url = __toESM(require("url"));
 var crypto = __toESM(require("crypto"));
+var fs7 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
+var os2 = __toESM(require("os"));
 var __activeServer = { server: null };
 function createHttpServerModule(callFn, callFunctionValue2) {
   const routes = [];
@@ -22943,13 +22993,13 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     const counter = ++requestCounter;
     return `req_${timestamp}_${counter}`;
   }
-  function logAccess(method, path16, status, duration, requestId) {
+  function logAccess(method, path18, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path16} ${status} ${duration}ms`);
+    console.log(`${icon} [${requestId}] ${method} ${path18} ${status} ${duration}ms`);
   }
-  function pathToRegex(path16) {
+  function pathToRegex(path18) {
     const params = [];
-    const pattern = path16.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+    const pattern = path18.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
       params.push(param);
       return "([^\\/]+)";
     });
@@ -22964,22 +23014,97 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   }
   async function readBody(req) {
     return new Promise((resolve7) => {
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk.toString();
-      });
+      const chunks = [];
+      req.on("data", (chunk) => chunks.push(chunk));
       req.on("end", () => {
-        const ct = (req.headers["content-type"] || "").toString().toLowerCase();
-        if (ct.includes("application/json") && body.trim()) {
+        const raw = Buffer.concat(chunks);
+        const ct = (req.headers["content-type"] || "").toString();
+        if (ct.includes("application/json")) {
           try {
-            resolve7(JSON.parse(body));
+            resolve7(JSON.parse(raw.toString()));
             return;
           } catch {
           }
         }
-        resolve7(body);
+        if (ct.includes("multipart/form-data")) {
+          try {
+            resolve7(parseMultipart(raw, ct));
+            return;
+          } catch {
+          }
+        }
+        if (ct.includes("application/x-www-form-urlencoded")) {
+          try {
+            const params = {};
+            new url.URLSearchParams(raw.toString()).forEach((v, k) => {
+              params[k] = v;
+            });
+            resolve7(params);
+            return;
+          } catch {
+          }
+        }
+        resolve7(raw.toString());
       });
     });
+  }
+  function parseMultipart(raw, contentType) {
+    const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+    if (!boundaryMatch) return {};
+    const boundary = boundaryMatch[1];
+    const delimiter = Buffer.from("\r\n--" + boundary);
+    const fields = {};
+    const files = [];
+    const uploadDir = path6.join(os2.tmpdir(), "fl-uploads");
+    if (!fs7.existsSync(uploadDir)) fs7.mkdirSync(uploadDir, { recursive: true });
+    const start = Buffer.from("--" + boundary + "\r\n");
+    let pos = raw.indexOf(start);
+    if (pos < 0) return { fields, files };
+    pos += start.length;
+    while (pos < raw.length) {
+      const next = raw.indexOf(delimiter, pos);
+      const partEnd = next < 0 ? raw.length : next;
+      const part = raw.slice(pos, partEnd);
+      const headerEnd = part.indexOf("\r\n\r\n");
+      if (headerEnd < 0) break;
+      const headerStr = part.slice(0, headerEnd).toString();
+      const bodyBuf = part.slice(headerEnd + 4);
+      const dispMatch = headerStr.match(/Content-Disposition:[^\n]*?;\s*name="([^"]+)"(?:[^\n]*?filename="([^"]+)")?/i);
+      if (!dispMatch) {
+        pos = partEnd + delimiter.length + 2;
+        continue;
+      }
+      const fieldName = dispMatch[1];
+      const fileName = dispMatch[2];
+      if (fileName) {
+        const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
+        const mimetype = ctMatch ? ctMatch[1].trim() : "application/octet-stream";
+        const ext = path6.extname(fileName) || "";
+        const savedName = crypto.randomBytes(8).toString("hex") + ext;
+        const savedPath = path6.join(uploadDir, savedName);
+        fs7.writeFileSync(savedPath, bodyBuf);
+        const m = /* @__PURE__ */ new Map();
+        m.set("fieldname", fieldName);
+        m.set("originalname", fileName);
+        m.set("mimetype", mimetype);
+        m.set("size", bodyBuf.length);
+        m.set("path", savedPath);
+        m.set("filename", savedName);
+        files.push(m);
+      } else {
+        fields[fieldName] = bodyBuf.toString().replace(/\r\n$/, "");
+      }
+      if (next < 0) break;
+      pos = next + delimiter.length;
+      if (raw.slice(pos, pos + 2).toString() === "--") break;
+      pos += 2;
+    }
+    const result = /* @__PURE__ */ new Map();
+    const fieldsMap = /* @__PURE__ */ new Map();
+    Object.entries(fields).forEach(([k, v]) => fieldsMap.set(k, v));
+    result.set("fields", fieldsMap);
+    result.set("files", files);
+    return result;
   }
   function sendResponse(res, status, body, contentType = "application/json", extraHeaders) {
     const headersToWrite = { "Content-Type": contentType };
@@ -23015,11 +23140,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       res.end(String(body ?? ""));
     }
   }
-  function createFlRequest(method, path16, query, headers, body, params, requestId) {
+  function createFlRequest(method, path18, query, headers, body, params, requestId) {
     return {
       __fl_request: true,
       method,
-      path: path16,
+      path: path18,
       query,
       headers,
       body: body || void 0,
@@ -23028,43 +23153,69 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       timestamp: Date.now()
     };
   }
+  const rlStore = /* @__PURE__ */ new Map();
+  let rlMax = 100;
+  let rlWindowMs = 6e4;
+  function checkRateLimit(ip) {
+    const now = Date.now();
+    let entry = rlStore.get(ip);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 1, resetAt: now + rlWindowMs };
+      rlStore.set(ip, entry);
+      return true;
+    }
+    entry.count++;
+    return entry.count <= rlMax;
+  }
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, e] of rlStore) {
+      if (now > e.resetAt + rlWindowMs) rlStore.delete(ip);
+    }
+  }, 3e5).unref();
   return {
     // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
     // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
     // handler가 응답 객체 반환 → 즉시 응답 (라우트 실행 안 함)
-    "server_use": (path16, handlerName) => {
-      const [pattern] = pathToRegex(path16);
+    "server_use": (path18, handlerName) => {
+      const [pattern] = pathToRegex(path18);
       middlewares.push({ pattern, handler: handlerName });
       return null;
     },
+    // server_rate_limit max window_ms → null  (e.g. 100req/60s)
+    "server_rate_limit": (max, windowMs) => {
+      rlMax = Math.max(1, Math.floor(max));
+      rlWindowMs = Math.max(1e3, Math.floor(windowMs));
+      return null;
+    },
     // server_get path handlerName -> null
-    "server_get": (path16, handlerName) => {
-      const [pattern, params] = pathToRegex(path16);
-      routes.push({ method: "GET", path: path16, pattern, params, handler: handlerName });
+    "server_get": (path18, handlerName) => {
+      const [pattern, params] = pathToRegex(path18);
+      routes.push({ method: "GET", path: path18, pattern, params, handler: handlerName });
       return null;
     },
     // server_post path handlerName -> null
-    "server_post": (path16, handlerName) => {
-      const [pattern, params] = pathToRegex(path16);
-      routes.push({ method: "POST", path: path16, pattern, params, handler: handlerName });
+    "server_post": (path18, handlerName) => {
+      const [pattern, params] = pathToRegex(path18);
+      routes.push({ method: "POST", path: path18, pattern, params, handler: handlerName });
       return null;
     },
     // server_put path handlerName -> null
-    "server_put": (path16, handlerName) => {
-      const [pattern, params] = pathToRegex(path16);
-      routes.push({ method: "PUT", path: path16, pattern, params, handler: handlerName });
+    "server_put": (path18, handlerName) => {
+      const [pattern, params] = pathToRegex(path18);
+      routes.push({ method: "PUT", path: path18, pattern, params, handler: handlerName });
       return null;
     },
     // server_patch path handlerName -> null
-    "server_patch": (path16, handlerName) => {
-      const [pattern, params] = pathToRegex(path16);
-      routes.push({ method: "PATCH", path: path16, pattern, params, handler: handlerName });
+    "server_patch": (path18, handlerName) => {
+      const [pattern, params] = pathToRegex(path18);
+      routes.push({ method: "PATCH", path: path18, pattern, params, handler: handlerName });
       return null;
     },
     // server_delete path handlerName -> null
-    "server_delete": (path16, handlerName) => {
-      const [pattern, params] = pathToRegex(path16);
-      routes.push({ method: "DELETE", path: path16, pattern, params, handler: handlerName });
+    "server_delete": (path18, handlerName) => {
+      const [pattern, params] = pathToRegex(path18);
+      routes.push({ method: "DELETE", path: path18, pattern, params, handler: handlerName });
       return null;
     },
     // server_start port -> string
@@ -23081,19 +23232,30 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const requestId = generateRequestId();
         currentRequestId = requestId;
         const method = req.method || "GET";
-        const { path: path16, query } = parseUrl(req.url || "/");
+        const { path: path18, query } = parseUrl(req.url || "/");
         const headers = req.headers;
         const body = await readBody(req);
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
         res.setHeader("X-Request-Id", requestId);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("X-Frame-Options", "SAMEORIGIN");
+        res.setHeader("X-XSS-Protection", "1; mode=block");
+        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+        res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         if (method === "OPTIONS") {
           res.writeHead(200);
           res.end();
           return;
         }
-        if (process.env.FL_DEV === "1" && path16 === "/__hot" && method === "GET") {
+        const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+        if (!checkRateLimit(clientIp)) {
+          res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(Math.ceil(rlWindowMs / 1e3)) });
+          res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1e3) }));
+          return;
+        }
+        if (process.env.FL_DEV === "1" && path18 === "/__hot" && method === "GET") {
           res.writeHead(200, {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -23103,9 +23265,9 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           res.write("retry: 400\n\n");
           return;
         }
-        const baseReq = createFlRequest(method, path16, query, headers, body, {}, requestId);
+        const baseReq = createFlRequest(method, path18, query, headers, body, {}, requestId);
         for (const mw of middlewares) {
-          if (!mw.pattern.exec(path16)) continue;
+          if (!mw.pattern.exec(path18)) continue;
           try {
             let mwResult;
             if (typeof mw.handler === "string") {
@@ -23121,7 +23283,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
               const mwCT = mwResult.contentType ?? "application/json";
               sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
-              logAccess(method, path16, mwStatus, Date.now() - requestStart, requestId);
+              logAccess(method, path18, mwStatus, Date.now() - requestStart, requestId);
               return;
             }
           } catch (mwErr) {
@@ -23132,7 +23294,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
-          const match = route.pattern.exec(path16);
+          const match = route.pattern.exec(path18);
           if (!match) continue;
           matched = true;
           let status = 200;
@@ -23141,7 +23303,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
             for (let i = 0; i < route.params.length; i++) {
               params[route.params[i]] = match[i + 1];
             }
-            const flReq = createFlRequest(method, path16, query, headers, body, params, requestId);
+            const flReq = createFlRequest(method, path18, query, headers, body, params, requestId);
             let rawResult;
             if (typeof route.handler === "string") {
               rawResult = callFn(route.handler, [flReq]);
@@ -23194,20 +23356,20 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               }
             }
             const duration = Date.now() - requestStart;
-            logAccess(method, path16, status, duration, requestId);
+            logAccess(method, path18, status, duration, requestId);
           } catch (err4) {
             const status2 = 500;
             sendResponse(res, status2, { error: err4.message });
             const duration = Date.now() - requestStart;
-            logAccess(method, path16, status2, duration, requestId);
+            logAccess(method, path18, status2, duration, requestId);
           }
           return;
         }
         if (!matched) {
           const status = 404;
-          sendResponse(res, status, { error: "Not Found", path: path16 });
+          sendResponse(res, status, { error: "Not Found", path: path18 });
           const duration = Date.now() - requestStart;
-          logAccess(method, path16, status, duration, requestId);
+          logAccess(method, path18, status, duration, requestId);
         }
       });
       server.on("upgrade", (req, socket, head) => {
@@ -23603,8 +23765,8 @@ function createHttpServerModule(callFn, callFunctionValue2) {
 var import_child_process4 = require("child_process");
 var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
-function kimdbReq(method, path16, body) {
-  const url2 = `${KIMDB}${path16}`;
+function kimdbReq(method, path18, body) {
+  const url2 = `${KIMDB}${path18}`;
   const args3 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args3.push("-X", method);
@@ -24115,8 +24277,8 @@ function createPubSubModule(callFn) {
 }
 
 // src/stdlib-process.ts
-var fs7 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs8 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 function createProcessModule() {
   let sigtermRegistered = false;
   const shutdownCallbacks = [];
@@ -24136,11 +24298,11 @@ function createProcessModule() {
   }
   return {
     "env_load": (envPath) => {
-      const filePath = envPath ? path6.resolve(envPath) : path6.resolve(process.cwd(), ".env");
+      const filePath = envPath ? path7.resolve(envPath) : path7.resolve(process.cwd(), ".env");
       const loaded2 = {};
       let content;
       try {
-        content = fs7.readFileSync(filePath, "utf-8");
+        content = fs8.readFileSync(filePath, "utf-8");
       } catch (err4) {
         if (err4.code === "ENOENT") return {};
         throw err4;
@@ -24191,9 +24353,9 @@ function createModuleSystem() {
   return {
     // module_load path -> {exports} | null
     // Load a module from file or registry
-    "module_load": (path16) => {
-      if (registry.has(path16)) {
-        return registry.get(path16);
+    "module_load": (path18) => {
+      if (registry.has(path18)) {
+        return registry.get(path18);
       }
       return null;
     },
@@ -24209,9 +24371,9 @@ function createModuleSystem() {
     },
     // module_require path -> {exports}
     // Require and return all exports from a module
-    "module_require": (path16) => {
-      if (registry.has(path16)) {
-        return registry.get(path16) || {};
+    "module_require": (path18) => {
+      if (registry.has(path18)) {
+        return registry.get(path18) || {};
       }
       return {};
     },
@@ -25119,8 +25281,8 @@ function createTotpModule() {
 }
 
 // src/stdlib-mail.ts
-var fs8 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var fs9 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
 var import_crypto7 = require("crypto");
 var tls = require("tls");
 function createMailModule() {
@@ -25128,11 +25290,11 @@ function createMailModule() {
     // mail_outbox_write dir to subject body -> string (파일 경로)
     "mail_outbox_write": (dir, to, subject, body) => {
       try {
-        fs8.mkdirSync(dir, { recursive: true });
+        fs9.mkdirSync(dir, { recursive: true });
       } catch {
       }
       const id = `${Date.now()}-${(0, import_crypto7.randomBytes)(6).toString("hex")}.json`;
-      const file = path7.join(dir, id);
+      const file = path8.join(dir, id);
       const payload = {
         id,
         to,
@@ -25141,16 +25303,16 @@ function createMailModule() {
         ts: (/* @__PURE__ */ new Date()).toISOString(),
         status: "queued"
       };
-      fs8.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+      fs9.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
       return file;
     },
     // mail_outbox_list dir -> array (JSON 배열, 큐된 메시지)
     "mail_outbox_list": (dir) => {
       try {
-        const files = fs8.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+        const files = fs9.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
         return files.map((f) => {
           try {
-            return JSON.parse(fs8.readFileSync(path7.join(dir, f), "utf8"));
+            return JSON.parse(fs9.readFileSync(path8.join(dir, f), "utf8"));
           } catch {
             return null;
           }
@@ -25162,7 +25324,7 @@ function createMailModule() {
     // mail_outbox_count dir -> number
     "mail_outbox_count": (dir) => {
       try {
-        return fs8.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
+        return fs9.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
       } catch {
         return 0;
       }
@@ -25516,7 +25678,7 @@ var cachedSock = null;
 function resolveSocket() {
   if (cachedSock) return cachedSock;
   if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
-  const fs20 = require("fs");
+  const fs22 = require("fs");
   const candidates = [
     "/data/data/com.termux/files/usr/tmp/mysqld.sock",
     // Termux
@@ -25529,7 +25691,7 @@ function resolveSocket() {
   ];
   for (const s of candidates) {
     try {
-      if (fs20.existsSync(s)) return cachedSock = s;
+      if (fs22.existsSync(s)) return cachedSock = s;
     } catch {
     }
   }
@@ -25628,9 +25790,9 @@ function createMariadbModule() {
 
 // src/stdlib-mongodb.ts
 var import_child_process7 = require("child_process");
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 function createMongodbModule() {
-  const helperPath = path8.join(__dirname, "_mongodb_helper.js");
+  const helperPath = path9.join(__dirname, "_mongodb_helper.js");
   function callHelper(req) {
     try {
       const json = JSON.stringify(req);
@@ -26180,8 +26342,8 @@ ${JSON.stringify(prompt.context)}` : "";
 }
 
 // src/stdlib-compile.ts
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs10 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 init_lexer();
 init_parser();
 
@@ -26989,7 +27151,7 @@ function createCompileModule() {
     // Compile a single .fl file to JavaScript
     "fl_compile_file": (inputPath, outputPath) => {
       try {
-        const source = fs9.readFileSync(inputPath, "utf-8");
+        const source = fs10.readFileSync(inputPath, "utf-8");
         const tokens = lex(source);
         const ast = parse(tokens);
         const js = cg.generate(ast, {
@@ -26998,11 +27160,11 @@ function createCompileModule() {
           minify: false,
           target: "node"
         });
-        const dir = path9.dirname(outputPath);
-        if (dir !== "." && !fs9.existsSync(dir)) {
-          fs9.mkdirSync(dir, { recursive: true });
+        const dir = path10.dirname(outputPath);
+        if (dir !== "." && !fs10.existsSync(dir)) {
+          fs10.mkdirSync(dir, { recursive: true });
         }
-        fs9.writeFileSync(outputPath, js, "utf-8");
+        fs10.writeFileSync(outputPath, js, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`fl_compile_file failed for '${inputPath}': ${err4.message}`);
@@ -27012,16 +27174,16 @@ function createCompileModule() {
     // Compile all .fl files in a directory
     "fl_compile": (srcDir, distDir) => {
       try {
-        const absDir = path9.resolve(srcDir);
-        const absOut = path9.resolve(distDir);
-        const files = fs9.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path9.join(absDir, f));
+        const absDir = path10.resolve(srcDir);
+        const absOut = path10.resolve(distDir);
+        const files = fs10.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path10.join(absDir, f));
         let compiled = 0;
         let failed = 0;
         const errors = [];
         for (const file of files) {
-          const outFile = path9.join(absOut, path9.basename(file, ".fl") + ".js");
+          const outFile = path10.join(absOut, path10.basename(file, ".fl") + ".js");
           try {
-            const source = fs9.readFileSync(file, "utf-8");
+            const source = fs10.readFileSync(file, "utf-8");
             const tokens = lex(source);
             const ast = parse(tokens);
             const js = cg.generate(ast, {
@@ -27030,15 +27192,15 @@ function createCompileModule() {
               minify: false,
               target: "node"
             });
-            const dir = path9.dirname(outFile);
-            if (dir !== "." && !fs9.existsSync(dir)) {
-              fs9.mkdirSync(dir, { recursive: true });
+            const dir = path10.dirname(outFile);
+            if (dir !== "." && !fs10.existsSync(dir)) {
+              fs10.mkdirSync(dir, { recursive: true });
             }
-            fs9.writeFileSync(outFile, js, "utf-8");
+            fs10.writeFileSync(outFile, js, "utf-8");
             compiled++;
           } catch (err4) {
             failed++;
-            errors.push(`${path9.basename(file)}: ${err4.message}`);
+            errors.push(`${path10.basename(file)}: ${err4.message}`);
           }
         }
         return { compiled, failed, errors };
@@ -27121,8 +27283,8 @@ function httpRequest(method, url2, body) {
 }
 
 // src/stdlib-oci.ts
-var fs10 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var fs11 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
 var crypto3 = __toESM(require("crypto"));
 function createOciModule() {
   const imageStore = /* @__PURE__ */ new Map();
@@ -27149,19 +27311,19 @@ function createOciModule() {
     "oci_create_layer": (dirPath) => {
       try {
         const { execSync: execSync2 } = require("child_process");
-        const resolvedPath = path10.resolve(dirPath);
-        if (!fs10.existsSync(resolvedPath)) {
+        const resolvedPath = path11.resolve(dirPath);
+        if (!fs11.existsSync(resolvedPath)) {
           throw new Error(`Directory not found: ${resolvedPath}`);
         }
-        const layerName = path10.basename(resolvedPath);
-        const layerFile = path10.join(path10.dirname(resolvedPath), `${layerName}-layer.tar.gz`);
-        const cmd2 = `cd "${path10.dirname(resolvedPath)}" && tar -czf "${path10.basename(layerFile)}" "${layerName}"`;
+        const layerName = path11.basename(resolvedPath);
+        const layerFile = path11.join(path11.dirname(resolvedPath), `${layerName}-layer.tar.gz`);
+        const cmd2 = `cd "${path11.dirname(resolvedPath)}" && tar -czf "${path11.basename(layerFile)}" "${layerName}"`;
         execSync2(cmd2, { encoding: "utf-8" });
-        if (!fs10.existsSync(layerFile)) {
+        if (!fs11.existsSync(layerFile)) {
           throw new Error(`Failed to create layer archive: ${layerFile}`);
         }
-        const stat = fs10.statSync(layerFile);
-        const content = fs10.readFileSync(layerFile);
+        const stat = fs11.statSync(layerFile);
+        const content = fs11.readFileSync(layerFile);
         const digest = "sha256:" + crypto3.createHash("sha256").update(content).digest("hex");
         return {
           path: layerFile,
@@ -27177,9 +27339,9 @@ function createOciModule() {
     "oci_build": (tag, layers) => {
       try {
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const imageDir = path10.resolve(".oci-images", tag);
-        if (!fs10.existsSync(imageDir)) {
-          fs10.mkdirSync(imageDir, { recursive: true });
+        const imageDir = path11.resolve(".oci-images", tag);
+        if (!fs11.existsSync(imageDir)) {
+          fs11.mkdirSync(imageDir, { recursive: true });
         }
         const manifest = {
           schemaVersion: 2,
@@ -27206,24 +27368,24 @@ function createOciModule() {
             created_by: "fl build --oci"
           }]
         };
-        fs10.writeFileSync(
-          path10.join(imageDir, "manifest.json"),
+        fs11.writeFileSync(
+          path11.join(imageDir, "manifest.json"),
           JSON.stringify(manifest, null, 2),
           "utf-8"
         );
-        fs10.writeFileSync(
-          path10.join(imageDir, "config.json"),
+        fs11.writeFileSync(
+          path11.join(imageDir, "config.json"),
           JSON.stringify(config, null, 2),
           "utf-8"
         );
-        fs10.writeFileSync(
-          path10.join(imageDir, "oci-layout"),
+        fs11.writeFileSync(
+          path11.join(imageDir, "oci-layout"),
           JSON.stringify({ imageLayoutVersion: "1.0.0" }),
           "utf-8"
         );
-        const blobsDir = path10.join(imageDir, "blobs", "sha256");
-        if (!fs10.existsSync(blobsDir)) {
-          fs10.mkdirSync(blobsDir, { recursive: true });
+        const blobsDir = path11.join(imageDir, "blobs", "sha256");
+        if (!fs11.existsSync(blobsDir)) {
+          fs11.mkdirSync(blobsDir, { recursive: true });
         }
         const indexJson = {
           schemaVersion: 2,
@@ -27236,8 +27398,8 @@ function createOciModule() {
             }
           }]
         };
-        fs10.writeFileSync(
-          path10.join(imageDir, "index.json"),
+        fs11.writeFileSync(
+          path11.join(imageDir, "index.json"),
           JSON.stringify(indexJson, null, 2),
           "utf-8"
         );
@@ -27336,9 +27498,9 @@ function createOciModule() {
           throw new Error(`Image not found: ${tag}`);
         }
         imageStore.delete(tag);
-        const imageDir = path10.resolve(".oci-images", tag);
-        if (fs10.existsSync(imageDir)) {
-          fs10.rmSync(imageDir, { recursive: true, force: true });
+        const imageDir = path11.resolve(".oci-images", tag);
+        if (fs11.existsSync(imageDir)) {
+          fs11.rmSync(imageDir, { recursive: true, force: true });
         }
         return true;
       } catch (err4) {
@@ -27912,13 +28074,13 @@ function createMiddlewareModule() {
 }
 
 // src/stdlib-table.ts
-var fs11 = __toESM(require("fs"));
+var fs12 = __toESM(require("fs"));
 function createTableModule() {
   return {
     // table_load_csv(path) → {headers, rows}
     "table_load_csv": (filePath) => {
       try {
-        const content = fs11.readFileSync(filePath, "utf-8");
+        const content = fs12.readFileSync(filePath, "utf-8");
         const lines = content.split("\n").filter((l) => l.trim());
         const headers = lines[0].split(",").map((h) => h.trim());
         const rows = lines.slice(1).map((line) => {
@@ -27938,7 +28100,7 @@ function createTableModule() {
     // table_load_json(path) → {headers, rows}
     "table_load_json": (filePath) => {
       try {
-        const content = fs11.readFileSync(filePath, "utf-8");
+        const content = fs12.readFileSync(filePath, "utf-8");
         const data = JSON.parse(content);
         if (!Array.isArray(data)) {
           throw new Error("JSON must be array of objects");
@@ -27958,7 +28120,7 @@ function createTableModule() {
             (row) => data.headers.map((h) => row[h] ?? "").join(",")
           )
         ].join("\n");
-        fs11.writeFileSync(filePath, csv, "utf-8");
+        fs12.writeFileSync(filePath, csv, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`table_save_csv failed: ${err4.message}`);
@@ -28232,7 +28394,7 @@ function createStatsModule() {
 }
 
 // src/stdlib-plot.ts
-var fs12 = __toESM(require("fs"));
+var fs13 = __toESM(require("fs"));
 function createPlotModule() {
   return {
     // plot_histogram(values, options) → ASCII chart string
@@ -28388,7 +28550,7 @@ function createPlotModule() {
     // plot_save(chart, path) → boolean
     "plot_save": (chart, filePath) => {
       try {
-        fs12.writeFileSync(filePath, chart, "utf-8");
+        fs13.writeFileSync(filePath, chart, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`plot_save failed: ${err4.message}`);
@@ -28816,9 +28978,9 @@ function createFeedModule() {
       out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
       out.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
       for (const r of routes || []) {
-        const path16 = typeof r === "string" ? r : r.loc;
+        const path18 = typeof r === "string" ? r : r.loc;
         out.push(`<url>`);
-        out.push(`<loc>${esc(base + (path16.startsWith("/") ? path16 : "/" + path16))}</loc>`);
+        out.push(`<loc>${esc(base + (path18.startsWith("/") ? path18 : "/" + path18))}</loc>`);
         if (typeof r !== "string") {
           if (r.lastmod) out.push(`<lastmod>${esc(r.lastmod)}</lastmod>`);
           if (r.changefreq) out.push(`<changefreq>${esc(r.changefreq)}</changefreq>`);
@@ -29544,6 +29706,103 @@ function requireModule(name, interp2) {
   }
 }
 
+// src/stdlib-image.ts
+var fs14 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
+var os3 = __toESM(require("os"));
+var crypto4 = __toESM(require("crypto"));
+var import_child_process10 = require("child_process");
+function tmpPath(ext) {
+  const dir = path12.join(os3.tmpdir(), "fl-images");
+  if (!fs14.existsSync(dir)) fs14.mkdirSync(dir, { recursive: true });
+  return path12.join(dir, crypto4.randomBytes(8).toString("hex") + ext);
+}
+function im(args3) {
+  const r = (0, import_child_process10.spawnSync)("convert", args3, { timeout: 3e4 });
+  if (r.error) throw new Error("ImageMagick not found: " + r.error.message);
+  const stderr = r.stderr?.toString() ?? "";
+  if (r.status !== 0) throw new Error("ImageMagick error: " + stderr);
+  return { ok: true, stderr };
+}
+function identify(filePath) {
+  const r = (0, import_child_process10.spawnSync)("identify", ["-format", "%wx%h %m %b", filePath], { timeout: 1e4 });
+  const m = /* @__PURE__ */ new Map();
+  if (r.status !== 0) {
+    m.set("width", 0);
+    m.set("height", 0);
+    m.set("format", "unknown");
+    m.set("size", 0);
+    m.set("channels", 3);
+    m.set("has_alpha", false);
+    return m;
+  }
+  const out = r.stdout?.toString().trim() ?? "";
+  const match = out.match(/^(\d+)x(\d+)\s+(\S+)\s+(.+)$/);
+  const stat = fs14.existsSync(filePath) ? fs14.statSync(filePath).size : 0;
+  m.set("width", match ? parseInt(match[1]) : 0);
+  m.set("height", match ? parseInt(match[2]) : 0);
+  m.set("format", match ? match[3].toLowerCase() : "unknown");
+  m.set("size", stat);
+  m.set("channels", 3);
+  m.set("has_alpha", false);
+  return m;
+}
+function createImageModule() {
+  return {
+    // image_info path → {width, height, format, size, channels, has_alpha}
+    "image_info": (filePath) => {
+      return identify(filePath);
+    },
+    // image_resize path width height → saved_path
+    "image_resize": (filePath, width, height) => {
+      const ext = path12.extname(filePath) || ".jpg";
+      const out = tmpPath(ext);
+      im([filePath, "-resize", `${Math.floor(width)}x${Math.floor(height)}>`, out]);
+      return out;
+    },
+    // image_thumbnail path size → saved_path (square crop, JPEG)
+    "image_thumbnail": (filePath, size) => {
+      const sz = Math.floor(size);
+      const out = tmpPath(".jpg");
+      im([filePath, "-thumbnail", `${sz}x${sz}^`, "-gravity", "center", "-extent", `${sz}x${sz}`, "-quality", "85", out]);
+      return out;
+    },
+    // image_convert path format → saved_path
+    "image_convert": (filePath, format) => {
+      const fmt = (format || "jpg").toLowerCase().replace("jpeg", "jpg");
+      const out = tmpPath("." + fmt);
+      im([filePath, "-quality", "85", out]);
+      return out;
+    },
+    // image_watermark path text → saved_path
+    "image_watermark": (filePath, text) => {
+      const ext = path12.extname(filePath) || ".jpg";
+      const out = tmpPath(ext);
+      im([
+        filePath,
+        "-gravity",
+        "SouthEast",
+        "-fill",
+        "rgba(255,255,255,0.6)",
+        "-pointsize",
+        "24",
+        "-annotate",
+        "+10+10",
+        text,
+        out
+      ]);
+      return out;
+    },
+    // image_crop path x y width height → saved_path
+    "image_crop": (filePath, x, y, w, h) => {
+      const ext = path12.extname(filePath) || ".jpg";
+      const out = tmpPath(ext);
+      im([filePath, "-crop", `${Math.floor(w)}x${Math.floor(h)}+${Math.floor(x)}+${Math.floor(y)}`, "+repage", out]);
+      return out;
+    }
+  };
+}
+
 // src/stdlib-loader.ts
 function loadAllStdlib(interp2) {
   interp2.registerModule(createFileModule());
@@ -29586,6 +29845,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createWscModule(
     (n, a) => interp2.callUserFunction(n, a)
   ));
+  interp2.registerModule(createImageModule());
   interp2.registerModule({
     "fl_require": (name) => requireModule(name, interp2),
     "fl_require?": (name) => isModuleLoaded(name),
@@ -29593,18 +29853,18 @@ function loadAllStdlib(interp2) {
   });
   const _aliases = {
     // ── get-in / assoc-in / update-in (깊은 접근 + 업데이트) ─────────────────
-    "get-in": (m, path16) => {
+    "get-in": (m, path18) => {
       let cur = m;
-      for (const k of path16) {
+      for (const k of path18) {
         if (cur === null || cur === void 0) return null;
         cur = cur instanceof Map ? cur.get(k) ?? cur.get(String(k)) ?? null : cur?.[k] ?? null;
       }
       return cur ?? null;
     },
-    "assoc-in": (m, path16, val) => {
-      if (!path16 || path16.length === 0) return val;
-      const key = path16[0];
-      const rest = path16.slice(1);
+    "assoc-in": (m, path18, val) => {
+      if (!path18 || path18.length === 0) return val;
+      const key = path18[0];
+      const rest = path18.slice(1);
       const child = m instanceof Map ? m.get(key) ?? m.get(String(key)) : m?.[key];
       const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? /* @__PURE__ */ new Map(), rest, val) : val;
       if (m instanceof Map) {
@@ -29614,8 +29874,8 @@ function loadAllStdlib(interp2) {
       }
       return Object.assign({}, m ?? {}, { [String(key)]: updated });
     },
-    "update-in": (m, path16, fn, ...args3) => {
-      const cur = _aliases["get-in"](m, path16);
+    "update-in": (m, path18, fn, ...args3) => {
+      const cur = _aliases["get-in"](m, path18);
       let newVal;
       if (typeof fn === "function") {
         newVal = fn(cur, ...args3);
@@ -29628,7 +29888,7 @@ function loadAllStdlib(interp2) {
       } else {
         newVal = cur;
       }
-      return _aliases["assoc-in"](m, path16, newVal);
+      return _aliases["assoc-in"](m, path18, newVal);
     },
     // ── regex 별칭 (re-* → Clojure 스타일) ───────────────────────────────────
     "re-match": (pattern, s) => {
@@ -32169,9 +32429,9 @@ var Interpreter = class _Interpreter {
   // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
   loadFlStdlib() {
     try {
-      const stdlibPath = path11.join(__dirname, "freelang-stdlib.fl");
-      if (!fs13.existsSync(stdlibPath)) return;
-      const src = fs13.readFileSync(stdlibPath, "utf-8");
+      const stdlibPath = path13.join(__dirname, "freelang-stdlib.fl");
+      if (!fs15.existsSync(stdlibPath)) return;
+      const src = fs15.readFileSync(stdlibPath, "utf-8");
       this.interpret(parse(lex(src)));
     } catch {
     }
@@ -33018,7 +33278,7 @@ var Interpreter = class _Interpreter {
   }
   handleRouteBlock(block) {
     const method = this.getFieldValue(block, "method", "GET");
-    const path16 = this.getFieldValue(block, "path", "/");
+    const path18 = this.getFieldValue(block, "path", "/");
     const handler = block.fields.get("handler");
     if (!handler) {
       throw new Error(`[ROUTE ${block.name}] Missing :handler`);
@@ -33026,7 +33286,7 @@ var Interpreter = class _Interpreter {
     this.context.routes.set(block.name, {
       name: block.name,
       method: method.toLowerCase(),
-      path: path16,
+      path: path18,
       handler
     });
   }
@@ -34329,8 +34589,8 @@ function formatFL(src) {
 init_debugger();
 
 // src/hot-reload.ts
-var fs14 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var fs16 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
 init_lexer();
 init_parser();
 function createDebounce(ms) {
@@ -34358,7 +34618,7 @@ var FileWatcher = class {
     const onReload = opts?.onReload;
     const onError = opts?.onError;
     const debounced = createDebounce(debounceMs);
-    const basename5 = path12.basename(file);
+    const basename5 = path14.basename(file);
     const handleChange = () => {
       debounced(() => {
         if (clearConsole) {
@@ -34381,14 +34641,14 @@ var FileWatcher = class {
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs14.statSync(file);
+      const st = fs16.statSync(file);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
     }
     const interval = setInterval(() => {
       try {
-        const st = fs14.statSync(file);
+        const st = fs16.statSync(file);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -34419,7 +34679,7 @@ var FileWatcher = class {
     const regex = new RegExp(ext.replace(".", "\\.") + "$");
     let watcher = null;
     try {
-      watcher = fs14.watch(dir, (_event, filename) => {
+      watcher = fs16.watch(dir, (_event, filename) => {
         if (!filename) return;
         if (!regex.test(filename)) return;
         debounced(() => {
@@ -34427,7 +34687,7 @@ var FileWatcher = class {
             process.stdout.write("\x1B[2J\x1B[0f");
           }
           console.log(`\x1B[36m[RELOAD]\x1B[0m ${filename} changed`);
-          const fullPath = path12.join(dir, filename);
+          const fullPath = path14.join(dir, filename);
           if (onReload) {
             try {
               onReload(fullPath);
@@ -34469,10 +34729,10 @@ var FileWatcher = class {
   }
 };
 function runWithWatch(file, opts) {
-  const absPath = path12.resolve(file);
+  const absPath = path14.resolve(file);
   function executeFile() {
     try {
-      const source = fs14.readFileSync(absPath, "utf-8");
+      const source = fs16.readFileSync(absPath, "utf-8");
       const tokens = lex(source);
       const ast = parse(tokens);
       const interp2 = new Interpreter();
@@ -34494,7 +34754,7 @@ function runWithWatch(file, opts) {
       if (opts?.onError) {
         opts.onError(file, e);
       } else {
-        console.error(`\x1B[31m[ERROR]\x1B[0m ${path12.basename(absPath)}: ${e.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m ${path14.basename(absPath)}: ${e.message}`);
       }
     }
   }
@@ -34506,7 +34766,7 @@ function runWithWatch(file, opts) {
       executeFile();
     }
   };
-  console.log(`\x1B[2m  watching ${path12.basename(absPath)}...\x1B[0m`);
+  console.log(`\x1B[2m  watching ${path14.basename(absPath)}...\x1B[0m`);
   watcher.watch(absPath, mergedOpts);
 }
 
@@ -34758,7 +35018,7 @@ function toAnchor(name) {
 }
 
 // src/ci-runner.ts
-var fs15 = __toESM(require("fs"));
+var fs17 = __toESM(require("fs"));
 init_linter();
 var CIPipeline = class {
   steps = [];
@@ -34845,8 +35105,8 @@ function createFmtCheckStep(files) {
       }
       const needsFormat = [];
       for (const f of files) {
-        if (!fs15.existsSync(f)) continue;
-        const src = fs15.readFileSync(f, "utf-8");
+        if (!fs17.existsSync(f)) continue;
+        const src = fs17.readFileSync(f, "utf-8");
         try {
           const formatted = formatFL(src);
           if (src !== formatted) {
@@ -34880,8 +35140,8 @@ function createLintStep(files) {
       const linter = createDefaultLinter();
       const errors = [];
       for (const f of files) {
-        if (!fs15.existsSync(f)) continue;
-        const src = fs15.readFileSync(f, "utf-8");
+        if (!fs17.existsSync(f)) continue;
+        const src = fs17.readFileSync(f, "utf-8");
         const diags = linter.lint(src);
         const errs = diags.filter((d) => d.severity === "error");
         for (const e of errs) {
@@ -34924,8 +35184,8 @@ function createDefaultPipeline(files, opts = {}) {
 }
 
 // src/web/app-router.ts
-var fs16 = __toESM(require("fs"));
-var path13 = __toESM(require("path"));
+var fs18 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
 var AppRouter = class {
   appDir;
   routes = [];
@@ -34945,8 +35205,8 @@ var AppRouter = class {
    */
   scanNotFound(dir) {
     try {
-      const notFoundPath = path13.join(dir, "not-found.fl");
-      if (fs16.existsSync(notFoundPath)) {
+      const notFoundPath = path15.join(dir, "not-found.fl");
+      if (fs18.existsSync(notFoundPath)) {
         this.notFoundHandler = notFoundPath;
         console.log(`approuter.not-found file=${notFoundPath}`);
       }
@@ -34957,7 +35217,7 @@ var AppRouter = class {
    * 파일시스템 스캔 시작
    */
   scan() {
-    if (!fs16.existsSync(this.appDir)) {
+    if (!fs18.existsSync(this.appDir)) {
       console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
       return;
     }
@@ -34976,9 +35236,9 @@ var AppRouter = class {
    */
   scanDirectory(dir, currentPath = "", phase = "page") {
     try {
-      const entries = fs16.readdirSync(dir, { withFileTypes: true });
+      const entries = fs18.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        const fullPath = path13.join(dir, entry.name);
+        const fullPath = path15.join(dir, entry.name);
         const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
         if (entry.isDirectory()) {
           const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
@@ -35126,8 +35386,8 @@ var AppRouter = class {
 };
 
 // src/web/fl-executor.ts
-var fs17 = __toESM(require("fs"));
-var crypto4 = __toESM(require("crypto"));
+var fs19 = __toESM(require("fs"));
+var crypto5 = __toESM(require("crypto"));
 init_lexer();
 init_parser();
 var FLExecutor = class {
@@ -35161,7 +35421,7 @@ var FLExecutor = class {
     if (cached && now - cached.timestamp < this.cacheTimeout) {
       return cached.ast;
     }
-    const code = fs17.readFileSync(filePath, "utf-8");
+    const code = fs19.readFileSync(filePath, "utf-8");
     const tokens = lex(code);
     const ast = parse(tokens);
     this.cache.set(filePath, { ast, timestamp: now });
@@ -35192,7 +35452,7 @@ var FLExecutor = class {
    */
   async executePage(filePath, context) {
     try {
-      if (!fs17.existsSync(filePath)) {
+      if (!fs19.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -35242,7 +35502,7 @@ var FLExecutor = class {
    */
   async executeRoute(filePath, context) {
     try {
-      if (!fs17.existsSync(filePath)) {
+      if (!fs19.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -35365,7 +35625,7 @@ var FLExecutor = class {
       const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
       const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString("base64url");
       const signingInput = `${encodedHeader}.${encodedPayload}`;
-      const signature = crypto4.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
+      const signature = crypto5.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
       return `${encodedHeader}.${encodedPayload}.${signature}`;
     };
     ctx["jwt-verify"] = (token) => {
@@ -35373,10 +35633,10 @@ var FLExecutor = class {
         const parts = token.split(".");
         if (parts.length !== 3) return null;
         const signingInput = `${parts[0]}.${parts[1]}`;
-        const expectedSig = crypto4.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
+        const expectedSig = crypto5.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
         const actualSigBuf = Buffer.from(parts[2]);
         const expectedSigBuf = Buffer.from(expectedSig);
-        if (actualSigBuf.length !== expectedSigBuf.length || !crypto4.timingSafeEqual(actualSigBuf, expectedSigBuf)) {
+        if (actualSigBuf.length !== expectedSigBuf.length || !crypto5.timingSafeEqual(actualSigBuf, expectedSigBuf)) {
           return null;
         }
         const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
@@ -35583,8 +35843,8 @@ var FLExecutor = class {
 var fl_executor_default = FLExecutor;
 
 // src/web/page-renderer.ts
-var fs18 = __toESM(require("fs"));
-var path14 = __toESM(require("path"));
+var fs20 = __toESM(require("fs"));
+var path16 = __toESM(require("path"));
 var PageRenderer = class {
   executor;
   ssrCache = /* @__PURE__ */ new Map();
@@ -35664,13 +35924,13 @@ var PageRenderer = class {
    */
   async renderSSG(context) {
     const cacheKey = this.getCacheKey(context.filePath, context.params);
-    const outputPath = path14.join(
+    const outputPath = path16.join(
       this.buildOutputDir,
       cacheKey.replace(/\//g, "_") + ".html"
     );
-    if (fs18.existsSync(outputPath)) {
-      const html = fs18.readFileSync(outputPath, "utf-8");
-      const stat = fs18.statSync(outputPath);
+    if (fs20.existsSync(outputPath)) {
+      const html = fs20.readFileSync(outputPath, "utf-8");
+      const stat = fs20.statSync(outputPath);
       return {
         html,
         timestamp: stat.mtime.getTime(),
@@ -35679,10 +35939,10 @@ var PageRenderer = class {
       };
     }
     const result = await this.renderSSR(context);
-    if (!fs18.existsSync(this.buildOutputDir)) {
-      fs18.mkdirSync(this.buildOutputDir, { recursive: true });
+    if (!fs20.existsSync(this.buildOutputDir)) {
+      fs20.mkdirSync(this.buildOutputDir, { recursive: true });
     }
-    fs18.writeFileSync(outputPath, result.html, "utf-8");
+    fs20.writeFileSync(outputPath, result.html, "utf-8");
     return result;
   }
   /**
@@ -36208,7 +36468,7 @@ function formatCallStack(stack) {
   ).join("\n");
 }
 function formatError(err4, source, filePath, callStack) {
-  const fileName = filePath ? path15.basename(filePath) : "<stdin>";
+  const fileName = filePath ? path17.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
     lines.push(`
@@ -36239,7 +36499,7 @@ function checkSource(source, filePath) {
   try {
     const tokens = lex(source);
     parse(tokens);
-    const fileName = filePath ? path15.basename(filePath) : "<stdin>";
+    const fileName = filePath ? path17.basename(filePath) : "<stdin>";
     console.log(`\x1B[32m\u2713\x1B[0m  ${fileName}  \uBB38\uBC95 \uC774\uC0C1 \uC5C6\uC74C`);
     return true;
   } catch (err4) {
@@ -36248,14 +36508,14 @@ function checkSource(source, filePath) {
   }
 }
 function cmdRun(filePath, watch2, extraArgs = []) {
-  const absPath = path15.resolve(filePath);
+  const absPath = path17.resolve(filePath);
   const vmBench = extraArgs.includes("--vm-bench");
-  if (!fs19.existsSync(absPath)) {
+  if (!fs21.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   function execute() {
-    const source = fs19.readFileSync(absPath, "utf-8");
+    const source = fs21.readFileSync(absPath, "utf-8");
     let ctx;
     try {
       const tokens = lex(source);
@@ -36286,7 +36546,7 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   if (vmBench) {
     console.log("\n\x1B[36m[vm-bench] \uC131\uB2A5 \uCE21\uC815 \uC2DC\uC791...\x1B[0m");
     const ITERATIONS = 100;
-    const source = fs19.readFileSync(absPath, "utf-8");
+    const source = fs21.readFileSync(absPath, "utf-8");
     const t0 = performance.now();
     for (let i = 0; i < ITERATIONS; i++) {
       delete process.env.FL_VM;
@@ -36335,19 +36595,19 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     if (!watch2) return;
   }
   if (!watch2 && !vmBench && !process.env.FL_NO_HINT) {
-    const isServerFile = fs19.readFileSync(absPath, "utf-8").includes("server_start");
+    const isServerFile = fs21.readFileSync(absPath, "utf-8").includes("server_start");
     if (isServerFile) {
-      process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path15.basename(absPath)}\x1B[0m
+      process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path17.basename(absPath)}\x1B[0m
 `);
     }
   }
   execute();
   if (watch2) {
-    console.log(`\x1B[2m  watching ${path15.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
+    console.log(`\x1B[2m  watching ${path17.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs19.statSync(absPath);
+      const st = fs21.statSync(absPath);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
@@ -36355,7 +36615,7 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     let debounce = null;
     setInterval(() => {
       try {
-        const st = fs19.statSync(absPath);
+        const st = fs21.statSync(absPath);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -36372,14 +36632,14 @@ function cmdRun(filePath, watch2, extraArgs = []) {
   }
 }
 function cmdProps(filePath, extraArgs) {
-  const absPath = path15.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path17.resolve(filePath);
+  if (!fs21.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   const samplesIdx = extraArgs.indexOf("--samples");
   const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : void 0;
-  const source = fs19.readFileSync(absPath, "utf-8");
+  const source = fs21.readFileSync(absPath, "utf-8");
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
@@ -36389,11 +36649,11 @@ function cmdProps(filePath, extraArgs) {
   } catch (err4) {
   }
   if (propRegistry.size === 0) {
-    console.log(`\x1B[33m[props]\x1B[0m  ${path15.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
+    console.log(`\x1B[33m[props]\x1B[0m  ${path17.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
     console.log(`\x1B[2m  \uD301: (defprop my-prop {:fn "add" :args [:int :int] :check (fn [$a $b] (= (add $a $b) (add $b $a)))})\x1B[0m`);
     return;
   }
-  console.log(`\x1B[36m[props]\x1B[0m  ${path15.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
+  console.log(`\x1B[36m[props]\x1B[0m  ${path17.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
 `);
   let interp2;
   try {
@@ -36446,12 +36706,12 @@ function cmdProps(filePath, extraArgs) {
   if (exitCode) process.exit(exitCode);
 }
 function cmdCheck(filePath) {
-  const absPath = path15.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path17.resolve(filePath);
+  if (!fs21.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const source = fs19.readFileSync(absPath, "utf-8");
+  const source = fs21.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
   const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
@@ -36459,7 +36719,7 @@ function cmdCheck(filePath) {
   if (metaMissing.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[33m[meta-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
+\x1B[33m[meta-check]\x1B[0m  ${path17.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
 `);
     for (const w of metaMissing) {
       process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 :context/:returns \uC5C6\uC74C
@@ -36473,7 +36733,7 @@ function cmdCheck(filePath) {
   if (pureErrors.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[31m[pure-violation]\x1B[0m  ${path15.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
+\x1B[31m[pure-violation]\x1B[0m  ${path17.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
 `);
     for (const w of pureErrors) {
       const hint = w.undeclared.map((e) => `:${e}`).join(" ");
@@ -36486,7 +36746,7 @@ function cmdCheck(filePath) {
   if (effectsOnly.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[33m[effects-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
+\x1B[33m[effects-check]\x1B[0m  ${path17.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
 `);
     for (const w of effectsOnly) {
       const hint = w.undeclared.map((e) => `:${e}`).join(" ");
@@ -36581,13 +36841,13 @@ function cmdCodegen(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
     process.exit(1);
   }
-  const absInput = path15.resolve(inputFile);
-  if (!fs19.existsSync(absInput)) {
+  const absInput = path17.resolve(inputFile);
+  if (!fs21.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs19.readFileSync(absInput, "utf-8");
+    const source = fs21.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -36604,7 +36864,7 @@ function cmdCodegen(args3) {
       }
     }
   } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs19.readFileSync(absInput, "utf-8"), absInput)}`);
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput)}`);
     process.exit(1);
   }
 }
@@ -36618,13 +36878,13 @@ function cmdCompile(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
     process.exit(1);
   }
-  const absInput = path15.resolve(inputFile);
-  if (!fs19.existsSync(absInput)) {
+  const absInput = path17.resolve(inputFile);
+  if (!fs21.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs19.readFileSync(absInput, "utf-8");
+    const source = fs21.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -36635,18 +36895,18 @@ function cmdCompile(args3) {
       target: "node"
     });
     if (outputFile) {
-      const absOutput = path15.resolve(outputFile);
-      const dir = path15.dirname(absOutput);
-      if (dir !== "." && !fs19.existsSync(dir)) {
-        fs19.mkdirSync(dir, { recursive: true });
+      const absOutput = path17.resolve(outputFile);
+      const dir = path17.dirname(absOutput);
+      if (dir !== "." && !fs21.existsSync(dir)) {
+        fs21.mkdirSync(dir, { recursive: true });
       }
-      fs19.writeFileSync(absOutput, js, "utf-8");
-      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path15.basename(inputFile)} \u2192 ${outputFile}`);
+      fs21.writeFileSync(absOutput, js, "utf-8");
+      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path17.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(js);
     }
   } catch (err4) {
-    console.error(formatError(err4, fs19.readFileSync(absInput, "utf-8"), absInput));
+    console.error(formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);
   }
 }
@@ -36655,9 +36915,9 @@ function cmdRepl() {
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   const historyPath = (() => {
     try {
-      const os2 = require("os");
-      const path16 = require("path");
-      return path16.join(os2.homedir(), ".fl_history");
+      const os4 = require("os");
+      const path18 = require("path");
+      return path18.join(os4.homedir(), ".fl_history");
     } catch {
       return null;
     }
@@ -36665,9 +36925,9 @@ function cmdRepl() {
   let initialHistory = [];
   if (historyPath) {
     try {
-      const fs20 = require("fs");
-      if (fs20.existsSync(historyPath)) {
-        initialHistory = fs20.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
+      const fs22 = require("fs");
+      if (fs22.existsSync(historyPath)) {
+        initialHistory = fs22.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
       }
     } catch {
     }
@@ -36846,8 +37106,8 @@ function cmdRepl() {
     }
     if (historyPath && source) {
       try {
-        const fs20 = require("fs");
-        fs20.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
+        const fs22 = require("fs");
+        fs22.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
       } catch {
       }
     }
@@ -36937,32 +37197,32 @@ function cmdFmt(args3) {
   }
   let needsChange = false;
   for (const filePath of filePaths) {
-    const absPath = path15.resolve(filePath);
-    if (!fs19.existsSync(absPath)) {
+    const absPath = path17.resolve(filePath);
+    if (!fs21.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
       process.exit(1);
     }
-    const src = fs19.readFileSync(absPath, "utf-8");
+    const src = fs21.readFileSync(absPath, "utf-8");
     let formatted;
     try {
       formatted = formatFL(src);
     } catch (err4) {
-      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path15.basename(absPath)}: ${err4.message}`);
+      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path17.basename(absPath)}: ${err4.message}`);
       process.exit(1);
     }
     if (checkMode) {
       if (src !== formatted) {
-        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path15.basename(absPath)}`);
+        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path17.basename(absPath)}`);
         needsChange = true;
       } else {
-        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path15.basename(absPath)}`);
+        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path17.basename(absPath)}`);
       }
     } else {
       if (src !== formatted) {
-        fs19.writeFileSync(absPath, formatted, "utf-8");
-        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path15.basename(absPath)}`);
+        fs21.writeFileSync(absPath, formatted, "utf-8");
+        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path17.basename(absPath)}`);
       } else {
-        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path15.basename(absPath)}`);
+        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path17.basename(absPath)}`);
       }
     }
   }
@@ -36971,8 +37231,8 @@ function cmdFmt(args3) {
   }
 }
 function cmdDebug(filePath, stepMode) {
-  const absPath = path15.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path17.resolve(filePath);
+  if (!fs21.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
@@ -36980,11 +37240,11 @@ function cmdDebug(filePath, stepMode) {
   session.enabled = true;
   session.stepMode = stepMode;
   setGlobalDebugSession(session);
-  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path15.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
+  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path17.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
   console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   try {
-    const source = fs19.readFileSync(absPath, "utf-8");
+    const source = fs21.readFileSync(absPath, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const interp2 = new Interpreter();
@@ -37010,14 +37270,14 @@ async function cmdCi(ciArgs) {
   const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
   let targetFiles;
   if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path15.resolve(f)).filter((f) => fs19.existsSync(f));
+    targetFiles = filePaths.map((f) => path17.resolve(f)).filter((f) => fs21.existsSync(f));
     if (targetFiles.length === 0) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
   } else {
     const cwd2 = process.cwd();
-    targetFiles = fs19.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path15.join(cwd2, f));
+    targetFiles = fs21.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path17.join(cwd2, f));
   }
   console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
@@ -37042,27 +37302,27 @@ function cmdDoc(docArgs) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  --dir \uB4A4\uC5D0 \uB514\uB809\uD1A0\uB9AC \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
       process.exit(1);
     }
-    const absDir = path15.resolve(dirPath);
-    if (!fs19.existsSync(absDir) || !fs19.statSync(absDir).isDirectory()) {
+    const absDir = path17.resolve(dirPath);
+    if (!fs21.existsSync(absDir) || !fs21.statSync(absDir).isDirectory()) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       process.exit(1);
     }
-    const flFiles = fs19.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path15.join(absDir, f));
+    const flFiles = fs21.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path17.join(absDir, f));
     if (flFiles.length === 0) {
       console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       return;
     }
     const allEntries = [];
     for (const filePath2 of flFiles) {
-      const src2 = fs19.readFileSync(filePath2, "utf-8");
+      const src2 = fs21.readFileSync(filePath2, "utf-8");
       allEntries.push(...extractDocs(src2));
     }
-    const title2 = path15.basename(absDir) + " API \uBB38\uC11C";
+    const title2 = path17.basename(absDir) + " API \uBB38\uC11C";
     const md2 = renderMarkdown(allEntries, title2);
     const outIdx2 = docArgs.indexOf("-o");
     if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
-      const outPath = path15.resolve(docArgs[outIdx2 + 1]);
-      fs19.writeFileSync(outPath, md2, "utf-8");
+      const outPath = path17.resolve(docArgs[outIdx2 + 1]);
+      fs21.writeFileSync(outPath, md2, "utf-8");
       console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
     } else {
       process.stdout.write(md2);
@@ -37075,19 +37335,19 @@ function cmdDoc(docArgs) {
     process.exit(1);
   }
   const filePath = filePaths[0];
-  const absPath = path15.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path17.resolve(filePath);
+  if (!fs21.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const src = fs19.readFileSync(absPath, "utf-8");
+  const src = fs21.readFileSync(absPath, "utf-8");
   const entries = extractDocs(src);
-  const title = path15.basename(absPath, ".fl") + " API \uBB38\uC11C";
+  const title = path17.basename(absPath, ".fl") + " API \uBB38\uC11C";
   const md = renderMarkdown(entries, title);
   const outIdx = docArgs.indexOf("-o");
   if (outIdx !== -1 && docArgs[outIdx + 1]) {
-    const outPath = path15.resolve(docArgs[outIdx + 1]);
-    fs19.writeFileSync(outPath, md, "utf-8");
+    const outPath = path17.resolve(docArgs[outIdx + 1]);
+    fs21.writeFileSync(outPath, md, "utf-8");
     console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
   } else {
     process.stdout.write(md);
@@ -37098,11 +37358,11 @@ function cmdBuild(buildArgs2) {
   const isStatic = buildArgs2.includes("--static");
   if (isStatic) {
     let expandDynamicParams = function(dir, paramName) {
-      const paramsFile = path15.join(dir, "generate-static-params.fl");
-      if (!fs19.existsSync(paramsFile)) return [];
+      const paramsFile = path17.join(dir, "generate-static-params.fl");
+      if (!fs21.existsSync(paramsFile)) return [];
       try {
-        const cwdBootstrap2 = path15.resolve(process.cwd(), "bootstrap.js");
-        const bs = fs19.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path15.resolve(__dirname, "bootstrap.js");
+        const cwdBootstrap2 = path17.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs21.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path17.resolve(__dirname, "bootstrap.js");
         const { execSync: execSync2 } = require("child_process");
         const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
         const m = out.match(/\[[\s\S]*\]/);
@@ -37114,20 +37374,20 @@ function cmdBuild(buildArgs2) {
         return [];
       }
     }, walk = function(dir, routeBase) {
-      const entries = fs19.readdirSync(dir, { withFileTypes: true });
+      const entries = fs21.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
-        const full = path15.join(dir, e.name);
+        const full = path17.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
             const paramName = e.name.slice(1, -1);
             const params = expandDynamicParams(full, paramName);
-            const pageFile = path15.join(full, "page.fl");
+            const pageFile = path17.join(full, "page.fl");
             if (params.length === 0) {
-              console.log(`build.skip reason=dynamic_no_params path=/${path15.relative(absApp, full)} param=${paramName}`);
+              console.log(`build.skip reason=dynamic_no_params path=/${path17.relative(absApp, full)} param=${paramName}`);
               continue;
             }
-            if (!fs19.existsSync(pageFile)) {
-              console.log(`build.skip reason=dynamic_no_page path=/${path15.relative(absApp, full)}`);
+            if (!fs21.existsSync(pageFile)) {
+              console.log(`build.skip reason=dynamic_no_page path=/${path17.relative(absApp, full)}`);
               continue;
             }
             for (const p of params) {
@@ -37150,18 +37410,18 @@ function cmdBuild(buildArgs2) {
     const appDir = appIdx !== -1 ? buildArgs2[appIdx + 1] : "app";
     const outDir = outIdx !== -1 ? buildArgs2[outIdx + 1] : "dist";
     const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
-    const absApp = path15.resolve(appDir);
-    const absOut = path15.resolve(outDir);
-    if (!fs19.existsSync(absApp)) {
+    const absApp = path17.resolve(appDir);
+    const absOut = path17.resolve(outDir);
+    if (!fs21.existsSync(absApp)) {
       console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
     }
     console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
-    fs19.mkdirSync(absOut, { recursive: true });
+    fs21.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
-    const notFoundFile = path15.join(absApp, "not-found.fl");
-    if (fs19.existsSync(notFoundFile)) {
+    const notFoundFile = path17.join(absApp, "not-found.fl");
+    if (fs21.existsSync(notFoundFile)) {
       pages.push({ filePath: notFoundFile, route: "/__404__" });
     }
     if (pages.length === 0) {
@@ -37170,8 +37430,8 @@ function cmdBuild(buildArgs2) {
     }
     const { spawn } = require("child_process");
     const http3 = require("http");
-    const cwdBootstrap = path15.resolve(process.cwd(), "bootstrap.js");
-    const bootstrap = fs19.existsSync(cwdBootstrap) ? cwdBootstrap : path15.resolve(__dirname, "bootstrap.js");
+    const cwdBootstrap = path17.resolve(process.cwd(), "bootstrap.js");
+    const bootstrap = fs21.existsSync(cwdBootstrap) ? cwdBootstrap : path17.resolve(__dirname, "bootstrap.js");
     const serveProc = spawn(
       "node",
       [bootstrap, "serve", "--app", absApp, "--port", String(port)],
@@ -37262,10 +37522,10 @@ function cmdBuild(buildArgs2) {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = p.route === "/__404__" ? path15.join(absOut, "404.html") : path15.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-          fs19.mkdirSync(path15.dirname(outPath), { recursive: true });
-          fs19.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path15.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          const outPath = p.route === "/__404__" ? path17.join(absOut, "404.html") : path17.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          fs21.mkdirSync(path17.dirname(outPath), { recursive: true });
+          fs21.writeFileSync(outPath, html);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path17.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);
@@ -37295,20 +37555,20 @@ function cmdBuild(buildArgs2) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
       process.exit(1);
     }
-    const absPath = path15.resolve(appFile);
-    if (!fs19.existsSync(absPath)) {
+    const absPath = path17.resolve(appFile);
+    if (!fs21.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path15.basename(appFile)} \u2192 ${tag}`);
-    const ociScriptPath = path15.resolve(__dirname, "../vpm/v9-oci.fl");
-    if (!fs19.existsSync(ociScriptPath)) {
+    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path17.basename(appFile)} \u2192 ${tag}`);
+    const ociScriptPath = path17.resolve(__dirname, "../vpm/v9-oci.fl");
+    if (!fs21.existsSync(ociScriptPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
-      const cmd2 = registry ? `node ${path15.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path15.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
+      const cmd2 = registry ? `node ${path17.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path17.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
       console.log(`\x1B[2m  Command: ${cmd2}\x1B[0m`);
       execSync2(cmd2, { stdio: "inherit" });
       console.log(`\x1B[32m[OK]\x1B[0m  OCI \uBE4C\uB4DC \uC644\uB8CC: ${tag}`);
@@ -37335,15 +37595,15 @@ function cmdRegistry(registryArgs) {
     }
     console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
     console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
-    const registryPath = path15.resolve(__dirname, "../vpm/registry-server.fl");
-    if (!fs19.existsSync(registryPath)) {
+    const registryPath = path17.resolve(__dirname, "../vpm/registry-server.fl");
+    if (!fs21.existsSync(registryPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
       process.env.REGISTRY_PORT = String(port);
-      execSync2(`node ${path15.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
+      execSync2(`node ${path17.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
         stdio: "inherit",
         env: { ...process.env, REGISTRY_PORT: String(port) }
       });
@@ -37394,19 +37654,19 @@ function cmdInstall(args3) {
     process.exit(1);
   }
   const homeDir = require("os").homedir();
-  const pluginsDir = path15.resolve(homeDir, ".fl", "plugins");
-  if (!fs19.existsSync(pluginsDir)) {
-    fs19.mkdirSync(pluginsDir, { recursive: true });
+  const pluginsDir = path17.resolve(homeDir, ".fl", "plugins");
+  if (!fs21.existsSync(pluginsDir)) {
+    fs21.mkdirSync(pluginsDir, { recursive: true });
     console.log(`\x1B[36m[Y5]\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uB514\uB809\uD1A0\uB9AC \uC0DD\uC131: ${pluginsDir}`);
   }
-  const localPath = path15.resolve(process.cwd(), "plugins", pluginName + ".fl");
-  const stdlibPath = path15.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
-  const installedPath = path15.resolve(pluginsDir, pluginName + ".fl");
+  const localPath = path17.resolve(process.cwd(), "plugins", pluginName + ".fl");
+  const stdlibPath = path17.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
+  const installedPath = path17.resolve(pluginsDir, pluginName + ".fl");
   let sourceFile = null;
-  if (fs19.existsSync(localPath)) {
+  if (fs21.existsSync(localPath)) {
     sourceFile = localPath;
     console.log(`\x1B[36m[Y5]\x1B[0m  \uB85C\uCEEC \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${localPath}`);
-  } else if (fs19.existsSync(stdlibPath)) {
+  } else if (fs21.existsSync(stdlibPath)) {
     sourceFile = stdlibPath;
     console.log(`\x1B[36m[Y5]\x1B[0m  \uB0B4\uC7A5 stdlib \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${stdlibPath}`);
   } else {
@@ -37417,8 +37677,8 @@ function cmdInstall(args3) {
     process.exit(1);
   }
   try {
-    const content = fs19.readFileSync(sourceFile, "utf-8");
-    fs19.writeFileSync(installedPath, content, "utf-8");
+    const content = fs21.readFileSync(sourceFile, "utf-8");
+    fs21.writeFileSync(installedPath, content, "utf-8");
     console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC124\uCE58 \uC644\uB8CC: ${installedPath}`);
     console.log(`\x1B[2m  \uC0AC\uC6A9: (use ${pluginName})\x1B[0m`);
   } catch (err4) {
@@ -37432,11 +37692,11 @@ function cmdPublish(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: publish <plugin-file.fl>`);
     process.exit(1);
   }
-  if (!fs19.existsSync(filePath)) {
+  if (!fs21.existsSync(filePath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const content = fs19.readFileSync(filePath, "utf-8");
+  const content = fs21.readFileSync(filePath, "utf-8");
   const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
   const versionMatch = content.match(/^;; version:\s*(.+)$/m);
   if (!nameMatch) {
@@ -37451,13 +37711,13 @@ function cmdPublish(args3) {
   console.log(`\x1B[36m[Y5]\x1B[0m  \uBC30\uD3EC \uC911: ${pluginName} (v${version})`);
   try {
     const { execSync: execSync2 } = require("child_process");
-    const tmpDir = path15.resolve("/tmp", `fl-publish-${Date.now()}`);
-    fs19.mkdirSync(tmpDir, { recursive: true });
+    const tmpDir = path17.resolve("/tmp", `fl-publish-${Date.now()}`);
+    fs21.mkdirSync(tmpDir, { recursive: true });
     execSync2("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
       cwd: tmpDir,
       stdio: "pipe"
     });
-    fs19.copyFileSync(filePath, path15.resolve(tmpDir, `${pluginName}.fl`));
+    fs21.copyFileSync(filePath, path17.resolve(tmpDir, `${pluginName}.fl`));
     execSync2(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
     execSync2(
       `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
@@ -37466,7 +37726,7 @@ function cmdPublish(args3) {
     execSync2("git push origin master", { cwd: tmpDir, stdio: "pipe" });
     console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 '${pluginName}' \uAC8C\uC2DC \uC644\uB8CC`);
     console.log(`\x1B[2m  \uC800\uC7A5\uC18C: https://gogs.dclub.kr/kim/fl-plugins\x1B[0m`);
-    fs19.rmSync(tmpDir, { recursive: true, force: true });
+    fs21.rmSync(tmpDir, { recursive: true, force: true });
   } catch (err4) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uBC30\uD3EC \uC2E4\uD328: ${err4.message}`);
     process.exit(1);
@@ -37499,11 +37759,11 @@ function cmdServe(args3) {
       port = parseInt(process.env.PORT, 10);
     } else {
       try {
-        const fs20 = require("fs");
-        const path16 = require("path");
-        const configPath = path16.join(process.cwd(), "fl.config.json");
-        if (fs20.existsSync(configPath)) {
-          const cfg = JSON.parse(fs20.readFileSync(configPath, "utf-8"));
+        const fs22 = require("fs");
+        const path18 = require("path");
+        const configPath = path18.join(process.cwd(), "fl.config.json");
+        if (fs22.existsSync(configPath)) {
+          const cfg = JSON.parse(fs22.readFileSync(configPath, "utf-8"));
           if (cfg.port) port = cfg.port;
         }
       } catch (_e) {
@@ -37686,12 +37946,12 @@ switch (cmd) {
       process.exit(1);
     }
     const noClear = args2.includes("--no-clear");
-    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path15.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
+    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path17.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
     runWithWatch(filePath, {
       clearConsole: !noClear,
       debounceMs: 300,
       onError: (file, err4) => {
-        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path15.basename(file)}: ${err4.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path17.basename(file)}: ${err4.message}`);
       }
     });
     break;

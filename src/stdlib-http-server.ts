@@ -5,6 +5,9 @@
 import * as http from "http";
 import * as url from "url";
 import * as crypto from "crypto";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
 // Global registry for hot-reload: tracks the currently active HTTP server
 // across Interpreter instances (each createHttpServerModule() creates a new
@@ -99,21 +102,109 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     };
   }
 
-  // 요청 본문 읽기 (v11.1: Content-Type 이 application/json 이면 자동 파싱)
+  // 요청 본문 읽기 (multipart/form-data 포함)
   async function readBody(req: http.IncomingMessage): Promise<string | any> {
     return new Promise((resolve) => {
-      let body = "";
-      req.on("data", (chunk) => {
-        body += chunk.toString();
-      });
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
       req.on("end", () => {
-        const ct = (req.headers["content-type"] || "").toString().toLowerCase();
-        if (ct.includes("application/json") && body.trim()) {
-          try { resolve(JSON.parse(body)); return; } catch { /* fall through */ }
+        const raw = Buffer.concat(chunks);
+        const ct = (req.headers["content-type"] || "").toString();
+
+        if (ct.includes("application/json")) {
+          try { resolve(JSON.parse(raw.toString())); return; } catch { /* fall through */ }
         }
-        resolve(body);
+
+        if (ct.includes("multipart/form-data")) {
+          try { resolve(parseMultipart(raw, ct)); return; } catch { /* fall through */ }
+        }
+
+        if (ct.includes("application/x-www-form-urlencoded")) {
+          try {
+            const params: Record<string, string> = {};
+            new url.URLSearchParams(raw.toString()).forEach((v, k) => { params[k] = v; });
+            resolve(params);
+            return;
+          } catch { /* fall through */ }
+        }
+
+        resolve(raw.toString());
       });
     });
+  }
+
+  // multipart/form-data 파서 — 파일은 /tmp/fl-uploads/ 에 저장
+  function parseMultipart(raw: Buffer, contentType: string): any {
+    const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+    if (!boundaryMatch) return {};
+
+    const boundary = boundaryMatch[1];
+    const delimiter = Buffer.from("\r\n--" + boundary);
+    const fields: Record<string, string> = {};
+    const files: any[] = [];
+
+    const uploadDir = path.join(os.tmpdir(), "fl-uploads");
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+    // 파트 분리
+    const start = Buffer.from("--" + boundary + "\r\n");
+    let pos = raw.indexOf(start);
+    if (pos < 0) return { fields, files };
+    pos += start.length;
+
+    while (pos < raw.length) {
+      const next = raw.indexOf(delimiter, pos);
+      const partEnd = next < 0 ? raw.length : next;
+      const part = raw.slice(pos, partEnd);
+
+      // 헤더/바디 분리 (\r\n\r\n)
+      const headerEnd = part.indexOf("\r\n\r\n");
+      if (headerEnd < 0) break;
+
+      const headerStr = part.slice(0, headerEnd).toString();
+      const bodyBuf = part.slice(headerEnd + 4);
+
+      // Content-Disposition 파싱
+      const dispMatch = headerStr.match(/Content-Disposition:[^\n]*?;\s*name="([^"]+)"(?:[^\n]*?filename="([^"]+)")?/i);
+      if (!dispMatch) { pos = partEnd + delimiter.length + 2; continue; }
+
+      const fieldName = dispMatch[1];
+      const fileName = dispMatch[2];
+
+      if (fileName) {
+        // 파일 파트
+        const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
+        const mimetype = ctMatch ? ctMatch[1].trim() : "application/octet-stream";
+        const ext = path.extname(fileName) || "";
+        const savedName = crypto.randomBytes(8).toString("hex") + ext;
+        const savedPath = path.join(uploadDir, savedName);
+        fs.writeFileSync(savedPath, bodyBuf);
+
+        const m = new Map<string, any>();
+        m.set("fieldname", fieldName);
+        m.set("originalname", fileName);
+        m.set("mimetype", mimetype);
+        m.set("size", bodyBuf.length);
+        m.set("path", savedPath);
+        m.set("filename", savedName);
+        files.push(m);
+      } else {
+        // 일반 필드
+        fields[fieldName] = bodyBuf.toString().replace(/\r\n$/, "");
+      }
+
+      if (next < 0) break;
+      pos = next + delimiter.length;
+      if (raw.slice(pos, pos + 2).toString() === "--") break; // 종료 경계
+      pos += 2; // \r\n 건너뜀
+    }
+
+    const result = new Map<string, any>();
+    const fieldsMap = new Map<string, string>();
+    Object.entries(fields).forEach(([k, v]) => fieldsMap.set(k, v));
+    result.set("fields", fieldsMap);
+    result.set("files", files);
+    return result;
   }
 
   // 응답 작성 (extraHeaders: 터널 응답 헤더 전달용)
@@ -177,6 +268,31 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     };
   }
 
+  // ── Rate Limiting (IP 기반 슬라이딩 윈도우) ─────────────────────────────
+  const rlStore = new Map<string, { count: number; resetAt: number }>();
+  let rlMax = 100;        // 윈도우당 최대 요청 수
+  let rlWindowMs = 60000; // 윈도우 크기 (ms)
+
+  function checkRateLimit(ip: string): boolean {
+    const now = Date.now();
+    let entry = rlStore.get(ip);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 1, resetAt: now + rlWindowMs };
+      rlStore.set(ip, entry);
+      return true;
+    }
+    entry.count++;
+    return entry.count <= rlMax;
+  }
+
+  // 오래된 항목 정리 (5분마다)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, e] of rlStore) {
+      if (now > e.resetAt + rlWindowMs) rlStore.delete(ip);
+    }
+  }, 300000).unref();
+
   return {
     // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
     // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
@@ -184,6 +300,13 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     "server_use": (path: string, handlerName: string | any): null => {
       const [pattern] = pathToRegex(path);
       middlewares.push({ pattern, handler: handlerName });
+      return null;
+    },
+
+    // server_rate_limit max window_ms → null  (e.g. 100req/60s)
+    "server_rate_limit": (max: number, windowMs: number): null => {
+      rlMax = Math.max(1, Math.floor(max));
+      rlWindowMs = Math.max(1000, Math.floor(windowMs));
       return null;
     },
 
@@ -243,12 +366,26 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           // CORS
           res.setHeader("Access-Control-Allow-Origin", "*");
           res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-          res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+          res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
           res.setHeader("X-Request-Id", requestId);
+          // 보안 헤더
+          res.setHeader("X-Content-Type-Options", "nosniff");
+          res.setHeader("X-Frame-Options", "SAMEORIGIN");
+          res.setHeader("X-XSS-Protection", "1; mode=block");
+          res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+          res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
           if (method === "OPTIONS") {
             res.writeHead(200);
             res.end();
+            return;
+          }
+
+          // Rate Limiting
+          const clientIp = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+          if (!checkRateLimit(clientIp)) {
+            res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(Math.ceil(rlWindowMs / 1000)) });
+            res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1000) }));
             return;
           }
 
