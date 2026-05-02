@@ -56,10 +56,15 @@ const nodeBuild = esbuild.build({
   target: "node18",
   outfile: "bootstrap.js",
   loader: { ".json": "json" },
-  external: ["better-sqlite3", "sqlite3", "sharp", "tls", "net", "fs", "path", "child_process", "os", "http", "https", "url", "util", "stream", "buffer", "crypto", "readline", "events", "vm", "tty", "assert"],
+  external: ["better-sqlite3", "sqlite3", "sharp", "mongodb", "tls", "net", "fs", "path", "child_process", "os", "http", "https", "url", "util", "stream", "buffer", "crypto", "readline", "events", "vm", "tty", "assert"],
   logLevel: "info",
-}).then(() => console.log("bootstrap=built"))
-  .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
+}).then(() => {
+  // helper 스크립트 복사 (bootstrap.js 옆에 위치해야 __dirname으로 찾을 수 있음)
+  const helperSrc = path.resolve(__dirname, "..", "src", "_mongodb_helper.js");
+  const helperDst = path.resolve(__dirname, "..", "_mongodb_helper.js");
+  if (fs.existsSync(helperSrc)) fs.copyFileSync(helperSrc, helperDst);
+  console.log("bootstrap=built");
+}).catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
 
 // 브라우저 빌드
 const browserBuild = esbuild.build({
