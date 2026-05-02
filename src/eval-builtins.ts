@@ -901,10 +901,6 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 
     // Phase MongoDB: bson-encode-native (FreeLang map → BSON hex)
     case "bson-encode-native": {
-      const doc = args[0] as Record<string, any>;
-      if (!doc || typeof doc !== 'object') return "0c000000107069696e6700010000000000"; // fallback: ping
-
-      // BSON encoding helper
       const int32ToHex = (n: number): string => {
         const b0 = n & 0xFF;
         const b1 = (n >> 8) & 0xFF;
@@ -915,7 +911,17 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
                b2.toString(16).padStart(2, '0') +
                b3.toString(16).padStart(2, '0');
       };
-
+      const int64ToHex = (n: number): string => {
+        // JS numbers are float64, safe up to 2^53
+        const lo = n >>> 0;
+        const hi = Math.floor(n / 0x100000000) >>> 0;
+        return int32ToHex(lo) + int32ToHex(hi);
+      };
+      const float64ToHex = (n: number): string => {
+        const buf = Buffer.allocUnsafe(8);
+        buf.writeDoubleLE(n, 0);
+        return buf.toString('hex');
+      };
       const stringToHex = (s: string): string => {
         let hex = '';
         for (let i = 0; i < s.length; i++) {
@@ -924,78 +930,108 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return hex;
       };
 
-      // Encode each field
-      let elements = '';
-      for (const [key, val] of Object.entries(doc)) {
-        if (typeof val === 'number' && Number.isInteger(val)) {
-          // INT32: 0x10
-          elements += '10' + stringToHex(key) + '00' + int32ToHex(val);
-        } else if (typeof val === 'string') {
-          // STRING: 0x02
-          const strBytes = Buffer.from(val, 'utf-8');
-          const len = strBytes.length + 1; // +1 for null terminator
-          elements += '02' + stringToHex(key) + '00' + int32ToHex(len) + strBytes.toString('hex') + '00';
-        } else if (typeof val === 'boolean') {
-          // BOOL: 0x08
-          elements += '08' + stringToHex(key) + '00' + (val ? '01' : '00');
-        } else if (val === null) {
-          // NULL: 0x0A
-          elements += '0a' + stringToHex(key) + '00';
+      const encodeDoc = (d: any): string => {
+        if (!d || typeof d !== 'object') return int32ToHex(5) + '00'; // empty doc
+        let elements = '';
+        const entries = Array.isArray(d)
+          ? d.map((v: any, i: number) => [String(i), v])
+          : Object.entries(d);
+        for (const [key, val] of entries) {
+          const k = stringToHex(key) + '00';
+          if (Array.isArray(val)) {
+            const subdoc = encodeDoc(val);
+            elements += '04' + k + subdoc;
+          } else if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+            const subdoc = encodeDoc(val);
+            elements += '03' + k + subdoc;
+          } else if (typeof val === 'number' && Number.isInteger(val) && val >= -2147483648 && val <= 2147483647) {
+            elements += '10' + k + int32ToHex(val);
+          } else if (typeof val === 'number') {
+            elements += '01' + k + float64ToHex(val);
+          } else if (typeof val === 'string') {
+            const strBytes = Buffer.from(val, 'utf-8');
+            const len = strBytes.length + 1;
+            elements += '02' + k + int32ToHex(len) + strBytes.toString('hex') + '00';
+          } else if (typeof val === 'boolean') {
+            elements += '08' + k + (val ? '01' : '00');
+          } else if (val === null || val === undefined) {
+            elements += '0a' + k;
+          }
         }
-      }
+        const size = 4 + elements.length / 2 + 1;
+        return int32ToHex(size) + elements + '00';
+      };
 
-      // Document: [size (4)] [elements] [0x00]
-      const size = 4 + elements.length / 2 + 1; // 4 (size field) + elements + 1 (null terminator)
-      const doc_hex = int32ToHex(size) + elements + '00';
-      return doc_hex;
+      const doc = args[0];
+      if (!doc || typeof doc !== 'object') return "0c000000107069696e6700010000000000";
+      return encodeDoc(doc);
     }
 
-    // Phase MongoDB: bson-decode-native (BSON hex → FreeLang map)
+    // Phase MongoDB: bson-decode-native (BSON hex → FreeLang map/array)
     case "bson-decode-native": {
       const hex = String(args[0] || "");
-      if (hex.length < 8) return {}; // too short
+      if (hex.length < 8) return {};
 
       const buf = Buffer.from(hex, 'hex');
-      const result: Record<string, any> = {};
 
-      // Read document size (first 4 bytes, little-endian)
-      const docSize = buf.readInt32LE(0);
+      const decodeDoc = (buf: Buffer, startOffset: number): [Record<string, any>, number] => {
+        if (startOffset + 4 > buf.length) return [{}, startOffset];
+        const docSize = buf.readInt32LE(startOffset);
+        const endOffset = startOffset + docSize;
+        const result: Record<string, any> = {};
+        let offset = startOffset + 4;
 
-      let offset = 4; // skip size field
-
-      // Parse elements until null terminator
-      while (offset < buf.length - 1 && buf[offset] !== 0x00) {
-        const elemType = buf[offset];
-        offset++;
-
-        // Read field name (c-string)
-        let nameEnd = offset;
-        while (nameEnd < buf.length && buf[nameEnd] !== 0x00) nameEnd++;
-        const fieldName = buf.toString('utf-8', offset, nameEnd);
-        offset = nameEnd + 1; // skip null terminator
-
-        // Read value based on type
-        if (elemType === 0x10) { // INT32
-          const val = buf.readInt32LE(offset);
-          result[fieldName] = val;
-          offset += 4;
-        } else if (elemType === 0x02) { // STRING
-          const strLen = buf.readInt32LE(offset);
-          offset += 4;
-          const strVal = buf.toString('utf-8', offset, offset + strLen - 1); // -1 to skip null terminator
-          result[fieldName] = strVal;
-          offset += strLen;
-        } else if (elemType === 0x08) { // BOOL
-          result[fieldName] = buf[offset] !== 0;
+        while (offset < endOffset - 1 && buf[offset] !== 0x00) {
+          const elemType = buf[offset];
           offset++;
-        } else if (elemType === 0x0a) { // NULL
-          result[fieldName] = null;
-        } else {
-          // Unknown type, skip
-          offset++;
+
+          let nameEnd = offset;
+          while (nameEnd < buf.length && buf[nameEnd] !== 0x00) nameEnd++;
+          const fieldName = buf.toString('utf-8', offset, nameEnd);
+          offset = nameEnd + 1;
+
+          if (elemType === 0x01) { // double
+            result[fieldName] = buf.readDoubleLE(offset);
+            offset += 8;
+          } else if (elemType === 0x02) { // string
+            const strLen = buf.readInt32LE(offset);
+            offset += 4;
+            result[fieldName] = buf.toString('utf-8', offset, offset + strLen - 1);
+            offset += strLen;
+          } else if (elemType === 0x03) { // embedded doc
+            const [subdoc, newOffset] = decodeDoc(buf, offset);
+            result[fieldName] = subdoc;
+            offset = newOffset;
+          } else if (elemType === 0x04) { // array
+            const [subdoc, newOffset] = decodeDoc(buf, offset);
+            result[fieldName] = Object.values(subdoc);
+            offset = newOffset;
+          } else if (elemType === 0x07) { // ObjectId (12 bytes)
+            result[fieldName] = buf.toString('hex', offset, offset + 12);
+            offset += 12;
+          } else if (elemType === 0x08) { // bool
+            result[fieldName] = buf[offset] !== 0;
+            offset++;
+          } else if (elemType === 0x09) { // datetime (int64 ms)
+            result[fieldName] = buf.readBigInt64LE(offset);
+            offset += 8;
+          } else if (elemType === 0x0a) { // null
+            result[fieldName] = null;
+          } else if (elemType === 0x10) { // int32
+            result[fieldName] = buf.readInt32LE(offset);
+            offset += 4;
+          } else if (elemType === 0x12) { // int64
+            result[fieldName] = Number(buf.readBigInt64LE(offset));
+            offset += 8;
+          } else {
+            // Unknown: skip rest of doc to avoid corruption
+            break;
+          }
         }
-      }
+        return [result, endOffset];
+      };
 
+      const [result] = decodeDoc(buf, 0);
       return result;
     }
 

@@ -1,24 +1,21 @@
 ;; self/stdlib/mongodb/bson.fl — BSON Encoder for MongoDB
-;; FreeLang v11 wrapper around native (TypeScript) BSON codec
+;; FreeLang v11 wrapper around native BSON codec
 
-;; === INT32 to Little-Endian Hex ===
-;; Converts number to 4-byte little-endian hex string
-[FUNC bson-int32-hex :params [n]
-  :body (let [[n (floor n)]
-              [b0 (% n 256)]
-              [b1 (% (floor (/ n 256)) 256)]
-              [b2 (% (floor (/ n 65536)) 256)]
-              [b3 (% (floor (/ n 16777216)) 256)]]
-    (str (to-hex b0) (to-hex b1) (to-hex b2) (to-hex b3)))]
+;; INT32 to little-endian hex (4 bytes)
+(defn bson-int32-hex [$n]
+  (let [[$n  (floor $n)]
+        [$b0 (% $n 256)]
+        [$b1 (% (floor (/ $n 256)) 256)]
+        [$b2 (% (floor (/ $n 65536)) 256)]
+        [$b3 (% (floor (/ $n 16777216)) 256)]]
+    (str (to-hex $b0) (to-hex $b1) (to-hex $b2) (to-hex $b3))))
 
-;; === BSON Encode: Delegate to native implementation ===
-;; Supports all major types: INT32, STRING, BOOL, NULL
-[FUNC bson-encode :params [doc]
-  :body (bson-encode-native doc)]
+;; Encode FreeLang map/array → BSON hex (delegates to native)
+(defn bson-encode [$doc]
+  (bson-encode-native $doc))
 
-;; === BSON Decode: Delegate to native implementation ===
-;; Returns FreeLang map from BSON hex
-[FUNC bson-decode :params [hex]
-  :body (bson-decode-native hex)]
+;; Decode BSON hex → FreeLang map (delegates to native)
+(defn bson-decode [$hex]
+  (bson-decode-native $hex))
 
 (println "BSON module loaded")

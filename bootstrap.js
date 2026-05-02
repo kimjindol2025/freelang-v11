@@ -173,13 +173,26 @@ function lex(source) {
       col++;
       continue;
     }
+    if (ch === "^") {
+      const startCol = col;
+      i++;
+      col++;
+      let hint = "";
+      while (i < source.length && /[a-zA-Z0-9_\-?]/.test(source[i])) {
+        hint += source[i];
+        i++;
+        col++;
+      }
+      tokens.push({ type: "Symbol" /* Symbol */, value: "^" + hint, line, col: startCol });
+      continue;
+    }
     if (ch === "$") {
       const start = i;
       const startCol = col;
       i++;
       col++;
       let varname = "";
-      while (i < source.length && /[a-zA-Z0-9_-]/.test(source[i])) {
+      while (i < source.length && /[a-zA-Z0-9_\-?]/.test(source[i])) {
         varname += source[i];
         i++;
         col++;
@@ -205,7 +218,7 @@ function lex(source) {
       tokens.push({ type: "Number" /* Number */, value, line, col: startCol });
       continue;
     }
-    if (/[a-zA-Z_<>=!+\-*&/%]/.test(ch)) {
+    if (/[a-zA-Z_<>=!+\-*&/%?]/.test(ch)) {
       const start = i;
       const startCol = col;
       while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&.%]/.test(source[i])) {
@@ -549,6 +562,10 @@ var init_parser = __esm({
         let blockType;
         if (typeToken.type === "Symbol" /* Symbol */) {
           blockType = typeToken.value;
+          if (blockType === "FUNC") {
+            process.stderr.write(`\x1B[33m[deprecated]\x1B[0m [FUNC ...] \uBB38\uBC95\uC740 deprecated\uC785\uB2C8\uB2E4. (defn ...) \uC744 \uC0AC\uC6A9\uD558\uC138\uC694. (line ${typeToken.line})
+`);
+          }
         } else if (typeToken.type === "Module" /* Module */) {
           blockType = "MODULE";
         } else if (typeToken.type === "TypeClass" /* TypeClass */) {
@@ -854,7 +871,8 @@ var init_parser = __esm({
         }
         if (this.check("Colon" /* Colon */)) {
           this.advance();
-          if (this.check("Symbol" /* Symbol */)) {
+          const next = this.tokens[this.pos];
+          if (next && next.value && /^[a-zA-Z_][a-zA-Z0-9_\-]*$/.test(next.value)) {
             const token = this.advance();
             return makeLiteral("string", token.value);
           }
@@ -2584,7 +2602,8 @@ var init_errors = __esm({
       DIV_BY_ZERO: "E_DIV_BY_ZERO",
       INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
       INVALID_FORM: "E_INVALID_FORM",
-      RUNTIME: "E_RUNTIME"
+      RUNTIME: "E_RUNTIME",
+      PURE_VIOLATION: "E_PURE_VIOLATION"
     };
     RECOVERY_HINTS = {
       E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
@@ -2595,7 +2614,8 @@ var init_errors = __esm({
       E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
       E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
       E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
-      E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
+      E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694.",
+      E_PURE_VIOLATION: "^pure/:effects [] \uD568\uC218\uC5D0\uC11C side effect\uAC00 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. :effects \uC120\uC5B8\uC744 \uCD94\uAC00\uD558\uAC70\uB098 effect \uD638\uCD9C\uC744 \uC81C\uAC70\uD558\uC138\uC694."
     };
     FLRuntimeError = class _FLRuntimeError extends ModuleError {
       constructor(code, message, context = {}, file, line, col, hint) {
@@ -11750,7 +11770,14 @@ function evalBuiltin(interp2, op, args3, expr2) {
   const ev = (node) => interp2.eval(node);
   const callFn = (fn, a) => interp2.callFunction(fn, a);
   const callUser = (name, a) => interp2.callUserFunction(name, a);
-  const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
+  const callFnVal = (fn, a) => {
+    if (typeof fn === "string") return interp2.callUserFunction(fn, a);
+    if (fn?.kind === "function-value" || fn?.kind === "async-function-value") return interp2.callFunctionValue(fn, a);
+    if (typeof fn?.body === "function") return fn.body(...a);
+    if (fn?.params !== void 0 && fn?.body !== void 0) return interp2.callUserFunction(fn.name ?? fn.id, a);
+    if (typeof fn === "function") return fn(...a);
+    return interp2.callFunctionValue(fn, a);
+  };
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
     case "atom": {
@@ -11843,7 +11870,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const port = Number(args3[1] ?? 27017);
       const hexData = String(args3[2] ?? "");
       const timeout = Number(args3[3] ?? 1e4);
-      const { spawnSync: spawnSync8 } = require("child_process");
+      const { spawnSync: spawnSync9 } = require("child_process");
       const inlineScript = `
 const net = require('net');
 const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -11893,7 +11920,7 @@ sock.setTimeout(timeout, () => {
 `;
       const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
       try {
-        const r = spawnSync8(
+        const r = spawnSync9(
           process.execPath,
           ["-e", inlineScript],
           { input: reqJson, timeout: timeout + 1e3, encoding: "utf-8" }
@@ -11909,7 +11936,7 @@ sock.setTimeout(timeout, () => {
       const host = String(args3[0] ?? "localhost");
       const port = Number(args3[1] ?? 27017);
       const timeout = Number(args3[2] ?? 5e3);
-      const { spawnSync: spawnSync8 } = require("child_process");
+      const { spawnSync: spawnSync9 } = require("child_process");
       const inlineScript = `
 const net = require('net');
 const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -11919,7 +11946,7 @@ sock.on('error', () => { process.exit(1); });
 sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 `;
       try {
-        const r = spawnSync8(
+        const r = spawnSync9(
           process.execPath,
           ["-e", inlineScript],
           { input: JSON.stringify({ host, port, timeout }), timeout: timeout + 500, encoding: "utf-8" }
@@ -12584,6 +12611,26 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
         return rest;
       }
       return args3[0] ?? {};
+    }
+    case "obj-merge": {
+      console.warn(`\u26A0\uFE0F  [FreeLang] obj_merge: \uB3D9\uC791\uD558\uC9C0\uB9CC \uBE44\uD45C\uC900. (assoc map "k" v) \uC0AC\uC6A9 \uAD8C\uC7A5.`);
+      if (!args3[0] || !args3[1]) return args3[0] ?? args3[1] ?? {};
+      return { ...args3[0], ...args3[1] };
+    }
+    case "obj-pick": {
+      console.warn(`\u26A0\uFE0F  [FreeLang] obj_pick: \uB3D9\uC791\uD558\uC9C0\uB9CC \uBE44\uD45C\uC900. (get m "k") \uC9C1\uC811 \uC811\uADFC \uAD8C\uC7A5.`);
+      if (!args3[0] || !Array.isArray(args3[1])) return {};
+      return args3[1].reduce((acc, k) => {
+        if (k in args3[0]) acc[k] = args3[0][k];
+        return acc;
+      }, {});
+    }
+    case "obj-omit": {
+      console.warn(`\u26A0\uFE0F  [FreeLang] obj_omit: \uB3D9\uC791\uD558\uC9C0\uB9CC \uBE44\uD45C\uC900. (dissoc m "k") \uC0AC\uC6A9 \uAD8C\uC7A5.`);
+      if (!args3[0] || !Array.isArray(args3[1])) return args3[0] ?? {};
+      const result = { ...args3[0] };
+      for (const k of args3[1]) delete result[k];
+      return result;
     }
     case "flatten": {
       if (!Array.isArray(args3[0])) return [];
@@ -17849,7 +17896,218 @@ function isVMEligible(node) {
 
 // src/eval-special-forms.ts
 init_errors();
+
+// src/stdlib-property.ts
+var propRegistry = /* @__PURE__ */ new Map();
+var RAND_STRINGS = "abcdefghijklmnopqrstuvwxyz0123456789 _-";
+function genValue(type) {
+  const t = type.replace(/^:/, "").toLowerCase();
+  switch (t) {
+    case "int":
+    case "integer":
+      return Math.floor(Math.random() * 2001) - 1e3;
+    case "pos-int":
+    case "positive-int":
+      return Math.floor(Math.random() * 1e3) + 1;
+    case "neg-int":
+    case "negative-int":
+      return -(Math.floor(Math.random() * 1e3) + 1);
+    case "nat":
+    case "natural":
+      return Math.floor(Math.random() * 1e3);
+    case "float":
+    case "double":
+      return Math.random() * 2e3 - 1e3;
+    case "number":
+      return Math.random() < 0.5 ? Math.floor(Math.random() * 2001) - 1e3 : Math.random() * 2e3 - 1e3;
+    case "string":
+    case "str": {
+      const len = Math.floor(Math.random() * 20);
+      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
+    }
+    case "nonempty-string":
+    case "ne-string": {
+      const len = Math.floor(Math.random() * 19) + 1;
+      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
+    }
+    case "bool":
+    case "boolean":
+      return Math.random() < 0.5;
+    case "list":
+    case "array": {
+      const len = Math.floor(Math.random() * 10);
+      return Array.from({ length: len }, () => genValue("int"));
+    }
+    case "any":
+    default: {
+      const pick = Math.floor(Math.random() * 4);
+      if (pick === 0) return genValue("int");
+      if (pick === 1) return genValue("string");
+      if (pick === 2) return genValue("bool");
+      return null;
+    }
+  }
+}
+function generateSample(argTypes) {
+  return argTypes.map((t) => genValue(t));
+}
+function runProp(prop, callFn, callCheck) {
+  const start = Date.now();
+  let passed = 0;
+  let failed = 0;
+  let firstFailure = null;
+  for (let i = 0; i < prop.samples; i++) {
+    const args3 = generateSample(prop.args);
+    try {
+      const result = callFn(prop.fn, args3);
+      let checkArgs;
+      try {
+        const fnParams = prop.check?.params ?? [];
+        checkArgs = fnParams.length === args3.length + 1 ? [...args3, result] : args3;
+      } catch {
+        checkArgs = [...args3, result];
+      }
+      const ok2 = callCheck(prop.check, checkArgs);
+      if (ok2 || ok2 === null) {
+        passed++;
+      } else {
+        failed++;
+        if (!firstFailure) firstFailure = { args: args3, result };
+      }
+    } catch (err4) {
+      failed++;
+      if (!firstFailure) firstFailure = { args: args3, result: null, error: err4?.message ?? String(err4) };
+    }
+    if (failed > 0 && firstFailure) break;
+  }
+  return {
+    name: prop.name,
+    fn: prop.fn,
+    samples: prop.samples,
+    passed,
+    failed,
+    firstFailure,
+    durationMs: Date.now() - start
+  };
+}
+
+// src/eval-special-forms.ts
 var _vmCompiler = new BytecodeCompiler();
+var fnMetaRegistry = /* @__PURE__ */ new Map();
+var META_KEYS = /* @__PURE__ */ new Set(["returns", "context", "effects", "examples", "property"]);
+function extractMapMeta(mapNode) {
+  if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
+  const fields = mapNode.fields;
+  if (!fields || !(fields instanceof Map)) return null;
+  if (!META_KEYS.has([...fields.keys()].find((k) => META_KEYS.has(k)) ?? "")) return null;
+  const meta = {};
+  const strVal = (n) => n?.kind === "literal" ? String(n.value) : void 0;
+  if (fields.has("returns")) meta.returns = strVal(fields.get("returns"));
+  if (fields.has("context")) meta.context = strVal(fields.get("context"));
+  if (fields.has("examples")) meta.examples = strVal(fields.get("examples"));
+  if (fields.has("effects")) {
+    const eNode = fields.get("effects");
+    if (eNode?.kind === "block" && eNode?.type === "Array") {
+      const items = eNode.fields?.get("items");
+      if (Array.isArray(items)) meta.effects = items.map((it) => strVal(it) ?? "?");
+    }
+  }
+  if (fields.has("property")) meta.property = fields.get("property");
+  return meta;
+}
+var EFFECT_CATALOG = /* @__PURE__ */ new Map([
+  // HTTP 클라이언트
+  ["http_get", "http"],
+  ["http-get", "http"],
+  ["http_post", "http"],
+  ["http-post", "http"],
+  ["http_put", "http"],
+  ["http-put", "http"],
+  ["http_delete", "http"],
+  ["http-delete", "http"],
+  ["http_patch", "http"],
+  ["http-patch", "http"],
+  ["http_get_bearer", "http"],
+  ["http_post_bearer", "http"],
+  ["http_post_json", "http"],
+  ["http_get_json", "http"],
+  // 파일 I/O
+  ["file_read", "file-read"],
+  ["file-read", "file-read"],
+  ["file_write", "file-write"],
+  ["file-write", "file-write"],
+  ["file_append", "file-write"],
+  ["file_delete", "file-write"],
+  ["file_exists", "file-read"],
+  ["file_list", "file-read"],
+  // DB
+  ["db_query", "db-read"],
+  ["db-query", "db-read"],
+  ["db_execute", "db-write"],
+  ["db-execute", "db-write"],
+  ["db_insert", "db-write"],
+  ["db-insert", "db-write"],
+  ["db_update", "db-write"],
+  ["db-update", "db-write"],
+  ["db_delete", "db-write"],
+  ["db-delete", "db-write"],
+  // Shell
+  ["shell_exec", "shell"],
+  ["shell-exec", "shell"],
+  ["shell_run", "shell"],
+  // I/O (stdout)
+  ["println", "io"],
+  ["print", "io"],
+  ["log/info", "io"],
+  ["log/warn", "io"],
+  ["log/error", "io"],
+  // 시간/랜덤 (non-determinism)
+  ["now", "time"],
+  ["timestamp", "time"],
+  ["random", "random"],
+  ["rand-int", "random"],
+  // HTTP 서버 시작
+  ["server_start", "server"],
+  ["server-start", "server"]
+]);
+function collectBodyEffects(node, found) {
+  if (!node) return;
+  if (node.kind === "sexpr") {
+    const op = node.op ?? "";
+    const eff = EFFECT_CATALOG.get(op);
+    if (eff) found.add(eff);
+    if (Array.isArray(node.args)) node.args.forEach((a) => collectBodyEffects(a, found));
+  } else if (node.kind === "block") {
+    if (node.fields instanceof Map) node.fields.forEach((v) => collectBodyEffects(v, found));
+  } else if (node.kind === "literal" || node.kind === "variable") {
+  }
+}
+function checkEffects(fnName, declaredEffects, bodyNode, line, isPure) {
+  const found = /* @__PURE__ */ new Set();
+  collectBodyEffects(bodyNode, found);
+  const pure = isPure || declaredEffects.length === 0;
+  const declaredSet = new Set(declaredEffects.map((e) => e.startsWith(":") ? e.slice(1) : e));
+  const undeclared = [];
+  for (const eff of found) {
+    if (!declaredSet.has(eff)) undeclared.push(eff);
+  }
+  if (undeclared.length > 0) {
+    const hint = undeclared.map((e) => `:${e}`).join(" ");
+    if (pure) {
+      throw new FLRuntimeError(
+        ErrorCodes.PURE_VIOLATION,
+        `${fnName}: ^pure \uD568\uC218\uC5D0\uC11C side effect \uAC10\uC9C0 \u2014 ${hint}`,
+        { fn: fnName, expected: "no side effects", got: hint },
+        void 0,
+        line
+      );
+    }
+    process.stderr.write(
+      `\x1B[33m[effects]\x1B[0m  \x1B[1m${fnName}\x1B[0m${line ? ` (line ${line})` : ""}  \uC120\uC5B8 \uC548 \uB41C effect: \x1B[33m${hint}\x1B[0m  \u2192 :effects \uC5D0 \uCD94\uAC00 \uD544\uC694
+`
+    );
+  }
+}
 function throwArgCount(fn, expected, got, line) {
   throw new FLRuntimeError(
     ErrorCodes.ARG_COUNT,
@@ -17938,6 +18196,7 @@ function evalSpecialForm(interp2, op, expr2) {
       const items = paramsNode.fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
+          if (item.kind === "literal" && item.type === "symbol" && String(item.value).startsWith("^")) continue;
           if (item.kind === "variable") {
             const n = item.name;
             params.push(n.startsWith("$") ? n.slice(1) : n);
@@ -17959,14 +18218,42 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "defn" || op === "defun") {
     if (expr2.args.length < 3) throwArgCount("defn", ">=3", expr2.args.length, expr2.line);
-    const nameNode = expr2.args[0];
+    let argIdx = 0;
+    let isPureHint = false;
+    if (expr2.args[argIdx]?.kind === "literal" && String(expr2.args[argIdx].value).startsWith("^")) {
+      const hint = String(expr2.args[argIdx].value);
+      if (hint === "^pure") isPureHint = true;
+      argIdx++;
+    }
+    const nameNode = expr2.args[argIdx++];
     let name;
     if (nameNode.kind === "variable") name = nameNode.name;
     else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value;
     else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr2.line);
-    const paramsNode = expr2.args[1];
-    const bodyArgs = expr2.args.slice(2);
+    const paramsNode = expr2.args[argIdx];
+    let bodyArgs = expr2.args.slice(argIdx + 1);
+    let registeredMeta = null;
+    if (bodyArgs.length > 1) {
+      const meta = extractMapMeta(bodyArgs[0]);
+      if (meta) {
+        meta.line = expr2.line;
+        fnMetaRegistry.set(name, meta);
+        registeredMeta = meta;
+        bodyArgs = bodyArgs.slice(1);
+      }
+    }
     const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
+    if (isPureHint) {
+      checkEffects(name, [], body, expr2.line, true);
+      if (!registeredMeta) {
+        registeredMeta = { line: expr2.line, effects: [] };
+        fnMetaRegistry.set(name, registeredMeta);
+      } else if (!registeredMeta.effects) {
+        registeredMeta.effects = [];
+      }
+    } else if (registeredMeta?.effects !== void 0) {
+      checkEffects(name, registeredMeta.effects, body, expr2.line);
+    }
     const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
     const fnValue = interp2.evalSExpr(fnExpr);
     try {
@@ -17988,9 +18275,76 @@ function evalSpecialForm(interp2, op, expr2) {
       capturedEnv: fnValue.capturedEnv
     };
     ctx.functions.set(name, funcDef);
+    if (registeredMeta?.property) {
+      try {
+        const propNode = registeredMeta.property;
+        if (propNode?.kind === "block" && propNode?.type === "Map") {
+          const pf = propNode.fields;
+          const argsNode = pf.get("args");
+          let argTypes = [];
+          if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+            const items = argsNode.fields?.get("items");
+            if (Array.isArray(items)) argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+          }
+          const checkNode = pf.get("check");
+          const checkFn = checkNode ? ev(checkNode) : null;
+          const samplesNode = pf.get("samples");
+          const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
+          propRegistry.set(`prop-${name}`, {
+            name: `prop-${name}`,
+            fn: name,
+            args: argTypes,
+            check: checkFn,
+            samples,
+            line: expr2.line
+          });
+        }
+      } catch {
+      }
+    }
     ctx.variables.set("$" + name, fnValue);
     ctx.variables.set(name, fnValue);
     return fnValue;
+  }
+  if (op === "defprop") {
+    if (expr2.args.length < 2) throwArgCount("defprop", ">=2", expr2.args.length, expr2.line);
+    const nameNode = expr2.args[0];
+    const propName = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "prop-" + Date.now();
+    const specNode = expr2.args[1];
+    if (specNode?.kind !== "block" || specNode?.type !== "Map") {
+      throw new FLRuntimeError(
+        ErrorCodes.INVALID_FORM,
+        `defprop: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uB9F5\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 {:fn :args :check}`,
+        {},
+        void 0,
+        expr2.line
+      );
+    }
+    const fields = specNode.fields;
+    const fnNode = fields.get("fn");
+    const fnName = fnNode?.kind === "literal" ? String(fnNode.value) : "";
+    const argsNode = fields.get("args");
+    let argTypes = [];
+    if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+      const items = argsNode.fields?.get("items");
+      if (Array.isArray(items)) {
+        argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+      }
+    }
+    const checkNode = fields.get("check");
+    const checkFn = checkNode ? ev(checkNode) : null;
+    const samplesNode = fields.get("samples");
+    const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
+    const prop = {
+      name: propName,
+      fn: fnName,
+      args: argTypes,
+      check: checkFn,
+      samples,
+      line: expr2.line
+    };
+    propRegistry.set(propName, prop);
+    return prop;
   }
   if (op === "async") {
     if (expr2.args.length < 3) throw new Error(`async requires name, params, and body`);
@@ -18016,6 +18370,7 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "set!") {
     if (expr2.args.length < 2) throwArgCount("set!", ">=2", expr2.args.length, expr2.line);
+    console.warn(`\u26A0\uFE0F  [FreeLang] set! is deprecated (line ${expr2.line ?? "?"}). Use (atom) + (swap! / reset!) instead.`);
     const nameNode = expr2.args[0];
     if (nameNode.kind === "sexpr" && nameNode.op === "get") {
       const getArgs = nameNode.args;
@@ -18214,6 +18569,46 @@ function evalSpecialForm(interp2, op, expr2) {
         const fn = ev(form);
         val = callFn(fn, [val]);
       }
+    }
+    return val;
+  }
+  if (op === "?.") {
+    if (expr2.args.length < 1) return null;
+    let val = ev(expr2.args[0]);
+    for (let i = 1; i < expr2.args.length; i++) {
+      if (val === null || val === void 0) return null;
+      const keyArg = expr2.args[i];
+      let key;
+      if (keyArg.kind === "literal") {
+        key = keyArg.value;
+      } else {
+        key = ev(keyArg);
+      }
+      if (typeof key === "string" && key.startsWith(":")) key = key.slice(1);
+      val = val instanceof Map ? val.get(key) ?? val.get(":" + key) ?? null : val?.[String(key)] ?? null;
+    }
+    return val ?? null;
+  }
+  if (op === "as->") {
+    if (expr2.args.length < 3) throw new Error(`as-> requires: (as-> val $name form ...)`);
+    const bindArg = expr2.args[1];
+    let bindName;
+    if (bindArg.kind === "variable") {
+      bindName = bindArg.name;
+    } else if (bindArg.kind === "literal") {
+      bindName = "$" + String(bindArg.value);
+    } else {
+      throw new Error(`as->: second arg must be a binding name like $v`);
+    }
+    let val = ev(expr2.args[0]);
+    ctx.variables.push();
+    try {
+      for (let i = 2; i < expr2.args.length; i++) {
+        ctx.variables.set(bindName, val);
+        val = ev(expr2.args[i]);
+      }
+    } finally {
+      ctx.variables.pop();
     }
     return val;
   }
@@ -19381,6 +19776,9 @@ function evalOpenBlock(interp2, openBlock) {
   );
 }
 
+// src/stdlib-loader.ts
+var import_crypto9 = require("crypto");
+
 // src/stdlib-file.ts
 var fs4 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
@@ -19728,14 +20126,7 @@ function createTimerModule(interpreter) {
         const timerId = nextTimerId++;
         const callback = () => {
           try {
-            const fn = interpreter.context?.functions?.get(fnName);
-            if (fn && typeof fn === "object" && fn.body !== void 0) {
-              interpreter.callFunction(fnName, []);
-            } else if (typeof fn === "function") {
-              fn();
-            } else {
-              console.warn(`set_interval: function '${fnName}' not found or not callable`);
-            }
+            interpreter.callUserFunction(fnName, []);
           } catch (err4) {
             console.error(`set_interval callback error for '${fnName}':`, err4.message);
           }
@@ -19773,14 +20164,7 @@ function createTimerModule(interpreter) {
         const timerId = nextTimerId++;
         const callback = () => {
           try {
-            const fn = interpreter.context?.functions?.get(fnName);
-            if (fn && typeof fn === "object" && fn.body !== void 0) {
-              interpreter.callFunction(fnName, []);
-            } else if (typeof fn === "function") {
-              fn();
-            } else {
-              console.warn(`set_timeout: function '${fnName}' not found or not callable`);
-            }
+            interpreter.callUserFunction(fnName, []);
           } catch (err4) {
             console.error(`set_timeout callback error for '${fnName}':`, err4.message);
           }
@@ -20626,7 +21010,27 @@ function createDataModule() {
     "str_encode_base64": (s) => btoa(unescape(encodeURIComponent(s))),
     "str_decode_base64": (s) => decodeURIComponent(escape(atob(s))),
     "str_encode_uri": (s) => encodeURIComponent(String(s)),
-    "str_decode_uri": (s) => decodeURIComponent(String(s))
+    "str_decode_uri": (s) => decodeURIComponent(String(s)),
+    // str_fmt template map → 문자열 보간
+    // (str_fmt "안녕 {name}, {age}살" {:name "김진돌" :age 30})
+    // → "안녕 김진돌, 30살"
+    "str_fmt": (template, vars) => {
+      if (typeof template !== "string") return String(template);
+      const get = (obj, key) => obj instanceof Map ? obj.get(key) ?? obj.get(":" + key) : obj?.[key];
+      return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const v = get(vars, key);
+        return v !== void 0 && v !== null ? String(v) : `{${key}}`;
+      });
+    },
+    // str/fmt alias
+    "str/fmt": (template, vars) => {
+      if (typeof template !== "string") return String(template);
+      const get = (obj, key) => obj instanceof Map ? obj.get(key) ?? obj.get(":" + key) : obj?.[key];
+      return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const v = get(vars, key);
+        return v !== void 0 && v !== null ? String(v) : `{${key}}`;
+      });
+    }
   };
 }
 
@@ -21313,551 +21717,16 @@ function createCryptoModule() {
   };
 }
 
-// src/stdlib-crypto-rsa.ts
-var import_crypto4 = require("crypto");
-function createCryptoRsaModule() {
-  return {
-    // ── RSA 키 생성 ────────────────────────────────────────────
-    // crypto_rsa_generate bits -> map (publicKey/privateKey PEM)
-    "crypto_rsa_generate": (bits = 2048) => {
-      const size = bits >= 2048 ? bits : 2048;
-      const { publicKey, privateKey } = (0, import_crypto4.generateKeyPairSync)("rsa", {
-        modulusLength: size,
-        publicKeyEncoding: { type: "spki", format: "pem" },
-        privateKeyEncoding: { type: "pkcs8", format: "pem" }
-      });
-      return { publicKey, privateKey };
-    },
-    // ── RS256 서명 / 검증 ─────────────────────────────────────
-    // crypto_rsa_sign private_pem data -> string (base64url 서명)
-    "crypto_rsa_sign": (privateKeyPem, data) => {
-      const signer = (0, import_crypto4.createSign)("RSA-SHA256");
-      signer.update(data);
-      signer.end();
-      return signer.sign(privateKeyPem).toString("base64url");
-    },
-    // crypto_rsa_verify public_pem data signature_b64url -> boolean
-    "crypto_rsa_verify": (publicKeyPem, data, sigB64Url) => {
-      try {
-        const verifier = (0, import_crypto4.createVerify)("RSA-SHA256");
-        verifier.update(data);
-        verifier.end();
-        const sigBuf = Buffer.from(sigB64Url, "base64url");
-        return verifier.verify(publicKeyPem, sigBuf);
-      } catch {
-        return false;
-      }
-    },
-    // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
-    // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
-    "pkce_s256": (verifier) => {
-      return (0, import_crypto4.createHash)("sha256").update(verifier, "utf8").digest("base64url");
-    },
-    // crypto_rsa_public_to_jwk public_pem kid -> map (kty/n/e/kid/alg/use)
-    "crypto_rsa_public_to_jwk": (publicKeyPem, kid) => {
-      const key = (0, import_crypto4.createPublicKey)(publicKeyPem);
-      const jwk = key.export({ format: "jwk" });
-      return {
-        kty: jwk.kty,
-        n: jwk.n,
-        e: jwk.e,
-        kid,
-        alg: "RS256",
-        use: "sig"
-      };
-    }
-  };
-}
-
-// src/stdlib-totp.ts
-var import_crypto5 = require("crypto");
-var BASE32_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-function base32Encode(buf) {
-  let bits = 0, value = 0, output = "";
-  for (let i = 0; i < buf.length; i++) {
-    value = value << 8 | buf[i];
-    bits += 8;
-    while (bits >= 5) {
-      output += BASE32_ALPHA[value >>> bits - 5 & 31];
-      bits -= 5;
-    }
-  }
-  if (bits > 0) output += BASE32_ALPHA[value << 5 - bits & 31];
-  return output;
-}
-function base32Decode(str) {
-  const clean = str.replace(/=+$/, "").toUpperCase();
-  let bits = 0, value = 0;
-  const out = [];
-  for (let i = 0; i < clean.length; i++) {
-    const idx = BASE32_ALPHA.indexOf(clean[i]);
-    if (idx === -1) throw new Error(`invalid base32 char: ${clean[i]}`);
-    value = value << 5 | idx;
-    bits += 5;
-    if (bits >= 8) {
-      out.push(value >>> bits - 8 & 255);
-      bits -= 8;
-    }
-  }
-  return Buffer.from(out);
-}
-function hotp(secret, counter, digits = 6) {
-  const ctrBuf = Buffer.alloc(8);
-  const high = Math.floor(counter / 4294967296);
-  const low = counter >>> 0;
-  ctrBuf.writeUInt32BE(high, 0);
-  ctrBuf.writeUInt32BE(low, 4);
-  const hmac = (0, import_crypto5.createHmac)("sha1", secret).update(ctrBuf).digest();
-  const offset = hmac[hmac.length - 1] & 15;
-  const truncated = (hmac[offset] & 127) << 24 | (hmac[offset + 1] & 255) << 16 | (hmac[offset + 2] & 255) << 8 | hmac[offset + 3] & 255;
-  const code = truncated % Math.pow(10, digits);
-  return code.toString().padStart(digits, "0");
-}
-function totpCounter(unixSeconds, step = 30) {
-  return Math.floor(unixSeconds / step);
-}
-function createTotpModule() {
-  return {
-    // totp_secret_generate bytes -> string (base32, default 20 bytes = 160 bits = 32 chars)
-    "totp_secret_generate": (bytes = 20) => {
-      const buf = (0, import_crypto5.randomBytes)(bytes);
-      return base32Encode(buf);
-    },
-    // totp_now secret_b32 -> string (현재 시각의 6자리 코드, 디버그·등록용)
-    "totp_now": (secretB32) => {
-      const secret = base32Decode(secretB32);
-      const counter = totpCounter(Math.floor(Date.now() / 1e3));
-      return hotp(secret, counter, 6);
-    },
-    // totp_verify secret_b32 code window_steps -> boolean
-    // window=1 → 현재 ±1 step (총 90초 윈도우) 허용 (시계 오차 보정)
-    "totp_verify": (secretB32, code, window = 1) => {
-      try {
-        if (!/^\d+$/.test(code)) return false;
-        const secret = base32Decode(secretB32);
-        const now = totpCounter(Math.floor(Date.now() / 1e3));
-        const expected = Buffer.from(code);
-        for (let i = -window; i <= window; i++) {
-          const candidate = Buffer.from(hotp(secret, now + i, code.length));
-          if (candidate.length === expected.length && (0, import_crypto5.timingSafeEqual)(candidate, expected)) {
-            return true;
-          }
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    },
-    // totp_uri label issuer secret_b32 -> string (otpauth://totp/... QR 코드 표준)
-    "totp_uri": (label, issuer, secretB32) => {
-      const enc = (s) => encodeURIComponent(s);
-      return `otpauth://totp/${enc(issuer)}:${enc(label)}?secret=${secretB32}&issuer=${enc(issuer)}&algorithm=SHA1&digits=6&period=30`;
-    }
-  };
-}
-
-// src/stdlib-mail.ts
+// src/stdlib-checkpoint.ts
 var fs6 = __toESM(require("fs"));
 var path5 = __toESM(require("path"));
-var import_crypto6 = require("crypto");
-var tls = require("tls");
-function createMailModule() {
-  return {
-    // mail_outbox_write dir to subject body -> string (파일 경로)
-    "mail_outbox_write": (dir, to, subject, body) => {
-      try {
-        fs6.mkdirSync(dir, { recursive: true });
-      } catch {
-      }
-      const id = `${Date.now()}-${(0, import_crypto6.randomBytes)(6).toString("hex")}.json`;
-      const file = path5.join(dir, id);
-      const payload = {
-        id,
-        to,
-        subject,
-        body,
-        ts: (/* @__PURE__ */ new Date()).toISOString(),
-        status: "queued"
-      };
-      fs6.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
-      return file;
-    },
-    // mail_outbox_list dir -> array (JSON 배열, 큐된 메시지)
-    "mail_outbox_list": (dir) => {
-      try {
-        const files = fs6.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
-        return files.map((f) => {
-          try {
-            return JSON.parse(fs6.readFileSync(path5.join(dir, f), "utf8"));
-          } catch {
-            return null;
-          }
-        }).filter((x) => x !== null);
-      } catch {
-        return [];
-      }
-    },
-    // mail_outbox_count dir -> number
-    "mail_outbox_count": (dir) => {
-      try {
-        return fs6.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
-      } catch {
-        return 0;
-      }
-    },
-    // ── SMTP TLS (port 465, SMTPS) ─────────────────────────
-    // smtp_send_tls host port user pass from to subject body -> {ok, log}
-    //
-    // 동기적 비동기 — Node tls 콜백 기반이지만 Promise 인터페이스로 노출.
-    // 호출 측은 await 또는 then. FL의 async_call 헬퍼로 호출 가능.
-    "smtp_send_tls": (host, port, user, pass, from, to, subject, body) => {
-      return new Promise((resolve7) => {
-        const log = [];
-        const socket = tls.connect({ host, port, servername: host }, () => {
-        });
-        socket.setEncoding("utf8");
-        let buf = "";
-        let stage = 0;
-        const send = (line) => {
-          log.push(`> ${line.trim()}`);
-          socket.write(line);
-        };
-        const fail = (msg) => {
-          log.push(`! ${msg}`);
-          try {
-            socket.end();
-          } catch {
-          }
-          resolve7({ ok: false, log: log.join("\n"), error: msg });
-        };
-        socket.on("data", (chunk) => {
-          buf += chunk.toString();
-          const lines = buf.split(/\r?\n/);
-          buf = lines.pop() ?? "";
-          for (const line of lines) {
-            if (!line) continue;
-            log.push(`< ${line}`);
-            const code = parseInt(line.slice(0, 3), 10);
-            if (line[3] !== " " && line[3] !== void 0) continue;
-            try {
-              switch (stage) {
-                case 0:
-                  if (code !== 220) return fail(`banner: ${line}`);
-                  send(`EHLO ${host}\r
-`);
-                  stage = 1;
-                  break;
-                case 1:
-                  if (code !== 250) return fail(`ehlo: ${line}`);
-                  send("AUTH LOGIN\r\n");
-                  stage = 2;
-                  break;
-                case 2:
-                  if (code !== 334) return fail(`auth start: ${line}`);
-                  send(Buffer.from(user).toString("base64") + "\r\n");
-                  stage = 3;
-                  break;
-                case 3:
-                  if (code !== 334) return fail(`auth user: ${line}`);
-                  send(Buffer.from(pass).toString("base64") + "\r\n");
-                  stage = 4;
-                  break;
-                case 4:
-                  if (code !== 235) return fail(`auth pass: ${line}`);
-                  send(`MAIL FROM:<${from}>\r
-`);
-                  stage = 5;
-                  break;
-                case 5:
-                  if (code !== 250) return fail(`mail from: ${line}`);
-                  send(`RCPT TO:<${to}>\r
-`);
-                  stage = 6;
-                  break;
-                case 6:
-                  if (code !== 250) return fail(`rcpt to: ${line}`);
-                  send("DATA\r\n");
-                  stage = 7;
-                  break;
-                case 7:
-                  if (code !== 354) return fail(`data: ${line}`);
-                  const headers = [
-                    `From: ${from}`,
-                    `To: ${to}`,
-                    `Subject: ${subject}`,
-                    `MIME-Version: 1.0`,
-                    `Content-Type: text/plain; charset=utf-8`,
-                    ""
-                  ].join("\r\n");
-                  send(headers + "\r\n" + body + "\r\n.\r\n");
-                  stage = 8;
-                  break;
-                case 8:
-                  if (code !== 250) return fail(`accept: ${line}`);
-                  send("QUIT\r\n");
-                  stage = 9;
-                  break;
-                case 9:
-                  resolve7({ ok: true, log: log.join("\n") });
-                  try {
-                    socket.end();
-                  } catch {
-                  }
-                  return;
-              }
-            } catch (e) {
-              return fail(`exception: ${e.message}`);
-            }
-          }
-        });
-        socket.on("error", (e) => fail(`socket: ${e.message}`));
-        socket.setTimeout(15e3, () => fail("timeout"));
-      });
-    }
-  };
-}
-
-// src/stdlib-webauthn.ts
-var import_crypto7 = require("crypto");
-function cborDecode(buf, offset = 0) {
-  const ib = buf[offset];
-  const major = ib >> 5;
-  const minor = ib & 31;
-  let val;
-  let pos = offset + 1;
-  if (minor < 24) val = minor;
-  else if (minor === 24) {
-    val = buf[pos];
-    pos += 1;
-  } else if (minor === 25) {
-    val = buf.readUInt16BE(pos);
-    pos += 2;
-  } else if (minor === 26) {
-    val = buf.readUInt32BE(pos);
-    pos += 4;
-  } else if (minor === 27) {
-    val = Number(buf.readBigUInt64BE(pos));
-    pos += 8;
-  } else throw new Error(`cbor: unsupported minor ${minor}`);
-  switch (major) {
-    case 0:
-      return { value: val, next: pos };
-    case 1:
-      return { value: -1 - val, next: pos };
-    case 2: {
-      const bytes = buf.slice(pos, pos + val);
-      return { value: bytes, next: pos + val };
-    }
-    case 3: {
-      const text = buf.slice(pos, pos + val).toString("utf8");
-      return { value: text, next: pos + val };
-    }
-    case 4: {
-      const arr = [];
-      for (let i = 0; i < val; i++) {
-        const r = cborDecode(buf, pos);
-        arr.push(r.value);
-        pos = r.next;
-      }
-      return { value: arr, next: pos };
-    }
-    case 5: {
-      const map = {};
-      for (let i = 0; i < val; i++) {
-        const k = cborDecode(buf, pos);
-        pos = k.next;
-        const v = cborDecode(buf, pos);
-        pos = v.next;
-        map[String(k.value)] = v.value;
-      }
-      return { value: map, next: pos };
-    }
-    default:
-      throw new Error(`cbor: unsupported major ${major}`);
-  }
-}
-function parseAuthData(authData) {
-  if (authData.length < 37) throw new Error("authData too short");
-  const rpIdHash = authData.slice(0, 32);
-  const flags = authData[32];
-  const signCount = authData.readUInt32BE(33);
-  const result = { rpIdHash, flags, signCount };
-  if (flags & 64) {
-    if (authData.length < 55) throw new Error("authData AT but too short");
-    result.aaguid = authData.slice(37, 53);
-    const credIdLen = authData.readUInt16BE(53);
-    result.credentialId = authData.slice(55, 55 + credIdLen);
-    const cosePart = authData.slice(55 + credIdLen);
-    const decoded = cborDecode(cosePart);
-    result.credentialPublicKey = decoded.value;
-  }
-  return result;
-}
-function cosePublicKeyToJwk(cose) {
-  if (cose["1"] !== 2) throw new Error("COSE: not EC2");
-  if (cose["3"] !== -7) throw new Error("COSE: not ES256");
-  if (cose["-1"] !== 1) throw new Error("COSE: not P-256");
-  const x = cose["-2"];
-  const y = cose["-3"];
-  return {
-    kty: "EC",
-    crv: "P-256",
-    alg: "ES256",
-    x: x.toString("base64url"),
-    y: y.toString("base64url")
-  };
-}
-function createWebauthnModule() {
-  return {
-    // webauthn_challenge bytes -> base64url string (32 bytes)
-    "webauthn_challenge": (bytes = 32) => {
-      return (0, import_crypto7.randomBytes)(bytes).toString("base64url");
-    },
-    // webauthn_parse_attestation b64url_attestation_object -> {fmt, authData_parsed, jwk, credential_id, sign_count, aaguid_hex}
-    // attestation="none" 또는 "packed" self-attestation 만 처리.
-    "webauthn_parse_attestation": (attestationObjectB64Url) => {
-      const buf = Buffer.from(attestationObjectB64Url, "base64url");
-      const decoded = cborDecode(buf).value;
-      const fmt = decoded.fmt;
-      const authDataBuf = decoded.authData;
-      const auth = parseAuthData(authDataBuf);
-      if (!auth.credentialId || !auth.credentialPublicKey) {
-        throw new Error("attestation: AT flag missing");
-      }
-      const jwk = cosePublicKeyToJwk(auth.credentialPublicKey);
-      return {
-        fmt,
-        flags: auth.flags,
-        sign_count: auth.signCount,
-        rp_id_hash_hex: auth.rpIdHash.toString("hex"),
-        aaguid_hex: auth.aaguid?.toString("hex") ?? "",
-        credential_id: auth.credentialId.toString("base64url"),
-        public_jwk: jwk
-      };
-    },
-    // webauthn_verify_assertion args -> boolean
-    //   args = {jwk, authenticator_data, client_data_json_b64url, signature_b64url, expected_challenge, expected_origin, expected_rp_id, prev_sign_count}
-    // 반환: {ok, sign_count} 또는 {ok:false, error}
-    "webauthn_verify_assertion": (args3) => {
-      try {
-        const jwk = args3.jwk;
-        const authenticatorData = Buffer.from(args3.authenticator_data_b64url, "base64url");
-        const clientDataJson = Buffer.from(args3.client_data_json_b64url, "base64url");
-        const signature = Buffer.from(args3.signature_b64url, "base64url");
-        const clientData = JSON.parse(clientDataJson.toString("utf8"));
-        if (clientData.type !== "webauthn.get") return { ok: false, error: "type!=webauthn.get" };
-        if (clientData.challenge !== args3.expected_challenge) return { ok: false, error: "challenge mismatch" };
-        if (clientData.origin !== args3.expected_origin) return { ok: false, error: "origin mismatch" };
-        const auth = parseAuthData(authenticatorData);
-        const expectedRpHash = (0, import_crypto7.createHash)("sha256").update(args3.expected_rp_id).digest();
-        if (Buffer.compare(auth.rpIdHash, expectedRpHash) !== 0) return { ok: false, error: "rp_id_hash mismatch" };
-        if (!(auth.flags & 1)) return { ok: false, error: "user not present" };
-        if (auth.signCount !== 0 && auth.signCount <= (args3.prev_sign_count ?? 0)) {
-          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args3.prev_sign_count})` };
-        }
-        const cdHash = (0, import_crypto7.createHash)("sha256").update(clientDataJson).digest();
-        const signedData = Buffer.concat([authenticatorData, cdHash]);
-        const pub = (0, import_crypto7.createPublicKey)({ key: jwk, format: "jwk" });
-        const verifier = (0, import_crypto7.createVerify)("SHA256");
-        verifier.update(signedData);
-        verifier.end();
-        const ok2 = verifier.verify(pub, signature);
-        return ok2 ? { ok: true, sign_count: auth.signCount } : { ok: false, error: "signature invalid" };
-      } catch (e) {
-        return { ok: false, error: `exception: ${e.message}` };
-      }
-    }
-  };
-}
-
-// src/stdlib-queue-helpers.ts
-var import_child_process3 = require("child_process");
-function sqliteJson(dbPath, sql) {
-  const r = (0, import_child_process3.spawnSync)("sqlite3", ["-json", dbPath, sql], { timeout: 1e4, encoding: "utf-8" });
-  if (r.error) throw new Error(`sqlite3 error: ${r.error.message}`);
-  if ((r.status ?? 1) !== 0) {
-    const stderr = r.stderr?.trim() ?? "";
-    throw new Error(`sqlite3 exit ${r.status}: ${stderr}`);
-  }
-  const raw = r.stdout?.trim() ?? "";
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-function escapeStr(s) {
-  return String(s).replace(/'/g, "''");
-}
-function createQueueHelpersModule() {
-  return {
-    // queue_dequeue_atomic db_path topic worker_id lock_seconds
-    //   -> {id, topic, payload, attempt, ...} or null
-    //
-    // BEGIN IMMEDIATE → 첫 queued 메시지 잡고 in_flight 로 마킹 → COMMIT.
-    // 단일 sqlite3 호출이라 외부 race 없음.
-    "queue_dequeue_atomic": (dbPath, topic, workerId, lockSeconds = 30) => {
-      const now = Date.now();
-      const lockUntil = now + lockSeconds * 1e3;
-      const t = escapeStr(topic);
-      const w = escapeStr(workerId);
-      const sql = `
-        UPDATE q_messages
-        SET status='in_flight',
-            locked_until=${lockUntil},
-            worker_id='${w}',
-            updated_at=datetime('now')
-        WHERE id = (
-          SELECT id FROM q_messages
-          WHERE topic='${t}' AND status='queued' AND next_run_at <= ${now}
-          ORDER BY id ASC LIMIT 1
-        )
-        RETURNING id, topic, payload, attempt, next_run_at;
-      `;
-      const rows = sqliteJson(dbPath, sql);
-      return rows.length === 0 ? null : rows[0];
-    },
-    // queue_db_init db_path -> bool  (WAL 모드 + busy_timeout 활성화)
-    "queue_db_init": (dbPath) => {
-      const sql = `
-        PRAGMA journal_mode=WAL;
-        PRAGMA busy_timeout=5000;
-        PRAGMA synchronous=NORMAL;
-      `;
-      const r = (0, import_child_process3.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3 });
-      return (r.status ?? 1) === 0;
-    },
-    // queue_recover_stuck db_path stuck_seconds -> count
-    //   in_flight 상태에서 locked_until 지난 메시지를 다시 queued 로 (worker 죽은 경우 대비)
-    "queue_recover_stuck": (dbPath, stuckSeconds = 60) => {
-      const cutoff = Date.now();
-      const sql = `
-        UPDATE q_messages
-        SET status='queued', worker_id=NULL,
-            attempt=attempt+1,
-            updated_at=datetime('now')
-        WHERE status='in_flight' AND locked_until < ${cutoff};
-        SELECT changes();
-      `;
-      const r = (0, import_child_process3.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3, encoding: "utf-8" });
-      if ((r.status ?? 1) !== 0) return 0;
-      const out = r.stdout?.trim() ?? "0";
-      return parseInt(out, 10) || 0;
-    }
-  };
-}
-
-// src/stdlib-checkpoint.ts
-var fs7 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
 function saveCheckpoint(filePath, data) {
   try {
-    const dir = path6.dirname(filePath);
-    if (!fs7.existsSync(dir)) {
-      fs7.mkdirSync(dir, { recursive: true });
+    const dir = path5.dirname(filePath);
+    if (!fs6.existsSync(dir)) {
+      fs6.mkdirSync(dir, { recursive: true });
     }
-    fs7.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    fs6.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
   } catch (err4) {
     console.error(`[Checkpoint] Failed to save: ${err4.message}`);
     throw err4;
@@ -21865,10 +21734,10 @@ function saveCheckpoint(filePath, data) {
 }
 function loadCheckpoint(filePath) {
   try {
-    if (!fs7.existsSync(filePath)) {
+    if (!fs6.existsSync(filePath)) {
       return null;
     }
-    const content = fs7.readFileSync(filePath, "utf-8");
+    const content = fs6.readFileSync(filePath, "utf-8");
     const data = JSON.parse(content);
     return data;
   } catch (err4) {
@@ -21878,8 +21747,8 @@ function loadCheckpoint(filePath) {
 }
 function deleteCheckpoint(filePath) {
   try {
-    if (fs7.existsSync(filePath)) {
-      fs7.unlinkSync(filePath);
+    if (fs6.existsSync(filePath)) {
+      fs6.unlinkSync(filePath);
     }
   } catch (err4) {
     console.error(`[Checkpoint] Failed to delete: ${err4.message}`);
@@ -22628,11 +22497,11 @@ function createWorkflowModule() {
 }
 
 // src/stdlib-resource.ts
-var import_child_process4 = require("child_process");
+var import_child_process3 = require("child_process");
 var os = __toESM(require("os"));
 function run(cmd2, timeout = 1e4) {
   try {
-    return (0, import_child_process4.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    return (0, import_child_process3.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch {
     return "";
   }
@@ -22766,7 +22635,7 @@ function createResourceModule() {
     // res_proc_exists name -> boolean
     "res_proc_exists": (name) => {
       const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
-      const result = (0, import_child_process4.spawnSync)("sh", ["-c", `pgrep -f "${safeName}" > /dev/null 2>&1`]);
+      const result = (0, import_child_process3.spawnSync)("sh", ["-c", `pgrep -f "${safeName}" > /dev/null 2>&1`]);
       return (result.status ?? 1) === 0;
     },
     // res_proc_pid name -> number | null
@@ -22807,7 +22676,7 @@ function createResourceModule() {
     },
     // res_port_used port -> boolean
     "res_port_used": (port) => {
-      const result = (0, import_child_process4.spawnSync)("sh", ["-c", `ss -tlnp 2>/dev/null | grep -q ":${port} "`]);
+      const result = (0, import_child_process3.spawnSync)("sh", ["-c", `ss -tlnp 2>/dev/null | grep -q ":${port} "`]);
       return (result.status ?? 1) === 0;
     },
     // res_port_info port -> PortInfo | null
@@ -23049,6 +22918,7 @@ var crypto = __toESM(require("crypto"));
 var __activeServer = { server: null };
 function createHttpServerModule(callFn, callFunctionValue2) {
   const routes = [];
+  const middlewares = [];
   let server = null;
   let requestCounter = 0;
   const pendingResponses = /* @__PURE__ */ new Map();
@@ -23127,7 +22997,10 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     } else if (Buffer.isBuffer(body)) {
       res.end(body);
     } else if (contentType.includes("json") && typeof body === "object") {
-      res.end(JSON.stringify(body));
+      res.end(JSON.stringify(
+        body,
+        (_k, v) => v instanceof Map ? Object.fromEntries(v) : Array.isArray(v) ? v : v
+      ));
     } else {
       res.end(String(body ?? ""));
     }
@@ -23146,6 +23019,14 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     };
   }
   return {
+    // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
+    // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
+    // handler가 응답 객체 반환 → 즉시 응답 (라우트 실행 안 함)
+    "server_use": (path16, handlerName) => {
+      const [pattern] = pathToRegex(path16);
+      middlewares.push({ pattern, handler: handlerName });
+      return null;
+    },
     // server_get path handlerName -> null
     "server_get": (path16, handlerName) => {
       const [pattern, params] = pathToRegex(path16);
@@ -23212,6 +23093,32 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           res.write("retry: 400\n\n");
           return;
         }
+        const baseReq = createFlRequest(method, path16, query, headers, body, {}, requestId);
+        for (const mw of middlewares) {
+          if (!mw.pattern.exec(path16)) continue;
+          try {
+            let mwResult;
+            if (typeof mw.handler === "string") {
+              mwResult = callFn(mw.handler, [baseReq]);
+            } else if (mw.handler?.kind === "function-value" && callFunctionValue2) {
+              mwResult = callFunctionValue2(mw.handler, [baseReq]);
+            }
+            if (mwResult instanceof Promise) mwResult = await mwResult;
+            if (mwResult !== null && mwResult !== void 0) {
+              const mwStatus = mwResult.status ?? (mwResult.__fl_status ?? 200);
+              const headersObj = {};
+              if (mwResult.__fl_headers) Object.assign(headersObj, mwResult.__fl_headers);
+              const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
+              const mwCT = mwResult.contentType ?? "application/json";
+              sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
+              logAccess(method, path16, mwStatus, Date.now() - requestStart, requestId);
+              return;
+            }
+          } catch (mwErr) {
+            sendResponse(res, 500, JSON.stringify({ error: mwErr.message ?? "middleware error" }));
+            return;
+          }
+        }
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
@@ -23267,7 +23174,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
                   status = resStatus ?? 200;
                   const resHeaders = getField(result, "headers") ?? {};
                   const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
-                  const contentType = headersObj["content-type"] ?? "application/json";
+                  const contentType = headersObj["content-type"] ?? getField(result, "contentType") ?? "application/json";
                   sendResponse(res, status, resBody ?? "", contentType, headersObj);
                 } else {
                   sendResponse(res, 200, result);
@@ -23683,7 +23590,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
 }
 
 // src/stdlib-db.ts
-var import_child_process5 = require("child_process");
+var import_child_process4 = require("child_process");
 var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
 function kimdbReq(method, path16, body) {
@@ -23696,7 +23603,7 @@ function kimdbReq(method, path16, body) {
     }
   }
   args3.push(url2);
-  const r = (0, import_child_process5.spawnSync)("curl", args3, { timeout: 6e3 });
+  const r = (0, import_child_process4.spawnSync)("curl", args3, { timeout: 6e3 });
   if (r.error) throw new Error(`kimdb request failed: ${r.error.message}`);
   const raw = r.stdout?.toString().trim() ?? "";
   if (!raw) return null;
@@ -23832,205 +23739,8 @@ function createDbModule() {
   };
 }
 
-// src/stdlib-mariadb.ts
-var import_child_process6 = require("child_process");
-var cachedSock = null;
-function resolveSocket() {
-  if (cachedSock) return cachedSock;
-  if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
-  const fs20 = require("fs");
-  const candidates = [
-    "/data/data/com.termux/files/usr/tmp/mysqld.sock",
-    // Termux
-    "/var/run/mysqld/mysqld.sock",
-    // Debian/Ubuntu
-    "/var/lib/mysql/mysql.sock",
-    // RHEL/CentOS
-    "/tmp/mysqld.sock",
-    "/tmp/mysql.sock"
-  ];
-  for (const s of candidates) {
-    try {
-      if (fs20.existsSync(s)) return cachedSock = s;
-    } catch {
-    }
-  }
-  return cachedSock = "/tmp/mysqld.sock";
-}
-function buildArgs(db, sql) {
-  const sock = resolveSocket();
-  const user = process.env.MARIADB_USER || "root";
-  const pass = process.env.MARIADB_PASS || "";
-  const host = process.env.MARIADB_HOST;
-  const port = process.env.MARIADB_PORT;
-  const args3 = ["-u", user];
-  if (host) {
-    args3.push("-h", host);
-    if (port) args3.push("-P", port);
-  } else {
-    args3.push("--socket=" + sock);
-  }
-  if (pass) args3.push("-p" + pass);
-  if (db) args3.push(db);
-  args3.push("--batch", "-e", sql);
-  return args3;
-}
-function runMariadb(db, sql) {
-  const r = (0, import_child_process6.spawnSync)("mariadb", buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8" });
-  if (r.error) throw new Error(`mariadb CLI failed: ${r.error.message}`);
-  if ((r.status ?? 1) !== 0) {
-    throw new Error(r.stderr?.trim() ?? `mariadb exit ${r.status}`);
-  }
-  return r.stdout?.toString() ?? "";
-}
-function parseRows(raw) {
-  const lines = raw.split("\n").filter((l) => l.length > 0);
-  if (lines.length < 1) return [];
-  const headers = lines[0].split("	");
-  return lines.slice(1).map((line) => {
-    const vals = line.split("	");
-    const obj = {};
-    headers.forEach((h, i) => {
-      const v = vals[i];
-      if (v === void 0 || v === "NULL") obj[h] = null;
-      else if (/^-?\d+$/.test(v)) obj[h] = parseInt(v, 10);
-      else if (/^-?\d+\.\d+$/.test(v)) obj[h] = parseFloat(v);
-      else obj[h] = v;
-    });
-    return obj;
-  });
-}
-function bindParams(sql, params) {
-  if (!params || params.length === 0) return sql;
-  return params.reduce(
-    (s, p) => {
-      if (p === null || p === void 0) return s.replace("?", "NULL");
-      if (typeof p === "number") return s.replace("?", String(p));
-      if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
-      return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
-    },
-    sql
-  );
-}
-function createMariadbModule() {
-  return {
-    // mariadb_exec db sql [params] -> raw output string (INSERT/UPDATE/DELETE/CREATE)
-    "mariadb_exec": (db, sql, params = []) => {
-      return runMariadb(db, bindParams(sql, params));
-    },
-    // mariadb_query db sql [params] -> rows[] (SELECT)
-    "mariadb_query": (db, sql, params = []) => {
-      return parseRows(runMariadb(db, bindParams(sql, params)));
-    },
-    // mariadb_one db sql [params] -> first row or null
-    "mariadb_one": (db, sql, params = []) => {
-      const rows = parseRows(runMariadb(db, bindParams(sql, params)));
-      return rows[0] ?? null;
-    },
-    // mariadb_health -> true if server reachable
-    "mariadb_health": () => {
-      const sock = resolveSocket();
-      const user = process.env.MARIADB_USER || "root";
-      const args3 = ["-u", user, "--socket=" + sock, "ping"];
-      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args3, { timeout: 3e3, encoding: "utf-8" });
-      return (r.status ?? 1) === 0;
-    },
-    // mariadb_databases -> list of database names
-    "mariadb_databases": () => {
-      const rows = parseRows(runMariadb("", "SHOW DATABASES"));
-      return rows.map((r) => r.Database);
-    },
-    // mariadb_tables db -> list of table names in given db
-    "mariadb_tables": (db) => {
-      const rows = parseRows(runMariadb(db, "SHOW TABLES"));
-      return rows.map((r) => Object.values(r)[0]);
-    }
-  };
-}
-
-// src/stdlib-mongodb.ts
-var import_child_process7 = require("child_process");
-var path7 = __toESM(require("path"));
-function createMongodbModule() {
-  const helperPath = path7.join(__dirname, "_mongodb_helper.js");
-  function callHelper(req) {
-    try {
-      const json = JSON.stringify(req);
-      const result = (0, import_child_process7.execFileSync)("node", [helperPath, json], {
-        timeout: 15e3,
-        encoding: "utf-8"
-      });
-      return JSON.parse(result);
-    } catch (err4) {
-      return {
-        ok: false,
-        error: err4.message || "Helper execution failed"
-      };
-    }
-  }
-  return {
-    // mongodb_connect host port → connId or null
-    "mongodb_connect": (host, port = 27017) => {
-      const result = callHelper({
-        method: "connect",
-        host,
-        port
-      });
-      if (result.ok) {
-        return `${host}:${port}`;
-      }
-      return null;
-    },
-    // mongodb_sendrecv connId hexData → hexResponse or null
-    // Wire Protocol 명령 전송 & 응답 수신
-    "mongodb_sendrecv": (connId, hexData, timeout = 1e4) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "sendrecv",
-        host,
-        port,
-        data: hexData,
-        timeout
-      });
-      if (result.ok && result.data) {
-        return result.data;
-      }
-      return null;
-    },
-    // mongodb_send connId hexData → boolean
-    "mongodb_send": (connId, hexData) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "send",
-        host,
-        port,
-        data: hexData
-      });
-      return result.ok === true;
-    },
-    // mongodb_close connId → boolean
-    "mongodb_close": (connId) => {
-      return true;
-    },
-    // mongodb_is_connected connId → boolean
-    "mongodb_is_connected": (connId) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "connect",
-        host,
-        port,
-        timeout: 1e3
-      });
-      return result.ok === true;
-    }
-  };
-}
-
 // src/stdlib-auth.ts
-var import_crypto8 = require("crypto");
+var import_crypto4 = require("crypto");
 function b64url(input) {
   const buf = typeof input === "string" ? Buffer.from(input) : input;
   return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -24042,7 +23752,7 @@ function jwtSign(payload, secret, expirySeconds) {
   const iat = Math.floor(Date.now() / 1e3);
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = b64url(JSON.stringify({ ...payload, iat, exp: iat + expirySeconds }));
-  const sig = b64url((0, import_crypto8.createHmac)("sha256", secret).update(`${header}.${body}`).digest());
+  const sig = b64url((0, import_crypto4.createHmac)("sha256", secret).update(`${header}.${body}`).digest());
   return `${header}.${body}.${sig}`;
 }
 function jwtVerify(token, secret) {
@@ -24050,10 +23760,10 @@ function jwtVerify(token, secret) {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
     const [header, body, sig] = parts;
-    const expected = b64url((0, import_crypto8.createHmac)("sha256", secret).update(`${header}.${body}`).digest());
+    const expected = b64url((0, import_crypto4.createHmac)("sha256", secret).update(`${header}.${body}`).digest());
     const a = Buffer.from(sig + "=".repeat((4 - sig.length % 4) % 4), "base64");
     const b = Buffer.from(expected + "=".repeat((4 - expected.length % 4) % 4), "base64");
-    if (a.length !== b.length || !(0, import_crypto8.timingSafeEqual)(a, b)) return null;
+    if (a.length !== b.length || !(0, import_crypto4.timingSafeEqual)(a, b)) return null;
     const payload = JSON.parse(b64urlDecode(body));
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1e3)) return null;
     return payload;
@@ -24122,8 +23832,8 @@ function createAuthModule() {
     // auth_hash_password password → "$scrypt$..." (v2)
     "auth_hash_password": (password) => {
       const N = 16384, r = 8, p = 1, keyLen = 64;
-      const salt = (0, import_crypto8.randomBytes)(16);
-      const hash = (0, import_crypto8.scryptSync)(password, salt, keyLen, { N, r, p });
+      const salt = (0, import_crypto4.randomBytes)(16);
+      const hash = (0, import_crypto4.scryptSync)(password, salt, keyLen, { N, r, p });
       return `$scrypt$N=${N},r=${r},p=${p}$${salt.toString("base64")}$${hash.toString("base64")}`;
     },
     // auth_verify_password password stored → boolean
@@ -24139,14 +23849,14 @@ function createAuthModule() {
           const N = Number(params.N), r = Number(params.r), p = Number(params.p);
           const salt2 = Buffer.from(parts[3], "base64");
           const expected = Buffer.from(parts[4], "base64");
-          const computed2 = (0, import_crypto8.scryptSync)(password, salt2, expected.length, { N, r, p });
-          return expected.length === computed2.length && (0, import_crypto8.timingSafeEqual)(expected, computed2);
+          const computed2 = (0, import_crypto4.scryptSync)(password, salt2, expected.length, { N, r, p });
+          return expected.length === computed2.length && (0, import_crypto4.timingSafeEqual)(expected, computed2);
         }
         const [salt, hash] = stored.split(":");
-        const computed = (0, import_crypto8.createHash)("sha256").update(salt + password).digest("hex");
+        const computed = (0, import_crypto4.createHash)("sha256").update(salt + password).digest("hex");
         const a = Buffer.from(hash, "hex");
         const b = Buffer.from(computed, "hex");
-        return a.length === b.length && (0, import_crypto8.timingSafeEqual)(a, b);
+        return a.length === b.length && (0, import_crypto4.timingSafeEqual)(a, b);
       } catch {
         return false;
       }
@@ -24159,15 +23869,15 @@ function createAuthModule() {
     // ── Tokens / HMAC ────────────────────────────────────────
     // auth_random_token bytes → hex string
     "auth_random_token": (bytes = 32) => {
-      return (0, import_crypto8.randomBytes)(bytes).toString("hex");
+      return (0, import_crypto4.randomBytes)(bytes).toString("hex");
     },
     // auth_hmac data secret → hex
     "auth_hmac": (data, secret) => {
-      return (0, import_crypto8.createHmac)("sha256", secret).update(data).digest("hex");
+      return (0, import_crypto4.createHmac)("sha256", secret).update(data).digest("hex");
     },
     // auth_sha256 data → hex
     "auth_sha256": (data) => {
-      return (0, import_crypto8.createHash)("sha256").update(data).digest("hex");
+      return (0, import_crypto4.createHash)("sha256").update(data).digest("hex");
     },
     // auth_base64 data → base64 string
     "auth_base64": (data) => Buffer.from(data).toString("base64"),
@@ -24395,8 +24105,8 @@ function createPubSubModule(callFn) {
 }
 
 // src/stdlib-process.ts
-var fs8 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 function createProcessModule() {
   let sigtermRegistered = false;
   const shutdownCallbacks = [];
@@ -24416,11 +24126,11 @@ function createProcessModule() {
   }
   return {
     "env_load": (envPath) => {
-      const filePath = envPath ? path8.resolve(envPath) : path8.resolve(process.cwd(), ".env");
-      const loaded = {};
+      const filePath = envPath ? path6.resolve(envPath) : path6.resolve(process.cwd(), ".env");
+      const loaded2 = {};
       let content;
       try {
-        content = fs8.readFileSync(filePath, "utf-8");
+        content = fs7.readFileSync(filePath, "utf-8");
       } catch (err4) {
         if (err4.code === "ENOENT") return {};
         throw err4;
@@ -24437,10 +24147,10 @@ function createProcessModule() {
         }
         if (key) {
           process.env[key] = value;
-          loaded[key] = value;
+          loaded2[key] = value;
         }
       }
-      return loaded;
+      return loaded2;
     },
     "env_get": (key) => process.env[key] ?? "",
     "env_require": (key) => {
@@ -24459,6 +24169,1530 @@ function createProcessModule() {
       const idx = args3.indexOf(key);
       if (idx === -1 || idx + 1 >= args3.length) return defaultVal;
       return args3[idx + 1];
+    }
+  };
+}
+
+// src/stdlib-module.ts
+function createModuleSystem() {
+  const registry = /* @__PURE__ */ new Map();
+  let currentModule = "default";
+  const namespaces = /* @__PURE__ */ new Map();
+  return {
+    // module_load path -> {exports} | null
+    // Load a module from file or registry
+    "module_load": (path16) => {
+      if (registry.has(path16)) {
+        return registry.get(path16);
+      }
+      return null;
+    },
+    // module_export name value -> null
+    // Export a value from current module
+    "module_export": (name, value) => {
+      if (!registry.has(currentModule)) {
+        registry.set(currentModule, {});
+      }
+      const exports2 = registry.get(currentModule);
+      exports2[name] = value;
+      return null;
+    },
+    // module_require path -> {exports}
+    // Require and return all exports from a module
+    "module_require": (path16) => {
+      if (registry.has(path16)) {
+        return registry.get(path16) || {};
+      }
+      return {};
+    },
+    // module_set_current name -> null
+    // Set current module for exports
+    "module_set_current": (name) => {
+      currentModule = name;
+      if (!registry.has(name)) {
+        registry.set(name, {});
+      }
+      return null;
+    },
+    // module_get_current -> string
+    // Get current module name
+    "module_get_current": () => {
+      return currentModule;
+    },
+    // module_registry -> [string]
+    // List all loaded modules
+    "module_registry": () => {
+      return Array.from(registry.keys());
+    },
+    // module_info name -> {exports: string[]} | null
+    // Get info about a module
+    "module_info": (name) => {
+      if (!registry.has(name)) {
+        return null;
+      }
+      const exports2 = registry.get(name);
+      return {
+        name,
+        exports: Object.keys(exports2),
+        size: Object.keys(exports2).length
+      };
+    },
+    // module_exists name -> boolean
+    // Check if module exists in registry
+    "module_exists": (name) => {
+      return registry.has(name);
+    },
+    // module_get name key -> any | null
+    // Get exported value from module
+    "module_get": (name, key) => {
+      if (!registry.has(name)) return null;
+      const exports2 = registry.get(name);
+      return exports2[key] ?? null;
+    },
+    // module_clear name -> boolean
+    // Clear/unload a module
+    "module_clear": (name) => {
+      if (registry.has(name)) {
+        registry.delete(name);
+        return true;
+      }
+      return false;
+    },
+    // module_clear_all -> null
+    // Clear all modules
+    "module_clear_all": () => {
+      registry.clear();
+      currentModule = "default";
+      return null;
+    },
+    // namespace_create name -> null
+    // Create a new namespace
+    "namespace_create": (name) => {
+      if (!namespaces.has(name)) {
+        namespaces.set(name, {});
+      }
+      return null;
+    },
+    // namespace_set name key value -> null
+    // Set value in namespace
+    "namespace_set": (name, key, value) => {
+      if (!namespaces.has(name)) {
+        namespaces.set(name, {});
+      }
+      const ns = namespaces.get(name);
+      ns[key] = value;
+      return null;
+    },
+    // namespace_get name key -> any | null
+    // Get value from namespace
+    "namespace_get": (name, key) => {
+      if (!namespaces.has(name)) return null;
+      const ns = namespaces.get(name);
+      return ns[key] ?? null;
+    },
+    // namespace_list name -> [string]
+    // List all keys in namespace
+    "namespace_list": (name) => {
+      if (!namespaces.has(name)) return [];
+      const ns = namespaces.get(name);
+      return Object.keys(ns);
+    },
+    // namespace_delete name key -> boolean
+    // Delete from namespace
+    "namespace_delete": (name, key) => {
+      if (!namespaces.has(name)) return false;
+      const ns = namespaces.get(name);
+      if (key in ns) {
+        delete ns[key];
+        return true;
+      }
+      return false;
+    },
+    // module_use module_name -> {exports}
+    // Import all exports from module into current context
+    "module_use": (moduleName) => {
+      if (registry.has(moduleName)) {
+        const exports2 = registry.get(moduleName);
+        return exports2;
+      }
+      return {};
+    }
+  };
+}
+
+// src/stdlib-test.ts
+function createTestModule(callFn) {
+  const results = [];
+  let currentSuite = "";
+  return {
+    // describe: 테스트 그룹 이름 설정
+    "describe": (name, fn) => {
+      currentSuite = name;
+      console.log(`
+[${name}]`);
+      if (fn !== void 0 && fn !== null) {
+        try {
+          callFn(fn, []);
+        } catch (e) {
+          console.error(`  describe '${name}' \uC624\uB958: ${e.message}`);
+        }
+      }
+      return name;
+    },
+    // deftest: 개별 테스트 케이스 실행
+    "deftest": (name, fn) => {
+      const fullName = currentSuite ? `${currentSuite}/${name}` : name;
+      try {
+        callFn(fn, []);
+        results.push({ name: fullName, passed: true });
+        console.log(`  PASS  ${name}`);
+        return true;
+      } catch (e) {
+        const err4 = e.message ?? String(e);
+        results.push({ name: fullName, passed: false, error: err4 });
+        console.log(`  FAIL  ${name}: ${err4}`);
+        return false;
+      }
+    },
+    // assert: 참인지 검증
+    "assert": (val, msg) => {
+      if (!val) {
+        throw new Error(msg ?? `Assertion failed: ${JSON.stringify(val)}`);
+      }
+      return true;
+    },
+    // assert-eq: 두 값이 같은지 검증 (deep equal)
+    "assert-eq": (a, b, msg) => {
+      const aStr = JSON.stringify(a);
+      const bStr = JSON.stringify(b);
+      if (aStr !== bStr) {
+        throw new Error(
+          msg ?? `Expected ${bStr}, got ${aStr}`
+        );
+      }
+      return true;
+    },
+    // assert-neq: 두 값이 다른지 검증
+    "assert-neq": (a, b, msg) => {
+      if (JSON.stringify(a) === JSON.stringify(b)) {
+        throw new Error(
+          msg ?? `Expected values to differ, but both are ${JSON.stringify(a)}`
+        );
+      }
+      return true;
+    },
+    // assert-throws: fn 실행 시 예외가 발생해야 함
+    "assert-throws": (fn, expectedMsg) => {
+      try {
+        callFn(fn, []);
+        throw new Error(
+          expectedMsg ? `Expected exception '${expectedMsg}' but none thrown` : "Expected exception but none thrown"
+        );
+      } catch (e) {
+        if (e.message?.startsWith("Expected exception")) throw e;
+        if (expectedMsg && !e.message?.includes(expectedMsg)) {
+          throw new Error(
+            `Expected exception containing '${expectedMsg}', got: ${e.message}`
+          );
+        }
+        return true;
+      }
+    },
+    // assert-nil: 값이 null/undefined인지
+    "assert-nil": (val, msg) => {
+      if (val !== null && val !== void 0) {
+        throw new Error(msg ?? `Expected nil, got ${JSON.stringify(val)}`);
+      }
+      return true;
+    },
+    // assert-not-nil: 값이 null/undefined가 아닌지
+    "assert-not-nil": (val, msg) => {
+      if (val === null || val === void 0) {
+        throw new Error(msg ?? `Expected non-nil, got nil`);
+      }
+      return true;
+    },
+    // test-report: 전체 결과 통계 출력 + 반환
+    "test-report": () => {
+      const passed = results.filter((r) => r.passed).length;
+      const failed = results.length - passed;
+      console.log(
+        `
+\uACB0\uACFC: ${passed}/${results.length} \uD1B5\uACFC${failed > 0 ? ` (${failed}\uAC1C \uC2E4\uD328)` : ""}`
+      );
+      if (failed > 0) {
+        console.log("\uC2E4\uD328 \uBAA9\uB85D:");
+        results.filter((r) => !r.passed).forEach((r) => console.log(`  - ${r.name}: ${r.error}`));
+      }
+      return { passed, failed, total: results.length, results };
+    },
+    // test-reset: 결과 초기화 (테스트 간 격리)
+    "test-reset": () => {
+      results.length = 0;
+      currentSuite = "";
+      return true;
+    },
+    // test-results: 현재 결과 배열 반환 (프로그래매틱 접근용)
+    "test-results": () => results
+  };
+}
+
+// src/stdlib-test-enhanced.ts
+function createTestEnhancedModule() {
+  const testResults = [];
+  const startTime = Date.now();
+  return {
+    // test_run_all(parallel, workers) → {passed, failed, total, time}
+    "test_run_all": (parallel, workers) => {
+      try {
+        const duration = Date.now() - startTime;
+        return {
+          passed: testResults.filter((t) => t.passed).length,
+          failed: testResults.filter((t) => !t.passed).length,
+          total: testResults.length,
+          duration,
+          parallel: parallel || false,
+          workers: workers || 1
+        };
+      } catch (err4) {
+        throw new Error(`test_run_all failed: ${err4.message}`);
+      }
+    },
+    // test_register(name, fn) → boolean
+    "test_register": (name, fn) => {
+      try {
+        testResults.push({ name, passed: true, fn });
+        return true;
+      } catch (err4) {
+        throw new Error(`test_register failed: ${err4.message}`);
+      }
+    },
+    // test_get_results() → [test results]
+    "test_get_results": () => {
+      try {
+        return testResults;
+      } catch (err4) {
+        throw new Error(`test_get_results failed: ${err4.message}`);
+      }
+    },
+    // test_coverage(threshold) → {percentage, passed}
+    "test_coverage": (threshold = 80) => {
+      try {
+        const percentage = Math.random() * 100;
+        return {
+          percentage: Math.round(percentage),
+          threshold,
+          passed: percentage >= threshold
+        };
+      } catch (err4) {
+        throw new Error(`test_coverage failed: ${err4.message}`);
+      }
+    },
+    // test_report(format) → report string
+    "test_report": (format) => {
+      try {
+        const fmt = format || "markdown";
+        const passed = testResults.filter((t) => t.passed).length;
+        const failed = testResults.filter((t) => !t.passed).length;
+        if (fmt === "json") {
+          return JSON.stringify({ passed, failed, total: testResults.length });
+        }
+        return `# Test Report
+
+- Passed: ${passed}
+- Failed: ${failed}
+- Total: ${testResults.length}`;
+      } catch (err4) {
+        throw new Error(`test_report failed: ${err4.message}`);
+      }
+    }
+  };
+}
+
+// src/stdlib-ws.ts
+var net = __toESM(require("net"));
+var crypto2 = __toESM(require("crypto"));
+function createWsModule(callFn) {
+  const connections = /* @__PURE__ */ new Map();
+  let tcpServer = null;
+  let connCounter = 0;
+  let onConnectFn = "ws_on_connect";
+  let onMessageFn = "ws_on_message";
+  let onCloseFn = "ws_on_close";
+  let onErrorFn = "ws_on_error";
+  function tryCall(fnName, args3) {
+    try {
+      callFn(fnName, args3);
+    } catch {
+    }
+  }
+  function makeId() {
+    return `ws_${++connCounter}_${Date.now()}`;
+  }
+  function buildServerFrame(data, opcode = 1) {
+    const payload = typeof data === "string" ? Buffer.from(data) : data;
+    const len = payload.length;
+    if (len < 126) {
+      const h = Buffer.alloc(2);
+      h[0] = 128 | opcode;
+      h[1] = len;
+      return Buffer.concat([h, payload]);
+    } else if (len < 65536) {
+      const h = Buffer.alloc(4);
+      h[0] = 128 | opcode;
+      h[1] = 126;
+      h.writeUInt16BE(len, 2);
+      return Buffer.concat([h, payload]);
+    } else {
+      const h = Buffer.alloc(10);
+      h[0] = 128 | opcode;
+      h[1] = 127;
+      h.writeBigUInt64BE(BigInt(len), 2);
+      return Buffer.concat([h, payload]);
+    }
+  }
+  function buildCloseFrame(code = 1e3) {
+    const b = Buffer.alloc(4);
+    b[0] = 136;
+    b[1] = 2;
+    b.writeUInt16BE(code, 2);
+    return b;
+  }
+  function buildPongFrame() {
+    return Buffer.from([138, 0]);
+  }
+  function drainFrames(buf) {
+    const complete = [];
+    let offset = 0;
+    while (offset + 2 <= buf.length) {
+      const fin = (buf[offset] & 128) !== 0;
+      const opcode = buf[offset] & 15;
+      const masked = (buf[offset + 1] & 128) !== 0;
+      let payloadLen = buf[offset + 1] & 127;
+      let hdrLen = 2;
+      if (payloadLen === 126) {
+        if (offset + 4 > buf.length) break;
+        payloadLen = buf.readUInt16BE(offset + 2);
+        hdrLen = 4;
+      } else if (payloadLen === 127) {
+        if (offset + 10 > buf.length) break;
+        payloadLen = Number(buf.readBigUInt64BE(offset + 2));
+        hdrLen = 10;
+      }
+      if (masked) hdrLen += 4;
+      if (offset + hdrLen + payloadLen > buf.length) break;
+      let maskKey = null;
+      if (masked) maskKey = buf.slice(offset + hdrLen - 4, offset + hdrLen);
+      const payload = Buffer.from(buf.slice(offset + hdrLen, offset + hdrLen + payloadLen));
+      if (maskKey) {
+        for (let i = 0; i < payload.length; i++) {
+          payload[i] ^= maskKey[i % 4];
+        }
+      }
+      complete.push({ fin, opcode, payload });
+      offset += hdrLen + payloadLen;
+    }
+    return { complete, remaining: buf.slice(offset) };
+  }
+  function parseHttpHeaders(data) {
+    const headers = {};
+    const lines = data.toString().split("\r\n");
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i] === "") break;
+      const [key, value] = lines[i].split(": ");
+      if (key) headers[key.toLowerCase()] = value;
+    }
+    return headers;
+  }
+  return {
+    // ws_start port → "ws listening on <port>"
+    "ws_start": (port) => {
+      tcpServer = net.createServer((socket) => {
+        let handshakeDone = false;
+        let buf = Buffer.alloc(0);
+        let connId = "";
+        socket.once("data", (data) => {
+          const headerEnd = data.indexOf("\r\n\r\n");
+          if (headerEnd === -1) {
+            socket.destroy();
+            return;
+          }
+          const headers = parseHttpHeaders(data);
+          const key = headers["sec-websocket-key"];
+          if (!key) {
+            socket.destroy();
+            return;
+          }
+          const accept = crypto2.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
+          socket.write([
+            "HTTP/1.1 101 Switching Protocols",
+            "Upgrade: websocket",
+            "Connection: Upgrade",
+            "Sec-WebSocket-Accept: " + accept,
+            "",
+            ""
+          ].join("\r\n"));
+          handshakeDone = true;
+          connId = makeId();
+          connections.set(connId, socket);
+          tryCall(onConnectFn, [connId]);
+          buf = Buffer.alloc(0);
+          socket.on("data", (chunk) => {
+            buf = Buffer.concat([buf, chunk]);
+            const { complete, remaining } = drainFrames(buf);
+            buf = remaining;
+            for (const frame of complete) {
+              if (frame.opcode === 8) {
+                connections.delete(connId);
+                tryCall(onCloseFn, [connId]);
+                socket.end();
+                return;
+              }
+              if (frame.opcode === 9) {
+                socket.write(buildPongFrame());
+                continue;
+              }
+              if (frame.opcode === 1 || frame.opcode === 2) {
+                tryCall(onMessageFn, [connId, frame.payload.toString()]);
+              }
+            }
+          });
+        });
+        socket.on("close", () => {
+          if (handshakeDone && connId) {
+            connections.delete(connId);
+            tryCall(onCloseFn, [connId]);
+          }
+        });
+        socket.on("error", (err4) => {
+          if (handshakeDone && connId) {
+            tryCall(onErrorFn, [connId, err4.message]);
+          }
+        });
+      });
+      tcpServer.listen(port);
+      return `ws listening on ${port}`;
+    },
+    // ws_stop → null
+    "ws_stop": () => {
+      if (tcpServer) {
+        tcpServer.close();
+        tcpServer = null;
+      }
+      connections.clear();
+      return null;
+    },
+    // ws_send connId message → boolean
+    "ws_send": (connId, message) => {
+      const socket = connections.get(connId);
+      if (!socket || socket.destroyed) return false;
+      try {
+        socket.write(buildServerFrame(message));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // ws_send_json connId data → boolean
+    "ws_send_json": (connId, data) => {
+      const socket = connections.get(connId);
+      if (!socket || socket.destroyed) return false;
+      try {
+        socket.write(buildServerFrame(JSON.stringify(data)));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // ws_broadcast message → sent count
+    "ws_broadcast": (message) => {
+      let count = 0;
+      for (const [, socket] of connections) {
+        if (!socket.destroyed) {
+          try {
+            socket.write(buildServerFrame(message));
+            count++;
+          } catch {
+          }
+        }
+      }
+      return count;
+    },
+    // ws_broadcast_json data → sent count
+    "ws_broadcast_json": (data) => {
+      const json = JSON.stringify(data);
+      let count = 0;
+      for (const [, socket] of connections) {
+        if (!socket.destroyed) {
+          try {
+            socket.write(buildServerFrame(json));
+            count++;
+          } catch {
+          }
+        }
+      }
+      return count;
+    },
+    // ws_close connId [code] → null
+    "ws_close": (connId, code = 1e3) => {
+      const socket = connections.get(connId);
+      if (socket && !socket.destroyed) {
+        socket.write(buildCloseFrame(code));
+        socket.end();
+        connections.delete(connId);
+      }
+      return null;
+    },
+    // ws_clients → [connId, ...]
+    "ws_clients": () => {
+      return Array.from(connections.keys());
+    },
+    // ws_count → number
+    "ws_count": () => {
+      return connections.size;
+    },
+    // ws_on_connect_fn handlerName → null
+    "ws_on_connect_fn": (name) => {
+      onConnectFn = name;
+      return null;
+    },
+    // ws_on_message_fn handlerName → null
+    "ws_on_message_fn": (name) => {
+      onMessageFn = name;
+      return null;
+    },
+    // ws_on_close_fn handlerName → null
+    "ws_on_close_fn": (name) => {
+      onCloseFn = name;
+      return null;
+    },
+    // ws_on_error_fn handlerName → null
+    "ws_on_error_fn": (name) => {
+      onErrorFn = name;
+      return null;
+    }
+  };
+}
+
+// src/stdlib-wsc.ts
+function createWscModule(callFn) {
+  const clients = /* @__PURE__ */ new Map();
+  let clientCounter = 0;
+  let onOpenFn = "wsc_on_open";
+  let onMessageFn = "wsc_on_message";
+  let onCloseFn = "wsc_on_close";
+  let onErrorFn = "wsc_on_error";
+  function tryCall(fnName, args3) {
+    try {
+      callFn(fnName, args3);
+    } catch {
+    }
+  }
+  function makeId() {
+    return `wsc_${++clientCounter}_${Date.now()}`;
+  }
+  function setupSocket(connId, socket) {
+    socket.addEventListener("open", () => {
+      tryCall(onOpenFn, [connId]);
+    });
+    socket.addEventListener("message", (event) => {
+      const data = event.data;
+      const message = typeof data === "string" ? data : data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)).toString() : data.toString();
+      tryCall(onMessageFn, [connId, message]);
+    });
+    socket.addEventListener("close", () => {
+      const client = clients.get(connId);
+      if (client && !client.reconnecting) {
+        clients.delete(connId);
+      }
+      tryCall(onCloseFn, [connId]);
+    });
+    socket.addEventListener("error", (event) => {
+      const msg = event.message ?? "WebSocket error";
+      tryCall(onErrorFn, [connId, msg]);
+    });
+  }
+  function connectSocket(url2, token) {
+    const id = makeId();
+    const headers = {};
+    if (token) {
+      headers["authorization"] = `Bearer ${token}`;
+    }
+    const socket = new globalThis.WebSocket(url2, {
+      headers: Object.keys(headers).length > 0 ? headers : void 0
+    });
+    const client = {
+      socket,
+      url: url2,
+      token,
+      reconnecting: false
+    };
+    clients.set(id, client);
+    setupSocket(id, socket);
+    return id;
+  }
+  return {
+    // wsc_connect url token → connId
+    "wsc_connect": (url2, token = "") => {
+      return connectSocket(url2, token);
+    },
+    // wsc_send connId message → boolean
+    "wsc_send": (connId, message) => {
+      const client = clients.get(connId);
+      if (!client || client.socket.readyState !== globalThis.WebSocket.OPEN) return false;
+      try {
+        client.socket.send(message);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // wsc_send_json connId data → boolean
+    "wsc_send_json": (connId, data) => {
+      const client = clients.get(connId);
+      if (!client || client.socket.readyState !== globalThis.WebSocket.OPEN) return false;
+      try {
+        client.socket.send(JSON.stringify(data));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // wsc_close connId → boolean
+    "wsc_close": (connId) => {
+      const client = clients.get(connId);
+      if (!client) return false;
+      try {
+        client.socket.close();
+        clients.delete(connId);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // wsc_state connId → "OPEN" | "CONNECTING" | "CLOSING" | "CLOSED"
+    "wsc_state": (connId) => {
+      const client = clients.get(connId);
+      if (!client) return "CLOSED";
+      const socket = client.socket;
+      switch (socket.readyState) {
+        case globalThis.WebSocket.CONNECTING:
+          return "CONNECTING";
+        case globalThis.WebSocket.OPEN:
+          return "OPEN";
+        case globalThis.WebSocket.CLOSING:
+          return "CLOSING";
+        case globalThis.WebSocket.CLOSED:
+          return "CLOSED";
+        default:
+          return "UNKNOWN";
+      }
+    },
+    // wsc_on_open_fn handlerName → set open handler
+    "wsc_on_open_fn": (name) => {
+      onOpenFn = name;
+      return null;
+    },
+    // wsc_on_message_fn handlerName → set message handler
+    "wsc_on_message_fn": (name) => {
+      onMessageFn = name;
+      return null;
+    },
+    // wsc_on_close_fn handlerName → set close handler
+    "wsc_on_close_fn": (name) => {
+      onCloseFn = name;
+      return null;
+    },
+    // wsc_on_error_fn handlerName → set error handler
+    "wsc_on_error_fn": (name) => {
+      onErrorFn = name;
+      return null;
+    },
+    // wsc_reconnect_with_backoff connId maxRetries → null
+    // 지수 백오프로 자동 재연결
+    "wsc_reconnect_with_backoff": (connId, maxRetries = 5) => {
+      const clientRef = clients.get(connId);
+      if (!clientRef) return null;
+      clientRef.reconnecting = true;
+      let attempt = 0;
+      const attemptReconnect = () => {
+        const client = clients.get(connId);
+        if (!client) return;
+        if (attempt >= maxRetries) {
+          client.reconnecting = false;
+          tryCall(onErrorFn, [connId, "max reconnect attempts reached"]);
+          return;
+        }
+        const delay = Math.min(1e3 * Math.pow(2, attempt), 3e4);
+        attempt++;
+        setTimeout(() => {
+          const currentClient = clients.get(connId);
+          if (!currentClient) return;
+          const newSocket = new globalThis.WebSocket(currentClient.url, {
+            headers: currentClient.token ? { authorization: `Bearer ${currentClient.token}` } : void 0
+          });
+          currentClient.socket = newSocket;
+          setupSocket(connId, newSocket);
+          newSocket.addEventListener("open", () => {
+            const openClient = clients.get(connId);
+            if (openClient) {
+              openClient.reconnecting = false;
+              attempt = 0;
+              tryCall(onOpenFn, [connId]);
+            }
+          });
+          newSocket.addEventListener("close", () => {
+            const closeClient = clients.get(connId);
+            if (closeClient && closeClient.reconnecting) {
+              attemptReconnect();
+            } else {
+              clients.delete(connId);
+            }
+          });
+          newSocket.addEventListener("error", (event) => {
+            const msg = event.message ?? "WebSocket error";
+            tryCall(onErrorFn, [connId, msg]);
+            const errClient = clients.get(connId);
+            if (errClient && errClient.reconnecting) {
+              attemptReconnect();
+            }
+          });
+        }, delay);
+      };
+      attemptReconnect();
+      return null;
+    }
+  };
+}
+
+// src/stdlib-crypto-rsa.ts
+var import_crypto5 = require("crypto");
+function createCryptoRsaModule() {
+  return {
+    // ── RSA 키 생성 ────────────────────────────────────────────
+    // crypto_rsa_generate bits -> map (publicKey/privateKey PEM)
+    "crypto_rsa_generate": (bits = 2048) => {
+      const size = bits >= 2048 ? bits : 2048;
+      const { publicKey, privateKey } = (0, import_crypto5.generateKeyPairSync)("rsa", {
+        modulusLength: size,
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" }
+      });
+      return { publicKey, privateKey };
+    },
+    // ── RS256 서명 / 검증 ─────────────────────────────────────
+    // crypto_rsa_sign private_pem data -> string (base64url 서명)
+    "crypto_rsa_sign": (privateKeyPem, data) => {
+      const signer = (0, import_crypto5.createSign)("RSA-SHA256");
+      signer.update(data);
+      signer.end();
+      return signer.sign(privateKeyPem).toString("base64url");
+    },
+    // crypto_rsa_verify public_pem data signature_b64url -> boolean
+    "crypto_rsa_verify": (publicKeyPem, data, sigB64Url) => {
+      try {
+        const verifier = (0, import_crypto5.createVerify)("RSA-SHA256");
+        verifier.update(data);
+        verifier.end();
+        const sigBuf = Buffer.from(sigB64Url, "base64url");
+        return verifier.verify(publicKeyPem, sigBuf);
+      } catch {
+        return false;
+      }
+    },
+    // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
+    // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
+    "pkce_s256": (verifier) => {
+      return (0, import_crypto5.createHash)("sha256").update(verifier, "utf8").digest("base64url");
+    },
+    // crypto_rsa_public_to_jwk public_pem kid -> map (kty/n/e/kid/alg/use)
+    "crypto_rsa_public_to_jwk": (publicKeyPem, kid) => {
+      const key = (0, import_crypto5.createPublicKey)(publicKeyPem);
+      const jwk = key.export({ format: "jwk" });
+      return {
+        kty: jwk.kty,
+        n: jwk.n,
+        e: jwk.e,
+        kid,
+        alg: "RS256",
+        use: "sig"
+      };
+    }
+  };
+}
+
+// src/stdlib-totp.ts
+var import_crypto6 = require("crypto");
+var BASE32_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function base32Encode(buf) {
+  let bits = 0, value = 0, output = "";
+  for (let i = 0; i < buf.length; i++) {
+    value = value << 8 | buf[i];
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_ALPHA[value >>> bits - 5 & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) output += BASE32_ALPHA[value << 5 - bits & 31];
+  return output;
+}
+function base32Decode(str) {
+  const clean = str.replace(/=+$/, "").toUpperCase();
+  let bits = 0, value = 0;
+  const out = [];
+  for (let i = 0; i < clean.length; i++) {
+    const idx = BASE32_ALPHA.indexOf(clean[i]);
+    if (idx === -1) throw new Error(`invalid base32 char: ${clean[i]}`);
+    value = value << 5 | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push(value >>> bits - 8 & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+function hotp(secret, counter, digits = 6) {
+  const ctrBuf = Buffer.alloc(8);
+  const high = Math.floor(counter / 4294967296);
+  const low = counter >>> 0;
+  ctrBuf.writeUInt32BE(high, 0);
+  ctrBuf.writeUInt32BE(low, 4);
+  const hmac = (0, import_crypto6.createHmac)("sha1", secret).update(ctrBuf).digest();
+  const offset = hmac[hmac.length - 1] & 15;
+  const truncated = (hmac[offset] & 127) << 24 | (hmac[offset + 1] & 255) << 16 | (hmac[offset + 2] & 255) << 8 | hmac[offset + 3] & 255;
+  const code = truncated % Math.pow(10, digits);
+  return code.toString().padStart(digits, "0");
+}
+function totpCounter(unixSeconds, step = 30) {
+  return Math.floor(unixSeconds / step);
+}
+function createTotpModule() {
+  return {
+    // totp_secret_generate bytes -> string (base32, default 20 bytes = 160 bits = 32 chars)
+    "totp_secret_generate": (bytes = 20) => {
+      const buf = (0, import_crypto6.randomBytes)(bytes);
+      return base32Encode(buf);
+    },
+    // totp_now secret_b32 -> string (현재 시각의 6자리 코드, 디버그·등록용)
+    "totp_now": (secretB32) => {
+      const secret = base32Decode(secretB32);
+      const counter = totpCounter(Math.floor(Date.now() / 1e3));
+      return hotp(secret, counter, 6);
+    },
+    // totp_verify secret_b32 code window_steps -> boolean
+    // window=1 → 현재 ±1 step (총 90초 윈도우) 허용 (시계 오차 보정)
+    "totp_verify": (secretB32, code, window = 1) => {
+      try {
+        if (!/^\d+$/.test(code)) return false;
+        const secret = base32Decode(secretB32);
+        const now = totpCounter(Math.floor(Date.now() / 1e3));
+        const expected = Buffer.from(code);
+        for (let i = -window; i <= window; i++) {
+          const candidate = Buffer.from(hotp(secret, now + i, code.length));
+          if (candidate.length === expected.length && (0, import_crypto6.timingSafeEqual)(candidate, expected)) {
+            return true;
+          }
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    // totp_uri label issuer secret_b32 -> string (otpauth://totp/... QR 코드 표준)
+    "totp_uri": (label, issuer, secretB32) => {
+      const enc = (s) => encodeURIComponent(s);
+      return `otpauth://totp/${enc(issuer)}:${enc(label)}?secret=${secretB32}&issuer=${enc(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    }
+  };
+}
+
+// src/stdlib-mail.ts
+var fs8 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
+var import_crypto7 = require("crypto");
+var tls = require("tls");
+function createMailModule() {
+  return {
+    // mail_outbox_write dir to subject body -> string (파일 경로)
+    "mail_outbox_write": (dir, to, subject, body) => {
+      try {
+        fs8.mkdirSync(dir, { recursive: true });
+      } catch {
+      }
+      const id = `${Date.now()}-${(0, import_crypto7.randomBytes)(6).toString("hex")}.json`;
+      const file = path7.join(dir, id);
+      const payload = {
+        id,
+        to,
+        subject,
+        body,
+        ts: (/* @__PURE__ */ new Date()).toISOString(),
+        status: "queued"
+      };
+      fs8.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+      return file;
+    },
+    // mail_outbox_list dir -> array (JSON 배열, 큐된 메시지)
+    "mail_outbox_list": (dir) => {
+      try {
+        const files = fs8.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+        return files.map((f) => {
+          try {
+            return JSON.parse(fs8.readFileSync(path7.join(dir, f), "utf8"));
+          } catch {
+            return null;
+          }
+        }).filter((x) => x !== null);
+      } catch {
+        return [];
+      }
+    },
+    // mail_outbox_count dir -> number
+    "mail_outbox_count": (dir) => {
+      try {
+        return fs8.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
+      } catch {
+        return 0;
+      }
+    },
+    // ── SMTP TLS (port 465, SMTPS) ─────────────────────────
+    // smtp_send_tls host port user pass from to subject body -> {ok, log}
+    //
+    // 동기적 비동기 — Node tls 콜백 기반이지만 Promise 인터페이스로 노출.
+    // 호출 측은 await 또는 then. FL의 async_call 헬퍼로 호출 가능.
+    "smtp_send_tls": (host, port, user, pass, from, to, subject, body) => {
+      return new Promise((resolve7) => {
+        const log = [];
+        const socket = tls.connect({ host, port, servername: host }, () => {
+        });
+        socket.setEncoding("utf8");
+        let buf = "";
+        let stage = 0;
+        const send = (line) => {
+          log.push(`> ${line.trim()}`);
+          socket.write(line);
+        };
+        const fail = (msg) => {
+          log.push(`! ${msg}`);
+          try {
+            socket.end();
+          } catch {
+          }
+          resolve7({ ok: false, log: log.join("\n"), error: msg });
+        };
+        socket.on("data", (chunk) => {
+          buf += chunk.toString();
+          const lines = buf.split(/\r?\n/);
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line) continue;
+            log.push(`< ${line}`);
+            const code = parseInt(line.slice(0, 3), 10);
+            if (line[3] !== " " && line[3] !== void 0) continue;
+            try {
+              switch (stage) {
+                case 0:
+                  if (code !== 220) return fail(`banner: ${line}`);
+                  send(`EHLO ${host}\r
+`);
+                  stage = 1;
+                  break;
+                case 1:
+                  if (code !== 250) return fail(`ehlo: ${line}`);
+                  send("AUTH LOGIN\r\n");
+                  stage = 2;
+                  break;
+                case 2:
+                  if (code !== 334) return fail(`auth start: ${line}`);
+                  send(Buffer.from(user).toString("base64") + "\r\n");
+                  stage = 3;
+                  break;
+                case 3:
+                  if (code !== 334) return fail(`auth user: ${line}`);
+                  send(Buffer.from(pass).toString("base64") + "\r\n");
+                  stage = 4;
+                  break;
+                case 4:
+                  if (code !== 235) return fail(`auth pass: ${line}`);
+                  send(`MAIL FROM:<${from}>\r
+`);
+                  stage = 5;
+                  break;
+                case 5:
+                  if (code !== 250) return fail(`mail from: ${line}`);
+                  send(`RCPT TO:<${to}>\r
+`);
+                  stage = 6;
+                  break;
+                case 6:
+                  if (code !== 250) return fail(`rcpt to: ${line}`);
+                  send("DATA\r\n");
+                  stage = 7;
+                  break;
+                case 7:
+                  if (code !== 354) return fail(`data: ${line}`);
+                  const headers = [
+                    `From: ${from}`,
+                    `To: ${to}`,
+                    `Subject: ${subject}`,
+                    `MIME-Version: 1.0`,
+                    `Content-Type: text/plain; charset=utf-8`,
+                    ""
+                  ].join("\r\n");
+                  send(headers + "\r\n" + body + "\r\n.\r\n");
+                  stage = 8;
+                  break;
+                case 8:
+                  if (code !== 250) return fail(`accept: ${line}`);
+                  send("QUIT\r\n");
+                  stage = 9;
+                  break;
+                case 9:
+                  resolve7({ ok: true, log: log.join("\n") });
+                  try {
+                    socket.end();
+                  } catch {
+                  }
+                  return;
+              }
+            } catch (e) {
+              return fail(`exception: ${e.message}`);
+            }
+          }
+        });
+        socket.on("error", (e) => fail(`socket: ${e.message}`));
+        socket.setTimeout(15e3, () => fail("timeout"));
+      });
+    }
+  };
+}
+
+// src/stdlib-webauthn.ts
+var import_crypto8 = require("crypto");
+function cborDecode(buf, offset = 0) {
+  const ib = buf[offset];
+  const major = ib >> 5;
+  const minor = ib & 31;
+  let val;
+  let pos = offset + 1;
+  if (minor < 24) val = minor;
+  else if (minor === 24) {
+    val = buf[pos];
+    pos += 1;
+  } else if (minor === 25) {
+    val = buf.readUInt16BE(pos);
+    pos += 2;
+  } else if (minor === 26) {
+    val = buf.readUInt32BE(pos);
+    pos += 4;
+  } else if (minor === 27) {
+    val = Number(buf.readBigUInt64BE(pos));
+    pos += 8;
+  } else throw new Error(`cbor: unsupported minor ${minor}`);
+  switch (major) {
+    case 0:
+      return { value: val, next: pos };
+    case 1:
+      return { value: -1 - val, next: pos };
+    case 2: {
+      const bytes = buf.slice(pos, pos + val);
+      return { value: bytes, next: pos + val };
+    }
+    case 3: {
+      const text = buf.slice(pos, pos + val).toString("utf8");
+      return { value: text, next: pos + val };
+    }
+    case 4: {
+      const arr = [];
+      for (let i = 0; i < val; i++) {
+        const r = cborDecode(buf, pos);
+        arr.push(r.value);
+        pos = r.next;
+      }
+      return { value: arr, next: pos };
+    }
+    case 5: {
+      const map = {};
+      for (let i = 0; i < val; i++) {
+        const k = cborDecode(buf, pos);
+        pos = k.next;
+        const v = cborDecode(buf, pos);
+        pos = v.next;
+        map[String(k.value)] = v.value;
+      }
+      return { value: map, next: pos };
+    }
+    default:
+      throw new Error(`cbor: unsupported major ${major}`);
+  }
+}
+function parseAuthData(authData) {
+  if (authData.length < 37) throw new Error("authData too short");
+  const rpIdHash = authData.slice(0, 32);
+  const flags = authData[32];
+  const signCount = authData.readUInt32BE(33);
+  const result = { rpIdHash, flags, signCount };
+  if (flags & 64) {
+    if (authData.length < 55) throw new Error("authData AT but too short");
+    result.aaguid = authData.slice(37, 53);
+    const credIdLen = authData.readUInt16BE(53);
+    result.credentialId = authData.slice(55, 55 + credIdLen);
+    const cosePart = authData.slice(55 + credIdLen);
+    const decoded = cborDecode(cosePart);
+    result.credentialPublicKey = decoded.value;
+  }
+  return result;
+}
+function cosePublicKeyToJwk(cose) {
+  if (cose["1"] !== 2) throw new Error("COSE: not EC2");
+  if (cose["3"] !== -7) throw new Error("COSE: not ES256");
+  if (cose["-1"] !== 1) throw new Error("COSE: not P-256");
+  const x = cose["-2"];
+  const y = cose["-3"];
+  return {
+    kty: "EC",
+    crv: "P-256",
+    alg: "ES256",
+    x: x.toString("base64url"),
+    y: y.toString("base64url")
+  };
+}
+function createWebauthnModule() {
+  return {
+    // webauthn_challenge bytes -> base64url string (32 bytes)
+    "webauthn_challenge": (bytes = 32) => {
+      return (0, import_crypto8.randomBytes)(bytes).toString("base64url");
+    },
+    // webauthn_parse_attestation b64url_attestation_object -> {fmt, authData_parsed, jwk, credential_id, sign_count, aaguid_hex}
+    // attestation="none" 또는 "packed" self-attestation 만 처리.
+    "webauthn_parse_attestation": (attestationObjectB64Url) => {
+      const buf = Buffer.from(attestationObjectB64Url, "base64url");
+      const decoded = cborDecode(buf).value;
+      const fmt = decoded.fmt;
+      const authDataBuf = decoded.authData;
+      const auth = parseAuthData(authDataBuf);
+      if (!auth.credentialId || !auth.credentialPublicKey) {
+        throw new Error("attestation: AT flag missing");
+      }
+      const jwk = cosePublicKeyToJwk(auth.credentialPublicKey);
+      return {
+        fmt,
+        flags: auth.flags,
+        sign_count: auth.signCount,
+        rp_id_hash_hex: auth.rpIdHash.toString("hex"),
+        aaguid_hex: auth.aaguid?.toString("hex") ?? "",
+        credential_id: auth.credentialId.toString("base64url"),
+        public_jwk: jwk
+      };
+    },
+    // webauthn_verify_assertion args -> boolean
+    //   args = {jwk, authenticator_data, client_data_json_b64url, signature_b64url, expected_challenge, expected_origin, expected_rp_id, prev_sign_count}
+    // 반환: {ok, sign_count} 또는 {ok:false, error}
+    "webauthn_verify_assertion": (args3) => {
+      try {
+        const jwk = args3.jwk;
+        const authenticatorData = Buffer.from(args3.authenticator_data_b64url, "base64url");
+        const clientDataJson = Buffer.from(args3.client_data_json_b64url, "base64url");
+        const signature = Buffer.from(args3.signature_b64url, "base64url");
+        const clientData = JSON.parse(clientDataJson.toString("utf8"));
+        if (clientData.type !== "webauthn.get") return { ok: false, error: "type!=webauthn.get" };
+        if (clientData.challenge !== args3.expected_challenge) return { ok: false, error: "challenge mismatch" };
+        if (clientData.origin !== args3.expected_origin) return { ok: false, error: "origin mismatch" };
+        const auth = parseAuthData(authenticatorData);
+        const expectedRpHash = (0, import_crypto8.createHash)("sha256").update(args3.expected_rp_id).digest();
+        if (Buffer.compare(auth.rpIdHash, expectedRpHash) !== 0) return { ok: false, error: "rp_id_hash mismatch" };
+        if (!(auth.flags & 1)) return { ok: false, error: "user not present" };
+        if (auth.signCount !== 0 && auth.signCount <= (args3.prev_sign_count ?? 0)) {
+          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args3.prev_sign_count})` };
+        }
+        const cdHash = (0, import_crypto8.createHash)("sha256").update(clientDataJson).digest();
+        const signedData = Buffer.concat([authenticatorData, cdHash]);
+        const pub = (0, import_crypto8.createPublicKey)({ key: jwk, format: "jwk" });
+        const verifier = (0, import_crypto8.createVerify)("SHA256");
+        verifier.update(signedData);
+        verifier.end();
+        const ok2 = verifier.verify(pub, signature);
+        return ok2 ? { ok: true, sign_count: auth.signCount } : { ok: false, error: "signature invalid" };
+      } catch (e) {
+        return { ok: false, error: `exception: ${e.message}` };
+      }
+    }
+  };
+}
+
+// src/stdlib-queue-helpers.ts
+var import_child_process5 = require("child_process");
+function sqliteJson(dbPath, sql) {
+  const r = (0, import_child_process5.spawnSync)("sqlite3", ["-json", dbPath, sql], { timeout: 1e4, encoding: "utf-8" });
+  if (r.error) throw new Error(`sqlite3 error: ${r.error.message}`);
+  if ((r.status ?? 1) !== 0) {
+    const stderr = r.stderr?.trim() ?? "";
+    throw new Error(`sqlite3 exit ${r.status}: ${stderr}`);
+  }
+  const raw = r.stdout?.trim() ?? "";
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+function escapeStr(s) {
+  return String(s).replace(/'/g, "''");
+}
+function createQueueHelpersModule() {
+  return {
+    // queue_dequeue_atomic db_path topic worker_id lock_seconds
+    //   -> {id, topic, payload, attempt, ...} or null
+    //
+    // BEGIN IMMEDIATE → 첫 queued 메시지 잡고 in_flight 로 마킹 → COMMIT.
+    // 단일 sqlite3 호출이라 외부 race 없음.
+    "queue_dequeue_atomic": (dbPath, topic, workerId, lockSeconds = 30) => {
+      const now = Date.now();
+      const lockUntil = now + lockSeconds * 1e3;
+      const t = escapeStr(topic);
+      const w = escapeStr(workerId);
+      const sql = `
+        UPDATE q_messages
+        SET status='in_flight',
+            locked_until=${lockUntil},
+            worker_id='${w}',
+            updated_at=datetime('now')
+        WHERE id = (
+          SELECT id FROM q_messages
+          WHERE topic='${t}' AND status='queued' AND next_run_at <= ${now}
+          ORDER BY id ASC LIMIT 1
+        )
+        RETURNING id, topic, payload, attempt, next_run_at;
+      `;
+      const rows = sqliteJson(dbPath, sql);
+      return rows.length === 0 ? null : rows[0];
+    },
+    // queue_db_init db_path -> bool  (WAL 모드 + busy_timeout 활성화)
+    "queue_db_init": (dbPath) => {
+      const sql = `
+        PRAGMA journal_mode=WAL;
+        PRAGMA busy_timeout=5000;
+        PRAGMA synchronous=NORMAL;
+      `;
+      const r = (0, import_child_process5.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3 });
+      return (r.status ?? 1) === 0;
+    },
+    // queue_recover_stuck db_path stuck_seconds -> count
+    //   in_flight 상태에서 locked_until 지난 메시지를 다시 queued 로 (worker 죽은 경우 대비)
+    "queue_recover_stuck": (dbPath, stuckSeconds = 60) => {
+      const cutoff = Date.now();
+      const sql = `
+        UPDATE q_messages
+        SET status='queued', worker_id=NULL,
+            attempt=attempt+1,
+            updated_at=datetime('now')
+        WHERE status='in_flight' AND locked_until < ${cutoff};
+        SELECT changes();
+      `;
+      const r = (0, import_child_process5.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3, encoding: "utf-8" });
+      if ((r.status ?? 1) !== 0) return 0;
+      const out = r.stdout?.trim() ?? "0";
+      return parseInt(out, 10) || 0;
+    }
+  };
+}
+
+// src/stdlib-mariadb.ts
+var import_child_process6 = require("child_process");
+var cachedSock = null;
+function resolveSocket() {
+  if (cachedSock) return cachedSock;
+  if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
+  const fs20 = require("fs");
+  const candidates = [
+    "/data/data/com.termux/files/usr/tmp/mysqld.sock",
+    // Termux
+    "/var/run/mysqld/mysqld.sock",
+    // Debian/Ubuntu
+    "/var/lib/mysql/mysql.sock",
+    // RHEL/CentOS
+    "/tmp/mysqld.sock",
+    "/tmp/mysql.sock"
+  ];
+  for (const s of candidates) {
+    try {
+      if (fs20.existsSync(s)) return cachedSock = s;
+    } catch {
+    }
+  }
+  return cachedSock = "/tmp/mysqld.sock";
+}
+function buildArgs(db, sql) {
+  const sock = resolveSocket();
+  const user = process.env.MARIADB_USER || "root";
+  const pass = process.env.MARIADB_PASS || "";
+  const host = process.env.MARIADB_HOST;
+  const port = process.env.MARIADB_PORT;
+  const args3 = ["-u", user];
+  if (host) {
+    args3.push("-h", host);
+    if (port) args3.push("-P", port);
+  } else {
+    args3.push("--socket=" + sock);
+  }
+  if (pass) args3.push("-p" + pass);
+  if (db) args3.push(db);
+  args3.push("--batch", "-e", sql);
+  return args3;
+}
+function runMariadb(db, sql) {
+  const r = (0, import_child_process6.spawnSync)("mariadb", buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8" });
+  if (r.error) throw new Error(`mariadb CLI failed: ${r.error.message}`);
+  if ((r.status ?? 1) !== 0) {
+    throw new Error(r.stderr?.trim() ?? `mariadb exit ${r.status}`);
+  }
+  return r.stdout?.toString() ?? "";
+}
+function parseRows(raw) {
+  const lines = raw.split("\n").filter((l) => l.length > 0);
+  if (lines.length < 1) return [];
+  const headers = lines[0].split("	");
+  return lines.slice(1).map((line) => {
+    const vals = line.split("	");
+    const obj = {};
+    headers.forEach((h, i) => {
+      const v = vals[i];
+      if (v === void 0 || v === "NULL") obj[h] = null;
+      else if (/^-?\d+$/.test(v)) obj[h] = parseInt(v, 10);
+      else if (/^-?\d+\.\d+$/.test(v)) obj[h] = parseFloat(v);
+      else obj[h] = v;
+    });
+    return obj;
+  });
+}
+function bindParams(sql, params) {
+  if (!params || params.length === 0) return sql;
+  return params.reduce(
+    (s, p) => {
+      if (p === null || p === void 0) return s.replace("?", "NULL");
+      if (typeof p === "number") return s.replace("?", String(p));
+      if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
+      return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
+    },
+    sql
+  );
+}
+function createMariadbModule() {
+  return {
+    // mariadb_exec db sql [params] -> raw output string (INSERT/UPDATE/DELETE/CREATE)
+    "mariadb_exec": (db, sql, params = []) => {
+      return runMariadb(db, bindParams(sql, params));
+    },
+    // mariadb_query db sql [params] -> rows[] (SELECT)
+    "mariadb_query": (db, sql, params = []) => {
+      return parseRows(runMariadb(db, bindParams(sql, params)));
+    },
+    // mariadb_one db sql [params] -> first row or null
+    "mariadb_one": (db, sql, params = []) => {
+      const rows = parseRows(runMariadb(db, bindParams(sql, params)));
+      return rows[0] ?? null;
+    },
+    // mariadb_health -> true if server reachable
+    "mariadb_health": () => {
+      const sock = resolveSocket();
+      const user = process.env.MARIADB_USER || "root";
+      const args3 = ["-u", user, "--socket=" + sock, "ping"];
+      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args3, { timeout: 3e3, encoding: "utf-8" });
+      return (r.status ?? 1) === 0;
+    },
+    // mariadb_databases -> list of database names
+    "mariadb_databases": () => {
+      const rows = parseRows(runMariadb("", "SHOW DATABASES"));
+      return rows.map((r) => r.Database);
+    },
+    // mariadb_tables db -> list of table names in given db
+    "mariadb_tables": (db) => {
+      const rows = parseRows(runMariadb(db, "SHOW TABLES"));
+      return rows.map((r) => Object.values(r)[0]);
+    }
+  };
+}
+
+// src/stdlib-mongodb.ts
+var import_child_process7 = require("child_process");
+var path8 = __toESM(require("path"));
+function createMongodbModule() {
+  const helperPath = path8.join(__dirname, "_mongodb_helper.js");
+  function callHelper(req) {
+    try {
+      const json = JSON.stringify(req);
+      const result = (0, import_child_process7.execFileSync)("node", [helperPath, json], {
+        timeout: 15e3,
+        encoding: "utf-8"
+      });
+      return JSON.parse(result);
+    } catch (err4) {
+      return {
+        ok: false,
+        error: err4.message || "Helper execution failed"
+      };
+    }
+  }
+  return {
+    // mongodb_connect host port → connId or null
+    "mongodb_connect": (host, port = 27017) => {
+      const result = callHelper({
+        method: "connect",
+        host,
+        port
+      });
+      if (result.ok) {
+        return `${host}:${port}`;
+      }
+      return null;
+    },
+    // mongodb_sendrecv connId hexData → hexResponse or null
+    // Wire Protocol 명령 전송 & 응답 수신
+    "mongodb_sendrecv": (connId, hexData, timeout = 1e4) => {
+      const [host, portStr] = connId.split(":");
+      const port = parseInt(portStr, 10);
+      const result = callHelper({
+        method: "sendrecv",
+        host,
+        port,
+        data: hexData,
+        timeout
+      });
+      if (result.ok && result.data) {
+        return result.data;
+      }
+      return null;
+    },
+    // mongodb_send connId hexData → boolean
+    "mongodb_send": (connId, hexData) => {
+      const [host, portStr] = connId.split(":");
+      const port = parseInt(portStr, 10);
+      const result = callHelper({
+        method: "send",
+        host,
+        port,
+        data: hexData
+      });
+      return result.ok === true;
+    },
+    // mongodb_close connId → boolean
+    "mongodb_close": (connId) => {
+      return true;
+    },
+    // mongodb_is_connected connId → boolean
+    "mongodb_is_connected": (connId) => {
+      const [host, portStr] = connId.split(":");
+      const port = parseInt(portStr, 10);
+      const result = callHelper({
+        method: "connect",
+        host,
+        port,
+        timeout: 1e3
+      });
+      return result.ok === true;
     }
   };
 }
@@ -24608,153 +25842,6 @@ function createAsyncModule(callFn) {
           throw new Error(`promise_then handler error: ${e.message}`);
         }
       });
-    }
-  };
-}
-
-// src/stdlib-module.ts
-function createModuleSystem() {
-  const registry = /* @__PURE__ */ new Map();
-  let currentModule = "default";
-  const namespaces = /* @__PURE__ */ new Map();
-  return {
-    // module_load path -> {exports} | null
-    // Load a module from file or registry
-    "module_load": (path16) => {
-      if (registry.has(path16)) {
-        return registry.get(path16);
-      }
-      return null;
-    },
-    // module_export name value -> null
-    // Export a value from current module
-    "module_export": (name, value) => {
-      if (!registry.has(currentModule)) {
-        registry.set(currentModule, {});
-      }
-      const exports2 = registry.get(currentModule);
-      exports2[name] = value;
-      return null;
-    },
-    // module_require path -> {exports}
-    // Require and return all exports from a module
-    "module_require": (path16) => {
-      if (registry.has(path16)) {
-        return registry.get(path16) || {};
-      }
-      return {};
-    },
-    // module_set_current name -> null
-    // Set current module for exports
-    "module_set_current": (name) => {
-      currentModule = name;
-      if (!registry.has(name)) {
-        registry.set(name, {});
-      }
-      return null;
-    },
-    // module_get_current -> string
-    // Get current module name
-    "module_get_current": () => {
-      return currentModule;
-    },
-    // module_registry -> [string]
-    // List all loaded modules
-    "module_registry": () => {
-      return Array.from(registry.keys());
-    },
-    // module_info name -> {exports: string[]} | null
-    // Get info about a module
-    "module_info": (name) => {
-      if (!registry.has(name)) {
-        return null;
-      }
-      const exports2 = registry.get(name);
-      return {
-        name,
-        exports: Object.keys(exports2),
-        size: Object.keys(exports2).length
-      };
-    },
-    // module_exists name -> boolean
-    // Check if module exists in registry
-    "module_exists": (name) => {
-      return registry.has(name);
-    },
-    // module_get name key -> any | null
-    // Get exported value from module
-    "module_get": (name, key) => {
-      if (!registry.has(name)) return null;
-      const exports2 = registry.get(name);
-      return exports2[key] ?? null;
-    },
-    // module_clear name -> boolean
-    // Clear/unload a module
-    "module_clear": (name) => {
-      if (registry.has(name)) {
-        registry.delete(name);
-        return true;
-      }
-      return false;
-    },
-    // module_clear_all -> null
-    // Clear all modules
-    "module_clear_all": () => {
-      registry.clear();
-      currentModule = "default";
-      return null;
-    },
-    // namespace_create name -> null
-    // Create a new namespace
-    "namespace_create": (name) => {
-      if (!namespaces.has(name)) {
-        namespaces.set(name, {});
-      }
-      return null;
-    },
-    // namespace_set name key value -> null
-    // Set value in namespace
-    "namespace_set": (name, key, value) => {
-      if (!namespaces.has(name)) {
-        namespaces.set(name, {});
-      }
-      const ns = namespaces.get(name);
-      ns[key] = value;
-      return null;
-    },
-    // namespace_get name key -> any | null
-    // Get value from namespace
-    "namespace_get": (name, key) => {
-      if (!namespaces.has(name)) return null;
-      const ns = namespaces.get(name);
-      return ns[key] ?? null;
-    },
-    // namespace_list name -> [string]
-    // List all keys in namespace
-    "namespace_list": (name) => {
-      if (!namespaces.has(name)) return [];
-      const ns = namespaces.get(name);
-      return Object.keys(ns);
-    },
-    // namespace_delete name key -> boolean
-    // Delete from namespace
-    "namespace_delete": (name, key) => {
-      if (!namespaces.has(name)) return false;
-      const ns = namespaces.get(name);
-      if (key in ns) {
-        delete ns[key];
-        return true;
-      }
-      return false;
-    },
-    // module_use module_name -> {exports}
-    // Import all exports from module into current context
-    "module_use": (moduleName) => {
-      if (registry.has(moduleName)) {
-        const exports2 = registry.get(moduleName);
-        return exports2;
-      }
-      return {};
     }
   };
 }
@@ -25079,123 +26166,6 @@ ${JSON.stringify(prompt.context)}` : "";
       if (typeof template !== "string") return String(template);
       return template.replace(/\{(\w+)\}/g, (_, k) => String(vars?.[k] ?? ""));
     }
-  };
-}
-
-// src/stdlib-test.ts
-function createTestModule(callFn) {
-  const results = [];
-  let currentSuite = "";
-  return {
-    // describe: 테스트 그룹 이름 설정
-    "describe": (name, fn) => {
-      currentSuite = name;
-      console.log(`
-[${name}]`);
-      if (fn !== void 0 && fn !== null) {
-        try {
-          callFn(fn, []);
-        } catch (e) {
-          console.error(`  describe '${name}' \uC624\uB958: ${e.message}`);
-        }
-      }
-      return name;
-    },
-    // deftest: 개별 테스트 케이스 실행
-    "deftest": (name, fn) => {
-      const fullName = currentSuite ? `${currentSuite}/${name}` : name;
-      try {
-        callFn(fn, []);
-        results.push({ name: fullName, passed: true });
-        console.log(`  PASS  ${name}`);
-        return true;
-      } catch (e) {
-        const err4 = e.message ?? String(e);
-        results.push({ name: fullName, passed: false, error: err4 });
-        console.log(`  FAIL  ${name}: ${err4}`);
-        return false;
-      }
-    },
-    // assert: 참인지 검증
-    "assert": (val, msg) => {
-      if (!val) {
-        throw new Error(msg ?? `Assertion failed: ${JSON.stringify(val)}`);
-      }
-      return true;
-    },
-    // assert-eq: 두 값이 같은지 검증 (deep equal)
-    "assert-eq": (a, b, msg) => {
-      const aStr = JSON.stringify(a);
-      const bStr = JSON.stringify(b);
-      if (aStr !== bStr) {
-        throw new Error(
-          msg ?? `Expected ${bStr}, got ${aStr}`
-        );
-      }
-      return true;
-    },
-    // assert-neq: 두 값이 다른지 검증
-    "assert-neq": (a, b, msg) => {
-      if (JSON.stringify(a) === JSON.stringify(b)) {
-        throw new Error(
-          msg ?? `Expected values to differ, but both are ${JSON.stringify(a)}`
-        );
-      }
-      return true;
-    },
-    // assert-throws: fn 실행 시 예외가 발생해야 함
-    "assert-throws": (fn, expectedMsg) => {
-      try {
-        callFn(fn, []);
-        throw new Error(
-          expectedMsg ? `Expected exception '${expectedMsg}' but none thrown` : "Expected exception but none thrown"
-        );
-      } catch (e) {
-        if (e.message?.startsWith("Expected exception")) throw e;
-        if (expectedMsg && !e.message?.includes(expectedMsg)) {
-          throw new Error(
-            `Expected exception containing '${expectedMsg}', got: ${e.message}`
-          );
-        }
-        return true;
-      }
-    },
-    // assert-nil: 값이 null/undefined인지
-    "assert-nil": (val, msg) => {
-      if (val !== null && val !== void 0) {
-        throw new Error(msg ?? `Expected nil, got ${JSON.stringify(val)}`);
-      }
-      return true;
-    },
-    // assert-not-nil: 값이 null/undefined가 아닌지
-    "assert-not-nil": (val, msg) => {
-      if (val === null || val === void 0) {
-        throw new Error(msg ?? `Expected non-nil, got nil`);
-      }
-      return true;
-    },
-    // test-report: 전체 결과 통계 출력 + 반환
-    "test-report": () => {
-      const passed = results.filter((r) => r.passed).length;
-      const failed = results.length - passed;
-      console.log(
-        `
-\uACB0\uACFC: ${passed}/${results.length} \uD1B5\uACFC${failed > 0 ? ` (${failed}\uAC1C \uC2E4\uD328)` : ""}`
-      );
-      if (failed > 0) {
-        console.log("\uC2E4\uD328 \uBAA9\uB85D:");
-        results.filter((r) => !r.passed).forEach((r) => console.log(`  - ${r.name}: ${r.error}`));
-      }
-      return { passed, failed, total: results.length, results };
-    },
-    // test-reset: 결과 초기화 (테스트 간 격리)
-    "test-reset": () => {
-      results.length = 0;
-      currentSuite = "";
-      return true;
-    },
-    // test-results: 현재 결과 배열 반환 (프로그래매틱 접근용)
-    "test-results": () => results
   };
 }
 
@@ -26143,7 +27113,7 @@ function httpRequest(method, url2, body) {
 // src/stdlib-oci.ts
 var fs10 = __toESM(require("fs"));
 var path10 = __toESM(require("path"));
-var crypto2 = __toESM(require("crypto"));
+var crypto3 = __toESM(require("crypto"));
 function createOciModule() {
   const imageStore = /* @__PURE__ */ new Map();
   return {
@@ -26182,7 +27152,7 @@ function createOciModule() {
         }
         const stat = fs10.statSync(layerFile);
         const content = fs10.readFileSync(layerFile);
-        const digest = "sha256:" + crypto2.createHash("sha256").update(content).digest("hex");
+        const digest = "sha256:" + crypto3.createHash("sha256").update(content).digest("hex");
         return {
           path: layerFile,
           size: stat.size,
@@ -26250,7 +27220,7 @@ function createOciModule() {
           manifests: [{
             mediaType: "application/vnd.docker.distribution.manifest.v2+json",
             size: Buffer.byteLength(JSON.stringify(manifest)),
-            digest: "sha256:" + crypto2.createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
+            digest: "sha256:" + crypto3.createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
             annotations: {
               "org.opencontainers.image.ref.name": tag
             }
@@ -26305,7 +27275,7 @@ function createOciModule() {
         if (!imageInfo) {
           throw new Error(`Image not found: ${tag}`);
         }
-        const signature = crypto2.createHmac("sha256", key || "default-key").update(imageInfo.digestSha256).digest("hex");
+        const signature = crypto3.createHmac("sha256", key || "default-key").update(imageInfo.digestSha256).digest("hex");
         return {
           signed: true,
           tag,
@@ -27417,78 +28387,6 @@ function createPlotModule() {
   };
 }
 
-// src/stdlib-test-enhanced.ts
-function createTestEnhancedModule() {
-  const testResults = [];
-  const startTime = Date.now();
-  return {
-    // test_run_all(parallel, workers) → {passed, failed, total, time}
-    "test_run_all": (parallel, workers) => {
-      try {
-        const duration = Date.now() - startTime;
-        return {
-          passed: testResults.filter((t) => t.passed).length,
-          failed: testResults.filter((t) => !t.passed).length,
-          total: testResults.length,
-          duration,
-          parallel: parallel || false,
-          workers: workers || 1
-        };
-      } catch (err4) {
-        throw new Error(`test_run_all failed: ${err4.message}`);
-      }
-    },
-    // test_register(name, fn) → boolean
-    "test_register": (name, fn) => {
-      try {
-        testResults.push({ name, passed: true, fn });
-        return true;
-      } catch (err4) {
-        throw new Error(`test_register failed: ${err4.message}`);
-      }
-    },
-    // test_get_results() → [test results]
-    "test_get_results": () => {
-      try {
-        return testResults;
-      } catch (err4) {
-        throw new Error(`test_get_results failed: ${err4.message}`);
-      }
-    },
-    // test_coverage(threshold) → {percentage, passed}
-    "test_coverage": (threshold = 80) => {
-      try {
-        const percentage = Math.random() * 100;
-        return {
-          percentage: Math.round(percentage),
-          threshold,
-          passed: percentage >= threshold
-        };
-      } catch (err4) {
-        throw new Error(`test_coverage failed: ${err4.message}`);
-      }
-    },
-    // test_report(format) → report string
-    "test_report": (format) => {
-      try {
-        const fmt = format || "markdown";
-        const passed = testResults.filter((t) => t.passed).length;
-        const failed = testResults.filter((t) => !t.passed).length;
-        if (fmt === "json") {
-          return JSON.stringify({ passed, failed, total: testResults.length });
-        }
-        return `# Test Report
-
-- Passed: ${passed}
-- Failed: ${failed}
-- Total: ${testResults.length}`;
-      } catch (err4) {
-        throw new Error(`test_report failed: ${err4.message}`);
-      }
-    }
-  };
-}
-
 // src/stdlib-service.ts
 function createServiceModule() {
   const services = /* @__PURE__ */ new Map();
@@ -27665,462 +28563,6 @@ function createServiceModule() {
       } catch (err4) {
         throw new Error(`observe_report failed: ${err4.message}`);
       }
-    }
-  };
-}
-
-// src/stdlib-ws.ts
-var net = __toESM(require("net"));
-var crypto3 = __toESM(require("crypto"));
-function createWsModule(callFn) {
-  const connections = /* @__PURE__ */ new Map();
-  let tcpServer = null;
-  let connCounter = 0;
-  let onConnectFn = "ws_on_connect";
-  let onMessageFn = "ws_on_message";
-  let onCloseFn = "ws_on_close";
-  let onErrorFn = "ws_on_error";
-  function tryCall(fnName, args3) {
-    try {
-      callFn(fnName, args3);
-    } catch {
-    }
-  }
-  function makeId() {
-    return `ws_${++connCounter}_${Date.now()}`;
-  }
-  function buildServerFrame(data, opcode = 1) {
-    const payload = typeof data === "string" ? Buffer.from(data) : data;
-    const len = payload.length;
-    if (len < 126) {
-      const h = Buffer.alloc(2);
-      h[0] = 128 | opcode;
-      h[1] = len;
-      return Buffer.concat([h, payload]);
-    } else if (len < 65536) {
-      const h = Buffer.alloc(4);
-      h[0] = 128 | opcode;
-      h[1] = 126;
-      h.writeUInt16BE(len, 2);
-      return Buffer.concat([h, payload]);
-    } else {
-      const h = Buffer.alloc(10);
-      h[0] = 128 | opcode;
-      h[1] = 127;
-      h.writeBigUInt64BE(BigInt(len), 2);
-      return Buffer.concat([h, payload]);
-    }
-  }
-  function buildCloseFrame(code = 1e3) {
-    const b = Buffer.alloc(4);
-    b[0] = 136;
-    b[1] = 2;
-    b.writeUInt16BE(code, 2);
-    return b;
-  }
-  function buildPongFrame() {
-    return Buffer.from([138, 0]);
-  }
-  function drainFrames(buf) {
-    const complete = [];
-    let offset = 0;
-    while (offset + 2 <= buf.length) {
-      const fin = (buf[offset] & 128) !== 0;
-      const opcode = buf[offset] & 15;
-      const masked = (buf[offset + 1] & 128) !== 0;
-      let payloadLen = buf[offset + 1] & 127;
-      let hdrLen = 2;
-      if (payloadLen === 126) {
-        if (offset + 4 > buf.length) break;
-        payloadLen = buf.readUInt16BE(offset + 2);
-        hdrLen = 4;
-      } else if (payloadLen === 127) {
-        if (offset + 10 > buf.length) break;
-        payloadLen = Number(buf.readBigUInt64BE(offset + 2));
-        hdrLen = 10;
-      }
-      if (masked) hdrLen += 4;
-      if (offset + hdrLen + payloadLen > buf.length) break;
-      let maskKey = null;
-      if (masked) maskKey = buf.slice(offset + hdrLen - 4, offset + hdrLen);
-      const payload = Buffer.from(buf.slice(offset + hdrLen, offset + hdrLen + payloadLen));
-      if (maskKey) {
-        for (let i = 0; i < payload.length; i++) {
-          payload[i] ^= maskKey[i % 4];
-        }
-      }
-      complete.push({ fin, opcode, payload });
-      offset += hdrLen + payloadLen;
-    }
-    return { complete, remaining: buf.slice(offset) };
-  }
-  function parseHttpHeaders(data) {
-    const headers = {};
-    const lines = data.toString().split("\r\n");
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i] === "") break;
-      const [key, value] = lines[i].split(": ");
-      if (key) headers[key.toLowerCase()] = value;
-    }
-    return headers;
-  }
-  return {
-    // ws_start port → "ws listening on <port>"
-    "ws_start": (port) => {
-      tcpServer = net.createServer((socket) => {
-        let handshakeDone = false;
-        let buf = Buffer.alloc(0);
-        let connId = "";
-        socket.once("data", (data) => {
-          const headerEnd = data.indexOf("\r\n\r\n");
-          if (headerEnd === -1) {
-            socket.destroy();
-            return;
-          }
-          const headers = parseHttpHeaders(data);
-          const key = headers["sec-websocket-key"];
-          if (!key) {
-            socket.destroy();
-            return;
-          }
-          const accept = crypto3.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
-          socket.write([
-            "HTTP/1.1 101 Switching Protocols",
-            "Upgrade: websocket",
-            "Connection: Upgrade",
-            "Sec-WebSocket-Accept: " + accept,
-            "",
-            ""
-          ].join("\r\n"));
-          handshakeDone = true;
-          connId = makeId();
-          connections.set(connId, socket);
-          tryCall(onConnectFn, [connId]);
-          buf = Buffer.alloc(0);
-          socket.on("data", (chunk) => {
-            buf = Buffer.concat([buf, chunk]);
-            const { complete, remaining } = drainFrames(buf);
-            buf = remaining;
-            for (const frame of complete) {
-              if (frame.opcode === 8) {
-                connections.delete(connId);
-                tryCall(onCloseFn, [connId]);
-                socket.end();
-                return;
-              }
-              if (frame.opcode === 9) {
-                socket.write(buildPongFrame());
-                continue;
-              }
-              if (frame.opcode === 1 || frame.opcode === 2) {
-                tryCall(onMessageFn, [connId, frame.payload.toString()]);
-              }
-            }
-          });
-        });
-        socket.on("close", () => {
-          if (handshakeDone && connId) {
-            connections.delete(connId);
-            tryCall(onCloseFn, [connId]);
-          }
-        });
-        socket.on("error", (err4) => {
-          if (handshakeDone && connId) {
-            tryCall(onErrorFn, [connId, err4.message]);
-          }
-        });
-      });
-      tcpServer.listen(port);
-      return `ws listening on ${port}`;
-    },
-    // ws_stop → null
-    "ws_stop": () => {
-      if (tcpServer) {
-        tcpServer.close();
-        tcpServer = null;
-      }
-      connections.clear();
-      return null;
-    },
-    // ws_send connId message → boolean
-    "ws_send": (connId, message) => {
-      const socket = connections.get(connId);
-      if (!socket || socket.destroyed) return false;
-      try {
-        socket.write(buildServerFrame(message));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    // ws_send_json connId data → boolean
-    "ws_send_json": (connId, data) => {
-      const socket = connections.get(connId);
-      if (!socket || socket.destroyed) return false;
-      try {
-        socket.write(buildServerFrame(JSON.stringify(data)));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    // ws_broadcast message → sent count
-    "ws_broadcast": (message) => {
-      let count = 0;
-      for (const [, socket] of connections) {
-        if (!socket.destroyed) {
-          try {
-            socket.write(buildServerFrame(message));
-            count++;
-          } catch {
-          }
-        }
-      }
-      return count;
-    },
-    // ws_broadcast_json data → sent count
-    "ws_broadcast_json": (data) => {
-      const json = JSON.stringify(data);
-      let count = 0;
-      for (const [, socket] of connections) {
-        if (!socket.destroyed) {
-          try {
-            socket.write(buildServerFrame(json));
-            count++;
-          } catch {
-          }
-        }
-      }
-      return count;
-    },
-    // ws_close connId [code] → null
-    "ws_close": (connId, code = 1e3) => {
-      const socket = connections.get(connId);
-      if (socket && !socket.destroyed) {
-        socket.write(buildCloseFrame(code));
-        socket.end();
-        connections.delete(connId);
-      }
-      return null;
-    },
-    // ws_clients → [connId, ...]
-    "ws_clients": () => {
-      return Array.from(connections.keys());
-    },
-    // ws_count → number
-    "ws_count": () => {
-      return connections.size;
-    },
-    // ws_on_connect_fn handlerName → null
-    "ws_on_connect_fn": (name) => {
-      onConnectFn = name;
-      return null;
-    },
-    // ws_on_message_fn handlerName → null
-    "ws_on_message_fn": (name) => {
-      onMessageFn = name;
-      return null;
-    },
-    // ws_on_close_fn handlerName → null
-    "ws_on_close_fn": (name) => {
-      onCloseFn = name;
-      return null;
-    },
-    // ws_on_error_fn handlerName → null
-    "ws_on_error_fn": (name) => {
-      onErrorFn = name;
-      return null;
-    }
-  };
-}
-
-// src/stdlib-wsc.ts
-function createWscModule(callFn) {
-  const clients = /* @__PURE__ */ new Map();
-  let clientCounter = 0;
-  let onOpenFn = "wsc_on_open";
-  let onMessageFn = "wsc_on_message";
-  let onCloseFn = "wsc_on_close";
-  let onErrorFn = "wsc_on_error";
-  function tryCall(fnName, args3) {
-    try {
-      callFn(fnName, args3);
-    } catch {
-    }
-  }
-  function makeId() {
-    return `wsc_${++clientCounter}_${Date.now()}`;
-  }
-  function setupSocket(connId, socket) {
-    socket.addEventListener("open", () => {
-      tryCall(onOpenFn, [connId]);
-    });
-    socket.addEventListener("message", (event) => {
-      const data = event.data;
-      const message = typeof data === "string" ? data : data instanceof ArrayBuffer ? Buffer.from(new Uint8Array(data)).toString() : data.toString();
-      tryCall(onMessageFn, [connId, message]);
-    });
-    socket.addEventListener("close", () => {
-      const client = clients.get(connId);
-      if (client && !client.reconnecting) {
-        clients.delete(connId);
-      }
-      tryCall(onCloseFn, [connId]);
-    });
-    socket.addEventListener("error", (event) => {
-      const msg = event.message ?? "WebSocket error";
-      tryCall(onErrorFn, [connId, msg]);
-    });
-  }
-  function connectSocket(url2, token) {
-    const id = makeId();
-    const headers = {};
-    if (token) {
-      headers["authorization"] = `Bearer ${token}`;
-    }
-    const socket = new globalThis.WebSocket(url2, {
-      headers: Object.keys(headers).length > 0 ? headers : void 0
-    });
-    const client = {
-      socket,
-      url: url2,
-      token,
-      reconnecting: false
-    };
-    clients.set(id, client);
-    setupSocket(id, socket);
-    return id;
-  }
-  return {
-    // wsc_connect url token → connId
-    "wsc_connect": (url2, token = "") => {
-      return connectSocket(url2, token);
-    },
-    // wsc_send connId message → boolean
-    "wsc_send": (connId, message) => {
-      const client = clients.get(connId);
-      if (!client || client.socket.readyState !== globalThis.WebSocket.OPEN) return false;
-      try {
-        client.socket.send(message);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    // wsc_send_json connId data → boolean
-    "wsc_send_json": (connId, data) => {
-      const client = clients.get(connId);
-      if (!client || client.socket.readyState !== globalThis.WebSocket.OPEN) return false;
-      try {
-        client.socket.send(JSON.stringify(data));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    // wsc_close connId → boolean
-    "wsc_close": (connId) => {
-      const client = clients.get(connId);
-      if (!client) return false;
-      try {
-        client.socket.close();
-        clients.delete(connId);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    // wsc_state connId → "OPEN" | "CONNECTING" | "CLOSING" | "CLOSED"
-    "wsc_state": (connId) => {
-      const client = clients.get(connId);
-      if (!client) return "CLOSED";
-      const socket = client.socket;
-      switch (socket.readyState) {
-        case globalThis.WebSocket.CONNECTING:
-          return "CONNECTING";
-        case globalThis.WebSocket.OPEN:
-          return "OPEN";
-        case globalThis.WebSocket.CLOSING:
-          return "CLOSING";
-        case globalThis.WebSocket.CLOSED:
-          return "CLOSED";
-        default:
-          return "UNKNOWN";
-      }
-    },
-    // wsc_on_open_fn handlerName → set open handler
-    "wsc_on_open_fn": (name) => {
-      onOpenFn = name;
-      return null;
-    },
-    // wsc_on_message_fn handlerName → set message handler
-    "wsc_on_message_fn": (name) => {
-      onMessageFn = name;
-      return null;
-    },
-    // wsc_on_close_fn handlerName → set close handler
-    "wsc_on_close_fn": (name) => {
-      onCloseFn = name;
-      return null;
-    },
-    // wsc_on_error_fn handlerName → set error handler
-    "wsc_on_error_fn": (name) => {
-      onErrorFn = name;
-      return null;
-    },
-    // wsc_reconnect_with_backoff connId maxRetries → null
-    // 지수 백오프로 자동 재연결
-    "wsc_reconnect_with_backoff": (connId, maxRetries = 5) => {
-      const clientRef = clients.get(connId);
-      if (!clientRef) return null;
-      clientRef.reconnecting = true;
-      let attempt = 0;
-      const attemptReconnect = () => {
-        const client = clients.get(connId);
-        if (!client) return;
-        if (attempt >= maxRetries) {
-          client.reconnecting = false;
-          tryCall(onErrorFn, [connId, "max reconnect attempts reached"]);
-          return;
-        }
-        const delay = Math.min(1e3 * Math.pow(2, attempt), 3e4);
-        attempt++;
-        setTimeout(() => {
-          const currentClient = clients.get(connId);
-          if (!currentClient) return;
-          const newSocket = new globalThis.WebSocket(currentClient.url, {
-            headers: currentClient.token ? { authorization: `Bearer ${currentClient.token}` } : void 0
-          });
-          currentClient.socket = newSocket;
-          setupSocket(connId, newSocket);
-          newSocket.addEventListener("open", () => {
-            const openClient = clients.get(connId);
-            if (openClient) {
-              openClient.reconnecting = false;
-              attempt = 0;
-              tryCall(onOpenFn, [connId]);
-            }
-          });
-          newSocket.addEventListener("close", () => {
-            const closeClient = clients.get(connId);
-            if (closeClient && closeClient.reconnecting) {
-              attemptReconnect();
-            } else {
-              clients.delete(connId);
-            }
-          });
-          newSocket.addEventListener("error", (event) => {
-            const msg = event.message ?? "WebSocket error";
-            tryCall(onErrorFn, [connId, msg]);
-            const errClient = clients.get(connId);
-            if (errClient && errClient.reconnecting) {
-              attemptReconnect();
-            }
-          });
-        }, delay);
-      };
-      attemptReconnect();
-      return null;
     }
   };
 }
@@ -28956,6 +29398,142 @@ function createMatrixModule() {
   };
 }
 
+// src/stdlib-audit.ts
+var import_child_process9 = require("child_process");
+function postJson(url2, body, apiKey) {
+  const args3 = [
+    "-s",
+    "-o",
+    "/dev/null",
+    "-w",
+    "%{http_code}",
+    "-X",
+    "POST",
+    "-H",
+    "Content-Type: application/json",
+    ...apiKey ? ["-H", `X-Service-Key: ${apiKey}`] : [],
+    "-d",
+    body,
+    url2
+  ];
+  try {
+    const result = (0, import_child_process9.spawnSync)("curl", args3, { timeout: 3e3 });
+    const code = parseInt(result.stdout?.toString().trim() ?? "0", 10);
+    return { ok: code >= 200 && code < 300, status: code };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
+function createAuditModule() {
+  return {
+    // audit_log serviceId actorId action resource detail
+    //   → {:ok true :status 200} | {:ok false :status N}
+    // actorId가 nil이면 serviceId로 자동 대체
+    // 실패해도 nil 반환 (본 작업 차단 없음)
+    "audit_log": (serviceId, actorId, action, resource, detail) => {
+      const url2 = process.env.AUDIT_URL ?? "";
+      const key = process.env.AUDIT_SERVICE_KEY ?? "";
+      if (!url2) return null;
+      const payload = JSON.stringify({
+        service_id: serviceId,
+        actor_id: actorId ?? serviceId,
+        action,
+        resource,
+        detail,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      try {
+        return postJson(url2, payload, key);
+      } catch {
+        return null;
+      }
+    },
+    // audit_log_custom serviceId actorId action resource detail extraMap
+    //   → extraMap을 페이로드에 병합
+    "audit_log_custom": (serviceId, actorId, action, resource, detail, extra) => {
+      const url2 = process.env.AUDIT_URL ?? "";
+      const key = process.env.AUDIT_SERVICE_KEY ?? "";
+      if (!url2) return null;
+      const payload = JSON.stringify({
+        service_id: serviceId,
+        actor_id: actorId ?? serviceId,
+        action,
+        resource,
+        detail,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        ...extra && typeof extra === "object" ? extra : {}
+      });
+      try {
+        return postJson(url2, payload, key);
+      } catch {
+        return null;
+      }
+    },
+    // audit_log_ok? result → true/false (결과 확인용)
+    "audit_log_ok?": (result) => {
+      return result !== null && result !== void 0 && result.ok === true;
+    }
+  };
+}
+
+// src/stdlib-lazy-registry.ts
+var LAZY_REGISTRY = {
+  "crypto-rsa": () => createCryptoRsaModule(),
+  "totp": () => createTotpModule(),
+  "mail": () => createMailModule(),
+  "webauthn": () => createWebauthnModule(),
+  "queue": () => createQueueHelpersModule(),
+  "workflow": () => createWorkflowModule(),
+  "resource": () => createResourceModule(),
+  "mariadb": () => createMariadbModule(),
+  "mongodb": () => createMongodbModule(),
+  "async": (interp2) => createAsyncModule(interp2 ? (n, a) => interp2.callUserFunction(n, a) : () => null),
+  "channel": () => createChannelModule(),
+  "immutable": () => createImmutableModule(),
+  "ai": () => createAiNativeModule(),
+  "compile": () => createCompileModule(),
+  "registry": () => createRegistryModule(),
+  "oci": () => createOciModule(),
+  "orm": () => createOrmModule(),
+  "validation": () => createValidationModule(),
+  "middleware": () => createMiddlewareModule(),
+  "table": () => createTableModule(),
+  "stats": () => createStatsModule(),
+  "plot": () => createPlotModule(),
+  "service": () => createServiceModule(),
+  "markdown": () => createMarkdownModule(),
+  "feed": () => createFeedModule(),
+  "blog": () => createBlogModule(),
+  "cloud": () => createCloudModule(),
+  "matrix": () => createMatrixModule(),
+  "audit": () => createAuditModule()
+};
+var loaded = /* @__PURE__ */ new Set();
+function getAvailableModules() {
+  return Object.keys(LAZY_REGISTRY);
+}
+function isModuleLoaded(name) {
+  return loaded.has(name);
+}
+function requireModule(name, interp2) {
+  const normalized = name.replace(/_/g, "-");
+  if (loaded.has(normalized)) return true;
+  const factory = LAZY_REGISTRY[normalized];
+  if (!factory) {
+    console.warn(`\u26A0\uFE0F  [FreeLang] require: \uC54C \uC218 \uC5C6\uB294 \uBAA8\uB4C8 "${name}". \uC0AC\uC6A9 \uAC00\uB2A5: ${Object.keys(LAZY_REGISTRY).join(", ")}`);
+    return false;
+  }
+  try {
+    const mod = factory(interp2);
+    interp2.registerModule(mod);
+    loaded.add(normalized);
+    return true;
+  } catch (e) {
+    console.error(`\u274C [FreeLang] require "${name}" \uB85C\uB4DC \uC2E4\uD328:`, e);
+    return false;
+  }
+}
+
 // src/stdlib-loader.ts
 function loadAllStdlib(interp2) {
   interp2.registerModule(createFileModule());
@@ -28970,11 +29548,6 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
-  interp2.registerModule(createCryptoRsaModule());
-  interp2.registerModule(createTotpModule());
-  interp2.registerModule(createMailModule());
-  interp2.registerModule(createWebauthnModule());
-  interp2.registerModule(createQueueHelpersModule());
   interp2.registerModule(createWorkflowModule());
   interp2.registerModule(createResourceModule());
   interp2.registerModule(createHttpServerModule(
@@ -28982,17 +29555,11 @@ function loadAllStdlib(interp2) {
     (fnValue, a) => interp2.callFunctionValue(fnValue, a)
   ));
   interp2.registerModule(createDbModule());
-  interp2.registerModule(createMariadbModule());
-  interp2.registerModule(createMongodbModule());
   interp2.registerModule(createAuthModule());
   interp2.registerModule(createCacheModule());
   interp2.registerModule(createPubSubModule((n, a) => interp2.callUserFunction(n, a)));
   interp2.registerModule(createProcessModule());
-  interp2.registerModule(createAsyncModule((n, a) => interp2.callUserFunction(n, a)));
   interp2.registerModule(createModuleSystem());
-  interp2.registerModule(createChannelModule());
-  interp2.registerModule(createImmutableModule());
-  interp2.registerModule(createAiNativeModule());
   interp2.registerModule(createTestModule(
     // Phase 76: deftest, describe, assert-eq, ...
     (fnValue, args3) => interp2.callFunctionValue(fnValue, args3)
@@ -29002,31 +29569,198 @@ function loadAllStdlib(interp2) {
     (fnValue, args3) => interp2.callFunctionValue(fnValue, args3),
     (name, args3) => interp2.callUserFunction(name, args3)
   ));
-  interp2.registerModule(createCompileModule());
-  interp2.registerModule(createRegistryModule());
-  interp2.registerModule(createOciModule());
-  interp2.registerModule(createOrmModule());
-  interp2.registerModule(createValidationModule());
-  interp2.registerModule(createMiddlewareModule());
-  interp2.registerModule(createTableModule());
-  interp2.registerModule(createStatsModule());
-  interp2.registerModule(createPlotModule());
   interp2.registerModule(createTestEnhancedModule());
-  interp2.registerModule(createServiceModule());
   interp2.registerModule(createWsModule(
-    // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
     (n, a) => interp2.callUserFunction(n, a)
   ));
   interp2.registerModule(createWscModule(
-    // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
     (n, a) => interp2.callUserFunction(n, a)
   ));
-  interp2.registerModule(createMarkdownModule());
-  interp2.registerModule(createFeedModule());
-  interp2.registerModule(createBlogModule());
-  interp2.registerModule(createCloudModule());
-  interp2.registerModule(createMatrixModule());
+  interp2.registerModule({
+    "fl_require": (name) => requireModule(name, interp2),
+    "fl_require?": (name) => isModuleLoaded(name),
+    "fl_modules": () => getAvailableModules()
+  });
   const _aliases = {
+    // ── get-in / assoc-in / update-in (깊은 접근 + 업데이트) ─────────────────
+    "get-in": (m, path16) => {
+      let cur = m;
+      for (const k of path16) {
+        if (cur === null || cur === void 0) return null;
+        cur = cur instanceof Map ? cur.get(k) ?? cur.get(String(k)) ?? null : cur?.[k] ?? null;
+      }
+      return cur ?? null;
+    },
+    "assoc-in": (m, path16, val) => {
+      if (!path16 || path16.length === 0) return val;
+      const key = path16[0];
+      const rest = path16.slice(1);
+      const child = m instanceof Map ? m.get(key) ?? m.get(String(key)) : m?.[key];
+      const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? /* @__PURE__ */ new Map(), rest, val) : val;
+      if (m instanceof Map) {
+        const r = new Map(m);
+        r.set(key, updated);
+        return r;
+      }
+      return Object.assign({}, m ?? {}, { [String(key)]: updated });
+    },
+    "update-in": (m, path16, fn, ...args3) => {
+      const cur = _aliases["get-in"](m, path16);
+      let newVal;
+      if (typeof fn === "function") {
+        newVal = fn(cur, ...args3);
+      } else if (fn?.kind === "function-value" || fn?.kind === "async-function-value") {
+        newVal = interp2.callFunctionValue(fn, [cur, ...args3]);
+      } else if (typeof fn?.body === "function") {
+        newVal = fn.body(cur, ...args3);
+      } else if (typeof fn === "string") {
+        newVal = interp2.callUserFunction(fn, [cur, ...args3]);
+      } else {
+        newVal = cur;
+      }
+      return _aliases["assoc-in"](m, path16, newVal);
+    },
+    // ── regex 별칭 (re-* → Clojure 스타일) ───────────────────────────────────
+    "re-match": (pattern, s) => {
+      try {
+        return new RegExp(pattern).test(String(s));
+      } catch {
+        return false;
+      }
+    },
+    "re-find": (pattern, s) => {
+      try {
+        const m = String(s).match(new RegExp(pattern));
+        return m ? m[0] : null;
+      } catch {
+        return null;
+      }
+    },
+    "re-find-all": (pattern, s) => {
+      try {
+        return [...String(s).matchAll(new RegExp(pattern, "g"))].map((m) => m[0]);
+      } catch {
+        return [];
+      }
+    },
+    "re-replace": (pattern, replacement, s) => {
+      try {
+        return String(s).replace(new RegExp(pattern, "g"), replacement);
+      } catch {
+        return String(s);
+      }
+    },
+    "re-split": (pattern, s) => {
+      try {
+        return String(s).split(new RegExp(pattern));
+      } catch {
+        return [String(s)];
+      }
+    },
+    "re-groups": (pattern, s) => {
+      try {
+        const m = String(s).match(new RegExp(pattern));
+        return m ? [...m].slice(1) : null;
+      } catch {
+        return null;
+      }
+    },
+    // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
+    "log/info": (msg, ctx) => {
+      const ts = (/* @__PURE__ */ new Date()).toISOString();
+      const ctxStr = ctx ? " " + JSON.stringify(ctx instanceof Map ? Object.fromEntries(ctx) : ctx) : "";
+      process.stdout.write(`\x1B[32m[INFO]\x1B[0m  ${ts} ${msg}${ctxStr}
+`);
+      return null;
+    },
+    "log/warn": (msg, ctx) => {
+      const ts = (/* @__PURE__ */ new Date()).toISOString();
+      const ctxStr = ctx ? " " + JSON.stringify(ctx instanceof Map ? Object.fromEntries(ctx) : ctx) : "";
+      process.stderr.write(`\x1B[33m[WARN]\x1B[0m  ${ts} ${msg}${ctxStr}
+`);
+      return null;
+    },
+    "log/error": (msg, ctx) => {
+      const ts = (/* @__PURE__ */ new Date()).toISOString();
+      const rawCtx = ctx instanceof Map ? Object.fromEntries(ctx) : ctx;
+      const errCtx = rawCtx?.raw instanceof Error ? { ...rawCtx, raw: rawCtx.raw.message } : rawCtx;
+      const ctxStr = errCtx ? " " + JSON.stringify(errCtx) : "";
+      process.stderr.write(`\x1B[31m[ERROR]\x1B[0m ${ts} ${msg}${ctxStr}
+`);
+      return null;
+    },
+    "log/debug": (msg, ctx) => {
+      if (!process.env.FL_DEBUG && !process.env.FL_LOG_DEBUG) return null;
+      const ts = (/* @__PURE__ */ new Date()).toISOString();
+      const ctxStr = ctx ? " " + JSON.stringify(ctx instanceof Map ? Object.fromEntries(ctx) : ctx) : "";
+      process.stderr.write(`\x1B[2m[DEBUG]\x1B[0m ${ts} ${msg}${ctxStr}
+`);
+      return null;
+    },
+    // AI-Native Phase 1: fn-meta — 사용자 정의 함수의 메타 조회
+    "fn-meta": (name) => {
+      const meta = fnMetaRegistry.get(name);
+      if (!meta) return null;
+      const m = /* @__PURE__ */ new Map();
+      if (meta.returns) m.set("returns", meta.returns);
+      if (meta.context) m.set("context", meta.context);
+      if (meta.effects) m.set("effects", meta.effects);
+      if (meta.examples) m.set("examples", meta.examples);
+      return m;
+    },
+    "fn_meta": (name) => _aliases["fn-meta"](name),
+    // AI-Native Phase 4: property-based testing 런타임 함수
+    "run-props": () => {
+      const results = [];
+      let totalPassed = 0;
+      let totalFailed = 0;
+      for (const [, prop] of propRegistry) {
+        const result = runProp(
+          prop,
+          (fnName, args3) => {
+            const fnVal = interp2.context?.variables?.get(fnName) ?? interp2.context?.variables?.get("$" + fnName);
+            if (!fnVal) throw new Error(`\uD568\uC218 \uC5C6\uC74C: ${fnName}`);
+            return interp2.callFunctionValue(fnVal, args3);
+          },
+          (checkFn, args3) => {
+            if (!checkFn) return true;
+            return interp2.callFunctionValue(checkFn, args3);
+          }
+        );
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        const ok2 = result.failed === 0;
+        const status = ok2 ? "\x1B[32m\u2713\x1B[0m" : "\x1B[31m\u2716\x1B[0m";
+        process.stdout.write(
+          `  ${status}  ${result.name}  \x1B[2m(${result.fn}, ${result.passed}/${result.samples} passed, ${result.durationMs}ms)\x1B[0m
+`
+        );
+        if (!ok2 && result.firstFailure) {
+          const f = result.firstFailure;
+          process.stdout.write(
+            `     \x1B[31m\uBC18\uB840\x1B[0m: args=${JSON.stringify(f.args)}` + (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
+          );
+        }
+        const m = /* @__PURE__ */ new Map();
+        m.set("name", result.name);
+        m.set("fn", result.fn);
+        m.set("passed", result.passed);
+        m.set("failed", result.failed);
+        m.set("ok", result.failed === 0);
+        results.push(m);
+      }
+      if (propRegistry.size > 0) {
+        const allOk = totalFailed === 0;
+        process.stdout.write(
+          `
+  ${allOk ? "\x1B[32m[PROPS PASS]\x1B[0m" : "\x1B[31m[PROPS FAIL]\x1B[0m"}  ${propRegistry.size}\uAC1C property, ${totalPassed} passed, ${totalFailed} failed
+`
+        );
+      }
+      return results;
+    },
+    "run_props": () => _aliases["run-props"](),
+    "props-list": () => [...propRegistry.keys()],
     // 숫자 변환
     "mod": (a, b) => a % b,
     "number": (v) => {
@@ -29063,11 +29797,65 @@ function loadAllStdlib(interp2) {
     "str-contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str_contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?": (s, sub) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? s.includes(sub) : false,
+    // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
+    "inc": (n) => typeof n === "number" ? n + 1 : Number(n) + 1,
+    "dec": (n) => typeof n === "number" ? n - 1 : Number(n) - 1,
+    // Map 유틸 — PUT 패턴에서 자주 쓰임
+    "dissoc-nil": (m) => {
+      if (m instanceof Map) {
+        const result = new Map(m);
+        result.forEach((v, k) => {
+          if (v === null || v === void 0) result.delete(k);
+        });
+        return result;
+      }
+      if (m && typeof m === "object" && !Array.isArray(m)) {
+        return Object.fromEntries(Object.entries(m).filter(([, v]) => v !== null && v !== void 0));
+      }
+      return m ?? /* @__PURE__ */ new Map();
+    },
+    "dissoc_nil": (m) => {
+      if (m instanceof Map) {
+        const result = new Map(m);
+        result.forEach((v, k) => {
+          if (v === null || v === void 0) result.delete(k);
+        });
+        return result;
+      }
+      if (m && typeof m === "object" && !Array.isArray(m)) {
+        return Object.fromEntries(Object.entries(m).filter(([, v]) => v !== null && v !== void 0));
+      }
+      return m ?? /* @__PURE__ */ new Map();
+    },
+    "merge": (...maps) => {
+      const result = /* @__PURE__ */ new Map();
+      for (const m of maps) {
+        if (m instanceof Map) m.forEach((v, k) => {
+          if (v !== null && v !== void 0) result.set(k, v);
+        });
+        else if (m && typeof m === "object" && !Array.isArray(m)) {
+          for (const [k, v] of Object.entries(m)) {
+            if (v !== null && v !== void 0) result.set(k, v);
+          }
+        }
+      }
+      return result;
+    },
+    "merge-all": (...maps) => {
+      const result = /* @__PURE__ */ new Map();
+      for (const m of maps) {
+        if (m instanceof Map) m.forEach((v, k) => result.set(k, v));
+        else if (m && typeof m === "object" && !Array.isArray(m)) {
+          for (const [k, v] of Object.entries(m)) result.set(k, v);
+        }
+      }
+      return result;
+    },
     // crypto 별칭 (kebab ↔ snake)
-    "hash-sha256": (v) => require("crypto").createHash("sha256").update(v, "utf8").digest("hex"),
-    "hmac-sha256": (key, msg) => require("crypto").createHmac("sha256", key).update(msg, "utf8").digest("hex"),
-    "hash_md5": (v) => require("crypto").createHash("md5").update(v, "utf8").digest("hex"),
-    "hash-md5": (v) => require("crypto").createHash("md5").update(v, "utf8").digest("hex")
+    "hash-sha256": (v) => (0, import_crypto9.createHash)("sha256").update(v, "utf8").digest("hex"),
+    "hmac-sha256": (key, msg) => (0, import_crypto9.createHmac)("sha256", key).update(msg, "utf8").digest("hex"),
+    "hash_md5": (v) => (0, import_crypto9.createHash)("md5").update(v, "utf8").digest("hex"),
+    "hash-md5": (v) => (0, import_crypto9.createHash)("md5").update(v, "utf8").digest("hex")
   };
   for (const [name, fn] of Object.entries(_aliases)) {
     if (!interp2.context.functions.has(name)) {
@@ -29118,11 +29906,22 @@ function evalTryBlock(interp2, tryBlock) {
       for (const catchClause of tryBlock.catchClauses) {
         interp2.context.variables.push();
         if (catchClause.variable) {
-          let errVal;
-          if (typeof error === "string") errVal = error;
-          else if (error instanceof Error) errVal = error.message;
-          else errVal = String(error);
-          interp2.context.variables.set("$" + catchClause.variable, errVal);
+          const errMap = /* @__PURE__ */ new Map();
+          if (typeof error === "string") {
+            errMap.set("message", error);
+          } else if (error instanceof Error) {
+            errMap.set("message", error.message);
+            const lineMatch = error.message.match(/\(at line (\d+)/);
+            if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
+            const flErr = error;
+            if (flErr.file) errMap.set("file", flErr.file);
+            if (flErr.code) errMap.set("code", flErr.code);
+            if (flErr.hint) errMap.set("hint", flErr.hint);
+          } else {
+            errMap.set("message", String(error));
+          }
+          errMap.set("raw", error);
+          interp2.context.variables.set("$" + catchClause.variable, errMap);
         }
         try {
           result = interp2.eval(catchClause.handler);
@@ -32455,7 +33254,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
@@ -32809,6 +33608,16 @@ var Interpreter = class _Interpreter {
     if (isLazySeq(val)) {
       const preview = take(3, val).map((v) => this.toDisplayString(v)).join(", ");
       return `<lazy-seq: ${preview}...>`;
+    }
+    if (val instanceof Map) {
+      if (val.has("message") && val.has("raw")) {
+        const msg = val.get("message") ?? "";
+        const line = val.get("line");
+        return line ? `[line ${line}] ${msg}` : String(msg);
+      }
+      const entries = [];
+      val.forEach((v, k) => entries.push(`${k}: ${this.toDisplayString(v)}`));
+      return "{" + entries.join(", ") + "}";
     }
     if (typeof val === "object") {
       if (val.kind === "function-value") return `<fn:${val.name || "\u03BB"}>`;
@@ -35515,6 +36324,13 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     console.log("");
     if (!watch2) return;
   }
+  if (!watch2 && !vmBench && !process.env.FL_NO_HINT) {
+    const isServerFile = fs19.readFileSync(absPath, "utf-8").includes("server_start");
+    if (isServerFile) {
+      process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path15.basename(absPath)}\x1B[0m
+`);
+    }
+  }
   execute();
   if (watch2) {
     console.log(`\x1B[2m  watching ${path15.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
@@ -35545,6 +36361,80 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     }, 500);
   }
 }
+function cmdProps(filePath, extraArgs) {
+  const absPath = path15.resolve(filePath);
+  if (!fs19.existsSync(absPath)) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
+    process.exit(1);
+  }
+  const samplesIdx = extraArgs.indexOf("--samples");
+  const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : void 0;
+  const source = fs19.readFileSync(absPath, "utf-8");
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const interp3 = new Interpreter();
+    interp3.currentFilePath = absPath;
+    interp3.interpret(ast);
+  } catch (err4) {
+  }
+  if (propRegistry.size === 0) {
+    console.log(`\x1B[33m[props]\x1B[0m  ${path15.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
+    console.log(`\x1B[2m  \uD301: (defprop my-prop {:fn "add" :args [:int :int] :check (fn [$a $b] (= (add $a $b) (add $b $a)))})\x1B[0m`);
+    return;
+  }
+  console.log(`\x1B[36m[props]\x1B[0m  ${path15.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
+`);
+  let interp2;
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    interp2 = new Interpreter();
+    interp2.currentFilePath = absPath;
+    interp2.interpret(ast);
+  } catch {
+  }
+  let totalPassed = 0;
+  let totalFailed = 0;
+  let exitCode = 0;
+  for (const [, prop] of propRegistry) {
+    const p = samplesOverride ? { ...prop, samples: samplesOverride } : prop;
+    const result = runProp(
+      p,
+      (fnName, fnArgs) => {
+        const fnVal = interp2?.context?.variables?.get(fnName) ?? interp2?.context?.variables?.get("$" + fnName);
+        if (!fnVal) throw new Error(`\uD568\uC218 \uC5C6\uC74C: ${fnName}`);
+        return interp2.callFunctionValue(fnVal, fnArgs);
+      },
+      (checkFn, checkArgs) => {
+        if (!checkFn) return true;
+        return interp2.callFunctionValue(checkFn, checkArgs);
+      }
+    );
+    totalPassed += result.passed;
+    totalFailed += result.failed;
+    const ok2 = result.failed === 0;
+    const status = ok2 ? "\x1B[32m\u2713\x1B[0m" : "\x1B[31m\u2716\x1B[0m";
+    process.stdout.write(
+      `  ${status}  \x1B[1m${result.name}\x1B[0m  \x1B[2m${result.fn}  ${result.passed}/${result.samples}  ${result.durationMs}ms\x1B[0m
+`
+    );
+    if (!ok2 && result.firstFailure) {
+      const f = result.firstFailure;
+      process.stdout.write(
+        `     \x1B[31m\uBC18\uB840\x1B[0m: args=${JSON.stringify(f.args)}` + (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
+      );
+      exitCode = 1;
+    }
+  }
+  const allOk = totalFailed === 0;
+  process.stdout.write(
+    `
+  ${allOk ? "\x1B[32m[PROPS PASS]\x1B[0m" : "\x1B[31m[PROPS FAIL]\x1B[0m"}  ${propRegistry.size}\uAC1C property \u2014 ${totalPassed} passed / ${totalFailed} failed
+`
+  );
+  if (exitCode) process.exit(exitCode);
+}
 function cmdCheck(filePath) {
   const absPath = path15.resolve(filePath);
   if (!fs19.existsSync(absPath)) {
@@ -35554,6 +36444,125 @@ function cmdCheck(filePath) {
   const source = fs19.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
+  const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
+  let hasWarnings = false;
+  if (metaMissing.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`
+\x1B[33m[meta-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
+`);
+    for (const w of metaMissing) {
+      process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 :context/:returns \uC5C6\uC74C
+`);
+    }
+    process.stderr.write(`\x1B[2m  \uD301: (defn ${metaMissing[0].name} [...] {:context "..." :returns "..."} ...)\x1B[0m
+`);
+  }
+  const pureErrors = effectsWarn.filter((w) => w.isPure);
+  const effectsOnly = effectsWarn.filter((w) => !w.isPure);
+  if (pureErrors.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`
+\x1B[31m[pure-violation]\x1B[0m  ${path15.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
+`);
+    for (const w of pureErrors) {
+      const hint = w.undeclared.map((e) => `:${e}`).join(" ");
+      process.stderr.write(`  \x1B[31m\u2716\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \x1B[31m${hint}\x1B[0m  (\uC21C\uC218 \uD568\uC218 \uC704\uBC18)
+`);
+    }
+    process.stderr.write(`\x1B[2m  :effects [] \uB610\uB294 ^pure \uC120\uC5B8 \uC2DC side effect \uD638\uCD9C \uBD88\uAC00\x1B[0m
+`);
+  }
+  if (effectsOnly.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`
+\x1B[33m[effects-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
+`);
+    for (const w of effectsOnly) {
+      const hint = w.undeclared.map((e) => `:${e}`).join(" ");
+      process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \uBBF8\uC120\uC5B8 effect: \x1B[33m${hint}\x1B[0m
+`);
+    }
+  }
+  if (hasWarnings) process.stderr.write("\n");
+}
+function checkDefnMeta(source, filePath) {
+  const metaMissing = [];
+  const effectsWarn = [];
+  try {
+    let collectCalls = function(node, found) {
+      if (!node) return;
+      if (node.kind === "sexpr") {
+        if (node.op) found.add(node.op);
+        if (Array.isArray(node.args)) node.args.forEach((a) => collectCalls(a, found));
+      } else if (node.kind === "block" && node.fields instanceof Map) {
+        node.fields.forEach((v) => collectCalls(v, found));
+      }
+    }, walkNodes = function(nodes) {
+      for (const node of nodes) {
+        if (!node) continue;
+        if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
+          let argIdx = 0;
+          const args3 = node.args ?? [];
+          let isPureHint = false;
+          if (args3[argIdx]?.kind === "literal" && String(args3[argIdx].value ?? "").startsWith("^")) {
+            if (String(args3[argIdx].value) === "^pure") isPureHint = true;
+            argIdx++;
+          }
+          const nameNode = args3[argIdx];
+          const name = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
+          let bodyArgs = args3.slice(argIdx + 2);
+          const first = bodyArgs[0];
+          let metaMap = null;
+          if (first?.kind === "block" && first?.type === "Map" && first.fields instanceof Map) {
+            if ([...first.fields.keys()].some((k) => META_KEYS2.has(k))) {
+              metaMap = first.fields;
+              bodyArgs = bodyArgs.slice(1);
+            }
+          }
+          if (!metaMap && bodyArgs.length > 0) {
+            metaMissing.push({ name, line: node.line ?? 0 });
+          }
+          const effectsDeclared = metaMap?.has("effects") || isPureHint;
+          if (effectsDeclared) {
+            let declared = [];
+            if (!isPureHint && metaMap?.has("effects")) {
+              const eNode = metaMap.get("effects");
+              if (eNode?.kind === "block" && eNode?.type === "Array") {
+                const items = eNode.fields?.get("items");
+                if (Array.isArray(items)) {
+                  declared = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+                }
+              }
+            }
+            const isPure = isPureHint || declared.length === 0;
+            const declaredSet = new Set(declared);
+            const calledOps = /* @__PURE__ */ new Set();
+            bodyArgs.forEach((b) => collectCalls(b, calledOps));
+            const undeclared = [];
+            calledOps.forEach((op) => {
+              const eff = EFFECT_CATALOG.get(op);
+              if (eff && !declaredSet.has(eff)) undeclared.push(eff);
+            });
+            if (undeclared.length > 0) {
+              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)], isPure });
+            }
+          }
+          walkNodes(bodyArgs);
+        } else if (node.kind === "sexpr" && node.args) {
+          walkNodes(node.args);
+        } else if (node.kind === "block" && node.fields instanceof Map) {
+          walkNodes([...node.fields.values()]);
+        }
+      }
+    };
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const META_KEYS2 = /* @__PURE__ */ new Set(["returns", "context", "effects", "examples"]);
+    walkNodes(ast);
+  } catch {
+  }
+  return { metaMissing, effectsWarn };
 }
 function cmdCodegen(args3) {
   const inputFile = args3.find((a) => !a.startsWith("-") && a.endsWith(".fl"));
@@ -36517,6 +37526,9 @@ function printUsage() {
     "  freelang fmt --check <file.fl>   \uC774\uBBF8 \uD3EC\uB9F7\uB410\uB294\uC9C0 \uD655\uC778 (\uBBF8\uD3EC\uB9F7 \u2192 exit 1)",
     "  freelang fmt --stdin             stdin \uC785\uB825\uBC1B\uC544 stdout \uCD9C\uB825",
     "  freelang repl                    \uB300\uD654\uD615 REPL",
+    "  freelang ls-fns                  \uC804\uCCB4 stdlib \uD568\uC218 \uBAA9\uB85D",
+    "  freelang ls-fns <\uD0A4\uC6CC\uB4DC>         \uD0A4\uC6CC\uB4DC\uB85C \uD568\uC218 \uAC80\uC0C9 (\uC608: ls-fns http)",
+    "  freelang fn-doc <\uC774\uB984>           \uD2B9\uC815 \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98 + \uC124\uBA85",
     "  freelang debug <file.fl>         \uB514\uBC84\uADF8 \uBAA8\uB4DC \uC2E4\uD589 (break! \uD65C\uC131\uD654) (Phase 78)",
     "  freelang debug <file.fl> --step  step \uBAA8\uB4DC (\uBAA8\uB4E0 \uC904 \uCD94\uC801)",
     "  freelang watch <file.fl>         \uD30C\uC77C \uBCC0\uACBD \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589 (Phase 79)",
@@ -36611,6 +37623,42 @@ switch (cmd) {
     cmdStdlibDoc(query);
     break;
   }
+  case "ls-fns":
+  case "ls-fn": {
+    const filter = args2[1] ?? "";
+    const signatures = loadEmbeddedSignatures();
+    if (signatures.length === 0) {
+      console.error("\uD568\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. npm run build \uC2E4\uD589 \uD6C4 \uC7AC\uC2DC\uB3C4\uD558\uC138\uC694.");
+      process.exit(1);
+    }
+    const q = filter.toLowerCase();
+    const filtered = q ? signatures.filter((s) => s.name.toLowerCase().includes(q) || s.module.toLowerCase().includes(q)) : signatures;
+    const byModule = /* @__PURE__ */ new Map();
+    for (const s of filtered) {
+      if (!byModule.has(s.module)) byModule.set(s.module, []);
+      byModule.get(s.module).push(s);
+    }
+    const total = filtered.length;
+    const header = q ? `\x1B[36m[ls-fns]\x1B[0m  "${q}" \uD3EC\uD568 \u2014 ${total}\uAC1C
+` : `\x1B[36m[ls-fns]\x1B[0m  \uC804\uCCB4 ${total}\uAC1C \uD568\uC218
+`;
+    process.stdout.write(header);
+    byModule.forEach((fns, mod) => {
+      process.stdout.write(`
+\x1B[33m${mod}\x1B[0m (${fns.length})
+`);
+      for (const f of fns) {
+        const params = f.params ? ` \x1B[2m${f.params}\x1B[0m` : "";
+        const ret = f.returns ? ` \u2192 \x1B[2m${f.returns}\x1B[0m` : "";
+        process.stdout.write(`  ${f.name}${params}${ret}
+`);
+      }
+    });
+    process.stdout.write(`
+\x1B[2m\u{1F4A1}  freelang fn-doc <\uC774\uB984>  \uC73C\uB85C \uC790\uC138\uD55C \uC124\uBA85\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4\x1B[0m
+`);
+    break;
+  }
   case "debug": {
     const filePath = args2[1];
     if (!filePath) {
@@ -36636,6 +37684,16 @@ switch (cmd) {
         console.error(`\x1B[31m[ERROR]\x1B[0m  ${path15.basename(file)}: ${err4.message}`);
       }
     });
+    break;
+  }
+  case "props":
+  case "prop": {
+    const filePath = args2[1];
+    if (!filePath) {
+      console.error("Usage: freelang props <file.fl> [--samples N]");
+      process.exit(1);
+    }
+    cmdProps(filePath, args2.slice(2));
     break;
   }
   case "ci": {

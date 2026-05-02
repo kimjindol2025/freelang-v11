@@ -1,45 +1,54 @@
 ;; self/stdlib/mongodb/wire.fl — MongoDB Wire Protocol OP_MSG
-;; Simplified for FreeLang v11
+;; FreeLang v11
 
-;; === Helper: Parse connection ID ===
-[FUNC wire-parse-host :params [connId]
-  :body (substring connId 0 (index-of connId ":"))]
+;; === Helper: Parse host from "host:port" connId ===
+(defn wire-parse-host [$connId]
+  (substring $connId 0 (index-of $connId ":")))
 
-[FUNC wire-parse-port :params [connId]
-  :body (num (substring connId (+ (index-of connId ":") 1)))]
+;; === Helper: Parse port from "host:port" connId ===
+(defn wire-parse-port [$connId]
+  (str-to-num (substring $connId (+ (index-of $connId ":") 1))))
 
-;; === Helper: Build OP_MSG header ===
-;; Returns: messageLength(4) + requestID(4) + responseTo(4) + opCode(4) + flags(4)
-;; opCode for OP_MSG = 2013 = 0x07dd (little-endian: dd 07 00 00)
-[FUNC wire-build-header :params [msgLen reqId]
-  :body (let [[len-hex (bson-int32-hex msgLen)]
-              [id-hex (bson-int32-hex reqId)]]
-    (str len-hex
-         id-hex                        ;; requestID
-         "00000000"                     ;; responseTo = 0
-         "dd070000"                     ;; opCode = 2013 (OP_MSG) - FIXED!
-         "00000000"))]                  ;; flags = 0
+;; === Helper: INT32 to little-endian hex ===
+(defn wire-int32-hex [$n]
+  (let [[$n (floor $n)]
+        [$b0 (% $n 256)]
+        [$b1 (% (floor (/ $n 256)) 256)]
+        [$b2 (% (floor (/ $n 65536)) 256)]
+        [$b3 (% (floor (/ $n 16777216)) 256)]]
+    (str (to-hex $b0) (to-hex $b1) (to-hex $b2) (to-hex $b3))))
 
-;; === Main: Send OP_MSG command ===
-[FUNC wire-send-command :params [connId db cmd]
-  :body (let [[host (wire-parse-host connId)]
-              [port (wire-parse-port connId)]
-              [bson (bson-encode-native cmd)]
-              [section (str "00" bson)]
-              [bson-size (/ (length bson) 2)]
-              [header-payload-size (+ 4 1 bson-size)]  ;; 4(flags) + 1(section type) + bson
-              [header (wire-build-header (+ 20 header-payload-size) 1)]
-              [opmsg (str header "00" bson)]]
-    (net-sendrecv host port opmsg 5000))]
+;; === Helper: Build OP_MSG header (20 bytes incl. flags) ===
+;; Layout: msgLen(4) + requestID(4) + responseTo(4) + opCode(4) + flags(4)
+(defn wire-build-header [$msgLen $reqId]
+  (let [[$len-hex (wire-int32-hex $msgLen)]
+        [$id-hex  (wire-int32-hex $reqId)]]
+    (str $len-hex
+         $id-hex
+         "00000000"    ;; responseTo = 0
+         "dd070000"    ;; opCode = 2013 (OP_MSG)
+         "00000000"))) ;; flags = 0
 
-;; === Response parser: Extract BSON from OP_MSG response ===
-;; OP_MSG Response: header(20) + flags(4) + sectionType(1) + BSON
-;; In hex: offset 42 (= 20*2 + 4*2) = header + flags
-;; Then skip 1 byte (2 hex chars) for sectionType → offset 44
-[FUNC wire-parse-response :params [responseHex]
-  :body (if (= responseHex null)
+;; === Main: Send OP_MSG command, return raw hex response ===
+;; MongoDB OP_MSG requires $db field in command document
+(defn wire-send-command [$connId $db $cmd]
+  (let [[$host     (wire-parse-host $connId)]
+        [$port     (wire-parse-port $connId)]
+        [$full-cmd (assoc $cmd "$db" $db)]
+        [$bson     (bson-encode-native $full-cmd)]
+        [$bson-size (/ (length $bson) 2)]
+        ;; total = MsgHeader(16) + flagBits(4) + sectionKind(1) + bson
+        [$total-size (+ 21 $bson-size)]
+        [$header   (wire-build-header $total-size 1)]
+        [$opmsg    (str $header "00" $bson)]]
+    (net-sendrecv $host $port $opmsg 5000)))
+
+;; === Parse OP_MSG response: skip MsgHeader(16) + flagBits(4) + sectionKind(1) ===
+;; In hex chars: 16*2 + 4*2 + 1*2 = 42 chars → BSON starts here
+(defn wire-parse-response [$responseHex]
+  (if (nil? $responseHex)
     null
-    (let [[bson-hex (substring responseHex 44)]]  ;; Skip header(40) + flags(4) + sectionType(2)
-      (bson-decode-native bson-hex)))]
+    (let [[$bson-hex (substring $responseHex 42)]]
+      (bson-decode-native $bson-hex))))
 
 (println "Wire Protocol module loaded")
