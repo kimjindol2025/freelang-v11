@@ -1,102 +1,70 @@
-# FreeLang v11 상태 보고서
+# FreeLang v11 현재 상태
 
-**최종 업데이트**: 2026-05-03
+**업데이트**: 2026-05-03  
 **버전**: 11.1.0
-**상태**: ✅ L1 자가호스팅 달성 + L2 증명 진행 중
 
 ---
 
-## 📊 자가호스팅 달성도
+## 자가 호스팅 단계
 
-| 단계 | 항목 | 상태 | 완성도 |
-|------|------|------|-------|
-| **L0** | TypeScript + Node.js (bootstrap.js) | ✅ 완료 | 100% |
-| **L1** | 자가호스팅 (FL 코드로 컴파일러 작성) | ✅ 완료 | 100% |
-| **L2** | 고정점 증명 (bootstrap == stage1 의미 동등성) | 🔧 16/17 | 94% |
-| **L3** | Node.js SEA 바이너리 | 📋 준비 | 0% |
-| **L4** | 완전 자립 (Node.js 제거) | 📋 장기 | 0% |
+| 단계 | 설명 | 상태 | 비고 |
+|------|------|------|------|
+| **L0** | TypeScript → `bootstrap.js` | ✅ 완료 | 38,661줄 |
+| **L1** | `bootstrap.js` → `stage1.js` (`self/all.fl` 컴파일) | ✅ 완료 | 620줄 |
+| **L2** | `bootstrap.js` == `stage1.js` 의미 동등성 | ✅ **17/17 (100%)** | 2026-05-02 달성 |
+| **L3** | `stage1.js` → `stage2.js` (자기 자신 컴파일) | 🔧 진행 중 | `cli_main` 연결 필요 |
+| **L4** | TypeScript 완전 독립 | 📋 예정 | Node.js SEA 검토 중 |
+
+### L3 현황
+```bash
+node stage1.js self/all.fl /tmp/stage2.js   # 컴파일: 성공 (8,523줄 생성)
+node /tmp/stage2.js input.fl out.js          # 실행: ReferenceError: cli_main is not defined
+```
+`self/main.fl`의 `cli_main`이 `self/all.fl`에 올바르게 포함되지 않아 실행 불가. 수정 필요.
 
 ---
 
-## 📈 현재 수치 (2026-05-03 실측)
+## 테스트 현황
 
 | 항목 | 수치 |
 |------|------|
-| 테스트 통과 | **773/832** (92.9%) |
-| 실패 Test Suite | 4개 (l2-proof, semantic-preservation, self-hosting, ai-library) |
-| bootstrap.js 크기 | 1.4MB |
-| stage1.js 크기 | 65KB |
-| 버전 | 11.1.0 |
+| 전체 테스트 | 832개 |
+| 통과 | 775개 (93.2%) |
+| 실패 | 56개 |
+| 실패 suite | ai-library (3개), semantic-preservation, self-hosting |
 
 ---
 
-## ✅ L1: 자가호스팅 완성
+## 언어 기능
 
-### 달성 경로
-```
-bootstrap.js (TypeScript, L0)
-    ↓ bootstrap.js compile self/all.fl
-stage1.js (FreeLang으로 작성된 컴파일러)
-    ↓ stage1.js compile self/all.fl
-동일한 컴파일러 재생성 (SHA256 일치)
-```
+### Tier 1: 핵심 ✅
+- Lexer / Parser / Codegen
+- Stdlib 500+ 함수 (HTTP, DB, File, Crypto, AI, WebSocket 등)
+- 재귀, 클로저, 고차함수
+- Pattern matching, let/let*
+- try/catch/finally
+- loop/recur (TCO)
+- async/await
+- Template literal (`${}`)
 
----
+### Tier 2: 프로덕션 ✅
+- 자가 호스팅 L2 완전 증명
+- AI-Native (fn-meta, ^pure, effects 추론) Phase 1~4
+- MariaDB Pool + MongoDB Wire Protocol
+- Rate Limiting + CSP + multipart
+- REPL 디버거 (watch, callStack)
+- MCP 서버 (`mcp.dclub.kr`, `fl_eval`)
 
-## 🔧 L2: 고정점 증명 (진행 중)
-
-### 정의
-`bootstrap.js compile X` 의 출력 == `stage1.js compile X` 의 출력 (17개 케이스 모두)
-
-### 현황: 16/17 통과
-| 케이스 | 내용 | 상태 |
-|--------|------|------|
-| case-01 ~ case-14 | arithmetic, comparisons, logic, control-flow, functions, collections, pattern-matching, recursion, strings, loops, higher-order, edge-cases, ai-vector, ai-cosine | ✅ |
-| **case-15** | ai-template (파라미터 버그) | 🔧 수정 중 |
-| case-16 ~ case-17 | ai-ranking, stdlib-extended | ✅ |
-
-### 발견된 버그 (현재 세션)
-`stage1.js`의 `extract-params-loop`에서 `kind === "literal"` 케이스 누락
-- 일반 파라미터 (`m`, `template`, `vars`)가 모두 `"p"`로 컴파일되는 문제
-- `all.fl` 수정 완료, stage1.js 재컴파일 진행 중
+### Tier 3: 진행 중 🔧
+- L3 자가 컴파일 (stage2)
+- 실패 테스트 suite 3개 수정
 
 ---
 
-## 🚀 최근 주요 추가 기능 (2026-04-29 이후)
+## 파일 크기
 
-| 커밋 | 기능 |
+| 파일 | 크기 |
 |------|------|
-| `a1d73e43` | `fl_load` — 다른 `.fl` 파일 로드 |
-| `41566cdf` | MongoDB stdlib 고급 드라이버 (npm mongodb) |
-| `e71825cc` | 보안 강화: Rate Limiting + CSP + multipart + 이미지 처리 |
-| `2302146c` | AI-Native Phase 4: defprop + property-based testing |
-| `bfce5f81` | AI-Native Phase 3: `^pure` 순수성 강제 |
-| `97a584f8` | AI-Native Phase 2: `:effects` 추론 + 강제 |
-| `0963669c` | AI-Native Phase 1: defn 메타 시스템 |
-
----
-
-## ❌ 현재 실패 항목 (해결 필요)
-
-| 항목 | 원인 | 우선순위 |
-|------|------|---------|
-| L2 case-15 | stage1 파라미터 코드젠 버그 | P0 (수정 중) |
-| ai-library 테스트 | `.test-cache/ai-lib.js` 삭제됨 | P1 |
-| self-hosting tier2 | stage1 self-compile 크기 부족 | P1 |
-| semantic-preservation | L2 연동 테스트 | P1 |
-
----
-
-## 📋 다음 단계
-
-```
-현재 (2026-05-03): L2 16/17 — case-15 수정 진행 중
-    ↓
-L2 17/17 완성 → stage1 파라미터 버그 완전 해결
-    ↓
-Phase 3-E: VM 최적화 (130ms → 87ms)
-    ↓
-Phase 4: stage1 완전 안정화 (모든 테스트 통과)
-    ↓
-Phase 5: 배포 패키징
-```
+| `bootstrap.js` | 38,661줄 (1.4MB) |
+| `stage1.js` | 620줄 |
+| `self/all.fl` | (컴파일러 전체 FL 소스) |

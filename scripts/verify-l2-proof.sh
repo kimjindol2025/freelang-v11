@@ -74,7 +74,7 @@ run_tests() {
     fi
 
     # 2. stage1으로 컴파일 및 실행
-    if ! node stage1.js compile "$test_file" -o "$stage1_js" --runtime >/dev/null 2>&1; then
+    if ! node stage1.js "$test_file" "$stage1_js" >/dev/null 2>&1; then
       log_fail "  stage1 컴파일 실패"; failed=$((failed + 1))
       results+=("{ \"name\": \"$test_name\", \"status\": \"FAIL\", \"reason\": \"stage1 compile\" }")
       continue
