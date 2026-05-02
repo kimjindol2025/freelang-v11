@@ -17916,6 +17916,89 @@ function extractMapMeta(mapNode) {
   }
   return meta;
 }
+var EFFECT_CATALOG = /* @__PURE__ */ new Map([
+  // HTTP 클라이언트
+  ["http_get", "http"],
+  ["http-get", "http"],
+  ["http_post", "http"],
+  ["http-post", "http"],
+  ["http_put", "http"],
+  ["http-put", "http"],
+  ["http_delete", "http"],
+  ["http-delete", "http"],
+  ["http_patch", "http"],
+  ["http-patch", "http"],
+  ["http_get_bearer", "http"],
+  ["http_post_bearer", "http"],
+  ["http_post_json", "http"],
+  ["http_get_json", "http"],
+  // 파일 I/O
+  ["file_read", "file-read"],
+  ["file-read", "file-read"],
+  ["file_write", "file-write"],
+  ["file-write", "file-write"],
+  ["file_append", "file-write"],
+  ["file_delete", "file-write"],
+  ["file_exists", "file-read"],
+  ["file_list", "file-read"],
+  // DB
+  ["db_query", "db-read"],
+  ["db-query", "db-read"],
+  ["db_execute", "db-write"],
+  ["db-execute", "db-write"],
+  ["db_insert", "db-write"],
+  ["db-insert", "db-write"],
+  ["db_update", "db-write"],
+  ["db-update", "db-write"],
+  ["db_delete", "db-write"],
+  ["db-delete", "db-write"],
+  // Shell
+  ["shell_exec", "shell"],
+  ["shell-exec", "shell"],
+  ["shell_run", "shell"],
+  // I/O (stdout)
+  ["println", "io"],
+  ["print", "io"],
+  ["log/info", "io"],
+  ["log/warn", "io"],
+  ["log/error", "io"],
+  // 시간/랜덤 (non-determinism)
+  ["now", "time"],
+  ["timestamp", "time"],
+  ["random", "random"],
+  ["rand-int", "random"],
+  // HTTP 서버 시작
+  ["server_start", "server"],
+  ["server-start", "server"]
+]);
+function collectBodyEffects(node, found) {
+  if (!node) return;
+  if (node.kind === "sexpr") {
+    const op = node.op ?? "";
+    const eff = EFFECT_CATALOG.get(op);
+    if (eff) found.add(eff);
+    if (Array.isArray(node.args)) node.args.forEach((a) => collectBodyEffects(a, found));
+  } else if (node.kind === "block") {
+    if (node.fields instanceof Map) node.fields.forEach((v) => collectBodyEffects(v, found));
+  } else if (node.kind === "literal" || node.kind === "variable") {
+  }
+}
+function checkEffects(fnName, declaredEffects, bodyNode, line) {
+  const found = /* @__PURE__ */ new Set();
+  collectBodyEffects(bodyNode, found);
+  const declaredSet = new Set(declaredEffects.map((e) => e.startsWith(":") ? e.slice(1) : e));
+  const undeclared = [];
+  for (const eff of found) {
+    if (!declaredSet.has(eff)) undeclared.push(eff);
+  }
+  if (undeclared.length > 0) {
+    const hint = undeclared.map((e) => `:${e}`).join(" ");
+    process.stderr.write(
+      `\x1B[33m[effects]\x1B[0m  \x1B[1m${fnName}\x1B[0m${line ? ` (line ${line})` : ""}  \uC120\uC5B8 \uC548 \uB41C effect: \x1B[33m${hint}\x1B[0m  \u2192 :effects \uC5D0 \uCD94\uAC00 \uD544\uC694
+`
+    );
+  }
+}
 function throwArgCount(fn, expected, got, line) {
   throw new FLRuntimeError(
     ErrorCodes.ARG_COUNT,
@@ -18035,15 +18118,20 @@ function evalSpecialForm(interp2, op, expr2) {
     else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr2.line);
     const paramsNode = expr2.args[argIdx];
     let bodyArgs = expr2.args.slice(argIdx + 1);
+    let registeredMeta = null;
     if (bodyArgs.length > 1) {
       const meta = extractMapMeta(bodyArgs[0]);
       if (meta) {
         meta.line = expr2.line;
         fnMetaRegistry.set(name, meta);
+        registeredMeta = meta;
         bodyArgs = bodyArgs.slice(1);
       }
     }
     const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
+    if (registeredMeta?.effects !== void 0) {
+      checkEffects(name, registeredMeta.effects, body, expr2.line);
+    }
     const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
     const fnValue = interp2.evalSExpr(fnExpr);
     try {
@@ -36041,24 +36129,46 @@ function cmdCheck(filePath) {
   const source = fs19.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
-  const metaWarnings = checkDefnMeta(source, absPath);
-  if (metaWarnings.length > 0) {
+  const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
+  let hasWarnings = false;
+  if (metaMissing.length > 0) {
+    hasWarnings = true;
     process.stderr.write(`
-\x1B[33m[meta-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${metaWarnings.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
+\x1B[33m[meta-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
 `);
-    for (const w of metaWarnings) {
+    for (const w of metaMissing) {
       process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 :context/:returns \uC5C6\uC74C
 `);
     }
-    process.stderr.write(`\x1B[2m  \uD301: (defn ${metaWarnings[0].name} [...] {:context "..." :returns "..."} ...)\x1B[0m
-
+    process.stderr.write(`\x1B[2m  \uD301: (defn ${metaMissing[0].name} [...] {:context "..." :returns "..."} ...)\x1B[0m
 `);
   }
+  if (effectsWarn.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`
+\x1B[33m[effects-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${effectsWarn.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
+`);
+    for (const w of effectsWarn) {
+      const hint = w.undeclared.map((e) => `:${e}`).join(" ");
+      process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \uBBF8\uC120\uC5B8 effect: \x1B[33m${hint}\x1B[0m
+`);
+    }
+  }
+  if (hasWarnings) process.stderr.write("\n");
 }
 function checkDefnMeta(source, filePath) {
-  const warnings = [];
+  const metaMissing = [];
+  const effectsWarn = [];
   try {
-    let walkNodes = function(nodes) {
+    let collectCalls = function(node, found) {
+      if (!node) return;
+      if (node.kind === "sexpr") {
+        if (node.op) found.add(node.op);
+        if (Array.isArray(node.args)) node.args.forEach((a) => collectCalls(a, found));
+      } else if (node.kind === "block" && node.fields instanceof Map) {
+        node.fields.forEach((v) => collectCalls(v, found));
+      }
+    }, walkNodes = function(nodes) {
       for (const node of nodes) {
         if (!node) continue;
         if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
@@ -36067,15 +36177,38 @@ function checkDefnMeta(source, filePath) {
           if (args3[argIdx]?.kind === "literal" && String(args3[argIdx].value ?? "").startsWith("^")) argIdx++;
           const nameNode = args3[argIdx];
           const name = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
-          const paramsNode = args3[argIdx + 1];
-          const bodyArgs = args3.slice(argIdx + 2);
+          let bodyArgs = args3.slice(argIdx + 2);
           const first = bodyArgs[0];
-          let hasMeta = false;
+          let metaMap = null;
           if (first?.kind === "block" && first?.type === "Map" && first.fields instanceof Map) {
-            hasMeta = [...first.fields.keys()].some((k) => META_KEYS2.has(k));
+            if ([...first.fields.keys()].some((k) => META_KEYS2.has(k))) {
+              metaMap = first.fields;
+              bodyArgs = bodyArgs.slice(1);
+            }
           }
-          if (!hasMeta && bodyArgs.length > 0) {
-            warnings.push({ name, line: node.line ?? 0 });
+          if (!metaMap && bodyArgs.length > 0) {
+            metaMissing.push({ name, line: node.line ?? 0 });
+          }
+          if (metaMap?.has("effects")) {
+            const eNode = metaMap.get("effects");
+            let declared = [];
+            if (eNode?.kind === "block" && eNode?.type === "Array") {
+              const items = eNode.fields?.get("items");
+              if (Array.isArray(items)) {
+                declared = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+              }
+            }
+            const declaredSet = new Set(declared);
+            const calledOps = /* @__PURE__ */ new Set();
+            bodyArgs.forEach((b) => collectCalls(b, calledOps));
+            const undeclared = [];
+            calledOps.forEach((op) => {
+              const eff = EFFECT_CATALOG.get(op);
+              if (eff && !declaredSet.has(eff)) undeclared.push(eff);
+            });
+            if (undeclared.length > 0) {
+              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)] });
+            }
           }
           walkNodes(bodyArgs);
         } else if (node.kind === "sexpr" && node.args) {
@@ -36091,7 +36224,7 @@ function checkDefnMeta(source, filePath) {
     walkNodes(ast);
   } catch {
   }
-  return warnings;
+  return { metaMissing, effectsWarn };
 }
 function cmdCodegen(args3) {
   const inputFile = args3.find((a) => !a.startsWith("-") && a.endsWith(".fl"));

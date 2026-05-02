@@ -53,6 +53,78 @@ function extractMapMeta(mapNode: any): FnMeta | null {
   return meta;
 }
 
+// ── AI-Native Phase 2: Effects 정적 분석 ─────────────────────────
+// 함수명 → 발생 effect 매핑 (well-known side effects)
+export const EFFECT_CATALOG = new Map<string, string>([
+  // HTTP 클라이언트
+  ["http_get",            "http"], ["http-get",            "http"],
+  ["http_post",           "http"], ["http-post",           "http"],
+  ["http_put",            "http"], ["http-put",            "http"],
+  ["http_delete",         "http"], ["http-delete",         "http"],
+  ["http_patch",          "http"], ["http-patch",          "http"],
+  ["http_get_bearer",     "http"], ["http_post_bearer",    "http"],
+  ["http_post_json",      "http"], ["http_get_json",       "http"],
+  // 파일 I/O
+  ["file_read",  "file-read"],  ["file-read",  "file-read"],
+  ["file_write", "file-write"], ["file-write", "file-write"],
+  ["file_append","file-write"], ["file_delete","file-write"],
+  ["file_exists","file-read"],  ["file_list",  "file-read"],
+  // DB
+  ["db_query",   "db-read"],  ["db-query",   "db-read"],
+  ["db_execute", "db-write"], ["db-execute", "db-write"],
+  ["db_insert",  "db-write"], ["db-insert",  "db-write"],
+  ["db_update",  "db-write"], ["db-update",  "db-write"],
+  ["db_delete",  "db-write"], ["db-delete",  "db-write"],
+  // Shell
+  ["shell_exec", "shell"], ["shell-exec", "shell"],
+  ["shell_run",  "shell"],
+  // I/O (stdout)
+  ["println", "io"], ["print", "io"],
+  ["log/info", "io"], ["log/warn", "io"], ["log/error", "io"],
+  // 시간/랜덤 (non-determinism)
+  ["now",        "time"], ["timestamp", "time"],
+  ["random",     "random"], ["rand-int",  "random"],
+  // HTTP 서버 시작
+  ["server_start", "server"], ["server-start", "server"],
+]);
+
+function collectBodyEffects(node: any, found: Set<string>): void {
+  if (!node) return;
+  if (node.kind === "sexpr") {
+    const op: string = node.op ?? "";
+    const eff = EFFECT_CATALOG.get(op);
+    if (eff) found.add(eff);
+    if (Array.isArray(node.args)) node.args.forEach((a: any) => collectBodyEffects(a, found));
+  } else if (node.kind === "block") {
+    if (node.fields instanceof Map) node.fields.forEach((v: any) => collectBodyEffects(v, found));
+  } else if (node.kind === "literal" || node.kind === "variable") {
+    // leaf — no recursion needed
+  }
+}
+
+function checkEffects(fnName: string, declaredEffects: string[], bodyNode: any, line?: number): void {
+  const found = new Set<string>();
+  collectBodyEffects(bodyNode, found);
+
+  const declaredSet = new Set(declaredEffects.map(e =>
+    e.startsWith(":") ? e.slice(1) : e));
+
+  const undeclared: string[] = [];
+  for (const eff of found) {
+    if (!declaredSet.has(eff)) undeclared.push(eff);
+  }
+
+  if (undeclared.length > 0) {
+    const hint = undeclared.map(e => `:${e}`).join(" ");
+    process.stderr.write(
+      `\x1b[33m[effects]\x1b[0m  \x1b[1m${fnName}\x1b[0m` +
+      `${line ? ` (line ${line})` : ""}` +
+      `  선언 안 된 effect: \x1b[33m${hint}\x1b[0m` +
+      `  → :effects 에 추가 필요\n`
+    );
+  }
+}
+
 // ── Phase A: 통일 에러 helper ────────────────────────────────────
 function throwArgCount(fn: string, expected: string, got: number, line?: number): never {
   throw new FLRuntimeError(
@@ -195,12 +267,14 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     const paramsNode = expr.args[argIdx];
     let bodyArgs = expr.args.slice(argIdx + 1);
 
-    // AI-Native Phase 1: 첫 body 표현식이 메타 맵이면 분리
+    // AI-Native Phase 1+2: 첫 body 표현식이 메타 맵이면 분리 + effects 검사
+    let registeredMeta: FnMeta | null = null;
     if (bodyArgs.length > 1) {
       const meta = extractMapMeta(bodyArgs[0]);
       if (meta) {
         meta.line = expr.line;
         fnMetaRegistry.set(name!, meta);
+        registeredMeta = meta;
         bodyArgs = bodyArgs.slice(1);
       }
     }
@@ -208,6 +282,11 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     const body = bodyArgs.length === 1
       ? bodyArgs[0]
       : ({ kind: "sexpr" as const, op: "do", args: bodyArgs } as any);
+
+    // AI-Native Phase 2: :effects 선언된 경우 body에서 실제 effect 추론 + 미선언 경고
+    if (registeredMeta?.effects !== undefined) {
+      checkEffects(name!, registeredMeta.effects, body, expr.line);
+    }
 
     // (fn [params] body) 를 synth → 현재 scope에서 eval하여 function-value 획득
     const fnExpr: any = { kind: "sexpr", op: "fn", args: [paramsNode, body] };

@@ -24,7 +24,7 @@ import { extractDocs } from "./doc-extractor"; // Phase 77: 문서 추출기
 import { renderMarkdown } from "./doc-renderer"; // Phase 77: 문서 렌더러
 import { createDefaultPipeline, createFmtCheckStep, createLintStep, createTestStep } from "./ci-runner"; // Phase 80: CI
 import { WebServer } from "./web"; // Phase 3: Web Server
-import { fnMetaRegistry, FnMeta } from "./eval-special-forms"; // AI-Native Phase 1
+import { fnMetaRegistry, FnMeta, EFFECT_CATALOG } from "./eval-special-forms"; // AI-Native Phase 1+2
 
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
@@ -260,47 +260,99 @@ function cmdCheck(filePath: string): void {
   const ok = checkSource(source, absPath);
   if (!ok) process.exit(1);
 
-  // AI-Native Phase 1: defn 메타 검사 (AST 정적 분석)
-  const metaWarnings = checkDefnMeta(source, absPath);
-  if (metaWarnings.length > 0) {
-    process.stderr.write(`\n\x1b[33m[meta-check]\x1b[0m  ${path.basename(absPath)} — ${metaWarnings.length}개 함수에 메타 없음\n`);
-    for (const w of metaWarnings) {
+  // AI-Native Phase 1+2: defn 메타 + effects 검사 (AST 정적 분석)
+  const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
+  let hasWarnings = false;
+
+  if (metaMissing.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`\n\x1b[33m[meta-check]\x1b[0m  ${path.basename(absPath)} — ${metaMissing.length}개 함수에 메타 없음\n`);
+    for (const w of metaMissing) {
       process.stderr.write(`  \x1b[33m⚠\x1b[0m  line ${w.line}: \x1b[1m${w.name}\x1b[0m — :context/:returns 없음\n`);
     }
-    process.stderr.write(`\x1b[2m  팁: (defn ${metaWarnings[0].name} [...] {:context "..." :returns "..."} ...)\x1b[0m\n\n`);
+    process.stderr.write(`\x1b[2m  팁: (defn ${metaMissing[0].name} [...] {:context "..." :returns "..."} ...)\x1b[0m\n`);
   }
+
+  if (effectsWarn.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`\n\x1b[33m[effects-check]\x1b[0m  ${path.basename(absPath)} — ${effectsWarn.length}개 함수에 미선언 effect\n`);
+    for (const w of effectsWarn) {
+      const hint = w.undeclared.map((e: string) => `:${e}`).join(" ");
+      process.stderr.write(`  \x1b[33m⚠\x1b[0m  line ${w.line}: \x1b[1m${w.name}\x1b[0m — 미선언 effect: \x1b[33m${hint}\x1b[0m\n`);
+    }
+  }
+
+  if (hasWarnings) process.stderr.write("\n");
 }
 
-function checkDefnMeta(source: string, filePath?: string): Array<{name: string; line: number}> {
-  const warnings: Array<{name: string; line: number}> = [];
+function checkDefnMeta(source: string, filePath?: string): {
+  metaMissing: Array<{name: string; line: number}>;
+  effectsWarn: Array<{name: string; line: number; undeclared: string[]}>;
+} {
+  const metaMissing: Array<{name: string; line: number}> = [];
+  const effectsWarn: Array<{name: string; line: number; undeclared: string[]}> = [];
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
     const META_KEYS = new Set(["returns", "context", "effects", "examples"]);
 
+    // Collect all calls in a subtree
+    function collectCalls(node: any, found: Set<string>): void {
+      if (!node) return;
+      if (node.kind === "sexpr") {
+        if (node.op) found.add(node.op);
+        if (Array.isArray(node.args)) node.args.forEach((a: any) => collectCalls(a, found));
+      } else if (node.kind === "block" && node.fields instanceof Map) {
+        node.fields.forEach((v: any) => collectCalls(v, found));
+      }
+    }
+
     function walkNodes(nodes: any[]): void {
       for (const node of nodes) {
         if (!node) continue;
         if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
-          // find function name
           let argIdx = 0;
           const args = node.args ?? [];
           if (args[argIdx]?.kind === "literal" && String((args[argIdx] as any).value ?? "").startsWith("^")) argIdx++;
           const nameNode = args[argIdx];
           const name: string = nameNode?.kind === "variable" ? nameNode.name
             : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
-          const paramsNode = args[argIdx + 1];
-          const bodyArgs = args.slice(argIdx + 2);
+          let bodyArgs = args.slice(argIdx + 2);
           // check if first body arg is a meta map
           const first = bodyArgs[0] as any;
-          let hasMeta = false;
+          let metaMap: Map<string, any> | null = null;
           if (first?.kind === "block" && first?.type === "Map" && first.fields instanceof Map) {
-            hasMeta = [...first.fields.keys()].some(k => META_KEYS.has(k));
+            if ([...first.fields.keys()].some(k => META_KEYS.has(k))) {
+              metaMap = first.fields;
+              bodyArgs = bodyArgs.slice(1);
+            }
           }
-          if (!hasMeta && bodyArgs.length > 0) {
-            warnings.push({ name, line: node.line ?? 0 });
+          if (!metaMap && bodyArgs.length > 0) {
+            metaMissing.push({ name, line: node.line ?? 0 });
           }
-          // recurse into body
+          // AI-Native Phase 2: effects 정적 검사
+          if (metaMap?.has("effects")) {
+            const eNode = metaMap.get("effects") as any;
+            let declared: string[] = [];
+            if (eNode?.kind === "block" && eNode?.type === "Array") {
+              const items = eNode.fields?.get("items") as any[];
+              if (Array.isArray(items)) {
+                declared = items.map((it: any) =>
+                  it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+              }
+            }
+            const declaredSet = new Set(declared);
+            const calledOps = new Set<string>();
+            bodyArgs.forEach((b: any) => collectCalls(b, calledOps));
+            const undeclared: string[] = [];
+            calledOps.forEach(op => {
+              const eff = EFFECT_CATALOG.get(op);
+              if (eff && !declaredSet.has(eff)) undeclared.push(eff);
+            });
+            if (undeclared.length > 0) {
+              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)] });
+            }
+          }
           walkNodes(bodyArgs);
         } else if (node.kind === "sexpr" && node.args) {
           walkNodes(node.args);
@@ -312,7 +364,7 @@ function checkDefnMeta(source: string, filePath?: string): Array<{name: string; 
 
     walkNodes(ast as any[]);
   } catch { /* parse errors already reported */ }
-  return warnings;
+  return { metaMissing, effectsWarn };
 }
 
 // ─────────────────────────────────────────
