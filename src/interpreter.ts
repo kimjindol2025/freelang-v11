@@ -2048,7 +2048,7 @@ export class Interpreter {
     if (typeof val === "object") {
       if (val.kind === "function-value") return `<fn:${val.name || "λ"}>`;
       const entries = Object.entries(val)
-        .filter(([k]) => !k.startsWith("_"))
+        .filter(([k]) => !k.startsWith("__"))
         .map(([k, v]) => `${k}: ${this.toDisplayString(v)}`);
       return "{" + entries.join(", ") + "}";
     }

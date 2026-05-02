@@ -584,12 +584,19 @@ export class Parser {
     if (this.check(T.Colon)) {
       this.advance(); // consume ':'
       const next = this.tokens[this.pos];
-      // Accept any token with an identifier-like value (Symbol, or any keyword like :open, :search, etc.)
-      if (next && next.value && /^[a-zA-Z_][a-zA-Z0-9_\-]*$/.test(next.value)) {
-        const token = this.advance();
-        return makeLiteral("string", token.value);
+      if (next) {
+        // :$set :$gt :$in → "$set" "$gt" "$in"  (MongoDB operators — Variable 토큰, $ 복원)
+        // ※ 반드시 심볼 체크보다 먼저 (Variable token의 value는 $ 없이 저장됨)
+        if (next.type === T.Variable && next.value) {
+          this.advance();
+          return makeLiteral("string", "$" + next.value);
+        }
+        // :symbol, :keyword → "symbol"
+        if (next.value && /^[a-zA-Z_][a-zA-Z0-9_\-]*$/.test(next.value)) {
+          return makeLiteral("string", this.advance().value);
+        }
       }
-      // Bare colon (shouldn't happen in valid code, but handle gracefully)
+      // Bare colon
       return makeLiteral("string", ":");
     }
 
@@ -685,13 +692,19 @@ export class Parser {
 
       // Accept both keyword keys (:name) and string keys ("name")
       if (this.check(T.Colon)) {
-        // Keyword key: :name — allow any token (Symbol or reserved keyword like :open :if :when)
+        // Keyword key: :name or :$operator (MongoDB)
         this.advance(); // consume ':'
         const keyTok = this.peek();
         if (keyTok.type === T.RBrace || this.isAtEnd()) {
           throw this.error(`Expected key after ':' in map literal`, keyTok);
         }
-        key = this.advance().value;
+        // :$set :$gt :$in — Variable token → restore $ prefix
+        if (keyTok.type === T.Variable) {
+          this.advance();
+          key = "$" + keyTok.value;
+        } else {
+          key = this.advance().value;
+        }
       } else if (this.check(T.String)) {
         // String key: "name" (includes MongoDB operators like "$set")
         key = this.advance().value;

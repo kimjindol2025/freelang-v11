@@ -872,9 +872,14 @@ var init_parser = __esm({
         if (this.check("Colon" /* Colon */)) {
           this.advance();
           const next = this.tokens[this.pos];
-          if (next && next.value && /^[a-zA-Z_][a-zA-Z0-9_\-]*$/.test(next.value)) {
-            const token = this.advance();
-            return makeLiteral("string", token.value);
+          if (next) {
+            if (next.type === "Variable" /* Variable */ && next.value) {
+              this.advance();
+              return makeLiteral("string", "$" + next.value);
+            }
+            if (next.value && /^[a-zA-Z_][a-zA-Z0-9_\-]*$/.test(next.value)) {
+              return makeLiteral("string", this.advance().value);
+            }
           }
           return makeLiteral("string", ":");
         }
@@ -946,7 +951,12 @@ var init_parser = __esm({
             if (keyTok.type === "RBrace" /* RBrace */ || this.isAtEnd()) {
               throw this.error(`Expected key after ':' in map literal`, keyTok);
             }
-            key = this.advance().value;
+            if (keyTok.type === "Variable" /* Variable */) {
+              this.advance();
+              key = "$" + keyTok.value;
+            } else {
+              key = this.advance().value;
+            }
           } else if (this.check("String" /* String */)) {
             key = this.advance().value;
           } else {
@@ -33621,7 +33631,7 @@ var Interpreter = class _Interpreter {
     }
     if (typeof val === "object") {
       if (val.kind === "function-value") return `<fn:${val.name || "\u03BB"}>`;
-      const entries = Object.entries(val).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k}: ${this.toDisplayString(v)}`);
+      const entries = Object.entries(val).filter(([k]) => !k.startsWith("__")).map(([k, v]) => `${k}: ${this.toDisplayString(v)}`);
       return "{" + entries.join(", ") + "}";
     }
     return String(val);
