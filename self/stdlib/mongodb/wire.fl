@@ -41,7 +41,7 @@
         [$total-size (+ 21 $bson-size)]
         [$header   (wire-build-header $total-size 1)]
         [$opmsg    (str $header "00" $bson)]]
-    (net-sendrecv $host $port $opmsg 5000)))
+    (net-sendrecv-pool $host $port $opmsg 5000)))
 
 ;; === Parse OP_MSG response: skip MsgHeader(16) + flagBits(4) + sectionKind(1) ===
 ;; In hex chars: 16*2 + 4*2 + 1*2 = 42 chars → BSON starts here

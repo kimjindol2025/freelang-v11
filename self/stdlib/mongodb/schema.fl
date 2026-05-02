@@ -1,0 +1,95 @@
+;; self/stdlib/mongodb/schema.fl — FreeLang v11 MongoDB 스키마 검증
+;; mongo-schema-define, mongo-schema-validate, mongo-validate-or-throw
+
+;; ─────────────────────────────────────────────────────────────────
+;; 스키마 레지스트리 (전역 atom)
+;; ─────────────────────────────────────────────────────────────────
+
+(define _mongo-schemas (atom {}))
+
+;; mongo-schema-define name schema → name
+;; schema: {:fields {"name" {:type "string" :required true}} :strict false}
+(defn mongo-schema-define [$name $schema]
+  (swap! _mongo-schemas (fn [$m] (assoc $m $name $schema)))
+  $name)
+
+;; ─────────────────────────────────────────────────────────────────
+;; 단일 필드 타입 체크
+;; ─────────────────────────────────────────────────────────────────
+
+(defn _schema-type-ok? [$val $type]
+  (cond
+    [(= $type "string")  (string? $val)]
+    [(= $type "number")  (number? $val)]
+    [(= $type "boolean") (boolean? $val)]
+    [(= $type "array")   (array? $val)]
+    [(= $type "object")  (map? $val)]
+    [(= $type "any")     true]
+    [true                true]))
+
+;; ─────────────────────────────────────────────────────────────────
+;; 문서 검증 (순수 함수 — atom 없음)
+;; ─────────────────────────────────────────────────────────────────
+
+;; _validate-fields: fields-map doc → [error-strings]
+(defn _validate-fields [$fields $doc]
+  (reduce
+    (fn [$errs $entry]
+      (let [[$fname (get $entry 0)]
+            [$fdef  (get $entry 1)]
+            [$req   (get $fdef "required")]
+            [$type  (get $fdef "type")]
+            [$val   (get $doc $fname)]]
+        (cond
+          [(and $req (nil? $val))
+           (append $errs (str $fname " is required"))]
+          [(and (not (nil? $val)) (not (nil? $type)) (not (_schema-type-ok? $val $type)))
+           (append $errs (str $fname " must be " $type))]
+          [true $errs])))
+    []
+    (map-entries $fields)))
+
+;; _validate-strict: fields-map doc → [error-strings]
+(defn _validate-strict [$fields $doc]
+  (reduce
+    (fn [$errs $entry]
+      (let [[$k (get $entry 0)]]
+        (if (nil? (get $fields $k))
+          (append $errs (str $k " is not allowed"))
+          $errs)))
+    []
+    (map-entries $doc)))
+
+;; mongo-schema-validate doc schema → {:ok true} or {:ok false :errors [...]}
+(defn mongo-schema-validate [$doc $schema]
+  (let [[$fields  (get $schema "fields")]
+        [$strict  (get $schema "strict")]
+        [$errs1   (if (map? $fields) (_validate-fields $fields $doc) [])]
+        [$errs2   (if (and $strict (map? $fields))
+                    (_validate-strict $fields $doc)
+                    [])]
+        [$all-errs (reduce (fn [$a $e] (append $a $e)) $errs1 $errs2)]]
+    (if (= (length $all-errs) 0)
+      {:ok true}
+      {:ok false :errors $all-errs})))
+
+;; mongo-validate-or-throw schema-name doc → doc (검증 통과 시) or throws
+(defn mongo-validate-or-throw [$schema-name $doc]
+  (let [[$schema (get (deref _mongo-schemas) $schema-name)]]
+    (if (nil? $schema)
+      (error (str "Schema not found: " $schema-name))
+      (let [[$result (mongo-schema-validate $doc $schema)]]
+        (if (get $result "ok")
+          $doc
+          (error (str "Schema validation failed: " (join (get $result "errors") ", "))))))))
+
+;; ─────────────────────────────────────────────────────────────────
+;; 검증 후 삽입 헬퍼
+;; ─────────────────────────────────────────────────────────────────
+
+;; mongo-insert-validated conn db coll schema-name doc → result
+(defn mongo-insert-validated [$conn $db $coll $schema-name $doc]
+  (mongo-validate-or-throw $schema-name $doc)
+  (mongo-insert $conn $db $coll $doc))
+
+(println "MongoDB schema module loaded")
