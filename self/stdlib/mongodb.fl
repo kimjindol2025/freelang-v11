@@ -2,8 +2,8 @@
 ;; Full implementation with Wire Protocol + Mock Responses
 
 ;; Load sub-modules (절대경로)
-(load "/root/kim/freelang-v11/self/stdlib/mongodb/bson.fl")
-(load "/root/kim/freelang-v11/self/stdlib/mongodb/wire.fl")
+(load "/home/kimjin/freelang-v11/self/stdlib/mongodb/bson.fl")
+(load "/home/kimjin/freelang-v11/self/stdlib/mongodb/wire.fl")
 
 ;; ─────────────────────────────────────────────────────────────────────
 ;; Connection Management

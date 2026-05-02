@@ -21,7 +21,7 @@ describe("MongoDB Phase 4: Integration Tests", () => {
       kind: "sexpr",
       op: "load",
       args: [
-        { kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/bson.fl" },
+        { kind: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb/bson.fl" },
       ],
     } as any);
 
@@ -41,7 +41,7 @@ describe("MongoDB Phase 4: Integration Tests", () => {
       kind: "sexpr",
       op: "load",
       args: [
-        { kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb/wire.fl" },
+        { kind: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb/wire.fl" },
       ],
     } as any);
 
@@ -56,7 +56,7 @@ describe("MongoDB Phase 4: Integration Tests", () => {
       kind: "sexpr",
       op: "load",
       args: [
-        { kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" },
+        { kind: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" },
       ],
     } as any);
 
@@ -104,7 +104,7 @@ describe("MongoDB Phase 4: CRUD Operations (Mock)", () => {
     interp.eval({
       kind: "sexpr",
       op: "load",
-      args: [{ kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
+      args: [{ kind: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" }],
     } as any);
   });
 
@@ -153,7 +153,7 @@ describe("MongoDB Phase 4: Completeness Check", () => {
     interp.eval({
       kind: "sexpr",
       op: "load",
-      args: [{ kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
+      args: [{ kind: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" }],
     } as any);
 
     const functions = [
@@ -184,7 +184,7 @@ describe("MongoDB Phase 4: Completeness Check", () => {
     interp.eval({
       kind: "sexpr",
       op: "load",
-      args: [{ kind: "literal", value: "/root/kim/freelang-v11/self/stdlib/mongodb.fl" }],
+      args: [{ kind: "literal", value: "/home/kimjin/freelang-v11/self/stdlib/mongodb.fl" }],
     } as any);
 
     const helpers = [

@@ -23,7 +23,7 @@ describe('Phase 3-D: AI Library (self/stdlib/ai.fl)', () => {
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
 
     execSync(
-      `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} run self/codegen.fl ${aiFile} ${outFile}`,
+      `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} run self/all.fl ${aiFile} ${outFile}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
 

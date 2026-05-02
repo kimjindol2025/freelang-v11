@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 415개 함수, 29 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 418개 함수, 28 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -440,12 +440,7 @@ parallel race with-timeout fl-try use`
 - `(file_mtime filePath)` → number (get modification time as timestamp)
 - `(file_ctime filePath)` → number (get creation time as timestamp)
 
-### greet (2개)
-
-- `(greet/hello $name)` → any
-- `(greet/goodbye $name)` → any
-
-### http (21개)
+### http (23개)
 
 - `(http_get url)` → {:status 200 :body "..."}
 - `(http_post url body)` → {:status 200 :body "..."}
@@ -455,6 +450,8 @@ parallel race with-timeout fl-try use`
 - `(http_patch url body)` → {:status 200 :body "..."}
 - `(http_delete url)` → {:status 200 :body "..."}
 - `(http_head url)` → {:status 200 :body ""}
+- `(http_get_key url api-key)` → {:status 200 :body "..."}
+- `(http_post_key url body api-key)` → {:status 200 :body "..."}
 - `(http_status url)` → number (상태코드만)
 - `(http_json url)` → {:status 200 :data {...} :error nil}
 - `(http_header url header)` → string (특정 헤더만)
@@ -469,7 +466,7 @@ parallel race with-timeout fl-try use`
 - `(is_http_redirect status)` → boolean
 - `(is_http_error status)` → boolean
 
-### http-server (30개)
+### http-server (33개)
 
 - `(server_get path handlerName)` → null
 - `(server_post path handlerName)` → null
@@ -484,10 +481,13 @@ parallel race with-timeout fl-try use`
 - `(server_html_cookie cookie html)` → response (Set-Cookie 헤더 포함 HTML 응답)
 - `(server_redirect url)` → response (302 리다이렉트)
 - `(server_redirect_cookie url cookie)` → response (302 리다이렉트 + Set-Cookie)
+- `(server_header response key value)` → response (헤더 추가)
+- `(server_options response)` → 204 No Content (CORS preflight 응답)
 - `(server_req_cookie req name)` → string | null (쿠키 값 읽기)
 - `(server_wait_respond promise)` → response object (비동기 응답 대기)
 - `(server_req_query req [key])` → object or string
 - `(server_req_header req name)` → string
+- `(server_req_headers req)` → object (전체 헤더 맵)
 - `(server_req_param req name)` → string
 - `(server_req_params req)` → object  (all URL params as an object)
 - `(server_req_method req)` → string
@@ -658,14 +658,6 @@ parallel race with-timeout fl-try use`
 - `(report_create title)` → Report
 - `(report_add report section_name data)` → Report
 - `(report_render report)` → string  (formatted text report)
-
-## Y5: 플러그인 (2개)
-
-FreeLang 플러그인 시스템(Y5)에서 제공하는 추가 함수들:
-- `(greet/hello $name)`
-- `(greet/goodbye $name)`
-
-
 ## 9. 코드 생성 시 체크리스트
 
 작성 후 자체 검증:
@@ -684,4 +676,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-01T00:26:30.724Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-02T05:18:42.240Z

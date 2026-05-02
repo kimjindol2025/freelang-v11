@@ -1,5 +1,5 @@
 ;; bootstrap match 문법 테스트
-;; 1. array pair 형태 (일반적인 match)
+;; 1. (pattern body) 형태
 (match 42
-  ([42 "literal"])
-  ([_ "wildcard"]))
+  (42 "literal")
+  (_ "wildcard"))

@@ -44,7 +44,7 @@ function compileWithBootstrap(flFile: string): CompilationResult {
   const jsFile = flFile.replace('.fl', '.bootstrap.js');
   try {
     execSync(
-      `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} run self/codegen.fl ${flFile} ${jsFile}`,
+      `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} run self/all.fl ${flFile} ${jsFile}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
     const jsCode = fs.readFileSync(jsFile, 'utf-8');

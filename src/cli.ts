@@ -24,6 +24,7 @@ import { extractDocs } from "./doc-extractor"; // Phase 77: 문서 추출기
 import { renderMarkdown } from "./doc-renderer"; // Phase 77: 문서 렌더러
 import { createDefaultPipeline, createFmtCheckStep, createLintStep, createTestStep } from "./ci-runner"; // Phase 80: CI
 import { WebServer } from "./web"; // Phase 3: Web Server
+import { fnMetaRegistry, FnMeta } from "./eval-special-forms"; // AI-Native Phase 1
 
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
@@ -205,6 +206,14 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
     if (!watch) return; // watch가 아니면 여기서 종료
   }
 
+  // 개발 중 --watch 미사용 시 한 번만 힌트 출력
+  if (!watch && !vmBench && !process.env.FL_NO_HINT) {
+    const isServerFile = fs.readFileSync(absPath, "utf-8").includes("server_start");
+    if (isServerFile) {
+      process.stderr.write(`\x1b[2m💡  개발 중에는: freelang watch ${path.basename(absPath)}\x1b[0m\n`);
+    }
+  }
+
   execute();
 
   if (watch) {
@@ -250,6 +259,60 @@ function cmdCheck(filePath: string): void {
   const source = fs.readFileSync(absPath, "utf-8");
   const ok = checkSource(source, absPath);
   if (!ok) process.exit(1);
+
+  // AI-Native Phase 1: defn 메타 검사 (AST 정적 분석)
+  const metaWarnings = checkDefnMeta(source, absPath);
+  if (metaWarnings.length > 0) {
+    process.stderr.write(`\n\x1b[33m[meta-check]\x1b[0m  ${path.basename(absPath)} — ${metaWarnings.length}개 함수에 메타 없음\n`);
+    for (const w of metaWarnings) {
+      process.stderr.write(`  \x1b[33m⚠\x1b[0m  line ${w.line}: \x1b[1m${w.name}\x1b[0m — :context/:returns 없음\n`);
+    }
+    process.stderr.write(`\x1b[2m  팁: (defn ${metaWarnings[0].name} [...] {:context "..." :returns "..."} ...)\x1b[0m\n\n`);
+  }
+}
+
+function checkDefnMeta(source: string, filePath?: string): Array<{name: string; line: number}> {
+  const warnings: Array<{name: string; line: number}> = [];
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const META_KEYS = new Set(["returns", "context", "effects", "examples"]);
+
+    function walkNodes(nodes: any[]): void {
+      for (const node of nodes) {
+        if (!node) continue;
+        if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
+          // find function name
+          let argIdx = 0;
+          const args = node.args ?? [];
+          if (args[argIdx]?.kind === "literal" && String((args[argIdx] as any).value ?? "").startsWith("^")) argIdx++;
+          const nameNode = args[argIdx];
+          const name: string = nameNode?.kind === "variable" ? nameNode.name
+            : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
+          const paramsNode = args[argIdx + 1];
+          const bodyArgs = args.slice(argIdx + 2);
+          // check if first body arg is a meta map
+          const first = bodyArgs[0] as any;
+          let hasMeta = false;
+          if (first?.kind === "block" && first?.type === "Map" && first.fields instanceof Map) {
+            hasMeta = [...first.fields.keys()].some(k => META_KEYS.has(k));
+          }
+          if (!hasMeta && bodyArgs.length > 0) {
+            warnings.push({ name, line: node.line ?? 0 });
+          }
+          // recurse into body
+          walkNodes(bodyArgs);
+        } else if (node.kind === "sexpr" && node.args) {
+          walkNodes(node.args);
+        } else if (node.kind === "block" && node.fields instanceof Map) {
+          walkNodes([...node.fields.values()]);
+        }
+      }
+    }
+
+    walkNodes(ast as any[]);
+  } catch { /* parse errors already reported */ }
+  return warnings;
 }
 
 // ─────────────────────────────────────────
@@ -1431,6 +1494,9 @@ function printUsage(): void {
     "  freelang fmt --check <file.fl>   이미 포맷됐는지 확인 (미포맷 → exit 1)",
     "  freelang fmt --stdin             stdin 입력받아 stdout 출력",
     "  freelang repl                    대화형 REPL",
+    "  freelang ls-fns                  전체 stdlib 함수 목록",
+    "  freelang ls-fns <키워드>         키워드로 함수 검색 (예: ls-fns http)",
+    "  freelang fn-doc <이름>           특정 함수 시그니처 + 설명",
     "  freelang debug <file.fl>         디버그 모드 실행 (break! 활성화) (Phase 78)",
     "  freelang debug <file.fl> --step  step 모드 (모든 줄 추적)",
     "  freelang watch <file.fl>         파일 변경 시 자동 재실행 (Phase 79)",
@@ -1522,6 +1588,42 @@ switch (cmd) {
       process.exit(1);
     }
     cmdStdlibDoc(query);
+    break;
+  }
+  case "ls-fns":
+  case "ls-fn": {
+    // freelang ls-fns           — 전체 함수 목록 (모듈별 그룹)
+    // freelang ls-fns "http"    — 이름에 "http" 포함된 것만
+    // freelang ls-fns --new     — 최근 추가 (미구현, 향후)
+    const filter = args[1] ?? "";
+    const signatures = loadEmbeddedSignatures();
+    if (signatures.length === 0) {
+      console.error("함수 목록을 불러올 수 없습니다. npm run build 실행 후 재시도하세요.");
+      process.exit(1);
+    }
+    const q = filter.toLowerCase();
+    const filtered = q ? signatures.filter(s => s.name.toLowerCase().includes(q) || s.module.toLowerCase().includes(q)) : signatures;
+
+    // 모듈별 그룹
+    const byModule = new Map<string, typeof signatures>();
+    for (const s of filtered) {
+      if (!byModule.has(s.module)) byModule.set(s.module, []);
+      byModule.get(s.module)!.push(s);
+    }
+
+    const total = filtered.length;
+    const header = q ? `\x1b[36m[ls-fns]\x1b[0m  "${q}" 포함 — ${total}개\n` : `\x1b[36m[ls-fns]\x1b[0m  전체 ${total}개 함수\n`;
+    process.stdout.write(header);
+
+    byModule.forEach((fns, mod) => {
+      process.stdout.write(`\n\x1b[33m${mod}\x1b[0m (${fns.length})\n`);
+      for (const f of fns) {
+        const params = f.params ? ` \x1b[2m${f.params}\x1b[0m` : "";
+        const ret = f.returns ? ` → \x1b[2m${f.returns}\x1b[0m` : "";
+        process.stdout.write(`  ${f.name}${params}${ret}\n`);
+      }
+    });
+    process.stdout.write(`\n\x1b[2m💡  freelang fn-doc <이름>  으로 자세한 설명을 볼 수 있습니다\x1b[0m\n`);
     break;
   }
   case "debug": {

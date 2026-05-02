@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 415개 함수, 29 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 418개 함수, 28 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### data
 
@@ -214,14 +214,6 @@ parallel race with-timeout fl-try use`
 - `(create_typed_error type message)` → error (create a typed error)
 
 _(전체 목록은 `docs/AI_SYSTEM_PROMPT.md` 참조)_
-
-## Y5: 플러그인 (2개)
-
-FreeLang 플러그인 시스템(Y5)에서 제공하는 추가 함수들:
-- `(greet/hello $name)`
-- `(greet/goodbye $name)`
-
-
 ## 9. 코드 생성 시 체크리스트
 
 작성 후 자체 검증:
@@ -240,4 +232,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-01T00:26:30.730Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-02T05:18:42.242Z

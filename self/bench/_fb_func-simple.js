@@ -1,2 +1,21 @@
-const double = (x)=>(x*2);
-console.log(double(21))
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null

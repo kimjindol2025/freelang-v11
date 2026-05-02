@@ -9,7 +9,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as net from "net";
-import * as tls from "tls";
+const tls = require("tls");
 import { randomBytes } from "crypto";
 
 export function createMailModule() {

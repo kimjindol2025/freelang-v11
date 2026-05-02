@@ -1624,7 +1624,7 @@ export class Interpreter {
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
     const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
     const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","pipe","->","->>","|>","let","set","if","if-let","when","when-let","unless","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use"]);
+    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","pipe","->","->>","as->","?.","?.","|>","let","set","if","if-let","when","when-let","unless","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
@@ -2033,6 +2033,17 @@ export class Interpreter {
     if (isLazySeq(val)) {
       const preview = lazyTake(3, val).map((v) => this.toDisplayString(v)).join(", ");
       return `<lazy-seq: ${preview}...>`;
+    }
+    if (val instanceof Map) {
+      // Error maps: show message prominently for easy println debugging
+      if (val.has("message") && val.has("raw")) {
+        const msg = val.get("message") ?? "";
+        const line = val.get("line");
+        return line ? `[line ${line}] ${msg}` : String(msg);
+      }
+      const entries: string[] = [];
+      val.forEach((v, k) => entries.push(`${k}: ${this.toDisplayString(v)}`));
+      return "{" + entries.join(", ") + "}";
     }
     if (typeof val === "object") {
       if (val.kind === "function-value") return `<fn:${val.name || "λ"}>`;

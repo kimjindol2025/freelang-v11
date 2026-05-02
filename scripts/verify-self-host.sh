@@ -126,8 +126,8 @@ for i in "${!RT_SNIPPETS[@]}"; do
   B="$WORK/rt_${i}_b.js"
   printf '%s\n' "${RT_SNIPPETS[$i]}" > "$SRC"
   # 2회 compile, 다른 시각에 (bootstrap canonical)
-  node --stack-size=8000 bootstrap.js run self/codegen.fl "$SRC" "$A" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
-  node --stack-size=8000 bootstrap.js run self/codegen.fl "$SRC" "$B" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
+  node --stack-size=8000 bootstrap.js run self/all.fl "$SRC" "$A" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
+  node --stack-size=8000 bootstrap.js run self/all.fl "$SRC" "$B" > /dev/null 2>&1 || { RT_FAIL=$((RT_FAIL+1)); continue; }
   SA=$(sha256sum "$A" | cut -c1-16)
   SB=$(sha256sum "$B" | cut -c1-16)
   if [ "$SA" = "$SB" ]; then
@@ -460,7 +460,7 @@ DEFS_T1=(
   "self/lexer.fl"
   "self/parser.fl"
   "self/ast.fl"
-  "self/codegen.fl"
+  "self/all.fl"
   "self/all.fl"
 )
 

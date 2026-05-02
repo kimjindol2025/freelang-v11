@@ -68,11 +68,24 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
       for (const catchClause of tryBlock.catchClauses) {
         interp.context.variables.push();
         if (catchClause.variable) {
-          let errVal: any;
-          if (typeof error === "string") errVal = error;
-          else if (error instanceof Error) errVal = error.message;
-          else errVal = String(error);
-          interp.context.variables.set("$" + catchClause.variable, errVal);
+          const errMap = new Map<string, any>();
+          if (typeof error === "string") {
+            errMap.set("message", error);
+          } else if (error instanceof Error) {
+            errMap.set("message", error.message);
+            // Extract line number from FL error messages like "(at line N, col M)"
+            const lineMatch = error.message.match(/\(at line (\d+)/);
+            if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
+            // Extract file from FreeLangError if available
+            const flErr = error as any;
+            if (flErr.file) errMap.set("file", flErr.file);
+            if (flErr.code) errMap.set("code", flErr.code);
+            if (flErr.hint) errMap.set("hint", flErr.hint);
+          } else {
+            errMap.set("message", String(error));
+          }
+          errMap.set("raw", error);
+          interp.context.variables.set("$" + catchClause.variable, errMap);
         }
 
         try {

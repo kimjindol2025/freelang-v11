@@ -19,6 +19,40 @@ import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase A: 통일 에러
 
 const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
 
+// ── AI-Native Phase 1: 함수 메타 레지스트리 ────────────────────────
+export interface FnMeta {
+  returns?: string;
+  context?: string;
+  effects?: string[];
+  examples?: string;
+  line?: number;
+  file?: string;
+}
+export const fnMetaRegistry = new Map<string, FnMeta>();
+
+const META_KEYS = new Set(["returns", "context", "effects", "examples"]);
+
+function extractMapMeta(mapNode: any): FnMeta | null {
+  if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
+  const fields: Map<string, any> = mapNode.fields;
+  if (!fields || !(fields instanceof Map)) return null;
+  if (!META_KEYS.has([...fields.keys()].find(k => META_KEYS.has(k)) ?? "")) return null;
+  const meta: FnMeta = {};
+  const strVal = (n: any): string | undefined =>
+    n?.kind === "literal" ? String(n.value) : undefined;
+  if (fields.has("returns"))  meta.returns  = strVal(fields.get("returns"));
+  if (fields.has("context"))  meta.context  = strVal(fields.get("context"));
+  if (fields.has("examples")) meta.examples = strVal(fields.get("examples"));
+  if (fields.has("effects")) {
+    const eNode = fields.get("effects") as any;
+    if (eNode?.kind === "block" && eNode?.type === "Array") {
+      const items = eNode.fields?.get("items") as any[];
+      if (Array.isArray(items)) meta.effects = items.map(it => strVal(it) ?? "?");
+    }
+  }
+  return meta;
+}
+
 // ── Phase A: 통일 에러 helper ────────────────────────────────────
 function throwArgCount(fn: string, expected: string, got: number, line?: number): never {
   throw new FLRuntimeError(
@@ -118,6 +152,9 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       const items = (paramsNode as any).fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
+          // ^type 힌트 심볼은 스킵 (타입 힌트는 런타임에서 무시)
+          if ((item as any).kind === "literal" && (item as any).type === "symbol"
+              && String((item as any).value).startsWith("^")) continue;
           // v11.1: variable ($x) 또는 bare symbol (x) 모두 허용 → 정식 이름은 $-접두사 포함
           if ((item as any).kind === "variable") {
             const n = (item as Variable).name;
@@ -145,14 +182,29 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // (defn name [params...] body) → (define name (fn [params...] body))
   if (op === "defn" || op === "defun") {
     if (expr.args.length < 3) throwArgCount("defn", ">=3", expr.args.length, expr.line);
-    const nameNode = expr.args[0] as any;
+    // ^return-type 힌트가 첫 arg로 올 수 있음: (defn ^number add [...] body)
+    // → name이 ^로 시작하면 다음 arg가 실제 이름
+    let argIdx = 0;
+    if (expr.args[argIdx]?.kind === "literal" && String((expr.args[argIdx] as any).value).startsWith("^")) argIdx++;
+    const nameNode = expr.args[argIdx++] as any;
     let name: string;
     if (nameNode.kind === "variable") name = nameNode.name;
     else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value as string;
     else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr.line);
 
-    const paramsNode = expr.args[1];
-    const bodyArgs = expr.args.slice(2);
+    const paramsNode = expr.args[argIdx];
+    let bodyArgs = expr.args.slice(argIdx + 1);
+
+    // AI-Native Phase 1: 첫 body 표현식이 메타 맵이면 분리
+    if (bodyArgs.length > 1) {
+      const meta = extractMapMeta(bodyArgs[0]);
+      if (meta) {
+        meta.line = expr.line;
+        fnMetaRegistry.set(name!, meta);
+        bodyArgs = bodyArgs.slice(1);
+      }
+    }
+
     const body = bodyArgs.length === 1
       ? bodyArgs[0]
       : ({ kind: "sexpr" as const, op: "do", args: bodyArgs } as any);
@@ -451,6 +503,56 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
         const fn = ev(form);
         val = callFn(fn, [val]);
       }
+    }
+    return val;
+  }
+
+  // ── ?. (nil-safe deep access) ────────────────────────────────────
+  // (?. $obj :key1 :key2 ...) → nil이 나오면 즉시 nil 반환
+  // get-in과 유사하지만 키 배열 대신 variadic 인자
+  if (op === "?.") {
+    if (expr.args.length < 1) return null;
+    let val = ev(expr.args[0]);
+    for (let i = 1; i < expr.args.length; i++) {
+      if (val === null || val === undefined) return null;
+      const keyArg = expr.args[i];
+      let key: any;
+      if ((keyArg as any).kind === "literal") {
+        key = (keyArg as Literal).value;
+      } else {
+        key = ev(keyArg);
+      }
+      if (typeof key === "string" && key.startsWith(":")) key = key.slice(1);
+      val = val instanceof Map
+        ? (val.get(key) ?? val.get(":" + key) ?? null)
+        : (val?.[String(key)] ?? null);
+    }
+    return val ?? null;
+  }
+
+  // ── as-> (thread with named binding) ────────────────────────────
+  // (as-> val $name form1 form2 ...)
+  // 각 form 안에서 $name 이 이전 결과를 가리킴 → 임의 위치에 삽입 가능
+  if (op === "as->") {
+    if (expr.args.length < 3) throw new Error(`as-> requires: (as-> val $name form ...)`);
+    const bindArg = expr.args[1];
+    let bindName: string;
+    if ((bindArg as any).kind === "variable") {
+      bindName = (bindArg as Variable).name;            // "$v" 형태
+    } else if ((bindArg as any).kind === "literal") {
+      bindName = "$" + String((bindArg as Literal).value); // "v" → "$v"
+    } else {
+      throw new Error(`as->: second arg must be a binding name like $v`);
+    }
+    let val = ev(expr.args[0]);
+    ctx.variables.push();
+    try {
+      for (let i = 2; i < expr.args.length; i++) {
+        ctx.variables.set(bindName, val);
+        val = ev(expr.args[i]);
+      }
+    } finally {
+      ctx.variables.pop();
     }
     return val;
   }

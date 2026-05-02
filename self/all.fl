@@ -1169,6 +1169,8 @@
     "const min_val = (a,b) => a<b?a:b;"
     "const error = (msg) => { throw new Error(String(msg)); };"
     "const now_ms = () => Date.now();"
+    "const now_iso = () => new Date().toISOString();"
+    "const now_unix = () => Math.floor(Date.now()/1000);"
     "const json_parse = (s) => { try{return JSON.parse(s);}catch(e){return null;} };"
     "const json_stringify = (v) => JSON.stringify(v);"
     "const shell_exec = (cmd,inp) => { try{const {execSync}=require('child_process');const opts={encoding:'utf8'};if(inp)opts.input=inp;return execSync(cmd,opts);}catch(e){return '';} };"
@@ -1189,14 +1191,14 @@
 
 [FUNC compile-file :params [$input $output]
   :body (let [[$src (file_read $input)]
-              [$ast (parse (lex $src))]
+              [$tokens (lex $src)]
+              [$ast (parse $tokens)]
               [$js (fl->js-with-prelude $ast)]]
           (do (file_write $output $js)
-              (println (str "Compiled " $input " -> " $output))))]
-
-;; self/stdlib/data.fl — Phase 26
-;; 순수 데이터 변환 함수
-
+              (println (str "📖 " $input " -> " $output))
+              (println (str "   Lexed: " (length $tokens) " tokens"))
+              (println (str "   Parsed: " (length $ast) " nodes"))
+              (println (str "   Generated: " (length $js) " bytes"))))]
 ;; 줄 분리
 [FUNC str-lines :params [s]
   :body (split s "\n")]
@@ -1541,11 +1543,17 @@
           (if (null? $argv) null
             (if (= (length $argv) 0) null
               (let [[$cmd (get $argv 0)]]
-                (if (= $cmd "run")
-                  (do-run (get $argv 1))
-                  (let [[$input (get $argv 0)]
-                        [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
-                    (compile-file $input $output)))))))]
+                (cond
+                  [(= $cmd "run")
+                    (do-run (get $argv 1))]
+                  [(= $cmd "compile")
+                    (let [[$input (get $argv 1)]
+                          [$output (if (= (get $argv 2) "-o") (get $argv 3) (get $argv 2))]]
+                      (compile-file $input $output))]
+                  [true
+                    (let [[$input (get $argv 0)]
+                          [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
+                      (compile-file $input $output))])))))]
 
 ;; Entry point trigger
 (cli-main)

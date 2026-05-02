@@ -236,6 +236,20 @@ export function lex(source: string): Token[] {
       continue;
     }
 
+    // Type hint: ^typename (e.g. ^number, ^string, ^map)
+    // Parsed as a special symbol token — parser will skip it gracefully
+    if (ch === "^") {
+      const startCol = col;
+      i++; col++;
+      let hint = "";
+      while (i < source.length && /[a-zA-Z0-9_\-?]/.test(source[i])) {
+        hint += source[i]; i++; col++;
+      }
+      // Emit as Symbol "^typename" — parser skips it as a type hint
+      tokens.push({ type: T.Symbol, value: "^" + hint, line, col: startCol });
+      continue;
+    }
+
     // Variable: $varname
     if (ch === "$") {
       const start = i;
@@ -282,7 +296,8 @@ export function lex(source: string): Token[] {
     // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
     // NOTE: '|' excluded - it's a separate Pipe token for or-patterns
     // NOTE: '.' included for field access: env.vars, node.op (self-hosting .fl files)
-    if (/[a-zA-Z_<>=!+\-*&/%]/.test(ch)) {
+    // NOTE: '?' as start char: allows ?. nil-safe accessor
+    if (/[a-zA-Z_<>=!+\-*&/%?]/.test(ch)) {
       const start = i;
       const startCol = col;
 

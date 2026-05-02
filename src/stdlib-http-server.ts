@@ -47,6 +47,9 @@ interface Request {
  */
 export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallFunctionValue) {
   const routes: Route[] = [];
+  // server_use 미들웨어: [{pattern, handler}] — 라우트 핸들러 실행 전에 순서대로 실행
+  // handler가 null/undefined 반환하면 통과, 응답 객체 반환하면 즉시 응답
+  const middlewares: Array<{ pattern: RegExp; handler: string | any }> = [];
   let server: http.Server | null = null;
   let requestCounter = 0;
 
@@ -141,7 +144,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     } else if (Buffer.isBuffer(body)) {
       res.end(body);
     } else if (contentType.includes("json") && typeof body === 'object') {
-      res.end(JSON.stringify(body));
+      // FreeLang Map 객체 자동 직렬화 (server_json {:key val} 패턴 지원)
+      res.end(JSON.stringify(body, (_k, v) =>
+        v instanceof Map ? Object.fromEntries(v) :
+        Array.isArray(v) ? v : v
+      ));
     } else {
       res.end(String(body ?? ""));
     }
@@ -171,6 +178,15 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   }
 
   return {
+    // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
+    // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
+    // handler가 응답 객체 반환 → 즉시 응답 (라우트 실행 안 함)
+    "server_use": (path: string, handlerName: string | any): null => {
+      const [pattern] = pathToRegex(path);
+      middlewares.push({ pattern, handler: handlerName });
+      return null;
+    },
+
     // server_get path handlerName -> null
     "server_get": (path: string, handlerName: string | any): null => {
       const [pattern, params] = pathToRegex(path);
@@ -249,6 +265,38 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             res.write("retry: 400\n\n");
             // Keep connection open until client disconnects or server restarts
             return;
+          }
+
+          // 미들웨어 실행 — 경로 매칭 시 핸들러 호출, 응답 반환 시 즉시 응답
+          const baseReq = createFlRequest(method, path, query, headers, body, {}, requestId);
+          for (const mw of middlewares) {
+            if (!mw.pattern.exec(path)) continue;
+            try {
+              let mwResult;
+              if (typeof mw.handler === "string") {
+                mwResult = callFn(mw.handler, [baseReq]);
+              } else if (mw.handler?.kind === "function-value" && callFunctionValue) {
+                mwResult = callFunctionValue(mw.handler, [baseReq]);
+              }
+              if (mwResult instanceof Promise) mwResult = await mwResult;
+              // null/undefined → 통과, 응답 객체 → 즉시 전송
+              if (mwResult !== null && mwResult !== undefined) {
+                // server_status()/server_json() 반환 객체: { __fl_response, status, body, contentType }
+                const mwStatus = mwResult.status ?? (mwResult.__fl_status ?? 200);
+                const headersObj: Record<string, string> = {};
+                if (mwResult.__fl_headers) Object.assign(headersObj, mwResult.__fl_headers);
+                const mwBody = mwResult.__fl_response
+                  ? (typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? ""))
+                  : (typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult));
+                const mwCT = mwResult.contentType ?? "application/json";
+                sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
+                logAccess(method, path, mwStatus, Date.now() - requestStart, requestId);
+                return;
+              }
+            } catch (mwErr: any) {
+              sendResponse(res, 500, JSON.stringify({ error: mwErr.message ?? "middleware error" }));
+              return;
+            }
           }
 
           // 라우트 매칭

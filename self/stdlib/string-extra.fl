@@ -1,8 +1,6 @@
 ;; self/stdlib/string-extra.fl — Phase 26
 ;; 문자열 함수 확장
 
-[FUNC str-slice :params [s start end]
-  :body (substring s start end)]
 
 [FUNC str-first :params [s] :body (char-at s 0)]
 [FUNC str-last :params [s] :body (char-at s (- (length s) 1))]
@@ -26,7 +24,6 @@
 [FUNC str-slug :params [s]
   :body (lower (replace (replace (str s) " " "-") "--" "-"))]
 
-[FUNC str-strip :params [s] :body (trim s)]
 [FUNC str-lstrip :params [s] :body (trim s)]
 [FUNC str-rstrip :params [s] :body (trim s)]
 

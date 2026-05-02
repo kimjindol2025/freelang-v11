@@ -58,7 +58,7 @@
 ;; ── let 문법 ─────────────────────────────────────────────────────
 (let [x 1 y 2] ...)                 → (let [[$x 1] [$y 2]] ...)
 
-;; ── 함수 선언 (v10 금지) ─────────────────────────────────────────
+;; ── 함수 선언 ([FUNC] deprecated, 경고 출력됨) ──────────────────
 [FUNC f :params [x] :body ...]      → (defn f [$x] ...)
 
 ;; ── map 키 ───────────────────────────────────────────────────────
@@ -83,16 +83,110 @@
 
 ---
 
+## 🛠️ 개발 명령어 (자주 모르는 것)
+
+```bash
+freelang watch server.fl          # 파일 저장 시 자동 재실행 ← 개발 중 필수!
+freelang run server.fl --watch    # 동일 (--watch 플래그)
+freelang check server.fl          # 문법 오류만 빠르게 확인
+freelang fmt server.fl            # 코드 포맷
+freelang debug server.fl          # 브레이크포인트 디버그
+freelang fn-doc str_split         # 함수 문서 조회
+```
+
+## ⚠️ try/catch — $e 구조
+
+```fl
+(try
+  (json_parse "bad")
+  (catch $e
+    (println $e)                  ;; "[line 2] json_parse: invalid JSON..."
+    (get $e "message")            ;; 에러 메시지 문자열
+    (get $e "line")               ;; 발생 줄 번호 (number)
+    (get $e "file")))             ;; 발생 파일명
+```
+
+---
+
+## 🆕 v11 최신 추가 함수 (모르면 손해)
+
+```fl
+;; ── 이미 되는 것 (몰랐으면 지금부터 사용) ────────────────────────────
+(assoc {} "a" 1 "b" 2 "c" 3)          ;; assoc 다중 인자 ← 지금도 됨!
+(->> $items (filter fn) (map fn))      ;; thread-last ← 이미 있음
+(defn empty? [$x] ...)                 ;; ? 함수명 ← 이미 됨
+(when-let [[$u (find-user $id)]] ...)  ;; when-let ← 이미 됨
+(freelang repl)                        ;; REPL ← 이미 있음!
+
+;; ── 깊은 객체 접근/수정 ────────────────────────────────────────────
+(get-in m ["a" "b" "c"])               ;; 깊은 접근
+(assoc-in m ["a" "b"] 99)             ;; 깊은 업데이트 (불변)
+(update-in m ["count"] (fn [$n] (+ $n 1)))  ;; 깊은 함수 업데이트
+
+;; ── 정규식 (re-* 별칭) ────────────────────────────────────────────
+(re-match "\\d+" "abc123")            ;; → true
+(re-find "\\d+" "abc123def")          ;; → "123"
+(re-find-all "\\d+" "1a2b3c")         ;; → ["1" "2" "3"]
+(re-replace "\\s+" "_" "a b c")       ;; → "a_b_c"
+(re-split "[,;]" "a,b;c")             ;; → ["a" "b" "c"]
+(re-groups "(\\w+)@(\\w+)" "a@b")     ;; → ["a" "b"] (캡처 그룹)
+
+;; ── 구조화 로깅 ────────────────────────────────────────────────────
+(log/info "user logged in" {:userId $uid})
+(log/warn "rate limit" {:current 90 :limit 100})
+(log/error "db failed" {:err $e})      ;; $e는 try/catch 에러 맵
+(log/debug "query" {:sql $q})          ;; FL_DEBUG=1 일 때만 출력
+
+;; ── PUT 패턴 단순화 ───────────────────────────────────────────────
+(merge $existing (dissoc-nil $body))  ;; nil 필드 제거 후 머지
+
+;; ── 파이프 확장 ────────────────────────────────────────────────────
+(->> [1 2 3] (filter (fn [$x] (> $x 1))) (map (fn [$x] (* $x 2))))
+(as-> $items $v
+  (filter (fn [$x] (> $x 0)) $v)   ; $v = 중간값
+  (map (fn [$x] (* $x 10)) $v))    ; 임의 위치 삽입 가능
+
+;; ── nil-safe 접근 (?.) ─────────────────────────────────────────────
+(?. $user :profile :name)          ; nil이면 즉시 nil 반환
+(?. $user :address :city)          ; 중간에 nil → null
+
+;; ── 타입 힌트 (선택, 런타임 무시) ──────────────────────────────────
+(defn ^string greet [^string $name] (str "Hello " $name))
+(defn ^number add [^number $a ^number $b] (+ $a $b))
+
+;; ── 함수 탐색 ──────────────────────────────────────────────────────
+;; freelang ls-fns           전체 목록
+;; freelang ls-fns "http"    http 관련만
+;; freelang fn-doc str_split 상세 설명
+
+;; ── AI-Native 메타 (Phase 1) ──────────────────────────────────────
+;; defn 첫 body에 맵을 두면 메타로 인식 (실행 안 됨, 분리됨)
+(defn get-user [$req]
+  {:context "Bearer 토큰으로 사용자 조회"
+   :returns "User | nil"
+   :effects [:http :db-read]
+   :examples "(get-user $req) => {:id 1 :name \"kim\"}"}
+  (http_get "http://auth/me"))
+
+;; 런타임 메타 조회
+(fn-meta "get-user")   ; => {:context "..." :returns "..." :effects [...]}
+
+;; check 명령어: 메타 누락 함수 경고
+;; freelang check server.fl
+;; ⚠  line 9: no-meta — :context/:returns 없음
+```
+
+---
+
 ## 🔤 기본 문법
 
 ```fl
 ;; 변수
 (define x 42)
 
-;; 함수 (두 가지)
-[FUNC add :params [a b] :body (+ a b)]
-(defn add [a b] (+ a b))
-;; ※ $ 접두사 불필요 — (defn f [a b] ...) 가 표준
+;; 함수 — (defn ...) 만 사용
+(defn add [$a $b] (+ $a $b))
+;; [FUNC add :params [$a $b] :body ...] ← deprecated, 경고 출력됨
 
 ;; 조건
 (if (> x 0) "양수" "음수")
