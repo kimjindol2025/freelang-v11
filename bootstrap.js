@@ -17896,9 +17896,105 @@ function isVMEligible(node) {
 
 // src/eval-special-forms.ts
 init_errors();
+
+// src/stdlib-property.ts
+var propRegistry = /* @__PURE__ */ new Map();
+var RAND_STRINGS = "abcdefghijklmnopqrstuvwxyz0123456789 _-";
+function genValue(type) {
+  const t = type.replace(/^:/, "").toLowerCase();
+  switch (t) {
+    case "int":
+    case "integer":
+      return Math.floor(Math.random() * 2001) - 1e3;
+    case "pos-int":
+    case "positive-int":
+      return Math.floor(Math.random() * 1e3) + 1;
+    case "neg-int":
+    case "negative-int":
+      return -(Math.floor(Math.random() * 1e3) + 1);
+    case "nat":
+    case "natural":
+      return Math.floor(Math.random() * 1e3);
+    case "float":
+    case "double":
+      return Math.random() * 2e3 - 1e3;
+    case "number":
+      return Math.random() < 0.5 ? Math.floor(Math.random() * 2001) - 1e3 : Math.random() * 2e3 - 1e3;
+    case "string":
+    case "str": {
+      const len = Math.floor(Math.random() * 20);
+      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
+    }
+    case "nonempty-string":
+    case "ne-string": {
+      const len = Math.floor(Math.random() * 19) + 1;
+      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
+    }
+    case "bool":
+    case "boolean":
+      return Math.random() < 0.5;
+    case "list":
+    case "array": {
+      const len = Math.floor(Math.random() * 10);
+      return Array.from({ length: len }, () => genValue("int"));
+    }
+    case "any":
+    default: {
+      const pick = Math.floor(Math.random() * 4);
+      if (pick === 0) return genValue("int");
+      if (pick === 1) return genValue("string");
+      if (pick === 2) return genValue("bool");
+      return null;
+    }
+  }
+}
+function generateSample(argTypes) {
+  return argTypes.map((t) => genValue(t));
+}
+function runProp(prop, callFn, callCheck) {
+  const start = Date.now();
+  let passed = 0;
+  let failed = 0;
+  let firstFailure = null;
+  for (let i = 0; i < prop.samples; i++) {
+    const args3 = generateSample(prop.args);
+    try {
+      const result = callFn(prop.fn, args3);
+      let checkArgs;
+      try {
+        const fnParams = prop.check?.params ?? [];
+        checkArgs = fnParams.length === args3.length + 1 ? [...args3, result] : args3;
+      } catch {
+        checkArgs = [...args3, result];
+      }
+      const ok2 = callCheck(prop.check, checkArgs);
+      if (ok2 || ok2 === null) {
+        passed++;
+      } else {
+        failed++;
+        if (!firstFailure) firstFailure = { args: args3, result };
+      }
+    } catch (err4) {
+      failed++;
+      if (!firstFailure) firstFailure = { args: args3, result: null, error: err4?.message ?? String(err4) };
+    }
+    if (failed > 0 && firstFailure) break;
+  }
+  return {
+    name: prop.name,
+    fn: prop.fn,
+    samples: prop.samples,
+    passed,
+    failed,
+    firstFailure,
+    durationMs: Date.now() - start
+  };
+}
+
+// src/eval-special-forms.ts
 var _vmCompiler = new BytecodeCompiler();
 var fnMetaRegistry = /* @__PURE__ */ new Map();
-var META_KEYS = /* @__PURE__ */ new Set(["returns", "context", "effects", "examples"]);
+var META_KEYS = /* @__PURE__ */ new Set(["returns", "context", "effects", "examples", "property"]);
 function extractMapMeta(mapNode) {
   if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
   const fields = mapNode.fields;
@@ -17916,6 +18012,7 @@ function extractMapMeta(mapNode) {
       if (Array.isArray(items)) meta.effects = items.map((it) => strVal(it) ?? "?");
     }
   }
+  if (fields.has("property")) meta.property = fields.get("property");
   return meta;
 }
 var EFFECT_CATALOG = /* @__PURE__ */ new Map([
@@ -18178,9 +18275,76 @@ function evalSpecialForm(interp2, op, expr2) {
       capturedEnv: fnValue.capturedEnv
     };
     ctx.functions.set(name, funcDef);
+    if (registeredMeta?.property) {
+      try {
+        const propNode = registeredMeta.property;
+        if (propNode?.kind === "block" && propNode?.type === "Map") {
+          const pf = propNode.fields;
+          const argsNode = pf.get("args");
+          let argTypes = [];
+          if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+            const items = argsNode.fields?.get("items");
+            if (Array.isArray(items)) argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+          }
+          const checkNode = pf.get("check");
+          const checkFn = checkNode ? ev(checkNode) : null;
+          const samplesNode = pf.get("samples");
+          const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
+          propRegistry.set(`prop-${name}`, {
+            name: `prop-${name}`,
+            fn: name,
+            args: argTypes,
+            check: checkFn,
+            samples,
+            line: expr2.line
+          });
+        }
+      } catch {
+      }
+    }
     ctx.variables.set("$" + name, fnValue);
     ctx.variables.set(name, fnValue);
     return fnValue;
+  }
+  if (op === "defprop") {
+    if (expr2.args.length < 2) throwArgCount("defprop", ">=2", expr2.args.length, expr2.line);
+    const nameNode = expr2.args[0];
+    const propName = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "prop-" + Date.now();
+    const specNode = expr2.args[1];
+    if (specNode?.kind !== "block" || specNode?.type !== "Map") {
+      throw new FLRuntimeError(
+        ErrorCodes.INVALID_FORM,
+        `defprop: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uB9F5\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 {:fn :args :check}`,
+        {},
+        void 0,
+        expr2.line
+      );
+    }
+    const fields = specNode.fields;
+    const fnNode = fields.get("fn");
+    const fnName = fnNode?.kind === "literal" ? String(fnNode.value) : "";
+    const argsNode = fields.get("args");
+    let argTypes = [];
+    if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+      const items = argsNode.fields?.get("items");
+      if (Array.isArray(items)) {
+        argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+      }
+    }
+    const checkNode = fields.get("check");
+    const checkFn = checkNode ? ev(checkNode) : null;
+    const samplesNode = fields.get("samples");
+    const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
+    const prop = {
+      name: propName,
+      fn: fnName,
+      args: argTypes,
+      check: checkFn,
+      samples,
+      line: expr2.line
+    };
+    propRegistry.set(propName, prop);
+    return prop;
   }
   if (op === "async") {
     if (expr2.args.length < 3) throw new Error(`async requires name, params, and body`);
@@ -29545,6 +29709,58 @@ function loadAllStdlib(interp2) {
       return m;
     },
     "fn_meta": (name) => _aliases["fn-meta"](name),
+    // AI-Native Phase 4: property-based testing 런타임 함수
+    "run-props": () => {
+      const results = [];
+      let totalPassed = 0;
+      let totalFailed = 0;
+      for (const [, prop] of propRegistry) {
+        const result = runProp(
+          prop,
+          (fnName, args3) => {
+            const fnVal = interp2.context?.variables?.get(fnName) ?? interp2.context?.variables?.get("$" + fnName);
+            if (!fnVal) throw new Error(`\uD568\uC218 \uC5C6\uC74C: ${fnName}`);
+            return interp2.callFunctionValue(fnVal, args3);
+          },
+          (checkFn, args3) => {
+            if (!checkFn) return true;
+            return interp2.callFunctionValue(checkFn, args3);
+          }
+        );
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        const ok2 = result.failed === 0;
+        const status = ok2 ? "\x1B[32m\u2713\x1B[0m" : "\x1B[31m\u2716\x1B[0m";
+        process.stdout.write(
+          `  ${status}  ${result.name}  \x1B[2m(${result.fn}, ${result.passed}/${result.samples} passed, ${result.durationMs}ms)\x1B[0m
+`
+        );
+        if (!ok2 && result.firstFailure) {
+          const f = result.firstFailure;
+          process.stdout.write(
+            `     \x1B[31m\uBC18\uB840\x1B[0m: args=${JSON.stringify(f.args)}` + (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
+          );
+        }
+        const m = /* @__PURE__ */ new Map();
+        m.set("name", result.name);
+        m.set("fn", result.fn);
+        m.set("passed", result.passed);
+        m.set("failed", result.failed);
+        m.set("ok", result.failed === 0);
+        results.push(m);
+      }
+      if (propRegistry.size > 0) {
+        const allOk = totalFailed === 0;
+        process.stdout.write(
+          `
+  ${allOk ? "\x1B[32m[PROPS PASS]\x1B[0m" : "\x1B[31m[PROPS FAIL]\x1B[0m"}  ${propRegistry.size}\uAC1C property, ${totalPassed} passed, ${totalFailed} failed
+`
+        );
+      }
+      return results;
+    },
+    "run_props": () => _aliases["run-props"](),
+    "props-list": () => [...propRegistry.keys()],
     // 숫자 변환
     "mod": (a, b) => a % b,
     "number": (v) => {
@@ -33038,7 +33254,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
@@ -36145,6 +36361,80 @@ function cmdRun(filePath, watch2, extraArgs = []) {
     }, 500);
   }
 }
+function cmdProps(filePath, extraArgs) {
+  const absPath = path15.resolve(filePath);
+  if (!fs19.existsSync(absPath)) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
+    process.exit(1);
+  }
+  const samplesIdx = extraArgs.indexOf("--samples");
+  const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : void 0;
+  const source = fs19.readFileSync(absPath, "utf-8");
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const interp3 = new Interpreter();
+    interp3.currentFilePath = absPath;
+    interp3.interpret(ast);
+  } catch (err4) {
+  }
+  if (propRegistry.size === 0) {
+    console.log(`\x1B[33m[props]\x1B[0m  ${path15.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
+    console.log(`\x1B[2m  \uD301: (defprop my-prop {:fn "add" :args [:int :int] :check (fn [$a $b] (= (add $a $b) (add $b $a)))})\x1B[0m`);
+    return;
+  }
+  console.log(`\x1B[36m[props]\x1B[0m  ${path15.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
+`);
+  let interp2;
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    interp2 = new Interpreter();
+    interp2.currentFilePath = absPath;
+    interp2.interpret(ast);
+  } catch {
+  }
+  let totalPassed = 0;
+  let totalFailed = 0;
+  let exitCode = 0;
+  for (const [, prop] of propRegistry) {
+    const p = samplesOverride ? { ...prop, samples: samplesOverride } : prop;
+    const result = runProp(
+      p,
+      (fnName, fnArgs) => {
+        const fnVal = interp2?.context?.variables?.get(fnName) ?? interp2?.context?.variables?.get("$" + fnName);
+        if (!fnVal) throw new Error(`\uD568\uC218 \uC5C6\uC74C: ${fnName}`);
+        return interp2.callFunctionValue(fnVal, fnArgs);
+      },
+      (checkFn, checkArgs) => {
+        if (!checkFn) return true;
+        return interp2.callFunctionValue(checkFn, checkArgs);
+      }
+    );
+    totalPassed += result.passed;
+    totalFailed += result.failed;
+    const ok2 = result.failed === 0;
+    const status = ok2 ? "\x1B[32m\u2713\x1B[0m" : "\x1B[31m\u2716\x1B[0m";
+    process.stdout.write(
+      `  ${status}  \x1B[1m${result.name}\x1B[0m  \x1B[2m${result.fn}  ${result.passed}/${result.samples}  ${result.durationMs}ms\x1B[0m
+`
+    );
+    if (!ok2 && result.firstFailure) {
+      const f = result.firstFailure;
+      process.stdout.write(
+        `     \x1B[31m\uBC18\uB840\x1B[0m: args=${JSON.stringify(f.args)}` + (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
+      );
+      exitCode = 1;
+    }
+  }
+  const allOk = totalFailed === 0;
+  process.stdout.write(
+    `
+  ${allOk ? "\x1B[32m[PROPS PASS]\x1B[0m" : "\x1B[31m[PROPS FAIL]\x1B[0m"}  ${propRegistry.size}\uAC1C property \u2014 ${totalPassed} passed / ${totalFailed} failed
+`
+  );
+  if (exitCode) process.exit(exitCode);
+}
 function cmdCheck(filePath) {
   const absPath = path15.resolve(filePath);
   if (!fs19.existsSync(absPath)) {
@@ -37394,6 +37684,16 @@ switch (cmd) {
         console.error(`\x1B[31m[ERROR]\x1B[0m  ${path15.basename(file)}: ${err4.message}`);
       }
     });
+    break;
+  }
+  case "props":
+  case "prop": {
+    const filePath = args2[1];
+    if (!filePath) {
+      console.error("Usage: freelang props <file.fl> [--samples N]");
+      process.exit(1);
+    }
+    cmdProps(filePath, args2.slice(2));
     break;
   }
   case "ci": {

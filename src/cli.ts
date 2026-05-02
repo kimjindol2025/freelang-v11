@@ -25,6 +25,7 @@ import { renderMarkdown } from "./doc-renderer"; // Phase 77: 문서 렌더러
 import { createDefaultPipeline, createFmtCheckStep, createLintStep, createTestStep } from "./ci-runner"; // Phase 80: CI
 import { WebServer } from "./web"; // Phase 3: Web Server
 import { fnMetaRegistry, FnMeta, EFFECT_CATALOG } from "./eval-special-forms"; // AI-Native Phase 1+2
+import { propRegistry, runProp } from "./stdlib-property"; // AI-Native Phase 4
 
 // ─────────────────────────────────────────
 // 에러 포맷터: 소스 줄 강조
@@ -249,6 +250,95 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
 // ─────────────────────────────────────────
 // check 커맨드
 // ─────────────────────────────────────────
+
+function cmdProps(filePath: string, extraArgs: string[]): void {
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
+    process.exit(1);
+  }
+
+  // --samples N 오버라이드
+  const samplesIdx = extraArgs.indexOf("--samples");
+  const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : undefined;
+
+  // 파일 실행 (defprop 등록)
+  const source = fs.readFileSync(absPath, "utf-8");
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    const interp = new Interpreter();
+    interp.currentFilePath = absPath;
+    // run-props를 자동 주입하지 않고 defprop 등록만 먼저 수행
+    interp.interpret(ast);
+  } catch (err: any) {
+    // 실행 에러는 무시하고 등록된 props만 실행
+  }
+
+  if (propRegistry.size === 0) {
+    console.log(`\x1b[33m[props]\x1b[0m  ${path.basename(absPath)} — defprop 없음`);
+    console.log(`\x1b[2m  팁: (defprop my-prop {:fn "add" :args [:int :int] :check (fn [$a $b] (= (add $a $b) (add $b $a)))})\x1b[0m`);
+    return;
+  }
+
+  console.log(`\x1b[36m[props]\x1b[0m  ${path.basename(absPath)} — ${propRegistry.size}개 property 실행\n`);
+
+  // interp 재생성 (함수 접근용)
+  let interp2: any;
+  try {
+    const tokens = lex(source);
+    const ast = parse(tokens);
+    interp2 = new Interpreter();
+    interp2.currentFilePath = absPath;
+    interp2.interpret(ast);
+  } catch { /* ignore */ }
+
+  let totalPassed = 0;
+  let totalFailed = 0;
+  let exitCode = 0;
+
+  for (const [, prop] of propRegistry) {
+    const p = samplesOverride ? { ...prop, samples: samplesOverride } : prop;
+    const result = runProp(
+      p,
+      (fnName, fnArgs) => {
+        const fnVal = interp2?.context?.variables?.get(fnName)
+          ?? interp2?.context?.variables?.get("$" + fnName);
+        if (!fnVal) throw new Error(`함수 없음: ${fnName}`);
+        return interp2.callFunctionValue(fnVal, fnArgs);
+      },
+      (checkFn, checkArgs) => {
+        if (!checkFn) return true;
+        return interp2.callFunctionValue(checkFn, checkArgs);
+      }
+    );
+
+    totalPassed += result.passed;
+    totalFailed += result.failed;
+
+    const ok = result.failed === 0;
+    const status = ok ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✖\x1b[0m";
+    process.stdout.write(
+      `  ${status}  \x1b[1m${result.name}\x1b[0m` +
+      `  \x1b[2m${result.fn}  ${result.passed}/${result.samples}  ${result.durationMs}ms\x1b[0m\n`
+    );
+    if (!ok && result.firstFailure) {
+      const f = result.firstFailure;
+      process.stdout.write(
+        `     \x1b[31m반례\x1b[0m: args=${JSON.stringify(f.args)}` +
+        (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
+      );
+      exitCode = 1;
+    }
+  }
+
+  const allOk = totalFailed === 0;
+  process.stdout.write(
+    `\n  ${allOk ? "\x1b[32m[PROPS PASS]\x1b[0m" : "\x1b[31m[PROPS FAIL]\x1b[0m"}` +
+    `  ${propRegistry.size}개 property — ${totalPassed} passed / ${totalFailed} failed\n`
+  );
+  if (exitCode) process.exit(exitCode);
+}
 
 function cmdCheck(filePath: string): void {
   const absPath = path.resolve(filePath);
@@ -1719,6 +1809,17 @@ switch (cmd) {
         console.error(`\x1b[31m[ERROR]\x1b[0m  ${path.basename(file)}: ${err.message}`);
       },
     });
+    break;
+  }
+  case "props":
+  case "prop": {
+    // AI-Native Phase 4: freelang props <file.fl> [--samples N]
+    const filePath = args[1];
+    if (!filePath) {
+      console.error("Usage: freelang props <file.fl> [--samples N]");
+      process.exit(1);
+    }
+    cmdProps(filePath, args.slice(2));
     break;
   }
   case "ci": {

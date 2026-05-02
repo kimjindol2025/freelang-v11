@@ -28,6 +28,7 @@ import { createMaybeModule } from "./maybe-type";        // Phase 91: 불확실�
 import { createTestEnhancedModule } from "./stdlib-test-enhanced";
 import { createWsModule } from "./stdlib-ws";            // WebSocket 서버
 import { fnMetaRegistry } from "./eval-special-forms";   // AI-Native Phase 1
+import { propRegistry, runProp, createPropertyModule } from "./stdlib-property"; // AI-Native Phase 4
 import { createWscModule } from "./stdlib-wsc";          // WebSocket 클라이언트
 import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-lazy-registry"; // Lazy Loading
 
@@ -194,6 +195,65 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       return m;
     },
     "fn_meta": (name: string): any => _aliases["fn-meta"](name),
+
+    // AI-Native Phase 4: property-based testing 런타임 함수
+    "run-props": (): any => {
+      const results: any[] = [];
+      let totalPassed = 0;
+      let totalFailed = 0;
+
+      for (const [, prop] of propRegistry) {
+        const result = runProp(
+          prop,
+          (fnName, args) => {
+            // 사용자 정의 함수 호출
+            const fnVal = (interp as any).context?.variables?.get(fnName)
+              ?? (interp as any).context?.variables?.get("$" + fnName);
+            if (!fnVal) throw new Error(`함수 없음: ${fnName}`);
+            return (interp as any).callFunctionValue(fnVal, args);
+          },
+          (checkFn, args) => {
+            if (!checkFn) return true;
+            return (interp as any).callFunctionValue(checkFn, args);
+          }
+        );
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+
+        const ok = result.failed === 0;
+        const status = ok ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✖\x1b[0m";
+        process.stdout.write(
+          `  ${status}  ${result.name}  \x1b[2m(${result.fn}, ${result.passed}/${result.samples} passed, ${result.durationMs}ms)\x1b[0m\n`
+        );
+        if (!ok && result.firstFailure) {
+          const f = result.firstFailure;
+          process.stdout.write(
+            `     \x1b[31m반례\x1b[0m: args=${JSON.stringify(f.args)}` +
+            (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
+          );
+        }
+
+        const m = new Map<string, any>();
+        m.set("name", result.name);
+        m.set("fn", result.fn);
+        m.set("passed", result.passed);
+        m.set("failed", result.failed);
+        m.set("ok", result.failed === 0);
+        results.push(m);
+      }
+
+      if (propRegistry.size > 0) {
+        const allOk = totalFailed === 0;
+        process.stdout.write(
+          `\n  ${allOk ? "\x1b[32m[PROPS PASS]\x1b[0m" : "\x1b[31m[PROPS FAIL]\x1b[0m"}` +
+          `  ${propRegistry.size}개 property, ${totalPassed} passed, ${totalFailed} failed\n`
+        );
+      }
+      return results;
+    },
+    "run_props": (): any => _aliases["run-props"](),
+    "props-list": (): string[] => [...propRegistry.keys()],
+
     // 숫자 변환
     "mod":           (a: number, b: number) => a % b,
     "number":        (v: any) => { const n = Number(v); return isNaN(n) ? null : n; },

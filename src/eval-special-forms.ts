@@ -16,6 +16,7 @@ import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type";
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
 import { registerVMFunction } from "./vm-eligible"; // Phase 3-E: VM 함수 등록
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase A: 통일 에러
+import { propRegistry, PropDef } from "./stdlib-property"; // AI-Native Phase 4
 
 const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
 
@@ -25,12 +26,13 @@ export interface FnMeta {
   context?: string;
   effects?: string[];
   examples?: string;
+  property?: any;    // raw AST node — evaluated lazily by defn handler
   line?: number;
   file?: string;
 }
 export const fnMetaRegistry = new Map<string, FnMeta>();
 
-const META_KEYS = new Set(["returns", "context", "effects", "examples"]);
+const META_KEYS = new Set(["returns", "context", "effects", "examples", "property"]);
 
 function extractMapMeta(mapNode: any): FnMeta | null {
   if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
@@ -50,6 +52,7 @@ function extractMapMeta(mapNode: any): FnMeta | null {
       if (Array.isArray(items)) meta.effects = items.map(it => strVal(it) ?? "?");
     }
   }
+  if (fields.has("property")) meta.property = fields.get("property"); // raw node
   return meta;
 }
 
@@ -340,10 +343,84 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     };
     ctx.functions.set(name, funcDef);
 
+    // AI-Native Phase 4: :property 인라인 → defprop 자동 등록
+    if (registeredMeta?.property) {
+      try {
+        const propNode = registeredMeta.property as any;
+        // :property 맵에서 :args, :check, :samples 추출
+        if (propNode?.kind === "block" && propNode?.type === "Map") {
+          const pf: Map<string, any> = propNode.fields;
+          const argsNode = pf.get("args") as any;
+          let argTypes: string[] = [];
+          if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+            const items = argsNode.fields?.get("items") as any[];
+            if (Array.isArray(items)) argTypes = items.map((it: any) =>
+              it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+          }
+          const checkNode = pf.get("check") as any;
+          const checkFn = checkNode ? ev(checkNode) : null;
+          const samplesNode = pf.get("samples") as any;
+          const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number"
+            ? samplesNode.value : 100;
+          propRegistry.set(`prop-${name}`, {
+            name: `prop-${name}`, fn: name!, args: argTypes,
+            check: checkFn, samples, line: expr.line,
+          });
+        }
+      } catch { /* property 등록 실패 시 무시 */ }
+    }
+
     // name을 set → bare symbol/variable 둘 다로 접근 가능하게 저장
     ctx.variables.set("$" + name, fnValue);
     ctx.variables.set(name, fnValue);
     return fnValue;
+  }
+
+  // ── defprop (AI-Native Phase 4) ──────────────────────────────────
+  // (defprop name {:fn "add" :args [:int :int] :check (fn [$a $b] ...) :samples 100})
+  if (op === "defprop") {
+    if (expr.args.length < 2) throwArgCount("defprop", ">=2", expr.args.length, expr.line);
+    const nameNode = expr.args[0] as any;
+    const propName: string = nameNode?.kind === "variable" ? nameNode.name
+      : nameNode?.kind === "literal" ? String(nameNode.value) : "prop-" + Date.now();
+
+    const specNode = expr.args[1] as any;
+    if (specNode?.kind !== "block" || specNode?.type !== "Map") {
+      throw new FLRuntimeError(ErrorCodes.INVALID_FORM,
+        `defprop: 두 번째 인자는 맵이어야 합니다 {:fn :args :check}`, {}, undefined, expr.line);
+    }
+    const fields: Map<string, any> = specNode.fields;
+
+    // :fn — 대상 함수명
+    const fnNode = fields.get("fn") as any;
+    const fnName: string = fnNode?.kind === "literal" ? String(fnNode.value) : "";
+
+    // :args — 타입 배열 [:int :int]
+    const argsNode = fields.get("args") as any;
+    let argTypes: string[] = [];
+    if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+      const items = argsNode.fields?.get("items") as any[];
+      if (Array.isArray(items)) {
+        argTypes = items.map((it: any) =>
+          it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+      }
+    }
+
+    // :check — FL 함수 (evaluate now)
+    const checkNode = fields.get("check") as any;
+    const checkFn = checkNode ? ev(checkNode) : null;
+
+    // :samples — 횟수 (기본 100)
+    const samplesNode = fields.get("samples") as any;
+    const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number"
+      ? samplesNode.value : 100;
+
+    const prop: PropDef = {
+      name: propName, fn: fnName, args: argTypes,
+      check: checkFn, samples, line: expr.line,
+    };
+    propRegistry.set(propName, prop);
+    return prop;
   }
 
   // ── async ─────────────────────────────────────────────────────────
