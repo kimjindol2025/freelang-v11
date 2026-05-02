@@ -135,6 +135,7 @@ export const ErrorCodes = {
   INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
   INVALID_FORM: "E_INVALID_FORM",
   RUNTIME: "E_RUNTIME",
+  PURE_VIOLATION: "E_PURE_VIOLATION",
 } as const;
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
@@ -150,6 +151,7 @@ export const RECOVERY_HINTS: Record<string, string> = {
   E_INDEX_OOB: "인덱스가 범위를 벗어났습니다. (length coll) 으로 길이를 먼저 확인하세요.",
   E_INVALID_FORM: "잘못된 special form 구조입니다. 문법 가이드를 확인하세요.",
   E_RUNTIME: "런타임 오류. 입력 데이터와 흐름을 점검하세요.",
+  E_PURE_VIOLATION: "^pure/:effects [] 함수에서 side effect가 발견되었습니다. :effects 선언을 추가하거나 effect 호출을 제거하세요.",
 };
 
 export interface FLErrorContext {

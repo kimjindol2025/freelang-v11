@@ -2602,7 +2602,8 @@ var init_errors = __esm({
       DIV_BY_ZERO: "E_DIV_BY_ZERO",
       INDEX_OUT_OF_BOUNDS: "E_INDEX_OOB",
       INVALID_FORM: "E_INVALID_FORM",
-      RUNTIME: "E_RUNTIME"
+      RUNTIME: "E_RUNTIME",
+      PURE_VIOLATION: "E_PURE_VIOLATION"
     };
     RECOVERY_HINTS = {
       E_TYPE_NIL: "\uAC12\uC774 nil\uC778\uC9C0 (nil? x) \uB610\uB294 (get-or x :key default) \uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
@@ -2613,7 +2614,8 @@ var init_errors = __esm({
       E_DIV_BY_ZERO: "0\uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBD84\uBAA8 \uAC80\uC99D (= denom 0) \uD6C4 \uBD84\uAE30\uD558\uC138\uC694.",
       E_INDEX_OOB: "\uC778\uB371\uC2A4\uAC00 \uBC94\uC704\uB97C \uBC97\uC5B4\uB0AC\uC2B5\uB2C8\uB2E4. (length coll) \uC73C\uB85C \uAE38\uC774\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
       E_INVALID_FORM: "\uC798\uBABB\uB41C special form \uAD6C\uC870\uC785\uB2C8\uB2E4. \uBB38\uBC95 \uAC00\uC774\uB4DC\uB97C \uD655\uC778\uD558\uC138\uC694.",
-      E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694."
+      E_RUNTIME: "\uB7F0\uD0C0\uC784 \uC624\uB958. \uC785\uB825 \uB370\uC774\uD130\uC640 \uD750\uB984\uC744 \uC810\uAC80\uD558\uC138\uC694.",
+      E_PURE_VIOLATION: "^pure/:effects [] \uD568\uC218\uC5D0\uC11C side effect\uAC00 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. :effects \uC120\uC5B8\uC744 \uCD94\uAC00\uD558\uAC70\uB098 effect \uD638\uCD9C\uC744 \uC81C\uAC70\uD558\uC138\uC694."
     };
     FLRuntimeError = class _FLRuntimeError extends ModuleError {
       constructor(code, message, context = {}, file, line, col, hint) {
@@ -17983,9 +17985,10 @@ function collectBodyEffects(node, found) {
   } else if (node.kind === "literal" || node.kind === "variable") {
   }
 }
-function checkEffects(fnName, declaredEffects, bodyNode, line) {
+function checkEffects(fnName, declaredEffects, bodyNode, line, isPure) {
   const found = /* @__PURE__ */ new Set();
   collectBodyEffects(bodyNode, found);
+  const pure = isPure || declaredEffects.length === 0;
   const declaredSet = new Set(declaredEffects.map((e) => e.startsWith(":") ? e.slice(1) : e));
   const undeclared = [];
   for (const eff of found) {
@@ -17993,6 +17996,15 @@ function checkEffects(fnName, declaredEffects, bodyNode, line) {
   }
   if (undeclared.length > 0) {
     const hint = undeclared.map((e) => `:${e}`).join(" ");
+    if (pure) {
+      throw new FLRuntimeError(
+        ErrorCodes.PURE_VIOLATION,
+        `${fnName}: ^pure \uD568\uC218\uC5D0\uC11C side effect \uAC10\uC9C0 \u2014 ${hint}`,
+        { fn: fnName, expected: "no side effects", got: hint },
+        void 0,
+        line
+      );
+    }
     process.stderr.write(
       `\x1B[33m[effects]\x1B[0m  \x1B[1m${fnName}\x1B[0m${line ? ` (line ${line})` : ""}  \uC120\uC5B8 \uC548 \uB41C effect: \x1B[33m${hint}\x1B[0m  \u2192 :effects \uC5D0 \uCD94\uAC00 \uD544\uC694
 `
@@ -18110,7 +18122,12 @@ function evalSpecialForm(interp2, op, expr2) {
   if (op === "defn" || op === "defun") {
     if (expr2.args.length < 3) throwArgCount("defn", ">=3", expr2.args.length, expr2.line);
     let argIdx = 0;
-    if (expr2.args[argIdx]?.kind === "literal" && String(expr2.args[argIdx].value).startsWith("^")) argIdx++;
+    let isPureHint = false;
+    if (expr2.args[argIdx]?.kind === "literal" && String(expr2.args[argIdx].value).startsWith("^")) {
+      const hint = String(expr2.args[argIdx].value);
+      if (hint === "^pure") isPureHint = true;
+      argIdx++;
+    }
     const nameNode = expr2.args[argIdx++];
     let name;
     if (nameNode.kind === "variable") name = nameNode.name;
@@ -18129,7 +18146,15 @@ function evalSpecialForm(interp2, op, expr2) {
       }
     }
     const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
-    if (registeredMeta?.effects !== void 0) {
+    if (isPureHint) {
+      checkEffects(name, [], body, expr2.line, true);
+      if (!registeredMeta) {
+        registeredMeta = { line: expr2.line, effects: [] };
+        fnMetaRegistry.set(name, registeredMeta);
+      } else if (!registeredMeta.effects) {
+        registeredMeta.effects = [];
+      }
+    } else if (registeredMeta?.effects !== void 0) {
       checkEffects(name, registeredMeta.effects, body, expr2.line);
     }
     const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
@@ -36143,12 +36168,27 @@ function cmdCheck(filePath) {
     process.stderr.write(`\x1B[2m  \uD301: (defn ${metaMissing[0].name} [...] {:context "..." :returns "..."} ...)\x1B[0m
 `);
   }
-  if (effectsWarn.length > 0) {
+  const pureErrors = effectsWarn.filter((w) => w.isPure);
+  const effectsOnly = effectsWarn.filter((w) => !w.isPure);
+  if (pureErrors.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[33m[effects-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${effectsWarn.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
+\x1B[31m[pure-violation]\x1B[0m  ${path15.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
 `);
-    for (const w of effectsWarn) {
+    for (const w of pureErrors) {
+      const hint = w.undeclared.map((e) => `:${e}`).join(" ");
+      process.stderr.write(`  \x1B[31m\u2716\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \x1B[31m${hint}\x1B[0m  (\uC21C\uC218 \uD568\uC218 \uC704\uBC18)
+`);
+    }
+    process.stderr.write(`\x1B[2m  :effects [] \uB610\uB294 ^pure \uC120\uC5B8 \uC2DC side effect \uD638\uCD9C \uBD88\uAC00\x1B[0m
+`);
+  }
+  if (effectsOnly.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`
+\x1B[33m[effects-check]\x1B[0m  ${path15.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
+`);
+    for (const w of effectsOnly) {
       const hint = w.undeclared.map((e) => `:${e}`).join(" ");
       process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \uBBF8\uC120\uC5B8 effect: \x1B[33m${hint}\x1B[0m
 `);
@@ -36174,7 +36214,11 @@ function checkDefnMeta(source, filePath) {
         if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
           let argIdx = 0;
           const args3 = node.args ?? [];
-          if (args3[argIdx]?.kind === "literal" && String(args3[argIdx].value ?? "").startsWith("^")) argIdx++;
+          let isPureHint = false;
+          if (args3[argIdx]?.kind === "literal" && String(args3[argIdx].value ?? "").startsWith("^")) {
+            if (String(args3[argIdx].value) === "^pure") isPureHint = true;
+            argIdx++;
+          }
           const nameNode = args3[argIdx];
           const name = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
           let bodyArgs = args3.slice(argIdx + 2);
@@ -36189,15 +36233,19 @@ function checkDefnMeta(source, filePath) {
           if (!metaMap && bodyArgs.length > 0) {
             metaMissing.push({ name, line: node.line ?? 0 });
           }
-          if (metaMap?.has("effects")) {
-            const eNode = metaMap.get("effects");
+          const effectsDeclared = metaMap?.has("effects") || isPureHint;
+          if (effectsDeclared) {
             let declared = [];
-            if (eNode?.kind === "block" && eNode?.type === "Array") {
-              const items = eNode.fields?.get("items");
-              if (Array.isArray(items)) {
-                declared = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+            if (!isPureHint && metaMap?.has("effects")) {
+              const eNode = metaMap.get("effects");
+              if (eNode?.kind === "block" && eNode?.type === "Array") {
+                const items = eNode.fields?.get("items");
+                if (Array.isArray(items)) {
+                  declared = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+                }
               }
             }
+            const isPure = isPureHint || declared.length === 0;
             const declaredSet = new Set(declared);
             const calledOps = /* @__PURE__ */ new Set();
             bodyArgs.forEach((b) => collectCalls(b, calledOps));
@@ -36207,7 +36255,7 @@ function checkDefnMeta(source, filePath) {
               if (eff && !declaredSet.has(eff)) undeclared.push(eff);
             });
             if (undeclared.length > 0) {
-              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)] });
+              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)], isPure });
             }
           }
           walkNodes(bodyArgs);

@@ -102,10 +102,11 @@ function collectBodyEffects(node: any, found: Set<string>): void {
   }
 }
 
-function checkEffects(fnName: string, declaredEffects: string[], bodyNode: any, line?: number): void {
+function checkEffects(fnName: string, declaredEffects: string[], bodyNode: any, line?: number, isPure?: boolean): void {
   const found = new Set<string>();
   collectBodyEffects(bodyNode, found);
 
+  const pure = isPure || declaredEffects.length === 0;
   const declaredSet = new Set(declaredEffects.map(e =>
     e.startsWith(":") ? e.slice(1) : e));
 
@@ -116,6 +117,15 @@ function checkEffects(fnName: string, declaredEffects: string[], bodyNode: any, 
 
   if (undeclared.length > 0) {
     const hint = undeclared.map(e => `:${e}`).join(" ");
+    if (pure) {
+      // Phase 3: ^pure/:effects [] 위반 → 컴파일 에러
+      throw new FLRuntimeError(
+        ErrorCodes.PURE_VIOLATION,
+        `${fnName}: ^pure 함수에서 side effect 감지 — ${hint}`,
+        { fn: fnName, expected: "no side effects", got: hint },
+        undefined, line
+      );
+    }
     process.stderr.write(
       `\x1b[33m[effects]\x1b[0m  \x1b[1m${fnName}\x1b[0m` +
       `${line ? ` (line ${line})` : ""}` +
@@ -254,10 +264,14 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // (defn name [params...] body) → (define name (fn [params...] body))
   if (op === "defn" || op === "defun") {
     if (expr.args.length < 3) throwArgCount("defn", ">=3", expr.args.length, expr.line);
-    // ^return-type 힌트가 첫 arg로 올 수 있음: (defn ^number add [...] body)
-    // → name이 ^로 시작하면 다음 arg가 실제 이름
+    // ^return-type 또는 ^pure 힌트가 첫 arg로 올 수 있음
     let argIdx = 0;
-    if (expr.args[argIdx]?.kind === "literal" && String((expr.args[argIdx] as any).value).startsWith("^")) argIdx++;
+    let isPureHint = false;
+    if (expr.args[argIdx]?.kind === "literal" && String((expr.args[argIdx] as any).value).startsWith("^")) {
+      const hint = String((expr.args[argIdx] as any).value);
+      if (hint === "^pure") isPureHint = true;
+      argIdx++;
+    }
     const nameNode = expr.args[argIdx++] as any;
     let name: string;
     if (nameNode.kind === "variable") name = nameNode.name;
@@ -283,8 +297,18 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       ? bodyArgs[0]
       : ({ kind: "sexpr" as const, op: "do", args: bodyArgs } as any);
 
-    // AI-Native Phase 2: :effects 선언된 경우 body에서 실제 effect 추론 + 미선언 경고
-    if (registeredMeta?.effects !== undefined) {
+    // AI-Native Phase 2+3: effects 검사 + ^pure 강제
+    if (isPureHint) {
+      // ^pure 힌트: :effects []와 동일 — effect 발견 시 에러
+      checkEffects(name!, [], body, expr.line, true);
+      // 메타에도 기록
+      if (!registeredMeta) {
+        registeredMeta = { line: expr.line, effects: [] };
+        fnMetaRegistry.set(name!, registeredMeta);
+      } else if (!registeredMeta.effects) {
+        registeredMeta.effects = [];
+      }
+    } else if (registeredMeta?.effects !== undefined) {
       checkEffects(name!, registeredMeta.effects, body, expr.line);
     }
 

@@ -273,10 +273,23 @@ function cmdCheck(filePath: string): void {
     process.stderr.write(`\x1b[2m  팁: (defn ${metaMissing[0].name} [...] {:context "..." :returns "..."} ...)\x1b[0m\n`);
   }
 
-  if (effectsWarn.length > 0) {
+  const pureErrors   = effectsWarn.filter((w: any) => w.isPure);
+  const effectsOnly  = effectsWarn.filter((w: any) => !w.isPure);
+
+  if (pureErrors.length > 0) {
     hasWarnings = true;
-    process.stderr.write(`\n\x1b[33m[effects-check]\x1b[0m  ${path.basename(absPath)} — ${effectsWarn.length}개 함수에 미선언 effect\n`);
-    for (const w of effectsWarn) {
+    process.stderr.write(`\n\x1b[31m[pure-violation]\x1b[0m  ${path.basename(absPath)} — ${pureErrors.length}개 ^pure 함수에서 side effect 발견\n`);
+    for (const w of pureErrors) {
+      const hint = w.undeclared.map((e: string) => `:${e}`).join(" ");
+      process.stderr.write(`  \x1b[31m✖\x1b[0m  line ${w.line}: \x1b[1m${w.name}\x1b[0m — \x1b[31m${hint}\x1b[0m  (순수 함수 위반)\n`);
+    }
+    process.stderr.write(`\x1b[2m  :effects [] 또는 ^pure 선언 시 side effect 호출 불가\x1b[0m\n`);
+  }
+
+  if (effectsOnly.length > 0) {
+    hasWarnings = true;
+    process.stderr.write(`\n\x1b[33m[effects-check]\x1b[0m  ${path.basename(absPath)} — ${effectsOnly.length}개 함수에 미선언 effect\n`);
+    for (const w of effectsOnly) {
       const hint = w.undeclared.map((e: string) => `:${e}`).join(" ");
       process.stderr.write(`  \x1b[33m⚠\x1b[0m  line ${w.line}: \x1b[1m${w.name}\x1b[0m — 미선언 effect: \x1b[33m${hint}\x1b[0m\n`);
     }
@@ -290,13 +303,12 @@ function checkDefnMeta(source: string, filePath?: string): {
   effectsWarn: Array<{name: string; line: number; undeclared: string[]}>;
 } {
   const metaMissing: Array<{name: string; line: number}> = [];
-  const effectsWarn: Array<{name: string; line: number; undeclared: string[]}> = [];
+  const effectsWarn: Array<{name: string; line: number; undeclared: string[]; isPure: boolean}> = [];
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
     const META_KEYS = new Set(["returns", "context", "effects", "examples"]);
 
-    // Collect all calls in a subtree
     function collectCalls(node: any, found: Set<string>): void {
       if (!node) return;
       if (node.kind === "sexpr") {
@@ -313,7 +325,12 @@ function checkDefnMeta(source: string, filePath?: string): {
         if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
           let argIdx = 0;
           const args = node.args ?? [];
-          if (args[argIdx]?.kind === "literal" && String((args[argIdx] as any).value ?? "").startsWith("^")) argIdx++;
+          // ^pure 또는 ^type 힌트
+          let isPureHint = false;
+          if (args[argIdx]?.kind === "literal" && String((args[argIdx] as any).value ?? "").startsWith("^")) {
+            if (String((args[argIdx] as any).value) === "^pure") isPureHint = true;
+            argIdx++;
+          }
           const nameNode = args[argIdx];
           const name: string = nameNode?.kind === "variable" ? nameNode.name
             : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
@@ -330,17 +347,21 @@ function checkDefnMeta(source: string, filePath?: string): {
           if (!metaMap && bodyArgs.length > 0) {
             metaMissing.push({ name, line: node.line ?? 0 });
           }
-          // AI-Native Phase 2: effects 정적 검사
-          if (metaMap?.has("effects")) {
-            const eNode = metaMap.get("effects") as any;
+          // AI-Native Phase 2+3: effects 정적 검사
+          const effectsDeclared = metaMap?.has("effects") || isPureHint;
+          if (effectsDeclared) {
             let declared: string[] = [];
-            if (eNode?.kind === "block" && eNode?.type === "Array") {
-              const items = eNode.fields?.get("items") as any[];
-              if (Array.isArray(items)) {
-                declared = items.map((it: any) =>
-                  it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+            if (!isPureHint && metaMap?.has("effects")) {
+              const eNode = metaMap!.get("effects") as any;
+              if (eNode?.kind === "block" && eNode?.type === "Array") {
+                const items = eNode.fields?.get("items") as any[];
+                if (Array.isArray(items)) {
+                  declared = items.map((it: any) =>
+                    it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
+                }
               }
             }
+            const isPure = isPureHint || declared.length === 0;
             const declaredSet = new Set(declared);
             const calledOps = new Set<string>();
             bodyArgs.forEach((b: any) => collectCalls(b, calledOps));
@@ -350,7 +371,7 @@ function checkDefnMeta(source: string, filePath?: string): {
               if (eff && !declaredSet.has(eff)) undeclared.push(eff);
             });
             if (undeclared.length > 0) {
-              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)] });
+              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)], isPure });
             }
           }
           walkNodes(bodyArgs);
