@@ -2683,6 +2683,10 @@ var init_debugger = __esm({
       sourceMap = null;
       /** 브레이크 이벤트 로그 (테스트 검증용) */
       breakLog = [];
+      /** watch 변수 목록 */
+      watchList = /* @__PURE__ */ new Set();
+      /** 호출 스택 */
+      callStack = [];
       static _key(file, line) {
         return `${file}:${line}`;
       }
@@ -2702,6 +2706,8 @@ var init_debugger = __esm({
        * 중단점 도달 시 처리:
        * - 콘솔에 "[BREAK] file:line:col" 출력
        * - 환경 변수 스냅샷 기록
+       * - watch 변수 값 출력
+       * - 호출 스택 출력
        * - 콜백 실행
        */
       onBreak(loc, env) {
@@ -2710,6 +2716,20 @@ var init_debugger = __esm({
         this.breakLog.push(event);
         const locStr = `${loc.file}:${loc.line}:${loc.col}`;
         console.log(`[BREAK] ${locStr}`);
+        if (this.callStack.length > 0) {
+          console.log(`  stack: [${this.callStack.join(" > ")}]`);
+        }
+        if (this.watchList.size > 0) {
+          const watchValues = this.getWatchValues(env);
+          const hasWatched = Object.keys(watchValues).length > 0;
+          if (hasWatched) {
+            console.log(`  \u{1F441} watch:`);
+            for (const [k, v] of Object.entries(watchValues)) {
+              const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+              console.log(`    ${k} = ${display.slice(0, 80)}`);
+            }
+          }
+        }
         const entries = Object.entries(env).slice(0, 10);
         if (entries.length > 0) {
           console.log(`  env:`);
@@ -2729,6 +2749,40 @@ var init_debugger = __esm({
       /** 중단점 개수 */
       breakpointCount() {
         return this.breakpoints.size;
+      }
+      /** watch에 변수 추가 */
+      addWatch(varName) {
+        this.watchList.add(varName);
+      }
+      /** watch에서 변수 제거 */
+      removeWatch(varName) {
+        this.watchList.delete(varName);
+      }
+      /** watch 중인 변수들의 현재값 반환 */
+      getWatchValues(env) {
+        const values = {};
+        for (const varName of this.watchList) {
+          if (varName in env) {
+            values[varName] = env[varName];
+          } else {
+            values[varName] = void 0;
+          }
+        }
+        return values;
+      }
+      /** 호출 스택에 함수명 추가 */
+      pushCall(fnName) {
+        this.callStack.push(fnName);
+      }
+      /** 호출 스택에서 제거 */
+      popCall() {
+        if (this.callStack.length > 0) {
+          this.callStack.pop();
+        }
+      }
+      /** 현재 호출 스택 반환 */
+      getStack() {
+        return [...this.callStack];
       }
     };
     _globalSession = null;
@@ -25554,6 +25608,76 @@ function createMailModule() {
         });
         socket.on("error", (e) => fail(`socket: ${e.message}`));
         socket.setTimeout(15e3, () => fail("timeout"));
+      });
+    },
+    // ── Mailgun API HTTP 메일 전송 ─────────────────────────
+    // mailgun_send api_key domain from to subject text -> {ok, id, error}
+    // Mailgun REST API v3 사용 (npm 0, Node https만 사용)
+    "mailgun_send": (api_key, domain, from, to, subject, text) => {
+      return new Promise((resolve7) => {
+        try {
+          const https = require("https");
+          const querystring = require("querystring");
+          const auth = Buffer.from(`api:${api_key}`).toString("base64");
+          const postData = querystring.stringify({
+            from,
+            to,
+            subject,
+            text
+          });
+          const options = {
+            hostname: "api.mailgun.net",
+            port: 443,
+            path: `/v3/${domain}/messages`,
+            method: "POST",
+            headers: {
+              "Authorization": `Basic ${auth}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Content-Length": Buffer.byteLength(postData)
+            }
+          };
+          const req = https.request(options, (res) => {
+            let data = "";
+            res.on("data", (chunk) => {
+              data += chunk;
+            });
+            res.on("end", () => {
+              try {
+                const json = JSON.parse(data);
+                if (res.statusCode === 200) {
+                  resolve7({
+                    ok: true,
+                    id: json.id,
+                    message: "\uBA54\uC77C \uC804\uC1A1 \uC644\uB8CC"
+                  });
+                } else {
+                  resolve7({
+                    ok: false,
+                    error: json.message || "Mailgun API \uC624\uB958"
+                  });
+                }
+              } catch (e) {
+                resolve7({
+                  ok: false,
+                  error: `\uD30C\uC2F1 \uC2E4\uD328: ${e.message}`
+                });
+              }
+            });
+          });
+          req.on("error", (e) => {
+            resolve7({
+              ok: false,
+              error: `\uC694\uCCAD \uC2E4\uD328: ${e.message}`
+            });
+          });
+          req.write(postData);
+          req.end();
+        } catch (e) {
+          resolve7({
+            ok: false,
+            error: `\uC608\uC678: ${e.message}`
+          });
+        }
       });
     }
   };

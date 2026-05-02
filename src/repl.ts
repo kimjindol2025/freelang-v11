@@ -58,13 +58,16 @@ export class FreeLangReplCore {
           "  :hist          — 히스토리 출력",
           "  :quit / :exit  — 종료",
           "",
-          "디버거 (S1, 2026-04-25):",
+          "디버거 (S2, 2026-05-01):",
           "  :break <fn>    — 함수에 break point 설정",
           "  :step          — step 모드 toggle (모든 줄에서 break)",
           "  :continue      — break 해제 + 계속 실행",
           "  :stack         — 현재 callStack 출력",
           "  :locals        — 현재 변수 dump",
           "  :debug         — debugger enabled toggle",
+          "  :watch <var>   — 변수 감시 추가",
+          "  :unwatch <var> — 변수 감시 제거",
+          "  :watches       — 감시 중인 변수 출력",
         ].join("\n");
 
       case "ls": {
@@ -198,6 +201,41 @@ export class FreeLangReplCore {
         return `debugger: ${sess.enabled ? "ON" : "OFF"}`;
       }
 
+      case "watch": {
+        const varName = args[0];
+        if (!varName) return "사용법: :watch <변수명>";
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.addWatch(varName);
+        return `👁 watching: ${varName}`;
+      }
+
+      case "unwatch": {
+        const varName = args[0];
+        if (!varName) return "사용법: :unwatch <변수명>";
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        sess.removeWatch(varName);
+        return `✓ removed: ${varName}`;
+      }
+
+      case "watches": {
+        const { getGlobalDebugSession } = require("./debugger");
+        const sess = getGlobalDebugSession();
+        const watched = sess.getWatchValues(this.interp.context.variables as any);
+        if (Object.keys(watched).length === 0) {
+          return "(감시 중인 변수 없음)";
+        }
+        const out: string[] = [];
+        for (const [k, v] of Object.entries(watched)) {
+          const valStr = typeof v === "function" ? "<function>"
+            : v?.kind === "function-value" ? "<fn-value>"
+            : JSON.stringify(v)?.slice(0, 80);
+          out.push(`  ${k} = ${valStr}`);
+        }
+        return out.join("\n");
+      }
+
       default:
         return `알 수 없는 명령어: :${name} (:help 참조)`;
     }
@@ -253,8 +291,12 @@ export class FreeLangRepl {
   }
 
   private completer(line: string): [string[], string] {
-    // :cmd 자동완성
-    const cmds = [":help", ":ls", ":src", ":inspect", ":time", ":clear", ":load", ":hist", ":quit", ":exit"];
+    // :cmd 자동완성 (15개 명령어)
+    const cmds = [
+      ":help", ":ls", ":src", ":inspect", ":time", ":clear", ":load", ":hist", ":quit", ":exit",
+      ":break", ":step", ":continue", ":stack", ":locals", ":debug",
+      ":watch", ":unwatch", ":watches",
+    ];
     if (line.startsWith(":")) {
       const hits = cmds.filter((c) => c.startsWith(line));
       return [hits.length ? hits : cmds, line];
