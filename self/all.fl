@@ -536,7 +536,7 @@
                    (if (null? $loop-array)
                      (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
                      (if (not (= (get $loop-array :kind) "array"))
-                       (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
+                       (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" $rest $line))
                        (let [[$items (get $loop-array :items)]
                              [$init (if (> (length $items) 0) (get $items 0) null)]
                              [$condition (if (> (length $items) 1) (get $items 1) null)]
