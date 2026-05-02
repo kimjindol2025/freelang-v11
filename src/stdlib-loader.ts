@@ -97,6 +97,29 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "fl_require":  (name: string): boolean => requireModule(name, interp as any),
     "fl_require?": (name: string): boolean => isModuleLoaded(name),
     "fl_modules":  (): string[] => getAvailableModules(),
+    // fl_load "path/to/lib.fl" → 다른 FL 파일을 현재 컨텍스트에 로드
+    // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
+    "fl_load": (filePath: string): boolean => {
+      const fs = require("fs");
+      const path = require("path");
+      const { lex } = require("./lexer");
+      const { parse } = require("./parser");
+      const resolved = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(process.cwd(), filePath);
+      if (!fs.existsSync(resolved)) {
+        console.error(`❌ [fl_load] 파일 없음: ${resolved}`);
+        return false;
+      }
+      try {
+        const src = fs.readFileSync(resolved, "utf-8");
+        (interp as any).interpret((parse as any)(lex(src)));
+        return true;
+      } catch (e: any) {
+        console.error(`❌ [fl_load] "${resolved}" 로드 실패:`, e.message);
+        return false;
+      }
+    },
   });
 
   // 네이밍 alias: 자주 쓰는 함수들의 대체 이름

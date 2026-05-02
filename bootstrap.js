@@ -25795,76 +25795,138 @@ function createMongodbModule() {
   const helperPath = path9.join(__dirname, "_mongodb_helper.js");
   function callHelper(req) {
     try {
-      const json = JSON.stringify(req);
-      const result = (0, import_child_process7.execFileSync)("node", [helperPath, json], {
-        timeout: 15e3,
+      const result = (0, import_child_process7.execFileSync)("node", [helperPath, JSON.stringify(req)], {
+        timeout: req.timeout ? req.timeout + 2e3 : 15e3,
         encoding: "utf-8"
       });
       return JSON.parse(result);
     } catch (err4) {
-      return {
-        ok: false,
-        error: err4.message || "Helper execution failed"
-      };
+      return { ok: false, error: err4.message || "Helper execution failed" };
     }
   }
+  function parseConn(connId) {
+    if (!connId) return { host: "localhost", port: 27017 };
+    const atIdx = connId.indexOf("@");
+    if (atIdx !== -1) {
+      const [creds, rest] = [connId.slice(0, atIdx), connId.slice(atIdx + 1)];
+      const colonIdx = creds.indexOf(":");
+      const user = creds.slice(0, colonIdx);
+      const pass = creds.slice(colonIdx + 1);
+      const slashIdx = rest.indexOf("/");
+      const hostPort = slashIdx !== -1 ? rest.slice(0, slashIdx) : rest;
+      const authDb = slashIdx !== -1 ? rest.slice(slashIdx + 1) : "admin";
+      const [host2, portStr2] = hostPort.split(":");
+      return { host: host2, port: parseInt(portStr2 || "27017", 10), user, pass, authDb };
+    }
+    const [host, portStr] = connId.split(":");
+    return { host, port: parseInt(portStr || "27017", 10) };
+  }
   return {
-    // mongodb_connect host port → connId or null
+    // ── 연결 ─────────────────────────────────────────────────
+    // mongo_connect "localhost" 27017 → connId ("localhost:27017")
+    "mongo_connect": (host, port = 27017) => {
+      const r = callHelper({ method: "ping", host, port });
+      return r.ok ? `${host}:${port}` : null;
+    },
+    // mongo_connect_auth "localhost" 27017 "user" "pass" "admin" → connId
+    "mongo_connect_auth": (host, port, user, pass, authDb = "admin") => {
+      const r = callHelper({ method: "ping", host, port, user, pass, authDb });
+      return r.ok ? `${user}:${pass}@${host}:${port}/${authDb}` : null;
+    },
+    // ── 단건 조회 ─────────────────────────────────────────────
+    // mongo_find_one connId "db" "col" {:_id "..."} → doc or nil
+    "mongo_find_one": (connId, db, col, filter = {}) => {
+      const r = callHelper({ method: "find_one", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.doc ?? null : null;
+    },
+    // ── 다건 조회 ─────────────────────────────────────────────
+    // mongo_find connId "db" "col" filter options → [docs]
+    // options: {:limit 10 :skip 0 :sort {:name 1}}
+    "mongo_find": (connId, db, col, filter = {}, opts = {}) => {
+      const r = callHelper({
+        method: "find_many",
+        ...parseConn(connId),
+        db,
+        collection: col,
+        filter,
+        limit: opts.limit,
+        skip: opts.skip,
+        sort: opts.sort,
+        projection: opts.projection
+      });
+      return r.ok ? r.docs ?? [] : [];
+    },
+    // ── 카운트 ────────────────────────────────────────────────
+    "mongo_count": (connId, db, col, filter = {}) => {
+      const r = callHelper({ method: "count", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.count ?? 0 : 0;
+    },
+    // ── 단건 삽입 ─────────────────────────────────────────────
+    // mongo_insert_one connId "db" "col" doc → inserted_id or nil
+    "mongo_insert_one": (connId, db, col, doc) => {
+      const r = callHelper({ method: "insert_one", ...parseConn(connId), db, collection: col, doc });
+      return r.ok ? r.inserted_id ?? null : null;
+    },
+    // ── 다건 삽입 ─────────────────────────────────────────────
+    "mongo_insert_many": (connId, db, col, docs) => {
+      const r = callHelper({ method: "insert_many", ...parseConn(connId), db, collection: col, docs });
+      return r.ok ? { count: r.inserted_count, ids: r.inserted_ids } : null;
+    },
+    // ── 단건 수정 ─────────────────────────────────────────────
+    // mongo_update_one connId "db" "col" filter update → {:matched 1 :modified 1}
+    "mongo_update_one": (connId, db, col, filter, update, opts = {}) => {
+      const r = callHelper({ method: "update_one", ...parseConn(connId), db, collection: col, filter, update, options: opts });
+      return r.ok ? { matched: r.matched, modified: r.modified } : null;
+    },
+    // ── 다건 수정 ─────────────────────────────────────────────
+    "mongo_update_many": (connId, db, col, filter, update, opts = {}) => {
+      const r = callHelper({ method: "update_many", ...parseConn(connId), db, collection: col, filter, update, options: opts });
+      return r.ok ? { matched: r.matched, modified: r.modified } : null;
+    },
+    // ── 단건 삭제 ─────────────────────────────────────────────
+    "mongo_delete_one": (connId, db, col, filter) => {
+      const r = callHelper({ method: "delete_one", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.deleted ?? 0 : 0;
+    },
+    // ── 다건 삭제 ─────────────────────────────────────────────
+    "mongo_delete_many": (connId, db, col, filter) => {
+      const r = callHelper({ method: "delete_many", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.deleted ?? 0 : 0;
+    },
+    // ── Aggregation ───────────────────────────────────────────
+    // mongo_aggregate connId "db" "col" pipeline → [docs]
+    "mongo_aggregate": (connId, db, col, pipeline) => {
+      const r = callHelper({ method: "aggregate", ...parseConn(connId), db, collection: col, pipeline });
+      return r.ok ? r.docs ?? [] : [];
+    },
+    // ── 트랜잭션 ──────────────────────────────────────────────
+    // mongo_transaction connId "db" ops → {:committed true :results [...]}
+    // ops: [{:method "insert_one" :collection "..." :doc {...}} ...]
+    // MongoDB Replica Set 필요 (트랜잭션은 standalone 미지원)
+    "mongo_transaction": (connId, db, ops) => {
+      const r = callHelper({ method: "transaction", ...parseConn(connId), db, ops });
+      return r;
+    },
+    // ── 인덱스 생성 ───────────────────────────────────────────
+    // mongo_create_index connId "db" "col" {:field 1} {:unique true} → name
+    "mongo_create_index": (connId, db, col, keys, opts = {}) => {
+      const r = callHelper({ method: "create_index", ...parseConn(connId), db, collection: col, filter: keys, options: opts });
+      return r.ok ? r.name ?? null : null;
+    },
+    // ── 컬렉션 목록 ───────────────────────────────────────────
+    "mongo_collections": (connId, db) => {
+      const r = callHelper({ method: "list_collections", ...parseConn(connId), db });
+      return r.ok ? r.collections ?? [] : [];
+    },
+    // ── 하위 호환 (deprecated) ────────────────────────────────
     "mongodb_connect": (host, port = 27017) => {
-      const result = callHelper({
-        method: "connect",
-        host,
-        port
-      });
-      if (result.ok) {
-        return `${host}:${port}`;
-      }
-      return null;
+      const r = callHelper({ method: "ping", host, port });
+      return r.ok ? `${host}:${port}` : null;
     },
-    // mongodb_sendrecv connId hexData → hexResponse or null
-    // Wire Protocol 명령 전송 & 응답 수신
-    "mongodb_sendrecv": (connId, hexData, timeout = 1e4) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "sendrecv",
-        host,
-        port,
-        data: hexData,
-        timeout
-      });
-      if (result.ok && result.data) {
-        return result.data;
-      }
-      return null;
-    },
-    // mongodb_send connId hexData → boolean
-    "mongodb_send": (connId, hexData) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "send",
-        host,
-        port,
-        data: hexData
-      });
-      return result.ok === true;
-    },
-    // mongodb_close connId → boolean
-    "mongodb_close": (connId) => {
-      return true;
-    },
-    // mongodb_is_connected connId → boolean
+    "mongodb_close": (_connId) => true,
     "mongodb_is_connected": (connId) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "connect",
-        host,
-        port,
-        timeout: 1e3
-      });
-      return result.ok === true;
+      const { host, port } = parseConn(connId);
+      return callHelper({ method: "ping", host, port, timeout: 1e3 }).ok === true;
     }
   };
 }
@@ -26457,6 +26519,14 @@ function _fl_shell_capture(cmd) {
 // \u2500 \uAE30\uD0C0 \u2500
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
 
+// \u2500 \uC2DC\uAC04 \u2500
+const now_ms = () => Date.now();
+const now_iso = () => new Date().toISOString();
+const now_unix = () => Math.floor(Date.now() / 1000);
+
+// \u2500 \uC178 \uC2E4\uD589 \u2500
+const shell_exec = (cmd, inp) => { try { const {execSync} = require("child_process"); const opts = {encoding: "utf8"}; if (inp) opts["input"] = inp; return execSync(cmd, opts); } catch(e) { return ""; } };
+
 // \u2500 \uAE00\uB85C\uBC8C \uBC14\uC778\uB529 \u2500
 let __argv__ = _fl_get_argv();
 
@@ -26825,8 +26895,8 @@ ${exportsStr}
   }
   genSExpr(node) {
     const { op, args: args3 } = node;
-    if (op === "and") return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
-    if (op === "or") return "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+    if (op === "and") return args3.length === 0 ? "true" : "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
+    if (op === "or") return args3.length === 0 ? "false" : "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
     if (op === "cond") return this.genCond(args3);
     if (op === "while") return this.genWhile(args3);
     if (op === "recur") {
@@ -26848,11 +26918,12 @@ ${exportsStr}
         inits.push(`let ${name} = ${val};`);
         names.push(name);
       }
-      const bodyCode = bodyExprs.map((e) => this.genNode(e)).join("; ");
+      const bodyParts = bodyExprs.map((e) => this.genNode(e));
+      const bodyCode = bodyParts.length === 1 ? `return ${bodyParts[0]};` : bodyParts.slice(0, -1).map((s) => `${s};`).join(" ") + ` return ${bodyParts[bodyParts.length - 1]};`;
       return `(() => {
         ${inits.join(" ")}
         while (true) {
-          const __r = (() => { return ${bodyCode}; })();
+          const __r = (() => { ${bodyCode} })();
           if (__r && __r.__recur) {
             [${names.join(", ")}] = __r.a;
             continue;
@@ -26931,13 +27002,22 @@ ${exportsStr}
           bindings = bindingsArg.args;
         }
         const bindingStmts = [];
-        for (const binding of bindings) {
-          if (binding.kind === "block" && binding.type === "Array") {
-            const pairItems = binding.fields.get("items") || [];
-            if (pairItems.length >= 2) {
-              const varName2 = this.extractVarName(pairItems[0]);
-              const value2 = this.genNode(pairItems[1]);
-              bindingStmts.push(`let ${varName2} = ${value2};`);
+        const isFlat = bindings.length > 0 && !(bindings[0].kind === "block" && bindings[0].type === "Array");
+        if (isFlat) {
+          for (let i = 0; i < bindings.length - 1; i += 2) {
+            const varName2 = this.extractVarName(bindings[i]);
+            const value2 = this.genNode(bindings[i + 1]);
+            bindingStmts.push(`let ${varName2} = ${value2};`);
+          }
+        } else {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && binding.type === "Array") {
+              const pairItems = binding.fields.get("items") || [];
+              if (pairItems.length >= 2) {
+                const varName2 = this.extractVarName(pairItems[0]);
+                const value2 = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName2} = ${value2};`);
+              }
             }
           }
         }
@@ -26952,15 +27032,27 @@ ${exportsStr}
   }
   genCond(args3) {
     if (args3.length === 0) return "null";
-    const clauses = args3.map((arg) => {
-      if (arg.kind === "block" && arg.type === "Array") return arg.fields.get("items") || [];
-      return Array.isArray(arg) ? arg : [arg];
-    });
+    const firstIsClause = args3[0].kind === "block" && args3[0].type === "Array";
+    let pairs;
+    if (firstIsClause) {
+      pairs = args3.map((arg) => {
+        const items = arg.kind === "block" && arg.type === "Array" ? arg.fields.get("items") || [] : [arg];
+        return [items[0], items[1]];
+      });
+    } else {
+      pairs = [];
+      for (let i = 0; i < args3.length - 1; i += 2) {
+        pairs.push([args3[i], args3[i + 1]]);
+      }
+      if (args3.length % 2 === 1) {
+        pairs.push([{ kind: "literal", value: true }, args3[args3.length - 1]]);
+      }
+    }
     let res = "null";
-    for (let i = clauses.length - 1; i >= 0; i--) {
-      const pair = clauses[i];
-      const test = this.genNode(pair[0]);
-      const body = pair[1] ? this.genNode(pair[1]) : "null";
+    for (let i = pairs.length - 1; i >= 0; i--) {
+      const [testNode, bodyNode] = pairs[i];
+      const test = this.genNode(testNode);
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
       res = "(" + test + " ? " + body + " : " + res + ")";
     }
     return res;
@@ -27029,11 +27121,10 @@ ${exportsStr}
   genMapBlock(node) {
     const pairs = [];
     node.fields.forEach((val, key) => {
-      if (key === "items" && node.type === "Map") return;
       const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
       pairs.push(jsKey + ": " + this.genNode(val));
     });
-    return "{ " + pairs.join(", ") + " }";
+    return "({ " + pairs.join(", ") + " })";
   }
   genArrayBlock(node) {
     const items = node.fields.get("items");
@@ -29846,10 +29937,32 @@ function loadAllStdlib(interp2) {
     (n, a) => interp2.callUserFunction(n, a)
   ));
   interp2.registerModule(createImageModule());
+  interp2.registerModule(createMongodbModule());
   interp2.registerModule({
     "fl_require": (name) => requireModule(name, interp2),
     "fl_require?": (name) => isModuleLoaded(name),
-    "fl_modules": () => getAvailableModules()
+    "fl_modules": () => getAvailableModules(),
+    // fl_load "path/to/lib.fl" → 다른 FL 파일을 현재 컨텍스트에 로드
+    // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
+    "fl_load": (filePath) => {
+      const fs22 = require("fs");
+      const path18 = require("path");
+      const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+      const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+      const resolved = path18.isAbsolute(filePath) ? filePath : path18.resolve(process.cwd(), filePath);
+      if (!fs22.existsSync(resolved)) {
+        console.error(`\u274C [fl_load] \uD30C\uC77C \uC5C6\uC74C: ${resolved}`);
+        return false;
+      }
+      try {
+        const src = fs22.readFileSync(resolved, "utf-8");
+        interp2.interpret(parse3(lex2(src)));
+        return true;
+      } catch (e) {
+        console.error(`\u274C [fl_load] "${resolved}" \uB85C\uB4DC \uC2E4\uD328:`, e.message);
+        return false;
+      }
+    }
   });
   const _aliases = {
     // ── get-in / assoc-in / update-in (깊은 접근 + 업데이트) ─────────────────
