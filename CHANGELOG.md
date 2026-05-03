@@ -1,16 +1,53 @@
 # FreeLang v11 변경 이력
 
-## [11.3.3] - 2026-05-03
+## [11.3.4] - 2026-05-03
 
-**마일스톤**: 오류 서치 #54-59 경로 통합 — 5개 버그 수정 (누적 59개)
+**마일스톤**: 오류 서치 #54-62 경로 통합 완료 — 20개 버그 수정 (누적 74개)
 
 ### 🐛 버그 수정
 
-#### 함수 경로 일관성 (Path Consolidation)
-- **`str` 경로 1 일관성**: String() → toDisplay() 통합
-- **`min/max` 경로 2 필터링**: 숫자 필터 추가 (경로 1과 일치)
-- **`sort` 경로 1 반환값**: 배열 아니면 [] 반환 (경로 2와 일치)
-- **`print` 경로 1**: String() → toDisplay() 통합 (경로 2와 일치)
+#### 함수 경로 일관성 (Path Consolidation - 3단계)
+
+**1단계 (str/min/max/sort/print)**
+- `str` 경로 1: String() → toDisplay()
+- `min/max` 경로 2: 숫자 필터 추가
+- `sort` 경로 1: [] 반환 일관성
+- `print` 경로 1: toDisplay() 통합
+
+**2단계 (배열 함수)**
+- `first` 경로 2: 일관성 개선
+- `rest` 경로 2: [] 반환 보장
+- `last` 경로 1: 안전 체크 개선
+- `reverse` 경로 2: 반환값 일관성
+
+**3단계 (객체/타입 검사)**
+- `empty?` 경로 2: 객체 처리 추가
+- `keys` 경로 1: Map 처리 추가
+- `values` 경로 1: Map 처리 추가
+- `has-key?` 경로 1: String 타입 변환
+
+**4단계 (문자열 함수)**
+- `starts-with?` 경로 1: 타입 체크 강화
+- `ends-with?` 경로 1: 타입 체크 강화
+- `replace` 경로 1: 완전한 타입 체크
+
+## [11.3.3] - 2026-05-03
+
+**마일스톤**: 오류 서치 #51-52 추가 — 8개 버그 수정 (누적 54개)
+
+### 🐛 버그 수정
+
+#### 문자열/정규식 처리
+- **`re-replace` $ 패턴 해석**: replacement의 $ → $$ 이스케이프 필수
+- **`format_date` 반복 토큰 미처리**: `.replace()` → `.replaceAll()` 또는 regex 사용
+
+#### DB 함수 에러 핸들링
+- **`db_put` try/catch 미포함**: 요청 실패 시 exception → null 처리
+- **`db_query` try/catch 미포함**: SQL 에러 시 exception → [] 처리
+- **`db_exec` try/catch 미포함**: SQL 에러 시 exception → "" 처리
+
+#### 진리값 일관성
+- **`and` JavaScript truthy 사용**: FreeLang falsy (null/undefined/false만) 기준으로 통일
 
 ## [11.3.2] - 2026-05-03
 
