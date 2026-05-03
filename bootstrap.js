@@ -11264,7 +11264,12 @@ function flDeepEq(a, b) {
     for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
     return true;
   }
-  if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+  if (a instanceof Map && b instanceof Map) {
+    if (a.size !== b.size) return false;
+    for (const [k, v] of a) if (!flDeepEq(v, b.get(k))) return false;
+    return true;
+  }
+  if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b) && !(a instanceof Map) && !(b instanceof Map)) {
     const ka = Object.keys(a), kb = Object.keys(b);
     if (ka.length !== kb.length) return false;
     for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
@@ -12668,9 +12673,10 @@ loop().catch(e => {
         if (findFn && findFn.kind === "function-value") {
           return args3[0].find((item) => callFnVal(findFn, [item])) ?? null;
         }
-        return args3[0].indexOf(findFn);
+        const _fi = args3[0].indexOf(findFn);
+        return _fi >= 0 ? args3[0][_fi] : null;
       }
-      return -1;
+      return null;
     case "last":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "first-or":
@@ -13201,7 +13207,7 @@ loop().catch(e => {
     }
     case "range": {
       if (args3.length === 0) return rangeSeq(0);
-      if (args3.length === 1) return rangeSeq(0, args3[0]);
+      if (args3.length === 1) { const _re = Number(args3[0]); const _ro = []; for (let i = 0; i < _re; i++) _ro.push(i); return _ro; }
       const start = Number(args3[0]);
       const end = Number(args3[1]);
       const step = args3.length >= 3 ? Number(args3[2]) : 1;
