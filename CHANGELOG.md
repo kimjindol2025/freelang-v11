@@ -1,5 +1,24 @@
 # FreeLang v11 변경 이력
 
+## [11.2.2] - 2026-05-03
+
+**마일스톤**: 오류 서치 #21~#24 — 버그 8개 수정
+
+### 🐛 버그 수정
+
+#### 타입/predicate
+- **`not`**: 3경로 모두 JS falsy(`!v`) → FL falsy(`v === null || undefined || false`) — `(not 0)` = `false` 로 수정
+- **`number?`**: NaN에서 `true` 반환 → `!isNaN()` 체크 추가 (2경로)
+- **`fn?`**: 이미 수정됨 (v11.2.1)
+- **`has-key?`**: Map 인스턴스에서 항상 `false` → `Map.has()` 분기 추가 (2경로)
+- **`empty?`**: flExecOpNative 경로에서 Map 인스턴스 미처리 → `instanceof Map` 추가
+
+#### atom
+- **`atom`/`deref`**: `{value: x}` 구조 가진 일반 맵도 atom으로 오인식 → non-enumerable `__isAtom` 마커로 정확히 구분 (4경로: atom/deref/reset!/swap! 모두)
+
+#### 패턴 매칭
+- **`match` guard**: JS falsy(`!guardResult`) → FL falsy(`guardResult === null || undefined || false`) — `0` 또는 `""` guard 조건이 잘못 실패하던 문제 수정
+
 ## [11.2.1] - 2026-05-03
 
 **마일스톤**: 오류 서치 #9~#17 — 버그 22개 수정, 신규 함수 3개 추가

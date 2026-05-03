@@ -11346,7 +11346,7 @@ function flExecOpNative(op, vals) {
     case ">=":
       return v0 >= v1;
     case "not":
-      return !v0;
+      return v0 === null || v0 === void 0 || v0 === false;
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
@@ -11354,12 +11354,14 @@ function flExecOpNative(op, vals) {
       if (v0 === null || v0 === void 0) return true;
       if (typeof v0 === "string") return v0.length === 0;
       if (Array.isArray(v0)) return v0.length === 0;
+      if (v0 instanceof Map) return v0.size === 0;
       if (typeof v0 === "object") return Object.keys(v0).length === 0;
       return false;
     }
     case "has-key?": {
       if (v0 === null || v0 === void 0 || typeof v0 !== "object" || Array.isArray(v0)) return false;
       const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      if (v0 instanceof Map) return v0.has(k);
       return Object.prototype.hasOwnProperty.call(v0, k);
     }
     case "nil-or-empty?":
@@ -11652,21 +11654,22 @@ function flExecOpNative(op, vals) {
     }
     case "atom": {
       const ref = { value: v0 !== void 0 ? v0 : null };
+      Object.defineProperty(ref, "__isAtom", { value: true, enumerable: false });
       return ref;
     }
     case "deref": {
-      if (v0 && typeof v0 === "object" && "value" in v0) return v0.value;
+      if (v0 && typeof v0 === "object" && v0.__isAtom === true) return v0.value;
       return v0;
     }
     case "reset!": {
-      if (v0 && typeof v0 === "object" && "value" in v0) {
+      if (v0 && typeof v0 === "object" && v0.__isAtom === true) {
         v0.value = v1;
         return v1;
       }
       return v1;
     }
     case "swap!": {
-      if (v0 && typeof v0 === "object" && "value" in v0 && v1) {
+      if (v0 && typeof v0 === "object" && v0.__isAtom === true && v1) {
         const extraArgs = args.slice(2);
         const newVal = flApplyNative(v1, [v0.value, ...extraArgs]);
         v0.value = newVal;
@@ -11797,8 +11800,7 @@ function flInterpSexpr(op, rawArgs, env) {
       }
       return lastVal2;
     }
-    case "not":
-      return !flInterpNative(rawArgs[0], env);
+    case "not": { const _nv = flInterpNative(rawArgs[0], env); return _nv === null || _nv === void 0 || _nv === false; }
     case "null?": {
       const v = flInterpNative(rawArgs[0], env);
       return v === null || v === void 0;
@@ -11868,16 +11870,18 @@ function evalBuiltin(interp2, op, args3, expr2) {
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
     case "atom": {
-      return { value: args3[0] !== void 0 ? args3[0] : null };
+      const _ref2 = { value: args3[0] !== void 0 ? args3[0] : null };
+      Object.defineProperty(_ref2, "__isAtom", { value: true, enumerable: false });
+      return _ref2;
     }
     case "deref": {
       const ref = args3[0];
-      if (ref && typeof ref === "object" && "value" in ref) return ref.value;
+      if (ref && typeof ref === "object" && ref.__isAtom === true) return ref.value;
       return ref;
     }
     case "reset!": {
       const ref = args3[0];
-      if (ref && typeof ref === "object" && "value" in ref) {
+      if (ref && typeof ref === "object" && ref.__isAtom === true) {
         ref.value = args3[1];
         return args3[1];
       }
@@ -11887,7 +11891,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const ref = args3[0];
       const fn = args3[1];
       const extra = args3.slice(2);
-      if (ref && typeof ref === "object" && "value" in ref && fn) {
+      if (ref && typeof ref === "object" && ref.__isAtom === true && fn) {
         const newVal = callFnVal(fn, [ref.value, ...extra]);
         ref.value = newVal;
         return newVal;
@@ -12211,7 +12215,7 @@ loop().catch(e => {
       return args3.length > 0 ? args3[args3.length - 1] : null;
     }
     case "not":
-      return !args3[0];
+      return args3[0] === null || args3[0] === void 0 || args3[0] === false;
     case "print":
       process.stdout.write(args3.map((a) => toDisplay(a)).join(" "));
       return null;
@@ -12601,6 +12605,7 @@ loop().catch(e => {
       const obj = args3[0], key = args3[1];
       if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
       const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
+      if (obj instanceof Map) return obj.has(k);
       return Object.prototype.hasOwnProperty.call(obj, k);
     }
     case "nil-or-empty?":
@@ -12618,7 +12623,7 @@ loop().catch(e => {
     case "string?":
       return typeof args3[0] === "string";
     case "number?":
-      return typeof args3[0] === "number";
+      return typeof args3[0] === "number" && !isNaN(args3[0]);
     case "boolean?":
     case "bool?":
       return typeof args3[0] === "boolean";
@@ -12830,7 +12835,7 @@ loop().catch(e => {
         case "string?":
           return typeof v0 === "string";
         case "number?":
-          return typeof v0 === "number";
+          return typeof v0 === "number" && !isNaN(v0);
         case "read-file":
           try {
             return require("fs").readFileSync(String(v0), "utf-8");
@@ -31198,7 +31203,7 @@ function evalPatternMatch(interp2, match) {
       }
       if (caseItem.guard) {
         const guardResult = interp2.eval(caseItem.guard);
-        if (!guardResult) {
+        if (guardResult === null || guardResult === void 0 || guardResult === false) {
           interp2.context.variables.pop();
           continue;
         }
