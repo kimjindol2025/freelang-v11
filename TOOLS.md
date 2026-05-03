@@ -42,6 +42,22 @@
 | `server_req_method req` | HTTP 메서드 (`"GET"` / `"POST"` 등) |
 | `server_req_path req` | 요청 경로 (`"/api/users/42"`) |
 | `server_req_id` | 현재 요청 ID (응답 보류용) |
+| `server_req_files req` | 업로드된 파일 배열 `[{fieldname, originalname, mimetype, size, path, filename}]` |
+| `server_req_file req fieldname` | 특정 fieldname 파일 단건 (없으면 null) |
+| `server_req_fields req` | multipart non-file 폼 필드 맵 `{fieldname: value}` |
+
+### 파일 업로드 예시
+```fl
+(server_post "/upload" (fn [$req]
+  (let [[$file (server_req_file $req "avatar")]]
+    (if (nil? $file)
+      (server_status 400 "파일 없음")
+      (server_json {:path    (get $file "path")
+                    :name    (get $file "originalname")
+                    :size    (get $file "size")
+                    :mime    (get $file "mimetype")})))))
+```
+> `Content-Type: multipart/form-data` 요청만 자동 파싱. 파일은 `/tmp/fl-uploads/` 에 저장.
 
 ### WebSocket (서버 내장)
 ```fl
