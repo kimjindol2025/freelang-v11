@@ -21410,7 +21410,12 @@ function createDataModule() {
 }
 
 // src/stdlib-collection.ts
-function createCollectionModule() {
+function createCollectionModule(interp2) {
+  const _callFl = (fn, args3) => {
+    if (fn && (fn.kind === "function-value" || fn.kind === "async-function-value")) return interp2.callFunctionValue(fn, args3);
+    if (typeof fn === "function") return fn(...args3);
+    throw new Error("함수 필요");
+  };
   return {
     // ── Array Transformation ──────────────────────────────────
     // arr_flatten arr -> [any]  (flatten one level deep)
@@ -21534,16 +21539,11 @@ function createCollectionModule() {
     // memoize fn [maxSize] -> fn  (LRU cache, memo_call/size/clear 지원)
     "memoize": (fn, maxSize = Infinity) => {
       const cache = /* @__PURE__ */ new Map();
-      const _callFn = (args3) => {
-        if (fn && fn.kind === "function-value") return callFnVal(fn, args3);
-        if (typeof fn === "function") return fn(...args3);
-        throw new Error("memoize: fn must be a function");
-      };
       const memoFn = (...args3) => {
         const key = JSON.stringify(args3);
         if (cache.has(key)) return cache.get(key);
         if (maxSize !== Infinity && cache.size >= maxSize) cache.delete(cache.keys().next().value);
-        const result = _callFn(args3);
+        const result = _callFl(fn, args3);
         cache.set(key, result);
         return result;
       };
@@ -21559,7 +21559,7 @@ function createCollectionModule() {
     // time_exec fn -> {result, ms}
     "time_exec": (fn) => {
       const t0 = Date.now();
-      const result = (fn && fn.kind === "function-value") ? callFnVal(fn, []) : (typeof fn === "function" ? fn() : null);
+      const result = _callFl(fn, []);
       return { result, ms: Date.now() - t0 };
     },
     // span name fn -> {name, result, ms, ok}
@@ -21567,7 +21567,7 @@ function createCollectionModule() {
       const t0 = Date.now();
       let result = null, ok = true;
       try {
-        result = (fn && fn.kind === "function-value") ? callFnVal(fn, []) : (typeof fn === "function" ? fn() : null);
+        result = _callFl(fn, []);
       } catch (e) { ok = false; result = e.message; }
       const ms = Date.now() - t0;
       if (process.env.FL_TRACE === "1") process.stderr.write(`[span] ${name}: ${ms}ms ${ok ? "ok" : "err"}\n`);
@@ -21580,7 +21580,7 @@ function createCollectionModule() {
       for (let i = 0; i < arr.length; i += batchSize) {
         const batch = arr.slice(i, i + batchSize);
         for (const item of batch) {
-          const r = (fn && fn.kind === "function-value") ? callFnVal(fn, [item]) : (typeof fn === "function" ? fn(item) : item);
+          const r = _callFl(fn, [item]);
           results.push(r);
         }
       }
@@ -21609,7 +21609,7 @@ function createCollectionModule() {
       if (typeof limiter !== "function" || !limiter.__fl_rl__) throw new Error("rl_call: rate_limit 결과 필요");
       const check = limiter();
       if (!check.ok) return check;
-      const result = (fn && fn.kind === "function-value") ? callFnVal(fn, args3) : (typeof fn === "function" ? fn(...args3) : null);
+      const result = _callFl(fn, args3);
       return { ok: true, result };
     },
     // once fn -> fn  (return version of fn that only executes once)
@@ -30755,7 +30755,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createHttpModule());
   interp2.registerModule(createShellModule());
   interp2.registerModule(createDataModule());
-  interp2.registerModule(createCollectionModule());
+  interp2.registerModule(createCollectionModule(interp2));
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
@@ -30877,6 +30877,7 @@ function loadAllStdlib(interp2) {
         return [];
       }
     },
+    // re-replace pattern replacement str  (패턴 먼저)
     "re-replace": (pattern, replacement, s) => {
       try {
         return String(s).replace(new RegExp(pattern, "g"), replacement);
@@ -30884,12 +30885,21 @@ function loadAllStdlib(interp2) {
         return String(s);
       }
     },
+    // str-re-replace str pattern replacement  (str-* 계열 순서: 문자열 먼저)
+    "str-re-replace": (s, pattern, replacement) => {
+      try { return String(s).replace(new RegExp(pattern, "g"), replacement); } catch { return String(s); }
+    },
+    // re-split pattern str  (패턴 먼저)
     "re-split": (pattern, s) => {
       try {
         return String(s).split(new RegExp(pattern));
       } catch {
         return [String(s)];
       }
+    },
+    // str-re-split str pattern  (str-* 계열 순서: 문자열 먼저)
+    "str-re-split": (s, pattern) => {
+      try { return String(s).split(new RegExp(pattern)); } catch { return [String(s)]; }
     },
     "re-groups": (pattern, s) => {
       try {
