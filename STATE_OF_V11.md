@@ -12,15 +12,19 @@
 | **L0** | TypeScript → `bootstrap.js` | ✅ 완료 | 38,661줄 |
 | **L1** | `bootstrap.js` → `stage1.js` (`self/all.fl` 컴파일) | ✅ 완료 | 620줄 |
 | **L2** | `bootstrap.js` == `stage1.js` 의미 동등성 | ✅ **17/17 (100%)** | 2026-05-02 달성 |
-| **L3** | `stage1.js` → `stage2.js` (자기 자신 컴파일) | 🔧 진행 중 | `cli_main` 연결 필요 |
+| **L3** | `stage1.js` → `stage2.js` (자기 자신 컴파일) | ✅ **완료** | 2026-05-03 달성 |
 | **L4** | TypeScript 완전 독립 | 📋 예정 | Node.js SEA 검토 중 |
 
-### L3 현황
+### L3 달성 내용
 ```bash
-node stage1.js self/all.fl /tmp/stage2.js   # 컴파일: 성공 (8,523줄 생성)
-node /tmp/stage2.js input.fl out.js          # 실행: ReferenceError: cli_main is not defined
+node bootstrap.js compile self/all.fl -o stage1.js --runtime
+node stage1.js self/all.fl /tmp/stage2.js     # 컴파일: 성공
+node /tmp/stage2.js test.fl out.js && node out.js  # 실행: 정상
+bash scripts/verify-l3-proof.sh                # ✅ L3 VERIFIED
 ```
-`self/main.fl`의 `cli_main`이 `self/all.fl`에 올바르게 포함되지 않아 실행 불가. 수정 필요.
+
+**핵심 버그 수정**: `cg-stmts` 추가 - `while` 루프 body에서 `return`을 삽입하지 않도록.
+이전엔 `cg-do-body`가 while body에 `return`을 삽입해 IIFE 첫 반복 후 탈출, Symbol 렉서가 한 글자만 읽는 문제 발생.
 
 ---
 

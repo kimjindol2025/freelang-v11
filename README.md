@@ -12,10 +12,10 @@
 | **L0** | TypeScript → `bootstrap.js` | ✅ 완료 |
 | **L1** | `bootstrap.js`가 `self/all.fl` → `stage1.js` | ✅ 완료 |
 | **L2** | `bootstrap.js` == `stage1.js` 의미 동등성 증명 | ✅ **17/17 (100%)** |
-| **L3** | `stage1.js`가 자기 자신을 컴파일 → `stage2.js` | 🔧 진행 중 (`cli_main` 연결 필요) |
+| **L3** | `stage1.js`가 자기 자신을 컴파일 → `stage2.js` | ✅ **완료** (`scripts/verify-l3-proof.sh`) |
 | **L4** | TypeScript 완전 독립 (Node.js SEA 바이너리) | 📋 예정 |
 
-**테스트**: 775/832 통과 (93.2%) | **실패 suite**: ai-library, semantic-preservation, self-hosting
+**테스트**: 775/832 통과 (93.2%) | **자기 호스팅**: L2 17/17 + L3 ✅ 완전 달성
 
 ---
 
@@ -38,6 +38,9 @@ node bootstrap.js repl
 # L2 증명 검증
 bash scripts/verify-l2-proof.sh --prepare
 bash scripts/verify-l2-proof.sh --run
+
+# L3 증명 검증
+bash scripts/verify-l3-proof.sh
 ```
 
 ---
