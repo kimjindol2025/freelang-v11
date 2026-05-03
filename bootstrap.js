@@ -11570,7 +11570,10 @@ function flExecOpNative(op, vals) {
       const fs22 = require("fs");
       const path18 = require("path");
       try {
-        const resolvedPath = path18.resolve(process.cwd(), filePath);
+        const _loadBase = interp.currentFilePath && !interp.currentFilePath.endsWith("/")
+          ? path18.dirname(interp.currentFilePath)
+          : (interp.currentFilePath || process.cwd());
+        const resolvedPath = path18.isAbsolute(filePath) ? filePath : path18.resolve(_loadBase, filePath);
         const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
@@ -11890,7 +11893,10 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const fs22 = require("fs");
       const path18 = require("path");
       try {
-        const resolvedPath = path18.resolve(process.cwd(), filePath);
+        const _loadBase2 = interp2.currentFilePath && !interp2.currentFilePath.endsWith("/")
+          ? path18.dirname(interp2.currentFilePath)
+          : (interp2.currentFilePath || process.cwd());
+        const resolvedPath = path18.isAbsolute(filePath) ? filePath : path18.resolve(_loadBase2, filePath);
         const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
@@ -19134,6 +19140,7 @@ function evalSpecialForm(interp2, op, expr2) {
     return last;
   }
   if (op === "map" && expr2.args.length === 3) {
+    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m map 3-인자 형태 `(map arr [param] body)` 비권장. `(map (fn [param] body) arr)` 사용 권장.\n");
     const arr = ev(expr2.args[0]);
     const paramNode = expr2.args[1];
     const bodyNode = expr2.args[2];
@@ -19307,6 +19314,7 @@ function evalSpecialForm(interp2, op, expr2) {
     return null;
   }
   if (op === "parallel") {
+    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m parallel: 순차 실행 (단일 스레드 인터프리터). 진짜 병렬은 workflow_run_async 사용.\n");
     if (expr2.args.length === 0) return [];
     const results = [];
     for (const arg of expr2.args) {
@@ -19323,6 +19331,7 @@ function evalSpecialForm(interp2, op, expr2) {
     return results;
   }
   if (op === "race") {
+    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m race: 첫 번째 non-nil 반환 (시간 경쟁 아님). 순차 평가.\n");
     if (expr2.args.length === 0) return null;
     let firstResult = void 0;
     for (const arg of expr2.args) {
@@ -19340,6 +19349,7 @@ function evalSpecialForm(interp2, op, expr2) {
     return firstResult ?? null;
   }
   if (op === "with-timeout") {
+    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m with-timeout: 타임아웃 파라미터 무시됨 (동기 인터프리터 제한). 그냥 실행.\n");
     if (expr2.args.length < 2) return null;
     try {
       let val = ev(expr2.args[1]);
