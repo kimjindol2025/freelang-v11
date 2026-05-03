@@ -11259,15 +11259,22 @@ init_parser();
 function flDeepEq(a, b) {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  if (a instanceof Map && b instanceof Map) {
+    if (a.size !== b.size) return false;
+    for (const [k, v] of a) if (!flDeepEq(b.get(k), v)) return false;
+    return true;
+  }
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
     return true;
   }
   if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
-    const ka = Object.keys(a), kb = Object.keys(b);
+    const toPlain = (x) => x instanceof Map ? Object.fromEntries(x) : x;
+    const pa = toPlain(a), pb = toPlain(b);
+    const ka = Object.keys(pa), kb = Object.keys(pb);
     if (ka.length !== kb.length) return false;
-    for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
+    for (const k of ka) if (!flDeepEq(pa[k], pb[k])) return false;
     return true;
   }
   return false;
@@ -12610,6 +12617,11 @@ loop().catch(e => {
     case "map-set":
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
         const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
+        if (args3[0] instanceof Map) {
+          const r = new Map(args3[0]);
+          r.set(k, args3[2]);
+          return r;
+        }
         return { ...args3[0], [k]: args3[2] };
       }
       return args3[0];
