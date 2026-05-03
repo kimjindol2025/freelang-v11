@@ -11399,7 +11399,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
     case "concat":
-      return vals.map((v) => v === null || v === void 0 ? "null" : String(v)).join("");
+      return vals.map((v) => v === null || v === void 0 ? "" : String(v)).join("");
     case "str-to-num": {
       const n = parseFloat(String(v0));
       return isNaN(n) ? null : n;
@@ -12208,7 +12208,7 @@ loop().catch(e => {
       process.stderr.write(args3.map((a) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args3.map((a) => toDisplay(a)).join("");
+      return args3.map((a) => a === null || a === undefined ? "" : toDisplay(a)).join("");
     case "repr":
       return JSON.stringify(args3[0], null, 2);
     case "inspect": {
@@ -20603,8 +20603,9 @@ function curlGetStatusAndBody(url2, method = "GET", headers, body) {
         args3.push("-H", `${key}: ${value}`);
       }
     }
-    if (body && body.length > 0) {
-      args3.push("-d", body);
+    const _bodyStr = (body !== null && body !== undefined && typeof body === "object") ? JSON.stringify(body) : body;
+    if (_bodyStr && _bodyStr.length > 0) {
+      args3.push("-d", _bodyStr);
     }
     args3.push(url2);
     const result = (0, import_child_process.spawnSync)("curl", args3, { timeout: 15e3 });
