@@ -1,5 +1,23 @@
 # FreeLang v11 변경 이력
 
+## [11.3.2] - 2026-05-03
+
+**마일스톤**: 오류 서치 #51-52 추가 — 8개 버그 수정 (누적 54개)
+
+### 🐛 버그 수정
+
+#### 문자열/정규식 처리
+- **`re-replace` $ 패턴 해석**: replacement의 $ → $$ 이스케이프 필수
+- **`format_date` 반복 토큰 미처리**: `.replace()` → `.replaceAll()` 또는 regex 사용
+
+#### DB 함수 에러 핸들링
+- **`db_put` try/catch 미포함**: 요청 실패 시 exception → null 처리
+- **`db_query` try/catch 미포함**: SQL 에러 시 exception → [] 처리
+- **`db_exec` try/catch 미포함**: SQL 에러 시 exception → "" 처리
+
+#### 진리값 일관성
+- **`and` JavaScript truthy 사용**: FreeLang falsy (null/undefined/false만) 기준으로 통일
+
 ## [11.3.1] - 2026-05-03
 
 **마일스톤**: P0-P3 우선순위 완성 — 6개 추가 버그 수정 (누적 46개)
