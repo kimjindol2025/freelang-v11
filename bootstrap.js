@@ -24343,8 +24343,7 @@ function b64urlDecode(s) {
 function jwtSign(payload, secret, expirySeconds) {
   const iat = Math.floor(Date.now() / 1e3);
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const _pl = payload instanceof Map ? Object.fromEntries(payload) : payload;
-  const body = b64url(JSON.stringify({ ..._pl, iat, exp: iat + expirySeconds }));
+  const body = b64url(JSON.stringify({ ...payload, iat, exp: iat + expirySeconds }));
   const sig = b64url((0, import_crypto4.createHmac)("sha256", secret).update(`${header}.${body}`).digest());
   return `${header}.${body}.${sig}`;
 }
