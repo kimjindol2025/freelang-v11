@@ -9735,14 +9735,14 @@ var CuriosityEngine = class {
    */
   selectNextTopic() {
     if (this.state.frontier.length === 0) return null;
-    const C = Math.SQRT2;
+    const C2 = Math.SQRT2;
     const N = Math.max(1, this.totalVisits);
     let bestTopic = null;
     let bestScore = -Infinity;
     for (const topic of this.state.frontier) {
       const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
       const avgGain = stats.visits > 0 ? stats.totalGain / stats.visits : 0;
-      const exploration = C * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
+      const exploration = C2 * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
       const ucb1Score = avgGain + exploration;
       if (ucb1Score > bestScore) {
         bestScore = ucb1Score;
@@ -9845,13 +9845,13 @@ var CuriosityEngine = class {
    * topics 목록에서 UCB1 점수 기준 내림차순 정렬
    */
   prioritize(topics) {
-    const C = Math.SQRT2;
+    const C2 = Math.SQRT2;
     const N = Math.max(1, this.totalVisits);
     return [...topics].sort((a, b) => {
       const sA = this.ucb1Stats.get(a) ?? { visits: 0, totalGain: 0 };
       const sB = this.ucb1Stats.get(b) ?? { visits: 0, totalGain: 0 };
-      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
-      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
+      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
+      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
       return scoreB - scoreA;
     });
   }
@@ -23496,13 +23496,16 @@ function createHttpServerModule(callFn, callFunctionValue2) {
                 let respBody = asyncResp.body ?? "";
                 let contentType = asyncResp.contentType ?? "application/json";
                 const extraHeaders = asyncResp.headers ?? {};
-                const getCT = (h) => Object.entries(h).find(([k]) => k.toLowerCase() === "content-type")?.[1];
                 if (asyncResp.encoding === "base64" && typeof respBody === "string") {
                   const buf = Buffer.from(respBody, "base64");
-                  if (getCT(extraHeaders)) contentType = getCT(extraHeaders);
+                  if (extraHeaders["content-type"]) {
+                    contentType = extraHeaders["content-type"];
+                  }
                   sendResponse(res, status, buf, contentType, extraHeaders);
                 } else {
-                  if (getCT(extraHeaders)) contentType = getCT(extraHeaders);
+                  if (extraHeaders["content-type"]) {
+                    contentType = extraHeaders["content-type"];
+                  }
                   sendResponse(res, status, respBody, contentType, extraHeaders);
                 }
               }
@@ -23515,8 +23518,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
                   status = resStatus ?? 200;
                   const resHeaders = getField(result, "headers") ?? {};
                   const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
-                  const ctFromHeaders = Object.entries(headersObj).find(([k]) => k.toLowerCase() === "content-type")?.[1];
-                  const contentType = ctFromHeaders ?? getField(result, "contentType") ?? "application/json";
+                  const contentType = headersObj["content-type"] ?? getField(result, "contentType") ?? "application/json";
                   sendResponse(res, status, resBody ?? "", contentType, headersObj);
                 } else {
                   sendResponse(res, 200, result);
@@ -38440,135 +38442,172 @@ function cmdServe(args3) {
     process.exit(1);
   });
 }
-function printUsage() {
+var C = {
+  bold: (s) => `\x1B[1m${s}\x1B[0m`,
+  cyan: (s) => `\x1B[36m${s}\x1B[0m`,
+  green: (s) => `\x1B[32m${s}\x1B[0m`,
+  dim: (s) => `\x1B[2m${s}\x1B[0m`,
+  red: (s) => `\x1B[31m${s}\x1B[0m`,
+  yellow: (s) => `\x1B[33m${s}\x1B[0m`
+};
+var FL_VERSION = "11.1.1-dev";
+function printUsage(errCmd) {
+  const b = C.bold, c = C.cyan, g = C.green, d = C.dim;
   console.log([
     "",
-    "FreeLang v11 CLI",
+    `${b("FreeLang")} ${c("v" + FL_VERSION)}  ${d("AI-Native Lisp \xB7 Self-Hosting \xB7 500+ stdlib")}`,
     "",
-    "\uC0AC\uC6A9\uBC95:",
-    "  freelang run <file.fl>           \uD30C\uC77C \uC2E4\uD589",
-    "  freelang run <file.fl> --watch   \uD30C\uC77C \uBCC0\uACBD \uAC10\uC9C0 + \uC790\uB3D9 \uC7AC\uC2E4\uD589",
-    "  freelang check <file.fl>         \uBB38\uBC95 \uAC80\uC0AC",
-    "  freelang fmt <file.fl>           \uD30C\uC77C \uC778\uD50C\uB808\uC774\uC2A4 \uD3EC\uB9F7 (Phase 73)",
-    "  freelang fmt --check <file.fl>   \uC774\uBBF8 \uD3EC\uB9F7\uB410\uB294\uC9C0 \uD655\uC778 (\uBBF8\uD3EC\uB9F7 \u2192 exit 1)",
-    "  freelang fmt --stdin             stdin \uC785\uB825\uBC1B\uC544 stdout \uCD9C\uB825",
-    "  freelang repl                    \uB300\uD654\uD615 REPL",
-    "  freelang ls-fns                  \uC804\uCCB4 stdlib \uD568\uC218 \uBAA9\uB85D",
-    "  freelang ls-fns <\uD0A4\uC6CC\uB4DC>         \uD0A4\uC6CC\uB4DC\uB85C \uD568\uC218 \uAC80\uC0C9 (\uC608: ls-fns http)",
-    "  freelang fn-doc <\uC774\uB984>           \uD2B9\uC815 \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98 + \uC124\uBA85",
-    "  freelang debug <file.fl>         \uB514\uBC84\uADF8 \uBAA8\uB4DC \uC2E4\uD589 (break! \uD65C\uC131\uD654) (Phase 78)",
-    "  freelang debug <file.fl> --step  step \uBAA8\uB4DC (\uBAA8\uB4E0 \uC904 \uCD94\uC801)",
-    "  freelang watch <file.fl>         \uD30C\uC77C \uBCC0\uACBD \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589 (Phase 79)",
-    "  freelang watch <file.fl> --no-clear  \uCF58\uC194 \uC9C0\uC6B0\uC9C0 \uC54A\uACE0 \uC7AC\uC2E4\uD589",
-    "  freelang serve [--app app] [--port 3000]  \uC6F9 \uC11C\uBC84 \uC2DC\uC791 (Phase 3, App Router)",
-    "  freelang serve --mode ssr|isr|ssg         \uB80C\uB354\uB9C1 \uBAA8\uB4DC \uC120\uD0DD",
-    "  freelang ci                      \uD604\uC7AC \uB514\uB809\uD1A0\uB9AC .fl \uD30C\uC77C \uC804\uCCB4 CI (Phase 80)",
-    "  freelang ci <file.fl>            \uD2B9\uC815 \uD30C\uC77C CI",
-    "  freelang ci --no-fail-fast       \uC2E4\uD328\uD574\uB3C4 \uACC4\uC18D \uC9C4\uD589",
-    "  freelang doc <file.fl>           Markdown \uBB38\uC11C \uC0DD\uC131 \u2192 stdout (Phase 77)",
-    "  freelang doc <file.fl> -o out.md \uD30C\uC77C\uB85C \uC800\uC7A5",
-    "  freelang doc --dir <dir>         \uB514\uB809\uD1A0\uB9AC \uB0B4 \uBAA8\uB4E0 .fl \uD30C\uC77C \uD1B5\uD569 \uBB38\uC11C\uD654",
-    "  freelang build --static [--app app/] [--out dist/]  \uC815\uC801 HTML export",
-    "  freelang build --oci <app.fl> --tag <tag>        Docker \uC5C6\uC774 OCI \uC774\uBBF8\uC9C0 \uBE4C\uB4DC (Phase 8)",
-    "  freelang build --oci <app.fl> --tag <tag> --registry <url>  OCI \uBE4C\uB4DC + push",
-    "  freelang registry start [--port]  npm \uD638\uD658 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (Phase 7)",
-    "  freelang registry status [--port] \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC0C1\uD0DC \uD655\uC778",
+    `${b("\uC0AC\uC6A9\uBC95:")}  freelang <\uCEE4\uB9E8\uB4DC> [\uC635\uC158]`,
     "",
-    "\uC608\uC81C:",
-    "  freelang run my-script.fl",
-    "  freelang run agent.fl --watch",
-    "  freelang check parser.fl",
-    "  freelang fmt my-script.fl",
-    "  freelang fmt --check *.fl",
-    "  cat script.fl | freelang fmt --stdin",
-    "  freelang repl",
-    "  freelang debug my-script.fl",
-    "  freelang debug my-script.fl --step",
-    "  freelang serve --app app --port 3000",
-    "  freelang serve --mode isr",
-    "  freelang doc fl-math-lib.fl",
-    "  freelang doc fl-math-lib.fl -o math-api.md",
-    "  freelang doc --dir src/",
+    `${c("\u2500\u2500 \uC2E4\uD589 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("run")}    <file.fl> [-- args...]  \uD30C\uC77C \uC2E4\uD589`,
+    `  ${g("run")}    <file.fl> --watch       \uC800\uC7A5 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`,
+    `  ${g("repl")}                           \uB300\uD654\uD615 REPL`,
+    `  ${g("check")}  <file.fl>               \uBB38\uBC95 \uAC80\uC0AC (\uC2E4\uD589 \uC5C6\uC74C)`,
+    "",
+    `${c("\u2500\u2500 \uAC1C\uBC1C \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("watch")}  <file.fl>               \uD30C\uC77C \uBCC0\uACBD \uAC10\uC9C0 \uC7AC\uC2E4\uD589`,
+    `  ${g("debug")}  <file.fl>               \uB514\uBC84\uADF8 \uBAA8\uB4DC (break! \uC9C0\uC6D0)`,
+    `  ${g("debug")}  <file.fl> --step        \uC2A4\uD15D \uBAA8\uB4DC`,
+    `  ${g("fmt")}    <file.fl>               \uCF54\uB4DC \uD3EC\uB9F7 (\uC778\uD50C\uB808\uC774\uC2A4)`,
+    `  ${g("fmt")}    --check <file.fl>       \uD3EC\uB9F7 \uAC80\uC0AC (exit 1 if dirty)`,
+    `  ${g("fmt")}    --stdin                 stdin \u2192 stdout \uD3EC\uB9F7`,
+    "",
+    `${c("\u2500\u2500 \uBB38\uC11C / \uD0D0\uC0C9 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("ls-fns")}  [\uD0A4\uC6CC\uB4DC]               stdlib \uD568\uC218 \uBAA9\uB85D (\uD0A4\uC6CC\uB4DC \uD544\uD130)`,
+    `  ${g("fn-doc")}  <\uC774\uB984>                 \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98 + \uC124\uBA85`,
+    `  ${g("doc")}     <file.fl> [-o out.md]  Markdown \uBB38\uC11C \uC0DD\uC131`,
+    `  ${g("doc")}     --dir <dir>            \uB514\uB809\uD1A0\uB9AC \uD1B5\uD569 \uBB38\uC11C\uD654`,
+    "",
+    `${c("\u2500\u2500 \uBE4C\uB4DC / \uBC30\uD3EC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("compile")} <file.fl> [-o out.js]  JS\uB85C \uCEF4\uD30C\uC77C (AOT)`,
+    `  ${g("build")}   --oci <app.fl> --tag <tag>  OCI \uC774\uBBF8\uC9C0 \uBE4C\uB4DC`,
+    `  ${g("serve")}   [--port 3000]          \uC6F9 \uC11C\uBC84 \uC2DC\uC791`,
+    `  ${g("ci")}      [file.fl]              CI \uAC80\uC0AC \uC2E4\uD589`,
+    "",
+    `${c("\u2500\u2500 \uAE30\uD0C0 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("--version")} / ${g("-v")}               \uBC84\uC804 \uCD9C\uB825`,
+    `  ${g("--help")}    / ${g("-h")}               \uC774 \uB3C4\uC6C0\uB9D0`,
+    "",
+    `${b("\uC608\uC81C:")}`,
+    `  freelang run app.fl`,
+    `  freelang run app.fl --watch`,
+    `  freelang run app.fl -- arg1 arg2`,
+    `  freelang repl`,
+    `  freelang check app.fl`,
+    `  freelang ls-fns http`,
+    `  freelang fn-doc json_parse`,
+    `  freelang compile app.fl -o app.js`,
     ""
   ].join("\n"));
+  if (errCmd) {
+    const known = [
+      "run",
+      "repl",
+      "check",
+      "watch",
+      "debug",
+      "fmt",
+      "ls-fns",
+      "fn-doc",
+      "doc",
+      "compile",
+      "build",
+      "serve",
+      "ci",
+      "version",
+      "help"
+    ];
+    const suggest = known.find(
+      (k) => k.startsWith(errCmd[0]) || Math.abs(k.length - errCmd.length) <= 2 && [...errCmd].filter((c2, i) => k[i] === c2).length >= Math.min(k.length, errCmd.length) - 2
+    );
+    console.error(`${C.red("\uC624\uB958")}  \uC54C \uC218 \uC5C6\uB294 \uCEE4\uB9E8\uB4DC: ${C.bold(errCmd)}${suggest ? `
+       \uD639\uC2DC ${C.green("freelang " + suggest)} ?` : ""}`);
+    process.exit(1);
+  }
 }
-function cmdPatch(patchArgs) {
-  const filePath = patchArgs[0];
-  if (!filePath) {
-    console.error("Usage:");
-    console.error("  freelang patch <file> --find <text> --replace <text>");
-    console.error("  freelang patch <file> --insert-after <anchor> --content <block>");
-    console.error("  freelang patch <file> --insert-before <anchor> --content <block>");
-    console.error("  freelang patch <file> --delete-line <pattern>");
-    process.exit(1);
-  }
-  const fs3 = require("fs");
-  if (!fs3.existsSync(filePath)) {
-    console.error(`[patch] 파일 없음: ${filePath}`);
-    process.exit(1);
-  }
-  let content = fs3.readFileSync(filePath, "utf8");
-  const get = (flag) => {
-    const idx = patchArgs.indexOf(flag);
-    return idx >= 0 ? patchArgs[idx + 1] : null;
+function printSubHelp(cmd2) {
+  const g = C.green, d = C.dim, b = C.bold;
+  const helps = {
+    run: [
+      `${b("freelang run")} \u2014 \uD30C\uC77C \uC2E4\uD589`,
+      "",
+      `  freelang run <file.fl>             \uC2E4\uD589`,
+      `  freelang run <file.fl> --watch     \uC800\uC7A5 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`,
+      `  freelang run <file.fl> -- a b      \uC2A4\uD06C\uB9BD\uD2B8\uC5D0 \uC778\uC790 \uC804\uB2EC ($__argv__)`,
+      "",
+      `${d("\uC608\uC81C:")}`,
+      `  freelang run app.fl`,
+      `  freelang run server.fl --watch`,
+      `  freelang run cli.fl -- input.txt`
+    ],
+    repl: [
+      `${b("freelang repl")} \u2014 \uB300\uD654\uD615 REPL`,
+      "",
+      `  (+ 1 2)           \uD45C\uD604\uC2DD \uD3C9\uAC00`,
+      `  (defn f [x] ...)  \uD568\uC218 \uC815\uC758 (\uC138\uC158 \uC720\uC9C0)`,
+      `  :stack            \uCF5C \uC2A4\uD0DD \uCD9C\uB825`,
+      `  :env              \uBC14\uC778\uB529 \uBAA9\uB85D`,
+      `  :exit / Ctrl+D    \uC885\uB8CC`
+    ],
+    check: [
+      `${b("freelang check")} \u2014 \uBB38\uBC95 \uAC80\uC0AC (\uC2E4\uD589 \uC5C6\uC74C)`,
+      "",
+      `  freelang check <file.fl>`,
+      "",
+      `  \uD30C\uC2F1 \uC624\uB958 \uBC1C\uC0DD \uC2DC \uB77C\uC778:\uCEEC\uB7FC + \uAD04\uD638 \uD78C\uD2B8 \uD45C\uC2DC`
+    ],
+    fmt: [
+      `${b("freelang fmt")} \u2014 \uCF54\uB4DC \uD3EC\uB9F7`,
+      "",
+      `  freelang fmt <file.fl>             \uC778\uD50C\uB808\uC774\uC2A4 \uD3EC\uB9F7`,
+      `  freelang fmt --check <file.fl>     \uD3EC\uB9F7 \uD544\uC694 \uC5EC\uBD80 \uAC80\uC0AC (exit 1)`,
+      `  freelang fmt --stdin               stdin \u2192 stdout`,
+      "",
+      `${d("CI \uD65C\uC6A9:")}`,
+      `  freelang fmt --check src/*.fl`
+    ],
+    compile: [
+      `${b("freelang compile")} \u2014 JS\uB85C AOT \uCEF4\uD30C\uC77C`,
+      "",
+      `  freelang compile <file.fl>           \u2192 file.fl.out.js`,
+      `  freelang compile <file.fl> -o app.js \u2192 app.js`,
+      "",
+      `  \uC0DD\uC131\uB41C .js\uB294 Node.js / Bun\uC73C\uB85C \uC9C1\uC811 \uC2E4\uD589 \uAC00\uB2A5`,
+      `  \uC2E4\uD589 \uC2DC FreeLang \uBD88\uD544\uC694 (\uB3C5\uB9BD \uBC30\uD3EC)`
+    ],
+    "ls-fns": [
+      `${b("freelang ls-fns")} \u2014 stdlib \uD568\uC218 \uD0D0\uC0C9`,
+      "",
+      `  freelang ls-fns              \uC804\uCCB4 \uBAA9\uB85D (500+)`,
+      `  freelang ls-fns http         "http" \uD3EC\uD568 \uD568\uC218\uB9CC`,
+      `  freelang ls-fns json         json \uAD00\uB828`
+    ],
+    "fn-doc": [
+      `${b("freelang fn-doc")} \u2014 \uD568\uC218 \uC0C1\uC138 \uBB38\uC11C`,
+      "",
+      `  freelang fn-doc json_parse`,
+      `  freelang fn-doc str_split`
+    ]
   };
-  const findText = get("--find");
-  const replaceText = get("--replace");
-  const insertAfter = get("--insert-after");
-  const insertBefore = get("--insert-before");
-  const insertContent = get("--content");
-  const deleteLine = get("--delete-line");
-  const nth = get("--nth");
-  let changed = false;
-  if (findText !== null && replaceText !== null) {
-    if (nth !== null) {
-      let count = 0;
-      const target = parseInt(nth, 10);
-      const newContent = content.replace(new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (match) => {
-        count++;
-        return count === target ? replaceText : match;
-      });
-      if (newContent === content) { console.error(`[patch] --find 텍스트를 찾지 못했습니다 (${nth}번째): ${findText}`); process.exit(1); }
-      content = newContent;
-    } else {
-      if (!content.includes(findText)) { console.error(`[patch] --find 텍스트를 찾지 못했습니다: ${findText}`); process.exit(1); }
-      content = content.split(findText).join(replaceText);
-    }
-    changed = true;
-  } else if (insertAfter !== null && insertContent !== null) {
-    const idx = content.indexOf(insertAfter);
-    if (idx < 0) { console.error(`[patch] --insert-after 앵커를 찾지 못했습니다: ${insertAfter}`); process.exit(1); }
-    const pos = idx + insertAfter.length;
-    content = content.slice(0, pos) + "\n" + insertContent + content.slice(pos);
-    changed = true;
-  } else if (insertBefore !== null && insertContent !== null) {
-    const idx = content.indexOf(insertBefore);
-    if (idx < 0) { console.error(`[patch] --insert-before 앵커를 찾지 못했습니다: ${insertBefore}`); process.exit(1); }
-    content = content.slice(0, idx) + insertContent + "\n" + content.slice(idx);
-    changed = true;
-  } else if (deleteLine !== null) {
-    const lines = content.split("\n");
-    const before = lines.length;
-    const filtered = lines.filter((l) => !l.includes(deleteLine));
-    if (filtered.length === before) { console.error(`[patch] --delete-line 패턴을 찾지 못했습니다: ${deleteLine}`); process.exit(1); }
-    content = filtered.join("\n");
-    changed = true;
+  const lines = helps[cmd2];
+  if (lines) {
+    console.log("\n" + lines.join("\n") + "\n");
   } else {
-    console.error("[patch] 옵션이 부족합니다. --find/--replace, --insert-after/--content, --insert-before/--content, --delete-line 중 하나 필요");
-    process.exit(1);
-  }
-  if (changed) {
-    fs3.writeFileSync(filePath, content, "utf8");
-    console.log(`[patch] ✓ ${filePath} 패치 완료`);
+    printUsage();
   }
 }
 var args2 = process.argv.slice(2);
 var cmd = args2[0];
 switch (cmd) {
   case "run": {
+    if (args2[1] === "--help" || args2[1] === "-h") {
+      printSubHelp("run");
+      break;
+    }
     const filePath = args2[1];
     if (!filePath) {
-      printUsage();
+      printSubHelp("run");
       process.exit(1);
     }
     const watch2 = args2.includes("--watch") || args2.includes("-w");
@@ -38578,17 +38617,25 @@ switch (cmd) {
     break;
   }
   case "check": {
+    if (args2[1] === "--help" || args2[1] === "-h") {
+      printSubHelp("check");
+      break;
+    }
     const filePath = args2[1];
     if (!filePath) {
-      printUsage();
+      printSubHelp("check");
       process.exit(1);
     }
     cmdCheck(filePath);
     break;
   }
   case "compile": {
+    if (args2[1] === "--help" || args2[1] === "-h") {
+      printSubHelp("compile");
+      break;
+    }
     if (args2.length < 2) {
-      printUsage();
+      printSubHelp("compile");
       process.exit(1);
     }
     cmdCompile(args2.slice(1));
@@ -38724,14 +38771,10 @@ switch (cmd) {
     cmdServe(args2.slice(1));
     break;
   }
-  case "patch": {
-    cmdPatch(args2.slice(1));
-    break;
-  }
   case "version":
   case "-v":
   case "--version":
-    console.log("FreeLang v11.2.0");
+    console.log(`FreeLang v${FL_VERSION}`);
     break;
   case "help":
   case "-h":
@@ -38739,10 +38782,10 @@ switch (cmd) {
     printUsage();
     break;
   default:
-    printUsage();
     if (cmd) {
-      console.error(`\x1B[31m\uC54C \uC218 \uC5C6\uB294 \uCEE4\uB9E8\uB4DC:\x1B[0m ${cmd}`);
-      process.exit(1);
+      printUsage(cmd);
+    } else {
+      printUsage();
     }
     break;
 }
