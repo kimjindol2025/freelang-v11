@@ -11364,7 +11364,8 @@ function flExecOpNative(op, vals) {
     case "false?":
       return v0 === false;
     case "and":
-      return !!(v0 && v1);
+      if (v0 === null || v0 === undefined || v0 === false) return v0;
+      return (v1 === null || v1 === undefined || v1 === false) ? v1 : v1;
     case "or": {
       const flFalsy = (v) => v === null || v === void 0 || v === false;
       if (!flFalsy(v0)) return v0;
@@ -11399,7 +11400,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
     case "concat":
-      return vals.map((v) => v === null || v === void 0 ? "null" : String(v)).join("");
+      return vals.map((v) => v === null || v === void 0 ? "" : String(v)).join("");
     case "str-to-num": {
       const n = parseFloat(String(v0));
       return isNaN(n) ? null : n;
@@ -11771,10 +11772,12 @@ function flInterpSexpr(op, rawArgs, env) {
       return result;
     }
     case "and": {
+      let _andRes = true;
       for (const arg of rawArgs) {
-        if (!flInterpNative(arg, env)) return false;
+        _andRes = flInterpNative(arg, env);
+        if (_andRes === null || _andRes === undefined || _andRes === false) return _andRes;
       }
-      return true;
+      return _andRes;
     }
     case "or": {
       const flFalsy2 = (v) => v === null || v === void 0 || v === false;
@@ -12183,8 +12186,14 @@ loop().catch(e => {
       return args3[0] >= args3[1];
     case "!=":
       return args3[0] !== args3[1];
-    case "and":
-      return args3.every((a) => a);
+    case "and": {
+      let _ar = true;
+      for (const _a of args3) {
+        _ar = _a;
+        if (_ar === null || _ar === undefined || _ar === false) return _ar;
+      }
+      return _ar;
+    }
     case "or": {
       const flFalsy3 = (v) => v === null || v === void 0 || v === false;
       for (const a of args3) {
@@ -12205,7 +12214,7 @@ loop().catch(e => {
       process.stderr.write(args3.map((a) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args3.map((a) => toDisplay(a)).join("");
+      return args3.map((a) => a === null || a === undefined ? "" : toDisplay(a)).join("");
     case "repr":
       return JSON.stringify(args3[0], null, 2);
     case "inspect": {
