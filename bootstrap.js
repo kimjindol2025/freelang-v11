@@ -11341,7 +11341,7 @@ function flExecOpNative(op, vals) {
     case ">=":
       return v0 >= v1;
     case "not":
-      return !v0;
+      return v0 === null || v0 === undefined || v0 === false;
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
@@ -11786,8 +11786,10 @@ function flInterpSexpr(op, rawArgs, env) {
       }
       return lastVal2;
     }
-    case "not":
-      return !flInterpNative(rawArgs[0], env);
+    case "not": {
+      const _nv = flInterpNative(rawArgs[0], env);
+      return _nv === null || _nv === undefined || _nv === false;
+    }
     case "null?": {
       const v = flInterpNative(rawArgs[0], env);
       return v === null || v === void 0;
@@ -12194,7 +12196,7 @@ loop().catch(e => {
       return args3.length > 0 ? args3[args3.length - 1] : null;
     }
     case "not":
-      return !args3[0];
+      return args3[0] === null || args3[0] === undefined || args3[0] === false;
     case "print":
       process.stdout.write(args3.map((a) => toDisplay(a)).join(" "));
       return null;
@@ -12654,16 +12656,21 @@ loop().catch(e => {
       }
       return coll;
     }
-    case "find":
-      if (Array.isArray(args3[0])) {
-        const findFn = args3[1];
-        if (typeof findFn === "function") return args3[0].find(findFn) ?? null;
-        if (findFn && findFn.kind === "function-value") {
-          return args3[0].find((item) => callFnVal(findFn, [item])) ?? null;
-        }
-        return args3[0].indexOf(findFn);
+    case "find": {
+      // (find fn arr) — map/filter와 동일한 순서 (권장)
+      // (find arr fn) — 레거시 순서도 지원
+      let _findArr, _findFn;
+      const _isFL = (v) => v && v.kind === "function-value";
+      if (typeof args3[0] === "function" || _isFL(args3[0])) {
+        _findFn = args3[0]; _findArr = args3[1];
+      } else {
+        _findArr = args3[0]; _findFn = args3[1];
       }
-      return -1;
+      if (!Array.isArray(_findArr)) return null;
+      if (typeof _findFn === "function") return _findArr.find(_findFn) ?? null;
+      if (_isFL(_findFn)) return _findArr.find((item) => callFnVal(_findFn, [item])) ?? null;
+      return _findArr.indexOf(_findFn) >= 0 ? _findFn : null;
+    }
     case "last":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "first-or":
@@ -19114,7 +19121,7 @@ function evalSpecialForm(interp2, op, expr2) {
     let result = true;
     for (const arg of expr2.args) {
       result = ev(arg);
-      if (!result) return result;
+      if (result === null || result === undefined || result === false) return result;
     }
     return result;
   }
@@ -31782,11 +31789,18 @@ ${tail}` : "")
     if (_callStack.length > 100) _callStack.shift();
     let result;
     try {
-      interp2.context.variables.fromSnapshot(func.capturedEnv);
-      for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args3[i]);
+      for (let recurIter = 0; recurIter < 2e6; recurIter++) {
+        interp2.context.variables.fromSnapshot(func.capturedEnv);
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+        if (result && typeof result === "object" && result.__FL_RECUR__) {
+          args3 = result.__args;
+          continue;
+        }
+        break;
       }
-      result = interp2.eval(func.body);
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
     } finally {
       interp2.callDepth--;
