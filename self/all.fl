@@ -766,7 +766,7 @@
 
 [FUNC cg-map-entries :params [$f]
   :body (let [[$items (get $f "items")]]
-          (if (Array.isArray $items)
+          (if (array? $items)
             (cg-map-flat-loop $items 0 "")
             (cg-map-loop (map-entries $f) 0 "")))]
 
@@ -815,6 +815,7 @@
           [(= $op "%") (str "(" (cg (get $args 0)) "%" (cg (get $args 1)) ")")]
           [(= $op "while") (str "(()=>{ while(" (cg (get $args 0)) ") { " (cg-stmts (slice $args 1 (length $args)) 0 "") " } })()")]
           [(= $op "set!") (str "(" (js-name (get (get $args 0) :name)) " = " (cg (get $args 1)) ")")]
+          [(= $op "define") (str "const " (extract-name (get $args 0)) "=" (cg (get $args 1)))]
           [true (cg-native-dispatch $op (cg-args $args))])]
 
 [FUNC cg-fn :params [$args]
@@ -947,6 +948,9 @@
     "const _fl_file_read = (p) => require('fs').readFileSync(p,'utf8');"
     "const _fl_file_write = (p,c) => require('fs').writeFileSync(p,c);"
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
+    "const file_read = (p) => _fl_file_read(String(p));"
+    "const file_write = (p,c) => _fl_file_write(String(p),String(c));"
+    "const file_exists = (p) => _fl_file_exists(String(p));"
     "const _fl_get_argv = () => (typeof process!=='undefined'?process.argv.slice(2):[]);"
     "const _fl_print = (v) => { console.log(v); return v; }"
     "const null_q = _fl_null_q;"
@@ -1047,9 +1051,12 @@
 
 [FUNC compile-file :params [$input $output]
   :body (let [[$src (file_read $input)]
-              [$ast (parse (lex $src))]
+              [$tokens (lex $src)]
+              [$ast (parse $tokens)]
+              [$node-count (length $ast)]
               [$js (fl->js-with-prelude $ast)]]
           (do (file_write $output $js)
+              (println (str "Parsed: " $node-count " nodes"))
               (println (str "Compiled " $input " -> " $output))))]
 
 ;; self/stdlib/data.fl — Phase 26
@@ -1233,11 +1240,7 @@
 ;; self/stdlib/file.fl — Phase 27
 ;; 파일 I/O 연산 (native file_* builtin wrapper)
 
-[FUNC file-read :params [path]
-  :body (_fl_file_read (str path))]
-
-[FUNC file-write :params [path content]
-  :body (_fl_file_write (str path) (str content))]
+; file-read/file-write: prelude에 const로 정의됨 (중복 방지)
 
 [FUNC file-append :params [path content]
   :body (file_append (str path) (str content))]

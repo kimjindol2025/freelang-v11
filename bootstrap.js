@@ -23496,16 +23496,13 @@ function createHttpServerModule(callFn, callFunctionValue2) {
                 let respBody = asyncResp.body ?? "";
                 let contentType = asyncResp.contentType ?? "application/json";
                 const extraHeaders = asyncResp.headers ?? {};
+                const getCT = (h) => Object.entries(h).find(([k]) => k.toLowerCase() === "content-type")?.[1];
                 if (asyncResp.encoding === "base64" && typeof respBody === "string") {
                   const buf = Buffer.from(respBody, "base64");
-                  if (extraHeaders["content-type"]) {
-                    contentType = extraHeaders["content-type"];
-                  }
+                  if (getCT(extraHeaders)) contentType = getCT(extraHeaders);
                   sendResponse(res, status, buf, contentType, extraHeaders);
                 } else {
-                  if (extraHeaders["content-type"]) {
-                    contentType = extraHeaders["content-type"];
-                  }
+                  if (getCT(extraHeaders)) contentType = getCT(extraHeaders);
                   sendResponse(res, status, respBody, contentType, extraHeaders);
                 }
               }
@@ -38495,6 +38492,76 @@ function printUsage() {
     ""
   ].join("\n"));
 }
+function cmdPatch(patchArgs) {
+  const filePath = patchArgs[0];
+  if (!filePath) {
+    console.error("Usage:");
+    console.error("  freelang patch <file> --find <text> --replace <text>");
+    console.error("  freelang patch <file> --insert-after <anchor> --content <block>");
+    console.error("  freelang patch <file> --insert-before <anchor> --content <block>");
+    console.error("  freelang patch <file> --delete-line <pattern>");
+    process.exit(1);
+  }
+  const fs3 = require("fs");
+  if (!fs3.existsSync(filePath)) {
+    console.error(`[patch] 파일 없음: ${filePath}`);
+    process.exit(1);
+  }
+  let content = fs3.readFileSync(filePath, "utf8");
+  const get = (flag) => {
+    const idx = patchArgs.indexOf(flag);
+    return idx >= 0 ? patchArgs[idx + 1] : null;
+  };
+  const findText = get("--find");
+  const replaceText = get("--replace");
+  const insertAfter = get("--insert-after");
+  const insertBefore = get("--insert-before");
+  const insertContent = get("--content");
+  const deleteLine = get("--delete-line");
+  const nth = get("--nth");
+  let changed = false;
+  if (findText !== null && replaceText !== null) {
+    if (nth !== null) {
+      let count = 0;
+      const target = parseInt(nth, 10);
+      const newContent = content.replace(new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (match) => {
+        count++;
+        return count === target ? replaceText : match;
+      });
+      if (newContent === content) { console.error(`[patch] --find 텍스트를 찾지 못했습니다 (${nth}번째): ${findText}`); process.exit(1); }
+      content = newContent;
+    } else {
+      if (!content.includes(findText)) { console.error(`[patch] --find 텍스트를 찾지 못했습니다: ${findText}`); process.exit(1); }
+      content = content.split(findText).join(replaceText);
+    }
+    changed = true;
+  } else if (insertAfter !== null && insertContent !== null) {
+    const idx = content.indexOf(insertAfter);
+    if (idx < 0) { console.error(`[patch] --insert-after 앵커를 찾지 못했습니다: ${insertAfter}`); process.exit(1); }
+    const pos = idx + insertAfter.length;
+    content = content.slice(0, pos) + "\n" + insertContent + content.slice(pos);
+    changed = true;
+  } else if (insertBefore !== null && insertContent !== null) {
+    const idx = content.indexOf(insertBefore);
+    if (idx < 0) { console.error(`[patch] --insert-before 앵커를 찾지 못했습니다: ${insertBefore}`); process.exit(1); }
+    content = content.slice(0, idx) + insertContent + "\n" + content.slice(idx);
+    changed = true;
+  } else if (deleteLine !== null) {
+    const lines = content.split("\n");
+    const before = lines.length;
+    const filtered = lines.filter((l) => !l.includes(deleteLine));
+    if (filtered.length === before) { console.error(`[patch] --delete-line 패턴을 찾지 못했습니다: ${deleteLine}`); process.exit(1); }
+    content = filtered.join("\n");
+    changed = true;
+  } else {
+    console.error("[patch] 옵션이 부족합니다. --find/--replace, --insert-after/--content, --insert-before/--content, --delete-line 중 하나 필요");
+    process.exit(1);
+  }
+  if (changed) {
+    fs3.writeFileSync(filePath, content, "utf8");
+    console.log(`[patch] ✓ ${filePath} 패치 완료`);
+  }
+}
 var args2 = process.argv.slice(2);
 var cmd = args2[0];
 switch (cmd) {
@@ -38657,10 +38724,14 @@ switch (cmd) {
     cmdServe(args2.slice(1));
     break;
   }
+  case "patch": {
+    cmdPatch(args2.slice(1));
+    break;
+  }
   case "version":
   case "-v":
   case "--version":
-    console.log("FreeLang v11.1.0");
+    console.log("FreeLang v11.2.0");
     break;
   case "help":
   case "-h":

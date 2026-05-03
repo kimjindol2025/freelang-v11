@@ -31,7 +31,7 @@ function sha256File(path: string): string {
 }
 
 function runNode(args: string[], timeoutMs = 60_000): string {
-  return execSync(`node --stack-size=8000 ${args.map(a => JSON.stringify(a)).join(" ")}`, {
+  return execSync(`node --stack-size=65536 ${args.map(a => JSON.stringify(a)).join(" ")}`, {
     cwd: REPO_ROOT,
     encoding: "utf8",
     timeout: timeoutMs,
