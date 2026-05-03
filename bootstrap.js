@@ -23535,14 +23535,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const savedName = crypto.randomBytes(8).toString("hex") + ext;
         const savedPath = path6.join(uploadDir, savedName);
         fs7.writeFileSync(savedPath, bodyBuf);
-        const m = /* @__PURE__ */ new Map();
-        m.set("fieldname", fieldName);
-        m.set("originalname", fileName);
-        m.set("mimetype", mimetype);
-        m.set("size", bodyBuf.length);
-        m.set("path", savedPath);
-        m.set("filename", savedName);
-        files.push(m);
+        files.push({ fieldname: fieldName, originalname: fileName, mimetype, size: bodyBuf.length, path: savedPath, filename: savedName });
       } else {
         fields[fieldName] = bodyBuf.toString().replace(/\r\n$/, "");
       }
@@ -23551,12 +23544,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       if (raw.slice(pos, pos + 2).toString() === "--") break;
       pos += 2;
     }
-    const result = /* @__PURE__ */ new Map();
-    const fieldsMap = /* @__PURE__ */ new Map();
-    Object.entries(fields).forEach(([k, v]) => fieldsMap.set(k, v));
-    result.set("fields", fieldsMap);
-    result.set("files", files);
-    return result;
+    return { fields, files };
   }
   function sendResponse(res, status, body, contentType = "application/json", extraHeaders) {
     const headersToWrite = { "Content-Type": contentType };
@@ -24226,6 +24214,26 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     // server_req_path req -> string
     "server_req_path": (req) => {
       return req.path;
+    },
+    // server_req_files req -> [{fieldname, originalname, mimetype, size, path, filename}]
+    "server_req_files": (req) => {
+      const body = req.body;
+      if (body && Array.isArray(body.files)) return body.files;
+      return [];
+    },
+    // server_req_file req fieldname -> {fieldname, originalname, mimetype, size, path, filename} | null
+    "server_req_file": (req, fieldname) => {
+      const body = req.body;
+      if (body && Array.isArray(body.files)) {
+        return body.files.find((f) => f.fieldname === fieldname) ?? null;
+      }
+      return null;
+    },
+    // server_req_fields req -> {fieldname: value, ...}  (multipart non-file fields)
+    "server_req_fields": (req) => {
+      const body = req.body;
+      if (body && typeof body.fields === "object" && !Array.isArray(body.fields)) return body.fields;
+      return {};
     },
     // Phase 57: 비동기 응답 보류 함수들
     // server_req_id -> string | null (현재 요청 ID)
