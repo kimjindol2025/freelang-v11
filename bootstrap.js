@@ -12630,7 +12630,14 @@ loop().catch(e => {
     case "num-to-str":
       return String(args3[0]);
     case "str-to-num": { const _stn3 = parseFloat(String(args3[0])); return isNaN(_stn3) ? null : _stn3; }
+    case "str-to-int":
+    case "str_to_int": { const _sti3 = parseInt(String(args3[0] ?? ""), 10); return isNaN(_sti3) ? null : _sti3; }
     case "map-set":
+      if (args3[0] instanceof Map) {
+        const _mm = new Map(args3[0]);
+        _mm.set(args3[1], args3[2]);
+        return _mm;
+      }
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
         const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
         return { ...args3[0], [k]: args3[2] };
@@ -12888,9 +12895,15 @@ loop().catch(e => {
       return finalEnv;
     }
     case "assoc": {
+      if (args3[0] instanceof Map) {
+        const _am = new Map(args3[0]);
+        for (let i = 1; i + 1 < args3.length; i += 2) _am.set(args3[i], args3[i + 1]);
+        return _am;
+      }
       let base = args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]) ? { ...args3[0] } : {};
       for (let i = 1; i + 1 < args3.length; i += 2) {
-        base[args3[i]] = args3[i + 1];
+        const _ak = typeof args3[i] === "string" && args3[i].startsWith(":") ? args3[i].slice(1) : String(args3[i] ?? "");
+        base[_ak] = args3[i + 1];
       }
       return base;
     }
@@ -21574,33 +21587,19 @@ function createCollectionModule(interp2) {
     "retry": (n, fn) => {
       let lastErr;
       for (let i = 0; i <= n; i++) {
-        try {
-          return fn();
-        } catch (err4) {
+        try { return _callFl(fn, []); } catch (err4) {
           lastErr = err4;
-          if (i < n) {
-            const start = Date.now();
-            while (Date.now() - start < 100 * i) {
-            }
-          }
+          if (i < n) { const _s = Date.now(); while (Date.now() - _s < Math.min(100 * i, 500)) {} }
         }
       }
       throw lastErr;
     },
-    // retry_silent n fn -> any|null  (retry n times, return null on final failure)
     "retry_silent": (n, fn) => {
-      for (let i = 0; i <= n; i++) {
-        try {
-          return fn();
-        } catch {
-        }
-      }
+      for (let i = 0; i <= n; i++) { try { return _callFl(fn, []); } catch {} }
       return null;
     },
-    // pipeline_run initial steps -> any  (chain: output of each step → input of next)
-    // steps: array of functions
     "pipeline_run": (initial, steps) => {
-      return steps.reduce((acc, fn) => fn(acc), initial);
+      return (Array.isArray(steps) ? steps : []).reduce((acc, fn) => _callFl(fn, [acc]), initial);
     },
     // memoize fn [maxSize] -> fn  (LRU cache, memo_call/size/clear 지원)
     "memoize": (fn, maxSize = Infinity) => {
@@ -31502,7 +31501,6 @@ var KNOWN_ALIASES = {
   "str_length": { correct: "length", usage: '(length "hello")' },
   "string_length": { correct: "length", usage: '(length "hello")' },
   "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
-  "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
   "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
   "int_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
   "to_string": { correct: "str", usage: "(str value)" },
@@ -36789,9 +36787,8 @@ var FLExecutor = class {
       memberCollection.set(key, member);
       return member;
     };
-    ctx["str-to-int"] = (str) => {
-      return parseInt(String(str), 10);
-    };
+    ctx["str-to-int"] = (str) => { const _n = parseInt(String(str), 10); return isNaN(_n) ? null : _n; };
+    _aliases["str-to-int"] = _aliases["str_to_int"] = (str) => { const _n = parseInt(String(str ?? ""), 10); return isNaN(_n) ? null : _n; };
     ctx["merge"] = (obj1, obj2) => {
       return { ...obj1, ...obj2 };
     };
