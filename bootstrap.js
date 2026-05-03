@@ -12221,10 +12221,12 @@ loop().catch(e => {
       console.log(inspected);
       return args3[0];
     }
-    case "concat":
+    case "concat": {
       if (!Array.isArray(args3[0])) return args3.join("");
-      if (!Array.isArray(args3[1])) return args3[0] || [];
-      return args3[0].concat(args3[1]);
+      const items = args3.slice(1).filter(Array.isArray);
+      if (items.length === 0) return args3[0] || [];
+      return args3[0].concat(...items);
+    }
     case "upper":
       return args3[0]?.toString().toUpperCase();
     case "lower":
@@ -12546,7 +12548,7 @@ loop().catch(e => {
     case "html-response":
       return { html: args3[0] };
     case "now":
-      return (/* @__PURE__ */ new Date()).toISOString();
+      return Date.now();
     case "server-uptime":
       return Date.now() - interp2.context.startTime;
     case "char-at":
