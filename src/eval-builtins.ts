@@ -177,6 +177,18 @@ function flExecOpNative(op: string, vals: any[]): any {
     case ">=": return v0 >= v1;
     case "not": return !v0;
     case "nil?": case "null?": return v0 === null || v0 === undefined;
+    case "empty?": {
+      if (v0 === null || v0 === undefined) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      if (v0 === null || v0 === undefined || typeof v0 !== "object" || Array.isArray(v0)) return false;
+      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      return Object.prototype.hasOwnProperty.call(v0, k);
+    }
     case "nil-or-empty?": return v0 === null || v0 === undefined || (v0 && v0.length === 0);
     case "true?": return v0 === true;
     case "false?": return v0 === false;
@@ -677,10 +689,22 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const { execSync } = require("child_process");
       const cmd = String(args[0] ?? "");
       try {
-        return execSync(cmd, { encoding: "utf-8" });
+        return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
       } catch (e: any) {
         return null;
       }
+    }
+    case "shell-exec-result": {
+      // stdout + stderr + exit_code 모두 반환: {:stdout "..." :stderr "..." :exit 0 :ok true}
+      const { spawnSync } = require("child_process");
+      const cmd = String(args[0] ?? "");
+      const res = spawnSync("sh", ["-c", cmd], { encoding: "utf-8" });
+      return {
+        stdout: res.stdout ?? "",
+        stderr: res.stderr ?? "",
+        exit: res.status ?? -1,
+        ok: (res.status ?? -1) === 0,
+      };
     }
     case "require": {
       const modulePath = String(args[0] ?? "");
@@ -1401,6 +1425,20 @@ loop().catch(e => {
     case "nil?":
     case "null?":
       return args[0] === null || args[0] === undefined;
+    case "empty?": {
+      const v = args[0];
+      if (v === null || v === undefined) return true;
+      if (typeof v === "string") return v.length === 0;
+      if (Array.isArray(v)) return v.length === 0;
+      if (typeof v === "object") return Object.keys(v).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      const obj = args[0], key = args[1];
+      if (obj === null || obj === undefined || typeof obj !== "object" || Array.isArray(obj)) return false;
+      const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
+      return Object.prototype.hasOwnProperty.call(obj, k);
+    }
     case "nil-or-empty?":
       return args[0] === null || args[0] === undefined || (args[0] && args[0].length === 0);
     case "zero?":
@@ -1698,6 +1736,40 @@ loop().catch(e => {
         if (typeof a === "number" && typeof b === "number") return a - b;
         return String(a).localeCompare(String(b));
       });
+    case "sort-by": case "sort_by": {
+      // (sort-by keyfn coll) — keyfn을 호출해 반환값으로 정렬
+      if (!Array.isArray(args[1])) return [];
+      const keyFn = args[0];
+      const callFn = interp?.callFunctionValue?.bind(interp);
+      if (!callFn) return [...args[1]];
+      return [...args[1]].sort((a, b) => {
+        const ka = callFn(keyFn, [a]);
+        const kb = callFn(keyFn, [b]);
+        if (typeof ka === "number" && typeof kb === "number") return ka - kb;
+        return String(ka).localeCompare(String(kb));
+      });
+    }
+    case "zip": {
+      // (zip arr1 arr2) → [[a1 b1] [a2 b2] ...]
+      const a = Array.isArray(args[0]) ? args[0] : [];
+      const b = Array.isArray(args[1]) ? args[1] : [];
+      const len = Math.min(a.length, b.length);
+      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
+    }
+    case "zip-with": {
+      // (zip-with f arr1 arr2) → [(f a1 b1) (f a2 b2) ...]
+      const fn = args[0];
+      const a = Array.isArray(args[1]) ? args[1] : [];
+      const b = Array.isArray(args[2]) ? args[2] : [];
+      const len = Math.min(a.length, b.length);
+      const callFn2 = interp?.callFunctionValue?.bind(interp);
+      if (!callFn2) return [];
+      return Array.from({ length: len }, (_, i) => callFn2(fn, [a[i], b[i]]));
+    }
+    case "uuid": case "uuid4": {
+      const { randomUUID } = require("crypto");
+      return randomUUID();
+    }
     case "push":
       if (!Array.isArray(args[0])) return [args[1]];
       return [...args[0], args[1]];

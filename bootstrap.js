@@ -11345,6 +11345,18 @@ function flExecOpNative(op, vals) {
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
+    case "empty?": {
+      if (v0 === null || v0 === void 0) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      if (v0 === null || v0 === void 0 || typeof v0 !== "object" || Array.isArray(v0)) return false;
+      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      return Object.prototype.hasOwnProperty.call(v0, k);
+    }
     case "nil-or-empty?":
       return v0 === null || v0 === void 0 || v0 && v0.length === 0;
     case "true?":
@@ -11899,10 +11911,21 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const { execSync: execSync2 } = require("child_process");
       const cmd2 = String(args3[0] ?? "");
       try {
-        return execSync2(cmd2, { encoding: "utf-8" });
+        return execSync2(cmd2, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
       } catch (e) {
         return null;
       }
+    }
+    case "shell-exec-result": {
+      const { spawnSync: spawnSync10 } = require("child_process");
+      const cmd2 = String(args3[0] ?? "");
+      const res = spawnSync10("sh", ["-c", cmd2], { encoding: "utf-8" });
+      return {
+        stdout: res.stdout ?? "",
+        stderr: res.stderr ?? "",
+        exit: res.status ?? -1,
+        ok: (res.status ?? -1) === 0
+      };
     }
     case "require": {
       const modulePath = String(args3[0] ?? "");
@@ -12539,6 +12562,20 @@ loop().catch(e => {
     case "nil?":
     case "null?":
       return args3[0] === null || args3[0] === void 0;
+    case "empty?": {
+      const v = args3[0];
+      if (v === null || v === void 0) return true;
+      if (typeof v === "string") return v.length === 0;
+      if (Array.isArray(v)) return v.length === 0;
+      if (typeof v === "object") return Object.keys(v).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      const obj = args3[0], key = args3[1];
+      if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
+      const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
+      return Object.prototype.hasOwnProperty.call(obj, k);
+    }
     case "nil-or-empty?":
       return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
     case "zero?":
@@ -12874,6 +12911,39 @@ loop().catch(e => {
         if (typeof a === "number" && typeof b === "number") return a - b;
         return String(a).localeCompare(String(b));
       });
+    case "sort-by":
+    case "sort_by": {
+      if (!Array.isArray(args3[1])) return [];
+      const keyFn = args3[0];
+      const callFn2 = interp2?.callFunctionValue?.bind(interp2);
+      if (!callFn2) return [...args3[1]];
+      return [...args3[1]].sort((a, b) => {
+        const ka = callFn2(keyFn, [a]);
+        const kb = callFn2(keyFn, [b]);
+        if (typeof ka === "number" && typeof kb === "number") return ka - kb;
+        return String(ka).localeCompare(String(kb));
+      });
+    }
+    case "zip": {
+      const a = Array.isArray(args3[0]) ? args3[0] : [];
+      const b = Array.isArray(args3[1]) ? args3[1] : [];
+      const len = Math.min(a.length, b.length);
+      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
+    }
+    case "zip-with": {
+      const fn = args3[0];
+      const a = Array.isArray(args3[1]) ? args3[1] : [];
+      const b = Array.isArray(args3[2]) ? args3[2] : [];
+      const len = Math.min(a.length, b.length);
+      const callFn2 = interp2?.callFunctionValue?.bind(interp2);
+      if (!callFn2) return [];
+      return Array.from({ length: len }, (_, i) => callFn2(fn, [a[i], b[i]]));
+    }
+    case "uuid":
+    case "uuid4": {
+      const { randomUUID: randomUUID5 } = require("crypto");
+      return randomUUID5();
+    }
     case "push":
       if (!Array.isArray(args3[0])) return [args3[1]];
       return [...args3[0], args3[1]];
@@ -18283,6 +18353,8 @@ var EFFECT_CATALOG = /* @__PURE__ */ new Map([
   // Shell
   ["shell_exec", "shell"],
   ["shell-exec", "shell"],
+  ["shell_exec_result", "shell"],
+  ["shell-exec-result", "shell"],
   ["shell_run", "shell"],
   // I/O (stdout)
   ["println", "io"],
