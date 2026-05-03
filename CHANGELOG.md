@@ -1,5 +1,24 @@
 # FreeLang v11 변경 이력
 
+## [11.2.9] - 2026-05-03
+
+**마일스톤**: 오류 서치 #36~#38 — 7개 버그 수정
+
+### 🐛 버그 수정
+
+#### 타입 체크
+- **`number?` NaN 오판**: `typeof === number` → `!isNaN()` 체크 추가
+
+#### 컬렉션
+- **`empty?` Map 항상 false**: Map 인스턴스 체크 → `v.size === 0` 사용
+- **`has-key?` Map 미지원**: Map `.has()` + plain object `hasOwnProperty` 분기
+
+#### 직렬화 & 인증
+- **`jwtSign` Map payload 오류**: payload → `Object.fromEntries(Map)` 변환
+- **`json-merge` Map 입력 오류**: 양쪽 input → `Object.fromEntries()` 변환 후 병합
+- **`json-set` Map 입력 오류**: Map → 객체 변환 후 JSON.stringify
+- **`file_write` 비문자열 콘텐츠**: 자동 직렬화 — Map/객체→JSON, 나머지→String()
+
 ## [11.2.8] - 2026-05-03
 
 **마일스톤**: 오류 서치 #34~#35 — 12개 버그 수정
