@@ -1,5 +1,20 @@
 # FreeLang v11 변경 이력
 
+## [11.2.3] - 2026-05-03
+
+**마일스톤**: SQL Injection 구조 수정 + parallel Promise 지원
+
+### 🔒 보안 수정 (P0 — SQL Injection)
+- **`db_insert`**: 테이블명/컬럼명 미검증 → `^[a-zA-Z_][a-zA-Z0-9_]*$` 정규식 강제 검증
+- **`db_update`**: 문자열 WHERE 직접 주입 → map `{:col val}` 구조 우선, string은 deprecated 경고
+- **`db_delete_row`**: 동일 — map WHERE 강제, 빈 map `{}` 전체삭제 방지 에러
+- **`db_count`**: 테이블명 미검증 → 동일 검증 추가
+
+### ⚡ parallel / race / with-timeout 개선
+- **`parallel`**: 모든 값 먼저 평가 후 Promise 감지 시 `Promise.all` 병렬 처리 (I/O 작업 실제 병렬 가능)
+- **`race`**: 동기 결과는 first non-nil, Promise 있으면 `Promise.race`
+- **`with-timeout`**: 첫 인자로 ms 받고 Promise 값에 실제 타임아웃 적용
+
 ## [11.2.2] - 2026-05-03
 
 **마일스톤**: 오류 서치 #21~#24 — 버그 8개 수정

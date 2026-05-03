@@ -19458,49 +19458,35 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "parallel") {
     if (expr2.args.length === 0) return [];
-    const results = [];
-    for (const arg of expr2.args) {
-      let val = ev(arg);
-      if (val && typeof val === "object" && typeof val.getValue === "function") {
-        try {
-          val = val.getValue();
-        } catch {
-          val = null;
-        }
-      }
-      results.push(val);
+    const vals = expr2.args.map((arg) => ev(arg));
+    const hasPromise = vals.some((v) => v && typeof v === "object" && typeof v.then === "function");
+    if (hasPromise) {
+      return Promise.all(vals.map((v) => (v && typeof v === "object" && typeof v.then === "function") ? v : Promise.resolve(v)));
     }
-    return results;
+    return vals.map((v) => (v && typeof v === "object" && typeof v.getValue === "function") ? (() => { try { return v.getValue(); } catch { return null; } })() : v);
   }
   if (op === "race") {
     if (expr2.args.length === 0) return null;
-    let firstResult = void 0;
-    for (const arg of expr2.args) {
-      let val = ev(arg);
-      if (val && typeof val === "object" && typeof val.getValue === "function") {
-        try {
-          val = val.getValue();
-        } catch {
-          val = null;
-        }
-      }
-      if (firstResult === void 0) firstResult = val;
-      if (val !== null && val !== void 0) return val;
+    const vals = expr2.args.map((arg) => ev(arg));
+    const hasPromise = vals.some((v) => v && typeof v === "object" && typeof v.then === "function");
+    if (hasPromise) {
+      return Promise.race(vals.map((v) => (v && typeof v === "object" && typeof v.then === "function") ? v : Promise.resolve(v)));
     }
-    return firstResult ?? null;
+    for (const v of vals) {
+      const resolved = (v && typeof v === "object" && typeof v.getValue === "function") ? (() => { try { return v.getValue(); } catch { return null; } })() : v;
+      if (resolved !== null && resolved !== void 0) return resolved;
+    }
+    return null;
   }
   if (op === "with-timeout") {
     if (expr2.args.length < 2) return null;
+    const ms = Number(ev(expr2.args[0]) ?? 5000);
     try {
-      let val = ev(expr2.args[1]);
-      if (val && typeof val === "object" && typeof val.getValue === "function") {
-        try {
-          val = val.getValue();
-        } catch {
-          val = null;
-        }
+      const val = ev(expr2.args[1]);
+      if (val && typeof val === "object" && typeof val.then === "function") {
+        return Promise.race([val, new Promise((_, rej) => setTimeout(() => rej(new Error(`with-timeout: exceeded ${ms}ms`)), ms))]);
       }
-      return val;
+      return (val && typeof val === "object" && typeof val.getValue === "function") ? (() => { try { return val.getValue(); } catch { return null; } })() : val;
     } catch {
       return null;
     }
@@ -24433,31 +24419,62 @@ function createDbModule() {
     // db_insert dbPath table data -> true
     "db_insert": (dbPath, table, data) => {
       const db = getDb(dbPath);
-      const keys = Object.keys(data);
+      const _si = (s) => { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(s))) throw new Error(`[db_insert] Invalid identifier: ${s}`); return s; };
+      _si(table);
+      const keys = Object.keys(data).map(_si);
       const placeholders = keys.map(() => "?").join(",");
-      const vals = Object.values(data);
-      db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${placeholders})`).run(vals);
+      const vals = keys.map((k) => data[k]);
+      db.prepare(`INSERT INTO \`${table}\` (\`${keys.join("`,`")}\`) VALUES (${placeholders})`).run(vals);
       return true;
     },
     // db_update dbPath table data where -> true
+    // where: map {:col val} 또는 legacy string (deprecated)
     "db_update": (dbPath, table, data, where, whereParams = []) => {
       const db = getDb(dbPath);
-      const keys = Object.keys(data);
-      const sets = keys.map((k) => `${k.replace(/[^a-zA-Z0-9_]/g, "")}=?`).join(", ");
-      const vals = [...Object.values(data), ...(Array.isArray(whereParams) ? whereParams : [])];
-      db.prepare(`UPDATE ${table.replace(/[^a-zA-Z0-9_]/g, "")} SET ${sets} WHERE ${where}`).run(vals);
+      const _su = (s) => { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(s))) throw new Error(`[db_update] Invalid identifier: ${s}`); return s; };
+      _su(table);
+      const dataKeys = Object.keys(data).map(_su);
+      const sets = dataKeys.map((k) => `\`${k}\`=?`).join(", ");
+      const dataVals = dataKeys.map((k) => data[k]);
+      let whereSql, whereVals;
+      if (where !== null && typeof where === "object" && !Array.isArray(where)) {
+        const wEntries = Object.entries(where);
+        if (wEntries.length === 0) throw new Error("[db_update] Empty WHERE map — would update all rows. Use db_raw for intentional full-table update.");
+        whereSql = wEntries.map(([k]) => `\`${_su(k)}\`=?`).join(" AND ");
+        whereVals = wEntries.map(([, v]) => v);
+      } else {
+        if (typeof where === "string") console.warn("[db_update] DEPRECATED: string WHERE is unsafe. Use map {:col val} instead.");
+        whereSql = String(where ?? "");
+        whereVals = Array.isArray(whereParams) ? whereParams : [];
+      }
+      db.prepare(`UPDATE \`${table}\` SET ${sets} WHERE ${whereSql}`).run([...dataVals, ...whereVals]);
       return true;
     },
-    // db_delete_row dbPath table where whereParams? -> true
+    // db_delete_row dbPath table where -> true
+    // where: map {:col val} 또는 legacy string (deprecated)
     "db_delete_row": (dbPath, table, where, whereParams = []) => {
       const db = getDb(dbPath);
-      db.prepare(`DELETE FROM ${table.replace(/[^a-zA-Z0-9_]/g, "")} WHERE ${where}`).run(Array.isArray(whereParams) ? whereParams : []);
+      const _sd = (s) => { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(s))) throw new Error(`[db_delete_row] Invalid identifier: ${s}`); return s; };
+      _sd(table);
+      let whereSql, whereVals;
+      if (where !== null && typeof where === "object" && !Array.isArray(where)) {
+        const wEntries = Object.entries(where);
+        if (wEntries.length === 0) throw new Error("[db_delete_row] Empty WHERE map — would delete all rows. Use db_raw for intentional truncate.");
+        whereSql = wEntries.map(([k]) => `\`${_sd(k)}\`=?`).join(" AND ");
+        whereVals = wEntries.map(([, v]) => v);
+      } else {
+        if (typeof where === "string") console.warn("[db_delete_row] DEPRECATED: string WHERE is unsafe. Use map {:col val} instead.");
+        whereSql = String(where ?? "");
+        whereVals = Array.isArray(whereParams) ? whereParams : [];
+      }
+      db.prepare(`DELETE FROM \`${table}\` WHERE ${whereSql}`).run(whereVals);
       return true;
     },
     // db_count dbPath table -> number
     "db_count": (dbPath, table) => {
       const db = getDb(dbPath);
-      const row = db.prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get();
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(table))) throw new Error(`[db_count] Invalid table name: ${table}`);
+      const row = db.prepare(`SELECT COUNT(*) as cnt FROM \`${table}\``).get();
       return Number(row?.cnt ?? 0);
     },
     // db_tables dbPath -> string[]
