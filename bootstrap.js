@@ -19001,7 +19001,8 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "if") {
     const condition = ev(expr2.args[0]);
-    const branch = condition ? expr2.args[1] : expr2.args[2] || null;
+    const _isFalsy = condition === null || condition === void 0 || condition === false;
+    const branch = _isFalsy ? (expr2.args[2] || null) : expr2.args[1];
     if (branch === null) return null;
     if (interp2.tcoMode && branch !== null) {
       const b = branch;
@@ -26165,7 +26166,7 @@ function bindParams(sql, params) {
 var DATA_BUF_SIZE = 4 * 1024 * 1024;
 var WORKER_CODE = `
 const { workerData } = require('worker_threads');
-const mysql2 = require('mysql2/promise');
+let mysql2; try { mysql2 = require('mysql2/promise'); } catch { mysql2 = require(require('path').join(${JSON.stringify(__dirname)}, 'node_modules/mysql2/promise')); }
 const control = new Int32Array(workerData.controlBuf);
 const data = Buffer.from(workerData.dataBuf);
 const pools = new Map();
@@ -27623,7 +27624,7 @@ ${exportsStr}
       const cond = this.genNode(args3[0]);
       const thenExpr = this.genNode(args3[1]);
       const elseExpr = args3[2] ? this.genNode(args3[2]) : "undefined";
-      return `(${cond} ? ${thenExpr} : ${elseExpr})`;
+      return `((c => c === null || c === undefined || c === false ? (${elseExpr}) : (${thenExpr}))(${cond}))`;
     }
     if (op === "define") {
       const varName = this.extractVarName(args3[0]);

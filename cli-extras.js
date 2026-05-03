@@ -47,7 +47,12 @@ function cmdPatch(patchArgs) {
 }
 
 async function cmdMigrate(migrateArgs) {
-  let mysql; try { mysql = require("mysql2/promise"); } catch { console.error("[migrate] mysql2 필요: npm install mysql2"); process.exit(1); }
+  let mysql;
+  try { mysql = require("mysql2/promise"); } catch {
+    try { mysql = require(path.join(__dirname, "node_modules/mysql2/promise")); } catch {
+      console.error("[migrate] mysql2 필요: npm install mysql2 (freelang-v11 디렉토리에서)"); process.exit(1);
+    }
+  }
   const sub = migrateArgs[0];
   const dir = path.resolve(process.cwd(), "migrations");
   const envFile = path.resolve(process.cwd(), ".env");
