@@ -24235,8 +24235,12 @@ function createDbModule() {
     },
     // db_put collection id data -> saved data
     "db_put": (collection, id, data) => {
-      const r = kimdbReq("PUT", `/api/c/${collection}/${id}`, data);
-      return r?.data ?? r;
+      try {
+        const r = kimdbReq("PUT", `/api/c/${collection}/${id}`, data);
+        return r?.data ?? r;
+      } catch (e) {
+        return null;
+      }
     },
     // db_delete collection id -> boolean
     "db_delete": (collection, id) => {
@@ -24269,14 +24273,22 @@ function createDbModule() {
     // ── SQLite ───────────────────────────────────────────────
     // db_query dbPath sql params -> rows (JSON array)
     "db_query": (dbPath, sql, params = []) => {
-      const db = getDb(dbPath);
-      return db.prepare(sql).all(params);
+      try {
+        const db = getDb(dbPath);
+        return db.prepare(sql).all(params);
+      } catch (e) {
+        return [];
+      }
     },
     // db_exec dbPath sql [params] -> stdout string
     "db_exec": (dbPath, sql, params = []) => {
-      const db = getDb(dbPath);
-      db.prepare(sql).run(params);
-      return "";
+      try {
+        const db = getDb(dbPath);
+        db.prepare(sql).run(params);
+        return "";
+      } catch (e) {
+        return "";
+      }
     },
     // db_insert dbPath table data -> true
     "db_insert": (dbPath, table, data) => {
@@ -30807,7 +30819,8 @@ function loadAllStdlib(interp2) {
     },
     "re-replace": (pattern, replacement, s) => {
       try {
-        return String(s).replace(new RegExp(pattern, "g"), replacement);
+        const escaped = String(replacement).replace(/\$/g, "$$$$");
+        return String(s).replace(new RegExp(pattern, "g"), escaped);
       } catch {
         return String(s);
       }
@@ -30960,14 +30973,8 @@ function loadAllStdlib(interp2) {
     "str_contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?": (s, sub) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? s.includes(sub) : false,
     // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
-    "inc": (n) => {
-      const num = typeof n === "number" ? n : Number(n);
-      return isNaN(num) ? null : num + 1;
-    },
-    "dec": (n) => {
-      const num = typeof n === "number" ? n : Number(n);
-      return isNaN(num) ? null : num - 1;
-    },
+    "inc": (n) => typeof n === "number" ? n + 1 : Number(n) + 1,
+    "dec": (n) => typeof n === "number" ? n - 1 : Number(n) - 1,
     // Map 유틸 — PUT 패턴에서 자주 쓰임
     "dissoc-nil": (m) => {
       if (m instanceof Map) {
