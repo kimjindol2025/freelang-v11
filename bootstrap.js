@@ -1956,15 +1956,7 @@ ${parenHint}` : parenHint;
       // Phase 11: Parse try-catch-finally expressions
       // (try body (catch [pattern] handler) (finally cleanup))
       parseTryExpression() {
-        const bodyExprs2 = [];
-        while (!this.isAtEnd() && !this.check("RParen" /* RParen */)) {
-          if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
-            const _n = this.tokens[this.pos + 1];
-            if (_n.type === "Symbol" && (_n.value === "catch" || _n.value === "finally")) break;
-          }
-          bodyExprs2.push(this.parseValue());
-        }
-        const body = bodyExprs2.length === 1 ? bodyExprs2[0] : { kind: "sexpr", op: "do", args: bodyExprs2 };
+        const body = this.parseValue();
         const catchClauses = [];
         let finallyBlock;
         while (this.check("LParen" /* LParen */) && !this.isAtEnd()) {
@@ -11273,11 +11265,9 @@ function flDeepEq(a, b) {
     return true;
   }
   if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
-    const toPlain = (x) => x instanceof Map ? Object.fromEntries(x) : x;
-    const pa = toPlain(a), pb = toPlain(b);
-    const ka = Object.keys(pa), kb = Object.keys(pb);
+    const ka = Object.keys(a), kb = Object.keys(b);
     if (ka.length !== kb.length) return false;
-    for (const k of ka) if (!flDeepEq(pa[k], pb[k])) return false;
+    for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
     return true;
   }
   return false;
@@ -12193,7 +12183,7 @@ loop().catch(e => {
     case ">=":
       return args3[0] >= args3[1];
     case "!=":
-      return !flDeepEq(args3[0], args3[1]);
+      return args3[0] !== args3[1];
     case "and":
       return args3.every((a) => a);
     case "or": {
@@ -12226,8 +12216,8 @@ loop().catch(e => {
     }
     case "concat":
       if (!Array.isArray(args3[0])) return args3.join("");
-      if (args3.length === 1) return args3[0] || [];
-      return args3[0].concat(...args3.slice(1).filter(Array.isArray));
+      if (!Array.isArray(args3[1])) return args3[0] || [];
+      return args3[0].concat(args3[1]);
     case "upper":
       return args3[0]?.toString().toUpperCase();
     case "lower":
@@ -12397,12 +12387,8 @@ loop().catch(e => {
       return args3;
     case "first":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : args3[0]?.[0] ?? null;
-    case "rest": {
-      const _rv = args3[0];
-      if (_rv === null || _rv === void 0) return null;
-      if (Array.isArray(_rv) || typeof _rv === "string") return _rv.slice(1);
-      return [];
-    }
+    case "rest":
+      return args3[0]?.slice(1);
     case "keys": {
       const kObj = args3[0];
       if (kObj instanceof Map) return Array.from(kObj.keys());
@@ -12440,8 +12426,7 @@ loop().catch(e => {
       return [...args3[0] || [], ...args3.slice(1)];
     case "reverse":
       if (Array.isArray(args3[0])) return [...args3[0]].reverse();
-      if (typeof args3[0] === "string") return args3[0].split("").reverse().join("");
-      return [];
+      return [...args3[0] || []].reverse();
     case "map": {
       const mapFn = args3[0];
       const mapArr = Array.isArray(args3[1]) ? args3[1] : [];
@@ -12759,7 +12744,7 @@ loop().catch(e => {
       const op2 = String(args3[0]);
       const vals = Array.isArray(args3[1]) ? args3[1] : [];
       const v0 = vals[0], v1 = vals[1], v2 = vals[2];
-      switch (op2) {
+      switch (normalizedOp2) {
         case "+":
           return vals.reduce((a, b) => a + b, 0);
         case "-":
@@ -12771,9 +12756,9 @@ loop().catch(e => {
         case "%":
           return typeof v0 === "number" && typeof v1 === "number" ? v0 % v1 : null;
         case "=":
-          return flDeepEq(v0, v1);
+          return v0 === v1;
         case "!=":
-          return !flDeepEq(v0, v1);
+          return v0 !== v1;
         case "<":
           return v0 < v1;
         case ">":
@@ -18918,11 +18903,11 @@ function evalSpecialForm(interp2, op, expr2) {
         const fnName = form.name;
         if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
         else if (ctx.variables.has(fnName)) val = callFn(ctx.variables.get(fnName), [val]);
-        else { ctx.variables.set(TMP_VAR, val); val = ev({ kind: "sexpr", op: fnName, args: [{ kind: "variable", name: TMP_VAR }] }); ctx.variables.delete(TMP_VAR); }
+        else throw new Error(`->: unknown function or variable: ${fnName}`);
       } else if (fk === "literal" && form.type === "symbol") {
         const fnName = form.value;
         if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
-        else { ctx.variables.set(TMP_VAR, val); val = ev({ kind: "sexpr", op: fnName, args: [{ kind: "variable", name: TMP_VAR }] }); ctx.variables.delete(TMP_VAR); }
+        else throw new Error(`->: unknown function: ${fnName}`);
       } else {
         const fn = ev(form);
         val = callFn(fn, [val]);
@@ -18948,11 +18933,11 @@ function evalSpecialForm(interp2, op, expr2) {
         const fnName = form.name;
         if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
         else if (ctx.variables.has(fnName)) val = callFn(ctx.variables.get(fnName), [val]);
-        else { ctx.variables.set(TMP_VAR, val); val = ev({ kind: "sexpr", op: fnName, args: [{ kind: "variable", name: TMP_VAR }] }); ctx.variables.delete(TMP_VAR); }
+        else throw new Error(`->>: unknown function or variable: ${fnName}`);
       } else if (fk === "literal" && form.type === "symbol") {
         const fnName = form.value;
         if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
-        else { ctx.variables.set(TMP_VAR, val); val = ev({ kind: "sexpr", op: fnName, args: [{ kind: "variable", name: TMP_VAR }] }); ctx.variables.delete(TMP_VAR); }
+        else throw new Error(`->>: unknown function: ${fnName}`);
       } else {
         const fn = ev(form);
         val = callFn(fn, [val]);
@@ -20682,12 +20667,8 @@ function curlGetStatusAndBody(url2, method = "GET", headers, body) {
         args3.push("-H", `${key}: ${value}`);
       }
     }
-    if (body !== null && body !== void 0 && body !== "") {
-      let _bodyStr;
-      if (typeof body === "string") _bodyStr = body;
-      else if (body instanceof Map) _bodyStr = JSON.stringify(Object.fromEntries(body));
-      else _bodyStr = JSON.stringify(body);
-      if (_bodyStr && _bodyStr.length > 0) args3.push("-d", _bodyStr);
+    if (body && body.length > 0) {
+      args3.push("-d", body);
     }
     args3.push(url2);
     const result = (0, import_child_process.spawnSync)("curl", args3, { timeout: 15e3 });
@@ -26246,10 +26227,6 @@ function parseRows(raw) {
 }
 function bindParams(sql, params) {
   if (!params || params.length === 0) return sql;
-  const placeholderCount = (sql.match(/\?/g) || []).length;
-  if (placeholderCount !== params.length) {
-    process.stderr.write(`⚠️  [FreeLang] bindParams: SQL에 ? ${placeholderCount}개, params ${params.length}개 (불일치)\n`);
-  }
   return params.reduce((s, p) => {
     if (p === null || p === void 0) return s.replace("?", "NULL");
     if (typeof p === "number") return s.replace("?", String(p));
@@ -31097,7 +31074,7 @@ function evalTryBlock(interp2, tryBlock) {
           } else if (error instanceof Error) {
             errMap.set("message", error.message);
             const lineMatch = error.message.match(/\(at line (\d+)/);
-            errMap.set("line", lineMatch ? parseInt(lineMatch[1], 10) : null);
+            if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
             const flErr = error;
             if (flErr.file) errMap.set("file", flErr.file);
             if (flErr.code) errMap.set("code", flErr.code);

@@ -1,5 +1,31 @@
 # FreeLang v11 변경 이력
 
+## [11.2.8] - 2026-05-03
+
+**마일스톤**: 오류 서치 #34~#35 — 12개 버그 수정
+
+### 🐛 버그 수정
+
+#### 타입 체크
+- **`nil-or-empty?` Map 항상 true**:  이슈 →  분기 추가
+- **`odd?`/`even?` NaN·소수 오판**: `typeof === number` → `Number.isInteger` 사용
+
+#### 컬렉션
+- **`contains?` 맵/객체 항상 false**: Map `.has()` + `hasOwnProperty` 추가
+- **`drop` 비배열 null 반환**: 문자열 → `.slice(n)`, lazy null → `?? []` 반환
+- **`index-of` 배열 미지원**: Array.findIndex + `Object.is` 비교 추가
+- **`arr_index_of`/`arr_remove` JSON.stringify 충돌**: null/NaN 동일 직렬화 → `Object.is` 사용
+- **`dissoc` 다중 키 무시**: `args3.slice(1)` 루프로 다중 키 + Map 인스턴스 지원
+
+#### 문자열
+- **`upper`/`lower` null→undefined**: 옵셔널 체이닝 제거 → null 입력 시 null 반환
+
+#### 직렬화
+- **`repr` Map→{}**: Map 인스턴스 `Object.fromEntries` 변환 후 JSON.stringify
+
+#### DB 헬퍼
+- **`dissoc-nil` nil→빈 Map**: `m ?? new Map()` → `m ?? null`
+
 ## [11.2.7] - 2026-05-03
 
 **마일스톤**: 오류 서치 #31~#33 — 11개 버그 수정
