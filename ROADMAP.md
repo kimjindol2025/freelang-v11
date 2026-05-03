@@ -91,6 +91,33 @@ freelang patch <file> --insert-after "<anchor>" --content "<block>"
 
 ---
 
+### P1 — `freelang migrate` — DB 마이그레이션 관리
+
+**배경**: Supabase에서 배운 것 — 스키마 변경 추적 없으면 "이 컬럼 언제 추가했지?" 반복  
+**파일**: `bootstrap.js` CLI + `migrations/` 폴더 규칙  
+**명령**:
+```bash
+freelang migrate create "add_status_to_orders"   # 파일 생성
+freelang migrate up                               # 미적용 실행
+freelang migrate down                             # 마지막 롤백
+freelang migrate status                           # 적용 현황
+```
+**완료 조건**: MariaDB `_migrations` 테이블 + SQL 파일 기반 버전 관리
+
+---
+
+### P2 — `auto_rest` — DB 테이블 → REST API 자동 생성
+
+**배경**: Supabase PostgREST 패턴 — CRUD 핸들러 반복 제거  
+**사용법**:
+```fl
+(auto_rest "orders" {:auth :required :read :public})
+; → GET /orders, POST /orders, PATCH /orders/:id, DELETE /orders/:id 자동
+```
+**완료 조건**: akl-crm 기존 CRUD 핸들러 50% 이상 제거 가능
+
+---
+
 ### P3 — WebSocket / Push API / Cron 정밀화
 
 | 기능 | 현황 | 목표 |

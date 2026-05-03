@@ -38929,6 +38929,16 @@ switch (cmd) {
     cmdServe(args2.slice(1));
     break;
   }
+  case "patch": {
+    const { cmdPatch } = require(require("path").join(__dirname, "cli-extras.js"));
+    cmdPatch(args2.slice(1));
+    break;
+  }
+  case "migrate": {
+    const { cmdMigrate } = require(require("path").join(__dirname, "cli-extras.js"));
+    cmdMigrate(args2.slice(1)).catch((e) => { console.error(`\x1B[31m[migrate 오류]\x1B[0m ${e.message}`); process.exit(1); });
+    break;
+  }
   case "version":
   case "-v":
   case "--version":
