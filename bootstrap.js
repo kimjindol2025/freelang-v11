@@ -11363,10 +11363,8 @@ function flExecOpNative(op, vals) {
       return v0 === true;
     case "false?":
       return v0 === false;
-    case "and": {
-      const flFalsy = (v) => v === null || v === void 0 || v === false;
-      return !flFalsy(v0) && !flFalsy(v1);
-    }
+    case "and":
+      return !!(v0 && v1);
     case "or": {
       const flFalsy = (v) => v === null || v === void 0 || v === false;
       if (!flFalsy(v0)) return v0;
@@ -11401,7 +11399,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
     case "concat":
-      return vals.map((v) => v === null || v === void 0 ? "null" : String(v)).join("");
+      return vals.map((v) => toDisplay(v)).join("");
     case "str-to-num": {
       const n = parseFloat(String(v0));
       return isNaN(n) ? null : n;
@@ -12186,10 +12184,8 @@ loop().catch(e => {
       return args3[0] >= args3[1];
     case "!=":
       return args3[0] !== args3[1];
-    case "and": {
-      const flFalsy = (v) => v === null || v === void 0 || v === false;
-      return !args3.some((a) => flFalsy(a));
-    }
+    case "and":
+      return args3.every((a) => a);
     case "or": {
       const flFalsy3 = (v) => v === null || v === void 0 || v === false;
       for (const a of args3) {
@@ -21770,16 +21766,7 @@ function createTimeModule() {
     // fmt tokens: YYYY MM DD HH mm ss SSS
     "format_date": (ts, fmt) => {
       const d = new Date(ts);
-      const tokens = {
-        YYYY: String(d.getFullYear()),
-        MM: String(d.getMonth() + 1).padStart(2, "0"),
-        DD: String(d.getDate()).padStart(2, "0"),
-        HH: String(d.getHours()).padStart(2, "0"),
-        mm: String(d.getMinutes()).padStart(2, "0"),
-        ss: String(d.getSeconds()).padStart(2, "0"),
-        SSS: String(d.getMilliseconds()).padStart(3, "0")
-      };
-      return fmt.replace(/YYYY|MM|DD|HH|mm|ss|SSS/g, m => tokens[m]);
+      return fmt.replace("YYYY", String(d.getFullYear())).replace("MM", String(d.getMonth() + 1).padStart(2, "0")).replace("DD", String(d.getDate()).padStart(2, "0")).replace("HH", String(d.getHours()).padStart(2, "0")).replace("mm", String(d.getMinutes()).padStart(2, "0")).replace("ss", String(d.getSeconds()).padStart(2, "0")).replace("SSS", String(d.getMilliseconds()).padStart(3, "0"));
     },
     // date_parts ts -> {year,month,day,hour,min,sec,ms,weekday}
     "date_parts": (ts) => {
@@ -24248,12 +24235,8 @@ function createDbModule() {
     },
     // db_put collection id data -> saved data
     "db_put": (collection, id, data) => {
-      try {
-        const r = kimdbReq("PUT", `/api/c/${collection}/${id}`, data);
-        return r?.data ?? r;
-      } catch (e) {
-        return null;
-      }
+      const r = kimdbReq("PUT", `/api/c/${collection}/${id}`, data);
+      return r?.data ?? r;
     },
     // db_delete collection id -> boolean
     "db_delete": (collection, id) => {
@@ -24286,22 +24269,14 @@ function createDbModule() {
     // ── SQLite ───────────────────────────────────────────────
     // db_query dbPath sql params -> rows (JSON array)
     "db_query": (dbPath, sql, params = []) => {
-      try {
-        const db = getDb(dbPath);
-        return db.prepare(sql).all(params);
-      } catch (e) {
-        return [];
-      }
+      const db = getDb(dbPath);
+      return db.prepare(sql).all(params);
     },
     // db_exec dbPath sql [params] -> stdout string
     "db_exec": (dbPath, sql, params = []) => {
-      try {
-        const db = getDb(dbPath);
-        db.prepare(sql).run(params);
-        return "";
-      } catch (e) {
-        return "";
-      }
+      const db = getDb(dbPath);
+      db.prepare(sql).run(params);
+      return "";
     },
     // db_insert dbPath table data -> true
     "db_insert": (dbPath, table, data) => {
@@ -30832,8 +30807,7 @@ function loadAllStdlib(interp2) {
     },
     "re-replace": (pattern, replacement, s) => {
       try {
-        const escaped = String(replacement).replace(/\$/g, "$$$$");
-        return String(s).replace(new RegExp(pattern, "g"), escaped);
+        return String(s).replace(new RegExp(pattern, "g"), replacement);
       } catch {
         return String(s);
       }
