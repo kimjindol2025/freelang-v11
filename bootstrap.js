@@ -11443,7 +11443,7 @@ function flExecOpNative(op, vals) {
     case "first":
       return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
     case "last":
-      return Array.isArray(v0) ? v0.length > 0 ? v0[v0.length - 1] : null : null;
+      return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
     case "get-or": {
@@ -12387,9 +12387,9 @@ loop().catch(e => {
     case "list":
       return args3;
     case "first":
-      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : args3[0]?.[0] ?? null;
+      return Array.isArray(args3[0]) ? args3[0][0] !== void 0 ? args3[0][0] : null : null;
     case "rest":
-      return args3[0]?.slice(1);
+      return Array.isArray(args3[0]) ? args3[0].slice(1) : [];
     case "keys": {
       const kObj = args3[0];
       if (kObj instanceof Map) return Array.from(kObj.keys());
@@ -12427,7 +12427,7 @@ loop().catch(e => {
       return [...args3[0] || [], ...args3.slice(1)];
     case "reverse":
       if (Array.isArray(args3[0])) return [...args3[0]].reverse();
-      return [...args3[0] || []].reverse();
+      return args3[0];
     case "map": {
       const mapFn = args3[0];
       const mapArr = Array.isArray(args3[1]) ? args3[1] : [];
