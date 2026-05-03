@@ -12873,15 +12873,8 @@ loop().catch(e => {
     }
     case "dissoc": {
       if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
-        const _keys = args3.slice(1).map((k) => typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k));
-        if (args3[0] instanceof Map) {
-          const _dm = new Map(args3[0]);
-          for (const _k of _keys) _dm.delete(_k);
-          return _dm;
-        }
-        const _dr = { ...args3[0] };
-        for (const _k of _keys) delete _dr[_k];
-        return _dr;
+        const { [args3[1]]: _, ...rest } = args3[0];
+        return rest;
       }
       return args3[0] ?? {};
     }
@@ -30690,7 +30683,9 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createHttpModule());
   interp2.registerModule(createShellModule());
   interp2.registerModule(createDataModule());
-  interp2.registerModule(createCollectionModule());
+  interp2.registerModule(createCollectionModule(
+    (fn, a) => interp2.callFunctionValue(fn, a)
+  ));
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
