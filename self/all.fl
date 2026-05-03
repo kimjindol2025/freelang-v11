@@ -745,9 +745,21 @@
               [$body (if $is-sexpr (cg (get (get $c :args) 1)) (cg $c))]]
           (str "let " $param "=err;return " $body ";"))]
 
+[FUNC cg-func-block :params [$n]
+  :body (let [[$name (js-name (get $n :name))]
+              [$f (get $n :fields)]
+              [$params-block (get $f :params)]
+              [$body-node (get $f :body)]
+              [$ps-info (extract-params (get-block-items $params-block))]
+              [$body (cg $body-node)]
+              [$pre (get $ps-info :preamble)]
+              [$final-body (if (= (length $pre) 0) $body (str "((() => { " $pre " return " $body "; })())"))]]
+          (str "function " $name "(" (get $ps-info :params) ") { return " $final-body "; }"))]
+
 [FUNC cg-block :params [$n]
   :body (let [[$t (get $n :type)] [$f (get $n :fields)]]
           (cond
+            [(= $t "FUNC") (cg-func-block $n)]
             [(= $t "Map") (str "({" (cg-map-entries $f) "})")]
             [(= $t "Array") (str "[" (cg-args (get $f "items")) "]")]
             [true "null"]))]
@@ -771,9 +783,6 @@
             (cg-map-flat-loop $it (+ $i 2) (if (= $i 0) $pair (str $acc "," $pair)))))]
 
 ;; ═══════ Special Forms ═══════
-
-[FUNC string? :params [$x] :body (= (type-of $x) "string")]
-[FUNC array? :params [$x] :body (= (type-of $x) "list")]
 
 [FUNC cg-sexpr :params [$n]
   :body (let [[$op (get $n :op)]]
@@ -804,6 +813,8 @@
           [(= $op ">=") (str "(" (cg (get $args 0)) ">=" (cg (get $args 1)) ")")]
           [(= $op "!=") (str "(" (cg (get $args 0)) "!==" (cg (get $args 1)) ")")]
           [(= $op "%") (str "(" (cg (get $args 0)) "%" (cg (get $args 1)) ")")]
+          [(= $op "while") (str "(()=>{ while(" (cg (get $args 0)) ") { " (cg-stmts (slice $args 1 (length $args)) 0 "") " } })()")]
+          [(= $op "set!") (str "(" (js-name (get (get $args 0) :name)) " = " (cg (get $args 1)) ")")]
           [true (cg-native-dispatch $op (cg-args $args))])]
 
 [FUNC cg-fn :params [$args]
@@ -843,6 +854,10 @@
                 [$c (cg (get $args $i))]
                 [$sep (if $last "return " "")]]
             (cg-do-body $args (+ $i 1) (str $acc $sep $c ";"))))]
+
+[FUNC cg-stmts :params [$args $i $acc]
+  :body (if (>= $i (length $args)) $acc
+          (cg-stmts $args (+ $i 1) (str $acc (cg (get $args $i)) ";")))]
 
 [FUNC cg-cond :params [$args]
   :body (if (= (length $args) 0) "null"
@@ -1214,20 +1229,15 @@
 [FUNC str-contains :params [$s $substr]
   :body (not (= -1 (str-index-of $s $substr)))]
 
-[FUNC str-replace :params [$s $old $new]
-  :body (let [[$idx (str-index-of $s $old)]]
-          (if (= $idx -1)
-            $s
-            (str (str-slice $s 0 $idx) $new (str-replace (str-slice $s (+ $idx (length $old)) (length $s)) $old $new))))]
 
 ;; self/stdlib/file.fl — Phase 27
 ;; 파일 I/O 연산 (native file_* builtin wrapper)
 
 [FUNC file-read :params [path]
-  :body (file_read (str path))]
+  :body (_fl_file_read (str path))]
 
 [FUNC file-write :params [path content]
-  :body (file_write (str path) (str content))]
+  :body (_fl_file_write (str path) (str content))]
 
 [FUNC file-append :params [path content]
   :body (file_append (str path) (str content))]

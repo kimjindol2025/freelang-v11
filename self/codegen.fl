@@ -79,9 +79,21 @@
               [$body (if $is-sexpr (cg (get (get $c :args) 1)) (cg $c))]]
           (str "let " $param "=err;return " $body ";"))]
 
+[FUNC cg-func-block :params [$n]
+  :body (let [[$name (js-name (get $n :name))]
+              [$f (get $n :fields)]
+              [$params-block (get $f :params)]
+              [$body-node (get $f :body)]
+              [$ps-info (extract-params (get-block-items $params-block))]
+              [$body (cg $body-node)]
+              [$pre (get $ps-info :preamble)]
+              [$final-body (if (= (length $pre) 0) $body (str "((() => { " $pre " return " $body "; })())"))]]
+          (str "function " $name "(" (get $ps-info :params) ") { return " $final-body "; }"))]
+
 [FUNC cg-block :params [$n]
   :body (let [[$t (get $n :type)] [$f (get $n :fields)]]
           (cond
+            [(= $t "FUNC") (cg-func-block $n)]
             [(= $t "Map") (str "({" (cg-map-entries $f) "})")]
             [(= $t "Array") (str "[" (cg-args (get $f "items")) "]")]
             [true "null"]))]
