@@ -11399,8 +11399,11 @@ function flExecOpNative(op, vals) {
       }
       return null;
     }
-    case "append":
-      return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
+    case "append": {
+      const _base = Array.isArray(v0) ? v0 : [v0];
+      const _rest = vals.slice(1).flatMap((v) => Array.isArray(v) ? v : [v]);
+      return [..._base, ..._rest];
+    }
     case "slice":
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
@@ -11427,6 +11430,7 @@ function flExecOpNative(op, vals) {
     case "char-at":
       return typeof v0 === "string" ? v0[Number(v1)] ?? "" : "";
     case "index-of":
+      if (Array.isArray(v0)) return v0.findIndex((item) => JSON.stringify(item) === JSON.stringify(v1));
       return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
     case "split":
       return typeof v0 === "string" ? v0.split(String(v1 ?? "")) : [];
@@ -12432,11 +12436,10 @@ loop().catch(e => {
       return typeof args3[0] === "string" ? args3[0][Number(args3[1])] ?? "" : "";
     case "math-pow":
       return Math.pow(Number(args3[0]), Number(args3[1]));
-    case "append":
-      if (Array.isArray(args3[0]) && args3.length === 2 && Array.isArray(args3[1])) {
-        return [...args3[0], ...args3[1]];
-      }
-      return [...args3[0] || [], ...args3.slice(1)];
+    case "append": {
+      const _ab = Array.isArray(args3[0]) ? args3[0] : [args3[0]];
+      return [..._ab, ...args3.slice(1).flatMap((v) => Array.isArray(v) ? v : [v])];
+    }
     case "reverse":
       if (Array.isArray(args3[0])) return [...args3[0]].reverse();
       return [...args3[0] || []].reverse();
@@ -12669,6 +12672,7 @@ loop().catch(e => {
     case "ends-with?":
       return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
     case "index-of":
+      if (Array.isArray(args3[0])) return args3[0].findIndex((item) => JSON.stringify(item) === JSON.stringify(args3[1]));
       return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].indexOf(args3[1]) : -1;
     case "replace":
       return typeof args3[0] === "string" && typeof args3[1] === "string" && typeof args3[2] === "string" ? args3[0].split(args3[1]).join(args3[2]) : "";
