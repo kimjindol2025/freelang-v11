@@ -30683,9 +30683,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createHttpModule());
   interp2.registerModule(createShellModule());
   interp2.registerModule(createDataModule());
-  interp2.registerModule(createCollectionModule(
-    (fn, a) => interp2.callFunctionValue(fn, a)
-  ));
+  interp2.registerModule(createCollectionModule());
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
