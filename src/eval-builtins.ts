@@ -1232,9 +1232,9 @@ loop().catch(e => {
     case "list":
       return args;
     case "first":
-      return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : (args[0]?.[0] ?? null);
+      return Array.isArray(args[0]) ? (args[0][0] !== undefined ? args[0][0] : null) : null;
     case "rest":
-      return args[0]?.slice(1);
+      return Array.isArray(args[0]) ? args[0].slice(1) : [];
     // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
     case "keys": {
       const kObj = args[0];
@@ -1273,7 +1273,7 @@ loop().catch(e => {
       return [...(args[0] || []), ...args.slice(1)];
     case "reverse":
       if (Array.isArray(args[0])) return [...args[0]].reverse();
-      return [...(args[0] || [])].reverse();
+      return args[0];
     case "map": {
       const mapFn = args[0];
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
