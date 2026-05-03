@@ -12580,6 +12580,7 @@ loop().catch(e => {
       if (v === null || v === void 0) return true;
       if (typeof v === "string") return v.length === 0;
       if (Array.isArray(v)) return v.length === 0;
+      if (v instanceof Map) return v.size === 0;
       if (typeof v === "object") return Object.keys(v).length === 0;
       return false;
     }
@@ -12661,7 +12662,7 @@ loop().catch(e => {
       const coll = args3[1];
       if (!Array.isArray(coll)) return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
-      if (filterFn && filterFn.kind === "function-value") {
+      if (filterFn && (filterFn.kind === "function-value" || filterFn.kind === "async-function-value")) {
         return coll.filter((item) => callFnVal(filterFn, [item]));
       }
       return coll;
@@ -12884,8 +12885,15 @@ loop().catch(e => {
       return base;
     }
     case "dissoc": {
+      if (args3[0] instanceof Map) {
+        const _dm = new Map(args3[0]);
+        const _dk = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
+        _dm.delete(_dk); _dm.delete(args3[1]);
+        return _dm;
+      }
       if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
-        const { [args3[1]]: _, ...rest } = args3[0];
+        const _k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1] ?? "");
+        const { [_k]: _, [String(args3[1] ?? "")]: _2, ...rest } = args3[0];
         return rest;
       }
       return args3[0] ?? {};
@@ -24408,18 +24416,18 @@ function createDbModule() {
       return true;
     },
     // db_update dbPath table data where -> true
-    "db_update": (dbPath, table, data, where) => {
+    "db_update": (dbPath, table, data, where, whereParams = []) => {
       const db = getDb(dbPath);
       const keys = Object.keys(data);
-      const sets = keys.map((k) => `${k}=?`).join(", ");
-      const vals = Object.values(data);
-      db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(vals);
+      const sets = keys.map((k) => `${k.replace(/[^a-zA-Z0-9_]/g, "")}=?`).join(", ");
+      const vals = [...Object.values(data), ...(Array.isArray(whereParams) ? whereParams : [])];
+      db.prepare(`UPDATE ${table.replace(/[^a-zA-Z0-9_]/g, "")} SET ${sets} WHERE ${where}`).run(vals);
       return true;
     },
-    // db_delete_row dbPath table where -> true
-    "db_delete_row": (dbPath, table, where) => {
+    // db_delete_row dbPath table where whereParams? -> true
+    "db_delete_row": (dbPath, table, where, whereParams = []) => {
       const db = getDb(dbPath);
-      db.prepare(`DELETE FROM ${table} WHERE ${where}`).run();
+      db.prepare(`DELETE FROM ${table.replace(/[^a-zA-Z0-9_]/g, "")} WHERE ${where}`).run(Array.isArray(whereParams) ? whereParams : []);
       return true;
     },
     // db_count dbPath table -> number
@@ -26351,7 +26359,7 @@ function bindParams(sql, params) {
     if (p === null || p === void 0) return s.replace("?", "NULL");
     if (typeof p === "number") return s.replace("?", String(p));
     if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
-    return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
+    return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/\0/g, "\\0").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x1a/g, "\\Z").replace(/'/g, "''")}'`);
   }, sql);
 }
 var DATA_BUF_SIZE = 4 * 1024 * 1024;
