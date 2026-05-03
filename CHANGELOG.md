@@ -1,5 +1,26 @@
 # FreeLang v11 변경 이력
 
+## [11.3.0] - 2026-05-03
+
+**마일스톤**: 오류 서치 #47~#49 — 10개 추가 버그 수정 (누적 40개)
+
+### 🐛 버그 수정
+
+#### 컬렉션 (keys/values/reverse/slice/sort/assoc)
+- **`keys`/`values` 1인자 경로 Map 미처리**: `Array.from(Map.keys/values())` 변환
+- **`reverse` Map 인자**: Map 값 → Array 변환 후 역순
+- **`slice` Map 인자**: Map 값 → Array 변환 후 slice
+- **`sort` Map/객체 입력**: items → Array 변환 후 정렬 (공통 로직)
+- **`assoc` Map 데이터 손실**: Map 인스턴스 보존, 새 키-값 add
+
+#### 동등성 비교
+- **`=` (flDeepEq) 모든 Map이 같음 판정**: Map 인스턴스 비교 + Map↔plain 변환
+- **`map-set` Map 데이터 손실**: Map 인자 시 기존 항목 보존
+
+#### 함수 & 연산
+- **`now()` 타입 불일치 (문자열 vs 숫자)**: ISO 8601 → `Date.now()` 숫자로 통일
+- **`concat` 3+ 인자 미지원**: 배열들만 filter 후 concat(...items)
+
 ## [11.2.9] - 2026-05-03
 
 **마일스톤**: 오류 서치 #36~#38 — 7개 버그 수정
