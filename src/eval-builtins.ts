@@ -1784,6 +1784,85 @@ loop().catch(e => {
     // Type/Utility
     case "typeof":
       return typeof args[0];
+
+    // ── 벡터 유사도 (pgvector 대체) ──────────────────────────────
+    case "vec-dot": case "dot-product": {
+      // (vec-dot a b) → 내적 (dot product)
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
+      return sum;
+    }
+    case "vec-norm": case "vec-magnitude": {
+      // (vec-norm v) → L2 노름 (크기)
+      const v = args[0];
+      if (!Array.isArray(v)) return 0;
+      return Math.sqrt(v.reduce((s: number, x: any) => s + x * x, 0));
+    }
+    case "cosine-sim": case "cosine_sim": {
+      // (cosine-sim a b) → 코사인 유사도 [-1, 1]
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        dot += (a[i] ?? 0) * (b[i] ?? 0);
+        na  += (a[i] ?? 0) ** 2;
+        nb  += (b[i] ?? 0) ** 2;
+      }
+      const denom = Math.sqrt(na) * Math.sqrt(nb);
+      return denom === 0 ? 0 : dot / denom;
+    }
+    case "euclidean-dist": case "vec-dist": {
+      // (euclidean-dist a b) → 유클리디안 거리
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        const d = (a[i] ?? 0) - (b[i] ?? 0);
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+    case "vec-add": {
+      // (vec-add a b) → 벡터 합
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return [];
+      return Array.from({ length: Math.min(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
+    }
+    case "vec-scale": {
+      // (vec-scale v scalar) → 스칼라 곱
+      const v = args[0], s = Number(args[1] ?? 1);
+      if (!Array.isArray(v)) return [];
+      return v.map((x: any) => x * s);
+    }
+    case "vec-normalize": {
+      // (vec-normalize v) → 단위 벡터
+      const v = args[0];
+      if (!Array.isArray(v)) return [];
+      const norm = Math.sqrt(v.reduce((s: number, x: any) => s + x * x, 0));
+      return norm === 0 ? v : v.map((x: any) => x / norm);
+    }
+    case "vec-top-k": {
+      // (vec-top-k query vectors k) → 코사인 유사도 상위 k개 [{:score :index :data}]
+      const query   = args[0];
+      const vectors = args[1];
+      const k       = Number(args[2] ?? 5);
+      if (!Array.isArray(query) || !Array.isArray(vectors)) return [];
+      const scored = vectors.map((item: any, idx: number) => {
+        const vec = Array.isArray(item) ? item : (item?.vector ?? item?.embedding ?? []);
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(query.length, vec.length); i++) {
+          dot += (query[i] ?? 0) * (vec[i] ?? 0);
+          na  += (query[i] ?? 0) ** 2;
+          nb  += (vec[i] ?? 0) ** 2;
+        }
+        const denom = Math.sqrt(na) * Math.sqrt(nb);
+        return { score: denom === 0 ? 0 : dot / denom, index: idx, data: item };
+      });
+      return scored.sort((a: any, b: any) => b.score - a.score).slice(0, k);
+    }
+
     case "assert-type": {
       const val = args[0];
       const typeStr = String(args[1]);

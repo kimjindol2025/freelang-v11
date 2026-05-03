@@ -11341,7 +11341,7 @@ function flExecOpNative(op, vals) {
     case ">=":
       return v0 >= v1;
     case "not":
-      return v0 === null || v0 === undefined || v0 === false;
+      return !v0;
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
@@ -11399,7 +11399,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
     case "concat":
-      return vals.map((v) => v === null || v === void 0 ? "" : String(v)).join("");
+      return vals.map((v) => v === null || v === void 0 ? "null" : String(v)).join("");
     case "str-to-num": {
       const n = parseFloat(String(v0));
       return isNaN(n) ? null : n;
@@ -11570,10 +11570,7 @@ function flExecOpNative(op, vals) {
       const fs22 = require("fs");
       const path18 = require("path");
       try {
-        const _loadBase = interp.currentFilePath && !interp.currentFilePath.endsWith("/")
-          ? path18.dirname(interp.currentFilePath)
-          : (interp.currentFilePath || process.cwd());
-        const resolvedPath = path18.isAbsolute(filePath) ? filePath : path18.resolve(_loadBase, filePath);
+        const resolvedPath = path18.resolve(process.cwd(), filePath);
         const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
@@ -11789,10 +11786,8 @@ function flInterpSexpr(op, rawArgs, env) {
       }
       return lastVal2;
     }
-    case "not": {
-      const _nv = flInterpNative(rawArgs[0], env);
-      return _nv === null || _nv === undefined || _nv === false;
-    }
+    case "not":
+      return !flInterpNative(rawArgs[0], env);
     case "null?": {
       const v = flInterpNative(rawArgs[0], env);
       return v === null || v === void 0;
@@ -11893,10 +11888,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const fs22 = require("fs");
       const path18 = require("path");
       try {
-        const _loadBase2 = interp2.currentFilePath && !interp2.currentFilePath.endsWith("/")
-          ? path18.dirname(interp2.currentFilePath)
-          : (interp2.currentFilePath || process.cwd());
-        const resolvedPath = path18.isAbsolute(filePath) ? filePath : path18.resolve(_loadBase2, filePath);
+        const resolvedPath = path18.resolve(process.cwd(), filePath);
         const src = fs22.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
@@ -12202,7 +12194,7 @@ loop().catch(e => {
       return args3.length > 0 ? args3[args3.length - 1] : null;
     }
     case "not":
-      return args3[0] === null || args3[0] === undefined || args3[0] === false;
+      return !args3[0];
     case "print":
       process.stdout.write(args3.map((a) => toDisplay(a)).join(" "));
       return null;
@@ -12214,7 +12206,7 @@ loop().catch(e => {
       process.stderr.write(args3.map((a) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args3.map((a) => a === null || a === undefined ? "" : toDisplay(a)).join("");
+      return args3.map((a) => toDisplay(a)).join("");
     case "repr":
       return JSON.stringify(args3[0], null, 2);
     case "inspect": {
@@ -12662,21 +12654,16 @@ loop().catch(e => {
       }
       return coll;
     }
-    case "find": {
-      // (find fn arr) — map/filter와 동일한 순서 (권장)
-      // (find arr fn) — 레거시 순서도 지원
-      let _findArr, _findFn;
-      const _isFL = (v) => v && v.kind === "function-value";
-      if (typeof args3[0] === "function" || _isFL(args3[0])) {
-        _findFn = args3[0]; _findArr = args3[1];
-      } else {
-        _findArr = args3[0]; _findFn = args3[1];
+    case "find":
+      if (Array.isArray(args3[0])) {
+        const findFn = args3[1];
+        if (typeof findFn === "function") return args3[0].find(findFn) ?? null;
+        if (findFn && findFn.kind === "function-value") {
+          return args3[0].find((item) => callFnVal(findFn, [item])) ?? null;
+        }
+        return args3[0].indexOf(findFn);
       }
-      if (!Array.isArray(_findArr)) return null;
-      if (typeof _findFn === "function") return _findArr.find(_findFn) ?? null;
-      if (_isFL(_findFn)) return _findArr.find((item) => callFnVal(_findFn, [item])) ?? null;
-      return _findArr.indexOf(_findFn) >= 0 ? _findFn : null;
-    }
+      return -1;
     case "last":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "first-or":
@@ -12969,6 +12956,78 @@ loop().catch(e => {
       return [args3[1], ...args3[0]];
     case "typeof":
       return typeof args3[0];
+    case "vec-dot":
+    case "dot-product": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
+      return sum;
+    }
+    case "vec-norm":
+    case "vec-magnitude": {
+      const v = args3[0];
+      if (!Array.isArray(v)) return 0;
+      return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+    }
+    case "cosine-sim":
+    case "cosine_sim": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        dot += (a[i] ?? 0) * (b[i] ?? 0);
+        na += (a[i] ?? 0) ** 2;
+        nb += (b[i] ?? 0) ** 2;
+      }
+      const denom = Math.sqrt(na) * Math.sqrt(nb);
+      return denom === 0 ? 0 : dot / denom;
+    }
+    case "euclidean-dist":
+    case "vec-dist": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        const d = (a[i] ?? 0) - (b[i] ?? 0);
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+    case "vec-add": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return [];
+      return Array.from({ length: Math.min(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
+    }
+    case "vec-scale": {
+      const v = args3[0], s = Number(args3[1] ?? 1);
+      if (!Array.isArray(v)) return [];
+      return v.map((x) => x * s);
+    }
+    case "vec-normalize": {
+      const v = args3[0];
+      if (!Array.isArray(v)) return [];
+      const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+      return norm === 0 ? v : v.map((x) => x / norm);
+    }
+    case "vec-top-k": {
+      const query = args3[0];
+      const vectors = args3[1];
+      const k = Number(args3[2] ?? 5);
+      if (!Array.isArray(query) || !Array.isArray(vectors)) return [];
+      const scored = vectors.map((item, idx) => {
+        const vec = Array.isArray(item) ? item : item?.vector ?? item?.embedding ?? [];
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(query.length, vec.length); i++) {
+          dot += (query[i] ?? 0) * (vec[i] ?? 0);
+          na += (query[i] ?? 0) ** 2;
+          nb += (vec[i] ?? 0) ** 2;
+        }
+        const denom = Math.sqrt(na) * Math.sqrt(nb);
+        return { score: denom === 0 ? 0 : dot / denom, index: idx, data: item };
+      });
+      return scored.sort((a, b) => b.score - a.score).slice(0, k);
+    }
     case "assert-type": {
       const val = args3[0];
       const typeStr = String(args3[1]);
@@ -19014,8 +19073,7 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "if") {
     const condition = ev(expr2.args[0]);
-    const _isFalsy = condition === null || condition === void 0 || condition === false;
-    const branch = _isFalsy ? (expr2.args[2] || null) : expr2.args[1];
+    const branch = condition ? expr2.args[1] : expr2.args[2] || null;
     if (branch === null) return null;
     if (interp2.tcoMode && branch !== null) {
       const b = branch;
@@ -19118,7 +19176,9 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "while") {
     let result = null;
-    while (ev(expr2.args[0])) {
+    for (;;) {
+      const _wc = ev(expr2.args[0]);
+      if (_wc === null || _wc === undefined || _wc === false) break;
       for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
     }
     return result;
@@ -19140,7 +19200,6 @@ function evalSpecialForm(interp2, op, expr2) {
     return last;
   }
   if (op === "map" && expr2.args.length === 3) {
-    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m map 3-인자 형태 `(map arr [param] body)` 비권장. `(map (fn [param] body) arr)` 사용 권장.\n");
     const arr = ev(expr2.args[0]);
     const paramNode = expr2.args[1];
     const bodyNode = expr2.args[2];
@@ -19314,7 +19373,6 @@ function evalSpecialForm(interp2, op, expr2) {
     return null;
   }
   if (op === "parallel") {
-    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m parallel: 순차 실행 (단일 스레드 인터프리터). 진짜 병렬은 workflow_run_async 사용.\n");
     if (expr2.args.length === 0) return [];
     const results = [];
     for (const arg of expr2.args) {
@@ -19331,7 +19389,6 @@ function evalSpecialForm(interp2, op, expr2) {
     return results;
   }
   if (op === "race") {
-    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m race: 첫 번째 non-nil 반환 (시간 경쟁 아님). 순차 평가.\n");
     if (expr2.args.length === 0) return null;
     let firstResult = void 0;
     for (const arg of expr2.args) {
@@ -19349,7 +19406,6 @@ function evalSpecialForm(interp2, op, expr2) {
     return firstResult ?? null;
   }
   if (op === "with-timeout") {
-    if (process.env.FL_NO_WARN !== "1") process.stderr.write("\x1B[33m[FL warn]\x1B[0m with-timeout: 타임아웃 파라미터 무시됨 (동기 인터프리터 제한). 그냥 실행.\n");
     if (expr2.args.length < 2) return null;
     try {
       let val = ev(expr2.args[1]);
@@ -20613,9 +20669,8 @@ function curlGetStatusAndBody(url2, method = "GET", headers, body) {
         args3.push("-H", `${key}: ${value}`);
       }
     }
-    const _bodyStr = (body !== null && body !== undefined && typeof body === "object") ? JSON.stringify(body) : body;
-    if (_bodyStr && _bodyStr.length > 0) {
-      args3.push("-d", _bodyStr);
+    if (body && body.length > 0) {
+      args3.push("-d", body);
     }
     args3.push(url2);
     const result = (0, import_child_process.spawnSync)("curl", args3, { timeout: 15e3 });
@@ -20940,8 +20995,7 @@ function createShellModule() {
     },
     // shell_env varname -> string (get environment variable)
     "shell_env": (varname) => {
-      const v = process.env[varname];
-      return v === undefined ? null : v;
+      return process.env[varname] ?? "";
     },
     // shell_cwd -> string (current working directory)
     "shell_cwd": () => {
@@ -21477,16 +21531,86 @@ function createCollectionModule() {
     "pipeline_run": (initial, steps) => {
       return steps.reduce((acc, fn) => fn(acc), initial);
     },
-    // memoize fn -> fn  (return memoized version of fn, keyed by JSON args)
-    "memoize": (fn) => {
+    // memoize fn [maxSize] -> fn  (LRU cache, memo_call/size/clear 지원)
+    "memoize": (fn, maxSize = Infinity) => {
       const cache = /* @__PURE__ */ new Map();
-      return (...args3) => {
+      const _callFn = (args3) => {
+        if (fn && fn.kind === "function-value") return callFnVal(fn, args3);
+        if (typeof fn === "function") return fn(...args3);
+        throw new Error("memoize: fn must be a function");
+      };
+      const memoFn = (...args3) => {
         const key = JSON.stringify(args3);
         if (cache.has(key)) return cache.get(key);
-        const result = fn(...args3);
+        if (maxSize !== Infinity && cache.size >= maxSize) cache.delete(cache.keys().next().value);
+        const result = _callFn(args3);
         cache.set(key, result);
         return result;
       };
+      memoFn.__fl_cache__ = cache;
+      return memoFn;
+    },
+    "memo_call": (m, ...args3) => {
+      if (typeof m !== "function") throw new Error("memo_call: memoize된 함수 필요");
+      return m(...args3);
+    },
+    "memo_size": (m) => m?.__fl_cache__?.size ?? 0,
+    "memo_clear": (m) => { m?.__fl_cache__?.clear(); return null; },
+    // time_exec fn -> {result, ms}
+    "time_exec": (fn) => {
+      const t0 = Date.now();
+      const result = (fn && fn.kind === "function-value") ? callFnVal(fn, []) : (typeof fn === "function" ? fn() : null);
+      return { result, ms: Date.now() - t0 };
+    },
+    // span name fn -> {name, result, ms, ok}
+    "span": (name, fn) => {
+      const t0 = Date.now();
+      let result = null, ok = true;
+      try {
+        result = (fn && fn.kind === "function-value") ? callFnVal(fn, []) : (typeof fn === "function" ? fn() : null);
+      } catch (e) { ok = false; result = e.message; }
+      const ms = Date.now() - t0;
+      if (process.env.FL_TRACE === "1") process.stderr.write(`[span] ${name}: ${ms}ms ${ok ? "ok" : "err"}\n`);
+      return { name, result, ms, ok };
+    },
+    // batch_map fn arr batchSize -> results (분할 처리)
+    "batch_map": (fn, arr, batchSize = 10) => {
+      if (!Array.isArray(arr)) return [];
+      const results = [];
+      for (let i = 0; i < arr.length; i += batchSize) {
+        const batch = arr.slice(i, i + batchSize);
+        for (const item of batch) {
+          const r = (fn && fn.kind === "function-value") ? callFnVal(fn, [item]) : (typeof fn === "function" ? fn(item) : item);
+          results.push(r);
+        }
+      }
+      return results;
+    },
+    // log_trace msg data -> nil
+    "log_trace": (msg, data = null) => {
+      if (process.env.FL_TRACE === "1") process.stderr.write(`[trace] ${msg}${data !== null ? " " + JSON.stringify(data) : ""}\n`);
+      return null;
+    },
+    // rate_limit maxCalls windowMs -> limiter-fn
+    "rate_limit": (maxCalls = 10, windowMs = 1e3) => {
+      const calls = [];
+      const limiterFn = (...args3) => {
+        const now = Date.now();
+        while (calls.length > 0 && calls[0] < now - windowMs) calls.shift();
+        if (calls.length >= maxCalls) return { ok: false, error: "rate_limit exceeded" };
+        calls.push(now);
+        return { ok: true };
+      };
+      limiterFn.__fl_rl__ = true;
+      return limiterFn;
+    },
+    // rl_call limiter fn ...args -> result or {ok:false}
+    "rl_call": (limiter, fn, ...args3) => {
+      if (typeof limiter !== "function" || !limiter.__fl_rl__) throw new Error("rl_call: rate_limit 결과 필요");
+      const check = limiter();
+      if (!check.ok) return check;
+      const result = (fn && fn.kind === "function-value") ? callFnVal(fn, args3) : (typeof fn === "function" ? fn(...args3) : null);
+      return { ok: true, result };
     },
     // once fn -> fn  (return version of fn that only executes once)
     "once": (fn) => {
@@ -24692,14 +24816,12 @@ function createProcessModule() {
       }
       return loaded2;
     },
-    "env_get": (key) => { const v = process.env[key]; return v === undefined ? null : v; },
+    "env_get": (key) => process.env[key] ?? "",
     "env_require": (key) => {
       const val = process.env[key];
       if (!val) throw new Error(`Required env var missing: ${key}`);
       return val;
     },
-    "env_or": (key, defaultVal) => { const v = process.env[key]; return (v === undefined || v === "") ? defaultVal : v; },
-    "env-or": (key, defaultVal) => { const v = process.env[key]; return (v === undefined || v === "") ? defaultVal : v; },
     // Default = undefined so Function.length === 0, allowing call with no args
     "on_sigterm": (callback = void 0) => registerShutdown(callback),
     "on_exit": (callback = void 0) => registerShutdown(callback),
@@ -26187,7 +26309,7 @@ function bindParams(sql, params) {
 var DATA_BUF_SIZE = 4 * 1024 * 1024;
 var WORKER_CODE = `
 const { workerData } = require('worker_threads');
-let mysql2; try { mysql2 = require('mysql2/promise'); } catch { mysql2 = require(require('path').join(${JSON.stringify(__dirname)}, 'node_modules/mysql2/promise')); }
+const mysql2 = require('mysql2/promise');
 const control = new Int32Array(workerData.controlBuf);
 const data = Buffer.from(workerData.dataBuf);
 const pools = new Map();
@@ -26355,7 +26477,7 @@ function createMariadbModule() {
       return poolId;
     },
     // mariadb_pool_query poolId sql [params] → rows[]
-    "mariadb_pool_query": (poolId, sql, params = []) => poolCall({ type: "query", poolId, sql, params }).rows ?? [],
+    "mariadb_pool_query": (poolId, sql, params = []) => poolCall({ type: "query", poolId, sql, params }).rows,
     // mariadb_pool_one poolId sql [params] → row or null
     "mariadb_pool_one": (poolId, sql, params = []) => poolCall({ type: "one", poolId, sql, params }).row,
     // mariadb_pool_exec poolId sql [params] → {affectedRows insertId}
@@ -27645,7 +27767,7 @@ ${exportsStr}
       const cond = this.genNode(args3[0]);
       const thenExpr = this.genNode(args3[1]);
       const elseExpr = args3[2] ? this.genNode(args3[2]) : "undefined";
-      return `((c => c === null || c === undefined || c === false ? (${elseExpr}) : (${thenExpr}))(${cond}))`;
+      return `(${cond} ? ${thenExpr} : ${elseExpr})`;
     }
     if (op === "define") {
       const varName = this.extractVarName(args3[0]);
@@ -31800,18 +31922,11 @@ ${tail}` : "")
     if (_callStack.length > 100) _callStack.shift();
     let result;
     try {
-      for (let recurIter = 0; recurIter < 2e6; recurIter++) {
-        interp2.context.variables.fromSnapshot(func.capturedEnv);
-        for (let i = 0; i < func.params.length; i++) {
-          interp2.context.variables.set(func.params[i], args3[i]);
-        }
-        result = interp2.eval(func.body);
-        if (result && typeof result === "object" && result.__FL_RECUR__) {
-          args3 = result.__args;
-          continue;
-        }
-        break;
+      interp2.context.variables.fromSnapshot(func.capturedEnv);
+      for (let i = 0; i < func.params.length; i++) {
+        interp2.context.variables.set(func.params[i], args3[i]);
       }
+      result = interp2.eval(func.body);
       propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
     } finally {
       interp2.callDepth--;
@@ -38956,16 +39071,6 @@ switch (cmd) {
   }
   case "serve": {
     cmdServe(args2.slice(1));
-    break;
-  }
-  case "patch": {
-    const { cmdPatch } = require(require("path").join(__dirname, "cli-extras.js"));
-    cmdPatch(args2.slice(1));
-    break;
-  }
-  case "migrate": {
-    const { cmdMigrate } = require(require("path").join(__dirname, "cli-extras.js"));
-    cmdMigrate(args2.slice(1)).catch((e) => { console.error(`\x1B[31m[migrate 오류]\x1B[0m ${e.message}`); process.exit(1); });
     break;
   }
   case "version":
