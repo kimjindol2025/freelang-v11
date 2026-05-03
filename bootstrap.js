@@ -20922,7 +20922,8 @@ function createShellModule() {
     },
     // shell_env varname -> string (get environment variable)
     "shell_env": (varname) => {
-      return process.env[varname] ?? "";
+      const v = process.env[varname];
+      return v === undefined ? null : v;
     },
     // shell_cwd -> string (current working directory)
     "shell_cwd": () => {
@@ -24673,12 +24674,14 @@ function createProcessModule() {
       }
       return loaded2;
     },
-    "env_get": (key) => process.env[key] ?? "",
+    "env_get": (key) => { const v = process.env[key]; return v === undefined ? null : v; },
     "env_require": (key) => {
       const val = process.env[key];
       if (!val) throw new Error(`Required env var missing: ${key}`);
       return val;
     },
+    "env_or": (key, defaultVal) => { const v = process.env[key]; return (v === undefined || v === "") ? defaultVal : v; },
+    "env-or": (key, defaultVal) => { const v = process.env[key]; return (v === undefined || v === "") ? defaultVal : v; },
     // Default = undefined so Function.length === 0, allowing call with no args
     "on_sigterm": (callback = void 0) => registerShutdown(callback),
     "on_exit": (callback = void 0) => registerShutdown(callback),
@@ -26334,7 +26337,7 @@ function createMariadbModule() {
       return poolId;
     },
     // mariadb_pool_query poolId sql [params] → rows[]
-    "mariadb_pool_query": (poolId, sql, params = []) => poolCall({ type: "query", poolId, sql, params }).rows,
+    "mariadb_pool_query": (poolId, sql, params = []) => poolCall({ type: "query", poolId, sql, params }).rows ?? [],
     // mariadb_pool_one poolId sql [params] → row or null
     "mariadb_pool_one": (poolId, sql, params = []) => poolCall({ type: "one", poolId, sql, params }).row,
     // mariadb_pool_exec poolId sql [params] → {affectedRows insertId}
