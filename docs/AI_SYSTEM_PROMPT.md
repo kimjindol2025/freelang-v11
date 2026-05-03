@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 412개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 411개 함수, 27 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -350,9 +350,9 @@ parallel race with-timeout fl-try use`
 - `(map-entries m)` → [[k,v],...] (introspection primitive — JS Map/plain object 모두 열거)
 - `(map_entries m)` → [[k,v],...] (alias for map-entries)
 - `(json_parse str)` → object (parse JSON string to object)
-- `(json_str obj)` → string (serialize to JSON string)
+- `(json_str obj)` → string (serialize to JSON string, handles Maps)
 - `(json_stringify obj)` → string (alias for json_str)
-- `(json_pretty obj)` → string (pretty-print JSON)
+- `(json_pretty obj)` → string (pretty-print JSON, handles Maps)
 - `(json_has obj key)` → boolean (check if key exists)
 - `(json_del obj key)` → object (delete key, returns new obj)
 - `(csv_parse str)` → [[string]] (parse CSV string to rows)
@@ -466,7 +466,7 @@ parallel race with-timeout fl-try use`
 - `(is_http_redirect status)` → boolean
 - `(is_http_error status)` → boolean
 
-### http-server (33개)
+### http-server (32개)
 
 - `(server_get path handlerName)` → null
 - `(server_post path handlerName)` → null
@@ -475,7 +475,6 @@ parallel race with-timeout fl-try use`
 - `(server_delete path handlerName)` → null
 - `(server_start port)` → string
 - `(server_stop)` → null
-- `(server_json obj)` → response object
 - `(server_text text)` → response object
 - `(server_status code body)` → response object
 - `(server_html_cookie cookie html)` → response (Set-Cookie 헤더 포함 HTML 응답)
@@ -667,4 +666,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-02T17:05:07.009Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-03T11:44:34.332Z
