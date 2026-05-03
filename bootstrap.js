@@ -30960,8 +30960,14 @@ function loadAllStdlib(interp2) {
     "str_contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?": (s, sub) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? s.includes(sub) : false,
     // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
-    "inc": (n) => typeof n === "number" ? n + 1 : Number(n) + 1,
-    "dec": (n) => typeof n === "number" ? n - 1 : Number(n) - 1,
+    "inc": (n) => {
+      const num = typeof n === "number" ? n : Number(n);
+      return isNaN(num) ? null : num + 1;
+    },
+    "dec": (n) => {
+      const num = typeof n === "number" ? n : Number(n);
+      return isNaN(num) ? null : num - 1;
+    },
     // Map 유틸 — PUT 패턴에서 자주 쓰임
     "dissoc-nil": (m) => {
       if (m instanceof Map) {
