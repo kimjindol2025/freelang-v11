@@ -275,7 +275,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "last-or": case "last_or":
       return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : (v1 !== undefined ? v1 : null);
     case "cons": return [v0, ...(Array.isArray(v1) ? v1 : [v1])];
-    case "reverse": return Array.isArray(v0) ? [...v0].reverse() : v0;
+    case "reverse": return Array.isArray(v0) ? [...v0].reverse() : [];
     case "sort": return Array.isArray(v0) ? [...v0].sort((a: any, b: any) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
     case "keys": return v0 instanceof Map ? Array.from(v0.keys()) : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : []);
     case "values": return v0 instanceof Map ? Array.from(v0.values()) : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : []);
@@ -1273,7 +1273,7 @@ loop().catch(e => {
       return [...(args[0] || []), ...args.slice(1)];
     case "reverse":
       if (Array.isArray(args[0])) return [...args[0]].reverse();
-      return args[0];
+      return [];
     case "map": {
       const mapFn = args[0];
       const mapArr = Array.isArray(args[1]) ? args[1] : [];

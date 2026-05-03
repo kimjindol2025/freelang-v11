@@ -13,6 +13,7 @@ export interface FreeLangError {
   hint?: string;     // 수정 제안
   code?: string;     // Phase A: ErrorCode (예: "E_TYPE_NIL")
   context?: Record<string, any>;  // Phase A: throw 시점 컨텍스트
+  stack?: Array<{ fn: string; line: number }>;  // Phase B: 호출 스택 트레이스
 }
 
 /**
@@ -185,6 +186,16 @@ export function formatError(err: FreeLangError): string {
     lines.push(`힌트: ${err.hint}`);
   } else if (autoHint) {
     lines.push(`힌트: ${autoHint}`);
+  }
+
+  // 5) 스택 트레이스 — Phase B: 함수 호출 체인
+  if (err.stack && err.stack.length > 0) {
+    lines.push(`호출 스택:`);
+    for (let i = 0; i < err.stack.length; i++) {
+      const frame = err.stack[i];
+      const indent = "  ".repeat(i + 1);
+      lines.push(`${indent}→ ${frame.fn} (line ${frame.line})`);
+    }
   }
 
   return lines.join("\n");
