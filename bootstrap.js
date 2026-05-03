@@ -20716,8 +20716,9 @@ function curlGetStatusAndBody(url2, method = "GET", headers, body) {
         args3.push("-H", `${key}: ${value}`);
       }
     }
-    if (body && body.length > 0) {
-      args3.push("-d", body);
+    if (body !== null && body !== undefined && body !== "") {
+      const _bodyStr = typeof body === "string" ? body : JSON.stringify(body);
+      args3.push("-d", _bodyStr);
     }
     args3.push(url2);
     const result = (0, import_child_process.spawnSync)("curl", args3, { timeout: 15e3 });
