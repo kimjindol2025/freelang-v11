@@ -11476,12 +11476,13 @@ function flExecOpNative(op, vals) {
     case "sort":
       return Array.isArray(v0) ? [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
     case "keys":
-      return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
+      return v0 && typeof v0 === "object" && !Array.isArray(v0) && v0?.kind !== "function-value" && v0?.kind !== "async-function-value" ? (v0 instanceof Map ? [...v0.keys()] : Object.keys(v0)) : [];
     case "values":
-      return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+      return v0 && typeof v0 === "object" && !Array.isArray(v0) && v0?.kind !== "function-value" && v0?.kind !== "async-function-value" ? (v0 instanceof Map ? [...v0.values()] : Object.values(v0)) : [];
     case "map-entries":
     case "map_entries":
-      return v0 instanceof Map ? [...v0.entries()] : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : [];
+      if (!v0 || typeof v0 !== "object" || Array.isArray(v0) || v0?.kind === "function-value" || v0?.kind === "async-function-value") return [];
+      return v0 instanceof Map ? [...v0.entries()] : Object.entries(v0);
     case "floor":
       return Math.floor(v0);
     case "ceil":
@@ -11492,10 +11493,8 @@ function flExecOpNative(op, vals) {
     case "math_abs":
     case "abs":
       return Math.abs(v0);
-    case "max":
-      return Math.max(...vals.filter((v) => typeof v === "number"));
-    case "min":
-      return Math.min(...vals.filter((v) => typeof v === "number"));
+    case "max": { const _nums = vals.filter((v) => typeof v === "number"); return _nums.length === 0 ? null : Math.max(..._nums); }
+    case "min": { const _nums = vals.filter((v) => typeof v === "number"); return _nums.length === 0 ? null : Math.min(..._nums); }
     case "pow":
       return Math.pow(v0, v1);
     case "math-sqrt":
@@ -12391,14 +12390,14 @@ loop().catch(e => {
       return args3[0]?.slice(1);
     case "keys": {
       const kObj = args3[0];
-      if (kObj instanceof Map) return Array.from(kObj.keys());
-      return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
+      if (!kObj || typeof kObj !== "object" || Array.isArray(kObj) || kObj?.kind === "function-value" || kObj?.kind === "async-function-value") return [];
+      return kObj instanceof Map ? Array.from(kObj.keys()) : Object.keys(kObj);
     }
     case "vals":
     case "values": {
       const vObj = args3[0];
-      if (vObj instanceof Map) return Array.from(vObj.values());
-      return vObj && typeof vObj === "object" && !Array.isArray(vObj) ? Object.values(vObj) : [];
+      if (!vObj || typeof vObj !== "object" || Array.isArray(vObj) || vObj?.kind === "function-value" || vObj?.kind === "async-function-value") return [];
+      return vObj instanceof Map ? Array.from(vObj.values()) : Object.values(vObj);
     }
     case "upper-case":
       return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0];
@@ -12600,9 +12599,9 @@ loop().catch(e => {
       return Array.isArray(args3[0]);
     case "function?":
     case "fn?":
-      return typeof args3[0] === "function";
+      return typeof args3[0] === "function" || args3[0]?.kind === "function-value" || args3[0]?.kind === "async-function-value";
     case "map?":
-      return args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]);
+      return args3[0] !== null && args3[0] !== undefined && typeof args3[0] === "object" && !Array.isArray(args3[0]) && args3[0]?.kind !== "function-value" && args3[0]?.kind !== "async-function-value";
     case "num-to-str":
       return String(args3[0]);
     case "str-to-num":
@@ -13048,10 +13047,8 @@ loop().catch(e => {
     case "math_abs":
     case "abs":
       return Math.abs(args3[0]);
-    case "min":
-      return Math.min(...args3);
-    case "max":
-      return Math.max(...args3);
+    case "min": { const _mn = args3.filter((v) => typeof v === "number"); return _mn.length === 0 ? null : Math.min(..._mn); }
+    case "max": { const _mx = args3.filter((v) => typeof v === "number"); return _mx.length === 0 ? null : Math.max(..._mx); }
     case "floor":
       return Math.floor(args3[0]);
     case "ceil":
@@ -19598,7 +19595,7 @@ function evalCond(interp2, args3) {
     }
     if (testNode && bodyNodes.length >= 1) {
       const test = ev(testNode);
-      if (test) {
+      if (test !== null && test !== undefined && test !== false) {
         let result = null;
         for (const b of bodyNodes) result = ev(b);
         return result;
@@ -20489,21 +20486,24 @@ var timerRegistry = /* @__PURE__ */ new Map();
 var nextTimerId = 2e3;
 function createTimerModule(interpreter) {
   return {
-    // set_interval fn ms -> number (fn: function name string, ms: interval)
+    // set_interval fn ms -> number (fn: 문자열 이름 또는 function-value)
     "set_interval": (fnName, ms) => {
       try {
-        if (typeof fnName !== "string") {
-          throw new Error(`Function name must be string, got ${typeof fnName}`);
-        }
-        if (typeof ms !== "number" || ms < 1) {
-          throw new Error(`Interval must be positive number, got ${ms}`);
-        }
+        if (typeof ms !== "number" || ms < 1) throw new Error(`Interval must be positive number, got ${ms}`);
         const timerId = nextTimerId++;
         const callback = () => {
           try {
-            interpreter.callUserFunction(fnName, []);
+            if (typeof fnName === "string") {
+              interpreter.callUserFunction(fnName, []);
+            } else if (fnName?.kind === "function-value" || fnName?.kind === "async-function-value") {
+              interpreter.callFunctionValue(fnName, []);
+            } else if (typeof fnName === "function") {
+              fnName();
+            } else {
+              throw new Error(`set_interval: fn은 문자열 이름 또는 함수 필요`);
+            }
           } catch (err4) {
-            console.error(`set_interval callback error for '${fnName}':`, err4.message);
+            console.error(`set_interval callback error:`, err4.message);
           }
         };
         const nodeTimer = setInterval(callback, ms);
@@ -31150,21 +31150,20 @@ function evalTryBlock(interp2, tryBlock) {
       for (const catchClause of tryBlock.catchClauses) {
         interp2.context.variables.push();
         if (catchClause.variable) {
-          const errMap = /* @__PURE__ */ new Map();
+          const errMap = {};
           if (typeof error === "string") {
-            errMap.set("message", error);
+            errMap.message = error;
           } else if (error instanceof Error) {
-            errMap.set("message", error.message);
+            errMap.message = error.message;
             const lineMatch = error.message.match(/\(at line (\d+)/);
-            if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
+            if (lineMatch) errMap.line = parseInt(lineMatch[1], 10);
             const flErr = error;
-            if (flErr.file) errMap.set("file", flErr.file);
-            if (flErr.code) errMap.set("code", flErr.code);
-            if (flErr.hint) errMap.set("hint", flErr.hint);
+            if (flErr.file) errMap.file = flErr.file;
+            if (flErr.code) errMap.code = flErr.code;
+            if (flErr.hint) errMap.hint = flErr.hint;
           } else {
-            errMap.set("message", String(error));
+            errMap.message = String(error);
           }
-          errMap.set("raw", error);
           interp2.context.variables.set("$" + catchClause.variable, errMap);
         }
         try {
