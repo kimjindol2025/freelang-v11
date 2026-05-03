@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.1.0",
-  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). v9와 v9-frontend 통합. [v11.1: P0 Agent Reliability Features]",
+  "version": "11.2.0",
+  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). [v11.2: L3 Self-Hosting 완성 — stage1.js가 자기 자신을 컴파일]",
   "keywords": [
     "ai",
     "language",
