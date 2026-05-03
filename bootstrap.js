@@ -11363,8 +11363,10 @@ function flExecOpNative(op, vals) {
       return v0 === true;
     case "false?":
       return v0 === false;
-    case "and":
-      return !!(v0 && v1);
+    case "and": {
+      const flFalsy = (v) => v === null || v === void 0 || v === false;
+      return !flFalsy(v0) && !flFalsy(v1);
+    }
     case "or": {
       const flFalsy = (v) => v === null || v === void 0 || v === false;
       if (!flFalsy(v0)) return v0;
@@ -12184,8 +12186,10 @@ loop().catch(e => {
       return args3[0] >= args3[1];
     case "!=":
       return args3[0] !== args3[1];
-    case "and":
-      return args3.every((a) => a);
+    case "and": {
+      const flFalsy = (v) => v === null || v === void 0 || v === false;
+      return !args3.some((a) => flFalsy(a));
+    }
     case "or": {
       const flFalsy3 = (v) => v === null || v === void 0 || v === false;
       for (const a of args3) {
