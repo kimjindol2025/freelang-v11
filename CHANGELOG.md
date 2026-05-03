@@ -1,5 +1,36 @@
 # FreeLang v11 변경 이력
 
+## [11.2.7] - 2026-05-03
+
+**마일스톤**: 오류 서치 #31~#33 — 11개 버그 수정
+
+### 🐛 버그 수정
+
+#### 동등성 비교
+- **`!=` 참조 비교**: `!==` (참조) → `!flDeepEq(...)` (깊은 동등성)로 수정 — `=`와 일관성 확보
+- **`flDeepEq` Map↔plain 교차 비교**: Map 인스턴스와 plain 객체 간 비교 → `Object.fromEntries()` 변환 후 비교
+
+#### 리플렉션
+- **`fl-exec-op` switch 변수 오류**: `switch (normalizedOp2)` (항상 "fl-exec-op") → `switch (op2)` 수정, `=`/`!=`도 deep equality 사용
+
+#### 제어 흐름
+- **`try` 단일 body 제한**: 멀티 body 지원 추가 — 여러 표현식 자동 `do` 래핑
+- **`try/catch` `$e.line` undefined**: 매칭 실패 시 `errMap.line` 미설정 → `null` 기본값 설정
+
+#### HTTP 클라이언트
+- **`http_post`/`put`/`patch` Map body 손실**: Map 인스턴스 `JSON.stringify` → `{}` → `Object.fromEntries()` 변환 후 직렬화
+
+#### 컬렉션
+- **`concat` 3개+ 배열 무시**: `args3[0].concat(args3[1])` → `args3[0].concat(...args3.slice(1))` 수정
+- **`reverse` 비배열 TypeError**: 문자열 → 문자 배열 역순 후 join, 기타 타입 → `[]` 반환
+- **`rest` 비배열/nil**: `?.slice(1)` → nil 시 `null`, 비배열/문자열 시 `[]` 반환
+
+#### 스레드 매크로
+- **`->` / `->>` 내장 함수 bare symbol**: 사용자 함수만 허용 → 내장 함수도 synthetic sexpr로 호출 지원
+
+#### DB
+- **`bindParams` 개수 불일치 무시**: `?` 개수 ≠ params 개수 시 stderr 경고 출력
+
 ## [11.2.6] - 2026-05-03
 
 **마일스톤**: 오류 서치 #30 — 버그 6개 수정
