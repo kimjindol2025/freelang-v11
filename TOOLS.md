@@ -31,11 +31,17 @@
 ### 요청 파싱
 | 함수 | 설명 |
 |------|------|
-| `server_req_body req` | 요청 바디 |
-| `server_req_query req key` | 쿼리 파라미터 |
+| `server_req_body req` | 요청 바디 (raw string) |
+| `server_req_json req` | 요청 바디 JSON 파싱 (Content-Type 무관) |
+| `server_req_query req key` | 쿼리 파라미터 단일 값 |
+| `server_req_params req` | 쿼리 파라미터 전체 맵 |
 | `server_req_param req name` | 경로 파라미터 |
-| `server_req_header req name` | 헤더 |
+| `server_req_header req name` | 헤더 단일 값 |
+| `server_req_headers req` | 헤더 전체 맵 |
 | `server_req_cookie req name` | 쿠키 |
+| `server_req_method req` | HTTP 메서드 (`"GET"` / `"POST"` 등) |
+| `server_req_path req` | 요청 경로 (`"/api/users/42"`) |
+| `server_req_id` | 현재 요청 ID (응답 보류용) |
 
 ### WebSocket (서버 내장)
 ```fl
@@ -98,6 +104,111 @@
 (log_error msg)
 (log_debug msg)
 (log_json obj)     ; 구조화 로그
+```
+
+### 비동기 응답 보류 (Long-polling)
+```fl
+(define req-id (server_req_id))
+(server_hold_response req-id)
+; ... 나중에 다른 핸들러에서
+(server_send_held req-id 200 (json_stringify {:data "..."}))
+```
+
+---
+
+## 🔧 함수형 유틸리티
+
+### 고차함수
+```fl
+(map fn arr)                      ; 배열 변환
+(filter fn arr)                   ; 조건 필터링
+(reduce fn init arr)              ; 누적 (3인자)
+(reduce fn arr)                   ; 누적 - 첫 원소를 초기값으로 (2인자)
+(apply fn args)                   ; 배열 펼쳐서 호출: (apply + [1 2 3]) → 6
+(apply fn a b [rest])             ; 중간 인자 + 배열 합산
+
+(find arr pred-fn)                ; 조건 만족 첫 요소
+(find arr value)                  ; 값으로 검색 → 요소 반환 (없으면 null)
+(some fn arr)                     ; 하나라도 true이면 true
+(every? fn arr)                   ; 모두 true이면 true
+(any? fn arr)                     ; some의 alias
+
+(zip arr1 arr2)                   ; [[a1 b1] [a2 b2] ...]
+(drop-first n arr)                ; 앞 n개 제거
+(drop-last n arr)                 ; 뒤 n개 제거
+```
+
+### 함수 래퍼
+```fl
+(memoize fn)                      ; 무한 캐시 메모이즈
+(memoize fn maxSize)              ; LRU 크기 제한 메모이즈
+(memo_call m args...)             ; 메모이즈된 함수 호출
+(memo_size m)                     ; 캐시 항목 수
+(memo_clear m)                    ; 캐시 초기화
+
+(once fn)                         ; 최초 1회만 실행, 이후 첫 결과 재사용
+(tap fn value)                    ; fn(value) 실행 후 value 반환 (->> 파이프용)
+(tap value fn)                    ; 순서 무관 자동 감지
+```
+
+### 성능/추적
+```fl
+(time_exec fn)                    ; 실행 시간 측정 → {:result v :ms n}
+(span name fn)                    ; 추적 스팬 → {:name s :result v :ms n :ok bool}
+(batch_map fn arr batchSize)      ; 배치 단위 처리 (기본 10)
+(log_trace msg)                   ; 추적 로그 출력
+(log_trace msg data)              ; 추적 로그 + 데이터
+```
+
+### 빈도 제한
+```fl
+(rate_limit maxCalls windowMs)    ; Rate limiter 생성
+(rl_call limiter fn args...)      ; Rate-limited 함수 호출
+```
+
+### Predicate
+```fl
+(nil? v)        (nil-or-empty? v)
+(fn? v)         (map? v)       (array? v)   (string? v)
+(number? v)     (boolean? v)   (zero? v)
+(pos? v)        (neg? v)       (even? v)    (odd? v)
+(empty? v)      (any? fn arr)  (every? fn arr)
+```
+
+### 모나드
+```fl
+(ok value)                        ; Result Ok
+(err code msg)                    ; Result Err
+(some value)                      ; Option Some
+(none)                            ; Option None
+(left value)                      ; Either Left
+(right value)                     ; Either Right
+(success value)                   ; Validation Success
+(failure errors)                  ; Validation Failure
+(bind monad fn)                   ; 체이닝 (배열도 지원)
+```
+
+---
+
+## 🌍 HTTP 클라이언트
+
+> ⚠️ 모두 `spawnSync curl` 동기 실행. 서버 핸들러 안에서 호출 시 이벤트 루프 블로킹 주의.
+
+모든 함수는 `{:status N :body "string"}` 반환.
+
+```fl
+(http_get url)                        ; GET
+(http_post url body)                  ; POST (string 또는 object 자동 JSON.stringify)
+(http_put url body)                   ; PUT
+(http_patch url body)                 ; PATCH
+(http_delete url)                     ; DELETE (body 없음)
+(http_get_bearer url token)           ; GET + Authorization: Bearer
+(http_get_key url api-key)            ; GET + X-API-Key
+(http_post_key url body api-key)      ; POST + X-API-Key
+(http_post_form url body)             ; POST + application/x-www-form-urlencoded
+(http_head url)                       ; HEAD → body 빈 문자열
+(http_status url)                     ; 상태코드만 반환 (숫자)
+(http_json url)                       ; GET + JSON 자동 파싱 → {:status N :data {...} :error nil}
 ```
 
 ---

@@ -1,5 +1,73 @@
 # FreeLang v11 변경 이력
 
+## [11.2.1] - 2026-05-03
+
+**마일스톤**: 오류 서치 #9~#17 — 버그 22개 수정, 신규 함수 3개 추가
+
+### 🐛 버그 수정
+
+#### 타입/predicate
+- **`nil-or-empty?`**: `""` 입력 시 `""` 반환 → `true` 반환 (2경로 수정)
+- **`empty?`**: Map 인스턴스에서 항상 `true` → `Map.size` 체크 추가
+- **`fn?`**: FreeLang `function-value` 감지 (`typeof` 기준 false 버그)
+- **`map?`**: `function-value`/atom 객체를 map으로 오인식 수정
+- **`typeof`**: FL 타입 반환 (`"null"`, `"array"`, `"function"` 등)
+
+#### 컬렉션/시퀀스
+- **`find` 값 검색**: `indexOf` 인덱스 반환 → 요소 자체 반환 (없으면 `null`)
+- **`range` 1인자**: lazy seq → 배열 반환 (`(range 5)` = `[0 1 2 3 4]`, `map` 호환)
+- **`filter`**: `async-function-value` 무시 → 지원 추가
+- **`dissoc`**: Map 인스턴스에서 `{}` 반환 → Map 분기 처리 추가
+- **`keys`/`values`/`map-entries`**: function-value를 map으로 오인식 수정
+- **`max`/`min`**: 유효 숫자 없을 때 `±Infinity` → `null` 반환
+
+#### 숫자/문자열
+- **`str-to-num`**: NaN 반환 → `null` 반환 (3경로 수정)
+- **`str`/`concat`**: `nil` → `"null"` → `""` 반환 (2경로 수정)
+
+#### 조건/제어흐름
+- **`and`/`not`**: JS falsy → Lisp falsy (`null`/`undefined`/`false`만) (각 4경로)
+- **`while`**: JS falsy 조건 → Lisp falsy + `for(;;)` break 패턴
+- **`cond [...]`**: 괄호 형태 JS falsy → Lisp falsy 수정
+
+#### 맵/중첩 구조
+- **`assoc-in`**: 중간 경로 `new Map()` 생성 → `{}` 사용 (json_stringify 호환)
+- **`flDeepEq`**: Map 인스턴스 비교 (`Object.keys` 빈 배열 문제) → `Map.size` 비교
+
+#### 고차함수
+- **`once`**: FL `function-value` 직접 호출 → `_callFl` 사용
+- **`tap`**: FL `function-value` 직접 호출 + `->>` 파이프 인자 순서 자동 감지
+
+#### HTTP/네트워크
+- **`http_post` object body**: `body.length` undefined → 조건 개선 + 자동 `JSON.stringify`
+
+#### DB/보안
+- **MariaDB `bindParams`**: `\0 \n \r \x1a` 이스케이프 누락 추가 (MySQL 완전 이스케이프)
+- **SQLite `db_update`**: WHERE절 SQL 인젝션 → `whereParams[]` 파라미터 추가
+- **SQLite `db_delete_row`**: 동일 패턴 수정 + 테이블/컬럼명 sanitize
+
+#### 직렬화
+- **`try/catch $e`**: `new Map()` → `{}` (json_stringify 가능)
+- **`fn-meta`**: `new Map()` → `{}` (json_stringify 가능)
+
+### ✨ 신규 함수
+
+| 함수 | 설명 |
+|------|------|
+| `apply` | `(apply fn args)` — 배열을 펼쳐서 함수 호출 |
+| `reduce` 2인자 | `(reduce fn coll)` — 첫 원소를 초기값으로 |
+| `any?` `every?` | predicate 배열 검사 |
+| `zip` | 두 배열을 쌍으로 묶기 |
+| `drop-last` `drop-first` | 배열 앞/뒤 제거 |
+| `str-re-split` `str-re-replace` | 정규식 분리/치환 |
+| `time_exec` | 실행 시간 측정 `{result, ms}` |
+| `span` | 추적 스팬 `{name, result, ms, ok}` |
+| `batch_map` | 배치 단위 처리 |
+| `log_trace` | 구조화 추적 로그 |
+| `rate_limit` `rl_call` | 호출 빈도 제한 |
+
+---
+
 ## [11.1.1-dev] - 2026-05-03
 
 **마일스톤**: AI-Native Phase 1~4 완료 + MongoDB + 보안 강화 + L2 버그 수정 진행
