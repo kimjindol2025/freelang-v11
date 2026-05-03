@@ -11358,7 +11358,7 @@ function flExecOpNative(op, vals) {
       return Object.prototype.hasOwnProperty.call(v0, k);
     }
     case "nil-or-empty?":
-      return v0 === null || v0 === void 0 || v0 && v0.length === 0;
+      return v0 === null || v0 === undefined || v0 === "" || (Array.isArray(v0) && v0.length === 0) || (typeof v0 === "object" && v0 !== null && !Array.isArray(v0) && Object.keys(v0).length === 0);
     case "true?":
       return v0 === true;
     case "false?":
@@ -12585,7 +12585,7 @@ loop().catch(e => {
       return Object.prototype.hasOwnProperty.call(obj, k);
     }
     case "nil-or-empty?":
-      return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
+      return args3[0] === null || args3[0] === undefined || args3[0] === "" || (Array.isArray(args3[0]) && args3[0].length === 0) || (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0]) && Object.keys(args3[0]).length === 0);
     case "zero?":
       return args3[0] === 0;
     case "pos?":
@@ -12613,8 +12613,7 @@ loop().catch(e => {
       return args3[0] !== null && args3[0] !== undefined && typeof args3[0] === "object" && !Array.isArray(args3[0]) && args3[0]?.kind !== "function-value" && args3[0]?.kind !== "async-function-value";
     case "num-to-str":
       return String(args3[0]);
-    case "str-to-num":
-      return parseFloat(String(args3[0]));
+    case "str-to-num": { const _stn3 = parseFloat(String(args3[0])); return isNaN(_stn3) ? null : _stn3; }
     case "map-set":
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
         const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
@@ -12791,8 +12790,7 @@ loop().catch(e => {
           return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
         case "num-to-str":
           return String(v0 ?? "");
-        case "str-to-num":
-          return parseFloat(String(v0));
+        case "str-to-num": { const _stnv = parseFloat(String(v0)); return isNaN(_stnv) ? null : _stnv; }
         case "replace":
           return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
         case "str-join":
@@ -30873,7 +30871,7 @@ function loadAllStdlib(interp2) {
       const key = path18[0];
       const rest = path18.slice(1);
       const child = m instanceof Map ? m.get(key) ?? m.get(String(key)) : m?.[key];
-      const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? /* @__PURE__ */ new Map(), rest, val) : val;
+      const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? {}, rest, val) : val;
       if (m instanceof Map) {
         const r = new Map(m);
         r.set(key, updated);
