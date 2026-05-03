@@ -11264,12 +11264,7 @@ function flDeepEq(a, b) {
     for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
     return true;
   }
-  if (a instanceof Map && b instanceof Map) {
-    if (a.size !== b.size) return false;
-    for (const [k, v] of a) if (!flDeepEq(v, b.get(k))) return false;
-    return true;
-  }
-  if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b) && !(a instanceof Map) && !(b instanceof Map)) {
+  if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
     const ka = Object.keys(a), kb = Object.keys(b);
     if (ka.length !== kb.length) return false;
     for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
@@ -11346,7 +11341,7 @@ function flExecOpNative(op, vals) {
     case ">=":
       return v0 >= v1;
     case "not":
-      return v0 === null || v0 === void 0 || v0 === false;
+      return !v0;
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
@@ -11354,25 +11349,22 @@ function flExecOpNative(op, vals) {
       if (v0 === null || v0 === void 0) return true;
       if (typeof v0 === "string") return v0.length === 0;
       if (Array.isArray(v0)) return v0.length === 0;
-      if (v0 instanceof Map) return v0.size === 0;
       if (typeof v0 === "object") return Object.keys(v0).length === 0;
       return false;
     }
     case "has-key?": {
       if (v0 === null || v0 === void 0 || typeof v0 !== "object" || Array.isArray(v0)) return false;
       const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
-      if (v0 instanceof Map) return v0.has(k);
       return Object.prototype.hasOwnProperty.call(v0, k);
     }
     case "nil-or-empty?":
-      return v0 === null || v0 === undefined || v0 === "" || (Array.isArray(v0) && v0.length === 0) || (typeof v0 === "object" && v0 !== null && !Array.isArray(v0) && Object.keys(v0).length === 0);
+      return v0 === null || v0 === void 0 || v0 && v0.length === 0;
     case "true?":
       return v0 === true;
     case "false?":
       return v0 === false;
     case "and":
-      if (v0 === null || v0 === undefined || v0 === false) return v0;
-      return (v1 === null || v1 === undefined || v1 === false) ? v1 : v1;
+      return !!(v0 && v1);
     case "or": {
       const flFalsy = (v) => v === null || v === void 0 || v === false;
       if (!flFalsy(v0)) return v0;
@@ -11401,20 +11393,15 @@ function flExecOpNative(op, vals) {
       }
       return null;
     }
-    case "append": {
-      const _base = Array.isArray(v0) ? v0 : [v0];
-      const _rest = vals.slice(1).flatMap((v) => Array.isArray(v) ? v : [v]);
-      return [..._base, ..._rest];
-    }
+    case "append":
+      return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice":
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
     case "concat":
-      return vals.map((v) => v === null || v === void 0 ? "" : String(v)).join("");
+      return vals.map((v) => v === null || v === void 0 ? "null" : String(v)).join("");
     case "str-to-num": {
-      const _s = String(v0 ?? "").trim();
-      if (_s === "") return null;
-      const n = Number(_s);
+      const n = parseFloat(String(v0));
       return isNaN(n) ? null : n;
     }
     case "num-to-str":
@@ -11434,7 +11421,6 @@ function flExecOpNative(op, vals) {
     case "char-at":
       return typeof v0 === "string" ? v0[Number(v1)] ?? "" : "";
     case "index-of":
-      if (Array.isArray(v0)) return v0.findIndex((item) => JSON.stringify(item) === JSON.stringify(v1));
       return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
     case "split":
       return typeof v0 === "string" ? v0.split(String(v1 ?? "")) : [];
@@ -11490,13 +11476,12 @@ function flExecOpNative(op, vals) {
     case "sort":
       return Array.isArray(v0) ? [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
     case "keys":
-      return v0 && typeof v0 === "object" && !Array.isArray(v0) && v0?.kind !== "function-value" && v0?.kind !== "async-function-value" ? (v0 instanceof Map ? [...v0.keys()] : Object.keys(v0)) : [];
+      return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
     case "values":
-      return v0 && typeof v0 === "object" && !Array.isArray(v0) && v0?.kind !== "function-value" && v0?.kind !== "async-function-value" ? (v0 instanceof Map ? [...v0.values()] : Object.values(v0)) : [];
+      return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
     case "map-entries":
     case "map_entries":
-      if (!v0 || typeof v0 !== "object" || Array.isArray(v0) || v0?.kind === "function-value" || v0?.kind === "async-function-value") return [];
-      return v0 instanceof Map ? [...v0.entries()] : Object.entries(v0);
+      return v0 instanceof Map ? [...v0.entries()] : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : [];
     case "floor":
       return Math.floor(v0);
     case "ceil":
@@ -11507,8 +11492,10 @@ function flExecOpNative(op, vals) {
     case "math_abs":
     case "abs":
       return Math.abs(v0);
-    case "max": { const _nums = vals.filter((v) => typeof v === "number"); return _nums.length === 0 ? null : Math.max(..._nums); }
-    case "min": { const _nums = vals.filter((v) => typeof v === "number"); return _nums.length === 0 ? null : Math.min(..._nums); }
+    case "max":
+      return Math.max(...vals.filter((v) => typeof v === "number"));
+    case "min":
+      return Math.min(...vals.filter((v) => typeof v === "number"));
     case "pow":
       return Math.pow(v0, v1);
     case "math-sqrt":
@@ -11656,22 +11643,21 @@ function flExecOpNative(op, vals) {
     }
     case "atom": {
       const ref = { value: v0 !== void 0 ? v0 : null };
-      Object.defineProperty(ref, "__isAtom", { value: true, enumerable: false });
       return ref;
     }
     case "deref": {
-      if (v0 && typeof v0 === "object" && v0.__isAtom === true) return v0.value;
+      if (v0 && typeof v0 === "object" && "value" in v0) return v0.value;
       return v0;
     }
     case "reset!": {
-      if (v0 && typeof v0 === "object" && v0.__isAtom === true) {
+      if (v0 && typeof v0 === "object" && "value" in v0) {
         v0.value = v1;
         return v1;
       }
       return v1;
     }
     case "swap!": {
-      if (v0 && typeof v0 === "object" && v0.__isAtom === true && v1) {
+      if (v0 && typeof v0 === "object" && "value" in v0 && v1) {
         const extraArgs = args.slice(2);
         const newVal = flApplyNative(v1, [v0.value, ...extraArgs]);
         v0.value = newVal;
@@ -11786,12 +11772,10 @@ function flInterpSexpr(op, rawArgs, env) {
       return result;
     }
     case "and": {
-      let _andRes = true;
       for (const arg of rawArgs) {
-        _andRes = flInterpNative(arg, env);
-        if (_andRes === null || _andRes === undefined || _andRes === false) return _andRes;
+        if (!flInterpNative(arg, env)) return false;
       }
-      return _andRes;
+      return true;
     }
     case "or": {
       const flFalsy2 = (v) => v === null || v === void 0 || v === false;
@@ -11802,7 +11786,8 @@ function flInterpSexpr(op, rawArgs, env) {
       }
       return lastVal2;
     }
-    case "not": { const _nv = flInterpNative(rawArgs[0], env); return _nv === null || _nv === void 0 || _nv === false; }
+    case "not":
+      return !flInterpNative(rawArgs[0], env);
     case "null?": {
       const v = flInterpNative(rawArgs[0], env);
       return v === null || v === void 0;
@@ -11872,18 +11857,16 @@ function evalBuiltin(interp2, op, args3, expr2) {
   const toDisplay = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
     case "atom": {
-      const _ref2 = { value: args3[0] !== void 0 ? args3[0] : null };
-      Object.defineProperty(_ref2, "__isAtom", { value: true, enumerable: false });
-      return _ref2;
+      return { value: args3[0] !== void 0 ? args3[0] : null };
     }
     case "deref": {
       const ref = args3[0];
-      if (ref && typeof ref === "object" && ref.__isAtom === true) return ref.value;
+      if (ref && typeof ref === "object" && "value" in ref) return ref.value;
       return ref;
     }
     case "reset!": {
       const ref = args3[0];
-      if (ref && typeof ref === "object" && ref.__isAtom === true) {
+      if (ref && typeof ref === "object" && "value" in ref) {
         ref.value = args3[1];
         return args3[1];
       }
@@ -11893,7 +11876,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const ref = args3[0];
       const fn = args3[1];
       const extra = args3.slice(2);
-      if (ref && typeof ref === "object" && ref.__isAtom === true && fn) {
+      if (ref && typeof ref === "object" && "value" in ref && fn) {
         const newVal = callFnVal(fn, [ref.value, ...extra]);
         ref.value = newVal;
         return newVal;
@@ -12201,14 +12184,8 @@ loop().catch(e => {
       return args3[0] >= args3[1];
     case "!=":
       return args3[0] !== args3[1];
-    case "and": {
-      let _ar = true;
-      for (const _a of args3) {
-        _ar = _a;
-        if (_ar === null || _ar === undefined || _ar === false) return _ar;
-      }
-      return _ar;
-    }
+    case "and":
+      return args3.every((a) => a);
     case "or": {
       const flFalsy3 = (v) => v === null || v === void 0 || v === false;
       for (const a of args3) {
@@ -12217,7 +12194,7 @@ loop().catch(e => {
       return args3.length > 0 ? args3[args3.length - 1] : null;
     }
     case "not":
-      return args3[0] === null || args3[0] === void 0 || args3[0] === false;
+      return !args3[0];
     case "print":
       process.stdout.write(args3.map((a) => toDisplay(a)).join(" "));
       return null;
@@ -12229,7 +12206,7 @@ loop().catch(e => {
       process.stderr.write(args3.map((a) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args3.map((a) => a === null || a === undefined ? "" : toDisplay(a)).join("");
+      return args3.map((a) => toDisplay(a)).join("");
     case "repr":
       return JSON.stringify(args3[0], null, 2);
     case "inspect": {
@@ -12414,14 +12391,14 @@ loop().catch(e => {
       return args3[0]?.slice(1);
     case "keys": {
       const kObj = args3[0];
-      if (!kObj || typeof kObj !== "object" || Array.isArray(kObj) || kObj?.kind === "function-value" || kObj?.kind === "async-function-value") return [];
-      return kObj instanceof Map ? Array.from(kObj.keys()) : Object.keys(kObj);
+      if (kObj instanceof Map) return Array.from(kObj.keys());
+      return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
     }
     case "vals":
     case "values": {
       const vObj = args3[0];
-      if (!vObj || typeof vObj !== "object" || Array.isArray(vObj) || vObj?.kind === "function-value" || vObj?.kind === "async-function-value") return [];
-      return vObj instanceof Map ? Array.from(vObj.values()) : Object.values(vObj);
+      if (vObj instanceof Map) return Array.from(vObj.values());
+      return vObj && typeof vObj === "object" && !Array.isArray(vObj) ? Object.values(vObj) : [];
     }
     case "upper-case":
       return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0];
@@ -12442,10 +12419,11 @@ loop().catch(e => {
       return typeof args3[0] === "string" ? args3[0][Number(args3[1])] ?? "" : "";
     case "math-pow":
       return Math.pow(Number(args3[0]), Number(args3[1]));
-    case "append": {
-      const _ab = Array.isArray(args3[0]) ? args3[0] : [args3[0]];
-      return [..._ab, ...args3.slice(1).flatMap((v) => Array.isArray(v) ? v : [v])];
-    }
+    case "append":
+      if (Array.isArray(args3[0]) && args3.length === 2 && Array.isArray(args3[1])) {
+        return [...args3[0], ...args3[1]];
+      }
+      return [...args3[0] || [], ...args3.slice(1)];
     case "reverse":
       if (Array.isArray(args3[0])) return [...args3[0]].reverse();
       return [...args3[0] || []].reverse();
@@ -12514,23 +12492,17 @@ loop().catch(e => {
       } else {
         throw new Error(`fn expects parameter array`);
       }
-      const _fnBodyArgs = expr2.args.slice(1);
-      const _fnBody = _fnBodyArgs.length === 1 ? _fnBodyArgs[0] : { kind: "sexpr", op: "do", args: _fnBodyArgs };
       return {
         kind: "function-value",
         params,
-        body: _fnBody,
+        body: expr2.args[1],
         capturedEnv: interp2.context.variables.snapshot()
       };
     }
     case "reduce": {
       const reduceFn = args3[0];
-      let accumulator, arr;
-      if (Array.isArray(args3[1]) && args3[2] === undefined) {
-        arr = args3[1]; accumulator = arr[0]; arr = arr.slice(1);
-      } else {
-        accumulator = args3[1]; arr = args3[2] ?? [];
-      }
+      let accumulator = args3[1];
+      let arr = args3[2] ?? [];
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
         let cur = arr;
@@ -12550,12 +12522,6 @@ loop().catch(e => {
         accumulator = callFn(reduceFn, [accumulator, item]);
       }
       return accumulator;
-    }
-    case "apply": {
-      const applyFn = args3[0];
-      const applyArgs = Array.isArray(args3[args3.length - 1]) ? args3[args3.length - 1] : [];
-      const spreadArgs = args3.length > 2 ? [...args3.slice(1, -1), ...applyArgs] : applyArgs;
-      return callFn(applyFn, spreadArgs);
     }
     case "json-response":
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) return args3[0];
@@ -12601,7 +12567,6 @@ loop().catch(e => {
       if (v === null || v === void 0) return true;
       if (typeof v === "string") return v.length === 0;
       if (Array.isArray(v)) return v.length === 0;
-      if (v instanceof Map) return v.size === 0;
       if (typeof v === "object") return Object.keys(v).length === 0;
       return false;
     }
@@ -12609,11 +12574,10 @@ loop().catch(e => {
       const obj = args3[0], key = args3[1];
       if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
       const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
-      if (obj instanceof Map) return obj.has(k);
       return Object.prototype.hasOwnProperty.call(obj, k);
     }
     case "nil-or-empty?":
-      return args3[0] === null || args3[0] === undefined || args3[0] === "" || (Array.isArray(args3[0]) && args3[0].length === 0) || (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0]) && Object.keys(args3[0]).length === 0);
+      return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
     case "zero?":
       return args3[0] === 0;
     case "pos?":
@@ -12627,7 +12591,7 @@ loop().catch(e => {
     case "string?":
       return typeof args3[0] === "string";
     case "number?":
-      return typeof args3[0] === "number" && !isNaN(args3[0]);
+      return typeof args3[0] === "number";
     case "boolean?":
     case "bool?":
       return typeof args3[0] === "boolean";
@@ -12636,20 +12600,14 @@ loop().catch(e => {
       return Array.isArray(args3[0]);
     case "function?":
     case "fn?":
-      return typeof args3[0] === "function" || args3[0]?.kind === "function-value" || args3[0]?.kind === "async-function-value";
+      return typeof args3[0] === "function";
     case "map?":
-      return args3[0] !== null && args3[0] !== undefined && typeof args3[0] === "object" && !Array.isArray(args3[0]) && args3[0]?.kind !== "function-value" && args3[0]?.kind !== "async-function-value";
+      return args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]);
     case "num-to-str":
       return String(args3[0]);
-    case "str-to-num": { const _stn3s = String(args3[0] ?? "").trim(); if (_stn3s === "") return null; const _stn3 = Number(_stn3s); return isNaN(_stn3) ? null : _stn3; }
-    case "str-to-int":
-    case "str_to_int": { const _sti3 = parseInt(String(args3[0] ?? ""), 10); return isNaN(_sti3) ? null : _sti3; }
+    case "str-to-num":
+      return parseFloat(String(args3[0]));
     case "map-set":
-      if (args3[0] instanceof Map) {
-        const _mm = new Map(args3[0]);
-        _mm.set(args3[1], args3[2]);
-        return _mm;
-      }
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
         const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
         return { ...args3[0], [k]: args3[2] };
@@ -12681,7 +12639,6 @@ loop().catch(e => {
     case "ends-with?":
       return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
     case "index-of":
-      if (Array.isArray(args3[0])) return args3[0].findIndex((item) => JSON.stringify(item) === JSON.stringify(args3[1]));
       return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].indexOf(args3[1]) : -1;
     case "replace":
       return typeof args3[0] === "string" && typeof args3[1] === "string" && typeof args3[2] === "string" ? args3[0].split(args3[1]).join(args3[2]) : "";
@@ -12691,25 +12648,22 @@ loop().catch(e => {
       const filterFn = args3[0];
       const coll = args3[1];
       if (!Array.isArray(coll)) return [];
-      const _flTruthy = (v) => v !== null && v !== void 0 && v !== false;
-      if (typeof filterFn === "function") return coll.filter((item) => _flTruthy(filterFn(item)));
-      if (filterFn && (filterFn.kind === "function-value" || filterFn.kind === "async-function-value")) {
-        return coll.filter((item) => _flTruthy(callFnVal(filterFn, [item])));
+      if (typeof filterFn === "function") return coll.filter(filterFn);
+      if (filterFn && filterFn.kind === "function-value") {
+        return coll.filter((item) => callFnVal(filterFn, [item]));
       }
       return coll;
     }
     case "find":
       if (Array.isArray(args3[0])) {
         const findFn = args3[1];
-        const _flT = (v) => v !== null && v !== void 0 && v !== false;
-        if (typeof findFn === "function") return args3[0].find((item) => _flT(findFn(item))) ?? null;
+        if (typeof findFn === "function") return args3[0].find(findFn) ?? null;
         if (findFn && findFn.kind === "function-value") {
-          return args3[0].find((item) => _flT(callFnVal(findFn, [item]))) ?? null;
+          return args3[0].find((item) => callFnVal(findFn, [item])) ?? null;
         }
-        const _fi = args3[0].indexOf(findFn);
-        return _fi >= 0 ? args3[0][_fi] : null;
+        return args3[0].indexOf(findFn);
       }
-      return null;
+      return -1;
     case "last":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "first-or":
@@ -12829,7 +12783,8 @@ loop().catch(e => {
           return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
         case "num-to-str":
           return String(v0 ?? "");
-        case "str-to-num": { const _stnvs = String(v0 ?? "").trim(); if (_stnvs === "") return null; const _stnv = Number(_stnvs); return isNaN(_stnv) ? null : _stnv; }
+        case "str-to-num":
+          return parseFloat(String(v0));
         case "replace":
           return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
         case "str-join":
@@ -12841,7 +12796,7 @@ loop().catch(e => {
         case "string?":
           return typeof v0 === "string";
         case "number?":
-          return typeof v0 === "number" && !isNaN(v0);
+          return typeof v0 === "number";
         case "read-file":
           try {
             return require("fs").readFileSync(String(v0), "utf-8");
@@ -12910,28 +12865,15 @@ loop().catch(e => {
       return finalEnv;
     }
     case "assoc": {
-      if (args3[0] instanceof Map) {
-        const _am = new Map(args3[0]);
-        for (let i = 1; i + 1 < args3.length; i += 2) _am.set(args3[i], args3[i + 1]);
-        return _am;
-      }
       let base = args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]) ? { ...args3[0] } : {};
       for (let i = 1; i + 1 < args3.length; i += 2) {
-        const _ak = typeof args3[i] === "string" && args3[i].startsWith(":") ? args3[i].slice(1) : String(args3[i] ?? "");
-        base[_ak] = args3[i + 1];
+        base[args3[i]] = args3[i + 1];
       }
       return base;
     }
     case "dissoc": {
-      if (args3[0] instanceof Map) {
-        const _dm = new Map(args3[0]);
-        const _dk = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
-        _dm.delete(_dk); _dm.delete(args3[1]);
-        return _dm;
-      }
       if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
-        const _k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1] ?? "");
-        const { [_k]: _, [String(args3[1] ?? "")]: _2, ...rest } = args3[0];
+        const { [args3[1]]: _, ...rest } = args3[0];
         return rest;
       }
       return args3[0] ?? {};
@@ -13009,45 +12951,11 @@ loop().catch(e => {
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "shift":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : null;
-    case "drop-last":
-    case "drop_last":
-      return Array.isArray(args3[0]) ? args3[0].slice(0, -1) : [];
-    case "drop-first":
-    case "drop_first":
-      return Array.isArray(args3[0]) ? args3[0].slice(1) : [];
     case "unshift":
       if (!Array.isArray(args3[0])) return [args3[1]];
       return [args3[1], ...args3[0]];
-    case "typeof": {
-      const _tv = args3[0];
-      if (_tv === null || _tv === undefined) return "null";
-      if (Array.isArray(_tv)) return "array";
-      if (_tv?.kind === "function-value" || _tv?.kind === "async-function-value") return "function";
-      return typeof _tv;
-    }
-    case "any?":
-    case "any": {
-      if (!Array.isArray(args3[1])) return false;
-      const _anyFn = args3[0];
-      return args3[1].some((item) => {
-        const r = callFnVal(_anyFn, [item]);
-        return r !== null && r !== undefined && r !== false;
-      });
-    }
-    case "every?":
-    case "every": {
-      if (!Array.isArray(args3[1])) return true;
-      const _evFn = args3[0];
-      return args3[1].every((item) => {
-        const r = callFnVal(_evFn, [item]);
-        return r !== null && r !== undefined && r !== false;
-      });
-    }
-    case "zip": {
-      const _a1 = args3[0], _a2 = args3[1];
-      if (!Array.isArray(_a1) || !Array.isArray(_a2)) return [];
-      return Array.from({ length: Math.min(_a1.length, _a2.length) }, (_, i) => [_a1[i], _a2[i]]);
-    }
+    case "typeof":
+      return typeof args3[0];
     case "vec-dot":
     case "dot-product": {
       const a = args3[0], b = args3[1];
@@ -13140,8 +13048,10 @@ loop().catch(e => {
     case "math_abs":
     case "abs":
       return Math.abs(args3[0]);
-    case "min": { const _mn = args3.filter((v) => typeof v === "number"); return _mn.length === 0 ? null : Math.min(..._mn); }
-    case "max": { const _mx = args3.filter((v) => typeof v === "number"); return _mx.length === 0 ? null : Math.max(..._mx); }
+    case "min":
+      return Math.min(...args3);
+    case "max":
+      return Math.max(...args3);
     case "floor":
       return Math.floor(args3[0]);
     case "ceil":
@@ -13253,7 +13163,7 @@ loop().catch(e => {
     }
     case "range": {
       if (args3.length === 0) return rangeSeq(0);
-      if (args3.length === 1) { const _re = Number(args3[0]); const _ro = []; for (let i = 0; i < _re; i++) _ro.push(i); return _ro; }
+      if (args3.length === 1) return rangeSeq(0, args3[0]);
       const start = Number(args3[0]);
       const end = Number(args3[1]);
       const step = args3.length >= 3 ? Number(args3[2]) : 1;
@@ -13304,8 +13214,7 @@ loop().catch(e => {
       if (Array.isArray(seq)) {
         const result = [];
         for (const v of seq) {
-          const pv = callFn(pred, [v]);
-          if (pv === null || pv === void 0 || pv === false) break;
+          if (!callFn(pred, [v])) break;
           result.push(v);
         }
         return result;
@@ -19267,9 +19176,7 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "while") {
     let result = null;
-    for (;;) {
-      const _wc = ev(expr2.args[0]);
-      if (_wc === null || _wc === undefined || _wc === false) break;
+    while (ev(expr2.args[0])) {
       for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
     }
     return result;
@@ -19278,7 +19185,7 @@ function evalSpecialForm(interp2, op, expr2) {
     let result = true;
     for (const arg of expr2.args) {
       result = ev(arg);
-      if (result === null || result === undefined || result === false) return result;
+      if (!result) return result;
     }
     return result;
   }
@@ -19465,35 +19372,49 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "parallel") {
     if (expr2.args.length === 0) return [];
-    const vals = expr2.args.map((arg) => ev(arg));
-    const hasPromise = vals.some((v) => v && typeof v === "object" && typeof v.then === "function");
-    if (hasPromise) {
-      return Promise.all(vals.map((v) => (v && typeof v === "object" && typeof v.then === "function") ? v : Promise.resolve(v)));
+    const results = [];
+    for (const arg of expr2.args) {
+      let val = ev(arg);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try {
+          val = val.getValue();
+        } catch {
+          val = null;
+        }
+      }
+      results.push(val);
     }
-    return vals.map((v) => (v && typeof v === "object" && typeof v.getValue === "function") ? (() => { try { return v.getValue(); } catch { return null; } })() : v);
+    return results;
   }
   if (op === "race") {
     if (expr2.args.length === 0) return null;
-    const vals = expr2.args.map((arg) => ev(arg));
-    const hasPromise = vals.some((v) => v && typeof v === "object" && typeof v.then === "function");
-    if (hasPromise) {
-      return Promise.race(vals.map((v) => (v && typeof v === "object" && typeof v.then === "function") ? v : Promise.resolve(v)));
+    let firstResult = void 0;
+    for (const arg of expr2.args) {
+      let val = ev(arg);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try {
+          val = val.getValue();
+        } catch {
+          val = null;
+        }
+      }
+      if (firstResult === void 0) firstResult = val;
+      if (val !== null && val !== void 0) return val;
     }
-    for (const v of vals) {
-      const resolved = (v && typeof v === "object" && typeof v.getValue === "function") ? (() => { try { return v.getValue(); } catch { return null; } })() : v;
-      if (resolved !== null && resolved !== void 0) return resolved;
-    }
-    return null;
+    return firstResult ?? null;
   }
   if (op === "with-timeout") {
     if (expr2.args.length < 2) return null;
-    const ms = Number(ev(expr2.args[0]) ?? 5000);
     try {
-      const val = ev(expr2.args[1]);
-      if (val && typeof val === "object" && typeof val.then === "function") {
-        return Promise.race([val, new Promise((_, rej) => setTimeout(() => rej(new Error(`with-timeout: exceeded ${ms}ms`)), ms))]);
+      let val = ev(expr2.args[1]);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try {
+          val = val.getValue();
+        } catch {
+          val = null;
+        }
       }
-      return (val && typeof val === "object" && typeof val.getValue === "function") ? (() => { try { return val.getValue(); } catch { return null; } })() : val;
+      return val;
     } catch {
       return null;
     }
@@ -19675,7 +19596,7 @@ function evalCond(interp2, args3) {
     }
     if (testNode && bodyNodes.length >= 1) {
       const test = ev(testNode);
-      if (test !== null && test !== undefined && test !== false) {
+      if (test) {
         let result = null;
         for (const b of bodyNodes) result = ev(b);
         return result;
@@ -20566,24 +20487,21 @@ var timerRegistry = /* @__PURE__ */ new Map();
 var nextTimerId = 2e3;
 function createTimerModule(interpreter) {
   return {
-    // set_interval fn ms -> number (fn: 문자열 이름 또는 function-value)
+    // set_interval fn ms -> number (fn: function name string, ms: interval)
     "set_interval": (fnName, ms) => {
       try {
-        if (typeof ms !== "number" || ms < 1) throw new Error(`Interval must be positive number, got ${ms}`);
+        if (typeof fnName !== "string") {
+          throw new Error(`Function name must be string, got ${typeof fnName}`);
+        }
+        if (typeof ms !== "number" || ms < 1) {
+          throw new Error(`Interval must be positive number, got ${ms}`);
+        }
         const timerId = nextTimerId++;
         const callback = () => {
           try {
-            if (typeof fnName === "string") {
-              interpreter.callUserFunction(fnName, []);
-            } else if (fnName?.kind === "function-value" || fnName?.kind === "async-function-value") {
-              interpreter.callFunctionValue(fnName, []);
-            } else if (typeof fnName === "function") {
-              fnName();
-            } else {
-              throw new Error(`set_interval: fn은 문자열 이름 또는 함수 필요`);
-            }
+            interpreter.callUserFunction(fnName, []);
           } catch (err4) {
-            console.error(`set_interval callback error:`, err4.message);
+            console.error(`set_interval callback error for '${fnName}':`, err4.message);
           }
         };
         const nodeTimer = setInterval(callback, ms);
@@ -20749,9 +20667,8 @@ function curlGetStatusAndBody(url2, method = "GET", headers, body) {
         args3.push("-H", `${key}: ${value}`);
       }
     }
-    if (body !== null && body !== undefined && body !== "") {
-      const _bodyStr = typeof body === "string" ? body : JSON.stringify(body);
-      args3.push("-d", _bodyStr);
+    if (body && body.length > 0) {
+      args3.push("-d", body);
     }
     args3.push(url2);
     const result = (0, import_child_process.spawnSync)("curl", args3, { timeout: 15e3 });
@@ -21491,12 +21408,7 @@ function createDataModule() {
 }
 
 // src/stdlib-collection.ts
-function createCollectionModule(interp2) {
-  const _callFl = (fn, args3) => {
-    if (fn && (fn.kind === "function-value" || fn.kind === "async-function-value")) return interp2.callFunctionValue(fn, args3);
-    if (typeof fn === "function") return fn(...args3);
-    throw new Error("함수 필요");
-  };
+function createCollectionModule() {
   return {
     // ── Array Transformation ──────────────────────────────────
     // arr_flatten arr -> [any]  (flatten one level deep)
@@ -21589,109 +21501,60 @@ function createCollectionModule(interp2) {
     "retry": (n, fn) => {
       let lastErr;
       for (let i = 0; i <= n; i++) {
-        try { return _callFl(fn, []); } catch (err4) {
+        try {
+          return fn();
+        } catch (err4) {
           lastErr = err4;
-          if (i < n) { const _s = Date.now(); while (Date.now() - _s < Math.min(100 * i, 500)) {} }
+          if (i < n) {
+            const start = Date.now();
+            while (Date.now() - start < 100 * i) {
+            }
+          }
         }
       }
       throw lastErr;
     },
+    // retry_silent n fn -> any|null  (retry n times, return null on final failure)
     "retry_silent": (n, fn) => {
-      for (let i = 0; i <= n; i++) { try { return _callFl(fn, []); } catch {} }
+      for (let i = 0; i <= n; i++) {
+        try {
+          return fn();
+        } catch {
+        }
+      }
       return null;
     },
+    // pipeline_run initial steps -> any  (chain: output of each step → input of next)
+    // steps: array of functions
     "pipeline_run": (initial, steps) => {
-      return (Array.isArray(steps) ? steps : []).reduce((acc, fn) => _callFl(fn, [acc]), initial);
+      return steps.reduce((acc, fn) => fn(acc), initial);
     },
-    // memoize fn [maxSize] -> fn  (LRU cache, memo_call/size/clear 지원)
-    "memoize": (fn, maxSize = Infinity) => {
+    // memoize fn -> fn  (return memoized version of fn, keyed by JSON args)
+    "memoize": (fn) => {
       const cache = /* @__PURE__ */ new Map();
-      const memoFn = (...args3) => {
+      return (...args3) => {
         const key = JSON.stringify(args3);
         if (cache.has(key)) return cache.get(key);
-        if (maxSize !== Infinity && cache.size >= maxSize) cache.delete(cache.keys().next().value);
-        const result = _callFl(fn, args3);
+        const result = fn(...args3);
         cache.set(key, result);
         return result;
       };
-      memoFn.__fl_cache__ = cache;
-      return memoFn;
-    },
-    "memo_call": (m, ...args3) => {
-      if (typeof m !== "function") throw new Error("memo_call: memoize된 함수 필요");
-      return m(...args3);
-    },
-    "memo_size": (m) => m?.__fl_cache__?.size ?? 0,
-    "memo_clear": (m) => { m?.__fl_cache__?.clear(); return null; },
-    // time_exec fn -> {result, ms}
-    "time_exec": (fn) => {
-      const t0 = Date.now();
-      const result = _callFl(fn, []);
-      return { result, ms: Date.now() - t0 };
-    },
-    // span name fn -> {name, result, ms, ok}
-    "span": (name, fn) => {
-      const t0 = Date.now();
-      let result = null, ok = true;
-      try {
-        result = _callFl(fn, []);
-      } catch (e) { ok = false; result = e.message; }
-      const ms = Date.now() - t0;
-      if (process.env.FL_TRACE === "1") process.stderr.write(`[span] ${name}: ${ms}ms ${ok ? "ok" : "err"}\n`);
-      return { name, result, ms, ok };
-    },
-    // batch_map fn arr batchSize -> results (분할 처리)
-    "batch_map": (fn, arr, batchSize = 10) => {
-      if (!Array.isArray(arr)) return [];
-      const results = [];
-      for (let i = 0; i < arr.length; i += batchSize) {
-        const batch = arr.slice(i, i + batchSize);
-        for (const item of batch) {
-          const r = _callFl(fn, [item]);
-          results.push(r);
-        }
-      }
-      return results;
-    },
-    // log_trace msg data -> nil
-    "log_trace": (msg, data = null) => {
-      if (process.env.FL_TRACE === "1") process.stderr.write(`[trace] ${msg}${data !== null ? " " + JSON.stringify(data) : ""}\n`);
-      return null;
-    },
-    // rate_limit maxCalls windowMs -> limiter-fn
-    "rate_limit": (maxCalls = 10, windowMs = 1e3) => {
-      const calls = [];
-      const limiterFn = (...args3) => {
-        const now = Date.now();
-        while (calls.length > 0 && calls[0] < now - windowMs) calls.shift();
-        if (calls.length >= maxCalls) return { ok: false, error: "rate_limit exceeded" };
-        calls.push(now);
-        return { ok: true };
-      };
-      limiterFn.__fl_rl__ = true;
-      return limiterFn;
-    },
-    // rl_call limiter fn ...args -> result or {ok:false}
-    "rl_call": (limiter, fn, ...args3) => {
-      if (typeof limiter !== "function" || !limiter.__fl_rl__) throw new Error("rl_call: rate_limit 결과 필요");
-      const check = limiter();
-      if (!check.ok) return check;
-      const result = _callFl(fn, args3);
-      return { ok: true, result };
     },
     // once fn -> fn  (return version of fn that only executes once)
     "once": (fn) => {
       let called = false, result;
       return (...args3) => {
-        if (!called) { called = true; result = _callFl(fn, args3); }
+        if (!called) {
+          called = true;
+          result = fn(...args3);
+        }
         return result;
       };
     },
-    // tap fn value -> value  (side effect, return value) — works with ->> pipe
-    "tap": (a, b) => {
-      const isFn = (x) => typeof x === "function" || (x && (x.kind === "function-value" || x.kind === "async-function-value"));
-      const [fn, value] = isFn(a) ? [a, b] : [b, a];
-      _callFl(fn, [value]); return value;
+    // tap value fn -> value  (call fn(value) for side effects, return value unchanged)
+    "tap": (value, fn) => {
+      fn(value);
+      return value;
     },
     // ── Range / Sequence ─────────────────────────────────────
     // range start end -> [number]  (inclusive start, exclusive end)
@@ -23536,7 +23399,14 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const savedName = crypto.randomBytes(8).toString("hex") + ext;
         const savedPath = path6.join(uploadDir, savedName);
         fs7.writeFileSync(savedPath, bodyBuf);
-        files.push({ fieldname: fieldName, originalname: fileName, mimetype, size: bodyBuf.length, path: savedPath, filename: savedName });
+        const m = /* @__PURE__ */ new Map();
+        m.set("fieldname", fieldName);
+        m.set("originalname", fileName);
+        m.set("mimetype", mimetype);
+        m.set("size", bodyBuf.length);
+        m.set("path", savedPath);
+        m.set("filename", savedName);
+        files.push(m);
       } else {
         fields[fieldName] = bodyBuf.toString().replace(/\r\n$/, "");
       }
@@ -23545,7 +23415,12 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       if (raw.slice(pos, pos + 2).toString() === "--") break;
       pos += 2;
     }
-    return { fields, files };
+    const result = /* @__PURE__ */ new Map();
+    const fieldsMap = /* @__PURE__ */ new Map();
+    Object.entries(fields).forEach(([k, v]) => fieldsMap.set(k, v));
+    result.set("fields", fieldsMap);
+    result.set("files", files);
+    return result;
   }
   function sendResponse(res, status, body, contentType = "application/json", extraHeaders) {
     const headersToWrite = { "Content-Type": contentType };
@@ -24216,26 +24091,6 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     "server_req_path": (req) => {
       return req.path;
     },
-    // server_req_files req -> [{fieldname, originalname, mimetype, size, path, filename}]
-    "server_req_files": (req) => {
-      const body = req.body;
-      if (body && Array.isArray(body.files)) return body.files;
-      return [];
-    },
-    // server_req_file req fieldname -> {fieldname, originalname, mimetype, size, path, filename} | null
-    "server_req_file": (req, fieldname) => {
-      const body = req.body;
-      if (body && Array.isArray(body.files)) {
-        return body.files.find((f) => f.fieldname === fieldname) ?? null;
-      }
-      return null;
-    },
-    // server_req_fields req -> {fieldname: value, ...}  (multipart non-file fields)
-    "server_req_fields": (req) => {
-      const body = req.body;
-      if (body && typeof body.fields === "object" && !Array.isArray(body.fields)) return body.fields;
-      return {};
-    },
     // Phase 57: 비동기 응답 보류 함수들
     // server_req_id -> string | null (현재 요청 ID)
     "server_req_id": () => {
@@ -24426,62 +24281,31 @@ function createDbModule() {
     // db_insert dbPath table data -> true
     "db_insert": (dbPath, table, data) => {
       const db = getDb(dbPath);
-      const _si = (s) => { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(s))) throw new Error(`[db_insert] Invalid identifier: ${s}`); return s; };
-      _si(table);
-      const keys = Object.keys(data).map(_si);
+      const keys = Object.keys(data);
       const placeholders = keys.map(() => "?").join(",");
-      const vals = keys.map((k) => data[k]);
-      db.prepare(`INSERT INTO \`${table}\` (\`${keys.join("`,`")}\`) VALUES (${placeholders})`).run(vals);
+      const vals = Object.values(data);
+      db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${placeholders})`).run(vals);
       return true;
     },
     // db_update dbPath table data where -> true
-    // where: map {:col val} 또는 legacy string (deprecated)
-    "db_update": (dbPath, table, data, where, whereParams = []) => {
+    "db_update": (dbPath, table, data, where) => {
       const db = getDb(dbPath);
-      const _su = (s) => { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(s))) throw new Error(`[db_update] Invalid identifier: ${s}`); return s; };
-      _su(table);
-      const dataKeys = Object.keys(data).map(_su);
-      const sets = dataKeys.map((k) => `\`${k}\`=?`).join(", ");
-      const dataVals = dataKeys.map((k) => data[k]);
-      let whereSql, whereVals;
-      if (where !== null && typeof where === "object" && !Array.isArray(where)) {
-        const wEntries = Object.entries(where);
-        if (wEntries.length === 0) throw new Error("[db_update] Empty WHERE map — would update all rows. Use db_raw for intentional full-table update.");
-        whereSql = wEntries.map(([k]) => `\`${_su(k)}\`=?`).join(" AND ");
-        whereVals = wEntries.map(([, v]) => v);
-      } else {
-        if (typeof where === "string") console.warn("[db_update] DEPRECATED: string WHERE is unsafe. Use map {:col val} instead.");
-        whereSql = String(where ?? "");
-        whereVals = Array.isArray(whereParams) ? whereParams : [];
-      }
-      db.prepare(`UPDATE \`${table}\` SET ${sets} WHERE ${whereSql}`).run([...dataVals, ...whereVals]);
+      const keys = Object.keys(data);
+      const sets = keys.map((k) => `${k}=?`).join(", ");
+      const vals = Object.values(data);
+      db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(vals);
       return true;
     },
     // db_delete_row dbPath table where -> true
-    // where: map {:col val} 또는 legacy string (deprecated)
-    "db_delete_row": (dbPath, table, where, whereParams = []) => {
+    "db_delete_row": (dbPath, table, where) => {
       const db = getDb(dbPath);
-      const _sd = (s) => { if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(s))) throw new Error(`[db_delete_row] Invalid identifier: ${s}`); return s; };
-      _sd(table);
-      let whereSql, whereVals;
-      if (where !== null && typeof where === "object" && !Array.isArray(where)) {
-        const wEntries = Object.entries(where);
-        if (wEntries.length === 0) throw new Error("[db_delete_row] Empty WHERE map — would delete all rows. Use db_raw for intentional truncate.");
-        whereSql = wEntries.map(([k]) => `\`${_sd(k)}\`=?`).join(" AND ");
-        whereVals = wEntries.map(([, v]) => v);
-      } else {
-        if (typeof where === "string") console.warn("[db_delete_row] DEPRECATED: string WHERE is unsafe. Use map {:col val} instead.");
-        whereSql = String(where ?? "");
-        whereVals = Array.isArray(whereParams) ? whereParams : [];
-      }
-      db.prepare(`DELETE FROM \`${table}\` WHERE ${whereSql}`).run(whereVals);
+      db.prepare(`DELETE FROM ${table} WHERE ${where}`).run();
       return true;
     },
     // db_count dbPath table -> number
     "db_count": (dbPath, table) => {
       const db = getDb(dbPath);
-      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(String(table))) throw new Error(`[db_count] Invalid table name: ${table}`);
-      const row = db.prepare(`SELECT COUNT(*) as cnt FROM \`${table}\``).get();
+      const row = db.prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get();
       return Number(row?.cnt ?? 0);
     },
     // db_tables dbPath -> string[]
@@ -26407,7 +26231,7 @@ function bindParams(sql, params) {
     if (p === null || p === void 0) return s.replace("?", "NULL");
     if (typeof p === "number") return s.replace("?", String(p));
     if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
-    return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/\0/g, "\\0").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x1a/g, "\\Z").replace(/'/g, "''")}'`);
+    return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
   }, sql);
 }
 var DATA_BUF_SIZE = 4 * 1024 * 1024;
@@ -30859,7 +30683,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(createHttpModule());
   interp2.registerModule(createShellModule());
   interp2.registerModule(createDataModule());
-  interp2.registerModule(createCollectionModule(interp2));
+  interp2.registerModule(createCollectionModule());
   interp2.registerModule(createAgentModule());
   interp2.registerModule(createTimeModule());
   interp2.registerModule(createCryptoModule());
@@ -30934,7 +30758,7 @@ function loadAllStdlib(interp2) {
       const key = path18[0];
       const rest = path18.slice(1);
       const child = m instanceof Map ? m.get(key) ?? m.get(String(key)) : m?.[key];
-      const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? {}, rest, val) : val;
+      const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? /* @__PURE__ */ new Map(), rest, val) : val;
       if (m instanceof Map) {
         const r = new Map(m);
         r.set(key, updated);
@@ -30981,7 +30805,6 @@ function loadAllStdlib(interp2) {
         return [];
       }
     },
-    // re-replace pattern replacement str  (패턴 먼저)
     "re-replace": (pattern, replacement, s) => {
       try {
         return String(s).replace(new RegExp(pattern, "g"), replacement);
@@ -30989,21 +30812,12 @@ function loadAllStdlib(interp2) {
         return String(s);
       }
     },
-    // str-re-replace str pattern replacement  (str-* 계열 순서: 문자열 먼저)
-    "str-re-replace": (s, pattern, replacement) => {
-      try { return String(s).replace(new RegExp(pattern, "g"), replacement); } catch { return String(s); }
-    },
-    // re-split pattern str  (패턴 먼저)
     "re-split": (pattern, s) => {
       try {
         return String(s).split(new RegExp(pattern));
       } catch {
         return [String(s)];
       }
-    },
-    // str-re-split str pattern  (str-* 계열 순서: 문자열 먼저)
-    "str-re-split": (s, pattern) => {
-      try { return String(s).split(new RegExp(pattern)); } catch { return [String(s)]; }
     },
     "re-groups": (pattern, s) => {
       try {
@@ -31049,11 +30863,11 @@ function loadAllStdlib(interp2) {
     "fn-meta": (name) => {
       const meta = fnMetaRegistry.get(name);
       if (!meta) return null;
-      const m = {};
-      if (meta.returns) m.returns = meta.returns;
-      if (meta.context) m.context = meta.context;
-      if (meta.effects) m.effects = meta.effects;
-      if (meta.examples) m.examples = meta.examples;
+      const m = /* @__PURE__ */ new Map();
+      if (meta.returns) m.set("returns", meta.returns);
+      if (meta.context) m.set("context", meta.context);
+      if (meta.effects) m.set("effects", meta.effects);
+      if (meta.examples) m.set("examples", meta.examples);
       return m;
     },
     "fn_meta": (name) => _aliases["fn-meta"](name),
@@ -31227,7 +31041,7 @@ function evalPatternMatch(interp2, match) {
       }
       if (caseItem.guard) {
         const guardResult = interp2.eval(caseItem.guard);
-        if (guardResult === null || guardResult === void 0 || guardResult === false) {
+        if (!guardResult) {
           interp2.context.variables.pop();
           continue;
         }
@@ -31254,20 +31068,21 @@ function evalTryBlock(interp2, tryBlock) {
       for (const catchClause of tryBlock.catchClauses) {
         interp2.context.variables.push();
         if (catchClause.variable) {
-          const errMap = {};
+          const errMap = /* @__PURE__ */ new Map();
           if (typeof error === "string") {
-            errMap.message = error;
+            errMap.set("message", error);
           } else if (error instanceof Error) {
-            errMap.message = error.message;
+            errMap.set("message", error.message);
             const lineMatch = error.message.match(/\(at line (\d+)/);
-            if (lineMatch) errMap.line = parseInt(lineMatch[1], 10);
+            if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
             const flErr = error;
-            if (flErr.file) errMap.file = flErr.file;
-            if (flErr.code) errMap.code = flErr.code;
-            if (flErr.hint) errMap.hint = flErr.hint;
+            if (flErr.file) errMap.set("file", flErr.file);
+            if (flErr.code) errMap.set("code", flErr.code);
+            if (flErr.hint) errMap.set("hint", flErr.hint);
           } else {
-            errMap.message = String(error);
+            errMap.set("message", String(error));
           }
+          errMap.set("raw", error);
           interp2.context.variables.set("$" + catchClause.variable, errMap);
         }
         try {
@@ -31534,6 +31349,7 @@ var KNOWN_ALIASES = {
   "str_length": { correct: "length", usage: '(length "hello")' },
   "string_length": { correct: "length", usage: '(length "hello")' },
   "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
+  "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
   "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
   "int_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
   "to_string": { correct: "str", usage: "(str value)" },
@@ -34835,20 +34651,12 @@ var Interpreter = class _Interpreter {
   }
   // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
   interpolateString(template) {
-    const _findMatchBrace = (tpl, openIdx) => {
-      let depth = 1;
-      for (let j = openIdx + 1; j < tpl.length; j++) {
-        if (tpl[j] === "{") depth++;
-        else if (tpl[j] === "}") { depth--; if (depth === 0) return j; }
-      }
-      return -1;
-    };
     let result = "";
     let i = 0;
     while (i < template.length) {
       if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
-        const end = _findMatchBrace(template, i + 1);
         const start = i + 2;
+        const end = template.indexOf("}", start);
         if (end > start) {
           const content = template.slice(start, end).trim();
           let val;
@@ -34857,8 +34665,7 @@ var Interpreter = class _Interpreter {
               const tokens = lex("(" + content + ")");
               const ast = parse(tokens);
               val = ast.length > 0 ? this.eval(ast[0]) : null;
-            } catch (e2) {
-              process.stderr.write(`[FL] \${...} error: ${e2.message}\n`);
+            } catch {
               val = null;
             }
           } else {
@@ -34866,9 +34673,11 @@ var Interpreter = class _Interpreter {
               const parts = content.split(".");
               val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
               for (let p = 1; p < parts.length; p++) {
-                if (val === null || val === void 0) { val = null; break; }
-                if (val instanceof Map) val = val.has(parts[p]) ? val.get(parts[p]) : null;
-                else val = typeof val === "object" ? val[parts[p]] : null;
+                if (val === null || val === void 0) {
+                  val = null;
+                  break;
+                }
+                val = typeof val === "object" ? val[parts[p]] : null;
               }
             } else {
               val = this.context.variables.has("$" + content) ? this.context.variables.get("$" + content) : this.context.variables.get(content);
@@ -36827,8 +36636,9 @@ var FLExecutor = class {
       memberCollection.set(key, member);
       return member;
     };
-    ctx["str-to-int"] = (str) => { const _n = parseInt(String(str), 10); return isNaN(_n) ? null : _n; };
-    _aliases["str-to-int"] = _aliases["str_to_int"] = (str) => { const _n = parseInt(String(str ?? ""), 10); return isNaN(_n) ? null : _n; };
+    ctx["str-to-int"] = (str) => {
+      return parseInt(String(str), 10);
+    };
     ctx["merge"] = (obj1, obj2) => {
       return { ...obj1, ...obj2 };
     };

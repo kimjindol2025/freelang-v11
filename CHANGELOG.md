@@ -1,5 +1,25 @@
 # FreeLang v11 변경 이력
 
+## [11.2.5] - 2026-05-03
+
+**마일스톤**: 오류 서치 #28~#29 — 버그 6개 수정
+
+### 🐛 버그 수정
+
+#### 함수/클로저
+- **`async` 멀티 body 무시**: `(async f [x] expr1 expr2)` → expr2 무시되던 버그 수정 — `fn`/`defn`과 동일하게 `do`로 래핑
+
+#### 컬렉션 / Map
+- **`merge` Map 인스턴스 반환**: `(merge m1 m2)` → `new Map()` 반환으로 `json_stringify → "{}"` 문제 수정 — 평범한 `{}` 객체로 교체
+- **`merge` nil 값 삭제**: `(merge {:a nil} {:b 2})` → `:a` 키가 사라지던 버그 수정 — nil도 보존
+- **`merge-all` 동일 수정**: Map 인스턴스 반환 + nil 삭제 동일 수정
+- **`obj-merge` Map spread**: Map 인스턴스 인자 시 `{...mapInstance} = {}` 버그 수정 — `Object.fromEntries` 변환 후 spread
+- **`contains?` map 미지원**: `(contains? {:a 1} "a")` → `false` 반환되던 버그 수정 — Map/plain object 키 체크 추가
+- **`get-in` 콜론 키 미정규화**: `(get-in m [":user" ":name"])` 작동 안 되던 버그 수정 — 콜론 prefix 자동 제거
+
+#### mutable state
+- **`set!` Map 인스턴스 할당**: `(set! (get m "k") v)` → Map 인스턴스엔 bracket 할당(`=`)이 아닌 `Map.set()` 사용
+
 ## [11.2.4] - 2026-05-03
 
 **마일스톤**: 오류 서치 #25~#27 — 버그 6개 수정
