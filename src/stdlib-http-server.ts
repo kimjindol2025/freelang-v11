@@ -345,6 +345,25 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return null;
     },
 
+    // route method path handler → 메서드 문자열로 등록
+    // (route "GET"    "/api/x" handler-fn)
+    // (route "POST"   "/api/x" handler-fn)
+    "route": (method: string, path: string, handlerName: string | any): null => {
+      const m = String(method).toUpperCase();
+      const [pattern, params] = pathToRegex(path);
+      routes.push({ method: m, path, pattern, params, handler: handlerName });
+      return null;
+    },
+
+    // server_all path handler → 모든 메서드 등록 (catch-all)
+    "server_all": (path: string, handlerName: string | any): null => {
+      const [pattern, params] = pathToRegex(path);
+      for (const m of ["GET","POST","PUT","PATCH","DELETE"]) {
+        routes.push({ method: m, path, pattern, params, handler: handlerName });
+      }
+      return null;
+    },
+
     // server_start port -> string
     "server_start": (port: number): string => {
       // Hot-reload: close previous server before starting new one
@@ -677,13 +696,16 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return null;
     },
 
-    // server_json obj -> response object
-    "server_json": (body: any): Record<string, any> => {
+    // server_json [status] obj -> response object
+    // (server_json data)        → 200 JSON
+    // (server_json 201 data)    → 201 JSON
+    "server_json": (statusOrBody: any, maybeBody?: any): Record<string, any> => {
+      const isStatus = typeof statusOrBody === "number" && statusOrBody >= 100 && statusOrBody < 600;
       return {
         __fl_response: true,
-        status: 200,
+        status: isStatus ? statusOrBody : 200,
         contentType: "application/json",
-        body,
+        body: isStatus ? maybeBody : statusOrBody,
       };
     },
 
@@ -765,6 +787,82 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     "server_header": (response: Record<string, any>, key: string, value: string): Record<string, any> => {
       const existing = response.headers || {};
       return { ...response, headers: { ...existing, [key]: value } };
+    },
+
+    // ── API 응답 헬퍼 ─────────────────────────────────────────────────
+    // api_ok data              → 200 {:ok true :data ...}
+    // api_ok "msg"             → 200 {:ok true :message ...}
+    "api_ok": (data: any): Record<string, any> => ({
+      __fl_response: true, status: 200, contentType: "application/json",
+      body: typeof data === "string" ? { ok: true, message: data } : { ok: true, data },
+    }),
+
+    // api_created data         → 201 {:ok true :data ...}
+    "api_created": (data: any): Record<string, any> => ({
+      __fl_response: true, status: 201, contentType: "application/json",
+      body: { ok: true, data },
+    }),
+
+    // api_error message [code] → 4xx/5xx {:ok false :error ...}
+    // (api_error "Not found" 404)
+    // (api_error "Server error")  → 500
+    "api_error": (message: string, code?: number): Record<string, any> => ({
+      __fl_response: true, status: code ?? 500, contentType: "application/json",
+      body: { ok: false, error: message },
+    }),
+
+    // api_not_found [message]  → 404
+    "api_not_found": (message?: string): Record<string, any> => ({
+      __fl_response: true, status: 404, contentType: "application/json",
+      body: { ok: false, error: message ?? "Not Found" },
+    }),
+
+    // api_bad_request [message] → 400
+    "api_bad_request": (message?: string): Record<string, any> => ({
+      __fl_response: true, status: 400, contentType: "application/json",
+      body: { ok: false, error: message ?? "Bad Request" },
+    }),
+
+    // api_unauthorized [message] → 401
+    "api_unauthorized": (message?: string): Record<string, any> => ({
+      __fl_response: true, status: 401, contentType: "application/json",
+      body: { ok: false, error: message ?? "Unauthorized" },
+    }),
+
+    // api_forbidden [message]  → 403
+    "api_forbidden": (message?: string): Record<string, any> => ({
+      __fl_response: true, status: 403, contentType: "application/json",
+      body: { ok: false, error: message ?? "Forbidden" },
+    }),
+
+    // ── CORS 헬퍼 ────────────────────────────────────────────────────
+    // server_cors response [origin] → response에 CORS 헤더 추가
+    // (server_cors (server_json data))
+    // (server_cors (server_json data) "https://app.example.com")
+    "server_cors": (response: Record<string, any>, origin?: string): Record<string, any> => {
+      const corsHeaders = {
+        "Access-Control-Allow-Origin": origin ?? "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      };
+      return { ...response, headers: { ...(response.headers || {}), ...corsHeaders } };
+    },
+
+    // server_cors_all → 모든 라우트에 CORS 미들웨어 등록 (use와 함께)
+    "server_cors_middleware": (): any => {
+      return (req: any) => {
+        if (req.method === "OPTIONS") {
+          return {
+            __fl_response: true, status: 204, contentType: "text/plain", body: "",
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+              "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            },
+          };
+        }
+        return null; // 통과
+      };
     },
 
     // server_options response -> 204 No Content (CORS preflight 응답)
