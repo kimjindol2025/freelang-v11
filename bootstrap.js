@@ -11407,7 +11407,7 @@ function flExecOpNative(op, vals) {
     case "num-to-str":
       return String(v0 ?? "");
     case "replace":
-      return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
+      return typeof v0 === "string" && typeof v1 === "string" && typeof v2 === "string" ? v0.split(v1).join(v2) : "";
     case "type-of":
       return typeof v0;
     case "print":
@@ -11435,9 +11435,9 @@ function flExecOpNative(op, vals) {
     case "includes?":
       return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
     case "starts-with?":
-      return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
+      return typeof v0 === "string" && typeof v1 === "string" ? v0.startsWith(v1) : false;
     case "ends-with?":
-      return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
+      return typeof v0 === "string" && typeof v1 === "string" ? v0.endsWith(v1) : false;
     case "empty?": {
       if (v0 === null || v0 === void 0) return true;
       if (typeof v0 === "string") return v0.length === 0;
