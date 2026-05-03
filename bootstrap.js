@@ -11354,7 +11354,7 @@ function flExecOpNative(op, vals) {
     }
     case "has-key?": {
       if (v0 === null || v0 === void 0 || typeof v0 !== "object" || Array.isArray(v0)) return false;
-      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : String(v1 ?? "");
       return Object.prototype.hasOwnProperty.call(v0, k);
     }
     case "nil-or-empty?":
@@ -11438,8 +11438,13 @@ function flExecOpNative(op, vals) {
       return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
     case "ends-with?":
       return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
-    case "empty?":
-      return Array.isArray(v0) ? v0.length === 0 : typeof v0 === "string" ? v0.length === 0 : v0 === null || v0 === void 0;
+    case "empty?": {
+      if (v0 === null || v0 === void 0) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
     case "first":
       return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
     case "last":
@@ -11476,10 +11481,14 @@ function flExecOpNative(op, vals) {
     case "sort":
       if (!Array.isArray(v0)) return [];
       return [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b)));
-    case "keys":
+    case "keys": {
+      if (v0 instanceof Map) return Array.from(v0.keys());
       return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
-    case "values":
+    }
+    case "values": {
+      if (v0 instanceof Map) return Array.from(v0.values());
       return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+    }
     case "map-entries":
     case "map_entries":
       return v0 instanceof Map ? [...v0.entries()] : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : [];
