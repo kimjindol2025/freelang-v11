@@ -1,5 +1,29 @@
 # FreeLang v11 변경 이력
 
+## [11.2.6] - 2026-05-03
+
+**마일스톤**: 오류 서치 #30 — 버그 6개 수정
+
+### 🐛 버그 수정
+
+#### 타입 / 컬렉션
+- **`length` Map/객체에서 0**: Map 인스턴스는 `.length` 없음 → `.size` 사용, plain object는 `Object.keys().length` (3경로 수정)
+
+#### 제어 흐름
+- **`if` JS truthy 분기**: `condition ? ... : ...` JS truthy 사용 → FL falsy(`null/false/undefined`)만 false로 처리
+
+#### 문자열 변환
+- **`str-to-int` 부분 파싱**: `parseInt("42abc") → 42` → `/^-?\d+$/` 정규식 사전 검증 추가, 실패 시 null 반환
+
+#### 오류 처리
+- **`json_parse` SyntaxError 전파**: 잘못된 JSON 입력 시 오류 던지던 것 → `null` 반환으로 변경 (2경로: `json_parse`, `json-parse`)
+
+#### HTTP 서버
+- **`server_req_header` undefined 반환**: 없는 헤더 → `undefined` 반환 → `null` 반환으로 수정
+
+#### 개발 편의
+- **사용자 함수 초과 인자 무시**: `FL_STRICT=1` 환경 변수 시 초과 인자 경고 출력
+
 ## [11.2.5] - 2026-05-03
 
 **마일스톤**: 오류 서치 #28~#29 — 버그 6개 수정
