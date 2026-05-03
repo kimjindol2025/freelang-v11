@@ -233,7 +233,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "str": case "concat": return vals.map((v: any) => toDisplay(v)).join("");
     case "str-to-num": { const n = parseFloat(String(v0)); return isNaN(n) ? null : n; }
     case "num-to-str": return String(v0 ?? "");
-    case "replace": return typeof v0 === "string" && typeof v1 === "string" && typeof v2 === "string" ? v0.split(v1).join(v2) : "";
+    case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
     case "type-of": return typeof v0;
     case "print": process.stdout.write(vals.map((v: any) => toDisplay(v)).join("")); return null;
     case "println": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
@@ -247,8 +247,8 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "lower-case": return typeof v0 === "string" ? v0.toLowerCase() : v0;
     case "strlen": return typeof v0 === "string" ? v0.length : 0;
     case "includes?": return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
-    case "starts-with?": return typeof v0 === "string" && typeof v1 === "string" ? v0.startsWith(v1) : false;
-    case "ends-with?": return typeof v0 === "string" && typeof v1 === "string" ? v0.endsWith(v1) : false;
+    case "starts-with?": return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
+    case "ends-with?": return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
     case "empty?": { if (v0 === null || v0 === undefined) return true; if (typeof v0 === "string") return v0.length === 0; if (Array.isArray(v0)) return v0.length === 0; if (typeof v0 === "object") return Object.keys(v0).length === 0; return false; }
     case "first": return Array.isArray(v0) ? (v0[0] !== undefined ? v0[0] : null) : null;
     case "last": return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
@@ -276,7 +276,7 @@ function flExecOpNative(op: string, vals: any[]): any {
       return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : (v1 !== undefined ? v1 : null);
     case "cons": return [v0, ...(Array.isArray(v1) ? v1 : [v1])];
     case "reverse": return Array.isArray(v0) ? [...v0].reverse() : v0;
-    case "sort": return Array.isArray(v0) ? [...v0].sort((a: any, b: any) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : [];
+    case "sort": return Array.isArray(v0) ? [...v0].sort((a: any, b: any) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
     case "keys": return v0 instanceof Map ? Array.from(v0.keys()) : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : []);
     case "values": return v0 instanceof Map ? Array.from(v0.values()) : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : []);
     case "map-entries": case "map_entries": return v0 instanceof Map ? [...v0.entries()] : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : []);
