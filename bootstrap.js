@@ -12950,11 +12950,45 @@ loop().catch(e => {
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
     case "shift":
       return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : null;
+    case "drop-last":
+    case "drop_last":
+      return Array.isArray(args3[0]) ? args3[0].slice(0, -1) : [];
+    case "drop-first":
+    case "drop_first":
+      return Array.isArray(args3[0]) ? args3[0].slice(1) : [];
     case "unshift":
       if (!Array.isArray(args3[0])) return [args3[1]];
       return [args3[1], ...args3[0]];
-    case "typeof":
-      return typeof args3[0];
+    case "typeof": {
+      const _tv = args3[0];
+      if (_tv === null || _tv === undefined) return "null";
+      if (Array.isArray(_tv)) return "array";
+      if (_tv?.kind === "function-value" || _tv?.kind === "async-function-value") return "function";
+      return typeof _tv;
+    }
+    case "any?":
+    case "any": {
+      if (!Array.isArray(args3[1])) return false;
+      const _anyFn = args3[0];
+      return args3[1].some((item) => {
+        const r = callFnVal(_anyFn, [item]);
+        return r !== null && r !== undefined && r !== false;
+      });
+    }
+    case "every?":
+    case "every": {
+      if (!Array.isArray(args3[1])) return true;
+      const _evFn = args3[0];
+      return args3[1].every((item) => {
+        const r = callFnVal(_evFn, [item]);
+        return r !== null && r !== undefined && r !== false;
+      });
+    }
+    case "zip": {
+      const _a1 = args3[0], _a2 = args3[1];
+      if (!Array.isArray(_a1) || !Array.isArray(_a2)) return [];
+      return Array.from({ length: Math.min(_a1.length, _a2.length) }, (_, i) => [_a1[i], _a2[i]]);
+    }
     case "vec-dot":
     case "dot-product": {
       const a = args3[0], b = args3[1];
