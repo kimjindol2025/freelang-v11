@@ -21113,51 +21113,51 @@ function createDataModule() {
     },
     // json_str obj -> string (serialize to JSON string, handles Maps)
     "json_str": function(obj) {
-      const toSerializable = (o) => {
+      const toSerializable2 = (o) => {
         if (o instanceof Map) return Object.fromEntries(o);
-        if (Array.isArray(o)) return o.map(toSerializable);
+        if (Array.isArray(o)) return o.map(toSerializable2);
         if (typeof o === "object" && o !== null) {
           const result = {};
           for (const [k, v] of Object.entries(o)) {
-            result[k] = toSerializable(v);
+            result[k] = toSerializable2(v);
           }
           return result;
         }
         return o;
       };
-      return JSON.stringify(toSerializable(obj));
+      return JSON.stringify(toSerializable2(obj));
     },
     // json_stringify obj -> string (alias for json_str)
     "json_stringify": function(obj) {
-      const toSerializable = (o) => {
+      const toSerializable2 = (o) => {
         if (o instanceof Map) return Object.fromEntries(o);
-        if (Array.isArray(o)) return o.map(toSerializable);
+        if (Array.isArray(o)) return o.map(toSerializable2);
         if (typeof o === "object" && o !== null) {
           const result = {};
           for (const [k, v] of Object.entries(o)) {
-            result[k] = toSerializable(v);
+            result[k] = toSerializable2(v);
           }
           return result;
         }
         return o;
       };
-      return JSON.stringify(toSerializable(obj));
+      return JSON.stringify(toSerializable2(obj));
     },
     // json_pretty obj -> string (pretty-print JSON, handles Maps)
     "json_pretty": function(obj) {
-      const toSerializable = (o2) => {
+      const toSerializable2 = (o2) => {
         if (o2 instanceof Map) return Object.fromEntries(o2);
-        if (Array.isArray(o2)) return o2.map(toSerializable);
+        if (Array.isArray(o2)) return o2.map(toSerializable2);
         if (typeof o2 === "object" && o2 !== null) {
           const result = {};
           for (const [k, v] of Object.entries(o2)) {
-            result[k] = toSerializable(v);
+            result[k] = toSerializable2(v);
           }
           return result;
         }
         return o2;
       };
-      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable(obj);
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable2(obj);
       return JSON.stringify(o, null, 2);
     },
     // ── Hyphen alias (Phase 후속 — Claude 평가에서 발견된 자주 틀리는 함수명) ──
@@ -21170,49 +21170,49 @@ function createDataModule() {
       }
     },
     "json-stringify": function(obj) {
-      const toSerializable = (o) => {
+      const toSerializable2 = (o) => {
         if (o instanceof Map) return Object.fromEntries(o);
-        if (Array.isArray(o)) return o.map(toSerializable);
+        if (Array.isArray(o)) return o.map(toSerializable2);
         if (typeof o === "object" && o !== null) {
           const result = {};
           for (const [k, v] of Object.entries(o)) {
-            result[k] = toSerializable(v);
+            result[k] = toSerializable2(v);
           }
           return result;
         }
         return o;
       };
-      return JSON.stringify(toSerializable(obj));
+      return JSON.stringify(toSerializable2(obj));
     },
     "json-str": function(obj) {
-      const toSerializable = (o) => {
+      const toSerializable2 = (o) => {
         if (o instanceof Map) return Object.fromEntries(o);
-        if (Array.isArray(o)) return o.map(toSerializable);
+        if (Array.isArray(o)) return o.map(toSerializable2);
         if (typeof o === "object" && o !== null) {
           const result = {};
           for (const [k, v] of Object.entries(o)) {
-            result[k] = toSerializable(v);
+            result[k] = toSerializable2(v);
           }
           return result;
         }
         return o;
       };
-      return JSON.stringify(toSerializable(obj));
+      return JSON.stringify(toSerializable2(obj));
     },
     "json-pretty": function(obj) {
-      const toSerializable = (o2) => {
+      const toSerializable2 = (o2) => {
         if (o2 instanceof Map) return Object.fromEntries(o2);
-        if (Array.isArray(o2)) return o2.map(toSerializable);
+        if (Array.isArray(o2)) return o2.map(toSerializable2);
         if (typeof o2 === "object" && o2 !== null) {
           const result = {};
           for (const [k, v] of Object.entries(o2)) {
-            result[k] = toSerializable(v);
+            result[k] = toSerializable2(v);
           }
           return result;
         }
         return o2;
       };
-      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable(obj);
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable2(obj);
       return JSON.stringify(o, null, 2);
     },
     "json-merge": (a, b) => {
@@ -22215,7 +22215,19 @@ function saveCheckpoint(filePath, data) {
     if (!fs6.existsSync(dir)) {
       fs6.mkdirSync(dir, { recursive: true });
     }
-    fs6.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    const toSerializable2 = (obj) => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map(toSerializable2);
+      if (typeof obj === "object" && obj !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = toSerializable2(v);
+        }
+        return result;
+      }
+      return obj;
+    };
+    fs6.writeFileSync(filePath, JSON.stringify(toSerializable2(data), null, 2), "utf-8");
   } catch (err4) {
     console.error(`[Checkpoint] Failed to save: ${err4.message}`);
     throw err4;
@@ -24302,12 +24314,24 @@ var import_child_process4 = require("child_process");
 var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
 function kimdbReq(method, path18, body) {
+  const toSerializable2 = (obj) => {
+    if (obj instanceof Map) return Object.fromEntries(obj);
+    if (Array.isArray(obj)) return obj.map(toSerializable2);
+    if (typeof obj === "object" && obj !== null) {
+      const result = {};
+      for (const [k, v] of Object.entries(obj)) {
+        result[k] = toSerializable2(v);
+      }
+      return result;
+    }
+    return obj;
+  };
   const url2 = `${KIMDB}${path18}`;
   const args3 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args3.push("-X", method);
     if (body !== void 0) {
-      args3.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
+      args3.push("-H", "Content-Type: application/json", "-d", JSON.stringify(toSerializable2(body)));
     }
   }
   args3.push(url2);
@@ -26560,7 +26584,19 @@ function createMongodbModule() {
   const helperPath = path9.join(__dirname, "_mongodb_helper.js");
   function callHelper(req) {
     try {
-      const result = (0, import_child_process7.execFileSync)("node", [helperPath, JSON.stringify(req)], {
+      const toSerializable2 = (obj) => {
+        if (obj instanceof Map) return Object.fromEntries(obj);
+        if (Array.isArray(obj)) return obj.map(toSerializable2);
+        if (typeof obj === "object" && obj !== null) {
+          const result2 = {};
+          for (const [k, v] of Object.entries(obj)) {
+            result2[k] = toSerializable2(v);
+          }
+          return result2;
+        }
+        return obj;
+      };
+      const result = (0, import_child_process7.execFileSync)("node", [helperPath, JSON.stringify(toSerializable2(req))], {
         timeout: req.timeout ? req.timeout + 2e3 : 15e3,
         encoding: "utf-8"
       });
@@ -27036,6 +27072,18 @@ function createImmutableModule() {
 }
 
 // src/stdlib-ai-native.ts
+var toSerializable = (obj) => {
+  if (obj instanceof Map) return Object.fromEntries(obj);
+  if (Array.isArray(obj)) return obj.map(toSerializable);
+  if (typeof obj === "object" && obj !== null) {
+    const result = {};
+    for (const [k, v] of Object.entries(obj)) {
+      result[k] = toSerializable(v);
+    }
+    return result;
+  }
+  return obj;
+};
 function createAiNativeModule() {
   return {
     // ── AI 모델 직접 호출 ────────────────────────────────────────────
@@ -27061,13 +27109,13 @@ ${JSON.stringify(prompt.context)}` : "";
               "x-api-key": anthropicKey,
               "anthropic-version": "2023-06-01"
             },
-            body: JSON.stringify({
+            body: JSON.stringify(toSerializable({
               model: model === "claude-3" ? "claude-3-haiku-20240307" : model,
               max_tokens: maxTokens,
               messages: [
                 { role: "user", content: promptStr + contextStr }
               ]
-            })
+            }))
           });
           if (res.ok) {
             const data = await res.json();
@@ -27085,10 +27133,10 @@ ${JSON.stringify(prompt.context)}` : "";
               "Content-Type": "application/json",
               Authorization: `Bearer ${openaiKey}`
             },
-            body: JSON.stringify({
+            body: JSON.stringify(toSerializable({
               model: model === "gpt-4" ? "gpt-4-turbo-preview" : model,
               messages: [{ role: "user", content: promptStr }]
-            })
+            }))
           });
           if (res.ok) {
             const data = await res.json();
@@ -27120,7 +27168,7 @@ ${JSON.stringify(prompt.context)}` : "";
         const res = await fetch(`http://localhost:${gptPort}/api/embed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify(toSerializable({ text })),
           signal: AbortSignal.timeout ? AbortSignal.timeout(3e3) : void 0
         });
         if (res.ok) {

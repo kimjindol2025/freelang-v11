@@ -21,7 +21,19 @@ export function saveCheckpoint(filePath: string, data: CheckpointData): void {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    const toSerializable = (obj: any): any => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map(toSerializable);
+      if (typeof obj === "object" && obj !== null) {
+        const result: any = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = toSerializable(v);
+        }
+        return result;
+      }
+      return obj;
+    };
+    fs.writeFileSync(filePath, JSON.stringify(toSerializable(data), null, 2), "utf-8");
   } catch (err: any) {
     console.error(`[Checkpoint] Failed to save: ${err.message}`);
     throw err;

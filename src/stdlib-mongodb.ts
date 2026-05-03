@@ -10,7 +10,19 @@ export function createMongodbModule() {
 
   function callHelper(req: Record<string, any>): any {
     try {
-      const result = execFileSync("node", [helperPath, JSON.stringify(req)], {
+      const toSerializable = (obj: any): any => {
+        if (obj instanceof Map) return Object.fromEntries(obj);
+        if (Array.isArray(obj)) return obj.map(toSerializable);
+        if (typeof obj === "object" && obj !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(obj)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return obj;
+      };
+      const result = execFileSync("node", [helperPath, JSON.stringify(toSerializable(req))], {
         timeout: req.timeout ? req.timeout + 2000 : 15000,
         encoding: "utf-8",
       });

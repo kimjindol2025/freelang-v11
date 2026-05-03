@@ -9,12 +9,25 @@ import Database from "better-sqlite3";
 const KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
 
 function kimdbReq(method: string, path: string, body?: any): any {
+  const toSerializable = (obj: any): any => {
+    if (obj instanceof Map) return Object.fromEntries(obj);
+    if (Array.isArray(obj)) return obj.map(toSerializable);
+    if (typeof obj === "object" && obj !== null) {
+      const result: any = {};
+      for (const [k, v] of Object.entries(obj)) {
+        result[k] = toSerializable(v);
+      }
+      return result;
+    }
+    return obj;
+  };
+
   const url = `${KIMDB}${path}`;
   const args = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args.push("-X", method);
     if (body !== undefined) {
-      args.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
+      args.push("-H", "Content-Type: application/json", "-d", JSON.stringify(toSerializable(body)));
     }
   }
   args.push(url);

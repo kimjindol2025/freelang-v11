@@ -1,6 +1,19 @@
 // FreeLang v9: AI 네이티브 모듈
 // Phase 71: ai-call / rag-search / embed / similarity / chunk-text / prompt-template
 
+const toSerializable = (obj: any): any => {
+  if (obj instanceof Map) return Object.fromEntries(obj);
+  if (Array.isArray(obj)) return obj.map(toSerializable);
+  if (typeof obj === "object" && obj !== null) {
+    const result: any = {};
+    for (const [k, v] of Object.entries(obj)) {
+      result[k] = toSerializable(v);
+    }
+    return result;
+  }
+  return obj;
+};
+
 /**
  * AI 네이티브 블록 생성
  * - API 키 없으면 Mock 모드로 동작
@@ -45,13 +58,13 @@ export function createAiNativeModule(): Record<string, Function> {
               "x-api-key": anthropicKey,
               "anthropic-version": "2023-06-01",
             },
-            body: JSON.stringify({
+            body: JSON.stringify(toSerializable({
               model: model === "claude-3" ? "claude-3-haiku-20240307" : model,
               max_tokens: maxTokens,
               messages: [
                 { role: "user", content: promptStr + contextStr },
               ],
-            }),
+            })),
           });
           if (res.ok) {
             const data = (await res.json()) as any;
@@ -71,10 +84,10 @@ export function createAiNativeModule(): Record<string, Function> {
               "Content-Type": "application/json",
               Authorization: `Bearer ${openaiKey}`,
             },
-            body: JSON.stringify({
+            body: JSON.stringify(toSerializable({
               model: model === "gpt-4" ? "gpt-4-turbo-preview" : model,
               messages: [{ role: "user", content: promptStr }],
-            }),
+            })),
           });
           if (res.ok) {
             const data = (await res.json()) as any;
@@ -110,7 +123,7 @@ export function createAiNativeModule(): Record<string, Function> {
         const res = await fetch(`http://localhost:${gptPort}/api/embed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify(toSerializable({ text })),
           signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined,
         });
         if (res.ok) {
