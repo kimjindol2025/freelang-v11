@@ -21682,17 +21682,15 @@ function createCollectionModule(interp2) {
     "once": (fn) => {
       let called = false, result;
       return (...args3) => {
-        if (!called) {
-          called = true;
-          result = fn(...args3);
-        }
+        if (!called) { called = true; result = _callFl(fn, args3); }
         return result;
       };
     },
-    // tap value fn -> value  (call fn(value) for side effects, return value unchanged)
-    "tap": (value, fn) => {
-      fn(value);
-      return value;
+    // tap fn value -> value  (side effect, return value) — works with ->> pipe
+    "tap": (a, b) => {
+      const isFn = (x) => typeof x === "function" || (x && (x.kind === "function-value" || x.kind === "async-function-value"));
+      const [fn, value] = isFn(a) ? [a, b] : [b, a];
+      _callFl(fn, [value]); return value;
     },
     // ── Range / Sequence ─────────────────────────────────────
     // range start end -> [number]  (inclusive start, exclusive end)
