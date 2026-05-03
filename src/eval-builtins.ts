@@ -1499,8 +1499,6 @@ loop().catch(e => {
       return false;
     case "starts-with?":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
-    case "ends-with?":
-      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].endsWith(args[1]) : false;
     case "index-of":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].indexOf(args[1]) : -1;
     case "replace":
