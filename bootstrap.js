@@ -11411,7 +11411,7 @@ function flExecOpNative(op, vals) {
     case "type-of":
       return typeof v0;
     case "print":
-      process.stdout.write(vals.map((v) => v === null ? "null" : String(v)).join(""));
+      process.stdout.write(vals.map((v) => toDisplay(v)).join(""));
       return null;
     case "println":
       console.log(...vals.map((v) => v === null ? "null" : String(v)));
@@ -11474,7 +11474,8 @@ function flExecOpNative(op, vals) {
     case "reverse":
       return Array.isArray(v0) ? [...v0].reverse() : v0;
     case "sort":
-      return Array.isArray(v0) ? [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
+      if (!Array.isArray(v0)) return [];
+      return [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b)));
     case "keys":
       return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
     case "values":
@@ -13049,9 +13050,9 @@ loop().catch(e => {
     case "abs":
       return Math.abs(args3[0]);
     case "min":
-      return Math.min(...args3);
+      return Math.min(...args3.filter((v) => typeof v === "number"));
     case "max":
-      return Math.max(...args3);
+      return Math.max(...args3.filter((v) => typeof v === "number"));
     case "floor":
       return Math.floor(args3[0]);
     case "ceil":
