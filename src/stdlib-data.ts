@@ -25,7 +25,19 @@ export function createDataModule() {
     // json_set obj path value -> object (immutable update, returns new obj)
     "json_set": (obj: any, path: string, value: any): any => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const clone = JSON.parse(JSON.stringify(parsed));
+      const deepClone = (o: any): any => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
       const parts = path.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -227,7 +239,19 @@ export function createDataModule() {
     },
     "json-set": (obj: any, path: string, value: any): any => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const clone = JSON.parse(JSON.stringify(parsed));
+      const deepClone = (o: any): any => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
       const parts = String(path).split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {

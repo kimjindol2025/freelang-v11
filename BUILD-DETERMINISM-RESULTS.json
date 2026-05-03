@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-05-03T11:44:34Z",
+  "timestamp": "2026-05-03T11:51:14Z",
   "pass": 2,
   "fail": 0,
-  "build1_seconds": 0,
-  "build2_seconds": 1,
+  "build1_seconds": 1,
+  "build2_seconds": 0,
   "artifacts": [
-    {"file": "bootstrap.js", "build1_sha256": "ec02741b47925618d84ec6bf26943395a909f9afd2d8dea986e2fa438998b880", "build2_sha256": "ec02741b47925618d84ec6bf26943395a909f9afd2d8dea986e2fa438998b880", "match": true},
+    {"file": "bootstrap.js", "build1_sha256": "c4d3a1a2892993e6e57ef5fb4dcea5b246178e36ed06c2b6b14ea9110963df13", "build2_sha256": "c4d3a1a2892993e6e57ef5fb4dcea5b246178e36ed06c2b6b14ea9110963df13", "match": true},
     {"file": "browser.js", "build1_sha256": "a642f742ca2a50c1e44ac4fadb16e15d855411efdc42a2b33fe8239fe9058cce", "build2_sha256": "a642f742ca2a50c1e44ac4fadb16e15d855411efdc42a2b33fe8239fe9058cce", "match": true}
   ]
 }
