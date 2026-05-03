@@ -7,10 +7,16 @@
 
 ## v11.3.7 릴리스 (2026-05-03) 🎉
 
-**마일스톤**: JSON Map 직렬화 + 한글 문자 처리 수정  
-**버그 수정**: 2개 (json_str, json_set)  
+**마일스톤**: 종합적 Map 직렬화 수정 + 한글 문자 데이터 전송 복구  
+**버그 수정**: 6개 모듈 (json_str, json_set, kimdbReq, callHelper, saveCheckpoint, AI API)  
+**근본 원인**: `JSON.stringify(Map)` → `{}` (데이터 손실)  
 **테스트**: 832/832 통과 (100%)  
 **상태**: ✅ **배포 완료**
+
+### 핵심 개선사항
+- 🔧 **db-post**: 한글 데이터 정상 저장 (KimDB)
+- 🔧 **데이터 계층**: MongoDB/Checkpoint/AI API 모두 Map 처리
+- 🔧 **재귀적 변환**: 중첩된 Map 구조까지 완전 지원
 
 ### 이전 릴리스
 

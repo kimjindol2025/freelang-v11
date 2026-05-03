@@ -6,21 +6,36 @@
 
 ### 🐛 버그 수정
 
-#### JSON 직렬화 (stdlib-data.ts)
-- **json_str**: Map 객체를 JSON 직렬화 가능한 형태로 변환
-  - `JSON.stringify(Map)` → `{}` 문제 해결
-  - 재귀적 변환으로 중첩된 Map 처리
-- **json_stringify**: 동일한 Map 처리 로직 적용
-- **json_pretty**: Map 처리 추가
-- **json_set**: deepClone 함수로 Map 보존
+#### Core Issue: Map Serialization
+- **근본 원인**: `JSON.stringify(Map)` → `{}` (빈 객체)로 변환
+- **영향**: Map 객체의 모든 데이터 손실, 특히 한글 문자 손상
 
-#### 영향 범위
-- **db-post**: 한글 데이터 직렬화 문제 해결
-- **HTTP 요청**: Map 기반 요청 본문 전송 정상화
-- **데이터 저장소**: KimDB/MariaDB에 한글 문자 정상 저장
+#### stdlib-data.ts (JSON 함수들)
+- **json_str/json_stringify**: toSerializable() 함수로 Map을 Object로 변환
+- **json_pretty**: Map 처리 추가로 예쁜 출력 지원
+- **json_set**: deepClone() 함수로 Map 객체 완전 복사 (JSON 직렬화 회피)
+
+#### 데이터 전송 계층 (크리티컬 수정)
+- **stdlib-db.ts - kimdbReq()**: KimDB REST API 요청 본문 Map 변환
+  - db_put/db_post 호출 시 Map 데이터 정상 직렬화
+  - **원인**: `curl -d JSON.stringify(body)` 직접 호출에서 Map 손실
+  
+- **stdlib-mongodb.ts - callHelper()**: MongoDB 요청 Map 변환
+  - execFileSync 호출 시 인자 직렬화 정상화
+  
+- **stdlib-checkpoint.ts - saveCheckpoint()**: 체크포인트 저장 Map 처리
+  - fs.writeFileSync 호출 시 Map 객체 완전 보존
+  
+- **stdlib-ai-native.ts - fetch bodies**: AI API 요청 Map 변환
+  - Anthropic/OpenAI/embed API 호출 시 Map 데이터 정상 전송
+
+### ✨ 결과
+- **db-post 한글 전송 문제 해결**: Korean characters now properly saved to KimDB
+- **모든 데이터베이스 작업 안정화**: HTTP/MongoDB/Checkpoint all handle Maps
+- **AI API 호출 개선**: Map-based prompt contexts properly serialized
 
 **테스트**: 832/832 통과 (100%)  
-**상태**: 프로덕션 안정성 강화
+**상태**: 프로덕션 안정성 강화 ✅
 
 ## [11.3.6] - 2026-05-03
 
