@@ -11412,7 +11412,9 @@ function flExecOpNative(op, vals) {
     case "concat":
       return vals.map((v) => v === null || v === void 0 ? "" : String(v)).join("");
     case "str-to-num": {
-      const n = parseFloat(String(v0));
+      const _s = String(v0 ?? "").trim();
+      if (_s === "") return null;
+      const n = Number(_s);
       return isNaN(n) ? null : n;
     }
     case "num-to-str":
@@ -12512,10 +12514,12 @@ loop().catch(e => {
       } else {
         throw new Error(`fn expects parameter array`);
       }
+      const _fnBodyArgs = expr2.args.slice(1);
+      const _fnBody = _fnBodyArgs.length === 1 ? _fnBodyArgs[0] : { kind: "sexpr", op: "do", args: _fnBodyArgs };
       return {
         kind: "function-value",
         params,
-        body: expr2.args[1],
+        body: _fnBody,
         capturedEnv: interp2.context.variables.snapshot()
       };
     }
@@ -12637,7 +12641,7 @@ loop().catch(e => {
       return args3[0] !== null && args3[0] !== undefined && typeof args3[0] === "object" && !Array.isArray(args3[0]) && args3[0]?.kind !== "function-value" && args3[0]?.kind !== "async-function-value";
     case "num-to-str":
       return String(args3[0]);
-    case "str-to-num": { const _stn3 = parseFloat(String(args3[0])); return isNaN(_stn3) ? null : _stn3; }
+    case "str-to-num": { const _stn3s = String(args3[0] ?? "").trim(); if (_stn3s === "") return null; const _stn3 = Number(_stn3s); return isNaN(_stn3) ? null : _stn3; }
     case "str-to-int":
     case "str_to_int": { const _sti3 = parseInt(String(args3[0] ?? ""), 10); return isNaN(_sti3) ? null : _sti3; }
     case "map-set":
@@ -12687,18 +12691,20 @@ loop().catch(e => {
       const filterFn = args3[0];
       const coll = args3[1];
       if (!Array.isArray(coll)) return [];
-      if (typeof filterFn === "function") return coll.filter(filterFn);
+      const _flTruthy = (v) => v !== null && v !== void 0 && v !== false;
+      if (typeof filterFn === "function") return coll.filter((item) => _flTruthy(filterFn(item)));
       if (filterFn && (filterFn.kind === "function-value" || filterFn.kind === "async-function-value")) {
-        return coll.filter((item) => callFnVal(filterFn, [item]));
+        return coll.filter((item) => _flTruthy(callFnVal(filterFn, [item])));
       }
       return coll;
     }
     case "find":
       if (Array.isArray(args3[0])) {
         const findFn = args3[1];
-        if (typeof findFn === "function") return args3[0].find(findFn) ?? null;
+        const _flT = (v) => v !== null && v !== void 0 && v !== false;
+        if (typeof findFn === "function") return args3[0].find((item) => _flT(findFn(item))) ?? null;
         if (findFn && findFn.kind === "function-value") {
-          return args3[0].find((item) => callFnVal(findFn, [item])) ?? null;
+          return args3[0].find((item) => _flT(callFnVal(findFn, [item]))) ?? null;
         }
         const _fi = args3[0].indexOf(findFn);
         return _fi >= 0 ? args3[0][_fi] : null;
@@ -12823,7 +12829,7 @@ loop().catch(e => {
           return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
         case "num-to-str":
           return String(v0 ?? "");
-        case "str-to-num": { const _stnv = parseFloat(String(v0)); return isNaN(_stnv) ? null : _stnv; }
+        case "str-to-num": { const _stnvs = String(v0 ?? "").trim(); if (_stnvs === "") return null; const _stnv = Number(_stnvs); return isNaN(_stnv) ? null : _stnv; }
         case "replace":
           return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
         case "str-join":
@@ -13298,7 +13304,8 @@ loop().catch(e => {
       if (Array.isArray(seq)) {
         const result = [];
         for (const v of seq) {
-          if (!callFn(pred, [v])) break;
+          const pv = callFn(pred, [v]);
+          if (pv === null || pv === void 0 || pv === false) break;
           result.push(v);
         }
         return result;
@@ -34828,12 +34835,20 @@ var Interpreter = class _Interpreter {
   }
   // 문자열 보간 처리: {$var} 와 {(expr)} 모두 지원
   interpolateString(template) {
+    const _findMatchBrace = (tpl, openIdx) => {
+      let depth = 1;
+      for (let j = openIdx + 1; j < tpl.length; j++) {
+        if (tpl[j] === "{") depth++;
+        else if (tpl[j] === "}") { depth--; if (depth === 0) return j; }
+      }
+      return -1;
+    };
     let result = "";
     let i = 0;
     while (i < template.length) {
       if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
+        const end = _findMatchBrace(template, i + 1);
         const start = i + 2;
-        const end = template.indexOf("}", start);
         if (end > start) {
           const content = template.slice(start, end).trim();
           let val;
@@ -34842,7 +34857,8 @@ var Interpreter = class _Interpreter {
               const tokens = lex("(" + content + ")");
               const ast = parse(tokens);
               val = ast.length > 0 ? this.eval(ast[0]) : null;
-            } catch {
+            } catch (e2) {
+              process.stderr.write(`[FL] \${...} error: ${e2.message}\n`);
               val = null;
             }
           } else {
@@ -34850,11 +34866,9 @@ var Interpreter = class _Interpreter {
               const parts = content.split(".");
               val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
               for (let p = 1; p < parts.length; p++) {
-                if (val === null || val === void 0) {
-                  val = null;
-                  break;
-                }
-                val = typeof val === "object" ? val[parts[p]] : null;
+                if (val === null || val === void 0) { val = null; break; }
+                if (val instanceof Map) val = val.has(parts[p]) ? val.get(parts[p]) : null;
+                else val = typeof val === "object" ? val[parts[p]] : null;
               }
             } else {
               val = this.context.variables.has("$" + content) ? this.context.variables.get("$" + content) : this.context.variables.get(content);

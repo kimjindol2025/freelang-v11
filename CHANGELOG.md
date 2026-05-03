@@ -1,5 +1,25 @@
 # FreeLang v11 변경 이력
 
+## [11.2.4] - 2026-05-03
+
+**마일스톤**: 오류 서치 #25~#27 — 버그 6개 수정
+
+### 🐛 버그 수정
+
+#### 함수/클로저
+- **`fn` 멀티 body 무시**: `fn [$x] expr1 expr2` → expr2 무시되던 버그 수정 — `defn`과 동일하게 `do`로 래핑
+
+#### 컬렉션
+- **`filter` JS falsy**: `(filter fn [0 1 2])` → 0 제외되던 버그 수정 — FL falsy(`null/false/undefined`)로 교체
+- **`find` predicate JS falsy**: 동일 수정
+- **`take-while` JS falsy**: `(take-while fn [1 2 0 3])` → 0에서 조기 종료되던 버그 수정
+
+#### 문자열
+- **`str-to-num` 부분 파싱**: `"42abc"` → 42 대신 null 반환 — `parseFloat` → `Number()` 교체 (3경로)
+- **문자열 보간 `${...}` 중첩 중괄호**: `${(get {:x 1} "x")}` 에서 첫 `}`에 조기 종료되던 버그 수정 — 중첩 깊이 카운팅
+- **문자열 보간 오류 로그**: 에러를 조용히 삼키던 것 → stderr 경고
+- **문자열 보간 Map 인스턴스 dot 접근**: `${user.name}` 에서 Map 인스턴스 접근 시 `Map.get()` 사용
+
 ## [11.2.3] - 2026-05-03
 
 **마일스톤**: SQL Injection 구조 수정 + parallel Promise 지원
