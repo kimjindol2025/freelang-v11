@@ -12566,15 +12566,6 @@ loop().catch(e => {
       return typeof args3[0] === "function";
     case "map?":
       return args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]);
-    case "empty?": {
-      const v = args3[0];
-      if (v === null || v === undefined || v === "") return true;
-      if (Array.isArray(v)) return v.length === 0;
-      if (typeof v === "object") return Object.keys(v).length === 0;
-      return false;
-    }
-    case "has-key?":
-      return args3[0] != null && String(args3[1]) in Object(args3[0]);
     case "num-to-str":
       return String(args3[0]);
     case "str-to-num":
@@ -26991,7 +26982,6 @@ function _fl_values(o) { return o ? Object.values(o) : []; }
 var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
 function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
-function _fl_empty_q(x) { return x === null || x === undefined || x === "" || (Array.isArray(x) ? x.length === 0 : (typeof x === "object" ? Object.keys(x).length === 0 : false)); }
 
 // \u2500 \uBB38\uC790\uC5F4 \uC870\uC791 \u2500
 function _fl_str(...xs) { return xs.map(x => x === null || x === undefined ? "" : (typeof x === "object" ? JSON.stringify(x) : String(x))).join(""); }
@@ -27117,7 +27107,6 @@ var HELPER_FUNCTIONS = [
   "_fl_entries",
   "_fl_map_set",
   "_fl_has_key_q",
-  "_fl_empty_q",
   "_fl_str",
   "_fl_char_at",
   "_fl_substring",
@@ -33155,7 +33144,6 @@ var Interpreter = class _Interpreter {
   // Phase 63: 표준 매크로 등록
   registerStandardMacros() {
     const expander = this.context.macroExpander;
-    // when/unless: 인터프리터가 다중 body 직접 처리 — 매크로 불필요
     expander.define("and2", ["$a", "$b"], {
       kind: "sexpr",
       op: "if",

@@ -159,26 +159,7 @@ export class Interpreter {
   // Phase 63: 표준 매크로 등록
   private registerStandardMacros(): void {
     const expander = this.context.macroExpander;
-    // (when $cond $body) → (if $cond $body nil)
-    expander.define("when", ["$cond", "$body"], {
-      kind: "sexpr",
-      op: "if",
-      args: [
-        { kind: "variable", name: "$cond" },
-        { kind: "variable", name: "$body" },
-        { kind: "literal", type: "null", value: null },
-      ],
-    });
-    // (unless $cond $body) → (if $cond nil $body)
-    expander.define("unless", ["$cond", "$body"], {
-      kind: "sexpr",
-      op: "if",
-      args: [
-        { kind: "variable", name: "$cond" },
-        { kind: "literal", type: "null", value: null },
-        { kind: "variable", name: "$body" },
-      ],
-    });
+    // when/unless는 eval-special-forms.ts에서 다중 body 지원하므로 매크로 등록 제거
     // (and2 $a $b) → (if $a $b false)
     expander.define("and2", ["$a", "$b"], {
       kind: "sexpr",
