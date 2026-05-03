@@ -12514,8 +12514,12 @@ loop().catch(e => {
     }
     case "reduce": {
       const reduceFn = args3[0];
-      let accumulator = args3[1];
-      let arr = args3[2] ?? [];
+      let accumulator, arr;
+      if (Array.isArray(args3[1]) && args3[2] === undefined) {
+        arr = args3[1]; accumulator = arr[0]; arr = arr.slice(1);
+      } else {
+        accumulator = args3[1]; arr = args3[2] ?? [];
+      }
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
         let cur = arr;
@@ -12535,6 +12539,12 @@ loop().catch(e => {
         accumulator = callFn(reduceFn, [accumulator, item]);
       }
       return accumulator;
+    }
+    case "apply": {
+      const applyFn = args3[0];
+      const applyArgs = Array.isArray(args3[args3.length - 1]) ? args3[args3.length - 1] : [];
+      const spreadArgs = args3.length > 2 ? [...args3.slice(1, -1), ...applyArgs] : applyArgs;
+      return callFn(applyFn, spreadArgs);
     }
     case "json-response":
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) return args3[0];
@@ -31001,11 +31011,11 @@ function loadAllStdlib(interp2) {
     "fn-meta": (name) => {
       const meta = fnMetaRegistry.get(name);
       if (!meta) return null;
-      const m = /* @__PURE__ */ new Map();
-      if (meta.returns) m.set("returns", meta.returns);
-      if (meta.context) m.set("context", meta.context);
-      if (meta.effects) m.set("effects", meta.effects);
-      if (meta.examples) m.set("examples", meta.examples);
+      const m = {};
+      if (meta.returns) m.returns = meta.returns;
+      if (meta.context) m.context = meta.context;
+      if (meta.effects) m.effects = meta.effects;
+      if (meta.examples) m.examples = meta.examples;
       return m;
     },
     "fn_meta": (name) => _aliases["fn-meta"](name),
