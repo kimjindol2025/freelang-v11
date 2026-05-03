@@ -21766,7 +21766,16 @@ function createTimeModule() {
     // fmt tokens: YYYY MM DD HH mm ss SSS
     "format_date": (ts, fmt) => {
       const d = new Date(ts);
-      return fmt.replace("YYYY", String(d.getFullYear())).replace("MM", String(d.getMonth() + 1).padStart(2, "0")).replace("DD", String(d.getDate()).padStart(2, "0")).replace("HH", String(d.getHours()).padStart(2, "0")).replace("mm", String(d.getMinutes()).padStart(2, "0")).replace("ss", String(d.getSeconds()).padStart(2, "0")).replace("SSS", String(d.getMilliseconds()).padStart(3, "0"));
+      const tokens = {
+        YYYY: String(d.getFullYear()),
+        MM: String(d.getMonth() + 1).padStart(2, "0"),
+        DD: String(d.getDate()).padStart(2, "0"),
+        HH: String(d.getHours()).padStart(2, "0"),
+        mm: String(d.getMinutes()).padStart(2, "0"),
+        ss: String(d.getSeconds()).padStart(2, "0"),
+        SSS: String(d.getMilliseconds()).padStart(3, "0")
+      };
+      return fmt.replace(/YYYY|MM|DD|HH|mm|ss|SSS/g, m => tokens[m]);
     },
     // date_parts ts -> {year,month,day,hour,min,sec,ms,weekday}
     "date_parts": (ts) => {
