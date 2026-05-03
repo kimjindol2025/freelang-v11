@@ -11259,22 +11259,15 @@ init_parser();
 function flDeepEq(a, b) {
   if (a === b) return true;
   if (a == null || b == null) return false;
-  if (a instanceof Map && b instanceof Map) {
-    if (a.size !== b.size) return false;
-    for (const [k, v] of a) if (!flDeepEq(b.get(k), v)) return false;
-    return true;
-  }
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
     return true;
   }
   if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
-    const toPlain = (x) => x instanceof Map ? Object.fromEntries(x) : x;
-    const pa = toPlain(a), pb = toPlain(b);
-    const ka = Object.keys(pa), kb = Object.keys(pb);
+    const ka = Object.keys(a), kb = Object.keys(b);
     if (ka.length !== kb.length) return false;
-    for (const k of ka) if (!flDeepEq(pa[k], pb[k])) return false;
+    for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
     return true;
   }
   return false;
@@ -12221,12 +12214,10 @@ loop().catch(e => {
       console.log(inspected);
       return args3[0];
     }
-    case "concat": {
+    case "concat":
       if (!Array.isArray(args3[0])) return args3.join("");
-      const items = args3.slice(1).filter(Array.isArray);
-      if (items.length === 0) return args3[0] || [];
-      return args3[0].concat(...items);
-    }
+      if (!Array.isArray(args3[1])) return args3[0] || [];
+      return args3[0].concat(args3[1]);
     case "upper":
       return args3[0]?.toString().toUpperCase();
     case "lower":
@@ -12548,7 +12539,7 @@ loop().catch(e => {
     case "html-response":
       return { html: args3[0] };
     case "now":
-      return Date.now();
+      return (/* @__PURE__ */ new Date()).toISOString();
     case "server-uptime":
       return Date.now() - interp2.context.startTime;
     case "char-at":
@@ -12619,11 +12610,6 @@ loop().catch(e => {
     case "map-set":
       if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
         const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
-        if (args3[0] instanceof Map) {
-          const r = new Map(args3[0]);
-          r.set(k, args3[2]);
-          return r;
-        }
         return { ...args3[0], [k]: args3[2] };
       }
       return args3[0];
@@ -12887,8 +12873,15 @@ loop().catch(e => {
     }
     case "dissoc": {
       if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
-        const { [args3[1]]: _, ...rest } = args3[0];
-        return rest;
+        const _keys = args3.slice(1).map((k) => typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k));
+        if (args3[0] instanceof Map) {
+          const _dm = new Map(args3[0]);
+          for (const _k of _keys) _dm.delete(_k);
+          return _dm;
+        }
+        const _dr = { ...args3[0] };
+        for (const _k of _keys) delete _dr[_k];
+        return _dr;
       }
       return args3[0] ?? {};
     }
