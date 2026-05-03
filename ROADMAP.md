@@ -19,6 +19,8 @@
 | MariaDB Pool + MongoDB Wire Protocol | 2026-04-30 |
 | REPL 디버거 강화 | 2026-04-30 |
 | npm 11.2.0 배포 | 2026-05-03 |
+| **P0: Content-Type case-insensitive 수정** | **2026-05-03** |
+| **P0: `freelang patch` 명령 추가** | **2026-05-03** |
 
 ---
 
@@ -33,20 +35,18 @@
 
 ## 다음 작업 (우선순위 순)
 
-### P0 — Content-Type 헤더 강제 버그 수정
+### ~~P0 — Content-Type 헤더 강제 버그 수정~~ ✅ 완료 (2026-05-03)
 
-**파일**: `src/stdlib-http-server.ts` → `sendResponse` 함수  
-**증상**: `server_text`/`server_html` 응답이 항상 `application/json`. CSS/JS link 태그로 못 가져옴.  
-**수정**: handler return 객체의 `contentType` 또는 `headers["Content-Type"]` 우선 반영  
-**완료 조건**: 5개 앱 회귀 테스트 통과
+**수정**: `bootstrap.js` `sendResponse` case-insensitive 헤더 탐색  
+**커밋**: 77c48955
 
 ---
 
-### P0 — `freelang patch` 명령 추가
+### ~~P0 — `freelang patch` 명령 추가~~ ✅ 완료 (2026-05-03)
 
-**파일**: `bootstrap.js` (CLI 서브커맨드 추가)  
-**증상**: 1000줄+ SPA 파일 수정 시 sed/heredoc escape 충돌. bash가 `${}`/백틱 평가 → Python 우회 강제.  
-**수정**:
+**수정**: `bootstrap.js`에 `patch` 서브커맨드 구현  
+**커밋**: 77c48955  
+**사용법**:
 ```bash
 freelang patch <file> --find "<text>" --replace "<text>"
 freelang patch <file> --insert-after "<anchor>" --content "<block>"
