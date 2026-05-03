@@ -56,8 +56,28 @@ function formatError(err: any, source?: string, filePath?: string, callStack?: A
     }
     lines.push(`  ${err.message}`);
   } else if (err instanceof Error) {
-    lines.push(`\n\x1b[31m실행 오류\x1b[0m  ${fileName}`);
-    lines.push(`  ${err.message}`);
+    // "FreeLang line N: msg" 패턴에서 라인 번호 추출
+    const lineMatch = err.message.match(/^FreeLang line (\d+):\s*/);
+    const errLine = lineMatch ? parseInt(lineMatch[1]) : 0;
+    const cleanMsg = lineMatch ? err.message.slice(lineMatch[0].length) : err.message;
+
+    lines.push(`\n\x1b[31m실행 오류\x1b[0m  ${fileName}${errLine ? `:${errLine}` : ""}`);
+
+    // 소스 컨텍스트: 에러 라인 ±1줄 표시
+    if (source && errLine > 0) {
+      const srcLines = source.split("\n");
+      const start = Math.max(0, errLine - 2);
+      const end = Math.min(srcLines.length - 1, errLine);
+      for (let i = start; i <= end; i++) {
+        const num = String(i + 1).padStart(4, " ");
+        const marker = (i + 1 === errLine) ? "\x1b[31m→\x1b[0m" : " ";
+        const lineColor = (i + 1 === errLine) ? `\x1b[31m${srcLines[i]}\x1b[0m` : `\x1b[2m${srcLines[i]}\x1b[0m`;
+        lines.push(`  ${marker} ${num} │ ${lineColor}`);
+      }
+      lines.push("");
+    }
+
+    lines.push(`  \x1b[31m✖\x1b[0m ${cleanMsg}`);
     const stack = callStack ?? (err as any).__flCallStack;
     if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {

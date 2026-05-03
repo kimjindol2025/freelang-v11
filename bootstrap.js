@@ -23518,7 +23518,8 @@ function createHttpServerModule(callFn, callFunctionValue2) {
                   status = resStatus ?? 200;
                   const resHeaders = getField(result, "headers") ?? {};
                   const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
-                  const contentType = headersObj["content-type"] ?? getField(result, "contentType") ?? "application/json";
+                  const ctFromHeaders = Object.entries(headersObj).find(([k]) => k.toLowerCase() === "content-type")?.[1];
+                  const contentType = ctFromHeaders ?? getField(result, "contentType") ?? "application/json";
                   sendResponse(res, status, resBody ?? "", contentType, headersObj);
                 } else {
                   sendResponse(res, 200, result);
@@ -37128,9 +37129,24 @@ function formatError(err4, source, filePath, callStack) {
     }
     lines.push(`  ${err4.message}`);
   } else if (err4 instanceof Error) {
+    const lineMatch = err4.message.match(/^FreeLang line (\d+):\s*/);
+    const errLine = lineMatch ? parseInt(lineMatch[1]) : 0;
+    const cleanMsg = lineMatch ? err4.message.slice(lineMatch[0].length) : err4.message;
     lines.push(`
-\x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}`);
-    lines.push(`  ${err4.message}`);
+\x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}${errLine ? `:${errLine}` : ""}`);
+    if (source && errLine > 0) {
+      const srcLines = source.split("\n");
+      const start = Math.max(0, errLine - 2);
+      const end = Math.min(srcLines.length - 1, errLine);
+      for (let i = start; i <= end; i++) {
+        const num = String(i + 1).padStart(4, " ");
+        const marker = i + 1 === errLine ? "\x1B[31m\u2192\x1B[0m" : " ";
+        const lineColor = i + 1 === errLine ? `\x1B[31m${srcLines[i]}\x1B[0m` : `\x1B[2m${srcLines[i]}\x1B[0m`;
+        lines.push(`  ${marker} ${num} \u2502 ${lineColor}`);
+      }
+      lines.push("");
+    }
+    lines.push(`  \x1B[31m\u2716\x1B[0m ${cleanMsg}`);
     const stack = callStack ?? err4.__flCallStack;
     if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
