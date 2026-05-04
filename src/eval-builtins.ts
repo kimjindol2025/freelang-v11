@@ -613,6 +613,12 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환
   const normalizedOp = op.replace(/_/g, '-');
+
+  // Phase X-2: Deprecation 경고 (snake_case 호출 시)
+  if (normalizedOp !== op && op !== 'server_start') {  // server_start는 이미 경고
+    console.warn(`⚠️  [FreeLang v11.5.1] ${op}은 deprecated입니다. ${normalizedOp}을 사용하세요.`);
+  }
+
   // interp.eval은 public이어야 하므로 (실제로는 public)
   const ev = (node: any) => (interp as any).eval(node);
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
