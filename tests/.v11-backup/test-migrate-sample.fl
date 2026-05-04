@@ -1,0 +1,22 @@
+;; 마이그레이션 테스트용 샘플 파일
+
+(defn handle-request [$req]
+  (let [[body (get $req "body")]
+        [count (str_to_num (get body "count"))]]
+    (if (file_exists "log.txt")
+      (do
+        (file_append "log.txt" "request\n")
+        (server_json $req {:success true :count count}))
+      (server_status $req 404))))
+
+(defn check-data [$data]
+  (if (is_array $data)
+    (let [[len (json_parse (str "[1,2,3]"))]]
+      (> (length len) 0))
+    false))
+
+(defn test-map []
+  (map (fn [$x] (* $x 2)) [1 2 3 4 5]))
+
+(defn test-filter []
+  (filter (fn [$x] (> $x 5)) [1 2 10 3 20]))
