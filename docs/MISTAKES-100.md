@@ -3,6 +3,21 @@
 > **목적**: Claude와 개발자가 반복하는 실수 모음. 코드 작성 전 반드시 확인.  
 > **업데이트**: 새 실수 발견 시 즉시 추가.
 
+## 🤖 Phase G: 25개는 언어가 자동 처리
+
+Phase G(v11.4.0)부터 stdlib 헬퍼가 인자 순서/별칭/HTTP 응답을 자동 감지/수정.
+
+| 카테고리 | 자동 처리 함수 | 처리되는 실수 |
+|---------|---------------|--------------|
+| 별칭 추천 | `suggest-fn`, `alias-of`, `help-text` | console_log, push, fetch 등 |
+| 인자 자동 | `smart-map`, `smart-filter`, `smart-get`, `smart-assoc` | #1, #2, #5, #6, #9 |
+| HTTP 래퍼 | `http-get-json`, `http-post-json`, `http-status` | #11–#15 |
+| Result | `try-call`, `try-call-1` (+ 기존 `ok?`/`unwrap`) | 에러 캡처 표준화 |
+
+남은 75개는 점진적으로 처리 (Phase H 예정).
+
+---
+
 ---
 
 ## 🔴 Category 1: 인자 순서 (가장 많이 틀림)

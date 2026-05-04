@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.3.7",
-  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). [v11.3.7: 완성도 9.5/10 — Map 직렬화, 한글 문자 처리 수정]",
+  "version": "11.4.0",
+  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). [v11.4.0: Phase G — MISTAKES-100 자동 처리 (smart-* / try-call / http-get-json)]",
   "keywords": [
     "ai",
     "language",

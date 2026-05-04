@@ -40,6 +40,7 @@ import { createWscModule } from "./stdlib-wsc";          // WebSocket 클라이�
 import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-lazy-registry"; // Lazy Loading
 import { createImageModule } from "./stdlib-image";     // Phase A: Image Processing
 import { createMongodbModule } from "./stdlib-mongodb"; // Phase A: MongoDB Driver
+import { createHelpersModule } from "./stdlib-helpers"; // Phase G: MISTAKES-100 자동 처리
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -58,7 +59,9 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createBitsModule());
   interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
   interp.registerModule(createErrorModule());
-  interp.registerModule(createHttpModule());
+  // Phase G: helpers는 http_get 위에 래핑되므로 http 모듈 객체를 캡처
+  const httpModule = createHttpModule();
+  interp.registerModule(httpModule);
   interp.registerModule(createShellModule());
   interp.registerModule(createDataModule());
   interp.registerModule(createCollectionModule());
@@ -105,6 +108,16 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   ));
   interp.registerModule(createImageModule());    // Phase A: image_info/resize/thumbnail/convert/watermark/crop
   interp.registerModule(createMongodbModule()); // Phase A: mongo_connect/find/insert/update/delete/aggregate/transaction
+
+  // Phase G: MISTAKES-100 자동 처리 헬퍼
+  // - smart-map/filter/get/assoc: 인자 순서 자동 감지
+  // - http-get-json / http-post-json / http-status: HTTP 래퍼
+  // - try-call / ok? / unwrap: Result 패턴
+  // - suggest-fn / alias-of / help-text: 에러 추천
+  interp.registerModule(createHelpersModule(
+    (fnValue: any, args: any[]) => interp.callFunctionValue(fnValue, args),
+    (httpModule as any).http_get
+  ));
 
   // ── fl_require builtin 등록 ─────────────────────────────────────
   // (fl_require "audit")   → audit_log 등 즉시 사용 가능
