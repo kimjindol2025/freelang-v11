@@ -1,0 +1,272 @@
+#!/usr/bin/env node
+/**
+ * freelang-smart — Phase G+ 자동 힌트 wrapper
+ *
+ * 효과:
+ *   - 함수 못 찾으면 "혹시 X 의미하셨나요?" 자동 출력
+ *   - 인자 순서 오류 패턴 감지 + 수정 제안
+ *   - let 단일 바인딩 자동 이중괄호화 (preprocessing)
+ *   - @변수 문법 → (deref atom) 안내
+ *   - [FUNC] deprecated → defn 변환 제안
+ *
+ * 사용법:
+ *   freelang-smart run app.fl
+ *   freelang-smart app.fl     (run 생략)
+ *
+ *   # 기존 freelang과 호환:
+ *   alias fl=freelang-smart
+ */
+
+"use strict";
+
+const { spawn } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
+
+// ─────────────────────────────────────────────────────────────
+// 별칭 + 유사 함수 추천 (helpers와 동일 데이터)
+// ─────────────────────────────────────────────────────────────
+const ALIASES = {
+  "console_log":   { correct: "println",      usage: "(println value)" },
+  "console.log":   { correct: "println",      usage: "(println value)" },
+  "print":         { correct: "println",      usage: "(println value)" },
+  "log":           { correct: "println",      usage: "(println value)" },
+  "push":          { correct: "append",       usage: "(append arr item)" },
+  "list_append":   { correct: "append",       usage: "(append arr item)" },
+  "array_push":    { correct: "append",       usage: "(append arr item)" },
+  "array_length":  { correct: "length",       usage: "(length arr)" },
+  "first":         { correct: "get",          usage: "(get arr 0)" },
+  "head":          { correct: "get",          usage: "(get arr 0)" },
+  "is_null":       { correct: "nil?",         usage: "(nil? value)" },
+  "is_nil":        { correct: "nil?",         usage: "(nil? value)" },
+  "null?":         { correct: "nil?",         usage: "(nil? value)" },
+  "is_array":      { correct: "array?",       usage: "(array? value)" },
+  "is_string":     { correct: "string?",      usage: "(string? value)" },
+  "is_number":     { correct: "number?",      usage: "(number? value)" },
+  "str_length":    { correct: "length",       usage: '(length "hello")' },
+  "string_length": { correct: "length",       usage: '(length "hello")' },
+  "str_concat":    { correct: "str",          usage: '(str "a" "b")' },
+  "str_to_int":    { correct: "str_to_num",   usage: '(str_to_num "42")' },
+  "parse_int":     { correct: "str_to_num",   usage: '(str_to_num "42")' },
+  "fetch":         { correct: "http_get",     usage: "(http_get url)" },
+  "server_listen": { correct: "server_start", usage: "(server_start 40000)" },
+  "raise":         { correct: "error",        usage: '(error "msg")' },
+  "panic":         { correct: "error",        usage: '(error "msg")' },
+};
+
+const COMMON_FNS = [
+  "println", "print", "map", "filter", "reduce", "append", "get", "assoc", "dissoc",
+  "str", "length", "nil?", "if", "cond", "let", "do", "defn", "fn", "define",
+  "server_start", "server_get", "server_post", "server_put", "server_delete",
+  "server_json", "server_html", "server_text", "server_status", "server_redirect",
+  "server_req_body", "server_req_query", "server_req_params", "server_req_cookie",
+  "mariadb_connect", "mariadb_query", "mariadb_one", "mariadb_exec",
+  "http_get", "http_post", "json_parse", "json_stringify", "json-str",
+  "file_read", "file_write", "file_exists", "file_mkdir",
+  "auth_jwt_sign", "auth_jwt_verify", "auth_hash_password", "auth_random_token",
+  // Phase G 신규
+  "suggest-fn", "alias-of", "help-text",
+  "smart-map", "smart-filter", "smart-get", "smart-assoc",
+  "http-get-json", "http-post-json", "http-status",
+  "try-call", "try-call-1", "ok?", "err?", "unwrap", "unwrap-or",
+];
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function suggestFn(name) {
+  if (ALIASES[name]) return [ALIASES[name].correct];
+  const limit = Math.max(2, Math.floor(name.length / 3));
+  return COMMON_FNS
+    .map((c) => ({ name: c, dist: levenshtein(name, c) }))
+    .filter((s) => s.dist > 0 && s.dist <= limit)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 3)
+    .map((s) => s.name);
+}
+
+// ─────────────────────────────────────────────────────────────
+// preprocessing: 안전한 자동 수정
+// ─────────────────────────────────────────────────────────────
+function preprocess(code) {
+  let modified = code;
+  const fixes = [];
+
+  // (a) 단일 let 바인딩 자동 이중괄호화
+  //     (let [$x 1] body) → (let [[$x 1]] body)
+  //     주의: 이미 이중괄호인 경우 제외
+  const singleLetPattern = /\(let\s+\[\s*\$([a-zA-Z_][\w-]*)\s+([^\[\]]+?)\]/g;
+  modified = modified.replace(singleLetPattern, (match, name, val) => {
+    fixes.push(`let 단일 바인딩 자동 이중괄호화: $${name}`);
+    return `(let [[$${name} ${val.trim()}]]`;
+  });
+
+  return { code: modified, fixes };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 에러 출력 분석 + hint 추가
+// ─────────────────────────────────────────────────────────────
+function analyzeError(stderr) {
+  const hints = [];
+
+  // 1. Function not found: NAME
+  const fnMatch = stderr.match(/Function not found:\s*([a-zA-Z_][\w\-?!]*)/);
+  if (fnMatch) {
+    const name = fnMatch[1];
+    const sims = suggestFn(name);
+    if (sims.length > 0) {
+      const alias = ALIASES[name];
+      if (alias) {
+        hints.push(
+          `💡 '${name}'은(는) 없습니다. 대신 ${alias.correct} 사용:\n     ${alias.usage}`
+        );
+      } else {
+        hints.push(
+          `💡 혹시 이 함수를 의미하셨나요?\n     ${sims.map((s) => `→ (${s} ...)`).join("\n     ")}`
+        );
+      }
+    }
+  }
+
+  // 2. Unexpected character '@'
+  if (stderr.includes("Unexpected character '@'")) {
+    hints.push(
+      "💡 @변수 문법은 지원되지 않습니다.\n" +
+      "     → atom 사용: (define x (atom 0)) (deref x) (reset! x 1)"
+    );
+  }
+
+  // 3. let 파싱 오류 (단일 바인딩이 자동 수정 후에도 발생)
+  if (stderr.includes("파싱 오류") && /\blet\b/.test(stderr)) {
+    hints.push(
+      "💡 let 문법:\n" +
+      "     → 이중괄호: (let [[$x 1] [$y 2]] body)\n" +
+      "     → 단일도 이중: (let [[$x 1]] body)"
+    );
+  }
+
+  // 4. [FUNC] deprecated 경고 (정보)
+  if (stderr.includes("[FUNC ...] 문법은 deprecated")) {
+    hints.push(
+      "💡 [FUNC] → defn 권장:\n" +
+      "     [FUNC name :params [$a $b] :body (...)]\n" +
+      "     → (defn name [$a $b] ...)"
+    );
+  }
+
+  // 5. server_req_body 결과 처리 (자주 틀림)
+  if (stderr.includes("server_req_body") || stderr.includes("Cannot get from string")) {
+    hints.push(
+      "💡 server_req_body는 JSON 문자열 반환:\n" +
+      "     → (json_parse (server_req_body $req)) 으로 파싱"
+    );
+  }
+
+  return hints;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 메인
+// ─────────────────────────────────────────────────────────────
+function main() {
+  const argv = process.argv.slice(2);
+
+  // run 명령 자동 추가
+  let cmd, fileArg, restArgs;
+  if (argv[0] === "run") {
+    cmd = "run";
+    fileArg = argv[1];
+    restArgs = argv.slice(2);
+  } else if (argv[0] && argv[0].endsWith(".fl")) {
+    cmd = "run";
+    fileArg = argv[0];
+    restArgs = argv.slice(1);
+  } else {
+    // 다른 명령은 그대로 전달
+    cmd = argv[0] || "help";
+    fileArg = argv[1];
+    restArgs = argv.slice(2);
+  }
+
+  if (!fileArg && cmd === "run") {
+    console.error("사용법: freelang-smart [run] <file.fl>");
+    process.exit(1);
+  }
+
+  // bootstrap.js 위치
+  const bootstrapPath = path.resolve(__dirname, "..", "bootstrap.js");
+  if (!fs.existsSync(bootstrapPath)) {
+    console.error(`bootstrap.js를 찾을 수 없습니다: ${bootstrapPath}`);
+    process.exit(1);
+  }
+
+  let runFile = fileArg;
+  let cleanup = null;
+
+  // run 명령일 때만 preprocessing
+  if (cmd === "run" && fileArg && fs.existsSync(fileArg)) {
+    const original = fs.readFileSync(fileArg, "utf-8");
+    const { code, fixes } = preprocess(original);
+
+    if (fixes.length > 0) {
+      const tmpFile = path.join(os.tmpdir(), `fl-smart-${Date.now()}.fl`);
+      fs.writeFileSync(tmpFile, code);
+      runFile = tmpFile;
+      cleanup = () => { try { fs.unlinkSync(tmpFile); } catch {} };
+
+      // 자동 수정 알림 (조용히)
+      console.error(`\x1b[33m[자동 수정]\x1b[0m`);
+      fixes.forEach((f) => console.error(`  ✓ ${f}`));
+      console.error("");
+    }
+  }
+
+  // bootstrap 실행
+  const args = cmd === "run" ? ["run", runFile, ...restArgs] : argv;
+  const child = spawn("node", [bootstrapPath, ...args], {
+    stdio: ["inherit", "inherit", "pipe"],
+  });
+
+  let stderrBuf = "";
+  child.stderr.on("data", (chunk) => {
+    const s = chunk.toString();
+    stderrBuf += s;
+    process.stderr.write(s);
+  });
+
+  child.on("close", (code) => {
+    if (cleanup) cleanup();
+
+    // 에러 발생 시 hint 추가
+    if (code !== 0 && stderrBuf) {
+      const hints = analyzeError(stderrBuf);
+      if (hints.length > 0) {
+        console.error("");
+        console.error("\x1b[36m─────────────────────────────────────\x1b[0m");
+        console.error("\x1b[36m  freelang-smart 자동 힌트\x1b[0m");
+        console.error("\x1b[36m─────────────────────────────────────\x1b[0m");
+        hints.forEach((h) => console.error(`\n  ${h}`));
+        console.error("");
+      }
+    }
+    process.exit(code || 0);
+  });
+}
+
+main();
