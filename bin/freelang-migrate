@@ -1,0 +1,295 @@
+#!/usr/bin/env node
+/**
+ * freelang-migrate — v11 → v12 자동 마이그레이션 도구 (prototype)
+ *
+ * 단계별 변환:
+ *   1. snake_case → kebab-case (alias 매핑 기반)
+ *   2. is_X → X? 술어 통일
+ *   3. 인자 순서 변환 (10개 핵심 함수, 옵션)
+ *   4. $ 접두사 제거 (옵션)
+ *
+ * 사용법:
+ *   freelang-migrate src/                    # 디렉토리 변환 (dry-run)
+ *   freelang-migrate src/ --apply            # 실제 적용
+ *   freelang-migrate file.fl                 # 단일 파일
+ *   freelang-migrate src/ --no-arg-order     # 인자 순서 제외
+ *   freelang-migrate src/ --remove-dollar    # $ 제거
+ */
+
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+
+// ─────────────────────────────────────────────────────────────
+// v11 → v12 작명 변환 (snake → kebab + 술어 통일)
+// ─────────────────────────────────────────────────────────────
+const RENAME_MAP = {
+  // 기본 stdlib
+  "str_to_num":   "str-to-num",
+  "str_concat":   "str-concat",
+  "json_parse":   "json-parse",
+  "json_stringify": "json-stringify",
+  "now_ms":       "now-ms",
+  "now_iso":      "now-iso",
+  "now_unix":     "now-unix",
+
+  // HTTP / 서버
+  "http_get":     "http-get",
+  "http_post":    "http-post",
+  "server_start": "server-start",
+  "server_get":   "server-get",
+  "server_post":  "server-post",
+  "server_put":   "server-put",
+  "server_delete":"server-delete",
+  "server_json":  "server-json",
+  "server_html":  "server-html",
+  "server_text":  "server-text",
+  "server_status":"server-status",
+  "server_redirect":"server-redirect",
+  "server_static":"server-static",
+  "server_req_body":  "server-req-body",
+  "server_req_query": "server-req-query",
+  "server_req_params":"server-req-params",
+  "server_req_param": "server-req-param",
+  "server_req_cookie":"server-req-cookie",
+  "server_req_header":"server-req-header",
+
+  // 파일/환경
+  "file_read":    "file-read",
+  "file_write":   "file-write",
+  "file_append":  "file-append",
+  "file_exists":  "file-exists?",
+  "file_mkdir":   "file-mkdir",
+  "file_rmdir":   "file-rmdir",
+  "file_delete":  "file-delete",
+  "file_size":    "file-size",
+  "file_is_dir":  "file-is-dir?",
+  "dir_list":     "dir-list",
+  "shell_env":    "shell-env",
+  "shell_exec":   "shell-exec",
+  "get_env":      "shell-env",
+  "get_env_or":   "shell-env-or",
+  "env_load":     "env-load",
+
+  // DB
+  "mariadb_connect":"mariadb-connect",
+  "mariadb_query":  "mariadb-query",
+  "mariadb_one":    "mariadb-one",
+  "mariadb_exec":   "mariadb-exec",
+
+  // Auth
+  "auth_jwt_sign":   "auth-jwt-sign",
+  "auth_jwt_verify": "auth-jwt-verify",
+  "auth_jwt_expired":"auth-jwt-expired?",
+  "auth_hash_password": "auth-hash-password",
+  "auth_verify_password":"auth-verify-password",
+  "auth_random_token": "auth-random-token",
+  "auth_sha256":  "auth-sha256",
+  "auth_hmac":    "auth-hmac",
+
+  // 술어 통일 (is_X → X?)
+  "is_null":      "nil?",
+  "is_nil":       "nil?",
+  "null?":        "nil?",
+  "is_array":     "array?",
+  "is_string":    "string?",
+  "is_number":    "number?",
+  "is_boolean":   "boolean?",
+
+  // 기타
+  "obj_merge":    "merge",
+  "obj_omit":     "dissoc",
+  "obj_pick":     "pick",
+  "json_keys":    "keys",
+  "object_keys":  "keys",
+  "fl_require":   "fl-require",
+  "fl_require?":  "fl-require?",
+  "fl_modules":   "fl-modules",
+};
+
+// ─────────────────────────────────────────────────────────────
+// 인자 순서 변환 — 10개 핵심 함수 (옵션)
+// (map fn arr) → (map arr fn) 등
+// ─────────────────────────────────────────────────────────────
+const ARG_REORDER_FNS = ["map", "filter", "smart-map", "smart-filter"];
+
+function reorderMapFilter(content) {
+  // 매우 단순한 패턴 매칭 — 정확한 파서가 아님
+  // (map (fn [$x] ...) arr) → (map arr (fn [$x] ...))
+  let changed = 0;
+  const result = content.replace(
+    /\((map|filter)\s+(\(fn\s*\[[^\]]*\][\s\S]*?\))\s+(\[[^\]]*\]|\$?[a-zA-Z][\w\-]*)\)/g,
+    (match, fn, fnExpr, arr) => {
+      changed++;
+      return `(${fn} ${arr} ${fnExpr})`;
+    }
+  );
+  return { result, changed };
+}
+
+// ─────────────────────────────────────────────────────────────
+// $ 접두사 제거 (옵션)
+// ─────────────────────────────────────────────────────────────
+function removeDollar(content) {
+  let changed = 0;
+  // defn/fn의 파라미터 + body의 $name 모두 제거
+  const result = content.replace(/\$([a-zA-Z][\w-]*)/g, (m, name) => {
+    changed++;
+    return name;
+  });
+  return { result, changed };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 핵심 변환
+// ─────────────────────────────────────────────────────────────
+function transformFile(content, opts = {}) {
+  const changes = [];
+  let result = content;
+
+  // 1. 함수명 변환 (RENAME_MAP)
+  for (const [from, to] of Object.entries(RENAME_MAP)) {
+    if (from === to) continue;
+    // 정확한 토큰 매치 — 식별자 경계
+    const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?<![\\w\\-])${escaped}(?![\\w\\-?!])`, "g");
+    let count = 0;
+    result = result.replace(re, () => { count++; return to; });
+    if (count > 0) changes.push({ kind: "rename", from, to, count });
+  }
+
+  // 2. 인자 순서 변환 (옵션)
+  if (opts.argOrder !== false) {
+    const r = reorderMapFilter(result);
+    result = r.result;
+    if (r.changed > 0) changes.push({ kind: "arg-order", count: r.changed });
+  }
+
+  // 3. $ 제거 (옵션)
+  if (opts.removeDollar) {
+    const r = removeDollar(result);
+    result = r.result;
+    if (r.changed > 0) changes.push({ kind: "remove-dollar", count: r.changed });
+  }
+
+  return { result, changes };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 파일/디렉토리 처리
+// ─────────────────────────────────────────────────────────────
+function findFlFiles(dir) {
+  const files = [];
+  const stack = [dir];
+  while (stack.length) {
+    const cur = stack.pop();
+    const stat = fs.statSync(cur);
+    if (stat.isDirectory()) {
+      if (path.basename(cur).startsWith(".")) continue;
+      if (path.basename(cur) === "node_modules") continue;
+      for (const ent of fs.readdirSync(cur)) {
+        stack.push(path.join(cur, ent));
+      }
+    } else if (cur.endsWith(".fl")) {
+      files.push(cur);
+    }
+  }
+  return files;
+}
+
+function processFile(filePath, opts) {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const { result, changes } = transformFile(content, opts);
+
+  if (changes.length === 0) {
+    return { filePath, changes: [], content, result };
+  }
+
+  if (opts.apply) {
+    // 백업 + 적용
+    const backupDir = path.join(path.dirname(filePath), ".v11-backup");
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    const backupFile = path.join(backupDir, path.basename(filePath));
+    fs.writeFileSync(backupFile, content);
+    fs.writeFileSync(filePath, result);
+  }
+
+  return { filePath, changes, content, result };
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLI
+// ─────────────────────────────────────────────────────────────
+function main() {
+  const args = process.argv.slice(2);
+  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
+    console.log(`사용법: freelang-migrate <path> [옵션]
+
+옵션:
+  --apply              실제 적용 (기본: dry-run)
+  --no-arg-order       인자 순서 변환 제외
+  --remove-dollar      $ 접두사 제거
+  --quiet              요약만 출력
+
+예시:
+  freelang-migrate src/                # 미리보기
+  freelang-migrate src/ --apply        # 실제 변환 (.v11-backup/ 자동 생성)
+  freelang-migrate src/main.fl --apply --no-arg-order
+`);
+    process.exit(args.length === 0 ? 1 : 0);
+  }
+
+  const target = args[0];
+  const opts = {
+    apply:        args.includes("--apply"),
+    argOrder:     !args.includes("--no-arg-order"),
+    removeDollar: args.includes("--remove-dollar"),
+    quiet:        args.includes("--quiet"),
+  };
+
+  if (!fs.existsSync(target)) {
+    console.error(`✖ 경로 없음: ${target}`);
+    process.exit(1);
+  }
+
+  const stat = fs.statSync(target);
+  const files = stat.isDirectory() ? findFlFiles(target) : [target];
+
+  console.log(`📂 ${files.length}개 .fl 파일 ${opts.apply ? "변환 중" : "검사 중 (dry-run)"}`);
+  console.log("");
+
+  let totalChanges = 0;
+  let totalFiles = 0;
+
+  for (const f of files) {
+    const result = processFile(f, opts);
+    if (result.changes.length === 0) continue;
+
+    totalFiles++;
+    if (!opts.quiet) {
+      console.log(`📄 ${path.relative(process.cwd(), f)}`);
+      for (const c of result.changes) {
+        if (c.kind === "rename") {
+          console.log(`   ${c.from.padEnd(25)} → ${c.to} (${c.count}회)`);
+        } else if (c.kind === "arg-order") {
+          console.log(`   인자 순서 변환: ${c.count}회`);
+        } else if (c.kind === "remove-dollar") {
+          console.log(`   $ 접두사 제거: ${c.count}회`);
+        }
+        totalChanges += c.count;
+      }
+      console.log("");
+    }
+  }
+
+  console.log("─".repeat(50));
+  console.log(`총 ${totalFiles}개 파일, ${totalChanges}개 변경`);
+  if (opts.apply) {
+    console.log(`✓ 적용됨. 백업: <dir>/.v11-backup/`);
+  } else {
+    console.log(`💡 실제 적용: --apply`);
+  }
+}
+
+main();

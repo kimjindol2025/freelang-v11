@@ -1,0 +1,223 @@
+# Phase X 시작 — v12 언어 통일 + 마이그레이션 도구
+
+**2026-05-04** · 오늘 5번째 글. 시리즈의 *행동* 단계.
+이름만 바꾸지 않는다. 100개 분류 → 3개 문서 분리 → v12 로드맵 → migrate 도구 prototype.
+
+---
+
+## 시리즈 정리 (오늘 하루)
+
+```
+1편  오전     "25개 자동 처리"     (부풀림)
+2편  오후 1   wrapper 자동 hint    (6개만)
+3편  오후 2   정직 점검 14 → 33    (측정)
+4편  저녁 1   "실수가 거짓말"      (분석)
+5편  저녁 2   ★ Phase X 시작      (행동)
+```
+
+---
+
+## 행동 1: 100개 분류 데이터화
+
+`docs/_classifications.json` 신규.
+
+```json
+{
+  "items": {
+    "#1":  { "type": "design",   "summary": "map: fn 먼저",
+             "fix": "v12: (map arr fn) — 컬렉션 first 통일" },
+    "#22": { "type": "normal",   "summary": "v11 let 정상 문법",
+             "fix": null },
+    "#90": { "type": "learning", "summary": "throw — error",
+             "fix": "ALIAS 처리됨" },
+    ...
+  }
+}
+```
+
+**카테고리 (6종)**:
+| 본질 | 개수 | 비율 |
+|------|-----|-----|
+| 🔧 design (언어 결함) | 44 | 44% |
+| 📚 normal (정상 동작) | 25 | 25% |
+| 💡 learning (학습 부족) | 20 | 20% |
+| 🚧 missing (미구현) | 5  | 5% |
+| 📝 doc (문서 오류) | 3  | 3% |
+| 💀 user (진짜 실수) | 3  | 3% |
+
+→ JSON이 **단일 소스**. 새 항목은 여기 추가하면 자동으로 3개 문서 갱신.
+
+---
+
+## 행동 2: 3개 문서로 분리
+
+`scripts/gen-mistakes-split.js` 자동 생성:
+
+```
+docs/MISTAKES.md          ← 진짜 실수 (28개)
+                            user(3) + learning(20) + missing(5)
+docs/LEARNING.md          ← Lisp 학습 (28개)
+                            normal(25) + doc(3)
+docs/LANGUAGE-FAULTS.md   ← 언어 결함 (44개) ★ v12 대상
+                            design(44)
+```
+
+기존 `MISTAKES-100.md`는 **인덱스**로 변경 — "여기 보지 말고 셋 중 하나로".
+
+```bash
+$ node scripts/gen-mistakes-split.js
+✓ docs/MISTAKES.md          생성
+✓ docs/LEARNING.md          생성
+✓ docs/LANGUAGE-FAULTS.md   생성
+
+분류 카운트:
+  🔧 ② 언어 디자인 결함  44
+  📚 ④ 정상 동작        25
+  💡 ① 학습 부족        20
+  🚧 ⑤ 미구현            5
+  📝 ③ 문서 오류         3
+  💀 💀 진짜 실수        3
+```
+
+---
+
+## 행동 3: v12 통일 규칙 5가지
+
+`docs/PHASE-X-V12-ROADMAP.md`:
+
+### 규칙 1: 인자 순서 — **데이터 → 함수 → 부가**
+```fl
+;; v11 (혼란)
+(map      fn  arr)
+(reduce   fn  init arr)
+(cache_set k  v   ttl)
+
+;; v12 (통일)
+(map      arr fn)
+(reduce   arr fn  init)
+(cache-set cache k v ttl)
+```
+
+### 규칙 2: 작명 — **kebab-case 통일**
+```
+str_to_num    → str-to-num
+json_parse    → json-parse
+mariadb_query → mariadb-query
+```
+
+### 규칙 3: 술어 — **`?` suffix**
+```
+is_null       → nil?
+is_array      → array?
+file_exists   → file-exists?
+```
+
+### 규칙 4: HTTP — **응답 분리 함수**
+```fl
+(http-get url)         ;; → 구조체
+(http-get-json url)    ;; → body 자동 파싱 (helpers에서 stdlib 승격)
+(http-status url)      ;; → 200
+(http-body url)        ;; → string
+```
+
+### 규칙 5: `$` 접두사 — **선택**
+```fl
+(defn add [$a $b] (+ $a $b))   ;; 호환 (deprecated 경고 X)
+(defn add [a b]   (+ a b))     ;; 권장
+```
+
+---
+
+## 행동 4: `freelang-migrate` 도구 (prototype)
+
+`bin/freelang-migrate` 작동 확인:
+
+```bash
+$ freelang-migrate sample-v11.fl
+📂 1개 .fl 파일 검사 중 (dry-run)
+
+📄 sample-v11.fl
+   str_to_num             → str-to-num (1회)
+   json_parse             → json-parse (1회)
+   http_get               → http-get (1회)
+   server_req_body        → server-req-body (1회)
+   get_env                → shell-env (1회)
+   mariadb_query          → mariadb-query (1회)
+   is_null                → nil? (1회)
+   is_array               → array? (1회)
+   인자 순서 변환: 1회
+
+총 1개 파일, 11개 변경
+💡 실제 적용: --apply
+```
+
+옵션:
+- 기본: dry-run (변경 미리보기만)
+- `--apply`: 실제 변환 + 자동 백업 (`<dir>/.v11-backup/`)
+- `--no-arg-order`: 인자 순서 변환 제외
+- `--remove-dollar`: `$` 접두사 제거
+
+**구현된 변환** (60+ 함수):
+- snake → kebab: `str_to_num`, `json_parse`, `http_get`, `mariadb_query`, `auth_*`, `file_*`, `server_*` 등
+- 술어 통일: `is_null` → `nil?`, `is_array` → `array?`
+- 인자 순서: `map`, `filter` (fn-first → arr-first)
+
+**미구현** (Phase X-3 대상):
+- `reduce`, `sort-by` 인자 순서
+- `(let [$x 1] body)` → `(let [[$x 1]] body)` (이미 wrapper에)
+- `(str map)` → `(json-stringify map)` 자동
+
+---
+
+## 통합 효과
+
+```
+Before (v11.4.2):
+  MISTAKES-100.md:  "100개 실수, 33개 처리"  ← 부정확
+
+After (v11.4.3):
+  MISTAKES.md (28):       대부분 ALIAS 처리
+  LEARNING.md (28):       실수 아님 (학습)
+  LANGUAGE-FAULTS.md (44): v12 통일 대상
+  PHASE-X-V12-ROADMAP.md:  3개월 계획
+  freelang-migrate:        도구 작동 (60+ 변환)
+```
+
+---
+
+## v11.4.3 → v12 일정
+
+```
+v11.4.3 (지금)  : 분리 + migrate prototype
+                  ↓
+v11.5.0 (1주)   : 모든 v12 alias 추가 (snake + kebab 둘 다 작동)
+                  ↓
+v11.9.0 (8주)   : v12 RC, deprecated 경고 출력
+                  ↓
+v12.0.0 (12주)  : 공식 릴리스 (2026-09 목표)
+                  ↓
+v12.5.0 (~1년)  : v11 alias 제거 시작
+                  ↓
+v13.0.0 (~2년)  : v11 완전 제거
+```
+
+**호환성 보장**: v11 코드는 v12에서 1년간 작동.
+
+---
+
+## 한 줄 정리 (시리즈 마무리)
+
+> 오전: "25개 자동 처리" → **부풀림**
+> 오후1: wrapper 6개 자동 → **부분**
+> 오후2: 33% 측정 → **정직**
+> 저녁1: "실수가 아니라 언어 결함" → **분석**
+> 저녁2: **분리 + 로드맵 + 도구** → **행동**
+>
+> 진보는 *카운트*가 아니라 *문제 정의*에서 나왔다.
+> v12에서 진짜 fix.
+
+---
+
+**커밋**: 다음 commit (v11.4.3)
+**도구**: `bin/freelang-migrate`
+**문서**: `docs/MISTAKES.md`, `docs/LEARNING.md`, `docs/LANGUAGE-FAULTS.md`, `docs/PHASE-X-V12-ROADMAP.md`

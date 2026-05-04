@@ -1,5 +1,64 @@
 # Changelog
 
+## [v11.4.3] — 2026-05-04 (Phase X 시작 — v12 로드맵)
+
+### 🔍 본질 재분류
+
+100개를 6개 본질 카테고리로 분류 (`docs/_classifications.json`):
+
+```
+🔧 design (언어 결함)    44  ← v12 Phase X
+📚 normal (정상 동작)    25  ← LEARNING.md
+💡 learning (학습 부족)  20  ← ALIAS 처리됨
+🚧 missing (미구현)       5  ← Phase Y
+📝 doc (문서 오류)        3  ← 정정 예정
+💀 user (진짜 실수)       3  ← wrapper hint
+```
+
+→ **80%는 사용자 실수가 아니라 언어가 만든 문제**.
+
+### 📦 추가
+- `docs/_classifications.json` — 100개 단일 소스
+- `docs/MISTAKES.md` — 진짜 실수 (28개)
+- `docs/LEARNING.md` — Lisp 학습 (28개)
+- `docs/LANGUAGE-FAULTS.md` — 언어 결함 (44개, v12 대상)
+- `docs/PHASE-X-V12-ROADMAP.md` — 통일 규칙 5가지 + 3개월 계획
+- `scripts/gen-mistakes-split.js` — JSON → 3개 문서 자동 생성
+- `bin/freelang-migrate` — v11 → v12 마이그레이션 도구 prototype
+
+### 🛠 freelang-migrate 도구
+
+```bash
+freelang-migrate src/                # dry-run
+freelang-migrate src/ --apply        # 실제 변환 + 자동 백업
+```
+
+지원 변환:
+- 60+ 함수명 (snake → kebab): str_to_num → str-to-num
+- 술어 통일: is_null → nil?, is_array → array?
+- 인자 순서: (map fn arr) → (map arr fn) — `map`, `filter` 만
+- $ 접두사 제거 (옵션)
+
+### 🎯 v12 통일 규칙
+
+1. **인자 순서**: 데이터 → 함수 → 부가 (col-first)
+2. **작명**: kebab-case 통일
+3. **술어**: ? suffix
+4. **HTTP**: 응답 분리 함수 (http-get-json, http-status, http-body)
+5. **`$` 접두사**: 선택 (호환 유지)
+
+### 🗓 일정
+- v11.5.0 (1주): v12 alias 사전 등록
+- v11.9.0 (8주): v12 RC + deprecated 경고
+- **v12.0.0 (12주, 2026-09)**: 공식 출시
+- v13.0.0 (~2027): v11 alias 제거
+
+### ⚠️ Breaking Change 없음 (v11.4.3)
+- v12는 별도 메이저 릴리스. v11.4.3은 분류/문서/도구만.
+- v11 코드는 그대로 작동.
+
+---
+
 ## [v11.4.2] — 2026-05-04 (Phase G+ ALIAS 확장 + 정직 카운트)
 
 ### 🔍 정직성 점검
