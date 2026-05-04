@@ -17,6 +17,9 @@ import { createPerfModule } from "./stdlib-perf";        // Phase F-2: AI 성능
 import { createVerifyModule } from "./stdlib-verify";    // Phase F-2: AI 코드 검증
 import { createHttpMacroModule } from "./stdlib-http-macro"; // Phase F-3: HTTP 1줄 매크로
 import { createDbQueryModule } from "./stdlib-db-query";     // Phase F-3: DB 쿼리 빌더
+import { createOptionalModule } from "./stdlib-optional";    // Phase F-4: 선택적 npm 브릿지
+import { createRestCrudModule } from "./stdlib-rest-crud";   // Phase F-4: REST CRUD 라우팅
+import { createCaptureErrorModule } from "./stdlib-capture-error"; // Phase F-4: 에러 추적
 import { createCryptoModule } from "./stdlib-crypto";    // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine (core)
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
@@ -67,6 +70,11 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createVerifyModule());        // Phase F-2: AI 코드 자동 검증
   interp.registerModule(createHttpMacroModule());    // Phase F-3: HTTP JSON 매크로
   interp.registerModule(createDbQueryModule());      // Phase F-3: DB 쿼리 빌더
+  interp.registerModule(createOptionalModule());     // Phase F-4: 선택적 npm 브릿지
+  interp.registerModule(createRestCrudModule());     // Phase F-4: REST CRUD 라우팅
+  interp.registerModule(createCaptureErrorModule(   // Phase F-4: 에러 추적 + retry
+    (fn, args) => interp.callFunctionValue(fn, args)
+  ));
   interp.registerModule(createCryptoModule());
   interp.registerModule(createWorkflowModule());
   interp.registerModule(createResourceModule());
