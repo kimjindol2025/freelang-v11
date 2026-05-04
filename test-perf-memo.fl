@@ -1,0 +1,55 @@
+;; 재귀 성능 개선 테스트
+
+(println "🔥 재귀 성능 개선 테스트")
+(println "════════════════════════════════════")
+(println "")
+
+;; 원본: 순수 재귀
+(defn fib-pure [$n]
+  (if (<= $n 1) $n
+    (+ (fib-pure (- $n 1)) (fib-pure (- $n 2)))))
+
+;; 개선 1: Memoization
+(define memo {})
+
+(defn fib-memo [$n]
+  (let [[$key (str $n)]]
+    (if (get memo $key)
+      (get memo $key)
+      (let [[$result (if (<= $n 1) $n
+                       (+ (fib-memo (- $n 1)) (fib-memo (- $n 2))))]]
+        (do
+          (set! memo (assoc memo $key $result))
+          $result)))))
+
+;; 개선 2: Tail recursive + loop
+(defn fib-iter [$n]
+  (loop [i 2 a 0 b 1]
+    (if (> i $n)
+      b
+      (recur (+ i 1) b (+ a b)))))
+
+(println "원본 (순수 재귀, fib 25):")
+(let [[$t (now_ms)]]
+  (let [[$r (fib-pure 25)]]
+    (println (str "  결과: " $r))
+    (println (str "  시간: " (- (now_ms) $t) "ms"))))
+
+(println "")
+
+(println "개선 1 (Memoization, fib 30):")
+(let [[$t (now_ms)]]
+  (let [[$r (fib-memo 30)]]
+    (println (str "  결과: " $r))
+    (println (str "  시간: " (- (now_ms) $t) "ms"))))
+
+(println "")
+
+(println "개선 2 (Iterative, fib 30):")
+(let [[$t (now_ms)]]
+  (let [[$r (fib-iter 30)]]
+    (println (str "  결과: " $r))
+    (println (str "  시간: " (- (now_ms) $t) "ms"))))
+
+(println "")
+(println "✅ 완료")

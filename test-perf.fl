@@ -1,0 +1,29 @@
+;; 성능 테스트 (심플)
+
+(println "🔥 성능 테스트")
+(println "")
+
+;; 재귀 테스트
+(defn fib [$n]
+  (if (<= $n 1) $n
+    (+ (fib (- $n 1)) (fib (- $n 2)))))
+
+(println "재귀 (fib 30):")
+(let [[$t (now_ms)]]
+  (let [[$r (fib 30)]]
+    (println (str "  결과: " $r))
+    (println (str "  시간: " (- (now_ms) $t) "ms"))))
+
+(println "")
+
+;; 루프 테스트
+(println "루프 (합계 10K):")
+(let [[$t (now_ms)]]
+  (let [[$sum (loop [i 0 acc 0]
+                (if (>= i 10000) acc
+                  (recur (+ i 1) (+ acc i))))]]
+    (println (str "  결과: " $sum))
+    (println (str "  시간: " (- (now_ms) $t) "ms"))))
+
+(println "")
+(println "✅ 완료")

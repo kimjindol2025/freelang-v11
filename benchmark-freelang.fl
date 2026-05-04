@@ -1,0 +1,52 @@
+;; FreeLang 성능 벤치마크
+;; 3가지 테스트: 재귀, 배열, I/O
+
+(println "🔥 FreeLang v11 성능 테스트")
+(println "════════════════════════════════════")
+(println "")
+
+;; Test 1: 재귀 (팩토리얼)
+(defn factorial [$n]
+  (if (<= $n 1) 1
+    (* $n (factorial (- $n 1)))))
+
+(println "📊 Test 1: 재귀 (factorial 25)")
+(let [[$start (now_ms)]]
+  (let [[$result (factorial 25)]]
+    (let [[$elapsed (- (now_ms) $start)]]
+      (do
+        (println (str "  결과: " $result))
+        (println (str "  시간: " $elapsed "ms"))))))
+
+(println "")
+
+;; Test 2: 배열 처리 (map + filter)
+(println "📊 Test 2: 배열 처리 (100K 반복)")
+(let [[$start (now_ms)]]
+  (let [[$arr (range 0 100000)]]
+    (let [[$result (->> $arr
+                       (map (fn [$x] (* $x 2)))
+                       (filter (fn [$x] (> $x 50000)))
+                       (length))]]
+      (let [[$elapsed (- (now_ms) $start)]]
+        (do
+          (println (str "  결과: " $result " 개"))
+          (println (str "  시간: " $elapsed "ms")))))))
+
+(println "")
+
+;; Test 3: 문자열 처리
+(println "📊 Test 3: 문자열 처리 (10K 반복)")
+(let [[$start (now_ms)]]
+  (let [[$result (loop [i 0 acc ""]
+                   (if (>= i 10000)
+                     (length acc)
+                     (recur (+ i 1) (str acc "x"))))]]
+    (let [[$elapsed (- (now_ms) $start)]]
+      (do
+        (println (str "  결과: " $result " 글자"))
+        (println (str "  시간: " $elapsed "ms"))))))
+
+(println "")
+(println "✅ 테스트 완료")
+(println "════════════════════════════════════")

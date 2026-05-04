@@ -1,0 +1,49 @@
+;; 더 간단한 벤치마크 (컴파일 호환)
+
+(println "🔥 FreeLang 성능 테스트 (간단)")
+(println "════════════════════════════════════")
+(println "")
+
+;; Test 1: 재귀
+(defn factorial [$n]
+  (if (<= $n 1) 1
+    (* $n (factorial (- $n 1)))))
+
+(println "📊 Test 1: 재귀 (factorial 25)")
+(let [[$start (now_ms)]]
+  (let [[$result (factorial 25)]]
+    (let [[$elapsed (- (now_ms) $start)]]
+      (do
+        (println (str "  시간: " $elapsed "ms"))))))
+
+(println "")
+
+;; Test 2: 루프
+(println "📊 Test 2: 루프 (10K 반복)")
+(let [[$start (now_ms)]]
+  (let [[$result (loop [i 0 sum 0]
+                   (if (>= i 10000)
+                     sum
+                     (recur (+ i 1) (+ sum i))))]]
+    (let [[$elapsed (- (now_ms) $start)]]
+      (do
+        (println (str "  결과: " $result))
+        (println (str "  시간: " $elapsed "ms"))))))
+
+(println "")
+
+;; Test 3: 간단한 맵
+(println "📊 Test 3: 배열 맵 (1K)")
+(let [[$start (now_ms)]]
+  (let [[$arr [1 2 3 4 5 6 7 8 9 10]]]
+    (let [[$result (loop [i 0 acc []]
+                     (if (>= i 1000)
+                       (length acc)
+                       (recur (+ i 1) (append acc (map (fn [$x] (* $x 2)) $arr)))))]
+      (let [[$elapsed (- (now_ms) $start)]]
+        (do
+          (println (str "  결과: " $result " items"))
+          (println (str "  시간: " $elapsed "ms")))))))
+
+(println "")
+(println "✅ 완료")
