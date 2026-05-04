@@ -1,1 +1,0 @@
-(println "[{\"slug\":\"hello\"},{\"slug\":\"arithmetic\"},{\"slug\":\"func\"},{\"slug\":\"map-filter\"},{\"slug\":\"fib\"}]")
