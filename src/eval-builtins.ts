@@ -177,6 +177,18 @@ function flExecOpNative(op: string, vals: any[]): any {
     case ">=": return v0 >= v1;
     case "not": return !v0;
     case "nil?": case "null?": return v0 === null || v0 === undefined;
+    case "empty?": {
+      if (v0 === null || v0 === undefined) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      if (v0 === null || v0 === undefined || typeof v0 !== "object" || Array.isArray(v0)) return false;
+      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      return Object.prototype.hasOwnProperty.call(v0, k);
+    }
     case "nil-or-empty?": return v0 === null || v0 === undefined || (v0 && v0.length === 0);
     case "true?": return v0 === true;
     case "false?": return v0 === false;
@@ -218,12 +230,12 @@ function flExecOpNative(op: string, vals: any[]): any {
     }
     case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
-    case "str": case "concat": return vals.map((v: any) => v === null || v === undefined ? "null" : String(v)).join("");
+    case "str": case "concat": return vals.map((v: any) => toDisplay(v)).join("");
     case "str-to-num": { const n = parseFloat(String(v0)); return isNaN(n) ? null : n; }
     case "num-to-str": return String(v0 ?? "");
     case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
     case "type-of": return typeof v0;
-    case "print": process.stdout.write(vals.map((v: any) => v === null ? "null" : String(v)).join("")); return null;
+    case "print": process.stdout.write(vals.map((v: any) => toDisplay(v)).join("")); return null;
     case "println": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
 
     case "substring": return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== undefined ? Number(v2) : undefined) : "";
@@ -237,9 +249,9 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "includes?": return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
     case "starts-with?": return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
     case "ends-with?": return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
-    case "empty?": return Array.isArray(v0) ? v0.length === 0 : typeof v0 === "string" ? v0.length === 0 : (v0 === null || v0 === undefined);
+    case "empty?": { if (v0 === null || v0 === undefined) return true; if (typeof v0 === "string") return v0.length === 0; if (Array.isArray(v0)) return v0.length === 0; if (typeof v0 === "object") return Object.keys(v0).length === 0; return false; }
     case "first": return Array.isArray(v0) ? (v0[0] !== undefined ? v0[0] : null) : null;
-    case "last": return Array.isArray(v0) ? (v0.length > 0 ? v0[v0.length - 1] : null) : null;
+    case "last": return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
     case "rest": return Array.isArray(v0) ? v0.slice(1) : [];
     // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
     case "get-or": {
@@ -263,10 +275,10 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "last-or": case "last_or":
       return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : (v1 !== undefined ? v1 : null);
     case "cons": return [v0, ...(Array.isArray(v1) ? v1 : [v1])];
-    case "reverse": return Array.isArray(v0) ? [...v0].reverse() : v0;
+    case "reverse": return Array.isArray(v0) ? [...v0].reverse() : [];
     case "sort": return Array.isArray(v0) ? [...v0].sort((a: any, b: any) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
-    case "keys": return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
-    case "values": return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+    case "keys": return v0 instanceof Map ? Array.from(v0.keys()) : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : []);
+    case "values": return v0 instanceof Map ? Array.from(v0.values()) : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : []);
     case "map-entries": case "map_entries": return v0 instanceof Map ? [...v0.entries()] : (v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : []);
     case "floor": return Math.floor(v0);
     case "ceil": return Math.ceil(v0);
@@ -677,10 +689,22 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const { execSync } = require("child_process");
       const cmd = String(args[0] ?? "");
       try {
-        return execSync(cmd, { encoding: "utf-8" });
+        return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
       } catch (e: any) {
         return null;
       }
+    }
+    case "shell-exec-result": {
+      // stdout + stderr + exit_code 모두 반환: {:stdout "..." :stderr "..." :exit 0 :ok true}
+      const { spawnSync } = require("child_process");
+      const cmd = String(args[0] ?? "");
+      const res = spawnSync("sh", ["-c", cmd], { encoding: "utf-8" });
+      return {
+        stdout: res.stdout ?? "",
+        stderr: res.stderr ?? "",
+        exit: res.status ?? -1,
+        ok: (res.status ?? -1) === 0,
+      };
     }
     case "require": {
       const modulePath = String(args[0] ?? "");
@@ -1208,9 +1232,9 @@ loop().catch(e => {
     case "list":
       return args;
     case "first":
-      return Array.isArray(args[0]) && args[0].length > 0 ? args[0][0] : (args[0]?.[0] ?? null);
+      return Array.isArray(args[0]) ? (args[0][0] !== undefined ? args[0][0] : null) : null;
     case "rest":
-      return args[0]?.slice(1);
+      return Array.isArray(args[0]) ? args[0].slice(1) : [];
     // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
     case "keys": {
       const kObj = args[0];
@@ -1249,7 +1273,7 @@ loop().catch(e => {
       return [...(args[0] || []), ...args.slice(1)];
     case "reverse":
       if (Array.isArray(args[0])) return [...args[0]].reverse();
-      return [...(args[0] || [])].reverse();
+      return [];
     case "map": {
       const mapFn = args[0];
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
@@ -1401,6 +1425,20 @@ loop().catch(e => {
     case "nil?":
     case "null?":
       return args[0] === null || args[0] === undefined;
+    case "empty?": {
+      const v = args[0];
+      if (v === null || v === undefined) return true;
+      if (typeof v === "string") return v.length === 0;
+      if (Array.isArray(v)) return v.length === 0;
+      if (typeof v === "object") return Object.keys(v).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      const obj = args[0], key = args[1];
+      if (obj === null || obj === undefined || typeof obj !== "object" || Array.isArray(obj)) return false;
+      const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
+      return Object.prototype.hasOwnProperty.call(obj, k);
+    }
     case "nil-or-empty?":
       return args[0] === null || args[0] === undefined || (args[0] && args[0].length === 0);
     case "zero?":
@@ -1461,8 +1499,6 @@ loop().catch(e => {
       return false;
     case "starts-with?":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
-    case "ends-with?":
-      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].endsWith(args[1]) : false;
     case "index-of":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].indexOf(args[1]) : -1;
     case "replace":
@@ -1698,6 +1734,40 @@ loop().catch(e => {
         if (typeof a === "number" && typeof b === "number") return a - b;
         return String(a).localeCompare(String(b));
       });
+    case "sort-by": case "sort_by": {
+      // (sort-by keyfn coll) — keyfn을 호출해 반환값으로 정렬
+      if (!Array.isArray(args[1])) return [];
+      const keyFn = args[0];
+      const callFn = interp?.callFunctionValue?.bind(interp);
+      if (!callFn) return [...args[1]];
+      return [...args[1]].sort((a, b) => {
+        const ka = callFn(keyFn, [a]);
+        const kb = callFn(keyFn, [b]);
+        if (typeof ka === "number" && typeof kb === "number") return ka - kb;
+        return String(ka).localeCompare(String(kb));
+      });
+    }
+    case "zip": {
+      // (zip arr1 arr2) → [[a1 b1] [a2 b2] ...]
+      const a = Array.isArray(args[0]) ? args[0] : [];
+      const b = Array.isArray(args[1]) ? args[1] : [];
+      const len = Math.min(a.length, b.length);
+      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
+    }
+    case "zip-with": {
+      // (zip-with f arr1 arr2) → [(f a1 b1) (f a2 b2) ...]
+      const fn = args[0];
+      const a = Array.isArray(args[1]) ? args[1] : [];
+      const b = Array.isArray(args[2]) ? args[2] : [];
+      const len = Math.min(a.length, b.length);
+      const callFn2 = interp?.callFunctionValue?.bind(interp);
+      if (!callFn2) return [];
+      return Array.from({ length: len }, (_, i) => callFn2(fn, [a[i], b[i]]));
+    }
+    case "uuid": case "uuid4": {
+      const { randomUUID } = require("crypto");
+      return randomUUID();
+    }
     case "push":
       if (!Array.isArray(args[0])) return [args[1]];
       return [...args[0], args[1]];
@@ -1712,6 +1782,85 @@ loop().catch(e => {
     // Type/Utility
     case "typeof":
       return typeof args[0];
+
+    // ── 벡터 유사도 (pgvector 대체) ──────────────────────────────
+    case "vec-dot": case "dot-product": {
+      // (vec-dot a b) → 내적 (dot product)
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
+      return sum;
+    }
+    case "vec-norm": case "vec-magnitude": {
+      // (vec-norm v) → L2 노름 (크기)
+      const v = args[0];
+      if (!Array.isArray(v)) return 0;
+      return Math.sqrt(v.reduce((s: number, x: any) => s + x * x, 0));
+    }
+    case "cosine-sim": case "cosine_sim": {
+      // (cosine-sim a b) → 코사인 유사도 [-1, 1]
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        dot += (a[i] ?? 0) * (b[i] ?? 0);
+        na  += (a[i] ?? 0) ** 2;
+        nb  += (b[i] ?? 0) ** 2;
+      }
+      const denom = Math.sqrt(na) * Math.sqrt(nb);
+      return denom === 0 ? 0 : dot / denom;
+    }
+    case "euclidean-dist": case "vec-dist": {
+      // (euclidean-dist a b) → 유클리디안 거리
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        const d = (a[i] ?? 0) - (b[i] ?? 0);
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+    case "vec-add": {
+      // (vec-add a b) → 벡터 합
+      const a = args[0], b = args[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return [];
+      return Array.from({ length: Math.min(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
+    }
+    case "vec-scale": {
+      // (vec-scale v scalar) → 스칼라 곱
+      const v = args[0], s = Number(args[1] ?? 1);
+      if (!Array.isArray(v)) return [];
+      return v.map((x: any) => x * s);
+    }
+    case "vec-normalize": {
+      // (vec-normalize v) → 단위 벡터
+      const v = args[0];
+      if (!Array.isArray(v)) return [];
+      const norm = Math.sqrt(v.reduce((s: number, x: any) => s + x * x, 0));
+      return norm === 0 ? v : v.map((x: any) => x / norm);
+    }
+    case "vec-top-k": {
+      // (vec-top-k query vectors k) → 코사인 유사도 상위 k개 [{:score :index :data}]
+      const query   = args[0];
+      const vectors = args[1];
+      const k       = Number(args[2] ?? 5);
+      if (!Array.isArray(query) || !Array.isArray(vectors)) return [];
+      const scored = vectors.map((item: any, idx: number) => {
+        const vec = Array.isArray(item) ? item : (item?.vector ?? item?.embedding ?? []);
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(query.length, vec.length); i++) {
+          dot += (query[i] ?? 0) * (vec[i] ?? 0);
+          na  += (query[i] ?? 0) ** 2;
+          nb  += (vec[i] ?? 0) ** 2;
+        }
+        const denom = Math.sqrt(na) * Math.sqrt(nb);
+        return { score: denom === 0 ? 0 : dot / denom, index: idx, data: item };
+      });
+      return scored.sort((a: any, b: any) => b.score - a.score).slice(0, k);
+    }
+
     case "assert-type": {
       const val = args[0];
       const typeStr = String(args[1]);
@@ -1734,9 +1883,9 @@ loop().catch(e => {
     case "abs":
       return Math.abs(args[0]);
     case "min":
-      return Math.min(...args);
+      return Math.min(...args.filter((v: any) => typeof v === "number"));
     case "max":
-      return Math.max(...args);
+      return Math.max(...args.filter((v: any) => typeof v === "number"));
     case "floor":
       return Math.floor(args[0]);
     case "ceil":

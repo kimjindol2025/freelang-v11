@@ -73,7 +73,7 @@ function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
 function _fl_append(l, x) { return [...(l || []), x]; }
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
 function _fl_values(o) { return o ? Object.values(o) : []; }
-function _fl_entries(o) { return o ? Object.entries(o).map(([k,v])=>[k,v]) : []; }
+var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
 function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 
@@ -115,8 +115,51 @@ function _fl_shell_capture(cmd) {
   }
 }
 
+// ─ 타입 ─
+function _fl_type_of(v) { if (v === null || v === undefined) return "nil"; if (Array.isArray(v)) return "list"; return typeof v; }
+
 // ─ 기타 ─
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
+
+// ─ 시간 ─
+const now_ms = () => Date.now();
+const now_iso = () => new Date().toISOString();
+const now_unix = () => Math.floor(Date.now() / 1000);
+
+// ─ 셸 실행 ─
+const shell_exec = (cmd, inp) => { try { const {execSync} = require("child_process"); const opts = {encoding: "utf8"}; if (inp) opts["input"] = inp; return execSync(cmd, opts); } catch(e) { return ""; } };
+
+// ─ 수학 ─
+var math_sqrt = (n) => Math.sqrt(n);
+var math_pow = (a, b) => Math.pow(a, b);
+var math_pi = Math.PI;
+
+// ─ 컬렉션 확장 ─
+function _fl_take(n, arr) { return (arr || []).slice(0, n); }
+function _fl_drop(n, arr) { return (arr || []).slice(n); }
+function _fl_zip(a, b) { const r = []; const l = Math.min((a || []).length, (b || []).length); for (let i = 0; i < l; i++) r.push([a[i], b[i]]); return r; }
+function _fl_flatten(arr) { return (arr || []).flat(); }
+function _fl_reverse(arr) { return Array.isArray(arr) ? [...arr].reverse() : arr; }
+function _fl_sort(arr, fn) { return fn ? [...(arr || [])].sort((a, b) => fn(a, b) ? -1 : 1) : [...(arr || [])].sort(); }
+
+// ─ 문자열 공개 별칭 ─
+var str_upper = (s) => String(s || "").toUpperCase();
+var str_lower = (s) => String(s || "").toLowerCase();
+var str_contains = (s, sub) => String(s || "").includes(String(sub || ""));
+var str_replace = (s, a, b) => { if (s == null) return ""; return String(s).split(String(a || "")).join(String(b || "")); };
+var str_starts_with = (s, p) => String(s || "").startsWith(String(p || ""));
+var str_ends_with = (s, sf) => String(s || "").endsWith(String(sf || ""));
+var str_trim = (s) => String(s || "").trim();
+var str_length = (s) => String(s || "").length;
+var str_split = (s, sep) => String(s || "").split(sep);
+
+// ─ 타입 확장 ─
+var list_q = (v) => Array.isArray(v);
+var map_q = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var fn_q = (v) => typeof v === "function";
+
+// ─ IIFE 폴백 ─
+var unknown = (...a) => a[a.length - 1];
 
 // ─ 글로벌 바인딩 ─
 let __argv__ = _fl_get_argv();
@@ -133,7 +176,8 @@ export const HELPER_FUNCTIONS = [
   '_fl_null_q', '_fl_true_q', '_fl_false_q', '_fl_number_q', '_fl_string_q', '_fl_list_q', '_fl_array_q', '_fl_map_q', '_fl_fn_q',
   '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
   '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
-  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture'
+  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture',
+  '_fl_take', '_fl_drop', '_fl_zip', '_fl_flatten', '_fl_reverse', '_fl_sort'
 ];
 
 export const HELPER_COUNT = HELPER_FUNCTIONS.length;

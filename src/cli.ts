@@ -56,8 +56,28 @@ function formatError(err: any, source?: string, filePath?: string, callStack?: A
     }
     lines.push(`  ${err.message}`);
   } else if (err instanceof Error) {
-    lines.push(`\n\x1b[31m실행 오류\x1b[0m  ${fileName}`);
-    lines.push(`  ${err.message}`);
+    // "FreeLang line N: msg" 패턴에서 라인 번호 추출
+    const lineMatch = err.message.match(/^FreeLang line (\d+):\s*/);
+    const errLine = lineMatch ? parseInt(lineMatch[1]) : 0;
+    const cleanMsg = lineMatch ? err.message.slice(lineMatch[0].length) : err.message;
+
+    lines.push(`\n\x1b[31m실행 오류\x1b[0m  ${fileName}${errLine ? `:${errLine}` : ""}`);
+
+    // 소스 컨텍스트: 에러 라인 ±1줄 표시
+    if (source && errLine > 0) {
+      const srcLines = source.split("\n");
+      const start = Math.max(0, errLine - 2);
+      const end = Math.min(srcLines.length - 1, errLine);
+      for (let i = start; i <= end; i++) {
+        const num = String(i + 1).padStart(4, " ");
+        const marker = (i + 1 === errLine) ? "\x1b[31m→\x1b[0m" : " ";
+        const lineColor = (i + 1 === errLine) ? `\x1b[31m${srcLines[i]}\x1b[0m` : `\x1b[2m${srcLines[i]}\x1b[0m`;
+        lines.push(`  ${marker} ${num} │ ${lineColor}`);
+      }
+      lines.push("");
+    }
+
+    lines.push(`  \x1b[31m✖\x1b[0m ${cleanMsg}`);
     const stack = callStack ?? (err as any).__flCallStack;
     if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
@@ -1644,57 +1664,151 @@ function cmdServe(args: string[]): void {
     });
 }
 
-function printUsage(): void {
+const C = {
+  bold:  (s: string) => `\x1b[1m${s}\x1b[0m`,
+  cyan:  (s: string) => `\x1b[36m${s}\x1b[0m`,
+  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
+  dim:   (s: string) => `\x1b[2m${s}\x1b[0m`,
+  red:   (s: string) => `\x1b[31m${s}\x1b[0m`,
+  yellow:(s: string) => `\x1b[33m${s}\x1b[0m`,
+};
+
+const FL_VERSION = "11.1.1-dev";
+
+function printUsage(errCmd?: string): void {
+  const b = C.bold, c = C.cyan, g = C.green, d = C.dim;
   console.log([
     "",
-    "FreeLang v11 CLI",
+    `${b("FreeLang")} ${c("v" + FL_VERSION)}  ${d("AI-Native Lisp · Self-Hosting · 500+ stdlib")}`,
     "",
-    "사용법:",
-    "  freelang run <file.fl>           파일 실행",
-    "  freelang run <file.fl> --watch   파일 변경 감지 + 자동 재실행",
-    "  freelang check <file.fl>         문법 검사",
-    "  freelang fmt <file.fl>           파일 인플레이스 포맷 (Phase 73)",
-    "  freelang fmt --check <file.fl>   이미 포맷됐는지 확인 (미포맷 → exit 1)",
-    "  freelang fmt --stdin             stdin 입력받아 stdout 출력",
-    "  freelang repl                    대화형 REPL",
-    "  freelang ls-fns                  전체 stdlib 함수 목록",
-    "  freelang ls-fns <키워드>         키워드로 함수 검색 (예: ls-fns http)",
-    "  freelang fn-doc <이름>           특정 함수 시그니처 + 설명",
-    "  freelang debug <file.fl>         디버그 모드 실행 (break! 활성화) (Phase 78)",
-    "  freelang debug <file.fl> --step  step 모드 (모든 줄 추적)",
-    "  freelang watch <file.fl>         파일 변경 시 자동 재실행 (Phase 79)",
-    "  freelang watch <file.fl> --no-clear  콘솔 지우지 않고 재실행",
-    "  freelang serve [--app app] [--port 3000]  웹 서버 시작 (Phase 3, App Router)",
-    "  freelang serve --mode ssr|isr|ssg         렌더링 모드 선택",
-    "  freelang ci                      현재 디렉토리 .fl 파일 전체 CI (Phase 80)",
-    "  freelang ci <file.fl>            특정 파일 CI",
-    "  freelang ci --no-fail-fast       실패해도 계속 진행",
-    "  freelang doc <file.fl>           Markdown 문서 생성 → stdout (Phase 77)",
-    "  freelang doc <file.fl> -o out.md 파일로 저장",
-    "  freelang doc --dir <dir>         디렉토리 내 모든 .fl 파일 통합 문서화",
-    "  freelang build --static [--app app/] [--out dist/]  정적 HTML export",
-    "  freelang build --oci <app.fl> --tag <tag>        Docker 없이 OCI 이미지 빌드 (Phase 8)",
-    "  freelang build --oci <app.fl> --tag <tag> --registry <url>  OCI 빌드 + push",
-    "  freelang registry start [--port]  npm 호환 패키지 레지스트리 시작 (Phase 7)",
-    "  freelang registry status [--port] 레지스트리 상태 확인",
+    `${b("사용법:")}  freelang <커맨드> [옵션]`,
     "",
-    "예제:",
-    "  freelang run my-script.fl",
-    "  freelang run agent.fl --watch",
-    "  freelang check parser.fl",
-    "  freelang fmt my-script.fl",
-    "  freelang fmt --check *.fl",
-    "  cat script.fl | freelang fmt --stdin",
-    "  freelang repl",
-    "  freelang debug my-script.fl",
-    "  freelang debug my-script.fl --step",
-    "  freelang serve --app app --port 3000",
-    "  freelang serve --mode isr",
-    "  freelang doc fl-math-lib.fl",
-    "  freelang doc fl-math-lib.fl -o math-api.md",
-    "  freelang doc --dir src/",
+    `${c("── 실행 ───────────────────────────────────────────────")}`,
+    `  ${g("run")}    <file.fl> [-- args...]  파일 실행`,
+    `  ${g("run")}    <file.fl> --watch       저장 시 자동 재실행`,
+    `  ${g("repl")}                           대화형 REPL`,
+    `  ${g("check")}  <file.fl>               문법 검사 (실행 없음)`,
+    "",
+    `${c("── 개발 ───────────────────────────────────────────────")}`,
+    `  ${g("watch")}  <file.fl>               파일 변경 감지 재실행`,
+    `  ${g("debug")}  <file.fl>               디버그 모드 (break! 지원)`,
+    `  ${g("debug")}  <file.fl> --step        스텝 모드`,
+    `  ${g("fmt")}    <file.fl>               코드 포맷 (인플레이스)`,
+    `  ${g("fmt")}    --check <file.fl>       포맷 검사 (exit 1 if dirty)`,
+    `  ${g("fmt")}    --stdin                 stdin → stdout 포맷`,
+    "",
+    `${c("── 문서 / 탐색 ────────────────────────────────────────")}`,
+    `  ${g("ls-fns")}  [키워드]               stdlib 함수 목록 (키워드 필터)`,
+    `  ${g("fn-doc")}  <이름>                 함수 시그니처 + 설명`,
+    `  ${g("doc")}     <file.fl> [-o out.md]  Markdown 문서 생성`,
+    `  ${g("doc")}     --dir <dir>            디렉토리 통합 문서화`,
+    "",
+    `${c("── 빌드 / 배포 ────────────────────────────────────────")}`,
+    `  ${g("compile")} <file.fl> [-o out.js]  JS로 컴파일 (AOT)`,
+    `  ${g("build")}   --oci <app.fl> --tag <tag>  OCI 이미지 빌드`,
+    `  ${g("serve")}   [--port 3000]          웹 서버 시작`,
+    `  ${g("ci")}      [file.fl]              CI 검사 실행`,
+    "",
+    `${c("── 기타 ───────────────────────────────────────────────")}`,
+    `  ${g("--version")} / ${g("-v")}               버전 출력`,
+    `  ${g("--help")}    / ${g("-h")}               이 도움말`,
+    "",
+    `${b("예제:")}`,
+    `  freelang run app.fl`,
+    `  freelang run app.fl --watch`,
+    `  freelang run app.fl -- arg1 arg2`,
+    `  freelang repl`,
+    `  freelang check app.fl`,
+    `  freelang ls-fns http`,
+    `  freelang fn-doc json_parse`,
+    `  freelang compile app.fl -o app.js`,
     "",
   ].join("\n"));
+
+  if (errCmd) {
+    // 유사 커맨드 제안
+    const known = ["run","repl","check","watch","debug","fmt","ls-fns","fn-doc",
+                   "doc","compile","build","serve","ci","version","help"];
+    const suggest = known.find(k =>
+      k.startsWith(errCmd[0]) ||
+      Math.abs(k.length - errCmd.length) <= 2 &&
+      [...errCmd].filter((c,i) => k[i] === c).length >= Math.min(k.length,errCmd.length) - 2
+    );
+    console.error(`${C.red("오류")}  알 수 없는 커맨드: ${C.bold(errCmd)}${suggest ? `\n       혹시 ${C.green("freelang " + suggest)} ?` : ""}`);
+    process.exit(1);
+  }
+}
+
+function printSubHelp(cmd: string): void {
+  const g = C.green, d = C.dim, b = C.bold;
+  const helps: Record<string, string[]> = {
+    run: [
+      `${b("freelang run")} — 파일 실행`,
+      "",
+      `  freelang run <file.fl>             실행`,
+      `  freelang run <file.fl> --watch     저장 시 자동 재실행`,
+      `  freelang run <file.fl> -- a b      스크립트에 인자 전달 ($__argv__)`,
+      "",
+      `${d("예제:")}`,
+      `  freelang run app.fl`,
+      `  freelang run server.fl --watch`,
+      `  freelang run cli.fl -- input.txt`,
+    ],
+    repl: [
+      `${b("freelang repl")} — 대화형 REPL`,
+      "",
+      `  (+ 1 2)           표현식 평가`,
+      `  (defn f [x] ...)  함수 정의 (세션 유지)`,
+      `  :stack            콜 스택 출력`,
+      `  :env              바인딩 목록`,
+      `  :exit / Ctrl+D    종료`,
+    ],
+    check: [
+      `${b("freelang check")} — 문법 검사 (실행 없음)`,
+      "",
+      `  freelang check <file.fl>`,
+      "",
+      `  파싱 오류 발생 시 라인:컬럼 + 괄호 힌트 표시`,
+    ],
+    fmt: [
+      `${b("freelang fmt")} — 코드 포맷`,
+      "",
+      `  freelang fmt <file.fl>             인플레이스 포맷`,
+      `  freelang fmt --check <file.fl>     포맷 필요 여부 검사 (exit 1)`,
+      `  freelang fmt --stdin               stdin → stdout`,
+      "",
+      `${d("CI 활용:")}`,
+      `  freelang fmt --check src/*.fl`,
+    ],
+    compile: [
+      `${b("freelang compile")} — JS로 AOT 컴파일`,
+      "",
+      `  freelang compile <file.fl>           → file.fl.out.js`,
+      `  freelang compile <file.fl> -o app.js → app.js`,
+      "",
+      `  생성된 .js는 Node.js / Bun으로 직접 실행 가능`,
+      `  실행 시 FreeLang 불필요 (독립 배포)`,
+    ],
+    "ls-fns": [
+      `${b("freelang ls-fns")} — stdlib 함수 탐색`,
+      "",
+      `  freelang ls-fns              전체 목록 (500+)`,
+      `  freelang ls-fns http         "http" 포함 함수만`,
+      `  freelang ls-fns json         json 관련`,
+    ],
+    "fn-doc": [
+      `${b("freelang fn-doc")} — 함수 상세 문서`,
+      "",
+      `  freelang fn-doc json_parse`,
+      `  freelang fn-doc str_split`,
+    ],
+  };
+  const lines = helps[cmd];
+  if (lines) {
+    console.log("\n" + lines.join("\n") + "\n");
+  } else {
+    printUsage();
+  }
 }
 
 
@@ -1704,8 +1818,9 @@ const cmd = args[0];
 
 switch (cmd) {
   case "run": {
+    if (args[1] === "--help" || args[1] === "-h") { printSubHelp("run"); break; }
     const filePath = args[1];
-    if (!filePath) { printUsage(); process.exit(1); }
+    if (!filePath) { printSubHelp("run"); process.exit(1); }
     const watch = args.includes("--watch") || args.includes("-w");
     // `--` 구분자 뒤의 인수는 스크립트로 전달 ($__argv__)
     // ⚠️ --watch와 extraArgs 충돌: -- 없이 `fl run file.fl --watch arg1` 하면
@@ -1719,13 +1834,15 @@ switch (cmd) {
     break;
   }
   case "check": {
+    if (args[1] === "--help" || args[1] === "-h") { printSubHelp("check"); break; }
     const filePath = args[1];
-    if (!filePath) { printUsage(); process.exit(1); }
+    if (!filePath) { printSubHelp("check"); process.exit(1); }
     cmdCheck(filePath);
     break;
   }
   case "compile": {
-    if (args.length < 2) { printUsage(); process.exit(1); }
+    if (args[1] === "--help" || args[1] === "-h") { printSubHelp("compile"); break; }
+    if (args.length < 2) { printSubHelp("compile"); process.exit(1); }
     cmdCompile(args.slice(1));
     break;
   }
@@ -1863,7 +1980,7 @@ switch (cmd) {
   case "version":
   case "-v":
   case "--version":
-    console.log("FreeLang v11.1.0");
+    console.log(`FreeLang v${FL_VERSION}`);
     break;
   case "help":
   case "-h":
@@ -1871,10 +1988,10 @@ switch (cmd) {
     printUsage();
     break;
   default:
-    printUsage();
     if (cmd) {
-      console.error(`\x1b[31m알 수 없는 커맨드:\x1b[0m ${cmd}`);
-      process.exit(1);
+      printUsage(cmd);
+    } else {
+      printUsage();
     }
     break;
 }

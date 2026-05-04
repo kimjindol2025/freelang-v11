@@ -1,0 +1,2 @@
+(println (and))
+(println (or))

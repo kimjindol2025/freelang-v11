@@ -22,4 +22,4 @@
   :body (let [[$idx (str-index-of $s $old)]]
           (if (= $idx -1)
             $s
-            (str (str-slice $s 0 $idx) $new (str-slice $s (+ $idx (length $old)) (length $s)))))]
+            (str (str-slice $s 0 $idx) $new (str-replace (str-slice $s (+ $idx (length $old)) (length $s)) $old $new))))]

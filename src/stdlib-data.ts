@@ -25,7 +25,19 @@ export function createDataModule() {
     // json_set obj path value -> object (immutable update, returns new obj)
     "json_set": (obj: any, path: string, value: any): any => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const clone = JSON.parse(JSON.stringify(parsed));
+      const deepClone = (o: any): any => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
       const parts = path.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -96,28 +108,121 @@ export function createDataModule() {
       }
     },
 
-    // json_str obj -> string (serialize to JSON string)
-    "json_str": (obj: any): string => {
-      return JSON.stringify(obj);
+    // Helper: Convert Maps and other types to JSON-serializable form
+    _toSerializable: (obj: any): any => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map((x) => obj._toSerializable?.(x) ?? (x instanceof Map ? Object.fromEntries(x) : x));
+      if (typeof obj === "object" && obj !== null) {
+        const result: any = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = v instanceof Map ? Object.fromEntries(v) : (typeof v === "object" && v !== null ? obj._toSerializable?.(v) : v);
+        }
+        return result;
+      }
+      return obj;
+    },
+
+    // json_str obj -> string (serialize to JSON string, handles Maps)
+    "json_str": function(obj: any): string {
+      const toSerializable = (o: any): any => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable(obj));
     },
 
     // json_stringify obj -> string (alias for json_str)
-    "json_stringify": (obj: any): string => {
-      return JSON.stringify(obj);
+    "json_stringify": function(obj: any): string {
+      const toSerializable = (o: any): any => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable(obj));
     },
 
-    // json_pretty obj -> string (pretty-print JSON)
-    "json_pretty": (obj: any): string => {
-      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+    // json_pretty obj -> string (pretty-print JSON, handles Maps)
+    "json_pretty": function(obj: any): string {
+      const toSerializable = (o: any): any => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable(obj);
       return JSON.stringify(o, null, 2);
     },
 
     // ── Hyphen alias (Phase 후속 — Claude 평가에서 발견된 자주 틀리는 함수명) ──
     // AI가 Lisp 관례 따라 hyphen으로 작성하는 경우 호환
     "json-parse": (str: string): any => { try { return JSON.parse(str); } catch (e: any) { throw new Error(`json-parse: invalid JSON: ${e.message}`); } },
-    "json-stringify": (obj: any): string => JSON.stringify(obj),
-    "json-str": (obj: any): string => JSON.stringify(obj),
-    "json-pretty": (obj: any): string => { const o = typeof obj === "string" ? JSON.parse(obj) : obj; return JSON.stringify(o, null, 2); },
+    "json-stringify": function(obj: any): string {
+      const toSerializable = (o: any): any => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable(obj));
+    },
+    "json-str": function(obj: any): string {
+      const toSerializable = (o: any): any => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable(obj));
+    },
+    "json-pretty": function(obj: any): string {
+      const toSerializable = (o: any): any => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable(obj);
+      return JSON.stringify(o, null, 2);
+    },
     "json-merge": (a: any, b: any): any => {
       const x = typeof a === "string" ? JSON.parse(a) : a;
       const y = typeof b === "string" ? JSON.parse(b) : b;
@@ -134,7 +239,19 @@ export function createDataModule() {
     },
     "json-set": (obj: any, path: string, value: any): any => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const clone = JSON.parse(JSON.stringify(parsed));
+      const deepClone = (o: any): any => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result: any = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
       const parts = String(path).split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {

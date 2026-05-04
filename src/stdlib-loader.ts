@@ -31,7 +31,8 @@ import { fnMetaRegistry } from "./eval-special-forms";   // AI-Native Phase 1
 import { propRegistry, runProp, createPropertyModule } from "./stdlib-property"; // AI-Native Phase 4
 import { createWscModule } from "./stdlib-wsc";          // WebSocket 클라이언트
 import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-lazy-registry"; // Lazy Loading
-import { createImageModule } from "./stdlib-image"; // Phase A: Image Processing
+import { createImageModule } from "./stdlib-image";     // Phase A: Image Processing
+import { createMongodbModule } from "./stdlib-mongodb"; // Phase A: MongoDB Driver
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -84,7 +85,8 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createWscModule(
     (n: string, a: any[]) => interp.callUserFunction(n, a)
   ));
-  interp.registerModule(createImageModule()); // Phase A: image_info/resize/thumbnail/convert/watermark/crop
+  interp.registerModule(createImageModule());    // Phase A: image_info/resize/thumbnail/convert/watermark/crop
+  interp.registerModule(createMongodbModule()); // Phase A: mongo_connect/find/insert/update/delete/aggregate/transaction
 
   // ── fl_require builtin 등록 ─────────────────────────────────────
   // (fl_require "audit")   → audit_log 등 즉시 사용 가능
@@ -95,6 +97,29 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "fl_require":  (name: string): boolean => requireModule(name, interp as any),
     "fl_require?": (name: string): boolean => isModuleLoaded(name),
     "fl_modules":  (): string[] => getAvailableModules(),
+    // fl_load "path/to/lib.fl" → 다른 FL 파일을 현재 컨텍스트에 로드
+    // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
+    "fl_load": (filePath: string): boolean => {
+      const fs = require("fs");
+      const path = require("path");
+      const { lex } = require("./lexer");
+      const { parse } = require("./parser");
+      const resolved = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(process.cwd(), filePath);
+      if (!fs.existsSync(resolved)) {
+        console.error(`❌ [fl_load] 파일 없음: ${resolved}`);
+        return false;
+      }
+      try {
+        const src = fs.readFileSync(resolved, "utf-8");
+        (interp as any).interpret((parse as any)(lex(src)));
+        return true;
+      } catch (e: any) {
+        console.error(`❌ [fl_load] "${resolved}" 로드 실패:`, e.message);
+        return false;
+      }
+    },
   });
 
   // 네이밍 alias: 자주 쓰는 함수들의 대체 이름

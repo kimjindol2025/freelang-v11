@@ -2642,7 +2642,7 @@ var init_errors = __esm({
 // src/_stdlib-signatures.json
 var require_stdlib_signatures = __commonJS({
   "src/_stdlib-signatures.json"(exports2, module2) {
-    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: "stdout string" }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_update", params: "dbPath table data where", returns: "true" }, { module: "db", name: "db_delete_row", params: "dbPath table where", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true  (CREATE TABLE ...)" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_start", params: "port", returns: "string" }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_json", params: "obj", returns: "response object" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_header", params: "url header", returns: "string (\uD2B9\uC815 \uD5E4\uB354\uB9CC)" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string (get environment variable)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
+    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: "stdout string" }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_update", params: "dbPath table data where", returns: "true" }, { module: "db", name: "db_delete_row", params: "dbPath table where", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true  (CREATE TABLE ...)" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_start", params: "port", returns: "string" }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_header", params: "url header", returns: "string (\uD2B9\uC815 \uD5E4\uB354\uB9CC)" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string (get environment variable)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
   }
 });
 
@@ -9735,14 +9735,14 @@ var CuriosityEngine = class {
    */
   selectNextTopic() {
     if (this.state.frontier.length === 0) return null;
-    const C = Math.SQRT2;
+    const C2 = Math.SQRT2;
     const N = Math.max(1, this.totalVisits);
     let bestTopic = null;
     let bestScore = -Infinity;
     for (const topic of this.state.frontier) {
       const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
       const avgGain = stats.visits > 0 ? stats.totalGain / stats.visits : 0;
-      const exploration = C * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
+      const exploration = C2 * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
       const ucb1Score = avgGain + exploration;
       if (ucb1Score > bestScore) {
         bestScore = ucb1Score;
@@ -9845,13 +9845,13 @@ var CuriosityEngine = class {
    * topics 목록에서 UCB1 점수 기준 내림차순 정렬
    */
   prioritize(topics) {
-    const C = Math.SQRT2;
+    const C2 = Math.SQRT2;
     const N = Math.max(1, this.totalVisits);
     return [...topics].sort((a, b) => {
       const sA = this.ucb1Stats.get(a) ?? { visits: 0, totalGain: 0 };
       const sB = this.ucb1Stats.get(b) ?? { visits: 0, totalGain: 0 };
-      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
-      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
+      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
+      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
       return scoreB - scoreA;
     });
   }
@@ -11345,6 +11345,18 @@ function flExecOpNative(op, vals) {
     case "nil?":
     case "null?":
       return v0 === null || v0 === void 0;
+    case "empty?": {
+      if (v0 === null || v0 === void 0) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      if (v0 === null || v0 === void 0 || typeof v0 !== "object" || Array.isArray(v0)) return false;
+      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      return Object.prototype.hasOwnProperty.call(v0, k);
+    }
     case "nil-or-empty?":
       return v0 === null || v0 === void 0 || v0 && v0.length === 0;
     case "true?":
@@ -11387,7 +11399,7 @@ function flExecOpNative(op, vals) {
       return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str":
     case "concat":
-      return vals.map((v) => v === null || v === void 0 ? "null" : String(v)).join("");
+      return vals.map((v) => toDisplay(v)).join("");
     case "str-to-num": {
       const n = parseFloat(String(v0));
       return isNaN(n) ? null : n;
@@ -11399,7 +11411,7 @@ function flExecOpNative(op, vals) {
     case "type-of":
       return typeof v0;
     case "print":
-      process.stdout.write(vals.map((v) => v === null ? "null" : String(v)).join(""));
+      process.stdout.write(vals.map((v) => toDisplay(v)).join(""));
       return null;
     case "println":
       console.log(...vals.map((v) => v === null ? "null" : String(v)));
@@ -11426,12 +11438,17 @@ function flExecOpNative(op, vals) {
       return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
     case "ends-with?":
       return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
-    case "empty?":
-      return Array.isArray(v0) ? v0.length === 0 : typeof v0 === "string" ? v0.length === 0 : v0 === null || v0 === void 0;
+    case "empty?": {
+      if (v0 === null || v0 === void 0) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
     case "first":
       return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
     case "last":
-      return Array.isArray(v0) ? v0.length > 0 ? v0[v0.length - 1] : null : null;
+      return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
     case "get-or": {
@@ -11460,13 +11477,13 @@ function flExecOpNative(op, vals) {
     case "cons":
       return [v0, ...Array.isArray(v1) ? v1 : [v1]];
     case "reverse":
-      return Array.isArray(v0) ? [...v0].reverse() : v0;
+      return Array.isArray(v0) ? [...v0].reverse() : [];
     case "sort":
       return Array.isArray(v0) ? [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
     case "keys":
-      return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
+      return v0 instanceof Map ? Array.from(v0.keys()) : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
     case "values":
-      return v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+      return v0 instanceof Map ? Array.from(v0.values()) : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
     case "map-entries":
     case "map_entries":
       return v0 instanceof Map ? [...v0.entries()] : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : [];
@@ -11842,7 +11859,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
     if (typeof fn === "function") return fn(...a);
     return interp2.callFunctionValue(fn, a);
   };
-  const toDisplay = (val) => interp2.toDisplayString(val);
+  const toDisplay2 = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
     case "atom": {
       return { value: args3[0] !== void 0 ? args3[0] : null };
@@ -11899,10 +11916,21 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const { execSync: execSync2 } = require("child_process");
       const cmd2 = String(args3[0] ?? "");
       try {
-        return execSync2(cmd2, { encoding: "utf-8" });
+        return execSync2(cmd2, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
       } catch (e) {
         return null;
       }
+    }
+    case "shell-exec-result": {
+      const { spawnSync: spawnSync10 } = require("child_process");
+      const cmd2 = String(args3[0] ?? "");
+      const res = spawnSync10("sh", ["-c", cmd2], { encoding: "utf-8" });
+      return {
+        stdout: res.stdout ?? "",
+        stderr: res.stderr ?? "",
+        exit: res.status ?? -1,
+        ok: (res.status ?? -1) === 0
+      };
     }
     case "require": {
       const modulePath = String(args3[0] ?? "");
@@ -12173,21 +12201,21 @@ loop().catch(e => {
     case "not":
       return !args3[0];
     case "print":
-      process.stdout.write(args3.map((a) => toDisplay(a)).join(" "));
+      process.stdout.write(args3.map((a) => toDisplay2(a)).join(" "));
       return null;
     case "println":
     case "echo":
-      console.log(...args3.map((a) => toDisplay(a)));
+      console.log(...args3.map((a) => toDisplay2(a)));
       return null;
     case "print-err":
-      process.stderr.write(args3.map((a) => toDisplay(a)).join(" ") + "\n");
+      process.stderr.write(args3.map((a) => toDisplay2(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args3.map((a) => toDisplay(a)).join("");
+      return args3.map((a) => toDisplay2(a)).join("");
     case "repr":
       return JSON.stringify(args3[0], null, 2);
     case "inspect": {
-      const inspected = toDisplay(args3[0]);
+      const inspected = toDisplay2(args3[0]);
       console.log(inspected);
       return args3[0];
     }
@@ -12363,9 +12391,9 @@ loop().catch(e => {
     case "list":
       return args3;
     case "first":
-      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : args3[0]?.[0] ?? null;
+      return Array.isArray(args3[0]) ? args3[0][0] !== void 0 ? args3[0][0] : null : null;
     case "rest":
-      return args3[0]?.slice(1);
+      return Array.isArray(args3[0]) ? args3[0].slice(1) : [];
     case "keys": {
       const kObj = args3[0];
       if (kObj instanceof Map) return Array.from(kObj.keys());
@@ -12403,7 +12431,7 @@ loop().catch(e => {
       return [...args3[0] || [], ...args3.slice(1)];
     case "reverse":
       if (Array.isArray(args3[0])) return [...args3[0]].reverse();
-      return [...args3[0] || []].reverse();
+      return [];
     case "map": {
       const mapFn = args3[0];
       const mapArr = Array.isArray(args3[1]) ? args3[1] : [];
@@ -12539,6 +12567,20 @@ loop().catch(e => {
     case "nil?":
     case "null?":
       return args3[0] === null || args3[0] === void 0;
+    case "empty?": {
+      const v = args3[0];
+      if (v === null || v === void 0) return true;
+      if (typeof v === "string") return v.length === 0;
+      if (Array.isArray(v)) return v.length === 0;
+      if (typeof v === "object") return Object.keys(v).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      const obj = args3[0], key = args3[1];
+      if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
+      const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
+      return Object.prototype.hasOwnProperty.call(obj, k);
+    }
     case "nil-or-empty?":
       return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
     case "zero?":
@@ -12599,8 +12641,6 @@ loop().catch(e => {
       return false;
     case "starts-with?":
       return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
-    case "ends-with?":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
     case "index-of":
       return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].indexOf(args3[1]) : -1;
     case "replace":
@@ -12874,6 +12914,39 @@ loop().catch(e => {
         if (typeof a === "number" && typeof b === "number") return a - b;
         return String(a).localeCompare(String(b));
       });
+    case "sort-by":
+    case "sort_by": {
+      if (!Array.isArray(args3[1])) return [];
+      const keyFn = args3[0];
+      const callFn2 = interp2?.callFunctionValue?.bind(interp2);
+      if (!callFn2) return [...args3[1]];
+      return [...args3[1]].sort((a, b) => {
+        const ka = callFn2(keyFn, [a]);
+        const kb = callFn2(keyFn, [b]);
+        if (typeof ka === "number" && typeof kb === "number") return ka - kb;
+        return String(ka).localeCompare(String(kb));
+      });
+    }
+    case "zip": {
+      const a = Array.isArray(args3[0]) ? args3[0] : [];
+      const b = Array.isArray(args3[1]) ? args3[1] : [];
+      const len = Math.min(a.length, b.length);
+      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
+    }
+    case "zip-with": {
+      const fn = args3[0];
+      const a = Array.isArray(args3[1]) ? args3[1] : [];
+      const b = Array.isArray(args3[2]) ? args3[2] : [];
+      const len = Math.min(a.length, b.length);
+      const callFn2 = interp2?.callFunctionValue?.bind(interp2);
+      if (!callFn2) return [];
+      return Array.from({ length: len }, (_, i) => callFn2(fn, [a[i], b[i]]));
+    }
+    case "uuid":
+    case "uuid4": {
+      const { randomUUID: randomUUID5 } = require("crypto");
+      return randomUUID5();
+    }
     case "push":
       if (!Array.isArray(args3[0])) return [args3[1]];
       return [...args3[0], args3[1]];
@@ -12886,6 +12959,78 @@ loop().catch(e => {
       return [args3[1], ...args3[0]];
     case "typeof":
       return typeof args3[0];
+    case "vec-dot":
+    case "dot-product": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
+      return sum;
+    }
+    case "vec-norm":
+    case "vec-magnitude": {
+      const v = args3[0];
+      if (!Array.isArray(v)) return 0;
+      return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+    }
+    case "cosine-sim":
+    case "cosine_sim": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        dot += (a[i] ?? 0) * (b[i] ?? 0);
+        na += (a[i] ?? 0) ** 2;
+        nb += (b[i] ?? 0) ** 2;
+      }
+      const denom = Math.sqrt(na) * Math.sqrt(nb);
+      return denom === 0 ? 0 : dot / denom;
+    }
+    case "euclidean-dist":
+    case "vec-dist": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        const d = (a[i] ?? 0) - (b[i] ?? 0);
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+    case "vec-add": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return [];
+      return Array.from({ length: Math.min(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
+    }
+    case "vec-scale": {
+      const v = args3[0], s = Number(args3[1] ?? 1);
+      if (!Array.isArray(v)) return [];
+      return v.map((x) => x * s);
+    }
+    case "vec-normalize": {
+      const v = args3[0];
+      if (!Array.isArray(v)) return [];
+      const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+      return norm === 0 ? v : v.map((x) => x / norm);
+    }
+    case "vec-top-k": {
+      const query = args3[0];
+      const vectors = args3[1];
+      const k = Number(args3[2] ?? 5);
+      if (!Array.isArray(query) || !Array.isArray(vectors)) return [];
+      const scored = vectors.map((item, idx) => {
+        const vec = Array.isArray(item) ? item : item?.vector ?? item?.embedding ?? [];
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(query.length, vec.length); i++) {
+          dot += (query[i] ?? 0) * (vec[i] ?? 0);
+          na += (query[i] ?? 0) ** 2;
+          nb += (vec[i] ?? 0) ** 2;
+        }
+        const denom = Math.sqrt(na) * Math.sqrt(nb);
+        return { score: denom === 0 ? 0 : dot / denom, index: idx, data: item };
+      });
+      return scored.sort((a, b) => b.score - a.score).slice(0, k);
+    }
     case "assert-type": {
       const val = args3[0];
       const typeStr = String(args3[1]);
@@ -12907,9 +13052,9 @@ loop().catch(e => {
     case "abs":
       return Math.abs(args3[0]);
     case "min":
-      return Math.min(...args3);
+      return Math.min(...args3.filter((v) => typeof v === "number"));
     case "max":
-      return Math.max(...args3);
+      return Math.max(...args3.filter((v) => typeof v === "number"));
     case "floor":
       return Math.floor(args3[0]);
     case "ceil":
@@ -18283,6 +18428,8 @@ var EFFECT_CATALOG = /* @__PURE__ */ new Map([
   // Shell
   ["shell_exec", "shell"],
   ["shell-exec", "shell"],
+  ["shell_exec_result", "shell"],
+  ["shell-exec-result", "shell"],
   ["shell_run", "shell"],
   // I/O (stdout)
   ["println", "io"],
@@ -20875,7 +21022,19 @@ function createDataModule() {
     // json_set obj path value -> object (immutable update, returns new obj)
     "json_set": (obj, path18, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const clone = JSON.parse(JSON.stringify(parsed));
+      const deepClone = (o) => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
       const parts = path18.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -20939,17 +21098,66 @@ function createDataModule() {
         throw new Error(`json_parse: invalid JSON: ${e.message}`);
       }
     },
-    // json_str obj -> string (serialize to JSON string)
-    "json_str": (obj) => {
-      return JSON.stringify(obj);
+    // Helper: Convert Maps and other types to JSON-serializable form
+    _toSerializable: (obj) => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map((x) => obj._toSerializable?.(x) ?? (x instanceof Map ? Object.fromEntries(x) : x));
+      if (typeof obj === "object" && obj !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = v instanceof Map ? Object.fromEntries(v) : typeof v === "object" && v !== null ? obj._toSerializable?.(v) : v;
+        }
+        return result;
+      }
+      return obj;
+    },
+    // json_str obj -> string (serialize to JSON string, handles Maps)
+    "json_str": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
     },
     // json_stringify obj -> string (alias for json_str)
-    "json_stringify": (obj) => {
-      return JSON.stringify(obj);
+    "json_stringify": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
     },
-    // json_pretty obj -> string (pretty-print JSON)
-    "json_pretty": (obj) => {
-      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+    // json_pretty obj -> string (pretty-print JSON, handles Maps)
+    "json_pretty": function(obj) {
+      const toSerializable2 = (o2) => {
+        if (o2 instanceof Map) return Object.fromEntries(o2);
+        if (Array.isArray(o2)) return o2.map(toSerializable2);
+        if (typeof o2 === "object" && o2 !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o2)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o2;
+      };
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable2(obj);
       return JSON.stringify(o, null, 2);
     },
     // ── Hyphen alias (Phase 후속 — Claude 평가에서 발견된 자주 틀리는 함수명) ──
@@ -20961,10 +21169,50 @@ function createDataModule() {
         throw new Error(`json-parse: invalid JSON: ${e.message}`);
       }
     },
-    "json-stringify": (obj) => JSON.stringify(obj),
-    "json-str": (obj) => JSON.stringify(obj),
-    "json-pretty": (obj) => {
-      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+    "json-stringify": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
+    },
+    "json-str": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
+    },
+    "json-pretty": function(obj) {
+      const toSerializable2 = (o2) => {
+        if (o2 instanceof Map) return Object.fromEntries(o2);
+        if (Array.isArray(o2)) return o2.map(toSerializable2);
+        if (typeof o2 === "object" && o2 !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o2)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o2;
+      };
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable2(obj);
       return JSON.stringify(o, null, 2);
     },
     "json-merge": (a, b) => {
@@ -20983,7 +21231,19 @@ function createDataModule() {
     },
     "json-set": (obj, path18, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
-      const clone = JSON.parse(JSON.stringify(parsed));
+      const deepClone = (o) => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
       const parts = String(path18).split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -21955,7 +22215,19 @@ function saveCheckpoint(filePath, data) {
     if (!fs6.existsSync(dir)) {
       fs6.mkdirSync(dir, { recursive: true });
     }
-    fs6.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    const toSerializable2 = (obj) => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map(toSerializable2);
+      if (typeof obj === "object" && obj !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = toSerializable2(v);
+        }
+        return result;
+      }
+      return obj;
+    };
+    fs6.writeFileSync(filePath, JSON.stringify(toSerializable2(data), null, 2), "utf-8");
   } catch (err4) {
     console.error(`[Checkpoint] Failed to save: ${err4.message}`);
     throw err4;
@@ -23390,6 +23662,23 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       routes.push({ method: "DELETE", path: path18, pattern, params, handler: handlerName });
       return null;
     },
+    // route method path handler → 메서드 문자열로 등록
+    // (route "GET"    "/api/x" handler-fn)
+    // (route "POST"   "/api/x" handler-fn)
+    "route": (method, path18, handlerName) => {
+      const m = String(method).toUpperCase();
+      const [pattern, params] = pathToRegex(path18);
+      routes.push({ method: m, path: path18, pattern, params, handler: handlerName });
+      return null;
+    },
+    // server_all path handler → 모든 메서드 등록 (catch-all)
+    "server_all": (path18, handlerName) => {
+      const [pattern, params] = pathToRegex(path18);
+      for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
+        routes.push({ method: m, path: path18, pattern, params, handler: handlerName });
+      }
+      return null;
+    },
     // server_start port -> string
     "server_start": (port) => {
       if (__activeServer.server) {
@@ -23669,13 +23958,16 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       }
       return null;
     },
-    // server_json obj -> response object
-    "server_json": (body) => {
+    // server_json [status] obj -> response object
+    // (server_json data)        → 200 JSON
+    // (server_json 201 data)    → 201 JSON
+    "server_json": (statusOrBody, maybeBody) => {
+      const isStatus = typeof statusOrBody === "number" && statusOrBody >= 100 && statusOrBody < 600;
       return {
         __fl_response: true,
-        status: 200,
+        status: isStatus ? statusOrBody : 200,
         contentType: "application/json",
-        body
+        body: isStatus ? maybeBody : statusOrBody
       };
     },
     // server_text text -> response object
@@ -23750,6 +24042,90 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     "server_header": (response, key, value) => {
       const existing = response.headers || {};
       return { ...response, headers: { ...existing, [key]: value } };
+    },
+    // ── API 응답 헬퍼 ─────────────────────────────────────────────────
+    // api_ok data              → 200 {:ok true :data ...}
+    // api_ok "msg"             → 200 {:ok true :message ...}
+    "api_ok": (data) => ({
+      __fl_response: true,
+      status: 200,
+      contentType: "application/json",
+      body: typeof data === "string" ? { ok: true, message: data } : { ok: true, data }
+    }),
+    // api_created data         → 201 {:ok true :data ...}
+    "api_created": (data) => ({
+      __fl_response: true,
+      status: 201,
+      contentType: "application/json",
+      body: { ok: true, data }
+    }),
+    // api_error message [code] → 4xx/5xx {:ok false :error ...}
+    // (api_error "Not found" 404)
+    // (api_error "Server error")  → 500
+    "api_error": (message, code) => ({
+      __fl_response: true,
+      status: code ?? 500,
+      contentType: "application/json",
+      body: { ok: false, error: message }
+    }),
+    // api_not_found [message]  → 404
+    "api_not_found": (message) => ({
+      __fl_response: true,
+      status: 404,
+      contentType: "application/json",
+      body: { ok: false, error: message ?? "Not Found" }
+    }),
+    // api_bad_request [message] → 400
+    "api_bad_request": (message) => ({
+      __fl_response: true,
+      status: 400,
+      contentType: "application/json",
+      body: { ok: false, error: message ?? "Bad Request" }
+    }),
+    // api_unauthorized [message] → 401
+    "api_unauthorized": (message) => ({
+      __fl_response: true,
+      status: 401,
+      contentType: "application/json",
+      body: { ok: false, error: message ?? "Unauthorized" }
+    }),
+    // api_forbidden [message]  → 403
+    "api_forbidden": (message) => ({
+      __fl_response: true,
+      status: 403,
+      contentType: "application/json",
+      body: { ok: false, error: message ?? "Forbidden" }
+    }),
+    // ── CORS 헬퍼 ────────────────────────────────────────────────────
+    // server_cors response [origin] → response에 CORS 헤더 추가
+    // (server_cors (server_json data))
+    // (server_cors (server_json data) "https://app.example.com")
+    "server_cors": (response, origin) => {
+      const corsHeaders = {
+        "Access-Control-Allow-Origin": origin ?? "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      };
+      return { ...response, headers: { ...response.headers || {}, ...corsHeaders } };
+    },
+    // server_cors_all → 모든 라우트에 CORS 미들웨어 등록 (use와 함께)
+    "server_cors_middleware": () => {
+      return (req) => {
+        if (req.method === "OPTIONS") {
+          return {
+            __fl_response: true,
+            status: 204,
+            contentType: "text/plain",
+            body: "",
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+              "Access-Control-Allow-Headers": "Content-Type, Authorization"
+            }
+          };
+        }
+        return null;
+      };
     },
     // server_options response -> 204 No Content (CORS preflight 응답)
     "server_options": (allowMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS") => {
@@ -23938,12 +24314,24 @@ var import_child_process4 = require("child_process");
 var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
 function kimdbReq(method, path18, body) {
+  const toSerializable2 = (obj) => {
+    if (obj instanceof Map) return Object.fromEntries(obj);
+    if (Array.isArray(obj)) return obj.map(toSerializable2);
+    if (typeof obj === "object" && obj !== null) {
+      const result = {};
+      for (const [k, v] of Object.entries(obj)) {
+        result[k] = toSerializable2(v);
+      }
+      return result;
+    }
+    return obj;
+  };
   const url2 = `${KIMDB}${path18}`;
   const args3 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args3.push("-X", method);
     if (body !== void 0) {
-      args3.push("-H", "Content-Type: application/json", "-d", JSON.stringify(body));
+      args3.push("-H", "Content-Type: application/json", "-d", JSON.stringify(toSerializable2(body)));
     }
   }
   args3.push(url2);
@@ -26196,76 +26584,150 @@ function createMongodbModule() {
   const helperPath = path9.join(__dirname, "_mongodb_helper.js");
   function callHelper(req) {
     try {
-      const json = JSON.stringify(req);
-      const result = (0, import_child_process7.execFileSync)("node", [helperPath, json], {
-        timeout: 15e3,
+      const toSerializable2 = (obj) => {
+        if (obj instanceof Map) return Object.fromEntries(obj);
+        if (Array.isArray(obj)) return obj.map(toSerializable2);
+        if (typeof obj === "object" && obj !== null) {
+          const result2 = {};
+          for (const [k, v] of Object.entries(obj)) {
+            result2[k] = toSerializable2(v);
+          }
+          return result2;
+        }
+        return obj;
+      };
+      const result = (0, import_child_process7.execFileSync)("node", [helperPath, JSON.stringify(toSerializable2(req))], {
+        timeout: req.timeout ? req.timeout + 2e3 : 15e3,
         encoding: "utf-8"
       });
       return JSON.parse(result);
     } catch (err4) {
-      return {
-        ok: false,
-        error: err4.message || "Helper execution failed"
-      };
+      return { ok: false, error: err4.message || "Helper execution failed" };
     }
   }
+  function parseConn(connId) {
+    if (!connId) return { host: "localhost", port: 27017 };
+    const atIdx = connId.indexOf("@");
+    if (atIdx !== -1) {
+      const [creds, rest] = [connId.slice(0, atIdx), connId.slice(atIdx + 1)];
+      const colonIdx = creds.indexOf(":");
+      const user = creds.slice(0, colonIdx);
+      const pass = creds.slice(colonIdx + 1);
+      const slashIdx = rest.indexOf("/");
+      const hostPort = slashIdx !== -1 ? rest.slice(0, slashIdx) : rest;
+      const authDb = slashIdx !== -1 ? rest.slice(slashIdx + 1) : "admin";
+      const [host2, portStr2] = hostPort.split(":");
+      return { host: host2, port: parseInt(portStr2 || "27017", 10), user, pass, authDb };
+    }
+    const [host, portStr] = connId.split(":");
+    return { host, port: parseInt(portStr || "27017", 10) };
+  }
   return {
-    // mongodb_connect host port → connId or null
+    // ── 연결 ─────────────────────────────────────────────────
+    // mongo_connect "localhost" 27017 → connId ("localhost:27017")
+    "mongo_connect": (host, port = 27017) => {
+      const r = callHelper({ method: "ping", host, port });
+      return r.ok ? `${host}:${port}` : null;
+    },
+    // mongo_connect_auth "localhost" 27017 "user" "pass" "admin" → connId
+    "mongo_connect_auth": (host, port, user, pass, authDb = "admin") => {
+      const r = callHelper({ method: "ping", host, port, user, pass, authDb });
+      return r.ok ? `${user}:${pass}@${host}:${port}/${authDb}` : null;
+    },
+    // ── 단건 조회 ─────────────────────────────────────────────
+    // mongo_find_one connId "db" "col" {:_id "..."} → doc or nil
+    "mongo_find_one": (connId, db, col, filter = {}) => {
+      const r = callHelper({ method: "find_one", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.doc ?? null : null;
+    },
+    // ── 다건 조회 ─────────────────────────────────────────────
+    // mongo_find connId "db" "col" filter options → [docs]
+    // options: {:limit 10 :skip 0 :sort {:name 1}}
+    "mongo_find": (connId, db, col, filter = {}, opts = {}) => {
+      const r = callHelper({
+        method: "find_many",
+        ...parseConn(connId),
+        db,
+        collection: col,
+        filter,
+        limit: opts.limit,
+        skip: opts.skip,
+        sort: opts.sort,
+        projection: opts.projection
+      });
+      return r.ok ? r.docs ?? [] : [];
+    },
+    // ── 카운트 ────────────────────────────────────────────────
+    "mongo_count": (connId, db, col, filter = {}) => {
+      const r = callHelper({ method: "count", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.count ?? 0 : 0;
+    },
+    // ── 단건 삽입 ─────────────────────────────────────────────
+    // mongo_insert_one connId "db" "col" doc → inserted_id or nil
+    "mongo_insert_one": (connId, db, col, doc) => {
+      const r = callHelper({ method: "insert_one", ...parseConn(connId), db, collection: col, doc });
+      return r.ok ? r.inserted_id ?? null : null;
+    },
+    // ── 다건 삽입 ─────────────────────────────────────────────
+    "mongo_insert_many": (connId, db, col, docs) => {
+      const r = callHelper({ method: "insert_many", ...parseConn(connId), db, collection: col, docs });
+      return r.ok ? { count: r.inserted_count, ids: r.inserted_ids } : null;
+    },
+    // ── 단건 수정 ─────────────────────────────────────────────
+    // mongo_update_one connId "db" "col" filter update → {:matched 1 :modified 1}
+    "mongo_update_one": (connId, db, col, filter, update, opts = {}) => {
+      const r = callHelper({ method: "update_one", ...parseConn(connId), db, collection: col, filter, update, options: opts });
+      return r.ok ? { matched: r.matched, modified: r.modified } : null;
+    },
+    // ── 다건 수정 ─────────────────────────────────────────────
+    "mongo_update_many": (connId, db, col, filter, update, opts = {}) => {
+      const r = callHelper({ method: "update_many", ...parseConn(connId), db, collection: col, filter, update, options: opts });
+      return r.ok ? { matched: r.matched, modified: r.modified } : null;
+    },
+    // ── 단건 삭제 ─────────────────────────────────────────────
+    "mongo_delete_one": (connId, db, col, filter) => {
+      const r = callHelper({ method: "delete_one", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.deleted ?? 0 : 0;
+    },
+    // ── 다건 삭제 ─────────────────────────────────────────────
+    "mongo_delete_many": (connId, db, col, filter) => {
+      const r = callHelper({ method: "delete_many", ...parseConn(connId), db, collection: col, filter });
+      return r.ok ? r.deleted ?? 0 : 0;
+    },
+    // ── Aggregation ───────────────────────────────────────────
+    // mongo_aggregate connId "db" "col" pipeline → [docs]
+    "mongo_aggregate": (connId, db, col, pipeline) => {
+      const r = callHelper({ method: "aggregate", ...parseConn(connId), db, collection: col, pipeline });
+      return r.ok ? r.docs ?? [] : [];
+    },
+    // ── 트랜잭션 ──────────────────────────────────────────────
+    // mongo_transaction connId "db" ops → {:committed true :results [...]}
+    // ops: [{:method "insert_one" :collection "..." :doc {...}} ...]
+    // MongoDB Replica Set 필요 (트랜잭션은 standalone 미지원)
+    "mongo_transaction": (connId, db, ops) => {
+      const r = callHelper({ method: "transaction", ...parseConn(connId), db, ops });
+      return r;
+    },
+    // ── 인덱스 생성 ───────────────────────────────────────────
+    // mongo_create_index connId "db" "col" {:field 1} {:unique true} → name
+    "mongo_create_index": (connId, db, col, keys, opts = {}) => {
+      const r = callHelper({ method: "create_index", ...parseConn(connId), db, collection: col, filter: keys, options: opts });
+      return r.ok ? r.name ?? null : null;
+    },
+    // ── 컬렉션 목록 ───────────────────────────────────────────
+    "mongo_collections": (connId, db) => {
+      const r = callHelper({ method: "list_collections", ...parseConn(connId), db });
+      return r.ok ? r.collections ?? [] : [];
+    },
+    // ── 하위 호환 (deprecated) ────────────────────────────────
     "mongodb_connect": (host, port = 27017) => {
-      const result = callHelper({
-        method: "connect",
-        host,
-        port
-      });
-      if (result.ok) {
-        return `${host}:${port}`;
-      }
-      return null;
+      const r = callHelper({ method: "ping", host, port });
+      return r.ok ? `${host}:${port}` : null;
     },
-    // mongodb_sendrecv connId hexData → hexResponse or null
-    // Wire Protocol 명령 전송 & 응답 수신
-    "mongodb_sendrecv": (connId, hexData, timeout = 1e4) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "sendrecv",
-        host,
-        port,
-        data: hexData,
-        timeout
-      });
-      if (result.ok && result.data) {
-        return result.data;
-      }
-      return null;
-    },
-    // mongodb_send connId hexData → boolean
-    "mongodb_send": (connId, hexData) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "send",
-        host,
-        port,
-        data: hexData
-      });
-      return result.ok === true;
-    },
-    // mongodb_close connId → boolean
-    "mongodb_close": (connId) => {
-      return true;
-    },
-    // mongodb_is_connected connId → boolean
+    "mongodb_close": (_connId) => true,
     "mongodb_is_connected": (connId) => {
-      const [host, portStr] = connId.split(":");
-      const port = parseInt(portStr, 10);
-      const result = callHelper({
-        method: "connect",
-        host,
-        port,
-        timeout: 1e3
-      });
-      return result.ok === true;
+      const { host, port } = parseConn(connId);
+      return callHelper({ method: "ping", host, port, timeout: 1e3 }).ok === true;
     }
   };
 }
@@ -26610,6 +27072,18 @@ function createImmutableModule() {
 }
 
 // src/stdlib-ai-native.ts
+var toSerializable = (obj) => {
+  if (obj instanceof Map) return Object.fromEntries(obj);
+  if (Array.isArray(obj)) return obj.map(toSerializable);
+  if (typeof obj === "object" && obj !== null) {
+    const result = {};
+    for (const [k, v] of Object.entries(obj)) {
+      result[k] = toSerializable(v);
+    }
+    return result;
+  }
+  return obj;
+};
 function createAiNativeModule() {
   return {
     // ── AI 모델 직접 호출 ────────────────────────────────────────────
@@ -26635,13 +27109,13 @@ ${JSON.stringify(prompt.context)}` : "";
               "x-api-key": anthropicKey,
               "anthropic-version": "2023-06-01"
             },
-            body: JSON.stringify({
+            body: JSON.stringify(toSerializable({
               model: model === "claude-3" ? "claude-3-haiku-20240307" : model,
               max_tokens: maxTokens,
               messages: [
                 { role: "user", content: promptStr + contextStr }
               ]
-            })
+            }))
           });
           if (res.ok) {
             const data = await res.json();
@@ -26659,10 +27133,10 @@ ${JSON.stringify(prompt.context)}` : "";
               "Content-Type": "application/json",
               Authorization: `Bearer ${openaiKey}`
             },
-            body: JSON.stringify({
+            body: JSON.stringify(toSerializable({
               model: model === "gpt-4" ? "gpt-4-turbo-preview" : model,
               messages: [{ role: "user", content: promptStr }]
-            })
+            }))
           });
           if (res.ok) {
             const data = await res.json();
@@ -26694,7 +27168,7 @@ ${JSON.stringify(prompt.context)}` : "";
         const res = await fetch(`http://localhost:${gptPort}/api/embed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify(toSerializable({ text })),
           signal: AbortSignal.timeout ? AbortSignal.timeout(3e3) : void 0
         });
         if (res.ok) {
@@ -26813,7 +27287,7 @@ function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
 function _fl_append(l, x) { return [...(l || []), x]; }
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
 function _fl_values(o) { return o ? Object.values(o) : []; }
-function _fl_entries(o) { return o ? Object.entries(o).map(([k,v])=>[k,v]) : []; }
+var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
 function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 
@@ -26855,8 +27329,51 @@ function _fl_shell_capture(cmd) {
   }
 }
 
+// \u2500 \uD0C0\uC785 \u2500
+function _fl_type_of(v) { if (v === null || v === undefined) return "nil"; if (Array.isArray(v)) return "list"; return typeof v; }
+
 // \u2500 \uAE30\uD0C0 \u2500
 function _while(condFn, bodyFn) { while(condFn()) { bodyFn(); } }
+
+// \u2500 \uC2DC\uAC04 \u2500
+const now_ms = () => Date.now();
+const now_iso = () => new Date().toISOString();
+const now_unix = () => Math.floor(Date.now() / 1000);
+
+// \u2500 \uC178 \uC2E4\uD589 \u2500
+const shell_exec = (cmd, inp) => { try { const {execSync} = require("child_process"); const opts = {encoding: "utf8"}; if (inp) opts["input"] = inp; return execSync(cmd, opts); } catch(e) { return ""; } };
+
+// \u2500 \uC218\uD559 \u2500
+var math_sqrt = (n) => Math.sqrt(n);
+var math_pow = (a, b) => Math.pow(a, b);
+var math_pi = Math.PI;
+
+// \u2500 \uCEEC\uB809\uC158 \uD655\uC7A5 \u2500
+function _fl_take(n, arr) { return (arr || []).slice(0, n); }
+function _fl_drop(n, arr) { return (arr || []).slice(n); }
+function _fl_zip(a, b) { const r = []; const l = Math.min((a || []).length, (b || []).length); for (let i = 0; i < l; i++) r.push([a[i], b[i]]); return r; }
+function _fl_flatten(arr) { return (arr || []).flat(); }
+function _fl_reverse(arr) { return Array.isArray(arr) ? [...arr].reverse() : arr; }
+function _fl_sort(arr, fn) { return fn ? [...(arr || [])].sort((a, b) => fn(a, b) ? -1 : 1) : [...(arr || [])].sort(); }
+
+// \u2500 \uBB38\uC790\uC5F4 \uACF5\uAC1C \uBCC4\uCE6D \u2500
+var str_upper = (s) => String(s || "").toUpperCase();
+var str_lower = (s) => String(s || "").toLowerCase();
+var str_contains = (s, sub) => String(s || "").includes(String(sub || ""));
+var str_replace = (s, a, b) => { if (s == null) return ""; return String(s).split(String(a || "")).join(String(b || "")); };
+var str_starts_with = (s, p) => String(s || "").startsWith(String(p || ""));
+var str_ends_with = (s, sf) => String(s || "").endsWith(String(sf || ""));
+var str_trim = (s) => String(s || "").trim();
+var str_length = (s) => String(s || "").length;
+var str_split = (s, sep) => String(s || "").split(sep);
+
+// \u2500 \uD0C0\uC785 \uD655\uC7A5 \u2500
+var list_q = (v) => Array.isArray(v);
+var map_q = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var fn_q = (v) => typeof v === "function";
+
+// \u2500 IIFE \uD3F4\uBC31 \u2500
+var unknown = (...a) => a[a.length - 1];
 
 // \u2500 \uAE00\uB85C\uBC8C \uBC14\uC778\uB529 \u2500
 let __argv__ = _fl_get_argv();
@@ -26920,7 +27437,13 @@ var HELPER_FUNCTIONS = [
   "_fl_file_read",
   "_fl_file_write",
   "_fl_file_exists",
-  "_fl_shell_capture"
+  "_fl_shell_capture",
+  "_fl_take",
+  "_fl_drop",
+  "_fl_zip",
+  "_fl_flatten",
+  "_fl_reverse",
+  "_fl_sort"
 ];
 var HELPER_COUNT = HELPER_FUNCTIONS.length;
 
@@ -26937,22 +27460,6 @@ function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
 function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
 function _fl_print(v) { console.log(v); return v; }
 `.trim();
-var BINARY_OPS = {
-  "+": "+",
-  "-": "-",
-  "*": "*",
-  "/": "/",
-  "%": "%",
-  "=": "===",
-  "==": "===",
-  "!=": "!==",
-  "<": "<",
-  ">": ">",
-  "<=": "<=",
-  ">=": ">=",
-  "and": "&&",
-  "or": "||"
-};
 var BUILTIN_MAP = {
   // 타입 체크
   "null?": "_fl_null_q",
@@ -26963,6 +27470,7 @@ var BUILTIN_MAP = {
   "char_at": "_fl_char_at",
   "char-at": "_fl_char_at",
   "substring": "_fl_substring",
+  "str-slice": "_fl_substring",
   "true?": "_fl_true_q",
   "false?": "_fl_false_q",
   "string?": "_fl_string_q",
@@ -26971,6 +27479,8 @@ var BUILTIN_MAP = {
   "array?": "_fl_array_q",
   "map?": "_fl_map_q",
   "fn?": "_fl_fn_q",
+  "boolean?": "_fl_boolean_q",
+  "type-of": "_fl_type_of",
   "empty?": "_fl_empty_q",
   // 문자 검증 (lexer 헬퍼)
   "is-digit?": "_fl_is_digit_q",
@@ -26987,6 +27497,12 @@ var BUILTIN_MAP = {
   "rest": "_fl_rest",
   "append": "_fl_append",
   "slice": "_fl_slice",
+  "take": "_fl_take",
+  "drop": "_fl_drop",
+  "zip": "_fl_zip",
+  "flatten": "_fl_flatten",
+  "reverse": "_fl_reverse",
+  "sort": "_fl_sort",
   "length": "_fl_length",
   "range": "_fl_range",
   // 문자열
@@ -26999,6 +27515,7 @@ var BUILTIN_MAP = {
   "str-lower": "_fl_lower",
   "trim": "_fl_trim",
   "replace": "_fl_replace",
+  "str-replace": "_fl_replace",
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
   "join": "_fl_join",
@@ -27013,10 +27530,8 @@ var BUILTIN_MAP = {
   "keys": "_fl_keys",
   "json_keys": "_fl_keys",
   "values": "_fl_values",
-  "entries": "_fl_entries",
   "map-keys": "_fl_keys",
   "map-values": "_fl_values",
-  "map-entries": "_fl_entries",
   "map-set": "_fl_map_set",
   "json-set": "_fl_map_set",
   "json_set": "_fl_map_set",
@@ -27226,8 +27741,14 @@ ${exportsStr}
   }
   genSExpr(node) {
     const { op, args: args3 } = node;
-    if (op === "and") return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
-    if (op === "or") return "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+    if (op === "and") {
+      if (args3.length === 0) return "true";
+      return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
+    }
+    if (op === "or") {
+      if (args3.length === 0) return "false";
+      return "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+    }
     if (op === "cond") return this.genCond(args3);
     if (op === "while") return this.genWhile(args3);
     if (op === "recur") {
@@ -27244,24 +27765,85 @@ ${exportsStr}
       const inits = [];
       const names = [];
       for (let i = 0; i < items.length; i += 2) {
-        const name = this.extractVarName(items[i]);
-        const val = this.genNode(items[i + 1]);
+        const nameNode = items[i];
+        const valNode = items[i + 1];
+        if (!nameNode) continue;
+        const name = this.extractVarName(nameNode);
+        const val = valNode ? this.genNode(valNode) : "null";
         inits.push(`let ${name} = ${val};`);
         names.push(name);
       }
-      const bodyCode = bodyExprs.map((e) => this.genNode(e)).join("; ");
-      return `(() => {
-        ${inits.join(" ")}
-        while (true) {
-          const __r = (() => { return ${bodyCode}; })();
-          if (__r && __r.__recur) {
-            [${names.join(", ")}] = __r.a;
-            continue;
-          }
-          return __r;
-        }
-      })()`;
+      const bodyParts = bodyExprs.map((e) => this.genNode(e).trim()).filter((s) => s !== "");
+      let bodyCode = "";
+      if (bodyParts.length === 0) {
+        bodyCode = "return null;";
+      } else if (bodyParts.length === 1) {
+        bodyCode = `return ${bodyParts[0]};`;
+      } else {
+        const stmts = bodyParts.slice(0, -1).map((s) => s.endsWith(";") ? s : s + ";");
+        bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+      }
+      return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
     }
+    if (op === "let") {
+      if (args3.length >= 2) {
+        const bindingsArg = args3[0];
+        let bindings = [];
+        if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
+          bindings = bindingsArg.fields.get("items") || [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = bindingsArg.args;
+        }
+        const bindingStmts = [];
+        const isNested = bindings.length > 0 && bindings[0].kind === "block" && bindings[0].type === "Array";
+        if (isNested) {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && binding.type === "Array") {
+              const pairItems = binding.fields.get("items") || [];
+              if (pairItems.length >= 2) {
+                const varName = this.extractVarName(pairItems[0]);
+                const value = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName} = ${value};`);
+              }
+            }
+          }
+        } else {
+          for (let i = 0; i < bindings.length; i += 2) {
+            if (!bindings[i]) continue;
+            const varName = this.extractVarName(bindings[i]);
+            const value = bindings[i + 1] ? this.genNode(bindings[i + 1]) : "null";
+            bindingStmts.push(`let ${varName} = ${value};`);
+          }
+        }
+        const bodyParts = args3.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
+        let bodyCode = "";
+        if (bodyParts.length === 0) {
+          bodyCode = "return null;";
+        } else if (bodyParts.length === 1) {
+          bodyCode = `return ${bodyParts[0]};`;
+        } else {
+          const stmts = bodyParts.slice(0, -1).map((s) => s.endsWith(";") ? s : s + ";");
+          bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+        }
+        return `((() => { ${bindingStmts.join(" ")} ${bodyCode} })())`;
+      }
+      return "(() => null)()";
+    }
+    if (op === "do") return this.genDo(args3);
+    const BINARY_OPS = {
+      "+": "+",
+      "-": "-",
+      "*": "*",
+      "/": "/",
+      "%": "%",
+      "<": "<",
+      ">": ">",
+      "<=": "<=",
+      ">=": ">=",
+      "==": "===",
+      "!=": "!==",
+      "=": "==="
+    };
     if (op in BINARY_OPS && args3.length === 2) {
       const left = this.genNode(args3[0]);
       const right = this.genNode(args3[1]);
@@ -27282,7 +27864,7 @@ ${exportsStr}
     if (op === "define") {
       const varName = this.extractVarName(args3[0]);
       const value = this.genNode(args3[1]);
-      return `let ${varName} = ${value};`;
+      return `const ${varName} = ${value};`;
     }
     if (op === "set!") {
       const varName = this.extractVarName(args3[0]);
@@ -27291,12 +27873,13 @@ ${exportsStr}
     }
     if (op === "defn" || op === "defun") {
       const name = this.extractVarName(args3[0]);
-      const params = this.extractParamList(args3[1]);
-      const body = args3[2] ? this.genNode(args3[2]) : "undefined";
-      return `function ${name}(${params.join(", ")}) { return ${body}; }`;
+      const { params, preamble } = this.extractParamListWithDestructuring(args3[1]);
+      const bodyNode = args3[2];
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+      return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
     }
     if (op === "fn") return this.genFn(args3);
-    if (op === "do") return this.genDo(args3);
     if (op === "list") {
       const elements = args3.map((a) => this.genNode(a));
       return `[${elements.join(", ")}]`;
@@ -27332,13 +27915,22 @@ ${exportsStr}
           bindings = bindingsArg.args;
         }
         const bindingStmts = [];
-        for (const binding of bindings) {
-          if (binding.kind === "block" && binding.type === "Array") {
-            const pairItems = binding.fields.get("items") || [];
-            if (pairItems.length >= 2) {
-              const varName2 = this.extractVarName(pairItems[0]);
-              const value2 = this.genNode(pairItems[1]);
-              bindingStmts.push(`let ${varName2} = ${value2};`);
+        const isFlat = bindings.length > 0 && !(bindings[0].kind === "block" && bindings[0].type === "Array");
+        if (isFlat) {
+          for (let i = 0; i < bindings.length - 1; i += 2) {
+            const varName2 = this.extractVarName(bindings[i]);
+            const value2 = this.genNode(bindings[i + 1]);
+            bindingStmts.push(`let ${varName2} = ${value2};`);
+          }
+        } else {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && binding.type === "Array") {
+              const pairItems = binding.fields.get("items") || [];
+              if (pairItems.length >= 2) {
+                const varName2 = this.extractVarName(pairItems[0]);
+                const value2 = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName2} = ${value2};`);
+              }
             }
           }
         }
@@ -27351,45 +27943,6 @@ ${exportsStr}
     }
     return this.genFuncCall(op, args3);
   }
-  genCond(args3) {
-    if (args3.length === 0) return "null";
-    const clauses = args3.map((arg) => {
-      if (arg.kind === "block" && arg.type === "Array") return arg.fields.get("items") || [];
-      return Array.isArray(arg) ? arg : [arg];
-    });
-    let res = "null";
-    for (let i = clauses.length - 1; i >= 0; i--) {
-      const pair = clauses[i];
-      const test = this.genNode(pair[0]);
-      const body = pair[1] ? this.genNode(pair[1]) : "null";
-      res = "(" + test + " ? " + body + " : " + res + ")";
-    }
-    return res;
-  }
-  genWhile(args3) {
-    const cond = this.genNode(args3[0]);
-    const body = args3.slice(1).map((a) => this.genNode(a)).join("; ");
-    return "(() => { while(" + cond + ") { " + body + " } })()";
-  }
-  genLoop(args3) {
-    const bindingsBlock = args3[0];
-    const bodyExprs = args3.slice(1);
-    let items = [];
-    if (bindingsBlock.kind === "block" && bindingsBlock.type === "Array") items = bindingsBlock.fields.get("items") || [];
-    const inits = [];
-    for (let i = 0; i < items.length; i += 2) {
-      const name = items[i].name ? items[i].name.replace(/^\$/, "") : "p";
-      const val = this.genNode(items[i + 1]);
-      inits.push("let " + name + " = " + val);
-    }
-    const bodyCode = bodyExprs.map((e) => this.genNode(e)).join("; ");
-    return "(() => { " + inits.join("; ") + "; while(true) { " + bodyCode + "; break; } })()";
-  }
-  genFn(args3) {
-    const params = this.extractParamList(args3[0]);
-    const body = args3[1] ? this.genNode(args3[1]) : "undefined";
-    return `((${params.join(", ")}) => ${body})`;
-  }
   genDo(args3) {
     if (args3.length === 0) return "(() => undefined)()";
     if (args3.length === 1) return `(() => ${this.genNode(args3[0])})()`;
@@ -27399,6 +27952,103 @@ ${exportsStr}
     }).filter((s) => s !== "");
     const last = this.genNode(args3[args3.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
+  }
+  genCond(args3) {
+    if (args3.length === 0) return "null";
+    let isNested = false;
+    if (args3[0].kind === "block" && args3[0].type === "Array") {
+      const items = args3[0].fields.get("items");
+      if (Array.isArray(items) && items.length >= 1) {
+        isNested = true;
+      }
+    }
+    let pairs;
+    if (isNested) {
+      pairs = args3.map((arg) => {
+        if (arg.kind === "block" && arg.type === "Array") {
+          const items = arg.fields.get("items") || [];
+          return [items[0], items[1]];
+        }
+        return [arg, null];
+      });
+    } else {
+      pairs = [];
+      for (let i = 0; i < args3.length - 1; i += 2) {
+        pairs.push([args3[i], args3[i + 1]]);
+      }
+      if (args3.length % 2 === 1) {
+        pairs.push([{ kind: "literal", type: "boolean", value: true }, args3[args3.length - 1]]);
+      }
+    }
+    let res = "null";
+    for (let i = pairs.length - 1; i >= 0; i--) {
+      const [testNode, bodyNode] = pairs[i];
+      if (!testNode) continue;
+      const test = this.genNode(testNode);
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      res = "(" + test + " ? " + body + " : " + res + ")";
+    }
+    return res;
+  }
+  genWhile(args3) {
+    const cond = this.genNode(args3[0]);
+    const bodyParts = args3.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
+    const bodyCode = bodyParts.map((s) => s.endsWith(";") ? s : s + ";").join(" ");
+    return "(() => { while(" + cond + ") { " + bodyCode + " } })()";
+  }
+  genFn(args3) {
+    const { params, preamble } = this.extractParamListWithDestructuring(args3[0]);
+    const bodyNode = args3[1];
+    const body = bodyNode ? this.genNode(bodyNode) : "undefined";
+    const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+    return `((${params.join(", ")}) => ${finalBody})`;
+  }
+  extractParamListWithDestructuring(node) {
+    if (!node) return { params: [], preamble: "" };
+    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
+    const params = [];
+    const bindingStmts = [];
+    let tmpCount = 0;
+    for (const p of pNodes || []) {
+      if (p.kind === "variable") {
+        params.push(flNameToJs(p.name.replace(/^\$/, "")));
+      } else if (p.kind === "literal" && (p.type === "symbol" || typeof p.value === "string")) {
+        params.push(flNameToJs(String(p.value).replace(/^\$/, "")));
+      } else if (p.kind === "block" && p.type === "Array") {
+        const tmpName = `_arg${tmpCount++}`;
+        params.push(tmpName);
+        const subItems = p.fields.get("items") || [];
+        for (let i = 0; i < subItems.length; i++) {
+          const sub = subItems[i];
+          if (sub.kind === "variable") {
+            const varName = flNameToJs(sub.name.replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          } else if (sub.kind === "literal" && (sub.type === "symbol" || typeof sub.value === "string")) {
+            const varName = flNameToJs(String(sub.value).replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          }
+        }
+      } else {
+        params.push("p");
+      }
+    }
+    return { params, preamble: bindingStmts.join(" ") };
+  }
+  extractVarName(node) {
+    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
+    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
+    return "unknown";
+  }
+  extractParamList(node) {
+    if (!node) return [];
+    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
+    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
+  }
+  extractBlockParams(node) {
+    const params = node.fields.get("params");
+    if (!params) return [];
+    let pNodes = Array.isArray(params) ? params : params.kind === "block" && params.type === "Array" ? params.fields.get("items") : [params];
+    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
   genFuncCall(op, args3) {
     const argStrs = args3.map((a) => this.genNode(a));
@@ -27430,11 +28080,10 @@ ${exportsStr}
   genMapBlock(node) {
     const pairs = [];
     node.fields.forEach((val, key) => {
-      if (key === "items" && node.type === "Map") return;
       const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
       pairs.push(jsKey + ": " + this.genNode(val));
     });
-    return "{ " + pairs.join(", ") + " }";
+    return "({ " + pairs.join(", ") + " })";
   }
   genArrayBlock(node) {
     const items = node.fields.get("items");
@@ -27522,22 +28171,6 @@ ${exportsStr}
     }
     if (node.finallyBlock) parts.push(`finally{${this.genNode(node.finallyBlock)};}`);
     return parts.join("") + "})()";
-  }
-  extractVarName(node) {
-    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
-    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
-    return "unknown";
-  }
-  extractParamList(node) {
-    if (!node) return [];
-    let pNodes = node.kind === "block" && node.type === "Array" ? node.fields.get("items") : node.kind === "sexpr" ? node.args : [node];
-    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
-  }
-  extractBlockParams(node) {
-    const params = node.fields.get("params");
-    if (!params) return [];
-    let pNodes = Array.isArray(params) ? params : params.kind === "block" && params.type === "Array" ? params.fields.get("items") : [params];
-    return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
   minify(code) {
     return code.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ").trim();
@@ -30247,10 +30880,32 @@ function loadAllStdlib(interp2) {
     (n, a) => interp2.callUserFunction(n, a)
   ));
   interp2.registerModule(createImageModule());
+  interp2.registerModule(createMongodbModule());
   interp2.registerModule({
     "fl_require": (name) => requireModule(name, interp2),
     "fl_require?": (name) => isModuleLoaded(name),
-    "fl_modules": () => getAvailableModules()
+    "fl_modules": () => getAvailableModules(),
+    // fl_load "path/to/lib.fl" → 다른 FL 파일을 현재 컨텍스트에 로드
+    // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
+    "fl_load": (filePath) => {
+      const fs22 = require("fs");
+      const path18 = require("path");
+      const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+      const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+      const resolved = path18.isAbsolute(filePath) ? filePath : path18.resolve(process.cwd(), filePath);
+      if (!fs22.existsSync(resolved)) {
+        console.error(`\u274C [fl_load] \uD30C\uC77C \uC5C6\uC74C: ${resolved}`);
+        return false;
+      }
+      try {
+        const src = fs22.readFileSync(resolved, "utf-8");
+        interp2.interpret(parse3(lex2(src)));
+        return true;
+      } catch (e) {
+        console.error(`\u274C [fl_load] "${resolved}" \uB85C\uB4DC \uC2E4\uD328:`, e.message);
+        return false;
+      }
+    }
   });
   const _aliases = {
     // ── get-in / assoc-in / update-in (깊은 접근 + 업데이트) ─────────────────
@@ -32797,24 +33452,6 @@ var Interpreter = class _Interpreter {
   // Phase 63: 표준 매크로 등록
   registerStandardMacros() {
     const expander = this.context.macroExpander;
-    expander.define("when", ["$cond", "$body"], {
-      kind: "sexpr",
-      op: "if",
-      args: [
-        { kind: "variable", name: "$cond" },
-        { kind: "variable", name: "$body" },
-        { kind: "literal", type: "null", value: null }
-      ]
-    });
-    expander.define("unless", ["$cond", "$body"], {
-      kind: "sexpr",
-      op: "if",
-      args: [
-        { kind: "variable", name: "$cond" },
-        { kind: "literal", type: "null", value: null },
-        { kind: "variable", name: "$body" }
-      ]
-    });
     expander.define("and2", ["$a", "$b"], {
       kind: "sexpr",
       op: "if",
@@ -36885,9 +37522,24 @@ function formatError(err4, source, filePath, callStack) {
     }
     lines.push(`  ${err4.message}`);
   } else if (err4 instanceof Error) {
+    const lineMatch = err4.message.match(/^FreeLang line (\d+):\s*/);
+    const errLine = lineMatch ? parseInt(lineMatch[1]) : 0;
+    const cleanMsg = lineMatch ? err4.message.slice(lineMatch[0].length) : err4.message;
     lines.push(`
-\x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}`);
-    lines.push(`  ${err4.message}`);
+\x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}${errLine ? `:${errLine}` : ""}`);
+    if (source && errLine > 0) {
+      const srcLines = source.split("\n");
+      const start = Math.max(0, errLine - 2);
+      const end = Math.min(srcLines.length - 1, errLine);
+      for (let i = start; i <= end; i++) {
+        const num = String(i + 1).padStart(4, " ");
+        const marker = i + 1 === errLine ? "\x1B[31m\u2192\x1B[0m" : " ";
+        const lineColor = i + 1 === errLine ? `\x1B[31m${srcLines[i]}\x1B[0m` : `\x1B[2m${srcLines[i]}\x1B[0m`;
+        lines.push(`  ${marker} ${num} \u2502 ${lineColor}`);
+      }
+      lines.push("");
+    }
+    lines.push(`  \x1B[31m\u2716\x1B[0m ${cleanMsg}`);
     const stack = callStack ?? err4.__flCallStack;
     if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
@@ -38184,65 +38836,172 @@ function cmdServe(args3) {
     process.exit(1);
   });
 }
-function printUsage() {
+var C = {
+  bold: (s) => `\x1B[1m${s}\x1B[0m`,
+  cyan: (s) => `\x1B[36m${s}\x1B[0m`,
+  green: (s) => `\x1B[32m${s}\x1B[0m`,
+  dim: (s) => `\x1B[2m${s}\x1B[0m`,
+  red: (s) => `\x1B[31m${s}\x1B[0m`,
+  yellow: (s) => `\x1B[33m${s}\x1B[0m`
+};
+var FL_VERSION = "11.1.1-dev";
+function printUsage(errCmd) {
+  const b = C.bold, c = C.cyan, g = C.green, d = C.dim;
   console.log([
     "",
-    "FreeLang v11 CLI",
+    `${b("FreeLang")} ${c("v" + FL_VERSION)}  ${d("AI-Native Lisp \xB7 Self-Hosting \xB7 500+ stdlib")}`,
     "",
-    "\uC0AC\uC6A9\uBC95:",
-    "  freelang run <file.fl>           \uD30C\uC77C \uC2E4\uD589",
-    "  freelang run <file.fl> --watch   \uD30C\uC77C \uBCC0\uACBD \uAC10\uC9C0 + \uC790\uB3D9 \uC7AC\uC2E4\uD589",
-    "  freelang check <file.fl>         \uBB38\uBC95 \uAC80\uC0AC",
-    "  freelang fmt <file.fl>           \uD30C\uC77C \uC778\uD50C\uB808\uC774\uC2A4 \uD3EC\uB9F7 (Phase 73)",
-    "  freelang fmt --check <file.fl>   \uC774\uBBF8 \uD3EC\uB9F7\uB410\uB294\uC9C0 \uD655\uC778 (\uBBF8\uD3EC\uB9F7 \u2192 exit 1)",
-    "  freelang fmt --stdin             stdin \uC785\uB825\uBC1B\uC544 stdout \uCD9C\uB825",
-    "  freelang repl                    \uB300\uD654\uD615 REPL",
-    "  freelang ls-fns                  \uC804\uCCB4 stdlib \uD568\uC218 \uBAA9\uB85D",
-    "  freelang ls-fns <\uD0A4\uC6CC\uB4DC>         \uD0A4\uC6CC\uB4DC\uB85C \uD568\uC218 \uAC80\uC0C9 (\uC608: ls-fns http)",
-    "  freelang fn-doc <\uC774\uB984>           \uD2B9\uC815 \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98 + \uC124\uBA85",
-    "  freelang debug <file.fl>         \uB514\uBC84\uADF8 \uBAA8\uB4DC \uC2E4\uD589 (break! \uD65C\uC131\uD654) (Phase 78)",
-    "  freelang debug <file.fl> --step  step \uBAA8\uB4DC (\uBAA8\uB4E0 \uC904 \uCD94\uC801)",
-    "  freelang watch <file.fl>         \uD30C\uC77C \uBCC0\uACBD \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589 (Phase 79)",
-    "  freelang watch <file.fl> --no-clear  \uCF58\uC194 \uC9C0\uC6B0\uC9C0 \uC54A\uACE0 \uC7AC\uC2E4\uD589",
-    "  freelang serve [--app app] [--port 3000]  \uC6F9 \uC11C\uBC84 \uC2DC\uC791 (Phase 3, App Router)",
-    "  freelang serve --mode ssr|isr|ssg         \uB80C\uB354\uB9C1 \uBAA8\uB4DC \uC120\uD0DD",
-    "  freelang ci                      \uD604\uC7AC \uB514\uB809\uD1A0\uB9AC .fl \uD30C\uC77C \uC804\uCCB4 CI (Phase 80)",
-    "  freelang ci <file.fl>            \uD2B9\uC815 \uD30C\uC77C CI",
-    "  freelang ci --no-fail-fast       \uC2E4\uD328\uD574\uB3C4 \uACC4\uC18D \uC9C4\uD589",
-    "  freelang doc <file.fl>           Markdown \uBB38\uC11C \uC0DD\uC131 \u2192 stdout (Phase 77)",
-    "  freelang doc <file.fl> -o out.md \uD30C\uC77C\uB85C \uC800\uC7A5",
-    "  freelang doc --dir <dir>         \uB514\uB809\uD1A0\uB9AC \uB0B4 \uBAA8\uB4E0 .fl \uD30C\uC77C \uD1B5\uD569 \uBB38\uC11C\uD654",
-    "  freelang build --static [--app app/] [--out dist/]  \uC815\uC801 HTML export",
-    "  freelang build --oci <app.fl> --tag <tag>        Docker \uC5C6\uC774 OCI \uC774\uBBF8\uC9C0 \uBE4C\uB4DC (Phase 8)",
-    "  freelang build --oci <app.fl> --tag <tag> --registry <url>  OCI \uBE4C\uB4DC + push",
-    "  freelang registry start [--port]  npm \uD638\uD658 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (Phase 7)",
-    "  freelang registry status [--port] \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC0C1\uD0DC \uD655\uC778",
+    `${b("\uC0AC\uC6A9\uBC95:")}  freelang <\uCEE4\uB9E8\uB4DC> [\uC635\uC158]`,
     "",
-    "\uC608\uC81C:",
-    "  freelang run my-script.fl",
-    "  freelang run agent.fl --watch",
-    "  freelang check parser.fl",
-    "  freelang fmt my-script.fl",
-    "  freelang fmt --check *.fl",
-    "  cat script.fl | freelang fmt --stdin",
-    "  freelang repl",
-    "  freelang debug my-script.fl",
-    "  freelang debug my-script.fl --step",
-    "  freelang serve --app app --port 3000",
-    "  freelang serve --mode isr",
-    "  freelang doc fl-math-lib.fl",
-    "  freelang doc fl-math-lib.fl -o math-api.md",
-    "  freelang doc --dir src/",
+    `${c("\u2500\u2500 \uC2E4\uD589 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("run")}    <file.fl> [-- args...]  \uD30C\uC77C \uC2E4\uD589`,
+    `  ${g("run")}    <file.fl> --watch       \uC800\uC7A5 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`,
+    `  ${g("repl")}                           \uB300\uD654\uD615 REPL`,
+    `  ${g("check")}  <file.fl>               \uBB38\uBC95 \uAC80\uC0AC (\uC2E4\uD589 \uC5C6\uC74C)`,
+    "",
+    `${c("\u2500\u2500 \uAC1C\uBC1C \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("watch")}  <file.fl>               \uD30C\uC77C \uBCC0\uACBD \uAC10\uC9C0 \uC7AC\uC2E4\uD589`,
+    `  ${g("debug")}  <file.fl>               \uB514\uBC84\uADF8 \uBAA8\uB4DC (break! \uC9C0\uC6D0)`,
+    `  ${g("debug")}  <file.fl> --step        \uC2A4\uD15D \uBAA8\uB4DC`,
+    `  ${g("fmt")}    <file.fl>               \uCF54\uB4DC \uD3EC\uB9F7 (\uC778\uD50C\uB808\uC774\uC2A4)`,
+    `  ${g("fmt")}    --check <file.fl>       \uD3EC\uB9F7 \uAC80\uC0AC (exit 1 if dirty)`,
+    `  ${g("fmt")}    --stdin                 stdin \u2192 stdout \uD3EC\uB9F7`,
+    "",
+    `${c("\u2500\u2500 \uBB38\uC11C / \uD0D0\uC0C9 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("ls-fns")}  [\uD0A4\uC6CC\uB4DC]               stdlib \uD568\uC218 \uBAA9\uB85D (\uD0A4\uC6CC\uB4DC \uD544\uD130)`,
+    `  ${g("fn-doc")}  <\uC774\uB984>                 \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98 + \uC124\uBA85`,
+    `  ${g("doc")}     <file.fl> [-o out.md]  Markdown \uBB38\uC11C \uC0DD\uC131`,
+    `  ${g("doc")}     --dir <dir>            \uB514\uB809\uD1A0\uB9AC \uD1B5\uD569 \uBB38\uC11C\uD654`,
+    "",
+    `${c("\u2500\u2500 \uBE4C\uB4DC / \uBC30\uD3EC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("compile")} <file.fl> [-o out.js]  JS\uB85C \uCEF4\uD30C\uC77C (AOT)`,
+    `  ${g("build")}   --oci <app.fl> --tag <tag>  OCI \uC774\uBBF8\uC9C0 \uBE4C\uB4DC`,
+    `  ${g("serve")}   [--port 3000]          \uC6F9 \uC11C\uBC84 \uC2DC\uC791`,
+    `  ${g("ci")}      [file.fl]              CI \uAC80\uC0AC \uC2E4\uD589`,
+    "",
+    `${c("\u2500\u2500 \uAE30\uD0C0 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
+    `  ${g("--version")} / ${g("-v")}               \uBC84\uC804 \uCD9C\uB825`,
+    `  ${g("--help")}    / ${g("-h")}               \uC774 \uB3C4\uC6C0\uB9D0`,
+    "",
+    `${b("\uC608\uC81C:")}`,
+    `  freelang run app.fl`,
+    `  freelang run app.fl --watch`,
+    `  freelang run app.fl -- arg1 arg2`,
+    `  freelang repl`,
+    `  freelang check app.fl`,
+    `  freelang ls-fns http`,
+    `  freelang fn-doc json_parse`,
+    `  freelang compile app.fl -o app.js`,
     ""
   ].join("\n"));
+  if (errCmd) {
+    const known = [
+      "run",
+      "repl",
+      "check",
+      "watch",
+      "debug",
+      "fmt",
+      "ls-fns",
+      "fn-doc",
+      "doc",
+      "compile",
+      "build",
+      "serve",
+      "ci",
+      "version",
+      "help"
+    ];
+    const suggest = known.find(
+      (k) => k.startsWith(errCmd[0]) || Math.abs(k.length - errCmd.length) <= 2 && [...errCmd].filter((c2, i) => k[i] === c2).length >= Math.min(k.length, errCmd.length) - 2
+    );
+    console.error(`${C.red("\uC624\uB958")}  \uC54C \uC218 \uC5C6\uB294 \uCEE4\uB9E8\uB4DC: ${C.bold(errCmd)}${suggest ? `
+       \uD639\uC2DC ${C.green("freelang " + suggest)} ?` : ""}`);
+    process.exit(1);
+  }
+}
+function printSubHelp(cmd2) {
+  const g = C.green, d = C.dim, b = C.bold;
+  const helps = {
+    run: [
+      `${b("freelang run")} \u2014 \uD30C\uC77C \uC2E4\uD589`,
+      "",
+      `  freelang run <file.fl>             \uC2E4\uD589`,
+      `  freelang run <file.fl> --watch     \uC800\uC7A5 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`,
+      `  freelang run <file.fl> -- a b      \uC2A4\uD06C\uB9BD\uD2B8\uC5D0 \uC778\uC790 \uC804\uB2EC ($__argv__)`,
+      "",
+      `${d("\uC608\uC81C:")}`,
+      `  freelang run app.fl`,
+      `  freelang run server.fl --watch`,
+      `  freelang run cli.fl -- input.txt`
+    ],
+    repl: [
+      `${b("freelang repl")} \u2014 \uB300\uD654\uD615 REPL`,
+      "",
+      `  (+ 1 2)           \uD45C\uD604\uC2DD \uD3C9\uAC00`,
+      `  (defn f [x] ...)  \uD568\uC218 \uC815\uC758 (\uC138\uC158 \uC720\uC9C0)`,
+      `  :stack            \uCF5C \uC2A4\uD0DD \uCD9C\uB825`,
+      `  :env              \uBC14\uC778\uB529 \uBAA9\uB85D`,
+      `  :exit / Ctrl+D    \uC885\uB8CC`
+    ],
+    check: [
+      `${b("freelang check")} \u2014 \uBB38\uBC95 \uAC80\uC0AC (\uC2E4\uD589 \uC5C6\uC74C)`,
+      "",
+      `  freelang check <file.fl>`,
+      "",
+      `  \uD30C\uC2F1 \uC624\uB958 \uBC1C\uC0DD \uC2DC \uB77C\uC778:\uCEEC\uB7FC + \uAD04\uD638 \uD78C\uD2B8 \uD45C\uC2DC`
+    ],
+    fmt: [
+      `${b("freelang fmt")} \u2014 \uCF54\uB4DC \uD3EC\uB9F7`,
+      "",
+      `  freelang fmt <file.fl>             \uC778\uD50C\uB808\uC774\uC2A4 \uD3EC\uB9F7`,
+      `  freelang fmt --check <file.fl>     \uD3EC\uB9F7 \uD544\uC694 \uC5EC\uBD80 \uAC80\uC0AC (exit 1)`,
+      `  freelang fmt --stdin               stdin \u2192 stdout`,
+      "",
+      `${d("CI \uD65C\uC6A9:")}`,
+      `  freelang fmt --check src/*.fl`
+    ],
+    compile: [
+      `${b("freelang compile")} \u2014 JS\uB85C AOT \uCEF4\uD30C\uC77C`,
+      "",
+      `  freelang compile <file.fl>           \u2192 file.fl.out.js`,
+      `  freelang compile <file.fl> -o app.js \u2192 app.js`,
+      "",
+      `  \uC0DD\uC131\uB41C .js\uB294 Node.js / Bun\uC73C\uB85C \uC9C1\uC811 \uC2E4\uD589 \uAC00\uB2A5`,
+      `  \uC2E4\uD589 \uC2DC FreeLang \uBD88\uD544\uC694 (\uB3C5\uB9BD \uBC30\uD3EC)`
+    ],
+    "ls-fns": [
+      `${b("freelang ls-fns")} \u2014 stdlib \uD568\uC218 \uD0D0\uC0C9`,
+      "",
+      `  freelang ls-fns              \uC804\uCCB4 \uBAA9\uB85D (500+)`,
+      `  freelang ls-fns http         "http" \uD3EC\uD568 \uD568\uC218\uB9CC`,
+      `  freelang ls-fns json         json \uAD00\uB828`
+    ],
+    "fn-doc": [
+      `${b("freelang fn-doc")} \u2014 \uD568\uC218 \uC0C1\uC138 \uBB38\uC11C`,
+      "",
+      `  freelang fn-doc json_parse`,
+      `  freelang fn-doc str_split`
+    ]
+  };
+  const lines = helps[cmd2];
+  if (lines) {
+    console.log("\n" + lines.join("\n") + "\n");
+  } else {
+    printUsage();
+  }
 }
 var args2 = process.argv.slice(2);
 var cmd = args2[0];
 switch (cmd) {
   case "run": {
+    if (args2[1] === "--help" || args2[1] === "-h") {
+      printSubHelp("run");
+      break;
+    }
     const filePath = args2[1];
     if (!filePath) {
-      printUsage();
+      printSubHelp("run");
       process.exit(1);
     }
     const watch2 = args2.includes("--watch") || args2.includes("-w");
@@ -38252,17 +39011,25 @@ switch (cmd) {
     break;
   }
   case "check": {
+    if (args2[1] === "--help" || args2[1] === "-h") {
+      printSubHelp("check");
+      break;
+    }
     const filePath = args2[1];
     if (!filePath) {
-      printUsage();
+      printSubHelp("check");
       process.exit(1);
     }
     cmdCheck(filePath);
     break;
   }
   case "compile": {
+    if (args2[1] === "--help" || args2[1] === "-h") {
+      printSubHelp("compile");
+      break;
+    }
     if (args2.length < 2) {
-      printUsage();
+      printSubHelp("compile");
       process.exit(1);
     }
     cmdCompile(args2.slice(1));
@@ -38401,7 +39168,7 @@ switch (cmd) {
   case "version":
   case "-v":
   case "--version":
-    console.log("FreeLang v11.1.0");
+    console.log(`FreeLang v${FL_VERSION}`);
     break;
   case "help":
   case "-h":
@@ -38409,10 +39176,10 @@ switch (cmd) {
     printUsage();
     break;
   default:
-    printUsage();
     if (cmd) {
-      console.error(`\x1B[31m\uC54C \uC218 \uC5C6\uB294 \uCEE4\uB9E8\uB4DC:\x1B[0m ${cmd}`);
-      process.exit(1);
+      printUsage(cmd);
+    } else {
+      printUsage();
     }
     break;
 }

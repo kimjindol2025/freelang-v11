@@ -464,26 +464,67 @@ docker build -t my-agent:sha256-abc123 .
 
 ### 에러 메시지 읽기
 
+FreeLang 에러는 **파일명:라인**, **소스 컨텍스트**, **콜 스택** 세 부분으로 구성된다:
+
 ```
-Error: Unknown function "map-entries"
-→ "map-entries" 함수가 없음. "map"이나 "keys/values" 사용?
+실행 오류  app.fl:9
+       8 │ (defn run []
+  →    9 │   (undefined-func 42)    ← 에러 라인 (빨간 강조)
+      10 │ )
 
-Error: Cannot read property "name" of undefined
-→ 객체가 nil. (nil? obj) 체크 추가
+  ✖ Function not found: undefined-func
 
-Error: Division by zero
-→ (if (= divisor 0) (throw "division by zero") ...)
+콜 스택:
+  → run (line 9)
+    main (line 12)
 ```
 
-### 타입 에러
+**읽는 법**:
+1. `실행 오류  파일명:라인` — 어느 파일 몇 번째 줄인지
+2. `→` 화살표가 가리키는 줄이 에러 발생 지점
+3. `✖` 뒤가 실제 에러 메시지
+4. 콜 스택 — 어떤 함수 체인에서 터졌는지 (역순, 최근 10개)
+
+### 자주 보는 에러
+
+```
+✖ Function not found: foo
+→ foo 함수 미정의. (defn foo [...] ...) 확인
+
+✖ [E_UNDEFINED_VAR] '$x' at line N
+→ 변수 $x 미정의. let 바인딩이나 defn 파라미터 확인
+
+✖ [E_PARSE_UNEXPECTED_TOKEN] Unexpected token: EOF
+→ 괄호 불일치. 힌트에 있는 열린 괄호 위치 확인
+
+✖ Import error: file not found: ./utils.fl
+→ import 경로 오류. 상대 경로 기준은 현재 파일 위치
+```
+
+### 파싱 에러 — 괄호 힌트
+
+```
+파싱 오류  app.fl:6:1
+     6 │
+       ^
+  [E_PARSE_UNEXPECTED_TOKEN] Unexpected token: EOF
+  힌트: 미닫힘 괄호 스택 (깊이: 2):
+  [1] '(' at line 1:1
+  [2] '(' at line 2:3
+
+필요한 닫힘 괄호 시퀀스: ))
+```
+
+몇 번째 줄에서 열린 괄호가 안 닫혔는지 스택으로 보여준다.
+
+### try/catch로 에러 처리
 
 ```lisp
-(+ "hello" 5)  ;; Error: Cannot add string and number
-
-해결:
-(+ (parse-number "hello") 5)
-또는
-(str "hello" 5)
+(try
+  (risky-operation)
+  (catch $e
+    (println "에러:" (get $e :message))
+    (println "라인:" (get $e :line))))
 ```
 
 ---

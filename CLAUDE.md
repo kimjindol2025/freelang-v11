@@ -94,6 +94,23 @@ freelang debug server.fl          # 브레이크포인트 디버그
 freelang fn-doc str_split         # 함수 문서 조회
 ```
 
+## ⚠️ 에러 메시지 포맷 (2026-05-03 개선)
+
+에러 발생 시 **파일명:라인 + 소스 컨텍스트 + 콜 스택** 자동 표시:
+
+```
+실행 오류  app.fl:9
+       8 │ (defn run []
+  →    9 │   (undefined-func 42)    ← 에러 라인 빨간 강조
+      10 │ )
+
+  ✖ Function not found: undefined-func
+
+콜 스택:
+  → run (line 9)
+    main (line 12)
+```
+
 ## ⚠️ try/catch — $e 구조
 
 ```fl

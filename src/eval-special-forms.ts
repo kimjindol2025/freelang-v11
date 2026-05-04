@@ -80,6 +80,7 @@ export const EFFECT_CATALOG = new Map<string, string>([
   ["db_delete",  "db-write"], ["db-delete",  "db-write"],
   // Shell
   ["shell_exec", "shell"], ["shell-exec", "shell"],
+  ["shell_exec_result", "shell"], ["shell-exec-result", "shell"],
   ["shell_run",  "shell"],
   // I/O (stdout)
   ["println", "io"], ["print", "io"],

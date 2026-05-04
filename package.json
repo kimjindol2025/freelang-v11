@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.1.0",
-  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). v9와 v9-frontend 통합. [v11.1: P0 Agent Reliability Features]",
+  "version": "11.3.7",
+  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). [v11.3.7: 완성도 9.5/10 — Map 직렬화, 한글 문자 처리 수정]",
   "keywords": [
     "ai",
     "language",
@@ -51,6 +51,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",
+    "mongodb": "^7.2.0",
+    "mysql2": "^3.22.3",
     "sharp": "^0.34.5"
   }
 }

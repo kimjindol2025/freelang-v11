@@ -1,228 +1,137 @@
-# FreeLang v11 공식 로드맵
+# FreeLang v11 로드맵
 
 > **언어 정의**: AI 에이전트 실행 엔진  
 > **설계 철학**: Deterministic + Self-Hosted + AI-First  
-> **현황 기준**: 2026-04-28
+> **업데이트**: 2026-05-03
 
 ---
 
-## 🎯 전략 요약
+## 완료된 것 ✅
 
-```
-Phase A (즉시 ~ 2주)    → Bootstrap 폐기 (primary = stage1)
-Phase B (3-4주)         → Codegen 모듈 스코핑 (필요시)
-Phase C (완료)          → C1/C2/C4 완료, C3 미해결 (미루기)
-Phase D (장기)          → 모듈 시스템 v12+ (추후 제공)
-```
-
----
-
-## 📌 Phase A: Bootstrap 폐기 및 Self-Parser 승격
-
-**목표**: stage1.js를 primary compiler로, bootstrap.js 제거
-
-### A-1: 기초 정리 ✅ (2026-04-28 완료)
-- [x] self/parser.fl 중복 AST 함수 제거
-- [x] build-stage1.sh concat 순서 정정 (ast 먼저)
-- [x] stage1.js 재생성 (1925줄)
-- [x] README 설계 철학 공식화
-
-### A-2: Self-Parser 문법 통합 (2주) 🟢 거의 완료
-
-**요구사항**: self-parser = bootstrap 문법의 상위 집합
-
-**격차 조사 완료** (Blog #602):
-- [x] try/catch 확인: ❌ **격차** (Bootstrap O, Self-Parser X)
-- [x] cond 확인: ✅ 호환 (Phase 2에서 구현)
-- [x] loop 확인: ❌ 격차 (Bootstrap O, Self-Parser X, 특수형)
-- [x] match 확인: ✅ 모두 미지원
-
-**결과**: self-parser 호환도 **87%** (try/catch 추가로 90%+)
-
-**진행 현황** (2026-04-29 Session 3 최종):
-- [x] **Try-Catch 구현** (A-2-1) ✅ 완료
-  - [x] src/parser.ts: TS 형식 + self-hosted 호환 파싱
-  - [x] src/codegen-js.ts: Try-Catch 코드젠
-  - [x] Catch 핸들러 다중 식 지원 (수정)
-  - [x] Bootstrap.js 검증 ✅ (패턴 A-E 작동)
-  - [x] Self-hosted 소스 (self/codegen.fl) 준비 완료
-  - 🟠 Stage1 자체호스팅: 런타임 헬퍼 누락 (미루기 - phase2 이후)
-  - 🟠 알려진 문제: throw 메시지 전달 미완
-- [x] **Template Literal** (A-2-2) ✅ 완료
-  - [x] ${varName} 변수 치환
-  - [x] ${(expr)} 표현식 평가
-  - [x] 코드젠 JavaScript 템플릿 리터럴 생성
-- [ ] Loop 특수형 (A-2-3, 미루기)
-- [ ] **Let Block Fields 버그** (Phase C-5)
-  - 근본 원인: Array block fields 부재
-  - 임시 해결: cg-let-1d/2d null check ✅
-  - 상태: 자체호스팅 안정화 후 처리
-
-### A-3: Bootstrap 최소화 (1주)
-**역할**: stage1 생성 전용으로 축소
-
-**작업**:
-```
-1. bootstrap.js verify-self-host 제거
-   (대신 node stage1.js verify-self-host 사용)
-2. 배포 문서 업데이트
-3. CI/CD 파이프라인 변경
-```
-
-**검증**: stage1만으로 전체 빌드 가능 확인
-
-### A-4: Phase A 완료 선언 (2주 말) 🟢 준비중
-**상태** (2026-04-29):
-- A-1: ✅ 기초 정리 완료
-- A-2: ✅ Try-Catch + Template Literal 완료 (Loop defer)
-- A-3: ⏳ Bootstrap 최소화 (자체호스팅 완성 후)
-- A-4: 🔄 v11.1.0-alpha 선언 준비
-
-**다음 작업**:
-```
-[ ] A-4 커밋: "Phase A: Try-Catch & Template Literal 완료"
-[ ] A-4 블로그: "Phase A-2 완료 — AI 에이전트 안정 기능"
-[ ] A-4 버전: v11.1.0-alpha (bootstrap.js 안정)
-```
+| 항목 | 완료일 |
+|------|--------|
+| L0: TypeScript bootstrap.js | 초기 |
+| L1: self/all.fl → stage1.js | 2026-04 |
+| L2: 17/17 의미 동등성 증명 | 2026-05-02 |
+| **L3: stage1 → stage2 자기 컴파일 (클로저 검증)** | **2026-05-03** |
+| AI-Native Phase 1~4 (fn-meta, effects, ^pure, property-based) | 2026-05-01 |
+| P0~P1: 에러처리, 병렬실행, 보상TX, Observability | 2026-04-29 |
+| MariaDB Pool + MongoDB Wire Protocol | 2026-04-30 |
+| REPL 디버거 강화 | 2026-04-30 |
+| npm 11.2.0 배포 | 2026-05-03 |
+| **P0: Content-Type case-insensitive 수정** | **2026-05-03** |
+| **P0: `freelang patch` 명령 추가** | **2026-05-03** |
 
 ---
 
-## 📌 v11.2: AI 컨텍스트 극대화 & Inline Test (2주)
+## 현재 진행 중 🔧
 
-**목표**: Claude가 FreeLang을 Python보다 더 자주 선택하게 만들기
+### 테스트 93% → 100%
 
-### C: 단일 AI 컨텍스트 파일 (CLAUDE_AI.md) ⏳
-- [x] 6개 문서 통합 분석
-- [ ] CLAUDE_AI.md 생성
-  - stdlib 46개 함수 자동 추출
-  - 5K 토큰 내 압축
-  - 실행 가능한 예제
-- [ ] CLAUDE.md 업데이트 (참조 추가)
-
-### B: Inline Test Syntax 설계 ⏳
-- [ ] 함수별 테스트 템플릿 설계
-- [ ] 10개 예제 추가 (테스트 포함)
-- [ ] AI 검증 자동화 스크립트
-
-### 결과
-- 컨텍스트 부담 ↓ (6 files → 1 file)
-- AI 생산성 ↑ (즉시 코드 작성)
-- FreeLang 선택 빈도 ↑
+현재: 831/832 (99.9%)  
+남은 실패: verify-self-host.sh tier2 PASS 82 → 86 기준
 
 ---
 
-## 🔧 Phase B: Codegen 모듈 스코핑 (조건부)
+## 다음 작업 (우선순위 순)
 
-**상태**: 설계 검토 중 (필요시만)
+### ~~P0 — Content-Type 헤더 강제 버그 수정~~ ✅ 완료 (2026-05-03)
 
-### 현황
-- 자체호스팅 에러: str_repeat 등 helper 함수 중복
-- **AI 관점**: 현재 flat namespace가 더 나음
-- **결정**: 모듈 시스템은 v12+ 이후
-
-### 임시 조치 (필요시)
-```
-Option 1: str_repeat → string_str_repeat (prefix 추가)
-Option 2: Phase B 스킵 (권장)
-```
-
-**결정**: 🟢 **필요시만** (지금은 불필요)
+**수정**: `bootstrap.js` `sendResponse` case-insensitive 헤더 탐색  
+**커밋**: 77c48955
 
 ---
 
-## ✨ Phase C: 증명 강화 (진행 중)
+### ~~P0 — `freelang patch` 명령 추가~~ ✅ 완료 (2026-05-03)
 
-**현황** (2026-04-29):
-- C1: - 연산자 가변인자 ✅
-- C2: append 가변인자 ✅
-- C3: loop 식별자 충돌 🟠 (미루기)
-- C4: let-rec 패턴 ✅
-- **C5: Let Block Fields 버그** 🔴 (발견, 임시 해결)
-  - 문제: Array block의 fields가 null/비어있음 → codegen 실패
-  - 근본 원인: Parser (parseArray) vs Interpreter 호환성 미정
-  - 임시 해결: cg-let-1d/2d에 null check 추가 (2026-04-29)
-  - 우선순위: 자체호스팅 안정화 후 (phase1 이후)
-
-**결정** (2026-04-29 Session 3):
-- [x] C3 미루기: loop 식별자 충돌 (v12+ 모듈 시스템 시점)
-- [x] C5 미루기: Let Block Fields (자체호스팅 phase2 시점)
-- [ ] Property test: examples/patterns/ 검증 (다음 단계)
-- [ ] Phase C 완료 선언 (C5 제외)
+**수정**: `bootstrap.js`에 `patch` 서브커맨드 구현  
+**커밋**: 77c48955  
+**사용법**:
+```bash
+freelang patch <file> --find "<text>" --replace "<text>"
+freelang patch <file> --insert-after "<anchor>" --content "<block>"
+```
+**완료 조건**: 특수문자(백틱, ${}, 한글, JSON) 포함 문자열 안전 처리
 
 ---
 
-## 📅 v12: 모듈 시스템 (장기)
+### P1 — 테스트 99.9% → 100%
 
-**시기**: 2026-Q3 이후 (현재 불필요)
-
-**계획**:
-```
-- 네임스페이스 문법 추가
-- import/export 지원
-- 순환 의존성 처리
-```
-
-**이유**: 현재는 AI 1회 요청 = 1파일 패턴에 최적화
+**남은 1개**: `verify-self-host.sh tier2` PASS 82 → 86  
+**원인**: fuzz invariant crash (file_read/write 선언 충돌 해결 중)
 
 ---
 
-## 🎓 평가 기준
+### P1 — `shell_env` nil 반환 수정
 
-### Phase A 성공 (2주)
-```
-✅ Stage1만으로 빌드 가능
-✅ Bootstrap 제거 (또는 불필요)
-✅ verify-self-host tier2 > 91 PASS
-✅ 버전 v11.1.0-alpha 배포
-```
-
-### 최종 등급
-```
-현재: A (자체호스팅 고정점 달성)
-Phase A 완료: A+ (bootstrap 폐기)
-Phase B/C: A++ (필요시)
-```
+**증상**: 미정의 환경변수가 `""` 반환 → `(or "" default)` 가 `""` 선택  
+**수정**: 미정의 시 `nil` 반환 + `(env-or key default)` 헬퍼 추가
 
 ---
 
-## 📊 타임라인
+### P1 — `mariadb_pool_query` 빈 결과 `[]` 반환
 
-```
-Week 1 (지금~4월 30일)
-├─ A-1 완료 ✓
-├─ A-2 격차 조사
-└─ A-3 CI/CD 준비
-
-Week 2 (5월 1~7일)
-├─ A-2 구현 (필요시)
-├─ A-3 완료
-└─ A-4 선언
-
-Week 3+ (5월 8일~)
-├─ Phase B (필요시)
-├─ Phase C 완료
-└─ v11.1.0 정식 배포
-```
+**증상**: 빈 테이블 조회 시 `nil` 반환 → `(map fn nil)` 폭발  
+**수정**: 빈 결과 시 `nil` 대신 `[]` 반환
 
 ---
 
-## 🚀 최종 비전
+### P2 — Phase L4: Bun 단일 바이너리
 
-**FreeLang v11.1** (2026-05월 말):
-```
-✅ Self-hosted compiler (bootstrap 폐기)
-✅ AI 에이전트 안정 엔진
-✅ 완벽한 결정론과 재현성
-✅ 자주국방 원칙 (외부 의존 0)
-```
-
-**평가**: **A+ (Production Ready)**
+**목표**: `bun build --compile stage1.js --outfile freelang`  
+**완료 조건**: Node.js 없이 `./freelang run app.fl` 실행  
+**예상 작업량**: 1세션
 
 ---
 
-## 📝 추적
+### P2 — 에러 메시지에 파일명 + 컨텍스트
 
-- 로드맵 정책: ROADMAP.md (이 파일)
-- Phase 진행: gogs Issues
-- 기술 논의: blog.dclub.kr (포스팅)
-- 일일 상태: CLAUDE.md 메모리
+**증상**: `"line 53 col 0"` — 어느 파일인지 모름. 디버깅 2배 소요.  
+**수정**: 에러 출력에 파일명 + 해당 줄 코드 3줄 컨텍스트 추가
+
+---
+
+### P1 — `freelang migrate` — DB 마이그레이션 관리
+
+**배경**: Supabase에서 배운 것 — 스키마 변경 추적 없으면 "이 컬럼 언제 추가했지?" 반복  
+**파일**: `bootstrap.js` CLI + `migrations/` 폴더 규칙  
+**명령**:
+```bash
+freelang migrate create "add_status_to_orders"   # 파일 생성
+freelang migrate up                               # 미적용 실행
+freelang migrate down                             # 마지막 롤백
+freelang migrate status                           # 적용 현황
+```
+**완료 조건**: MariaDB `_migrations` 테이블 + SQL 파일 기반 버전 관리
+
+---
+
+### P2 — `auto_rest` — DB 테이블 → REST API 자동 생성
+
+**배경**: Supabase PostgREST 패턴 — CRUD 핸들러 반복 제거  
+**사용법**:
+```fl
+(auto_rest "orders" {:auth :required :read :public})
+; → GET /orders, POST /orders, PATCH /orders/:id, DELETE /orders/:id 자동
+```
+**완료 조건**: akl-crm 기존 CRUD 핸들러 50% 이상 제거 가능
+
+---
+
+### P3 — WebSocket / Push API / Cron 정밀화
+
+| 기능 | 현황 | 목표 |
+|------|------|------|
+| WebSocket | community-ws 별도 구현 | stdlib 통합 |
+| Push API 서버 측 | 미구현 | Web Push protocol |
+| Cron | set_interval 60초 | "매주 월요일 9시" 수준 |
+
+---
+
+## 버전 히스토리
+
+| 버전 | 날짜 | 주요 변경 |
+|------|------|-----------|
+| 11.2.0 | 2026-05-03 | L3 자기 호스팅 완성, while codegen 수정 |
+| 11.1.0 | 2026-05 | L2 100% 완성, AI-Native Phase 1~4 |
+| 11.0.x | 2026-04 | L1 자가호스팅, P0~P1 완성, MongoDB |
