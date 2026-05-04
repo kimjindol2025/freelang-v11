@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 413개 함수, 28 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 424개 함수, 30 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -530,6 +530,16 @@ parallel race with-timeout fl-try use`
 - `(matrix_zeros rows cols)` → [[number]]  (create zero matrix)
 - `(vector_zeros n)` → [number]  (create zero vector)
 
+### perf (7개)
+
+- `(profile_fn fn count)` → PerfResult
+- `(trace_expr fn label)` → TraceResult
+- `(perf_stats)` → PerfStats
+- `(now_ms)` → number
+- `(elapsed_ms start)` → number
+- `(bench fn iterations)` → {ms, ops_per_sec}
+- `(time_fn fn args...)` → {result, ms}
+
 ### queue-helpers (1개)
 
 - `(queue_db_init db_path)` → bool  (WAL 모드 + busy_timeout 활성화)
@@ -630,6 +640,13 @@ parallel race with-timeout fl-try use`
 - `(totp_now secret_b32)` → string (현재 시각의 6자리 코드, 디버그·등록용)
 - `(totp_uri label issuer secret_b32)` → string (otpauth://totp/... QR 코드 표준)
 
+### verify (4개)
+
+- `(check_parens code)` → VerifyResult
+- `(verify_code code)` → {valid, error_count, first_error}
+- `(fix_parens code)` → 자동 수정된 코드 (or original if already valid)
+- `(count_parens code)` → {open, close, balanced}
+
 ### webauthn (1개)
 
 - `(webauthn_challenge bytes)` → base64url string (32 bytes)
@@ -679,4 +696,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-04T02:25:01.909Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-04T03:29:59.019Z
