@@ -15,6 +15,8 @@ import { createAgentModule } from "./stdlib-agent";      // Phase 15: AI Agent S
 import { createTimeModule } from "./stdlib-time";        // Phase 16: Time + Logging + Monitoring
 import { createPerfModule } from "./stdlib-perf";        // Phase F-2: AI 성능 프로파일링
 import { createVerifyModule } from "./stdlib-verify";    // Phase F-2: AI 코드 검증
+import { createHttpMacroModule } from "./stdlib-http-macro"; // Phase F-3: HTTP 1줄 매크로
+import { createDbQueryModule } from "./stdlib-db-query";     // Phase F-3: DB 쿼리 빌더
 import { createCryptoModule } from "./stdlib-crypto";    // Phase 17: Crypto + UUID + Regex
 import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine (core)
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
@@ -63,6 +65,8 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (fn, args) => interp.callFunctionValue(fn, args)
   ));
   interp.registerModule(createVerifyModule());        // Phase F-2: AI 코드 자동 검증
+  interp.registerModule(createHttpMacroModule());    // Phase F-3: HTTP JSON 매크로
+  interp.registerModule(createDbQueryModule());      // Phase F-3: DB 쿼리 빌더
   interp.registerModule(createCryptoModule());
   interp.registerModule(createWorkflowModule());
   interp.registerModule(createResourceModule());
