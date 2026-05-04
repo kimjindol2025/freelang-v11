@@ -27,35 +27,15 @@ type CallFnValue = (fn: any, args: any[]) => any;
 type HttpGetFn = (url: string, opts?: any) => any;
 
 // ─────────────────────────────────────────────────────────────
-// G-1: 별칭 매핑
+// G-1: 별칭 매핑 — _aliases.json (wrapper와 공유)
 // ─────────────────────────────────────────────────────────────
-const HELPER_ALIASES: Record<string, { correct: string; usage: string }> = {
-  "console_log":   { correct: "println",     usage: '(println value)' },
-  "console.log":   { correct: "println",     usage: '(println value)' },
-  "print":         { correct: "println",     usage: '(println value)' },
-  "log":           { correct: "println",     usage: '(println value)' },
-  "push":          { correct: "append",      usage: '(append arr item)' },
-  "list_append":   { correct: "append",      usage: '(append arr item)' },
-  "array_push":    { correct: "append",      usage: '(append arr item)' },
-  "array_length":  { correct: "length",      usage: '(length arr)' },
-  "first":         { correct: "get",         usage: '(get arr 0)' },
-  "head":          { correct: "get",         usage: '(get arr 0)' },
-  "is_null":       { correct: "nil?",        usage: '(nil? value)' },
-  "is_nil":        { correct: "nil?",        usage: '(nil? value)' },
-  "null?":         { correct: "nil?",        usage: '(nil? value)' },
-  "is_array":      { correct: "array?",      usage: '(array? value)' },
-  "is_string":     { correct: "string?",     usage: '(string? value)' },
-  "is_number":     { correct: "number?",     usage: '(number? value)' },
-  "str_length":    { correct: "length",      usage: '(length "hello")' },
-  "string_length": { correct: "length",      usage: '(length "hello")' },
-  "str_concat":    { correct: "str",         usage: '(str "a" "b")' },
-  "str_to_int":    { correct: "str_to_num",  usage: '(str_to_num "42")' },
-  "parse_int":     { correct: "str_to_num",  usage: '(str_to_num "42")' },
-  "fetch":         { correct: "http_get",    usage: '(http_get url)' },
-  "server_listen": { correct: "server_start", usage: '(server_start 40000)' },
-  "raise":         { correct: "error",       usage: '(error "msg")' },
-  "panic":         { correct: "error",       usage: '(error "msg")' },
-};
+import * as ALIASES_RAW from "./_aliases.json";
+
+const HELPER_ALIASES: Record<string, { correct: string; usage: string; mistake?: string | null }> = {};
+for (const [k, v] of Object.entries(ALIASES_RAW as any)) {
+  if (k.startsWith("_")) continue;
+  HELPER_ALIASES[k] = v as any;
+}
 
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;

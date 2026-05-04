@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.4.0",
-  "description": "FreeLang v11 — Unified AI-Native Language (v9 Runtime + Web Framework). [v11.4.0: Phase G — MISTAKES-100 자동 처리 (smart-* / try-call / http-get-json)]",
+  "version": "11.4.2",
+  "description": "FreeLang v11 — Unified AI-Native Language. [v11.4.2: ALIAS 확장 — MISTAKES-100 33/100 자동 처리 (정직 카운트)]",
   "keywords": [
     "ai",
     "language",

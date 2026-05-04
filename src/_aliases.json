@@ -1,0 +1,84 @@
+{
+  "_comment": "FreeLang v11 함수명 별칭 — wrapper(bin/freelang-smart)와 stdlib-helpers가 공유. MISTAKES-100 매핑 명시.",
+
+  "console_log":     { "correct": "println",       "usage": "(println value)",                  "mistake": "#35" },
+  "console.log":     { "correct": "println",       "usage": "(println value)",                  "mistake": "#35" },
+  "log":             { "correct": "println",       "usage": "(println value)",                  "mistake": "#35" },
+  "print":           { "correct": "println",       "usage": "(println value)",                  "mistake": "#35" },
+
+  "push":            { "correct": "append",        "usage": "(append arr item)",                "mistake": null },
+  "list_append":     { "correct": "append",        "usage": "(append arr item)",                "mistake": null },
+  "array_push":      { "correct": "append",        "usage": "(append arr item)",                "mistake": null },
+
+  "array_length":    { "correct": "length",        "usage": "(length arr)",                     "mistake": "#42" },
+  "count":           { "correct": "length",        "usage": "(length arr)",                     "mistake": "#42" },
+  "size":            { "correct": "length",        "usage": "(length arr)",                     "mistake": "#42" },
+
+  "first":           { "correct": "get",           "usage": "(get arr 0)",                      "mistake": null },
+  "head":            { "correct": "get",           "usage": "(get arr 0)",                      "mistake": null },
+
+  "is_null":         { "correct": "nil?",          "usage": "(nil? value)",                     "mistake": "#55" },
+  "is_nil":          { "correct": "nil?",          "usage": "(nil? value)",                     "mistake": "#55" },
+  "null?":           { "correct": "nil?",          "usage": "(nil? value)",                     "mistake": "#55" },
+  "is_array":        { "correct": "array?",        "usage": "(array? value)",                   "mistake": null },
+  "is_string":       { "correct": "string?",       "usage": "(string? value)",                  "mistake": null },
+  "is_number":       { "correct": "number?",       "usage": "(number? value)",                  "mistake": null },
+
+  "str_length":      { "correct": "str-length",    "usage": "(str-length \"hello\")",            "mistake": "#77" },
+  "string_length":   { "correct": "str-length",    "usage": "(str-length \"hello\")",            "mistake": "#77" },
+  "trim":            { "correct": "str-trim",      "usage": "(str-trim \"  x  \")",              "mistake": "#78" },
+  "starts-with?":    { "correct": "str-starts-with","usage": "(str-starts-with s prefix)",        "mistake": "#79" },
+  "ends-with?":      { "correct": "str-ends-with", "usage": "(str-ends-with s suffix)",          "mistake": "#79" },
+  "includes":        { "correct": "str-contains",  "usage": "(str-contains s pattern)",          "mistake": "#80" },
+  "to-upper":        { "correct": "str-upper",     "usage": "(str-upper s)",                     "mistake": "#81" },
+  "to-lower":        { "correct": "str-lower",     "usage": "(str-lower s)",                     "mistake": "#81" },
+  "toString":        { "correct": "str",           "usage": "(str value)",                       "mistake": "#82" },
+  "to_string":       { "correct": "str",           "usage": "(str value)",                       "mistake": "#82" },
+  "to_str":          { "correct": "str",           "usage": "(str value)",                       "mistake": "#82" },
+  "str_concat":      { "correct": "str",           "usage": "(str \"a\" \"b\")",                  "mistake": null },
+
+  "str_to_int":      { "correct": "str_to_num",    "usage": "(str_to_num \"42\")",               "mistake": "#34" },
+  "parse_int":       { "correct": "str_to_num",    "usage": "(str_to_num \"42\")",               "mistake": "#34" },
+  "parseInt":        { "correct": "str_to_num",    "usage": "(str_to_num \"42\")",               "mistake": "#34" },
+  "num_to_str":      { "correct": "str",           "usage": "(str 42)",                          "mistake": "#57" },
+
+  "split":           { "correct": "str-split",     "usage": "(str-split s \",\")",              "mistake": "#43" },
+  "str_split":       { "correct": "str-split",     "usage": "(str-split s \",\")",              "mistake": "#43" },
+
+  "JSON.parse":      { "correct": "json_parse",    "usage": "(json_parse s)",                   "mistake": "#44" },
+  "parse_json":      { "correct": "json_parse",    "usage": "(json_parse s)",                   "mistake": "#44" },
+  "JSON.stringify":  { "correct": "json_stringify","usage": "(json_stringify x)",               "mistake": "#45" },
+  "stringify":       { "correct": "json_stringify","usage": "(json_stringify x)",               "mistake": "#45" },
+
+  "json_keys":       { "correct": "keys",          "usage": "(keys m)",                          "mistake": "#36" },
+  "object_keys":     { "correct": "keys",          "usage": "(keys m)",                          "mistake": "#36" },
+  "obj_merge":       { "correct": "assoc",         "usage": "(assoc m \"k\" v)  ;; 키별로",      "mistake": "#39" },
+  "merge":           { "correct": "assoc",         "usage": "(assoc m \"k\" v)  ;; 키별로",      "mistake": "#39" },
+  "obj_omit":        { "correct": "dissoc",        "usage": "(dissoc m \"k\")",                  "mistake": "#40" },
+  "omit":            { "correct": "dissoc",        "usage": "(dissoc m \"k\")",                  "mistake": "#40" },
+  "obj_pick":        { "correct": "get",           "usage": "(get m \"k\")  ;; 개별 키 접근",    "mistake": "#41" },
+  "dict":            { "correct": "map-set",       "usage": "(map-set {} \"k\" v)",              "mistake": null },
+
+  "now-ms":          { "correct": "now_ms",        "usage": "(now_ms)",                          "mistake": "#37" },
+  "Date.now":        { "correct": "now_ms",        "usage": "(now_ms)",                          "mistake": "#37" },
+  "current_time_ms": { "correct": "now_ms",        "usage": "(now_ms)",                          "mistake": "#37" },
+
+  "env":             { "correct": "shell_env",     "usage": "(shell_env \"KEY\")",               "mistake": "#32" },
+  "get_env":         { "correct": "shell_env",     "usage": "(shell_env \"KEY\")",               "mistake": "#32" },
+  "get-env":         { "correct": "shell_env",     "usage": "(shell_env \"KEY\")",               "mistake": "#32" },
+  "env_get":         { "correct": "shell_env",     "usage": "(shell_env \"KEY\")",               "mistake": "#32" },
+
+  "fetch":           { "correct": "http_get",      "usage": "(http_get url)",                    "mistake": null },
+  "http_post":       { "correct": "http_get",      "usage": "(http_get url {:method \"POST\"})", "mistake": null },
+
+  "server_listen":   { "correct": "server_start",  "usage": "(server_start 40000)",              "mistake": "#33" },
+  "server_run":      { "correct": "server_start",  "usage": "(server_start 40000)",              "mistake": "#33" },
+  "listen":          { "correct": "server_start",  "usage": "(server_start 40000)",              "mistake": "#33" },
+
+  "raise":           { "correct": "error",         "usage": "(error \"msg\")",                   "mistake": "#90" },
+  "panic":           { "correct": "error",         "usage": "(error \"msg\")",                   "mistake": "#90" },
+  "throw":           { "correct": "error",         "usage": "(error \"msg\")",                   "mistake": "#90" },
+
+  "mariadb_all":     { "correct": "mariadb_query", "usage": "(mariadb_query db sql params)",     "mistake": "#38" },
+  "db_query":        { "correct": "mariadb_query", "usage": "(mariadb_query db sql params)",     "mistake": "#38" }
+}

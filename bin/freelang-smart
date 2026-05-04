@@ -25,35 +25,21 @@ const fs = require("fs");
 const os = require("os");
 
 // ─────────────────────────────────────────────────────────────
-// 별칭 + 유사 함수 추천 (helpers와 동일 데이터)
+// 별칭 — _aliases.json (단일 소스, helpers와 공유)
 // ─────────────────────────────────────────────────────────────
-const ALIASES = {
-  "console_log":   { correct: "println",      usage: "(println value)" },
-  "console.log":   { correct: "println",      usage: "(println value)" },
-  "print":         { correct: "println",      usage: "(println value)" },
-  "log":           { correct: "println",      usage: "(println value)" },
-  "push":          { correct: "append",       usage: "(append arr item)" },
-  "list_append":   { correct: "append",       usage: "(append arr item)" },
-  "array_push":    { correct: "append",       usage: "(append arr item)" },
-  "array_length":  { correct: "length",       usage: "(length arr)" },
-  "first":         { correct: "get",          usage: "(get arr 0)" },
-  "head":          { correct: "get",          usage: "(get arr 0)" },
-  "is_null":       { correct: "nil?",         usage: "(nil? value)" },
-  "is_nil":        { correct: "nil?",         usage: "(nil? value)" },
-  "null?":         { correct: "nil?",         usage: "(nil? value)" },
-  "is_array":      { correct: "array?",       usage: "(array? value)" },
-  "is_string":     { correct: "string?",      usage: "(string? value)" },
-  "is_number":     { correct: "number?",      usage: "(number? value)" },
-  "str_length":    { correct: "length",       usage: '(length "hello")' },
-  "string_length": { correct: "length",       usage: '(length "hello")' },
-  "str_concat":    { correct: "str",          usage: '(str "a" "b")' },
-  "str_to_int":    { correct: "str_to_num",   usage: '(str_to_num "42")' },
-  "parse_int":     { correct: "str_to_num",   usage: '(str_to_num "42")' },
-  "fetch":         { correct: "http_get",     usage: "(http_get url)" },
-  "server_listen": { correct: "server_start", usage: "(server_start 40000)" },
-  "raise":         { correct: "error",        usage: '(error "msg")' },
-  "panic":         { correct: "error",        usage: '(error "msg")' },
-};
+const ALIASES_JSON_PATH = path.resolve(__dirname, "..", "src", "_aliases.json");
+let ALIASES = {};
+try {
+  const raw = JSON.parse(fs.readFileSync(ALIASES_JSON_PATH, "utf-8"));
+  // _comment 필드는 제외
+  for (const [k, v] of Object.entries(raw)) {
+    if (k.startsWith("_")) continue;
+    ALIASES[k] = v;
+  }
+} catch (e) {
+  // _aliases.json 없으면 빈 객체로 운영 (Levenshtein만 동작)
+  console.error(`[freelang-smart] _aliases.json 로드 실패: ${e.message}`);
+}
 
 const COMMON_FNS = [
   "println", "print", "map", "filter", "reduce", "append", "get", "assoc", "dissoc",

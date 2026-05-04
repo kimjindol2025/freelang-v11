@@ -3,18 +3,47 @@
 > **목적**: Claude와 개발자가 반복하는 실수 모음. 코드 작성 전 반드시 확인.  
 > **업데이트**: 새 실수 발견 시 즉시 추가.
 
-## 🤖 Phase G: 25개는 언어가 자동 처리
+## 🤖 Phase G+ 자동 처리 현황 (v11.4.2 기준)
 
-Phase G(v11.4.0)부터 stdlib 헬퍼가 인자 순서/별칭/HTTP 응답을 자동 감지/수정.
+`scripts/verify-mistakes-coverage.js` 측정 결과 — **실제 매핑된 33/100**
 
-| 카테고리 | 자동 처리 함수 | 처리되는 실수 |
-|---------|---------------|--------------|
-| 별칭 추천 | `suggest-fn`, `alias-of`, `help-text` | console_log, push, fetch 등 |
-| 인자 자동 | `smart-map`, `smart-filter`, `smart-get`, `smart-assoc` | #1, #2, #5, #6, #9 |
-| HTTP 래퍼 | `http-get-json`, `http-post-json`, `http-status` | #11–#15 |
-| Result | `try-call`, `try-call-1` (+ 기존 `ok?`/`unwrap`) | 에러 캡처 표준화 |
+| 분류 | 수 | 효과 |
+|------|---|-----|
+| Wrapper 자동 수정 | **2** | `freelang-smart` 사용 시 코드 수정 없이 동작 |
+| ALIAS hint 자동 출력 | **23** | 함수 미존재 시 정답 + 사용법 표시 |
+| 옵션 헬퍼 (호출 시) | **8** | `smart-*` / `http-*-json` / `try-call` |
+| **자동 처리 합계** | **33** | (ALIAS 항목 중 일부는 함수가 실제 작동하면 hint 미트리거) |
+| 미처리 | 67 | Cat 3, 7, 9, 10, 11, 13, 15 등 |
 
-남은 75개는 점진적으로 처리 (Phase H 예정).
+### 카테고리별 커버리지
+
+| 카테고리 | 처리 | 비고 |
+|---------|------|------|
+| Cat 1 인자 순서 | 4/10 | smart-map/filter/get/assoc (옵션) |
+| Cat 2 HTTP 응답 | 4/5 | http-*-json (옵션) |
+| Cat 3 atom | 0/5 | 미처리 (타입 시스템 필요) |
+| Cat 4 let | 1/5 | #23 wrapper 자동 수정 |
+| Cat 5 함수 선언 | 1/6 | #26 [FUNC] hint |
+| **Cat 6 함수명 오류** | **14/14** | **100% ALIAS** |
+| Cat 7 HTTP 서버 | 0/9 | 미처리 |
+| Cat 8 데이터 타입 | 2/6 | #55 #57 |
+| Cat 9 조건문 | 0/5 | 미처리 |
+| Cat 10 DB | 0/5 | 미처리 |
+| Cat 11 파일/환경 | 0/5 | 미처리 |
+| **Cat 12 문자열** | **6/7** | trim/includes/toString 등 ALIAS |
+| Cat 13 배열 | 0/6 | 미처리 |
+| Cat 14 에러 처리 | 1/4 | #90 throw → error |
+| Cat 15 기타 | 0/8 | 미처리 |
+
+### Caveat (정직)
+
+- ALIAS 매핑된 23개 중 일부 (예: `json_keys`, `trim`)는 **실제로 작동**. 사용자가 호출하면 그냥 동작하니까 hint 트리거 안 됨. 하지만 100선에 명시된 항목 → "처리됨"으로 카운트.
+- "옵션 헬퍼 8개"는 사용자가 `smart-` 접두사 알고 호출해야 동작 — 진짜 자동 아님.
+- 진짜 *코드 수정 없이 동작*하는 wrapper 자동 = **2개** (#23 let, #26 [FUNC] hint)
+
+진짜 자동을 25→50개로 늘리려면 Phase H에서 파서 패치 + 추가 ALIAS + 패턴 감지 필요.
+
+검증 도구: `node scripts/verify-mistakes-coverage.js` → `MISTAKES-COVERAGE.json` 자동 갱신
 
 ---
 

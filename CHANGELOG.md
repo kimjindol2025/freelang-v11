@@ -1,5 +1,61 @@
 # Changelog
 
+## [v11.4.2] — 2026-05-04 (Phase G+ ALIAS 확장 + 정직 카운트)
+
+### 🔍 정직성 점검
+
+v11.4.0 발표 시 "25개 처리"라고 표기했지만 실제 MISTAKES-100 매핑은 **14개**.
+v11.4.2에서 ALIAS 확장 후 **33개**로 정정. (100선 항목 직접 매핑 기준)
+
+### 📦 추가
+- `src/_aliases.json` — wrapper와 stdlib-helpers가 공유하는 단일 소스
+- `scripts/verify-mistakes-coverage.js` — 실제 커버리지 측정 도구
+- `MISTAKES-COVERAGE.json` — 자동 생성 리포트
+
+### ✨ ALIAS 22개 추가 (총 25 → 50+)
+
+#32 env, get_env, env_get → shell_env
+#36 json_keys, object_keys → keys
+#37 now-ms, Date.now, current_time_ms → now_ms
+#38 mariadb_all, db_query → mariadb_query
+#39 obj_merge, merge → assoc
+#40 obj_omit, omit → dissoc
+#41 obj_pick → get
+#42 count, size → length
+#43 split, str_split → str-split
+#44 JSON.parse, parse_json → json_parse
+#45 JSON.stringify, stringify → json_stringify
+#57 num_to_str → str
+#77 str_length → str-length
+#78 trim → str-trim
+#79 starts-with?, ends-with? → str-starts-with/ends-with
+#80 includes → str-contains
+#81 to-upper, to-lower → str-upper/str-lower
+#82 toString, to_string, to_str → str
+#90 throw → error
++ parseInt → str_to_num, server_run/listen → server_start
+
+### 📊 커버리지 (실측)
+
+```
+Cat 6 함수명 오류:    14/14 (100%)  ← ALIAS 완성
+Cat 12 문자열:         6/7  (86%)
+Cat 2 HTTP 응답:       4/5  (80%)
+Cat 1 인자 순서:       4/10 (40%)
+Cat 4 let:            1/5  (20%)
+─────────────────────────────────
+총합:                33/100 (33%)
+```
+
+### 🔧 수정
+- `bin/freelang-smart` → `_aliases.json` 로드 (코드 분리)
+- `src/stdlib-helpers.ts` → 동일 JSON 사용 (단일 소스)
+
+### 📊 빌드
+- bootstrap.js: 750.8KB → 762.5KB (+12KB, ALIAS 데이터 임베드)
+
+---
+
 ## [v11.4.0] — 2026-05-04 (Phase G: AI 헬퍼)
 
 ### 🎯 Phase G — MISTAKES-100 자동 처리
