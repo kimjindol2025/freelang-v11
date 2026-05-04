@@ -125,8 +125,8 @@ function preprocess(code) {
 function analyzeError(stderr) {
   const hints = [];
 
-  // 1. Function not found: NAME
-  const fnMatch = stderr.match(/Function not found:\s*([a-zA-Z_][\w\-?!]*)/);
+  // 1. Function not found: NAME (이름에 dot, hyphen, ?, ! 허용)
+  const fnMatch = stderr.match(/Function not found:\s*([a-zA-Z_][\w.\-?!]*)/);
   if (fnMatch) {
     const name = fnMatch[1];
     const sims = suggestFn(name);
