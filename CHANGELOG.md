@@ -1,5 +1,87 @@
 # Changelog
 
+## [v11.5.0] — 2026-05-04 (진짜 언어 변경 — kebab alias 자동 등록)
+
+### ⚠️ 정정: v11.4.3은 도구만이었다
+
+v11.4.3에서 "Phase X 시작" "v11.5.1 통일" 등 거창하게 표기했으나
+**실제로는 도구/문서만 추가, 언어 코어 변경 0**이었음.
+
+`freelang-migrate`로 변환한 코드도 stdlib에 kebab alias가 없어서 *작동 안 했음*.
+
+### ✅ v11.5.0: 진짜 언어 변경
+
+`src/stdlib-kebab-aliases.ts` 추가. **400개 kebab-case alias 자동 등록.**
+
+- `now_ms` → `now-ms` (둘 다 작동)
+- `str_to_num` → `str-to-num` (둘 다 작동)
+- `json_parse` → `json-parse` (둘 다 작동)
+- `file_exists` → `file-exists` + `file-exists?` (술어 alias)
+- `mariadb_query` → `mariadb-query`
+- `auth_jwt_sign` → `auth-jwt-sign`
+- `server_req_body` → `server-req-body`
+- ... 400개 자동
+
+### 🔧 변경 (실제 코드)
+- `src/stdlib-kebab-aliases.ts` 신규 (110줄)
+- `src/stdlib-loader.ts` 모든 stateless 모듈을 변수에 캡처 (alias 생성용)
+- `bin/freelang-migrate` 명시적 경고 추가 (v11.5.0+ 런타임 필요)
+
+### ✅ end-to-end 검증
+
+```bash
+# 1. v11 코드 작성 (snake_case)
+echo '(json_parse "{\"a\":1}")' > app.fl
+
+# 2. migrate로 변환 (kebab으로)
+freelang-migrate app.fl --apply
+# → (json-parse "{\"a\":1}")
+
+# 3. 변환된 코드 실행 → ✅ 작동 (이전엔 실패)
+node bootstrap.js run app.fl
+```
+
+### 📊 빌드
+- bootstrap.js: 762.5KB → 763.5KB (+1KB)
+- 등록 alias: 400개 자동
+- 회귀: 29/29 통과
+
+### ⚠️ 정직한 분류
+
+| 통일 규칙 (제안) | v11.5.0 상태 |
+|------|--------|
+| 1. 인자 순서 | ❌ 제안만 |
+| 2. **kebab-case** | ✅ **구현됨** |
+| 3. 술어 `?` | △ 부분 (file-exists? 등) |
+| 4. HTTP 응답 분리 | ❌ 제안만 |
+| 5. `$` 선택 | ❌ 제안만 |
+
+→ 5가지 중 1.5가지 진짜 구현. 나머지는 후속.
+
+### 🗓 다음
+- v11.5.1: 술어 ? alias 확장 (`is_X?`, `array?` 등)
+- v11.5.2: HTTP 응답 분리 함수 stdlib 승격
+- v11.5.3+: 인자 순서 alias (위험도 높아 마지막)
+
+---
+
+## [v11.4.3] — 2026-05-04 (도구 + 문서 보강 — 언어 변경 X)
+
+### ⚠️ 자기 정정 (v11.5.0 시점)
+
+v11.4.3은 *언어가 발전한 게 아니라 우리 도구가 발전한 것*.
+- ALIAS 데이터 추가 (도구용)
+- wrapper 스크립트 (외부)
+- 문서 분리
+- migrate 도구 prototype (변환만, 변환된 코드는 실행 안 됨)
+
+bootstrap.js 코어 변경 0. stdlib 함수 추가 0.
+"Phase X 시작"은 v11.5.0에서야 진실.
+
+### 📦 추가 (도구/문서)
+
+(이하 v11.4.3 내용 그대로)
+
 ## [v11.4.3] — 2026-05-04 (Phase X 시작 — v11.5.x 로드맵)
 
 ### 🔍 본질 재분류

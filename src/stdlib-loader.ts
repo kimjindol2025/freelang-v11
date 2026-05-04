@@ -41,6 +41,7 @@ import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-laz
 import { createImageModule } from "./stdlib-image";     // Phase A: Image Processing
 import { createMongodbModule } from "./stdlib-mongodb"; // Phase A: MongoDB Driver
 import { createHelpersModule } from "./stdlib-helpers"; // Phase G: MISTAKES-100 자동 처리
+import { createKebabAliasesModule } from "./stdlib-kebab-aliases"; // v11.5.0: snake → kebab alias
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -54,44 +55,67 @@ interface InterpreterLike {
  * interpreter.ts constructor 대신 이 함수 한 줄로 호출
  */
 export function loadAllStdlib(interp: InterpreterLike): void {
-  interp.registerModule(createFileModule());
-  interp.registerModule(createFdModule());
-  interp.registerModule(createBitsModule());
-  interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
-  interp.registerModule(createErrorModule());
-  // Phase G: helpers는 http_get 위에 래핑되므로 http 모듈 객체를 캡처
+  // v11.5.0: stateless 모듈은 변수에 캡처 — kebab alias 생성용
+  const fileModule = createFileModule();
+  const fdModule = createFdModule();
+  const bitsModule = createBitsModule();
+  const errorModule = createErrorModule();
   const httpModule = createHttpModule();
+
+  interp.registerModule(fileModule);
+  interp.registerModule(fdModule);
+  interp.registerModule(bitsModule);
+  interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
+  interp.registerModule(errorModule);
   interp.registerModule(httpModule);
-  interp.registerModule(createShellModule());
-  interp.registerModule(createDataModule());
-  interp.registerModule(createCollectionModule());
-  interp.registerModule(createAgentModule());
-  interp.registerModule(createTimeModule());
+  const shellModule = createShellModule();
+  const dataModule = createDataModule();
+  const collectionModule = createCollectionModule();
+  const agentModule = createAgentModule();
+  const timeModule = createTimeModule();
+  interp.registerModule(shellModule);
+  interp.registerModule(dataModule);
+  interp.registerModule(collectionModule);
+  interp.registerModule(agentModule);
+  interp.registerModule(timeModule);
   interp.registerModule(createPerfModule(             // Phase F-2: 성능 프로파일링
     (fn, args) => interp.callFunctionValue(fn, args)
   ));
-  interp.registerModule(createVerifyModule());        // Phase F-2: AI 코드 자동 검증
-  interp.registerModule(createHttpMacroModule());    // Phase F-3: HTTP JSON 매크로
-  interp.registerModule(createDbQueryModule());      // Phase F-3: DB 쿼리 빌더
-  interp.registerModule(createOptionalModule());     // Phase F-4: 선택적 npm 브릿지
-  interp.registerModule(createRestCrudModule());     // Phase F-4: REST CRUD 라우팅
+  const verifyModule = createVerifyModule();
+  const httpMacroModule = createHttpMacroModule();
+  const dbQueryModule = createDbQueryModule();
+  const optionalModule = createOptionalModule();
+  const restCrudModule = createRestCrudModule();
+  interp.registerModule(verifyModule);        // Phase F-2: AI 코드 자동 검증
+  interp.registerModule(httpMacroModule);    // Phase F-3: HTTP JSON 매크로
+  interp.registerModule(dbQueryModule);      // Phase F-3: DB 쿼리 빌더
+  interp.registerModule(optionalModule);     // Phase F-4: 선택적 npm 브릿지
+  interp.registerModule(restCrudModule);     // Phase F-4: REST CRUD 라우팅
   interp.registerModule(createCaptureErrorModule(   // Phase F-4: 에러 추적 + retry
     (fn, args) => interp.callFunctionValue(fn, args)
   ));
-  interp.registerModule(createCryptoModule());
-  interp.registerModule(createWorkflowModule());
-  interp.registerModule(createResourceModule());
+  const cryptoModule = createCryptoModule();
+  const workflowModule = createWorkflowModule();
+  const resourceModule = createResourceModule();
+  interp.registerModule(cryptoModule);
+  interp.registerModule(workflowModule);
+  interp.registerModule(resourceModule);
   // Phase 4a: Pure HTTP Server — callUserFunction/callFunctionValue 콜백 필요
   interp.registerModule(createHttpServerModule(
     (n: string, a: any[]) => interp.callUserFunction(n, a),
     (fnValue: any, a: any[]) => interp.callFunctionValue(fnValue, a)
   ));
-  interp.registerModule(createDbModule());
-  interp.registerModule(createAuthModule());
-  interp.registerModule(createCacheModule());
+  const dbModule = createDbModule();
+  const authModule = createAuthModule();
+  const cacheModule = createCacheModule();
+  interp.registerModule(dbModule);
+  interp.registerModule(authModule);
+  interp.registerModule(cacheModule);
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
-  interp.registerModule(createProcessModule());  // Phase 22: env_load, on_sigterm
-  interp.registerModule(createModuleSystem());   // Phase 24: module_*, namespace_*
+  const processModule = createProcessModule();
+  const moduleSystem = createModuleSystem();
+  interp.registerModule(processModule);  // Phase 22: env_load, on_sigterm
+  interp.registerModule(moduleSystem);   // Phase 24: module_*, namespace_*
   interp.registerModule(createTestModule(         // Phase 76: deftest, describe, assert-eq, ...
     (fnValue, args) => interp.callFunctionValue(fnValue, args)
   ));
@@ -106,18 +130,34 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createWscModule(
     (n: string, a: any[]) => interp.callUserFunction(n, a)
   ));
-  interp.registerModule(createImageModule());    // Phase A: image_info/resize/thumbnail/convert/watermark/crop
-  interp.registerModule(createMongodbModule()); // Phase A: mongo_connect/find/insert/update/delete/aggregate/transaction
+  const imageModule = createImageModule();
+  const mongodbModule = createMongodbModule();
+  interp.registerModule(imageModule);    // Phase A
+  interp.registerModule(mongodbModule); // Phase A
 
   // Phase G: MISTAKES-100 자동 처리 헬퍼
-  // - smart-map/filter/get/assoc: 인자 순서 자동 감지
-  // - http-get-json / http-post-json / http-status: HTTP 래퍼
-  // - try-call / ok? / unwrap: Result 패턴
-  // - suggest-fn / alias-of / help-text: 에러 추천
-  interp.registerModule(createHelpersModule(
+  const helpersModule = createHelpersModule(
     (fnValue: any, args: any[]) => interp.callFunctionValue(fnValue, args),
     (httpModule as any).http_get
-  ));
+  );
+  interp.registerModule(helpersModule);
+
+  // ─────────────────────────────────────────────────────────────
+  // v11.5.0: 모든 stdlib에 kebab-case alias 자동 등록
+  // 예: str_to_num → str-to-num, json_parse → json-parse
+  // 기존 snake_case 함수는 그대로 작동 (호환성 유지)
+  // ─────────────────────────────────────────────────────────────
+  const aliasSourceModules = [
+    fileModule, fdModule, bitsModule, errorModule, httpModule,
+    shellModule, dataModule, collectionModule, agentModule, timeModule,
+    verifyModule, httpMacroModule, dbQueryModule, optionalModule, restCrudModule,
+    cryptoModule, workflowModule, resourceModule,
+    dbModule, authModule, cacheModule,
+    processModule, moduleSystem,
+    imageModule, mongodbModule,
+    helpersModule,
+  ];
+  interp.registerModule(createKebabAliasesModule(aliasSourceModules));
 
   // ── fl_require builtin 등록 ─────────────────────────────────────
   // (fl_require "audit")   → audit_log 등 즉시 사용 가능

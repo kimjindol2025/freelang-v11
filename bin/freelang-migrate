@@ -236,6 +236,11 @@ function main() {
   freelang-migrate src/                # 미리보기
   freelang-migrate src/ --apply        # 실제 변환 (.v11-backup/ 자동 생성)
   freelang-migrate src/main.fl --apply --no-arg-order
+
+전제 (중요):
+  변환된 kebab-case 코드는 v11.5.0+ 런타임에서 작동합니다.
+  v11.4.x 런타임에서는 변환된 코드가 "Function not found" 에러.
+  → 런타임 버전 확인: node bootstrap.js --version
 `);
     process.exit(args.length === 0 ? 1 : 0);
   }

@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.4.3",
-  "description": "FreeLang v11 — Unified AI-Native Language. [v11.4.3: 100개 재분류 + Phase X(v11.5.1) 로드맵 + freelang-migrate 도구]",
+  "version": "11.5.0",
+  "description": "FreeLang v11 — Unified AI-Native Language. [v11.5.0: stdlib kebab-case alias 자동 등록 (400개) — 진짜 언어 변경 시작]",
   "keywords": [
     "ai",
     "language",
