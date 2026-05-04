@@ -1,72 +1,15 @@
-# Node.js
 node_modules/
-npm-debug.log
-npm-debug.log.*
-yarn-error.log
-pnpm-debug.log
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
+.cache/
+.backup/
+.tmp-*
+*.log
 *.swp
 *.swo
 *~
 .DS_Store
-
-# Build
 dist/
 build/
+.env
+.env.local
 coverage/
-
-# Testing
-.nyc_output/
-*.lcov
-
-# Temporary & Debug Files
-*.tmp
-*.log
-*.out
-temp/
-tmp/
-
-# Benchmark Results (keep locally, not in git)
-benchmark-results.json
-
-# Development artifacts (old/experimental files)
-compiler-*.js
-bootstrap-*.js
-L2_*.js
-codegen-*.js
-cg-*.js
-*.test.js.old
-
-# Documentation artifacts
-BEAUTY_APP_ROADMAP.md
-PROJECT_TEMPLATE.md
-
-# Test files (exclude from gogs push)
-**/*.test.js
-**/*.test.fl
-**/*.spec.js
-**/test-*.js
-/test/
-/tests/
-__tests__/
-ROADMAP_PHASES_8_15.md
-SELF_HOSTING_*.md
-VERIFICATION_REPORT_*.md
-CODE_REVIEW.md
-TRUTH_POLICY.md
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Root clutter
--o
-freelang
+.test-cache/

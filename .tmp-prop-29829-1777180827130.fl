@@ -1,1 +1,0 @@
-(let [[apply (fn [f x] (f x))] [sq (fn [x] (* x x))]] (println (apply sq 9)))
