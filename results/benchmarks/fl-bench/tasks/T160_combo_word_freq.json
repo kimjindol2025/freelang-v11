@@ -1,1 +1,0 @@
-{"id":"T160_combo_word_freq","category":"data-transform","difficulty":"hard","prompt":"\"hello world hello\" 단어 빈도 — \"hello\"가 2번. (filter + length)","validation":{"type":"stdout_contains","expected":"2"},"reference_solution":"(println (length (filter (fn [w] (= w \"hello\")) (str-split \"hello world hello\" \" \"))))","tags":["frequency","filter"]}

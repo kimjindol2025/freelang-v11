@@ -1,9 +1,0 @@
-{
-  "id": "T47_avg_score",
-  "category": "data-transform",
-  "difficulty": "hard",
-  "prompt": "점수 리스트 [80 90 70 85 95]의 평균(84)을 계산해 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "84" },
-  "reference_solution": "(let [[scores (list 80 90 70 85 95)] [total (reduce (fn [a b] (+ a b)) 0 scores)]] (println (/ total (length scores))))",
-  "tags": ["reduce", "let", "average"]
-}

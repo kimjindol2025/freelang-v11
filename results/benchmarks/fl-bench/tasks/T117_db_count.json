@@ -1,9 +1,0 @@
-{
-  "id": "T117_db_count",
-  "category": "db",
-  "difficulty": "easy",
-  "prompt": "테이블 [{:age 18} {:age 25} {:age 17} {:age 30}]에서 성인(>=18) row 갯수 (3) 출력.",
-  "validation": { "type": "stdout_contains", "expected": "3" },
-  "reference_solution": "(println (length (filter (fn [r] (>= (get r :age) 18)) (list {:age 18} {:age 25} {:age 17} {:age 30}))))",
-  "tags": ["db", "filter", "count"]
-}

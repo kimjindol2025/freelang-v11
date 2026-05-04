@@ -1,9 +1,0 @@
-{
-  "id": "T57_math_abs",
-  "category": "math",
-  "difficulty": "easy",
-  "prompt": "-7의 절대값(7)을 출력.",
-  "validation": { "type": "stdout_contains", "expected": "7" },
-  "reference_solution": "(println (abs -7))",
-  "tags": ["abs"]
-}

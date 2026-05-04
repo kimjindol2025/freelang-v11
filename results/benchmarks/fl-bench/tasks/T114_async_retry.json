@@ -1,9 +1,0 @@
-{
-  "id": "T114_async_retry",
-  "category": "async",
-  "difficulty": "hard",
-  "prompt": "재시도 시뮬레이션: try-once는 50% 확률 실패 (시뮬레이션 위해 항상 success). N번 재시도해서 결과 카운트. (count-success 5)는 5 출력.",
-  "validation": { "type": "stdout_contains", "expected": "5" },
-  "reference_solution": "(defn try-once [] true)\n(defn count-success [n] (reduce (fn [acc _] (if (try-once) (+ acc 1) acc)) 0 (range 0 n)))\n(println (count-success 5))",
-  "tags": ["retry", "reduce", "range"]
-}

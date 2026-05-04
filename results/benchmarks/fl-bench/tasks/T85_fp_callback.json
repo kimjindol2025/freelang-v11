@@ -1,9 +1,0 @@
-{
-  "id": "T85_fp_callback",
-  "category": "functional",
-  "difficulty": "easy",
-  "prompt": "함수 process는 [x cb]를 받고 (cb (* x 2))를 호출. (process 5 (fn [r] r)) → 10. 결과 출력.",
-  "validation": { "type": "stdout_contains", "expected": "10" },
-  "reference_solution": "(defn process [x cb] (cb (* x 2)))\n(println (process 5 (fn [r] r)))",
-  "tags": ["callback", "fn"]
-}

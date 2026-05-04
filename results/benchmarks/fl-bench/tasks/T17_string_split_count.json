@@ -1,9 +1,0 @@
-{
-  "id": "T17_string_split_count",
-  "category": "string",
-  "difficulty": "easy",
-  "prompt": "문자열 \"a,b,c,d,e\"를 쉼표로 분리한 후 갯수(5)를 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "5" },
-  "reference_solution": "(println (length (str-split \"a,b,c,d,e\" \",\")))",
-  "tags": ["split", "length"]
-}

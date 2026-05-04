@@ -1,9 +1,0 @@
-{
-  "id": "T40_threading_first",
-  "category": "higher-order",
-  "difficulty": "medium",
-  "prompt": "-> 매크로(thread-first)를 사용해 100을 시작으로 (- 50), (* 2), (+ 1) 순서로 적용한 결과(101)를 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "101" },
-  "reference_solution": "(println (-> 100 (- 50) (* 2) (+ 1)))",
-  "tags": ["thread-first", "->"]
-}

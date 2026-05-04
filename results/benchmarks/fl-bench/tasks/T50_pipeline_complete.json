@@ -1,9 +1,0 @@
-{
-  "id": "T50_pipeline_complete",
-  "category": "data-transform",
-  "difficulty": "hard",
-  "prompt": "사용자 [{:name \"a\" :age 20 :score 90} {:name \"b\" :age 17 :score 85} {:name \"c\" :age 25 :score 70}] 중 18+ 성인의 점수만 더한 합계(160)를 출력하세요. (90+70=160)",
-  "validation": { "type": "stdout_contains", "expected": "160" },
-  "reference_solution": "(let [[users (list {:name \"a\" :age 20 :score 90} {:name \"b\" :age 17 :score 85} {:name \"c\" :age 25 :score 70})] [adults (filter (fn [u] (>= (get u :age) 18)) users)] [scores (map (fn [u] (get u :score)) adults)]] (println (reduce (fn [a b] (+ a b)) 0 scores)))",
-  "tags": ["filter", "map", "reduce", "let", "pipeline"]
-}

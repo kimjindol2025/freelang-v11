@@ -1,9 +1,0 @@
-{
-  "id": "T26_file_write_read",
-  "category": "file-io",
-  "difficulty": "easy",
-  "prompt": "임시 파일 \"/tmp/fl-bench-t26.txt\"에 \"hello\"를 쓰고, 다시 읽어서 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "hello" },
-  "reference_solution": "(file_write \"/tmp/fl-bench-t26.txt\" \"hello\")\n(println (file_read \"/tmp/fl-bench-t26.txt\"))",
-  "tags": ["file_write", "file_read"]
-}

@@ -1,1 +1,0 @@
-{"id":"T138_data_top3","category":"data-transform","difficulty":"hard","prompt":"점수 [85 70 95 80 60 90]에서 상위 3개의 합 (95+90+85=270). sort + take.","validation":{"type":"stdout_contains","expected":"270"},"reference_solution":"(println (reduce + 0 (take 3 (reverse (sort (list 85 70 95 80 60 90))))))","tags":["sort","take","top-n"]}

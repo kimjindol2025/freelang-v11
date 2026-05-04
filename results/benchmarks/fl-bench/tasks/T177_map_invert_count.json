@@ -1,1 +1,0 @@
-{"id":"T177_map_invert_count","category":"map","difficulty":"medium","prompt":"맵 {:a 1 :b 2 :c 3}의 entries 리스트 길이(3).","validation":{"type":"stdout_contains","expected":"3"},"reference_solution":"(println (length (map_entries {:a 1 :b 2 :c 3})))","tags":["map_entries"]}

@@ -1,9 +1,0 @@
-{
-  "id": "T24_json_parse",
-  "category": "json",
-  "difficulty": "medium",
-  "prompt": "JSON 문자열 \"{\\\"x\\\":42}\"를 파싱해서 :x 값(42)을 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "42" },
-  "reference_solution": "(println (get (json_parse \"{\\\"x\\\":42}\") :x))",
-  "tags": ["json_parse", "get"]
-}

@@ -1,9 +1,0 @@
-{
-  "id": "T98_combo_squares_sum",
-  "category": "algorithm",
-  "difficulty": "medium",
-  "prompt": "1²+2²+3²+...+10²=385을 reduce + range로 계산해 출력.",
-  "validation": { "type": "stdout_contains", "expected": "385" },
-  "reference_solution": "(println (reduce (fn [acc n] (+ acc (* n n))) 0 (range 1 11)))",
-  "tags": ["reduce", "range", "sum-squares"]
-}

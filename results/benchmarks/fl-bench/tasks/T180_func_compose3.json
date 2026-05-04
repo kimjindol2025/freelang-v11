@@ -1,1 +1,0 @@
-{"id":"T180_func_compose3","category":"functional","difficulty":"hard","prompt":"f = comp inc double inc. (f 5) → ((5+1)*2+1) = 13.","validation":{"type":"stdout_contains","expected":"13"},"reference_solution":"(let [[f (comp (fn [x] (+ x 1)) (fn [x] (* x 2)) (fn [x] (+ x 1)))]] (println (f 5)))","tags":["comp"]}

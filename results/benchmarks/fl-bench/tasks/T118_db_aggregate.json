@@ -1,9 +1,0 @@
-{
-  "id": "T118_db_aggregate",
-  "category": "db",
-  "difficulty": "medium",
-  "prompt": "주문 [{:price 100} {:price 200} {:price 50}]의 총 가격(350) 출력.",
-  "validation": { "type": "stdout_contains", "expected": "350" },
-  "reference_solution": "(println (reduce + 0 (map (fn [r] (get r :price)) (list {:price 100} {:price 200} {:price 50}))))",
-  "tags": ["db", "aggregate", "sum"]
-}

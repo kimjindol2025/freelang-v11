@@ -1,9 +1,0 @@
-{
-  "id": "T28_file_lines_count",
-  "category": "file-io",
-  "difficulty": "medium",
-  "prompt": "파일 \"/tmp/fl-bench-t28.txt\"에 3줄을 쓴 후 (\"line1\\nline2\\nline3\"), 다시 읽어 줄 수(3)를 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "3" },
-  "reference_solution": "(file_write \"/tmp/fl-bench-t28.txt\" \"line1\\nline2\\nline3\")\n(println (length (str-split (file_read \"/tmp/fl-bench-t28.txt\") \"\\n\")))",
-  "tags": ["file_write", "file_read", "str-split"]
-}

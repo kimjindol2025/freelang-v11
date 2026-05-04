@@ -1,9 +1,0 @@
-{
-  "id": "T54_regex_split",
-  "category": "regex",
-  "difficulty": "medium",
-  "prompt": "\"a1b22c333\"를 숫자 패턴 \\\\d+로 분할 후 결과 길이를 출력 (4: a, b, c, '').",
-  "validation": { "type": "stdout_contains", "expected": "4" },
-  "reference_solution": "(println (length (regex_split \"a1b22c333\" \"\\\\d+\")))",
-  "tags": ["regex_split", "length"]
-}

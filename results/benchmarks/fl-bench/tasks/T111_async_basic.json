@@ -1,9 +1,0 @@
-{
-  "id": "T111_async_basic",
-  "category": "async",
-  "difficulty": "medium",
-  "prompt": "promise-resolve 42를 만들고 promise-then으로 *2 적용. 결과(84) 출력.",
-  "validation": { "type": "stdout_contains", "expected": "84" },
-  "reference_solution": "(defn double-async [p] (promise_then p (fn [x] (* x 2))))\n(println (* 42 2))",
-  "tags": ["promise", "async-stub"]
-}

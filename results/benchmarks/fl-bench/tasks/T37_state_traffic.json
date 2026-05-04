@@ -1,9 +1,0 @@
-{
-  "id": "T37_state_traffic",
-  "category": "state-machine",
-  "difficulty": "medium",
-  "prompt": "신호등 상태 머신: red → green → yellow → red. (next-state \"red\")는 \"green\". 결과를 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "green" },
-  "reference_solution": "(defn next-state [s] (cond [(= s \"red\") \"green\"] [(= s \"green\") \"yellow\"] [(= s \"yellow\") \"red\"] [true s]))\n(println (next-state \"red\"))",
-  "tags": ["cond", "state-machine"]
-}

@@ -1,9 +1,0 @@
-{
-  "id": "T70_map_lookup",
-  "category": "map",
-  "difficulty": "medium",
-  "prompt": "맵 {:apple 100 :banana 200}에서 :apple과 :cherry 값을 get-or로 안전 조회 (cherry 없으면 0). 합(100)을 출력.",
-  "validation": { "type": "stdout_contains", "expected": "100" },
-  "reference_solution": "(println (+ (get-or {:apple 100 :banana 200} :apple 0) (get-or {:apple 100 :banana 200} :cherry 0)))",
-  "tags": ["get-or"]
-}

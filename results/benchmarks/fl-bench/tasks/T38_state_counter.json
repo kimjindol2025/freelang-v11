@@ -1,9 +1,0 @@
-{
-  "id": "T38_state_counter",
-  "category": "state-machine",
-  "difficulty": "medium",
-  "prompt": "카운터 상태 머신. 초기 {:count 0}에 inc 이벤트 적용 후 :count 값(1)을 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "1" },
-  "reference_solution": "(defn apply-event [state event] (cond [(= event :inc) {:count (+ (get state :count) 1)}] [(= event :reset) {:count 0}] [true state]))\n(println (get (apply-event {:count 0} :inc) :count))",
-  "tags": ["state-machine", "map", "cond"]
-}

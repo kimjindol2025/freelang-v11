@@ -1,9 +1,0 @@
-{
-  "id": "T126_list_partition",
-  "category": "list",
-  "difficulty": "medium",
-  "prompt": "(list 1 2 3 4 5 6)을 짝수와 홀수로 분리. 짝수 갯수(3) 출력.",
-  "validation": { "type": "stdout_contains", "expected": "3" },
-  "reference_solution": "(println (length (filter (fn [x] (= 0 (% x 2))) (list 1 2 3 4 5 6))))",
-  "tags": ["partition", "filter"]
-}

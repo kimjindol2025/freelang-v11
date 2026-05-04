@@ -1,9 +1,0 @@
-{
-  "id": "T31_error_try_catch",
-  "category": "error-handling",
-  "difficulty": "medium",
-  "prompt": "fl-try로 (throw \"my-error\") 결과를 받고, message에서 \"my-error\"가 포함되는지 확인. fl-try 결과를 println으로 출력하세요. (Result 객체에 my-error 포함되어야 함)",
-  "validation": { "type": "stdout_contains", "expected": "my-error" },
-  "reference_solution": "(println (fl-try (throw \"my-error\")))",
-  "tags": ["fl-try", "throw", "Result"]
-}

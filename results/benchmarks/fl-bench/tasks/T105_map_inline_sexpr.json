@@ -1,9 +1,0 @@
-{
-  "id": "T105_map_inline_sexpr",
-  "category": "map",
-  "difficulty": "hard",
-  "prompt": "make-user 함수: name과 age 받아서 {:name name :age age :greeting (str \"Hello, \" name)} 반환. (make-user \"Alice\" 25)에서 greeting 부분에 \"Hello, Alice\" 포함 출력.",
-  "validation": { "type": "stdout_contains", "expected": "Hello, Alice" },
-  "reference_solution": "(defn make-user [name age] {:name name :age age :greeting (str \"Hello, \" name)})\n(println (make-user \"Alice\" 25))",
-  "tags": ["map-literal", "inline-sexpr", "defn"]
-}

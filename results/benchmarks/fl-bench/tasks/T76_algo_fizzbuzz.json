@@ -1,9 +1,0 @@
-{
-  "id": "T76_algo_fizzbuzz",
-  "category": "algorithm",
-  "difficulty": "medium",
-  "prompt": "FizzBuzz: n을 받아 3의 배수면 \"Fizz\", 5의 배수면 \"Buzz\", 둘 다면 \"FizzBuzz\", 그 외엔 n. (fizzbuzz 15) → \"FizzBuzz\".",
-  "validation": { "type": "stdout_contains", "expected": "FizzBuzz" },
-  "reference_solution": "(defn fizzbuzz [n] (cond [(= 0 (% n 15)) \"FizzBuzz\"] [(= 0 (% n 3)) \"Fizz\"] [(= 0 (% n 5)) \"Buzz\"] [true n]))\n(println (fizzbuzz 15))",
-  "tags": ["cond", "fizzbuzz"]
-}

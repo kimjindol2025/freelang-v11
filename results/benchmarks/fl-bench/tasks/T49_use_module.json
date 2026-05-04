@@ -1,9 +1,0 @@
-{
-  "id": "T49_use_module",
-  "category": "module",
-  "difficulty": "easy",
-  "prompt": "(use json) 으로 self/stdlib/json.fl을 가져온 후 (json_keys {:a 1 :b 2})로 키 갯수(2)를 출력하세요. (이미 import 없이 가능하지만 use 구문 동작 확인)",
-  "validation": { "type": "stdout_contains", "expected": "2" },
-  "reference_solution": "(use json)\n(println (length (json_keys {:a 1 :b 2})))",
-  "tags": ["use", "module"]
-}

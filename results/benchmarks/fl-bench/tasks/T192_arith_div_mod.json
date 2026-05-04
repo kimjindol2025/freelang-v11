@@ -1,1 +1,0 @@
-{"id":"T192_arith_div_mod","category":"arithmetic","difficulty":"easy","prompt":"23 / 5 = 4 나머지 3. (println (% 23 5))","validation":{"type":"stdout_contains","expected":"3"},"reference_solution":"(println (% 23 5))","tags":["modulo"]}

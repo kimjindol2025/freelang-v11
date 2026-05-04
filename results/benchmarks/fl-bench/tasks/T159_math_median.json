@@ -1,1 +1,0 @@
-{"id":"T159_math_median","category":"math","difficulty":"medium","prompt":"(list 3 1 4 1 5 9 2 6) 정렬 후 가운데 두 값(3,4) 평균 → median 3 또는 4. 중간 인덱스 4 위치 값 출력.","validation":{"type":"stdout_contains","expected":"4"},"reference_solution":"(let [[xs (sort (list 3 1 4 1 5 9 2 6))]] (println (get xs (/ (length xs) 2))))","tags":["median","sort"]}

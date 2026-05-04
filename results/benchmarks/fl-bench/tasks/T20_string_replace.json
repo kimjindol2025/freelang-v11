@@ -1,9 +1,0 @@
-{
-  "id": "T20_string_replace",
-  "category": "string",
-  "difficulty": "easy",
-  "prompt": "문자열 \"hello world\"에서 \"world\"를 \"FreeLang\"으로 치환해 출력하세요. \"hello FreeLang\".",
-  "validation": { "type": "stdout_contains", "expected": "hello FreeLang" },
-  "reference_solution": "(println (replace \"hello world\" \"world\" \"FreeLang\"))",
-  "tags": ["replace"]
-}

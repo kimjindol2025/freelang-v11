@@ -1,9 +1,0 @@
-{
-  "id": "T104_nested_map_3deep",
-  "category": "map",
-  "difficulty": "hard",
-  "prompt": "3단 중첩 맵 {:inner {:deep {:val 42}}}을 만들고 :val (42)를 추출 출력. let bind 사용.",
-  "validation": { "type": "stdout_contains", "expected": "42" },
-  "reference_solution": "(let [[outer {:inner {:deep {:val 42}}}]] (println (get (get (get outer :inner) :deep) :val)))",
-  "tags": ["map-nested", "let", "get"]
-}

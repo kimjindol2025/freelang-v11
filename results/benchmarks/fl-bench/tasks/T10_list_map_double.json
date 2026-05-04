@@ -1,9 +1,0 @@
-{
-  "id": "T10_list_map_double",
-  "category": "list",
-  "difficulty": "easy",
-  "prompt": "리스트 [1 2 3]의 모든 원소를 2배로 만들어 출력하세요. [2 4 6] 형태.",
-  "validation": { "type": "stdout_regex", "expected": "2\\D+4\\D+6" },
-  "reference_solution": "(println (map (fn [x] (* x 2)) (list 1 2 3)))",
-  "tags": ["map"]
-}

@@ -1,1 +1,0 @@
-{"id":"T165_higher_inc_n","category":"higher-order","difficulty":"medium","prompt":"inc 함수를 5번 적용. (apply-n inc 5 0) → 5.","validation":{"type":"stdout_contains","expected":"5"},"reference_solution":"(defn apply-n [f n x] (if (<= n 0) x (apply-n f (- n 1) (f x))))\n(println (apply-n (fn [n] (+ n 1)) 5 0))","tags":["higher-order","recursion"]}

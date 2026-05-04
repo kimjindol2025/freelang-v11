@@ -1,9 +1,0 @@
-{
-  "id": "T119_db_group_count",
-  "category": "db",
-  "difficulty": "hard",
-  "prompt": "사용자 [{:name \"a\" :role \"admin\"} {:name \"b\" :role \"user\"} {:name \"c\" :role \"admin\"}]에서 admin 갯수(2) 출력.",
-  "validation": { "type": "stdout_contains", "expected": "2" },
-  "reference_solution": "(println (length (filter (fn [u] (= (get u :role) \"admin\")) (list {:name \"a\" :role \"admin\"} {:name \"b\" :role \"user\"} {:name \"c\" :role \"admin\"}))))",
-  "tags": ["db", "group-by"]
-}

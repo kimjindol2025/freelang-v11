@@ -1,1 +1,0 @@
-{"id":"T185_data_normalize","category":"data-transform","difficulty":"medium","prompt":"(list 5 10 15)을 max로 나눈 비율 (1.0). 마지막 값(1)/3 → 1.","validation":{"type":"stdout_contains","expected":"1"},"reference_solution":"(let [[xs (list 5 10 15)] [m (reduce (fn [a b] (if (> a b) a b)) 0 xs)]] (println (/ m m)))","tags":["normalize","reduce"]}

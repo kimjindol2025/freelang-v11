@@ -1,9 +1,0 @@
-{
-  "id": "T78_algo_isprime",
-  "category": "algorithm",
-  "difficulty": "hard",
-  "prompt": "소수 판별: n이 소수인지 검사. (prime? 7) → true, (prime? 9) → false. 두 결과 출력.",
-  "validation": { "type": "stdout_regex", "expected": "true[\\s\\S]+false" },
-  "reference_solution": "(defn divides? [n k] (if (>= k n) false (if (= 0 (% n k)) true (divides? n (+ k 1)))))\n(defn prime? [n] (if (< n 2) false (not (divides? n 2))))\n(println (prime? 7))\n(println (prime? 9))",
-  "tags": ["recursion", "prime"]
-}

@@ -1,1 +1,0 @@
-{"id":"T152_func_curry","category":"functional","difficulty":"medium","prompt":"add-to-3 = (curry 3). (add-to-3 7) → 10. (closure)","validation":{"type":"stdout_contains","expected":"10"},"reference_solution":"(defn make-adder [a] (fn [b] (+ a b)))\n(let [[add-to-3 (make-adder 3)]] (println (add-to-3 7)))","tags":["closure","curry"]}

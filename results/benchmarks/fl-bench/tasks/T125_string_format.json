@@ -1,9 +1,0 @@
-{
-  "id": "T125_string_format",
-  "category": "string",
-  "difficulty": "easy",
-  "prompt": "이름 \"Alice\"와 나이 30을 \"Alice (30)\" 형태로 출력 (str 사용).",
-  "validation": { "type": "stdout_contains", "expected": "Alice (30)" },
-  "reference_solution": "(println (str \"Alice\" \" (\" 30 \")\"))",
-  "tags": ["str", "format"]
-}

@@ -1,9 +1,0 @@
-{
-  "id": "T120_db_update",
-  "category": "db",
-  "difficulty": "hard",
-  "prompt": "row {:name \"Alice\" :age 25}에서 age를 26으로 update한 새 row의 age(26) 출력. (immutable update — json_set 또는 merge)",
-  "validation": { "type": "stdout_contains", "expected": "26" },
-  "reference_solution": "(println (get (json_set {:name \"Alice\" :age 25} \"age\" 26) :age))",
-  "tags": ["db-update", "immutable", "json_set"]
-}

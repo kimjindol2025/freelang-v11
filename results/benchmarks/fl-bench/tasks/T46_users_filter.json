@@ -1,9 +1,0 @@
-{
-  "id": "T46_users_filter",
-  "category": "data-transform",
-  "difficulty": "hard",
-  "prompt": "사용자 리스트 [{:name \"Alice\" :age 25} {:name \"Bob\" :age 17} {:name \"Charlie\" :age 30}]에서 18세 이상 성인의 이름만 추출해 출력하세요. Alice와 Charlie 포함.",
-  "validation": { "type": "stdout_regex", "expected": "Alice[\\s\\S]*Charlie|Charlie[\\s\\S]*Alice" },
-  "reference_solution": "(println (map (fn [u] (get u :name)) (filter (fn [u] (>= (get u :age) 18)) (list {:name \"Alice\" :age 25} {:name \"Bob\" :age 17} {:name \"Charlie\" :age 30}))))",
-  "tags": ["map", "filter", "get", "users"]
-}

@@ -1,9 +1,0 @@
-{
-  "id": "T88_data_sum_by",
-  "category": "data-transform",
-  "difficulty": "medium",
-  "prompt": "주문 [{:price 100} {:price 50} {:price 25}]의 총 가격(175)을 출력.",
-  "validation": { "type": "stdout_contains", "expected": "175" },
-  "reference_solution": "(println (reduce (fn [acc o] (+ acc (get o :price))) 0 (list {:price 100} {:price 50} {:price 25})))",
-  "tags": ["reduce", "get"]
-}

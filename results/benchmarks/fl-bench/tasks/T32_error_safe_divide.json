@@ -1,9 +1,0 @@
-{
-  "id": "T32_error_safe_divide",
-  "category": "error-handling",
-  "difficulty": "medium",
-  "prompt": "두 숫자를 받아 나누되, 분모가 0이면 \"error\"를 반환하는 safe-div 함수를 정의하세요. (safe-div 10 2) → 5, (safe-div 10 0) → \"error\". 두 결과를 한 줄씩 출력하세요.",
-  "validation": { "type": "stdout_regex", "expected": "5[\\s\\S]*error" },
-  "reference_solution": "(defn safe-div [a b] (if (= b 0) \"error\" (/ a b)))\n(println (safe-div 10 2))\n(println (safe-div 10 0))",
-  "tags": ["if", "div", "error"]
-}

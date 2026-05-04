@@ -1,9 +1,0 @@
-{
-  "id": "T61_list_sort",
-  "category": "list",
-  "difficulty": "easy",
-  "prompt": "리스트 [3 1 4 1 5 9 2 6]을 정렬해 출력. 1로 시작.",
-  "validation": { "type": "stdout_regex", "expected": "1.*9" },
-  "reference_solution": "(println (sort (list 3 1 4 1 5 9 2 6)))",
-  "tags": ["sort"]
-}

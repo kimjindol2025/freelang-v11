@@ -1,9 +1,0 @@
-{
-  "id": "T59_math_sqrt",
-  "category": "math",
-  "difficulty": "easy",
-  "prompt": "144의 제곱근(12)을 출력.",
-  "validation": { "type": "stdout_contains", "expected": "12" },
-  "reference_solution": "(println (sqrt 144))",
-  "tags": ["sqrt"]
-}

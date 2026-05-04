@@ -1,1 +1,0 @@
-{"id":"T171_arith_fib_iter","category":"arithmetic","difficulty":"medium","prompt":"fib 10 (55) — reduce + range로 반복 계산.","validation":{"type":"stdout_contains","expected":"55"},"reference_solution":"(defn fib-iter [n] (get (reduce (fn [acc _] (list (get acc 1) (+ (get acc 0) (get acc 1)))) (list 0 1) (range 0 n)) 0))\n(println (fib-iter 10))","tags":["fib","iter"]}

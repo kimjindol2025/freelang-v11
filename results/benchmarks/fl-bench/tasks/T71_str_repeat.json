@@ -1,9 +1,0 @@
-{
-  "id": "T71_str_repeat",
-  "category": "string",
-  "difficulty": "easy",
-  "prompt": "문자열 \"ab\"를 3번 반복해 출력 (ababab).",
-  "validation": { "type": "stdout_contains", "expected": "ababab" },
-  "reference_solution": "(println (str_repeat \"ab\" 3))",
-  "tags": ["str_repeat"]
-}

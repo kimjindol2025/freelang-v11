@@ -1,1 +1,0 @@
-{"id":"T156_json_path","category":"json","difficulty":"hard","prompt":"중첩 {:user {:profile {:age 25}}}에서 user.profile.age 추출 (25).","validation":{"type":"stdout_contains","expected":"25"},"reference_solution":"(println (get (get (get {:user {:profile {:age 25}}} :user) :profile) :age))","tags":["json-path","nested"]}

@@ -1,1 +1,0 @@
-{"id":"T178_combo_cleanup","category":"data-transform","difficulty":"hard","prompt":"문자열 list [\"  a  \" \"\" \"b\" \"\"]에서 trim + 빈 문자열 제거 후 갯수(2: a,b).","validation":{"type":"stdout_contains","expected":"2"},"reference_solution":"(println (length (filter (fn [s] (> (length s) 0)) (map (fn [s] (trim s)) (list \"  a  \" \"\" \"b\" \"\")))))","tags":["trim","filter","cleanup"]}

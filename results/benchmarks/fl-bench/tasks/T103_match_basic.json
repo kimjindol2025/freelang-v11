@@ -1,9 +1,0 @@
-{
-  "id": "T103_match_basic",
-  "category": "pattern-match",
-  "difficulty": "medium",
-  "prompt": "match로 0→\"zero\", 1→\"one\", 2→\"two\", 그 외 → \"many\". (classify 2)는 \"two\". 결과 출력.",
-  "validation": { "type": "stdout_contains", "expected": "two" },
-  "reference_solution": "(defn classify [n] (match n (0 \"zero\") (1 \"one\") (2 \"two\") (default \"many\")))\n(println (classify 2))",
-  "tags": ["match"]
-}

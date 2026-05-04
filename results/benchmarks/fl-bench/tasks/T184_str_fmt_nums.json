@@ -1,1 +1,0 @@
-{"id":"T184_str_fmt_nums","category":"string","difficulty":"easy","prompt":"숫자 [1 2 3]을 \"-\"로 join. \"1-2-3\".","validation":{"type":"stdout_contains","expected":"1-2-3"},"reference_solution":"(println (str_join \"-\" (list 1 2 3)))","tags":["str_join"]}

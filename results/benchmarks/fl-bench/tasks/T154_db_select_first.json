@@ -1,1 +1,0 @@
-{"id":"T154_db_select_first","category":"db","difficulty":"easy","prompt":"테이블 [{:id 1} {:id 2} {:id 3}]의 첫 row :id (1) 출력.","validation":{"type":"stdout_contains","expected":"1"},"reference_solution":"(println (get (first (list {:id 1} {:id 2} {:id 3})) :id))","tags":["db","first"]}

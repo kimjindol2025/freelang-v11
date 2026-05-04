@@ -1,9 +1,0 @@
-{
-  "id": "T29_file_append",
-  "category": "file-io",
-  "difficulty": "medium",
-  "prompt": "파일 \"/tmp/fl-bench-t29.txt\"에 \"foo\"를 쓰고 다시 \"bar\"를 추가한 후 전체 내용 \"foobar\"를 읽어 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "foobar" },
-  "reference_solution": "(file_write \"/tmp/fl-bench-t29.txt\" \"foo\")\n(file_append \"/tmp/fl-bench-t29.txt\" \"bar\")\n(println (file_read \"/tmp/fl-bench-t29.txt\"))",
-  "tags": ["file_write", "file_append"]
-}

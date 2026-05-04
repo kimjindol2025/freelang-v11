@@ -1,9 +1,0 @@
-{
-  "id": "T121_collection_zip",
-  "category": "list",
-  "difficulty": "medium",
-  "prompt": "두 리스트 (1 2 3)와 (a b c)를 같은 인덱스로 짝지어 [(1 \"a\") (2 \"b\") (3 \"c\")] 같은 결과의 길이(3)를 출력. (range + map 사용)",
-  "validation": { "type": "stdout_contains", "expected": "3" },
-  "reference_solution": "(let [[as (list 1 2 3)] [bs (list \"a\" \"b\" \"c\")]] (println (length (map (fn [i] (list (get as i) (get bs i))) (range 0 3)))))",
-  "tags": ["zip", "map", "range"]
-}

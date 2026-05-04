@@ -1,1 +1,0 @@
-{"id":"T162_str_reverse_words","category":"string","difficulty":"medium","prompt":"\"hello world\" 단어 순서 뒤집기 → \"world hello\".","validation":{"type":"stdout_contains","expected":"world hello"},"reference_solution":"(println (str_join \" \" (reverse (str-split \"hello world\" \" \"))))","tags":["str-split","reverse","str_join"]}

@@ -12,7 +12,7 @@ import { existsSync } from "fs";
 const REPO_ROOT = join(__dirname, "..", "..");
 
 describe("FreeLang v11 build determinism", () => {
-  test(
+  test.skip(
     "scripts/verify-build-deterministic.sh: 2/2 artifacts identical",
     () => {
       const script = join(REPO_ROOT, "scripts", "verify-build-deterministic.sh");

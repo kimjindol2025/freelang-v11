@@ -1,1 +1,0 @@
-{"id":"T174_data_max_score","category":"data-transform","difficulty":"hard","prompt":"users [{:s 80} {:s 95} {:s 70}]의 최고 점수(95).","validation":{"type":"stdout_contains","expected":"95"},"reference_solution":"(println (reduce (fn [a b] (if (> a b) a b)) 0 (map (fn [u] (get u :s)) (list {:s 80} {:s 95} {:s 70}))))","tags":["max-by"]}

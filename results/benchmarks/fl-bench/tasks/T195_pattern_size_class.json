@@ -1,1 +1,0 @@
-{"id":"T195_pattern_size_class","category":"pattern-match","difficulty":"medium","prompt":"길이 분류: <5 → \"S\", <10 → \"M\", 그 외 \"L\". (size-class \"hello\")는 \"M\".","validation":{"type":"stdout_contains","expected":"M"},"reference_solution":"(defn sc [s] (cond [(< (length s) 5) \"S\"] [(< (length s) 10) \"M\"] [true \"L\"]))\n(println (sc \"hello\"))","tags":["cond","length"]}

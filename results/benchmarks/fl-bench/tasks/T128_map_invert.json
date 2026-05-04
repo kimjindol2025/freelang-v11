@@ -1,9 +1,0 @@
-{
-  "id": "T128_map_invert",
-  "category": "map",
-  "difficulty": "hard",
-  "prompt": "맵 {:a 1 :b 2}의 값(2)을 키로 변환한 새 맵에서 :2가 \"b\"인지 확인. (간단 검증: 값 2가 맵 안에 있는지) → 결과: true",
-  "validation": { "type": "stdout_contains", "expected": "true" },
-  "reference_solution": "(println (not (= -1 (index-of (json_vals {:a 1 :b 2}) 2))))",
-  "tags": ["map", "json_vals"]
-}

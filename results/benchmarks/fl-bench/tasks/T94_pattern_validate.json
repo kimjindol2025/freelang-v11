@@ -1,9 +1,0 @@
-{
-  "id": "T94_pattern_validate",
-  "category": "pattern-match",
-  "difficulty": "hard",
-  "prompt": "사용자 데이터 검증: {:name \"Alice\" :age 25}이 (1) :name이 string? (2) :age가 number?면 valid. valid? 함수 정의 후 결과 출력 (true).",
-  "validation": { "type": "stdout_contains", "expected": "true" },
-  "reference_solution": "(defn valid? [u] (and (string? (get u :name)) (number? (get u :age))))\n(println (valid? {:name \"Alice\" :age 25}))",
-  "tags": ["and", "predicate"]
-}

@@ -1,9 +1,0 @@
-{
-  "id": "T93_state_session",
-  "category": "state-machine",
-  "difficulty": "medium",
-  "prompt": "세션 상태: 초기 {:logged-in false :user nil}에 :login 이벤트로 (apply state :login \"alice\") 호출 → {:logged-in true :user \"alice\"}. :user 값(alice) 출력.",
-  "validation": { "type": "stdout_contains", "expected": "alice" },
-  "reference_solution": "(defn apply-event [s e v] (cond [(= e :login) {:logged-in true :user v}] [(= e :logout) {:logged-in false :user nil}] [true s]))\n(println (get (apply-event {:logged-in false :user nil} :login \"alice\") :user))",
-  "tags": ["state-machine", "map", "cond"]
-}

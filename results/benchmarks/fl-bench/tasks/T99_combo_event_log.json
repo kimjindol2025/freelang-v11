@@ -1,9 +1,0 @@
-{
-  "id": "T99_combo_event_log",
-  "category": "data-transform",
-  "difficulty": "hard",
-  "prompt": "이벤트 로그 [{:type :error :msg \"e1\"} {:type :info :msg \"i1\"} {:type :error :msg \"e2\"}]에서 :error 타입만 필터하여 갯수(2)를 출력.",
-  "validation": { "type": "stdout_contains", "expected": "2" },
-  "reference_solution": "(println (length (filter (fn [e] (= (get e :type) :error)) (list {:type :error :msg \"e1\"} {:type :info :msg \"i1\"} {:type :error :msg \"e2\"}))))",
-  "tags": ["filter", "get", "keyword"]
-}

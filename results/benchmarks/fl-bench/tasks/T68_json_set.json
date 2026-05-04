@@ -1,9 +1,0 @@
-{
-  "id": "T68_json_set",
-  "category": "map",
-  "difficulty": "medium",
-  "prompt": "맵 {:a 1}에 :b 키로 99를 set한 후 :b 값(99)을 출력.",
-  "validation": { "type": "stdout_contains", "expected": "99" },
-  "reference_solution": "(println (get (json_set {:a 1} \"b\" 99) :b))",
-  "tags": ["json_set", "get"]
-}

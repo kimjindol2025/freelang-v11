@@ -1,1 +1,0 @@
-{"id":"T136_pred_any","category":"list","difficulty":"medium","prompt":"(list 1 3 5 8)에 짝수 있나? true 출력.","validation":{"type":"stdout_contains","expected":"true"},"reference_solution":"(println (> (length (filter (fn [x] (= 0 (% x 2))) (list 1 3 5 8))) 0))","tags":["any?","filter"]}

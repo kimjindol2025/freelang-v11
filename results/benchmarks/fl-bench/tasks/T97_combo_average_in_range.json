@@ -1,9 +1,0 @@
-{
-  "id": "T97_combo_average_in_range",
-  "category": "data-transform",
-  "difficulty": "hard",
-  "prompt": "(range 1 11)의 평균(5.5)을 계산해 출력. (sum 55 / length 10)",
-  "validation": { "type": "stdout_contains", "expected": "5.5" },
-  "reference_solution": "(let [[xs (range 1 11)] [s (reduce (fn [a b] (+ a b)) 0 xs)]] (println (/ s (length xs))))",
-  "tags": ["reduce", "range", "average"]
-}

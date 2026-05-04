@@ -1,9 +1,0 @@
-{
-  "id": "T110_oidc_userinfo",
-  "category": "oauth-jwt",
-  "difficulty": "hard",
-  "prompt": "OIDC userinfo 응답 {:sub \"u123\" :email \"a@b.c\" :name \"Alice\"}에서 sub와 email만 추출해 새 맵 만들고 :sub 값 출력.",
-  "validation": { "type": "stdout_contains", "expected": "u123" },
-  "reference_solution": "(let [[ui {:sub \"u123\" :email \"a@b.c\" :name \"Alice\"}] [filtered {:sub (get ui :sub) :email (get ui :email)}]] (println (get filtered :sub)))",
-  "tags": ["oidc", "map-projection"]
-}

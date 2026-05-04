@@ -1,9 +1,0 @@
-{
-  "id": "T25_map_values_sum",
-  "category": "map",
-  "difficulty": "medium",
-  "prompt": "맵 {:a 10 :b 20 :c 30}의 모든 값의 합(60)을 출력하세요.",
-  "validation": { "type": "stdout_contains", "expected": "60" },
-  "reference_solution": "(println (reduce (fn [acc x] (+ acc x)) 0 (json_vals {:a 10 :b 20 :c 30})))",
-  "tags": ["values", "reduce"]
-}

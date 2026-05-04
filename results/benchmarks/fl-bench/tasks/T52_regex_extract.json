@@ -1,9 +1,0 @@
-{
-  "id": "T52_regex_extract",
-  "category": "regex",
-  "difficulty": "medium",
-  "prompt": "\"I am 25 years old\"에서 첫 숫자(25)를 정규식 (\\\\d+)으로 추출해 출력.",
-  "validation": { "type": "stdout_contains", "expected": "25" },
-  "reference_solution": "(println (first (regex_extract \"I am 25 years old\" \"(\\\\d+)\")))",
-  "tags": ["regex_extract", "first"]
-}

@@ -1,9 +1,0 @@
-{
-  "id": "T81_fp_closure",
-  "category": "functional",
-  "difficulty": "medium",
-  "prompt": "make-adder는 x를 받아서 (fn [y] (+ x y)) 클로저를 반환. (let [[add5 (make-adder 5)]] (add5 10)) → 15. 결과 출력.",
-  "validation": { "type": "stdout_contains", "expected": "15" },
-  "reference_solution": "(defn make-adder [x] (fn [y] (+ x y)))\n(let [[add5 (make-adder 5)]] (println (call add5 10)))",
-  "tags": ["closure", "fn"]
-}
