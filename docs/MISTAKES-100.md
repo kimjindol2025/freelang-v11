@@ -8,7 +8,7 @@
 
 | 본질 | 개수 | 문서 | Phase |
 |------|-----|-----|-------|
-| 🔧 언어 디자인 결함 | **44** | [LANGUAGE-FAULTS.md](LANGUAGE-FAULTS.md) | **X (v12)** |
+| 🔧 언어 디자인 결함 | **44** | [LANGUAGE-FAULTS.md](LANGUAGE-FAULTS.md) | **X (v11.5.1)** |
 | 📚 정상 동작 (학습) | 25 | [LEARNING.md](LEARNING.md) | — |
 | 💡 학습 부족 (안내) | 20 | [MISTAKES.md](MISTAKES.md) | G+ (✅ ALIAS 완료) |
 | 🚧 언어 미구현 | 5  | [MISTAKES.md](MISTAKES.md) | Y |
@@ -29,7 +29,7 @@
 
 - **언어 결함** (44개) → `LANGUAGE-FAULTS.md`
   - 인자 순서/작명/시그니처 비일관
-  - **v12 Phase X에서 통일 + 마이그레이션 도구 제공**
+  - **v11.5.x Phase X에서 통일 + 마이그레이션 도구 제공**
 
 ## 자동 카운트
 
@@ -49,4 +49,4 @@ node scripts/gen-mistakes-split.js         # 3개 문서 재생성
 재분류 후: 사용자 실수 28%, 학습 자료 28%, **언어 결함 44%**
 
 → Phase H에서 ALIAS 더 추가하는 건 응급처치.
-→ Phase X (v12) 언어 통일이 진짜 fix.
+→ Phase X (v11.5.1) 언어 통일이 진짜 fix.

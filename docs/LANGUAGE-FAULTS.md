@@ -1,12 +1,12 @@
 # FreeLang v11 — 언어 디자인 결함 (44개)
 
 > *사용자가 실수하는 게 아니라 언어가 일관성 없게 만들어졌다.*
-> Phase X (v12) 대상. Breaking change + 마이그레이션 도구.
+> Phase X (v11.5.1) 대상. Breaking change + 마이그레이션 도구.
 
 관련 문서:
 - `MISTAKES.md` — 진짜 사용자 실수
 - `LEARNING.md` — Lisp 학습 자료
-- `ROADMAP.md` Phase X — v12 통일 계획
+- `ROADMAP.md` Phase X — v11.5.x 통일 계획
 
 ---
 
@@ -27,7 +27,7 @@
 
 ## 모든 항목 (44개)
 
-각 항목의 **fix**는 v12 Phase X 작업 항목.
+각 항목의 **fix**는 v11.5.x Phase X 작업 항목.
 
 ### #1 — map: fn 먼저
 
@@ -37,7 +37,7 @@
 (map fn [1 2 3])            ;; ✅
 ```
 
-**v12 fix**: v12: (map arr fn) — 컬렉션 first 통일
+**v11.5.x fix**: v11.5.x: (map arr fn) — 컬렉션 first 통일
 
 ### #2 — filter: fn 먼저
 
@@ -47,7 +47,7 @@
 (filter fn arr)             ;; ✅
 ```
 
-**v12 fix**: v12: (filter arr fn) 통일
+**v11.5.x fix**: v11.5.x: (filter arr fn) 통일
 
 ### #3 — reduce: fn,init,arr
 
@@ -57,7 +57,7 @@
 (reduce fn init arr)        ;; ✅
 ```
 
-**v12 fix**: v12: (reduce arr init fn) 통일
+**v11.5.x fix**: v11.5.x: (reduce arr init fn) 통일
 
 ### #4 — sort-by: fn 먼저
 
@@ -67,7 +67,7 @@
 (sort-by key-fn arr)        ;; ✅
 ```
 
-**v12 fix**: v12: (sort-by arr fn) 통일
+**v11.5.x fix**: v11.5.x: (sort-by arr fn) 통일
 
 ### #5 — assoc: map 먼저 (그러나 다른 함수와 다름)
 
@@ -77,7 +77,7 @@
 (assoc m "key" "val")       ;; ✅
 ```
 
-**v12 fix**: v12: 컬렉션 first 통일
+**v11.5.x fix**: v11.5.x: 컬렉션 first 통일
 
 ### #6 — dissoc: map 먼저
 
@@ -87,7 +87,7 @@
 (dissoc m "key")            ;; ✅
 ```
 
-**v12 fix**: v12: 통일됨 (이미 일관)
+**v11.5.x fix**: v11.5.x: 통일됨 (이미 일관)
 
 ### #7 — str-contains 인자 순서
 
@@ -97,7 +97,7 @@
 (str-contains "hello" "lo") ;; ✅
 ```
 
-**v12 fix**: v12: (str-contains s pattern) 통일
+**v11.5.x fix**: v11.5.x: (str-contains s pattern) 통일
 
 ### #8 — str-replace 인자 순서
 
@@ -107,7 +107,7 @@
 (str-replace s "old" "new") ;; ✅
 ```
 
-**v12 fix**: v12: (str-replace s old new) 통일
+**v11.5.x fix**: v11.5.x: (str-replace s old new) 통일
 
 ### #9 — get: map 먼저
 
@@ -117,7 +117,7 @@
 (get m "name")              ;; ✅
 ```
 
-**v12 fix**: v12: 통일됨
+**v11.5.x fix**: v11.5.x: 통일됨
 
 ### #10 — cache_set 인자 순서
 
@@ -127,7 +127,7 @@
 (cache_set key val ttl)     ;; ✅
 ```
 
-**v12 fix**: v12: (cache-set k v ttl) 통일
+**v11.5.x fix**: v11.5.x: (cache-set k v ttl) 통일
 
 ### #11 — http_get 반환 구조체
 
@@ -137,7 +137,7 @@
 (json_parse (get (http_get url) "body"))        ;; ✅
 ```
 
-**v12 fix**: v12: http-get-json 표준화
+**v11.5.x fix**: v11.5.x: http-get-json 표준화
 
 ### #12 — http_post 반환 구조체
 
@@ -147,7 +147,7 @@
 (json_parse (get (http_post url body) "body"))  ;; ✅
 ```
 
-**v12 fix**: v12: 동일
+**v11.5.x fix**: v11.5.x: 동일
 
 ### #13 — http_get status 추출
 
@@ -157,7 +157,7 @@
 (= (get (http_get url) "status") 200)           ;; ✅
 ```
 
-**v12 fix**: v12: http-status 표준화
+**v11.5.x fix**: v11.5.x: http-status 표준화
 
 ### #15 — http_post body 문자열 강제
 
@@ -167,7 +167,7 @@
 (http_post url (json_stringify {:data item}))   ;; ✅
 ```
 
-**v12 fix**: v12: 자동 JSON 인코딩
+**v11.5.x fix**: v11.5.x: 자동 JSON 인코딩
 
 ### #16 — define 재정의 안 됨
 
@@ -184,7 +184,7 @@
 (deref count)                       ;; 읽기
 ```
 
-**v12 fix**: v12: atom 명시 또는 mut 키워드
+**v11.5.x fix**: v11.5.x: atom 명시 또는 mut 키워드
 
 ### #17 — set! 클로저 미반영
 
@@ -197,7 +197,7 @@
 (swap! state assoc "k" "v")         ;; ✅
 ```
 
-**v12 fix**: v12: atom 강제 또는 명확한 에러
+**v11.5.x fix**: v11.5.x: atom 강제 또는 명확한 에러
 
 ### #18 — 전역 배열 set! 미반영
 
@@ -210,7 +210,7 @@
 (swap! items (fn [$a] (append $a [x])))  ;; ✅
 ```
 
-**v12 fix**: v12: 동일
+**v11.5.x fix**: v11.5.x: 동일
 
 ### #19 — deref 누락
 
@@ -220,7 +220,7 @@
 (get (deref state) "key")           ;; ✅
 ```
 
-**v12 fix**: v12: atom 자동 deref 옵션
+**v11.5.x fix**: v11.5.x: atom 자동 deref 옵션
 
 ### #20 — swap! fn 인자 누락
 
@@ -230,7 +230,7 @@
 (swap! ref (fn [$cur] new-val))     ;; ✅
 ```
 
-**v12 fix**: v12: arity 검사
+**v11.5.x fix**: v11.5.x: arity 검사
 
 ### #21 — v10 let 형식 (단일 괄호)
 
@@ -239,7 +239,7 @@
 (let [x 1 y 2] (+ x y))            ;; ❌
 ```
 
-**v12 fix**: v12: 단일 괄호 허용
+**v11.5.x fix**: v11.5.x: 단일 괄호 허용
 
 ### #23 — 단일 바인딩도 이중 괄호
 
@@ -249,7 +249,7 @@
 (let [[$x 1]] $x)                  ;; ✅
 ```
 
-**v12 fix**: v12: 단일은 [$x val] 허용
+**v11.5.x fix**: v11.5.x: 단일은 [$x val] 허용
 
 ### #26 — [FUNC] deprecated
 
@@ -258,7 +258,7 @@
 [FUNC add :params [a b] :body (+ a b)]  ;; ❌
 ```
 
-**v12 fix**: v12: 완전 제거 + migrate 자동 변환
+**v11.5.x fix**: v11.5.x: 완전 제거 + migrate 자동 변환
 
 ### #28 — $ 파라미터 누락
 
@@ -268,7 +268,7 @@
 (defn add [$a $b] (+ $a $b))       ;; ✅
 ```
 
-**v12 fix**: v12: $ 접두사 폐지 검토 (또는 자동 추가)
+**v11.5.x fix**: v11.5.x: $ 접두사 폐지 검토 (또는 자동 추가)
 
 ### #29 — fn $ 누락
 
@@ -278,7 +278,7 @@
 (fn [$x] (* $x 2))                 ;; ✅
 ```
 
-**v12 fix**: v12: 동일
+**v11.5.x fix**: v11.5.x: 동일
 
 ### #31 — 고차함수 + $ 누락 복합
 
@@ -288,7 +288,7 @@
 (map (fn [$x] (* $x 2)) [1 2 3])   ;; ✅
 ```
 
-**v12 fix**: v12: 인자 순서 + $ 통일
+**v11.5.x fix**: v11.5.x: 인자 순서 + $ 통일
 
 ### #39 — obj_merge / merge — assoc은 단일 키만
 
@@ -298,7 +298,7 @@
 (assoc a "k" v)                     ;; ✅ 개별 키 추가
 ```
 
-**v12 fix**: v12: merge 함수 추가
+**v11.5.x fix**: v11.5.x: merge 함수 추가
 
 ### #46 — 핸들러 문자열 vs 함수
 
@@ -308,7 +308,7 @@
 (server_get "/path" "handle-fn")   ;; ✅ — 문자열
 ```
 
-**v12 fix**: v12: 함수 직접 허용
+**v11.5.x fix**: v11.5.x: 함수 직접 허용
 
 ### #47 — server_req_param vs params
 
@@ -318,7 +318,7 @@
 (server_req_param  $req "id")      ;; ✅ — 단일 파라미터
 ```
 
-**v12 fix**: v12: API 통일
+**v11.5.x fix**: v11.5.x: API 통일
 
 ### #48 — body 자동 파싱 비일관
 
@@ -328,7 +328,7 @@
 (get (json_parse (server_req_body $req)) "k") ;; ✅ 문자열 body일 때
 ```
 
-**v12 fix**: v12: Content-Type 기반 자동
+**v11.5.x fix**: v11.5.x: Content-Type 기반 자동
 
 ### #49 — 응답 맵 직접 반환 안됨
 
@@ -338,7 +338,7 @@
 (fn [$req] (server_json {:ok true}))  ;; ✅
 ```
 
-**v12 fix**: v12: 자동 server_json wrap
+**v11.5.x fix**: v11.5.x: 자동 server_json wrap
 
 ### #50 — server_status 인자 순서
 
@@ -348,7 +348,7 @@
 (server_status 400 {:error "msg"}) ;; ✅
 ```
 
-**v12 fix**: v12: (server-status code body) 통일
+**v11.5.x fix**: v11.5.x: (server-status code body) 통일
 
 ### #52 — express + server_* 혼용
 
@@ -359,7 +359,7 @@
 (app-get    "/path" "handler")     ;; ✅
 ```
 
-**v12 fix**: v12: 단일 API
+**v11.5.x fix**: v11.5.x: 단일 API
 
 ### #53 — WS 핸들러 시그니처
 
@@ -369,7 +369,7 @@
 (defn on-message [$sid $msg] ...)           ;; ✅
 ```
 
-**v12 fix**: v12: 표준화
+**v11.5.x fix**: v11.5.x: 표준화
 
 ### #54 — on-close 파라미터 시그니처
 
@@ -379,7 +379,7 @@
 (defn on-close [$sid] ...)          ;; ✅
 ```
 
-**v12 fix**: v12: 표준화
+**v11.5.x fix**: v11.5.x: 표준화
 
 ### #56 — 맵 키 키워드 필수
 
@@ -389,7 +389,7 @@
 {:name "kim" :age 30}                ;; ✅
 ```
 
-**v12 fix**: v12: 문자열 키 자동 변환
+**v11.5.x fix**: v11.5.x: 문자열 키 자동 변환
 
 ### #63 — cond [:else ...] 미지원
 
@@ -399,7 +399,7 @@
 (cond [(= x 1) "하나"] [true  "기타"])  ;; ✅
 ```
 
-**v12 fix**: v12: :else 키워드 허용
+**v11.5.x fix**: v11.5.x: :else 키워드 허용
 
 ### #66 — db_query 배열 반환 구조
 
@@ -409,7 +409,7 @@
 (get (get (db_query db sql []) 0) "name")  ;; ✅ — 첫 행의 컬럼
 ```
 
-**v12 fix**: v12: db-query-one 표준화
+**v11.5.x fix**: v11.5.x: db-query-one 표준화
 
 ### #67 — mariadb_connect 시그니처 다름
 
@@ -419,7 +419,7 @@
 (mariadb_connect {:host "localhost" :user "root" :password "" :database "db"})  ;; ✅
 ```
 
-**v12 fix**: v12: positional + map 둘다 지원
+**v11.5.x fix**: v11.5.x: positional + map 둘다 지원
 
 ### #68 — SQL 파라미터 배열 강제
 
@@ -429,7 +429,7 @@
 (mariadb_exec db "INSERT INTO t VALUES (?)" ["val"]) ;; ✅
 ```
 
-**v12 fix**: v12: 단일 값도 자동 배열화
+**v11.5.x fix**: v11.5.x: 단일 값도 자동 배열화
 
 ### #72 — env_load 자동 호출 안됨
 
@@ -439,7 +439,7 @@
 (env_load ".env") (shell_env "PORT")  ;; ✅ — env_load 먼저
 ```
 
-**v12 fix**: v12: 시작 시 자동 .env 로드
+**v11.5.x fix**: v11.5.x: 시작 시 자동 .env 로드
 
 ### #74 — shell_exec 반환 구조체
 
@@ -450,7 +450,7 @@
 (println (get (shell_exec "ls") "stdout"))  ;; ✅
 ```
 
-**v12 fix**: v12: shell-exec-stdout 추가
+**v11.5.x fix**: v11.5.x: shell-exec-stdout 추가
 
 ### #84 — (= arr []) 참조 비교
 
@@ -460,7 +460,7 @@
 (= (length arr) 0)                ;; ✅
 ```
 
-**v12 fix**: v12: 깊은 동등성 = 기본
+**v11.5.x fix**: v11.5.x: 깊은 동등성 = 기본
 
 ### #94 — define 재정의 클로저 미반영
 
@@ -470,7 +470,7 @@
 (define x 2)   ;; 새 바인딩, 기존 x 참조하는 클로저는 1 유지
 ```
 
-**v12 fix**: v12: 명확한 에러
+**v11.5.x fix**: v11.5.x: 명확한 에러
 
 ### #97 — (str map) 결과 "[object Object]"
 
@@ -480,4 +480,4 @@
 (str {:a 1})                      ;; ❌ — "[object Object]" 같은 결과
 ```
 
-**v12 fix**: v12: str가 자동 JSON
+**v11.5.x fix**: v11.5.x: str가 자동 JSON

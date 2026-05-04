@@ -5,7 +5,7 @@
 
 관련 문서:
 - `LEARNING.md` — Lisp/FreeLang 학습 (실수 아님, 25개)
-- `LANGUAGE-FAULTS.md` — 언어 디자인 결함 (44개, v12 fix 대상)
+- `LANGUAGE-FAULTS.md` — 언어 디자인 결함 (44개, v11.5.x fix 대상)
 - `MISTAKES-COVERAGE.json` — 자동 처리 카운트
 
 ---

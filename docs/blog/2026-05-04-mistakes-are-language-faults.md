@@ -189,7 +189,7 @@ docs/MISTAKES-100.md:
 | **Y** | 미구현 완성 | -10% | 2주 |
 | **Z** | 문서 자동 검증 | -5% | 3일 |
 
-**Phase X (v12)** 가 진짜 fix:
+**Phase X (v11.5.1)** 가 진짜 fix:
 
 ```fl
 ;; v11 (지금)
@@ -198,7 +198,7 @@ docs/MISTAKES-100.md:
 (cache_set k v ttl)
 (str-replace s old new)
 
-;; v12 (제안) — 컬렉션 + 함수 + 데이터, 통일
+;; v11.5.x (제안) — 컬렉션 + 함수 + 데이터, 통일
 (map arr fn)        ;; 항상 컬렉션 먼저
 (assoc map k v)
 (cache-set cache k v ttl)
@@ -209,11 +209,11 @@ str-length, json-parse, now-ms, str-to-num
 ;; alias 호환 유지 (deprecated 경고)
 ```
 
-이건 **breaking change**. v12를 선언하고 마이그레이션 도구를 함께 제공해야 함.
+이건 **마이너 release** (v11.5.1)로 진행. alias 호환 + deprecated 경고 + 마이그레이션 도구.
 
 마이그레이션 도구:
 ```bash
-freelang-migrate v11 → v12 src/
+freelang-migrate v11 → v11.5.x src/
 # 자동 변환:
 #   (str_to_num x) → (str-to-num x)
 #   (json_parse s) → (json-parse s)
@@ -243,11 +243,11 @@ freelang-migrate v11 → v12 src/
 
 1. **MISTAKES-100 분리** — `MISTAKES.md` (실수 30개) + `LEARNING.md` (Lisp 입문 25개)
 2. **언어 결함 목록** — `LANGUAGE-FAULTS.md` 신규 (디자인 결함 40개 명시)
-3. **v12 Phase X 로드맵** — 통일 규칙 + 마이그레이션 도구
+3. **v11.5.x Phase X 로드맵** — 통일 규칙 + 마이그레이션 도구
 
 ALIAS 더 추가하는 건 의미 있지만, *"실수 처리율"* 이라는 프레임 자체를 버려야 한다.
 
-**v12 Phase X 시작 시점**: 사용자 결정 필요.
+**v11.5.x Phase X 시작 시점**: 사용자 결정 필요.
 
 ---
 
@@ -257,7 +257,7 @@ ALIAS 더 추가하는 건 의미 있지만, *"실수 처리율"* 이라는 프�
 > 오후엔 "wrapper로 자동화" 했다.
 > 결국 정직하게 보니, **언어가 자신을 방어해야 할 만큼 잘못 만들어져 있었다**.
 >
-> Phase G/H는 응급실, Phase X(v12)는 수술실.
+> Phase G/H는 응급실, Phase X(v11.5.1)는 수술실.
 
 ---
 

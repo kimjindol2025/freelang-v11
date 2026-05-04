@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 429개 함수, 31 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 447개 함수, 33 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -260,6 +260,18 @@ parallel race with-timeout fl-try use`
 - `(browser_timeout ms handlerName)` → id
 - `(browser_interval ms handlerName)` → id
 - `(browser_clear_timer id)` → null
+
+### capture-error (9개)
+
+- `(capture_error_args fn args context?)` → {ok, result, error?}
+- `(error_log)` → [{message, name, stack, timestamp, context?}, ...]
+- `(error_log_clear)` → count cleared
+- `(error_log_last n?)` → last n errors (default 10)
+- `(error_count)` → number of captured errors
+- `(make_error message name? code?)` → plain object
+- `(error_message err)` → string
+- `(error_stack err)` → [string]
+- `(retry fn attempts delay_ms?)` → {ok, result, attempts_used, error?}
 
 ### collection (28개)
 
@@ -440,11 +452,6 @@ parallel race with-timeout fl-try use`
 - `(file_mtime filePath)` → number (get modification time as timestamp)
 - `(file_ctime filePath)` → number (get creation time as timestamp)
 
-### greet (2개)
-
-- `(greet/hello $name)` → any
-- `(greet/goodbye $name)` → any
-
 ### http (23개)
 
 - `(http_get url)` → {:status 200 :body "..."}
@@ -538,6 +545,13 @@ parallel race with-timeout fl-try use`
 - `(matrix_zeros rows cols)` → [[number]]  (create zero matrix)
 - `(vector_zeros n)` → [number]  (create zero vector)
 
+### optional (4개)
+
+- `(require_optional modName)` → true/false (설치 여부)
+- `(optional_call modName fnPath args)` → result or throws
+- `(optional_has? modName)` → boolean
+- `(optional_version modName)` → string or nil
+
 ### perf (7개)
 
 - `(profile_fn fn count)` → PerfResult
@@ -583,6 +597,16 @@ parallel race with-timeout fl-try use`
 - `(res_snapshot)` → ResourceSnapshot  (complete server state, ~1s)
 - `(res_snapshot_report snapshot)` → string  (human/AI readable)
 - `(res_health_check)` → {ok, warnings, errors}
+
+### rest-crud (7개)
+
+- `(route_info basePath)` → {base, param_name, supported_ops: [...]}
+- `(path_param req paramName)` → string or nil
+- `(rest_response status body)` → Map
+- `(rest_ok body)` → Map (200)
+- `(rest_created body)` → Map (201)
+- `(rest_not_found msg)` → Map (404)
+- `(rest_error status msg)` → Map
 
 ### shell (8개)
 
@@ -678,14 +702,6 @@ parallel race with-timeout fl-try use`
 - `(report_create title)` → Report
 - `(report_add report section_name data)` → Report
 - `(report_render report)` → string  (formatted text report)
-
-## Y5: 플러그인 (2개)
-
-FreeLang 플러그인 시스템(Y5)에서 제공하는 추가 함수들:
-- `(greet/hello $name)`
-- `(greet/goodbye $name)`
-
-
 ## 9. 코드 생성 시 체크리스트
 
 작성 후 자체 검증:
@@ -704,4 +720,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-04T03:39:57.326Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-04T05:41:58.189Z

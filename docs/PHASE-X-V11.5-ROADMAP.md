@@ -1,7 +1,7 @@
-# Phase X — v12 언어 통일 로드맵
+# Phase X — v11.5.x 언어 통일 로드맵
 
 > **목표**: v11의 디자인 결함 44개를 통일된 언어 규칙으로 fix
-> **버전**: v12.0.0 (breaking change)
+> **버전**: v11.5.1 (breaking change)
 > **타임라인**: 3개월 (X-1 → X-5)
 > **호환성**: `freelang-migrate` 도구 + alias 호환 모드
 
@@ -21,7 +21,7 @@
 (swap! ref fn)             ;; ref 먼저
 (str-replace s old new)    ;; string 먼저
 
-;; v12 (통일) — "데이터 → 변환 → 부가"
+;; v11.5.x (통일) — "데이터 → 변환 → 부가"
 (map      arr fn)
 (filter   arr fn)
 (reduce   arr fn init)
@@ -36,7 +36,7 @@
 ### 규칙 2: 작명 — **kebab-case 통일**
 
 ```
-v11                      v12
+v11                      v11.5.x
 ─────────────────────────────────────
 length, str-length    → 둘 다 유지 (alias)
 str_to_num            → str-to-num
@@ -54,7 +54,7 @@ snake 형식은 deprecated alias로 유지. 컴파일러 경고.
 ### 규칙 3: 술어(predicate) — **`?` suffix 통일**
 
 ```
-v11 (혼재)              v12
+v11 (혼재)              v11.5.x
 ─────────────────────────────────────
 nil?                  → nil?         (이미 OK)
 is_array              → array?
@@ -72,7 +72,7 @@ fl_require?           → fl-require?  (이미 OK)
 ;; → {:status 200 :body "..." :headers {...}}
 (json_parse (get (http_get url) "body"))   ;; 매번 추출
 
-;; v12 — 분리된 함수로 명확
+;; v11.5.x — 분리된 함수로 명확
 (http-get url)            ;; → {:status :body :headers}
 (http-get-json url)       ;; → body 자동 JSON 파싱 (helpers에서 승격)
 (http-status url)         ;; → 200
@@ -87,7 +87,7 @@ fl_require?           → fl-require?  (이미 OK)
 ;; v11 — $ 필수
 (defn add [$a $b] (+ $a $b))
 
-;; v12 — $ 선택 (호환성 위해 유지하되 권장 안 함)
+;; v11.5.x — $ 선택 (호환성 위해 유지하되 권장 안 함)
 (defn add [a b] (+ a b))
 
 ;; 이유: AI 입장에서 노이즈, 다른 Lisp(Clojure 등)과 다름
@@ -102,8 +102,8 @@ fl_require?           → fl-require?  (이미 OK)
 
 ```
 ✓ 통일 규칙 5개 명문화
-✓ docs/V12-RULES.md 작성
-✓ scripts/migrate-v11-to-v12.js prototype
+✓ docs/V11.5-RULES.md 작성
+✓ bin/freelang-migrate prototype
   - snake_case → kebab-case 자동 변환
   - 인자 순서 자동 감지/변환 (10개 함수)
   - $ 제거 옵션
@@ -114,7 +114,7 @@ fl_require?           → fl-require?  (이미 OK)
 ### X-2 (2-3주차): stdlib alias 추가
 
 ```
-✓ 모든 v11 함수의 v12 alias 등록
+✓ 모든 v11 함수의 v11.5.x alias 등록
   예: str_to_num → str-to-num (둘 다 작동)
 ✓ 컴파일러 경고: deprecated 함수 사용 시 hint
 ✓ docs/_aliases.json 확장
@@ -142,10 +142,10 @@ fl_require?           → fl-require?  (이미 OK)
 ### X-5 (11-12주차): 출시
 
 ```
-✓ v12.0.0 릴리스
+✓ v11.5.1 릴리스
 ✓ migrate 도구 안정화
 ✓ docs/MIGRATION.md
-✓ 블로그: v12 안내
+✓ 블로그: v11.5.x 안내
 ```
 
 ---
@@ -157,7 +157,7 @@ fl_require?           → fl-require?  (이미 OK)
 npm install -g freelang-cli@12
 
 # 사용
-freelang-migrate v11 → v12 src/
+freelang-migrate v11 → v11.5.x src/
 
 # 출력 예시
 Scanning src/...
@@ -187,19 +187,19 @@ Found 23 .fl files
 
 ## 호환성 보장 — Migration Path
 
-v11 → v12 전환은 **단계적으로**:
+v11 → v11.5.x 전환은 **단계적으로**:
 
 ```
 v11.4.2  (지금)              ─┐
                               │ migrate 도구 동작
-v11.5.0  v12 alias 미리 추가  │
+v11.5.0  v11.5.x alias 미리 추가  │
                               │ 모든 사용자 코드 작동
-v11.9.0  v12 RC               │
+v11.9.0  v11.5.x RC               │
                               │ deprecated 경고 출력
-v12.0.0  공식 릴리스          ─┘
+v11.5.1  공식 릴리스          ─┘
                               │ v11 alias 1년 유지
-v12.5.0  alias 제거 시작
-v13.0.0  v11 alias 완전 제거
+v11.6.0  alias 제거 시작
+v11.9.0  v11 alias 완전 제거
 ```
 
 → **2027년까지 v11 코드 그대로 작동 보장**.
@@ -245,12 +245,12 @@ node scripts/verify-mistakes-coverage.js
 4. ⏳ alias 추가 (v11.5.0)
 5. ⏳ X-1 완료 후 사용자 피드백 → X-2 진행
 
-**v12 RC 목표**: 2026-08 (3개월 후)
-**v12.0.0 출시**: 2026-09
+**v11.5.x RC 목표**: 2026-08 (3개월 후)
+**v11.5.1 출시**: 2026-09
 
 ---
 
 ## 한 줄 정리
 
-> v11.4.2의 33% 처리는 응급처치. v12 Phase X는 *언어를 다시 디자인*하는 것.
+> v11.4.2의 33% 처리는 응급처치. v11.5.x Phase X는 *언어를 다시 디자인*하는 것.
 > "사용자가 실수한다"가 아니라 "언어가 일관되도록" 만드는 게 진짜 fix.

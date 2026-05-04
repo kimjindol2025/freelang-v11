@@ -1,13 +1,13 @@
 # Changelog
 
-## [v11.4.3] — 2026-05-04 (Phase X 시작 — v12 로드맵)
+## [v11.4.3] — 2026-05-04 (Phase X 시작 — v11.5.x 로드맵)
 
 ### 🔍 본질 재분류
 
 100개를 6개 본질 카테고리로 분류 (`docs/_classifications.json`):
 
 ```
-🔧 design (언어 결함)    44  ← v12 Phase X
+🔧 design (언어 결함)    44  ← v11.5.x Phase X
 📚 normal (정상 동작)    25  ← LEARNING.md
 💡 learning (학습 부족)  20  ← ALIAS 처리됨
 🚧 missing (미구현)       5  ← Phase Y
@@ -21,10 +21,10 @@
 - `docs/_classifications.json` — 100개 단일 소스
 - `docs/MISTAKES.md` — 진짜 실수 (28개)
 - `docs/LEARNING.md` — Lisp 학습 (28개)
-- `docs/LANGUAGE-FAULTS.md` — 언어 결함 (44개, v12 대상)
-- `docs/PHASE-X-V12-ROADMAP.md` — 통일 규칙 5가지 + 3개월 계획
+- `docs/LANGUAGE-FAULTS.md` — 언어 결함 (44개, v11.5.x 대상)
+- `docs/PHASE-X-V11.5-ROADMAP.md` — 통일 규칙 5가지 + 3개월 계획
 - `scripts/gen-mistakes-split.js` — JSON → 3개 문서 자동 생성
-- `bin/freelang-migrate` — v11 → v12 마이그레이션 도구 prototype
+- `bin/freelang-migrate` — v11 → v11.5.x 마이그레이션 도구 prototype
 
 ### 🛠 freelang-migrate 도구
 
@@ -39,7 +39,7 @@ freelang-migrate src/ --apply        # 실제 변환 + 자동 백업
 - 인자 순서: (map fn arr) → (map arr fn) — `map`, `filter` 만
 - $ 접두사 제거 (옵션)
 
-### 🎯 v12 통일 규칙
+### 🎯 v11.5.x 통일 규칙
 
 1. **인자 순서**: 데이터 → 함수 → 부가 (col-first)
 2. **작명**: kebab-case 통일
@@ -48,14 +48,16 @@ freelang-migrate src/ --apply        # 실제 변환 + 자동 백업
 5. **`$` 접두사**: 선택 (호환 유지)
 
 ### 🗓 일정
-- v11.5.0 (1주): v12 alias 사전 등록
-- v11.9.0 (8주): v12 RC + deprecated 경고
-- **v12.0.0 (12주, 2026-09)**: 공식 출시
-- v13.0.0 (~2027): v11 alias 제거
+- v11.4.3 (지금): 분리 + 도구 prototype + 분류 100개
+- v11.5.0 (1주): v11.5.x alias 사전 등록 (snake + kebab 둘 다)
+- v11.5.1-rc (8주): RC + deprecated 경고
+- **v11.5.1 (12주, 2026-09)**: 공식 통일 출시
+- v11.6.0 (~1년): v11 alias 제거 시작 (선택)
+- v11.9.0 (~2027): v11 alias 완전 제거
 
-### ⚠️ Breaking Change 없음 (v11.4.3)
-- v12는 별도 메이저 릴리스. v11.4.3은 분류/문서/도구만.
-- v11 코드는 그대로 작동.
+### ⚠️ Breaking Change 없음
+- v11 마이너 시리즈로 진행 (v12 메이저 점프 없음).
+- v11.4.x 코드는 v11.5.1 이후 1년간 작동 (deprecated 경고만).
 
 ---
 
