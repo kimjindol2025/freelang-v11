@@ -35,7 +35,7 @@ function formatCallStack(stack: Array<{fn: string; line: number; args?: any[]}>)
   if (!stack || stack.length === 0) return "";
   const frames = stack.slice().reverse().slice(0, 10);
   return "\n\x1b[2m콜 스택:\x1b[0m\n" + frames.map((f, i) =>
-    `  \x1b[2m${i === 0 ? "→" : " "} ${f.fn} (line ${f.line})\x1b[0m`
+    `  \x1b[2m${i === 0 ? "→" : " "} ${(f as any).name ?? f.fn ?? "?"} (line ${f.line})\x1b[0m`
   ).join("\n");
 }
 

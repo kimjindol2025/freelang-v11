@@ -11,6 +11,7 @@ import { createValidationModule } from "./stdlib-validation";
 import { createStatsModule } from "./stdlib-stats";
 import { createMatrixModule } from "./stdlib-matrix";
 import { createBrowserModule } from "./stdlib-browser";
+import { BrowserDebugPanel } from "./browser-debug-panel";
 
 function createBrowserInterpreter() {
   const interp = new Interpreter();
@@ -29,6 +30,9 @@ function createBrowserInterpreter() {
   interp.registerModule(createBrowserModule(
     (name, args) => interp.callUserFunction(name, args)
   ));
+
+  // Phase Y-2-C: 브라우저 디버그 패널 초기화
+  BrowserDebugPanel.init(interp.context);
 
   return interp;
 }

@@ -1,8 +1,9 @@
 // FreeLang v9: Error Formatter
 // Phase 59: 위치 정보 + 소스 강조 + 유사 함수 힌트
 // Phase A (2026-04-25): ErrorCode + context + 자동 복구 힌트
+// Phase Y-1: VariableNotFoundError 특별 포매팅
 
-import { RECOVERY_HINTS } from "./errors";
+import { RECOVERY_HINTS, VariableNotFoundError } from "./errors";
 
 export interface FreeLangError {
   message: string;
@@ -123,7 +124,62 @@ export function suggestSimilar(name: string, candidates: string[]): string | nul
 /**
  * 에러 포매팅 — 파일:줄:컬럼 헤더 + 소스 강조 (±2줄) + 힌트
  */
+/**
+ * Phase Y-1: VariableNotFoundError 전용 포매팅
+ */
+export function formatVariableNotFoundError(err: VariableNotFoundError): string {
+  const lines: string[] = [];
+
+  // 1) 헤더
+  let header = `변수 미정의 오류`;
+  if (err.file) {
+    header += `  ${err.file}`;
+    if (err.line != null) header += `:${err.line}`;
+  }
+  lines.push(header);
+  lines.push("");
+
+  // 2) 에러 메시지
+  lines.push(`✖ ${err.message}`);
+  lines.push("");
+
+  // 3) 현재 스코프의 정의된 변수 (에러 컨텍스트에서 얻기)
+  if (err.context?.scope && Array.isArray(err.context.scope)) {
+    lines.push(`현재 스코프의 변수들:`);
+    const scopeVars = (err.context.scope as string[]).slice(0, 5);
+    scopeVars.forEach(v => {
+      lines.push(`  • ${v}`);
+    });
+    if ((err.context.scope as string[]).length > 5) {
+      lines.push(`  ... 외 ${(err.context.scope as string[]).length - 5}개`);
+    }
+    lines.push("");
+  }
+
+  // 4) 유사 이름 제안
+  if (err.context?.suggestions && Array.isArray(err.context.suggestions) && err.context.suggestions.length > 0) {
+    lines.push(`유사한 변수명:`);
+    (err.context.suggestions as string[]).slice(0, 3).forEach(v => {
+      lines.push(`  • ${v}`);
+    });
+    lines.push("");
+  }
+
+  // 5) 힌트
+  if (err.hint) {
+    lines.push(`💡 힌트:`);
+    lines.push(`  ${err.hint}`);
+  }
+
+  return lines.join("\n");
+}
+
 export function formatError(err: FreeLangError): string {
+  // Phase Y-1: VariableNotFoundError 특별 처리
+  if (err instanceof VariableNotFoundError) {
+    return formatVariableNotFoundError(err);
+  }
+
   const lines: string[] = [];
 
   // 1) 헤더 줄

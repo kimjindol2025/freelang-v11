@@ -8,7 +8,7 @@ import { parse } from "./parser";
 import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock, isControlBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { RuntimeTypeChecker } from "./type-system"; // Phase 60: 런타임 타입 검증
-import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError, FunctionNotFoundError } from "./errors";
+import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError, FunctionNotFoundError, VariableNotFoundError } from "./errors";
 import { suggestSimilar } from "./error-formatter";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 import { extractParamNames, extractFunctions } from "./ast-helpers";
@@ -121,6 +121,8 @@ export class Interpreter {
       macroExpander: new MacroExpander(), // Phase 63: 매크로 시스템
       protocols: new ProtocolRegistry(),  // Phase 64: 프로토콜 시스템
       structs: new StructRegistry(),      // Phase 66: 구조체/레코드 타입 시스템
+      callStack: [],                      // Phase Y-2: 함수 호출 스택 추적
+      lastError: undefined,               // Phase Y-2-B: 에러 컨텍스트 저장
     };
 
     // Phase 9a: Initialize WebSearchAdapter (mock mode by default)
@@ -264,8 +266,8 @@ export class Interpreter {
       if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
         e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
       }
-      if (e instanceof Error && !(e as any).__flCallStack && this.callStack.length > 0) {
-        (e as any).__flCallStack = [...this.callStack];
+      if (e instanceof Error && !(e as any).__flCallStack && this.context.callStack.length > 0) {
+        (e as any).__flCallStack = [...this.context.callStack];
       }
       throw e;
     }
@@ -1462,7 +1464,32 @@ export class Interpreter {
           ? this.context.variables.get("$" + parts[0])
           : this.context.variables.get(parts[0]);
         if (obj === undefined && !this.context.variables.has("$" + parts[0]) && !this.context.variables.has(parts[0])) {
-          throw new Error(`[E_UNDEFINED_VAR] '$${parts[0]}' (accessed via '${varName}') at line ${line || this.currentLine}${locSuffix}`);
+          // Phase Y-1: VariableNotFoundError로 변경
+          const scopeVars = this.context.variables.getAllVars();
+          const similar = suggestSimilar(parts[0], scopeVars);
+          const err = new VariableNotFoundError(
+            parts[0],
+            scopeVars.filter(v => !v.startsWith("__")),
+            similar,
+            fileHint,
+            line || this.currentLine,
+            0
+          );
+          // Phase Y-2-B: callStack을 에러 발생 시점에 즉시 캡처 (finally pop 전)
+          (err as any).__flCallStack = this.context.callStack.slice();
+          this.context.lastError = {
+            message: err.message,
+            code: err.code,
+            file: err.file,
+            line: err.line,
+            col: err.col,
+            callStack: this.context.callStack.slice(),
+            variables: Object.fromEntries(
+              this.context.variables.getAllVars().slice(0, 10).map(v => [v, this.context.variables.get(v)])
+            ),
+            hint: err.hint,
+          };
+          throw err;
         }
         for (let p = 1; p < parts.length; p++) {
           if (obj === null || obj === undefined) return null;
@@ -1477,7 +1504,32 @@ export class Interpreter {
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
       }
-      throw new Error(`[E_UNDEFINED_VAR] '$${varName}' at line ${line || this.currentLine}${locSuffix}`);
+      // Phase Y-1: VariableNotFoundError로 변경
+      const scopeVars = this.context.variables.getAllVars();
+      const similar = suggestSimilar(varName, scopeVars);
+      const err = new VariableNotFoundError(
+        varName,
+        scopeVars.filter(v => !v.startsWith("__")),
+        similar,
+        fileHint,
+        line || this.currentLine,
+        0
+      );
+      // Phase Y-2-B: callStack을 에러 발생 시점에 즉시 캡처 (finally pop 전)
+      (err as any).__flCallStack = this.context.callStack.slice();
+      this.context.lastError = {
+        message: err.message,
+        code: err.code,
+        file: err.file,
+        line: err.line,
+        col: err.col,
+        callStack: this.context.callStack.slice(),
+        variables: Object.fromEntries(
+          scopeVars.slice(0, 10).map(v => [v, this.context.variables.get(v)])
+        ),
+        hint: err.hint,
+      };
+      throw err;
     }
 
     // Keywords

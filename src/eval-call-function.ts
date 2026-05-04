@@ -222,8 +222,8 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // Phase 82: Profiler 연동 (enabled=false 시 no-op)
   const exitProfiler = globalProfiler.enter(baseName);
 
-  // Phase E + 자잘 #3 (2026-04-25): 호출 체인 추적 + 변수 값/타입 dump
-  const _callStack: Array<{ fn: string; line: number; args?: any[] }> = (interp as any).callStack ?? [];
+  // Phase Y-2-A: 콜스택을 context에 저장
+  const _callStack = interp.context.callStack;  // context.callStack 사용
   const _argsBrief = args.slice(0, 5).map(a =>
     a === null ? "nil"
     : Array.isArray(a) ? `[${a.length}]`
@@ -232,7 +232,8 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     : typeof a === "string" ? (a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"`)
     : String(a)
   );
-  const _stackEntry = { fn: baseName, line: interp.currentLine, args: _argsBrief };
+  // Phase Y-2-A: 스택 엔트리 형식 수정 (fn → name, args 포함)
+  const _stackEntry = { name: baseName, line: interp.currentLine, args: _argsBrief };
   if (process.env.FL_TRACE === "1") {
     console.error(`[trace] ${"  ".repeat(Math.min(interp.callDepth, 20))}→ ${baseName}(${_argsBrief.join(", ")}) (line ${interp.currentLine})`);
   }

@@ -270,9 +270,9 @@ export function createMariadbModule() {
       return poolId;
     },
 
-    // mariadb_pool_query poolId sql [params] → rows[]
+    // mariadb_pool_query poolId sql [params] → rows[] (nil 불가, 항상 배열)
     "mariadb_pool_query": (poolId: string, sql: string, params: any[] = []) =>
-      poolCall({ type: "query", poolId, sql, params }).rows,
+      poolCall({ type: "query", poolId, sql, params }).rows ?? [],
 
     // mariadb_pool_one poolId sql [params] → row or null
     "mariadb_pool_one": (poolId: string, sql: string, params: any[] = []) =>

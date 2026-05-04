@@ -136,6 +136,8 @@ export const ErrorCodes = {
   INVALID_FORM: "E_INVALID_FORM",
   RUNTIME: "E_RUNTIME",
   PURE_VIOLATION: "E_PURE_VIOLATION",
+  UNDEFINED_VAR: "E_UNDEFINED_VAR",      // Phase Y-1
+  UNRESOLVED_SYMBOL: "E_UNRESOLVED_SYMBOL", // Phase Y-1
 } as const;
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
@@ -152,6 +154,8 @@ export const RECOVERY_HINTS: Record<string, string> = {
   E_INVALID_FORM: "잘못된 special form 구조입니다. 문법 가이드를 확인하세요.",
   E_RUNTIME: "런타임 오류. 입력 데이터와 흐름을 점검하세요.",
   E_PURE_VIOLATION: "^pure/:effects [] 함수에서 side effect가 발견되었습니다. :effects 선언을 추가하거나 effect 호출을 제거하세요.",
+  E_UNDEFINED_VAR: "변수가 정의되지 않았습니다. (define name value) 또는 (let [[name value]] ...) 로 먼저 정의하세요.",
+  E_UNRESOLVED_SYMBOL: "심볼을 찾을 수 없습니다. 함수명 오타, 모듈 import, 또는 변수 정의를 확인하세요.",
 };
 
 export interface FLErrorContext {
@@ -177,5 +181,82 @@ export class FLRuntimeError extends ModuleError {
     super(`[${code}] ${message}`, "runtime", file, line, col, hint ?? RECOVERY_HINTS[code]);
     this.name = "FLRuntimeError";
     Object.setPrototypeOf(this, FLRuntimeError.prototype);
+  }
+}
+
+/** Phase Y-1: 변수 미정의 에러 — 스코프 정보 + 유사 이름 추천 포함 */
+export class VariableNotFoundError extends FLRuntimeError {
+  constructor(
+    varName: string,
+    availableVars?: string[],     // 현재 스코프의 정의된 변수들
+    similarVars?: string | string[] | null,  // 유사 이름 추천 (string | string[] | null 모두 허용)
+    file?: string,
+    line?: number,
+    col?: number
+  ) {
+    // string | null → string[] 정규화
+    if (typeof similarVars === "string") similarVars = [similarVars];
+    else if (!Array.isArray(similarVars)) similarVars = [];
+    const contextMsg = [
+      `변수 '$${varName}'이(가) 정의되지 않았습니다.`,
+      availableVars && availableVars.length > 0
+        ? `스코프 내 변수: ${availableVars.slice(0, 5).join(", ")}${availableVars.length > 5 ? " ..." : ""}`
+        : null,
+      similarVars && similarVars.length > 0
+        ? `유사 이름: ${similarVars.slice(0, 3).join(", ")}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    super(
+      ErrorCodes.UNDEFINED_VAR,
+      contextMsg,
+      {
+        varName,
+        scope: availableVars,
+        suggestions: similarVars,
+      },
+      file,
+      line,
+      col
+    );
+    this.name = "VariableNotFoundError";
+    Object.setPrototypeOf(this, VariableNotFoundError.prototype);
+  }
+}
+
+/** Phase Y-1: 심볼 미해결 에러 */
+export class UnresolvedSymbolError extends FLRuntimeError {
+  constructor(
+    symbol: string,
+    availableSymbols?: string[],
+    similarSymbols?: string[],
+    file?: string,
+    line?: number,
+    col?: number
+  ) {
+    const contextMsg = [
+      `심볼 '${symbol}'을(를) 찾을 수 없습니다.`,
+      similarSymbols && similarSymbols.length > 0
+        ? `유사 이름: ${similarSymbols.slice(0, 3).join(", ")}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    super(
+      ErrorCodes.UNRESOLVED_SYMBOL,
+      contextMsg,
+      {
+        symbol,
+        suggestions: similarSymbols,
+      },
+      file,
+      line,
+      col
+    );
+    this.name = "UnresolvedSymbolError";
+    Object.setPrototypeOf(this, UnresolvedSymbolError.prototype);
   }
 }

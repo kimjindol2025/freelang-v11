@@ -128,7 +128,7 @@ function buildErr(message: string, code = "E_TRY_CALL", category = "runtime-erro
 // ─────────────────────────────────────────────────────────────
 // 메인 모듈
 // ─────────────────────────────────────────────────────────────
-export function createHelpersModule(callFnValue?: CallFnValue, httpGet?: HttpGetFn) {
+export function createHelpersModule(callFnValue?: CallFnValue, httpGet?: HttpGetFn, httpPost?: HttpGetFn) {
   const cfv = callFnValue;
 
   // ── G-1: 에러 추천 ─────────────────────────────────────────
@@ -208,14 +208,16 @@ export function createHelpersModule(callFnValue?: CallFnValue, httpGet?: HttpGet
     return maybeParseJson(extractBody(resp));
   };
   const http_post_json = (url: string, body: any): any => {
-    if (!httpGet) throw new Error("http-post-json: http_get 미연결");
-    const opts = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: typeof body === "string" ? body : JSON.stringify(body),
-    };
+    const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
+    if (httpPost) {
+      // http_post 사용 — {status, data} 구조 (stdlib http_post_json과 동일)
+      const resp = httpPost(url, bodyStr);
+      return { status: extractStatus(resp), data: maybeParseJson(extractBody(resp)) };
+    }
+    if (!httpGet) throw new Error("http-post-json: http_post/http_get 미연결");
+    const opts = { method: "POST", headers: { "Content-Type": "application/json" }, body: bodyStr };
     const resp = httpGet(url, opts);
-    return maybeParseJson(extractBody(resp));
+    return { status: extractStatus(resp), data: maybeParseJson(extractBody(resp)) };
   };
   const http_status = (url: string, opts?: any): number => {
     if (!httpGet) throw new Error("http-status: http_get 미연결");
@@ -258,10 +260,8 @@ export function createHelpersModule(callFnValue?: CallFnValue, httpGet?: HttpGet
     "smart-assoc": smart_assoc,
     "smart_assoc": smart_assoc,
     // G-3-A
-    "http-get-json": http_get_json,
-    "http_get_json": http_get_json,
-    "http-post-json": http_post_json,
-    "http_post_json": http_post_json,
+    // http_get_json / http_post_json: stdlib-http.ts가 정확 (headers 지원, {status,data} 반환)
+    // helpers에서 덮어쓰지 않음 — alias loop이 stdlib-http.ts 버전으로 kebab-case 생성
     "http-status": http_status,
     "http_status": http_status,
     // G-3-B (기존 ok?/err?/unwrap/unwrap-or와 호환)

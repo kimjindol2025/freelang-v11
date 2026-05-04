@@ -138,7 +138,8 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   // Phase G: MISTAKES-100 자동 처리 헬퍼
   const helpersModule = createHelpersModule(
     (fnValue: any, args: any[]) => interp.callFunctionValue(fnValue, args),
-    (httpModule as any).http_get
+    (httpModule as any).http_get,
+    (httpModule as any).http_post
   );
   interp.registerModule(helpersModule);
 

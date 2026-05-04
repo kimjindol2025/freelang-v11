@@ -33,7 +33,11 @@ function curlGetStatusAndBody(url: string, method: string = "GET", headers?: any
     const args: string[] = ["-s", "-w", "\n%{http_code}", "--max-time", "10", "-X", method];
 
     if (headers && typeof headers === "object") {
-      for (const [key, value] of Object.entries(headers)) {
+      // FL Map은 일반 JS 객체 또는 Map 인스턴스일 수 있음
+      const entries = headers instanceof Map
+        ? Array.from(headers.entries())
+        : Object.entries(headers);
+      for (const [key, value] of entries) {
         args.push("-H", `${key}: ${value}`);
       }
     }

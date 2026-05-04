@@ -125,6 +125,24 @@ export function lex(source: string): Token[] {
       continue;
     }
 
+    // Raw string: """...""" (따옴표/역슬래시 이스케이프 없음 — HTML/JS 임베드용)
+    if (ch === '"' && source[i + 1] === '"' && source[i + 2] === '"') {
+      const startCol = col;
+      i += 3; col += 3;
+      let value = "";
+      while (i < source.length) {
+        if (source[i] === '"' && source[i + 1] === '"' && source[i + 2] === '"') {
+          i += 3; col += 3;
+          break;
+        }
+        if (source[i] === "\n") { line++; col = 1; } else { col++; }
+        value += source[i];
+        i++;
+      }
+      tokens.push({ type: T.String, value, line, col: startCol });
+      continue;
+    }
+
     // String: "..."
     if (ch === '"') {
       const start = i;

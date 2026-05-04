@@ -62,9 +62,10 @@ export function createShellModule() {
       return (result.status ?? 1) === 0;
     },
 
-    // shell_env varname -> string (get environment variable)
-    "shell_env": (varname: string): string => {
-      return process.env[varname] ?? "";
+    // shell_env varname -> string | null (환경변수 없으면 null)
+    "shell_env": (varname: string): string | null => {
+      const val = process.env[varname];
+      return (val === undefined || val === "") ? null : val;
     },
 
     // shell_cwd -> string (current working directory)
