@@ -56,7 +56,20 @@ const nodeBuild = esbuild.build({
   target: "node18",
   outfile: "bootstrap.js",
   loader: { ".json": "json" },
-  external: ["better-sqlite3", "sqlite3", "mysql2", "sharp", "tls", "net", "fs", "path", "child_process", "os", "http", "https", "url", "util", "stream", "buffer", "crypto", "readline", "events", "vm", "tty", "assert"],
+  minify: true,
+  minifyWhitespace: true,
+  minifyIdentifiers: true,
+  minifySyntax: true,
+  external: [
+    // 선택적 npm (런타임에 설치 가능)
+    "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
+    // Node.js 내장 모듈 전체
+    "tls", "net", "fs", "path", "child_process", "os",
+    "http", "https", "url", "util", "stream", "buffer",
+    "crypto", "readline", "events", "vm", "tty", "assert",
+    "worker_threads", "zlib", "dgram", "dns", "https",
+    "http2", "perf_hooks", "inspector", "v8", "module",
+  ],
   logLevel: "info",
 }).then(() => console.log("bootstrap=built"))
   .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
