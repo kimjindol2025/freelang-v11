@@ -110,6 +110,8 @@ const browserBuild = esbuild.build({
     "vm":              "./src/browser-stubs/misc-stubs",
     "tty":             "./src/browser-stubs/misc-stubs",
     "assert":          "./src/browser-stubs/misc-stubs",
+    "worker_threads":  "./src/browser-stubs/misc-stubs",
+    "tls":             "./src/browser-stubs/misc-stubs",
   },
 }).then(() => console.log("browser.js=built"))
   .catch((err) => { console.error("browser.js=failed error=" + err.message); });
