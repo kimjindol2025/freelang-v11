@@ -179,9 +179,30 @@ freelang fn-doc str_split         # 함수 문서 조회
 (http-get-bearer  $url $token)            ;; → {:status N :body "..."}
 (http-post-bearer $url $body $token)      ;; body는 JSON 문자열
 
-;; ── 타입 힌트 (선택, check 명령어로 컴파일 타임 검사) ─────────────
+;; ── 병렬 HTTP (http-parallel) ────────────────────────────────────
+(define results (http-parallel [
+  {:url "https://api/a" :method "GET" :token $tok}
+  {:url "https://api/b" :method "POST" :body "{}" :token $tok}
+]))
+;; → [{:status 200 :body "..."} {:status 201 :body "..."}]
+;; 직렬 N초 → 병렬 1초 (OS 레벨 curl 병렬 실행)
+
+;; ── 소수점 정밀도 ────────────────────────────────────────────────
+(math-round-dec (+ 0.1 0.2) 10)   ;; → 0.3  (IEEE 754 정밀도 문제 해결)
+(math-round-dec 3.14159265 4)      ;; → 3.1416
+
+;; ── namespace 모듈 격리 ──────────────────────────────────────────
+(load "lib/utils.fl" "utils")      ;; utils/ 접두사로 격리
+(utils/square 5)                   ;; → 25  (전역 오염 없음)
+(load "lib/utils.fl")              ;; 기존 방식도 그대로 동작
+
+;; ── 타입 힌트 + 변수 타입 추론 (check 명령어) ───────────────────
 (defn ^string greet [^string $name] (str "Hello " $name))
 (defn ^number add [^number $a ^number $b] (+ $a $b))
+
+;; define으로 선언된 변수도 타입 추론 (컴파일 타임 경고)
+(define x 42)
+(greet x)   ;; ⚠ check 시 경고: ^string 파라미터에 number 전달
 
 ;; ── 함수 탐색 ──────────────────────────────────────────────────────
 ;; freelang ls-fns           전체 목록
@@ -586,6 +607,13 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
+| 2026-05-07 | `http-parallel` — OS 레벨 curl 병렬 실행, 직렬 N배 개선 | ✅ bootstrap.js |
+| 2026-05-07 | `load "file.fl" "ns"` — namespace 파라미터, 전역 오염 방지 | ✅ bootstrap.js |
+| 2026-05-07 | `define` 변수 타입 추론 — `check` 명령어가 변수 거친 타입도 검사 | ✅ bootstrap.js |
+| 2026-05-07 | `math-round-dec` — 소수점 N자리 정밀도 반올림 | ✅ bootstrap.js |
+| 2026-05-07 | `catch $e` — `"category"` 필드 추가 (`"IO"` / `"TYPE_ERROR"` 등) | ✅ bootstrap.js |
+| 2026-05-07 | `load` 캐시 활성화 — watch 모드 자동 우회, 재파싱 방지 | ✅ bootstrap.js |
+| 2026-05-07 | `defmacro` 문서화 — STDLIB_REFERENCE에 예제 추가 | ✅ docs |
 | 2026-05-07 | **정적 타입 검사기** — `check` 명령어 arity + type-hint 컴파일 타임 검사 | ✅ bootstrap.js |
 | 2026-05-07 | `http-get-bearer` / `http-post-bearer` stdlib 추가 | ✅ bootstrap.js |
 | 2026-05-07 | `str-substr` (length 방식) 추가 — str-slice는 end-exclusive | ✅ bootstrap.js |
