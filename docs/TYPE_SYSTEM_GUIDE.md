@@ -111,15 +111,84 @@ FREELANG_STRICT=1 node bootstrap.js run my.fl
   run: make verify-all
 ```
 
+## 정적 타입 검사기 (check 명령어, 2026-05-07~)
+
+`freelang check file.fl` — 실행 없이 컴파일 타임 타입 검사. `FREELANG_STRICT=1`과 독립적으로 동작.
+
+### 검사 항목
+
+| 코드 | 종류 | 설명 |
+|------|------|------|
+| `arity` | error | 인자 수 불일치 |
+| `type-mismatch` | warning | 타입 힌트 파라미터에 다른 타입 전달 |
+| `return-type` | warning | 선언 반환 타입과 실제 반환 리터럴 불일치 |
+
+### 타입 추론 범위
+
+정적 검사기는 다음 세 가지 소스에서 변수 타입을 추론한다:
+
+**1. 리터럴 직접 전달**
+```lisp
+(defn greet [^string $name] ...)
+(greet 42)   ;; ⚠ type-mismatch: number → ^string
+```
+
+**2. define 바인딩 추론 (L-01, 2026-05-07~)**
+```lisp
+(define x "hello")
+(greet x)    ;; x가 string임을 추론 → 경고 없음
+(define n 42)
+(greet n)    ;; n이 number임을 추론 → ⚠ type-mismatch
+```
+
+**3. let 바인딩 추론 (S4-01, 2026-05-07~)**
+```lisp
+(let [[$n 42] [$s "hi"]]
+  (greet $n)   ;; $n이 number → ⚠ type-mismatch
+  (greet $s))  ;; $s가 string → 경고 없음
+```
+
+### Return Type 검사 (S4-02, 2026-05-07~)
+
+`^type` 반환 힌트를 선언하고 body 마지막 expression이 리터럴이면 타입을 비교한다.
+
+```lisp
+(defn ^number compute [] "not-a-number")
+;; ⚠ return-type: 선언 반환 타입 ^number이나 string 리터럴 반환
+
+(defn ^string label [] "active")   ;; ✅ 일치
+(defn ^number count [] 42)         ;; ✅ 일치
+```
+
+**설계 원칙**: "sounded but not complete" — 변수 반환이나 조건 분기 반환은 검사하지 않음 (false positive 방지).
+
+```lisp
+(defn ^number maybe [^bool $flag]
+  (if $flag 1 "no"))   ;; 마지막 expr이 sexpr → 검사 skip
+```
+
+### 사용
+
+```bash
+freelang check app.fl
+
+# 출력 예:
+# ✖  line 5: arity — (my-fn) — 인자 3개 전달, 2개 필요
+# ⚠  line 8: type-mismatch — (greet) — $name: ^string 파라미터에 number 전달
+# ⚠  line 12: return-type — (compute) — 선언 반환 타입 ^number이나 string 리터럴 반환
+```
+
+---
+
 ## 한계 + 향후 개선
 
 **현재 한계**:
 - 제네릭 (`<T>`) 부분 지원
-- 타입 추론은 호출 시점만 (선언 시점 추론 미흡)
+- let 추론은 같은 파일 스코프만 (cross-file 미지원)
+- return-type은 리터럴 반환만 검사 (변수/조건 반환 skip)
 - Union 타입 (`int | string`) 미지원
-- struct/protocol 타입 일부
 
-**1년 로드맵 (M1 후속)**:
+**로드맵**:
 - Union 타입
 - Record 타입 (`{:name string :age int}`)
 - 패턴 매치 + 타입 narrowing
@@ -127,5 +196,6 @@ FREELANG_STRICT=1 node bootstrap.js run my.fl
 
 ---
 
-생성: 2026-04-25 (M1 활성화 후)
+생성: 2026-04-25 (M1 활성화 후)  
+업데이트: 2026-05-07 (정적 검사기 let/return-type 강화)
 근거: 사용자 평가 — 타입 안정성 78점이 가장 큰 약점

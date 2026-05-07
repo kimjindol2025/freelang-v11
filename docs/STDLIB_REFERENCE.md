@@ -1,7 +1,7 @@
 # FreeLang v11 표준 라이브러리 완전 참조
 
 **대상**: AI 에이전트 & 개발자  
-**최종 업데이트**: 2026-04-25
+**최종 업데이트**: 2026-05-07
 
 ---
 
@@ -19,6 +19,10 @@
 - [데이터베이스 (Database)](#데이터베이스)
 - [날짜/시간 (Date & Time)](#날짜시간)
 - [에러 처리 (Error Handling)](#에러-처리)
+- [HTTP Bearer 헬퍼](#http-bearer-헬퍼-lir-004)
+- [HTTP Retry](#http-retry-s4-04-2026-05-07)
+- [frequencies](#frequencies-s4-03-2026-05-07)
+- [매크로 시스템](#매크로-시스템-defmacro)
 
 ---
 
@@ -1323,6 +1327,92 @@ FreeLang v11은 **위생적 매크로(Hygienic Macro)**를 지원한다.
 - 위생성 보장: 매크로 내부 `let` 바인딩은 gensym으로 충돌 방지
 - 중첩 매크로 가능 (확장 결과를 다시 확장)
 - `defmacro`는 파일 상단에 정의 권장 (사용 전 선언 필수)
+
+---
+
+## frequencies (S4-03, 2026-05-07~)
+
+### `(frequencies arr)`
+배열 내 각 값의 빈도수를 맵으로 반환. Clojure `frequencies`와 동일.
+
+**파라미터**:
+- `arr` (array) — 임의 타입의 배열
+
+**반환값**: `{value: count}` — 값을 문자열 키로, 빈도수를 값으로
+
+**예제**:
+```lisp
+(frequencies [1 2 1 3 2 1])
+;; → {"1": 3, "2": 2, "3": 1}
+
+(frequencies ["a" "b" "a" "c" "a"])
+;; → {"a": 3, "b": 1, "c": 1}
+
+;; 상위 빈도 찾기
+(define counts (frequencies $words))
+(define sorted (arr-sort-by-desc (map (fn [k] {:word k :cnt (get counts k)}) (keys counts)) "cnt"))
+(get (get sorted 0) "word")   ;; → 가장 많이 등장한 단어
+```
+
+**vs arr-count-by**: `arr-count-by`는 객체 배열의 특정 필드를 기준으로 분류.
+`frequencies`는 값 자체를 키로 사용.
+
+```lisp
+;; arr-count-by: 객체 배열 + 필드명 필요
+(arr-count-by [{:role "admin"} {:role "user"} {:role "admin"}] "role")
+;; → {"admin": 2, "user": 1}
+
+;; frequencies: 스칼라 배열 직접 집계
+(frequencies ["admin" "user" "admin"])
+;; → {"admin": 2, "user": 1}
+```
+
+---
+
+## HTTP Retry (S4-04, 2026-05-07~)
+
+### `(http-retry url token retries?)`
+GET 요청 + 5xx/네트워크 오류 시 자동 재시도.
+
+**파라미터**:
+- `url` (string) — 요청 URL
+- `token` (string) — Bearer 인증 토큰
+- `retries` (number, 선택) — 최대 재시도 횟수 (기본값: 3)
+
+**반환값**: `{:status N :body "..."}`
+
+**재시도 조건**: status 0 (네트워크 오류) 또는 5xx. 4xx는 즉시 반환.
+
+**백오프**: 200ms × 시도 횟수 (1회=200ms, 2회=400ms, 3회=600ms)
+
+```lisp
+(http-retry "https://api/status" $token)        ;; 기본 3회
+(http-retry "https://api/status" $token 5)      ;; 최대 5회
+
+(define res (http-retry "https://api/users" $token 3))
+(if (is-http-success (get res "status"))
+  (json-parse (get res "body"))
+  (throw "API 실패"))
+```
+
+---
+
+### `(http-retry-post url body token retries?)`
+POST 요청 + 5xx/네트워크 오류 시 자동 재시도.
+
+**파라미터**:
+- `url` (string) — 요청 URL
+- `body` (string) — JSON 문자열 body
+- `token` (string) — Bearer 인증 토큰
+- `retries` (number, 선택) — 최대 재시도 횟수 (기본값: 3)
+
+**반환값**: `{:status N :body "..."}`
+
+```lisp
+(http-retry-post "https://api/jobs"
+  (json-stringify {:task "process" :id $id})
+  $token 3)
+```
 
 ---
 

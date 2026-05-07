@@ -204,6 +204,21 @@ freelang fn-doc str_split         # 함수 문서 조회
 (define x 42)
 (greet x)   ;; ⚠ check 시 경고: ^string 파라미터에 number 전달
 
+;; let 바인딩도 타입 추론 (S4-01, 2026-05-07~)
+(let [[$n 42]]
+  (greet $n))   ;; ⚠ $n이 number → ^string 파라미터에 전달 경고
+
+;; return type 검사 (S4-02, 2026-05-07~)
+(defn ^number bad [] "hello")   ;; ⚠ return-type: string 리터럴 반환
+
+;; ── 빈도 집계 (frequencies) ───────────────────────────────────────
+(frequencies [1 2 1 3 2 1])          ;; → {"1": 3, "2": 2, "3": 1}
+(frequencies ["admin" "user" "admin"]) ;; → {"admin": 2, "user": 1}
+
+;; ── HTTP Retry ────────────────────────────────────────────────────
+(http-retry      "https://api/users" $token 3)        ;; GET, 5xx 시 재시도
+(http-retry-post "https://api/jobs" $body $token 3)   ;; POST, 5xx 시 재시도
+
 ;; ── 함수 탐색 ──────────────────────────────────────────────────────
 ;; freelang ls-fns           전체 목록
 ;; freelang ls-fns "http"    http 관련만
@@ -607,6 +622,10 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
+| 2026-05-07 | `let` 바인딩 타입 추론 — `(let [[$n 42]] ...)` → n:number 추적, check 경고 | ✅ bootstrap.js |
+| 2026-05-07 | return type 검사 — `(defn ^number f [] "hi")` → ⚠ return-type 경고 | ✅ bootstrap.js |
+| 2026-05-07 | `frequencies` — `(frequencies [1 2 1])` → `{1:3 2:2}` 값 빈도 집계 | ✅ bootstrap.js |
+| 2026-05-07 | `http-retry` / `http-retry-post` — 5xx/네트워크 오류 N회 재시도, 4xx 즉시 반환 | ✅ bootstrap.js |
 | 2026-05-07 | `http-parallel` — OS 레벨 curl 병렬 실행, 직렬 N배 개선 | ✅ bootstrap.js |
 | 2026-05-07 | `load "file.fl" "ns"` — namespace 파라미터, 전역 오염 방지 | ✅ bootstrap.js |
 | 2026-05-07 | `define` 변수 타입 추론 — `check` 명령어가 변수 거친 타입도 검사 | ✅ bootstrap.js |
