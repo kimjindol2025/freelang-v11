@@ -26,6 +26,7 @@ export interface FnDef {
   returnType: FLType;
   line: number;
   variadic: boolean;   // rest param (마지막 param이 $...rest 형태)
+  lastExprNode?: any;  // S4-02: body 마지막 expr → return type 검사용
 }
 
 export interface TypeIssue {
@@ -126,6 +127,9 @@ const STDLIB_ARITY: Map<string, { min: number; max: number }> = new Map([
   ["http-get-bearer",  { min: 2, max: 2 }],
   ["http-post-bearer", { min: 3, max: 3 }],
   ["http-parallel",    { min: 1, max: 1 }],
+  ["http-retry",       { min: 2, max: 3 }],
+  ["http-retry-post",  { min: 3, max: 4 }],
+  ["frequencies",      { min: 1, max: 1 }],
   ["auth-sha256",     { min: 1, max: 1 }],
   ["auth-hmac",       { min: 2, max: 2 }],
   ["math-round-dec",  { min: 2, max: 2 }],
@@ -174,6 +178,27 @@ function collectDefns(ast: any): { defs: Map<string, FnDef>; varTypes: Map<strin
         else if (nameNode?.kind === "literal" && nameNode?.type === "symbol") varName = String(nameNode.value ?? ""); // x → "x"
         const t = literalType(valueNode);
         if (varName && t !== null) varTypes.set(varName, t);
+      }
+      // let 바인딩 — 각 쌍의 리터럴 값 타입 기록 (S4-01)
+      if ((op === "let" || op === "let*") && (node.args?.length ?? 0) >= 1) {
+        const bindingsNode = node.args[0];
+        if (bindingsNode?.kind === "block" && bindingsNode?.type === "Array") {
+          const pairs: any[] = bindingsNode.fields?.get?.("items") ?? [];
+          for (const pair of pairs) {
+            if (pair?.kind === "block" && pair?.type === "Array") {
+              const pairItems: any[] = pair.fields?.get?.("items") ?? [];
+              if (pairItems.length >= 2) {
+                const varNode = pairItems[0];
+                const valNode = pairItems[1];
+                let vName = "";
+                if (varNode?.kind === "variable") vName = varNode.name;
+                else if (varNode?.kind === "literal" && varNode?.type === "symbol") vName = String(varNode.value ?? "");
+                const t = literalType(valNode);
+                if (vName && t !== null) varTypes.set(vName, t);
+              }
+            }
+          }
+        }
       }
       node.args?.forEach(walkNode);
       return;
@@ -225,10 +250,13 @@ function collectDefns(ast: any): { defs: Map<string, FnDef>; varTypes: Map<strin
       }
     }
 
-    defs.set(name, { name, params, returnType, line: node.line ?? 0, variadic });
+    // S4-02: body 마지막 expr 저장 (return type 검사용)
+    const bodyExprs = args.slice(idx + 1);
+    const lastExprNode = bodyExprs.length > 0 ? bodyExprs[bodyExprs.length - 1] : undefined;
+    defs.set(name, { name, params, returnType, line: node.line ?? 0, variadic, lastExprNode });
 
     // defn body도 순회
-    args.slice(idx + 1).forEach(walkNode);
+    bodyExprs.forEach(walkNode);
   }
 
   if (Array.isArray(ast)) ast.forEach(walkNode);
@@ -262,6 +290,21 @@ function checkCalls(ast: any, defs: Map<string, FnDef>, varTypes: Map<string, FL
       let fnName = "";
       if (nameNode?.kind === "variable") fnName = nameNode.name;
       else if (nameNode?.kind === "literal") fnName = String(nameNode.value);
+
+      // S4-02: return type 검사 — ^hint 있고 body 마지막 expr 타입을 알 수 있으면 비교
+      const fnDef = fnName ? defs.get(fnName) : undefined;
+      if (fnDef && fnDef.returnType !== "any" && fnDef.lastExprNode) {
+        const actualReturn = literalType(fnDef.lastExprNode);
+        if (actualReturn !== null && !typesCompatible(fnDef.returnType, actualReturn)) {
+          issues.push({
+            kind: "warning",
+            code: "return-type",
+            line: fnDef.line,
+            message: `(${fnName}) — 선언 반환 타입 ^${fnDef.returnType}이나 ${actualReturn} 리터럴 반환`,
+          });
+        }
+      }
+
       // skip params, recurse into body
       args.slice(idx + 1).forEach((a: any) => walkNode(a, fnName));
       return;

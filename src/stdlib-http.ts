@@ -357,6 +357,51 @@ export function createHttpModule() {
       return results;
     },
 
+    // http_retry url token retries -> {:status 200 :body "..."}
+    // GET with bearer token, retry up to N times on 5xx or network error (status 0)
+    "http_retry": (url: string, token: string, retries: number = 3): any => {
+      const maxRetries = Number(retries) || 3;
+      let lastResult: any = { status: 0, body: "" };
+      for (let i = 0; i <= maxRetries; i++) {
+        try {
+          const result = curlGetStatusAndBody(url, "GET", { "Authorization": `Bearer ${token}` });
+          lastResult = result;
+          if (result.status >= 200 && result.status < 500) return result;
+          // 5xx → retry
+        } catch (err: any) {
+          lastResult = { status: 0, body: "", error: err.message };
+        }
+        if (i < maxRetries) {
+          const delay = 200 * (i + 1);
+          const start = Date.now();
+          while (Date.now() - start < delay) { /* spin wait */ }
+        }
+      }
+      return lastResult;
+    },
+
+    // http_retry_post url body token retries -> {:status 200 :body "..."}
+    "http_retry_post": (url: string, body: string, token: string, retries: number = 3): any => {
+      const maxRetries = Number(retries) || 3;
+      let lastResult: any = { status: 0, body: "" };
+      for (let i = 0; i <= maxRetries; i++) {
+        try {
+          const result = curlGetStatusAndBody(url, "POST",
+            { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }, body);
+          lastResult = result;
+          if (result.status >= 200 && result.status < 500) return result;
+        } catch (err: any) {
+          lastResult = { status: 0, body: "", error: err.message };
+        }
+        if (i < maxRetries) {
+          const delay = 200 * (i + 1);
+          const start = Date.now();
+          while (Date.now() - start < delay) { /* spin wait */ }
+        }
+      }
+      return lastResult;
+    },
+
     // is_http_success status -> boolean
     "is_http_success": (status: number): boolean => status >= 200 && status < 300,
 

@@ -91,6 +91,16 @@ export function createCollectionModule() {
       });
     },
 
+    // frequencies arr -> {value: count}  (count occurrences of each value)
+    "frequencies": (arr: any[]): Record<string, number> => {
+      const result: Record<string, number> = {};
+      for (const item of arr) {
+        const k = String(item ?? "__nil__");
+        result[k] = (result[k] ?? 0) + 1;
+      }
+      return result;
+    },
+
     // arr_count_by arr key -> {key: count}  (count by key value)
     "arr_count_by": (arr: Record<string, any>[], key: string): Record<string, number> => {
       const result: Record<string, number> = {};
