@@ -81,7 +81,20 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
             if (flErr.file) errMap.set("file", flErr.file);
             if (flErr.code) errMap.set("code", flErr.code);
             if (flErr.hint) errMap.set("hint", flErr.hint);
-            if (flErr.category) errMap.set("category", flErr.category);
+            // category: FreeLangError에 명시된 값 우선, 없으면 메시지로 추론
+            if (flErr.category) {
+              errMap.set("category", flErr.category);
+            } else {
+              const m = error.message.toLowerCase();
+              let cat = "RUNTIME_ERROR";
+              if (m.includes("not found") || m.includes("undefined") || m.includes("cannot find")) cat = "NOT_FOUND";
+              else if (m.includes("type") || m.includes("is not a")) cat = "TYPE_ERROR";
+              else if (m.includes("arity") || m.includes("argument")) cat = "ARITY";
+              else if (m.includes("timeout")) cat = "TIMEOUT";
+              else if (m.includes("enoent") || m.includes("eacces") || m.includes("network") || m.includes("fetch")) cat = "IO";
+              else if (m.includes("json") || m.includes("parse")) cat = "TYPE_ERROR";
+              errMap.set("category", cat);
+            }
           } else {
             errMap.set("message", String(error));
           }
