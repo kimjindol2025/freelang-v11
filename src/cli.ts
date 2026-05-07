@@ -18,6 +18,7 @@ import { interpret, Interpreter } from "./interpreter";
 import { Block } from "./ast";
 import { JSCodegen } from "./codegen-js"; // Phase 6: FL 컴파일러
 import { formatFL } from "./formatter";
+import { typeCheckSource, formatTypeIssues } from "./type-check-static";
 import { DebugSession, setGlobalDebugSession } from "./debugger"; // Phase 78: 디버거
 import { runWithWatch } from "./hot-reload"; // Phase 79: 워치 모드
 import { extractDocs } from "./doc-extractor"; // Phase 77: 문서 추출기
@@ -406,6 +407,15 @@ function cmdCheck(filePath: string): void {
   }
 
   if (hasWarnings) process.stderr.write("\n");
+
+  // 정적 타입 검사 (arity + type hint)
+  const { errors: typeErrors, warnings: typeWarns, fnCount } = typeCheckSource(source);
+  if (typeErrors.length > 0 || typeWarns.length > 0) {
+    process.stderr.write(formatTypeIssues([...typeErrors, ...typeWarns], absPath) + "\n\n");
+    if (typeErrors.length > 0) process.exit(1);
+  } else if (fnCount > 0) {
+    console.log(`\x1b[36m[type-check]\x1b[0m  ${path.basename(absPath)}  타입 이상 없음 (함수 ${fnCount}개 분석)`);
+  }
 }
 
 function checkDefnMeta(source: string, filePath?: string): {
