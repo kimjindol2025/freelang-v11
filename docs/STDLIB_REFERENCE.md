@@ -1268,6 +1268,94 @@ Bearer 토큰 인증 POST 요청 (Content-Type: application/json 자동 설정).
 
 ---
 
+## 매크로 시스템 (defmacro)
+
+FreeLang v11은 **위생적 매크로(Hygienic Macro)**를 지원한다.  
+매크로는 컴파일 타임에 코드를 코드로 변환한다 — 함수와 달리 인자가 평가되기 전에 변환.
+
+### 기본 문법
+
+```lisp
+(defmacro 이름 [$패턴변수...] 변환-템플릿)
+```
+
+### 예제 1: when (조건 참일 때만 실행)
+
+```lisp
+(defmacro when [$cond $body]
+  (if $cond $body nil))
+
+(when (> x 0) (println "양수"))
+;; 확장됨 → (if (> x 0) (println "양수") nil)
+```
+
+### 예제 2: unless (조건 거짓일 때 실행)
+
+```lisp
+(defmacro unless [$cond $body]
+  (if $cond nil $body))
+
+(unless (nil? $user) (do-something $user))
+```
+
+### 예제 3: with-logging (실행 전후 로그)
+
+```lisp
+(defmacro with-logging [$name $body]
+  (do
+    (println (str "[START] " $name))
+    $body
+    (println (str "[END] " $name))))
+
+(with-logging "db-query" (mariadb-query DB "SELECT 1" []))
+```
+
+### macroexpand — 확장 결과 확인
+
+```lisp
+(macroexpand '(when (> x 0) (println "ok")))
+;; → (if (> x 0) (println "ok") nil)
+```
+
+### 주의사항
+
+- 매크로 파라미터는 `$` 접두사 사용 (변수와 동일 규칙)
+- 위생성 보장: 매크로 내부 `let` 바인딩은 gensym으로 충돌 방지
+- 중첩 매크로 가능 (확장 결과를 다시 확장)
+- `defmacro`는 파일 상단에 정의 권장 (사용 전 선언 필수)
+
+---
+
+## catch $e — category 필드 (L-04, 2026-05-07~)
+
+`try-catch`에서 `$e` 맵에 `"category"` 필드가 추가됐다.
+
+```lisp
+(try
+  (http-get-bearer $url $token)
+  (catch $e
+    (println (get $e "message"))    ;; 에러 메시지
+    (println (get $e "category"))   ;; "IO" | "TYPE_ERROR" | "RUNTIME_ERROR" | "NOT_FOUND" | "ARITY" | "AI" | "USER" | "TIMEOUT"
+    (println (get $e "line"))       ;; 발생 줄 번호
+    (if (= (get $e "category") "IO")
+      (println "네트워크 문제")
+      (println "기타 에러"))))
+```
+
+**category 값 목록**:
+| 값 | 의미 |
+|----|------|
+| `"IO"` | 파일/HTTP/네트워크 오류 |
+| `"TYPE_ERROR"` | 타입 불일치 |
+| `"RUNTIME_ERROR"` | 일반 런타임 오류 |
+| `"NOT_FOUND"` | 함수/변수 미정의 |
+| `"ARITY"` | 인자 수 불일치 |
+| `"AI"` | AI API 오류 |
+| `"USER"` | 사용자 정의 throw |
+| `"TIMEOUT"` | 시간 초과 |
+
+---
+
 ## 참고
 
 - **All functions are deterministic** — 같은 입력은 항상 같은 출력

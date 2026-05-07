@@ -40,7 +40,7 @@ function flDeepEq(a: any, b: any): boolean {
 // NOTE: Global cache causes issues with multiple interpreter instances
 // Each interpreter should manage its own module cache to avoid cross-interpreter conflicts
 // TODO: Move MODULE_CACHE to per-interpreter context
-const MODULE_CACHE_DISABLED = true;
+const MODULE_CACHE_DISABLED = false; // per-interpreter __loadCache 사용 (watch 모드 자동 우회)
 import {
   lazySeq, isLazySeq, lazyHead, lazyTail,
   take, drop, iterate, rangeSeq, filterLazy, mapLazy, zipWithLazy, takeWhile,
@@ -666,6 +666,14 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const path = require("path");
       try {
         const resolvedPath = path.resolve(process.cwd(), filePath);
+
+        // 모듈 캐시 — watch 모드(-w)가 아닐 때 재파싱 방지
+        const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
+        if (!MODULE_CACHE_DISABLED && !isWatchMode) {
+          if (!(interp as any).__loadCache) (interp as any).__loadCache = new Set<string>();
+          if ((interp as any).__loadCache.has(resolvedPath)) return null;
+          (interp as any).__loadCache.add(resolvedPath);
+        }
 
         const src = fs.readFileSync(resolvedPath, "utf-8");
         const { lex } = require("./lexer");

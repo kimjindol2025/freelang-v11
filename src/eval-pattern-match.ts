@@ -81,6 +81,7 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
             if (flErr.file) errMap.set("file", flErr.file);
             if (flErr.code) errMap.set("code", flErr.code);
             if (flErr.hint) errMap.set("hint", flErr.hint);
+            if (flErr.category) errMap.set("category", flErr.category);
           } else {
             errMap.set("message", String(error));
           }
