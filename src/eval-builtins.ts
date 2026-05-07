@@ -1481,6 +1481,25 @@ loop().catch(e => {
       return typeof args[0] === "number" && args[0] % 2 === 0;
     case "odd?":
       return typeof args[0] === "number" && args[0] % 2 !== 0;
+    case "some?":
+      return args[0] !== null && args[0] !== undefined;
+    case "positive?":
+      return typeof args[0] === "number" && args[0] > 0;
+    case "negative?":
+      return typeof args[0] === "number" && args[0] < 0;
+    case "int?":
+      return typeof args[0] === "number" && Number.isInteger(args[0]);
+    case "float?":
+      return typeof args[0] === "number" && !Number.isInteger(args[0]);
+    case "nan?":
+      return typeof args[0] === "number" && isNaN(args[0]);
+    case "dir-exists?": {
+      try {
+        return require("fs").statSync(String(args[0])).isDirectory();
+      } catch {
+        return false;
+      }
+    }
     case "string?":
       return typeof args[0] === "string";
     case "number?":

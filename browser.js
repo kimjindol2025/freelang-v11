@@ -13013,6 +13013,25 @@ loop().catch(e => {
         return typeof args2[0] === "number" && args2[0] % 2 === 0;
       case "odd?":
         return typeof args2[0] === "number" && args2[0] % 2 !== 0;
+      case "some?":
+        return args2[0] !== null && args2[0] !== void 0;
+      case "positive?":
+        return typeof args2[0] === "number" && args2[0] > 0;
+      case "negative?":
+        return typeof args2[0] === "number" && args2[0] < 0;
+      case "int?":
+        return typeof args2[0] === "number" && Number.isInteger(args2[0]);
+      case "float?":
+        return typeof args2[0] === "number" && !Number.isInteger(args2[0]);
+      case "nan?":
+        return typeof args2[0] === "number" && isNaN(args2[0]);
+      case "dir-exists?": {
+        try {
+          return (init_node_stubs(), __toCommonJS(node_stubs_exports)).statSync(String(args2[0])).isDirectory();
+        } catch {
+          return false;
+        }
+      }
       case "string?":
         return typeof args2[0] === "string";
       case "number?":
@@ -32580,6 +32599,20 @@ ${exportsStr}
     map_lazy: () => map_lazy,
     map_ok: () => map_ok,
     map_set: () => map_set,
+    "mariadb-batch": () => mariadb_batch,
+    "mariadb-databases": () => mariadb_databases,
+    "mariadb-exec": () => mariadb_exec,
+    "mariadb-health": () => mariadb_health,
+    "mariadb-one": () => mariadb_one,
+    "mariadb-pool-close": () => mariadb_pool_close,
+    "mariadb-pool-connect": () => mariadb_pool_connect,
+    "mariadb-pool-exec": () => mariadb_pool_exec,
+    "mariadb-pool-one": () => mariadb_pool_one,
+    "mariadb-pool-query": () => mariadb_pool_query,
+    "mariadb-pool-transaction": () => mariadb_pool_transaction,
+    "mariadb-query": () => mariadb_query,
+    "mariadb-tables": () => mariadb_tables,
+    "mariadb-transaction": () => mariadb_transaction,
     mariadb_all: () => mariadb_all,
     math_abs: () => math_abs,
     math_pow: () => math_pow,
@@ -33756,6 +33789,76 @@ ${exportsStr}
     usage: "(zip-with ...)",
     mistake: "Phase X-2"
   };
+  var mariadb_exec = {
+    correct: "mariadb_exec",
+    usage: "(mariadb_exec db sql params)",
+    mistake: "P6"
+  };
+  var mariadb_query = {
+    correct: "mariadb_query",
+    usage: "(mariadb_query db sql params)",
+    mistake: "P6"
+  };
+  var mariadb_one = {
+    correct: "mariadb_one",
+    usage: "(mariadb_one db sql params)",
+    mistake: "P6"
+  };
+  var mariadb_transaction = {
+    correct: "mariadb_transaction",
+    usage: "(mariadb_transaction db stmts)",
+    mistake: "P6"
+  };
+  var mariadb_batch = {
+    correct: "mariadb_batch",
+    usage: "(mariadb_batch db queries)",
+    mistake: "P6"
+  };
+  var mariadb_pool_connect = {
+    correct: "mariadb_pool_connect",
+    usage: "(mariadb_pool_connect config)",
+    mistake: "P6"
+  };
+  var mariadb_pool_query = {
+    correct: "mariadb_pool_query",
+    usage: "(mariadb_pool_query poolId sql params)",
+    mistake: "P6"
+  };
+  var mariadb_pool_one = {
+    correct: "mariadb_pool_one",
+    usage: "(mariadb_pool_one poolId sql params)",
+    mistake: "P6"
+  };
+  var mariadb_pool_exec = {
+    correct: "mariadb_pool_exec",
+    usage: "(mariadb_pool_exec poolId sql params)",
+    mistake: "P6"
+  };
+  var mariadb_pool_transaction = {
+    correct: "mariadb_pool_transaction",
+    usage: "(mariadb_pool_transaction poolId stmts)",
+    mistake: "P6"
+  };
+  var mariadb_pool_close = {
+    correct: "mariadb_pool_close",
+    usage: "(mariadb_pool_close poolId)",
+    mistake: "P6"
+  };
+  var mariadb_health = {
+    correct: "mariadb_health",
+    usage: "(mariadb_health)",
+    mistake: "P6"
+  };
+  var mariadb_databases = {
+    correct: "mariadb_databases",
+    usage: "(mariadb_databases)",
+    mistake: "P6"
+  };
+  var mariadb_tables = {
+    correct: "mariadb_tables",
+    usage: "(mariadb_tables db)",
+    mistake: "P6"
+  };
   var aliases_default = {
     "Date.now": Date_now,
     "JSON.parse": JSON_parse,
@@ -33967,7 +34070,21 @@ ${exportsStr}
     vec_scale,
     vec_top_k,
     write_file,
-    zip_with
+    zip_with,
+    "mariadb-exec": mariadb_exec,
+    "mariadb-query": mariadb_query,
+    "mariadb-one": mariadb_one,
+    "mariadb-transaction": mariadb_transaction,
+    "mariadb-batch": mariadb_batch,
+    "mariadb-pool-connect": mariadb_pool_connect,
+    "mariadb-pool-query": mariadb_pool_query,
+    "mariadb-pool-one": mariadb_pool_one,
+    "mariadb-pool-exec": mariadb_pool_exec,
+    "mariadb-pool-transaction": mariadb_pool_transaction,
+    "mariadb-pool-close": mariadb_pool_close,
+    "mariadb-health": mariadb_health,
+    "mariadb-databases": mariadb_databases,
+    "mariadb-tables": mariadb_tables
   };
 
   // src/stdlib-helpers.ts

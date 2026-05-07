@@ -1049,5 +1049,75 @@
     "correct": "zip-with",
     "usage": "(zip-with ...)",
     "mistake": "Phase X-2"
+  },
+  "mariadb-exec": {
+    "correct": "mariadb_exec",
+    "usage": "(mariadb_exec db sql params)",
+    "mistake": "P6"
+  },
+  "mariadb-query": {
+    "correct": "mariadb_query",
+    "usage": "(mariadb_query db sql params)",
+    "mistake": "P6"
+  },
+  "mariadb-one": {
+    "correct": "mariadb_one",
+    "usage": "(mariadb_one db sql params)",
+    "mistake": "P6"
+  },
+  "mariadb-transaction": {
+    "correct": "mariadb_transaction",
+    "usage": "(mariadb_transaction db stmts)",
+    "mistake": "P6"
+  },
+  "mariadb-batch": {
+    "correct": "mariadb_batch",
+    "usage": "(mariadb_batch db queries)",
+    "mistake": "P6"
+  },
+  "mariadb-pool-connect": {
+    "correct": "mariadb_pool_connect",
+    "usage": "(mariadb_pool_connect config)",
+    "mistake": "P6"
+  },
+  "mariadb-pool-query": {
+    "correct": "mariadb_pool_query",
+    "usage": "(mariadb_pool_query poolId sql params)",
+    "mistake": "P6"
+  },
+  "mariadb-pool-one": {
+    "correct": "mariadb_pool_one",
+    "usage": "(mariadb_pool_one poolId sql params)",
+    "mistake": "P6"
+  },
+  "mariadb-pool-exec": {
+    "correct": "mariadb_pool_exec",
+    "usage": "(mariadb_pool_exec poolId sql params)",
+    "mistake": "P6"
+  },
+  "mariadb-pool-transaction": {
+    "correct": "mariadb_pool_transaction",
+    "usage": "(mariadb_pool_transaction poolId stmts)",
+    "mistake": "P6"
+  },
+  "mariadb-pool-close": {
+    "correct": "mariadb_pool_close",
+    "usage": "(mariadb_pool_close poolId)",
+    "mistake": "P6"
+  },
+  "mariadb-health": {
+    "correct": "mariadb_health",
+    "usage": "(mariadb_health)",
+    "mistake": "P6"
+  },
+  "mariadb-databases": {
+    "correct": "mariadb_databases",
+    "usage": "(mariadb_databases)",
+    "mistake": "P6"
+  },
+  "mariadb-tables": {
+    "correct": "mariadb_tables",
+    "usage": "(mariadb_tables db)",
+    "mistake": "P6"
   }
 }
