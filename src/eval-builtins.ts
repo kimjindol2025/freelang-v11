@@ -1502,6 +1502,13 @@ loop().catch(e => {
     case "contains?":
       if (typeof args[0] === "string" && typeof args[1] === "string") return args[0].includes(args[1]);
       if (Array.isArray(args[0])) return args[0].includes(args[1]);
+      if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
+        let ck: any = args[1];
+        if (ck !== null && typeof ck === "object" && (ck as any).kind === "keyword") ck = (ck as any).name;
+        const ckNorm = typeof ck === "string" && ck.startsWith(":") ? ck.slice(1) : String(ck);
+        return Object.prototype.hasOwnProperty.call(args[0], ckNorm)
+          || Object.prototype.hasOwnProperty.call(args[0], ":" + ckNorm);
+      }
       return false;
     case "starts-with?":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;

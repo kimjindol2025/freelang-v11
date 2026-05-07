@@ -1,7 +1,7 @@
 {
   "Date.now": {
-    "correct": "now_ms",
-    "usage": "(now_ms)",
+    "correct": "now-ms",
+    "usage": "(now-ms)",
     "mistake": "#37"
   },
   "JSON.parse": {
@@ -156,8 +156,8 @@
     "mistake": "Phase X-2"
   },
   "current_time_ms": {
-    "correct": "now_ms",
-    "usage": "(now_ms)",
+    "correct": "now-ms",
+    "usage": "(now-ms)",
     "mistake": "#37"
   },
   "db_query": {
@@ -566,8 +566,8 @@
     "mistake": "Phase X-2"
   },
   "now-ms": {
-    "correct": "now_ms",
-    "usage": "(now_ms)",
+    "correct": "now-ms",
+    "usage": "(now-ms)",
     "mistake": "#37"
   },
   "now_iso": {

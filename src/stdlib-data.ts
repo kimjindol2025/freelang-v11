@@ -465,6 +465,7 @@ export function createDataModule() {
       return [s.slice(0, i), sep, s.slice(i + sep.length)];
     },
     "str_slice": (s: string, start: number, end?: number) => String(s).slice(Number(start), end !== undefined ? Number(end) : undefined),
+    "str_substr": (s: string, start: number, len: number) => { const st = Number(start); return String(s).slice(st, st + Number(len)); },
     "str_removeprefix": (s: string, prefix: string) => { const t = String(s); return t.startsWith(prefix) ? t.slice(prefix.length) : t; },
     "str_removesuffix": (s: string, suffix: string) => { const t = String(s); return t.endsWith(suffix) ? t.slice(0, -suffix.length) : t; },
     "str_expandtabs": (s: string, tabsize: number = 8) => String(s).replace(/\t/g, " ".repeat(Number(tabsize))),

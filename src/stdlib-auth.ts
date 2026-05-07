@@ -155,12 +155,14 @@ export function createAuthModule() {
       return randomBytes(bytes).toString("hex");
     },
 
-    // auth_hmac data secret → hex
+    // auth_hmac data secret → hex-string (소문자 hex 64자)
+    // ※ secret은 UTF-8 문자열로 처리됨. SigV4 key chain에서 hex 출력을 다음 key로 재사용 가능.
+    // ⚠️ SigV4 정식 구현 시 raw-bytes key 필요 → auth_hmac_raw 사용 권장 (LIR-003)
     "auth_hmac": (data: string, secret: string): string => {
       return createHmac("sha256", secret).update(data).digest("hex");
     },
 
-    // auth_sha256 data → hex
+    // auth_sha256 data → hex-string (소문자 hex 64자)
     "auth_sha256": (data: string): string => {
       return createHash("sha256").update(data).digest("hex");
     },

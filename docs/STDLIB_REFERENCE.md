@@ -1112,7 +1112,7 @@ SQL 명령 실행 (INSERT, UPDATE, DELETE).
 ## 날짜/시간
 
 ### `(now-ms)`
-현재 시간 (밀리초).
+현재 시간 (밀리초). **canonical 형태** — `now_ms`는 deprecated alias.
 
 **반환값**: Unix timestamp (밀리초)
 
@@ -1173,6 +1173,97 @@ SQL 명령 실행 (INSERT, UPDATE, DELETE).
 ```lisp
 (if (< age 18)
   (throw "Must be 18 or older"))
+```
+
+---
+
+---
+
+## 문자열 슬라이싱 (LIR-001 명문화)
+
+### `(str-slice str start end)`
+`str[start..end)` — **end-exclusive** index 방식.
+
+```lisp
+(str-slice "hello" 1 3)   ;; → "el"   (index 1, 2)
+(str-slice "hello" 0 5)   ;; → "hello"
+(str-slice $auth 7 (length $auth))  ;; Bearer 토큰 추출 패턴
+```
+
+### `(str-substr str start length)`
+`str[start..start+length)` — **length** 방식. str-slice의 별칭.
+
+```lisp
+(str-substr "hello" 1 3)  ;; → "ell"  (1번부터 3글자)
+(str-substr "hello" 0 5)  ;; → "hello"
+```
+
+---
+
+## 인증 함수 반환 타입 (LIR-003 명문화)
+
+### `(auth-sha256 data)`
+SHA-256 해시.
+
+**반환값**: hex-string (소문자 hex 64자)
+
+```lisp
+(auth-sha256 "hello")  ;; → "2cf24dba..." (64자 hex)
+```
+
+### `(auth-hmac data key)`
+HMAC-SHA256.
+
+**반환값**: hex-string (소문자 hex 64자)  
+**key**: UTF-8 문자열로 처리됨.
+
+```lisp
+(auth-hmac "data" "secret")  ;; → hex-string 64자
+;; ※ SigV4 key chain에서 hex 출력을 다음 key로 재사용 가능
+;; ⚠️ SigV4 정식 구현 시 raw-bytes key 필요 (향후 auth-hmac-raw 예정)
+```
+
+---
+
+## map 키 정규화 보장 (LIR-002 명문화)
+
+FreeLang v11에서 keyword 키(`:name`)와 문자열 키(`"name"`)는 **동일하게 취급**됩니다.
+
+```lisp
+;; 아래 4가지 조합 모두 동일한 결과
+(get {:key "val"} "key")    ;; → "val"
+(get {:key "val"} :key)     ;; → "val"
+(get {"key" "val"} "key")   ;; → "val"
+(get {"key" "val"} :key)    ;; → "val"
+
+;; contains?, has-key? 도 동일
+(contains? {:key "val"} "key")   ;; → true
+(has-key? {:key "val"} :key)     ;; → true
+```
+
+**권장**: map 리터럴은 keyword 키(`{:key val}`), 접근은 문자열/keyword 자유롭게.
+
+---
+
+## HTTP Bearer 헬퍼 (LIR-004)
+
+### `(http-get-bearer url token)`
+Bearer 토큰 인증 GET 요청.
+
+**반환값**: `{:status N :body "..."}`
+
+```lisp
+(http-get-bearer "http://api/userinfo" $token)
+;; Before: (http_request "GET" url {"Authorization" (str "Bearer " token)} "")
+```
+
+### `(http-post-bearer url body token)`
+Bearer 토큰 인증 POST 요청 (Content-Type: application/json 자동 설정).
+
+**반환값**: `{:status N :body "..."}`
+
+```lisp
+(http-post-bearer "http://api/invoke" (json-stringify {:fn "myFn"}) $token)
 ```
 
 ---

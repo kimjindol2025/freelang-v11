@@ -297,6 +297,15 @@ export function createHttpModule() {
       }
     },
 
+    // http_get_bearer url token -> {:status 200 :body "..."}
+    "http_get_bearer": (url: string, token: string): any =>
+      curlGetStatusAndBody(url, "GET", { "Authorization": `Bearer ${token}` }),
+
+    // http_post_bearer url body token -> {:status 200 :body "..."}
+    "http_post_bearer": (url: string, body: string, token: string): any =>
+      curlGetStatusAndBody(url, "POST",
+        { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }, body),
+
     // is_http_success status -> boolean
     "is_http_success": (status: number): boolean => status >= 200 && status < 300,
 
