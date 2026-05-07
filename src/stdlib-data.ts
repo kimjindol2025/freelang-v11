@@ -464,6 +464,12 @@ export function createDataModule() {
       const i = String(s).lastIndexOf(sep); if (i === -1) return ["", "", s];
       return [s.slice(0, i), sep, s.slice(i + sep.length)];
     },
+    // math-round-dec: 소수점 N자리 반올림 (금융 정밀도 — L-03)
+    // (math-round-dec (+ 0.1 0.2) 10) → 0.3
+    "math_round_dec": (n: number, places: number) => {
+      const f = Math.pow(10, Number(places));
+      return Math.round(Number(n) * f) / f;
+    },
     "str_slice": (s: string, start: number, end?: number) => String(s).slice(Number(start), end !== undefined ? Number(end) : undefined),
     "str_substr": (s: string, start: number, len: number) => { const st = Number(start); return String(s).slice(st, st + Number(len)); },
     "str_removeprefix": (s: string, prefix: string) => { const t = String(s); return t.startsWith(prefix) ? t.slice(prefix.length) : t; },

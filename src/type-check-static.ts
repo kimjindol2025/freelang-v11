@@ -67,6 +67,22 @@ function literalType(node: any): FLType | null {
   return null; // variable / sexpr → unknown
 }
 
+// 변수 타입 맵을 참조해 인자 타입 해석 (L-01: 변수 타입 추론)
+function resolveArgType(node: any, varTypes: Map<string, FLType>): FLType | null {
+  const lit = literalType(node);
+  if (lit !== null) return lit;
+  // $x → variable node, name = "x" ($ 제거됨)
+  if (node?.kind === "variable" && varTypes.has(node.name)) {
+    return varTypes.get(node.name)!;
+  }
+  // x → symbol literal, value = "x" (바인딩 조회)
+  if (node?.kind === "literal" && node?.type === "symbol") {
+    const sym = String(node.value ?? "");
+    if (varTypes.has(sym)) return varTypes.get(sym)!;
+  }
+  return null;
+}
+
 function typesCompatible(expected: FLType, actual: FLType): boolean {
   if (expected === "any" || actual === "any") return true;
   return expected === actual;
@@ -109,8 +125,9 @@ const STDLIB_ARITY: Map<string, { min: number; max: number }> = new Map([
   ["has-key?",    { min: 2, max: 2 }],
   ["http-get-bearer",  { min: 2, max: 2 }],
   ["http-post-bearer", { min: 3, max: 3 }],
-  ["auth-sha256", { min: 1, max: 1 }],
-  ["auth-hmac",   { min: 2, max: 2 }],
+  ["auth-sha256",     { min: 1, max: 1 }],
+  ["auth-hmac",       { min: 2, max: 2 }],
+  ["math-round-dec",  { min: 2, max: 2 }],
   ["server-get",  { min: 2, max: 2 }],
   ["server-post", { min: 2, max: 2 }],
   ["server-put",  { min: 2, max: 2 }],
@@ -133,8 +150,9 @@ const SPECIAL_FORMS = new Set([
 // 1단계: defn 수집
 // ─────────────────────────────────────────
 
-function collectDefns(ast: any): Map<string, FnDef> {
+function collectDefns(ast: any): { defs: Map<string, FnDef>; varTypes: Map<string, FLType> } {
   const defs = new Map<string, FnDef>();
+  const varTypes = new Map<string, FLType>();
 
   function walkNode(node: any): void {
     if (!node || typeof node !== "object") return;
@@ -146,6 +164,16 @@ function collectDefns(ast: any): Map<string, FnDef> {
 
     const op = node.op;
     if (op !== "defn" && op !== "defun") {
+      // define 바인딩 — 리터럴 값이면 타입 기록 (L-01)
+      if (op === "define" && (node.args?.length ?? 0) >= 2) {
+        const nameNode = node.args[0];
+        const valueNode = node.args[1];
+        let varName = "";
+        if (nameNode?.kind === "variable") varName = nameNode.name; // $x → "x"
+        else if (nameNode?.kind === "literal" && nameNode?.type === "symbol") varName = String(nameNode.value ?? ""); // x → "x"
+        const t = literalType(valueNode);
+        if (varName && t !== null) varTypes.set(varName, t);
+      }
       node.args?.forEach(walkNode);
       return;
     }
@@ -203,14 +231,14 @@ function collectDefns(ast: any): Map<string, FnDef> {
   }
 
   if (Array.isArray(ast)) ast.forEach(walkNode);
-  return defs;
+  return { defs, varTypes };
 }
 
 // ─────────────────────────────────────────
 // 2단계: 호출 검사
 // ─────────────────────────────────────────
 
-function checkCalls(ast: any, defs: Map<string, FnDef>): TypeIssue[] {
+function checkCalls(ast: any, defs: Map<string, FnDef>, varTypes: Map<string, FLType>): TypeIssue[] {
   const issues: TypeIssue[] = [];
 
   function walkNode(node: any, insideDefn?: string): void {
@@ -262,7 +290,7 @@ function checkCalls(ast: any, defs: Map<string, FnDef>): TypeIssue[] {
         for (let i = 0; i < def.params.length; i++) {
           const param = def.params[i];
           if (param.type === "any") continue;
-          const actual = literalType(args[i]);
+          const actual = resolveArgType(args[i], varTypes);
           if (actual === null) continue; // 변수/표현식은 unknown → skip
           if (!typesCompatible(param.type, actual)) {
             issues.push({
@@ -318,8 +346,8 @@ export function typeCheckSource(source: string): TypeCheckResult {
   try {
     const tokens = lex(source);
     const ast: any[] = parse(tokens) as any[];
-    const defs = collectDefns(ast);
-    const issues = checkCalls(ast, defs);
+    const { defs, varTypes } = collectDefns(ast);
+    const issues = checkCalls(ast, defs, varTypes);
 
     return {
       errors: issues.filter(i => i.kind === "error"),
