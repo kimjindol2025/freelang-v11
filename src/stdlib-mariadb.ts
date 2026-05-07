@@ -71,13 +71,29 @@ function parseRows(raw: string): any[] {
   });
 }
 
+function escapeString(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/\0/g, "\\0")
+    .replace(/'/g, "''")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\x1a/g, "\\Z");
+}
+
 function bindParams(sql: string, params: any[]): string {
   if (!params || params.length === 0) return sql;
   return params.reduce((s: string, p: any) => {
     if (p === null || p === undefined) return s.replace("?", "NULL");
-    if (typeof p === "number") return s.replace("?", String(p));
     if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
-    return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
+    if (typeof p === "number") {
+      if (!isFinite(p) || isNaN(p))
+        throw new Error(`SQL 파라미터 오류: 유효하지 않은 숫자 (${p})`);
+      return s.replace("?", String(p));
+    }
+    if (Array.isArray(p) || (typeof p === "object" && p !== null))
+      throw new Error(`SQL 파라미터 오류: 객체/배열은 파라미터로 사용 불가`);
+    return s.replace("?", `'${escapeString(String(p))}'`);
   }, sql);
 }
 

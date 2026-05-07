@@ -27978,13 +27978,22 @@ req.end();
       return obj;
     });
   }
+  function escapeString(s) {
+    return s.replace(/\\/g, "\\\\").replace(/\0/g, "\\0").replace(/'/g, "''").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x1a/g, "\\Z");
+  }
   function bindParams(sql, params) {
     if (!params || params.length === 0) return sql;
     return params.reduce((s, p) => {
       if (p === null || p === void 0) return s.replace("?", "NULL");
-      if (typeof p === "number") return s.replace("?", String(p));
       if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
-      return s.replace("?", `'${String(p).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`);
+      if (typeof p === "number") {
+        if (!isFinite(p) || isNaN(p))
+          throw new Error(`SQL \uD30C\uB77C\uBBF8\uD130 \uC624\uB958: \uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uC22B\uC790 (${p})`);
+        return s.replace("?", String(p));
+      }
+      if (Array.isArray(p) || typeof p === "object" && p !== null)
+        throw new Error(`SQL \uD30C\uB77C\uBBF8\uD130 \uC624\uB958: \uAC1D\uCCB4/\uBC30\uC5F4\uC740 \uD30C\uB77C\uBBF8\uD130\uB85C \uC0AC\uC6A9 \uBD88\uAC00`);
+      return s.replace("?", `'${escapeString(String(p))}'`);
     }, sql);
   }
   var DATA_BUF_SIZE = 4 * 1024 * 1024;
