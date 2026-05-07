@@ -1,5 +1,94 @@
 # FreeLang v11 변경 이력
 
+## [11.5.3] - 2026-05-08
+
+**마일스톤**: CSRF/XSS 보안 강화 (5개 함수 추가)
+
+### ✨ 보안 기능 추가
+
+#### XSS 방어 (eval-builtins.ts)
+- `html-escape`: HTML 특수 문자(`<>&'"`) → 엔티티 변환
+- `js-escape`: JavaScript 문자열 이스케이프(`"'\\\n\r\0` → 이스케이프)
+
+#### CSRF 방어 (stdlib-auth.ts)
+- `auth-csrf-token`: HMAC-SHA256 기반 타임스탐프 토큰 (60분 유효)
+- `auth-csrf-verify`: 토큰 검증 (HMAC + 시간 제한)
+
+#### 쿠키 보안 (stdlib-http-server.ts)
+- `server-set-cookie`: HttpOnly + Secure + SameSite 자동 설정 쿠키 생성
+
+### 🔐 보안 특징
+
+| 함수 | 용도 | 특징 |
+|------|------|------|
+| `html-escape` | HTML 콘텐츠 안전 | 4가지 엔티티 변환 |
+| `js-escape` | JS 문자열 안전 | 6가지 이스케이프 |
+| `auth-csrf-token` | CSRF 토큰 생성 | Stateless HMAC |
+| `auth-csrf-verify` | CSRF 검증 | 60분 TTL |
+| `server-set-cookie` | 안전한 쿠키 | Strict 정책 기본 |
+
+### ✅ 테스트 결과
+
+- **Jest**: 68/68 통과 (100%)
+- **프로덕션**: 5개 앱 검증 완료
+
+---
+
+## [11.5.2] - 2026-05-08
+
+**마일스톤**: 데이터베이스 인자 순서 통일 (Phase 8)
+
+### 🔧 개선사항
+
+#### MariaDB 함수 표준화
+- `db-query`: `(db-query $db sql params)` 형식 통일
+- `db-exec`: `(db-exec $db sql params)` 형식 통일
+- 모든 바인드 파라미터는 배열: `[value1 value2 ...]`
+
+#### 영향받는 모듈
+- `stdlib-storage-unified.fl`: 전체 통일
+
+### ✅ 호환성
+
+- **이전 코드**: 자동 마이그레이션 가능
+- **신규 코드**: 통일된 형식만 사용
+
+---
+
+## [11.5.1] - 2026-05-07~08
+
+**마일스톤**: Phase 1-7 + 보안 강화 (8개 전개)
+
+### ✨ Phase 1-7 개선사항
+
+| Phase | 내용 | 상태 |
+|-------|------|------|
+| P1 | fn 소괄호 에러 처리 | ✅ |
+| P2 | Reserved keywords (if/let/fn) | ✅ |
+| P3 | Query string 파싱 | ✅ |
+| P4 | MariaDB 배치 성능 (40배) | ✅ |
+| P5 | 문자열 보간 에러 처리 | ✅ |
+| P6 | kebab-case alias 14개 | ✅ |
+| P7 | 술어(predicate) 7개 추가 | ✅ |
+
+### 🔐 보안 강화
+
+#### SQL Injection 방어
+- `db-query` bindParams 검증 강화
+- 타입 체크: string/number만 허용
+- null/undefined 자동 필터링
+
+#### 입력 검증
+- Request body 문자열 길이 제한
+- 비정상 포맷 자동 거부
+
+### ✅ 테스트
+
+- **모듈별 테스트**: 372개 통과
+- **통합 테스트**: 25개 앱 검증
+
+---
+
 ## [11.3.7] - 2026-05-03
 
 **마일스톤**: JSON 직렬화 Map 처리 + 한글 문자 전송 수정

@@ -1,7 +1,7 @@
 # FreeLang v11 표준 라이브러리 완전 참조
 
 **대상**: AI 에이전트 & 개발자  
-**최종 업데이트**: 2026-05-07
+**최종 업데이트**: 2026-05-08 (v11.5.3)
 
 ---
 
@@ -15,6 +15,7 @@
 - [AI & 벡터 (AI & Vector)](#ai--벡터)
 - [비동기 (Async)](#비동기)
 - [파일 I/O (File I/O)](#파일-io)
+- [보안 & 이스케이프 (Security & Escape)](#보안--이스케이프-v1153)
 - [HTTP & 네트워킹 (HTTP & Network)](#http--네트워킹)
 - [데이터베이스 (Database)](#데이터베이스)
 - [날짜/시간 (Date & Time)](#날짜시간)
@@ -1034,6 +1035,162 @@ Promise 대기.
 ```lisp
 (file-write "output.txt" "Hello, World!")
 ```
+
+---
+
+## 보안 & 이스케이프 (v11.5.3)
+
+### `(html-escape str)`
+HTML 특수 문자를 엔티티로 변환하여 XSS 공격을 방지.
+
+**파라미터**:
+- `str` (string) — 변환할 문자열
+
+**반환값**: 이스케이프된 문자열
+
+**예제**:
+```lisp
+(html-escape "<script>alert(1)</script>")
+;; → "&lt;script&gt;alert(1)&lt;/script&gt;"
+
+(let [[$name (get $req-body "name")]]
+  (server-html (str "<h1>" (html-escape $name) "</h1>")))
+;; 사용자 입력이 안전하게 표시됨
+```
+
+**변환 규칙**:
+- `<` → `&lt;`
+- `>` → `&gt;`
+- `&` → `&amp;`
+- `"` → `&quot;`
+- `'` → `&#x27;`
+
+**주의**: HTML 콘텐츠 삽입 시 **반드시** 이 함수 사용
+
+---
+
+### `(js-escape str)`
+JavaScript 문자열 내 특수 문자를 이스케이프하여 문법 오류 & 인젝션 방지.
+
+**파라미터**:
+- `str` (string) — 변환할 문자열
+
+**반환값**: 이스케이프된 문자열
+
+**예제**:
+```lisp
+(js-escape "He said \"Hello\"")
+;; → "He said \\\"Hello\\\""
+
+(let [[$msg (get $req-body "message")]]
+  (server-html (str "<script>console.log('" (js-escape $msg) "')</script>")))
+;; 변수 주입 시 문자열 경계 보호
+```
+
+**변환 규칙**:
+- `\` → `\\`
+- `"` → `\"`
+- `'` → `\'`
+- `\n` → `\n` (줄바꿈 이스케이프)
+- `\r` → `\r` (캐리지 리턴)
+- `\0` → `\0` (null 바이트)
+
+**주의**: JS 문자열 리터럴(`'...'` 또는 `"..."`) 내에만 사용
+
+---
+
+### `(auth-csrf-token secret)`
+CSRF 방지용 타임스탬프 기반 토큰 생성 (60분 유효).
+
+**파라미터**:
+- `secret` (string) — 서버 시크릿 키
+
+**반환값**: 토큰 문자열 (형식: `"timestamp.hmac16"`)
+
+**예제**:
+```lisp
+(let [[$token (auth-csrf-token "my-secret-key")]]
+  (server-html (str """
+    <form method="POST" action="/submit">
+      <input type="hidden" name="_csrf" value="${$token}">
+      <input name="data"><button>제출</button>
+    </form>
+  """)))
+```
+
+**특징**:
+- **Stateless**: 서버 저장소 불필요
+- **HMAC 검증**: SHA256 기반 서명
+- **시간 제한**: 생성 후 60분 유효
+- **재생 공격 방지**: 타임스탬프 + 서명
+
+**구조**: `1748168501.db1e7cb72af9cf22`
+
+---
+
+### `(auth-csrf-verify token secret)`
+CSRF 토큰 검증. 토큰 유효성 및 만료 시간 확인.
+
+**파라미터**:
+- `token` (string) — 검증할 토큰
+- `secret` (string) — 서버 시크릿 키 (생성 시와 동일)
+
+**반환값**: boolean (유효하면 true, 만료/불일치하면 false)
+
+**예제**:
+```lisp
+;; POST 핸들러
+(defn handle-submit [$req]
+  (let [[$body (get $req "body")]
+        [$token (get $body "_csrf")]]
+    (if (auth-csrf-verify $token "my-secret-key")
+      (server-json {:status "success"})
+      (server-status 403 "CSRF token invalid or expired"))))
+```
+
+**검증 로직**:
+1. 토큰 형식 확인 (timestamp.hmac 구조)
+2. HMAC-SHA256 재계산 → 서명 비교
+3. 타임스탬프 나이 확인 (60분 이내)
+
+---
+
+### `(server-set-cookie name value [opts])`
+HTTP 응답에 안전한 쿠키 설정. HttpOnly, Secure, SameSite 플래그 자동 적용.
+
+**파라미터**:
+- `name` (string) — 쿠키명
+- `value` (string) — 쿠키 값
+- `opts` (map, 선택) — 옵션 맵
+  - `:max_age` (number) — 유지 시간 (초)
+  - `:path` (string) — 경로 (기본: `/`)
+  - `:domain` (string) — 도메인
+  - `:same_site` (string) — SameSite 정책 (기본: `"Strict"`, `"Lax"` 가능)
+
+**반환값**: Set-Cookie 헤더 문자열
+
+**예제**:
+```lisp
+;; 기본 사용 (HttpOnly + Secure + SameSite=Strict 자동)
+(let [[$cookie (server-set-cookie "session" "token123" {:max_age 3600})]]
+  (server-html-cookie "<h1>로그인 됨</h1>" $cookie))
+
+;; 결과 헤더:
+;; session=token123; Max-Age=3600; Path=/; HttpOnly; Secure; SameSite=Strict
+
+;; 커스텀 옵션
+(let [[$cookie (server-set-cookie "auth" "token" {
+  :max_age 86400
+  :path "/app"
+  :same_site "Lax"
+})]]
+  (server-html-cookie $html $cookie))
+```
+
+**보안 특징**:
+- **HttpOnly**: JavaScript 접근 차단 (항상 활성)
+- **Secure**: HTTPS 연결에서만 전송 (항상 활성)
+- **SameSite=Strict**: 크로스-사이트 요청에서 전송 안 함 (CSRF 방지)
 
 ---
 
