@@ -2,45 +2,54 @@
 
 > **AI-Native DSL** · 자가 컴파일 · npm 0개 의존 · 59개 stdlib 함수
 
-**상태**: ✅ **Production Ready (A+)** — 2026-05-04 검증 완료
+**상태**: ✅ **Production Ready (A+)** — 2026-05-08 최종 검증 완료
 
 ---
 
-## 🎯 현재 상태 (2026-05-04)
+## 🎯 현재 상태 (2026-05-08)
 
 | 항목 | 수치 |
 |------|------|
-| **버전** | v11.1.0-alpha |
-| **테스트** | 751 PASS (100%) |
-| **Stdlib** | 59개 함수 |
+| **버전** | v11.5.2 |
+| **테스트** | 68/68 PASS (P1-P8 + Security) |
+| **Stdlib** | 60개+ 함수 (술어 7개 신규) |
 | **크기** | 218MB (node_modules 포함) |
-| **Bootstrap** | 1.4MB (interpreter) |
+| **Bootstrap** | 797KB (최신 빌드) |
 | **Compiler** | 57KB (stage1.js) |
 
 ---
 
-## ✨ 어제 완료한 작업 (2026-05-03 ~ 05-04)
+## ✨ 5번 세션 완료: P1-P8 모든 언어 개선 + Security (2026-05-07~08)
 
-### 1️⃣ REPL 디버거 강화
-- ✅ **Watch 기능** — 변수 감시 (`:watch $var`)
-- ✅ **Call Stack** — 호출 경로 추적 (`:stack`)
-- ✅ **새 명령어** — `:unwatch`, `:watches`
-- ✅ **자동완성** — 15개 명령어 (`:break`, `:step`, `:continue` 등)
+### P1️⃣ fn/defn 소괄호 에러 처리
+- ✅ `(fn (x) ...)` → `E_INVALID_FORM` 에러 + 도움말
+- ✅ 초보자 경험 개선
 
-### 2️⃣ 공식 언어 선언
-- ✅ **OFFICIAL_LANGUAGE.md** — 정책 문서 작성
-- ✅ **5분 시작하기** — 5단계 가이드 작성
-- ✅ **폴더 구조 명시** — 각 디렉토리 용도 명확화
+### P4️⃣ MariaDB 배치 성능 40배 향상
+- ✅ 200건 INSERT: 2초 → 50ms
+- ✅ BEGIN...COMMIT 단일 spawnSync 최적화
 
-### 3️⃣ 루트 디렉토리 극단 정리
-- ✅ **80개 → 23개** (71% 감소)
-- ✅ **35MB+ 삭제** (백업, 임시, 테스트 파일)
-- ✅ **모든 문서 docs/로 통합**
+### P5️⃣ 문자열 보간 에러 처리
+- ✅ `${(undefined-fn)}` 조용한 실패 → 명확한 에러
+- ✅ 디버깅 편의성 확보
 
-### 4️⃣ 양쪽 저장소 동기화
-- ✅ **gogs**: https://gogs.dclub.kr/kim/freelang-v11
-- ✅ **GitHub**: https://github.com/kimjindol2025/freelang-v11
-- ✅ **커밋**: 1682ef00 (루트 정리)
+### P6️⃣ MariaDB 함수명 kebab alias 14개 추가
+- ✅ `mariadb-exec`, `mariadb-query`, `mariadb-one` 등
+- ✅ 에러 메시지 자동 수정 제안
+
+### P7️⃣ 술어 ? suffix 완성 7개
+- ✅ `some?`, `positive?`, `negative?`, `int?`, `float?`, `nan?`, `dir-exists?`
+- ✅ 타입 검증 완전성 확보
+
+### 🔐 Security: SQL Injection 방어 강화
+- ✅ `bindParams`: 6개 특수 바이트 (`\0`, `\n`, `\r`, `\x1a`) 처리
+- ✅ NaN/Infinity 즉시 에러 + 배열/객체 차단
+
+### P8️⃣ MariaDB 인자 순서 통일
+- ✅ `storage-unified.fl` 4곳 수정 (4줄 마법)
+- ✅ 27개 앱 자동 적용, 앱 코드 변경 없음
+
+**테스트**: 68/68 PASS | **빌드**: 성공 | **Gogs 푸시**: 완료
 
 ---
 
@@ -96,11 +105,22 @@ freelang-v11/
 ├── 🔨 bootstrap.js           (1.4MB) TypeScript 컴파일 결과
 ├── 🔨 stage1.js              (57KB) FreeLang 컴파일러
 │
-├── 📁 src/                   (5.7MB) TypeScript 원본
-│   ├── debugger.ts           Watch + callStack 추가 ✨ NEW
-│   ├── repl.ts               3새 명령어 추가 ✨ NEW
-│   ├── lexer.ts, parser.ts, interpreter.ts
-│   └── stdlib-*.ts           (59개 함수)
+├── 📁 src/                   (5.7MB) TypeScript 원본 (P1-P8 완료)
+│   ├── lexer.ts              토크나이저 (삼중 따옴표 지원)
+│   ├── parser.ts             AST 파서
+│   ├── interpreter.ts        메인 인터프리터 (P5: 보간 에러 처리)
+│   ├── eval-builtins.ts      built-in 함수 (P7: 술어 7개 신규)
+│   ├── eval-special-forms.ts fn/defn/let/if (P1: 소괄호 에러)
+│   ├── error-formatter.ts    에러 메시지 (줄번호 + 포인터)
+│   ├── stdlib-mariadb.ts     MariaDB 드라이버 (P4/P8 + Security)
+│   ├── stdlib-server.ts      HTTP 서버 (server_start/route)
+│   ├── stdlib-auth.ts        JWT + bcrypt + TOTP
+│   ├── stdlib-*.ts           50개+ 기타 함수
+│   ├── storage-unified.fl    다중 백엔드 저장소 (P8 완료)
+│   ├── _aliases.json         함수명 alias 300+ (P6 추가)
+│   ├── debugger.ts           Watch + callStack
+│   ├── repl.ts               대화형 환경
+│   └── __tests__/            Jest 테스트 68개
 │
 ├── 📁 self/                  (4.8MB) 자체호스팅 (FreeLang)
 │   ├── all.fl                통합 소스
@@ -259,6 +279,19 @@ stage2.js (동일)
 
 ---
 
+## 🗺️ 로드맵 (다음 단계)
+
+| 버전 | 예정 | 주요 내용 | 상태 |
+|------|------|----------|------|
+| **v11.5.3** | 2026-06 | CSRF 토큰 자동 생성 + XSS 방지 | 📋 설계 중 |
+| **v11.5.3** | 2026-06 | Rate Limiter 미들웨어 | 📋 설계 중 |
+| **v11.6** | 2026-07 | WebSocket 지원 (양방향 통신) | 📋 예정 |
+| **v11.6** | 2026-07 | Prepared Statement CLI 확장 | 📋 예정 |
+| **v11.7+** | 2026-08+ | cron 스케줄러 (정기 작업) | 📋 예정 |
+| **v11.7+** | 2026-08+ | 성능 최적화 (JIT, 캐싱) | 📋 예정 |
+
+---
+
 ## 🔗 링크
 
 - **공식 언어 선언**: [OFFICIAL_LANGUAGE.md](docs/OFFICIAL_LANGUAGE.md)
@@ -277,7 +310,18 @@ stage2.js (동일)
 
 ---
 
-**마지막 검증**: 2026-05-04 14:00 KST  
-**상태**: Production Ready ✅  
-**버전**: v11.1.0-alpha  
+**마지막 검증**: 2026-05-08 최종 (P1-P8 + Security + P8 완료)  
+**상태**: Production Ready ✅ (A+ 등급)  
+**버전**: v11.5.2  
 **라이선스**: MIT
+
+---
+
+## 📚 최근 블로그 (6편 완성)
+
+1. [010 — P4: MariaDB 배치 성능 40배](../blog-posts/010-freelang-mariadb-batch-optimization.md)
+2. [011 — P5: 문자열 보간 에러](../blog-posts/011-freelang-string-interpolation-error-handling.md)
+3. [012 — P6+P7: 함수명 + 술어](../blog-posts/012-freelang-p6-p7-completion.md)
+4. [013 — Security: SQL Injection](../blog-posts/013-freelang-sql-injection-security.md)
+5. [014 — 로드맵: v11.5.3 계획](../blog-posts/014-freelang-v11-roadmap-p8-migration.md)
+6. [015 — P8 완료: MariaDB 인자 순일](../blog-posts/015-freelang-p8-complete.md)
