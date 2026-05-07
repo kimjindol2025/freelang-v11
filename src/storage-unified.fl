@@ -17,6 +17,7 @@
     {
       :type type
       :config config
+      :db (get config :db)
       :status "ready"
       :tables {}
     }
@@ -105,7 +106,7 @@
   value
 ]
   :body (do
-    (mariadb-query (str
+    (mariadb_query (get storage :db) (str
       "INSERT INTO " table " (id, data) VALUES (?, ?) "
       "ON DUPLICATE KEY UPDATE data = VALUES(data)"
     ) [key (json-stringify value)])
@@ -120,7 +121,7 @@
   key
 ]
   :body (let [
-    [result (mariadb-query
+    [result (mariadb_query (get storage :db)
       (str "SELECT data FROM " table " WHERE id = ? LIMIT 1")
       [key]
     )]
@@ -204,7 +205,7 @@
   ] (if (= type "sqlite")
     (storage-query-sqlite storage sql)
     (if (= type "mariadb")
-      (mariadb-query sql)
+      (mariadb_query (get storage :db) sql)
       (do
         (println "⚠ Query not supported for this backend")
         nil
