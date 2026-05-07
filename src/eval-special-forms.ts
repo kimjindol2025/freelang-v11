@@ -17,6 +17,7 @@ import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
 import { registerVMFunction } from "./vm-eligible"; // Phase 3-E: VM 함수 등록
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase A: 통일 에러
 import { propRegistry, PropDef } from "./stdlib-property"; // AI-Native Phase 4
+import { ScopeVarMeta } from "./interpreter-scope"; // Phase Y-1: 변수 메타정보
 
 const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
 
@@ -54,6 +55,20 @@ function extractMapMeta(mapNode: any): FnMeta | null {
   }
   if (fields.has("property")) meta.property = fields.get("property"); // raw node
   return meta;
+}
+
+// ── Phase Y-1: 타입 추론 헬퍼 ─────────────────────────────
+function inferType(value: any): { kind: "type"; name: string } | undefined {
+  if (typeof value === "number") return { kind: "type", name: "number" };
+  if (typeof value === "string") return { kind: "type", name: "string" };
+  if (typeof value === "boolean") return { kind: "type", name: "boolean" };
+  if (value === null) return { kind: "type", name: "nil" };
+  if (Array.isArray(value)) return { kind: "type", name: "list" };
+  if (value && typeof value === "object") {
+    if ((value as any)["_isVMFunc"] || (value as any).params) return { kind: "type", name: "function" };
+    return { kind: "type", name: "map" };
+  }
+  return undefined;
 }
 
 // ── AI-Native Phase 2: Effects 정적 분석 ─────────────────────────
@@ -251,6 +266,18 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
           }
         }
       }
+    } else if ((paramsNode as any).kind === "sexpr") {
+      throwInvalidForm(
+        "fn",
+        `파라미터 목록은 대괄호 [ ]를 사용하세요.\n  잘못된 예: (fn (x y) ...)\n  올바른 예: (fn [$x $y] ...)`,
+        expr
+      );
+    } else {
+      throwInvalidForm(
+        "fn",
+        `파라미터는 [변수1 변수2 ...] 형태여야 합니다.`,
+        expr
+      );
     }
     const body = expr.args.length === 2
       ? expr.args[1]
@@ -426,7 +453,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── async ─────────────────────────────────────────────────────────
   if (op === "async") {
-    if (expr.args.length < 3) throw new Error(`async requires name, params, and body`);
+    if (expr.args.length < 3) throwArgCount("async", ">=3", expr.args.length, expr.line);
     const nameNode = expr.args[0];
     const name = (nameNode as Variable).name || "async-fn";
     const paramsNode = expr.args[1];
@@ -438,6 +465,18 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
           if ((item as any).kind === "variable") params.push((item as Variable).name);
         }
       }
+    } else if ((paramsNode as any).kind === "sexpr") {
+      throwInvalidForm(
+        "async",
+        `파라미터 목록은 대괄호 [ ]를 사용하세요.\n  잘못된 예: (async myFn (x) ...)\n  올바른 예: (async myFn [$x] ...)`,
+        expr
+      );
+    } else {
+      throwInvalidForm(
+        "async",
+        `파라미터는 [변수1 변수2 ...] 형태여야 합니다.`,
+        expr
+      );
     }
     return {
       kind: "async-function-value",
@@ -528,7 +567,15 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       }
       return value;
     } else {
-      ctx.variables.set("$" + name, value);
+      // Phase Y-1: 타입 추론 및 메타정보 저장
+      const meta: Partial<ScopeVarMeta> = {
+        file: (expr as any).file,
+        line: expr.line || (nameNode as any).line,
+        col: (nameNode as any).col,
+        type: inferType(value),
+      };
+
+      ctx.variables.set("$" + name, value, meta);
       return value;
     }
   }
@@ -795,7 +842,13 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     if (truthy) {
       interp.context.variables.push();
       try {
-        interp.context.variables.set(varName, value);
+        // Phase Y-1: 메타정보 저장
+        const meta: Partial<ScopeVarMeta> = {
+          line: (pairItems[0] as any).line,
+          col: (pairItems[0] as any).col,
+          type: inferType(value),
+        };
+        interp.context.variables.set(varName, value, meta);
         if (op === "if-let") {
           // (if-let [[x expr]] then else?)
           return ev(expr.args[1]);
@@ -1495,7 +1548,14 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
             const bindingItems = (item as any).fields.get("items");
             if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
               const varName = toVarName(bindingItems[0]);
-              ctx.variables.set(varName, ev(bindingItems[1]));
+              const value = ev(bindingItems[1]);
+              // Phase Y-1: 메타정보 저장
+              const meta: Partial<ScopeVarMeta> = {
+                line: (bindingItems[0] as any).line,
+                col: (bindingItems[0] as any).col,
+                type: inferType(value),
+              };
+              ctx.variables.set(varName, value, meta);
             }
           }
         }
@@ -1507,7 +1567,14 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
         }
         for (let i = 0; i < items.length; i += 2) {
           const varName = toVarName(items[i]);
-          ctx.variables.set(varName, ev(items[i + 1]));
+          const value = ev(items[i + 1]);
+          // Phase Y-1: 메타정보 저장
+          const meta: Partial<ScopeVarMeta> = {
+            line: (items[i] as any).line,
+            col: (items[i] as any).col,
+            type: inferType(value),
+          };
+          ctx.variables.set(varName, value, meta);
         }
       }
     }

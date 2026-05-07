@@ -297,3 +297,17 @@ describe("Phase E — callStack 추적 + stack overflow 에러", () => {
     expect(Interpreter.CALL_STACK_LIMIT).toBe(100);
   });
 });
+
+describe("에러 개선 (v11) — fn/defn/async 소괄호 파라미터", () => {
+  test("(fn (x) ...) → E_INVALID_FORM 에러 발생", () => {
+    const err = runExpectError("(fn (x y) (+ x y))");
+    expect(err.message).toContain("E_INVALID_FORM");
+    expect(err.message).toContain("파라미터");
+    expect(err.message).toContain("대괄호");
+  });
+
+  test("(defn add (x y) ...) → E_INVALID_FORM 에러 발생", () => {
+    const err = runExpectError("(defn add (x y) (+ x y))");
+    expect(err.message).toContain("E_INVALID_FORM");
+  });
+});
