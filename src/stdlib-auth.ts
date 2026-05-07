@@ -172,5 +172,25 @@ export function createAuthModule() {
 
     // auth_base64_decode b64 → string
     "auth_base64_decode": (b64: string): string => Buffer.from(b64, "base64").toString("utf8"),
+
+    // ── CSRF 방어 ────────────────────────────────────────
+
+    // auth_csrf_token secret → "timestamp.hmac" (60분 유효)
+    "auth_csrf_token": (secret: string): string => {
+      const ts = Math.floor(Date.now() / 1000).toString();
+      const sig = createHmac("sha256", secret).update(ts).digest("hex").slice(0, 16);
+      return `${ts}.${sig}`;
+    },
+
+    // auth_csrf_verify token secret → boolean
+    "auth_csrf_verify": (token: string, secret: string): boolean => {
+      const parts = (token || "").split(".");
+      if (parts.length !== 2) return false;
+      const [ts, sig] = parts;
+      const age = Math.floor(Date.now() / 1000) - parseInt(ts, 10);
+      if (isNaN(age) || age < 0 || age > 3600) return false;
+      const expected = createHmac("sha256", secret).update(ts).digest("hex").slice(0, 16);
+      return sig === expected;
+    },
   };
 }

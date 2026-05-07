@@ -1426,6 +1426,18 @@ loop().catch(e => {
     case "html-response":
       return { html: args[0] };
 
+    // XSS 방어
+    case "html-escape": {
+      const s = String(args[0] ?? "");
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+    }
+    case "js-escape": {
+      const s = String(args[0] ?? "");
+      return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/'/g, "\\'")
+              .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x00/g, "\\0");
+    }
+
     // Time
     case "now":
       return new Date().toISOString();

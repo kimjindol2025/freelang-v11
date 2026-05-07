@@ -761,6 +761,19 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       };
     },
 
+    // server_set_cookie name value opts -> cookie string (HttpOnly+Secure+SameSite 자동)
+    "server_set_cookie": (name: string, value: string, opts: any = {}): string => {
+      let cookie = `${encodeURIComponent(String(name))}=${encodeURIComponent(String(value))}`;
+      if (opts && opts["max_age"] !== undefined) cookie += `; Max-Age=${opts["max_age"]}`;
+      cookie += `; Path=${(opts && opts["path"]) || "/"}`;
+      if (opts && opts["domain"]) cookie += `; Domain=${opts["domain"]}`;
+      if (!opts || opts["http_only"] !== false) cookie += "; HttpOnly";
+      if (!opts || opts["secure"] !== false) cookie += "; Secure";
+      const ss = (opts && opts["same_site"]) || "Strict";
+      cookie += `; SameSite=${ss}`;
+      return cookie;
+    },
+
     // server_redirect url -> response (302 리다이렉트)
     "server_redirect": (url: string): Record<string, any> => {
       return {
