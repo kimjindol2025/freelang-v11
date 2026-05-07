@@ -8,7 +8,7 @@ import { parse } from "./parser";
 import { ASTNode, Block, Literal, Variable, SExpr, Keyword, TypeAnnotation, Pattern, PatternMatch, MatchCase, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, ModuleBlock, ImportBlock, OpenBlock, SearchBlock, LearnBlock, ReasoningBlock, ReasoningSequence, AsyncFunction, AwaitExpression, TryBlock, CatchClause, ThrowExpression, TypeClass, TypeClassInstance, TypeClassMethod, isModuleBlock, isImportBlock, isOpenBlock, isSearchBlock, isLearnBlock, isReasoningBlock, isReasoningSequence, isTryBlock, isThrowExpression, isFuncBlock, isBlock, isControlBlock } from "./ast";
 import { TypeChecker, createTypeChecker } from "./type-checker";
 import { RuntimeTypeChecker } from "./type-system"; // Phase 60: 런타임 타입 검증
-import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError, FunctionNotFoundError, VariableNotFoundError } from "./errors";
+import { ModuleNotFoundError, SelectiveImportError, FunctionRegistrationError, FunctionNotFoundError, VariableNotFoundError, FLRuntimeError, ErrorCodes } from "./errors";
 import { suggestSimilar } from "./error-formatter";
 import { Logger, StructuredLogger, getGlobalLogger } from "./logger";
 import { extractParamNames, extractFunctions } from "./ast-helpers";
@@ -1972,8 +1972,14 @@ export class Interpreter {
               const tokens = lex("(" + content + ")");
               const ast = parse(tokens);
               val = ast.length > 0 ? this.eval(ast[0]) : null;
-            } catch {
-              val = null;
+            } catch (e: any) {
+              const cause = e?.message ?? String(e);
+              throw new FLRuntimeError(
+                ErrorCodes.E_INVALID_FORM,
+                `문자열 보간 실패 — \${(${content})}\n  원인: ${cause}`,
+                undefined, undefined, undefined,
+                `올바른 표현식인지 확인하세요. 예: "\${(+ 1 2)}" 또는 "\${varName}"`
+              );
             }
           } else {
             // ${varName} — evaluate as variable
@@ -2041,8 +2047,14 @@ export class Interpreter {
               const ast = parse(tokens);
               const val = ast.length > 0 ? this.eval(ast[0]) : null;
               result += val === null || val === undefined ? "" : String(val);
-            } catch {
-              result += template.slice(i, j + 2); // 오류 시 원본 유지
+            } catch (e: any) {
+              const cause = e?.message ?? String(e);
+              throw new FLRuntimeError(
+                ErrorCodes.E_INVALID_FORM,
+                `문자열 보간 실패 — {(${exprStr})}\n  원인: ${cause}`,
+                undefined, undefined, undefined,
+                `올바른 표현식인지 확인하세요.`
+              );
             }
             i = j + 2; // ')' + '}' 건너뜀
             continue;

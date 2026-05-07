@@ -38483,8 +38483,17 @@ ${tail}` : "")
                 const tokens = lex("(" + content + ")");
                 const ast = parse(tokens);
                 val = ast.length > 0 ? this.eval(ast[0]) : null;
-              } catch {
-                val = null;
+              } catch (e) {
+                const cause = (e == null ? void 0 : e.message) ?? String(e);
+                throw new FLRuntimeError(
+                  ErrorCodes.E_INVALID_FORM,
+                  `\uBB38\uC790\uC5F4 \uBCF4\uAC04 \uC2E4\uD328 \u2014 \${(${content})}
+  \uC6D0\uC778: ${cause}`,
+                  void 0,
+                  void 0,
+                  void 0,
+                  `\uC62C\uBC14\uB978 \uD45C\uD604\uC2DD\uC778\uC9C0 \uD655\uC778\uD558\uC138\uC694. \uC608: "\${(+ 1 2)}" \uB610\uB294 "\${varName}"`
+                );
               }
             } else {
               if (content.includes(".")) {
@@ -38548,8 +38557,17 @@ ${tail}` : "")
                 const ast = parse(tokens);
                 const val = ast.length > 0 ? this.eval(ast[0]) : null;
                 result += val === null || val === void 0 ? "" : String(val);
-              } catch {
-                result += template.slice(i, j + 2);
+              } catch (e) {
+                const cause = (e == null ? void 0 : e.message) ?? String(e);
+                throw new FLRuntimeError(
+                  ErrorCodes.E_INVALID_FORM,
+                  `\uBB38\uC790\uC5F4 \uBCF4\uAC04 \uC2E4\uD328 \u2014 {(${exprStr})}
+  \uC6D0\uC778: ${cause}`,
+                  void 0,
+                  void 0,
+                  void 0,
+                  `\uC62C\uBC14\uB978 \uD45C\uD604\uC2DD\uC778\uC9C0 \uD655\uC778\uD558\uC138\uC694.`
+                );
               }
               i = j + 2;
               continue;
