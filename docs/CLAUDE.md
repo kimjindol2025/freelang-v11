@@ -71,7 +71,7 @@
 (str-to-int "42")                   → (str-to-num "42")
 (console.log x)                     → (println x)
 (json_keys m)                       → (keys m)
-(now-ms)                            → (now_ms)
+(now_ms)                            → (now-ms)  ;; kebab-case 정식명, snake는 deprecated
 (mariadb_all db sql p)              → (mariadb_query db sql p)
 (obj_merge a b)                     → 미구현 — (assoc a "k" v) 직접
 (obj_omit m ["k"])                  → (dissoc m "k")
@@ -88,7 +88,7 @@
 ```bash
 freelang watch server.fl          # 파일 저장 시 자동 재실행 ← 개발 중 필수!
 freelang run server.fl --watch    # 동일 (--watch 플래그)
-freelang check server.fl          # 문법 오류만 빠르게 확인
+freelang check server.fl          # 문법 오류 + 정적 타입 검사 (arity, type-hint)
 freelang fmt server.fl            # 코드 포맷
 freelang debug server.fl          # 브레이크포인트 디버그
 freelang fn-doc str_split         # 함수 문서 조회
@@ -167,7 +167,19 @@ freelang fn-doc str_split         # 함수 문서 조회
 (?. $user :profile :name)          ; nil이면 즉시 nil 반환
 (?. $user :address :city)          ; 중간에 nil → null
 
-;; ── 타입 힌트 (선택, 런타임 무시) ──────────────────────────────────
+;; ── 문자열 슬라이스 ──────────────────────────────────────────────
+(str-slice  "hello" 1 3)   ;; → "el"   (end-exclusive index)
+(str-substr "hello" 1 3)   ;; → "ell"  (length 방식)
+
+;; ── contains? — map도 지원 (2026-05-07~) ────────────────────────
+(contains? {:key "val"} "key")  ;; → true  ✅
+(contains? {:key "val"} :key)   ;; → true
+
+;; ── HTTP Bearer 패턴 ────────────────────────────────────────────
+(http-get-bearer  $url $token)            ;; → {:status N :body "..."}
+(http-post-bearer $url $body $token)      ;; body는 JSON 문자열
+
+;; ── 타입 힌트 (선택, check 명령어로 컴파일 타임 검사) ─────────────
 (defn ^string greet [^string $name] (str "Hello " $name))
 (defn ^number add [^number $a ^number $b] (+ $a $b))
 
@@ -574,6 +586,11 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
+| 2026-05-07 | **정적 타입 검사기** — `check` 명령어 arity + type-hint 컴파일 타임 검사 | ✅ bootstrap.js |
+| 2026-05-07 | `http-get-bearer` / `http-post-bearer` stdlib 추가 | ✅ bootstrap.js |
+| 2026-05-07 | `str-substr` (length 방식) 추가 — str-slice는 end-exclusive | ✅ bootstrap.js |
+| 2026-05-07 | `contains?` map 지원 수정 — 이전엔 항상 false 반환 bug | ✅ bootstrap.js |
+| 2026-05-07 | `now-ms` = canonical, `now_ms` = deprecated (_aliases.json 수정) | ✅ bootstrap.js |
 | 2026-04-28 | **기명 함수 → fn-value 전달 (인터프리터 근본 수정)** | ✅ bootstrap.js |
 | 2026-04-28 | P2: `sandbox_run` `memoize/memo_call` `rate_limit/rl_call` `workflow_dag` | ✅ bootstrap.js |
 | 2026-04-28 | P1: `saga_run` `workflow_parallel` `batch_map` `distribute` `time_exec` `span` | ✅ bootstrap.js |
