@@ -125,6 +125,7 @@ const STDLIB_ARITY: Map<string, { min: number; max: number }> = new Map([
   ["has-key?",    { min: 2, max: 2 }],
   ["http-get-bearer",  { min: 2, max: 2 }],
   ["http-post-bearer", { min: 3, max: 3 }],
+  ["http-parallel",    { min: 1, max: 1 }],
   ["auth-sha256",     { min: 1, max: 1 }],
   ["auth-hmac",       { min: 2, max: 2 }],
   ["math-round-dec",  { min: 2, max: 2 }],

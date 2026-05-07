@@ -306,6 +306,57 @@ export function createHttpModule() {
       curlGetStatusAndBody(url, "POST",
         { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }, body),
 
+    // http_parallel requests -> [{:status N :body "..."}]
+    // requests: [{:url "..." :method "GET" :token "..." :body "..." :headers {...}}]
+    // 모든 요청을 shell & + wait으로 병렬 실행 — spawnSync 1회로 전체 완료 (L-02)
+    "http_parallel": (requests: any[]): any[] => {
+      const tmpDir = `/tmp/fl-http-par-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const fs = require("fs");
+      fs.mkdirSync(tmpDir, { recursive: true });
+
+      const getF = (obj: any, key: string): any => {
+        if (!obj) return null;
+        return obj instanceof Map ? obj.get(key) : (obj[key] ?? obj[":" + key] ?? null);
+      };
+
+      const normReqs: any[] = Array.isArray(requests) ? requests : [requests];
+      const cmds: string[] = [];
+
+      normReqs.forEach((req: any, i: number) => {
+        const url    = String(getF(req, "url")    || getF(req, ":url")    || "");
+        const method = String(getF(req, "method") || getF(req, ":method") || "GET").toUpperCase();
+        const token  = getF(req, "token")  || getF(req, ":token");
+        const body   = getF(req, "body")   || getF(req, ":body")   || "";
+        const outFile = `${tmpDir}/${i}`;
+
+        const esc = (s: string) => s.replace(/'/g, `'\\''`);
+        let cmd = `curl -s -w '\\n%{http_code}' --max-time 10 -X '${method}'`;
+        if (token) cmd += ` -H 'Authorization: Bearer ${esc(String(token))}'`;
+        if (body)  cmd += ` -H 'Content-Type: application/json' -d '${esc(String(body))}'`;
+        cmd += ` '${esc(url)}' > '${outFile}' 2>/dev/null`;
+        cmds.push(cmd);
+      });
+
+      // 모든 curl을 백그라운드로 실행, wait으로 전체 완료 대기
+      const script = cmds.join(" &\n") + "\nwait";
+      spawnSync("sh", ["-c", script], { timeout: 30000 });
+
+      const results = normReqs.map((_: any, i: number) => {
+        try {
+          const content = fs.readFileSync(`${tmpDir}/${i}`, "utf-8");
+          const lines   = content.split("\n");
+          const status  = parseInt(lines[lines.length - 1]?.trim() || "0", 10) || 0;
+          const respBody = lines.slice(0, -1).join("\n");
+          return { status, body: respBody };
+        } catch {
+          return { status: 0, body: "" };
+        }
+      });
+
+      try { require("fs").rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      return results;
+    },
+
     // is_http_success status -> boolean
     "is_http_success": (status: number): boolean => status >= 200 && status < 300,
 

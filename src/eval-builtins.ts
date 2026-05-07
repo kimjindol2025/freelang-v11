@@ -662,6 +662,7 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
 
     case "load": {
       const filePath = String(args[0] ?? "");
+      const nsPrefix = args[1] != null ? String(args[1]) : null; // L-07: optional namespace
       const fs = require("fs");
       const path = require("path");
       try {
@@ -669,7 +670,7 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
 
         // 모듈 캐시 — watch 모드(-w)가 아닐 때 재파싱 방지
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
-        if (!MODULE_CACHE_DISABLED && !isWatchMode) {
+        if (!MODULE_CACHE_DISABLED && !isWatchMode && !nsPrefix) {
           if (!(interp as any).__loadCache) (interp as any).__loadCache = new Set<string>();
           if ((interp as any).__loadCache.has(resolvedPath)) return null;
           (interp as any).__loadCache.add(resolvedPath);
@@ -681,8 +682,23 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
         const tokens = lex(src, resolvedPath);
         const ast = parse(tokens);
 
+        // L-07: namespace 파라미터 있으면 로드 전 함수 목록 스냅샷
+        const ctx = (interp as any).context;
+        const fnsBefore: Set<string> = nsPrefix && ctx?.functions instanceof Map
+          ? new Set(ctx.functions.keys())
+          : new Set();
+
         // Evaluate module (control blocks like [FUNC] allowed)
-        const result = (interp as any).interpret(ast);
+        (interp as any).interpret(ast);
+
+        // L-07: 새로 추가된 함수에 ns/ 접두사 별칭 등록 (수집 후 일괄 추가)
+        if (nsPrefix && ctx?.functions instanceof Map) {
+          const toAlias: [string, any][] = [];
+          for (const [name, def] of ctx.functions.entries()) {
+            if (!fnsBefore.has(name)) toAlias.push([`${nsPrefix}/${name}`, def]);
+          }
+          for (const [aliasName, def] of toAlias) ctx.functions.set(aliasName, def);
+        }
 
         return null;
       } catch (e: any) {
