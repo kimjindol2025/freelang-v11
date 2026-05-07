@@ -252,15 +252,33 @@ export function createMariadbModule() {
     },
 
     // mariadb_batch db [{sql params type}] → [{ok result}]
-    "mariadb_batch": (db: string, queries: Array<{sql: string, params?: any[], type?: string}>) =>
-      queries.map((q) => {
+    "mariadb_batch": (db: string, queries: Array<{sql: string, params?: any[], type?: string}>) => {
+      if (!Array.isArray(queries) || queries.length === 0) return [];
+
+      // exec 타입만 있으면 단일 spawnSync로 처리 (성능 최적화)
+      const allExec = queries.every(q => q.type === "exec" || !q.type);
+      if (allExec && queries.length > 1) {
+        const sqls = queries.map(q => bindParams(q.sql, q.params ?? []));
+        const combined = "SET autocommit=0;\nBEGIN;\n" + sqls.join(";\n") + ";\nCOMMIT;";
+        try {
+          runMariadb(db, combined);
+          return queries.map(() => ({ ok: true }));
+        } catch (e: any) {
+          try { runMariadb(db, "ROLLBACK"); } catch {}
+          return queries.map(() => ({ ok: false, error: e.message }));
+        }
+      }
+
+      // SELECT/ONE 타입이 있으면 개별 처리 (반환값 필요)
+      return queries.map((q) => {
         const bound = bindParams(q.sql, q.params ?? []);
         try {
           if (q.type === "exec") return { ok: true, result: runMariadb(db, bound) };
           if (q.type === "one")  return { ok: true, result: parseRows(runMariadb(db, bound))[0] ?? null };
           return { ok: true, result: parseRows(runMariadb(db, bound)) };
         } catch (e: any) { return { ok: false, error: e.message }; }
-      }),
+      });
+    },
 
     // ── 풀 방식 (영구 연결) ───────────────────────────────────────────────────
     // mariadb_pool_connect config → poolId
