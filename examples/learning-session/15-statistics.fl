@@ -1,0 +1,123 @@
+;; 통계 계산기 — 평균/중앙값/분산/표준편차/분위수/이상치
+
+(let [;; 기초 연산
+      sum      (fn [xs] (reduce + 0 xs))
+      mean     (fn [xs] (/ (sum xs) (length xs)))
+
+      ;; 정렬된 배열에서 중앙값
+      median   (fn [xs]
+                 (let [s (sort xs (fn [a b] (< a b)))
+                       n (length s)
+                       m (floor (/ n 2))]
+                   (if (= (- n (* 2 m)) 0)
+                     (/ (+ (get s (- m 1)) (get s m)) 2)
+                     (get s m))))
+
+      ;; 분산 (모분산)
+      variance (fn [xs]
+                 (let [mu (mean xs)]
+                   (/ (sum (map (fn [x]
+                                  (let [d (- x mu)]
+                                    (* d d)))
+                                xs))
+                      (length xs))))
+
+      ;; 표준편차
+      stdev    (fn [xs] (math_sqrt (variance xs)))
+
+      ;; 백분위수 (선형 보간)
+      percentile (fn [xs p]
+                   (let [s  (sort xs (fn [a b] (< a b)))
+                         n  (length s)
+                         idx (/ (* p (- n 1)) 100)
+                         lo  (floor idx)
+                         hi  (+ lo 1)
+                         fr  (- idx lo)]
+                     (if (>= hi n)
+                       (get s (- n 1))
+                       (+ (get s lo) (* fr (- (get s hi) (get s lo)))))))
+
+      ;; Q1, Q3, IQR
+      iqr-stats (fn [xs]
+                  (let [q1  (percentile xs 25)
+                        q3  (percentile xs 75)
+                        iqr (- q3 q1)]
+                    {"q1" q1 "q3" q3 "iqr" iqr}))
+
+      ;; 이상치 탐지 (Tukey 방식: Q1-1.5*IQR ~ Q3+1.5*IQR 벗어난 값)
+      outliers (fn [xs]
+                 (let [st   (iqr-stats xs)
+                       q1   (get st "q1")
+                       q3   (get st "q3")
+                       iqr  (get st "iqr")
+                       lo   (- q1 (* 1.5 iqr))
+                       hi   (+ q3 (* 1.5 iqr))]
+                   (filter (fn [x] (or (< x lo) (> x hi))) xs)))
+
+      ;; 빈도 분포 (구간 수 지정)
+      histogram (fn [xs bins]
+                  (let [mn  (reduce (fn [a x] (if (< x a) x a)) (first xs) xs)
+                        mx  (reduce (fn [a x] (if (> x a) x a)) (first xs) xs)
+                        w   (/ (- mx mn) bins)]
+                    (map (fn [i]
+                           (let [lo (+ mn (* i w))
+                                 hi (+ lo w)
+                                 cnt (length (filter (fn [x]
+                                                       (if (= i (- bins 1))
+                                                         (and (>= x lo) (<= x hi))
+                                                         (and (>= x lo) (< x hi))))
+                                                     xs))]
+                             {"lo" (round-to lo 1) "hi" (round-to hi 1) "count" cnt}))
+                         (range bins))))
+
+      round-to (fn [n p]
+                 (let [f (reduce * 1 (map (fn [_] 10) (range p)))]
+                   (/ (round (* n f)) f)))
+
+      ;; 보고서 출력
+      report   (fn [label xs]
+                 (let [n    (length xs)
+                       mu   (round-to (mean xs) 2)
+                       med  (round-to (median xs) 2)
+                       sd   (round-to (stdev xs) 2)
+                       mn   (reduce (fn [a x] (if (< x a) x a)) (first xs) xs)
+                       mx   (reduce (fn [a x] (if (> x a) x a)) (first xs) xs)
+                       st   (iqr-stats xs)
+                       outs (outliers xs)]
+                   (println (str "─── " label " ───"))
+                   (println (str "  N=" n "  최소=" mn "  최대=" mx))
+                   (println (str "  평균=" mu "  중앙값=" med "  표준편차=" sd))
+                   (println (str "  Q1=" (round-to (get st "q1") 2)
+                                 "  Q3=" (round-to (get st "q3") 2)
+                                 "  IQR=" (round-to (get st "iqr") 2)))
+                   (if (> (length outs) 0)
+                     (println (str "  이상치: " outs))
+                     (println "  이상치: 없음"))
+                   (println "")))
+
+      ;; 히스토그램 출력
+      show-hist (fn [label xs bins]
+                  (println (str "─── " label " 분포 ───"))
+                  (let [hist (histogram xs bins)
+                        max-cnt (reduce (fn [a h] (if (> (get h "count") a) (get h "count") a))
+                                        0 hist)]
+                    (map (fn [h]
+                           (let [bar (str-repeat "█" (get h "count"))
+                                 lbl (str (get h "lo") "~" (get h "hi"))]
+                             (println (str "  " lbl "\t" bar " (" (get h "count") ")"))))
+                         hist))
+                  (println ""))
+
+      ;; 데이터셋
+      scores   [72 85 90 88 76 95 68 82 79 91
+                84 73 87 93 66 78 89 94 71 83]
+
+      salaries [3200 3500 4100 2800 5200 3800 4500 3100
+                6800 3300 4200 2900 3700 4800 3000 9500]]
+
+  (println "=== 통계 분석 리포트 ===")
+  (println "")
+  (report "시험 점수 (20명)" scores)
+  (report "월급 데이터 (만원, 16명)" salaries)
+  (show-hist "시험 점수" scores 5)
+  (show-hist "월급" salaries 4))
