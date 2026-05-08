@@ -114,6 +114,19 @@ function _fl_file_copy(s, d) { require("fs").copyFileSync(s, d); }
 function _fl_file_rename(o, n) { require("fs").renameSync(o, n); }
 function _fl_file_size(p) { try { return require("fs").statSync(p).size; } catch(e) { return 0; } }
 function _fl_file_modified(p) { try { return require("fs").statSync(p).mtimeMs; } catch(e) { return 0; } }
+function _fl_file_mkdir(p) { try { require("fs").mkdirSync(p, { recursive: true }); } catch(e) {} }
+function _fl_file_rmdir(p) { try { require("fs").rmSync(p, { recursive: true, force: true }); } catch(e) {} }
+function _fl_file_list(p) { try { return require("fs").readdirSync(p); } catch(e) { return []; } }
+function _fl_process_run(cmd) { try { const {execSync}=require("child_process"); return execSync(cmd,{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_run_args(cmd, args) { try { const {execSync}=require("child_process"); return execSync(cmd+" "+(args||[]).join(" "),{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_exec(cmd) { try { const {execSync}=require("child_process"); return execSync(cmd,{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_exec_args(cmd, args) { try { const {execSync}=require("child_process"); return execSync(cmd+" "+(args||[]).join(" "),{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_spawn(cmd, args) { try { const {spawnSync}=require("child_process"); const r=spawnSync(cmd,args||[],{encoding:"utf8"}); return r.stdout||""; } catch(e) { return ""; } }
+function _fl_process_kill(pid) { try { process.kill(pid); } catch(e) {} }
+function _fl_process_wait(pid) { return null; }
+function _fl_env_get(k) { return process.env[k] || null; }
+function _fl_env_set(k, v) { process.env[k] = String(v); }
+function _fl_env_all() { return process.env; }
 function _fl_readline(prompt) {
   if (prompt) process.stdout.write(prompt);
   try {
