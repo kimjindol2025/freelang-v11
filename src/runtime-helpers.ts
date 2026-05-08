@@ -108,6 +108,22 @@ function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.
 function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
 function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
 function _fl_file_exists(p) { return require("fs").existsSync(p); }
+function _fl_readline(prompt) {
+  if (prompt) process.stdout.write(prompt);
+  try {
+    const fs = require("fs");
+    const parts = [];
+    const b = Buffer.alloc(1);
+    while (true) {
+      const n = fs.readSync(process.stdin.fd, b, 0, 1);
+      if (n === 0) return parts.length === 0 ? null : parts.join("");
+      const c = b[0];
+      if (c === 10) break;
+      if (c !== 13) parts.push(String.fromCharCode(c));
+    }
+    return parts.join("");
+  } catch(e) { return null; }
+}
 function _fl_shell_capture(cmd) {
   try {
     const {execSync} = require("child_process");

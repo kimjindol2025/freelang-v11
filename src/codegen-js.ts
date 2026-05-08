@@ -56,6 +56,8 @@ const BUILTIN_MAP: Record<string, string> = {
   "file-write": "_fl_file_write",
   "file-exists": "_fl_file_exists",
   "file_exists": "_fl_file_exists",
+  "readline": "_fl_readline",
+  "read-line": "_fl_readline",
   "char_at": "_fl_char_at",
   "char-at": "_fl_char_at",
   "substring": "_fl_substring",
