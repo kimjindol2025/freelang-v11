@@ -107,8 +107,11 @@ const BUILTIN_MAP: Record<string, string> = {
   "str-index-of": "_fl_str_index_of",
   "str_index_of": "_fl_str_index_of",
   "join": "_fl_join",
+  "str-join": "_fl_join",
   "split": "_fl_split",
+  "str-split": "_fl_split",
   "repeat": "_fl_repeat",
+  "str-repeat": "_fl_repeat",
 
   // 맵/객체
   "get": "_fl_get",
