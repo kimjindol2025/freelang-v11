@@ -948,6 +948,12 @@
     "const _fl_file_read = (p) => require('fs').readFileSync(p,'utf8');"
     "const _fl_file_write = (p,c) => require('fs').writeFileSync(p,c);"
     "const _fl_file_exists = (p) => require('fs').existsSync(p);"
+    "const _fl_file_delete = (p) => { try { require('fs').unlinkSync(p); } catch(e) {} };"
+    "const _fl_file_append = (p,c) => require('fs').appendFileSync(p,String(c));"
+    "const _fl_file_copy = (s,d) => require('fs').copyFileSync(s,d);"
+    "const _fl_file_rename = (o,n) => require('fs').renameSync(o,n);"
+    "const _fl_file_size = (p) => { try { return require('fs').statSync(p).size; } catch(e) { return 0; } };"
+    "const _fl_file_modified = (p) => { try { return require('fs').statSync(p).mtimeMs; } catch(e) { return 0; } };"
     "const file_read = (p) => _fl_file_read(String(p));"
     "const file_write = (p,c) => _fl_file_write(String(p),String(c));"
     "const file_exists = (p) => _fl_file_exists(String(p));"
@@ -1243,25 +1249,25 @@
 ; file-read/file-write: prelude에 const로 정의됨 (중복 방지)
 
 [FUNC file-append :params [path content]
-  :body (file_append (str path) (str content))]
+  :body (_fl_file_append (str path) (str content))]
 
 [FUNC file-exists? :params [path]
   :body (file_exists (str path))]
 
 [FUNC file-delete :params [path]
-  :body (file_delete (str path))]
+  :body (_fl_file_delete (str path))]
 
 [FUNC file-copy :params [src dest]
-  :body (file_copy (str src) (str dest))]
+  :body (_fl_file_copy (str src) (str dest))]
 
 [FUNC file-rename :params [old new]
-  :body (file_rename (str old) (str new))]
+  :body (_fl_file_rename (str old) (str new))]
 
 [FUNC file-size :params [path]
-  :body (file_size (str path))]
+  :body (_fl_file_size (str path))]
 
 [FUNC file-modified :params [path]
-  :body (file_modified (str path))]
+  :body (_fl_file_modified (str path))]
 
 [FUNC file-json :params [path]
   :body (json-parse (file_read (str path)))]
@@ -1392,11 +1398,12 @@
       (/ $dot (* $mag1 $mag2))))]
 
 
-[FUNC do-run :params [$input]
-  :body (let [[$output (str "/tmp/fl-run-" (now-ms) ".js")]]
+[FUNC do-run :params [$input $extra-args]
+  :body (let [[$output (str "/tmp/fl-run-" (now-ms) ".js")]
+              [$args-str (str-join $extra-args " ")]]
           (do
             (compile-file $input $output)
-            (shell-exec (str "node " $output) ".")
+            (shell-exec (str "node " $output " " $args-str) ".")
             (file-delete $output)))]
 
 [FUNC cli-main :params []
@@ -1405,8 +1412,9 @@
             (if (= (length $argv) 0) null
               (let [[$cmd (get $argv 0)]]
                 (if (= $cmd "run")
-                  (let [[$input (get $argv 1)]]
-                    (do-run $input))
+                  (let [[$input (get $argv 1)]
+                        [$extra (slice $argv 2 (length $argv))]]
+                    (do-run $input $extra))
                   (let [[$input (get $argv 0)]
                         [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
                     (compile-file $input $output)))))))]

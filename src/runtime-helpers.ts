@@ -108,6 +108,12 @@ function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.
 function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
 function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
 function _fl_file_exists(p) { return require("fs").existsSync(p); }
+function _fl_file_delete(p) { try { require("fs").unlinkSync(p); } catch(e) {} }
+function _fl_file_append(p, c) { require("fs").appendFileSync(p, String(c)); }
+function _fl_file_copy(s, d) { require("fs").copyFileSync(s, d); }
+function _fl_file_rename(o, n) { require("fs").renameSync(o, n); }
+function _fl_file_size(p) { try { return require("fs").statSync(p).size; } catch(e) { return 0; } }
+function _fl_file_modified(p) { try { return require("fs").statSync(p).mtimeMs; } catch(e) { return 0; } }
 function _fl_readline(prompt) {
   if (prompt) process.stdout.write(prompt);
   try {

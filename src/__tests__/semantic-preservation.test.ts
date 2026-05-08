@@ -59,11 +59,17 @@ function compileWithBootstrap(flFile: string): CompilationResult {
  * 현재: stage1.js 자체 컴파일 버그로 인해 skip
  */
 function compileWithStage1(flFile: string): CompilationResult {
-  // Phase 4 백로그: stage1.js 파라미터 버그 해결 후 활성화
-  return {
-    success: false,
-    error: 'Phase 4: stage1.js 파라미터 누락 버그 미해결 상태'
-  };
+  const jsFile = flFile.replace('.fl', '.stage1.js');
+  try {
+    execSync(
+      `node ${path.join(PROJECT_ROOT, 'stage1.js')} run self/all.fl ${flFile} ${jsFile}`,
+      { cwd: PROJECT_ROOT, stdio: 'pipe' }
+    );
+    const jsCode = fs.readFileSync(jsFile, 'utf-8');
+    return { success: true, jsCode };
+  } catch (e) {
+    return { success: false, error: String(e) };
+  }
 }
 
 /**
@@ -143,7 +149,7 @@ describe('L2 Proof: Semantic Preservation (Stage1 vs Bootstrap)', () => {
   });
 
   describe('L2 증명 준비 (Phase 4 이후)', () => {
-    it.skip('stage1.js: 파라미터 버그 해결 후 활성화', () => {
+    it('stage1.js: bootstrap과 동등성 검증 (file-delete 버그 수정됨)', () => {
       // TODO: Phase 4에서 stage1.js 파라미터 누락 버그 수정 후
       // compileWithStage1 함수 활성화 및 이 테스트 실행
       const flFile = path.join(TESTS_DIR, '01-arithmetic.fl');
