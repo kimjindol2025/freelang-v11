@@ -1801,7 +1801,7 @@ loop().catch(e => {
       const flatten = (arr: any[]): any[] => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
       return flatten(args[0]);
     }
-    case "unique":
+    case "unique": case "distinct":
       return Array.isArray(args[0]) ? [...new Set(args[0])] : [];
     case "sort":
       if (!Array.isArray(args[0])) return [];
@@ -1823,11 +1823,12 @@ loop().catch(e => {
       });
     }
     case "zip": {
-      // (zip arr1 arr2) → [[a1 b1] [a2 b2] ...]
+      // (zip keys vals) → Map<key, val>
       const a = Array.isArray(args[0]) ? args[0] : [];
       const b = Array.isArray(args[1]) ? args[1] : [];
-      const len = Math.min(a.length, b.length);
-      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
+      const m = new Map<any, any>();
+      for (let i = 0; i < a.length; i++) m.set(a[i], b[i] ?? null);
+      return m;
     }
     case "zip-with": {
       // (zip-with f arr1 arr2) → [(f a1 b1) (f a2 b2) ...]

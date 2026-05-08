@@ -442,6 +442,44 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "str-contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str_contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "includes?":     (s: string, sub: string) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? (s as any[]).includes(sub) : false,
+    // str-pad (s width [char] [dir]) — dir: "right"(기본)/"left"
+    "str-pad": (s: string, width: number, ch?: string, dir?: string): string => {
+      const str = String(s ?? ""); const w = Number(width); const c = (String(ch ?? " ")[0]) ?? " ";
+      if (str.length >= w) return str;
+      const pad = c.repeat(w - str.length);
+      return (dir === "left" || dir === ":left") ? pad + str : str + pad;
+    },
+    "str_pad": (s: string, width: number, ch?: string, dir?: string): string => {
+      const str = String(s ?? ""); const w = Number(width); const c = (String(ch ?? " ")[0]) ?? " ";
+      if (str.length >= w) return str;
+      const pad = c.repeat(w - str.length);
+      return (dir === "left" || dir === ":left") ? pad + str : str + pad;
+    },
+    // str-repeat s n
+    "str-repeat": (s: string, n: number): string => String(s ?? "").repeat(Math.max(0, Math.trunc(Number(n)))),
+    "str_repeat": (s: string, n: number): string => String(s ?? "").repeat(Math.max(0, Math.trunc(Number(n)))),
+    // flatten — 1단계 중첩 해제
+    "flatten": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [arr];
+      return (arr as any[]).reduce((acc: any[], v: any) => Array.isArray(v) ? acc.concat(v) : (acc.push(v), acc), []);
+    },
+    // distinct — 중복 제거 (순서 유지)
+    "distinct": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      const seen = new Set<any>(); const out: any[] = [];
+      for (const v of arr) {
+        const k = (v !== null && typeof v === "object") ? JSON.stringify(v) : v;
+        if (!seen.has(k)) { seen.add(k); out.push(v); }
+      }
+      return out;
+    },
+    // zip keys vals → Map
+    "zip": (keys: any[], vals: any[]): Map<any, any> => {
+      const m = new Map<any, any>();
+      const ks = Array.isArray(keys) ? keys : []; const vs = Array.isArray(vals) ? vals : [];
+      for (let i = 0; i < ks.length; i++) m.set(ks[i], vs[i] ?? null);
+      return m;
+    },
     // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
     "inc":           (n: number) => (typeof n === "number" ? n + 1 : Number(n) + 1),
     "dec":           (n: number) => (typeof n === "number" ? n - 1 : Number(n) - 1),
