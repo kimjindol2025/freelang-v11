@@ -730,8 +730,16 @@ export class Parser {
     const peekPos = this.pos + 1;
     if (peekPos >= this.tokens.length) return false;
     const nextToken = this.tokens[peekPos];
-    // If next token is a variable or non-symbol value, it's an array literal
-    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket || nextToken.type === T.LBracket;
+    // Symbol(일반 변수)도 배열 리터럴 요소가 될 수 있음 — generic type은 대문자 시작 또는 단일 대문자 관례
+    // [a b c] 처럼 소문자 심볼로 시작하면 배열 리터럴로 처리
+    if (nextToken.type === T.Symbol) {
+      const v = nextToken.value;
+      // 소문자 시작 심볼 → 배열 리터럴 (변수명)
+      // 대문자 단일 글자 (T, E, K, V 등) → generic type parameter
+      const isGenericType = v.length <= 2 && v === v.toUpperCase() && /^[A-Z]/.test(v);
+      return !isGenericType;
+    }
+    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket || nextToken.type === T.LBracket || nextToken.type === T.LParen;
   }
 
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions

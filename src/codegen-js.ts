@@ -82,7 +82,7 @@ const BUILTIN_MAP: Record<string, string> = {
   "first": "_fl_first",
   "last": "_fl_last",
   "rest": "_fl_rest",
-  "append": "_fl_append", "slice": "_fl_slice",
+  "append": "_fl_append", "concat": "_fl_concat", "slice": "_fl_slice",
   "take": "_fl_take", "drop": "_fl_drop",
   "zip": "_fl_zip", "flatten": "_fl_flatten",
   "reverse": "_fl_reverse", "sort": "_fl_sort",

@@ -71,6 +71,7 @@ function _fl_first(l) { return (l && l.length > 0) ? l[0] : null; }
 function _fl_last(l) { return (l && l.length > 0) ? l[l.length - 1] : null; }
 function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
 function _fl_append(l, x) { return [...(l || []), x]; }
+function _fl_concat(a, b) { return Array.isArray(a) && Array.isArray(b) ? [...a, ...b] : String(a || "") + String(b || ""); }
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
 function _fl_values(o) { return o ? Object.values(o) : []; }
 var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
@@ -175,7 +176,7 @@ let __argv__ = _fl_get_argv();
 export const HELPER_FUNCTIONS = [
   '_plus', '_minus', '_star', '_slash', '_gt', '_lt', '_eq', '_gt_eq', '_lt_eq', '_not', '_and', '_or', '_concat',
   '_fl_null_q', '_fl_true_q', '_fl_false_q', '_fl_number_q', '_fl_string_q', '_fl_list_q', '_fl_array_q', '_fl_map_q', '_fl_fn_q',
-  '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
+  '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_concat', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
   '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_str_to_num', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
   '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture',
   '_fl_take', '_fl_drop', '_fl_zip', '_fl_flatten', '_fl_reverse', '_fl_sort'
