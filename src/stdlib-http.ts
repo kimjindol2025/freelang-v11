@@ -335,8 +335,11 @@ export function createHttpModule() {
         if (body)  headers["Content-Type"] = "application/json";
         return { url, method, headers, body };
       });
+      // 전체 타임아웃 = 개별 최대 타임아웃 + 2초 오버헤드 (기본 12s, 최대 60s)
+      const maxReqTimeout = fetchReqs.reduce((m: number, r: any) => Math.max(m, r.timeout ?? 10000), 10000);
+      const globalTimeout = Math.min(maxReqTimeout + 2000, 60000);
       const result = spawnSync(process.execPath, ["-e", FETCH_PARALLEL_SCRIPT], {
-        input: JSON.stringify(fetchReqs), timeout: 30000, encoding: "utf8"
+        input: JSON.stringify(fetchReqs), timeout: globalTimeout, encoding: "utf8"
       });
       if (result.error) return normReqs.map(() => ({ status: 0, body: "", error: result.error!.message }));
       try {

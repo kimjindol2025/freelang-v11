@@ -13,6 +13,7 @@ import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
+import { ReturnSignal } from "./return-signal";
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
 import { registerVMFunction } from "./vm-eligible"; // Phase 3-E: VM 함수 등록
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase A: 통일 에러
@@ -1104,30 +1105,49 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return undefined;
   }
 
+  // ── return ───────────────────────────────────────────────────────
+  // (return expr) — fn 본체 내 early exit. try/catch를 통과해 함수 경계에서 캐치됨
+  if (op === "return") {
+    const val = expr.args.length > 0 ? ev(expr.args[0]) : null;
+    throw new ReturnSignal(val);
+  }
+
   // ── map-vals / map-keys ───────────────────────────────────────────
+  // (map-vals m)   → values array  (alias for values)
+  // (map-keys m)   → keys array    (alias for keys)
   // (map-vals f m) → new map with f applied to each value
   // (map-keys f m) → new map with f applied to each key
-  if ((op === "map-vals" || op === "map_vals" || op === "map-keys" || op === "map_keys") && expr.args.length === 2) {
-    const fn = ev(expr.args[0]);
-    const m  = ev(expr.args[1]);
-    const applyFn = (fn: any, arg: any): any => {
-      if (typeof fn === "function") return fn(arg);
-      return callFn(fn, [arg]);
-    };
+  if (op === "map-vals" || op === "map_vals" || op === "map-keys" || op === "map_keys") {
     const isKey = op === "map-keys" || op === "map_keys";
-    if (m instanceof Map) {
-      const out = new Map();
-      for (const [k, v] of (m as Map<any,any>).entries())
-        out.set(isKey ? applyFn(fn, k) : k, isKey ? v : applyFn(fn, v));
-      return out;
+
+    // 1-arg: (map-keys m) / (map-vals m) → keys or values array
+    if (expr.args.length === 1) {
+      const m = ev(expr.args[0]);
+      if (m instanceof Map) return isKey ? [...(m as Map<any,any>).keys()] : [...(m as Map<any,any>).values()];
+      if (m && typeof m === "object" && !Array.isArray(m)) return isKey ? Object.keys(m) : Object.values(m);
+      return [];
     }
-    if (m && typeof m === "object" && !Array.isArray(m)) {
-      const out: Record<string, any> = {};
-      for (const [k, v] of Object.entries(m))
-        out[isKey ? String(applyFn(fn, k)) : k] = isKey ? v : applyFn(fn, v);
-      return out;
+
+    // 2-arg: (map-keys f m) / (map-vals f m) → transformed map
+    if (expr.args.length === 2) {
+      const fn = ev(expr.args[0]);
+      const m  = ev(expr.args[1]);
+      const applyFn = (fn: any, arg: any): any =>
+        typeof fn === "function" ? fn(arg) : callFn(fn, [arg]);
+      if (m instanceof Map) {
+        const out = new Map();
+        for (const [k, v] of (m as Map<any,any>).entries())
+          out.set(isKey ? applyFn(fn, k) : k, isKey ? v : applyFn(fn, v));
+        return out;
+      }
+      if (m && typeof m === "object" && !Array.isArray(m)) {
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(m))
+          out[isKey ? String(applyFn(fn, k)) : k] = isKey ? v : applyFn(fn, v);
+        return out;
+      }
+      return m;
     }
-    return m;
   }
 
   // ── defstruct ─────────────────────────────────────────────────────

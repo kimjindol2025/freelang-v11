@@ -1,5 +1,32 @@
 # Changelog
 
+## [v11.6.5] — 2026-05-08 (return early exit, map-keys/vals 1-arg, http-parallel timeout)
+
+### 언어 개선
+- **`(return expr)`**: fn 본체 내 early exit. try/catch 블록을 통과해 함수 경계까지 전파됨 (`ReturnSignal` 패턴)
+  - `callUserFunction` / `callFunctionValue` / `callUserFunctionTCO` 모두 처리
+  - `evalTryBlock`에서 재throw — try가 가로채지 않음
+
+### 함수 개선
+- **`map-keys m`** / **`map-vals m`** 1인자 형식 추가: 키/값 배열 반환 (기존 2인자 변환 형식 유지)
+
+### 성능
+- **`http-parallel` 타임아웃**: 고정 30s → 개별 요청 최대 timeout + 2s 오버헤드 (기본 12s, 최대 60s)
+
+---
+
+## [v11.6.4] — 2026-05-08 (map-vals, map-keys, db-query-one)
+
+### 신규 함수
+- **`map-vals f m`**: 맵의 모든 값에 함수 적용 → 새 맵 반환 (FL fn 객체 지원)
+- **`map-keys f m`**: 맵의 모든 키에 함수 적용 → 새 맵 반환
+- **`db-query-one db sql [params]`**: CLI 연결 문자열 또는 pool ID 자동 감지 — 첫 번째 행 또는 `nil`
+
+### 확인
+- `str-join` 2인자 구분자: `(str-join $list ", ")` 이미 작동 중 (v11.5부터)
+
+---
+
 ## [v11.6.3] — 2026-05-08 (P0 DX — http-get-data, server-html status, set-interval fn ref)
 
 ### 신규 함수

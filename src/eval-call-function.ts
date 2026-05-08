@@ -11,6 +11,7 @@ import { isTailCall } from "./tco";
 import { globalProfiler } from "./profiler";
 import { vmFunctionRegistry } from "./vm-eligible"; // Phase 3-E
 import { VM } from "./vm"; // Phase 3-E
+import { ReturnSignal, isReturnSignal } from "./return-signal";
 
 const _callVM = new VM(); // Phase 3-E
 
@@ -253,6 +254,9 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
       }
       result = interp.eval(func.body);
       propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
+    } catch (e) {
+      if (isReturnSignal(e)) { result = e.value; }
+      else throw e;
     } finally {
       interp.callDepth--;
       _callStack.pop();
@@ -273,7 +277,13 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
       for (let i = 0; i < func.params.length; i++) {
         interp.context.variables.set(func.params[i], args[i]);
       }
-      const result = interp.eval(func.body);
+      let result: any;
+      try {
+        result = interp.eval(func.body);
+      } catch (e) {
+        if (isReturnSignal(e)) return e.value;
+        throw e;
+      }
       if (result && typeof result === "object" && (result as any).__FL_RECUR__) {
         args = (result as any).__args;
         continue;
@@ -313,6 +323,9 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
     }
     result = interp.eval(fn.body);
     propagateMutations(interp, fn.capturedEnv, paramSet, savedStack);
+  } catch (e) {
+    if (isReturnSignal(e)) { result = e.value; }
+    else throw e;
   } finally {
     interp.callDepth--;
     interp.context.variables.restoreStack(savedStack);
@@ -435,6 +448,9 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
               interp.context.variables.set(func.params[j], currentArgs[j]);
             }
             result = interp.eval(func.body);
+          } catch (e) {
+            if (isReturnSignal(e)) { result = e.value; }
+            else throw e;
           } finally {
             interp.context.variables.restoreStack(savedStack);
           }
@@ -446,6 +462,9 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
               interp.context.variables.set(func.params[j], currentArgs[j]);
             }
             result = interp.eval(func.body);
+          } catch (e) {
+            if (isReturnSignal(e)) { result = e.value; }
+            else throw e;
           } finally {
             interp.context.variables.pop();
           }

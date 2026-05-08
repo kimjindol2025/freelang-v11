@@ -263,6 +263,7 @@ export class Interpreter {
         }
       }
     } catch (e: any) {
+      if (e && e.constructor && e.constructor.name === "ReturnSignal") throw e;
       if (e instanceof Error && this.currentLine > 0 && !e.message.includes("FreeLang line")) {
         e.message = `FreeLang line ${this.currentLine}: ${e.message}`;
       }
@@ -1657,7 +1658,7 @@ export class Interpreter {
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
     const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
     const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","pipe","->","->>","as->","?.","?.","|>","let","set","if","if-let","when","when-let","unless","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals"]);
+    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","pipe","->","->>","as->","?.","?.","|>","let","set","if","if-let","when","when-let","unless","cond","do","begin","progn","loop","recur","while","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
@@ -1914,10 +1915,12 @@ export class Interpreter {
     try {
       return evalBuiltin(this, op, args, expr);
     } catch (err: any) {
+      // ReturnSignal은 가로채지 않고 함수 경계로 전파
+      if (err && err.constructor && err.constructor.name === "ReturnSignal") throw err;
       const line = expr.line ?? this.currentLine;
       const col = (expr as any).col ?? 0;
       // 첫 번째 (at line ...) 만 유지 — 중복 방지
-      const enhancedMsg = err.message.includes("(at line ")
+      const enhancedMsg = (err.message ?? "").includes("(at line ")
         ? err.message
         : `${err.message} (at line ${line}, col ${col})`;
 
