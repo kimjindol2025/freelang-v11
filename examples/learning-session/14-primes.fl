@@ -1,0 +1,107 @@
+;; 소수 탐험기 — 에라토스테네스의 체 / 소인수분해 / 쌍둥이소수 / 골드바흐
+
+(let [;; 소수 판별 — loop 없이 filter 조합
+      prime?    (fn [n]
+                  (if (< n 2) false
+                    (= 0 (length (filter
+                                   (fn [d] (= (- n (* (floor (/ n d)) d)) 0))
+                                   (range 2 (+ 1 (floor (math_sqrt n)))))))))
+
+      ;; 에라토스테네스의 체
+      sieve     (fn [n]
+                  (loop [cands (range 2 (+ n 1))
+                         primes []]
+                    (if (or (= (length cands) 0)
+                            (> (* (first cands) (first cands)) n))
+                      (concat primes cands)
+                      (let [p (first cands)]
+                        (recur (filter
+                                 (fn [x] (not (= (- x (* (floor (/ x p)) p)) 0)))
+                                 (rest cands))
+                               (append primes p))))))
+
+      ;; 소인수 분해
+      factorize (fn [n]
+                  (loop [m n d 2 factors []]
+                    (cond
+                      (< m 2)
+                      factors
+                      (> (* d d) m)
+                      (append factors m)
+                      (= (- m (* (floor (/ m d)) d)) 0)
+                      (recur (floor (/ m d)) d (append factors d))
+                      :else
+                      (recur m (+ d 1) factors))))
+
+      ;; 소인수 분해 문자열
+      factor-str (fn [n]
+                   (let [fs (factorize n)]
+                     (if (= (length fs) 1)
+                       (str n " (소수)")
+                       (let [grouped (reduce
+                                       (fn [acc f]
+                                         (let [last-g (last acc)]
+                                           (if (and (not (= last-g nil))
+                                                    (= (get last-g "b") f))
+                                             (concat (slice acc 0 (- (length acc) 1))
+                                                     [(assoc last-g "e" (+ (get last-g "e") 1))])
+                                             (append acc {"b" f "e" 1}))))
+                                       []
+                                       fs)]
+                         (str-join
+                           (map (fn [g]
+                                  (if (= (get g "e") 1)
+                                    (str (get g "b"))
+                                    (str (get g "b") "^" (get g "e"))))
+                                grouped)
+                           " × ")))))
+
+      ;; 쌍둥이 소수
+      twin-primes (fn [limit]
+                    (let [ps (sieve limit)]
+                      (filter (fn [p] (prime? (+ p 2))) ps)))
+
+      ;; 골드바흐 추측
+      goldbach  (fn [n]
+                  (let [ps (sieve n)]
+                    (first (filter (fn [p] (prime? (- n p))) ps))))
+
+      ;; 소수 밀도
+      prime-density (fn [lo hi]
+                      (let [cnt (length (filter prime? (range lo (+ hi 1))))]
+                        (/ (* cnt 100) (+ (- hi lo) 1))))]
+
+  ;; 1. 소수 목록
+  (let [ps (sieve 100)]
+    (println "=== 100 이하 소수 ===")
+    (println (str-join (map str ps) " "))
+    (println (str "총 " (length ps) "개"))
+    (println ""))
+
+  ;; 2. 소인수 분해
+  (println "=== 소인수 분해 ===")
+  (map (fn [n] (println (str "  " n " = " (factor-str n))))
+       [12 60 100 360 1024 9999 10007])
+  (println "")
+
+  ;; 3. 쌍둥이 소수
+  (println "=== 50 이하 쌍둥이 소수 ===")
+  (map (fn [p] (println (str "  (" p ", " (+ p 2) ")")))
+       (twin-primes 50))
+  (println "")
+
+  ;; 4. 골드바흐 추측
+  (println "=== 골드바흐 추측 ===")
+  (map (fn [n]
+         (let [p (goldbach n)]
+           (println (str "  " n " = " p " + " (- n p)))))
+       [10 20 28 50 100])
+  (println "")
+
+  ;; 5. 소수 밀도
+  (println "=== 구간별 소수 밀도 ===")
+  (map (fn [lo]
+         (let [hi  (+ lo 99)
+               pct (/ (round (* (prime-density lo hi) 10)) 10)]
+           (println (str "  " lo "~" hi ": " pct "%"))))
+       [2 100 500 1000]))
