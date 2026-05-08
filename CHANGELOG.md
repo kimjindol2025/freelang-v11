@@ -1,5 +1,52 @@
 # Changelog
 
+## [v11.6.15] — 2026-05-08 (자기호출 무한재귀 7개 추가 수정)
+
+### 버그 수정
+
+**file-is-file?/file-is-dir? + process-exists?/getcwd/chdir/pid/pid-parent 무한재귀**
+
+`_fl_*` native 미구현으로 wrapper가 자기 자신을 호출하던 버그 7개 수정.
+
+| 함수 | 원인 |
+|------|------|
+| `file-is-file?` | `file_is_file` → `_fl_file_is_file` |
+| `file-is-dir?` | `file_is_dir` → `_fl_file_is_dir` |
+| `process-exists?` | `process_exists` → `_fl_process_exists` |
+| `getcwd` | `process_getcwd` → `_fl_process_getcwd` |
+| `chdir` | `process_chdir` → `_fl_process_chdir` |
+| `pid` | `process_pid` → `_fl_process_pid` |
+| `pid-parent` | `process_ppid` → `_fl_process_ppid` |
+
+Commit: 00885598 | Tests: 903/903 | Fixed-Point: 5/5
+
+---
+
+## [v11.6.14] — 2026-05-08 (자기호출 무한재귀 13개 수정 + 스킵 테스트 활성화)
+
+### 버그 수정
+
+**file-mkdir/rmdir/list + process-* + env-* 무한재귀 13개**
+
+```
+file-mkdir / file-rmdir / file-list
+process-run / process-run-args / process-exec / process-exec-args
+process-spawn / process-kill / process-wait
+env-get / env-set / env-all
+```
+
+**stage1.js file-delete 무한재귀 + do-run argv 누락**
+- `file_delete` → `_fl_file_delete` native 호출로 수정
+- `do-run` extra argv 전달 누락 수정
+
+**테스트 스킵 해제**
+- `semantic-preservation`: `compileWithStage1` 실제 구현 + `it.skip` → `it`
+- 결과: Tests 903/903 (0 skip)
+
+Commit: 9b9a9605, 635d7023
+
+---
+
 ## [v11.6.13] — 2026-05-08 (L2 고정점 재달성 — stage1.js 레거시 중복 헬퍼 제거)
 
 ### 버그 수정
