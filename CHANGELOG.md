@@ -1,5 +1,20 @@
 # Changelog
 
+## [v11.6.18] — 2026-05-08 (stdlib 정확성 버그 4개)
+
+### 버그 수정
+
+| 함수 | 버그 | 수정 |
+|------|------|------|
+| `index-of` | 배열에 항상 -1 반환 (문자열 전용이었음) | `Array.isArray` 분기 추가 |
+| `get` | 3번째 인수 기본값 무시, 항상 null | `args[2]` 기본값 반영 |
+| `zip` | Map 객체 반환 (`{1: a, 2: b}`) | `[[a1 b1] [a2 b2] ...]` 배열 of pairs로 수정 |
+| `str-to-num` | 잘못된 입력에 NaN 반환 (2개 중복 case) | 양쪽 모두 `null` 반환으로 통일 |
+
+Commit: 0409894c | Tests: 903/903 | Fixed-Point: 5/5
+
+---
+
 ## [v11.6.17] — 2026-05-08 (fn-exists? 전체 커버리지 + is-nil/is-empty alias)
 
 ### 버그 수정
