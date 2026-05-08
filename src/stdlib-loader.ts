@@ -232,8 +232,82 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       }
       return _aliases["assoc-in"](m, path, newVal);
     },
+    // ── format (sprintf 스타일) ──────────────────────────────────────────────
+    // (format "%.2f" 3.14) → "3.14"  (format "%d items" 5) → "5 items"
+    "format": (fmt: string, ...args: any[]): string => {
+      let i = 0;
+      return String(fmt).replace(/%([-+]?\d*\.?\d*)?([dfsoxXbeE%])/g, (_, flags, spec) => {
+        if (spec === "%") return "%";
+        const val = args[i++];
+        const precMatch = (flags ?? "").match(/\.(\d+)/);
+        const prec = precMatch ? parseInt(precMatch[1]) : 6;
+        const width = parseInt((flags ?? "").replace(/\.\d+/, "")) || 0;
+        const pad = (s: string) => width > 0 ? s.padStart(width) : width < 0 ? s.padEnd(-width) : s;
+        switch (spec) {
+          case "d": return pad(String(Math.trunc(Number(val))));
+          case "f": return pad(Number(val).toFixed(prec));
+          case "e": return pad(Number(val).toExponential(prec));
+          case "E": return pad(Number(val).toExponential(prec).toUpperCase());
+          case "s": return pad(String(val ?? ""));
+          case "o": return pad(Number(val).toString(8));
+          case "x": return pad(Number(val).toString(16));
+          case "X": return pad(Number(val).toString(16).toUpperCase());
+          case "b": return pad(Number(val).toString(2));
+          default:  return pad(String(val));
+        }
+      });
+    },
+
+    // ── date-format / date-add ──────────────────────────────────────────────
+    // (date-format ts-ms "yyyy-MM-dd") → "2026-05-08"
+    "date-format": (ts: number, fmt: string): string => {
+      const d = new Date(Number(ts));
+      return String(fmt)
+        .replace("yyyy", String(d.getFullYear()))
+        .replace("MM",   String(d.getMonth() + 1).padStart(2, "0"))
+        .replace("dd",   String(d.getDate()).padStart(2, "0"))
+        .replace("HH",   String(d.getHours()).padStart(2, "0"))
+        .replace("mm",   String(d.getMinutes()).padStart(2, "0"))
+        .replace("ss",   String(d.getSeconds()).padStart(2, "0"))
+        .replace("SSS",  String(d.getMilliseconds()).padStart(3, "0"));
+    },
+    // (date-add ts-ms :days 7) → new ts-ms
+    "date-add": (ts: number, unit: string, amount: number): number => {
+      const d = new Date(Number(ts));
+      const u = String(unit).replace(/^:/, "");
+      if (u === "days"    || u === "day")    d.setDate(d.getDate() + Number(amount));
+      else if (u === "hours"   || u === "hour")   d.setHours(d.getHours() + Number(amount));
+      else if (u === "minutes" || u === "minute") d.setMinutes(d.getMinutes() + Number(amount));
+      else if (u === "months"  || u === "month")  d.setMonth(d.getMonth() + Number(amount));
+      else if (u === "years"   || u === "year")   d.setFullYear(d.getFullYear() + Number(amount));
+      else if (u === "seconds" || u === "second") d.setSeconds(d.getSeconds() + Number(amount));
+      else if (u === "weeks"   || u === "week")   d.setDate(d.getDate() + Number(amount) * 7);
+      return d.getTime();
+    },
+    // (date-diff ts1-ms ts2-ms :days) → number
+    "date-diff": (ts1: number, ts2: number, unit: string): number => {
+      const ms = Number(ts2) - Number(ts1);
+      const u = String(unit).replace(/^:/, "");
+      if (u === "days")    return Math.floor(ms / 86400000);
+      if (u === "hours")   return Math.floor(ms / 3600000);
+      if (u === "minutes") return Math.floor(ms / 60000);
+      if (u === "seconds") return Math.floor(ms / 1000);
+      if (u === "weeks")   return Math.floor(ms / 604800000);
+      return ms;
+    },
+    // (date-parse "2026-05-08") → ts-ms
+    "date-parse": (s: string): number => {
+      const ts = Date.parse(String(s));
+      return isNaN(ts) ? 0 : ts;
+    },
+
     // ── regex 별칭 (re-* → Clojure 스타일) ───────────────────────────────────
-    "re-match":   (pattern: string, s: string): boolean => {
+    // re-match: 첫 번째 매치 문자열 반환 (nil if no match) — v11.6.7 변경
+    "re-match":   (pattern: string, s: string): string | null => {
+      try { const m = String(s).match(new RegExp(pattern)); return m ? m[0] : null; } catch { return null; }
+    },
+    // re-test: boolean 체크 (기존 re-match 동작)
+    "re-test": (pattern: string, s: string): boolean => {
       try { return new RegExp(pattern).test(String(s)); } catch { return false; }
     },
     "re-find":    (pattern: string, s: string): string | null => {

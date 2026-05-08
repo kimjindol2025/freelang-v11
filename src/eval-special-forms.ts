@@ -1131,6 +1131,45 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return undefined;
   }
 
+  // ── partial ───────────────────────────────────────────────────────
+  // (partial f arg1 arg2 ...) → fn that prepends partialArgs to call
+  if (op === "partial") {
+    if (expr.args.length < 1) throwArgCount("partial", ">=1", expr.args.length, expr.line);
+    const fn = ev(expr.args[0]);
+    const partialArgs = expr.args.slice(1).map(ev);
+    return (...rest: any[]) => {
+      const allArgs = [...partialArgs, ...rest];
+      if (typeof fn === "function") return fn(...allArgs);
+      return callFn(fn, allArgs);
+    };
+  }
+
+  // ── group-by ─────────────────────────────────────────────────────
+  // (group-by key-fn coll) → {:key [items...]} map
+  // key-fn: keyword string (:status) or FL function
+  if (op === "group-by" || op === "group_by") {
+    if (expr.args.length < 2) throwArgCount("group-by", "2", expr.args.length, expr.line);
+    const keyFn = ev(expr.args[0]);
+    const coll   = ev(expr.args[1]);
+    if (!Array.isArray(coll)) return new Map();
+    const getKey = (item: any): any => {
+      if (typeof keyFn === "string") {
+        const k = keyFn.startsWith(":") ? keyFn.slice(1) : keyFn;
+        if (item instanceof Map) return item.get(keyFn) ?? item.get(k) ?? null;
+        return item?.[k] ?? item?.[keyFn] ?? null;
+      }
+      if (typeof keyFn === "function") return keyFn(item);
+      return callFn(keyFn, [item]);
+    };
+    const result = new Map<any, any[]>();
+    for (const item of coll) {
+      const key = getKey(item);
+      if (!result.has(key)) result.set(key, []);
+      result.get(key)!.push(item);
+    }
+    return result;
+  }
+
   // ── return ───────────────────────────────────────────────────────
   // (return expr) — fn 본체 내 early exit. try/catch를 통과해 함수 경계에서 캐치됨
   if (op === "return") {
