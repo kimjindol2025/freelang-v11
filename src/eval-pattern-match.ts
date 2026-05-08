@@ -2,6 +2,7 @@
 // Phase 58: interpreter.ts에서 분리된 패턴 매칭 로직
 
 import { PatternMatch, TryBlock, ThrowExpression, Pattern, LiteralPattern, VariablePattern, WildcardPattern, ListPattern, StructPattern, OrPattern, RangePattern } from "./ast";
+import { isReturnSignal } from "./return-signal";
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -62,6 +63,8 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
   try {
     result = interp.eval(tryBlock.body);
   } catch (error: any) {
+    // ReturnSignal은 try/catch가 가로채지 않음 — 함수 경계까지 전파
+    if (isReturnSignal(error)) throw error;
     let handled = false;
 
     if (tryBlock.catchClauses && tryBlock.catchClauses.length > 0) {
