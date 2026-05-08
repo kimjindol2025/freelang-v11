@@ -192,7 +192,9 @@ export class JSCodegen {
     for (const node of nodes) {
       const code = this.genNode(node);
       if (code !== "") {
-        bodyParts.push(code);
+        // JS ASI 함정 방지: 최상위 문장 뒤 세미콜론 강제 삽입
+        // `(` 또는 `[` 로 시작하는 다음 줄이 앞 줄의 함수 호출로 파싱되는 것을 막음
+        bodyParts.push(code.endsWith(";") ? code : code + ";");
       }
     }
     parts.push(...bodyParts);
