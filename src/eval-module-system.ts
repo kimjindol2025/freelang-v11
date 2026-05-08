@@ -11,6 +11,12 @@ import { extractParamNames } from "./ast-helpers";
 import { lex } from "./lexer";
 import { parse } from "./parser";
 
+interface ModuleCache {
+  functions: Map<string, FreeLangFunction>;
+  variables: Map<string, any>;
+}
+const MODULE_CACHE = new Map<string, ModuleCache>();
+
   // Phase 6 Step 4: Evaluate module block
   // Module 정의를 등록하고 내부 함수들을 평가
 export function evalModuleBlock(interp: Interpreter, moduleBlock: ModuleBlock): void {
@@ -193,59 +199,62 @@ export function evalImportBlock(interp: Interpreter, importBlock: ImportBlock): 
       throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
     }
 
-    // 순환 import 방지
-    if (interp.importedFiles.has(absPath)) {
-      return;
-    }
-    interp.importedFiles.add(absPath);
-
-    // 서브 인터프리터로 FL 파일 실행
-    const src = fs.readFileSync(absPath, "utf-8");
-    const subInterp = new Interpreter();
-    subInterp.currentFilePath = absPath;
-    subInterp.importedFiles = interp.importedFiles; // 순환 방지 공유
-
-    // stdlib 로드 전 함수 목록 스냅샷 (내장  함수 제외용)
-    const builtinFuncs = new Set<string>(subInterp.context.functions.keys());
-
-    // We also want to capture the initial variables, but normally they are none.
-
-    subInterp.interpret(parse(lex(src)));
-    if (process.env.FL_IMPORT_DEBUG === "1") {
-      const userDefined: string[] = [];
-      for (const k of subInterp.context.functions.keys()) {
-        if (!builtinFuncs.has(k)) userDefined.push(k);
+    // 모듈 캐시 조회 (캐시 미스 시에만 파싱 + 순환 import 체크)
+    let cached = MODULE_CACHE.get(absPath);
+    if (!cached) {
+      // 순환 import 방지: 현재 import 체인에서 처리 중인 파일인지 확인
+      if (interp.importedFiles.has(absPath)) {
+        return;
       }
-      console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
+      interp.importedFiles.add(absPath);
+
+      // 서브 인터프리터로 FL 파일 실행
+      const src = fs.readFileSync(absPath, "utf-8");
+      const subInterp = new Interpreter();
+      subInterp.currentFilePath = absPath;
+      subInterp.importedFiles = interp.importedFiles; // 순환 방지 공유
+
+      const builtinFuncs = new Set<string>(subInterp.context.functions.keys());
+      subInterp.interpret(parse(lex(src)));
+
+      if (process.env.FL_IMPORT_DEBUG === "1") {
+        const userDefined: string[] = [];
+        for (const k of subInterp.context.functions.keys()) {
+          if (!builtinFuncs.has(k)) userDefined.push(k);
+        }
+        console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
+      }
+
+      // 사용자 정의 함수/변수 추출 후 캐시 저장
+      const userFuncs = new Map<string, FreeLangFunction>();
+      for (const [funcName, func] of subInterp.context.functions) {
+        if (!builtinFuncs.has(funcName)) userFuncs.set(funcName, func);
+      }
+      const userVars = new Map<string, any>(subInterp.context.variables.snapshot());
+      cached = { functions: userFuncs, variables: userVars };
+      MODULE_CACHE.set(absPath, cached);
     }
 
-    // 사용자 정의 함수 추출 (stdlib 내장 제외)
+    // 캐시 또는 신규 로드 결과를 현재 인터프리터에 등록
     const effectivePrefix = alias ?? prefix;
-    for (const [funcName, func] of subInterp.context.functions) {
-      if (builtinFuncs.has(funcName)) continue; // 내장 함수 skip
-
+    for (const [funcName, func] of cached.functions) {
       if (selective && selective.length > 0) {
-        // :only 필터: prefix 없이 직접 등록
         if (selective.includes(funcName)) {
           interp.context.functions.set(funcName, func);
         }
       } else {
-        // prefix:funcName 형식으로 등록
         interp.context.functions.set(`${effectivePrefix}:${funcName}`, func);
       }
     }
 
-    // 모듈 변수 추출: get top-level bindings from subInterp's global scope
-    const globalVars = subInterp.context.variables.snapshot();
-    for (const [varName, varVal] of globalVars) {
-        if (selective && selective.length > 0) {
-            if (selective.includes(varName)) {
-                interp.context.variables.setGlobal(varName, varVal);
-            }
-        } else {
-            // Register as prefix:varName
-            interp.context.variables.setGlobal(`${effectivePrefix}:${varName}`, varVal);
+    for (const [varName, varVal] of cached.variables) {
+      if (selective && selective.length > 0) {
+        if (selective.includes(varName)) {
+          interp.context.variables.setGlobal(varName, varVal);
         }
+      } else {
+        interp.context.variables.setGlobal(`${effectivePrefix}:${varName}`, varVal);
+      }
     }
   }
 
