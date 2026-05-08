@@ -26,6 +26,7 @@
 - [HTTP Retry](#http-retry-s4-04-2026-05-07)
 - [frequencies](#frequencies-s4-03-2026-05-07)
 - [매크로 시스템](#매크로-시스템-defmacro)
+- [v11.6.x 신규 기능](#v116x-신규--확인된-기능-2026-05-08) — `->` 스레딩, `if-let` 평탄형, `some?`, 기본값 인자, `return`, `mariadb-transaction`, 상호재귀
 
 ---
 
@@ -1952,6 +1953,209 @@ POST body 자동 JSON 파싱. `server-req-body` + `json-parse` 조합 대체.
 ```
 
 > `server-req-body` → 문자열 반환 / `server-req-json` → 파싱된 맵 반환
+---
+
+## v11.6.x 신규 / 확인된 기능 (2026-05-08)
+
+### `(-> x f1 f2 f3)` — 스레딩 (Thread-first)
+
+함수 중첩 대신 왼쪽→오른쪽으로 읽히는 파이프라인.
+
+```lisp
+; 기존 중첩 표현
+(str-upper (str-trim (str-replace $s " " "_")))
+
+; -> 스레딩
+(-> $s
+    (str-replace " " "_")
+    str-trim
+    str-upper)
+
+; 인자가 있는 함수는 첫 번째 인자 위치에 삽입됨
+(-> 5 (+ 1) (* 2) (- 3))  ; → ((5+1)*2)-3 = 9
+```
+
+`->>` (thread-last)도 지원 — 마지막 인자 위치에 삽입.
+
+---
+
+### `(if-let [$x expr] then else)` — 평탄형 (v11.6.6+)
+
+nil 체크와 바인딩을 한 번에. 기존 이중 괄호 `[[x expr]]`도 유지.
+
+```lisp
+; ✅ v11.6.6 평탄형 (권장)
+(if-let [$user (db-query-one DB "SELECT * FROM users WHERE id=?" [$id])]
+  (server-json $user)
+  (server-json {:error "not found"} 404))
+
+; 구버전 이중 괄호 (하위 호환)
+(if-let [[user (db-query-one DB "..." [$id])]]
+  (server-json user)
+  (server-json {:error "not found"} 404))
+```
+
+**반환값**: `then` 결과 (truthy) 또는 `else` 결과 (nil/false)
+
+---
+
+### `(some? x)` / `(not-nil? x)` — nil 아님 확인 (v11.6.6+)
+
+```lisp
+; 기존
+(if (not (nil? $user)) ...)
+
+; v11.6.6
+(if (some? $user) ...)
+(if (not-nil? $user) ...)
+
+; filter와 함께
+(filter some? $list)  ; nil 제거
+```
+
+**반환값**: boolean
+
+---
+
+### `(assoc m key val)` / `(dissoc m key)` — 맵 키 추가/삭제
+
+불변 — 원본 수정 없이 새 맵 반환.
+
+```lisp
+(define m {:name "Alice" :age 25})
+
+(assoc m :email "alice@example.com")
+; → {:name "Alice" :age 25 :email "alice@example.com"}
+
+(dissoc m :age)
+; → {:name "Alice"}
+
+; 체이닝
+(-> m
+    (assoc :email "alice@example.com")
+    (dissoc :age))
+```
+
+---
+
+### `(defn f [$a [$b default]])` — 기본값 인자 (v11.6.6+)
+
+미전달 인자에 기본값 자동 적용. 정의 시점 평가 (Python 스타일).
+
+```lisp
+(defn paginate [$sql [$page 1] [$limit 20]]
+  (str $sql " LIMIT " $limit " OFFSET " (* (- $page 1) $limit)))
+
+(paginate "SELECT * FROM users")       ; page=1, limit=20
+(paginate "SELECT * FROM users" 2)     ; page=2, limit=20
+(paginate "SELECT * FROM users" 3 50)  ; page=3, limit=50
+
+; 표현식도 가능
+(defn with-ts [$data [$ts (now-ms)]]
+  (assoc $data :created_at $ts))
+```
+
+**규칙**: 기본값 인자는 반드시 오른쪽에 몰아서 선언.
+
+---
+
+### `(return expr)` — 함수 내 early exit (v11.6.5+)
+
+try/catch 블록을 통과해 함수 경계까지 전파.
+
+```lisp
+(defn find-user [$id]
+  (when (= $id 0) (return nil))
+  (when (< $id 0) (return {:error "invalid id"}))
+  (db-query-one DB "SELECT * FROM users WHERE id=?" [$id]))
+
+; try 안에서도 작동
+(defn safe-parse [$json]
+  (try
+    (when (nil? $json) (return nil))
+    (json-parse $json)
+    (catch $e nil)))
+```
+
+---
+
+### `(mariadb-transaction db stmts)` — 원자적 다중 실행
+
+여러 SQL을 BEGIN/COMMIT으로 묶어 원자적 실행. 실패 시 ROLLBACK.
+
+```lisp
+; CLI 모드
+(define result
+  (mariadb-transaction DB
+    [{:sql "INSERT INTO orders (user_id, total) VALUES (?, ?)"
+      :params [$user_id $total]}
+     {:sql "UPDATE inventory SET stock = stock - ? WHERE item_id = ?"
+      :params [$qty $item_id]}]))
+
+(if (get result :ok)
+  (server-json {:success true})
+  (server-json {:error (get result :error)} 500))
+```
+
+**반환값**: `{:ok true :count N}` 또는 `{:ok false :error "..."}`
+
+---
+
+### `(mariadb-pool-transaction pool-id stmts)` — 풀 트랜잭션
+
+```lisp
+(define POOL (mariadb-pool-create "localhost" "mydb" "user" "pass"))
+
+(mariadb-pool-transaction POOL
+  [{:sql "UPDATE accounts SET balance = balance - ? WHERE id = ?"
+    :params [$amount $from_id]}
+   {:sql "UPDATE accounts SET balance = balance + ? WHERE id = ?"
+    :params [$amount $to_id]}])
+```
+
+---
+
+### 상호 재귀 (Mutual Recursion) — declare 불필요
+
+FreeLang은 함수 본체를 **호출 시점**에 평가합니다. 두 함수가 서로 참조해도 **호출 전에 둘 다 정의**되면 정상 작동합니다.
+
+```lisp
+; 정의 순서 무관 — 호출 전에 둘 다 정의되면 됨
+(defn my-even? [$n]
+  (if (= $n 0) true (my-odd? (- $n 1))))
+
+(defn my-odd? [$n]
+  (if (= $n 0) false (my-even? (- $n 1))))
+
+(my-even? 10)  ; → true
+(my-odd? 7)    ; → true
+```
+
+**주의**: `my-even?` 정의 시점에 `my-odd?`는 없어도 됨. 실제 호출 시 조회.
+
+---
+
+### `(http-get-data url [headers])` / `(http-post-data url body [headers])` — JSON 직접 반환 (v11.6.3+)
+
+`{:status :data}` 이중구조 없이 파싱된 JSON 바로 반환.
+
+```lisp
+; 기존 (이중구조)
+(define resp (http-get-json "https://api.example.com/user/1"))
+(define user (get resp :data))
+
+; v11.6.3+
+(define user (http-get-data "https://api.example.com/user/1"))
+(define name (get user "name"))
+
+; POST
+(define result (http-post-data
+  "https://api.example.com/items"
+  (json-stringify {:name "Widget"})))
+```
+
+**반환값**: 파싱된 map/array, 또는 `nil` (에러/파싱 실패)
+
 ---
 
 ## 참고

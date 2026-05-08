@@ -1494,6 +1494,7 @@ loop().catch(e => {
     case "odd?":
       return typeof args[0] === "number" && args[0] % 2 !== 0;
     case "some?":
+    case "not-nil?":
       return args[0] !== null && args[0] !== undefined;
     case "positive?":
       return typeof args[0] === "number" && args[0] > 0;

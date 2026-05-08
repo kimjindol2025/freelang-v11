@@ -30,6 +30,12 @@ export const TYPE_PREDICATES: PredicateDef[] = [
     doc: "값이 null 또는 undefined인지",
   },
   {
+    name: "some?",
+    aliases: ["not-nil?"],
+    test: (v) => v !== null && v !== undefined,
+    doc: "값이 nil이 아닌지 — (not (nil? x)) 단축형",
+  },
+  {
     name: "nil-or-empty?",
     aliases: [],
     test: (v) => v === null || v === undefined || (v && v.length === 0),

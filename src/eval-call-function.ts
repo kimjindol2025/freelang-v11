@@ -190,6 +190,14 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     return (func.body as Function)(...args);
   }
 
+  // 기본값 적용: 부족한 인자를 paramDefaults로 채움
+  if (func.paramDefaults) {
+    while (args.length < func.params.length) {
+      const def = func.paramDefaults[args.length];
+      if (def !== undefined) args = [...args, def];
+      else break;
+    }
+  }
   if (func.params.length > args.length) {
     throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args.length}`);
   }
@@ -308,6 +316,14 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
 
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
+  }
+  // 기본값 적용
+  if (fn.paramDefaults) {
+    while (args.length < fn.params.length) {
+      const def = fn.paramDefaults[args.length];
+      if (def !== undefined) args = [...args, def];
+      else break;
+    }
   }
   if (interp.callDepth >= MAX_CALL_DEPTH) {
     throw new Error(`FreeLang line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) — possible infinite recursion`);

@@ -1,5 +1,21 @@
 # Changelog
 
+## [v11.6.6] — 2026-05-08 (if-let 평탄형, some?/not-nil?, 기본값 인자)
+
+### 언어 개선
+- **`if-let` 평탄형**: `(if-let [$x expr] then else)` — 기존 `[[x expr]]` 이중 괄호 불필요. 두 형식 모두 지원
+- **함수 기본값 인자**: `(defn f [$a [$b 10]] ...)` — `(f 1)` 호출 시 `$b = 10`
+
+### 신규 함수
+- **`some?`**: `(some? x)` → `(not (nil? x))` 단축형 (기존 구현됨, 문서화)
+- **`not-nil?`**: `some?` alias — `(not-nil? x)`
+
+### 확인 (이미 구현됨)
+- `->` 스레딩: `(-> $x f1 f2 f3)` 정상 작동
+- `assoc`/`dissoc`: `(assoc m :k v)` / `(dissoc m :k)` 정상 작동
+
+---
+
 ## [v11.6.5] — 2026-05-08 (return early exit, map-keys/vals 1-arg, http-parallel timeout)
 
 ### 언어 개선
