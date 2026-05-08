@@ -1131,6 +1131,135 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return undefined;
   }
 
+  // ── 테스트 프레임워크 ─────────────────────────────────────────────
+  // (deftest "name" body...)  — 테스트 등록 + 즉시 실행
+  // (describe "suite" body...) — 동일 (별칭)
+  // (it "name" body...)        — describe 내부용 (동일)
+  if (op === "deftest" || op === "describe" || op === "it") {
+    const ctx = interp.context as any;
+    if (!ctx._testResults) ctx._testResults = { passed: 0, failed: 0, errors: [] as string[] };
+    const name = expr.args.length > 0 ? String(ev(expr.args[0])) : "(anonymous)";
+    const bodies = expr.args.slice(1);
+    try {
+      for (const b of bodies) ev(b);
+      ctx._testResults.passed++;
+      process.stdout.write(`  ✓ ${name}\n`);
+    } catch (e: any) {
+      ctx._testResults.failed++;
+      const msg = e?.message ?? String(e);
+      ctx._testResults.errors.push(`  ✗ ${name}: ${msg}`);
+      process.stdout.write(`  ✗ ${name}: ${msg}\n`);
+    }
+    return null;
+  }
+
+  // (is expr)          — truthy assertion
+  // (is= expected got) — equality assertion
+  if (op === "is") {
+    const val = expr.args.length > 0 ? ev(expr.args[0]) : false;
+    const msg = expr.args.length > 1 ? String(ev(expr.args[1])) : `Expected truthy, got: ${JSON.stringify(val)}`;
+    if (!val) throw new Error(msg);
+    return val;
+  }
+  if (op === "is=") {
+    if (expr.args.length < 2) throwArgCount("is=", "2", expr.args.length, expr.line);
+    const expected = ev(expr.args[0]);
+    const actual   = ev(expr.args[1]);
+    const eq = JSON.stringify(expected) === JSON.stringify(actual);
+    if (!eq) throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    return actual;
+  }
+
+  // (run-tests)  — 테스트 결과 출력 + 통계 반환
+  if (op === "run-tests") {
+    const ctx = interp.context as any;
+    const r = ctx._testResults ?? { passed: 0, failed: 0, errors: [] };
+    const total = r.passed + r.failed;
+    process.stdout.write(`\nTest Results: ${r.passed}/${total} passed`);
+    if (r.failed > 0) process.stdout.write(` (${r.failed} FAILED)`);
+    process.stdout.write("\n");
+    ctx._testResults = { passed: 0, failed: 0, errors: [] };
+    return { passed: r.passed, failed: r.failed, total };
+  }
+  // (test-summary) — 결과를 Map으로 반환 (출력 없음)
+  if (op === "test-summary") {
+    const ctx = interp.context as any;
+    const r = ctx._testResults ?? { passed: 0, failed: 0, errors: [] };
+    return new Map([["passed", r.passed], ["failed", r.failed], ["total", r.passed + r.failed], ["errors", r.errors]]);
+  }
+
+  // ── import (use 별칭) ─────────────────────────────────────────────
+  // (import "file.fl") — use와 동일하게 파일 로드
+  if (op === "import") {
+    if (expr.args.length < 1) throwArgCount("import", "1", expr.args.length, expr.line);
+    const filePath = String(ev(expr.args[0]));
+    // use 핸들러를 재활용
+    const useExpr = { ...expr, op: "use", args: expr.args };
+    return interp.evalSpecialForm("use", useExpr);
+  }
+
+  // ── migrate — 버전 관리 DB 마이그레이션 ──────────────────────────
+  // (migrate db [["v1" "CREATE TABLE ..."] ["v2" "ALTER TABLE ..."]])
+  // db: string(mariadb DB name) or number(pool-id) or nil(in-memory 테스트)
+  if (op === "migrate") {
+    if (expr.args.length < 2) throwArgCount("migrate", "2", expr.args.length, expr.line);
+    const db    = ev(expr.args[0]);
+    const steps = ev(expr.args[1]);
+    if (!Array.isArray(steps)) throw new Error("migrate: second arg must be [[version sql] ...] array");
+
+    const ctx = interp.context as any;
+
+    // in-memory 모드 (db = null/nil): 실제 SQL 없이 버전 추적만
+    if (db === null || db === undefined) {
+      if (!ctx._migrate_applied) ctx._migrate_applied = new Set<string>();
+      const applied: Set<string> = ctx._migrate_applied;
+      let count = 0;
+      for (const step of steps) {
+        const pair = Array.isArray(step) ? step : [step];
+        const version = String(pair[0]);
+        if (applied.has(version)) continue;
+        applied.add(version);
+        count++;
+        process.stdout.write(`  [migrate] applied: ${version}\n`);
+      }
+      if (count === 0) process.stdout.write("  [migrate] up to date\n");
+      return { applied: count, total: steps.length };
+    }
+
+    // mariadb-exec 함수 참조
+    const execFn = interp.context.functions.get("mariadb_exec") ??
+                   interp.context.functions.get("mariadb-exec");
+    const queryFn = interp.context.functions.get("mariadb_query") ??
+                    interp.context.functions.get("mariadb-query");
+    if (!execFn || !queryFn) throw new Error("migrate: mariadb functions not loaded");
+    const exec  = (sql: string, params: any[] = []) => callFn(execFn.body ?? execFn, [db, sql, params]);
+    const query = (sql: string, params: any[] = []) => callFn(queryFn.body ?? queryFn, [db, sql, params]);
+
+    // _migrations 테이블 생성
+    exec(`CREATE TABLE IF NOT EXISTS _migrations (
+      version VARCHAR(255) PRIMARY KEY,
+      applied_at BIGINT NOT NULL
+    )`);
+
+    // 적용된 버전 조회
+    const rows   = query("SELECT version FROM _migrations") as any[];
+    const applied = new Set((rows ?? []).map((r: any) => String(r.version ?? r[0] ?? "")));
+
+    let count = 0;
+    for (const step of steps) {
+      const pair = Array.isArray(step) ? step : [step];
+      const version = String(pair[0]);
+      const sql     = String(pair[1] ?? "");
+      if (applied.has(version)) continue;
+      exec(sql);
+      exec("INSERT INTO _migrations (version, applied_at) VALUES (?, ?)", [version, Date.now()]);
+      count++;
+      process.stdout.write(`  [migrate] applied: ${version}\n`);
+    }
+    if (count === 0) process.stdout.write("  [migrate] up to date\n");
+    return { applied: count, total: steps.length };
+  }
+
   // ── memoize ──────────────────────────────────────────────────────
   // (memoize fn) → memoized version that caches by JSON(args)
   if (op === "memoize") {

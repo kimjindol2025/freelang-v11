@@ -649,6 +649,18 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       interp.context.functions.set(name, { name, params: [], body: fn });
     }
   }
+  // ── process/signal 별칭 ────────────────────────────────────────────
+  const _processAliases: Record<string, string> = {
+    "on-shutdown": "on_sigterm",
+    "on_shutdown": "on_sigterm",
+    "on-exit":     "on_exit",
+  };
+  for (const [alias, target] of Object.entries(_processAliases)) {
+    if (!interp.context.functions.has(alias) && interp.context.functions.has(target)) {
+      const orig = interp.context.functions.get(target)!;
+      interp.context.functions.set(alias, { ...orig, name: alias });
+    }
+  }
   // ── auth 별칭 등록 (auth_* 함수가 이미 등록된 후 별칭 추가) ──────────
   for (const [alias, target] of Object.entries(_authAliases)) {
     if (!interp.context.functions.has(alias) && interp.context.functions.has(target)) {

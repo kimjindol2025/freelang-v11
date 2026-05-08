@@ -1,5 +1,48 @@
 # Changelog
 
+## [v11.6.11] — 2026-05-08 (deftest/is/run-tests, migrate, on-shutdown, import 별칭)
+
+### 신규 기능
+
+**내장 테스트 프레임워크** — special form으로 구현
+```lisp
+(deftest "덧셈" (is (= (+ 1 2) 3)))
+(deftest "등호" (is= 10 (+ 5 5)))
+(deftest "컬렉션" (is (= 3 (length [1 2 3]))))
+
+(run-tests)
+; Test Results: 3/3 passed
+```
+- `(deftest "name" body...)` — 테스트 등록 + 즉시 실행, ✓/✗ 출력
+- `(is expr)` / `(is expr "msg")` — truthy assertion
+- `(is= expected actual)` — equality assertion
+- `(run-tests)` — 통계 출력 + Map 반환 `{:passed N :failed N :total N}`
+- `(describe ...)` / `(it ...)` — `deftest` 동의어
+
+**버전 관리 DB 마이그레이션**
+```lisp
+; MariaDB 사용
+(migrate "mydb" [
+  ["v1" "CREATE TABLE users (id BIGINT PRIMARY KEY, name VARCHAR(255))"]
+  ["v2" "ALTER TABLE users ADD COLUMN email VARCHAR(255)"]
+])
+; → _migrations 테이블 자동 생성, 미적용 항목만 실행
+
+; nil = in-memory 테스트 모드
+(migrate nil [["v1" "..."] ["v2" "..."]])
+```
+
+### 별칭 추가
+- **`on-shutdown`** → `on-sigterm` (SIGTERM + SIGINT 등록)
+- **`import`** → `use` (파일 로드)
+
+### 확인 (이미 구현됨)
+- **그레이스풀 셧다운**: `on-sigterm`/`on-exit` — SIGTERM 수신 시 핸들러 실행 후 종료
+- **핫 리로드**: `FL_DEV=1 node bootstrap.js run server.fl` — .fl 변경 감지 → 재시작
+- **모듈 시스템**: `(use "utils.fl")` 작동, `(import "utils.fl")` 별칭 추가
+
+---
+
 ## [v11.6.10] — 2026-05-08 (bcrypt-*/jwt-* 별칭 + REST API 패턴 확인)
 
 ### 별칭 추가 (기존 auth_* 함수의 친숙한 이름)
