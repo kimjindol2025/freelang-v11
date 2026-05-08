@@ -1,5 +1,31 @@
 # Changelog
 
+## [v11.6.10] — 2026-05-08 (bcrypt-*/jwt-* 별칭 + REST API 패턴 확인)
+
+### 별칭 추가 (기존 auth_* 함수의 친숙한 이름)
+- **`bcrypt-hash`** → `auth-hash-password` (scrypt 기반, 산업 표준)
+- **`bcrypt-verify`** → `auth-verify-password`
+- **`jwt-sign`** → `auth-jwt-sign` (HS256)
+- **`jwt-verify`** → `auth-jwt-verify`
+- **`jwt-decode`** → `auth-jwt-decode`
+- **`password-hash`** / **`password-verify`** 추가 별칭
+
+### 확인 (이미 구현됨)
+- **라우터 파라미터**: `(server-req-param req "id")` — `/users/:id`, `/posts/:postId/comments/:commentId` 정상 작동
+- **CORS**: `(server-cors response)` — 응답에 CORS 헤더 추가, 전역 자동 적용
+- **쿠키**: `(server-req-cookie req "name")` / `(server-set-cookie "name" "val" opts)` / `(server-html-cookie cookie html)`
+- **파일 업로드**: multipart/form-data 자동 파싱 → `/tmp/fl-uploads/`에 저장
+
+### 통합 테스트 (PASS)
+```lisp
+; /api/login → bcrypt-verify + jwt-sign
+; /api/me → jwt-verify (Authorization: Bearer 헤더)
+; /api/users/:id → server-req-param
+```
+모두 200ms 이내 정상 응답
+
+---
+
 ## [v11.6.9] — 2026-05-08 (log-info/warn/error, memoize, validate, list-min/max)
 
 ### 언어 개선

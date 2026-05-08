@@ -626,9 +626,34 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "hash_md5":      (v: string) => createHash("md5").update(v, "utf8").digest("hex"),
     "hash-md5":      (v: string) => createHash("md5").update(v, "utf8").digest("hex"),
   };
+  // ── auth 친숙한 별칭 (기존 auth_* 함수를 찾아 위임) ─────────────────
+  // 등록된 auth 함수를 래핑해서 bcrypt-*/jwt-* 이름으로 노출
+  const _authAliases: Record<string, string> = {
+    "bcrypt-hash":   "auth_hash_password",
+    "bcrypt_hash":   "auth_hash_password",
+    "bcrypt-verify": "auth_verify_password",
+    "bcrypt_verify": "auth_verify_password",
+    "jwt-sign":      "auth_jwt_sign",
+    "jwt_sign":      "auth_jwt_sign",
+    "jwt-verify":    "auth_jwt_verify",
+    "jwt_verify":    "auth_jwt_verify",
+    "jwt-decode":    "auth_jwt_decode",
+    "jwt_decode":    "auth_jwt_decode",
+    "password-hash":   "auth_hash_password",
+    "password_hash":   "auth_hash_password",
+    "password-verify": "auth_verify_password",
+    "password_verify": "auth_verify_password",
+  };
   for (const [name, fn] of Object.entries(_aliases)) {
     if (!interp.context.functions.has(name)) {
       interp.context.functions.set(name, { name, params: [], body: fn });
+    }
+  }
+  // ── auth 별칭 등록 (auth_* 함수가 이미 등록된 후 별칭 추가) ──────────
+  for (const [alias, target] of Object.entries(_authAliases)) {
+    if (!interp.context.functions.has(alias) && interp.context.functions.has(target)) {
+      const orig = interp.context.functions.get(target)!;
+      interp.context.functions.set(alias, { ...orig, name: alias });
     }
   }
   // ── 강제 override: _aliases보다 우선 등록되어야 할 함수들 ────────────
