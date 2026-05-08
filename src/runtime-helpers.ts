@@ -127,6 +127,13 @@ function _fl_process_wait(pid) { return null; }
 function _fl_env_get(k) { return process.env[k] || null; }
 function _fl_env_set(k, v) { process.env[k] = String(v); }
 function _fl_env_all() { return process.env; }
+function _fl_file_is_file(p) { try { return require("fs").statSync(p).isFile(); } catch(e) { return false; } }
+function _fl_file_is_dir(p) { try { return require("fs").statSync(p).isDirectory(); } catch(e) { return false; } }
+function _fl_process_exists(pid) { try { process.kill(pid, 0); return true; } catch(e) { return false; } }
+function _fl_process_getcwd() { return process.cwd(); }
+function _fl_process_chdir(p) { try { process.chdir(p); } catch(e) {} }
+function _fl_process_pid() { return process.pid; }
+function _fl_process_ppid() { return process.ppid || null; }
 function _fl_readline(prompt) {
   if (prompt) process.stdout.write(prompt);
   try {

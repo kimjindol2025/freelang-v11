@@ -967,6 +967,13 @@
     "const _fl_env_get = (k) => process.env[k]||null;"
     "const _fl_env_set = (k,v) => { process.env[k]=String(v); };"
     "const _fl_env_all = () => process.env;"
+    "const _fl_file_is_file = (p) => { try { return require('fs').statSync(p).isFile(); } catch(e) { return false; } };"
+    "const _fl_file_is_dir = (p) => { try { return require('fs').statSync(p).isDirectory(); } catch(e) { return false; } };"
+    "const _fl_process_exists = (pid) => { try { process.kill(pid,0); return true; } catch(e) { return false; } };"
+    "const _fl_process_getcwd = () => process.cwd();"
+    "const _fl_process_chdir = (p) => { try { process.chdir(p); } catch(e) {} };"
+    "const _fl_process_pid = () => process.pid;"
+    "const _fl_process_ppid = () => process.ppid||null;"
     "const file_read = (p) => _fl_file_read(String(p));"
     "const file_write = (p,c) => _fl_file_write(String(p),String(c));"
     "const file_exists = (p) => _fl_file_exists(String(p));"
@@ -1301,10 +1308,10 @@
   :body (_fl_file_list (str path))]
 
 [FUNC file-is-file? :params [path]
-  :body (file_is_file (str path))]
+  :body (_fl_file_is_file (str path))]
 
 [FUNC file-is-dir? :params [path]
-  :body (file_is_dir (str path))]
+  :body (_fl_file_is_dir (str path))]
 
 ;; self/stdlib/process.fl — Phase 27
 ;; 프로세스/쉘 연산 (native process_* builtin wrapper)
@@ -1328,7 +1335,7 @@
   :body (_fl_process_kill (floor pid))]
 
 [FUNC process-exists? :params [pid]
-  :body (process_exists (floor pid))]
+  :body (_fl_process_exists (floor pid))]
 
 [FUNC process-wait :params [pid]
   :body (_fl_process_wait (floor pid))]
@@ -1348,14 +1355,14 @@
 [FUNC env-all :params []
   :body (_fl_env_all)]
 
-[FUNC getcwd :params [] :body (process_getcwd)]
+[FUNC getcwd :params [] :body (_fl_process_getcwd)]
 
 [FUNC chdir :params [path]
-  :body (process_chdir (str path))]
+  :body (_fl_process_chdir (str path))]
 
-[FUNC pid :params [] :body (process_pid)]
+[FUNC pid :params [] :body (_fl_process_pid)]
 
-[FUNC pid-parent :params [] :body (process_ppid)]
+[FUNC pid-parent :params [] :body (_fl_process_ppid)]
 
 ;; Vector Math Functions (Phase C-9)
 ;; vector-add, vector-dot, vector-magnitude, math-sqrt
