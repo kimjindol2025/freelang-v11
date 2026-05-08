@@ -68,7 +68,15 @@ export function createProcessModule() {
       return loaded;
     },
 
-    "env_get": (key: string): string => process.env[key] ?? "",
+    "env_get": (key: string): string | null => {
+      const val = process.env[key];
+      return (val === undefined || val === "") ? null : val;
+    },
+
+    "env_or": (key: string, defaultVal: any): any => {
+      const val = process.env[key];
+      return (val === undefined || val === "") ? defaultVal : val;
+    },
 
     "env_require": (key: string): string => {
       const val = process.env[key];

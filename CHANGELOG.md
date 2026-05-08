@@ -1,5 +1,25 @@
 # Changelog
 
+## [v11.6.0] — 2026-05-08 (LIR 언어 개선 — 키 정규화 + env_get + alias)
+
+### 언어 개선 (LIR)
+
+- **LIR-002**: `assoc`/`dissoc`에 키워드 키 정규화 추가
+  - `(assoc {} :name "Kim")` → `(get m "name")` 이제 `"Kim"` 반환 ✅
+  - `eval-builtins.ts` assoc/dissoc 케이스 수정
+- **LIR-004**: `http-get-bearer`, `http-post-bearer` kebab alias 자동 등록 확인
+  - `stdlib-kebab-aliases.ts` 자동 변환으로 이미 처리됨
+- **P1**: `env_get` nil 반환 수정
+  - 미정의 환경변수: `""` → `null` 반환 (LIR 원래 의도대로)
+  - `env_or` 헬퍼 추가: `(env-or "KEY" "default")` → 안전한 기본값 처리
+  - `stdlib-process.ts` 수정
+
+### 문서
+- `docs/LANGUAGE-FAULTS.md` — LIR-002 항목 추가
+- `docs/LANGUAGE_IMPROVEMENT_REQUESTS.md` — 해결 현황 반영
+
+---
+
 ## [v11.5.0] — 2026-05-04 (진짜 언어 변경 — kebab alias 자동 등록)
 
 ### ⚠️ 정정: v11.4.3은 도구만이었다

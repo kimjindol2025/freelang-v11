@@ -76,25 +76,32 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
             // Extract line number from FL error messages like "(at line N, col M)"
             const lineMatch = error.message.match(/\(at line (\d+)/);
             if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
-            // Extract file from FreeLangError if available
+            // Extract FLRuntimeError fields
             const flErr = error as any;
             if (flErr.file) errMap.set("file", flErr.file);
-            if (flErr.code) errMap.set("code", flErr.code);
+            const code = flErr.code ?? null;
+            if (code) errMap.set("code", code);
             if (flErr.hint) errMap.set("hint", flErr.hint);
-            // category: FreeLangError에 명시된 값 우선, 없으면 메시지로 추론
-            if (flErr.category) {
-              errMap.set("category", flErr.category);
-            } else {
-              const m = error.message.toLowerCase();
-              let cat = "RUNTIME_ERROR";
-              if (m.includes("not found") || m.includes("undefined") || m.includes("cannot find")) cat = "NOT_FOUND";
-              else if (m.includes("type") || m.includes("is not a")) cat = "TYPE_ERROR";
-              else if (m.includes("arity") || m.includes("argument")) cat = "ARITY";
-              else if (m.includes("timeout")) cat = "TIMEOUT";
-              else if (m.includes("enoent") || m.includes("eacces") || m.includes("network") || m.includes("fetch")) cat = "IO";
-              else if (m.includes("json") || m.includes("parse")) cat = "TYPE_ERROR";
-              errMap.set("category", cat);
-            }
+            // category: code -> category direct map (no message inference)
+            const CODE_TO_CATEGORY: Record<string, string> = {
+              "E_TYPE_NIL":          "TYPE_ERROR",
+              "E_TYPE_MISMATCH":     "TYPE_ERROR",
+              "E_ARG_COUNT":         "ARITY",
+              "E_FN_NOT_FOUND":      "NOT_FOUND",
+              "E_UNDEFINED_VAR":     "NOT_FOUND",
+              "E_UNRESOLVED_SYMBOL": "NOT_FOUND",
+              "E_DIV_BY_ZERO":       "RUNTIME_ERROR",
+              "E_INDEX_OOB":         "RUNTIME_ERROR",
+              "E_INVALID_FORM":      "RUNTIME_ERROR",
+              "E_PURE_VIOLATION":    "RUNTIME_ERROR",
+              "E_STACK_OVERFLOW":    "RUNTIME_ERROR",
+              "E_RUNTIME":           "RUNTIME_ERROR",
+            };
+            const category = flErr.category
+              ?? (code ? CODE_TO_CATEGORY[code] : null)
+              ?? "RUNTIME_ERROR";
+            errMap.set("category", category);
+            errMap.set("type", category);
           } else {
             errMap.set("message", String(error));
           }
