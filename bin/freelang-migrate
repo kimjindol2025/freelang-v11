@@ -146,7 +146,14 @@ function removeDollar(content) {
 // ─────────────────────────────────────────────────────────────
 function transformFile(content, opts = {}) {
   const changes = [];
-  let result = content;
+
+  // 주석 구간 보호: ;로 시작하는 줄 끝까지를 플레이스홀더로 교체 후 복원
+  const commentPlaceholders = [];
+  let result = content.replace(/;[^\n]*/g, (m) => {
+    const idx = commentPlaceholders.length;
+    commentPlaceholders.push(m);
+    return `\x00COMMENT${idx}\x00`;
+  });
 
   // 1. 함수명 변환 (RENAME_MAP)
   for (const [from, to] of Object.entries(RENAME_MAP)) {
@@ -158,6 +165,9 @@ function transformFile(content, opts = {}) {
     result = result.replace(re, () => { count++; return to; });
     if (count > 0) changes.push({ kind: "rename", from, to, count });
   }
+
+  // 주석 복원
+  result = result.replace(/\x00COMMENT(\d+)\x00/g, (_, i) => commentPlaceholders[+i]);
 
   // 2. 인자 순서 변환 (옵션)
   if (opts.argOrder !== false) {
@@ -181,15 +191,15 @@ function transformFile(content, opts = {}) {
 // ─────────────────────────────────────────────────────────────
 function findFlFiles(dir) {
   const files = [];
-  const stack = [dir];
+  const stack = [{ p: dir, isRoot: true }];
   while (stack.length) {
-    const cur = stack.pop();
+    const { p: cur, isRoot } = stack.pop();
     const stat = fs.statSync(cur);
     if (stat.isDirectory()) {
-      if (path.basename(cur).startsWith(".")) continue;
-      if (path.basename(cur) === "node_modules") continue;
+      if (!isRoot && path.basename(cur).startsWith(".")) continue;
+      if (!isRoot && path.basename(cur) === "node_modules") continue;
       for (const ent of fs.readdirSync(cur)) {
-        stack.push(path.join(cur, ent));
+        stack.push({ p: path.join(cur, ent), isRoot: false });
       }
     } else if (cur.endsWith(".fl")) {
       files.push(cur);

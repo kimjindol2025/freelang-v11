@@ -12,9 +12,10 @@ import { execSync } from "child_process";
  * - 규칙 3: 술어 통일 (is_X → X?, 부분)
  */
 
+const MIGRATE_BIN = path.join(__dirname, "../../bin/freelang-migrate");
+const TEMP_DIR = path.join(__dirname, "test-migrate-tmp");
+
 describe("freelang-migrate: v11 → v11.5.x 자동 변환", () => {
-  const MIGRATE_BIN = path.join(__dirname, "../../bin/freelang-migrate");
-  const TEMP_DIR = path.join(__dirname, ".test-migrate-tmp");
 
   // 테스트용 임시 디렉토리
   beforeEach(() => {
@@ -400,15 +401,3 @@ function runMigrate(
   }
 }
 
-// 임시 디렉토리 정의 (위 describe 블록 외)
-function beforeEach(cb: () => void) {
-  if (typeof global.beforeEach === "function") {
-    global.beforeEach(cb);
-  }
-}
-
-function afterEach(cb: () => void) {
-  if (typeof global.afterEach === "function") {
-    global.afterEach(cb);
-  }
-}
