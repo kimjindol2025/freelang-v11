@@ -203,6 +203,11 @@ let __argv__ = _fl_get_argv();
 
 // ═══════════════════════════════════════════════════════
 
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
+
 function _fl_is_digit_q(c) { return (_fl_null_q(c) ? false : ((c >= "0") && (c <= "9"))); };
 function _fl_is_alpha_q(c) { return (_fl_null_q(c) ? false : (((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z")))); };
 function _fl_is_alnum_q(c) { return (_fl_is_digit_q(c) || _fl_is_alpha_q(c)); };

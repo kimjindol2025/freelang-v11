@@ -501,6 +501,8 @@ export function createDataModule() {
     },
 
     // CLAUDE.md 문서화 별칭
+    "is-nil":          (v: any) => v === null || v === undefined,
+    "is-empty":        (v: any) => v === null || v === undefined || (Array.isArray(v) && v.length === 0) || (typeof v === "string" && v.length === 0),
     "str-to-upper":    (s: string) => String(s || "").toUpperCase(),
     "str-to-lower":    (s: string) => String(s || "").toLowerCase(),
     "str-starts-with": (s: string, p: string) => String(s || "").startsWith(String(p || "")),
