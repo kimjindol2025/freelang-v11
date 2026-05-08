@@ -1,0 +1,201 @@
+;; 미니 템플릿 엔진 — {{변수}}, {{#if}}, {{#each}}, {{#unless}}
+
+(let [;; 토큰 타입: "text" | "var" | "if" | "else" | "end" | "each" | "unless"
+      ;; 템플릿 문자열 → 토큰 배열
+      tokenize (fn [tmpl]
+                 (loop [s tmpl tokens []]
+                   (let [pos (str-index-of s "{{")]
+                     (if (= pos -1)
+                       (if (> (length s) 0)
+                         (append tokens {"type" "text" "val" s})
+                         tokens)
+                       (let [pre  (substring s 0 pos)
+                             rest (substring s (+ pos 2))
+                             end  (str-index-of rest "}}")
+                             tag  (str-trim (substring rest 0 end))
+                             after (substring rest (+ end 2))
+                             tokens2 (if (> (length pre) 0)
+                                       (append tokens {"type" "text" "val" pre})
+                                       tokens)
+                             tok  (cond
+                                    (str-starts-with tag "#if ")
+                                    {"type" "if"     "val" (substring tag 4)}
+                                    (str-starts-with tag "#each ")
+                                    {"type" "each"   "val" (substring tag 6)}
+                                    (str-starts-with tag "#unless ")
+                                    {"type" "unless" "val" (substring tag 8)}
+                                    (= tag "#else")
+                                    {"type" "else"   "val" ""}
+                                    (= tag "/if")
+                                    {"type" "end-if"   "val" ""}
+                                    (= tag "/each")
+                                    {"type" "end-each" "val" ""}
+                                    (= tag "/unless")
+                                    {"type" "end-unless" "val" ""}
+                                    :else
+                                    {"type" "var" "val" tag})]
+                         (recur after (append tokens2 tok)))))))
+
+      ;; 컨텍스트에서 점 경로로 값 가져오기 (예: "user.name")
+      get-path (fn [ctx path]
+                 (loop [parts (str-split path ".") val ctx]
+                   (if (or (= (length parts) 0) (= val nil))
+                     val
+                     (recur (rest parts) (get val (first parts))))))
+
+      ;; truthy 판별
+      truthy? (fn [v]
+                (and (not (= v nil))
+                     (not (= v false))
+                     (not (= v ""))
+                     (not (and (array? v) (= (length v) 0)))))
+
+      ;; 토큰 배열 + 컨텍스트 → 렌더링
+      ;; state: {"out" "" "i" 0}
+      render-tokens (fn [tokens ctx]
+                      (loop [i 0 out ""]
+                        (if (>= i (length tokens))
+                          out
+                          (let [tok  (get tokens i)
+                                type (get tok "type")
+                                val  (get tok "val")]
+                            (cond
+                              (= type "text")
+                              (recur (+ i 1) (str out val))
+
+                              (= type "var")
+                              (let [v (get-path ctx val)]
+                                (recur (+ i 1) (str out (if (= v nil) "" (str v)))))
+
+                              (= type "if")
+                              (let [cond-val (truthy? (get-path ctx val))
+                                    ;; if 블록 범위 찾기: end-if 또는 else 까지
+                                    block (loop [j (+ i 1) depth 0 then-toks [] else-toks [] in-else false]
+                                            (if (>= j (length tokens))
+                                              {"then" then-toks "else" else-toks "end" j}
+                                              (let [t (get tokens j)
+                                                    tt (get t "type")]
+                                                (cond
+                                                  (and (= tt "end-if") (= depth 0))
+                                                  {"then" then-toks "else" else-toks "end" (+ j 1)}
+                                                  (and (= tt "else") (= depth 0))
+                                                  (recur (+ j 1) depth then-toks else-toks true)
+                                                  (or (= tt "if") (= tt "each") (= tt "unless"))
+                                                  (if in-else
+                                                    (recur (+ j 1) (+ depth 1) then-toks (append else-toks t) false)
+                                                    (recur (+ j 1) (+ depth 1) (append then-toks t) else-toks false))
+                                                  (or (= tt "end-if") (= tt "end-each") (= tt "end-unless"))
+                                                  (if in-else
+                                                    (recur (+ j 1) (- depth 1) then-toks (append else-toks t) true)
+                                                    (recur (+ j 1) (- depth 1) (append then-toks t) else-toks false))
+                                                  :else
+                                                  (if in-else
+                                                    (recur (+ j 1) depth then-toks (append else-toks t) true)
+                                                    (recur (+ j 1) depth (append then-toks t) else-toks false))))))
+                                    branch (if cond-val (get block "then") (get block "else"))
+                                    result (render-tokens branch ctx)]
+                                (recur (get block "end") (str out result)))
+
+                              (= type "unless")
+                              (let [cond-val (not (truthy? (get-path ctx val)))
+                                    block (loop [j (+ i 1) depth 0 body []]
+                                            (if (>= j (length tokens))
+                                              {"body" body "end" j}
+                                              (let [t (get tokens j)
+                                                    tt (get t "type")]
+                                                (cond
+                                                  (and (= tt "end-unless") (= depth 0))
+                                                  {"body" body "end" (+ j 1)}
+                                                  (or (= tt "if") (= tt "each") (= tt "unless"))
+                                                  (recur (+ j 1) (+ depth 1) (append body t))
+                                                  (or (= tt "end-if") (= tt "end-each") (= tt "end-unless"))
+                                                  (recur (+ j 1) (- depth 1) (append body t))
+                                                  :else
+                                                  (recur (+ j 1) depth (append body t))))))
+                                    result (if cond-val (render-tokens (get block "body") ctx) "")]
+                                (recur (get block "end") (str out result)))
+
+                              (= type "each")
+                              (let [items (get-path ctx val)
+                                    block (loop [j (+ i 1) depth 0 body []]
+                                            (if (>= j (length tokens))
+                                              {"body" body "end" j}
+                                              (let [t (get tokens j)
+                                                    tt (get t "type")]
+                                                (cond
+                                                  (and (= tt "end-each") (= depth 0))
+                                                  {"body" body "end" (+ j 1)}
+                                                  (or (= tt "if") (= tt "each") (= tt "unless"))
+                                                  (recur (+ j 1) (+ depth 1) (append body t))
+                                                  (or (= tt "end-if") (= tt "end-each") (= tt "end-unless"))
+                                                  (recur (+ j 1) (- depth 1) (append body t))
+                                                  :else
+                                                  (recur (+ j 1) depth (append body t))))))
+                                    body  (get block "body")
+                                    result (if (or (= items nil) (not (array? items)))
+                                             ""
+                                             (str-join
+                                               (map (fn [item]
+                                                      (let [item-ctx (if (map? item)
+                                                                       (assoc item "@parent" ctx)
+                                                                       {"." item "@parent" ctx})]
+                                                        (render-tokens body item-ctx)))
+                                                    items)
+                                               ""))]
+                                (recur (get block "end") (str out result)))
+
+                              :else
+                              (recur (+ i 1) out))))))
+
+      ;; 최상위 render
+      render (fn [tmpl ctx]
+               (render-tokens (tokenize tmpl) ctx))
+
+      ;; ── 테스트 ──
+
+      ;; 1. 기본 변수 치환
+      t1 "안녕하세요, {{name}}님! 나이: {{age}}세"
+      c1 {"name" "김민수" "age" 29}
+
+      ;; 2. 조건 (if/else)
+      t2 "상태: {{#if active}}활성{{#else}}비활성{{/if}} | 점수: {{#if score}}{{score}}점{{/if}}"
+      c2a {"active" true  "score" 95}
+      c2b {"active" false "score" 0}
+
+      ;; 3. unless
+      t3 "{{#unless error}}정상 처리 완료{{/unless}}{{#if error}}오류: {{error}}{{/if}}"
+      c3a {"error" nil}
+      c3b {"error" "연결 실패"}
+
+      ;; 4. each 반복
+      t4 "장바구니:\n{{#each items}}- {{name}}: {{price}}원\n{{/each}}합계 확인 요망"
+      c4 {"items" [{"name" "노트북" "price" 1500000}
+                   {"name" "마우스" "price" 35000}
+                   {"name" "키보드" "price" 89000}]}
+
+      ;; 5. 중첩 (if 안에 each)
+      t5 "{{#if users}}사용자 목록:\n{{#each users}}  - {{name}}\n{{/each}}{{/if}}{{#unless users}}사용자 없음{{/unless}}"
+      c5a {"users" [{"name" "Alice"} {"name" "Bob"} {"name" "Charlie"}]}
+      c5b {"users" []}]
+
+  (println "=== 1. 변수 치환 ===")
+  (println (render t1 c1))
+  (println "")
+
+  (println "=== 2. if/else 조건 ===")
+  (println (render t2 c2a))
+  (println (render t2 c2b))
+  (println "")
+
+  (println "=== 3. unless ===")
+  (println (render t3 c3a))
+  (println (render t3 c3b))
+  (println "")
+
+  (println "=== 4. each 반복 ===")
+  (println (render t4 c4))
+  (println "")
+
+  (println "=== 5. 중첩 ===")
+  (println (render t5 c5a))
+  (println (render t5 c5b)))
