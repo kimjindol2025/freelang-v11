@@ -135,6 +135,12 @@ const shell_exec = (cmd, inp) => { try { const {execSync} = require("child_proce
 var math_sqrt = (n) => Math.sqrt(n);
 var math_pow = (a, b) => Math.pow(a, b);
 var math_pi = Math.PI;
+var round = (n) => Math.round(n);
+var floor = (n) => Math.floor(n);
+var ceil = (n) => Math.ceil(n);
+var abs = (n) => Math.abs(n);
+var min = (...args) => Math.min(...args);
+var max = (...args) => Math.max(...args);
 
 // ─ 컬렉션 확장 ─
 function _fl_take(n, arr) { return (arr || []).slice(0, n); }
