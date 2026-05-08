@@ -1,0 +1,107 @@
+;; 마크다운 → HTML 변환기
+;; 지원: # 헤딩, **bold**, *italic*, `code`, - 리스트, > 인용, --- 구분선
+
+(let [;; 짝수=원문 홀수=태그로 감싸기
+      wrap-parts (fn [parts tag-open tag-close]
+                   (reduce
+                     (fn [acc i]
+                       (let [part (get parts i)
+                             odd  (= (- i (* 2 (floor (/ i 2)))) 1)]
+                         (if odd
+                           (str acc tag-open part tag-close)
+                           (str acc part))))
+                     ""
+                     (range (length parts))))
+
+      ;; **bold** 변환
+      apply-bold   (fn [s]
+                     (wrap-parts (str-split s "**") "<strong>" "</strong>"))
+
+      ;; *italic* 변환 (bold 처리 후 남은 단일 *)
+      apply-italic (fn [s]
+                     (wrap-parts (str-split s "*") "<em>" "</em>"))
+
+      ;; `code` 변환
+      apply-code   (fn [s]
+                     (wrap-parts (str-split s "`") "<code>" "</code>"))
+
+      ;; 인라인 변환 체이닝
+      inline (fn [text]
+               (-> text apply-bold apply-italic apply-code))
+
+      ;; 헤딩 판별 및 변환
+      to-heading (fn [line]
+                   (cond
+                     (str-starts-with line "### ") (str "<h3>" (inline (substring line 4)) "</h3>")
+                     (str-starts-with line "## ")  (str "<h2>" (inline (substring line 3)) "</h2>")
+                     (str-starts-with line "# ")   (str "<h1>" (inline (substring line 2)) "</h1>")
+                     :else line))
+
+      ;; 줄 → HTML
+      convert-line (fn [line]
+                     (cond
+                       (= line "")                  ""
+                       (or (= line "---")
+                           (= line "***"))          "<hr>"
+                       (str-starts-with line "# ")  (to-heading line)
+                       (str-starts-with line "## ") (to-heading line)
+                       (str-starts-with line "### ")(to-heading line)
+                       (str-starts-with line "- ")  (str "<li>" (inline (substring line 2)) "</li>")
+                       (str-starts-with line "* ")  (str "<li>" (inline (substring line 2)) "</li>")
+                       (str-starts-with line "> ")  (str "<blockquote>" (inline (substring line 2)) "</blockquote>")
+                       :else                        (if (> (length (str-trim line)) 0)
+                                                      (str "<p>" (inline line) "</p>")
+                                                      "")))
+
+      ;; 연속 <li> → <ul>로 감싸기
+      wrap-lists  (fn [lines]
+                    (let [with-end (append lines "")]
+                      (reduce
+                        (fn [state line]
+                          (let [html     (get state "html")
+                                in-list  (get state "in-list")
+                                is-li    (str-starts-with line "<li>")]
+                            (cond
+                              (and is-li (not in-list))
+                              {"html" (append (append html "<ul>") line) "in-list" true}
+                              (and (not is-li) in-list)
+                              {"html" (append (append html "</ul>") line) "in-list" false}
+                              :else
+                              {"html" (append html line) "in-list" in-list})))
+                        {"html" [] "in-list" false}
+                        with-end)))
+
+      ;; 마크다운 → HTML
+      to-html     (fn [md]
+                    (let [lines  (str-split md "\n")
+                          conv   (map convert-line lines)
+                          state  (wrap-lists conv)
+                          html   (get state "html")]
+                      (str-join (filter (fn [l] (> (length l) 0)) html) "\n")))
+
+      ;; 테스트 마크다운
+      sample (str-join
+               ["# FreeLang v11 소개"
+                ""
+                "## 주요 기능"
+                ""
+                "FreeLang은 **함수형** 언어로 *불변 데이터*를 기본으로 합니다."
+                ""
+                "### 설치 방법"
+                ""
+                "- Node.js v18 이상 필요"
+                "- 외부 npm 패키지 **불필요**"
+                "- `node bootstrap.js compile app.fl` 로 컴파일"
+                ""
+                "> 함수형 프로그래밍은 부작용을 최소화합니다."
+                ""
+                "---"
+                ""
+                "코드 품질과 `가독성`을 *동시에* 잡으세요."]
+               "\n")]
+
+  (println "=== 마크다운 입력 ===")
+  (println sample)
+  (println "")
+  (println "=== HTML 출력 ===")
+  (println (to-html sample)))
