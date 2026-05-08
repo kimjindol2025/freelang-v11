@@ -1,5 +1,23 @@
 # Changelog
 
+## [v11.6.8] — 2026-05-08 (str-pad, str-repeat, zip→Map, flatten, distinct, when/merge 확인)
+
+### 신규 함수
+- **`str-pad`**: `(str-pad s 10)` 우측 패딩, `(str-pad s 10 "-" :left)` 좌측 패딩
+- **`str-repeat`**: `(str-repeat "=" 40)` → `"========================================"`
+- **`flatten`**: `(flatten [[1 2] [3 4]])` → `[1 2 3 4]` (완전 재귀 해제)
+- **`distinct`**: `(distinct [1 1 2 2 3])` → `[1 2 3]` (순서 유지, `unique` alias)
+
+### 함수 변경
+- **`zip`**: 기존 pairs 배열 → **Map 반환** `(zip ["name" "age"] ["Alice" 30])` → Map
+
+### 확인 (이미 구현됨)
+- `when`/`unless`: 정상 작동
+- `merge`: `(merge $m1 $m2 $m3)` 다중 인자 지원
+- `str-contains?`: 이미 구현됨
+
+---
+
 ## [v11.6.7] — 2026-05-08 (group-by, format, date-*, partial, re-match 개선)
 
 ### 신규 함수
