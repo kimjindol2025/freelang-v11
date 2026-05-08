@@ -329,6 +329,43 @@ export class JSCodegen {
     }
     if (op === "cond") return this.genCond(args);
     if (op === "while") return this.genWhile(args);
+
+    // -> (thread-first): (-> x (f a b) (g c)) → (g (f x a b) c)
+    if (op === "->") {
+      if (args.length === 0) return "null";
+      let acc = this.genNode(args[0]);
+      for (let i = 1; i < args.length; i++) {
+        const step = args[i];
+        if (step.kind === "sexpr") {
+          const { op: fn, args: fnArgs } = step as SExpr;
+          const fnJs = flNameToJs(fn);
+          const rest = fnArgs.map(a => this.genNode(a));
+          acc = `${fnJs}(${[acc, ...rest].join(", ")})`;
+        } else {
+          // 단순 함수명: (-> x f) → f(x)
+          acc = `${this.genNode(step)}(${acc})`;
+        }
+      }
+      return acc;
+    }
+
+    // ->> (thread-last): (-> x (f a b) (g c)) → (g c (f a b x))
+    if (op === "->>") {
+      if (args.length === 0) return "null";
+      let acc = this.genNode(args[0]);
+      for (let i = 1; i < args.length; i++) {
+        const step = args[i];
+        if (step.kind === "sexpr") {
+          const { op: fn, args: fnArgs } = step as SExpr;
+          const fnJs = flNameToJs(fn);
+          const rest = fnArgs.map(a => this.genNode(a));
+          acc = `${fnJs}(${[...rest, acc].join(", ")})`;
+        } else {
+          acc = `${this.genNode(step)}(${acc})`;
+        }
+      }
+      return acc;
+    }
     if (op === "recur") {
       const argStrs = args.map(a => this.genNode(a));
       return `{ __recur: true, a: [${argStrs.join(", ")}] }`;
