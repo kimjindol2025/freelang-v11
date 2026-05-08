@@ -1,5 +1,23 @@
 # Changelog
 
+## [v11.6.16] — 2026-05-08 (누락 stdlib alias 17개 복구)
+
+### 버그 수정
+
+**CLAUDE.md 문서화 함수명 vs 실제 구현 불일치 — 17개 alias 누락**
+
+| 계층 | 추가된 함수 |
+|------|------------|
+| `stdlib-data.ts` | `str-to-upper`, `str-to-lower`, `str-starts-with`, `str-ends-with`, `str-to-num`, `html-escape` |
+| `eval-builtins.ts` | `obj-keys`, `obj-values`, `obj-entries` (switch-case 추가) |
+| `stdlib-loader.ts` | `fn-exists?` — eval-builtins 함수도 true 반환하도록 확장 (`uuid`, `sleep`, `sort-by` 등 포함) |
+
+이전에는 `(fn-exists? "obj-keys")` → `false`, `(str-to-upper "hello")` → 오류였음. 수정 후 정상 동작.
+
+Commit: accba490 | Tests: 903/903 | Fixed-Point: 5/5
+
+---
+
 ## [v11.6.15] — 2026-05-08 (자기호출 무한재귀 7개 추가 수정)
 
 ### 버그 수정
