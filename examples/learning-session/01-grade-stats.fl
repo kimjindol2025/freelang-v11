@@ -1,0 +1,49 @@
+;; 여러 반 성적 통계 비교
+
+(let [classes {"A반" [85 92 78 95 88 72 90 83 76 91]
+               "B반" [70 65 80 72 68 75 71 69 77 74]
+               "C반" [95 98 100 92 97 94 99 96 93 88]}
+
+      average (fn [scores]
+                (/ (reduce + 0 scores) (length scores)))
+
+      grade   (fn [avg]
+                (cond
+                  (>= avg 90) "A"
+                  (>= avg 80) "B"
+                  (>= avg 70) "C"
+                  (>= avg 60) "D"
+                  :else       "F"))
+
+      stats   (fn [scores]
+                (let [avg     (average scores)
+                      mx      (reduce (fn [a x] (if (> x a) x a)) 0 scores)
+                      mn      (reduce (fn [a x] (if (< x a) x a)) 100 scores)
+                      cnt80   (length (filter (fn [x] (>= x 80)) scores))]
+                  {:avg avg :max mx :min mn :cnt80 cnt80 :grade (grade avg)}))
+
+      report  (fn [name scores]
+                (let [s (stats scores)]
+                  (println (str "┌─ " name " ───────────────────"))
+                  (println (str "│  평균: " (get s :avg) "  등급: " (get s :grade)))
+                  (println (str "│  최고: " (get s :max) "  최저: " (get s :min)))
+                  (println (str "│  80점 이상: " (get s :cnt80) "명 / " (length scores) "명"))
+                  (println "└───────────────────────────")))]
+
+  (println "=== 반별 성적 통계 ===")
+  (println "")
+  (report "A반" (get classes "A반"))
+  (println "")
+  (report "B반" (get classes "B반"))
+  (println "")
+  (report "C반" (get classes "C반"))
+  (println "")
+
+  (let [all (append (get classes "A반")
+                    (append (get classes "B반")
+                            (get classes "C반")))
+        s   (stats all)]
+    (println "=== 전체 통합 ===")
+    (println (str "전체 평균: " (get s :avg)))
+    (println (str "전체 등급: " (get s :grade)))
+    (println (str "80점 이상: " (get s :cnt80) "명 / " (length all) "명"))))

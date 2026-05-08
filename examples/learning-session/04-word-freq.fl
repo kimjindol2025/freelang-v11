@@ -1,0 +1,57 @@
+;; 단어 빈도 분석기
+
+(let [text "the quick brown fox jumps over the lazy dog the fox was very quick and the dog was very lazy"
+
+      ;; 텍스트 → 단어 배열
+      words     (str-split (str-lower text) " ")
+
+      ;; 단어 빈도 맵 구성
+      count-words (fn [words]
+                    (reduce
+                      (fn [acc word]
+                        (if (= word "")
+                          acc
+                          (let [cur (get acc word 0)]
+                            (assoc acc word (+ cur 1)))))
+                      {}
+                      words))
+
+      ;; 맵 → [{:word w :count n}] 배열로 변환
+      to-entries  (fn [freq-map]
+                    (map
+                      (fn [w]
+                        {:word w :count (get freq-map w)})
+                      (keys freq-map)))
+
+      ;; 빈도 내림차순 정렬
+      sort-desc   (fn [entries]
+                    (sort entries
+                          (fn [a b]
+                            (> (get a :count) (get b :count)))))
+
+      ;; 상위 N개 추출
+      top-n       (fn [entries n]
+                    (take n entries))
+
+      ;; 결과 출력
+      print-bar   (fn [entry rank]
+                    (let [w  (get entry :word)
+                          n  (get entry :count)
+                          bar (str-repeat "█" n)]
+                      (println (str rank ". " w
+                                    (str-repeat " " (- 10 (length w)))
+                                    bar " (" n ")"))))
+
+      freq   (count-words words)
+      sorted (sort-desc (to-entries freq))
+      top    (top-n sorted 8)]
+
+  (println (str "분석 텍스트: \"" text "\""))
+  (println (str "총 단어 수: " (length words)))
+  (println (str "고유 단어 수: " (length (keys freq))))
+  (println "")
+  (println "=== 상위 8개 단어 ===")
+  (map
+    (fn [pair]
+      (print-bar (first pair) (+ (last pair) 1)))
+    (zip top (range (length top)))))

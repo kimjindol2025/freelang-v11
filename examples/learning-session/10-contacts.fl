@@ -1,0 +1,109 @@
+;; 주소록 관리 — CRUD + 검색 + 파일 저장
+
+(let [;; 연락처 생성
+      make-contact (fn [id name phone email group]
+                     {"id" id "name" name "phone" phone
+                      "email" email "group" group})
+
+      ;; ID 기반 조회
+      find-by-id  (fn [contacts id]
+                    (first (filter (fn [c] (= (get c "id") id)) contacts)))
+
+      ;; 이름/전화/이메일 텍스트 검색
+      find-by-kw  (fn [contacts kw]
+                    (filter (fn [c]
+                              (or (str-includes (str-lower (get c "name"))  (str-lower kw))
+                                  (str-includes (str-lower (get c "email")) (str-lower kw))
+                                  (str-includes (get c "phone") kw)))
+                            contacts))
+
+      ;; 그룹 필터
+      by-group    (fn [contacts group]
+                    (filter (fn [c] (= (get c "group") group)) contacts))
+
+      ;; 추가
+      add-contact (fn [contacts contact]
+                    (append contacts contact))
+
+      ;; 수정 (id 기준)
+      update-contact (fn [contacts id field value]
+                       (map (fn [c]
+                              (if (= (get c "id") id)
+                                (assoc c field value)
+                                c))
+                            contacts))
+
+      ;; 삭제
+      delete-contact (fn [contacts id]
+                       (filter (fn [c] (not (= (get c "id") id))) contacts))
+
+      ;; 정렬 (이름 오름차순)
+      sort-by-name (fn [contacts]
+                     (sort contacts (fn [a b]
+                                      (< (str-lower (get a "name"))
+                                         (str-lower (get b "name"))))))
+
+      ;; 출력
+      print-contact (fn [c]
+                      (println (str "  [" (get c "id") "] "
+                                    (get c "name") "\t"
+                                    (get c "phone") "\t"
+                                    (get c "email") "\t"
+                                    "(" (get c "group") ")")))
+
+      ;; 초기 데이터
+      init [(make-contact 1 "김민수" "010-1234-5678" "minsoo@email.com"  "가족")
+            (make-contact 2 "이수진" "010-2345-6789" "sujin@work.com"   "직장")
+            (make-contact 3 "박지훈" "010-3456-7890" "jihun@email.com"  "친구")
+            (make-contact 4 "최유리" "010-4567-8901" "yuri@work.com"    "직장")
+            (make-contact 5 "정태양" "010-5678-9012" "sun@email.com"    "친구")
+            (make-contact 6 "한소희" "010-6789-0123" "sohee@email.com"  "가족")
+            (make-contact 7 "오민준" "010-7890-1234" "minjun@work.com"  "직장")]
+
+      ;; 다음 ID
+      next-id     (fn [contacts]
+                    (+ 1 (reduce (fn [mx c] (if (> (get c "id") mx) (get c "id") mx))
+                                 0 contacts)))]
+
+  ;; 1. 전체 목록 (이름순)
+  (println "=== 전체 연락처 (이름순) ===")
+  (map print-contact (sort-by-name init))
+  (println (str "  총 " (length init) "명"))
+  (println "")
+
+  ;; 2. 그룹별
+  (println "=== 그룹별 ===")
+  (map (fn [g]
+         (let [members (by-group init g)]
+           (println (str "  [" g "] " (length members) "명"))
+           (map (fn [c] (println (str "    " (get c "name") " " (get c "phone"))))
+                members)))
+       ["가족" "친구" "직장"])
+  (println "")
+
+  ;; 3. 키워드 검색
+  (println "=== 'work' 검색 ===")
+  (map print-contact (find-by-kw init "work"))
+  (println "")
+
+  ;; 4. CRUD 시연
+  (println "=== CRUD 시연 ===")
+
+  ;; 추가
+  (let [new-c   (make-contact (next-id init) "신예린" "010-8901-2345" "yerin@email.com" "친구")
+        added   (add-contact init new-c)]
+    (println (str "  [추가] " (get new-c "name") " → 총 " (length added) "명"))
+
+    ;; 수정
+    (let [updated (update-contact added 3 "phone" "010-9999-0000")]
+      (let [changed (find-by-id updated 3)]
+        (println (str "  [수정] 박지훈 전화: " (get changed "phone"))))
+
+      ;; 삭제
+      (let [deleted (delete-contact updated 2)]
+        (println (str "  [삭제] 이수진 제거 → 총 " (length deleted) "명"))
+
+        ;; 최종 목록
+        (println "")
+        (println "=== 최종 연락처 ===")
+        (map print-contact (sort-by-name deleted))))))

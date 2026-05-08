@@ -1,0 +1,61 @@
+;; 장바구니 — 상품 추가 / 할인 / 합계
+
+(let [products {"apple"  {:name "사과"   :price 1200 :stock 50}
+                "banana" {:name "바나나" :price 800  :stock 30}
+                "orange" {:name "오렌지" :price 1500 :stock 20}
+                "grape"  {:name "포도"   :price 3000 :stock 15}}
+
+      discounts {"vip"     0.2
+                 "member"  0.1
+                 "student" 0.05}
+
+      add-item  (fn [cart id qty]
+                  (let [p (get products id)]
+                    (if (= p nil)
+                      cart
+                      (let [cur    (get cart id {:qty 0 :product p})
+                            newqty (+ (get cur :qty) qty)]
+                        (assoc cart id {:qty newqty :product p})))))
+
+      subtotal  (fn [cart]
+                  (reduce
+                    (fn [acc item]
+                      (+ acc (* (get item :qty)
+                                (get (get item :product) :price))))
+                    0
+                    (values cart)))
+
+      discount  (fn [total grade]
+                  (let [rate (get discounts grade 0)]
+                    {:total    total
+                     :rate     rate
+                     :discount (* total rate)
+                     :final    (* total (- 1 rate))}))
+
+      print-row (fn [item]
+                  (let [p     (get item :product)
+                        qty   (get item :qty)
+                        price (get p :price)]
+                    (println (str "  " (get p :name)
+                                  " x" qty
+                                  "  @" price "원"
+                                  "  = " (* qty price) "원"))))
+
+      receipt   (fn [cart grade]
+                  (let [sub (subtotal cart)
+                        d   (discount sub grade)]
+                    (println "================================")
+                    (println "         장바구니 영수증")
+                    (println "================================")
+                    (map print-row (values cart))
+                    (println "--------------------------------")
+                    (println (str "소계:       " (get d :total) "원"))
+                    (println (str "할인(" grade "): -" (get d :discount) "원"))
+                    (println "================================")
+                    (println (str "최종합계:   " (get d :final) "원"))))]
+
+  (let [c1 (add-item {} "apple"  3)
+        c2 (add-item c1 "banana" 5)
+        c3 (add-item c2 "grape"  2)
+        c4 (add-item c3 "apple"  2)]
+    (receipt c4 "member")))

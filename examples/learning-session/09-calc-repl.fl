@@ -1,0 +1,92 @@
+;; 계산기 REPL — loop + readline + 수식 파서
+;; 사용법: printf "2 + 3\n10 * 4\nquit\n" | node calc.js
+
+(let [;; 토큰화: "10 + 3 * 2" → ["10" "+" "3" "*" "2"]
+      tokenize  (fn [s]
+                  (filter (fn [t] (> (length t) 0))
+                          (str-split (str-trim s) " ")))
+
+      ;; 문자열이 숫자인지 확인
+      num-str?  (fn [s]
+                  (not (= (str-to-num s) nil)))
+
+      ;; 단일 연산
+      apply-op  (fn [a op b]
+                  (cond
+                    (= op "+") (+ a b)
+                    (= op "-") (- a b)
+                    (= op "*") (* a b)
+                    (= op "/") (if (= b 0) nil (/ a b))
+                    (= op "%") (if (= b 0) nil (- a (* (floor (/ a b)) b)))
+                    :else nil))
+
+      ;; 좌→우 평가 (같은 우선순위끼리만)
+      eval-pass (fn [tokens ops]
+                  (if (<= (length tokens) 1)
+                    tokens
+                    (let [a  (str-to-num (get tokens 0))
+                          op (get tokens 1)
+                          b  (str-to-num (get tokens 2))]
+                      (if (and (not (= a nil))
+                               (not (= b nil))
+                               (str-includes ops op))
+                        (let [r (apply-op a op b)
+                              rest-toks (slice tokens 3 (length tokens))]
+                          (eval-pass (concat [(str r)] rest-toks) ops))
+                        ;; 이 연산자 건너뜀 — 다음 위치로
+                        (concat [(get tokens 0) (get tokens 1)]
+                                (eval-pass (slice tokens 2 (length tokens)) ops))))))
+
+      ;; 수식 계산 (우선순위: * / 먼저, 그 다음 + -)
+      calc      (fn [input]
+                  (let [tokens (tokenize input)]
+                    (if (< (length tokens) 3)
+                      (if (= (length tokens) 1)
+                        (str-to-num (get tokens 0))
+                        nil)
+                      (let [after-mul (eval-pass tokens "*/")
+                            result    (eval-pass after-mul "+-")]
+                        (if (= (length result) 1)
+                          (str-to-num (get result 0))
+                          nil)))))
+
+      ;; 히스토리 출력
+      show-history (fn [hist]
+                     (if (= (length hist) 0)
+                       (println "  (기록 없음)")
+                       (map (fn [h]
+                              (println (str "  " (get h "expr") " = " (get h "result"))))
+                            hist)))]
+
+  (println "FreeLang 계산기 v1.0")
+  (println "명령: quit / history / clear")
+  (println "예시: 2 + 3   10 * 4 - 2   100 / 4 + 5 * 2")
+  (println "")
+
+  (loop [history []]
+    (let [input (readline "> ")]
+      (cond
+        (= input nil)       (do (println "") (println "EOF — 종료"))
+        (= input "quit")    (do
+                               (println "")
+                               (println "=== 계산 기록 ===")
+                               (show-history history)
+                               (println "안녕히 가세요!"))
+        (= input "history") (do
+                               (println "=== 계산 기록 ===")
+                               (show-history history)
+                               (println "")
+                               (recur history))
+        (= input "clear")   (do
+                               (println "  기록 초기화")
+                               (recur []))
+        (= input "")        (recur history)
+        :else
+        (let [result (calc input)]
+          (if (= result nil)
+            (do
+              (println "  오류: 인식할 수 없는 수식 (예: 2 + 3)")
+              (recur history))
+            (do
+              (println (str "  = " result))
+              (recur (append history {"expr" input "result" result})))))))))

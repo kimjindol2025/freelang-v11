@@ -1,0 +1,76 @@
+;; 도서관 검색 시스템 — 텍스트 검색 + 정렬 + 필터
+
+(let [;; 도서 데이터
+      books [{"id" 1 "title" "FreeLang 입문"         "author" "김철수" "year" 2024 "genre" "프로그래밍" "rating" 4.8}
+             {"id" 2 "title" "함수형 프로그래밍 실전"  "author" "이영희" "year" 2023 "genre" "프로그래밍" "rating" 4.5}
+             {"id" 3 "title" "Lisp의 힘"              "author" "박민준" "year" 2022 "genre" "프로그래밍" "rating" 4.2}
+             {"id" 4 "title" "데이터 과학 with Python" "author" "최수진" "year" 2024 "genre" "데이터"     "rating" 4.6}
+             {"id" 5 "title" "알고리즘 문제 풀기"      "author" "정다혜" "year" 2021 "genre" "알고리즘"   "rating" 4.3}
+             {"id" 6 "title" "함수형 사고방식"         "author" "김철수" "year" 2023 "genre" "프로그래밍" "rating" 4.7}
+             {"id" 7 "title" "클린 코드"               "author" "로버트 마틴" "year" 2020 "genre" "소프트웨어" "rating" 4.9}
+             {"id" 8 "title" "프로그래밍 언어 이론"    "author" "이영희" "year" 2022 "genre" "프로그래밍" "rating" 4.1}]
+
+      ;; 제목/저자 텍스트 검색
+      find-books (fn [books keyword]
+                   (filter (fn [b]
+                             (or (str-includes (get b "title")  keyword)
+                                 (str-includes (get b "author") keyword)))
+                           books))
+
+      ;; 장르 필터
+      by-genre   (fn [books genre]
+                   (filter (fn [b] (= (get b "genre") genre)) books))
+
+      ;; 연도 범위 필터
+      by-year    (fn [books from to]
+                   (filter (fn [b]
+                             (and (>= (get b "year") from)
+                                  (<= (get b "year") to)))
+                           books))
+
+      ;; 평점 높은 순 정렬
+      sort-rating (fn [books]
+                    (sort books (fn [a b] (> (get a "rating") (get b "rating")))))
+
+      ;; 연도 최신순 정렬
+      sort-year   (fn [books]
+                    (sort books (fn [a b] (> (get a "year") (get b "year")))))
+
+      ;; 도서 출력
+      print-book (fn [b]
+                   (println (str "  [" (get b "id") "] "
+                                 (get b "title")
+                                 " / " (get b "author")
+                                 " (" (get b "year") ")"
+                                 " ★" (get b "rating"))))
+
+      ;; 결과 출력 헬퍼
+      show       (fn [label books]
+                   (println label)
+                   (if (= (length books) 0)
+                     (println "  (결과 없음)")
+                     (map print-book books))
+                   (println (str "  → " (length books) "권"))
+                   (println ""))]
+
+  ;; 1. 전체 목록 (평점순)
+  (show "=== 전체 도서 (평점순) ===" (sort-rating books))
+
+  ;; 2. 키워드 검색
+  (show "=== '함수형' 검색 ===" (find-books books "함수형"))
+
+  ;; 3. 저자 검색
+  (show "=== 저자 '이영희' 검색 ===" (find-books books "이영희"))
+
+  ;; 4. 장르 필터
+  (show "=== 장르: 프로그래밍 ===" (sort-rating (by-genre books "프로그래밍")))
+
+  ;; 5. 연도 범위 + 최신순
+  (show "=== 2022~2024 최신순 ===" (sort-year (by-year books 2022 2024)))
+
+  ;; 6. 복합 검색 — 파이프로 체이닝
+  (show "=== 프로그래밍 장르 중 2022년 이후 평점순 ==="
+        (-> books
+            (by-genre "프로그래밍")
+            (by-year 2022 2025)
+            sort-rating)))

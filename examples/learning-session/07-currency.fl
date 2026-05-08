@@ -1,0 +1,99 @@
+;; 환율 계산기 — map 변환 + 소수점 처리 + 정렬
+
+(let [;; 환율 데이터 (KRW 기준)
+      rates {"USD" 1350.5
+             "EUR" 1462.3
+             "JPY" 9.12
+             "GBP" 1710.8
+             "CNY" 186.4
+             "CAD" 994.2
+             "AUD" 876.5
+             "CHF" 1521.0}
+
+      ;; 소수점 n자리 반올림
+      round-to   (fn [n places]
+                   (let [factor (reduce * 1 (map (fn [_] 10) (range places)))]
+                     (/ (round (* n factor)) factor)))
+
+      ;; KRW → 외화 변환
+      krw-to     (fn [krw code]
+                   (let [rate (get rates code)]
+                     (if (= rate nil)
+                       nil
+                       (round-to (/ krw rate) 2))))
+
+      ;; 외화 → KRW 변환
+      to-krw     (fn [amount code]
+                   (let [rate (get rates code)]
+                     (if (= rate nil)
+                       nil
+                       (round-to (* amount rate) 0))))
+
+      ;; 숫자 천 단위 콤마
+      fmt-num    (fn [n]
+                   (let [s     (str (round-to n 2))
+                         parts (str-split s ".")]
+                     (let [int-part (first parts)
+                           dec-part (if (> (length parts) 1) (str "." (get parts 1)) "")]
+                       (str int-part dec-part))))
+
+      ;; 단일 통화 출력
+      print-rate (fn [code]
+                   (let [rate (get rates code)
+                         per1 (round-to (/ 1 rate) 6)]
+                     (println (str "  " code " : "
+                                   "1 " code " = " rate " KRW  |  "
+                                   "1,000 KRW = " (round-to (/ 1000 rate) 4) " " code))))
+
+      ;; 환전 결과 출력
+      show-convert (fn [amount from to]
+                     (let [krw    (if (= from "KRW") amount (to-krw amount from))
+                           result (if (= to "KRW") krw (krw-to krw to))]
+                       (println (str "  " amount " " from
+                                     " → " result " " to))))]
+
+  ;; 1. 환율표
+  (println "=== 환율표 (KRW 기준) ===")
+  (map print-rate ["USD" "EUR" "JPY" "GBP" "CNY" "CAD" "AUD" "CHF"])
+  (println "")
+
+  ;; 2. KRW → 각국 통화 변환
+  (println "=== 100,000 KRW 환전 ===")
+  (map (fn [code]
+         (let [result (krw-to 100000 code)]
+           (println (str "  100,000 KRW = " result " " code))))
+       ["USD" "EUR" "JPY" "GBP" "CNY"])
+  (println "")
+
+  ;; 3. 외화 → KRW
+  (println "=== 외화 → KRW ===")
+  (show-convert 100 "USD" "KRW")
+  (show-convert 100 "EUR" "KRW")
+  (show-convert 10000 "JPY" "KRW")
+  (show-convert 50 "GBP" "KRW")
+  (println "")
+
+  ;; 4. 교차 환율 (USD ↔ EUR)
+  (println "=== 교차 환율 ===")
+  (let [usd-krw (get rates "USD")
+        eur-krw (get rates "EUR")
+        usd-to-eur (round-to (/ usd-krw eur-krw) 4)
+        eur-to-usd (round-to (/ eur-krw usd-krw) 4)]
+    (println (str "  1 USD = " usd-to-eur " EUR"))
+    (println (str "  1 EUR = " eur-to-usd " USD")))
+  (println "")
+
+  ;; 5. 강세/약세 통화 순위 (KRW 대비)
+  (println "=== 고가 통화 순위 (KRW 대비) ===")
+  (let [pairs [["GBP" (get rates "GBP")]
+               ["EUR" (get rates "EUR")]
+               ["CHF" (get rates "CHF")]
+               ["USD" (get rates "USD")]
+               ["CAD" (get rates "CAD")]
+               ["AUD" (get rates "AUD")]
+               ["CNY" (get rates "CNY")]
+               ["JPY" (get rates "JPY")]]
+        sorted (sort pairs (fn [a b] (> (get a 1) (get b 1))))]
+    (map (fn [pair]
+           (println (str "  " (get pair 0) " : " (get pair 1) " KRW")))
+         sorted)))

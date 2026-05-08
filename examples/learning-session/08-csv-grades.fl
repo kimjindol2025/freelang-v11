@@ -1,0 +1,104 @@
+;; 성적 CSV 파서 — 문자열 파싱 + reduce 통계
+
+(let [;; CSV 파일 읽기
+      raw      (file-read "/tmp/grades.csv")
+
+      ;; 줄 단위로 분리, 빈 줄 제거
+      lines    (filter (fn [l] (> (length l) 0))
+                       (str-split raw "\n"))
+
+      ;; 헤더 파싱
+      header   (str-split (first lines) ",")
+
+      ;; 데이터 줄 파싱 → 맵 리스트
+      parse-row (fn [line]
+                  (let [cols (str-split line ",")]
+                    (reduce (fn [acc i]
+                              (assoc acc (get header i)
+                                     (if (= i 0)
+                                       (get cols i)
+                                       (str-to-num (get cols i)))))
+                            {}
+                            (range (length cols)))))
+
+      rows     (map parse-row (rest lines))
+
+      ;; 과목 목록 (헤더에서 이름 제외)
+      subjects (rest header)
+
+      ;; 소수점 반올림
+      round-to (fn [n p]
+                 (let [f (reduce * 1 (map (fn [_] 10) (range p)))]
+                   (/ (round (* n f)) f)))
+
+      ;; 평균 계산
+      avg      (fn [nums]
+                 (/ (reduce + 0 nums) (length nums)))
+
+      ;; 학생별 총점 / 평균
+      with-stats (fn [row]
+                   (let [scores (map (fn [s] (get row s)) subjects)
+                         total  (reduce + 0 scores)
+                         mean   (round-to (/ total (length scores)) 1)]
+                     (assoc (assoc row "total" total) "avg" mean)))
+
+      ;; 등급
+      grade    (fn [avg]
+                 (cond
+                   (>= avg 90) "A"
+                   (>= avg 80) "B"
+                   (>= avg 70) "C"
+                   (>= avg 60) "D"
+                   :else       "F"))
+
+      ;; 통계가 붙은 전체 데이터
+      data     (map with-stats rows)
+
+      ;; 정렬 (총점 높은 순)
+      ranked   (sort data (fn [a b] (> (get a "total") (get b "total"))))
+
+      ;; 학생 한 줄 출력
+      print-row (fn [i row]
+                  (println (str (+ i 1) "위  "
+                                (get row "이름") "\t"
+                                "총점:" (get row "total") "  "
+                                "평균:" (get row "avg") "  "
+                                "등급:" (grade (get row "avg")))))
+
+      ;; 과목별 최고/최저/평균
+      subject-stats (fn [s]
+                      (let [vals   (map (fn [r] (get r s)) data)
+                            mx     (reduce (fn [a x] (if (> x a) x a)) 0 vals)
+                            mn     (reduce (fn [a x] (if (< x a) x a)) 100 vals)
+                            mean   (round-to (avg vals) 1)]
+                        (println (str "  " s "\t최고:" mx "  최저:" mn "  평균:" mean))))]
+
+  ;; 1. 성적 순위
+  (println "=== 성적 순위 ===")
+  (map (fn [pair] (print-row (first pair) (get pair 1)))
+       (map (fn [i] [i (get ranked i)]) (range (length ranked))))
+  (println "")
+
+  ;; 2. 과목별 통계
+  (println "=== 과목별 통계 ===")
+  (map subject-stats subjects)
+  (println "")
+
+  ;; 3. 등급 분포
+  (println "=== 등급 분포 ===")
+  (let [grades (map (fn [r] (grade (get r "avg"))) data)
+        count-grade (fn [g] (length (filter (fn [x] (= x g)) grades)))]
+    (map (fn [g]
+           (let [cnt (count-grade g)]
+             (if (> cnt 0)
+               (println (str "  " g "등급: " cnt "명")))))
+         ["A" "B" "C" "D" "F"]))
+  (println "")
+
+  ;; 4. 전체 평균
+  (println "=== 전체 ===")
+  (let [all-avgs (map (fn [r] (get r "avg")) data)
+        overall  (round-to (avg all-avgs) 1)]
+    (println (str "  전체 평균: " overall))
+    (println (str "  최우수: " (get (first ranked) "이름")
+                  " (" (get (first ranked) "total") "점)"))))

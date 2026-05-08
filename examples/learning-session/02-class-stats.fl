@@ -1,0 +1,52 @@
+(let [a-scores [85 92 78 95 88 72 90 83 76 91]
+      b-scores [70 65 80 72 68 75 71 69 77 74]
+      c-scores [95 98 100 92 97 94 99 96 93 88]
+
+      average  (fn [scores]
+                 (/ (reduce + 0 scores) (length scores)))
+
+      grade    (fn [avg]
+                 (cond
+                   (>= avg 90) "A"
+                   (>= avg 80) "B"
+                   (>= avg 70) "C"
+                   (>= avg 60) "D"
+                   :else       "F"))
+
+      stats    (fn [scores]
+                 (let [avg   (average scores)
+                       mx    (reduce (fn [a x] (if (> x a) x a)) 0 scores)
+                       mn    (reduce (fn [a x] (if (< x a) x a)) 100 scores)
+                       cnt80 (length (filter (fn [x] (>= x 80)) scores))]
+                   {:avg avg :max mx :min mn :cnt80 cnt80 :grade (grade avg)}))
+
+      report   (fn [name scores]
+                 (let [s (stats scores)]
+                   (println (str "┌─ " name " ──────────────────"))
+                   (println (str "│  평균: " (get s :avg) "  등급: " (get s :grade)))
+                   (println (str "│  최고: " (get s :max) "  최저: " (get s :min)))
+                   (println (str "│  80점 이상: " (get s :cnt80) "명 / " (length scores) "명"))
+                   (println "└──────────────────────────")))]
+
+  (println "=== 반별 성적 통계 ===")
+  (println "")
+  (report "A반" a-scores)
+  (println "")
+  (report "B반" b-scores)
+  (println "")
+  (report "C반" c-scores)
+  (println "")
+
+  ;; 전체: 3개 반 합산 직접 계산
+  (let [total-sum   (+ (reduce + 0 a-scores)
+                       (reduce + 0 b-scores)
+                       (reduce + 0 c-scores))
+        total-cnt   (+ (length a-scores) (length b-scores) (length c-scores))
+        total-avg   (/ total-sum total-cnt)
+        total-cnt80 (+ (length (filter (fn [x] (>= x 80)) a-scores))
+                       (length (filter (fn [x] (>= x 80)) b-scores))
+                       (length (filter (fn [x] (>= x 80)) c-scores)))]
+    (println "=== 전체 통합 ===")
+    (println (str "전체 평균: " total-avg))
+    (println (str "전체 등급: " (grade total-avg)))
+    (println (str "80점 이상: " total-cnt80 "명 / " total-cnt "명"))))
