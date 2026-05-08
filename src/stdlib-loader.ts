@@ -437,6 +437,97 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "parse-float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
     "parse_float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
     "number?":       (v: any) => typeof v === "number" && !isNaN(v),
+    // ── 레벨별 로깅 (console 출력) ──────────────────────────────────
+    // stdlib-time.ts의 Logger 패턴(log_info logger msg)과 공존:
+    // 첫 번째 인자가 Logger 객체(.entries 배열)이면 시간 기반 Logger 패턴으로 위임,
+    // 아니면 단순 console 출력
+    "log-info": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
+        const logger = args[0]; const msg = String(args[1]);
+        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
+      }
+      console.log(`[INFO]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log_info": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
+        const logger = args[0]; const msg = String(args[1]);
+        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
+      }
+      console.log(`[INFO]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log-warn": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
+        const logger = args[0]; const msg = String(args[1]);
+        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
+      }
+      console.warn(`[WARN]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log_warn": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
+        const logger = args[0]; const msg = String(args[1]);
+        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
+      }
+      console.warn(`[WARN]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log-error": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
+        const logger = args[0]; const msg = String(args[1]);
+        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "error", msg }] };
+      }
+      console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
+    },
+    "log_error": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
+        const logger = args[0]; const msg = String(args[1]);
+        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "error", msg }] };
+      }
+      console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
+    },
+    // ── validate ────────────────────────────────────────────────────
+    // (validate body schema) → null(성공) or ["field: msg", ...]
+    // schema: Map or plain object. values: :required :number :string :boolean :email :min-N :max-N
+    "validate": (body: any, schema: any): string[] | null => {
+      const errs: string[] = [];
+      const rules: [string, any][] = schema instanceof Map
+        ? [...schema.entries()]
+        : Object.entries(schema ?? {});
+      const val = body instanceof Map
+        ? (k: string) => body.get(k) ?? body.get(":" + k)
+        : (k: string) => (body ?? {})[k];
+      for (const [field, spec] of rules) {
+        const f = String(field).replace(/^:/, "");
+        const v = val(f);
+        const specs = Array.isArray(spec) ? spec : [spec];
+        for (const s of specs) {
+          const rule = String(s ?? "").replace(/^:/, "");
+          if (rule === "required" && (v === null || v === undefined || v === "")) {
+            errs.push(`${f}: required`);
+          } else if (rule === "number" && v !== null && v !== undefined && typeof v !== "number" && isNaN(Number(v))) {
+            errs.push(`${f}: must be number`);
+          } else if (rule === "string" && v !== null && v !== undefined && typeof v !== "string") {
+            errs.push(`${f}: must be string`);
+          } else if (rule === "boolean" && v !== null && v !== undefined && typeof v !== "boolean") {
+            errs.push(`${f}: must be boolean`);
+          } else if (rule === "email" && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v))) {
+            errs.push(`${f}: must be valid email`);
+          } else if (rule.startsWith("min-")) {
+            const mn = Number(rule.slice(4));
+            if (typeof v === "string" && v.length < mn) errs.push(`${f}: min length ${mn}`);
+            else if (typeof v === "number" && v < mn) errs.push(`${f}: min value ${mn}`);
+          } else if (rule.startsWith("max-")) {
+            const mx = Number(rule.slice(4));
+            if (typeof v === "string" && v.length > mx) errs.push(`${f}: max length ${mx}`);
+            else if (typeof v === "number" && v > mx) errs.push(`${f}: max value ${mx}`);
+          }
+        }
+      }
+      return errs.length > 0 ? errs : null;
+    },
+    // ── list-min / list-max ─────────────────────────────────────────
+    "list-min": (arr: any[]): number | null => Array.isArray(arr) && arr.length > 0 ? Math.min(...arr.map(Number)) : null,
+    "list_min": (arr: any[]): number | null => Array.isArray(arr) && arr.length > 0 ? Math.min(...arr.map(Number)) : null,
+    "list-max": (arr: any[]): number | null => Array.isArray(arr) && arr.length > 0 ? Math.max(...arr.map(Number)) : null,
+    "list_max": (arr: any[]): number | null => Array.isArray(arr) && arr.length > 0 ? Math.max(...arr.map(Number)) : null,
     // 문자열 포함
     "str-contains?": (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str-contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
@@ -539,5 +630,42 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     if (!interp.context.functions.has(name)) {
       interp.context.functions.set(name, { name, params: [], body: fn });
     }
+  }
+  // ── 강제 override: _aliases보다 우선 등록되어야 할 함수들 ────────────
+  // (timeModule의 log_info 등이 먼저 등록되어 _aliases가 무시됨 → 여기서 덮어씀)
+  const _overrides: Record<string, (...a: any[]) => any> = {
+    "log-info": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries))
+        return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "info", msg: String(args[1]) }] };
+      console.log(`[INFO]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log_info": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries))
+        return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "info", msg: String(args[1]) }] };
+      console.log(`[INFO]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log-warn": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries))
+        return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "warn", msg: String(args[1]) }] };
+      console.warn(`[WARN]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log_warn": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries))
+        return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "warn", msg: String(args[1]) }] };
+      console.warn(`[WARN]  ${args.map(String).join(" ")}`); return null;
+    },
+    "log-error": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries))
+        return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "error", msg: String(args[1]) }] };
+      console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
+    },
+    "log_error": (...args: any[]): any => {
+      if (args.length === 2 && args[0] && Array.isArray(args[0].entries))
+        return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "error", msg: String(args[1]) }] };
+      console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
+    },
+  };
+  for (const [name, fn] of Object.entries(_overrides)) {
+    interp.context.functions.set(name, { name, params: [], body: fn });
   }
 }
