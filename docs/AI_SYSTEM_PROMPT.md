@@ -18,19 +18,20 @@ FreeLang은 **AI 안정 DSL** — S-expression 문법(Lisp 계열) + 결정론�
 ## 2. 기본 문법
 
 ```fl
-;; 함수 정의 (Clojure 스타일) — 파라미터 반드시 $-prefix
-(defn add [$a $b] (+ $a $b))
+;; 함수 정의 (Clojure 스타일)
+(defn add [a b] (+ a b))
 
 ;; 동의어: defun (Common Lisp 호환), [FUNC ...] (forward-ref 지원)
 [FUNC factorial :params [$n]
   :body (if (<= $n 1) 1 (* $n (factorial (- $n 1))))]
 
-;; 변수: 반드시 $-prefix (v11 표준)
+;; 변수: 일반 / $-prefix (둘 다 가능)
+(let [[x 10] [y 20]] (+ x y))
 (let [[$x 10] [$y 20]] (+ $x $y))
 
-;; 조건/분기 — 변수 참조는 $-prefix 필수
-(if $cond $then $else)
-(cond [$test1 $result1] [$test2 $result2] [true $default])
+;; 조건/분기
+(if cond then else)
+(cond [test1 result1] [test2 result2] [true default])
 
 ;; 컬렉션
 (list 1 2 3)
@@ -117,65 +118,6 @@ parallel race with-timeout fl-try use`
 (get (json_parse data) :x)
 ```
 
-### 4.8. 서버 라우팅 & HTTP
-
-```fl
-;; 라우트 정의
-(server_post "/api/users" handle-user)
-
-;; Request 접근
-(defn handle-user [$req]
-  (let [[$body (get $req "body")]
-        [$name (get $body "name")]]
-    (server_json {:status "ok" :name $name})))
-
-;; Response 헬퍼
-(server_html "<h1>Hello</h1>")
-(server_json {:key "value"})
-(server_status 404 "Not found")
-```
-
-### 4.9. 데이터베이스 쿼리
-
-```fl
-;; MariaDB 쿼리 (? 바인드)
-(let [[$result (db_query $db "SELECT * FROM users WHERE id = ?" [$user_id])]]
-  (if (empty? $result)
-    (server_status 404 "User not found")
-    (server_json (first $result))))
-
-;; 삽입/갱신
-(db_exec $db "INSERT INTO users (name, email) VALUES (?, ?)" [$name $email])
-(db_exec $db "UPDATE users SET email = ? WHERE id = ?" [$email $id])
-```
-
-### 4.10. 보안 & 이스케이프 (v11.5.3+)
-
-```fl
-;; XSS 방어 — 사용자 입력 이스케이프
-(let [[$user_input (get $req-body "name")]]
-  (server_html (str "<h1>" (html_escape $user_input) "</h1>")))
-
-;; JavaScript 문자열 안전 처리
-(let [[$msg (get $body "message")]]
-  (server_html (str "<script>alert('" (js_escape $msg) "')</script>")))
-
-;; CSRF 토큰 (60분 유효)
-(let [[$token (auth_csrf_token "my-secret")]]
-  (server_html (str "<input type=\"hidden\" name=\"_csrf\" value=\"" $token "\">")))
-
-;; CSRF 검증
-(let [[$body (get $req "body")]
-      [$token (get $body "_csrf")]]
-  (if (auth_csrf_verify $token "my-secret")
-    (server_json {:status "ok"})
-    (server_status 403 "CSRF failed")))
-
-;; 안전한 쿠키 (HttpOnly + Secure + SameSite 자동)
-(let [[$cookie (server_set_cookie "session" "abc123" {:max_age 3600})]]
-  (server_html_cookie "<h1>Logged in</h1>" $cookie))
-```
-
 ## 5. 자주 틀리는 함정
 
 | 함정 | 잘못 | 올바름 |
@@ -213,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 452개 함수, 33 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 456개 함수, 34 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -511,7 +453,12 @@ parallel race with-timeout fl-try use`
 - `(file_mtime filePath)` → number (get modification time as timestamp)
 - `(file_ctime filePath)` → number (get creation time as timestamp)
 
-### http (26개)
+### greet (2개)
+
+- `(greet/hello $name)` → any
+- `(greet/goodbye $name)` → any
+
+### http (28개)
 
 - `(http_get url)` → {:status 200 :body "..."}
 - `(http_post url body)` → {:status 200 :body "..."}
@@ -525,13 +472,15 @@ parallel race with-timeout fl-try use`
 - `(http_post_key url body api-key)` → {:status 200 :body "..."}
 - `(http_status url)` → number (상태코드만)
 - `(http_json url)` → {:status 200 :data {...} :error nil}
-- `(http_header url header)` → string (특정 헤더만)
+- `(http_header url header)` → string (특정 헤더 값만)
 - `(http_with_timeout url timeout)` → {:status 200 :body "..."}
 - `(http_post_json url data)` → {:status 200 :data {...}}
 - `(http_put_json url data)` → {:status 200 :data {...}}
 - `(http_request method url headers body)` → {:status 200 :body "..."}
 - `(http_req_status method url headers body)` → number
 - `(http_get_json url headers)` → {:status 200 :data {...}}
+- `(http_get_data url [headers])` → parsed JSON directly (null on error)
+- `(http_post_data url body [headers])` → parsed JSON directly (null on error)
 - `(http_get_json_bearer url token)` → {:status 200 :data {...}}
 - `(http_get_bearer url token)` → {:status 200 :body "..."}
 - `(http_post_bearer url body token)` → {:status 200 :body "..."}
@@ -692,7 +641,7 @@ parallel race with-timeout fl-try use`
 - `(time_since ts)` → number (ms elapsed since ts)
 - `(time_ago ts)` → string (human-readable: "3s ago", "2m ago", "1h ago")
 - `(date_parts ts)` → {year,month,day,hour,min,sec,ms,weekday}
-- `(date_add ts unit n)` → number  (unit: "ms"|"s"|"m"|"h"|"d")
+- `(date_add ts unit n)` → number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")
 - `(date_parse str)` → number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)
 - `(sleep_ms ms)` → void  (synchronous spin-wait, short durations only)
 - `(timer_start label)` → Timer
@@ -765,6 +714,14 @@ parallel race with-timeout fl-try use`
 - `(report_create title)` → Report
 - `(report_add report section_name data)` → Report
 - `(report_render report)` → string  (formatted text report)
+
+## Y5: 플러그인 (2개)
+
+FreeLang 플러그인 시스템(Y5)에서 제공하는 추가 함수들:
+- `(greet/hello $name)`
+- `(greet/goodbye $name)`
+
+
 ## 9. 코드 생성 시 체크리스트
 
 작성 후 자체 검증:
@@ -783,4 +740,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-08T00:00:00.000Z (v11.5.3)
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-08T07:41:26.491Z

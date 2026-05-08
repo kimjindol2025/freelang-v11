@@ -90,11 +90,21 @@ export function createTimeModule() {
       };
     },
 
-    // date_add ts unit n -> number  (unit: "ms"|"s"|"m"|"h"|"d")
+    // date_add ts unit n -> number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")
     "date_add": (ts: number, unit: string, n: number): number => {
+      const u = String(unit).replace(/^:/, "");
       const mul: Record<string, number> = { ms: 1, s: 1000, m: 60000, h: 3600000, d: 86400000 };
-      if (!mul[unit]) throw new Error(`date_add: unknown unit "${unit}". Use: ms/s/m/h/d`);
-      return ts + n * mul[unit];
+      if (mul[u] !== undefined) return ts + n * mul[u];
+      // verbose unit names → calendar-aware mutation
+      const d = new Date(Number(ts));
+      if (u === "days"    || u === "day")    { d.setDate(d.getDate() + Number(n)); return d.getTime(); }
+      if (u === "hours"   || u === "hour")   { d.setHours(d.getHours() + Number(n)); return d.getTime(); }
+      if (u === "minutes" || u === "minute") { d.setMinutes(d.getMinutes() + Number(n)); return d.getTime(); }
+      if (u === "months"  || u === "month")  { d.setMonth(d.getMonth() + Number(n)); return d.getTime(); }
+      if (u === "years"   || u === "year")   { d.setFullYear(d.getFullYear() + Number(n)); return d.getTime(); }
+      if (u === "seconds" || u === "second") { d.setSeconds(d.getSeconds() + Number(n)); return d.getTime(); }
+      if (u === "weeks"   || u === "week")   { d.setDate(d.getDate() + Number(n) * 7); return d.getTime(); }
+      throw new Error(`date_add: unknown unit "${unit}". Use: ms/s/m/h/d/days/hours/minutes/months/years/weeks`);
     },
 
     // date_parse str -> number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)

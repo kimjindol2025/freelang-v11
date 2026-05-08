@@ -1,5 +1,25 @@
 # Changelog
 
+## [v11.6.7] — 2026-05-08 (group-by, format, date-*, partial, re-match 개선)
+
+### 신규 함수
+- **`group-by`**: `(group-by :status rows)` — keyword/문자열/FL함수 key-fn, Map<key, items[]> 반환
+- **`format`**: `(format "%.2f" 3.14159)` → `"3.14"` — `%d/%f/%s/%x/%b/%e`, width/precision 지원
+- **`date-format`**: `(date-format ts "yyyy-MM-dd HH:mm:ss")` — ts-ms → 포맷 문자열
+- **`date-add`**: `(date-add ts :days 7)` — 달력 기반 날짜 연산 (days/hours/minutes/months/years/weeks/seconds + d/h/m/s/ms)
+- **`date-diff`**: `(date-diff ts2 ts1 :days)` → number
+- **`date-parse`**: `(date-parse "2026-05-08")` → ts-ms
+- **`partial`**: `(partial f arg...)` — 부분 적용, FL함수+네이티브함수 통합 지원
+- **`re-test`**: `(re-test pattern str)` → boolean (기존 re-match 역할)
+
+### 함수 변경
+- **`re-match`**: boolean → `string|null` 변경 — 첫 번째 매치 문자열 반환, 없으면 null
+
+### 기존 `date_add` 확장
+- `d/h/m/ms/s` 외 verbose 유닛 `:days/:hours/:minutes/:months/:years/:weeks/:seconds` 수용
+
+---
+
 ## [v11.6.6] — 2026-05-08 (if-let 평탄형, some?/not-nil?, 기본값 인자)
 
 ### 언어 개선
