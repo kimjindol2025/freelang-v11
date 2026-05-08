@@ -217,16 +217,16 @@ function flExecOpNative(op: string, vals: any[]): any {
       }
       let k: any = v1;
       if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
-      if (Array.isArray(v0)) return v0[k as any] !== undefined ? v0[k as any] : null;
-      if (v0 instanceof Map) return v0.get(String(k).replace(/^:/, "")) ?? null;
+      const _def = v2 !== undefined ? v2 : null;
+      if (Array.isArray(v0)) return v0[k as any] !== undefined ? v0[k as any] : _def;
+      if (v0 instanceof Map) return v0.has(String(k).replace(/^:/, "")) ? v0.get(String(k).replace(/^:/, "")) : _def;
       if (v0 !== null && typeof v0 === "object") {
         const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
         if (v0[normalized] !== undefined) return v0[normalized];
-        // ":key" 형태로 저장된 객체도 허용
         if (typeof k === "string" && v0[k] !== undefined) return v0[k];
-        return null;
+        return _def;
       }
-      return null;
+      return _def;
     }
     case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
@@ -1530,8 +1530,7 @@ loop().catch(e => {
       return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]);
     case "num-to-str":
       return String(args[0]);
-    case "str-to-num":
-      return parseFloat(String(args[0]));
+    case "str-to-num": { const _n = parseFloat(String(args[0])); return isNaN(_n) ? null : _n; }
     case "map-set":
       if (typeof args[0] === "object" && args[0] !== null && !Array.isArray(args[0])) {
         const k = typeof args[1] === "string" && args[1].startsWith(":") ? args[1].slice(1) : String(args[1]);
@@ -1569,6 +1568,7 @@ loop().catch(e => {
     case "starts-with?":
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
     case "index-of":
+      if (Array.isArray(args[0])) return args[0].indexOf(args[1]);
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].indexOf(args[1]) : -1;
     case "replace":
       return typeof args[0] === "string" && typeof args[1] === "string" && typeof args[2] === "string"
@@ -1644,16 +1644,17 @@ loop().catch(e => {
       }
       let k: any = args[1];
       if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
-      if (Array.isArray(args[0])) return typeof k === "number" ? (args[0][k] ?? null) : null;
-      if (typeof args[0] === "string") return typeof k === "number" ? (args[0][k] ?? null) : null;
-      if (args[0] instanceof Map) return args[0].get(String(k).replace(/^:/, "")) ?? null;
+      const _getDef = args.length >= 3 ? args[2] : null;
+      if (Array.isArray(args[0])) return typeof k === "number" ? (args[0][k] ?? _getDef) : _getDef;
+      if (typeof args[0] === "string") return typeof k === "number" ? (args[0][k] ?? _getDef) : _getDef;
+      if (args[0] instanceof Map) return args[0].has(String(k).replace(/^:/, "")) ? args[0].get(String(k).replace(/^:/, "")) : _getDef;
       if (args[0] !== null && typeof args[0] === "object") {
         const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
         if (args[0][normalized] !== undefined) return args[0][normalized];
         if (typeof k === "string" && args[0][k] !== undefined) return args[0][k];
-        return null;
+        return _getDef;
       }
-      return null;
+      return _getDef;
     }
     case "block-items":
       // Array 블록에서 items 추출 (셀프 호스팅용)
@@ -1714,7 +1715,7 @@ loop().catch(e => {
         case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
         case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
         case "num-to-str": return String(v0 ?? "");
-        case "str-to-num": return parseFloat(String(v0));
+        case "str-to-num": { const _n2 = parseFloat(String(v0)); return isNaN(_n2) ? null : _n2; }
         case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
         case "str-join": return Array.isArray(v0) ? v0.join(String(v1 ?? "")) : String(v0 ?? "");
         case "null?": return v0 === null || v0 === undefined;
@@ -1841,12 +1842,11 @@ loop().catch(e => {
       });
     }
     case "zip": {
-      // (zip keys vals) → Map<key, val>
+      // (zip arr1 arr2) → [[a1 b1] [a2 b2] ...]
       const a = Array.isArray(args[0]) ? args[0] : [];
       const b = Array.isArray(args[1]) ? args[1] : [];
-      const m = new Map<any, any>();
-      for (let i = 0; i < a.length; i++) m.set(a[i], b[i] ?? null);
-      return m;
+      const len = Math.min(a.length, b.length);
+      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
     }
     case "zip-with": {
       // (zip-with f arr1 arr2) → [(f a1 b1) (f a2 b2) ...]
