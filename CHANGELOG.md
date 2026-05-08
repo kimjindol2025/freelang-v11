@@ -1,5 +1,20 @@
 # Changelog
 
+## [v11.6.19] — 2026-05-08 (higher-order 함수 버그 4개)
+
+### 버그 수정
+
+| 함수 | 버그 | 수정 |
+|------|------|------|
+| `flat-map` | `<fn:λ>` 반환 — Result 모나드 flatMap 호출 + 인수 순서 오류 | `(flat-map fn arr)` fn-first 배열 처리로 재작성 |
+| `some` | Maybe 모나드 생성자와 이름 충돌 — 항상 `{tag:Some}` 반환 | fn 인수면 배열 술어, 값이면 Option 생성자로 분기 |
+| `includes-item` | Function not found — eval-builtins에만 있고 context.functions 미등록 | stdlib-loader.ts에 `includes?` alias로 등록 |
+| `find` | `(find arr fn)` — closure kind 체크 누락으로 predicate 무시 | `kind === "closure"` 포함으로 수정 |
+
+Commit: c08f7c5c | Tests: 903/903 | Fixed-Point: 5/5
+
+---
+
 ## [v11.6.18] — 2026-05-08 (stdlib 정확성 버그 4개)
 
 ### 버그 수정
