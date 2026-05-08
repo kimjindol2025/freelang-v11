@@ -17,9 +17,11 @@
 - [파일 I/O (File I/O)](#파일-io)
 - [보안 & 이스케이프 (Security & Escape)](#보안--이스케이프-v1153)
 - [HTTP & 네트워킹 (HTTP & Network)](#http--네트워킹)
+- [HTTP 서버 요청 파싱](#http-서버-요청-파싱)
 - [데이터베이스 (Database)](#데이터베이스)
 - [날짜/시간 (Date & Time)](#날짜시간)
 - [에러 처리 (Error Handling)](#에러-처리)
+- [환경변수](#환경변수-v1160)
 - [HTTP Bearer 헬퍼](#http-bearer-헬퍼-lir-004)
 - [HTTP Retry](#http-retry-s4-04-2026-05-07)
 - [frequencies](#frequencies-s4-03-2026-05-07)
@@ -121,30 +123,37 @@
 
 ---
 
-### `(let [[symbol value ...] ...] body)`
-로컬 바인딩 (변수 정의).
+### `(let [symbol value ...] body)` — 권장 형식 (v11.1+)
+로컬 바인딩 (변수 정의). **평탄형(flat)이 권장 문법**.
 
 **파라미터**:
-- `bindings` ([[symbol value] ...]) — 이름-값 쌍 배열
+- `bindings` ([symbol value ...]) — 이름-값 쌍을 1차원으로 나열
 - `body` (expr) — 바인딩 내에서 실행
 
 **반환값**: `body`의 결과
 
 **예제**:
 ```lisp
-(let [[x 5] [y 10]]
+; ✅ 권장: 평탄형 (Clojure 스타일)
+(let [x 5 y 10]
   (+ x y))
 ;; → 15
 
-(let [[name "Alice"]
-      [greeting (+ "Hello, " name)]]
+(let [name "Alice"
+      greeting (str "Hello, " name)]
   (println greeting))
 ;; 출력: Hello, Alice
+
+; 구버전 중첩형도 동작 (하위 호환)
+(let [[x 5] [y 10]]
+  (+ x y))
+;; → 15
 ```
 
 **규칙**:
 - 바인딩은 순서대로 평가됨 (후속 바인딩에서 이전 값 참조 가능)
 - 스코프는 `let` 블록 내부로 제한
+- `$` 접두사 없이 순수 심볼 사용
 
 ---
 
@@ -173,6 +182,50 @@
 **주의**:
 - `false`, `nil`, `0` 제외 모두 truthy
 - 3번째 인자 없으면 else는 `nil`
+
+---
+
+### `(cond ...)` — 다중 조건 분기
+여러 조건을 순서대로 평가해 첫 번째 참인 분기 실행.
+
+**세 가지 문법 — 모두 지원**:
+
+```lisp
+; 1. 평탄형 (권장, Clojure 스타일)
+(cond
+  (= x 1) "one"
+  (= x 2) "two"
+  :else   "other")   ; :else 또는 else → catch-all
+
+; 2. 브래킷형
+(cond
+  [(= x 1) "one"]
+  [(= x 2) "two"]
+  [:else   "other"])  ; [:else ...] 또는 [else ...] → catch-all
+
+; 3. 괄호형 (구버전)
+(cond
+  ((= x 1) "one")
+  ((= x 2) "two")
+  (else    "other"))
+```
+
+**반환값**: 첫 번째 참인 분기의 결과, 없으면 `nil`
+
+**예제**:
+```lisp
+(define score 85)
+(cond
+  (>= score 90) "A"
+  (>= score 80) "B"
+  (>= score 70) "C"
+  :else         "F")
+;; → "B"
+```
+
+**규칙**:
+- `:else`, `else` 모두 catch-all로 작동 (v11.6.2+)
+- 평탄형에서 홀수 번째 마지막 항목도 default로 작동
 
 ---
 
@@ -467,6 +520,38 @@
 ---
 
 ## 문자열
+
+### 멀티라인 문자열 `"""..."""`
+이스케이프 없는 Raw 문자열. HTML, JSON, SQL 임베드에 적합.
+
+```lisp
+; """ 로 시작하고 """ 로 끝남 — 내부 이스케이프 없음
+(define html """
+<div class="container">
+  <h1>Hello FreeLang</h1>
+</div>
+""")
+
+; JSON 임베드
+(define body """{
+  "name": "Alice",
+  "score": 100
+}""")
+
+; SQL 임베드
+(define q """
+  SELECT * FROM users
+  WHERE age > 18
+  ORDER BY name
+""")
+```
+
+**특징**:
+- 줄바꿈, 쌍따옴표, 역슬래시 모두 그대로 사용 가능
+- 이스케이프 시퀀스(`\n`, `\"`)가 해석되지 않음
+- 일반 문자열과 동일하게 `str`, `length`, `replace` 사용 가능
+
+---
 
 ### `(str value1 value2 ...)`
 값들을 문자열로 연결.
@@ -1233,6 +1318,64 @@ HTTP POST 요청.
 
 ---
 
+## HTTP 서버 요청 파싱
+
+서버 핸들러 내에서 `$req` 객체에서 데이터를 추출하는 함수들.
+
+### `(server-req-json req)` — **POST body 파싱 권장**
+요청 본문을 JSON 객체로 자동 파싱. Content-Type과 무관하게 작동.
+
+```lisp
+; ✅ 권장 — 한 줄로 body 파싱
+(route POST "/api/users"
+  (fn [$req]
+    (define data (server-req-json $req))
+    (define name (get data "name"))
+    (json-response {:ok true :name name})))
+
+; ❌ 이전 보일러플레이트 패턴 (불필요)
+(define raw (server-req-body $req))
+(define data (if (string? raw) (json-parse raw) raw))
+```
+
+**반환값**: 파싱된 map/array, 또는 `nil` (body 없음 / 파싱 실패)
+
+---
+
+### `(server-req-body req)`
+요청 본문을 **문자열**로 반환. JSON이 이미 파싱됐으면 다시 stringify.
+
+```lisp
+(define raw (server-req-body $req))
+;; → "{\"name\":\"Alice\"}"
+```
+
+---
+
+### `(server-req-query req [key])`
+쿼리 파라미터 반환. `key` 없으면 전체 map 반환.
+
+```lisp
+; GET /search?q=hello&page=2
+(server-req-query $req "q")    ;; → "hello"
+(server-req-query $req "page") ;; → "2"
+(server-req-query $req)        ;; → {:q "hello" :page "2"}
+```
+
+---
+
+### `(server-req-header req header-name)`
+요청 헤더 값 반환.
+
+```lisp
+(server-req-header $req "authorization")
+;; → "Bearer eyJ..."
+(server-req-header $req "content-type")
+;; → "application/json"
+```
+
+---
+
 ## 데이터베이스
 
 ### `(db-query sql [params])`
@@ -1600,6 +1743,54 @@ POST 요청 + 5xx/네트워크 오류 시 자동 재시도.
 | `"AI"` | AI API 오류 |
 | `"USER"` | 사용자 정의 throw |
 | `"TIMEOUT"` | 시간 초과 |
+
+---
+
+## 환경변수 (v11.6.0+)
+
+### `(env-get key)` — nil 반환 (v11.6.0+)
+환경변수 값 반환. 미정의 시 `""` 대신 **`nil` 반환** (or/env-or와 조합 가능).
+
+```lisp
+; ✅ 권장: env-or 사용
+(define db-url (env-or "DATABASE_URL" "localhost:3306"))
+
+; 직접 nil 체크
+(define val (env-get "MY_VAR"))
+(if (nil? val)
+  "not set"
+  val)
+
+; or과 조합
+(define port (or (env-get "PORT") 3000))
+```
+
+**주의**: v11.6.0 이전에는 `""` 반환 → `(or "" default)` 가 `""` 선택하는 버그 존재.
+
+---
+
+### `(env-or key default)`
+환경변수가 없거나 빈 문자열이면 `default` 반환.
+
+```lisp
+(env-or "PORT" 3000)
+;; PORT 미정의 → 3000
+
+(env-or "API_KEY" nil)
+;; API_KEY 미정의 → nil
+
+(env-or "DB_HOST" "localhost")
+;; DB_HOST="prod.db.example.com" → "prod.db.example.com"
+```
+
+---
+
+### `(shell-env key)` — 동의어
+`env-get`과 동일. shell 환경변수 조회.
+
+```lisp
+(shell-env "HOME")  ;; → "/root"
+```
 
 ---
 
