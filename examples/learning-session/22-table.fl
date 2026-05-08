@@ -1,0 +1,96 @@
+;; ASCII 테이블 렌더러 — 컬럼 너비 자동 계산 + 정렬
+
+(let [;; 값 → 표시 문자열
+      display (fn [v]
+                (if (= v nil) "" (str v)))
+
+      ;; 문자열 왼쪽 패딩 (오른쪽 정렬)
+      pad-left (fn [s n]
+                 (let [len (length s)]
+                   (if (>= len n) s
+                     (str (str-repeat " " (- n len)) s))))
+
+      ;; 문자열 오른쪽 패딩 (왼쪽 정렬)
+      pad-right (fn [s n]
+                  (let [len (length s)]
+                    (if (>= len n) s
+                      (str s (str-repeat " " (- n len))))))
+
+      ;; 컬럼별 최대 너비 계산 (헤더 포함)
+      col-widths (fn [headers rows]
+                   (map (fn [i]
+                          (let [hlen (length (get headers i))
+                                mlen (reduce
+                                       (fn [mx row]
+                                         (let [v (length (display (get row i)))]
+                                           (if (> v mx) v mx)))
+                                       hlen
+                                       rows)]
+                            mlen))
+                        (range (length headers))))
+
+      ;; 구분선 생성
+      divider (fn [widths]
+                (str "+" (str-join (map (fn [w] (str-repeat "-" (+ w 2))) widths) "+") "+"))
+
+      ;; 행 렌더링 (align: "left" | "right")
+      render-row (fn [cells widths aligns]
+                   (str "|" (str-join
+                              (map (fn [i]
+                                     (let [s   (display (get cells i))
+                                           w   (get widths i)
+                                           al  (get aligns i)
+                                           pad (if (= al "right")
+                                                 (pad-left s w)
+                                                 (pad-right s w))]
+                                       (str " " pad " ")))
+                                   (range (length cells)))
+                              "|") "|"))
+
+      ;; 테이블 출력
+      print-table (fn [headers rows aligns]
+                    (let [widths (col-widths headers rows)
+                          div    (divider widths)]
+                      (println div)
+                      (println (render-row headers widths (map (fn [_] "left") headers)))
+                      (println div)
+                      (map (fn [row] (println (render-row row widths aligns))) rows)
+                      (println div)
+                      (println (str (length rows) "개 행"))))
+
+      ;; ── 테스트 데이터 ──
+
+      ;; 1. 소수 목록
+      primes-data [[2 "소수" "yes"]
+                   [3 "소수" "yes"]
+                   [4 "합성수" "no"]
+                   [5 "소수" "yes"]
+                   [10 "합성수" "no"]
+                   [13 "소수" "yes"]
+                   [100 "합성수" "no"]
+                   [101 "소수" "yes"]]
+
+      ;; 2. 학생 성적표
+      students [["김민수" 92 88 95 "A"]
+                ["이수진" 78 85 80 "B+"]
+                ["박지훈" 65 70 72 "C+"]
+                ["최유리" 98 95 99 "A+"]
+                ["정태양" 55 60 58 "D+"]]
+
+      ;; 3. 서버 상태
+      servers [["web-01" "running" 12 "45ms" "정상"]
+               ["web-02" "running" 8  "52ms" "정상"]
+               ["db-01"  "running" 95 "12ms" "경고"]
+               ["cache"  "stopped" 0  "N/A"  "오류"]
+               ["api-gw" "running" 31 "28ms" "정상"]]]
+
+  (println "=== 소수 판별 ===")
+  (print-table ["수" "분류" "소수?"] primes-data ["right" "left" "left"])
+  (println "")
+
+  (println "=== 학생 성적표 ===")
+  (print-table ["이름" "국어" "영어" "수학" "등급"] students ["left" "right" "right" "right" "left"])
+  (println "")
+
+  (println "=== 서버 상태 ===")
+  (print-table ["서버" "상태" "CPU%" "응답시간" "비고"] servers ["left" "left" "right" "right" "left"]))
