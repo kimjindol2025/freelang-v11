@@ -1,5 +1,35 @@
 # Changelog
 
+## [v11.6.12] — 2026-05-08 (DX 개선 4종: 에러 추적·stdlib 탐색·safe-push·callFn 정리)
+
+### 신규 기능
+
+**stdlib 탐색 함수 3종**
+```lisp
+(stdlib-list)          ; => 전체 함수 목록 (정렬)
+(fn-where "str-pad")   ; => "native:str-pad"
+(fn-exists? "nil-or")  ; => true
+```
+
+**scripts/safe-push.sh** — bootstrap.js 충돌 없는 원자적 push
+```bash
+./scripts/safe-push.sh "commit message"
+# 빌드 → SHA 검증 → push 순서로 진행
+```
+
+### 개선
+
+**에러 메시지 [op] 접두사** — 런타임 오류에 연산자명 자동 표시
+```
+Before: r.entries is not iterable
+After:  [log_info] r.entries is not iterable
+```
+
+**callFn typeof 분기 제거** — `eval-special-forms.ts`의 memoize/map-keys/vals 정리,
+`callFn(fn, args)` 단일 경로로 통일
+
+---
+
 ## [v11.6.11] — 2026-05-08 (deftest/is/run-tests, migrate, on-shutdown, import 별칭)
 
 ### 신규 기능
