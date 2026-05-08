@@ -1,0 +1,87 @@
+;; 달력 생성기 — 월/연도 입력 → 텍스트 달력 출력
+
+(let [;; 월 이름
+      month-names ["1월" "2월" "3월" "4월" "5월" "6월"
+                   "7월" "8월" "9월" "10월" "11월" "12월"]
+
+      ;; 윤년 판별
+      leap-year?  (fn [y]
+                    (or (and (= (- y (* (floor (/ y 4)) 4)) 0)
+                             (not (= (- y (* (floor (/ y 100)) 100)) 0)))
+                        (= (- y (* (floor (/ y 400)) 400)) 0)))
+
+      ;; 월별 일수
+      days-in-month (fn [y m]
+                      (cond
+                        (or (= m 1) (= m 3) (= m 5) (= m 7)
+                            (= m 8) (= m 10) (= m 12)) 31
+                        (or (= m 4) (= m 6) (= m 9) (= m 11)) 30
+                        (leap-year? y) 29
+                        :else 28))
+
+      ;; 첫날 요일 (Zeller 공식 — 0=일 1=월 ... 6=토)
+      first-weekday (fn [y m]
+                      (let [a  (if (< m 3) 1 0)
+                            yy (- y a)
+                            mm (+ m (if (= a 1) 10 -2))
+                            k  (- yy (* (floor (/ yy 100)) 100))
+                            j  (floor (/ yy 100))
+                            h  (- (+ 1 (floor (/ (* mm 26) 10)) k
+                                     (floor (/ k 4)) (floor (/ j 4))
+                                     (* 5 j))
+                                  (* 7 (floor (/ (+ 1 (floor (/ (* mm 26) 10)) k
+                                                    (floor (/ k 4)) (floor (/ j 4))
+                                                    (* 5 j))
+                                                 7))))]
+                        (- (+ h 6) (* 7 (floor (/ (+ h 6) 7))))))
+
+      ;; 숫자 2자리 패딩
+      pad2  (fn [n]
+               (if (< n 10) (str " " n) (str n)))
+
+      ;; 달력 한 행 출력
+      print-week (fn [days]
+                   (println (str-join (map pad2 days) " ")))
+
+      ;; 달력 생성 및 출력
+      print-calendar (fn [y m]
+                       (let [total   (days-in-month y m)
+                             start   (first-weekday y m)
+                             title   (str (get month-names (- m 1)) " " y)
+                             pad     (- 12 (floor (/ (length title) 2)))]
+                         (println (str (str-repeat " " pad) title))
+                         (println "일  월  화  수  목  금  토")
+                         (println "---------------------------")
+                         ;; 첫 주 앞 빈칸 채우기
+                         (let [first-row (concat (map (fn [_] "  ") (range start))
+                                                 (map (fn [d] (pad2 d))
+                                                      (range 1 (+ 1 (- 7 start)))))]
+                           (println (str-join first-row " ")))
+                         ;; 나머지 주
+                         (loop [day (+ 1 (- 7 start))]
+                           (if (> day total)
+                             nil
+                             (do
+                               (let [week (map (fn [d]
+                                                 (if (<= d total) (pad2 d) "  "))
+                                               (range day (+ day 7)))]
+                                 (println (str-join week " ")))
+                               (recur (+ day 7)))))
+                         (println "")))
+
+      ;; 연간 달력
+      print-year  (fn [y]
+                    (println (str "======= " y "년 달력 ======="))
+                    (println "")
+                    (map (fn [m] (print-calendar y m))
+                         (range 1 13)))]
+
+  ;; 2026년 5월, 6월
+  (print-calendar 2026 5)
+  (print-calendar 2026 6)
+
+  ;; 윤년 확인
+  (println "=== 윤년 확인 ===")
+  (map (fn [y]
+         (println (str "  " y "년: " (if (leap-year? y) "윤년" "평년"))))
+       [2020 2024 2025 2026 2100 2400]))
