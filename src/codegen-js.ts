@@ -647,8 +647,18 @@ export class JSCodegen {
 
   private genFn(args: ASTNode[]): string {
     const { params, preamble } = this.extractParamListWithDestructuring(args[0]);
-    const bodyNode = args[1];
-    const body = bodyNode ? this.genNode(bodyNode) : "undefined";
+    let body: string;
+    if (args.length <= 1) {
+      body = "undefined";
+    } else if (args.length === 2) {
+      body = this.genNode(args[1]);
+    } else {
+      // 여러 body 표현식 → IIFE로 감싸고 마지막 값 반환
+      const bodyNodes = args.slice(1);
+      const stmts = bodyNodes.slice(0, -1).map(n => this.genNode(n) + ";").join(" ");
+      const last = this.genNode(bodyNodes[bodyNodes.length - 1]);
+      body = `((() => { ${stmts} return ${last}; })())`;
+    }
     const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
     return `((${params.join(", ")}) => ${finalBody})`;
   }
