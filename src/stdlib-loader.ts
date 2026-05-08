@@ -571,6 +571,13 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       for (let i = 0; i < ks.length; i++) m.set(ks[i], vs[i] ?? null);
       return m;
     },
+    // ── nil-or / or-default — nil coalescing ──────────────────────
+    // (nil-or val default) → val이 nil이면 default 반환
+    "nil-or":       (v: any, d: any) => (v === null || v === undefined) ? d : v,
+    "nil_or":       (v: any, d: any) => (v === null || v === undefined) ? d : v,
+    "or-default":   (v: any, d: any) => (v === null || v === undefined) ? d : v,
+    "or_default":   (v: any, d: any) => (v === null || v === undefined) ? d : v,
+    "coalesce":     (...args: any[]) => args.find(v => v !== null && v !== undefined) ?? null,
     // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
     "inc":           (n: number) => (typeof n === "number" ? n + 1 : Number(n) + 1),
     "dec":           (n: number) => (typeof n === "number" ? n - 1 : Number(n) - 1),
