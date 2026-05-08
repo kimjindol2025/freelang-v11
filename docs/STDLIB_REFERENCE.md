@@ -1844,13 +1844,114 @@ POST 요청 + 5xx/네트워크 오류 시 자동 재시도.
 
 ---
 
-### `(shell-env key)` — 동의어
-`env-get`과 동일. shell 환경변수 조회.
+### `(shell-env key)` — 레거시 동의어
+`env-get`과 동일. 레거시 코드 호환용.
 
 ```lisp
 (shell-env "HOME")  ;; → "/root"
 ```
 
+---
+
+## cond — :else 포함 3가지 문법 (LIR-006, 2026-05-08~)
+
+`cond`의 전통 방식과 편의 문법 3가지.
+
+### 형태 1 — `[true ...]` (전통)
+
+```lisp
+(cond
+  [(= $x 1) "one"]
+  [(= $x 2) "two"]
+  [true "default"])
+```
+
+### 형태 2 — `:else` (권장)
+
+```lisp
+(cond
+  [(= $x 1) "one"]
+  [(= $x 2) "two"]
+  [:else "default"])
+```
+
+`true`와 완전히 동일. 의도를 명시적으로 표현.
+
+### 형태 3 — `else` 심볼
+
+```lisp
+(cond
+  [(> $x 0) "양수"]
+  [(< $x 0) "음수"]
+  [else "영"])
+```
+
+세 가지 모두 동작. `:else` 사용 권장.
+
+---
+
+## """ 멀티라인 문자열 (triple-quote, 2026-05-08~)
+
+삼중 따옴표로 여러 줄 문자열을 그대로 작성 가능. HTML/SQL/JSON 작성 시 유용.
+
+```lisp
+;; 기본
+(let [[$html """
+<div>
+  <h1>제목</h1>
+  <p>내용</p>
+</div>
+"""]]
+  (server-html $html))
+
+;; 변수 보간
+(let [[$name "Kim"] [$count 5]]
+  (server-html """
+    <h1>안녕 ${$name}</h1>
+    <p>항목 수: ${$count}</p>
+  """))
+
+;; SQL
+(db-query DB_PATH """
+  SELECT data FROM crm_events
+  WHERE json_extract(data,'$.entity_id') = ?
+    AND json_extract(data,'$.event_type') = 'STATE_TRANSITION'
+  ORDER BY json_extract(data,'$.event_ms') DESC
+  LIMIT 1
+""" [$entity-id])
+```
+
+---
+
+## server-req-json (2026-05-08~)
+
+POST body 자동 JSON 파싱. `server-req-body` + `json-parse` 조합 대체.
+
+```
+(server-req-json req) → map | nil
+```
+
+- Content-Type 무관하게 body 파싱 시도
+- 이미 객체로 파싱된 경우 그대로 반환
+- 파싱 실패 시 `nil`
+
+```lisp
+;; Before
+(let [[$body (json-parse (server-req-body $req))]] ...)
+
+;; After
+(let [[$body (server-req-json $req)]] ...)
+
+;; 예제
+(defn handle-create [$req]
+  (let [[$body (server-req-json $req)]
+        [$name (get $body "name")]]
+    (if (nil? $name)
+      (res-err 400 "name 필수")
+      (res-ok {:created $name}))))
+```
+
+> `server-req-body` → 문자열 반환 / `server-req-json` → 파싱된 맵 반환
 ---
 
 ## 참고
