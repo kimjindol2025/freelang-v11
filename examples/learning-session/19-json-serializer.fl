@@ -1,0 +1,86 @@
+;; JSON 직렬화기 — FreeLang 값 → JSON 문자열 (pretty-print 지원)
+
+(let [;; 문자열 이스케이프
+      escape-str (fn [s]
+                   (let [s1 (str-replace s "\\" "\\\\")
+                         s2 (str-replace s1 "\"" "\\\"")
+                         s3 (str-replace s2 "\n" "\\n")
+                         s4 (str-replace s3 "\t" "\\t")]
+                     s4))
+
+      ;; 들여쓰기 생성
+      indent (fn [depth]
+               (str-repeat "  " depth))
+
+      ;; 값 → JSON (재귀)
+      to-json (fn [val depth]
+                (cond
+                  (= val nil)    "null"
+                  (= val true)   "true"
+                  (= val false)  "false"
+                  (number? val)  (str val)
+                  (string? val)  (str "\"" (escape-str val) "\"")
+                  (array? val)
+                  (if (= (length val) 0)
+                    "[]"
+                    (let [inner (str-join
+                                  (map (fn [item]
+                                         (str (indent (+ depth 1))
+                                              (to-json item (+ depth 1))))
+                                       val)
+                                  ",\n")]
+                      (str "[\n" inner "\n" (indent depth) "]")))
+                  (map? val)
+                  (let [pairs (map
+                                (fn [k]
+                                  (str (indent (+ depth 1))
+                                       "\"" k "\": "
+                                       (to-json (get val k) (+ depth 1))))
+                                (keys val))]
+                    (if (= (length pairs) 0)
+                      "{}"
+                      (str "{\n"
+                           (str-join pairs ",\n")
+                           "\n" (indent depth) "}")))
+                  :else (str "\"" (str val) "\"")))
+
+      ;; 최상위 진입
+      json (fn [val] (to-json val 0))
+
+      ;; 테스트 데이터
+      person {"name" "김민수"
+              "age"  29
+              "active" true
+              "score" 98.5
+              "tags" ["개발자" "FreeLang" "함수형"]
+              "address" {"city" "서울"
+                         "zip"  "04523"}}
+
+      products [{"id" 1 "name" "노트북" "price" 1500000 "stock" 12}
+                {"id" 2 "name" "마우스" "price" 35000  "stock" 0}
+                {"id" 3 "name" "키보드" "price" 89000  "stock" 5}]
+
+      config {"version" "1.0.0"
+              "debug" false
+              "limits" {"max-conn" 100 "timeout" 30}
+              "features" ["auth" "cache" "logging"]
+              "meta" nil}]
+
+  (println "=== person ===")
+  (println (json person))
+  (println "")
+
+  (println "=== products ===")
+  (println (json products))
+  (println "")
+
+  (println "=== config ===")
+  (println (json config))
+  (println "")
+
+  ;; 엣지 케이스
+  (println "=== 엣지 케이스 ===")
+  (println (str "null:   " (json nil)))
+  (println (str "빈 배열: " (json [])))
+  (println (str "빈 맵:  " (json {})))
+  (println (str "이스케이프: " (json "안녕 \"world\"\n탭\t끝"))))
