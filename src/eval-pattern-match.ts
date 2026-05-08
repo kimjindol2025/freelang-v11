@@ -79,7 +79,8 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
             // Extract FLRuntimeError fields
             const flErr = error as any;
             if (flErr.file) errMap.set("file", flErr.file);
-            if (flErr.code) errMap.set("code", flErr.code);
+            const code = flErr.code ?? null;
+            if (code) errMap.set("code", code);
             if (flErr.hint) errMap.set("hint", flErr.hint);
             // category: code -> category direct map (no message inference)
             const CODE_TO_CATEGORY: Record<string, string> = {
