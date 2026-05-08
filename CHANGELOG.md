@@ -1,5 +1,30 @@
 # Changelog
 
+## [v11.6.13] — 2026-05-08 (L2 고정점 재달성 — stage1.js 레거시 중복 헬퍼 제거)
+
+### 버그 수정
+
+**stage1.js 결정론성 복구** — L2 fixed-point 5/5 ✅
+
+`stage1.js` 180-183줄에 레거시 중복 헬퍼 4개가 잔존하여 매 컴파일마다 SHA256이 달라지는 문제 수정.
+
+```
+// 제거된 중복 코드 (현재 컴파일러는 lambda wrapping 버전만 생성)
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
+```
+
+수정 후 SHA256 고정점 체인 완전 수렴:
+```
+stage1~5: 939c3c374a428e15... (5/5 일치)
+```
+
+Commit: 71c4276b
+
+---
+
 ## [v11.6.12] — 2026-05-08 (DX 개선 4종: 에러 추적·stdlib 탐색·safe-push·callFn 정리)
 
 ### 신규 기능
