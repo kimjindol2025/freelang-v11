@@ -1131,6 +1131,21 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return undefined;
   }
 
+  // ── memoize ──────────────────────────────────────────────────────
+  // (memoize fn) → memoized version that caches by JSON(args)
+  if (op === "memoize") {
+    if (expr.args.length < 1) throwArgCount("memoize", "1", expr.args.length, expr.line);
+    const fn = ev(expr.args[0]);
+    const cache = new Map<string, any>();
+    return (...args: any[]) => {
+      const key = JSON.stringify(args);
+      if (cache.has(key)) return cache.get(key);
+      const result = typeof fn === "function" ? fn(...args) : callFn(fn, args);
+      cache.set(key, result);
+      return result;
+    };
+  }
+
   // ── partial ───────────────────────────────────────────────────────
   // (partial f arg1 arg2 ...) → fn that prepends partialArgs to call
   if (op === "partial") {

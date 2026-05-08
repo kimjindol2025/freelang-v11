@@ -1,5 +1,26 @@
 # Changelog
 
+## [v11.6.9] — 2026-05-08 (log-info/warn/error, memoize, validate, list-min/max)
+
+### 언어 개선
+- **`memoize`**: `(memoize fn)` — FL 함수 + 네이티브 함수 자동 결과 캐싱 (JSON 키 기반). special form으로 이동
+
+### 신규 함수
+- **`log-info`**: `(log-info "서버 시작" "포트" 3000)` → stderr `[INFO]  ...`
+- **`log-warn`**: `(log-warn "캐시 만료 임박")` → stderr `[WARN]  ...`
+- **`log-error`**: `(log-error "DB 연결 실패")` → stderr `[ERROR] ...`
+  - 기존 Logger 패턴 `(log-info logger msg)` 과 공존 (첫 인자 Logger 객체 여부로 자동 분기)
+- **`validate`**: `(validate body schema)` → `null`(성공) or `["field: msg" ...]`(오류 목록)
+  - schema: Map 또는 plain object. 규칙: `:required :number :string :boolean :email :min-N :max-N`
+- **`list-min`**: `(list-min [5 2 8 1 9])` → `1`
+- **`list-max`**: `(list-max [5 2 8 1 9])` → `9`
+
+### 확인 (이미 구현됨)
+- `file-read/write/append/exists?/delete`: 모두 정상 작동
+- `abs/ceil/floor/round`: 정상 작동
+
+---
+
 ## [v11.6.8] — 2026-05-08 (str-pad, str-repeat, zip→Map, flatten, distinct, when/merge 확인)
 
 ### 신규 함수
