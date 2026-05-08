@@ -246,7 +246,7 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "upper-case": return typeof v0 === "string" ? v0.toUpperCase() : v0;
     case "lower-case": return typeof v0 === "string" ? v0.toLowerCase() : v0;
     case "strlen": return typeof v0 === "string" ? v0.length : 0;
-    case "includes?": return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
+    case "includes?": case "includes-item": return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
     case "starts-with?": return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
     case "ends-with?": return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
     case "empty?": { if (v0 === null || v0 === undefined) return true; if (typeof v0 === "string") return v0.length === 0; if (Array.isArray(v0)) return v0.length === 0; if (typeof v0 === "object") return Object.keys(v0).length === 0; return false; }
@@ -1589,16 +1589,16 @@ loop().catch(e => {
       }
       return coll;
     }
-    case "find":
-      if (Array.isArray(args[0])) {
-        const findFn = args[1];
-        if (typeof findFn === "function") return args[0].find(findFn) ?? null;
-        if (findFn && (findFn as any).kind === "function-value") {
-          return args[0].find((item: any) => callFnVal(findFn, [item])) ?? null;
-        }
-        return args[0].indexOf(findFn);
+    case "find": {
+      // (find arr fn-or-value) — arr-first; fn → element, value → index
+      if (!Array.isArray(args[0])) return -1;
+      const findTarget = args[1];
+      if (typeof findTarget === "function") return args[0].find(findTarget) ?? null;
+      if (findTarget && ((findTarget as any).kind === "function-value" || (findTarget as any).kind === "closure")) {
+        return args[0].find((item: any) => callFnVal(findTarget, [item])) ?? null;
       }
-      return -1;
+      return args[0].indexOf(findTarget);
+    }
     case "last":
       return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
     // Phase C: nil-safe wrapper들
@@ -2022,6 +2022,12 @@ loop().catch(e => {
       return err("ERR", String(args[0] ?? ''));
     }
     case "some":
+      // (some fn arr) → bool array predicate; (some val) → Option monad constructor
+      if (typeof args[0] === "function" || (args[0] && ((args[0] as any).kind === "function-value" || (args[0] as any).kind === "closure"))) {
+        const someFn = args[0], someArr = Array.isArray(args[1]) ? args[1] : [];
+        if (typeof someFn === "function") return someArr.some(someFn);
+        return someArr.some((item: any) => callFnVal(someFn, [item]));
+      }
       return { tag: "Some", value: args[0], kind: "Option" };
     case "none":
       return { tag: "None", value: null, kind: "Option" };
@@ -2304,9 +2310,19 @@ loop().catch(e => {
 
     // (flat-map result fn) → Result
     case "flat-map": {
-      const r = args[0];
-      const fn = args[1];
-      return flatMap(r, (v: any) => callFn(fn, [v]));
+      // (flat-map fn arr) — fn-first
+      const fmFn = args[0], fmArr = args[1];
+      if (Array.isArray(fmArr)) {
+        const results: any[] = [];
+        for (const item of fmArr) {
+          const r = callFnVal(fmFn, [item]);
+          if (Array.isArray(r)) results.push(...r);
+          else if (r !== null && r !== undefined) results.push(r);
+        }
+        return results;
+      }
+      // Result monad flat-map fallback
+      return flatMap(fmArr, (v: any) => callFn(fmFn, [v]));
     }
 
     // (recover result fn) → value (Ok값 또는 fn(err) 반환)

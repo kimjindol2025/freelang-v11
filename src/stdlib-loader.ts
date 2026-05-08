@@ -532,7 +532,8 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "str-contains?": (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str-contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
     "str_contains":  (s: string, sub: string) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
-    "includes?":     (s: string, sub: string) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? (s as any[]).includes(sub) : false,
+    "includes?":      (s: string, sub: string) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? (s as any[]).includes(sub) : false,
+    "includes-item":  (arr: any[], item: any) => Array.isArray(arr) ? arr.includes(item) : false,
     // str-pad (s width [char] [dir]) — dir: "right"(기본)/"left"
     "str-pad": (s: string, width: number, ch?: string, dir?: string): string => {
       const str = String(s ?? ""); const w = Number(width); const c = (String(ch ?? " ")[0]) ?? " ";
