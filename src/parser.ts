@@ -1985,7 +1985,18 @@ export class Parser {
   // (try body (catch [pattern] handler) (finally cleanup))
   private parseTryExpression(): TryBlock {
     // 'try' keyword already consumed by parseSExpr
-    const body = this.parseValue();
+    // body: 여러 표현식 허용 — (catch/finally 절이 아닌 것들을 do 블록으로 묶음)
+    const bodyExprs: ASTNode[] = [];
+    while (this.check(T.LParen) || !this.check(T.RParen)) {
+      // 다음 토큰이 (catch 또는 (finally 이면 body 수집 종료
+      if (this.check(T.LParen) && this.pos + 1 < this.tokens.length) {
+        const next = this.tokens[this.pos + 1];
+        if (next.type === T.Symbol && (next.value === "catch" || next.value === "finally")) break;
+      }
+      if (this.isAtEnd() || this.check(T.RParen)) break;
+      bodyExprs.push(this.parseValue());
+    }
+    const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
 
     const catchClauses: CatchClause[] = [];
     let finallyBlock: ASTNode | undefined;
