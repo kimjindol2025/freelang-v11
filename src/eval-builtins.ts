@@ -1776,6 +1776,18 @@ loop().catch(e => {
       }
       return args[0] ?? {};
     }
+    case "obj-keys": case "obj_keys": {
+      if (!args[0] || typeof args[0] !== "object" || Array.isArray(args[0])) return [];
+      return Object.keys(args[0]);
+    }
+    case "obj-values": case "obj_values": {
+      if (!args[0] || typeof args[0] !== "object" || Array.isArray(args[0])) return [];
+      return Object.values(args[0]);
+    }
+    case "obj-entries": case "obj_entries": {
+      if (!args[0] || typeof args[0] !== "object" || Array.isArray(args[0])) return [];
+      return Object.entries(args[0]);
+    }
     case "obj-merge": case "obj_merge": case "merge": {
       // (obj-merge m1 m2 ...) — 오른쪽이 우선
       if (args.length === 0) return {};

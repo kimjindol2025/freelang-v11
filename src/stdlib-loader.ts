@@ -734,15 +734,20 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     },
     "fn-exists?": (name: string): boolean => {
       const s = String(name);
-      return interp.context.functions.has(s)
+      if (interp.context.functions.has(s)
         || interp.context.functions.has(s.replace(/-/g, "_"))
-        || interp.context.functions.has(s.replace(/_/g, "-"));
+        || interp.context.functions.has(s.replace(/_/g, "-"))) return true;
+      // eval-builtins 커버
+      const _builtins = new Set(["obj-keys","obj-values","obj-entries","obj-merge","obj-pick","obj-omit","html-escape","uuid","uuid4","sleep","sort-by","flat-map","index-of","includes-item","flatten","if-let","when","cond","match","try","catch"]);
+      return _builtins.has(s) || _builtins.has(s.replace(/_/g,"-"));
     },
     "fn_exists": (name: string): boolean => {
       const s = String(name);
-      return interp.context.functions.has(s)
+      if (interp.context.functions.has(s)
         || interp.context.functions.has(s.replace(/-/g, "_"))
-        || interp.context.functions.has(s.replace(/_/g, "-"));
+        || interp.context.functions.has(s.replace(/_/g, "-"))) return true;
+      const _builtins = new Set(["obj-keys","obj-values","obj-entries","obj-merge","obj-pick","obj-omit","html-escape","uuid","uuid4","sleep","sort-by","flat-map","index-of","includes-item","flatten","if-let","when","cond","match","try","catch"]);
+      return _builtins.has(s) || _builtins.has(s.replace(/_/g,"-"));
     },
   };
   for (const [name, fn] of Object.entries(_overrides)) {

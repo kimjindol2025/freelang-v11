@@ -500,6 +500,14 @@ export function createDataModule() {
       });
     },
 
+    // CLAUDE.md 문서화 별칭
+    "str-to-upper":    (s: string) => String(s || "").toUpperCase(),
+    "str-to-lower":    (s: string) => String(s || "").toLowerCase(),
+    "str-starts-with": (s: string, p: string) => String(s || "").startsWith(String(p || "")),
+    "str-ends-with":   (s: string, p: string) => String(s || "").endsWith(String(p || "")),
+    "str-to-num":      (s: string) => { const n = Number(String(s || "").trim()); return isNaN(n) ? null : n; },
+    "html-escape":     (s: string) => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),
+
     // str/fmt alias
     "str/fmt": (template: string, vars: any): string => {
       if (typeof template !== "string") return String(template);
