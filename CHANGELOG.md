@@ -1,5 +1,24 @@
 # Changelog
 
+## [v11.6.17] — 2026-05-08 (fn-exists? 전체 커버리지 + is-nil/is-empty alias)
+
+### 버그 수정
+
+**fn-exists? — eval-builtins 338개 함수 인식 불가 (fn-exists? "map") → false**
+
+`fn-exists?`가 `context.functions` 맵만 검사하고 eval-builtins의 switch-case 함수는 완전히 무시했던 버그. `map`, `filter`, `reduce`, `println`, `length`, `push`, `pop`, `nil?` 등 핵심 함수 전부 `false` 반환.
+
+hardcoded 21개 → 338개 전체 목록으로 교체.
+
+| 추가 | 내용 |
+|------|------|
+| `stdlib-loader.ts` | fn-exists? / fn_exists 모두 338개 eval-builtins 커버 |
+| `stdlib-data.ts` | `is-nil`, `is-empty` — CLAUDE.md 문서화 별칭 실체화 |
+
+Commit: a0a83a6b | Tests: 903/903 | Fixed-Point: 5/5
+
+---
+
 ## [v11.6.16] — 2026-05-08 (누락 stdlib alias 17개 복구)
 
 ### 버그 수정
