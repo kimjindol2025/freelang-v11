@@ -18,10 +18,11 @@ let nextTimerId = 2000; // Start from 2000 to avoid conflicts
 export function createTimerModule(interpreter: any) {
   return {
     // set_interval fn ms -> number (fn: function name string, ms: interval)
-    "set_interval": (fnName: string, ms: number): number => {
+    "set_interval": (fnName: string | any, ms: number): number => {
       try {
-        if (typeof fnName !== "string") {
-          throw new Error(`Function name must be string, got ${typeof fnName}`);
+        const isFnObj = fnName && typeof fnName === "object" && fnName.body !== undefined;
+        if (typeof fnName !== "string" && !isFnObj) {
+          throw new Error(`Function name must be string or function, got ${typeof fnName}`);
         }
         if (typeof ms !== "number" || ms < 1) {
           throw new Error(`Interval must be positive number, got ${ms}`);
@@ -29,12 +30,16 @@ export function createTimerModule(interpreter: any) {
 
         const timerId = nextTimerId++;
 
-        // Create a wrapper that calls the FreeLang function
         const callback = () => {
           try {
-            interpreter.callUserFunction(fnName, []);
+            if (isFnObj) {
+              interpreter.callFunction(fnName, []);
+            } else {
+              interpreter.callUserFunction(fnName as string, []);
+            }
           } catch (err: any) {
-            console.error(`set_interval callback error for '${fnName}':`, err.message);
+            const label = isFnObj ? "<fn>" : fnName;
+            console.error(`set_interval callback error for '${label}':`, err.message);
           }
         };
 

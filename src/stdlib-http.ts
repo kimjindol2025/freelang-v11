@@ -276,6 +276,21 @@ export function createHttpModule() {
       }
     },
 
+    // http_get_data url [headers] -> parsed JSON directly (null on error)
+    "http_get_data": (url: string, headers?: any): any => {
+      const result = fetchSync(url, "GET", headers);
+      if (result.error || !result.body) return null;
+      try { return JSON.parse(result.body); } catch { return null; }
+    },
+
+    // http_post_data url body [headers] -> parsed JSON directly (null on error)
+    "http_post_data": (url: string, body: string, headers?: any): any => {
+      const h = { "Content-Type": "application/json", ...headersToPlain(headers) };
+      const result = fetchSync(url, "POST", h, body);
+      if (result.error || !result.body) return null;
+      try { return JSON.parse(result.body); } catch { return null; }
+    },
+
     // http_get_json_bearer url token -> {:status 200 :data {...}}
     "http_get_json_bearer": (url: string, token: string): any => {
       const result = fetchSync(url, "GET",

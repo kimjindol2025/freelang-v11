@@ -1,5 +1,20 @@
 # Changelog
 
+## [v11.6.3] — 2026-05-08 (P0 DX — http-get-data, server-html status, set-interval fn ref)
+
+### 신규 함수
+- **`http-get-data url [headers]`**: GET 후 파싱된 JSON 직접 반환 (이중구조 제거)
+- **`http-post-data url body [headers]`**: POST 후 파싱된 JSON 직접 반환
+
+### 언어 개선
+- **`server-html` status 코드**: `(server-html "<html>" 404)` — 두 번째 인자로 상태코드 지정 (`stdlib-http-server.ts`)
+- **`set-interval` 함수 참조**: 문자열 이름 외 FreeLang 함수 객체 직접 전달 지원 (`stdlib-timer.ts`)
+
+### 문서화
+- STDLIB_REFERENCE: `http-get-data`, `http-post-data`, `mariadb-one`, `mariadb-pool-one` 추가
+
+---
+
 ## [v11.6.2] — 2026-05-08 (DX 개선 — cond :else + HTTP async + 모듈 캐시)
 
 ### 언어 개선

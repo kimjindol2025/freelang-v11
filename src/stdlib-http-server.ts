@@ -732,7 +732,8 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     // server_html body -> response object (text/html)
     // In dev mode (FL_DEV=1), injects hot-reload script before </body>
     // so browsers auto-refresh when the FreeLang source file changes.
-    "server_html": (body: string): Record<string, any> => {
+    "server_html": (body: string, statusOrUndef?: number): Record<string, any> => {
+      const status = (typeof statusOrUndef === "number") ? statusOrUndef : 200;
       let finalBody = body;
       if (process.env.FL_DEV === "1" && typeof finalBody === "string") {
         const script = `<script>(function(){let w=false;function c(){const e=new EventSource('/__hot');e.onopen=function(){if(w)location.reload();w=true;};e.onerror=function(){e.close();setTimeout(c,400);};}c();})();</script>`;
@@ -744,7 +745,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       }
       return {
         __fl_response: true,
-        status: 200,
+        status,
         contentType: "text/html; charset=utf-8",
         body: finalBody,
       };

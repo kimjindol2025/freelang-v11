@@ -1318,6 +1318,38 @@ HTTP POST 요청.
 
 ---
 
+### `(http-get-data url [headers])` — **JSON 직접 반환 (이중구조 없음)**
+GET 요청 후 파싱된 JSON을 **바로** 반환. `{:status :data}` 래퍼 없음.
+
+```lisp
+; ✅ 이제 이렇게
+(define user (http-get-data "https://api.example.com/users/1"))
+(define name (get user "name"))
+
+; ❌ 기존 이중구조 패턴 (불필요)
+(define resp (http-get-json "https://api.example.com/users/1"))
+(define user (get resp :data))
+(define name (get user "name"))
+```
+
+**반환값**: 파싱된 map/array, 또는 `nil` (에러/파싱 실패)
+
+---
+
+### `(http-post-data url body [headers])` — **JSON 직접 반환**
+POST 요청 후 파싱된 JSON을 바로 반환.
+
+```lisp
+(define result (http-post-data
+  "https://api.example.com/items"
+  (json-stringify {:name "Widget" :price 9.99})))
+(define id (get result "id"))
+```
+
+**반환값**: 파싱된 map/array, 또는 `nil` (에러/파싱 실패)
+
+---
+
 ## HTTP 서버 요청 파싱
 
 서버 핸들러 내에서 `$req` 객체에서 데이터를 추출하는 함수들.
@@ -1410,6 +1442,33 @@ SQL 명령 실행 (INSERT, UPDATE, DELETE).
          ["Alice" "alice@example.com"])
 ;; → 1
 ```
+
+---
+
+### `(mariadb-one db sql [params])` — **단일 행 조회**
+첫 번째 결과 행만 반환. 없으면 `nil`.
+
+```lisp
+(define user (mariadb-one DB "SELECT * FROM users WHERE id = ?" [42]))
+(if (= user nil)
+  (print "없음")
+  (print (get user "name")))
+```
+
+**반환값**: map (첫 번째 행), 또는 `nil`
+
+---
+
+### `(mariadb-pool-one pool-id sql [params])` — **풀에서 단일 행 조회**
+`mariadb-pool-query` 대신 한 행만 필요할 때 사용.
+
+```lisp
+(define DB_POOL (mariadb-pool-create "localhost" "mydb" "user" "pass"))
+(define user (mariadb-pool-one DB_POOL "SELECT * FROM users WHERE email = ?" [$email]))
+(define name (get user "name"))
+```
+
+**반환값**: map (첫 번째 행), 또는 `nil`
 
 ---
 
