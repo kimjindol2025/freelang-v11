@@ -251,6 +251,21 @@ export function createMariadbModule() {
     "mariadb_one":   (db: string, sql: string, params: any[] = []) =>
       parseRows(runMariadb(db, bindParams(sql, params)))[0] ?? null,
 
+    // db_query_one db sql [params] → row or nil
+    // db: CLI connection string (string) or pool ID (number) — auto-detect
+    "db_query_one": (db: any, sql: string, params: any[] = []) => {
+      if (typeof db === "number") {
+        return poolCall({ type: "one", poolId: db, sql, params }).row ?? null;
+      }
+      return parseRows(runMariadb(String(db), bindParams(sql, params)))[0] ?? null;
+    },
+    "db-query-one": (db: any, sql: string, params: any[] = []) => {
+      if (typeof db === "number") {
+        return poolCall({ type: "one", poolId: db, sql, params }).row ?? null;
+      }
+      return parseRows(runMariadb(String(db), bindParams(sql, params)))[0] ?? null;
+    },
+
     // mariadb_transaction db [{sql params}] → {ok count} or {ok:false error}
     // 단일 연결에서 BEGIN/COMMIT/ROLLBACK 보장
     "mariadb_transaction": (db: string, stmts: Array<{sql: string, params?: any[]}>) => {

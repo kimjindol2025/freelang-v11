@@ -1104,6 +1104,32 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return undefined;
   }
 
+  // ── map-vals / map-keys ───────────────────────────────────────────
+  // (map-vals f m) → new map with f applied to each value
+  // (map-keys f m) → new map with f applied to each key
+  if ((op === "map-vals" || op === "map_vals" || op === "map-keys" || op === "map_keys") && expr.args.length === 2) {
+    const fn = ev(expr.args[0]);
+    const m  = ev(expr.args[1]);
+    const applyFn = (fn: any, arg: any): any => {
+      if (typeof fn === "function") return fn(arg);
+      return callFn(fn, [arg]);
+    };
+    const isKey = op === "map-keys" || op === "map_keys";
+    if (m instanceof Map) {
+      const out = new Map();
+      for (const [k, v] of (m as Map<any,any>).entries())
+        out.set(isKey ? applyFn(fn, k) : k, isKey ? v : applyFn(fn, v));
+      return out;
+    }
+    if (m && typeof m === "object" && !Array.isArray(m)) {
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(m))
+        out[isKey ? String(applyFn(fn, k)) : k] = isKey ? v : applyFn(fn, v);
+      return out;
+    }
+    return m;
+  }
+
   // ── defstruct ─────────────────────────────────────────────────────
   // (defstruct Point [:x :float :y :float])
   // 자동 생성:
