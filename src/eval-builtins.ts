@@ -1776,24 +1776,30 @@ loop().catch(e => {
       }
       return args[0] ?? {};
     }
-    case "obj-merge": {
-      console.warn(`⚠️  [FreeLang] obj_merge: 동작하지만 비표준. (assoc map "k" v) 사용 권장.`);
-      if (!args[0] || !args[1]) return args[0] ?? args[1] ?? {};
-      return { ...args[0], ...args[1] };
+    case "obj-merge": case "obj_merge": case "merge": {
+      // (obj-merge m1 m2 ...) — 오른쪽이 우선
+      if (args.length === 0) return {};
+      return Object.assign({}, ...args.filter((a: any) => a && typeof a === "object" && !Array.isArray(a)));
     }
-    case "obj-pick": {
-      console.warn(`⚠️  [FreeLang] obj_pick: 동작하지만 비표준. (get m "k") 직접 접근 권장.`);
+    case "obj-pick": case "obj_pick": case "pick": {
+      // (obj-pick m ["k1" "k2"]) — 지정 키만 추출
       if (!args[0] || !Array.isArray(args[1])) return {};
+      const m = args[0];
       return args[1].reduce((acc: any, k: string) => {
-        if (k in args[0]) acc[k] = args[0][k];
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (key in m) acc[key] = m[key];
         return acc;
       }, {});
     }
-    case "obj-omit": {
-      console.warn(`⚠️  [FreeLang] obj_omit: 동작하지만 비표준. (dissoc m "k") 사용 권장.`);
-      if (!args[0] || !Array.isArray(args[1])) return args[0] ?? {};
+    case "obj-omit": case "obj_omit": case "omit": {
+      // (obj-omit m ["k1" "k2"]) — 지정 키 제외한 나머지
+      if (!args[0]) return {};
+      if (!Array.isArray(args[1])) return { ...args[0] };
       const result = { ...args[0] };
-      for (const k of args[1]) delete result[k];
+      for (const k of args[1]) {
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        delete result[key];
+      }
       return result;
     }
     case "flatten": {

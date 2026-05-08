@@ -95,6 +95,22 @@ function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.
 function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
 function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
 function _fl_file_exists(p) { return require("fs").existsSync(p); }
+function _fl_readline(prompt) {
+  if (prompt) process.stdout.write(prompt);
+  try {
+    const fs = require("fs");
+    const parts = [];
+    const b = Buffer.alloc(1);
+    while (true) {
+      const n = fs.readSync(process.stdin.fd, b, 0, 1);
+      if (n === 0) return parts.length === 0 ? null : parts.join("");
+      const c = b[0];
+      if (c === 10) break;
+      if (c !== 13) parts.push(String.fromCharCode(c));
+    }
+    return parts.join("");
+  } catch(e) { return null; }
+}
 function _fl_shell_capture(cmd) {
   try {
     const {execSync} = require("child_process");
@@ -122,6 +138,12 @@ const shell_exec = (cmd, inp) => { try { const {execSync} = require("child_proce
 var math_sqrt = (n) => Math.sqrt(n);
 var math_pow = (a, b) => Math.pow(a, b);
 var math_pi = Math.PI;
+var round = (n) => Math.round(n);
+var floor = (n) => Math.floor(n);
+var ceil = (n) => Math.ceil(n);
+var abs = (n) => Math.abs(n);
+var min = (...args) => Math.min(...args);
+var max = (...args) => Math.max(...args);
 
 // ─ 컬렉션 확장 ─
 function _fl_take(n, arr) { return (arr || []).slice(0, n); }
@@ -154,11 +176,6 @@ var unknown = (...a) => a[a.length - 1];
 let __argv__ = _fl_get_argv();
 
 // ═══════════════════════════════════════════════════════
-
-function _fl_map(arr, fn) { return (arr || []).map(fn); }
-function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
-function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
-function _fl_print(v) { console.log(v); return v; }
 
 function _fl_is_digit_q(c) { return (_fl_null_q(c) ? false : ((c >= "0") && (c <= "9"))); };
 function _fl_is_alpha_q(c) { return (_fl_null_q(c) ? false : (((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z")))); };
@@ -346,7 +363,7 @@ function _fl_upper(s) { return ((() => { let chars = _fl_split(s, ""); return _f
 function _fl_lower(s) { return ((() => { let chars = _fl_split(s, ""); return _fl_join(_fl_map(chars, ((c) => (((char_code_at(c, 0) >= 65) && (char_code_at(c, 0) <= 90)) ? from_char_code((char_code_at(c, 0) + 32)) : c))), ""); })()); };
 function _fl_contains_q(s, substr) { return (!(-1 === _fl_str_index_of(s, substr))); };
 function file_append(path, content) { return file_append(_fl_str(path), _fl_str(content)); };
-function file_exists_q(path) { return file_exists(_fl_str(path)); };
+function file_exists_q(path) { return _fl_file_exists(_fl_str(path)); };
 function file_delete(path) { return file_delete(_fl_str(path)); };
 function file_copy(src, dest) { return file_copy(_fl_str(src), _fl_str(dest)); };
 function file_rename(old, _new) { return file_rename(_fl_str(old), _fl_str(_new)); };
