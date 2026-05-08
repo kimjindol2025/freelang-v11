@@ -1758,13 +1758,19 @@ loop().catch(e => {
         ? { ...args[0] } : {};
       // 멀티 쌍: (assoc map k1 v1 k2 v2 ...)
       for (let i = 1; i + 1 < args.length; i += 2) {
-        base[args[i]] = args[i + 1];
+        // 키 정규화: :key → "key" (LIR-002)
+        const rawK = args[i];
+        const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
+        base[k] = args[i + 1];
       }
       return base;
     }
     case "dissoc": {
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
-        const { [args[1]]: _, ...rest } = args[0];
+        // 키 정규화: :key → "key" (LIR-002)
+        const rawK = args[1];
+        const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
+        const { [k]: _, ...rest } = args[0];
         return rest;
       }
       return args[0] ?? {};

@@ -481,3 +481,25 @@
 ```
 
 **v11.5.x fix**: v11.5.x: str가 자동 JSON
+
+---
+
+### LIR-002 — assoc/dissoc 키워드 키 불일치 (v11.6.0 수정)
+
+```lisp
+;; ❌ 수정 전: assoc에 :key 사용 시 콜론 포함 저장 → get으로 접근 불가
+(define m (assoc {} :name "Kim"))
+(get m "name")   ;; → nil  ← 버그
+
+;; ✅ v11.6.0: assoc/dissoc 키 정규화 적용
+(define m (assoc {} :name "Kim"))
+(get m "name")   ;; → "Kim" ✅
+(get m :name)    ;; → "Kim" ✅
+
+;; map 리터럴은 이미 정규화됨 (영향 없음)
+(get {:name "Kim"} "name")  ;; → "Kim" ✅ (기존)
+```
+
+**원인**: `assoc`/`dissoc`에 키 정규화 누락. `get`은 이미 정규화됨.  
+**수정**: `eval-builtins.ts` assoc/dissoc 케이스에 `:key → "key"` 정규화 추가.  
+**v11.6.0 fix**: assoc, dissoc 모두 정규화 적용.
