@@ -250,6 +250,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     if (expr.args.length < 2) throwArgCount("fn", ">=2", expr.args.length, expr.line);
     const paramsNode = expr.args[0];
     const params: string[] = [];
+    const paramDefaults: (any | undefined)[] = []; // parallel to params, undefined if no default
     if ((paramsNode as any).kind === "block" && (paramsNode as any).type === "Array") {
       const items = (paramsNode as any).fields.get("items");
       if (Array.isArray(items)) {
@@ -257,13 +258,27 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
           // ^type 힌트 심볼은 스킵 (타입 힌트는 런타임에서 무시)
           if ((item as any).kind === "literal" && (item as any).type === "symbol"
               && String((item as any).value).startsWith("^")) continue;
+          // 기본값: [$var defaultExpr] → 중첩 Array 블록
+          if ((item as any).kind === "block" && (item as any).type === "Array") {
+            const inner = (item as any).fields?.get("items") ?? [];
+            if (inner.length >= 2) {
+              const nameNode = inner[0] as any;
+              const n = nameNode.kind === "variable" ? nameNode.name
+                : nameNode.kind === "literal" ? String(nameNode.value) : "";
+              params.push(n.startsWith("$") ? n.slice(1) : n);
+              paramDefaults.push(ev(inner[1])); // 정의 시점 평가
+            }
+            continue;
+          }
           // v11.1: variable ($x) 또는 bare symbol (x) 모두 허용 → 정식 이름은 $-접두사 포함
           if ((item as any).kind === "variable") {
             const n = (item as Variable).name;
             params.push(n.startsWith("$") ? n.slice(1) : n);
+            paramDefaults.push(undefined);
           } else if ((item as any).kind === "literal" && (item as any).type === "symbol") {
             const v = (item as any).value as string;
             params.push(v.startsWith("$") ? v.slice(1) : v);
+            paramDefaults.push(undefined);
           }
         }
       }
@@ -283,9 +298,11 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     const body = expr.args.length === 2
       ? expr.args[1]
       : { kind: "sexpr" as const, op: "do", args: expr.args.slice(1) };
+    const hasDefaults = paramDefaults.some((d) => d !== undefined);
     return {
       kind: "function-value",
       params,
+      ...(hasDefaults && { paramDefaults }),
       body,
       capturedEnv: ctx.variables.snapshot(),
       name: undefined,
@@ -364,12 +381,13 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     }
 
     // functions에도 등록 (callUserFunction 경로 지원)
-    const funcDef = {
+    const funcDef: any = {
       name,
       params: fnValue.params,
       body: fnValue.body,
       capturedEnv: fnValue.capturedEnv,
     };
+    if (fnValue.paramDefaults) funcDef.paramDefaults = fnValue.paramDefaults;
     ctx.functions.set(name, funcDef);
 
     // AI-Native Phase 4: :property 인라인 → defprop 자동 등록
@@ -824,18 +842,26 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   if (op === "if-let" || op === "when-let") {
     if (expr.args.length < 2) throwArgCount(op, ">=2", expr.args.length, expr.line);
     const bindingsNode = expr.args[0] as any;
-    const items: any[] =
+    const outerItems: any[] =
       bindingsNode.kind === "block" && bindingsNode.type === "Array"
         ? bindingsNode.fields?.get("items") ?? []
         : [];
-    if (items.length < 1) throwInvalidForm(op, "binding 형태가 [[var expr]] 이어야 함", expr.line);
-    // 첫 번째 binding만 사용
-    const firstPair = items[0] as any;
-    const pairItems: any[] =
-      firstPair.kind === "block" && firstPair.type === "Array"
-        ? firstPair.fields?.get("items") ?? []
+    if (outerItems.length < 1) throwInvalidForm(op, "binding 형태가 [$x expr] 이어야 함", expr.line);
+
+    // 평탄형: [$x expr] — outerItems[0]이 variable이면 flat
+    // 이중 괄호형: [[x expr]] — outerItems[0]이 Array 블록
+    let pairItems: any[];
+    const firstItem = outerItems[0] as any;
+    if (firstItem.kind === "variable" || firstItem.kind === "literal") {
+      // flat form: [$x expr] → pairItems = outerItems
+      pairItems = outerItems;
+    } else {
+      // double-bracket form: [[x expr]] → pairItems = firstItem.items
+      pairItems = firstItem.kind === "block" && firstItem.type === "Array"
+        ? firstItem.fields?.get("items") ?? []
         : [];
-    if (pairItems.length < 2) throwInvalidForm(op, "[[var expr]] 형태가 잘못됨", expr.line);
+    }
+    if (pairItems.length < 2) throwInvalidForm(op, "[$x expr] 형태가 잘못됨", expr.line);
     const varName = pairItems[0].kind === "variable" ? pairItems[0].name
       : pairItems[0].kind === "literal" ? String(pairItems[0].value) : "";
     const value = ev(pairItems[1]);
