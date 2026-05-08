@@ -47,8 +47,8 @@
 | `(count arr)` | JS, v11은 length | `(length $arr)` |
 | `(assoc m :k v)` | 키워드(:k), 다중 불가 | `(assoc $m "k" $v)` 또는 `{...k $v...}` |
 | `(merge a b)` | 없음, obj-merge 사용 | `(obj-merge $a $b)` |
-| `(map f seq)` | 없음, map-fn 사용 | `(map-fn $f $seq)` |
-| `(filter f seq)` | 없음, filter-fn 사용 | `(filter-fn $f $seq)` |
+| `(map arr fn)` | 인자 순서 반대, fn 먼저 | `(map $fn $arr)` |
+| `(filter arr fn)` | 인자 순서 반대, fn 먼저 | `(filter $fn $arr)` |
 | `(server_listen port)` | 구버전, v11.5+ | `(server-start $port)` |
 | `(defn handler [req res] ...)` | res 없음 (HTTP 패턴) | `(defn handler [$req] ...)` 만 |
 | `(if-let [x expr] body)` | 구버전, v11.5+ | `(if-let [[$x $expr]] $body)` |
@@ -378,7 +378,7 @@ true false nil          ;; 불린/nil
 - `str`, `str-to-num`, `str-to-upper`, `str-to-lower`, `str-trim`, `str-split`, `str-includes`, `str-starts-with`, `str-ends-with`, `str-replace`, `str-slice`
 
 ### 배열/벡터
-- `length`, `push`, `pop`, `shift`, `unshift`, `map-fn`, `filter-fn`, `reduce-fn`, `reverse`, `sort-by`, `includes-item`, `index-of`
+- `length`, `push`, `pop`, `shift`, `unshift`, `map`, `filter`, `reduce`, `reverse`, `sort-by`, `includes-item`, `index-of`
 
 ### 객체/맵
 - `get`, `assoc`, `obj-merge`, `obj-pick`, `obj-omit`, `obj-keys`, `obj-values`, `obj-entries`

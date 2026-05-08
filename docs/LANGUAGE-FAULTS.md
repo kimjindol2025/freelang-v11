@@ -1,7 +1,8 @@
 # FreeLang v11 — 언어 디자인 결함 (44개)
 
 > *사용자가 실수하는 게 아니라 언어가 일관성 없게 만들어졌다.*
-> Phase X (v11.5.1) 대상. Breaking change + 마이그레이션 도구.
+> 원래 Phase X (v11.5.x) 대상이었으나, v11.6.x 기준 대부분 **현행 유지** 결정.
+> 각 항목에 현재 구현 상태와 실제 올바른 사용법이 명시됨.
 
 관련 문서:
 - `MISTAKES.md` — 진짜 사용자 실수
@@ -29,45 +30,53 @@
 
 각 항목의 **fix**는 v11.5.x Phase X 작업 항목.
 
-### #1 — map: fn 먼저
+### #1 — map: fn 먼저 (현재 구현 = fn-first, 변경 없음)
 
 ```lisp
 ;; #1 — map: fn 먼저, 배열 나중
-(map [1 2 3] fn)            ;; ❌
-(map fn [1 2 3])            ;; ✅
+(map [1 2 3] fn)            ;; ❌ arr-first (잘못된 사용)
+(map fn [1 2 3])            ;; ✅ fn-first (현재 표준)
 ```
 
-**v11.5.x fix**: v11.5.x: (map arr fn) — 컬렉션 first 통일
+**현재 구현**: `eval-builtins.ts` args[0]=fn, args[1]=arr — fn-first 고정.  
+**v11.5.x 논의**: 컬렉션-first(arr-first)로 변경 검토됐으나 **미채택** (v11.6.11 기준).  
+**결론**: `(map fn arr)` 가 올바른 현행 문법.
 
-### #2 — filter: fn 먼저
+### #2 — filter: fn 먼저 (현재 구현 = fn-first, 변경 없음)
 
 ```lisp
 ;; #2 — filter: fn 먼저
-(filter arr fn)             ;; ❌
-(filter fn arr)             ;; ✅
+(filter arr fn)             ;; ❌ arr-first (잘못된 사용)
+(filter fn arr)             ;; ✅ fn-first (현재 표준)
 ```
 
-**v11.5.x fix**: v11.5.x: (filter arr fn) 통일
+**현재 구현**: `eval-builtins.ts` args[0]=fn, args[1]=arr — fn-first 고정 (주석 "fn-first 고정" 명시).  
+**v11.5.x 논의**: arr-first 변경 검토됐으나 **미채택**.  
+**결론**: `(filter fn arr)` 가 올바른 현행 문법.
 
-### #3 — reduce: fn,init,arr
+### #3 — reduce: fn,init,arr (현재 구현 = fn-first, 변경 없음)
 
 ```lisp
 ;; #3 — reduce: fn 먼저, 초기값 두 번째
-(reduce arr init fn)        ;; ❌
-(reduce fn init arr)        ;; ✅
+(reduce arr init fn)        ;; ❌ arr-first (잘못된 사용)
+(reduce fn init arr)        ;; ✅ fn-first (현재 표준)
 ```
 
-**v11.5.x fix**: v11.5.x: (reduce arr init fn) 통일
+**현재 구현**: `eval-builtins.ts` args[0]=fn, args[1]=init, args[2]=arr — fn-first 고정 (주석 명시).  
+**v11.5.x 논의**: arr-first 변경 검토됐으나 **미채택**.  
+**결론**: `(reduce fn init arr)` 가 올바른 현행 문법.
 
-### #4 — sort-by: fn 먼저
+### #4 — sort-by: fn 먼저 (현재 구현 = fn-first, 변경 없음)
 
 ```lisp
 ;; #4 — sort-by: fn 먼저
-(sort-by arr key-fn)        ;; ❌
-(sort-by key-fn arr)        ;; ✅
+(sort-by arr key-fn)        ;; ❌ arr-first (잘못된 사용)
+(sort-by key-fn arr)        ;; ✅ fn-first (현재 표준)
 ```
 
-**v11.5.x fix**: v11.5.x: (sort-by arr fn) 통일
+**현재 구현**: `eval-builtins.ts` args[0]=keyfn, args[1]=arr — fn-first 고정.  
+**v11.5.x 논의**: arr-first 변경 검토됐으나 **미채택**.  
+**결론**: `(sort-by keyfn arr)` 가 올바른 현행 문법.
 
 ### #5 — assoc: map 먼저 (그러나 다른 함수와 다름)
 

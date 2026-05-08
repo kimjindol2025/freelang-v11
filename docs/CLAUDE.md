@@ -274,8 +274,8 @@ freelang fn-doc str_split         # 함수 문서 조회
 (length arr)                                  ;; 길이
 (append arr 6)                                ;; 추가 (불변)
 (slice arr 1 3)                               ;; 슬라이스
-(map fn arr)                                  ;; ※ fn 먼저!
-(filter arr fn)                               ;; ※ array 먼저!
+(map fn arr)                                  ;; fn 먼저!
+(filter fn arr)                               ;; fn 먼저!
 (reduce fn init arr)
 (join arr ", ")
 
