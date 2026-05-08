@@ -1919,10 +1919,15 @@ export class Interpreter {
       if (err && err.constructor && err.constructor.name === "ReturnSignal") throw err;
       const line = expr.line ?? this.currentLine;
       const col = (expr as any).col ?? 0;
+      const rawMsg = (err.message ?? String(err));
+      // 함수명 접두어 — 이미 포함되어 있으면 생략
+      const withOp = (rawMsg.startsWith(`[${op}]`) || rawMsg.startsWith(`(${op})`))
+        ? rawMsg
+        : `[${op}] ${rawMsg}`;
       // 첫 번째 (at line ...) 만 유지 — 중복 방지
-      const enhancedMsg = (err.message ?? "").includes("(at line ")
-        ? err.message
-        : `${err.message} (at line ${line}, col ${col})`;
+      const enhancedMsg = withOp.includes("(at line ")
+        ? withOp
+        : `${withOp} (at line ${line}, col ${col})`;
 
       if (err.code || err.name === "FLRuntimeError") {
         err.message = enhancedMsg;

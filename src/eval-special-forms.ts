@@ -1269,7 +1269,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return (...args: any[]) => {
       const key = JSON.stringify(args);
       if (cache.has(key)) return cache.get(key);
-      const result = typeof fn === "function" ? fn(...args) : callFn(fn, args);
+      const result = callFn(fn, args);
       cache.set(key, result);
       return result;
     };
@@ -1341,8 +1341,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     if (expr.args.length === 2) {
       const fn = ev(expr.args[0]);
       const m  = ev(expr.args[1]);
-      const applyFn = (fn: any, arg: any): any =>
-        typeof fn === "function" ? fn(arg) : callFn(fn, [arg]);
+      const applyFn = (fn: any, arg: any): any => callFn(fn, [arg]);
       if (m instanceof Map) {
         const out = new Map();
         for (const [k, v] of (m as Map<any,any>).entries())

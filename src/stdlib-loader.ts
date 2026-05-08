@@ -708,6 +708,42 @@ export function loadAllStdlib(interp: InterpreterLike): void {
         return { ...args[0], entries: [...args[0].entries, { ts: Date.now(), level: "error", msg: String(args[1]) }] };
       console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
     },
+    "stdlib-list": (): string[] => [...interp.context.functions.keys()].sort(),
+    "stdlib_list": (): string[] => [...interp.context.functions.keys()].sort(),
+    "fn-where": (name: string): string => {
+      const key = String(name).replace(/-/g, "_");
+      const altKey = String(name).replace(/_/g, "-");
+      const found = interp.context.functions.has(String(name)) ? String(name)
+        : interp.context.functions.has(key) ? key
+        : interp.context.functions.has(altKey) ? altKey : null;
+      if (!found) return `not-found: ${name}`;
+      const fn = interp.context.functions.get(found);
+      if (typeof fn?.body === "function") return `native:${found}`;
+      return `fl-defined:${found}`;
+    },
+    "fn_where": (name: string): string => {
+      const key = String(name).replace(/-/g, "_");
+      const altKey = String(name).replace(/_/g, "-");
+      const found = interp.context.functions.has(String(name)) ? String(name)
+        : interp.context.functions.has(key) ? key
+        : interp.context.functions.has(altKey) ? altKey : null;
+      if (!found) return `not-found: ${name}`;
+      const fn = interp.context.functions.get(found);
+      if (typeof fn?.body === "function") return `native:${found}`;
+      return `fl-defined:${found}`;
+    },
+    "fn-exists?": (name: string): boolean => {
+      const s = String(name);
+      return interp.context.functions.has(s)
+        || interp.context.functions.has(s.replace(/-/g, "_"))
+        || interp.context.functions.has(s.replace(/_/g, "-"));
+    },
+    "fn_exists": (name: string): boolean => {
+      const s = String(name);
+      return interp.context.functions.has(s)
+        || interp.context.functions.has(s.replace(/-/g, "_"))
+        || interp.context.functions.has(s.replace(/_/g, "-"));
+    },
   };
   for (const [name, fn] of Object.entries(_overrides)) {
     interp.context.functions.set(name, { name, params: [], body: fn });
