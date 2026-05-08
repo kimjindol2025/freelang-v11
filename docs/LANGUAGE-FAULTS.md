@@ -503,3 +503,25 @@
 **원인**: `assoc`/`dissoc`에 키 정규화 누락. `get`은 이미 정규화됨.  
 **수정**: `eval-builtins.ts` assoc/dissoc 케이스에 `:key → "key"` 정규화 추가.  
 **v11.6.0 fix**: assoc, dissoc 모두 정규화 적용.
+
+---
+
+### LIR-005 — cond :else 브래킷/플랫 모드 미지원 (v11.6.2 수정)
+
+```lisp
+;; ❌ 수정 전: [else ...] / [:else ...] 브래킷에서 else 변수 조회 → null
+(cond [(= x 1) "one"] [:else "other"])  ;; → nil (버그)
+
+;; ✅ v11.6.2: :else / else 명시적 감지
+(cond [(= x 1) "one"] [:else "other"])  ;; → "other" ✅
+(cond [(= x 1) "one"] [else "other"])   ;; → "other" ✅
+(cond (= x 1) "one" :else "other")     ;; → "other" ✅ (flat-pair)
+(cond (= x 1) "one" else "other")      ;; → "other" ✅ (flat-pair)
+
+;; paren 형식은 이미 지원 (변경 없음)
+(cond (false "one") (else "other"))     ;; → "other" ✅ (기존)
+```
+
+**원인**: bracketed 모드에서 `items[0]`을 무조건 변수 조회 → `$else` 미정의.  
+**수정**: `eval-special-forms.ts:evalCond` — `isElse` 감지 후 `{kind:"literal", value:true}` 대체.  
+**v11.6.2 fix**: bracketed + flat-pair 모드 모두 `:else` / `else` catch-all 지원.

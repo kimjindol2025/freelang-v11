@@ -1607,7 +1607,10 @@ function evalCond(interp: Interpreter, args: ASTNode[]): any {
     // flat-pair 모드: 2개씩 (test, result), 마지막 홀수면 default
     let i = 0;
     while (i < args.length - 1) {
-      const test = ev(args[i]);
+      const testArg = args[i] as any;
+      const isElse = testArg?.kind === "variable" &&
+        (testArg?.name === "else" || testArg?.name === ":else" || testArg?.name === "$else");
+      const test = isElse ? true : ev(testArg);
       if (test !== null && test !== undefined && test !== false) {
         return ev(args[i + 1]);
       }
@@ -1627,7 +1630,10 @@ function evalCond(interp: Interpreter, args: ASTNode[]): any {
     if ((arg as any).kind === "block" && (arg as any).type === "Array") {
       const items = (arg as any).fields.get("items");
       if (Array.isArray(items) && items.length >= 2) {
-        testNode = items[0];
+        const firstItem = items[0] as any;
+        const isElse = firstItem?.kind === "variable" &&
+          (firstItem?.name === "else" || firstItem?.name === ":else" || firstItem?.name === "$else");
+        testNode = isElse ? { kind: "literal", type: "boolean", value: true } : firstItem;
         bodyNodes = items.slice(1);
       }
     }

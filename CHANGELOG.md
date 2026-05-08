@@ -1,5 +1,28 @@
 # Changelog
 
+## [v11.6.2] — 2026-05-08 (DX 개선 — cond :else + HTTP async + 모듈 캐시)
+
+### 언어 개선
+- **LIR-005**: `cond :else` / `[else ...]` 브래킷 + 플랫 모드 지원
+  - `(cond [(= x 1) "one"] [:else "other"])` 정상 작동 ✅
+  - `(cond (= x 1) "one" :else "other")` flat-pair 정상 작동 ✅
+  - `eval-special-forms.ts` evalCond 수정
+
+### 성능
+- **모듈 캐시**: `MODULE_CACHE` 전역 캐시 — 동일 파일 재파싱 제거 (`eval-module-system.ts`)
+- **HTTP async**: `curl spawnSync` → Node.js `fetch` + `Promise.all` 병렬 처리 (`stdlib-http.ts`)
+
+### 버그 수정
+- `catch` CODE_TO_CATEGORY — `code` 변수 미선언 ReferenceError 수정 (`eval-pattern-match.ts`)
+- `env_get` nil 반환 — 미정의 환경변수 `""` → `null` (`stdlib-process.ts`)
+
+### 기존 기능 확인 (이미 구현됨)
+- `server_req_json`: POST body 자동 JSON 파싱 (`stdlib-http-server.ts:929`)
+- `let` 평탄형: `(let [x 1 y 2] ...)` 지원 (v11.1부터)
+- `"""` 멀티라인 문자열: `lexer.ts` 지원
+
+---
+
 ## [v11.6.0] — 2026-05-08 (LIR 언어 개선 — 키 정규화 + env_get + alias)
 
 ### 언어 개선 (LIR)
