@@ -1,0 +1,37 @@
+{
+  "lexing": {
+    "iterations": 1000,
+    "totalMs": "0.19",
+    "opsPerSec": "5302396",
+    "opsPerMs": "5302.3956"
+  },
+  "parsing": {
+    "iterations": 100,
+    "totalMs": "0.32",
+    "opsPerSec": "310881",
+    "opsPerMs": "310.8805"
+  },
+  "execution": {
+    "iterations": 1000,
+    "totalMs": "1.00",
+    "opsPerSec": "995335",
+    "opsPerMs": "995.3349"
+  },
+  "memory": {
+    "heapUsedMB": "74.99",
+    "totalAllocations": 1000,
+    "allocPerSec": "16130",
+    "timeMs": "62.00"
+  },
+  "compilation": {
+    "codeLines": 20,
+    "timeMs": "0.02",
+    "linesPerSec": "1284274"
+  },
+  "concurrency": {
+    "promises": 100,
+    "totalMs": "4.18",
+    "opsPerSec": "23938",
+    "avgPerOp": "0.04"
+  }
+}
