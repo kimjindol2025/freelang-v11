@@ -11797,15 +11797,16 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
         }
         let k = v1;
         if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
-        if (Array.isArray(v0)) return v0[k] !== void 0 ? v0[k] : null;
-        if (v0 instanceof Map) return v0.get(String(k).replace(/^:/, "")) ?? null;
+        const _def = v2 !== void 0 ? v2 : null;
+        if (Array.isArray(v0)) return v0[k] !== void 0 ? v0[k] : _def;
+        if (v0 instanceof Map) return v0.has(String(k).replace(/^:/, "")) ? v0.get(String(k).replace(/^:/, "")) : _def;
         if (v0 !== null && typeof v0 === "object") {
           const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
           if (v0[normalized] !== void 0) return v0[normalized];
           if (typeof k === "string" && v0[k] !== void 0) return v0[k];
-          return null;
+          return _def;
         }
-        return null;
+        return _def;
       }
       case "append":
         return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
@@ -11847,6 +11848,7 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
       case "strlen":
         return typeof v0 === "string" ? v0.length : 0;
       case "includes?":
+      case "includes-item":
         return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
       case "starts-with?":
         return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
@@ -12272,8 +12274,28 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     const callFnVal = (fn, a) => {
       if (typeof fn === "string") return interp2.callUserFunction(fn, a);
       if ((fn == null ? void 0 : fn.kind) === "function-value" || (fn == null ? void 0 : fn.kind) === "async-function-value") return interp2.callFunctionValue(fn, a);
+      if ((fn == null ? void 0 : fn.kind) === "closure") {
+        const params = fn.params || [];
+        const prevVars = interp2.context.variables.snapshot();
+        interp2.context.variables.push();
+        try {
+          if (fn["closure-env"]) {
+            for (const [k, v] of Object.entries(fn["closure-env"].vars || {})) {
+              interp2.context.variables.set(k, v);
+            }
+          }
+          for (let i = 0; i < params.length; i++) {
+            interp2.context.variables.set(params[i], a[i] ?? null);
+          }
+          let result = null;
+          for (const node of fn.body || []) result = interp2.eval(node);
+          return result;
+        } finally {
+          interp2.context.variables.pop();
+        }
+      }
       if (typeof (fn == null ? void 0 : fn.body) === "function") return fn.body(...a);
-      if ((fn == null ? void 0 : fn.params) !== void 0 && (fn == null ? void 0 : fn.body) !== void 0) return interp2.callUserFunction(fn.name ?? fn.id, a);
+      if ((fn == null ? void 0 : fn.params) !== void 0 && (fn == null ? void 0 : fn.body) !== void 0 && (fn == null ? void 0 : fn.name)) return interp2.callUserFunction(fn.name, a);
       if (typeof fn === "function") return fn(...a);
       return interp2.callFunctionValue(fn, a);
     };
@@ -12790,7 +12812,7 @@ loop().catch(e => {
         const fns = args2.filter((a) => a != null);
         const callOne = (fn, callArgs) => {
           if (typeof fn === "function") return fn(...callArgs);
-          if ((fn == null ? void 0 : fn.kind) === "function-value") return callFnVal(fn, callArgs);
+          if ((fn == null ? void 0 : fn.kind) === "function-value" || (fn == null ? void 0 : fn.kind) === "closure") return callFnVal(fn, callArgs);
           return null;
         };
         return (...callArgs) => {
@@ -12804,7 +12826,7 @@ loop().catch(e => {
         const fns = args2.filter((a) => a != null);
         const callOne = (fn, callArgs) => {
           if (typeof fn === "function") return fn(...callArgs);
-          if ((fn == null ? void 0 : fn.kind) === "function-value") return callFnVal(fn, callArgs);
+          if ((fn == null ? void 0 : fn.kind) === "function-value" || (fn == null ? void 0 : fn.kind) === "closure") return callFnVal(fn, callArgs);
           return null;
         };
         return (...callArgs) => fns.map((fn) => callOne(fn, callArgs));
@@ -12817,10 +12839,19 @@ loop().catch(e => {
         const pred = args2[0];
         const callOne = (fn, callArgs) => {
           if (typeof fn === "function") return fn(...callArgs);
-          if ((fn == null ? void 0 : fn.kind) === "function-value") return callFnVal(fn, callArgs);
+          if ((fn == null ? void 0 : fn.kind) === "function-value" || (fn == null ? void 0 : fn.kind) === "closure") return callFnVal(fn, callArgs);
           return null;
         };
         return (...callArgs) => !callOne(pred, callArgs);
+      }
+      case "every?":
+      case "every": {
+        const evFn = args2[0], evArr = Array.isArray(args2[1]) ? args2[1] : [];
+        if (typeof evFn === "function") return evArr.every(evFn);
+        if ((evFn == null ? void 0 : evFn.kind) === "function-value" || (evFn == null ? void 0 : evFn.kind) === "closure") {
+          return evArr.every((item) => callFnVal(evFn, [item]));
+        }
+        return true;
       }
       case "list":
         return args2;
@@ -13072,8 +13103,10 @@ loop().catch(e => {
         return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
       case "num-to-str":
         return String(args2[0]);
-      case "str-to-num":
-        return parseFloat(String(args2[0]));
+      case "str-to-num": {
+        const _n = parseFloat(String(args2[0]));
+        return isNaN(_n) ? null : _n;
+      }
       case "map-set":
         if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
           const k = typeof args2[1] === "string" && args2[1].startsWith(":") ? args2[1].slice(1) : String(args2[1]);
@@ -13110,6 +13143,7 @@ loop().catch(e => {
       case "starts-with?":
         return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
       case "index-of":
+        if (Array.isArray(args2[0])) return args2[0].indexOf(args2[1]);
         return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].indexOf(args2[1]) : -1;
       case "replace":
         return typeof args2[0] === "string" && typeof args2[1] === "string" && typeof args2[2] === "string" ? args2[0].split(args2[1]).join(args2[2]) : "";
@@ -13125,16 +13159,15 @@ loop().catch(e => {
         }
         return coll;
       }
-      case "find":
-        if (Array.isArray(args2[0])) {
-          const findFn = args2[1];
-          if (typeof findFn === "function") return args2[0].find(findFn) ?? null;
-          if (findFn && findFn.kind === "function-value") {
-            return args2[0].find((item) => callFnVal(findFn, [item])) ?? null;
-          }
-          return args2[0].indexOf(findFn);
+      case "find": {
+        if (!Array.isArray(args2[0])) return -1;
+        const findTarget = args2[1];
+        if (typeof findTarget === "function") return args2[0].find(findTarget) ?? null;
+        if (findTarget && (findTarget.kind === "function-value" || findTarget.kind === "closure")) {
+          return args2[0].find((item) => callFnVal(findTarget, [item])) ?? null;
         }
-        return -1;
+        return args2[0].indexOf(findTarget);
+      }
       case "last":
         return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
       case "first-or":
@@ -13174,16 +13207,17 @@ loop().catch(e => {
         }
         let k = args2[1];
         if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
-        if (Array.isArray(args2[0])) return typeof k === "number" ? args2[0][k] ?? null : null;
-        if (typeof args2[0] === "string") return typeof k === "number" ? args2[0][k] ?? null : null;
-        if (args2[0] instanceof Map) return args2[0].get(String(k).replace(/^:/, "")) ?? null;
+        const _getDef = args2.length >= 3 ? args2[2] : null;
+        if (Array.isArray(args2[0])) return typeof k === "number" ? args2[0][k] ?? _getDef : _getDef;
+        if (typeof args2[0] === "string") return typeof k === "number" ? args2[0][k] ?? _getDef : _getDef;
+        if (args2[0] instanceof Map) return args2[0].has(String(k).replace(/^:/, "")) ? args2[0].get(String(k).replace(/^:/, "")) : _getDef;
         if (args2[0] !== null && typeof args2[0] === "object") {
           const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
           if (args2[0][normalized] !== void 0) return args2[0][normalized];
           if (typeof k === "string" && args2[0][k] !== void 0) return args2[0][k];
-          return null;
+          return _getDef;
         }
-        return null;
+        return _getDef;
       }
       case "block-items":
         if (args2[0] && typeof args2[0] === "object" && args2[0].kind === "block" && args2[0].type === "Array") {
@@ -13254,8 +13288,10 @@ loop().catch(e => {
             return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
           case "num-to-str":
             return String(v0 ?? "");
-          case "str-to-num":
-            return parseFloat(String(v0));
+          case "str-to-num": {
+            const _n2 = parseFloat(String(v0));
+            return isNaN(_n2) ? null : _n2;
+          }
           case "replace":
             return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
           case "str-join":
@@ -13353,24 +13389,51 @@ loop().catch(e => {
         }
         return args2[0] ?? {};
       }
-      case "obj-merge": {
-        console.warn(`\u26A0\uFE0F  [FreeLang] obj_merge: \uB3D9\uC791\uD558\uC9C0\uB9CC \uBE44\uD45C\uC900. (assoc map "k" v) \uC0AC\uC6A9 \uAD8C\uC7A5.`);
-        if (!args2[0] || !args2[1]) return args2[0] ?? args2[1] ?? {};
-        return { ...args2[0], ...args2[1] };
+      case "obj-keys":
+      case "obj_keys": {
+        if (!args2[0] || typeof args2[0] !== "object" || Array.isArray(args2[0])) return [];
+        if (args2[0] instanceof Map) return [...args2[0].keys()];
+        return Object.keys(args2[0]);
       }
-      case "obj-pick": {
-        console.warn(`\u26A0\uFE0F  [FreeLang] obj_pick: \uB3D9\uC791\uD558\uC9C0\uB9CC \uBE44\uD45C\uC900. (get m "k") \uC9C1\uC811 \uC811\uADFC \uAD8C\uC7A5.`);
+      case "obj-values":
+      case "obj_values": {
+        if (!args2[0] || typeof args2[0] !== "object" || Array.isArray(args2[0])) return [];
+        if (args2[0] instanceof Map) return [...args2[0].values()];
+        return Object.values(args2[0]);
+      }
+      case "obj-entries":
+      case "obj_entries": {
+        if (!args2[0] || typeof args2[0] !== "object" || Array.isArray(args2[0])) return [];
+        if (args2[0] instanceof Map) return [...args2[0].entries()];
+        return Object.entries(args2[0]);
+      }
+      case "obj-merge":
+      case "obj_merge":
+      case "merge": {
+        if (args2.length === 0) return {};
+        return Object.assign({}, ...args2.filter((a) => a && typeof a === "object" && !Array.isArray(a)));
+      }
+      case "obj-pick":
+      case "obj_pick":
+      case "pick": {
         if (!args2[0] || !Array.isArray(args2[1])) return {};
+        const m = args2[0];
         return args2[1].reduce((acc, k) => {
-          if (k in args2[0]) acc[k] = args2[0][k];
+          const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+          if (key in m) acc[key] = m[key];
           return acc;
         }, {});
       }
-      case "obj-omit": {
-        console.warn(`\u26A0\uFE0F  [FreeLang] obj_omit: \uB3D9\uC791\uD558\uC9C0\uB9CC \uBE44\uD45C\uC900. (dissoc m "k") \uC0AC\uC6A9 \uAD8C\uC7A5.`);
-        if (!args2[0] || !Array.isArray(args2[1])) return args2[0] ?? {};
+      case "obj-omit":
+      case "obj_omit":
+      case "omit": {
+        if (!args2[0]) return {};
+        if (!Array.isArray(args2[1])) return { ...args2[0] };
         const result = { ...args2[0] };
-        for (const k of args2[1]) delete result[k];
+        for (const k of args2[1]) {
+          const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+          delete result[key];
+        }
         return result;
       }
       case "flatten": {
@@ -13403,9 +13466,8 @@ loop().catch(e => {
       case "zip": {
         const a = Array.isArray(args2[0]) ? args2[0] : [];
         const b = Array.isArray(args2[1]) ? args2[1] : [];
-        const m = /* @__PURE__ */ new Map();
-        for (let i = 0; i < a.length; i++) m.set(a[i], b[i] ?? null);
-        return m;
+        const len = Math.min(a.length, b.length);
+        return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
       }
       case "zip-with": {
         const fn = args2[0];
@@ -13567,6 +13629,11 @@ loop().catch(e => {
         return err("ERR", String(args2[0] ?? ""));
       }
       case "some":
+        if (typeof args2[0] === "function" || args2[0] && (args2[0].kind === "function-value" || args2[0].kind === "closure")) {
+          const someFn = args2[0], someArr = Array.isArray(args2[1]) ? args2[1] : [];
+          if (typeof someFn === "function") return someArr.some(someFn);
+          return someArr.some((item) => callFnVal(someFn, [item]));
+        }
         return { tag: "Some", value: args2[0], kind: "Option" };
       case "none":
         return { tag: "None", value: null, kind: "Option" };
@@ -13783,9 +13850,17 @@ loop().catch(e => {
         return mapErr(r, (e) => callFn2(fn, [e]));
       }
       case "flat-map": {
-        const r = args2[0];
-        const fn = args2[1];
-        return flatMap(r, (v) => callFn2(fn, [v]));
+        const fmFn = args2[0], fmArr = args2[1];
+        if (Array.isArray(fmArr)) {
+          const results = [];
+          for (const item of fmArr) {
+            const r = callFnVal(fmFn, [item]);
+            if (Array.isArray(r)) results.push(...r);
+            else if (r !== null && r !== void 0) results.push(r);
+          }
+          return results;
+        }
+        return flatMap(fmArr, (v) => callFn2(fmFn, [v]));
       }
       case "recover": {
         const r = args2[0];
@@ -19671,6 +19746,40 @@ ${cssVars.join(";\n")};
       return evalCond(interp2, expr2.args);
     }
     if (op === "do" || op === "begin" || op === "progn") {
+      if (expr2.args.length >= 2) {
+        const first2 = ev(expr2.args[0]);
+        const isCallable = typeof first2 === "function" || (first2 == null ? void 0 : first2.kind) === "function-value" || (first2 == null ? void 0 : first2.kind) === "async-function-value" || (first2 == null ? void 0 : first2.kind) === "closure";
+        if (isCallable) {
+          const callArgs = expr2.args.slice(1).map((a) => ev(a));
+          if (typeof first2 === "function") return first2(...callArgs);
+          if ((first2 == null ? void 0 : first2.kind) === "function-value" || (first2 == null ? void 0 : first2.kind) === "async-function-value") return interp2.callFunctionValue(first2, callArgs);
+          if ((first2 == null ? void 0 : first2.kind) === "closure") {
+            const params = first2.params || [];
+            ctx.variables.push();
+            try {
+              if (first2["closure-env"]) {
+                for (const [k, v] of Object.entries(first2["closure-env"].vars || {})) ctx.variables.set(k, v);
+              }
+              for (let i = 0; i < params.length; i++) ctx.variables.set(params[i], callArgs[i] ?? null);
+              let result3 = null;
+              for (const node of first2.body || []) result3 = ev(node);
+              return result3;
+            } finally {
+              ctx.variables.pop();
+            }
+          }
+        }
+        let result2 = first2;
+        for (const arg of expr2.args.slice(1)) {
+          if (isBlock(arg) && isControlBlock(arg)) {
+            interp2.evalBlock(arg);
+            result2 = null;
+            continue;
+          }
+          result2 = ev(arg);
+        }
+        return result2;
+      }
       let result = null;
       for (const arg of expr2.args) {
         if (isBlock(arg) && isControlBlock(arg)) {
@@ -19799,6 +19908,121 @@ ${cssVars.join(";\n")};
       }
       return void 0;
     }
+    if (op === "deftest" || op === "describe" || op === "it") {
+      const ctx2 = interp2.context;
+      if (!ctx2._testResults) ctx2._testResults = { passed: 0, failed: 0, errors: [] };
+      const name = expr2.args.length > 0 ? String(ev(expr2.args[0])) : "(anonymous)";
+      const bodies = expr2.args.slice(1);
+      try {
+        for (const b of bodies) ev(b);
+        ctx2._testResults.passed++;
+        process.stdout.write(`  \u2713 ${name}
+`);
+      } catch (e) {
+        ctx2._testResults.failed++;
+        const msg = (e == null ? void 0 : e.message) ?? String(e);
+        ctx2._testResults.errors.push(`  \u2717 ${name}: ${msg}`);
+        process.stdout.write(`  \u2717 ${name}: ${msg}
+`);
+      }
+      return null;
+    }
+    if (op === "is") {
+      const val = expr2.args.length > 0 ? ev(expr2.args[0]) : false;
+      const msg = expr2.args.length > 1 ? String(ev(expr2.args[1])) : `Expected truthy, got: ${JSON.stringify(val)}`;
+      if (!val) throw new Error(msg);
+      return val;
+    }
+    if (op === "is=") {
+      if (expr2.args.length < 2) throwArgCount("is=", "2", expr2.args.length, expr2.line);
+      const expected = ev(expr2.args[0]);
+      const actual = ev(expr2.args[1]);
+      const eq = JSON.stringify(expected) === JSON.stringify(actual);
+      if (!eq) throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+      return actual;
+    }
+    if (op === "run-tests") {
+      const ctx2 = interp2.context;
+      const r = ctx2._testResults ?? { passed: 0, failed: 0, errors: [] };
+      const total = r.passed + r.failed;
+      process.stdout.write(`
+Test Results: ${r.passed}/${total} passed`);
+      if (r.failed > 0) process.stdout.write(` (${r.failed} FAILED)`);
+      process.stdout.write("\n");
+      ctx2._testResults = { passed: 0, failed: 0, errors: [] };
+      return { passed: r.passed, failed: r.failed, total };
+    }
+    if (op === "test-summary") {
+      const ctx2 = interp2.context;
+      const r = ctx2._testResults ?? { passed: 0, failed: 0, errors: [] };
+      return /* @__PURE__ */ new Map([["passed", r.passed], ["failed", r.failed], ["total", r.passed + r.failed], ["errors", r.errors]]);
+    }
+    if (op === "import") {
+      if (expr2.args.length < 1) throwArgCount("import", "1", expr2.args.length, expr2.line);
+      const filePath = String(ev(expr2.args[0]));
+      const useExpr = { ...expr2, op: "use", args: expr2.args };
+      return interp2.evalSpecialForm("use", useExpr);
+    }
+    if (op === "migrate") {
+      if (expr2.args.length < 2) throwArgCount("migrate", "2", expr2.args.length, expr2.line);
+      const db = ev(expr2.args[0]);
+      const steps = ev(expr2.args[1]);
+      if (!Array.isArray(steps)) throw new Error("migrate: second arg must be [[version sql] ...] array");
+      const ctx2 = interp2.context;
+      if (db === null || db === void 0) {
+        if (!ctx2._migrate_applied) ctx2._migrate_applied = /* @__PURE__ */ new Set();
+        const applied2 = ctx2._migrate_applied;
+        let count3 = 0;
+        for (const step of steps) {
+          const pair = Array.isArray(step) ? step : [step];
+          const version = String(pair[0]);
+          if (applied2.has(version)) continue;
+          applied2.add(version);
+          count3++;
+          process.stdout.write(`  [migrate] applied: ${version}
+`);
+        }
+        if (count3 === 0) process.stdout.write("  [migrate] up to date\n");
+        return { applied: count3, total: steps.length };
+      }
+      const execFn = interp2.context.functions.get("mariadb_exec") ?? interp2.context.functions.get("mariadb-exec");
+      const queryFn = interp2.context.functions.get("mariadb_query") ?? interp2.context.functions.get("mariadb-query");
+      if (!execFn || !queryFn) throw new Error("migrate: mariadb functions not loaded");
+      const exec2 = (sql, params = []) => callFn2(execFn.body ?? execFn, [db, sql, params]);
+      const query = (sql, params = []) => callFn2(queryFn.body ?? queryFn, [db, sql, params]);
+      exec2(`CREATE TABLE IF NOT EXISTS _migrations (
+      version VARCHAR(255) PRIMARY KEY,
+      applied_at BIGINT NOT NULL
+    )`);
+      const rows = query("SELECT version FROM _migrations");
+      const applied = new Set((rows ?? []).map((r) => String(r.version ?? r[0] ?? "")));
+      let count2 = 0;
+      for (const step of steps) {
+        const pair = Array.isArray(step) ? step : [step];
+        const version = String(pair[0]);
+        const sql = String(pair[1] ?? "");
+        if (applied.has(version)) continue;
+        exec2(sql);
+        exec2("INSERT INTO _migrations (version, applied_at) VALUES (?, ?)", [version, Date.now()]);
+        count2++;
+        process.stdout.write(`  [migrate] applied: ${version}
+`);
+      }
+      if (count2 === 0) process.stdout.write("  [migrate] up to date\n");
+      return { applied: count2, total: steps.length };
+    }
+    if (op === "memoize") {
+      if (expr2.args.length < 1) throwArgCount("memoize", "1", expr2.args.length, expr2.line);
+      const fn = ev(expr2.args[0]);
+      const cache = /* @__PURE__ */ new Map();
+      return (...args2) => {
+        const key = JSON.stringify(args2);
+        if (cache.has(key)) return cache.get(key);
+        const result = callFn2(fn, args2);
+        cache.set(key, result);
+        return result;
+      };
+    }
     if (op === "partial") {
       if (expr2.args.length < 1) throwArgCount("partial", ">=1", expr2.args.length, expr2.line);
       const fn = ev(expr2.args[0]);
@@ -19846,7 +20070,7 @@ ${cssVars.join(";\n")};
       if (expr2.args.length === 2) {
         const fn = ev(expr2.args[0]);
         const m = ev(expr2.args[1]);
-        const applyFn = (fn2, arg) => typeof fn2 === "function" ? fn2(arg) : callFn2(fn2, [arg]);
+        const applyFn = (fn2, arg) => callFn2(fn2, [arg]);
         if (m instanceof Map) {
           const out = /* @__PURE__ */ new Map();
           for (const [k, v] of m.entries())
@@ -22347,6 +22571,18 @@ fetch(r.url,{method:'HEAD'})
           return v !== void 0 && v !== null ? String(v) : `{${key}}`;
         });
       },
+      // CLAUDE.md 문서화 별칭
+      "is-nil": (v) => v === null || v === void 0,
+      "is-empty": (v) => v === null || v === void 0 || Array.isArray(v) && v.length === 0 || typeof v === "string" && v.length === 0,
+      "str-to-upper": (s) => String(s || "").toUpperCase(),
+      "str-to-lower": (s) => String(s || "").toLowerCase(),
+      "str-starts-with": (s, p) => String(s || "").startsWith(String(p || "")),
+      "str-ends-with": (s, p) => String(s || "").endsWith(String(p || "")),
+      "str-to-num": (s) => {
+        const n = Number(String(s || "").trim());
+        return isNaN(n) ? null : n;
+      },
+      "html-escape": (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"),
       // str/fmt alias
       "str/fmt": (template, vars) => {
         if (typeof template !== "string") return String(template);
@@ -29219,6 +29455,32 @@ function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.
 function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
 function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
 function _fl_file_exists(p) { return require("fs").existsSync(p); }
+function _fl_file_delete(p) { try { require("fs").unlinkSync(p); } catch(e) {} }
+function _fl_file_append(p, c) { require("fs").appendFileSync(p, String(c)); }
+function _fl_file_copy(s, d) { require("fs").copyFileSync(s, d); }
+function _fl_file_rename(o, n) { require("fs").renameSync(o, n); }
+function _fl_file_size(p) { try { return require("fs").statSync(p).size; } catch(e) { return 0; } }
+function _fl_file_modified(p) { try { return require("fs").statSync(p).mtimeMs; } catch(e) { return 0; } }
+function _fl_file_mkdir(p) { try { require("fs").mkdirSync(p, { recursive: true }); } catch(e) {} }
+function _fl_file_rmdir(p) { try { require("fs").rmSync(p, { recursive: true, force: true }); } catch(e) {} }
+function _fl_file_list(p) { try { return require("fs").readdirSync(p); } catch(e) { return []; } }
+function _fl_process_run(cmd) { try { const {execSync}=require("child_process"); return execSync(cmd,{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_run_args(cmd, args) { try { const {execSync}=require("child_process"); return execSync(cmd+" "+(args||[]).join(" "),{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_exec(cmd) { try { const {execSync}=require("child_process"); return execSync(cmd,{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_exec_args(cmd, args) { try { const {execSync}=require("child_process"); return execSync(cmd+" "+(args||[]).join(" "),{encoding:"utf8"}); } catch(e) { return ""; } }
+function _fl_process_spawn(cmd, args) { try { const {spawnSync}=require("child_process"); const r=spawnSync(cmd,args||[],{encoding:"utf8"}); return r.stdout||""; } catch(e) { return ""; } }
+function _fl_process_kill(pid) { try { process.kill(pid); } catch(e) {} }
+function _fl_process_wait(pid) { return null; }
+function _fl_env_get(k) { return process.env[k] || null; }
+function _fl_env_set(k, v) { process.env[k] = String(v); }
+function _fl_env_all() { return process.env; }
+function _fl_file_is_file(p) { try { return require("fs").statSync(p).isFile(); } catch(e) { return false; } }
+function _fl_file_is_dir(p) { try { return require("fs").statSync(p).isDirectory(); } catch(e) { return false; } }
+function _fl_process_exists(pid) { try { process.kill(pid, 0); return true; } catch(e) { return false; } }
+function _fl_process_getcwd() { return process.cwd(); }
+function _fl_process_chdir(p) { try { process.chdir(p); } catch(e) {} }
+function _fl_process_pid() { return process.pid; }
+function _fl_process_ppid() { return process.ppid || null; }
 function _fl_readline(prompt) {
   if (prompt) process.stdout.write(prompt);
   try {
@@ -35190,11 +35452,111 @@ ${exportsStr}
         return isNaN(n) ? null : n;
       },
       "number?": (v) => typeof v === "number" && !isNaN(v),
+      // ── 레벨별 로깅 (console 출력) ──────────────────────────────────
+      // stdlib-time.ts의 Logger 패턴(log_info logger msg)과 공존:
+      // 첫 번째 인자가 Logger 객체(.entries 배열)이면 시간 기반 Logger 패턴으로 위임,
+      // 아니면 단순 console 출력
+      "log-info": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries)) {
+          const logger = args2[0];
+          const msg = String(args2[1]);
+          return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
+        }
+        console.log(`[INFO]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log_info": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries)) {
+          const logger = args2[0];
+          const msg = String(args2[1]);
+          return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
+        }
+        console.log(`[INFO]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log-warn": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries)) {
+          const logger = args2[0];
+          const msg = String(args2[1]);
+          return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
+        }
+        console.warn(`[WARN]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log_warn": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries)) {
+          const logger = args2[0];
+          const msg = String(args2[1]);
+          return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
+        }
+        console.warn(`[WARN]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log-error": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries)) {
+          const logger = args2[0];
+          const msg = String(args2[1]);
+          return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "error", msg }] };
+        }
+        console.error(`[ERROR] ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log_error": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries)) {
+          const logger = args2[0];
+          const msg = String(args2[1]);
+          return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "error", msg }] };
+        }
+        console.error(`[ERROR] ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      // ── validate ────────────────────────────────────────────────────
+      // (validate body schema) → null(성공) or ["field: msg", ...]
+      // schema: Map or plain object. values: :required :number :string :boolean :email :min-N :max-N
+      "validate": (body, schema) => {
+        const errs = [];
+        const rules = schema instanceof Map ? [...schema.entries()] : Object.entries(schema ?? {});
+        const val = body instanceof Map ? (k) => body.get(k) ?? body.get(":" + k) : (k) => (body ?? {})[k];
+        for (const [field, spec] of rules) {
+          const f = String(field).replace(/^:/, "");
+          const v = val(f);
+          const specs = Array.isArray(spec) ? spec : [spec];
+          for (const s of specs) {
+            const rule = String(s ?? "").replace(/^:/, "");
+            if (rule === "required" && (v === null || v === void 0 || v === "")) {
+              errs.push(`${f}: required`);
+            } else if (rule === "number" && v !== null && v !== void 0 && typeof v !== "number" && isNaN(Number(v))) {
+              errs.push(`${f}: must be number`);
+            } else if (rule === "string" && v !== null && v !== void 0 && typeof v !== "string") {
+              errs.push(`${f}: must be string`);
+            } else if (rule === "boolean" && v !== null && v !== void 0 && typeof v !== "boolean") {
+              errs.push(`${f}: must be boolean`);
+            } else if (rule === "email" && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v))) {
+              errs.push(`${f}: must be valid email`);
+            } else if (rule.startsWith("min-")) {
+              const mn = Number(rule.slice(4));
+              if (typeof v === "string" && v.length < mn) errs.push(`${f}: min length ${mn}`);
+              else if (typeof v === "number" && v < mn) errs.push(`${f}: min value ${mn}`);
+            } else if (rule.startsWith("max-")) {
+              const mx = Number(rule.slice(4));
+              if (typeof v === "string" && v.length > mx) errs.push(`${f}: max length ${mx}`);
+              else if (typeof v === "number" && v > mx) errs.push(`${f}: max value ${mx}`);
+            }
+          }
+        }
+        return errs.length > 0 ? errs : null;
+      },
+      // ── list-min / list-max ─────────────────────────────────────────
+      "list-min": (arr) => Array.isArray(arr) && arr.length > 0 ? Math.min(...arr.map(Number)) : null,
+      "list_min": (arr) => Array.isArray(arr) && arr.length > 0 ? Math.min(...arr.map(Number)) : null,
+      "list-max": (arr) => Array.isArray(arr) && arr.length > 0 ? Math.max(...arr.map(Number)) : null,
+      "list_max": (arr) => Array.isArray(arr) && arr.length > 0 ? Math.max(...arr.map(Number)) : null,
       // 문자열 포함
       "str-contains?": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
       "str-contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
       "str_contains": (s, sub) => typeof s === "string" && typeof sub === "string" ? s.includes(sub) : false,
       "includes?": (s, sub) => typeof s === "string" ? s.includes(String(sub)) : Array.isArray(s) ? s.includes(sub) : false,
+      "includes-item": (arr, item) => Array.isArray(arr) ? arr.includes(item) : false,
       // str-pad (s width [char] [dir]) — dir: "right"(기본)/"left"
       "str-pad": (s, width, ch, dir) => {
         const str = String(s ?? "");
@@ -35242,6 +35604,13 @@ ${exportsStr}
         for (let i = 0; i < ks.length; i++) m.set(ks[i], vs[i] ?? null);
         return m;
       },
+      // ── nil-or / or-default — nil coalescing ──────────────────────
+      // (nil-or val default) → val이 nil이면 default 반환
+      "nil-or": (v, d) => v === null || v === void 0 ? d : v,
+      "nil_or": (v, d) => v === null || v === void 0 ? d : v,
+      "or-default": (v, d) => v === null || v === void 0 ? d : v,
+      "or_default": (v, d) => v === null || v === void 0 ? d : v,
+      "coalesce": (...args2) => args2.find((v) => v !== null && v !== void 0) ?? null,
       // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
       "inc": (n) => typeof n === "number" ? n + 1 : Number(n) + 1,
       "dec": (n) => typeof n === "number" ? n - 1 : Number(n) - 1,
@@ -35302,10 +35671,116 @@ ${exportsStr}
       "hash_md5": (v) => createHash("md5").update(v, "utf8").digest("hex"),
       "hash-md5": (v) => createHash("md5").update(v, "utf8").digest("hex")
     };
+    const _authAliases = {
+      "bcrypt-hash": "auth_hash_password",
+      "bcrypt_hash": "auth_hash_password",
+      "bcrypt-verify": "auth_verify_password",
+      "bcrypt_verify": "auth_verify_password",
+      "jwt-sign": "auth_jwt_sign",
+      "jwt_sign": "auth_jwt_sign",
+      "jwt-verify": "auth_jwt_verify",
+      "jwt_verify": "auth_jwt_verify",
+      "jwt-decode": "auth_jwt_decode",
+      "jwt_decode": "auth_jwt_decode",
+      "password-hash": "auth_hash_password",
+      "password_hash": "auth_hash_password",
+      "password-verify": "auth_verify_password",
+      "password_verify": "auth_verify_password"
+    };
     for (const [name, fn] of Object.entries(_aliases)) {
       if (!interp2.context.functions.has(name)) {
         interp2.context.functions.set(name, { name, params: [], body: fn });
       }
+    }
+    const _processAliases = {
+      "on-shutdown": "on_sigterm",
+      "on_shutdown": "on_sigterm",
+      "on-exit": "on_exit"
+    };
+    for (const [alias, target] of Object.entries(_processAliases)) {
+      if (!interp2.context.functions.has(alias) && interp2.context.functions.has(target)) {
+        const orig = interp2.context.functions.get(target);
+        interp2.context.functions.set(alias, { ...orig, name: alias });
+      }
+    }
+    for (const [alias, target] of Object.entries(_authAliases)) {
+      if (!interp2.context.functions.has(alias) && interp2.context.functions.has(target)) {
+        const orig = interp2.context.functions.get(target);
+        interp2.context.functions.set(alias, { ...orig, name: alias });
+      }
+    }
+    const _overrides = {
+      "log-info": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+          return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "info", msg: String(args2[1]) }] };
+        console.log(`[INFO]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log_info": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+          return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "info", msg: String(args2[1]) }] };
+        console.log(`[INFO]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log-warn": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+          return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "warn", msg: String(args2[1]) }] };
+        console.warn(`[WARN]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log_warn": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+          return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "warn", msg: String(args2[1]) }] };
+        console.warn(`[WARN]  ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log-error": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+          return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "error", msg: String(args2[1]) }] };
+        console.error(`[ERROR] ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "log_error": (...args2) => {
+        if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+          return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "error", msg: String(args2[1]) }] };
+        console.error(`[ERROR] ${args2.map(String).join(" ")}`);
+        return null;
+      },
+      "stdlib-list": () => [...interp2.context.functions.keys()].sort(),
+      "stdlib_list": () => [...interp2.context.functions.keys()].sort(),
+      "fn-where": (name) => {
+        const key = String(name).replace(/-/g, "_");
+        const altKey = String(name).replace(/_/g, "-");
+        const found = interp2.context.functions.has(String(name)) ? String(name) : interp2.context.functions.has(key) ? key : interp2.context.functions.has(altKey) ? altKey : null;
+        if (!found) return `not-found: ${name}`;
+        const fn = interp2.context.functions.get(found);
+        if (typeof (fn == null ? void 0 : fn.body) === "function") return `native:${found}`;
+        return `fl-defined:${found}`;
+      },
+      "fn_where": (name) => {
+        const key = String(name).replace(/-/g, "_");
+        const altKey = String(name).replace(/_/g, "-");
+        const found = interp2.context.functions.has(String(name)) ? String(name) : interp2.context.functions.has(key) ? key : interp2.context.functions.has(altKey) ? altKey : null;
+        if (!found) return `not-found: ${name}`;
+        const fn = interp2.context.functions.get(found);
+        if (typeof (fn == null ? void 0 : fn.body) === "function") return `native:${found}`;
+        return `fl-defined:${found}`;
+      },
+      "fn-exists?": (name) => {
+        const s = String(name);
+        if (interp2.context.functions.has(s) || interp2.context.functions.has(s.replace(/-/g, "_")) || interp2.context.functions.has(s.replace(/_/g, "-"))) return true;
+        const _builtins = /* @__PURE__ */ new Set(["abs", "agent-broadcast", "agent-history", "agent-inbox-size", "agent-list", "agent-process", "agent-recv", "agent-send", "agent-spawn", "and", "append", "array?", "assert-type", "assoc", "atom", "begin", "bind", "block-items", "bool", "bool?", "boolean?", "bson-decode-native", "bson-encode-native", "call", "ceil", "char-at", "char-code", "clamp", "cli-args", "closure?", "comp", "complement", "concat", "cons", "constantly", "contains?", "cos", "cosine-sim", "cosine_sim", "ctx-add", "ctx-all", "ctx-get", "ctx-has-room?", "ctx-new", "ctx-remove", "ctx-stats", "ctx-trim", "define", "deref", "dir-exists?", "dir-list", "dissoc", "distinct", "do", "dot-product", "drop", "echo", "empty?", "ends-with?", "err", "err?", "error", "euclidean-dist", "even?", "exp", "export", "failure", "false?", "file-append", "file-exists?", "file-mkdir", "file_append", "file_mkdir", "filter", "filter-lazy", "find", "first", "first-or", "first_or", "fl-concepts", "fl-env-get", "fl-example-count", "fl-examples", "fl-exec-op", "fl-fix-env", "fl-interp", "fl-learn", "fl-parse", "fl-special-op?", "flat-map", "flatten", "float?", "floor", "fn", "fn?", "function?", "get", "get-or", "has-key?", "help", "html-escape", "html-response", "http-get", "http_get", "identity", "if", "if-let", "includes?", "index-of", "inspect", "int?", "is-digit?", "is-symbol?", "is-whitespace?", "iterate", "join", "js-escape", "json-response", "juxt", "keys", "last", "last-or", "last_or", "lazy-head", "lazy-seq", "lazy-tail", "lazy?", "left", "length", "let", "lex", "list", "list-tools", "list?", "load", "log", "lower", "lower-case", "lowercase", "map", "map-entries", "map-err", "map-lazy", "map-ok", "map-set", "map?", "map_entries", "match", "math-abs", "math-pow", "math-sqrt", "math_abs", "math_sqrt", "max", "maybe-bind", "maybe-chain", "maybe-combine", "maybe-filter", "maybe-map", "maybe-select", "mem-episode", "mem-forget", "mem-keys", "mem-purge", "mem-recall", "mem-remember", "mem-remember-short", "mem-search-episodes", "mem-search-tag", "mem-stats", "mem-working-clear", "mem-working-get", "mem-working-set", "merge", "min", "mod", "nan?", "neg?", "negative?", "net-connect", "net-sendrecv", "net-sendrecv-pool", "nil-or-empty?", "nil?", "none", "not", "not-nil?", "now", "now-iso", "now_iso", "null?", "num", "num-to-str", "number?", "obj-entries", "obj-keys", "obj-merge", "obj-omit", "obj-pick", "obj-values", "obj_entries", "obj_keys", "obj_merge", "obj_omit", "obj_pick", "obj_values", "odd?", "ok", "ok?", "omit", "or", "parse", "pick", "pop", "pos?", "positive?", "pow", "print", "print-err", "println", "promise", "prompt-compile", "prompt-from-code", "prompt-target", "prompt-tokens", "pure", "pure-writer", "push", "quality-check", "quality-feedback", "quality-passed?", "rag-add", "rag-query", "rag-remove", "rag-retrieve", "rag-size", "random", "range", "read-file", "recover", "reduce", "repeat", "replace", "repr", "require", "reset!", "rest", "result-classify", "result-explain", "return-writer", "reverse", "right", "round", "sdk-features", "sdk-snippet", "sdk-supports", "sdk-validate", "sdk-version", "server-uptime", "set!", "set-timeout", "shell-exec", "shell-exec-result", "shift", "sin", "slice", "sleep", "some", "some?", "sort", "sort-by", "sort_by", "split", "sqrt", "starts-with?", "str", "str-char-at", "str-ends-with?", "str-join", "str-split", "str-starts-with?", "str-to-num", "str_trim", "stream-chunk-count", "stream-chunks", "stream-collect", "stream-create", "stream-delete", "stream-done?", "stream-end", "stream-text", "stream-write", "string?", "string_trim", "strlen", "substring", "success", "swap!", "take", "take-while", "tan", "tell", "to-hex", "trace-add", "trace-create", "trace-enter", "trace-exit", "trace-markdown", "trace-node-count", "trace-tree", "trim", "true?", "try", "try-reason", "try-with-fallback", "type-of", "typeof", "unique", "unshift", "unwrap", "unwrap-or", "upper", "upper-case", "uppercase", "use-tool", "uuid", "uuid4", "vals", "values", "vec-add", "vec-dist", "vec-dot", "vec-magnitude", "vec-norm", "vec-normalize", "vec-scale", "vec-top-k", "when", "write-file", "zero?", "zip", "zip-with", "cond", "catch", "includes-item", "flatten"]);
+        return _builtins.has(s) || _builtins.has(s.replace(/_/g, "-"));
+      },
+      "fn_exists": (name) => {
+        const s = String(name);
+        if (interp2.context.functions.has(s) || interp2.context.functions.has(s.replace(/-/g, "_")) || interp2.context.functions.has(s.replace(/_/g, "-"))) return true;
+        const _builtins = /* @__PURE__ */ new Set(["abs", "agent-broadcast", "agent-history", "agent-inbox-size", "agent-list", "agent-process", "agent-recv", "agent-send", "agent-spawn", "and", "append", "array?", "assert-type", "assoc", "atom", "begin", "bind", "block-items", "bool", "bool?", "boolean?", "bson-decode-native", "bson-encode-native", "call", "ceil", "char-at", "char-code", "clamp", "cli-args", "closure?", "comp", "complement", "concat", "cons", "constantly", "contains?", "cos", "cosine-sim", "cosine_sim", "ctx-add", "ctx-all", "ctx-get", "ctx-has-room?", "ctx-new", "ctx-remove", "ctx-stats", "ctx-trim", "define", "deref", "dir-exists?", "dir-list", "dissoc", "distinct", "do", "dot-product", "drop", "echo", "empty?", "ends-with?", "err", "err?", "error", "euclidean-dist", "even?", "exp", "export", "failure", "false?", "file-append", "file-exists?", "file-mkdir", "file_append", "file_mkdir", "filter", "filter-lazy", "find", "first", "first-or", "first_or", "fl-concepts", "fl-env-get", "fl-example-count", "fl-examples", "fl-exec-op", "fl-fix-env", "fl-interp", "fl-learn", "fl-parse", "fl-special-op?", "flat-map", "flatten", "float?", "floor", "fn", "fn?", "function?", "get", "get-or", "has-key?", "help", "html-escape", "html-response", "http-get", "http_get", "identity", "if", "if-let", "includes?", "index-of", "inspect", "int?", "is-digit?", "is-symbol?", "is-whitespace?", "iterate", "join", "js-escape", "json-response", "juxt", "keys", "last", "last-or", "last_or", "lazy-head", "lazy-seq", "lazy-tail", "lazy?", "left", "length", "let", "lex", "list", "list-tools", "list?", "load", "log", "lower", "lower-case", "lowercase", "map", "map-entries", "map-err", "map-lazy", "map-ok", "map-set", "map?", "map_entries", "match", "math-abs", "math-pow", "math-sqrt", "math_abs", "math_sqrt", "max", "maybe-bind", "maybe-chain", "maybe-combine", "maybe-filter", "maybe-map", "maybe-select", "mem-episode", "mem-forget", "mem-keys", "mem-purge", "mem-recall", "mem-remember", "mem-remember-short", "mem-search-episodes", "mem-search-tag", "mem-stats", "mem-working-clear", "mem-working-get", "mem-working-set", "merge", "min", "mod", "nan?", "neg?", "negative?", "net-connect", "net-sendrecv", "net-sendrecv-pool", "nil-or-empty?", "nil?", "none", "not", "not-nil?", "now", "now-iso", "now_iso", "null?", "num", "num-to-str", "number?", "obj-entries", "obj-keys", "obj-merge", "obj-omit", "obj-pick", "obj-values", "obj_entries", "obj_keys", "obj_merge", "obj_omit", "obj_pick", "obj_values", "odd?", "ok", "ok?", "omit", "or", "parse", "pick", "pop", "pos?", "positive?", "pow", "print", "print-err", "println", "promise", "prompt-compile", "prompt-from-code", "prompt-target", "prompt-tokens", "pure", "pure-writer", "push", "quality-check", "quality-feedback", "quality-passed?", "rag-add", "rag-query", "rag-remove", "rag-retrieve", "rag-size", "random", "range", "read-file", "recover", "reduce", "repeat", "replace", "repr", "require", "reset!", "rest", "result-classify", "result-explain", "return-writer", "reverse", "right", "round", "sdk-features", "sdk-snippet", "sdk-supports", "sdk-validate", "sdk-version", "server-uptime", "set!", "set-timeout", "shell-exec", "shell-exec-result", "shift", "sin", "slice", "sleep", "some", "some?", "sort", "sort-by", "sort_by", "split", "sqrt", "starts-with?", "str", "str-char-at", "str-ends-with?", "str-join", "str-split", "str-starts-with?", "str-to-num", "str_trim", "stream-chunk-count", "stream-chunks", "stream-collect", "stream-create", "stream-delete", "stream-done?", "stream-end", "stream-text", "stream-write", "string?", "string_trim", "strlen", "substring", "success", "swap!", "take", "take-while", "tan", "tell", "to-hex", "trace-add", "trace-create", "trace-enter", "trace-exit", "trace-markdown", "trace-node-count", "trace-tree", "trim", "true?", "try", "try-reason", "try-with-fallback", "type-of", "typeof", "unique", "unshift", "unwrap", "unwrap-or", "upper", "upper-case", "uppercase", "use-tool", "uuid", "uuid4", "vals", "values", "vec-add", "vec-dist", "vec-dot", "vec-magnitude", "vec-norm", "vec-normalize", "vec-scale", "vec-top-k", "when", "write-file", "zero?", "zip", "zip-with", "cond", "catch", "includes-item", "flatten"]);
+        return _builtins.has(s) || _builtins.has(s.replace(/_/g, "-"));
+      }
+    };
+    for (const [name, fn] of Object.entries(_overrides)) {
+      interp2.context.functions.set(name, { name, params: [], body: fn });
     }
   }
 
@@ -35357,7 +35832,9 @@ ${exportsStr}
             if (typeof error === "string") {
               errMap.set("message", error);
             } else if (error instanceof Error) {
-              errMap.set("message", error.message);
+              const cleanMsg = error.message.replace(/^\[[\w][\w-]*\]\s*/, "").replace(/\s*\(at line \d+,\s*col \d+\)\s*$/, "");
+              errMap.set("message", cleanMsg);
+              errMap.set("full-message", error.message);
               const lineMatch = error.message.match(/\(at line (\d+)/);
               if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
               const flErr = error;
@@ -38815,6 +39292,30 @@ ${tail}` : "")
       if (expr2.line !== void 0) this.currentLine = expr2.line;
       let op = expr2.op;
       if (typeof op !== "string") {
+        if (op && typeof op === "object" && op.kind) {
+          const fnVal = this.eval(op);
+          const callArgs = expr2.args.map((a) => this.eval(a));
+          if (typeof fnVal === "function") return fnVal(...callArgs);
+          if ((fnVal == null ? void 0 : fnVal.kind) === "function-value" || (fnVal == null ? void 0 : fnVal.kind) === "async-function-value") return this.callFunctionValue(fnVal, callArgs);
+          if ((fnVal == null ? void 0 : fnVal.kind) === "closure") {
+            const params = fnVal.params || [];
+            this.context.variables.push();
+            try {
+              if (fnVal["closure-env"]) {
+                for (const [k, v] of Object.entries(fnVal["closure-env"].vars || {})) {
+                  this.context.variables.set(k, v);
+                }
+              }
+              for (let i = 0; i < params.length; i++) this.context.variables.set(params[i], callArgs[i] ?? null);
+              let result = null;
+              for (const node of fnVal.body || []) result = this.eval(node);
+              return result;
+            } finally {
+              this.context.variables.pop();
+            }
+          }
+          return fnVal;
+        }
         op = (op == null ? void 0 : op.name) ? op.name : String(op);
       }
       op = String(op).trim();
@@ -38839,7 +39340,7 @@ ${tail}` : "")
       const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
       const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
       const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-      const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial"]);
+      const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate"]);
       if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
       if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
       if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
@@ -39064,7 +39565,9 @@ ${tail}` : "")
         if (err4 && err4.constructor && err4.constructor.name === "ReturnSignal") throw err4;
         const line = expr2.line ?? this.currentLine;
         const col = expr2.col ?? 0;
-        const enhancedMsg = (err4.message ?? "").includes("(at line ") ? err4.message : `${err4.message} (at line ${line}, col ${col})`;
+        const rawMsg = err4.message ?? String(err4);
+        const withOp = rawMsg.startsWith(`[${op}]`) || rawMsg.startsWith(`(${op})`) ? rawMsg : `[${op}] ${rawMsg}`;
+        const enhancedMsg = withOp.includes("(at line ") ? withOp : `${withOp} (at line ${line}, col ${col})`;
         if (err4.code || err4.name === "FLRuntimeError") {
           err4.message = enhancedMsg;
           throw err4;

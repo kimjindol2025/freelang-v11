@@ -957,6 +957,43 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
   // ── do / begin / progn ───────────────────────────────────────────
   if (op === "do" || op === "begin" || op === "progn") {
+    // IIFE: ((fn-expr) arg1 arg2 ...) — parser creates do-block; detect and call
+    if (expr.args.length >= 2) {
+      const first = ev(expr.args[0]);
+      const isCallable = typeof first === "function"
+        || first?.kind === "function-value"
+        || first?.kind === "async-function-value"
+        || first?.kind === "closure";
+      if (isCallable) {
+        const callArgs = expr.args.slice(1).map((a) => ev(a));
+        if (typeof first === "function") return first(...callArgs);
+        if (first?.kind === "function-value" || first?.kind === "async-function-value") return (interp as any).callFunctionValue(first, callArgs);
+        if (first?.kind === "closure") {
+          const params: string[] = first.params || [];
+          ctx.variables.push();
+          try {
+            if (first["closure-env"]) {
+              for (const [k, v] of Object.entries((first["closure-env"] as any).vars || {})) ctx.variables.set(k, v);
+            }
+            for (let i = 0; i < params.length; i++) ctx.variables.set(params[i], callArgs[i] ?? null);
+            let result: any = null;
+            for (const node of (first.body || [])) result = ev(node);
+            return result;
+          } finally { ctx.variables.pop(); }
+        }
+      }
+      // not callable: args[0] already evaluated as `first`, evaluate remaining args
+      let result: any = first;
+      for (const arg of expr.args.slice(1)) {
+        if (isBlock(arg) && isControlBlock(arg as any)) {
+          (interp as any).evalBlock(arg);
+          result = null;
+          continue;
+        }
+        result = ev(arg);
+      }
+      return result;
+    }
     let result: any = null;
     for (const arg of expr.args) {
       if (isBlock(arg) && isControlBlock(arg as any)) {
