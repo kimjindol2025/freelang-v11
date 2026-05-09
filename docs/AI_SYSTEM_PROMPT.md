@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 456개 함수, 34 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 453개 함수, 34 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -458,7 +458,7 @@ parallel race with-timeout fl-try use`
 - `(greet/hello $name)` → any
 - `(greet/goodbye $name)` → any
 
-### http (28개)
+### http (25개)
 
 - `(http_get url)` → {:status 200 :body "..."}
 - `(http_post url body)` → {:status 200 :body "..."}
@@ -472,17 +472,14 @@ parallel race with-timeout fl-try use`
 - `(http_post_key url body api-key)` → {:status 200 :body "..."}
 - `(http_status url)` → number (상태코드만)
 - `(http_json url)` → {:status 200 :data {...} :error nil}
-- `(http_header url header)` → string (특정 헤더 값만)
+- `(http_header url header)` → string (특정 헤더만)
 - `(http_with_timeout url timeout)` → {:status 200 :body "..."}
 - `(http_post_json url data)` → {:status 200 :data {...}}
 - `(http_put_json url data)` → {:status 200 :data {...}}
 - `(http_request method url headers body)` → {:status 200 :body "..."}
 - `(http_req_status method url headers body)` → number
 - `(http_get_json url headers)` → {:status 200 :data {...}}
-- `(http_get_data url [headers])` → parsed JSON directly (null on error)
-- `(http_post_data url body [headers])` → parsed JSON directly (null on error)
 - `(http_get_json_bearer url token)` → {:status 200 :data {...}}
-- `(http_get_bearer url token)` → {:status 200 :body "..."}
 - `(http_post_bearer url body token)` → {:status 200 :body "..."}
 - `(http_retry_post url body token retries)` → {:status 200 :body "..."}
 - `(is_http_success status)` → boolean
@@ -740,4 +737,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-08T08:16:36.458Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-09T23:37:22.298Z
