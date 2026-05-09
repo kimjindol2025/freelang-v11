@@ -1,0 +1,219 @@
+;; FreeLang v11 — 10개 테이블 관리 앱
+;; 실행: node bootstrap.js run examples/tables-app.fl
+
+(define DB "/root/kim/freelang-v11/data/tables-app.db")
+
+;; ─────────────────────────────────────────
+;; DB 초기화 — 10개 테이블 생성
+;; ─────────────────────────────────────────
+(defn init-db []
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, price REAL, stock INTEGER, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, user_name TEXT, product TEXT, qty INTEGER, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS employees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, department TEXT, salary INTEGER, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, manager TEXT, budget INTEGER, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, company TEXT, contact TEXT, country TEXT, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, address TEXT, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS inventory (id INTEGER PRIMARY KEY AUTOINCREMENT, item TEXT, qty INTEGER, location TEXT, created_at TEXT)" [])
+  (db-exec $DB "CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, product TEXT, rating INTEGER, comment TEXT, created_at TEXT)" []))
+
+(init-db)
+
+;; ─────────────────────────────────────────
+;; HTML 공통 스타일
+;; ─────────────────────────────────────────
+(defn page-css []
+  "body{font-family:sans-serif;max-width:1200px;margin:0 auto;padding:20px;background:#f5f5f5}
+  h1{color:#333;border-bottom:2px solid #4CAF50;padding-bottom:10px}
+  h2{color:#555;font-size:15px;margin:0 0 8px}
+  .section{background:#fff;border-radius:8px;padding:16px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#4CAF50;color:#fff;padding:7px 10px;text-align:left}
+  td{padding:6px 10px;border-bottom:1px solid #eee}
+  tr:hover td{background:#f9f9f9}
+  form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  input{padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;flex:1;min-width:100px}
+  button{padding:6px 16px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px}
+  button:hover{background:#388E3C}
+  .empty{color:#aaa;font-size:13px;padding:8px 0}
+  nav{margin-bottom:20px}
+  nav a{margin-right:12px;color:#4CAF50;text-decoration:none;font-size:13px}
+  nav a:hover{text-decoration:underline}")
+
+;; ─────────────────────────────────────────
+;; 테이블 HTML 렌더링 헬퍼
+;; ─────────────────────────────────────────
+(defn render-table [$rows $cols]
+  (if (= (length $rows) 0)
+    "<p class='empty'>데이터 없음</p>"
+    (str
+      "<table><tr>"
+      (join (map (fn [$c] (str "<th>" $c "</th>")) $cols) "")
+      "</tr>"
+      (join (map (fn [$row]
+        (str "<tr>"
+          (join (map (fn [$c] (str "<td>" (or (get $row $c) "-") "</td>")) $cols) "")
+          "</tr>")) $rows) "")
+      "</table>")))
+
+;; ─────────────────────────────────────────
+;; GET / — 메인 대시보드
+;; ─────────────────────────────────────────
+(defn handle-main [$req]
+  (let [[$users     (db-query $DB "SELECT * FROM users ORDER BY id DESC LIMIT 10" [])]
+        [$products  (db-query $DB "SELECT * FROM products ORDER BY id DESC LIMIT 10" [])]
+        [$categories (db-query $DB "SELECT * FROM categories ORDER BY id DESC LIMIT 10" [])]
+        [$orders    (db-query $DB "SELECT * FROM orders ORDER BY id DESC LIMIT 10" [])]
+        [$employees (db-query $DB "SELECT * FROM employees ORDER BY id DESC LIMIT 10" [])]
+        [$departments (db-query $DB "SELECT * FROM departments ORDER BY id DESC LIMIT 10" [])]
+        [$suppliers (db-query $DB "SELECT * FROM suppliers ORDER BY id DESC LIMIT 10" [])]
+        [$customers (db-query $DB "SELECT * FROM customers ORDER BY id DESC LIMIT 10" [])]
+        [$inventory (db-query $DB "SELECT * FROM inventory ORDER BY id DESC LIMIT 10" [])]
+        [$reviews   (db-query $DB "SELECT * FROM reviews ORDER BY id DESC LIMIT 10" [])]]
+    (server-html (str
+      "<!DOCTYPE html><html><head><meta charset=utf-8>"
+      "<title>FreeLang 테이블 관리</title>"
+      "<style>" (page-css) "</style></head><body>"
+      "<h1>FreeLang v11 — 10개 테이블 관리</h1>"
+
+      ;; 1. 사용자
+      "<div class='section'><h2>1. 사용자 (users)</h2>"
+      (render-table $users ["id" "name" "email" "created_at"])
+      "<form method=POST action='/add/users'>"
+      "<input name=name placeholder='이름' required>"
+      "<input name=email placeholder='이메일' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 2. 상품
+      "<div class='section'><h2>2. 상품 (products)</h2>"
+      (render-table $products ["id" "name" "price" "stock" "created_at"])
+      "<form method=POST action='/add/products'>"
+      "<input name=name placeholder='상품명' required>"
+      "<input name=price placeholder='가격' required>"
+      "<input name=stock placeholder='재고' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 3. 카테고리
+      "<div class='section'><h2>3. 카테고리 (categories)</h2>"
+      (render-table $categories ["id" "name" "description" "created_at"])
+      "<form method=POST action='/add/categories'>"
+      "<input name=name placeholder='카테고리명' required>"
+      "<input name=description placeholder='설명'>"
+      "<button>추가</button></form></div>"
+
+      ;; 4. 주문
+      "<div class='section'><h2>4. 주문 (orders)</h2>"
+      (render-table $orders ["id" "user_name" "product" "qty" "created_at"])
+      "<form method=POST action='/add/orders'>"
+      "<input name=user_name placeholder='주문자' required>"
+      "<input name=product placeholder='상품' required>"
+      "<input name=qty placeholder='수량' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 5. 직원
+      "<div class='section'><h2>5. 직원 (employees)</h2>"
+      (render-table $employees ["id" "name" "department" "salary" "created_at"])
+      "<form method=POST action='/add/employees'>"
+      "<input name=name placeholder='이름' required>"
+      "<input name=department placeholder='부서' required>"
+      "<input name=salary placeholder='급여' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 6. 부서
+      "<div class='section'><h2>6. 부서 (departments)</h2>"
+      (render-table $departments ["id" "name" "manager" "budget" "created_at"])
+      "<form method=POST action='/add/departments'>"
+      "<input name=name placeholder='부서명' required>"
+      "<input name=manager placeholder='매니저' required>"
+      "<input name=budget placeholder='예산' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 7. 공급업체
+      "<div class='section'><h2>7. 공급업체 (suppliers)</h2>"
+      (render-table $suppliers ["id" "company" "contact" "country" "created_at"])
+      "<form method=POST action='/add/suppliers'>"
+      "<input name=company placeholder='회사명' required>"
+      "<input name=contact placeholder='담당자' required>"
+      "<input name=country placeholder='국가' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 8. 고객
+      "<div class='section'><h2>8. 고객 (customers)</h2>"
+      (render-table $customers ["id" "name" "phone" "address" "created_at"])
+      "<form method=POST action='/add/customers'>"
+      "<input name=name placeholder='이름' required>"
+      "<input name=phone placeholder='전화번호' required>"
+      "<input name=address placeholder='주소' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 9. 재고
+      "<div class='section'><h2>9. 재고 (inventory)</h2>"
+      (render-table $inventory ["id" "item" "qty" "location" "created_at"])
+      "<form method=POST action='/add/inventory'>"
+      "<input name=item placeholder='품목' required>"
+      "<input name=qty placeholder='수량' required>"
+      "<input name=location placeholder='위치' required>"
+      "<button>추가</button></form></div>"
+
+      ;; 10. 리뷰
+      "<div class='section'><h2>10. 리뷰 (reviews)</h2>"
+      (render-table $reviews ["id" "product" "rating" "comment" "created_at"])
+      "<form method=POST action='/add/reviews'>"
+      "<input name=product placeholder='상품' required>"
+      "<input name=rating placeholder='평점(1-5)' required>"
+      "<input name=comment placeholder='내용' required>"
+      "<button>추가</button></form></div>"
+
+      "</body></html>"))))
+
+;; ─────────────────────────────────────────
+;; POST /add/:table — DB 저장 후 리다이렉트
+;; ─────────────────────────────────────────
+(defn handle-add [$req]
+  (let [[$tbl  (get (get $req "params") "table")]
+        [$body (get $req "body")]
+        [$ts   (now-iso)]]
+    (do
+      (cond
+        (= $tbl "users")
+          (db-exec $DB "INSERT INTO users (name,email,created_at) VALUES (?,?,?)"
+            [(get $body "name") (get $body "email") $ts])
+        (= $tbl "products")
+          (db-exec $DB "INSERT INTO products (name,price,stock,created_at) VALUES (?,?,?,?)"
+            [(get $body "name") (get $body "price") (get $body "stock") $ts])
+        (= $tbl "categories")
+          (db-exec $DB "INSERT INTO categories (name,description,created_at) VALUES (?,?,?)"
+            [(get $body "name") (get $body "description") $ts])
+        (= $tbl "orders")
+          (db-exec $DB "INSERT INTO orders (user_name,product,qty,created_at) VALUES (?,?,?,?)"
+            [(get $body "user_name") (get $body "product") (get $body "qty") $ts])
+        (= $tbl "employees")
+          (db-exec $DB "INSERT INTO employees (name,department,salary,created_at) VALUES (?,?,?,?)"
+            [(get $body "name") (get $body "department") (get $body "salary") $ts])
+        (= $tbl "departments")
+          (db-exec $DB "INSERT INTO departments (name,manager,budget,created_at) VALUES (?,?,?,?)"
+            [(get $body "name") (get $body "manager") (get $body "budget") $ts])
+        (= $tbl "suppliers")
+          (db-exec $DB "INSERT INTO suppliers (company,contact,country,created_at) VALUES (?,?,?,?)"
+            [(get $body "company") (get $body "contact") (get $body "country") $ts])
+        (= $tbl "customers")
+          (db-exec $DB "INSERT INTO customers (name,phone,address,created_at) VALUES (?,?,?,?)"
+            [(get $body "name") (get $body "phone") (get $body "address") $ts])
+        (= $tbl "inventory")
+          (db-exec $DB "INSERT INTO inventory (item,qty,location,created_at) VALUES (?,?,?,?)"
+            [(get $body "item") (get $body "qty") (get $body "location") $ts])
+        (= $tbl "reviews")
+          (db-exec $DB "INSERT INTO reviews (product,rating,comment,created_at) VALUES (?,?,?,?)"
+            [(get $body "product") (get $body "rating") (get $body "comment") $ts])
+        true nil)
+      (server-redirect "/"))))
+
+;; ─────────────────────────────────────────
+;; 라우트 등록
+;; ─────────────────────────────────────────
+(server-get "/" "handle-main")
+(server-post "/add/:table" "handle-add")
+
+(server-start 40102)
+(println "서버 시작: http://localhost:40102")

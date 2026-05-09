@@ -1,0 +1,29 @@
+;; FreeLang v11 — 간단한 HTTP 서버 예제
+;; 실행: node bootstrap.js run examples/simple-server.fl
+
+;; GET / — 환영 HTML
+(defn handle-index [$req]
+  (server-html "<h1>FreeLang 서버!</h1><p><a href='/api/hello'>API 테스트</a></p>"))
+
+;; GET /api/hello — JSON 응답
+(defn handle-hello [$req]
+  (server-json {"status" "ok" "message" "안녕하세요!" "version" "v11"}))
+
+;; GET /api/greet/:name — 경로 파라미터
+(defn handle-greet [$req]
+  (let [[$name (get (get $req "params") "name")]]
+    (server-json {"status" "ok" "greeting" (str "안녕하세요, " $name "님!")})))
+
+;; POST /api/echo — body 그대로 돌려주기
+(defn handle-echo [$req]
+  (let [[$body (get $req "body")]]
+    (server-json {"status" "ok" "echo" $body})))
+
+;; 라우트 등록
+(server-get "/" "handle-index")
+(server-get "/api/hello" "handle-hello")
+(server-get "/api/greet/:name" "handle-greet")
+(server-post "/api/echo" "handle-echo")
+
+(server-start 40099)
+(println "서버 시작: http://localhost:40099")

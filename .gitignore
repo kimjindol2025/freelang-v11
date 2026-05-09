@@ -13,3 +13,6 @@ build/
 .env.local
 coverage/
 .test-cache/
+
+# local data
+data/
