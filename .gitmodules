@@ -1,0 +1,3 @@
+[submodule "examples/infra"]
+	path = examples/infra
+	url = https://gogs.dclub.kr/kim/fl-infra.git
