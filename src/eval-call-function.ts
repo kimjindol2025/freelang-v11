@@ -190,11 +190,11 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     return (func.body as Function)(...args);
   }
 
-  // 기본값 적용: 부족한 인자를 paramDefaults로 채움
+  // 기본값 적용: 부족한 인자를 paramDefaults로 채움 (lazy — 호출 시점 평가)
   if (func.paramDefaults) {
     while (args.length < func.params.length) {
       const def = func.paramDefaults[args.length];
-      if (def !== undefined) args = [...args, def];
+      if (def !== undefined) args = [...args, interp.eval(def)];
       else break;
     }
   }

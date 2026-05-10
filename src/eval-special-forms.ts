@@ -266,7 +266,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
               const n = nameNode.kind === "variable" ? nameNode.name
                 : nameNode.kind === "literal" ? String(nameNode.value) : "";
               params.push(n.startsWith("$") ? n.slice(1) : n);
-              paramDefaults.push(ev(inner[1])); // 정의 시점 평가
+              paramDefaults.push(inner[1]); // AST 노드 저장 → 호출 시점 lazy 평가
             }
             continue;
           }
