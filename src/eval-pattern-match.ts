@@ -102,8 +102,16 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
             const code = flErr.code ?? null;
             if (code) errObj["code"] = code;
             if (flErr.hint) errObj["hint"] = flErr.hint;
-            // stack (optional)
-            if (error.stack) errObj["stack"] = error.stack;
+            // stack — bootstrap.js 내부 경로 제거, FreeLang 위치만 노출
+            if (error.stack) {
+              const filtered = error.stack
+                .split("\n")
+                .filter((ln: string) => !ln.includes("bootstrap.js") && !ln.includes("node:internal"))
+                .join("\n")
+                .trim();
+              const lineInfo = errObj["line"] != null ? `FreeLang line ${errObj["line"]}` : null;
+              errObj["stack"] = filtered || lineInfo || errObj["message"];
+            }
             // category: code -> category direct map (no message inference)
             const CODE_TO_CATEGORY: Record<string, string> = {
               "E_TYPE_NIL":          "TypeError",
