@@ -1,5 +1,19 @@
 {
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
+  "_coverage": {
+    "total": 100,
+    "covered": 38,
+    "percent": 38,
+    "last_updated": "2026-05-10",
+    "covered_items": [
+      "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
+      "#74 (shell-exec-stdout: stdout 직접 반환 — v11.6.20)",
+      "#72 (env-load 자동: .env 자동 로드 — v11.6.20)",
+      "#68 (db-exec scalar: 단일값 자동 배열화 — v11.6.20)",
+      "#69 (mariadb-one nil-safe: 결과 없으면 nil 반환 — v11.6.20)"
+    ],
+    "_note": "covered 38개 = 기존 33개 + 이번 5개 (#71, #74, #72, #68, #69)"
+  },
   "_categories": {
     "design":   { "label": "② 언어 디자인 결함", "icon": "🔧" },
     "normal":   { "label": "④ 정상 동작 (학습)", "icon": "📚" },
@@ -85,14 +99,14 @@
 
     "#66": { "type": "design",   "summary": "db_query 배열 반환 구조",       "fix": "v12: db-query-one 표준화" },
     "#67": { "type": "design",   "summary": "mariadb_connect 시그니처 다름", "fix": "v12: positional + map 둘다 지원" },
-    "#68": { "type": "design",   "summary": "SQL 파라미터 배열 강제",       "fix": "v12: 단일 값도 자동 배열화" },
-    "#69": { "type": "missing",  "summary": "mariadb_one nil 자동 처리 미지원", "fix": "Phase Y: 안전 접근자" },
+    "#68": { "type": "design",   "summary": "SQL 파라미터 배열 강제",       "fix": "✅ v11.6.20: db-exec/db-query scalar 단일값 자동 배열화 (AGENT-3)" },
+    "#69": { "type": "missing",  "summary": "mariadb_one nil 자동 처리 미지원", "fix": "✅ v11.6.20: mariadb-one nil-safe (undefined 제거, AGENT-3)" },
     "#70": { "type": "doc",      "summary": "KimDB URL 형식",               "fix": "문서 명시" },
 
-    "#71": { "type": "missing",  "summary": "file_read 없는 파일 → 에러",   "fix": "Phase Y: file-read-or 추가" },
-    "#72": { "type": "design",   "summary": "env_load 자동 호출 안됨",       "fix": "v12: 시작 시 자동 .env 로드" },
+    "#71": { "type": "missing",  "summary": "file_read 없는 파일 → 에러",   "fix": "✅ v11.6.20: file-read-or 추가 (AGENT-2)" },
+    "#72": { "type": "design",   "summary": "env_load 자동 호출 안됨",       "fix": "✅ v11.6.20: .env 자동 로드 (FL_NO_AUTO_ENV=1로 비활성화 가능, AGENT-2)" },
     "#73": { "type": "normal",   "summary": "file_mkdir 재귀 생성",          "fix": null },
-    "#74": { "type": "design",   "summary": "shell_exec 반환 구조체",        "fix": "v12: shell-exec-stdout 추가" },
+    "#74": { "type": "design",   "summary": "shell_exec 반환 구조체",        "fix": "✅ v11.6.20: shell-exec-stdout 추가 (stdout 직접 반환, AGENT-2)" },
     "#75": { "type": "user",     "summary": "file_append 개행 누락",         "fix": null },
 
     "#76": { "type": "normal",   "summary": "str 임의 타입 변환",            "fix": null },

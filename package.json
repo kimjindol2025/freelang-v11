@@ -1,7 +1,7 @@
 {
   "name": "freelang-v11",
-  "version": "11.6.19",
-  "description": "FreeLang v11 — Unified AI-Native Language. [v11.6.19: 보안 강화 + 버그 수정 완성]",
+  "version": "11.6.20",
+  "description": "FreeLang v11 — Unified AI-Native Language. [v11.6.20: stdlib 확장 + DB 안정화 (AGENT-2/3)]",
   "keywords": [
     "ai",
     "language",

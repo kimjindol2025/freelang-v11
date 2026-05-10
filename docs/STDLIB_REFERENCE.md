@@ -1124,6 +1124,28 @@ Promise 대기.
 
 ---
 
+### `(file-read-or path default)` — v11.6.20
+파일 읽기. 파일이 없거나 오류 발생 시 기본값 반환.
+
+**파라미터**:
+- `path` (string) — 파일 경로
+- `default` (any) — 파일 없거나 오류 시 반환할 기본값
+
+**반환값**: 파일 내용 (문자열) 또는 `default`
+
+**예제**:
+```lisp
+(file-read-or "config.json" "{}")
+;; 파일 없으면 → "{}"
+
+(file-read-or ".env" nil)
+;; 오류 시 → nil
+```
+
+**비교**: `file-read`는 파일 없으면 에러 발생, `file-read-or`는 기본값 반환 (안전).
+
+---
+
 ## 보안 & 이스케이프 (v11.5.3)
 
 ### `(html-escape str)`
@@ -1564,6 +1586,41 @@ SQL 명령 실행 (INSERT, UPDATE, DELETE).
 
 ---
 
+### `(str-contains-in s pattern)` — v11.6.20
+`(str-contains pattern s)` 의 인자 순서 alias. `(s pattern)` 순서로 호출 가능.
+
+**파라미터**:
+- `s` (string) — 검색 대상 문자열
+- `pattern` (string) — 찾을 패턴
+
+**반환값**: boolean
+
+```lisp
+(str-contains-in "hello world" "world")  ;; → true
+(str-contains-in "hello world" "xyz")    ;; → false
+```
+
+**비교**: `(str-contains "world" "hello world")` — 기존 방식은 pattern 먼저.
+
+---
+
+### `(str-replace-in s old new)` — v11.6.20
+`(str-replace old new s)` 의 인자 순서 alias. `(s old new)` 순서로 호출 가능 (replaceAll).
+
+**파라미터**:
+- `s` (string) — 원본 문자열
+- `old` (string) — 찾을 문자열
+- `new` (string) — 대체 문자열
+
+**반환값**: 치환된 문자열
+
+```lisp
+(str-replace-in "a-b-c" "-" "_")  ;; → "a_b_c"
+(str-replace-in "hello world" "world" "AI")  ;; → "hello AI"
+```
+
+---
+
 ## 인증 함수 반환 타입 (LIR-003 명문화)
 
 ### `(auth-sha256 data)`
@@ -1851,6 +1908,112 @@ POST 요청 + 5xx/네트워크 오류 시 자동 재시도.
 ```lisp
 (shell-env "HOME")  ;; → "/root"
 ```
+
+---
+
+### `.env` 자동 로드 (v11.6.20+)
+
+인터프리터 초기화 시 `.env` 파일을 자동으로 파싱하여 환경변수로 주입.
+
+```bash
+# .env 파일 예시
+DATABASE_URL=localhost:3306
+API_KEY=my-secret-key
+PORT=3000
+```
+
+```lisp
+; .env 자동 로드 후 env-get으로 접근 가능
+(define db-url (env-or "DATABASE_URL" "localhost"))
+```
+
+**비활성화**: `FL_NO_AUTO_ENV=1` 환경변수 설정 시 자동 로드 건너뜀.
+
+---
+
+## 프로세스 & 쉘 (v11.6.20+)
+
+### `(shell-exec-stdout cmd)` — v11.6.20
+셸 명령을 실행하고 stdout 문자열을 직접 반환. 실패 시 `nil`.
+
+**파라미터**:
+- `cmd` (string) — 실행할 쉘 명령
+
+**반환값**: stdout 문자열, 실패/오류 시 `nil`
+
+```lisp
+(shell-exec-stdout "git log --oneline -3")
+;; → "abc1234 first commit\ndef5678 second commit\n..."
+
+(shell-exec-stdout "cat /nonexistent")
+;; → nil (오류 시)
+```
+
+**비교**: `shell-exec`는 `{:stdout :stderr :code :ok}` 구조체 반환. `shell-exec-stdout`는 stdout 문자열만 직접 반환.
+
+---
+
+## 빈값 체크 (v11.6.20+)
+
+### `(empty? x)` — v11.6.20
+배열, 문자열, 맵, nil 모두 빈값 체크. `(= arr [])` 참조 비교 버그 대체.
+
+**파라미터**:
+- `x` (any) — 검사할 값
+
+**반환값**: boolean
+
+```lisp
+(empty? [])          ;; → true
+(empty? "")          ;; → true
+(empty? {})          ;; → true
+(empty? nil)         ;; → true
+(empty? [1 2 3])     ;; → false
+(empty? "hello")     ;; → false
+```
+
+**비교**: `(= arr [])` 는 참조 비교라 빈 배열도 `false` 반환할 수 있음. `empty?` 사용 권장.
+
+---
+
+### `(array-empty? x)` — v11.6.20
+배열만 빈값 체크. 배열이 아닌 경우 `false`.
+
+**파라미터**:
+- `x` (any) — 검사할 값
+
+**반환값**: boolean
+
+```lisp
+(array-empty? [])        ;; → true
+(array-empty? [1 2 3])   ;; → false
+(array-empty? "")        ;; → false  (문자열은 false)
+(array-empty? nil)       ;; → false  (nil은 false)
+```
+
+---
+
+## 캐시 (v11.6.20+)
+
+### `(cache-set-ttl key val ttl)` — v11.6.20
+`cache-set` 의 `(key value ttl)` 순서 alias.
+
+**파라미터**:
+- `key` (string) — 캐시 키
+- `val` (any) — 캐시할 값
+- `ttl` (number) — 유효시간 (밀리초)
+
+**반환값**: nil
+
+```lisp
+(cache-set-ttl "user:123" $user 60000)
+;; 60초 TTL로 캐시
+
+(cache-set-ttl "rate-limit:ip" $count 1000)
+;; 1초 TTL
+```
+
+**비교**: `cache-set` 은 `(ttl key value)` 순서 (기존). `cache-set-ttl` 은 `(key value ttl)` 순서 (직관적).
 
 ---
 

@@ -1,5 +1,32 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.20] — 2026-05-10 (AGENT-2/3: stdlib 확장 + DB 안정화)
+
+### 신규 함수 (AGENT-2 — Safe Stdlib)
+| 함수 | 설명 |
+|------|------|
+| `file-read-or path default` | 파일 없거나 오류 시 기본값 반환 |
+| `shell-exec-stdout cmd` | 셸 실행 후 stdout 문자열 직접 반환, 실패 시 nil |
+| `empty? x` | 배열/문자열/맵/nil 모두 빈값 체크 (= arr [] 대체) |
+| `array-empty? x` | 배열만 빈값 체크 |
+| `str-contains-in s pattern` | (s pattern) 순서 alias |
+| `str-replace-in s old new` | (s old new) 순서 replaceAll alias |
+| `cache-set-ttl key val ttl` | (key value ttl) 순서 alias |
+
+### 언어 개선 (AGENT-2)
+- **`.env` 자동 로드**: 인터프리터 초기화 시 `.env` 자동 파싱. `FL_NO_AUTO_ENV=1`로 비활성화 가능
+
+### DB 안정화 (AGENT-3 — Database Hardening)
+| 항목 | 변경 |
+|------|------|
+| `mariadb-one` | 결과 없으면 항상 `nil` 반환 (undefined 제거) |
+| `db-exec` params | scalar 단일값 자동 배열 래핑: `"Kim"` → `["Kim"]` |
+| `db-query` params | 동일 패턴 적용 |
+
+Commit: 2a07ad7b | Tests: 903/903 | Semantics: 변경 없음
+
+---
+
 ## [11.5.3] - 2026-05-08
 
 **마일스톤**: CSRF/XSS 보안 강화 (5개 함수 추가)
