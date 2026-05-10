@@ -5,36 +5,38 @@
 
 ---
 
-## ⚡ 즉시 적용 필수 규칙
+## ⚡ 즉시 적용 규칙
 
-### Rule 1: $ 파라미터 접두사 (반드시 모든 변수에 붙일 것)
+### Rule 1: $ 접두사는 선택사항
 
-**가장 중요한 규칙** — 이것 하나만 지켜도 구문법 실수 99% 제거.
+`$`는 optional. 있어도 되고 없어도 된다. **둘 다 동작한다.**
 
 ```lisp
-;; ❌ 금지 (Clojure 혼동, Scheme처럼 봐야함)
+;; ✅ $ 없이 (권장 — 더 자연스러움)
 (defn add [a b] (+ a b))
 (fn [x] (* x 2))
-(let [[n (get req "name")]] (println n))
+(let [n (get req "name")] (println n))
 (loop [i 0] (recur (inc i)))
 
-;; ✅ 올바른 것 (v11 표준)
-(defn add [$a $b] (+ $a $b))
-(fn [$x] (* $x 2))
-(let [[$n (get $req "name")]] (println $n))
-(loop [$i 0] (recur (inc $i)))
-
-;; ✅ let 바인딩 예제 — 반드시 [[name value]] 쌍 + 모든 사용처에 $
-(let [[$user (get $req "user")]
-      [$token (auth-jwt-sign {:id (get $user "id")} "secret" 3600)]]
-  (str "Hello " $user ", token: " $token))
+;; ✅ $ 있어도 동작 (기존 코드 호환)
+(defn add [a b] (+ a b))
+(fn [x] (* x 2))
+(let [n (get req "name")] (println n))
+(loop [i 0] (recur (inc i)))
 ```
 
-**핵심**: 
-- 함수 파라미터: `(defn f [$a $b] ...)`
-- let 바인딩: `(let [[$x 10] [$y 20]] ...)`
-- 사용처: 항상 `$x`, `$y` (접두사 필수)
-- 예외: 문자열 키는 `$` 불필요 → `(get $req "name")`
+**let 바인딩**: 단일 괄호, 이중 괄호 둘 다 동작
+
+```lisp
+;; ✅ 단일 괄호 (더 자연스러움)
+(let [user (get req "user")
+      token (auth-jwt-sign {:id (get user "id")} "secret" 3600)]
+  (str "Hello " user))
+
+;; ✅ 이중 괄호도 동작 (기존 코드 호환)
+(let [user (get req "user")]
+  (str "Hello " user))
+```
 
 ---
 
@@ -43,15 +45,15 @@
 | 패턴 | 이유 | 올바른 것 |
 |------|------|----------|
 | `(def name "Kim")` | Clojure, v11은 define | `(define name "Kim")` |
-| `(defn [args] body)` | 함수명 생략 | `(defn fn-name [$arg] body)` |
-| `(count arr)` | JS, v11은 length | `(length $arr)` |
-| `(assoc m :k v)` | 키워드(:k), 다중 불가 | `(assoc $m "k" $v)` 또는 `{...k $v...}` |
-| `(merge a b)` | 없음, obj-merge 사용 | `(obj-merge $a $b)` |
-| `(map arr fn)` | 인자 순서 반대, fn 먼저 | `(map $fn $arr)` |
-| `(filter arr fn)` | 인자 순서 반대, fn 먼저 | `(filter $fn $arr)` |
-| `(server_listen port)` | 구버전, v11.5+ | `(server-start $port)` |
-| `(defn handler [req res] ...)` | res 없음 (HTTP 패턴) | `(defn handler [$req] ...)` 만 |
-| `(if-let [x expr] body)` | 구버전, v11.5+ | `(if-let [[$x $expr]] $body)` |
+| `(defn [args] body)` | 함수명 생략 | `(defn fn-name [arg] body)` |
+| `(count arr)` | JS, v11은 length | `(length arr)` |
+| `(assoc m :k v)` | 키워드(:k), 다중 불가 | `(assoc m "k" v)` |
+| `(merge a b)` | 없음, obj-merge 사용 | `(obj-merge a b)` |
+| `(map arr fn)` | 인자 순서 반대, fn 먼저 | `(map fn arr)` |
+| `(filter arr fn)` | 인자 순서 반대, fn 먼저 | `(filter fn arr)` |
+| `(server_listen port)` | 구버전, v11.5+ | `(server-start port)` |
+| `(defn handler [req res] ...)` | res 없음 (HTTP 패턴) | `(defn handler [req] ...)` 만 |
+| `(if-let [x expr] body)` | 구버전, v11.5+ | `(if-let [[x expr]] body)` |
 
 ---
 
@@ -73,44 +75,45 @@ true false nil          ;; 불린/nil
 ### 함수 정의 & 호출
 
 ```lisp
-;; 함수 정의 — 파라미터 반드시 [$a $b ...]
-(defn greet [$name]
-  (str "Hello, " $name))
+;; 함수 정의 — $ 없이 자연스럽게
+(defn greet [name]
+  (str "Hello, " name))
 
 ;; 함수 호출
 (greet "Alice")         ;; → "Hello, Alice"
 
 ;; 익명함수 (fn)
-(fn [$x] (* $x 2))
+(fn [x] (* x 2))
 
 ;; 조건부 (if)
-(if $condition
+(if condition
   "then branch"
   "else branch")
 
-;; 조건부 바인딩 (if-let) — if + let 합친 것
-(if-let [[$user (get $req "user")]]
-  (str "User: " $user)
+;; 조건부 바인딩 (if-let)
+(if-let [[user (get req "user")]]
+  (str "User: " user)
   "No user")
 
 ;; 루프 (loop/recur)
-(loop [$i 0 $sum 0]
-  (if (< $i 10)
-    (recur (inc $i) (+ $sum $i))
-    $sum))  ;; → 0+1+2+...+9 = 45
+(loop [i 0 sum 0]
+  (if (< i 10)
+    (recur (inc i) (+ sum i))
+    sum))  ;; → 0+1+2+...+9 = 45
 ```
 
 ### 문자열 보간 (triple-quote)
 
 ```lisp
 ;; 기본 보간
-(str "Hello, " $name)
+(str "Hello, " name)
 
 ;; 삼중따옴표 — HTML/JSON/JS 임베드 시 이스케이프 자동 처리 (v11.5+)
-(let [[$title "Welcome"] [$count 5]]
+(let [title "Welcome"
+      count 5]
   """
-  <h1>${$title}</h1>
-  <p>Count: ${$count}</p>
+  <h1>${title}</h1>
+  <p>Count: ${count}</p>
   """)
 ;; → HTML 문자열 직렬화, 이중 이스케이프 불필요
 ```
@@ -119,27 +122,27 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; 맵 생성
-(let [[$user {"name" "Alice" "age" 30}]]
+(let [user {"name" "Alice" "age" 30}]
   ...)
 
 ;; 값 추출
-(get $user "name")     ;; → "Alice"
-(get $user "missing")  ;; → nil
+(get user "name")     ;; → "Alice"
+(get user "missing")  ;; → nil
 
 ;; 기본값 포함
-(get $user "missing" "default-value")  ;; → "default-value"
+(get user "missing" "default-value")  ;; → "default-value"
 
 ;; 맵 갱신 (단일 키)
-(assoc $user "age" 31) ;; → {"name" "Alice" "age" 31}
+(assoc user "age" 31) ;; → {"name" "Alice" "age" 31}
 
 ;; 맵 병합
-(obj-merge $user {"email" "alice@example.com"})
+(obj-merge user {"email" "alice@example.com"})
 
 ;; 특정 키만 추출
-(obj-pick $user ["name" "email"])  ;; → {"name" "Alice" "email" "..."}
+(obj-pick user ["name" "email"])  ;; → {"name" "Alice" "email" "..."}
 
 ;; 특정 키 제외
-(obj-omit $user ["age"])  ;; → {"name" "Alice"}
+(obj-omit user ["age"])  ;; → {"name" "Alice"}
 ```
 
 ---
@@ -155,11 +158,11 @@ true false nil          ;; 불린/nil
 ;; 라우팅 정의
 (define routes {
   :get {
-    "/" (fn [$req] (handle-index $req))
-    "/api/users/:id" (fn [$req] (handle-user $req))
+    "/" (fn [req] (handle-index req))
+    "/api/users/:id" (fn [req] (handle-user req))
   }
   :post {
-    "/api/submit" (fn [$req] (handle-submit $req))
+    "/api/submit" (fn [req] (handle-submit req))
   }
 })
 
@@ -182,11 +185,11 @@ true false nil          ;; 불린/nil
 }
 
 ;; 접근 패턴
-(get $req "method")                   ;; → "GET"
-(get (get $req "query") "filter")     ;; → "active"
-(get (get $req "params") "id")        ;; → "123"
-(get (get $req "headers") "authorization")
-(get $req "body")                     ;; 이미 파싱된 맵 (JSON)
+(get req "method")                   ;; → "GET"
+(get (get req "query") "filter")     ;; → "active"
+(get (get req "params") "id")        ;; → "123"
+(get (get req "headers") "authorization")
+(get req "body")                     ;; 이미 파싱된 맵 (JSON)
 ```
 
 ### Response 패턴
@@ -208,8 +211,8 @@ true false nil          ;; 불린/nil
 (server-file "/path/to/file.pdf" "application/pdf")
 
 ;; 쿠키 설정 (v11.5.3+) — HttpOnly + Secure + SameSite 자동
-(let [[$cookie (server-set-cookie "session" "token123" {:max_age 3600})]]
-  (server-html-cookie "<h1>ok</h1>" $cookie))
+(let [cookie (server-set-cookie "session" "token123" {:max_age 3600})]
+  (server-html-cookie "<h1>ok</h1>" cookie))
 ```
 
 ---
@@ -229,23 +232,23 @@ true false nil          ;; 불린/nil
 })
 
 ;; 조회 (db-query)
-(let [[$result (db-query $db
+(let [[result (db-query db
         "SELECT * FROM users WHERE age > ?" 
         [25])]]
-  (println $result))  ;; → [{"id" 1 "name" "Alice"} ...]
+  (println result))  ;; → [{"id" 1 "name" "Alice"} ...]
 
 ;; 삽입 (db-exec)
-(db-exec $db
+(db-exec db
   "INSERT INTO users (name, age) VALUES (?, ?)"
   ["Bob" 30])
 
 ;; 갱신
-(db-exec $db
+(db-exec db
   "UPDATE users SET age = ? WHERE id = ?"
   [31 1])
 
 ;; 삭제
-(db-exec $db
+(db-exec db
   "DELETE FROM users WHERE id = ?"
   [1])
 ```
@@ -254,7 +257,7 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; SQLite 조회
-(let [[$result (db-query {:type "sqlite" :path "./local.db"}
+(let [[result (db-query {:type "sqlite" :path "./local.db"}
         "SELECT * FROM items"
         [])]]
   ...)
@@ -268,39 +271,39 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; ❌ 위험 — 사용자 입력이 그대로 HTML로
-(let [[$name (get $req-body "name")]]
-  (server-html (str "<h1>" $name "</h1>")))
+(let [name (get req-body "name")]
+  (server-html (str "<h1>" name "</h1>")))
 ;; 공격: name = "<script>alert(1)</script>" → 실행됨!
 
 ;; ✅ 안전 — html-escape로 이스케이프
-(let [[$name (get $req-body "name")]]
-  (server-html (str "<h1>" (html-escape $name) "</h1>")))
+(let [name (get req-body "name")]
+  (server-html (str "<h1>" (html-escape name) "</h1>")))
 ;; 결과: <h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1> → 문자열로 표시
 
 ;; JavaScript 문자열 안 이스케이프
-(let [[$msg (get $req-body "message")]]
-  (server-html (str "<script>console.log('" (js-escape $msg) "')</script>")))
+(let [msg (get req-body "message")]
+  (server-html (str "<script>console.log('" (js-escape msg) "')</script>")))
 ```
 
 ### CSRF 토큰 (60분 유효)
 
 ```lisp
 ;; 폼 페이지 생성
-(defn form-page [$req]
-  (let [[$token (auth-csrf-token "my-secret-key")]]
+(defn form-page [req]
+  (let [token (auth-csrf-token "my-secret-key")]
     (server-html (str """
       <form method="POST" action="/submit">
-        <input type="hidden" name="_csrf" value="${$token}">
+        <input type="hidden" name="_csrf" value="${token}">
         <input name="name" placeholder="이름">
         <button>제출</button>
       </form>
     """))))
 
 ;; POST 처리 — 토큰 검증
-(defn handle-submit [$req]
-  (let [[$body (get $req "body")]
-        [$token (get $body "_csrf")]]
-    (if (auth-csrf-verify $token "my-secret-key")
+(defn handle-submit [req]
+  (let [body (get req "body")
+      token (get body "_csrf")]
+    (if (auth-csrf-verify token "my-secret-key")
       (server-html "<p>성공</p>")
       (server-status 403 "CSRF 토큰 실패"))))
 ```
@@ -309,18 +312,18 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; 쿠키 생성 (HttpOnly + Secure + SameSite=Strict 자동)
-(let [[$c (server-set-cookie "session" "abc123xyz" {:max_age 7200})]]
-  (server-html-cookie "<h1>로그인 됨</h1>" $c))
+(let [c (server-set-cookie "session" "abc123xyz" {:max_age 7200})]
+  (server-html-cookie "<h1>로그인 됨</h1>" c))
 
 ;; 결과 Set-Cookie 헤더:
 ;; session=abc123xyz; Max-Age=7200; Path=/; HttpOnly; Secure; SameSite=Strict
 
 ;; 옵션 커스터마이징
-(let [[$c (server-set-cookie "auth" "token" {
+(let [c (server-set-cookie "auth" "token" {
   :max_age 86400
   :path "/app"
   :same_site "Lax"
-})]]
+})]
   ...)
 ```
 
@@ -332,21 +335,21 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; 토큰 생성 (1시간 유효)
-(let [[$token (auth-jwt-sign 
+(let [token (auth-jwt-sign 
         {:user_id 123 :role "admin"} 
         "secret-key"
-        3600)]]
-  $token)
+        3600)]
+  token)
 ;; → "eyJhbGc..." (3부 JWT)
 
 ;; 토큰 검증
-(let [[$payload (auth-jwt-verify $token "secret-key")]]
-  (if (nil? $payload)
+(let [payload (auth-jwt-verify token "secret-key")]
+  (if (nil? payload)
     (server-status 401 "Invalid token")
-    (str "User ID: " (get $payload "user_id"))))
+    (str "User ID: " (get payload "user_id"))))
 
 ;; 토큰 만료 확인
-(if (auth-jwt-expired $token)
+(if (auth-jwt-expired token)
   (server-status 401 "Token expired")
   "OK")
 ```
@@ -355,19 +358,19 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; 비밀번호 해싱 (신규: scrypt v2)
-(let [[$hash (auth-hash-password "mypassword123")]]
-  ;; 저장: "$scrypt$N=16384,r=8,p=1$..." (62자)
-  (db-exec $db "UPDATE users SET password_hash = ? WHERE id = ?" [$hash 1]))
+(let [hash (auth-hash-password "mypassword123")]
+  ;; 저장: "scryptN=16384,r=8,p=1$..." (62자)
+  (db-exec db "UPDATE users SET password_hash = ? WHERE id = ?" [hash 1]))
 
 ;; 비밀번호 검증 (v1/v2 자동 인식)
-(if (auth-verify-password "mypassword123" $stored_hash)
+(if (auth-verify-password "mypassword123" stored_hash)
   "로그인 성공"
   "비밀번호 불일치")
 
 ;; 재해싱 필요 여부 확인 (v1 → v2 마이그레이션)
-(if (auth-password-needs-rehash $stored_hash)
-  (let [[$new-hash (auth-hash-password $password)]]
-    (db-exec $db "UPDATE users SET password_hash = ? WHERE id = ?" [$new-hash $user_id])))
+(if (auth-password-needs-rehash stored_hash)
+  (let [new-hash (auth-hash-password password)]
+    (db-exec db "UPDATE users SET password_hash = ? WHERE id = ?" [new-hash user_id])))
 ```
 
 ---
@@ -413,10 +416,10 @@ true false nil          ;; 불린/nil
 ```lisp
 ;; 기본 형태
 (try
-  (let [[$result (db-query $db "SELECT ..." [])]]
-    (str "Results: " $result))
-  (catch $error
-    (str "Error: " (get $error "message")))
+  (let [[result (db-query db "SELECT ..." [])]]
+    (str "Results: " result))
+  (catch error
+    (str "Error: " (get error "message")))
   (finally
     (println "Cleanup")))
 
@@ -432,15 +435,15 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; 조건 실패 시 이전 값 유지
-(let [[$x (:if (> 5 3) "yes" "no")]]
-  (println $x))  ;; → "yes"
+(let [x (:if (> 5 3) "yes" "no")]
+  (println x))  ;; → "yes"
 
 ;; 중첩
-(:if $is-admin
-  (handle-admin $req)
-  (:if $is-user
-    (handle-user $req)
-    (handle-guest $req)))
+(:if is-admin
+  (handle-admin req)
+  (:if is-user
+    (handle-user req)
+    (handle-guest req)))
 ```
 
 ---
@@ -452,28 +455,28 @@ true false nil          ;; 불린/nil
 ```lisp
 (define routes {
   :post {
-    "/api/users" (fn [$req]
+    "/api/users" (fn [req]
       ;; 1. 요청 검증
-      (let [[$body (get $req "body")]
-            [$email (get $body "email")]
-            [$password (get $body "password")]]
+      (let [[body (get req "body")]
+            [email (get body "email")]
+            [password (get body "password")]]
         
         ;; 2. 이메일 존재 여부
-        (if (nil? $email)
+        (if (nil? email)
           (server-status 400 "Email required")
           
           ;; 3. 비밀번호 해싱
-          (let [[$hash (auth-hash-password $password)]
-                [$user_id (db-exec $db 
+          (let [[hash (auth-hash-password password)]
+                [user_id (db-exec db 
                   "INSERT INTO users (email, password_hash) VALUES (?, ?)"
-                  [$email $hash])]]
+                  [email hash])]]
             
             ;; 4. JWT 토큰 생성
-            (let [[$token (auth-jwt-sign {:user_id $user_id :email $email} "secret" 86400)]]
+            (let [token (auth-jwt-sign {:user_id user_id :email email} "secret" 86400)]
               
               ;; 5. 쿠키 설정
-              (let [[$cookie (server-set-cookie "auth" $token {:max_age 86400})]]
-                (server-json-cookie {"status" "created" "token" $token} $cookie)))))))
+              (let [cookie (server-set-cookie "auth" token {:max_age 86400})]
+                (server-json-cookie {"status" "created" "token" token} cookie)))))))
     }
   }
 })
@@ -482,15 +485,15 @@ true false nil          ;; 불린/nil
 ### 파일 업로드 + HTML 응답
 
 ```lisp
-(defn upload-page [$req]
+(defn upload-page [req]
   ;; HTML + CSS + JS 분리 (best practice)
-  (let [[$html (file-read "app/upload.html")]
-        [$css  (file-read "app/upload.css")]
-        [$js   (file-read "app/upload.js")]]
-    (server-html (html-inject $html {"css" $css "js" $js}))))
+  (let [[html (file-read "app/upload.html")]
+        [css  (file-read "app/upload.css")]
+        [js   (file-read "app/upload.js")]]
+    (server-html (html-inject html {"css" css "js" js}))))
 
 ;; helper: html-inject는 AKL 표준
-;; (html-inject $html {"css" "..." "js" "..."})
+;; (html-inject html {"css" "..." "js" "..."})
 ;;   → CSS는 </head> 전에, JS는 </body> 전에 주입
 ```
 
@@ -500,13 +503,14 @@ true false nil          ;; 불린/nil
 
 | 실수 | 원인 | 수정 |
 |------|------|------|
-| `(let [[x 10]] x)` → 5버전 이상 | 이중 대괄호 + $ 접두사 누락 | `(let [[$x 10]] $x)` |
-| `(defn f [a b])` 파라미터 | $ 접두사 생략 | `(defn f [$a $b] ...)` |
-| `(get body "key")` → body 정의 안 됨 | let 바인딩 변수에 $ 접두사 필수 | `(get $body "key")` |
+| `(defn f [])` 파라미터 없음 | 함수명 없이 정의 | `(defn f [a b] ...)` |
+| `(get body "key")` → body 미정의 | let 바인딩 빠짐 | `(let [body (get req "body")] ...)` |
 | `(server_listen 3000)` | 구버전 함수명 | `(server-start 3000)` |
-| `(server-html (str html css))` → 이중 이스케이프 | 문자열 자체를 이스케이프 | `(html-inject $html {"css" $css})` |
-| `(db-query db sql)` → 파라미터 배열 누락 | 바인드 변수 누락 | `(db-query $db "..." [$var1 $var2])` |
+| `(server-html (str html css))` → 이중 이스케이프 | 문자열 자체를 이스케이프 | `(html-inject html {"css" css})` |
+| `(db-query db sql)` → 파라미터 배열 누락 | 바인드 변수 누락 | `(db-query db "..." [var1 var2])` |
 | `(auth_jwt_sign ...)` 언더스코어 | 함수명은 kebab-case | `(auth-jwt-sign ...)` |
+
+**$ 없이도 완전히 동작** — `$`는 선택사항이며 생략해도 됩니다.
 
 ---
 
