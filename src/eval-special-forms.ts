@@ -1197,6 +1197,61 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return null;
   }
 
+  // ── case — (case expr val1 res1 val2 res2 ... default) ───────────
+  if (op === "case") {
+    if (expr.args.length === 0) return null;
+    const testVal = ev(expr.args[0]);
+    let i = 1;
+    while (i < expr.args.length - 1) {
+      const matchVal = ev(expr.args[i]);
+      if (testVal === matchVal) return ev(expr.args[i + 1]);
+      i += 2;
+    }
+    // 홀수개 남으면 기본값
+    if (i === expr.args.length - 1) return ev(expr.args[i]);
+    return null;
+  }
+
+  // ── for — (for [x coll :when pred] body) → array ─────────────────
+  if (op === "for") {
+    const bindingNode = expr.args[0] as any;
+    const items: any[] = bindingNode?.kind === "array"
+      ? bindingNode.items || []
+      : bindingNode?.fields?.get?.("items") || [];
+    if (items.length < 2) return [];
+    const bindName = (items[0] as any)?.name || (items[0] as any)?.value || "";
+    const coll = ev(items[1]);
+    if (!Array.isArray(coll)) return [];
+
+    // :when 필터 추출 (선택적)
+    let whenFn: any = null;
+    for (let wi = 2; wi < items.length - 1; wi++) {
+      const kw = (items[wi] as any)?.value || (items[wi] as any)?.name || "";
+      if (kw === ":when" || kw === "when") {
+        whenFn = items[wi + 1];
+        break;
+      }
+    }
+
+    const result: any[] = [];
+    for (const item of coll) {
+      interp.context.variables.push();
+      try {
+        interp.context.variables.set(bindName, item);
+        if (whenFn) {
+          const pass = ev(whenFn);
+          if (!pass && pass !== 0) { continue; }
+        }
+        let val: any = null;
+        for (let bi = 1; bi < expr.args.length; bi++) val = ev(expr.args[bi]);
+        result.push(val);
+      } finally {
+        interp.context.variables.pop();
+      }
+    }
+    return result;
+  }
+
   // ── and (short-circuit) ───────────────────────────────────────────
   if (op === "and") {
     let result: any = true;

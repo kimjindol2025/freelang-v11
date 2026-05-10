@@ -13792,7 +13792,7 @@ req.end();`;
     }
   }
   function evalBuiltin(interp2, op, args2, expr2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const normalizedOp2 = op.replace(/_/g, "-");
     if (normalizedOp2 !== op && op !== "server_start") {
       console.warn(`\u26A0\uFE0F  [FreeLang v11.5.1] ${op}\uC740 deprecated\uC785\uB2C8\uB2E4. ${normalizedOp2}\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.`);
@@ -14572,6 +14572,46 @@ loop().catch(e => {
         const s = String(args2[0] ?? "");
         return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x00/g, "\\0");
       }
+      case "h": {
+        const VOID_TAGS = /* @__PURE__ */ new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+        const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        const escText = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const tag = String(args2[0] ?? "div").toLowerCase();
+        let attrs = {};
+        let childStart = 1;
+        if (args2[1] !== null && args2[1] !== void 0 && typeof args2[1] === "object" && !Array.isArray(args2[1])) {
+          attrs = args2[1];
+          childStart = 2;
+        }
+        const attrStr = Object.entries(attrs).filter(([, v]) => v !== null && v !== void 0 && v !== false).map(([k, v]) => {
+          if (v === true) return ` ${k}`;
+          return ` ${k}="${escAttr(String(v))}"`;
+        }).join("");
+        if (VOID_TAGS.has(tag)) return `<${tag}${attrStr}>`;
+        const children = args2.slice(childStart).flat().filter((c) => c !== null && c !== void 0 && c !== false).map((c) => {
+          if (typeof c === "string") return c;
+          if (typeof c === "number" || typeof c === "boolean") return escText(String(c));
+          return String(c ?? "");
+        }).join("");
+        return `<${tag}${attrStr}>${children}</${tag}>`;
+      }
+      case "cx": {
+        return args2.flat().filter((c) => c !== null && c !== void 0 && c !== false && c !== "").map((c) => String(c).trim()).filter((c) => c.length > 0).join(" ");
+      }
+      case "for-html": {
+        if (!Array.isArray(args2[0])) return "";
+        return args2[0].map((item) => {
+          const result = callFnVal(args2[1], [item]);
+          return result !== null && result !== void 0 ? String(result) : "";
+        }).join("");
+      }
+      case "for-html-indexed": {
+        if (!Array.isArray(args2[0])) return "";
+        return args2[0].map((item, i) => {
+          const result = callFnVal(args2[1], [item, i]);
+          return result !== null && result !== void 0 ? String(result) : "";
+        }).join("");
+      }
       case "now":
         return (/* @__PURE__ */ new Date()).toISOString();
       case "server-uptime":
@@ -14663,15 +14703,23 @@ loop().catch(e => {
       case "function?":
       case "fn?": {
         const fv = args2[0];
-        return typeof fv === "function" || fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value");
+        return typeof fv === "function" || fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value" || fv.kind === "builtin-fn");
       }
       case "map?":
         return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
+      case "vector?":
+      case "array?":
+      case "list?":
+        return Array.isArray(args2[0]);
+      case "integer?":
+        return typeof args2[0] === "number" && Number.isInteger(args2[0]);
+      case "float?":
+        return typeof args2[0] === "number" && !Number.isInteger(args2[0]);
       case "num-to-str":
         return String(args2[0]);
       case "str-to-num": {
-        const _n2 = parseFloat(String(args2[0]));
-        return isNaN(_n2) ? null : _n2;
+        const _n = parseFloat(String(args2[0]));
+        return isNaN(_n) ? null : _n;
       }
       case "map-set":
         if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
@@ -14831,15 +14879,24 @@ loop().catch(e => {
         const cifn = args2[0], ciarr = Array.isArray(args2[1]) ? args2[1] : [];
         return ciarr.filter((x) => callFnVal(cifn, [x])).length;
       }
+      case "find-first": {
+        const fffn = args2[0], ffarr = Array.isArray(args2[1]) ? args2[1] : [];
+        const found = ffarr.find((x) => callFnVal(fffn, [x]));
+        return found !== void 0 ? found : null;
+      }
       case "max-by": {
         const mbfn = args2[0], mbarr = Array.isArray(args2[1]) ? args2[1] : [];
         if (mbarr.length === 0) return null;
-        return mbarr.reduce((best, x) => callFnVal(mbfn, [x]) > callFnVal(mbfn, [best]) ? x : best);
+        const mbIsField = typeof mbfn === "string" && mbarr[0] !== null && typeof mbarr[0] === "object";
+        const mbKey = mbIsField ? (x) => x !== null && typeof x === "object" ? x[mbfn] : null : (x) => callFnVal(mbfn, [x]);
+        return mbarr.reduce((best, x) => mbKey(x) > mbKey(best) ? x : best);
       }
       case "min-by": {
         const mnbfn = args2[0], mnbarr = Array.isArray(args2[1]) ? args2[1] : [];
         if (mnbarr.length === 0) return null;
-        return mnbarr.reduce((best, x) => callFnVal(mnbfn, [x]) < callFnVal(mnbfn, [best]) ? x : best);
+        const mnbIsField = typeof mnbfn === "string" && mnbarr[0] !== null && typeof mnbarr[0] === "object";
+        const mnbKey = mnbIsField ? (x) => x !== null && typeof x === "object" ? x[mnbfn] : null : (x) => callFnVal(mnbfn, [x]);
+        return mnbarr.reduce((best, x) => mnbKey(x) < mnbKey(best) ? x : best);
       }
       case "max-of": {
         const moarr = Array.isArray(args2[0]) ? args2[0] : args2;
@@ -15258,11 +15315,12 @@ loop().catch(e => {
         }
         if (!Array.isArray(args2[1])) return [];
         const keyFn = args2[0];
-        const callFn3 = (_e = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _e.bind(interp2);
-        if (!callFn3) return [...args2[1]];
-        return [...args2[1]].sort((a, b) => {
-          const ka = callFn3(keyFn, [a]);
-          const kb = callFn3(keyFn, [b]);
+        const sbArr = args2[1];
+        const sbIsField = typeof keyFn === "string" && sbArr.length > 0 && sbArr[0] !== null && typeof sbArr[0] === "object";
+        const sbExtract = sbIsField ? (x) => x !== null && typeof x === "object" ? x[keyFn] : null : (x) => callFnVal(keyFn, [x]);
+        return [...sbArr].sort((a, b) => {
+          const ka = sbExtract(a);
+          const kb = sbExtract(b);
           if (typeof ka === "number" && typeof kb === "number") return ka - kb;
           return String(ka).localeCompare(String(kb));
         });
@@ -15278,7 +15336,7 @@ loop().catch(e => {
         const a = Array.isArray(args2[1]) ? args2[1] : [];
         const b = Array.isArray(args2[2]) ? args2[2] : [];
         const len = Math.min(a.length, b.length);
-        const callFn22 = (_f = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _f.bind(interp2);
+        const callFn22 = (_e = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _e.bind(interp2);
         if (!callFn22) return [];
         return Array.from({ length: len }, (_, i) => callFn22(fn, [a[i], b[i]]));
       }
@@ -16576,13 +16634,13 @@ loop().catch(e => {
           const [problem, evalFn] = args2;
           const evaluate2 = (output) => Number(callFn2(evalFn, [output]));
           const result = globalCompetition.run(problem, evaluate2);
-          return ((_g = result.winner) == null ? void 0 : _g.agentId) ?? null;
+          return ((_f = result.winner) == null ? void 0 : _f.agentId) ?? null;
         }
         if (op === "compete-score") {
           const [problem, evalFn] = args2;
           const evaluate2 = (output) => Number(callFn2(evalFn, [output]));
           const result = globalCompetition.run(problem, evaluate2);
-          return ((_h = result.winner) == null ? void 0 : _h.score) ?? null;
+          return ((_g = result.winner) == null ? void 0 : _g.score) ?? null;
         }
         if (op === "compete-all") {
           const [problem, evalFn] = args2;
@@ -17252,7 +17310,7 @@ loop().catch(e => {
             const history2 = arg.get("history") ?? [];
             if (history2.length < 5) return false;
             const recent = history2.slice(-5);
-            const firstBest = recent[0] instanceof Map ? recent[0].get("best") : (_i = recent[0]) == null ? void 0 : _i.best;
+            const firstBest = recent[0] instanceof Map ? recent[0].get("best") : (_h = recent[0]) == null ? void 0 : _h.best;
             return recent.every((s) => {
               const b = s instanceof Map ? s.get("best") : s == null ? void 0 : s.best;
               return Math.abs(b - firstBest) < 1e-9;
@@ -17476,8 +17534,8 @@ loop().catch(e => {
           return /* @__PURE__ */ new Map([
             ["success", result.success],
             ["reason", result.reason ?? null],
-            ["previousId", ((_j = result.previous) == null ? void 0 : _j.id) ?? null],
-            ["restoredId", ((_k = result.restored) == null ? void 0 : _k.id) ?? null]
+            ["previousId", ((_i = result.previous) == null ? void 0 : _i.id) ?? null],
+            ["restoredId", ((_j = result.restored) == null ? void 0 : _j.id) ?? null]
           ]);
         }
         if (op === "version-prev") {
@@ -17485,8 +17543,8 @@ loop().catch(e => {
           return /* @__PURE__ */ new Map([
             ["success", result.success],
             ["reason", result.reason ?? null],
-            ["previousId", ((_l = result.previous) == null ? void 0 : _l.id) ?? null],
-            ["restoredId", ((_m = result.restored) == null ? void 0 : _m.id) ?? null]
+            ["previousId", ((_k = result.previous) == null ? void 0 : _k.id) ?? null],
+            ["restoredId", ((_l = result.restored) == null ? void 0 : _l.id) ?? null]
           ]);
         }
         if (op === "version-diff") {
@@ -17649,7 +17707,7 @@ loop().catch(e => {
               ["name", brResult.name],
               ["results", brResult.results.map(brToMap)],
               ["startTime", brResult.startTime.toISOString()],
-              ["endTime", ((_n = brResult.endTime) == null ? void 0 : _n.toISOString()) ?? ""],
+              ["endTime", ((_m = brResult.endTime) == null ? void 0 : _m.toISOString()) ?? ""],
               ["summary", /* @__PURE__ */ new Map([
                 ["total", brResult.summary.total],
                 ["fastest", brResult.summary.fastest ? brToMap(brResult.summary.fastest) : null],
@@ -19488,7 +19546,7 @@ ${cssVars.join(";\n")};
     );
   }
   function evalSpecialForm(interp2, op, expr2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const ev = (node) => interp2.eval(node);
     const callUser = (name, a) => interp2.callUserFunction(name, a);
     const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
@@ -20313,6 +20371,53 @@ ${cssVars.join(";\n")};
       }
       return null;
     }
+    if (op === "case") {
+      if (expr2.args.length === 0) return null;
+      const testVal = ev(expr2.args[0]);
+      let i = 1;
+      while (i < expr2.args.length - 1) {
+        const matchVal = ev(expr2.args[i]);
+        if (testVal === matchVal) return ev(expr2.args[i + 1]);
+        i += 2;
+      }
+      if (i === expr2.args.length - 1) return ev(expr2.args[i]);
+      return null;
+    }
+    if (op === "for") {
+      const bindingNode = expr2.args[0];
+      const items = (bindingNode == null ? void 0 : bindingNode.kind) === "array" ? bindingNode.items || [] : ((_s = (_r = bindingNode == null ? void 0 : bindingNode.fields) == null ? void 0 : _r.get) == null ? void 0 : _s.call(_r, "items")) || [];
+      if (items.length < 2) return [];
+      const bindName = ((_t = items[0]) == null ? void 0 : _t.name) || ((_u = items[0]) == null ? void 0 : _u.value) || "";
+      const coll = ev(items[1]);
+      if (!Array.isArray(coll)) return [];
+      let whenFn = null;
+      for (let wi = 2; wi < items.length - 1; wi++) {
+        const kw = ((_v = items[wi]) == null ? void 0 : _v.value) || ((_w = items[wi]) == null ? void 0 : _w.name) || "";
+        if (kw === ":when" || kw === "when") {
+          whenFn = items[wi + 1];
+          break;
+        }
+      }
+      const result = [];
+      for (const item of coll) {
+        interp2.context.variables.push();
+        try {
+          interp2.context.variables.set(bindName, item);
+          if (whenFn) {
+            const pass = ev(whenFn);
+            if (!pass && pass !== 0) {
+              continue;
+            }
+          }
+          let val = null;
+          for (let bi = 1; bi < expr2.args.length; bi++) val = ev(expr2.args[bi]);
+          result.push(val);
+        } finally {
+          interp2.context.variables.pop();
+        }
+      }
+      return result;
+    }
     if (op === "and") {
       let result = true;
       for (const arg of expr2.args) {
@@ -20333,7 +20438,7 @@ ${cssVars.join(";\n")};
       const arr = ev(expr2.args[0]);
       const paramNode = expr2.args[1];
       const bodyNode = expr2.args[2];
-      const items = paramNode.kind === "block" && paramNode.type === "Array" ? ((_s = (_r = paramNode.fields).get) == null ? void 0 : _s.call(_r, "items")) || [] : paramNode.kind === "array" ? paramNode.items || [] : [];
+      const items = paramNode.kind === "block" && paramNode.type === "Array" ? ((_y = (_x = paramNode.fields).get) == null ? void 0 : _y.call(_x, "items")) || [] : paramNode.kind === "array" ? paramNode.items || [] : [];
       const paramNames = items.map((item) => {
         if (item.kind === "variable") return item.name;
         if (item.kind === "literal") return "$" + item.value;
@@ -38773,7 +38878,7 @@ ${tail}` : "")
       const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
       const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
       const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-      const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate"]);
+      const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate"]);
       if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
       if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
       if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
