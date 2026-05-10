@@ -1628,8 +1628,11 @@ loop().catch(e => {
     case "array?":
       return Array.isArray(args[0]);
     case "function?":
-    case "fn?":
-      return typeof args[0] === "function";
+    case "fn?": {
+      const fv = args[0];
+      return typeof fv === "function"
+        || (fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value"));
+    }
     case "map?":
       return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]);
     case "num-to-str":
@@ -1649,7 +1652,10 @@ loop().catch(e => {
       return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].split(args[1]) : [];
     case "join":
     case "str-join":
-      return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
+      // (str-join arr sep) 또는 (str-join sep arr) 양방향 지원
+      if (Array.isArray(args[0])) return args[0].join(args[1] !== undefined ? String(args[1]) : "");
+      if (typeof args[0] === "string" && Array.isArray(args[1])) return args[1].join(args[0]);
+      return Array.isArray(args[0]) ? args[0].join("") : "";
     case "str-format": case "format": {
       // (str-format "%s has %d items, total %.2f" name count total)
       let fmt = String(args[0] ?? "");
@@ -2004,6 +2010,19 @@ loop().catch(e => {
       }
       return base;
     }
+    case "assoc-in": {
+      // (assoc-in obj [k1 k2 k3] val) → 중첩 맵을 불변으로 업데이트
+      if (!Array.isArray(args[1]) || args[1].length === 0) throw new Error(`assoc-in: 두 번째 인자는 비어있지 않은 키 배열이어야 합니다`);
+      const aiKeys = args[1];
+      const aiVal = args[2];
+      function aiSet(obj: any, keys: any[], val: any): any {
+        const k = typeof keys[0] === "string" && keys[0].startsWith(":") ? keys[0].slice(1) : String(keys[0]);
+        const base = (obj !== null && typeof obj === "object" && !Array.isArray(obj)) ? { ...obj } : {};
+        base[k] = keys.length === 1 ? val : aiSet(base[k], keys.slice(1), val);
+        return base;
+      }
+      return aiSet(args[0], aiKeys, aiVal);
+    }
     case "dissoc": {
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
         // 키 정규화: :key → "key" (LIR-002)
@@ -2052,6 +2071,35 @@ loop().catch(e => {
       }
       return result;
     }
+    case "select-keys": {
+      // (select-keys m [:a :b]) → {a: ..., b: ...}
+      if (!args[0] || !Array.isArray(args[1])) return {};
+      const result: Record<string, any> = {};
+      for (const k of args[1]) {
+        const key = k && typeof k === "object" && k.kind === "keyword" ? k.name
+          : typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (args[0][key] !== undefined) result[key] = args[0][key];
+      }
+      return result;
+    }
+    case "rename-keys": {
+      // (rename-keys m {:old-key :new-key}) → m with keys renamed
+      if (!args[0] || !args[1]) return { ...args[0] };
+      const result = { ...args[0] };
+      for (const [oldK, newK] of Object.entries(args[1])) {
+        const ok = typeof oldK === "string" && oldK.startsWith(":") ? oldK.slice(1) : oldK;
+        const nk = newK && typeof newK === "object" && (newK as any).kind === "keyword" ? (newK as any).name
+          : typeof newK === "string" && newK.startsWith(":") ? newK.slice(1) : String(newK);
+        if (result[ok] !== undefined) { result[nk] = result[ok]; delete result[ok]; }
+      }
+      return result;
+    }
+    case "str-index-of": case "str-index_of": {
+      if (typeof args[0] !== "string") return -1;
+      return args[0].indexOf(String(args[1] ?? ""), args[2] !== undefined ? Number(args[2]) : 0);
+    }
+    case "str-replace-all": case "str-replace":
+      return typeof args[0] === "string" ? args[0].split(String(args[1] ?? "")).join(String(args[2] ?? "")) : "";
     case "flatten": {
       if (!Array.isArray(args[0])) return [];
       const flatten = (arr: any[]): any[] => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
