@@ -356,5 +356,28 @@ export function createHttpModule() {
 
     // is_http_error status -> boolean
     "is_http_error": (status: number): boolean => status >= 400,
+
+    // http-get-data url -> parsed JSON data | nil  (#11 해결)
+    // http_get_json의 {status,data} 구조 없이 data만 직접 반환
+    "http-get-data": (url: string): any => {
+      const result = nodeHttpRequest(url, "GET");
+      if (!result.body) return null;
+      try { return JSON.parse(result.body); } catch { return null; }
+    },
+
+    // http-post-data url data -> parsed JSON data | nil  (#12 해결)
+    "http-post-data": (url: string, data: any): any => {
+      const body = typeof data === "string" ? data : JSON.stringify(data);
+      const result = nodeHttpRequest(url, "POST", { "Content-Type": "application/json" }, body);
+      if (!result.body) return null;
+      try { return JSON.parse(result.body); } catch { return null; }
+    },
+
+    // http-get-status url -> number  (#13 해결)
+    // GET 요청 후 status 코드만 반환
+    "http-get-status": (url: string): number => {
+      const result = nodeHttpRequest(url, "GET");
+      return result.status;
+    },
   };
 }

@@ -101,6 +101,22 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   // 에러
   "raise":            { correct: "error",        usage: '(error "메시지")' },
   "panic":            { correct: "error",        usage: '(error "메시지")' },
+  // 문자열 변환 (#str-to-int 오용)
+  "str-to-int":       { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  "str_to_int":       { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  "parse-int":        { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  "parseInt":         { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  // 맵 키 목록
+  "json_keys":        { correct: "keys",         usage: '(keys map)' },
+  "json-keys":        { correct: "keys",         usage: '(keys map)' },
+  "map-keys":         { correct: "keys",         usage: '(keys map)' },
+  "object-keys":      { correct: "keys",         usage: '(keys map)' },
+  // HTTP 데이터 추출 (#11/#12/#13)
+  "http-simple-get":  { correct: "http-get-data", usage: '(http-get-data url)' },
+  "http-fetch":       { correct: "http-get-data", usage: '(http-get-data url)' },
+  // 맵 병합 (#39)
+  "obj-merge":        { correct: "merge",        usage: '(merge map1 map2)' },
+  "obj_merge":        { correct: "merge",        usage: '(merge map1 map2)' },
 };
 
 export function suggestSimilar(name: string, candidates: string[]): string | null {
