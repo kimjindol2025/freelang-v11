@@ -675,7 +675,14 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
   const callUser = (name: string, a: any[]) => (interp as any).callUserFunction(name, a);
   const callFnVal = (fn: any, a: any[]) => {
-    if (typeof fn === "string") return (interp as any).callUserFunction(fn, a);
+    if (typeof fn === "string") {
+      try { return (interp as any).callUserFunction(fn, a); } catch (e: any) {
+        if (e?.message?.includes("찾을 수 없습니다") || e?.message?.includes("not found") || e?.message?.includes("Function not found")) {
+          return evalBuiltin(interp, fn, a, expr);
+        }
+        throw e;
+      }
+    }
     if (fn?.kind === "builtin-fn") return evalBuiltin(interp, fn.name, a, expr);
     if (fn?.kind === "function-value" || fn?.kind === "async-function-value") return (interp as any).callFunctionValue(fn, a);
     if (typeof fn?.body === "function") return fn.body(...a);  // native stdlib (inc, dec 등)
@@ -1401,12 +1408,7 @@ loop().catch(e => {
       const mapFn = args[0];
       if (args[1] === null || args[1] === undefined) throw new Error(`타입 불일치: map 대상이 nil — 배열 예상`);
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
-      if (typeof mapFn === "function") {
-        return mapArr.map((item: any) => mapFn(item));
-      } else if (mapFn && ((mapFn as any).kind === "function-value" || (mapFn as any).kind === "async-function-value")) {
-        return mapArr.map((item: any) => callFnVal(mapFn, [item]));
-      }
-      return mapArr;
+      return mapArr.map((item: any) => callFnVal(mapFn, [item]));
     }
 
     // Phase 7: Async functions
@@ -1577,6 +1579,15 @@ loop().catch(e => {
       if (typeof v === "object") return Object.keys(v).length === 0;
       return false;
     }
+    case "not-empty?": {
+      // (not-empty? v) — empty?의 반대
+      const v = args[0];
+      if (v === null || v === undefined) return false;
+      if (typeof v === "string") return v.length > 0;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === "object") return Object.keys(v).length > 0;
+      return true;
+    }
     case "has-key?": {
       const obj = args[0], key = args[1];
       if (obj === null || obj === undefined || typeof obj !== "object" || Array.isArray(obj)) return false;
@@ -1655,12 +1666,13 @@ loop().catch(e => {
       if (typeof args[0] === "string" && Array.isArray(args[1])) return args[1].join(args[0]);
       return Array.isArray(args[0]) ? args[0].join("") : "";
     case "str-format": case "format": {
-      // (str-format "%s has %d items, total %.2f" name count total)
+      // (str-format "%s has %d items" name count) 또는 (str-format "%s has %d" [name count])
       let fmt = String(args[0] ?? "");
-      let i = 1;
+      const fmtArgs = (args.length === 2 && Array.isArray(args[1])) ? args[1] : args.slice(1);
+      let i = 0;
       return fmt.replace(/%(-?\d*\.?\d*)([sdfoexX%])/g, (_m, spec, t) => {
         if (t === "%") return "%";
-        const v = args[i++];
+        const v = fmtArgs[i++];
         if (t === "d") return String(Math.trunc(Number(v)));
         if (t === "f") {
           const prec = spec.includes(".") ? parseInt(spec.split(".")[1]) : 6;
@@ -1720,11 +1732,7 @@ loop().catch(e => {
       const coll = args[1];
       if (coll === null || coll === undefined) throw new Error(`타입 불일치: filter 대상이 nil — 배열 예상`);
       if (!Array.isArray(coll)) return [];
-      if (typeof filterFn === "function") return coll.filter((item: any) => filterFn(item));
-      if (filterFn && (filterFn as any).kind === "function-value") {
-        return coll.filter((item: any) => callFnVal(filterFn, [item]));
-      }
-      return coll;
+      return coll.filter((item: any) => callFnVal(filterFn, [item]));
     }
     case "find": {
       // (find arr fn-or-value) — arr-first; fn → element, value → index
@@ -1738,6 +1746,8 @@ loop().catch(e => {
     }
     case "last":
       return Array.isArray(args[0]) && args[0].length > 0 ? args[0][args[0].length - 1] : null;
+    case "butlast":
+      return Array.isArray(args[0]) && args[0].length > 1 ? args[0].slice(0, -1) : [];
     // Phase C: nil-safe wrapper들
     case "first-or": case "first_or":
       return Array.isArray(args[0]) && args[0].length > 0 && args[0][0] !== undefined
@@ -2074,6 +2084,39 @@ loop().catch(e => {
       if (args.length === 0) return {};
       return Object.assign({}, ...args.filter((a: any) => a && typeof a === "object" && !Array.isArray(a)));
     }
+    case "merge-with": {
+      // (merge-with fn m1 m2) — 키 충돌 시 fn(v1 v2)로 합산
+      const fn = args[0];
+      const maps = args.slice(1).filter((a: any) => a && typeof a === "object" && !Array.isArray(a));
+      if (maps.length === 0) return {};
+      const result: any = { ...maps[0] };
+      for (let mi = 1; mi < maps.length; mi++) {
+        for (const [k, v] of Object.entries(maps[mi])) {
+          result[k] = k in result ? callFnVal(fn, [result[k], v]) : v;
+        }
+      }
+      return result;
+    }
+    case "into": {
+      // (into target coll) — coll의 모든 요소를 target에 합침
+      const target = args[0];
+      const coll = args[1];
+      if (Array.isArray(target)) {
+        return Array.isArray(coll) ? [...target, ...coll] : target;
+      }
+      if (target && typeof target === "object" && !Array.isArray(target)) {
+        if (Array.isArray(coll)) {
+          const res = { ...target };
+          for (const item of coll) {
+            if (Array.isArray(item) && item.length === 2) res[String(item[0])] = item[1];
+            else if (item && typeof item === "object") Object.assign(res, item);
+          }
+          return res;
+        }
+        return target;
+      }
+      return coll ?? target;
+    }
     case "obj-pick": case "obj_pick": case "pick": {
       // (obj-pick m ["k1" "k2"]) — 지정 키만 추출
       if (!args[0] || !Array.isArray(args[1])) return {};
@@ -2133,8 +2176,9 @@ loop().catch(e => {
       if (!Array.isArray(args[1])) throw new Error(`every?: 두 번째 인자는 배열이어야 합니다`);
       return args[1].every((item: any) => callFnVal(args[0], [item]));
     }
-    case "some?": case "some": {
-      if (!Array.isArray(args[1])) throw new Error(`some?: 두 번째 인자는 배열이어야 합니다`);
+    case "any?": case "any": {
+      // (any? pred coll) — 하나라도 만족하면 첫 매칭값 반환, 없으면 nil (some?은 not-nil? 별칭이므로 충돌 회피)
+      if (!Array.isArray(args[1])) throw new Error(`any?: 두 번째 인자는 배열이어야 합니다`);
       const found = args[1].find((item: any) => callFnVal(args[0], [item]));
       return found !== undefined ? found : null;
     }
