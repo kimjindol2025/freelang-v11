@@ -159,10 +159,26 @@ function flGetParamNames(paramsNode: any): string[] {
 function flExecOpNative(op: string, vals: any[]): any {
   const v0 = vals[0], v1 = vals[1], v2 = vals[2];
   switch (normalizedOp) {
-    case "+": return vals.reduce((a: number, b: number) => a + b, 0);
-    case "-": return vals.length === 1 ? -v0 : vals.reduce((a: number, b: number) => a - b);
-    case "*": return vals.reduce((a: number, b: number) => a * b, 1);
-    case "/": return vals.length === 1 ? 1 / v0 : vals.reduce((a: number, b: number) => a / b);
+    case "+": {
+      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
+      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      return vals.reduce((a: number, b: number) => a + b, 0);
+    }
+    case "-": {
+      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
+      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      return vals.length === 1 ? -v0 : vals.reduce((a: number, b: number) => a - b);
+    }
+    case "*": {
+      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
+      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      return vals.reduce((a: number, b: number) => a * b, 1);
+    }
+    case "/": {
+      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
+      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      return vals.length === 1 ? 1 / v0 : vals.reduce((a: number, b: number) => a / b);
+    }
     case "%": return v0 % v1;
     case "=": {
       const n0 = v0 === null || v0 === undefined;
@@ -1017,14 +1033,26 @@ loop().catch(e => {
     }
 
     // Arithmetic
-    case "+":
+    case "+": {
+      const ni = args.findIndex((v: any) => v === null || v === undefined);
+      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
       return args.reduce((a: number, b: number) => a + b, 0);
-    case "-":
+    }
+    case "-": {
+      const ni = args.findIndex((v: any) => v === null || v === undefined);
+      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
       return args.length === 1 ? -args[0] : args.reduce((a: number, b: number) => a - b);
-    case "*":
+    }
+    case "*": {
+      const ni = args.findIndex((v: any) => v === null || v === undefined);
+      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
       return args.reduce((a: number, b: number) => a * b, 1);
-    case "/":
+    }
+    case "/": {
+      const ni = args.findIndex((v: any) => v === null || v === undefined);
+      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
       return args.length === 1 ? 1 / args[0] : args.reduce((a: number, b: number) => a / b);
+    }
     case "%":
       return args[0] % args[1];
 
@@ -1351,6 +1379,7 @@ loop().catch(e => {
         }
       }
       const mapFn = args[0];
+      if (args[1] === null || args[1] === undefined) throw new Error(`타입 불일치: map 대상이 nil — 배열 예상`);
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
       if (typeof mapFn === "function") {
         return mapArr.map(mapFn);
@@ -1642,6 +1671,7 @@ loop().catch(e => {
       // fn-first 고정: (filter fn arr)
       const filterFn = args[0];
       const coll = args[1];
+      if (coll === null || coll === undefined) throw new Error(`타입 불일치: filter 대상이 nil — 배열 예상`);
       if (!Array.isArray(coll)) return [];
       if (typeof filterFn === "function") return coll.filter(filterFn);
       if (filterFn && (filterFn as any).kind === "function-value") {
