@@ -21504,16 +21504,17 @@ Test Results: ${r.passed}/${total} passed`);
       },
       // error_type err -> string (get error type/name)
       "error_type": (err4) => {
-        if (err4 instanceof Error) {
-          return err4.constructor.name;
-        }
-        if (typeof err4 === "string") {
-          return "string";
-        }
         if (err4 && typeof err4 === "object" && err4.type) {
           return String(err4.type);
         }
-        return typeof err4;
+        if (err4 instanceof Error) {
+          const name = err4.constructor.name;
+          return name === "Error" ? "RuntimeError" : name;
+        }
+        if (typeof err4 === "string") {
+          return "RuntimeError";
+        }
+        return "RuntimeError";
       },
       // is_error value -> boolean (check if value is an error)
       "is_error": (value) => {
@@ -35810,6 +35811,7 @@ ${exportsStr}
     throw new Error("Pattern match exhausted without matching case");
   }
   function evalTryBlock(interp2, tryBlock) {
+    var _a;
     let result;
     try {
       result = interp2.eval(tryBlock.body);
@@ -35820,40 +35822,58 @@ ${exportsStr}
         for (const catchClause of tryBlock.catchClauses) {
           interp2.context.variables.push();
           if (catchClause.variable) {
-            const errMap = /* @__PURE__ */ new Map();
+            const errObj = {};
             if (typeof error === "string") {
-              errMap.set("message", error);
+              errObj["message"] = error;
+              errObj["type"] = "RuntimeError";
             } else if (error instanceof Error) {
-              errMap.set("message", error.message);
+              let rawMessage = error.message;
+              const flLineMatch = rawMessage.match(/^FreeLang line \d+:\s*/);
+              if (flLineMatch) rawMessage = rawMessage.slice(flLineMatch[0].length);
+              const flOpAtMatch = rawMessage.match(/^\[[^\]]+\]\s*(.*?)(?:\s*\(at line \d+.*)?$/s);
+              if (flOpAtMatch) rawMessage = flOpAtMatch[1].trim();
+              else {
+                const atLineMatch = rawMessage.match(/^(.*?)\s*\(at line \d+/s);
+                if (atLineMatch) rawMessage = atLineMatch[1].trim();
+              }
+              errObj["message"] = rawMessage || error.message;
+              const ctorName = ((_a = error.constructor) == null ? void 0 : _a.name) ?? "RuntimeError";
+              errObj["type"] = ctorName === "Error" ? "RuntimeError" : ctorName;
               const lineMatch = error.message.match(/\(at line (\d+)/);
-              if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
+              if (lineMatch) errObj["line"] = parseInt(lineMatch[1], 10);
               const flErr = error;
-              if (flErr.file) errMap.set("file", flErr.file);
+              if (flErr.file) errObj["file"] = flErr.file;
               const code = flErr.code ?? null;
-              if (code) errMap.set("code", code);
-              if (flErr.hint) errMap.set("hint", flErr.hint);
+              if (code) errObj["code"] = code;
+              if (flErr.hint) errObj["hint"] = flErr.hint;
+              if (error.stack) errObj["stack"] = error.stack;
               const CODE_TO_CATEGORY = {
-                "E_TYPE_NIL": "TYPE_ERROR",
-                "E_TYPE_MISMATCH": "TYPE_ERROR",
-                "E_ARG_COUNT": "ARITY",
-                "E_FN_NOT_FOUND": "NOT_FOUND",
-                "E_UNDEFINED_VAR": "NOT_FOUND",
-                "E_UNRESOLVED_SYMBOL": "NOT_FOUND",
-                "E_DIV_BY_ZERO": "RUNTIME_ERROR",
-                "E_INDEX_OOB": "RUNTIME_ERROR",
-                "E_INVALID_FORM": "RUNTIME_ERROR",
-                "E_PURE_VIOLATION": "RUNTIME_ERROR",
-                "E_STACK_OVERFLOW": "RUNTIME_ERROR",
-                "E_RUNTIME": "RUNTIME_ERROR"
+                "E_TYPE_NIL": "TypeError",
+                "E_TYPE_MISMATCH": "TypeError",
+                "E_ARG_COUNT": "ArityError",
+                "E_FN_NOT_FOUND": "ReferenceError",
+                "E_UNDEFINED_VAR": "ReferenceError",
+                "E_UNRESOLVED_SYMBOL": "ReferenceError",
+                "E_DIV_BY_ZERO": "RuntimeError",
+                "E_INDEX_OOB": "RuntimeError",
+                "E_INVALID_FORM": "RuntimeError",
+                "E_PURE_VIOLATION": "RuntimeError",
+                "E_STACK_OVERFLOW": "RuntimeError",
+                "E_RUNTIME": "RuntimeError"
               };
-              const category = flErr.category ?? (code ? CODE_TO_CATEGORY[code] : null) ?? "RUNTIME_ERROR";
-              errMap.set("category", category);
-              errMap.set("type", category);
+              if (flErr.category || code) {
+                errObj["type"] = (code ? CODE_TO_CATEGORY[code] : null) ?? flErr.category ?? "RuntimeError";
+              }
+            } else if (error && typeof error === "object") {
+              errObj["message"] = error.message ?? String(error);
+              errObj["type"] = error.type ?? "RuntimeError";
+              if (error.stack) errObj["stack"] = error.stack;
             } else {
-              errMap.set("message", String(error));
+              errObj["message"] = String(error);
+              errObj["type"] = "RuntimeError";
             }
-            errMap.set("raw", error);
-            interp2.context.variables.set("$" + catchClause.variable, errMap);
+            errObj["raw"] = error;
+            interp2.context.variables.set("$" + catchClause.variable, errObj);
           }
           try {
             result = interp2.eval(catchClause.handler);

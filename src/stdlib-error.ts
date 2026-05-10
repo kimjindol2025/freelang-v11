@@ -23,16 +23,18 @@ export function createErrorModule() {
 
     // error_type err -> string (get error type/name)
     "error_type": (err: any): string => {
-      if (err instanceof Error) {
-        return err.constructor.name;
-      }
-      if (typeof err === "string") {
-        return "string";
-      }
+      // FreeLang error object (plain JS object with type field)
       if (err && typeof err === "object" && err.type) {
         return String(err.type);
       }
-      return typeof err;
+      if (err instanceof Error) {
+        const name = err.constructor.name;
+        return name === "Error" ? "RuntimeError" : name;
+      }
+      if (typeof err === "string") {
+        return "RuntimeError";
+      }
+      return "RuntimeError";
     },
 
     // is_error value -> boolean (check if value is an error)

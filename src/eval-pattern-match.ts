@@ -71,45 +71,68 @@ export function evalTryBlock(interp: InterpreterLike, tryBlock: TryBlock): any {
       for (const catchClause of tryBlock.catchClauses) {
         interp.context.variables.push();
         if (catchClause.variable) {
-          const errMap = new Map<string, any>();
+          // FreeLang error object: 일반 JS 객체로 wrapping (get/assoc 등이 바로 접근 가능)
+          const errObj: Record<string, any> = {};
           if (typeof error === "string") {
-            errMap.set("message", error);
+            errObj["message"] = error;
+            errObj["type"] = "RuntimeError";
           } else if (error instanceof Error) {
-            errMap.set("message", error.message);
+            // FreeLang이 에러 메시지를 형식화한 경우 원본 메시지 추출
+            // 형식 1: "[op] original (at line N, col M)"
+            // 형식 2: "FreeLang line N: original"
+            let rawMessage = error.message;
+            const flLineMatch = rawMessage.match(/^FreeLang line \d+:\s*/);
+            if (flLineMatch) rawMessage = rawMessage.slice(flLineMatch[0].length);
+            const flOpAtMatch = rawMessage.match(/^\[[^\]]+\]\s*(.*?)(?:\s*\(at line \d+.*)?$/s);
+            if (flOpAtMatch) rawMessage = flOpAtMatch[1].trim();
+            else {
+              const atLineMatch = rawMessage.match(/^(.*?)\s*\(at line \d+/s);
+              if (atLineMatch) rawMessage = atLineMatch[1].trim();
+            }
+            errObj["message"] = rawMessage || error.message;
+            // constructor 이름이 "Error"이면 "RuntimeError"로 정규화
+            const ctorName = error.constructor?.name ?? "RuntimeError";
+            errObj["type"] = ctorName === "Error" ? "RuntimeError" : ctorName;
             // Extract line number from FL error messages like "(at line N, col M)"
             const lineMatch = error.message.match(/\(at line (\d+)/);
-            if (lineMatch) errMap.set("line", parseInt(lineMatch[1], 10));
+            if (lineMatch) errObj["line"] = parseInt(lineMatch[1], 10);
             // Extract FLRuntimeError fields
             const flErr = error as any;
-            if (flErr.file) errMap.set("file", flErr.file);
+            if (flErr.file) errObj["file"] = flErr.file;
             const code = flErr.code ?? null;
-            if (code) errMap.set("code", code);
-            if (flErr.hint) errMap.set("hint", flErr.hint);
+            if (code) errObj["code"] = code;
+            if (flErr.hint) errObj["hint"] = flErr.hint;
+            // stack (optional)
+            if (error.stack) errObj["stack"] = error.stack;
             // category: code -> category direct map (no message inference)
             const CODE_TO_CATEGORY: Record<string, string> = {
-              "E_TYPE_NIL":          "TYPE_ERROR",
-              "E_TYPE_MISMATCH":     "TYPE_ERROR",
-              "E_ARG_COUNT":         "ARITY",
-              "E_FN_NOT_FOUND":      "NOT_FOUND",
-              "E_UNDEFINED_VAR":     "NOT_FOUND",
-              "E_UNRESOLVED_SYMBOL": "NOT_FOUND",
-              "E_DIV_BY_ZERO":       "RUNTIME_ERROR",
-              "E_INDEX_OOB":         "RUNTIME_ERROR",
-              "E_INVALID_FORM":      "RUNTIME_ERROR",
-              "E_PURE_VIOLATION":    "RUNTIME_ERROR",
-              "E_STACK_OVERFLOW":    "RUNTIME_ERROR",
-              "E_RUNTIME":           "RUNTIME_ERROR",
+              "E_TYPE_NIL":          "TypeError",
+              "E_TYPE_MISMATCH":     "TypeError",
+              "E_ARG_COUNT":         "ArityError",
+              "E_FN_NOT_FOUND":      "ReferenceError",
+              "E_UNDEFINED_VAR":     "ReferenceError",
+              "E_UNRESOLVED_SYMBOL": "ReferenceError",
+              "E_DIV_BY_ZERO":       "RuntimeError",
+              "E_INDEX_OOB":         "RuntimeError",
+              "E_INVALID_FORM":      "RuntimeError",
+              "E_PURE_VIOLATION":    "RuntimeError",
+              "E_STACK_OVERFLOW":    "RuntimeError",
+              "E_RUNTIME":           "RuntimeError",
             };
-            const category = flErr.category
-              ?? (code ? CODE_TO_CATEGORY[code] : null)
-              ?? "RUNTIME_ERROR";
-            errMap.set("category", category);
-            errMap.set("type", category);
+            if (flErr.category || code) {
+              errObj["type"] = (code ? CODE_TO_CATEGORY[code] : null) ?? flErr.category ?? "RuntimeError";
+            }
+          } else if (error && typeof error === "object") {
+            // Already a FreeLang error map — pass through
+            errObj["message"] = error.message ?? String(error);
+            errObj["type"] = error.type ?? "RuntimeError";
+            if (error.stack) errObj["stack"] = error.stack;
           } else {
-            errMap.set("message", String(error));
+            errObj["message"] = String(error);
+            errObj["type"] = "RuntimeError";
           }
-          errMap.set("raw", error);
-          interp.context.variables.set("$" + catchClause.variable, errMap);
+          errObj["raw"] = error;
+          interp.context.variables.set("$" + catchClause.variable, errObj);
         }
 
         try {
