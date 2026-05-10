@@ -1158,8 +1158,11 @@ loop().catch(e => {
       return args[0]?.toString().toUpperCase();
     case "lower":
       return args[0]?.toString().toLowerCase();
-    case "length":
-      return args[0]?.length || 0;
+    case "length": case "count":
+      return Array.isArray(args[0]) ? args[0].length
+        : typeof args[0] === "string" ? args[0].length
+        : (args[0] !== null && typeof args[0] === "object") ? Object.keys(args[0]).length
+        : 0;
 
     // Phase MongoDB: to-hex (number → 2-digit hex string)
     case "to-hex": {

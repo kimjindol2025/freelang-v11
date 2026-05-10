@@ -118,7 +118,6 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "obj-merge":        { correct: "merge",        usage: '(merge map1 map2)' },
   "obj_merge":        { correct: "merge",        usage: '(merge map1 map2)' },
   // 배열 길이 (#42)
-  "count":            { correct: "length",        usage: '(length arr)' },
   "size":             { correct: "length",        usage: '(length arr)' },
   // 문자열 분리 (#43)
   "split":            { correct: "str-split",     usage: '(str-split "a,b" ",")' },
