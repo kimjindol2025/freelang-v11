@@ -1,0 +1,222 @@
+;; ─────────────────────────────────────────────────────────────
+;; FreeLang CSV 분석 도구 v2
+;;
+;; 환경변수:
+;;   CSV_FILE     파일 경로 (기본: employees.csv)
+;;   CSV_LIMIT    미리보기 행 수 (기본: 5)
+;;   CSV_FILTER   "컬럼=값" 형식으로 필터 (예: dept=개발)
+;;   CSV_SORT     정렬 컬럼 (예: salary)
+;;   CSV_SORT_ASC "1"이면 오름차순, 기본 내림차순
+;;   CSV_OUTPUT   결과 CSV 저장 경로 (선택)
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 숫자 헬퍼 (설정 로드 전 필요) ──────────────────────────
+(defn to-num [s] (?? (str-to-num s) 0))
+
+;; ── 설정 로드 ────────────────────────────────────────────────
+(define CSV_FILE    (?? (shell-env "CSV_FILE")    "employees.csv"))
+(define CSV_LIMIT   (to-num (?? (shell-env "CSV_LIMIT") "5")))
+(define CSV_FILTER  (shell-env "CSV_FILTER"))
+(define CSV_SORT    (shell-env "CSV_SORT"))
+(define CSV_SORT_ASC (= (shell-env "CSV_SORT_ASC") "1"))
+(define CSV_OUTPUT  (shell-env "CSV_OUTPUT"))
+
+;; ── 표시 폭 계산 (한글/CJK = 2칸) ──────────────────────────
+(defn display-width [s]
+  (let [chars (str-split (str s) "")]
+    (sum (map (fn [c]
+                (let [code (char-code c)]
+                  (if (or (and (>= code 0x1100) (<= code 0xFFFF))
+                          (>= code 0x20000))
+                    2
+                    1)))
+              chars))))
+
+(defn pad-display [s width]
+  (let [text (str (?? s ""))
+        dw   (display-width text)
+        cut  (- width 1)]
+    (if (> dw width)
+      (str (str-slice text 0 cut) "…")
+      (str text (str-repeat " " (max 0 (- width dw)))))))
+
+;; ── CSV 파싱 ────────────────────────────────────────────────
+(defn parse-csv [text]
+  (let [lines  (filter (fn [l] (not (str-blank? l)))
+                       (str-split text "\n"))
+        header (str-split (first lines) ",")
+        rows   (map (fn [line]
+                      (let [vals (str-split line ",")]
+                        (reduce
+                          (fn [acc i]
+                            (assoc acc (nth header i) (nth vals i)))
+                          {}
+                          (range (length header)))))
+                    (rest lines))]
+    {:header header :rows rows}))
+
+;; ── 필터 파싱 ────────────────────────────────────────────────
+(defn parse-filter [filter-str]
+  (if (str-blank? filter-str)
+    nil
+    (let [parts (str-split filter-str "=" 2)]
+      (if (= (length parts) 2)
+        {:col (first parts) :val (second parts)}
+        nil))))
+
+(defn apply-filter [rows flt]
+  (if (nil? flt)
+    rows
+    (filter (fn [row]
+              (= (get row (get flt "col")) (get flt "val")))
+            rows)))
+
+;; ── 정렬 ────────────────────────────────────────────────────
+(defn apply-sort [rows col asc?]
+  (if (str-blank? col)
+    rows
+    (let [num-col? (str-to-num (get (first rows) col))
+          keyfn    (if num-col?
+                     (fn [r] (to-num (get r col)))
+                     (fn [r] (?? (get r col) "")))]
+      (if asc?
+        (sort-by keyfn rows)
+        (sort-by (fn [r] (- (to-num (get r col)))) rows)))))
+
+;; ── 테이블 출력 ──────────────────────────────────────────────
+(defn col-widths [header rows]
+  (map (fn [col]
+         (max 10
+              (+ (display-width col) 2)
+              (reduce (fn [m row]
+                        (max m (+ (display-width (str (get row col))) 1)))
+                      0
+                      (take 20 rows))))
+       header))
+
+(defn print-table [header rows]
+  (let [widths (col-widths header rows)]
+    (println (str-join
+               (map (fn [i] (pad-display (nth header i) (nth widths i)))
+                    (range (length header)))
+               " "))
+    (println (str-join
+               (map (fn [w] (str-repeat "─" w)) widths)
+               " "))
+    (doseq [row rows]
+      (println (str-join
+                 (map (fn [i] (pad-display (get row (nth header i)) (nth widths i)))
+                      (range (length header)))
+                 " ")))))
+
+;; ── 통계 ────────────────────────────────────────────────────
+(defn numeric-stats [rows col]
+  (let [vals (filter (fn [v] (not (nil? v)))
+                     (map (fn [r] (str-to-num (get r col))) rows))]
+    (when (not (empty? vals))
+      {:min   (apply min vals)
+       :max   (apply max vals)
+       :avg   (average vals)
+       :sum   (sum vals)
+       :count (length vals)})))
+
+;; ── 구분선 ──────────────────────────────────────────────────
+(defn hr [] (println (str-repeat "─" 62)))
+
+;; ── CSV 내보내기 ─────────────────────────────────────────────
+(defn export-csv [header rows path]
+  (let [lines (into
+                [(str-join header ",")]
+                (map (fn [row]
+                       (str-join (map (fn [col] (?? (get row col) "")) header) ","))
+                     rows))]
+    (file-write path (str-join lines "\n"))
+    (println (str-format "  💾 %d행 저장됨 → %s" [(length rows) path]))))
+
+;; ── 빈도 바 차트 ─────────────────────────────────────────────
+(defn freq-chart [rows col]
+  (let [freqs  (frequencies (map (fn [r] (get r col)) rows))
+        total  (length rows)
+        keys   (sort (keys freqs))]
+    (doseq [k keys]
+      (let [cnt (get freqs k)
+            pct (round (* 100 (/ cnt total)))
+            bar (str-repeat "█" (round (* 16 (/ cnt total))))]
+        (println (str-format "  %-8s %3d명 %3d%%  %s"
+                             [k cnt pct bar]))))))
+
+;; ── 메인 ─────────────────────────────────────────────────────
+(defn main []
+  (let [text   (file-read CSV_FILE)
+        parsed (parse-csv text)
+        header (get parsed "header")
+        all    (get parsed "rows")
+        flt    (parse-filter CSV_FILTER)
+        rows   (apply-sort (apply-filter all flt) CSV_SORT CSV_SORT_ASC)]
+
+    (println "")
+    (println (str "📊 FreeLang CSV 분석기 v2"))
+    (println (str "   파일: " CSV_FILE
+                  (if flt (str "  필터: " CSV_FILTER) "")
+                  (if CSV_SORT (str "  정렬: " CSV_SORT) "")))
+    (hr)
+
+    ;; 1. 미리보기
+    (println (str-format "▶ 데이터 (%d행%s)"
+                         [(length rows)
+                          (if flt (str-format " / 전체 %d행" [(length all)]) "")]))
+    (println "")
+    (print-table header (take CSV_LIMIT rows))
+    (when (> (length rows) CSV_LIMIT)
+      (println (str-format "  ... 외 %d행" [(- (length rows) CSV_LIMIT)])))
+    (println "")
+    (hr)
+
+    ;; 2. 수치 컬럼 통계
+    (let [num-cols (filter (fn [col]
+                             (str-to-num (get (first rows) col)))
+                           header)]
+      (when (not (empty? num-cols))
+        (println "▶ 수치 통계")
+        (println "")
+        (println (str-format "  %-10s %10s %10s %12s %14s"
+                             ["컬럼" "최소" "최대" "평균" "합계"]))
+        (println (str-repeat "─" 56))
+        (doseq [col num-cols]
+          (let [s (numeric-stats rows col)]
+            (when s
+              (println (str-format "  %-10s %10s %10s %12.0f %14s"
+                                   [col
+                                    (str (get s "min"))
+                                    (str (get s "max"))
+                                    [(get s "avg")]
+                                    (str (get s "sum"))])))))
+        (println "")
+        (hr)))
+
+    ;; 3. 문자열 컬럼 분포
+    (let [str-cols (filter (fn [col]
+                             (not (str-to-num (get (first rows) col))))
+                           (filter (fn [col]
+                                     (not (= col (first header))))
+                                   header))]
+      (when (not (empty? str-cols))
+        (println "▶ 분포")
+        (println "")
+        (doseq [col str-cols]
+          (println (str "  [" col "]"))
+          (freq-chart rows col)
+          (println ""))
+        (hr)))
+
+    ;; 4. CSV 내보내기
+    (when (not (str-blank? CSV_OUTPUT))
+      (println "▶ 내보내기")
+      (println "")
+      (export-csv header rows CSV_OUTPUT)
+      (println "")
+      (hr))
+
+    (println (str-format "✅ 완료: %d행 분석" [(length rows)]))))
+
+(main)
