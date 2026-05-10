@@ -2,6 +2,15 @@
 
 ---
 
+## v11.6.32 — A-1: Azure cloud 모듈 bootstrap 번들 제거 (2026-05-10)
+
+- `stdlib-lazy-registry.ts`: `createCloudModule` static import 제거 → 진정한 optional 분리
+- bootstrap.js 크기 857KB → 850KB (-7KB)
+- cloud 모듈 사용 시 명시적 에러 메시지 ("표준 배포에 포함되지 않음")
+- **검증**: 903/903 PASS, L2 SHA 47407b90 유지
+
+---
+
 ## Phase H 로드맵 — MISTAKES-100 75% 달성 (2026-05-10~)
 
 > **목표**: 52% → 75% | **원칙**: semantics 변경 최소화, eval-builtins 수정 = isolated commit

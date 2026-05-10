@@ -27,7 +27,6 @@ import { createServiceModule }      from "./stdlib-service";
 import { createMarkdownModule }     from "./stdlib-markdown";
 import { createFeedModule }         from "./stdlib-feed";
 import { createBlogModule }         from "./stdlib-blog";
-import { createCloudModule }        from "./stdlib-cloud";
 import { createMatrixModule }       from "./stdlib-matrix";
 import { createAuditModule }        from "./stdlib-audit";
 
@@ -68,7 +67,7 @@ const LAZY_REGISTRY: Record<string, ModuleFactory> = {
   "markdown":    () => createMarkdownModule(),
   "feed":        () => createFeedModule(),
   "blog":        () => createBlogModule(),
-  "cloud":       () => createCloudModule(),
+  "cloud":       () => { throw new Error("cloud 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "matrix":      () => createMatrixModule(),
   "audit":       () => createAuditModule(),
 };
