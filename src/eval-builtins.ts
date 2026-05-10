@@ -1643,10 +1643,16 @@ loop().catch(e => {
     case "fn?": {
       const fv = args[0];
       return typeof fv === "function"
-        || (fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value"));
+        || (fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value" || fv.kind === "builtin-fn"));
     }
     case "map?":
       return args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]);
+    case "vector?": case "array?": case "list?":
+      return Array.isArray(args[0]);
+    case "integer?":
+      return typeof args[0] === "number" && Number.isInteger(args[0]);
+    case "float?":
+      return typeof args[0] === "number" && !Number.isInteger(args[0]);
     case "num-to-str":
       return String(args[0]);
     case "str-to-num": { const _n = parseFloat(String(args[0])); return isNaN(_n) ? null : _n; }
@@ -1833,16 +1839,31 @@ loop().catch(e => {
       return ciarr.filter((x: any) => callFnVal(cifn, [x])).length;
     }
 
+    case "find-first": {
+      const fffn = args[0], ffarr = Array.isArray(args[1]) ? args[1] : [];
+      const found = ffarr.find((x: any) => callFnVal(fffn, [x]));
+      return found !== undefined ? found : null;
+    }
+
     // ── max-by / min-by: (max-by fn arr) ─────────────────────────────
     case "max-by": {
       const mbfn = args[0], mbarr = Array.isArray(args[1]) ? args[1] : [];
       if (mbarr.length === 0) return null;
-      return mbarr.reduce((best: any, x: any) => callFnVal(mbfn, [x]) > callFnVal(mbfn, [best]) ? x : best);
+      // 문자열이고 배열 첫 항목이 객체면 필드 접근, 아니면 함수 호출
+      const mbIsField = typeof mbfn === "string" && mbarr[0] !== null && typeof mbarr[0] === "object";
+      const mbKey = mbIsField
+        ? (x: any) => (x !== null && typeof x === "object") ? x[mbfn] : null
+        : (x: any) => callFnVal(mbfn, [x]);
+      return mbarr.reduce((best: any, x: any) => mbKey(x) > mbKey(best) ? x : best);
     }
     case "min-by": {
       const mnbfn = args[0], mnbarr = Array.isArray(args[1]) ? args[1] : [];
       if (mnbarr.length === 0) return null;
-      return mnbarr.reduce((best: any, x: any) => callFnVal(mnbfn, [x]) < callFnVal(mnbfn, [best]) ? x : best);
+      const mnbIsField = typeof mnbfn === "string" && mnbarr[0] !== null && typeof mnbarr[0] === "object";
+      const mnbKey = mnbIsField
+        ? (x: any) => (x !== null && typeof x === "object") ? x[mnbfn] : null
+        : (x: any) => callFnVal(mnbfn, [x]);
+      return mnbarr.reduce((best: any, x: any) => mnbKey(x) < mnbKey(best) ? x : best);
     }
 
     // ── max-of / min-of: (max-of arr) ────────────────────────────────
@@ -2226,11 +2247,14 @@ loop().catch(e => {
       }
       if (!Array.isArray(args[1])) return [];
       const keyFn = args[0];
-      const callFn = interp?.callFunctionValue?.bind(interp);
-      if (!callFn) return [...args[1]];
-      return [...args[1]].sort((a, b) => {
-        const ka = callFn(keyFn, [a]);
-        const kb = callFn(keyFn, [b]);
+      const sbArr = args[1] as any[];
+      const sbIsField = typeof keyFn === "string" && sbArr.length > 0 && sbArr[0] !== null && typeof sbArr[0] === "object";
+      const sbExtract = sbIsField
+        ? (x: any) => (x !== null && typeof x === "object") ? x[keyFn] : null
+        : (x: any) => callFnVal(keyFn, [x]);
+      return [...sbArr].sort((a, b) => {
+        const ka = sbExtract(a);
+        const kb = sbExtract(b);
         if (typeof ka === "number" && typeof kb === "number") return ka - kb;
         return String(ka).localeCompare(String(kb));
       });
