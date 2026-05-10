@@ -1993,7 +1993,37 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
           throw new Error(`let: expected even number of binding items, got ${items.length}`);
         }
         for (let i = 0; i < items.length; i += 2) {
-          const varName = toVarName(items[i]);
+          const pattern = items[i];
+
+          // Map 구조분해: {:keys [name age]} sourceMap
+          if ((pattern as any)?.kind === "block" && (pattern as any)?.type === "Map") {
+            const mapFields = (pattern as any).fields as Map<string, any>;
+            const keysField = mapFields?.get("keys");
+            if (keysField?.kind === "block" && keysField?.type === "Array") {
+              const sourceMap = ev(items[i + 1]);
+              const keyItems: any[] = keysField.fields.get("items") ?? [];
+              for (const keyNode of keyItems) {
+                const rawName: string | null =
+                  keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value as string
+                  : keyNode?.kind === "variable" ? (keyNode.name as string).replace(/^\$/, "")
+                  : null;
+                if (rawName !== null) {
+                  const varName = rawName.startsWith("$") ? rawName : "$" + rawName;
+                  const value = (sourceMap !== null && typeof sourceMap === "object")
+                    ? (sourceMap[rawName] ?? null)
+                    : null;
+                  ctx.variables.set(varName, value, {
+                    line: (keyNode as any).line,
+                    col: (keyNode as any).col,
+                    type: inferType(value),
+                  } as Partial<ScopeVarMeta>);
+                }
+              }
+            }
+            continue;
+          }
+
+          const varName = toVarName(pattern);
           const value = ev(items[i + 1]);
           // Phase Y-1: 메타정보 저장
           const meta: Partial<ScopeVarMeta> = {
