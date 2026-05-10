@@ -187,7 +187,7 @@ function flExecOpNative(op: string, vals: any[]): any {
       if (n0 || n1) return false;
       return v0 === v1;
     }
-    case "!=": return v0 !== v1;
+    case "!=": case "not=": return v0 !== v1;
     case "<": return v0 < v1;
     case ">": return v0 > v1;
     case "<=": return v0 <= v1;
@@ -281,8 +281,11 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "ends-with?": return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
     case "empty?": { if (v0 === null || v0 === undefined) return true; if (typeof v0 === "string") return v0.length === 0; if (Array.isArray(v0)) return v0.length === 0; if (typeof v0 === "object") return Object.keys(v0).length === 0; return false; }
     case "first": return Array.isArray(v0) ? (v0[0] !== undefined ? v0[0] : null) : null;
+    case "second": return Array.isArray(v0) ? (v0[1] !== undefined ? v0[1] : null) : null;
     case "last": return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
     case "rest": return Array.isArray(v0) ? v0.slice(1) : [];
+    case "nth": return Array.isArray(v0) && args[1] !== undefined ? (v0[Number(args[1])] !== undefined ? v0[Number(args[1])] : null) : null;
+    case "not=": return args[0] !== args[1];
     // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
     case "get-or": {
       // (get-or coll key default) — coll이 nil이거나 key가 없으면 default 반환
@@ -1068,7 +1071,7 @@ loop().catch(e => {
       return args[0] <= args[1];
     case ">=":
       return args[0] >= args[1];
-    case "!=":
+    case "!=": case "not=":
       return args[0] !== args[1];
 
     // Logical (evaluated versions — unevaluated short-circuit is in eval-special-forms.ts)
@@ -1319,6 +1322,10 @@ loop().catch(e => {
       return args;
     case "first":
       return Array.isArray(args[0]) ? (args[0][0] !== undefined ? args[0][0] : null) : null;
+    case "second":
+      return Array.isArray(args[0]) ? (args[0][1] !== undefined ? args[0][1] : null) : null;
+    case "nth":
+      return Array.isArray(args[0]) ? (args[0][Number(args[1])] !== undefined ? args[0][Number(args[1])] : null) : null;
     case "rest":
       return Array.isArray(args[0]) ? args[0].slice(1) : [];
     // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
@@ -2231,17 +2238,14 @@ loop().catch(e => {
 
     // (range n) → lazy [0..n-1], (range start end) → lazy [start..end-1]
     case "range": {
-      // 호환 정책 (Phase B 후속):
-      // - args.length 0: 무한 lazy seq (rangeSeq(0))
-      // - args.length 1: 0~N lazy seq (take 등 lazy 처리에 적합)
-      // - args.length 2+: eager array [start..end)
-      //   → reduce/map/filter와 즉시 호환 (가장 흔한 사용)
+      // (range n) → [0 1 ... n-1] eager array
+      // (range start end) → [start ... end-1] eager array
+      // (range start end step) → stepped array
+      // (range) → infinite lazy seq (무한 seq, take와 함께 사용)
       if (args.length === 0) return rangeSeq(0);
-      if (args.length === 1) return rangeSeq(0, args[0]);
-      // args.length >= 2: eager array
-      const start = Number(args[0]);
-      const end = Number(args[1]);
-      const step = args.length >= 3 ? Number(args[2]) : 1;
+      const start = args.length === 1 ? 0 : Number(args[0]);
+      const end   = args.length === 1 ? Number(args[0]) : Number(args[1]);
+      const step  = args.length >= 3 ? Number(args[2]) : 1;
       const out: number[] = [];
       if (step > 0) for (let i = start; i < end; i += step) out.push(i);
       else if (step < 0) for (let i = start; i > end; i += step) out.push(i);
