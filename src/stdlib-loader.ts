@@ -171,6 +171,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "fl_modules":  (): string[] => getAvailableModules(),
     // fl_load "path/to/lib.fl" → 다른 FL 파일을 현재 컨텍스트에 로드
     // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
+    // 이미 로드된 파일은 캐싱으로 중복 실행 방지 (importedFiles 공유)
     "fl_load": (filePath: string): boolean => {
       const fs = require("fs");
       const path = require("path");
@@ -183,11 +184,16 @@ export function loadAllStdlib(interp: InterpreterLike): void {
         console.error(`❌ [fl_load] 파일 없음: ${resolved}`);
         return false;
       }
+      const loadedFiles: Set<string> = (interp as any).importedFiles ?? new Set();
+      if (loadedFiles.has(resolved)) return true;
+      loadedFiles.add(resolved);
+      (interp as any).importedFiles = loadedFiles;
       try {
         const src = fs.readFileSync(resolved, "utf-8");
         (interp as any).interpret((parse as any)(lex(src)));
         return true;
       } catch (e: any) {
+        loadedFiles.delete(resolved);
         console.error(`❌ [fl_load] "${resolved}" 로드 실패:`, e.message);
         return false;
       }
