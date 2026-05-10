@@ -14719,8 +14719,11 @@ loop().catch(e => {
         return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].indexOf(args2[1]) : -1;
       case "replace":
         return typeof args2[0] === "string" && typeof args2[1] === "string" && typeof args2[2] === "string" ? args2[0].split(args2[1]).join(args2[2]) : "";
-      case "repeat":
-        return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
+      case "repeat": {
+        if (typeof args2[0] === "number") return Array(args2[0]).fill(args2[1] !== void 0 ? args2[1] : null);
+        if (typeof args2[0] === "string" && typeof args2[1] === "number") return args2[0].repeat(args2[1]);
+        return [];
+      }
       case "filter": {
         if (Array.isArray(args2[0]) && args2[0].length > 0) {
           const second = args2[1];
@@ -15062,6 +15065,25 @@ loop().catch(e => {
         const aiVal = args2[2];
         return aiSet(args2[0], aiKeys, aiVal);
       }
+      case "update-in": {
+        let uiUpdate = function(obj, keys) {
+          const k = typeof keys[0] === "string" && keys[0].startsWith(":") ? keys[0].slice(1) : String(keys[0]);
+          const base = obj !== null && typeof obj === "object" && !Array.isArray(obj) ? { ...obj } : {};
+          if (keys.length === 1) {
+            const cur = base[k] !== void 0 ? base[k] : null;
+            const uiCallArgs = [cur, ...uiExtraArgs];
+            base[k] = typeof uiFn === "string" ? evalBuiltin(interp2, uiFn, uiCallArgs, expr2) : callFnVal(uiFn, uiCallArgs);
+          } else {
+            base[k] = uiUpdate(base[k], keys.slice(1));
+          }
+          return base;
+        };
+        if (!Array.isArray(args2[1]) || args2[1].length === 0) throw new Error(`update-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        const uiKeys = args2[1];
+        const uiFn = args2[2];
+        const uiExtraArgs = args2.slice(3);
+        return uiUpdate(args2[0], uiKeys);
+      }
       case "dissoc": {
         if (args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0])) {
           const rawK = args2[1];
@@ -15149,6 +15171,22 @@ loop().catch(e => {
         if (!Array.isArray(args2[0])) return [];
         const flatten = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
         return flatten(args2[0]);
+      }
+      case "every?":
+      case "every": {
+        if (!Array.isArray(args2[1])) throw new Error(`every?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        return args2[1].every((item) => callFnVal(args2[0], [item]));
+      }
+      case "some?":
+      case "some": {
+        if (!Array.isArray(args2[1])) throw new Error(`some?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        const found = args2[1].find((item) => callFnVal(args2[0], [item]));
+        return found !== void 0 ? found : null;
+      }
+      case "none?":
+      case "none": {
+        if (!Array.isArray(args2[1])) throw new Error(`none?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        return args2[1].every((item) => !callFnVal(args2[0], [item]));
       }
       case "unique":
       case "distinct":
@@ -15503,6 +15541,31 @@ loop().catch(e => {
           return result;
         };
         return doTakeWhile(isLazySeq(seq) ? seq : null);
+      }
+      case "drop-while": {
+        const pred = args2[0];
+        const seq = args2[1];
+        if (!Array.isArray(seq)) return [];
+        let i = 0;
+        while (i < seq.length && callFnVal(pred, [seq[i]])) i++;
+        return seq.slice(i);
+      }
+      case "map-indexed": {
+        const fn = args2[0];
+        const seq = args2[1];
+        if (!Array.isArray(seq)) return [];
+        return seq.map((v, i) => callFnVal(fn, [i, v]));
+      }
+      case "reduce-kv": {
+        const fn = args2[0];
+        const init = args2[1];
+        const m = args2[2];
+        if (m === null || m === void 0 || typeof m !== "object" || Array.isArray(m)) return init;
+        let acc = init;
+        for (const [k, v] of Object.entries(m)) {
+          acc = callFnVal(fn, [acc, k, v]);
+        }
+        return acc;
       }
       case "lazy-head": {
         return isLazySeq(args2[0]) ? lazyHead(args2[0]) : null;
@@ -35132,7 +35195,11 @@ ${exportsStr}
               const code = flErr.code ?? null;
               if (code) errObj["code"] = code;
               if (flErr.hint) errObj["hint"] = flErr.hint;
-              if (error.stack) errObj["stack"] = error.stack;
+              if (error.stack) {
+                const filtered = error.stack.split("\n").filter((ln) => !ln.includes("bootstrap.js") && !ln.includes("node:internal")).join("\n").trim();
+                const lineInfo = errObj["line"] != null ? `FreeLang line ${errObj["line"]}` : null;
+                errObj["stack"] = filtered || lineInfo || errObj["message"];
+              }
               const CODE_TO_CATEGORY = {
                 "E_TYPE_NIL": "TypeError",
                 "E_TYPE_MISMATCH": "TypeError",

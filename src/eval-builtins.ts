@@ -2129,6 +2129,19 @@ loop().catch(e => {
       const flatten = (arr: any[]): any[] => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
       return flatten(args[0]);
     }
+    case "every?": case "every": {
+      if (!Array.isArray(args[1])) throw new Error(`every?: 두 번째 인자는 배열이어야 합니다`);
+      return args[1].every((item: any) => callFnVal(args[0], [item]));
+    }
+    case "some?": case "some": {
+      if (!Array.isArray(args[1])) throw new Error(`some?: 두 번째 인자는 배열이어야 합니다`);
+      const found = args[1].find((item: any) => callFnVal(args[0], [item]));
+      return found !== undefined ? found : null;
+    }
+    case "none?": case "none": {
+      if (!Array.isArray(args[1])) throw new Error(`none?: 두 번째 인자는 배열이어야 합니다`);
+      return args[1].every((item: any) => !callFnVal(args[0], [item]));
+    }
     case "unique": case "distinct":
       return Array.isArray(args[0]) ? [...new Set(args[0])] : [];
     case "sort":
