@@ -573,12 +573,13 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
     const value = ev(expr.args[1]);
     if (value !== null && value !== undefined && (value as any).kind === "function-value") {
-      const funcDef = {
+      const funcDef: any = {
         name,
         params: (value as any).params,
         body: (value as any).body,
         capturedEnv: (value as any).capturedEnv,
       };
+      if ((value as any)._call) funcDef._call = (value as any)._call;
       ctx.functions.set(name, funcDef);
       if (ctx.typeChecker) {
         const paramTypes = (value as any).params.map(() => ({ kind: "type" as const, name: "any" }));
@@ -626,35 +627,36 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     throw new Error(`call expects function-value, got ${(fn as any).kind || typeof fn}`);
   }
 
-  // ── compose ───────────────────────────────────────────────────────
-  if (op === "compose") {
-    if (expr.args.length < 2) throw new Error(`compose requires at least 2 functions`);
-    const funcsToCompose = expr.args.map((arg) => {
-      if ((arg as any).kind === "literal" && (arg as any).type === "symbol") {
-        const fnName = (arg as Literal).value as string;
-        if (ctx.functions.has(fnName)) return { _isFunctionName: true, name: fnName };
-        throw new Error(`compose: '${fnName}' is not a function`);
-      } else if ((arg as any).kind === "variable") {
-        const fnName = (arg as Variable).name;
-        if (ctx.functions.has(fnName)) return { _isFunctionName: true, name: fnName };
-        const value = ctx.variables.get(fnName);
-        if (value && ((value as any).kind === "function-value" || typeof value === "function")) return value;
-        throw new Error(`compose: '${fnName}' is not a function`);
-      } else {
-        const fn = ev(arg);
-        if (typeof fn !== "function" && (fn as any).kind !== "function-value") throw new Error(`compose: argument is not a function`);
-        return fn;
-      }
+  // ── compose / comp ───────────────────────────────────────────────
+  // (comp f g h) → (fn [x] (f (g (h x)))) — 오른쪽부터 적용
+  // 유저 함수·function-value·빌트인 모두 지원
+  if (op === "compose" || op === "comp") {
+    if (expr.args.length < 1) throw new Error(`${op} requires at least 1 function`);
+
+    // 각 인자를 핸들로 변환: 심볼은 name으로, 나머지는 즉시 평가
+    const handles = expr.args.map((arg: any) => {
+      const fk = arg.kind;
+      if (fk === "variable") return { type: "name", name: arg.name };
+      if (fk === "literal" && arg.type === "symbol") return { type: "name", name: String(arg.value) };
+      return { type: "val", val: ev(arg) };
     });
-    return (x: any) => {
+
+    // _call: 호출 시점의 interp.context 사용
+    const compFn = { kind: "function-value", name: `(${op})`, params: ["__x__"], body: null, env: null };
+    (compFn as any)._call = (x: any) => {
       let result = x;
-      for (let i = funcsToCompose.length - 1; i >= 0; i--) {
-        const fn = funcsToCompose[i];
-        if ((fn as any)._isFunctionName) result = callUser((fn as any).name, [result]);
-        else result = callFn(fn, [result]);
+      for (let i = handles.length - 1; i >= 0; i--) {
+        const handle = handles[i];
+        if (handle.type === "val") {
+          result = interp.callFunctionValue(handle.val, [result]);
+        } else {
+          // functions 맵에 있으면 callUserFunction (모듈 함수 포함)
+          result = interp.callUserFunction(handle.name, [result]);
+        }
       }
       return result;
     };
+    return compFn;
   }
 
   // ── pipe ──────────────────────────────────────────────────────────
@@ -1138,6 +1140,39 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       for (let i = 1; i < expr.args.length; i++) result = ev(expr.args[i]);
     }
     return result;
+  }
+
+  // ── when-not — (when-not cond body...) ───────────────────────────
+  if (op === "when-not") {
+    if (expr.args.length < 2) return null;
+    const c = ev(expr.args[0]);
+    if (c === null || c === undefined || c === false) {
+      let result: any = null;
+      for (let i = 1; i < expr.args.length; i++) result = ev(expr.args[i]);
+      return result;
+    }
+    return null;
+  }
+
+  // ── dotimes — (dotimes [i n] body...) iterate 0..n-1 ────────────
+  if (op === "dotimes") {
+    const bindingNode = expr.args[0] as any;
+    const items: any[] = bindingNode?.kind === "array"
+      ? bindingNode.items || []
+      : bindingNode?.fields?.get?.("items") || [];
+    if (items.length < 2) return null;
+    const bindName = (items[0] as any)?.name || (items[0] as any)?.value || "";
+    const n = Number(ev(items[1]));
+    for (let i = 0; i < n; i++) {
+      interp.context.variables.push();
+      try {
+        interp.context.variables.set(bindName, i);
+        for (let j = 1; j < expr.args.length; j++) ev(expr.args[j]);
+      } finally {
+        interp.context.variables.pop();
+      }
+    }
+    return null;
   }
 
   // ── doseq — (doseq [x coll] body...) side-effect iteration ───────

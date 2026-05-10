@@ -1533,6 +1533,10 @@ export class Interpreter {
       if (this.context.variables.has(varName)) {
         return this.context.variables.get(varName);
       }
+      // builtin 함수명을 first-class value로: (comp inc str-to-upper) 같은 패턴 지원
+      if (this.context.functions.has(varName) || this.context.functions.has("$" + varName)) {
+        return { kind: "builtin-fn", name: varName };
+      }
       // Phase Y-1: VariableNotFoundError로 변경
       const scopeVars = this.context.variables.getAllVars();
       const similar = suggestSimilar(varName, scopeVars);
@@ -1686,7 +1690,7 @@ export class Interpreter {
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
     const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
     const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-let","unless","cond","do","begin","progn","loop","recur","while","doseq","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate"]);
+    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","comp","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-not","when-let","unless","cond","do","begin","progn","loop","recur","while","doseq","dotimes","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);

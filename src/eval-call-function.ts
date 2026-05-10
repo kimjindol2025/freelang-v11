@@ -167,6 +167,9 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     );
   }
 
+  // comp/compose가 반환한 _call 핸들
+  if ((func as any)._call) return (func as any)._call(...args);
+
   let isGenericCall = false;
   if (func.generics && func.generics.length > 0) {
     if (!typeArgs) {
@@ -314,6 +317,8 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
     return callFunctionValueTCO(interp, fn, args);
   }
 
+  // comp/compose가 반환한 _call 핸들
+  if (fn._call) return fn._call(...args);
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
@@ -422,7 +427,12 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
       const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch) baseName = bracketMatch[1];
 
-      const func = interp.context.functions.get(baseName);
+      let func = interp.context.functions.get(baseName);
+      // kebab ↔ snake 양방향 조회
+      if (!func) {
+        const alt = baseName.includes('_') ? baseName.replace(/_/g, '-') : baseName.replace(/-/g, '_');
+        if (alt !== baseName) func = interp.context.functions.get(alt);
+      }
       if (!func) {
         const candidates = [...interp.context.functions.keys()];
         const similar = suggestSimilar(baseName, candidates);
@@ -431,6 +441,9 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
           : `'${baseName}'를 찾을 수 없습니다. 함수가 정의되어 있는지 확인하세요.`;
         throw new FunctionNotFoundError(baseName, interp.currentFilePath, interp.currentLine > 0 ? interp.currentLine : undefined, undefined, hint);
       }
+
+      // comp/compose _call 핸들
+      if ((func as any)._call) return (func as any)._call(...currentArgs);
 
       // Native JS 함수는 바로 실행
       if (typeof func.body === "function") {
