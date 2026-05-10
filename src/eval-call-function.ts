@@ -71,6 +71,35 @@ function propagateMutations(
 
 const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
 
+/** 단일 파라미터 바인딩 — Map 구조분해 {:keys [a b]} 지원 */
+function bindParam(interp: InterpreterLike, param: any, value: any): void {
+  if (typeof param === "string") {
+    interp.context.variables.set(param, value);
+    return;
+  }
+  // Map 구조분해: {:keys [name age]} 패턴
+  if ((param as any)?.kind === "block" && (param as any)?.type === "Map") {
+    const fields = (param as any).fields as Map<string, any>;
+    const keysField = fields?.get("keys");
+    if (keysField?.kind === "block" && keysField?.type === "Array") {
+      const keyItems: any[] = keysField.fields.get("items") ?? [];
+      for (const keyNode of keyItems) {
+        const rawName: string | null =
+          keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value as string
+          : keyNode?.kind === "variable" ? (keyNode.name as string).replace(/^\$/, "")
+          : null;
+        if (rawName !== null) {
+          const varName = rawName.startsWith("$") ? rawName : "$" + rawName;
+          const extracted = (value !== null && typeof value === "object")
+            ? (value[rawName] ?? null)
+            : null;
+          interp.context.variables.set(varName, extracted);
+        }
+      }
+    }
+  }
+}
+
 export function callUserFunction(interp: InterpreterLike, name: string, args: any[]): any {
   // TCO 모드 활성화 시 trampoline으로 라우팅
   if (interp.tcoMode) {
@@ -261,7 +290,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     try {
       interp.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args[i]);
+        bindParam(interp, func.params[i], args[i]);
       }
       result = interp.eval(func.body);
       propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
@@ -286,7 +315,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   try {
     for (let recurIter = 0; recurIter < 2_000_000; recurIter++) {
       for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args[i]);
+        bindParam(interp, func.params[i], args[i]);
       }
       let result: any;
       try {
@@ -340,7 +369,7 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
   try {
     interp.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      interp.context.variables.set(fn.params[i], args[i]);
+      bindParam(interp, fn.params[i], args[i]);
     }
     result = interp.eval(fn.body);
     propagateMutations(interp, fn.capturedEnv, paramSet, savedStack);
@@ -363,7 +392,7 @@ export function callAsyncFunctionValue(interp: InterpreterLike, fn: any, args: a
     try {
       interp.context.variables.fromSnapshot(fn.capturedEnv);
       for (let i = 0; i < fn.params.length; i++) {
-        interp.context.variables.set(fn.params[i], args[i]);
+        bindParam(interp, fn.params[i], args[i]);
       }
       const result = interp.eval(fn.body);
       if (result instanceof FreeLangPromise) {
@@ -474,7 +503,7 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
           try {
             interp.context.variables.fromSnapshot(func.capturedEnv);
             for (let j = 0; j < func.params.length; j++) {
-              interp.context.variables.set(func.params[j], currentArgs[j]);
+              bindParam(interp, func.params[j], currentArgs[j]);
             }
             result = interp.eval(func.body);
           } catch (e) {
@@ -488,7 +517,7 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
           interp.context.variables.push();
           try {
             for (let j = 0; j < func.params.length; j++) {
-              interp.context.variables.set(func.params[j], currentArgs[j]);
+              bindParam(interp, func.params[j], currentArgs[j]);
             }
             result = interp.eval(func.body);
           } catch (e) {
@@ -541,7 +570,7 @@ export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any
       try {
         interp.context.variables.fromSnapshot(currentFn.capturedEnv);
         for (let j = 0; j < currentFn.params.length; j++) {
-          interp.context.variables.set(currentFn.params[j], currentArgs[j]);
+          bindParam(interp, currentFn.params[j], currentArgs[j]);
         }
         result = interp.eval(currentFn.body);
       } finally {

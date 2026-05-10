@@ -249,7 +249,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   if (op === "fn") {
     if (expr.args.length < 2) throwArgCount("fn", ">=2", expr.args.length, expr.line);
     const paramsNode = expr.args[0];
-    const params: string[] = [];
+    const params: any[] = [];
     const paramDefaults: (any | undefined)[] = []; // parallel to params, undefined if no default
     if ((paramsNode as any).kind === "block" && (paramsNode as any).type === "Array") {
       const items = (paramsNode as any).fields.get("items");
@@ -258,6 +258,12 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
           // ^type 힌트 심볼은 스킵 (타입 힌트는 런타임에서 무시)
           if ((item as any).kind === "literal" && (item as any).type === "symbol"
               && String((item as any).value).startsWith("^")) continue;
+          // Map 구조분해: {:keys [name age]} 패턴 — AST 노드 그대로 저장
+          if ((item as any).kind === "block" && (item as any).type === "Map") {
+            params.push(item);
+            paramDefaults.push(undefined);
+            continue;
+          }
           // 기본값: [$var defaultExpr] → 중첩 Array 블록
           if ((item as any).kind === "block" && (item as any).type === "Array") {
             const inner = (item as any).fields?.get("items") ?? [];

@@ -19754,6 +19754,11 @@ ${cssVars.join(";\n")};
         if (Array.isArray(items)) {
           for (const item of items) {
             if (item.kind === "literal" && item.type === "symbol" && String(item.value).startsWith("^")) continue;
+            if (item.kind === "block" && item.type === "Map") {
+              params.push(item);
+              paramDefaults.push(void 0);
+              continue;
+            }
             if (item.kind === "block" && item.type === "Array") {
               const inner = ((_a = item.fields) == null ? void 0 : _a.get("items")) ?? [];
               if (inner.length >= 2) {
@@ -36097,6 +36102,27 @@ ${exportsStr}
     }
   }
   var MAX_CALL_DEPTH = 5e3;
+  function bindParam(interp2, param, value) {
+    if (typeof param === "string") {
+      interp2.context.variables.set(param, value);
+      return;
+    }
+    if ((param == null ? void 0 : param.kind) === "block" && (param == null ? void 0 : param.type) === "Map") {
+      const fields = param.fields;
+      const keysField = fields == null ? void 0 : fields.get("keys");
+      if ((keysField == null ? void 0 : keysField.kind) === "block" && (keysField == null ? void 0 : keysField.type) === "Array") {
+        const keyItems = keysField.fields.get("items") ?? [];
+        for (const keyNode of keyItems) {
+          const rawName = (keyNode == null ? void 0 : keyNode.kind) === "literal" && (keyNode == null ? void 0 : keyNode.type) === "symbol" ? keyNode.value : (keyNode == null ? void 0 : keyNode.kind) === "variable" ? keyNode.name.replace(/^\$/, "") : null;
+          if (rawName !== null) {
+            const varName = rawName.startsWith("$") ? rawName : "$" + rawName;
+            const extracted = value !== null && typeof value === "object" ? value[rawName] ?? null : null;
+            interp2.context.variables.set(varName, extracted);
+          }
+        }
+      }
+    }
+  }
   function callUserFunction(interp2, name, args2) {
     if (interp2.tcoMode) {
       return callUserFunctionTCO(interp2, name, args2);
@@ -36242,7 +36268,7 @@ ${tail}` : "")
       try {
         interp2.context.variables.fromSnapshot(func.capturedEnv);
         for (let i = 0; i < func.params.length; i++) {
-          interp2.context.variables.set(func.params[i], args2[i]);
+          bindParam(interp2, func.params[i], args2[i]);
         }
         result = interp2.eval(func.body);
         propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
@@ -36266,7 +36292,7 @@ ${tail}` : "")
     try {
       for (let recurIter = 0; recurIter < 2e6; recurIter++) {
         for (let i = 0; i < func.params.length; i++) {
-          interp2.context.variables.set(func.params[i], args2[i]);
+          bindParam(interp2, func.params[i], args2[i]);
         }
         let result;
         try {
@@ -36315,7 +36341,7 @@ ${tail}` : "")
     try {
       interp2.context.variables.fromSnapshot(fn.capturedEnv);
       for (let i = 0; i < fn.params.length; i++) {
-        interp2.context.variables.set(fn.params[i], args2[i]);
+        bindParam(interp2, fn.params[i], args2[i]);
       }
       result = interp2.eval(fn.body);
       propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
@@ -36338,7 +36364,7 @@ ${tail}` : "")
       try {
         interp2.context.variables.fromSnapshot(fn.capturedEnv);
         for (let i = 0; i < fn.params.length; i++) {
-          interp2.context.variables.set(fn.params[i], args2[i]);
+          bindParam(interp2, fn.params[i], args2[i]);
         }
         const result = interp2.eval(fn.body);
         if (result instanceof FreeLangPromise) {
@@ -36421,7 +36447,7 @@ ${tail}` : "")
             try {
               interp2.context.variables.fromSnapshot(func.capturedEnv);
               for (let j = 0; j < func.params.length; j++) {
-                interp2.context.variables.set(func.params[j], currentArgs[j]);
+                bindParam(interp2, func.params[j], currentArgs[j]);
               }
               result = interp2.eval(func.body);
             } catch (e) {
@@ -36435,7 +36461,7 @@ ${tail}` : "")
             interp2.context.variables.push();
             try {
               for (let j = 0; j < func.params.length; j++) {
-                interp2.context.variables.set(func.params[j], currentArgs[j]);
+                bindParam(interp2, func.params[j], currentArgs[j]);
               }
               result = interp2.eval(func.body);
             } catch (e) {
@@ -36480,7 +36506,7 @@ ${tail}` : "")
         try {
           interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
           for (let j = 0; j < currentFn.params.length; j++) {
-            interp2.context.variables.set(currentFn.params[j], currentArgs[j]);
+            bindParam(interp2, currentFn.params[j], currentArgs[j]);
           }
           result = interp2.eval(currentFn.body);
         } finally {
