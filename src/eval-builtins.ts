@@ -1735,6 +1735,7 @@ loop().catch(e => {
       const coll = args[1];
       if (coll === null || coll === undefined) throw new Error(`타입 불일치: filter 대상이 nil — 배열 예상`);
       if (!Array.isArray(coll)) return [];
+      if (filterFn === null || filterFn === undefined) return coll;
       return coll.filter((item: any) => callFnVal(filterFn, [item]));
     }
     case "find": {
@@ -2185,10 +2186,17 @@ loop().catch(e => {
       const found = args[1].find((item: any) => callFnVal(args[0], [item]));
       return found !== undefined ? found : null;
     }
-    case "none?": case "none": {
-      if (!Array.isArray(args[1])) throw new Error(`none?: 두 번째 인자는 배열이어야 합니다`);
+    case "none?": {
+      // (none? pred arr) → 모든 요소가 pred를 만족하지 않으면 true
+      if (!Array.isArray(args[1])) return true;
       return args[1].every((item: any) => !callFnVal(args[0], [item]));
     }
+    case "none":
+      // (none) → Option monad None 생성자; (none? pred arr) 와 구분
+      if (args.length === 0) return { tag: "None", value: null, kind: "Option" };
+      // 2인자: none?와 동일 동작 (하위호환)
+      if (Array.isArray(args[1])) return args[1].every((item: any) => !callFnVal(args[0], [item]));
+      return { tag: "None", value: null, kind: "Option" };
     case "unique": case "distinct":
       return Array.isArray(args[0]) ? [...new Set(args[0])] : [];
     case "sort":

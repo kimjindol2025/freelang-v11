@@ -4160,7 +4160,6 @@ ${parenHint}` : parenHint;
     "obj-merge": { correct: "merge", usage: "(merge map1 map2)" },
     "obj_merge": { correct: "merge", usage: "(merge map1 map2)" },
     // 배열 길이 (#42)
-    "count": { correct: "length", usage: "(length arr)" },
     "size": { correct: "length", usage: "(length arr)" },
     // 문자열 분리 (#43)
     "split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
@@ -13793,7 +13792,7 @@ req.end();`;
     }
   }
   function evalBuiltin(interp2, op, args2, expr2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const normalizedOp2 = op.replace(/_/g, "-");
     if (normalizedOp2 !== op && op !== "server_start") {
       console.warn(`\u26A0\uFE0F  [FreeLang v11.5.1] ${op}\uC740 deprecated\uC785\uB2C8\uB2E4. ${normalizedOp2}\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.`);
@@ -13802,7 +13801,17 @@ req.end();`;
     const callFn2 = (fn, a) => interp2.callFunction(fn, a);
     const callUser = (name, a) => interp2.callUserFunction(name, a);
     const callFnVal = (fn, a) => {
-      if (typeof fn === "string") return interp2.callUserFunction(fn, a);
+      var _a2, _b2, _c2;
+      if (typeof fn === "string") {
+        try {
+          return interp2.callUserFunction(fn, a);
+        } catch (e) {
+          if (((_a2 = e == null ? void 0 : e.message) == null ? void 0 : _a2.includes("\uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4")) || ((_b2 = e == null ? void 0 : e.message) == null ? void 0 : _b2.includes("not found")) || ((_c2 = e == null ? void 0 : e.message) == null ? void 0 : _c2.includes("Function not found"))) {
+            return evalBuiltin(interp2, fn, a, expr2);
+          }
+          throw e;
+        }
+      }
       if ((fn == null ? void 0 : fn.kind) === "builtin-fn") return evalBuiltin(interp2, fn.name, a, expr2);
       if ((fn == null ? void 0 : fn.kind) === "function-value" || (fn == null ? void 0 : fn.kind) === "async-function-value") return interp2.callFunctionValue(fn, a);
       if (typeof (fn == null ? void 0 : fn.body) === "function") return fn.body(...a);
@@ -14227,7 +14236,8 @@ loop().catch(e => {
       case "lower":
         return (_b = args2[0]) == null ? void 0 : _b.toString().toLowerCase();
       case "length":
-        return ((_c = args2[0]) == null ? void 0 : _c.length) || 0;
+      case "count":
+        return Array.isArray(args2[0]) ? args2[0].length : typeof args2[0] === "string" ? args2[0].length : args2[0] !== null && typeof args2[0] === "object" ? Object.keys(args2[0]).length : 0;
       case "to-hex": {
         const n = Math.floor(Number(args2[0])) & 255;
         return n.toString(16).padStart(2, "0");
@@ -14445,12 +14455,7 @@ loop().catch(e => {
         const mapFn = args2[0];
         if (args2[1] === null || args2[1] === void 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: map \uB300\uC0C1\uC774 nil \u2014 \uBC30\uC5F4 \uC608\uC0C1`);
         const mapArr = Array.isArray(args2[1]) ? args2[1] : [];
-        if (typeof mapFn === "function") {
-          return mapArr.map((item) => mapFn(item));
-        } else if (mapFn && (mapFn.kind === "function-value" || mapFn.kind === "async-function-value")) {
-          return mapArr.map((item) => callFnVal(mapFn, [item]));
-        }
-        return mapArr;
+        return mapArr.map((item) => callFnVal(mapFn, [item]));
       }
       case "set-timeout": {
         if (expr2.args.length < 2) throw new Error(`set-timeout requires callback and delay`);
@@ -14599,6 +14604,14 @@ loop().catch(e => {
         if (typeof v === "object") return Object.keys(v).length === 0;
         return false;
       }
+      case "not-empty?": {
+        const v = args2[0];
+        if (v === null || v === void 0) return false;
+        if (typeof v === "string") return v.length > 0;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === "object") return Object.keys(v).length > 0;
+        return true;
+      }
       case "has-key?": {
         const obj = args2[0], key = args2[1];
         if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
@@ -14680,10 +14693,11 @@ loop().catch(e => {
       case "str-format":
       case "format": {
         let fmt = String(args2[0] ?? "");
-        let i = 1;
+        const fmtArgs = args2.length === 2 && Array.isArray(args2[1]) ? args2[1] : args2.slice(1);
+        let i = 0;
         return fmt.replace(/%(-?\d*\.?\d*)([sdfoexX%])/g, (_m2, spec, t) => {
           if (t === "%") return "%";
-          const v = args2[i++];
+          const v = fmtArgs[i++];
           if (t === "d") return String(Math.trunc(Number(v)));
           if (t === "f") {
             const prec = spec.includes(".") ? parseInt(spec.split(".")[1]) : 6;
@@ -14735,11 +14749,8 @@ loop().catch(e => {
         const coll = args2[1];
         if (coll === null || coll === void 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: filter \uB300\uC0C1\uC774 nil \u2014 \uBC30\uC5F4 \uC608\uC0C1`);
         if (!Array.isArray(coll)) return [];
-        if (typeof filterFn === "function") return coll.filter((item) => filterFn(item));
-        if (filterFn && filterFn.kind === "function-value") {
-          return coll.filter((item) => callFnVal(filterFn, [item]));
-        }
-        return coll;
+        if (filterFn === null || filterFn === void 0) return coll;
+        return coll.filter((item) => callFnVal(filterFn, [item]));
       }
       case "find": {
         if (!Array.isArray(args2[0])) return -1;
@@ -14752,6 +14763,8 @@ loop().catch(e => {
       }
       case "last":
         return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
+      case "butlast":
+        return Array.isArray(args2[0]) && args2[0].length > 1 ? args2[0].slice(0, -1) : [];
       case "first-or":
       case "first_or":
         return Array.isArray(args2[0]) && args2[0].length > 0 && args2[0][0] !== void 0 ? args2[0][0] : args2[1] !== void 0 ? args2[1] : null;
@@ -15114,6 +15127,37 @@ loop().catch(e => {
         if (args2.length === 0) return {};
         return Object.assign({}, ...args2.filter((a) => a && typeof a === "object" && !Array.isArray(a)));
       }
+      case "merge-with": {
+        const fn = args2[0];
+        const maps = args2.slice(1).filter((a) => a && typeof a === "object" && !Array.isArray(a));
+        if (maps.length === 0) return {};
+        const result = { ...maps[0] };
+        for (let mi = 1; mi < maps.length; mi++) {
+          for (const [k, v] of Object.entries(maps[mi])) {
+            result[k] = k in result ? callFnVal(fn, [result[k], v]) : v;
+          }
+        }
+        return result;
+      }
+      case "into": {
+        const target = args2[0];
+        const coll = args2[1];
+        if (Array.isArray(target)) {
+          return Array.isArray(coll) ? [...target, ...coll] : target;
+        }
+        if (target && typeof target === "object" && !Array.isArray(target)) {
+          if (Array.isArray(coll)) {
+            const res = { ...target };
+            for (const item of coll) {
+              if (Array.isArray(item) && item.length === 2) res[String(item[0])] = item[1];
+              else if (item && typeof item === "object") Object.assign(res, item);
+            }
+            return res;
+          }
+          return target;
+        }
+        return coll ?? target;
+      }
       case "obj-pick":
       case "obj_pick":
       case "pick": {
@@ -15177,17 +15221,20 @@ loop().catch(e => {
         if (!Array.isArray(args2[1])) throw new Error(`every?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
         return args2[1].every((item) => callFnVal(args2[0], [item]));
       }
-      case "some?":
-      case "some": {
-        if (!Array.isArray(args2[1])) throw new Error(`some?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      case "any?":
+      case "any": {
+        if (!Array.isArray(args2[1])) throw new Error(`any?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
         const found = args2[1].find((item) => callFnVal(args2[0], [item]));
         return found !== void 0 ? found : null;
       }
-      case "none?":
-      case "none": {
-        if (!Array.isArray(args2[1])) throw new Error(`none?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      case "none?": {
+        if (!Array.isArray(args2[1])) return true;
         return args2[1].every((item) => !callFnVal(args2[0], [item]));
       }
+      case "none":
+        if (args2.length === 0) return { tag: "None", value: null, kind: "Option" };
+        if (Array.isArray(args2[1])) return args2[1].every((item) => !callFnVal(args2[0], [item]));
+        return { tag: "None", value: null, kind: "Option" };
       case "unique":
       case "distinct":
         return Array.isArray(args2[0]) ? [...new Set(args2[0])] : [];
@@ -15201,7 +15248,7 @@ loop().catch(e => {
       case "sort_by": {
         if (Array.isArray(args2[0]) && args2[0].length > 0) {
           const second = args2[1];
-          const firstElemIsFunc = typeof args2[0][0] === "function" || ((_d = args2[0][0]) == null ? void 0 : _d.kind) === "function-value" || ((_e = args2[0][0]) == null ? void 0 : _e.kind) === "closure";
+          const firstElemIsFunc = typeof args2[0][0] === "function" || ((_c = args2[0][0]) == null ? void 0 : _c.kind) === "function-value" || ((_d = args2[0][0]) == null ? void 0 : _d.kind) === "closure";
           const secondIsFunc = second && (typeof second === "function" || (second == null ? void 0 : second.kind) === "function-value" || (second == null ? void 0 : second.kind) === "closure");
           if (secondIsFunc && !firstElemIsFunc) {
             throw new Error(
@@ -15211,7 +15258,7 @@ loop().catch(e => {
         }
         if (!Array.isArray(args2[1])) return [];
         const keyFn = args2[0];
-        const callFn3 = (_f = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _f.bind(interp2);
+        const callFn3 = (_e = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _e.bind(interp2);
         if (!callFn3) return [...args2[1]];
         return [...args2[1]].sort((a, b) => {
           const ka = callFn3(keyFn, [a]);
@@ -15231,7 +15278,7 @@ loop().catch(e => {
         const a = Array.isArray(args2[1]) ? args2[1] : [];
         const b = Array.isArray(args2[2]) ? args2[2] : [];
         const len = Math.min(a.length, b.length);
-        const callFn22 = (_g = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _g.bind(interp2);
+        const callFn22 = (_f = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _f.bind(interp2);
         if (!callFn22) return [];
         return Array.from({ length: len }, (_, i) => callFn22(fn, [a[i], b[i]]));
       }
@@ -16529,13 +16576,13 @@ loop().catch(e => {
           const [problem, evalFn] = args2;
           const evaluate2 = (output) => Number(callFn2(evalFn, [output]));
           const result = globalCompetition.run(problem, evaluate2);
-          return ((_h = result.winner) == null ? void 0 : _h.agentId) ?? null;
+          return ((_g = result.winner) == null ? void 0 : _g.agentId) ?? null;
         }
         if (op === "compete-score") {
           const [problem, evalFn] = args2;
           const evaluate2 = (output) => Number(callFn2(evalFn, [output]));
           const result = globalCompetition.run(problem, evaluate2);
-          return ((_i = result.winner) == null ? void 0 : _i.score) ?? null;
+          return ((_h = result.winner) == null ? void 0 : _h.score) ?? null;
         }
         if (op === "compete-all") {
           const [problem, evalFn] = args2;
@@ -17205,7 +17252,7 @@ loop().catch(e => {
             const history2 = arg.get("history") ?? [];
             if (history2.length < 5) return false;
             const recent = history2.slice(-5);
-            const firstBest = recent[0] instanceof Map ? recent[0].get("best") : (_j = recent[0]) == null ? void 0 : _j.best;
+            const firstBest = recent[0] instanceof Map ? recent[0].get("best") : (_i = recent[0]) == null ? void 0 : _i.best;
             return recent.every((s) => {
               const b = s instanceof Map ? s.get("best") : s == null ? void 0 : s.best;
               return Math.abs(b - firstBest) < 1e-9;
@@ -17429,8 +17476,8 @@ loop().catch(e => {
           return /* @__PURE__ */ new Map([
             ["success", result.success],
             ["reason", result.reason ?? null],
-            ["previousId", ((_k = result.previous) == null ? void 0 : _k.id) ?? null],
-            ["restoredId", ((_l = result.restored) == null ? void 0 : _l.id) ?? null]
+            ["previousId", ((_j = result.previous) == null ? void 0 : _j.id) ?? null],
+            ["restoredId", ((_k = result.restored) == null ? void 0 : _k.id) ?? null]
           ]);
         }
         if (op === "version-prev") {
@@ -17438,8 +17485,8 @@ loop().catch(e => {
           return /* @__PURE__ */ new Map([
             ["success", result.success],
             ["reason", result.reason ?? null],
-            ["previousId", ((_m = result.previous) == null ? void 0 : _m.id) ?? null],
-            ["restoredId", ((_n = result.restored) == null ? void 0 : _n.id) ?? null]
+            ["previousId", ((_l = result.previous) == null ? void 0 : _l.id) ?? null],
+            ["restoredId", ((_m = result.restored) == null ? void 0 : _m.id) ?? null]
           ]);
         }
         if (op === "version-diff") {
@@ -17602,7 +17649,7 @@ loop().catch(e => {
               ["name", brResult.name],
               ["results", brResult.results.map(brToMap)],
               ["startTime", brResult.startTime.toISOString()],
-              ["endTime", ((_o = brResult.endTime) == null ? void 0 : _o.toISOString()) ?? ""],
+              ["endTime", ((_n = brResult.endTime) == null ? void 0 : _n.toISOString()) ?? ""],
               ["summary", /* @__PURE__ */ new Map([
                 ["total", brResult.summary.total],
                 ["fastest", brResult.summary.fastest ? brToMap(brResult.summary.fastest) : null],
