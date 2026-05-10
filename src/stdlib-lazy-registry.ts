@@ -1,6 +1,8 @@
 // FreeLang v11: Lazy Module Registry
 // (require "audit") 호출 시 해당 모듈만 로드 — 번들 크기 무관하게 시작 빠름
 
+import { createWsModule }           from "./stdlib-ws";
+import { createWscModule }          from "./stdlib-wsc";
 import { createCryptoRsaModule }    from "./stdlib-crypto-rsa";
 import { createTotpModule }         from "./stdlib-totp";
 import { createMailModule }         from "./stdlib-mail";
@@ -36,6 +38,8 @@ interface InterpreterLike {
 // 모듈명 → 팩토리 함수 매핑
 // 새 stdlib 추가 시 여기에만 한 줄 추가하면 됨
 const LAZY_REGISTRY: Record<string, ModuleFactory> = {
+  "ws":          (interp?: any) => createWsModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
+  "wsc":         (interp?: any) => createWscModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
   "crypto-rsa":  () => createCryptoRsaModule(),
   "totp":        () => createTotpModule(),
   "mail":        () => createMailModule(),

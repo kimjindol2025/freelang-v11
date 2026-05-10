@@ -33,10 +33,8 @@ import { createModuleSystem } from "./stdlib-module";    // Phase 24: Module sys
 import { createTestModule } from "./stdlib-test";        // Phase 76: FL 테스트 러너
 import { createMaybeModule } from "./maybe-type";        // Phase 91: 불확실성 타입
 import { createTestEnhancedModule } from "./stdlib-test-enhanced";
-import { createWsModule } from "./stdlib-ws";            // WebSocket 서버
 import { fnMetaRegistry } from "./eval-special-forms";   // AI-Native Phase 1
 import { propRegistry, runProp, createPropertyModule } from "./stdlib-property"; // AI-Native Phase 4
-import { createWscModule } from "./stdlib-wsc";          // WebSocket 클라이언트
 import { requireModule, getAvailableModules, isModuleLoaded } from "./stdlib-lazy-registry"; // Lazy Loading
 import { createImageModule } from "./stdlib-image";     // Phase A: Image Processing
 import { createMongodbModule } from "./stdlib-mongodb"; // Phase A: MongoDB Driver
@@ -124,12 +122,6 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     (name, args) => interp.callUserFunction(name, args)
   ));
   interp.registerModule(createTestEnhancedModule());
-  interp.registerModule(createWsModule(
-    (n: string, a: any[]) => interp.callUserFunction(n, a)
-  ));
-  interp.registerModule(createWscModule(
-    (n: string, a: any[]) => interp.callUserFunction(n, a)
-  ));
   const imageModule = createImageModule();
   const mongodbModule = createMongodbModule();
   interp.registerModule(imageModule);    // Phase A

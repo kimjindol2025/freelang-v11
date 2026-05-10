@@ -2,6 +2,16 @@
 
 ---
 
+## v11.6.34 — A-3: WebSocket lazy 등록 (2026-05-10)
+
+- `stdlib-ws`/`stdlib-wsc` stdlib-loader.ts eager 등록 제거
+- lazy-registry로 이동: `(require "ws")` / `(require "wsc")` 명시 필요
+- 자동 시작 없음 — WS 서버/클라이언트는 require 호출 후에만 활성화
+- 기존 HTTP server의 WS upgrade 핸들러(RFC 6455)는 그대로 유지
+- **검증**: 903/903 PASS, L2 SHA 47407b90 유지
+
+---
+
 ## v11.6.33 — A-2: 특화 모듈 5개 bootstrap 번들 제거 (2026-05-10)
 
 - 제거: `oci`(321줄), `stats`(172줄), `plot`(196줄), `feed`(171줄), `matrix`(170줄)
