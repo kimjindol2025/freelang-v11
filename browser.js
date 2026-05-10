@@ -15510,6 +15510,20 @@ loop().catch(e => {
         return Math.ceil(args2[0]);
       case "round":
         return Math.round(args2[0]);
+      case "quot":
+        return Math.trunc(Number(args2[0]) / Number(args2[1]));
+      case "rem":
+        return Number(args2[0]) - Math.trunc(Number(args2[0]) / Number(args2[1])) * Number(args2[1]);
+      case "int":
+        return Math.trunc(Number(args2[0]));
+      case "sorted?": {
+        const arr = args2[0];
+        if (!Array.isArray(arr) || arr.length <= 1) return true;
+        for (let i = 1; i < arr.length; i++) {
+          if (arr[i] < arr[i - 1]) return false;
+        }
+        return true;
+      }
       case "math-sqrt":
       case "math_sqrt":
       case "sqrt":
@@ -15639,11 +15653,17 @@ loop().catch(e => {
         return out;
       }
       case "take": {
+        if (Array.isArray(args2[0]) && typeof args2[1] === "number") {
+          throw new Error(`take \uC778\uC790 \uC21C\uC11C \uC624\uB958: (take n coll) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (take coll n)`);
+        }
         const n = args2[0];
         const seq = args2[1];
         return take(n, isLazySeq(seq) ? seq : Array.isArray(seq) ? seq : null);
       }
       case "drop": {
+        if (Array.isArray(args2[0]) && typeof args2[1] === "number") {
+          throw new Error(`drop \uC778\uC790 \uC21C\uC11C \uC624\uB958: (drop n coll) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (drop coll n)`);
+        }
         const n = args2[0];
         const seq = args2[1];
         if (Array.isArray(seq)) return seq.slice(n);
@@ -21015,7 +21035,29 @@ Test Results: ${r.passed}/${total} passed`);
             throw new Error(`let: expected even number of binding items, got ${items.length}`);
           }
           for (let i = 0; i < items.length; i += 2) {
-            const varName = toVarName(items[i]);
+            const pattern = items[i];
+            if ((pattern == null ? void 0 : pattern.kind) === "block" && (pattern == null ? void 0 : pattern.type) === "Map") {
+              const mapFields = pattern.fields;
+              const keysField = mapFields == null ? void 0 : mapFields.get("keys");
+              if ((keysField == null ? void 0 : keysField.kind) === "block" && (keysField == null ? void 0 : keysField.type) === "Array") {
+                const sourceMap = ev(items[i + 1]);
+                const keyItems = keysField.fields.get("items") ?? [];
+                for (const keyNode of keyItems) {
+                  const rawName = (keyNode == null ? void 0 : keyNode.kind) === "literal" && (keyNode == null ? void 0 : keyNode.type) === "symbol" ? keyNode.value : (keyNode == null ? void 0 : keyNode.kind) === "variable" ? keyNode.name.replace(/^\$/, "") : null;
+                  if (rawName !== null) {
+                    const varName2 = rawName.startsWith("$") ? rawName : "$" + rawName;
+                    const value2 = sourceMap !== null && typeof sourceMap === "object" ? sourceMap[rawName] ?? null : null;
+                    ctx.variables.set(varName2, value2, {
+                      line: keyNode.line,
+                      col: keyNode.col,
+                      type: inferType2(value2)
+                    });
+                  }
+                }
+              }
+              continue;
+            }
+            const varName = toVarName(pattern);
             const value = ev(items[i + 1]);
             const meta = {
               line: items[i].line,

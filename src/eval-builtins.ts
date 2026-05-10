@@ -2530,6 +2530,24 @@ loop().catch(e => {
       return Math.ceil(args[0]);
     case "round":
       return Math.round(args[0]);
+    case "quot":
+      // (quot a b) → 정수 나눗셈 (0 방향으로 버림)
+      return Math.trunc(Number(args[0]) / Number(args[1]));
+    case "rem":
+      // (rem a b) → 나머지 (부호는 피제수 따름)
+      return Number(args[0]) - Math.trunc(Number(args[0]) / Number(args[1])) * Number(args[1]);
+    case "int":
+      // (int x) → 정수로 변환 (0 방향 버림)
+      return Math.trunc(Number(args[0]));
+    case "sorted?": {
+      // (sorted? coll) → 오름차순 정렬 여부
+      const arr = args[0];
+      if (!Array.isArray(arr) || arr.length <= 1) return true;
+      for (let i = 1; i < arr.length; i++) {
+        if (arr[i] < arr[i - 1]) return false;
+      }
+      return true;
+    }
     case "math-sqrt": case "math_sqrt":
     case "sqrt":
       return Math.sqrt(args[0]);
@@ -2684,6 +2702,10 @@ loop().catch(e => {
 
     // (take n seq) — lazy or array에서 n개 꺼냄
     case "take": {
+      // 인자 순서 감지: (take arr n) → 즉시 throw
+      if (Array.isArray(args[0]) && typeof args[1] === "number") {
+        throw new Error(`take 인자 순서 오류: (take n coll) 형식이 올바릅니다. 현재 입력: (take coll n)`);
+      }
       const n = args[0] as number;
       const seq = args[1];
       return take(n, isLazySeq(seq) ? seq : Array.isArray(seq) ? seq : null);
@@ -2691,6 +2713,10 @@ loop().catch(e => {
 
     // (drop n seq) — lazy seq에서 n개 버리고 나머지 반환
     case "drop": {
+      // 인자 순서 감지: (drop arr n) → 즉시 throw
+      if (Array.isArray(args[0]) && typeof args[1] === "number") {
+        throw new Error(`drop 인자 순서 오류: (drop n coll) 형식이 올바릅니다. 현재 입력: (drop coll n)`);
+      }
       const n = args[0] as number;
       const seq = args[1];
       if (Array.isArray(seq)) return seq.slice(n);
