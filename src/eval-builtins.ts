@@ -1490,10 +1490,20 @@ loop().catch(e => {
           throw new Error(`reduce 인자 순서 오류: (reduce fn init arr) 형식이 올바릅니다. 현재 입력: (reduce arr init fn)`);
         }
       }
-      // fn-first 고정: (reduce fn init arr)
+      // fn-first 고정: (reduce fn init arr) 또는 2인자 (reduce fn arr)
       const reduceFn = args[0];
-      let accumulator = args[1];
-      let arr = args[2] ?? [];
+      let accumulator: any;
+      let arr: any;
+      if (args.length <= 2 || args[2] === undefined) {
+        // 2-arg form: (reduce fn coll) — 첫 요소를 초기값으로
+        const coll = Array.isArray(args[1]) ? args[1] : [];
+        if (coll.length === 0) return null;
+        accumulator = coll[0];
+        arr = coll.slice(1);
+      } else {
+        accumulator = args[1];
+        arr = args[2] ?? [];
+      }
       // lazy seq 지원 (범위 제한 100k)
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 100000;
@@ -2156,11 +2166,14 @@ loop().catch(e => {
     }
     case "dissoc": {
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
-        // 키 정규화: :key → "key" (LIR-002)
-        const rawK = args[1];
-        const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
-        const { [k]: _, ...rest } = args[0];
-        return rest;
+        // 다중 키 지원: (dissoc m "a" "b" "c")
+        let result = { ...args[0] };
+        for (let ki = 1; ki < args.length; ki++) {
+          const rawK = args[ki];
+          const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
+          delete result[k];
+        }
+        return result;
       }
       return args[0] ?? {};
     }
@@ -2266,8 +2279,49 @@ loop().catch(e => {
       return typeof args[0] === "string" ? args[0].split(String(args[1] ?? "")).join(String(args[2] ?? "")) : "";
     case "flatten": {
       if (!Array.isArray(args[0])) return [];
-      const flatten = (arr: any[]): any[] => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
-      return flatten(args[0]);
+      const flattenDeep = (arr: any[]): any[] => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flattenDeep(val) : val), []);
+      return flattenDeep(args[0]);
+    }
+    case "flatten-1": case "flat-1": {
+      // 1단계만 펼치기
+      if (!Array.isArray(args[0])) return [];
+      return (args[0] as any[]).reduce((acc: any[], val: any) => acc.concat(Array.isArray(val) ? val : [val]), []);
+    }
+    case "conj": {
+      // (conj coll v1 v2 ...) — 배열 끝에 추가, 맵이면 병합
+      const coll = args[0];
+      const vals = args.slice(1);
+      if (Array.isArray(coll)) return [...coll, ...vals];
+      if (coll !== null && typeof coll === "object" && !Array.isArray(coll)) {
+        let result = { ...coll };
+        for (const v of vals) {
+          if (v && typeof v === "object" && !Array.isArray(v)) Object.assign(result, v);
+          else if (Array.isArray(v) && v.length === 2) result[String(v[0])] = v[1];
+        }
+        return result;
+      }
+      return vals;
+    }
+    case "partition-by": {
+      // (partition-by fn coll) — 연속된 같은 결과끼리 그룹화
+      const fn = args[0];
+      const coll = args[1];
+      if (!Array.isArray(coll) || coll.length === 0) return [];
+      const result: any[][] = [];
+      let group: any[] = [coll[0]];
+      let lastKey = callFnVal(fn, [coll[0]]);
+      for (let i = 1; i < coll.length; i++) {
+        const key = callFnVal(fn, [coll[i]]);
+        if (key === lastKey) {
+          group.push(coll[i]);
+        } else {
+          result.push(group);
+          group = [coll[i]];
+          lastKey = key;
+        }
+      }
+      result.push(group);
+      return result;
     }
     case "every?": case "every": {
       if (!Array.isArray(args[1])) throw new Error(`every?: 두 번째 인자는 배열이어야 합니다`);

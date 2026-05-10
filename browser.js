@@ -14527,8 +14527,17 @@ loop().catch(e => {
           }
         }
         const reduceFn = args2[0];
-        let accumulator = args2[1];
-        let arr = args2[2] ?? [];
+        let accumulator;
+        let arr;
+        if (args2.length <= 2 || args2[2] === void 0) {
+          const coll = Array.isArray(args2[1]) ? args2[1] : [];
+          if (coll.length === 0) return null;
+          accumulator = coll[0];
+          arr = coll.slice(1);
+        } else {
+          accumulator = args2[1];
+          arr = args2[2] ?? [];
+        }
         if (isLazySeq(arr)) {
           const REDUCE_LAZY_LIMIT = 1e5;
           let cur = arr;
@@ -15156,10 +15165,13 @@ loop().catch(e => {
       }
       case "dissoc": {
         if (args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0])) {
-          const rawK = args2[1];
-          const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
-          const { [k]: _, ...rest } = args2[0];
-          return rest;
+          let result = { ...args2[0] };
+          for (let ki = 1; ki < args2.length; ki++) {
+            const rawK = args2[ki];
+            const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
+            delete result[k];
+          }
+          return result;
         }
         return args2[0] ?? {};
       }
@@ -15270,8 +15282,47 @@ loop().catch(e => {
         return typeof args2[0] === "string" ? args2[0].split(String(args2[1] ?? "")).join(String(args2[2] ?? "")) : "";
       case "flatten": {
         if (!Array.isArray(args2[0])) return [];
-        const flatten = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
-        return flatten(args2[0]);
+        const flattenDeep = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flattenDeep(val) : val), []);
+        return flattenDeep(args2[0]);
+      }
+      case "flatten-1":
+      case "flat-1": {
+        if (!Array.isArray(args2[0])) return [];
+        return args2[0].reduce((acc, val) => acc.concat(Array.isArray(val) ? val : [val]), []);
+      }
+      case "conj": {
+        const coll = args2[0];
+        const vals = args2.slice(1);
+        if (Array.isArray(coll)) return [...coll, ...vals];
+        if (coll !== null && typeof coll === "object" && !Array.isArray(coll)) {
+          let result = { ...coll };
+          for (const v of vals) {
+            if (v && typeof v === "object" && !Array.isArray(v)) Object.assign(result, v);
+            else if (Array.isArray(v) && v.length === 2) result[String(v[0])] = v[1];
+          }
+          return result;
+        }
+        return vals;
+      }
+      case "partition-by": {
+        const fn = args2[0];
+        const coll = args2[1];
+        if (!Array.isArray(coll) || coll.length === 0) return [];
+        const result = [];
+        let group = [coll[0]];
+        let lastKey = callFnVal(fn, [coll[0]]);
+        for (let i = 1; i < coll.length; i++) {
+          const key = callFnVal(fn, [coll[i]]);
+          if (key === lastKey) {
+            group.push(coll[i]);
+          } else {
+            result.push(group);
+            group = [coll[i]];
+            lastKey = key;
+          }
+        }
+        result.push(group);
+        return result;
       }
       case "every?":
       case "every": {
