@@ -1545,6 +1545,35 @@ loop().catch(e => {
               .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x00/g, "\\0");
     }
 
+    case "cx": {
+      // (cx "btn" (when active "btn-active") nil "rounded")
+      // nil/false/빈 문자열 필터링 후 공백으로 join
+      return args
+        .flat()
+        .filter((c: any) => c !== null && c !== undefined && c !== false && c !== "")
+        .map((c: any) => String(c).trim())
+        .filter((c: string) => c.length > 0)
+        .join(" ");
+    }
+
+    case "for-html": {
+      // (for-html items render-fn) → str-join(map(fn, items), "")
+      if (!Array.isArray(args[0])) return "";
+      return args[0].map((item: any) => {
+        const result = callFnVal(args[1], [item]);
+        return result !== null && result !== undefined ? String(result) : "";
+      }).join("");
+    }
+
+    case "for-html-indexed": {
+      // (for-html-indexed items render-fn) → fn receives [item index]
+      if (!Array.isArray(args[0])) return "";
+      return args[0].map((item: any, i: number) => {
+        const result = callFnVal(args[1], [item, i]);
+        return result !== null && result !== undefined ? String(result) : "";
+      }).join("");
+    }
+
     // Time
     case "now":
       return new Date().toISOString();
