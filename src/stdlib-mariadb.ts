@@ -248,8 +248,12 @@ export function createMariadbModule() {
     "mariadb_query": (db: string, sql: string, params: any[] = []) =>
       parseRows(runMariadb(db, bindParams(sql, params))),
 
-    "mariadb_one":   (db: string, sql: string, params: any[] = []) =>
-      parseRows(runMariadb(db, bindParams(sql, params)))[0] ?? null,
+    "mariadb_one":   (db: string, sql: string, params: any[] = []) => {
+      const rows = parseRows(runMariadb(db, bindParams(sql, params)));
+      // 결과 없으면 반드시 null (undefined 금지 — nil-safe 보장)
+      const row = rows[0];
+      return (row === undefined || row === null) ? null : row;
+    },
 
     // db_query_one db sql [params] → row or nil
     // db: CLI connection string (string) or pool ID (number) — auto-detect

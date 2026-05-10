@@ -104,6 +104,15 @@ export function createCacheModule() {
       return result;
     },
 
+    // cache_set_ttl key value ttl_ms → null  (인자 순서: key value ttl — cache_set과 동일하지만 명시적)
+    "cache_set_ttl": (key: string, val: any, ttlMs: number): null => {
+      _cache.set(key, {
+        value: val,
+        expiresAt: ttlMs > 0 ? Date.now() + ttlMs : null,
+      });
+      return null;
+    },
+
     // cache_mset entries ttl → null  (entries = {key: value, ...})
     "cache_mset": (entries: Record<string, any>, ttlMs: number = 0): null => {
       const expiresAt = ttlMs > 0 ? Date.now() + ttlMs : null;

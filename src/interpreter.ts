@@ -137,6 +137,34 @@ export class Interpreter {
     // Phase 58: 모든 stdlib 모듈 등록 (stdlib-loader.ts로 분리)
     loadAllStdlib(this);
 
+    // AGENT-2: .env 자동 로드 — 인터프리터 초기화 시 process.cwd()/.env 파일 자동 파싱
+    // FL_NO_AUTO_ENV=1 환경변수로 비활성화 가능
+    if (!process.env.FL_NO_AUTO_ENV) {
+      try {
+        const _fsEnv = require("fs");
+        const _pathEnv = require("path");
+        const _envFile = _pathEnv.resolve(process.cwd(), ".env");
+        if (_fsEnv.existsSync(_envFile)) {
+          const _content = _fsEnv.readFileSync(_envFile, "utf-8");
+          for (const _rawLine of _content.split("\n")) {
+            const _line = _rawLine.trim();
+            if (!_line || _line.startsWith("#")) continue;
+            const _eqIdx = _line.indexOf("=");
+            if (_eqIdx === -1) continue;
+            const _key = _line.slice(0, _eqIdx).trim();
+            let _value = _line.slice(_eqIdx + 1).trim();
+            if ((_value.startsWith('"') && _value.endsWith('"')) ||
+                (_value.startsWith("'") && _value.endsWith("'"))) {
+              _value = _value.slice(1, -1);
+            }
+            if (_key && process.env[_key] === undefined) {
+              process.env[_key] = _value;
+            }
+          }
+        }
+      } catch { /* .env 로드 실패는 무시 */ }
+    }
+
     // Phase 49: FL 표준 라이브러리 (fl-map, fl-filter, fl-reduce, Maybe, Result 등)
     this.loadFlStdlib();
 

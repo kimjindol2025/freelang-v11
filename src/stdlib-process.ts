@@ -103,5 +103,18 @@ export function createProcessModule() {
       if (idx === -1 || idx + 1 >= args.length) return defaultVal;
       return args[idx + 1];
     },
+
+    // shell_exec_stdout cmd cwd? -> string | null (stdout만 반환, 실패 시 null)
+    "shell_exec_stdout": (cmd: string, cwd?: string): string | null => {
+      try {
+        const { execSync } = require("child_process");
+        const opts: any = { encoding: "utf8", timeout: 30000 };
+        if (cwd) opts.cwd = cwd;
+        const stdout = execSync(cmd, opts);
+        return typeof stdout === "string" ? stdout : String(stdout);
+      } catch {
+        return null;
+      }
+    },
   };
 }

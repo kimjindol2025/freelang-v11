@@ -169,5 +169,14 @@ export function createFileModule() {
         throw new Error(`file_ctime failed for '${filePath}': ${err.message}`);
       }
     },
+
+    // file_read_or filePath defaultVal -> string | any (파일 없거나 오류 시 기본값 반환)
+    "file_read_or": (filePath: string, defaultVal: any = null): any => {
+      try {
+        return fs.readFileSync(filePath, "utf-8");
+      } catch {
+        return defaultVal ?? null;
+      }
+    },
   };
 }

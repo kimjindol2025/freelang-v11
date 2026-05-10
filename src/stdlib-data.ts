@@ -500,6 +500,28 @@ export function createDataModule() {
       });
     },
 
+    // empty? x -> boolean (배열/문자열/객체/nil 모두 지원)
+    "empty?": (x: any): boolean => {
+      if (x === null || x === undefined) return true;
+      if (Array.isArray(x)) return x.length === 0;
+      if (typeof x === "string") return x.length === 0;
+      if (typeof x === "object") return Object.keys(x).length === 0;
+      return false;
+    },
+
+    // array-empty? x -> boolean (배열만 확인)
+    "array-empty?": (x: any): boolean => Array.isArray(x) && x.length === 0,
+    "array_empty_q": (x: any): boolean => Array.isArray(x) && x.length === 0,
+
+    // str_contains_in s pattern -> boolean (인자 순서: s 먼저, pattern 나중)
+    // 기존 str_includes(s, sub)와 동일 순서지만 명시적 별칭
+    "str_contains_in": (s: string, pattern: string): boolean => String(s).includes(String(pattern)),
+    "str-contains-in": (s: string, pattern: string): boolean => String(s).includes(String(pattern)),
+
+    // str_replace_in s old new -> string (replaceAll, 인자 순서: s 먼저)
+    "str_replace_in": (s: string, oldStr: string, newStr: string): string => String(s).replaceAll(String(oldStr), String(newStr)),
+    "str-replace-in": (s: string, oldStr: string, newStr: string): string => String(s).replaceAll(String(oldStr), String(newStr)),
+
     // CLAUDE.md 문서화 별칭
     "is-nil":          (v: any) => v === null || v === undefined,
     "is-empty":        (v: any) => v === null || v === undefined || (Array.isArray(v) && v.length === 0) || (typeof v === "string" && v.length === 0),

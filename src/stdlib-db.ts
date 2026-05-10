@@ -105,15 +105,21 @@ export function createDbModule() {
     // ── SQLite ───────────────────────────────────────────────
 
     // db_query dbPath sql params -> rows (JSON array)
-    "db_query": (dbPath: string, sql: string, params: any[] = []): any[] => {
+    // params: 배열이 아닌 단일값도 자동으로 [val] 래핑 (scalar auto-wrap)
+    "db_query": (dbPath: string, sql: string, params: any = []): any[] => {
       const db = getDb(dbPath);
-      return db.prepare(sql).all(params);
+      const p = Array.isArray(params) ? params
+               : (params !== null && params !== undefined ? [params] : []);
+      return db.prepare(sql).all(p);
     },
 
     // db_exec dbPath sql [params] -> stdout string
-    "db_exec": (dbPath: string, sql: string, params: any[] = []): string => {
+    // params: 배열이 아닌 단일값도 자동으로 [val] 래핑 (scalar auto-wrap)
+    "db_exec": (dbPath: string, sql: string, params: any = []): string => {
       const db = getDb(dbPath);
-      db.prepare(sql).run(params);
+      const p = Array.isArray(params) ? params
+               : (params !== null && params !== undefined ? [params] : []);
+      db.prepare(sql).run(p);
       return "";
     },
 
