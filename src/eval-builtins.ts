@@ -1121,7 +1121,7 @@ loop().catch(e => {
       return null;
     case "println":
     case "echo":
-      console.log(...args.map((a: any) => toDisplay(a)));
+      process.stdout.write(args.map((a: any) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "tap": case "dbg": {
       // (tap x) → 값을 stderr에 출력하고 그대로 반환 (디버깅용)
@@ -1415,7 +1415,7 @@ loop().catch(e => {
         }
       }
       const mapFn = args[0];
-      if (args[1] === null || args[1] === undefined) throw new Error(`타입 불일치: map 대상이 nil — 배열 예상`);
+      if (args[1] === null || args[1] === undefined) return [];
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
       return mapArr.map((item: any) => callFnVal(mapFn, [item]));
     }
@@ -1773,19 +1773,54 @@ loop().catch(e => {
       return Array.isArray(args[0]) ? args[0].join("") : "";
     case "str-format": case "format": {
       // (str-format "%s has %d items" name count) 또는 (str-format "%s has %d" [name count])
-      let fmt = String(args[0] ?? "");
+      const fmt = String(args[0] ?? "");
       const fmtArgs = (args.length === 2 && Array.isArray(args[1])) ? args[1] : args.slice(1);
       let i = 0;
-      return fmt.replace(/%(-?\d*\.?\d*)([sdfoexX%])/g, (_m, spec, t) => {
+      return fmt.replace(/%([+\-0 ]*)(\d*)\.?(\d*)([sdifoexX%])/g, (_m, flags, width, prec, t) => {
         if (t === "%") return "%";
         const v = fmtArgs[i++];
-        if (t === "d") return String(Math.trunc(Number(v)));
-        if (t === "f") {
-          const prec = spec.includes(".") ? parseInt(spec.split(".")[1]) : 6;
-          return Number(v).toFixed(prec);
+        const w = width ? parseInt(width) : 0;
+        const hasPlus = flags.includes("+");
+        const hasZero = flags.includes("0");
+        const hasLeft = flags.includes("-");
+        const pad = (s: string, positive: boolean) => {
+          if (w <= s.length) return s;
+          if (hasLeft) return s.padEnd(w, " ");
+          if (hasZero) {
+            const sign = s[0] === "+" || s[0] === "-" ? s[0] : "";
+            return sign + (sign ? s.slice(1) : s).padStart(w - sign.length, "0");
+          }
+          return s.padStart(w, " ");
+        };
+        if (t === "d" || t === "i") {
+          const n = Math.trunc(Number(v));
+          let s = String(Math.abs(n));
+          if (n < 0) s = "-" + s;
+          else if (hasPlus) s = "+" + s;
+          return pad(s, n >= 0);
         }
-        if (t === "s") return v === null || v === undefined ? "null" : String(v);
+        if (t === "f") {
+          const precision = prec !== "" ? parseInt(prec) : 6;
+          const n = Number(v);
+          let s = Math.abs(n).toFixed(precision);
+          if (n < 0) s = "-" + s;
+          else if (hasPlus) s = "+" + s;
+          return pad(s, n >= 0);
+        }
+        if (t === "e" || t === "E") {
+          const precision = prec !== "" ? parseInt(prec) : 6;
+          let s = Number(v).toExponential(precision);
+          if (t === "E") s = s.toUpperCase();
+          return w > s.length ? (hasLeft ? s.padEnd(w) : s.padStart(w)) : s;
+        }
+        if (t === "s") {
+          let s = v === null || v === undefined ? "null" : String(v);
+          if (w > s.length) s = hasLeft ? s.padEnd(w, " ") : s.padStart(w, " ");
+          return s;
+        }
         if (t === "o") return JSON.stringify(v);
+        if (t === "x") return Math.trunc(Number(v)).toString(16);
+        if (t === "X") return Math.trunc(Number(v)).toString(16).toUpperCase();
         return String(v);
       });
     }
@@ -1838,7 +1873,7 @@ loop().catch(e => {
       // fn-first 고정: (filter fn arr)
       const filterFn = args[0];
       const coll = args[1];
-      if (coll === null || coll === undefined) throw new Error(`타입 불일치: filter 대상이 nil — 배열 예상`);
+      if (coll === null || coll === undefined) return [];
       if (!Array.isArray(coll)) return [];
       if (filterFn === null || filterFn === undefined) return coll;
       return coll.filter((item: any) => callFnVal(filterFn, [item]));
@@ -2350,11 +2385,12 @@ loop().catch(e => {
       return result;
     }
     case "every?": case "every": {
+      if (args[1] === null || args[1] === undefined) return true; // vacuous truth
       if (!Array.isArray(args[1])) throw new Error(`every?: 두 번째 인자는 배열이어야 합니다`);
       return args[1].every((item: any) => callFnVal(args[0], [item]));
     }
     case "any?": case "any": {
-      // (any? pred coll) — 하나라도 만족하면 첫 매칭값 반환, 없으면 nil (some?은 not-nil? 별칭이므로 충돌 회피)
+      if (args[1] === null || args[1] === undefined) return null;
       if (!Array.isArray(args[1])) throw new Error(`any?: 두 번째 인자는 배열이어야 합니다`);
       const found = args[1].find((item: any) => callFnVal(args[0], [item]));
       return found !== undefined ? found : null;

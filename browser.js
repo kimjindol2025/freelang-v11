@@ -13351,7 +13351,7 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
         process.stdout.write(vals.map((v) => toDisplay(v)).join(""));
         return null;
       case "println":
-        console.log(...vals.map((v) => v === null ? "null" : String(v)));
+        process.stdout.write(vals.map((v) => v === null ? "null" : String(v)).join(" ") + "\n");
         return null;
       case "substring":
         return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== void 0 ? Number(v2) : void 0) : "";
@@ -14199,7 +14199,7 @@ loop().catch(e => {
         return null;
       case "println":
       case "echo":
-        console.log(...args2.map((a) => toDisplay2(a)));
+        process.stdout.write(args2.map((a) => toDisplay2(a)).join(" ") + "\n");
         return null;
       case "tap":
       case "dbg": {
@@ -14458,7 +14458,7 @@ loop().catch(e => {
           }
         }
         const mapFn = args2[0];
-        if (args2[1] === null || args2[1] === void 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: map \uB300\uC0C1\uC774 nil \u2014 \uBC30\uC5F4 \uC608\uC0C1`);
+        if (args2[1] === null || args2[1] === void 0) return [];
         const mapArr = Array.isArray(args2[1]) ? args2[1] : [];
         return mapArr.map((item) => callFnVal(mapFn, [item]));
       }
@@ -14763,19 +14763,54 @@ loop().catch(e => {
         return Array.isArray(args2[0]) ? args2[0].join("") : "";
       case "str-format":
       case "format": {
-        let fmt = String(args2[0] ?? "");
+        const fmt = String(args2[0] ?? "");
         const fmtArgs = args2.length === 2 && Array.isArray(args2[1]) ? args2[1] : args2.slice(1);
         let i = 0;
-        return fmt.replace(/%(-?\d*\.?\d*)([sdfoexX%])/g, (_m2, spec, t) => {
+        return fmt.replace(/%([+\-0 ]*)(\d*)\.?(\d*)([sdifoexX%])/g, (_m2, flags, width, prec, t) => {
           if (t === "%") return "%";
           const v = fmtArgs[i++];
-          if (t === "d") return String(Math.trunc(Number(v)));
-          if (t === "f") {
-            const prec = spec.includes(".") ? parseInt(spec.split(".")[1]) : 6;
-            return Number(v).toFixed(prec);
+          const w = width ? parseInt(width) : 0;
+          const hasPlus = flags.includes("+");
+          const hasZero = flags.includes("0");
+          const hasLeft = flags.includes("-");
+          const pad = (s, positive) => {
+            if (w <= s.length) return s;
+            if (hasLeft) return s.padEnd(w, " ");
+            if (hasZero) {
+              const sign = s[0] === "+" || s[0] === "-" ? s[0] : "";
+              return sign + (sign ? s.slice(1) : s).padStart(w - sign.length, "0");
+            }
+            return s.padStart(w, " ");
+          };
+          if (t === "d" || t === "i") {
+            const n = Math.trunc(Number(v));
+            let s = String(Math.abs(n));
+            if (n < 0) s = "-" + s;
+            else if (hasPlus) s = "+" + s;
+            return pad(s, n >= 0);
           }
-          if (t === "s") return v === null || v === void 0 ? "null" : String(v);
+          if (t === "f") {
+            const precision = prec !== "" ? parseInt(prec) : 6;
+            const n = Number(v);
+            let s = Math.abs(n).toFixed(precision);
+            if (n < 0) s = "-" + s;
+            else if (hasPlus) s = "+" + s;
+            return pad(s, n >= 0);
+          }
+          if (t === "e" || t === "E") {
+            const precision = prec !== "" ? parseInt(prec) : 6;
+            let s = Number(v).toExponential(precision);
+            if (t === "E") s = s.toUpperCase();
+            return w > s.length ? hasLeft ? s.padEnd(w) : s.padStart(w) : s;
+          }
+          if (t === "s") {
+            let s = v === null || v === void 0 ? "null" : String(v);
+            if (w > s.length) s = hasLeft ? s.padEnd(w, " ") : s.padStart(w, " ");
+            return s;
+          }
           if (t === "o") return JSON.stringify(v);
+          if (t === "x") return Math.trunc(Number(v)).toString(16);
+          if (t === "X") return Math.trunc(Number(v)).toString(16).toUpperCase();
           return String(v);
         });
       }
@@ -14820,7 +14855,7 @@ loop().catch(e => {
         }
         const filterFn = args2[0];
         const coll = args2[1];
-        if (coll === null || coll === void 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: filter \uB300\uC0C1\uC774 nil \u2014 \uBC30\uC5F4 \uC608\uC0C1`);
+        if (coll === null || coll === void 0) return [];
         if (!Array.isArray(coll)) return [];
         if (filterFn === null || filterFn === void 0) return coll;
         return coll.filter((item) => callFnVal(filterFn, [item]));
@@ -15350,11 +15385,13 @@ loop().catch(e => {
       }
       case "every?":
       case "every": {
+        if (args2[1] === null || args2[1] === void 0) return true;
         if (!Array.isArray(args2[1])) throw new Error(`every?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
         return args2[1].every((item) => callFnVal(args2[0], [item]));
       }
       case "any?":
       case "any": {
+        if (args2[1] === null || args2[1] === void 0) return null;
         if (!Array.isArray(args2[1])) throw new Error(`any?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
         const found = args2[1].find((item) => callFnVal(args2[0], [item]));
         return found !== void 0 ? found : null;
@@ -23374,6 +23411,7 @@ req.end();`;
       },
       // frequencies arr -> {value: count}  (count occurrences of each value)
       "frequencies": (arr) => {
+        if (arr === null || arr === void 0) return {};
         const result = {};
         for (const item of arr) {
           const k = String(item ?? "__nil__");

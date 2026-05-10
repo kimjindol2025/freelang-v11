@@ -93,6 +93,7 @@ export function createCollectionModule() {
 
     // frequencies arr -> {value: count}  (count occurrences of each value)
     "frequencies": (arr: any[]): Record<string, number> => {
+      if (arr === null || arr === undefined) return {};
       const result: Record<string, number> = {};
       for (const item of arr) {
         const k = String(item ?? "__nil__");
