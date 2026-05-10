@@ -2,8 +2,8 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 43,
-    "percent": 43,
+    "covered": 52,
+    "percent": 52,
     "last_updated": "2026-05-10",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
@@ -15,9 +15,18 @@
       "#7 (str-contains-in alias 추가 — v11.6.20)",
       "#8 (str-replace-in alias 추가 — v11.6.20)",
       "#10 (cache-set-ttl alias 추가 — v11.6.20)",
-      "#84 (empty?/array-empty? helper 추가 — v11.6.20)"
+      "#84 (empty?/array-empty? helper 추가 — v11.6.20)",
+      "#11 (http-get-data: GET JSON data 직접 반환 — v11.6.22)",
+      "#12 (http-post-data: POST JSON data 직접 반환 — v11.6.22)",
+      "#13 (http-get-status: GET status 직접 반환 — v11.6.22)",
+      "#14 (http-get-key: 이미 v11.6.20 구현됨)",
+      "#66 (db-query-one: 이미 stdlib-mariadb.ts에 구현됨)",
+      "#97 ((str map) JSON stringify — v11.6.23)",
+      "#1 (map 인자 순서 감지 throw — v11.6.24)",
+      "#2 (filter 인자 순서 감지 throw — v11.6.24)",
+      "#3 (reduce 인자 순서 감지 throw — v11.6.24)"
     ],
-    "_note": "covered 43개 = 기존 38개 + 이번 5개 (#89, #7, #8, #10, #84)"
+    "_note": "covered 52개 = 기존 43개 + Phase G 9개 (#11/#12/#13/#14/#66/#97/#1/#2/#3)"
   },
   "_categories": {
     "design": {
@@ -49,17 +58,23 @@
     "#1": {
       "type": "design",
       "summary": "map: fn 먼저",
-      "fix": "v12: (map arr fn) — 컬렉션 first 통일"
+      "fix": "v12: (map arr fn) — 컬렉션 first 통일",
+      "status": "covered",
+      "solved_in": "v11.6.24"
     },
     "#2": {
       "type": "design",
       "summary": "filter: fn 먼저",
-      "fix": "v12: (filter arr fn) 통일"
+      "fix": "v12: (filter arr fn) 통일",
+      "status": "covered",
+      "solved_in": "v11.6.24"
     },
     "#3": {
       "type": "design",
       "summary": "reduce: fn,init,arr",
-      "fix": "v12: (reduce arr init fn) 통일"
+      "fix": "v12: (reduce arr init fn) 통일",
+      "status": "covered",
+      "solved_in": "v11.6.24"
     },
     "#4": {
       "type": "design",
@@ -105,22 +120,30 @@
     "#11": {
       "type": "design",
       "summary": "http_get 반환 구조체",
-      "fix": "v12: http-get-json 표준화"
+      "fix": "v12: http-get-json 표준화",
+      "status": "covered",
+      "solved_in": "v11.6.22"
     },
     "#12": {
       "type": "design",
       "summary": "http_post 반환 구조체",
-      "fix": "v12: 동일"
+      "fix": "v12: 동일",
+      "status": "covered",
+      "solved_in": "v11.6.22"
     },
     "#13": {
       "type": "design",
       "summary": "http_get status 추출",
-      "fix": "v12: http-status 표준화"
+      "fix": "v12: http-status 표준화",
+      "status": "covered",
+      "solved_in": "v11.6.22"
     },
     "#14": {
       "type": "missing",
       "summary": "http_get_key 미구현",
-      "fix": "Phase Y: API Key 인증 구현"
+      "fix": "Phase Y: API Key 인증 구현",
+      "status": "covered",
+      "solved_in": "v11.6.20"
     },
     "#15": {
       "type": "design",
@@ -380,7 +403,9 @@
     "#66": {
       "type": "design",
       "summary": "db_query 배열 반환 구조",
-      "fix": "v12: db-query-one 표준화"
+      "fix": "v12: db-query-one 표준화",
+      "status": "covered",
+      "solved_in": "v11.6.20"
     },
     "#67": {
       "type": "design",
@@ -539,7 +564,9 @@
     "#97": {
       "type": "design",
       "summary": "(str map) 결과 \"[object Object]\"",
-      "fix": "v12: str가 자동 JSON"
+      "fix": "v12: str가 자동 JSON",
+      "status": "covered",
+      "solved_in": "v11.6.23"
     },
     "#98": {
       "type": "normal",
