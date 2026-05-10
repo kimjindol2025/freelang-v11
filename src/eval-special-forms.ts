@@ -804,6 +804,18 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return val;
   }
 
+  // ── ?? (nil 병합) ────────────────────────────────────────────────
+  // (?? expr default) → expr이 nil이면 default, 아니면 expr
+  // (?? a b c) → 왼쪽부터 첫 번째 non-nil 값 반환
+  if (op === "??") {
+    if (expr.args.length < 2) throw new Error(`?? requires at least 2 arguments`);
+    for (let i = 0; i < expr.args.length; i++) {
+      const val = ev(expr.args[i]);
+      if (val !== null && val !== undefined) return val;
+    }
+    return null;
+  }
+
   // ── |> (thread-last pipe) ────────────────────────────────────────
   // (|> val (f arg...) ...) → pipeVal을 각 단계의 마지막 인자로 주입
   // (|> [1 2 3] (filter even?) (map inc)) → (map inc (filter even? [1 2 3]))
