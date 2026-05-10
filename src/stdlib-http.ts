@@ -6,7 +6,7 @@ import { execSync } from "child_process";
 import { writeFileSync, unlinkSync } from "fs";
 import { randomUUID } from "crypto";
 
-function nodeHttpRequest(url: string, method: string = "GET", headers?: any, body?: string): { status: number; body: string; error?: string } {
+function nodeHttpRequest(url: string, method: string = "GET", headers?: any, body?: string, timeoutMs: number = 10000): { status: number; body: string; error?: string } {
   let tmpFile: string | null = null;
   try {
     const headersObj: Record<string, string> = {};
@@ -39,15 +39,18 @@ const req=mod.request(opts,res=>{
   res.on('data',d=>chunks.push(d));
   res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString('utf-8')}))});
 });
-req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
-req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+let done=false;
+const fail=(msg)=>{if(done)return;done=true;process.stdout.write(JSON.stringify({s:0,b:'',e:msg}))};
+req.on('error',e=>fail(e.message));
+req.on('socket',s=>{s.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')})});
+req.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')});
 if(bodyStr!=null)req.write(bodyStr,'utf-8');
 req.end();`;
 
     writeFileSync(tmpFile, script, "utf-8");
-    const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15000 });
+    const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: timeoutMs + 2000 });
     const parsed = JSON.parse(result);
-    return { status: parsed.s || 0, body: parsed.b || "" };
+    return { status: parsed.s || 0, body: parsed.b || "", ...(parsed.e && { error: parsed.e }) };
   } catch (err: any) {
     return { status: 0, body: "", error: err.message };
   } finally {
@@ -236,6 +239,18 @@ export function createHttpModule() {
     // http_request method url headers body -> {:status 200 :body "..."}
     "http_request": (method: string, url: string, headers: any, body: string): any => {
       const result = curlGetStatusAndBody(url, method, headers, body);
+      return {
+        status: result.status,
+        body: result.body,
+        ...(result.error && { error: result.error })
+      };
+    },
+
+    // http_request_timeout method url headers body timeout_ms -> {:status 200 :body "..." :error nil}
+    // timeout_ms: 최대 대기 시간 (ms). 초과 시 status:0, error:"timeout" 반환
+    "http_request_timeout": (method: string, url: string, headers: any, body: string, timeoutMs: number): any => {
+      const ms = Number(timeoutMs) || 5000;
+      const result = nodeHttpRequest(url, method, headers, body || undefined, ms);
       return {
         status: result.status,
         body: result.body,
