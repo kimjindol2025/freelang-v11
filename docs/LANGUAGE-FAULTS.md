@@ -534,3 +534,50 @@
 **원인**: bracketed 모드에서 `items[0]`을 무조건 변수 조회 → `$else` 미정의.  
 **수정**: `eval-special-forms.ts:evalCond` — `isElse` 감지 후 `{kind:"literal", value:true}` 대체.  
 **v11.6.2 fix**: bracketed + flat-pair 모드 모두 `:else` / `else` catch-all 지원.
+
+---
+
+### #89 — try/catch 완전 구현 (v11.6.21 해결 ✅)
+
+```lisp
+;; ❌ v11.6.20 이전: try/catch 동작 불완전
+;; - error object가 JS Map으로 생성 → (get $e "message") → nil
+;; - 에러 메시지에 "[op] msg (at line N)" 포맷 그대로 저장
+;; - error type이 정규화되지 않음
+
+;; ✅ v11.6.21: 완전 구현
+(try
+  (error "custom message")
+  (catch $e
+    (get $e "message")))  ; → "custom message"
+
+(try
+  (error "x")
+  (catch $e
+    (get $e "type")))  ; → "RuntimeError"
+
+(try
+  (try (error "inner") (catch $e "caught-inner"))
+  (catch $e "caught-outer"))  ; → "caught-inner"
+```
+
+**원인 1**: `new Map()` 사용 → FreeLang map 연산 nil 반환 → `{}` 일반 객체로 수정.  
+**원인 2**: 런타임 포맷 `[op] msg (at line N)` 그대로 저장 → 정규식으로 원본 메시지 추출.  
+**원인 3**: `error.constructor.name` 환경별 편차 → FreeLang 에러 타입 외 모두 `"RuntimeError"` 정규화.  
+**v11.6.21 fix**: `eval-special-forms.ts evalTryBlock` 수정, 5-case PASS 확인.
+
+---
+
+## v11.6.20 해결 항목
+
+| # | 항목 | 방법 | 파일 |
+|---|------|------|------|
+| #71 | `file-read-or` | 신규 함수 추가 | `stdlib-file.ts` |
+| #74 | `shell-exec-stdout` | 신규 함수 추가 | `stdlib-process.ts` |
+| #72 | `env-load` 자동 | interpreter 초기화 1줄 | `interpreter.ts` |
+| #68 | `db-exec` scalar 배열화 | 내부 처리 수정 | `stdlib-db.ts` |
+| #69 | `mariadb-one` nil-safe | null 명시 보장 | `stdlib-mariadb.ts` |
+| #84 | `empty?` / `array-empty?` | 신규 helper | `stdlib-data.ts` |
+| #7  | `str-contains-in` alias | alias 추가 | `stdlib-data.ts` |
+| #8  | `str-replace-in` alias | alias 추가 | `stdlib-data.ts` |
+| #10 | `cache-set-ttl` alias | alias 추가 | `stdlib-cache.ts` |

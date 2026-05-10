@@ -1,7 +1,7 @@
 # FreeLang v11 표준 라이브러리 완전 참조
 
 **대상**: AI 에이전트 & 개발자  
-**최종 업데이트**: 2026-05-08 (v11.5.3)
+**최종 업데이트**: 2026-05-10 (v11.6.21)
 
 ---
 
@@ -2116,6 +2116,106 @@ POST body 자동 JSON 파싱. `server-req-body` + `json-parse` 조합 대체.
 ```
 
 > `server-req-body` → 문자열 반환 / `server-req-json` → 파싱된 맵 반환
+---
+
+## v11.6.20~21 신규 함수 (2026-05-10)
+
+### `(file-read-or path default)` — 파일 안전 읽기
+
+파일이 없거나 오류 시 기본값 반환. 설정 파일 로드 등에 유용.
+
+```lisp
+(file-read-or "config.json" "{}")
+(file-read-or "/tmp/cache.txt" "")
+```
+
+**반환값**: 파일 내용 문자열 | default 값
+
+---
+
+### `(shell-exec-stdout cmd)` — shell stdout 직접 반환
+
+shell 명령 실행 후 stdout 문자열만 직접 반환 (trim 포함).
+
+```lisp
+(shell-exec-stdout "git log --oneline -3")
+(shell-exec-stdout "ls -la")
+```
+
+**반환값**: stdout 문자열 | 오류 시 nil
+
+---
+
+### `(empty? val)` — nil/빈 값 안전 검사
+
+nil, 빈 문자열, 빈 배열 모두 true 반환.
+
+```lisp
+(empty? nil)   ; → true
+(empty? "")    ; → true
+(empty? [])    ; → true
+(empty? "hi")  ; → false
+(empty? [1])   ; → false
+```
+
+### `(array-empty? arr)` — 배열 전용 empty 검사
+
+```lisp
+(array-empty? [])   ; → true
+(array-empty? [1])  ; → false
+```
+
+---
+
+### `(str-contains-in s pattern)` — 문자열 포함 alias
+
+`str-contains`의 인자 순서 alias. (s pattern) 순서로 호출.
+
+```lisp
+(str-contains-in "hello world" "world")  ; → true
+```
+
+### `(str-replace-in s old new)` — 문자열 치환 alias
+
+`str-replace`의 인자 순서 alias. (s old new) 순서로 호출.
+
+```lisp
+(str-replace-in "hello" "ell" "ELL")  ; → "hELLo"
+```
+
+### `(cache-set-ttl key val ttl)` — 캐시 저장 alias
+
+`cache-set`의 인자 순서 alias. (key value ttl) 순서로 호출.
+
+```lisp
+(cache-set-ttl "user:1" user-data 3600)  ; 1시간 캐시
+```
+
+---
+
+### try/catch 완전 구현 (v11.6.21)
+
+error object 구조:
+```lisp
+{
+  "type"    "RuntimeError"   ; 에러 타입 (정규화됨)
+  "message" "원본 메시지"     ; 파싱된 원본 메시지
+  "line"    N                ; 발생 라인
+  "stack"   "..."            ; JS 스택 트레이스
+}
+```
+
+```lisp
+(try
+  (error "something went wrong")
+  (catch $e
+    (get $e "message")))  ; → "something went wrong"
+
+(try
+  (try (error "inner") (catch $e "caught-inner"))
+  (catch $e "caught-outer"))  ; → "caught-inner"
+```
+
 ---
 
 ## v11.6.x 신규 / 확인된 기능 (2026-05-08)

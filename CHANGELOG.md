@@ -1,5 +1,63 @@
 # Changelog
 
+## [v11.6.21] — 2026-05-10 (AGENT-4 try/catch 완전 구현 + AGENT-1 최종 검증)
+
+### 핵심 변경
+
+| Agent | 역할 | 내용 |
+|-------|------|------|
+| AGENT-4 | Core Isolation | `evalTryBlock` 3버그 수정 — JS Map→Record, 메시지 파싱, type 정규화 |
+| AGENT-1 | Stability Guard | 903/903 PASS · L2 SHA 47407b90 고정점 확인 · try/catch 5케이스 검증 |
+
+### 수정 상세 (AGENT-4)
+
+- **버그 1**: error object를 `new Map()` 으로 생성 → FreeLang map 연산 nil 반환 → `{}` 일반 객체로 수정
+- **버그 2**: `[op] 원본메시지 (at line N)` 포맷 문자열이 그대로 message 필드에 → 정규식으로 원본 메시지만 추출
+- **버그 3**: `error.constructor.name` 환경별 편차 → FreeLang 에러 타입 아닐 경우 `"RuntimeError"` 강제 정규화
+
+### 검증 (AGENT-1)
+
+```
+npm test: 903/903 PASS (35 suites)
+L2 SHA stage2: 47407b900fab6ceec314f5cd1ba3c6584432abeb51e84ea17df2ac880c5e7be8
+L2 SHA stage3: 47407b900fab6ceec314f5cd1ba3c6584432abeb51e84ea17df2ac880c5e7be8
+```
+
+Commit: e0c61c94 | Tests: 903/903 | Fixed-Point: deterministic ✅
+
+---
+
+## [v11.6.20] — 2026-05-10 (AGENT-2 Safe Stdlib + AGENT-3 DB Hardening)
+
+### 신규 함수 (AGENT-2)
+
+| 함수 | 파일 | 설명 |
+|------|------|------|
+| `file-read-or` | `stdlib-file.ts` | 파일 없거나 오류 시 기본값 반환 |
+| `shell-exec-stdout` | `stdlib-process.ts` | shell 명령 실행 후 stdout 문자열 직접 반환 |
+| `empty?` | `stdlib-data.ts` | nil/빈 문자열/빈 배열 → true |
+| `array-empty?` | `stdlib-data.ts` | 배열 전용 empty 검사 |
+| `str-contains-in` | `stdlib-data.ts` | `(str-contains-in s pattern)` 순서 alias |
+| `str-replace-in` | `stdlib-data.ts` | `(str-replace-in s old new)` 순서 alias |
+| `cache-set-ttl` | `stdlib-cache.ts` | `(cache-set-ttl k v ttl)` 순서 alias |
+
+### .env 자동 로드 (AGENT-2)
+
+- `interpreter.ts` 초기화 시 `.env` 파일 자동 로드
+- 비활성화: `FL_NO_AUTO_ENV=1`
+
+### DB 안정화 (AGENT-3)
+
+| 함수 | 수정 내용 |
+|------|----------|
+| `mariadb-one` | undefined 대신 명시적 null 반환 보장 |
+| `db-exec` | scalar 파라미터 자동 `[val]` 배열 래핑 |
+| `db-query` | scalar 파라미터 자동 `[val]` 배열 래핑 |
+
+Commit: 2a07ad7b | Tests: 903/903 | Fixed-Point: 5/5
+
+---
+
 ## [v11.6.19] — 2026-05-08 (higher-order 함수 버그 4개)
 
 ### 버그 수정
