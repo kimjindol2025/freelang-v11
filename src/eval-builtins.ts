@@ -279,9 +279,15 @@ function flExecOpNative(op: string, vals: any[]): any {
     case "str-to-num": { const n = parseFloat(String(v0)); return isNaN(n) ? null : n; }
     case "num-to-str": return String(v0 ?? "");
     case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
-    case "type-of": return typeof v0;
+    case "type-of": {
+      if (v0 === null || v0 === undefined) return "nil";
+      if (Array.isArray(v0)) return "array";
+      if (v0 instanceof Map || (typeof v0 === "object" && v0 !== null && !Array.isArray(v0) && typeof v0 !== "function")) return "map";
+      if (typeof v0 === "function" || v0?.kind === "function-value" || v0?.kind === "closure" || v0?.kind === "builtin-fn") return "function";
+      return typeof v0; // "number", "string", "boolean"
+    }
     case "print": process.stdout.write(vals.map((v: any) => toDisplay(v)).join("")); return null;
-    case "println": console.log(...vals.map((v: any) => v === null ? "null" : String(v))); return null;
+    case "println": process.stdout.write(vals.map((v: any) => v === null ? "null" : String(v)).join(" ") + "\n"); return null;
 
     case "substring": return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== undefined ? Number(v2) : undefined) : "";
     case "char-at": return typeof v0 === "string" ? (v0[Number(v1)] ?? "") : "";
@@ -1748,8 +1754,17 @@ loop().catch(e => {
       if (Array.isArray(args[0])) return args[0].slice(args[1], args[2]);
       if (typeof args[0] === "string") return args[0].slice(args[1], args[2]);
       return [];
-    case "str-split":
-      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].split(args[1]) : [];
+    case "str-split": {
+      if (typeof args[0] !== "string" || typeof args[1] !== "string") return [];
+      const parts = args[0].split(args[1]);
+      if (args[2] !== undefined) {
+        const lim = Number(args[2]);
+        if (lim > 0 && parts.length > lim) {
+          return [...parts.slice(0, lim - 1), parts.slice(lim - 1).join(args[1])];
+        }
+      }
+      return parts;
+    }
     case "join":
     case "str-join":
       // (str-join arr sep) 또는 (str-join sep arr) 양방향 지원
@@ -1774,6 +1789,8 @@ loop().catch(e => {
         return String(v);
       });
     }
+    case "str-blank?":
+      return args[0] === null || args[0] === undefined || (typeof args[0] === "string" && args[0].trim() === "");
     case "trim":
     case "string_trim":
     case "str_trim":
@@ -2117,6 +2134,15 @@ loop().catch(e => {
       }
       return finalEnv;
     }
+    case "hash-map": {
+      // (hash-map k1 v1 k2 v2 ...) → map
+      const hm: Record<string, any> = {};
+      for (let i = 0; i + 1 < args.length; i += 2) {
+        const k = typeof args[i] === "string" && args[i].startsWith(":") ? args[i].slice(1) : String(args[i]);
+        hm[k] = args[i + 1];
+      }
+      return hm;
+    }
     case "assoc": {
       let base = (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]))
         ? { ...args[0] } : {};
@@ -2420,6 +2446,14 @@ loop().catch(e => {
     // Type/Utility
     case "typeof":
       return typeof args[0];
+    case "type-of": {
+      const v = args[0];
+      if (v === null || v === undefined) return "nil";
+      if (Array.isArray(v)) return "array";
+      if (typeof v === "function" || v?.kind === "function-value" || v?.kind === "closure" || v?.kind === "builtin-fn") return "function";
+      if (typeof v === "object") return "map";
+      return typeof v; // "number", "string", "boolean"
+    }
 
     // ── 벡터 유사도 (pgvector 대체) ──────────────────────────────
     case "vec-dot": case "dot-product": {
@@ -2564,7 +2598,13 @@ loop().catch(e => {
     case "tan":
       return Math.tan(args[0]);
     case "random":
+    case "rand":
       return Math.random();
+    case "rand-int": {
+      // (rand-int n) → 0..n-1,  (rand-int min max) → min..max-1
+      if (args.length >= 2) return Math.floor(Math.random() * (Number(args[1]) - Number(args[0]))) + Number(args[0]);
+      return Math.floor(Math.random() * Number(args[0]));
+    }
     case "clamp":
       return Math.max(args[1], Math.min(args[2], args[0]));
 

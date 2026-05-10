@@ -13340,8 +13340,13 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
         return String(v0 ?? "");
       case "replace":
         return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
-      case "type-of":
+      case "type-of": {
+        if (v0 === null || v0 === void 0) return "nil";
+        if (Array.isArray(v0)) return "array";
+        if (v0 instanceof Map || typeof v0 === "object" && v0 !== null && !Array.isArray(v0) && typeof v0 !== "function") return "map";
+        if (typeof v0 === "function" || (v0 == null ? void 0 : v0.kind) === "function-value" || (v0 == null ? void 0 : v0.kind) === "closure" || (v0 == null ? void 0 : v0.kind) === "builtin-fn") return "function";
         return typeof v0;
+      }
       case "print":
         process.stdout.write(vals.map((v) => toDisplay(v)).join(""));
         return null;
@@ -14740,8 +14745,17 @@ loop().catch(e => {
         if (Array.isArray(args2[0])) return args2[0].slice(args2[1], args2[2]);
         if (typeof args2[0] === "string") return args2[0].slice(args2[1], args2[2]);
         return [];
-      case "str-split":
-        return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].split(args2[1]) : [];
+      case "str-split": {
+        if (typeof args2[0] !== "string" || typeof args2[1] !== "string") return [];
+        const parts = args2[0].split(args2[1]);
+        if (args2[2] !== void 0) {
+          const lim = Number(args2[2]);
+          if (lim > 0 && parts.length > lim) {
+            return [...parts.slice(0, lim - 1), parts.slice(lim - 1).join(args2[1])];
+          }
+        }
+        return parts;
+      }
       case "join":
       case "str-join":
         if (Array.isArray(args2[0])) return args2[0].join(args2[1] !== void 0 ? String(args2[1]) : "");
@@ -14765,6 +14779,8 @@ loop().catch(e => {
           return String(v);
         });
       }
+      case "str-blank?":
+        return args2[0] === null || args2[0] === void 0 || typeof args2[0] === "string" && args2[0].trim() === "";
       case "trim":
       case "string_trim":
       case "str_trim":
@@ -15123,6 +15139,14 @@ loop().catch(e => {
         }
         return finalEnv;
       }
+      case "hash-map": {
+        const hm = {};
+        for (let i = 0; i + 1 < args2.length; i += 2) {
+          const k = typeof args2[i] === "string" && args2[i].startsWith(":") ? args2[i].slice(1) : String(args2[i]);
+          hm[k] = args2[i + 1];
+        }
+        return hm;
+      }
       case "assoc": {
         let base = args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? { ...args2[0] } : {};
         for (let i = 1; i + 1 < args2.length; i += 2) {
@@ -15408,6 +15432,14 @@ loop().catch(e => {
         return [args2[1], ...args2[0]];
       case "typeof":
         return typeof args2[0];
+      case "type-of": {
+        const v = args2[0];
+        if (v === null || v === void 0) return "nil";
+        if (Array.isArray(v)) return "array";
+        if (typeof v === "function" || (v == null ? void 0 : v.kind) === "function-value" || (v == null ? void 0 : v.kind) === "closure" || (v == null ? void 0 : v.kind) === "builtin-fn") return "function";
+        if (typeof v === "object") return "map";
+        return typeof v;
+      }
       case "vec-dot":
       case "dot-product": {
         const a = args2[0], b = args2[1];
@@ -15541,7 +15573,12 @@ loop().catch(e => {
       case "tan":
         return Math.tan(args2[0]);
       case "random":
+      case "rand":
         return Math.random();
+      case "rand-int": {
+        if (args2.length >= 2) return Math.floor(Math.random() * (Number(args2[1]) - Number(args2[0]))) + Number(args2[0]);
+        return Math.floor(Math.random() * Number(args2[0]));
+      }
       case "clamp":
         return Math.max(args2[1], Math.min(args2[2], args2[0]));
       case "ok":
