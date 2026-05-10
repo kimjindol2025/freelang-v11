@@ -676,6 +676,7 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   const callUser = (name: string, a: any[]) => (interp as any).callUserFunction(name, a);
   const callFnVal = (fn: any, a: any[]) => {
     if (typeof fn === "string") return (interp as any).callUserFunction(fn, a);
+    if (fn?.kind === "builtin-fn") return evalBuiltin(interp, fn.name, a, expr);
     if (fn?.kind === "function-value" || fn?.kind === "async-function-value") return (interp as any).callFunctionValue(fn, a);
     if (typeof fn?.body === "function") return fn.body(...a);  // native stdlib (inc, dec 등)
     if (fn?.params !== undefined && fn?.body !== undefined) return (interp as any).callUserFunction(fn.name ?? fn.id, a);
@@ -1109,6 +1110,13 @@ loop().catch(e => {
     case "echo":
       console.log(...args.map((a: any) => toDisplay(a)));
       return null;
+    case "tap": case "dbg": {
+      // (tap x) → 값을 stderr에 출력하고 그대로 반환 (디버깅용)
+      const label = args.length > 1 ? String(args[0]) + " " : "";
+      const val = args.length > 1 ? args[1] : args[0];
+      process.stderr.write("[tap] " + label + toDisplay(val) + "\n");
+      return val;
+    }
     case "print-err":
       process.stderr.write(args.map((a: any) => toDisplay(a)).join(" ") + "\n");
       return null;
@@ -1294,27 +1302,17 @@ loop().catch(e => {
     case "comp": {
       // (comp f g h) → (fn [x] (f (g (h x))))
       const fns = args.filter(a => a != null);
-      const callOne = (fn: any, callArgs: any[]) => {
-        if (typeof fn === "function") return fn(...callArgs);
-        if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
-        return null;
-      };
       return (...callArgs: any[]) => {
         if (fns.length === 0) return callArgs[0];
-        let result = callOne(fns[fns.length - 1], callArgs);
-        for (let i = fns.length - 2; i >= 0; i--) result = callOne(fns[i], [result]);
+        let result = callFnVal(fns[fns.length - 1], callArgs);
+        for (let i = fns.length - 2; i >= 0; i--) result = callFnVal(fns[i], [result]);
         return result;
       };
     }
     case "juxt": {
       // (juxt f g h) → (fn [x] [(f x) (g x) (h x)])
       const fns = args.filter(a => a != null);
-      const callOne = (fn: any, callArgs: any[]) => {
-        if (typeof fn === "function") return fn(...callArgs);
-        if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
-        return null;
-      };
-      return (...callArgs: any[]) => fns.map(fn => callOne(fn, callArgs));
+      return (...callArgs: any[]) => fns.map(fn => callFnVal(fn, callArgs));
     }
     case "constantly": {
       // (constantly v) → (fn [...args] v) — 인자 무시하고 v 반환
@@ -1404,7 +1402,7 @@ loop().catch(e => {
       if (args[1] === null || args[1] === undefined) throw new Error(`타입 불일치: map 대상이 nil — 배열 예상`);
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
       if (typeof mapFn === "function") {
-        return mapArr.map(mapFn);
+        return mapArr.map((item: any) => mapFn(item));
       } else if (mapFn && ((mapFn as any).kind === "function-value" || (mapFn as any).kind === "async-function-value")) {
         return mapArr.map((item: any) => callFnVal(mapFn, [item]));
       }
@@ -1718,7 +1716,7 @@ loop().catch(e => {
       const coll = args[1];
       if (coll === null || coll === undefined) throw new Error(`타입 불일치: filter 대상이 nil — 배열 예상`);
       if (!Array.isArray(coll)) return [];
-      if (typeof filterFn === "function") return coll.filter(filterFn);
+      if (typeof filterFn === "function") return coll.filter((item: any) => filterFn(item));
       if (filterFn && (filterFn as any).kind === "function-value") {
         return coll.filter((item: any) => callFnVal(filterFn, [item]));
       }
