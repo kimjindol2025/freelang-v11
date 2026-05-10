@@ -1298,6 +1298,15 @@ loop().catch(e => {
       if (kObj instanceof Map) return Array.from(kObj.keys());
       return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
     }
+    case "length-or-zero": case "length_or_zero": {
+      const v = args[0];
+      if (v === null || v === undefined) return 0;
+      if (typeof v === "string") return v.length;
+      if (Array.isArray(v)) return v.length;
+      if (v instanceof Map) return v.size;
+      if (typeof v === "object") return Object.keys(v).length;
+      return 0;
+    }
     case "vals":
     case "values": {
       const vObj = args[0];
@@ -1880,6 +1889,23 @@ loop().catch(e => {
       });
     case "sort-by": case "sort_by": {
       // (sort-by keyfn coll) — keyfn을 호출해 반환값으로 정렬
+      // 인자 순서 오류 감지: (sort-by arr fn) 형식은 잘못됨
+      if (Array.isArray(args[0]) && args[0].length > 0) {
+        const second = args[1];
+        const firstElemIsFunc = typeof args[0][0] === "function"
+          || args[0][0]?.kind === "function-value"
+          || args[0][0]?.kind === "closure";
+        const secondIsFunc = second && (
+          typeof second === "function"
+          || second?.kind === "function-value"
+          || second?.kind === "closure"
+        );
+        if (secondIsFunc && !firstElemIsFunc) {
+          throw new Error(
+            `sort-by 인자 순서 오류: (sort-by fn arr) 형식이 올바릅니다. 현재 입력: (sort-by arr fn)`
+          );
+        }
+      }
       if (!Array.isArray(args[1])) return [];
       const keyFn = args[0];
       const callFn = interp?.callFunctionValue?.bind(interp);

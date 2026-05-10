@@ -117,6 +117,39 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   // 맵 병합 (#39)
   "obj-merge":        { correct: "merge",        usage: '(merge map1 map2)' },
   "obj_merge":        { correct: "merge",        usage: '(merge map1 map2)' },
+  // 배열 길이 (#42)
+  "count":            { correct: "length",        usage: '(length arr)' },
+  "size":             { correct: "length",        usage: '(length arr)' },
+  // 문자열 분리 (#43)
+  "split":            { correct: "str-split",     usage: '(str-split "a,b" ",")' },
+  "str_split":        { correct: "str-split",     usage: '(str-split "a,b" ",")' },
+  // JSON 파싱 (#44)
+  "JSON.parse":       { correct: "json-parse",    usage: '(json-parse "{}")' },
+  "parseJSON":        { correct: "json-parse",    usage: '(json-parse "{}")' },
+  "parse_json":       { correct: "json-parse",    usage: '(json-parse "{}")' },
+  // JSON 직렬화 (#45)
+  "JSON.stringify":   { correct: "json-stringify", usage: '(json-stringify {})' },
+  "toJSON":           { correct: "json-stringify", usage: '(json-stringify {})' },
+  "stringify":        { correct: "json-stringify", usage: '(json-stringify {})' },
+  // 숫자→문자열 (#57)
+  "num-to-str":       { correct: "num_to_str",    usage: '(num_to_str 42)' },
+  "numToStr":         { correct: "num_to_str",    usage: '(num_to_str 42)' },
+  "number_to_str":    { correct: "num_to_str",    usage: '(num_to_str 42)' },
+  // 문자열 공백 제거 (#78)
+  "trim":             { correct: "str-trim",      usage: '(str-trim "  hello  ")' },
+  "str_trim":         { correct: "str-trim",      usage: '(str-trim "  hello  ")' },
+  // 문자열 시작 여부 (#79)
+  "starts-with?":     { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+  "startsWith":       { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+  // 문자열 포함 여부 (#80)
+  "includes":         { correct: "str-contains",  usage: '(str-contains "hello" "ell")' },
+  "str_includes":     { correct: "str-contains",  usage: '(str-contains "hello" "ell")' },
+  // 대문자 변환 (#81)
+  "to-upper":         { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
+  "toUpperCase":      { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
+  "to_upper":         { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
+  // 문자열 변환 (#82)
+  "toString":         { correct: "str",           usage: '(str value)' },
 };
 
 export function suggestSimilar(name: string, candidates: string[]): string | null {

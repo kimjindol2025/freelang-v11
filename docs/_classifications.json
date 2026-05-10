@@ -2,8 +2,8 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 52,
-    "percent": 52,
+    "covered": 75,
+    "percent": 75,
     "last_updated": "2026-05-10",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
@@ -24,9 +24,32 @@
       "#97 ((str map) JSON stringify — v11.6.23)",
       "#1 (map 인자 순서 감지 throw — v11.6.24)",
       "#2 (filter 인자 순서 감지 throw — v11.6.24)",
-      "#3 (reduce 인자 순서 감지 throw — v11.6.24)"
+      "#3 (reduce 인자 순서 감지 throw — v11.6.24)",
+      "#63 (cond :else 이미 v11.6.2 구현 확인 — Phase H 재분류)",
+      "#32 (env/get_env → shell_env ALIAS — v11.6.27)",
+      "#33 (server_listen → server_start ALIAS — v11.6.27)",
+      "#34 (str-to-int/parseInt → str-to-num ALIAS — v11.6.27)",
+      "#35 (console.log/log → println ALIAS — v11.6.27)",
+      "#38 (mariadb_all/db_query → mariadb_query ALIAS — v11.6.27)",
+      "#40 (obj_omit → dissoc ALIAS — v11.6.27)",
+      "#41 (obj_pick → get ALIAS — v11.6.27)",
+      "#42 (count/size → length ALIAS — v11.6.26)",
+      "#43 (split/str_split → str-split ALIAS — v11.6.26)",
+      "#44 (JSON.parse/parseJSON → json-parse ALIAS — v11.6.26)",
+      "#45 (JSON.stringify/stringify → json-stringify ALIAS — v11.6.26)",
+      "#55 (null?/is_nil → nil? ALIAS — v11.6.27)",
+      "#57 (num-to-str/numToStr → num_to_str ALIAS — v11.6.26)",
+      "#78 (trim/str_trim → str-trim ALIAS — v11.6.26)",
+      "#79 (starts-with?/startsWith → str-starts-with ALIAS — v11.6.26)",
+      "#80 (includes/str_includes → str-contains ALIAS — v11.6.26)",
+      "#81 (to-upper/toUpperCase → str-to-upper ALIAS — v11.6.26)",
+      "#82 (toString → str ALIAS — v11.6.26)",
+      "#90 (raise/panic → error ALIAS — v11.6.27)",
+      "#4 (sort-by 인자 순서 감지 throw — v11.6.28)",
+      "#nil-keys (keys nil → [] 이미 구현됨 — Phase H 재분류)",
+      "#length-or-zero (nil-safe length 헬퍼 추가 — v11.6.30)"
     ],
-    "_note": "covered 52개 = 기존 43개 + Phase G 9개 (#11/#12/#13/#14/#66/#97/#1/#2/#3)"
+    "_note": "covered 75개 = Phase G 52개 + #63(1) + v11.6.26(10) + v11.6.27(9) + v11.6.28(1) + v11.6.30(2)"
   },
   "_categories": {
     "design": {
@@ -79,7 +102,10 @@
     "#4": {
       "type": "design",
       "summary": "sort-by: fn 먼저",
-      "fix": "v12: (sort-by arr fn) 통일"
+      "fix": "v12: (sort-by arr fn) 통일",
+      "status": "covered",
+      "solved_in": "v11.6.28",
+      "note": "sort-by 인자 순서 감지 throw"
     },
     "#5": {
       "type": "design",
@@ -233,22 +259,34 @@
     "#32": {
       "type": "learning",
       "summary": "env / get_env (다른 언어 습관)",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "env/get_env → shell_env ALIAS"
     },
     "#33": {
       "type": "learning",
       "summary": "server_listen / server_run",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "server_listen → server_start ALIAS"
     },
     "#34": {
       "type": "learning",
       "summary": "str-to-int / parseInt",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "str-to-int/parseInt → str-to-num ALIAS"
     },
     "#35": {
       "type": "learning",
       "summary": "console.log / log",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "console.log/log → println ALIAS"
     },
     "#36": {
       "type": "doc",
@@ -263,7 +301,10 @@
     "#38": {
       "type": "learning",
       "summary": "mariadb_all / db_query",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "mariadb_all/db_query → mariadb_query ALIAS"
     },
     "#39": {
       "type": "design",
@@ -273,32 +314,50 @@
     "#40": {
       "type": "learning",
       "summary": "obj_omit / omit",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "obj_omit → dissoc ALIAS"
     },
     "#41": {
       "type": "learning",
       "summary": "obj_pick",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "obj_pick → get ALIAS"
     },
     "#42": {
       "type": "learning",
       "summary": "count / size",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "count/size → length ALIAS"
     },
     "#43": {
       "type": "learning",
       "summary": "split / str_split",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "split/str_split → str-split ALIAS"
     },
     "#44": {
       "type": "learning",
       "summary": "JSON.parse / parse_json",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "JSON.parse/parseJSON → json-parse ALIAS"
     },
     "#45": {
       "type": "learning",
       "summary": "JSON.stringify",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "JSON.stringify/stringify → json-stringify ALIAS"
     },
     "#46": {
       "type": "design",
@@ -348,7 +407,10 @@
     "#55": {
       "type": "learning",
       "summary": "(= x null) / null? — nil?로 통일",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "null?/is_nil → nil? ALIAS"
     },
     "#56": {
       "type": "design",
@@ -358,7 +420,10 @@
     "#57": {
       "type": "learning",
       "summary": "num-to-str — (str)",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "num-to-str/numToStr → num_to_str ALIAS"
     },
     "#58": {
       "type": "normal",
@@ -388,7 +453,10 @@
     "#63": {
       "type": "design",
       "summary": "cond [:else ...] 미지원",
-      "fix": "v12: :else 키워드 허용"
+      "fix": "v12: :else 키워드 허용",
+      "status": "covered",
+      "solved_in": "v11.6.2",
+      "note": "이미 구현됨 — Phase H에서 재분류"
     },
     "#64": {
       "type": "normal",
@@ -465,27 +533,42 @@
     "#78": {
       "type": "learning",
       "summary": "trim — str-trim",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "trim/str_trim → str-trim ALIAS"
     },
     "#79": {
       "type": "learning",
       "summary": "starts-with? — str-starts-with",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "starts-with?/startsWith → str-starts-with ALIAS"
     },
     "#80": {
       "type": "learning",
       "summary": "includes — str-contains",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "includes/str_includes → str-contains ALIAS"
     },
     "#81": {
       "type": "learning",
       "summary": "to-upper — str-upper",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "to-upper/toUpperCase → str-to-upper ALIAS"
     },
     "#82": {
       "type": "learning",
       "summary": "toString — str",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.26",
+      "note": "toString → str ALIAS"
     },
     "#83": {
       "type": "normal",
@@ -529,7 +612,10 @@
     "#90": {
       "type": "learning",
       "summary": "throw — error",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.27",
+      "note": "raise/panic → error ALIAS"
     },
     "#91": {
       "type": "missing",

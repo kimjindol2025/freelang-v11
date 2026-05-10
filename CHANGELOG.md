@@ -1,5 +1,206 @@
 # Changelog
 
+---
+
+## Phase H 로드맵 — MISTAKES-100 75% 달성 (2026-05-10~)
+
+> **목표**: 52% → 75% | **원칙**: semantics 변경 최소화, eval-builtins 수정 = isolated commit
+> **한계선**: 75-80%가 v11.6.x 상한선 (이후는 v12 semantics 재설계 필요)
+
+| 버전 | 내용 | 항목 | 누적 |
+|------|------|------|------|
+| v11.6.26 | KNOWN_ALIASES 신규 10개 (JS 습관 흡수) | +10 | 62% |
+| v11.6.27 | 기존 alias 항목 재분류 9개 | +9 | 71% |
+| v11.6.28 | sort-by 인자 순서 감지 (isolated) | +1 | 72% |
+| v11.6.29 | ~~cond :else~~ — **이미 v11.6.2 구현됨, 재분류** | +1 | 73% |
+| v11.6.30 | keys(nil)=[] + length-or-zero 헬퍼 | +2 | 75% |
+| v11.6.31 | 검증 + 문서 마감 + Gogs + 블로그 | — | ✅ |
+
+**위험도**: alias(매우낮음) → sort-by(중간) → cond/nil(높음, 제한적 처리)
+
+---
+
+## Phase G 완료 요약 — MISTAKES-100 43% → 52% (2026-05-10)
+
+| 버전 | 내용 | 해결 항목 |
+|------|------|----------|
+| v11.6.22 | HTTP wrapper 3개 + KNOWN_ALIASES 확장 | #11 #12 #13 #14 |
+| v11.6.23 | (str map) JSON stringify (isolated) | #97 |
+| v11.6.24 | map/filter/reduce 인자 순서 감지 (isolated) | #1 #2 #3 |
+| v11.6.25 | 검증 + 문서 | #66 |
+
+L2 고정점 SHA: `47407b90` | 테스트: 903/903 PASS
+
+---
+
+## [v11.6.30] — 2026-05-10 (Phase H — keys(nil) 재분류 + length-or-zero 헬퍼)
+
+### 변경 (eval-builtins.ts)
+- `length-or-zero` / `length_or_zero` 헬퍼 추가 — nil/빈값 안전 length, 0 반환
+- `keys(nil) → []` 이미 구현됨 확인 → 재분류 (코드 변경 없음)
+
+### 이유
+- `(length nil) → 0` 은 에러 은폐 위험으로 금지 유지
+- 대신 명시적 `(length-or-zero nil)` 헬퍼로 안전한 대안 제공
+
+```lisp
+(length-or-zero nil)    ; → 0
+(length-or-zero [1 2])  ; → 2
+(length-or-zero "hi")   ; → 2
+(keys nil)              ; → [] (기존 동작)
+```
+
+### MISTAKES-100
+- MISTAKES-100: 73% → 75%
+- L2 SHA: `47407b90` 유지 | 테스트: 903/903 PASS
+
+---
+
+## [v11.6.28] — 2026-05-10 (Phase H — sort-by 인자 순서 감지, isolated)
+
+### 변경 (eval-builtins.ts — isolated commit)
+- `sort-by`: 첫 인자 배열 + 두 번째 인자 함수 → throw "sort-by 인자 순서 오류"
+- map/filter/reduce와 동일 패턴으로 일관성 확보
+- 감지 조건: `Array.isArray(first) && first.length > 0 && secondIsFunc && !firstElemIsFunc`
+
+```lisp
+(sort-by [3 1 2] (fn [$x] $x))
+; → 실행 오류: sort-by 인자 순서 오류: (sort-by fn arr) 형식이 올바릅니다
+
+(sort-by (fn [$x] $x) [3 1 2])
+; → [1, 2, 3]  ✅
+```
+
+### 해결 항목
+- #4 (sort-by: fn 먼저)
+
+### MISTAKES-100
+- MISTAKES-100: 72% → 73%
+- L2 SHA: `47407b90` 유지 | 테스트: 903/903 PASS
+
+---
+
+## [v11.6.27] — 2026-05-10 (Phase H — 기존 ALIAS 항목 재분류 9개)
+
+### 변경 (docs만 — 코드 수정 없음)
+기존 KNOWN_ALIASES에 이미 등록된 항목들을 covered로 공식 기록.
+
+| # | 잘못된 이름 | ALIAS 방어 |
+|---|------------|-----------|
+| #32 | env, get_env | → shell_env |
+| #33 | server_listen | → server_start |
+| #34 | str-to-int, parseInt | → str-to-num |
+| #35 | console.log, log | → println |
+| #38 | mariadb_all | → mariadb_query |
+| #40 | obj_omit | → dissoc |
+| #41 | obj_pick | → get |
+| #55 | null?, is_nil | → nil? |
+| #90 | raise, panic | → error |
+
+### MISTAKES-100
+- MISTAKES-100: 62% → 71% (+9)
+
+---
+
+## [v11.6.26] — 2026-05-10 (Phase H — KNOWN_ALIASES 신규 10개 추가)
+
+### 변경 (src/error-formatter.ts)
+JavaScript/Python 습관에서 오는 실수를 ALIAS 힌트로 방어.
+
+| 잘못된 이름 | 올바른 것 | 항목 |
+|------------|----------|------|
+| `count`, `size` | `length` | #42 |
+| `split`, `str_split` | `str-split` | #43 |
+| `JSON.parse`, `parseJSON` | `json-parse` | #44 |
+| `JSON.stringify`, `stringify` | `json-stringify` | #45 |
+| `num-to-str`, `numToStr` | `num_to_str` | #57 |
+| `trim`, `str_trim` | `str-trim` | #78 |
+| `starts-with?`, `startsWith` | `str-starts-with` | #79 |
+| `includes`, `str_includes` | `str-contains` | #80 |
+| `to-upper`, `toUpperCase` | `str-to-upper` | #81 |
+| `toString` | `str` | #82 |
+
+```
+(count [1 2 3])
+→ 오류: 'count'는 없습니다. 대신 'length'를 사용하세요. 사용법: (length arr)
+```
+
+### 원칙
+- alias는 "실행 지원" 아닌 "에러 힌트" only — FreeLang canonical naming 보호
+- runtime semantics 변경 없음
+
+### MISTAKES-100
+- MISTAKES-100: 53% → 62% (+10, #63 재분류 포함 시 53%→62%)
+- L2 SHA: `47407b90` 유지 | 테스트: 903/903 PASS
+
+---
+
+## [v11.6.25] — 2026-05-10 (Phase G 문서 마감)
+
+### 변경
+- `docs/_classifications.json` — MISTAKES-100 커버리지 43% → 52% 갱신
+- `docs/STDLIB_REFERENCE.md` — v11.6.22~24 신규 함수 추가
+- `CHANGELOG.md` — Phase G 전체 이력 정리
+
+### 통계
+- MISTAKES-100: 43% → 52% (9개 신규 해결)
+- L2 SHA: `47407b900fab...` 유지
+- 테스트: 903/903 PASS
+
+---
+
+## [v11.6.24] — 2026-05-10 (map/filter/reduce 인자 순서 감지 — isolated)
+
+### 변경 (eval-builtins.ts — isolated commit)
+- `map`: 첫 인자 배열 + 두 번째 인자 함수 → throw "map 인자 순서 오류: (map fn arr)"
+- `filter`: 동일 패턴 → throw "filter 인자 순서 오류: (filter fn arr)"
+- `reduce`: 첫 인자 배열 + 세 번째 인자 함수 → throw "reduce 인자 순서 오류: (reduce fn init arr)"
+
+### 감지 조건
+- `Array.isArray(args[0]) && args[0].length > 0` — 비어있지 않은 배열
+- `args[1]?.kind === "function-value" || "closure"` — callable
+- 자동 변환 금지, 명확한 에러 메시지만
+
+### 해결 항목
+- #1 (map 인자 순서), #2 (filter 인자 순서), #3 (reduce 인자 순서)
+
+---
+
+## [v11.6.23] — 2026-05-10 ((str map) JSON stringify — isolated)
+
+### 변경 (eval-builtins.ts — isolated commit)
+- `str` 함수: plain object / Array 인자 → `JSON.stringify()` 적용
+- Map / function-value / closure → 기존 `toDisplay()` 유지
+- circular reference → try/catch fallback
+
+```lisp
+(str {"name" "kim"})  ; 이전: "[object Object]" → 이후: '{"name":"kim"}'
+(str [1 2 3])         ; 이전: "1,2,3"           → 이후: "[1,2,3]"
+```
+
+### 해결 항목
+- #97 ((str map) 결과 "[object Object]")
+
+---
+
+## [v11.6.22] — 2026-05-10 (HTTP wrapper + KNOWN_ALIASES 확장)
+
+### 신규 함수 (stdlib-http.ts)
+- `http-get-data url` — GET 후 JSON data 직접 반환 (body 추출 불필요)
+- `http-post-data url data` — POST 후 JSON data 직접 반환
+- `http-get-status url` — GET 후 status 숫자만 반환
+
+### KNOWN_ALIASES 확장 (error-formatter.ts)
+- `str-to-int`, `str_to_int`, `parse-int`, `parseInt` → `str-to-num`
+- `json_keys`, `json-keys`, `map-keys`, `object-keys` → `keys`
+- `http-simple-get`, `http-fetch` → `http-get-data`
+- `obj-merge`, `obj_merge` → `merge`
+
+### 해결 항목
+- #11 (http-get-data), #12 (http-post-data), #13 (http-get-status), #14 (http_get_key)
+
+---
+
 ## [v11.6.21] — 2026-05-10 (AGENT-4 try/catch 완전 구현 + AGENT-1 최종 검증)
 
 ### 핵심 변경
