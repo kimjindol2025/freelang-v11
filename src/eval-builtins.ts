@@ -379,24 +379,27 @@ function flExecOpNative(op: string, vals: any[]): any {
       const url = String(v0 ?? "");
       try {
         const { execSync } = require("child_process");
-        const escapedUrl = url.replace(/'/g, "'\\''");
-        const cmd = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
-        const result = execSync(cmd, { encoding: "utf-8", timeout: 10000 });
-        const lines = result.split("\n");
-        const status = parseInt(lines[lines.length - 1], 10) || 0;
-        const body = lines.slice(0, -1).join("\n");
-        return {
-          status: status,
-          body: body,
-          headers: {}
-        };
+        const { writeFileSync, unlinkSync } = require("fs");
+        const { randomUUID } = require("crypto");
+        const tmpFile = `/tmp/fl-http-${randomUUID()}.js`;
+        const nodeScript = `process.env.FL_URL=${JSON.stringify(url)};
+const u=require('url').parse(process.env.FL_URL);
+const mod=u.protocol==='https:'?require('https'):require('http');
+const chunks=[];
+const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'/',method:'GET'},res=>{
+  res.on('data',d=>chunks.push(d));
+  res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString()}))});
+});
+req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
+req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+req.end();`;
+        writeFileSync(tmpFile, nodeScript, "utf-8");
+        const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15000 });
+        try { unlinkSync(tmpFile); } catch {}
+        const parsed = JSON.parse(result);
+        return { status: parsed.s || 0, body: parsed.b || "", headers: {} };
       } catch (e: any) {
-        return {
-          status: 0,
-          body: "",
-          headers: {},
-          error: e.message
-        };
+        return { status: 0, body: "", headers: {}, error: e.message };
       }
     }
     // atom: 변경 가능한 참조 컨테이너 (전역 상태 관리용)
@@ -5015,24 +5018,27 @@ loop().catch(e => {
           const url = String(args[0] ?? "");
           try {
             const { execSync } = require("child_process");
-            const escapedUrl = url.replace(/'/g, "'\\''");
-            const cmd = `curl -s -w '\\n%{http_code}' '${escapedUrl}' 2>/dev/null`;
-            const result = execSync(cmd, { encoding: "utf-8", timeout: 10000 });
-            const lines = result.split("\n");
-            const status = parseInt(lines[lines.length - 1], 10) || 0;
-            const body = lines.slice(0, -1).join("\n");
-            return {
-              status: status,
-              body: body,
-              headers: {}
-            };
+            const { writeFileSync, unlinkSync } = require("fs");
+            const { randomUUID } = require("crypto");
+            const tmpFile = `/tmp/fl-http-${randomUUID()}.js`;
+            const nodeScript = `process.env.FL_URL=${JSON.stringify(url)};
+const u=require('url').parse(process.env.FL_URL);
+const mod=u.protocol==='https:'?require('https'):require('http');
+const chunks=[];
+const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'/',method:'GET'},res=>{
+  res.on('data',d=>chunks.push(d));
+  res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString()}))});
+});
+req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
+req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+req.end();`;
+            writeFileSync(tmpFile, nodeScript, "utf-8");
+            const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15000 });
+            try { unlinkSync(tmpFile); } catch {}
+            const parsed = JSON.parse(result);
+            return { status: parsed.s || 0, body: parsed.b || "", headers: {} };
           } catch (e: any) {
-            return {
-              status: 0,
-              body: "",
-              headers: {},
-              error: e.message
-            };
+            return { status: 0, body: "", headers: {}, error: e.message };
           }
         }
         case "now-iso": case "now_iso": {

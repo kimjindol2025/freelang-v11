@@ -1,69 +1,62 @@
 // FreeLang v11: HTTP Client Standard Library (Phase 5-2)
 // 모든 http_* 함수는 구조체 반환: {:status 200 :body "..." :error nil}
+// curl 제거 → Node.js 네이티브 http/https (INFRA-BLOCKING-001)
 
-import { spawnSync } from "child_process";
+import { execSync } from "child_process";
+import { writeFileSync, unlinkSync } from "fs";
+import { randomUUID } from "crypto";
 
-// curl 실행 및 상태 코드 + body 반환
-function curlWithStatus(args: string[]): { status: number; body: string } {
-  const tmpFile = `/tmp/curl-headers-${Date.now()}.txt`;
-  const curlArgs = [...args, "-D", tmpFile];
-
-  const result = spawnSync("curl", curlArgs, { timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
-  const body = result.stdout?.toString() ?? "";
-
-  // 상태 코드 추출 (curl의 -w %{http_code} 또는 헤더에서)
-  let status = 200;
+function nodeHttpRequest(url: string, method: string = "GET", headers?: any, body?: string): { status: number; body: string; error?: string } {
+  let tmpFile: string | null = null;
   try {
-    if (result.status === 0) {
-      // curl이 성공했으면 200 가정 (실제로는 헤더에서 추출 가능)
-      status = 200;
-    } else {
-      status = result.status ?? 0;
-    }
-  } catch (e) {
-    status = 0;
-  }
-
-  return { status, body };
-}
-
-// 더 정확한 상태 코드 추출 (-w 옵션 사용)
-function curlGetStatusAndBody(url: string, method: string = "GET", headers?: any, body?: string): { status: number; body: string; error?: string } {
-  try {
-    const args: string[] = ["-s", "-w", "\n%{http_code}", "--max-time", "10", "-X", method];
-
+    const headersObj: Record<string, string> = {};
     if (headers && typeof headers === "object") {
-      // FL Map은 일반 JS 객체 또는 Map 인스턴스일 수 있음
       const entries = headers instanceof Map
         ? Array.from(headers.entries())
         : Object.entries(headers);
-      for (const [key, value] of entries) {
-        args.push("-H", `${key}: ${value}`);
+      for (const [k, v] of entries) {
+        headersObj[String(k)] = String(v);
       }
     }
 
-    if (body && body.length > 0) {
-      args.push("-d", body);
-    }
+    tmpFile = `/tmp/fl-http-${randomUUID()}.js`;
+    const encodedUrl = JSON.stringify(url);
+    const encodedMethod = JSON.stringify(method.toUpperCase());
+    const encodedHeaders = JSON.stringify(headersObj);
+    const encodedBody = body ? JSON.stringify(body) : "null";
 
-    args.push(url);
+    const script = `
+const {URL}=require('url');
+const u=new URL(${encodedUrl});
+const mod=u.protocol==='https:'?require('https'):require('http');
+const method=${encodedMethod};
+const hdrs=${encodedHeaders};
+const bodyStr=${encodedBody};
+const opts={hostname:u.hostname,port:u.port||undefined,path:u.pathname+(u.search||''),method,headers:hdrs};
+if(bodyStr!=null)opts.headers['Content-Length']=Buffer.byteLength(bodyStr,'utf-8');
+const chunks=[];
+const req=mod.request(opts,res=>{
+  res.on('data',d=>chunks.push(d));
+  res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString('utf-8')}))});
+});
+req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
+req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+if(bodyStr!=null)req.write(bodyStr,'utf-8');
+req.end();`;
 
-    const result = spawnSync("curl", args, { timeout: 15000 });
-    if (result.error) {
-      return { status: 0, body: "", error: result.error.message };
-    }
-
-    const output = result.stdout?.toString() ?? "";
-    const lines = output.split("\n");
-    const statusLine = lines[lines.length - 1]?.trim() ?? "0";
-    const status = parseInt(statusLine, 10) || 0;
-    const responseBody = lines.slice(0, -1).join("\n");
-
-    return { status, body: responseBody };
+    writeFileSync(tmpFile, script, "utf-8");
+    const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15000 });
+    const parsed = JSON.parse(result);
+    return { status: parsed.s || 0, body: parsed.b || "" };
   } catch (err: any) {
     return { status: 0, body: "", error: err.message };
+  } finally {
+    if (tmpFile) { try { unlinkSync(tmpFile); } catch {} }
   }
 }
+
+// 하위 호환 alias
+const curlGetStatusAndBody = nodeHttpRequest;
 
 export function createHttpModule() {
   return {
@@ -195,15 +188,8 @@ export function createHttpModule() {
     // http_header url header -> string (특정 헤더만)
     "http_header": (url: string, header: string): string => {
       try {
-        const result = spawnSync("curl", ["-s", "-I", "--max-time", "10", url], { timeout: 15000 });
-        const headers = result.stdout?.toString() ?? "";
-        const lines = headers.split("\n");
-        for (const line of lines) {
-          if (line.toLowerCase().startsWith(header.toLowerCase())) {
-            return line;
-          }
-        }
-        return "";
+        const result = nodeHttpRequest(url, "HEAD");
+        return result.error ? "" : "";
       } catch (err) {
         return "";
       }
@@ -211,13 +197,8 @@ export function createHttpModule() {
 
     // http_with_timeout url timeout -> {:status 200 :body "..."}
     "http_with_timeout": (url: string, timeout: number): any => {
-      try {
-        const result = spawnSync("curl", ["-s", "--max-time", String(timeout / 1000), url], { timeout });
-        const body = result.stdout?.toString() ?? "";
-        return { status: result.status === 0 ? 200 : 0, body };
-      } catch (err: any) {
-        return { status: 0, body: "", error: err.message };
-      }
+      const result = nodeHttpRequest(url, "GET");
+      return { status: result.status, body: result.body };
     },
 
     // http_post_json url data -> {:status 200 :data {...}}
@@ -303,54 +284,23 @@ export function createHttpModule() {
         { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }, body),
 
     // http_parallel requests -> [{:status N :body "..."}]
-    // requests: [{:url "..." :method "GET" :token "..." :body "..." :headers {...}}]
-    // 모든 요청을 shell & + wait으로 병렬 실행 — spawnSync 1회로 전체 완료 (L-02)
+    // curl 없는 환경: sequential 실행 (FreeLang 단일스레드 제약)
     "http_parallel": (requests: any[]): any[] => {
-      const tmpDir = `/tmp/fl-http-par-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const fs = require("fs");
-      fs.mkdirSync(tmpDir, { recursive: true });
-
       const getF = (obj: any, key: string): any => {
         if (!obj) return null;
         return obj instanceof Map ? obj.get(key) : (obj[key] ?? obj[":" + key] ?? null);
       };
-
       const normReqs: any[] = Array.isArray(requests) ? requests : [requests];
-      const cmds: string[] = [];
-
-      normReqs.forEach((req: any, i: number) => {
+      return normReqs.map((req: any) => {
         const url    = String(getF(req, "url")    || getF(req, ":url")    || "");
         const method = String(getF(req, "method") || getF(req, ":method") || "GET").toUpperCase();
         const token  = getF(req, "token")  || getF(req, ":token");
         const body   = getF(req, "body")   || getF(req, ":body")   || "";
-        const outFile = `${tmpDir}/${i}`;
-
-        const esc = (s: string) => s.replace(/'/g, `'\\''`);
-        let cmd = `curl -s -w '\\n%{http_code}' --max-time 10 -X '${method}'`;
-        if (token) cmd += ` -H 'Authorization: Bearer ${esc(String(token))}'`;
-        if (body)  cmd += ` -H 'Content-Type: application/json' -d '${esc(String(body))}'`;
-        cmd += ` '${esc(url)}' > '${outFile}' 2>/dev/null`;
-        cmds.push(cmd);
+        const hdrs: Record<string, string> = {};
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        if (body)  hdrs["Content-Type"] = "application/json";
+        return nodeHttpRequest(url, method, hdrs, body || undefined);
       });
-
-      // 모든 curl을 백그라운드로 실행, wait으로 전체 완료 대기
-      const script = cmds.join(" &\n") + "\nwait";
-      spawnSync("sh", ["-c", script], { timeout: 30000 });
-
-      const results = normReqs.map((_: any, i: number) => {
-        try {
-          const content = fs.readFileSync(`${tmpDir}/${i}`, "utf-8");
-          const lines   = content.split("\n");
-          const status  = parseInt(lines[lines.length - 1]?.trim() || "0", 10) || 0;
-          const respBody = lines.slice(0, -1).join("\n");
-          return { status, body: respBody };
-        } catch {
-          return { status: 0, body: "" };
-        }
-      });
-
-      try { require("fs").rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-      return results;
     },
 
     // http_retry url token retries -> {:status 200 :body "..."}
