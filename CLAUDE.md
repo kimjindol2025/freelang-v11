@@ -391,28 +391,44 @@ true false nil          ;; 불린/nil
 
 ### 문자열
 - `str`, `str-to-num`, `str-to-upper`, `str-to-lower`, `str-trim`, `str-split`, `str-includes`, `str-starts-with`, `str-ends-with`, `str-replace`, `str-slice`
+- `str-format` (printf 스타일: `(str-format "%s is %d" [name age])` 또는 `(str-format "%s is %d" name age)`)
+- `str-repeat`, `str-lines`, `str-pad-left`, `str-pad-right`, `str-index-of`, `str-replace-all`
 
 ### 배열/벡터
-- `length` / `count`, `push`, `pop`, `shift`, `unshift`, `map`, `filter`, `reduce`, `reverse`, `sort-by`, `includes-item`, `index-of`
-- `every?` (모두 만족), `any?` (하나라도 만족 → 첫 값 반환), `none?` (하나도 없음)
-- `mapcat`, `map-indexed`, `flatten`, `distinct`, `take`, `drop`, `frequencies`
-- `comp` / `compose` (함수 합성), `partial` (부분 적용)
+- `length` / `count`, `push`, `pop`, `shift`, `unshift`, `map`, `filter`, `reduce`, `reverse`, `sort`, `sort-by`, `includes-item`, `index-of`
+- `every?`, `any?`, `none?` (pred arr), `some` (pred arr → 첫 매칭 값)
+- `take`, `drop`, `take-while`, `drop-while`, `butlast`, `last`, `first`, `second`, `nth`
+- `map-indexed`, `mapcat`, `keep`, `partition`, `interpose`, `flatten`, `distinct`
+- `zip`, `group-by`, `frequencies`, `range`, `repeat` (`(repeat n val)` → 배열)
+- `into` (컬렉션 합침), `find-first`, `count-if`, `sum`, `product`, `average`
+- `max-by`, `min-by`, `max-of`, `min-of`
+- `comp` (함수 합성), `juxt` (복수 함수 동시 적용), `partial`, `complement`, `constantly`
+- `tap` / `dbg` (파이프라인 중간값 출력, 값 통과)
+- `apply` (fn + 인자 배열로 호출)
 
 ### 객체/맵
-- `get`, `assoc`, `obj-merge`, `obj-pick`, `obj-omit`, `obj-keys`, `obj-values`, `obj-entries`
-- `get-in` (중첩 접근), `assoc-in` (중첩 갱신), `update-in` (중첩 함수 적용), `dissoc`
+- `get`, `assoc`, `obj-merge`, `obj-pick`, `obj-omit`, `obj-keys` / `keys`, `obj-values` / `vals`, `obj-entries` / `entries`
+- `get-in` (중첩 접근), `assoc-in` (중첩 갱신), `update-in` (중첩 함수 적용 — builtin 지원), `dissoc`
+- `select-keys`, `rename-keys`, `merge-with` (키 충돌 시 fn으로 합산), `reduce-kv` (맵 키-값 축적)
+- `has-key?`, `update` (단일 키 함수 적용)
 
 ### 수학
-- `+`, `-`, `*`, `/`, `%`, `inc`, `dec`, `min`, `max`, `abs`, `round`, `floor`, `ceil`, `pow`, `sqrt`
+- `+`, `-`, `*`, `/`, `%`, `inc`, `dec`, `min`, `max`, `abs`, `round`, `floor`, `ceil`, `pow`, `sqrt`, `clamp`
 
 ### 논리
-- `and`, `or`, `not`, `=`, `!=`, `<`, `>`, `<=`, `>=`, `nil?`, `is-empty`, `nil-or-empty?`
+- `and`, `or`, `not`, `=`, `!=` / `not=`, `<`, `>`, `<=`, `>=`
+- `nil?`, `empty?`, `not-empty?`, `nil-or-empty?`
 - `??` (nil 병합: 첫 번째 non-nil 값 반환)
+
+### 제어 흐름
+- `when` (조건 참일 때), `when-not` (조건 거짓일 때)
+- `dotimes` (`(dotimes [i n] body)` — N번 반복)
+- `doseq` (`(doseq [x coll] body)` — 순회 side-effect)
 
 ### HTTP 서버
 - `server-start`, `server-html`, `server-json`, `server-status`, `server-redirect`, `server-file`, `server-html-cookie`, `server-set-cookie`
 
-### 인증 (auth_*)
+### 인증 (auth-*)
 - `auth-jwt-sign`, `auth-jwt-verify`, `auth-jwt-decode`, `auth-jwt-expired`, `auth-hash-password`, `auth-verify-password`, `auth-password-needs-rehash`, `auth-csrf-token`, `auth-csrf-verify`, `auth-bearer-extract`, `auth-apikey-valid`
 
 ### 데이터베이스
@@ -523,9 +539,12 @@ true false nil          ;; 불린/nil
 | `(defn f [])` 파라미터 없음 | 함수명 없이 정의 | `(defn f [a b] ...)` |
 | `(get body "key")` → body 미정의 | let 바인딩 빠짐 | `(let [body (get req "body")] ...)` |
 | `(server_listen 3000)` | 구버전 함수명 | `(server-start 3000)` |
-| `(server-html (str html css))` → 이중 이스케이프 | 문자열 자체를 이스케이프 | `(html-inject html {"css" css})` |
 | `(db-query db sql)` → 파라미터 배열 누락 | 바인드 변수 누락 | `(db-query db "..." [var1 var2])` |
-| `(auth_jwt_sign ...)` 언더스코어 | 함수명은 kebab-case | `(auth-jwt-sign ...)` |
+| `(map arr fn)` | 인자 순서 반대 | `(map fn arr)` |
+| `(filter arr fn)` | 인자 순서 반대 | `(filter fn arr)` |
+| `(str-format "%d" 42)` → NaN | 배열로 감싸야 함 | `(str-format "%d" [42])` 또는 `(str-format "%d" 42)` ← 둘 다 동작 |
+| `(comp inc str-to-upper)` → 타입 오류 | comp 인자 순서: 오른쪽부터 실행 | `(comp str-to-upper inc)` — 먼저 할 것을 마지막에 |
+| `(update-in m ["k"] "inc")` | fn을 문자열로 | `(update-in m ["k"] inc)` |
 
 **$ 없이도 완전히 동작** — `$`는 선택사항이며 생략해도 됩니다.
 
