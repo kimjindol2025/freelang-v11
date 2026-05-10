@@ -5,7 +5,6 @@ var FreeLang = (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
   var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
     get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
   }) : x)(function(x) {
@@ -39,7 +38,6 @@ var FreeLang = (() => {
     mod
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
   // <define:process.env>
   var define_process_env_default;
@@ -189,8 +187,8 @@ var FreeLang = (() => {
           if (source[i] === "\\" && i + 1 < source.length) {
             i++;
             col++;
-            const esc2 = source[i];
-            switch (esc2) {
+            const esc = source[i];
+            switch (esc) {
               case "n":
                 value += "\n";
                 break;
@@ -207,7 +205,7 @@ var FreeLang = (() => {
                 value += '"';
                 break;
               default:
-                value += esc2;
+                value += esc;
             }
             i++;
             col++;
@@ -631,11 +629,10 @@ var FreeLang = (() => {
         "Unterminated string": '\uBB38\uC790\uC5F4\uC774 \uB2EB\uD788\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uB2EB\uB294 " \uB97C \uCD94\uAC00\uD558\uC138\uC694.'
       };
       Parser = class {
-        pos = 0;
-        tokens;
-        // 자잘 #4 (2026-04-25): paren matching info — opening LParen 위치 추적
-        parenStack = [];
         constructor(tokens) {
+          this.pos = 0;
+          // 자잘 #4 (2026-04-25): paren matching info — opening LParen 위치 추적
+          this.parenStack = [];
           this.tokens = tokens;
         }
         parse() {
@@ -3776,8 +3773,10 @@ ${parenHint}` : parenHint;
     ["list", { params: [{ kind: "type", name: "any" }], returnType: { kind: "type", name: "array<any>" } }]
   ]);
   var TypeChecker = class {
-    functionTypes = /* @__PURE__ */ new Map();
-    variableTypes = /* @__PURE__ */ new Map();
+    constructor() {
+      this.functionTypes = /* @__PURE__ */ new Map();
+      this.variableTypes = /* @__PURE__ */ new Map();
+    }
     /**
      * Register a function type (from FUNC block with type annotations)
      */
@@ -3994,10 +3993,9 @@ ${parenHint}` : parenHint;
     }
   }
   var RuntimeTypeChecker = class {
-    strict;
-    // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
-    funcTypes = /* @__PURE__ */ new Map();
     constructor(strict = false) {
+      // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
+      this.funcTypes = /* @__PURE__ */ new Map();
       this.strict = strict;
     }
     get isStrict() {
@@ -4212,14 +4210,13 @@ ${parenHint}` : parenHint;
   // src/logger.ts
   init_define_process_env();
   var StructuredLogger = class {
-    logLevelOrder = {
-      debug: 0,
-      info: 1,
-      warn: 2,
-      error: 3
-    };
-    currentLogLevel;
     constructor(initialLevel) {
+      this.logLevelOrder = {
+        debug: 0,
+        info: 1,
+        warn: 2,
+        error: 3
+      };
       const envLevel = define_process_env_default.LOG_LEVEL;
       this.currentLogLevel = initialLevel || envLevel || "info";
       if (define_process_env_default.DEBUG_LOGGER) {
@@ -4275,9 +4272,11 @@ ${parenHint}` : parenHint;
   // src/interpreter-scope.ts
   init_define_process_env();
   var ScopeStack = class {
-    stack = [/* @__PURE__ */ new Map()];
-    /** Phase Y-1: 메타정보 저장소 — 키: "depth:name", 값: ScopeVarMeta */
-    meta = /* @__PURE__ */ new Map();
+    constructor() {
+      this.stack = [/* @__PURE__ */ new Map()];
+      /** Phase Y-1: 메타정보 저장소 — 키: "depth:name", 값: ScopeVarMeta */
+      this.meta = /* @__PURE__ */ new Map();
+    }
     /** 스코프 체인 역방향 탐색 — 가장 안쪽 스코프 우선 */
     get(name) {
       for (let i = this.stack.length - 1; i >= 0; i--) {
@@ -4389,12 +4388,9 @@ ${parenHint}` : parenHint;
   // src/web-search-adapter.ts
   init_define_process_env();
   var WebSearchAdapter = class {
-    cache;
-    apiKey;
-    apiProvider;
-    cacheTtlMs = 24 * 60 * 60 * 1e3;
     // 24 hours
     constructor(apiKey, provider = "mock") {
+      this.cacheTtlMs = 24 * 60 * 60 * 1e3;
       this.cache = /* @__PURE__ */ new Map();
       this.apiKey = apiKey;
       this.apiProvider = provider;
@@ -4642,14 +4638,11 @@ ${parenHint}` : parenHint;
   init_node_stubs();
   init_path_stubs();
   var LearnedFactsStore = class {
-    filePath;
-    facts;
-    defaultTtlDays = 30;
-    autoSaveInterval = 5e3;
-    // Auto-save every 5 seconds
-    isDirty = false;
-    autoSaveTimer;
     constructor(filePath = "./data/learned-facts.json", defaultTtlDays = 30) {
+      this.defaultTtlDays = 30;
+      this.autoSaveInterval = 5e3;
+      // Auto-save every 5 seconds
+      this.isDirty = false;
       this.filePath = filePath;
       this.facts = /* @__PURE__ */ new Map();
       this.defaultTtlDays = defaultTtlDays;
@@ -4864,12 +4857,12 @@ ${parenHint}` : parenHint;
   // src/async-runtime.ts
   init_define_process_env();
   var FreeLangPromise = class _FreeLangPromise {
-    state = "pending";
-    value = void 0;
-    error = null;
-    resolvers = [];
-    rejecters = [];
     constructor(executor) {
+      this.state = "pending";
+      this.value = void 0;
+      this.error = null;
+      this.resolvers = [];
+      this.rejecters = [];
       try {
         executor(this.resolve.bind(this), this.reject.bind(this));
       } catch (e) {
@@ -5134,7 +5127,6 @@ ${parenHint}` : parenHint;
     return `ctx-${Date.now()}-${++_idCounter}`;
   }
   var ContextManager = class {
-    window;
     constructor(maxTokens = 4096, strategy = "priority") {
       this.window = {
         maxTokens,
@@ -5296,7 +5288,9 @@ ${parenHint}` : parenHint;
   // src/error-system.ts
   init_define_process_env();
   var AIErrorSystem = class {
-    strategies = [];
+    constructor() {
+      this.strategies = [];
+    }
     addStrategy(s) {
       this.strategies.push(s);
       return this;
@@ -5360,7 +5354,9 @@ ${parenHint}` : parenHint;
   // src/tool-registry.ts
   init_define_process_env();
   var ToolRegistry = class {
-    tools = /* @__PURE__ */ new Map();
+    constructor() {
+      this.tools = /* @__PURE__ */ new Map();
+    }
     /** 도구 등록 (chainable) */
     register(tool) {
       this.tools.set(tool.name, tool);
@@ -5506,10 +5502,12 @@ ${parenHint}` : parenHint;
   // src/memory-system.ts
   init_define_process_env();
   var MemorySystem = class {
-    longTerm = /* @__PURE__ */ new Map();
-    shortTerm = /* @__PURE__ */ new Map();
-    episodes = [];
-    working = null;
+    constructor() {
+      this.longTerm = /* @__PURE__ */ new Map();
+      this.shortTerm = /* @__PURE__ */ new Map();
+      this.episodes = [];
+      this.working = null;
+    }
     // 저장
     remember(key, value, options = {}) {
       const entry = {
@@ -5620,7 +5618,9 @@ ${parenHint}` : parenHint;
     return overlap / (Math.sqrt(query.length) * Math.sqrt(doc.length));
   }
   var RAGStore = class {
-    docs = [];
+    constructor() {
+      this.docs = [];
+    }
     // 문서 추가
     add(doc) {
       this.docs.push(doc);
@@ -5668,9 +5668,11 @@ ${retrieved.map((d) => d.content).join("\n---\n")}`;
   // src/multi-agent.ts
   init_define_process_env();
   var MessageBus = class {
-    agents = /* @__PURE__ */ new Map();
-    log = [];
-    msgCounter = 0;
+    constructor() {
+      this.agents = /* @__PURE__ */ new Map();
+      this.log = [];
+      this.msgCounter = 0;
+    }
     // 에이전트 등록
     spawn(id, handler) {
       const handle = { id, handler, inbox: [], running: true };
@@ -5745,7 +5747,9 @@ ${retrieved.map((d) => d.content).join("\n---\n")}`;
   // src/try-reason.ts
   init_define_process_env();
   var TryReasoner = class {
-    history = [];
+    constructor() {
+      this.history = [];
+    }
     async run(config) {
       var _a;
       const errors = [];
@@ -5807,10 +5811,13 @@ ${errors.join("\n")}`);
   init_define_process_env();
   init_misc_stubs();
   var FLStream = class extends EventEmitter {
-    chunks = [];
-    chunkIndex = 0;
-    _done = false;
-    _collected = "";
+    constructor() {
+      super(...arguments);
+      this.chunks = [];
+      this.chunkIndex = 0;
+      this._done = false;
+      this._collected = "";
+    }
     write(content) {
       if (this._done) return;
       const chunk = {
@@ -5958,7 +5965,6 @@ ${errors.join("\n")}`);
     { concept: "SELF-IMPROVE", code: "(self-improve :target $code :evaluate score-fn :improve enhance-fn :iterations 3)", description: "\uC790\uAE30 \uAC1C\uC120", difficulty: "advanced", tags: ["ai", "improve"] }
   ];
   var FLTutor = class {
-    examples;
     constructor(examples = FL_EXAMPLES) {
       this.examples = examples.map((e) => ({ ...e, tags: [...e.tags] }));
     }
@@ -6032,11 +6038,9 @@ ${examples[0].code.replace(/\$\w+/g, "???")}` : `; ${concept} \uC608\uC81C\uB97C
   // src/reasoning-debugger.ts
   init_define_process_env();
   var ReasoningTrace = class {
-    root;
-    current;
-    stack = [];
-    nodeCounter = 0;
     constructor(label) {
+      this.stack = [];
+      this.nodeCounter = 0;
       this.root = this.makeNode("thought", label);
       this.current = this.root;
     }
@@ -6169,7 +6173,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     })
   };
   var PromptCompiler = class {
-    target;
     constructor(target = "claude") {
       this.target = target;
     }
@@ -6237,7 +6240,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/fl-sdk.ts
   init_define_process_env();
   var FLCodeBuilder = class {
-    lines = [];
+    constructor() {
+      this.lines = [];
+    }
     // 기본 폼
     define(name, value) {
       this.lines.push(`(define ${name} ${value})`);
@@ -6290,28 +6295,30 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     }
   };
   var FLSDK = class {
-    version = "9.0.0";
-    features = [
-      "maybe",
-      "cot",
-      "tot",
-      "reflect",
-      "context",
-      "result",
-      "fl-try",
-      "use-tool",
-      "agent",
-      "self-improve",
-      "memory",
-      "rag",
-      "multi-agent",
-      "try-reason",
-      "streaming",
-      "quality-loop",
-      "tutor",
-      "debugger",
-      "prompt-compiler"
-    ];
+    constructor() {
+      this.version = "9.0.0";
+      this.features = [
+        "maybe",
+        "cot",
+        "tot",
+        "reflect",
+        "context",
+        "result",
+        "fl-try",
+        "use-tool",
+        "agent",
+        "self-improve",
+        "memory",
+        "rag",
+        "multi-agent",
+        "try-reason",
+        "streaming",
+        "quality-loop",
+        "tutor",
+        "debugger",
+        "prompt-compiler"
+      ];
+    }
     // 코드 빌더 생성
     builder() {
       return new FLCodeBuilder();
@@ -6548,8 +6555,10 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/checkpoint.ts
   init_define_process_env();
   var CheckpointManager = class {
-    checkpoints = /* @__PURE__ */ new Map();
-    depth = 0;
+    constructor() {
+      this.checkpoints = /* @__PURE__ */ new Map();
+      this.depth = 0;
+    }
     /** 상태 저장 (깊은 복사) */
     save(name, state) {
       const cloned = typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
@@ -6658,7 +6667,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     return { strategy, score, reason };
   }
   var MetaReasoner = class {
-    strategies;
     constructor(strategies = [...ALL_STRATEGIES]) {
       this.strategies = strategies;
     }
@@ -6682,7 +6690,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/belief.ts
   init_define_process_env();
   var BeliefSystem = class {
-    beliefs = /* @__PURE__ */ new Map();
+    constructor() {
+      this.beliefs = /* @__PURE__ */ new Map();
+    }
     // 신념 설정
     set(claim, confidence) {
       const clamped = Math.max(0, Math.min(1, confidence));
@@ -6758,8 +6768,10 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     return intersection / Math.sqrt(tokA.size * tokB.size);
   }
   var AnalogyStore = class {
-    patterns = [];
-    counter = 0;
+    constructor() {
+      this.patterns = [];
+      this.counter = 0;
+    }
     // 패턴 저장
     store(description, solution, tags = []) {
       const p = {
@@ -6919,9 +6931,8 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     }
   };
   var PipelineBuilder = class {
-    steps = [];
-    composer;
     constructor(composer) {
+      this.steps = [];
       this.composer = composer;
     }
     step(name, fn, options = {}) {
@@ -6940,14 +6951,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/cognitive.ts
   init_define_process_env();
   var CognitiveArchitecture = class {
-    meta;
-    beliefs;
-    analogies;
-    hypothesis;
-    critique;
-    composer;
-    debater;
-    checkpoints;
     constructor() {
       this.meta = new MetaReasoner();
       this.beliefs = new BeliefSystem();
@@ -7080,7 +7083,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/delegate.ts
   init_define_process_env();
   var DelegationManager = class {
-    agents = /* @__PURE__ */ new Map();
+    constructor() {
+      this.agents = /* @__PURE__ */ new Map();
+    }
     register(agent) {
       this.agents.set(agent.id, agent);
     }
@@ -7315,7 +7320,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/peer-review.ts
   init_define_process_env();
   var PeerReviewSystem = class {
-    reviewers = /* @__PURE__ */ new Map();
+    constructor() {
+      this.reviewers = /* @__PURE__ */ new Map();
+    }
     addReviewer(reviewer) {
       this.reviewers.set(reviewer.id, reviewer);
     }
@@ -7340,7 +7347,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/compete.ts
   init_define_process_env();
   var Competition = class {
-    competitors = /* @__PURE__ */ new Map();
+    constructor() {
+      this.competitors = /* @__PURE__ */ new Map();
+    }
     register(competitor) {
       this.competitors.set(competitor.id, competitor);
     }
@@ -7376,7 +7385,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/chain-agents.ts
   init_define_process_env();
   var AgentChain = class _AgentChain {
-    agents = [];
+    constructor() {
+      this.agents = [];
+    }
     add(agent) {
       this.agents.push(agent);
       return this;
@@ -7435,7 +7446,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/orchestrate.ts
   init_define_process_env();
   var Orchestrator = class {
-    agents = /* @__PURE__ */ new Map();
+    constructor() {
+      this.agents = /* @__PURE__ */ new Map();
+    }
     /** 에이전트 등록 */
     register(agent) {
       this.agents.set(agent.id, agent);
@@ -7504,15 +7517,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
 
   // src/multi-agent-hub.ts
   var MultiAgentHub = class {
-    consensus;
-    delegation;
-    voting;
-    negotiator;
-    swarm;
-    orchestrator;
-    peerReview;
-    chain;
-    competition;
     constructor() {
       this.consensus = new ConsensusEngine();
       this.delegation = new DelegationManager();
@@ -7686,11 +7690,10 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   init_define_process_env();
   init_crypto_stubs();
   var EvolutionEngine = class {
-    config;
-    population = [];
-    currentGeneration = 0;
-    history = [];
     constructor(config) {
+      this.population = [];
+      this.currentGeneration = 0;
+      this.history = [];
       this.config = {
         populationSize: config.populationSize ?? 20,
         maxGenerations: config.maxGenerations ?? 50,
@@ -7887,7 +7890,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   };
   var CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   var Mutator = class {
-    config;
     constructor(config) {
       this.config = { ...DEFAULT_CONFIG, ...config };
     }
@@ -8043,7 +8045,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/crossover.ts
   init_define_process_env();
   var Crossover = class {
-    config;
     constructor(config) {
       this.config = {
         type: (config == null ? void 0 : config.type) ?? "single-point",
@@ -8229,7 +8230,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     return dp[m][n];
   }
   var FitnessEvaluator = class {
-    config;
     constructor(config = {}) {
       this.config = {
         normalize: config.normalize !== false,
@@ -8385,11 +8385,10 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/generation.ts
   init_define_process_env();
   var GenerationLoop = class {
-    config;
-    statsHistory = [];
-    stagnationCount = 0;
-    currentStats = null;
     constructor(config) {
+      this.statsHistory = [];
+      this.stagnationCount = 0;
+      this.currentStats = null;
       this.config = {
         maxGenerations: config.maxGenerations,
         targetFitness: config.targetFitness,
@@ -8527,7 +8526,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     };
   }
   var Pruner = class {
-    config;
     constructor(config) {
       this.config = config ?? {};
     }
@@ -8640,9 +8638,8 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/benchmark-self.ts
   init_define_process_env();
   var SelfBenchmark = class {
-    suite;
-    pendingFns = [];
     constructor(suiteName = "default") {
+      this.pendingFns = [];
       this.suite = {
         name: suiteName,
         results: [],
@@ -8818,6 +8815,170 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     }
   };
   var globalBenchmark = new SelfBenchmark("global");
+
+  // src/version-self.ts
+  init_define_process_env();
+  init_crypto_stubs();
+  function generateDiff(prev, next) {
+    const prevStr = JSON.stringify(prev, null, 2);
+    const nextStr = JSON.stringify(next, null, 2);
+    if (prevStr === nextStr) return "(no changes)";
+    const prevLines = prevStr.split("\n");
+    const nextLines = nextStr.split("\n");
+    const added = nextLines.filter((l) => !prevLines.includes(l)).length;
+    const removed = prevLines.filter((l) => !nextLines.includes(l)).length;
+    return `+${added} lines, -${removed} lines`;
+  }
+  function parseVersion(v) {
+    const parts = v.split(".").map(Number);
+    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+  }
+  var SelfVersioning = class {
+    constructor(maxHistory = 100) {
+      this.maxHistory = maxHistory;
+      this.history = {
+        snapshots: [],
+        current: "",
+        total: 0,
+        branches: /* @__PURE__ */ new Map()
+      };
+    }
+    // 현재 상태 스냅샷
+    snapshot(data, description, tags = [], performance2) {
+      const id = randomUUID();
+      const parentId = this.history.current || void 0;
+      const parent = parentId ? this.get(parentId) : null;
+      const version = parent ? this.bumpVersion(parent.version, "patch") : "1.0.0";
+      const diff = parent ? generateDiff(parent.data, data) : void 0;
+      const snap = {
+        id,
+        version,
+        timestamp: /* @__PURE__ */ new Date(),
+        data,
+        metadata: {
+          description,
+          tags,
+          performance: performance2
+        },
+        parentId,
+        diff
+      };
+      this.history.snapshots.push(snap);
+      this.history.current = id;
+      this.history.total++;
+      if (this.history.snapshots.length > this.maxHistory) {
+        const branchIds = new Set(this.history.branches.values());
+        branchIds.add(this.history.current);
+        const toRemove = this.history.snapshots.find((s) => !branchIds.has(s.id) && s.id !== this.history.current);
+        if (toRemove) {
+          const idx = this.history.snapshots.indexOf(toRemove);
+          this.history.snapshots.splice(idx, 1);
+        }
+      }
+      return snap;
+    }
+    // 특정 버전으로 롤백
+    rollback(id) {
+      const current = this.latest();
+      const target = this.get(id);
+      if (!current || !target) {
+        return {
+          previous: current,
+          restored: current,
+          success: false,
+          reason: `Snapshot ${id} not found`
+        };
+      }
+      this.history.current = id;
+      return {
+        previous: current,
+        restored: target,
+        success: true
+      };
+    }
+    // 이전 버전으로 롤백
+    rollbackPrev() {
+      const current = this.latest();
+      if (!current || !current.parentId) {
+        return {
+          previous: current,
+          restored: current,
+          success: false,
+          reason: "No previous version"
+        };
+      }
+      return this.rollback(current.parentId);
+    }
+    // 버전 비교
+    diff(id1, id2) {
+      const s1 = this.get(id1);
+      const s2 = this.get(id2);
+      if (!s1 || !s2) return "(one or both snapshots not found)";
+      return generateDiff(s1.data, s2.data);
+    }
+    // 특정 버전 조회
+    get(id) {
+      return this.history.snapshots.find((s) => s.id === id) ?? null;
+    }
+    // 최신 버전
+    latest() {
+      if (!this.history.current) return null;
+      return this.get(this.history.current);
+    }
+    // 버전 히스토리
+    getHistory() {
+      return [...this.history.snapshots];
+    }
+    // 태그로 검색
+    findByTag(tag) {
+      return this.history.snapshots.filter((s) => s.metadata.tags.includes(tag));
+    }
+    // 브랜치 생성
+    branch(name, fromId) {
+      const targetId = fromId ?? this.history.current;
+      if (!targetId) throw new Error("No snapshot to branch from");
+      this.history.branches.set(name, targetId);
+      return targetId;
+    }
+    // 브랜치 체크아웃
+    checkout(branchName) {
+      const id = this.history.branches.get(branchName);
+      if (!id) return null;
+      this.history.current = id;
+      return this.get(id);
+    }
+    // 자동 버전 넘버 생성 (semantic versioning)
+    nextVersion(type) {
+      const latest = this.latest();
+      const base = latest ? latest.version : "1.0.0";
+      return this.bumpVersion(base, type);
+    }
+    bumpVersion(base, type) {
+      const [major, minor, patch] = parseVersion(base);
+      switch (type) {
+        case "major":
+          return `${major + 1}.0.0`;
+        case "minor":
+          return `${major}.${minor + 1}.0`;
+        case "patch":
+          return `${major}.${minor}.${patch + 1}`;
+      }
+    }
+    // 최고 성능 버전
+    bestPerforming() {
+      const withPerf = this.history.snapshots.filter(
+        (s) => s.metadata.performance !== void 0
+      );
+      if (withPerf.length === 0) return null;
+      return withPerf.reduce(
+        (best, s) => s.metadata.performance > best.metadata.performance ? s : best
+      );
+    }
+  };
+  var globalVersioning = new SelfVersioning(100);
+
+  // src/self-evolution-hub.ts
+  init_define_process_env();
 
   // src/refactor-self.ts
   init_define_process_env();
@@ -9073,171 +9234,7 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   };
   var globalRefactorer = new SelfRefactorer();
 
-  // src/version-self.ts
-  init_define_process_env();
-  init_crypto_stubs();
-  function generateDiff(prev, next) {
-    const prevStr = JSON.stringify(prev, null, 2);
-    const nextStr = JSON.stringify(next, null, 2);
-    if (prevStr === nextStr) return "(no changes)";
-    const prevLines = prevStr.split("\n");
-    const nextLines = nextStr.split("\n");
-    const added = nextLines.filter((l) => !prevLines.includes(l)).length;
-    const removed = prevLines.filter((l) => !nextLines.includes(l)).length;
-    return `+${added} lines, -${removed} lines`;
-  }
-  function parseVersion(v) {
-    const parts = v.split(".").map(Number);
-    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
-  }
-  var SelfVersioning = class {
-    history;
-    maxHistory;
-    constructor(maxHistory = 100) {
-      this.maxHistory = maxHistory;
-      this.history = {
-        snapshots: [],
-        current: "",
-        total: 0,
-        branches: /* @__PURE__ */ new Map()
-      };
-    }
-    // 현재 상태 스냅샷
-    snapshot(data, description, tags = [], performance2) {
-      const id = randomUUID();
-      const parentId = this.history.current || void 0;
-      const parent = parentId ? this.get(parentId) : null;
-      const version = parent ? this.bumpVersion(parent.version, "patch") : "1.0.0";
-      const diff = parent ? generateDiff(parent.data, data) : void 0;
-      const snap = {
-        id,
-        version,
-        timestamp: /* @__PURE__ */ new Date(),
-        data,
-        metadata: {
-          description,
-          tags,
-          performance: performance2
-        },
-        parentId,
-        diff
-      };
-      this.history.snapshots.push(snap);
-      this.history.current = id;
-      this.history.total++;
-      if (this.history.snapshots.length > this.maxHistory) {
-        const branchIds = new Set(this.history.branches.values());
-        branchIds.add(this.history.current);
-        const toRemove = this.history.snapshots.find((s) => !branchIds.has(s.id) && s.id !== this.history.current);
-        if (toRemove) {
-          const idx = this.history.snapshots.indexOf(toRemove);
-          this.history.snapshots.splice(idx, 1);
-        }
-      }
-      return snap;
-    }
-    // 특정 버전으로 롤백
-    rollback(id) {
-      const current = this.latest();
-      const target = this.get(id);
-      if (!current || !target) {
-        return {
-          previous: current,
-          restored: current,
-          success: false,
-          reason: `Snapshot ${id} not found`
-        };
-      }
-      this.history.current = id;
-      return {
-        previous: current,
-        restored: target,
-        success: true
-      };
-    }
-    // 이전 버전으로 롤백
-    rollbackPrev() {
-      const current = this.latest();
-      if (!current || !current.parentId) {
-        return {
-          previous: current,
-          restored: current,
-          success: false,
-          reason: "No previous version"
-        };
-      }
-      return this.rollback(current.parentId);
-    }
-    // 버전 비교
-    diff(id1, id2) {
-      const s1 = this.get(id1);
-      const s2 = this.get(id2);
-      if (!s1 || !s2) return "(one or both snapshots not found)";
-      return generateDiff(s1.data, s2.data);
-    }
-    // 특정 버전 조회
-    get(id) {
-      return this.history.snapshots.find((s) => s.id === id) ?? null;
-    }
-    // 최신 버전
-    latest() {
-      if (!this.history.current) return null;
-      return this.get(this.history.current);
-    }
-    // 버전 히스토리
-    getHistory() {
-      return [...this.history.snapshots];
-    }
-    // 태그로 검색
-    findByTag(tag) {
-      return this.history.snapshots.filter((s) => s.metadata.tags.includes(tag));
-    }
-    // 브랜치 생성
-    branch(name, fromId) {
-      const targetId = fromId ?? this.history.current;
-      if (!targetId) throw new Error("No snapshot to branch from");
-      this.history.branches.set(name, targetId);
-      return targetId;
-    }
-    // 브랜치 체크아웃
-    checkout(branchName) {
-      const id = this.history.branches.get(branchName);
-      if (!id) return null;
-      this.history.current = id;
-      return this.get(id);
-    }
-    // 자동 버전 넘버 생성 (semantic versioning)
-    nextVersion(type) {
-      const latest = this.latest();
-      const base = latest ? latest.version : "1.0.0";
-      return this.bumpVersion(base, type);
-    }
-    bumpVersion(base, type) {
-      const [major, minor, patch] = parseVersion(base);
-      switch (type) {
-        case "major":
-          return `${major + 1}.0.0`;
-        case "minor":
-          return `${major}.${minor + 1}.0`;
-        case "patch":
-          return `${major}.${minor}.${patch + 1}`;
-      }
-    }
-    // 최고 성능 버전
-    bestPerforming() {
-      const withPerf = this.history.snapshots.filter(
-        (s) => s.metadata.performance !== void 0
-      );
-      if (withPerf.length === 0) return null;
-      return withPerf.reduce(
-        (best, s) => s.metadata.performance > best.metadata.performance ? s : best
-      );
-    }
-  };
-  var globalVersioning = new SelfVersioning(100);
-
   // src/self-evolution-hub.ts
-  init_define_process_env();
   init_crypto_stubs();
   var DEFAULT_CYCLE_CONFIG = {
     target: null,
@@ -9251,18 +9248,13 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     enableRefactor: false
   };
   var SelfEvolutionHub = class {
-    fitnessEval;
-    pruner;
-    refactorer;
-    benchmark;
-    versioning;
-    // 내부 통계
-    _cycleCount = 0;
-    _totalGenerations = 0;
-    _refactorSuggestions = 0;
-    _versionCount = 0;
-    _fitnessHistory = [];
     constructor() {
+      // 내부 통계
+      this._cycleCount = 0;
+      this._totalGenerations = 0;
+      this._refactorSuggestions = 0;
+      this._versionCount = 0;
+      this._fitnessHistory = [];
       this.fitnessEval = new FitnessEvaluator({ normalize: true, maximize: true });
       this.pruner = new Pruner();
       this.refactorer = new SelfRefactorer();
@@ -9533,11 +9525,186 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   };
   var globalSelfEvolution = new SelfEvolutionHub();
 
+  // src/causal.ts
+  init_define_process_env();
+  var CausalGraph = class {
+    constructor() {
+      this.nodes = /* @__PURE__ */ new Map();
+      this.edges = [];
+    }
+    addNode(node) {
+      this.nodes.set(node.id, node);
+    }
+    addEdge(edge) {
+      this.edges.push(edge);
+    }
+    getDirectCauses(nodeId) {
+      return this.edges.filter((e) => e.to === nodeId);
+    }
+    getDirectEffects(nodeId) {
+      return this.edges.filter((e) => e.from === nodeId);
+    }
+    findCausalChains(causeId, effectId, visited = /* @__PURE__ */ new Set()) {
+      var _a, _b, _c;
+      if (causeId === effectId) {
+        return [{
+          path: [causeId],
+          totalStrength: 1,
+          explanation: `${((_a = this.nodes.get(causeId)) == null ? void 0 : _a.name) ?? causeId}`,
+          confidence: 1
+        }];
+      }
+      if (visited.has(causeId)) return [];
+      visited.add(causeId);
+      const chains = [];
+      const directEffects = this.getDirectEffects(causeId);
+      for (const edge of directEffects) {
+        const subChains = this.findCausalChains(edge.to, effectId, new Set(visited));
+        for (const sub of subChains) {
+          const fromName = ((_b = this.nodes.get(causeId)) == null ? void 0 : _b.name) ?? causeId;
+          const toName = ((_c = this.nodes.get(edge.to)) == null ? void 0 : _c.name) ?? edge.to;
+          const mechanism = edge.mechanism ? ` (${edge.mechanism})` : "";
+          chains.push({
+            path: [causeId, ...sub.path],
+            totalStrength: edge.strength * sub.totalStrength,
+            explanation: `${fromName} \u2192 ${toName}${mechanism}; ${sub.explanation}`,
+            confidence: edge.confidence * sub.confidence
+          });
+        }
+      }
+      return chains;
+    }
+    explain(effectId) {
+      var _a, _b;
+      const effectNode = this.nodes.get(effectId);
+      const effectName = (effectNode == null ? void 0 : effectNode.name) ?? effectId;
+      const allCauses = [];
+      for (const [nodeId] of this.nodes) {
+        if (nodeId === effectId) continue;
+        const chains = this.findCausalChains(nodeId, effectId);
+        for (const chain of chains) {
+          if (chain.path.length >= 2) {
+            allCauses.push({ cause: nodeId, chain });
+          }
+        }
+      }
+      const bestByCause = /* @__PURE__ */ new Map();
+      for (const item of allCauses) {
+        const existing = bestByCause.get(item.cause);
+        if (!existing || Math.abs(item.chain.totalStrength) > Math.abs(existing.chain.totalStrength)) {
+          bestByCause.set(item.cause, item);
+        }
+      }
+      const causesArr = Array.from(bestByCause.values());
+      const totalAbsStrength = causesArr.reduce((s, c) => s + Math.abs(c.chain.totalStrength), 0) || 1;
+      const causesWithContrib = causesArr.map((c) => ({
+        cause: c.cause,
+        chain: c.chain,
+        contribution: Math.abs(c.chain.totalStrength) / totalAbsStrength
+      }));
+      causesWithContrib.sort((a, b) => b.contribution - a.contribution);
+      const primaryCause = ((_a = causesWithContrib[0]) == null ? void 0 : _a.cause) ?? effectId;
+      const primaryName = ((_b = this.nodes.get(primaryCause)) == null ? void 0 : _b.name) ?? primaryCause;
+      const avgConfidence = causesWithContrib.length > 0 ? causesWithContrib.reduce((s, c) => s + c.chain.confidence, 0) / causesWithContrib.length : 0;
+      const explanation = causesWithContrib.length > 0 ? `${effectName}\uC758 \uC8FC\uC694 \uC6D0\uC778\uC740 "${primaryName}"\uC774\uB2E4. ` + causesWithContrib.slice(0, 3).map((c) => {
+        var _a2;
+        const cn = ((_a2 = this.nodes.get(c.cause)) == null ? void 0 : _a2.name) ?? c.cause;
+        return `${cn} (\uAE30\uC5EC\uB3C4: ${(c.contribution * 100).toFixed(1)}%)`;
+      }).join(", ") + "." : `${effectName}\uC758 \uC6D0\uC778\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
+      return {
+        effect: effectId,
+        causes: causesWithContrib,
+        primaryCause,
+        explanation,
+        confidence: avgConfidence
+      };
+    }
+    findRootCauses(effectId, visited = /* @__PURE__ */ new Set()) {
+      if (visited.has(effectId)) return [];
+      visited.add(effectId);
+      const directCauses = this.getDirectCauses(effectId);
+      if (directCauses.length === 0) {
+        return [effectId];
+      }
+      const roots = [];
+      for (const edge of directCauses) {
+        const subRoots = this.findRootCauses(edge.from, new Set(visited));
+        for (const r of subRoots) {
+          if (!roots.includes(r)) roots.push(r);
+        }
+      }
+      return roots;
+    }
+    simulate(interventions) {
+      var _a, _b;
+      const result = { ...interventions };
+      const queue = Object.keys(interventions);
+      const processed = new Set(queue);
+      while (queue.length > 0) {
+        const nodeId = queue.shift();
+        const currentValue = result[nodeId] ?? (((_a = this.nodes.get(nodeId)) == null ? void 0 : _a.value) ?? 0);
+        const effects = this.getDirectEffects(nodeId);
+        for (const edge of effects) {
+          if (!processed.has(edge.to)) {
+            const baseValue = ((_b = this.nodes.get(edge.to)) == null ? void 0 : _b.value) ?? 0;
+            const delta = currentValue * edge.strength * edge.confidence;
+            result[edge.to] = (result[edge.to] ?? baseValue) + delta;
+            queue.push(edge.to);
+            processed.add(edge.to);
+          }
+        }
+      }
+      return result;
+    }
+    summarize(nodeId) {
+      const node = this.nodes.get(nodeId);
+      if (!node) return `\uB178\uB4DC "${nodeId}"\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
+      const causes = this.getDirectCauses(nodeId);
+      const effects = this.getDirectEffects(nodeId);
+      const roots = this.findRootCauses(nodeId);
+      const causesStr = causes.length > 0 ? causes.map((e) => {
+        var _a;
+        const n = ((_a = this.nodes.get(e.from)) == null ? void 0 : _a.name) ?? e.from;
+        return `${n}(\uAC15\uB3C4:${e.strength})`;
+      }).join(", ") : "\uC5C6\uC74C";
+      const effectsStr = effects.length > 0 ? effects.map((e) => {
+        var _a;
+        const n = ((_a = this.nodes.get(e.to)) == null ? void 0 : _a.name) ?? e.to;
+        return `${n}(\uAC15\uB3C4:${e.strength})`;
+      }).join(", ") : "\uC5C6\uC74C";
+      const rootsStr = roots.filter((r) => r !== nodeId).length > 0 ? roots.filter((r) => r !== nodeId).map((r) => {
+        var _a;
+        return ((_a = this.nodes.get(r)) == null ? void 0 : _a.name) ?? r;
+      }).join(", ") : "\uC5C6\uC74C (\uB8E8\uD2B8 \uC6D0\uC778)";
+      return `[${node.name}] \uC9C1\uC811\uC6D0\uC778: ${causesStr} | \uC9C1\uC811\uACB0\uACFC: ${effectsStr} | \uB8E8\uD2B8\uC6D0\uC778: ${rootsStr}`;
+    }
+    detectCycle(startId, endId) {
+      const visited = /* @__PURE__ */ new Set();
+      const queue = [endId];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current === startId) return true;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        const effects = this.getDirectEffects(current);
+        for (const e of effects) queue.push(e.to);
+      }
+      return false;
+    }
+  };
+  var globalCausal = new CausalGraph();
+  function whyCaused(effect, cause) {
+    const chains = globalCausal.findCausalChains(cause, effect);
+    if (chains.length === 0) return null;
+    return chains.sort((a, b) => Math.abs(b.totalStrength) - Math.abs(a.totalStrength))[0];
+  }
+
+  // src/eval-builtins-ai.ts
+  init_define_process_env();
+
   // src/align.ts
   init_define_process_env();
   var AlignmentSystem = class {
-    goals;
-    values;
     constructor() {
       this.goals = /* @__PURE__ */ new Map();
       this.values = /* @__PURE__ */ new Map();
@@ -9947,7 +10114,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     autonomyPrinciple
   ];
   var EthicsChecker = class {
-    principles;
     constructor() {
       this.principles = [...DEFAULT_PRINCIPLES];
     }
@@ -10146,9 +10312,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/curiosity.ts
   init_define_process_env();
   var CuriosityEngine = class {
-    state;
-    ucb1Stats;
-    totalVisits;
     constructor(initialTopics) {
       this.state = {
         explored: /* @__PURE__ */ new Set(),
@@ -10375,8 +10538,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     };
   }
   var WisdomEngine = class {
-    experiences;
-    heuristics;
     constructor() {
       this.experiences = [];
       this.heuristics = [];
@@ -10593,182 +10754,6 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     }
   };
   var globalWisdom = new WisdomEngine();
-
-  // src/causal.ts
-  init_define_process_env();
-  var CausalGraph = class {
-    nodes;
-    edges;
-    constructor() {
-      this.nodes = /* @__PURE__ */ new Map();
-      this.edges = [];
-    }
-    addNode(node) {
-      this.nodes.set(node.id, node);
-    }
-    addEdge(edge) {
-      this.edges.push(edge);
-    }
-    getDirectCauses(nodeId) {
-      return this.edges.filter((e) => e.to === nodeId);
-    }
-    getDirectEffects(nodeId) {
-      return this.edges.filter((e) => e.from === nodeId);
-    }
-    findCausalChains(causeId, effectId, visited = /* @__PURE__ */ new Set()) {
-      var _a, _b, _c;
-      if (causeId === effectId) {
-        return [{
-          path: [causeId],
-          totalStrength: 1,
-          explanation: `${((_a = this.nodes.get(causeId)) == null ? void 0 : _a.name) ?? causeId}`,
-          confidence: 1
-        }];
-      }
-      if (visited.has(causeId)) return [];
-      visited.add(causeId);
-      const chains = [];
-      const directEffects = this.getDirectEffects(causeId);
-      for (const edge of directEffects) {
-        const subChains = this.findCausalChains(edge.to, effectId, new Set(visited));
-        for (const sub of subChains) {
-          const fromName = ((_b = this.nodes.get(causeId)) == null ? void 0 : _b.name) ?? causeId;
-          const toName = ((_c = this.nodes.get(edge.to)) == null ? void 0 : _c.name) ?? edge.to;
-          const mechanism = edge.mechanism ? ` (${edge.mechanism})` : "";
-          chains.push({
-            path: [causeId, ...sub.path],
-            totalStrength: edge.strength * sub.totalStrength,
-            explanation: `${fromName} \u2192 ${toName}${mechanism}; ${sub.explanation}`,
-            confidence: edge.confidence * sub.confidence
-          });
-        }
-      }
-      return chains;
-    }
-    explain(effectId) {
-      var _a, _b;
-      const effectNode = this.nodes.get(effectId);
-      const effectName = (effectNode == null ? void 0 : effectNode.name) ?? effectId;
-      const allCauses = [];
-      for (const [nodeId] of this.nodes) {
-        if (nodeId === effectId) continue;
-        const chains = this.findCausalChains(nodeId, effectId);
-        for (const chain of chains) {
-          if (chain.path.length >= 2) {
-            allCauses.push({ cause: nodeId, chain });
-          }
-        }
-      }
-      const bestByCause = /* @__PURE__ */ new Map();
-      for (const item of allCauses) {
-        const existing = bestByCause.get(item.cause);
-        if (!existing || Math.abs(item.chain.totalStrength) > Math.abs(existing.chain.totalStrength)) {
-          bestByCause.set(item.cause, item);
-        }
-      }
-      const causesArr = Array.from(bestByCause.values());
-      const totalAbsStrength = causesArr.reduce((s, c) => s + Math.abs(c.chain.totalStrength), 0) || 1;
-      const causesWithContrib = causesArr.map((c) => ({
-        cause: c.cause,
-        chain: c.chain,
-        contribution: Math.abs(c.chain.totalStrength) / totalAbsStrength
-      }));
-      causesWithContrib.sort((a, b) => b.contribution - a.contribution);
-      const primaryCause = ((_a = causesWithContrib[0]) == null ? void 0 : _a.cause) ?? effectId;
-      const primaryName = ((_b = this.nodes.get(primaryCause)) == null ? void 0 : _b.name) ?? primaryCause;
-      const avgConfidence = causesWithContrib.length > 0 ? causesWithContrib.reduce((s, c) => s + c.chain.confidence, 0) / causesWithContrib.length : 0;
-      const explanation = causesWithContrib.length > 0 ? `${effectName}\uC758 \uC8FC\uC694 \uC6D0\uC778\uC740 "${primaryName}"\uC774\uB2E4. ` + causesWithContrib.slice(0, 3).map((c) => {
-        var _a2;
-        const cn = ((_a2 = this.nodes.get(c.cause)) == null ? void 0 : _a2.name) ?? c.cause;
-        return `${cn} (\uAE30\uC5EC\uB3C4: ${(c.contribution * 100).toFixed(1)}%)`;
-      }).join(", ") + "." : `${effectName}\uC758 \uC6D0\uC778\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
-      return {
-        effect: effectId,
-        causes: causesWithContrib,
-        primaryCause,
-        explanation,
-        confidence: avgConfidence
-      };
-    }
-    findRootCauses(effectId, visited = /* @__PURE__ */ new Set()) {
-      if (visited.has(effectId)) return [];
-      visited.add(effectId);
-      const directCauses = this.getDirectCauses(effectId);
-      if (directCauses.length === 0) {
-        return [effectId];
-      }
-      const roots = [];
-      for (const edge of directCauses) {
-        const subRoots = this.findRootCauses(edge.from, new Set(visited));
-        for (const r of subRoots) {
-          if (!roots.includes(r)) roots.push(r);
-        }
-      }
-      return roots;
-    }
-    simulate(interventions) {
-      var _a, _b;
-      const result = { ...interventions };
-      const queue = Object.keys(interventions);
-      const processed = new Set(queue);
-      while (queue.length > 0) {
-        const nodeId = queue.shift();
-        const currentValue = result[nodeId] ?? (((_a = this.nodes.get(nodeId)) == null ? void 0 : _a.value) ?? 0);
-        const effects = this.getDirectEffects(nodeId);
-        for (const edge of effects) {
-          if (!processed.has(edge.to)) {
-            const baseValue = ((_b = this.nodes.get(edge.to)) == null ? void 0 : _b.value) ?? 0;
-            const delta = currentValue * edge.strength * edge.confidence;
-            result[edge.to] = (result[edge.to] ?? baseValue) + delta;
-            queue.push(edge.to);
-            processed.add(edge.to);
-          }
-        }
-      }
-      return result;
-    }
-    summarize(nodeId) {
-      const node = this.nodes.get(nodeId);
-      if (!node) return `\uB178\uB4DC "${nodeId}"\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
-      const causes = this.getDirectCauses(nodeId);
-      const effects = this.getDirectEffects(nodeId);
-      const roots = this.findRootCauses(nodeId);
-      const causesStr = causes.length > 0 ? causes.map((e) => {
-        var _a;
-        const n = ((_a = this.nodes.get(e.from)) == null ? void 0 : _a.name) ?? e.from;
-        return `${n}(\uAC15\uB3C4:${e.strength})`;
-      }).join(", ") : "\uC5C6\uC74C";
-      const effectsStr = effects.length > 0 ? effects.map((e) => {
-        var _a;
-        const n = ((_a = this.nodes.get(e.to)) == null ? void 0 : _a.name) ?? e.to;
-        return `${n}(\uAC15\uB3C4:${e.strength})`;
-      }).join(", ") : "\uC5C6\uC74C";
-      const rootsStr = roots.filter((r) => r !== nodeId).length > 0 ? roots.filter((r) => r !== nodeId).map((r) => {
-        var _a;
-        return ((_a = this.nodes.get(r)) == null ? void 0 : _a.name) ?? r;
-      }).join(", ") : "\uC5C6\uC74C (\uB8E8\uD2B8 \uC6D0\uC778)";
-      return `[${node.name}] \uC9C1\uC811\uC6D0\uC778: ${causesStr} | \uC9C1\uC811\uACB0\uACFC: ${effectsStr} | \uB8E8\uD2B8\uC6D0\uC778: ${rootsStr}`;
-    }
-    detectCycle(startId, endId) {
-      const visited = /* @__PURE__ */ new Set();
-      const queue = [endId];
-      while (queue.length > 0) {
-        const current = queue.shift();
-        if (current === startId) return true;
-        if (visited.has(current)) continue;
-        visited.add(current);
-        const effects = this.getDirectEffects(current);
-        for (const e of effects) queue.push(e.to);
-      }
-      return false;
-    }
-  };
-  var globalCausal = new CausalGraph();
-  function whyCaused(effect, cause) {
-    const chains = globalCausal.findCausalChains(cause, effect);
-    if (chains.length === 0) return null;
-    return chains.sort((a, b) => Math.abs(b.totalStrength) - Math.abs(a.totalStrength))[0];
-  }
 
   // src/explain.ts
   init_define_process_env();
@@ -11025,10 +11010,8 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   // src/world-model.ts
   init_define_process_env();
   var WorldModel = class {
-    state;
-    history;
-    _idCounter = 0;
     constructor() {
+      this._idCounter = 0;
       this.state = {
         entities: /* @__PURE__ */ new Map(),
         relations: [],
@@ -11311,7 +11294,9 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
     return `${changes}\uC73C\uB85C \uBCC0\uACBD\uD574\uB3C4 \uACB0\uACFC "${String(originalOutcome)}"\uB294 \uB3D9\uC77C\uD569\uB2C8\uB2E4.`;
   }
   var CounterfactualReasoner = class {
-    scenarios = /* @__PURE__ */ new Map();
+    constructor() {
+      this.scenarios = /* @__PURE__ */ new Map();
+    }
     // 시나리오 등록
     registerScenario(scenario) {
       this.scenarios.set(scenario.id, scenario);
@@ -11715,6 +11700,1452 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   };
   var globalPredictor = new Predictor();
 
+  // src/eval-builtins-ai.ts
+  function evalRefactorSelf(op, args2) {
+    if (op === "refactor-analyze") {
+      const code = String(args2[0] ?? "");
+      const result = globalRefactorer.refactor(code, true);
+      return /* @__PURE__ */ new Map([
+        ["suggestions", result.suggestions.map((s) => /* @__PURE__ */ new Map([
+          ["pattern", s.pattern],
+          ["location", s.location],
+          ["original", s.original],
+          ["suggested", s.suggested],
+          ["reason", s.reason],
+          ["impact", s.impact]
+        ]))],
+        ["applied", result.applied],
+        ["skipped", result.skipped],
+        ["score", /* @__PURE__ */ new Map([
+          ["before", result.score.before],
+          ["after", result.score.after],
+          ["improvement", result.score.improvement]
+        ])]
+      ]);
+    }
+    if (op === "refactor-suggest") {
+      const code = String(args2[0] ?? "");
+      return globalRefactorer.suggest(code).map((s) => /* @__PURE__ */ new Map([
+        ["pattern", s.pattern],
+        ["location", s.location],
+        ["original", s.original],
+        ["suggested", s.suggested],
+        ["reason", s.reason],
+        ["impact", s.impact]
+      ]));
+    }
+    if (op === "refactor-apply") {
+      const code = String(args2[0] ?? "");
+      const rawSuggestions = Array.isArray(args2[1]) ? args2[1] : [];
+      const suggestions = rawSuggestions.map((s) => {
+        if (s instanceof Map) return {
+          pattern: s.get("pattern") ?? "extract-duplicate",
+          location: s.get("location") ?? "",
+          original: s.get("original") ?? "",
+          suggested: s.get("suggested") ?? "",
+          reason: s.get("reason") ?? "",
+          impact: s.get("impact") ?? "low"
+        };
+        return s;
+      });
+      const applyResult = globalRefactorer.apply(code, suggestions);
+      return /* @__PURE__ */ new Map([
+        ["code", applyResult.code],
+        ["applied", applyResult.applied.map((s) => /* @__PURE__ */ new Map([
+          ["pattern", s.pattern],
+          ["location", s.location],
+          ["impact", s.impact]
+        ]))]
+      ]);
+    }
+    if (op === "refactor-complexity") {
+      const code = String(args2[0] ?? "");
+      const c = globalRefactorer.analyzeComplexity(code);
+      return /* @__PURE__ */ new Map([["lines", c.lines], ["depth", c.depth], ["conditions", c.conditions], ["score", c.score]]);
+    }
+    if (op === "refactor-quality") {
+      const code = String(args2[0] ?? "");
+      return globalRefactorer.qualityScore(code);
+    }
+    if (op === "refactor-naming") {
+      const code = String(args2[0] ?? "");
+      const n = globalRefactorer.analyzeNaming(code);
+      return /* @__PURE__ */ new Map([
+        ["issues", n.issues.map((i) => /* @__PURE__ */ new Map([
+          ["name", i.name],
+          ["suggestion", i.suggestion],
+          ["reason", i.reason]
+        ]))],
+        ["score", n.score]
+      ]);
+    }
+    if (op === "refactor-duplicates") {
+      const code = String(args2[0] ?? "");
+      return globalRefactorer.findDuplicates(code).map((s) => /* @__PURE__ */ new Map([
+        ["pattern", s.pattern],
+        ["location", s.location],
+        ["original", s.original],
+        ["suggested", s.suggested],
+        ["reason", s.reason],
+        ["impact", s.impact]
+      ]));
+    }
+    if (op === "refactor-score") {
+      const r = args2[0];
+      if (r instanceof Map) {
+        const score = r.get("score");
+        if (score instanceof Map) return /* @__PURE__ */ new Map([
+          ["before", score.get("before") ?? 0],
+          ["after", score.get("after") ?? 0],
+          ["improvement", score.get("improvement") ?? 0]
+        ]);
+      }
+      return /* @__PURE__ */ new Map([["before", 0], ["after", 0], ["improvement", 0]]);
+    }
+    if (op === "causal-add-node") {
+      const kw = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kw[key] = args2[i + 1];
+      }
+      const node = {
+        id: String(kw["id"] ?? ""),
+        name: String(kw["name"] ?? kw["id"] ?? ""),
+        description: String(kw["desc"] ?? kw["description"] ?? ""),
+        value: kw["value"] !== void 0 ? Number(kw["value"]) : void 0
+      };
+      globalCausal.addNode(node);
+      return /* @__PURE__ */ new Map([["id", node.id], ["name", node.name], ["description", node.description]]);
+    }
+    if (op === "causal-add-edge") {
+      const kw = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kw[key] = args2[i + 1];
+      }
+      const edge = {
+        from: String(kw["from"] ?? ""),
+        to: String(kw["to"] ?? ""),
+        strength: Number(kw["strength"] ?? 1),
+        confidence: Number(kw["confidence"] ?? 1),
+        delay: kw["delay"] !== void 0 ? Number(kw["delay"]) : void 0,
+        mechanism: kw["mechanism"] !== void 0 ? String(kw["mechanism"]) : void 0
+      };
+      globalCausal.addEdge(edge);
+      return /* @__PURE__ */ new Map([["from", edge.from], ["to", edge.to], ["strength", edge.strength], ["confidence", edge.confidence]]);
+    }
+    if (op === "causal-explain") {
+      const effectId = String(args2[0] ?? "");
+      const expl = globalCausal.explain(effectId);
+      return /* @__PURE__ */ new Map([
+        ["effect", expl.effect],
+        ["primaryCause", expl.primaryCause],
+        ["explanation", expl.explanation],
+        ["confidence", expl.confidence],
+        ["causes", expl.causes.map((c) => /* @__PURE__ */ new Map([
+          ["cause", c.cause],
+          ["contribution", c.contribution],
+          ["chain", /* @__PURE__ */ new Map([
+            ["path", c.chain.path],
+            ["totalStrength", c.chain.totalStrength],
+            ["explanation", c.chain.explanation],
+            ["confidence", c.chain.confidence]
+          ])]
+        ]))]
+      ]);
+    }
+    if (op === "causal-chains") {
+      const causeId = String(args2[0] ?? "");
+      const effectId = String(args2[1] ?? "");
+      const chains = globalCausal.findCausalChains(causeId, effectId);
+      return chains.map((c) => /* @__PURE__ */ new Map([
+        ["path", c.path],
+        ["totalStrength", c.totalStrength],
+        ["explanation", c.explanation],
+        ["confidence", c.confidence]
+      ]));
+    }
+    if (op === "causal-causes") {
+      const nodeId = String(args2[0] ?? "");
+      const causes = globalCausal.getDirectCauses(nodeId);
+      return causes.map((e) => /* @__PURE__ */ new Map([
+        ["from", e.from],
+        ["to", e.to],
+        ["strength", e.strength],
+        ["confidence", e.confidence]
+      ]));
+    }
+    if (op === "causal-effects") {
+      const nodeId = String(args2[0] ?? "");
+      const effects = globalCausal.getDirectEffects(nodeId);
+      return effects.map((e) => /* @__PURE__ */ new Map([
+        ["from", e.from],
+        ["to", e.to],
+        ["strength", e.strength],
+        ["confidence", e.confidence]
+      ]));
+    }
+    if (op === "causal-roots") {
+      const nodeId = String(args2[0] ?? "");
+      return globalCausal.findRootCauses(nodeId);
+    }
+    if (op === "causal-simulate") {
+      const arg = args2[0];
+      const interventions = {};
+      if (arg instanceof Map) {
+        for (const [k, v] of arg.entries()) {
+          interventions[String(k)] = Number(v);
+        }
+      }
+      const result = globalCausal.simulate(interventions);
+      return new Map(Object.entries(result));
+    }
+    if (op === "causal-why") {
+      const effectId = String(args2[0] ?? "");
+      const causeId = String(args2[1] ?? "");
+      const chain = whyCaused(effectId, causeId);
+      if (chain === null) return null;
+      return /* @__PURE__ */ new Map([
+        ["path", chain.path],
+        ["totalStrength", chain.totalStrength],
+        ["explanation", chain.explanation],
+        ["confidence", chain.confidence]
+      ]);
+    }
+    if (op === "causal-summary") {
+      const nodeId = String(args2[0] ?? "");
+      return globalCausal.summarize(nodeId);
+    }
+    return null;
+  }
+  function evalAlign(op, args2) {
+    if (op === "align-add-goal") {
+      const kw = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kw[key] = args2[i + 1];
+      }
+      const goal = {
+        id: String(kw["id"] ?? `goal_${Date.now()}`),
+        description: String(kw["desc"] ?? kw["description"] ?? ""),
+        priority: Number(kw["priority"] ?? 5),
+        measurable: Boolean(kw["measurable"] ?? false),
+        metric: kw["metric"] !== void 0 ? String(kw["metric"]) : void 0,
+        target: kw["target"] !== void 0 ? Number(kw["target"]) : void 0
+      };
+      globalAlignment.addGoal(goal);
+      return /* @__PURE__ */ new Map([
+        ["id", goal.id],
+        ["description", goal.description],
+        ["priority", goal.priority],
+        ["measurable", goal.measurable]
+      ]);
+    }
+    if (op === "align-add-value") {
+      const kw = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kw[key] = args2[i + 1];
+      }
+      const value = {
+        id: String(kw["id"] ?? `value_${Date.now()}`),
+        name: String(kw["name"] ?? ""),
+        description: String(kw["desc"] ?? kw["description"] ?? ""),
+        weight: Number(kw["weight"] ?? 0.5)
+      };
+      globalAlignment.addValue(value);
+      return /* @__PURE__ */ new Map([
+        ["id", value.id],
+        ["name", value.name],
+        ["description", value.description],
+        ["weight", value.weight]
+      ]);
+    }
+    if (op === "align-score") {
+      const actionRaw = args2[0];
+      const _getF = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
+      const _getEO = (obj) => {
+        const eo = _getF(obj, "expectedOutcomes");
+        if (eo instanceof Map) return Object.fromEntries(eo);
+        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+        return {};
+      };
+      const action = {
+        id: String(_getF(actionRaw, "id") ?? ""),
+        description: String(_getF(actionRaw, "description") ?? ""),
+        expectedOutcomes: _getEO(actionRaw),
+        risks: Array.isArray(_getF(actionRaw, "risks")) ? _getF(actionRaw, "risks") : []
+      };
+      const result = globalAlignment.score(action);
+      return /* @__PURE__ */ new Map([
+        ["action", actionRaw],
+        ["goalAlignment", new Map(Object.entries(result.goalAlignment))],
+        ["valueAlignment", new Map(Object.entries(result.valueAlignment))],
+        ["overallScore", result.overallScore],
+        ["conflicts", result.conflicts.map((c) => /* @__PURE__ */ new Map([["goal1", c.goal1], ["goal2", c.goal2], ["severity", c.severity]]))],
+        ["recommendation", result.recommendation],
+        ["reasons", result.reasons]
+      ]);
+    }
+    if (op === "align-best") {
+      const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
+      const _getF2 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
+      const _getEO2 = (obj) => {
+        const eo = _getF2(obj, "expectedOutcomes");
+        if (eo instanceof Map) return Object.fromEntries(eo);
+        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+        return {};
+      };
+      const actions = actionsList.map((m) => ({
+        id: String(_getF2(m, "id") ?? ""),
+        description: String(_getF2(m, "description") ?? ""),
+        expectedOutcomes: _getEO2(m),
+        risks: Array.isArray(_getF2(m, "risks")) ? _getF2(m, "risks") : []
+      }));
+      if (actions.length === 0) return null;
+      const best = globalAlignment.selectBestAligned(actions);
+      return /* @__PURE__ */ new Map([
+        ["id", best.id],
+        ["description", best.description]
+      ]);
+    }
+    if (op === "align-conflicts") {
+      const conflicts = globalAlignment.detectConflicts();
+      return conflicts.map((c) => /* @__PURE__ */ new Map([
+        ["goal1", c.goal1],
+        ["goal2", c.goal2],
+        ["description", c.description]
+      ]));
+    }
+    if (op === "align-plan") {
+      const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
+      const _gFP = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
+      const _gEOP = (obj) => {
+        const eo = _gFP(obj, "expectedOutcomes");
+        if (eo instanceof Map) return Object.fromEntries(eo);
+        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+        return {};
+      };
+      const actions = actionsList.map((m) => ({
+        id: String(_gFP(m, "id") ?? ""),
+        description: String(_gFP(m, "description") ?? ""),
+        expectedOutcomes: _gEOP(m),
+        risks: Array.isArray(_gFP(m, "risks")) ? _gFP(m, "risks") : []
+      }));
+      const result = globalAlignment.evaluatePlan(actions);
+      return /* @__PURE__ */ new Map([
+        ["overallAlignment", result.overallAlignment],
+        ["weakLinks", result.weakLinks.map((a) => /* @__PURE__ */ new Map([["id", a.id], ["description", a.description]]))],
+        ["summary", result.summary]
+      ]);
+    }
+    if (op === "align-improve") {
+      const actionRaw3 = args2[0];
+      const _getF3 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
+      const _getEO3 = (obj) => {
+        const eo = _getF3(obj, "expectedOutcomes");
+        if (eo instanceof Map) return Object.fromEntries(eo);
+        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
+        return {};
+      };
+      const action = {
+        id: String(_getF3(actionRaw3, "id") ?? ""),
+        description: String(_getF3(actionRaw3, "description") ?? ""),
+        expectedOutcomes: _getEO3(actionRaw3),
+        risks: Array.isArray(_getF3(actionRaw3, "risks")) ? _getF3(actionRaw3, "risks") : []
+      };
+      return globalAlignment.suggestImprovements(action);
+    }
+    if (op === "align-goals") {
+      const goals = globalAlignment.prioritizeGoals();
+      return goals.map((g) => /* @__PURE__ */ new Map([
+        ["id", g.id],
+        ["description", g.description],
+        ["priority", g.priority],
+        ["measurable", g.measurable]
+      ]));
+    }
+    return null;
+  }
+  function evalPredict_PHASE144(op, args2) {
+    if (op === "predict-linear") {
+      const data144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      let horizon144 = 1;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const k = String(args2[i]).replace(/^:/, "");
+        if (k === "horizon") horizon144 = Number(args2[i + 1]);
+      }
+      const p144 = globalPredictor.linearRegression(data144, horizon144);
+      return /* @__PURE__ */ new Map([
+        ["value", p144.value],
+        ["lower", p144.lower],
+        ["upper", p144.upper],
+        ["confidence", p144.confidence],
+        ["method", p144.method],
+        ["horizon", p144.horizon ?? 1]
+      ]);
+    }
+    if (op === "predict-ma") {
+      const data144ma = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      let window144 = 3;
+      let horizon144ma = 1;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const k = String(args2[i]).replace(/^:/, "");
+        if (k === "window") window144 = Number(args2[i + 1]);
+        else if (k === "horizon") horizon144ma = Number(args2[i + 1]);
+      }
+      const pma = globalPredictor.movingAverage(data144ma, window144, horizon144ma);
+      return /* @__PURE__ */ new Map([
+        ["value", pma.value],
+        ["lower", pma.lower],
+        ["upper", pma.upper],
+        ["confidence", pma.confidence],
+        ["method", pma.method],
+        ["horizon", pma.horizon ?? 1]
+      ]);
+    }
+    if (op === "predict-exp") {
+      const data144exp = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      let alpha144 = 0.3;
+      let horizon144exp = 1;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const k = String(args2[i]).replace(/^:/, "");
+        if (k === "alpha") alpha144 = Number(args2[i + 1]);
+        else if (k === "horizon") horizon144exp = Number(args2[i + 1]);
+      }
+      const pexp = globalPredictor.exponentialSmoothing(data144exp, alpha144, horizon144exp);
+      return /* @__PURE__ */ new Map([
+        ["value", pexp.value],
+        ["lower", pexp.lower],
+        ["upper", pexp.upper],
+        ["confidence", pexp.confidence],
+        ["method", pexp.method],
+        ["horizon", pexp.horizon ?? 1]
+      ]);
+    }
+    if (op === "predict-forecast") {
+      const data144ts = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      let steps144 = 3;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const k = String(args2[i]).replace(/^:/, "");
+        if (k === "steps") steps144 = Number(args2[i + 1]);
+      }
+      const tsResult = globalPredictor.forecastTimeSeries(data144ts, steps144);
+      return /* @__PURE__ */ new Map([
+        ["predictions", tsResult.predictions.map((p) => /* @__PURE__ */ new Map([
+          ["value", p.value],
+          ["lower", p.lower],
+          ["upper", p.upper],
+          ["confidence", p.confidence],
+          ["method", p.method],
+          ["horizon", p.horizon ?? 1]
+        ]))],
+        ["trend", tsResult.trend],
+        ["seasonality", tsResult.seasonality ?? null],
+        ["accuracy", tsResult.accuracy ?? null]
+      ]);
+    }
+    if (op === "predict-ci") {
+      const samples144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      let conf144 = 0.95;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const k = String(args2[i]).replace(/^:/, "");
+        if (k === "confidence") conf144 = Number(args2[i + 1]);
+      }
+      const ci = globalPredictor.confidenceInterval(samples144, conf144);
+      return /* @__PURE__ */ new Map([["lower", ci.lower], ["upper", ci.upper]]);
+    }
+    if (op === "predict-classify") {
+      const rawFeatures = args2[0];
+      const features144 = {};
+      if (rawFeatures instanceof Map) {
+        rawFeatures.forEach((v, k) => {
+          features144[String(k).replace(/^:/, "")] = Number(v);
+        });
+      } else if (typeof rawFeatures === "object" && rawFeatures !== null) {
+        Object.entries(rawFeatures).forEach(([k, v]) => {
+          features144[k.replace(/^:/, "")] = Number(v);
+        });
+      }
+      const rawTraining = Array.isArray(args2[1]) ? args2[1] : [];
+      const trainingData144 = rawTraining.map((item) => {
+        if (item instanceof Map) {
+          const rawF = item.get("features") ?? item.get(":features");
+          const label = String(item.get("label") ?? item.get(":label") ?? "unknown");
+          const feats = {};
+          if (rawF instanceof Map) {
+            rawF.forEach((v, k) => {
+              feats[String(k).replace(/^:/, "")] = Number(v);
+            });
+          }
+          return { features: feats, label };
+        }
+        return { features: {}, label: "unknown" };
+      });
+      const clf = globalPredictor.classify(features144, trainingData144);
+      return /* @__PURE__ */ new Map([
+        ["classes", clf.classes.map((c) => /* @__PURE__ */ new Map([["label", c.label], ["probability", c.probability]]))],
+        ["predicted", clf.predicted],
+        ["confidence", clf.confidence]
+      ]);
+    }
+    if (op === "predict-evaluate") {
+      const preds144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      const actuals144 = Array.isArray(args2[1]) ? args2[1].map(Number) : [];
+      const evalResult = globalPredictor.evaluate(preds144, actuals144);
+      return /* @__PURE__ */ new Map([
+        ["mae", evalResult.mae],
+        ["rmse", evalResult.rmse],
+        ["mape", evalResult.mape]
+      ]);
+    }
+    if (op === "predict-trend") {
+      const data144tr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+      return globalPredictor.detectTrend(data144tr);
+    }
+    return null;
+  }
+  function evalCuriosity(op, args2, callFn2) {
+    if (op === "curiosity-score") {
+      const topic = String(args2[0] ?? "");
+      const knownFacts = Array.isArray(args2[1]) ? args2[1].map((f) => String(f)) : [];
+      return globalCuriosity.computeCuriosity(topic, knownFacts);
+    }
+    if (op === "curiosity-next") {
+      return globalCuriosity.selectNextTopic();
+    }
+    if (op === "curiosity-explore") {
+      const topic = String(args2[0] ?? "");
+      const fn = args2[1];
+      const explorerFunc = (t) => {
+        const result = callFn2 ? callFn2(fn, [t]) : typeof fn === "function" ? fn(t) : null;
+        if (result instanceof Map) {
+          const facts = Array.isArray(result.get("facts")) ? result.get("facts").map(String) : [];
+          const questions = Array.isArray(result.get("questions")) ? result.get("questions").map(String) : [];
+          return { facts, questions };
+        }
+        return { facts: [], questions: [] };
+      };
+      const res = globalCuriosity.explore(topic, explorerFunc);
+      return /* @__PURE__ */ new Map([
+        ["topic", res.topic],
+        ["discovered", res.discovered],
+        ["newQuestions", res.newQuestions],
+        ["informationGain", res.informationGain],
+        ["surpriseLevel", res.surpriseLevel],
+        ["relatedTopics", res.relatedTopics]
+      ]);
+    }
+    if (op === "curiosity-gaps") {
+      const known = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
+      const all = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
+      const gaps = globalCuriosity.identifyGaps(known, all);
+      return gaps.map((g) => /* @__PURE__ */ new Map([
+        ["topic", g.topic],
+        ["unknownAspects", g.unknownAspects],
+        ["priority", g.priority],
+        ["explorationCost", g.explorationCost],
+        ["expectedGain", g.expectedGain]
+      ]));
+    }
+    if (op === "curiosity-questions") {
+      const topic = String(args2[0] ?? "");
+      const context = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
+      return globalCuriosity.generateQuestions(topic, context);
+    }
+    if (op === "curiosity-prioritize") {
+      const topics = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
+      return globalCuriosity.prioritize(topics);
+    }
+    if (op === "curiosity-analyze") {
+      const analysis = globalCuriosity.analyzeExplorationHistory();
+      return /* @__PURE__ */ new Map([
+        ["totalExplored", analysis.totalExplored],
+        ["avgInfoGain", analysis.avgInfoGain],
+        ["mostSurprising", analysis.mostSurprising],
+        ["recommendations", analysis.recommendations]
+      ]);
+    }
+    if (op === "curiosity-state") {
+      const st = globalCuriosity.getState();
+      return /* @__PURE__ */ new Map([
+        ["explored", Array.from(st.explored)],
+        ["frontier", st.frontier],
+        ["knowledgeGaps", st.knowledgeGaps.map((g) => /* @__PURE__ */ new Map([
+          ["topic", g.topic],
+          ["unknownAspects", g.unknownAspects],
+          ["priority", g.priority],
+          ["explorationCost", g.explorationCost],
+          ["expectedGain", g.expectedGain]
+        ]))],
+        ["curiosityScore", st.curiosityScore],
+        ["explorationHistory", st.explorationHistory.map((h) => /* @__PURE__ */ new Map([
+          ["topic", h.topic],
+          ["gain", h.gain],
+          ["timestamp", h.timestamp.toISOString()]
+        ]))]
+      ]);
+    }
+    if (op === "wisdom-add-exp") {
+      const kwargs = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kwargs[key] = args2[i + 1];
+      }
+      const exp = globalWisdom.addExperience({
+        situation: String(kwargs["situation"] ?? ""),
+        action: String(kwargs["action"] ?? ""),
+        outcome: String(kwargs["outcome"] ?? ""),
+        lesson: String(kwargs["lesson"] ?? ""),
+        success: kwargs["success"] === true || kwargs["success"] === "true",
+        importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
+        domain: String(kwargs["domain"] ?? "general")
+      });
+      return /* @__PURE__ */ new Map([
+        ["id", exp.id],
+        ["situation", exp.situation],
+        ["action", exp.action],
+        ["outcome", exp.outcome],
+        ["lesson", exp.lesson],
+        ["success", exp.success],
+        ["importance", exp.importance],
+        ["domain", exp.domain],
+        ["timestamp", exp.timestamp.toISOString()]
+      ]);
+    }
+    if (op === "wisdom-judge") {
+      const situation = String(args2[0] ?? "");
+      const judgment = globalWisdom.judge(situation);
+      return /* @__PURE__ */ new Map([
+        ["situation", judgment.situation],
+        ["recommendation", judgment.recommendation],
+        ["reasoning", judgment.reasoning],
+        ["relevantExperiences", judgment.relevantExperiences.map((e) => /* @__PURE__ */ new Map([
+          ["id", e.id],
+          ["situation", e.situation],
+          ["lesson", e.lesson],
+          ["success", e.success],
+          ["importance", e.importance],
+          ["domain", e.domain]
+        ]))],
+        ["applicableHeuristics", judgment.applicableHeuristics.map((h) => /* @__PURE__ */ new Map([
+          ["id", h.id],
+          ["rule", h.rule],
+          ["confidence", h.confidence],
+          ["successCount", h.successCount],
+          ["totalCount", h.totalCount],
+          ["domain", h.domain]
+        ]))],
+        ["confidence", judgment.confidence],
+        ["caveats", judgment.caveats],
+        ["alternatives", judgment.alternatives]
+      ]);
+    }
+    if (op === "wisdom-heuristics") {
+      return globalWisdom.getHeuristics().map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount],
+        ["domain", h.domain],
+        ["derivedFrom", h.derivedFrom]
+      ]));
+    }
+    if (op === "wisdom-extract") {
+      const heuristics = globalWisdom.extractHeuristics();
+      return heuristics.map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount],
+        ["domain", h.domain],
+        ["derivedFrom", h.derivedFrom]
+      ]));
+    }
+    if (op === "wisdom-relevant") {
+      const situation = String(args2[0] ?? "");
+      const limit = typeof args2[1] === "number" ? args2[1] : 5;
+      return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
+        ["id", e.id],
+        ["situation", e.situation],
+        ["action", e.action],
+        ["outcome", e.outcome],
+        ["lesson", e.lesson],
+        ["success", e.success],
+        ["importance", e.importance],
+        ["domain", e.domain]
+      ]));
+    }
+    if (op === "wisdom-lessons") {
+      let domain;
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        if (key === "domain") domain = String(args2[i + 1]);
+      }
+      return globalWisdom.getLessons(domain);
+    }
+    if (op === "wisdom-score") {
+      return globalWisdom.wisdomScore();
+    }
+    if (op === "wisdom-domain") {
+      const domain = String(args2[0] ?? "general");
+      const summary = globalWisdom.summarizeDomain(domain);
+      return /* @__PURE__ */ new Map([
+        ["topLessons", summary.topLessons],
+        ["bestHeuristics", summary.bestHeuristics.map((h) => /* @__PURE__ */ new Map([
+          ["id", h.id],
+          ["rule", h.rule],
+          ["confidence", h.confidence],
+          ["successCount", h.successCount],
+          ["totalCount", h.totalCount]
+        ]))],
+        ["successRate", summary.successRate]
+      ]);
+    }
+    if (op === "wisdom-valid?") {
+      const expMap = args2[0];
+      if (!(expMap instanceof Map)) return false;
+      const exp = {
+        id: String(expMap.get("id") ?? ""),
+        situation: String(expMap.get("situation") ?? ""),
+        action: String(expMap.get("action") ?? ""),
+        outcome: String(expMap.get("outcome") ?? ""),
+        lesson: String(expMap.get("lesson") ?? ""),
+        success: expMap.get("success") === true,
+        importance: Number(expMap.get("importance") ?? 0.5),
+        timestamp: new Date(String(expMap.get("timestamp") ?? (/* @__PURE__ */ new Date()).toISOString())),
+        domain: String(expMap.get("domain") ?? "general")
+      };
+      return globalWisdom.isStillValid(exp);
+    }
+    if (op === "wisdom-similar") {
+      const situation = String(args2[0] ?? "");
+      return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
+        ["id", e.id],
+        ["situation", e.situation],
+        ["action", e.action],
+        ["outcome", e.outcome],
+        ["lesson", e.lesson],
+        ["success", e.success],
+        ["importance", e.importance],
+        ["domain", e.domain]
+      ]));
+    }
+    return null;
+  }
+  function evalCounterfactual(op, args2, callFn2) {
+    if (op === "cf-scenario") {
+      const kw = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kw[key] = args2[i + 1];
+      }
+      const id = String(kw["id"] ?? `s-${Date.now()}`);
+      const name = String(kw["name"] ?? id);
+      let variables = {};
+      if (kw["vars"] instanceof Map) {
+        for (const [k, v] of kw["vars"]) variables[String(k).replace(/^:/, "")] = v;
+      } else if (kw["vars"] && typeof kw["vars"] === "object") {
+        variables = kw["vars"];
+      }
+      const outcome = kw["outcome"] ?? null;
+      const scenario = { id, name, variables, outcome };
+      globalCounterfactual.registerScenario(scenario);
+      return /* @__PURE__ */ new Map([
+        ["id", id],
+        ["name", name],
+        ["variables", new Map(Object.entries(variables))],
+        ["outcome", outcome]
+      ]);
+    }
+    if (op === "cf-what-if") {
+      let variables = {};
+      let change = {};
+      if (args2[0] instanceof Map) {
+        for (const [k, v] of args2[0]) variables[String(k).replace(/^:/, "")] = v;
+      }
+      if (args2[1] instanceof Map) {
+        for (const [k, v] of args2[1]) change[String(k).replace(/^:/, "")] = v;
+      }
+      const fn = args2[2];
+      const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
+      const cf = globalCounterfactual.whatIf(variables, change, outcomeFunc);
+      return /* @__PURE__ */ new Map([
+        ["id", cf.id],
+        ["intervention", new Map(Object.entries(cf.intervention))],
+        ["counterfactualOutcome", cf.counterfactualOutcome],
+        ["delta", new Map(Object.entries(cf.delta))],
+        ["probability", cf.probability],
+        ["explanation", cf.explanation]
+      ]);
+    }
+    if (op === "cf-analyze") {
+      const scenarioId = String(args2[0] ?? "");
+      const interventionsList = [];
+      if (Array.isArray(args2[1])) {
+        for (const iv of args2[1]) {
+          const obj = {};
+          if (iv instanceof Map) {
+            for (const [k, v] of iv) obj[String(k).replace(/^:/, "")] = v;
+          }
+          interventionsList.push(obj);
+        }
+      }
+      const fn = args2[2];
+      const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
+      const analysis = globalCounterfactual.analyze(scenarioId, interventionsList, outcomeFunc);
+      return /* @__PURE__ */ new Map([
+        ["original", /* @__PURE__ */ new Map([
+          ["id", analysis.original.id],
+          ["name", analysis.original.name],
+          ["outcome", analysis.original.outcome]
+        ])],
+        ["counterfactuals", analysis.counterfactuals.map((cf) => /* @__PURE__ */ new Map([
+          ["id", cf.id],
+          ["probability", cf.probability],
+          ["counterfactualOutcome", cf.counterfactualOutcome],
+          ["explanation", cf.explanation]
+        ]))],
+        ["mostLikelyAlternative", /* @__PURE__ */ new Map([
+          ["id", analysis.mostLikelyAlternative.id],
+          ["probability", analysis.mostLikelyAlternative.probability],
+          ["counterfactualOutcome", analysis.mostLikelyAlternative.counterfactualOutcome],
+          ["explanation", analysis.mostLikelyAlternative.explanation]
+        ])],
+        ["keyFactors", analysis.keyFactors],
+        ["sensitivity", new Map(Object.entries(analysis.sensitivity))]
+      ]);
+    }
+    if (op === "cf-minimal") {
+      const scenarioId = String(args2[0] ?? "");
+      const targetOutcome = args2[1];
+      const fn = args2[2];
+      const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
+      const minimal = globalCounterfactual.findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc);
+      if (minimal === null) return null;
+      return new Map(Object.entries(minimal));
+    }
+    if (op === "cf-sensitivity") {
+      let variables = {};
+      const rawVars = args2[0];
+      if (rawVars instanceof Map) {
+        for (const [k, v] of rawVars) variables[String(k).replace(/^:/, "")] = v;
+      } else if (rawVars && typeof rawVars === "object" && !Array.isArray(rawVars)) {
+        for (const [k, v] of Object.entries(rawVars)) variables[String(k).replace(/^:/, "")] = v;
+      }
+      const fn = args2[1];
+      const outcomeFunc = (vars) => {
+        try {
+          return Number(callFn2(fn, [vars]));
+        } catch {
+          return 0;
+        }
+      };
+      const sens = globalCounterfactual.sensitivityAnalysis(variables, outcomeFunc);
+      return new Map(Object.entries(sens));
+    }
+    if (op === "cf-key-factors") {
+      const analysis = args2[0];
+      if (analysis instanceof Map) {
+        const factors = analysis.get("keyFactors");
+        if (Array.isArray(factors)) return factors;
+      }
+      return [];
+    }
+    if (op === "cf-best-alt") {
+      const analysis = args2[0];
+      if (analysis instanceof Map) {
+        return analysis.get("mostLikelyAlternative") ?? null;
+      }
+      return null;
+    }
+    if (op === "cf-explain") {
+      const cf = args2[0];
+      if (cf instanceof Map) {
+        return cf.get("explanation") ?? "";
+      }
+      return "";
+    }
+    if (op === "explain-decision") {
+      const decision = args2[0];
+      const rawFactors = args2[1];
+      const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
+      const factors = {};
+      if (rawFactors instanceof Map) {
+        for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+      } else if (rawFactors && typeof rawFactors === "object") {
+        for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
+      }
+      const explanation = globalExplainer.explain(decision, factors, context);
+      return /* @__PURE__ */ new Map([
+        ["decision", explanation.decision],
+        ["reasoning", explanation.reasoning],
+        ["features", explanation.features.map((f) => /* @__PURE__ */ new Map([
+          ["feature", f.feature],
+          ["importance", f.importance],
+          ["direction", f.direction],
+          ["description", f.description]
+        ]))],
+        ["confidence", explanation.confidence],
+        ["alternatives", explanation.alternatives.map((a) => /* @__PURE__ */ new Map([
+          ["decision", a.decision],
+          ["reason", a.reason],
+          ["probability", a.probability]
+        ]))],
+        ["summary", explanation.summary],
+        ["audience", explanation.audience]
+      ]);
+    }
+    if (op === "explain-features") {
+      const toRecord145 = (v) => {
+        const result = {};
+        if (v instanceof Map) {
+          for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
+        } else if (v && typeof v === "object") {
+          for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
+        }
+        return result;
+      };
+      const inputs145 = toRecord145(args2[0]);
+      const outputs145 = toRecord145(args2[1]);
+      const baseline145 = args2[2] !== void 0 ? toRecord145(args2[2]) : void 0;
+      const features145 = globalExplainer.featureImportance(inputs145, outputs145, baseline145);
+      return features145.map((f) => /* @__PURE__ */ new Map([
+        ["feature", f.feature],
+        ["importance", f.importance],
+        ["direction", f.direction],
+        ["description", f.description]
+      ]));
+    }
+    if (op === "explain-local") {
+      const rawInput145 = args2[0];
+      const output145 = args2[1];
+      const modelFn145 = args2[2];
+      const input145 = {};
+      if (rawInput145 instanceof Map) {
+        for (const [k, v] of rawInput145.entries()) input145[String(k).replace(/^:/, "")] = v;
+      } else if (rawInput145 && typeof rawInput145 === "object") {
+        for (const [k, v] of Object.entries(rawInput145)) input145[String(k).replace(/^:/, "")] = v;
+      }
+      const model145 = (inp) => {
+        if (modelFn145) {
+          try {
+            return callFn2(modelFn145, [new Map(Object.entries(inp))]);
+          } catch {
+            return output145;
+          }
+        }
+        return output145;
+      };
+      const local145 = globalExplainer.localExplain(input145, output145, model145);
+      return /* @__PURE__ */ new Map([
+        ["input", new Map(Object.entries(local145.input))],
+        ["output", local145.output],
+        ["topFactors", local145.topFactors.map((f) => /* @__PURE__ */ new Map([
+          ["feature", f.feature],
+          ["importance", f.importance],
+          ["direction", f.direction],
+          ["description", f.description]
+        ]))],
+        ["counterfactual", local145.counterfactual],
+        ["confidence", local145.confidence]
+      ]);
+    }
+    if (op === "explain-natural") {
+      const rawExpl145 = args2[0];
+      let audience145 = "technical";
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        if (key === "audience") audience145 = String(args2[i + 1]);
+      }
+      if (!(rawExpl145 instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
+      const featuresRaw145 = rawExpl145.get("features") ?? [];
+      const features145n = (Array.isArray(featuresRaw145) ? featuresRaw145 : []).map((f) => {
+        if (f instanceof Map) {
+          return {
+            feature: String(f.get("feature") ?? ""),
+            importance: Number(f.get("importance") ?? 0),
+            direction: String(f.get("direction") ?? "positive"),
+            description: String(f.get("description") ?? "")
+          };
+        }
+        return { feature: "", importance: 0, direction: "positive", description: "" };
+      });
+      const altsRaw145 = rawExpl145.get("alternatives") ?? [];
+      const alternatives145 = (Array.isArray(altsRaw145) ? altsRaw145 : []).map((a) => {
+        if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
+        return { decision: null, reason: "", probability: 0 };
+      });
+      const explanation145n = {
+        decision: rawExpl145.get("decision"),
+        reasoning: rawExpl145.get("reasoning") ?? [],
+        features: features145n,
+        confidence: Number(rawExpl145.get("confidence") ?? 0.5),
+        alternatives: alternatives145,
+        summary: String(rawExpl145.get("summary") ?? ""),
+        audience: rawExpl145.get("audience") ?? "technical"
+      };
+      return globalExplainer.toNaturalLanguage(explanation145n, audience145);
+    }
+    if (op === "explain-contrast") {
+      const decision145c = args2[0];
+      const alternative145c = args2[1];
+      const rawFactors145c = args2[2];
+      const factors145c = {};
+      if (rawFactors145c instanceof Map) {
+        for (const [k, v] of rawFactors145c.entries()) factors145c[String(k).replace(/^:/, "")] = Number(v);
+      } else if (rawFactors145c && typeof rawFactors145c === "object") {
+        for (const [k, v] of Object.entries(rawFactors145c)) factors145c[String(k).replace(/^:/, "")] = Number(v);
+      }
+      return globalExplainer.contrastiveExplain(decision145c, alternative145c, factors145c);
+    }
+    if (op === "explain-rules") {
+      const rawExamples145 = args2[0];
+      const examples145 = [];
+      const toRecord145r = (v) => {
+        const result = {};
+        if (v instanceof Map) {
+          for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = val;
+        } else if (v && typeof v === "object") {
+          Object.assign(result, v);
+        }
+        return result;
+      };
+      if (Array.isArray(rawExamples145)) {
+        for (const ex of rawExamples145) {
+          if (ex instanceof Map) {
+            examples145.push({ input: toRecord145r(ex.get("input")), output: ex.get("output") });
+          } else if (ex && typeof ex === "object") {
+            examples145.push({ input: toRecord145r(ex.input), output: ex.output });
+          }
+        }
+      }
+      const rules145 = globalExplainer.extractRules(examples145);
+      return rules145.map((r) => /* @__PURE__ */ new Map([
+        ["condition", r.condition],
+        ["outcome", r.outcome],
+        ["support", r.support]
+      ]));
+    }
+    if (op === "explain-top-factors") {
+      const rawExpl145tf = args2[0];
+      let n145 = 3;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        if (key === "n") n145 = Number(args2[i + 1]);
+      }
+      let features145tf = [];
+      if (rawExpl145tf instanceof Map) features145tf = rawExpl145tf.get("features") ?? [];
+      if (!Array.isArray(features145tf)) features145tf = [];
+      return features145tf.slice(0, n145);
+    }
+    if (op === "explain-summary") {
+      const rawExpl145s = args2[0];
+      if (rawExpl145s instanceof Map) return String(rawExpl145s.get("summary") ?? "");
+      return "";
+    }
+    return null;
+  }
+  function evalWisdom(op, args2) {
+    if (op === "wisdom-add-exp") {
+      const kwargs = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        kwargs[key] = args2[i + 1];
+      }
+      const exp = globalWisdom.addExperience({
+        situation: String(kwargs["situation"] ?? ""),
+        action: String(kwargs["action"] ?? ""),
+        outcome: String(kwargs["outcome"] ?? ""),
+        lesson: String(kwargs["lesson"] ?? ""),
+        success: kwargs["success"] === true || kwargs["success"] === "true",
+        importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
+        domain: String(kwargs["domain"] ?? "general")
+      });
+      return /* @__PURE__ */ new Map([
+        ["id", exp.id],
+        ["situation", exp.situation],
+        ["action", exp.action],
+        ["outcome", exp.outcome],
+        ["lesson", exp.lesson],
+        ["success", exp.success],
+        ["importance", exp.importance],
+        ["domain", exp.domain],
+        ["timestamp", exp.timestamp.toISOString()]
+      ]);
+    }
+    if (op === "wisdom-judge") {
+      const situation = String(args2[0] ?? "");
+      const judgment = globalWisdom.judge(situation);
+      return /* @__PURE__ */ new Map([
+        ["situation", judgment.situation],
+        ["recommendation", judgment.recommendation],
+        ["reasoning", judgment.reasoning],
+        ["relevantExperiences", judgment.relevantExperiences.map((e) => /* @__PURE__ */ new Map([
+          ["id", e.id],
+          ["situation", e.situation],
+          ["lesson", e.lesson],
+          ["success", e.success],
+          ["importance", e.importance],
+          ["domain", e.domain]
+        ]))],
+        ["applicableHeuristics", judgment.applicableHeuristics.map((h) => /* @__PURE__ */ new Map([
+          ["id", h.id],
+          ["rule", h.rule],
+          ["confidence", h.confidence],
+          ["successCount", h.successCount],
+          ["totalCount", h.totalCount],
+          ["domain", h.domain]
+        ]))],
+        ["confidence", judgment.confidence],
+        ["caveats", judgment.caveats],
+        ["alternatives", judgment.alternatives]
+      ]);
+    }
+    if (op === "wisdom-heuristics") {
+      return globalWisdom.getHeuristics().map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount],
+        ["domain", h.domain],
+        ["derivedFrom", h.derivedFrom]
+      ]));
+    }
+    if (op === "wisdom-extract") {
+      const heuristics = globalWisdom.extractHeuristics();
+      return heuristics.map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount],
+        ["domain", h.domain],
+        ["derivedFrom", h.derivedFrom]
+      ]));
+    }
+    if (op === "wisdom-relevant") {
+      const situation = String(args2[0] ?? "");
+      const limit = typeof args2[1] === "number" ? args2[1] : 5;
+      return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
+        ["id", e.id],
+        ["situation", e.situation],
+        ["action", e.action],
+        ["outcome", e.outcome],
+        ["lesson", e.lesson],
+        ["success", e.success],
+        ["importance", e.importance],
+        ["domain", e.domain]
+      ]));
+    }
+    if (op === "wisdom-lessons") {
+      let domain;
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        if (key === "domain") domain = String(args2[i + 1]);
+      }
+      return globalWisdom.getLessons(domain);
+    }
+    if (op === "wisdom-score") {
+      return globalWisdom.wisdomScore();
+    }
+    if (op === "wisdom-domain") {
+      const domain = String(args2[0] ?? "general");
+      const summary = globalWisdom.summarizeDomain(domain);
+      return /* @__PURE__ */ new Map([
+        ["topLessons", summary.topLessons],
+        ["bestHeuristics", summary.bestHeuristics.map((h) => /* @__PURE__ */ new Map([
+          ["id", h.id],
+          ["rule", h.rule],
+          ["confidence", h.confidence],
+          ["successCount", h.successCount],
+          ["totalCount", h.totalCount]
+        ]))],
+        ["successRate", summary.successRate]
+      ]);
+    }
+    if (op === "wisdom-valid?") {
+      const expMap = args2[0];
+      if (!(expMap instanceof Map)) return false;
+      const exp = {
+        id: String(expMap.get("id") ?? ""),
+        situation: String(expMap.get("situation") ?? ""),
+        action: String(expMap.get("action") ?? ""),
+        outcome: String(expMap.get("outcome") ?? ""),
+        lesson: String(expMap.get("lesson") ?? ""),
+        success: expMap.get("success") === true,
+        importance: Number(expMap.get("importance") ?? 0.5),
+        timestamp: new Date(String(expMap.get("timestamp") ?? (/* @__PURE__ */ new Date()).toISOString())),
+        domain: String(expMap.get("domain") ?? "general")
+      };
+      return globalWisdom.isStillValid(exp);
+    }
+    if (op === "wisdom-similar") {
+      const situation = String(args2[0] ?? "");
+      return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
+        ["id", e.id],
+        ["situation", e.situation],
+        ["action", e.action],
+        ["outcome", e.outcome],
+        ["lesson", e.lesson],
+        ["success", e.success],
+        ["importance", e.importance],
+        ["domain", e.domain]
+      ]));
+    }
+    return null;
+  }
+  function evalExplain_PHASE145(op, args2, callFnVal) {
+    if (op === "explain-decision") {
+      const decision = args2[0];
+      const rawFactors = args2[1];
+      const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
+      const factors = {};
+      if (rawFactors instanceof Map) {
+        for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+      } else if (rawFactors && typeof rawFactors === "object") {
+        for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
+      }
+      const explanation = globalExplainer.explain(decision, factors, context);
+      return /* @__PURE__ */ new Map([
+        ["decision", explanation.decision],
+        ["reasoning", explanation.reasoning],
+        ["features", explanation.features.map((f) => /* @__PURE__ */ new Map([
+          ["feature", f.feature],
+          ["importance", f.importance],
+          ["direction", f.direction],
+          ["description", f.description]
+        ]))],
+        ["confidence", explanation.confidence],
+        ["alternatives", explanation.alternatives.map((a) => /* @__PURE__ */ new Map([
+          ["decision", a.decision],
+          ["reason", a.reason],
+          ["probability", a.probability]
+        ]))],
+        ["summary", explanation.summary],
+        ["audience", explanation.audience]
+      ]);
+    }
+    if (op === "explain-features") {
+      const toRecord = (v) => {
+        const result = {};
+        if (v instanceof Map) {
+          for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
+        } else if (v && typeof v === "object") {
+          for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
+        }
+        return result;
+      };
+      const features = globalExplainer.featureImportance(toRecord(args2[0]), toRecord(args2[1]), args2[2] !== void 0 ? toRecord(args2[2]) : void 0);
+      return features.map((f) => /* @__PURE__ */ new Map([
+        ["feature", f.feature],
+        ["importance", f.importance],
+        ["direction", f.direction],
+        ["description", f.description]
+      ]));
+    }
+    if (op === "explain-local") {
+      const rawInput = args2[0];
+      const output = args2[1];
+      const modelFn = args2[2];
+      const input = {};
+      if (rawInput instanceof Map) {
+        for (const [k, v] of rawInput.entries()) input[String(k).replace(/^:/, "")] = v;
+      } else if (rawInput && typeof rawInput === "object") {
+        for (const [k, v] of Object.entries(rawInput)) input[String(k).replace(/^:/, "")] = v;
+      }
+      const model = (inp) => {
+        if (modelFn && callFnVal) {
+          try {
+            return callFnVal(modelFn, [new Map(Object.entries(inp))]);
+          } catch {
+            return output;
+          }
+        }
+        return output;
+      };
+      const local = globalExplainer.localExplain(input, output, model);
+      return /* @__PURE__ */ new Map([
+        ["input", new Map(Object.entries(local.input))],
+        ["output", local.output],
+        ["topFactors", local.topFactors.map((f) => /* @__PURE__ */ new Map([
+          ["feature", f.feature],
+          ["importance", f.importance],
+          ["direction", f.direction],
+          ["description", f.description]
+        ]))],
+        ["counterfactual", local.counterfactual],
+        ["confidence", local.confidence]
+      ]);
+    }
+    if (op === "explain-natural") {
+      const rawExpl = args2[0];
+      let audience = "technical";
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        if (key === "audience") audience = String(args2[i + 1]);
+      }
+      if (!(rawExpl instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
+      const featuresRaw = rawExpl.get("features") ?? [];
+      const features = (Array.isArray(featuresRaw) ? featuresRaw : []).map((f) => {
+        if (f instanceof Map) {
+          return {
+            feature: String(f.get("feature") ?? ""),
+            importance: Number(f.get("importance") ?? 0),
+            direction: String(f.get("direction") ?? "positive"),
+            description: String(f.get("description") ?? "")
+          };
+        }
+        return { feature: "", importance: 0, direction: "positive", description: "" };
+      });
+      const altsRaw = rawExpl.get("alternatives") ?? [];
+      const alternatives = (Array.isArray(altsRaw) ? altsRaw : []).map((a) => {
+        if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
+        return { decision: null, reason: "", probability: 0 };
+      });
+      const explanation = {
+        decision: rawExpl.get("decision"),
+        reasoning: rawExpl.get("reasoning") ?? [],
+        features,
+        confidence: Number(rawExpl.get("confidence") ?? 0.5),
+        alternatives,
+        summary: String(rawExpl.get("summary") ?? ""),
+        audience: rawExpl.get("audience") ?? "technical"
+      };
+      return globalExplainer.toNaturalLanguage(explanation, audience);
+    }
+    if (op === "explain-contrast") {
+      const factors = {};
+      const rawF = args2[2];
+      if (rawF instanceof Map) {
+        for (const [k, v] of rawF.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+      } else if (rawF && typeof rawF === "object") {
+        for (const [k, v] of Object.entries(rawF)) factors[String(k).replace(/^:/, "")] = Number(v);
+      }
+      return globalExplainer.contrastiveExplain(args2[0], args2[1], factors);
+    }
+    if (op === "explain-rules") {
+      const examples = [];
+      const toRec = (v) => {
+        const r = {};
+        if (v instanceof Map) {
+          for (const [k, val] of v.entries()) r[String(k).replace(/^:/, "")] = val;
+        } else if (v && typeof v === "object") {
+          Object.assign(r, v);
+        }
+        return r;
+      };
+      if (Array.isArray(args2[0])) {
+        for (const ex of args2[0]) {
+          if (ex instanceof Map) examples.push({ input: toRec(ex.get("input")), output: ex.get("output") });
+          else if (ex && typeof ex === "object") examples.push({ input: toRec(ex.input), output: ex.output });
+        }
+      }
+      return globalExplainer.extractRules(examples).map((r) => /* @__PURE__ */ new Map([
+        ["condition", r.condition],
+        ["outcome", r.outcome],
+        ["support", r.support]
+      ]));
+    }
+    if (op === "explain-top-factors") {
+      let n = 3;
+      for (let i = 1; i < args2.length - 1; i += 2) {
+        if (String(args2[i]).replace(/^:/, "") === "n") n = Number(args2[i + 1]);
+      }
+      const rawExpl = args2[0];
+      let features = [];
+      if (rawExpl instanceof Map) features = rawExpl.get("features") ?? [];
+      if (!Array.isArray(features)) features = [];
+      return features.slice(0, n);
+    }
+    if (op === "explain-summary") {
+      const rawExpl = args2[0];
+      if (rawExpl instanceof Map) return String(rawExpl.get("summary") ?? "");
+      return "";
+    }
+    return null;
+  }
+  function evalWorldModel141(op, args2) {
+    if (op === "world-add-entity") {
+      const kw = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        kw[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+      }
+      const rawP = kw["props"] ?? kw["properties"] ?? {};
+      const props = rawP instanceof Map ? Object.fromEntries(rawP.entries()) : typeof rawP === "object" && rawP !== null ? rawP : {};
+      const e = globalWorldModel.addEntity({ id: String(kw["id"] ?? `entity-${Date.now()}`), type: String(kw["type"] ?? "unknown"), confidence: typeof kw["confidence"] === "number" ? kw["confidence"] : 1, properties: props });
+      return /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
+    }
+    if (op === "world-update-entity") {
+      const rawPu = args2[1] ?? {};
+      const propsu = rawPu instanceof Map ? Object.fromEntries(rawPu.entries()) : typeof rawPu === "object" && rawPu !== null ? rawPu : {};
+      const eu = globalWorldModel.updateEntity(String(args2[0] ?? ""), propsu);
+      if (!eu) return null;
+      return /* @__PURE__ */ new Map([["id", eu.id], ["type", eu.type], ["properties", new Map(Object.entries(eu.properties))], ["confidence", eu.confidence], ["lastUpdated", eu.lastUpdated.toISOString()]]);
+    }
+    if (op === "world-get-entity") {
+      const eg = globalWorldModel.getEntity(String(args2[0] ?? ""));
+      if (!eg) return null;
+      return /* @__PURE__ */ new Map([["id", eg.id], ["type", eg.type], ["properties", new Map(Object.entries(eg.properties))], ["confidence", eg.confidence], ["lastUpdated", eg.lastUpdated.toISOString()]]);
+    }
+    if (op === "world-remove-entity") {
+      return globalWorldModel.removeEntity(String(args2[0] ?? ""));
+    }
+    if (op === "world-add-relation") {
+      const kwr = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        kwr[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+      }
+      const rel = globalWorldModel.addRelation({ from: String(kwr["from"] ?? ""), to: String(kwr["to"] ?? ""), type: String(kwr["type"] ?? "related"), strength: typeof kwr["strength"] === "number" ? kwr["strength"] : 1, bidirectional: kwr["bidirectional"] === true });
+      return /* @__PURE__ */ new Map([["id", rel.id], ["from", rel.from], ["to", rel.to], ["type", rel.type], ["strength", rel.strength], ["bidirectional", rel.bidirectional]]);
+    }
+    if (op === "world-get-relations") {
+      return globalWorldModel.getRelations(String(args2[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
+    }
+    if (op === "world-find-path") {
+      return globalWorldModel.findPath(String(args2[0] ?? ""), String(args2[1] ?? ""));
+    }
+    if (op === "world-set-fact") {
+      globalWorldModel.setFact(String(args2[0] ?? ""), args2[1]);
+      return null;
+    }
+    if (op === "world-get-fact") {
+      return globalWorldModel.getFact(String(args2[0] ?? ""));
+    }
+    if (op === "world-add-rule") {
+      const kwrule = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        kwrule[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+      }
+      const rule = globalWorldModel.addRule({ condition: String(kwrule["condition"] ?? ""), consequence: String(kwrule["consequence"] ?? ""), confidence: typeof kwrule["confidence"] === "number" ? kwrule["confidence"] : 0.8 });
+      return /* @__PURE__ */ new Map([["id", rule.id], ["condition", rule.condition], ["consequence", rule.consequence], ["confidence", rule.confidence]]);
+    }
+    if (op === "world-apply-rules") {
+      return globalWorldModel.applyRules().map((u) => /* @__PURE__ */ new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]]));
+    }
+    if (op === "world-query") {
+      const kwq = {};
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        kwq[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
+      }
+      return globalWorldModel.query(kwq["type"] !== void 0 ? String(kwq["type"]) : void 0, kwq["min-confidence"] !== void 0 ? Number(kwq["min-confidence"]) : void 0).map((e) => /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]));
+    }
+    if (op === "world-snapshot") {
+      const snap = globalWorldModel.snapshot();
+      return /* @__PURE__ */ new Map([["entityCount", snap.entities.size], ["relationCount", snap.relations.length], ["factCount", snap.facts.size], ["ruleCount", snap.rules.length], ["version", snap.version], ["timestamp", snap.timestamp.toISOString()]]);
+    }
+    if (op === "world-summarize") {
+      return globalWorldModel.summarize();
+    }
+    if (op === "world-history") {
+      return globalWorldModel.getHistory().map((u) => /* @__PURE__ */ new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]]));
+    }
+    return void 0;
+  }
+
   // src/eval-builtins.ts
   init_lexer();
   init_parser();
@@ -11776,14 +13207,26 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
   function flExecOpNative(op, vals) {
     const v0 = vals[0], v1 = vals[1], v2 = vals[2];
     switch (normalizedOp) {
-      case "+":
+      case "+": {
+        const nilIdx = vals.findIndex((v) => v === null || v === void 0);
+        if (nilIdx >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${nilIdx + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return vals.reduce((a, b) => a + b, 0);
-      case "-":
+      }
+      case "-": {
+        const nilIdx = vals.findIndex((v) => v === null || v === void 0);
+        if (nilIdx >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${nilIdx + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return vals.length === 1 ? -v0 : vals.reduce((a, b) => a - b);
-      case "*":
+      }
+      case "*": {
+        const nilIdx = vals.findIndex((v) => v === null || v === void 0);
+        if (nilIdx >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${nilIdx + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return vals.reduce((a, b) => a * b, 1);
-      case "/":
+      }
+      case "/": {
+        const nilIdx = vals.findIndex((v) => v === null || v === void 0);
+        if (nilIdx >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${nilIdx + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return vals.length === 1 ? 1 / v0 : vals.reduce((a, b) => a / b);
+      }
       case "%":
         return v0 % v1;
       case "=": {
@@ -11794,6 +13237,7 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
         return v0 === v1;
       }
       case "!=":
+      case "not=":
         return v0 !== v1;
       case "<":
         return v0 < v1;
@@ -11856,6 +13300,19 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
           return _def;
         }
         return _def;
+      }
+      case "get-in": {
+        if (!Array.isArray(v1)) throw new Error(`get-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        const defaultVal = v2 !== void 0 ? v2 : null;
+        let cur = v0;
+        for (const k of v1) {
+          if (cur === null || cur === void 0) return defaultVal;
+          const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
+          if (Array.isArray(cur)) cur = cur[key] !== void 0 ? cur[key] : null;
+          else if (cur !== null && typeof cur === "object") cur = cur[key] !== void 0 ? cur[key] : null;
+          else return defaultVal;
+        }
+        return cur !== void 0 ? cur : defaultVal;
       }
       case "append":
         return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
@@ -11924,10 +13381,16 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
       }
       case "first":
         return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
+      case "second":
+        return Array.isArray(v0) ? v0[1] !== void 0 ? v0[1] : null : null;
       case "last":
         return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
       case "rest":
         return Array.isArray(v0) ? v0.slice(1) : [];
+      case "nth":
+        return Array.isArray(v0) && args[1] !== void 0 ? v0[Number(args[1])] !== void 0 ? v0[Number(args[1])] : null : null;
+      case "not=":
+        return args[0] !== args[1];
       case "get-or": {
         let k = v1;
         if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
@@ -12340,6 +13803,7 @@ req.end();`;
     const callUser = (name, a) => interp2.callUserFunction(name, a);
     const callFnVal = (fn, a) => {
       if (typeof fn === "string") return interp2.callUserFunction(fn, a);
+      if ((fn == null ? void 0 : fn.kind) === "builtin-fn") return evalBuiltin(interp2, fn.name, a, expr2);
       if ((fn == null ? void 0 : fn.kind) === "function-value" || (fn == null ? void 0 : fn.kind) === "async-function-value") return interp2.callFunctionValue(fn, a);
       if (typeof (fn == null ? void 0 : fn.body) === "function") return fn.body(...a);
       if ((fn == null ? void 0 : fn.params) !== void 0 && (fn == null ? void 0 : fn.body) !== void 0) return interp2.callUserFunction(fn.name ?? fn.id, a);
@@ -12670,14 +14134,26 @@ loop().catch(e => {
         if (!resp.ok) return null;
         return resp.data;
       }
-      case "+":
+      case "+": {
+        const ni = args2.findIndex((v) => v === null || v === void 0);
+        if (ni >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${ni + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return args2.reduce((a, b) => a + b, 0);
-      case "-":
+      }
+      case "-": {
+        const ni = args2.findIndex((v) => v === null || v === void 0);
+        if (ni >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${ni + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return args2.length === 1 ? -args2[0] : args2.reduce((a, b) => a - b);
-      case "*":
+      }
+      case "*": {
+        const ni = args2.findIndex((v) => v === null || v === void 0);
+        if (ni >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${ni + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return args2.reduce((a, b) => a * b, 1);
-      case "/":
+      }
+      case "/": {
+        const ni = args2.findIndex((v) => v === null || v === void 0);
+        if (ni >= 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: \uC778\uC790 ${ni + 1}\uBC88\uC774 nil \u2014 \uC22B\uC790 \uC608\uC0C1`);
         return args2.length === 1 ? 1 / args2[0] : args2.reduce((a, b) => a / b);
+      }
       case "%":
         return args2[0] % args2[1];
       case "=":
@@ -12691,6 +14167,7 @@ loop().catch(e => {
       case ">=":
         return args2[0] >= args2[1];
       case "!=":
+      case "not=":
         return args2[0] !== args2[1];
       case "and":
         return args2.every((a) => a);
@@ -12710,6 +14187,13 @@ loop().catch(e => {
       case "echo":
         console.log(...args2.map((a) => toDisplay2(a)));
         return null;
+      case "tap":
+      case "dbg": {
+        const label = args2.length > 1 ? String(args2[0]) + " " : "";
+        const val = args2.length > 1 ? args2[1] : args2[0];
+        process.stderr.write("[tap] " + label + toDisplay2(val) + "\n");
+        return val;
+      }
       case "print-err":
         process.stderr.write(args2.map((a) => toDisplay2(a)).join(" ") + "\n");
         return null;
@@ -12869,26 +14353,16 @@ loop().catch(e => {
         return args2[0];
       case "comp": {
         const fns = args2.filter((a) => a != null);
-        const callOne = (fn, callArgs) => {
-          if (typeof fn === "function") return fn(...callArgs);
-          if ((fn == null ? void 0 : fn.kind) === "function-value") return callFnVal(fn, callArgs);
-          return null;
-        };
         return (...callArgs) => {
           if (fns.length === 0) return callArgs[0];
-          let result = callOne(fns[fns.length - 1], callArgs);
-          for (let i = fns.length - 2; i >= 0; i--) result = callOne(fns[i], [result]);
+          let result = callFnVal(fns[fns.length - 1], callArgs);
+          for (let i = fns.length - 2; i >= 0; i--) result = callFnVal(fns[i], [result]);
           return result;
         };
       }
       case "juxt": {
         const fns = args2.filter((a) => a != null);
-        const callOne = (fn, callArgs) => {
-          if (typeof fn === "function") return fn(...callArgs);
-          if ((fn == null ? void 0 : fn.kind) === "function-value") return callFnVal(fn, callArgs);
-          return null;
-        };
-        return (...callArgs) => fns.map((fn) => callOne(fn, callArgs));
+        return (...callArgs) => fns.map((fn) => callFnVal(fn, callArgs));
       }
       case "constantly": {
         const v = args2[0];
@@ -12907,6 +14381,10 @@ loop().catch(e => {
         return args2;
       case "first":
         return Array.isArray(args2[0]) ? args2[0][0] !== void 0 ? args2[0][0] : null : null;
+      case "second":
+        return Array.isArray(args2[0]) ? args2[0][1] !== void 0 ? args2[0][1] : null : null;
+      case "nth":
+        return Array.isArray(args2[0]) ? args2[0][Number(args2[1])] !== void 0 ? args2[0][Number(args2[1])] : null : null;
       case "rest":
         return Array.isArray(args2[0]) ? args2[0].slice(1) : [];
       case "keys": {
@@ -12965,9 +14443,10 @@ loop().catch(e => {
           }
         }
         const mapFn = args2[0];
+        if (args2[1] === null || args2[1] === void 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: map \uB300\uC0C1\uC774 nil \u2014 \uBC30\uC5F4 \uC608\uC0C1`);
         const mapArr = Array.isArray(args2[1]) ? args2[1] : [];
         if (typeof mapFn === "function") {
-          return mapArr.map(mapFn);
+          return mapArr.map((item) => mapFn(item));
         } else if (mapFn && (mapFn.kind === "function-value" || mapFn.kind === "async-function-value")) {
           return mapArr.map((item) => callFnVal(mapFn, [item]));
         }
@@ -13169,8 +14648,10 @@ loop().catch(e => {
       case "array?":
         return Array.isArray(args2[0]);
       case "function?":
-      case "fn?":
-        return typeof args2[0] === "function";
+      case "fn?": {
+        const fv = args2[0];
+        return typeof fv === "function" || fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value");
+      }
       case "map?":
         return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
       case "num-to-str":
@@ -13193,7 +14674,26 @@ loop().catch(e => {
         return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].split(args2[1]) : [];
       case "join":
       case "str-join":
-        return Array.isArray(args2[0]) ? args2[0].join(args2[1] || "") : "";
+        if (Array.isArray(args2[0])) return args2[0].join(args2[1] !== void 0 ? String(args2[1]) : "");
+        if (typeof args2[0] === "string" && Array.isArray(args2[1])) return args2[1].join(args2[0]);
+        return Array.isArray(args2[0]) ? args2[0].join("") : "";
+      case "str-format":
+      case "format": {
+        let fmt = String(args2[0] ?? "");
+        let i = 1;
+        return fmt.replace(/%(-?\d*\.?\d*)([sdfoexX%])/g, (_m2, spec, t) => {
+          if (t === "%") return "%";
+          const v = args2[i++];
+          if (t === "d") return String(Math.trunc(Number(v)));
+          if (t === "f") {
+            const prec = spec.includes(".") ? parseInt(spec.split(".")[1]) : 6;
+            return Number(v).toFixed(prec);
+          }
+          if (t === "s") return v === null || v === void 0 ? "null" : String(v);
+          if (t === "o") return JSON.stringify(v);
+          return String(v);
+        });
+      }
       case "trim":
       case "string_trim":
       case "str_trim":
@@ -13230,8 +14730,9 @@ loop().catch(e => {
         }
         const filterFn = args2[0];
         const coll = args2[1];
+        if (coll === null || coll === void 0) throw new Error(`\uD0C0\uC785 \uBD88\uC77C\uCE58: filter \uB300\uC0C1\uC774 nil \u2014 \uBC30\uC5F4 \uC608\uC0C1`);
         if (!Array.isArray(coll)) return [];
-        if (typeof filterFn === "function") return coll.filter(filterFn);
+        if (typeof filterFn === "function") return coll.filter((item) => filterFn(item));
         if (filterFn && filterFn.kind === "function-value") {
           return coll.filter((item) => callFnVal(filterFn, [item]));
         }
@@ -13254,6 +14755,97 @@ loop().catch(e => {
       case "last-or":
       case "last_or":
         return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : args2[1] !== void 0 ? args2[1] : null;
+      case "apply": {
+        const apFn = args2[0], apArr = Array.isArray(args2[args2.length - 1]) ? args2[args2.length - 1] : [];
+        const extraArgs = args2.slice(1, args2.length - 1);
+        const allArgs = [...extraArgs, ...apArr];
+        if (typeof apFn === "string") return evalBuiltin(interp2, apFn, allArgs, expr2);
+        return callFnVal(apFn, allArgs);
+      }
+      case "sum": {
+        const arr = Array.isArray(args2[0]) ? args2[0] : args2;
+        return arr.reduce((a, b) => a + Number(b), 0);
+      }
+      case "product": {
+        const arr = Array.isArray(args2[0]) ? args2[0] : args2;
+        return arr.reduce((a, b) => a * Number(b), 1);
+      }
+      case "average": {
+        const arr = Array.isArray(args2[0]) ? args2[0] : args2;
+        if (arr.length === 0) return null;
+        return arr.reduce((a, b) => a + Number(b), 0) / arr.length;
+      }
+      case "update": {
+        const uMap = args2[0], uKey0 = args2[1], uFn = args2[2];
+        let uKey = uKey0;
+        if (uKey && typeof uKey === "object" && uKey.kind === "keyword") uKey = uKey.name;
+        else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
+        const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
+        const next = callFnVal(uFn, [cur]);
+        return { ...uMap, [uKey]: next };
+      }
+      case "partition": {
+        const n = Number(args2[0]), parr = Array.isArray(args2[1]) ? args2[1] : [];
+        const out = [];
+        for (let i = 0; i < parr.length; i += n) out.push(parr.slice(i, i + n));
+        return out;
+      }
+      case "interpose": {
+        const sep = args2[0], iarr = Array.isArray(args2[1]) ? args2[1] : [];
+        if (iarr.length === 0) return [];
+        const result = [iarr[0]];
+        for (let i = 1; i < iarr.length; i++) {
+          result.push(sep);
+          result.push(iarr[i]);
+        }
+        return result;
+      }
+      case "keep": {
+        const kfn = args2[0], karr = Array.isArray(args2[1]) ? args2[1] : [];
+        return karr.map((x) => callFnVal(kfn, [x])).filter((v) => v !== null && v !== void 0);
+      }
+      case "mapcat": {
+        const mcfn = args2[0], mcarr = Array.isArray(args2[1]) ? args2[1] : [];
+        return mcarr.flatMap((x) => {
+          const r = callFnVal(mcfn, [x]);
+          return Array.isArray(r) ? r : [r];
+        });
+      }
+      case "count-if": {
+        const cifn = args2[0], ciarr = Array.isArray(args2[1]) ? args2[1] : [];
+        return ciarr.filter((x) => callFnVal(cifn, [x])).length;
+      }
+      case "max-by": {
+        const mbfn = args2[0], mbarr = Array.isArray(args2[1]) ? args2[1] : [];
+        if (mbarr.length === 0) return null;
+        return mbarr.reduce((best, x) => callFnVal(mbfn, [x]) > callFnVal(mbfn, [best]) ? x : best);
+      }
+      case "min-by": {
+        const mnbfn = args2[0], mnbarr = Array.isArray(args2[1]) ? args2[1] : [];
+        if (mnbarr.length === 0) return null;
+        return mnbarr.reduce((best, x) => callFnVal(mnbfn, [x]) < callFnVal(mnbfn, [best]) ? x : best);
+      }
+      case "max-of": {
+        const moarr = Array.isArray(args2[0]) ? args2[0] : args2;
+        return moarr.length === 0 ? null : Math.max(...moarr.map(Number));
+      }
+      case "min-of": {
+        const minarr = Array.isArray(args2[0]) ? args2[0] : args2;
+        return minarr.length === 0 ? null : Math.min(...minarr.map(Number));
+      }
+      case "get-in": {
+        if (!Array.isArray(args2[1])) throw new Error(`get-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        const giDefault = args2[2] !== void 0 ? args2[2] : null;
+        let cur = args2[0];
+        for (const k of args2[1]) {
+          if (cur === null || cur === void 0) return giDefault;
+          const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
+          if (Array.isArray(cur)) cur = cur[key] !== void 0 ? cur[key] : void 0;
+          else if (cur !== null && typeof cur === "object") cur = cur[key] !== void 0 ? cur[key] : void 0;
+          else return giDefault;
+        }
+        return cur !== void 0 ? cur : giDefault;
+      }
       case "get-or": {
         const def = args2[2] !== void 0 ? args2[2] : null;
         let k = args2[1];
@@ -13458,6 +15050,18 @@ loop().catch(e => {
         }
         return base;
       }
+      case "assoc-in": {
+        let aiSet = function(obj, keys, val) {
+          const k = typeof keys[0] === "string" && keys[0].startsWith(":") ? keys[0].slice(1) : String(keys[0]);
+          const base = obj !== null && typeof obj === "object" && !Array.isArray(obj) ? { ...obj } : {};
+          base[k] = keys.length === 1 ? val : aiSet(base[k], keys.slice(1), val);
+          return base;
+        };
+        if (!Array.isArray(args2[1]) || args2[1].length === 0) throw new Error(`assoc-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+        const aiKeys = args2[1];
+        const aiVal = args2[2];
+        return aiSet(args2[0], aiKeys, aiVal);
+      }
       case "dissoc": {
         if (args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0])) {
           const rawK = args2[1];
@@ -13511,6 +15115,36 @@ loop().catch(e => {
         }
         return result;
       }
+      case "select-keys": {
+        if (!args2[0] || !Array.isArray(args2[1])) return {};
+        const result = {};
+        for (const k of args2[1]) {
+          const key = k && typeof k === "object" && k.kind === "keyword" ? k.name : typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+          if (args2[0][key] !== void 0) result[key] = args2[0][key];
+        }
+        return result;
+      }
+      case "rename-keys": {
+        if (!args2[0] || !args2[1]) return { ...args2[0] };
+        const result = { ...args2[0] };
+        for (const [oldK, newK] of Object.entries(args2[1])) {
+          const ok2 = typeof oldK === "string" && oldK.startsWith(":") ? oldK.slice(1) : oldK;
+          const nk = newK && typeof newK === "object" && newK.kind === "keyword" ? newK.name : typeof newK === "string" && newK.startsWith(":") ? newK.slice(1) : String(newK);
+          if (result[ok2] !== void 0) {
+            result[nk] = result[ok2];
+            delete result[ok2];
+          }
+        }
+        return result;
+      }
+      case "str-index-of":
+      case "str-index_of": {
+        if (typeof args2[0] !== "string") return -1;
+        return args2[0].indexOf(String(args2[1] ?? ""), args2[2] !== void 0 ? Number(args2[2]) : 0);
+      }
+      case "str-replace-all":
+      case "str-replace":
+        return typeof args2[0] === "string" ? args2[0].split(String(args2[1] ?? "")).join(String(args2[2] ?? "")) : "";
       case "flatten": {
         if (!Array.isArray(args2[0])) return [];
         const flatten = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
@@ -13720,6 +15354,16 @@ loop().catch(e => {
           return someArr.some((item) => callFnVal(someFn, [item]));
         }
         return { tag: "Some", value: args2[0], kind: "Option" };
+      case "every?": {
+        const evFn = args2[0], evArr = Array.isArray(args2[1]) ? args2[1] : [];
+        if (typeof evFn === "function") return evArr.every(evFn);
+        return evArr.every((item) => callFnVal(evFn, [item]));
+      }
+      case "any?": {
+        const anyFn = args2[0], anyArr = Array.isArray(args2[1]) ? args2[1] : [];
+        if (typeof anyFn === "function") return anyArr.some(anyFn);
+        return anyArr.some((item) => callFnVal(anyFn, [item]));
+      }
       case "none":
         return { tag: "None", value: null, kind: "Option" };
       case "pure":
@@ -13792,9 +15436,8 @@ loop().catch(e => {
       }
       case "range": {
         if (args2.length === 0) return rangeSeq(0);
-        if (args2.length === 1) return rangeSeq(0, args2[0]);
-        const start = Number(args2[0]);
-        const end = Number(args2[1]);
+        const start = args2.length === 1 ? 0 : Number(args2[0]);
+        const end = args2.length === 1 ? Number(args2[0]) : Number(args2[1]);
         const step = args2.length >= 3 ? Number(args2[2]) : 1;
         const out = [];
         if (step > 0) for (let i = start; i < end; i += step) out.push(i);
@@ -16315,1466 +17958,6 @@ req.end();`;
       }
     }
   }
-  function pruneResultToMap(result) {
-    const statsMap = /* @__PURE__ */ new Map([
-      ["originalCount", result.stats.originalCount],
-      ["keptCount", result.stats.keptCount],
-      ["removedCount", result.stats.removedCount],
-      ["avgFitnessKept", result.stats.avgFitnessKept],
-      ["avgFitnessRemoved", result.stats.avgFitnessRemoved]
-    ]);
-    return /* @__PURE__ */ new Map([
-      ["kept", result.kept],
-      ["removed", result.removed],
-      ["keptRatio", result.keptRatio],
-      ["strategy", result.strategy],
-      ["stats", statsMap]
-    ]);
-  }
-  function evalRefactorSelf(op, args2) {
-    if (op === "refactor-analyze") {
-      const code = String(args2[0] ?? "");
-      const result = globalRefactorer.refactor(code, true);
-      return /* @__PURE__ */ new Map([
-        ["suggestions", result.suggestions.map((s) => /* @__PURE__ */ new Map([
-          ["pattern", s.pattern],
-          ["location", s.location],
-          ["original", s.original],
-          ["suggested", s.suggested],
-          ["reason", s.reason],
-          ["impact", s.impact]
-        ]))],
-        ["applied", result.applied],
-        ["skipped", result.skipped],
-        ["score", /* @__PURE__ */ new Map([
-          ["before", result.score.before],
-          ["after", result.score.after],
-          ["improvement", result.score.improvement]
-        ])]
-      ]);
-    }
-    if (op === "refactor-suggest") {
-      const code = String(args2[0] ?? "");
-      return globalRefactorer.suggest(code).map((s) => /* @__PURE__ */ new Map([
-        ["pattern", s.pattern],
-        ["location", s.location],
-        ["original", s.original],
-        ["suggested", s.suggested],
-        ["reason", s.reason],
-        ["impact", s.impact]
-      ]));
-    }
-    if (op === "refactor-apply") {
-      const code = String(args2[0] ?? "");
-      const rawSuggestions = Array.isArray(args2[1]) ? args2[1] : [];
-      const suggestions = rawSuggestions.map((s) => {
-        if (s instanceof Map) return {
-          pattern: s.get("pattern") ?? "extract-duplicate",
-          location: s.get("location") ?? "",
-          original: s.get("original") ?? "",
-          suggested: s.get("suggested") ?? "",
-          reason: s.get("reason") ?? "",
-          impact: s.get("impact") ?? "low"
-        };
-        return s;
-      });
-      const applyResult = globalRefactorer.apply(code, suggestions);
-      return /* @__PURE__ */ new Map([
-        ["code", applyResult.code],
-        ["applied", applyResult.applied.map((s) => /* @__PURE__ */ new Map([
-          ["pattern", s.pattern],
-          ["location", s.location],
-          ["impact", s.impact]
-        ]))]
-      ]);
-    }
-    if (op === "refactor-complexity") {
-      const code = String(args2[0] ?? "");
-      const c = globalRefactorer.analyzeComplexity(code);
-      return /* @__PURE__ */ new Map([["lines", c.lines], ["depth", c.depth], ["conditions", c.conditions], ["score", c.score]]);
-    }
-    if (op === "refactor-quality") {
-      const code = String(args2[0] ?? "");
-      return globalRefactorer.qualityScore(code);
-    }
-    if (op === "refactor-naming") {
-      const code = String(args2[0] ?? "");
-      const n = globalRefactorer.analyzeNaming(code);
-      return /* @__PURE__ */ new Map([
-        ["issues", n.issues.map((i) => /* @__PURE__ */ new Map([
-          ["name", i.name],
-          ["suggestion", i.suggestion],
-          ["reason", i.reason]
-        ]))],
-        ["score", n.score]
-      ]);
-    }
-    if (op === "refactor-duplicates") {
-      const code = String(args2[0] ?? "");
-      return globalRefactorer.findDuplicates(code).map((s) => /* @__PURE__ */ new Map([
-        ["pattern", s.pattern],
-        ["location", s.location],
-        ["original", s.original],
-        ["suggested", s.suggested],
-        ["reason", s.reason],
-        ["impact", s.impact]
-      ]));
-    }
-    if (op === "refactor-score") {
-      const r = args2[0];
-      if (r instanceof Map) {
-        const score = r.get("score");
-        if (score instanceof Map) return /* @__PURE__ */ new Map([
-          ["before", score.get("before") ?? 0],
-          ["after", score.get("after") ?? 0],
-          ["improvement", score.get("improvement") ?? 0]
-        ]);
-      }
-      return /* @__PURE__ */ new Map([["before", 0], ["after", 0], ["improvement", 0]]);
-    }
-    if (op === "causal-add-node") {
-      const kw = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kw[key] = args2[i + 1];
-      }
-      const node = {
-        id: String(kw["id"] ?? ""),
-        name: String(kw["name"] ?? kw["id"] ?? ""),
-        description: String(kw["desc"] ?? kw["description"] ?? ""),
-        value: kw["value"] !== void 0 ? Number(kw["value"]) : void 0
-      };
-      globalCausal.addNode(node);
-      return /* @__PURE__ */ new Map([["id", node.id], ["name", node.name], ["description", node.description]]);
-    }
-    if (op === "causal-add-edge") {
-      const kw = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kw[key] = args2[i + 1];
-      }
-      const edge = {
-        from: String(kw["from"] ?? ""),
-        to: String(kw["to"] ?? ""),
-        strength: Number(kw["strength"] ?? 1),
-        confidence: Number(kw["confidence"] ?? 1),
-        delay: kw["delay"] !== void 0 ? Number(kw["delay"]) : void 0,
-        mechanism: kw["mechanism"] !== void 0 ? String(kw["mechanism"]) : void 0
-      };
-      globalCausal.addEdge(edge);
-      return /* @__PURE__ */ new Map([["from", edge.from], ["to", edge.to], ["strength", edge.strength], ["confidence", edge.confidence]]);
-    }
-    if (op === "causal-explain") {
-      const effectId = String(args2[0] ?? "");
-      const expl = globalCausal.explain(effectId);
-      return /* @__PURE__ */ new Map([
-        ["effect", expl.effect],
-        ["primaryCause", expl.primaryCause],
-        ["explanation", expl.explanation],
-        ["confidence", expl.confidence],
-        ["causes", expl.causes.map((c) => /* @__PURE__ */ new Map([
-          ["cause", c.cause],
-          ["contribution", c.contribution],
-          ["chain", /* @__PURE__ */ new Map([
-            ["path", c.chain.path],
-            ["totalStrength", c.chain.totalStrength],
-            ["explanation", c.chain.explanation],
-            ["confidence", c.chain.confidence]
-          ])]
-        ]))]
-      ]);
-    }
-    if (op === "causal-chains") {
-      const causeId = String(args2[0] ?? "");
-      const effectId = String(args2[1] ?? "");
-      const chains = globalCausal.findCausalChains(causeId, effectId);
-      return chains.map((c) => /* @__PURE__ */ new Map([
-        ["path", c.path],
-        ["totalStrength", c.totalStrength],
-        ["explanation", c.explanation],
-        ["confidence", c.confidence]
-      ]));
-    }
-    if (op === "causal-causes") {
-      const nodeId = String(args2[0] ?? "");
-      const causes = globalCausal.getDirectCauses(nodeId);
-      return causes.map((e) => /* @__PURE__ */ new Map([
-        ["from", e.from],
-        ["to", e.to],
-        ["strength", e.strength],
-        ["confidence", e.confidence]
-      ]));
-    }
-    if (op === "causal-effects") {
-      const nodeId = String(args2[0] ?? "");
-      const effects = globalCausal.getDirectEffects(nodeId);
-      return effects.map((e) => /* @__PURE__ */ new Map([
-        ["from", e.from],
-        ["to", e.to],
-        ["strength", e.strength],
-        ["confidence", e.confidence]
-      ]));
-    }
-    if (op === "causal-roots") {
-      const nodeId = String(args2[0] ?? "");
-      return globalCausal.findRootCauses(nodeId);
-    }
-    if (op === "causal-simulate") {
-      const arg = args2[0];
-      const interventions = {};
-      if (arg instanceof Map) {
-        for (const [k, v] of arg.entries()) {
-          interventions[String(k)] = Number(v);
-        }
-      }
-      const result = globalCausal.simulate(interventions);
-      return new Map(Object.entries(result));
-    }
-    if (op === "causal-why") {
-      const effectId = String(args2[0] ?? "");
-      const causeId = String(args2[1] ?? "");
-      const chain = whyCaused(effectId, causeId);
-      if (chain === null) return null;
-      return /* @__PURE__ */ new Map([
-        ["path", chain.path],
-        ["totalStrength", chain.totalStrength],
-        ["explanation", chain.explanation],
-        ["confidence", chain.confidence]
-      ]);
-    }
-    if (op === "causal-summary") {
-      const nodeId = String(args2[0] ?? "");
-      return globalCausal.summarize(nodeId);
-    }
-    return null;
-  }
-  function evalAlign(op, args2) {
-    if (op === "align-add-goal") {
-      const kw = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kw[key] = args2[i + 1];
-      }
-      const goal = {
-        id: String(kw["id"] ?? `goal_${Date.now()}`),
-        description: String(kw["desc"] ?? kw["description"] ?? ""),
-        priority: Number(kw["priority"] ?? 5),
-        measurable: Boolean(kw["measurable"] ?? false),
-        metric: kw["metric"] !== void 0 ? String(kw["metric"]) : void 0,
-        target: kw["target"] !== void 0 ? Number(kw["target"]) : void 0
-      };
-      globalAlignment.addGoal(goal);
-      return /* @__PURE__ */ new Map([
-        ["id", goal.id],
-        ["description", goal.description],
-        ["priority", goal.priority],
-        ["measurable", goal.measurable]
-      ]);
-    }
-    if (op === "align-add-value") {
-      const kw = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kw[key] = args2[i + 1];
-      }
-      const value = {
-        id: String(kw["id"] ?? `value_${Date.now()}`),
-        name: String(kw["name"] ?? ""),
-        description: String(kw["desc"] ?? kw["description"] ?? ""),
-        weight: Number(kw["weight"] ?? 0.5)
-      };
-      globalAlignment.addValue(value);
-      return /* @__PURE__ */ new Map([
-        ["id", value.id],
-        ["name", value.name],
-        ["description", value.description],
-        ["weight", value.weight]
-      ]);
-    }
-    if (op === "align-score") {
-      const actionRaw = args2[0];
-      const _getF = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
-      const _getEO = (obj) => {
-        const eo = _getF(obj, "expectedOutcomes");
-        if (eo instanceof Map) return Object.fromEntries(eo);
-        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
-        return {};
-      };
-      const action = {
-        id: String(_getF(actionRaw, "id") ?? ""),
-        description: String(_getF(actionRaw, "description") ?? ""),
-        expectedOutcomes: _getEO(actionRaw),
-        risks: Array.isArray(_getF(actionRaw, "risks")) ? _getF(actionRaw, "risks") : []
-      };
-      const result = globalAlignment.score(action);
-      return /* @__PURE__ */ new Map([
-        ["action", actionRaw],
-        ["goalAlignment", new Map(Object.entries(result.goalAlignment))],
-        ["valueAlignment", new Map(Object.entries(result.valueAlignment))],
-        ["overallScore", result.overallScore],
-        ["conflicts", result.conflicts.map((c) => /* @__PURE__ */ new Map([["goal1", c.goal1], ["goal2", c.goal2], ["severity", c.severity]]))],
-        ["recommendation", result.recommendation],
-        ["reasons", result.reasons]
-      ]);
-    }
-    if (op === "align-best") {
-      const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
-      const _getF2 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
-      const _getEO2 = (obj) => {
-        const eo = _getF2(obj, "expectedOutcomes");
-        if (eo instanceof Map) return Object.fromEntries(eo);
-        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
-        return {};
-      };
-      const actions = actionsList.map((m) => ({
-        id: String(_getF2(m, "id") ?? ""),
-        description: String(_getF2(m, "description") ?? ""),
-        expectedOutcomes: _getEO2(m),
-        risks: Array.isArray(_getF2(m, "risks")) ? _getF2(m, "risks") : []
-      }));
-      if (actions.length === 0) return null;
-      const best = globalAlignment.selectBestAligned(actions);
-      return /* @__PURE__ */ new Map([
-        ["id", best.id],
-        ["description", best.description]
-      ]);
-    }
-    if (op === "align-conflicts") {
-      const conflicts = globalAlignment.detectConflicts();
-      return conflicts.map((c) => /* @__PURE__ */ new Map([
-        ["goal1", c.goal1],
-        ["goal2", c.goal2],
-        ["description", c.description]
-      ]));
-    }
-    if (op === "align-plan") {
-      const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
-      const _gFP = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
-      const _gEOP = (obj) => {
-        const eo = _gFP(obj, "expectedOutcomes");
-        if (eo instanceof Map) return Object.fromEntries(eo);
-        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
-        return {};
-      };
-      const actions = actionsList.map((m) => ({
-        id: String(_gFP(m, "id") ?? ""),
-        description: String(_gFP(m, "description") ?? ""),
-        expectedOutcomes: _gEOP(m),
-        risks: Array.isArray(_gFP(m, "risks")) ? _gFP(m, "risks") : []
-      }));
-      const result = globalAlignment.evaluatePlan(actions);
-      return /* @__PURE__ */ new Map([
-        ["overallAlignment", result.overallAlignment],
-        ["weakLinks", result.weakLinks.map((a) => /* @__PURE__ */ new Map([["id", a.id], ["description", a.description]]))],
-        ["summary", result.summary]
-      ]);
-    }
-    if (op === "align-improve") {
-      const actionRaw3 = args2[0];
-      const _getF3 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
-      const _getEO3 = (obj) => {
-        const eo = _getF3(obj, "expectedOutcomes");
-        if (eo instanceof Map) return Object.fromEntries(eo);
-        if (eo && typeof eo === "object") return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, Number(v)]));
-        return {};
-      };
-      const action = {
-        id: String(_getF3(actionRaw3, "id") ?? ""),
-        description: String(_getF3(actionRaw3, "description") ?? ""),
-        expectedOutcomes: _getEO3(actionRaw3),
-        risks: Array.isArray(_getF3(actionRaw3, "risks")) ? _getF3(actionRaw3, "risks") : []
-      };
-      return globalAlignment.suggestImprovements(action);
-    }
-    if (op === "align-goals") {
-      const goals = globalAlignment.prioritizeGoals();
-      return goals.map((g) => /* @__PURE__ */ new Map([
-        ["id", g.id],
-        ["description", g.description],
-        ["priority", g.priority],
-        ["measurable", g.measurable]
-      ]));
-    }
-    return null;
-  }
-  function evalPredict_PHASE144(op, args2) {
-    if (op === "predict-linear") {
-      const data144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      let horizon144 = 1;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const k = String(args2[i]).replace(/^:/, "");
-        if (k === "horizon") horizon144 = Number(args2[i + 1]);
-      }
-      const p144 = globalPredictor.linearRegression(data144, horizon144);
-      return /* @__PURE__ */ new Map([
-        ["value", p144.value],
-        ["lower", p144.lower],
-        ["upper", p144.upper],
-        ["confidence", p144.confidence],
-        ["method", p144.method],
-        ["horizon", p144.horizon ?? 1]
-      ]);
-    }
-    if (op === "predict-ma") {
-      const data144ma = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      let window144 = 3;
-      let horizon144ma = 1;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const k = String(args2[i]).replace(/^:/, "");
-        if (k === "window") window144 = Number(args2[i + 1]);
-        else if (k === "horizon") horizon144ma = Number(args2[i + 1]);
-      }
-      const pma = globalPredictor.movingAverage(data144ma, window144, horizon144ma);
-      return /* @__PURE__ */ new Map([
-        ["value", pma.value],
-        ["lower", pma.lower],
-        ["upper", pma.upper],
-        ["confidence", pma.confidence],
-        ["method", pma.method],
-        ["horizon", pma.horizon ?? 1]
-      ]);
-    }
-    if (op === "predict-exp") {
-      const data144exp = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      let alpha144 = 0.3;
-      let horizon144exp = 1;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const k = String(args2[i]).replace(/^:/, "");
-        if (k === "alpha") alpha144 = Number(args2[i + 1]);
-        else if (k === "horizon") horizon144exp = Number(args2[i + 1]);
-      }
-      const pexp = globalPredictor.exponentialSmoothing(data144exp, alpha144, horizon144exp);
-      return /* @__PURE__ */ new Map([
-        ["value", pexp.value],
-        ["lower", pexp.lower],
-        ["upper", pexp.upper],
-        ["confidence", pexp.confidence],
-        ["method", pexp.method],
-        ["horizon", pexp.horizon ?? 1]
-      ]);
-    }
-    if (op === "predict-forecast") {
-      const data144ts = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      let steps144 = 3;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const k = String(args2[i]).replace(/^:/, "");
-        if (k === "steps") steps144 = Number(args2[i + 1]);
-      }
-      const tsResult = globalPredictor.forecastTimeSeries(data144ts, steps144);
-      return /* @__PURE__ */ new Map([
-        ["predictions", tsResult.predictions.map((p) => /* @__PURE__ */ new Map([
-          ["value", p.value],
-          ["lower", p.lower],
-          ["upper", p.upper],
-          ["confidence", p.confidence],
-          ["method", p.method],
-          ["horizon", p.horizon ?? 1]
-        ]))],
-        ["trend", tsResult.trend],
-        ["seasonality", tsResult.seasonality ?? null],
-        ["accuracy", tsResult.accuracy ?? null]
-      ]);
-    }
-    if (op === "predict-ci") {
-      const samples144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      let conf144 = 0.95;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const k = String(args2[i]).replace(/^:/, "");
-        if (k === "confidence") conf144 = Number(args2[i + 1]);
-      }
-      const ci = globalPredictor.confidenceInterval(samples144, conf144);
-      return /* @__PURE__ */ new Map([["lower", ci.lower], ["upper", ci.upper]]);
-    }
-    if (op === "predict-classify") {
-      const rawFeatures = args2[0];
-      const features144 = {};
-      if (rawFeatures instanceof Map) {
-        rawFeatures.forEach((v, k) => {
-          features144[String(k).replace(/^:/, "")] = Number(v);
-        });
-      } else if (typeof rawFeatures === "object" && rawFeatures !== null) {
-        Object.entries(rawFeatures).forEach(([k, v]) => {
-          features144[k.replace(/^:/, "")] = Number(v);
-        });
-      }
-      const rawTraining = Array.isArray(args2[1]) ? args2[1] : [];
-      const trainingData144 = rawTraining.map((item) => {
-        if (item instanceof Map) {
-          const rawF = item.get("features") ?? item.get(":features");
-          const label = String(item.get("label") ?? item.get(":label") ?? "unknown");
-          const feats = {};
-          if (rawF instanceof Map) {
-            rawF.forEach((v, k) => {
-              feats[String(k).replace(/^:/, "")] = Number(v);
-            });
-          }
-          return { features: feats, label };
-        }
-        return { features: {}, label: "unknown" };
-      });
-      const clf = globalPredictor.classify(features144, trainingData144);
-      return /* @__PURE__ */ new Map([
-        ["classes", clf.classes.map((c) => /* @__PURE__ */ new Map([["label", c.label], ["probability", c.probability]]))],
-        ["predicted", clf.predicted],
-        ["confidence", clf.confidence]
-      ]);
-    }
-    if (op === "predict-evaluate") {
-      const preds144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      const actuals144 = Array.isArray(args2[1]) ? args2[1].map(Number) : [];
-      const evalResult = globalPredictor.evaluate(preds144, actuals144);
-      return /* @__PURE__ */ new Map([
-        ["mae", evalResult.mae],
-        ["rmse", evalResult.rmse],
-        ["mape", evalResult.mape]
-      ]);
-    }
-    if (op === "predict-trend") {
-      const data144tr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
-      return globalPredictor.detectTrend(data144tr);
-    }
-    return null;
-  }
-  function evalCuriosity(op, args2, callFn2) {
-    if (op === "curiosity-score") {
-      const topic = String(args2[0] ?? "");
-      const knownFacts = Array.isArray(args2[1]) ? args2[1].map((f) => String(f)) : [];
-      return globalCuriosity.computeCuriosity(topic, knownFacts);
-    }
-    if (op === "curiosity-next") {
-      return globalCuriosity.selectNextTopic();
-    }
-    if (op === "curiosity-explore") {
-      const topic = String(args2[0] ?? "");
-      const fn = args2[1];
-      const explorerFunc = (t) => {
-        const result = callFn2 ? callFn2(fn, [t]) : typeof fn === "function" ? fn(t) : null;
-        if (result instanceof Map) {
-          const facts = Array.isArray(result.get("facts")) ? result.get("facts").map(String) : [];
-          const questions = Array.isArray(result.get("questions")) ? result.get("questions").map(String) : [];
-          return { facts, questions };
-        }
-        return { facts: [], questions: [] };
-      };
-      const res = globalCuriosity.explore(topic, explorerFunc);
-      return /* @__PURE__ */ new Map([
-        ["topic", res.topic],
-        ["discovered", res.discovered],
-        ["newQuestions", res.newQuestions],
-        ["informationGain", res.informationGain],
-        ["surpriseLevel", res.surpriseLevel],
-        ["relatedTopics", res.relatedTopics]
-      ]);
-    }
-    if (op === "curiosity-gaps") {
-      const known = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
-      const all = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
-      const gaps = globalCuriosity.identifyGaps(known, all);
-      return gaps.map((g) => /* @__PURE__ */ new Map([
-        ["topic", g.topic],
-        ["unknownAspects", g.unknownAspects],
-        ["priority", g.priority],
-        ["explorationCost", g.explorationCost],
-        ["expectedGain", g.expectedGain]
-      ]));
-    }
-    if (op === "curiosity-questions") {
-      const topic = String(args2[0] ?? "");
-      const context = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
-      return globalCuriosity.generateQuestions(topic, context);
-    }
-    if (op === "curiosity-prioritize") {
-      const topics = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
-      return globalCuriosity.prioritize(topics);
-    }
-    if (op === "curiosity-analyze") {
-      const analysis = globalCuriosity.analyzeExplorationHistory();
-      return /* @__PURE__ */ new Map([
-        ["totalExplored", analysis.totalExplored],
-        ["avgInfoGain", analysis.avgInfoGain],
-        ["mostSurprising", analysis.mostSurprising],
-        ["recommendations", analysis.recommendations]
-      ]);
-    }
-    if (op === "curiosity-state") {
-      const st = globalCuriosity.getState();
-      return /* @__PURE__ */ new Map([
-        ["explored", Array.from(st.explored)],
-        ["frontier", st.frontier],
-        ["knowledgeGaps", st.knowledgeGaps.map((g) => /* @__PURE__ */ new Map([
-          ["topic", g.topic],
-          ["unknownAspects", g.unknownAspects],
-          ["priority", g.priority],
-          ["explorationCost", g.explorationCost],
-          ["expectedGain", g.expectedGain]
-        ]))],
-        ["curiosityScore", st.curiosityScore],
-        ["explorationHistory", st.explorationHistory.map((h) => /* @__PURE__ */ new Map([
-          ["topic", h.topic],
-          ["gain", h.gain],
-          ["timestamp", h.timestamp.toISOString()]
-        ]))]
-      ]);
-    }
-    if (op === "wisdom-add-exp") {
-      const kwargs = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kwargs[key] = args2[i + 1];
-      }
-      const exp = globalWisdom.addExperience({
-        situation: String(kwargs["situation"] ?? ""),
-        action: String(kwargs["action"] ?? ""),
-        outcome: String(kwargs["outcome"] ?? ""),
-        lesson: String(kwargs["lesson"] ?? ""),
-        success: kwargs["success"] === true || kwargs["success"] === "true",
-        importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
-        domain: String(kwargs["domain"] ?? "general")
-      });
-      return /* @__PURE__ */ new Map([
-        ["id", exp.id],
-        ["situation", exp.situation],
-        ["action", exp.action],
-        ["outcome", exp.outcome],
-        ["lesson", exp.lesson],
-        ["success", exp.success],
-        ["importance", exp.importance],
-        ["domain", exp.domain],
-        ["timestamp", exp.timestamp.toISOString()]
-      ]);
-    }
-    if (op === "wisdom-judge") {
-      const situation = String(args2[0] ?? "");
-      const judgment = globalWisdom.judge(situation);
-      return /* @__PURE__ */ new Map([
-        ["situation", judgment.situation],
-        ["recommendation", judgment.recommendation],
-        ["reasoning", judgment.reasoning],
-        ["relevantExperiences", judgment.relevantExperiences.map((e) => /* @__PURE__ */ new Map([
-          ["id", e.id],
-          ["situation", e.situation],
-          ["lesson", e.lesson],
-          ["success", e.success],
-          ["importance", e.importance],
-          ["domain", e.domain]
-        ]))],
-        ["applicableHeuristics", judgment.applicableHeuristics.map((h) => /* @__PURE__ */ new Map([
-          ["id", h.id],
-          ["rule", h.rule],
-          ["confidence", h.confidence],
-          ["successCount", h.successCount],
-          ["totalCount", h.totalCount],
-          ["domain", h.domain]
-        ]))],
-        ["confidence", judgment.confidence],
-        ["caveats", judgment.caveats],
-        ["alternatives", judgment.alternatives]
-      ]);
-    }
-    if (op === "wisdom-heuristics") {
-      return globalWisdom.getHeuristics().map((h) => /* @__PURE__ */ new Map([
-        ["id", h.id],
-        ["rule", h.rule],
-        ["confidence", h.confidence],
-        ["successCount", h.successCount],
-        ["totalCount", h.totalCount],
-        ["domain", h.domain],
-        ["derivedFrom", h.derivedFrom]
-      ]));
-    }
-    if (op === "wisdom-extract") {
-      const heuristics = globalWisdom.extractHeuristics();
-      return heuristics.map((h) => /* @__PURE__ */ new Map([
-        ["id", h.id],
-        ["rule", h.rule],
-        ["confidence", h.confidence],
-        ["successCount", h.successCount],
-        ["totalCount", h.totalCount],
-        ["domain", h.domain],
-        ["derivedFrom", h.derivedFrom]
-      ]));
-    }
-    if (op === "wisdom-relevant") {
-      const situation = String(args2[0] ?? "");
-      const limit = typeof args2[1] === "number" ? args2[1] : 5;
-      return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
-        ["id", e.id],
-        ["situation", e.situation],
-        ["action", e.action],
-        ["outcome", e.outcome],
-        ["lesson", e.lesson],
-        ["success", e.success],
-        ["importance", e.importance],
-        ["domain", e.domain]
-      ]));
-    }
-    if (op === "wisdom-lessons") {
-      let domain;
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        if (key === "domain") domain = String(args2[i + 1]);
-      }
-      return globalWisdom.getLessons(domain);
-    }
-    if (op === "wisdom-score") {
-      return globalWisdom.wisdomScore();
-    }
-    if (op === "wisdom-domain") {
-      const domain = String(args2[0] ?? "general");
-      const summary = globalWisdom.summarizeDomain(domain);
-      return /* @__PURE__ */ new Map([
-        ["topLessons", summary.topLessons],
-        ["bestHeuristics", summary.bestHeuristics.map((h) => /* @__PURE__ */ new Map([
-          ["id", h.id],
-          ["rule", h.rule],
-          ["confidence", h.confidence],
-          ["successCount", h.successCount],
-          ["totalCount", h.totalCount]
-        ]))],
-        ["successRate", summary.successRate]
-      ]);
-    }
-    if (op === "wisdom-valid?") {
-      const expMap = args2[0];
-      if (!(expMap instanceof Map)) return false;
-      const exp = {
-        id: String(expMap.get("id") ?? ""),
-        situation: String(expMap.get("situation") ?? ""),
-        action: String(expMap.get("action") ?? ""),
-        outcome: String(expMap.get("outcome") ?? ""),
-        lesson: String(expMap.get("lesson") ?? ""),
-        success: expMap.get("success") === true,
-        importance: Number(expMap.get("importance") ?? 0.5),
-        timestamp: new Date(String(expMap.get("timestamp") ?? (/* @__PURE__ */ new Date()).toISOString())),
-        domain: String(expMap.get("domain") ?? "general")
-      };
-      return globalWisdom.isStillValid(exp);
-    }
-    if (op === "wisdom-similar") {
-      const situation = String(args2[0] ?? "");
-      return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
-        ["id", e.id],
-        ["situation", e.situation],
-        ["action", e.action],
-        ["outcome", e.outcome],
-        ["lesson", e.lesson],
-        ["success", e.success],
-        ["importance", e.importance],
-        ["domain", e.domain]
-      ]));
-    }
-    return null;
-  }
-  function evalCounterfactual(op, args2, callFn2) {
-    if (op === "cf-scenario") {
-      const kw = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kw[key] = args2[i + 1];
-      }
-      const id = String(kw["id"] ?? `s-${Date.now()}`);
-      const name = String(kw["name"] ?? id);
-      let variables = {};
-      if (kw["vars"] instanceof Map) {
-        for (const [k, v] of kw["vars"]) variables[String(k).replace(/^:/, "")] = v;
-      } else if (kw["vars"] && typeof kw["vars"] === "object") {
-        variables = kw["vars"];
-      }
-      const outcome = kw["outcome"] ?? null;
-      const scenario = { id, name, variables, outcome };
-      globalCounterfactual.registerScenario(scenario);
-      return /* @__PURE__ */ new Map([
-        ["id", id],
-        ["name", name],
-        ["variables", new Map(Object.entries(variables))],
-        ["outcome", outcome]
-      ]);
-    }
-    if (op === "cf-what-if") {
-      let variables = {};
-      let change = {};
-      if (args2[0] instanceof Map) {
-        for (const [k, v] of args2[0]) variables[String(k).replace(/^:/, "")] = v;
-      }
-      if (args2[1] instanceof Map) {
-        for (const [k, v] of args2[1]) change[String(k).replace(/^:/, "")] = v;
-      }
-      const fn = args2[2];
-      const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
-      const cf = globalCounterfactual.whatIf(variables, change, outcomeFunc);
-      return /* @__PURE__ */ new Map([
-        ["id", cf.id],
-        ["intervention", new Map(Object.entries(cf.intervention))],
-        ["counterfactualOutcome", cf.counterfactualOutcome],
-        ["delta", new Map(Object.entries(cf.delta))],
-        ["probability", cf.probability],
-        ["explanation", cf.explanation]
-      ]);
-    }
-    if (op === "cf-analyze") {
-      const scenarioId = String(args2[0] ?? "");
-      const interventionsList = [];
-      if (Array.isArray(args2[1])) {
-        for (const iv of args2[1]) {
-          const obj = {};
-          if (iv instanceof Map) {
-            for (const [k, v] of iv) obj[String(k).replace(/^:/, "")] = v;
-          }
-          interventionsList.push(obj);
-        }
-      }
-      const fn = args2[2];
-      const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
-      const analysis = globalCounterfactual.analyze(scenarioId, interventionsList, outcomeFunc);
-      return /* @__PURE__ */ new Map([
-        ["original", /* @__PURE__ */ new Map([
-          ["id", analysis.original.id],
-          ["name", analysis.original.name],
-          ["outcome", analysis.original.outcome]
-        ])],
-        ["counterfactuals", analysis.counterfactuals.map((cf) => /* @__PURE__ */ new Map([
-          ["id", cf.id],
-          ["probability", cf.probability],
-          ["counterfactualOutcome", cf.counterfactualOutcome],
-          ["explanation", cf.explanation]
-        ]))],
-        ["mostLikelyAlternative", /* @__PURE__ */ new Map([
-          ["id", analysis.mostLikelyAlternative.id],
-          ["probability", analysis.mostLikelyAlternative.probability],
-          ["counterfactualOutcome", analysis.mostLikelyAlternative.counterfactualOutcome],
-          ["explanation", analysis.mostLikelyAlternative.explanation]
-        ])],
-        ["keyFactors", analysis.keyFactors],
-        ["sensitivity", new Map(Object.entries(analysis.sensitivity))]
-      ]);
-    }
-    if (op === "cf-minimal") {
-      const scenarioId = String(args2[0] ?? "");
-      const targetOutcome = args2[1];
-      const fn = args2[2];
-      const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
-      const minimal = globalCounterfactual.findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc);
-      if (minimal === null) return null;
-      return new Map(Object.entries(minimal));
-    }
-    if (op === "cf-sensitivity") {
-      let variables = {};
-      const rawVars = args2[0];
-      if (rawVars instanceof Map) {
-        for (const [k, v] of rawVars) variables[String(k).replace(/^:/, "")] = v;
-      } else if (rawVars && typeof rawVars === "object" && !Array.isArray(rawVars)) {
-        for (const [k, v] of Object.entries(rawVars)) variables[String(k).replace(/^:/, "")] = v;
-      }
-      const fn = args2[1];
-      const outcomeFunc = (vars) => {
-        try {
-          return Number(callFn2(fn, [vars]));
-        } catch {
-          return 0;
-        }
-      };
-      const sens = globalCounterfactual.sensitivityAnalysis(variables, outcomeFunc);
-      return new Map(Object.entries(sens));
-    }
-    if (op === "cf-key-factors") {
-      const analysis = args2[0];
-      if (analysis instanceof Map) {
-        const factors = analysis.get("keyFactors");
-        if (Array.isArray(factors)) return factors;
-      }
-      return [];
-    }
-    if (op === "cf-best-alt") {
-      const analysis = args2[0];
-      if (analysis instanceof Map) {
-        return analysis.get("mostLikelyAlternative") ?? null;
-      }
-      return null;
-    }
-    if (op === "cf-explain") {
-      const cf = args2[0];
-      if (cf instanceof Map) {
-        return cf.get("explanation") ?? "";
-      }
-      return "";
-    }
-    if (op === "explain-decision") {
-      const decision = args2[0];
-      const rawFactors = args2[1];
-      const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
-      const factors = {};
-      if (rawFactors instanceof Map) {
-        for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
-      } else if (rawFactors && typeof rawFactors === "object") {
-        for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
-      }
-      const explanation = globalExplainer.explain(decision, factors, context);
-      return /* @__PURE__ */ new Map([
-        ["decision", explanation.decision],
-        ["reasoning", explanation.reasoning],
-        ["features", explanation.features.map((f) => /* @__PURE__ */ new Map([
-          ["feature", f.feature],
-          ["importance", f.importance],
-          ["direction", f.direction],
-          ["description", f.description]
-        ]))],
-        ["confidence", explanation.confidence],
-        ["alternatives", explanation.alternatives.map((a) => /* @__PURE__ */ new Map([
-          ["decision", a.decision],
-          ["reason", a.reason],
-          ["probability", a.probability]
-        ]))],
-        ["summary", explanation.summary],
-        ["audience", explanation.audience]
-      ]);
-    }
-    if (op === "explain-features") {
-      const toRecord145 = (v) => {
-        const result = {};
-        if (v instanceof Map) {
-          for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
-        } else if (v && typeof v === "object") {
-          for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
-        }
-        return result;
-      };
-      const inputs145 = toRecord145(args2[0]);
-      const outputs145 = toRecord145(args2[1]);
-      const baseline145 = args2[2] !== void 0 ? toRecord145(args2[2]) : void 0;
-      const features145 = globalExplainer.featureImportance(inputs145, outputs145, baseline145);
-      return features145.map((f) => /* @__PURE__ */ new Map([
-        ["feature", f.feature],
-        ["importance", f.importance],
-        ["direction", f.direction],
-        ["description", f.description]
-      ]));
-    }
-    if (op === "explain-local") {
-      const rawInput145 = args2[0];
-      const output145 = args2[1];
-      const modelFn145 = args2[2];
-      const input145 = {};
-      if (rawInput145 instanceof Map) {
-        for (const [k, v] of rawInput145.entries()) input145[String(k).replace(/^:/, "")] = v;
-      } else if (rawInput145 && typeof rawInput145 === "object") {
-        for (const [k, v] of Object.entries(rawInput145)) input145[String(k).replace(/^:/, "")] = v;
-      }
-      const model145 = (inp) => {
-        if (modelFn145) {
-          try {
-            return callFn2(modelFn145, [new Map(Object.entries(inp))]);
-          } catch {
-            return output145;
-          }
-        }
-        return output145;
-      };
-      const local145 = globalExplainer.localExplain(input145, output145, model145);
-      return /* @__PURE__ */ new Map([
-        ["input", new Map(Object.entries(local145.input))],
-        ["output", local145.output],
-        ["topFactors", local145.topFactors.map((f) => /* @__PURE__ */ new Map([
-          ["feature", f.feature],
-          ["importance", f.importance],
-          ["direction", f.direction],
-          ["description", f.description]
-        ]))],
-        ["counterfactual", local145.counterfactual],
-        ["confidence", local145.confidence]
-      ]);
-    }
-    if (op === "explain-natural") {
-      const rawExpl145 = args2[0];
-      let audience145 = "technical";
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        if (key === "audience") audience145 = String(args2[i + 1]);
-      }
-      if (!(rawExpl145 instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
-      const featuresRaw145 = rawExpl145.get("features") ?? [];
-      const features145n = (Array.isArray(featuresRaw145) ? featuresRaw145 : []).map((f) => {
-        if (f instanceof Map) {
-          return {
-            feature: String(f.get("feature") ?? ""),
-            importance: Number(f.get("importance") ?? 0),
-            direction: String(f.get("direction") ?? "positive"),
-            description: String(f.get("description") ?? "")
-          };
-        }
-        return { feature: "", importance: 0, direction: "positive", description: "" };
-      });
-      const altsRaw145 = rawExpl145.get("alternatives") ?? [];
-      const alternatives145 = (Array.isArray(altsRaw145) ? altsRaw145 : []).map((a) => {
-        if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
-        return { decision: null, reason: "", probability: 0 };
-      });
-      const explanation145n = {
-        decision: rawExpl145.get("decision"),
-        reasoning: rawExpl145.get("reasoning") ?? [],
-        features: features145n,
-        confidence: Number(rawExpl145.get("confidence") ?? 0.5),
-        alternatives: alternatives145,
-        summary: String(rawExpl145.get("summary") ?? ""),
-        audience: rawExpl145.get("audience") ?? "technical"
-      };
-      return globalExplainer.toNaturalLanguage(explanation145n, audience145);
-    }
-    if (op === "explain-contrast") {
-      const decision145c = args2[0];
-      const alternative145c = args2[1];
-      const rawFactors145c = args2[2];
-      const factors145c = {};
-      if (rawFactors145c instanceof Map) {
-        for (const [k, v] of rawFactors145c.entries()) factors145c[String(k).replace(/^:/, "")] = Number(v);
-      } else if (rawFactors145c && typeof rawFactors145c === "object") {
-        for (const [k, v] of Object.entries(rawFactors145c)) factors145c[String(k).replace(/^:/, "")] = Number(v);
-      }
-      return globalExplainer.contrastiveExplain(decision145c, alternative145c, factors145c);
-    }
-    if (op === "explain-rules") {
-      const rawExamples145 = args2[0];
-      const examples145 = [];
-      const toRecord145r = (v) => {
-        const result = {};
-        if (v instanceof Map) {
-          for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = val;
-        } else if (v && typeof v === "object") {
-          Object.assign(result, v);
-        }
-        return result;
-      };
-      if (Array.isArray(rawExamples145)) {
-        for (const ex of rawExamples145) {
-          if (ex instanceof Map) {
-            examples145.push({ input: toRecord145r(ex.get("input")), output: ex.get("output") });
-          } else if (ex && typeof ex === "object") {
-            examples145.push({ input: toRecord145r(ex.input), output: ex.output });
-          }
-        }
-      }
-      const rules145 = globalExplainer.extractRules(examples145);
-      return rules145.map((r) => /* @__PURE__ */ new Map([
-        ["condition", r.condition],
-        ["outcome", r.outcome],
-        ["support", r.support]
-      ]));
-    }
-    if (op === "explain-top-factors") {
-      const rawExpl145tf = args2[0];
-      let n145 = 3;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        if (key === "n") n145 = Number(args2[i + 1]);
-      }
-      let features145tf = [];
-      if (rawExpl145tf instanceof Map) features145tf = rawExpl145tf.get("features") ?? [];
-      if (!Array.isArray(features145tf)) features145tf = [];
-      return features145tf.slice(0, n145);
-    }
-    if (op === "explain-summary") {
-      const rawExpl145s = args2[0];
-      if (rawExpl145s instanceof Map) return String(rawExpl145s.get("summary") ?? "");
-      return "";
-    }
-    return null;
-  }
-  function evalWisdom(op, args2) {
-    if (op === "wisdom-add-exp") {
-      const kwargs = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        kwargs[key] = args2[i + 1];
-      }
-      const exp = globalWisdom.addExperience({
-        situation: String(kwargs["situation"] ?? ""),
-        action: String(kwargs["action"] ?? ""),
-        outcome: String(kwargs["outcome"] ?? ""),
-        lesson: String(kwargs["lesson"] ?? ""),
-        success: kwargs["success"] === true || kwargs["success"] === "true",
-        importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
-        domain: String(kwargs["domain"] ?? "general")
-      });
-      return /* @__PURE__ */ new Map([
-        ["id", exp.id],
-        ["situation", exp.situation],
-        ["action", exp.action],
-        ["outcome", exp.outcome],
-        ["lesson", exp.lesson],
-        ["success", exp.success],
-        ["importance", exp.importance],
-        ["domain", exp.domain],
-        ["timestamp", exp.timestamp.toISOString()]
-      ]);
-    }
-    if (op === "wisdom-judge") {
-      const situation = String(args2[0] ?? "");
-      const judgment = globalWisdom.judge(situation);
-      return /* @__PURE__ */ new Map([
-        ["situation", judgment.situation],
-        ["recommendation", judgment.recommendation],
-        ["reasoning", judgment.reasoning],
-        ["relevantExperiences", judgment.relevantExperiences.map((e) => /* @__PURE__ */ new Map([
-          ["id", e.id],
-          ["situation", e.situation],
-          ["lesson", e.lesson],
-          ["success", e.success],
-          ["importance", e.importance],
-          ["domain", e.domain]
-        ]))],
-        ["applicableHeuristics", judgment.applicableHeuristics.map((h) => /* @__PURE__ */ new Map([
-          ["id", h.id],
-          ["rule", h.rule],
-          ["confidence", h.confidence],
-          ["successCount", h.successCount],
-          ["totalCount", h.totalCount],
-          ["domain", h.domain]
-        ]))],
-        ["confidence", judgment.confidence],
-        ["caveats", judgment.caveats],
-        ["alternatives", judgment.alternatives]
-      ]);
-    }
-    if (op === "wisdom-heuristics") {
-      return globalWisdom.getHeuristics().map((h) => /* @__PURE__ */ new Map([
-        ["id", h.id],
-        ["rule", h.rule],
-        ["confidence", h.confidence],
-        ["successCount", h.successCount],
-        ["totalCount", h.totalCount],
-        ["domain", h.domain],
-        ["derivedFrom", h.derivedFrom]
-      ]));
-    }
-    if (op === "wisdom-extract") {
-      const heuristics = globalWisdom.extractHeuristics();
-      return heuristics.map((h) => /* @__PURE__ */ new Map([
-        ["id", h.id],
-        ["rule", h.rule],
-        ["confidence", h.confidence],
-        ["successCount", h.successCount],
-        ["totalCount", h.totalCount],
-        ["domain", h.domain],
-        ["derivedFrom", h.derivedFrom]
-      ]));
-    }
-    if (op === "wisdom-relevant") {
-      const situation = String(args2[0] ?? "");
-      const limit = typeof args2[1] === "number" ? args2[1] : 5;
-      return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
-        ["id", e.id],
-        ["situation", e.situation],
-        ["action", e.action],
-        ["outcome", e.outcome],
-        ["lesson", e.lesson],
-        ["success", e.success],
-        ["importance", e.importance],
-        ["domain", e.domain]
-      ]));
-    }
-    if (op === "wisdom-lessons") {
-      let domain;
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        if (key === "domain") domain = String(args2[i + 1]);
-      }
-      return globalWisdom.getLessons(domain);
-    }
-    if (op === "wisdom-score") {
-      return globalWisdom.wisdomScore();
-    }
-    if (op === "wisdom-domain") {
-      const domain = String(args2[0] ?? "general");
-      const summary = globalWisdom.summarizeDomain(domain);
-      return /* @__PURE__ */ new Map([
-        ["topLessons", summary.topLessons],
-        ["bestHeuristics", summary.bestHeuristics.map((h) => /* @__PURE__ */ new Map([
-          ["id", h.id],
-          ["rule", h.rule],
-          ["confidence", h.confidence],
-          ["successCount", h.successCount],
-          ["totalCount", h.totalCount]
-        ]))],
-        ["successRate", summary.successRate]
-      ]);
-    }
-    if (op === "wisdom-valid?") {
-      const expMap = args2[0];
-      if (!(expMap instanceof Map)) return false;
-      const exp = {
-        id: String(expMap.get("id") ?? ""),
-        situation: String(expMap.get("situation") ?? ""),
-        action: String(expMap.get("action") ?? ""),
-        outcome: String(expMap.get("outcome") ?? ""),
-        lesson: String(expMap.get("lesson") ?? ""),
-        success: expMap.get("success") === true,
-        importance: Number(expMap.get("importance") ?? 0.5),
-        timestamp: new Date(String(expMap.get("timestamp") ?? (/* @__PURE__ */ new Date()).toISOString())),
-        domain: String(expMap.get("domain") ?? "general")
-      };
-      return globalWisdom.isStillValid(exp);
-    }
-    if (op === "wisdom-similar") {
-      const situation = String(args2[0] ?? "");
-      return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
-        ["id", e.id],
-        ["situation", e.situation],
-        ["action", e.action],
-        ["outcome", e.outcome],
-        ["lesson", e.lesson],
-        ["success", e.success],
-        ["importance", e.importance],
-        ["domain", e.domain]
-      ]));
-    }
-    return null;
-  }
-  function evalExplain_PHASE145(op, args2, callFnVal) {
-    if (op === "explain-decision") {
-      const decision = args2[0];
-      const rawFactors = args2[1];
-      const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
-      const factors = {};
-      if (rawFactors instanceof Map) {
-        for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
-      } else if (rawFactors && typeof rawFactors === "object") {
-        for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
-      }
-      const explanation = globalExplainer.explain(decision, factors, context);
-      return /* @__PURE__ */ new Map([
-        ["decision", explanation.decision],
-        ["reasoning", explanation.reasoning],
-        ["features", explanation.features.map((f) => /* @__PURE__ */ new Map([
-          ["feature", f.feature],
-          ["importance", f.importance],
-          ["direction", f.direction],
-          ["description", f.description]
-        ]))],
-        ["confidence", explanation.confidence],
-        ["alternatives", explanation.alternatives.map((a) => /* @__PURE__ */ new Map([
-          ["decision", a.decision],
-          ["reason", a.reason],
-          ["probability", a.probability]
-        ]))],
-        ["summary", explanation.summary],
-        ["audience", explanation.audience]
-      ]);
-    }
-    if (op === "explain-features") {
-      const toRecord = (v) => {
-        const result = {};
-        if (v instanceof Map) {
-          for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
-        } else if (v && typeof v === "object") {
-          for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
-        }
-        return result;
-      };
-      const features = globalExplainer.featureImportance(toRecord(args2[0]), toRecord(args2[1]), args2[2] !== void 0 ? toRecord(args2[2]) : void 0);
-      return features.map((f) => /* @__PURE__ */ new Map([
-        ["feature", f.feature],
-        ["importance", f.importance],
-        ["direction", f.direction],
-        ["description", f.description]
-      ]));
-    }
-    if (op === "explain-local") {
-      const rawInput = args2[0];
-      const output = args2[1];
-      const modelFn = args2[2];
-      const input = {};
-      if (rawInput instanceof Map) {
-        for (const [k, v] of rawInput.entries()) input[String(k).replace(/^:/, "")] = v;
-      } else if (rawInput && typeof rawInput === "object") {
-        for (const [k, v] of Object.entries(rawInput)) input[String(k).replace(/^:/, "")] = v;
-      }
-      const model = (inp) => {
-        if (modelFn && callFnVal) {
-          try {
-            return callFnVal(modelFn, [new Map(Object.entries(inp))]);
-          } catch {
-            return output;
-          }
-        }
-        return output;
-      };
-      const local = globalExplainer.localExplain(input, output, model);
-      return /* @__PURE__ */ new Map([
-        ["input", new Map(Object.entries(local.input))],
-        ["output", local.output],
-        ["topFactors", local.topFactors.map((f) => /* @__PURE__ */ new Map([
-          ["feature", f.feature],
-          ["importance", f.importance],
-          ["direction", f.direction],
-          ["description", f.description]
-        ]))],
-        ["counterfactual", local.counterfactual],
-        ["confidence", local.confidence]
-      ]);
-    }
-    if (op === "explain-natural") {
-      const rawExpl = args2[0];
-      let audience = "technical";
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        const key = String(args2[i]).replace(/^:/, "");
-        if (key === "audience") audience = String(args2[i + 1]);
-      }
-      if (!(rawExpl instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
-      const featuresRaw = rawExpl.get("features") ?? [];
-      const features = (Array.isArray(featuresRaw) ? featuresRaw : []).map((f) => {
-        if (f instanceof Map) {
-          return {
-            feature: String(f.get("feature") ?? ""),
-            importance: Number(f.get("importance") ?? 0),
-            direction: String(f.get("direction") ?? "positive"),
-            description: String(f.get("description") ?? "")
-          };
-        }
-        return { feature: "", importance: 0, direction: "positive", description: "" };
-      });
-      const altsRaw = rawExpl.get("alternatives") ?? [];
-      const alternatives = (Array.isArray(altsRaw) ? altsRaw : []).map((a) => {
-        if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
-        return { decision: null, reason: "", probability: 0 };
-      });
-      const explanation = {
-        decision: rawExpl.get("decision"),
-        reasoning: rawExpl.get("reasoning") ?? [],
-        features,
-        confidence: Number(rawExpl.get("confidence") ?? 0.5),
-        alternatives,
-        summary: String(rawExpl.get("summary") ?? ""),
-        audience: rawExpl.get("audience") ?? "technical"
-      };
-      return globalExplainer.toNaturalLanguage(explanation, audience);
-    }
-    if (op === "explain-contrast") {
-      const factors = {};
-      const rawF = args2[2];
-      if (rawF instanceof Map) {
-        for (const [k, v] of rawF.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
-      } else if (rawF && typeof rawF === "object") {
-        for (const [k, v] of Object.entries(rawF)) factors[String(k).replace(/^:/, "")] = Number(v);
-      }
-      return globalExplainer.contrastiveExplain(args2[0], args2[1], factors);
-    }
-    if (op === "explain-rules") {
-      const examples = [];
-      const toRec = (v) => {
-        const r = {};
-        if (v instanceof Map) {
-          for (const [k, val] of v.entries()) r[String(k).replace(/^:/, "")] = val;
-        } else if (v && typeof v === "object") {
-          Object.assign(r, v);
-        }
-        return r;
-      };
-      if (Array.isArray(args2[0])) {
-        for (const ex of args2[0]) {
-          if (ex instanceof Map) examples.push({ input: toRec(ex.get("input")), output: ex.get("output") });
-          else if (ex && typeof ex === "object") examples.push({ input: toRec(ex.input), output: ex.output });
-        }
-      }
-      return globalExplainer.extractRules(examples).map((r) => /* @__PURE__ */ new Map([
-        ["condition", r.condition],
-        ["outcome", r.outcome],
-        ["support", r.support]
-      ]));
-    }
-    if (op === "explain-top-factors") {
-      let n = 3;
-      for (let i = 1; i < args2.length - 1; i += 2) {
-        if (String(args2[i]).replace(/^:/, "") === "n") n = Number(args2[i + 1]);
-      }
-      const rawExpl = args2[0];
-      let features = [];
-      if (rawExpl instanceof Map) features = rawExpl.get("features") ?? [];
-      if (!Array.isArray(features)) features = [];
-      return features.slice(0, n);
-    }
-    if (op === "explain-summary") {
-      const rawExpl = args2[0];
-      if (rawExpl instanceof Map) return String(rawExpl.get("summary") ?? "");
-      return "";
-    }
-    return null;
-  }
-  function evalWorldModel141(op, args2) {
-    if (op === "world-add-entity") {
-      const kw = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        kw[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
-      }
-      const rawP = kw["props"] ?? kw["properties"] ?? {};
-      const props = rawP instanceof Map ? Object.fromEntries(rawP.entries()) : typeof rawP === "object" && rawP !== null ? rawP : {};
-      const e = globalWorldModel.addEntity({ id: String(kw["id"] ?? `entity-${Date.now()}`), type: String(kw["type"] ?? "unknown"), confidence: typeof kw["confidence"] === "number" ? kw["confidence"] : 1, properties: props });
-      return /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
-    }
-    if (op === "world-update-entity") {
-      const rawPu = args2[1] ?? {};
-      const propsu = rawPu instanceof Map ? Object.fromEntries(rawPu.entries()) : typeof rawPu === "object" && rawPu !== null ? rawPu : {};
-      const eu = globalWorldModel.updateEntity(String(args2[0] ?? ""), propsu);
-      if (!eu) return null;
-      return /* @__PURE__ */ new Map([["id", eu.id], ["type", eu.type], ["properties", new Map(Object.entries(eu.properties))], ["confidence", eu.confidence], ["lastUpdated", eu.lastUpdated.toISOString()]]);
-    }
-    if (op === "world-get-entity") {
-      const eg = globalWorldModel.getEntity(String(args2[0] ?? ""));
-      if (!eg) return null;
-      return /* @__PURE__ */ new Map([["id", eg.id], ["type", eg.type], ["properties", new Map(Object.entries(eg.properties))], ["confidence", eg.confidence], ["lastUpdated", eg.lastUpdated.toISOString()]]);
-    }
-    if (op === "world-remove-entity") {
-      return globalWorldModel.removeEntity(String(args2[0] ?? ""));
-    }
-    if (op === "world-add-relation") {
-      const kwr = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        kwr[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
-      }
-      const rel = globalWorldModel.addRelation({ from: String(kwr["from"] ?? ""), to: String(kwr["to"] ?? ""), type: String(kwr["type"] ?? "related"), strength: typeof kwr["strength"] === "number" ? kwr["strength"] : 1, bidirectional: kwr["bidirectional"] === true });
-      return /* @__PURE__ */ new Map([["id", rel.id], ["from", rel.from], ["to", rel.to], ["type", rel.type], ["strength", rel.strength], ["bidirectional", rel.bidirectional]]);
-    }
-    if (op === "world-get-relations") {
-      return globalWorldModel.getRelations(String(args2[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
-    }
-    if (op === "world-find-path") {
-      return globalWorldModel.findPath(String(args2[0] ?? ""), String(args2[1] ?? ""));
-    }
-    if (op === "world-set-fact") {
-      globalWorldModel.setFact(String(args2[0] ?? ""), args2[1]);
-      return null;
-    }
-    if (op === "world-get-fact") {
-      return globalWorldModel.getFact(String(args2[0] ?? ""));
-    }
-    if (op === "world-add-rule") {
-      const kwrule = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        kwrule[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
-      }
-      const rule = globalWorldModel.addRule({ condition: String(kwrule["condition"] ?? ""), consequence: String(kwrule["consequence"] ?? ""), confidence: typeof kwrule["confidence"] === "number" ? kwrule["confidence"] : 0.8 });
-      return /* @__PURE__ */ new Map([["id", rule.id], ["condition", rule.condition], ["consequence", rule.consequence], ["confidence", rule.confidence]]);
-    }
-    if (op === "world-apply-rules") {
-      return globalWorldModel.applyRules().map((u) => /* @__PURE__ */ new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]]));
-    }
-    if (op === "world-query") {
-      const kwq = {};
-      for (let i = 0; i < args2.length - 1; i += 2) {
-        kwq[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
-      }
-      return globalWorldModel.query(kwq["type"] !== void 0 ? String(kwq["type"]) : void 0, kwq["min-confidence"] !== void 0 ? Number(kwq["min-confidence"]) : void 0).map((e) => /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]));
-    }
-    if (op === "world-snapshot") {
-      const snap = globalWorldModel.snapshot();
-      return /* @__PURE__ */ new Map([["entityCount", snap.entities.size], ["relationCount", snap.relations.length], ["factCount", snap.facts.size], ["ruleCount", snap.rules.length], ["version", snap.version], ["timestamp", snap.timestamp.toISOString()]]);
-    }
-    if (op === "world-summarize") {
-      return globalWorldModel.summarize();
-    }
-    if (op === "world-history") {
-      return globalWorldModel.getHistory().map((u) => /* @__PURE__ */ new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]]));
-    }
-    return void 0;
-  }
 
   // src/eval-ai-blocks.ts
   init_define_process_env();
@@ -18438,9 +18621,11 @@ ${stepsStr}
   // src/style-registry.ts
   init_define_process_env();
   var StyleRegistry = class {
-    themes = [];
-    // :root { --token: value; }
-    styles = [];
+    constructor() {
+      this.themes = [];
+      // :root { --token: value; }
+      this.styles = [];
+    }
     // .selector { prop: value; }
     /**
      * THEME 블록 결과 추가
@@ -19193,7 +19378,7 @@ ${cssVars.join(";\n")};
     );
   }
   function evalSpecialForm(interp2, op, expr2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
     const ev = (node) => interp2.eval(node);
     const callUser = (name, a) => interp2.callUserFunction(name, a);
     const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
@@ -19262,7 +19447,7 @@ ${cssVars.join(";\n")};
                 const nameNode = inner[0];
                 const n = nameNode.kind === "variable" ? nameNode.name : nameNode.kind === "literal" ? String(nameNode.value) : "";
                 params.push(n.startsWith("$") ? n.slice(1) : n);
-                paramDefaults.push(ev(inner[1]));
+                paramDefaults.push(inner[1]);
               }
               continue;
             }
@@ -19528,6 +19713,7 @@ ${cssVars.join(";\n")};
           body: value.body,
           capturedEnv: value.capturedEnv
         };
+        if (value._call) funcDef._call = value._call;
         ctx.functions.set(name, funcDef);
         if (ctx.typeChecker) {
           const paramTypes = value.params.map(() => ({ kind: "type", name: "any" }));
@@ -19568,34 +19754,28 @@ ${cssVars.join(";\n")};
       if (typeof fn === "string") return callUser(fn, evaluatedArgs);
       throw new Error(`call expects function-value, got ${fn.kind || typeof fn}`);
     }
-    if (op === "compose") {
-      if (expr2.args.length < 2) throw new Error(`compose requires at least 2 functions`);
-      const funcsToCompose = expr2.args.map((arg) => {
-        if (arg.kind === "literal" && arg.type === "symbol") {
-          const fnName = arg.value;
-          if (ctx.functions.has(fnName)) return { _isFunctionName: true, name: fnName };
-          throw new Error(`compose: '${fnName}' is not a function`);
-        } else if (arg.kind === "variable") {
-          const fnName = arg.name;
-          if (ctx.functions.has(fnName)) return { _isFunctionName: true, name: fnName };
-          const value = ctx.variables.get(fnName);
-          if (value && (value.kind === "function-value" || typeof value === "function")) return value;
-          throw new Error(`compose: '${fnName}' is not a function`);
-        } else {
-          const fn = ev(arg);
-          if (typeof fn !== "function" && fn.kind !== "function-value") throw new Error(`compose: argument is not a function`);
-          return fn;
-        }
+    if (op === "compose" || op === "comp") {
+      if (expr2.args.length < 1) throw new Error(`${op} requires at least 1 function`);
+      const handles = expr2.args.map((arg) => {
+        const fk = arg.kind;
+        if (fk === "variable") return { type: "name", name: arg.name };
+        if (fk === "literal" && arg.type === "symbol") return { type: "name", name: String(arg.value) };
+        return { type: "val", val: ev(arg) };
       });
-      return (x) => {
+      const compFn = { kind: "function-value", name: `(${op})`, params: ["__x__"], body: null, env: null };
+      compFn._call = (x) => {
         let result = x;
-        for (let i = funcsToCompose.length - 1; i >= 0; i--) {
-          const fn = funcsToCompose[i];
-          if (fn._isFunctionName) result = callUser(fn.name, [result]);
-          else result = callFn2(fn, [result]);
+        for (let i = handles.length - 1; i >= 0; i--) {
+          const handle = handles[i];
+          if (handle.type === "val") {
+            result = interp2.callFunctionValue(handle.val, [result]);
+          } else {
+            result = interp2.callUserFunction(handle.name, [result]);
+          }
         }
         return result;
       };
+      return compFn;
     }
     if (op === "pipe") {
       if (expr2.args.length < 2) throw new Error(`pipe requires at least a value and one function`);
@@ -19720,23 +19900,41 @@ ${cssVars.join(";\n")};
       }
       return val;
     }
+    if (op === "??") {
+      if (expr2.args.length < 2) throw new Error(`?? requires at least 2 arguments`);
+      for (let i = 0; i < expr2.args.length; i++) {
+        const val = ev(expr2.args[i]);
+        if (val !== null && val !== void 0) return val;
+      }
+      return null;
+    }
     if (op === "|>") {
       if (expr2.args.length < 2) throw new Error(`|> requires at least a value and one function`);
       let pipeVal = ev(expr2.args[0]);
       for (let i = 1; i < expr2.args.length; i++) {
-        const fnArg = expr2.args[i];
-        const fk = fnArg.kind;
-        if (fk === "literal" && fnArg.type === "symbol") {
-          const fnName = fnArg.value;
-          if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
-          else throw new Error(`|>: unknown function: ${fnName}`);
+        const step = expr2.args[i];
+        const fk = step.kind;
+        if (fk === "sexpr") {
+          const s = step;
+          const tmpVar = `__pipe_${i}__`;
+          ctx.variables.set(tmpVar, pipeVal);
+          const injectedArg = { kind: "variable", name: tmpVar };
+          const newSExpr = { kind: "sexpr", op: s.op, args: [...s.args, injectedArg], line: s.line };
+          try {
+            pipeVal = ev(newSExpr);
+          } finally {
+            ctx.variables.delete(tmpVar);
+          }
         } else if (fk === "variable") {
-          const fnName = fnArg.name;
+          const fnName = step.name;
           if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
           else if (ctx.variables.has(fnName)) pipeVal = callFn2(ctx.variables.get(fnName), [pipeVal]);
-          else throw new Error(`|>: unknown function or variable: ${fnName}`);
+        } else if (fk === "literal" && step.type === "symbol") {
+          const fnName = String(step.value);
+          if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
+          else if (ctx.variables.has(fnName)) pipeVal = callFn2(ctx.variables.get(fnName), [pipeVal]);
         } else {
-          const fn = ev(fnArg);
+          const fn = ev(step);
           pipeVal = callFn2(fn, [pipeVal]);
         }
       }
@@ -19960,6 +20158,51 @@ ${cssVars.join(";\n")};
       }
       return result;
     }
+    if (op === "when-not") {
+      if (expr2.args.length < 2) return null;
+      const c = ev(expr2.args[0]);
+      if (c === null || c === void 0 || c === false) {
+        let result = null;
+        for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
+        return result;
+      }
+      return null;
+    }
+    if (op === "dotimes") {
+      const bindingNode = expr2.args[0];
+      const items = (bindingNode == null ? void 0 : bindingNode.kind) === "array" ? bindingNode.items || [] : ((_j = (_i = bindingNode == null ? void 0 : bindingNode.fields) == null ? void 0 : _i.get) == null ? void 0 : _j.call(_i, "items")) || [];
+      if (items.length < 2) return null;
+      const bindName = ((_k = items[0]) == null ? void 0 : _k.name) || ((_l = items[0]) == null ? void 0 : _l.value) || "";
+      const n = Number(ev(items[1]));
+      for (let i = 0; i < n; i++) {
+        interp2.context.variables.push();
+        try {
+          interp2.context.variables.set(bindName, i);
+          for (let j = 1; j < expr2.args.length; j++) ev(expr2.args[j]);
+        } finally {
+          interp2.context.variables.pop();
+        }
+      }
+      return null;
+    }
+    if (op === "doseq") {
+      const bindingNode = expr2.args[0];
+      const items = (bindingNode == null ? void 0 : bindingNode.kind) === "array" ? bindingNode.items || [] : ((_n = (_m = bindingNode == null ? void 0 : bindingNode.fields) == null ? void 0 : _m.get) == null ? void 0 : _n.call(_m, "items")) || [];
+      if (items.length < 2) return null;
+      const bindName = ((_o = items[0]) == null ? void 0 : _o.name) || ((_p = items[0]) == null ? void 0 : _p.value) || String(((_q = items[0]) == null ? void 0 : _q.value) ?? "");
+      const coll = ev(items[1]);
+      if (!Array.isArray(coll)) return null;
+      for (const item of coll) {
+        interp2.context.variables.push();
+        try {
+          interp2.context.variables.set(bindName, item);
+          for (let i = 1; i < expr2.args.length; i++) ev(expr2.args[i]);
+        } finally {
+          interp2.context.variables.pop();
+        }
+      }
+      return null;
+    }
     if (op === "and") {
       let result = true;
       for (const arg of expr2.args) {
@@ -19980,7 +20223,7 @@ ${cssVars.join(";\n")};
       const arr = ev(expr2.args[0]);
       const paramNode = expr2.args[1];
       const bodyNode = expr2.args[2];
-      const items = paramNode.kind === "block" && paramNode.type === "Array" ? ((_j = (_i = paramNode.fields).get) == null ? void 0 : _j.call(_i, "items")) || [] : paramNode.kind === "array" ? paramNode.items || [] : [];
+      const items = paramNode.kind === "block" && paramNode.type === "Array" ? ((_s = (_r = paramNode.fields).get) == null ? void 0 : _s.call(_r, "items")) || [] : paramNode.kind === "array" ? paramNode.items || [] : [];
       const paramNames = items.map((item) => {
         if (item.kind === "variable") return item.name;
         if (item.kind === "literal") return "$" + item.value;
@@ -27449,6 +27692,9 @@ req.end();
     };
   }
 
+  // src/stdlib-lazy-registry.ts
+  init_define_process_env();
+
   // src/stdlib-ws.ts
   init_define_process_env();
   init_misc_stubs();
@@ -27906,9 +28152,6 @@ req.end();
       }
     };
   }
-
-  // src/stdlib-lazy-registry.ts
-  init_define_process_env();
 
   // src/stdlib-crypto-rsa.ts
   init_define_process_env();
@@ -29158,9 +29401,8 @@ loop().catch(e => {
     return `ch_${++_chanIdCounter}_${Date.now()}`;
   }
   var Channel = class {
-    queue = [];
-    maxSize;
     constructor(size2 = 100) {
+      this.queue = [];
       this.maxSize = size2;
     }
     /** 값을 채널에 보냄. 가득 차면 false 반환 */
@@ -29960,9 +30202,8 @@ function _fl_print(v) { console.log(v); return v; }
     return encoded;
   }
   var JSCodegen = class {
-    opts;
-    exportedNames = [];
     constructor() {
+      this.exportedNames = [];
       this.opts = { ...DEFAULT_OPTIONS };
     }
     generate(nodes, opts) {
@@ -30701,235 +30942,6 @@ ${exportsStr}
     } catch (err4) {
       throw new Error(`HTTP ${method} ${url} failed: ${err4.message}`);
     }
-  }
-
-  // src/stdlib-oci.ts
-  init_define_process_env();
-  init_node_stubs();
-  init_path_stubs();
-  init_crypto_stubs();
-  function createOciModule() {
-    const imageStore = /* @__PURE__ */ new Map();
-    return {
-      // oci_create_manifest(config) → manifest JSON 생성
-      "oci_create_manifest": (config) => {
-        try {
-          const now = (/* @__PURE__ */ new Date()).toISOString();
-          const manifest = {
-            schemaVersion: 2,
-            mediaType: "application/vnd.docker.distribution.manifest.v2+json",
-            config: {
-              size: 0,
-              digest: ""
-            },
-            layers: config.layers || []
-          };
-          return manifest;
-        } catch (err4) {
-          throw new Error(`oci_create_manifest failed: ${err4.message}`);
-        }
-      },
-      // oci_create_layer(dir) → tar.gz 생성 및 정보 반환
-      "oci_create_layer": (dirPath) => {
-        try {
-          const { execSync: execSync2 } = (init_child_process_stubs(), __toCommonJS(child_process_stubs_exports));
-          const resolvedPath = resolve(dirPath);
-          if (!existsSync(resolvedPath)) {
-            throw new Error(`Directory not found: ${resolvedPath}`);
-          }
-          const layerName = basename(resolvedPath);
-          const layerFile = join(dirname(resolvedPath), `${layerName}-layer.tar.gz`);
-          const cmd = `cd "${dirname(resolvedPath)}" && tar -czf "${basename(layerFile)}" "${layerName}"`;
-          execSync2(cmd, { encoding: "utf-8" });
-          if (!existsSync(layerFile)) {
-            throw new Error(`Failed to create layer archive: ${layerFile}`);
-          }
-          const stat = statSync(layerFile);
-          const content = readFileSync(layerFile);
-          const digest = "sha256:" + createHash("sha256").update(content).digest("hex");
-          return {
-            path: layerFile,
-            size: stat.size,
-            digest,
-            mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip"
-          };
-        } catch (err4) {
-          throw new Error(`oci_create_layer failed: ${err4.message}`);
-        }
-      },
-      // oci_build(tag, layers[]) → OCI layout 디렉토리 생성
-      "oci_build": (tag, layers) => {
-        try {
-          const now = (/* @__PURE__ */ new Date()).toISOString();
-          const imageDir = resolve(".oci-images", tag);
-          if (!existsSync(imageDir)) {
-            mkdirSync(imageDir, { recursive: true });
-          }
-          const manifest = {
-            schemaVersion: 2,
-            mediaType: "application/vnd.docker.distribution.manifest.v2+json",
-            config: {
-              size: 0,
-              digest: ""
-            },
-            layers: layers || []
-          };
-          const config = {
-            architecture: "amd64",
-            config: {
-              Env: ["PATH=/usr/local/bin:/usr/bin:/bin"],
-              Cmd: ["node", "app.js"],
-              WorkingDir: "/app"
-            },
-            rootfs: {
-              type: "layers",
-              diff_ids: (layers == null ? void 0 : layers.map((l) => l.digest)) || []
-            },
-            history: [{
-              created: now,
-              created_by: "fl build --oci"
-            }]
-          };
-          writeFileSync(
-            join(imageDir, "manifest.json"),
-            JSON.stringify(manifest, null, 2),
-            "utf-8"
-          );
-          writeFileSync(
-            join(imageDir, "config.json"),
-            JSON.stringify(config, null, 2),
-            "utf-8"
-          );
-          writeFileSync(
-            join(imageDir, "oci-layout"),
-            JSON.stringify({ imageLayoutVersion: "1.0.0" }),
-            "utf-8"
-          );
-          const blobsDir = join(imageDir, "blobs", "sha256");
-          if (!existsSync(blobsDir)) {
-            mkdirSync(blobsDir, { recursive: true });
-          }
-          const indexJson = {
-            schemaVersion: 2,
-            manifests: [{
-              mediaType: "application/vnd.docker.distribution.manifest.v2+json",
-              size: Buffer.byteLength(JSON.stringify(manifest)),
-              digest: "sha256:" + createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
-              annotations: {
-                "org.opencontainers.image.ref.name": tag
-              }
-            }]
-          };
-          writeFileSync(
-            join(imageDir, "index.json"),
-            JSON.stringify(indexJson, null, 2),
-            "utf-8"
-          );
-          const digestSha256 = indexJson.manifests[0].digest;
-          const size2 = (layers == null ? void 0 : layers.reduce((sum, l) => sum + (l.size || 0), 0)) || 0;
-          const imageInfo = {
-            tag,
-            manifest,
-            config,
-            digestSha256,
-            created: now,
-            size: size2
-          };
-          imageStore.set(tag, imageInfo);
-          return imageInfo;
-        } catch (err4) {
-          throw new Error(`oci_build failed: ${err4.message}`);
-        }
-      },
-      // oci_push(tag, registry) → HTTP PUT으로 레이어 업로드
-      "oci_push": (tag, registry) => {
-        try {
-          const registryUrl = registry || define_process_env_default.OCI_REGISTRY || "http://localhost:5000";
-          const imageInfo = imageStore.get(tag);
-          if (!imageInfo) {
-            throw new Error(`Image not found: ${tag}`);
-          }
-          const { execSync: execSync2 } = (init_child_process_stubs(), __toCommonJS(child_process_stubs_exports));
-          const cmd = `curl -X POST "${registryUrl}/v2/${tag}/manifests" -H "Content-Type: application/vnd.docker.distribution.manifest.v2+json" --data @index.json`;
-          return {
-            pushed: true,
-            tag,
-            registry: registryUrl,
-            digest: imageInfo.digestSha256,
-            message: `Image ${tag} pushed to ${registryUrl}`
-          };
-        } catch (err4) {
-          throw new Error(`oci_push failed: ${err4.message}`);
-        }
-      },
-      // oci_sign(tag, key) — 서명 (선택)
-      "oci_sign": (tag, key) => {
-        try {
-          const imageInfo = imageStore.get(tag);
-          if (!imageInfo) {
-            throw new Error(`Image not found: ${tag}`);
-          }
-          const signature = createHmac("sha256", key || "default-key").update(imageInfo.digestSha256).digest("hex");
-          return {
-            signed: true,
-            tag,
-            digest: imageInfo.digestSha256,
-            signature
-          };
-        } catch (err4) {
-          throw new Error(`oci_sign failed: ${err4.message}`);
-        }
-      },
-      // oci_list() → 로컬 이미지 목록
-      "oci_list": () => {
-        try {
-          return Array.from(imageStore.values()).map((info) => ({
-            tag: info.tag,
-            digest: info.digestSha256,
-            size: info.size,
-            created: info.created
-          }));
-        } catch (err4) {
-          throw new Error(`oci_list failed: ${err4.message}`);
-        }
-      },
-      // oci_inspect(tag) → 이미지 상세 정보
-      "oci_inspect": (tag) => {
-        try {
-          const imageInfo = imageStore.get(tag);
-          if (!imageInfo) {
-            throw new Error(`Image not found: ${tag}`);
-          }
-          return {
-            tag: imageInfo.tag,
-            digest: imageInfo.digestSha256,
-            config: imageInfo.config,
-            size: imageInfo.size,
-            created: imageInfo.created,
-            architecture: imageInfo.config.architecture,
-            cmd: imageInfo.config.config.Cmd
-          };
-        } catch (err4) {
-          throw new Error(`oci_inspect failed: ${err4.message}`);
-        }
-      },
-      // oci_remove(tag) → 이미지 삭제
-      "oci_remove": (tag) => {
-        try {
-          if (!imageStore.has(tag)) {
-            throw new Error(`Image not found: ${tag}`);
-          }
-          imageStore.delete(tag);
-          const imageDir = resolve(".oci-images", tag);
-          if (existsSync(imageDir)) {
-            (void 0)(imageDir, { recursive: true, force: true });
-          }
-          return true;
-        } catch (err4) {
-          throw new Error(`oci_remove failed: ${err4.message}`);
-        }
-      }
-    };
   }
 
   // src/stdlib-orm.ts
@@ -31672,324 +31684,6 @@ ${exportsStr}
     };
   }
 
-  // src/stdlib-stats.ts
-  init_define_process_env();
-  function createStatsModule() {
-    return {
-      // stats_mean(list) → average
-      "stats_mean": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return 0;
-          const sum = values.reduce((a, b) => a + b, 0);
-          return sum / values.length;
-        } catch (err4) {
-          throw new Error(`stats_mean failed: ${err4.message}`);
-        }
-      },
-      // stats_median(list) → middle value
-      "stats_median": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return 0;
-          const sorted = [...values].sort((a, b) => a - b);
-          const mid = Math.floor(sorted.length / 2);
-          return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-        } catch (err4) {
-          throw new Error(`stats_median failed: ${err4.message}`);
-        }
-      },
-      // stats_mode(list) → most frequent value
-      "stats_mode": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return null;
-          const freq = {};
-          let maxCount = 0;
-          let mode = values[0];
-          values.forEach((v) => {
-            const key = String(v);
-            freq[key] = (freq[key] || 0) + 1;
-            if (freq[key] > maxCount) {
-              maxCount = freq[key];
-              mode = v;
-            }
-          });
-          return mode;
-        } catch (err4) {
-          throw new Error(`stats_mode failed: ${err4.message}`);
-        }
-      },
-      // stats_stddev(list) → standard deviation
-      "stats_stddev": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return 0;
-          const mean2 = values.reduce((a, b) => a + b, 0) / values.length;
-          const squareDiffs = values.map((v) => (v - mean2) ** 2);
-          const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
-          return Math.sqrt(avgSquareDiff);
-        } catch (err4) {
-          throw new Error(`stats_stddev failed: ${err4.message}`);
-        }
-      },
-      // stats_variance(list) → variance
-      "stats_variance": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return 0;
-          const mean2 = values.reduce((a, b) => a + b, 0) / values.length;
-          const squareDiffs = values.map((v) => (v - mean2) ** 2);
-          return squareDiffs.reduce((a, b) => a + b, 0) / values.length;
-        } catch (err4) {
-          throw new Error(`stats_variance failed: ${err4.message}`);
-        }
-      },
-      // stats_percentile(list, p) → p-th percentile
-      "stats_percentile": (values, p) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return 0;
-          const sorted = [...values].sort((a, b) => a - b);
-          const idx = p / 100 * (sorted.length - 1);
-          const lower = Math.floor(idx);
-          const upper = Math.ceil(idx);
-          const weight = idx % 1;
-          if (lower === upper) return sorted[lower];
-          return sorted[lower] * (1 - weight) + sorted[upper] * weight;
-        } catch (err4) {
-          throw new Error(`stats_percentile failed: ${err4.message}`);
-        }
-      },
-      // stats_correlation(list1, list2) → correlation coefficient
-      "stats_correlation": (x, y) => {
-        try {
-          if (x.length !== y.length || x.length === 0) return 0;
-          const meanX = x.reduce((a, b) => a + b, 0) / x.length;
-          const meanY = y.reduce((a, b) => a + b, 0) / y.length;
-          let numerator = 0;
-          let denom1 = 0;
-          let denom2 = 0;
-          for (let i = 0; i < x.length; i++) {
-            const dx = x[i] - meanX;
-            const dy = y[i] - meanY;
-            numerator += dx * dy;
-            denom1 += dx * dx;
-            denom2 += dy * dy;
-          }
-          const denom = Math.sqrt(denom1 * denom2);
-          return denom === 0 ? 0 : numerator / denom;
-        } catch (err4) {
-          throw new Error(`stats_correlation failed: ${err4.message}`);
-        }
-      },
-      // stats_normalize(list) → values in [0, 1]
-      "stats_normalize": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return [];
-          const min = Math.min(...values);
-          const max = Math.max(...values);
-          const range = max - min;
-          if (range === 0) return values.map(() => 0);
-          return values.map((v) => (v - min) / range);
-        } catch (err4) {
-          throw new Error(`stats_normalize failed: ${err4.message}`);
-        }
-      },
-      // stats_zscore(list) → z-score normalized
-      "stats_zscore": (values) => {
-        try {
-          if (!Array.isArray(values) || values.length === 0) return [];
-          const mean2 = values.reduce((a, b) => a + b, 0) / values.length;
-          const stddev2 = Math.sqrt(
-            values.map((v) => (v - mean2) ** 2).reduce((a, b) => a + b, 0) / values.length
-          );
-          if (stddev2 === 0) return values.map(() => 0);
-          return values.map((v) => (v - mean2) / stddev2);
-        } catch (err4) {
-          throw new Error(`stats_zscore failed: ${err4.message}`);
-        }
-      },
-      // stats_min(list) → minimum value
-      "stats_min": (values) => {
-        try {
-          return Array.isArray(values) && values.length > 0 ? Math.min(...values) : 0;
-        } catch (err4) {
-          throw new Error(`stats_min failed: ${err4.message}`);
-        }
-      },
-      // stats_max(list) → maximum value
-      "stats_max": (values) => {
-        try {
-          return Array.isArray(values) && values.length > 0 ? Math.max(...values) : 0;
-        } catch (err4) {
-          throw new Error(`stats_max failed: ${err4.message}`);
-        }
-      }
-    };
-  }
-
-  // src/stdlib-plot.ts
-  init_define_process_env();
-  init_node_stubs();
-  function createPlotModule() {
-    return {
-      // plot_histogram(values, options) → ASCII chart string
-      "plot_histogram": (values, options) => {
-        try {
-          const opts = options || {};
-          const bins = opts.bins || 10;
-          const title = opts.title || "Histogram";
-          if (!Array.isArray(values) || values.length === 0) {
-            return `${title}
-(no data)`;
-          }
-          const min = Math.min(...values);
-          const max = Math.max(...values);
-          const range = max - min || 1;
-          const binWidth = range / bins;
-          const buckets = Array(bins).fill(0);
-          values.forEach((v) => {
-            const binIdx = Math.min(Math.floor((v - min) / binWidth), bins - 1);
-            buckets[binIdx]++;
-          });
-          const maxCount = Math.max(...buckets);
-          const height = 10;
-          let chart = `${title}
-`;
-          for (let h = height; h > 0; h--) {
-            let row = "";
-            for (let b = 0; b < bins; b++) {
-              const barHeight = Math.round(buckets[b] / maxCount * height);
-              row += barHeight >= h ? "\u2588" : " ";
-            }
-            chart += row + "\n";
-          }
-          return chart;
-        } catch (err4) {
-          throw new Error(`plot_histogram failed: ${err4.message}`);
-        }
-      },
-      // plot_bar(labels, values, options) → ASCII bar chart
-      "plot_bar": (labels, values, options) => {
-        try {
-          const opts = options || {};
-          const title = opts.title || "Bar Chart";
-          if (!Array.isArray(labels) || !Array.isArray(values) || labels.length === 0 || labels.length !== values.length) {
-            return `${title}
-(invalid data)`;
-          }
-          const maxValue = Math.max(...values);
-          const maxLabelLen = Math.max(...labels.map((l) => String(l).length));
-          const barWidth = 30;
-          let chart = `${title}
-`;
-          labels.forEach((label, i) => {
-            const barLen = Math.round(values[i] / maxValue * barWidth);
-            const bar = "\u2588".repeat(barLen);
-            chart += `${String(label).padEnd(maxLabelLen)} \u2502 ${bar} ${values[i]}
-`;
-          });
-          return chart;
-        } catch (err4) {
-          throw new Error(`plot_bar failed: ${err4.message}`);
-        }
-      },
-      // plot_line(x, y, options) → ASCII line chart
-      "plot_line": (x, y, options) => {
-        try {
-          const opts = options || {};
-          const title = opts.title || "Line Chart";
-          if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length) {
-            return `${title}
-(invalid data)`;
-          }
-          const minX = Math.min(...x);
-          const maxX = Math.max(...x);
-          const minY = Math.min(...y);
-          const maxY = Math.max(...y);
-          const width = 40;
-          const height = 10;
-          const grid = Array(height).fill(null).map(() => Array(width).fill(" "));
-          x.forEach((xi, i) => {
-            const col = Math.round((xi - minX) / (maxX - minX || 1) * (width - 1));
-            const row = Math.round((maxY - y[i]) / (maxY - minY || 1) * (height - 1));
-            if (col >= 0 && col < width && row >= 0 && row < height) {
-              grid[row][col] = "\u2022";
-            }
-          });
-          let chart = `${title}
-`;
-          grid.forEach((row) => {
-            chart += row.join("") + "\n";
-          });
-          return chart;
-        } catch (err4) {
-          throw new Error(`plot_line failed: ${err4.message}`);
-        }
-      },
-      // plot_scatter(x, y, options) → ASCII scatter plot
-      "plot_scatter": (x, y, options) => {
-        try {
-          const opts = options || {};
-          const title = opts.title || "Scatter Plot";
-          if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length) {
-            return `${title}
-(invalid data)`;
-          }
-          const minX = Math.min(...x);
-          const maxX = Math.max(...x);
-          const minY = Math.min(...y);
-          const maxY = Math.max(...y);
-          const width = 40;
-          const height = 10;
-          const grid = Array(height).fill(null).map(() => Array(width).fill("."));
-          x.forEach((xi, i) => {
-            const col = Math.round((xi - minX) / (maxX - minX || 1) * (width - 1));
-            const row = Math.round((maxY - y[i]) / (maxY - minY || 1) * (height - 1));
-            if (col >= 0 && col < width && row >= 0 && row < height) {
-              grid[row][col] = "*";
-            }
-          });
-          let chart = `${title}
-`;
-          grid.forEach((row) => {
-            chart += row.join("") + "\n";
-          });
-          return chart;
-        } catch (err4) {
-          throw new Error(`plot_scatter failed: ${err4.message}`);
-        }
-      },
-      // plot_heatmap(matrix) → ASCII heatmap
-      "plot_heatmap": (matrix) => {
-        try {
-          if (!Array.isArray(matrix) || matrix.length === 0) {
-            return "(no data)";
-          }
-          const flat = matrix.flat();
-          const min = Math.min(...flat);
-          const max = Math.max(...flat);
-          const range = max - min || 1;
-          const chars = [" ", "\u2591", "\u2592", "\u2593", "\u2588"];
-          let heatmap = "Heatmap\n";
-          matrix.forEach((row) => {
-            heatmap += row.map((v) => {
-              const idx = Math.floor((v - min) / range * (chars.length - 1));
-              return chars[idx];
-            }).join("") + "\n";
-          });
-          return heatmap;
-        } catch (err4) {
-          throw new Error(`plot_heatmap failed: ${err4.message}`);
-        }
-      },
-      // plot_save(chart, path) → boolean
-      "plot_save": (chart, filePath) => {
-        try {
-          writeFileSync(filePath, chart, "utf-8");
-          return true;
-        } catch (err4) {
-          throw new Error(`plot_save failed: ${err4.message}`);
-        }
-      }
-    };
-  }
-
   // src/stdlib-service.ts
   init_define_process_env();
   function createServiceModule() {
@@ -32342,147 +32036,6 @@ ${exportsStr}
     };
   }
 
-  // src/stdlib-feed.ts
-  init_define_process_env();
-  function esc(s) {
-    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-  }
-  function createFeedModule() {
-    return {
-      // rss_feed meta items -> <?xml ... <rss>...</rss>
-      "rss_feed": (meta, items) => {
-        const lang = meta.language || "en";
-        const buildDate = meta.updated || (/* @__PURE__ */ new Date()).toUTCString();
-        const out = [];
-        out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-        out.push(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">`);
-        out.push(`<channel>`);
-        out.push(`<title>${esc(meta.title)}</title>`);
-        out.push(`<link>${esc(meta.url)}</link>`);
-        out.push(`<description>${esc(meta.description || "")}</description>`);
-        out.push(`<language>${esc(lang)}</language>`);
-        out.push(`<lastBuildDate>${esc(buildDate)}</lastBuildDate>`);
-        out.push(`<atom:link href="${esc(meta.url.replace(/\/?$/, "/"))}feed.xml" rel="self" type="application/rss+xml"/>`);
-        for (const it of items || []) {
-          out.push(`<item>`);
-          out.push(`<title>${esc(it.title)}</title>`);
-          out.push(`<link>${esc(it.url)}</link>`);
-          out.push(`<guid isPermaLink="true">${esc(it.url)}</guid>`);
-          if (it.date) out.push(`<pubDate>${esc(new Date(it.date).toUTCString())}</pubDate>`);
-          if (it.author) out.push(`<author>${esc(it.author)}</author>`);
-          if (it.description) out.push(`<description>${esc(it.description)}</description>`);
-          if (it.content) out.push(`<content:encoded><![CDATA[${it.content}]]></content:encoded>`);
-          out.push(`</item>`);
-        }
-        out.push(`</channel>`);
-        out.push(`</rss>`);
-        return out.join("\n");
-      },
-      // atom_feed meta items -> <?xml ... <feed>...</feed>
-      "atom_feed": (meta, items) => {
-        const updated = meta.updated || (/* @__PURE__ */ new Date()).toISOString();
-        const out = [];
-        out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-        out.push(`<feed xmlns="http://www.w3.org/2005/Atom">`);
-        out.push(`<title>${esc(meta.title)}</title>`);
-        out.push(`<link href="${esc(meta.url)}"/>`);
-        out.push(`<link rel="self" href="${esc(meta.url.replace(/\/?$/, "/"))}atom.xml"/>`);
-        out.push(`<id>${esc(meta.url)}</id>`);
-        out.push(`<updated>${esc(updated)}</updated>`);
-        if (meta.author) out.push(`<author><name>${esc(meta.author)}</name></author>`);
-        if (meta.description) out.push(`<subtitle>${esc(meta.description)}</subtitle>`);
-        for (const it of items || []) {
-          out.push(`<entry>`);
-          out.push(`<title>${esc(it.title)}</title>`);
-          out.push(`<link href="${esc(it.url)}"/>`);
-          out.push(`<id>${esc(it.url)}</id>`);
-          if (it.date) out.push(`<updated>${esc(new Date(it.date).toISOString())}</updated>`);
-          if (it.author) out.push(`<author><name>${esc(it.author)}</name></author>`);
-          if (it.description) out.push(`<summary>${esc(it.description)}</summary>`);
-          if (it.content) out.push(`<content type="html"><![CDATA[${it.content}]]></content>`);
-          out.push(`</entry>`);
-        }
-        out.push(`</feed>`);
-        return out.join("\n");
-      },
-      // sitemap_xml baseUrl routes -> <?xml ... <urlset>...
-      "sitemap_xml": (baseUrl, routes) => {
-        const base = baseUrl.replace(/\/$/, "");
-        const out = [];
-        out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-        out.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
-        for (const r of routes || []) {
-          const path = typeof r === "string" ? r : r.loc;
-          out.push(`<url>`);
-          out.push(`<loc>${esc(base + (path.startsWith("/") ? path : "/" + path))}</loc>`);
-          if (typeof r !== "string") {
-            if (r.lastmod) out.push(`<lastmod>${esc(r.lastmod)}</lastmod>`);
-            if (r.changefreq) out.push(`<changefreq>${esc(r.changefreq)}</changefreq>`);
-            if (typeof r.priority === "number") out.push(`<priority>${r.priority}</priority>`);
-          }
-          out.push(`</url>`);
-        }
-        out.push(`</urlset>`);
-        return out.join("\n");
-      },
-      // robots_txt options -> "User-agent: * ..."
-      "robots_txt": (opts) => {
-        const o = opts || {};
-        const ua = o.userAgent || "*";
-        const lines = [`User-agent: ${ua}`];
-        for (const a of o.allow || []) lines.push(`Allow: ${a}`);
-        for (const d of o.disallow || []) lines.push(`Disallow: ${d}`);
-        if ((o.allow || []).length === 0 && (o.disallow || []).length === 0) {
-          lines.push("Allow: /");
-        }
-        if (o.sitemap) lines.push(`Sitemap: ${o.sitemap}`);
-        return lines.join("\n") + "\n";
-      },
-      // jsonld_article article -> <script type="application/ld+json">...<\/script>
-      "jsonld_article": (article) => {
-        const obj = {
-          "@context": "https://schema.org",
-          "@type": "Article",
-          headline: article.title,
-          url: article.url
-        };
-        if (article.description) obj.description = article.description;
-        if (article.image) obj.image = article.image;
-        if (article.datePublished) obj.datePublished = article.datePublished;
-        if (article.dateModified) obj.dateModified = article.dateModified;
-        if (article.author) obj.author = { "@type": "Person", name: article.author };
-        if (article.publisher) obj.publisher = { "@type": "Organization", name: article.publisher };
-        return `<script type="application/ld+json">${JSON.stringify(obj)}<\/script>`;
-      },
-      // jsonld_breadcrumb items -> schema.org BreadcrumbList
-      "jsonld_breadcrumb": (items) => {
-        const obj = {
-          "@context": "https://schema.org",
-          "@type": "BreadcrumbList",
-          itemListElement: (items || []).map((it, i) => ({
-            "@type": "ListItem",
-            position: i + 1,
-            name: it.name,
-            item: it.url
-          }))
-        };
-        return `<script type="application/ld+json">${JSON.stringify(obj)}<\/script>`;
-      },
-      // jsonld_organization org -> schema.org Organization
-      "jsonld_organization": (org) => {
-        const obj = {
-          "@context": "https://schema.org",
-          "@type": "Organization",
-          name: org.name,
-          url: org.url
-        };
-        if (org.logo) obj.logo = org.logo;
-        if (org.sameAs && org.sameAs.length > 0) obj.sameAs = org.sameAs;
-        return `<script type="application/ld+json">${JSON.stringify(obj)}<\/script>`;
-      }
-    };
-  }
-
   // src/stdlib-blog.ts
   init_define_process_env();
   function normalize(s) {
@@ -32577,440 +32130,6 @@ ${exportsStr}
     };
   }
 
-  // src/stdlib-cloud.ts
-  init_define_process_env();
-  init_child_process_stubs();
-  var cliAvailable = {};
-  function checkAwsCLI() {
-    if (cliAvailable.aws !== void 0) return cliAvailable.aws;
-    const result = spawnSync("aws", ["--version"], { timeout: 3e3 });
-    cliAvailable.aws = !result.error && result.status === 0;
-    return cliAvailable.aws;
-  }
-  function checkGcloudCLI() {
-    if (cliAvailable.gcloud !== void 0) return cliAvailable.gcloud;
-    const result = spawnSync("gcloud", ["--version"], { timeout: 3e3 });
-    cliAvailable.gcloud = !result.error && result.status === 0;
-    return cliAvailable.gcloud;
-  }
-  function checkAzCLI() {
-    if (cliAvailable.az !== void 0) return cliAvailable.az;
-    const result = spawnSync("az", ["--version"], { timeout: 3e3 });
-    cliAvailable.az = !result.error && result.status === 0;
-    return cliAvailable.az;
-  }
-  function runAws(args2) {
-    var _a, _b;
-    if (!checkAwsCLI()) {
-      return { status: "cli_not_found", reason: "aws CLI not installed", details: "install aws-cli" };
-    }
-    try {
-      const result = spawnSync("aws", args2, { timeout: 3e4, encoding: "utf-8" });
-      if (result.error) throw new Error(result.error.message);
-      if ((result.status ?? 1) !== 0) {
-        const stderr = ((_a = result.stderr) == null ? void 0 : _a.trim()) ?? "";
-        throw new Error(`aws exited ${result.status}${stderr ? ": " + stderr : ""}`);
-      }
-      const stdout = ((_b = result.stdout) == null ? void 0 : _b.trim()) ?? "";
-      return { status: "success", output: stdout, raw: stdout };
-    } catch (err4) {
-      return { status: "error", reason: err4.message };
-    }
-  }
-  function runGcloud(args2) {
-    var _a, _b;
-    if (!checkGcloudCLI()) {
-      return { status: "cli_not_found", reason: "gcloud CLI not installed", details: "install google-cloud-sdk" };
-    }
-    try {
-      const result = spawnSync("gcloud", args2, { timeout: 3e4, encoding: "utf-8" });
-      if (result.error) throw new Error(result.error.message);
-      if ((result.status ?? 1) !== 0) {
-        const stderr = ((_a = result.stderr) == null ? void 0 : _a.trim()) ?? "";
-        throw new Error(`gcloud exited ${result.status}${stderr ? ": " + stderr : ""}`);
-      }
-      const stdout = ((_b = result.stdout) == null ? void 0 : _b.trim()) ?? "";
-      return { status: "success", output: stdout, raw: stdout };
-    } catch (err4) {
-      return { status: "error", reason: err4.message };
-    }
-  }
-  function runAz(args2) {
-    var _a, _b;
-    if (!checkAzCLI()) {
-      return { status: "cli_not_found", reason: "az CLI not installed", details: "install azure-cli" };
-    }
-    try {
-      const result = spawnSync("az", args2, { timeout: 3e4, encoding: "utf-8" });
-      if (result.error) throw new Error(result.error.message);
-      if ((result.status ?? 1) !== 0) {
-        const stderr = ((_a = result.stderr) == null ? void 0 : _a.trim()) ?? "";
-        throw new Error(`az exited ${result.status}${stderr ? ": " + stderr : ""}`);
-      }
-      const stdout = ((_b = result.stdout) == null ? void 0 : _b.trim()) ?? "";
-      return { status: "success", output: stdout, raw: stdout };
-    } catch (err4) {
-      return { status: "error", reason: err4.message };
-    }
-  }
-  function createCloudModule() {
-    return {
-      // ── AWS S3 ──────────────────────────────────────────────────
-      // aws-s3-upload bucket file → { status, location, size }
-      "aws-s3-upload": (bucket, file, data) => {
-        const localFile = `/tmp/fl-upload-${Date.now()}.tmp`;
-        try {
-          if (data) {
-            const payload = typeof data === "string" ? data : JSON.stringify(data);
-            (init_node_stubs(), __toCommonJS(node_stubs_exports)).writeFileSync(localFile, payload);
-          }
-          const res = runAws(["s3", "cp", localFile, `s3://${bucket}/${file}`]);
-          if (res.status === "cli_not_found") return res;
-          if (res.status === "error") return { status: "upload_failed", reason: res.reason, bucket, file };
-          return { status: "uploaded", bucket, file, location: `s3://${bucket}/${file}`, size: 0 };
-        } finally {
-          try {
-            (init_node_stubs(), __toCommonJS(node_stubs_exports)).unlinkSync(localFile);
-          } catch {
-          }
-        }
-      },
-      // aws-s3-download bucket file → { status, data, location }
-      "aws-s3-download": (bucket, file) => {
-        const localFile = `/tmp/fl-download-${Date.now()}.tmp`;
-        try {
-          const res = runAws(["s3", "cp", `s3://${bucket}/${file}`, localFile]);
-          if (res.status === "cli_not_found") return res;
-          if (res.status === "error") return { status: "download_failed", reason: res.reason, bucket, file };
-          try {
-            const data = (init_node_stubs(), __toCommonJS(node_stubs_exports)).readFileSync(localFile, "utf-8");
-            return { status: "downloaded", bucket, file, location: `s3://${bucket}/${file}`, data, size: data.length };
-          } catch (e) {
-            return { status: "read_failed", reason: e.message };
-          }
-        } finally {
-          try {
-            (init_node_stubs(), __toCommonJS(node_stubs_exports)).unlinkSync(localFile);
-          } catch {
-          }
-        }
-      },
-      // aws-s3-list bucket prefix → { status, files: [name], count }
-      "aws-s3-list": (bucket, prefix = "") => {
-        const cmd = ["s3", "ls", `s3://${bucket}${prefix ? "/" + prefix : ""}`, "--recursive"];
-        const res = runAws(cmd);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "list_failed", reason: res.reason, bucket, prefix };
-        const files = res.output.split("\n").filter((line) => line.trim()).map((line) => {
-          const parts = line.split(/\s+/);
-          return parts[parts.length - 1];
-        });
-        return { status: "listed", bucket, prefix, files, count: files.length };
-      },
-      // aws-s3-delete bucket file → { status, location }
-      "aws-s3-delete": (bucket, file) => {
-        const res = runAws(["s3", "rm", `s3://${bucket}/${file}`]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "delete_failed", reason: res.reason, bucket, file };
-        return { status: "deleted", bucket, file, location: `s3://${bucket}/${file}` };
-      },
-      // aws-s3-config bucket region → { status: "configured" }
-      "aws-s3-config": (bucket, region) => {
-        return { status: "configured", bucket, region, message: "AWS S3 credentials via environment variables" };
-      },
-      // ── AWS Lambda ──────────────────────────────────────────────
-      // aws-lambda-invoke function payload → { status, output, duration_ms }
-      "aws-lambda-invoke": (functionName, payload) => {
-        const payloadFile = `/tmp/fl-lambda-${Date.now()}.json`;
-        const startTime = Date.now();
-        try {
-          const payloadStr = JSON.stringify(payload);
-          (init_node_stubs(), __toCommonJS(node_stubs_exports)).writeFileSync(payloadFile, payloadStr);
-          const res = runAws(["lambda", "invoke", "--function-name", functionName, "--payload", `file://${payloadFile}`, "/tmp/response.json"]);
-          if (res.status === "cli_not_found") return res;
-          if (res.status === "error") return { status: "invoke_failed", reason: res.reason, functionName };
-          try {
-            const responseData = (init_node_stubs(), __toCommonJS(node_stubs_exports)).readFileSync("/tmp/response.json", "utf-8");
-            return { status: "invoked", functionName, output: responseData, duration_ms: Date.now() - startTime };
-          } catch {
-            return { status: "invoked", functionName, output: null, duration_ms: Date.now() - startTime };
-          }
-        } finally {
-          try {
-            (init_node_stubs(), __toCommonJS(node_stubs_exports)).unlinkSync(payloadFile);
-          } catch {
-          }
-        }
-      },
-      // aws-lambda-create function → { status, arn }
-      "aws-lambda-create": (functionName, handler = "index.handler", runtime = "nodejs20.x") => {
-        return {
-          status: "create_via_cli",
-          message: "Use: aws lambda create-function --function-name <name> --handler <handler> --runtime <runtime>",
-          functionName,
-          handler,
-          runtime
-        };
-      },
-      // aws-lambda-delete function → { status }
-      "aws-lambda-delete": (functionName) => {
-        const res = runAws(["lambda", "delete-function", "--function-name", functionName]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "delete_failed", reason: res.reason };
-        return { status: "deleted", functionName };
-      },
-      // ── AWS RDS ──────────────────────────────────────────────
-      // aws-rds-query dbInstanceId sql → { status, rows }
-      "aws-rds-query": (dbInstanceId, sql) => {
-        return {
-          status: "query_via_cli",
-          message: "Use: aws rds-data execute-statement --resource-arn <arn> --sql <sql>",
-          dbInstanceId,
-          sql
-        };
-      },
-      // aws-rds-create dbInstanceId engine → { status }
-      "aws-rds-create": (dbInstanceId, engine = "mysql", masterUsername = "admin") => {
-        return {
-          status: "create_via_cli",
-          message: "Use: aws rds create-db-instance --db-instance-identifier <id> --engine <engine>",
-          dbInstanceId,
-          engine,
-          masterUsername
-        };
-      },
-      // ── GCP Cloud Run ─────────────────────────────────────────
-      // gcp-run-deploy service image region → { status, url }
-      "gcp-run-deploy": (serviceName, imageUri, region = "us-central1") => {
-        const res = runGcloud(["run", "deploy", serviceName, "--image", imageUri, "--region", region, "--allow-unauthenticated"]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "deploy_failed", reason: res.reason, serviceName };
-        const urlMatch = res.output.match(/https:\/\/[^\s]+/);
-        const url = urlMatch ? urlMatch[0] : `https://${serviceName}-xxx.a.run.app`;
-        return { status: "deployed", serviceName, imageUri, region, url };
-      },
-      // gcp-run-invoke service data region → { status, output }
-      "gcp-run-invoke": (serviceName, data, region = "us-central1") => {
-        var _a;
-        const dataJson = JSON.stringify(data);
-        const res = runGcloud([
-          "run",
-          "services",
-          "describe",
-          serviceName,
-          "--region",
-          region,
-          "--format",
-          "get(status.url)"
-        ]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "invoke_failed", reason: res.reason, serviceName };
-        const url = res.output;
-        const curlResult = spawnSync("curl", ["-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", dataJson, url], { timeout: 1e4, encoding: "utf-8" });
-        const output = ((_a = curlResult.stdout) == null ? void 0 : _a.trim()) ?? "";
-        return { status: "invoked", serviceName, url, output };
-      },
-      // gcp-run-list region → { status, services: [] }
-      "gcp-run-list": (region = "us-central1") => {
-        const res = runGcloud(["run", "services", "list", "--region", region, "--format", "value(metadata.name)"]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "list_failed", reason: res.reason };
-        const services = res.output.split("\n").filter((s) => s.trim());
-        return { status: "listed", region, services, count: services.length };
-      },
-      // ── Azure Functions ──────────────────────────────────────
-      // azure-function-invoke functionName data → { status, output }
-      "azure-function-invoke": (functionName, data) => {
-        const dataJson = JSON.stringify(data);
-        const res = runAz(["functionapp", "function", "invoke", "--name", functionName, "--input", dataJson]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "invoke_failed", reason: res.reason, functionName };
-        return { status: "invoked", functionName, output: res.output };
-      },
-      // azure-function-create functionName → { status }
-      "azure-function-create": (functionName, runtime = "node") => {
-        return {
-          status: "create_via_cli",
-          message: "Use: az functionapp create --resource-group <rg> --consumption-plan-location <location> --runtime <runtime>",
-          functionName,
-          runtime
-        };
-      },
-      // azure-app-deploy appName imageUri region → { status, url }
-      "azure-app-deploy": (appName, imageUri, region = "eastus") => {
-        const res = runAz(["webapp", "create", "--resource-group", "default", "--plan", "default", "--name", appName, "--image", imageUri]);
-        if (res.status === "cli_not_found") return res;
-        if (res.status === "error") return { status: "deploy_failed", reason: res.reason, appName };
-        return { status: "deployed", appName, imageUri, region, url: `https://${appName}.azurewebsites.net` };
-      },
-      // ── Common Cloud Utilities ──────────────────────────────────
-      // cloud-health provider → { status, healthy }
-      "cloud-health": (provider) => {
-        const healthChecks = {
-          aws: checkAwsCLI,
-          gcp: checkGcloudCLI,
-          azure: checkAzCLI
-        };
-        const check = healthChecks[provider];
-        if (!check) return { status: "unknown_provider", provider };
-        const healthy = check();
-        return {
-          status: "checked",
-          provider,
-          healthy,
-          message: healthy ? `${provider} CLI available` : `${provider} CLI not found`
-        };
-      },
-      // cloud-get-config provider → object
-      "cloud-get-config": (provider) => {
-        if (!provider) return { aws: checkAwsCLI(), gcp: checkGcloudCLI(), azure: checkAzCLI() };
-        const checks = {
-          aws: checkAwsCLI(),
-          gcp: checkGcloudCLI(),
-          azure: checkAzCLI()
-        };
-        return { [provider]: checks[provider] ?? false };
-      }
-    };
-  }
-
-  // src/stdlib-matrix.ts
-  init_define_process_env();
-  function createMatrixModule() {
-    return {
-      // ── Matrix Operations ──────────────────────────────────
-      // matrix_mul A B -> [[number]]  (matrix multiplication)
-      "matrix_mul": (A2, B) => {
-        if (!Array.isArray(A2) || !Array.isArray(B)) {
-          throw new Error("matrix_mul: requires 2D arrays (matrices)");
-        }
-        if (A2.length === 0 || B.length === 0) {
-          throw new Error("matrix_mul: empty matrix");
-        }
-        const rowsA = A2.length;
-        const colsA = A2[0].length;
-        const colsB = B[0].length;
-        if (colsA !== B.length) {
-          throw new Error(
-            `matrix_mul: dimension mismatch (${rowsA}x${colsA} * ${B.length}x${colsB})`
-          );
-        }
-        const result = Array.from(
-          { length: rowsA },
-          () => Array(colsB).fill(0)
-        );
-        for (let i = 0; i < rowsA; i++) {
-          for (let j = 0; j < colsB; j++) {
-            let sum = 0;
-            for (let k = 0; k < colsA; k++) {
-              sum += A2[i][k] * B[k][j];
-            }
-            result[i][j] = sum;
-          }
-        }
-        return result;
-      },
-      // matrix_transpose A -> [[number]]  (transpose matrix)
-      "matrix_transpose": (A2) => {
-        if (!Array.isArray(A2) || A2.length === 0) {
-          return [];
-        }
-        const rows = A2.length;
-        const cols = A2[0].length;
-        const result = Array.from(
-          { length: cols },
-          () => Array(rows).fill(0)
-        );
-        for (let i = 0; i < rows; i++) {
-          for (let j = 0; j < cols; j++) {
-            result[j][i] = A2[i][j];
-          }
-        }
-        return result;
-      },
-      // ── Vector Operations ──────────────────────────────────
-      // vector_dot u v -> number  (dot product)
-      "vector_dot": (u, v) => {
-        if (!Array.isArray(u) || !Array.isArray(v)) {
-          throw new Error("vector_dot: requires 1D arrays (vectors)");
-        }
-        if (u.length !== v.length) {
-          throw new Error(`vector_dot: length mismatch (${u.length} vs ${v.length})`);
-        }
-        let sum = 0;
-        for (let i = 0; i < u.length; i++) {
-          sum += u[i] * v[i];
-        }
-        return sum;
-      },
-      // vector_add u v -> [number]  (vector addition)
-      "vector_add": (u, v) => {
-        if (!Array.isArray(u) || !Array.isArray(v)) {
-          throw new Error("vector_add: requires 1D arrays (vectors)");
-        }
-        if (u.length !== v.length) {
-          throw new Error(`vector_add: length mismatch (${u.length} vs ${v.length})`);
-        }
-        return u.map((x, i) => x + v[i]);
-      },
-      // vector_sub u v -> [number]  (vector subtraction)
-      "vector_sub": (u, v) => {
-        if (!Array.isArray(u) || !Array.isArray(v)) {
-          throw new Error("vector_sub: requires 1D arrays (vectors)");
-        }
-        if (u.length !== v.length) {
-          throw new Error(`vector_sub: length mismatch (${u.length} vs ${v.length})`);
-        }
-        return u.map((x, i) => x - v[i]);
-      },
-      // vector_scale v s -> [number]  (scalar multiplication)
-      "vector_scale": (v, s) => {
-        if (!Array.isArray(v)) {
-          throw new Error("vector_scale: first arg must be 1D array");
-        }
-        return v.map((x) => x * s);
-      },
-      // vector_norm v -> number  (Euclidean norm / L2 norm)
-      "vector_norm": (v) => {
-        if (!Array.isArray(v)) {
-          throw new Error("vector_norm: requires 1D array");
-        }
-        let sum = 0;
-        for (const x of v) {
-          sum += x * x;
-        }
-        return Math.sqrt(sum);
-      },
-      // ── Utility Operations ──────────────────────────────────
-      // matrix_zeros rows cols -> [[number]]  (create zero matrix)
-      "matrix_zeros": (rows, cols) => {
-        return Array.from({ length: rows }, () => Array(cols).fill(0));
-      },
-      // vector_zeros n -> [number]  (create zero vector)
-      "vector_zeros": (n) => {
-        return Array(n).fill(0);
-      },
-      // ── Parallel/Batch Operations ──────────────────────────────────
-      // parallel_map arr fn -> [any]  (map function over array, near-parallel via Promise.all)
-      // Note: fn is a FreeLang closure, passed as native JS function reference
-      "parallel_map": (arr, fn) => {
-        if (!Array.isArray(arr)) {
-          throw new Error("parallel_map: first arg must be array");
-        }
-        const promises = arr.map((item) => {
-          return new Promise((resolve2) => {
-            setImmediate(() => {
-              resolve2(item);
-            });
-          });
-        });
-        return arr.map((item, idx) => {
-          return item;
-        });
-      }
-    };
-  }
-
   // src/stdlib-audit.ts
   init_define_process_env();
   init_child_process_stubs();
@@ -33093,6 +32212,8 @@ ${exportsStr}
 
   // src/stdlib-lazy-registry.ts
   var LAZY_REGISTRY = {
+    "ws": (interp2) => createWsModule(interp2 ? (n, a) => interp2.callUserFunction(n, a) : () => null),
+    "wsc": (interp2) => createWscModule(interp2 ? (n, a) => interp2.callUserFunction(n, a) : () => null),
     "crypto-rsa": () => createCryptoRsaModule(),
     "totp": () => createTotpModule(),
     "mail": () => createMailModule(),
@@ -33108,19 +32229,31 @@ ${exportsStr}
     "ai": () => createAiNativeModule(),
     "compile": () => createCompileModule(),
     "registry": () => createRegistryModule(),
-    "oci": () => createOciModule(),
+    "oci": () => {
+      throw new Error("oci \uBAA8\uB4C8\uC740 \uBCC4\uB3C4 \uD328\uD0A4\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uD45C\uC900 \uBC30\uD3EC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    },
     "orm": () => createOrmModule(),
     "validation": () => createValidationModule(),
     "middleware": () => createMiddlewareModule(),
     "table": () => createTableModule(),
-    "stats": () => createStatsModule(),
-    "plot": () => createPlotModule(),
+    "stats": () => {
+      throw new Error("stats \uBAA8\uB4C8\uC740 \uBCC4\uB3C4 \uD328\uD0A4\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uD45C\uC900 \uBC30\uD3EC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    },
+    "plot": () => {
+      throw new Error("plot \uBAA8\uB4C8\uC740 \uBCC4\uB3C4 \uD328\uD0A4\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uD45C\uC900 \uBC30\uD3EC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    },
     "service": () => createServiceModule(),
     "markdown": () => createMarkdownModule(),
-    "feed": () => createFeedModule(),
+    "feed": () => {
+      throw new Error("feed \uBAA8\uB4C8\uC740 \uBCC4\uB3C4 \uD328\uD0A4\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uD45C\uC900 \uBC30\uD3EC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    },
     "blog": () => createBlogModule(),
-    "cloud": () => createCloudModule(),
-    "matrix": () => createMatrixModule(),
+    "cloud": () => {
+      throw new Error("cloud \uBAA8\uB4C8\uC740 \uBCC4\uB3C4 \uD328\uD0A4\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uD45C\uC900 \uBC30\uD3EC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    },
+    "matrix": () => {
+      throw new Error("matrix \uBAA8\uB4C8\uC740 \uBCC4\uB3C4 \uD328\uD0A4\uC9C0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4. \uD45C\uC900 \uBC30\uD3EC\uC5D0 \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+    },
     "audit": () => createAuditModule()
   };
   var loaded = /* @__PURE__ */ new Set();
@@ -35235,12 +34368,6 @@ ${exportsStr}
       (name, args2) => interp2.callUserFunction(name, args2)
     ));
     interp2.registerModule(createTestEnhancedModule());
-    interp2.registerModule(createWsModule(
-      (n, a) => interp2.callUserFunction(n, a)
-    ));
-    interp2.registerModule(createWscModule(
-      (n, a) => interp2.callUserFunction(n, a)
-    ));
     const imageModule = createImageModule();
     const mongodbModule = createMongodbModule();
     interp2.registerModule(imageModule);
@@ -35286,6 +34413,7 @@ ${exportsStr}
       "fl_modules": () => getAvailableModules(),
       // fl_load "path/to/lib.fl" → 다른 FL 파일을 현재 컨텍스트에 로드
       // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
+      // 이미 로드된 파일은 캐싱으로 중복 실행 방지 (importedFiles 공유)
       "fl_load": (filePath) => {
         const fs = (init_node_stubs(), __toCommonJS(node_stubs_exports));
         const path = (init_path_stubs(), __toCommonJS(path_stubs_exports));
@@ -35296,11 +34424,16 @@ ${exportsStr}
           console.error(`\u274C [fl_load] \uD30C\uC77C \uC5C6\uC74C: ${resolved}`);
           return false;
         }
+        const loadedFiles = interp2.importedFiles ?? /* @__PURE__ */ new Set();
+        if (loadedFiles.has(resolved)) return true;
+        loadedFiles.add(resolved);
+        interp2.importedFiles = loadedFiles;
         try {
           const src = fs.readFileSync(resolved, "utf-8");
           interp2.interpret(parse3(lex2(src)));
           return true;
         } catch (e) {
+          loadedFiles.delete(resolved);
           console.error(`\u274C [fl_load] "${resolved}" \uB85C\uB4DC \uC2E4\uD328:`, e.message);
           return false;
         }
@@ -36262,10 +35395,12 @@ ${exportsStr}
   // src/profiler.ts
   init_define_process_env();
   var Profiler = class {
-    enabled = false;
-    entries = /* @__PURE__ */ new Map();
-    // 호출 스택: selfMs(자식 제외 시간) 계산용
-    callStack = [];
+    constructor() {
+      this.enabled = false;
+      this.entries = /* @__PURE__ */ new Map();
+      // 호출 스택: selfMs(자식 제외 시간) 계산용
+      this.callStack = [];
+    }
     /**
      * enter(name) → exit 함수 반환
      * exit 호출 시 경과 시간 기록
@@ -36372,9 +35507,11 @@ ${exportsStr}
   // src/vm.ts
   init_define_process_env();
   var VM = class {
-    stack = [];
-    vars = /* @__PURE__ */ new Map();
-    ip = 0;
+    constructor() {
+      this.stack = [];
+      this.vars = /* @__PURE__ */ new Map();
+      this.ip = 0;
+    }
     run(chunk) {
       this.stack = [];
       this.vars = /* @__PURE__ */ new Map();
@@ -36646,6 +35783,7 @@ ${exportsStr}
         hint
       );
     }
+    if (func._call) return func._call(...args2);
     let isGenericCall = false;
     if (func.generics && func.generics.length > 0) {
       if (!typeArgs) {
@@ -36668,7 +35806,7 @@ ${exportsStr}
     if (func.paramDefaults) {
       while (args2.length < func.params.length) {
         const def = func.paramDefaults[args2.length];
-        if (def !== void 0) args2 = [...args2, def];
+        if (def !== void 0) args2 = [...args2, interp2.eval(def)];
         else break;
       }
     }
@@ -36769,6 +35907,7 @@ ${tail}` : "")
     if (interp2.tcoMode) {
       return callFunctionValueTCO(interp2, fn, args2);
     }
+    if (fn._call) return fn._call(...args2);
     if (fn.kind !== "function-value") {
       throw new Error(`Expected function-value, got ${fn.kind}`);
     }
@@ -36859,13 +35998,18 @@ ${tail}` : "")
         let baseName = currentName;
         const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
         if (bracketMatch) baseName = bracketMatch[1];
-        const func = interp2.context.functions.get(baseName);
+        let func = interp2.context.functions.get(baseName);
+        if (!func) {
+          const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
+          if (alt !== baseName) func = interp2.context.functions.get(alt);
+        }
         if (!func) {
           const candidates = [...interp2.context.functions.keys()];
           const similar = suggestSimilar(baseName, candidates);
           const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
           throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
         }
+        if (func._call) return func._call(...currentArgs);
         if (typeof func.body === "function") {
           return func.body(...currentArgs);
         }
@@ -37017,7 +36161,9 @@ ${tail}` : "")
   // src/macro-expander.ts
   init_define_process_env();
   var MacroExpander = class {
-    macros = /* @__PURE__ */ new Map();
+    constructor() {
+      this.macros = /* @__PURE__ */ new Map();
+    }
     define(name, params, body) {
       this.macros.set(name, { name, params, body });
     }
@@ -37148,12 +36294,14 @@ ${tail}` : "")
   // src/protocol.ts
   init_define_process_env();
   var ProtocolRegistry = class {
-    // protocolName → Protocol
-    protocols = /* @__PURE__ */ new Map();
-    // "ProtocolName:TypeName" → ProtocolImpl
-    impls = /* @__PURE__ */ new Map();
-    // methodName → Set<protocolName> (역인덱스: 어떤 프로토콜에 속하는지)
-    methodIndex = /* @__PURE__ */ new Map();
+    constructor() {
+      // protocolName → Protocol
+      this.protocols = /* @__PURE__ */ new Map();
+      // "ProtocolName:TypeName" → ProtocolImpl
+      this.impls = /* @__PURE__ */ new Map();
+      // methodName → Set<protocolName> (역인덱스: 어떤 프로토콜에 속하는지)
+      this.methodIndex = /* @__PURE__ */ new Map();
+    }
     defineProtocol(proto) {
       this.protocols.set(proto.name, proto);
       for (const method of proto.methods) {
@@ -37234,7 +36382,9 @@ ${tail}` : "")
   // src/struct-system.ts
   init_define_process_env();
   var StructRegistry = class {
-    structs = /* @__PURE__ */ new Map();
+    constructor() {
+      this.structs = /* @__PURE__ */ new Map();
+    }
     /** Struct 정의 등록 */
     define(def) {
       this.structs.set(def.name, def);
@@ -37316,22 +36466,24 @@ ${tail}` : "")
   // src/debugger.ts
   init_define_process_env();
   var DebugSession = class _DebugSession {
-    /** 중단점 집합 — "file:line" 형태 */
-    breakpoints = /* @__PURE__ */ new Set();
-    /** step 모드 — true면 모든 줄에서 break */
-    stepMode = false;
-    /** 디버그 모드 활성화 여부 */
-    enabled = false;
-    /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
-    onBreakCallback = null;
-    /** 소스맵 (선택적) */
-    sourceMap = null;
-    /** 브레이크 이벤트 로그 (테스트 검증용) */
-    breakLog = [];
-    /** watch 변수 목록 */
-    watchList = /* @__PURE__ */ new Set();
-    /** 호출 스택 */
-    callStack = [];
+    constructor() {
+      /** 중단점 집합 — "file:line" 형태 */
+      this.breakpoints = /* @__PURE__ */ new Set();
+      /** step 모드 — true면 모든 줄에서 break */
+      this.stepMode = false;
+      /** 디버그 모드 활성화 여부 */
+      this.enabled = false;
+      /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
+      this.onBreakCallback = null;
+      /** 소스맵 (선택적) */
+      this.sourceMap = null;
+      /** 브레이크 이벤트 로그 (테스트 검증용) */
+      this.breakLog = [];
+      /** watch 변수 목록 */
+      this.watchList = /* @__PURE__ */ new Set();
+      /** 호출 스택 */
+      this.callStack = [];
+    }
     static _key(file, line) {
       return `${file}:${line}`;
     }
@@ -37445,7 +36597,9 @@ ${tail}` : "")
   // src/cot.ts
   init_define_process_env();
   var ChainOfThought = class {
-    steps = [];
+    constructor() {
+      this.steps = [];
+    }
     /**
      * 추론 단계 추가 + 즉시 실행
      * @param thought 이 단계에서 하는 생각 (설명)
@@ -37597,10 +36751,12 @@ ${tail}` : "")
   // src/tot.ts
   init_define_process_env();
   var TreeOfThought = class {
-    _branches = [];
-    _scoreFn = null;
-    _pruneThreshold = 0;
-    _executed = [];
+    constructor() {
+      this._branches = [];
+      this._scoreFn = null;
+      this._pruneThreshold = 0;
+      this._executed = [];
+    }
     /**
      * 분기 추가: 가설 이름과 실행 함수
      */
@@ -37715,7 +36871,9 @@ ${tail}` : "")
   // src/reflect.ts
   init_define_process_env();
   var Reflector = class {
-    criteriaList = [];
+    constructor() {
+      this.criteriaList = [];
+    }
     addCriteria(c) {
       this.criteriaList.push(c);
       return this;
@@ -37812,12 +36970,10 @@ ${tail}` : "")
   // src/agent.ts
   init_define_process_env();
   var FLAgent = class {
-    state;
-    options;
-    // 미리 등록된 단계 함수 목록 (step() 메서드로 추가)
-    stepFunctions = [];
-    stepCursor = 0;
     constructor(opts) {
+      // 미리 등록된 단계 함수 목록 (step() 메서드로 추가)
+      this.stepFunctions = [];
+      this.stepCursor = 0;
       this.options = opts;
       this.state = {
         goal: opts.goal,
@@ -38206,8 +37362,10 @@ ${tail}` : "")
     }
   };
   var Optimizer = class {
-    passes = [];
-    stats = [];
+    constructor() {
+      this.passes = [];
+      this.stats = [];
+    }
     addPass(pass) {
       this.passes.push(pass);
       return this;
@@ -38234,32 +37392,22 @@ ${tail}` : "")
 
   // src/interpreter.ts
   var _Interpreter = class _Interpreter {
-    context;
-    // Public for testing
-    logger;
-    searchAdapter;
-    // Phase 9a: WebSearch
-    learnedFactsStore;
-    // Phase 9b: Learning persistence
-    currentLine = 0;
-    // FreeLang source line tracking
-    callDepth = 0;
-    // Phase E 후속 (2026-04-25): mongodb-integration.test 호환 alias
-    // 일부 테스트가 interp.globals 사용 — context.functions 가 정확하지만 alias 제공
-    get globals() {
-      return this.context.functions;
-    }
-    // Phase E (2026-04-25): 호출 체인 추적 — 에러 발생 시 마지막 100개까지 표시
-    callStack = [];
-    // Phase 61: 상향 (trampoline이 100만 재귀 처리)
-    // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
-    tcoMode = false;
-    // Phase 52: FL 파일 import 지원
-    importedFiles = /* @__PURE__ */ new Set();
-    currentFilePath = process.cwd();
-    // Phase 78: 디버거 세션
-    debugSession = getGlobalDebugSession();
     constructor(logger, options) {
+      // Phase 9b: Learning persistence
+      this.currentLine = 0;
+      // FreeLang source line tracking
+      this.callDepth = 0;
+      // Phase E (2026-04-25): 호출 체인 추적 — 에러 발생 시 마지막 100개까지 표시
+      this.callStack = [];
+      // Phase 61: 상향 (trampoline이 100만 재귀 처리)
+      // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
+      this.tcoMode = false;
+      // Phase 52: FL 파일 import 지원
+      this.importedFiles = /* @__PURE__ */ new Set();
+      this.currentFilePath = process.cwd();
+      // Phase 78: 디버거 세션
+      this.debugSession = getGlobalDebugSession();
+      this.serverConfig = null;
       this.logger = logger || getGlobalLogger();
       const strictMode = (options == null ? void 0 : options.strict) ?? define_process_env_default.FREELANG_STRICT === "1";
       this.context = {
@@ -38325,6 +37473,11 @@ ${tail}` : "")
       this.registerBuiltinTypeClasses();
       this.registerStandardMacros();
       this.registerAgentBuiltins();
+    }
+    // Phase E 후속 (2026-04-25): mongodb-integration.test 호환 alias
+    // 일부 테스트가 interp.globals 사용 — context.functions 가 정확하지만 alias 제공
+    get globals() {
+      return this.context.functions;
     }
     // Phase 98: Agent 빌트인 함수 등록
     registerAgentBuiltins() {
@@ -39203,7 +38356,6 @@ ${tail}` : "")
         throw new Error(result.error || `Tool failed: ${name}`);
       })();
     }
-    serverConfig = null;
     handleServerBlock(block) {
       const port = Number(this.getFieldValue(block, "port") || 3009);
       const host = String(this.getFieldValue(block, "host") || "0.0.0.0");
@@ -39397,6 +38549,9 @@ ${tail}` : "")
         if (this.context.variables.has(varName)) {
           return this.context.variables.get(varName);
         }
+        if (this.context.functions.has(varName) || this.context.functions.has("$" + varName)) {
+          return { kind: "builtin-fn", name: varName };
+        }
         const scopeVars = this.context.variables.getAllVars();
         const similar = suggestSimilar(varName, scopeVars);
         const err4 = new VariableNotFoundError(
@@ -39504,7 +38659,7 @@ ${tail}` : "")
       const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
       const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
       const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-      const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "let", "set", "if", "if-let", "when", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate"]);
+      const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate"]);
       if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
       if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
       if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
@@ -40091,16 +39246,304 @@ ${tail}` : "")
       this.logger.info("Interpreter cleanup completed");
     }
   };
-  __publicField(_Interpreter, "CALL_STACK_LIMIT", 100);
+  _Interpreter.CALL_STACK_LIMIT = 100;
   // 메모리 안전을 위해 마지막 N개만 유지
-  __publicField(_Interpreter, "MAX_CALL_DEPTH", 5e3);
+  _Interpreter.MAX_CALL_DEPTH = 5e3;
   // ← 기본값 유지 (TCO 라우팅은 내부용)
   // Phase 3-E: VM opt-in 최적화
-  __publicField(_Interpreter, "_vmCompiler", new BytecodeCompiler());
-  __publicField(_Interpreter, "_vmOptimizer", createDefaultOptimizer());
-  __publicField(_Interpreter, "_vm", new VM());
-  __publicField(_Interpreter, "_vmEnabled", define_process_env_default.FL_VM === "1");
+  _Interpreter._vmCompiler = new BytecodeCompiler();
+  _Interpreter._vmOptimizer = createDefaultOptimizer();
+  _Interpreter._vm = new VM();
+  _Interpreter._vmEnabled = define_process_env_default.FL_VM === "1";
   var Interpreter = _Interpreter;
+
+  // src/stdlib-stats.ts
+  init_define_process_env();
+  function createStatsModule() {
+    return {
+      // stats_mean(list) → average
+      "stats_mean": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return 0;
+          const sum = values.reduce((a, b) => a + b, 0);
+          return sum / values.length;
+        } catch (err4) {
+          throw new Error(`stats_mean failed: ${err4.message}`);
+        }
+      },
+      // stats_median(list) → middle value
+      "stats_median": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return 0;
+          const sorted = [...values].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+        } catch (err4) {
+          throw new Error(`stats_median failed: ${err4.message}`);
+        }
+      },
+      // stats_mode(list) → most frequent value
+      "stats_mode": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return null;
+          const freq = {};
+          let maxCount = 0;
+          let mode = values[0];
+          values.forEach((v) => {
+            const key = String(v);
+            freq[key] = (freq[key] || 0) + 1;
+            if (freq[key] > maxCount) {
+              maxCount = freq[key];
+              mode = v;
+            }
+          });
+          return mode;
+        } catch (err4) {
+          throw new Error(`stats_mode failed: ${err4.message}`);
+        }
+      },
+      // stats_stddev(list) → standard deviation
+      "stats_stddev": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return 0;
+          const mean2 = values.reduce((a, b) => a + b, 0) / values.length;
+          const squareDiffs = values.map((v) => (v - mean2) ** 2);
+          const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+          return Math.sqrt(avgSquareDiff);
+        } catch (err4) {
+          throw new Error(`stats_stddev failed: ${err4.message}`);
+        }
+      },
+      // stats_variance(list) → variance
+      "stats_variance": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return 0;
+          const mean2 = values.reduce((a, b) => a + b, 0) / values.length;
+          const squareDiffs = values.map((v) => (v - mean2) ** 2);
+          return squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+        } catch (err4) {
+          throw new Error(`stats_variance failed: ${err4.message}`);
+        }
+      },
+      // stats_percentile(list, p) → p-th percentile
+      "stats_percentile": (values, p) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return 0;
+          const sorted = [...values].sort((a, b) => a - b);
+          const idx = p / 100 * (sorted.length - 1);
+          const lower = Math.floor(idx);
+          const upper = Math.ceil(idx);
+          const weight = idx % 1;
+          if (lower === upper) return sorted[lower];
+          return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+        } catch (err4) {
+          throw new Error(`stats_percentile failed: ${err4.message}`);
+        }
+      },
+      // stats_correlation(list1, list2) → correlation coefficient
+      "stats_correlation": (x, y) => {
+        try {
+          if (x.length !== y.length || x.length === 0) return 0;
+          const meanX = x.reduce((a, b) => a + b, 0) / x.length;
+          const meanY = y.reduce((a, b) => a + b, 0) / y.length;
+          let numerator = 0;
+          let denom1 = 0;
+          let denom2 = 0;
+          for (let i = 0; i < x.length; i++) {
+            const dx = x[i] - meanX;
+            const dy = y[i] - meanY;
+            numerator += dx * dy;
+            denom1 += dx * dx;
+            denom2 += dy * dy;
+          }
+          const denom = Math.sqrt(denom1 * denom2);
+          return denom === 0 ? 0 : numerator / denom;
+        } catch (err4) {
+          throw new Error(`stats_correlation failed: ${err4.message}`);
+        }
+      },
+      // stats_normalize(list) → values in [0, 1]
+      "stats_normalize": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return [];
+          const min = Math.min(...values);
+          const max = Math.max(...values);
+          const range = max - min;
+          if (range === 0) return values.map(() => 0);
+          return values.map((v) => (v - min) / range);
+        } catch (err4) {
+          throw new Error(`stats_normalize failed: ${err4.message}`);
+        }
+      },
+      // stats_zscore(list) → z-score normalized
+      "stats_zscore": (values) => {
+        try {
+          if (!Array.isArray(values) || values.length === 0) return [];
+          const mean2 = values.reduce((a, b) => a + b, 0) / values.length;
+          const stddev2 = Math.sqrt(
+            values.map((v) => (v - mean2) ** 2).reduce((a, b) => a + b, 0) / values.length
+          );
+          if (stddev2 === 0) return values.map(() => 0);
+          return values.map((v) => (v - mean2) / stddev2);
+        } catch (err4) {
+          throw new Error(`stats_zscore failed: ${err4.message}`);
+        }
+      },
+      // stats_min(list) → minimum value
+      "stats_min": (values) => {
+        try {
+          return Array.isArray(values) && values.length > 0 ? Math.min(...values) : 0;
+        } catch (err4) {
+          throw new Error(`stats_min failed: ${err4.message}`);
+        }
+      },
+      // stats_max(list) → maximum value
+      "stats_max": (values) => {
+        try {
+          return Array.isArray(values) && values.length > 0 ? Math.max(...values) : 0;
+        } catch (err4) {
+          throw new Error(`stats_max failed: ${err4.message}`);
+        }
+      }
+    };
+  }
+
+  // src/stdlib-matrix.ts
+  init_define_process_env();
+  function createMatrixModule() {
+    return {
+      // ── Matrix Operations ──────────────────────────────────
+      // matrix_mul A B -> [[number]]  (matrix multiplication)
+      "matrix_mul": (A2, B) => {
+        if (!Array.isArray(A2) || !Array.isArray(B)) {
+          throw new Error("matrix_mul: requires 2D arrays (matrices)");
+        }
+        if (A2.length === 0 || B.length === 0) {
+          throw new Error("matrix_mul: empty matrix");
+        }
+        const rowsA = A2.length;
+        const colsA = A2[0].length;
+        const colsB = B[0].length;
+        if (colsA !== B.length) {
+          throw new Error(
+            `matrix_mul: dimension mismatch (${rowsA}x${colsA} * ${B.length}x${colsB})`
+          );
+        }
+        const result = Array.from(
+          { length: rowsA },
+          () => Array(colsB).fill(0)
+        );
+        for (let i = 0; i < rowsA; i++) {
+          for (let j = 0; j < colsB; j++) {
+            let sum = 0;
+            for (let k = 0; k < colsA; k++) {
+              sum += A2[i][k] * B[k][j];
+            }
+            result[i][j] = sum;
+          }
+        }
+        return result;
+      },
+      // matrix_transpose A -> [[number]]  (transpose matrix)
+      "matrix_transpose": (A2) => {
+        if (!Array.isArray(A2) || A2.length === 0) {
+          return [];
+        }
+        const rows = A2.length;
+        const cols = A2[0].length;
+        const result = Array.from(
+          { length: cols },
+          () => Array(rows).fill(0)
+        );
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            result[j][i] = A2[i][j];
+          }
+        }
+        return result;
+      },
+      // ── Vector Operations ──────────────────────────────────
+      // vector_dot u v -> number  (dot product)
+      "vector_dot": (u, v) => {
+        if (!Array.isArray(u) || !Array.isArray(v)) {
+          throw new Error("vector_dot: requires 1D arrays (vectors)");
+        }
+        if (u.length !== v.length) {
+          throw new Error(`vector_dot: length mismatch (${u.length} vs ${v.length})`);
+        }
+        let sum = 0;
+        for (let i = 0; i < u.length; i++) {
+          sum += u[i] * v[i];
+        }
+        return sum;
+      },
+      // vector_add u v -> [number]  (vector addition)
+      "vector_add": (u, v) => {
+        if (!Array.isArray(u) || !Array.isArray(v)) {
+          throw new Error("vector_add: requires 1D arrays (vectors)");
+        }
+        if (u.length !== v.length) {
+          throw new Error(`vector_add: length mismatch (${u.length} vs ${v.length})`);
+        }
+        return u.map((x, i) => x + v[i]);
+      },
+      // vector_sub u v -> [number]  (vector subtraction)
+      "vector_sub": (u, v) => {
+        if (!Array.isArray(u) || !Array.isArray(v)) {
+          throw new Error("vector_sub: requires 1D arrays (vectors)");
+        }
+        if (u.length !== v.length) {
+          throw new Error(`vector_sub: length mismatch (${u.length} vs ${v.length})`);
+        }
+        return u.map((x, i) => x - v[i]);
+      },
+      // vector_scale v s -> [number]  (scalar multiplication)
+      "vector_scale": (v, s) => {
+        if (!Array.isArray(v)) {
+          throw new Error("vector_scale: first arg must be 1D array");
+        }
+        return v.map((x) => x * s);
+      },
+      // vector_norm v -> number  (Euclidean norm / L2 norm)
+      "vector_norm": (v) => {
+        if (!Array.isArray(v)) {
+          throw new Error("vector_norm: requires 1D array");
+        }
+        let sum = 0;
+        for (const x of v) {
+          sum += x * x;
+        }
+        return Math.sqrt(sum);
+      },
+      // ── Utility Operations ──────────────────────────────────
+      // matrix_zeros rows cols -> [[number]]  (create zero matrix)
+      "matrix_zeros": (rows, cols) => {
+        return Array.from({ length: rows }, () => Array(cols).fill(0));
+      },
+      // vector_zeros n -> [number]  (create zero vector)
+      "vector_zeros": (n) => {
+        return Array(n).fill(0);
+      },
+      // ── Parallel/Batch Operations ──────────────────────────────────
+      // parallel_map arr fn -> [any]  (map function over array, near-parallel via Promise.all)
+      // Note: fn is a FreeLang closure, passed as native JS function reference
+      "parallel_map": (arr, fn) => {
+        if (!Array.isArray(arr)) {
+          throw new Error("parallel_map: first arg must be array");
+        }
+        const promises = arr.map((item) => {
+          return new Promise((resolve2) => {
+            setImmediate(() => {
+              resolve2(item);
+            });
+          });
+        });
+        return arr.map((item, idx) => {
+          return item;
+        });
+      }
+    };
+  }
 
   // src/stdlib-browser.ts
   init_define_process_env();
@@ -40541,8 +39984,8 @@ ${tail}` : "")
       setInterval(updatePanel, 500);
     }
   };
-  __publicField(_BrowserDebugPanel, "panelElement", null);
-  __publicField(_BrowserDebugPanel, "context", null);
+  _BrowserDebugPanel.panelElement = null;
+  _BrowserDebugPanel.context = null;
   var BrowserDebugPanel = _BrowserDebugPanel;
 
   // src/browser-entry.ts
