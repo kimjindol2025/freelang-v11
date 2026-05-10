@@ -2106,6 +2106,18 @@ loop().catch(e => {
         return someArr.some((item: any) => callFnVal(someFn, [item]));
       }
       return { tag: "Some", value: args[0], kind: "Option" };
+    case "every?": {
+      // (every? fn arr) → true if all elements satisfy predicate
+      const evFn = args[0], evArr = Array.isArray(args[1]) ? args[1] : [];
+      if (typeof evFn === "function") return evArr.every(evFn);
+      return evArr.every((item: any) => callFnVal(evFn, [item]));
+    }
+    case "any?": {
+      // (any? fn arr) → true if any element satisfies predicate
+      const anyFn = args[0], anyArr = Array.isArray(args[1]) ? args[1] : [];
+      if (typeof anyFn === "function") return anyArr.some(anyFn);
+      return anyArr.some((item: any) => callFnVal(anyFn, [item]));
+    }
     case "none":
       return { tag: "None", value: null, kind: "Option" };
     case "pure":

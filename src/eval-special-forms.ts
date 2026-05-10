@@ -1116,6 +1116,28 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return result;
   }
 
+  // ── doseq — (doseq [x coll] body...) side-effect iteration ───────
+  if (op === "doseq") {
+    const bindingNode = expr.args[0] as any;
+    const items: any[] = bindingNode?.kind === "array"
+      ? bindingNode.items || []
+      : bindingNode?.fields?.get?.("items") || [];
+    if (items.length < 2) return null;
+    const bindName = (items[0] as any)?.name || (items[0] as any)?.value || String((items[0] as any)?.value ?? "");
+    const coll = ev(items[1]);
+    if (!Array.isArray(coll)) return null;
+    for (const item of coll) {
+      interp.context.variables.push();
+      try {
+        interp.context.variables.set(bindName, item);
+        for (let i = 1; i < expr.args.length; i++) ev(expr.args[i]);
+      } finally {
+        interp.context.variables.pop();
+      }
+    }
+    return null;
+  }
+
   // ── and (short-circuit) ───────────────────────────────────────────
   if (op === "and") {
     let result: any = true;
