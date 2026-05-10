@@ -1699,8 +1699,12 @@ loop().catch(e => {
       return typeof args[0] === "string" && typeof args[1] === "string" && typeof args[2] === "string"
         ? args[0].split(args[1]).join(args[2])
         : "";
-    case "repeat":
-      return typeof args[0] === "string" && typeof args[1] === "number" ? args[0].repeat(args[1]) : "";
+    case "repeat": {
+      // (repeat n val) → [val val val ...]  또는  (repeat str n) → str 반복 (하위호환)
+      if (typeof args[0] === "number") return Array(args[0]).fill(args[1] !== undefined ? args[1] : null);
+      if (typeof args[0] === "string" && typeof args[1] === "number") return args[0].repeat(args[1]);
+      return [];
+    }
 
     // Array Operations
     case "filter": {
@@ -2020,6 +2024,28 @@ loop().catch(e => {
         return base;
       }
       return aiSet(args[0], aiKeys, aiVal);
+    }
+    case "update-in": {
+      // (update-in obj [k1 k2 k3] fn) → 중첩 경로의 값에 fn 적용, 불변 반환
+      if (!Array.isArray(args[1]) || args[1].length === 0) throw new Error(`update-in: 두 번째 인자는 비어있지 않은 키 배열이어야 합니다`);
+      const uiKeys = args[1];
+      const uiFn = args[2];
+      const uiExtraArgs = args.slice(3);
+      function uiUpdate(obj: any, keys: any[]): any {
+        const k = typeof keys[0] === "string" && keys[0].startsWith(":") ? keys[0].slice(1) : String(keys[0]);
+        const base = (obj !== null && typeof obj === "object" && !Array.isArray(obj)) ? { ...obj } : {};
+        if (keys.length === 1) {
+          const cur = base[k] !== undefined ? base[k] : null;
+          const uiCallArgs = [cur, ...uiExtraArgs];
+          base[k] = typeof uiFn === "string"
+            ? evalBuiltin(interp, uiFn, uiCallArgs, expr)
+            : callFnVal(uiFn, uiCallArgs);
+        } else {
+          base[k] = uiUpdate(base[k], keys.slice(1));
+        }
+        return base;
+      }
+      return uiUpdate(args[0], uiKeys);
     }
     case "dissoc": {
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
@@ -2507,6 +2533,37 @@ loop().catch(e => {
         return result;
       };
       return doTakeWhile(isLazySeq(seq) ? seq : null);
+    }
+
+    case "drop-while": {
+      // (drop-while pred seq) → pred가 truthy인 동안 건너뛰고 나머지 반환
+      const pred = args[0];
+      const seq = args[1];
+      if (!Array.isArray(seq)) return [];
+      let i = 0;
+      while (i < seq.length && callFnVal(pred, [seq[i]])) i++;
+      return seq.slice(i);
+    }
+
+    case "map-indexed": {
+      // (map-indexed fn seq) → fn이 [index value]를 인자로 받음
+      const fn = args[0];
+      const seq = args[1];
+      if (!Array.isArray(seq)) return [];
+      return seq.map((v, i) => callFnVal(fn, [i, v]));
+    }
+
+    case "reduce-kv": {
+      // (reduce-kv fn init map) → map의 키-값 쌍을 순회하며 축적
+      const fn = args[0];
+      const init = args[1];
+      const m = args[2];
+      if (m === null || m === undefined || typeof m !== "object" || Array.isArray(m)) return init;
+      let acc = init;
+      for (const [k, v] of Object.entries(m)) {
+        acc = callFnVal(fn, [acc, k, v]);
+      }
+      return acc;
     }
 
     // (lazy-head seq) / (lazy-tail seq) — 직접 접근
