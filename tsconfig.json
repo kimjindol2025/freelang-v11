@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "commonjs",
+    "lib": ["ES2021"],
+    "strict": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  },
+  "files": [
+    "src/ast.ts",
+    "src/lexer.ts",
+    "src/parser.ts",
+    "src/tco.ts",
+    "src/return-signal.ts",
+    "src/errors.ts",
+    "src/stdlib-http.ts",
+    "src/stdlib-shell.ts",
+    "src/stdlib-auth.ts",
+    "src/stdlib-file.ts",
+    "src/stdlib-time.ts",
+    "src/stdlib-crypto.ts",
+    "src/stdlib-db.ts",
+    "src/stdlib-bits.ts",
+    "src/stdlib-agent.ts",
+    "src/stdlib-process.ts",
+    "src/stdlib-optional.ts",
+    "src/stdlib-perf.ts",
+    "src/stdlib-verify.ts",
+    "src/stdlib-image.ts",
+    "src/stdlib-resource.ts",
+    "src/stdlib-rest-crud.ts",
+    "src/stdlib-module.ts",
+    "src/stdlib-kebab-aliases.ts",
+    "src/maybe-type.ts"
+  ]
+}
