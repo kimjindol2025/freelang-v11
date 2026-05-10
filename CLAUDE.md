@@ -68,7 +68,8 @@
 3.14                    ;; 실수
 true false nil          ;; 불린/nil
 [1 2 3]                 ;; 벡터 (배열)
-{"a" 1 "b" 2}          ;; 맵 (객체) — 키는 반드시 문자열
+{"a" 1 "b" 2}          ;; 맵 (객체) — 문자열 키
+{:name "Alice" :age 30} ;; 맵 (객체) — keyword 키 ✅ 권장
 [:a :b :c]             ;; 벡터 내부 심볼
 ```
 
@@ -121,25 +122,26 @@ true false nil          ;; 불린/nil
 ### 맵 & 객체 조작
 
 ```lisp
-;; 맵 생성
-(let [user {"name" "Alice" "age" 30}]
+;; 맵 생성 — keyword 키 권장
+(let [user {:name "Alice" :age 30}]
   ...)
 
-;; 값 추출
-(get user "name")     ;; → "Alice"
-(get user "missing")  ;; → nil
+;; 값 추출 — keyword 또는 문자열 둘 다 동작
+(get user :name)      ;; → "Alice" ✅
+(get user "name")     ;; → "Alice" ✅
+(get user :missing)   ;; → nil
 
 ;; 기본값 포함
-(get user "missing" "default-value")  ;; → "default-value"
+(get user :missing "default")  ;; → "default"
 
 ;; 맵 갱신 (단일 키)
-(assoc user "age" 31) ;; → {"name" "Alice" "age" 31}
+(assoc user :email "alice@example.com")
 
 ;; 맵 병합
-(obj-merge user {"email" "alice@example.com"})
+(obj-merge user {:email "alice@example.com"})
 
 ;; 특정 키만 추출
-(obj-pick user ["name" "email"])  ;; → {"name" "Alice" "email" "..."}
+(obj-pick user ["name" "email"])  ;; → {"name" "Alice" ...}
 
 ;; 특정 키 제외
 (obj-omit user ["age"])  ;; → {"name" "Alice"}
