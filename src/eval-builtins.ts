@@ -1545,6 +1545,49 @@ loop().catch(e => {
               .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x00/g, "\\0");
     }
 
+    case "h": {
+      // (h :div {:class "card" :id "main"} child1 child2 ...)
+      // (h :br)  (h :input {:type "text" :name "q"})
+      const VOID_TAGS = new Set(["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"]);
+      const escAttr = (v: string) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      const escText = (v: string) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+      // 태그명 추출 (키워드 or 문자열)
+      const tag = String(args[0] ?? "div").toLowerCase();
+
+      // 두 번째 인자가 객체이면 attrs, 아니면 첫 번째 child
+      let attrs: Record<string, any> = {};
+      let childStart = 1;
+      if (args[1] !== null && args[1] !== undefined && typeof args[1] === "object" && !Array.isArray(args[1])) {
+        attrs = args[1];
+        childStart = 2;
+      }
+
+      // attrs → HTML attribute string
+      const attrStr = Object.entries(attrs)
+        .filter(([, v]) => v !== null && v !== undefined && v !== false)
+        .map(([k, v]) => {
+          if (v === true) return ` ${k}`;           // boolean attr: disabled, checked
+          return ` ${k}="${escAttr(String(v))}"`;
+        })
+        .join("");
+
+      if (VOID_TAGS.has(tag)) return `<${tag}${attrStr}>`;
+
+      // children: strings, h() results, nil 필터, 배열 flat
+      const children = args.slice(childStart)
+        .flat()
+        .filter((c: any) => c !== null && c !== undefined && c !== false)
+        .map((c: any) => {
+          if (typeof c === "string") return c;       // h() 결과는 이미 escaped
+          if (typeof c === "number" || typeof c === "boolean") return escText(String(c));
+          return String(c ?? "");
+        })
+        .join("");
+
+      return `<${tag}${attrStr}>${children}</${tag}>`;
+    }
+
     case "cx": {
       // (cx "btn" (when active "btn-active") nil "rounded")
       // nil/false/빈 문자열 필터링 후 공백으로 join
