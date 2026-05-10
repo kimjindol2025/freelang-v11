@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 453개 함수, 34 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 456개 함수, 35 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -352,7 +352,7 @@ parallel race with-timeout fl-try use`
 - `(pkce_s256 verifier)` → string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
 - `(crypto_rsa_public_to_jwk public_pem kid)` → map (kty/n/e/kid/alg/use)
 
-### data (27개)
+### data (30개)
 
 - `(json_get obj path)` → any  (dot-path access: "user.name" or "items.0")
 - `(json_set obj path value)` → object (immutable update, returns new obj)
@@ -381,8 +381,11 @@ parallel race with-timeout fl-try use`
 - `(number_format num decimals)` → string  (1234567 0 -> "1,234,567")
 - `(to_fixed num decimals)` → string  (3.14159 2 -> "3.14")
 - `(format_currency num code)` → string  (1234567 "KRW" -> "₩1,234,567")
+- `(empty? x)` → boolean (배열/문자열/객체/nil 모두 지원)
+- `(array-empty? x)` → boolean (배열만 확인)
+- `(str_replace_in s old new)` → string (replaceAll, 인자 순서: s 먼저)
 
-### db (15개)
+### db (13개)
 
 - `(db_get collection id)` → data or null
 - `(db_all collection)` → array
@@ -390,8 +393,6 @@ parallel race with-timeout fl-try use`
 - `(db_delete collection id)` → boolean
 - `(db_project name)` → project data or null  (kimdb shorthand)
 - `(db_projects)` → project list
-- `(db_query dbPath sql params)` → rows (JSON array)
-- `(db_exec dbPath sql [params])` → stdout string
 - `(db_insert dbPath table data)` → true
 - `(db_update dbPath table data where)` → true
 - `(db_delete_row dbPath table where)` → true
@@ -436,7 +437,7 @@ parallel race with-timeout fl-try use`
 - `(jsonld_breadcrumb items)` → schema.org BreadcrumbList
 - `(jsonld_organization org)` → schema.org Organization
 
-### file (14개)
+### file (15개)
 
 - `(file_read filePath)` → string (read file content)
 - `(file_write filePath content)` → boolean (write content to file)
@@ -452,6 +453,7 @@ parallel race with-timeout fl-try use`
 - `(file_is_dir filePath)` → boolean (check if path is a directory)
 - `(file_mtime filePath)` → number (get modification time as timestamp)
 - `(file_ctime filePath)` → number (get creation time as timestamp)
+- `(file_read_or filePath defaultVal)` → string | any (파일 없거나 오류 시 기본값 반환)
 
 ### greet (2개)
 
@@ -570,6 +572,10 @@ parallel race with-timeout fl-try use`
 - `(elapsed_ms start)` → number
 - `(bench fn iterations)` → {ms, ops_per_sec}
 - `(time_fn fn args...)` → {result, ms}
+
+### process (1개)
+
+- `(shell_exec_stdout cmd cwd?)` → string | null (stdout만 반환, 실패 시 null)
 
 ### queue-helpers (1개)
 
@@ -737,4 +743,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-09T23:37:22.298Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-10T04:38:29.836Z
