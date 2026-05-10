@@ -804,25 +804,37 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     return val;
   }
 
-  // ── |> (simple pipe, alias for pipe) ─────────────────────────────
-  // (|> val f1 f2 f3) ≡ (pipe val f1 f2 f3)
+  // ── |> (thread-last pipe) ────────────────────────────────────────
+  // (|> val (f arg...) ...) → pipeVal을 각 단계의 마지막 인자로 주입
+  // (|> [1 2 3] (filter even?) (map inc)) → (map inc (filter even? [1 2 3]))
   if (op === "|>") {
     if (expr.args.length < 2) throw new Error(`|> requires at least a value and one function`);
     let pipeVal = ev(expr.args[0]);
     for (let i = 1; i < expr.args.length; i++) {
-      const fnArg = expr.args[i];
-      const fk = (fnArg as any).kind;
-      if (fk === "literal" && (fnArg as Literal).type === "symbol") {
-        const fnName = (fnArg as Literal).value as string;
-        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
-        else throw new Error(`|>: unknown function: ${fnName}`);
+      const step = expr.args[i];
+      const fk = (step as any).kind;
+      if (fk === "sexpr") {
+        // (f arg1 arg2 ...) → 임시 변수에 pipeVal 바인딩 후 마지막 인자로 주입
+        const s = step as SExpr;
+        const tmpVar = `__pipe_${i}__`;
+        ctx.variables.set(tmpVar, pipeVal);
+        const injectedArg: Variable = { kind: "variable", name: tmpVar };
+        const newSExpr: SExpr = { kind: "sexpr", op: s.op, args: [...s.args, injectedArg], line: s.line };
+        try {
+          pipeVal = ev(newSExpr);
+        } finally {
+          ctx.variables.delete(tmpVar);
+        }
       } else if (fk === "variable") {
-        const fnName = (fnArg as Variable).name;
+        const fnName = (step as Variable).name;
         if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
         else if (ctx.variables.has(fnName)) pipeVal = callFn(ctx.variables.get(fnName), [pipeVal]);
-        else throw new Error(`|>: unknown function or variable: ${fnName}`);
+      } else if (fk === "literal" && (step as Literal).type === "symbol") {
+        const fnName = String((step as Literal).value);
+        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
+        else if (ctx.variables.has(fnName)) pipeVal = callFn(ctx.variables.get(fnName), [pipeVal]);
       } else {
-        const fn = ev(fnArg);
+        const fn = ev(step);
         pipeVal = callFn(fn, [pipeVal]);
       }
     }
