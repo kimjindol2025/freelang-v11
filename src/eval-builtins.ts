@@ -245,6 +245,21 @@ function flExecOpNative(op: string, vals: any[]): any {
       }
       return _def;
     }
+    case "get-in": {
+      // (get-in obj [k1 k2 k3]) → (get (get (get obj k1) k2) k3)
+      // (get-in obj [k1 k2] default) → default if any step is nil
+      if (!Array.isArray(v1)) throw new Error(`get-in: 두 번째 인자는 키 배열이어야 합니다`);
+      const defaultVal = v2 !== undefined ? v2 : null;
+      let cur: any = v0;
+      for (const k of v1) {
+        if (cur === null || cur === undefined) return defaultVal;
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
+        if (Array.isArray(cur)) cur = cur[key] !== undefined ? cur[key] : null;
+        else if (cur !== null && typeof cur === "object") cur = cur[key] !== undefined ? cur[key] : null;
+        else return defaultVal;
+      }
+      return cur !== undefined ? cur : defaultVal;
+    }
     case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
     case "str": case "concat": return vals.map((v: any) => {
@@ -1635,6 +1650,23 @@ loop().catch(e => {
     case "join":
     case "str-join":
       return Array.isArray(args[0]) ? args[0].join(args[1] || "") : "";
+    case "str-format": case "format": {
+      // (str-format "%s has %d items, total %.2f" name count total)
+      let fmt = String(args[0] ?? "");
+      let i = 1;
+      return fmt.replace(/%(-?\d*\.?\d*)([sdfoexX%])/g, (_m, spec, t) => {
+        if (t === "%") return "%";
+        const v = args[i++];
+        if (t === "d") return String(Math.trunc(Number(v)));
+        if (t === "f") {
+          const prec = spec.includes(".") ? parseInt(spec.split(".")[1]) : 6;
+          return Number(v).toFixed(prec);
+        }
+        if (t === "s") return v === null || v === undefined ? "null" : String(v);
+        if (t === "o") return JSON.stringify(v);
+        return String(v);
+      });
+    }
     case "trim":
     case "string_trim":
     case "str_trim":
@@ -1707,6 +1739,114 @@ loop().catch(e => {
       return Array.isArray(args[0]) && args[0].length > 0
         ? args[0][args[0].length - 1]
         : (args[1] !== undefined ? args[1] : null);
+
+    // ── apply: (apply fn args-array) ─────────────────────────────────
+    case "apply": {
+      const apFn = args[0], apArr = Array.isArray(args[args.length - 1]) ? args[args.length - 1] : [];
+      const extraArgs = args.slice(1, args.length - 1);
+      const allArgs = [...extraArgs, ...apArr];
+      // builtin 연산자(+,-,*,/,max,min 등)는 evalBuiltin으로 직접 호출
+      if (typeof apFn === "string") return evalBuiltin(interp, apFn, allArgs, expr);
+      return callFnVal(apFn, allArgs);
+    }
+
+    // ── sum / product / average ───────────────────────────────────────
+    case "sum": {
+      const arr = Array.isArray(args[0]) ? args[0] : args;
+      return arr.reduce((a: number, b: number) => a + Number(b), 0);
+    }
+    case "product": {
+      const arr = Array.isArray(args[0]) ? args[0] : args;
+      return arr.reduce((a: number, b: number) => a * Number(b), 1);
+    }
+    case "average": {
+      const arr = Array.isArray(args[0]) ? args[0] : args;
+      if (arr.length === 0) return null;
+      return arr.reduce((a: number, b: number) => a + Number(b), 0) / arr.length;
+    }
+
+    // ── update: (update map key fn) ──────────────────────────────────
+    case "update": {
+      const uMap = args[0], uKey0 = args[1], uFn = args[2];
+      let uKey = uKey0;
+      if (uKey && typeof uKey === "object" && (uKey as any).kind === "keyword") uKey = (uKey as any).name;
+      else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
+      const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
+      const next = callFnVal(uFn, [cur]);
+      return { ...uMap, [uKey]: next };
+    }
+
+    // ── partition: (partition n arr) ─────────────────────────────────
+    case "partition": {
+      const n = Number(args[0]), parr = Array.isArray(args[1]) ? args[1] : [];
+      const out: any[] = [];
+      for (let i = 0; i < parr.length; i += n) out.push(parr.slice(i, i + n));
+      return out;
+    }
+
+    // ── interpose: (interpose sep arr) ───────────────────────────────
+    case "interpose": {
+      const sep = args[0], iarr = Array.isArray(args[1]) ? args[1] : [];
+      if (iarr.length === 0) return [];
+      const result: any[] = [iarr[0]];
+      for (let i = 1; i < iarr.length; i++) { result.push(sep); result.push(iarr[i]); }
+      return result;
+    }
+
+    // ── keep: (keep fn arr) → non-nil results ────────────────────────
+    case "keep": {
+      const kfn = args[0], karr = Array.isArray(args[1]) ? args[1] : [];
+      return karr.map((x: any) => callFnVal(kfn, [x])).filter((v: any) => v !== null && v !== undefined);
+    }
+
+    // ── mapcat: (mapcat fn arr) → map + flatten 1 level ──────────────
+    case "mapcat": {
+      const mcfn = args[0], mcarr = Array.isArray(args[1]) ? args[1] : [];
+      return mcarr.flatMap((x: any) => { const r = callFnVal(mcfn, [x]); return Array.isArray(r) ? r : [r]; });
+    }
+
+    // ── count-if: (count-if fn arr) ──────────────────────────────────
+    case "count-if": {
+      const cifn = args[0], ciarr = Array.isArray(args[1]) ? args[1] : [];
+      return ciarr.filter((x: any) => callFnVal(cifn, [x])).length;
+    }
+
+    // ── max-by / min-by: (max-by fn arr) ─────────────────────────────
+    case "max-by": {
+      const mbfn = args[0], mbarr = Array.isArray(args[1]) ? args[1] : [];
+      if (mbarr.length === 0) return null;
+      return mbarr.reduce((best: any, x: any) => callFnVal(mbfn, [x]) > callFnVal(mbfn, [best]) ? x : best);
+    }
+    case "min-by": {
+      const mnbfn = args[0], mnbarr = Array.isArray(args[1]) ? args[1] : [];
+      if (mnbarr.length === 0) return null;
+      return mnbarr.reduce((best: any, x: any) => callFnVal(mnbfn, [x]) < callFnVal(mnbfn, [best]) ? x : best);
+    }
+
+    // ── max-of / min-of: (max-of arr) ────────────────────────────────
+    case "max-of": {
+      const moarr = Array.isArray(args[0]) ? args[0] : args;
+      return moarr.length === 0 ? null : Math.max(...moarr.map(Number));
+    }
+    case "min-of": {
+      const minarr = Array.isArray(args[0]) ? args[0] : args;
+      return minarr.length === 0 ? null : Math.min(...minarr.map(Number));
+    }
+    case "get-in": {
+      // (get-in obj [k1 k2 k3]) → 중첩 맵 접근
+      // (get-in obj [k1 k2] default) → 경로 중 nil이면 default 반환
+      if (!Array.isArray(args[1])) throw new Error(`get-in: 두 번째 인자는 키 배열이어야 합니다`);
+      const giDefault = args[2] !== undefined ? args[2] : null;
+      let cur: any = args[0];
+      for (const k of args[1]) {
+        if (cur === null || cur === undefined) return giDefault;
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
+        if (Array.isArray(cur)) cur = cur[key] !== undefined ? cur[key] : undefined;
+        else if (cur !== null && typeof cur === "object") cur = cur[key] !== undefined ? cur[key] : undefined;
+        else return giDefault;
+      }
+      return cur !== undefined ? cur : giDefault;
+    }
     case "get-or": {
       // (get-or coll key default)
       const def = args[2] !== undefined ? args[2] : null;
