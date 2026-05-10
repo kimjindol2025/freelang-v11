@@ -1,5 +1,51 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.28] — 2026-05-10 (Batch 7: str-blank?/str-split limit/hash-map/type-of/rand-int)
+
+### 신규/수정 함수
+| 항목 | 변경 |
+|------|------|
+| `str-blank?` | nil/빈문자열/공백전용 → true (폼 입력 검증) |
+| `str-split limit` | `(str-split s sep n)` 3번째 인자 무시 버그 수정 |
+| `hash-map` | `(hash-map k1 v1 ...)` → 맵 생성 신규 추가 |
+| `type-of` | FL-friendly 타입명 반환 (`"array"/"map"/"nil"/"function"` 등) — JS `"object"` 버그 수정 |
+| `rand` | `(rand)` → 0.0~1.0 (`random` alias) |
+| `rand-int` | `(rand-int n)` → 0..n-1 / `(rand-int min max)` → 범위 지정 |
+
+Commit: 54cd68b9 | Tests: 903/903 | L2 SHA: 47407b90
+
+---
+
+## [v11.6.25] — 2026-05-10 (Batch 6: quot/rem/int/sorted?/take-drop 인자순서 감지)
+
+### 신규/수정 함수
+| 항목 | 변경 |
+|------|------|
+| `quot` | `(quot a b)` → 0 방향 정수 나눗셈 (`Math.trunc`) |
+| `rem` | `(rem a b)` → 피제수 부호 따르는 나머지 |
+| `int` | `(int 3.7)` → truncate 변환 (floor와 다름) |
+| `sorted?` | 배열 정렬 여부 확인 |
+| `take`/`drop` 순서 감지 | `(take [arr] n)` → 즉시 오류 (기존 조용한 버그) |
+
+Commit: f274045c | Tests: 903/903 | L2 SHA: 47407b90
+
+---
+
+## [v11.6.21] — 2026-05-10 (Batch 5: reduce 2-arg/dissoc 다중키/flatten-1/conj/partition-by)
+
+### 신규/수정 함수
+| 항목 | 변경 |
+|------|------|
+| `reduce` 2-arg | `(reduce fn coll)` — 초기값 없이 첫 요소를 init으로 |
+| `dissoc` 다중 키 | `(dissoc m "a" "b" "c")` — 기존 첫 키만 제거 버그 수정 |
+| `flatten-1`/`flat-1` | 1단계만 평탄화 (기존 `flatten`은 완전 재귀) |
+| `conj` | 배열과 맵 모두 지원하는 범용 추가 연산 |
+| `partition-by` | 연속된 같은 조건 요소끼리 그룹화 |
+
+Commit: — | Tests: 903/903 | L2 SHA: 47407b90
+
+---
+
 ## [v11.6.20] — 2026-05-10 (AGENT-2/3: stdlib 확장 + DB 안정화)
 
 ### 신규 함수 (AGENT-2 — Safe Stdlib)

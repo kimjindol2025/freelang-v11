@@ -2524,6 +2524,122 @@ FreeLang은 함수 본체를 **호출 시점**에 평가합니다. 두 함수가
 
 ---
 
+## "내가 쓴다면?" 개선 Batch 1-7 (2026-05-10)
+
+### 문자열 신규/수정
+
+#### `(str-blank? s)` → boolean
+nil, 빈 문자열, 공백만 있는 문자열 모두 `true` 반환.
+```lisp
+(str-blank? nil)    ; → true
+(str-blank? "")     ; → true
+(str-blank? "  ")   ; → true
+(str-blank? "hi")   ; → false
+```
+
+#### `(str-split s sep [limit])` — limit 지원 수정
+`limit` 인자를 주면 최대 `limit`개로 분할 (기존: 무시됨).
+```lisp
+(str-split "a,b,c,d" "," 2)  ; → ["a" "b,c,d"]
+(str-split "a,b,c,d" "," 3)  ; → ["a" "b" "c,d"]
+```
+
+---
+
+### 맵/객체 신규
+
+#### `(hash-map k1 v1 k2 v2 ...)` → map
+```lisp
+(hash-map "x" 1 "y" 2)           ; → {"x": 1, "y": 2}
+(hash-map :name "Alice" :age 30)  ; → {"name": "Alice", "age": 30}
+```
+
+---
+
+### 타입 시스템
+
+#### `(type-of v)` → string (FL-friendly)
+JS `typeof` 대신 FreeLang 관점의 타입명.
+```lisp
+(type-of nil)     ; → "nil"    (JS: "object")
+(type-of [1 2])   ; → "array"  (JS: "object")
+(type-of {"a" 1}) ; → "map"    (JS: "object")
+(type-of 42)      ; → "number"
+(type-of "hi")    ; → "string"
+(type-of true)    ; → "boolean"
+(type-of println) ; → "function"
+```
+
+#### `(integer? v)` / `(float? v)` → boolean
+```lisp
+(integer? 42)    ; → true    (float? 42 → false)
+(float? 3.14)    ; → true    (integer? 3.14 → false)
+```
+
+#### `(vector? v)` / `(array? v)` → boolean
+```lisp
+(vector? [1 2 3])  ; → true
+(vector? {"a" 1})  ; → false
+```
+
+---
+
+### 수학 신규
+
+#### `(quot a b)` / `(rem a b)` / `(int v)`
+```lisp
+(quot -17 5)   ; → -3   (0 방향 truncate, floor는 -4)
+(rem -17 5)    ; → -2   (피제수 부호 따름, % 는 양수)
+(int -3.7)     ; → -3   (truncate, floor는 -4)
+```
+
+---
+
+### 컬렉션 신규
+
+#### `(sorted? coll)` / `(conj coll ...)` / `(flatten-1 coll)` / `(partition-by fn coll)`
+```lisp
+(sorted? [1 2 3])                               ; → true
+(conj [1 2] 3 4)                                ; → [1 2 3 4]
+(flatten-1 [[1 [2]] [3]])                       ; → [1 [2] 3]
+(partition-by even? [1 1 2 2 3])                ; → [[1 1] [2 2] [3]]
+```
+
+#### `(reduce fn coll)` — 2-arg form / `(dissoc m k1 k2 ...)` — 다중 키
+```lisp
+(reduce + [1 2 3 4 5])                           ; → 15
+(dissoc {"a" 1 "b" 2 "c" 3} "a" "b")            ; → {"c": 3}
+```
+
+---
+
+### 난수
+
+#### `(rand)` / `(rand-int n)` / `(rand-int min max)`
+```lisp
+(rand)          ; → 0.0~1.0
+(rand-int 10)   ; → 0~9
+(rand-int 5 15) ; → 5~14
+```
+
+---
+
+### 제어 흐름 신규: `when-not` / `dotimes` / `case` / `for`
+```lisp
+(when-not (empty? errors) (println "실패"))
+
+(dotimes [i 3] (println i))   ; 0 1 2
+
+(case status
+  "active" "활성"
+  "비활성")   ; default
+
+(for [x [1 2 3 4 5 6] :when (= (% x 2) 0)] (* x x))
+; → [4 16 36]
+```
+
+---
+
 ## 참고
 
 - **All functions are deterministic** — 같은 입력은 항상 같은 출력

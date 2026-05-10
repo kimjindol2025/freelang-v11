@@ -391,39 +391,55 @@ true false nil          ;; 불린/nil
 
 ### 문자열
 - `str`, `str-to-num`, `str-to-upper`, `str-to-lower`, `str-trim`, `str-split`, `str-includes`, `str-starts-with`, `str-ends-with`, `str-replace`, `str-slice`
+- `str-blank?` — nil/빈문자열/공백만인 경우 true (폼 입력 검증용)
+- `str-split` — `(str-split s sep)` 전체, `(str-split s sep n)` 최대 n개로 분할
 - `str-format` (printf 스타일: `(str-format "%s is %d" [name age])` 또는 `(str-format "%s is %d" name age)`)
 - `str-repeat`, `str-lines`, `str-pad-left`, `str-pad-right`, `str-index-of`, `str-replace-all`
 
 ### 배열/벡터
 - `length` / `count`, `push`, `pop`, `shift`, `unshift`, `map`, `filter`, `reduce`, `reverse`, `sort`, `sort-by`, `includes-item`, `index-of`
 - `every?`, `any?`, `none?` (pred arr), `some` (pred arr → 첫 매칭 값)
-- `take`, `drop`, `take-while`, `drop-while`, `butlast`, `last`, `first`, `second`, `nth`
-- `map-indexed`, `mapcat`, `keep`, `partition`, `interpose`, `flatten`, `distinct`
+- `take`, `drop` — ⚠ 인자 순서 엄격: `(take n coll)`, `(drop n coll)` — 순서 틀리면 오류
+- `take-while`, `drop-while`, `butlast`, `last`, `first`, `second`, `nth`
+- `map-indexed`, `mapcat`, `keep`, `partition`, `partition-by`, `interpose`, `flatten`, `flatten-1` (1단계만), `distinct`
 - `zip`, `group-by`, `frequencies`, `range`, `repeat` (`(repeat n val)` → 배열)
-- `into` (컬렉션 합침), `find-first`, `count-if`, `sum`, `product`, `average`
+- `into` (컬렉션 합침), `conj` (배열/맵 범용 추가), `find-first`, `count-if`, `sum`, `product`, `average`
+- `sorted?` — 배열이 정렬되어 있는지 확인
 - `max-by`, `min-by`, `max-of`, `min-of`
-- `comp` (함수 합성), `juxt` (복수 함수 동시 적용), `partial`, `complement`, `constantly`
+- `comp` (함수 합성 — 오른쪽→왼쪽 실행), `juxt` (복수 함수 동시 적용), `partial`, `complement`, `constantly`
 - `tap` / `dbg` (파이프라인 중간값 출력, 값 통과)
 - `apply` (fn + 인자 배열로 호출)
 
 ### 객체/맵
 - `get`, `assoc`, `obj-merge`, `obj-pick`, `obj-omit`, `obj-keys` / `keys`, `obj-values` / `vals`, `obj-entries` / `entries`
-- `get-in` (중첩 접근), `assoc-in` (중첩 갱신), `update-in` (중첩 함수 적용 — builtin 지원), `dissoc`
+- `hash-map` — `(hash-map k1 v1 k2 v2 ...)` 키-값 쌍으로 맵 생성
+- `get-in` (중첩 접근), `assoc-in` (중첩 갱신), `update-in` (중첩 함수 적용 — builtin 지원), `dissoc` (다중 키 지원)
 - `select-keys`, `rename-keys`, `merge-with` (키 충돌 시 fn으로 합산), `reduce-kv` (맵 키-값 축적)
 - `has-key?`, `update` (단일 키 함수 적용)
 
 ### 수학
 - `+`, `-`, `*`, `/`, `%`, `inc`, `dec`, `min`, `max`, `abs`, `round`, `floor`, `ceil`, `pow`, `sqrt`, `clamp`
+- `quot` — `(quot a b)` 0 방향 정수 나눗셈 (`quot -17 5` → `-3`)
+- `rem` — `(rem a b)` 피제수 부호를 따르는 나머지 (`rem -17 5` → `-2`)
+- `int` — `(int 3.7)` truncate 변환 (`int -3.7` → `-3`, `floor`와 다름)
+
+### 타입 술어
+- `type-of` — FL-friendly 타입명: `"nil"` / `"array"` / `"map"` / `"function"` / `"number"` / `"string"` / `"boolean"`
+- `integer?`, `float?` — 정수/실수 구분 (`number?`는 둘 다 true)
+- `vector?` / `array?` — 배열 타입 확인
+- `fn?`, `string?`, `number?`, `boolean?`, `nil?`, `map?`, `keyword?`
 
 ### 논리
 - `and`, `or`, `not`, `=`, `!=` / `not=`, `<`, `>`, `<=`, `>=`
-- `nil?`, `empty?`, `not-empty?`, `nil-or-empty?`
+- `nil?`, `empty?`, `not-empty?`, `nil-or-empty?`, `str-blank?`
 - `??` (nil 병합: 첫 번째 non-nil 값 반환)
 
 ### 제어 흐름
 - `when` (조건 참일 때), `when-not` (조건 거짓일 때)
 - `dotimes` (`(dotimes [i n] body)` — N번 반복)
 - `doseq` (`(doseq [x coll] body)` — 순회 side-effect)
+- `case` — `(case val v1 r1 v2 r2 default)` 리터럴 값 매칭 (cond는 조건식, case는 값)
+- `for` — `(for [x coll :when pred] body)` 리스트 컴프리헨션 (`:when` 필터 지원)
 
 ### HTTP 서버
 - `server-start`, `server-html`, `server-json`, `server-status`, `server-redirect`, `server-file`, `server-html-cookie`, `server-set-cookie`
@@ -439,6 +455,8 @@ true false nil          ;; 불린/nil
 
 ### 유틸
 - `println`, `uuid`, `now-ms`, `sleep`, `json-parse`, `json-stringify`, `html-escape`, `js-escape`
+- `rand` — `(rand)` → 0.0~1.0 실수 (Math.random())
+- `rand-int` — `(rand-int n)` → 0~n-1, `(rand-int min max)` → min~max-1
 
 ---
 
@@ -545,6 +563,11 @@ true false nil          ;; 불린/nil
 | `(str-format "%d" 42)` → NaN | 배열로 감싸야 함 | `(str-format "%d" [42])` 또는 `(str-format "%d" 42)` ← 둘 다 동작 |
 | `(comp inc str-to-upper)` → 타입 오류 | comp 인자 순서: 오른쪽부터 실행 | `(comp str-to-upper inc)` — 먼저 할 것을 마지막에 |
 | `(update-in m ["k"] "inc")` | fn을 문자열로 | `(update-in m ["k"] inc)` |
+| `(take [1 2 3] 2)` | 인자 순서 반대 — 오류 발생 | `(take 2 [1 2 3])` — n 먼저 |
+| `(drop [1 2 3] 1)` | 인자 순서 반대 — 오류 발생 | `(drop 1 [1 2 3])` — n 먼저 |
+| `(sort-by [1 2] fn)` | 인자 순서 반대 — 오류 발생 | `(sort-by fn [1 2])` — fn 먼저 |
+| `(type-of x)` → `"object"` | 구버전 `typeof` 사용 | `(type-of x)` → `"array"/"map"/"nil"` 등 FL 타입명 반환 |
+| `(str-split s sep 2)` 무시됨 | 구버전 버그 | 수정됨 — `(str-split "a,b,c" "," 2)` → `["a","b,c"]` |
 
 **$ 없이도 완전히 동작** — `$`는 선택사항이며 생략해도 됩니다.
 
