@@ -4160,7 +4160,40 @@ ${parenHint}` : parenHint;
     "http-fetch": { correct: "http-get-data", usage: "(http-get-data url)" },
     // 맵 병합 (#39)
     "obj-merge": { correct: "merge", usage: "(merge map1 map2)" },
-    "obj_merge": { correct: "merge", usage: "(merge map1 map2)" }
+    "obj_merge": { correct: "merge", usage: "(merge map1 map2)" },
+    // 배열 길이 (#42)
+    "count": { correct: "length", usage: "(length arr)" },
+    "size": { correct: "length", usage: "(length arr)" },
+    // 문자열 분리 (#43)
+    "split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
+    "str_split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
+    // JSON 파싱 (#44)
+    "JSON.parse": { correct: "json-parse", usage: '(json-parse "{}")' },
+    "parseJSON": { correct: "json-parse", usage: '(json-parse "{}")' },
+    "parse_json": { correct: "json-parse", usage: '(json-parse "{}")' },
+    // JSON 직렬화 (#45)
+    "JSON.stringify": { correct: "json-stringify", usage: "(json-stringify {})" },
+    "toJSON": { correct: "json-stringify", usage: "(json-stringify {})" },
+    "stringify": { correct: "json-stringify", usage: "(json-stringify {})" },
+    // 숫자→문자열 (#57)
+    "num-to-str": { correct: "num_to_str", usage: "(num_to_str 42)" },
+    "numToStr": { correct: "num_to_str", usage: "(num_to_str 42)" },
+    "number_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
+    // 문자열 공백 제거 (#78)
+    "trim": { correct: "str-trim", usage: '(str-trim "  hello  ")' },
+    "str_trim": { correct: "str-trim", usage: '(str-trim "  hello  ")' },
+    // 문자열 시작 여부 (#79)
+    "starts-with?": { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+    "startsWith": { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+    // 문자열 포함 여부 (#80)
+    "includes": { correct: "str-contains", usage: '(str-contains "hello" "ell")' },
+    "str_includes": { correct: "str-contains", usage: '(str-contains "hello" "ell")' },
+    // 대문자 변환 (#81)
+    "to-upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
+    "toUpperCase": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
+    "to_upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
+    // 문자열 변환 (#82)
+    "toString": { correct: "str", usage: "(str value)" }
   };
   function suggestSimilar(name, candidates) {
     let best = null;
@@ -12297,7 +12330,7 @@ req.end();`;
     }
   }
   function evalBuiltin(interp2, op, args2, expr2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const normalizedOp2 = op.replace(/_/g, "-");
     if (normalizedOp2 !== op && op !== "server_start") {
       console.warn(`\u26A0\uFE0F  [FreeLang v11.5.1] ${op}\uC740 deprecated\uC785\uB2C8\uB2E4. ${normalizedOp2}\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.`);
@@ -12881,6 +12914,16 @@ loop().catch(e => {
         if (kObj instanceof Map) return Array.from(kObj.keys());
         return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
       }
+      case "length-or-zero":
+      case "length_or_zero": {
+        const v = args2[0];
+        if (v === null || v === void 0) return 0;
+        if (typeof v === "string") return v.length;
+        if (Array.isArray(v)) return v.length;
+        if (v instanceof Map) return v.size;
+        if (typeof v === "object") return Object.keys(v).length;
+        return 0;
+      }
       case "vals":
       case "values": {
         const vObj = args2[0];
@@ -13133,8 +13176,8 @@ loop().catch(e => {
       case "num-to-str":
         return String(args2[0]);
       case "str-to-num": {
-        const _n = parseFloat(String(args2[0]));
-        return isNaN(_n) ? null : _n;
+        const _n2 = parseFloat(String(args2[0]));
+        return isNaN(_n2) ? null : _n2;
       }
       case "map-set":
         if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
@@ -13484,9 +13527,19 @@ loop().catch(e => {
         });
       case "sort-by":
       case "sort_by": {
+        if (Array.isArray(args2[0]) && args2[0].length > 0) {
+          const second = args2[1];
+          const firstElemIsFunc = typeof args2[0][0] === "function" || ((_d = args2[0][0]) == null ? void 0 : _d.kind) === "function-value" || ((_e = args2[0][0]) == null ? void 0 : _e.kind) === "closure";
+          const secondIsFunc = second && (typeof second === "function" || (second == null ? void 0 : second.kind) === "function-value" || (second == null ? void 0 : second.kind) === "closure");
+          if (secondIsFunc && !firstElemIsFunc) {
+            throw new Error(
+              `sort-by \uC778\uC790 \uC21C\uC11C \uC624\uB958: (sort-by fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (sort-by arr fn)`
+            );
+          }
+        }
         if (!Array.isArray(args2[1])) return [];
         const keyFn = args2[0];
-        const callFn3 = (_d = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _d.bind(interp2);
+        const callFn3 = (_f = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _f.bind(interp2);
         if (!callFn3) return [...args2[1]];
         return [...args2[1]].sort((a, b) => {
           const ka = callFn3(keyFn, [a]);
@@ -13506,7 +13559,7 @@ loop().catch(e => {
         const a = Array.isArray(args2[1]) ? args2[1] : [];
         const b = Array.isArray(args2[2]) ? args2[2] : [];
         const len = Math.min(a.length, b.length);
-        const callFn22 = (_e = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _e.bind(interp2);
+        const callFn22 = (_g = interp2 == null ? void 0 : interp2.callFunctionValue) == null ? void 0 : _g.bind(interp2);
         if (!callFn22) return [];
         return Array.from({ length: len }, (_, i) => callFn22(fn, [a[i], b[i]]));
       }
@@ -14770,13 +14823,13 @@ loop().catch(e => {
           const [problem, evalFn] = args2;
           const evaluate2 = (output) => Number(callFn2(evalFn, [output]));
           const result = globalCompetition.run(problem, evaluate2);
-          return ((_f = result.winner) == null ? void 0 : _f.agentId) ?? null;
+          return ((_h = result.winner) == null ? void 0 : _h.agentId) ?? null;
         }
         if (op === "compete-score") {
           const [problem, evalFn] = args2;
           const evaluate2 = (output) => Number(callFn2(evalFn, [output]));
           const result = globalCompetition.run(problem, evaluate2);
-          return ((_g = result.winner) == null ? void 0 : _g.score) ?? null;
+          return ((_i = result.winner) == null ? void 0 : _i.score) ?? null;
         }
         if (op === "compete-all") {
           const [problem, evalFn] = args2;
@@ -15446,7 +15499,7 @@ loop().catch(e => {
             const history2 = arg.get("history") ?? [];
             if (history2.length < 5) return false;
             const recent = history2.slice(-5);
-            const firstBest = recent[0] instanceof Map ? recent[0].get("best") : (_h = recent[0]) == null ? void 0 : _h.best;
+            const firstBest = recent[0] instanceof Map ? recent[0].get("best") : (_j = recent[0]) == null ? void 0 : _j.best;
             return recent.every((s) => {
               const b = s instanceof Map ? s.get("best") : s == null ? void 0 : s.best;
               return Math.abs(b - firstBest) < 1e-9;
@@ -15670,8 +15723,8 @@ loop().catch(e => {
           return /* @__PURE__ */ new Map([
             ["success", result.success],
             ["reason", result.reason ?? null],
-            ["previousId", ((_i = result.previous) == null ? void 0 : _i.id) ?? null],
-            ["restoredId", ((_j = result.restored) == null ? void 0 : _j.id) ?? null]
+            ["previousId", ((_k = result.previous) == null ? void 0 : _k.id) ?? null],
+            ["restoredId", ((_l = result.restored) == null ? void 0 : _l.id) ?? null]
           ]);
         }
         if (op === "version-prev") {
@@ -15679,8 +15732,8 @@ loop().catch(e => {
           return /* @__PURE__ */ new Map([
             ["success", result.success],
             ["reason", result.reason ?? null],
-            ["previousId", ((_k = result.previous) == null ? void 0 : _k.id) ?? null],
-            ["restoredId", ((_l = result.restored) == null ? void 0 : _l.id) ?? null]
+            ["previousId", ((_m = result.previous) == null ? void 0 : _m.id) ?? null],
+            ["restoredId", ((_n = result.restored) == null ? void 0 : _n.id) ?? null]
           ]);
         }
         if (op === "version-diff") {
@@ -15843,7 +15896,7 @@ loop().catch(e => {
               ["name", brResult.name],
               ["results", brResult.results.map(brToMap)],
               ["startTime", brResult.startTime.toISOString()],
-              ["endTime", ((_m = brResult.endTime) == null ? void 0 : _m.toISOString()) ?? ""],
+              ["endTime", ((_o = brResult.endTime) == null ? void 0 : _o.toISOString()) ?? ""],
               ["summary", /* @__PURE__ */ new Map([
                 ["total", brResult.summary.total],
                 ["fastest", brResult.summary.fastest ? brToMap(brResult.summary.fastest) : null],
@@ -21623,7 +21676,7 @@ Test Results: ${r.passed}/${total} passed`);
   init_child_process_stubs();
   init_node_stubs();
   init_crypto_stubs();
-  function nodeHttpRequest(url, method = "GET", headers, body) {
+  function nodeHttpRequest(url, method = "GET", headers, body, timeoutMs = 1e4) {
     let tmpFile = null;
     try {
       const headersObj = {};
@@ -21652,14 +21705,17 @@ const req=mod.request(opts,res=>{
   res.on('data',d=>chunks.push(d));
   res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString('utf-8')}))});
 });
-req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
-req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+let done=false;
+const fail=(msg)=>{if(done)return;done=true;process.stdout.write(JSON.stringify({s:0,b:'',e:msg}))};
+req.on('error',e=>fail(e.message));
+req.on('socket',s=>{s.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')})});
+req.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')});
 if(bodyStr!=null)req.write(bodyStr,'utf-8');
 req.end();`;
       writeFileSync(tmpFile, script, "utf-8");
-      const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
+      const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: timeoutMs + 2e3 });
       const parsed = JSON.parse(result);
-      return { status: parsed.s || 0, body: parsed.b || "" };
+      return { status: parsed.s || 0, body: parsed.b || "", ...parsed.e && { error: parsed.e } };
     } catch (err4) {
       return { status: 0, body: "", error: err4.message };
     } finally {
@@ -21865,6 +21921,17 @@ req.end();`;
       // http_request method url headers body -> {:status 200 :body "..."}
       "http_request": (method, url, headers, body) => {
         const result = curlGetStatusAndBody(url, method, headers, body);
+        return {
+          status: result.status,
+          body: result.body,
+          ...result.error && { error: result.error }
+        };
+      },
+      // http_request_timeout method url headers body timeout_ms -> {:status 200 :body "..." :error nil}
+      // timeout_ms: 최대 대기 시간 (ms). 초과 시 status:0, error:"timeout" 반환
+      "http_request_timeout": (method, url, headers, body, timeoutMs) => {
+        const ms = Number(timeoutMs) || 5e3;
+        const result = nodeHttpRequest(url, method, headers, body || void 0, ms);
         return {
           status: result.status,
           body: result.body,
