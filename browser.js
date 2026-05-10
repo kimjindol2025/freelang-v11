@@ -12915,6 +12915,12 @@ loop().catch(e => {
         if (Array.isArray(args2[0])) return [...args2[0]].reverse();
         return [];
       case "map": {
+        if (Array.isArray(args2[0]) && args2[0].length > 0) {
+          const second = args2[1];
+          if (second && (typeof second === "function" || (second == null ? void 0 : second.kind) === "function-value" || (second == null ? void 0 : second.kind) === "closure")) {
+            throw new Error(`map \uC778\uC790 \uC21C\uC11C \uC624\uB958: (map fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (map arr fn)`);
+          }
+        }
         const mapFn = args2[0];
         const mapArr = Array.isArray(args2[1]) ? args2[1] : [];
         if (typeof mapFn === "function") {
@@ -12987,6 +12993,12 @@ loop().catch(e => {
         };
       }
       case "reduce": {
+        if (Array.isArray(args2[0]) && args2[0].length > 0) {
+          const third = args2[2];
+          if (third && (typeof third === "function" || (third == null ? void 0 : third.kind) === "function-value" || (third == null ? void 0 : third.kind) === "closure")) {
+            throw new Error(`reduce \uC778\uC790 \uC21C\uC11C \uC624\uB958: (reduce fn init arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (reduce arr init fn)`);
+          }
+        }
         const reduceFn = args2[0];
         let accumulator = args2[1];
         let arr = args2[2] ?? [];
@@ -13167,6 +13179,12 @@ loop().catch(e => {
       case "repeat":
         return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0].repeat(args2[1]) : "";
       case "filter": {
+        if (Array.isArray(args2[0]) && args2[0].length > 0) {
+          const second = args2[1];
+          if (second && (typeof second === "function" || (second == null ? void 0 : second.kind) === "function-value" || (second == null ? void 0 : second.kind) === "closure")) {
+            throw new Error(`filter \uC778\uC790 \uC21C\uC11C \uC624\uB958: (filter fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (filter arr fn)`);
+          }
+        }
         const filterFn = args2[0];
         const coll = args2[1];
         if (!Array.isArray(coll)) return [];

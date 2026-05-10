@@ -1332,6 +1332,14 @@ loop().catch(e => {
       if (Array.isArray(args[0])) return [...args[0]].reverse();
       return [];
     case "map": {
+      // 인자 순서 감지: (map arr fn) → 즉시 throw (#1 해결)
+      // 조건: 첫 인자 비어있지 않은 배열 + 두 번째 인자 함수
+      if (Array.isArray(args[0]) && args[0].length > 0) {
+        const second = args[1];
+        if (second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure")) {
+          throw new Error(`map 인자 순서 오류: (map fn arr) 형식이 올바릅니다. 현재 입력: (map arr fn)`);
+        }
+      }
       const mapFn = args[0];
       const mapArr = Array.isArray(args[1]) ? args[1] : [];
       if (typeof mapFn === "function") {
@@ -1410,6 +1418,14 @@ loop().catch(e => {
     }
 
     case "reduce": {
+      // 인자 순서 감지: (reduce arr init fn) → 즉시 throw (#3 해결)
+      // reduce는 3인자: args[0]=fn, args[1]=init, args[2]=arr
+      if (Array.isArray(args[0]) && args[0].length > 0) {
+        const third = args[2];
+        if (third && (typeof third === "function" || third?.kind === "function-value" || third?.kind === "closure")) {
+          throw new Error(`reduce 인자 순서 오류: (reduce fn init arr) 형식이 올바릅니다. 현재 입력: (reduce arr init fn)`);
+        }
+      }
       // fn-first 고정: (reduce fn init arr)
       const reduceFn = args[0];
       let accumulator = args[1];
@@ -1606,6 +1622,13 @@ loop().catch(e => {
 
     // Array Operations
     case "filter": {
+      // 인자 순서 감지: (filter arr fn) → 즉시 throw (#2 해결)
+      if (Array.isArray(args[0]) && args[0].length > 0) {
+        const second = args[1];
+        if (second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure")) {
+          throw new Error(`filter 인자 순서 오류: (filter fn arr) 형식이 올바릅니다. 현재 입력: (filter arr fn)`);
+        }
+      }
       // fn-first 고정: (filter fn arr)
       const filterFn = args[0];
       const coll = args[1];
