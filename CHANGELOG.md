@@ -2,6 +2,16 @@
 
 ---
 
+## v11.6.35 — B-1: eval-builtins AI 추론 블록 분리 (2026-05-10)
+
+- `eval-builtins.ts` 6,793줄 → 5,161줄 (-1,632줄)
+- 신규 `eval-builtins-ai.ts` 1,659줄 생성
+- 이동 함수: evalRefactorSelf / evalAlign / evalPredict / evalCuriosity / evalEthicsCheck / evalCounterfactual / evalWisdom / evalExplain / evalWorldModel141
+- semantics 변경 없음, zero runtime impact
+- **검증**: 903/903 PASS, L2 SHA 47407b90 유지
+
+---
+
 ## v11.6.34 — A-3: WebSocket lazy 등록 (2026-05-10)
 
 - `stdlib-ws`/`stdlib-wsc` stdlib-loader.ts eager 등록 제거
