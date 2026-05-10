@@ -16,18 +16,13 @@ import { createImmutableModule }    from "./immutable";
 import { createAiNativeModule }     from "./stdlib-ai-native";
 import { createCompileModule }      from "./stdlib-compile";
 import { createRegistryModule }     from "./stdlib-registry";
-import { createOciModule }          from "./stdlib-oci";
 import { createOrmModule }          from "./stdlib-orm";
 import { createValidationModule }   from "./stdlib-validation";
 import { createMiddlewareModule }   from "./stdlib-middleware";
 import { createTableModule }        from "./stdlib-table";
-import { createStatsModule }        from "./stdlib-stats";
-import { createPlotModule }         from "./stdlib-plot";
 import { createServiceModule }      from "./stdlib-service";
 import { createMarkdownModule }     from "./stdlib-markdown";
-import { createFeedModule }         from "./stdlib-feed";
 import { createBlogModule }         from "./stdlib-blog";
-import { createMatrixModule }       from "./stdlib-matrix";
 import { createAuditModule }        from "./stdlib-audit";
 
 type ModuleFactory = () => Record<string, unknown>;
@@ -56,19 +51,19 @@ const LAZY_REGISTRY: Record<string, ModuleFactory> = {
   "ai":          () => createAiNativeModule(),
   "compile":     () => createCompileModule(),
   "registry":    () => createRegistryModule(),
-  "oci":         () => createOciModule(),
+  "oci":         () => { throw new Error("oci 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "orm":         () => createOrmModule(),
   "validation":  () => createValidationModule(),
   "middleware":  () => createMiddlewareModule(),
   "table":       () => createTableModule(),
-  "stats":       () => createStatsModule(),
-  "plot":        () => createPlotModule(),
+  "stats":       () => { throw new Error("stats 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
+  "plot":        () => { throw new Error("plot 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "service":     () => createServiceModule(),
   "markdown":    () => createMarkdownModule(),
-  "feed":        () => createFeedModule(),
+  "feed":        () => { throw new Error("feed 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "blog":        () => createBlogModule(),
   "cloud":       () => { throw new Error("cloud 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "matrix":      () => createMatrixModule(),
+  "matrix":      () => { throw new Error("matrix 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "audit":       () => createAuditModule(),
 };
 

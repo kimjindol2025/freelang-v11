@@ -2,6 +2,15 @@
 
 ---
 
+## v11.6.33 — A-2: 특화 모듈 5개 bootstrap 번들 제거 (2026-05-10)
+
+- 제거: `oci`(321줄), `stats`(172줄), `plot`(196줄), `feed`(171줄), `matrix`(170줄)
+- bootstrap.js 850KB → 817KB (-33KB)
+- `(require "...")` 호출 시 명시적 에러 메시지 제공
+- **검증**: 903/903 PASS, L2 SHA 47407b90 유지
+
+---
+
 ## v11.6.32 — A-1: Azure cloud 모듈 bootstrap 번들 제거 (2026-05-10)
 
 - `stdlib-lazy-registry.ts`: `createCloudModule` static import 제거 → 진정한 optional 분리
