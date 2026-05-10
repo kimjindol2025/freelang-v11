@@ -230,7 +230,20 @@ function flExecOpNative(op: string, vals: any[]): any {
     }
     case "append": return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice": return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
-    case "str": case "concat": return vals.map((v: any) => toDisplay(v)).join("");
+    case "str": case "concat": return vals.map((v: any) => {
+      if (v === null || v === undefined) return "null";
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+      // plain object 또는 Array → JSON.stringify (#97 해결)
+      // Map / function-value / closure 는 toDisplay 유지
+      const isPlainObj = typeof v === "object" && !Array.isArray(v)
+        && !(v instanceof Map)
+        && v?.kind !== "function-value"
+        && v?.kind !== "closure";
+      if (Array.isArray(v) || isPlainObj) {
+        try { return JSON.stringify(v); } catch { return toDisplay(v); }
+      }
+      return toDisplay(v);
+    }).join("");
     case "str-to-num": { const n = parseFloat(String(v0)); return isNaN(n) ? null : n; }
     case "num-to-str": return String(v0 ?? "");
     case "replace": return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
@@ -1053,7 +1066,18 @@ loop().catch(e => {
       process.stderr.write(args.map((a: any) => toDisplay(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args.map((a: any) => toDisplay(a)).join("");
+      return args.map((a: any) => {
+        if (a === null || a === undefined) return "null";
+        if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
+        const isPlainObj = typeof a === "object" && !Array.isArray(a)
+          && !(a instanceof Map)
+          && a?.kind !== "function-value"
+          && a?.kind !== "closure";
+        if (Array.isArray(a) || isPlainObj) {
+          try { return JSON.stringify(a); } catch { return toDisplay(a); }
+        }
+        return toDisplay(a);
+      }).join("");
     case "repr":
       return JSON.stringify(args[0], null, 2);
     case "inspect": {

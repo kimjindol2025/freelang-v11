@@ -11830,7 +11830,19 @@ For each step: observe \u2192 think \u2192 act \u2192 verify.`
         return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
       case "str":
       case "concat":
-        return vals.map((v) => toDisplay(v)).join("");
+        return vals.map((v) => {
+          if (v === null || v === void 0) return "null";
+          if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+          const isPlainObj = typeof v === "object" && !Array.isArray(v) && !(v instanceof Map) && (v == null ? void 0 : v.kind) !== "function-value" && (v == null ? void 0 : v.kind) !== "closure";
+          if (Array.isArray(v) || isPlainObj) {
+            try {
+              return JSON.stringify(v);
+            } catch {
+              return toDisplay(v);
+            }
+          }
+          return toDisplay(v);
+        }).join("");
       case "str-to-num": {
         const n = parseFloat(String(v0));
         return isNaN(n) ? null : n;
@@ -12669,7 +12681,19 @@ loop().catch(e => {
         process.stderr.write(args2.map((a) => toDisplay2(a)).join(" ") + "\n");
         return null;
       case "str":
-        return args2.map((a) => toDisplay2(a)).join("");
+        return args2.map((a) => {
+          if (a === null || a === void 0) return "null";
+          if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
+          const isPlainObj = typeof a === "object" && !Array.isArray(a) && !(a instanceof Map) && (a == null ? void 0 : a.kind) !== "function-value" && (a == null ? void 0 : a.kind) !== "closure";
+          if (Array.isArray(a) || isPlainObj) {
+            try {
+              return JSON.stringify(a);
+            } catch {
+              return toDisplay2(a);
+            }
+          }
+          return toDisplay2(a);
+        }).join("");
       case "repr":
         return JSON.stringify(args2[0], null, 2);
       case "inspect": {
