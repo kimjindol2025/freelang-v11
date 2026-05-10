@@ -1,6 +1,6 @@
 # FreeLang v11 — Claude AI 완전 레퍼런스
 
-**버전**: v11.5.3 | **최신 갱신**: 2026-05-08  
+**버전**: v11.5.4 | **최신 갱신**: 2026-05-10  
 **상태**: 프로덕션 (68/68 테스트 통과) | **AI 신뢰도**: 9.5/10
 
 ---
@@ -46,9 +46,8 @@
 |------|------|----------|
 | `(def name "Kim")` | Clojure, v11은 define | `(define name "Kim")` |
 | `(defn [args] body)` | 함수명 생략 | `(defn fn-name [arg] body)` |
-| `(count arr)` | JS, v11은 length | `(length arr)` |
+| `(merge a b)` | 없음 | `(obj-merge a b)` |
 | `(assoc m :k v)` | 키워드(:k), 다중 불가 | `(assoc m "k" v)` |
-| `(merge a b)` | 없음, obj-merge 사용 | `(obj-merge a b)` |
 | `(map arr fn)` | 인자 순서 반대, fn 먼저 | `(map fn arr)` |
 | `(filter arr fn)` | 인자 순서 반대, fn 먼저 | `(filter fn arr)` |
 | `(server_listen port)` | 구버전, v11.5+ | `(server-start port)` |
@@ -123,28 +122,39 @@ true false nil          ;; 불린/nil
 
 ```lisp
 ;; 맵 생성 — keyword 키 권장
-(let [user {:name "Alice" :age 30}]
+(let [user {:name "Alice" :age 30 :scores {:math 95 :eng 88}}]
   ...)
 
 ;; 값 추출 — keyword 또는 문자열 둘 다 동작
-(get user :name)      ;; → "Alice" ✅
-(get user "name")     ;; → "Alice" ✅
-(get user :missing)   ;; → nil
+(get user :name)                      ;; → "Alice"
+(get user :missing "default")         ;; → "default" (기본값)
 
-;; 기본값 포함
-(get user :missing "default")  ;; → "default"
+;; 중첩 접근 (get-in)
+(get-in user [:scores :math])         ;; → 95
+(get-in user [:scores :missing] 0)    ;; → 0 (기본값)
+
+;; nil 연쇄 접근 (?.)
+(?. user :profile :name)              ;; 중간에 nil이면 즉시 nil 반환
+
+;; nil 병합 (??)
+(?? (get user :nickname) (get user :name))  ;; 첫 번째 nil 아닌 값
 
 ;; 맵 갱신 (단일 키)
 (assoc user :email "alice@example.com")
 
+;; 중첩 갱신 (assoc-in) — 불변
+(assoc-in user [:scores :math] 100)
+
+;; 중첩 함수 적용 (update-in) — 불변
+(update-in user [:scores :math] inc)     ;; 95 → 96
+(update-in user [:scores :math] + 5)     ;; 95 → 100
+
 ;; 맵 병합
 (obj-merge user {:email "alice@example.com"})
 
-;; 특정 키만 추출
-(obj-pick user ["name" "email"])  ;; → {"name" "Alice" ...}
-
-;; 특정 키 제외
-(obj-omit user ["age"])  ;; → {"name" "Alice"}
+;; 특정 키만 추출 / 제외
+(obj-pick user ["name" "email"])
+(obj-omit user ["age"])
 ```
 
 ---
@@ -383,16 +393,21 @@ true false nil          ;; 불린/nil
 - `str`, `str-to-num`, `str-to-upper`, `str-to-lower`, `str-trim`, `str-split`, `str-includes`, `str-starts-with`, `str-ends-with`, `str-replace`, `str-slice`
 
 ### 배열/벡터
-- `length`, `push`, `pop`, `shift`, `unshift`, `map`, `filter`, `reduce`, `reverse`, `sort-by`, `includes-item`, `index-of`
+- `length` / `count`, `push`, `pop`, `shift`, `unshift`, `map`, `filter`, `reduce`, `reverse`, `sort-by`, `includes-item`, `index-of`
+- `every?` (모두 만족), `any?` (하나라도 만족 → 첫 값 반환), `none?` (하나도 없음)
+- `mapcat`, `map-indexed`, `flatten`, `distinct`, `take`, `drop`, `frequencies`
+- `comp` / `compose` (함수 합성), `partial` (부분 적용)
 
 ### 객체/맵
 - `get`, `assoc`, `obj-merge`, `obj-pick`, `obj-omit`, `obj-keys`, `obj-values`, `obj-entries`
+- `get-in` (중첩 접근), `assoc-in` (중첩 갱신), `update-in` (중첩 함수 적용), `dissoc`
 
 ### 수학
 - `+`, `-`, `*`, `/`, `%`, `inc`, `dec`, `min`, `max`, `abs`, `round`, `floor`, `ceil`, `pow`, `sqrt`
 
 ### 논리
-- `and`, `or`, `not`, `=`, `!=`, `<`, `>`, `<=`, `>=`, `is-nil`, `is-empty`, `nil-or-empty?`
+- `and`, `or`, `not`, `=`, `!=`, `<`, `>`, `<=`, `>=`, `nil?`, `is-empty`, `nil-or-empty?`
+- `??` (nil 병합: 첫 번째 non-nil 값 반환)
 
 ### HTTP 서버
 - `server-start`, `server-html`, `server-json`, `server-status`, `server-redirect`, `server-file`, `server-html-cookie`, `server-set-cookie`

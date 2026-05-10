@@ -136,9 +136,30 @@ freelang fn-doc str_split         # 함수 문서 조회
 (freelang repl)                        ;; REPL ← 이미 있음!
 
 ;; ── 깊은 객체 접근/수정 ────────────────────────────────────────────
-(get-in m ["a" "b" "c"])               ;; 깊은 접근
-(assoc-in m ["a" "b"] 99)             ;; 깊은 업데이트 (불변)
-(update-in m ["count"] (fn [$n] (+ $n 1)))  ;; 깊은 함수 업데이트
+(get-in m [:a :b :c])                  ;; 깊은 접근
+(get-in m [:a :missing] "default")    ;; 기본값 지원
+(assoc-in m [:a :b] 99)               ;; 깊은 업데이트 (불변)
+(update-in m [:score] inc)            ;; 깊은 함수 적용
+(update-in m [:score] + 5)            ;; 추가 인자 전달 가능
+
+;; ── nil 병합 (??) ──────────────────────────────────────────────────
+(?? (get user :nickname) (get user :name) "anonymous")  ;; 첫 non-nil
+
+;; ── 컬렉션 술어 ─────────────────────────────────────────────────────
+(every? even? [2 4 6])        ;; → true  (모두 만족)
+(any? even? [1 3 4 5])        ;; → 4     (첫 매칭값, 없으면 nil)
+(none? even? [1 3 5])         ;; → true  (하나도 없음)
+(every? (fn [u] (>= (get u :age) 18)) users)  ;; 람다도 동작
+
+;; ── 함수 합성 (comp) ────────────────────────────────────────────────
+(define double-inc (comp inc (* 2)))   ;; inc ∘ double
+(double-inc 3)                          ;; → 7  (오른쪽→왼쪽)
+(map (comp str inc) [1 2 3])           ;; → ["2" "3" "4"]
+
+;; ── count — length 별칭 ─────────────────────────────────────────────
+(count [1 2 3])        ;; → 3
+(count "hello")        ;; → 5
+(count {:a 1 :b 2})   ;; → 2  (맵은 키 개수)
 
 ;; ── 정규식 (re-* 별칭) ────────────────────────────────────────────
 (re-match "\\d+" "abc123")            ;; → true
@@ -622,6 +643,15 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 | 날짜 | 기능 | 상태 |
 |------|------|------|
+| 2026-05-10 | `count` — `length` 별칭 추가. 배열/문자열/맵 지원 | ✅ bootstrap.js |
+| 2026-05-10 | `every?` / `any?` / `none?` — 컬렉션 술어 (any?는 첫 매칭값 반환) | ✅ bootstrap.js |
+| 2026-05-10 | `update-in` — `(update-in m [:a :b] inc)` 중첩 함수 적용, 불변 | ✅ bootstrap.js |
+| 2026-05-10 | `map`/`filter` 빌트인 fn 참조 수정 — `(map inc [1 2 3])` 정상 동작 | ✅ bootstrap.js |
+| 2026-05-10 | `try-catch` stack 필드 정제 — `bootstrap.js` 내부 경로 제거 | ✅ bootstrap.js |
+| 2026-05-10 | `??` nil 병합 연산자 — `(?? a b c)` 첫 번째 non-nil 반환 | ✅ bootstrap.js |
+| 2026-05-10 | `get-in` / `assoc-in` — 중첩 맵 접근 및 불변 업데이트 | ✅ bootstrap.js |
+| 2026-05-10 | `comp` / `compose` — 빌트인+유저함수 모두 합성 | ✅ bootstrap.js |
+| 2026-05-10 | nil 산술 전파 차단 — `(+ nil 1)` 이제 명시적 에러 | ✅ bootstrap.js |
 | 2026-05-07 | `let` 바인딩 타입 추론 — `(let [[$n 42]] ...)` → n:number 추적, check 경고 | ✅ bootstrap.js |
 | 2026-05-07 | return type 검사 — `(defn ^number f [] "hi")` → ⚠ return-type 경고 | ✅ bootstrap.js |
 | 2026-05-07 | `frequencies` — `(frequencies [1 2 1])` → `{1:3 2:2}` 값 빈도 집계 | ✅ bootstrap.js |

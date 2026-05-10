@@ -520,6 +520,109 @@
 
 ---
 
+### `(count coll)`
+배열, 문자열, 맵의 크기. `length` 별칭.
+
+**예제**:
+```lisp
+(count [1 2 3])        ;; → 3
+(count "hello")        ;; → 5
+(count {:a 1 :b 2})   ;; → 2  (키 개수)
+```
+
+---
+
+### `(every? pred coll)`
+컬렉션의 모든 요소가 pred를 만족하면 true.
+
+**예제**:
+```lisp
+(every? even? [2 4 6])                         ;; → true
+(every? (fn [u] (>= (get u :age) 18)) users)  ;; → false
+```
+
+---
+
+### `(any? pred coll)`
+하나라도 만족하면 첫 번째 매칭 값 반환, 없으면 nil.
+
+**예제**:
+```lisp
+(any? even? [1 3 4 5])   ;; → 4
+(any? even? [1 3 5])     ;; → nil
+```
+
+---
+
+### `(none? pred coll)`
+하나도 만족하지 않으면 true.
+
+**예제**:
+```lisp
+(none? even? [1 3 5])   ;; → true
+(none? even? [1 2 5])   ;; → false
+```
+
+---
+
+### `(get-in map keys [default])`
+중첩 맵에서 키 경로로 값 접근.
+
+**예제**:
+```lisp
+(get-in {:user {:name "Alice" :score 95}} [:user :score])     ;; → 95
+(get-in {:user {:name "Alice"}} [:user :email] "없음")         ;; → "없음"
+```
+
+---
+
+### `(assoc-in map keys value)`
+중첩 경로에 값을 세팅한 새 맵 반환 (불변).
+
+**예제**:
+```lisp
+(assoc-in {:user {:score 90}} [:user :score] 100)
+;; → {:user {:score 100}}
+```
+
+---
+
+### `(update-in map keys fn & extra-args)`
+중첩 경로의 값에 함수를 적용한 새 맵 반환 (불변).
+
+**예제**:
+```lisp
+(update-in {:user {:score 90}} [:user :score] inc)      ;; → {:user {:score 91}}
+(update-in {:user {:score 90}} [:user :score] + 5)      ;; → {:user {:score 95}}
+(update-in {} [:count] (fn [x] (+ (if (nil? x) 0 x) 1)))  ;; → {:count 1}
+```
+
+---
+
+### `(?? val1 val2 ...)`
+첫 번째 nil이 아닌 값 반환. nil 병합 연산자.
+
+**예제**:
+```lisp
+(?? nil nil "default")                           ;; → "default"
+(?? (get user :nickname) (get user :name))       ;; 닉네임 없으면 이름
+```
+
+---
+
+### `(comp fn1 fn2 ...)`
+함수들을 오른쪽→왼쪽 순서로 합성.
+
+**예제**:
+```lisp
+(define double-inc (comp inc (* 2)))
+(double-inc 3)   ;; → 7  ( (inc (* 2 3)) = (inc 6) = 7 )
+
+(map (comp str inc) [1 2 3])   ;; → ["2" "3" "4"]
+```
+
+---
+
 ## 문자열
 
 ### 멀티라인 문자열 `"""..."""`
