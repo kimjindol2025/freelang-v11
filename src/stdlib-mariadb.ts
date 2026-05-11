@@ -46,11 +46,34 @@ function buildArgs(db: string, sql: string): string[] {
   return args;
 }
 
+const MARIADB_SEARCH_PATHS = [
+  "/data/data/com.termux/files/usr/bin", // Termux
+  "/usr/bin",
+  "/usr/local/bin",
+  "/opt/homebrew/bin",
+  "/opt/local/bin",
+];
+
+let resolvedMariadbBin: string | null = null;
+function resolveMariadBin(): string {
+  if (resolvedMariadbBin) return resolvedMariadbBin;
+  const fs = require("fs") as typeof import("fs");
+  const path = require("path") as typeof import("path");
+  for (const dir of MARIADB_SEARCH_PATHS) {
+    const full = path.join(dir, "mariadb");
+    try { if (fs.existsSync(full)) return (resolvedMariadbBin = full); } catch {}
+  }
+  return (resolvedMariadbBin = "mariadb"); // fallback — PATH 의존
+}
+
 function runMariadb(db: string, sql: string): string {
-  const r = spawnSync("mariadb", buildArgs(db, sql), { timeout: 15000, encoding: "utf-8" });
+  const bin = resolveMariadBin();
+  const extraPath = MARIADB_SEARCH_PATHS.join(":");
+  const env = { ...process.env, PATH: `${extraPath}:${process.env.PATH ?? ""}` };
+  const r = spawnSync(bin, buildArgs(db, sql), { timeout: 15000, encoding: "utf-8", env });
   if (r.error) {
     const hint = r.error.message.includes("ENOENT")
-      ? "\n힌트: mariadb CLI를 찾을 수 없습니다. PATH 환경변수를 확인하세요.\n  예) PATH=/data/data/com.termux/files/usr/bin:$PATH"
+      ? `\n힌트: mariadb CLI를 찾을 수 없습니다. 확인한 경로: ${MARIADB_SEARCH_PATHS.join(", ")}`
       : "";
     throw new Error(`mariadb CLI 실패: ${r.error.message}${hint}\nDB: ${db}\nSQL: ${sql.slice(0, 200)}`);
   }
