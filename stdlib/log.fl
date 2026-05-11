@@ -1,0 +1,44 @@
+;; stdlib/log.fl — 구조화 로그 유틸리티 (v11.6.36)
+;; (load "stdlib/log.fl")
+;;
+;; 사용법:
+;;   (log-info "user.login" {:userId 1 :ip "1.2.3.4"})
+;;   (log-warn "rate.limit" {:current 90 :limit 100})
+;;   (log-error "db.fail" {:err "timeout"})
+;;   (log-debug "cache.miss" {:key "x"})  ;; FL_DEBUG=1 환경변수 필요
+;;   (log-to-file! "app.log")             ;; 이후 로그를 파일에도 기록
+
+;; ── 내부 상태 ────────────────────────────────────────────────────────────────
+(define *log-file* nil)
+
+(defn log-to-file! [path]
+  (define *log-file* path))
+
+;; ── 내부 포맷터 ───────────────────────────────────────────────────────────────
+(defn -log-format [level event ctx]
+  (let [ts (now-ms)
+        entry {:ts ts :level level :event event :ctx ctx}]
+    (json-stringify entry)))
+
+(defn -log-write [level event ctx]
+  (let [line (-log-format level event ctx)]
+    (println line)
+    (if (not (nil? *log-file*))
+      (file-append-line *log-file* line)
+      nil)))
+
+;; ── 공개 API ─────────────────────────────────────────────────────────────────
+(defn log-info [event ctx]
+  (-log-write "INFO" event ctx))
+
+(defn log-warn [event ctx]
+  (-log-write "WARN" event ctx))
+
+(defn log-error [event ctx]
+  (-log-write "ERROR" event ctx))
+
+(defn log-debug [event ctx]
+  (let [debug-env (fl-env-get "FL_DEBUG" "")]
+    (if (= debug-env "1")
+      (-log-write "DEBUG" event ctx)
+      nil)))

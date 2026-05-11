@@ -685,6 +685,8 @@ function cacheEvict(ch: CacheHandle): void {
     if (firstKey !== undefined) ch.map.delete(firstKey);
   }
 }
+// 글로벌 싱글톤 캐시 (핸들 없는 API용 — cache_set/cache_get/cache_has/cache_del)
+const _globalCache = makeCacheHandle(10000);
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
@@ -2550,53 +2552,57 @@ loop().catch(e => {
       return makeCacheHandle(maxSize);
     }
     case "cache-set": {
-      const ch = args[0] as CacheHandle;
-      if (!ch || ch.kind !== "cache") return false;
-      const key = String(args[1]);
-      const val = args[2];
-      const ttlMs = typeof args[3] === "number" ? args[3] : null;
-      if (ch.map.has(key)) ch.map.delete(key); // LRU 순서 갱신
+      // 핸들 모드: (cache-set ch key val [ttl-ms])
+      // 글로벌 모드: (cache-set key val [ttl-sec]) — 하위 호환
+      const isHandle = args[0] && (args[0] as any).kind === "cache";
+      const ch = isHandle ? (args[0] as CacheHandle) : _globalCache;
+      const key = String(isHandle ? args[1] : args[0]);
+      const val = isHandle ? args[2] : args[1];
+      const rawTtl = isHandle ? args[3] : args[2];
+      // 글로벌 모드는 TTL이 초 단위, 핸들 모드는 ms 단위
+      const ttlMs = typeof rawTtl === "number" ? (isHandle ? rawTtl : rawTtl * 1000) : null;
+      if (ch.map.has(key)) ch.map.delete(key);
       else cacheEvict(ch);
       ch.map.set(key, { value: val, expires: ttlMs !== null ? Date.now() + ttlMs : null });
       return true;
     }
     case "cache-get": {
-      const ch = args[0] as CacheHandle;
-      if (!ch || ch.kind !== "cache") return null;
-      const key = String(args[1]);
+      const isHandle = args[0] && (args[0] as any).kind === "cache";
+      const ch = isHandle ? (args[0] as CacheHandle) : _globalCache;
+      const key = String(isHandle ? args[1] : args[0]);
       const entry = ch.map.get(key);
       if (!entry) { ch.misses++; return null; }
       if (entry.expires !== null && Date.now() > entry.expires) {
         ch.map.delete(key); ch.misses++; return null;
       }
-      // LRU 갱신: 삭제 후 재삽입
       ch.map.delete(key); ch.map.set(key, entry);
       ch.hits++;
       return entry.value;
     }
     case "cache-has": {
-      const ch = args[0] as CacheHandle;
-      if (!ch || ch.kind !== "cache") return false;
-      const key = String(args[1]);
+      const isHandle = args[0] && (args[0] as any).kind === "cache";
+      const ch = isHandle ? (args[0] as CacheHandle) : _globalCache;
+      const key = String(isHandle ? args[1] : args[0]);
       const entry = ch.map.get(key);
       if (!entry) return false;
       if (entry.expires !== null && Date.now() > entry.expires) { ch.map.delete(key); return false; }
       return true;
     }
     case "cache-del": {
-      const ch = args[0] as CacheHandle;
-      if (!ch || ch.kind !== "cache") return false;
-      return ch.map.delete(String(args[1]));
+      const isHandle = args[0] && (args[0] as any).kind === "cache";
+      const ch = isHandle ? (args[0] as CacheHandle) : _globalCache;
+      const key = String(isHandle ? args[1] : args[0]);
+      return ch.map.delete(key);
     }
     case "cache-clear": {
-      const ch = args[0] as CacheHandle;
-      if (!ch || ch.kind !== "cache") return false;
+      const isHandle = args[0] && (args[0] as any).kind === "cache";
+      const ch = isHandle ? (args[0] as CacheHandle) : _globalCache;
       ch.map.clear(); ch.hits = 0; ch.misses = 0;
       return true;
     }
     case "cache-stats": {
-      const ch = args[0] as CacheHandle;
-      if (!ch || ch.kind !== "cache") return null;
+      const isHandle = args[0] && (args[0] as any).kind === "cache";
+      const ch = isHandle ? (args[0] as CacheHandle) : _globalCache;
       const total = ch.hits + ch.misses;
       return { size: ch.map.size, hits: ch.hits, misses: ch.misses, "hit-rate": total > 0 ? ch.hits / total : 0 };
     }

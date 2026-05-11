@@ -1,0 +1,42 @@
+;; stdlib/cache.fl — LRU+TTL 인메모리 캐시 래퍼 (v11.6.36)
+;; (load "stdlib/cache.fl")
+;;
+;; 내장 cache-* 함수를 감싸는 얇은 레이어.
+;; 내장 함수 직접 사용 가능 — 이 파일은 문서/편의용.
+
+;; ── 캐시 생성 ────────────────────────────────────────────────────────────────
+;; (cache-create 100)       → maxSize=100 캐시 핸들
+;; (cache-create)           → maxSize=100 기본값
+(defn make-cache [max-size]
+  (cache-create max-size))
+
+(defn make-cache-default []
+  (cache-create 100))
+
+;; ── 캐시 조작 ────────────────────────────────────────────────────────────────
+;; (cache-set ch "key" value)         → 영구 저장
+;; (cache-set ch "key" value 60000)   → TTL 60초(ms)
+;; (cache-get ch "key")               → value or nil
+;; (cache-has ch "key")               → bool
+;; (cache-del ch "key")               → bool
+;; (cache-clear ch)                   → bool
+;; (cache-stats ch)                   → {:size N :hits N :misses N :hit-rate N}
+
+;; ── 헬퍼 패턴 ────────────────────────────────────────────────────────────────
+;; get-or-set: 캐시 미스 시 fn 호출 후 결과 저장
+(defn cache-get-or-set [ch key loader]
+  (let [cached (cache-get ch key)]
+    (if (nil? cached)
+      (let [val (loader)]
+        (cache-set ch key val)
+        val)
+      cached)))
+
+;; get-or-set with TTL
+(defn cache-get-or-set-ttl [ch key ttl-ms loader]
+  (let [cached (cache-get ch key)]
+    (if (nil? cached)
+      (let [val (loader)]
+        (cache-set ch key val ttl-ms)
+        val)
+      cached)))
