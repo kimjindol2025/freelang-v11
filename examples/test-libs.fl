@@ -1,0 +1,272 @@
+;; test-libs.fl — 5개 표준 라이브러리 통합 테스트
+(load "lib/validate.fl")
+(load "lib/pipeline.fl")
+(load "lib/template.fl")
+(load "lib/datetime.fl")
+
+(define pass-count (atom 0))
+(define fail-count (atom 0))
+
+(defn assert-eq [label expected actual]
+  (if (= expected actual)
+    (do
+      (swap! pass-count inc)
+      (println (str "  ✅ " label)))
+    (do
+      (swap! fail-count inc)
+      (println (str "  ❌ " label))
+      (println (str "     기대: " (str expected)))
+      (println (str "     실제: " (str actual))))))
+
+(defn assert-ok [label result]
+  (if (get result "ok")
+    (do (swap! pass-count inc) (println (str "  ✅ " label)))
+    (do (swap! fail-count inc) (println (str "  ❌ " label " → " (str result))))))
+
+(defn assert-fail [label result]
+  (if (not (get result "ok"))
+    (do (swap! pass-count inc) (println (str "  ✅ " label " (실패가 올바름)")))
+    (do (swap! fail-count inc) (println (str "  ❌ " label " (실패여야 하는데 통과됨)")))))
+
+;; ═══════════════════════════════════════════════════════════
+;; 1. validate.fl
+;; ═══════════════════════════════════════════════════════════
+(println "\n[1] validate.fl")
+
+(assert-ok "required - 값 있음"
+  (vld/check "Alice" {:required true}))
+
+(assert-fail "required - 빈 문자열"
+  (vld/check "" {:required true}))
+
+(assert-fail "required - nil"
+  (vld/check nil {:required true}))
+
+(assert-ok "type string"
+  (vld/check "hello" {:type "string"}))
+
+(assert-fail "type 불일치"
+  (vld/check 42 {:type "string"}))
+
+(assert-ok "min-length 통과"
+  (vld/check "hello" {:min-length 3}))
+
+(assert-fail "min-length 실패"
+  (vld/check "hi" {:min-length 3}))
+
+(assert-ok "max-length 통과"
+  (vld/check "hi" {:max-length 5}))
+
+(assert-fail "max-length 실패"
+  (vld/check "toolong" {:max-length 5}))
+
+(assert-ok "email 유효"
+  (vld/check "alice@example.com" {:email true}))
+
+(assert-fail "email 무효"
+  (vld/check "notanemail" {:email true}))
+
+(assert-ok "url 유효"
+  (vld/check "https://example.com" {:url true}))
+
+(assert-fail "url 무효"
+  (vld/check "example.com" {:url true}))
+
+(assert-ok "in 통과"
+  (vld/check "admin" {:in ["admin" "user" "guest"]}))
+
+(assert-fail "in 실패"
+  (vld/check "superuser" {:in ["admin" "user" "guest"]}))
+
+(assert-ok "min 통과"
+  (vld/check 25 {:min 18}))
+
+(assert-fail "min 실패"
+  (vld/check 15 {:min 18}))
+
+(let [schema {:name {:required true :type "string" :min-length 2}
+              :age  {:type "number" :min 0 :max 120}
+              :email {:email true}}
+      valid-data {:name "Alice" :age 30 :email "alice@example.com"}
+      invalid-data {:name "A" :age -5 :email "bad"}]
+  (assert-ok "schema 유효 데이터"
+    (vld/schema valid-data schema))
+  (assert-fail "schema 무효 데이터"
+    (vld/schema invalid-data schema)))
+
+;; ═══════════════════════════════════════════════════════════
+;; 2. pipeline.fl
+;; ═══════════════════════════════════════════════════════════
+(println "\n[2] pipeline.fl")
+
+(let [data [1 2 3 4 5 6 7 8 9 10]]
+  (assert-eq "filter even"
+    [2 4 6 8 10]
+    (pipe/run data [(pipe/filter even?)]))
+
+  (assert-eq "map double"
+    [2 4 6 8 10 12 14 16 18 20]
+    (pipe/run data [(pipe/map (fn [x] (* x 2)))]))
+
+  (assert-eq "filter + map"
+    [4 8 12 16 20]
+    (pipe/run data [(pipe/filter even?)
+                    (pipe/map (fn [x] (* x 2)))]))
+
+  (assert-eq "take 3"
+    [1 2 3]
+    (pipe/run data [(pipe/take 3)]))
+
+  (assert-eq "drop 7"
+    [8 9 10]
+    (pipe/run data [(pipe/drop 7)]))
+
+  (assert-eq "sort-by desc"
+    [10 9 8 7 6 5 4 3 2 1]
+    (pipe/run data [(pipe/sort-by-desc identity)]))
+
+  (assert-eq "take-while < 5"
+    [1 2 3 4]
+    (pipe/run data [(pipe/take-while (fn [x] (< x 5)))]))
+
+  (assert-eq "distinct"
+    [1 2 3]
+    (pipe/run [1 2 2 3 3 3] [(pipe/distinct)]))
+
+  (assert-eq "reduce sum"
+    55
+    (pipe/run data [(pipe/reduce + 0)]))
+
+  (let [grouped (pipe/run data [(pipe/group-by (fn [x] (if (even? x) "even" "odd")))])]
+    (assert-eq "group-by even count"
+      5
+      (length (get grouped "even"))))
+
+  (assert-eq "pipe/stats count"
+    10
+    (get (pipe/stats data identity) "count"))
+
+  (assert-eq "pipe/stats sum"
+    55
+    (get (pipe/stats data identity) "sum")))
+
+(let [people [{:name "Alice" :age 30}
+              {:name "Bob"   :age 25}
+              {:name "Carol" :age 35}]]
+  (assert-eq "sort-by age asc"
+    "Bob"
+    (get (first (pipe/run people [(pipe/sort-by (fn [p] (get p "age")))])) "name"))
+
+  (assert-eq "max-by-field age"
+    "Carol"
+    (get (pipe/max-by-field (fn [p] (get p "age")) people) "name"))
+
+  (assert-eq "min-by-field age"
+    "Bob"
+    (get (pipe/min-by-field (fn [p] (get p "age")) people) "name")))
+
+;; ═══════════════════════════════════════════════════════════
+;; 3. template.fl
+;; ═══════════════════════════════════════════════════════════
+(println "\n[3] template.fl")
+
+(assert-eq "변수 치환"
+  "Hello, Alice!"
+  (tmpl/render "Hello, {{name}}!" {:name "Alice"}))
+
+(assert-eq "다중 변수"
+  "Name: Bob, Age: 25"
+  (tmpl/render "Name: {{name}}, Age: {{age}}" {:name "Bob" :age 25}))
+
+(assert-eq "nil 변수 → 빈 문자열"
+  "Hello, !"
+  (tmpl/render "Hello, {{missing}}!" {}))
+
+(assert-eq "if 참"
+  "Welcome, admin!"
+  (tmpl/render "Welcome, {{#if is_admin}}admin{{/if}}!" {:is_admin true}))
+
+(assert-eq "if 거짓"
+  "Welcome, !"
+  (tmpl/render "Welcome, {{#if is_admin}}admin{{/if}}!" {:is_admin false}))
+
+(assert-eq "each 기본"
+  "1 2 3 "
+  (tmpl/render "{{#each nums}}{{.}} {{/each}}" {:nums [1 2 3]}))
+
+(assert-eq "each 빈 목록"
+  ""
+  (tmpl/render "{{#each items}}{{.}}{{/each}}" {:items []}))
+
+(assert-eq "boolean true"
+  "true"
+  (tmpl/to-str true))
+
+(assert-eq "boolean false"
+  "false"
+  (tmpl/to-str false))
+
+(assert-eq "nil → 빈 문자열"
+  ""
+  (tmpl/to-str nil))
+
+;; partial 테스트
+(tmpl/register "header" "<header>{{title}}</header>")
+(assert-eq "partial 렌더"
+  "<header>My App</header>"
+  (tmpl/render "{{> header}}" {:title "My App"}))
+
+;; ═══════════════════════════════════════════════════════════
+;; 4. datetime.fl
+;; ═══════════════════════════════════════════════════════════
+(println "\n[4] datetime.fl")
+
+(let [ts (dt/now)]
+  (assert-eq "now-ms는 숫자"
+    true
+    (> ts 0))
+
+  (assert-eq "dt/add days"
+    true
+    (= (dt/add ts "days" 1) (+ ts dt/MS_DAY)))
+
+  (assert-eq "dt/add hours"
+    true
+    (= (dt/add ts "hours" 1) (+ ts dt/MS_HOUR)))
+
+  (assert-eq "dt/diff same"
+    0
+    (dt/diff ts ts "days"))
+
+  (assert-eq "dt/diff 1 day"
+    1
+    (dt/diff ts (+ ts dt/MS_DAY) "days"))
+
+  (assert-eq "dt/between? true"
+    true
+    (dt/between? ts (- ts 1000) (+ ts 1000)))
+
+  (assert-eq "dt/between? false"
+    false
+    (dt/between? ts (+ ts 1000) (+ ts 2000))))
+
+(assert-eq "dt/diff 7 days → weeks"
+  1
+  (dt/diff 0 (* 7 dt/MS_DAY) "weeks"))
+
+;; 상대 시간
+(let [now (dt/now)]
+  (assert-eq "방금 전"
+    "방금 전"
+    (dt/relative (- now 30000)))
+  (assert-eq "방금 후 (미래)"
+    "방금 후"
+    (dt/relative (+ now 5000))))
+
+;; ═══════════════════════════════════════════════════════════
+;; 결과
+;; ═══════════════════════════════════════════════════════════
+(println)
+(println (str "═══ 결과: " (deref pass-count) " PASS / " (deref fail-count) " FAIL ═══"))
+(when (> (deref fail-count) 0)
+  (println "⚠️  실패한 테스트가 있습니다."))

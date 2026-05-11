@@ -1,0 +1,123 @@
+;; ─────────────────────────────────────────────────────────────
+;; datetime.fl — 날짜/시간 처리 라이브러리
+;; (load "lib/datetime.fl")
+;;
+;; 사용:
+;;   (dt/now)                        → 현재 timestamp (ms)
+;;   (dt/format ts "YYYY-MM-DD")     → "2026-05-10"
+;;   (dt/relative ts)                → "3분 전"
+;;   (dt/diff ts1 ts2 "days")        → 5
+;;   (dt/add ts "days" 3)            → ts + 3일
+;;   (dt/weekday ts)                 → "토요일"
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 상수 ────────────────────────────────────────────────────
+(define dt/MS_SEC   1000)
+(define dt/MS_MIN   60000)
+(define dt/MS_HOUR  3600000)
+(define dt/MS_DAY   86400000)
+(define dt/MS_WEEK  604800000)
+
+(define dt/WEEKDAYS ["일요일" "월요일" "화요일" "수요일" "목요일" "금요일" "토요일"])
+(define dt/MONTHS   ["1월" "2월" "3월" "4월" "5월" "6월"
+                     "7월" "8월" "9월" "10월" "11월" "12월"])
+
+;; ── 기본 ─────────────────────────────────────────────────────
+(defn dt/now [] (now-ms))
+
+(defn dt/from-parts [y m d h min s]
+  (let [pad2 (fn [n] (if (< n 10) (str "0" n) (str n)))
+        iso  (str y "-" (pad2 m) "-" (pad2 d)
+                  "T" (pad2 h) ":" (pad2 min) ":" (pad2 s) ".000Z")]
+    (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date('" iso "').getTime())\""
+)))))
+
+;; ── 분해 ────────────────────────────────────────────────────
+(defn dt/year  [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getFullYear())\""))))
+(defn dt/month [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getMonth()+1)\""))))
+(defn dt/day   [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getDate())\""))))
+(defn dt/hour  [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getHours())\""))))
+(defn dt/minute [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getMinutes())\""))))
+(defn dt/second [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getSeconds())\""))))
+(defn dt/weekday-num [ts] (str-to-num (shell-exec-stdout (str "node -e \"console.log(new Date(" ts ").getDay())\""))))
+
+;; ── 포맷 ────────────────────────────────────────────────────
+(defn dt/pad2 [n] (if (< n 10) (str "0" n) (str n)))
+(defn dt/pad4 [n] (str n))
+
+(defn dt/format [ts fmt]
+  (let [y   (dt/year ts)
+        mo  (dt/month ts)
+        d   (dt/day ts)
+        h   (dt/hour ts)
+        mi  (dt/minute ts)
+        s   (dt/second ts)
+        wd  (dt/weekday-num ts)]
+    (-> fmt
+        (str-replace "YYYY" (dt/pad4 y))
+        (str-replace "MM"   (dt/pad2 mo))
+        (str-replace "DD"   (dt/pad2 d))
+        (str-replace "HH"   (dt/pad2 h))
+        (str-replace "mm"   (dt/pad2 mi))
+        (str-replace "ss"   (dt/pad2 s))
+        (str-replace "M"    (str mo))
+        (str-replace "D"    (str d))
+        (str-replace "ddd"  (nth dt/WEEKDAYS wd))
+        (str-replace "Mon"  (nth dt/MONTHS (- mo 1))))))
+
+;; ── 차이 ─────────────────────────────────────────────────────
+(defn dt/diff [ts1 ts2 unit]
+  (let [delta (abs (- ts2 ts1))]
+    (case unit
+      "ms"      delta
+      "seconds" (quot delta dt/MS_SEC)
+      "minutes" (quot delta dt/MS_MIN)
+      "hours"   (quot delta dt/MS_HOUR)
+      "days"    (quot delta dt/MS_DAY)
+      "weeks"   (quot delta dt/MS_WEEK)
+      delta)))
+
+;; ── 더하기 ───────────────────────────────────────────────────
+(defn dt/add [ts unit amount]
+  (+ ts (* amount
+           (case unit
+             "ms"      1
+             "seconds" dt/MS_SEC
+             "minutes" dt/MS_MIN
+             "hours"   dt/MS_HOUR
+             "days"    dt/MS_DAY
+             "weeks"   dt/MS_WEEK
+             0))))
+
+;; ── 요일 ─────────────────────────────────────────────────────
+(defn dt/weekday [ts]
+  (nth dt/WEEKDAYS (dt/weekday-num ts)))
+
+;; ── 상대 시간 ────────────────────────────────────────────────
+(defn dt/relative [ts]
+  (let [now   (dt/now)
+        delta (- now ts)
+        secs  (quot delta dt/MS_SEC)
+        mins  (quot delta dt/MS_MIN)
+        hours (quot delta dt/MS_HOUR)
+        days  (quot delta dt/MS_DAY)]
+    (cond
+      [(< delta 0)       "방금 후"]
+      [(< secs 60)       "방금 전"]
+      [(< mins 60)       (str mins "분 전")]
+      [(< hours 24)      (str hours "시간 전")]
+      [(< days 7)        (str days "일 전")]
+      [(< days 30)       (str (quot days 7) "주 전")]
+      [(< days 365)      (str (quot days 30) "개월 전")]
+      [true              (str (quot days 365) "년 전")])))
+
+;; ── 범위 ─────────────────────────────────────────────────────
+(defn dt/between? [ts start end]
+  (and (>= ts start) (<= ts end)))
+
+(defn dt/today-start []
+  (let [now (dt/now)]
+    (* (quot now dt/MS_DAY) dt/MS_DAY)))
+
+(defn dt/today-end []
+  (+ (dt/today-start) dt/MS_DAY -1))

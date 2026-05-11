@@ -1,0 +1,161 @@
+;; ─────────────────────────────────────────────────────────────
+;; template.fl — 미니 템플릿 엔진
+;; (load "lib/template.fl")
+;;
+;; 문법:
+;;   {{변수}}              값 치환
+;;   {{#if cond}}...{{/if}}     조건부
+;;   {{#each items}}...{{/each}} 반복 ({{.}} = 현재값, {{@index}} = 인덱스)
+;;   {{#with obj}}...{{/with}}   스코프 변경
+;;   {{> partial ctx}}           부분 템플릿 호출
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 부분 템플릿 레지스트리 ───────────────────────────────────
+(define tmpl/partials (atom {}))
+
+(defn tmpl/register [name tmpl-str]
+  (swap! tmpl/partials assoc name tmpl-str))
+
+;; ── 값 직렬화 ────────────────────────────────────────────────
+(defn tmpl/to-str [v]
+  (cond
+    [(nil? v)    ""]
+    [(boolean? v) (if v "true" "false")]
+    [true         (str v)]))
+
+;; ── 변수 치환 ────────────────────────────────────────────────
+(defn tmpl/replace-vars [s ctx]
+  (reduce
+    (fn [acc key]
+      (str-replace acc (str "{{" key "}}") (tmpl/to-str (get ctx key))))
+    s
+    (keys ctx)))
+
+;; ── {{#if}} 처리 ────────────────────────────────────────────
+(defn tmpl/process-if [s ctx]
+  (let [pattern "{{#if "
+        parts   (str-split s pattern)]
+    (if (= (length parts) 1)
+      s
+      (reduce
+        (fn [acc part]
+          (let [close-idx (str-index-of part "}}")]
+            (if (= close-idx -1)
+              (str acc part)
+              (let [cond-key (str-slice part 0 close-idx)
+                    rest-str (str-slice part (+ close-idx 2) (length part))
+                    end-tag  "{{/if}}"
+                    end-idx  (str-index-of rest-str end-tag)]
+                (if (= end-idx -1)
+                  (str acc part)
+                  (let [body     (str-slice rest-str 0 end-idx)
+                        after    (str-slice rest-str (+ end-idx (length end-tag)) (length rest-str))
+                        cond-val (get ctx cond-key)]
+                    (str acc (if cond-val body "") after)))))))
+        (first parts)
+        (rest parts)))))
+
+;; ── {{#each}} 처리 ───────────────────────────────────────────
+(defn tmpl/process-each [s ctx]
+  (let [pattern "{{#each "
+        parts   (str-split s pattern)]
+    (if (= (length parts) 1)
+      s
+      (reduce
+        (fn [acc part]
+          (let [close-idx (str-index-of part "}}")]
+            (if (= close-idx -1)
+              (str acc part)
+              (let [list-key  (str-slice part 0 close-idx)
+                    rest-str  (str-slice part (+ close-idx 2) (length part))
+                    end-tag   "{{/each}}"
+                    end-idx   (str-index-of rest-str end-tag)]
+                (if (= end-idx -1)
+                  (str acc part)
+                  (let [body   (str-slice rest-str 0 end-idx)
+                        after  (str-slice rest-str (+ end-idx (length end-tag)) (length rest-str))
+                        items  (?? (get ctx list-key) [])]
+                    (str acc
+                         (str-join
+                           (map-indexed
+                             (fn [idx item]
+                               (-> body
+                                   (str-replace "{{.}}" (tmpl/to-str item))
+                                   (str-replace "{{@index}}" (str idx))
+                                   (tmpl/replace-vars (if (map? item) item {}))))
+                             items)
+                           "")
+                         after)))))))
+        (first parts)
+        (rest parts)))))
+
+;; ── {{#with}} 처리 ───────────────────────────────────────────
+(defn tmpl/process-with [s ctx]
+  (let [pattern "{{#with "
+        parts   (str-split s pattern)]
+    (if (= (length parts) 1)
+      s
+      (reduce
+        (fn [acc part]
+          (let [close-idx (str-index-of part "}}")]
+            (if (= close-idx -1)
+              (str acc part)
+              (let [obj-key  (str-slice part 0 close-idx)
+                    rest-str (str-slice part (+ close-idx 2) (length part))
+                    end-tag  "{{/with}}"
+                    end-idx  (str-index-of rest-str end-tag)]
+                (if (= end-idx -1)
+                  (str acc part)
+                  (let [body  (str-slice rest-str 0 end-idx)
+                        after (str-slice rest-str (+ end-idx (length end-tag)) (length rest-str))
+                        obj   (?? (get ctx obj-key) {})]
+                    (str acc (tmpl/render body obj) after)))))))
+        (first parts)
+        (rest parts)))))
+
+;; ── {{> partial}} 처리 ──────────────────────────────────────
+(defn tmpl/process-partials [s ctx]
+  (let [pattern "{{> "
+        parts   (str-split s pattern)]
+    (if (= (length parts) 1)
+      s
+      (reduce
+        (fn [acc part]
+          (let [close-idx (str-index-of part "}}")]
+            (if (= close-idx -1)
+              (str acc part)
+              (let [name-part (str-slice part 0 close-idx)
+                    after     (str-slice part (+ close-idx 2) (length part))
+                    pname     (str-trim name-part)
+                    partial   (get (deref tmpl/partials) pname)]
+                (str acc (if partial (tmpl/render partial ctx) "") after)))))
+        (first parts)
+        (rest parts)))))
+
+;; ── 남은 {{...}} 제거 ────────────────────────────────────────
+(defn tmpl/clear-unknowns [s]
+  (let [parts (str-split s "{{")]
+    (if (= (length parts) 1)
+      s
+      (reduce
+        (fn [acc part]
+          (let [close-idx (str-index-of part "}}")]
+            (if (= close-idx -1)
+              (str acc "{{" part)
+              (str acc (str-slice part (+ close-idx 2) (length part))))))
+        (first parts)
+        (rest parts)))))
+
+;; ── 메인 렌더 ────────────────────────────────────────────────
+(defn tmpl/render [tmpl-str ctx]
+  (-> tmpl-str
+      (tmpl/process-partials ctx)
+      (tmpl/process-each ctx)
+      (tmpl/process-if ctx)
+      (tmpl/process-with ctx)
+      (tmpl/replace-vars ctx)
+      (tmpl/clear-unknowns)))
+
+;; ── 파일에서 렌더 ────────────────────────────────────────────
+(defn tmpl/render-file [path ctx]
+  (tmpl/render (file-read path) ctx))

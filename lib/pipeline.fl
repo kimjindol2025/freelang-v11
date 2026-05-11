@@ -1,0 +1,150 @@
+;; ─────────────────────────────────────────────────────────────
+;; pipeline.fl — 데이터 파이프라인 라이브러리
+;; (load "lib/pipeline.fl")
+;;
+;; 사용:
+;;   (pipe/run data
+;;     (pipe/filter even?)
+;;     (pipe/map (fn [x] (* x 2)))
+;;     (pipe/sort-by identity)
+;;     (pipe/take 5)
+;;     (pipe/group-by (fn [x] (if (> x 10) "big" "small"))))
+;;
+;; 또는 선언형:
+;;   (pipe/build
+;;     [:source data]
+;;     [:filter "age > 25"]      ← 문자열 조건
+;;     [:map    "salary * 1.1"]  ← 문자열 변환
+;;     [:sort   "salary" :desc]
+;;     [:take   10])
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 스텝 생성자 ─────────────────────────────────────────────
+
+(defn pipe/filter [pred]
+  {:type "filter" :fn pred})
+
+(defn pipe/map [f]
+  {:type "map" :fn f})
+
+(defn pipe/flat-map [f]
+  {:type "flat-map" :fn f})
+
+(defn pipe/take [n]
+  {:type "take" :n n})
+
+(defn pipe/drop [n]
+  {:type "drop" :n n})
+
+(defn pipe/take-while [pred]
+  {:type "take-while" :fn pred})
+
+(defn pipe/drop-while [pred]
+  {:type "drop-while" :fn pred})
+
+(defn pipe/sort-by [key-fn]
+  {:type "sort-by" :fn key-fn :asc true})
+
+(defn pipe/sort-by-desc [key-fn]
+  {:type "sort-by" :fn key-fn :asc false})
+
+(defn pipe/group-by [key-fn]
+  {:type "group-by" :fn key-fn})
+
+(defn pipe/partition-by [pred]
+  {:type "partition-by" :fn pred})
+
+(defn pipe/distinct []
+  {:type "distinct"})
+
+(defn pipe/reverse []
+  {:type "reverse"})
+
+(defn pipe/frequencies []
+  {:type "frequencies"})
+
+(defn pipe/reduce [f init]
+  {:type "reduce" :fn f :init init})
+
+(defn pipe/each [f]
+  {:type "each" :fn f})
+
+(defn pipe/tap [label]
+  {:type "tap" :label label})
+
+;; ── 스텝 실행 ───────────────────────────────────────────────
+
+(defn pipe/exec-step [data step]
+  (let [t (get step "type")]
+    (case t
+      "filter"     (filter (get step "fn") data)
+      "map"        (map (get step "fn") data)
+      "flat-map"   (mapcat (get step "fn") data)
+      "take"       (take (get step "n") data)
+      "drop"       (drop (get step "n") data)
+      "take-while" (take-while (get step "fn") data)
+      "drop-while" (drop-while (get step "fn") data)
+      "sort-by"    (if (get step "asc")
+                     (sort-by (get step "fn") data)
+                     (sort-by (fn [x] (- ((get step "fn") x))) data))
+      "group-by"   (group-by (get step "fn") data)
+      "partition-by" (partition-by (get step "fn") data)
+      "distinct"   (distinct data)
+      "reverse"    (reverse data)
+      "frequencies" (frequencies data)
+      "reduce"     (reduce (get step "fn") (get step "init") data)
+      "each"       (do (doseq [x data] ((get step "fn") x)) data)
+      "tap"        (do (println (str "  [" (get step "label") "] count=" (length data)
+                                     " sample=" (str (first data))))
+                       data)
+      data)))
+
+;; ── 파이프라인 실행 ─────────────────────────────────────────
+
+(defn pipe/run [data steps]
+  (reduce pipe/exec-step data steps))
+
+;; ── 파이프라인 객체 (체이닝) ─────────────────────────────────
+
+(defn pipe/new [data]
+  {:data data :steps []})
+
+(defn pipe/add [pipeline step]
+  (assoc pipeline "steps" (conj (get pipeline "steps") step)))
+
+(defn pipe/exec [pipeline]
+  (reduce pipe/exec-step
+          (get pipeline "data")
+          (get pipeline "steps")))
+
+;; ── 집계 헬퍼 ───────────────────────────────────────────────
+
+(defn pipe/count [data] (length data))
+
+(defn pipe/sum-by [f data]
+  (sum (map f data)))
+
+(defn pipe/avg-by [f data]
+  (average (map f data)))
+
+(defn pipe/max-by-field [f data]
+  (reduce (fn [acc x]
+            (if (> (f x) (f acc)) x acc))
+          (first data)
+          (rest data)))
+
+(defn pipe/min-by-field [f data]
+  (reduce (fn [acc x]
+            (if (< (f x) (f acc)) x acc))
+          (first data)
+          (rest data)))
+
+;; ── 통계 요약 ───────────────────────────────────────────────
+
+(defn pipe/stats [data f]
+  (let [vals (map f data)]
+    {:count (length vals)
+     :sum   (sum vals)
+     :avg   (average vals)
+     :min   (apply min vals)
+     :max   (apply max vals)}))

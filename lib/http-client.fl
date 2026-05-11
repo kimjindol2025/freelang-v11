@@ -1,0 +1,129 @@
+;; ─────────────────────────────────────────────────────────────
+;; http-client.fl — HTTP 클라이언트 래퍼
+;; (load "lib/http-client.fl")
+;;
+;; 사용:
+;;   (http/get url)
+;;   (http/get url {:token "..." :headers {...} :retry 3})
+;;   (http/post url body {:token "..." :content-type "application/json"})
+;;   (http/put url body opts)
+;;   (http/delete url opts)
+;;
+;;   ;; 베이스 URL 클라이언트
+;;   (define api (http/client "https://api.example.com" {:token "..."}))
+;;   (api "/users")
+;;   (api "/users/1" {:method "DELETE"})
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 기본값 ──────────────────────────────────────────────────
+(define http/DEFAULT_TIMEOUT 10000)
+(define http/DEFAULT_RETRY    0)
+
+;; ── 응답 파싱 ────────────────────────────────────────────────
+(defn http/parse-response [resp]
+  (let [status (get resp "status")
+        body   (get resp "body")
+        parsed (if (str-blank? body)
+                 nil
+                 (?? (json-parse body) body))]
+    {:status  status
+     :ok      (and (>= status 200) (< status 300))
+     :body    parsed
+     :raw     body}))
+
+;; ── 헤더 빌더 ────────────────────────────────────────────────
+(defn http/build-headers [opts]
+  (let [base      {"Content-Type" "application/json"
+                   "Accept"       "application/json"}
+        token     (get opts "token")
+        with-auth (if (not (str-blank? token))
+                    (assoc base "Authorization" (str "Bearer " token))
+                    base)
+        extra     (?? (get opts "headers") {})]
+    (obj-merge with-auth extra)))
+
+;; ── 재시도 래퍼 ─────────────────────────────────────────────
+(defn http/with-retry [f retry]
+  (loop [attempt 0]
+    (let [result (try (f) (catch e {:error true :msg (get e "message")}))]
+      (if (or (get result "ok")
+              (not (get result "error"))
+              (>= attempt retry))
+        result
+        (do
+          (sleep (* attempt 500))
+          (recur (inc attempt)))))))
+
+;; ── GET ──────────────────────────────────────────────────────
+(defn http/get [url]
+  (http/parse-response (http_get url)))
+
+(defn http/get-with [url opts]
+  (let [headers (http/build-headers opts)
+        retry   (?? (get opts "retry") http/DEFAULT_RETRY)
+        token   (get opts "token")]
+    (http/with-retry
+      (fn []
+        (http/parse-response
+          (if (not (str-blank? token))
+            (http-get-bearer url token)
+            (http_get url))))
+      retry)))
+
+;; ── POST ─────────────────────────────────────────────────────
+(defn http/post [url body]
+  (let [payload (if (string? body) body (json-stringify body))]
+    (http/parse-response (http_post url payload))))
+
+(defn http/post-with [url body opts]
+  (let [payload (if (string? body) body (json-stringify body))
+        retry   (?? (get opts "retry") http/DEFAULT_RETRY)
+        token   (get opts "token")]
+    (http/with-retry
+      (fn []
+        (http/parse-response
+          (if (not (str-blank? token))
+            (http-post-bearer url payload token)
+            (http_post url payload))))
+      retry)))
+
+;; ── PUT / PATCH / DELETE ─────────────────────────────────────
+(defn http/put [url body opts]
+  (http/post-with url body (assoc opts "method" "PUT")))
+
+(defn http/delete [url opts]
+  (http/get-with url (assoc opts "method" "DELETE")))
+
+;; ── 편의 함수 ────────────────────────────────────────────────
+(defn http/ok? [resp] (get resp "ok"))
+(defn http/body [resp] (get resp "body"))
+(defn http/status [resp] (get resp "status"))
+
+(defn http/body-or [resp default]
+  (?? (http/body resp) default))
+
+(defn http/assert-ok [resp msg]
+  (when (not (http/ok? resp))
+    (error (str msg " (HTTP " (str (http/status resp)) ")"))))
+
+;; ── 베이스 URL 클라이언트 ────────────────────────────────────
+(defn http/client [base-url opts]
+  (fn [path]
+    (http/get-with (str base-url path) opts)))
+
+(defn http/client-post [base-url opts]
+  (fn [path body]
+    (http/post-with (str base-url path) body opts)))
+
+;; ── JSON 편의 ────────────────────────────────────────────────
+(defn http/get-json [url token]
+  (let [resp (http/get-with url {:token token})]
+    (if (http/ok? resp)
+      (http/body resp)
+      nil)))
+
+(defn http/post-json [url body token]
+  (let [resp (http/post-with url body {:token token})]
+    (if (http/ok? resp)
+      (http/body resp)
+      nil)))

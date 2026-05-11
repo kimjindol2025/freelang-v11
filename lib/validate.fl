@@ -1,0 +1,133 @@
+;; ─────────────────────────────────────────────────────────────
+;; validate.fl — 입력 검증 라이브러리
+;; (load "lib/validate.fl")
+;;
+;; 사용:
+;;   (vld/check value {:required true :type "string" :min-length 2})
+;;   (vld/schema data {:name {:required true :type "string"}
+;;                      :age  {:type "number" :min 0 :max 120}})
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 개별 규칙 검사 ─────────────────────────────────────────
+
+(defn vld/rule-required [v _opts]
+  (when (or (nil? v) (and (string? v) (str-blank? v)))
+    "필수 항목입니다"))
+
+(defn vld/rule-type [v opts]
+  (let [expected (get opts "type")]
+    (when (not (str-blank? expected))
+      (let [actual (type-of v)]
+        (when (not (= actual expected))
+          (str-format "타입 오류: %s 예상, %s 입력됨" [expected actual]))))))
+
+(defn vld/rule-min-length [v opts]
+  (let [min (get opts "min-length")]
+    (when (and (not (nil? min)) (string? v))
+      (when (< (length v) min)
+        (str-format "최소 %d자 이상이어야 합니다" [min])))))
+
+(defn vld/rule-max-length [v opts]
+  (let [max (get opts "max-length")]
+    (when (and (not (nil? max)) (string? v))
+      (when (> (length v) max)
+        (str-format "최대 %d자 이하이어야 합니다" [max])))))
+
+(defn vld/rule-min [v opts]
+  (let [min (get opts "min")]
+    (when (and (not (nil? min)) (number? v))
+      (when (< v min)
+        (str-format "최솟값은 %s입니다" [(str min)])))))
+
+(defn vld/rule-max [v opts]
+  (let [max (get opts "max")]
+    (when (and (not (nil? max)) (number? v))
+      (when (> v max)
+        (str-format "최댓값은 %s입니다" [(str max)])))))
+
+(defn vld/rule-email [v opts]
+  (when (get opts "email")
+    (when (and (string? v) (not (str-blank? v)))
+      (when (not (and (str-contains v "@")
+                      (str-contains v ".")
+                      (> (length v) 5)))
+        "올바른 이메일 형식이 아닙니다"))))
+
+(defn vld/rule-url [v opts]
+  (when (get opts "url")
+    (when (and (string? v) (not (str-blank? v)))
+      (when (not (or (str-starts-with v "http://")
+                     (str-starts-with v "https://")))
+        "올바른 URL 형식이 아닙니다 (http:// 또는 https://로 시작)"))))
+
+(defn vld/rule-in [v opts]
+  (let [allowed (get opts "in")]
+    (when (not (nil? allowed))
+      (when (not (includes-item allowed v))
+        (str-format "허용값: %s" [(str-join (map str allowed) ", ")])))))
+
+(defn vld/rule-pattern [v opts]
+  (let [pat (get opts "pattern")]
+    (when (and (not (str-blank? pat)) (string? v))
+      (when (not (re-match pat v))
+        (?? (get opts "pattern-msg") "형식이 올바르지 않습니다")))))
+
+;; ── 단일 값 검사 ────────────────────────────────────────────
+
+(defn vld/check [value opts]
+  (let [checkers [vld/rule-required
+                  vld/rule-type
+                  vld/rule-min-length
+                  vld/rule-max-length
+                  vld/rule-min
+                  vld/rule-max
+                  vld/rule-email
+                  vld/rule-url
+                  vld/rule-in
+                  vld/rule-pattern]
+        errors (filter (fn [e] (not (nil? e)))
+                 (map (fn [chk] (chk value opts)) checkers))]
+    (if (empty? errors)
+      {:ok true}
+      {:ok false :errors errors})))
+
+;; ── 스키마 검사 ─────────────────────────────────────────────
+
+(defn vld/schema [data schema]
+  (let [field-results
+        (map (fn [field]
+               (let [field-rules (get schema field)
+                     value       (get data field)
+                     result      (vld/check value field-rules)]
+                 (if (get result "ok")
+                   nil
+                   {:field field :errors (get result "errors")})))
+             (keys schema))
+        failures (filter (fn [fr] (not (nil? fr))) field-results)]
+    (if (empty? failures)
+      {:ok true}
+      {:ok false
+       :errors (reduce (fn [acc f]
+                         (assoc acc (get f "field") (get f "errors")))
+                       {}
+                       failures)})))
+
+;; ── 편의 함수 ───────────────────────────────────────────────
+
+(defn vld/ok? [result] (get result "ok"))
+
+(defn vld/errors [result] (get result "errors"))
+
+(defn vld/assert [result msg]
+  (when (not (vld/ok? result))
+    (error msg)))
+
+(defn vld/error-str [result]
+  (let [errs (vld/errors result)]
+    (if (map? errs)
+      (str-join
+        (map (fn [field]
+               (str field ": " (str-join (get errs field) ", ")))
+             (keys errs))
+        " | ")
+      (str-join errs ", "))))
