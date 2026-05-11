@@ -170,6 +170,17 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "num-abs":          { correct: "abs",           usage: '(abs -5)' },
   "num-floor":        { correct: "floor",         usage: '(floor 3.7)' },
   "num-ceil":         { correct: "ceil",          usage: '(ceil 3.2)' },
+  // #47: req["params"]["id"] 대신 server_req_param 사용
+  "req_param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  "req_query":        { correct: "server_req_query", usage: '(server_req_query req "key")' },
+  "req-query":        { correct: "server_req_query", usage: '(server_req_query req "key")' },
+  "req_body":         { correct: "server_req_body",  usage: '(server_req_body req)' },
+  "req-body":         { correct: "server_req_body",  usage: '(server_req_body req)' },
+  // #67: mariadb_connect positional args
+  "mariadb_connect":  { correct: "mariadb_connect",  usage: '(mariadb_connect {:host "h" :user "u" :password "p" :database "d"}) 또는 (mariadb_connect "host" "user" "pass" "db")' },
+  // 추가 HTTP 힌트
+  "http-post-json":   { correct: "http_post",        usage: '(http_post url (json-stringify body))' },
 };
 
 export function suggestSimilar(name: string, candidates: string[]): string | null {

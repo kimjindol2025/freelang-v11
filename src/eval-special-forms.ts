@@ -515,7 +515,8 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // ── set! ──────────────────────────────────────────────────────────
   if (op === "set!") {
     if (expr.args.length < 2) throwArgCount("set!", ">=2", expr.args.length, expr.line);
-    console.warn(`⚠️  [FreeLang] set! is deprecated (line ${expr.line ?? "?"}). Use (atom) + (swap! / reset!) instead.`);
+    // #17: set! 클로저 미전파 힌트
+    console.warn(`⚠️  [FreeLang] set! is deprecated (line ${expr.line ?? "?"}). 전역 변수 수정은 클로저에 전파되지 않습니다. atom 권장: (define x (atom 0)) (swap! x + 1)`);
     const nameNode = expr.args[0];
 
     // (set! (get $obj "key") value) — map/array 프로퍼티 뮤테이션
@@ -601,6 +602,10 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
         type: inferType(value),
       };
 
+      // #16: 재정의 감지 — 이미 정의된 변수를 덮어쓸 때 atom 힌트
+      if (ctx.variables.has("$" + name)) {
+        console.warn(`⚠️  [FreeLang] '${name}'은(는) 이미 정의됐습니다 (line ${expr.line ?? "?"}). 가변 값은 atom을 사용하세요: (define ${name} (atom ${JSON.stringify(value)})) → (swap! ${name} (fn [v] 새값))`);
+      }
       ctx.variables.set("$" + name, value, meta);
       return value;
     }

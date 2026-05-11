@@ -561,7 +561,10 @@
     "#67": {
       "type": "design",
       "summary": "mariadb_connect 시그니처 다름",
-      "fix": "v12: positional + map 둘다 지원"
+      "fix": "✅ v11.6.37: positional + map 둘다 지원 (stdlib-mariadb.ts)",
+      "status": "covered",
+      "solved_in": "Phase I-3 (v11.6.37)",
+      "covered_by": "mariadb_connect 오버로드"
     },
     "#68": {
       "type": "design",

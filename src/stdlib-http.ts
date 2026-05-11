@@ -75,6 +75,11 @@ export function createHttpModule() {
 
     // http_post url body -> {:status 200 :body "..."}
     "http_post": (url: string, body: string): any => {
+      // #15: body에 map/객체 직접 전달 시 json-stringify 힌트
+      if (body !== null && typeof body === "object") {
+        console.warn(`⚠️  [FreeLang] http-post body에 map이 전달됐습니다. (json-stringify body)로 직렬화 후 전달하세요.`);
+        body = JSON.stringify(body);
+      }
       const result = curlGetStatusAndBody(url, "POST",
         { "Content-Type": "application/json" }, body);
       return {

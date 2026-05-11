@@ -272,14 +272,26 @@ function poolCall(req: object): any {
 
 export function createMariadbModule() {
   return {
-    // ── CLI 방식 (기존) ──────────────────────────────────────────────────────
-    "mariadb_exec":  (db: string, sql: string, params: any[] = []) =>
-      runMariadb(db, bindParams(sql, params)),
+    // ── CLI 방식 (기존) — pool_* prefix → pool 자동 라우팅 ──────────────────
+    "mariadb_exec":  (db: string, sql: string, params: any[] = []) => {
+      if (typeof db === "string" && db.startsWith("pool_")) {
+        const r = poolCall({ type: "exec", poolId: db, sql, params });
+        return { affectedRows: r.affectedRows, insertId: r.insertId };
+      }
+      return runMariadb(db, bindParams(sql, params));
+    },
 
-    "mariadb_query": (db: string, sql: string, params: any[] = []) =>
-      parseRows(runMariadb(db, bindParams(sql, params))),
+    "mariadb_query": (db: string, sql: string, params: any[] = []) => {
+      if (typeof db === "string" && db.startsWith("pool_")) {
+        return poolCall({ type: "query", poolId: db, sql, params }).rows ?? [];
+      }
+      return parseRows(runMariadb(db, bindParams(sql, params)));
+    },
 
     "mariadb_one":   (db: string, sql: string, params: any[] = []) => {
+      if (typeof db === "string" && db.startsWith("pool_")) {
+        return poolCall({ type: "one", poolId: db, sql, params }).row ?? null;
+      }
       const rows = parseRows(runMariadb(db, bindParams(sql, params)));
       // 결과 없으면 반드시 null (undefined 금지 — nil-safe 보장)
       const row = rows[0];
@@ -344,6 +356,39 @@ export function createMariadbModule() {
           return { ok: true, result: parseRows(runMariadb(db, bound)) };
         } catch (e: any) { return { ok: false, error: e.message }; }
       });
+    },
+
+    // ── mariadb_connect — 맵/positional 양방향 지원 ──────────────────────────
+    // (mariadb_connect {:host "h" :user "u" :password "p" :database "d"})
+    // (mariadb_connect "host" "user" "password" "database" [port])  ← #67 해결
+    "mariadb_connect":  (...args: any[]) => {
+      let config: any = args[0];
+      // positional 감지: 첫 인자가 문자열이면 4-5 인자를 맵으로 변환
+      if (typeof config === "string") {
+        config = {
+          host:     args[0] ?? "localhost",
+          user:     args[1] ?? "",
+          password: args[2] ?? "",
+          database: args[3] ?? "",
+          port:     typeof args[4] === "number" ? args[4] : 3306,
+        };
+      }
+      const poolId = `pool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      poolCall({ type: "connect", poolId, config });
+      return poolId;
+    },
+    "mariadb-connect":  (...args: any[]) => {
+      let config: any = args[0];
+      if (typeof config === "string") {
+        config = {
+          host: args[0] ?? "localhost", user: args[1] ?? "",
+          password: args[2] ?? "", database: args[3] ?? "",
+          port: typeof args[4] === "number" ? args[4] : 3306,
+        };
+      }
+      const poolId = `pool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      poolCall({ type: "connect", poolId, config });
+      return poolId;
     },
 
     // ── 풀 방식 (영구 연결) ───────────────────────────────────────────────────
