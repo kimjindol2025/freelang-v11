@@ -137,7 +137,8 @@ export class Parser {
         if (nextIdx < this.tokens.length) {
           const nextToken = this.tokens[nextIdx];
           const isBlockKeyword = nextToken.type === T.Module || nextToken.type === T.TypeClass || nextToken.type === T.Instance || nextToken.type === T.Page || nextToken.type === T.Api || nextToken.type === T.Component || nextToken.type === T.Form || nextToken.type === T.Route || nextToken.type === T.Service || nextToken.type === T.Controller || nextToken.type === T.Guard || nextToken.type === T.Model || nextToken.type === T.Query || nextToken.type === T.Migration || nextToken.type === T.Repository || nextToken.type === T.Database || nextToken.type === T.Cached || nextToken.type === T.Kafka || nextToken.type === T.JWT || nextToken.type === T.OAuth || nextToken.type === T.Dockerfile || nextToken.type === T.K8sDeployment || nextToken.type === T.AWS || nextToken.type === T.GCP || nextToken.type === T.Azure;
-          const isKnownBlockType = nextToken.type === T.Symbol && knownBlockTypes.includes(nextToken.value.toUpperCase());
+          // 블록 타입은 반드시 UPPERCASE여야 함 (소문자 page/rule/form 등은 일반 변수)
+          const isKnownBlockType = nextToken.type === T.Symbol && knownBlockTypes.includes(nextToken.value);
           const hasKeywordAfter = nextIdx + 1 < this.tokens.length &&
             (this.tokens[nextIdx + 1].type === T.Keyword || this.tokens[nextIdx + 1].type === T.Colon);
 
@@ -615,7 +616,8 @@ export class Parser {
       if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === T.Symbol) {
         const potentialType = this.tokens[nextIdx].value;
         // Check if it's a known block type (uppercase) or looks like a block name followed by a keyword
-        const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
+        // 블록 타입은 반드시 UPPERCASE여야 함 (소문자 page/form/guard 등은 일반 변수)
+        const isKnownType = knownBlockTypes.includes(potentialType);
         const nextNextIdx = nextIdx + 1;
         const hasKeywordAfterName = nextNextIdx < this.tokens.length &&
           (this.tokens[nextNextIdx].type === T.Keyword || this.tokens[nextNextIdx].type === T.Colon);

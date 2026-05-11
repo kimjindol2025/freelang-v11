@@ -1,254 +1,167 @@
-; FreeLang v11 — Reactive State Management
-; Phase D: 상태 관리 + DOM 바인딩
-; 의존성 없음 (순수 JavaScript)
+;; stdlib/web/state.fl — 반응형 상태 관리 + DOM 바인딩 (v11)
+;; (load "stdlib/web/state.fl")
+;;
+;; 서버에서 <script> 블록을 생성하는 SSR 헬퍼들.
+;; 브라우저에서 window.flGetState / flSetState / flSubscribe / flAction 제공.
 
-; ==================== 상태 부트스트랩 ====================
+;; ── 상태 초기화 스크립트 ────────────────────────────────────────
+;; (init-state-js {:count 0 :name "Alice"}) → "<script>window.__flState=...;</script>"
+(defn init-state-js [initial-state]
+  (str "<script>"
+       "window.__flState=window.__flState||{};"
+       "Object.assign(window.__flState," (json-stringify initial-state) ");"
+       "window.__flSubscribers=window.__flSubscribers||{};"
+       "window.flGetState=function(k){return window.__flState[k];};"
+       "window.flSetState=function(k,v){"
+         "window.__flState[k]=v;"
+         "var subs=window.__flSubscribers[k]||[];"
+         "subs.forEach(function(fn){fn(v);});"
+         "document.dispatchEvent(new CustomEvent('fl-state-change',{detail:{key:k,value:v}}));"
+       "};"
+       "window.flSubscribe=function(k,fn){"
+         "window.__flSubscribers[k]=window.__flSubscribers[k]||[];"
+         "window.__flSubscribers[k].push(fn);"
+       "};"
+       "window.flUnsubscribe=function(k,fn){"
+         "var subs=window.__flSubscribers[k]||[];"
+         "window.__flSubscribers[k]=subs.filter(function(s){return s!==fn;});"
+       "};"
+       "</script>"))
 
-[FUNC init-state-js :params [initial-state]
-  :returns str
-  :body [
-    (do
-      (var state-json (json-stringify initial-state))
-      (concat
-        "<script>"
-        "window.__flState = window.__flState || {};"
-        "const _flInitState = " state-json ";"
-        "Object.assign(window.__flState, _flInitState);"
-        "window.__flSubscribers = window.__flSubscribers || {};"
-        "window.flGetState = function(key) {"
-        "  return window.__flState[key];"
-        "};"
-        "window.flSetState = function(key, value) {"
-        "  window.__flState[key] = value;"
-        "  const subs = window.__flSubscribers[key] || [];"
-        "  subs.forEach(function(fn) { fn(value); });"
-        "  document.dispatchEvent(new CustomEvent('fl-state-change', {"
-        "    detail: { key: key, value: value }"
-        "  }));"
-        "};"
-        "window.flSubscribe = function(key, fn) {"
-        "  window.__flSubscribers[key] = window.__flSubscribers[key] || [];"
-        "  window.__flSubscribers[key].push(fn);"
-        "};"
-        "window.flUnsubscribe = function(key, fn) {"
-        "  const subs = window.__flSubscribers[key] || [];"
-        "  window.__flSubscribers[key] = subs.filter(function(s) { return s !== fn; });"
-        "};"
-        "</script>"))
-  ]
-]
+;; ── 상태 → DOM 바인딩 스크립트 ──────────────────────────────────
+;; (bind-state-js "count" "#counter") → "<script>...</script>"
+(defn bind-state-js [state-key selector]
+  (str "<script>(function(){"
+       "function _u(v){document.querySelectorAll('" selector "').forEach(function(el){el.textContent=String(v);});}"
+       "flSubscribe('" state-key "',_u);"
+       "document.addEventListener('DOMContentLoaded',function(){_u(flGetState('" state-key "')||'');});"
+       "})();</script>"))
 
-; ==================== DOM 상태 바인딩 ====================
+;; ── localStorage 영속화 스크립트 ────────────────────────────────
+;; (persist-state-js ["count" "user"]) → "<script>...</script>"
+(defn persist-state-js [keys]
+  (str "<script>(function(){"
+       "var persistKeys=" (json-stringify keys) ";"
+       "persistKeys.forEach(function(k){"
+         "var saved=localStorage.getItem('fl-state-'+k);"
+         "if(saved!==null){try{flSetState(k,JSON.parse(saved));}catch(e){}}"
+         "flSubscribe(k,function(v){localStorage.setItem('fl-state-'+k,JSON.stringify(v));});"
+       "});"
+       "})();</script>"))
 
-[FUNC bind-state-js :params [state-key selector :transform ""]
-  :returns str
-  :body [
-    (do
-      (var transform-fn (if (not (eq transform "")) transform "function(v) { return v; }"))
-      (concat
-        "<script>"
-        "(function() {"
-        "  var _transform = " transform-fn ";"
-        "  function _update(val) {"
-        "    var els = document.querySelectorAll('" selector "');"
-        "    els.forEach(function(el) { el.textContent = _transform(val); });"
-        "  }"
-        "  flSubscribe('" state-key "', _update);"
-        "  document.addEventListener('DOMContentLoaded', function() {"
-        "    _update(flGetState('" state-key "') || '');"
-        "  });"
-        "})();"
-        "</script>"))
-  ]
-]
+;; ── 상태 블록 통합 렌더링 ───────────────────────────────────────
+;; (render-state-block {:count 0} ["count"]) → init + persist 합친 스크립트
+(defn render-state-block [initial-data persist-keys]
+  (let [init (init-state-js initial-data)
+        persist (if (> (length persist-keys) 0)
+                  (persist-state-js persist-keys)
+                  "")]
+    (str init persist)))
 
-; ==================== localStorage 영속화 ====================
+;; ── 자동 바인딩 스크립트 ────────────────────────────────────────
+;; HTML 속성으로 반응성 선언:
+;;   <p data-fl-bind="count">0</p>          ← 상태 textContent 반영
+;;   <input data-fl-model="name">           ← 양방향 input
+;;   <button data-fl-click="inc">+1</button> ← 클릭 이벤트 연결
+;;   <div data-fl-show="loggedIn">...</div> ← 조건부 표시
+(defn auto-bind-js []
+  (str "<script>(function(){"
+       "var actions={};"
+       "window.flAction=function(name,fn){actions[name]=fn;};"
+       "function scanElement(root){"
+         "var q=function(s){return root.querySelectorAll?root.querySelectorAll(s):[];};"
+         "q('[data-fl-bind]').forEach(function(el){"
+           "var k=el.getAttribute('data-fl-bind');"
+           "if(el.__flBound===k)return;el.__flBound=k;"
+           "var cur=flGetState(k);if(cur!==undefined)el.textContent=String(cur);"
+           "flSubscribe(k,function(v){el.textContent=String(v);});"
+         "});"
+         "q('[data-fl-model]').forEach(function(el){"
+           "var k=el.getAttribute('data-fl-model');"
+           "if(el.__flModel===k)return;el.__flModel=k;"
+           "var cur=flGetState(k);if(cur!==undefined)el.value=String(cur);"
+           "el.addEventListener('input',function(){flSetState(k,el.value);});"
+           "flSubscribe(k,function(v){if(document.activeElement!==el)el.value=String(v);});"
+         "});"
+         "q('[data-fl-click]').forEach(function(el){"
+           "var name=el.getAttribute('data-fl-click');"
+           "if(el.__flClick===name)return;el.__flClick=name;"
+           "el.addEventListener('click',function(e){"
+             "var fn=actions[name];if(fn)fn(e,el);else console.warn('[fl] no action: '+name);"
+           "});"
+         "});"
+         "q('[data-fl-show]').forEach(function(el){"
+           "var k=el.getAttribute('data-fl-show');"
+           "if(el.__flShow===k)return;el.__flShow=k;"
+           "function apply(v){el.style.display=(v&&v!=='false')?'':'none';}"
+           "apply(flGetState(k));flSubscribe(k,apply);"
+         "});"
+       "}"
+       "function scanAll(){scanElement(document);}"
+       "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scanAll);"
+       "else scanAll();"
+       "new MutationObserver(function(muts){"
+         "muts.forEach(function(m){"
+           "m.addedNodes.forEach(function(n){if(n.nodeType===1)scanElement(n);});"
+         "});"
+       "}).observe(document.body,{childList:true,subtree:true});"
+       "})();</script>"))
 
-[FUNC persist-state-js :params [keys]
-  :returns str
-  :body [
-    (do
-      (var keys-json (json-stringify keys))
-      (concat
-        "<script>"
-        "(function() {"
-        "  var persistKeys = " keys-json ";"
-        "  persistKeys.forEach(function(key) {"
-        "    var saved = localStorage.getItem('fl-state-' + key);"
-        "    if (saved !== null) {"
-        "      try { flSetState(key, JSON.parse(saved)); } catch(e) {}"
-        "    }"
-        "    flSubscribe(key, function(val) {"
-        "      localStorage.setItem('fl-state-' + key, JSON.stringify(val));"
-        "    });"
-        "  });"
-        "})();"
-        "</script>"))
-  ]
-]
+;; ── 액션 등록 스크립트 ───────────────────────────────────────────
+;; (register-action-js "inc" "function(e,el){flSetState('count',(flGetState('count')||0)+1);}")
+(defn register-action-js [name body-js]
+  (str "<script>flAction(" (json-stringify name) "," body-js ");</script>"))
 
-; ==================== 상태 블록 통합 렌더링 ====================
-
-[FUNC render-state-block :params [id initial-data :persist-keys []]
-  :returns str
-  :body [
-    (do
-      (var init-script (init-state-js initial-data))
-      (var persist-script (if (> (len persist-keys) 0) (persist-state-js persist-keys) ""))
-      (concat init-script persist-script))
-  ]
-]
-
-; ==================== 선언적 자동 바인딩 ====================
-; HTML 속성으로 반응성 선언 — React 대체 수준의 간단 DSL:
-;   <p data-fl-bind="count">0</p>          ← 상태 값 textContent 반영
-;   <input data-fl-model="name">           ← 양방향 input
-;   <button data-fl-click="inc">+1</button> ← 클릭 이벤트 연결
-;   <div data-fl-show="loggedIn">...</div> ← 조건부 표시
-;
-; 한 번만 auto-bind-js를 호출하면 전체 페이지가 반응형이 됨.
-; MutationObserver로 동적 삽입 요소도 자동 처리.
-
-[FUNC auto-bind-js :params []
-  :returns str
-  :body [
-    (concat
-      "<script>"
-      "(function(){"
-      "var actions = {};"
-      "window.flAction = function(name, fn){ actions[name] = fn; };"
-      "function scanElement(root){"
-      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-bind]') : []).forEach(function(el){"
-      "    var key = el.getAttribute('data-fl-bind');"
-      "    if(el.__flBound === key) return;"
-      "    el.__flBound = key;"
-      "    var cur = flGetState(key);"
-      "    if(cur !== undefined) el.textContent = String(cur);"
-      "    flSubscribe(key, function(v){ el.textContent = String(v); });"
-      "  });"
-      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-model]') : []).forEach(function(el){"
-      "    var key = el.getAttribute('data-fl-model');"
-      "    if(el.__flModel === key) return;"
-      "    el.__flModel = key;"
-      "    var cur = flGetState(key);"
-      "    if(cur !== undefined) el.value = String(cur);"
-      "    el.addEventListener('input', function(){ flSetState(key, el.value); });"
-      "    flSubscribe(key, function(v){ if(document.activeElement !== el) el.value = String(v); });"
-      "  });"
-      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-click]') : []).forEach(function(el){"
-      "    var name = el.getAttribute('data-fl-click');"
-      "    if(el.__flClick === name) return;"
-      "    el.__flClick = name;"
-      "    el.addEventListener('click', function(e){"
-      "      var fn = actions[name];"
-      "      if(fn) fn(e, el);"
-      "      else console.warn('[fl] no action: ' + name);"
-      "    });"
-      "  });"
-      "  (root.querySelectorAll ? root.querySelectorAll('[data-fl-show]') : []).forEach(function(el){"
-      "    var key = el.getAttribute('data-fl-show');"
-      "    if(el.__flShow === key) return;"
-      "    el.__flShow = key;"
-      "    function apply(v){ el.style.display = (v && v !== 'false') ? '' : 'none'; }"
-      "    apply(flGetState(key));"
-      "    flSubscribe(key, apply);"
-      "  });"
-      "}"
-      "function scanAll(){ scanElement(document); }"
-      "if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scanAll);"
-      "else scanAll();"
-      "new MutationObserver(function(muts){"
-      "  muts.forEach(function(m){"
-      "    m.addedNodes.forEach(function(n){ if(n.nodeType===1) scanElement(n); });"
-      "  });"
-      "}).observe(document.body, { childList: true, subtree: true });"
-      "})();"
-      "</script>")
-  ]
-]
-
-; ==================== 액션 등록 (서버 측 헬퍼) ====================
-; (register-action "inc" "function(e,el){ flSetState('count', (flGetState('count')||0)+1); }")
-
-[FUNC register-action-js :params [name body-js]
-  :returns str
-  :body [
-    (concat "<script>flAction(" (json-stringify name) ", " body-js ");</script>")
-  ]
-]
-
-; ==================== Q3-3 옵티미스틱 UI ====================
-; <form data-fl-submit="/api/posts" data-fl-optimistic="posts:prepend">
-;   <input name="title">
-;   <button>Post</button>
-; </form>
-;
-; On submit: AJAX POST (form serialized) → optimistic state update →
-; on success merge response, on error rollback + show error in [data-fl-error].
-; data-fl-optimistic="key:op" where op = prepend|append|set|increment.
-
-[FUNC optimistic-submit-js :params []
-  :doc "data-fl-submit 폼을 AJAX + 낙관 업데이트로 처리하는 <script>"
-  :body [
-    (concat
-      "<script>"
-      "(function(){"
-      "function applyOp(key, op, value){"
-      "  if(op==='set') flSetState(key, value);"
-      "  else if(op==='prepend'){ var arr = flGetState(key) || []; flSetState(key, [value].concat(arr)); }"
-      "  else if(op==='append'){ var arr = flGetState(key) || []; flSetState(key, arr.concat([value])); }"
-      "  else if(op==='increment'){ flSetState(key, (flGetState(key) || 0) + (Number(value) || 1)); }"
-      "}"
-      "function attach(form){"
-      "  if(form.__flSubmit) return; form.__flSubmit = true;"
-      "  form.addEventListener('submit', async function(ev){"
-      "    ev.preventDefault();"
-      "    var endpoint = form.getAttribute('data-fl-submit');"
-      "    var optSpec = form.getAttribute('data-fl-optimistic');"
-      "    var data = {};"
-      "    new FormData(form).forEach(function(v,k){ data[k] = v; });"
-      "    var prev = null, key = null, op = null;"
-      "    if(optSpec){"
-      "      var parts = optSpec.split(':'); key = parts[0]; op = parts[1] || 'set';"
-      "      prev = flGetState(key);"
-      "      applyOp(key, op, data);"
-      "    }"
-      "    var errEl = form.querySelector('[data-fl-error]');"
-      "    if(errEl) errEl.textContent = '';"
-      "    form.classList.add('fl-submitting');"
-      "    try {"
-      "      var res = await fetch(endpoint, {"
-      "        method: form.getAttribute('method') || 'POST',"
-      "        headers: {'Content-Type': 'application/json'},"
-      "        body: JSON.stringify(data)"
-      "      });"
-      "      var body; try { body = await res.json(); } catch(e){ body = { ok: res.ok }; }"
-      "      if(!res.ok || body.success === false){"
-      "        if(key !== null) flSetState(key, prev);"
-      "        if(errEl) errEl.textContent = (body && body.error) || ('HTTP ' + res.status);"
-      "      } else {"
-      "        if(key && body && body.data) applyOp(key, 'set', body.data);"
-      "        form.reset();"
-      "        form.dispatchEvent(new CustomEvent('fl-submit-ok', { detail: body }));"
-      "      }"
-      "    } catch(err){"
-      "      if(key !== null) flSetState(key, prev);"
-      "      if(errEl) errEl.textContent = err.message || 'network error';"
-      "    } finally {"
-      "      form.classList.remove('fl-submitting');"
-      "    }"
-      "  });"
-      "}"
-      "function scan(root){"
-      "  (root.querySelectorAll ? root.querySelectorAll('form[data-fl-submit]') : []).forEach(attach);"
-      "}"
-      "if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ scan(document); });"
-      "else scan(document);"
-      "new MutationObserver(function(ms){ ms.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.nodeType===1) scan(n); }); }); })"
-      "  .observe(document.body, { childList: true, subtree: true });"
-      "})();"
-      "</script>")
-  ]
-]
-
-[EXPORT init-state-js bind-state-js persist-state-js render-state-block auto-bind-js register-action-js optimistic-submit-js]
+;; ── 낙관적 제출 스크립트 (data-fl-submit 폼 → AJAX + 즉시 UI 갱신) ──
+;; <form data-fl-submit="/api/posts" data-fl-optimistic="posts:prepend">
+(defn optimistic-submit-js []
+  (str "<script>(function(){"
+       "function applyOp(k,op,v){"
+         "if(op==='set')flSetState(k,v);"
+         "else if(op==='prepend'){var a=flGetState(k)||[];flSetState(k,[v].concat(a));}"
+         "else if(op==='append'){var a=flGetState(k)||[];flSetState(k,a.concat([v]));}"
+         "else if(op==='increment'){flSetState(k,(flGetState(k)||0)+(Number(v)||1));}"
+       "}"
+       "function attach(form){"
+         "if(form.__flSubmit)return;form.__flSubmit=true;"
+         "form.addEventListener('submit',async function(ev){"
+           "ev.preventDefault();"
+           "var endpoint=form.getAttribute('data-fl-submit');"
+           "var optSpec=form.getAttribute('data-fl-optimistic');"
+           "var data={};new FormData(form).forEach(function(v,k){data[k]=v;});"
+           "var prev=null,key=null,op=null;"
+           "if(optSpec){var parts=optSpec.split(':');key=parts[0];op=parts[1]||'set';"
+             "prev=flGetState(key);applyOp(key,op,data);}"
+           "var errEl=form.querySelector('[data-fl-error]');"
+           "if(errEl)errEl.textContent='';"
+           "form.classList.add('fl-submitting');"
+           "try{"
+             "var res=await fetch(endpoint,{"
+               "method:form.getAttribute('method')||'POST',"
+               "headers:{'Content-Type':'application/json'},"
+               "body:JSON.stringify(data)});"
+             "var body;try{body=await res.json();}catch(e){body={ok:res.ok};}"
+             "if(!res.ok||body.success===false){"
+               "if(key!==null)flSetState(key,prev);"
+               "if(errEl)errEl.textContent=(body&&body.error)||('HTTP '+res.status);"
+             "}else{"
+               "if(key&&body&&body.data)applyOp(key,'set',body.data);"
+               "form.reset();"
+               "form.dispatchEvent(new CustomEvent('fl-submit-ok',{detail:body}));"
+             "}"
+           "}catch(err){"
+             "if(key!==null)flSetState(key,prev);"
+             "if(errEl)errEl.textContent=err.message||'network error';"
+           "}finally{form.classList.remove('fl-submitting');}"
+         "});"
+       "}"
+       "function scan(root){"
+         "var q=root.querySelectorAll?root.querySelectorAll('form[data-fl-submit]'):[];"
+         "q.forEach(attach);"
+       "}"
+       "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){scan(document);});"
+       "else scan(document);"
+       "new MutationObserver(function(ms){"
+         "ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1)scan(n);});});"
+       "}).observe(document.body,{childList:true,subtree:true});"
+       "})();</script>"))

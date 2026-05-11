@@ -645,7 +645,7 @@ var FreeLang = (() => {
               if (nextIdx < this.tokens.length) {
                 const nextToken = this.tokens[nextIdx];
                 const isBlockKeyword = nextToken.type === "Module" /* Module */ || nextToken.type === "TypeClass" /* TypeClass */ || nextToken.type === "Instance" /* Instance */ || nextToken.type === "Page" /* Page */ || nextToken.type === "Api" /* Api */ || nextToken.type === "Component" /* Component */ || nextToken.type === "Form" /* Form */ || nextToken.type === "Route" /* Route */ || nextToken.type === "Service" /* Service */ || nextToken.type === "Controller" /* Controller */ || nextToken.type === "Guard" /* Guard */ || nextToken.type === "Model" /* Model */ || nextToken.type === "Query" /* Query */ || nextToken.type === "Migration" /* Migration */ || nextToken.type === "Repository" /* Repository */ || nextToken.type === "Database" /* Database */ || nextToken.type === "Cached" /* Cached */ || nextToken.type === "Kafka" /* Kafka */ || nextToken.type === "JWT" /* JWT */ || nextToken.type === "OAuth" /* OAuth */ || nextToken.type === "Dockerfile" /* Dockerfile */ || nextToken.type === "K8sDeployment" /* K8sDeployment */ || nextToken.type === "AWS" /* AWS */ || nextToken.type === "GCP" /* GCP */ || nextToken.type === "Azure" /* Azure */;
-                const isKnownBlockType = nextToken.type === "Symbol" /* Symbol */ && knownBlockTypes.includes(nextToken.value.toUpperCase());
+                const isKnownBlockType = nextToken.type === "Symbol" /* Symbol */ && knownBlockTypes.includes(nextToken.value);
                 const hasKeywordAfter = nextIdx + 1 < this.tokens.length && (this.tokens[nextIdx + 1].type === "Keyword" /* Keyword */ || this.tokens[nextIdx + 1].type === "Colon" /* Colon */);
                 if (isBlockKeyword || isKnownBlockType || hasKeywordAfter) {
                   nodes.push(this.parseBlock());
@@ -1009,7 +1009,7 @@ var FreeLang = (() => {
             const knownBlockTypes = ["FUNC", "INTENT", "PROMPT", "PIPE", "AGENT", "LOAD", "RULE", "MODULE", "TYPECLASS", "INSTANCE", "SERVER", "ROUTE", "MIDDLEWARE", "WEBSOCKET", "ERROR-HANDLER", "PAGE", "COMPONENT", "FORM", "SERVICE", "CONTROLLER", "GUARD"];
             if (nextIdx < this.tokens.length && this.tokens[nextIdx].type === "Symbol" /* Symbol */) {
               const potentialType = this.tokens[nextIdx].value;
-              const isKnownType = knownBlockTypes.includes(potentialType.toUpperCase());
+              const isKnownType = knownBlockTypes.includes(potentialType);
               const nextNextIdx = nextIdx + 1;
               const hasKeywordAfterName = nextNextIdx < this.tokens.length && (this.tokens[nextNextIdx].type === "Keyword" /* Keyword */ || this.tokens[nextNextIdx].type === "Colon" /* Colon */);
               if (isKnownType || hasKeywordAfterName) {
@@ -4190,7 +4190,12 @@ ${parenHint}` : parenHint;
     "toUpperCase": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
     "to_upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
     // 문자열 변환 (#82)
-    "toString": { correct: "str", usage: "(str value)" }
+    "toString": { correct: "str", usage: "(str value)" },
+    // 시간 (#37)
+    "Date.now": { correct: "now-ms", usage: "(now-ms)" },
+    "Date.now()": { correct: "now-ms", usage: "(now-ms)" },
+    "now_ms": { correct: "now-ms", usage: "(now-ms)" },
+    "currentTimeMs": { correct: "now-ms", usage: "(now-ms)" }
   };
   function suggestSimilar(name, candidates) {
     let best = null;
@@ -15339,6 +15344,67 @@ loop().catch(e => {
       case "str-replace-all":
       case "str-replace":
         return typeof args2[0] === "string" ? args2[0].split(String(args2[1] ?? "")).join(String(args2[2] ?? "")) : "";
+      case "str-to-upper":
+      case "str-upper":
+        return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0] ?? "";
+      case "str-to-lower":
+      case "str-lower":
+        return typeof args2[0] === "string" ? args2[0].toLowerCase() : args2[0] ?? "";
+      case "str-trim":
+        return typeof args2[0] === "string" ? args2[0].trim() : args2[0] === null || args2[0] === void 0 ? null : "";
+      case "str-trim-left":
+        return typeof args2[0] === "string" ? args2[0].trimStart() : args2[0] ?? "";
+      case "str-trim-right":
+        return typeof args2[0] === "string" ? args2[0].trimEnd() : args2[0] ?? "";
+      case "str-starts-with":
+        return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
+      case "str-ends-with":
+        return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].endsWith(args2[1]) : false;
+      case "str-includes":
+      case "str-contains":
+        return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].includes(args2[1]) : false;
+      case "str-repeat":
+        return typeof args2[0] === "string" ? args2[0].repeat(Math.max(0, Number(args2[1] ?? 0))) : "";
+      case "str-pad-left": {
+        if (typeof args2[0] !== "string") return String(args2[0] ?? "");
+        const padLen = Number(args2[1] ?? 0);
+        const padCh = typeof args2[2] === "string" ? args2[2] : " ";
+        return args2[0].padStart(padLen, padCh);
+      }
+      case "str-pad-right": {
+        if (typeof args2[0] !== "string") return String(args2[0] ?? "");
+        const padLen = Number(args2[1] ?? 0);
+        const padCh = typeof args2[2] === "string" ? args2[2] : " ";
+        return args2[0].padEnd(padLen, padCh);
+      }
+      case "str-lines":
+        return typeof args2[0] === "string" ? args2[0].split("\n") : [];
+      case "str-reverse":
+        return typeof args2[0] === "string" ? args2[0].split("").reverse().join("") : "";
+      case "map-vals": {
+        const fn = args2[0];
+        const m = args2[1];
+        if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+        const out = {};
+        for (const [k, v] of Object.entries(m)) out[k] = callFnVal(fn, [v]);
+        return out;
+      }
+      case "map-keys": {
+        const fn = args2[0];
+        const m = args2[1];
+        if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+        const out = {};
+        for (const [k, v] of Object.entries(m)) out[String(callFnVal(fn, [k]))] = v;
+        return out;
+      }
+      case "filter-vals": {
+        const fn = args2[0];
+        const m = args2[1];
+        if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+        const out = {};
+        for (const [k, v] of Object.entries(m)) if (callFnVal(fn, [v])) out[k] = v;
+        return out;
+      }
       case "flatten": {
         if (!Array.isArray(args2[0])) return [];
         const flattenDeep = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flattenDeep(val) : val), []);

@@ -1,111 +1,94 @@
-; FreeLang v11 — Form Processing Library
-; Phase C: 폼 렌더링 + 클라이언트 검증
-; components.fl과 독립적
+;; stdlib/web/forms.fl — 폼 렌더링 + 클라이언트 검증 (v11)
+;; (load "stdlib/web/forms.fl")
 
-; ==================== 필드 렌더링 ====================
+;; ── 단일 필드 렌더링 ──────────────────────────────────────────────
+;; field: {:name "email" :type "email" :label "이메일" :required true :placeholder "..."}
+(defn render-field [field]
+  (let [name        (get field "name")
+        ftype       (?? (get field "type") "text")
+        label       (?? (get field "label") name)
+        required    (?? (get field "required") false)
+        placeholder (?? (get field "placeholder") "")
+        req-attr    (if required " required" "")
+        ph-attr     (if (str-blank? placeholder)
+                      ""
+                      (str " placeholder=\"" placeholder "\""))]
+    (str "<div class='fl-field'>"
+         "<label for='fl-" name "'>" label "</label>"
+         "<input type='" ftype "' id='fl-" name "' name='" name "'" req-attr ph-attr " />"
+         "<span class='fl-field-error' id='fl-err-" name "'></span>"
+         "</div>")))
 
-[FUNC render-field :params [field]
-  :returns str
-  :body [
-    (do
-      (var name (get field "name"))
-      (var type (get field "type" "text"))
-      (var label (get field "label" name))
-      (var required (get field "required" false))
-      (var placeholder (get field "placeholder" ""))
-      (var req-attr (if required " required" ""))
-      (var ph-attr (if (not (eq placeholder "")) (concat " placeholder=\"" placeholder "\"") ""))
-      (concat
-        "<div class='fl-field'>"
-        "<label for='fl-" name "'>" label "</label>"
-        "<input type='" type "' id='fl-" name "' name='" name "'" req-attr ph-attr " />"
-        "<span class='fl-field-error' id='fl-err-" name "'></span>"
-        "</div>"))
-  ]
-]
+;; ── 폼 HTML 생성 ─────────────────────────────────────────────────
+;; (render-form "login" "/api/login" [{:name "email" ...} {:name "pwd" ...}])
+(defn render-form [id action fields]
+  (let [fields-html (str-join (map render-field fields) "")]
+    (str "<form id='fl-form-" id "' action='" action "' method='post'"
+         " onsubmit='flFormSubmit(event,\"" id "\")'>"
+         "<div class='fl-form-fields'>" fields-html "</div>"
+         "<div class='fl-form-errors' id='fl-form-err-" id "'></div>"
+         "<button type='submit' class='fl-btn fl-btn-primary'>제출</button>"
+         "</form>")))
 
-; ==================== 폼 HTML 생성 ====================
+;; (render-form-ex id action fields submit-text) — 제출 버튼 텍스트 지정
+(defn render-form-ex [id action fields submit-text]
+  (let [fields-html (str-join (map render-field fields) "")]
+    (str "<form id='fl-form-" id "' action='" action "' method='post'"
+         " onsubmit='flFormSubmit(event,\"" id "\")'>"
+         "<div class='fl-form-fields'>" fields-html "</div>"
+         "<div class='fl-form-errors' id='fl-form-err-" id "'></div>"
+         "<button type='submit' class='fl-btn fl-btn-primary'>" submit-text "</button>"
+         "</form>")))
 
-[FUNC render-form :params [id action fields :method "post" :submit-text "제출"]
-  :returns str
-  :body [
-    (do
-      (var fields-html "")
-      (doseq field fields
-        (set fields-html (concat fields-html (render-field field))))
-      (concat
-        "<form id='fl-form-" id "' action='" action "' method='" method "' onsubmit='flFormSubmit(event, \"" id "\")'>"
-        "<div class='fl-form-fields'>" fields-html "</div>"
-        "<div class='fl-form-errors' id='fl-form-err-" id "'></div>"
-        "<button type='submit' class='fl-btn fl-btn-primary'>" submit-text "</button>"
-        "</form>"))
-  ]
-]
+;; ── 폼 검증 JS 생성 ──────────────────────────────────────────────
+;; rules: {"email" {:required true :pattern ".*@.*" :patternMsg "이메일 형식 오류"}}
+(defn form-validation-js [id rules]
+  (str "<script>"
+       "window._flFormRules=window._flFormRules||{};"
+       "window._flFormRules['" id "']=" (json-stringify rules) ";"
+       "function flFormSubmit(e,formId){"
+         "e.preventDefault();"
+         "var form=document.getElementById('fl-form-'+formId);"
+         "var rules=window._flFormRules[formId]||{};"
+         "var data=Object.fromEntries(new FormData(form));"
+         "var errors={};"
+         "Object.entries(rules).forEach(function(entry){"
+           "var field=entry[0],rule=entry[1],val=data[field]||'';"
+           "if(rule.required&&!val)errors[field]=rule.requiredMsg||field+' 필수입니다';"
+           "if(rule.minLength&&val.length<rule.minLength)errors[field]=rule.minMsg||field+' 너무 짧습니다';"
+           "if(rule.pattern&&!new RegExp(rule.pattern).test(val))errors[field]=rule.patternMsg||field+' 형식 오류';"
+         "});"
+         "var hasErrors=Object.keys(errors).length>0;"
+         "Object.entries(errors).forEach(function(entry){"
+           "var el=document.getElementById('fl-err-'+entry[0]);"
+           "if(el)el.textContent=entry[1];"
+         "});"
+         "if(!hasErrors){"
+           "fetch(form.action,{method:'POST',"
+             "headers:{'Content-Type':'application/json'},"
+             "body:JSON.stringify(data)})"
+           ".then(function(r){return r.json();})"
+           ".then(function(res){"
+             "if(res.ok)window.location=res.redirect||'/';"
+             "else{var errEl=document.getElementById('fl-form-err-'+formId);"
+               "if(errEl)errEl.textContent=res.message||'오류 발생';}"
+           "})"
+           ".catch(function(err){"
+             "var errEl=document.getElementById('fl-form-err-'+formId);"
+             "if(errEl)errEl.textContent=err.message||'네트워크 오류';"
+           "});"
+         "}"
+       "}"
+       "</script>"))
 
-; ==================== 폼 검증 JS 생성 ====================
-
-[FUNC form-validation-js :params [id rules]
-  :returns str
-  :body [
-    (do
-      (var rules-json "")
-      (concat
-        "<script>"
-        "window._flFormRules = window._flFormRules || {};"
-        "window._flFormRules['" id "'] = " (json-stringify rules) ";"
-        "function flFormSubmit(e, formId) {"
-        "  e.preventDefault();"
-        "  const form = document.getElementById('fl-form-' + formId);"
-        "  const rules = window._flFormRules[formId] || {};"
-        "  const data = Object.fromEntries(new FormData(form));"
-        "  const errors = {};"
-        "  Object.entries(rules).forEach(([field, rule]) => {"
-        "    const val = data[field] || '';"
-        "    if (rule.required && !val) errors[field] = rule.requiredMsg || field + ' 필수입니다';"
-        "    if (rule.minLength && val.length < rule.minLength) errors[field] = rule.minMsg || field + ' 너무 짧습니다';"
-        "    if (rule.pattern && !new RegExp(rule.pattern).test(val)) errors[field] = rule.patternMsg || field + ' 형식 오류';"
-        "  });"
-        "  const hasErrors = Object.keys(errors).length > 0;"
-        "  Object.entries(errors).forEach(([f, msg]) => {"
-        "    const el = document.getElementById('fl-err-' + f);"
-        "    if (el) el.textContent = msg;"
-        "  });"
-        "  if (!hasErrors) {"
-        "    fetch(form.action, {"
-        "      method: 'POST',"
-        "      headers: {'Content-Type': 'application/json'},"
-        "      body: JSON.stringify(data)"
-        "    }).then(r => r.json()).then(res => {"
-        "      if (res.ok) window.location = res.redirect || '/';"
-        "      else {"
-        "        const errEl = document.getElementById('fl-form-err-' + formId);"
-        "        if (errEl) errEl.textContent = res.message || '오류 발생';"
-        "      }"
-        "    }).catch(err => {"
-        "      const errEl = document.getElementById('fl-form-err-' + formId);"
-        "      if (errEl) errEl.textContent = err.message || '네트워크 오류';"
-        "    });"
-        "  }"
-        "}"
-        "</script>"))
-  ]
-]
-
-; ==================== 폼 CSS ====================
-
-[FUNC form-css :params []
-  :returns str
-  :body [
-    "<style>
-.fl-form-fields { display:flex; flex-direction:column; gap:var(--space-4); }
-.fl-field { display:flex; flex-direction:column; gap:var(--space-1); }
-.fl-field label { font-size:var(--font-sm); font-weight:500; color:var(--color-text); }
-.fl-field input, .fl-field select, .fl-field textarea { padding:var(--space-2) var(--space-3); border:1px solid var(--color-border); border-radius:var(--radius-md); font-size:var(--font-base); background:var(--color-bg); color:var(--color-text); width:100%; }
-.fl-field input:focus { outline:none; border-color:var(--color-primary); box-shadow:0 0 0 2px rgba(59,130,246,0.2); }
-.fl-field-error { font-size:var(--font-sm); color:var(--color-danger); min-height:1.2em; }
-.fl-form-errors { color:var(--color-danger); font-size:var(--font-sm); margin:var(--space-2) 0; }
-    </style>"
-  ]
-]
-
-[EXPORT render-field render-form form-validation-js form-css]
+;; ── 폼 CSS ───────────────────────────────────────────────────────
+(defn form-css []
+  "<style>
+.fl-form-fields{display:flex;flex-direction:column;gap:var(--space-4);}
+.fl-field{display:flex;flex-direction:column;gap:var(--space-1);}
+.fl-field label{font-size:var(--font-sm);font-weight:500;color:var(--color-text);}
+.fl-field input,.fl-field select,.fl-field textarea{padding:var(--space-2) var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--font-base);background:var(--color-bg);color:var(--color-text);width:100%;}
+.fl-field input:focus{outline:none;border-color:var(--color-primary);box-shadow:0 0 0 2px rgba(59,130,246,0.2);}
+.fl-field-error{font-size:var(--font-sm);color:var(--color-danger);min-height:1.2em;}
+.fl-form-errors{color:var(--color-danger);font-size:var(--font-sm);margin:var(--space-2) 0;}
+</style>")
