@@ -149,6 +149,11 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "to_upper":         { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
   // 문자열 변환 (#82)
   "toString":         { correct: "str",           usage: '(str value)' },
+  // 시간 (#37)
+  "Date.now":         { correct: "now-ms",        usage: '(now-ms)' },
+  "Date.now()":       { correct: "now-ms",        usage: '(now-ms)' },
+  "now_ms":           { correct: "now-ms",        usage: '(now-ms)' },
+  "currentTimeMs":    { correct: "now-ms",        usage: '(now-ms)' },
 };
 
 export function suggestSimilar(name: string, candidates: string[]): string | null {

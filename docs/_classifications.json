@@ -2,9 +2,9 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 75,
-    "percent": 75,
-    "last_updated": "2026-05-10",
+    "covered": 70,
+    "percent": 70,
+    "last_updated": "2026-05-11",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
       "#74 (shell-exec-stdout: stdout 직접 반환 — v11.6.20)",
@@ -47,9 +47,13 @@
       "#90 (raise/panic → error ALIAS — v11.6.27)",
       "#4 (sort-by 인자 순서 감지 throw — v11.6.28)",
       "#nil-keys (keys nil → [] 이미 구현됨 — Phase H 재분류)",
-      "#length-or-zero (nil-safe length 헬퍼 추가 — v11.6.30)"
+      "#length-or-zero (nil-safe length 헬퍼 추가 — v11.6.30)",
+      "#37 (Date.now → now-ms ALIAS — v11.6.32)",
+      "#91 (에러 객체 접근 이미 구현 — (get e message) 동작)",
+      "LEARNING.md: #22/#24/#25/#27/#30/#58-#62/#64-#65/#73/#76/#83/#85-#88/#92-#93/#95-#96/#98/#100 문서화",
+      "LEARNING.md: #36/#70/#77 문서 오류 수정"
     ],
-    "_note": "covered 75개 = Phase G 52개 + #63(1) + v11.6.26(10) + v11.6.27(9) + v11.6.28(1) + v11.6.30(2)"
+    "_note": "Phase I: LEARNING.md 문서화 25+3개 + #37 alias + #91 구현 확인"
   },
   "_categories": {
     "design": {
@@ -209,7 +213,10 @@
     "#22": {
       "type": "normal",
       "summary": "v11 let 정상 문법",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#23": {
       "type": "design",
@@ -219,12 +226,18 @@
     "#24": {
       "type": "normal",
       "summary": "let body 마지막 식 반환",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#25": {
       "type": "normal",
       "summary": "let 안에서 이전 바인딩 참조",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#26": {
       "type": "design",
@@ -234,7 +247,10 @@
     "#27": {
       "type": "normal",
       "summary": "v11 defn 표준",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#28": {
       "type": "design",
@@ -249,7 +265,10 @@
     "#30": {
       "type": "normal",
       "summary": "재귀: 함수명 직접 호출",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#31": {
       "type": "design",
@@ -291,12 +310,18 @@
     "#36": {
       "type": "doc",
       "summary": "json_keys ALIAS, 실제로 작동도 함",
-      "fix": "문서 정정"
+      "fix": "문서 정정",
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 문서 오류 수정)"
     },
     "#37": {
       "type": "learning",
       "summary": "now-ms / Date.now",
-      "fix": "ALIAS 처리됨"
+      "fix": "ALIAS 처리됨",
+      "status": "covered",
+      "solved_in": "v11.6.32",
+      "covered_by": "KNOWN_ALIASES: Date.now → now-ms"
     },
     "#38": {
       "type": "learning",
@@ -428,27 +453,42 @@
     "#58": {
       "type": "normal",
       "summary": "(= x true) — 권장 안 함",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#59": {
       "type": "normal",
       "summary": "0/\"\" truthy (Lisp 표준)",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#60": {
       "type": "normal",
       "summary": "0-based 인덱스",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#61": {
       "type": "normal",
       "summary": "if 단일 식만",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#62": {
       "type": "normal",
       "summary": "다중 분기 cond 권장",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#63": {
       "type": "design",
@@ -461,12 +501,18 @@
     "#64": {
       "type": "normal",
       "summary": "and/or 마지막 truthy 반환",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#65": {
       "type": "normal",
       "summary": "if + do 블록",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#66": {
       "type": "design",
@@ -483,37 +529,58 @@
     "#68": {
       "type": "design",
       "summary": "SQL 파라미터 배열 강제",
-      "fix": "✅ v11.6.20: db-exec/db-query scalar 단일값 자동 배열화 (AGENT-3)"
+      "fix": "✅ v11.6.20: db-exec/db-query scalar 단일값 자동 배열화 (AGENT-3)",
+      "status": "covered",
+      "solved_in": "Phase G (v11.6.20 지역)",
+      "covered_by": "sync"
     },
     "#69": {
       "type": "missing",
       "summary": "mariadb_one nil 자동 처리 미지원",
-      "fix": "✅ v11.6.20: mariadb-one nil-safe (undefined 제거, AGENT-3)"
+      "fix": "✅ v11.6.20: mariadb-one nil-safe (undefined 제거, AGENT-3)",
+      "status": "covered",
+      "solved_in": "Phase G (v11.6.20 지역)",
+      "covered_by": "sync"
     },
     "#70": {
       "type": "doc",
       "summary": "KimDB URL 형식",
-      "fix": "문서 명시"
+      "fix": "문서 명시",
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 문서 오류 수정)"
     },
     "#71": {
       "type": "missing",
       "summary": "file_read 없는 파일 → 에러",
-      "fix": "✅ v11.6.20: file-read-or 추가 (AGENT-2)"
+      "fix": "✅ v11.6.20: file-read-or 추가 (AGENT-2)",
+      "status": "covered",
+      "solved_in": "Phase G (v11.6.20 지역)",
+      "covered_by": "sync"
     },
     "#72": {
       "type": "design",
       "summary": "env_load 자동 호출 안됨",
-      "fix": "✅ v11.6.20: .env 자동 로드 (FL_NO_AUTO_ENV=1로 비활성화 가능, AGENT-2)"
+      "fix": "✅ v11.6.20: .env 자동 로드 (FL_NO_AUTO_ENV=1로 비활성화 가능, AGENT-2)",
+      "status": "covered",
+      "solved_in": "Phase G (v11.6.20 지역)",
+      "covered_by": "sync"
     },
     "#73": {
       "type": "normal",
       "summary": "file_mkdir 재귀 생성",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#74": {
       "type": "design",
       "summary": "shell_exec 반환 구조체",
-      "fix": "✅ v11.6.20: shell-exec-stdout 추가 (stdout 직접 반환, AGENT-2)"
+      "fix": "✅ v11.6.20: shell-exec-stdout 추가 (stdout 직접 반환, AGENT-2)",
+      "status": "covered",
+      "solved_in": "Phase G (v11.6.20 지역)",
+      "covered_by": "sync"
     },
     "#75": {
       "type": "user",
@@ -523,12 +590,18 @@
     "#76": {
       "type": "normal",
       "summary": "str 임의 타입 변환",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#77": {
       "type": "doc",
       "summary": "length는 string에도 작동 (문서 거짓)",
-      "fix": "문서 정정"
+      "fix": "문서 정정",
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 문서 오류 수정)"
     },
     "#78": {
       "type": "learning",
@@ -573,7 +646,10 @@
     "#83": {
       "type": "normal",
       "summary": "append 불변",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#84": {
       "type": "design",
@@ -585,22 +661,34 @@
     "#85": {
       "type": "normal",
       "summary": "slice end 미포함",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#86": {
       "type": "normal",
       "summary": "flatten 동작",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#87": {
       "type": "normal",
       "summary": "zip 동작",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#88": {
       "type": "normal",
       "summary": "range end 미포함",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#89": {
       "type": "missing",
@@ -620,17 +708,26 @@
     "#91": {
       "type": "missing",
       "summary": "에러 객체 구조 접근",
-      "fix": "Phase Y: error 메타"
+      "fix": "Phase Y: error 메타",
+      "status": "covered",
+      "solved_in": "Phase G (이미 구현됨)",
+      "covered_by": "(get e \"message\") 이미 동작"
     },
     "#92": {
       "type": "normal",
       "summary": "workflow on_error 동작",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#93": {
       "type": "normal",
       "summary": "load 경로",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#94": {
       "type": "design",
@@ -640,12 +737,18 @@
     "#95": {
       "type": "normal",
       "summary": "do 마지막 식 반환",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#96": {
       "type": "normal",
       "summary": "심볼 vs 문자열",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#97": {
       "type": "design",
@@ -657,7 +760,10 @@
     "#98": {
       "type": "normal",
       "summary": "재귀 깊이 제한",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     },
     "#99": {
       "type": "user",
@@ -667,7 +773,10 @@
     "#100": {
       "type": "normal",
       "summary": "(or nil 0) → 0 (Lisp 표준)",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "LEARNING.md",
+      "covered_by": "documentation (LEARNING.md — 정상 동작 문서화)"
     }
   }
 }
