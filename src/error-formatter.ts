@@ -170,6 +170,11 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "num-abs":          { correct: "abs",           usage: '(abs -5)' },
   "num-floor":        { correct: "floor",         usage: '(floor 3.7)' },
   "num-ceil":         { correct: "ceil",          usage: '(ceil 3.2)' },
+  // 정규식 — regex-test 12회 오용 (fl errors TOP 1)
+  "regex-test":       { correct: "re-test",       usage: '(re-test "^hello" "hello world")  ;; → true' },
+  "regex_test":       { correct: "re-test",       usage: '(re-test "패턴" 문자열)' },
+  "regexp-test":      { correct: "re-test",       usage: '(re-test "패턴" 문자열)' },
+  "re-match":         { correct: "re-test",       usage: '(re-test "패턴" 문자열)  ;; boolean 반환' },
   // #47: req["params"]["id"] 대신 server_req_param 사용
   "req_param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
   "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
