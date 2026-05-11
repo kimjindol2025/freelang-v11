@@ -666,13 +666,34 @@ function flInterpSexpr(op: any, rawArgs: any[], env: any): any {
 
 // ── End Native FL Interpreter Helpers ────────────────────────────────────────
 
+// ── cache-* 내장 구현 (LRU + TTL) ────────────────────────────────────────────
+interface CacheEntry { value: any; expires: number | null; }
+interface CacheHandle {
+  kind: "cache";
+  maxSize: number;
+  map: Map<string, CacheEntry>;
+  hits: number;
+  misses: number;
+}
+function makeCacheHandle(maxSize: number): CacheHandle {
+  return { kind: "cache", maxSize, map: new Map(), hits: 0, misses: 0 };
+}
+function cacheEvict(ch: CacheHandle): void {
+  if (ch.map.size >= ch.maxSize) {
+    // LRU: Map 삽입 순서 기반 — 첫 번째 키 제거
+    const firstKey = ch.map.keys().next().value;
+    if (firstKey !== undefined) ch.map.delete(firstKey);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환
   const normalizedOp = op.replace(/_/g, '-');
 
-  // Phase X-2: Deprecation 경고 (snake_case 호출 시)
-  if (normalizedOp !== op && op !== 'server_start') {  // server_start는 이미 경고
+  // Phase X-2: Deprecation 경고 (snake_case 호출 시) — FL_NO_DEPRECATION_WARN=1 로 끄기 가능
+  if (normalizedOp !== op && op !== 'server_start' && !process.env.FL_NO_DEPRECATION_WARN) {
     console.warn(`⚠️  [FreeLang v11.5.1] ${op}은 deprecated입니다. ${normalizedOp}을 사용하세요.`);
   }
 
@@ -2523,6 +2544,64 @@ loop().catch(e => {
       if (!callFn2) return [];
       return Array.from({ length: len }, (_, i) => callFn2(fn, [a[i], b[i]]));
     }
+    // ── cache-* (LRU + TTL) ──────────────────────────────────────────────────
+    case "cache-create": {
+      const maxSize = typeof args[0] === "number" ? Math.max(1, args[0]) : 100;
+      return makeCacheHandle(maxSize);
+    }
+    case "cache-set": {
+      const ch = args[0] as CacheHandle;
+      if (!ch || ch.kind !== "cache") return false;
+      const key = String(args[1]);
+      const val = args[2];
+      const ttlMs = typeof args[3] === "number" ? args[3] : null;
+      if (ch.map.has(key)) ch.map.delete(key); // LRU 순서 갱신
+      else cacheEvict(ch);
+      ch.map.set(key, { value: val, expires: ttlMs !== null ? Date.now() + ttlMs : null });
+      return true;
+    }
+    case "cache-get": {
+      const ch = args[0] as CacheHandle;
+      if (!ch || ch.kind !== "cache") return null;
+      const key = String(args[1]);
+      const entry = ch.map.get(key);
+      if (!entry) { ch.misses++; return null; }
+      if (entry.expires !== null && Date.now() > entry.expires) {
+        ch.map.delete(key); ch.misses++; return null;
+      }
+      // LRU 갱신: 삭제 후 재삽입
+      ch.map.delete(key); ch.map.set(key, entry);
+      ch.hits++;
+      return entry.value;
+    }
+    case "cache-has": {
+      const ch = args[0] as CacheHandle;
+      if (!ch || ch.kind !== "cache") return false;
+      const key = String(args[1]);
+      const entry = ch.map.get(key);
+      if (!entry) return false;
+      if (entry.expires !== null && Date.now() > entry.expires) { ch.map.delete(key); return false; }
+      return true;
+    }
+    case "cache-del": {
+      const ch = args[0] as CacheHandle;
+      if (!ch || ch.kind !== "cache") return false;
+      return ch.map.delete(String(args[1]));
+    }
+    case "cache-clear": {
+      const ch = args[0] as CacheHandle;
+      if (!ch || ch.kind !== "cache") return false;
+      ch.map.clear(); ch.hits = 0; ch.misses = 0;
+      return true;
+    }
+    case "cache-stats": {
+      const ch = args[0] as CacheHandle;
+      if (!ch || ch.kind !== "cache") return null;
+      const total = ch.hits + ch.misses;
+      return { size: ch.map.size, hits: ch.hits, misses: ch.misses, "hit-rate": total > 0 ? ch.hits / total : 0 };
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     case "uuid": case "uuid4": {
       const { randomUUID } = require("crypto");
       return randomUUID();
