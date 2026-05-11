@@ -2338,6 +2338,64 @@ loop().catch(e => {
     }
     case "str-replace-all": case "str-replace":
       return typeof args[0] === "string" ? args[0].split(String(args[1] ?? "")).join(String(args[2] ?? "")) : "";
+    // 정식 str-* 이름 (alias)
+    case "str-to-upper": case "str-upper":
+      return typeof args[0] === "string" ? args[0].toUpperCase() : (args[0] ?? "");
+    case "str-to-lower": case "str-lower":
+      return typeof args[0] === "string" ? args[0].toLowerCase() : (args[0] ?? "");
+    case "str-trim":
+      return typeof args[0] === "string" ? args[0].trim() : (args[0] === null || args[0] === undefined ? null : "");
+    case "str-trim-left":
+      return typeof args[0] === "string" ? args[0].trimStart() : (args[0] ?? "");
+    case "str-trim-right":
+      return typeof args[0] === "string" ? args[0].trimEnd() : (args[0] ?? "");
+    case "str-starts-with":
+      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].startsWith(args[1]) : false;
+    case "str-ends-with":
+      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].endsWith(args[1]) : false;
+    case "str-includes": case "str-contains":
+      return typeof args[0] === "string" && typeof args[1] === "string" ? args[0].includes(args[1]) : false;
+    // 신규 문자열 함수
+    case "str-repeat":
+      return typeof args[0] === "string" ? args[0].repeat(Math.max(0, Number(args[1] ?? 0))) : "";
+    case "str-pad-left": {
+      if (typeof args[0] !== "string") return String(args[0] ?? "");
+      const padLen = Number(args[1] ?? 0);
+      const padCh = typeof args[2] === "string" ? args[2] : " ";
+      return args[0].padStart(padLen, padCh);
+    }
+    case "str-pad-right": {
+      if (typeof args[0] !== "string") return String(args[0] ?? "");
+      const padLen = Number(args[1] ?? 0);
+      const padCh = typeof args[2] === "string" ? args[2] : " ";
+      return args[0].padEnd(padLen, padCh);
+    }
+    case "str-lines":
+      return typeof args[0] === "string" ? args[0].split("\n") : [];
+    case "str-reverse":
+      return typeof args[0] === "string" ? args[0].split("").reverse().join("") : "";
+    // 맵 변환 유틸리티
+    case "map-vals": {
+      const fn = args[0]; const m = args[1];
+      if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(m)) out[k] = callFnVal(fn, [v]);
+      return out;
+    }
+    case "map-keys": {
+      const fn = args[0]; const m = args[1];
+      if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(m)) out[String(callFnVal(fn, [k]))] = v;
+      return out;
+    }
+    case "filter-vals": {
+      const fn = args[0]; const m = args[1];
+      if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(m)) if (callFnVal(fn, [v])) out[k] = v;
+      return out;
+    }
     case "flatten": {
       if (!Array.isArray(args[0])) return [];
       const flattenDeep = (arr: any[]): any[] => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flattenDeep(val) : val), []);

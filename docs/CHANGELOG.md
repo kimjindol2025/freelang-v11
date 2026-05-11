@@ -1,5 +1,30 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.32] — 2026-05-11 (Batch 8: str-* 정식명 + map-vals/map-keys/filter-vals)
+
+### 신규/수정 함수
+| 항목 | 변경 |
+|------|------|
+| `str-to-upper` / `str-upper` | CLAUDE.md에 문서화되었으나 미구현 → 신규 추가 |
+| `str-to-lower` / `str-lower` | 동일 |
+| `str-trim` | nil 입력 → nil 반환 (이전: `trim`은 `""` 반환) |
+| `str-trim-left` / `str-trim-right` | 단방향 공백 제거 (신규) |
+| `str-starts-with` | `str-starts-with?` 비-predicate alias (신규) |
+| `str-ends-with` | `str-ends-with?` 비-predicate alias (신규) |
+| `str-includes` / `str-contains` | 문자열 포함 여부 (정식 구현) |
+| `str-repeat` | `(str-repeat "ab" 3)` → `"ababab"` |
+| `str-pad-left` | `(str-pad-left "42" 6 "0")` → `"000042"` |
+| `str-pad-right` | `(str-pad-right "hi" 6 ".")` → `"hi...."` |
+| `str-lines` | `(str-lines "a\nb\nc")` → `["a","b","c"]` |
+| `str-reverse` | `(str-reverse "hello")` → `"olleh"` |
+| `map-vals` | `(map-vals inc {:a 1 :b 2})` → `{:a 2 :b 3}` |
+| `map-keys` | `(map-keys str-to-upper {"foo" 1})` → `{"FOO" 1}` |
+| `filter-vals` | `(filter-vals pred m)` → 조건 통과 값만 |
+
+Tests: 903/903 | L2 SHA: 47407b90
+
+---
+
 ## [v11.6.28] — 2026-05-10 (Batch 7: str-blank?/str-split limit/hash-map/type-of/rand-int)
 
 ### 신규/수정 함수
