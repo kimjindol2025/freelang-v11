@@ -231,7 +231,12 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     }
   }
   if (func.params.length > args.length) {
-    throw new Error(`Function '${baseName}' expects ${func.params.length} args, got ${args.length}`);
+    const paramNames = func.params.map((p: any) =>
+      typeof p === "string" ? p.replace(/^\$/, "")
+      : (p?.kind === "variable") ? (p.name as string).replace(/^\$/, "")
+      : "…"
+    );
+    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args.length}`);
   }
 
   if (interp.callDepth >= MAX_CALL_DEPTH) {
@@ -296,7 +301,12 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
       propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
     } catch (e) {
       if (isReturnSignal(e)) { result = e.value; }
-      else throw e;
+      else {
+        if (e instanceof Error && !(e as any).__flCallStack) {
+          (e as any).__flCallStack = [..._callStack];
+        }
+        throw e;
+      }
     } finally {
       interp.callDepth--;
       _callStack.pop();
@@ -322,6 +332,9 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
         result = interp.eval(func.body);
       } catch (e) {
         if (isReturnSignal(e)) return e.value;
+        if (e instanceof Error && !(e as any).__flCallStack) {
+          (e as any).__flCallStack = [..._callStack];
+        }
         throw e;
       }
       if (result && typeof result === "object" && (result as any).__FL_RECUR__) {
@@ -375,7 +388,13 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
     propagateMutations(interp, fn.capturedEnv, paramSet, savedStack);
   } catch (e) {
     if (isReturnSignal(e)) { result = e.value; }
-    else throw e;
+    else {
+      if (e instanceof Error && !(e as any).__flCallStack) {
+        const _cs = (interp as any).context?.callStack;
+        if (_cs?.length) (e as any).__flCallStack = [..._cs];
+      }
+      throw e;
+    }
   } finally {
     interp.callDepth--;
     interp.context.variables.restoreStack(savedStack);

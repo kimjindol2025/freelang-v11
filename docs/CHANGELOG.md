@@ -1,5 +1,31 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.37] — 2026-05-11 (Phase J: 에러/디버그 품질 개선)
+
+### 에러 메시지 개선
+
+| 항목 | 이전 | 이후 |
+|------|------|------|
+| 인자 수 오류 | `expects 2 args, got 1` | `expects 2 args (name, age), got 1` — 파라미터 이름 표시 |
+| nil 산술 | `인자 2번이 nil — 숫자 예상` | `[E_TYPE_MISMATCH] +: 인자 2번에 nil 전달됨 — number 필요 (nil? 확인 후 기본값 사용)` |
+| 잘못된 타입 산술 | (미감지) | `[E_TYPE_MISMATCH] +: 인자 2번에 string 전달됨 — number 필요 (str-to-num 변환 확인)` |
+
+### callStack 전파 개선
+
+- `eval-call-function.ts` catch 블록 3곳에 `__flCallStack` 캡처 추가
+- 에러 발생 위치에서 `finally`(스택 pop) 전에 스택 캡처 → 더 완전한 스택 트레이스
+
+### 구현 파일
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/eval-call-function.ts` | 파라미터 이름 포함 arg count 에러 + callStack catch 첨부 |
+| `src/eval-builtins.ts` | `flTypeOf()` 헬퍼 추가, 산술 타입 에러 개선 (nil+wrong type 모두 감지) |
+
+**테스트**: 962/962 PASS 유지
+
+---
+
 ## [v11.6.36] — 2026-05-11 (Phase I-1: stdlib 3개 신규 모듈)
 
 ### 신규 stdlib 모듈 (3개)

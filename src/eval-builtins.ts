@@ -36,6 +36,16 @@ function flDeepEq(a: any, b: any): boolean {
   return false;
 }
 
+// Phase J: 에러 메시지용 FL 타입명 반환 헬퍼
+function flTypeOf(v: any): string {
+  if (v === null || v === undefined) return "nil";
+  if (Array.isArray(v)) return "array";
+  if (v instanceof Map) return "map";
+  if (typeof v === "object" && (v.kind === "function-value" || v.kind === "closure" || v.kind === "builtin-fn")) return "function";
+  if (typeof v === "object") return "map";
+  return typeof v; // "number" | "string" | "boolean" | "function"
+}
+
 // Phase L1.5: Module Cache Layer (비활성화)
 // NOTE: Global cache causes issues with multiple interpreter instances
 // Each interpreter should manage its own module cache to avoid cross-interpreter conflicts
@@ -160,23 +170,39 @@ function flExecOpNative(op: string, vals: any[]): any {
   const v0 = vals[0], v1 = vals[1], v2 = vals[2];
   switch (normalizedOp) {
     case "+": {
-      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
-      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      const badIdx = vals.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? 값인지 확인 후 기본값을 사용하세요)` : `(str-to-num 등으로 변환하세요)`;
+        throw new Error(`[E_TYPE_MISMATCH] +: 인자 ${badIdx + 1}번에 ${actual} 전달됨 — number 필요 ${hint}`);
+      }
       return vals.reduce((a: number, b: number) => a + b, 0);
     }
     case "-": {
-      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
-      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      const badIdx = vals.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? 확인 후 기본값 사용)` : `(str-to-num 변환 확인)`;
+        throw new Error(`[E_TYPE_MISMATCH] -: 인자 ${badIdx + 1}번에 ${actual} 전달됨 — number 필요 ${hint}`);
+      }
       return vals.length === 1 ? -v0 : vals.reduce((a: number, b: number) => a - b);
     }
     case "*": {
-      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
-      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      const badIdx = vals.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? 확인 후 기본값 사용)` : `(str-to-num 변환 확인)`;
+        throw new Error(`[E_TYPE_MISMATCH] *: 인자 ${badIdx + 1}번에 ${actual} 전달됨 — number 필요 ${hint}`);
+      }
       return vals.reduce((a: number, b: number) => a * b, 1);
     }
     case "/": {
-      const nilIdx = vals.findIndex((v: any) => v === null || v === undefined);
-      if (nilIdx >= 0) throw new Error(`타입 불일치: 인자 ${nilIdx + 1}번이 nil — 숫자 예상`);
+      const badIdx = vals.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? 확인 후 기본값 사용)` : `(str-to-num 변환 확인)`;
+        throw new Error(`[E_TYPE_MISMATCH] /: 인자 ${badIdx + 1}번에 ${actual} 전달됨 — number 필요 ${hint}`);
+      }
       return vals.length === 1 ? 1 / v0 : vals.reduce((a: number, b: number) => a / b);
     }
     case "%": return v0 % v1;
@@ -1089,23 +1115,23 @@ loop().catch(e => {
 
     // Arithmetic
     case "+": {
-      const ni = args.findIndex((v: any) => v === null || v === undefined);
-      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
+      const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (bi >= 0) { const t = flTypeOf(args[bi]); const h = t === "nil" ? "(nil? 확인 후 기본값 사용)" : "(str-to-num 변환 확인)"; throw new Error(`[E_TYPE_MISMATCH] +: 인자 ${bi + 1}번에 ${t} 전달됨 — number 필요 ${h}`); }
       return args.reduce((a: number, b: number) => a + b, 0);
     }
     case "-": {
-      const ni = args.findIndex((v: any) => v === null || v === undefined);
-      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
+      const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (bi >= 0) { const t = flTypeOf(args[bi]); const h = t === "nil" ? "(nil? 확인 후 기본값 사용)" : "(str-to-num 변환 확인)"; throw new Error(`[E_TYPE_MISMATCH] -: 인자 ${bi + 1}번에 ${t} 전달됨 — number 필요 ${h}`); }
       return args.length === 1 ? -args[0] : args.reduce((a: number, b: number) => a - b);
     }
     case "*": {
-      const ni = args.findIndex((v: any) => v === null || v === undefined);
-      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
+      const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (bi >= 0) { const t = flTypeOf(args[bi]); const h = t === "nil" ? "(nil? 확인 후 기본값 사용)" : "(str-to-num 변환 확인)"; throw new Error(`[E_TYPE_MISMATCH] *: 인자 ${bi + 1}번에 ${t} 전달됨 — number 필요 ${h}`); }
       return args.reduce((a: number, b: number) => a * b, 1);
     }
     case "/": {
-      const ni = args.findIndex((v: any) => v === null || v === undefined);
-      if (ni >= 0) throw new Error(`타입 불일치: 인자 ${ni + 1}번이 nil — 숫자 예상`);
+      const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
+      if (bi >= 0) { const t = flTypeOf(args[bi]); const h = t === "nil" ? "(nil? 확인 후 기본값 사용)" : "(str-to-num 변환 확인)"; throw new Error(`[E_TYPE_MISMATCH] /: 인자 ${bi + 1}번에 ${t} 전달됨 — number 필요 ${h}`); }
       return args.length === 1 ? 1 / args[0] : args.reduce((a: number, b: number) => a / b);
     }
     case "%":
