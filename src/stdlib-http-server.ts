@@ -355,6 +355,67 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return null;
     },
 
+    // server_static dir [urlPrefix] -> null  정적 파일 서빙 (server-static "public" "/")
+    "server_static": (dir: string, urlPrefix: string = "/"): null => {
+      const mimeMap: Record<string, string> = {
+        ".html": "text/html; charset=utf-8",
+        ".htm":  "text/html; charset=utf-8",
+        ".css":  "text/css; charset=utf-8",
+        ".js":   "application/javascript; charset=utf-8",
+        ".mjs":  "application/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".png":  "image/png",
+        ".jpg":  "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif":  "image/gif",
+        ".svg":  "image/svg+xml",
+        ".ico":  "image/x-icon",
+        ".woff": "font/woff",
+        ".woff2":"font/woff2",
+        ".ttf":  "font/ttf",
+        ".txt":  "text/plain; charset=utf-8",
+        ".pdf":  "application/pdf",
+      };
+      const absDir = path.resolve(dir);
+      const prefix = urlPrefix.endsWith("/") ? urlPrefix : urlPrefix + "/";
+
+      const handler = (_req: http.IncomingMessage, res: http.ServerResponse, reqPath: string) => {
+        // strip url prefix, default to index.html
+        let rel = reqPath.startsWith(prefix) ? reqPath.slice(prefix.length - 1) : reqPath;
+        if (rel === "" || rel === "/") rel = "/index.html";
+        // security: block path traversal
+        const filePath = path.join(absDir, rel);
+        if (!filePath.startsWith(absDir)) {
+          res.writeHead(403, { "Content-Type": "text/plain" });
+          res.end("Forbidden");
+          return true;
+        }
+        if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
+        const ext = path.extname(filePath).toLowerCase();
+        const mime = mimeMap[ext] || "application/octet-stream";
+        const content = fs.readFileSync(filePath);
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Content-Length": content.length,
+          "Cache-Control": "public, max-age=3600",
+        });
+        res.end(content);
+        return true;
+      };
+
+      // 와일드카드 패턴으로 GET 라우트 등록
+      const routePath = prefix === "/" ? "/*" : prefix + "*";
+      const [pattern, params] = pathToRegex(routePath);
+      routes.push({
+        method: "GET",
+        path: routePath,
+        pattern,
+        params,
+        handler: { __fl_static_handler: true, fn: handler } as any,
+      });
+      return null;
+    },
+
     // server_all path handler → 모든 메서드 등록 (catch-all)
     "server_all": (path: string, handlerName: string | any): null => {
       const [pattern, params] = pathToRegex(path);
@@ -487,6 +548,13 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
               if (typeof route.handler === 'string') {
                 // 함수 이름 (문자열) → callFn으로 호출
                 rawResult = callFn(route.handler, [flReq]);
+              } else if (route.handler && (route.handler as any).__fl_static_handler === true) {
+                // server_static 정적 파일 핸들러
+                const served = (route.handler as any).fn(req, res, path);
+                if (served) return; // 직접 응답 완료
+                // 파일 없으면 404
+                sendResponse(res, 404, { error: "Not found" });
+                return;
               } else if (route.handler && route.handler.kind === 'function-value' && callFunctionValue) {
                 // v9 람다 함수 (function-value 객체) → callFunctionValue로 호출
                 rawResult = callFunctionValue(route.handler, [flReq]);
