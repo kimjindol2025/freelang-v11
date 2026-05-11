@@ -2646,3 +2646,77 @@ JS `typeof` 대신 FreeLang 관점의 타입명.
 - **Immutable by default** — 컬렉션은 불변 (새 복사본 반환)
 - **Type coercion** — 자동 타입 변환 지원 (필요시 명시적 타입 체크 권장)
 - **Error handling** — try-catch로 모든 에러 처리 가능
+
+
+---
+
+## stdlib 확장 모듈 (load 필요)
+
+### validate.fl — 데이터 검증
+
+```lisp
+(load "stdlib/validate.fl")
+
+(validate-email "a@b.com")         ; → true
+(validate-url "https://x.com")     ; → true
+(validate-min-length "hi" 5)       ; → false
+(validate-max-length "hi" 10)      ; → true
+(validate-range 3 1 10)            ; → true
+(validate-integer 5)               ; → true
+(validate-positive 1)              ; → true
+(validate-non-negative 0)          ; → true
+
+;; 빈 필드 검출
+(validate-required {:name "" :age nil} ["name" "age"])  ; → ["name" "age"]
+
+;; 스키마 검증
+(validate-schema
+  {:name "Kim" :email "bad" :age 200}
+  {:name  {:required true :min-length 2}
+   :email {:required true :email true}
+   :age   {:type "number" :max 150}})
+; → {:ok false :errors [{:field "email" :message "email must be a valid email"}
+;                       {:field "age"   :message "age must be <= 150"}]}
+```
+
+### cache.fl — LRU+TTL 캐시
+
+```lisp
+(load "stdlib/cache.fl")
+
+;; 핸들 기반
+(define ch (cache-create 100))
+(cache-set ch "key" value)           ; 영구 저장
+(cache-set ch "key" value 60000)     ; TTL 60초(ms)
+(cache-get ch "key")                 ; → value or nil
+(cache-has ch "key")                 ; → bool
+(cache-del ch "key")
+(cache-clear ch)
+(cache-stats ch)   ; → {:size N :hits N :misses N :hit-rate N}
+
+;; get-or-set 헬퍼
+(cache-get-or-set ch "key" (fn [] (fetch-data)))    ; 미스 시 fn 호출
+(cache-get-or-set-ttl ch "key" 30000 (fn [] data))  ; TTL 30초
+
+;; 글로벌 모드 (핸들 없이 싱글톤)
+(cache-set "key" value 60)   ; TTL 60초(초 단위)
+(cache-get "key")
+(cache-del "key")
+```
+
+### log.fl — 구조화 로그
+
+```lisp
+(load "stdlib/log.fl")
+
+(log-info  "user.login"  {:userId 1 :ip "1.2.3.4"})
+(log-warn  "rate.limit"  {:current 90 :limit 100})
+(log-error "db.fail"     {:err "timeout"})
+(log-debug "cache.miss"  {:key "x"})   ; FL_DEBUG=1 시만 출력
+
+;; 파일 기록
+(log-to-file! "app.log")   ; 이후 모든 로그가 파일에도 기록됨
+
+;; 출력 형식 (JSON 1줄)
+; {"ts":1234567890,"level":"INFO","event":"user.login","ctx":{"userId":1}}
+```

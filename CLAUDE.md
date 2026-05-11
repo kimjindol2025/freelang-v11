@@ -1,7 +1,7 @@
 # FreeLang v11 — Claude AI 완전 레퍼런스
 
-**버전**: v11.6.32 | **최신 갱신**: 2026-05-11  
-**상태**: 프로덕션 (68/68 테스트 통과) | **AI 신뢰도**: 9.5/10
+**버전**: v11.6.36 | **최신 갱신**: 2026-05-11  
+**상태**: 프로덕션 (962/962 테스트 통과) | **AI 신뢰도**: 9.5/10
 
 ---
 
@@ -453,12 +453,35 @@ true false nil          ;; 불린/nil
 - `db-query`, `db-exec`, `db-transaction`
 
 ### 파일
-- `file-read`, `file-write`, `file-append`, `file-exists`, `file-delete`
+- `file-read`, `file-write`, `file-append`, `file-exists`, `file-delete`, `file-append-line`
 
 ### 유틸
 - `println`, `uuid`, `now-ms`, `sleep`, `json-parse`, `json-stringify`, `html-escape`, `js-escape`
 - `rand` — `(rand)` → 0.0~1.0 실수 (Math.random())
 - `rand-int` — `(rand-int n)` → 0~n-1, `(rand-int min max)` → min~max-1
+- `fl-env-get` — `(fl-env-get "KEY" "default")` 환경변수 읽기
+- `re-test` — `(re-test "pattern" str)` 정규식 테스트
+
+### 캐시 (stdlib/cache.fl + 내장)
+- `(load "stdlib/cache.fl")` 로 로드
+- `(cache-create n)` → 핸들, `(cache-set ch key val [ttl-ms])`, `(cache-get ch key)`
+- `(cache-has ch key)`, `(cache-del ch key)`, `(cache-clear ch)`, `(cache-stats ch)`
+- `(cache-get-or-set ch key loader-fn)` — 캐시 미스 시 fn 호출 후 저장
+- 글로벌 모드: `(cache-set "key" val [ttl-sec])` (핸들 없이 싱글톤 사용)
+
+### 검증 (stdlib/validate.fl)
+- `(load "stdlib/validate.fl")` 로 로드
+- `(validate-email s)`, `(validate-url s)`, `(validate-min-length s n)`, `(validate-max-length s n)`
+- `(validate-range v mn mx)`, `(validate-integer v)`, `(validate-positive v)`, `(validate-non-negative v)`
+- `(validate-required m fields)` → 비어있는 필드 목록
+- `(validate-schema data schema)` → `{:ok bool :errors [{:field k :message msg}]}`
+
+### 로그 (stdlib/log.fl)
+- `(load "stdlib/log.fl")` 로 로드
+- `(log-info event ctx)`, `(log-warn event ctx)`, `(log-error event ctx)`
+- `(log-debug event ctx)` — `FL_DEBUG=1` 환경변수 필요
+- `(log-to-file! "app.log")` — 이후 로그를 파일에도 기록
+- 출력 형식: `{"ts":…,"level":"INFO","event":"…","ctx":{…}}`
 
 ---
 

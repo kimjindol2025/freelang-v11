@@ -1,5 +1,34 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.36] — 2026-05-11 (Phase I-1: stdlib 3개 신규 모듈)
+
+### 신규 stdlib 모듈 (3개)
+
+| 모듈 | 경로 | 주요 함수 |
+|------|------|----------|
+| validate | `stdlib/validate.fl` | validate-email, validate-url, validate-schema 등 |
+| cache    | `stdlib/cache.fl`   | cache-get-or-set, cache-get-or-set-ttl 래퍼 |
+| log      | `stdlib/log.fl`     | log-info, log-warn, log-error, log-debug |
+
+### 내장 함수 추가 (eval-builtins.ts)
+
+| 함수 | 동작 |
+|------|------|
+| `cache-create` | `(cache-create maxSize)` → CacheHandle (LRU+TTL) |
+| `cache-set`    | `(cache-set ch key val [ttl-ms])` — LRU 순서 갱신 |
+| `cache-get`    | `(cache-get ch key)` — TTL 만료 시 자동 제거 |
+| `cache-has`    | `(cache-has ch key)` → bool |
+| `cache-del`    | `(cache-del ch key)` → bool |
+| `cache-clear`  | `(cache-clear ch)` → bool |
+| `cache-stats`  | `(cache-stats ch)` → `{:size :hits :misses :hit-rate}` |
+
+**글로벌 모드 유지**: `(cache-set "key" val ttl-sec)` — 핸들 없이 싱글톤 사용 (하위 호환)
+
+### 테스트
+- `src/__tests__/stdlib-new.test.ts` — 29개 신규 테스트 (전체 962/962 PASS)
+
+---
+
 ## [v11.6.35] — 2026-05-11 (MISTAKES-100 80% 달성: 재분류 4개)
 
 ### MISTAKES-100 재분류 (이미 동작 확인 → covered)
