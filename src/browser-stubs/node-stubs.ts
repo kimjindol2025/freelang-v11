@@ -1,6 +1,7 @@
 // Node.js 모듈 브라우저 스텁 — 빌드 에러 방지용
 export const readFileSync = () => "";
 export const writeFileSync = () => {};
+export const appendFileSync = () => {};
 export const existsSync = () => false;
 export const mkdirSync = () => {};
 export const readdirSync = () => [];

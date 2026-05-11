@@ -1987,6 +1987,43 @@ switch (cmd) {
     cmdServe(args.slice(1));
     break;
   }
+  case "errors": {
+    // fl errors [top N] — 누적된 unknown function 로그 빈도 분석
+    const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
+    const topN = parseInt(args[1] ?? "20", 10);
+    try {
+      const raw = fs.readFileSync(logPath, "utf-8").trim();
+      if (!raw) { console.log("(기록된 에러 없음)"); break; }
+      const freq: Record<string, number> = {};
+      const examples: Record<string, string> = {};
+      for (const line of raw.split("\n")) {
+        try {
+          const e = JSON.parse(line);
+          freq[e.name] = (freq[e.name] ?? 0) + 1;
+          if (!examples[e.name] && e.file) examples[e.name] = `${e.file}:${e.line ?? "?"}`;
+        } catch { /* 손상된 줄 무시 */ }
+      }
+      const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, topN);
+      console.log(`\n📊 FreeLang 미발견 함수 TOP ${topN}  (로그: ${logPath})\n`);
+      sorted.forEach(([name, count], i) => {
+        const ex = examples[name] ? `  ← ${examples[name]}` : "";
+        console.log(`  ${String(i + 1).padStart(2)}. ${name.padEnd(30)} ${String(count).padStart(4)}회${ex}`);
+      });
+      console.log(`\n총 ${Object.keys(freq).length}종류 / ${raw.split("\n").length}건\n`);
+    } catch (e: any) {
+      if (e.code === "ENOENT") console.log(`(아직 기록 없음 — ${logPath})`);
+      else console.error(e.message);
+    }
+    break;
+  }
+  case "errors-clear": {
+    const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
+    try {
+      fs.unlinkSync(logPath);
+      console.log(`✓ 로그 삭제: ${logPath}`);
+    } catch { console.log("(로그 없음)"); }
+    break;
+  }
   case "version":
   case "-v":
   case "--version":

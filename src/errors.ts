@@ -2,6 +2,17 @@
 // Phase 6: Module System + Type-safe Error Handling
 // Phase 59: 위치 정보 (file/line/col/hint) 추가
 
+import { appendFileSync } from "fs";
+
+const FL_ERROR_LOG = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
+
+function logUnknownFunction(name: string, file?: string, line?: number) {
+  try {
+    const entry = JSON.stringify({ name, file, line, ts: Date.now() }) + "\n";
+    appendFileSync(FL_ERROR_LOG, entry);
+  } catch { /* 로그 실패는 조용히 무시 */ }
+}
+
 /**
  * 기본 ModuleError 클래스
  * 모듈 시스템 관련 모든 에러의 부모 클래스
@@ -117,6 +128,7 @@ export class FunctionNotFoundError extends Error {
     super(`Function not found: ${functionName}${hintStr}`);
     this.name = "FunctionNotFoundError";
     Object.setPrototypeOf(this, FunctionNotFoundError.prototype);
+    logUnknownFunction(functionName, file, line);
   }
 }
 
