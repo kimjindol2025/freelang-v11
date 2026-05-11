@@ -332,6 +332,74 @@ export function createDataModule() {
       });
     },
 
+    // ── CSV kebab-case aliases (Phase B) ─────────────────────
+
+    // csv-parse text [delimiter] -> [[string]] (quoted fields 완전 지원)
+    "csv-parse": (str: string, delimiter?: string): string[][] => {
+      const delim = delimiter ?? ",";
+      const lines = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+      return lines.filter(l => l.trim() !== "").map(line => {
+        const result: string[] = [];
+        let cur = "";
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+            else inQuote = !inQuote;
+          } else if (line.startsWith(delim, i) && !inQuote) {
+            result.push(cur); cur = "";
+            i += delim.length - 1;
+          } else { cur += ch; }
+        }
+        result.push(cur);
+        return result;
+      });
+    },
+
+    // csv-parse-map text [delimiter] -> [{header: val}] (헤더 포함 파싱)
+    "csv-parse-map": (str: string, delimiter?: string): Record<string, string>[] => {
+      const delim = delimiter ?? ",";
+      const lines = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n").filter(l => l.trim() !== "");
+      if (lines.length < 2) return [];
+      const parseLine = (line: string): string[] => {
+        const result: string[] = [];
+        let cur = "";
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+            else inQuote = !inQuote;
+          } else if (line.startsWith(delim, i) && !inQuote) {
+            result.push(cur); cur = "";
+            i += delim.length - 1;
+          } else { cur += ch; }
+        }
+        result.push(cur);
+        return result;
+      };
+      const headers = parseLine(lines[0]);
+      return lines.slice(1).map(line => {
+        const vals = parseLine(line);
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
+        return obj;
+      });
+    },
+
+    // csv-stringify rows [delimiter] -> string
+    "csv-stringify": (rows: any[][], delimiter?: string): string => {
+      const delim = delimiter ?? ",";
+      return rows.map((row: any[]) =>
+        row.map((cell: any) => {
+          const s = String(cell ?? "");
+          return (s.includes(delim) || s.includes('"') || s.includes("\n"))
+            ? `"${s.replace(/"/g, '""')}"` : s;
+        }).join(delim)
+      ).join("\n");
+    },
+
     // ── String Template ───────────────────────────────────────
 
     // str_template template vars -> string  ({key} → value substitution)

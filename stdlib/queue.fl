@@ -1,0 +1,57 @@
+;; FreeLang stdlib — queue.fl (불변 큐/스택)
+;; (load "stdlib/queue.fl")
+;;
+;; Queue (FIFO): queue-create / queue-push / queue-pop / queue-peek / queue-size / queue-empty? / queue->list
+;; Stack (LIFO): stack-create / stack-push / stack-pop / stack-peek / stack-size / stack-empty? / stack->list
+
+;; ── Queue (FIFO) ─────────────────────────────────────────────────
+
+(defn queue-create []
+  {:items [] :size 0})
+
+(defn queue-push [q item]
+  {:items (append (get q :items) item) :size (inc (get q :size))})
+
+(defn queue-pop [q]
+  (let [items (get q :items)]
+    (if (empty? items)
+      {:val nil :queue q}
+      {:val (first items) :queue {:items (rest items) :size (dec (get q :size))}})))
+
+(defn queue-peek [q]
+  (first (get q :items)))
+
+(defn queue-size [q]
+  (get q :size))
+
+(defn queue-empty? [q]
+  (= (get q :size) 0))
+
+(defn queue->list [q]
+  (get q :items))
+
+;; ── Stack (LIFO) ──────────────────────────────────────────────────
+
+(defn stack-create []
+  {:items [] :size 0})
+
+(defn stack-push [s item]
+  {:items (append (get s :items) item) :size (inc (get s :size))})
+
+(defn stack-pop [s]
+  (let [items (get s :items)]
+    (if (empty? items)
+      {:val nil :stack s}
+      {:val (last items) :stack {:items (butlast items) :size (dec (get s :size))}})))
+
+(defn stack-peek [s]
+  (last (get s :items)))
+
+(defn stack-size [s]
+  (get s :size))
+
+(defn stack-empty? [s]
+  (= (get s :size) 0))
+
+(defn stack->list [s]
+  (get s :items))

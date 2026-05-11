@@ -1,0 +1,38 @@
+;; FreeLang stdlib — csv.fl (CSV 파싱/직렬화)
+;; (load "stdlib/csv.fl")
+;;
+;; 내장 함수 (eval-builtins → stdlib-data.ts):
+;;   csv-parse       — [[string]] 반환, quoted fields 완전 지원
+;;   csv-parse-map   — [{header: val}] 반환
+;;   csv-stringify   — rows → CSV 문자열
+;;
+;; 이 파일은 FL 레벨 유틸리티 함수 제공
+
+;; CSV 첫 행(헤더)만 반환
+(defn csv-headers [text]
+  (first (csv-parse text)))
+
+;; CSV를 파싱해 헤더 제외 데이터 행만 반환
+(defn csv-data-rows [text]
+  (rest (csv-parse text)))
+
+;; 헤더 + 데이터 rows를 CSV로 직렬화
+(defn csv-from-maps [headers maps]
+  (let [header-row [headers]
+        data-rows (map (fn [m] (map (fn [h] (get m h)) headers)) maps)]
+    (csv-stringify (append header-row data-rows))))
+
+;; CSV 행 수 (헤더 제외)
+(defn csv-row-count [text]
+  (length (csv-data-rows text)))
+
+;; 특정 컬럼만 추출 → [{col: val}]
+(defn csv-select [text col-names]
+  (let [rows (csv-parse-map text)]
+    (map (fn [row]
+      (reduce (fn [acc col] (assoc acc col (get row col))) {} col-names))
+      rows)))
+
+;; CSV에서 특정 컬럼 필터링
+(defn csv-filter [text col pred-fn]
+  (filter (fn [row] (pred-fn (get row col))) (csv-parse-map text)))

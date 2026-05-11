@@ -1,5 +1,30 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.38] — 2026-05-11 (Phase B: stdlib 실용 모듈 3개)
+
+### 신규 stdlib 모듈
+
+| 모듈 | 경로 | 주요 함수 |
+|------|------|----------|
+| queue | `stdlib/queue.fl` | queue-create/push/pop/peek/size/empty?/→list, stack-create/push/pop/peek/size/empty?/→list |
+| math-ext | `stdlib/math-ext.fl` | math-sum/mean/median/variance/stddev/min/max/range/percentile/normalize/clamp |
+| csv | `stdlib/csv.fl` | csv-headers/data-rows/row-count/from-maps/select/filter |
+
+### 신규 내장 함수 (stdlib-data.ts)
+
+| 함수 | 동작 |
+|------|------|
+| `csv-parse` | `(csv-parse text [delim])` → `[[string]]` — quoted fields 완전 지원 |
+| `csv-parse-map` | `(csv-parse-map text [delim])` → `[{header: val}]` |
+| `csv-stringify` | `(csv-stringify rows [delim])` → CSV 문자열, 특수문자 자동 인용부호 |
+
+### 테스트
+
+- `src/__tests__/stdlib-phase-b.test.ts` — 35개 신규 테스트
+- 전체: 962/962 → **997/997 PASS**
+
+---
+
 ## [v11.6.37] — 2026-05-11 (Phase J: 에러/디버그 품질 개선)
 
 ### 에러 메시지 개선

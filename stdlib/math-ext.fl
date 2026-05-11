@@ -1,0 +1,57 @@
+;; FreeLang stdlib — math-ext.fl (확장 수학/통계 함수)
+;; (load "stdlib/math-ext.fl")
+;;
+;; math-sum / math-mean / math-median / math-variance / math-stddev
+;; math-min / math-max / math-range / math-percentile
+;; math-normalize / math-clamp
+
+(defn math-sum [xs]
+  (reduce + 0 xs))
+
+(defn math-mean [xs]
+  (if (empty? xs) nil
+    (/ (math-sum xs) (length xs))))
+
+(defn math-median [xs]
+  (let [s (sort xs)
+        n (length s)
+        m (quot n 2)]
+    (if (= (% n 2) 0)
+      (/ (+ (nth s (- m 1)) (nth s m)) 2)
+      (nth s m))))
+
+(defn math-variance [xs]
+  (let [n (length xs)
+        mu (math-mean xs)]
+    (if (nil? mu) nil
+      (/ (reduce + 0 (map (fn [x] (pow (- x mu) 2)) xs)) n))))
+
+(defn math-stddev [xs]
+  (let [v (math-variance xs)]
+    (if (nil? v) nil (sqrt v))))
+
+(defn math-min [xs]
+  (reduce (fn [a b] (if (< a b) a b)) (first xs) (rest xs)))
+
+(defn math-max [xs]
+  (reduce (fn [a b] (if (> a b) a b)) (first xs) (rest xs)))
+
+(defn math-range [xs]
+  (- (math-max xs) (math-min xs)))
+
+(defn math-percentile [xs p]
+  (let [s (sort xs)
+        n (length s)
+        idx (floor (* (/ p 100.0) (- n 1)))]
+    (nth s (min idx (- n 1)))))
+
+(defn math-clamp [v lo hi]
+  (max lo (min hi v)))
+
+(defn math-normalize [xs]
+  (let [lo (math-min xs)
+        hi (math-max xs)
+        r (- hi lo)]
+    (if (= r 0)
+      (map (fn [x] 0) xs)
+      (map (fn [x] (/ (- x lo) r)) xs))))
