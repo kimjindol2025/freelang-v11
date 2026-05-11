@@ -154,6 +154,22 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "Date.now()":       { correct: "now-ms",        usage: '(now-ms)' },
   "now_ms":           { correct: "now-ms",        usage: '(now-ms)' },
   "currentTimeMs":    { correct: "now-ms",        usage: '(now-ms)' },
+  // 수학 (#90) — num-round 등 잘못된 함수명
+  "num-round":        { correct: "round",         usage: '(round 3.7)  ;; → 4 | 소수점 이하 제거는 (int 3.7) → 3' },
+  "num_round":        { correct: "round",         usage: '(round 3.7)' },
+  "Math.round":       { correct: "round",         usage: '(round 3.7)' },
+  "Math.floor":       { correct: "floor",         usage: '(floor 3.7)  ;; → 3' },
+  "Math.ceil":        { correct: "ceil",          usage: '(ceil 3.2)   ;; → 4' },
+  "Math.abs":         { correct: "abs",           usage: '(abs -5)     ;; → 5' },
+  "Math.max":         { correct: "max",           usage: '(max 3 7)    ;; → 7' },
+  "Math.min":         { correct: "min",           usage: '(min 3 7)    ;; → 3' },
+  "Math.pow":         { correct: "pow",           usage: '(pow 2 10)   ;; → 1024' },
+  "Math.sqrt":        { correct: "sqrt",          usage: '(sqrt 16)    ;; → 4' },
+  "truncate":         { correct: "int",           usage: '(int 3.9)    ;; → 3 (소수점 버림)' },
+  "trunc":            { correct: "int",           usage: '(int 3.9)    ;; → 3' },
+  "num-abs":          { correct: "abs",           usage: '(abs -5)' },
+  "num-floor":        { correct: "floor",         usage: '(floor 3.7)' },
+  "num-ceil":         { correct: "ceil",          usage: '(ceil 3.2)' },
 };
 
 export function suggestSimilar(name: string, candidates: string[]): string | null {

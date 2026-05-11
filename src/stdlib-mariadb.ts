@@ -48,8 +48,16 @@ function buildArgs(db: string, sql: string): string[] {
 
 function runMariadb(db: string, sql: string): string {
   const r = spawnSync("mariadb", buildArgs(db, sql), { timeout: 15000, encoding: "utf-8" });
-  if (r.error) throw new Error(`mariadb CLI failed: ${r.error.message}`);
-  if ((r.status ?? 1) !== 0) throw new Error(r.stderr?.trim() ?? `mariadb exit ${r.status}`);
+  if (r.error) {
+    const hint = r.error.message.includes("ENOENT")
+      ? "\n힌트: mariadb CLI를 찾을 수 없습니다. PATH 환경변수를 확인하세요.\n  예) PATH=/data/data/com.termux/files/usr/bin:$PATH"
+      : "";
+    throw new Error(`mariadb CLI 실패: ${r.error.message}${hint}\nDB: ${db}\nSQL: ${sql.slice(0, 200)}`);
+  }
+  if ((r.status ?? 1) !== 0) {
+    const stderr = r.stderr?.trim() ?? `mariadb exit ${r.status}`;
+    throw new Error(`MariaDB 오류: ${stderr}\nDB: ${db}\nSQL: ${sql.slice(0, 200)}`);
+  }
   return r.stdout?.toString() ?? "";
 }
 
@@ -92,7 +100,7 @@ function bindParams(sql: string, params: any[]): string {
       return s.replace("?", String(p));
     }
     if (Array.isArray(p) || (typeof p === "object" && p !== null))
-      throw new Error(`SQL 파라미터 오류: 객체/배열은 파라미터로 사용 불가`);
+      throw new Error(`SQL 파라미터 오류: 객체/배열은 파라미터로 사용 불가 (받은 값: ${JSON.stringify(p).slice(0, 80)})\n힌트: (json-stringify 값) 으로 문자열 변환 후 삽입하세요`);
     return s.replace("?", `'${escapeString(String(p))}'`);
   }, sql);
 }
