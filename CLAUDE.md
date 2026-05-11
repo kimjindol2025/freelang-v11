@@ -1,6 +1,6 @@
 # FreeLang v11 — Claude AI 완전 레퍼런스
 
-**버전**: v11.5.4 | **최신 갱신**: 2026-05-10  
+**버전**: v11.6.32 | **최신 갱신**: 2026-05-11  
 **상태**: 프로덕션 (68/68 테스트 통과) | **AI 신뢰도**: 9.5/10
 
 ---
@@ -416,6 +416,8 @@ true false nil          ;; 불린/nil
 - `get-in` (중첩 접근), `assoc-in` (중첩 갱신), `update-in` (중첩 함수 적용 — builtin 지원), `dissoc` (다중 키 지원)
 - `select-keys`, `rename-keys`, `merge-with` (키 충돌 시 fn으로 합산), `reduce-kv` (맵 키-값 축적)
 - `has-key?`, `update` (단일 키 함수 적용)
+- `map-vals` — `(map-vals fn m)` 모든 값에 fn 적용, `map-keys` — `(map-keys fn m)` 모든 키에 fn 적용
+- `filter-vals` — `(filter-vals pred m)` 조건 통과 값만 유지
 
 ### 수학
 - `+`, `-`, `*`, `/`, `%`, `inc`, `dec`, `min`, `max`, `abs`, `round`, `floor`, `ceil`, `pow`, `sqrt`, `clamp`
