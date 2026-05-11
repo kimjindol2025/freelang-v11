@@ -364,8 +364,15 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return null;
     },
 
-    // server_start port -> string
-    "server_start": (port: number): string => {
+    // server_start port|config -> string
+    // 선언형 API: (server_start {:port 40090 :routes [...] :middleware [...]})
+    // 기존 API:   (server_start 40090)
+    "server_start": (portOrConfig: number | Record<string, any>): string => {
+      // 선언형 API: (server-start {:port 40090 :routes [...] :middleware [...]})
+      // :routes 안의 server-get/post 등은 평가 시 이미 routes[]에 등록됨 → 포트만 추출
+      const port: number = (portOrConfig !== null && typeof portOrConfig === "object")
+        ? ((portOrConfig as any)[":port"] ?? (portOrConfig as any)["port"] ?? 8080)
+        : portOrConfig as number;
       // Hot-reload: close previous server before starting new one
       if (__activeServer.server) {
         try {
