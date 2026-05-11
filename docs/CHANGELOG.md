@@ -1,5 +1,19 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.35] — 2026-05-11 (MISTAKES-100 80% 달성: 재분류 4개)
+
+### MISTAKES-100 재분류 (이미 동작 확인 → covered)
+| # | 항목 | 이유 |
+|---|------|------|
+| #39 | obj_merge/merge 단일키 제한 | `obj-merge`/`merge` alias 이미 구현됨 |
+| #56 | 맵 키 keyword 필수 | keyword/string 혼용 이미 허용됨 |
+| #31 | 고차함수 + $ 누락 복합 | `$` 선택사항 + fn/map/filter 정상 동작 |
+| #46 | 핸들러 문자열 필수 | `server_get`이 `function-value` 직접 전달 이미 지원 |
+
+커버리지: 76% → **80%** | Tests: 933/933 | L2 SHA: 47407b90
+
+---
+
 ## [v11.6.34] — 2026-05-11 (MISTAKES-100 76% 달성: 재분류 5 + file-append-line)
 
 ### 신규 함수

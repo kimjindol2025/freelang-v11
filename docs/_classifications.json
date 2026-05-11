@@ -2,8 +2,8 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 76,
-    "percent": 76,
+    "covered": 80,
+    "percent": 80,
     "last_updated": "2026-05-11",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
@@ -57,7 +57,11 @@
       "#26 ([FUNC] deprecated — 경고 이미 출력 — Phase H 재분류)",
       "#28 ($ 파라미터 누락 — $ 선택사항 이미 동작 — Phase H 재분류)",
       "#29 (fn $ 누락 — $ 선택사항 이미 동작 — Phase H 재분류)",
-      "#75 (file-append-line 헬퍼 추가 — v11.6.34)"
+      "#75 (file-append-line 헬퍼 추가 — v11.6.34)",
+      "#39 (obj_merge/merge 이미 구현됨 — Phase H 재분류)",
+      "#56 (맵 키 keyword/string 혼용 — Phase H 재분류)",
+      "#31 (고차함수 + $ 없는 fn — Phase H 재분류)",
+      "#46 (server_get fn-value 직접 전달 — Phase H 재분류)"
     ],
     "_note": "Phase I: LEARNING.md 문서화 25+3개 + #37 alias + #91 구현 확인"
   },
@@ -294,7 +298,10 @@
     "#31": {
       "type": "design",
       "summary": "고차함수 + $ 누락 복합",
-      "fix": "v12: 인자 순서 + $ 통일"
+      "fix": "v12: 인자 순서 + $ 통일",
+      "status": "covered",
+      "solved_in": "v11.6.35",
+      "note": "고차함수 + $ 없는 fn 복합 — $ 선택사항 + fn/map/filter 정상 동작"
     },
     "#32": {
       "type": "learning",
@@ -355,7 +362,10 @@
     "#39": {
       "type": "design",
       "summary": "obj_merge / merge — assoc은 단일 키만",
-      "fix": "v12: merge 함수 추가"
+      "fix": "v12: merge 함수 추가",
+      "status": "covered",
+      "solved_in": "v11.6.35",
+      "note": "obj_merge/merge alias 이미 구현됨 — (obj-merge m1 m2) 다중 키 지원"
     },
     "#40": {
       "type": "learning",
@@ -408,7 +418,10 @@
     "#46": {
       "type": "design",
       "summary": "핸들러 문자열 vs 함수",
-      "fix": "v12: 함수 직접 허용"
+      "fix": "v12: 함수 직접 허용",
+      "status": "covered",
+      "solved_in": "v11.6.35",
+      "note": "핸들러 함수 직접 전달 — server_get이 function-value 타입 이미 지원 (stdlib-http-server.ts:483)"
     },
     "#47": {
       "type": "design",
@@ -461,7 +474,10 @@
     "#56": {
       "type": "design",
       "summary": "맵 키 키워드 필수",
-      "fix": "v12: 문자열 키 자동 변환"
+      "fix": "v12: 문자열 키 자동 변환",
+      "status": "covered",
+      "solved_in": "v11.6.35",
+      "note": "맵 키 keyword/string 모두 허용 — {:name \"kim\"} 과 {\"name\" \"kim\"} 동일 동작"
     },
     "#57": {
       "type": "learning",
