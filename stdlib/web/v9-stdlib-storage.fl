@@ -1,234 +1,70 @@
-; FreeLang Frontend v9 - Web Storage Library
-; localStorage, sessionStorage, 데이터 직렬화
+;; stdlib/web/v9-stdlib-storage.fl — localStorage/sessionStorage JS 헬퍼 (v11 SSR 재작성)
+;; (load "stdlib/web/v9-stdlib-storage.fl")
+;;
+;; 서버에서 <script> 블록을 생성 → 브라우저에서 스토리지 관리.
+;; 모든 함수는 HTML 문자열을 반환합니다.
 
-; ==================== LocalStorage ====================
+;; ── 스토리지 유틸리티 주입 ───────────────────────────────────────
+;; (storage-utils-js) → <script>window.flStorage = {...}</script>
+;; 브라우저에서:
+;;   flStorage.set('key', value)
+;;   flStorage.get('key', defaultValue)
+;;   flStorage.remove('key')
+;;   flStorage.session.set/get/remove (sessionStorage)
+(defn storage-utils-js []
+  "<script>(function(){
+function makeStorage(s){
+  return {
+    set:function(k,v){try{s.setItem(k,JSON.stringify(v));}catch(e){}},
+    get:function(k,def){try{var v=s.getItem(k);return v!==null?JSON.parse(v):(def!==undefined?def:null);}catch(e){return def!==undefined?def:null;}},
+    remove:function(k){s.removeItem(k);},
+    clear:function(){s.clear();},
+    has:function(k){return s.getItem(k)!==null;},
+    keys:function(){return Object.keys(s);}
+  };
+}
+window.flStorage=makeStorage(localStorage);
+window.flSession=makeStorage(sessionStorage);
+})();</script>")
 
-; storage-set: localStorage에 데이터 저장
-[FUNC storage-set :params [key :value]
-  :body [
-    (do
-      (var json-str (json-stringify value))
-      (js-call "localStorage.setItem" [key json-str]))
-    )
-]
+;; ── 페이지 로드 시 스토리지 값 읽어 DOM 업데이트 ────────────────
+;; (storage-load-js "theme" "#theme-indicator" "data-theme")
+(defn storage-load-js [key selector attr-or-text]
+  (str "<script>(function(){"
+       "var val=flStorage.get(" (json-stringify key) ");"
+       "if(val===null)return;"
+       "var el=document.querySelector(" (json-stringify selector) ");"
+       "if(!el)return;"
+       (if (= attr-or-text "textContent")
+         "el.textContent=String(val);"
+         (if (= attr-or-text "value")
+           "el.value=String(val);"
+           (str "el.setAttribute(" (json-stringify attr-or-text) ",String(val));")))
+       "})();</script>"))
 
-; storage-get: localStorage에서 데이터 가져오기
-[FUNC storage-get :params [key :default nil]
-  :returns any
-  :body [
-    (do
-      (var value nil)
-      (try
-        (do
-          (var json-str (js-call "localStorage.getItem" [key]))
-          (if (not (eq json-str nil))
-            (set value (json-parse json-str))
-            (set value default)))
-        (catch [e] (set value default)))
-      value)
-    )
-]
+;; ── 다크모드 토글 + 저장 ────────────────────────────────────────
+;; (dark-mode-js) → 다크모드 토글 + localStorage 저장 스크립트
+(defn dark-mode-js []
+  "<script>(function(){
+var saved=flStorage.get('fl-dark-mode');
+if(saved===true||(saved===null&&window.matchMedia('(prefers-color-scheme:dark)').matches)){
+  document.documentElement.classList.add('dark');
+}
+window.flToggleDark=function(){
+  var isDark=document.documentElement.classList.toggle('dark');
+  flStorage.set('fl-dark-mode',isDark);
+};
+})();</script>")
 
-; storage-remove: localStorage에서 데이터 제거
-[FUNC storage-remove :params [key]
-  :body [
-    (js-call "localStorage.removeItem" [key])
-  ]
-]
-
-; storage-clear: localStorage 전체 삭제
-[FUNC storage-clear :params []
-  :body [
-    (js-call "localStorage.clear" [])
-  ]
-]
-
-; storage-key: 인덱스로 키 가져오기
-[FUNC storage-key :params [index]
-  :returns str
-  :body [
-    (do
-      (var key (js-call "localStorage.key" [index]))
-      (if (eq key nil) "" key))
-    )
-]
-
-; storage-length: 저장된 항목 개수
-[FUNC storage-length :params []
-  :returns i32
-  :body [
-    (get "localStorage.length")
-  ]
-]
-
-; storage-keys: 모든 키 목록
-[FUNC storage-keys :params []
-  :returns [str]
-  :body [
-    (do
-      (var keys [])
-      (var len (js-call "localStorage.length" []))
-      (for i (range 0 len)
-        (fn []
-          (var key (js-call "localStorage.key" [i]))
-          (if (not (eq key nil))
-            (push keys key))))
-      keys)
-    )
-]
-
-; ==================== SessionStorage ====================
-
-; session-set: sessionStorage에 데이터 저장
-[FUNC session-set :params [key :value]
-  :body [
-    (do
-      (var json-str (json-stringify value))
-      (js-call "sessionStorage.setItem" [key json-str]))
-    )
-]
-
-; session-get: sessionStorage에서 데이터 가져오기
-[FUNC session-get :params [key :default nil]
-  :returns any
-  :body [
-    (do
-      (var value nil)
-      (try
-        (do
-          (var json-str (js-call "sessionStorage.getItem" [key]))
-          (if (not (eq json-str nil))
-            (set value (json-parse json-str))
-            (set value default)))
-        (catch [e] (set value default)))
-      value)
-    )
-]
-
-; session-remove: sessionStorage에서 데이터 제거
-[FUNC session-remove :params [key]
-  :body [
-    (js-call "sessionStorage.removeItem" [key])
-  ]
-]
-
-; session-clear: sessionStorage 전체 삭제
-[FUNC session-clear :params []
-  :body [
-    (js-call "sessionStorage.clear" [])
-  ]
-]
-
-; ==================== TTL 캐시 ====================
-
-; cache-set: TTL을 포함한 로컬스토리지 캐시
-[FUNC cache-set :params [key :value :ttl-seconds 3600]
-  :body [
-    (do
-      (var now (js-call "Date.now" []))
-      (var expires-at (+ now (* ttl-seconds 1000)))
-
-      (var cache-obj {
-        :value value
-        :expires-at expires-at
-      })
-
-      (var json-str (json-stringify cache-obj))
-      (js-call "localStorage.setItem" [key json-str]))
-    )
-]
-
-; cache-get: TTL을 확인하고 캐시 가져오기
-[FUNC cache-get :params [key :default nil]
-  :returns any
-  :body [
-    (do
-      (var value nil)
-      (try
-        (do
-          (var json-str (js-call "localStorage.getItem" [key]))
-          (if (not (eq json-str nil))
-            (do
-              (var cache-obj (json-parse json-str))
-              (var now (js-call "Date.now" []))
-
-              ; TTL 확인
-              (if (< now (get cache-obj "expires-at"))
-                (set value (get cache-obj "value"))
-                (do
-                  (js-call "localStorage.removeItem" [key])
-                  (set value default))))
-            (set value default)))
-        (catch [e] (set value default)))
-      value)
-    )
-]
-
-; cache-remove: 캐시 제거
-[FUNC cache-remove :params [key]
-  :body [
-    (js-call "localStorage.removeItem" [key])
-  ]
-]
-
-; cache-expired?: 캐시 만료 여부 확인
-[FUNC cache-expired? :params [key]
-  :returns bool
-  :body [
-    (do
-      (var is-expired true)
-      (try
-        (do
-          (var json-str (js-call "localStorage.getItem" [key]))
-          (if (not (eq json-str nil))
-            (do
-              (var cache-obj (json-parse json-str))
-              (var now (js-call "Date.now" []))
-              (set is-expired (>= now (get cache-obj "expires-at"))))
-            (set is-expired true)))
-        (catch [e] (set is-expired true)))
-      is-expired)
-    )
-]
-
-; ==================== IndexedDB Wrapper ====================
-
-; db-open: IndexedDB 데이터베이스 열기
-[FUNC db-open :params [db-name :version 1]
-  :returns any
-  :body [
-    (try
-      (js-call "indexedDB.open" [db-name version])
-      (catch [e] nil))
-    )
-]
-
-; db-store-add: IndexedDB에 객체 추가
-[FUNC db-store-add :params [db :store-name :object]
-  :body [
-    (do
-      (var tx (js-call db.transaction [[store-name] "readwrite"]))
-      (var store (js-call tx.objectStore [store-name]))
-      (js-call store.add [object]))
-    )
-]
-
-; db-store-get: IndexedDB에서 객체 가져오기
-[FUNC db-store-get :params [db :store-name :key]
-  :returns any
-  :body [
-    (do
-      (var tx (js-call db.transaction [[store-name] "readonly"]))
-      (var store (js-call tx.objectStore [store-name]))
-      (js-call store.get [key]))
-    )
-]
-
-; ==================== Export ====================
-
-[EXPORT
-  storage-set storage-get storage-remove storage-clear storage-key storage-length storage-keys
-  session-set session-get session-remove session-clear
-  cache-set cache-get cache-remove cache-expired?
-  db-open db-store-add db-store-get
-]
+;; ── 최근 방문 기록 ───────────────────────────────────────────────
+;; (track-visit-js) → 현재 페이지 방문 기록 (최대 10개)
+(defn track-visit-js []
+  "<script>(function(){
+var key='fl-visits';
+var visits=flStorage.get(key)||[];
+var entry={url:location.pathname,time:Date.now()};
+visits=visits.filter(function(v){return v.url!==entry.url;});
+visits.unshift(entry);
+if(visits.length>10)visits=visits.slice(0,10);
+flStorage.set(key,visits);
+})();</script>")

@@ -1,5 +1,26 @@
 # FreeLang v11 변경 이력
 
+## [v11.6.33] — 2026-05-11 (stdlib/web 전체 v11 재작성)
+
+### stdlib/web 파일 재작성
+| 파일 | 변경 내용 |
+|------|----------|
+| `styles.fl` | `[FUNC]`+`concat` → `defn`+`str` 재작성. `inject-base()` 정상화 |
+| `metadata.fl` | `[FUNC]`+`replace` → `defn`+`str-replace-all` 재작성. XSS 이스케이프 정상화 |
+| `image.fl` | keyword params 제거, `(render-image src alt opts-map)` 패턴으로 재작성 |
+| `v9-stdlib-dom.fl` | 로드 불가(파스 오류) → SSR DOM JS 생성기로 완전 재작성 |
+| `v9-stdlib-fetch.fl` | 로드 불가(파스 오류) → SSR fetch JS 생성기로 완전 재작성 |
+| `v9-stdlib-storage.fl` | 로드 불가(파스 오류) → SSR localStorage JS 생성기로 재작성 |
+| `v9-stdlib-ui.fl` | 로드 불가(파스 오류) → SSR 탭/드롭다운/아코디언/복사 JS 생성기로 재작성 |
+
+### 파서 버그 수정
+- `page`, `per-page`, `form`, `guard`, `model`, `rule` 등 소문자 심볼이 블록 타입 키워드로 오인식되던 버그 수정
+- 원인: `knownBlockTypes.includes(nextToken.value.toUpperCase())` — v11 블록 타입은 UPPERCASE만
+
+Tests: 922/922 | L2 SHA: 47407b90
+
+---
+
 ## [v11.6.32] — 2026-05-11 (Batch 8: str-* 정식명 + map-vals/map-keys/filter-vals)
 
 ### 신규/수정 함수
