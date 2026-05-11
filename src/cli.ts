@@ -139,8 +139,9 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
   }
 
   // PID 파일 기록 — fl stop으로 정확하게 종료 가능
+  // 형식: "pid\noriginalAbsPath" (경로 역산 불필요)
   const pidFile = flPidFile(absPath);
-  try { fs.writeFileSync(pidFile, String(process.pid)); } catch {}
+  try { fs.writeFileSync(pidFile, `${process.pid}\n${absPath}`); } catch {}
   process.on("exit", () => { try { fs.unlinkSync(pidFile); } catch {} });
 
   function execute(): void {
@@ -2044,10 +2045,12 @@ switch (cmd) {
       let killed = 0;
       for (const pf of pidFiles) {
         try {
-          const pid = parseInt(fs.readFileSync(`/tmp/${pf}`, "utf-8").trim(), 10);
+          const content = fs.readFileSync(`/tmp/${pf}`, "utf-8").trim();
+          const [pidStr, filePath] = content.split("\n");
+          const pid = parseInt(pidStr, 10);
           process.kill(pid, "SIGTERM");
           fs.unlinkSync(`/tmp/${pf}`);
-          console.log(`✓ 종료: PID ${pid}  (${pf})`);
+          console.log(`✓ 종료: PID ${pid}  ${filePath ?? pf}`);
           killed++;
         } catch (e: any) {
           if (e.code === "ESRCH") {
@@ -2063,7 +2066,8 @@ switch (cmd) {
       const absTarget = path.resolve(target);
       const pidFile = flPidFile(absTarget);
       try {
-        const pid = parseInt(fs.readFileSync(pidFile, "utf-8").trim(), 10);
+        const content = fs.readFileSync(pidFile, "utf-8").trim();
+        const pid = parseInt(content.split("\n")[0], 10);
         process.kill(pid, "SIGTERM");
         try { fs.unlinkSync(pidFile); } catch {}
         console.log(`✓ 종료: ${target}  (PID ${pid})`);
@@ -2082,9 +2086,11 @@ switch (cmd) {
     console.log("\n실행 중인 FreeLang 프로세스:\n");
     for (const pf of pidFiles) {
       try {
-        const pid = parseInt(fs.readFileSync(`/tmp/${pf}`, "utf-8").trim(), 10);
+        const content = fs.readFileSync(`/tmp/${pf}`, "utf-8").trim();
+        const [pidStr, filePath] = content.split("\n");
+        const pid = parseInt(pidStr, 10);
         process.kill(pid, 0); // 생존 확인
-        const name = pf.replace(/^fl_/, "").replace(/\.pid$/, "").replace(/_/g, "/").replace(/^\//, "");
+        const name = filePath ?? pf;
         console.log(`  PID ${String(pid).padEnd(8)} ${name}`);
       } catch (e: any) {
         if (e.code === "ESRCH") { try { fs.unlinkSync(`/tmp/${pf}`); } catch {} } // 죽은 프로세스 청소
