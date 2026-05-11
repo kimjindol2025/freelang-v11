@@ -62,7 +62,7 @@
 
 (defn vld/rule-in [v opts]
   (let [allowed (get opts "in")]
-    (when (not (nil? allowed))
+    (when (and (not (nil? allowed)) (not (nil? v)))
       (when (not (includes-item allowed v))
         (str-format "허용값: %s" [(str-join (map str allowed) ", ")])))))
 
@@ -75,21 +75,24 @@
 ;; ── 단일 값 검사 ────────────────────────────────────────────
 
 (defn vld/check [value opts]
-  (let [checkers [vld/rule-required
-                  vld/rule-type
-                  vld/rule-min-length
-                  vld/rule-max-length
-                  vld/rule-min
-                  vld/rule-max
-                  vld/rule-email
-                  vld/rule-url
-                  vld/rule-in
-                  vld/rule-pattern]
-        errors (filter (fn [e] (not (nil? e)))
-                 (map (fn [chk] (chk value opts)) checkers))]
-    (if (empty? errors)
-      {:ok true}
-      {:ok false :errors errors})))
+  ;; nil이고 required가 없으면 검증 생략 (PATCH/PUT 부분 업데이트 지원)
+  (if (and (nil? value) (not (get opts "required")))
+    {:ok true}
+    (let [checkers [vld/rule-required
+                    vld/rule-type
+                    vld/rule-min-length
+                    vld/rule-max-length
+                    vld/rule-min
+                    vld/rule-max
+                    vld/rule-email
+                    vld/rule-url
+                    vld/rule-in
+                    vld/rule-pattern]
+          errors (filter (fn [e] (not (nil? e)))
+                   (map (fn [chk] (chk value opts)) checkers))]
+      (if (empty? errors)
+        {:ok true}
+        {:ok false :errors errors}))))
 
 ;; ── 스키마 검사 ─────────────────────────────────────────────
 
