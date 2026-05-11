@@ -2,8 +2,8 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 70,
-    "percent": 70,
+    "covered": 76,
+    "percent": 76,
     "last_updated": "2026-05-11",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
@@ -51,7 +51,13 @@
       "#37 (Date.now → now-ms ALIAS — v11.6.32)",
       "#91 (에러 객체 접근 이미 구현 — (get e message) 동작)",
       "LEARNING.md: #22/#24/#25/#27/#30/#58-#62/#64-#65/#73/#76/#83/#85-#88/#92-#93/#95-#96/#98/#100 문서화",
-      "LEARNING.md: #36/#70/#77 문서 오류 수정"
+      "LEARNING.md: #36/#70/#77 문서 오류 수정",
+      "#21 (v10 let 단일 괄호 — v11.6.x 이미 동작 — Phase H 재분류)",
+      "#23 (단일 바인딩 단일 괄호 — v11.6.x 이미 동작 — Phase H 재분류)",
+      "#26 ([FUNC] deprecated — 경고 이미 출력 — Phase H 재분류)",
+      "#28 ($ 파라미터 누락 — $ 선택사항 이미 동작 — Phase H 재분류)",
+      "#29 (fn $ 누락 — $ 선택사항 이미 동작 — Phase H 재분류)",
+      "#75 (file-append-line 헬퍼 추가 — v11.6.34)"
     ],
     "_note": "Phase I: LEARNING.md 문서화 25+3개 + #37 alias + #91 구현 확인"
   },
@@ -208,7 +214,10 @@
     "#21": {
       "type": "design",
       "summary": "v10 let 형식 (단일 괄호)",
-      "fix": "v12: 단일 괄호 허용"
+      "fix": "v12: 단일 괄호 허용",
+      "status": "covered",
+      "solved_in": "v11.6.34",
+      "note": "v10 let 단일 괄호 — v11.6.x에서 이미 동작 (let [x 10] 정상)"
     },
     "#22": {
       "type": "normal",
@@ -221,7 +230,10 @@
     "#23": {
       "type": "design",
       "summary": "단일 바인딩도 이중 괄호",
-      "fix": "v12: 단일은 [$x val] 허용"
+      "fix": "v12: 단일은 [$x val] 허용",
+      "status": "covered",
+      "solved_in": "v11.6.34",
+      "note": "단일 바인딩 단일 괄호 — v11.6.x에서 이미 동작"
     },
     "#24": {
       "type": "normal",
@@ -242,7 +254,10 @@
     "#26": {
       "type": "design",
       "summary": "[FUNC] deprecated",
-      "fix": "v12: 완전 제거 + migrate 자동 변환"
+      "fix": "v12: 완전 제거 + migrate 자동 변환",
+      "status": "covered",
+      "solved_in": "v11.6.34",
+      "note": "[FUNC] deprecated — v11 파서에서 이미 deprecation 경고 출력"
     },
     "#27": {
       "type": "normal",
@@ -255,12 +270,18 @@
     "#28": {
       "type": "design",
       "summary": "$ 파라미터 누락",
-      "fix": "v12: $ 접두사 폐지 검토 (또는 자동 추가)"
+      "fix": "v12: $ 접두사 폐지 검토 (또는 자동 추가)",
+      "status": "covered",
+      "solved_in": "v11.6.34",
+      "note": "$ 파라미터 누락 — v11.6.x에서 $ 접두사 선택사항으로 이미 동작"
     },
     "#29": {
       "type": "design",
       "summary": "fn $ 누락",
-      "fix": "v12: 동일"
+      "fix": "v12: 동일",
+      "status": "covered",
+      "solved_in": "v11.6.34",
+      "note": "fn $ 누락 — v11.6.x에서 $ 접두사 선택사항으로 이미 동작"
     },
     "#30": {
       "type": "normal",
@@ -585,7 +606,10 @@
     "#75": {
       "type": "user",
       "summary": "file_append 개행 누락",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "v11.6.34",
+      "note": "file-append-line 헬퍼 추가 — (file-append-line path text) → 자동 개행"
     },
     "#76": {
       "type": "normal",

@@ -2140,6 +2140,7 @@ loop().catch(e => {
         case "write-file": try { require("fs").writeFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
         case "file-exists?": try { return require("fs").existsSync(String(v0)); } catch { return false; }
         case "file-append": try { require("fs").appendFileSync(String(v0), String(v1 ?? "")); return true; } catch { return false; }
+        case "file-append-line": try { require("fs").appendFileSync(String(v0), String(v1 ?? "") + "\n"); return true; } catch { return false; }
         case "dir-list": try { return require("fs").readdirSync(String(v0)); } catch { return []; }
         default: return null;
       }

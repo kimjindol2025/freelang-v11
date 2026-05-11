@@ -141,3 +141,18 @@ describe("stdlib/web/v9-stdlib-ui.fl", () => {
     expect(r).toContain('data-fl-copy');
   });
 });
+
+describe("MISTAKES-100 재분류 후보 검증", () => {
+  test("#28 $ 없는 defn 파라미터 — 이미 동작함", () => {
+    expect(run("(defn add [a b] (+ a b)) (add 3 4)")).toBe(7);
+  });
+  test("#29 $ 없는 fn 파라미터 — 이미 동작함", () => {
+    expect(run("((fn [x] (* x 2)) 5)")).toBe(10);
+  });
+  test("#21 v10 let 단일 괄호 — 이미 동작함", () => {
+    expect(run("(let [x 10 y 20] (+ x y))")).toBe(30);
+  });
+  test("#23 단일 바인딩 단일 괄호 — 이미 동작함", () => {
+    expect(run('(let [u "alice"] (str "Hello " u))')).toBe("Hello alice");
+  });
+});
