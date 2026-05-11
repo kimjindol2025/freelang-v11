@@ -59,4 +59,4 @@
 ;; NOTE: msg 는 서버가 안전한 문자열만 전달해야 함. 사용자 입력 직접 삽입 금지.
 (defn toast-emit-js [msg type]
   (str "<script>if(window.flToast)flToast("
-       (json_str msg) "," (json_str type) ");</script>"))
+       (json-stringify msg) "," (json-stringify type) ");</script>"))
