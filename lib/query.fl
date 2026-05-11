@@ -1,0 +1,160 @@
+;; ─────────────────────────────────────────────────────────────
+;; query.fl — SQL 쿼리 빌더 DSL
+;; (load "lib/query.fl")
+;;
+;; 사용:
+;;   (-> (q/from "users")
+;;       (q/select ["id" "name" "email"])
+;;       (q/where "age > ?" [25])
+;;       (q/where "status = ?" ["active"])
+;;       (q/order-by "name" "ASC")
+;;       (q/limit 10)
+;;       (q/offset 20)
+;;       (q/exec db))
+;;
+;; INSERT:
+;;   (q/insert db "users" {:name "Alice" :email "a@b.com"})
+;;
+;; UPDATE:
+;;   (q/update db "users" {:name "Bob"} "id = ?" [1])
+;;
+;; DELETE:
+;;   (q/delete db "users" "id = ?" [1])
+;; ─────────────────────────────────────────────────────────────
+
+;; ── SELECT 빌더 ──────────────────────────────────────────────
+
+(defn q/from [table]
+  {:table table
+   :cols  "*"
+   :wheres []
+   :params []
+   :order  nil
+   :dir    "ASC"
+   :lim    nil
+   :off    nil})
+
+(defn q/select [q cols]
+  (assoc q :cols (str-join cols ", ")))
+
+(defn q/where [q cond params]
+  {:table  (get q :table)
+   :cols   (get q :cols)
+   :wheres (push (get q :wheres) cond)
+   :params (reduce push (get q :params) params)
+   :order  (get q :order)
+   :dir    (get q :dir)
+   :lim    (get q :lim)
+   :off    (get q :off)})
+
+(defn q/order-by [q col dir]
+  (assoc (assoc q :order col) :dir (?? dir "ASC")))
+
+(defn q/limit [q n]
+  (assoc q :lim n))
+
+(defn q/offset [q n]
+  (assoc q :off n))
+
+;; ── SQL 문자열 생성 ──────────────────────────────────────────
+
+(defn q/build-select [q]
+  (let [base   (str "SELECT " (get q :cols) " FROM " (get q :table))
+        wheres (get q :wheres)
+        where  (if (empty? wheres)
+                 ""
+                 (str " WHERE " (str-join wheres " AND ")))
+        order  (if (nil? (get q :order))
+                 ""
+                 (str " ORDER BY " (get q :order) " " (get q :dir)))
+        lim    (if (nil? (get q :lim))
+                 ""
+                 (str " LIMIT " (get q :lim)))
+        off    (if (nil? (get q :off))
+                 ""
+                 (str " OFFSET " (get q :off)))]
+    (str base where order lim off)))
+
+;; ── 실행 ─────────────────────────────────────────────────────
+
+(defn q/exec [q db]
+  (db-query db (q/build-select q) (get q :params)))
+
+(defn q/exec-one [q db]
+  (let [result (db-query db
+                  (q/build-select (q/limit q 1))
+                  (get q :params))]
+    (if (empty? result)
+      nil
+      (first result))))
+
+;; ── INSERT ───────────────────────────────────────────────────
+
+(defn q/insert [db table row]
+  (let [cols   (keys row)
+        vals   (map (fn [k] (get row k)) cols)
+        marks  (str-join (map (fn [_] "?") cols) ", ")
+        sql    (str "INSERT INTO " table
+                    " (" (str-join cols ", ")
+                    ") VALUES (" marks ")")]
+    (db-exec db sql vals)))
+
+;; ── INSERT (키워드 키 지원) ──────────────────────────────────
+
+(defn q/insert-kw [db table row]
+  (let [cols   (map (fn [k] (str-replace (str k) ":" "")) (keys row))
+        vals   (map (fn [k] (get row k)) (keys row))
+        marks  (str-join (map (fn [_] "?") cols) ", ")
+        sql    (str "INSERT INTO " table
+                    " (" (str-join cols ", ")
+                    ") VALUES (" marks ")")]
+    (db-exec db sql vals)))
+
+;; ── UPDATE ───────────────────────────────────────────────────
+
+(defn q/update [db table row cond cond-params]
+  (let [cols   (keys row)
+        sets   (str-join (map (fn [c] (str c " = ?")) cols) ", ")
+        vals   (map (fn [k] (get row k)) cols)
+        all-params (reduce push vals cond-params)
+        sql    (str "UPDATE " table " SET " sets " WHERE " cond)]
+    (db-exec db sql all-params)))
+
+;; ── DELETE ───────────────────────────────────────────────────
+
+(defn q/delete [db table cond params]
+  (db-exec db
+    (str "DELETE FROM " table " WHERE " cond)
+    params))
+
+;; ── 집계 쿼리 ────────────────────────────────────────────────
+
+(defn q/count [db table cond params]
+  (let [sql    (str "SELECT COUNT(*) as cnt FROM " table
+                    (if (str-blank? cond) "" (str " WHERE " cond)))
+        result (db-query db sql (?? params []))]
+    (if (empty? result)
+      0
+      (get (first result) "cnt"))))
+
+(defn q/exists? [db table cond params]
+  (> (q/count db table cond params) 0))
+
+;; ── 페이지네이션 ─────────────────────────────────────────────
+
+(defn q/paginate [q db page per-page]
+  (let [offset (* (- page 1) per-page)
+        data   (-> q
+                   (q/limit per-page)
+                   (q/offset offset)
+                   (q/exec db))
+        total  (q/count db (get q :table)
+                  (if (empty? (get q :wheres)) ""
+                    (str-join (get q :wheres) " AND "))
+                  (get q :params))
+        pages  (ceil (/ total per-page))]
+    {:data  data
+     :page  page
+     :total total
+     :pages pages
+     :per   per-page}))

@@ -1,0 +1,124 @@
+;; ─────────────────────────────────────────────────────────────
+;; result.fl — Result 모나드 (성공/실패 체이닝)
+;; (load "lib/result.fl")
+;;
+;; 사용:
+;;   (res/ok 42)                          → {:ok true :val 42}
+;;   (res/err "실패 이유")                 → {:ok false :err "실패 이유"}
+;;   (-> (res/ok data)
+;;       (res/then validate-fn)
+;;       (res/then save-fn)
+;;       (res/catch log-err-fn)
+;;       (res/unwrap-or "기본값"))
+;; ─────────────────────────────────────────────────────────────
+
+;; ── 생성자 ──────────────────────────────────────────────────
+
+(defn res/ok [val]
+  {:ok true :val val})
+
+(defn res/err [msg]
+  {:ok false :err msg})
+
+;; ── 술어 ────────────────────────────────────────────────────
+
+(defn res/ok? [r]
+  (= true (get r :ok)))
+
+(defn res/err? [r]
+  (= false (get r :ok)))
+
+;; ── 체이닝 ──────────────────────────────────────────────────
+
+;; 성공일 때만 fn 적용 (fn은 val을 받아 res/ok 또는 res/err 반환)
+(defn res/then [r f]
+  (if (res/ok? r)
+    (f (get r :val))
+    r))
+
+;; 실패일 때만 fn 적용 (복구 시도)
+(defn res/catch [r f]
+  (if (res/err? r)
+    (f (get r :err))
+    r))
+
+;; 성공 값을 변환 (Result 아닌 일반 값 반환하는 fn)
+(defn res/map [r f]
+  (if (res/ok? r)
+    (res/ok (f (get r :val)))
+    r))
+
+;; 실패 메시지를 변환
+(defn res/map-err [r f]
+  (if (res/err? r)
+    (res/err (f (get r :err)))
+    r))
+
+;; ── 값 추출 ─────────────────────────────────────────────────
+
+;; 성공이면 val, 실패면 기본값
+(defn res/unwrap-or [r default]
+  (if (res/ok? r)
+    (get r :val)
+    default))
+
+;; 성공이면 val, 실패면 에러 throw
+(defn res/unwrap! [r]
+  (if (res/ok? r)
+    (get r :val)
+    (error (str "res/unwrap! 실패: " (get r :err)))))
+
+;; 성공 값 (nil이면 실패)
+(defn res/val [r]
+  (get r :val))
+
+;; 실패 메시지 (nil이면 성공)
+(defn res/err-msg [r]
+  (get r :err))
+
+;; ── HTTP 응답 변환 ───────────────────────────────────────────
+
+;; Result → server-json 응답
+(defn res/to-json [r]
+  (if (res/ok? r)
+    (server-json {:ok true :data (get r :val)})
+    (server-json {:ok false :error (get r :err)})))
+
+;; Result → server-json (상태 코드 포함)
+(defn res/to-response [r ok-code err-code]
+  (if (res/ok? r)
+    (server-json {:ok true :data (get r :val)})
+    {:status err-code :body {:ok false :error (get r :err)}}))
+
+;; ── 유틸 ────────────────────────────────────────────────────
+
+;; try 블록을 Result로 래핑
+(defn res/try [f]
+  (try
+    (res/ok (f))
+    (catch e
+      (res/err (get e "message")))))
+
+;; 여러 Result 중 첫 번째 실패 반환 (모두 성공이면 마지막 값)
+(defn res/all [results]
+  (reduce
+    (fn [acc r]
+      (if (res/err? acc)
+        acc
+        (if (res/err? r)
+          r
+          r)))
+    (res/ok nil)
+    results))
+
+;; 조건부 Result 생성
+(defn res/from [val pred err-msg]
+  (if (pred val)
+    (res/ok val)
+    (res/err err-msg)))
+
+;; nil 값을 Result로 변환
+(defn res/from-nil [val err-msg]
+  (if (nil? val)
+    (res/err err-msg)
+    (res/ok val)))
