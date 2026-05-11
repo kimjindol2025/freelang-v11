@@ -124,6 +124,11 @@ function checkSource(source: string, filePath?: string): boolean {
 // run 커맨드
 // ─────────────────────────────────────────
 
+function flPidFile(absPath: string): string {
+  const safe = absPath.replace(/[^a-zA-Z0-9]/g, "_");
+  return `/tmp/fl_${safe}.pid`;
+}
+
 function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): void {
   const absPath = path.resolve(filePath);
   const vmBench = extraArgs.includes("--vm-bench");
@@ -132,6 +137,11 @@ function cmdRun(filePath: string, watch: boolean, extraArgs: string[] = []): voi
     console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${filePath}`);
     process.exit(1);
   }
+
+  // PID 파일 기록 — fl stop으로 정확하게 종료 가능
+  const pidFile = flPidFile(absPath);
+  try { fs.writeFileSync(pidFile, String(process.pid)); } catch {}
+  process.on("exit", () => { try { fs.unlinkSync(pidFile); } catch {} });
 
   function execute(): void {
     const source = fs.readFileSync(absPath, "utf-8");
@@ -2022,6 +2032,65 @@ switch (cmd) {
       fs.unlinkSync(logPath);
       console.log(`✓ 로그 삭제: ${logPath}`);
     } catch { console.log("(로그 없음)"); }
+    break;
+  }
+  case "stop": {
+    // fl stop <file.fl> — PID 파일로 정확하게 프로세스 종료
+    const target = args[1];
+    if (!target) {
+      // 인수 없으면 모든 fl PID 파일 종료
+      const pidFiles = fs.readdirSync("/tmp").filter(f => f.startsWith("fl_") && f.endsWith(".pid"));
+      if (pidFiles.length === 0) { console.log("(실행 중인 fl 프로세스 없음)"); break; }
+      let killed = 0;
+      for (const pf of pidFiles) {
+        try {
+          const pid = parseInt(fs.readFileSync(`/tmp/${pf}`, "utf-8").trim(), 10);
+          process.kill(pid, "SIGTERM");
+          fs.unlinkSync(`/tmp/${pf}`);
+          console.log(`✓ 종료: PID ${pid}  (${pf})`);
+          killed++;
+        } catch (e: any) {
+          if (e.code === "ESRCH") {
+            try { fs.unlinkSync(`/tmp/${pf}`); } catch {}
+            console.log(`✓ 이미 종료됨: ${pf}`);
+          } else {
+            console.error(`✗ 실패: ${pf} — ${e.message}`);
+          }
+        }
+      }
+      console.log(`\n총 ${killed}개 종료`);
+    } else {
+      const absTarget = path.resolve(target);
+      const pidFile = flPidFile(absTarget);
+      try {
+        const pid = parseInt(fs.readFileSync(pidFile, "utf-8").trim(), 10);
+        process.kill(pid, "SIGTERM");
+        try { fs.unlinkSync(pidFile); } catch {}
+        console.log(`✓ 종료: ${target}  (PID ${pid})`);
+      } catch (e: any) {
+        if (e.code === "ENOENT") console.log(`(PID 파일 없음 — ${target} 이 실행 중이지 않거나 이미 종료됨)`);
+        else if (e.code === "ESRCH") { try { fs.unlinkSync(pidFile); } catch {} console.log(`(이미 종료됨)`); }
+        else console.error(e.message);
+      }
+    }
+    break;
+  }
+  case "ps": {
+    // fl ps — 실행 중인 fl 프로세스 목록
+    const pidFiles = fs.readdirSync("/tmp").filter(f => f.startsWith("fl_") && f.endsWith(".pid"));
+    if (pidFiles.length === 0) { console.log("(실행 중인 fl 프로세스 없음)"); break; }
+    console.log("\n실행 중인 FreeLang 프로세스:\n");
+    for (const pf of pidFiles) {
+      try {
+        const pid = parseInt(fs.readFileSync(`/tmp/${pf}`, "utf-8").trim(), 10);
+        process.kill(pid, 0); // 생존 확인
+        const name = pf.replace(/^fl_/, "").replace(/\.pid$/, "").replace(/_/g, "/").replace(/^\//, "");
+        console.log(`  PID ${String(pid).padEnd(8)} ${name}`);
+      } catch (e: any) {
+        if (e.code === "ESRCH") { try { fs.unlinkSync(`/tmp/${pf}`); } catch {} } // 죽은 프로세스 청소
+      }
+    }
+    console.log();
     break;
   }
   case "version":

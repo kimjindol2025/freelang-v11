@@ -20,6 +20,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch",
     "docs:gen": "node scripts/gen-stdlib-docs.js",
     "compile": "node --stack-size=8000 stage1.js",
     "compile:self": "node --stack-size=8000 stage1.js self/all.fl stage1-new.js",

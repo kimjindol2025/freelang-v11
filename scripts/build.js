@@ -48,22 +48,21 @@ try {
   console.warn(`ai_prompt=skipped (${e.message})`);
 }
 
-// Node.js 빌드
-const nodeBuild = esbuild.build({
+const isWatch = process.argv.includes("--watch") || process.argv.includes("-w");
+
+const nodeConfig = {
   entryPoints: ["src/cli.ts"],
   bundle: true,
   platform: "node",
   target: "node18",
   outfile: "bootstrap.js",
   loader: { ".json": "json" },
-  minify: true,
-  minifyWhitespace: true,
-  minifyIdentifiers: true,
-  minifySyntax: true,
+  minify: !isWatch,
+  minifyWhitespace: !isWatch,
+  minifyIdentifiers: !isWatch,
+  minifySyntax: !isWatch,
   external: [
-    // 선택적 npm (런타임에 설치 가능)
     "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
-    // Node.js 내장 모듈 전체
     "tls", "net", "fs", "path", "child_process", "os",
     "http", "https", "url", "util", "stream", "buffer",
     "crypto", "readline", "events", "vm", "tty", "assert",
@@ -71,8 +70,20 @@ const nodeBuild = esbuild.build({
     "http2", "perf_hooks", "inspector", "v8", "module",
   ],
   logLevel: "info",
-}).then(() => console.log("bootstrap=built"))
-  .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
+};
+
+// Node.js 빌드
+let nodeBuild;
+if (isWatch) {
+  nodeBuild = esbuild.context(nodeConfig).then(ctx => {
+    ctx.watch();
+    console.log("bootstrap=watch TS 변경 시 자동 재빌드 (Ctrl+C 로 종료)");
+  });
+} else {
+  nodeBuild = esbuild.build(nodeConfig)
+    .then(() => console.log("bootstrap=built"))
+    .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
+}
 
 // 브라우저 빌드
 const browserBuild = esbuild.build({
