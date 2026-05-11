@@ -268,6 +268,23 @@ export function lex(source: string): Token[] {
       continue;
     }
 
+    // Deref shorthand: @varname → (deref varname)  [v12 #19]
+    if (ch === "@") {
+      const startCol = col;
+      i++; col++;
+      let varname = "";
+      while (i < source.length && /[a-zA-Z0-9_\-?!]/.test(source[i])) {
+        varname += source[i]; i++; col++;
+      }
+      if (varname.length === 0) throw new Error(`Expected atom name after @ at line ${line}, col ${startCol}`);
+      // @x → (deref x) : LParen + Symbol("deref") + Symbol(x) + RParen
+      tokens.push({ type: T.LParen, value: "(", line, col: startCol });
+      tokens.push({ type: T.Symbol, value: "deref", line, col: startCol });
+      tokens.push({ type: T.Symbol, value: varname, line, col: startCol });
+      tokens.push({ type: T.RParen, value: ")", line, col: startCol });
+      continue;
+    }
+
     // Variable: $varname
     if (ch === "$") {
       const start = i;
