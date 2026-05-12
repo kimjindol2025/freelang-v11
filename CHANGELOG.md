@@ -2,6 +2,32 @@
 
 ---
 
+## v11.7.4 — 정규식 강화 (re-groups 개선 + snake_case alias) (2026-05-13)
+
+### 🔧 정규식 함수 개선
+- **`re-groups` 반환값 변경** — groups만이 아닌 **전체 + groups** 반환
+  - 기존: `(re-groups "(\\d+)" "123")` → `["123"]` (그룹만)
+  - 개선: `(re-groups "(\\d+)" "123")` → `["123", "123"]` (전체, 그룹)
+  - 실전: 이메일 추출 → `["user@example.com", "user", "example.com"]`
+
+### 🆕 snake_case alias 추가
+- `re_match`, `re_test`, `re_find`, `re_find_all`
+- `re_split`, `re_groups`, `re_replace`
+- 기존 kebab-case와 100% 호환 (deprecated 경고 없음)
+
+### 📊 테스트
+- **re-groups**: 3개 신규 (전체+그룹, 다중그룹, null)
+- **snake_case alias**: 7개 신규 (모든 regex 함수)
+- **전체**: 1079 → 1090개 (+11)
+
+### 📈 개선사항
+- **정규식 편의성**: 그룹 + 전체 매치 동시 접근
+- **일관성**: kebab/snake case 모두 지원
+- **AI 코드 생성**: 정규식 활용도 증가
+- **버전**: 11.7.3 → 11.7.4
+
+---
+
 ## v11.7.3 — 함수 메타데이터 + 타입 검증 (2026-05-13)
 
 ### 🆕 메타데이터 확장

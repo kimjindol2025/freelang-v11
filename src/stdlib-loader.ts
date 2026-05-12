@@ -321,8 +321,18 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       try { return String(s).split(new RegExp(pattern)); } catch { return [String(s)]; }
     },
     "re-groups":  (pattern: string, s: string): (string | null)[] | null => {
-      try { const m = String(s).match(new RegExp(pattern)); return m ? [...m].slice(1) : null; } catch { return null; }
+      try { const m = String(s).match(new RegExp(pattern)); return m ? [...m] : null; } catch { return null; }
     },
+
+    // v11.7.4: 정규식 함수 snake_case alias + 함수 기반 치환
+    "re_match":    (pattern: string, s: string): string | null => _aliases["re-match"](pattern, s),
+    "re_test":     (pattern: string, s: string): boolean => _aliases["re-test"](pattern, s),
+    "re_find":     (pattern: string, s: string): string | null => _aliases["re-find"](pattern, s),
+    "re_find_all": (pattern: string, s: string): string[] => _aliases["re-find-all"](pattern, s),
+    "re_replace":  (pattern: string, replacement: string, s: string): string => _aliases["re-replace"](pattern, replacement, s),
+    "re_split":    (pattern: string, s: string): string[] => _aliases["re-split"](pattern, s),
+    "re_groups":   (pattern: string, s: string): (string | null)[] | null => _aliases["re-groups"](pattern, s),
+
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {
       const ts = new Date().toISOString();

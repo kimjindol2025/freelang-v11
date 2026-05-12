@@ -501,6 +501,68 @@ describe("v11.7.3 — 함수 메타데이터 + 타입 검증", () => {
   });
 });
 
+describe("v11.7.4 — 정규식 강화 (re-groups, 함수 alias)", () => {
+  test("re-groups 전체 + 그룹 반환", () => {
+    const result = run('(re-groups "(\\\\d+)-(\\\\w+)" "123-abc")');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe("123-abc");
+    expect(result[1]).toBe("123");
+    expect(result[2]).toBe("abc");
+  });
+
+  test("re-groups 매치 없음", () => {
+    expect(run('(re-groups "\\\\d+" "abc")')).toBeNull();
+  });
+
+  test("re-groups 단일 그룹", () => {
+    const result = run('(re-groups "(\\\\d{2})/(\\\\d{2})/(\\\\d{4})" "13/05/2026")');
+    expect(result).toEqual(["13/05/2026", "13", "05", "2026"]);
+  });
+
+  test("re_match snake_case alias", () => {
+    expect(run('(re_match "\\\\d+" "abc123")')).toBe("123");
+  });
+
+  test("re_find snake_case alias", () => {
+    expect(run('(re_find "\\\\w+" "hello world")')).toBe("hello");
+  });
+
+  test("re_find_all snake_case alias", () => {
+    const result = run('(re_find_all "\\\\d+" "123 456 789")');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(3);
+  });
+
+  test("re_split snake_case alias", () => {
+    const result = run('(re_split "," "a,b,c")');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(3);
+  });
+
+  test("re_groups snake_case alias", () => {
+    const result = run('(re_groups "(\\\\w+)" "hello")');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]).toBe("hello");
+  });
+
+  test("re_test 성공", () => {
+    expect(run('(re_test "\\\\d+" "123")')).toBe(true);
+  });
+
+  test("re_test 실패", () => {
+    expect(run('(re_test "\\\\d+" "abc")')).toBe(false);
+  });
+
+  test("re-groups 다중 호출 유효성", () => {
+    const result = run(`
+      (let [m (re-groups "([a-z]+)@([a-z.]+)" "user@example.com")]
+        (list (get $m 1) (get $m 2)))
+    `);
+    expect(result).toEqual(["user", "example.com"]);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");
