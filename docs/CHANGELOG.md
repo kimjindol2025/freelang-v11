@@ -1,5 +1,25 @@
 # FreeLang v11 변경 이력
 
+## [v12-alpha] — 2026-05-11 (Phase v12 Alpha: Breaking Changes 구현)
+
+### v12 Breaking Changes (FL_V12=1 활성화 시)
+
+| # | 기능 | 내용 |
+|---|------|------|
+| #16 | define 재정의 금지 | `FL_V12=1`일 때 동일 이름 재정의 시 에러 + atom 패턴 안내 |
+| #17/#18 | set! 금지 | `FL_V12=1`일 때 `set!` 사용 시 에러 + atom+swap! 안내 |
+| #19 | @atom 문법 | `@varname` → `(deref varname)` lexer 레벨 변환 (FL_V12 무관) |
+| #20 | swap! extra args | `(swap! a + 1)` `(swap! a fn)` 형태 완전 지원 확인 |
+| #94 | atom 클로저 캡처 | atom 참조를 클로저가 공유하는 패턴 동작 확인 |
+
+### 테스트
+
+- `src/__tests__/v12-alpha.test.ts` — 21개 신규 테스트 (6개 describe)
+- MISTAKES-100 커버리지: **81% → 86%** (+6)
+- 전체: 997/997 → **1018/1018 PASS**
+
+---
+
 ## [v11.6.38] — 2026-05-11 (Phase B: stdlib 실용 모듈 3개)
 
 ### 신규 stdlib 모듈

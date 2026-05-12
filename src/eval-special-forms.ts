@@ -515,7 +515,16 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // ── set! ──────────────────────────────────────────────────────────
   if (op === "set!") {
     if (expr.args.length < 2) throwArgCount("set!", ">=2", expr.args.length, expr.line);
-    // #17: set! 클로저 미전파 힌트
+    // #17/#18: v12에서 set! 완전 제거 (FL_V12=1 시 에러, 기본은 경고)
+    const varHint = (expr.args[0] as any)?.name ?? (expr.args[0] as any)?.value ?? "x";
+    if (process.env.FL_V12 === "1") {
+      throw new FLRuntimeError(
+        ErrorCodes.INVALID_FORM,
+        `[v12] set!은 제거됐습니다 (line ${expr.line ?? "?"}). atom을 사용하세요:\n  (define ${varHint} (atom 초기값)) → (swap! ${varHint} (fn [v] 새값)) 또는 (reset! ${varHint} 새값)`,
+        { fn: "set!" },
+        undefined, expr.line
+      );
+    }
     console.warn(`⚠️  [FreeLang] set! is deprecated (line ${expr.line ?? "?"}). 전역 변수 수정은 클로저에 전파되지 않습니다. atom 권장: (define x (atom 0)) (swap! x + 1)`);
     const nameNode = expr.args[0];
 
@@ -602,8 +611,16 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
         type: inferType(value),
       };
 
-      // #16: 재정의 감지 — 이미 정의된 변수를 덮어쓸 때 atom 힌트
+      // #16: 재정의 감지 — FL_V12=1 시 에러, 기본은 경고
       if (ctx.variables.has("$" + name)) {
+        if (process.env.FL_V12 === "1") {
+          throw new FLRuntimeError(
+            ErrorCodes.INVALID_FORM,
+            `[v12] '${name}'은(는) 이미 정의됐습니다 (line ${expr.line ?? "?"}). 가변 값은 atom을 사용하세요:\n  (define ${name} (atom 초기값)) → (swap! ${name} (fn [v] 새값))`,
+            { fn: "define", varName: name },
+            undefined, expr.line
+          );
+        }
         console.warn(`⚠️  [FreeLang] '${name}'은(는) 이미 정의됐습니다 (line ${expr.line ?? "?"}). 가변 값은 atom을 사용하세요: (define ${name} (atom ${JSON.stringify(value)})) → (swap! ${name} (fn [v] 새값))`);
       }
       ctx.variables.set("$" + name, value, meta);

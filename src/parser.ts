@@ -176,7 +176,7 @@ export class Parser {
     if (typeToken.type === T.Symbol) {
       blockType = typeToken.value;
       // [FUNC ...] deprecated — use (defn ...) instead
-      if (blockType === "FUNC") {
+      if (blockType === "FUNC" && !process.env.FL_NO_DEPRECATION_WARN) {
         process.stderr.write(`\x1b[33m[deprecated]\x1b[0m [FUNC ...] 문법은 deprecated입니다. (defn ...) 을 사용하세요. (line ${typeToken.line})\n`);
       }
     } else if (typeToken.type === T.Module) {

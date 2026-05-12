@@ -696,7 +696,7 @@ var FreeLang = (() => {
           let blockType;
           if (typeToken.type === "Symbol" /* Symbol */) {
             blockType = typeToken.value;
-            if (blockType === "FUNC") {
+            if (blockType === "FUNC" && !define_process_env_default.FL_NO_DEPRECATION_WARN) {
               process.stderr.write(`\x1B[33m[deprecated]\x1B[0m [FUNC ...] \uBB38\uBC95\uC740 deprecated\uC785\uB2C8\uB2E4. (defn ...) \uC744 \uC0AC\uC6A9\uD558\uC138\uC694. (line ${typeToken.line})
 `);
             }
@@ -2690,18 +2690,39 @@ ${parenHint}` : parenHint;
     VariableNotFoundError: () => VariableNotFoundError
   });
   function logUnknownFunction(name, file, line) {
+    if (FL_BUILTIN_OPS.has(name)) return;
     try {
       const entry = JSON.stringify({ name, file, line, ts: Date.now() }) + "\n";
       appendFileSync(FL_ERROR_LOG, entry);
     } catch {
     }
   }
-  var FL_ERROR_LOG, ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError, VariableNotFoundError, UnresolvedSymbolError;
+  var FL_ERROR_LOG, FL_BUILTIN_OPS, ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError, VariableNotFoundError, UnresolvedSymbolError;
   var init_errors = __esm({
     "src/errors.ts"() {
       init_define_process_env();
       init_node_stubs();
       FL_ERROR_LOG = define_process_env_default.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
+      FL_BUILTIN_OPS = /* @__PURE__ */ new Set([
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "!=",
+        "<",
+        ">",
+        "<=",
+        ">=",
+        "and",
+        "or",
+        "not",
+        "str",
+        "inc",
+        "dec",
+        "mod"
+      ]);
       ModuleError = class _ModuleError extends Error {
         constructor(message, moduleName, file, line, col, hint) {
           super(message);
@@ -4164,6 +4185,12 @@ ${parenHint}` : parenHint;
     // DB
     "mariadb_all": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
     "db_query": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+    // mariadb-* kebab-case — (load "stdlib/db.fl") 또는 DB 맵 정의 필요
+    "mariadb-query": { correct: "mariadb_query", usage: '\uBA3C\uC800 DB \uB9F5 \uC815\uC758: (define DB {:host "localhost" :user "u" :password "p" :database "d"})\n  \uADF8 \uD6C4: (mariadb_query DB "SELECT ..." [params])' },
+    "mariadb-exec": { correct: "mariadb_exec", usage: '(mariadb_exec DB "INSERT INTO ..." [params])' },
+    "mariadb-one": { correct: "mariadb_one", usage: '(mariadb_one DB "SELECT ... LIMIT 1" [params])  ;; \u2192 \uB2E8\uC77C row \uBC18\uD658' },
+    "db-query": { correct: "mariadb_query", usage: '(mariadb_query DB "SELECT ..." [params])' },
+    "db-exec": { correct: "mariadb_exec", usage: '(mariadb_exec DB "INSERT ..." [params])' },
     // HTTP
     "http_post": { correct: "http_get", usage: '(http_get url {:method "POST" :body data})' },
     "fetch": { correct: "http_get", usage: "(http_get url)" },

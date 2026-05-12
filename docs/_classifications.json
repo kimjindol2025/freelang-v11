@@ -2,7 +2,7 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 80,
+    "covered": 86,
     "percent": 80,
     "last_updated": "2026-05-11",
     "covered_items": [
@@ -193,27 +193,42 @@
     "#16": {
       "type": "design",
       "summary": "define 재정의 안 됨",
-      "fix": "v12: atom 명시 또는 mut 키워드"
+      "fix": "v12: atom 명시 또는 mut 키워드",
+      "status": "covered",
+      "solved_in": "v12-alpha",
+      "note": "FL_V12=1 define 재정의 → 에러 throw, @atom 패턴 안내"
     },
     "#17": {
       "type": "design",
       "summary": "set! 클로저 미반영",
-      "fix": "v12: atom 강제 또는 명확한 에러"
+      "fix": "v12: atom 강제 또는 명확한 에러",
+      "status": "covered",
+      "solved_in": "v12-alpha",
+      "note": "FL_V12=1 set! → 에러 throw, atom+swap! 안내"
     },
     "#18": {
       "type": "design",
       "summary": "전역 배열 set! 미반영",
-      "fix": "v12: 동일"
+      "fix": "v12: 동일",
+      "status": "covered",
+      "solved_in": "v12-alpha",
+      "note": "FL_V12=1 set! 전체 금지 (전역 배열 포함)"
     },
     "#19": {
       "type": "design",
       "summary": "deref 누락",
-      "fix": "v12: atom 자동 deref 옵션"
+      "fix": "v12: atom 자동 deref 옵션",
+      "status": "covered",
+      "solved_in": "v12-alpha",
+      "note": "@varname → (deref varname) lexer 레벨 변환"
     },
     "#20": {
       "type": "design",
       "summary": "swap! fn 인자 누락",
-      "fix": "v12: arity 검사"
+      "fix": "v12: arity 검사",
+      "status": "covered",
+      "solved_in": "v12-alpha",
+      "note": "swap! extra args 지원: (swap! a + 1), fn 인자 포함"
     },
     "#21": {
       "type": "design",
@@ -775,7 +790,10 @@
     "#94": {
       "type": "design",
       "summary": "define 재정의 클로저 미반영",
-      "fix": "v12: 명확한 에러"
+      "fix": "v12: 명확한 에러",
+      "status": "covered",
+      "solved_in": "v12-alpha",
+      "note": "atom 클로저 참조 캡처 테스트 확인 완료"
     },
     "#95": {
       "type": "normal",
