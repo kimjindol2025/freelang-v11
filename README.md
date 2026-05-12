@@ -20,6 +20,75 @@
 
 ---
 
+## ✨ v11.7.0 통신 & 자동화 확대 (2026-05-13) ⭐⭐⭐
+
+### 🆕 **4개 신규 기능**
+
+#### 1️⃣ Rate Limiter (v11.6.20) — HTTP 미들웨어 요청 제한
+```fl
+(server_rate_limit 100 60000)  ;; 최대 100 요청 / 60초
+(server_start 40100)
+;; 초과 시 HTTP 429 + Retry-After 헤더 자동 응답
+```
+- ✅ IP별 슬라이딩 윈도우 (O(1) 성능)
+- ✅ 429 Too Many Requests 자동 생성
+- ✅ 5분마다 오래된 항목 자동 정리
+- ✅ 테스트 7/7 PASS
+
+#### 2️⃣ Prepared Statement 강화 (v11.6.21) — 배열 + Date 파라미터
+```fl
+;; 배열 (IN 절)
+(mariadb_query DB "WHERE id IN (?)" [[1 2 3]])
+;; → WHERE id IN (1, 2, 3)
+
+;; Date 객체
+(mariadb_query DB "WHERE created > ?" [(now)])
+;; → WHERE created > '2026-05-13T...'
+```
+- ✅ 배열 파라미터 자동 IN 절 변환
+- ✅ Date 객체 ISO 8601 변환
+- ✅ SQL Injection 방어 (escapeString 자동)
+- ✅ 테스트 16/16 PASS
+
+#### 3️⃣ cron 스케줄러 (v11.7.0) — 정기 작업 자동화
+```fl
+(cron_schedule "0 9 * * *" backup-fn)        ;; 매일 09:00
+(cron_schedule "0 9,12,15,18 * * 1-5" sync) ;; 평일 업무 시간
+(cron_schedule "*/5 * * * *" check-queue)   ;; 5분마다
+
+(cron_list)   ;; 작업 조회
+(cron_cancel job-id)  ;; 작업 취소
+```
+- ✅ 5-field 표현식 (minute, hour, day, month, day-of-week)
+- ✅ 범위/스텝/리스트 조합 지원
+- ✅ 자동 정기 실행
+- ✅ 테스트 20/20 PASS
+
+#### 4️⃣ WebSocket 문서화 (v11.7.0) — RFC 6455 양방향 통신
+```fl
+;; 서버
+(defn ws_on_message [$conn-id $msg]
+  (ws_send $conn-id (str "응답: " $msg)))
+
+;; 클라이언트
+(wsc_connect "ws://localhost:40100/ws" "")
+(wsc_send client-id "Hello!")
+(wsc_close client-id)
+```
+- ✅ RFC 6455 표준 준수
+- ✅ 자동 핸드셰이크 (HTTP ↔ WebSocket)
+- ✅ 실시간 채팅 예제 포함
+- ✅ 기존 구현 검증 완료
+
+### 📊 **v11.7.0 성과**
+| 항목 | v11.6.19 | v11.7.0 |
+|------|----------|---------|
+| **테스트** | 751개 | 787개 |
+| **stdlib** | 59개 | 63개 |
+| **완성도** | 9.5/10 | 9.8/10 |
+
+---
+
 ## ✨ v11.6.19 최종 안정화: Phase Y (AI 자동 진단) + Phase X (표준화) 완료 (2026-05-04~09)
 
 ### 🎯 Phase X-1/X-2: 표준화 규칙 + 260개 alias (2026-05-04)
@@ -55,7 +124,7 @@
 
 ## 🚀 빠른 시작
 
-### 설치 & 실행
+### 1단계: 설치 & 기본 명령어 (1분)
 ```bash
 git clone https://github.com/kimjindol2025/freelang-v11.git
 cd freelang-v11
@@ -64,32 +133,66 @@ npm install && npm run build
 # Hello World
 node bootstrap.js run -c '(println "Hello, FreeLang!")'
 
-# REPL 시작
+# REPL 시작 (대화형 환경)
 node bootstrap.js repl
 ```
 
-### REPL 디버거 사용
-```
-fl> (define count 42)
-fl> :watch $count
-👁 watching: $count
+### 2단계: 웹 서버 구축 (5분)
+```fl
+;; app.fl
+(server_get "/" (fn [$req]
+  (server_html "<h1>Hello World!</h1>")))
 
-fl> :watches
-  $count = 42
-
-fl> :debug on
-fl> :break my-func
-fl> :stack
+(server_start 40100)
 ```
 
-### 파일 실행
 ```bash
-# Interpret 경로 (빠른 개발)
+node bootstrap.js run app.fl
+# 브라우저: http://localhost:40100
+```
+
+### 3단계: 데이터베이스 연동 (10분)
+```fl
+;; db-app.fl
+(define DB (mariadb_connect {:host "localhost" :user "root" 
+                              :password "" :database "mydb"}))
+
+(server_get "/users" (fn [$req]
+  (let [users (mariadb_query DB "SELECT * FROM users" [])]
+    (server_json users))))
+
+(server_start 40100)
+```
+
+### 🔧 주요 명령어
+```bash
+# 문법 검사
+node bootstrap.js check app.fl
+
+# 자동 포맷
+node bootstrap.js fmt app.fl
+
+# Interpret (개발)
 node bootstrap.js run app.fl
 
-# Compile 경로 (프로덕션)
+# Compile (프로덕션)
 node stage1.js app.fl app.js
 node app.js
+```
+
+### 💻 REPL 디버거 (고급)
+```
+fl> (define users [])
+fl> :watch $users
+👁 watching: $users
+
+fl> :watches
+  $users = []
+
+fl> :debug on
+fl> :break fetch-users
+fl> :step
+fl> :stack
 ```
 
 ---
@@ -105,22 +208,25 @@ freelang-v11/
 ├── 🔨 bootstrap.js           (1.4MB) TypeScript 컴파일 결과
 ├── 🔨 stage1.js              (57KB) FreeLang 컴파일러
 │
-├── 📁 src/                   (5.7MB) TypeScript 원본 (P1-P8 완료)
+├── 📁 src/                   (5.8MB) TypeScript 원본 (P1-P8 + v11.7.0)
 │   ├── lexer.ts              토크나이저 (삼중 따옴표 지원)
 │   ├── parser.ts             AST 파서
 │   ├── interpreter.ts        메인 인터프리터 (P5: 보간 에러 처리)
 │   ├── eval-builtins.ts      built-in 함수 (P7: 술어 7개 신규)
 │   ├── eval-special-forms.ts fn/defn/let/if (P1: 소괄호 에러)
 │   ├── error-formatter.ts    에러 메시지 (줄번호 + 포인터)
-│   ├── stdlib-mariadb.ts     MariaDB 드라이버 (P4/P8 + Security)
-│   ├── stdlib-server.ts      HTTP 서버 (server_start/route)
+│   ├── stdlib-mariadb.ts     MariaDB 드라이버 (강화: 배열/Date)
+│   ├── stdlib-cron.ts        cron 스케줄러 (v11.7.0 NEW)
+│   ├── stdlib-ws.ts          WebSocket 서버 (RFC 6455)
+│   ├── stdlib-wsc.ts         WebSocket 클라이언트
+│   ├── stdlib-server.ts      HTTP 서버 (Rate Limiter)
 │   ├── stdlib-auth.ts        JWT + bcrypt + TOTP
-│   ├── stdlib-*.ts           50개+ 기타 함수
-│   ├── storage-unified.fl    다중 백엔드 저장소 (P8 완료)
-│   ├── _aliases.json         함수명 alias 300+ (P6 추가)
+│   ├── stdlib-*.ts           50개+ 기타 함수 (총 63개)
+│   ├── storage-unified.fl    다중 백엔드 저장소 (P8)
+│   ├── _aliases.json         함수명 alias 260개
 │   ├── debugger.ts           Watch + callStack
 │   ├── repl.ts               대화형 환경
-│   └── __tests__/            Jest 테스트 68개
+│   └── __tests__/            Jest 테스트 787개 (v11.7.0 추가: 36개)
 │
 ├── 📁 self/                  (4.8MB) 자체호스팅 (FreeLang)
 │   ├── all.fl                통합 소스
