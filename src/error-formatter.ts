@@ -92,6 +92,12 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   // DB
   "mariadb_all":      { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
   "db_query":         { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  // mariadb-* kebab-case — (load "stdlib/db.fl") 또는 DB 맵 정의 필요
+  "mariadb-query":    { correct: "mariadb_query", usage: '먼저 DB 맵 정의: (define DB {:host "localhost" :user "u" :password "p" :database "d"})\n  그 후: (mariadb_query DB "SELECT ..." [params])' },
+  "mariadb-exec":     { correct: "mariadb_exec",  usage: '(mariadb_exec DB "INSERT INTO ..." [params])' },
+  "mariadb-one":      { correct: "mariadb_one",   usage: '(mariadb_one DB "SELECT ... LIMIT 1" [params])  ;; → 단일 row 반환' },
+  "db-query":         { correct: "mariadb_query", usage: '(mariadb_query DB "SELECT ..." [params])' },
+  "db-exec":          { correct: "mariadb_exec",  usage: '(mariadb_exec DB "INSERT ..." [params])' },
   // HTTP
   "http_post":        { correct: "http_get",     usage: '(http_get url {:method "POST" :body data})' },
   "fetch":            { correct: "http_get",     usage: '(http_get url)' },

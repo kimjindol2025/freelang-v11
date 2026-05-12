@@ -6,7 +6,14 @@ import { appendFileSync } from "fs";
 
 const FL_ERROR_LOG = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
 
+// 내장 연산자/특수폼 — swap! 등에 값으로 넘겨도 오탐 로그 제외
+const FL_BUILTIN_OPS = new Set([
+  "+", "-", "*", "/", "%", "=", "!=", "<", ">", "<=", ">=",
+  "and", "or", "not", "str", "inc", "dec", "mod"
+]);
+
 function logUnknownFunction(name: string, file?: string, line?: number) {
+  if (FL_BUILTIN_OPS.has(name)) return; // 내장 연산자 오탐 방지
   try {
     const entry = JSON.stringify({ name, file, line, ts: Date.now() }) + "\n";
     appendFileSync(FL_ERROR_LOG, entry);
