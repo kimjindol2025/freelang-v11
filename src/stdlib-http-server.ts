@@ -875,6 +875,26 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       };
     },
 
+    // v12: 짧은 응답 별칭 — res-json / res-html / res-status / res-redirect / res-text
+    "res-json":     (statusOrBody: any, maybeBody?: any): Record<string, any> => {
+      const isStatus = typeof statusOrBody === "number" && statusOrBody >= 100 && statusOrBody < 600;
+      return { __fl_response: true, status: isStatus ? statusOrBody : 200,
+               contentType: "application/json", body: isStatus ? maybeBody : statusOrBody };
+    },
+    "res-html":     (body: string, status = 200): Record<string, any> => ({
+      __fl_response: true, status, contentType: "text/html; charset=utf-8", body,
+    }),
+    "res-status":   (code: number, body: any): Record<string, any> => ({
+      __fl_response: true, status: code, contentType: "application/json", body,
+    }),
+    "res-redirect": (url: string): Record<string, any> => ({
+      __fl_response: true, status: 302, contentType: "text/plain", body: "",
+      headers: { "Location": url },
+    }),
+    "res-text":     (body: string, status = 200): Record<string, any> => ({
+      __fl_response: true, status, contentType: "text/plain; charset=utf-8", body,
+    }),
+
     // server_redirect_cookie url cookie -> response (302 리다이렉트 + Set-Cookie)
     "server_redirect_cookie": (url: string, cookie: string): Record<string, any> => {
       return {
@@ -1057,6 +1077,25 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     // server_req_params req -> object  (all URL params as an object)
     "server_req_params": (req: Request): Record<string, string> => {
       return req.params ?? {};
+    },
+
+    // v12: 짧은 별칭 — req-param / req-query / req-body / req-header
+    "req-param":  (req: Request, name: string): string | null => req.params[name] ?? null,
+    "req-query":  (req: Request, key?: string): any => {
+      if (key === undefined) return req.query ?? {};
+      const v = (req.query ?? {})[key];
+      return Array.isArray(v) ? v[0] : (v ?? null);
+    },
+    "req-body":   (req: Request): any => {
+      const b = req.body;
+      if (b === null || b === undefined) return null;
+      if (typeof b === "object") return b;
+      if (typeof b === "string") { try { return JSON.parse(b); } catch { return b; } }
+      return b;
+    },
+    "req-header": (req: Request, name: string): string | null => {
+      const v = req.headers[name.toLowerCase()];
+      return Array.isArray(v) ? v[0] : (v ?? null);
     },
 
     // server_req_method req -> string

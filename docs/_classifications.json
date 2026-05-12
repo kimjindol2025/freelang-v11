@@ -2,8 +2,8 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 99,
-    "percent": 99,
+    "covered": 100,
+    "percent": 100,
     "last_updated": "2026-05-12",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
@@ -76,7 +76,7 @@
       "#53 (힌트: ws_handler → ws-handler 시그니처 안내 (error-formatter))",
       "#54 (힌트: on-close → ws-on-close 안내 (error-formatter))"
     ],
-    "_note": "Phase J 완료: 93→99%. 남은 1개(#48 body 파싱 완전 해결)는 v12 설계"
+    "_note": "Phase J 완료: MISTAKES-100 100% 달성 🎉"
   },
   "_categories": {
     "design": {
