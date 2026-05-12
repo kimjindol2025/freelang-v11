@@ -547,6 +547,96 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 ---
 
+### 🔌 WebSocket (v11.7.0) — 양방향 실시간 통신
+
+**서버** (RFC 6455):
+
+```fl
+;; WebSocket 서버 시작
+(server_start 40100)
+
+;; 라우트 정의 (HTTP ↔ WebSocket 업그레이드)
+(server_get "/ws" "ws_handler")
+
+;; 핸들러 함수 내부
+(defn ws_handler [$req]
+  ;; HTTP 요청을 WebSocket으로 업그레이드
+  ;; 클라이언트 연결 시 ws_on_connect 콜백 호출
+  )
+
+;; 콜백 함수들 정의
+(defn ws_on_connect [$conn-id]
+  (println (str "클라이언트 연결: " $conn-id)))
+
+(defn ws_on_message [$conn-id $message]
+  ;; $message = 클라이언트가 보낸 문자열
+  (println (str "수신: " $message))
+  ;; 응답 전송
+  (ws_send $conn-id (str "응답: " $message)))
+
+(defn ws_on_close [$conn-id]
+  (println (str "클라이언트 종료: " $conn-id)))
+
+(defn ws_on_error [$conn-id $error]
+  (println (str "에러 [" $conn-id "]: " $error)))
+```
+
+**클라이언트**:
+
+```fl
+;; WebSocket 연결
+(define client-id (wsc_connect "ws://localhost:40100/ws" ""))
+
+;; 메시지 전송
+(wsc_send client-id "Hello, Server!")
+
+;; 연결 상태 확인
+(wsc_state client-id)  ;; → "OPEN" / "CONNECTING" / "CLOSED"
+
+;; JSON 전송
+(wsc_send_json client-id {:type "ping" :data "test"})
+
+;; 연결 종료
+(wsc_close client-id)
+```
+
+**실전 예제 — 실시간 채팅**:
+
+```fl
+;; 연결된 클라이언트 추적
+(define clients (atom {}))
+
+(defn ws_on_connect [$conn-id]
+  (swap! clients assoc $conn-id {:connected true :username nil}))
+
+(defn ws_on_message [$conn-id $msg]
+  (let [parsed (try (json_parse $msg) (catch $e nil))]
+    (if parsed
+      ;; 사용자명 설정
+      (if (= (get parsed "action") "set_user")
+        (swap! clients assoc-in [$conn-id :username] (get parsed "username"))
+        
+        ;; 메시지 브로드캐스트
+        (if (= (get parsed "action") "message")
+          (let [username (get-in @clients [$conn-id :username])
+                response (json-stringify {:user username :text (get parsed "text")})]
+            ;; 모든 연결된 클라이언트에 전송
+            (doseq [[cid _] @clients]
+              (wsc_send cid response))))))))
+
+(defn ws_on_close [$conn-id]
+  (swap! clients dissoc $conn-id))
+```
+
+**특징**:
+- RFC 6455 표준 준수
+- 자동 핸드셰이크 (HTTP ↔ WebSocket 업그레이드)
+- 프레임 파싱 (마스킹 처리)
+- 자동 재연결 (클라이언트 측)
+- Node.js 25+ 네이티브 WebSocket 사용 (의존성 0)
+
+---
+
 ## 🗄️ MariaDB
 
 ```fl
