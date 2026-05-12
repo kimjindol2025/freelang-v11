@@ -7,9 +7,7 @@
 ;; 토큰 종류: LParen/RParen/LBracket/RBracket/LBrace/RBrace
 ;;          Number/String/Symbol/Variable/Keyword/Unknown
 
-;; ──────────────────────────────────────
-;; char predicates
-;; ──────────────────────────────────────
+;; ── char predicates
 
 (defn is-digit? [$c]
   (if (null? $c) false (and (>= $c "0") (<= $c "9"))))
@@ -33,9 +31,7 @@
       (= $c "=") (= $c "+") (= $c "*") (= $c "%")
       (= $c "&") (= $c "|") (= $c "^") (= $c "~"))))
 
-;; ──────────────────────────────────────
-;; state = {:src :idx :line :col :tokens}
-;; ──────────────────────────────────────
+;; ── state = {:src :idx :line :col :tokens}
 
 (defn make-state [$src]
   {:src $src :idx 0 :line 1 :col 1 :tokens []})
@@ -67,9 +63,7 @@
   :tokens (append (get $st :tokens)
                   {:kind $kind :type $kind :value $value :line $sl :col $sc})})
 
-;; ──────────────────────────────────────
-;; 스킵 (whitespace + ; line comment)
-;; ──────────────────────────────────────
+;; ── 스킵 (whitespace + ; line comment)
 
 (defn skip-comment-loop [$cur]
   (if (or (at-end? $cur) (= (peek $cur) "\n"))
@@ -90,9 +84,7 @@
 (defn skip-ws [$st]
   (skip-ws-loop $st))
 
-;; ──────────────────────────────────────
-;; 숫자 (정수/실수/음수)
-;; ──────────────────────────────────────
+;; ── 숫자 (정수/실수/음수)
 
 (defn read-number-iter [$cur $res_acc $dot $line $col]
   (if (at-end? $cur) (emit $cur "Number" $res_acc $line $col)
@@ -110,9 +102,7 @@
 (defn read-number [$st]
   (read-number-body $st "" false (get $st :line) (get $st :col)))
 
-;; ──────────────────────────────────────
-;; 문자열 (escape \n \t \r \" \\)
-;; ──────────────────────────────────────
+;; ── 문자열 (escape \n \t \r \" \\)
 
 (defn translate-esc [$c]
   (cond
@@ -139,9 +129,7 @@
       [$st1 (advance $st)]]
   (read-string-body $st1 "" $line $col)))
 
-;; ──────────────────────────────────────
-;; 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
-;; ──────────────────────────────────────
+;; ── 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
 
 (defn read-symbol-iter [$cur $res_acc $line $col $kind]
   (if (at-end? $cur) (emit $cur $kind $res_acc $line $col)
@@ -166,9 +154,7 @@
       [$st1 (advance $st)]]
   (read-symbol-body-kind $st1 "" $line $col "Keyword")))
 
-;; ──────────────────────────────────────
-;; 토큰 하나 읽기
-;; ──────────────────────────────────────
+;; ── 토큰 하나 읽기
 
 (defn read-token [$st]
   (let [[$st1 (skip-ws $st)]]
@@ -190,9 +176,7 @@
         [(is-symbol-char? $c) (read-symbol $st1)]
         [true (emit (advance $st1) "Unknown" $c $line $col)])))))
 
-;; ──────────────────────────────────────
-;; 메인 루프 — 모든 토큰 수집
-;; ──────────────────────────────────────
+;; ── 메인 루프 — 모든 토큰 수집
 
 (defn lex-loop [$cur]
   (let [[$ws (skip-ws $cur)]]
@@ -206,9 +190,7 @@
 ;; ── AST 노드 생성자 ─────────────────────────────────────────────────
 ;; 모든 노드는 plain map: {:kind "..." ...필드}
 
-;; ──────────────────────────────────────
-;; 21 기본 원자 (Literal/Variable/Keyword/SExpr)
-;; ──────────────────────────────────────
+;; ── 21 기본 원자 (Literal/Variable/Keyword/SExpr)
 
 (defn make-literal [type value line]
   {:kind "literal" :type type :value value :line line})
@@ -222,9 +204,7 @@
 (defn make-sexpr [op args line]
   {:kind "sexpr" :op op :args args :line line})
 
-;; ──────────────────────────────────────
-;; 22 SExpr 편의 + 원시값 래퍼
-;; ──────────────────────────────────────
+;; ── 22 SExpr 편의 + 원시값 래퍼
 
 (defn make-number [v line]
   (make-literal "number" v line))
@@ -255,9 +235,7 @@
 (defn make-map-block [items line]
   (make-block "Map" null {:items items} line))
 
-;; ──────────────────────────────────────
-;; 24 Pattern 7종
-;; ──────────────────────────────────────
+;; ── 24 Pattern 7종
 
 (defn make-pattern-literal [value line]
   {:kind "pattern-literal" :value value :line line})
@@ -280,9 +258,7 @@
 (defn make-pattern-range [start end line]
   {:kind "pattern-range" :start start :end end :line line})
 
-;; ──────────────────────────────────────
-;; 25 Pattern matching
-;; ──────────────────────────────────────
+;; ── 25 Pattern matching
 
 (defn make-pattern-match [value cases line]
   {:kind "pattern-match" :value value :cases cases :line line})
@@ -290,9 +266,7 @@
 (defn make-match-case [pattern guard body line]
   {:kind "match-case" :pattern pattern :guard guard :body body :line line})
 
-;; ──────────────────────────────────────
-;; 26 함수/타입
-;; ──────────────────────────────────────
+;; ── 26 함수/타입
 
 (defn make-function-value [params body captured-env name]
   {:kind "function-value" :params params :body body
@@ -306,9 +280,7 @@
   {:kind "type-class-instance" :class class-name :type type-name
   :impls impls :line line})
 
-;; ──────────────────────────────────────
-;; 27 Module / Import
-;; ──────────────────────────────────────
+;; ── 27 Module / Import
 
 (defn make-module-block [name exports body line]
   {:kind "module" :name name :exports exports :body body :line line})
@@ -319,9 +291,7 @@
 (defn make-open-block [module-name line]
   {:kind "open" :module module-name :line line})
 
-;; ──────────────────────────────────────
-;; 28 AI 블록 (SearchBlock / LearnBlock / ReasoningBlock)
-;; ──────────────────────────────────────
+;; ── 28 AI 블록 (SearchBlock / LearnBlock / ReasoningBlock)
 
 (defn make-search-block [query fields line]
   {:kind "search-block" :query query :fields fields :line line})
@@ -332,9 +302,7 @@
 (defn make-reasoning-block [name fields line]
   {:kind "reasoning-block" :name name :fields fields :line line})
 
-;; ──────────────────────────────────────
-;; 29 Async / Try
-;; ──────────────────────────────────────
+;; ── 29 Async / Try
 
 (defn make-async-function [name params body line]
   {:kind "async-function" :name name :params params :body body :line line})
@@ -357,9 +325,7 @@
 (defn make-loop [init condition update body line]
   {:kind "loop" :init init :condition condition :update update :body body :line line})
 
-;; ──────────────────────────────────────
-;; 30 웹 노드 + deep-equal?
-;; ──────────────────────────────────────
+;; ── 30 웹 노드 + deep-equal?
 
 (defn make-page [name path fields line]
   {:kind "page" :name name :path path :fields fields :line line})
@@ -422,9 +388,7 @@
 ;; (모든 make-* 함수는 ast.fl 표준 정의 참조)
 ;; ──────────────────────────────────────
 
-;; ──────────────────────────────────────
-;; 31 파서 상태 + peek/advance/expect
-;; ──────────────────────────────────────
+;; ── 31 파서 상태 + peek/advance/expect
 
 (defn p-make [$tokens]
   {:tokens $tokens :idx 0 :ast []})
@@ -453,9 +417,7 @@
 (defn r-pair [$p $node]
   {:p $p :node $node})
 
-;; ──────────────────────────────────────
-;; 32 parseAtom — number/string/symbol/keyword/variable
-;; ──────────────────────────────────────
+;; ── 32 parseAtom — number/string/symbol/keyword/variable
 
 (defn string-contains? [$s $substr]
   (not (= -1 (str-index-of $s $substr))))
@@ -477,9 +439,7 @@
      (r-pair (p-advance $p) (make-keyword $v $line))]
     [true (r-pair (p-advance $p) (make-literal "unknown" $v $line))])))
 
-;; ──────────────────────────────────────
-;; 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
-;; ──────────────────────────────────────
+;; ── 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
 
 (defn parse-expr [$p]
   (let [[$t (p-peek $p)] [$k (get $t :kind)]]
@@ -489,9 +449,7 @@
     [(= $k "LBrace")   (parse-map $p)]
     [true (parse-atom $p)])))
 
-;; ──────────────────────────────────────
-;; 33 parse-sexpr (parens)
-;; ──────────────────────────────────────
+;; ── 33 parse-sexpr (parens)
 
 (defn parse-sexpr [$p]
   (let [[$start-tok (p-peek $p)] [$line (get $start-tok :line)]
@@ -557,9 +515,7 @@
      (let [[$one (parse-expr $p)]]
        (parse-args (get $one :p) (append $acc (get $one :node))))])))
 
-;; ──────────────────────────────────────
-;; 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
-;; ──────────────────────────────────────
+;; ── 34 parse-bracket — [a b c] 또는 [FUNC ...] 블록
 
 (defn parse-bracket [$p]
   (let [[$tok (p-peek $p)] [$line (get $tok :line)]
@@ -634,9 +590,7 @@
     (p-advance $p)
     $p)))
 
-;; ──────────────────────────────────────
-;; 40/44 공개 API: parse(tokens) → ast list
-;; ──────────────────────────────────────
+;; ── 40/44 공개 API: parse(tokens) → ast list
 
 (defn parse-all [$p]
   (if (p-end? $p)
