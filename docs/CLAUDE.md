@@ -406,6 +406,52 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 ---
 
+### 🔐 Rate Limiter (v11.6.20) — IP 기반 요청 제한
+
+```fl
+;; HTTP 미들웨어 레벨의 자동 Rate Limiting
+;; IP별 슬라이딩 윈도우 방식
+
+;; 설정: 최대 100 요청 / 60초
+(server_rate_limit 100 60000)
+
+;; 설정 후 server_start 호출
+(server_get  "/api/data" "handler")
+(server_start 40100)
+
+;; 초과 시 자동 응답:
+;;   HTTP 429 Too Many Requests
+;;   Retry-After 헤더 포함 (초 단위)
+;;   Body: {:error "Too Many Requests" :retry_after 45}
+```
+
+**특징**:
+- IP별 독립 추적 (다중 클라이언트 안전)
+- 슬라이딩 윈도우 (정확한 시간 제어)
+- 5분마다 오래된 항목 자동 정리
+- 성능: O(1) 조회 시간
+
+**제한 확인 로직**:
+```fl
+;; HTTP 핸들러 내부에서:
+(defn handle-request [$req]
+  ;; 자동 체크 (server_rate_limit 호출 시)
+  ;; 초과 시 429 자동 응답, 통과 시 계속
+  (server_json {:data "..."}))
+```
+
+**함수 호출 레벨 Rate Limiter** (선택사항):
+```fl
+;; 함수 자체 호출 빈도 제한
+(define calc-expensive (rate_limit square 10 1000))
+
+;; 10회/1초 제한
+(rl_call calc-expensive 5)    ;; → 25
+(rl_call calc-expensive 10)   ;; 11번째 → error: "rate_limit 초과"
+```
+
+---
+
 ### ❌ 금지 패턴
 
 ```fl
