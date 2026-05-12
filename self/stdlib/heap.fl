@@ -43,7 +43,7 @@
             (set (let [] smallest) 0 right))
           (if (= smallest i) h
             (do (swap-in-heap h i smallest)
-                (heap-bubble-down h smallest)))))]
+                (heap-bubble-down h smallest))))]
 
 [FUNC swap-in-heap :params [h i j]
   :body (let [[tmp (get h i)]]

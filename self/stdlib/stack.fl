@@ -51,4 +51,4 @@
               (= ch "}") (if (= (stack-top s) "{")
                             (stack-balanced-loop str (stack-pop s) (+ i 1))
                             false)
-              true (stack-balanced-loop str s (+ i 1))))))]
+              true (stack-balanced-loop str s (+ i 1)))))]

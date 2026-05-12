@@ -37,7 +37,7 @@
           (replace (replace (replace content "\n" " ") "  " " ") "  " " "))]
 
 [FUNC minify-css :params [css]
-  :body (replace (replace (str css) "\n" "") " { " "{"))]
+  :body (replace (replace (str css) "\n" "") " { " "{")]
 
 [FUNC minify-js :params [js]
   :body (str js)]
