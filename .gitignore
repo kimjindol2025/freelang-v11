@@ -24,6 +24,8 @@ freelang
 browser.js
 BUILD-DETERMINISM-RESULTS.json
 L2-PROOF-RESULTS.json
+stage1.js
+*.out.js
 
 # 빌드 타임스탬프 포함 자동생성 문서
 docs/AI_SYSTEM_PROMPT.md
