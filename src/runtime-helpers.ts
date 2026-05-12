@@ -122,6 +122,7 @@ function _fl_process_run_args(cmd, args) { try { const {execSync}=require("child
 function _fl_process_exec(cmd) { try { const {execSync}=require("child_process"); return execSync(cmd,{encoding:"utf8"}); } catch(e) { return ""; } }
 function _fl_process_exec_args(cmd, args) { try { const {execSync}=require("child_process"); return execSync(cmd+" "+(args||[]).join(" "),{encoding:"utf8"}); } catch(e) { return ""; } }
 function _fl_process_spawn(cmd, args) { try { const {spawnSync}=require("child_process"); const r=spawnSync(cmd,args||[],{encoding:"utf8"}); return r.stdout||""; } catch(e) { return ""; } }
+function _fl_run_inherit(cmd) { require("child_process").spawnSync(cmd,{shell:true,stdio:"inherit"}); }
 function _fl_process_kill(pid) { try { process.kill(pid); } catch(e) {} }
 function _fl_process_wait(pid) { return null; }
 function _fl_env_get(k) { return process.env[k] || null; }
