@@ -474,10 +474,62 @@ freelang fn-doc str_split         # 함수 문서 조회
 (mariadb_query DB "SELECT * FROM users" [])            ;; → 배열
 (mariadb_one   DB "SELECT * FROM users WHERE id=1" []) ;; → row or null
 (mariadb_exec  DB "INSERT INTO t (name) VALUES (?)" ["kim"])
-
-;; SQL 이스케이프 (내장 esc 함수 사용)
-(str "SELECT * FROM users WHERE name=" (esc username))
 ```
+
+### 🔒 Prepared Statement (v11.6.21) — 파라미터 바인딩 + SQL Injection 방어
+
+**자동 파라미터 바인딩** (SQL Injection 완벽 방어):
+
+```fl
+;; 1. 기본 타입 — null, boolean, number, string
+(mariadb_exec DB "INSERT INTO users (name, age, active) VALUES (?, ?, ?)"
+              ["kim" 30 true])
+;; → INSERT INTO users ... VALUES ('kim', 30, 1)
+
+;; 2. 배열 파라미터 (IN 절) — v11.6.21 신규
+(mariadb_query DB "SELECT * FROM users WHERE id IN (?)"
+               [[1 2 3]])
+;; → SELECT * FROM users WHERE id IN (1, 2, 3)
+
+;; 3. Date 객체 — v11.6.21 신규
+(mariadb_query DB "SELECT * FROM logs WHERE created > ?"
+               [(now)])  ;; Date 자동 ISO 문자열 변환
+;; → SELECT * FROM logs WHERE created > '2026-05-13T...'
+
+;; 4. SQL Injection 방어 — escapeString 자동 적용
+(mariadb_query DB "SELECT * FROM users WHERE name = ?"
+               ["'; DROP TABLE users; --"])
+;; → 안전 (따옴표 escape: ' → '')
+;; → SELECT * FROM users WHERE name = '''; DROP TABLE users; --'
+```
+
+**타입별 변환**:
+
+| 입력 | 변환 | 예시 |
+|------|------|------|
+| `null` / `undefined` | `NULL` | `:password nil` → `NULL` |
+| `true` / `false` | `1` / `0` | `:active true` → `1` |
+| `42` / `-3.14` | 숫자 검증 후 그대로 | `:age 30` → `30` |
+| `"string"` | 이스케이프 + 따옴표 | `:name "Kim's"` → `'Kim''s'` |
+| `[1 2 3]` | 쉼표 구분 | `IN (?)` → `IN (1, 2, 3)` |
+| `(now)` (Date) | ISO 8601 | `2026-05-13T12:30:45Z` |
+| `{:key "val"}` | ❌ 에러 발생 | `json-stringify` 후 문자열로 |
+
+**오류 방지**:
+
+```fl
+;; ❌ 금지: 수동 문자열 연결
+(str "SELECT * FROM users WHERE name='" name "'")
+
+;; ❌ 금지: JSON 객체 직접 전달
+(mariadb_query DB "SELECT * WHERE data = ?" [{:a 1}])
+
+;; ✅ 올바름: 파라미터 배열로 전달
+(mariadb_query DB "SELECT * FROM users WHERE name = ?" [name])
+(mariadb_query DB "SELECT * WHERE data = ?" [(json-stringify {:a 1})])
+```
+
+---
 
 ---
 

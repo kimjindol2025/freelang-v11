@@ -115,15 +115,41 @@ function escapeString(s: string): string {
 function bindParams(sql: string, params: any[]): string {
   if (!params || params.length === 0) return sql;
   return params.reduce((s: string, p: any) => {
+    // null/undefined → NULL
     if (p === null || p === undefined) return s.replace("?", "NULL");
+
+    // boolean → 1/0
     if (typeof p === "boolean") return s.replace("?", p ? "1" : "0");
+
+    // number → 검증 후 숫자
     if (typeof p === "number") {
       if (!isFinite(p) || isNaN(p))
         throw new Error(`SQL 파라미터 오류: 유효하지 않은 숫자 (${p})`);
       return s.replace("?", String(p));
     }
-    if (Array.isArray(p) || (typeof p === "object" && p !== null))
-      throw new Error(`SQL 파라미터 오류: 객체/배열은 파라미터로 사용 불가 (받은 값: ${JSON.stringify(p).slice(0, 80)})\n힌트: (json-stringify 값) 으로 문자열 변환 후 삽입하세요`);
+
+    // 배열 (IN 절) — v11.6.21
+    if (Array.isArray(p)) {
+      const items = p.map((item) => {
+        if (item === null || item === undefined) return "NULL";
+        if (typeof item === "number") return String(item);
+        if (typeof item === "boolean") return item ? "1" : "0";
+        return `'${escapeString(String(item))}'`;
+      });
+      return s.replace("?", items.join(", "));
+    }
+
+    // Date 객체 → ISO 문자열 (v11.6.21)
+    if (p instanceof Date) {
+      return s.replace("?", `'${p.toISOString()}'`);
+    }
+
+    // 일반 객체 → 에러
+    if (typeof p === "object") {
+      throw new Error(`SQL 파라미터 오류: 객체는 파라미터로 사용 불가 (받은 값: ${JSON.stringify(p).slice(0, 80)})\n힌트: (json-stringify 값) 으로 문자열 변환 후 삽입하세요`);
+    }
+
+    // string (기본)
     return s.replace("?", `'${escapeString(String(p))}'`);
   }, sql);
 }
