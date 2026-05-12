@@ -176,6 +176,30 @@ describe("내장 함수 — 배열 상세", () => {
     `)).toBe(2);
   });
 
+  test("assoc 다중인자 — 3쌍", () => {
+    expect(run('(assoc {} "a" 1 "b" 2 "c" 3)')).toEqual({ a: 1, b: 2, c: 3 });
+  });
+
+  test("assoc 다중인자 — 기존 맵에 추가", () => {
+    expect(run('(assoc {"x" 0} "a" 1 "b" 2)')).toEqual({ x: 0, a: 1, b: 2 });
+  });
+
+  test("assoc 다중인자 — 키 덮어쓰기", () => {
+    expect(run('(assoc {"a" 1} "a" 99 "b" 2)')).toEqual({ a: 99, b: 2 });
+  });
+
+  test("assoc 다중인자 — null base", () => {
+    expect(run('(assoc null "x" 1 "y" 2)')).toEqual({ x: 1, y: 2 });
+  });
+
+  test("assoc 기존 1쌍 호환성", () => {
+    expect(run('(assoc {} "k" "v")')).toEqual({ k: "v" });
+  });
+
+  test("map-set 별칭 동작", () => {
+    expect(run('(map-set {} "k" "v")')).toEqual({ k: "v" });
+  });
+
   test("find 요소 탐색", () => {
     expect(run("(find (list 10 20 30) 20)")).toBe(1);
     expect(run("(find (list 10 20 30) 99)")).toBe(-1);

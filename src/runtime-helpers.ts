@@ -75,7 +75,7 @@ function _fl_concat(a, b) { return Array.isArray(a) && Array.isArray(b) ? [...a,
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
 function _fl_values(o) { return o ? Object.values(o) : []; }
 var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
-function _fl_map_set(o, k, v) { return {...o, [k]: v}; }
+function _fl_map_set(o, ...args) { const result = {...(o || {})}; for (let i = 0; i + 1 < args.length; i += 2) { result[args[i]] = args[i + 1]; } return result; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 
 // ─ 문자열 조작 ─
