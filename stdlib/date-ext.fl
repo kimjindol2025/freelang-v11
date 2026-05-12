@@ -1,0 +1,68 @@
+;; stdlib/date-ext.fl — 날짜 확장 유틸리티
+
+(defn date-now-ms []
+  ;; 현재 타임스탬프(ms) 반환
+  (now-ms))
+
+(defn date-diff-days [ts1 ts2]
+  ;; 두 타임스탬프(ms) 간 차이를 일수로 반환 (절대값)
+  ;; (date-diff-days (now-ms) (+ (now-ms) 86400000)) → 1
+  (floor (/ (abs (- ts2 ts1)) 86400000)))
+
+(defn date-add-days [ts days]
+  ;; 타임스탬프에 days일 추가
+  ;; (date-add-days (now-ms) 7) → 7일 뒤 ms
+  (+ ts (* days 86400000)))
+
+(defn date-start-of-day [ts]
+  ;; 해당 날짜의 00:00:00 타임스탬프
+  (* (floor (/ ts 86400000)) 86400000))
+
+(defn date-format-ko [ts]
+  ;; 타임스탬프를 한국어 날짜 포맷으로 반환
+  ;; → "2026년 5월 12일"
+  (let [parts (date-parts ts)]
+    (str (get parts "year") "년 "
+         (get parts "month") "월 "
+         (get parts "day") "일")))
+
+(defn date-format-ko-full [ts]
+  ;; "2026년 5월 12일 오전 9시 30분"
+  (let [parts (date-parts ts)
+        hour (get parts "hour")
+        ampm (if (< hour 12) "오전" "오후")
+        h12 (if (= hour 0) 12 (if (> hour 12) (- hour 12) hour))]
+    (str (get parts "year") "년 "
+         (get parts "month") "월 "
+         (get parts "day") "일 "
+         ampm " " h12 "시 "
+         (get parts "minute") "분")))
+
+(defn date-iso [ts]
+  ;; ISO 8601 형식 반환 "2026-05-12"
+  (let [parts (date-parts ts)]
+    (str (get parts "year") "-"
+         (str-pad-left (str (get parts "month")) 2 "0") "-"
+         (str-pad-left (str (get parts "day")) 2 "0"))))
+
+(defn date-past? [ts]
+  ;; 해당 타임스탬프가 현재보다 과거인지
+  (< ts (now-ms)))
+
+(defn date-future? [ts]
+  ;; 해당 타임스탬프가 현재보다 미래인지
+  (> ts (now-ms)))
+
+(defn date-ago [ts]
+  ;; "N일 전", "N시간 전", "방금" 같은 상대 표현
+  (let [diff (- (now-ms) ts)
+        days (floor (/ diff 86400000))
+        hours (floor (/ diff 3600000))
+        mins (floor (/ diff 60000))]
+    (cond
+      [(>= days 365) (str (floor (/ days 365)) "년 전")]
+      [(>= days 30)  (str (floor (/ days 30)) "달 전")]
+      [(>= days 1)   (str days "일 전")]
+      [(>= hours 1)  (str hours "시간 전")]
+      [(>= mins 1)   (str mins "분 전")]
+      [true          "방금"])))

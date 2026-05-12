@@ -1,0 +1,45 @@
+;; stdlib/string-ext.fl — 문자열 확장 유틸리티
+
+(defn str-words [s]
+  ;; 문자열을 공백으로 분리해 단어 배열 반환
+  ;; (str-words "hello world foo") → ["hello" "world" "foo"]
+  (filter (fn [w] (not (str-blank? w))) (str-split (str-trim s) " ")))
+
+(defn str-truncate [s max-len]
+  ;; 최대 길이 초과 시 "..." 붙여 자름
+  ;; (str-truncate "hello world" 8) → "hello..."
+  (if (<= (length s) max-len)
+    s
+    (str (str-slice s 0 (- max-len 3)) "...")))
+
+(defn str-camel-case [s]
+  ;; kebab-case → camelCase 변환
+  ;; (str-camel-case "hello-world-foo") → "helloWorldFoo"
+  (let [parts (str-split s "-")]
+    (if (empty? parts) s
+      (str (first parts)
+           (apply str (map (fn [w] (str (str-to-upper (str-slice w 0 1)) (str-slice w 1))) (rest parts)))))))
+
+(defn str-pascal-case [s]
+  ;; kebab-case → PascalCase 변환
+  ;; (str-pascal-case "hello-world") → "HelloWorld"
+  (apply str (map (fn [w] (str (str-to-upper (str-slice w 0 1)) (str-slice w 1))) (str-split s "-"))))
+
+(defn str-snake-case [s]
+  ;; kebab-case → snake_case 변환
+  ;; (str-snake-case "hello-world") → "hello_world"
+  (str-replace-all s "-" "_"))
+
+(defn str-kebab-case [s]
+  ;; snake_case → kebab-case 변환
+  ;; (str-kebab-case "hello_world") → "hello-world"
+  (str-replace-all s "_" "-"))
+
+(defn str-count-words [s]
+  ;; 단어 수 반환
+  (length (str-words s)))
+
+(defn str-repeat-join [s n sep]
+  ;; s를 n번 sep으로 이어서 반환
+  ;; (str-repeat-join "ha" 3 "-") → "ha-ha-ha"
+  (join (repeat n s) sep))

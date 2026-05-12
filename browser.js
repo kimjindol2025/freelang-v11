@@ -28718,6 +28718,14 @@ req.end();
             }
           });
         });
+        tcpServer.on("error", (err4) => {
+          if (err4.code === "EADDRINUSE") {
+            console.warn(`[ws] \uD3EC\uD2B8 ${port} \uC774\uBBF8 \uC0AC\uC6A9 \uC911 \u2014 WS \uC11C\uBC84 \uC2DC\uC791 \uAC74\uB108\uB700`);
+            tcpServer = null;
+          } else {
+            console.error(`[ws] \uC11C\uBC84 \uC624\uB958: ${err4.message}`);
+          }
+        });
         tcpServer.listen(port);
         return `ws listening on ${port}`;
       },

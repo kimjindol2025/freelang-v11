@@ -1,0 +1,47 @@
+;; stdlib/number-ext.fl — 숫자 확장 유틸리티
+
+(defn num-format [n]
+  ;; 천단위 쉼표 포맷
+  ;; (num-format 1234567) → "1,234,567"
+  (let [s (str (floor n))
+        parts (str-split s ".")]
+    (let [int-part (nth parts 0)
+          chars (reverse (str-split int-part ""))
+          grouped (map-indexed (fn [i c] (if (and (> i 0) (= (% i 3) 0)) (str "," c) c)) chars)]
+      (join (reverse grouped) ""))))
+
+(defn num-pad [n width]
+  ;; 앞에 0을 채워 width 자리로 맞춤
+  ;; (num-pad 42 5) → "00042"
+  (str-pad-left (str n) width "0"))
+
+(defn num-clamp [n lo hi]
+  ;; n을 lo~hi 범위로 제한 (clamp 별칭)
+  (max lo (min hi n)))
+
+(defn num-percent [part total]
+  ;; 백분율 반환 (소수점 1자리)
+  ;; (num-percent 3 4) → 75.0
+  (if (= total 0) 0 (* 100.0 (/ part total))))
+
+(defn num-to-ordinal [n]
+  ;; 영어 서수 반환
+  ;; (num-to-ordinal 1) → "1st"
+  (let [mod10 (% n 10)
+        mod100 (% n 100)]
+    (cond
+      [(and (= mod10 1) (not= mod100 11)) (str n "st")]
+      [(and (= mod10 2) (not= mod100 12)) (str n "nd")]
+      [(and (= mod10 3) (not= mod100 13)) (str n "rd")]
+      [true (str n "th")])))
+
+(defn num-sign [n]
+  ;; 양수 "+N", 음수 "-N", 0 "0"
+  (cond
+    [(> n 0) (str "+" n)]
+    [(< n 0) (str n)]
+    [true "0"]))
+
+(defn num-in-range? [n lo hi]
+  ;; n이 lo<=n<=hi 범위인지 확인
+  (and (>= n lo) (<= n hi)))

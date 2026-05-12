@@ -155,7 +155,7 @@ parallel race with-timeout fl-try use`
 
 ## 8. 표준 라이브러리 함수 (자동 생성)
 
-총 456개 함수, 35 모듈. `(use MODULE)`로 일부는 명시 import 필요.
+총 460개 함수, 35 모듈. `(use MODULE)`로 일부는 명시 import 필요.
 
 ### agent (24개)
 
@@ -352,7 +352,7 @@ parallel race with-timeout fl-try use`
 - `(pkce_s256 verifier)` → string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
 - `(crypto_rsa_public_to_jwk public_pem kid)` → map (kty/n/e/kid/alg/use)
 
-### data (30개)
+### data (33개)
 
 - `(json_get obj path)` → any  (dot-path access: "user.name" or "items.0")
 - `(json_set obj path value)` → object (immutable update, returns new obj)
@@ -372,6 +372,9 @@ parallel race with-timeout fl-try use`
 - `(csv_write rows)` → string (serialize rows to CSV string)
 - `(csv_header rows)` → [string] (get first row as header)
 - `(csv_to_objects rows)` → [{header: value}] (rows to named objects)
+- `(csv-parse text [delimiter])` → [[string]] (quoted fields 완전 지원)
+- `(csv-parse-map text [delimiter])` → [{header: val}] (헤더 포함 파싱)
+- `(csv-stringify rows [delimiter])` → string
 - `(str_template template vars)` → string  ({key} → value substitution)
 - `(str_lines str)` → [string] (split into lines)
 - `(str_join_lines lines)` → string
@@ -497,13 +500,14 @@ parallel race with-timeout fl-try use`
 - `(http_body result)` → parsed body or null
 - `(http_status result)` → number
 
-### http-server (32개)
+### http-server (33개)
 
 - `(server_get path handlerName)` → null
 - `(server_post path handlerName)` → null
 - `(server_put path handlerName)` → null
 - `(server_patch path handlerName)` → null
 - `(server_delete path handlerName)` → null
+- `(server_static dir [urlPrefix])` → null  정적 파일 서빙 (server-static "public" "/")
 - `(server_stop)` → null
 - `(server_text text)` → response object
 - `(server_status code body)` → response object
@@ -743,4 +747,4 @@ FL_STRICT=1 node bootstrap.js run my-code.fl  # nil 엄격 모드
 
 ---
 
-이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-11T14:06:48.077Z
+이 프롬프트는 `scripts/gen-ai-prompt.js`로 자동 생성됩니다. 빌드 시점: 2026-05-12T01:09:42.417Z
