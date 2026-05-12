@@ -452,6 +452,88 @@ freelang fn-doc str_split         # 함수 문서 조회
 
 ---
 
+### ⏰ Cron 스케줄러 (v11.7.0) — 정기적인 작업 자동화
+
+**5-field 표현식** (minute hour day month day-of-week):
+
+```fl
+;; 매일 09:00에 실행
+(define job1 (cron_schedule "0 9 * * *" (fn [] (println "Good morning!"))))
+
+;; 매주 월요일 18:00 실행
+(define job2 (cron_schedule "0 18 * * 1" report-fn))
+
+;; 매월 1일 00:00 실행
+(define job3 (cron_schedule "0 0 1 * *" monthly-task))
+
+;; 업무 시간마다 (09:00, 12:00, 15:00, 18:00) 월-금
+(cron_schedule "0 9,12,15,18 * * 1-5" sync-data)
+
+;; 5분마다 실행
+(cron_schedule "*/5 * * * *" check-queue)
+```
+
+**표현식 문법**:
+
+| 필드 | 범위 | 예시 |
+|------|------|------|
+| minute | 0-59 | `0` (0분), `*/5` (5분마다), `0-30` (0-30분) |
+| hour | 0-23 | `9` (9시), `9-17` (9-17시) |
+| day | 1-31 | `1` (1일), `15` (15일) |
+| month | 1-12 | `6` (6월), `1-6` (1-6월) |
+| day-of-week | 0-6 | `1` (월), `0-5` (일-금) |
+
+**기본 표현식**:
+- `*` — 모든 값 (제약 없음)
+- `5` — 정확한 값
+- `0-5` — 범위
+- `*/5` — 5 간격 (0, 5, 10, ...)
+- `0-30/5` — 범위 내 5 간격 (0, 5, 10, ..., 30)
+- `0,15,30,45` — 리스트
+
+**작업 관리**:
+
+```fl
+;; 모든 예약된 작업 조회
+(cron_list)
+;; → [{:id "cron-..." :expression "0 9 * * *" :created_at "2026-05-13T..."}]
+
+;; 작업 취소
+(cron_cancel job-id)  ;; → true/false
+
+;; 모든 작업 일괄 정지
+(cron_clear)  ;; → 정지된 작업 개수
+```
+
+**예제**:
+
+```fl
+;; 데이터베이스 백업 — 매일 자정
+(cron_schedule "0 0 * * *"
+  (fn []
+    (let [result (shell_exec "mysqldump -u root mydb > backup.sql" "/tmp")]
+      (if (get result "ok")
+        (println "✅ 백업 완료")
+        (println "❌ 백업 실패")))))
+
+;; 로그 정리 — 매주 월요일 03:00
+(cron_schedule "0 3 * * 1"
+  (fn []
+    (let [old-logs (dir_list "logs/")]
+      (doseq [log old-logs]
+        (if (> (file_age log) 604800000)  ; 7일 이상
+          (file_delete log))))))
+
+;; 모니터링 alert — 30초마다 (분 경계에서)
+(cron_schedule "*/1 * * * *"  ; 매분
+  (fn []
+    (let [health (server_health)]
+      (if (< (get health "uptime") 0.9)
+        (email_alert "Server health degraded")))))
+```
+
+---
+
 ### ❌ 금지 패턴
 
 ```fl
