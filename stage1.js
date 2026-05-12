@@ -208,458 +208,222 @@ function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
 function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
 function _fl_print(v) { console.log(v); return v; }
 
-function _fl_is_digit_q(c) { return (_fl_null_q(c) ? false : ((c >= "0") && (c <= "9"))); };
-function _fl_is_alpha_q(c) { return (_fl_null_q(c) ? false : (((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z")))); };
-function _fl_is_alnum_q(c) { return (_fl_is_digit_q(c) || _fl_is_alpha_q(c)); };
-function _fl_is_space_q(c) { return ((c === " ") || (c === "\t") || (c === "\n") || (c === "\r")); };
-function _fl_is_symbol_char_q(c) { return (_fl_null_q(c) ? false : (_fl_is_alnum_q(c) || (c === "-") || (c === "_") || (c === "?") || (c === "!") || (c === "/") || (c === ".") || (c === "<") || (c === ">") || (c === "=") || (c === "+") || (c === "*") || (c === "%") || (c === "&") || (c === "|") || (c === "^") || (c === "~"))); };
-function make_state(src) { return ({ src: src, idx: 0, line: 1, col: 1, tokens: [] }); };
-function peek_at(st, offset) { return ((() => { let src = _fl_get(st, "src"); let i = (_fl_get(st, "idx") + offset); return ((i >= _fl_length(src)) ? null : _fl_char_at(src, i)); })()); };
-function peek(st) { return peek_at(st, 0); };
-function at_end_q(st) { return (_fl_get(st, "idx") >= _fl_length(_fl_get(st, "src"))); };
-function advance(st) { return ((() => { let c = peek(st); return ((c === "\n") ? ({ src: _fl_get(st, "src"), idx: (_fl_get(st, "idx") + 1), line: (_fl_get(st, "line") + 1), col: 1, tokens: _fl_get(st, "tokens") }) : ({ src: _fl_get(st, "src"), idx: (_fl_get(st, "idx") + 1), line: _fl_get(st, "line"), col: (_fl_get(st, "col") + 1), tokens: _fl_get(st, "tokens") })); })()); };
-function emit(st, kind, value, sl, sc) { return ({ src: _fl_get(st, "src"), idx: _fl_get(st, "idx"), line: _fl_get(st, "line"), col: _fl_get(st, "col"), tokens: _fl_append(_fl_get(st, "tokens"), ({ kind: kind, type: kind, value: value, line: sl, col: sc })) }); };
-function skip_comment(st) { return ((() => { let cur = st; return (() => { (() => { while(((!at_end_q(cur)) && (!(peek(cur) === "\n")))) { (cur = advance(cur)); } })(); return (at_end_q(cur) ? cur : advance(cur)); })(); })()); };
-function skip_ws(st) { return ((() => { let cur = st; let running = true; return (() => { (() => { while(((!at_end_q(cur)) && running)) { ((() => { let c = peek(cur); return (_fl_is_space_q(c) ? (cur = advance(cur)) : ((c === ";") ? (cur = skip_comment(cur)) : (true ? (running = false) : null))); })()); } })(); return cur; })(); })()); };
-function read_number_body(st, acc, has_dot, line, col) { return ((() => { let cur = st; let res_acc = acc; let dot = has_dot; let running = true; return (() => { (() => { while(((!at_end_q(cur)) && running)) { ((() => { let c = peek(cur); return (_fl_is_digit_q(c) ? (() => { (res_acc = _fl_str(res_acc, c)); return (cur = advance(cur)); })() : (((c === ".") && (!dot)) ? (() => { (res_acc = _fl_str(res_acc, c)); (dot = true); return (cur = advance(cur)); })() : (true ? (running = false) : null))); })()); } })(); return emit(cur, "Number", res_acc, line, col); })(); })()); };
-function read_number(st) { return read_number_body(st, "", false, _fl_get(st, "line"), _fl_get(st, "col")); };
-function translate_esc(c) { return ((c === "n") ? "\n" : ((c === "t") ? "\t" : ((c === "r") ? "\r" : ((c === "\"") ? "\"" : ((c === "\\") ? "\\" : (true ? c : null)))))); };
-function read_string_body(st, acc, line, col) { return ((() => { let cur = st; let res_acc = acc; let running = true; return (() => { (() => { while(((!at_end_q(cur)) && running)) { ((() => { let c = peek(cur); return ((c === "\"") ? (() => { (cur = advance(cur)); return (running = false); })() : ((c === "\\") ? ((() => { let st2 = advance(cur); let c2 = peek(st2); return (() => { (res_acc = _fl_str(res_acc, translate_esc(c2))); return (cur = advance(st2)); })(); })()) : (true ? (() => { (res_acc = _fl_str(res_acc, c)); return (cur = advance(cur)); })() : null))); })()); } })(); return emit(cur, "String", res_acc, line, col); })(); })()); };
-function read_string(st) { return ((() => { let line = _fl_get(st, "line"); let col = _fl_get(st, "col"); let st1 = advance(st); return read_string_body(st1, "", line, col); })()); };
-function read_symbol_body_kind(st, acc, line, col, kind) { return ((() => { let cur = st; let res_acc = acc; let running = true; return (() => { (() => { while(((!at_end_q(cur)) && running)) { ((() => { let c = peek(cur); return (_fl_is_symbol_char_q(c) ? (() => { (res_acc = _fl_str(res_acc, c)); return (cur = advance(cur)); })() : (running = false)); })()); } })(); return emit(cur, kind, res_acc, line, col); })(); })()); };
-function read_symbol(st) { return read_symbol_body_kind(st, "", _fl_get(st, "line"), _fl_get(st, "col"), "Symbol"); };
-function read_variable(st) { return ((() => { let line = _fl_get(st, "line"); let col = _fl_get(st, "col"); let st1 = advance(st); return read_symbol_body_kind(st1, "", line, col, "Variable"); })()); };
-function read_keyword(st) { return ((() => { let line = _fl_get(st, "line"); let col = _fl_get(st, "col"); let st1 = advance(st); return read_symbol_body_kind(st1, "", line, col, "Keyword"); })()); };
-function read_token(st) { return ((() => { let st1 = skip_ws(st); return (at_end_q(st1) ? st1 : ((() => { let c = peek(st1); let line = _fl_get(st1, "line"); let col = _fl_get(st1, "col"); return ((c === "(") ? emit(advance(st1), "LParen", c, line, col) : ((c === ")") ? emit(advance(st1), "RParen", c, line, col) : ((c === "[") ? emit(advance(st1), "LBracket", c, line, col) : ((c === "]") ? emit(advance(st1), "RBracket", c, line, col) : ((c === "{") ? emit(advance(st1), "LBrace", c, line, col) : ((c === "}") ? emit(advance(st1), "RBrace", c, line, col) : ((c === "\"") ? read_string(st1) : ((c === "$") ? read_variable(st1) : ((c === ":") ? read_keyword(st1) : (_fl_is_digit_q(c) ? read_number(st1) : (((c === "-") && _fl_is_digit_q(peek_at(st1, 1))) ? read_number_body(advance(st1), "-", false, line, col) : (_fl_is_symbol_char_q(c) ? read_symbol(st1) : (true ? emit(advance(st1), "Unknown", c, line, col) : null))))))))))))); })())); })()); };
-function lex_loop(st) { return ((() => { let cur = st; return (() => { (() => { while((!at_end_q(skip_ws(cur)))) { (cur = read_token(cur)); } })(); return _fl_get(cur, "tokens"); })(); })()); };
-function lex(src) { return lex_loop(make_state(src)); };
-function make_literal(type, value, line) { return ({ kind: "literal", type: type, value: value, line: line }); };
-function make_variable(name, line) { return ({ kind: "variable", name: name, line: line }); };
-function make_keyword(name, line) { return ({ kind: "keyword", name: name, line: line }); };
-function make_sexpr(op, args, line) { return ({ kind: "sexpr", op: op, args: args, line: line }); };
-function make_number(v, line) { return make_literal("number", v, line); };
-function make_string(v, line) { return make_literal("string", v, line); };
-function make_bool(v, line) { return make_literal("boolean", v, line); };
-function make_null(line) { return make_literal("null", null, line); };
-function make_symbol(v, line) { return make_literal("symbol", v, line); };
-function make_block(type, name, fields, line) { return ({ kind: "block", type: type, name: name, fields: fields, line: line }); };
-function make_array_block(items, line) { return make_block("Array", null, ({ items: items }), line); };
-function make_map_block(items, line) { return make_block("Map", null, ({ items: items }), line); };
-function make_pattern_literal(value, line) { return ({ kind: "pattern-literal", value: value, line: line }); };
-function make_pattern_variable(name, line) { return ({ kind: "pattern-variable", name: name, line: line }); };
-function make_pattern_wildcard(line) { return ({ kind: "pattern-wildcard", line: line }); };
-function make_pattern_list(items, _fl_rest, line) { return ({ kind: "pattern-list", items: items, rest: _fl_rest, line: line }); };
-function make_pattern_struct(type_name, fields, line) { return ({ kind: "pattern-struct", type: type_name, fields: fields, line: line }); };
-function make_pattern_or(alternatives, line) { return ({ kind: "pattern-or", alternatives: alternatives, line: line }); };
-function make_pattern_range(start, end, line) { return ({ kind: "pattern-range", start: start, end: end, line: line }); };
-function make_pattern_match(value, cases, line) { return ({ kind: "pattern-match", value: value, cases: cases, line: line }); };
-function make_match_case(pattern, guard, body, line) { return ({ kind: "match-case", pattern: pattern, guard: guard, body: body, line: line }); };
-function make_function_value(params, body, captured_env, name) { return ({ kind: "function-value", params: params, body: body, capturedEnv: captured_env, name: name }); };
-function make_type_class(name, generics, methods, line) { return ({ kind: "type-class", name: name, generics: generics, methods: methods, line: line }); };
-function make_type_class_instance(class_name, type_name, impls, line) { return ({ kind: "type-class-instance", class: class_name, type: type_name, impls: impls, line: line }); };
-function make_module_block(name, exports, body, line) { return ({ kind: "module", name: name, exports: exports, body: body, line: line }); };
-function make_import_block(path, alias, names, line) { return ({ kind: "import", path: path, alias: alias, names: names, line: line }); };
-function make_open_block(module_name, line) { return ({ kind: "open", module: module_name, line: line }); };
-function make_search_block(query, fields, line) { return ({ kind: "search-block", query: query, fields: fields, line: line }); };
-function make_learn_block(topic, fields, line) { return ({ kind: "learn-block", topic: topic, fields: fields, line: line }); };
-function make_reasoning_block(name, fields, line) { return ({ kind: "reasoning-block", name: name, fields: fields, line: line }); };
-function make_async_function(name, params, body, line) { return ({ kind: "async-function", name: name, params: params, body: body, line: line }); };
-function make_await(expr, line) { return ({ kind: "await", expr: expr, line: line }); };
-function make_try(body, _catch, _finally, line) { return ({ kind: "try", body: body, catch: _catch, finally: _finally, line: line }); };
-function make_catch(param, body, line) { return ({ kind: "catch", param: param, body: body, line: line }); };
-function make_throw(expr, line) { return ({ kind: "throw", expr: expr, line: line }); };
-function make_template_string(parts, expressions, line) { return ({ kind: "template-string", parts: parts, expressions: expressions, line: line }); };
-function make_loop(init, condition, update, body, line) { return ({ kind: "loop", init: init, condition: condition, update: update, body: body, line: line }); };
-function make_page(name, path, fields, line) { return ({ kind: "page", name: name, path: path, fields: fields, line: line }); };
-function make_route(method, path, handler, line) { return ({ kind: "route", method: method, path: path, handler: handler, line: line }); };
-function make_component(name, fields, line) { return ({ kind: "component", name: name, fields: fields, line: line }); };
-function make_form(name, fields, line) { return ({ kind: "form", name: name, fields: fields, line: line }); };
-function deep_equal_q(a, b) { return ((_fl_null_q(a) && _fl_null_q(b)) ? true : ((_fl_null_q(a) || _fl_null_q(b)) ? false : ((_fl_list_q(a) && _fl_list_q(b)) ? deep_equal_list_q(a, b, 0) : ((_fl_map_q(a) && _fl_map_q(b)) ? deep_equal_map_q(a, b) : (true ? (a === b) : null))))); };
-function deep_equal_list_q(a, b, i) { return ((!(_fl_length(a) === _fl_length(b))) ? false : ((i >= _fl_length(a)) ? true : ((!deep_equal_q(_fl_get(a, i), _fl_get(b, i))) ? false : (true ? deep_equal_list_q(a, b, (i + 1)) : null)))); };
-function deep_equal_map_q(a, b) { return ((() => { let ka = keys_no_line(a); let kb = keys_no_line(b); return ((!(_fl_length(ka) === _fl_length(kb))) ? false : deep_equal_map_keys_q(a, b, ka, 0)); })()); };
-function keys_no_line(m) { return _fl_filter(_fl_keys(m), ((k) => (!(k === "line")))); };
-function deep_equal_map_keys_q(a, b, ks, i) { return ((i >= _fl_length(ks)) ? true : (((() => { let k = _fl_get(ks, i); return (!deep_equal_q(_fl_get(a, k), _fl_get(b, k))); })()) ? false : (true ? deep_equal_map_keys_q(a, b, ks, (i + 1)) : null))); };
-function _fl_list_q(v) { return (_fl_null_q(v) ? false : (_fl_str_to_num(_fl_str("[", v)) === null)); };
-function _fl_map_q(v) { return (_fl_null_q(v) ? false : (!_fl_null_q(_fl_get(v, "kind")))); };
-function p_make(tokens) { return ({ tokens: tokens, idx: 0, ast: [] }); };
-function p_peek(p) { return ((() => { let i = _fl_get(p, "idx"); let t = _fl_get(p, "tokens"); return ((i >= _fl_length(t)) ? null : _fl_get(t, i)); })()); };
-function p_peek_at(p, offset) { return ((() => { let i = (_fl_get(p, "idx") + offset); let t = _fl_get(p, "tokens"); return ((i >= _fl_length(t)) ? null : _fl_get(t, i)); })()); };
-function p_end_q(p) { return (_fl_get(p, "idx") >= _fl_length(_fl_get(p, "tokens"))); };
-function p_advance(p) { return ({ tokens: _fl_get(p, "tokens"), idx: (_fl_get(p, "idx") + 1), ast: _fl_get(p, "ast") }); };
-function p_with_ast(p, ast) { return ({ tokens: _fl_get(p, "tokens"), idx: _fl_get(p, "idx"), ast: ast }); };
-function p_append_ast(p, node) { return p_with_ast(p, _fl_append(_fl_get(p, "ast"), node)); };
-function r_pair(p, node) { return ({ p: p, node: node }); };
-function string_contains_q(s, substr) { return (!(-1 === _fl_str_index_of(s, substr))); };
-function parse_atom(p) { return ((() => { let t = p_peek(p); let k = _fl_get(t, "kind"); let v = _fl_get(t, "value"); let line = _fl_get(t, "line"); return ((k === "Number") ? r_pair(p_advance(p), make_literal("number", v, line)) : ((k === "String") ? (string_contains_q(v, _fl_str("$", "{")) ? r_pair(p_advance(p), make_template_string(v, [], line)) : r_pair(p_advance(p), make_literal("string", v, line))) : ((k === "Symbol") ? r_pair(p_advance(p), make_literal("symbol", v, line)) : ((k === "Variable") ? r_pair(p_advance(p), make_variable(v, line)) : ((k === "Keyword") ? r_pair(p_advance(p), make_keyword(v, line)) : (true ? r_pair(p_advance(p), make_literal("unknown", v, line)) : null)))))); })()); };
-function parse_expr(p) { return ((() => { let t = p_peek(p); let k = _fl_get(t, "kind"); return ((k === "LParen") ? parse_sexpr(p) : ((k === "LBracket") ? parse_bracket(p) : ((k === "LBrace") ? parse_map(p) : (true ? parse_atom(p) : null)))); })()); };
-function parse_sexpr(p) { return ((() => { let start_tok = p_peek(p); let line = _fl_get(start_tok, "line"); let p1 = p_advance(p); let _fl_first = parse_args(p1, []); let p2 = _fl_get(_fl_first, "p"); let args = _fl_get(_fl_first, "node"); return ((_fl_length(args) === 0) ? r_pair(parse_consume_rparen(p2), make_sexpr("", [], line)) : ((() => { let op_node = _fl_get(args, 0); let op = ((_fl_get(op_node, "kind") === "literal") ? _fl_get(op_node, "value") : ((_fl_get(op_node, "kind") === "variable") ? _fl_str("$", _fl_get(op_node, "name")) : "unknown")); let _fl_rest = _fl_slice(args, 1, _fl_length(args)); return ((op === "try") ? ((() => { let body = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let catch_clause = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); let finally_clause = ((_fl_length(_fl_rest) > 2) ? _fl_get(_fl_rest, 2) : null); return r_pair(parse_consume_rparen(p2), make_try(body, catch_clause, finally_clause, line)); })()) : ((op === "loop") ? ((() => { let loop_array = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let body_start = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); return (_fl_null_q(loop_array) ? r_pair(parse_consume_rparen(p2), make_sexpr("loop", [], line)) : ((!(_fl_get(loop_array, "kind") === "array")) ? r_pair(parse_consume_rparen(p2), make_sexpr("loop", _fl_rest, line)) : ((() => { let items = _fl_get(loop_array, "items"); let init = ((_fl_length(items) > 0) ? _fl_get(items, 0) : null); let condition = ((_fl_length(items) > 1) ? _fl_get(items, 1) : null); let update = ((_fl_length(items) > 2) ? _fl_get(items, 2) : null); let body_exprs = _fl_slice(_fl_rest, 1, _fl_length(_fl_rest)); return r_pair(parse_consume_rparen(p2), make_loop(init, condition, update, ((_fl_length(body_exprs) === 1) ? _fl_get(body_exprs, 0) : make_sexpr("do", body_exprs, line)), line)); })()))); })()) : (true ? r_pair(parse_consume_rparen(p2), make_sexpr(op, _fl_rest, line)) : null))); })())); })()); };
-function parse_consume_rparen(p) { return ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RParen")) ? p_advance(p) : p); })()); };
-function parse_args(p, acc) { return ((() => { let t = p_peek(p); return (_fl_null_q(t) ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RParen") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBracket") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBrace") ? r_pair(p, acc) : (true ? ((() => { let one = parse_expr(p); return parse_args(_fl_get(one, "p"), _fl_append(acc, _fl_get(one, "node"))); })()) : null))))); })()); };
-function parse_bracket(p) { return ((() => { let tok = p_peek(p); let line = _fl_get(tok, "line"); let p1 = p_advance(p); let next = p_peek(p1); return (((!_fl_null_q(next)) && (_fl_get(next, "kind") === "Symbol") && is_block_type_q(_fl_get(next, "value")) && (_fl_get(next, "value") === upper_case(_fl_get(next, "value")))) ? parse_named_block(p1, line) : parse_array(p1, line)); })()); };
-function is_block_type_q(s) { return ((() => { let c = _fl_char_at(s, 0); return ((c >= "A") && (c <= "Z")); })()); };
-function upper_case(s) { return s; };
-function parse_array(p, line) { return ((() => { let collected = parse_args(p, []); let p2 = _fl_get(collected, "p"); let items = _fl_get(collected, "node"); return r_pair(parse_consume_rbracket(p2), make_array_block(items, line)); })()); };
-function parse_consume_rbracket(p) { return ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBracket")) ? p_advance(p) : p); })()); };
-function parse_named_block(p, line) { return ((() => { let type_tok = p_peek(p); let type = _fl_get(type_tok, "value"); let p1 = p_advance(p); let name_info = parse_optional_name(p1); let p2 = _fl_get(name_info, "p"); let name = _fl_get(name_info, "node"); let fields_info = parse_block_fields(p2, ({  })); let p3 = _fl_get(fields_info, "p"); let fields = _fl_get(fields_info, "node"); return r_pair(parse_consume_rbracket(p3), make_block(type, name, fields, line)); })()); };
-function parse_optional_name(p) { return ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "Symbol") && (!(_fl_char_at(_fl_get(t, "value"), 0) === ":"))) ? r_pair(p_advance(p), _fl_get(t, "value")) : r_pair(p, null)); })()); };
-function parse_block_fields(p, acc) { return ((() => { let cur = p; let res_acc = acc; let running = true; return (() => { (() => { while(((!p_end_q(cur)) && running)) { ((() => { let t = p_peek(cur); return ((_fl_get(t, "kind") === "Keyword") ? ((() => { let key = _fl_get(t, "value"); let p1 = p_advance(cur); let val = parse_expr(p1); return (() => { (res_acc = _fl_map_set(res_acc, key, _fl_get(val, "node"))); return (cur = _fl_get(val, "p")); })(); })()) : (running = false)); })()); } })(); return r_pair(cur, res_acc); })(); })()); };
-function parse_map(p) { return ((() => { let tok = p_peek(p); let line = _fl_get(tok, "line"); let p1 = p_advance(p); let collected = parse_args(p1, []); let p2 = _fl_get(collected, "p"); let items = _fl_get(collected, "node"); return r_pair(parse_consume_rbrace(p2), make_map_block(items, line)); })()); };
-function parse_consume_rbrace(p) { return ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBrace")) ? p_advance(p) : p); })()); };
-function parse_all(p) { return (p_end_q(p) ? _fl_get(p, "ast") : ((() => { let one = parse_expr(p); let p2 = p_append_ast(_fl_get(one, "p"), _fl_get(one, "node")); return parse_all(p2); })())); };
-function parse(tokens) { return parse_all(p_make(tokens)); };
-function js_reserved_q(n) { return ((n === "default") || (n === "class") || (n === "const") || (n === "let") || (n === "if") || (n === "else") || (n === "switch") || (n === "case") || (n === "break") || (n === "continue") || (n === "for") || (n === "while") || (n === "function") || (n === "return") || (n === "throw") || (n === "try") || (n === "catch") || (n === "new") || (n === "delete") || (n === "typeof") || (n === "instanceof") || (n === "var") || (n === "in") || (n === "of") || (n === "this") || (n === "super") || (n === "void") || (n === "yield") || (n === "async") || (n === "await") || (n === "import") || (n === "export") || (n === "enum") || (n === "do") || (n === "with") || (n === "finally") || (n === "null") || (n === "true") || (n === "false")); };
-function js_name_inner(n) { return ((() => { let g = _fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(n, "-", "_"), "?", "_q"), "!", "_x"), ">", "_gt"), "<", "_lt"), "*", "_st"), "+", "_pl"); return (js_reserved_q(g) ? _fl_str(g, "_") : g); })()); };
-function js_name(n) { return (_fl_null_q(n) ? "_" : js_name_inner(n)); };
-function js_esc_inner(s) { return _fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(s, "\\", "\\\\"), "\"", "\\\""), "\n", "\\n"), "\r", "\\r"), "\t", "\\t"); };
-function js_esc(s) { return _fl_str("\"", js_esc_inner(s), "\""); };
-function get_block_items(node) { return (_fl_null_q(node) ? [] : (((_fl_get(node, "kind") === "block") && (_fl_get(node, "type") === "Array")) ? _fl_get(_fl_get(node, "fields"), "items") : node)); };
-function cg(n) { return (_fl_null_q(n) ? "null" : ((_fl_get(n, "kind") === "literal") ? cg_literal(n) : ((_fl_get(n, "kind") === "variable") ? js_name(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "keyword") ? js_esc(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "template-string") ? cg_template_string(n) : ((_fl_get(n, "kind") === "try") ? cg_try(n) : ((_fl_get(n, "kind") === "loop") ? cg_loop(n) : ((_fl_get(n, "kind") === "sexpr") ? cg_sexpr(n) : ((_fl_get(n, "kind") === "block") ? cg_block(n) : ((_fl_get(n, "kind") === "and") ? cg_and(_fl_get(n, "args")) : ((_fl_get(n, "kind") === "or") ? cg_or(_fl_get(n, "args")) : ((_fl_get(n, "kind") === "pattern-match") ? cg_match(n) : ((_fl_get(n, "kind") === "await") ? _fl_str("(await ", cg(_fl_get(n, "argument")), ")") : ((_fl_get(n, "kind") === "throw") ? _fl_str("((()=>{throw new Error(String(", cg(_fl_get(n, "argument")), "))})())") : (true ? "null" : null))))))))))))))); };
-function cg_literal(n) { return ((() => { let t = _fl_get(n, "type"); let v = _fl_get(n, "value"); return ((t === "number") ? _fl_str(v) : ((t === "string") ? js_esc(v) : ((t === "boolean") ? (v ? "true" : "false") : ((t === "symbol") ? ((v === "true") ? "true" : ((v === "false") ? "false" : ((v === "null") ? "null" : ((v === "nil") ? "null" : (true ? js_name(v) : null))))) : (true ? "null" : null))))); })()); };
-function cg_template_string(n) { return _fl_str("`", _fl_replace(_fl_replace(_fl_get(n, "value"), "\\", "\\\\"), "`", "\\`"), "`"); };
-function cg_try(n) { return ((() => { let body = cg(_fl_get(n, "body")); let _catch = _fl_get(n, "catch"); let _finally = _fl_get(n, "finally"); let c_code = (_fl_null_q(_catch) ? "" : cg_catch_clause(_catch)); let f_code = (_fl_null_q(_finally) ? "" : _fl_str("finally{", cg(_finally), "}")); return _fl_str("(()=>{try{return ", body, "}catch(err){", c_code, "}", f_code, "})()"); })()); };
-function cg_catch_clause(c) { return ((() => { let is_sexpr = (_fl_get(c, "kind") === "sexpr"); let param = (is_sexpr ? js_name(_fl_get(_fl_get(_fl_get(c, "args"), 0), "name")) : "err"); let body = (is_sexpr ? cg(_fl_get(_fl_get(c, "args"), 1)) : cg(c)); return _fl_str("let ", param, "=err;return ", body, ";"); })()); };
-function cg_func_block(n) { return ((() => { let name = js_name(_fl_get(n, "name")); let f = _fl_get(n, "fields"); let params_block = _fl_get(f, "params"); let body_node = _fl_get(f, "body"); let ps_info = extract_params(get_block_items(params_block)); let body = cg(body_node); let pre = _fl_get(ps_info, "preamble"); let final_body = ((_fl_length(pre) === 0) ? body : _fl_str("((() => { ", pre, " return ", body, "; })())")); return _fl_str("function ", name, "(", _fl_get(ps_info, "params"), ") { return ", final_body, "; }"); })()); };
-function cg_block(n) { return ((() => { let t = _fl_get(n, "type"); let f = _fl_get(n, "fields"); return ((t === "FUNC") ? cg_func_block(n) : ((t === "Map") ? _fl_str("({", cg_map_entries(f), "})") : ((t === "Array") ? _fl_str("[", cg_args(_fl_get(f, "items")), "]") : (true ? "null" : null)))); })()); };
-function cg_map_entries(f) { return ((() => { let items = _fl_get(f, "items"); return (_fl_array_q(items) ? cg_map_flat_loop(items, 0, "") : cg_map_loop(map_entries(f), 0, "")); })()); };
-function cg_map_loop(e, i, acc) { return ((i >= _fl_length(e)) ? acc : ((() => { let pair = _fl_str(js_esc(_fl_get(_fl_get(e, i), 0)), ":", cg(_fl_get(_fl_get(e, i), 1))); return cg_map_loop(e, (i + 1), ((i === 0) ? pair : _fl_str(acc, ",", pair))); })())); };
-function cg_map_flat_loop(it, i, acc) { return ((i >= _fl_length(it)) ? acc : ((() => { let k = _fl_get(it, i); let v = _fl_get(it, (i + 1)); let key = ((_fl_get(k, "kind") === "keyword") ? js_esc(_fl_get(k, "name")) : ((_fl_get(k, "kind") === "literal") ? js_esc(_fl_str(_fl_get(k, "value"))) : (true ? "\"_anon\"" : null))); let pair = _fl_str(key, ":", cg(v)); return cg_map_flat_loop(it, (i + 2), ((i === 0) ? pair : _fl_str(acc, ",", pair))); })())); };
-function cg_sexpr(n) { return ((() => { let op = _fl_get(n, "op"); return (_fl_string_q(op) ? cg_sexpr_dispatch(op, _fl_get(n, "args")) : _fl_str("(", cg(op), ")(", cg_args(_fl_get(n, "args")), ")")); })()); };
-function cg_sexpr_dispatch(op, args) { return ((op === "if") ? _fl_str("(", cg(_fl_get(args, 0)), "?", cg(_fl_get(args, 1)), ":", ((_fl_length(args) >= 3) ? cg(_fl_get(args, 2)) : "null"), ")") : ((op === "fn") ? cg_fn(args) : ((op === "defn") ? cg_defn(args) : ((op === "let") ? cg_let(args) : ((op === "do") ? _fl_str("(()=>{", cg_do_body(args, 0, ""), "})()") : ((op === "cond") ? cg_cond(args) : ((op === "loop") ? cg_loop(args) : ((op === "recur") ? _fl_str("{__recur:true,a:[", cg_args(args), "]}") : ((op === "and") ? _fl_str("(", _fl_join(_fl_map(args, ((a) => cg(a))), "&&"), ")") : ((op === "or") ? _fl_str("(", _fl_join(_fl_map(args, ((a) => cg(a))), "||"), ")") : ((op === "+") ? ((_fl_length(args) === 0) ? "0" : _fl_str("(", binop_loop(args, 0, "", "+"), ")")) : ((op === "-") ? ((_fl_length(args) === 1) ? _fl_str("(-", cg(_fl_get(args, 0)), ")") : _fl_str("(", binop_loop(args, 0, "", "-"), ")")) : ((op === "*") ? ((_fl_length(args) === 0) ? "1" : _fl_str("(", binop_loop(args, 0, "", "*"), ")")) : ((op === "/") ? _fl_str("(", cg(_fl_get(args, 0)), "/", cg(_fl_get(args, 1)), ")") : ((op === "=") ? _fl_str("(", cg(_fl_get(args, 0)), "===", cg(_fl_get(args, 1)), ")") : ((op === "<") ? _fl_str("(", cg(_fl_get(args, 0)), "<", cg(_fl_get(args, 1)), ")") : ((op === ">") ? _fl_str("(", cg(_fl_get(args, 0)), ">", cg(_fl_get(args, 1)), ")") : ((op === "<=") ? _fl_str("(", cg(_fl_get(args, 0)), "<=", cg(_fl_get(args, 1)), ")") : ((op === ">=") ? _fl_str("(", cg(_fl_get(args, 0)), ">=", cg(_fl_get(args, 1)), ")") : ((op === "!=") ? _fl_str("(", cg(_fl_get(args, 0)), "!==", cg(_fl_get(args, 1)), ")") : ((op === "%") ? _fl_str("(", cg(_fl_get(args, 0)), "%", cg(_fl_get(args, 1)), ")") : ((op === "while") ? _fl_str("(()=>{ while(", cg(_fl_get(args, 0)), ") { ", cg_stmts(_fl_slice(args, 1, _fl_length(args)), 0, ""), " } })()") : ((op === "set!") ? _fl_str("(", js_name(_fl_get(_fl_get(args, 0), "name")), " = ", cg(_fl_get(args, 1)), ")") : ((op === "define") ? _fl_str("const ", extract_name(_fl_get(args, 0)), "=", cg(_fl_get(args, 1))) : (true ? cg_native_dispatch(op, cg_args(args)) : null))))))))))))))))))))))))); };
-function cg_fn(args) { return ((() => { let ps_info = extract_params(get_block_items(_fl_get(args, 0))); let body = cg(_fl_get(args, 1)); let pre = _fl_get(ps_info, "preamble"); let final_body = ((_fl_length(pre) === 0) ? body : _fl_str("((() => { ", pre, " return ", body, "; })())")); return _fl_str("((", _fl_get(ps_info, "params"), ") => ", final_body, ")"); })()); };
-function cg_defn(args) { return ((() => { let ps_info = extract_params(get_block_items(_fl_get(args, 1))); let body = cg(_fl_get(args, 2)); let pre = _fl_get(ps_info, "preamble"); let final_body = ((_fl_length(pre) === 0) ? body : _fl_str("((() => { ", pre, " return ", body, "; })())")); return _fl_str("var ", extract_name(_fl_get(args, 0)), " = (", _fl_get(ps_info, "params"), ") => ", final_body); })()); };
-function cg_let(args) { return ((() => { let items = get_block_items(_fl_get(args, 0)); let _fl_first = _fl_get(items, 0); let nested = ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array")); let bindings = (nested ? cg_let_2d(items, 0, "") : cg_let_1d(items, 0, "")); let body = cg_do_body(_fl_slice(args, 1, _fl_length(args)), 0, ""); return _fl_str("((()=>{", bindings, body, "})())"); })()); };
-function cg_let_1d(it, i, acc) { return ((i >= _fl_length(it)) ? acc : cg_let_1d(it, (i + 2), _fl_str(acc, "let ", extract_name(_fl_get(it, i)), "=", cg(_fl_get(it, (i + 1))), ";"))); };
-function cg_let_2d(it, i, acc) { return ((i >= _fl_length(it)) ? acc : ((() => { let p = get_block_items(_fl_get(it, i)); return cg_let_2d(it, (i + 1), _fl_str(acc, "let ", extract_name(_fl_get(p, 0)), "=", cg(_fl_get(p, 1)), ";")); })())); };
-function cg_do_body(args, i, acc) { return ((i >= _fl_length(args)) ? acc : ((() => { let _fl_last = (i === (_fl_length(args) - 1)); let c = cg(_fl_get(args, i)); let sep = (_fl_last ? "return " : ""); return cg_do_body(args, (i + 1), _fl_str(acc, sep, c, ";")); })())); };
-function cg_stmts(args, i, acc) { return ((i >= _fl_length(args)) ? acc : cg_stmts(args, (i + 1), _fl_str(acc, cg(_fl_get(args, i)), ";"))); };
-function cg_cond(args) { return ((_fl_length(args) === 0) ? "null" : ((() => { let _fl_first = _fl_get(args, 0); let nested = ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array")); return (nested ? cg_cond_nested(args, (_fl_length(args) - 1), "null") : cg_cond_flat(args, 0, "null")); })())); };
-function cg_cond_nested(args, i, acc) { return ((i < 0) ? acc : ((() => { let items = get_block_items(_fl_get(args, i)); return cg_cond_nested(args, (i - 1), _fl_str("(", cg(_fl_get(items, 0)), "?", cg(_fl_get(items, 1)), ":", acc, ")")); })())); };
-function cg_cond_flat(args, i, acc) { return ((() => { let len = _fl_length(args); return ((i >= len) ? acc : ((i === (len - 1)) ? _fl_str("(", cg(_fl_get(args, i)), ")") : _fl_str("(", cg(_fl_get(args, i)), "?", cg(_fl_get(args, (i + 1))), ":", cg_cond_flat(args, (i + 2), acc), ")"))); })()); };
-function cg_loop(args) { return ((() => { let items = get_block_items(_fl_get(args, 0)); let _fl_first = _fl_get(items, 0); let nested = ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array")); let inits = (nested ? loop_inits_2d(items, 0, "") : loop_inits_1d(items, 0, "")); let names = (nested ? loop_names_2d(items, 0, "") : loop_names_1d(items, 0, "")); let body = cg_do_body(_fl_slice(args, 1, _fl_length(args)), 0, ""); return _fl_str("((()=>{", inits, "while(true){let __r=(()=>{", body, "})();if(__r&&__r.__recur){", ((_fl_length(names) === 0) ? "" : _fl_str("[", names, "]=__r.a;")), "continue;}return __r;}})())"); })()); };
-function loop_inits_1d(it, i, acc) { return ((i >= _fl_length(it)) ? acc : loop_inits_1d(it, (i + 2), _fl_str(acc, "let ", extract_name(_fl_get(it, i)), "=", cg(_fl_get(it, (i + 1))), ";"))); };
-function loop_inits_2d(it, i, acc) { return ((i >= _fl_length(it)) ? acc : ((() => { let p = get_block_items(_fl_get(it, i)); return loop_inits_2d(it, (i + 1), _fl_str(acc, "let ", extract_name(_fl_get(p, 0)), "=", cg(_fl_get(p, 1)), ";")); })())); };
-function loop_names_1d(it, i, acc) { return ((i >= _fl_length(it)) ? acc : ((() => { let n = extract_name(_fl_get(it, i)); return loop_names_1d(it, (i + 2), ((_fl_length(acc) === 0) ? n : _fl_str(acc, ",", n))); })())); };
-function loop_names_2d(it, i, acc) { return ((i >= _fl_length(it)) ? acc : ((() => { let p = get_block_items(_fl_get(it, i)); let n = extract_name(_fl_get(p, 0)); return loop_names_2d(it, (i + 1), ((_fl_length(acc) === 0) ? n : _fl_str(acc, ",", n))); })())); };
-function cg_args(args) { return args_loop(args, 0, ""); };
-function args_loop(args, i, acc) { return ((_fl_null_q(args) || (i >= _fl_length(args))) ? acc : ((() => { let c = cg(_fl_get(args, i)); return args_loop(args, (i + 1), ((i === 0) ? c : _fl_str(acc, ",", c))); })())); };
-function binop_loop(args, i, acc, op) { return ((i >= _fl_length(args)) ? acc : ((() => { let c = cg(_fl_get(args, i)); return binop_loop(args, (i + 1), ((i === 0) ? c : _fl_str(acc, op, c)), op); })())); };
-function extract_name(n) { return ((_fl_get(n, "kind") === "variable") ? js_name(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "literal") ? js_name(_fl_get(n, "value")) : (true ? "_anon" : null))); };
-function extract_params(it) { return extract_params_loop(it, 0, "", "", 0); };
-function extract_params_loop(it, i, ps, pre, tc) { return ((_fl_null_q(it) || (i >= _fl_length(it))) ? ({ params: ps, preamble: pre }) : ((() => { let c = _fl_get(it, i); let k = _fl_get(c, "kind"); return (((k === "variable") || (k === "literal")) ? extract_params_loop(it, (i + 1), ((_fl_length(ps) === 0) ? extract_name(c) : _fl_str(ps, ",", extract_name(c))), pre, tc) : (((k === "block") && (_fl_get(c, "type") === "Array")) ? ((() => { let t = _fl_str("_arg", tc); let sub = _fl_get(_fl_get(c, "fields"), "items"); return extract_params_loop(it, (i + 1), ((_fl_length(ps) === 0) ? t : _fl_str(ps, ",", t)), _fl_str(pre, destructure_loop(sub, t, 0)), (tc + 1)); })()) : extract_params_loop(it, (i + 1), ((_fl_length(ps) === 0) ? "p" : _fl_str(ps, ",p")), pre, tc))); })())); };
-function destructure_loop(it, t, i) { return ((i >= _fl_length(it)) ? "" : _fl_str("let ", extract_name(_fl_get(it, i)), "=", t, "[", i, "]; ", destructure_loop(it, t, (i + 1)))); };
-function cg_native_dispatch(op, as) { return ((op === "str") ? _fl_str("_fl_str(", as, ")") : ((op === "length") ? _fl_str("_fl_length(", as, ")") : ((op === "println") ? _fl_str("_fl_print(", as, ")") : ((op === "print") ? _fl_str("_fl_print(", as, ")") : (true ? _fl_str(js_name(op), "(", as, ")") : null))))); };
-function prelude_parts() { return ["const _fl_str = (...xs) => xs.map(x => x==null?'':String(x)).join('');", "const _fl_length = (x) => (x?x.length:0);", "const _fl_get = (o,k,d) => { if(o==null)return d||null; let ks=String(k).startsWith(':')?k.slice(1):String(k); if(Array.isArray(o)){let idx=parseInt(ks);if(!isNaN(idx))return o[idx]!==undefined?o[idx]:(d||null);if(ks==='length')return o.length;} if(typeof o==='object'){if(o[ks]!==undefined)return o[ks];} return d||null; }", "const _fl_null_q = (v) => v===null||v===undefined;", "const _fl_keys = (o) => o?Object.keys(o):[];", "const _fl_map_set = (o,k,v) => ({...o,[k]:v});", "const _fl_has_key_q = (o,k) => o?(String(k) in o):false;", "const _fl_append = (l,x) => [...(l||[]),x];", "const list = (...args) => [...args];", "const append = (l,x) => [...(l||[]),x];", "const _fl_first = (l) => (l&&l.length>0)?l[0]:null;", "const _fl_last = (l) => (l&&l.length>0)?l[l.length-1]:null;", "const _fl_rest = (l) => (l&&l.length>0)?l.slice(1):[];", "const _fl_slice = (l,a,b) => (l||[]).slice(a,b);", "const _fl_map = (arr,fn) => (arr||[]).map(x=>fn(x));", "const _fl_filter = (arr,fn) => (arr||[]).filter(x=>{const r=fn(x);return r!==false&&r!==null;});", "const _fl_reduce = (arr,fn,init) => (arr||[]).reduce((a,x)=>fn(a,x),init);", "const _fl_some = (f,l) => (l||[]).some(x=>f(x));", "const _fl_every = (f,l) => (l||[]).every(x=>f(x));", "const _fl_file_read = (p) => require('fs').readFileSync(p,'utf8');", "const _fl_file_write = (p,c) => require('fs').writeFileSync(p,c);", "const _fl_file_exists = (p) => require('fs').existsSync(p);", "const _fl_file_delete = (p) => { try { require('fs').unlinkSync(p); } catch(e) {} };", "const _fl_file_append = (p,c) => require('fs').appendFileSync(p,String(c));", "const _fl_file_copy = (s,d) => require('fs').copyFileSync(s,d);", "const _fl_file_rename = (o,n) => require('fs').renameSync(o,n);", "const _fl_file_size = (p) => { try { return require('fs').statSync(p).size; } catch(e) { return 0; } };", "const _fl_file_modified = (p) => { try { return require('fs').statSync(p).mtimeMs; } catch(e) { return 0; } };", "const _fl_file_mkdir = (p) => { try { require('fs').mkdirSync(p,{recursive:true}); } catch(e) {} };", "const _fl_file_rmdir = (p) => { try { require('fs').rmSync(p,{recursive:true,force:true}); } catch(e) {} };", "const _fl_file_list = (p) => { try { return require('fs').readdirSync(p); } catch(e) { return []; } };", "const _fl_process_run = (cmd) => { try { return require('child_process').execSync(cmd,{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_run_args = (cmd,args) => { try { return require('child_process').execSync(cmd+' '+(args||[]).join(' '),{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_exec = (cmd) => { try { return require('child_process').execSync(cmd,{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_exec_args = (cmd,args) => { try { return require('child_process').execSync(cmd+' '+(args||[]).join(' '),{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_spawn = (cmd,args) => { try { const r=require('child_process').spawnSync(cmd,args||[],{encoding:'utf8'}); return r.stdout||''; } catch(e) { return ''; } };", "const _fl_process_kill = (pid) => { try { process.kill(pid); } catch(e) {} };", "const _fl_process_wait = (pid) => null;", "const _fl_env_get = (k) => process.env[k]||null;", "const _fl_env_set = (k,v) => { process.env[k]=String(v); };", "const _fl_env_all = () => process.env;", "const _fl_file_is_file = (p) => { try { return require('fs').statSync(p).isFile(); } catch(e) { return false; } };", "const _fl_file_is_dir = (p) => { try { return require('fs').statSync(p).isDirectory(); } catch(e) { return false; } };", "const _fl_process_exists = (pid) => { try { process.kill(pid,0); return true; } catch(e) { return false; } };", "const _fl_process_getcwd = () => process.cwd();", "const _fl_process_chdir = (p) => { try { process.chdir(p); } catch(e) {} };", "const _fl_process_pid = () => process.pid;", "const _fl_process_ppid = () => process.ppid||null;", "const file_read = (p) => _fl_file_read(String(p));", "const file_write = (p,c) => _fl_file_write(String(p),String(c));", "const file_exists = (p) => _fl_file_exists(String(p));", "const _fl_get_argv = () => (typeof process!=='undefined'?process.argv.slice(2):[]);", "const _fl_print = (v) => { console.log(v); return v; }", "const null_q = _fl_null_q;", "const some_q = _fl_some;", "const every_q = _fl_every;", "const cli_args = _fl_get_argv;", "const get = _fl_get;", "const keys = _fl_keys;", "const has_key_q = _fl_has_key_q;", "const slice = _fl_slice;", "const first = _fl_first;", "const last = _fl_last;", "const rest = _fl_rest;", "const map = (fn,arr) => (arr||[]).map(x=>fn(x));", "const filter = (fn,arr) => (arr||[]).filter(x=>{const r=fn(x);return r!==false&&r!==null;});", "const reduce = (fn,init,arr) => (arr||[]).reduce((a,x)=>fn(a,x),init);", "const print = _fl_print;", "const println = (v) => { console.log(v==null?'':String(v)); return v; }", "const str_replace = (s,ov,nv) => { if(s==null)return ''; const st=String(s); return st.split(String(ov)).join(nv==null?'':String(nv)); };", "const str_index_of = (s,sub) => (typeof s==='string'&&typeof sub==='string')?s.indexOf(sub):-1;", "const index_of = str_index_of;", "const str_slice = (s,a,b) => s?(b===undefined?s.slice(a):s.slice(a,b)):'';", "const substring = str_slice;", "const char_at = (s,i) => (s&&s[i])||null;", "const char_code_at = (s,i) => typeof s==='string'?s.charCodeAt(i):0;", "const trim = (s) => String(s||'').trim();", "const starts_with_q = (s,p) => String(s||'').startsWith(String(p||''));", "const ends_with_q = (s,sf) => String(s||'').endsWith(String(sf||''));", "const replace = (s,ov,nv) => { if(s==null)return ''; const st=String(s); if(ov instanceof RegExp)return st.replace(ov,nv==null?'':String(nv)); return st.split(String(ov)).join(nv==null?'':String(nv)); };", "const split = (s,sep) => String(s||'').split(sep);", "const str_join = (arr,sep) => (arr||[]).join(sep===undefined?'':sep);", "const join = str_join;", "const concat = (a,b) => (Array.isArray(a)&&Array.isArray(b))?[...a,...b]:String(a||'')+String(b||'');", "const push = (arr,v) => [...(arr||[]),v];", "const pop = (arr) => (arr&&arr.length>0)?arr.slice(0,-1):[];", "const reverse = (arr) => Array.isArray(arr)?[...arr].reverse():arr;", "const sort_by = (arr,fn) => Array.isArray(arr)?[...arr].sort((a,b)=>fn(a)<fn(b)?-1:fn(a)>fn(b)?1:0):arr;", "const flat_map = (arr,fn) => (arr||[]).flatMap(fn);", "const range = (s,e) => { const r=[]; let st=e===undefined?0:s; let en=e===undefined?s:e; for(let i=st;i<en;i++)r.push(i); return r; };", "const merge = (a,b) => Object.assign({},a,b);", "const assoc = (o,k,v) => { const r=Object.assign({},o); const key=typeof k==='string'&&k.startsWith(':')?k.slice(1):String(k); r[key]=v; return r; };", "const dissoc = (o,k) => { const r=Object.assign({},o); const key=typeof k==='string'&&k.startsWith(':')?k.slice(1):String(k); delete r[key]; return r; };", "var map_entries = (m) => m instanceof Map?[...m.entries()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.entries(m):[]);", "var map_keys = (m) => m instanceof Map?[...m.keys()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.keys(m):[]);", "var map_values = (m) => m instanceof Map?[...m.values()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.values(m):[]);", "const array_q = (v) => Array.isArray(v);", "var list_q = (v) => Array.isArray(v);", "var map_q = (v) => v!==null&&typeof v==='object'&&!Array.isArray(v);", "var fn_q = (v) => typeof v==='function';", "const number_q = (v) => typeof v==='number';", "const string_q = (v) => typeof v==='string';", "var str_upper = (s) => String(s||'').toUpperCase();", "var str_lower = (s) => String(s||'').toLowerCase();", "var str_contains = (s,sub) => String(s||'').includes(String(sub||''));", "var str_starts_with = (s,p) => String(s||'').startsWith(String(p||''));", "var str_ends_with = (s,sf) => String(s||'').endsWith(String(sf||''));", "var str_trim = (s) => String(s||'').trim();", "var str_length = (s) => String(s||'').length;", "var str_split = (s,sep) => String(s||'').split(sep);", "var take = (n,arr) => (arr||[]).slice(0,n);", "var drop = (n,arr) => (arr||[]).slice(n);", "var zip = (a,b) => { const r=[]; const l=Math.min((a||[]).length,(b||[]).length); for(let i=0;i<l;i++)r.push([a[i],b[i]]); return r; };", "var flatten = (arr) => (arr||[]).flat();", "var sort = (arr,fn) => fn?[...(arr||[])].sort((a,b)=>fn(a,b)?-1:1):[...(arr||[])].sort();", "var math_sqrt = (n) => Math.sqrt(n);", "var math_pi = Math.PI;", "var unknown = (...a) => a[a.length-1];", "function _fl_type_of(v) { if(v===null||v===undefined)return 'nil'; if(Array.isArray(v))return 'list'; return typeof v; }", "const not = (v) => !v;", "const abs = (n) => Math.abs(n);", "const floor = (n) => Math.floor(n);", "const ceil_val = (n) => Math.ceil(n);", "const round = (n) => Math.round(n);", "const max_val = (a,b) => a>b?a:b;", "const min_val = (a,b) => a<b?a:b;", "const error = (msg) => { throw new Error(String(msg)); };", "const now_ms = () => Date.now();", "const now_iso = () => new Date().toISOString();", "const now_unix = () => Math.floor(Date.now()/1000);", "const json_parse = (s) => { try{return JSON.parse(s);}catch(e){return null;} };", "const json_stringify = (v) => JSON.stringify(v);", "const shell_exec = (cmd,inp) => { try{const {execSync}=require('child_process');const opts={encoding:'utf8'};if(inp)opts.input=inp;return execSync(cmd,opts);}catch(e){return '';} };", "const __fl_routes = [];", "const _fl_server_get = (path,fn) => { __fl_routes.push({method:'GET',path,fn}); };", "const _fl_server_start = (port) => { const http=require('http'); http.createServer(async(req,res)=>{ const r=__fl_routes.find(r=>r.method===req.method&&r.path===require('url').parse(req.url).pathname); if(r){const result=await(typeof r.fn==='string'?eval(r.fn):r.fn)(req);res.end(String(result));}else{res.statusCode=404;res.end('Not Found');} }).listen(port);console.log('Server on '+port); };", "const server_get = _fl_server_get;", "const server_start = _fl_server_start;"]; };
-function runtime_prelude() { return _fl_join(prelude_parts(), "\n"); };
-function fl__gtjs_code(ast) { return _fl_reduce(ast, ((acc, n) => _fl_str(acc, cg(n), ";\n")), ""); };
-function fl__gtjs_with_prelude(ast) { return _fl_str(runtime_prelude(), "\n", fl__gtjs_code(ast)); };
-function compile_file(input, output) { return ((() => { let src = _fl_file_read(input); let tokens = lex(src); let ast = parse(tokens); let node_count = _fl_length(ast); let js = fl__gtjs_with_prelude(ast); return (() => { _fl_file_write(output, js); _fl_print(_fl_str("Parsed: ", node_count, " nodes")); return _fl_print(_fl_str("Compiled ", input, " -> ", output)); })(); })()); };
-function str_lines(s) { return _fl_split(s, "\n"); };
-function str_words(s) { return _fl_split(_fl_trim(s), " "); };
-function str_join_lines(lines) { return str_join_loop(lines, 0, ""); };
-function str_join_loop(lst, i, acc) { return ((i >= _fl_length(lst)) ? acc : str_join_loop(lst, (i + 1), ((i === 0) ? _fl_get(lst, 0) : _fl_str(acc, "\n", _fl_get(lst, i))))); };
-function str_count(s, sub) { return ((_fl_length(sub) === 0) ? 0 : str_count_loop(s, sub, 0, 0)); };
-function str_count_loop(s, sub, pos, acc) { return ((() => { let _fl_rest = _fl_substring(s, pos, _fl_length(s)); let idx = index_of(_fl_rest, sub); return ((idx < 0) ? acc : str_count_loop(s, sub, _plus(pos, idx, _fl_length(sub)), (acc + 1))); })()); };
-function csv_parse_line(line) { return _fl_split(line, ","); };
-function csv_parse(csv) { return ((() => { let lines = _fl_split(csv, "\n"); return csv_parse_loop(lines, 0, []); })()); };
-function csv_parse_loop(lines, i, acc) { return ((i >= _fl_length(lines)) ? acc : csv_parse_loop(lines, (i + 1), _fl_append(acc, csv_parse_line(_fl_get(lines, i))))); };
-function _fl_repeat(s, n) { return ((n <= 0) ? "" : str_repeat_loop(s, n, 0, "")); };
-function str_repeat_loop(s, n, i, acc) { return ((i >= n) ? acc : str_repeat_loop(s, n, (i + 1), _fl_str(acc, s))); };
-function data_json_parse(s) { return JSON.parse(s); };
-function data_json_str(obj) { return JSON.stringify(obj); };
-function data_json_pretty(obj) { return JSON.stringify(obj); };
-function to_query_string(obj) { return to_query_loop(_fl_keys(obj), obj, 0, []); };
-function to_query_loop(ks, obj, i, acc) { return ((i >= _fl_length(ks)) ? _fl_join(acc, "&") : ((() => { let k = _fl_get(ks, i); let v = _fl_get(obj, k); return to_query_loop(ks, obj, (i + 1), _fl_append(acc, _fl_str(k, "=", v))); })())); };
-function hash_simple(s) { return hash_simple_loop(_fl_str(s), 0, 5381, 0); };
-function hash_simple_loop(s, i, hash, max) { return ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_simple_loop(s, (i + 1), ((hash * 33) + char_code_at(s, i)), (i + 1))); };
-function hash_fnv1a(s) { return ((() => { let fnv_offset = 2166136261; let fnv_prime = 16777619; return hash_fnv_loop(_fl_str(s), 0, fnv_offset); })()); };
-function hash_fnv_loop(s, i, hash) { return ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_fnv_loop(s, (i + 1), (bit_xor(hash, char_code_at(s, i)) * 16777619))); };
-function hash_djb2(s) { return hash_djb_loop(_fl_str(s), 0, 5381); };
-function hash_djb_loop(s, i, hash) { return ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_djb_loop(s, (i + 1), ((hash * 33) + char_code_at(s, i)))); };
-function hash_object(obj) { return hash_simple(JSON.stringify(obj)); };
-function hash_consistent(s, seed) { return ((() => { let h = hash_simple(s); return (((h * seed) + seed) % 2147483647); })()); };
-function now_s() { return floor((now() / 1000)); };
-function time_diff_ms(t1, t2) { return (t2 - t1); };
-function time_elapsed(start) { return (now() - start); };
-function date_parts(ts) { return ({ ts: ts, s: floor((ts / 1000)), m: floor((ts / 60000)), h: floor((ts / 3600000)), d: floor((ts / 86400000)) }); };
-function ts_to_s(ts) { return floor((ts / 1000)); };
-function s_to_ts(s) { return (s * 1000); };
-function time_ago(ts) { return ((() => { let diff = (now() - ts); let s = floor((diff / 1000)); let m = floor((s / 60)); let h = floor((m / 60)); let d = floor((h / 24)); return ((s < 60) ? _fl_str(s, "s ago") : ((m < 60) ? _fl_str(m, "m ago") : ((h < 24) ? _fl_str(h, "h ago") : (true ? _fl_str(d, "d ago") : null)))); })()); };
-function str_starts_with_q(s, prefix) { return ((_fl_length(prefix) > _fl_length(s)) ? false : (_fl_substring(s, 0, _fl_length(prefix)) === prefix)); };
-function str_ends_with_q(s, suffix) { return ((_fl_length(suffix) > _fl_length(s)) ? false : (_fl_substring(s, (_fl_length(s) - _fl_length(suffix)), _fl_length(s)) === suffix)); };
-function _fl_repeat(s, n) { return str_repeat_loop(s, n, ""); };
-function str_repeat_loop(s, n, acc) { return ((n <= 0) ? acc : str_repeat_loop(s, (n - 1), _fl_str(acc, s))); };
-function str_pad_left(s, n, pad) { return ((() => { let diff = (n - _fl_length(s)); return ((diff <= 0) ? s : _fl_str(_fl_repeat(pad, diff), s)); })()); };
-function str_pad_right(s, n, pad) { return ((() => { let diff = (n - _fl_length(s)); return ((diff <= 0) ? s : _fl_str(s, _fl_repeat(pad, diff))); })()); };
-function _fl_upper(s) { return ((() => { let chars = _fl_split(s, ""); return _fl_join(_fl_map(chars, ((c) => (((char_code_at(c, 0) >= 97) && (char_code_at(c, 0) <= 122)) ? from_char_code((char_code_at(c, 0) - 32)) : c))), ""); })()); };
-function _fl_lower(s) { return ((() => { let chars = _fl_split(s, ""); return _fl_join(_fl_map(chars, ((c) => (((char_code_at(c, 0) >= 65) && (char_code_at(c, 0) <= 90)) ? from_char_code((char_code_at(c, 0) + 32)) : c))), ""); })()); };
-function _fl_contains_q(s, substr) { return (!(-1 === _fl_str_index_of(s, substr))); };
-function file_append(path, content) { return _fl_file_append(_fl_str(path), _fl_str(content)); };
-function file_exists_q(path) { return _fl_file_exists(_fl_str(path)); };
-function file_delete(path) { return _fl_file_delete(_fl_str(path)); };
-function file_copy(src, dest) { return _fl_file_copy(_fl_str(src), _fl_str(dest)); };
-function file_rename(old, _new) { return _fl_file_rename(_fl_str(old), _fl_str(_new)); };
-function file_size(path) { return _fl_file_size(_fl_str(path)); };
-function file_modified(path) { return _fl_file_modified(_fl_str(path)); };
-function file_json(path) { return JSON.parse(_fl_file_read(_fl_str(path))); };
-function file_json_write(path, obj) { return _fl_file_write(_fl_str(path), JSON.stringify(obj)); };
-function file_lines(path) { return str_lines(_fl_file_read(_fl_str(path))); };
-function file_mkdir(path) { return _fl_file_mkdir(_fl_str(path)); };
-function file_rmdir(path) { return _fl_file_rmdir(_fl_str(path)); };
-function file_list(path) { return _fl_file_list(_fl_str(path)); };
-function file_is_file_q(path) { return _fl_file_is_file(_fl_str(path)); };
-function file_is_dir_q(path) { return _fl_file_is_dir(_fl_str(path)); };
-function process_run(cmd) { return _fl_process_run(_fl_str(cmd)); };
-function process_run_args(cmd, args) { return _fl_process_run_args(_fl_str(cmd), args); };
-function process_exec(cmd) { return _fl_process_exec(_fl_str(cmd)); };
-function process_exec_args(cmd, args) { return _fl_process_exec_args(_fl_str(cmd), args); };
-function process_spawn(cmd, args) { return _fl_process_spawn(_fl_str(cmd), args); };
-function process_kill(pid) { return _fl_process_kill(floor(pid)); };
-function process_exists_q(pid) { return _fl_process_exists(floor(pid)); };
-function process_wait(pid) { return _fl_process_wait(floor(pid)); };
-function shell_run(cmd) { return process_exec(_fl_str(cmd)); };
-function shell_pipe(cmd1, cmd2) { return process_exec(_fl_str(cmd1, " | ", cmd2)); };
-function env_get(key) { return _fl_env_get(_fl_str(key)); };
-function env_set(key, value) { return _fl_env_set(_fl_str(key), _fl_str(value)); };
-function env_all() { return _fl_env_all(); };
-function getcwd() { return _fl_process_getcwd(); };
-function chdir(path) { return _fl_process_chdir(_fl_str(path)); };
-function pid() { return _fl_process_pid(); };
-function pid_parent() { return _fl_process_ppid(); };
-function vector_add(v1, v2) { return _fl_map(_fl_range(0, _fl_length(v1)), ((i) => (_fl_get(v1, i) + _fl_get(v2, i)))); };
-function vector_dot(v1, v2) { return _fl_reduce(_fl_range(0, _fl_length(v1)), ((acc, i) => (acc + (_fl_get(v1, i) * _fl_get(v2, i)))), 0); };
-function vector_magnitude(v) { return math_sqrt(_fl_reduce(v, ((acc, x) => (acc + (x * x))), 0)); };
-function math_sqrt(n) { return ((n < 0) ? error("sqrt of negative number") : ((() => { let x = (n / 2); return ((x === 0) ? 0 : ((() => { let next = ((x + (n / x)) / 2); return (((x - next) < 0.0001) ? next : math_sqrt_iter(n, next)); })())); })())); };
-function math_sqrt_iter(n, guess) { return ((() => { let next = ((guess + (n / guess)) / 2); return (((guess - next) < 0.0001) ? next : math_sqrt_iter(n, next)); })()); };
-function math_pow(base, exp) { return ((exp === 0) ? 1 : ((exp < 0) ? (1 / math_pow(base, (0 - exp))) : (base * math_pow(base, (exp - 1))))); };
-function cosine_sim(v1, v2) { return ((() => { let dot = vector_dot(v1, v2); let mag1 = vector_magnitude(v1); let mag2 = vector_magnitude(v2); return (((mag1 === 0) || (mag2 === 0)) ? 0 : (dot / (mag1 * mag2))); })()); };
-function do_run(input, extra_args) { return ((() => { let output = _fl_str("/tmp/fl-run-", now_ms(), ".js"); let args_str = _fl_join(extra_args, " "); return (() => { compile_file(input, output); shell_exec(_fl_str("node ", output, " ", args_str), "."); return file_delete(output); })(); })()); };
-function cli_main() { return ((() => { let argv = _fl_get_argv(); return (_fl_null_q(argv) ? null : ((_fl_length(argv) === 0) ? null : ((() => { let cmd = _fl_get(argv, 0); return ((cmd === "run") ? ((() => { let input = _fl_get(argv, 1); let extra = _fl_slice(argv, 2, _fl_length(argv)); return do_run(input, extra); })()) : ((() => { let input = _fl_get(argv, 0); let output = ((_fl_length(argv) >= 2) ? _fl_get(argv, 1) : _fl_str(input, ".out.js")); return compile_file(input, output); })())); })()))); })()); };
+const _fl_is_digit_q = (c) => (_fl_null_q(c) ? false : ((c >= "0") && (c <= "9")));
+const _fl_is_alpha_q = (c) => (_fl_null_q(c) ? false : (((c >= "a") && (c <= "z")) || ((c >= "A") && (c <= "Z"))));
+const _fl_is_alnum_q = (c) => (_fl_is_digit_q(c) || _fl_is_alpha_q(c));
+const _fl_is_space_q = (c) => ((c === " ") || (c === "\t") || (c === "\n") || (c === "\r"));
+const _fl_is_symbol_char_q = (c) => (_fl_null_q(c) ? false : (_fl_is_alnum_q(c) || (c === "-") || (c === "_") || (c === "?") || (c === "!") || (c === "/") || (c === ".") || (c === "<") || (c === ">") || (c === "=") || (c === "+") || (c === "*") || (c === "%") || (c === "&") || (c === "|") || (c === "^") || (c === "~")));
+const make_state = (src) => ({ src: src, idx: 0, line: 1, col: 1, tokens: [] });
+const peek_at = (st, offset) => ((() => { let src = _fl_get(st, "src"); let i = (_fl_get(st, "idx") + offset); return ((i >= _fl_length(src)) ? null : _fl_char_at(src, i)); })());
+const peek = (st) => peek_at(st, 0);
+const at_end_q = (st) => (_fl_get(st, "idx") >= _fl_length(_fl_get(st, "src")));
+const advance = (st) => ((() => { let c = peek(st); return ((c === "\n") ? ({ src: _fl_get(st, "src"), idx: (_fl_get(st, "idx") + 1), line: (_fl_get(st, "line") + 1), col: 1, tokens: _fl_get(st, "tokens") }) : ({ src: _fl_get(st, "src"), idx: (_fl_get(st, "idx") + 1), line: _fl_get(st, "line"), col: (_fl_get(st, "col") + 1), tokens: _fl_get(st, "tokens") })); })());
+const emit = (st, kind, value, sl, sc) => ({ src: _fl_get(st, "src"), idx: _fl_get(st, "idx"), line: _fl_get(st, "line"), col: _fl_get(st, "col"), tokens: _fl_append(_fl_get(st, "tokens"), ({ kind: kind, type: kind, value: value, line: sl, col: sc })) });
+const skip_comment_loop = (cur) => ((at_end_q(cur) || (peek(cur) === "\n")) ? (at_end_q(cur) ? cur : advance(cur)) : skip_comment_loop(advance(cur)));
+const skip_comment = (st) => skip_comment_loop(st);
+const skip_ws_loop = (cur) => (at_end_q(cur) ? cur : ((() => { let c = peek(cur); return (_fl_is_space_q(c) ? skip_ws_loop(advance(cur)) : ((c === ";") ? skip_ws_loop(skip_comment(cur)) : (true ? cur : null))); })()));
+const skip_ws = (st) => skip_ws_loop(st);
+const read_number_iter = (cur, res_acc, dot, line, col) => (at_end_q(cur) ? emit(cur, "Number", res_acc, line, col) : ((() => { let c = peek(cur); return (_fl_is_digit_q(c) ? read_number_iter(advance(cur), _fl_str(res_acc, c), dot, line, col) : (((c === ".") && (!dot)) ? read_number_iter(advance(cur), _fl_str(res_acc, c), true, line, col) : (true ? emit(cur, "Number", res_acc, line, col) : null))); })()));
+const read_number_body = (st, acc, has_dot, line, col) => read_number_iter(st, acc, has_dot, line, col);
+const read_number = (st) => read_number_body(st, "", false, _fl_get(st, "line"), _fl_get(st, "col"));
+const translate_esc = (c) => ((c === "n") ? "\n" : ((c === "t") ? "\t" : ((c === "r") ? "\r" : ((c === "\"") ? "\"" : ((c === "\\") ? "\\" : (true ? c : null))))));
+const read_string_iter = (cur, res_acc, line, col) => (at_end_q(cur) ? emit(cur, "String", res_acc, line, col) : ((() => { let c = peek(cur); return ((c === "\"") ? emit(advance(cur), "String", res_acc, line, col) : ((c === "\\") ? ((() => { let st2 = advance(cur); let c2 = peek(st2); return read_string_iter(advance(st2), _fl_str(res_acc, translate_esc(c2)), line, col); })()) : (true ? read_string_iter(advance(cur), _fl_str(res_acc, c), line, col) : null))); })()));
+const read_string_body = (st, acc, line, col) => read_string_iter(st, acc, line, col);
+const read_string = (st) => ((() => { let line = _fl_get(st, "line"); let col = _fl_get(st, "col"); let st1 = advance(st); return read_string_body(st1, "", line, col); })());
+const read_symbol_iter = (cur, res_acc, line, col, kind) => (at_end_q(cur) ? emit(cur, kind, res_acc, line, col) : ((() => { let c = peek(cur); return (_fl_is_symbol_char_q(c) ? read_symbol_iter(advance(cur), _fl_str(res_acc, c), line, col, kind) : emit(cur, kind, res_acc, line, col)); })()));
+const read_symbol_body_kind = (st, acc, line, col, kind) => read_symbol_iter(st, acc, line, col, kind);
+const read_symbol = (st) => read_symbol_body_kind(st, "", _fl_get(st, "line"), _fl_get(st, "col"), "Symbol");
+const read_variable = (st) => ((() => { let line = _fl_get(st, "line"); let col = _fl_get(st, "col"); let st1 = advance(st); return read_symbol_body_kind(st1, "", line, col, "Variable"); })());
+const read_keyword = (st) => ((() => { let line = _fl_get(st, "line"); let col = _fl_get(st, "col"); let st1 = advance(st); return read_symbol_body_kind(st1, "", line, col, "Keyword"); })());
+const read_token = (st) => ((() => { let st1 = skip_ws(st); return (at_end_q(st1) ? st1 : ((() => { let c = peek(st1); let line = _fl_get(st1, "line"); let col = _fl_get(st1, "col"); return ((c === "(") ? emit(advance(st1), "LParen", c, line, col) : ((c === ")") ? emit(advance(st1), "RParen", c, line, col) : ((c === "[") ? emit(advance(st1), "LBracket", c, line, col) : ((c === "]") ? emit(advance(st1), "RBracket", c, line, col) : ((c === "{") ? emit(advance(st1), "LBrace", c, line, col) : ((c === "}") ? emit(advance(st1), "RBrace", c, line, col) : ((c === "\"") ? read_string(st1) : ((c === "$") ? read_variable(st1) : ((c === ":") ? read_keyword(st1) : (_fl_is_digit_q(c) ? read_number(st1) : (((c === "-") && _fl_is_digit_q(peek_at(st1, 1))) ? read_number_body(advance(st1), "-", false, line, col) : (_fl_is_symbol_char_q(c) ? read_symbol(st1) : (true ? emit(advance(st1), "Unknown", c, line, col) : null))))))))))))); })())); })());
+const lex_loop = (cur) => ((() => { let ws = skip_ws(cur); return (at_end_q(ws) ? _fl_get(ws, "tokens") : lex_loop(read_token(ws))); })());
+const lex = (src) => lex_loop(make_state(src));
+const make_literal = (type, value, line) => ({ kind: "literal", type: type, value: value, line: line });
+const make_variable = (name, line) => ({ kind: "variable", name: name, line: line });
+const make_keyword = (name, line) => ({ kind: "keyword", name: name, line: line });
+const make_sexpr = (op, args, line) => ({ kind: "sexpr", op: op, args: args, line: line });
+const make_number = (v, line) => make_literal("number", v, line);
+const make_string = (v, line) => make_literal("string", v, line);
+const make_bool = (v, line) => make_literal("boolean", v, line);
+const make_null = (line) => make_literal("null", null, line);
+const make_symbol = (v, line) => make_literal("symbol", v, line);
+const make_block = (type, name, fields, line) => ({ kind: "block", type: type, name: name, fields: fields, line: line });
+const make_array_block = (items, line) => make_block("Array", null, ({ items: items }), line);
+const make_map_block = (items, line) => make_block("Map", null, ({ items: items }), line);
+const make_pattern_literal = (value, line) => ({ kind: "pattern-literal", value: value, line: line });
+const make_pattern_variable = (name, line) => ({ kind: "pattern-variable", name: name, line: line });
+const make_pattern_wildcard = (line) => ({ kind: "pattern-wildcard", line: line });
+const make_pattern_list = (items, _fl_rest, line) => ({ kind: "pattern-list", items: items, rest: _fl_rest, line: line });
+const make_pattern_struct = (type_name, fields, line) => ({ kind: "pattern-struct", type: type_name, fields: fields, line: line });
+const make_pattern_or = (alternatives, line) => ({ kind: "pattern-or", alternatives: alternatives, line: line });
+const make_pattern_range = (start, end, line) => ({ kind: "pattern-range", start: start, end: end, line: line });
+const make_pattern_match = (value, cases, line) => ({ kind: "pattern-match", value: value, cases: cases, line: line });
+const make_match_case = (pattern, guard, body, line) => ({ kind: "match-case", pattern: pattern, guard: guard, body: body, line: line });
+const make_function_value = (params, body, captured_env, name) => ({ kind: "function-value", params: params, body: body, capturedEnv: captured_env, name: name });
+const make_type_class = (name, generics, methods, line) => ({ kind: "type-class", name: name, generics: generics, methods: methods, line: line });
+const make_type_class_instance = (class_name, type_name, impls, line) => ({ kind: "type-class-instance", class: class_name, type: type_name, impls: impls, line: line });
+const make_module_block = (name, exports, body, line) => ({ kind: "module", name: name, exports: exports, body: body, line: line });
+const make_import_block = (path, alias, names, line) => ({ kind: "import", path: path, alias: alias, names: names, line: line });
+const make_open_block = (module_name, line) => ({ kind: "open", module: module_name, line: line });
+const make_search_block = (query, fields, line) => ({ kind: "search-block", query: query, fields: fields, line: line });
+const make_learn_block = (topic, fields, line) => ({ kind: "learn-block", topic: topic, fields: fields, line: line });
+const make_reasoning_block = (name, fields, line) => ({ kind: "reasoning-block", name: name, fields: fields, line: line });
+const make_async_function = (name, params, body, line) => ({ kind: "async-function", name: name, params: params, body: body, line: line });
+const make_await = (expr, line) => ({ kind: "await", expr: expr, line: line });
+const make_try = (body, _catch, _finally, line) => ({ kind: "try", body: body, catch: _catch, finally: _finally, line: line });
+const make_catch = (param, body, line) => ({ kind: "catch", param: param, body: body, line: line });
+const make_throw = (expr, line) => ({ kind: "throw", expr: expr, line: line });
+const make_template_string = (parts, expressions, line) => ({ kind: "template-string", parts: parts, expressions: expressions, line: line });
+const make_loop = (init, condition, update, body, line) => ({ kind: "loop", init: init, condition: condition, update: update, body: body, line: line });
+const make_page = (name, path, fields, line) => ({ kind: "page", name: name, path: path, fields: fields, line: line });
+const make_route = (method, path, handler, line) => ({ kind: "route", method: method, path: path, handler: handler, line: line });
+const make_component = (name, fields, line) => ({ kind: "component", name: name, fields: fields, line: line });
+const make_form = (name, fields, line) => ({ kind: "form", name: name, fields: fields, line: line });
+const deep_equal_q = (a, b) => ((_fl_null_q(a) && _fl_null_q(b)) ? true : ((_fl_null_q(a) || _fl_null_q(b)) ? false : ((_fl_list_q(a) && _fl_list_q(b)) ? deep_equal_list_q(a, b, 0) : ((_fl_map_q(a) && _fl_map_q(b)) ? deep_equal_map_q(a, b) : (true ? (a === b) : null)))));
+const deep_equal_list_q = (a, b, i) => ((!(_fl_length(a) === _fl_length(b))) ? false : ((i >= _fl_length(a)) ? true : ((!deep_equal_q(_fl_get(a, i), _fl_get(b, i))) ? false : (true ? deep_equal_list_q(a, b, (i + 1)) : null))));
+const deep_equal_map_q = (a, b) => ((() => { let ka = keys_no_line(a); let kb = keys_no_line(b); return ((!(_fl_length(ka) === _fl_length(kb))) ? false : deep_equal_map_keys_q(a, b, ka, 0)); })());
+const keys_no_line = (m) => _fl_filter(_fl_keys(m), ((k) => (!(k === "line"))));
+const deep_equal_map_keys_q = (a, b, ks, i) => ((i >= _fl_length(ks)) ? true : (((() => { let k = _fl_get(ks, i); return (!deep_equal_q(_fl_get(a, k), _fl_get(b, k))); })()) ? false : (true ? deep_equal_map_keys_q(a, b, ks, (i + 1)) : null)));
+const json_keys = (m) => obj_keys(m);
+const p_make = (tokens) => ({ tokens: tokens, idx: 0, ast: [] });
+const p_peek = (p) => ((() => { let i = _fl_get(p, "idx"); let t = _fl_get(p, "tokens"); return ((i >= _fl_length(t)) ? null : _fl_get(t, i)); })());
+const p_peek_at = (p, offset) => ((() => { let i = (_fl_get(p, "idx") + offset); let t = _fl_get(p, "tokens"); return ((i >= _fl_length(t)) ? null : _fl_get(t, i)); })());
+const p_end_q = (p) => (_fl_get(p, "idx") >= _fl_length(_fl_get(p, "tokens")));
+const p_advance = (p) => ({ tokens: _fl_get(p, "tokens"), idx: (_fl_get(p, "idx") + 1), ast: _fl_get(p, "ast") });
+const p_with_ast = (p, ast) => ({ tokens: _fl_get(p, "tokens"), idx: _fl_get(p, "idx"), ast: ast });
+const p_append_ast = (p, node) => p_with_ast(p, _fl_append(_fl_get(p, "ast"), node));
+const r_pair = (p, node) => ({ p: p, node: node });
+const string_contains_q = (s, substr) => (!(-1 === _fl_str_index_of(s, substr)));
+const parse_atom = (p) => ((() => { let t = p_peek(p); let k = _fl_get(t, "kind"); let v = _fl_get(t, "value"); let line = _fl_get(t, "line"); return ((k === "Number") ? r_pair(p_advance(p), make_literal("number", v, line)) : ((k === "String") ? (string_contains_q(v, _fl_str("$", "{")) ? r_pair(p_advance(p), make_template_string(v, [], line)) : r_pair(p_advance(p), make_literal("string", v, line))) : ((k === "Symbol") ? r_pair(p_advance(p), make_literal("symbol", v, line)) : ((k === "Variable") ? r_pair(p_advance(p), make_variable(v, line)) : ((k === "Keyword") ? r_pair(p_advance(p), make_keyword(v, line)) : (true ? r_pair(p_advance(p), make_literal("unknown", v, line)) : null)))))); })());
+const parse_expr = (p) => ((() => { let t = p_peek(p); let k = _fl_get(t, "kind"); return ((k === "LParen") ? parse_sexpr(p) : ((k === "LBracket") ? parse_bracket(p) : ((k === "LBrace") ? parse_map(p) : (true ? parse_atom(p) : null)))); })());
+const parse_sexpr = (p) => ((() => { let start_tok = p_peek(p); let line = _fl_get(start_tok, "line"); let p1 = p_advance(p); let _fl_first = parse_args(p1, []); let p2 = _fl_get(_fl_first, "p"); let args = _fl_get(_fl_first, "node"); return ((_fl_length(args) === 0) ? r_pair(parse_consume_rparen(p2), make_sexpr("", [], line)) : ((() => { let op_node = _fl_get(args, 0); let op = ((_fl_get(op_node, "kind") === "literal") ? _fl_get(op_node, "value") : ((_fl_get(op_node, "kind") === "variable") ? _fl_str("$", _fl_get(op_node, "name")) : "unknown")); let _fl_rest = _fl_slice(args, 1, _fl_length(args)); return ((op === "try") ? ((() => { let body = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let catch_clause = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); let finally_clause = ((_fl_length(_fl_rest) > 2) ? _fl_get(_fl_rest, 2) : null); return r_pair(parse_consume_rparen(p2), make_try(body, catch_clause, finally_clause, line)); })()) : ((op === "loop") ? ((() => { let loop_array = ((_fl_length(_fl_rest) > 0) ? _fl_get(_fl_rest, 0) : null); let body_start = ((_fl_length(_fl_rest) > 1) ? _fl_get(_fl_rest, 1) : null); return (_fl_null_q(loop_array) ? r_pair(parse_consume_rparen(p2), make_sexpr("loop", [], line)) : ((!(_fl_get(loop_array, "kind") === "array")) ? r_pair(parse_consume_rparen(p2), make_sexpr("loop", _fl_rest, line)) : ((() => { let items = _fl_get(loop_array, "items"); let init = ((_fl_length(items) > 0) ? _fl_get(items, 0) : null); let condition = ((_fl_length(items) > 1) ? _fl_get(items, 1) : null); let update = ((_fl_length(items) > 2) ? _fl_get(items, 2) : null); let body_exprs = _fl_slice(_fl_rest, 1, _fl_length(_fl_rest)); return r_pair(parse_consume_rparen(p2), make_loop(init, condition, update, ((_fl_length(body_exprs) === 1) ? _fl_get(body_exprs, 0) : make_sexpr("do", body_exprs, line)), line)); })()))); })()) : (true ? r_pair(parse_consume_rparen(p2), make_sexpr(op, _fl_rest, line)) : null))); })())); })());
+const parse_consume_rparen = (p) => ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RParen")) ? p_advance(p) : p); })());
+const parse_args = (p, acc) => ((() => { let t = p_peek(p); return (_fl_null_q(t) ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RParen") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBracket") ? r_pair(p, acc) : ((_fl_get(t, "kind") === "RBrace") ? r_pair(p, acc) : (true ? ((() => { let one = parse_expr(p); return parse_args(_fl_get(one, "p"), _fl_append(acc, _fl_get(one, "node"))); })()) : null))))); })());
+const parse_bracket = (p) => ((() => { let tok = p_peek(p); let line = _fl_get(tok, "line"); let p1 = p_advance(p); let next = p_peek(p1); return (((!_fl_null_q(next)) && (_fl_get(next, "kind") === "Symbol") && is_block_type_q(_fl_get(next, "value")) && (_fl_get(next, "value") === upper_case(_fl_get(next, "value")))) ? parse_named_block(p1, line) : parse_array(p1, line)); })());
+const is_block_type_q = (s) => ((() => { let c = _fl_char_at(s, 0); return ((c >= "A") && (c <= "Z")); })());
+const upper_case = (s) => s;
+const parse_array = (p, line) => ((() => { let collected = parse_args(p, []); let p2 = _fl_get(collected, "p"); let items = _fl_get(collected, "node"); return r_pair(parse_consume_rbracket(p2), make_array_block(items, line)); })());
+const parse_consume_rbracket = (p) => ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBracket")) ? p_advance(p) : p); })());
+const parse_named_block = (p, line) => ((() => { let type_tok = p_peek(p); let type = _fl_get(type_tok, "value"); let p1 = p_advance(p); let name_info = parse_optional_name(p1); let p2 = _fl_get(name_info, "p"); let name = _fl_get(name_info, "node"); let fields_info = parse_block_fields(p2, ({  })); let p3 = _fl_get(fields_info, "p"); let fields = _fl_get(fields_info, "node"); return r_pair(parse_consume_rbracket(p3), make_block(type, name, fields, line)); })());
+const parse_optional_name = (p) => ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "Symbol") && (!(_fl_char_at(_fl_get(t, "value"), 0) === ":"))) ? r_pair(p_advance(p), _fl_get(t, "value")) : r_pair(p, null)); })());
+const parse_block_fields = (p, acc) => (p_end_q(p) ? r_pair(p, acc) : ((() => { let t = p_peek(p); return ((_fl_get(t, "kind") === "Keyword") ? ((() => { let key = _fl_get(t, "value"); let p1 = p_advance(p); let val = parse_expr(p1); return parse_block_fields(_fl_get(val, "p"), _fl_map_set(acc, key, _fl_get(val, "node"))); })()) : r_pair(p, acc)); })()));
+const parse_map = (p) => ((() => { let tok = p_peek(p); let line = _fl_get(tok, "line"); let p1 = p_advance(p); let collected = parse_args(p1, []); let p2 = _fl_get(collected, "p"); let items = _fl_get(collected, "node"); return r_pair(parse_consume_rbrace(p2), make_map_block(items, line)); })());
+const parse_consume_rbrace = (p) => ((() => { let t = p_peek(p); return (((!_fl_null_q(t)) && (_fl_get(t, "kind") === "RBrace")) ? p_advance(p) : p); })());
+const parse_all = (p) => (p_end_q(p) ? _fl_get(p, "ast") : ((() => { let one = parse_expr(p); let p2 = p_append_ast(_fl_get(one, "p"), _fl_get(one, "node")); return parse_all(p2); })()));
+const parse = (tokens) => parse_all(p_make(tokens));
+const js_reserved_q = (n) => ((n === "default") || (n === "class") || (n === "const") || (n === "let") || (n === "if") || (n === "else") || (n === "switch") || (n === "case") || (n === "break") || (n === "continue") || (n === "for") || (n === "while") || (n === "function") || (n === "return") || (n === "throw") || (n === "try") || (n === "catch") || (n === "new") || (n === "delete") || (n === "typeof") || (n === "instanceof") || (n === "var") || (n === "in") || (n === "of") || (n === "this") || (n === "super") || (n === "void") || (n === "yield") || (n === "async") || (n === "await") || (n === "import") || (n === "export") || (n === "enum") || (n === "do") || (n === "with") || (n === "finally") || (n === "null") || (n === "true") || (n === "false"));
+const js_name_inner = (n) => ((() => { let g = _fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(n, "-", "_"), "?", "_q"), "!", "_x"), ">", "_gt"), "<", "_lt"), "*", "_st"), "+", "_pl"); return (js_reserved_q(g) ? _fl_str(g, "_") : g); })());
+const js_name = (n) => (_fl_null_q(n) ? "_" : js_name_inner(n));
+const js_esc_inner = (s) => _fl_replace(_fl_replace(_fl_replace(_fl_replace(_fl_replace(s, "\\", "\\\\"), "\"", "\\\""), "\n", "\\n"), "\r", "\\r"), "\t", "\\t");
+const js_esc = (s) => _fl_str("\"", js_esc_inner(s), "\"");
+const get_block_items = (node) => (_fl_null_q(node) ? [] : (((_fl_get(node, "kind") === "block") && (_fl_get(node, "type") === "Array")) ? _fl_get(_fl_get(node, "fields"), "items") : node));
+const cg = (n) => (_fl_null_q(n) ? "null" : ((_fl_get(n, "kind") === "literal") ? cg_literal(n) : ((_fl_get(n, "kind") === "variable") ? js_name(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "keyword") ? js_esc(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "template-string") ? cg_template_string(n) : ((_fl_get(n, "kind") === "try") ? cg_try(n) : ((_fl_get(n, "kind") === "loop") ? cg_loop(n) : ((_fl_get(n, "kind") === "sexpr") ? cg_sexpr(n) : ((_fl_get(n, "kind") === "block") ? cg_block(n) : ((_fl_get(n, "kind") === "and") ? cg_and(_fl_get(n, "args")) : ((_fl_get(n, "kind") === "or") ? cg_or(_fl_get(n, "args")) : ((_fl_get(n, "kind") === "pattern-match") ? cg_match(n) : ((_fl_get(n, "kind") === "await") ? _fl_str("(await ", cg(_fl_get(n, "argument")), ")") : ((_fl_get(n, "kind") === "throw") ? _fl_str("((()=>{throw new Error(String(", cg(_fl_get(n, "argument")), "))})())") : (true ? "null" : null)))))))))))))));
+const cg_literal = (n) => ((() => { let t = _fl_get(n, "type"); let v = _fl_get(n, "value"); return ((t === "number") ? _fl_str(v) : ((t === "string") ? js_esc(v) : ((t === "boolean") ? (v ? "true" : "false") : ((t === "symbol") ? ((v === "true") ? "true" : ((v === "false") ? "false" : ((v === "null") ? "null" : ((v === "nil") ? "null" : (true ? js_name(v) : null))))) : (true ? "null" : null))))); })());
+const cg_template_string = (n) => _fl_str("`", _fl_replace(_fl_replace(_fl_get(n, "value"), "\\", "\\\\"), "`", "\\`"), "`");
+const cg_try = (n) => ((() => { let body = cg(_fl_get(n, "body")); let _catch = _fl_get(n, "catch"); let _finally = _fl_get(n, "finally"); let c_code = (_fl_null_q(_catch) ? "" : cg_catch_clause(_catch)); let f_code = (_fl_null_q(_finally) ? "" : _fl_str("finally{", cg(_finally), "}")); return _fl_str("(()=>{try{return ", body, "}catch(err){", c_code, "}", f_code, "})()"); })());
+const cg_catch_clause = (c) => ((() => { let is_sexpr = (_fl_get(c, "kind") === "sexpr"); let param = (is_sexpr ? js_name(_fl_get(_fl_get(_fl_get(c, "args"), 0), "name")) : "err"); let body = (is_sexpr ? cg(_fl_get(_fl_get(c, "args"), 1)) : cg(c)); return _fl_str("let ", param, "=err;return ", body, ";"); })());
+const cg_func_block = (n) => ((() => { let name = js_name(_fl_get(n, "name")); let f = _fl_get(n, "fields"); let params_block = _fl_get(f, "params"); let body_node = _fl_get(f, "body"); let ps_info = extract_params(get_block_items(params_block)); let body = cg(body_node); let pre = _fl_get(ps_info, "preamble"); let final_body = ((_fl_length(pre) === 0) ? body : _fl_str("((() => { ", pre, " return ", body, "; })())")); return _fl_str("function ", name, "(", _fl_get(ps_info, "params"), ") { return ", final_body, "; }"); })());
+const cg_block = (n) => ((() => { let t = _fl_get(n, "type"); let f = _fl_get(n, "fields"); return ((t === "FUNC") ? cg_func_block(n) : ((t === "Map") ? _fl_str("({", cg_map_entries(f), "})") : ((t === "Array") ? _fl_str("[", cg_args(_fl_get(f, "items")), "]") : (true ? "null" : null)))); })());
+const cg_map_entries = (f) => ((() => { let items = _fl_get(f, "items"); return (_fl_array_q(items) ? cg_map_flat_loop(items, 0, "") : cg_map_loop(map_entries(f), 0, "")); })());
+const cg_map_loop = (e, i, acc) => ((i >= _fl_length(e)) ? acc : ((() => { let pair = _fl_str(js_esc(_fl_get(_fl_get(e, i), 0)), ":", cg(_fl_get(_fl_get(e, i), 1))); return cg_map_loop(e, (i + 1), ((i === 0) ? pair : _fl_str(acc, ",", pair))); })()));
+const cg_map_flat_loop = (it, i, acc) => ((i >= _fl_length(it)) ? acc : ((() => { let k = _fl_get(it, i); let v = _fl_get(it, (i + 1)); let key = ((_fl_get(k, "kind") === "keyword") ? js_esc(_fl_get(k, "name")) : ((_fl_get(k, "kind") === "literal") ? js_esc(_fl_str(_fl_get(k, "value"))) : (true ? "\"_anon\"" : null))); let pair = _fl_str(key, ":", cg(v)); return cg_map_flat_loop(it, (i + 2), ((i === 0) ? pair : _fl_str(acc, ",", pair))); })()));
+const cg_sexpr = (n) => ((() => { let op = _fl_get(n, "op"); return (_fl_string_q(op) ? cg_sexpr_dispatch(op, _fl_get(n, "args")) : _fl_str("(", cg(op), ")(", cg_args(_fl_get(n, "args")), ")")); })());
+const cg_sexpr_dispatch = (op, args) => ((op === "if") ? _fl_str("(", cg(_fl_get(args, 0)), "?", cg(_fl_get(args, 1)), ":", ((_fl_length(args) >= 3) ? cg(_fl_get(args, 2)) : "null"), ")") : ((op === "fn") ? cg_fn(args) : ((op === "defn") ? cg_defn(args) : ((op === "let") ? cg_let(args) : ((op === "do") ? _fl_str("(()=>{", cg_do_body(args, 0, ""), "})()") : ((op === "cond") ? cg_cond(args) : ((op === "loop") ? cg_loop(args) : ((op === "recur") ? _fl_str("{__recur:true,a:[", cg_args(args), "]}") : ((op === "and") ? _fl_str("(", _fl_join(_fl_map(args, ((a) => cg(a))), "&&"), ")") : ((op === "or") ? _fl_str("(", _fl_join(_fl_map(args, ((a) => cg(a))), "||"), ")") : ((op === "+") ? ((_fl_length(args) === 0) ? "0" : _fl_str("(", binop_loop(args, 0, "", "+"), ")")) : ((op === "-") ? ((_fl_length(args) === 1) ? _fl_str("(-", cg(_fl_get(args, 0)), ")") : _fl_str("(", binop_loop(args, 0, "", "-"), ")")) : ((op === "*") ? ((_fl_length(args) === 0) ? "1" : _fl_str("(", binop_loop(args, 0, "", "*"), ")")) : ((op === "/") ? _fl_str("(", cg(_fl_get(args, 0)), "/", cg(_fl_get(args, 1)), ")") : ((op === "=") ? _fl_str("(", cg(_fl_get(args, 0)), "===", cg(_fl_get(args, 1)), ")") : ((op === "<") ? _fl_str("(", cg(_fl_get(args, 0)), "<", cg(_fl_get(args, 1)), ")") : ((op === ">") ? _fl_str("(", cg(_fl_get(args, 0)), ">", cg(_fl_get(args, 1)), ")") : ((op === "<=") ? _fl_str("(", cg(_fl_get(args, 0)), "<=", cg(_fl_get(args, 1)), ")") : ((op === ">=") ? _fl_str("(", cg(_fl_get(args, 0)), ">=", cg(_fl_get(args, 1)), ")") : ((op === "!=") ? _fl_str("(", cg(_fl_get(args, 0)), "!==", cg(_fl_get(args, 1)), ")") : ((op === "%") ? _fl_str("(", cg(_fl_get(args, 0)), "%", cg(_fl_get(args, 1)), ")") : ((op === "while") ? _fl_str("(()=>{ while(", cg(_fl_get(args, 0)), ") { ", cg_stmts(_fl_slice(args, 1, _fl_length(args)), 0, ""), " } })()") : ((op === "set!") ? _fl_str("(", js_name(_fl_get(_fl_get(args, 0), "name")), " = ", cg(_fl_get(args, 1)), ")") : ((op === "define") ? _fl_str("const ", extract_name(_fl_get(args, 0)), "=", cg(_fl_get(args, 1))) : (true ? cg_native_dispatch(op, cg_args(args)) : null)))))))))))))))))))))))));
+const cg_fn = (args) => ((() => { let ps_info = extract_params(get_block_items(_fl_get(args, 0))); let body = cg(_fl_get(args, 1)); let pre = _fl_get(ps_info, "preamble"); let final_body = ((_fl_length(pre) === 0) ? body : _fl_str("((() => { ", pre, " return ", body, "; })())")); return _fl_str("((", _fl_get(ps_info, "params"), ") => ", final_body, ")"); })());
+const cg_defn = (args) => ((() => { let ps_info = extract_params(get_block_items(_fl_get(args, 1))); let body = cg(_fl_get(args, 2)); let pre = _fl_get(ps_info, "preamble"); let final_body = ((_fl_length(pre) === 0) ? body : _fl_str("((() => { ", pre, " return ", body, "; })())")); return _fl_str("var ", extract_name(_fl_get(args, 0)), " = (", _fl_get(ps_info, "params"), ") => ", final_body); })());
+const cg_let = (args) => ((() => { let items = get_block_items(_fl_get(args, 0)); let _fl_first = _fl_get(items, 0); let nested = ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array")); let bindings = (nested ? cg_let_2d(items, 0, "") : cg_let_1d(items, 0, "")); let body = cg_do_body(_fl_slice(args, 1, _fl_length(args)), 0, ""); return _fl_str("((()=>{", bindings, body, "})())"); })());
+const cg_let_1d = (it, i, acc) => ((i >= _fl_length(it)) ? acc : cg_let_1d(it, (i + 2), _fl_str(acc, "let ", extract_name(_fl_get(it, i)), "=", cg(_fl_get(it, (i + 1))), ";")));
+const cg_let_2d = (it, i, acc) => ((i >= _fl_length(it)) ? acc : ((() => { let p = get_block_items(_fl_get(it, i)); return cg_let_2d(it, (i + 1), _fl_str(acc, "let ", extract_name(_fl_get(p, 0)), "=", cg(_fl_get(p, 1)), ";")); })()));
+const cg_do_body = (args, i, acc) => ((i >= _fl_length(args)) ? acc : ((() => { let _fl_last = (i === (_fl_length(args) - 1)); let c = cg(_fl_get(args, i)); let sep = (_fl_last ? "return " : ""); return cg_do_body(args, (i + 1), _fl_str(acc, sep, c, ";")); })()));
+const cg_stmts = (args, i, acc) => ((i >= _fl_length(args)) ? acc : cg_stmts(args, (i + 1), _fl_str(acc, cg(_fl_get(args, i)), ";")));
+const cg_cond = (args) => ((_fl_length(args) === 0) ? "null" : ((() => { let _fl_first = _fl_get(args, 0); let nested = ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array")); return (nested ? cg_cond_nested(args, (_fl_length(args) - 1), "null") : cg_cond_flat(args, 0, "null")); })()));
+const cg_cond_nested = (args, i, acc) => ((i < 0) ? acc : ((() => { let items = get_block_items(_fl_get(args, i)); return cg_cond_nested(args, (i - 1), _fl_str("(", cg(_fl_get(items, 0)), "?", cg(_fl_get(items, 1)), ":", acc, ")")); })()));
+const cg_cond_flat = (args, i, acc) => ((() => { let len = _fl_length(args); return ((i >= len) ? acc : ((i === (len - 1)) ? _fl_str("(", cg(_fl_get(args, i)), ")") : _fl_str("(", cg(_fl_get(args, i)), "?", cg(_fl_get(args, (i + 1))), ":", cg_cond_flat(args, (i + 2), acc), ")"))); })());
+const cg_loop = (args) => ((() => { let items = get_block_items(_fl_get(args, 0)); let _fl_first = _fl_get(items, 0); let nested = ((_fl_get(_fl_first, "kind") === "block") && (_fl_get(_fl_first, "type") === "Array")); let inits = (nested ? loop_inits_2d(items, 0, "") : loop_inits_1d(items, 0, "")); let names = (nested ? loop_names_2d(items, 0, "") : loop_names_1d(items, 0, "")); let body = cg_do_body(_fl_slice(args, 1, _fl_length(args)), 0, ""); return _fl_str("((()=>{", inits, "while(true){let __r=(()=>{", body, "})();if(__r&&__r.__recur){", ((_fl_length(names) === 0) ? "" : _fl_str("[", names, "]=__r.a;")), "continue;}return __r;}})())"); })());
+const loop_inits_1d = (it, i, acc) => ((i >= _fl_length(it)) ? acc : loop_inits_1d(it, (i + 2), _fl_str(acc, "let ", extract_name(_fl_get(it, i)), "=", cg(_fl_get(it, (i + 1))), ";")));
+const loop_inits_2d = (it, i, acc) => ((i >= _fl_length(it)) ? acc : ((() => { let p = get_block_items(_fl_get(it, i)); return loop_inits_2d(it, (i + 1), _fl_str(acc, "let ", extract_name(_fl_get(p, 0)), "=", cg(_fl_get(p, 1)), ";")); })()));
+const loop_names_1d = (it, i, acc) => ((i >= _fl_length(it)) ? acc : ((() => { let n = extract_name(_fl_get(it, i)); return loop_names_1d(it, (i + 2), ((_fl_length(acc) === 0) ? n : _fl_str(acc, ",", n))); })()));
+const loop_names_2d = (it, i, acc) => ((i >= _fl_length(it)) ? acc : ((() => { let p = get_block_items(_fl_get(it, i)); let n = extract_name(_fl_get(p, 0)); return loop_names_2d(it, (i + 1), ((_fl_length(acc) === 0) ? n : _fl_str(acc, ",", n))); })()));
+const cg_args = (args) => args_loop(args, 0, "");
+const args_loop = (args, i, acc) => ((_fl_null_q(args) || (i >= _fl_length(args))) ? acc : ((() => { let c = cg(_fl_get(args, i)); return args_loop(args, (i + 1), ((i === 0) ? c : _fl_str(acc, ",", c))); })()));
+const binop_loop = (args, i, acc, op) => ((i >= _fl_length(args)) ? acc : ((() => { let c = cg(_fl_get(args, i)); return binop_loop(args, (i + 1), ((i === 0) ? c : _fl_str(acc, op, c)), op); })()));
+const extract_name = (n) => ((_fl_get(n, "kind") === "variable") ? js_name(_fl_get(n, "name")) : ((_fl_get(n, "kind") === "literal") ? js_name(_fl_get(n, "value")) : (true ? "_anon" : null)));
+const extract_params = (it) => extract_params_loop(it, 0, "", "", 0);
+const extract_params_loop = (it, i, ps, pre, tc) => ((_fl_null_q(it) || (i >= _fl_length(it))) ? ({ params: ps, preamble: pre }) : ((() => { let c = _fl_get(it, i); let k = _fl_get(c, "kind"); return (((k === "variable") || (k === "literal")) ? extract_params_loop(it, (i + 1), ((_fl_length(ps) === 0) ? extract_name(c) : _fl_str(ps, ",", extract_name(c))), pre, tc) : (((k === "block") && (_fl_get(c, "type") === "Array")) ? ((() => { let t = _fl_str("_arg", tc); let sub = _fl_get(_fl_get(c, "fields"), "items"); return extract_params_loop(it, (i + 1), ((_fl_length(ps) === 0) ? t : _fl_str(ps, ",", t)), _fl_str(pre, destructure_loop(sub, t, 0)), (tc + 1)); })()) : extract_params_loop(it, (i + 1), ((_fl_length(ps) === 0) ? "p" : _fl_str(ps, ",p")), pre, tc))); })()));
+const destructure_loop = (it, t, i) => ((i >= _fl_length(it)) ? "" : _fl_str("let ", extract_name(_fl_get(it, i)), "=", t, "[", i, "]; ", destructure_loop(it, t, (i + 1))));
+const cg_native_dispatch = (op, as) => ((op === "str") ? _fl_str("_fl_str(", as, ")") : ((op === "length") ? _fl_str("_fl_length(", as, ")") : ((op === "println") ? _fl_str("_fl_print(", as, ")") : ((op === "print") ? _fl_str("_fl_print(", as, ")") : (true ? _fl_str(js_name(op), "(", as, ")") : null)))));
+const prelude_parts = () => ["const _fl_str = (...xs) => xs.map(x => x==null?'':String(x)).join('');", "const _fl_length = (x) => (x?x.length:0);", "const _fl_get = (o,k,d) => { if(o==null)return d||null; let ks=String(k).startsWith(':')?k.slice(1):String(k); if(Array.isArray(o)){let idx=parseInt(ks);if(!isNaN(idx))return o[idx]!==undefined?o[idx]:(d||null);if(ks==='length')return o.length;} if(typeof o==='object'){if(o[ks]!==undefined)return o[ks];} return d||null; }", "const _fl_null_q = (v) => v===null||v===undefined;", "const _fl_keys = (o) => o?Object.keys(o):[];", "const _fl_map_set = (o,k,v) => ({...o,[k]:v});", "const _fl_has_key_q = (o,k) => o?(String(k) in o):false;", "const _fl_append = (l,x) => [...(l||[]),x];", "const list = (...args) => [...args];", "const append = (l,x) => [...(l||[]),x];", "const _fl_first = (l) => (l&&l.length>0)?l[0]:null;", "const _fl_last = (l) => (l&&l.length>0)?l[l.length-1]:null;", "const _fl_rest = (l) => (l&&l.length>0)?l.slice(1):[];", "const _fl_slice = (l,a,b) => (l||[]).slice(a,b);", "const _fl_map = (arr,fn) => (arr||[]).map(x=>fn(x));", "const _fl_filter = (arr,fn) => (arr||[]).filter(x=>{const r=fn(x);return r!==false&&r!==null;});", "const _fl_reduce = (arr,fn,init) => (arr||[]).reduce((a,x)=>fn(a,x),init);", "const _fl_some = (f,l) => (l||[]).some(x=>f(x));", "const _fl_every = (f,l) => (l||[]).every(x=>f(x));", "const _fl_file_read = (p) => require('fs').readFileSync(p,'utf8');", "const _fl_file_write = (p,c) => require('fs').writeFileSync(p,c);", "const _fl_file_exists = (p) => require('fs').existsSync(p);", "const _fl_file_delete = (p) => { try { require('fs').unlinkSync(p); } catch(e) {} };", "const _fl_file_append = (p,c) => require('fs').appendFileSync(p,String(c));", "const _fl_file_copy = (s,d) => require('fs').copyFileSync(s,d);", "const _fl_file_rename = (o,n) => require('fs').renameSync(o,n);", "const _fl_file_size = (p) => { try { return require('fs').statSync(p).size; } catch(e) { return 0; } };", "const _fl_file_modified = (p) => { try { return require('fs').statSync(p).mtimeMs; } catch(e) { return 0; } };", "const _fl_file_mkdir = (p) => { try { require('fs').mkdirSync(p,{recursive:true}); } catch(e) {} };", "const _fl_file_rmdir = (p) => { try { require('fs').rmSync(p,{recursive:true,force:true}); } catch(e) {} };", "const _fl_file_list = (p) => { try { return require('fs').readdirSync(p); } catch(e) { return []; } };", "const _fl_process_run = (cmd) => { try { return require('child_process').execSync(cmd,{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_run_args = (cmd,args) => { try { return require('child_process').execSync(cmd+' '+(args||[]).join(' '),{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_exec = (cmd) => { try { return require('child_process').execSync(cmd,{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_exec_args = (cmd,args) => { try { return require('child_process').execSync(cmd+' '+(args||[]).join(' '),{encoding:'utf8'}); } catch(e) { return ''; } };", "const _fl_process_spawn = (cmd,args) => { try { const r=require('child_process').spawnSync(cmd,args||[],{encoding:'utf8'}); return r.stdout||''; } catch(e) { return ''; } };", "const _fl_process_kill = (pid) => { try { process.kill(pid); } catch(e) {} };", "const _fl_process_wait = (pid) => null;", "const _fl_env_get = (k) => process.env[k]||null;", "const _fl_env_set = (k,v) => { process.env[k]=String(v); };", "const _fl_env_all = () => process.env;", "const _fl_file_is_file = (p) => { try { return require('fs').statSync(p).isFile(); } catch(e) { return false; } };", "const _fl_file_is_dir = (p) => { try { return require('fs').statSync(p).isDirectory(); } catch(e) { return false; } };", "const _fl_process_exists = (pid) => { try { process.kill(pid,0); return true; } catch(e) { return false; } };", "const _fl_process_getcwd = () => process.cwd();", "const _fl_process_chdir = (p) => { try { process.chdir(p); } catch(e) {} };", "const _fl_process_pid = () => process.pid;", "const _fl_process_ppid = () => process.ppid||null;", "const file_read = (p) => _fl_file_read(String(p));", "const file_write = (p,c) => _fl_file_write(String(p),String(c));", "const file_exists = (p) => _fl_file_exists(String(p));", "const _fl_get_argv = () => (typeof process!=='undefined'?process.argv.slice(2):[]);", "const _fl_print = (v) => { console.log(v); return v; }", "const null_q = _fl_null_q;", "const some_q = _fl_some;", "const every_q = _fl_every;", "const cli_args = _fl_get_argv;", "const get = _fl_get;", "const keys = _fl_keys;", "const has_key_q = _fl_has_key_q;", "const slice = _fl_slice;", "const first = _fl_first;", "const last = _fl_last;", "const rest = _fl_rest;", "const map = (fn,arr) => (arr||[]).map(x=>fn(x));", "const filter = (fn,arr) => (arr||[]).filter(x=>{const r=fn(x);return r!==false&&r!==null;});", "const reduce = (fn,init,arr) => (arr||[]).reduce((a,x)=>fn(a,x),init);", "const print = _fl_print;", "const println = (v) => { console.log(v==null?'':String(v)); return v; }", "const str_replace = (s,ov,nv) => { if(s==null)return ''; const st=String(s); return st.split(String(ov)).join(nv==null?'':String(nv)); };", "const str_index_of = (s,sub) => (typeof s==='string'&&typeof sub==='string')?s.indexOf(sub):-1;", "const index_of = str_index_of;", "const str_slice = (s,a,b) => s?(b===undefined?s.slice(a):s.slice(a,b)):'';", "const substring = str_slice;", "const char_at = (s,i) => (s&&s[i])||null;", "const char_code_at = (s,i) => typeof s==='string'?s.charCodeAt(i):0;", "const trim = (s) => String(s||'').trim();", "const starts_with_q = (s,p) => String(s||'').startsWith(String(p||''));", "const ends_with_q = (s,sf) => String(s||'').endsWith(String(sf||''));", "const replace = (s,ov,nv) => { if(s==null)return ''; const st=String(s); if(ov instanceof RegExp)return st.replace(ov,nv==null?'':String(nv)); return st.split(String(ov)).join(nv==null?'':String(nv)); };", "const split = (s,sep) => String(s||'').split(sep);", "const str_join = (arr,sep) => (arr||[]).join(sep===undefined?'':sep);", "const join = str_join;", "const concat = (a,b) => (Array.isArray(a)&&Array.isArray(b))?[...a,...b]:String(a||'')+String(b||'');", "const push = (arr,v) => [...(arr||[]),v];", "const pop = (arr) => (arr&&arr.length>0)?arr.slice(0,-1):[];", "const reverse = (arr) => Array.isArray(arr)?[...arr].reverse():arr;", "const sort_by = (arr,fn) => Array.isArray(arr)?[...arr].sort((a,b)=>fn(a)<fn(b)?-1:fn(a)>fn(b)?1:0):arr;", "const flat_map = (arr,fn) => (arr||[]).flatMap(fn);", "const range = (s,e) => { const r=[]; let st=e===undefined?0:s; let en=e===undefined?s:e; for(let i=st;i<en;i++)r.push(i); return r; };", "const merge = (a,b) => Object.assign({},a,b);", "const assoc = (o,k,v) => { const r=Object.assign({},o); const key=typeof k==='string'&&k.startsWith(':')?k.slice(1):String(k); r[key]=v; return r; };", "const dissoc = (o,k) => { const r=Object.assign({},o); const key=typeof k==='string'&&k.startsWith(':')?k.slice(1):String(k); delete r[key]; return r; };", "var map_entries = (m) => m instanceof Map?[...m.entries()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.entries(m):[]);", "var map_keys = (m) => m instanceof Map?[...m.keys()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.keys(m):[]);", "var map_values = (m) => m instanceof Map?[...m.values()]:(m&&typeof m==='object'&&!Array.isArray(m)?Object.values(m):[]);", "const array_q = (v) => Array.isArray(v);", "var list_q = (v) => Array.isArray(v);", "var map_q = (v) => v!==null&&typeof v==='object'&&!Array.isArray(v);", "var fn_q = (v) => typeof v==='function';", "const number_q = (v) => typeof v==='number';", "const string_q = (v) => typeof v==='string';", "var str_upper = (s) => String(s||'').toUpperCase();", "var str_lower = (s) => String(s||'').toLowerCase();", "var str_contains = (s,sub) => String(s||'').includes(String(sub||''));", "var str_starts_with = (s,p) => String(s||'').startsWith(String(p||''));", "var str_ends_with = (s,sf) => String(s||'').endsWith(String(sf||''));", "var str_trim = (s) => String(s||'').trim();", "var str_length = (s) => String(s||'').length;", "var str_split = (s,sep) => String(s||'').split(sep);", "var take = (n,arr) => (arr||[]).slice(0,n);", "var drop = (n,arr) => (arr||[]).slice(n);", "var zip = (a,b) => { const r=[]; const l=Math.min((a||[]).length,(b||[]).length); for(let i=0;i<l;i++)r.push([a[i],b[i]]); return r; };", "var flatten = (arr) => (arr||[]).flat();", "var sort = (arr,fn) => fn?[...(arr||[])].sort((a,b)=>fn(a,b)?-1:1):[...(arr||[])].sort();", "var math_sqrt = (n) => Math.sqrt(n);", "var math_pi = Math.PI;", "var unknown = (...a) => a[a.length-1];", "function _fl_type_of(v) { if(v===null||v===undefined)return 'nil'; if(Array.isArray(v))return 'list'; return typeof v; }", "const not = (v) => !v;", "const abs = (n) => Math.abs(n);", "const floor = (n) => Math.floor(n);", "const ceil_val = (n) => Math.ceil(n);", "const round = (n) => Math.round(n);", "const max_val = (a,b) => a>b?a:b;", "const min_val = (a,b) => a<b?a:b;", "const error = (msg) => { throw new Error(String(msg)); };", "const now_ms = () => Date.now();", "const now_iso = () => new Date().toISOString();", "const now_unix = () => Math.floor(Date.now()/1000);", "const json_parse = (s) => { try{return JSON.parse(s);}catch(e){return null;} };", "const json_stringify = (v) => JSON.stringify(v);", "const shell_exec = (cmd,inp) => { try{const {execSync}=require('child_process');const opts={encoding:'utf8'};if(inp)opts.input=inp;return execSync(cmd,opts);}catch(e){return '';} };", "const __fl_routes = [];", "const _fl_server_get = (path,fn) => { __fl_routes.push({method:'GET',path,fn}); };", "const _fl_server_start = (port) => { const http=require('http'); http.createServer(async(req,res)=>{ const r=__fl_routes.find(r=>r.method===req.method&&r.path===require('url').parse(req.url).pathname); if(r){const result=await(typeof r.fn==='string'?eval(r.fn):r.fn)(req);res.end(String(result));}else{res.statusCode=404;res.end('Not Found');} }).listen(port);console.log('Server on '+port); };", "const server_get = _fl_server_get;", "const server_start = _fl_server_start;"];
+const runtime_prelude = () => _fl_join(prelude_parts(), "\n");
+const fl__gtjs_code = (ast) => _fl_reduce(ast, ((acc, n) => _fl_str(acc, cg(n), ";\n")), "");
+const fl__gtjs_with_prelude = (ast) => _fl_str(runtime_prelude(), "\n", fl__gtjs_code(ast));
+const compile_file = (input, output) => ((() => { let src = _fl_file_read(input); let tokens = lex(src); let ast = parse(tokens); let node_count = _fl_length(ast); let js = fl__gtjs_with_prelude(ast); return (() => { _fl_file_write(output, js); _fl_print(_fl_str("Parsed: ", node_count, " nodes")); return _fl_print(_fl_str("Compiled ", input, " -> ", output)); })(); })());
+const str_lines = (s) => _fl_split(s, "\n");
+const str_words = (s) => _fl_split(_fl_trim(s), " ");
+const str_join_lines = (lines) => str_join_loop(lines, 0, "");
+const str_join_loop = (lst, i, acc) => ((i >= _fl_length(lst)) ? acc : str_join_loop(lst, (i + 1), ((i === 0) ? _fl_get(lst, 0) : _fl_str(acc, "\n", _fl_get(lst, i)))));
+const str_count = (s, sub) => ((_fl_length(sub) === 0) ? 0 : str_count_loop(s, sub, 0, 0));
+const str_count_loop = (s, sub, pos, acc) => ((() => { let _fl_rest = _fl_substring(s, pos, _fl_length(s)); let idx = index_of(_fl_rest, sub); return ((idx < 0) ? acc : str_count_loop(s, sub, _plus(pos, idx, _fl_length(sub)), (acc + 1))); })());
+const csv_parse_line = (line) => _fl_split(line, ",");
+const csv_parse = (csv) => ((() => { let lines = _fl_split(csv, "\n"); return csv_parse_loop(lines, 0, []); })());
+const csv_parse_loop = (lines, i, acc) => ((i >= _fl_length(lines)) ? acc : csv_parse_loop(lines, (i + 1), _fl_append(acc, csv_parse_line(_fl_get(lines, i)))));
+const data_json_parse = (s) => JSON.parse(s);
+const data_json_str = (obj) => JSON.stringify(obj);
+const data_json_pretty = (obj) => JSON.stringify(obj);
+const to_query_string = (obj) => to_query_loop(_fl_keys(obj), obj, 0, []);
+const to_query_loop = (ks, obj, i, acc) => ((i >= _fl_length(ks)) ? _fl_join(acc, "&") : ((() => { let k = _fl_get(ks, i); let v = _fl_get(obj, k); return to_query_loop(ks, obj, (i + 1), _fl_append(acc, _fl_str(k, "=", v))); })()));
+const hash_simple = (s) => hash_simple_loop(_fl_str(s), 0, 5381, 0);
+const hash_simple_loop = (s, i, hash, max) => ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_simple_loop(s, (i + 1), ((hash * 33) + char_code_at(s, i)), (i + 1)));
+const hash_fnv1a = (s) => ((() => { let fnv_offset = 2166136261; let fnv_prime = 16777619; return hash_fnv_loop(_fl_str(s), 0, fnv_offset); })());
+const hash_fnv_loop = (s, i, hash) => ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_fnv_loop(s, (i + 1), (bit_xor(hash, char_code_at(s, i)) * 16777619)));
+const hash_djb2 = (s) => hash_djb_loop(_fl_str(s), 0, 5381);
+const hash_djb_loop = (s, i, hash) => ((i >= _fl_length(s)) ? (abs(hash) % 2147483647) : hash_djb_loop(s, (i + 1), ((hash * 33) + char_code_at(s, i))));
+const hash_object = (obj) => hash_simple(JSON.stringify(obj));
+const hash_consistent = (s, seed) => ((() => { let h = hash_simple(s); return (((h * seed) + seed) % 2147483647); })());
+const now_s = () => floor((now() / 1000));
+const time_diff_ms = (t1, t2) => (t2 - t1);
+const time_elapsed = (start) => (now() - start);
+const date_parts = (ts) => ({ ts: ts, s: floor((ts / 1000)), m: floor((ts / 60000)), h: floor((ts / 3600000)), d: floor((ts / 86400000)) });
+const ts_to_s = (ts) => floor((ts / 1000));
+const s_to_ts = (s) => (s * 1000);
+const time_ago = (ts) => ((() => { let diff = (now() - ts); let s = floor((diff / 1000)); let m = floor((s / 60)); let h = floor((m / 60)); let d = floor((h / 24)); return ((s < 60) ? _fl_str(s, "s ago") : ((m < 60) ? _fl_str(m, "m ago") : ((h < 24) ? _fl_str(h, "h ago") : (true ? _fl_str(d, "d ago") : null)))); })());
+const str_starts_with_q = (s, prefix) => ((_fl_length(prefix) > _fl_length(s)) ? false : (_fl_substring(s, 0, _fl_length(prefix)) === prefix));
+const str_ends_with_q = (s, suffix) => ((_fl_length(suffix) > _fl_length(s)) ? false : (_fl_substring(s, (_fl_length(s) - _fl_length(suffix)), _fl_length(s)) === suffix));
+const file_append = (path, content) => _fl_file_append(_fl_str(path), _fl_str(content));
+const file_exists_q = (path) => _fl_file_exists(_fl_str(path));
+const file_delete = (path) => _fl_file_delete(_fl_str(path));
+const file_copy = (src, dest) => _fl_file_copy(_fl_str(src), _fl_str(dest));
+const file_rename = (old, _new) => _fl_file_rename(_fl_str(old), _fl_str(_new));
+const file_size = (path) => _fl_file_size(_fl_str(path));
+const file_modified = (path) => _fl_file_modified(_fl_str(path));
+const file_json = (path) => JSON.parse(_fl_file_read(_fl_str(path)));
+const file_json_write = (path, obj) => _fl_file_write(_fl_str(path), JSON.stringify(obj));
+const file_lines = (path) => str_lines(_fl_file_read(_fl_str(path)));
+const file_mkdir = (path) => _fl_file_mkdir(_fl_str(path));
+const file_rmdir = (path) => _fl_file_rmdir(_fl_str(path));
+const file_list = (path) => _fl_file_list(_fl_str(path));
+const file_is_file_q = (path) => _fl_file_is_file(_fl_str(path));
+const file_is_dir_q = (path) => _fl_file_is_dir(_fl_str(path));
+const process_run = (cmd) => _fl_process_run(_fl_str(cmd));
+const process_run_args = (cmd, args) => _fl_process_run_args(_fl_str(cmd), args);
+const process_exec = (cmd) => _fl_process_exec(_fl_str(cmd));
+const process_exec_args = (cmd, args) => _fl_process_exec_args(_fl_str(cmd), args);
+const process_spawn = (cmd, args) => _fl_process_spawn(_fl_str(cmd), args);
+const process_kill = (pid) => _fl_process_kill(floor(pid));
+const process_exists_q = (pid) => _fl_process_exists(floor(pid));
+const process_wait = (pid) => _fl_process_wait(floor(pid));
+const shell_run = (cmd) => process_exec(_fl_str(cmd));
+const shell_pipe = (cmd1, cmd2) => process_exec(_fl_str(cmd1, " | ", cmd2));
+const env_get = (key) => _fl_env_get(_fl_str(key));
+const env_set = (key, value) => _fl_env_set(_fl_str(key), _fl_str(value));
+const env_all = () => _fl_env_all();
+const getcwd = () => _fl_process_getcwd();
+const chdir = (path) => _fl_process_chdir(_fl_str(path));
+const pid = () => _fl_process_pid();
+const pid_parent = () => _fl_process_ppid();
+const vector_add = (v1, v2) => _fl_map(_fl_range(0, _fl_length(v1)), ((i) => (_fl_get(v1, i) + _fl_get(v2, i))));
+const vector_dot = (v1, v2) => _fl_reduce(_fl_range(0, _fl_length(v1)), ((acc, i) => (acc + (_fl_get(v1, i) * _fl_get(v2, i)))), 0);
+const vector_magnitude = (v) => math_sqrt(_fl_reduce(v, ((acc, x) => (acc + (x * x))), 0));
+const cosine_sim = (v1, v2) => ((() => { let dot = vector_dot(v1, v2); let mag1 = vector_magnitude(v1); let mag2 = vector_magnitude(v2); return (((mag1 === 0) || (mag2 === 0)) ? 0 : (dot / (mag1 * mag2))); })());
+const do_run = (input, extra_args) => ((() => { let output = _fl_str("/tmp/fl-run-", now_ms(), ".js"); let args_str = _fl_join(extra_args, " "); return (() => { compile_file(input, output); shell_exec(_fl_str("node ", output, " ", args_str), "."); return file_delete(output); })(); })());
+const cli_main = () => ((() => { let argv = _fl_get_argv(); return (_fl_null_q(argv) ? null : ((_fl_length(argv) === 0) ? null : ((() => { let cmd = _fl_get(argv, 0); return ((cmd === "run") ? ((() => { let input = _fl_get(argv, 1); let extra = _fl_slice(argv, 2, _fl_length(argv)); return do_run(input, extra); })()) : ((() => { let input = _fl_get(argv, 0); let output = ((_fl_length(argv) >= 2) ? _fl_get(argv, 1) : _fl_str(input, ".out.js")); return compile_file(input, output); })())); })()))); })());
 cli_main();
-module.exports = {
-  _fl_is_digit_q: _fl_is_digit_q,
-  _fl_is_alpha_q: _fl_is_alpha_q,
-  _fl_is_alnum_q: _fl_is_alnum_q,
-  _fl_is_space_q: _fl_is_space_q,
-  _fl_is_symbol_char_q: _fl_is_symbol_char_q,
-  make_state: make_state,
-  peek_at: peek_at,
-  peek: peek,
-  at_end_q: at_end_q,
-  advance: advance,
-  emit: emit,
-  skip_comment: skip_comment,
-  skip_ws: skip_ws,
-  read_number_body: read_number_body,
-  read_number: read_number,
-  translate_esc: translate_esc,
-  read_string_body: read_string_body,
-  read_string: read_string,
-  read_symbol_body_kind: read_symbol_body_kind,
-  read_symbol: read_symbol,
-  read_variable: read_variable,
-  read_keyword: read_keyword,
-  read_token: read_token,
-  lex_loop: lex_loop,
-  lex: lex,
-  make_literal: make_literal,
-  make_variable: make_variable,
-  make_keyword: make_keyword,
-  make_sexpr: make_sexpr,
-  make_number: make_number,
-  make_string: make_string,
-  make_bool: make_bool,
-  make_null: make_null,
-  make_symbol: make_symbol,
-  make_block: make_block,
-  make_array_block: make_array_block,
-  make_map_block: make_map_block,
-  make_pattern_literal: make_pattern_literal,
-  make_pattern_variable: make_pattern_variable,
-  make_pattern_wildcard: make_pattern_wildcard,
-  make_pattern_list: make_pattern_list,
-  make_pattern_struct: make_pattern_struct,
-  make_pattern_or: make_pattern_or,
-  make_pattern_range: make_pattern_range,
-  make_pattern_match: make_pattern_match,
-  make_match_case: make_match_case,
-  make_function_value: make_function_value,
-  make_type_class: make_type_class,
-  make_type_class_instance: make_type_class_instance,
-  make_module_block: make_module_block,
-  make_import_block: make_import_block,
-  make_open_block: make_open_block,
-  make_search_block: make_search_block,
-  make_learn_block: make_learn_block,
-  make_reasoning_block: make_reasoning_block,
-  make_async_function: make_async_function,
-  make_await: make_await,
-  make_try: make_try,
-  make_catch: make_catch,
-  make_throw: make_throw,
-  make_template_string: make_template_string,
-  make_loop: make_loop,
-  make_page: make_page,
-  make_route: make_route,
-  make_component: make_component,
-  make_form: make_form,
-  deep_equal_q: deep_equal_q,
-  deep_equal_list_q: deep_equal_list_q,
-  deep_equal_map_q: deep_equal_map_q,
-  keys_no_line: keys_no_line,
-  deep_equal_map_keys_q: deep_equal_map_keys_q,
-  _fl_list_q: _fl_list_q,
-  _fl_map_q: _fl_map_q,
-  p_make: p_make,
-  p_peek: p_peek,
-  p_peek_at: p_peek_at,
-  p_end_q: p_end_q,
-  p_advance: p_advance,
-  p_with_ast: p_with_ast,
-  p_append_ast: p_append_ast,
-  r_pair: r_pair,
-  string_contains_q: string_contains_q,
-  parse_atom: parse_atom,
-  parse_expr: parse_expr,
-  parse_sexpr: parse_sexpr,
-  parse_consume_rparen: parse_consume_rparen,
-  parse_args: parse_args,
-  parse_bracket: parse_bracket,
-  is_block_type_q: is_block_type_q,
-  upper_case: upper_case,
-  parse_array: parse_array,
-  parse_consume_rbracket: parse_consume_rbracket,
-  parse_named_block: parse_named_block,
-  parse_optional_name: parse_optional_name,
-  parse_block_fields: parse_block_fields,
-  parse_map: parse_map,
-  parse_consume_rbrace: parse_consume_rbrace,
-  parse_all: parse_all,
-  parse: parse,
-  js_reserved_q: js_reserved_q,
-  js_name_inner: js_name_inner,
-  js_name: js_name,
-  js_esc_inner: js_esc_inner,
-  js_esc: js_esc,
-  get_block_items: get_block_items,
-  cg: cg,
-  cg_literal: cg_literal,
-  cg_template_string: cg_template_string,
-  cg_try: cg_try,
-  cg_catch_clause: cg_catch_clause,
-  cg_func_block: cg_func_block,
-  cg_block: cg_block,
-  cg_map_entries: cg_map_entries,
-  cg_map_loop: cg_map_loop,
-  cg_map_flat_loop: cg_map_flat_loop,
-  cg_sexpr: cg_sexpr,
-  cg_sexpr_dispatch: cg_sexpr_dispatch,
-  cg_fn: cg_fn,
-  cg_defn: cg_defn,
-  cg_let: cg_let,
-  cg_let_1d: cg_let_1d,
-  cg_let_2d: cg_let_2d,
-  cg_do_body: cg_do_body,
-  cg_stmts: cg_stmts,
-  cg_cond: cg_cond,
-  cg_cond_nested: cg_cond_nested,
-  cg_cond_flat: cg_cond_flat,
-  cg_loop: cg_loop,
-  loop_inits_1d: loop_inits_1d,
-  loop_inits_2d: loop_inits_2d,
-  loop_names_1d: loop_names_1d,
-  loop_names_2d: loop_names_2d,
-  cg_args: cg_args,
-  args_loop: args_loop,
-  binop_loop: binop_loop,
-  extract_name: extract_name,
-  extract_params: extract_params,
-  extract_params_loop: extract_params_loop,
-  destructure_loop: destructure_loop,
-  cg_native_dispatch: cg_native_dispatch,
-  prelude_parts: prelude_parts,
-  runtime_prelude: runtime_prelude,
-  fl__gtjs_code: fl__gtjs_code,
-  fl__gtjs_with_prelude: fl__gtjs_with_prelude,
-  compile_file: compile_file,
-  str_lines: str_lines,
-  str_words: str_words,
-  str_join_lines: str_join_lines,
-  str_join_loop: str_join_loop,
-  str_count: str_count,
-  str_count_loop: str_count_loop,
-  csv_parse_line: csv_parse_line,
-  csv_parse: csv_parse,
-  csv_parse_loop: csv_parse_loop,
-  _fl_repeat: _fl_repeat,
-  str_repeat_loop: str_repeat_loop,
-  data_json_parse: data_json_parse,
-  data_json_str: data_json_str,
-  data_json_pretty: data_json_pretty,
-  to_query_string: to_query_string,
-  to_query_loop: to_query_loop,
-  hash_simple: hash_simple,
-  hash_simple_loop: hash_simple_loop,
-  hash_fnv1a: hash_fnv1a,
-  hash_fnv_loop: hash_fnv_loop,
-  hash_djb2: hash_djb2,
-  hash_djb_loop: hash_djb_loop,
-  hash_object: hash_object,
-  hash_consistent: hash_consistent,
-  now_s: now_s,
-  time_diff_ms: time_diff_ms,
-  time_elapsed: time_elapsed,
-  date_parts: date_parts,
-  ts_to_s: ts_to_s,
-  s_to_ts: s_to_ts,
-  time_ago: time_ago,
-  str_starts_with_q: str_starts_with_q,
-  str_ends_with_q: str_ends_with_q,
-  _fl_repeat: _fl_repeat,
-  str_repeat_loop: str_repeat_loop,
-  str_pad_left: str_pad_left,
-  str_pad_right: str_pad_right,
-  _fl_upper: _fl_upper,
-  _fl_lower: _fl_lower,
-  _fl_contains_q: _fl_contains_q,
-  file_append: file_append,
-  file_exists_q: file_exists_q,
-  file_delete: file_delete,
-  file_copy: file_copy,
-  file_rename: file_rename,
-  file_size: file_size,
-  file_modified: file_modified,
-  file_json: file_json,
-  file_json_write: file_json_write,
-  file_lines: file_lines,
-  file_mkdir: file_mkdir,
-  file_rmdir: file_rmdir,
-  file_list: file_list,
-  file_is_file_q: file_is_file_q,
-  file_is_dir_q: file_is_dir_q,
-  process_run: process_run,
-  process_run_args: process_run_args,
-  process_exec: process_exec,
-  process_exec_args: process_exec_args,
-  process_spawn: process_spawn,
-  process_kill: process_kill,
-  process_exists_q: process_exists_q,
-  process_wait: process_wait,
-  shell_run: shell_run,
-  shell_pipe: shell_pipe,
-  env_get: env_get,
-  env_set: env_set,
-  env_all: env_all,
-  getcwd: getcwd,
-  chdir: chdir,
-  pid: pid,
-  pid_parent: pid_parent,
-  vector_add: vector_add,
-  vector_dot: vector_dot,
-  vector_magnitude: vector_magnitude,
-  math_sqrt: math_sqrt,
-  math_sqrt_iter: math_sqrt_iter,
-  math_pow: math_pow,
-  cosine_sim: cosine_sim,
-  do_run: do_run,
-  cli_main: cli_main
-};

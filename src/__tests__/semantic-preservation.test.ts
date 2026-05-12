@@ -62,7 +62,7 @@ function compileWithStage1(flFile: string): CompilationResult {
   const jsFile = flFile.replace('.fl', '.stage1.js');
   try {
     execSync(
-      `node ${path.join(PROJECT_ROOT, 'stage1.js')} run self/all.fl ${flFile} ${jsFile}`,
+      `node --stack-size=65536 ${path.join(PROJECT_ROOT, 'stage1.js')} run self/all.fl ${flFile} ${jsFile}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
     const jsCode = fs.readFileSync(jsFile, 'utf-8');
