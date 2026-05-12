@@ -604,7 +604,14 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
                     const contentType = headersObj["content-type"] ?? getField(result, "contentType") ?? "application/json";
                     sendResponse(res, status, resBody ?? "", contentType, headersObj);
                   } else {
-                    sendResponse(res, 200, result);
+                    // #49: 라우트 핸들러가 map을 직접 반환한 경우 — server-json 권장 힌트
+                    const hint49 = `[FreeLang #49] 라우트 핸들러가 map을 직접 반환했습니다.\n  자동으로 JSON 직렬화하여 전송합니다.\n  명시적 응답: (server-json result) 사용을 권장합니다.`;
+                    if (process.env.FL_V12 === "1") {
+                      sendResponse(res, 400, { error: hint49 });
+                    } else {
+                      console.warn(`⚠️  ${hint49}`);
+                      sendResponse(res, 200, result);
+                    }
                   }
                 } else {
                   sendResponse(res, 200, result ?? "");

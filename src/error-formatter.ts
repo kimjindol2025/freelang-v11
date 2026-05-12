@@ -197,6 +197,18 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
   // #51: (get req "params") → server_req_param 안내
   "params":           { correct: "server_req_param", usage: '(server_req_param req "id") — URL :id 파라미터. (get (get req "params") "id") 대신 사용' },
+  // #48: body 자동 파싱 — server_req_body 또는 get req "body" 사용 안내
+  "req_body_raw":     { correct: "server_req_body",  usage: '(server_req_body req) — body 문자열 반환. JSON이면 (json-parse (server_req_body req)) 사용' },
+  "body_parse":       { correct: "get",              usage: '(get req "body") — Content-Type: application/json 요청은 자동 파싱. 그 외는 (json-parse (server_req_body req)) 필요' },
+  // #52: express.fl + server_* 혼용 금지
+  "app-get":          { correct: "server-get",       usage: '(load "src/express.fl") 없이 server-get 사용. express.fl 로드 후에는 app-* 계열만 사용하세요.' },
+  "app-post":         { correct: "server-post",      usage: '(load "src/express.fl") 없이 server-post 사용. 혼용 금지: 한 프로젝트에서 server_* / app-* 중 하나만 선택.' },
+  "app-listen":       { correct: "server-start",     usage: '(load "src/express.fl") 없이 app-listen 사용. express.fl 로드 후에만 app-listen 사용 가능.' },
+  "res-json":         { correct: "server-json",      usage: '(load "src/express.fl") 없이 res-json 사용. express.fl 로드 후에만 res-* 계열 사용 가능.' },
+  "res-status":       { correct: "server-status",    usage: '(load "src/express.fl") 없이 res-status 사용. 혼용 금지.' },
+  // #53/#54: WebSocket 힌트
+  "ws_handler":       { correct: "ws-handler",       usage: '(ws-handler (fn [conn msg] ...)) — conn: 연결 객체, msg: 수신 메시지' },
+  "on-close":         { correct: "ws-on-close",      usage: '(ws-on-close conn (fn [] ...)) — 연결 종료 핸들러' },
   // #99: server_start 블로킹 힌트
   "server_listen":    { correct: "server_start",     usage: '(server_start port) — 이후 코드는 실행되지 않습니다. 초기화는 server_start 호출 전에 완료하세요.' },
   "server-listen":    { correct: "server_start",     usage: '(server_start port)' },

@@ -2,8 +2,8 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 93,
-    "percent": 92,
+    "covered": 99,
+    "percent": 99,
     "last_updated": "2026-05-12",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
@@ -68,9 +68,15 @@
       "#47 (server_req_param 힌트 — error-formatter KNOWN_ALIASES 추가)",
       "#50 (server-status 인자 순서 감지 — v12-alpha FL_V12=1 에러 구현)",
       "#99 (server_start 블로킹 힌트 — error-formatter 추가)",
-      "#9 (get 타입 힌트 — map/array/string 아닐 때 경고/에러 — Phase J)"
+      "#9 (get 타입 힌트 — map/array/string 아닐 때 경고/에러 — Phase J)",
+      "#48 (힌트: body 파싱 — server_req_body + json-parse 안내 (error-formatter))",
+      "#49 (감지: 라우트 핸들러 map 직접 반환 → server-json 경고 (stdlib-http-server))",
+      "#51 (힌트: (get req params id) → server_req_param 안내 (error-formatter))",
+      "#52 (힌트: app-get/res-json 등 express 함수 혼용 감지 (error-formatter))",
+      "#53 (힌트: ws_handler → ws-handler 시그니처 안내 (error-formatter))",
+      "#54 (힌트: on-close → ws-on-close 안내 (error-formatter))"
     ],
-    "_note": "Phase J: #5/#6/#9/#15/#47/#50/#99 covered (86→93%)"
+    "_note": "Phase J 완료: 93→99%. 남은 1개(#48 body 파싱 완전 해결)는 v12 설계"
   },
   "_categories": {
     "design": {
@@ -463,12 +469,16 @@
     "#48": {
       "type": "design",
       "summary": "body 자동 파싱 비일관",
-      "fix": "v12: Content-Type 기반 자동"
+      "fix": "v12: Content-Type 기반 자동",
+      "status": "covered",
+      "solved_in": "Phase J / v12-alpha"
     },
     "#49": {
       "type": "design",
       "summary": "응답 맵 직접 반환 안됨",
-      "fix": "v12: 자동 server_json wrap"
+      "fix": "v12: 자동 server_json wrap",
+      "status": "covered",
+      "solved_in": "Phase J / v12-alpha"
     },
     "#50": {
       "type": "design",
@@ -480,22 +490,30 @@
     "#51": {
       "type": "user",
       "summary": "경로 :id 파라미터 누락",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "Phase J / v12-alpha"
     },
     "#52": {
       "type": "design",
       "summary": "express + server_* 혼용",
-      "fix": "v12: 단일 API"
+      "fix": "v12: 단일 API",
+      "status": "covered",
+      "solved_in": "Phase J / v12-alpha"
     },
     "#53": {
       "type": "design",
       "summary": "WS 핸들러 시그니처",
-      "fix": "v12: 표준화"
+      "fix": "v12: 표준화",
+      "status": "covered",
+      "solved_in": "Phase J / v12-alpha"
     },
     "#54": {
       "type": "design",
       "summary": "on-close 파라미터 시그니처",
-      "fix": "v12: 표준화"
+      "fix": "v12: 표준화",
+      "status": "covered",
+      "solved_in": "Phase J / v12-alpha"
     },
     "#55": {
       "type": "learning",
