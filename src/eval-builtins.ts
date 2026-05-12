@@ -2105,6 +2105,14 @@ loop().catch(e => {
           { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
         );
       }
+      // #9: 첫 번째 인자가 map/array/string이 아닌 경우 타입 힌트
+      if (args[0] !== null && args[0] !== undefined &&
+          typeof args[0] !== "object" && typeof args[0] !== "string" &&
+          !Array.isArray(args[0])) {
+        const hint = `[E_TYPE_MISMATCH] get: 첫 번째 인자는 map, array, string이어야 합니다 (받은 값: ${typeof args[0]})\n  올바른 형식: (get map key) 또는 (get arr index)\n  예: (get {:name "kim"} "name") → "kim"`;
+        if (process.env.FL_V12 === "1") throw new Error(hint);
+        console.warn(`⚠️  [FreeLang] ${hint}`);
+      }
       let k: any = args[1];
       if (k !== null && typeof k === "object" && (k as any).kind === "keyword") k = (k as any).name;
       const _getDef = args.length >= 3 ? args[2] : null;

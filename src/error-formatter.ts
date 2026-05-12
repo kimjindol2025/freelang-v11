@@ -195,6 +195,8 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   // #47: req params 접근 힌트
   "req-params":       { correct: "server_req_param", usage: '(server_req_param req "id") — URL :id 파라미터 접근' },
   "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  // #51: (get req "params") → server_req_param 안내
+  "params":           { correct: "server_req_param", usage: '(server_req_param req "id") — URL :id 파라미터. (get (get req "params") "id") 대신 사용' },
   // #99: server_start 블로킹 힌트
   "server_listen":    { correct: "server_start",     usage: '(server_start port) — 이후 코드는 실행되지 않습니다. 초기화는 server_start 호출 전에 완료하세요.' },
   "server-listen":    { correct: "server_start",     usage: '(server_start port)' },

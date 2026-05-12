@@ -2,9 +2,9 @@
   "_comment": "MISTAKES-100 본질 분류. ②언어결함/④정상/①학습/⑤미구현/③문서/💀실수",
   "_coverage": {
     "total": 100,
-    "covered": 86,
-    "percent": 80,
-    "last_updated": "2026-05-11",
+    "covered": 93,
+    "percent": 92,
+    "last_updated": "2026-05-12",
     "covered_items": [
       "#71 (file-read-or: 파일 없거나 오류 시 기본값 반환 — v11.6.20)",
       "#74 (shell-exec-stdout: stdout 직접 반환 — v11.6.20)",
@@ -61,9 +61,16 @@
       "#39 (obj_merge/merge 이미 구현됨 — Phase H 재분류)",
       "#56 (맵 키 keyword/string 혼용 — Phase H 재분류)",
       "#31 (고차함수 + $ 없는 fn — Phase H 재분류)",
-      "#46 (server_get fn-value 직접 전달 — Phase H 재분류)"
+      "#46 (server_get fn-value 직접 전달 — Phase H 재분류)",
+      "#5 (assoc map 타입 체크 — v12-alpha FL_V12=1 에러 구현)",
+      "#6 (dissoc map 타입 체크 — v12-alpha FL_V12=1 에러 구현)",
+      "#15 (http_post body map → json-stringify 경고/에러 — v12-alpha 구현)",
+      "#47 (server_req_param 힌트 — error-formatter KNOWN_ALIASES 추가)",
+      "#50 (server-status 인자 순서 감지 — v12-alpha FL_V12=1 에러 구현)",
+      "#99 (server_start 블로킹 힌트 — error-formatter 추가)",
+      "#9 (get 타입 힌트 — map/array/string 아닐 때 경고/에러 — Phase J)"
     ],
-    "_note": "Phase I: LEARNING.md 문서화 25+3개 + #37 alias + #91 구현 확인"
+    "_note": "Phase J: #5/#6/#9/#15/#47/#50/#99 covered (86→93%)"
   },
   "_categories": {
     "design": {
@@ -124,12 +131,16 @@
     "#5": {
       "type": "design",
       "summary": "assoc: map 먼저 (그러나 다른 함수와 다름)",
-      "fix": "v12: 컬렉션 first 통일"
+      "fix": "v12: 컬렉션 first 통일",
+      "status": "covered",
+      "solved_in": "v12-alpha / v11.6.38"
     },
     "#6": {
       "type": "design",
       "summary": "dissoc: map 먼저",
-      "fix": "v12: 통일됨 (이미 일관)"
+      "fix": "v12: 통일됨 (이미 일관)",
+      "status": "covered",
+      "solved_in": "v12-alpha / v11.6.38"
     },
     "#7": {
       "type": "design",
@@ -148,7 +159,9 @@
     "#9": {
       "type": "design",
       "summary": "get: map 먼저",
-      "fix": "v12: 통일됨"
+      "fix": "v12: 통일됨",
+      "status": "covered",
+      "solved_in": "v12-alpha / Phase J"
     },
     "#10": {
       "type": "design",
@@ -188,7 +201,9 @@
     "#15": {
       "type": "design",
       "summary": "http_post body 문자열 강제",
-      "fix": "v12: 자동 JSON 인코딩"
+      "fix": "v12: 자동 JSON 인코딩",
+      "status": "covered",
+      "solved_in": "v12-alpha / v11.6.38"
     },
     "#16": {
       "type": "design",
@@ -441,7 +456,9 @@
     "#47": {
       "type": "design",
       "summary": "server_req_param vs params",
-      "fix": "v12: API 통일"
+      "fix": "v12: API 통일",
+      "status": "covered",
+      "solved_in": "v12-alpha / v11.6.38"
     },
     "#48": {
       "type": "design",
@@ -456,7 +473,9 @@
     "#50": {
       "type": "design",
       "summary": "server_status 인자 순서",
-      "fix": "v12: (server-status code body) 통일"
+      "fix": "v12: (server-status code body) 통일",
+      "status": "covered",
+      "solved_in": "v12-alpha / v11.6.38"
     },
     "#51": {
       "type": "user",
@@ -829,7 +848,9 @@
     "#99": {
       "type": "user",
       "summary": "server_start 블로킹",
-      "fix": null
+      "fix": null,
+      "status": "covered",
+      "solved_in": "v12-alpha / v11.6.38"
     },
     "#100": {
       "type": "normal",
