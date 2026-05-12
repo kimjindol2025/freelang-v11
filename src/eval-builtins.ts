@@ -2229,6 +2229,10 @@ loop().catch(e => {
       return hm;
     }
     case "assoc": {
+      // #5 v12 힌트: 첫 번째 인자가 map이 아니면 명확한 에러
+      if (args[0] !== null && (typeof args[0] !== "object" || Array.isArray(args[0]))) {
+        throw new Error(`[E_TYPE_MISMATCH] assoc: 첫 번째 인자는 map이어야 합니다 (받은 값: ${typeof args[0]})\n  올바른 형식: (assoc map key val)\n  예: (assoc {:a 1} "b" 2) → {:a 1 :b 2}`);
+      }
       let base = (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]))
         ? { ...args[0] } : {};
       // 멀티 쌍: (assoc map k1 v1 k2 v2 ...)
@@ -2276,6 +2280,10 @@ loop().catch(e => {
       return uiUpdate(args[0], uiKeys);
     }
     case "dissoc": {
+      // #6 v12 힌트: 첫 번째 인자가 map이 아니면 에러
+      if (args[0] !== null && args[0] !== undefined && (typeof args[0] !== "object" || Array.isArray(args[0]))) {
+        throw new Error(`[E_TYPE_MISMATCH] dissoc: 첫 번째 인자는 map이어야 합니다 (받은 값: ${typeof args[0]})\n  올바른 형식: (dissoc map key)\n  예: (dissoc {:a 1 :b 2} "a") → {:b 2}`);
+      }
       if (args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0])) {
         // 다중 키 지원: (dissoc m "a" "b" "c")
         let result = { ...args[0] };

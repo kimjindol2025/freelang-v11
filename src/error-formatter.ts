@@ -192,6 +192,12 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "mariadb_connect":  { correct: "mariadb_connect",  usage: '(mariadb_connect {:host "h" :user "u" :password "p" :database "d"}) 또는 (mariadb_connect "host" "user" "pass" "db")' },
   // 추가 HTTP 힌트
   "http-post-json":   { correct: "http_post",        usage: '(http_post url (json-stringify body))' },
+  // #47: req params 접근 힌트
+  "req-params":       { correct: "server_req_param", usage: '(server_req_param req "id") — URL :id 파라미터 접근' },
+  "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  // #99: server_start 블로킹 힌트
+  "server_listen":    { correct: "server_start",     usage: '(server_start port) — 이후 코드는 실행되지 않습니다. 초기화는 server_start 호출 전에 완료하세요.' },
+  "server-listen":    { correct: "server_start",     usage: '(server_start port)' },
 };
 
 export function suggestSimilar(name: string, candidates: string[]): string | null {

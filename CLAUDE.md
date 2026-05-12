@@ -1,7 +1,7 @@
 # FreeLang v11 — Claude AI 완전 레퍼런스
 
-**버전**: v11.6.36 | **최신 갱신**: 2026-05-11  
-**상태**: 프로덕션 (962/962 테스트 통과) | **AI 신뢰도**: 9.5/10
+**버전**: v11.6.38 / v12-alpha | **최신 갱신**: 2026-05-12  
+**상태**: 프로덕션 (1018/1018 테스트 통과) | **AI 신뢰도**: 9.5/10
 
 ---
 
@@ -36,6 +36,28 @@
 ;; ✅ 이중 괄호도 동작 (기존 코드 호환)
 (let [user (get req "user")]
   (str "Hello " user))
+```
+
+---
+
+### Rule 1-b: v12 atom 패턴 (가변 상태)
+
+```lisp
+;; ✅ v12 권장 — atom으로 가변 상태 관리
+(define count (atom 0))       ;; atom 생성
+(swap! count + 1)             ;; 값 변경 (함수 적용)
+(reset! count 0)              ;; 값 직접 설정
+@count                        ;; deref 단축 표기 (= (deref count))
+
+;; ✅ 클로저가 atom 참조 공유
+(define state (atom []))
+(defn push-item! [x] (swap! state append x))
+(push-item! 42)
+@state  ;; → [42]
+
+;; FL_V12=1 활성화 시 아래는 에러
+;; (define x 1) (define x 2)  → [v12] 재정의 금지, atom 사용
+;; (set! x 99)                 → [v12] set! 금지, swap!/reset! 사용
 ```
 
 ---

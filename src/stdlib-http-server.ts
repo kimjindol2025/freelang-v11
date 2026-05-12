@@ -796,9 +796,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
     // server_status code body -> response object
     "server_status": (code: any, body: any): Record<string, any> => {
-      // #50: 인자 순서 역전 감지 — (server-status "msg" 200) 같은 실수 경고
+      // #50: 인자 순서 역전 감지 — (server-status "msg" 200) 같은 실수 경고/에러
       if (typeof code === "string" && typeof body === "number") {
-        console.warn(`⚠️  [FreeLang] server-status 인자 순서 오류: (server-status ${body} "${code}") 형식이어야 합니다. 숫자가 먼저, body가 두 번째입니다.`);
+        const hint = `server-status 인자 순서: (server-status code body)\n  예: (server-status 404 "Not Found")\n  → 받은 값: (server-status "${code}" ${body}) — 숫자와 문자열 역전`;
+        if (process.env.FL_V12 === "1") throw new Error(`[v12] ${hint}`);
+        console.warn(`⚠️  [FreeLang] ${hint}`);
         return { __fl_response: true, status: Number(body), contentType: "application/json", body: code };
       }
       return {
