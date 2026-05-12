@@ -1,17 +1,11 @@
-; self/all.fl — Phase 28 (AUTO-GENERATED)
-; 2026-05-02 23:53:53
+;; self/all.fl — FreeLang 컴파일러 (self-hosted)
+;; 독립선언 v1 달성 (2026-05-12) — L2 고정점 SHA256: 5fe0a3fd...
 
-;; self/lexer.fl — FL 로 작성된 Lexer (Phase 01, [FUNC] 블록 버전)
-;;
-;; v11 defn 이 forward-ref 를 지원하지 않아 [FUNC] 블록 사용.
-;; [FUNC] 는 2-pass 등록이라 상호재귀 허용.
-;;
+;; ── Lexer ───────────────────────────────────────────────────────────
 ;; 입력: source string
 ;; 출력: tokens list. 각 토큰 = {:kind :value :line :col}
-;;
-;; 토큰 종류: LParen / RParen / LBracket / RBracket / LBrace / RBrace
-;;          / Number / String / Symbol / Variable / Keyword
-;;          / Unknown / (comment 는 drop)
+;; 토큰 종류: LParen/RParen/LBracket/RBracket/LBrace/RBrace
+;;          Number/String/Symbol/Variable/Keyword/Unknown
 
 ;; ──────────────────────────────────────
 ;; char predicates
@@ -209,11 +203,8 @@
 (defn lex [$src]
   (lex-loop (make-state $src)))
 
-;; self/ast.fl — AST 노드 생성자 (Phase 02/21-30)
-;;
-;; v11 src/ast.ts (806 줄, 25+ 노드) 의 FL 재작성.
+;; ── AST 노드 생성자 ─────────────────────────────────────────────────
 ;; 모든 노드는 plain map: {:kind "..." ...필드}
-;; 생성자는 [FUNC make-xxx :params [...] :body {:kind ...}]
 
 ;; ──────────────────────────────────────
 ;; 21 기본 원자 (Literal/Variable/Keyword/SExpr)
@@ -421,11 +412,8 @@
 (defn json-keys [m] (obj-keys m))
 ;; list? / array? / map? 는 prelude builtin — 재정의 불필요
 
-;; self/parser.fl — FL 로 작성된 Parser (Phase 03/31-45)
-;;
-;; 입력: tokens (lexer 출력)
-;; 출력: AST nodes (list of ast nodes)
-;;
+;; ── Parser ──────────────────────────────────────────────────────────
+;; 입력: tokens (lexer 출력) / 출력: AST nodes
 ;; 모든 함수 [FUNC] 블록. 파서 상태 = {:tokens :idx}.
 ;; node 생성자는 self/ast.fl 정의 재사용. 테스트 단독 실행 위해 여기에도 복제.
 
@@ -660,9 +648,7 @@
 (defn parse [$tokens]
   (parse-all (p-make $tokens)))
 
-;; self/codegen.fl — FL AST → JS source (v2.2, Clean & Consistent)
-
-;; ═══════ Utilities ═══════
+;; ── Codegen: FL AST → JS source ────────────────────────────────────
 
 (defn js-reserved? [$n]
   (or (= $n "default") (= $n "class") (= $n "const") (= $n "let")
@@ -1082,17 +1068,16 @@
   (str (runtime-prelude) "\n" (fl->js-code $ast)))
 
 (defn compile-file [$input $output]
-  (let [[$src (file_read $input)]
+  (let [[$src (file-read $input)]
       [$tokens (lex $src)]
       [$ast (parse $tokens)]
       [$node-count (length $ast)]
       [$js (fl->js-with-prelude $ast)]]
-  (do (file_write $output $js)
+  (do (file-write $output $js)
       (println (str "Parsed: " $node-count " nodes"))
       (println (str "Compiled " $input " -> " $output)))))
 
-;; self/stdlib/data.fl — Phase 26
-;; 순수 데이터 변환 함수
+;; ── stdlib: 데이터 변환 ─────────────────────────────────────────────
 
 ;; 줄 분리
 (defn str-lines [s]
@@ -1155,7 +1140,7 @@
     (to-query-loop ks obj (+ i 1)
       (append acc (str k "=" v))))))
 
-;; self/stdlib/hash.fl — Phase 26 Part 3
+;; ── stdlib: hash ────────────────────────────────────────────────────
 ;; 해시 함수
 
 (defn hash-simple [s]
@@ -1188,7 +1173,7 @@
   (let [[h (hash-simple s)]]
   (% (+ (* h seed) seed) 2147483647)))
 
-;; self/stdlib/time.fl — 시간 관련 stdlib (v12-candidate 호환)
+;; ── stdlib: time ────────────────────────────────────────────────────
 ;;
 ;; now-ms 는 prelude(JS runtime) 에서 이미 `const now_ms = () => Date.now()` 로
 ;; 제공되므로 FL 에서 재정의하지 않는다. FL 코드에서 (now-ms) 호출 시
@@ -1225,7 +1210,7 @@
         [(< h 24) (str h "h ago")]
         [true (str d "d ago")])))
 
-;; self/stdlib/string.fl — Phase 08/87
+;; ── stdlib: string 확장 ─────────────────────────────────────────────
 
 (defn str-starts-with? [s prefix]
   (if (> (length prefix) (length s)) false
@@ -1240,7 +1225,7 @@
 ;; str-upper/str-lower/str-contains 는 prelude builtin — 재정의 불필요
 
 
-;; self/stdlib/file.fl — Phase 27
+;; ── stdlib: file ────────────────────────────────────────────────────
 ;; 파일 I/O 연산 (native file_* builtin wrapper)
 
 ; file-read/file-write: prelude에 const로 정의됨 (중복 방지)
@@ -1267,13 +1252,13 @@
   (_fl_file_modified (str path)))
 
 (defn file-json [path]
-  (json-parse (file_read (str path))))
+  (json-parse (file-read (str path))))
 
 (defn file-json-write [path obj]
-  (file_write (str path) (json-stringify obj)))
+  (file-write (str path) (json-stringify obj)))
 
 (defn file-lines [path]
-  (str-lines (file_read (str path))))
+  (str-lines (file-read (str path))))
 
 (defn file-mkdir [path]
   (_fl_file_mkdir (str path)))
@@ -1290,7 +1275,7 @@
 (defn file-is-dir? [path]
   (_fl_file_is_dir (str path)))
 
-;; self/stdlib/process.fl — Phase 27
+;; ── stdlib: process ─────────────────────────────────────────────────
 ;; 프로세스/쉘 연산 (native process_* builtin wrapper)
 
 (defn process-run [cmd]

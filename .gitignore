@@ -19,3 +19,8 @@ data/
 
 # standalone binary (bun build 산출물 — scripts/build-standalone.sh로 재생성)
 freelang
+
+# 빌드/테스트 자동생성 산출물
+browser.js
+BUILD-DETERMINISM-RESULTS.json
+L2-PROOF-RESULTS.json
