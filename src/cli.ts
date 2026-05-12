@@ -623,7 +623,7 @@ function cmdCompile(args: string[]): void {
 // ─────────────────────────────────────────
 
 function cmdRepl(): void {
-  console.log(`FreeLang v11 REPL  (\x1b[2m:q 종료  :help 도움말  :reset 세션 초기화\x1b[0m)`);
+  console.log(`FreeLang v11 REPL  (\x1b[2m:q / (exit) / (quit) 종료  :help 도움말  :reset 세션 초기화\x1b[0m)`);
   console.log(`─────────────────────────────────────────`);
 
   // v11.3: ~/.fl_history 기반 영구 history
@@ -684,10 +684,16 @@ function cmdRepl(): void {
   rl.on("line", (line: string) => {
     // 커맨드 처리
     const trimmed = line.trim();
-    if (trimmed === ":q" || trimmed === ":quit" || trimmed === ":exit") {
+    if (trimmed === ":q" || trimmed === ":quit" || trimmed === ":exit" ||
+        trimmed === "(exit)" || trimmed === "(quit)" || trimmed === "exit" || trimmed === "quit") {
       console.log("bye.");
       rl.close();
       process.exit(0);
+    }
+    // (exit) / (quit) 오타 감지 — 친절한 안내
+    if (trimmed === "(exit" || trimmed === "(quit") {
+      console.log(`\x1b[33m💡 종료하려면: :q  또는  (exit)  입력\x1b[0m`);
+      return;
     }
     if (trimmed === ":help") {
       console.log([
@@ -1730,6 +1736,14 @@ function printUsage(errCmd?: string): void {
     `  ${g("serve")}   [--port 3000]          웹 서버 시작`,
     `  ${g("ci")}      [file.fl]              CI 검사 실행`,
     "",
+    `${c("── 프로세스 관리 ──────────────────────────────────────")}`,
+    `  ${g("ps")}                           실행 중인 fl 프로세스 목록`,
+    `  ${g("stop")}   [file.fl]             프로세스 종료 (없으면 전체)`,
+    "",
+    `${c("── 에러 분석 ──────────────────────────────────────────")}`,
+    `  ${g("errors")}  [N]                  미발견 함수 TOP N 분석 (기본 20)`,
+    `  ${g("errors-clear")}                 에러 로그 초기화`,
+    "",
     `${c("── 기타 ───────────────────────────────────────────────")}`,
     `  ${g("--version")} / ${g("-v")}               버전 출력`,
     `  ${g("--help")}    / ${g("-h")}               이 도움말`,
@@ -1743,6 +1757,9 @@ function printUsage(errCmd?: string): void {
     `  freelang ls-fns http`,
     `  freelang fn-doc json_parse`,
     `  freelang compile app.fl -o app.js`,
+    `  freelang ps`,
+    `  freelang stop app.fl`,
+    `  freelang errors`,
     "",
   ].join("\n"));
 

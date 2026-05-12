@@ -2109,11 +2109,11 @@ export class Interpreter {
   }
 
   // 값을 사람/AI가 읽기 좋은 문자열로 변환
-  public toDisplayString(val: any): string {
+  public toDisplayString(val: any, _inner = false): string {
     if (val === null || val === undefined) return "null";
-    if (typeof val === "string") return val;
+    if (typeof val === "string") return _inner ? `"${val}"` : val;
     if (typeof val === "number" || typeof val === "boolean") return String(val);
-    if (Array.isArray(val)) return "[" + val.map((v) => this.toDisplayString(v)).join(", ") + "]";
+    if (Array.isArray(val)) return "[" + val.map((v) => this.toDisplayString(v, true)).join(", ") + "]";
     // Phase 69: 레이지 시퀀스 — 앞 3개만 미리보기
     if (isLazySeq(val)) {
       const preview = lazyTake(3, val).map((v) => this.toDisplayString(v)).join(", ");
@@ -2127,14 +2127,15 @@ export class Interpreter {
         return line ? `[line ${line}] ${msg}` : String(msg);
       }
       const entries: string[] = [];
-      val.forEach((v, k) => entries.push(`${k}: ${this.toDisplayString(v)}`));
+      val.forEach((v, k) => entries.push(`${k}: ${this.toDisplayString(v, true)}`));
       return "{" + entries.join(", ") + "}";
     }
     if (typeof val === "object") {
       if (val.kind === "function-value") return `<fn:${val.name || "λ"}>`;
+      // JSON 표준 형식으로 출력 (키에 따옴표 포함)
       const entries = Object.entries(val)
         .filter(([k]) => !k.startsWith("__"))
-        .map(([k, v]) => `${k}: ${this.toDisplayString(v)}`);
+        .map(([k, v]) => `"${k}": ${this.toDisplayString(v, true)}`);
       return "{" + entries.join(", ") + "}";
     }
     return String(val);
