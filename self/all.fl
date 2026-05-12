@@ -1022,15 +1022,30 @@
 (defn fl->js-with-prelude [$ast]
   (str (runtime-prelude) "\n" (fl->js-code $ast)))
 
+(defn count-parens [$tokens]
+  (reduce
+    (fn [$acc $tok]
+      (let [[$k (or (get $tok :type) (get $tok :kind))]]
+        (if (= $k "LParen") (+ $acc 1)
+        (if (= $k "RParen") (- $acc 1)
+        $acc))))
+    0
+    $tokens))
+
 (defn compile-file [$input $output]
   (let [[$src (file-read $input)]
       [$tokens (lex $src)]
+      [$depth (count-parens $tokens)]
       [$ast (parse $tokens)]
       [$node-count (length $ast)]
       [$js (fl->js-with-prelude $ast)]]
-  (do (file-write $output $js)
-      (println (str "Parsed: " $node-count " nodes"))
-      (println (str "Compiled " $input " -> " $output)))))
+  (do
+    (if (not (= $depth 0))
+      (println (str "Warning: " $input ": 괄호 불균형 (깊이=" $depth ")"))
+      null)
+    (file-write $output $js)
+    (println (str "Parsed: " $node-count " nodes"))
+    (println (str "Compiled " $input " -> " $output)))))
 
 ;; ── stdlib: 데이터 변환 ─────────────────────────────────────────────
 
@@ -1167,13 +1182,7 @@
 
 ;; ── stdlib: string 확장 ─────────────────────────────────────────────
 
-(defn str-starts-with? [s prefix]
-  (if (> (length prefix) (length s)) false
-  (= (substring s 0 (length prefix)) prefix)))
-
-(defn str-ends-with? [s suffix]
-  (if (> (length suffix) (length s)) false
-  (= (substring s (- (length s) (length suffix)) (length s)) suffix)))
+;; str-starts-with?/str-ends-with? 은 미사용 — starts-with?/ends-with? 내장 사용
 
 ;; str-repeat/str-pad-left/str-pad-right 은 builtin — 재정의 불필요
 

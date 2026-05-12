@@ -285,7 +285,8 @@ var prelude_parts = () => list("const _fl_str = (...xs) => xs.map(x => x==null?'
 var runtime_prelude = () => join(prelude_parts(),"\n");
 var fl__gtjs_code = (ast) => reduce(((acc,n) => _fl_str(acc,cg(n),";\n")),"",ast);
 var fl__gtjs_with_prelude = (ast) => _fl_str(runtime_prelude(),"\n",fl__gtjs_code(ast));
-var compile_file = (input,output) => ((()=>{let src=file_read(input);let tokens=lex(src);let ast=parse(tokens);let node_count=_fl_length(ast);let js=fl__gtjs_with_prelude(ast);return (()=>{file_write(output,js);_fl_print(_fl_str("Parsed: ",node_count," nodes"));return _fl_print(_fl_str("Compiled ",input," -> ",output));})();})());
+var count_parens = (tokens) => reduce(((acc,tok) => ((()=>{let k=(get(tok,"type")||get(tok,"kind"));return ((k==="LParen")?(acc+1):((k==="RParen")?(acc-1):acc));})())),0,tokens);
+var compile_file = (input,output) => ((()=>{let src=file_read(input);let tokens=lex(src);let depth=count_parens(tokens);let ast=parse(tokens);let node_count=_fl_length(ast);let js=fl__gtjs_with_prelude(ast);return (()=>{(not((depth===0))?_fl_print(_fl_str("Warning: ",input,": 괄호 불균형 (깊이=",depth,")")):null);file_write(output,js);_fl_print(_fl_str("Parsed: ",node_count," nodes"));return _fl_print(_fl_str("Compiled ",input," -> ",output));})();})());
 var str_lines = (s) => split(s,"\n");
 var str_words = (s) => split(trim(s)," ");
 var str_join_lines = (lines) => str_join_loop(lines,0,"");
@@ -315,8 +316,6 @@ var date_parts = (ts) => ({"ts":ts,"s":floor((ts/1000)),"m":floor((ts/60000)),"h
 var ts_to_s = (ts) => floor((ts/1000));
 var s_to_ts = (s) => (s*1000);
 var time_ago = (ts) => ((()=>{let diff=(now()-ts);let s=floor((diff/1000));let m=floor((s/60));let h=floor((m/60));let d=floor((h/24));return ((s<60)?_fl_str(s,"s ago"):((m<60)?_fl_str(m,"m ago"):((h<24)?_fl_str(h,"h ago"):(true?_fl_str(d,"d ago"):null))));})());
-var str_starts_with_q = (s,prefix) => ((_fl_length(prefix)>_fl_length(s))?false:(substring(s,0,_fl_length(prefix))===prefix));
-var str_ends_with_q = (s,suffix) => ((_fl_length(suffix)>_fl_length(s))?false:(substring(s,(_fl_length(s)-_fl_length(suffix)),_fl_length(s))===suffix));
 var file_append = (path,content) => _fl_file_append(_fl_str(path),_fl_str(content));
 var file_exists_q = (path) => file_exists(_fl_str(path));
 var file_delete = (path) => _fl_file_delete(_fl_str(path));
