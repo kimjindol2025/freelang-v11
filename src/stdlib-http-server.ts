@@ -1053,6 +1053,20 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return value ?? null;
     },
 
+    // server_req_files req -> array of multipart files
+    "server_req_files": (req: Request): any[] => {
+      const b = req.body;
+      if (b instanceof Map) return b.get("files") ?? [];
+      return [];
+    },
+
+    // server_req_fields req -> map of multipart text fields
+    "server_req_fields": (req: Request): any => {
+      const b = req.body;
+      if (b instanceof Map) return b.get("fields") ?? new Map();
+      return null;
+    },
+
     // server_req_header req name -> string
     "server_req_header": (req: Request, name: string): string | null => {
       const value = req.headers[name.toLowerCase()];

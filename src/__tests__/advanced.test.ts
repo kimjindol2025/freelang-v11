@@ -375,6 +375,60 @@ describe("인터프리터 scope — interpreter-scope.ts", () => {
   });
 });
 
+describe("HTTP 서버 — multipart 파일 업로드", () => {
+  test("server_req_files — multipart body 없음", () => {
+    const { createHttpServerModule } = require("../stdlib-http-server");
+    const httpModule = createHttpServerModule(() => {}, () => {});
+    const reqNoFiles = { body: null, query: {}, headers: {} } as any;
+    expect(httpModule.server_req_files(reqNoFiles)).toEqual([]);
+  });
+
+  test("server_req_files — multipart files 추출", () => {
+    const { createHttpServerModule } = require("../stdlib-http-server");
+    const httpModule = createHttpServerModule(() => {}, () => {});
+
+    const mockFiles = [
+      new Map([
+        ["fieldname", "photo"],
+        ["originalname", "image.jpg"],
+        ["mimetype", "image/jpeg"],
+        ["size", 1024],
+        ["path", "/tmp/fl-uploads/abc123.jpg"],
+        ["filename", "abc123.jpg"]
+      ])
+    ];
+    const mockBody = new Map([
+      ["files", mockFiles],
+      ["fields", new Map()]
+    ]);
+    const reqWithFiles = { body: mockBody, query: {}, headers: {} } as any;
+
+    const files = httpModule.server_req_files(reqWithFiles);
+    expect(files.length).toBe(1);
+    expect(files[0].get("originalname")).toBe("image.jpg");
+    expect(files[0].get("mimetype")).toBe("image/jpeg");
+  });
+
+  test("server_req_fields — multipart 텍스트 필드", () => {
+    const { createHttpServerModule } = require("../stdlib-http-server");
+    const httpModule = createHttpServerModule(() => {}, () => {});
+
+    const mockFields = new Map([
+      ["username", "kim"],
+      ["email", "kim@example.com"]
+    ]);
+    const mockBody = new Map([
+      ["files", []],
+      ["fields", mockFields]
+    ]);
+    const reqWithFields = { body: mockBody, query: {}, headers: {} } as any;
+
+    const fields = httpModule.server_req_fields(reqWithFields);
+    expect(fields.get("username")).toBe("kim");
+    expect(fields.get("email")).toBe("kim@example.com");
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

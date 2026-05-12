@@ -2,6 +2,35 @@
 
 ---
 
+## v11.7.2 — multipart 파일 업로드 + Content-Type 헤더 (2026-05-13)
+
+### 🆕 HTTP 파일 처리 함수
+- **`server_req_files(req)`** — multipart 파일 배열 반환
+  - 기존: `(get (server_req_json req) "files")` 복잡함
+  - 개선: `(server_req_files req)` — 직접 접근
+  - 반환: `[{:fieldname :originalname :mimetype :size :path :filename}]`
+- **`server_req_fields(req)`** — multipart 텍스트 필드 반환
+  - 기존: `(get (server_req_json req) "fields")` 복잡함
+  - 개선: `(server_req_fields req)` — 직접 접근
+
+### 🔧 Content-Type 응답
+- handler의 `headers` 맵에서 `"content-type"` 키 이미 지원 (v11.7.0+)
+- 문서화: CSS/JS 응답 시 `{:headers {"content-type" "text/css"}}` 패턴 명확화
+
+### 📊 테스트
+- **multipart 파일**: 3개 신규 PASS
+  - server_req_files 빈 body
+  - server_req_files 파일 추출
+  - server_req_fields 텍스트 필드
+- **전체**: 793 → 796개 (1070 기준)
+
+### 📈 개선사항
+- **AKL 지원**: 파일 업로드 가능 (akl-budget 영수증, akl-drive 파일)
+- **코드 간결**: multipart 접근 1줄로 단순화
+- **버전**: 11.7.1 → 11.7.2
+
+---
+
 ## v11.7.1 — assoc 다중인자 지원 (2026-05-13)
 
 ### 🔧 assoc 함수 강화
