@@ -352,6 +352,6 @@ var vector_add = (v1,v2) => map(((i) => (get(v1,i)+get(v2,i))),range(0,_fl_lengt
 var vector_dot = (v1,v2) => reduce(((acc,i) => (acc+(get(v1,i)*get(v2,i)))),0,range(0,_fl_length(v1)));
 var vector_magnitude = (v) => math_sqrt(reduce(((acc,x) => (acc+(x*x))),0,v));
 var cosine_sim = (v1,v2) => ((()=>{let dot=vector_dot(v1,v2);let mag1=vector_magnitude(v1);let mag2=vector_magnitude(v2);return (((mag1===0)||(mag2===0))?0:(dot/(mag1*mag2)));})());
-var do_run = (input,extra_args) => ((()=>{let output=_fl_str("/tmp/fl-run-",now_ms(),".js");let args_str=str_join(extra_args," ");return (()=>{compile_file(input,output);shell_exec(_fl_str("node ",output," ",args_str),".");return file_delete(output);})();})());
+var do_run = (input,extra_args) => ((()=>{let output=_fl_str("/tmp/fl-run-",now_ms(),".js");let args_str=str_join(extra_args," ");return (()=>{compile_file(input,output);return ((()=>{let result=shell_exec(_fl_str("node ",output," ",args_str),".");return (()=>{file_delete(output);return ((not(null_q(result))&&(_fl_length(result)>0))?_fl_print(result):null);})();})());})();})());
 var cli_main = () => ((()=>{let argv=cli_args();return (null_q(argv)?null:((_fl_length(argv)===0)?null:((()=>{let cmd=get(argv,0);return ((cmd==="run")?((()=>{let input=get(argv,1);let extra=slice(argv,2,_fl_length(argv));return do_run(input,extra);})()):((()=>{let input=get(argv,0);let output=((_fl_length(argv)>=2)?get(argv,1):_fl_str(input,".out.js"));return compile_file(input,output);})()));})())));})());
 cli_main();

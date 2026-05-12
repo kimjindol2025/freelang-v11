@@ -1322,8 +1322,12 @@
       [$args-str (str-join $extra-args " ")]]
   (do
     (compile-file $input $output)
-    (shell-exec (str "node " $output " " $args-str) ".")
-    (file-delete $output))))
+    (let [[$result (shell-exec (str "node " $output " " $args-str) ".")]]
+      (do
+        (file-delete $output)
+        (if (and (not (null? $result)) (> (length $result) 0))
+          (print $result)
+          nil))))))
 
 (defn cli-main []
   (let [[$argv (cli-args)]]
