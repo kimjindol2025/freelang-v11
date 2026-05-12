@@ -2,6 +2,52 @@
 
 ---
 
+## v11.7.0 — 통신 & 자동화 확대 (2026-05-13)
+
+### 🆕 Rate Limiter (v11.6.20)
+- **`server_rate_limit(max, windowMs)`** — HTTP 미들웨어 레벨 요청 제한
+  - IP별 슬라이딩 윈도우
+  - 429 Too Many Requests 자동 응답
+  - Retry-After 헤더
+  - 5분마다 오래된 항목 자동 정리
+- **테스트**: 7개 PASS
+
+### 🆕 Prepared Statement 강화 (v11.6.21)
+- 배열 파라미터 (IN 절): `[[1, 2, 3]]` → `(1, 2, 3)`
+- Date 객체 지원: `(now)` → `'2026-05-13T...'`
+- 타입 검증: NaN/Infinity 거부
+- SQL Injection 방어: escapeString 자동 이스케이프
+- **테스트**: 16개 PASS
+
+### 🆕 cron 스케줄러 (v11.7.0)
+- **`cron_schedule(expr, callback)`** — 5-field 표현식 정기 작업
+- **`cron_cancel(job-id)`** — 작업 취소
+- **`cron_list()`** — 작업 조회
+- **`cron_clear()`** — 모든 작업 정지
+- 표현식: `0 9 * * *`, `*/5 * * * *`, `0-30/5`, 리스트 등
+- **테스트**: 20개 PASS
+
+### 🆕 WebSocket 문서화 (v11.7.0)
+- RFC 6455 표준 준수 (stdlib-ws.ts 333줄, stdlib-wsc.ts 243줄)
+- 서버: `ws_on_connect/message/close/error`
+- 클라이언트: `wsc_connect/send/send_json/close/state`
+- 실전 예제: 실시간 채팅 (클라이언트 추적 + 브로드캐스트)
+- Node.js 25+ 네이티브 WebSocket (의존성 0)
+
+### 📊 테스트
+- **Rate Limiter**: 7/7 PASS
+- **Prepared Statement**: 16/16 PASS
+- **cron**: 20/20 PASS
+- **전체**: 787개 PASS (100%)
+
+### 📈 개선사항
+- **stdlib 함수**: 59 → 63개 (+4)
+- **완성도**: 9.5/10 → 9.8/10
+- **bootstrap.js**: 1.4MB (동일)
+- **문서**: CLAUDE.md 4개 섹션 추가 (Rate Limiter, Prepared Statement, cron, WebSocket)
+
+---
+
 ## v11.6.35 — B-1: eval-builtins AI 추론 블록 분리 (2026-05-10)
 
 - `eval-builtins.ts` 6,793줄 → 5,161줄 (-1,632줄)

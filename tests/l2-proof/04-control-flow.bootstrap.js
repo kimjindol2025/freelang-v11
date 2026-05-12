@@ -131,6 +131,7 @@ const now_unix = () => Math.floor(Date.now()/1000);
 const json_parse = (s) => { try{return JSON.parse(s);}catch(e){return null;} };
 const json_stringify = (v) => JSON.stringify(v);
 const shell_exec = (cmd,inp) => { try{const {execSync}=require('child_process');const opts={encoding:'utf8'};if(inp)opts.input=inp;return execSync(cmd,opts);}catch(e){return '';} };
+const _fl_run_inherit = (cmd) => { require('child_process').spawnSync(cmd,{shell:true,stdio:'inherit'}); };
 const __fl_routes = [];
 const _fl_server_get = (path,fn) => { __fl_routes.push({method:'GET',path,fn}); };
 const _fl_server_start = (port) => { const http=require('http'); http.createServer(async(req,res)=>{ const r=__fl_routes.find(r=>r.method===req.method&&r.path===require('url').parse(req.url).pathname); if(r){const result=await(typeof r.fn==='string'?eval(r.fn):r.fn)(req);res.end(String(result));}else{res.statusCode=404;res.end('Not Found');} }).listen(port);console.log('Server on '+port); };
