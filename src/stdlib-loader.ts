@@ -359,6 +359,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       const meta = fnMetaRegistry.get(name);
       if (!meta) return null;
       const m = new Map<string, any>();
+      if (meta.doc)      m.set("doc",      meta.doc);      // v11.7.3
       if (meta.returns)  m.set("returns",  meta.returns);
       if (meta.context)  m.set("context",  meta.context);
       if (meta.effects)  m.set("effects",  meta.effects);
@@ -366,6 +367,51 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       return m;
     },
     "fn_meta": (name: string): any => _aliases["fn-meta"](name),
+
+    // v11.7.3: 타입 검증 헬퍼
+    "check-arg-type": (arg: any, expectedType: string): any => {
+      const actual = typeof arg === "number" ? "number"
+        : typeof arg === "string" ? "string"
+        : typeof arg === "boolean" ? "boolean"
+        : arg === null ? "nil"
+        : Array.isArray(arg) ? "array"
+        : typeof arg === "function" ? "function"
+        : "map";
+      if (actual !== expectedType) {
+        const err = new Error(`Expected ${expectedType}, got ${actual}`);
+        (err as any).code = "TYPE_MISMATCH";
+        (err as any).context = { expectedType, actualType: actual, value: arg };
+        throw err;
+      }
+      return arg;
+    },
+    "check_arg_type": function(arg: any, expectedType: string): any {
+      return this["check-arg-type"](arg, expectedType);
+    },
+
+    "validate-args": (args: any[], types: any[]): any[] => {
+      const argsArray = Array.isArray(args) ? args : [args];
+      const typesArray = Array.isArray(types) ? types : [types];
+      for (let i = 0; i < Math.min(argsArray.length, typesArray.length); i++) {
+        const actual = typeof argsArray[i] === "number" ? "number"
+          : typeof argsArray[i] === "string" ? "string"
+          : typeof argsArray[i] === "boolean" ? "boolean"
+          : argsArray[i] === null ? "nil"
+          : Array.isArray(argsArray[i]) ? "array"
+          : typeof argsArray[i] === "function" ? "function"
+          : "map";
+        if (actual !== typesArray[i]) {
+          const err = new Error(`Argument ${i}: expected ${typesArray[i]}, got ${actual}`);
+          (err as any).code = "TYPE_MISMATCH";
+          (err as any).context = { argIndex: i, expectedType: typesArray[i], actualType: actual };
+          throw err;
+        }
+      }
+      return argsArray;
+    },
+    "validate_args": function(args: any[], types: any[]): any[] {
+      return this["validate-args"](args, types);
+    },
 
     // AI-Native Phase 4: property-based testing 런타임 함수
     "run-props": (): any => {

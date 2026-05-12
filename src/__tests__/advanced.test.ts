@@ -429,6 +429,78 @@ describe("HTTP 서버 — multipart 파일 업로드", () => {
   });
 });
 
+describe("v11.7.3 — 함수 메타데이터 + 타입 검증", () => {
+  test("defn :doc 메타데이터 파싱", () => {
+    expect(run(`
+      (defn add [a b]
+        {:doc "두 수를 더함" :returns "number"}
+        (+ $a $b))
+      (fn-meta "add")
+    `)).toBeDefined();
+  });
+
+  test("fn-meta :doc 반환", () => {
+    const result = run(`
+      (defn greet [name]
+        {:doc "인사말 생성" :returns "string"}
+        (str "Hello, " $name))
+      (get (fn-meta "greet") "doc")
+    `);
+    expect(result).toBe("인사말 생성");
+  });
+
+  test("check-arg-type 정상 검증", () => {
+    expect(run("(check-arg-type 42 \"number\")")).toBe(42);
+    expect(run("(check-arg-type \"hello\" \"string\")")).toBe("hello");
+    expect(run("(check-arg-type true \"boolean\")")).toBe(true);
+    expect(run("(check-arg-type null \"nil\")")).toBeNull();
+  });
+
+  test("check-arg-type 타입 불일치", () => {
+    expect(() => run("(check-arg-type \"42\" \"number\")")).toThrow();
+  });
+
+  test("validate-args 다중 인자 검증", () => {
+    const result = run(`
+      (validate-args (list 1 "hello" true) (list "number" "string" "boolean"))
+    `);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(3);
+  });
+
+  test("validate-args 배열 반환", () => {
+    const result = run(`
+      (let [validated (validate-args (list 42) (list "number"))]
+        (length $validated))
+    `);
+    expect(result).toBe(1);
+  });
+
+  test("defn 메타 없을 때 기존 호환성", () => {
+    expect(run(`
+      (defn multiply [a b]
+        (* $a $b))
+      (multiply 3 4)
+    `)).toBe(12);
+  });
+
+  test("fn-meta 없는 함수 null 반환", () => {
+    expect(run(`
+      (fn-meta "nonexistent-function")
+    `)).toBeNull();
+  });
+
+  test(":context 메타 조회", () => {
+    const result = run(`
+      (defn divide [a b]
+        {:context "두 수를 나눔" :returns "number"}
+        (/ $a $b))
+      (get (fn-meta "divide") "context")
+    `);
+    expect(result).toBe("두 수를 나눔");
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

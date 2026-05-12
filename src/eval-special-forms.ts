@@ -24,6 +24,7 @@ const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
 
 // ── AI-Native Phase 1: 함수 메타 레지스트리 ────────────────────────
 export interface FnMeta {
+  doc?: string;      // v11.7.3: 함수 설명
   returns?: string;
   context?: string;
   effects?: string[];
@@ -34,7 +35,7 @@ export interface FnMeta {
 }
 export const fnMetaRegistry = new Map<string, FnMeta>();
 
-const META_KEYS = new Set(["returns", "context", "effects", "examples", "property"]);
+const META_KEYS = new Set(["doc", "returns", "context", "effects", "examples", "property"]);
 
 function extractMapMeta(mapNode: any): FnMeta | null {
   if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
@@ -44,6 +45,7 @@ function extractMapMeta(mapNode: any): FnMeta | null {
   const meta: FnMeta = {};
   const strVal = (n: any): string | undefined =>
     n?.kind === "literal" ? String(n.value) : undefined;
+  if (fields.has("doc"))      meta.doc      = strVal(fields.get("doc"));
   if (fields.has("returns"))  meta.returns  = strVal(fields.get("returns"));
   if (fields.has("context"))  meta.context  = strVal(fields.get("context"));
   if (fields.has("examples")) meta.examples = strVal(fields.get("examples"));

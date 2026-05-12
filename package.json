@@ -1,6 +1,6 @@
 {
   "name": "freelang-v11",
-  "version": "11.7.2",
+  "version": "11.7.3",
   "description": "FreeLang v11 — Unified AI-Native Language. [v11.7.0: Rate Limiter + Prepared Statement + cron + WebSocket]",
   "keywords": [
     "ai",
