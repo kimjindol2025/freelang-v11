@@ -648,6 +648,36 @@ describe("배열 헬퍼 함수 — v11.7.7", () => {
   });
 });
 
+describe("배열 계산 함수 — v11.7.8", () => {
+  test("sum 합계", () => {
+    expect(run('(sum [1 2 3 4 5])')).toBe(15);
+    expect(run('(sum [10 20 30])')).toBe(60);
+  });
+
+  test("sum 빈 배열", () => {
+    expect(run('(sum [])')).toBe(0);
+  });
+
+  test("product 곱셈", () => {
+    expect(run('(product [2 3 4])')).toBe(24);
+    expect(run('(product [5 2])')).toBe(10);
+  });
+
+  test("product 빈 배열", () => {
+    expect(run('(product [])')).toBe(1);
+  });
+
+  test("chunk 청크 분할", () => {
+    const result = run('(chunk [1 2 3 4 5] 2)');
+    expect(result).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  test("chunk 균등 분할", () => {
+    const result = run('(chunk [1 2 3 4] 2)');
+    expect(result).toEqual([[1, 2], [3, 4]]);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

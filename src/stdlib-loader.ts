@@ -427,6 +427,26 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     },
     "flatten_one": (arr: any[]) => _aliases["flatten-one"](arr),
 
+    // v11.7.8: 배열 계산 헬퍼 (합계, 곱, 청크)
+    "sum": (arr: any[]): number => {
+      if (!Array.isArray(arr)) return 0;
+      return arr.reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
+    },
+
+    "product": (arr: any[]): number => {
+      if (!Array.isArray(arr)) return 1;
+      return arr.reduce((acc, val) => acc * (typeof val === "number" ? val : 1), 1);
+    },
+
+    "chunk": (arr: any[], size: number): any[][] => {
+      if (!Array.isArray(arr) || size <= 0) return [];
+      const chunks: any[][] = [];
+      for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+      }
+      return chunks;
+    },
+
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {
       const ts = new Date().toISOString();
