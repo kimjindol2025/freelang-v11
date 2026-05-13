@@ -1,0 +1,294 @@
+;; self/codegen-c.fl — FreeLang → C 코드젠 (Stage 2)
+;; 지원 범위: self/CODEGEN_C_SCOPE.md 참조
+;; ABI: self/ABI.md (FLValue tagged union)
+
+;; ── 유틸 ──
+
+(defn get-block-items [$node]
+  (if (null? $node) (list)
+  (if (and (= (get $node :kind) "block") (= (get $node :type) "Array"))
+    (get (get $node :fields) "items")
+    $node)))
+
+(defn c-esc [$s]
+  ;; 문자열 리터럴을 C 이스케이프로 변환
+  (str-replace (str-replace (str-replace $s "\\" "\\\\") "\"" "\\\"") "\n" "\\n"))
+
+(defn c-name [$n]
+  ;; FL 식별자를 C 식별자로 변환 (- → _)
+  (str-replace $n "-" "_"))
+
+;; ── 메인 dispatch ──
+
+(defn cgc [$n]
+  (cond
+    [(null? $n) "fl_nil()"]
+    [(= (get $n :kind) "literal")   (cgc-literal $n)]
+    [(= (get $n :kind) "variable")  (c-name (get $n :name))]
+    [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
+    [(= (get $n :kind) "block")     (cgc-block $n)]
+    [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
+    [(= (get $n :kind) "or")        (cgc-or (get $n :args))]
+    [true (str "/* unsupported:" (get $n :kind) " */ fl_nil()")]))
+
+;; ── 리터럴 ──
+
+(defn cgc-literal [$n]
+  (let [[$t (get $n :type)] [$v (get $n :value)]]
+  (cond
+    [(= $t "number")  (if (str-includes (str $v) ".") (str "fl_float(" $v ")") (str "fl_int(" $v ")"))]
+    [(= $t "string")  (str "fl_str_val(\"" (c-esc $v) "\")")]
+    [(= $t "boolean") (if $v "fl_bool(true)" "fl_bool(false)")]
+    [(= $t "symbol")  (cond
+                        [(= $v "true")  "fl_bool(true)"]
+                        [(= $v "false") "fl_bool(false)"]
+                        [(or (= $v "nil") (= $v "null")) "fl_nil()"]
+                        [true (c-name $v)])]
+    [true "fl_nil()"])))
+
+;; ── block (FUNC/Array/Map) ──
+
+(defn cgc-block [$n]
+  (let [[$t (get $n :type)]]
+  (cond
+    [(= $t "FUNC") (cgc-func-block $n)]
+    [true (str "/* unsupported block:" $t " */ fl_nil()")])))
+
+(defn cgc-func-block [$n]
+  (let [[$name (c-name (get $n :name))]
+      [$f (get $n :fields)]
+      [$params-block (get $f :params)]
+      [$body-node (get $f :body)]
+      [$ps (cgc-params (get-block-items $params-block))]
+      [$body (cgc $body-node)]]
+  (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))
+
+(defn cgc-params [$it]
+  (cgc-params-loop $it 0 ""))
+(defn cgc-params-loop [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+  (let [[$n (cgc-extract-name (get $it $i))]
+        [$entry (str "FLValue " $n)]]
+    (cgc-params-loop $it (+ $i 1) (if (= (length $acc) 0) $entry (str $acc ", " $entry))))))
+
+(defn cgc-extract-name [$node]
+  (cond
+    [(= (get $node :kind) "variable") (c-name (get $node :name))]
+    [(= (get $node :kind) "literal")  (c-name (str (get $node :value)))]
+    [true "_anon"]))
+
+;; ── sexpr ──
+
+(defn cgc-sexpr [$n]
+  (let [[$op (get $n :op)] [$args (get $n :args)]]
+  (if (string? $op)
+    (cgc-dispatch $op $args)
+    (str "(" (cgc $op) ")(" (cgc-args $args) ")"))))
+
+(defn cgc-dispatch [$op $args]
+  (cond
+  [(= $op "if")     (cgc-if $args)]
+  [(= $op "cond")   (cgc-cond $args)]
+  [(= $op "do")     (cgc-do $args)]
+  [(= $op "let")    (cgc-let $args)]
+  [(= $op "defn")   (cgc-defn $args)]
+  [(= $op "define") (cgc-define $args)]
+  [(= $op "+")      (cgc-binop-chain $args "fl_add")]
+  [(= $op "-")      (if (= (length $args) 1)
+                      (str "fl_sub(fl_int(0), " (cgc (get $args 0)) ")")
+                      (cgc-binop-chain $args "fl_sub"))]
+  [(= $op "*")      (cgc-binop-chain $args "fl_mul")]
+  [(= $op "/")      (str "fl_div(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "%")      (str "fl_mod(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "=")      (str "fl_eq(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "!=")     (str "fl_neq(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "<")      (str "fl_lt(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op ">")      (str "fl_gt(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "<=")     (str "fl_lte(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op ">=")     (str "fl_gte(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "and")    (cgc-and $args)]
+  [(= $op "or")     (cgc-or $args)]
+  [(= $op "not")    (str "fl_not(" (cgc (get $args 0)) ")")]
+  [(= $op "println") (str "fl_println(" (cgc-str-arg $args) ")")]
+  [(= $op "print")   (str "fl_print(" (cgc-str-arg $args) ")")]
+  [(= $op "str")    (cgc-str $args)]
+  [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
+
+;; ── str 특수 처리 (n인자 → fl_str_n) ──
+
+(defn cgc-str [$args]
+  (let [[$n (length $args)]]
+  (if (= $n 0) "fl_str_val(\"\")"
+    (if (= $n 1) (str "fl_str_n(1, " (cgc (get $args 0)) ")")
+      (str "fl_str_n(" $n ", " (cgc-args $args) ")")))))
+
+(defn cgc-str-arg [$args]
+  (if (= (length $args) 1)
+    (cgc (get $args 0))
+    (cgc-str $args)))
+
+;; ── if ──
+
+(defn cgc-if [$args]
+  (let [[$cond (cgc (get $args 0))]
+        [$then (cgc (get $args 1))]
+        [$else (if (>= (length $args) 3) (cgc (get $args 2)) "fl_nil()")]]
+  (str "(fl_truthy(" $cond ") ? " $then " : " $else ")")))
+
+;; ── cond ──
+
+(defn cgc-cond [$args]
+  (if (= (length $args) 0) "fl_nil()"
+  (let [[$first (get $args 0)]
+        [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]]
+    (if $nested
+      (cgc-cond-nested $args (- (length $args) 1) "fl_nil()")
+      "fl_nil()"))))
+
+(defn cgc-cond-nested [$args $i $acc]
+  (if (< $i 0) $acc
+  (let [[$items (get-block-items (get $args $i))]
+        [$test (get $items 0)]
+        [$body (get $items 1)]
+        [$is-else (and (= (get $test :kind) "literal") (= (get $test :value) true))]]
+    (cgc-cond-nested $args (- $i 1)
+      (if $is-else
+        (cgc $body)
+        (str "(fl_truthy(" (cgc $test) ") ? " (cgc $body) " : " $acc ")"))))))
+
+;; ── do ──
+
+(defn cgc-do [$args]
+  (str "((FLValue(*)(void))({ " (cgc-stmts $args 0 "") " })())"))
+
+;; ── let ──
+
+(defn cgc-let [$args]
+  (let [[$items (get-block-items (get $args 0))]
+        [$first (get $items 0)]
+        [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]
+        [$decls (if $nested (cgc-let-2d $items 0 "") (cgc-let-1d $items 0 ""))]
+        [$body (cgc-body (slice $args 1 (length $args)) 0 "")]]
+  (str "((__extension__ ({\n" $decls "    " $body ";\n})))")))
+
+(defn cgc-let-1d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+  (let [[$n (cgc-extract-name (get $it $i))]
+        [$v (cgc (get $it (+ $i 1)))]]
+    (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n " = " $v ";\n")))))
+
+(defn cgc-let-2d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+  (let [[$p (get-block-items (get $it $i))]
+        [$n (cgc-extract-name (get $p 0))]
+        [$v (cgc (get $p 1))]]
+    (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n " = " $v ";\n")))))
+
+(defn cgc-body [$args $i $acc]
+  (if (>= $i (length $args)) $acc
+  (let [[$last (= $i (- (length $args) 1))]
+        [$c (cgc (get $args $i))]]
+    (if $last $c (cgc-body $args (+ $i 1) (str $acc $c ";\n    "))))))
+
+;; ── defn (최상위) ──
+
+(defn cgc-defn [$args]
+  (let [[$name (c-name (cgc-extract-name (get $args 0)))]
+        [$ps (cgc-params (get-block-items (get $args 1)))]
+        [$body (cgc (get $args 2))]]
+  (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))
+
+;; ── define (전역 변수) ──
+
+(defn cgc-define [$args]
+  (let [[$name (c-name (cgc-extract-name (get $args 0)))]
+        [$val (cgc (get $args 1))]]
+  (str "FLValue " $name " = " $val ";")))
+
+;; ── 이진 연산 연쇄 (fl_add(fl_add(a,b),c)) ──
+
+(defn cgc-binop-chain [$args $fn]
+  (if (= (length $args) 0) "fl_int(0)"
+  (if (= (length $args) 1) (cgc (get $args 0))
+  (cgc-binop-fold $args $fn 1 (cgc (get $args 0))))))
+
+(defn cgc-binop-fold [$args $fn $i $acc]
+  (if (>= $i (length $args)) $acc
+  (cgc-binop-fold $args $fn (+ $i 1)
+    (str $fn "(" $acc ", " (cgc (get $args $i)) ")"))))
+
+;; ── and / or ──
+
+(defn cgc-and [$args]
+  (if (= (length $args) 0) "fl_bool(true)"
+  (if (= (length $args) 1) (cgc (get $args 0))
+  (cgc-and-fold $args 1 (cgc (get $args 0))))))
+
+(defn cgc-and-fold [$args $i $acc]
+  (if (>= $i (length $args)) $acc
+  (cgc-and-fold $args (+ $i 1)
+    (str "fl_and(" $acc ", " (cgc (get $args $i)) ")"))))
+
+(defn cgc-or [$args]
+  (if (= (length $args) 0) "fl_bool(false)"
+  (if (= (length $args) 1) (cgc (get $args 0))
+  (cgc-or-fold $args 1 (cgc (get $args 0))))))
+
+(defn cgc-or-fold [$args $i $acc]
+  (if (>= $i (length $args)) $acc
+  (cgc-or-fold $args (+ $i 1)
+    (str "fl_or(" $acc ", " (cgc (get $args $i)) ")"))))
+
+;; ── args list ──
+
+(defn cgc-args [$args]
+  (cgc-args-loop $args 0 ""))
+(defn cgc-args-loop [$args $i $acc]
+  (if (or (null? $args) (>= $i (length $args))) $acc
+  (let [[$c (cgc (get $args $i))]]
+    (cgc-args-loop $args (+ $i 1) (if (= $i 0) $c (str $acc ", " $c))))))
+
+;; ── stmts (do 블록) ──
+
+(defn cgc-stmts [$args $i $acc]
+  (if (>= $i (length $args)) $acc
+  (cgc-stmts $args (+ $i 1) (str $acc (cgc (get $args $i)) "; "))))
+
+;; ── 전체 프로그램 생성 ──
+
+(defn cgc-forward-decls [$nodes]
+  (cgc-forward-loop $nodes 0 ""))
+
+(defn cgc-forward-loop [$nodes $i $acc]
+  (if (>= $i (length $nodes)) $acc
+  (let [[$n (get $nodes $i)]]
+  (cgc-forward-loop $nodes (+ $i 1)
+    (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
+      (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
+            [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
+        (str $acc "FLValue " $name "(" $ps ");\n"))
+      $acc)))))
+
+(defn cgc-top-level [$nodes $i $stmts $fns]
+  (if (>= $i (length $nodes)) {:stmts $stmts :fns $fns}
+  (let [[$n (get $nodes $i)]
+        [$k (get $n :kind)]
+        [$is-defn (and (= $k "sexpr") (= (get $n :op) "defn"))]
+        [$is-block-func (and (= $k "block") (= (get $n :type) "FUNC"))]]
+    (if (or $is-defn $is-block-func)
+      (cgc-top-level $nodes (+ $i 1) $stmts (str $fns (cgc $n) "\n\n"))
+      (cgc-top-level $nodes (+ $i 1) (str $stmts "    " (cgc $n) ";\n") $fns)))))
+
+(defn generate-c [$nodes]
+  (let [[$fwd (cgc-forward-decls $nodes)]
+        [$parts (cgc-top-level $nodes 0 "" "")]
+        [$fns (get $parts :fns)]
+        [$stmts (get $parts :stmts)]]
+  (str
+    "#include \"runtime.h\"\n\n"
+    $fwd "\n"
+    $fns
+    "int main(void) {\n"
+    $stmts
+    "    return 0;\n"
+    "}\n")))

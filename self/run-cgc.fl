@@ -1,0 +1,17 @@
+;; run-cgc.fl — codegen-c.fl 드라이버
+;; 사용: node bootstrap.js run self/run-cgc.fl <input.fl> <output.c>
+
+(load "self/codegen-c.fl")
+
+(defn main [argv]
+  (let [[input  (get argv 0)]
+        [output (get argv 1)]]
+  (if (or (null? input) (null? output))
+    (println "usage: run-cgc.fl <input.fl> <output.c>")
+    (let [[src    (file-read input)]
+          [nodes  (fl-parse src)]
+          [c-code (generate-c nodes)]]
+      (file-write output c-code)
+      (println (str "Compiled " input " -> " output))))))
+
+(main (cli-args))
