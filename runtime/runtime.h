@@ -1,6 +1,7 @@
 #ifndef FREELANG_RUNTIME_H
 #define FREELANG_RUNTIME_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -117,5 +118,17 @@ FLValue fl_map_from_pairs(FLValue* kv, uint32_t n); /* n = 쌍의 수 */
 FLValue fl_map_get(FLValue map, FLValue key);
 FLValue fl_map_set(FLValue map, FLValue key, FLValue val);
 FLValue fl_map_len(FLValue map);
+
+/* ── S7: Closure ── */
+typedef struct FLClosure {
+    FLObject base;   /* type = FL_FN */
+    FLValue (*call)(struct FLClosure* self, int argc, FLValue* argv);
+    uint32_t nenv;
+    FLValue  env[];  /* flexible array — captured values */
+} FLClosure;
+
+FLValue fl_fn_new(FLValue (*call)(FLClosure*, int, FLValue*),
+                  uint32_t nenv, FLValue* env);
+FLValue fl_fn_call(FLValue fn, int argc, FLValue* argv);
 
 #endif /* FREELANG_RUNTIME_H */

@@ -62,6 +62,7 @@ static const char* fl_to_str(FLValue v, char* buf, size_t sz) {
             snprintf(buf, sz, "{%u keys}", mp->len);
             return buf;
         }
+        case FL_FN: return "#<fn>";
         default: return "";
     }
 }
@@ -358,4 +359,21 @@ FLValue fl_map_set(FLValue map, FLValue key, FLValue val) {
     if (n && src->entries) memcpy(m->entries, src->entries, sizeof(FLMapEntry) * n);
     m->entries[n].key = key; m->entries[n].val = val;
     FLValue r; r.tag = FL_MAP; r.obj = (FLObject*)m; return r;
+}
+
+/* ── S7: Closure ── */
+
+FLValue fl_fn_new(FLValue (*call)(FLClosure*, int, FLValue*),
+                  uint32_t nenv, FLValue* env) {
+    FLClosure* cl = malloc(sizeof(FLClosure) + sizeof(FLValue) * nenv);
+    cl->base.type = FL_FN; cl->base.rc = 1;
+    cl->call = call; cl->nenv = nenv;
+    for (uint32_t i = 0; i < nenv; i++) cl->env[i] = env[i];
+    FLValue r; r.tag = FL_FN; r.obj = (FLObject*)cl; return r;
+}
+
+FLValue fl_fn_call(FLValue fn, int argc, FLValue* argv) {
+    if (fn.tag != FL_FN) { fputs("error: not a fn\n", stderr); exit(1); }
+    FLClosure* cl = (FLClosure*)fn.obj;
+    return cl->call(cl, argc, argv);
 }

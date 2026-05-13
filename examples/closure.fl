@@ -1,0 +1,15 @@
+(define double (fn [x] (* x 2)))
+(println (double 5))
+
+(defn make-adder [n]
+  (fn [x] (+ n x)))
+(define add5 (make-adder 5))
+(println (add5 3))
+
+(defn make-between [lo hi]
+  (fn [x] (and (>= x lo) (<= x hi))))
+(define in-range (make-between 1 10))
+(println (in-range 5))
+(println (in-range 15))
+
+(println ((fn [x y] (+ x y)) 3 4))

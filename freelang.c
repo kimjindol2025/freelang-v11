@@ -149,6 +149,28 @@ static int loop_ids[32];
 static int loop_top = 0;
 static int loop_counter = 0;
 
+/* ──────────────────────────────── Closure support ── */
+static FILE* preamble;
+static int   anon_id;
+
+typedef struct { char s[32][64]; int n; } SymSet;
+
+static void sym_add(SymSet* ss, const char* v) {
+    for (int i = 0; i < ss->n; i++) if (!strcmp(ss->s[i], v)) return;
+    if (ss->n < 32) { strncpy(ss->s[ss->n], v, 63); ss->s[ss->n++][63] = 0; }
+}
+
+static void collect_syms(N* n, SymSet* out_ss) {
+    if (!n) return;
+    if (n->k == NA) { sym_add(out_ss, n->v); return; }
+    if (n->k == NL) {
+        /* skip c[0] — always operator/form name, not a variable reference */
+        for (int i = 1; i < n->nc; i++) collect_syms(n->c[i], out_ss);
+        return;
+    }
+    for (int i = 0; i < n->nc; i++) collect_syms(n->c[i], out_ss);
+}
+
 /* ──────────────────────────────── Emitter ── */
 static FILE* out;
 static void E(const char* fmt, ...) {
@@ -157,9 +179,16 @@ static void E(const char* fmt, ...) {
 
 static void cname(const char* s, char* b, size_t sz) {
     size_t i = 0;
-    for (size_t j = 0; s[j] && i < sz-1; j++)
+    for (size_t j = 0; s[j] && i < sz-2; j++)
         b[i++] = (s[j] == '-' || s[j] == '?') ? '_' : s[j];
     b[i] = 0;
+    /* avoid C keywords — append _ if name collides */
+    static const char* kw[] = {"double","float","int","long","short","char","void",
+        "for","while","do","return","break","continue","if","else","switch",
+        "case","default","goto","struct","union","enum","typedef","static",
+        "extern","const","volatile","inline","sizeof","auto","register",NULL};
+    for (int k = 0; kw[k]; k++)
+        if (!strcmp(b, kw[k])) { b[i]='_'; b[i+1]=0; break; }
 }
 static void cesc(const char* s) {
     for (; *s; s++) {
@@ -171,6 +200,15 @@ static void cesc(const char* s) {
     }
 }
 
+/* nodes/nnodes forward — defined in Program section */
+#define MAX_NODES 4096
+static N* nodes[MAX_NODES];
+static int nnodes;
+
+/* forward declarations for closure helpers */
+static int  is_defn_name(const char*);
+static int  is_global_name(const char*);
+static void free_vars(N*, SymSet*);
 static void emit_node(N* n);
 
 static void emit_args(N** a, int n) {
@@ -309,37 +347,24 @@ static void emit_node(N* n) {
         E("/* %s inside expr — skip */fl_nil()", op->v); return;
     }
     /* file I/O */
-    if (sym(op,"file-read")) {
-        E("fl_file_read("); emit_node(a[0]); E(")"); return;
-    }
-    if (sym(op,"file-write")) {
-        E("fl_file_write("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return;
-    }
+    if (sym(op,"file-read"))  { E("fl_file_read("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"file-write")) { E("fl_file_write("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     /* loop/recur */
     if (sym(op,"loop")) {
-        N* bl = a[0];                    /* NV node: [name init name init ...] */
-        int nv = bl->nc / 2;
-        int lid = loop_counter++;
+        N* bl = a[0]; int nv = bl->nc/2, lid = loop_counter++;
         E("(__extension__({\n");
         for (int i = 0; i < nv; i++) {
             char b[512]; cname(bl->c[i*2]->v, b, sizeof(b));
-            E("    FLValue _lv%d_%d = ", lid, i);
-            emit_node(bl->c[i*2+1]);
-            E("; /* %s */\n", b);
+            E("    FLValue _lv%d_%d = ", lid, i); emit_node(bl->c[i*2+1]); E(";\n");
         }
-        E("    FLValue _lr%d;\n", lid);
-        E("    _loop_%d:;\n", lid);
-        E("    {\n");
+        E("    FLValue _lr%d;\n    _loop_%d:;\n    {\n", lid, lid);
         for (int i = 0; i < nv; i++) {
             char b[512]; cname(bl->c[i*2]->v, b, sizeof(b));
             E("        FLValue %s = _lv%d_%d;\n", b, lid, i);
         }
         loop_ids[loop_top++] = lid;
-        E("        _lr%d = ", lid);
-        emit_node(na > 1 ? a[na-1] : NULL);
-        E(";\n    }\n");
-        loop_top--;
-        E("    _lr%d;\n}))", lid);
+        E("        _lr%d = ", lid); emit_node(na > 1 ? a[na-1] : NULL);
+        E(";\n    }\n    _lr%d;\n}))", lid); loop_top--;
         return;
     }
     if (sym(op,"recur")) {
@@ -361,15 +386,88 @@ static void emit_node(N* n) {
     if (sym(op,"map-get"))  { E("fl_map_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"map-set"))  { E("fl_map_set(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     if (sym(op,"map-len"))  { E("fl_map_len(");  emit_node(a[0]); E(")"); return; }
-    /* generic call */
+    /* fn literal */
+    if (sym(op,"fn")) {
+        SymSet fv = {0};
+        free_vars(n, &fv);
+        int id = anon_id++;
+        FILE* saved = out; out = preamble;
+        E("static FLValue _anon_%d(FLClosure* _cl, int _ac, FLValue* _av) {\n", id);
+        N* params = (na >= 1) ? a[0] : NULL;
+        if (params) for (int i = 0; i < params->nc; i++) {
+            char b[512]; cname(params->c[i]->v, b, sizeof(b));
+            E("    FLValue %s = _av[%d];\n", b, i);
+        }
+        for (int i = 0; i < fv.n; i++) {
+            char b[512]; cname(fv.s[i], b, sizeof(b));
+            E("    FLValue %s = _cl->env[%d];\n", b, i);
+        }
+        E("    return "); emit_node(na >= 2 ? a[1] : NULL); E(";\n}\n");
+        out = saved;
+        if (fv.n > 0) {
+            E("fl_fn_new(_anon_%d, %d, (FLValue[]){", id, fv.n);
+            for (int i = 0; i < fv.n; i++) {
+                if (i) E(", ");
+                char b[512]; cname(fv.s[i], b, sizeof(b)); E("%s", b);
+            }
+            E("})");
+        } else {
+            E("fl_fn_new(_anon_%d, 0, NULL)", id);
+        }
+        return;
+    }
+    /* IIFE: op is itself a fn node */
+    if (op->k == NL) {
+        E("fl_fn_call("); emit_node(op);
+        if (na > 0) { E(", %d, (FLValue[]){", na); emit_args(a, na); E("})"); }
+        else E(", 0, NULL)");
+        return;
+    }
+    /* generic call — defn → direct C, define/unknown → dynamic dispatch */
     char b[512]; cname(op->v, b, sizeof(b));
-    E("%s(", b); emit_args(a, na); E(")");
+    if (is_defn_name(op->v)) {
+        E("%s(", b); emit_args(a, na); E(")");
+    } else {
+        if (na > 0) { E("fl_fn_call(%s, %d, (FLValue[]){", b, na); emit_args(a, na); E("})"); }
+        else E("fl_fn_call(%s, 0, NULL)", b);
+    }
 }
 
 /* ──────────────────────────────── Program ── */
-#define MAX_NODES 4096
-static N* nodes[MAX_NODES];
-static int nnodes;
+
+static int is_defn_name(const char* name) {
+    for (int i = 0; i < nnodes; i++) {
+        N* nd = nodes[i];
+        if (nd && nd->k==NL && nd->nc>=2 && sym(nd->c[0],"defn")
+            && !strcmp(nd->c[1]->v, name)) return 1;
+    }
+    return 0;
+}
+
+static int is_global_name(const char* name) {
+    static const char* bi[] = {"true","false","nil","null",NULL};
+    for (int i = 0; bi[i]; i++) if (!strcmp(name, bi[i])) return 1;
+    for (int i = 0; i < nnodes; i++) {
+        N* nd = nodes[i];
+        if (nd && nd->k==NL && nd->nc>=2
+            && (sym(nd->c[0],"defn")||sym(nd->c[0],"define"))
+            && !strcmp(nd->c[1]->v, name)) return 1;
+    }
+    return 0;
+}
+
+static void free_vars(N* fn_node, SymSet* fv) {
+    SymSet used = {0};
+    if (fn_node->nc >= 3) collect_syms(fn_node->c[2], &used);
+    N* params = (fn_node->nc >= 2) ? fn_node->c[1] : NULL;
+    for (int i = 0; i < used.n; i++) {
+        const char* v = used.s[i]; int bound = 0;
+        if (is_global_name(v)) continue;
+        if (params) for (int j = 0; j < params->nc; j++)
+            if (!strcmp(params->c[j]->v, v)) { bound=1; break; }
+        if (!bound) sym_add(fv, v);
+    }
+}
 
 static void emit_params(N* params) {
     int first = 1;
@@ -377,13 +475,28 @@ static void emit_params(N* params) {
         if (params->c[i]->k != NA) continue;
         char b[512]; cname(params->c[i]->v, b, sizeof(b));
         if (!first) E(", ");
-        first = 0;
-        E("FLValue %s", b);
+        first = 0; E("FLValue %s", b);
     }
 }
 
+static void flush_file(FILE* src, FILE* dst) {
+    rewind(src); int ch;
+    while ((ch = fgetc(src)) != EOF) fputc(ch, dst);
+    fclose(src);
+}
+
 static void emit_program(void) {
-    E("#include \"runtime.h\"\n\n");
+    /* Two-buffer strategy:
+     * preamble  — anonymous fn C functions (populated by fn handler)
+     * body      — forward decls + defn bodies + main()
+     * Final output: header + preamble + body */
+    preamble = tmpfile();
+    FILE* body = tmpfile();
+    if (!preamble || !body) { fputs("error: tmpfile failed\n", stderr); exit(1); }
+
+    FILE* final_out = out;
+    out = body;
+
     /* forward declarations */
     for (int i = 0; i < nnodes; i++) {
         N* n = nodes[i];
@@ -402,7 +515,7 @@ static void emit_program(void) {
         E("static FLValue %s;\n", b);
     }
     E("\n");
-    /* function definitions */
+    /* function definitions — fn literals inside bodies populate preamble */
     for (int i = 0; i < nnodes; i++) {
         N* n = nodes[i];
         if (!n || n->k != NL || n->nc < 4) continue;
@@ -425,6 +538,11 @@ static void emit_program(void) {
         E("    "); emit_node(n); E(";\n");
     }
     E("    return 0;\n}\n");
+
+    out = final_out;
+    fprintf(out, "#include \"runtime.h\"\n\n");
+    flush_file(preamble, out);
+    flush_file(body, out);
 }
 
 /* ──────────────────────────────── Driver ── */
