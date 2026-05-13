@@ -136,4 +136,9 @@ FLValue fl_map_fn(FLValue fn, FLValue vec);
 FLValue fl_filter_fn(FLValue fn, FLValue vec);
 FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec);
 
+/* ── S9: 맵 accessor ── */
+FLValue fl_map_keys(FLValue map);
+FLValue fl_map_vals(FLValue map);
+FLValue fl_map_entries(FLValue map);
+
 #endif /* FREELANG_RUNTIME_H */

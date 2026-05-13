@@ -413,3 +413,32 @@ FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec) {
     }
     return acc;
 }
+
+/* ── S9: 맵 accessor ── */
+
+FLValue fl_map_keys(FLValue map) {
+    if (map.tag != FL_MAP) return fl_vec_new();
+    FLMap* m = (FLMap*)map.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < m->len; i++) r = fl_vec_push(r, m->entries[i].key);
+    return r;
+}
+
+FLValue fl_map_vals(FLValue map) {
+    if (map.tag != FL_MAP) return fl_vec_new();
+    FLMap* m = (FLMap*)map.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < m->len; i++) r = fl_vec_push(r, m->entries[i].val);
+    return r;
+}
+
+FLValue fl_map_entries(FLValue map) {
+    if (map.tag != FL_MAP) return fl_vec_new();
+    FLMap* m = (FLMap*)map.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < m->len; i++) {
+        FLValue pair[2] = { m->entries[i].key, m->entries[i].val };
+        r = fl_vec_push(r, fl_vec_from(pair, 2));
+    }
+    return r;
+}

@@ -1,14 +1,5 @@
-/*
- * freelang.c — FreeLang seed compiler (Stage 4)
- *
- * 지원: number/string/bool/nil literal, variable, defn, define,
- *       let, if, cond, do, +,-,*,/,%, =,!=,<,>,<=,>=, and,or,not,
- *       println, print, str, loop/recur, vector, map, function call
- * 제외: closure, try/catch
- *
- * 사용: ./freelang input.fl
- * 컴파일: gcc freelang.c -o freelang
- */
+/* freelang.c — FreeLang seed compiler
+ * 사용: ./freelang input.fl  |  컴파일: gcc freelang.c -o freelang */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -383,6 +374,9 @@ static void emit_node(N* n) {
     if (sym(op,"map-get"))  { E("fl_map_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"map-set"))  { E("fl_map_set(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     if (sym(op,"map-len"))  { E("fl_map_len(");  emit_node(a[0]); E(")"); return; }
+    if (sym(op,"map-keys"))    { E("fl_map_keys(");    emit_node(a[0]); E(")"); return; }
+    if (sym(op,"map-vals"))    { E("fl_map_vals(");    emit_node(a[0]); E(")"); return; }
+    if (sym(op,"map-entries")) { E("fl_map_entries("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"map"))    { E("fl_map_fn(");    emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"filter")) { E("fl_filter_fn("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"reduce")) { E("fl_reduce_fn("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }

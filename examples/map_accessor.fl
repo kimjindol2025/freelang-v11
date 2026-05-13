@@ -1,0 +1,15 @@
+(define m {"a" 1 "b" 2 "c" 3})
+
+(define ks (map-keys m))
+(println (vec-len ks))
+(println (vec-get ks 0))
+
+(define vs (map-vals m))
+(println (vec-len vs))
+(println (vec-get vs 0))
+
+(define es (map-entries m))
+(println (vec-len es))
+(define e0 (vec-get es 0))
+(println (vec-get e0 0))
+(println (vec-get e0 1))
