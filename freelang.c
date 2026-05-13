@@ -346,7 +346,6 @@ static void emit_node(N* n) {
     if (sym(op,"defn") || sym(op,"define")) {
         E("/* %s inside expr — skip */fl_nil()", op->v); return;
     }
-    /* file I/O */
     if (sym(op,"file-read"))  { E("fl_file_read("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"file-write")) { E("fl_file_write("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     /* loop/recur */
@@ -377,15 +376,16 @@ static void emit_node(N* n) {
         E("(__extension__({goto _loop_%d; fl_nil();})))", lid);
         return;
     }
-    /* vector ops */
     if (sym(op,"vec-get"))  { E("fl_vec_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"vec-set"))  { E("fl_vec_set(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     if (sym(op,"vec-push")) { E("fl_vec_push("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"vec-len"))  { E("fl_vec_len(");  emit_node(a[0]); E(")"); return; }
-    /* map ops */
     if (sym(op,"map-get"))  { E("fl_map_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"map-set"))  { E("fl_map_set(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     if (sym(op,"map-len"))  { E("fl_map_len(");  emit_node(a[0]); E(")"); return; }
+    if (sym(op,"map"))    { E("fl_map_fn(");    emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"filter")) { E("fl_filter_fn("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"reduce")) { E("fl_reduce_fn("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};

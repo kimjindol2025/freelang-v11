@@ -377,3 +377,39 @@ FLValue fl_fn_call(FLValue fn, int argc, FLValue* argv) {
     FLClosure* cl = (FLClosure*)fn.obj;
     return cl->call(cl, argc, argv);
 }
+
+/* ── S8: 고차함수 ── */
+
+FLValue fl_map_fn(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue elem = v->data[i];
+        FLValue out = fl_fn_call(fn, 1, &elem);
+        r = fl_vec_push(r, out);
+    }
+    return r;
+}
+
+FLValue fl_filter_fn(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue elem = v->data[i];
+        if (fl_truthy(fl_fn_call(fn, 1, &elem))) r = fl_vec_push(r, elem);
+    }
+    return r;
+}
+
+FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return init;
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue acc = init;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue args[2] = { acc, v->data[i] };
+        acc = fl_fn_call(fn, 2, args);
+    }
+    return acc;
+}

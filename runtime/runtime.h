@@ -131,4 +131,9 @@ FLValue fl_fn_new(FLValue (*call)(FLClosure*, int, FLValue*),
                   uint32_t nenv, FLValue* env);
 FLValue fl_fn_call(FLValue fn, int argc, FLValue* argv);
 
+/* ── S8: 고차함수 ── */
+FLValue fl_map_fn(FLValue fn, FLValue vec);
+FLValue fl_filter_fn(FLValue fn, FLValue vec);
+FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec);
+
 #endif /* FREELANG_RUNTIME_H */

@@ -1,0 +1,17 @@
+(define nums [1 2 3 4 5])
+
+(define doubled (map (fn [x] (* x 2)) nums))
+(println (vec-get doubled 0))
+(println (vec-get doubled 4))
+(println (vec-len doubled))
+
+(define evens (filter (fn [x] (= (% x 2) 0)) nums))
+(println (vec-len evens))
+(println (vec-get evens 0))
+(println (vec-get evens 1))
+
+(define total (reduce (fn [acc x] (+ acc x)) 0 nums))
+(println total)
+
+(define strs (map (fn [x] (str x)) [10 20 30]))
+(println (vec-get strs 0))
