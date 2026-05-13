@@ -369,6 +369,32 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     },
     "format_percent": (n: any, decimals?: number) => _aliases["format-percent"](n, decimals),
 
+    // v11.7.6: 간단한 헬퍼 함수들
+    "str-repeat-n": (s: string, n: number): string => {
+      return String(s).repeat(Math.max(0, n));
+    },
+    "str_repeat_n": (s: string, n: number) => _aliases["str-repeat-n"](s, n),
+    "nth-last": (arr: any[], n: number): any => {
+      const a = Array.isArray(arr) ? arr : [];
+      const idx = a.length - (Math.max(0, n) + 1);
+      return idx >= 0 ? a[idx] : null;
+    },
+    "nth_last": (arr: any[], n: number) => _aliases["nth-last"](arr, n),
+    "take-last": (arr: any[], n: number): any[] => {
+      const a = Array.isArray(arr) ? arr : [];
+      const count = Math.max(0, n);
+      return count >= a.length ? a : a.slice(-count);
+    },
+    "take_last": (arr: any[], n: number) => _aliases["take-last"](arr, n),
+    "starts-with": (s: string, prefix: string): boolean => {
+      return String(s).startsWith(String(prefix));
+    },
+    "starts_with": (s: string, prefix: string) => _aliases["starts-with"](s, prefix),
+    "ends-with": (s: string, suffix: string): boolean => {
+      return String(s).endsWith(String(suffix));
+    },
+    "ends_with": (s: string, suffix: string) => _aliases["ends-with"](s, suffix),
+
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {
       const ts = new Date().toISOString();

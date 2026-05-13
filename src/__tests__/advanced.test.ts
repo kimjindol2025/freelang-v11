@@ -600,6 +600,32 @@ describe("포맷팅 헬퍼 함수 — v11.7.5", () => {
   });
 });
 
+describe("간단한 헬퍼 함수 — v11.7.6", () => {
+  test("str-repeat-n 기본", () => {
+    expect(run('(str-repeat-n "ab" 3)')).toBe("ababab");
+  });
+
+  test("nth-last 뒤에서 n번째", () => {
+    const result = run('(nth-last [1 2 3 4 5] 0)');
+    expect(result).toBe(5);
+  });
+
+  test("take-last 뒤에서 n개", () => {
+    const result = run('(take-last [1 2 3 4 5] 2)');
+    expect(result).toEqual([4, 5]);
+  });
+
+  test("starts-with 문자열 시작", () => {
+    expect(run('(starts-with "hello world" "hello")')).toBe(true);
+    expect(run('(starts-with "hello world" "world")')).toBe(false);
+  });
+
+  test("ends-with 문자열 끝", () => {
+    expect(run('(ends-with "hello world" "world")')).toBe(true);
+    expect(run('(ends-with "hello world" "hello")')).toBe(false);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

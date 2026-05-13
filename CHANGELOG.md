@@ -2,6 +2,38 @@
 
 ---
 
+## v11.7.6 — 간단한 헬퍼 함수 (2026-05-13)
+
+### 🆕 문자열 & 배열 헬퍼
+- **`str-repeat-n(s, n)`** — 문자열 반복
+  - `(str-repeat-n "ab" 3)` → `"ababab"`
+  - snake_case alias: `str_repeat_n`
+- **`starts-with(s, prefix)`** — 문자열 시작 검사
+  - `(starts-with "hello world" "hello")` → `true`
+  - snake_case alias: `starts_with`
+- **`ends-with(s, suffix)`** — 문자열 끝 검사
+  - `(ends-with "hello world" "world")` → `true`
+  - snake_case alias: `ends_with`
+- **`nth-last(arr, n)`** — 뒤에서 n번째 요소
+  - `(nth-last [1 2 3 4 5] 0)` → `5`
+  - snake_case alias: `nth_last`
+- **`take-last(arr, n)`** — 뒤에서 n개 요소
+  - `(take-last [1 2 3 4 5] 2)` → `[4 5]`
+  - snake_case alias: `take_last`
+
+### 📊 테스트
+- **간단한 헬퍼**: 5개 신규 PASS
+  - str-repeat-n, starts-with, ends-with
+  - nth-last, take-last
+- **전체**: 1098 → 1103개 (+5)
+
+### 📈 개선사항
+- **배열/문자열 조작**: 편의 함수 추가로 일반적인 작업 1줄로 단순화
+- **일관성**: kebab/snake case 모두 지원
+- **버전**: 11.7.5 → 11.7.6
+
+---
+
 ## v11.7.5 — 포맷팅 헬퍼 함수 (2026-05-13)
 
 ### 🆕 문자열 포맷팅
