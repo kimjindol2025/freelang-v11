@@ -59,6 +59,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   // Phase 57: 비동기 응답 보류용 저장소
   const pendingResponses = new Map<string, http.ServerResponse>();
   let currentRequestId: string | null = null;
+  let currentNonce = "";
 
   // WebSocket 공개 클라이언트 (터널 WS 프록시용)
   const wsPublicMap = new Map<string, WebSocket>();
@@ -231,6 +232,13 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     }
     res.writeHead(status, headersToWrite);
     if (typeof body === 'string') {
+      // M-4: HTML 응답에 nonce 자동 주입 (<script>/<style> 태그)
+      if (contentType.includes("text/html") && currentNonce) {
+        body = body.replace(
+          /<(script|style)(?![^>]*\bnonce=)(\s|>)/gi,
+          (_, tag, rest) => `<${tag} nonce="${currentNonce}"${rest}`
+        );
+      }
       res.end(body);
     } else if (Buffer.isBuffer(body)) {
       res.end(body);
@@ -264,6 +272,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       body: body || undefined,
       params,
       request_id: requestId,
+      csp_nonce: currentNonce,
       timestamp: Date.now(),
     };
   }
@@ -455,6 +464,8 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           const requestStart = Date.now();
           const requestId = generateRequestId();
           currentRequestId = requestId;  // Phase 57: 현재 요청 ID 저장
+          const cspNonce = crypto.randomBytes(16).toString("base64url");
+          currentNonce = cspNonce;
           const method = req.method || "GET";
           const { path, query } = parseUrl(req.url || "/");
           const headers = req.headers;
@@ -478,7 +489,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           res.setHeader("X-Content-Type-Options", "nosniff");
           res.setHeader("X-Frame-Options", "SAMEORIGIN");
           res.setHeader("X-XSS-Protection", "1; mode=block");
-          res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+          res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'`);
           res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
           if (method === "OPTIONS") {
@@ -871,6 +882,9 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
         headers: { "Set-Cookie": cookie },
       };
     },
+
+    // server_csp_nonce -> string (현재 요청의 CSP nonce — <script nonce=...> 등에 사용)
+    "server_csp_nonce": (): string => currentNonce,
 
     // server_set_cookie name value opts -> cookie string (HttpOnly+Secure+SameSite 자동)
     "server_set_cookie": (name: string, value: string, opts: any = {}): string => {
