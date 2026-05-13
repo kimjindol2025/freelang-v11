@@ -1,0 +1,141 @@
+;; 디버깅 도구 — inspect, trace, watch
+;; (load "stdlib/debug-tools.fl")
+
+(define *debug-enabled* true)
+(define *watch-vars* {})
+(define *trace-depth* 0)
+
+;; 1. inspect — 변수 상세 검사
+(defn inspect [name value]
+  "변수의 타입, 크기, 값 모두 출력"
+  (let [type-name (type-of value)
+        size (if (array? value) (count value) (if (map? value) (count (keys value)) "N/A"))]
+    (println "")
+    (println (str "🔍 inspect: " name))
+    (println (str "  타입: " type-name))
+    (println (str "  크기: " size))
+    (println (str "  값: " value))
+    (println ""))
+  value)
+
+;; 2. debug — 특정 함수의 실행 흐름 추적
+(defn debug [fn-name fn body]
+  "함수 실행 시 자동으로 입력/출력 출력"
+  (let [traced-fn (fn [& args]
+    (do
+      (println "")
+      (println (str "→ [" fn-name "] 호출"))
+      (println (str "  인자: " (str-join ", " args)))
+      (let [start-time (now)
+            result (apply fn args)
+            duration (- (now) start-time)]
+        (println (str "  결과: " result))
+        (println (str "  소요시간: " duration "ms"))
+        (println ""))
+      result))]
+    traced-fn))
+
+;; 3. watch — 변수 변화 감시
+(defn watch [var-name initial-value]
+  "변수의 변화를 자동으로 추적"
+  (do
+    (assoc *watch-vars* var-name {
+      :initial initial-value
+      :current initial-value
+      :changes []
+    })
+    (println (str "👁️ [watch] " var-name " 감시 시작: " initial-value))))
+
+(defn update-watched [var-name new-value]
+  "감시 중인 변수 업데이트 (자동으로 추적)"
+  (if-let [watch-info (get *watch-vars* var-name)]
+    (do
+      (let [old-value (get watch-info :current)]
+        (println (str "📊 [watch] " var-name " 변경: " old-value " → " new-value))
+        (assoc watch-info :current new-value)
+        (append (get watch-info :changes) {
+          :from old-value
+          :to new-value
+          :time (now)
+        })))
+      (println (str "⚠️ [watch] " var-name " 등록되지 않음"))))
+
+;; 4. trace — 실행 스택 출력
+(defn trace [fn-name & body]
+  "함수 호출 스택 시각화"
+  (do
+    (let [indent (apply str (repeat *trace-depth* "  "))]
+      (println (str indent "├─ " fn-name)))
+    (set! *trace-depth* (+ *trace-depth* 1))
+    (let [result (do @body)]
+      (set! *trace-depth* (- *trace-depth* 1))
+      result)))
+
+;; 5. breakpoint — 브레이크포인트 (수동)
+(defn breakpoint [name context]
+  "실행 일시 정지 및 컨텍스트 출력"
+  (println "")
+  (println (str "⏸️ === 브레이크포인트: " name " ==="))
+  (println "컨텍스트:")
+  (doseq [[k v] context]
+    (println (str "  " k " = " v)))
+  (println "")
+  context)
+
+;; 6. assert — 조건 검증
+(defn assert [condition message]
+  "조건이 참이 아니면 에러 출력"
+  (if (not condition)
+    (do
+      (println "")
+      (println (str "❌ assertion failed: " message))
+      (throw {:type "AssertionError" :message message}))
+    (do
+      (println (str "✅ assertion passed: " message))
+      true)))
+
+;; 7. log-vars — 여러 변수 한번에 출력
+(defn log-vars [& vars]
+  "여러 변수를 정렬된 형태로 출력"
+  (println "")
+  (println "📋 === 변수 로그 ===")
+  (doseq [[name value] vars]
+    (println (str "  " name ": " value)))
+  (println ""))
+
+;; 8. time-fn — 함수 실행 시간 측정
+(defn time-fn [fn-name fn & args]
+  "함수 실행 시간 측정 및 출력"
+  (let [start (now)
+        result (apply fn args)
+        elapsed (- (now) start)]
+    (println (str "⏱️  " fn-name " 실행시간: " elapsed "ms"))
+    result))
+
+;; 사용 예시:
+
+;; 1. 변수 검사
+;; (inspect "user" {:id 1 :name "John"})
+
+;; 2. 함수 디버깅
+;; (let [add-fn (debug "add" + (+ 2 3))]
+;;   (add-fn 2 3))
+
+;; 3. 변수 감시
+;; (watch "counter" 0)
+;; (update-watched "counter" 1)
+;; (update-watched "counter" 2)
+
+;; 4. 실행 스택 추적
+;; (trace "main"
+;;   (trace "fetch-user"
+;;     (trace "db-query"
+;;       (println "SELECT * FROM users"))))
+
+;; 5. 브레이크포인트
+;; (let [user {:id 1 :name "John"}]
+;;   (breakpoint "before-save" {:user user}))
+
+;; 6. 조건 검증
+;; (assert (> 5 3) "5는 3보다 크다")
+;; (assert (nil? nil) "nil 체크")

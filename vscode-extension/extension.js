@@ -276,24 +276,79 @@ function registerHoverProvider(context) {
 function registerCompletionProvider(context) {
   vscode.languages.registerCompletionItemProvider('freelang', {
     provideCompletionItems() {
-      const items = [
-        // Keywords
-        'defn', 'let', 'if', 'when', 'loop', 'try', 'catch',
-        'map', 'filter', 'reduce', 'for', 'doseq',
+      const completions = [
+        // Control Flow
+        { label: 'defn', kind: 'Function', doc: '(defn name [args] body) — 함수 정의' },
+        { label: 'fn', kind: 'Keyword', doc: '(fn [args] body) — 익명 함수' },
+        { label: 'let', kind: 'Keyword', doc: '(let [x 1 y 2] body) — 지역 바인딩' },
+        { label: 'if', kind: 'Keyword', doc: '(if cond then else) — 조건' },
+        { label: 'when', kind: 'Keyword', doc: '(when cond body) — 참일 때만' },
+        { label: 'loop', kind: 'Keyword', doc: '(loop [x 0] (recur (inc x))) — 재귀' },
+        { label: 'try', kind: 'Keyword', doc: '(try body (catch e handler)) — 예외 처리' },
+
+        // Collections
+        { label: 'map', kind: 'Function', doc: '(map fn coll) — 함수 적용' },
+        { label: 'filter', kind: 'Function', doc: '(filter fn coll) — 조건 필터' },
+        { label: 'reduce', kind: 'Function', doc: '(reduce fn init coll) — 축약' },
+        { label: 'for', kind: 'Keyword', doc: '(for [x coll] body) — 컴프리헨션' },
+        { label: 'doseq', kind: 'Keyword', doc: '(doseq [x coll] body) — 순회' },
+        { label: 'sort', kind: 'Function', doc: '(sort coll) — 정렬' },
+        { label: 'reverse', kind: 'Function', doc: '(reverse coll) — 역순' },
 
         // Server
-        'server-start', 'server-json', 'server-html', 'server-status',
+        { label: 'server-start', kind: 'Function', doc: '(server-start port) — 서버 시작' },
+        { label: 'server-json', kind: 'Function', doc: '(server-json obj) — JSON 응답' },
+        { label: 'server-html', kind: 'Function', doc: '(server-html str) — HTML 응답' },
+        { label: 'server-status', kind: 'Function', doc: '(server-status code msg) — 상태 코드' },
+        { label: 'route', kind: 'Function', doc: '(route routes) — 라우트 등록' },
 
-        // DB
-        'db-query', 'db-exec', 'db-transaction',
+        // Database
+        { label: 'db-query', kind: 'Function', doc: '(db-query db sql params) — 쿼리 실행' },
+        { label: 'db-exec', kind: 'Function', doc: '(db-exec db sql params) — 명령 실행' },
+        { label: 'db-transaction', kind: 'Function', doc: '(db-transaction db body) — 트랜잭션' },
 
         // Auth
-        'auth-jwt-sign', 'auth-jwt-verify', 'auth-hash-password',
+        { label: 'auth-jwt-sign', kind: 'Function', doc: '(auth-jwt-sign payload secret ttl) — JWT 생성' },
+        { label: 'auth-jwt-verify', kind: 'Function', doc: '(auth-jwt-verify token secret) — JWT 검증' },
+        { label: 'auth-hash-password', kind: 'Function', doc: '(auth-hash-password pwd) — 비밀번호 해싱' },
+        { label: 'auth-verify-password', kind: 'Function', doc: '(auth-verify-password pwd hash) — 비밀번호 확인' },
+
+        // String
+        { label: 'str', kind: 'Function', doc: '(str a b c) — 문자열 연결' },
+        { label: 'str-split', kind: 'Function', doc: '(str-split s sep) — 문자열 분할' },
+        { label: 'str-includes', kind: 'Function', doc: '(str-includes s substr) — 포함 여부' },
+        { label: 'str-trim', kind: 'Function', doc: '(str-trim s) — 공백 제거' },
+        { label: 'str-replace', kind: 'Function', doc: '(str-replace s old new) — 문자열 치환' },
+        { label: 'str-to-upper', kind: 'Function', doc: '(str-to-upper s) — 대문자' },
+        { label: 'str-to-lower', kind: 'Function', doc: '(str-to-lower s) — 소문자' },
+
+        // Object/Map
+        { label: 'get', kind: 'Function', doc: '(get map key default) — 값 추출' },
+        { label: 'assoc', kind: 'Function', doc: '(assoc map key val) — 값 설정' },
+        { label: 'obj-merge', kind: 'Function', doc: '(obj-merge m1 m2) — 객체 병합' },
+        { label: 'obj-keys', kind: 'Function', doc: '(obj-keys map) — 키 목록' },
+        { label: 'obj-values', kind: 'Function', doc: '(obj-values map) — 값 목록' },
+
+        // Math
+        { label: 'inc', kind: 'Function', doc: '(inc x) — x + 1' },
+        { label: 'dec', kind: 'Function', doc: '(dec x) — x - 1' },
+        { label: 'abs', kind: 'Function', doc: '(abs x) — 절댓값' },
+        { label: 'pow', kind: 'Function', doc: '(pow x n) — 거듭제곱' },
+        { label: 'sqrt', kind: 'Function', doc: '(sqrt x) — 제곱근' },
 
         // Utilities
-        'println', 'str', 'str-split', 'str-includes',
-        'get', 'assoc', 'obj-merge', 'obj-keys'
-      ].map(label => new vscode.CompletionItem(label, vscode.CompletionItemKind.Keyword));
+        { label: 'println', kind: 'Function', doc: '(println a b c) — 콘솔 출력' },
+        { label: 'type-of', kind: 'Function', doc: '(type-of x) — 타입 확인' },
+        { label: 'nil?', kind: 'Function', doc: '(nil? x) — nil 여부' },
+        { label: 'empty?', kind: 'Function', doc: '(empty? coll) — 비어있는지 확인' },
+      ];
+
+      const items = completions.map(c => {
+        const item = new vscode.CompletionItem(c.label, vscode.CompletionItemKind[c.kind]);
+        item.documentation = c.doc;
+        item.detail = c.doc;
+        return item;
+      });
 
       return items;
     }

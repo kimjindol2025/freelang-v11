@@ -1,0 +1,108 @@
+;; 에러 메시지 개선 — 자세한 진단 + 해결 방법 제시
+;; (load "stdlib/error-helper.fl")
+
+(define *error-solutions* {
+  "PARSE_PAREN_MISMATCH" {
+    :message "괄호 불일치 발견"
+    :solutions [
+      "1. 열린 괄호 ( [ { 의 개수 확인"
+      "2. 닫는 괄호 ) ] } 의 개수 확인"
+      "3. 중첩된 괄호 순서 확인: ( [ { } ] )"
+      "4. 문자열 내의 괄호는 자동 무시됨"
+    ]
+  }
+  "UNDEFINED_FUNCTION" {
+    :message "정의되지 않은 함수 호출"
+    :solutions [
+      "1. 함수명 철자 확인"
+      "2. 필수 라이브러리 로드 확인: (load \"stdlib/...\")"
+      "3. 함수 정의 순서 확인 (defn은 호출 전에)"
+      "4. (ls-fns keyword) 로 사용 가능 함수 검색"
+    ]
+  }
+  "TYPE_MISMATCH" {
+    :message "타입 불일치"
+    :solutions [
+      "1. 함수의 인자 타입 확인"
+      "2. (type-of value) 로 현재 타입 확인"
+      "3. 타입 변환 함수 사용: (str value), (int value) 등"
+      "4. (defn-typed ...) 로 타입 검증 활성화"
+    ]
+  }
+  "RUNTIME_ERROR" {
+    :message "런타임 오류 발생"
+    :solutions [
+      "1. 스택 트레이스에서 에러 위치 확인"
+      "2. 변수 값 확인: (println var)"
+      "3. (try ... (catch e ...)) 로 예외 처리"
+      "4. (debug-trace fn-name) 로 함수 실행 추적"
+    ]
+  }
+})
+
+;; 상세한 에러 메시지 출력
+(defn print-error-detailed [error-type error-message error-location]
+  "전체 에러 정보 출력 (타입, 메시지, 위치, 해결 방법)"
+  (let [solution (get *error-solutions* error-type)]
+    (println "")
+    (println "❌ === 에러 발생 ===")
+    (println (str "타입: " error-type))
+    (println (str "위치: " error-location))
+    (println (str "메시지: " error-message))
+    (println "")
+    (if (nil? solution)
+      (println "💡 해결 방법: CLAUDE.md 참고")
+      (do
+        (println (str "💡 " (get solution :message)))
+        (println "")
+        (println "📋 시도할 수 있는 해결책:")
+        (doseq [sol (get solution :solutions)]
+          (println (str "   " sol)))))
+    (println "")))
+
+;; 괄호 불일치 감지 및 자세한 정보 제시
+(defn check-paren-balance [code]
+  "코드의 괄호 균형 검사"
+  (let [opens 0
+        closes 0
+        pairs []]
+    (for [i (range (count code))]
+      (let [ch (nth code i)]
+        (cond
+          (= ch "(") (do (set! opens (+ opens 1)) (append pairs {:type "(" :pos i}))
+          (= ch ")") (do (set! closes (+ closes 1)) (append pairs {:type ")" :pos i}))
+          (= ch "[") (do (set! opens (+ opens 1)) (append pairs {:type "[" :pos i}))
+          (= ch "]") (do (set! closes (+ closes 1)) (append pairs {:type "]" :pos i}))
+          (= ch "{") (do (set! opens (+ opens 1)) (append pairs {:type "{" :pos i}))
+          (= ch "}") (do (set! closes (+ closes 1)) (append pairs {:type "}" :pos i})))))
+
+    (if (not= opens closes)
+      {:ok false :opens opens :closes closes :pairs pairs}
+      {:ok true})))
+
+;; 파싱 오류 분석
+(defn analyze-parse-error [error-message code-snippet]
+  "파싱 오류 원인 분석 및 해결책 제시"
+  (let [paren-check (check-paren-balance code-snippet)
+        is-paren-issue (not (get paren-check :ok))]
+
+    (if is-paren-issue
+      (do
+        (println "")
+        (println "🔍 === 괄호 분석 ===")
+        (println (str "열린 괄호: " (get paren-check :opens)))
+        (println (str "닫는 괄호: " (get paren-check :closes)))
+        (println (str "불일치 개수: " (abs (- (get paren-check :opens) (get paren-check :closes)))))
+        (println "")
+        (println "💡 해결책:")
+        (println "   1. 코드의 마지막 부분부터 확인")
+        (println "   2. 함수 정의 끝에 ) 있는지 확인")
+        (println "   3. 딕셔너리 { } 짝 확인")
+        (println "")
+        error-message)
+      error-message)))
+
+;; 사용 예시:
+;; (print-error-detailed "PARSE_PAREN_MISMATCH" "Unexpected token: RBrace" "line 371:1")
+;; (check-paren-balance "(define routes { :get { } })")
+;; (analyze-parse-error "Unexpected token" "(define routes { :get { }")
