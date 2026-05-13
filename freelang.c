@@ -3,8 +3,8 @@
  *
  * 지원: number/string/bool/nil literal, variable, defn, define,
  *       let, if, cond, do, +,-,*,/,%, =,!=,<,>,<=,>=, and,or,not,
- *       println, print, str, function call
- * 제외: closure, map, vector, loop/recur, try/catch
+ *       println, print, str, loop/recur, vector, map, function call
+ * 제외: closure, try/catch
  *
  * 사용: ./freelang input.fl
  * 컴파일: gcc freelang.c -o freelang
@@ -143,6 +143,11 @@ static N* pnode(void) {
 static int sym(N* n, const char* s) {
     return n && n->k == NA && strcmp(n->v, s) == 0;
 }
+
+/* ──────────────────────────────── Loop context ── */
+static int loop_ids[32];
+static int loop_top = 0;
+static int loop_counter = 0;
 
 /* ──────────────────────────────── Emitter ── */
 static FILE* out;
@@ -309,6 +314,43 @@ static void emit_node(N* n) {
     }
     if (sym(op,"file-write")) {
         E("fl_file_write("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return;
+    }
+    /* loop/recur */
+    if (sym(op,"loop")) {
+        N* bl = a[0];                    /* NV node: [name init name init ...] */
+        int nv = bl->nc / 2;
+        int lid = loop_counter++;
+        E("(__extension__({\n");
+        for (int i = 0; i < nv; i++) {
+            char b[512]; cname(bl->c[i*2]->v, b, sizeof(b));
+            E("    FLValue _lv%d_%d = ", lid, i);
+            emit_node(bl->c[i*2+1]);
+            E("; /* %s */\n", b);
+        }
+        E("    FLValue _lr%d;\n", lid);
+        E("    _loop_%d:;\n", lid);
+        E("    {\n");
+        for (int i = 0; i < nv; i++) {
+            char b[512]; cname(bl->c[i*2]->v, b, sizeof(b));
+            E("        FLValue %s = _lv%d_%d;\n", b, lid, i);
+        }
+        loop_ids[loop_top++] = lid;
+        E("        _lr%d = ", lid);
+        emit_node(na > 1 ? a[na-1] : NULL);
+        E(";\n    }\n");
+        loop_top--;
+        E("    _lr%d;\n}))", lid);
+        return;
+    }
+    if (sym(op,"recur")) {
+        if (loop_top == 0) { E("fl_nil()"); return; }
+        int lid = loop_ids[loop_top-1];
+        E("(");
+        for (int i = 0; i < na; i++) {
+            E("_lv%d_%d = ", lid, i); emit_node(a[i]); E(", ");
+        }
+        E("(__extension__({goto _loop_%d; fl_nil();})))", lid);
+        return;
     }
     /* vector ops */
     if (sym(op,"vec-get"))  { E("fl_vec_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
