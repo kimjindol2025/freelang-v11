@@ -381,7 +381,15 @@ function mariadbConfigToPoolId(db: any): string {
 // Module export
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function createMariadbModule() {
+export function createMariadbModule(callFn?: (fn: any, args: any[]) => any) {
+  // FreeLang function value 호출 헬퍼
+  function callFlFn(fn: any): any {
+    if (typeof fn === "function") return fn();
+    if (typeof fn?.body === "function") return fn.body();
+    if (callFn) return callFn(fn, []);
+    throw new Error("db-transaction: fn 인자가 호출 가능한 함수가 아닙니다");
+  }
+
   return {
     // ── CLI 방식 (기존) — pool_* prefix → pool 자동 라우팅 ──────────────────
     "mariadb_exec":  (db: string, sql: string, params: any[] = []) => {
@@ -626,7 +634,7 @@ export function createMariadbModule() {
         const sqliteDb = getSqliteDb(getSqlitePath(db));
         sqliteDb.exec("BEGIN");
         try {
-          const result = typeof fn === "function" ? fn() : fn;
+          const result = callFlFn(fn);
           sqliteDb.exec("COMMIT");
           return result;
         } catch (e: any) {

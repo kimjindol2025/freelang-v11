@@ -155,7 +155,9 @@ export function loadAllStdlib(interp: InterpreterLike): void {
 
   // Universal DB wrapper — db-query/db-exec/db-transaction (MariaDB + SQLite routing)
   // 등록은 kebab alias 이후 → db-exec alias(db_exec)를 이 버전으로 덮어씀
-  interp.registerModule(createMariadbModule());
+  interp.registerModule(createMariadbModule(
+    (fn: any, args: any[]) => interp.callFunctionValue(fn, args)
+  ));
 
   // ── fl_require builtin 등록 ─────────────────────────────────────
   // (fl_require "audit")   → audit_log 등 즉시 사용 가능
