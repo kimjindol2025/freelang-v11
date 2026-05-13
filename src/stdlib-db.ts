@@ -1,8 +1,9 @@
 // FreeLang v9: Database Driver Standard Library
 // Phase 20: kimdb REST API + SQLite CLI driver
+// npm 0 달성: better-sqlite3 → node:sqlite (Node.js v22.5+ 내장)
 
 import { spawnSync } from "child_process";
-import Database from "better-sqlite3";
+const { DatabaseSync } = require("node:sqlite");
 
 // ── kimdb helper ─────────────────────────────────────────────────────────────
 
@@ -38,15 +39,26 @@ function kimdbReq(method: string, path: string, body?: any): any {
   try { return JSON.parse(raw); } catch { return raw; }
 }
 
-// ── SQLite helper ─────────────────────────────────────────────────────────────
+// ── SQLite helper (node:sqlite 내장) ─────────────────────────────────────────
 
-const dbConnections = new Map<string, Database.Database>();
+const dbConnections = new Map<string, any>();
 
-function getDb(dbPath: string): Database.Database {
+function getDb(dbPath: string): any {
   if (!dbConnections.has(dbPath)) {
-    dbConnections.set(dbPath, new Database(dbPath));
+    dbConnections.set(dbPath, new DatabaseSync(dbPath));
   }
   return dbConnections.get(dbPath)!;
+}
+
+function toPlain(row: any): any {
+  if (!row) return row;
+  return Object.assign({}, row);
+}
+
+function spreadParams(p: any): any[] {
+  if (Array.isArray(p)) return p;
+  if (p !== null && p !== undefined) return [p];
+  return [];
 }
 
 // ── Module ───────────────────────────────────────────────────────────────────
@@ -105,21 +117,17 @@ export function createDbModule() {
     // ── SQLite ───────────────────────────────────────────────
 
     // db_query dbPath sql params -> rows (JSON array)
-    // params: 배열이 아닌 단일값도 자동으로 [val] 래핑 (scalar auto-wrap)
     "db_query": (dbPath: string, sql: string, params: any = []): any[] => {
       const db = getDb(dbPath);
-      const p = Array.isArray(params) ? params
-               : (params !== null && params !== undefined ? [params] : []);
-      return db.prepare(sql).all(p);
+      const p = spreadParams(params);
+      return db.prepare(sql).all(...p).map(toPlain);
     },
 
-    // db_exec dbPath sql [params] -> stdout string
-    // params: 배열이 아닌 단일값도 자동으로 [val] 래핑 (scalar auto-wrap)
+    // db_exec dbPath sql [params] -> ""
     "db_exec": (dbPath: string, sql: string, params: any = []): string => {
       const db = getDb(dbPath);
-      const p = Array.isArray(params) ? params
-               : (params !== null && params !== undefined ? [params] : []);
-      db.prepare(sql).run(p);
+      const p = spreadParams(params);
+      db.prepare(sql).run(...p);
       return "";
     },
 
@@ -128,8 +136,7 @@ export function createDbModule() {
       const db = getDb(dbPath);
       const keys = Object.keys(data);
       const placeholders = keys.map(() => '?').join(',');
-      const vals = Object.values(data);
-      db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${placeholders})`).run(vals);
+      db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${placeholders})`).run(...Object.values(data));
       return true;
     },
 
@@ -138,45 +145,39 @@ export function createDbModule() {
       const db = getDb(dbPath);
       const keys = Object.keys(data);
       const sets = keys.map(k => `${k}=?`).join(", ");
-      const vals = Object.values(data);
-      // Assuming 'where' doesn't need parameter binding for this simple helper, though it's a risk.
-      // Better way would be to support where params, but keeping it compatible with existing sig.
-      db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(vals);
+      db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(...Object.values(data));
       return true;
     },
 
     // db_delete_row dbPath table where -> true
     "db_delete_row": (dbPath: string, table: string, where: string): boolean => {
-      const db = getDb(dbPath);
-      db.prepare(`DELETE FROM ${table} WHERE ${where}`).run();
+      getDb(dbPath).prepare(`DELETE FROM ${table} WHERE ${where}`).run();
       return true;
     },
 
     // db_count dbPath table -> number
     "db_count": (dbPath: string, table: string): number => {
-      const db = getDb(dbPath);
-      const row = db.prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get() as {cnt: number};
+      const row = toPlain(getDb(dbPath).prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get());
       return Number(row?.cnt ?? 0);
     },
 
     // db_tables dbPath -> string[]
     "db_tables": (dbPath: string): string[] => {
-      const db = getDb(dbPath);
-      const rows = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as {name: string}[];
-      return rows.map(r => r.name);
+      return getDb(dbPath)
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        .all().map((r: any) => toPlain(r).name);
     },
 
-    // db_create dbPath sql -> true  (CREATE TABLE ...)
+    // db_create dbPath sql -> true
     "db_create": (dbPath: string, sql: string): boolean => {
-      const db = getDb(dbPath);
-      db.exec(sql); // exec can run multiple statements
+      getDb(dbPath).exec(sql);
       return true;
     },
-    
+
     // db_close dbPath -> true
     "db_close": (dbPath: string): boolean => {
       if (dbConnections.has(dbPath)) {
-        dbConnections.get(dbPath)!.close();
+        dbConnections.get(dbPath).close();
         dbConnections.delete(dbPath);
       }
       return true;

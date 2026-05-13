@@ -160,71 +160,99 @@ function bindParams(sql: string, params: any[]): string {
 
 const DATA_BUF_SIZE = 4 * 1024 * 1024; // 4MB
 
-// 인라인 워커 코드: mysql2 커넥션 풀 유지 + Atomics 동기화
+// 인라인 워커 코드: 네이티브 CLI 방식 풀 (npm 0 — mysql2 제거)
+// spawnSync('mysql') 기반 — Worker Thread 동기화는 그대로 유지
 const WORKER_CODE = `
 const { workerData } = require('worker_threads');
-const mysql2 = require('mysql2/promise');
+const { spawnSync } = require('child_process');
 const control = new Int32Array(workerData.controlBuf);
 const data = Buffer.from(workerData.dataBuf);
-const pools = new Map();
+const pools = new Map(); // poolId -> config
 
-async function handle(req) {
+function buildArgs(config) {
+  const args = ['-u', config.user || 'root'];
+  if (config.socketPath) {
+    args.push('--socket=' + config.socketPath);
+  } else {
+    args.push('-h', config.host || '127.0.0.1', '-P', String(config.port || 3306));
+  }
+  if (config.password) args.push('-p' + config.password);
+  if (config.database) args.push(config.database);
+  return args;
+}
+
+function runSql(config, sql) {
+  const args = [...buildArgs(config), '--batch', '--column-names', '-e', sql];
+  const r = spawnSync('mysql', args, { timeout: 15000, encoding: 'utf8' });
+  if (r.error) throw new Error('mysql: ' + r.error.message);
+  if (r.status !== 0) throw new Error((r.stderr || '').trim() || 'mysql exit ' + r.status);
+  return r.stdout || '';
+}
+
+function parseRows(text) {
+  const lines = text.trim().split('\\n').filter(Boolean);
+  if (!lines.length) return [];
+  const headers = lines[0].split('\\t');
+  return lines.slice(1).map(line => {
+    const vals = line.split('\\t');
+    const row = {};
+    headers.forEach((h, i) => { row[h] = vals[i] === 'NULL' ? null : vals[i]; });
+    return row;
+  });
+}
+
+function bindParams(sql, params) {
+  if (!params || !params.length) return sql;
+  let i = 0;
+  return sql.replace(/\\?/g, () => {
+    const p = params[i++];
+    if (p === null || p === undefined) return 'NULL';
+    if (typeof p === 'number') return String(p);
+    return "'" + String(p).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'") + "'";
+  });
+}
+
+function handle(req) {
   if (req.type === 'connect') {
-    if (pools.has(req.poolId)) return { ok: true };
-    const pool = await mysql2.createPool({
-      host:     req.config.host || '127.0.0.1',
-      port:     req.config.port || 3306,
-      user:     req.config.user || 'root',
-      password: req.config.password || '',
-      database: req.config.database || '',
-      connectionLimit: req.config.poolSize || 5,
-      socketPath: req.config.socketPath,
-    });
-    pools.set(req.poolId, pool);
+    pools.set(req.poolId, req.config);
     return { ok: true };
   }
   if (req.type === 'close') {
-    const pool = pools.get(req.poolId);
-    if (pool) { await pool.end(); pools.delete(req.poolId); }
+    pools.delete(req.poolId);
     return { ok: true };
   }
-  const pool = pools.get(req.poolId);
-  if (!pool) return { ok: false, error: 'pool ' + req.poolId + ' not found' };
+  const config = pools.get(req.poolId);
+  if (!config) return { ok: false, error: 'pool ' + req.poolId + ' not found' };
 
-  if (req.type === 'query') {
-    const [rows] = await pool.query(req.sql, req.params || []);
-    return { ok: true, rows: Array.from(rows).map(r => Object.assign({}, r)) };
-  }
-  if (req.type === 'exec') {
-    const [result] = await pool.query(req.sql, req.params || []);
-    return { ok: true, affectedRows: result.affectedRows || 0, insertId: result.insertId || 0 };
-  }
-  if (req.type === 'one') {
-    const [rows] = await pool.query(req.sql, req.params || []);
-    return { ok: true, row: rows[0] ? Object.assign({}, rows[0]) : null };
-  }
-  if (req.type === 'transaction') {
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      const results = [];
-      for (const stmt of req.stmts) {
-        const [r] = await conn.query(stmt.sql, stmt.params || []);
-        results.push({ ok: true, affectedRows: r.affectedRows || 0, insertId: r.insertId || 0 });
-      }
-      await conn.commit();
-      return { ok: true, results };
-    } catch (e) {
-      await conn.rollback();
-      return { ok: false, error: e.message };
-    } finally {
-      conn.release();
+  try {
+    const sql = bindParams(req.sql, req.params || []);
+    if (req.type === 'query') {
+      return { ok: true, rows: parseRows(runSql(config, sql)) };
     }
+    if (req.type === 'one') {
+      return { ok: true, row: parseRows(runSql(config, sql))[0] || null };
+    }
+    if (req.type === 'exec') {
+      runSql(config, sql);
+      // affectedRows/insertId 근사치 — CLI는 직접 지원 안함
+      try {
+        const meta = parseRows(runSql(config, 'SELECT ROW_COUNT() as ar, LAST_INSERT_ID() as lid'));
+        return { ok: true, affectedRows: Number(meta[0]?.ar || 0), insertId: Number(meta[0]?.lid || 0) };
+      } catch { return { ok: true, affectedRows: 0, insertId: 0 }; }
+    }
+    if (req.type === 'transaction') {
+      const sqls = req.stmts.map(s => bindParams(s.sql, s.params || []));
+      const txSql = 'START TRANSACTION;\\n' + sqls.join(';\\n') + ';\\nCOMMIT;';
+      runSql(config, txSql);
+      return { ok: true, results: req.stmts.map(() => ({ ok: true, affectedRows: 0, insertId: 0 })) };
+    }
+    return { ok: false, error: 'unknown type: ' + req.type };
+  } catch(e) {
+    return { ok: false, error: e.message };
   }
-  return { ok: false, error: 'unknown type: ' + req.type };
 }
 
-async function loop() {
+function loop() {
   while (true) {
     Atomics.wait(control, 0, 0);
     const flag = Atomics.load(control, 0);
@@ -232,25 +260,17 @@ async function loop() {
     const reqLen = data.readInt32LE(0);
     const reqStr = data.toString('utf8', 4, 4 + reqLen);
     let resp;
-    try {
-      const req = JSON.parse(reqStr);
-      resp = await handle(req);
-    } catch(e) {
-      resp = { ok: false, error: e.message };
-    }
+    try { resp = handle(JSON.parse(reqStr)); }
+    catch(e) { resp = { ok: false, error: e.message }; }
     const respStr = JSON.stringify(resp);
     data.writeInt32LE(respStr.length, 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
-    Atomics.wait(control, 0, 2); // wait for main thread to acknowledge (reset to 0)
+    Atomics.wait(control, 0, 2);
   }
 }
-loop().catch(e => {
-  console.error('[MariaDB Worker]', e.message);
-  Atomics.store(control, 0, -2);
-  Atomics.notify(control, 0);
-});
+loop();
 `;
 
 let poolWorker: any = null;

@@ -1,15 +1,13 @@
 // FreeLang v11: DB Query Builder Standard Library
 // Phase F-3: DSL 기반 SQLite 쿼리 (코드 50% 감소)
-//
-// 기존: (db_exec path "SELECT * FROM users WHERE age > ?" [18])
-// 신규: (db_query path :select ["id" "name"] :from "users" :where {"age>" 18})
+// npm 0 달성: better-sqlite3 → node:sqlite (Node.js v22.5+ 내장)
 
-let Database: any;
-try { Database = require("better-sqlite3"); } catch { Database = null; }
+const { DatabaseSync: DBSync } = require("node:sqlite");
+const _dbqCache = new Map<string, any>();
 
 function getDb(dbPath: string): any {
-  if (!Database) throw new Error("better-sqlite3 미설치. npm install better-sqlite3 실행");
-  return new Database(dbPath);
+  if (!_dbqCache.has(dbPath)) _dbqCache.set(dbPath, new DBSync(dbPath));
+  return _dbqCache.get(dbPath);
 }
 
 function toSerializable(obj: any): any {
@@ -148,8 +146,9 @@ export function createDbQueryModule() {
         const stmt = db.prepare(sql);
 
         // 트랜잭션으로 묶어서 빠르게 처리
-        const insertMany = db.transaction((items: any[]) => {
-          for (const row of items) {
+        db.exec("BEGIN");
+        try {
+          for (const row of rows) {
             try {
               const data = toSerializable(row instanceof Map ? Object.fromEntries(row) : row);
               stmt.run(...keys.map((k: string) => data[k]));
@@ -158,9 +157,11 @@ export function createDbQueryModule() {
               errors.push(e.message);
             }
           }
-        });
-
-        insertMany(rows);
+          db.exec("COMMIT");
+        } catch(e: any) {
+          try { db.exec("ROLLBACK"); } catch {}
+          throw e;
+        }
       } catch (e: any) {
         errors.push(e.message);
       } finally {
@@ -179,17 +180,16 @@ export function createDbQueryModule() {
       const results: any[] = [];
 
       try {
-        const runAll = db.transaction(() => {
-          for (const q of queries) {
-            const qMap = q instanceof Map ? q : new Map(Object.entries(q));
-            const op = qMap.get("op") ?? "select";
-            // 재귀 호출 대신 인라인 처리
-            results.push({ op, done: true });
-          }
-        });
-        runAll();
-      } finally {
-        db.close();
+        db.exec("BEGIN");
+        for (const q of queries) {
+          const qMap = q instanceof Map ? q : new Map(Object.entries(q));
+          const op = qMap.get("op") ?? "select";
+          results.push({ op, done: true });
+        }
+        db.exec("COMMIT");
+      } catch(e: any) {
+        try { db.exec("ROLLBACK"); } catch {}
+        throw e;
       }
 
       return results;
