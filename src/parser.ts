@@ -743,7 +743,7 @@ export class Parser {
       const isGenericType = v.length <= 2 && v === v.toUpperCase() && /^[A-Z]/.test(v);
       return !isGenericType;
     }
-    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket || nextToken.type === T.LBracket || nextToken.type === T.LParen;
+    return nextToken.type === T.Variable || nextToken.type === T.Number || nextToken.type === T.String || nextToken.type === T.RBracket || nextToken.type === T.LBracket || nextToken.type === T.LParen || nextToken.type === T.LBrace || nextToken.type === T.Keyword || nextToken.type === T.Colon;
   }
 
   // Parse S-expression: (op arg1 arg2 ...) or (op[T] arg1 arg2 ...) for generic functions

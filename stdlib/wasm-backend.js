@@ -431,6 +431,77 @@ try {
     mem32[0] = nB;
     const outPtr = inst.exports.__zipmap__(pA, pB);
     out({ ok: true, value: readArr(mem32, outPtr) });
+
+  } else if (mode === 'arr-filter') {
+    // {input_array, expr}  — expr uses "x" → i32(0=skip, 1=keep)
+    const { input_array, expr } = ast;
+    const xExpr = ['arr-get', 'in_ptr', 'i'];
+    const predExpr = substVar(expr, 'x', xExpr);
+    // WASM: 조건 통과한 원소만 out에 복사
+    const fn = {
+      name: '__filter__',
+      params: ['in_ptr'],
+      body: ['let',
+        [['n',   ['arr-len', 'in_ptr']],
+         ['out', ['arr-new', 'n', 0]],   // 최대 크기로 미리 할당
+         ['i',   0],
+         ['j',   0]],                    // j = 출력 인덱스
+        ['do',
+          ['while', ['<', 'i', 'n'],
+            ['do',
+              ['if', predExpr,
+                ['do', ['arr-set', 'out', 'j', ['arr-get', 'in_ptr', 'i']],
+                       ['set!', 'j', ['+', 'j', 1]]],
+                0],
+              ['set!', 'i', ['+', 'i', 1]]]],
+          // out[0] = 실제 길이로 수정 후 반환
+          ['do', ['arr-set', 'out', -1, 'j'],  // 길이 덮어쓰기
+                 'out']]]
+    };
+    // 특수: 길이를 j로 갱신하는 방식 — arr-set(out, -1, j)는 ptr+(-1*4+4)=ptr 즉 length 위치
+    const b = buildModule({ fns: [fn], memory: true });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const mem32 = new Int32Array(inst.exports.memory.buffer);
+    const { ptr, next } = writeArr(mem32, input_array, 0x1000);
+    mem32[0] = next;
+    const outPtr = inst.exports.__filter__(ptr);
+    out({ ok: true, value: readArr(mem32, outPtr) });
+
+  } else if (mode === 'arr-scan') {
+    // {input_array, init, expr}  — 누적 중간값 배열 반환 (running total)
+    // expr uses "acc", "x"
+    const { input_array, init = 0, expr } = ast;
+    const xExpr = ['arr-get', 'in_ptr', 'i'];
+    const bodyExpr = substVar(expr, 'x', xExpr);
+    const fn = {
+      name: '__scan__',
+      params: ['init', 'in_ptr'],
+      body: ['let',
+        [['n',   ['arr-len', 'in_ptr']],
+         ['out', ['arr-new', 'n', 0]],
+         ['acc', 'init'],
+         ['i',   0]],
+        ['do',
+          ['while', ['<', 'i', 'n'],
+            ['do',
+              ['set!', 'acc', substVar(bodyExpr, 'acc', 'acc')],
+              ['arr-set', 'out', 'i', 'acc'],
+              ['set!', 'i', ['+', 'i', 1]]]],
+          'out']]
+    };
+    const b = buildModule({ fns: [fn], memory: true });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const mem32 = new Int32Array(inst.exports.memory.buffer);
+    const { ptr, next } = writeArr(mem32, input_array, 0x1000);
+    mem32[0] = next;
+    const outPtr = inst.exports.__scan__(init, ptr);
+    out({ ok: true, value: readArr(mem32, outPtr) });
+
+  } else if (mode === 'compile-fn') {
+    // {fns: [{name, params, body, returnType?}], memory?}
+    // 여러 함수를 하나의 모듈로 컴파일 → base64 WASM
+    const b = buildModule(ast);
+    out({ ok: true, wasm: b.toString('base64'), size: b.length, fns: ast.fns.map(f=>f.name) });
   }
 } catch(e) {
   out({ ok:false, error:e.message });
