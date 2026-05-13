@@ -626,6 +626,28 @@ describe("간단한 헬퍼 함수 — v11.7.6", () => {
   });
 });
 
+describe("배열 헬퍼 함수 — v11.7.7", () => {
+  test("unique 중복 제거", () => {
+    const result = run('(unique [1 2 2 3 3 3])');
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  test("unique 문자열 중복 제거", () => {
+    const result = run('(unique ["a" "b" "a" "c" "b"])');
+    expect(result).toEqual(["a", "b", "c"]);
+  });
+
+  test("flatten-one 1단계 펴기", () => {
+    const result = run('(flatten-one [[1 2] [3 4] [5]])');
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test("flatten-one 섞인 배열", () => {
+    const result = run('(flatten-one [1 [2 3] 4 [5]])');
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

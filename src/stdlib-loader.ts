@@ -26,6 +26,7 @@ import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Re
 import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server
 import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver (SQLite)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
+import { createCryptoUtilsModule } from "./stdlib-crypto-utils"; // Phase 25: AES-256-GCM + hashing
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process";  // Phase 22: Process (env + SIGTERM)
@@ -106,9 +107,11 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   ));
   const dbModule = createDbModule();
   const authModule = createAuthModule();
+  const cryptoUtilsModule = createCryptoUtilsModule();
   const cacheModule = createCacheModule();
   interp.registerModule(dbModule);
   interp.registerModule(authModule);
+  interp.registerModule(cryptoUtilsModule);
   interp.registerModule(cacheModule);
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
   const processModule = createProcessModule();
@@ -145,7 +148,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     fileModule, fdModule, bitsModule, errorModule, httpModule,
     shellModule, dataModule, collectionModule, agentModule, timeModule,
     verifyModule, httpMacroModule, dbQueryModule, optionalModule, restCrudModule,
-    cryptoModule, workflowModule, resourceModule,
+    cryptoModule, cryptoUtilsModule, workflowModule, resourceModule,
     dbModule, authModule, cacheModule,
     processModule, moduleSystem,
     imageModule, mongodbModule,
@@ -394,6 +397,35 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       return String(s).endsWith(String(suffix));
     },
     "ends_with": (s: string, suffix: string) => _aliases["ends-with"](s, suffix),
+
+    // v11.7.7: 배열 헬퍼 (중복제거, 1단계 펴기)
+    "unique": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      const seen = new Set();
+      const result: any[] = [];
+      for (const item of arr) {
+        const key = typeof item === "object" ? JSON.stringify(item) : item;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push(item);
+        }
+      }
+      return result;
+    },
+
+    "flatten-one": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      const result: any[] = [];
+      for (const item of arr) {
+        if (Array.isArray(item)) {
+          result.push(...item);
+        } else {
+          result.push(item);
+        }
+      }
+      return result;
+    },
+    "flatten_one": (arr: any[]) => _aliases["flatten-one"](arr),
 
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {
