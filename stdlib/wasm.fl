@@ -1,0 +1,108 @@
+;; stdlib/wasm.fl — FreeLang → WASM 컴파일러 (v11.7.3)
+;; (load "stdlib/wasm.fl")
+;;
+;; FreeLang S-expression을 WebAssembly 바이트코드로 컴파일하고 실행한다.
+;; 외부 도구 없이 순수 Node.js WebAssembly API만 사용.
+;;
+;; 사용법:
+;;   (wasm-fn "add" ["a" "b"] ["+", "a", "b"])
+;;   → 함수 정의 맵 반환 (wasm-module에 전달)
+;;
+;;   (wasm-module [fn1 fn2 ...])
+;;   → {:ok true :wasm base64 :size n} 또는 {:ok false :error msg}
+;;
+;;   (wasm-run! module "add" [3 4])
+;;   → 7  (또는 throw)
+;;
+;;   (wasm-eval expr params args)
+;;   → (wasm-eval ["+", "a", "b"] ["a" "b"] [3 4]) → 7
+;;
+;; 지원 연산자:
+;;   + - * / %           산술
+;;   == != < > <= >=     비교 (i32 결과)
+;;   and or not xor      논리/비트
+;;   << >>               비트 시프트
+;;   if do let call      제어 흐름
+;;   abs neg min max     수학
+;;
+;; 실무 예제:
+;;   (load "stdlib/wasm.fl")
+;;   (let [m (wasm-module
+;;             [(wasm-fn "fib" ["n"]
+;;               ["if" ["<=" "n" 1] "n"
+;;                ["+", ["call" "fib" ["-" "n" 1]]
+;;                      ["call" "fib" ["-" "n" 2]]]])])]
+;;     (wasm-run! m "fib" [20]))  ;; → 6765
+
+(defn -wasm-backend []
+  (let [r (shell-exec-result "pwd")]
+    (str (str-trim (get r :stdout)) "/stdlib/wasm-backend.js")))
+
+(defn -wasm-tmp []
+  (str "/tmp/wasm_" (str (now-ms)) ".json"))
+
+(defn -wasm-exec [mode ast-map]
+  (let [tmp  (-wasm-tmp)
+        _    (file-write tmp (json-stringify ast-map))
+        cmd  (str "node " (-wasm-backend) " " mode " " tmp)
+        res  (shell-exec-result cmd)
+        _    (shell-exec-result (str "rm -f " tmp))]
+    (if (not (get res :ok))
+      {:ok false :error (get res :stderr)}
+      (try (json-parse (str-trim (get res :stdout)))
+           (catch e {:ok false :error (str "parse error: " e)})))))
+
+;; ── 공개 API ──────────────────────────────────────────────────────────────────
+
+(defn wasm-fn [name params body]
+  {"name" name "params" params "body" body})
+
+(defn wasm-fn-f64 [name params body]
+  {"name" name "params" params "body" body "returnType" "f64"})
+
+(defn wasm-module [fns]
+  (let [r (-wasm-exec "compile" {"fns" fns})]
+    (if (get r "ok")
+      {:ok true :wasm (get r "wasm") :size (get r "size")}
+      {:ok false :error (get r "error")})))
+
+(defn wasm-run! [module fn-name args]
+  (when (not (get module :ok))
+    (throw (str "WASM 모듈 오류: " (get module :error))))
+  (let [tmp  (-wasm-tmp)
+        wasm (get module :wasm)
+        _    (file-write tmp (json-stringify {"wasm" wasm}))
+        cmd  (str "node -e \""
+               "const fs=require('fs');"
+               "const b=Buffer.from('" wasm "','base64');"
+               "const m=new WebAssembly.Module(b);"
+               "const i=new WebAssembly.Instance(m);"
+               "const f=i.exports['" fn-name "'];"
+               "const args=" (json-stringify args) ";"
+               "process.stdout.write(JSON.stringify({ok:true,value:f(...args)}));"
+               "\"")
+        res  (shell-exec-result cmd)
+        _    (shell-exec-result (str "rm -f " tmp))]
+    (if (not (get res :ok))
+      (throw (str "WASM 실행 오류: " (get res :stderr)))
+      (let [data (json-parse (str-trim (get res :stdout)))]
+        (if (get data "ok")
+          (get data "value")
+          (throw (str "WASM 오류: " (get data "error"))))))))
+
+(defn wasm-eval [expr params args]
+  (let [r (-wasm-exec "eval" {"expr" expr "params" params "args" args})]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM eval 오류: " (get r "error"))))))
+
+;; ── 편의 함수 ──────────────────────────────────────────────────────────────────
+
+(defn wasm-compile-expr [name params body]
+  (wasm-module [(wasm-fn name params body)]))
+
+(defn wasm-ok? [module]
+  (= (get module :ok) true))
+
+(defn wasm-size [module]
+  (get module :size 0))

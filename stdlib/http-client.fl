@@ -1,0 +1,126 @@
+;; stdlib/http-client.fl — HTTP 클라이언트 (Node.js 기반) (v11.7.3)
+;; (load "stdlib/http-client.fl")
+;;
+;; 사용법:
+;;   (http-get "https://api.example.com/users")    → {:ok :status :body}
+;;   (http-post url body-str headers)
+;;   (http-json-get url)          → {:ok :status :body(파싱된 맵)}
+;;   (http-json-post url data)    → {:ok :status :body}
+;;   (http-build-url base params) → "https://base?k=v"
+;;
+;; 실무 예제:
+;;   (load "stdlib/http-client.fl")
+;;   (defn fetch-weather [city]
+;;     (let [url (http-build-url "https://wttr.in" {"format" "j1" "location" city})
+;;           r   (http-json-get url)]
+;;       (if (get r :ok) (get r :body) (throw "날씨 API 오류"))))
+
+;; ── Node.js 기반 요청 ─────────────────────────────────────────────────────────
+
+(defn -http-node-request [method url body-str headers timeout-ms]
+  (let [hdr-json  (str-replace-all (json-stringify (if (nil? headers) {} headers)) "\"" "\\\"")
+        body-safe (if (nil? body-str) "" (str-replace-all (str-replace-all body-str "\\" "\\\\") "\"" "\\\""))
+        script    (str
+"const https=require('https'),http=require('http'),url=new URL('" url "');"
+"const opts={hostname:url.hostname,port:url.port||undefined,path:url.pathname+url.search,method:'" (str-to-upper method) "',"
+"headers:" hdr-json "};"
+"const lib=url.protocol==='https:'?https:http;"
+"let body='" body-safe "';"
+"if(body)opts.headers['Content-Length']=Buffer.byteLength(body);"
+"const req=lib.request(opts,res=>{"
+"let d='';res.on('data',c=>d+=c);"
+"res.on('end',()=>{"
+"try{process.stdout.write(JSON.stringify({s:res.statusCode,b:d}));}catch(e){process.stdout.write(JSON.stringify({s:0,b:''}));}"
+"})});"
+"req.setTimeout(" (str timeout-ms) ",()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'timeout'}));});"
+"req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:e.message})));"
+"if(body)req.write(body);req.end();")
+        result    (shell-exec-result (str "node -e \"" script "\""))]
+    (if (not (get result :ok))
+      {:ok false :status 0 :body "" :error (get result :stderr)}
+      (let [out  (str-trim (get result :stdout))
+            data (try (json-parse out) (catch e {"s" 0 "b" ""}))]
+        (let [status (get data "s" 0)
+              body   (get data "b" "")]
+          {:ok     (and (>= status 200) (< status 300))
+           :status status
+           :body   body})))))
+
+;; ── 기본 요청 ─────────────────────────────────────────────────────────────────
+
+(defn http-request [method url opts]
+  (let [headers (get opts :headers {})
+        body    (get opts :body nil)
+        timeout (get opts :timeout 10000)]
+    (-http-node-request method url body headers timeout)))
+
+(defn http-get [url]
+  (http-request "GET" url {}))
+
+(defn http-get-h [url headers]
+  (http-request "GET" url {:headers headers}))
+
+(defn http-post [url body headers]
+  (http-request "POST" url {:body body :headers headers}))
+
+(defn http-put [url body headers]
+  (http-request "PUT" url {:body body :headers headers}))
+
+(defn http-patch [url body headers]
+  (http-request "PATCH" url {:body body :headers headers}))
+
+(defn http-delete [url]
+  (http-request "DELETE" url {}))
+
+;; ── JSON 편의 함수 ────────────────────────────────────────────────────────────
+
+(defn -json-headers []
+  {"Content-Type" "application/json" "Accept" "application/json"})
+
+(defn -parse-json-body [r]
+  (let [body (get r :body "")]
+    (assoc r :body
+      (try (json-parse body)
+           (catch e body)))))
+
+(defn http-json-get [url]
+  (-parse-json-body (http-get-h url (-json-headers))))
+
+(defn http-json-get-h [url headers]
+  (-parse-json-body (http-get-h url (obj-merge (-json-headers) headers))))
+
+(defn http-json-post [url data]
+  (-parse-json-body (http-post url (json-stringify data) (-json-headers))))
+
+(defn http-json-post-h [url data headers]
+  (-parse-json-body (http-post url (json-stringify data) (obj-merge (-json-headers) headers))))
+
+(defn http-json-put [url data]
+  (-parse-json-body (http-put url (json-stringify data) (-json-headers))))
+
+(defn http-json-delete [url]
+  (-parse-json-body (http-delete url)))
+
+;; ── URL 빌더 ─────────────────────────────────────────────────────────────────
+
+(defn http-build-url [base params]
+  (if (or (nil? params) (empty? (keys params)))
+    base
+    (let [qs (str-join "&"
+                (map (fn [e] (str (first e) "=" (second e)))
+                     (obj-entries params)))]
+      (str base "?" qs))))
+
+;; ── 인증 헬퍼 ─────────────────────────────────────────────────────────────────
+
+(defn http-bearer [url token]
+  (http-get-h url {"Authorization" (str "Bearer " token)}))
+
+(defn http-json-bearer [url token]
+  (http-json-get-h url {"Authorization" (str "Bearer " token)}))
+
+(defn http-json-post-bearer [url data token]
+  (http-json-post-h url data {"Authorization" (str "Bearer " token)}))
+
+(defn http-api-key [url key header-name]
+  (http-get-h url (assoc {} header-name key)))
