@@ -619,7 +619,9 @@ export class Parser {
         // 블록 타입은 반드시 UPPERCASE여야 함 (소문자 page/form/guard 등은 일반 변수)
         const isKnownType = knownBlockTypes.includes(potentialType);
         const nextNextIdx = nextIdx + 1;
-        const hasKeywordAfterName = nextNextIdx < this.tokens.length &&
+        // 블록 이름은 반드시 ALLCAPS여야 함 — 소문자 이름+콜론은 타입 어노테이션 [a :int]
+        const isAllCaps = /^[A-Z][A-Z0-9_\-]*$/.test(potentialType);
+        const hasKeywordAfterName = isAllCaps && nextNextIdx < this.tokens.length &&
           (this.tokens[nextNextIdx].type === T.Keyword || this.tokens[nextNextIdx].type === T.Colon);
 
         if (isKnownType || hasKeywordAfterName) {

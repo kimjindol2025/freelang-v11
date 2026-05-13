@@ -1,316 +1,330 @@
 #!/usr/bin/env node
-// FreeLang → WASM 컴파일러 백엔드 (v11.7.3)
-// Usage:
-//   node wasm-backend.js compile /tmp/ast.json       → {ok,wasm_b64}
-//   node wasm-backend.js run /tmp/ast.json add 3 4   → {ok,value}
-//   node wasm-backend.js eval /tmp/expr.json          → {ok,value}
-
+// FreeLang → WASM 컴파일러 백엔드 v2 (W-2)
+// mode: compile <ast.json> | run <ast.json> <fn> <args...> | eval <ast.json>
 'use strict';
 
-// ── WASM 바이너리 인코딩 유틸 ────────────────────────────────────────────────
+// ── 인코딩 유틸 ───────────────────────────────────────────────────────────────
 
 function uleb128(n) {
   n = n >>> 0;
-  const bytes = [];
-  do {
-    let byte = n & 0x7F;
-    n >>>= 7;
-    if (n !== 0) byte |= 0x80;
-    bytes.push(byte);
-  } while (n !== 0);
-  return bytes;
+  const b = [];
+  do { let byte = n & 0x7F; n >>>= 7; if (n) byte |= 0x80; b.push(byte); } while (n);
+  return b;
 }
 
 function sleb128(n) {
-  const bytes = [];
+  const b = [];
   let more = true;
   while (more) {
-    let byte = n & 0x7F;
-    n >>= 7;
-    if ((n === 0 && (byte & 0x40) === 0) || (n === -1 && (byte & 0x40) !== 0)) {
-      more = false;
-    } else {
-      byte |= 0x80;
-    }
-    bytes.push(byte);
+    let byte = n & 0x7F; n >>= 7;
+    if ((n === 0 && !(byte & 0x40)) || (n === -1 && (byte & 0x40))) more = false;
+    else byte |= 0x80;
+    b.push(byte);
   }
-  return bytes;
+  return b;
 }
 
-function f64bytes(v) {
-  const buf = Buffer.allocUnsafe(8);
-  buf.writeDoubleLe(v, 0);
-  return [...buf];
+function f64le(v) { const b = Buffer.allocUnsafe(8); b.writeDoubleLE(v, 0); return [...b]; }
+function i32le(v) { const b = Buffer.allocUnsafe(4); b.writeInt32LE(v, 0); return [...b]; }
+function encStr(s) { const r = [...Buffer.from(s, 'utf8')]; return [...uleb128(r.length), ...r]; }
+function section(id, content) { const b = content.flat(Infinity); return [id, ...uleb128(b.length), ...b]; }
+
+// ── 타입 상수 ─────────────────────────────────────────────────────────────────
+const I32 = 0x7F, F64 = 0x7C, VOID = 0x40;
+
+// ── 내장 함수 (메모리 모드 시 자동 주입) ─────────────────────────────────────
+// idx: __alloc=0 __arr_len=1 __arr_get=2 __arr_set=3 __arr_new=4
+const BUILTIN_COUNT = 5;
+const ALLOC_IDX = 0, ARR_LEN_IDX = 1, ARR_GET_IDX = 2, ARR_SET_IDX = 3, ARR_NEW_IDX = 4;
+
+// (i32)->i32, (i32,i32)->i32, (i32,i32,i32)->i32
+const BT_1I_I = [0x60, 0x01, I32, 0x01, I32];
+const BT_2I_I = [0x60, 0x02, I32, I32, 0x01, I32];
+const BT_3I_I = [0x60, 0x03, I32, I32, I32, 0x01, I32];
+
+const BUILTIN_TYPES = [BT_1I_I, BT_1I_I, BT_2I_I, BT_3I_I, BT_2I_I];
+
+// 각 내장 함수 코드 바이트 (locals 선언 포함)
+const BUILTIN_CODE = [
+  // __alloc(size)->i32: ptr=*mem[0]; *mem[0]=ptr+size; return ptr
+  [0x01,0x01,I32, 0x41,0x00, 0x28,0x02,0x00, 0x21,0x01,
+   0x41,0x00, 0x20,0x01, 0x20,0x00, 0x6A, 0x36,0x02,0x00, 0x20,0x01, 0x0B],
+  // __arr_len(ptr)->i32: *ptr
+  [0x00, 0x20,0x00, 0x28,0x02,0x00, 0x0B],
+  // __arr_get(ptr,i)->i32: *(ptr+i*4+4)
+  [0x00, 0x20,0x00, 0x20,0x01, 0x41,0x04, 0x6C, 0x6A, 0x28,0x02,0x04, 0x0B],
+  // __arr_set(ptr,i,val)->i32: *(ptr+i*4+4)=val; return val
+  [0x00, 0x20,0x00, 0x20,0x01, 0x41,0x04, 0x6C, 0x6A, 0x20,0x02, 0x36,0x02,0x04, 0x20,0x02, 0x0B],
+  // __arr_new(len,init)->i32: alloc+fill
+  [0x01,0x02,I32,
+   0x20,0x00, 0x41,0x04, 0x6C, 0x41,0x04, 0x6A, 0x10,0x00, 0x21,0x02,  // ptr=alloc(4+len*4)
+   0x20,0x02, 0x20,0x00, 0x36,0x02,0x00,                                 // *ptr=len
+   0x41,0x00, 0x21,0x03,                                                  // i=0
+   0x02,0x40, 0x03,0x40,                                                  // block loop
+   0x20,0x03, 0x20,0x00, 0x4E, 0x0D,0x01,                               // if i>=len break
+   0x20,0x02, 0x20,0x03, 0x41,0x04, 0x6C, 0x6A, 0x20,0x01, 0x36,0x02,0x04, // arr[i]=init
+   0x20,0x03, 0x41,0x01, 0x6A, 0x21,0x03, 0x0C,0x00,                    // i++; continue
+   0x0B, 0x0B,                                                            // end loop/block
+   0x20,0x02, 0x0B]                                                        // return ptr
+];
+
+// ── 표현식 컴파일러 ───────────────────────────────────────────────────────────
+
+function promoteToF64(c) {
+  if (c.type === F64) return c;
+  return { bytes: [...c.bytes, 0xB7], type: F64 }; // f64.convert_i32_s
 }
 
-function encStr(s) {
-  const raw = [...Buffer.from(s, 'utf8')];
-  return [...uleb128(raw.length), ...raw];
-}
+function compileExpr(expr, params, pTypes, locals, fns, bofs) {
+  const CE = e => compileExpr(e, params, pTypes, locals, fns, bofs);
 
-function flat(...arrays) {
-  return arrays.flat(Infinity);
-}
-
-function section(id, content) {
-  const bytes = flat(content);
-  return [id, ...uleb128(bytes.length), ...bytes];
-}
-
-function vecOf(items, encode) {
-  const encoded = items.flatMap(encode);
-  return [...uleb128(items.length), ...encoded];
-}
-
-// ── 타입 ──────────────────────────────────────────────────────────────────────
-// valtype: i32=0x7F, i64=0x7E, f32=0x7D, f64=0x7C
-
-const I32 = 0x7F;
-const F64 = 0x7C;
-
-// ── 표현식 컴파일 ─────────────────────────────────────────────────────────────
-// AST: number | string | [op, ...args]
-// 지원 연산: +, -, *, /, %, ==, !=, <, >, <=, >=, and, or, not
-//           if, let, do (sequence), call (local fn call)
-
-function compileExpr(expr, params, locals, fns) {
-  // 정수 상수
   if (typeof expr === 'number') {
-    if (Number.isInteger(expr) && expr >= -2147483648 && expr <= 2147483647) {
+    if (Number.isInteger(expr) && expr >= -2147483648 && expr <= 2147483647)
       return { bytes: [0x41, ...sleb128(expr)], type: I32 };
-    } else {
-      return { bytes: [0x44, ...f64bytes(expr)], type: F64 };
-    }
+    return { bytes: [0x44, ...f64le(expr)], type: F64 };
   }
 
-  // 변수 참조
   if (typeof expr === 'string') {
-    // 먼저 로컬에서 찾기
-    const locIdx = locals.findIndex(l => l.name === expr);
-    if (locIdx >= 0) {
-      return { bytes: [0x20, ...uleb128(params.length + locIdx)], type: locals[locIdx].type };
+    for (let i = locals.length - 1; i >= 0; i--) {
+      if (locals[i].name === expr)
+        return { bytes: [0x20, ...uleb128(params.length + i)], type: locals[i].type };
     }
-    // 파라미터에서 찾기
-    const pIdx = params.findIndex(p => p === expr);
-    if (pIdx >= 0) {
-      return { bytes: [0x20, ...uleb128(pIdx)], type: I32 };
-    }
+    const pi = params.indexOf(expr);
+    if (pi >= 0) return { bytes: [0x20, ...uleb128(pi)], type: pTypes[pi] === 'f64' ? F64 : I32 };
     throw new Error(`Unknown variable: ${expr}`);
   }
 
-  if (!Array.isArray(expr)) throw new Error(`Invalid expr: ${JSON.stringify(expr)}`);
-
+  if (!Array.isArray(expr)) throw new Error(`Bad AST: ${JSON.stringify(expr)}`);
   const [op, ...args] = expr;
 
-  // ── 특수 폼 ────────────────────────────────────────────────────────────────
-
-  // (if cond then else)
+  // ── 특수 폼 ───────────────────────────────────────────────────────────────
   if (op === 'if') {
-    const [cond, thenExpr, elseExpr] = args;
-    const condC = compileExpr(cond, params, locals, fns);
-    const thenC = compileExpr(thenExpr, params, locals, fns);
-    const elseC = elseExpr !== undefined
-      ? compileExpr(elseExpr, params, locals, fns)
-      : { bytes: [0x41, 0x00], type: I32 };
-    return {
-      bytes: [...condC.bytes, 0x04, thenC.type, ...thenC.bytes, 0x05, ...elseC.bytes, 0x0B],
-      type: thenC.type
-    };
-  }
-
-  // (do expr1 expr2 ... exprN) — sequence, return last
-  if (op === 'do') {
-    const compiled = args.map(a => compileExpr(a, params, locals, fns));
-    const allBytes = [];
-    for (let i = 0; i < compiled.length - 1; i++) {
-      allBytes.push(...compiled[i].bytes, 0x1A); // drop
+    const cC = CE(args[0]), tC = CE(args[1]);
+    const eC = args[2] !== undefined ? CE(args[2]) : { bytes: [0x41, 0x00], type: I32 };
+    let tB = tC.bytes, eB = eC.bytes, rt = tC.type;
+    if (tC.type !== eC.type) {
+      const tp = promoteToF64(tC), ep = promoteToF64(eC);
+      tB = tp.bytes; eB = ep.bytes; rt = F64;
     }
-    allBytes.push(...compiled[compiled.length - 1].bytes);
-    return { bytes: allBytes, type: compiled[compiled.length - 1].type };
+    return { bytes: [...cC.bytes, 0x04, rt, ...tB, 0x05, ...eB, 0x0B], type: rt };
   }
 
-  // (let [[name val] ...] body)  — local variable binding
+  if (op === 'do') {
+    if (!args.length) return { bytes: [0x41, 0x00], type: I32 };
+    const b = [];
+    for (let i = 0; i < args.length - 1; i++) {
+      const c = CE(args[i]);
+      b.push(...c.bytes);
+      if (c.type !== 'void') b.push(0x1A); // drop
+    }
+    const last = CE(args[args.length - 1]);
+    b.push(...last.bytes);
+    return { bytes: b, type: last.type };
+  }
+
   if (op === 'let') {
     const [bindings, body] = args;
-    const newLocals = [...locals];
-    const allBytes = [];
-    for (const [name, valExpr] of bindings) {
-      const valC = compileExpr(valExpr, params, newLocals, fns);
-      const idx = params.length + newLocals.length;
-      newLocals.push({ name, type: valC.type });
-      allBytes.push(...valC.bytes, 0x21, ...uleb128(idx)); // local.set
+    const b = [];
+    for (const [name, val] of bindings) {
+      const vC = CE(val);
+      b.push(...vC.bytes, 0x21, ...uleb128(params.length + locals.length)); // local.set
+      locals.push({ name, type: vC.type });
     }
-    const bodyC = compileExpr(body, params, newLocals, fns);
-    // Merge new locals back (for caller to know about them)
-    locals.push(...newLocals.slice(locals.length));
-    return { bytes: [...allBytes, ...bodyC.bytes], type: bodyC.type };
+    const bC = CE(body);
+    b.push(...bC.bytes);
+    return { bytes: b, type: bC.type };
   }
 
-  // (call fn-name args...) — call another function in module
-  if (op === 'call') {
-    const [fnName, ...callArgs] = args;
-    const fnIdx = fns.findIndex(f => f.name === fnName);
-    if (fnIdx < 0) throw new Error(`Unknown function: ${fnName}`);
-    const compiledArgs = callArgs.map(a => compileExpr(a, params, locals, fns));
-    const argBytes = compiledArgs.flatMap(c => c.bytes);
+  if (op === 'set!') {
+    const [name, val] = args;
+    for (let i = locals.length - 1; i >= 0; i--) {
+      if (locals[i].name === name) {
+        const vC = CE(val);
+        return { bytes: [...vC.bytes, 0x22, ...uleb128(params.length + i)], type: vC.type }; // local.tee
+      }
+    }
+    throw new Error(`set! not found: ${name}`);
+  }
+
+  if (op === 'while') {
+    const [cond, body] = args;
+    const cC = CE(cond), bC = CE(body);
+    const bBytes = bC.type !== 'void' ? [...bC.bytes, 0x1A] : bC.bytes;
     return {
-      bytes: [...argBytes, 0x10, ...uleb128(fnIdx)], // call
-      type: fns[fnIdx].returnType === 'f64' ? F64 : I32
+      bytes: [0x02,VOID, 0x03,VOID,
+              ...cC.bytes, 0x45, 0x0D,0x01,  // eqz + br_if break
+              ...bBytes, 0x0C,0x00,           // body + br loop
+              0x0B, 0x0B,                     // end loop/block
+              0x41, 0x00],                    // return 0
+      type: I32
     };
   }
 
-  // ── 이항 연산 ──────────────────────────────────────────────────────────────
+  if (op === 'call') {
+    const [name, ...cArgs] = args;
+    const fi = fns.findIndex(f => f.name === name);
+    if (fi < 0) throw new Error(`Unknown fn: ${name}`);
+    const rt = fns[fi].returnType === 'f64' ? F64 : I32;
+    return { bytes: [...cArgs.flatMap(a => CE(a).bytes), 0x10, ...uleb128(fi + bofs)], type: rt };
+  }
 
-  const i32ops = {
-    '+':   0x6A, '-':  0x6B, '*':  0x6C, '/':  0x6D, '%':  0x6F,
-    '==':  0x46, '!=': 0x47, '<':  0x48, '>':  0x4A, '<=': 0x4C, '>=': 0x4E,
-    'and': 0x71, 'or': 0x72, 'xor': 0x73, '<<': 0x74, '>>': 0x75
+  // ── 배열 (메모리) 연산 ────────────────────────────────────────────────────
+  if (op === 'arr-new') {
+    const [l, ini] = args;
+    return { bytes: [...CE(l).bytes, ...CE(ini).bytes, 0x10, ARR_NEW_IDX], type: I32 };
+  }
+  if (op === 'arr-get') {
+    const [p, i] = args;
+    return { bytes: [...CE(p).bytes, ...CE(i).bytes, 0x10, ARR_GET_IDX], type: I32 };
+  }
+  if (op === 'arr-set') {
+    const [p, i, v] = args;
+    return { bytes: [...CE(p).bytes, ...CE(i).bytes, ...CE(v).bytes, 0x10, ARR_SET_IDX], type: I32 };
+  }
+  if (op === 'arr-len') {
+    return { bytes: [...CE(args[0]).bytes, 0x10, ARR_LEN_IDX], type: I32 };
+  }
+
+  // ── 산술 / 비교 ──────────────────────────────────────────────────────────
+  const i32map = {
+    '+':0x6A,'-':0x6B,'*':0x6C,'/':0x6D,'%':0x6F,
+    '==':0x46,'!=':0x47,'<':0x48,'>':0x4A,'<=':0x4C,'>=':0x4E,
+    'and':0x71,'or':0x72,'xor':0x73,'<<':0x74,'>>':0x75
   };
+  const f64map = { '+':0xA0,'-':0xA1,'*':0xA2,'/':0xA3 };
+  const f64cmp = { '==':0x61,'!=':0x62,'<':0x63,'>':0x64,'<=':0x65,'>=':0x66 };
+  const isCmp = s => ['==','!=','<','>','<=','>='].includes(s);
 
-  if (op in i32ops) {
-    const compiled = args.map(a => compileExpr(a, params, locals, fns));
-    const bytes = [...compiled.flatMap(c => c.bytes), i32ops[op]];
-    const isCompare = ['==','!=','<','>','<=','>='].includes(op);
-    return { bytes, type: I32 };
+  if (op in i32map || op in f64map || op in f64cmp) {
+    const cs = args.map(a => CE(a));
+    if (cs.some(c => c.type === F64)) {
+      const ps = cs.map(promoteToF64);
+      const opc = f64map[op] ?? f64cmp[op];
+      if (!opc) throw new Error(`f64 unsupported: ${op}`);
+      return { bytes: [...ps.flatMap(c => c.bytes), opc], type: isCmp(op) ? I32 : F64 };
+    }
+    return { bytes: [...cs.flatMap(c => c.bytes), i32map[op]], type: I32 };
   }
 
-  // (not x) → eqz
-  if (op === 'not') {
-    const c = compileExpr(args[0], params, locals, fns);
-    return { bytes: [...c.bytes, 0x45], type: I32 }; // i32.eqz
-  }
-
-  // (neg x) → 0 - x
+  if (op === 'not')  return { bytes: [...CE(args[0]).bytes, 0x45], type: I32 };
   if (op === 'neg') {
-    const c = compileExpr(args[0], params, locals, fns);
-    return { bytes: [0x41, 0x00, ...c.bytes, 0x6B], type: I32 };
+    const c = CE(args[0]);
+    return c.type === F64
+      ? { bytes: [...c.bytes, 0x9A], type: F64 }
+      : { bytes: [0x41,0x00,...c.bytes,0x6B], type: I32 };
   }
-
-  // (abs x) → x >= 0 ? x : 0-x  (i32 버전)
   if (op === 'abs') {
-    const c = compileExpr(args[0], params, locals, fns);
-    // (if (>= x 0) x (neg x))
-    return compileExpr(['if', ['>=', args[0], 0], args[0], ['neg', args[0]]], params, locals, fns);
+    const c = CE(args[0]);
+    return c.type === F64
+      ? { bytes: [...c.bytes, 0x99], type: F64 }
+      : CE(['if',['>=',args[0],0],args[0],['neg',args[0]]]);
   }
+  if (op === 'sqrt')  return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9F], type: F64 };
+  if (op === 'floor') return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9C], type: F64 };
+  if (op === 'ceil')  return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9D], type: F64 };
+  if (op === 'min')   return CE(['if',['<=',args[0],args[1]],args[0],args[1]]);
+  if (op === 'max')   return CE(['if',['>=',args[0],args[1]],args[0],args[1]]);
+  if (op === 'to-int') {
+    const c = CE(args[0]);
+    return c.type === I32 ? c : { bytes: [...c.bytes, 0xAA], type: I32 }; // i32.trunc_f64_s
+  }
+  if (op === 'to-f64') return promoteToF64(CE(args[0]));
 
-  // (min a b) / (max a b)
-  if (op === 'min') {
-    return compileExpr(['if', ['<=', args[0], args[1]], args[0], args[1]], params, locals, fns);
-  }
-  if (op === 'max') {
-    return compileExpr(['if', ['>=', args[0], args[1]], args[0], args[1]], params, locals, fns);
-  }
-
-  throw new Error(`Unknown operator: ${op}`);
+  throw new Error(`Unknown op: ${op}`);
 }
 
 // ── 함수 컴파일 ───────────────────────────────────────────────────────────────
 
-function compileFn(fn, allFns) {
+function compileFn(fn, allFns, bofs) {
   const params = fn.params || [];
+  const pTypes = fn.paramTypes || [];
   const locals = [];
 
-  const bodyC = compileExpr(fn.body, params, locals, allFns);
-  const instrs = [...bodyC.bytes, 0x0B]; // end
+  const bodyC = compileExpr(fn.body, params, pTypes, locals, allFns, bofs);
 
-  // Local declarations (after params)
-  const localDecls = locals.map(l => [...uleb128(1), l.type]);
-  const localVec = [...uleb128(locals.length), ...localDecls.flat()];
+  // 선언 리턴 타입과 실제 타입 맞춤
+  let retType = fn.returnType === 'f64' ? F64 : I32;
+  let finalBytes = bodyC.bytes;
+  if (retType === F64 && bodyC.type !== F64) finalBytes = [...promoteToF64(bodyC).bytes];
+  else if (retType === I32 && bodyC.type === F64) finalBytes = [...bodyC.bytes, 0xAA]; // trunc
 
+  const instrs = [...finalBytes, 0x0B]; // end
+
+  // locals: 1개씩 선언 (순서 보장)
+  const localVec = [...uleb128(locals.length), ...locals.flatMap(l => [0x01, l.type])];
   const codeBody = [...localVec, ...instrs];
   const codeEntry = [...uleb128(codeBody.length), ...codeBody];
 
-  const returnType = fn.returnType === 'f64' ? F64 : I32;
-  const typeEntry = [
-    0x60,
+  const typeEntry = [0x60,
     ...uleb128(params.length),
-    ...Array(params.length).fill(I32),
-    0x01, returnType
-  ];
+    ...pTypes.map(t => t === 'f64' ? F64 : I32).concat(Array(params.length - pTypes.length).fill(I32)),
+    0x01, retType];
 
   return { name: fn.name, typeEntry, codeEntry };
 }
 
-// ── WASM 모듈 빌드 ────────────────────────────────────────────────────────────
+// ── 모듈 빌드 ─────────────────────────────────────────────────────────────────
 
-function buildModule(fns) {
-  const compiled = fns.map(f => compileFn(f, fns));
+function buildModule(ast) {
+  const fns = ast.fns || [];
+  const mem = !!ast.memory;
+  const bofs = mem ? BUILTIN_COUNT : 0;
 
-  const magic = [0x00, 0x61, 0x73, 0x6D];
-  const version = [0x01, 0x00, 0x00, 0x00];
+  const magic = [0x00,0x61,0x73,0x6D,0x01,0x00,0x00,0x00];
 
-  // Type section
-  const typeContent = [
-    ...uleb128(compiled.length),
-    ...compiled.flatMap(f => f.typeEntry)
-  ];
-  const typeSec = section(0x01, typeContent);
+  const compiled = fns.map(f => compileFn(f, fns, bofs));
 
-  // Function section
-  const fnContent = [
-    ...uleb128(compiled.length),
-    ...compiled.flatMap((_, i) => uleb128(i))
-  ];
-  const fnSec = section(0x03, fnContent);
+  let types, fnIdx, codes, exps;
 
-  // Export section
-  const exportContent = [
-    ...uleb128(compiled.length),
-    ...compiled.flatMap((f, i) => [...encStr(f.name), 0x00, ...uleb128(i)])
-  ];
-  const exportSec = section(0x07, exportContent);
+  if (mem) {
+    types = [...BUILTIN_TYPES, ...compiled.map(f => f.typeEntry)];
+    fnIdx = [...BUILTIN_TYPES.map((_,i)=>i), ...compiled.map((_,i)=>i+BUILTIN_COUNT)];
+    codes = [...BUILTIN_CODE.map(b=>[...uleb128(b.length),...b]), ...compiled.map(f=>f.codeEntry)];
+    exps  = compiled.map((f,i)=>[...encStr(f.name), 0x00, ...uleb128(i+BUILTIN_COUNT)]);
+  } else {
+    types = compiled.map(f => f.typeEntry);
+    fnIdx = compiled.map((_,i)=>[i]);
+    codes = compiled.map(f => f.codeEntry);
+    exps  = compiled.map((f,i)=>[...encStr(f.name), 0x00, ...uleb128(i)]);
+  }
 
-  // Code section
-  const codeContent = [
-    ...uleb128(compiled.length),
-    ...compiled.flatMap(f => f.codeEntry)
-  ];
-  const codeSec = section(0x0A, codeContent);
+  const typeSec   = section(0x01, [...uleb128(types.length), ...types.flat()]);
+  const fnSec     = section(0x03, [...uleb128(fnIdx.length), ...fnIdx.flat().flatMap(i=>uleb128(i))]);
+  const memSec    = mem ? section(0x05,[0x01,0x00,0x01]) : [];
+  const exportSec = section(0x07, [...uleb128(exps.length), ...exps.flat()]);
+  // data: heap ptr = 0x1000
+  const dataSec   = mem ? section(0x0B,[0x01, 0x00, 0x41,0x00,0x0B, 0x04,...i32le(0x1000)]) : [];
+  const codeSec   = section(0x0A, [...uleb128(codes.length), ...codes.flat()]);
 
-  return Buffer.from([...magic, ...version, ...typeSec, ...fnSec, ...exportSec, ...codeSec]);
+  return Buffer.from([...magic,...typeSec,...fnSec,...memSec,...exportSec,...dataSec,...codeSec]);
 }
 
-// ── 실행 진입점 ────────────────────────────────────────────────────────────────
-
-const [,, mode, astFile, ...rest] = process.argv;
-
-function out(obj) {
-  process.stdout.write(JSON.stringify(obj));
-}
+// ── 진입점 ────────────────────────────────────────────────────────────────────
+const [,,mode,astFile,...rest] = process.argv;
+function out(o) { process.stdout.write(JSON.stringify(o)); }
 
 try {
   const fs = require('fs');
-  const ast = JSON.parse(fs.readFileSync(astFile, 'utf8'));
-  const fns = ast.fns || [];
+  const ast = JSON.parse(fs.readFileSync(astFile,'utf8'));
 
   if (mode === 'compile') {
-    const bytes = buildModule(fns);
-    out({ ok: true, wasm: bytes.toString('base64'), size: bytes.length });
+    const b = buildModule(ast);
+    out({ ok:true, wasm:b.toString('base64'), size:b.length });
 
   } else if (mode === 'run') {
-    const fnName = rest[0];
-    const args = rest.slice(1).map(Number);
-    const bytes = buildModule(fns);
-    const wasmModule = new WebAssembly.Module(bytes);
-    const instance = new WebAssembly.Instance(wasmModule);
-    const fn = instance.exports[fnName];
-    if (!fn) throw new Error(`No export: ${fnName}`);
-    out({ ok: true, value: fn(...args) });
+    const b = buildModule(ast);
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const fn = inst.exports[rest[0]];
+    if (!fn) throw new Error(`No export: ${rest[0]}`);
+    out({ ok:true, value: fn(...rest.slice(1).map(Number)) });
 
   } else if (mode === 'eval') {
-    // ast = {expr, params, args}
-    const expr = ast.expr;
-    const params = ast.params || [];
-    const args = (ast.args || []).map(Number);
-    const wrapper = { name: '__eval__', params, body: expr };
-    const bytes = buildModule([wrapper]);
-    const wasmModule = new WebAssembly.Module(bytes);
-    const instance = new WebAssembly.Instance(wasmModule);
-    out({ ok: true, value: instance.exports.__eval__(...args) });
-
-  } else {
-    out({ ok: false, error: `Unknown mode: ${mode}` });
+    const { expr, params, paramTypes, args, memory } = ast;
+    const w = { name:'__eval__', params:params||[], paramTypes, body:expr };
+    const b = buildModule({ fns:[w], memory });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    out({ ok:true, value: inst.exports.__eval__(...(args||[]).map(Number)) });
   }
-} catch (e) {
-  out({ ok: false, error: e.message });
+} catch(e) {
+  out({ ok:false, error:e.message });
 }

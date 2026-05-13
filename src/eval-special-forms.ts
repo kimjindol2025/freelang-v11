@@ -256,38 +256,57 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     if ((paramsNode as any).kind === "block" && (paramsNode as any).type === "Array") {
       const items = (paramsNode as any).fields.get("items");
       if (Array.isArray(items)) {
-        for (const item of items) {
+        const _pAnns: (string | null)[] = [];
+        let _ii = 0;
+        while (_ii < items.length) {
+          const item = items[_ii] as any;
           // ^type 힌트 심볼은 스킵 (타입 힌트는 런타임에서 무시)
-          if ((item as any).kind === "literal" && (item as any).type === "symbol"
-              && String((item as any).value).startsWith("^")) continue;
+          if (item.kind === "literal" && item.type === "symbol"
+              && String(item.value).startsWith("^")) { _ii++; continue; }
           // Map 구조분해: {:keys [name age]} 패턴 — AST 노드 그대로 저장
-          if ((item as any).kind === "block" && (item as any).type === "Map") {
-            params.push(item);
-            paramDefaults.push(undefined);
-            continue;
+          if (item.kind === "block" && item.type === "Map") {
+            params.push(item); paramDefaults.push(undefined); _pAnns.push(null);
+            _ii++; continue;
           }
           // 기본값: [$var defaultExpr] → 중첩 Array 블록
-          if ((item as any).kind === "block" && (item as any).type === "Array") {
-            const inner = (item as any).fields?.get("items") ?? [];
+          if (item.kind === "block" && item.type === "Array") {
+            const inner = item.fields?.get("items") ?? [];
             if (inner.length >= 2) {
               const nameNode = inner[0] as any;
               const n = nameNode.kind === "variable" ? nameNode.name
                 : nameNode.kind === "literal" ? String(nameNode.value) : "";
               params.push(n.startsWith("$") ? n.slice(1) : n);
-              paramDefaults.push(inner[1]); // AST 노드 저장 → 호출 시점 lazy 평가
+              paramDefaults.push(inner[1]);
+              _pAnns.push(null);
             }
-            continue;
+            _ii++; continue;
           }
-          // v11.1: variable ($x) 또는 bare symbol (x) 모두 허용 → 정식 이름은 $-접두사 포함
-          if ((item as any).kind === "variable") {
+          // v11.1: variable ($x) 또는 bare symbol (x) 모두 허용
+          let _pname: string | null = null;
+          if (item.kind === "variable") {
             const n = (item as Variable).name;
-            params.push(n.startsWith("$") ? n.slice(1) : n);
-            paramDefaults.push(undefined);
-          } else if ((item as any).kind === "literal" && (item as any).type === "symbol") {
-            const v = (item as any).value as string;
-            params.push(v.startsWith("$") ? v.slice(1) : v);
-            paramDefaults.push(undefined);
+            _pname = n.startsWith("$") ? n.slice(1) : n;
+          } else if (item.kind === "literal" && item.type === "symbol") {
+            const v = item.value as string;
+            _pname = v.startsWith("$") ? v.slice(1) : v;
           }
+          if (_pname !== null) {
+            params.push(_pname); paramDefaults.push(undefined);
+            // 타입 어노테이션: [name :type ...] — keyword 또는 string literal(:type → "type")
+            const _nx = items[_ii + 1] as any;
+            const _nxType = _nx?.kind === "keyword" ? _nx.name
+              : (_nx?.kind === "literal" && _nx?.type === "string") ? String(_nx.value)
+              : (_nx?.kind === "literal" && _nx?.type === "symbol") ? String(_nx.value)
+              : null;
+            if (_nxType && /^(int|float|number|string|bool|boolean|any|list|array|map|fn|function|nil)$/.test(_nxType)) {
+              _pAnns.push(_nxType); _ii += 2; continue;
+            }
+            _pAnns.push(null);
+          }
+          _ii++;
+        }
+        if (_pAnns.some((a: string | null) => a !== null)) {
+          (paramsNode as any).__pAnns = _pAnns;
         }
       }
     } else if ((paramsNode as any).kind === "sexpr") {
@@ -307,10 +326,12 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       ? expr.args[1]
       : { kind: "sexpr" as const, op: "do", args: expr.args.slice(1) };
     const hasDefaults = paramDefaults.some((d) => d !== undefined);
+    const _fnPAnns = (paramsNode as any).__pAnns as (string | null)[] | undefined;
     return {
       kind: "function-value",
       params,
       ...(hasDefaults && { paramDefaults }),
+      ...(_fnPAnns && { paramAnnotations: _fnPAnns }),
       body,
       capturedEnv: ctx.variables.snapshot(),
       name: undefined,
@@ -337,6 +358,18 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
 
     const paramsNode = expr.args[argIdx];
     let bodyArgs = expr.args.slice(argIdx + 1);
+
+    // 타입 어노테이션: -> returnType 패턴 감지
+    let _defnRetAnn: string | null = null;
+    if (bodyArgs.length >= 2) {
+      const _arrow = bodyArgs[0] as any;
+      if (_arrow?.kind === "literal" && _arrow?.type === "symbol" && _arrow?.value === "->") {
+        const _rt = bodyArgs[1] as any;
+        const _rtn = _rt?.kind === "keyword" ? _rt.name
+          : _rt?.kind === "literal" && (_rt?.type === "symbol" || _rt?.type === "string") ? String(_rt.value) : null;
+        if (_rtn) { _defnRetAnn = _rtn; bodyArgs = bodyArgs.slice(2); }
+      }
+    }
 
     // AI-Native Phase 1+2: 첫 body 표현식이 메타 맵이면 분리 + effects 검사
     let registeredMeta: FnMeta | null = null;
@@ -372,6 +405,8 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     // (fn [params] body) 를 synth → 현재 scope에서 eval하여 function-value 획득
     const fnExpr: any = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
     const fnValue = (interp as any).evalSExpr(fnExpr);
+    fnValue.name = name;
+    if (_defnRetAnn) fnValue.returnAnnotation = _defnRetAnn;
 
     // Phase 3-E: VM 함수 컴파일 및 등록
     try {
@@ -396,6 +431,8 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       capturedEnv: fnValue.capturedEnv,
     };
     if (fnValue.paramDefaults) funcDef.paramDefaults = fnValue.paramDefaults;
+    if (fnValue.paramAnnotations) funcDef.paramAnnotations = fnValue.paramAnnotations;
+    if (fnValue.returnAnnotation) funcDef.returnAnnotation = fnValue.returnAnnotation;
     ctx.functions.set(name, funcDef);
 
     // AI-Native Phase 4: :property 인라인 → defprop 자동 등록

@@ -71,6 +71,35 @@ function propagateMutations(
 
 const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
 
+// ── 런타임 타입 시스템 ────────────────────────────────────────────────────────
+function _flCheckType(type: string, val: any): boolean {
+  switch (type) {
+    case "int":      return typeof val === "number" && Number.isInteger(val);
+    case "float":    return typeof val === "number" && !Number.isInteger(val);
+    case "number":   return typeof val === "number";
+    case "string":   return typeof val === "string";
+    case "bool":
+    case "boolean":  return typeof val === "boolean";
+    case "array":
+    case "list":     return Array.isArray(val);
+    case "map":      return val !== null && typeof val === "object" && !Array.isArray(val)
+                       && val?.kind !== "function-value" && val?.kind !== "async-function-value";
+    case "fn":
+    case "function": return typeof val === "function" || val?.kind === "function-value"
+                       || val?.kind === "async-function-value";
+    case "nil":      return val === null || val === undefined;
+    case "any":      return true;
+    default:         return true; // 알 수 없는 타입은 통과
+  }
+}
+function _flTypeName(val: any): string {
+  if (val === null || val === undefined) return "nil";
+  if (Array.isArray(val)) return "array";
+  if (typeof val === "function" || val?.kind === "function-value") return "function";
+  if (typeof val === "object") return "map";
+  return typeof val;
+}
+
 /** 단일 파라미터 바인딩 — Map 구조분해 {:keys [a b]} 지원 */
 function bindParam(interp: InterpreterLike, param: any, value: any): void {
   if (typeof param === "string") {
@@ -284,6 +313,18 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     console.error(`[trace] ${"  ".repeat(Math.min(interp.callDepth, 20))}→ ${baseName}(${_argsBrief.join(", ")}) (line ${interp.currentLine})`);
   }
 
+  // 파라미터 타입 체크 (defn 타입 어노테이션)
+  if (func.paramAnnotations) {
+    for (let _ti = 0; _ti < func.params.length; _ti++) {
+      const _ann = func.paramAnnotations[_ti];
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args[_ti])) {
+        throw new TypeError(
+          `[FreeLang 타입 오류] '${baseName}' 파라미터 '${func.params[_ti]}': ${_ann} 필요, ${_flTypeName(args[_ti])} 전달됨`
+        );
+      }
+    }
+  }
+
   // 클로저: capturedEnv가 있으면 해당 환경에서 실행
   if (func.capturedEnv) {
     const savedStack = interp.context.variables.saveStack();
@@ -298,6 +339,11 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
         bindParam(interp, func.params[i], args[i]);
       }
       result = interp.eval(func.body);
+      if (func.returnAnnotation && func.returnAnnotation !== "any" && !_flCheckType(func.returnAnnotation, result)) {
+        throw new TypeError(
+          `[FreeLang 타입 오류] '${baseName}' 반환값: ${func.returnAnnotation} 필요, ${_flTypeName(result)} 반환됨`
+        );
+      }
       propagateMutations(interp, func.capturedEnv, paramSet, savedStack);
     } catch (e) {
       if (isReturnSignal(e)) { result = e.value; }
@@ -375,6 +421,18 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
   if (interp.callDepth >= MAX_CALL_DEPTH) {
     throw new Error(`FreeLang line ${interp.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) — possible infinite recursion`);
   }
+  // 파라미터 타입 체크
+  if (fn.paramAnnotations) {
+    for (let _ti = 0; _ti < fn.params.length; _ti++) {
+      const _ann = fn.paramAnnotations[_ti];
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args[_ti])) {
+        const _fn = fn.name ?? "익명";
+        throw new TypeError(
+          `[FreeLang 타입 오류] '${_fn}' 파라미터 '${fn.params[_ti]}': ${_ann} 필요, ${_flTypeName(args[_ti])} 전달됨`
+        );
+      }
+    }
+  }
   const savedStack = interp.context.variables.saveStack();
   const paramSet = new Set<string>(fn.params);
   interp.callDepth++;
@@ -385,6 +443,15 @@ export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[])
       bindParam(interp, fn.params[i], args[i]);
     }
     result = interp.eval(fn.body);
+    // 반환 타입 체크
+    if (fn.returnAnnotation && fn.returnAnnotation !== "any") {
+      if (!_flCheckType(fn.returnAnnotation, result)) {
+        const _fn = fn.name ?? "익명";
+        throw new TypeError(
+          `[FreeLang 타입 오류] '${_fn}' 반환값: ${fn.returnAnnotation} 필요, ${_flTypeName(result)} 반환됨`
+        );
+      }
+    }
     propagateMutations(interp, fn.capturedEnv, paramSet, savedStack);
   } catch (e) {
     if (isReturnSignal(e)) { result = e.value; }
