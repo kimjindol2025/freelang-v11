@@ -2,12 +2,9 @@
 // 모든 http_* 함수는 구조체 반환: {:status 200 :body "..." :error nil}
 // curl 제거 → Node.js 네이티브 http/https (INFRA-BLOCKING-001)
 
-import { execSync } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
-import { randomUUID } from "crypto";
+import { spawnSync } from "child_process";
 
 function nodeHttpRequest(url: string, method: string = "GET", headers?: any, body?: string, timeoutMs: number = 10000): { status: number; body: string; error?: string } {
-  let tmpFile: string | null = null;
   try {
     const headersObj: Record<string, string> = {};
     if (headers && typeof headers === "object") {
@@ -19,42 +16,19 @@ function nodeHttpRequest(url: string, method: string = "GET", headers?: any, bod
       }
     }
 
-    tmpFile = `/tmp/fl-http-${randomUUID()}.js`;
     const encodedUrl = JSON.stringify(url);
     const encodedMethod = JSON.stringify(method.toUpperCase());
     const encodedHeaders = JSON.stringify(headersObj);
     const encodedBody = body ? JSON.stringify(body) : "null";
 
-    const script = `
-const {URL}=require('url');
-const u=new URL(${encodedUrl});
-const mod=u.protocol==='https:'?require('https'):require('http');
-const method=${encodedMethod};
-const hdrs=${encodedHeaders};
-const bodyStr=${encodedBody};
-const opts={hostname:u.hostname,port:u.port||undefined,path:u.pathname+(u.search||''),method,headers:hdrs};
-if(bodyStr!=null)opts.headers['Content-Length']=Buffer.byteLength(bodyStr,'utf-8');
-const chunks=[];
-const req=mod.request(opts,res=>{
-  res.on('data',d=>chunks.push(d));
-  res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString('utf-8')}))});
-});
-let done=false;
-const fail=(msg)=>{if(done)return;done=true;process.stdout.write(JSON.stringify({s:0,b:'',e:msg}))};
-req.on('error',e=>fail(e.message));
-req.on('socket',s=>{s.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')})});
-req.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')});
-if(bodyStr!=null)req.write(bodyStr,'utf-8');
-req.end();`;
+    const script = `const {URL}=require('url');const u=new URL(${encodedUrl});const mod=u.protocol==='https:'?require('https'):require('http');const method=${encodedMethod};const hdrs=${encodedHeaders};const bodyStr=${encodedBody};const opts={hostname:u.hostname,port:u.port||undefined,path:u.pathname+(u.search||''),method,headers:hdrs};if(bodyStr!=null)opts.headers['Content-Length']=Buffer.byteLength(bodyStr,'utf-8');const chunks=[];const req=mod.request(opts,res=>{res.on('data',d=>chunks.push(d));res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString('utf-8')}))})});let done=false;const fail=(msg)=>{if(done)return;done=true;process.stdout.write(JSON.stringify({s:0,b:'',e:msg}))};req.on('error',e=>fail(e.message));req.on('socket',s=>{s.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')})});req.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')});if(bodyStr!=null)req.write(bodyStr,'utf-8');req.end();`;
 
-    writeFileSync(tmpFile, script, "utf-8");
-    const result = execSync(`node ${tmpFile}`, { encoding: "utf-8", timeout: timeoutMs + 2000 });
-    const parsed = JSON.parse(result);
+    const r = spawnSync("node", ["-e", script], { encoding: "utf-8", timeout: timeoutMs + 2000 });
+    if (r.error) return { status: 0, body: "", error: r.error.message };
+    const parsed = JSON.parse(r.stdout || "{}");
     return { status: parsed.s || 0, body: parsed.b || "", ...(parsed.e && { error: parsed.e }) };
   } catch (err: any) {
     return { status: 0, body: "", error: err.message };
-  } finally {
-    if (tmpFile) { try { unlinkSync(tmpFile); } catch {} }
   }
 }
 

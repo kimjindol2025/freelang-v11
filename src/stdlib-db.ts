@@ -65,6 +65,12 @@ function spreadParams(p: any): any[] {
   return [];
 }
 
+function validateIdentifier(name: string): string {
+  if (typeof name !== "string" || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name))
+    throw new Error(`잘못된 SQL 식별자: '${name}'`);
+  return name;
+}
+
 // ── Module ───────────────────────────────────────────────────────────────────
 
 export function createDbModule() {
@@ -138,7 +144,8 @@ export function createDbModule() {
     // db_insert dbPath table data -> true
     "db_insert": (dbPath: string, table: string, data: Record<string, any>): boolean => {
       const db = getDb(dbPath);
-      const keys = Object.keys(data);
+      validateIdentifier(table);
+      const keys = Object.keys(data).map(validateIdentifier);
       const placeholders = keys.map(() => '?').join(',');
       db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${placeholders})`).run(...Object.values(data));
       return true;
@@ -147,7 +154,10 @@ export function createDbModule() {
     // db_update dbPath table data where -> true
     "db_update": (dbPath: string, table: string, data: Record<string, any>, where: string): boolean => {
       const db = getDb(dbPath);
-      const keys = Object.keys(data);
+      validateIdentifier(table);
+      if (typeof where === "string" && where.includes(";"))
+        throw new Error("db_update: where 절에 세미콜론 사용 금지");
+      const keys = Object.keys(data).map(validateIdentifier);
       const sets = keys.map(k => `${k}=?`).join(", ");
       db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(...Object.values(data));
       return true;
@@ -155,12 +165,16 @@ export function createDbModule() {
 
     // db_delete_row dbPath table where -> true
     "db_delete_row": (dbPath: string, table: string, where: string): boolean => {
+      validateIdentifier(table);
+      if (typeof where === "string" && where.includes(";"))
+        throw new Error("db_delete_row: where 절에 세미콜론 사용 금지");
       getDb(dbPath).prepare(`DELETE FROM ${table} WHERE ${where}`).run();
       return true;
     },
 
     // db_count dbPath table -> number
     "db_count": (dbPath: string, table: string): number => {
+      validateIdentifier(table);
       const row = toPlain(getDb(dbPath).prepare(`SELECT COUNT(*) as cnt FROM ${table}`).get());
       return Number(row?.cnt ?? 0);
     },

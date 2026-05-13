@@ -66,20 +66,32 @@ function resolveMariadBin(): string {
   return (resolvedMariadbBin = "mariadb"); // fallback — PATH 의존
 }
 
+function validateNoMultiStatement(sql: string): void {
+  const trimmed = sql.trim().toUpperCase();
+  // BEGIN/COMMIT/ROLLBACK 트랜잭션 구문은 허용
+  if (/^(BEGIN|COMMIT|ROLLBACK)(\s|;|$)/.test(trimmed)) return;
+  if (sql.includes(";")) {
+    throw new Error("CLI 방식: 멀티스테이트먼트(;) 차단. 풀 방식(mariadb_pool_*)을 사용하거나 단일 쿼리로 분리하세요.");
+  }
+}
+
 function runMariadb(db: string, sql: string): string {
+  validateNoMultiStatement(sql);
   const bin = resolveMariadBin();
   const extraPath = MARIADB_SEARCH_PATHS.join(":");
   const env = { ...process.env, PATH: `${extraPath}:${process.env.PATH ?? ""}` };
   const r = spawnSync(bin, buildArgs(db, sql), { timeout: 15000, encoding: "utf-8", env });
+  const isProd = process.env.NODE_ENV === "production";
+  const sqlHint = isProd ? "" : `\nSQL: ${sql.slice(0, 200)}`;
   if (r.error) {
     const hint = r.error.message.includes("ENOENT")
       ? `\n힌트: mariadb CLI를 찾을 수 없습니다. 확인한 경로: ${MARIADB_SEARCH_PATHS.join(", ")}`
       : "";
-    throw new Error(`mariadb CLI 실패: ${r.error.message}${hint}\nDB: ${db}\nSQL: ${sql.slice(0, 200)}`);
+    throw new Error(`mariadb CLI 실패: ${r.error.message}${hint}\nDB: ${db}${sqlHint}`);
   }
   if ((r.status ?? 1) !== 0) {
     const stderr = r.stderr?.trim() ?? `mariadb exit ${r.status}`;
-    throw new Error(`MariaDB 오류: ${stderr}\nDB: ${db}\nSQL: ${sql.slice(0, 200)}`);
+    throw new Error(`MariaDB 오류: ${stderr}\nDB: ${db}${sqlHint}`);
   }
   return r.stdout?.toString() ?? "";
 }
@@ -207,8 +219,15 @@ function bindParams(sql, params) {
   return sql.replace(/\\?/g, () => {
     const p = params[i++];
     if (p === null || p === undefined) return 'NULL';
+    if (typeof p === 'boolean') return p ? '1' : '0';
     if (typeof p === 'number') return String(p);
-    return "'" + String(p).replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'") + "'";
+    return "'" + String(p)
+      .replace(/\\\\/g, '\\\\\\\\')
+      .replace(/\\0/g, '\\\\0')
+      .replace(/'/g, "''")
+      .replace(/\\n/g, '\\\\n')
+      .replace(/\\r/g, '\\\\r')
+      .replace(/\\x1a/g, '\\\\Z') + "'";
   });
 }
 

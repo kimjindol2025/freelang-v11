@@ -460,8 +460,17 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           const headers = req.headers;
           const body = await readBody(req);
 
-          // CORS
-          res.setHeader("Access-Control-Allow-Origin", "*");
+          // CORS (M-1: FL_ALLOWED_ORIGINS 환경변수로 제어)
+          const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
+          if (allowedOrigins && allowedOrigins !== "*") {
+            const reqOrigin = (req.headers["origin"] as string) || "";
+            if (allowedOrigins.split(",").map(s => s.trim()).includes(reqOrigin)) {
+              res.setHeader("Access-Control-Allow-Origin", reqOrigin);
+              res.setHeader("Vary", "Origin");
+            }
+          } else {
+            res.setHeader("Access-Control-Allow-Origin", "*");
+          }
           res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
           res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
           res.setHeader("X-Request-Id", requestId);
@@ -478,8 +487,10 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             return;
           }
 
-          // Rate Limiting
-          const clientIp = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+          // Rate Limiting (M-5: FL_TRUST_PROXY=1 일 때만 X-Forwarded-For 신뢰)
+          const clientIp = process.env.FL_TRUST_PROXY === "1"
+            ? ((req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown").split(",")[0].trim()
+            : (req.socket.remoteAddress || "unknown");
           if (!checkRateLimit(clientIp)) {
             res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(Math.ceil(rlWindowMs / 1000)) });
             res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1000) }));
@@ -866,7 +877,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       let cookie = `${encodeURIComponent(String(name))}=${encodeURIComponent(String(value))}`;
       if (opts && opts["max_age"] !== undefined) cookie += `; Max-Age=${opts["max_age"]}`;
       cookie += `; Path=${(opts && opts["path"]) || "/"}`;
-      if (opts && opts["domain"]) cookie += `; Domain=${opts["domain"]}`;
+      if (opts && opts["domain"]) {
+        const domain = String(opts["domain"]);
+        if (!/^[a-zA-Z0-9.\-]+$/.test(domain)) throw new Error(`잘못된 쿠키 도메인: '${domain}'`);
+        cookie += `; Domain=${domain}`;
+      }
       if (!opts || opts["http_only"] !== false) cookie += "; HttpOnly";
       if (!opts || opts["secure"] !== false) cookie += "; Secure";
       const ss = (opts && opts["same_site"]) || "Strict";
@@ -881,7 +896,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
         status: 302,
         contentType: "text/plain",
         body: "",
-        headers: { "Location": url },
+        headers: { "Location": String(url).replace(/[\r\n]/g, "") },
       };
     },
 
@@ -899,7 +914,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     }),
     "res-redirect": (url: string): Record<string, any> => ({
       __fl_response: true, status: 302, contentType: "text/plain", body: "",
-      headers: { "Location": url },
+      headers: { "Location": String(url).replace(/[\r\n]/g, "") },
     }),
     "res-text":     (body: string, status = 200): Record<string, any> => ({
       __fl_response: true, status, contentType: "text/plain; charset=utf-8", body,

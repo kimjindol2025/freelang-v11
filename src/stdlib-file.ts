@@ -9,12 +9,23 @@ import * as path from "path";
  * Provides: file_read, file_write, file_exists, file_delete, file_append
  *           dir_create, dir_list, dir_delete, file_copy
  */
+function validateFilePath(filePath: string): string {
+  const base = process.env.FL_FILE_BASE;
+  if (!base) return filePath;
+  const resolved = path.resolve(filePath);
+  const resolvedBase = path.resolve(base);
+  if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path.sep)) {
+    throw new Error(`Path traversal 차단: '${filePath}' (허용 기준: FL_FILE_BASE=${resolvedBase})`);
+  }
+  return resolved;
+}
+
 export function createFileModule() {
   return {
     // file_read filePath -> string (read file content)
     "file_read": (filePath: string): string => {
       try {
-        return fs.readFileSync(filePath, "utf-8");
+        return fs.readFileSync(validateFilePath(filePath), "utf-8");
       } catch (err: any) {
         throw new Error(`file_read failed for '${filePath}': ${err.message}`);
       }
@@ -23,6 +34,7 @@ export function createFileModule() {
     // file_write filePath content -> boolean (write content to file)
     "file_write": (filePath: string, content: string): boolean => {
       try {
+        filePath = validateFilePath(filePath);
         // Ensure parent directory exists
         const dir = path.dirname(filePath);
         if (dir !== "." && !fs.existsSync(dir)) {
@@ -43,6 +55,7 @@ export function createFileModule() {
     // file_delete filePath -> boolean (delete file)
     "file_delete": (filePath: string): boolean => {
       try {
+        filePath = validateFilePath(filePath);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
           return true;
@@ -56,6 +69,7 @@ export function createFileModule() {
     // file_append filePath content -> boolean (append content to file)
     "file_append": (filePath: string, content: string): boolean => {
       try {
+        filePath = validateFilePath(filePath);
         // Ensure parent directory exists
         const dir = path.dirname(filePath);
         if (dir !== "." && !fs.existsSync(dir)) {

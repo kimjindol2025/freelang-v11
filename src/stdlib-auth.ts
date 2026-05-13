@@ -54,7 +54,7 @@ export function createAuthModule() {
       return jwtVerify(token, secret);
     },
 
-    // auth_jwt_decode token → payload (no signature check)
+    // auth_jwt_decode token → payload (서명 미검증 — 인증 목적 사용 금지, auth_jwt_verify 사용)
     "auth_jwt_decode": (token: string): any => {
       try {
         const [, body] = token.split(".");
@@ -190,7 +190,8 @@ export function createAuthModule() {
       const age = Math.floor(Date.now() / 1000) - parseInt(ts, 10);
       if (isNaN(age) || age < 0 || age > 3600) return false;
       const expected = createHmac("sha256", secret).update(ts).digest("hex").slice(0, 16);
-      return sig === expected;
+      return sig.length === expected.length &&
+        timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
     },
   };
 }

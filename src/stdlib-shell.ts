@@ -62,6 +62,19 @@ export function createShellModule() {
       return (result.status ?? 1) === 0;
     },
 
+    // shell_safe program args -> string (인자 배열 방식 — 사용자 입력 안전 실행, sh -c 미사용)
+    "shell_safe": (program: string, args: string[]): string => {
+      if (typeof program !== "string" || !program) throw new Error("shell_safe: program은 문자열이어야 합니다");
+      if (!Array.isArray(args)) throw new Error("shell_safe: args는 배열이어야 합니다");
+      const result = spawnSync(program, args.map(String), { timeout: 30000, encoding: "utf-8" });
+      if (result.error) throw new Error(`shell_safe failed: ${result.error.message}`);
+      if ((result.status ?? 1) !== 0) {
+        const stderr = result.stderr?.trim() ?? "";
+        throw new Error(`shell_safe failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
+      }
+      return result.stdout ?? "";
+    },
+
     // shell_env varname -> string | null (환경변수 없으면 null)
     "shell_env": (varname: string): string | null => {
       const val = process.env[varname];

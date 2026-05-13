@@ -12,6 +12,19 @@ function getDb(dbPath: string): any {
   return _dbqCache.get(dbPath);
 }
 
+function validateIdentifier(name: string): string {
+  if (typeof name !== "string" || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name))
+    throw new Error(`잘못된 SQL 식별자: '${name}'`);
+  return name;
+}
+
+function safeCol(c: string): string {
+  if (c === "*") return c;
+  if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(c))
+    throw new Error(`잘못된 컬럼명: '${c}'`);
+  return `\`${c}\``;
+}
+
 function toSerializable(obj: any): any {
   if (obj instanceof Map) {
     const r: any = {};
@@ -65,8 +78,8 @@ export function createDbQueryModule() {
       try {
         if (op === "select") {
           const cols = o.get("select") ?? ["*"];
-          const colStr = Array.isArray(cols) ? cols.join(", ") : String(cols);
-          const table = o.get("from") ?? o.get("table");
+          const colStr = Array.isArray(cols) ? cols.map(safeCol).join(", ") : safeCol(String(cols));
+          const table = validateIdentifier(String(o.get("from") ?? o.get("table") ?? ""));
           if (!table) throw new Error("db_query select: :from 필수");
           const { sql: whereSql, params } = buildWhere(o.get("where"));
           const orderBy = o.get("order_by") ? `ORDER BY ${o.get("order_by")}` : "";
@@ -76,11 +89,11 @@ export function createDbQueryModule() {
           return rows.map(rowToMap);
 
         } else if (op === "insert") {
-          const table = o.get("into") ?? o.get("table");
+          const table = validateIdentifier(String(o.get("into") ?? o.get("table") ?? ""));
           if (!table) throw new Error("db_query insert: :into 필수");
           const data = toSerializable(o.get("values") ?? o.get("data"));
           if (!data) throw new Error("db_query insert: :values 필수");
-          const keys = Object.keys(data);
+          const keys = Object.keys(data).map(validateIdentifier);
           const sql = `INSERT INTO ${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`;
           const result = db.prepare(sql).run(...keys.map((k: string) => data[k]));
           const m = new Map<string, any>();
@@ -89,11 +102,11 @@ export function createDbQueryModule() {
           return m;
 
         } else if (op === "update") {
-          const table = o.get("table");
+          const table = validateIdentifier(String(o.get("table") ?? ""));
           if (!table) throw new Error("db_query update: :table 필수");
           const data = toSerializable(o.get("set") ?? o.get("data"));
           if (!data) throw new Error("db_query update: :set 필수");
-          const keys = Object.keys(data);
+          const keys = Object.keys(data).map(validateIdentifier);
           const { sql: whereSql, params: whereParams } = buildWhere(o.get("where"));
           const sql = `UPDATE ${table} SET ${keys.map((k: string) => `${k} = ?`).join(", ")} ${whereSql}`;
           const result = db.prepare(sql).run(...keys.map((k: string) => data[k]), ...whereParams);
@@ -102,7 +115,7 @@ export function createDbQueryModule() {
           return m;
 
         } else if (op === "delete") {
-          const table = o.get("from") ?? o.get("table");
+          const table = validateIdentifier(String(o.get("from") ?? o.get("table") ?? ""));
           if (!table) throw new Error("db_query delete: :from 필수");
           const { sql: whereSql, params } = buildWhere(o.get("where"));
           const sql = `DELETE FROM ${table} ${whereSql}`.trim();
@@ -112,7 +125,7 @@ export function createDbQueryModule() {
           return m;
 
         } else if (op === "count") {
-          const table = o.get("from") ?? o.get("table");
+          const table = validateIdentifier(String(o.get("from") ?? o.get("table") ?? ""));
           if (!table) throw new Error("db_query count: :from 필수");
           const { sql: whereSql, params } = buildWhere(o.get("where"));
           const sql = `SELECT COUNT(*) as n FROM ${table} ${whereSql}`.trim();
@@ -130,6 +143,7 @@ export function createDbQueryModule() {
     // db_batch_insert path table rows -> {inserted, errors}
     // (db_batch_insert "app.db" "users" [{:name "A"} {:name "B"} ...])
     "db_batch_insert": (dbPath: string, table: string, rows: any[]): Map<string, any> => {
+      validateIdentifier(table);
       const db = getDb(dbPath);
       const result = new Map<string, any>();
       let inserted = 0;
@@ -143,7 +157,7 @@ export function createDbQueryModule() {
         }
 
         const firstRow = toSerializable(rows[0] instanceof Map ? Object.fromEntries(rows[0]) : rows[0]);
-        const keys = Object.keys(firstRow);
+        const keys = Object.keys(firstRow).map(validateIdentifier);
         const sql = `INSERT INTO ${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`;
         const stmt = db.prepare(sql);
 
