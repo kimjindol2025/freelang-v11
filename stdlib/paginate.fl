@@ -1,0 +1,92 @@
+;; stdlib/paginate.fl — DB 페이지네이션 헬퍼 (v11.7.3)
+;; (load "stdlib/paginate.fl")
+;;
+;; 사용법:
+;;   (pg-query db "SELECT * FROM users" [] {:page 2 :per-page 20})
+;;   → {:data [...] :page 2 :per-page 20 :total 150 :total-pages 8 :has-next true :has-prev true}
+;;
+;;   (pg-offset {:page 3 :per-page 10})  ;; → 20
+;;   (pg-response data total opts)       ;; → 표준 페이지 응답 맵
+;;
+;; 실무 예제:
+;;   (load "stdlib/paginate.fl")
+;;   (defn handle-list-users [req]
+;;     (let [q    (get req "query")
+;;           opts {:page     (env-int q "page" 1)
+;;                 :per-page (env-int q "per_page" 20)}
+;;           res  (pg-query DB
+;;                  "SELECT * FROM users WHERE active=1 ORDER BY created_at DESC"
+;;                  [] opts)]
+;;       (server-json res)))
+
+;; ── 헬퍼 ─────────────────────────────────────────────────────────────────────
+
+(defn pg-offset [opts]
+  (let [page     (max 1 (get opts :page 1))
+        per-page (max 1 (get opts :per-page 20))]
+    (* (- page 1) per-page)))
+
+(defn pg-total-pages [total per-page]
+  (let [pp (max 1 per-page)]
+    (int (ceil (/ total pp)))))
+
+(defn pg-response [data total opts]
+  (let [page       (max 1 (get opts :page 1))
+        per-page   (max 1 (get opts :per-page 20))
+        total-pages (pg-total-pages total per-page)]
+    {:data        data
+     :page        page
+     :per-page    per-page
+     :total       total
+     :total-pages total-pages
+     :has-prev    (> page 1)
+     :has-next    (< page total-pages)
+     :from        (+ (* (- page 1) per-page) 1)
+     :to          (min (* page per-page) total)}))
+
+;; ── DB 쿼리 ──────────────────────────────────────────────────────────────────
+
+(defn pg-query [db sql params opts]
+  (let [page     (max 1 (get opts :page 1))
+        per-page (max 1 (get opts :per-page 20))
+        offset   (pg-offset opts)
+        count-sql (str "SELECT COUNT(*) as cnt FROM (" sql ") as _pg_count")
+        count-row (first (db-query db count-sql params))
+        total     (get count-row "cnt" 0)
+        data-sql  (str sql " LIMIT " per-page " OFFSET " offset)
+        data      (db-query db data-sql params)]
+    (pg-response data total opts)))
+
+(defn pg-query-search [db sql params search-col search-term opts]
+  (let [where-sql (if (str-blank? search-term)
+                    sql
+                    (str sql " WHERE " search-col " LIKE ?"))
+        where-params (if (str-blank? search-term)
+                       params
+                       (append params (str "%" search-term "%")))]
+    (pg-query db where-sql where-params opts)))
+
+;; ── 배열 페이지네이션 (DB 없이) ───────────────────────────────────────────────
+
+(defn pg-slice [arr opts]
+  (let [page     (max 1 (get opts :page 1))
+        per-page (max 1 (get opts :per-page 20))
+        total    (length arr)
+        offset   (pg-offset opts)
+        data     (take per-page (drop offset arr))]
+    (pg-response data total opts)))
+
+;; ── 커서 기반 페이지네이션 ────────────────────────────────────────────────────
+
+(defn pg-cursor [db sql params cursor-col cursor-val limit]
+  (let [cursor-sql (if (nil? cursor-val)
+                     (str sql " ORDER BY " cursor-col " LIMIT " limit)
+                     (str sql " WHERE " cursor-col " > ? ORDER BY " cursor-col " LIMIT " limit))
+        cursor-params (if (nil? cursor-val) params (append params cursor-val))
+        data      (db-query db cursor-sql cursor-params)
+        next-cursor (if (< (length data) limit)
+                      nil
+                      (get (last data) cursor-col))]
+    {:data        data
+     :next-cursor next-cursor
+     :has-next    (not (nil? next-cursor))}))

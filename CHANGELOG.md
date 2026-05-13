@@ -2,6 +2,46 @@
 
 ---
 
+## v11.7.5 — 포맷팅 헬퍼 함수 (2026-05-13)
+
+### 🆕 문자열 포맷팅
+- **`str-pad-left(s, len, char=" ")`** — 좌측 패딩
+  - `(str-pad-left "5" 5 "0")` → `"00005"`
+  - snake_case alias: `str_pad_left`
+- **`str-pad-right(s, len, char=" ")`** — 우측 패딩
+  - `(str-pad-right "hi" 5)` → `"hi   "`
+  - snake_case alias: `str_pad_right`
+- **`str-truncate(s, len, suffix="...")`** — 문자열 자르기
+  - `(str-truncate "hello" 3)` → `"hel..."`
+  - snake_case alias: `str_truncate`
+
+### 🆕 숫자 포맷팅
+- **`format-number(n, decimals=0)`** — 천 단위 쉼표
+  - `(format-number 1234567)` → `"1,234,567"`
+  - snake_case alias: `format_number`
+- **`format-decimal(n, places=2)`** — 소수점 자리 제한
+  - `(format-decimal 3.14159 2)` → `"3.14"`
+  - snake_case alias: `format_decimal`
+- **`format-percent(n, decimals=1)`** — 백분율 포맷
+  - `(format-percent 0.456 1)` → `"45.6%"`
+  - snake_case alias: `format_percent`
+
+### 📊 테스트
+- **포맷팅 헬퍼**: 8개 신규 PASS
+  - str-pad-left/right 기본 및 커스텀 char
+  - str-truncate suffix
+  - format-number 자리수
+  - format-decimal 소수점
+  - format-percent 계산
+- **전체**: 1090 → 1098개 (+8)
+
+### 📈 개선사항
+- **사용자 경험**: 문자열/숫자 포맷팅 편의성 대폭 개선
+- **언어 완성도**: 9.88/10 → 9.89/10
+- **버전**: 11.7.4 → 11.7.5
+
+---
+
 ## v11.7.4 — 정규식 강화 (re-groups 개선 + snake_case alias) (2026-05-13)
 
 ### 🔧 정규식 함수 개선

@@ -1,0 +1,146 @@
+;; stdlib/money.fl — 금액/통화 계산 (소수점 안전) (v11.7.3)
+;; (load "stdlib/money.fl")
+;;
+;; 핵심 원칙: 모든 금액은 정수(최소 단위) 기반으로 계산.
+;;   원화(KRW): 1원 단위 정수
+;;   달러(USD): 센트(1/100달러) 정수
+;;
+;; 사용법:
+;;   (money 10000 "KRW")                    ;; 금액 생성
+;;   (money-add m1 m2)                      ;; 덧셈
+;;   (money-sub m1 m2)                      ;; 뺄셈
+;;   (money-mul m 1.1)                      ;; 10% 추가 (반올림)
+;;   (money-pct m 10)                       ;; 10% 계산
+;;   (money-format m)                       ;; "₩10,000" or "$100.00"
+;;   (money-tax m 10)                       ;; 세금 계산 (부가세 10%)
+;;   (money-split m 3)                      ;; 균등 분할 (나머지 첫째)
+;;
+;; 실무 예제:
+;;   (load "stdlib/money.fl")
+;;   (defn calc-order-total [items tax-rate]
+;;     (let [subtotal (reduce money-add
+;;                     (map (fn [i]
+;;                            (money-mul (money (get i :price) "KRW")
+;;                                       (get i :quantity)))
+;;                          items))
+;;           tax      (money-pct subtotal tax-rate)
+;;           total    (money-add subtotal tax)]
+;;       {:subtotal (money-format subtotal)
+;;        :tax      (money-format tax)
+;;        :total    (money-format total)}))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn money [amount currency]
+  {:amount   (int (round amount))
+   :currency (str-to-upper currency)})
+
+(defn money-krw [amount] (money amount "KRW"))
+(defn money-usd [amount] (money amount "USD"))
+(defn money-zero [currency] (money 0 currency))
+
+;; ── 검증 ─────────────────────────────────────────────────────────────────────
+
+(defn -money-assert-same [m1 m2]
+  (when (not (= (get m1 :currency) (get m2 :currency)))
+    (throw (str "통화 불일치: " (get m1 :currency) " vs " (get m2 :currency)))))
+
+;; ── 사칙연산 ─────────────────────────────────────────────────────────────────
+
+(defn money-add [m1 m2]
+  (-money-assert-same m1 m2)
+  (money (+ (get m1 :amount) (get m2 :amount)) (get m1 :currency)))
+
+(defn money-sub [m1 m2]
+  (-money-assert-same m1 m2)
+  (money (- (get m1 :amount) (get m2 :amount)) (get m1 :currency)))
+
+(defn money-mul [m factor]
+  (money (round (* (get m :amount) factor)) (get m :currency)))
+
+(defn money-div [m divisor]
+  (when (= divisor 0) (throw "0으로 나눌 수 없습니다"))
+  (money (round (/ (get m :amount) divisor)) (get m :currency)))
+
+;; ── 비율 계산 ─────────────────────────────────────────────────────────────────
+
+(defn money-pct [m pct]
+  (money (round (* (get m :amount) (/ pct 100))) (get m :currency)))
+
+(defn money-tax [m tax-rate]
+  (let [tax (money-pct m tax-rate)]
+    {:subtotal m
+     :tax      tax
+     :total    (money-add m tax)}))
+
+(defn money-discount [m pct]
+  (let [discount (money-pct m pct)]
+    {:original m
+     :discount discount
+     :final    (money-sub m discount)}))
+
+;; ── 비교 ─────────────────────────────────────────────────────────────────────
+
+(defn money-eq? [m1 m2]
+  (and (= (get m1 :amount) (get m2 :amount))
+       (= (get m1 :currency) (get m2 :currency))))
+
+(defn money-gt? [m1 m2]
+  (-money-assert-same m1 m2)
+  (> (get m1 :amount) (get m2 :amount)))
+
+(defn money-lt? [m1 m2]
+  (-money-assert-same m1 m2)
+  (< (get m1 :amount) (get m2 :amount)))
+
+(defn money-zero? [m]
+  (= (get m :amount) 0))
+
+(defn money-negative? [m]
+  (< (get m :amount) 0))
+
+;; ── 분할 ─────────────────────────────────────────────────────────────────────
+
+(defn money-split [m n]
+  (when (< n 1) (throw "1 이상으로 나눠야 합니다"))
+  (let [amount   (get m :amount)
+        currency (get m :currency)
+        base     (int (/ amount n))
+        remainder (% amount n)
+        parts    (map (fn [i]
+                        (if (< i remainder)
+                          (money (+ base 1) currency)
+                          (money base currency)))
+                      (range 0 n))]
+    parts))
+
+;; ── 포맷팅 ───────────────────────────────────────────────────────────────────
+
+(defn -money-comma [n]
+  (let [s    (str (abs n))
+        len  (length s)
+        result (atom "")]
+    (loop [i 0]
+      (when (< i len)
+        (when (and (> i 0) (= (% (- len i) 3) 0))
+          (swap! result str ","))
+        (swap! result str (str-slice s i (+ i 1)))
+        (recur (+ i 1))))
+    (if (< n 0) (str "-" (deref result)) (deref result))))
+
+(defn money-format [m]
+  (let [amount   (get m :amount)
+        currency (get m :currency)]
+    (cond
+      (= currency "KRW") (str "₩" (-money-comma amount))
+      (= currency "USD") (str "$" (-money-comma (int (/ amount 100)))
+                              "." (str-pad-left (str (% (abs amount) 100)) 2 "0"))
+      (= currency "EUR") (str "€" (-money-comma (int (/ amount 100)))
+                              "." (str-pad-left (str (% (abs amount) 100)) 2 "0"))
+      true (str amount " " currency))))
+
+(defn money-amount [m]
+  (get m :amount))
+
+(defn money-currency [m]
+  (get m :currency))

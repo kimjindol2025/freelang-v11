@@ -1,0 +1,118 @@
+;; stdlib/slugify.fl — URL Slug 생성 (v11.7.3)
+;; (load "stdlib/slugify.fl")
+;;
+;; 특징:
+;;   - 영문 소문자 변환
+;;   - 한글/CJK 보존 (URL 인코딩 없이 그대로)
+;;   - 액센트 문자 → ASCII 근사 변환 (café→cafe)
+;;   - 특수문자 → 하이픈
+;;   - 연속 하이픈 → 단일 하이픈
+;;   - 앞뒤 하이픈 제거
+;;   - 최대 길이 제한 지원
+;;
+;; 사용법:
+;;   (slugify "Hello World")          → "hello-world"
+;;   (slugify "김진돌 블로그 v1.0")    → "김진돌-블로그-v1-0"
+;;   (slugify "café résumé")          → "cafe-resume"
+;;   (slugify "Hello World" 10)       → "hello-worl"
+;;   (slugify-unique "제목" existing-slugs)  → "제목-2" (충돌 시)
+;;
+;; 실무 예제:
+;;   (load "stdlib/slugify.fl")
+;;   (defn handle-create-post [req]
+;;     (let [body    (get req "body")
+;;           title   (get body "title")
+;;           slug    (slugify title)
+;;           exists  (db-query DB "SELECT id FROM posts WHERE slug=?" [slug])
+;;           final   (if (empty? exists) slug (str slug "-" (uuid)))]
+;;       (db-exec DB "INSERT INTO posts (title,slug) VALUES (?,?)" [title final])
+;;       (server-json {:ok true :slug final})))
+
+;; ── 액센트 변환 테이블 ────────────────────────────────────────────────────────
+
+(define *accent-map*
+  {"à" "a" "á" "a" "â" "a" "ã" "a" "ä" "a" "å" "a"
+   "è" "e" "é" "e" "ê" "e" "ë" "e"
+   "ì" "i" "í" "i" "î" "i" "ï" "i"
+   "ò" "o" "ó" "o" "ô" "o" "õ" "o" "ö" "o"
+   "ù" "u" "ú" "u" "û" "u" "ü" "u"
+   "ý" "y" "ÿ" "y"
+   "ñ" "n" "ç" "c" "ß" "ss"
+   "À" "a" "Á" "a" "Â" "a" "Ã" "a" "Ä" "a" "Å" "a"
+   "È" "e" "É" "e" "Ê" "e" "Ë" "e"
+   "Ì" "i" "Í" "i" "Î" "i" "Ï" "i"
+   "Ò" "o" "Ó" "o" "Ô" "o" "Õ" "o" "Ö" "o"
+   "Ù" "u" "Ú" "u" "Û" "u" "Ü" "u"
+   "Ý" "y" "Ñ" "n" "Ç" "c"})
+
+;; ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+(defn -slugify-replace-accents [s]
+  (reduce
+    (fn [acc char]
+      (let [replacement (get *accent-map* char)]
+        (if (nil? replacement) (str acc char) (str acc replacement))))
+    ""
+    (str-split s "")))
+
+(defn -slugify-char-to-slug [ch]
+  (cond
+    ;; 영문 소문자 → 그대로
+    (re-test "^[a-z]$" ch) ch
+    ;; 영문 대문자 → 소문자
+    (re-test "^[A-Z]$" ch) (str-to-lower ch)
+    ;; 숫자 → 그대로
+    (re-test "^[0-9]$" ch) ch
+    ;; 한글/CJK → 그대로 보존
+    (re-test "^[\\u3131-\\uD7A3\\u4E00-\\u9FFF\\u3400-\\u4DBF]$" ch) ch
+    ;; 하이픈/언더스코어/공백/특수문자 → 구분자
+    true "-"))
+
+(defn -slugify-core [s]
+  (let [accent-replaced (-slugify-replace-accents s)
+        chars           (str-split accent-replaced "")
+        slug-chars      (map -slugify-char-to-slug chars)
+        joined          (str-join "" slug-chars)
+        no-multi-hyphen (loop [result joined]
+                          (if (str-includes result "--")
+                            (recur (str-replace-all result "--" "-"))
+                            result))
+        trimmed         (str-trim no-multi-hyphen)
+        trimmed         (if (str-starts-with trimmed "-")
+                          (str-slice trimmed 1 (length trimmed))
+                          trimmed)
+        trimmed         (if (str-ends-with trimmed "-")
+                          (str-slice trimmed 0 (- (length trimmed) 1))
+                          trimmed)]
+    trimmed))
+
+;; ── 공개 API ─────────────────────────────────────────────────────────────────
+
+(defn slugify [s]
+  (if (str-blank? s)
+    ""
+    (-slugify-core s)))
+
+(defn slugify-max [s max-len]
+  (let [slug (slugify s)]
+    (if (<= (length slug) max-len)
+      slug
+      (let [truncated (str-slice slug 0 max-len)]
+        (if (str-ends-with truncated "-")
+          (str-slice truncated 0 (- (length truncated) 1))
+          truncated)))))
+
+(defn slugify-unique [s existing-slugs]
+  (let [base (slugify s)]
+    (if (not (includes-item existing-slugs base))
+      base
+      (loop [n 2]
+        (let [candidate (str base "-" n)]
+          (if (not (includes-item existing-slugs candidate))
+            candidate
+            (recur (+ n 1))))))))
+
+(defn slugify-path [s]
+  (let [parts (filter (fn [p] (not (str-blank? p)))
+                      (str-split s "/"))]
+    (str-join "/" (map slugify parts))))

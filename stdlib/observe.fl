@@ -1,0 +1,99 @@
+;; stdlib/observe.fl — 관찰자 패턴 / 반응형 상태 (v11.7.3)
+;; (load "stdlib/observe.fl")
+;;
+;; 사용법:
+;;   (obs-create val)                    ;; 관찰 가능한 값 생성
+;;   (obs-get ob)                        ;; 현재 값 읽기
+;;   (obs-set! ob new-val)               ;; 값 변경 + 구독자 알림
+;;   (obs-watch ob key fn)               ;; 변경 구독 (fn [key old new])
+;;   (obs-unwatch ob key)                ;; 구독 해제
+;;   (obs-computed obs-list fn)          ;; 파생 값 (자동 재계산)
+;;
+;; 실무 예제:
+;;   (load "stdlib/observe.fl")
+;;   ;; 쇼핑카트 반응형 상태
+;;   (define cart-items (obs-create []))
+;;   (define cart-total (obs-computed [cart-items]
+;;     (fn [items] (reduce + 0 (map (fn [i] (get i :price)) items)))))
+;;   (obs-watch cart-total "logger"
+;;     (fn [k old new] (println (str "합계 변경: " old " → " new))))
+;;   (obs-set! cart-items (push (obs-get cart-items) {:name "사과" :price 1000}))
+;;   ;; → "합계 변경: 0 → 1000" 자동 출력
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn obs-create [initial]
+  (atom {:value     initial
+         :watchers  {}
+         :version   0}))
+
+;; ── 읽기 / 쓰기 ───────────────────────────────────────────────────────────────
+
+(defn obs-get [ob]
+  (get (deref ob) :value))
+
+(defn obs-version [ob]
+  (get (deref ob) :version 0))
+
+(defn -obs-notify [ob old new-val]
+  (let [watchers (get (deref ob) :watchers {})]
+    (doseq [entry (obj-entries watchers)]
+      (let [k   (first entry)
+            wfn (second entry)]
+        (wfn k old new-val)))))
+
+(defn obs-set! [ob new-val]
+  (let [old (get (deref ob) :value)]
+    (when (not (= (json-stringify old) (json-stringify new-val)))
+      (swap! ob assoc :value new-val :version (+ (get (deref ob) :version 0) 1))
+      (-obs-notify ob old new-val))
+    new-val))
+
+(defn obs-update! [ob fn-update]
+  (obs-set! ob (fn-update (obs-get ob))))
+
+;; ── 구독 ─────────────────────────────────────────────────────────────────────
+
+(defn obs-watch [ob key watcher-fn]
+  (swap! ob assoc-in [:watchers key] watcher-fn))
+
+(defn obs-unwatch [ob key]
+  (swap! ob update :watchers (fn [w] (dissoc w key))))
+
+(defn obs-watchers [ob]
+  (keys (get (deref ob) :watchers {})))
+
+;; ── 파생 값 ──────────────────────────────────────────────────────────────────
+
+(defn obs-computed [sources compute-fn]
+  (let [computed (obs-create (apply compute-fn (map obs-get sources)))]
+    (doseq [i (range 0 (length sources))]
+      (let [src (nth sources i)]
+        (obs-watch src (str "computed-" i)
+          (fn [k old new-val]
+            (obs-set! computed
+              (apply compute-fn (map obs-get sources)))))))
+    computed))
+
+;; ── 히스토리 ─────────────────────────────────────────────────────────────────
+
+(defn obs-with-history [ob max-size]
+  (let [history (atom [(obs-get ob)])]
+    (obs-watch ob "history-tracker"
+      (fn [k old new-val]
+        (swap! history push new-val)
+        (when (> (length (deref history)) max-size)
+          (reset! history (take max-size (deref history))))))
+    history))
+
+;; ── 디바운스 구독 ─────────────────────────────────────────────────────────────
+
+(defn obs-debounce-watch [ob key delay-ms watcher-fn]
+  (let [last-val (atom (obs-get ob))]
+    (obs-watch ob key
+      (fn [k old new-val]
+        (reset! last-val new-val)
+        (when (> delay-ms 0)
+          (js-eval (str "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0," delay-ms ")")))
+        (when (= (json-stringify (deref last-val)) (json-stringify new-val))
+          (watcher-fn k old new-val))))))

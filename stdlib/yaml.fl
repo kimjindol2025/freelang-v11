@@ -1,0 +1,139 @@
+;; stdlib/yaml.fl — YAML 파싱/생성 (v11.7.3)
+;; (load "stdlib/yaml.fl")
+;;
+;; 경량 YAML 파서. 들여쓰기 기반 맵/배열/스칼라 지원.
+;; 지원: 문자열·숫자·bool·null·맵·배열(- 항목)·들여쓰기 중첩
+;;
+;; 사용법:
+;;   (yaml-parse "port: 3000\ndebug: true\nname: myapp")
+;;   → {:port 3000 :debug true :name "myapp"}
+;;
+;;   (yaml-stringify {:port 3000 :name "myapp" :tags ["a" "b"]})
+;;   → "port: 3000\nname: myapp\ntags:\n  - a\n  - b\n"
+;;
+;; 실무 예제:
+;;   (load "stdlib/yaml.fl")
+;;   (define cfg (yaml-parse (file-read "config.yml")))
+;;   (define port (get cfg "port"))
+;;   (define db   (get cfg "database"))
+;;   (define host (get db "host"))
+
+;; ── 스칼라 변환 ──────────────────────────────────────────────────────────────
+
+(defn -yaml-scalar [s]
+  (let [t (str-trim s)]
+    (if (or (= t "true") (= t "yes"))  true
+      (if (or (= t "false") (= t "no")) false
+        (if (or (= t "null") (= t "~") (= t "")) nil
+          (let [n (str-to-num t)]
+            (if (nil? n)
+              (if (and (str-starts-with t "\"") (str-ends-with t "\""))
+                (str-slice t 1 (- (length t) 1))
+                (if (and (str-starts-with t "'") (str-ends-with t "'"))
+                  (str-slice t 1 (- (length t) 1))
+                  t))
+              n)))))))
+
+;; ── 들여쓰기 계산 ─────────────────────────────────────────────────────────────
+
+(defn -yaml-indent [line]
+  (let [len (length line)]
+    (loop [i 0]
+      (if (or (>= i len) (not (= (str-slice line i (+ i 1)) " ")))
+        i
+        (recur (+ i 1))))))
+
+;; ── 파싱 ─────────────────────────────────────────────────────────────────────
+
+(defn yaml-parse [yaml-str]
+  (let [lines (filter
+                (fn [l] (not (str-starts-with (str-trim l) "#")))
+                (str-lines yaml-str))
+        lines (filter (fn [l] (not (str-blank? l))) lines)]
+    (-yaml-parse-block lines 0)))
+
+(defn -yaml-parse-block [lines base-indent]
+  (if (empty? lines) {}
+    (let [first-line (first lines)
+          indent     (-yaml-indent first-line)
+          is-list    (str-starts-with (str-trim first-line) "- ")]
+      (if is-list
+        (-yaml-parse-list lines base-indent)
+        (-yaml-parse-map lines base-indent)))))
+
+(defn -yaml-parse-map [lines base-indent]
+  (let [result (atom {})
+        remain (atom lines)]
+    (loop []
+      (let [cur (deref remain)]
+        (when (not (empty? cur))
+          (let [line   (first cur)
+                indent (-yaml-indent line)
+                trimmed (str-trim line)]
+            (when (>= indent base-indent)
+              (let [colon-i (str-index-of trimmed ":")]
+                (when (> colon-i 0)
+                  (let [key     (str-trim (str-slice trimmed 0 colon-i))
+                        rest    (str-trim (str-slice trimmed (+ colon-i 1) (length trimmed)))
+                        next-lines (rest cur)]
+                    (if (str-blank? rest)
+                      (let [child-indent (if (empty? next-lines) 999
+                                           (-yaml-indent (first next-lines)))
+                            child-lines  (filter
+                                           (fn [l] (>= (-yaml-indent l) child-indent))
+                                           next-lines)
+                            after-lines  (filter
+                                           (fn [l] (< (-yaml-indent l) child-indent))
+                                           next-lines)]
+                        (swap! result assoc key (-yaml-parse-block child-lines child-indent))
+                        (reset! remain after-lines))
+                      (do
+                        (swap! result assoc key (-yaml-scalar rest))
+                        (reset! remain next-lines)))
+                    (recur)))))))))
+    (deref result)))
+
+(defn -yaml-parse-list [lines base-indent]
+  (let [result (atom [])]
+    (doseq [line lines]
+      (let [trimmed (str-trim line)]
+        (when (str-starts-with trimmed "- ")
+          (let [val (-yaml-scalar (str-slice trimmed 2 (length trimmed)))]
+            (swap! result append val)))))
+    (deref result)))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn yaml-stringify [data]
+  (-yaml-to-str data 0))
+
+(defn -yaml-indent-str [n]
+  (str-repeat " " n))
+
+(defn -yaml-to-str [data indent]
+  (if (nil? data)
+    "null"
+    (if (boolean? data)
+      (if data "true" "false")
+      (if (number? data)
+        (str data)
+        (if (string? data)
+          (if (str-includes data ":") (str "\"" data "\"") data)
+          (if (array? data)
+            (str-join ""
+              (map (fn [item]
+                     (str (-yaml-indent-str indent) "- "
+                          (-yaml-to-str item (+ indent 2)) "\n"))
+                   data))
+            (if (map? data)
+              (str-join ""
+                (map (fn [k]
+                       (let [v    (get data k)
+                             k-str (str k)]
+                         (if (or (map? v) (array? v))
+                           (str (-yaml-indent-str indent) k-str ":\n"
+                                (-yaml-to-str v (+ indent 2)))
+                           (str (-yaml-indent-str indent) k-str ": "
+                                (-yaml-to-str v 0) "\n"))))
+                     (obj-keys data)))
+              (str data))))))))

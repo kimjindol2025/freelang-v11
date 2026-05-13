@@ -1,0 +1,110 @@
+;; stdlib/rate-limiter.fl — Sliding Window Rate Limiter (v11.7.3)
+;; (load "stdlib/rate-limiter.fl")
+;;
+;; 사용법:
+;;   (define rl (rl-create 100 60000))        ;; 60초에 100회
+;;   (rl-check rl "user:123")                 ;; → {:ok true :remaining 99 :reset-at 1234567890}
+;;   (rl-check rl "user:123")                 ;; → {:ok false :remaining 0 :retry-after 45000}
+;;   (rl-reset rl "user:123")                 ;; 특정 키 초기화
+;;   (rl-stats rl "user:123")                 ;; 현재 상태 조회
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn rl-create [limit window-ms]
+  {:limit limit
+   :window-ms window-ms
+   :store (cache-create 10000)})
+
+(defn rl-create-default []
+  (rl-create 60 60000))
+
+;; ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+(defn -rl-get-entry [store key]
+  (let [entry (cache-get store key)]
+    (if (nil? entry)
+      {:count 0 :window-start (now-ms)}
+      entry)))
+
+(defn -rl-in-window? [entry window-ms]
+  (< (- (now-ms) (get entry :window-start)) window-ms))
+
+;; ── 핵심 체크 ────────────────────────────────────────────────────────────────
+
+(defn rl-check [rl key]
+  (let [store     (get rl :store)
+        limit     (get rl :limit)
+        window-ms (get rl :window-ms)
+        entry     (-rl-get-entry store key)
+        now       (now-ms)]
+    (if (-rl-in-window? entry window-ms)
+      (if (< (get entry :count) limit)
+        (let [new-entry {:count (+ (get entry :count) 1)
+                         :window-start (get entry :window-start)}
+              remaining (- limit (get new-entry :count))
+              reset-at  (+ (get entry :window-start) window-ms)]
+          (cache-set store key new-entry window-ms)
+          {:ok true :remaining remaining :reset-at reset-at})
+        (let [retry-after (- (+ (get entry :window-start) window-ms) now)]
+          {:ok false :remaining 0 :retry-after retry-after}))
+      (let [new-entry {:count 1 :window-start now}
+            remaining (- limit 1)]
+        (cache-set store key new-entry window-ms)
+        {:ok true :remaining remaining :reset-at (+ now window-ms)}))))
+
+;; ── 유틸 ─────────────────────────────────────────────────────────────────────
+
+(defn rl-reset [rl key]
+  (cache-del (get rl :store) key))
+
+(defn rl-stats [rl key]
+  (let [store     (get rl :store)
+        limit     (get rl :limit)
+        window-ms (get rl :window-ms)
+        entry     (-rl-get-entry store key)
+        now       (now-ms)]
+    {:key        key
+     :limit      limit
+     :window-ms  window-ms
+     :count      (get entry :count)
+     :remaining  (- limit (get entry :count))
+     :window-start (get entry :window-start)
+     :reset-at   (+ (get entry :window-start) window-ms)}))
+
+;; ── HTTP 미들웨어 헬퍼 ────────────────────────────────────────────────────────
+;; 사용법:
+;;   (defn handler [req]
+;;     (rl-middleware rl req (fn [req] (server-json {:ok true}))))
+
+(defn rl-middleware [rl req handler]
+  (let [ip     (get (get req "headers") "x-forwarded-for")
+        key    (str "ip:" (if (nil? ip) "unknown" ip))
+        result (rl-check rl key)]
+    (if (get result :ok)
+      (handler req)
+      (server-status 429 (str "Too Many Requests. retry-after=" (get result :retry-after) "ms")))))
+
+;; ── 실무 예제: API 서버 rate limiting ────────────────────────────────────────
+;;
+;; (load "stdlib/rate-limiter.fl")
+;;
+;; (define api-rl  (rl-create 100 60000))   ;; IP당 분당 100회
+;; (define user-rl (rl-create 1000 60000))  ;; 유저당 분당 1000회
+;;
+;; (define routes {
+;;   :post {
+;;     "/api/messages" (fn [req]
+;;       (let [ip     (get (get req "headers") "x-forwarded-for")
+;;             uid    (get (get req "body") "user_id")
+;;             ip-ok  (rl-check api-rl  (str "ip:"   ip))
+;;             usr-ok (rl-check user-rl (str "uid:"  uid))]
+;;         (if (not (get ip-ok :ok))
+;;           (server-status 429 "IP 한도 초과")
+;;           (if (not (get usr-ok :ok))
+;;             (server-status 429 "유저 한도 초과")
+;;             (server-json {:ok true})))))
+;;   }
+;; })
+;;
+;; (route routes)
+;; (server-start 8080)

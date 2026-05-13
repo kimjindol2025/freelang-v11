@@ -1,0 +1,129 @@
+;; stdlib/circuit-breaker.fl — Circuit Breaker 패턴 (v11.7.3)
+;; (load "stdlib/circuit-breaker.fl")
+;;
+;; 상태: CLOSED(정상) → OPEN(차단) → HALF-OPEN(복구 시도)
+;;
+;; 사용법:
+;;   (define cb (cb-create "db" 5 10000 30000))  ;; 이름 실패5회 10초창 30초복구
+;;   (cb-call cb (fn [] (db-query db "SELECT 1" [])))
+;;   (cb-state cb)   ;; → "CLOSED" | "OPEN" | "HALF-OPEN"
+;;   (cb-stats cb)
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn cb-create [name fail-threshold window-ms recover-ms]
+  {:name           name
+   :fail-threshold fail-threshold
+   :window-ms      window-ms
+   :recover-ms     recover-ms
+   :state          (atom "CLOSED")
+   :failures       (atom [])
+   :opened-at      (atom nil)
+   :total-calls    (atom 0)
+   :total-failures (atom 0)
+   :total-blocked  (atom 0)})
+
+(defn cb-create-default [name]
+  (cb-create name 5 60000 30000))
+
+;; ── 상태 조회 ─────────────────────────────────────────────────────────────────
+
+(defn cb-state [cb]
+  (deref (get cb :state)))
+
+(defn -cb-recent-failures [cb]
+  (let [window-ms (get cb :window-ms)
+        cutoff    (- (now-ms) window-ms)
+        failures  (deref (get cb :failures))]
+    (filter (fn [t] (> t cutoff)) failures)))
+
+(defn -cb-check-recover [cb]
+  (let [opened-at (deref (get cb :opened-at))
+        recover-ms (get cb :recover-ms)]
+    (if (nil? opened-at)
+      false
+      (> (- (now-ms) opened-at) recover-ms))))
+
+;; ── 호출 ─────────────────────────────────────────────────────────────────────
+
+(defn cb-call [cb fn-to-call]
+  (swap! (get cb :total-calls) + 1)
+  (let [state (cb-state cb)]
+    (if (= state "OPEN")
+      (if (-cb-check-recover cb)
+        (do
+          (reset! (get cb :state) "HALF-OPEN")
+          (try
+            (let [result (fn-to-call)]
+              (reset! (get cb :state) "CLOSED")
+              (reset! (get cb :failures) [])
+              (reset! (get cb :opened-at) nil)
+              result)
+            (catch err
+              (reset! (get cb :state) "OPEN")
+              (reset! (get cb :opened-at) (now-ms))
+              (swap! (get cb :total-failures) + 1)
+              (throw err))))
+        (do
+          (swap! (get cb :total-blocked) + 1)
+          (throw (str "Circuit OPEN: " (get cb :name)))))
+      (try
+        (let [result (fn-to-call)]
+          (when (= state "HALF-OPEN")
+            (reset! (get cb :state) "CLOSED")
+            (reset! (get cb :failures) []))
+          result)
+        (catch err
+          (swap! (get cb :failures) append (now-ms))
+          (swap! (get cb :total-failures) + 1)
+          (let [recent (length (-cb-recent-failures cb))]
+            (when (>= recent (get cb :fail-threshold))
+              (reset! (get cb :state) "OPEN")
+              (reset! (get cb :opened-at) (now-ms))))
+          (throw err))))))
+
+;; ── 수동 제어 ─────────────────────────────────────────────────────────────────
+
+(defn cb-reset [cb]
+  (reset! (get cb :state) "CLOSED")
+  (reset! (get cb :failures) [])
+  (reset! (get cb :opened-at) nil))
+
+(defn cb-open [cb]
+  (reset! (get cb :state) "OPEN")
+  (reset! (get cb :opened-at) (now-ms)))
+
+;; ── 통계 ─────────────────────────────────────────────────────────────────────
+
+(defn cb-stats [cb]
+  {:name            (get cb :name)
+   :state           (cb-state cb)
+   :total-calls     (deref (get cb :total-calls))
+   :total-failures  (deref (get cb :total-failures))
+   :total-blocked   (deref (get cb :total-blocked))
+   :recent-failures (length (-cb-recent-failures cb))
+   :fail-threshold  (get cb :fail-threshold)})
+
+;; ── 실무 예제: 외부 결제 API 보호 ────────────────────────────────────────────
+;;
+;; (load "stdlib/circuit-breaker.fl")
+;;
+;; (define pg-cb (cb-create "payment-gateway" 3 30000 60000))
+;;
+;; (defn charge-card [amount card-token]
+;;   (cb-call pg-cb (fn []
+;;     (let [res (http-post "https://pg.example.com/charge"
+;;                          {:amount amount :token card-token})]
+;;       (if (= (get res :status) 200)
+;;         (get res :body)
+;;         (throw "결제 실패"))))))
+;;
+;; (defn handle-payment [req]
+;;   (try
+;;     (let [body   (get req "body")
+;;           result (charge-card (get body :amount) (get body :card))]
+;;       (server-json {:ok true :txId (get result :id)}))
+;;     (catch err
+;;       (if (str-includes (get err "message") "Circuit OPEN")
+;;         (server-status 503 "결제 서비스 일시 중단")
+;;         (server-status 402 "결제 실패")))))

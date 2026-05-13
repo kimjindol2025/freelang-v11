@@ -1,0 +1,118 @@
+;; stdlib/migration.fl — DB 마이그레이션 실행기 (v11.7.3)
+;; (load "stdlib/migration.fl")
+;;
+;; db = SQLite 파일 경로 문자열 (예: "/app/data/app.db")
+;;
+;; 사용법:
+;;   (define mg (mg-create "/app/data/app.db"))
+;;   (mg-register mg 1 "create users" "CREATE TABLE users (...)" "DROP TABLE users")
+;;   (mg-run mg)          ;; 미실행 마이그레이션 순서대로 실행
+;;   (mg-rollback mg 1)   ;; 특정 버전 롤백
+;;   (mg-status mg)       ;; 현재 상태 조회
+;;
+;; 실무 예제:
+;;   (load "stdlib/migration.fl")
+;;   (define mg (mg-create "/app/data/app.db"))
+;;   (mg-register mg 1 "init schema"
+;;     "CREATE TABLE IF NOT EXISTS users (id VARCHAR(36) PRIMARY KEY, email VARCHAR(255) UNIQUE, created_at BIGINT)"
+;;     "DROP TABLE IF EXISTS users")
+;;   (mg-register mg 2 "add sessions"
+;;     "CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36), token TEXT, expires_at BIGINT)"
+;;     "DROP TABLE IF EXISTS sessions")
+;;   (mg-run mg)
+;;   ;; → {:applied 2 :skipped 0 :errors []}
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn mg-create [db-path]
+  (db-exec db-path
+    "CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at BIGINT)"
+    [])
+  {:db         db-path
+   :migrations (atom [])})
+
+;; ── 등록 ─────────────────────────────────────────────────────────────────────
+
+(defn mg-register [mg version name up-sql down-sql]
+  (swap! (get mg :migrations) append
+         {:version version :name name :up up-sql :down down-sql})
+  mg)
+
+(defn mg-register-many [mg migrations]
+  (doseq [m migrations]
+    (mg-register mg (get m :version) (get m :name) (get m :up) (get m :down)))
+  mg)
+
+;; ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+(defn -mg-applied [db]
+  (let [rows (db-query db "SELECT version FROM _migrations ORDER BY version" [])]
+    (map (fn [r] (get r "version")) rows)))
+
+(defn -mg-applied? [applied version]
+  (includes-item applied version))
+
+;; ── 실행 ─────────────────────────────────────────────────────────────────────
+
+(defn mg-run [mg]
+  (let [db       (get mg :db)
+        applied  (-mg-applied db)
+        all      (sort-by (fn [m] (get m :version))
+                          (deref (get mg :migrations)))]
+    (reduce
+      (fn [acc m]
+        (let [ver (get m :version)]
+          (if (-mg-applied? applied ver)
+            (assoc acc :skipped (+ (get acc :skipped) 1))
+            (try
+              (db-exec db (get m :up) [])
+              (db-exec db
+                "INSERT INTO _migrations (version, name, applied_at) VALUES (?, ?, ?)"
+                [ver (get m :name) (now-ms)])
+              (assoc acc :applied (+ (get acc :applied) 1))
+              (catch err
+                (assoc acc :errors
+                       (append (get acc :errors)
+                               {:version ver :error (get err "message")})))))))
+      {:applied 0 :skipped 0 :errors []}
+      all)))
+
+;; ── 롤백 ─────────────────────────────────────────────────────────────────────
+
+(defn mg-rollback [mg version]
+  (let [db   (get mg :db)
+        all  (deref (get mg :migrations))
+        m    (find-first (fn [m] (= (get m :version) version)) all)]
+    (if (nil? m)
+      {:ok false :error (str "버전 없음: " version)}
+      (try
+        (db-exec db (get m :down) [])
+        (db-exec db "DELETE FROM _migrations WHERE version = ?" [version])
+        {:ok true :version version}
+        (catch err
+          {:ok false :error (get err "message")})))))
+
+(defn mg-rollback-last [mg]
+  (let [db      (get mg :db)
+        applied (-mg-applied db)]
+    (if (empty? applied)
+      {:ok false :error "적용된 마이그레이션 없음"}
+      (mg-rollback mg (last applied)))))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn mg-status [mg]
+  (let [db      (get mg :db)
+        applied (-mg-applied db)
+        all     (deref (get mg :migrations))]
+    (map (fn [m]
+           {:version  (get m :version)
+            :name     (get m :name)
+            :applied  (-mg-applied? applied (get m :version))})
+         (sort-by (fn [m] (get m :version)) all))))
+
+(defn mg-current-version [mg]
+  (let [applied (-mg-applied (get mg :db))]
+    (if (empty? applied)
+      0
+      (last applied))))

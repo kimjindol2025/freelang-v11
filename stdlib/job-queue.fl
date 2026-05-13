@@ -1,0 +1,140 @@
+;; stdlib/job-queue.fl — 비동기 작업 큐 (retry/delay) (v11.7.3)
+;; (load "stdlib/job-queue.fl")
+;;
+;; 사용법:
+;;   (define jq (jq-create))
+;;   (jq-push jq "send-email" {:to "a@b.com"})
+;;   (jq-push-delayed jq "cleanup" {} 5000)       ;; 5초 후 실행
+;;   (jq-process jq handlers)                     ;; 핸들러 맵으로 처리
+;;   (jq-stats jq)                                ;; 통계
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn jq-create []
+  {:pending  (atom [])
+   :done     (atom [])
+   :failed   (atom [])
+   :max-retry 3})
+
+(defn jq-create-opts [opts]
+  {:pending   (atom [])
+   :done      (atom [])
+   :failed    (atom [])
+   :max-retry (get opts :max-retry 3)})
+
+;; ── 작업 추가 ─────────────────────────────────────────────────────────────────
+
+(defn -jq-make-job [type payload run-at]
+  {:id        (uuid)
+   :type      type
+   :payload   payload
+   :run-at    run-at
+   :attempts  0
+   :created-at (now-ms)})
+
+(defn jq-push [jq type payload]
+  (let [job (-jq-make-job type payload (now-ms))]
+    (swap! (get jq :pending) append job)
+    (get job :id)))
+
+(defn jq-push-delayed [jq type payload delay-ms]
+  (let [job (-jq-make-job type payload (+ (now-ms) delay-ms))]
+    (swap! (get jq :pending) append job)
+    (get job :id)))
+
+;; ── 처리 ─────────────────────────────────────────────────────────────────────
+
+(defn -jq-ready? [job]
+  (<= (get job :run-at) (now-ms)))
+
+(defn jq-process [jq handlers]
+  (let [now     (now-ms)
+        pending (deref (get jq :pending))
+        ready   (filter -jq-ready? pending)
+        waiting (filter (fn [j] (not (-jq-ready? j))) pending)]
+    (reset! (get jq :pending) waiting)
+    (reduce
+      (fn [acc job]
+        (let [type    (get job :type)
+              handler (get handlers type)]
+          (if (nil? handler)
+            (let [failed-job (assoc job :error (str "핸들러 없음: " type))]
+              (swap! (get jq :failed) append failed-job)
+              (assoc acc :failed (+ (get acc :failed) 1)))
+            (try
+              (handler (get job :payload))
+              (swap! (get jq :done) append (assoc job :done-at (now-ms)))
+              (assoc acc :done (+ (get acc :done) 1))
+              (catch err
+                (let [attempts (+ (get job :attempts) 1)
+                      max-r    (get jq :max-retry)]
+                  (if (< attempts max-r)
+                    (let [retry-job (assoc (assoc job :attempts attempts)
+                                           :run-at (+ (now-ms) (* attempts 1000)))]
+                      (swap! (get jq :pending) append retry-job)
+                      (assoc acc :retried (+ (get acc :retried) 1)))
+                    (let [failed-job (assoc (assoc job :attempts attempts)
+                                            :error (get err "message"))]
+                      (swap! (get jq :failed) append failed-job)
+                      (assoc acc :failed (+ (get acc :failed) 1))))))))))
+      {:done 0 :failed 0 :retried 0}
+      ready)))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn jq-pending [jq]
+  (deref (get jq :pending)))
+
+(defn jq-done [jq]
+  (deref (get jq :done)))
+
+(defn jq-failed [jq]
+  (deref (get jq :failed)))
+
+(defn jq-stats [jq]
+  {:pending (length (deref (get jq :pending)))
+   :done    (length (deref (get jq :done)))
+   :failed  (length (deref (get jq :failed)))})
+
+(defn jq-clear-done [jq]
+  (reset! (get jq :done) []))
+
+(defn jq-retry-failed [jq]
+  (let [failed (deref (get jq :failed))]
+    (reset! (get jq :failed) [])
+    (doseq [job failed]
+      (swap! (get jq :pending) append
+             (assoc (assoc job :attempts 0) :run-at (now-ms))))))
+
+;; ── 실무 예제: 이메일 발송 비동기 처리 ──────────────────────────────────────
+;;
+;; (load "stdlib/job-queue.fl")
+;;
+;; (define jq (jq-create))
+;;
+;; (define handlers
+;;   {"send-email" (fn [p]
+;;      (mailgun-send (get p :to) (get p :subject) (get p :body)))
+;;    "resize-image" (fn [p]
+;;      (println "이미지 리사이즈:" (get p :path)))
+;;    "push-notif" (fn [p]
+;;      (println "푸시 발송:" (get p :token)))})
+;;
+;; ;; POST /api/signup → 회원가입 즉시 응답, 이메일은 비동기
+;; (define routes {
+;;   :post {
+;;     "/api/signup" (fn [req]
+;;       (let [body (get req "body")
+;;             email (get body "email")]
+;;         (jq-push jq "send-email"
+;;                  {:to email :subject "환영합니다" :body "가입 완료!"})
+;;         (server-json {:ok true})))
+;;   }
+;; })
+;;
+;; ;; 백그라운드 워커 (1초마다 처리)
+;; (define (start-worker)
+;;   (loop []
+;;     (jq-process jq handlers)
+;;     (sleep 1000)
+;;     (recur)))

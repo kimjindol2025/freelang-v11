@@ -1,0 +1,87 @@
+;; stdlib/retry.fl — 재시도 유틸 (v11.7.3)
+;; (load "stdlib/retry.fl")
+;;
+;; 사용법:
+;;   (retry fn opts)                  ;; 재시도 실행
+;;   (retry-fixed fn 3 100)           ;; 3회 고정 100ms 간격
+;;   (retry-expo fn 3 100)            ;; 3회 지수 백오프 (100→200→400ms)
+;;   (retry-with-jitter fn 3 100 50)  ;; 지수 + 랜덤 지터
+;;
+;; opts 맵:
+;;   :max-tries   최대 시도 횟수 (기본 3)
+;;   :delay-ms    초기 대기 시간 (기본 100)
+;;   :backoff     "fixed" | "expo" | "linear" (기본 "expo")
+;;   :jitter      jitter ms (기본 0)
+;;   :on-fail     실패 시 호출할 함수 (fn [err attempt])
+;;   :should-retry 재시도 여부 결정 함수 (fn [err] → bool)
+;;
+;; 실무 예제:
+;;   (load "stdlib/retry.fl")
+;;   ;; 외부 API 호출 — 네트워크 오류 시 3회 재시도
+;;   (defn call-payment-api [payload]
+;;     (retry
+;;       (fn []
+;;         (let [r (http-post "https://api.payment.com/charge" payload)]
+;;           (if (get r :ok) (get r :body)
+;;             (throw (str "API 오류: " (get r :status))))))
+;;       {:max-tries 3 :delay-ms 500 :backoff "expo"}))
+
+;; ── 내부 ─────────────────────────────────────────────────────────────────────
+
+(defn -retry-delay [opts attempt]
+  (let [base    (get opts :delay-ms 100)
+        backoff (get opts :backoff "expo")
+        jitter  (get opts :jitter 0)
+        base-d  (cond
+                  (= backoff "fixed")  base
+                  (= backoff "expo")   (* base (pow 2 (- attempt 1)))
+                  (= backoff "linear") (* base attempt)
+                  true base)
+        jitter-d (if (> jitter 0) (rand-int 0 jitter) 0)]
+    (int (+ base-d jitter-d))))
+
+;; ── 공개 API ─────────────────────────────────────────────────────────────────
+
+(defn retry [fn-to-call opts]
+  (let [max-tries    (get opts :max-tries 3)
+        on-fail      (get opts :on-fail nil)
+        should-retry (get opts :should-retry nil)]
+    (loop [attempt 1 last-err nil]
+      (let [result (try
+                     {:ok true :value (fn-to-call)}
+                     (catch err {:ok false :error err}))]
+        (if (get result :ok)
+          (get result :value)
+          (let [err (get result :error)
+                can-retry (if (nil? should-retry)
+                            true
+                            (should-retry err))]
+            (when (not (nil? on-fail))
+              (on-fail err attempt))
+            (if (or (>= attempt max-tries) (not can-retry))
+              (throw err)
+              (let [d (-retry-delay opts attempt)]
+                (when (> d 0)
+                  (js-eval (str "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0," d ")")))
+                (recur (+ attempt 1) err)))))))))
+
+
+
+(defn retry-fixed [fn-to-call max-tries delay-ms]
+  (retry fn-to-call {:max-tries max-tries :delay-ms delay-ms :backoff "fixed"}))
+
+(defn retry-expo [fn-to-call max-tries delay-ms]
+  (retry fn-to-call {:max-tries max-tries :delay-ms delay-ms :backoff "expo"}))
+
+(defn retry-with-jitter [fn-to-call max-tries delay-ms jitter-ms]
+  (retry fn-to-call {:max-tries max-tries :delay-ms delay-ms :backoff "expo" :jitter jitter-ms}))
+
+(defn retry-safe [fn-to-call opts default]
+  (try
+    (retry fn-to-call opts)
+    (catch err default)))
+
+(defn retry-result [fn-to-call opts]
+  (try
+    {:ok true :value (retry fn-to-call opts)}
+    (catch err {:ok false :error err})))

@@ -1,0 +1,139 @@
+;; stdlib/mutex.fl — 뮤텍스 / 분산 락 (v11.7.3)
+;; (load "stdlib/mutex.fl")
+;;
+;; 주의: FreeLang은 단일 스레드. 이 뮤텍스는 같은 프로세스 내 재진입 방지용.
+;;       분산 환경에서는 Redis/DB 기반 락이 필요.
+;;
+;; 사용법:
+;;   (mx-create "resource-name")         ;; 뮤텍스 생성
+;;   (mx-acquire m timeout-ms)           ;; 락 획득 (timeout 내 재시도)
+;;   (mx-release m)                      ;; 락 해제
+;;   (mx-with-lock m fn)                 ;; 락 보장 실행 (자동 해제)
+;;   (mx-locked? m)                      ;; 락 상태 확인
+;;
+;; 실무 예제:
+;;   (load "stdlib/mutex.fl")
+;;   ;; 재고 차감 — 동시 주문 충돌 방지
+;;   (define inventory-lock (mx-create "inventory"))
+;;   (defn deduct-stock [item-id qty]
+;;     (mx-with-lock inventory-lock
+;;       (fn []
+;;         (let [stock (db-query DB "SELECT qty FROM items WHERE id=?" [item-id])
+;;               curr  (get (first stock) "qty" 0)]
+;;           (if (< curr qty)
+;;             (throw "재고 부족")
+;;             (db-exec DB "UPDATE items SET qty=qty-? WHERE id=?" [qty item-id]))))))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn mx-create [name]
+  (atom {:name    name
+         :locked  false
+         :owner   nil
+         :count   0
+         :waited  0
+         :acquired-at nil}))
+
+;; ── 락 획득 ──────────────────────────────────────────────────────────────────
+
+(defn mx-locked? [mx]
+  (get (deref mx) :locked false))
+
+(defn mx-acquire [mx timeout-ms]
+  (let [start    (now-ms)
+        deadline (+ start timeout-ms)]
+    (loop []
+      (let [state (deref mx)]
+        (if (not (get state :locked false))
+          (do
+            (reset! mx (assoc state
+                          :locked true
+                          :acquired-at (now-ms)
+                          :count (+ (get state :count 0) 1)))
+            true)
+          (if (>= (now-ms) deadline)
+            false
+            (do
+              (swap! mx assoc :waited (+ (get (deref mx) :waited 0) 1))
+              (recur))))))))
+
+(defn mx-try-acquire [mx]
+  (let [state (deref mx)]
+    (if (not (get state :locked false))
+      (do
+        (reset! mx (assoc state
+                      :locked true
+                      :acquired-at (now-ms)
+                      :count (+ (get state :count 0) 1)))
+        true)
+      false)))
+
+;; ── 락 해제 ──────────────────────────────────────────────────────────────────
+
+(defn mx-release [mx]
+  (swap! mx assoc :locked false :acquired-at nil)
+  true)
+
+;; ── 자동 락/해제 ─────────────────────────────────────────────────────────────
+
+(defn mx-with-lock [mx fn-body]
+  (let [acquired (mx-acquire mx 5000)]
+    (if (not acquired)
+      (throw (str "락 획득 타임아웃: " (get (deref mx) :name)))
+      (try
+        (let [result (fn-body)]
+          (mx-release mx)
+          result)
+        (catch err
+          (mx-release mx)
+          (throw err))))))
+
+(defn mx-with-lock-timeout [mx timeout-ms fn-body]
+  (let [acquired (mx-acquire mx timeout-ms)]
+    (if (not acquired)
+      (throw (str "락 획득 타임아웃: " (get (deref mx) :name)))
+      (try
+        (let [result (fn-body)]
+          (mx-release mx)
+          result)
+        (catch err
+          (mx-release mx)
+          (throw err))))))
+
+;; ── 통계 ─────────────────────────────────────────────────────────────────────
+
+(defn mx-stats [mx]
+  (let [state (deref mx)]
+    {:name        (get state :name)
+     :locked      (get state :locked false)
+     :count       (get state :count 0)
+     :waited      (get state :waited 0)
+     :acquired-at (get state :acquired-at)}))
+
+;; ── 세마포어 (N개 동시 접근 허용) ────────────────────────────────────────────
+
+(defn sem-create [name n]
+  (atom {:name n :permits n :max n :waiters 0}))
+
+(defn sem-acquire [sem]
+  (let [state (deref sem)]
+    (if (> (get state :permits 0) 0)
+      (do (swap! sem assoc :permits (- (get state :permits) 1)) true)
+      false)))
+
+(defn sem-release [sem]
+  (let [state (deref sem)
+        mx    (get state :max 1)]
+    (swap! sem assoc :permits (min mx (+ (get state :permits 0) 1)))
+    true))
+
+(defn sem-with [sem fn-body]
+  (if (not (sem-acquire sem))
+    (throw "세마포어 초과: 허용 용량 넘음")
+    (try
+      (let [r (fn-body)]
+        (sem-release sem)
+        r)
+      (catch err
+        (sem-release sem)
+        (throw err)))))

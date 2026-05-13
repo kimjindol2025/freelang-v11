@@ -1,0 +1,205 @@
+;; stdlib/devtools.fl — 개발 도구 통합 (v11.7.3)
+;; (load "stdlib/devtools.fl")
+;;
+;; Claude Code의 Read/Edit/Write/Bash/Grep/Glob + FreeLang 에러처리를
+;; FreeLang 함수로 제공. 에디터 없이 FreeLang 스크립트로 개발 자동화.
+;;
+;; 사용법:
+;;   (dev-read "app.fl")                        ;; 파일 읽기 (safe)
+;;   (dev-write "app.fl" content)               ;; 파일 쓰기
+;;   (dev-edit "app.fl" "old-str" "new-str")    ;; 부분 수정
+;;   (dev-shell "git status")                   ;; 셸 실행
+;;   (dev-grep "*.fl" "defn")                   ;; 파일 내 패턴 검색
+;;   (dev-glob "stdlib/*.fl")                   ;; 파일 목록
+;;   (dev-fl-check "app.fl")                    ;; FreeLang 문법 체크
+;;   (dev-fl-run "app.fl")                      ;; FreeLang 실행
+;;
+;; 실무 예제:
+;;   (load "stdlib/devtools.fl")
+;;   ;; 프로젝트 내 모든 .fl 파일 문법 체크
+;;   (let [files  (dev-glob "**/*.fl")
+;;         errors (filter (fn [f] (not (get (dev-fl-check f) :ok))) files)]
+;;     (if (empty? errors)
+;;       (println "모든 파일 OK")
+;;       (doseq [f errors] (println "에러:" f))))
+
+;; ── Read — 파일 읽기 ─────────────────────────────────────────────────────────
+
+(defn dev-read [path]
+  (if (not (file-exists path))
+    {:ok false :error (str "파일 없음: " path) :content nil}
+    (try
+      {:ok true :content (file-read path) :path path}
+      (catch err {:ok false :error (get err "message") :content nil}))))
+
+(defn dev-read! [path]
+  (let [r (dev-read path)]
+    (if (get r :ok)
+      (get r :content)
+      (throw (get r :error)))))
+
+(defn dev-read-lines [path]
+  (let [r (dev-read path)]
+    (if (get r :ok)
+      {:ok true :lines (str-lines (get r :content)) :path path}
+      r)))
+
+;; ── Write — 파일 쓰기 ────────────────────────────────────────────────────────
+
+(defn dev-write [path content]
+  (try
+    (file-write path content)
+    {:ok true :path path :bytes (length content)}
+    (catch err {:ok false :error (get err "message")})))
+
+(defn dev-append [path content]
+  (try
+    (file-append path content)
+    {:ok true :path path}
+    (catch err {:ok false :error (get err "message")})))
+
+;; ── Edit — 부분 수정 ─────────────────────────────────────────────────────────
+
+(defn dev-edit [path old-str new-str]
+  (let [r (dev-read path)]
+    (if (not (get r :ok))
+      r
+      (let [content (get r :content)]
+        (if (not (str-includes content old-str))
+          {:ok false :error "패턴을 찾을 수 없습니다" :path path}
+          (let [new-content (str-replace content old-str new-str)
+                changed     (not (= content new-content))]
+            (file-write path new-content)
+            {:ok true :path path :changed changed}))))))
+
+(defn dev-edit-all [path old-str new-str]
+  (let [r (dev-read path)]
+    (if (not (get r :ok))
+      r
+      (let [content     (get r :content)
+            new-content (str-replace-all content old-str new-str)
+            count       (length (str-split content old-str))]
+        (file-write path new-content)
+        {:ok true :path path :replaced (- count 1)}))))
+
+(defn dev-edit-line [path line-num new-content]
+  (let [r (dev-read-lines path)]
+    (if (not (get r :ok))
+      r
+      (let [lines     (get r :lines)
+            new-lines (map-indexed
+                        (fn [i line]
+                          (if (= i (- line-num 1)) new-content line))
+                        lines)]
+        (file-write path (str-join "\n" new-lines))
+        {:ok true :path path :line line-num}))))
+
+;; ── Bash — 셸 실행 ───────────────────────────────────────────────────────────
+
+(defn dev-shell [cmd]
+  (let [r (shell-exec-result cmd)]
+    {:ok     (get r :ok)
+     :stdout (str-trim (get r :stdout))
+     :stderr (str-trim (get r :stderr))
+     :exit   (get r :exit)
+     :cmd    cmd}))
+
+(defn dev-shell! [cmd]
+  (let [r (dev-shell cmd)]
+    (if (get r :ok)
+      (get r :stdout)
+      (throw (str "명령 실패 [" (get r :exit) "]: " (get r :stderr))))))
+
+(defn dev-shell-lines [cmd]
+  (let [r (dev-shell cmd)]
+    (if (get r :ok)
+      (filter (fn [l] (not (str-blank? l)))
+              (str-lines (get r :stdout)))
+      [])))
+
+;; ── Grep — 파일 내 검색 ──────────────────────────────────────────────────────
+
+(defn dev-grep [pattern path-or-glob]
+  (let [cmd (str "grep -rn --include='" path-or-glob "' '" pattern "' . 2>/dev/null || true")
+        lines (dev-shell-lines cmd)
+        parsed (map (fn [line]
+                      (let [colon1 (str-index-of line ":")
+                            rest1  (str-slice line (+ colon1 1) (length line))
+                            colon2 (str-index-of rest1 ":")]
+                        (if (or (< colon1 0) (< colon2 0))
+                          {:file line :line 0 :content line}
+                          {:file    (str-slice line 0 colon1)
+                           :line    (str-to-num (str-slice rest1 0 colon2))
+                           :content (str-trim (str-slice rest1 (+ colon2 1) (length rest1)))})))
+                    lines)]
+    {:ok true :matches parsed :count (length parsed)}))
+
+(defn dev-grep-files [pattern path-or-glob]
+  (let [cmd (str "grep -rl --include='" path-or-glob "' '" pattern "' . 2>/dev/null || true")]
+    (dev-shell-lines cmd)))
+
+;; ── Glob — 파일 목록 ─────────────────────────────────────────────────────────
+
+(defn dev-glob [pattern]
+  (let [r (dev-shell (str "find . -path './" pattern "' -type f 2>/dev/null | sort"))]
+    (if (get r :ok)
+      (filter (fn [l] (not (str-blank? l)))
+              (str-lines (get r :stdout)))
+      [])))
+
+(defn dev-ls [dir]
+  (let [r (dev-shell (str "ls -1 " dir " 2>/dev/null"))]
+    (if (get r :ok)
+      (filter (fn [l] (not (str-blank? l)))
+              (str-lines (get r :stdout)))
+      [])))
+
+;; ── FreeLang 전용 — 문법 체크/실행 ──────────────────────────────────────────
+
+(defn dev-fl-check [path]
+  (let [bootstrap (str-trim (dev-shell! "which node") )
+        cmd       (str "node /root/kim/freelang-v11/bootstrap.js check " path " 2>&1")
+        r         (dev-shell cmd)]
+    (if (get r :ok)
+      {:ok true :path path}
+      {:ok    false
+       :path  path
+       :error (get r :stdout)})))
+
+(defn dev-fl-run [path]
+  (let [cmd (str "node /root/kim/freelang-v11/bootstrap.js run " path " 2>&1")
+        r   (dev-shell cmd)]
+    {:ok     (get r :ok)
+     :output (get r :stdout)
+     :error  (get r :stderr)
+     :exit   (get r :exit)}))
+
+(defn dev-fl-check-all [dir]
+  (let [files  (dev-glob (str dir "/**/*.fl"))
+        results (map (fn [f] (dev-fl-check f)) files)
+        errors  (filter (fn [r] (not (get r :ok))) results)]
+    {:total  (length files)
+     :ok     (- (length files) (length errors))
+     :errors errors}))
+
+;; ── 유틸 ─────────────────────────────────────────────────────────────────────
+
+(defn dev-diff [path1 path2]
+  (dev-shell (str "diff " path1 " " path2 " 2>&1 || true")))
+
+(defn dev-file-info [path]
+  (if (not (file-exists path))
+    {:exists false :path path}
+    (let [r (dev-shell (str "wc -l -c " path " 2>/dev/null"))]
+      {:exists true
+       :path   path
+       :info   (get r :stdout)})))
+
+(defn dev-mkdir [path]
+  (dev-shell (str "mkdir -p " path)))
+
+(defn dev-cp [src dst]
+  (dev-shell (str "cp -r " src " " dst)))
+
+(defn dev-mv [src dst]
+  (dev-shell (str "mv " src " " dst)))

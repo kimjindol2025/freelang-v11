@@ -1,0 +1,149 @@
+;; stdlib/xml.fl — XML 파싱/생성 (v11.7.3)
+;; (load "stdlib/xml.fl")
+;;
+;; 경량 XML 파서. 속성·중첩 태그·텍스트 노드 지원.
+;;
+;; 사용법:
+;;   (xml-parse "<user id=\"1\"><name>김진돌</name></user>")
+;;   → {:tag "user" :attrs {"id" "1"} :children [{:tag "name" :text "김진돌"}]}
+;;
+;;   (xml-build "users" {} [(xml-node "user" {"id" "1"} "김진돌")])
+;;   → "<users><user id=\"1\">김진돌</user></users>"
+;;
+;; 실무 예제:
+;;   (load "stdlib/xml.fl")
+;;   ;; RSS 피드 파싱
+;;   (defn parse-rss [xml-str]
+;;     (let [doc     (xml-parse xml-str)
+;;           channel (xml-child doc "channel")
+;;           items   (xml-children channel "item")]
+;;       (map (fn [item]
+;;              {:title (xml-text (xml-child item "title"))
+;;               :link  (xml-text (xml-child item "link"))
+;;               :desc  (xml-text (xml-child item "description"))})
+;;            items)))
+;;
+;;   ;; XML API 응답 생성
+;;   (defn orders-to-xml [orders]
+;;     (xml-build "orders" {:version "1.0"}
+;;       (map (fn [o]
+;;              (xml-node "order" {:id (get o :id)}
+;;                (xml-node "amount" {} (str (get o :amount)))))
+;;            orders)))
+
+;; ── XML 생성 ─────────────────────────────────────────────────────────────────
+
+(defn xml-attr-str [attrs]
+  (if (empty? (obj-keys attrs))
+    ""
+    (str " " (str-join " " (map (fn [k] (str k "=\"" (get attrs k) "\""))
+                                (obj-keys attrs))))))
+
+(defn xml-node [tag attrs content]
+  (let [attr-s (xml-attr-str attrs)]
+    (if (string? content)
+      (str "<" tag attr-s ">" (html-escape content) "</" tag ">")
+      (if (array? content)
+        (str "<" tag attr-s ">" (str-join "" content) "</" tag ">")
+        (str "<" tag attr-s "></" tag ">")))))
+
+(defn xml-build [tag attrs children]
+  (let [attr-s (xml-attr-str attrs)]
+    (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+         "<" tag attr-s ">"
+         (str-join "" children)
+         "</" tag ">")))
+
+(defn xml-text-node [tag text]
+  (xml-node tag {} text))
+
+;; ── XML 파싱 (경량 정규식 기반) ──────────────────────────────────────────────
+
+(defn -xml-parse-attrs [attr-str]
+  (if (str-blank? attr-str)
+    {}
+    (let [parts (str-split (str-trim attr-str) " ")]
+      (reduce
+        (fn [acc part]
+          (let [eq-idx (str-index-of part "=")]
+            (if (< eq-idx 0)
+              acc
+              (let [k   (str-trim (str-slice part 0 eq-idx))
+                    raw (str-trim (str-slice part (+ eq-idx 1) (length part)))
+                    v   (if (and (str-starts-with raw "\"")
+                                 (str-ends-with raw "\""))
+                          (str-slice raw 1 (- (length raw) 1))
+                          raw)]
+                (assoc acc k v)))))
+        {}
+        parts))))
+
+(defn -xml-find-close [s tag start]
+  (let [close-tag (str "</" tag ">")]
+    (str-index-of (str-slice s start (length s)) close-tag)))
+
+(defn xml-parse [xml-str]
+  (let [s       (str-trim xml-str)
+        s       (if (str-starts-with s "<?")
+                  (str-slice s (+ (str-index-of s "?>") 2) (length s))
+                  s)
+        s       (str-trim s)
+        tag-end (str-index-of s ">")]
+    (if (< tag-end 0)
+      nil
+      (let [open-tag   (str-slice s 1 tag-end)
+            space-idx  (str-index-of open-tag " ")
+            tag-name   (if (< space-idx 0) open-tag
+                         (str-slice open-tag 0 space-idx))
+            attr-str   (if (< space-idx 0) ""
+                         (str-slice open-tag (+ space-idx 1) (length open-tag)))
+            attrs      (-xml-parse-attrs attr-str)
+            inner-start (+ tag-end 1)
+            inner-end  (str-index-of s (str "</" tag-name ">"))
+            inner      (if (< inner-end 0) ""
+                         (str-slice s inner-start inner-end))
+            inner-trim (str-trim inner)
+            children   (if (str-starts-with inner-trim "<")
+                         (-xml-parse-children inner-trim)
+                         [])]
+        {:tag      tag-name
+         :attrs    attrs
+         :text     (if (str-starts-with inner-trim "<") "" inner-trim)
+         :children children}))))
+
+(defn -xml-parse-children [s]
+  (let [result (atom [])
+        remain (atom (str-trim s))]
+    (loop []
+      (let [cur (deref remain)]
+        (when (and (not (str-blank? cur)) (str-starts-with cur "<"))
+          (let [tag-end  (str-index-of cur ">")
+                open-tag (str-slice cur 1 tag-end)
+                space-i  (str-index-of open-tag " ")
+                tag-name (if (< space-i 0) open-tag (str-slice open-tag 0 space-i))
+                close    (str "</" tag-name ">")
+                close-i  (str-index-of cur close)
+                full-end (+ close-i (length close))
+                node-xml (str-slice cur 0 full-end)
+                parsed   (xml-parse node-xml)]
+            (when (not (nil? parsed))
+              (swap! result append parsed))
+            (reset! remain (str-trim (str-slice cur full-end (length cur))))
+            (recur)))))
+    (deref result)))
+
+;; ── 탐색 헬퍼 ────────────────────────────────────────────────────────────────
+
+(defn xml-child [node tag]
+  (find-first (fn [c] (= (get c :tag) tag))
+              (get node :children [])))
+
+(defn xml-children [node tag]
+  (filter (fn [c] (= (get c :tag) tag))
+          (get node :children [])))
+
+(defn xml-text [node]
+  (if (nil? node) nil (get node :text "")))
+
+(defn xml-attr [node key]
+  (get (get node :attrs {}) key))

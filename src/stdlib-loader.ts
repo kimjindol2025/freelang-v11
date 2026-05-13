@@ -340,6 +340,35 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "re_split":    (pattern: string, s: string): string[] => _aliases["re-split"](pattern, s),
     "re_groups":   (pattern: string, s: string): (string | null)[] | null => _aliases["re-groups"](pattern, s),
 
+    // v11.7.5: 포맷팅 헬퍼 (문자열 & 숫자)
+    "str-pad-left": (s: any, len: number, char: string = " "): string => {
+      return String(s).padStart(Math.abs(len), String(char).charAt(0));
+    },
+    "str_pad_left": (s: any, len: number, char?: string) => _aliases["str-pad-left"](s, len, char),
+    "str-pad-right": (s: any, len: number, char: string = " "): string => {
+      return String(s).padEnd(Math.abs(len), String(char).charAt(0));
+    },
+    "str_pad_right": (s: any, len: number, char?: string) => _aliases["str-pad-right"](s, len, char),
+    "str-truncate": (s: any, len: number, suffix: string = "..."): string => {
+      const str = String(s);
+      return str.length > len ? str.substring(0, Math.max(0, len - suffix.length)) + suffix : str;
+    },
+    "str_truncate": (s: any, len: number, suffix?: string) => _aliases["str-truncate"](s, len, suffix),
+    "format-number": (n: any, decimals: number = 0): string => {
+      const num = Number(n);
+      return num.toLocaleString('en-US', { maximumFractionDigits: decimals, minimumFractionDigits: 0 });
+    },
+    "format_number": (n: any, decimals?: number) => _aliases["format-number"](n, decimals),
+    "format-decimal": (n: any, places: number = 2): string => {
+      return Number(n).toFixed(Math.max(0, places));
+    },
+    "format_decimal": (n: any, places?: number) => _aliases["format-decimal"](n, places),
+    "format-percent": (n: any, decimals: number = 1): string => {
+      const num = Number(n);
+      return (num * 100).toFixed(Math.max(0, decimals)) + "%";
+    },
+    "format_percent": (n: any, decimals?: number) => _aliases["format-percent"](n, decimals),
+
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {
       const ts = new Date().toISOString();

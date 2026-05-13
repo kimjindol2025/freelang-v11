@@ -1,0 +1,87 @@
+;; stdlib/health.fl — 헬스체크 엔드포인트 (v11.7.3)
+;; (load "stdlib/health.fl")
+;;
+;; 사용법:
+;;   (define hc (hc-create "my-app" "1.0.0"))
+;;   (hc-add hc "db"    (fn [] (db-query DB "SELECT 1" []) true))
+;;   (hc-add hc "cache" (fn [] (cache-has app-cache "ping")))
+;;   (hc-check hc)   ;; → {:status "ok" :checks {...} :uptime 12345}
+;;   (hc-handler hc) ;; → HTTP 핸들러 함수 (route에 바로 등록)
+;;
+;; 실무 예제:
+;;   (load "stdlib/health.fl")
+;;   (define hc (hc-create "fishing-app" "2.1.0"))
+;;   (hc-add hc "database" (fn []
+;;     (db-query DB "SELECT 1 as ok" [])
+;;     true))
+;;   (hc-add hc "disk" (fn []
+;;     (file-exists "/app/data")))
+;;
+;;   (define routes {
+;;     :get {
+;;       "/health"       (hc-handler hc)
+;;       "/health/ready" (hc-ready-handler hc)
+;;       "/health/live"  (hc-live-handler hc)
+;;     }
+;;   })
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn hc-create [app-name version]
+  {:app-name   app-name
+   :version    version
+   :started-at (now-ms)
+   :checks     (atom {})})
+
+;; ── 체크 등록 ─────────────────────────────────────────────────────────────────
+
+(defn hc-add [hc name check-fn]
+  (swap! (get hc :checks) assoc name check-fn)
+  hc)
+
+(defn hc-remove [hc name]
+  (swap! (get hc :checks) dissoc name)
+  hc)
+
+;; ── 실행 ─────────────────────────────────────────────────────────────────────
+
+(defn hc-check [hc]
+  (let [checks   (deref (get hc :checks))
+        uptime   (- (now-ms) (get hc :started-at))
+        results  (atom {})
+        all-ok   (atom true)]
+    (doseq [name (obj-keys checks)]
+      (let [check-fn (get checks name)]
+        (try
+          (let [ok (check-fn)]
+            (swap! results assoc name {:ok (not (nil? ok)) :status "up"})
+            (when (nil? ok) (reset! all-ok false)))
+          (catch err
+            (swap! results assoc name {:ok false :status "down" :error (get err "message")})
+            (reset! all-ok false)))))
+    {:status    (if (deref all-ok) "ok" "degraded")
+     :app       (get hc :app-name)
+     :version   (get hc :version)
+     :uptime-ms uptime
+     :checks    (deref results)}))
+
+;; ── HTTP 핸들러 ───────────────────────────────────────────────────────────────
+
+(defn hc-handler [hc]
+  (fn [req]
+    (let [result (hc-check hc)
+          status (get result :status)]
+      (if (= status "ok")
+        (server-json result)
+        (server-status 503 (json-stringify result))))))
+
+(defn hc-ready-handler [hc]
+  (fn [req]
+    (let [result (hc-check hc)]
+      (if (= (get result :status) "ok")
+        (server-json {:ready true})
+        (server-status 503 (json-stringify {:ready false}))))))
+
+(defn hc-live-handler [hc]
+  (fn [req]
+    (server-json {:alive true :uptime-ms (- (now-ms) (get hc :started-at))})))

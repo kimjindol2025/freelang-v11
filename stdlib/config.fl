@@ -1,0 +1,106 @@
+;; stdlib/config.fl — 앱 설정 계층 관리 (v11.7.3)
+;; (load "stdlib/config.fl")
+;;
+;; 우선순위: 환경변수 > .env 파일 > 기본값 (낮은 번호 = 높은 우선순위)
+;;
+;; 사용법:
+;;   (define cfg (cfg-create))
+;;   (cfg-defaults cfg {:port 3000 :debug false :db-pool 5})
+;;   (cfg-load-env cfg "APP")      ;; APP_PORT, APP_DEBUG 등 자동 매핑
+;;   (cfg-get cfg :port)           ;; → 3000 or 환경변수 값
+;;   (cfg-get cfg :port 8080)      ;; → 기본값 8080 (없을 때)
+;;   (cfg-require cfg :db-url)     ;; 없으면 즉시 에러
+;;
+;; 실무 예제:
+;;   (load "stdlib/config.fl")
+;;   (load "stdlib/env.fl")
+;;   (env-load! ".env")
+;;   (define cfg (cfg-create))
+;;   (cfg-defaults cfg
+;;     {:port      3000
+;;      :db-url    nil
+;;      :jwt-secret nil
+;;      :debug     false
+;;      :log-level "info"
+;;      :db-pool   5})
+;;   (cfg-load-env cfg "APP")
+;;   (cfg-require cfg :db-url)
+;;   (cfg-require cfg :jwt-secret)
+;;   (server-start (cfg-int cfg :port))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn cfg-create []
+  {:store    (atom {})
+   :defaults (atom {})
+   :prefix   (atom nil)})
+
+;; ── 기본값 설정 ───────────────────────────────────────────────────────────────
+
+(defn cfg-defaults [cfg defaults-map]
+  (reset! (get cfg :defaults) defaults-map)
+  cfg)
+
+(defn cfg-set [cfg key val]
+  (swap! (get cfg :store) assoc key val)
+  cfg)
+
+;; ── 환경변수 로드 (PREFIX_KEY → :key 자동 매핑) ──────────────────────────────
+
+(defn cfg-load-env [cfg prefix]
+  (reset! (get cfg :prefix) prefix)
+  (let [defaults (deref (get cfg :defaults))]
+    (doseq [k (obj-keys defaults)]
+      (let [env-key (str prefix "_" (str-to-upper (str-replace (str k) "-" "_")))
+            env-val (fl-env-get env-key nil)]
+        (when (not (nil? env-val))
+          (swap! (get cfg :store) assoc k env-val))))
+    cfg))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn cfg-get [cfg key]
+  (let [from-store    (get (deref (get cfg :store)) key)
+        from-defaults (get (deref (get cfg :defaults)) key)]
+    (if (nil? from-store) from-defaults from-store)))
+
+(defn cfg-get-default [cfg key default]
+  (let [val (cfg-get cfg key)]
+    (if (nil? val) default val)))
+
+(defn cfg-require [cfg key]
+  (let [val (cfg-get cfg key)]
+    (if (nil? val)
+      (throw (str "필수 설정 없음: " (str key)))
+      val)))
+
+;; ── 타입 변환 ─────────────────────────────────────────────────────────────────
+
+(defn cfg-int [cfg key]
+  (let [val (cfg-get cfg key)]
+    (if (nil? val) nil
+      (if (number? val) (int val)
+        (let [n (str-to-num (str val))]
+          (if (nil? n) nil (int n)))))))
+
+(defn cfg-bool [cfg key]
+  (let [val (cfg-get cfg key)]
+    (if (nil? val) false
+      (if (boolean? val) val
+        (or (= (str val) "true") (= (str val) "1") (= (str val) "yes"))))))
+
+(defn cfg-str [cfg key]
+  (let [val (cfg-get cfg key)]
+    (if (nil? val) nil (str val))))
+
+;; ── 전체 조회/검증 ────────────────────────────────────────────────────────────
+
+(defn cfg-all [cfg]
+  (obj-merge (deref (get cfg :defaults))
+             (deref (get cfg :store))))
+
+(defn cfg-validate [cfg required-keys]
+  (let [missing (filter (fn [k] (nil? (cfg-get cfg k))) required-keys)]
+    (if (empty? missing)
+      {:ok true}
+      {:ok false :missing missing})))

@@ -1,0 +1,130 @@
+;; stdlib/cron.fl — Cron 표현식 파서/스케줄러 (v11.7.3)
+;; (load "stdlib/cron.fl")
+;;
+;; cron 표현식: "분 시 일 월 요일"
+;;   *  = 모두
+;;   숫자 = 고정값
+;;   */n = n마다
+;;   a,b = a 또는 b
+;;
+;; 사용법:
+;;   (define cr (cron-create))
+;;   (cron-add cr "backup"   "0 3 * * *"   (fn [] (println "새벽 3시 백업")))
+;;   (cron-add cr "cleanup"  "*/30 * * * *" (fn [] (println "30분마다 정리")))
+;;   (cron-tick cr)    ;; 현재 시각 기준 실행할 작업 처리
+;;   (cron-next cr "backup")  ;; 다음 실행 예정 정보
+;;
+;; 실무 예제:
+;;   (load "stdlib/cron.fl")
+;;   (define cr (cron-create))
+;;   (cron-add cr "daily-report" "0 9 * * *"
+;;     (fn [] (let [data (db-query DB "SELECT COUNT(*) as cnt FROM orders WHERE DATE(created_at)=DATE('now')" [])]
+;;              (println "오늘 주문:" (get (first data) "cnt")))))
+;;   (cron-add cr "hourly-cache-clear" "0 * * * *"
+;;     (fn [] (cache-clear app-cache)))
+;;   ;; 서버 루프에서 1분마다 tick
+;;   ;; (loop [] (cron-tick cr) (sleep 60000) (recur))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn cron-create []
+  {:jobs (atom {})})
+
+;; ── cron 파싱 헬퍼 ───────────────────────────────────────────────────────────
+
+(defn -cron-field-matches? [field value]
+  (if (= field "*")
+    true
+    (if (str-starts-with field "*/")
+      (let [n (str-to-num (str-slice field 2 (length field)))]
+        (= (% value (int n)) 0))
+      (if (str-includes field ",")
+        (let [parts (str-split field ",")]
+          (includes-item (map str-to-num parts) value))
+        (= (str-to-num field) value)))))
+
+(defn -cron-matches? [expr now-map]
+  (let [parts (str-split expr " ")]
+    (if (not (= (length parts) 5))
+      false
+      (and
+        (-cron-field-matches? (nth parts 0) (get now-map :minute))
+        (-cron-field-matches? (nth parts 1) (get now-map :hour))
+        (-cron-field-matches? (nth parts 2) (get now-map :day))
+        (-cron-field-matches? (nth parts 3) (get now-map :month))
+        (-cron-field-matches? (nth parts 4) (get now-map :weekday))))))
+
+(defn -cron-now []
+  (let [d   (now-ms)
+        sec (/ d 1000)
+        min (int (/ (% (int sec) 3600) 60))
+        hr  (int (% (/ (int sec) 3600) 24))
+        day (int (+ (% (/ (int sec) 86400) 31) 1))
+        mon (int (+ (% (/ (int sec) 2592000) 12) 1))
+        wd  (int (% (/ (int sec) 86400) 7))]
+    {:minute min :hour hr :day day :month mon :weekday wd}))
+
+;; ── 작업 등록/제거 ────────────────────────────────────────────────────────────
+
+(defn cron-add [cr name expr handler]
+  (swap! (get cr :jobs) assoc name
+         {:name     name
+          :expr     expr
+          :handler  handler
+          :last-run nil
+          :run-count 0})
+  cr)
+
+(defn cron-remove [cr name]
+  (swap! (get cr :jobs) dissoc name)
+  cr)
+
+;; ── 실행 ─────────────────────────────────────────────────────────────────────
+
+(defn cron-tick [cr]
+  (let [now-map (-cron-now)
+        jobs    (deref (get cr :jobs))
+        result  (atom {:ran [] :errors []})]
+    (doseq [name (obj-keys jobs)]
+      (let [job  (get jobs name)
+            expr (get job :expr)]
+        (when (-cron-matches? expr now-map)
+          (try
+            ((get job :handler))
+            (swap! (get cr :jobs) assoc name
+                   (assoc (assoc job :last-run (now-ms))
+                          :run-count (+ (get job :run-count) 1)))
+            (swap! result assoc :ran (append (get (deref result) :ran) name))
+            (catch err
+              (swap! result assoc :errors (append (get (deref result) :errors)
+                                                  {:name name :error (get err "message")})))))))
+    (deref result)))
+
+(defn cron-tick-now [cr]
+  (let [jobs   (deref (get cr :jobs))
+        result (atom {:ran [] :errors []})]
+    (doseq [name (obj-keys jobs)]
+      (let [job (get jobs name)]
+        (try
+          ((get job :handler))
+          (swap! (get cr :jobs) assoc name
+                 (assoc (assoc job :last-run (now-ms))
+                        :run-count (+ (get job :run-count) 1)))
+          (swap! result assoc :ran (append (get (deref result) :ran) name))
+          (catch err
+            (swap! result assoc :errors (append (get (deref result) :errors)
+                                                {:name name :error (get err "message")}))))))
+    (deref result)))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn cron-jobs [cr]
+  (obj-values (deref (get cr :jobs))))
+
+(defn cron-job [cr name]
+  (get (deref (get cr :jobs)) name))
+
+(defn cron-stats [cr]
+  (let [jobs (obj-values (deref (get cr :jobs)))]
+    {:total     (length jobs)
+     :total-runs (sum (map (fn [j] (get j :run-count)) jobs))}))

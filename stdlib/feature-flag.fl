@@ -1,0 +1,123 @@
+;; stdlib/feature-flag.fl — 기능 플래그 (Feature Flag) (v11.7.3)
+;; (load "stdlib/feature-flag.fl")
+;;
+;; 사용법:
+;;   (ff-create)                             ;; 플래그 저장소 생성
+;;   (ff-enable! store "new-ui")             ;; 플래그 전체 활성화
+;;   (ff-disable! store "new-ui")            ;; 비활성화
+;;   (ff-rollout! store "beta" 30)           ;; 30% 롤아웃
+;;   (ff-user-target! store "premium" users) ;; 특정 사용자만
+;;   (ff-on? store "new-ui" user-id)         ;; 활성 여부 확인
+;;
+;; 실무 예제:
+;;   (load "stdlib/feature-flag.fl")
+;;   (define ff (ff-create))
+;;   (ff-rollout! ff "new-checkout" 10)   ;; 10% 베타
+;;   (ff-user-target! ff "early-access" ["u123" "u456"])
+;;   ;; 핸들러에서
+;;   (defn handle-checkout [req]
+;;     (let [uid (get req "user-id")]
+;;       (if (ff-on? ff "new-checkout" uid)
+;;         (new-checkout-handler req)
+;;         (old-checkout-handler req))))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn ff-create []
+  (atom {}))
+
+;; ── 플래그 설정 ───────────────────────────────────────────────────────────────
+
+(defn ff-enable! [store flag]
+  (swap! store assoc flag {:type "all" :enabled true}))
+
+(defn ff-disable! [store flag]
+  (swap! store assoc flag {:type "all" :enabled false}))
+
+(defn ff-rollout! [store flag pct]
+  (swap! store assoc flag {:type "rollout" :pct (max 0 (min 100 pct)) :enabled true}))
+
+(defn ff-user-target! [store flag user-ids]
+  (swap! store assoc flag {:type "users" :users user-ids :enabled true}))
+
+(defn ff-group-target! [store flag groups]
+  (swap! store assoc flag {:type "groups" :groups groups :enabled true}))
+
+(defn ff-schedule! [store flag from-ms to-ms]
+  (swap! store assoc flag {:type "schedule" :from from-ms :to to-ms :enabled true}))
+
+(defn ff-set! [store flag config]
+  (swap! store assoc flag config))
+
+(defn ff-remove! [store flag]
+  (swap! store dissoc flag))
+
+;; ── 해시 기반 롤아웃 (결정론적) ──────────────────────────────────────────────
+
+(defn -ff-hash [flag user-id]
+  (let [s      (str flag ":" user-id)
+        chars  (str-split s "")
+        n      (reduce
+                 (fn [acc c]
+                   (% (+ (* acc 31) (str-to-num (str (str-index-of "0123456789abcdefghijklmnopqrstuvwxyz" (str-to-lower (str-slice c 0 1))))) ) 1000003))
+                 7
+                 chars)]
+    (abs n)))
+
+(defn -ff-rollout-on? [pct flag user-id]
+  (if (nil? user-id)
+    false
+    (< (% (-ff-hash flag (str user-id)) 100) pct)))
+
+;; ── 활성 여부 확인 ────────────────────────────────────────────────────────────
+
+(defn ff-on? [store flag user-id]
+  (let [cfg (get (deref store) flag)]
+    (if (nil? cfg)
+      false
+      (let [enabled (get cfg :enabled true)
+            tp      (get cfg :type "all")]
+        (if (not enabled)
+          false
+          (cond
+            (= tp "all")      true
+            (= tp "rollout")  (-ff-rollout-on? (get cfg :pct 0) flag user-id)
+            (= tp "users")    (includes-item (get cfg :users []) (str user-id))
+            (= tp "groups")   false
+            (= tp "schedule") (let [now (now-ms)
+                                    fr  (get cfg :from 0)
+                                    to  (get cfg :to 0)]
+                                (and (>= now fr) (<= now to)))
+            true false))))))
+
+(defn ff-on-group? [store flag group]
+  (let [cfg (get (deref store) flag)]
+    (if (nil? cfg)
+      false
+      (let [enabled (get cfg :enabled true)
+            tp      (get cfg :type "all")]
+        (if (not enabled)
+          false
+          (cond
+            (= tp "all")    true
+            (= tp "groups") (includes-item (get cfg :groups []) group)
+            true false))))))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn ff-list [store]
+  (keys (deref store)))
+
+(defn ff-get [store flag]
+  (get (deref store) flag))
+
+(defn ff-all [store]
+  (deref store))
+
+;; ── 미들웨어 헬퍼 ─────────────────────────────────────────────────────────────
+
+(defn ff-middleware [store flag req handler alt-handler]
+  (let [uid (get req "user-id" (get (get req "headers") "x-user-id"))]
+    (if (ff-on? store flag uid)
+      (handler req)
+      (alt-handler req))))

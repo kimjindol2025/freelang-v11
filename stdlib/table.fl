@@ -1,0 +1,183 @@
+;; stdlib/table.fl — 텍스트 테이블 렌더링 (v11.7.3)
+;; (load "stdlib/table.fl")
+;;
+;; 사용법:
+;;   (table-render cols rows)              ;; 기본 박스 테이블
+;;   (table-render-csv cols rows)          ;; CSV 출력
+;;   (table-render-md cols rows)           ;; Markdown 테이블
+;;   (table-render-html cols rows)         ;; HTML <table>
+;;   (table-summary rows key)             ;; 컬럼 합계/평균/min/max
+;;
+;; 실무 예제:
+;;   (load "stdlib/table.fl")
+;;   ;; CLI 대시보드 — 서버 상태 출력
+;;   (let [servers [{:name "web-1" :cpu 23 :mem 512 :status "OK"}
+;;                  {:name "web-2" :cpu 87 :mem 1024 :status "WARN"}
+;;                  {:name "db-1"  :cpu 12 :mem 4096 :status "OK"}]
+;;         cols [{:key "name" :label "서버" :width 8}
+;;               {:key "cpu"  :label "CPU%" :width 6 :align "right"}
+;;               {:key "mem"  :label "MEM"  :width 6 :align "right"}
+;;               {:key "status" :label "상태" :width 6}]]
+;;     (println (table-render cols servers)))
+
+;; ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+(defn -tbl-pad-right [s w]
+  (let [len (length s)]
+    (if (>= len w) (str-slice s 0 w)
+      (str s (str-repeat " " (- w len))))))
+
+(defn -tbl-pad-left [s w]
+  (let [len (length s)]
+    (if (>= len w) (str-slice s 0 w)
+      (str (str-repeat " " (- w len)) s))))
+
+(defn -tbl-col-get [col k default]
+  (let [v (get col k)]
+    (if (nil? v) (get col (str k) default) v)))
+
+(defn -tbl-cell [val col]
+  (let [w     (-tbl-col-get col "width" 12)
+        align (-tbl-col-get col "align" "left")
+        s     (if (nil? val) "" (str val))]
+    (if (= align "right")
+      (-tbl-pad-left s w)
+      (-tbl-pad-right s w))))
+
+(defn -tbl-get-val [row col]
+  (let [k (-tbl-col-get col "key" "")
+        v (get row k)]
+    (if (nil? v) "" v)))
+
+(defn -tbl-col-widths [cols rows]
+  (map (fn [col]
+         (let [label   (-tbl-col-get col "label" "")
+               label-w (length label)
+               data-w  (reduce
+                          (fn [mx row]
+                            (let [v (-tbl-get-val row col)]
+                              (max mx (length (if (nil? v) "" (str v))))))
+                          label-w
+                          rows)
+               manual  (-tbl-col-get col "width" 0)]
+           (if (> manual 0) manual (max label-w data-w 4))))
+       cols))
+
+;; ── 텍스트 박스 테이블 ────────────────────────────────────────────────────────
+
+(defn table-render [cols rows]
+  (let [widths    (-tbl-col-widths cols rows)
+        sep-parts (map (fn [w] (str-repeat "-" (+ w 2))) widths)
+        sep       (str "+" (str-join "+" sep-parts) "+")
+        header    (str "| "
+                       (str-join " | "
+                         (map-indexed
+                           (fn [i col]
+                             (let [w (nth widths i)
+                                   l (-tbl-col-get col "label" "")]
+                               (-tbl-pad-right l w)))
+                           cols))
+                       " |")
+        data-rows (map
+                    (fn [row]
+                      (str "| "
+                           (str-join " | "
+                             (map-indexed
+                               (fn [i col]
+                                 (let [w   (nth widths i)
+                                       col (assoc col "width" w)
+                                       v   (-tbl-get-val row col)]
+                                   (-tbl-cell v col)))
+                               cols))
+                           " |"))
+                    rows)
+        lines     (flatten [[sep header sep] data-rows [sep]])]
+    (str-join "\n" lines)))
+
+;; ── CSV ───────────────────────────────────────────────────────────────────────
+
+(defn -tbl-csv-escape [s]
+  (let [s (str s)]
+    (if (or (str-includes s ",") (str-includes s "\"") (str-includes s "\n"))
+      (str "\"" (str-replace-all s "\"" "\"\"") "\"")
+      s)))
+
+(defn table-render-csv [cols rows]
+  (let [header (str-join "," (map (fn [c] (-tbl-csv-escape (-tbl-col-get c "label" ""))) cols))
+        data   (map
+                 (fn [row]
+                   (str-join ","
+                     (map (fn [col]
+                            (-tbl-csv-escape (str (-tbl-get-val row col))))
+                          cols)))
+                 rows)]
+    (str-join "\n" (flatten [[header] data]))))
+
+;; ── Markdown ─────────────────────────────────────────────────────────────────
+
+(defn table-render-md [cols rows]
+  (let [widths  (-tbl-col-widths cols rows)
+        header  (str "| " (str-join " | " (map (fn [c] (-tbl-col-get c "label" "")) cols)) " |")
+        sep     (str "| "
+                     (str-join " | "
+                       (map-indexed
+                         (fn [i col]
+                           (let [w     (nth widths i)
+                                 align (-tbl-col-get col "align" "left")]
+                             (if (= align "right")
+                               (str (str-repeat "-" (max 1 (- w 1))) ":")
+                               (str-repeat "-" (max 3 w)))))
+                         cols))
+                     " |")
+        data    (map
+                  (fn [row]
+                    (str "| "
+                         (str-join " | "
+                           (map (fn [col]
+                                  (let [v (-tbl-get-val row col)]
+                                    (if (nil? v) "" (str v))))
+                                cols))
+                         " |"))
+                  rows)]
+    (str-join "\n" (flatten [[header sep] data]))))
+
+;; ── HTML ──────────────────────────────────────────────────────────────────────
+
+(defn table-render-html [cols rows]
+  (let [thead (str "<thead><tr>"
+                   (str-join ""
+                     (map (fn [c]
+                            (str "<th>" (html-escape (-tbl-col-get c "label" "")) "</th>"))
+                          cols))
+                   "</tr></thead>")
+        tbody (str "<tbody>"
+                   (str-join ""
+                     (map (fn [row]
+                            (str "<tr>"
+                                 (str-join ""
+                                   (map (fn [col]
+                                          (let [v (-tbl-get-val row col)
+                                                s (if (nil? v) "" (str v))]
+                                            (str "<td>" (html-escape s) "</td>")))
+                                        cols))
+                                 "</tr>"))
+                          rows))
+                   "</tbody>")]
+    (str "<table>" thead tbody "</table>")))
+
+;; ── 통계 ─────────────────────────────────────────────────────────────────────
+
+(defn table-summary [rows key]
+  (let [vals   (filter (fn [v] (number? v))
+                       (map (fn [row] (get row key)) rows))
+        n      (length vals)]
+    (if (= n 0)
+      {:count 0 :sum nil :avg nil :min nil :max nil}
+      {:count n
+       :sum   (reduce + 0 vals)
+       :avg   (/ (reduce + 0 vals) n)
+       :min   (reduce min (first vals) vals)
+       :max   (reduce max (first vals) vals)})))
+
+(defn table-sort [rows key direction]
+  (sort-by (fn [row] (get row key)) rows))

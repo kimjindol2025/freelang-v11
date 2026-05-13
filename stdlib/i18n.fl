@@ -1,0 +1,142 @@
+;; stdlib/i18n.fl — 다국어 지원 (i18n) (v11.7.3)
+;; (load "stdlib/i18n.fl")
+;;
+;; 사용법:
+;;   (i18n-set-locale! "ko")
+;;   (i18n-load! "ko" {"hello" "안녕하세요" "bye" "안녕히 가세요"})
+;;   (t "hello")                        → "안녕하세요"
+;;   (t "greeting" {:name "Alice"})     → "안녕하세요, Alice님"
+;;   (t-plural "item" 3)               → "3 items"
+;;   (i18n-format-number 1234567.89 "ko") → "1,234,567.89"
+;;   (i18n-format-date ts "ko")        → "2026년 5월 13일"
+;;
+;; 실무 예제:
+;;   (load "stdlib/i18n.fl")
+;;   (i18n-load! "ko" {"welcome" "{{name}}님 환영합니다"
+;;                     "cart"    "장바구니에 {{count}}개"})
+;;   (i18n-load! "en" {"welcome" "Welcome, {{name}}"
+;;                     "cart"    "{{count}} items in cart"})
+;;   (i18n-set-locale! "ko")
+;;   (t "welcome" {:name "Alice"})   → "Alice님 환영합니다"
+;;   (t "cart"    {:count 3})        → "장바구니에 3개"
+
+;; ── 내부 상태 ─────────────────────────────────────────────────────────────────
+
+(define *i18n-locales* (atom {}))
+(define *i18n-locale*  (atom "en"))
+(define *i18n-fallback* (atom "en"))
+
+;; ── 로드 / 설정 ───────────────────────────────────────────────────────────────
+
+(defn i18n-load! [locale messages]
+  (swap! *i18n-locales* assoc locale messages))
+
+(defn i18n-set-locale! [locale]
+  (reset! *i18n-locale* locale))
+
+(defn i18n-set-fallback! [locale]
+  (reset! *i18n-fallback* locale))
+
+(defn i18n-locale []
+  (deref *i18n-locale*))
+
+(defn i18n-locales []
+  (keys (deref *i18n-locales*)))
+
+;; ── 번역 ─────────────────────────────────────────────────────────────────────
+
+(defn -i18n-interpolate [template params]
+  (if (or (nil? params) (empty? (keys params)))
+    template
+    (reduce
+      (fn [s entry]
+        (let [k (first entry)
+              v (str (second entry))]
+          (str-replace-all
+            (str-replace-all s (str "{{" k "}}") v)
+            (str "${" k "}") v)))
+      template
+      (obj-entries params))))
+
+(defn i18n-get [locale key]
+  (let [msgs (get (deref *i18n-locales*) locale {})]
+    (get msgs key)))
+
+(defn t [key params]
+  (let [locale   (deref *i18n-locale*)
+        fallback (deref *i18n-fallback*)
+        msg      (i18n-get locale key)
+        msg      (if (nil? msg) (i18n-get fallback key) msg)
+        msg      (if (nil? msg) key msg)]
+    (-i18n-interpolate msg params)))
+
+(defn t1 [key]
+  (t key nil))
+
+(defn t-in [locale key params]
+  (let [msg (i18n-get locale key)
+        msg (if (nil? msg) key msg)]
+    (-i18n-interpolate msg params)))
+
+;; ── 복수형 ───────────────────────────────────────────────────────────────────
+
+(defn i18n-load-plural! [locale key singular plural]
+  (i18n-load! locale (assoc (get (deref *i18n-locales*) locale {})
+                             (str key ".one") singular
+                             (str key ".other") plural)))
+
+(defn t-plural [key n]
+  (let [form (if (= n 1) (str key ".one") (str key ".other"))
+        msg  (t form {:count n :n n})]
+    msg))
+
+;; ── 숫자 포맷 ─────────────────────────────────────────────────────────────────
+
+(defn -i18n-num-comma [n sep]
+  (let [s   (str (abs (int n)))
+        len (length s)
+        result (atom "")]
+    (loop [i 0]
+      (when (< i len)
+        (when (and (> i 0) (= (% (- len i) 3) 0))
+          (swap! result str sep))
+        (swap! result str (str-slice s i (+ i 1)))
+        (recur (+ i 1))))
+    (if (< n 0) (str "-" (deref result)) (deref result))))
+
+(defn i18n-format-number [n locale]
+  (cond
+    (= locale "ko") (-i18n-num-comma n ",")
+    (= locale "de") (str-replace-all (-i18n-num-comma n ".") "." ",")
+    true            (-i18n-num-comma n ",")))
+
+(defn i18n-format-currency [amount locale currency]
+  (let [formatted (i18n-format-number amount locale)]
+    (cond
+      (= currency "KRW") (str "₩" formatted)
+      (= currency "USD") (str "$" formatted)
+      (= currency "EUR") (str "€" formatted)
+      true (str formatted " " currency))))
+
+;; ── 날짜 포맷 ─────────────────────────────────────────────────────────────────
+
+(defn -i18n-pad [n] (str-pad-left (str n) 2 "0"))
+
+(defn i18n-format-date [ts locale]
+  (let [d     (js-eval (str "new Date(" ts ")"))
+        year  (js-eval (str "new Date(" ts ").getFullYear()"))
+        month (+ (js-eval (str "new Date(" ts ").getMonth()")) 1)
+        day   (js-eval (str "new Date(" ts ").getDate()"))]
+    (cond
+      (= locale "ko") (str year "년 " month "월 " day "일")
+      (= locale "ja") (str year "年" (-i18n-pad month) "月" (-i18n-pad day) "日")
+      (= locale "de") (str (-i18n-pad day) "." (-i18n-pad month) "." year)
+      true            (str year "-" (-i18n-pad month) "-" (-i18n-pad day)))))
+
+;; ── HTTP 미들웨어 헬퍼 ────────────────────────────────────────────────────────
+
+(defn i18n-detect-locale [req supported fallback]
+  (let [accept (get (get req "headers") "accept-language" "")
+        lang   (str-slice (str-split accept ",") 0 2)
+        found  (find-first (fn [l] (includes-item supported l)) supported)]
+    (if (nil? found) fallback found)))

@@ -1,0 +1,112 @@
+;; stdlib/schema.fl — JSON Schema 검증 (v11.7.3)
+;; (load "stdlib/schema.fl")
+;;
+;; 사용법:
+;;   (define s {:type "object"
+;;              :required ["name" "email"]
+;;              :properties {:name  {:type "string" :min-length 2}
+;;                           :email {:type "string" :format "email"}
+;;                           :age   {:type "number" :min 0 :max 150}}})
+;;   (schema-validate s {:name "김진돌" :email "kim@test.com" :age 30})
+;;   → {:ok true :errors []}
+;;
+;; 실무 예제:
+;;   (load "stdlib/schema.fl")
+;;   (define user-schema
+;;     {:type "object"
+;;      :required ["email" "password"]
+;;      :properties {:email    {:type "string" :format "email"}
+;;                   :password {:type "string" :min-length 8}
+;;                   :age      {:type "number" :min 0 :max 150}
+;;                   :role     {:type "string" :enum ["admin" "user" "guest"]}}})
+;;   (defn handle-signup [req]
+;;     (let [body   (get req "body")
+;;           result (schema-validate user-schema body)]
+;;       (if (get result :ok)
+;;         (server-json {:ok true})
+;;         (server-status 400 (json-stringify {:errors (get result :errors)})))))
+
+;; ── 타입 검사 ─────────────────────────────────────────────────────────────────
+
+(defn -schema-check-type [val expected-type field]
+  (cond
+    (= expected-type "string")  (if (string? val)  nil (str field ": 문자열이어야 합니다"))
+    (= expected-type "number")  (if (number? val)  nil (str field ": 숫자여야 합니다"))
+    (= expected-type "integer") (if (integer? val) nil (str field ": 정수여야 합니다"))
+    (= expected-type "boolean") (if (boolean? val) nil (str field ": 불린이어야 합니다"))
+    (= expected-type "array")   (if (array? val)   nil (str field ": 배열이어야 합니다"))
+    (= expected-type "object")  (if (map? val)     nil (str field ": 객체여야 합니다"))
+    (= expected-type "null")    (if (nil? val)     nil (str field ": null이어야 합니다"))
+    true nil))
+
+;; ── 포맷 검사 ────────────────────────────────────────────────────────────────
+
+(defn -schema-check-format [val fmt field]
+  (cond
+    (= fmt "email")
+    (if (re-test "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" val) nil
+        (str field ": 이메일 형식이 아닙니다"))
+    (= fmt "url")
+    (if (re-test "^https?://" val) nil
+        (str field ": URL 형식이 아닙니다"))
+    (= fmt "uuid")
+    (if (re-test "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" val) nil
+        (str field ": UUID 형식이 아닙니다"))
+    (= fmt "date")
+    (if (re-test "^\\d{4}-\\d{2}-\\d{2}$" val) nil
+        (str field ": YYYY-MM-DD 형식이 아닙니다"))
+    true nil))
+
+;; ── 필드 규칙 검사 ────────────────────────────────────────────────────────────
+
+(defn -schema-check-field [val rules field]
+  (let [errors (atom [])]
+    (when (not (nil? (get rules :type)))
+      (let [err (-schema-check-type val (get rules :type) field)]
+        (when err (swap! errors append err))))
+    (when (and (string? val) (not (nil? (get rules :min-length))))
+      (when (< (length val) (get rules :min-length))
+        (swap! errors append (str field ": 최소 " (get rules :min-length) "자 이상이어야 합니다"))))
+    (when (and (string? val) (not (nil? (get rules :max-length))))
+      (when (> (length val) (get rules :max-length))
+        (swap! errors append (str field ": 최대 " (get rules :max-length) "자까지 허용됩니다"))))
+    (when (and (number? val) (not (nil? (get rules :min))))
+      (when (< val (get rules :min))
+        (swap! errors append (str field ": 최솟값은 " (get rules :min) "입니다"))))
+    (when (and (number? val) (not (nil? (get rules :max))))
+      (when (> val (get rules :max))
+        (swap! errors append (str field ": 최댓값은 " (get rules :max) "입니다"))))
+    (when (not (nil? (get rules :format)))
+      (let [err (-schema-check-format val (get rules :format) field)]
+        (when err (swap! errors append err))))
+    (when (not (nil? (get rules :enum)))
+      (when (not (includes-item (get rules :enum) val))
+        (swap! errors append (str field ": 허용값은 " (json-stringify (get rules :enum)) " 중 하나여야 합니다"))))
+    (when (and (array? val) (not (nil? (get rules :min-items))))
+      (when (< (length val) (get rules :min-items))
+        (swap! errors append (str field ": 최소 " (get rules :min-items) "개 이상이어야 합니다"))))
+    (deref errors)))
+
+;; ── 메인 검증 ────────────────────────────────────────────────────────────────
+
+(defn schema-validate [schema data]
+  (let [errors   (atom [])
+        req      (get schema :required [])
+        props    (get schema :properties {})]
+    (doseq [field req]
+      (let [val (get data field)]
+        (when (nil? val)
+          (swap! errors append (str field ": 필수 항목입니다")))))
+    (doseq [field (obj-keys props)]
+      (let [val   (get data field)
+            rules (get props field)]
+        (when (not (nil? val))
+          (let [field-errors (-schema-check-field val rules field)]
+            (doseq [e field-errors]
+              (swap! errors append e))))))
+    (let [errs (deref errors)]
+      {:ok     (empty? errs)
+       :errors errs})))
+
+(defn schema-valid? [schema data]
+  (get (schema-validate schema data) :ok))

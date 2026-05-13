@@ -1,0 +1,98 @@
+;; stdlib/diff.fl — 텍스트/객체 diff (v11.7.3)
+;; (load "stdlib/diff.fl")
+;;
+;; 사용법:
+;;   (diff-lines "a\nb\nc" "a\nx\nc")   ;; 줄 단위 diff
+;;   (diff-map {:a 1 :b 2} {:a 1 :b 3 :c 4})  ;; 맵 diff
+;;   (diff-patch original patches)             ;; 패치 적용
+;;
+;; 실무 예제:
+;;   (load "stdlib/diff.fl")
+;;   ;; 설정 변경 감지
+;;   (defn detect-config-change [old-cfg new-cfg]
+;;     (let [d (diff-map old-cfg new-cfg)]
+;;       (when (not (diff-empty? d))
+;;         (log-info "config.changed" {:changes d})
+;;         (em-emit em "config.updated" {:diff d}))))
+
+;; ── 줄 단위 diff ──────────────────────────────────────────────────────────────
+
+(defn diff-lines [old-str new-str]
+  (let [old-lines (str-lines old-str)
+        new-lines (str-lines new-str)
+        result    (atom [])]
+    (let [max-len (max (length old-lines) (length new-lines))]
+      (loop [i 0]
+        (when (< i max-len)
+          (let [old-line (nth old-lines i nil)
+                new-line (nth new-lines i nil)]
+            (cond
+              (nil? old-line)
+              (swap! result append {:op "+" :line (+ i 1) :content new-line})
+              (nil? new-line)
+              (swap! result append {:op "-" :line (+ i 1) :content old-line})
+              (not (= old-line new-line))
+              (do
+                (swap! result append {:op "-" :line (+ i 1) :content old-line})
+                (swap! result append {:op "+" :line (+ i 1) :content new-line})))
+            (recur (+ i 1))))))
+    (deref result)))
+
+(defn diff-lines-str [old-str new-str]
+  (let [changes (diff-lines old-str new-str)]
+    (str-join "\n"
+      (map (fn [c]
+             (str (get c :op) " [L" (get c :line) "] " (get c :content)))
+           changes))))
+
+;; ── 맵 diff ──────────────────────────────────────────────────────────────────
+
+(defn diff-map [old-map new-map]
+  (let [old-keys (obj-keys old-map)
+        new-keys (obj-keys new-map)
+        all-keys (distinct (into old-keys new-keys))
+        result   (atom {:added {} :removed {} :changed {} :unchanged {}})]
+    (doseq [k all-keys]
+      (let [old-val (get old-map k)
+            new-val (get new-map k)]
+        (cond
+          (nil? old-val)
+          (swap! result assoc-in [:added k] new-val)
+          (nil? new-val)
+          (swap! result assoc-in [:removed k] old-val)
+          (not (= (json-stringify old-val) (json-stringify new-val)))
+          (swap! result assoc-in [:changed k] {:from old-val :to new-val})
+          true
+          (swap! result assoc-in [:unchanged k] new-val))))
+    (deref result)))
+
+(defn diff-empty? [d]
+  (and (empty? (obj-keys (get d :added)))
+       (empty? (obj-keys (get d :removed)))
+       (empty? (obj-keys (get d :changed)))))
+
+(defn diff-summary [d]
+  {:added   (length (obj-keys (get d :added)))
+   :removed (length (obj-keys (get d :removed)))
+   :changed (length (obj-keys (get d :changed)))})
+
+;; ── 배열 diff ────────────────────────────────────────────────────────────────
+
+(defn diff-arrays [old-arr new-arr]
+  (let [added   (filter (fn [x] (not (includes-item old-arr x))) new-arr)
+        removed (filter (fn [x] (not (includes-item new-arr x))) old-arr)]
+    {:added added :removed removed}))
+
+;; ── 패치 적용 ─────────────────────────────────────────────────────────────────
+
+(defn diff-patch [original diff]
+  (let [added   (get diff :added {})
+        removed (get diff :removed {})
+        changed (get diff :changed {})]
+    (let [after-add     (reduce (fn [m k] (assoc m k (get added k)))
+                                original (obj-keys added))
+          after-remove  (reduce (fn [m k] (dissoc m k))
+                                after-add (obj-keys removed))
+          after-change  (reduce (fn [m k] (assoc m k (get (get changed k) :to)))
+                                after-remove (obj-keys changed))]
+      after-change)))

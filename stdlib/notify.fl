@@ -1,0 +1,135 @@
+;; stdlib/notify.fl — 알림 / 웹훅 디스패처 (v11.7.3)
+;; (load "stdlib/notify.fl")
+;;
+;; 사용법:
+;;   (notify-create)                          ;; 알림 시스템 생성
+;;   (notify-add-channel! ns "slack" handler) ;; 채널 등록
+;;   (notify-send! ns "slack" msg)            ;; 단일 채널 발송
+;;   (notify-broadcast! ns msg)               ;; 모든 채널 발송
+;;   (notify-queue! ns channel msg)           ;; 큐에 쌓기
+;;   (notify-flush! ns)                       ;; 큐 일괄 발송
+;;
+;; 내장 채널 헬퍼:
+;;   (notify-slack-channel webhook-url)       ;; Slack 웹훅 채널 생성
+;;   (notify-webhook-channel url method)      ;; 일반 웹훅 채널
+;;   (notify-log-channel)                     ;; 로그 채널 (개발용)
+;;   (notify-memory-channel)                  ;; 메모리 채널 (테스트용)
+;;
+;; 실무 예제:
+;;   (load "stdlib/notify.fl")
+;;   (define ns (notify-create))
+;;   (notify-add-channel! ns "log" (notify-log-channel))
+;;   (notify-add-channel! ns "slack"
+;;     (notify-slack-channel "https://hooks.slack.com/..."))
+;;   ;; 주문 완료 시 알림
+;;   (defn on-order-complete [order]
+;;     (notify-broadcast! ns
+;;       {:title "새 주문"
+;;        :body  (str "주문 " (get order :id) " 완료")
+;;        :data  order}))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn notify-create []
+  (atom {:channels {}
+         :queue    []
+         :sent     0
+         :failed   0}))
+
+;; ── 채널 등록 ─────────────────────────────────────────────────────────────────
+
+(defn notify-add-channel! [ns name handler]
+  (swap! ns assoc-in [:channels name] handler))
+
+(defn notify-remove-channel! [ns name]
+  (swap! ns update :channels (fn [ch] (dissoc ch name))))
+
+(defn notify-channels [ns]
+  (keys (get (deref ns) :channels {})))
+
+;; ── 발송 ─────────────────────────────────────────────────────────────────────
+
+(defn notify-send! [ns channel msg]
+  (let [channels (get (deref ns) :channels {})
+        handler  (get channels channel)]
+    (if (nil? handler)
+      {:ok false :error (str "채널 없음: " channel)}
+      (let [r (try
+                {:ok true :result (handler msg)}
+                (catch err {:ok false :error err}))]
+        (if (get r :ok)
+          (do (swap! ns assoc :sent (+ (get (deref ns) :sent 0) 1)) r)
+          (do (swap! ns assoc :failed (+ (get (deref ns) :failed 0) 1)) r))))))
+
+(defn notify-broadcast! [ns msg]
+  (let [channels (get (deref ns) :channels {})
+        results  (atom [])]
+    (doseq [entry (obj-entries channels)]
+      (let [ch-name (first entry)
+            handler (second entry)
+            r       (try
+                      {:ok true :channel ch-name :result (handler msg)}
+                      (catch err {:ok false :channel ch-name :error err}))]
+        (if (get r :ok)
+          (swap! ns assoc :sent (+ (get (deref ns) :sent 0) 1))
+          (swap! ns assoc :failed (+ (get (deref ns) :failed 0) 1)))
+        (swap! results append r)))
+    (deref results)))
+
+;; ── 큐 ───────────────────────────────────────────────────────────────────────
+
+(defn notify-queue! [ns channel msg]
+  (swap! ns assoc :queue (append (get (deref ns) :queue []) {:channel channel :msg msg})))
+
+(defn notify-flush! [ns]
+  (let [q (get (deref ns) :queue [])]
+    (swap! ns assoc :queue [])
+    (doseq [item q]
+      (notify-send! ns (get item :channel) (get item :msg)))))
+
+;; ── 내장 채널 헬퍼 ────────────────────────────────────────────────────────────
+
+(defn notify-log-channel []
+  (fn [msg]
+    (println (str "[NOTIFY] " (get msg :title msg) ": " (get msg :body "")))
+    true))
+
+(defn notify-memory-channel []
+  (let [store (atom [])]
+    {:handler (fn [msg] (swap! store append msg) true)
+     :messages store}))
+
+(defn notify-webhook-channel [url method]
+  (fn [msg]
+    (let [body (json-stringify msg)
+          r    (try
+                 (let [result (shell-exec-result
+                                (str "curl -s -X " (str-to-upper method)
+                                     " -H 'Content-Type: application/json'"
+                                     " -d '" body "'"
+                                     " '" url "' 2>&1"))]
+                   {:ok (get result :ok) :body (get result :stdout)})
+                 (catch err {:ok false :error err}))]
+      r)))
+
+(defn notify-slack-channel [webhook-url]
+  (fn [msg]
+    (let [title (get msg :title "알림")
+          body  (get msg :body "")
+          text  (str "*" title "*\n" body)
+          payload (json-stringify {"text" text})]
+      (let [result (shell-exec-result
+                     (str "curl -s -X POST"
+                          " -H 'Content-Type: application/json'"
+                          " -d '" payload "'"
+                          " '" webhook-url "' 2>&1"))]
+        {:ok (get result :ok) :body (get result :stdout)}))))
+
+;; ── 통계 ─────────────────────────────────────────────────────────────────────
+
+(defn notify-stats [ns]
+  (let [state (deref ns)]
+    {:channels (length (keys (get state :channels {})))
+     :queue    (length (get state :queue []))
+     :sent     (get state :sent 0)
+     :failed   (get state :failed 0)}))

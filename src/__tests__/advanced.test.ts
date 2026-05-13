@@ -563,6 +563,43 @@ describe("v11.7.4 — 정규식 강화 (re-groups, 함수 alias)", () => {
   });
 });
 
+describe("포맷팅 헬퍼 함수 — v11.7.5", () => {
+  test("str-pad-left 기본 (space)", () => {
+    expect(run('(str-pad-left "5" 5)')).toBe("    5");
+  });
+
+  test("str-pad-left 커스텀 char (zero)", () => {
+    expect(run('(str-pad-left "5" 5 "0")')).toBe("00005");
+  });
+
+  test("str-pad-right 기본 (space)", () => {
+    expect(run('(str-pad-right "hi" 5)')).toBe("hi   ");
+  });
+
+  test("str-pad-right 커스텀 char (dash)", () => {
+    expect(run('(str-pad-right "hi" 5 "-")')).toBe("hi---");
+  });
+
+  test("str-truncate 기본 suffix", () => {
+    expect(run('(str-truncate "hello world" 5)')).toBe("he...");
+  });
+
+  test("str-truncate 커스텀 suffix", () => {
+    expect(run('(str-truncate "hello world" 5 "~")')).toBe("hell~");
+  });
+
+  test("format-number 천 단위 쉼표", () => {
+    expect(run('(format-number 1234567)')).toBe("1,234,567");
+  });
+
+  test("format-decimal + format-percent", () => {
+    const decimal = run('(format-decimal 3.14159 2)');
+    const percent = run('(format-percent 0.456 1)');
+    expect(decimal).toBe("3.14");
+    expect(percent).toBe("45.6%");
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

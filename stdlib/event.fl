@@ -1,0 +1,129 @@
+;; stdlib/event.fl — 이벤트 에미터 pub/sub (v11.7.3)
+;; (load "stdlib/event.fl")
+;;
+;; 사용법:
+;;   (define em (em-create))
+;;   (em-on em "user.login" (fn [data] (println "로그인:" data)))
+;;   (em-emit em "user.login" {:userId 1 :ip "127.0.0.1"})
+;;   (em-off em "user.login" handler-fn)
+;;   (em-once em "app.start" (fn [d] (println "앱 시작!")))
+;;
+;; 실무 예제 (와일드카드):
+;;   (em-on em "user.*" (fn [d] (log-info "user event" d)))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn em-create []
+  {:listeners (atom {})
+   :history   (atom [])
+   :max-history 100})
+
+;; ── 구독 ─────────────────────────────────────────────────────────────────────
+
+(defn em-on [em event handler]
+  (let [listeners (deref (get em :listeners))
+        current   (get listeners event [])]
+    (swap! (get em :listeners)
+           assoc event (append current {:fn handler :once false})))
+  em)
+
+(defn em-once [em event handler]
+  (let [listeners (deref (get em :listeners))
+        current   (get listeners event [])]
+    (swap! (get em :listeners)
+           assoc event (append current {:fn handler :once true})))
+  em)
+
+;; ── 구독 해제 ─────────────────────────────────────────────────────────────────
+
+(defn em-off [em event handler]
+  (let [listeners (deref (get em :listeners))
+        current   (get listeners event [])]
+    (swap! (get em :listeners)
+           assoc event
+           (filter (fn [h] (not (= (get h :fn) handler))) current)))
+  em)
+
+(defn em-off-all [em event]
+  (swap! (get em :listeners) assoc event [])
+  em)
+
+;; ── 와일드카드 매칭 ───────────────────────────────────────────────────────────
+
+(defn -em-matches? [pattern event]
+  (if (= pattern event)
+    true
+    (if (str-ends-with pattern "*")
+      (str-starts-with event (str-slice pattern 0 (- (length pattern) 1)))
+      false)))
+
+;; ── 발행 ─────────────────────────────────────────────────────────────────────
+
+(defn em-emit [em event data]
+  (let [listeners (deref (get em :listeners))
+        max-h     (get em :max-history)
+        history   (deref (get em :history))]
+    (swap! (get em :history)
+           (fn [h]
+             (let [entry {:event event :data data :ts (now-ms)}
+                   new-h (append h entry)]
+               (if (> (length new-h) max-h)
+                 (drop 1 new-h)
+                 new-h))))
+    (doseq [pattern (obj-keys listeners)]
+      (when (-em-matches? pattern event)
+        (let [handlers (get listeners pattern)
+              called   (atom [])]
+          (doseq [h handlers]
+            ((get h :fn) data)
+            (when (not (get h :once))
+              (swap! called append h)))
+          (when (< (length (deref called)) (length handlers))
+            (swap! (get em :listeners)
+                   assoc pattern (deref called))))))
+    em))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn em-listeners [em event]
+  (get (deref (get em :listeners)) event []))
+
+(defn em-listener-count [em event]
+  (length (em-listeners em event)))
+
+(defn em-history [em]
+  (deref (get em :history)))
+
+(defn em-history-for [em event]
+  (filter (fn [h] (= (get h :event) event)) (em-history em)))
+
+(defn em-stats [em]
+  (let [listeners (deref (get em :listeners))]
+    {:events   (length (obj-keys listeners))
+     :history  (length (deref (get em :history)))}))
+
+;; ── 실무 예제: 주문 처리 도메인 이벤트 ──────────────────────────────────────
+;;
+;; (load "stdlib/event.fl")
+;; (load "stdlib/log.fl")
+;;
+;; (define em (em-create))
+;;
+;; ;; 구독 설정 (앱 시작 시)
+;; (em-on em "order.created" (fn [o]
+;;   (db-exec db "INSERT INTO order_log VALUES (?,?)" [(get o :id) "created"])))
+;; (em-on em "order.created" (fn [o]
+;;   (jq-push jq "send-email" {:to (get o :email) :subject "주문 완료"})))
+;; (em-on em "order.paid" (fn [o]
+;;   (db-exec db "UPDATE orders SET status='paid' WHERE id=?" [(get o :id)])))
+;; (em-on em "order.*" (fn [o]
+;;   (log-info "order.event" o)))
+;;
+;; ;; 주문 생성 핸들러
+;; (defn handle-create-order [req]
+;;   (let [body (get req "body")
+;;         id   (uuid)]
+;;     (db-exec db "INSERT INTO orders (id,email) VALUES (?,?)"
+;;              [id (get body :email)])
+;;     (em-emit em "order.created" {:id id :email (get body :email)})
+;;     (server-json {:ok true :orderId id})))

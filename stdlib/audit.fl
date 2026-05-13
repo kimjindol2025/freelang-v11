@@ -1,0 +1,129 @@
+;; stdlib/audit.fl — 감사 로그 (Audit Log) (v11.7.3)
+;; (load "stdlib/audit.fl")
+;;
+;; 사용법:
+;;   (audit-create db-path)              ;; 감사 로그 저장소 생성 (SQLite)
+;;   (audit-log! al user action target)  ;; 행위 기록
+;;   (audit-log-detail! al user action target detail) ;; 상세 포함
+;;   (audit-query al opts)               ;; 조회 (user/action/target 필터)
+;;   (audit-recent al n)                 ;; 최근 n건
+;;
+;; 실무 예제:
+;;   (load "stdlib/audit.fl")
+;;   (define al (audit-create "/data/audit.db"))
+;;   ;; 사용자 행위 기록
+;;   (defn handle-delete-post [req]
+;;     (let [uid (get req "user-id")
+;;           pid (get (get req "params") "id")]
+;;       (audit-log! al uid "post.delete" (str "post:" pid))
+;;       (db-exec DB "DELETE FROM posts WHERE id=?" [pid])
+;;       (server-json {:ok true})))
+
+;; ── 초기화 ────────────────────────────────────────────────────────────────────
+
+(defn audit-create [db-path]
+  (db-exec db-path
+    "CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      user TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target TEXT,
+      detail TEXT,
+      ip TEXT,
+      session_id TEXT
+    )" [])
+  (db-exec db-path
+    "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user)" [])
+  (db-exec db-path
+    "CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action)" [])
+  (db-exec db-path
+    "CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs(ts)" [])
+  {:db db-path})
+
+;; ── 기록 ─────────────────────────────────────────────────────────────────────
+
+(defn audit-log! [al user action target]
+  (let [db (get al :db)]
+    (db-exec db
+      "INSERT INTO audit_logs (ts, user, action, target) VALUES (?,?,?,?)"
+      [(now-ms) (str user) (str action) (str target)])))
+
+(defn audit-log-detail! [al user action target detail]
+  (let [db (get al :db)]
+    (db-exec db
+      "INSERT INTO audit_logs (ts, user, action, target, detail) VALUES (?,?,?,?,?)"
+      [(now-ms) (str user) (str action) (str target)
+       (if (string? detail) detail (json-stringify detail))])))
+
+(defn audit-log-req! [al req action target]
+  (let [db      (get al :db)
+        user    (get req "user-id" "anonymous")
+        ip      (get (get req "headers") "x-forwarded-for"
+                     (get (get req "headers") "x-real-ip" "unknown"))
+        session (get (get req "cookies") "session")]
+    (db-exec db
+      "INSERT INTO audit_logs (ts, user, action, target, ip, session_id) VALUES (?,?,?,?,?,?)"
+      [(now-ms) (str user) (str action) (str target) (str ip) (str session)])))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn audit-recent [al n]
+  (let [db (get al :db)]
+    (db-query db
+      "SELECT * FROM audit_logs ORDER BY ts DESC LIMIT ?"
+      [n])))
+
+(defn audit-query [al opts]
+  (let [db     (get al :db)
+        user   (get opts :user)
+        action (get opts :action)
+        target (get opts :target)
+        from   (get opts :from)
+        to     (get opts :to)
+        limit  (get opts :limit 100)
+        wheres (atom [])
+        params (atom [])]
+    (when (not (nil? user))
+      (swap! wheres push "user = ?")
+      (swap! params push user))
+    (when (not (nil? action))
+      (swap! wheres push "action = ?")
+      (swap! params push action))
+    (when (not (nil? target))
+      (swap! wheres push "target = ?")
+      (swap! params push target))
+    (when (not (nil? from))
+      (swap! wheres push "ts >= ?")
+      (swap! params push from))
+    (when (not (nil? to))
+      (swap! wheres push "ts <= ?")
+      (swap! params push to))
+    (let [where-sql (if (empty? (deref wheres))
+                      ""
+                      (str " WHERE " (str-join " AND " (deref wheres))))
+          sql       (str "SELECT * FROM audit_logs" where-sql
+                         " ORDER BY ts DESC LIMIT ?")]
+      (swap! params push limit)
+      (db-query db sql (deref params)))))
+
+(defn audit-count [al opts]
+  (let [rows (audit-query al opts)]
+    (length rows)))
+
+(defn audit-user-actions [al user limit]
+  (audit-query al {:user user :limit limit}))
+
+(defn audit-purge! [al before-ms]
+  (let [db (get al :db)]
+    (db-exec db "DELETE FROM audit_logs WHERE ts < ?" [before-ms])))
+
+(defn audit-export [al opts]
+  (let [rows (audit-query al opts)]
+    (map (fn [row]
+           {:ts       (get row "ts")
+            :user     (get row "user")
+            :action   (get row "action")
+            :target   (get row "target")
+            :detail   (get row "detail")})
+         rows)))

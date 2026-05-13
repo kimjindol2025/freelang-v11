@@ -1,0 +1,109 @@
+;; stdlib/session.fl — 서버 세션 관리 (v11.7.3)
+;; (load "stdlib/session.fl")
+;;
+;; 인메모리 세션 저장소. 필요 시 DB 백엔드로 교체 가능.
+;;
+;; 사용법:
+;;   (define ss (ss-create 3600000))          ;; TTL 1시간
+;;   (define sid (ss-new ss {:userId 1}))     ;; 세션 생성 → 세션 ID 반환
+;;   (ss-get ss sid)                          ;; → {:userId 1} or nil
+;;   (ss-set ss sid :role "admin")            ;; 값 추가/갱신
+;;   (ss-destroy ss sid)                      ;; 세션 삭제
+;;   (ss-touch ss sid)                        ;; 만료 시간 갱신
+;;
+;; 실무 예제:
+;;   (load "stdlib/session.fl")
+;;   (define ss (ss-create 3600000))
+;;
+;;   (defn handle-login [req]
+;;     (let [body  (get req "body")
+;;           email (get body "email")
+;;           pass  (get body "password")
+;;           user  (db-query-one DB "SELECT * FROM users WHERE email=?" [email])]
+;;       (if (and user (auth-verify-password pass (get user "password_hash")))
+;;         (let [sid    (ss-new ss {:userId (get user "id") :email email :role (get user "role")})
+;;               cookie (server-set-cookie "sid" sid {:max_age 3600})]
+;;           (server-json-cookie {:ok true} cookie))
+;;         (server-status 401 "인증 실패"))))
+;;
+;;   (defn require-auth [req handler]
+;;     (let [sid  (get (get req "cookies") "sid")
+;;           data (ss-get ss sid)]
+;;       (if (nil? data)
+;;         (server-status 401 "로그인 필요")
+;;         (handler req data))))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn ss-create [ttl-ms]
+  {:store  (cache-create 10000)
+   :ttl-ms ttl-ms})
+
+(defn ss-create-default []
+  (ss-create 3600000))
+
+;; ── 세션 생성/조회/갱신/삭제 ──────────────────────────────────────────────────
+
+(defn ss-new [ss data]
+  (let [sid (uuid)
+        ttl (get ss :ttl-ms)]
+    (cache-set (get ss :store) sid data ttl)
+    sid))
+
+(defn ss-get [ss sid]
+  (if (nil? sid)
+    nil
+    (cache-get (get ss :store) sid)))
+
+(defn ss-set [ss sid key val]
+  (let [data (ss-get ss sid)]
+    (when (not (nil? data))
+      (cache-set (get ss :store) sid
+                 (assoc data key val)
+                 (get ss :ttl-ms)))))
+
+(defn ss-update [ss sid updater]
+  (let [data (ss-get ss sid)]
+    (when (not (nil? data))
+      (cache-set (get ss :store) sid
+                 (updater data)
+                 (get ss :ttl-ms)))))
+
+(defn ss-touch [ss sid]
+  (let [data (ss-get ss sid)]
+    (when (not (nil? data))
+      (cache-set (get ss :store) sid data (get ss :ttl-ms))
+      true)))
+
+(defn ss-destroy [ss sid]
+  (cache-del (get ss :store) sid))
+
+(defn ss-exists? [ss sid]
+  (not (nil? (ss-get ss sid))))
+
+;; ── 미들웨어 헬퍼 ─────────────────────────────────────────────────────────────
+
+(defn ss-middleware [ss req handler]
+  (let [sid  (get (get req "cookies") "sid")
+        data (ss-get ss sid)]
+    (if (nil? data)
+      (server-status 401 "로그인 필요")
+      (do
+        (ss-touch ss sid)
+        (handler req data)))))
+
+(defn ss-require-role [ss req role handler]
+  (let [sid  (get (get req "cookies") "sid")
+        data (ss-get ss sid)]
+    (if (nil? data)
+      (server-status 401 "로그인 필요")
+      (if (not (= (get data :role) role))
+        (server-status 403 "권한 없음")
+        (do
+          (ss-touch ss sid)
+          (handler req data))))))
+
+;; ── 통계 ─────────────────────────────────────────────────────────────────────
+
+(defn ss-stats [ss]
+  (cache-stats (get ss :store)))

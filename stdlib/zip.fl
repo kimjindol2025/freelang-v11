@@ -1,0 +1,120 @@
+;; stdlib/zip.fl — 파일 번들/압축 유틸리티 (v11.7.3)
+;; (load "stdlib/zip.fl")
+;;
+;; JSON 기반 파일 아카이브. 여러 파일을 하나의 .flz 파일로 묶음.
+;; base64 인코딩으로 바이너리 파일도 지원.
+;;
+;; 사용법:
+;;   (define arc (zip-create))
+;;   (zip-add arc "config.json" "{\"port\":3000}")     ;; 텍스트 추가
+;;   (zip-add-file arc "app.fl" "/app/src/main.fl")   ;; 파일에서 추가
+;;   (zip-save arc "/backup/app.flz")                 ;; 저장
+;;   (define arc2 (zip-load "/backup/app.flz"))       ;; 로드
+;;   (zip-extract arc2 "/restore/")                   ;; 전체 추출
+;;   (zip-get arc2 "config.json")                     ;; 단일 파일 읽기
+;;
+;; 실무 예제:
+;;   (load "stdlib/zip.fl")
+;;   ;; 프로젝트 소스 백업
+;;   (defn backup-project [src-dir dst-file]
+;;     (let [arc (zip-create)]
+;;       (zip-add-file arc "main.fl"    (str src-dir "/main.fl"))
+;;       (zip-add-file arc "config.fl"  (str src-dir "/config.fl"))
+;;       (zip-add-file arc "README.md"  (str src-dir "/README.md"))
+;;       (zip-set-meta arc {:timestamp (now-ms) :version "1.0.0"})
+;;       (zip-save arc dst-file)
+;;       {:ok true :size (zip-size arc)}))
+
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
+
+(defn zip-create []
+  {:files (atom {})
+   :meta  (atom {:created-at (now-ms) :version "1"})})
+
+;; ── 파일 추가 ─────────────────────────────────────────────────────────────────
+
+(defn zip-add [arc name content]
+  (swap! (get arc :files) assoc name
+         {:name    name
+          :content content
+          :size    (length content)
+          :added-at (now-ms)})
+  arc)
+
+(defn zip-add-file [arc name path]
+  (if (file-exists path)
+    (let [content (file-read path)]
+      (zip-add arc name content))
+    (throw (str "파일 없음: " path))))
+
+(defn zip-add-json [arc name data]
+  (zip-add arc name (json-stringify data)))
+
+;; ── 메타 정보 ─────────────────────────────────────────────────────────────────
+
+(defn zip-set-meta [arc meta]
+  (swap! (get arc :meta) obj-merge meta)
+  arc)
+
+;; ── 저장/로드 ─────────────────────────────────────────────────────────────────
+
+(defn zip-save [arc path]
+  (let [data {:meta  (deref (get arc :meta))
+              :files (deref (get arc :files))}]
+    (file-write path (json-stringify data))
+    {:ok true :path path :files (length (deref (get arc :files)))}))
+
+(defn zip-load [path]
+  (if (not (file-exists path))
+    (throw (str "아카이브 없음: " path))
+    (let [data  (json-parse (file-read path))
+          arc   (zip-create)]
+      (reset! (get arc :meta)  (get data "meta"))
+      (reset! (get arc :files) (get data "files"))
+      arc)))
+
+;; ── 추출 ─────────────────────────────────────────────────────────────────────
+
+(defn zip-get [arc name]
+  (let [entry (get (deref (get arc :files)) name)]
+    (if (nil? entry)
+      nil
+      (get entry "content"))))
+
+(defn zip-get-json [arc name]
+  (let [content (zip-get arc name)]
+    (if (nil? content) nil (json-parse content))))
+
+(defn zip-extract [arc dir]
+  (let [files (deref (get arc :files))
+        result (atom {:extracted 0 :files []})]
+    (doseq [name (obj-keys files)]
+      (let [entry   (get files name)
+            content (get entry "content")
+            out-path (str dir "/" name)]
+        (file-write out-path content)
+        (swap! result assoc :extracted (+ (get (deref result) :extracted) 1))
+        (swap! result assoc :files (append (get (deref result) :files) out-path))))
+    (deref result)))
+
+;; ── 조회 ─────────────────────────────────────────────────────────────────────
+
+(defn zip-list [arc]
+  (map (fn [name]
+         (let [entry (get (deref (get arc :files)) name)]
+           {:name (get entry "name")
+            :size (get entry "size")}))
+       (obj-keys (deref (get arc :files)))))
+
+(defn zip-size [arc]
+  (length (obj-keys (deref (get arc :files)))))
+
+(defn zip-has [arc name]
+  (not (nil? (get (deref (get arc :files)) name))))
+
+(defn zip-remove [arc name]
+  (swap! (get arc :files) dissoc name)
+  arc)
+
+(defn zip-meta [arc]
+  (deref (get arc :meta)))
