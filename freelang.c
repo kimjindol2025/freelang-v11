@@ -29,7 +29,7 @@ static void* aa(size_t n) {
 }
 
 /* ──────────────────────────────── Lexer ── */
-typedef enum { T_LP,T_RP,T_LB,T_RB,T_NUM,T_STR,T_SYM,T_EOF } TK;
+typedef enum { T_LP,T_RP,T_LB,T_RB,T_LC,T_RC,T_NUM,T_STR,T_SYM,T_EOF } TK;
 typedef struct { TK k; char v[512]; } Tok;
 #define MAX_TOKS 32768
 static Tok toks[MAX_TOKS];
@@ -47,6 +47,8 @@ static void lex(const char* s) {
         case ')': t.k=T_RP; i++; break;
         case '[': t.k=T_LB; i++; break;
         case ']': t.k=T_RB; i++; break;
+        case '{': t.k=T_LC; i++; break;
+        case '}': t.k=T_RC; i++; break;
         case '"': {
             i++; size_t j = 0;
             while (s[i] && s[i] != '"') {
@@ -69,7 +71,8 @@ static void lex(const char* s) {
         default: {
             size_t j = 0;
             while (s[i] && !isspace((unsigned char)s[i]) &&
-                   s[i]!='(' && s[i]!=')' && s[i]!='[' && s[i]!=']' && s[i]!=';')
+                   s[i]!='(' && s[i]!=')' && s[i]!='[' && s[i]!=']' &&
+                   s[i]!='{' && s[i]!='}' && s[i]!=';')
                 t.v[j++] = s[i++];
             t.v[j] = 0;
             char* e; strtod(t.v, &e);
@@ -90,6 +93,8 @@ static Tok nx(void) { return toks[tpos++]; }
 #define NN 1   /* number */
 #define NS 2   /* string */
 #define NL 3   /* list   */
+#define NV 4   /* vector [...] */
+#define NM 5   /* map    {...} */
 typedef struct N N;
 struct N { int k; char v[512]; N** c; int nc; };
 
@@ -98,8 +103,8 @@ static N* mkn(int k, const char* v) {
     if (v) { strncpy(n->v, v, 511); n->v[511] = 0; }
     return n;
 }
-static N* mkl(N** items, int n) {
-    N* nd = mkn(NL, NULL);
+static N* mkn2(int k, N** items, int n) {
+    N* nd = mkn(k, NULL);
     nd->c = aa(sizeof(N*) * (n + 1));
     memcpy(nd->c, items, sizeof(N*) * n);
     nd->nc = n; return nd;
@@ -108,14 +113,26 @@ static N* mkl(N** items, int n) {
 static N* pnode(void) {
     Tok t = pk();
     if (t.k == T_EOF) return NULL;
-    if (t.k == T_LP || t.k == T_LB) {
-        TK close = (t.k == T_LP) ? T_RP : T_RB;
+    if (t.k == T_LP) {
         nx();
         N* items[1024]; int n = 0;
-        while (pk().k != close && pk().k != T_EOF)
-            items[n++] = pnode();
-        if (pk().k == close) nx();
-        return mkl(items, n);
+        while (pk().k != T_RP && pk().k != T_EOF) items[n++] = pnode();
+        if (pk().k == T_RP) nx();
+        return mkn2(NL, items, n);
+    }
+    if (t.k == T_LB) {
+        nx();
+        N* items[1024]; int n = 0;
+        while (pk().k != T_RB && pk().k != T_EOF) items[n++] = pnode();
+        if (pk().k == T_RB) nx();
+        return mkn2(NV, items, n);
+    }
+    if (t.k == T_LC) {
+        nx();
+        N* items[1024]; int n = 0;
+        while (pk().k != T_RC && pk().k != T_EOF) items[n++] = pnode();
+        if (pk().k == T_RC) nx();
+        return mkn2(NM, items, n);
     }
     nx();
     if (t.k == T_NUM) return mkn(NN, t.v);
@@ -192,6 +209,18 @@ static void emit_node(N* n) {
         if (!strcmp(n->v,"false"))          { E("fl_bool(false)"); return; }
         if (!strcmp(n->v,"nil") || !strcmp(n->v,"null")) { E("fl_nil()"); return; }
         char b[512]; cname(n->v, b, sizeof(b)); E("%s", b); return;
+    }
+    /* NV — vector literal */
+    if (n->k == NV) {
+        if (n->nc == 0) { E("fl_vec_new()"); return; }
+        E("fl_vec_from((FLValue[]){"); emit_args(n->c, n->nc); E("}, %d)", n->nc);
+        return;
+    }
+    /* NM — map literal */
+    if (n->k == NM) {
+        if (n->nc == 0) { E("fl_map_new()"); return; }
+        E("fl_map_from_pairs((FLValue[]){"); emit_args(n->c, n->nc); E("}, %d)", n->nc/2);
+        return;
     }
     /* NL */
     if (n->nc == 0) { E("fl_nil()"); return; }
@@ -281,6 +310,15 @@ static void emit_node(N* n) {
     if (sym(op,"file-write")) {
         E("fl_file_write("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return;
     }
+    /* vector ops */
+    if (sym(op,"vec-get"))  { E("fl_vec_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"vec-set"))  { E("fl_vec_set(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    if (sym(op,"vec-push")) { E("fl_vec_push("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"vec-len"))  { E("fl_vec_len(");  emit_node(a[0]); E(")"); return; }
+    /* map ops */
+    if (sym(op,"map-get"))  { E("fl_map_get(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"map-set"))  { E("fl_map_set(");  emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    if (sym(op,"map-len"))  { E("fl_map_len(");  emit_node(a[0]); E(")"); return; }
     /* generic call */
     char b[512]; cname(op->v, b, sizeof(b));
     E("%s(", b); emit_args(a, na); E(")");

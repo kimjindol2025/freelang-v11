@@ -41,6 +41,27 @@ typedef struct {
     char     data[];
 } FLString;
 
+/* ── S5: Heap Object System ── */
+
+typedef struct {
+    FLValue key;
+    FLValue val;
+} FLMapEntry;
+
+typedef struct {
+    FLObject  base;   /* type = FL_VECTOR */
+    uint32_t  len;
+    uint32_t  cap;
+    FLValue*  data;
+} FLVector;
+
+typedef struct {
+    FLObject    base;  /* type = FL_MAP */
+    uint32_t    len;
+    uint32_t    cap;
+    FLMapEntry* entries;
+} FLMap;
+
 /* ── 값 생성 ── */
 FLValue fl_int(int64_t v);
 FLValue fl_float(double v);
@@ -81,5 +102,20 @@ FLValue fl_print(FLValue v);
 /* ── 파일 I/O ── */
 FLValue fl_file_read(FLValue path);
 FLValue fl_file_write(FLValue path, FLValue content);
+
+/* ── Vector ── */
+FLValue fl_vec_new(void);
+FLValue fl_vec_from(FLValue* items, uint32_t n);
+FLValue fl_vec_get(FLValue vec, FLValue idx);
+FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val);
+FLValue fl_vec_push(FLValue vec, FLValue val);
+FLValue fl_vec_len(FLValue vec);
+
+/* ── Map ── */
+FLValue fl_map_new(void);
+FLValue fl_map_from_pairs(FLValue* kv, uint32_t n); /* n = 쌍의 수 */
+FLValue fl_map_get(FLValue map, FLValue key);
+FLValue fl_map_set(FLValue map, FLValue key, FLValue val);
+FLValue fl_map_len(FLValue map);
 
 #endif /* FREELANG_RUNTIME_H */

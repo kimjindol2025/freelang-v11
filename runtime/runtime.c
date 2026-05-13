@@ -52,7 +52,17 @@ static const char* fl_to_str(FLValue v, char* buf, size_t sz) {
         case FL_BOOL:   return v.b ? "true" : "false";
         case FL_NIL:    return "nil";
         case FL_STRING: return ((FLString*)v.obj)->data;
-        default:        return "";
+        case FL_VECTOR: {
+            FLVector* vec = (FLVector*)v.obj;
+            snprintf(buf, sz, "[%u items]", vec->len);
+            return buf;
+        }
+        case FL_MAP: {
+            FLMap* mp = (FLMap*)v.obj;
+            snprintf(buf, sz, "{%u keys}", mp->len);
+            return buf;
+        }
+        default: return "";
     }
 }
 
@@ -227,4 +237,125 @@ FLValue fl_file_write(FLValue path, FLValue content) {
     fwrite(s, 1, strlen(s), f);
     fclose(f);
     return fl_nil();
+}
+
+/* ── Vector ── */
+
+FLValue fl_vec_new(void) {
+    FLVector* v = malloc(sizeof(FLVector));
+    v->base.type = FL_VECTOR; v->base.rc = 1;
+    v->len = 0; v->cap = 0; v->data = NULL;
+    FLValue r; r.tag = FL_VECTOR; r.obj = (FLObject*)v; return r;
+}
+
+FLValue fl_vec_from(FLValue* items, uint32_t n) {
+    FLVector* v = malloc(sizeof(FLVector));
+    v->base.type = FL_VECTOR; v->base.rc = 1;
+    v->len = n; v->cap = n;
+    v->data = n ? malloc(sizeof(FLValue) * n) : NULL;
+    if (n) memcpy(v->data, items, sizeof(FLValue) * n);
+    FLValue r; r.tag = FL_VECTOR; r.obj = (FLObject*)v; return r;
+}
+
+FLValue fl_vec_get(FLValue vec, FLValue idx) {
+    if (vec.tag != FL_VECTOR) return fl_nil();
+    FLVector* v = (FLVector*)vec.obj;
+    int64_t i = (idx.tag == FL_FLOAT) ? (int64_t)idx.f : idx.i;
+    if (i < 0 || (uint32_t)i >= v->len) return fl_nil();
+    return v->data[i];
+}
+
+FLValue fl_vec_len(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_int(0);
+    return fl_int((int64_t)((FLVector*)vec.obj)->len);
+}
+
+/* copy semantics: 새 vector 반환 */
+FLValue fl_vec_push(FLValue vec, FLValue val) {
+    FLVector* src = (vec.tag == FL_VECTOR) ? (FLVector*)vec.obj : NULL;
+    uint32_t n = src ? src->len : 0;
+    FLVector* v = malloc(sizeof(FLVector));
+    v->base.type = FL_VECTOR; v->base.rc = 1;
+    v->len = n + 1; v->cap = n + 1;
+    v->data = malloc(sizeof(FLValue) * (n + 1));
+    if (n && src->data) memcpy(v->data, src->data, sizeof(FLValue) * n);
+    v->data[n] = val;
+    FLValue r; r.tag = FL_VECTOR; r.obj = (FLObject*)v; return r;
+}
+
+FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* src = (FLVector*)vec.obj;
+    int64_t i = (idx.tag == FL_FLOAT) ? (int64_t)idx.f : idx.i;
+    if (i < 0 || (uint32_t)i >= src->len) return vec;
+    FLVector* v = malloc(sizeof(FLVector));
+    v->base.type = FL_VECTOR; v->base.rc = 1;
+    v->len = src->len; v->cap = src->len;
+    v->data = malloc(sizeof(FLValue) * src->len);
+    memcpy(v->data, src->data, sizeof(FLValue) * src->len);
+    v->data[i] = val;
+    FLValue r; r.tag = FL_VECTOR; r.obj = (FLObject*)v; return r;
+}
+
+/* ── Map ── */
+
+FLValue fl_map_new(void) {
+    FLMap* m = malloc(sizeof(FLMap));
+    m->base.type = FL_MAP; m->base.rc = 1;
+    m->len = 0; m->cap = 0; m->entries = NULL;
+    FLValue r; r.tag = FL_MAP; r.obj = (FLObject*)m; return r;
+}
+
+/* kv: [k0,v0, k1,v1, ...], n = 쌍의 수 */
+FLValue fl_map_from_pairs(FLValue* kv, uint32_t n) {
+    FLMap* m = malloc(sizeof(FLMap));
+    m->base.type = FL_MAP; m->base.rc = 1;
+    m->len = n; m->cap = n;
+    m->entries = n ? malloc(sizeof(FLMapEntry) * n) : NULL;
+    for (uint32_t i = 0; i < n; i++) {
+        m->entries[i].key = kv[i * 2];
+        m->entries[i].val = kv[i * 2 + 1];
+    }
+    FLValue r; r.tag = FL_MAP; r.obj = (FLObject*)m; return r;
+}
+
+FLValue fl_map_get(FLValue map, FLValue key) {
+    if (map.tag != FL_MAP) return fl_nil();
+    FLMap* m = (FLMap*)map.obj;
+    for (uint32_t i = 0; i < m->len; i++) {
+        if (fl_truthy(fl_eq(m->entries[i].key, key)))
+            return m->entries[i].val;
+    }
+    return fl_nil();
+}
+
+FLValue fl_map_len(FLValue map) {
+    if (map.tag != FL_MAP) return fl_int(0);
+    return fl_int((int64_t)((FLMap*)map.obj)->len);
+}
+
+/* copy semantics: upsert 후 새 map 반환 */
+FLValue fl_map_set(FLValue map, FLValue key, FLValue val) {
+    FLMap* src = (map.tag == FL_MAP) ? (FLMap*)map.obj : NULL;
+    uint32_t n = src ? src->len : 0;
+    /* 기존 키 탐색 */
+    for (uint32_t i = 0; i < n; i++) {
+        if (fl_truthy(fl_eq(src->entries[i].key, key))) {
+            FLMap* m = malloc(sizeof(FLMap));
+            m->base.type = FL_MAP; m->base.rc = 1;
+            m->len = n; m->cap = n;
+            m->entries = malloc(sizeof(FLMapEntry) * n);
+            memcpy(m->entries, src->entries, sizeof(FLMapEntry) * n);
+            m->entries[i].val = val;
+            FLValue r; r.tag = FL_MAP; r.obj = (FLObject*)m; return r;
+        }
+    }
+    /* 새 키 추가 */
+    FLMap* m = malloc(sizeof(FLMap));
+    m->base.type = FL_MAP; m->base.rc = 1;
+    m->len = n + 1; m->cap = n + 1;
+    m->entries = malloc(sizeof(FLMapEntry) * (n + 1));
+    if (n && src->entries) memcpy(m->entries, src->entries, sizeof(FLMapEntry) * n);
+    m->entries[n].key = key; m->entries[n].val = val;
+    FLValue r; r.tag = FL_MAP; r.obj = (FLObject*)m; return r;
 }
