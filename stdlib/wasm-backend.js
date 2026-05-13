@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// FreeLang → WASM 컴파일러 백엔드 v2 (W-2)
-// mode: compile <ast.json> | run <ast.json> <fn> <args...> | eval <ast.json>
+// FreeLang → WASM 컴파일러 백엔드 v3 (W-4)
+// mode: compile | eval | arr-reduce | arr-map | arr-zip-map | arr-filter | arr-scan
+//       arr-reduce-f64 | arr-map-f64 | arr-zip-map-f64
 'use strict';
 
 // ── 인코딩 유틸 ───────────────────────────────────────────────────────────────
@@ -31,6 +32,21 @@ function section(id, content) { const b = content.flat(Infinity); return [id, ..
 
 // ── 타입 상수 ─────────────────────────────────────────────────────────────────
 const I32 = 0x7F, F64 = 0x7C, VOID = 0x40;
+
+// ── Math import 정의 (W-4) ────────────────────────────────────────────────────
+const MATH_IMPORTS_DEF = [
+  { module:'math', field:'sin',   type:[0x60,0x01,F64,0x01,F64] },
+  { module:'math', field:'cos',   type:[0x60,0x01,F64,0x01,F64] },
+  { module:'math', field:'tan',   type:[0x60,0x01,F64,0x01,F64] },
+  { module:'math', field:'exp',   type:[0x60,0x01,F64,0x01,F64] },
+  { module:'math', field:'log',   type:[0x60,0x01,F64,0x01,F64] },
+  { module:'math', field:'pow',   type:[0x60,0x02,F64,F64,0x01,F64] },
+  { module:'math', field:'atan',  type:[0x60,0x01,F64,0x01,F64] },
+  { module:'math', field:'atan2', type:[0x60,0x02,F64,F64,0x01,F64] },
+];
+const MATH_FN_NAMES = MATH_IMPORTS_DEF.map(m => m.field);
+const MATH_OBJ = { sin:Math.sin, cos:Math.cos, tan:Math.tan, exp:Math.exp,
+                   log:Math.log, pow:Math.pow, atan:Math.atan, atan2:Math.atan2 };
 
 // ── 내장 함수 (메모리 모드 시 자동 주입) ─────────────────────────────────────
 // idx: __alloc=0 __arr_len=1 __arr_get=2 __arr_set=3 __arr_new=4
@@ -75,8 +91,8 @@ function promoteToF64(c) {
   return { bytes: [...c.bytes, 0xB7], type: F64 }; // f64.convert_i32_s
 }
 
-function compileExpr(expr, params, pTypes, locals, fns, bofs) {
-  const CE = e => compileExpr(e, params, pTypes, locals, fns, bofs);
+function compileExpr(expr, params, pTypes, locals, fns, bofs, mathOfs) {
+  const CE = e => compileExpr(e, params, pTypes, locals, fns, bofs, mathOfs);
 
   if (typeof expr === 'number') {
     if (Number.isInteger(expr) && expr >= -2147483648 && expr <= 2147483647)
@@ -221,7 +237,9 @@ function compileExpr(expr, params, pTypes, locals, fns, bofs) {
   }
   if (op === 'sqrt')  return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9F], type: F64 };
   if (op === 'floor') return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9C], type: F64 };
-  if (op === 'ceil')  return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9D], type: F64 };
+  if (op === 'ceil')  return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9B], type: F64 };
+  if (op === 'trunc') return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9D], type: F64 };
+  if (op === 'round') return { bytes: [...promoteToF64(CE(args[0])).bytes, 0x9E], type: F64 };
   if (op === 'min')   return CE(['if',['<=',args[0],args[1]],args[0],args[1]]);
   if (op === 'max')   return CE(['if',['>=',args[0],args[1]],args[0],args[1]]);
   if (op === 'to-int') {
@@ -230,17 +248,25 @@ function compileExpr(expr, params, pTypes, locals, fns, bofs) {
   }
   if (op === 'to-f64') return promoteToF64(CE(args[0]));
 
+  // ── Math import 함수 (W-4: useMath 시 사용 가능) ────────────────────────────
+  if (MATH_FN_NAMES.includes(op)) {
+    const idx = MATH_FN_NAMES.indexOf(op);
+    if (mathOfs === 0) throw new Error(`Math op '${op}' requires useMath:true`);
+    const cArgs = args.map(a => promoteToF64(CE(a)));
+    return { bytes: [...cArgs.flatMap(c => c.bytes), 0x10, ...uleb128(idx)], type: F64 };
+  }
+
   throw new Error(`Unknown op: ${op}`);
 }
 
 // ── 함수 컴파일 ───────────────────────────────────────────────────────────────
 
-function compileFn(fn, allFns, bofs) {
+function compileFn(fn, allFns, bofs, mathOfs) {
   const params = fn.params || [];
   const pTypes = fn.paramTypes || [];
   const locals = [];
 
-  const bodyC = compileExpr(fn.body, params, pTypes, locals, allFns, bofs);
+  const bodyC = compileExpr(fn.body, params, pTypes, locals, allFns, bofs, mathOfs || 0);
 
   // 선언 리턴 타입과 실제 타입 맞춤
   let retType = fn.returnType === 'f64' ? F64 : I32;
@@ -268,24 +294,44 @@ function compileFn(fn, allFns, bofs) {
 function buildModule(ast) {
   const fns = ast.fns || [];
   const mem = !!ast.memory;
-  const bofs = mem ? BUILTIN_COUNT : 0;
+  const useMath = !!ast.math;
+
+  // math + memory 동시 사용은 W-4에서 미지원
+  if (mem && useMath) throw new Error('memory + math 동시 사용은 미지원 (W-5에서 추가 예정)');
+
+  const mathOfs = useMath ? MATH_IMPORTS_DEF.length : 0;
+  const bofs    = mem ? BUILTIN_COUNT : 0;
+  const fnOfs   = mathOfs + bofs; // 사용자 함수 인덱스 시작점
 
   const magic = [0x00,0x61,0x73,0x6D,0x01,0x00,0x00,0x00];
+  const compiled = fns.map(f => compileFn(f, fns, fnOfs, mathOfs));
 
-  const compiled = fns.map(f => compileFn(f, fns, bofs));
+  let types, importSec, fnIdx, codes, exps;
 
-  let types, fnIdx, codes, exps;
-
-  if (mem) {
+  if (useMath) {
+    // math import 타입들 먼저, 그 다음 사용자 함수 타입들
+    const mathTypes = MATH_IMPORTS_DEF.map(m => m.type);
+    types = [...mathTypes, ...compiled.map(f => f.typeEntry)];
+    // import 섹션 생성
+    const impEntries = MATH_IMPORTS_DEF.map((m, i) =>
+      [...encStr(m.module), ...encStr(m.field), 0x00, ...uleb128(i)]
+    );
+    importSec = section(0x02, [...uleb128(impEntries.length), ...impEntries.flat()]);
+    // 함수 섹션: 사용자 함수만 (import는 이미 등록됨)
+    fnIdx = compiled.map((_, i) => i + mathTypes.length);
+    codes = compiled.map(f => f.codeEntry);
+    exps  = compiled.map((f, i) => [...encStr(f.name), 0x00, ...uleb128(i + mathOfs)]);
+  } else if (mem) {
+    importSec = [];
     types = [...BUILTIN_TYPES, ...compiled.map(f => f.typeEntry)];
     fnIdx = [...BUILTIN_TYPES.map((_,i)=>i), ...compiled.map((_,i)=>i+BUILTIN_COUNT)];
     codes = [...BUILTIN_CODE.map(b=>[...uleb128(b.length),...b]), ...compiled.map(f=>f.codeEntry)];
-    // 함수 exports + memory export
     exps  = [
       ...compiled.map((f,i)=>[...encStr(f.name), 0x00, ...uleb128(i+BUILTIN_COUNT)]),
-      [...encStr("memory"), 0x02, 0x00]  // memory export (kind=2, idx=0)
+      [...encStr("memory"), 0x02, 0x00]
     ];
   } else {
+    importSec = [];
     types = compiled.map(f => f.typeEntry);
     fnIdx = compiled.map((_,i)=>[i]);
     codes = compiled.map(f => f.codeEntry);
@@ -297,10 +343,9 @@ function buildModule(ast) {
   const memSec    = mem ? section(0x05,[0x01,0x00,0x01]) : [];
   const exportSec = section(0x07, [...uleb128(exps.length), ...exps.flat()]);
   const codeSec   = section(0x0A, [...uleb128(codes.length), ...codes.flat()]);
-  // data 섹션(0x0B)은 반드시 code 섹션(0x0A) 이후에 위치해야 함
   const dataSec   = mem ? section(0x0B,[0x01, 0x00, 0x41,0x00,0x0B, 0x04,...i32le(0x1000)]) : [];
 
-  return Buffer.from([...magic,...typeSec,...fnSec,...memSec,...exportSec,...codeSec,...dataSec]);
+  return Buffer.from([...magic,...typeSec,...importSec,...fnSec,...memSec,...exportSec,...codeSec,...dataSec]);
 }
 
 // ── AST 변수 치환 (arr-reduce/arr-map 생성용) ──────────────────────────────────
@@ -334,22 +379,29 @@ try {
   const fs = require('fs');
   const ast = JSON.parse(fs.readFileSync(astFile,'utf8'));
 
+  function makeInstance(b, useMath) {
+    const mod = new WebAssembly.Module(b);
+    return useMath
+      ? new WebAssembly.Instance(mod, { math: MATH_OBJ })
+      : new WebAssembly.Instance(mod);
+  }
+
   if (mode === 'compile') {
     const b = buildModule(ast);
     out({ ok:true, wasm:b.toString('base64'), size:b.length });
 
   } else if (mode === 'run') {
     const b = buildModule(ast);
-    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const inst = makeInstance(b, !!ast.math);
     const fn = inst.exports[rest[0]];
     if (!fn) throw new Error(`No export: ${rest[0]}`);
     out({ ok:true, value: fn(...rest.slice(1).map(Number)) });
 
   } else if (mode === 'eval') {
-    const { expr, params, paramTypes, args, memory } = ast;
-    const w = { name:'__eval__', params:params||[], paramTypes, body:expr };
-    const b = buildModule({ fns:[w], memory });
-    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const { expr, params, paramTypes, returnType, args, memory, math } = ast;
+    const w = { name:'__eval__', params:params||[], paramTypes, returnType, body:expr };
+    const b = buildModule({ fns:[w], memory, math });
+    const inst = makeInstance(b, !!math);
     out({ ok:true, value: inst.exports.__eval__(...(args||[]).map(Number)) });
 
   } else if (mode === 'arr-reduce') {
@@ -498,10 +550,79 @@ try {
     out({ ok: true, value: readArr(mem32, outPtr) });
 
   } else if (mode === 'compile-fn') {
-    // {fns: [{name, params, body, returnType?}], memory?}
-    // 여러 함수를 하나의 모듈로 컴파일 → base64 WASM
     const b = buildModule(ast);
     out({ ok: true, wasm: b.toString('base64'), size: b.length, fns: ast.fns.map(f=>f.name) });
+
+  // ── W-4: f64 배열 연산 (JS-side Float64Array) ─────────────────────────────
+
+  } else if (mode === 'arr-reduce-f64') {
+    // {input_array, init, expr, math?}
+    // expr uses "acc", "x" (f64)
+    const { input_array, init = 0.0, expr, math } = ast;
+    const bodyExpr = substVar(expr, 'x', 'x_val');
+    const fn = {
+      name: '__reduce_f64__',
+      params: ['acc', 'x_val'],
+      paramTypes: ['f64', 'f64'],
+      returnType: 'f64',
+      body: substVar(substVar(bodyExpr, 'acc', 'acc'), 'x_val', 'x_val')
+    };
+    const b = buildModule({ fns:[fn], math });
+    const inst = makeInstance(b, !!math);
+    const step = inst.exports.__reduce_f64__;
+    let acc = init;
+    for (const x of input_array) acc = step(acc, x);
+    out({ ok: true, value: acc });
+
+  } else if (mode === 'arr-map-f64') {
+    // {input_array, expr, math?}
+    // expr uses "x" (f64) → f64
+    const { input_array, expr, math } = ast;
+    const fn = {
+      name: '__map_f64__',
+      params: ['x'],
+      paramTypes: ['f64'],
+      returnType: 'f64',
+      body: expr
+    };
+    const b = buildModule({ fns:[fn], math });
+    const inst = makeInstance(b, !!math);
+    const step = inst.exports.__map_f64__;
+    out({ ok: true, value: input_array.map(x => step(x)) });
+
+  } else if (mode === 'arr-zip-map-f64') {
+    // {arr_a, arr_b, expr, math?}
+    // expr uses "a", "b" (f64) → f64
+    const { arr_a, arr_b, expr, math } = ast;
+    const fn = {
+      name: '__zipmap_f64__',
+      params: ['a', 'b'],
+      paramTypes: ['f64', 'f64'],
+      returnType: 'f64',
+      body: expr
+    };
+    const b = buildModule({ fns:[fn], math });
+    const inst = makeInstance(b, !!math);
+    const step = inst.exports.__zipmap_f64__;
+    out({ ok: true, value: arr_a.map((a, i) => step(a, arr_b[i])) });
+
+  } else if (mode === 'arr-scan-f64') {
+    // {input_array, init, expr, math?}
+    const { input_array, init = 0.0, expr, math } = ast;
+    const fn = {
+      name: '__scan_f64__',
+      params: ['acc', 'x'],
+      paramTypes: ['f64', 'f64'],
+      returnType: 'f64',
+      body: expr
+    };
+    const b = buildModule({ fns:[fn], math });
+    const inst = makeInstance(b, !!math);
+    const step = inst.exports.__scan_f64__;
+    let acc = init;
+    const result = [];
+    for (const x of input_array) { acc = step(acc, x); result.push(acc); }
+    out({ ok: true, value: result });
   }
 } catch(e) {
   out({ ok:false, error:e.message });

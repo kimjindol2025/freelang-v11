@@ -58,7 +58,12 @@
   {"name" name "params" params "body" body})
 
 (defn wasm-fn-f64 [name params body]
-  {"name" name "params" params "body" body "returnType" "f64"})
+  {"name" name "params" params "body" body "returnType" "f64"
+   "paramTypes" (map (fn [_] "f64") params)})
+
+(defn wasm-fn-typed [name params param-types body return-type]
+  {"name" name "params" params "paramTypes" param-types
+   "body" body "returnType" return-type})
 
 (defn wasm-module [fns]
   (let [r (-wasm-exec "compile" {"fns" fns})]
@@ -71,12 +76,15 @@
     (throw (str "WASM 모듈 오류: " (get module :error))))
   (let [tmp  (-wasm-tmp)
         wasm (get module :wasm)
+        use-math (= (get module :math) true)
         _    (file-write tmp (json-stringify {"wasm" wasm}))
+        inst-code (if use-math
+          "const MATH={sin:Math.sin,cos:Math.cos,tan:Math.tan,exp:Math.exp,log:Math.log,pow:Math.pow,atan:Math.atan,atan2:Math.atan2};const i=new WebAssembly.Instance(m,{math:MATH});"
+          "const i=new WebAssembly.Instance(m);")
         cmd  (str "node -e \""
-               "const fs=require('fs');"
                "const b=Buffer.from('" wasm "','base64');"
                "const m=new WebAssembly.Module(b);"
-               "const i=new WebAssembly.Instance(m);"
+               inst-code
                "const f=i.exports['" fn-name "'];"
                "const args=" (json-stringify args) ";"
                "process.stdout.write(JSON.stringify({ok:true,value:f(...args)}));"
@@ -280,3 +288,135 @@
      :fl-ms    (- fe fs)
      :speedup  (if (> (- we ws) 0) (/ (- fe fs) (- we ws)) nil)
      :runs     n-runs}))
+
+;; ── W-4: f64 / 수학 함수 ──────────────────────────────────────────────────────
+;;
+;; (wasm-eval-f64 expr params args)
+;;   f64 타입 eval — 파라미터와 반환값 모두 f64
+;;
+;; (wasm-eval-math expr params args)
+;;   수학 함수(sin/cos/tan/exp/log/pow/atan/atan2) 포함 eval
+;;
+;; (wasm-defn-f64 fn-name params body)
+;;   f64 파라미터 + f64 반환 WASM 클로저
+;;
+;; (wasm-arr-reduce-f64 arr init expr)
+;;   f64 배열 reduce — "acc", "x" 사용
+;;
+;; (wasm-arr-map-f64 arr expr)
+;;   f64 배열 map — "x" 사용
+;;
+;; (wasm-arr-zip-map-f64 arr-a arr-b expr)
+;;   두 f64 배열 합산 변환 — "a", "b" 사용
+;;
+;; (wasm-arr-scan-f64 arr init expr)
+;;   f64 running total 배열
+;;
+;; 편의 함수:
+;;   (wasm-arr-sum-f64 arr)
+;;   (wasm-arr-dot-f64 a b)
+;;   (wasm-arr-scale-f64 arr k)
+;;   (wasm-arr-stats arr) → {:sum :mean :max :min}
+
+(defn wasm-eval-f64 [expr params args]
+  (let [param-types (map (fn [_] "f64") params)
+        r (-wasm-exec "eval" {"expr" expr "params" params
+                              "paramTypes" param-types "returnType" "f64" "args" args})]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM eval-f64 오류: " (get r "error"))))))
+
+(defn wasm-eval-math [expr params args]
+  (let [param-types (map (fn [_] "f64") params)
+        r (-wasm-exec "eval" {"expr" expr "params" params
+                              "paramTypes" param-types "returnType" "f64" "args" args "math" true})]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM eval-math 오류: " (get r "error"))))))
+
+(defn wasm-defn-f64 [fn-name params body]
+  (let [m (wasm-module [(wasm-fn-f64 fn-name params body)])
+        n (length params)]
+    (cond
+      (= n 0) (fn [] (wasm-run! m fn-name []))
+      (= n 1) (fn [a] (wasm-run! m fn-name [a]))
+      (= n 2) (fn [a b] (wasm-run! m fn-name [a b]))
+      (= n 3) (fn [a b c] (wasm-run! m fn-name [a b c]))
+      (= n 4) (fn [a b c d] (wasm-run! m fn-name [a b c d]))
+      (= n 5) (fn [a b c d e] (wasm-run! m fn-name [a b c d e]))
+      true (throw "wasm-defn-f64: 파라미터 최대 5개"))))
+
+(defn -wasm-math-module [fns]
+  (let [r (-wasm-exec "compile" {"fns" fns "math" true})]
+    (if (get r "ok")
+      {:ok true :wasm (get r "wasm") :size (get r "size") :math true}
+      {:ok false :error (get r "error")})))
+
+(defn wasm-defn-math [fn-name params body]
+  (let [fn-def (wasm-fn-f64 fn-name params body)
+        m (-wasm-math-module [fn-def])
+        n (length params)]
+    (when (not (get m :ok))
+      (throw (str "WASM math 컴파일 오류: " (get m :error))))
+    (cond
+      (= n 0) (fn [] (wasm-run! m fn-name []))
+      (= n 1) (fn [a] (wasm-run! m fn-name [a]))
+      (= n 2) (fn [a b] (wasm-run! m fn-name [a b]))
+      (= n 3) (fn [a b c] (wasm-run! m fn-name [a b c]))
+      (= n 4) (fn [a b c d] (wasm-run! m fn-name [a b c d]))
+      (= n 5) (fn [a b c d e] (wasm-run! m fn-name [a b c d e]))
+      true (throw "wasm-defn-math: 파라미터 최대 5개"))))
+
+;; ── f64 배열 연산 ─────────────────────────────────────────────────────────────
+
+(defn wasm-arr-reduce-f64 [fl-arr init expr]
+  (let [r (-wasm-exec "arr-reduce-f64" {
+    "input_array" fl-arr "init" init "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-reduce-f64 오류: " (get r "error"))))))
+
+(defn wasm-arr-map-f64 [fl-arr expr]
+  (let [r (-wasm-exec "arr-map-f64" {
+    "input_array" fl-arr "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-map-f64 오류: " (get r "error"))))))
+
+(defn wasm-arr-zip-map-f64 [arr-a arr-b expr]
+  (let [r (-wasm-exec "arr-zip-map-f64" {
+    "arr_a" arr-a "arr_b" arr-b "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-zip-map-f64 오류: " (get r "error"))))))
+
+(defn wasm-arr-scan-f64 [fl-arr init expr]
+  (let [r (-wasm-exec "arr-scan-f64" {
+    "input_array" fl-arr "init" init "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-scan-f64 오류: " (get r "error"))))))
+
+;; ── f64 편의 함수 ─────────────────────────────────────────────────────────────
+
+(defn wasm-arr-sum-f64 [arr]
+  (wasm-arr-reduce-f64 arr 0.0 ["+" "acc" "x"]))
+
+(defn wasm-arr-dot-f64 [arr-a arr-b]
+  (wasm-arr-reduce-f64
+    (wasm-arr-zip-map-f64 arr-a arr-b ["*" "a" "b"])
+    0.0 ["+" "acc" "x"]))
+
+(defn wasm-arr-scale-f64 [arr k]
+  (wasm-arr-map-f64 arr ["*" "x" k]))
+
+(defn wasm-arr-stats [arr]
+  (let [n (length arr)
+        s (wasm-arr-sum-f64 arr)
+        mx (wasm-arr-reduce-f64 arr (first arr) ["if" [">" "x" "acc"] "x" "acc"])
+        mn (wasm-arr-reduce-f64 arr (first arr) ["if" ["<" "x" "acc"] "x" "acc"])]
+    {:sum s :mean (/ s n) :max mx :min mn :count n}))
