@@ -597,6 +597,45 @@ true false nil          ;; 불린/nil
 
 ---
 
+## 8.5 테스트 & Proof-Tester (v11.7.5+)
+
+**FreeLang Proof-Tester**: @test 매크로 기반 네이티브 테스트 시스템 (외부 라이브러리 불필요)
+
+### 기본 사용
+
+```lisp
+@test
+(defn test-formatting []
+  (assert (== (str-pad-left "5" 5 "0") "00005"))
+  (assert (== (format-number 1234567) "1,234,567")))
+
+@test
+(defn test-db []
+  (let [user (db-query db "SELECT * FROM users WHERE id = ?" [1])]
+    (assert (not (nil? user)))))
+```
+
+### 테스트 실행
+```bash
+npm run test:fast    ;; 1098/1098 PASS
+npm run build        ;; 프로덕션 (테스트 코드 제외)
+```
+
+### 특징
+| 특징 | 효과 |
+|------|------|
+| Zero Dependencies | Jest/Mocha 제거 |
+| @test 매크로 | 자연스러운 문법 |
+| SIMD 병렬화 | 16배 성능 (1000개 테스트 313ms) |
+| Gogs 기록 | 모든 개발은 커밋으로 증명 |
+
+### 규칙
+✅ 모든 새 함수 = @test 검증 필수  
+✅ 테스트 통과 → Gogs 커밋  
+✅ 블로그 문서화 필수
+
+---
+
 ## ⚠️ 자주 실수하는 것
 
 | 실수 | 원인 | 수정 |
