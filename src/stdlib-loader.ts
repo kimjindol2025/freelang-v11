@@ -553,52 +553,6 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "parse-float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
     "parse_float":   (v: any) => { const n = parseFloat(v); return isNaN(n) ? null : n; },
     "number?":       (v: any) => typeof v === "number" && !isNaN(v),
-    // ── 레벨별 로깅 (console 출력) ──────────────────────────────────
-    // stdlib-time.ts의 Logger 패턴(log_info logger msg)과 공존:
-    // 첫 번째 인자가 Logger 객체(.entries 배열)이면 시간 기반 Logger 패턴으로 위임,
-    // 아니면 단순 console 출력
-    "log-info": (...args: any[]): any => {
-      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
-        const logger = args[0]; const msg = String(args[1]);
-        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
-      }
-      console.log(`[INFO]  ${args.map(String).join(" ")}`); return null;
-    },
-    "log_info": (...args: any[]): any => {
-      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
-        const logger = args[0]; const msg = String(args[1]);
-        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
-      }
-      console.log(`[INFO]  ${args.map(String).join(" ")}`); return null;
-    },
-    "log-warn": (...args: any[]): any => {
-      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
-        const logger = args[0]; const msg = String(args[1]);
-        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
-      }
-      console.warn(`[WARN]  ${args.map(String).join(" ")}`); return null;
-    },
-    "log_warn": (...args: any[]): any => {
-      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
-        const logger = args[0]; const msg = String(args[1]);
-        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
-      }
-      console.warn(`[WARN]  ${args.map(String).join(" ")}`); return null;
-    },
-    "log-error": (...args: any[]): any => {
-      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
-        const logger = args[0]; const msg = String(args[1]);
-        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "error", msg }] };
-      }
-      console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
-    },
-    "log_error": (...args: any[]): any => {
-      if (args.length === 2 && args[0] && Array.isArray(args[0].entries)) {
-        const logger = args[0]; const msg = String(args[1]);
-        return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "error", msg }] };
-      }
-      console.error(`[ERROR] ${args.map(String).join(" ")}`); return null;
-    },
     // ── validate ────────────────────────────────────────────────────
     // (validate body schema) → null(성공) or ["field: msg", ...]
     // schema: Map or plain object. values: :required :number :string :boolean :email :min-N :max-N

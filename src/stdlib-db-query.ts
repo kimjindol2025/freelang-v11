@@ -190,17 +190,28 @@ export function createDbQueryModule() {
     },
 
     // db_transaction path queries -> [결과1, 결과2, ...]
-    // queries: [{op, ...}, ...]  — 실패 시 전체 롤백
+    // queries: [{sql, params, op}]  — 실패 시 전체 롤백
+    // op: "select" → rows[], 그 외 → {changes, last_id}
     "db_transaction": (dbPath: string, queries: any[]): any[] => {
+      if (!Array.isArray(queries) || queries.length === 0) return [];
       const db = getDb(dbPath);
       const results: any[] = [];
 
       try {
         db.exec("BEGIN");
         for (const q of queries) {
-          const qMap = q instanceof Map ? q : new Map(Object.entries(q));
-          const op = qMap.get("op") ?? "select";
-          results.push({ op, done: true });
+          const qMap = q instanceof Map ? q : new Map(Object.entries(q ?? {}));
+          const sql = String(qMap.get("sql") ?? "");
+          if (!sql) throw new Error("db_transaction: 'sql' 필드 필요");
+          const params: any[] = Array.isArray(qMap.get("params")) ? qMap.get("params") : [];
+          const op = String(qMap.get("op") ?? "exec");
+          const stmt = db.prepare(sql);
+          if (op === "select") {
+            results.push((stmt.all(...params) as any[]).map(rowToMap));
+          } else {
+            const info = stmt.run(...params);
+            results.push({ changes: info.changes, last_id: Number(info.lastInsertRowid) });
+          }
         }
         db.exec("COMMIT");
       } catch(e: any) {

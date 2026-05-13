@@ -32,14 +32,12 @@ function nodeHttpRequest(url: string, method: string = "GET", headers?: any, bod
   }
 }
 
-// 하위 호환 alias
-const curlGetStatusAndBody = nodeHttpRequest;
 
 export function createHttpModule() {
   return {
     // http_get url -> {:status 200 :body "..."}
     "http_get": (url: string): any => {
-      const result = curlGetStatusAndBody(url, "GET");
+      const result = nodeHttpRequest(url, "GET");
       return {
         status: result.status,
         body: result.body,
@@ -56,7 +54,7 @@ export function createHttpModule() {
         console.warn(`⚠️  [FreeLang] ${hint}`);
         body = JSON.stringify(body);
       }
-      const result = curlGetStatusAndBody(url, "POST",
+      const result = nodeHttpRequest(url, "POST",
         { "Content-Type": "application/json" }, body);
       return {
         status: result.status,
@@ -67,7 +65,7 @@ export function createHttpModule() {
 
     // http_post_form url body -> {:status 200 :body "..."}
     "http_post_form": (url: string, body: string): any => {
-      const result = curlGetStatusAndBody(url, "POST",
+      const result = nodeHttpRequest(url, "POST",
         { "Content-Type": "application/x-www-form-urlencoded" }, body);
       return {
         status: result.status,
@@ -78,7 +76,7 @@ export function createHttpModule() {
 
     // http_get_bearer url token -> {:status 200 :body "..."}
     "http_get_bearer": (url: string, token: string): any => {
-      const result = curlGetStatusAndBody(url, "GET",
+      const result = nodeHttpRequest(url, "GET",
         { "Authorization": `Bearer ${token}` });
       return {
         status: result.status,
@@ -89,7 +87,7 @@ export function createHttpModule() {
 
     // http_put url body -> {:status 200 :body "..."}
     "http_put": (url: string, body: string): any => {
-      const result = curlGetStatusAndBody(url, "PUT",
+      const result = nodeHttpRequest(url, "PUT",
         { "Content-Type": "application/json" }, body);
       return {
         status: result.status,
@@ -100,7 +98,7 @@ export function createHttpModule() {
 
     // http_patch url body -> {:status 200 :body "..."}
     "http_patch": (url: string, body: string): any => {
-      const result = curlGetStatusAndBody(url, "PATCH",
+      const result = nodeHttpRequest(url, "PATCH",
         { "Content-Type": "application/json" }, body);
       return {
         status: result.status,
@@ -111,7 +109,7 @@ export function createHttpModule() {
 
     // http_delete url -> {:status 200 :body "..."}
     "http_delete": (url: string): any => {
-      const result = curlGetStatusAndBody(url, "DELETE");
+      const result = nodeHttpRequest(url, "DELETE");
       return {
         status: result.status,
         body: result.body,
@@ -121,7 +119,7 @@ export function createHttpModule() {
 
     // http_head url -> {:status 200 :body ""}
     "http_head": (url: string): any => {
-      const result = curlGetStatusAndBody(url, "HEAD");
+      const result = nodeHttpRequest(url, "HEAD");
       return {
         status: result.status,
         body: "",
@@ -131,7 +129,7 @@ export function createHttpModule() {
 
     // http_get_key url api-key -> {:status 200 :body "..."}
     "http_get_key": (url: string, apiKey: string): any => {
-      const result = curlGetStatusAndBody(url, "GET", { "X-API-Key": apiKey });
+      const result = nodeHttpRequest(url, "GET", { "X-API-Key": apiKey });
       return {
         status: result.status,
         body: result.body,
@@ -141,7 +139,7 @@ export function createHttpModule() {
 
     // http_post_key url body api-key -> {:status 200 :body "..."}
     "http_post_key": (url: string, body: string, apiKey: string): any => {
-      const result = curlGetStatusAndBody(url, "POST",
+      const result = nodeHttpRequest(url, "POST",
         { "Content-Type": "application/json", "X-API-Key": apiKey }, body);
       return {
         status: result.status,
@@ -152,13 +150,13 @@ export function createHttpModule() {
 
     // http_status url -> number (상태코드만)
     "http_status": (url: string): number => {
-      const result = curlGetStatusAndBody(url, "GET");
+      const result = nodeHttpRequest(url, "GET");
       return result.status;
     },
 
     // http_json url -> {:status 200 :data {...} :error nil}
     "http_json": (url: string): any => {
-      const result = curlGetStatusAndBody(url, "GET");
+      const result = nodeHttpRequest(url, "GET");
       if (result.error) {
         return { status: 0, data: null, error: result.error };
       }
@@ -169,26 +167,17 @@ export function createHttpModule() {
       }
     },
 
-    // http_header url header -> string (특정 헤더만)
-    "http_header": (url: string, header: string): string => {
-      try {
-        const result = nodeHttpRequest(url, "HEAD");
-        return result.error ? "" : "";
-      } catch (err) {
-        return "";
-      }
-    },
-
     // http_with_timeout url timeout -> {:status 200 :body "..."}
     "http_with_timeout": (url: string, timeout: number): any => {
-      const result = nodeHttpRequest(url, "GET");
-      return { status: result.status, body: result.body };
+      const ms = typeof timeout === "number" && timeout > 0 ? timeout : 10000;
+      const result = nodeHttpRequest(url, "GET", undefined, undefined, ms);
+      return { status: result.status, body: result.body, ...(result.error && { error: result.error }) };
     },
 
     // http_post_json url data -> {:status 200 :data {...}}
     "http_post_json": (url: string, data: any): any => {
       const body = JSON.stringify(data);
-      const result = curlGetStatusAndBody(url, "POST",
+      const result = nodeHttpRequest(url, "POST",
         { "Content-Type": "application/json" }, body);
       try {
         return {
@@ -204,7 +193,7 @@ export function createHttpModule() {
     // http_put_json url data -> {:status 200 :data {...}}
     "http_put_json": (url: string, data: any): any => {
       const body = JSON.stringify(data);
-      const result = curlGetStatusAndBody(url, "PUT",
+      const result = nodeHttpRequest(url, "PUT",
         { "Content-Type": "application/json" }, body);
       try {
         return {
@@ -219,7 +208,7 @@ export function createHttpModule() {
 
     // http_request method url headers body -> {:status 200 :body "..."}
     "http_request": (method: string, url: string, headers: any, body: string): any => {
-      const result = curlGetStatusAndBody(url, method, headers, body);
+      const result = nodeHttpRequest(url, method, headers, body);
       return {
         status: result.status,
         body: result.body,
@@ -241,13 +230,13 @@ export function createHttpModule() {
 
     // http_req_status method url headers body -> number
     "http_req_status": (method: string, url: string, headers: any, body: string): number => {
-      const result = curlGetStatusAndBody(url, method, headers, body);
+      const result = nodeHttpRequest(url, method, headers, body);
       return result.status;
     },
 
     // http_get_json url headers -> {:status 200 :data {...}}
     "http_get_json": (url: string, headers?: any): any => {
-      const result = curlGetStatusAndBody(url, "GET", headers);
+      const result = nodeHttpRequest(url, "GET", headers);
       try {
         return {
           status: result.status,
@@ -261,7 +250,7 @@ export function createHttpModule() {
 
     // http_get_json_bearer url token -> {:status 200 :data {...}}
     "http_get_json_bearer": (url: string, token: string): any => {
-      const result = curlGetStatusAndBody(url, "GET",
+      const result = nodeHttpRequest(url, "GET",
         { "Authorization": `Bearer ${token}` });
       try {
         return {
@@ -276,7 +265,7 @@ export function createHttpModule() {
 
     // http_post_bearer url body token -> {:status 200 :body "..."}
     "http_post_bearer": (url: string, body: string, token: string): any =>
-      curlGetStatusAndBody(url, "POST",
+      nodeHttpRequest(url, "POST",
         { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }, body),
 
     // http_parallel requests -> [{:status N :body "..."}]
@@ -306,7 +295,7 @@ export function createHttpModule() {
       let lastResult: any = { status: 0, body: "" };
       for (let i = 0; i <= maxRetries; i++) {
         try {
-          const result = curlGetStatusAndBody(url, "GET", { "Authorization": `Bearer ${token}` });
+          const result = nodeHttpRequest(url, "GET", { "Authorization": `Bearer ${token}` });
           lastResult = result;
           if (result.status >= 200 && result.status < 500) return result;
           // 5xx → retry
@@ -328,7 +317,7 @@ export function createHttpModule() {
       let lastResult: any = { status: 0, body: "" };
       for (let i = 0; i <= maxRetries; i++) {
         try {
-          const result = curlGetStatusAndBody(url, "POST",
+          const result = nodeHttpRequest(url, "POST",
             { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }, body);
           lastResult = result;
           if (result.status >= 200 && result.status < 500) return result;

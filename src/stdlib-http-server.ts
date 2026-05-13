@@ -16,8 +16,6 @@ export const __activeServer: { server: http.Server | null } = { server: null };
 
 // WebSocket (Node.js v25 native via stdlib-ws.ts)
 // RFC 6455 핸드셰이크는 아래 server.on('upgrade') 에서 처리
-const WS_OPEN = 1;
-const WS_CLOSING = 2;
 
 type CallFn = (name: string, args: any[]) => any;
 type CallFunctionValue = (fnValue: any, args: any[]) => any;
