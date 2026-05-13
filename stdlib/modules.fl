@@ -1,0 +1,142 @@
+;; Module System — 의존성 관리 + 순환 참조 감지
+;; (load "stdlib/modules.fl")
+;; (module-import "routes/api" {:as "api"})
+
+(define *modules* {})
+(define *module-graph* {})
+(define *loading-stack* [])
+
+;; 모듈 등록
+(defn module-register [name exports]
+  "모듈 등록 및 의존성 추적
+   (module-register \"routes/api\" {:handler handler})"
+  (do
+    (assoc *modules* name {:exports exports :loaded-at (now-ms)})
+    (println (str "✅ Registered module: " name))))
+
+;; 모듈 임포트 (의존성 추적)
+(defn module-import [name opts]
+  "모듈 임포트 + 순환 참조 감지
+   (module-import \"routes/api\" {:as \"api\"})"
+  (let [alias (get opts :as name)]
+    (try
+      (do
+        ;; 순환 참조 검사
+        (if (includes-item *loading-stack* name)
+          (throw {
+            :type "CircularDependencyError"
+            :message (str "Circular import detected: " name)
+            :stack *loading-stack*
+          }))
+
+        ;; 로딩 스택에 추가
+        (swap! *loading-stack* append name)
+
+        ;; 모듈 로드
+        (let [module (load (str "src/" name ".fl"))]
+          ;; 의존성 그래프 기록
+          (assoc *module-graph* name {
+            :dependencies (get module :__deps__ [])
+            :loaded-at (now-ms)
+          })
+
+          ;; 스택에서 제거
+          (swap! *loading-stack* pop)
+
+          ;; 별칭으로 바인딩
+          (assoc module name module))))
+
+      (catch e
+        ;; 스택에서 제거
+        (swap! *loading-stack* pop)
+
+        ;; 에러 정보 추가
+        (assoc e
+          :module name
+          :loading-stack *loading-stack*)
+
+        (throw e)))))
+
+;; 모듈 그래프 조회 (순환 참조 검사)
+(defn check-circular-dependencies []
+  "순환 참조 검사
+   (check-circular-dependencies)"
+  (let [visited {}
+        errors []]
+
+    ;; DFS로 순환 참조 검사
+    (defn dfs [node visited-set]
+      (if (has-key? visited-set node)
+        ;; 순환 참조 발견
+        (do
+          (swap! errors append {
+            :type "Circular"
+            :module node
+            :path visited-set
+          })
+          false)
+
+        ;; 이웃 모듈 탐색
+        (let [deps (get (get *module-graph* node {}) :dependencies [])]
+          (for [dep deps]
+            (if (not (dfs dep (conj visited-set dep)))
+              (return false))))
+        true))
+
+    ;; 모든 모듈 검사
+    (for [module (keys *module-graph*)]
+      (dfs module [module]))
+
+    ;; 결과 반환
+    (if (empty? errors)
+      {:ok true}
+      {:ok false :errors errors})))
+
+;; 모듈 정보 조회
+(defn module-info [module-name]
+  "모듈 정보 조회"
+  (let [mod (get *modules* module-name)
+        graph (get *module-graph* module-name)]
+    {:name module-name
+     :exports (get mod :exports {})
+     :dependencies (get graph :dependencies [])
+     :loaded-at (get mod :loaded-at)
+     :size (count (get mod :exports {}))}))
+
+;; 모든 모듈 목록
+(defn module-list []
+  "로드된 모든 모듈 목록"
+  (map module-info (keys *modules*)))
+
+;; 모듈 의존성 트리 출력
+(defn module-tree [module-name indent]
+  "모듈 의존성 트리 출력
+   (module-tree \"app\" 0)"
+  (let [graph (get *module-graph* module-name)
+        deps (get graph :dependencies [])]
+
+    (println (str (repeat indent "  ") "├─ " module-name))
+
+    (for [dep deps]
+      (module-tree dep (+ indent 1)))))
+
+;; 사용 예시:
+;; (load "stdlib/modules.fl")
+;;
+;; ;; 모듈 정의
+;; (define routes {
+;;   :handler (fn [req] ...)
+;;   :__deps__ ["std/db" "std/auth"]
+;; })
+;; (module-register "routes/api" routes)
+;;
+;; ;; 모듈 임포트
+;; (module-import "routes/api" {:as "api"})
+;;
+;; ;; 순환 참조 검사
+;; (check-circular-dependencies)
+;; ;; → {:ok true} 또는 {:ok false :errors [...]}
+;;
+;; ;; 모듈 트리 출력
+;; (module-tree "app" 0)
+;; ;; → 의존성 구조 시각화

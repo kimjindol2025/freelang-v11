@@ -1,0 +1,159 @@
+;; Runtime Type Checking — 함수 인자 검증
+;; (load "stdlib/type-check.fl")
+;; (defn-typed add [a:int b:int] -> int (+ a b))
+
+(define *type-specs* {})
+
+;; 타입 정의
+(defn deftype [name schema]
+  "타입 정의
+   (deftype User {:name string :age int :email string})"
+  (do
+    (assoc *type-specs* name schema)
+    (println (str "✅ Defined type: " name))))
+
+;; 타입 검증
+(defn validate-type [value expected-type]
+  "값이 예상 타입과 일치하는지 검증
+   (validate-type 42 \"int\")    → true
+   (validate-type \"hi\" \"int\") → false"
+  (let [actual-type (type-of value)]
+    (case expected-type
+      "int" (integer? value)
+      "string" (string? value)
+      "number" (number? value)
+      "boolean" (boolean? value)
+      "array" (array? value)
+      "map" (map? value)
+      "fn" (fn? value)
+      "nil" (nil? value)
+      ;; 커스텀 타입
+      (let [schema (get *type-specs* expected-type)]
+        (if (nil? schema)
+          (do
+            (println (str "⚠️  Unknown type: " expected-type))
+            false)
+          ;; 스키마 검증
+          (validate-schema value schema))))))
+
+;; 스키마 검증 (맵/객체)
+(defn validate-schema [value schema]
+  "객체가 스키마와 일치하는지 검증
+   (validate-schema user user-schema)"
+  (if (not (map? value))
+    false
+    ;; 모든 필드 검증
+    (every? (fn [key]
+      (let [expected-type (get schema key)
+            actual-value (get value key)]
+        (validate-type actual-value expected-type)))
+      (keys schema))))
+
+;; 타입 검증 + 에러 메시지
+(defn check-types [values types fn-name]
+  "함수 인자 타입 검증
+   (check-types [42 \"hello\"] [\"int\" \"string\"] \"add\")"
+  (let [errors []]
+    (for [i (range (count values))]
+      (let [value (nth values i)
+            expected-type (nth types i)
+            is-valid (validate-type value expected-type)]
+        (if (not is-valid)
+          (swap! errors append {
+            :param i
+            :expected expected-type
+            :actual (type-of value)
+            :value value
+          }))))
+
+    ;; 검증 실패 시 에러 발생
+    (if (not-empty? errors)
+      (throw {
+        :type "TypeError"
+        :function fn-name
+        :message (str "Type mismatch in " fn-name)
+        :errors errors
+      })
+      true)))
+
+;; 함수 정의 (타입 검증 포함)
+(defmacro defn-typed [name params return-type & body]
+  "타입 검증이 포함된 함수 정의
+   (defn-typed add [a:int b:int] -> int (+ a b))"
+
+  ;; 파라미터에서 이름과 타입 추출
+  (let [param-specs (map (fn [p]
+    (if (string? p)
+      ;; \"a:int\" → {:name \"a\" :type \"int\"}
+      (let [parts (str-split p \":")]
+        {:name (nth parts 0)
+         :type (if (> (count parts) 1) (nth parts 1) "any")})
+      {:name p :type "any"}))
+    params)]
+
+    ;; 함수 정의
+    `(do
+      ;; 타입 등록
+      (assoc *type-specs* (quote ~name) {
+        :params ~param-specs
+        :return ~return-type
+      })
+
+      ;; 함수 정의 (타입 체크 포함)
+      (defn ~name [& args]
+        ;; 인자 수 검증
+        (if (not= (count args) (count ~param-specs))
+          (throw {
+            :type "ArgumentError"
+            :function (quote ~name)
+            :expected (count ~param-specs)
+            :actual (count args)
+          }))
+
+        ;; 타입 검증
+        (check-types args
+          (map (fn [spec] (get spec :type)) ~param-specs)
+          (quote ~name))
+
+        ;; 함수 실행
+        (let [result (do ~@body)]
+          ;; 반환 타입 검증
+          (if (not= ~return-type "any")
+            (if (not (validate-type result ~return-type))
+              (throw {
+                :type "ReturnTypeError"
+                :function (quote ~name)
+                :expected ~return-type
+                :actual (type-of result)
+              })
+              result)
+            result))))))
+
+;; 사용 예시:
+;; (load "stdlib/type-check.fl")
+;;
+;; ;; 커스텀 타입 정의
+;; (deftype User {
+;;   :name "string"
+;;   :age "int"
+;;   :email "string"
+;; })
+;;
+;; ;; 타입 검증이 있는 함수
+;; (defn-typed add [a:int b:int] -> int
+;;   (+ a b))
+;;
+;; (add 2 3)       → 5 ✅
+;; (add "2" 3)     → TypeError ❌
+;; (add 2)         → ArgumentError ❌
+;;
+;; ;; 객체 검증
+;; (defn-typed create-user [user:User] -> map
+;;   (db-insert db "users" user)
+;;   user)
+;;
+;; (create-user {:name "John" :age 30 :email "john@example.com"})
+;; → {:name "John" ...} ✅
+;;
+;; (create-user {:name "John" :age "30"})
+;; → TypeError (age should be int) ❌

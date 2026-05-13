@@ -1,0 +1,122 @@
+;; Enhanced Error Tracing — 스택 트레이스 + 콘텍스트
+;; (load "stdlib/enhanced-errors.fl")
+;; (try ... (catch e (print-error-detailed e)))
+
+(define *call-stack* [])
+(define *error-context* {})
+
+;; 함수 호출 추적
+(defn with-trace [fn-name fn]
+  "함수를 추적 가능하게 래핑
+   (with-trace \"my-handler\" handler)"
+  (fn [& args]
+    (try
+      (do
+        ;; 스택에 추가
+        (swap! *call-stack* append {:fn fn-name :ts (now-ms)})
+
+        ;; 함수 실행
+        (let [result (apply fn args)]
+          ;; 스택에서 제거
+          (swap! *call-stack* pop)
+          result))
+
+      (catch e
+        ;; 스택에서 제거
+        (swap! *call-stack* pop)
+
+        ;; 에러에 콘텍스트 추가
+        (assoc e
+          :stack (deref *call-stack*)
+          :context *error-context*
+          :args args)
+
+        ;; 에러 재발생
+        (throw e)))))
+
+;; 에러 상세 출력
+(defn print-error-detailed [e]
+  "향상된 에러 메시지 출력"
+  (do
+    ;; 에러 타입 + 메시지
+    (println (str "❌ " (get e "type") ": " (get e "message")))
+    (println "")
+
+    ;; 스택 트레이스
+    (let [stack (get e :stack [])]
+      (if (not-empty? stack)
+        (do
+          (println "📍 Stack Trace:")
+          (for [i (range (count stack))]
+            (let [frame (nth stack i)
+                  fn-name (get frame :fn)
+                  ts (get frame :ts)]
+              (println (str "  " (repeat i "  ") "→ " fn-name " (" ts "ms)")))))))
+
+    ;; 콘텍스트 변수들
+    (let [ctx (get e :context {})]
+      (if (not-empty? ctx)
+        (do
+          (println "")
+          (println "🔍 Context:")
+          (for [key (keys ctx)]
+            (println (str "  " key " = " (get ctx key)))))))
+
+    ;; 인자들
+    (let [args (get e :args [])]
+      (if (not-empty? args)
+        (do
+          (println "")
+          (println "📥 Arguments:")
+          (for [i (range (count args))]
+            (println (str "  arg" i " = " (nth args i)))))))
+
+    ;; 원본 스택 (있으면)
+    (let [orig-stack (get e "stack")]
+      (if (not-nil? orig-stack)
+        (do
+          (println "")
+          (println "📋 Original Stack:")
+          (println orig-stack))))))
+
+;; 에러 콘텍스트 설정
+(defn set-error-context [key value]
+  "에러 발생 시 포함될 콘텍스트 설정
+   (set-error-context \"user-id\" 123)
+   (set-error-context \"request-id\" req-id)"
+  (assoc *error-context* key value))
+
+;; 에러 콘텍스트 초기화
+(defn clear-error-context []
+  "에러 콘텍스트 초기화"
+  (reset! *error-context* {}))
+
+;; 타입 안전 래퍼
+(defn with-type-check [expected-type fn]
+  "함수 인자를 타입 체크
+   (with-type-check \"string\" fn)"
+  (fn [arg]
+    (let [actual-type (type-of arg)]
+      (if (not= actual-type expected-type)
+        (throw {
+          :type "TypeError"
+          :message (str "Expected " expected-type " but got " actual-type)
+          :expected expected-type
+          :actual actual-type
+          :value arg
+        })
+        (fn arg)))))
+
+;; 사용 예시:
+;; (load "stdlib/enhanced-errors.fl")
+;;
+;; (defn handle-user [req]
+;;   (set-error-context "user-id" (get req "user-id"))
+;;   (let [user (db-query db "SELECT * FROM users WHERE id = ?"
+;;                 [(get req "user-id")])]
+;;     user))
+;;
+;; (try
+;;   (with-trace "handler" handle-user)
+;;   (catch e
+;;     (print-error-detailed e)))

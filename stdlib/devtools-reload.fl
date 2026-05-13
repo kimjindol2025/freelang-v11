@@ -1,0 +1,103 @@
+;; DevTools Hot Reload — 파일 변경 감지 + 자동 재로드
+;; (load "stdlib/devtools-reload.fl")
+;; (watch-and-reload "src" {:extensions [".fl"] :debounce 300})
+
+(define *file-watchers* {})
+(define *module-cache* {})
+
+;; 파일 감시 시작
+(defn watch-and-reload [path opts]
+  "파일 변경 감시 + 자동 재로드
+   opts: {:extensions [.fl] :debounce 300 :on-reload fn}"
+  (let [extensions (get opts :extensions [".fl"])
+        debounce (get opts :debounce 300)
+        on-reload (get opts :on-reload println)]
+
+    (println (str "👀 Watching: " path))
+
+    ;; 파일 시스템 감시 (간단한 구현)
+    (let [watch-fn (fn []
+      (loop [last-state {}]
+        (sleep 500)
+
+        ;; 현재 파일 상태 조회
+        (let [current-state (file-ls path)]
+          (if (not= last-state current-state)
+            (do
+              (println (str "📝 Changes detected in " path))
+              (on-reload)
+              (recur current-state))
+            (recur last-state)))))]
+
+      ;; 백그라운드 스레드에서 실행
+      (spawn-thread watch-fn)
+
+      ;; 등록
+      (assoc *file-watchers* path watch-fn))))
+
+;; 모듈 재로드
+(defn reload [module-path]
+  "특정 모듈 재로드
+   (reload \"routes/api.fl\")"
+  (try
+    (do
+      ;; 캐시에서 제거
+      (dissoc *module-cache* module-path)
+
+      ;; 파일 다시 로드
+      (load module-path)
+
+      ;; 라우트가 있으면 재등록
+      (if (defined? routes)
+        (do
+          (println (str "🔄 Reloaded: " module-path))
+          (route routes))))
+
+    (catch e
+      (do
+        (println (str "❌ Reload failed: " (get e "message")))
+        (stacktrace e)))))
+
+;; 모듈 캐시 조회 (성능)
+(defn get-module-cached [path]
+  "캐시된 모듈 조회, 없으면 로드"
+  (if (has-key? *module-cache* path)
+    (get *module-cache* path)
+    (do
+      (let [module (load path)]
+        (assoc *module-cache* path module)
+        module))))
+
+;; 파일 감시 중지
+(defn stop-watch [path]
+  "파일 감시 중지"
+  (do
+    (dissoc *file-watchers* path)
+    (println (str "🛑 Stopped watching: " path))))
+
+;; 모든 감시 중지
+(defn stop-watch-all []
+  "모든 파일 감시 중지"
+  (do
+    (for [path (keys *file-watchers*)]
+      (stop-watch path))
+    (println "🛑 All watchers stopped")))
+
+;; 간단한 파일 리스팅 (helper)
+(defn file-ls [path]
+  "디렉토리의 파일 목록 + 타임스탐프"
+  {:files []  ;; 실제 구현에서는 fs 모듈 사용
+   :ts (now-ms)})
+
+;; 스레드 생성 (간단한 mock)
+(defn spawn-thread [fn]
+  "백그라운드 스레드에서 함수 실행 (프로토타입)"
+  (fn))  ;; 실제로는 Worker/Cluster 사용
+
+;; 사용 예시:
+;; (load "stdlib/devtools-reload.fl")
+;; (watch-and-reload "src" {
+;;   :extensions [".fl"]
+;;   :debounce 300
+;;   :on-reload (fn [] (println "🔄 App reloaded!"))
+;; })
