@@ -96,8 +96,7 @@ export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> =
   "mariadb-query":    { correct: "mariadb_query", usage: '먼저 DB 맵 정의: (define DB {:host "localhost" :user "u" :password "p" :database "d"})\n  그 후: (mariadb_query DB "SELECT ..." [params])' },
   "mariadb-exec":     { correct: "mariadb_exec",  usage: '(mariadb_exec DB "INSERT INTO ..." [params])' },
   "mariadb-one":      { correct: "mariadb_one",   usage: '(mariadb_one DB "SELECT ... LIMIT 1" [params])  ;; → 단일 row 반환' },
-  "db-query":         { correct: "mariadb_query", usage: '(mariadb_query DB "SELECT ..." [params])' },
-  "db-exec":          { correct: "mariadb_exec",  usage: '(mariadb_exec DB "INSERT ..." [params])' },
+  // db-query / db-exec 는 universal wrapper로 구현됨 — 힌트 제거
   // HTTP
   "http_post":        { correct: "http_get",     usage: '(http_get url {:method "POST" :body data})' },
   "fetch":            { correct: "http_get",     usage: '(http_get url)' },

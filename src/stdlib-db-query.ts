@@ -2,11 +2,13 @@
 // Phase F-3: DSL 기반 SQLite 쿼리 (코드 50% 감소)
 // npm 0 달성: better-sqlite3 → node:sqlite (Node.js v22.5+ 내장)
 
-const { DatabaseSync: DBSync } = require("node:sqlite");
 const _dbqCache = new Map<string, any>();
 
 function getDb(dbPath: string): any {
-  if (!_dbqCache.has(dbPath)) _dbqCache.set(dbPath, new DBSync(dbPath));
+  if (!_dbqCache.has(dbPath)) {
+    const { DatabaseSync: DBSync } = eval('require')("node:sqlite");
+    _dbqCache.set(dbPath, new DBSync(dbPath));
+  }
   return _dbqCache.get(dbPath);
 }
 

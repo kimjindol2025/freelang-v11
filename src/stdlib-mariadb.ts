@@ -313,6 +313,71 @@ function poolCall(req: object): any {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Universal DB wrapper — db-query / db-exec / db-transaction
+// config map: {:host ... :user ... :password ... :database ...} → MariaDB
+//             {:type "sqlite" :path "..."} or {:path "..."}     → SQLite
+// pool ID string (starts with "pool_")                          → MariaDB pool
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isSqliteConfig(db: any): boolean {
+  if (!db || typeof db !== "object") return false;
+  const m = db instanceof Map ? db : new Map(Object.entries(db));
+  return m.get("type") === "sqlite" || (m.get("path") && !m.get("host"));
+}
+
+function getSqlitePath(db: any): string {
+  const m = db instanceof Map ? db : new Map(Object.entries(db));
+  return String(m.get("path") ?? ":memory:");
+}
+
+function getMariadbName(db: any): string {
+  const m = db instanceof Map ? db : new Map(Object.entries(db));
+  return String(m.get("database") ?? m.get("db") ?? "");
+}
+
+const _sqliteCache = new Map<string, any>();
+function getSqliteDb(path: string): any {
+  if (!_sqliteCache.has(path)) {
+    const { DatabaseSync } = eval('require')("node:sqlite");
+    _sqliteCache.set(path, new DatabaseSync(path));
+  }
+  return _sqliteCache.get(path);
+}
+
+function sqliteQuery(path: string, sql: string, params: any[]): any[] {
+  const db = getSqliteDb(path);
+  const rows = db.prepare(sql).all(...params) as any[];
+  return rows.map((r: any) => {
+    const m = new Map<string, any>();
+    for (const [k, v] of Object.entries(r)) m.set(k, v);
+    return m;
+  });
+}
+
+function sqliteExec(path: string, sql: string, params: any[]): any {
+  const db = getSqliteDb(path);
+  const result = db.prepare(sql).run(...params);
+  const m = new Map<string, any>();
+  m.set("affectedRows", result.changes ?? 0);
+  m.set("insertId", Number(result.lastInsertRowid ?? 0));
+  return m;
+}
+
+function mariadbConfigToPoolId(db: any): string {
+  const m = db instanceof Map ? db : new Map(Object.entries(db));
+  const config = {
+    host:     m.get("host") ?? "localhost",
+    user:     m.get("user") ?? process.env.MARIADB_USER ?? "root",
+    password: m.get("password") ?? m.get("pass") ?? process.env.MARIADB_PASS ?? "",
+    database: m.get("database") ?? m.get("db") ?? "",
+    port:     m.get("port") ?? 3306,
+  };
+  const poolId = `pool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  poolCall({ type: "connect", poolId, config });
+  return poolId;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Module export
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -483,5 +548,98 @@ export function createMariadbModule() {
 
     "mariadb_tables": (db: string) =>
       parseRows(runMariadb(db, "SHOW TABLES")).map((r: any) => Object.values(r)[0]),
+
+    // ── Universal db-query / db-exec / db-transaction ────────────────────────
+    // db: {:host ...} → MariaDB  |  {:path ...} → SQLite  |  "pool_..." → pool
+    "db-query": (db: any, sql: string, params: any[] = []): any[] => {
+      if (isSqliteConfig(db)) return sqliteQuery(getSqlitePath(db), sql, params);
+      if (typeof db === "string" && db.startsWith("pool_"))
+        return poolCall({ type: "query", poolId: db, sql, params }).rows ?? [];
+      // map config → MariaDB CLI
+      const dbName = getMariadbName(db);
+      const m = db instanceof Map ? db : new Map(Object.entries(db));
+      const savedUser = process.env.MARIADB_USER;
+      const savedPass = process.env.MARIADB_PASS;
+      const savedHost = process.env.MARIADB_HOST;
+      const savedPort = process.env.MARIADB_PORT;
+      if (m.get("user"))     process.env.MARIADB_USER = String(m.get("user"));
+      if (m.get("password")) process.env.MARIADB_PASS = String(m.get("password"));
+      if (m.get("host"))     process.env.MARIADB_HOST = String(m.get("host"));
+      if (m.get("port"))     process.env.MARIADB_PORT = String(m.get("port"));
+      try {
+        cachedSock = null;
+        const rows = parseRows(runMariadb(dbName, bindParams(sql, params)));
+        return rows.map((r: any) => {
+          const rm = new Map<string, any>();
+          for (const [k, v] of Object.entries(r)) rm.set(k, v);
+          return rm;
+        });
+      } finally {
+        if (savedUser !== undefined) process.env.MARIADB_USER = savedUser; else delete process.env.MARIADB_USER;
+        if (savedPass !== undefined) process.env.MARIADB_PASS = savedPass; else delete process.env.MARIADB_PASS;
+        if (savedHost !== undefined) process.env.MARIADB_HOST = savedHost; else delete process.env.MARIADB_HOST;
+        if (savedPort !== undefined) process.env.MARIADB_PORT = savedPort; else delete process.env.MARIADB_PORT;
+        cachedSock = null;
+      }
+    },
+
+    "db-exec": (db: any, sql: string, params: any[] = []): any => {
+      if (isSqliteConfig(db)) return sqliteExec(getSqlitePath(db), sql, params);
+      if (typeof db === "string" && db.startsWith("pool_")) {
+        const r = poolCall({ type: "exec", poolId: db, sql, params });
+        const m = new Map<string, any>();
+        m.set("affectedRows", r.affectedRows ?? 0);
+        m.set("insertId", r.insertId ?? 0);
+        return m;
+      }
+      const dbName = getMariadbName(db);
+      const m2 = db instanceof Map ? db : new Map(Object.entries(db));
+      const savedUser = process.env.MARIADB_USER;
+      const savedPass = process.env.MARIADB_PASS;
+      const savedHost = process.env.MARIADB_HOST;
+      const savedPort = process.env.MARIADB_PORT;
+      if (m2.get("user"))     process.env.MARIADB_USER = String(m2.get("user"));
+      if (m2.get("password")) process.env.MARIADB_PASS = String(m2.get("password"));
+      if (m2.get("host"))     process.env.MARIADB_HOST = String(m2.get("host"));
+      if (m2.get("port"))     process.env.MARIADB_PORT = String(m2.get("port"));
+      try {
+        cachedSock = null;
+        runMariadb(dbName, bindParams(sql, params));
+        try {
+          const meta = parseRows(runMariadb(dbName, "SELECT ROW_COUNT() as ar, LAST_INSERT_ID() as lid"));
+          const rm = new Map<string, any>();
+          rm.set("affectedRows", Number(meta[0]?.ar ?? 0));
+          rm.set("insertId", Number(meta[0]?.lid ?? 0));
+          return rm;
+        } catch { const rm = new Map<string, any>(); rm.set("affectedRows", 0); rm.set("insertId", 0); return rm; }
+      } finally {
+        if (savedUser !== undefined) process.env.MARIADB_USER = savedUser; else delete process.env.MARIADB_USER;
+        if (savedPass !== undefined) process.env.MARIADB_PASS = savedPass; else delete process.env.MARIADB_PASS;
+        if (savedHost !== undefined) process.env.MARIADB_HOST = savedHost; else delete process.env.MARIADB_HOST;
+        if (savedPort !== undefined) process.env.MARIADB_PORT = savedPort; else delete process.env.MARIADB_PORT;
+        cachedSock = null;
+      }
+    },
+
+    "db-transaction": (db: any, fn: any): any => {
+      if (isSqliteConfig(db)) {
+        const sqliteDb = getSqliteDb(getSqlitePath(db));
+        sqliteDb.exec("BEGIN");
+        try {
+          const result = typeof fn === "function" ? fn() : fn;
+          sqliteDb.exec("COMMIT");
+          return result;
+        } catch (e: any) {
+          try { sqliteDb.exec("ROLLBACK"); } catch {}
+          throw e;
+        }
+      }
+      // MariaDB pool
+      if (typeof db === "string" && db.startsWith("pool_")) {
+        // fn은 [{sql, params}] 배열 또는 호출 가능한 함수
+        if (Array.isArray(fn)) return poolCall({ type: "transaction", poolId: db, stmts: fn });
+      }
+      return null;
+    },
   };
 }

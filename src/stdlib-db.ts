@@ -3,7 +3,11 @@
 // npm 0 달성: better-sqlite3 → node:sqlite (Node.js v22.5+ 내장)
 
 import { spawnSync } from "child_process";
-const { DatabaseSync } = require("node:sqlite");
+let _DatabaseSync: any = null;
+function getDatabaseSync() {
+  if (!_DatabaseSync) _DatabaseSync = eval('require')("node:sqlite").DatabaseSync;
+  return _DatabaseSync;
+}
 
 // ── kimdb helper ─────────────────────────────────────────────────────────────
 
@@ -45,7 +49,7 @@ const dbConnections = new Map<string, any>();
 
 function getDb(dbPath: string): any {
   if (!dbConnections.has(dbPath)) {
-    dbConnections.set(dbPath, new DatabaseSync(dbPath));
+    dbConnections.set(dbPath, new (getDatabaseSync())(dbPath));
   }
   return dbConnections.get(dbPath)!;
 }

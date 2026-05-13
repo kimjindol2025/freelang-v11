@@ -40,6 +40,7 @@ import { createImageModule } from "./stdlib-image";     // Phase A: Image Proces
 import { createMongodbModule } from "./stdlib-mongodb"; // Phase A: MongoDB Driver
 import { createHelpersModule } from "./stdlib-helpers"; // Phase G: MISTAKES-100 자동 처리
 import { createKebabAliasesModule } from "./stdlib-kebab-aliases"; // v11.5.0: snake → kebab alias
+import { createMariadbModule } from "./stdlib-mariadb";          // Universal db-query/db-exec wrapper
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -151,6 +152,10 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     helpersModule,
   ];
   interp.registerModule(createKebabAliasesModule(aliasSourceModules));
+
+  // Universal DB wrapper — db-query/db-exec/db-transaction (MariaDB + SQLite routing)
+  // 등록은 kebab alias 이후 → db-exec alias(db_exec)를 이 버전으로 덮어씀
+  interp.registerModule(createMariadbModule());
 
   // ── fl_require builtin 등록 ─────────────────────────────────────
   // (fl_require "audit")   → audit_log 등 즉시 사용 가능
