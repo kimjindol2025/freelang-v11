@@ -27,6 +27,8 @@ import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure
 import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver (SQLite)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
 import { createCryptoUtilsModule } from "./stdlib-crypto-utils"; // Phase 25: AES-256-GCM + hashing
+import { createMetricsModule } from "./stdlib-metrics";  // Phase 25: Prometheus metrics
+import { createTextProcessorModule } from "./stdlib-text-processor"; // Phase 25: NLP + similarity
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process";  // Phase 22: Process (env + SIGTERM)
@@ -108,10 +110,14 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   const dbModule = createDbModule();
   const authModule = createAuthModule();
   const cryptoUtilsModule = createCryptoUtilsModule();
+  const metricsModule = createMetricsModule();
+  const textProcessorModule = createTextProcessorModule();
   const cacheModule = createCacheModule();
   interp.registerModule(dbModule);
   interp.registerModule(authModule);
   interp.registerModule(cryptoUtilsModule);
+  interp.registerModule(metricsModule);
+  interp.registerModule(textProcessorModule);
   interp.registerModule(cacheModule);
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
   const processModule = createProcessModule();
@@ -148,7 +154,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     fileModule, fdModule, bitsModule, errorModule, httpModule,
     shellModule, dataModule, collectionModule, agentModule, timeModule,
     verifyModule, httpMacroModule, dbQueryModule, optionalModule, restCrudModule,
-    cryptoModule, cryptoUtilsModule, workflowModule, resourceModule,
+    cryptoModule, cryptoUtilsModule, metricsModule, textProcessorModule, workflowModule, resourceModule,
     dbModule, authModule, cacheModule,
     processModule, moduleSystem,
     imageModule, mongodbModule,
@@ -445,6 +451,18 @@ export function loadAllStdlib(interp: InterpreterLike): void {
         chunks.push(arr.slice(i, i + size));
       }
       return chunks;
+    },
+
+    // v11.7.9: 추가 배열 헬퍼 (평균, 콤팩트)
+    "average": (arr: any[]): number => {
+      if (!Array.isArray(arr) || arr.length === 0) return 0;
+      const sum = arr.reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
+      return sum / arr.length;
+    },
+
+    "compact": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      return arr.filter((item) => item !== null && item !== undefined && item !== false && item !== "");
     },
 
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────

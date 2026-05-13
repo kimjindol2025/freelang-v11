@@ -678,6 +678,23 @@ describe("배열 계산 함수 — v11.7.8", () => {
   });
 });
 
+describe("추가 배열 헬퍼 — v11.7.9", () => {
+  test("average 평균", () => {
+    expect(run('(average [2 4 6])')).toBe(4);
+    expect(run('(average [10 20 30])')).toBe(20);
+  });
+
+  test("compact 콤팩트", () => {
+    const result = run('(compact [1 null 2 3])');
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  test("compact 모두 유효", () => {
+    const result = run('(compact [1 2 3])');
+    expect(result).toEqual([1, 2, 3]);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");
