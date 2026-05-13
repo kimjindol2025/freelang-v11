@@ -465,6 +465,13 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       return arr.filter((item) => item !== null && item !== undefined && item !== false && item !== "");
     },
 
+    // v11.7.10: 최종 배열 헬퍼 (무작위 선택)
+    "random-element": (arr: any[]): any => {
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const idx = Math.floor(Math.random() * arr.length);
+      return arr[idx];
+    },
+
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {
       const ts = new Date().toISOString();

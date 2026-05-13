@@ -695,6 +695,18 @@ describe("추가 배열 헬퍼 — v11.7.9", () => {
   });
 });
 
+describe("최종 배열 헬퍼 — v11.7.10", () => {
+  test("random-element 선택", () => {
+    const result = run('(random-element [1 2 3 4 5])');
+    expect([1, 2, 3, 4, 5]).toContain(result);
+  });
+
+  test("random-element 단일원소", () => {
+    const result = run('(random-element [42])');
+    expect(result).toBe(42);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");
