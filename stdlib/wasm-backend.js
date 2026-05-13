@@ -280,7 +280,11 @@ function buildModule(ast) {
     types = [...BUILTIN_TYPES, ...compiled.map(f => f.typeEntry)];
     fnIdx = [...BUILTIN_TYPES.map((_,i)=>i), ...compiled.map((_,i)=>i+BUILTIN_COUNT)];
     codes = [...BUILTIN_CODE.map(b=>[...uleb128(b.length),...b]), ...compiled.map(f=>f.codeEntry)];
-    exps  = compiled.map((f,i)=>[...encStr(f.name), 0x00, ...uleb128(i+BUILTIN_COUNT)]);
+    // 함수 exports + memory export
+    exps  = [
+      ...compiled.map((f,i)=>[...encStr(f.name), 0x00, ...uleb128(i+BUILTIN_COUNT)]),
+      [...encStr("memory"), 0x02, 0x00]  // memory export (kind=2, idx=0)
+    ];
   } else {
     types = compiled.map(f => f.typeEntry);
     fnIdx = compiled.map((_,i)=>[i]);
@@ -292,11 +296,34 @@ function buildModule(ast) {
   const fnSec     = section(0x03, [...uleb128(fnIdx.length), ...fnIdx.flat().flatMap(i=>uleb128(i))]);
   const memSec    = mem ? section(0x05,[0x01,0x00,0x01]) : [];
   const exportSec = section(0x07, [...uleb128(exps.length), ...exps.flat()]);
-  // data: heap ptr = 0x1000
-  const dataSec   = mem ? section(0x0B,[0x01, 0x00, 0x41,0x00,0x0B, 0x04,...i32le(0x1000)]) : [];
   const codeSec   = section(0x0A, [...uleb128(codes.length), ...codes.flat()]);
+  // data 섹션(0x0B)은 반드시 code 섹션(0x0A) 이후에 위치해야 함
+  const dataSec   = mem ? section(0x0B,[0x01, 0x00, 0x41,0x00,0x0B, 0x04,...i32le(0x1000)]) : [];
 
-  return Buffer.from([...magic,...typeSec,...fnSec,...memSec,...exportSec,...dataSec,...codeSec]);
+  return Buffer.from([...magic,...typeSec,...fnSec,...memSec,...exportSec,...codeSec,...dataSec]);
+}
+
+// ── AST 변수 치환 (arr-reduce/arr-map 생성용) ──────────────────────────────────
+function substVar(expr, from, to) {
+  if (typeof expr === 'string') return expr === from ? to : expr;
+  if (Array.isArray(expr)) return expr.map(e => substVar(e, from, to));
+  return expr;
+}
+
+// ── FreeLang 배열 → WASM 메모리에 기록 후 포인터 반환 ─────────────────────────
+function writeArr(mem32, arr, heapPtr) {
+  const ptr = heapPtr;
+  mem32[ptr >> 2] = arr.length;
+  for (let i = 0; i < arr.length; i++) mem32[(ptr >> 2) + 1 + i] = arr[i];
+  return { ptr, next: ptr + (1 + arr.length) * 4 };
+}
+
+// ── WASM 메모리에서 배열 읽기 ─────────────────────────────────────────────────
+function readArr(mem32, ptr) {
+  const len = mem32[ptr >> 2];
+  const r = [];
+  for (let i = 0; i < len; i++) r.push(mem32[(ptr >> 2) + 1 + i]);
+  return r;
 }
 
 // ── 진입점 ────────────────────────────────────────────────────────────────────
@@ -324,6 +351,86 @@ try {
     const b = buildModule({ fns:[w], memory });
     const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
     out({ ok:true, value: inst.exports.__eval__(...(args||[]).map(Number)) });
+
+  } else if (mode === 'arr-reduce') {
+    // {input_array, init, expr}  — expr uses "acc"(누적값) + "x"(현재원소)
+    const { input_array, init = 0, expr } = ast;
+    const xExpr = ['arr-get', 'arr_ptr', 'i'];
+    const bodyExpr = substVar(expr, 'x', xExpr);
+    const fn = {
+      name: '__reduce__',
+      params: ['init', 'arr_ptr'],
+      body: ['let',
+        [['acc', 'init'], ['i', 0], ['n', ['arr-len', 'arr_ptr']]],
+        ['do',
+          ['while', ['<', 'i', 'n'],
+            ['do',
+              ['set!', 'acc', bodyExpr],
+              ['set!', 'i', ['+', 'i', 1]]]],
+          'acc']]
+    };
+    const b = buildModule({ fns: [fn], memory: true });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const mem32 = new Int32Array(inst.exports.memory.buffer);
+    const { ptr, next } = writeArr(mem32, input_array, 0x1000);
+    mem32[0] = next; // heap ptr 갱신
+    out({ ok: true, value: inst.exports.__reduce__(init, ptr) });
+
+  } else if (mode === 'arr-map') {
+    // {input_array, expr}  — expr uses "x"(원소) → 변환된 값
+    const { input_array, expr } = ast;
+    const xExpr = ['arr-get', 'in_ptr', 'i'];
+    const bodyExpr = substVar(expr, 'x', xExpr);
+    const fn = {
+      name: '__map__',
+      params: ['in_ptr'],
+      body: ['let',
+        [['n', ['arr-len', 'in_ptr']],
+         ['out', ['arr-new', 'n', 0]],
+         ['i', 0]],
+        ['do',
+          ['while', ['<', 'i', 'n'],
+            ['do',
+              ['arr-set', 'out', 'i', bodyExpr],
+              ['set!', 'i', ['+', 'i', 1]]]],
+          'out']]
+    };
+    const b = buildModule({ fns: [fn], memory: true });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const mem32 = new Int32Array(inst.exports.memory.buffer);
+    const { ptr, next } = writeArr(mem32, input_array, 0x1000);
+    mem32[0] = next;
+    const outPtr = inst.exports.__map__(ptr);
+    out({ ok: true, value: readArr(mem32, outPtr) });
+
+  } else if (mode === 'arr-zip-map') {
+    // {arr_a, arr_b, expr}  — expr uses "a" + "b" → 변환된 값
+    const { arr_a, arr_b, expr } = ast;
+    const aExpr = ['arr-get', 'ptr_a', 'i'];
+    const bExpr = ['arr-get', 'ptr_b', 'i'];
+    const bodyExpr = substVar(substVar(expr, 'a', aExpr), 'b', bExpr);
+    const fn = {
+      name: '__zipmap__',
+      params: ['ptr_a', 'ptr_b'],
+      body: ['let',
+        [['n', ['arr-len', 'ptr_a']],
+         ['out', ['arr-new', 'n', 0]],
+         ['i', 0]],
+        ['do',
+          ['while', ['<', 'i', 'n'],
+            ['do',
+              ['arr-set', 'out', 'i', bodyExpr],
+              ['set!', 'i', ['+', 'i', 1]]]],
+          'out']]
+    };
+    const b = buildModule({ fns: [fn], memory: true });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const mem32 = new Int32Array(inst.exports.memory.buffer);
+    const { ptr: pA, next: nA } = writeArr(mem32, arr_a, 0x1000);
+    const { ptr: pB, next: nB } = writeArr(mem32, arr_b, nA);
+    mem32[0] = nB;
+    const outPtr = inst.exports.__zipmap__(pA, pB);
+    out({ ok: true, value: readArr(mem32, outPtr) });
   }
 } catch(e) {
   out({ ok:false, error:e.message });

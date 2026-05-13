@@ -106,3 +106,86 @@
 
 (defn wasm-size [module]
   (get module :size 0))
+
+;; ── W-2: 배열 연산 (linear memory) ───────────────────────────────────────────
+;;
+;; (wasm-eval-mem expr params args)
+;;   메모리 모드로 eval — arr-new/get/set/len 사용 가능
+;;   반환값은 스칼라(i32)
+;;
+;; (wasm-arr-reduce arr init expr)
+;;   FreeLang 배열을 WASM으로 reduce — expr에서 "acc"(누적), "x"(원소) 사용
+;;   예: (wasm-arr-reduce [1 2 3 4 5] 0 ["+", "acc", "x"])  → 15
+;;
+;; (wasm-arr-map arr expr)
+;;   FreeLang 배열을 WASM으로 map → 새 FreeLang 배열 반환
+;;   예: (wasm-arr-map [1 2 3] ["*", "x", 2])  → [2 4 6]
+;;
+;; (wasm-arr-zip-map arr-a arr-b expr)
+;;   두 배열을 같은 인덱스로 합쳐 변환 — expr에서 "a", "b" 사용
+;;   예: (wasm-arr-zip-map [1 2 3] [4 5 6] ["+", "a", "b"])  → [5 7 9]
+;;
+;; ── 편의 함수 ─────────────────────────────────────────────────────────────────
+;;
+;; (wasm-arr-sum arr)           → 합계
+;; (wasm-arr-max arr)           → 최댓값
+;; (wasm-arr-min arr)           → 최솟값
+;; (wasm-arr-scale arr k)       → 각 원소 × k
+;; (wasm-arr-dot arr-a arr-b)   → 내적 (dot product)
+
+(defn wasm-eval-mem [expr params args]
+  (let [r (-wasm-exec "eval" {"expr" expr "params" params "args" args "memory" true})]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM eval-mem 오류: " (get r "error"))))))
+
+(defn wasm-arr-reduce [fl-arr init expr]
+  (let [r (-wasm-exec "arr-reduce" {
+    "input_array" fl-arr
+    "init" init
+    "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-reduce 오류: " (get r "error"))))))
+
+(defn wasm-arr-map [fl-arr expr]
+  (let [r (-wasm-exec "arr-map" {
+    "input_array" fl-arr
+    "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-map 오류: " (get r "error"))))))
+
+(defn wasm-arr-zip-map [arr-a arr-b expr]
+  (let [r (-wasm-exec "arr-zip-map" {
+    "arr_a" arr-a
+    "arr_b" arr-b
+    "expr" expr
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-zip-map 오류: " (get r "error"))))))
+
+;; ── 편의 함수 ─────────────────────────────────────────────────────────────────
+
+(defn wasm-arr-sum [arr]
+  (wasm-arr-reduce arr 0 ["+" "acc" "x"]))
+
+(defn wasm-arr-max [arr]
+  (wasm-arr-reduce arr (first arr)
+    ["if" [">" "x" "acc"] "x" "acc"]))
+
+(defn wasm-arr-min [arr]
+  (wasm-arr-reduce arr (first arr)
+    ["if" ["<" "x" "acc"] "x" "acc"]))
+
+(defn wasm-arr-scale [arr k]
+  (wasm-arr-map arr ["*" "x" k]))
+
+(defn wasm-arr-dot [arr-a arr-b]
+  (wasm-arr-reduce
+    (wasm-arr-zip-map arr-a arr-b ["*" "a" "b"])
+    0
+    ["+" "acc" "x"]))
