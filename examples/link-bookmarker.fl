@@ -1,0 +1,325 @@
+;; Link Bookmarker — 난이도 4 애플리케이션
+;; 링크 저장 + 태그 + 검색 + 공유 기능
+;; 포트: 8080
+
+(server-start 8080)
+
+;; ===================
+;; DB 스키마 (SQLite)
+;; ===================
+
+(define db {
+  :type "sqlite"
+  :path "./data/bookmarks.db"
+})
+
+;; DB 초기화
+(try
+  (db-exec db "
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  " [])
+
+  (db-exec db "
+    CREATE TABLE IF NOT EXISTS bookmarks (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      tags TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  " [])
+
+  (println "✅ DB 초기화 완료")
+
+  (catch e (println (str "⚠️ DB 이미 존재: " (get e "message")))))
+
+;; ===================
+;; 유틸 함수
+;; ===================
+
+(defn hash-password [password]
+  "비밀번호 해싱"
+  (auth-hash-password password))
+
+(defn verify-password [password hash]
+  "비밀번호 검증"
+  (auth-verify-password password hash))
+
+(defn create-token [user-id email]
+  "JWT 토큰 생성 (7일 유효)"
+  (auth-jwt-sign
+    {:user_id user_id :email email}
+    "secret-key-change-this"
+    604800))
+
+(defn verify-token [token]
+  "토큰 검증"
+  (auth-jwt-verify token "secret-key-change-this"))
+
+(defn extract-tags [tag-string]
+  "태그 문자열 → 배열"
+  (if (nil? tag-string)
+    []
+    (map str-trim (str-split tag-string ","))))
+
+(defn get-user-id-from-req [req]
+  "요청에서 user_id 추출"
+  (try
+    (let [auth-header (get (get req "headers") "authorization")
+          token (if auth-header
+            (nth (str-split auth-header " ") 1)
+            nil)]
+      (if (nil? token)
+        nil
+        (let [payload (verify-token token)]
+          (if (nil? payload)
+            nil
+            (get payload "user_id")))))
+    (catch e nil)))
+
+;; ===================
+;; API 엔드포인트
+;; ===================
+
+(define routes {
+  :get {
+    "/" (fn [req]
+      (server-html """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Link Bookmarker</title>
+  <style>
+    body { font-family: Arial; max-width: 1000px; margin: 0 auto; padding: 20px; }
+    h1 { color: #333; }
+    .form { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    input, textarea, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    button { background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #0056b3; }
+    .bookmark { background: white; border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px; }
+    .bookmark a { color: #007bff; text-decoration: none; }
+    .tags { color: #666; font-size: 12px; }
+    .error { color: #dc3545; }
+    .success { color: #28a745; }
+  </style>
+</head>
+<body>
+  <h1>📚 Link Bookmarker</h1>
+  <div id="app">
+    <div class="form" id="loginForm">
+      <h2>로그인 / 회원가입</h2>
+      <input type="email" id="email" placeholder="이메일">
+      <input type="password" id="password" placeholder="비밀번호">
+      <button onclick="login()">로그인</button>
+      <button onclick="signup()">회원가입</button>
+    </div>
+    <div class="form" id="bookmarkForm" style="display:none;">
+      <h2>링크 저장</h2>
+      <input type="url" id="url" placeholder="https://example.com">
+      <input type="text" id="title" placeholder="제목">
+      <textarea id="description" placeholder="설명" rows="3"></textarea>
+      <input type="text" id="tags" placeholder="태그 (쉼표로 구분)">
+      <button onclick="saveBookmark()">저장</button>
+      <button onclick="logout()">로그아웃</button>
+    </div>
+    <div id="bookmarkList"></div>
+    <div id="message"></div>
+  </div>
+  <script>
+    const API_URL = '/api';
+    let token = localStorage.getItem('token');
+
+    function showMessage(msg, type = 'info') {
+      document.getElementById('message').innerHTML = '<p class="' + type + '">' + msg + '</p>';
+      setTimeout(() => document.getElementById('message').innerHTML = '', 3000);
+    }
+
+    function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      fetch(API_URL + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          token = data.token;
+          showUI();
+          loadBookmarks();
+        } else {
+          showMessage(data.error || '로그인 실패', 'error');
+        }
+      });
+    }
+
+    function signup() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      fetch(API_URL + '/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          token = data.token;
+          showUI();
+          loadBookmarks();
+          showMessage('회원가입 완료!', 'success');
+        } else {
+          showMessage(data.error || '회원가입 실패', 'error');
+        }
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      token = null;
+      showUI();
+    }
+
+    function saveBookmark() {
+      const url = document.getElementById('url').value;
+      const title = document.getElementById('title').value;
+      const description = document.getElementById('description').value;
+      const tags = document.getElementById('tags').value;
+      fetch(API_URL + '/bookmarks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ url, title, description, tags })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.id) {
+          document.getElementById('url').value = '';
+          document.getElementById('title').value = '';
+          document.getElementById('description').value = '';
+          document.getElementById('tags').value = '';
+          loadBookmarks();
+          showMessage('링크가 저장되었습니다!', 'success');
+        } else {
+          showMessage(data.error || '저장 실패', 'error');
+        }
+      });
+    }
+
+    function loadBookmarks() {
+      fetch(API_URL + '/bookmarks', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+      .then(r => r.json())
+      .then(data => {
+        const html = data.map(b => '<div class="bookmark"><h3><a href="' + b.url + '" target="_blank">' + b.title + '</a></h3><p>' + (b.description || '') + '</p><p class="tags">태그: ' + (b.tags || '없음') + '</p><small>' + b.created_at + '</small></div>').join('');
+        document.getElementById('bookmarkList').innerHTML = html;
+      });
+    }
+
+    function showUI() {
+      if (token) {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('bookmarkForm').style.display = 'block';
+      } else {
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('bookmarkForm').style.display = 'none';
+        document.getElementById('bookmarkList').innerHTML = '';
+      }
+    }
+
+    if (token) {
+      showUI();
+      loadBookmarks();
+    } else {
+      showUI();
+    }
+  </script>
+</body>
+</html>"""))
+
+    "/api/bookmarks" (fn [req]
+      (let [user-id (get-user-id-from-req req)]
+        (if (nil? user-id)
+          (server-status 401 "Unauthorized")
+          (let [bookmarks (db-query db "SELECT * FROM bookmarks WHERE user_id = ? ORDER BY created_at DESC" [user-id])]
+            (server-json bookmarks)))))
+  }
+
+  :post {
+    "/api/signup" (fn [req]
+      (let [body (get req "body")
+            email (get body "email")
+            password (get body "password")]
+        (if (or (nil? email) (nil? password))
+          (server-json {:error "email과 password가 필요합니다"})
+          (try
+            (do
+              (db-exec db "INSERT INTO users (email, password) VALUES (?, ?)" [email (hash-password password)])
+              (let [user (db-query db "SELECT id FROM users WHERE email = ?" [email])]
+                (if (empty? user)
+                  (server-json {:error "가입 실패"})
+                  (let [user-id (get (nth user 0) "id")
+                        token (create-token user-id email)]
+                    (server-json {:token token :user_id user-id})))))
+            (catch e (server-json {:error "이미 가입된 이메일입니다"}))))))
+
+    "/api/login" (fn [req]
+      (let [body (get req "body")
+            email (get body "email")
+            password (get body "password")]
+        (if (or (nil? email) (nil? password))
+          (server-json {:error "email과 password가 필요합니다"})
+          (let [users (db-query db "SELECT id, password FROM users WHERE email = ?" [email])]
+            (if (empty? users)
+              (server-json {:error "존재하지 않는 이메일입니다"})
+              (let [user (nth users 0)
+                    stored-password (get user "password")
+                    user-id (get user "id")]
+                (if (verify-password password stored-password)
+                  (let [token (create-token user-id email)]
+                    (server-json {:token token :user_id user-id}))
+                  (server-json {:error "비밀번호가 잘못되었습니다"}))))))))
+
+    "/api/bookmarks" (fn [req]
+      (let [user-id (get-user-id-from-req req)]
+        (if (nil? user-id)
+          (server-status 401 "Unauthorized")
+          (let [body (get req "body")
+                url (get body "url")
+                title (get body "title")
+                description (get body "description")
+                tags (get body "tags")]
+            (if (or (nil? url) (nil? title))
+              (server-json {:error "url과 title은 필수입니다"})
+              (try
+                (do
+                  (db-exec db "INSERT INTO bookmarks (user_id, url, title, description, tags) VALUES (?, ?, ?, ?, ?)" [user-id url title description tags])
+                  (server-json {:success true :id 1}))
+                (catch e (server-json {:error (get e "message")}))))))))
+  }
+})
+
+;; ===================
+;; 라우트 정의
+;; ===================
+
+(server-routes routes)
+
+(println "")
+(println "🚀 Link Bookmarker 시작!")
+(println "📍 http://localhost:8080")
+(println "")
