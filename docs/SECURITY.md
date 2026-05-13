@@ -16,11 +16,10 @@
 | DB 보안 | 62/100 | 93/100 | D+ → A- |
 | 입력 검증 | 55/100 | 88/100 | D → B+ |
 | 파일 / 쉘 보안 | 40/100 | 85/100 | F → B |
-| HTTP 서버 | 75/100 | 88/100 | C+ → B+ |
-| **종합** | **63/100** | **89/100** | **D+ → B+** |
+| HTTP 서버 | 75/100 | 93/100 | C+ → A- |
+| **종합** | **63/100** | **91/100** | **D+ → A-** |
 
-> **미해결 항목**: CSP `'unsafe-inline'` (M-4) — nonce 기반 전환은 아키텍처 변경 필요.  
-> v1 비밀번호 재해싱(H-5)은 앱 레벨 구현 필요 (stdlib 준비 완료).
+> **미해결 항목**: v1 비밀번호 재해싱(H-5)은 앱 레벨 구현 필요 (stdlib 준비 완료).
 
 ---
 
@@ -222,7 +221,7 @@ stdlib에 `auth_password_needs_rehash()` 함수 존재. 로그인 핸들러에�
 | M-1 | `stdlib-http-server.ts` | CORS `Access-Control-Allow-Origin: *` | ✅ `FL_ALLOWED_ORIGINS` 환경변수 제어 |
 | M-2 | `stdlib-http-server.ts` | Redirect URL `\r\n` 미필터 → 헤더 인젝션 | ✅ `.replace(/[\r\n]/g, "")` 적용 |
 | M-3 | `stdlib-http-server.ts` | 쿠키 `domain` 옵션 미검증 | ✅ `/^[a-zA-Z0-9.\-]+$/` 정규식 검증 |
-| M-4 | `stdlib-http-server.ts` | CSP `'unsafe-inline'` 허용 | ⚠️ **미패치** — nonce 기반 전환 아키텍처 변경 필요 |
+| M-4 | `stdlib-http-server.ts` | CSP `'unsafe-inline'` 허용 | ✅ 요청별 nonce 자동 생성·주입 (commit 6cdb7da2) |
 | M-5 | `stdlib-http-server.ts` | `X-Forwarded-For` 위조 → Rate Limit 우회 | ✅ `FL_TRUST_PROXY=1` 일 때만 신뢰 |
 
 ---
@@ -263,6 +262,7 @@ throw new Error(`MariaDB 오류: ${stderr}\nDB: ${db}${sqlHint}`);
 | MariaDB bindParams (값 이스케이프) | `stdlib-mariadb.ts:105-155` | ✅ |
 | `html-escape` 5종 (`& < > " '`) | `eval-builtins.ts:1677` | ✅ |
 | `server_static` 경로 탐색 방지 | `stdlib-http-server.ts:397` | ✅ |
+| CSP nonce 자동 생성·주입 | `stdlib-http-server.ts` | ✅ 신규 |
 | 쿠키 HttpOnly + Secure + SameSite 기본값 | `stdlib-http-server.ts` | ✅ |
 | CSRF HMAC + 60분 만료 | `stdlib-auth.ts:179` | ✅ |
 | Rate Limiting (슬라이딩 윈도우) | `stdlib-http-server.ts` | ✅ |
@@ -278,11 +278,11 @@ throw new Error(`MariaDB 오류: ${stderr}\nDB: ${db}${sqlHint}`);
 
 ---
 
-## 남은 과제 (Phase 3)
+## 남은 과제
 
 ```
-[ ] M-4  CSP 'unsafe-inline' 제거 — 요청별 nonce 생성 + HTML 주입 아키텍처 필요
 [ ] H-5  v1 비밀번호 자동 재해싱 — 앱 레벨 로그인 핸들러에 표준 패턴 적용
+         (stdlib 준비 완료: auth_password_needs_rehash 사용)
 ```
 
 ---
