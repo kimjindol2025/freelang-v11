@@ -66,20 +66,22 @@
 ;; ── 스킵 (whitespace + ; line comment)
 
 (defn skip-comment-loop [$cur]
-  (if (or (at-end? $cur) (= (peek $cur) "\n"))
-    (if (at-end? $cur) $cur (advance $cur))
-    (skip-comment-loop (advance $cur))))
+  (loop [$cur $cur]
+    (if (or (at-end? $cur) (= (peek $cur) "\n"))
+      (if (at-end? $cur) $cur (advance $cur))
+      (recur (advance $cur)))))
 
 (defn skip-comment [$st]
   (skip-comment-loop $st))
 
 (defn skip-ws-loop [$cur]
-  (if (at-end? $cur) $cur
-    (let [[$c (peek $cur)]]
-      (cond
-        [(is-space? $c) (skip-ws-loop (advance $cur))]
-        [(= $c ";")     (skip-ws-loop (skip-comment $cur))]
-        [true           $cur]))))
+  (loop [$cur $cur]
+    (if (at-end? $cur) $cur
+      (let [[$c (peek $cur)]]
+        (cond
+          [(is-space? $c) (recur (advance $cur))]
+          [(= $c ";")     (recur (skip-comment $cur))]
+          [true           $cur])))))
 
 (defn skip-ws [$st]
   (skip-ws-loop $st))
@@ -87,14 +89,15 @@
 ;; ── 숫자 (정수/실수/음수)
 
 (defn read-number-iter [$cur $res_acc $dot $line $col]
-  (if (at-end? $cur) (emit $cur "Number" $res_acc $line $col)
-    (let [[$c (peek $cur)]]
-      (cond
-        [(is-digit? $c)
-         (read-number-iter (advance $cur) (str $res_acc $c) $dot $line $col)]
-        [(and (= $c ".") (not $dot))
-         (read-number-iter (advance $cur) (str $res_acc $c) true $line $col)]
-        [true (emit $cur "Number" $res_acc $line $col)]))))
+  (loop [$cur $cur $res_acc $res_acc $dot $dot]
+    (if (at-end? $cur) (emit $cur "Number" $res_acc $line $col)
+      (let [[$c (peek $cur)]]
+        (cond
+          [(is-digit? $c)
+           (recur (advance $cur) (str $res_acc $c) $dot)]
+          [(and (= $c ".") (not $dot))
+           (recur (advance $cur) (str $res_acc $c) true)]
+          [true (emit $cur "Number" $res_acc $line $col)])))))
 
 (defn read-number-body [$st $acc $has-dot $line $col]
   (read-number-iter $st $acc $has-dot $line $col))
@@ -110,16 +113,17 @@
   [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c]))
 
 (defn read-string-iter [$cur $res_acc $line $col]
-  (if (at-end? $cur) (emit $cur "String" $res_acc $line $col)
-    (let [[$c (peek $cur)]]
-      (cond
-        [(= $c "\"")
-         (emit (advance $cur) "String" $res_acc $line $col)]
-        [(= $c "\\")
-         (let [[$st2 (advance $cur)] [$c2 (peek $st2)]]
-           (read-string-iter (advance $st2) (str $res_acc (translate-esc $c2)) $line $col))]
-        [true
-         (read-string-iter (advance $cur) (str $res_acc $c) $line $col)]))))
+  (loop [$cur $cur $res_acc $res_acc]
+    (if (at-end? $cur) (emit $cur "String" $res_acc $line $col)
+      (let [[$c (peek $cur)]]
+        (cond
+          [(= $c "\"")
+           (emit (advance $cur) "String" $res_acc $line $col)]
+          [(= $c "\\")
+           (let [[$st2 (advance $cur)] [$c2 (peek $st2)]]
+             (recur (advance $st2) (str $res_acc (translate-esc $c2))))]
+          [true
+           (recur (advance $cur) (str $res_acc $c))])))))
 
 (defn read-string-body [$st $acc $line $col]
   (read-string-iter $st $acc $line $col))
@@ -132,11 +136,12 @@
 ;; ── 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
 
 (defn read-symbol-iter [$cur $res_acc $line $col $kind]
-  (if (at-end? $cur) (emit $cur $kind $res_acc $line $col)
-    (let [[$c (peek $cur)]]
-      (if (is-symbol-char? $c)
-        (read-symbol-iter (advance $cur) (str $res_acc $c) $line $col $kind)
-        (emit $cur $kind $res_acc $line $col)))))
+  (loop [$cur $cur $res_acc $res_acc]
+    (if (at-end? $cur) (emit $cur $kind $res_acc $line $col)
+      (let [[$c (peek $cur)]]
+        (if (is-symbol-char? $c)
+          (recur (advance $cur) (str $res_acc $c))
+          (emit $cur $kind $res_acc $line $col))))))
 
 (defn read-symbol-body-kind [$st $acc $line $col $kind]
   (read-symbol-iter $st $acc $line $col $kind))
@@ -179,10 +184,11 @@
 ;; ── 메인 루프 — 모든 토큰 수집
 
 (defn lex-loop [$cur]
-  (let [[$ws (skip-ws $cur)]]
-  (if (at-end? $ws)
-    (get $ws :tokens)
-    (lex-loop (read-token $ws)))))
+  (loop [$cur $cur]
+    (let [[$ws (skip-ws $cur)]]
+      (if (at-end? $ws)
+        (get $ws :tokens)
+        (recur (read-token $ws))))))
 
 (defn lex [$src]
   (lex-loop (make-state $src)))
@@ -819,15 +825,42 @@
   (let [[$items (get-block-items (get $args 0))]
       [$first (get $items 0)]
       [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]
-      [$inits (if $nested (loop-inits-2d $items 0 "") (loop-inits-1d $items 0 ""))]
       [$names (if $nested (loop-names-2d $items 0 "") (loop-names-1d $items 0 ""))]
+      [$pnames (if $nested (loop-pnames-2d $items 0 "") (loop-pnames-1d $items 0 ""))]
+      [$pinits (if $nested (loop-pinits-2d $items 0 "") (loop-pinits-1d $items 0 ""))]
+      [$vals   (if $nested (loop-vals-2d $items 0 "") (loop-vals-1d $items 0 ""))]
       [$body (cg-do-body (slice $args 1 (length $args)) 0 "")]]
-  (str "((()=>{" $inits "while(true){let __r=(()=>{" $body "})();if(__r&&__r.__recur){" (if (= (length $names) 0) "" (str "[" $names "]=__r.a;")) "continue;}return __r;}})())")))
+  (str "((" $pnames ")=>{" $pinits "while(true){let __r=(()=>{" $body "})();if(__r&&__r.__recur){" (if (= (length $names) 0) "" (str "[" $names "]=__r.a;")) "continue;}return __r;}})(" $vals ")")))
 
-(defn loop-inits-1d [$it $i $acc]
-  (if (>= $i (length $it)) $acc (loop-inits-1d $it (+ $i 2) (str $acc "let " (extract-name (get $it $i)) "=" (cg (get $it (+ $i 1))) ";"))))
-(defn loop-inits-2d [$it $i $acc]
-  (if (>= $i (length $it)) $acc (let [[$p (get-block-items (get $it $i))]] (loop-inits-2d $it (+ $i 1) (str $acc "let " (extract-name (get $p 0)) "=" (cg (get $p 1)) ";")))))
+;; _p_ 접두사 파라미터 이름 (초기값 수신용)
+(defn loop-pnames-1d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+    (let [[$n (str "_p_" (extract-name (get $it $i)))]]
+      (loop-pnames-1d $it (+ $i 2) (if (= (length $acc) 0) $n (str $acc "," $n))))))
+(defn loop-pnames-2d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+    (let [[$p (get-block-items (get $it $i))] [$n (str "_p_" (extract-name (get $p 0)))]]
+      (loop-pnames-2d $it (+ $i 1) (if (= (length $acc) 0) $n (str $acc "," $n))))))
+
+;; var name=_p_name 초기화
+(defn loop-pinits-1d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+    (let [[$n (extract-name (get $it $i))]]
+      (loop-pinits-1d $it (+ $i 2) (str $acc "var " $n "=_p_" $n ";")))))
+(defn loop-pinits-2d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+    (let [[$p (get-block-items (get $it $i))] [$n (extract-name (get $p 0))]]
+      (loop-pinits-2d $it (+ $i 1) (str $acc "var " $n "=_p_" $n ";")))))
+
+;; 초기값 표현식 (호출 인자)
+(defn loop-vals-1d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+    (let [[$v (cg (get $it (+ $i 1)))]]
+      (loop-vals-1d $it (+ $i 2) (if (= (length $acc) 0) $v (str $acc "," $v))))))
+(defn loop-vals-2d [$it $i $acc]
+  (if (>= $i (length $it)) $acc
+    (let [[$p (get-block-items (get $it $i))] [$v (cg (get $p 1))]]
+      (loop-vals-2d $it (+ $i 1) (if (= (length $acc) 0) $v (str $acc "," $v))))))
 (defn loop-names-1d [$it $i $acc]
   (if (>= $i (length $it)) $acc (let [[$n (extract-name (get $it $i))]] (loop-names-1d $it (+ $i 2) (if (= (length $acc) 0) $n (str $acc "," $n))))))
 (defn loop-names-2d [$it $i $acc]
