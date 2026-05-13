@@ -631,3 +631,92 @@ true false nil          ;; 불린/nil
 
 **핵심 정리**: $ 파라미터 + kebab-case 함수 + 맵은 문자열 키 + let 바인딩 이중대괄호 — 이 3가지만 지켜도 v11 코드 90% 정확.
 
+---
+
+## 🚀 v11.7.4 → v12 로드맵 (생산성 계층)
+
+**현재 상태**: 기본 웹 플랫폼 완성 ✅  
+**다음 축**: 운영/개발 생산성 강화
+
+### TOP 5 우선순위 (체감 가치 순)
+
+#### 1. 🔥 Hot Reload (v12.0)
+- `(reload "routes/api.fl")` — 함수/라우트 즉시 교체
+- `(watch "src")` — 파일 변경 자동 감지
+- WebSocket 유지 + State 보존
+- **영향**: 개발 속도 10배 향상
+
+#### 2. 🎭 Macro System 강화 (v12.1)
+```lisp
+(defmacro unless [cond body]
+  `(if (not ~cond) ~body))
+```
+- DSL 생성 (ORM, HTML, Routing, Test)
+- Macro Expansion Trace
+- **영향**: 언어 급 상향
+
+#### 3. 🐛 Error Trace System (v12.1)
+```lisp
+(try ... (catch e (stacktrace e)))
+```
+- Stack Trace + Source Map
+- Macro Expansion Trace
+- Runtime Context Capture
+- Variable Snapshot
+- **영향**: 대형 프로젝트 가능
+
+#### 4. 📦 Module System 2.0 (v12.2)
+```lisp
+(import std/http)
+(import std/auth :as auth)
+(export defn add)
+```
+- Namespace 충돌 방지
+- Lazy Load + Cyclic Import 검출
+- 버전 호환 체계
+- **영향**: 프로젝트 규모 확장성
+
+#### 5. 🎨 Formatter / Linter (v12.2)
+```bash
+freelang fmt src/        ;; 자동 포맷
+freelang lint            ;; 정적 검사
+freelang doctor          ;; 프로젝트 진단
+```
+- S-expression 최적화된 포맷터
+- AI-native 린터
+- **영향**: 코드 품질 + 팀 협업
+
+### 부가 기능 (v12.3+)
+
+| 기능 | v12.x | 설명 |
+|------|-------|------|
+| Type Hints/Contract | 12.3 | `(defn add [a:int b:int] -> int ...)` |
+| ORM Query Builder | 12.3 | `(select users (where ...))` |
+| Observability | 12.4 | metrics, tracing, profiling |
+| Test Framework | 12.4 | describe/it + snapshot + mock |
+| Process Management | 12.5 | cluster, worker, supervision |
+| AI Runtime API | 12.5 | ai-complete, ai-embed, ai-agent |
+| Build System | 12.6 | freelang build/test/lint/doctor |
+| Package Registry | 13.0 | fl install/add (생태계) |
+| AST Public API | 13.0 | (parse), (ast-walk), (ast-transform) |
+
+---
+
+## 📊 v11.7.4 완성도
+
+| 영역 | 완성도 | 상태 |
+|------|--------|------|
+| 기본 언어 | 100% | ✅ 프로덕션 |
+| 웹 플랫폼 | 100% | ✅ 프로덕션 |
+| DB 연동 | 100% | ✅ 프로덕션 |
+| 보안 | 100% | ✅ 프로덕션 |
+| DevTools | 100% | ✅ 프로덕션 |
+| 성능 | 100% | ✅ 376M ops/sec |
+| 테스트 | 100% | ✅ 1090/1090 통과 |
+| | | |
+| **운영 생산성** | 20% | ⏳ v12에서 강화 |
+| **개발 생산성** | 30% | ⏳ v12에서 강화 |
+
+**v11의 역할**: Web Platform + Language Core  
+**v12의 역할**: Developer Productivity + Ecosystem
+
