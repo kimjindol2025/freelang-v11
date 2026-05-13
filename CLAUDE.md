@@ -759,3 +759,52 @@ freelang doctor          ;; 프로젝트 진단
 **v11의 역할**: Web Platform + Language Core  
 **v12의 역할**: Developer Productivity + Ecosystem
 
+---
+
+## 🔧 코드 작성 진행 규칙 (seed compiler / runtime 작업 시)
+
+> 전체 규칙: `CODING_RULES.md`
+
+### 작업 진입 순서 (필수)
+```
+리서치 → 플랜모드 → 문서화 → 태스크 등록 → 구현 → 테스트/검증 루프
+```
+
+### 핵심 원칙
+- **혼자 결정 금지** — 아키텍처·ABI·Stage 설계 변경은 반드시 협의
+- **단일 관심사** — 각 Stage는 한 기능만 (S5=vector+map, S6=loop/recur, S7=closure)
+- **검증은 실제 실행** — 눈으로 보고 통과 선언 금지
+- **경고 0** — `gcc -Wall -Wextra` 기준, 경고 있으면 다음 단계 진행 불가
+- **줄 수 한도** — `runtime.c` ≤ 500줄, `freelang.c` ≤ 600줄
+- **Edit 도구** — `sed -i` 금지, 파일 수정은 항상 Edit 도구
+
+### Stage 실패 규칙
+중간단계 하나라도 실패 시 **해당 Stage 처음부터 재시작** (부분 수정 금지)
+
+### 완료 후 처리 (Stage 단위)
+```bash
+git add <변경파일> && git commit -m "[S{N}] 제목"
+git push origin master
+# 블로그 포스팅 (blog.dclub.kr, 500자 이상)
+```
+
+### 금지 패턴
+| 금지 | 대신 |
+|------|------|
+| `sed -i` 파일 수정 | Edit 도구 |
+| 눈으로 보고 통과 선언 | 실제 명령 실행 후 확인 |
+| 여러 기능 한 Stage | Stage 분리 |
+| 혼자 아키텍처 결정 | 협의 |
+| 임시 우회 (hotfix) | 근본 원인 수정 |
+| `--no-verify` / `--force` | 원인 해결 |
+
+### seed compiler 현재 지원 범위
+| 기능 | 상태 |
+|------|------|
+| 리터럴·defn·define·let·if·cond·do | ✅ S4 |
+| 산술·비교·논리·I/O | ✅ S4 |
+| vector `[...]`·map `{...}`·vec-\*/map-\* | ✅ S5 |
+| loop/recur | ✅ S6 |
+| closure (fn literal) | ✅ S7 |
+| map/filter (고차함수) | ⏳ S8 |
+
