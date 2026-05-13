@@ -118,9 +118,11 @@ export class ScopeStack {
     this.meta = new Map();
   }
 
-  /** 전체 스택 저장 (callFunctionValue 복원용) */
+  /** 전체 스택 저장 (callFunctionValue 복원용).
+   *  stack[0](전역)은 참조로 보존 — fl-reload 등 전역 수정이 함수 반환 후에도 유지됨.
+   *  클로저 스코프(stack[1+])는 격리를 위해 복사. */
   saveStack(): Map<string, any>[] {
-    return this.stack.map((s) => new Map(s));
+    return [this.stack[0], ...this.stack.slice(1).map((s) => new Map(s))];
   }
 
   /** 저장된 스택으로 복원 */

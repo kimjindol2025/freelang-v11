@@ -162,6 +162,17 @@ export function lex(source: string): Token[] {
             case "r": value += "\r"; break;
             case "\\": value += "\\"; break;
             case '"': value += '"'; break;
+            case "x": {
+              // \xNN hex escape
+              const hex = source.slice(i + 1, i + 3);
+              if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                value += String.fromCharCode(parseInt(hex, 16));
+                i += 2; col += 2;
+              } else {
+                value += "x";
+              }
+              break;
+            }
             default: value += esc;
           }
           i++;

@@ -1,103 +1,88 @@
-;; DevTools Hot Reload — 파일 변경 감지 + 자동 재로드
+;; stdlib/devtools-reload.fl — v12 Hot Reload
 ;; (load "stdlib/devtools-reload.fl")
-;; (watch-and-reload "src" {:extensions [".fl"] :debounce 300})
+;;
+;; 파일 변경 감지 → 라우트 재등록 (서버 재시작 없음)
+;;
+;; 빠른 시작:
+;;   (load "stdlib/devtools-reload.fl")
+;;   (hot-reload! "app.fl")          ; app.fl 변경 시 자동 재로드
+;;
+;; 세밀한 제어:
+;;   (hot-reload! "routes.fl" {:debounce 200 :on-reload (fn [f] (println f))})
+;;
+;; 다중 파일:
+;;   (watch-files ["routes.fl" "handlers.fl"] (fn [f] (reload-and-refresh! f)))
 
-(define *file-watchers* {})
-(define *module-cache* {})
+;; ── 핵심 API ──────────────────────────────────────────────────────────────────
 
-;; 파일 감시 시작
-(defn watch-and-reload [path opts]
-  "파일 변경 감시 + 자동 재로드
-   opts: {:extensions [.fl] :debounce 300 :on-reload fn}"
-  (let [extensions (get opts :extensions [".fl"])
-        debounce (get opts :debounce 300)
-        on-reload (get opts :on-reload println)]
-
-    (println (str "👀 Watching: " path))
-
-    ;; 파일 시스템 감시 (간단한 구현)
-    (let [watch-fn (fn []
-      (loop [last-state {}]
-        (sleep 500)
-
-        ;; 현재 파일 상태 조회
-        (let [current-state (file-ls path)]
-          (if (not= last-state current-state)
-            (do
-              (println (str "📝 Changes detected in " path))
-              (on-reload)
-              (recur current-state))
-            (recur last-state)))))]
-
-      ;; 백그라운드 스레드에서 실행
-      (spawn-thread watch-fn)
-
-      ;; 등록
-      (assoc *file-watchers* path watch-fn))))
-
-;; 모듈 재로드
-(defn reload [module-path]
-  "특정 모듈 재로드
-   (reload \"routes/api.fl\")"
+(defn reload! [file-path]
+  "파일을 현재 인터프리터 컨텍스트에서 재평가.
+   defn/define이 현재 env에서 업데이트됨."
   (try
-    (do
-      ;; 캐시에서 제거
-      (dissoc *module-cache* module-path)
-
-      ;; 파일 다시 로드
-      (load module-path)
-
-      ;; 라우트가 있으면 재등록
-      (if (defined? routes)
-        (do
-          (println (str "🔄 Reloaded: " module-path))
-          (route routes))))
-
+    (fl-reload file-path)
+    (println (str "\x1b[36m[HOT]\x1b[0m reloaded: " file-path))
     (catch e
-      (do
-        (println (str "❌ Reload failed: " (get e "message")))
-        (stacktrace e)))))
+      (println (str "\x1b[31m[HOT]\x1b[0m reload error: " (get e "message"))))))
 
-;; 모듈 캐시 조회 (성능)
-(defn get-module-cached [path]
-  "캐시된 모듈 조회, 없으면 로드"
-  (if (has-key? *module-cache* path)
-    (get *module-cache* path)
-    (do
-      (let [module (load path)]
-        (assoc *module-cache* path module)
-        module))))
+(defn reload-and-refresh! [file-path]
+  "파일 재로드 후 라우트 재등록.
+   HTTP 서버는 계속 실행됨 (포트 유지)."
+  (try
+    (server-clear-routes)
+    (fl-reload file-path)
+    (println (str "\x1b[36m[HOT]\x1b[0m reloaded + routes refreshed: " file-path))
+    (catch e
+      (println (str "\x1b[31m[HOT]\x1b[0m reload error: " (get e "message"))))))
 
-;; 파일 감시 중지
-(defn stop-watch [path]
-  "파일 감시 중지"
-  (do
-    (dissoc *file-watchers* path)
-    (println (str "🛑 Stopped watching: " path))))
+(defn hot-reload! [file-path]
+  "파일 변경 감지 → 자동 재로드 + 라우트 재등록.
+   서버는 계속 실행. 옵션 없으면 기본값 사용."
+  (hot-reload-opts! file-path {}))
 
-;; 모든 감시 중지
-(defn stop-watch-all []
-  "모든 파일 감시 중지"
-  (do
-    (for [path (keys *file-watchers*)]
-      (stop-watch path))
-    (println "🛑 All watchers stopped")))
+(defn hot-reload-opts! [file-path opts]
+  "hot-reload! + 옵션 지원.
+   opts: {:debounce 300 :on-reload (fn [f] ...) :clear-routes true}"
+  (let [debounce  (get opts :debounce 300)
+        on-reload (get opts :on-reload nil)
+        clear?    (get opts :clear-routes true)]
+    (println (str "\x1b[2m[HOT] watching: " file-path "\x1b[0m"))
+    (fl-watch file-path
+      (fn [changed]
+        (when clear? (server-clear-routes))
+        (try
+          (fl-reload changed)
+          (println (str "\x1b[36m[HOT]\x1b[0m " (now-ms) " reloaded: " changed))
+          (when on-reload (on-reload changed))
+          (catch e
+            (println (str "\x1b[31m[HOT]\x1b[0m error in " changed ": " (get e "message"))))))
+      {:debounce debounce})))
 
-;; 간단한 파일 리스팅 (helper)
-(defn file-ls [path]
-  "디렉토리의 파일 목록 + 타임스탐프"
-  {:files []  ;; 실제 구현에서는 fs 모듈 사용
-   :ts (now-ms)})
+;; ── 다중 파일 감시 ────────────────────────────────────────────────────────────
 
-;; 스레드 생성 (간단한 mock)
-(defn spawn-thread [fn]
-  "백그라운드 스레드에서 함수 실행 (프로토타입)"
-  (fn))  ;; 실제로는 Worker/Cluster 사용
+(defn watch-files [file-paths callback]
+  "여러 파일을 동시에 감시. 각 변경마다 callback(changed-path) 호출."
+  (map (fn [f] (fl-watch f callback {})) file-paths))
 
-;; 사용 예시:
-;; (load "stdlib/devtools-reload.fl")
-;; (watch-and-reload "src" {
-;;   :extensions [".fl"]
-;;   :debounce 300
-;;   :on-reload (fn [] (println "🔄 App reloaded!"))
-;; })
+(defn hot-reload-dir! [dir ext]
+  "디렉토리 내 특정 확장자 파일 모두 감시.
+   예: (hot-reload-dir! \"routes\" \".fl\")"
+  (let [files (filter
+                (fn [f] (str-ends-with f ext))
+                (file-list dir))]
+    (watch-files files (fn [changed]
+      (server-clear-routes)
+      (try
+        (fl-reload changed)
+        (println (str "\x1b[36m[HOT]\x1b[0m reloaded: " changed))
+        (catch e
+          (println (str "\x1b[31m[HOT]\x1b[0m error: " (get e "message")))))))))
+
+;; ── 파일 목록 헬퍼 ────────────────────────────────────────────────────────────
+
+(defn file-list [dir]
+  "디렉토리 내 파일 목록 반환 (전체 경로)."
+  (let [r (shell-exec-result (str "find " dir " -type f 2>/dev/null"))]
+    (if (get r :ok)
+      (filter (fn [s] (> (length s) 0))
+              (str-split (str-trim (get r :stdout)) "\n"))
+      [])))

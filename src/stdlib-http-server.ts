@@ -355,6 +355,16 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return null;
     },
 
+    // v12: 라우트 초기화 (hot reload 시 재등록 전 호출)
+    "server-clear-routes": (): null => {
+      routes.length = 0;
+      return null;
+    },
+    "server_clear_routes": (): null => {
+      routes.length = 0;
+      return null;
+    },
+
     // server_static dir [urlPrefix] -> null  정적 파일 서빙 (server-static "public" "/")
     "server_static": (dir: string, urlPrefix: string = "/"): null => {
       const mimeMap: Record<string, string> = {

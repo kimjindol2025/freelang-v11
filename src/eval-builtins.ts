@@ -433,6 +433,7 @@ function flExecOpNative(op: string, vals: any[]): any {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }
     }
+
     case "file-mkdir": case "file_mkdir": {
       const dirPath = String(v0 ?? "");
       const fs = require("fs");
@@ -818,6 +819,80 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       } catch (e: any) {
         throw new Error(`load failed: '${filePath}': ${e.message}`);
       }
+    }
+
+    // ── v12 Hot Reload ─────────────────────────────────────────────────────────
+    case "fl-reload": {
+      // (fl-reload "path/to/file.fl") — 현재 인터프리터 컨텍스트에서 파일 재평가
+      const frFilePath = String(args[0] ?? "");
+      const frFs = require("fs");
+      const frPath = require("path");
+      try {
+        const frResolved = frPath.resolve(process.cwd(), frFilePath);
+        if ((interp as any).__loadCache) (interp as any).__loadCache.delete(frResolved);
+        const frSrc = frFs.readFileSync(frResolved, "utf-8");
+        const { lex: frLex } = require("./lexer");
+        const { parse: frParse } = require("./parser");
+        const frTokens = frLex(frSrc, frResolved);
+        const frAst = frParse(frTokens);
+        const frSavedPath = (interp as any).currentFilePath;
+        (interp as any).currentFilePath = frResolved;
+        // callFunctionValue는 fromSnapshot으로 스코프를 교체한다.
+        // fl-reload는 항상 전역 스코프에 define해야 하므로 스택을 전역 전용으로 임시 교체.
+        const frVars = (interp as any).context.variables;
+        // 전역 Map 참조 — 최초 호출 시 저장 (top-level에서만 유효)
+        if (!(interp as any).__hotReloadGlobalMap) {
+          (interp as any).__hotReloadGlobalMap = frVars.stack ? frVars.stack[0] : null;
+        }
+        const frGlobal = (interp as any).__hotReloadGlobalMap;
+        const frSavedStack = frVars.saveStack ? frVars.saveStack() : null;
+        try {
+          if (frGlobal && frVars.restoreStack) frVars.restoreStack([frGlobal]);
+          (interp as any).interpret(frAst);
+        } finally {
+          // frGlobal은 interpret 중 새 define이 쓰여진 실제 Map 참조.
+          // stack[0]을 frGlobal로 고정하고 나머지 클로저 스코프만 복원.
+          if (frSavedStack && frVars.restoreStack) {
+            frVars.restoreStack([frGlobal, ...frSavedStack.slice(1)]);
+          }
+          (interp as any).currentFilePath = frSavedPath;
+        }
+        return null;
+      } catch (e: any) {
+        throw new Error(`[fl-reload] '${frFilePath}': ${e.message}`);
+      }
+    }
+    case "fl-watch": {
+      // (fl-watch "path" callback-fn) or (fl-watch "path" callback-fn {:debounce 300})
+      const fwPath = String(args[0] ?? "");
+      const fwCb = args[1];
+      const fwOpts = args[2];
+      const fwDebounce: number = (fwOpts && typeof fwOpts === "object")
+        ? ((fwOpts as any)[":debounce"] ?? (fwOpts as any)["debounce"] ?? 300)
+        : 300;
+      const fwFs = require("fs");
+      const fwPathMod = require("path");
+      const fwResolved = fwPathMod.resolve(process.cwd(), fwPath);
+      let fwLastMtime = 0; let fwLastSize = -1;
+      try { const st = fwFs.statSync(fwResolved); fwLastMtime = st.mtimeMs; fwLastSize = st.size; } catch (_e) {}
+      let fwDebTimer: NodeJS.Timeout | null = null;
+      const fwInterval = setInterval(() => {
+        try {
+          const st = fwFs.statSync(fwResolved);
+          if (st.mtimeMs !== fwLastMtime || st.size !== fwLastSize) {
+            fwLastMtime = st.mtimeMs; fwLastSize = st.size;
+            if (fwDebTimer) clearTimeout(fwDebTimer);
+            fwDebTimer = setTimeout(() => {
+              fwDebTimer = null;
+              try { callFnVal(fwCb, [fwResolved]); } catch (e: any) {
+                process.stderr.write(`\x1b[33m[fl-watch]\x1b[0m ${e.message}\n`);
+              }
+            }, fwDebounce);
+          }
+        } catch (_e) {}
+      }, 500);
+      (fwInterval as any).unref?.();
+      return null;
     }
 
     // Phase Step3: require function (module system)
@@ -2653,6 +2728,13 @@ loop().catch(e => {
     case "uuid": case "uuid4": {
       const { randomUUID } = require("crypto");
       return randomUUID();
+    }
+    case "sleep": {
+      const ms = Math.max(0, Number(args[0] ?? 0));
+      // 동기 sleep — SharedArrayBuffer 없이 Atomics.wait 사용
+      const buf = new SharedArrayBuffer(4);
+      Atomics.wait(new Int32Array(buf), 0, 0, ms);
+      return null;
     }
     case "push":
       if (!Array.isArray(args[0])) return [args[1]];
