@@ -79,7 +79,7 @@
         use-math (= (get module :math) true)
         _    (file-write tmp (json-stringify {"wasm" wasm}))
         inst-code (if use-math
-          "const MATH={sin:Math.sin,cos:Math.cos,tan:Math.tan,exp:Math.exp,log:Math.log,pow:Math.pow,atan:Math.atan,atan2:Math.atan2};const i=new WebAssembly.Instance(m,{math:MATH});"
+          "const MATH={sin:Math.sin,cos:Math.cos,tan:Math.tan,exp:Math.exp,log:Math.log,pow:Math.pow,atan:Math.atan,atan2:Math.atan2,tanh:Math.tanh};const i=new WebAssembly.Instance(m,{math:MATH});"
           "const i=new WebAssembly.Instance(m);")
         cmd  (str "node -e \""
                "const b=Buffer.from('" wasm "','base64');"
