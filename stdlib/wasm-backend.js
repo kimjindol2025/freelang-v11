@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// FreeLang → WASM 컴파일러 백엔드 v3 (W-4)
+// FreeLang → WASM 컴파일러 백엔드 v4 (W-5)
 // mode: compile | eval | arr-reduce | arr-map | arr-zip-map | arr-filter | arr-scan
-//       arr-reduce-f64 | arr-map-f64 | arr-zip-map-f64
+//       arr-reduce-f64 | arr-map-f64 | arr-zip-map-f64 | arr-scan-f64
+//       matrix-mul-f64 (W-5)
 'use strict';
 
 // ── 인코딩 유틸 ───────────────────────────────────────────────────────────────
@@ -43,10 +44,12 @@ const MATH_IMPORTS_DEF = [
   { module:'math', field:'pow',   type:[0x60,0x02,F64,F64,0x01,F64] },
   { module:'math', field:'atan',  type:[0x60,0x01,F64,0x01,F64] },
   { module:'math', field:'atan2', type:[0x60,0x02,F64,F64,0x01,F64] },
+  { module:'math', field:'tanh',  type:[0x60,0x01,F64,0x01,F64] },
 ];
 const MATH_FN_NAMES = MATH_IMPORTS_DEF.map(m => m.field);
 const MATH_OBJ = { sin:Math.sin, cos:Math.cos, tan:Math.tan, exp:Math.exp,
-                   log:Math.log, pow:Math.pow, atan:Math.atan, atan2:Math.atan2 };
+                   log:Math.log, pow:Math.pow, atan:Math.atan, atan2:Math.atan2,
+                   tanh:Math.tanh };
 
 // ── 내장 함수 (메모리 모드 시 자동 주입) ─────────────────────────────────────
 // idx: __alloc=0 __arr_len=1 __arr_get=2 __arr_set=3 __arr_new=4
@@ -83,6 +86,22 @@ const BUILTIN_CODE = [
    0x0B, 0x0B,                                                            // end loop/block
    0x20,0x02, 0x0B]                                                        // return ptr
 ];
+
+// __arr_new 바이트코드를 동적 alloc 인덱스로 생성 (mem+math 동시 사용 시 필요)
+function genArrNewCode(allocCallIdx) {
+  return [
+    0x01, 0x02, I32,
+    0x20,0x00, 0x41,0x04, 0x6C, 0x41,0x04, 0x6A, 0x10,...uleb128(allocCallIdx), 0x21,0x02,
+    0x20,0x02, 0x20,0x00, 0x36,0x02,0x00,
+    0x41,0x00, 0x21,0x03,
+    0x02,0x40, 0x03,0x40,
+    0x20,0x03, 0x20,0x00, 0x4E, 0x0D,0x01,
+    0x20,0x02, 0x20,0x03, 0x41,0x04, 0x6C, 0x6A, 0x20,0x01, 0x36,0x02,0x04,
+    0x20,0x03, 0x41,0x01, 0x6A, 0x21,0x03, 0x0C,0x00,
+    0x0B, 0x0B,
+    0x20,0x02, 0x0B
+  ];
+}
 
 // ── 표현식 컴파일러 ───────────────────────────────────────────────────────────
 
@@ -187,18 +206,18 @@ function compileExpr(expr, params, pTypes, locals, fns, bofs, mathOfs) {
   // ── 배열 (메모리) 연산 ────────────────────────────────────────────────────
   if (op === 'arr-new') {
     const [l, ini] = args;
-    return { bytes: [...CE(l).bytes, ...CE(ini).bytes, 0x10, ARR_NEW_IDX], type: I32 };
+    return { bytes: [...CE(l).bytes, ...CE(ini).bytes, 0x10, ...uleb128(mathOfs + ARR_NEW_IDX)], type: I32 };
   }
   if (op === 'arr-get') {
     const [p, i] = args;
-    return { bytes: [...CE(p).bytes, ...CE(i).bytes, 0x10, ARR_GET_IDX], type: I32 };
+    return { bytes: [...CE(p).bytes, ...CE(i).bytes, 0x10, ...uleb128(mathOfs + ARR_GET_IDX)], type: I32 };
   }
   if (op === 'arr-set') {
     const [p, i, v] = args;
-    return { bytes: [...CE(p).bytes, ...CE(i).bytes, ...CE(v).bytes, 0x10, ARR_SET_IDX], type: I32 };
+    return { bytes: [...CE(p).bytes, ...CE(i).bytes, ...CE(v).bytes, 0x10, ...uleb128(mathOfs + ARR_SET_IDX)], type: I32 };
   }
   if (op === 'arr-len') {
-    return { bytes: [...CE(args[0]).bytes, 0x10, ARR_LEN_IDX], type: I32 };
+    return { bytes: [...CE(args[0]).bytes, 0x10, ...uleb128(mathOfs + ARR_LEN_IDX)], type: I32 };
   }
 
   // ── 산술 / 비교 ──────────────────────────────────────────────────────────
@@ -296,9 +315,6 @@ function buildModule(ast) {
   const mem = !!ast.memory;
   const useMath = !!ast.math;
 
-  // math + memory 동시 사용은 W-4에서 미지원
-  if (mem && useMath) throw new Error('memory + math 동시 사용은 미지원 (W-5에서 추가 예정)');
-
   const mathOfs = useMath ? MATH_IMPORTS_DEF.length : 0;
   const bofs    = mem ? BUILTIN_COUNT : 0;
   const fnOfs   = mathOfs + bofs; // 사용자 함수 인덱스 시작점
@@ -308,7 +324,25 @@ function buildModule(ast) {
 
   let types, importSec, fnIdx, codes, exps;
 
-  if (useMath) {
+  if (useMath && mem) {
+    // W-5: math import + memory 동시 지원
+    const mathTypes = MATH_IMPORTS_DEF.map(m => m.type);
+    types = [...mathTypes, ...BUILTIN_TYPES, ...compiled.map(f => f.typeEntry)];
+    const impEntries = MATH_IMPORTS_DEF.map((m, i) =>
+      [...encStr(m.module), ...encStr(m.field), 0x00, ...uleb128(i)]
+    );
+    importSec = section(0x02, [...uleb128(impEntries.length), ...impEntries.flat()]);
+    fnIdx = [...BUILTIN_TYPES.map((_, i) => mathOfs + i),
+             ...compiled.map((_, i) => mathOfs + BUILTIN_COUNT + i)];
+    const arrNewCode = genArrNewCode(mathOfs + ALLOC_IDX);
+    const builtinCodes = [...BUILTIN_CODE.slice(0, 4), arrNewCode]
+      .map(b => [...uleb128(b.length), ...b]);
+    codes = [...builtinCodes, ...compiled.map(f => f.codeEntry)];
+    exps  = [
+      ...compiled.map((f, i) => [...encStr(f.name), 0x00, ...uleb128(mathOfs + BUILTIN_COUNT + i)]),
+      [...encStr("memory"), 0x02, 0x00]
+    ];
+  } else if (useMath) {
     // math import 타입들 먼저, 그 다음 사용자 함수 타입들
     const mathTypes = MATH_IMPORTS_DEF.map(m => m.type);
     types = [...mathTypes, ...compiled.map(f => f.typeEntry)];
@@ -623,6 +657,33 @@ try {
     const result = [];
     for (const x of input_array) { acc = step(acc, x); result.push(acc); }
     out({ ok: true, value: result });
+
+  // ── W-5: ML / 행렬 연산 ───────────────────────────────────────────────────
+
+  } else if (mode === 'matrix-mul-f64') {
+    // {mat_a, mat_b, rows_a, cols_a, cols_b}  — 행렬 곱 (WASM macc 스텝)
+    const { mat_a, mat_b, rows_a, cols_a, cols_b } = ast;
+    const fn = {
+      name: '__macc__',
+      params: ['sum', 'a', 'b'],
+      paramTypes: ['f64', 'f64', 'f64'],
+      returnType: 'f64',
+      body: ['+', 'sum', ['*', 'a', 'b']]
+    };
+    const b = buildModule({ fns:[fn] });
+    const inst = new WebAssembly.Instance(new WebAssembly.Module(b));
+    const macc = inst.exports.__macc__;
+    const C = new Array(rows_a * cols_b);
+    for (let i = 0; i < rows_a; i++) {
+      for (let j = 0; j < cols_b; j++) {
+        let sum = 0;
+        for (let k = 0; k < cols_a; k++) {
+          sum = macc(sum, mat_a[i * cols_a + k], mat_b[k * cols_b + j]);
+        }
+        C[i * cols_b + j] = sum;
+      }
+    }
+    out({ ok: true, value: C });
   }
 } catch(e) {
   out({ ok:false, error:e.message });

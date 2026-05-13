@@ -420,3 +420,56 @@
         mx (wasm-arr-reduce-f64 arr (first arr) ["if" [">" "x" "acc"] "x" "acc"])
         mn (wasm-arr-reduce-f64 arr (first arr) ["if" ["<" "x" "acc"] "x" "acc"])]
     {:sum s :mean (/ s n) :max mx :min mn :count n}))
+
+;; ── W-5: ML 활성화 함수 & 행렬 연산 ─────────────────────────────────────────────
+;;
+;; (wasm-arr-map-math arr expr)  — Math import 사용 가능한 f64 map
+;; (wasm-arr-sigmoid arr)        — sigmoid(x) = 1/(1+exp(-x))
+;; (wasm-arr-relu arr)           — relu(x) = max(0,x)
+;; (wasm-arr-tanh arr)           — tanh(x)
+;; (wasm-arr-softmax arr)        — softmax (수치 안정적)
+;; (wasm-matrix-mul A B ra ca cb) — 행렬 곱, row-major 평탄 배열
+;; (wasm-nn-forward W x b act)   — 단일 dense layer: act(W*x+b)
+
+(defn wasm-arr-map-math [fl-arr expr]
+  (let [r (-wasm-exec "arr-map-f64" {"input_array" fl-arr "expr" expr "math" true})]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM arr-map-math 오류: " (get r "error"))))))
+
+(defn wasm-arr-sigmoid [arr]
+  (wasm-arr-map-math arr ["/" 1.0 ["+" 1.0 ["exp" ["neg" "x"]]]]))
+
+(defn wasm-arr-relu [arr]
+  (wasm-arr-map-f64 arr ["if" [">" "x" 0.0] "x" 0.0]))
+
+(defn wasm-arr-tanh [arr]
+  (wasm-arr-map-math arr ["tanh" "x"]))
+
+(defn wasm-arr-softmax [arr]
+  (let [max-val (wasm-arr-reduce-f64 arr (first arr)
+                  ["if" [">" "x" "acc"] "x" "acc"])
+        shifted (wasm-arr-map-math arr ["exp" ["-" "x" max-val]])
+        sum     (wasm-arr-sum-f64 shifted)]
+    (wasm-arr-scale-f64 shifted (/ 1.0 sum))))
+
+(defn wasm-matrix-mul [mat-a mat-b rows-a cols-a cols-b]
+  (let [r (-wasm-exec "matrix-mul-f64" {
+    "mat_a" mat-a "mat_b" mat-b
+    "rows_a" rows-a "cols_a" cols-a "cols_b" cols-b
+  })]
+    (if (get r "ok")
+      (get r "value")
+      (throw (str "WASM matrix-mul 오류: " (get r "error"))))))
+
+(defn wasm-nn-forward [W x b-vec activation]
+  (let [in-size  (length x)
+        out-size (length b-vec)
+        Wx       (wasm-matrix-mul W x out-size in-size 1)
+        z        (wasm-arr-zip-map-f64 Wx b-vec ["+" "a" "b"])]
+    (cond
+      (= activation "sigmoid") (wasm-arr-sigmoid z)
+      (= activation "relu")    (wasm-arr-relu z)
+      (= activation "tanh")    (wasm-arr-tanh z)
+      (= activation "softmax") (wasm-arr-softmax z)
+      true z)))
