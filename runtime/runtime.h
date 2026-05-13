@@ -78,4 +78,8 @@ FLValue fl_str_n(int count, ...);
 FLValue fl_println(FLValue v);
 FLValue fl_print(FLValue v);
 
+/* ── 파일 I/O ── */
+FLValue fl_file_read(FLValue path);
+FLValue fl_file_write(FLValue path, FLValue content);
+
 #endif /* FREELANG_RUNTIME_H */
