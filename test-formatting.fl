@@ -1,35 +1,20 @@
-;; 포맷팅 헬퍼 직접 테스트
-
 (println "=== 포맷팅 헬퍼 테스트 ===")
-
-;; str-pad-left
 (println "str-pad-left tests:")
-(println (str-pad-left "5" 5 "0"))      ;; "00005"
-(println (str-pad-left "hi" 5))         ;; "   hi"
-
-;; str-pad-right  
+(println (str-pad-left "5" 5 "0"))
+(println (str-pad-left "hi" 5))
 (println "str-pad-right tests:")
-(println (str-pad-right "hi" 5))        ;; "hi   "
-(println (str-pad-right "hi" 5 "-"))    ;; "hi---"
-
-;; str-truncate
+(println (str-pad-right "hi" 5))
+(println (str-pad-right "hi" 5 "-"))
 (println "str-truncate tests:")
-(println (str-truncate "hello world" 5))      ;; "he..."
-(println (str-truncate "hello" 5 "~"))        ;; "hell~"
-
-;; format-number
+(println (str-truncate "hello world" 5))
+(println (str-truncate "hello" 5 "~"))
 (println "format-number tests:")
-(println (format-number 1234567))       ;; "1,234,567"
-(println (format-number 42))            ;; "42"
-
-;; format-decimal
+(println (format-number 1234567))
+(println (format-number 42))
 (println "format-decimal tests:")
-(println (format-decimal 3.14159 2))    ;; "3.14"
-(println (format-decimal 42 2))         ;; "42.00"
-
-;; format-percent
+(println (format-decimal 3.14159 2))
+(println (format-decimal 42 2))
 (println "format-percent tests:")
-(println (format-percent 0.456 1))      ;; "45.6%"
-(println (format-percent 1.0 0))        ;; "100%"
-
+(println (format-percent 0.456 1))
+(println (format-percent 1 0))
 (println "✅ 모든 테스트 완료!")

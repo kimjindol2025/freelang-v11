@@ -71,6 +71,28 @@ function validateIdentifier(name: string): string {
   return name;
 }
 
+function buildWhere(where: any): { sql: string; params: any[] } {
+  if (typeof where === "string")
+    throw new Error(`db WHERE 절에 문자열 금지 — Map으로 전달하세요. 예: {:id 1} 또는 {"status" "active"}`);
+  if (!where) return { sql: "", params: [] };
+  const obj: Record<string, any> = where instanceof Map ? Object.fromEntries(where) : where;
+  const parts: string[] = [];
+  const params: any[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    const m = k.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*([><=!]+)?$/);
+    if (!m) throw new Error(`잘못된 WHERE 키: '${k}'`);
+    const col = m[1];
+    const op = m[2] || "=";
+    if (v === null || v === undefined) {
+      parts.push(op === "!=" ? `${col} IS NOT NULL` : `${col} IS NULL`);
+    } else {
+      parts.push(`${col} ${op} ?`);
+      params.push(v);
+    }
+  }
+  return { sql: parts.length ? "WHERE " + parts.join(" AND ") : "", params };
+}
+
 // ── Module ───────────────────────────────────────────────────────────────────
 
 export function createDbModule() {
@@ -152,23 +174,23 @@ export function createDbModule() {
     },
 
     // db_update dbPath table data where -> true
-    "db_update": (dbPath: string, table: string, data: Record<string, any>, where: string): boolean => {
+    // where: Map 또는 객체 — 예: {:id 1} {"status" "active"}
+    "db_update": (dbPath: string, table: string, data: Record<string, any>, where: any): boolean => {
       const db = getDb(dbPath);
       validateIdentifier(table);
-      if (typeof where === "string" && where.includes(";"))
-        throw new Error("db_update: where 절에 세미콜론 사용 금지");
       const keys = Object.keys(data).map(validateIdentifier);
       const sets = keys.map(k => `${k}=?`).join(", ");
-      db.prepare(`UPDATE ${table} SET ${sets} WHERE ${where}`).run(...Object.values(data));
+      const { sql: whereSql, params: whereParams } = buildWhere(where);
+      db.prepare(`UPDATE ${table} SET ${sets} ${whereSql}`).run(...Object.values(data), ...whereParams);
       return true;
     },
 
     // db_delete_row dbPath table where -> true
-    "db_delete_row": (dbPath: string, table: string, where: string): boolean => {
+    // where: Map 또는 객체 — 예: {:id 1} {"status" "inactive"}
+    "db_delete_row": (dbPath: string, table: string, where: any): boolean => {
       validateIdentifier(table);
-      if (typeof where === "string" && where.includes(";"))
-        throw new Error("db_delete_row: where 절에 세미콜론 사용 금지");
-      getDb(dbPath).prepare(`DELETE FROM ${table} WHERE ${where}`).run();
+      const { sql: whereSql, params } = buildWhere(where);
+      getDb(dbPath).prepare(`DELETE FROM ${table} ${whereSql}`).run(...params);
       return true;
     },
 
