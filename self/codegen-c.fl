@@ -23,10 +23,12 @@
     "\r" "\\r"))
 
 (defn c-name [$n]
-  ;; FL 식별자를 C 식별자로 변환 (- → _ / ? → _p / ! → _b)
+  ;; FL 식별자를 C 식별자로 변환 (-> → _to_ / - → _ / ? → _p / ! → _b)
   (str-replace
     (str-replace
-      (str-replace $n "-" "_")
+      (str-replace
+        (str-replace $n "->" "_to_")
+        "-" "_")
       "?" "_p")
     "!" "_b"))
 
@@ -153,7 +155,20 @@
   [(= $op "substring")   (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "trim")        (str "trim(" (cgc (get $args 0)) ")")]
   [(= $op "slice")       (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  ;; S16: list vararg → fl_vec_from, _fl-map-set alias
+  [(= $op "list")        (cgc-list $args)]
+  [(= $op "_fl_map_set") (str "fl_map_set(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
+
+;; ── list (vararg → fl_vec_from) ──
+
+(defn cgc-list [$args]
+  (if (= (length $args) 0)
+    "fl_vec_new()"
+    (let [[$cnt (length $args)]
+          [$vals (cgc-args $args)]]
+      (str "(__extension__ ({ FLValue __fl_lst[" $cnt "] = {" $vals "};"
+           " fl_vec_from(__fl_lst, " $cnt "); }))"))))
 
 ;; ── str 특수 처리 (n인자 → fl_str_n) ──
 
