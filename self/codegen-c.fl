@@ -2,9 +2,10 @@
 ;; 지원 범위: self/CODEGEN_C_SCOPE.md 참조
 ;; ABI: self/ABI.md (FLValue tagged union)
 
-;; S19: lambda collector — capture-free fn → static FLClosure
-(define lambda-id-atom   (atom 0))
-(define lambda-defs-atom (atom []))
+;; S19/S20: lambda collector + capture 추적
+(define lambda-id-atom    (atom 0))
+(define lambda-defs-atom  (atom []))
+(define outer-params-atom (atom []))
 
 ;; ── 유틸 ──
 
@@ -209,27 +210,83 @@
   [(= $op "cg-match")"fl_nil()"]
   [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
 
-;; ── S19: fn lambda → static FLClosure 추출 ──
+;; ── S19/S20: fn lambda → static FLClosure 추출 (capture 지원) ──
 
+;; argv[i] 선언 구문
 (defn cgc-fn-argv-decls [$items $i $acc]
   (if (>= $i (length $items)) $acc
   (let [[$name (c-name (cgc-extract-name (get $items $i)))]]
     (cgc-fn-argv-decls $items (+ $i 1)
       (str $acc "    FLValue " $name " = argv[" $i "];\n")))))
 
+;; 파라미터 이름 목록 수집
+(defn cgc-fn-param-names [$items $i $acc]
+  (if (>= $i (length $items)) $acc
+  (cgc-fn-param-names $items (+ $i 1)
+    (push $acc (c-name (cgc-extract-name (get $items $i)))))))
+
+;; body AST에서 variable 이름 수집 (중복 제거)
+(defn cgc-collect-vars [$node $acc]
+  (cond
+    [(null? $node) $acc]
+    [(= (get $node :kind) "variable")
+     (let [[$n (c-name (get $node :name))]]
+       (if (includes-item $acc $n) $acc (push $acc $n)))]
+    [(= (get $node :kind) "sexpr")
+     (cgc-collect-vars-loop (get $node :args) 0 $acc)]
+    [(= (get $node :kind) "block")
+     (cgc-collect-vars-loop (get-block-items $node) 0 $acc)]
+    [(= (get $node :kind) "and")
+     (cgc-collect-vars-loop (get $node :args) 0 $acc)]
+    [(= (get $node :kind) "or")
+     (cgc-collect-vars-loop (get $node :args) 0 $acc)]
+    [true $acc]))
+
+(defn cgc-collect-vars-loop [$args $i $acc]
+  (if (or (null? $args) (>= $i (length $args))) $acc
+  (cgc-collect-vars-loop $args (+ $i 1)
+    (cgc-collect-vars (get $args $i) $acc))))
+
+;; _self->env[i] 복원 구문
+(defn cgc-fn-env-decls [$caps $i $acc]
+  (if (>= $i (length $caps)) $acc
+  (cgc-fn-env-decls $caps (+ $i 1)
+    (str $acc "    FLValue " (get $caps $i) " = _self->env[" $i "];\n"))))
+
+;; 캡처 변수 배열 표현식 "v1, v2"
+(defn cgc-env-arr [$caps $i $acc]
+  (if (>= $i (length $caps)) $acc
+  (cgc-env-arr $caps (+ $i 1)
+    (if (= $i 0) (get $caps 0) (str $acc ", " (get $caps $i))))))
+
 (defn cgc-fn [$args]
   (let [[$id @lambda-id-atom]
         [$param-items (get-block-items (get $args 0))]
-        [$body-c (cgc (get $args 1))]
+        [$param-names (cgc-fn-param-names $param-items 0 [])]
+        [$body-node (get $args 1)]
+        [$all-vars (cgc-collect-vars $body-node [])]
+        [$outer @outer-params-atom]
+        [$caps (filter (fn [$v]
+                  (and (not (includes-item $param-names $v))
+                       (includes-item $outer $v)))
+                  $all-vars)]
+        [$nenv (length $caps)]
+        [$env-decls (cgc-fn-env-decls $caps 0 "")]
+        [$body-c (cgc $body-node)]
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]
     (swap! lambda-id-atom + 1)
     (swap! lambda-defs-atom push
       (str "static FLValue " $fn-name
            "(FLClosure* _self, int _argc, FLValue* argv) {\n"
+           $env-decls
            $decls
            "    return " $body-c ";\n}"))
-    (str "fl_fn_new(" $fn-name ", 0, NULL)")))
+    (if (= $nenv 0)
+      (str "fl_fn_new(" $fn-name ", 0, NULL)")
+      (str "(__extension__ ({ FLValue __env_" $id "[" $nenv "] = {"
+           (cgc-env-arr $caps 0 "") "};"
+           " fl_fn_new(" $fn-name ", " $nenv ", __env_" $id "); }))"))))
 
 ;; ── list (vararg → fl_vec_from) ──
 
@@ -321,9 +378,12 @@
 
 (defn cgc-defn [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
-        [$ps (cgc-params (get-block-items (get $args 1)))]
-        [$body (cgc (get $args 2))]]
-  (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))
+        [$param-items (get-block-items (get $args 1))]
+        [$ps (cgc-params $param-items)]
+        [$pnames (cgc-fn-param-names $param-items 0 [])]]
+    (reset! outer-params-atom $pnames)
+    (let [[$body (cgc (get $args 2))]]
+      (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}"))))
 
 ;; ── define (전역 변수) ──
 
