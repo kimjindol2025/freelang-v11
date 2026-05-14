@@ -2,6 +2,10 @@
 ;; 지원 범위: self/CODEGEN_C_SCOPE.md 참조
 ;; ABI: self/ABI.md (FLValue tagged union)
 
+;; S19: lambda collector — capture-free fn → static FLClosure
+(define lambda-id-atom   (atom 0))
+(define lambda-defs-atom (atom []))
+
 ;; ── 유틸 ──
 
 (defn get-block-items [$node]
@@ -198,12 +202,34 @@
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
   [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
   [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
-  ;; S18: fn 람다 stub (closure 낮추기 전까지), cg-* JS 전용 stub
-  [(= $op "fn")      "fl_nil()"]
+  ;; S19: fn lambda → static FLClosure 추출
+  [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
   [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
+
+;; ── S19: fn lambda → static FLClosure 추출 ──
+
+(defn cgc-fn-argv-decls [$items $i $acc]
+  (if (>= $i (length $items)) $acc
+  (let [[$name (c-name (cgc-extract-name (get $items $i)))]]
+    (cgc-fn-argv-decls $items (+ $i 1)
+      (str $acc "    FLValue " $name " = argv[" $i "];\n")))))
+
+(defn cgc-fn [$args]
+  (let [[$id @lambda-id-atom]
+        [$param-items (get-block-items (get $args 0))]
+        [$body-c (cgc (get $args 1))]
+        [$decls (cgc-fn-argv-decls $param-items 0 "")]
+        [$fn-name (str "__fl_anon_" $id)]]
+    (swap! lambda-id-atom + 1)
+    (swap! lambda-defs-atom push
+      (str "static FLValue " $fn-name
+           "(FLClosure* _self, int _argc, FLValue* argv) {\n"
+           $decls
+           "    return " $body-c ";\n}"))
+    (str "fl_fn_new(" $fn-name ", 0, NULL)")))
 
 ;; ── list (vararg → fl_vec_from) ──
 
@@ -380,14 +406,35 @@
       (cgc-top-level $nodes (+ $i 1) $stmts (str $fns (cgc $n) "\n\n"))
       (cgc-top-level $nodes (+ $i 1) (str $stmts "    " (cgc $n) ";\n") $fns)))))
 
+;; S19: lambda forward decl 목록 생성
+(defn cgc-lambda-fwd-loop [$defs $i $acc]
+  (if (>= $i (length $defs)) $acc
+  (cgc-lambda-fwd-loop $defs (+ $i 1)
+    (str $acc "static FLValue __fl_anon_" $i "(FLClosure*, int, FLValue*);\n"))))
+
+(defn cgc-lambda-fwds []
+  (cgc-lambda-fwd-loop @lambda-defs-atom 0 ""))
+
+;; S19: lambda 정의 목록 이어붙이기
+(defn cgc-join-lambda-loop [$defs $i $acc]
+  (if (>= $i (length $defs)) $acc
+  (cgc-join-lambda-loop $defs (+ $i 1) (str $acc (get $defs $i) "\n\n"))))
+
+(defn cgc-join-lambdas []
+  (cgc-join-lambda-loop @lambda-defs-atom 0 ""))
+
 (defn generate-c [$nodes]
   (let [[$fwd (cgc-forward-decls $nodes)]
         [$parts (cgc-top-level $nodes 0 "" "")]
         [$fns (get $parts :fns)]
-        [$stmts (get $parts :stmts)]]
+        [$stmts (get $parts :stmts)]
+        [$lfwd (cgc-lambda-fwds)]
+        [$ldefs (cgc-join-lambdas)]]
   (str
     "#include \"runtime.h\"\n\n"
-    $fwd "\n"
+    $fwd
+    $lfwd "\n"
+    $ldefs
     $fns
     "int main(void) {\n"
     $stmts
