@@ -198,6 +198,11 @@
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
   [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
   [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
+  ;; S18: fn 람다 stub (closure 낮추기 전까지), cg-* JS 전용 stub
+  [(= $op "fn")      "fl_nil()"]
+  [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "cg-match")"fl_nil()"]
   [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
 
 ;; ── list (vararg → fl_vec_from) ──
