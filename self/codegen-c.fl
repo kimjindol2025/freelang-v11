@@ -11,12 +11,24 @@
     $node)))
 
 (defn c-esc [$s]
-  ;; 문자열 리터럴을 C 이스케이프로 변환
-  (str-replace (str-replace (str-replace $s "\\" "\\\\") "\"" "\\\"") "\n" "\\n"))
+  ;; 문자열 리터럴을 C 이스케이프로 변환 (\\ " \n \t \r)
+  (str-replace
+    (str-replace
+      (str-replace
+        (str-replace
+          (str-replace $s "\\" "\\\\")
+          "\"" "\\\"")
+        "\n" "\\n")
+      "\t" "\\t")
+    "\r" "\\r"))
 
 (defn c-name [$n]
-  ;; FL 식별자를 C 식별자로 변환 (- → _)
-  (str-replace $n "-" "_"))
+  ;; FL 식별자를 C 식별자로 변환 (- → _ / ? → _p / ! → _b)
+  (str-replace
+    (str-replace
+      (str-replace $n "-" "_")
+      "?" "_p")
+    "!" "_b"))
 
 ;; ── 메인 dispatch ──
 
