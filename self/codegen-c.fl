@@ -63,7 +63,9 @@
 (defn cgc-block [$n]
   (let [[$t (get $n :type)]]
   (cond
-    [(= $t "FUNC") (cgc-func-block $n)]
+    [(= $t "FUNC")  (cgc-func-block $n)]
+    [(= $t "Array") (cgc-array-block $n)]
+    [(= $t "Map")   (cgc-map-block $n)]
     [true (str "/* unsupported block:" $t " */ fl_nil()")])))
 
 (defn cgc-func-block [$n]
@@ -432,3 +434,33 @@
   (let [[$last (= $i (- (length $args) 1))]
         [$c (cgc-with-recur (get $args $i) $vars)]]
     (if $last $c (cgc-body-wr $args $vars (+ $i 1) (str $acc $c ";\n    "))))))
+
+;; ── S14: Array / Map 리터럴 lowering ──
+
+(defn cgc-array-block [$n]
+  (let [[$items (get (get $n :fields) "items")]]
+  (if (or (null? $items) (= (length $items) 0))
+    "fl_vec_new()"
+    (let [[$cnt (length $items)]
+          [$vals (cgc-args $items)]]
+      (str "(__extension__ ({ FLValue __fl_arr[" $cnt "] = {" $vals "};"
+           " fl_vec_from(__fl_arr, " $cnt "); }))")))))
+
+(defn cgc-map-entry-c [$ent]
+  (str "fl_str_val(\"" (c-esc (get $ent 0)) "\"), " (cgc (get $ent 1))))
+
+(defn cgc-map-entries-c [$ents $i $acc]
+  (if (>= $i (length $ents)) $acc
+    (let [[$sep (if (= $i 0) "" ", ")]
+          [$ec (cgc-map-entry-c (get $ents $i))]]
+      (cgc-map-entries-c $ents (+ $i 1) (str $acc $sep $ec)))))
+
+(defn cgc-map-block [$n]
+  (let [[$ents (obj-entries (json-parse (json-stringify (get $n :fields))))]]
+  (if (or (null? $ents) (= (length $ents) 0))
+    "fl_map_new()"
+    (let [[$n-pairs (length $ents)]
+          [$n-items (* $n-pairs 2)]
+          [$kvs (cgc-map-entries-c $ents 0 "")]]
+      (str "(__extension__ ({ FLValue __fl_kv[" $n-items "] = {" $kvs "};"
+           " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))")))))
