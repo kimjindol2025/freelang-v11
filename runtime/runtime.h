@@ -141,4 +141,10 @@ FLValue fl_map_keys(FLValue map);
 FLValue fl_map_vals(FLValue map);
 FLValue fl_map_entries(FLValue map);
 
+/* ── S12: bridge builtins (FL generic) ── */
+FLValue null_p(FLValue v);
+FLValue get(FLValue obj, FLValue key);
+FLValue length(FLValue obj);
+FLValue char_at(FLValue str, FLValue idx);
+
 #endif /* FREELANG_RUNTIME_H */

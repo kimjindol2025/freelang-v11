@@ -442,3 +442,38 @@ FLValue fl_map_entries(FLValue map) {
     }
     return r;
 }
+
+/* ── S12: bridge builtins ── */
+
+FLValue null_p(FLValue v) {
+    return fl_bool(v.tag == FL_NIL);
+}
+
+FLValue get(FLValue obj, FLValue key) {
+    if (obj.tag == FL_MAP) return fl_map_get(obj, key);
+    if (obj.tag == FL_VECTOR) {
+        if (key.tag != FL_INT) return fl_nil();
+        return fl_vec_get(obj, key);
+    }
+    if (obj.tag == FL_STRING) {
+        if (key.tag != FL_INT) return fl_nil();
+        int64_t idx = key.i;
+        const char* s = ((FLString*)obj.obj)->data;
+        int64_t len = (int64_t)strlen(s);
+        if (idx < 0 || idx >= len) return fl_nil();
+        char buf[2] = { s[idx], '\0' };
+        return fl_str_val(buf);
+    }
+    return fl_nil();
+}
+
+FLValue length(FLValue obj) {
+    if (obj.tag == FL_VECTOR) return fl_vec_len(obj);
+    if (obj.tag == FL_MAP)    return fl_map_len(obj);
+    if (obj.tag == FL_STRING) return fl_int((int64_t)strlen(((FLString*)obj.obj)->data));
+    return fl_int(0);
+}
+
+FLValue char_at(FLValue str, FLValue idx) {
+    return get(str, idx);
+}
