@@ -6,6 +6,8 @@
 (define lambda-id-atom    (atom 0))
 (define lambda-defs-atom  (atom []))
 (define outer-params-atom (atom []))
+;; S23: define 변수 이름 추적 — 이 이름으로 호출 시 fl_fn_call 사용
+(define known-fncall-targets-atom (atom []))
 
 ;; ── 유틸 ──
 
@@ -100,11 +102,22 @@
 
 ;; ── sexpr ──
 
+;; S23: FLValue fn 동적 호출 — fl_fn_call 사용
+(defn cgc-fncall [$fn-c $args]
+  (let [[$argc (length $args)]
+        [$id @lambda-id-atom]]
+    (swap! lambda-id-atom + 1)
+    (if (= $argc 0)
+      (str "fl_fn_call(" $fn-c ", 0, NULL)")
+      (str "(__extension__ ({ FLValue __fl_ca_" $id "[" $argc "] = {"
+           (cgc-args $args) "};"
+           " fl_fn_call(" $fn-c ", " $argc ", __fl_ca_" $id "); }))"))))
+
 (defn cgc-sexpr [$n]
   (let [[$op (get $n :op)] [$args (get $n :args)]]
   (if (string? $op)
     (cgc-dispatch $op $args)
-    (str "(" (cgc $op) ")(" (cgc-args $args) ")"))))
+    (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
   (cond
@@ -208,7 +221,13 @@
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
-  [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
+  [true             (cgc-dispatch-fallback $op $args)]))
+
+(defn cgc-dispatch-fallback [$op $args]
+  (let [[$cn (c-name $op)]]
+    (if (includes-item @known-fncall-targets-atom $cn)
+      (cgc-fncall $cn $args)
+      (str $cn "(" (cgc-args $args) ")"))))
 
 ;; ── S19/S20: fn lambda → static FLClosure 추출 (capture 지원) ──
 
@@ -359,6 +378,7 @@
   (if (>= $i (length $it)) $acc
   (let [[$n (cgc-extract-name (get $it $i))]
         [$v (cgc (get $it (+ $i 1)))]]
+    (swap! known-fncall-targets-atom push $n)
     (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n " = " $v ";\n")))))
 
 (defn cgc-let-2d [$it $i $acc]
@@ -366,6 +386,7 @@
   (let [[$p (get-block-items (get $it $i))]
         [$n (cgc-extract-name (get $p 0))]
         [$v (cgc (get $p 1))]]
+    (swap! known-fncall-targets-atom push $n)
     (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n " = " $v ";\n")))))
 
 (defn cgc-body [$args $i $acc]
@@ -390,7 +411,8 @@
 (defn cgc-define [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$val (cgc (get $args 1))]]
-  (str "FLValue " $name " = " $val ";")))
+    (swap! known-fncall-targets-atom push $name)
+    (str "FLValue " $name " = " $val ";")))
 
 ;; ── 이진 연산 연쇄 (fl_add(fl_add(a,b),c)) ──
 
