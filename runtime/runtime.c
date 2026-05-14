@@ -598,3 +598,19 @@ FLValue str_index_of(FLValue s, FLValue sub) {
     if (!p) return fl_int(-1);
     return fl_int((int64_t)(p-((FLString*)s.obj)->data));
 }
+
+/* ── S22: argv ── */
+static FLValue _fl_argv;
+static bool    _fl_argv_init = false;
+
+void fl_init_argv(int argc, char** argv) {
+    FLValue vec = fl_vec_new();
+    for (int i = 1; i < argc; i++)   /* argv[0]은 프로그램 이름 — Node slice(2)와 동일 */
+        vec = fl_vec_push(vec, fl_str_val(argv[i]));
+    _fl_argv = vec;
+    _fl_argv_init = true;
+}
+
+FLValue fl_get_argv(void) {
+    return _fl_argv_init ? _fl_argv : fl_vec_new();
+}

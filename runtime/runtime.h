@@ -141,6 +141,10 @@ FLValue fl_map_keys(FLValue map);
 FLValue fl_map_vals(FLValue map);
 FLValue fl_map_entries(FLValue map);
 
+/* ── S22: argv ── */
+void    fl_init_argv(int argc, char** argv);
+FLValue fl_get_argv(void);
+
 /* ── S12: bridge builtins (FL generic) ── */
 FLValue null_p(FLValue v);
 FLValue get(FLValue obj, FLValue key);

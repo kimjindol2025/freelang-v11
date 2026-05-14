@@ -198,7 +198,7 @@
   [(= $op "_fl_process_pid")       "fl_int(0)"]
   [(= $op "_fl_process_ppid")      "fl_nil()"]
   [(= $op "_fl_run_inherit")       "fl_nil()"]
-  [(= $op "cli-args")              "fl_vec_new()"]
+  [(= $op "cli-args")              "fl_get_argv()"]
   [(= $op "bit-xor")               (str "fl_int(" (cgc (get $args 0)) ".i ^ " (cgc (get $args 1)) ".i)")]
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
   [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
@@ -496,7 +496,8 @@
     $lfwd "\n"
     $ldefs
     $fns
-    "int main(void) {\n"
+    "int main(int argc, char** argv) {\n"
+    "    fl_init_argv(argc, argv);\n"
     $stmts
     "    return 0;\n"
     "}\n")))
