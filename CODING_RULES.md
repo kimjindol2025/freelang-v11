@@ -76,7 +76,7 @@ gcc -Wall -Wextra freelang.c -o freelang               # 경고 0
 
 | 파일 | 한도 |
 |------|------|
-| `runtime/runtime.c` | 500줄 이하 |
+| `runtime/runtime.c` | 600줄 이하 (S15 stdlib bridge 추가로 상향) |
 | `freelang.c` | 600줄 이하 (기능 추가 시 재협의) |
 
 초과 시 불필요한 함수/매크로 정리 후 재확인.

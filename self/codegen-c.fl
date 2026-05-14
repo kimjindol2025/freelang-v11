@@ -130,6 +130,29 @@
   [(= $op "while")  (cgc-while $args)]
   [(= $op "loop")   (cgc-loop $args)]
   [(= $op "recur")  "/* orphan recur */ fl_nil()"]
+  ;; S15: collection ops → 기존 fl_* 직접 매핑
+  [(= $op "map")         (str "fl_map_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "filter")      (str "fl_filter_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "reduce")      (str "fl_reduce_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "append")      (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "push")        (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "keys")        (str "fl_map_keys(" (cgc (get $args 0)) ")")]
+  [(= $op "obj-keys")    (str "fl_map_keys(" (cgc (get $args 0)) ")")]
+  [(= $op "map-entries") (str "fl_map_entries(" (cgc (get $args 0)) ")")]
+  [(= $op "null?")       (str "null_p(" (cgc (get $args 0)) ")")]
+  [(= $op "nil?")        (str "null_p(" (cgc (get $args 0)) ")")]
+  ;; S15: math/time — C stdlib 충돌 방지용 fl_ 접두사
+  [(= $op "floor")       (str "fl_floor(" (cgc (get $args 0)) ")")]
+  [(= $op "ceil")        (str "fl_ceil(" (cgc (get $args 0)) ")")]
+  [(= $op "abs")         (str "fl_abs(" (cgc (get $args 0)) ")")]
+  [(= $op "math-sqrt")   (str "fl_math_sqrt(" (cgc (get $args 0)) ")")]
+  [(= $op "now")         "fl_now()"]
+  [(= $op "now-ms")      "fl_now_ms()"]
+  [(= $op "str-join")    (str "join(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-replace") (str "str_replace(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "substring")   (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "trim")        (str "trim(" (cgc (get $args 0)) ")")]
+  [(= $op "slice")       (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [true             (str (c-name $op) "(" (cgc-args $args) ")")]))
 
 ;; ── str 특수 처리 (n인자 → fl_str_n) ──

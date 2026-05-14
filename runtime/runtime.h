@@ -147,4 +147,26 @@ FLValue get(FLValue obj, FLValue key);
 FLValue length(FLValue obj);
 FLValue char_at(FLValue str, FLValue idx);
 
+/* ── S15: stdlib bridge ── */
+FLValue fl_floor(FLValue x);
+FLValue fl_ceil(FLValue x);
+FLValue fl_abs(FLValue x);
+FLValue fl_math_sqrt(FLValue x);
+FLValue fl_now(void);
+FLValue fl_now_ms(void);
+FLValue string_p(FLValue v);
+FLValue array_p(FLValue v);
+FLValue list_p(FLValue v);
+FLValue map_p(FLValue v);
+FLValue fn_p(FLValue v);
+FLValue str_replace(FLValue s, FLValue from, FLValue to);
+FLValue split(FLValue s, FLValue sep);
+FLValue join(FLValue vec, FLValue sep);
+FLValue range(FLValue start, FLValue end);
+FLValue char_code_at(FLValue s, FLValue idx);
+FLValue substring(FLValue s, FLValue start, FLValue end);
+FLValue trim(FLValue s);
+FLValue index_of(FLValue vec, FLValue val);
+FLValue str_index_of(FLValue s, FLValue sub);
+
 #endif /* FREELANG_RUNTIME_H */
