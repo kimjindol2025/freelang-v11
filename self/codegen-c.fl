@@ -748,12 +748,41 @@
           [$ec (cgc-map-entry-c (get $ents $i))]]
       (cgc-map-entries-c $ents (+ $i 1) (str $acc $sep $ec)))))
 
-(defn cgc-map-block [$n]
-  (let [[$ents (obj-entries (get $n :fields))]]
-  (if (or (null? $ents) (= (length $ents) 0))
+;; all.fl AST: items 배열에서 Keyword/val 쌍 처리
+(defn cgc-map-key-c [$key-node]
+  (if (= (get $key-node :kind) "keyword")
+    (str "fl_str_val(\"" (c-esc (get $key-node :name)) "\")")
+    (cgc $key-node)))
+
+(defn cgc-map-items-c [$items $i $acc]
+  (if (>= $i (length $items)) $acc
+    (let [[$sep (if (= $i 0) "" ", ")]
+          [$key-c (cgc-map-key-c (get $items $i))]
+          [$val-c (cgc (get $items (+ $i 1)))]]
+      (cgc-map-items-c $items (+ $i 2)
+        (str $acc $sep $key-c ", " $val-c)))))
+
+(defn cgc-map-from-items [$items]
+  (if (or (null? $items) (= (length $items) 0))
     "fl_map_new()"
-    (let [[$n-pairs (length $ents)]
-          [$n-items (* $n-pairs 2)]
-          [$kvs (cgc-map-entries-c $ents 0 "")]]
+    (let [[$n-pairs (/ (length $items) 2)]
+          [$n-items (length $items)]
+          [$kvs (cgc-map-items-c $items 0 "")]]
       (str "(__extension__ ({ FLValue __fl_kv[" $n-items "] = {" $kvs "};"
-           " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))")))))
+           " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))"))))
+
+(defn cgc-map-block [$n]
+  (let [[$fields (get $n :fields)]
+        [$items  (get $fields :items)]]
+  (if (null? $items)
+    ;; bootstrap.js AST 경로: fields가 직접 키-값 맵
+    (let [[$ents (obj-entries (json-parse (json-stringify $fields)))]]
+    (if (or (null? $ents) (= (length $ents) 0))
+      "fl_map_new()"
+      (let [[$n-pairs (length $ents)]
+            [$n-items (* $n-pairs 2)]
+            [$kvs (cgc-map-entries-c $ents 0 "")]]
+        (str "(__extension__ ({ FLValue __fl_kv[" $n-items "] = {" $kvs "};"
+             " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))"))))
+    ;; all.fl AST 경로: items 배열에 Keyword/val 쌍으로 저장
+    (cgc-map-from-items $items))))
