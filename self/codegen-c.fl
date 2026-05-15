@@ -8,6 +8,11 @@
 (define outer-params-atom (atom []))
 ;; S23: define 변수 이름 추적 — 이 이름으로 호출 시 fl_fn_call 사용
 (define known-fncall-targets-atom (atom []))
+;; S24: defn 이름 목록 (forward pass) + wrapper 구현 목록
+(define known-defns-atom   (atom []))
+(define wrapper-defs-atom  (atom []))
+;; S24: define 전역 선언 목록 ("static FLValue name;")
+(define global-decls-atom  (atom []))
 
 ;; ── 유틸 ──
 
@@ -45,7 +50,11 @@
   (cond
     [(null? $n) "fl_nil()"]
     [(= (get $n :kind) "literal")   (cgc-literal $n)]
-    [(= (get $n :kind) "variable")  (c-name (get $n :name))]
+    [(= (get $n :kind) "variable")
+      (let [[$cn (c-name (get $n :name))]]
+        (if (includes-item @known-defns-atom $cn)
+          (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+          $cn))]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
@@ -64,7 +73,10 @@
                         [(= $v "true")  "fl_bool(true)"]
                         [(= $v "false") "fl_bool(false)"]
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
-                        [true (c-name $v)])]
+                        [true (let [[$cn (c-name $v)]]
+                                (if (includes-item @known-defns-atom $cn)
+                                  (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+                                  $cn))])]
     [true "fl_nil()"])))
 
 ;; ── block (FUNC/Array/Map) ──
@@ -403,8 +415,13 @@
         [$ps (cgc-params $param-items)]
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
     (reset! outer-params-atom $pnames)
-    (let [[$body (cgc (get $args 2))]]
-      (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}"))))
+    (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]]
+      (swap! wrapper-defs-atom push
+        (str "static FLValue __fl_wrap_" $name
+             "(FLClosure* _s, int _ac, FLValue* argv) {\n"
+             "    return " $name "(" $call-args ");\n}"))
+      (let [[$body (cgc (get $args 2))]]
+        (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))))
 
 ;; ── define (전역 변수) ──
 
@@ -412,7 +429,8 @@
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$val (cgc (get $args 1))]]
     (swap! known-fncall-targets-atom push $name)
-    (str "FLValue " $name " = " $val ";")))
+    (swap! global-decls-atom push (str "static FLValue " $name ";"))
+    (str $name " = " $val ";")))
 
 ;; ── 이진 연산 연쇄 (fl_add(fl_add(a,b),c)) ──
 
@@ -475,8 +493,17 @@
     (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
       (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
             [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
-        (str $acc "FLValue " $name "(" $ps ");\n"))
+        (swap! known-defns-atom push $name)
+        (str $acc
+             "FLValue " $name "(" $ps ");\n"
+             "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
       $acc)))))
+
+;; S24: defn wrapper argv 호출 인자 생성 "argv[0], argv[1], ..."
+(defn cgc-wrapper-call-args [$items $i $acc]
+  (if (>= $i (length $items)) $acc
+  (cgc-wrapper-call-args $items (+ $i 1)
+    (str $acc (if (= (length $acc) 0) "" ", ") "argv[" $i "]"))))
 
 (defn cgc-top-level [$nodes $i $stmts $fns]
   (if (>= $i (length $nodes)) {:stmts $stmts :fns $fns}
@@ -505,18 +532,30 @@
 (defn cgc-join-lambdas []
   (cgc-join-lambda-loop @lambda-defs-atom 0 ""))
 
+;; S24: wrapper 구현 목록 이어붙이기
+(defn cgc-join-wrappers []
+  (cgc-join-lambda-loop @wrapper-defs-atom 0 ""))
+
+;; S24: global define 선언 목록 이어붙이기
+(defn cgc-join-globals []
+  (cgc-join-lambda-loop @global-decls-atom 0 ""))
+
 (defn generate-c [$nodes]
   (let [[$fwd (cgc-forward-decls $nodes)]
         [$parts (cgc-top-level $nodes 0 "" "")]
         [$fns (get $parts :fns)]
         [$stmts (get $parts :stmts)]
+        [$gdecls (cgc-join-globals)]
         [$lfwd (cgc-lambda-fwds)]
-        [$ldefs (cgc-join-lambdas)]]
+        [$ldefs (cgc-join-lambdas)]
+        [$wdefs (cgc-join-wrappers)]]
   (str
     "#include \"runtime.h\"\n\n"
     $fwd
+    $gdecls "\n"
     $lfwd "\n"
     $ldefs
+    $wdefs "\n"
     $fns
     "int main(int argc, char** argv) {\n"
     "    fl_init_argv(argc, argv);\n"
