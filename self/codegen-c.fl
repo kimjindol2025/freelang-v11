@@ -775,8 +775,8 @@
   (let [[$fields (get $n :fields)]
         [$items  (get $fields :items)]]
   (if (null? $items)
-    ;; bootstrap.js AST 경로: fields가 직접 키-값 맵
-    (let [[$ents (obj-entries (json-parse (json-stringify $fields)))]]
+    ;; bootstrap.js AST 경로: map-entries로 직접 접근 (json 라운드트립 금지 — 중첩 Map 손상)
+    (let [[$ents (map-entries $fields)]]
     (if (or (null? $ents) (= (length $ents) 0))
       "fl_map_new()"
       (let [[$n-pairs (length $ents)]
