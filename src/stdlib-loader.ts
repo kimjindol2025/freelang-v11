@@ -26,6 +26,9 @@ import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Re
 import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server
 import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver (SQLite)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
+import { createCryptoUtilsModule } from "./stdlib-crypto-utils"; // Phase 25: AES-256-GCM + hashing
+import { createMetricsModule } from "./stdlib-metrics";  // Phase 25: Prometheus metrics
+import { createTextProcessorModule } from "./stdlib-text-processor"; // Phase 25: NLP + similarity
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
 import { createProcessModule } from "./stdlib-process";  // Phase 22: Process (env + SIGTERM)
@@ -106,9 +109,15 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   ));
   const dbModule = createDbModule();
   const authModule = createAuthModule();
+  const cryptoUtilsModule = createCryptoUtilsModule();
+  const metricsModule = createMetricsModule();
+  const textProcessorModule = createTextProcessorModule();
   const cacheModule = createCacheModule();
   interp.registerModule(dbModule);
   interp.registerModule(authModule);
+  interp.registerModule(cryptoUtilsModule);
+  interp.registerModule(metricsModule);
+  interp.registerModule(textProcessorModule);
   interp.registerModule(cacheModule);
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
   const processModule = createProcessModule();
@@ -145,7 +154,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     fileModule, fdModule, bitsModule, errorModule, httpModule,
     shellModule, dataModule, collectionModule, agentModule, timeModule,
     verifyModule, httpMacroModule, dbQueryModule, optionalModule, restCrudModule,
-    cryptoModule, workflowModule, resourceModule,
+    cryptoModule, cryptoUtilsModule, metricsModule, textProcessorModule, workflowModule, resourceModule,
     dbModule, authModule, cacheModule,
     processModule, moduleSystem,
     imageModule, mongodbModule,
@@ -394,6 +403,74 @@ export function loadAllStdlib(interp: InterpreterLike): void {
       return String(s).endsWith(String(suffix));
     },
     "ends_with": (s: string, suffix: string) => _aliases["ends-with"](s, suffix),
+
+    // v11.7.7: 배열 헬퍼 (중복제거, 1단계 펴기)
+    "unique": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      const seen = new Set();
+      const result: any[] = [];
+      for (const item of arr) {
+        const key = typeof item === "object" ? JSON.stringify(item) : item;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push(item);
+        }
+      }
+      return result;
+    },
+
+    "flatten-one": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      const result: any[] = [];
+      for (const item of arr) {
+        if (Array.isArray(item)) {
+          result.push(...item);
+        } else {
+          result.push(item);
+        }
+      }
+      return result;
+    },
+    "flatten_one": (arr: any[]) => _aliases["flatten-one"](arr),
+
+    // v11.7.8: 배열 계산 헬퍼 (합계, 곱, 청크)
+    "sum": (arr: any[]): number => {
+      if (!Array.isArray(arr)) return 0;
+      return arr.reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
+    },
+
+    "product": (arr: any[]): number => {
+      if (!Array.isArray(arr)) return 1;
+      return arr.reduce((acc, val) => acc * (typeof val === "number" ? val : 1), 1);
+    },
+
+    "chunk": (arr: any[], size: number): any[][] => {
+      if (!Array.isArray(arr) || size <= 0) return [];
+      const chunks: any[][] = [];
+      for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+      }
+      return chunks;
+    },
+
+    // v11.7.9: 추가 배열 헬퍼 (평균, 콤팩트)
+    "average": (arr: any[]): number => {
+      if (!Array.isArray(arr) || arr.length === 0) return 0;
+      const sum = arr.reduce((acc, val) => acc + (typeof val === "number" ? val : 0), 0);
+      return sum / arr.length;
+    },
+
+    "compact": (arr: any[]): any[] => {
+      if (!Array.isArray(arr)) return [];
+      return arr.filter((item) => item !== null && item !== undefined && item !== false && item !== "");
+    },
+
+    // v11.7.10: 최종 배열 헬퍼 (무작위 선택)
+    "random-element": (arr: any[]): any => {
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const idx = Math.floor(Math.random() * arr.length);
+      return arr[idx];
+    },
 
     // ── 구조화 로깅 (log/info, log/warn, log/error) ────────────────────────
     "log/info":  (msg: string, ctx?: any): null => {

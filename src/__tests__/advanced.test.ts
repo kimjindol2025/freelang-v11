@@ -626,6 +626,87 @@ describe("간단한 헬퍼 함수 — v11.7.6", () => {
   });
 });
 
+describe("배열 헬퍼 함수 — v11.7.7", () => {
+  test("unique 중복 제거", () => {
+    const result = run('(unique [1 2 2 3 3 3])');
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  test("unique 문자열 중복 제거", () => {
+    const result = run('(unique ["a" "b" "a" "c" "b"])');
+    expect(result).toEqual(["a", "b", "c"]);
+  });
+
+  test("flatten-one 1단계 펴기", () => {
+    const result = run('(flatten-one [[1 2] [3 4] [5]])');
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  test("flatten-one 섞인 배열", () => {
+    const result = run('(flatten-one [1 [2 3] 4 [5]])');
+    expect(result).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("배열 계산 함수 — v11.7.8", () => {
+  test("sum 합계", () => {
+    expect(run('(sum [1 2 3 4 5])')).toBe(15);
+    expect(run('(sum [10 20 30])')).toBe(60);
+  });
+
+  test("sum 빈 배열", () => {
+    expect(run('(sum [])')).toBe(0);
+  });
+
+  test("product 곱셈", () => {
+    expect(run('(product [2 3 4])')).toBe(24);
+    expect(run('(product [5 2])')).toBe(10);
+  });
+
+  test("product 빈 배열", () => {
+    expect(run('(product [])')).toBe(1);
+  });
+
+  test("chunk 청크 분할", () => {
+    const result = run('(chunk [1 2 3 4 5] 2)');
+    expect(result).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  test("chunk 균등 분할", () => {
+    const result = run('(chunk [1 2 3 4] 2)');
+    expect(result).toEqual([[1, 2], [3, 4]]);
+  });
+});
+
+describe("추가 배열 헬퍼 — v11.7.9", () => {
+  test("average 평균", () => {
+    expect(run('(average [2 4 6])')).toBe(4);
+    expect(run('(average [10 20 30])')).toBe(20);
+  });
+
+  test("compact 콤팩트", () => {
+    const result = run('(compact [1 null 2 3])');
+    expect(result).toEqual([1, 2, 3]);
+  });
+
+  test("compact 모두 유효", () => {
+    const result = run('(compact [1 2 3])');
+    expect(result).toEqual([1, 2, 3]);
+  });
+});
+
+describe("최종 배열 헬퍼 — v11.7.10", () => {
+  test("random-element 선택", () => {
+    const result = run('(random-element [1 2 3 4 5])');
+    expect([1, 2, 3, 4, 5]).toContain(result);
+  });
+
+  test("random-element 단일원소", () => {
+    const result = run('(random-element [42])');
+    expect(result).toBe(42);
+  });
+});
+
 describe("error-formatter.ts — suggestSimilar", () => {
   test("유사 함수명 힌트", () => {
     const { suggestSimilar } = require("../error-formatter");

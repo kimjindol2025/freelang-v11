@@ -10,6 +10,10 @@ export const createSign: any = rsaUnsupported;
 export const createVerify: any = rsaUnsupported;
 export const createPublicKey: any = rsaUnsupported;
 export const scryptSync: any = () => { throw new Error("scryptSync unavailable in browser stub"); };
+export const pbkdf2Sync: any = () => { throw new Error("pbkdf2Sync unavailable in browser stub"); };
+export const createCipheriv: any = () => { throw new Error("createCipheriv unavailable in browser stub"); };
+export const createDecipheriv: any = () => { throw new Error("createDecipheriv unavailable in browser stub"); };
 export type KeyObject = any;
 export default { randomUUID, randomBytes, createHash, createHmac, timingSafeEqual,
-  generateKeyPairSync, createSign, createVerify, createPublicKey, scryptSync };
+  generateKeyPairSync, createSign, createVerify, createPublicKey, scryptSync,
+  pbkdf2Sync, createCipheriv, createDecipheriv };
