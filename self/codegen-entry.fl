@@ -443,7 +443,7 @@
   (if (>= $i (length $args)) $acc
   (let [[$last (= $i (- (length $args) 1))]
         [$c (cgc (get $args $i))]]
-    (if $last (str $acc $c) (cgc-body $args (+ $i 1) (str $acc $c ";\n    "))))))
+    (if $last $c (cgc-body $args (+ $i 1) (str $acc $c ";\n    "))))))
 
 ;; ── defn (최상위) ──
 
@@ -616,16 +616,13 @@
   (loop-extract-vars $items (+ $i 2)
     (push $acc (cgc-extract-name (get $items $i))))))
 
-;; FLValue 선언문 생성 — 임시변수로 초기값 먼저 저장 (파라미터 shadow UB 방지)
+;; FLValue 선언문 생성
 (defn loop-make-decls [$items $i $acc]
   (if (>= $i (length $items)) $acc
   (let [[$name (cgc-extract-name (get $items $i))]
-        [$val (cgc (get $items (+ $i 1)))]
-        [$tmp (str "_fl_linit_" $i)]]
+        [$val (cgc (get $items (+ $i 1)))]]
     (loop-make-decls $items (+ $i 2)
-      (str $acc
-           "    FLValue " $tmp " = " $val ";\n"
-           "    FLValue " $name " = " $tmp ";\n")))))
+      (str $acc "    FLValue " $name " = " $val ";\n")))))
 
 ;; (loop [...] body) → while 래퍼 생성
 (defn cgc-loop [$args]
@@ -749,7 +746,7 @@
       (cgc-map-entries-c $ents (+ $i 1) (str $acc $sep $ec)))))
 
 (defn cgc-map-block [$n]
-  (let [[$ents (obj-entries (get $n :fields))]]
+  (let [[$ents (obj-entries (json-parse (json-stringify (get $n :fields))))]]
   (if (or (null? $ents) (= (length $ents) 0))
     "fl_map_new()"
     (let [[$n-pairs (length $ents)]
@@ -757,3 +754,17 @@
           [$kvs (cgc-map-entries-c $ents 0 "")]]
       (str "(__extension__ ({ FLValue __fl_kv[" $n-items "] = {" $kvs "};"
            " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))")))))
+
+;; ── S27 entry point ──────────────────────────────────────────────────────────
+(defn cgc-run [$argv]
+  (let [[$input  (get $argv 0)]
+        [$output (get $argv 1)]]
+  (if (or (null? $input) (null? $output))
+    (println "usage: cgc-bin <input.fl> <output.c>")
+    (let [[$src    (file-read $input)]
+          [$nodes  (fl-parse $src)]
+          [$c-code (generate-c $nodes)]]
+      (file-write $output $c-code)
+      (println (str "Compiled " $input " -> " $output))))))
+
+(cgc-run (cli-args))

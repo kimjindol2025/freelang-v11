@@ -183,4 +183,7 @@ FLValue fl_includes_item(FLValue vec, FLValue item);
 FLValue fl_str_includes(FLValue s, FLValue sub);
 FLValue fl_string_p(FLValue v);
 
+/* ── S27: FL 소스 → AST (cgc-bridge.c + parser.c에서 제공) ── */
+FLValue fl_parse(FLValue src);
+
 #endif /* FREELANG_RUNTIME_H */
