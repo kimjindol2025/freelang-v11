@@ -391,6 +391,7 @@
   (let [[$n (cgc-extract-name (get $it $i))]
         [$v (cgc (get $it (+ $i 1)))]]
     (swap! known-fncall-targets-atom push $n)
+    (swap! outer-params-atom push $n)
     (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n " = " $v ";\n")))))
 
 (defn cgc-let-2d [$it $i $acc]
@@ -399,6 +400,7 @@
         [$n (cgc-extract-name (get $p 0))]
         [$v (cgc (get $p 1))]]
     (swap! known-fncall-targets-atom push $n)
+    (swap! outer-params-atom push $n)
     (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n " = " $v ";\n")))))
 
 (defn cgc-body [$args $i $acc]
