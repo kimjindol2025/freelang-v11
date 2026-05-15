@@ -614,3 +614,26 @@ void fl_init_argv(int argc, char** argv) {
 FLValue fl_get_argv(void) {
     return _fl_argv_init ? _fl_argv : fl_vec_new();
 }
+
+/* ── S26: atom ── */
+FLValue fl_atom_new(FLValue init) { return fl_vec_from(&init, 1); }
+FLValue fl_atom_deref(FLValue atom) { return fl_vec_get(atom, fl_int(0)); }
+FLValue fl_atom_reset(FLValue atom, FLValue val) {
+    ((FLVector*)atom.obj)->data[0] = val;
+    return val;
+}
+
+FLValue fl_includes_item(FLValue vec, FLValue item) {
+    if (vec.tag != FL_VECTOR) return fl_bool(false);
+    FLVector* v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++)
+        if (fl_truthy(fl_eq(v->data[i], item))) return fl_bool(true);
+    return fl_bool(false);
+}
+
+FLValue fl_str_includes(FLValue s, FLValue sub) {
+    if (s.tag != FL_STRING || sub.tag != FL_STRING) return fl_bool(false);
+    return fl_bool(strstr(((FLString*)s.obj)->data, ((FLString*)sub.obj)->data) != NULL);
+}
+
+FLValue fl_string_p(FLValue v) { return string_p(v); }

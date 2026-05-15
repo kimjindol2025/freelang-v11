@@ -173,4 +173,14 @@ FLValue trim(FLValue s);
 FLValue index_of(FLValue vec, FLValue val);
 FLValue str_index_of(FLValue s, FLValue sub);
 
+/* ── S26: atom (mutable cell) ── */
+FLValue fl_atom_new(FLValue init);
+FLValue fl_atom_deref(FLValue atom);
+FLValue fl_atom_reset(FLValue atom, FLValue val);
+
+/* ── S26: stdlib bridge ── */
+FLValue fl_includes_item(FLValue vec, FLValue item);
+FLValue fl_str_includes(FLValue s, FLValue sub);
+FLValue fl_string_p(FLValue v);
+
 #endif /* FREELANG_RUNTIME_H */

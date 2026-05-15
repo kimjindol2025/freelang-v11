@@ -34,15 +34,24 @@
       "\t" "\\t")
     "\r" "\\r"))
 
+(defn c-reserved? [$s]
+  (includes-item ["else" "return" "for" "while" "do" "int" "long" "void"
+                  "char" "float" "double" "struct" "union" "enum"
+                  "static" "const" "if" "switch" "case" "break"
+                  "continue" "default" "goto" "sizeof" "auto" "inline"
+                  "bool" "true" "false"] $s))
+
 (defn c-name [$n]
   ;; FL 식별자를 C 식별자로 변환 (-> → _to_ / - → _ / ? → _p / ! → _b)
-  (str-replace
-    (str-replace
-      (str-replace
-        (str-replace $n "->" "_to_")
-        "-" "_")
-      "?" "_p")
-    "!" "_b"))
+  ;; C 예약어는 fl_ 접두사 추가
+  (let [[$raw (str-replace
+                (str-replace
+                  (str-replace
+                    (str-replace $n "->" "_to_")
+                    "-" "_")
+                  "?" "_p")
+                "!" "_b")]]
+    (if (c-reserved? $raw) (str "fl_" $raw) $raw)))
 
 ;; ── 메인 dispatch ──
 
@@ -160,6 +169,16 @@
   [(= $op "str")    (cgc-str $args)]
   [(= $op "set!")   (cgc-set! $args)]
   [(= $op "while")  (cgc-while $args)]
+  ;; S26: atom / deref / swap! / reset!
+  [(= $op "atom")          (str "fl_atom_new(" (cgc (get $args 0)) ")")]
+  [(= $op "deref")         (str "fl_atom_deref(" (cgc (get $args 0)) ")")]
+  [(= $op "reset!")        (str "fl_atom_reset(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "swap!")         (cgc-swap! $args)]
+  ;; S26: 누락 stdlib 매핑
+  [(= $op "includes-item") (str "fl_includes_item(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-includes")  (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "string?")       (str "fl_string_p(" (cgc (get $args 0)) ")")]
+  [(= $op "obj-entries")   (str "fl_map_entries(" (cgc (get $args 0)) ")")]
   [(= $op "loop")   (cgc-loop $args)]
   [(= $op "recur")  "/* orphan recur */ fl_nil()"]
   ;; S15: collection ops → 기존 fl_* 직접 매핑
@@ -234,6 +253,23 @@
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
   [true             (cgc-dispatch-fallback $op $args)]))
+
+(defn cgc-swap! [$args]
+  (let [[$atom-c  (cgc (get $args 0))]
+        [$fn-node (get $args 1)]
+        [$extra   (slice $args 2 (length $args))]]
+    (let [[$deref (str "fl_atom_deref(" $atom-c ")")]
+          [$op    (get $fn-node :value)]
+          [$ec    (cgc-args $extra)]]
+      (let [[$rhs (cond
+                    [(= $op "+")    (str "fl_add(" $deref ", " $ec ")")]
+                    [(= $op "-")    (str "fl_sub(" $deref ", " $ec ")")]
+                    [(= $op "*")    (str "fl_mul(" $deref ", " $ec ")")]
+                    [(= $op "push") (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [true           (str (c-name $op) "(" $deref
+                                      (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
+                  )]]
+        (str "fl_atom_reset(" $atom-c ", " $rhs ")")))))
 
 (defn cgc-dispatch-fallback [$op $args]
   (let [[$cn (c-name $op)]]
