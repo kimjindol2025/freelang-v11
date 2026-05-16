@@ -1188,6 +1188,60 @@ loop().catch(e => {
       return resp.data;
     }
 
+    // ── Capability Registry ────────────────────────────────────────────
+    // globalThis.__flCapRegistry: { [name]: { enabled: boolean, builtins: string[] } }
+    // self-host/bootstrap 동일 registry 사용. capability 단위로 enable/disable.
+    // Note: helpers are inlined per-case to avoid switch-jump TDZ issues.
+
+    // (capability-list) → ["tcp" "file" "http" "db" "process" ...]
+    case "capability-list": {
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = { tcp:{enabled:true,builtins:["tcp-server-start","tcp-server-stop","tcp-send","tcp-server-running?","fl-event-tick","fl-event-drain","fl-event-queue-size","fl-error-drain","fl-error-queue-size"]},file:{enabled:true,builtins:["file-read","file-write","file-append","file-append-line","file-exists?","file-delete","file-mkdir","dir-list","dir-exists?"]},http:{enabled:true,builtins:["http-get","server-start","server-html","server-json","server-status","server-redirect","server-file","server-html-cookie","server-set-cookie"]},db:{enabled:true,builtins:["db-query","db-exec","db-transaction"]},process:{enabled:true,builtins:["fl-env-get","sleep","now-ms","uuid"]} };
+      return Object.keys((globalThis as any).__flCapRegistry);
+    }
+
+    // (capability-enabled? name) → true | false
+    case "capability-enabled?": {
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = { tcp:{enabled:true,builtins:[]},file:{enabled:true,builtins:[]},http:{enabled:true,builtins:[]},db:{enabled:true,builtins:[]},process:{enabled:true,builtins:[]} };
+      const _capName = String(args[0] ?? "");
+      return !!((globalThis as any).__flCapRegistry[_capName]?.enabled);
+    }
+
+    // (capability-builtins name) → ["builtin1" ...]
+    case "capability-builtins": {
+      if (!(globalThis as any).__flCapRegistry) return [];
+      const _capName = String(args[0] ?? "");
+      return (globalThis as any).__flCapRegistry[_capName]?.builtins ?? [];
+    }
+
+    // (capability-disable name) → "ok" | "not-found"
+    case "capability-disable": {
+      if (!(globalThis as any).__flCapRegistry) return "not-found";
+      const _capName = String(args[0] ?? "");
+      const _reg = (globalThis as any).__flCapRegistry;
+      if (!_reg[_capName]) return "not-found";
+      _reg[_capName].enabled = false;
+      return "ok";
+    }
+
+    // (capability-enable name) → "ok" | "not-found"
+    case "capability-enable": {
+      if (!(globalThis as any).__flCapRegistry) return "not-found";
+      const _capName = String(args[0] ?? "");
+      const _reg = (globalThis as any).__flCapRegistry;
+      if (!_reg[_capName]) return "not-found";
+      _reg[_capName].enabled = true;
+      return "ok";
+    }
+
+    // (capability-register name builtins) → "ok"
+    case "capability-register": {
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = {};
+      const _capName = String(args[0] ?? "");
+      const _builtins: string[] = Array.isArray(args[1]) ? args[1].map(String) : [];
+      (globalThis as any).__flCapRegistry[_capName] = { enabled: true, builtins: _builtins };
+      return "ok";
+    }
+
     // ── Event Queue + IO Error Queue (reactor model) ──────────────────
     // IO layer enqueues; VM tick drains. Evaluator never entered from IO thread.
     // event: { handler: string, args: any[], sock: any | null }
@@ -1195,13 +1249,13 @@ loop().catch(e => {
 
     // helper: enqueue nonfatal error
     // severity: "nonfatal" | "fatal"  source: "handler" | "write" | "queue"
-    function ioErr(severity: string, source: string, msg: string) {
+    const ioErr = (severity: string, source: string, msg: string) => {
       if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
       (globalThis as any).__flErrorQueue.push(["io-err", severity, source, msg]);
-    }
+    };
 
     // helper: run one event, write response, capture errors
-    function runEvent(ev: any) {
+    const runEvent = (ev: any) => {
       try {
         const resp = (interp as any).callUserFunction(ev.handler, ev.args);
         const out = resp != null ? String(resp) : "";
@@ -1222,6 +1276,8 @@ loop().catch(e => {
 
     // (fl-event-tick) → number (events processed: 0 or 1)
     case "fl-event-tick": {
+      const _capReg1 = (globalThis as any).__flCapRegistry;
+      if (_capReg1) { for (const [_n,_c] of Object.entries(_capReg1) as any[]) { if (_c.builtins.includes("fl-event-tick") && !_c.enabled) return `[capability-denied ${_n}]`; } }
       const q: any[] = (globalThis as any).__flEventQueue ?? [];
       if (q.length === 0) return 0;
       runEvent(q.shift());
@@ -1230,6 +1286,8 @@ loop().catch(e => {
 
     // (fl-event-drain) → number (total events processed)
     case "fl-event-drain": {
+      const denied = capCheck("fl-event-drain");
+      if (denied) return denied;
       const q: any[] = (globalThis as any).__flEventQueue ?? [];
       let count = 0;
       while (q.length > 0) { runEvent(q.shift()); count++; }
@@ -1256,8 +1314,10 @@ loop().catch(e => {
     // ── TCP Server (FL-Cache / raw TCP daemon) ────────────────────────
     // registry: { [port]: { server, sockets: Set, stopped: boolean } }
     // IO data → __flEventQueue (never calls evaluator directly)
-    // (tcp-server-start port handler-name) → "ok" | "already-running"
+    // (tcp-server-start port handler-name) → "ok" | "already-running" | "[capability-denied tcp]"
     case "tcp-server-start": {
+      const denied = capCheck("tcp-server-start");
+      if (denied) return denied;
       const port = Number(args[0] ?? 30390);
       const handlerName = String(args[1] ?? "");
       const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
