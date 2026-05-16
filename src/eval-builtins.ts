@@ -1188,26 +1188,43 @@ loop().catch(e => {
       return resp.data;
     }
 
-    // ── Event Queue (reactor model) ────────────────────────────────────
+    // ── Event Queue + IO Error Queue (reactor model) ──────────────────
     // IO layer enqueues; VM tick drains. Evaluator never entered from IO thread.
     // event: { handler: string, args: any[], sock: any | null }
+    // io-error: ["io-err" severity source message] — nonfatal handler errors
 
-    // (fl-event-tick) → number (events processed)
-    case "fl-event-tick": {
-      const q: any[] = (globalThis as any).__flEventQueue ?? [];
-      if (q.length === 0) return 0;
-      const ev = q.shift();
+    // helper: enqueue nonfatal error
+    // severity: "nonfatal" | "fatal"  source: "handler" | "write" | "queue"
+    function ioErr(severity: string, source: string, msg: string) {
+      if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+      (globalThis as any).__flErrorQueue.push(["io-err", severity, source, msg]);
+    }
+
+    // helper: run one event, write response, capture errors
+    function runEvent(ev: any) {
       try {
         const resp = (interp as any).callUserFunction(ev.handler, ev.args);
         const out = resp != null ? String(resp) : "";
         if (out && ev.sock && !ev.sock.destroyed) {
-          ev.sock.write(out.endsWith("\n") ? out : out + "\n");
+          try {
+            ev.sock.write(out.endsWith("\n") ? out : out + "\n");
+          } catch (we: any) {
+            ioErr("nonfatal", "write", we.message);
+          }
         }
       } catch (e: any) {
+        ioErr("nonfatal", "handler", e.message);
         if (ev.sock && !ev.sock.destroyed) {
-          ev.sock.write(`ERR ${e.message}\n`);
+          try { ev.sock.write(`ERR ${e.message}\n`); } catch {}
         }
       }
+    }
+
+    // (fl-event-tick) → number (events processed: 0 or 1)
+    case "fl-event-tick": {
+      const q: any[] = (globalThis as any).__flEventQueue ?? [];
+      if (q.length === 0) return 0;
+      runEvent(q.shift());
       return 1;
     }
 
@@ -1215,27 +1232,25 @@ loop().catch(e => {
     case "fl-event-drain": {
       const q: any[] = (globalThis as any).__flEventQueue ?? [];
       let count = 0;
-      while (q.length > 0) {
-        const ev = q.shift();
-        count++;
-        try {
-          const resp = (interp as any).callUserFunction(ev.handler, ev.args);
-          const out = resp != null ? String(resp) : "";
-          if (out && ev.sock && !ev.sock.destroyed) {
-            ev.sock.write(out.endsWith("\n") ? out : out + "\n");
-          }
-        } catch (e: any) {
-          if (ev.sock && !ev.sock.destroyed) {
-            ev.sock.write(`ERR ${e.message}\n`);
-          }
-        }
-      }
+      while (q.length > 0) { runEvent(q.shift()); count++; }
       return count;
     }
 
     // (fl-event-queue-size) → number
     case "fl-event-queue-size": {
       return ((globalThis as any).__flEventQueue ?? []).length;
+    }
+
+    // (fl-error-drain) → [["io-err" severity source msg] ...]  clears error queue
+    case "fl-error-drain": {
+      const eq: any[] = (globalThis as any).__flErrorQueue ?? [];
+      (globalThis as any).__flErrorQueue = [];
+      return eq;
+    }
+
+    // (fl-error-queue-size) → number
+    case "fl-error-queue-size": {
+      return ((globalThis as any).__flErrorQueue ?? []).length;
     }
 
     // ── TCP Server (FL-Cache / raw TCP daemon) ────────────────────────
