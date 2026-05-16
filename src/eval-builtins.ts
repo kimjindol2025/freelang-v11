@@ -1188,6 +1188,100 @@ loop().catch(e => {
       return resp.data;
     }
 
+    // ── TCP Server (FL-Cache / raw TCP daemon) ───────────────────────────
+    // (tcp-server-start port handler-name) → "ok"
+    // handler-name: FreeLang 함수명. 인자: (conn-id line) → string (응답)
+    case "tcp-server-start": {
+      const port = Number(args[0] ?? 30390);
+      const handlerName = String(args[1] ?? "");
+      if ((globalThis as any).__tcpServers?.[port]) return "already-running";
+
+      // FL 함수 호출 콜백 등록 (매번 최신 interp 참조 갱신)
+      (globalThis as any).__flEvalBuiltin = (name: string, fnArgs: any[]) =>
+        (interp as any).callUserFunction(name, fnArgs);
+
+      const net = require("net");
+      if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = {};
+
+      let connSeq = 0;
+      const server = net.createServer((sock: any) => {
+        const connId = `conn_${++connSeq}`;
+        sock.setEncoding("utf8");
+        let buf = "";
+        sock.on("data", (chunk: string) => {
+          buf += chunk;
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const resp = (globalThis as any).__flEvalBuiltin?.(handlerName, [connId, trimmed]);
+              const out = resp != null ? String(resp) : "";
+              if (out) sock.write(out.endsWith("\n") ? out : out + "\n");
+            } catch (e: any) {
+              sock.write(`ERR ${e.message}\n`);
+            }
+          }
+        });
+        sock.on("error", () => {});
+      });
+      // 즉시 등록 — listen은 async지만 서버 참조는 동기적으로 저장
+      (globalThis as any).__tcpServers[port] = server;
+      server.listen(port, "0.0.0.0");
+      server.on("error", (e: any) => {
+        delete (globalThis as any).__tcpServers[port];
+      });
+      return "ok";
+    }
+
+    // (tcp-server-stop port) → "ok"
+    case "tcp-server-stop": {
+      const port = Number(args[0] ?? 30390);
+      const srv = (globalThis as any).__tcpServers?.[port];
+      if (!srv) return "not-running";
+      srv.close();
+      delete (globalThis as any).__tcpServers[port];
+      return "ok";
+    }
+
+    // (tcp-send host port line) → response-string | nil
+    // 단순 line 기반 요청-응답 (한 줄 송신 → 한 줄 수신)
+    case "tcp-send": {
+      const host = String(args[0] ?? "localhost");
+      const port = Number(args[1] ?? 30390);
+      const line = String(args[2] ?? "");
+      const timeout = Number(args[3] ?? 3000);
+
+      const { spawnSync } = require("child_process");
+      const script = `
+const net = require('net');
+const r = JSON.parse(require('fs').readFileSync(0,'utf8'));
+const sock = net.createConnection({host:r.host,port:r.port});
+let resp='',done=false;
+sock.setEncoding('utf8');
+sock.on('connect',()=>sock.write(r.line+(r.line.endsWith('\\n')?'':'\\n')));
+sock.on('data',c=>{resp+=c;if(resp.includes('\\n')&&!done){done=true;sock.destroy();process.stdout.write(resp.trim());process.exit(0);}});
+sock.on('error',()=>process.exit(1));
+sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.write(resp.trim());process.exit(resp?0:1);}});
+`;
+      try {
+        const r = spawnSync(process.execPath, ["-e", script], {
+          input: JSON.stringify({ host, port, line, timeout }),
+          timeout: timeout + 500, encoding: "utf-8" as any,
+        });
+        if (r.error || r.status !== 0) return null;
+        const out = (r.stdout ?? "").trim();
+        return out.length ? out : null;
+      } catch { return null; }
+    }
+
+    // (tcp-server-running? port) → true | false
+    case "tcp-server-running?": {
+      const port = Number(args[0] ?? 30390);
+      return !!(globalThis as any).__tcpServers?.[port];
+    }
+
     // Arithmetic
     case "+": {
       const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
