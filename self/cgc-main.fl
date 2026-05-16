@@ -448,11 +448,16 @@
 ;; ── 33 parse-expr — 단일 표현식 (atom 또는 S-expr/array/map/block)
 
 (defn parse-expr [$p]
-  (let [[$t (p-peek $p)] [$k (get $t :kind)]]
+  (let [[$t (p-peek $p)] [$k (get $t :kind)] [$v (get $t :value)]]
   (cond
     [(= $k "LParen")   (parse-sexpr $p)]
     [(= $k "LBracket") (parse-bracket $p)]
     [(= $k "LBrace")   (parse-map $p)]
+    [(and (= $k "Unknown") (= $v "@"))
+     (let [[$p1 (p-advance $p)]
+           [$res (parse-expr $p1)]]
+       (r-pair (get $res :p)
+               (make-sexpr "deref" (list (get $res :node)) (get $t :line))))]
     [true (parse-atom $p)])))
 
 ;; ── 33 parse-sexpr (parens)
@@ -674,6 +679,7 @@
         (if (includes-item @known-defns-atom $cn)
           (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
           $cn))]
+    [(= (get $n :kind) "keyword")   (str "fl_str_val(\"" (c-esc (get $n :name)) "\")")]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
@@ -1398,7 +1404,9 @@
 (defn cgc-map-block [$n]
   (let [[$fields (get $n :fields)]
         [$items  (get $fields :items)]]
-  (if (null? $items)
+  (if (and (not (null? $items)) (= (type-of $items) "array"))
+    ;; self-hosted AST 경로: items 배열에 Keyword/val 쌍으로 저장
+    (cgc-map-from-items $items)
     ;; bootstrap.js AST 경로: map-entries로 직접 접근 (json 라운드트립 금지 — 중첩 Map 손상)
     (let [[$ents (map-entries $fields)]]
     (if (or (null? $ents) (= (length $ents) 0))
@@ -1407,9 +1415,7 @@
             [$n-items (* $n-pairs 2)]
             [$kvs (cgc-map-entries-c $ents 0 "")]]
         (str "(__extension__ ({ FLValue __fl_kv[" $n-items "] = {" $kvs "};"
-             " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))"))))
-    ;; all.fl AST 경로: items 배열에 Keyword/val 쌍으로 저장
-    (cgc-map-from-items $items))))
+             " fl_map_from_pairs(__fl_kv, " $n-pairs "); }))")))))))
 
 ;; ── S27 entry point ──────────────────────────────────────────────────────────
 (defn cgc-run [$argv]

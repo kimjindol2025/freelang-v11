@@ -154,10 +154,27 @@ static double fl_num(FLValue v) {
     return (v.tag == FL_FLOAT) ? v.f : (double)v.i;
 }
 
-FLValue fl_lt(FLValue a, FLValue b)  { return fl_bool(fl_num(a) <  fl_num(b)); }
-FLValue fl_gt(FLValue a, FLValue b)  { return fl_bool(fl_num(a) >  fl_num(b)); }
-FLValue fl_lte(FLValue a, FLValue b) { return fl_bool(fl_num(a) <= fl_num(b)); }
-FLValue fl_gte(FLValue a, FLValue b) { return fl_bool(fl_num(a) >= fl_num(b)); }
+static int fl_str_cmp(FLValue a, FLValue b) {
+    const char* sa = (a.tag==FL_STRING && a.obj) ? ((FLString*)a.obj)->data : "";
+    const char* sb = (b.tag==FL_STRING && b.obj) ? ((FLString*)b.obj)->data : "";
+    return strcmp(sa, sb);
+}
+FLValue fl_lt(FLValue a, FLValue b)  {
+    if (a.tag==FL_STRING && b.tag==FL_STRING) return fl_bool(fl_str_cmp(a,b) <  0);
+    return fl_bool(fl_num(a) <  fl_num(b));
+}
+FLValue fl_gt(FLValue a, FLValue b)  {
+    if (a.tag==FL_STRING && b.tag==FL_STRING) return fl_bool(fl_str_cmp(a,b) >  0);
+    return fl_bool(fl_num(a) >  fl_num(b));
+}
+FLValue fl_lte(FLValue a, FLValue b) {
+    if (a.tag==FL_STRING && b.tag==FL_STRING) return fl_bool(fl_str_cmp(a,b) <= 0);
+    return fl_bool(fl_num(a) <= fl_num(b));
+}
+FLValue fl_gte(FLValue a, FLValue b) {
+    if (a.tag==FL_STRING && b.tag==FL_STRING) return fl_bool(fl_str_cmp(a,b) >= 0);
+    return fl_bool(fl_num(a) >= fl_num(b));
+}
 FLValue fl_neq(FLValue a, FLValue b) { return fl_bool(!fl_truthy(fl_eq(a, b))); }
 
 /* ── 논리 ── */
@@ -501,6 +518,19 @@ FLValue array_p(FLValue v)  { return fl_bool(v.tag==FL_VECTOR); }
 FLValue list_p(FLValue v)   { return fl_bool(v.tag==FL_VECTOR); }
 FLValue map_p(FLValue v)    { return fl_bool(v.tag==FL_MAP); }
 FLValue fn_p(FLValue v)     { return fl_bool(v.tag==FL_FN); }
+FLValue type_of(FLValue v) {
+    switch(v.tag) {
+        case FL_NIL:    return fl_str_val("nil");
+        case FL_INT:    return fl_str_val("number");
+        case FL_FLOAT:  return fl_str_val("number");
+        case FL_BOOL:   return fl_str_val("boolean");
+        case FL_STRING: return fl_str_val("string");
+        case FL_VECTOR: return fl_str_val("array");
+        case FL_MAP:    return fl_str_val("map");
+        case FL_FN:     return fl_str_val("function");
+        default:        return fl_str_val("unknown");
+    }
+}
 
 /* B-3: String ops */
 FLValue str_replace(FLValue s, FLValue from, FLValue to) {
@@ -508,14 +538,22 @@ FLValue str_replace(FLValue s, FLValue from, FLValue to) {
     const char *src=((FLString*)s.obj)->data;
     const char *f=((FLString*)from.obj)->data;
     const char *t=((FLString*)to.obj)->data;
-    char *pos=strstr(src,f);
-    if (!pos) return s;
-    size_t flen=strlen(f), tlen=strlen(t), plen=(size_t)(pos-src);
-    size_t nlen=strlen(src)-flen+tlen;
-    char *buf=(char*)malloc(nlen+1);
-    memcpy(buf,src,plen);
-    memcpy(buf+plen,t,tlen);
-    strcpy(buf+plen+tlen,pos+flen);
+    size_t flen=strlen(f);
+    if (flen==0) return s;
+    size_t tlen=strlen(t);
+    /* global replace: 모든 occurrence 치환 */
+    size_t cap=strlen(src)*2+64; char *buf=(char*)malloc(cap+1);
+    size_t wi=0; const char *cur=src; const char *pos;
+    while ((pos=strstr(cur,f))) {
+        size_t plen=(size_t)(pos-cur);
+        if (wi+plen+tlen>cap) { cap=(wi+plen+tlen)*2; buf=(char*)realloc(buf,cap+1); }
+        memcpy(buf+wi,cur,plen); wi+=plen;
+        memcpy(buf+wi,t,tlen); wi+=tlen;
+        cur=pos+flen;
+    }
+    size_t rest=strlen(cur);
+    if (wi+rest>cap) buf=(char*)realloc(buf,wi+rest+1);
+    memcpy(buf+wi,cur,rest); buf[wi+rest]='\0';
     FLValue r=fl_str_val(buf); free(buf); return r;
 }
 FLValue split(FLValue s, FLValue sep) {
@@ -563,6 +601,18 @@ FLValue char_code_at(FLValue s, FLValue idx) {
     return fl_int((unsigned char)p[i]);
 }
 FLValue substring(FLValue s, FLValue start, FLValue end) {
+    /* 벡터 슬라이스 지원: (slice vec i j) → substring(vec, i, j) */
+    if (s.tag==FL_VECTOR) {
+        FLVector* vec=(FLVector*)s.obj;
+        int64_t len=(int64_t)vec->len;
+        int64_t a=start.tag==FL_INT?start.i:0, b=end.tag==FL_INT?end.i:len;
+        if (a<0) a=0;
+        if (b>len) b=len;
+        if (a>b) a=b;
+        FLValue r=fl_vec_new();
+        for (int64_t i=a; i<b; i++) r=fl_vec_push(r, vec->data[i]);
+        return r;
+    }
     if (s.tag!=FL_STRING) return fl_str_val("");
     const char *p=((FLString*)s.obj)->data;
     int64_t len=(int64_t)strlen(p);

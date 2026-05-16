@@ -163,6 +163,7 @@ FLValue array_p(FLValue v);
 FLValue list_p(FLValue v);
 FLValue map_p(FLValue v);
 FLValue fn_p(FLValue v);
+FLValue type_of(FLValue v);
 FLValue str_replace(FLValue s, FLValue from, FLValue to);
 FLValue split(FLValue s, FLValue sep);
 FLValue join(FLValue vec, FLValue sep);
