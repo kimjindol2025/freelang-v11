@@ -482,8 +482,7 @@
         [(= $op "loop")
          ;; loop: (loop [[$i 0] (< $i 10) (+ $i 1)] body...)
          ;; 형식: (loop [init-binding condition update] body)
-         (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]
-               [$body-start (if (> (length $rest) 1) (get $rest 1) null)]]
+         (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]]
            (if (null? $loop-array)
              (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
              (if (not (= (get $loop-array :kind) "array"))
@@ -1154,8 +1153,7 @@
     (+ (* hash 33) (char-code-at s i)) (+ i 1))))
 
 (defn hash-fnv1a [s]
-  (let [[fnv-offset 2166136261]
-      [fnv-prime 16777619]]
+  (let [[fnv-offset 2166136261]]
   (hash-fnv-loop (str s) 0 fnv-offset)))
 (defn hash-fnv-loop [s i hash]
   (if (>= i (length s)) (% (abs hash) 2147483647)
