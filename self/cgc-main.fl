@@ -945,6 +945,17 @@
     (recur (+ $i 1)
       (if (= $i 0) (get $caps 0) (str $acc ", " (get $caps $i)))))))
 
+;; 캡처 후보 필터 (closure 대신 loop — self-host 캡처 분석 회피)
+(defn cgc-fn-caps-filter [$all-vars $param-names $outer $i $acc]
+  (if (>= $i (length $all-vars))
+    $acc
+    (let [[$v (get $all-vars $i)]]
+      (cgc-fn-caps-filter $all-vars $param-names $outer (+ $i 1)
+        (if (and (not (includes-item $param-names $v))
+                 (includes-item $outer $v))
+          (push $acc $v)
+          $acc)))))
+
 (defn cgc-fn [$args]
   (let [[$id @lambda-id-atom]
         [$param-items (get-block-items (get $args 0))]
@@ -952,10 +963,7 @@
         [$body-node (get $args 1)]
         [$all-vars (cgc-collect-vars $body-node [])]
         [$outer @outer-params-atom]
-        [$caps (filter (fn [$v]
-                  (and (not (includes-item $param-names $v))
-                       (includes-item $outer $v)))
-                  $all-vars)]
+        [$caps (cgc-fn-caps-filter $all-vars $param-names $outer 0 [])]
         [$nenv (length $caps)]
         [$env-decls (cgc-fn-env-decls $caps 0 "")]
         [$body-c (cgc $body-node)]
