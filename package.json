@@ -39,7 +39,9 @@
     "server": "node bootstrap.js serve app/",
     "freelang": "node bootstrap.js run",
     "fl": "node bootstrap.js run",
-    "repl": "node bootstrap.js repl"
+    "repl": "node bootstrap.js repl",
+    "fl-test": "node bootstrap.js run tests/fl-test-suite/core.test.fl",
+    "fl-build": "node bootstrap.js run scripts/fl-build.fl --help"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

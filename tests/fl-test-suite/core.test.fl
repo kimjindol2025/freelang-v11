@@ -1,0 +1,85 @@
+;; Core FreeLang Tests (FL-Native)
+
+(defn assert-eq [actual expected name]
+  (if (= actual expected)
+    (println (str "  ✅ " name))
+    (throw (str "FAIL " name ": expected " expected " got " actual))))
+
+(defn assert-true [value name]
+  (if (= value true)
+    (println (str "  ✅ " name))
+    (throw (str "FAIL " name ": expected true got " value))))
+
+;; 테스트 1: 산술
+(do
+  (println "📋 Arithmetic Tests")
+  (assert-eq (+ 1 2) 3 "1+2=3")
+  (assert-eq (* 3 4) 12 "3*4=12")
+  (assert-eq (- 10 3) 7 "10-3=7")
+  (assert-eq (/ 20 4) 5 "20/4=5"))
+
+;; 테스트 2: 문자열
+(do
+  (println "📋 String Tests")
+  (assert-eq (str "Hello" " " "World") "Hello World" "str concat")
+  (assert-eq (length "test") 4 "length string")
+  (assert-eq (upper "hello") "HELLO" "upper case"))
+
+;; 테스트 3: 컬렉션
+(do
+  (println "📋 Collection Tests")
+  (assert-eq (length [1 2 3]) 3 "vector length")
+  (assert-eq (get [10 20 30] 1) 20 "vector index")
+  (assert-eq (length {:a 1 :b 2}) 2 "map length"))
+
+;; 테스트 4: 제어흐름
+(do
+  (println "📋 Control Flow Tests")
+  (assert-eq (if true 42 0) 42 "if true")
+  (assert-eq (if false 0 99) 99 "if false")
+  (let [x 5]
+    (assert-eq x 5 "let binding")))
+
+;; 테스트 5: 함수
+(do
+  (println "📋 Function Tests")
+  (defn add [a b] (+ a b))
+  (assert-eq (add 3 4) 7 "defn basic")
+  (let [double (fn [x] (* x 2))]
+    (assert-eq (double 5) 10 "fn anonymous")))
+
+;; 테스트 6: 술어
+(do
+  (println "📋 Predicate Tests")
+  (assert-true (nil? nil) "nil?")
+  (assert-true (empty? []) "empty?")
+  (assert-true (not (nil? 0)) "not nil?"))
+
+;; 테스트 7: 고차함수
+(do
+  (println "📋 Higher-order Function Tests")
+  (assert-eq (count (map (fn [x] (* x 2)) [1 2 3])) 3 "map count")
+  (assert-eq (count (filter (fn [x] (> x 2)) [1 2 3 4 5])) 3 "filter count"))
+
+;; 테스트 8: 재귀
+(do
+  (println "📋 Recursion Tests")
+  (defn fact [n]
+    (if (<= n 1) 1 (* n (fact (- n 1)))))
+  (assert-eq (fact 5) 120 "factorial 5"))
+
+;; 테스트 9: let 바인딩
+(do
+  (println "📋 Let Binding Tests")
+  (let [x 10 y 20 z (+ x y)]
+    (assert-eq z 30 "let multi-binding")))
+
+;; 테스트 10: 타입 체크
+(do
+  (println "📋 Type Checking Tests")
+  (assert-true (boolean? true) "boolean?")
+  (assert-true (string? "test") "string?")
+  (assert-true (number? 42) "number?"))
+
+(println "")
+(println "✅ All tests passed (10/10)")

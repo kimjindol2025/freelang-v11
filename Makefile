@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases clean help
+.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -93,3 +93,11 @@ install-plugin:
 # Y5: AI 시스템 프롬프트 생성 (stdlib + plugins)
 gen-ai-prompt:
 	@$(NODE) scripts/gen-ai-prompt.js
+
+# FL-Native 테스트 러너
+fl-test:
+	@npm run fl-test
+
+# FL-Native 빌드 도구
+fl-build:
+	@npm run fl-build

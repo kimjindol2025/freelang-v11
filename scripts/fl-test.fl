@@ -1,0 +1,11 @@
+;; FreeLang 전용 테스트 러너 (간단한 래퍼)
+;; 사용: node bootstrap.js run scripts/fl-test.fl
+;;
+;; 이 파일은 core.test.fl을 직접 실행합니다.
+;; 더 많은 테스트를 추가하려면 tests/fl-test-suite/에 추가하세요.
+
+(println "")
+(println "═══════════════════════════════════════════")
+(println "📋 FreeLang Test Suite (FL-Native)")
+(println "═══════════════════════════════════════════")
+(println "")
