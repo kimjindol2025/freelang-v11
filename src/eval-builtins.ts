@@ -1189,26 +1189,31 @@ loop().catch(e => {
     }
 
     // ── TCP Server (FL-Cache / raw TCP daemon) ───────────────────────────
-    // (tcp-server-start port handler-name) → "ok"
-    // handler-name: FreeLang 함수명. 인자: (conn-id line) → string (응답)
+    // registry: { [port]: { server, sockets: Set, stopped: boolean } }
+    // (tcp-server-start port handler-name) → "ok" | "already-running"
     case "tcp-server-start": {
       const port = Number(args[0] ?? 30390);
       const handlerName = String(args[1] ?? "");
-      if ((globalThis as any).__tcpServers?.[port]) return "already-running";
+      const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
+      if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = reg;
+      if (reg[port] && !reg[port].stopped) return "already-running";
 
-      // FL 함수 호출 콜백 등록 (매번 최신 interp 참조 갱신)
       (globalThis as any).__flEvalBuiltin = (name: string, fnArgs: any[]) =>
         (interp as any).callUserFunction(name, fnArgs);
 
       const net = require("net");
-      if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = {};
+      const entry = { server: null as any, sockets: new Set<any>(), stopped: false };
+      reg[port] = entry;
 
       let connSeq = 0;
-      const server = net.createServer((sock: any) => {
+      entry.server = net.createServer((sock: any) => {
+        if (entry.stopped) { sock.destroy(); return; }
         const connId = `conn_${++connSeq}`;
+        entry.sockets.add(sock);
         sock.setEncoding("utf8");
         let buf = "";
         sock.on("data", (chunk: string) => {
+          if (entry.stopped) { sock.destroy(); return; }
           buf += chunk;
           const lines = buf.split("\n");
           buf = lines.pop() ?? "";
@@ -1224,24 +1229,29 @@ loop().catch(e => {
             }
           }
         });
-        sock.on("error", () => {});
+        sock.on("close", () => entry.sockets.delete(sock));
+        sock.on("error", () => { entry.sockets.delete(sock); sock.destroy(); });
       });
-      // 즉시 등록 — listen은 async지만 서버 참조는 동기적으로 저장
-      (globalThis as any).__tcpServers[port] = server;
-      server.listen(port, "0.0.0.0");
-      server.on("error", (e: any) => {
-        delete (globalThis as any).__tcpServers[port];
+      entry.server.listen(port, "0.0.0.0");
+      entry.server.on("error", () => {
+        entry.stopped = true;
+        delete reg[port];
       });
       return "ok";
     }
 
-    // (tcp-server-stop port) → "ok"
+    // (tcp-server-stop port) → "ok" | "not-running"
     case "tcp-server-stop": {
       const port = Number(args[0] ?? 30390);
-      const srv = (globalThis as any).__tcpServers?.[port];
-      if (!srv) return "not-running";
-      srv.close();
-      delete (globalThis as any).__tcpServers[port];
+      const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
+      const entry = reg[port];
+      if (!entry || entry.stopped) return "not-running";
+      // lifecycle 계약: stop 즉시 기존 연결 모두 종료 (orphan 방지)
+      entry.stopped = true;
+      for (const sock of entry.sockets) { try { sock.destroy(); } catch {} }
+      entry.sockets.clear();
+      entry.server.close();
+      delete reg[port];
       return "ok";
     }
 
@@ -1279,7 +1289,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // (tcp-server-running? port) → true | false
     case "tcp-server-running?": {
       const port = Number(args[0] ?? 30390);
-      return !!(globalThis as any).__tcpServers?.[port];
+      const entry = (globalThis as any).__tcpServers?.[port];
+      return !!(entry && !entry.stopped);
     }
 
     // Arithmetic
