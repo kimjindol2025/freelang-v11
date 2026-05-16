@@ -1188,8 +1188,59 @@ loop().catch(e => {
       return resp.data;
     }
 
-    // ── TCP Server (FL-Cache / raw TCP daemon) ───────────────────────────
+    // ── Event Queue (reactor model) ────────────────────────────────────
+    // IO layer enqueues; VM tick drains. Evaluator never entered from IO thread.
+    // event: { handler: string, args: any[], sock: any | null }
+
+    // (fl-event-tick) → number (events processed)
+    case "fl-event-tick": {
+      const q: any[] = (globalThis as any).__flEventQueue ?? [];
+      if (q.length === 0) return 0;
+      const ev = q.shift();
+      try {
+        const resp = (interp as any).callUserFunction(ev.handler, ev.args);
+        const out = resp != null ? String(resp) : "";
+        if (out && ev.sock && !ev.sock.destroyed) {
+          ev.sock.write(out.endsWith("\n") ? out : out + "\n");
+        }
+      } catch (e: any) {
+        if (ev.sock && !ev.sock.destroyed) {
+          ev.sock.write(`ERR ${e.message}\n`);
+        }
+      }
+      return 1;
+    }
+
+    // (fl-event-drain) → number (total events processed)
+    case "fl-event-drain": {
+      const q: any[] = (globalThis as any).__flEventQueue ?? [];
+      let count = 0;
+      while (q.length > 0) {
+        const ev = q.shift();
+        count++;
+        try {
+          const resp = (interp as any).callUserFunction(ev.handler, ev.args);
+          const out = resp != null ? String(resp) : "";
+          if (out && ev.sock && !ev.sock.destroyed) {
+            ev.sock.write(out.endsWith("\n") ? out : out + "\n");
+          }
+        } catch (e: any) {
+          if (ev.sock && !ev.sock.destroyed) {
+            ev.sock.write(`ERR ${e.message}\n`);
+          }
+        }
+      }
+      return count;
+    }
+
+    // (fl-event-queue-size) → number
+    case "fl-event-queue-size": {
+      return ((globalThis as any).__flEventQueue ?? []).length;
+    }
+
+    // ── TCP Server (FL-Cache / raw TCP daemon) ────────────────────────
     // registry: { [port]: { server, sockets: Set, stopped: boolean } }
+    // IO data → __flEventQueue (never calls evaluator directly)
     // (tcp-server-start port handler-name) → "ok" | "already-running"
     case "tcp-server-start": {
       const port = Number(args[0] ?? 30390);
@@ -1197,9 +1248,7 @@ loop().catch(e => {
       const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
       if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = reg;
       if (reg[port] && !reg[port].stopped) return "already-running";
-
-      (globalThis as any).__flEvalBuiltin = (name: string, fnArgs: any[]) =>
-        (interp as any).callUserFunction(name, fnArgs);
+      if (!(globalThis as any).__flEventQueue) (globalThis as any).__flEventQueue = [];
 
       const net = require("net");
       const entry = { server: null as any, sockets: new Set<any>(), stopped: false };
@@ -1220,13 +1269,8 @@ loop().catch(e => {
           for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-            try {
-              const resp = (globalThis as any).__flEvalBuiltin?.(handlerName, [connId, trimmed]);
-              const out = resp != null ? String(resp) : "";
-              if (out) sock.write(out.endsWith("\n") ? out : out + "\n");
-            } catch (e: any) {
-              sock.write(`ERR ${e.message}\n`);
-            }
+            // reactor contract: enqueue only, never call evaluator from IO
+            (globalThis as any).__flEventQueue.push({ handler: handlerName, args: [connId, trimmed], sock });
           }
         });
         sock.on("close", () => entry.sockets.delete(sock));
