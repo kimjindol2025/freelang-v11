@@ -69,7 +69,9 @@
     [(= (get $n :kind) "block")     (cgc-block $n)]
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
     [(= (get $n :kind) "or")        (cgc-or (get $n :args))]
-    [true (str "/* unsupported:" (get $n :kind) " */ fl_nil()")]))
+    [true
+     (do (println (str "[CGC-ERR] unsupported IR kind=" (get $n :kind) " line=" (get $n :line)))
+         "fl_nil()")]))
 
 ;; ── 리터럴 ──
 
@@ -79,6 +81,7 @@
     [(= $t "number")  (if (str-includes (str $v) ".") (str "fl_float(" $v ")") (str "fl_int(" $v ")"))]
     [(= $t "string")  (str "fl_str_val(\"" (c-esc $v) "\")")]
     [(= $t "boolean") (if $v "fl_bool(true)" "fl_bool(false)")]
+    [(= $t "nil")     "fl_nil()"]
     [(= $t "symbol")  (cond
                         [(= $v "true")  "fl_bool(true)"]
                         [(= $v "false") "fl_bool(false)"]
@@ -87,7 +90,9 @@
                                 (if (includes-item @known-defns-atom $cn)
                                   (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
                                   $cn))])]
-    [true "fl_nil()"])))
+    [true
+     (do (println (str "[CGC-ERR] unsupported literal type=" (get $n :type) " line=" (get $n :line)))
+         "fl_nil()")])))
 
 ;; ── block (FUNC/Array/Map) ──
 
@@ -97,7 +102,9 @@
     [(= $t "FUNC")  (cgc-func-block $n)]
     [(= $t "Array") (cgc-array-block $n)]
     [(= $t "Map")   (cgc-map-block $n)]
-    [true (str "/* unsupported block:" $t " */ fl_nil()")])))
+    [true
+     (do (println (str "[CGC-ERR] unsupported block type=" $t " line=" (get $n :line)))
+         "fl_nil()")])))
 
 (defn cgc-func-block [$n]
   (let [[$name (c-name (get $n :name))]
