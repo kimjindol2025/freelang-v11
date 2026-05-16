@@ -1247,51 +1247,44 @@ loop().catch(e => {
     // event: { handler: string, args: any[], sock: any | null }
     // io-error: ["io-err" severity source message] — nonfatal handler errors
 
-    // helper: enqueue nonfatal error
-    // severity: "nonfatal" | "fatal"  source: "handler" | "write" | "queue"
-    const ioErr = (severity: string, source: string, msg: string) => {
-      if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
-      (globalThis as any).__flErrorQueue.push(["io-err", severity, source, msg]);
-    };
-
-    // helper: run one event, write response, capture errors
-    const runEvent = (ev: any) => {
-      try {
-        const resp = (interp as any).callUserFunction(ev.handler, ev.args);
-        const out = resp != null ? String(resp) : "";
-        if (out && ev.sock && !ev.sock.destroyed) {
-          try {
-            ev.sock.write(out.endsWith("\n") ? out : out + "\n");
-          } catch (we: any) {
-            ioErr("nonfatal", "write", we.message);
-          }
-        }
-      } catch (e: any) {
-        ioErr("nonfatal", "handler", e.message);
-        if (ev.sock && !ev.sock.destroyed) {
-          try { ev.sock.write(`ERR ${e.message}\n`); } catch {}
-        }
-      }
-    }
-
     // (fl-event-tick) → number (events processed: 0 or 1)
     case "fl-event-tick": {
       const _capReg1 = (globalThis as any).__flCapRegistry;
-      if (_capReg1) { for (const [_n,_c] of Object.entries(_capReg1) as any[]) { if (_c.builtins.includes("fl-event-tick") && !_c.enabled) return `[capability-denied ${_n}]`; } }
-      const q: any[] = (globalThis as any).__flEventQueue ?? [];
-      if (q.length === 0) return 0;
-      runEvent(q.shift());
+      if (_capReg1) { for (const [_n,_c] of Object.entries(_capReg1) as any[]) { if ((_c as any).builtins.includes("fl-event-tick") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
+      const _q1: any[] = (globalThis as any).__flEventQueue ?? [];
+      if (_q1.length === 0) return 0;
+      const _ev1 = _q1.shift();
+      try {
+        const _r1 = (interp as any).callUserFunction(_ev1.handler, _ev1.args);
+        const _o1 = _r1 != null ? String(_r1) : "";
+        if (_o1 && _ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(_o1.endsWith("\n") ? _o1 : _o1 + "\n"); } catch {}
+      } catch (e: any) {
+        if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
+        (globalThis as any).__flErrorQueue.push(["io-err", "nonfatal", "handler", e.message]);
+        if (_ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(`ERR ${e.message}\n`); } catch {}
+      }
       return 1;
     }
 
     // (fl-event-drain) → number (total events processed)
     case "fl-event-drain": {
-      const denied = capCheck("fl-event-drain");
-      if (denied) return denied;
-      const q: any[] = (globalThis as any).__flEventQueue ?? [];
-      let count = 0;
-      while (q.length > 0) { runEvent(q.shift()); count++; }
-      return count;
+      const _capReg2 = (globalThis as any).__flCapRegistry;
+      if (_capReg2) { for (const [_n,_c] of Object.entries(_capReg2) as any[]) { if ((_c as any).builtins.includes("fl-event-drain") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
+      const _q2: any[] = (globalThis as any).__flEventQueue ?? [];
+      let _cnt = 0;
+      while (_q2.length > 0) {
+        const _ev2 = _q2.shift(); _cnt++;
+        try {
+          const _r2 = (interp as any).callUserFunction(_ev2.handler, _ev2.args);
+          const _o2 = _r2 != null ? String(_r2) : "";
+          if (_o2 && _ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(_o2.endsWith("\n") ? _o2 : _o2 + "\n"); } catch {}
+        } catch (e: any) {
+          if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
+          (globalThis as any).__flErrorQueue.push(["io-err", "nonfatal", "handler", e.message]);
+          if (_ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(`ERR ${e.message}\n`); } catch {}
+        }
+      }
+      return _cnt;
     }
 
     // (fl-event-queue-size) → number
@@ -1316,8 +1309,8 @@ loop().catch(e => {
     // IO data → __flEventQueue (never calls evaluator directly)
     // (tcp-server-start port handler-name) → "ok" | "already-running" | "[capability-denied tcp]"
     case "tcp-server-start": {
-      const denied = capCheck("tcp-server-start");
-      if (denied) return denied;
+      const _capReg3 = (globalThis as any).__flCapRegistry;
+      if (_capReg3) { for (const [_n,_c] of Object.entries(_capReg3) as any[]) { if (_c.builtins.includes("tcp-server-start") && !_c.enabled) return `[capability-denied ${_n}]`; } }
       const port = Number(args[0] ?? 30390);
       const handlerName = String(args[1] ?? "");
       const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
