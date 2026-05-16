@@ -110,10 +110,11 @@
 (defn cgc-params [$it]
   (cgc-params-loop $it 0 ""))
 (defn cgc-params-loop [$it $i $acc]
-  (if (>= $i (length $it)) $acc
-  (let [[$n (cgc-extract-name (get $it $i))]
-        [$entry (str "FLValue " $n)]]
-    (cgc-params-loop $it (+ $i 1) (if (= (length $acc) 0) $entry (str $acc ", " $entry))))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $it)) $acc
+    (let [[$n (cgc-extract-name (get $it $i))]
+          [$entry (str "FLValue " $n)]]
+      (recur (+ $i 1) (if (= (length $acc) 0) $entry (str $acc ", " $entry)))))))
 
 (defn cgc-extract-name [$node]
   (cond
@@ -310,21 +311,23 @@
     [true $acc]))
 
 (defn cgc-collect-vars-loop [$args $i $acc]
-  (if (or (null? $args) (>= $i (length $args))) $acc
-  (cgc-collect-vars-loop $args (+ $i 1)
-    (cgc-collect-vars (get $args $i) $acc))))
+  (loop [$i $i $acc $acc]
+    (if (or (null? $args) (>= $i (length $args))) $acc
+    (recur (+ $i 1) (cgc-collect-vars (get $args $i) $acc)))))
 
 ;; _self->env[i] 복원 구문
 (defn cgc-fn-env-decls [$caps $i $acc]
-  (if (>= $i (length $caps)) $acc
-  (cgc-fn-env-decls $caps (+ $i 1)
-    (str $acc "    FLValue " (get $caps $i) " = _self->env[" $i "];\n"))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $caps)) $acc
+    (recur (+ $i 1)
+      (str $acc "    FLValue " (get $caps $i) " = _self->env[" $i "];\n")))))
 
 ;; 캡처 변수 배열 표현식 "v1, v2"
 (defn cgc-env-arr [$caps $i $acc]
-  (if (>= $i (length $caps)) $acc
-  (cgc-env-arr $caps (+ $i 1)
-    (if (= $i 0) (get $caps 0) (str $acc ", " (get $caps $i))))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $caps)) $acc
+    (recur (+ $i 1)
+      (if (= $i 0) (get $caps 0) (str $acc ", " (get $caps $i)))))))
 
 (defn cgc-fn [$args]
   (let [[$id @lambda-id-atom]
@@ -509,15 +512,17 @@
 (defn cgc-args [$args]
   (cgc-args-loop $args 0 ""))
 (defn cgc-args-loop [$args $i $acc]
-  (if (or (null? $args) (>= $i (length $args))) $acc
-  (let [[$c (cgc (get $args $i))]]
-    (cgc-args-loop $args (+ $i 1) (if (= $i 0) $c (str $acc ", " $c))))))
+  (loop [$i $i $acc $acc]
+    (if (or (null? $args) (>= $i (length $args))) $acc
+    (let [[$c (cgc (get $args $i))]]
+      (recur (+ $i 1) (if (= $i 0) $c (str $acc ", " $c)))))))
 
 ;; ── stmts (do 블록) ──
 
 (defn cgc-stmts [$args $i $acc]
-  (if (>= $i (length $args)) $acc
-  (cgc-stmts $args (+ $i 1) (str $acc (cgc (get $args $i)) "; "))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $args)) $acc
+    (recur (+ $i 1) (str $acc (cgc (get $args $i)) "; ")))))
 
 ;; ── 전체 프로그램 생성 ──
 
@@ -525,47 +530,52 @@
   (cgc-forward-loop $nodes 0 ""))
 
 (defn cgc-forward-loop [$nodes $i $acc]
-  (if (>= $i (length $nodes)) $acc
-  (let [[$n (get $nodes $i)]]
-  (cgc-forward-loop $nodes (+ $i 1)
-    (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
-      (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
-            [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
-        (swap! known-defns-atom push $name)
-        (str $acc
-             "FLValue " $name "(" $ps ");\n"
-             "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
-      $acc)))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $nodes)) $acc
+    (let [[$n (get $nodes $i)]]
+    (recur (+ $i 1)
+      (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
+        (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
+              [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
+          (swap! known-defns-atom push $name)
+          (str $acc
+               "FLValue " $name "(" $ps ");\n"
+               "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
+        $acc))))))
 
 ;; S24: defn wrapper argv 호출 인자 생성 "argv[0], argv[1], ..."
 (defn cgc-wrapper-call-args [$items $i $acc]
-  (if (>= $i (length $items)) $acc
-  (cgc-wrapper-call-args $items (+ $i 1)
-    (str $acc (if (= (length $acc) 0) "" ", ") "argv[" $i "]"))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $items)) $acc
+    (recur (+ $i 1)
+      (str $acc (if (= (length $acc) 0) "" ", ") "argv[" $i "]")))))
 
 (defn cgc-top-level [$nodes $i $stmts $fns]
-  (if (>= $i (length $nodes)) {:stmts $stmts :fns $fns}
-  (let [[$n (get $nodes $i)]
-        [$k (get $n :kind)]
-        [$is-defn (and (= $k "sexpr") (= (get $n :op) "defn"))]
-        [$is-block-func (and (= $k "block") (= (get $n :type) "FUNC"))]]
-    (if (or $is-defn $is-block-func)
-      (cgc-top-level $nodes (+ $i 1) $stmts (str $fns (cgc $n) "\n\n"))
-      (cgc-top-level $nodes (+ $i 1) (str $stmts "    " (cgc $n) ";\n") $fns)))))
+  (loop [$i $i $stmts $stmts $fns $fns]
+    (if (>= $i (length $nodes)) {:stmts $stmts :fns $fns}
+    (let [[$n (get $nodes $i)]
+          [$k (get $n :kind)]
+          [$is-defn (and (= $k "sexpr") (= (get $n :op) "defn"))]
+          [$is-block-func (and (= $k "block") (= (get $n :type) "FUNC"))]]
+      (if (or $is-defn $is-block-func)
+        (recur (+ $i 1) $stmts (str $fns (cgc $n) "\n\n"))
+        (recur (+ $i 1) (str $stmts "    " (cgc $n) ";\n") $fns))))))
 
 ;; S19: lambda forward decl 목록 생성
 (defn cgc-lambda-fwd-loop [$defs $i $acc]
-  (if (>= $i (length $defs)) $acc
-  (cgc-lambda-fwd-loop $defs (+ $i 1)
-    (str $acc "static FLValue __fl_anon_" $i "(FLClosure*, int, FLValue*);\n"))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $defs)) $acc
+    (recur (+ $i 1)
+      (str $acc "static FLValue __fl_anon_" $i "(FLClosure*, int, FLValue*);\n")))))
 
 (defn cgc-lambda-fwds []
   (cgc-lambda-fwd-loop @lambda-defs-atom 0 ""))
 
 ;; S19: lambda 정의 목록 이어붙이기
 (defn cgc-join-lambda-loop [$defs $i $acc]
-  (if (>= $i (length $defs)) $acc
-  (cgc-join-lambda-loop $defs (+ $i 1) (str $acc (get $defs $i) "\n\n"))))
+  (loop [$i $i $acc $acc]
+    (if (>= $i (length $defs)) $acc
+    (recur (+ $i 1) (str $acc (get $defs $i) "\n\n")))))
 
 (defn cgc-join-lambdas []
   (cgc-join-lambda-loop @lambda-defs-atom 0 ""))
