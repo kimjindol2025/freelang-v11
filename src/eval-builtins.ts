@@ -1254,13 +1254,17 @@ loop().catch(e => {
       const _q1: any[] = (globalThis as any).__flEventQueue ?? [];
       if (_q1.length === 0) return 0;
       const _ev1 = _q1.shift();
+      if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
       try {
         const _r1 = (interp as any).callUserFunction(_ev1.handler, _ev1.args);
         const _o1 = _r1 != null ? String(_r1) : "";
-        if (_o1 && _ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(_o1.endsWith("\n") ? _o1 : _o1 + "\n"); } catch {}
+        if (_o1 && _ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(_o1.endsWith("\n") ? _o1 : _o1 + "\n"); } catch (we: any) {
+          (globalThis as any).__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+        }
       } catch (e: any) {
-        if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
-        (globalThis as any).__flErrorQueue.push(["io-err", "nonfatal", "handler", e.message]);
+        // handler logic throw → recoverable; evaluator internal error → fatal
+        const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+        (globalThis as any).__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
         if (_ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(`ERR ${e.message}\n`); } catch {}
       }
       return 1;
@@ -1271,16 +1275,19 @@ loop().catch(e => {
       const _capReg2 = (globalThis as any).__flCapRegistry;
       if (_capReg2) { for (const [_n,_c] of Object.entries(_capReg2) as any[]) { if ((_c as any).builtins.includes("fl-event-drain") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
       const _q2: any[] = (globalThis as any).__flEventQueue ?? [];
+      if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
       let _cnt = 0;
       while (_q2.length > 0) {
         const _ev2 = _q2.shift(); _cnt++;
         try {
           const _r2 = (interp as any).callUserFunction(_ev2.handler, _ev2.args);
           const _o2 = _r2 != null ? String(_r2) : "";
-          if (_o2 && _ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(_o2.endsWith("\n") ? _o2 : _o2 + "\n"); } catch {}
+          if (_o2 && _ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(_o2.endsWith("\n") ? _o2 : _o2 + "\n"); } catch (we: any) {
+            (globalThis as any).__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+          }
         } catch (e: any) {
-          if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
-          (globalThis as any).__flErrorQueue.push(["io-err", "nonfatal", "handler", e.message]);
+          const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+          (globalThis as any).__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
           if (_ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(`ERR ${e.message}\n`); } catch {}
         }
       }
@@ -1302,6 +1309,23 @@ loop().catch(e => {
     // (fl-error-queue-size) → number
     case "fl-error-queue-size": {
       return ((globalThis as any).__flErrorQueue ?? []).length;
+    }
+
+    // (fl-error-fatal?) → true if any fatal error in queue
+    case "fl-error-fatal?": {
+      const eq: any[] = (globalThis as any).__flErrorQueue ?? [];
+      return eq.some((e: any) => Array.isArray(e) && e[1] === "fatal");
+    }
+
+    // (fl-queue-cap) → current cap
+    // (fl-queue-cap n) → set cap to n, return old cap
+    case "fl-queue-cap": {
+      const prev = (globalThis as any).__flQueueCap ?? 10000;
+      if (args[0] != null) {
+        const n = Number(args[0]);
+        if (n > 0) (globalThis as any).__flQueueCap = n;
+      }
+      return prev;
     }
 
     // ── TCP Server (FL-Cache / raw TCP daemon) ────────────────────────
@@ -1338,7 +1362,16 @@ loop().catch(e => {
             const trimmed = line.trim();
             if (!trimmed) continue;
             // reactor contract: enqueue only, never call evaluator from IO
-            (globalThis as any).__flEventQueue.push({ handler: handlerName, args: [connId, trimmed], sock });
+            // fatal boundary: queue cap 초과 시 drop newest + [io-err fatal queue-overflow]
+            const _q = (globalThis as any).__flEventQueue;
+            const _cap = (globalThis as any).__flQueueCap ?? 10000;
+            if (_q.length >= _cap) {
+              if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+              (globalThis as any).__flErrorQueue.push(["io-err", "fatal", "queue-overflow", `queue full (cap=${_cap}), dropping event from ${connId}`]);
+              if (sock && !sock.destroyed) try { sock.write(`ERR queue-overflow\n`); } catch {}
+            } else {
+              _q.push({ handler: handlerName, args: [connId, trimmed], sock });
+            }
           }
         });
         sock.on("close", () => entry.sockets.delete(sock));
