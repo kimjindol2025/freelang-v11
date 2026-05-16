@@ -195,7 +195,59 @@ upstream-sock data → enqueue {:type :upstream→client :conn-id :chunk}
 | Upstream :down | 503 응답 → CLOSING |
 | Upstream connect 타임아웃 (3초) | 502 응답 → CLOSING |
 | Header accumulate 타임아웃 (5초) | 408 응답 → CLOSING |
+| Header 크기 초과 (64KB) | 431 응답 → CLOSING |
 | Relay 중 upstream reset | CLOSING, passive fail +1 |
+| 아웃바운드 큐 초과 | `[io-err backpressure]` 발생 → CLOSING |
+
+---
+
+## Timeout 상수
+
+```lisp
+(define HEADER_TIMEOUT_MS    5000)   ; slow loris 방어
+(define MAX_HEADER_SIZE      65536)  ; 64KB — 초과 시 431
+(define CONNECT_TIMEOUT_MS   3000)   ; upstream TCP connect
+(define HEALTH_TIMEOUT_MS    1000)   ; active health check TCP probe
+(define IDLE_TIMEOUT_MS     60000)   ; RELAYING 중 양쪽 무데이터 시
+```
+
+### TIMEOUT 상태
+
+```
+READING_HEADER
+  ↓ HEADER_TIMEOUT_MS 초과  또는  버퍼 > MAX_HEADER_SIZE
+TIMEOUT                     ← 408 / 431 응답 후 CLOSING
+```
+
+---
+
+## Backpressure 정책
+
+각 connection은 별도 아웃바운드 큐를 가진다.
+
+- **큐 cap**: 연결당 64개 청크 (기본값, config에서 조정 가능)
+- **오버플로**: 신규 청크 drop + `[io-err "fatal" "backpressure" "conn_id: outbound queue full"]` 발생 → connection CLOSING
+- **목적**: 느린 클라이언트가 upstream 처리를 막는 head-of-line blocking 방지
+
+---
+
+## Route 해석 우선순위
+
+같은 요청에 여러 규칙이 매칭될 경우 아래 순서로 첫 번째 규칙 선택 (first-match):
+
+1. **exact host + 최장 path prefix** — `"tasks.dclub.kr"` + `"/api/v2"`
+2. **exact host + 짧은 path prefix** — `"tasks.dclub.kr"` + `"/"`
+3. **wildcard host (`nil`) + 최장 path prefix** — `nil` + `"/api/tasks"`
+4. **wildcard host + 짧은 path prefix** — `nil` + `"/"`
+5. **default route** (domain=nil, path-prefix="/")
+
+정렬은 startup 시 ROUTE-RULES 로드 직후 한 번만 수행 (stable sort). 런타임 중 재정렬 없음.
+
+```lisp
+; startup 시 정렬 키
+; [host-specificity path-length original-index]
+; host-specificity: exact=1, wildcard=0
+```
 
 ---
 
