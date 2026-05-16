@@ -2,6 +2,7 @@
 ;; 사용: node bootstrap.js run self/run-cgc.fl <input.fl> <output.c>
 
 (load "self/codegen-c.fl")
+(load "self/ir-validator.fl")
 
 (defn main [argv]
   (let [[input  (get argv 0)]
@@ -10,6 +11,7 @@
     (println "usage: run-cgc.fl <input.fl> <output.c>")
     (let [[src    (file-read input)]
           [nodes  (fl-parse src)]
+          [_v     (ir-validate nodes)]
           [c-code (generate-c nodes)]]
       (file-write output c-code)
       (println (str "Compiled " input " -> " output))))))
