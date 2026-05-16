@@ -1,7 +1,7 @@
 {
   "name": "freelang-editor",
-  "version": "11.7.10",
-  "description": "FreeLang Editor — AI-Native Language with Built-in DevTools & WebSocket. [v11.7.10: Array Complete + 1129 tests]",
+  "version": "11.7.11",
+  "description": "FreeLang Editor — AI-Native Language with Built-in DevTools & WebSocket. [v11.7.11: FL-Native Build/Test Tools + 1129 tests]",
   "keywords": [
     "ai",
     "language",

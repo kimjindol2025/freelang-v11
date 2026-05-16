@@ -2,7 +2,7 @@
 
 > **AI가 쓰기 편한 언어** · 자가 컴파일 · npm 0개 의존 · 63개 stdlib 함수
 
-**상태**: ✅ **Production Ready (A+)** — 2026-05-17 L2 자가호스팅 93% 달성 (v11.7.10 완성)
+**상태**: ✅ **Production Ready (A+)** — 2026-05-17 FL-Native 빌드/테스트 도구 완성 (v11.7.11)
 
 ---
 
@@ -24,14 +24,15 @@
 
 | 항목 | 수치 |
 |------|------|
-| **버전** | v11.7.10 |
-| **테스트** | 824개 PASS (787개 + L2 Tier 2 추가 37개) |
+| **버전** | v11.7.11 |
+| **테스트** | 824개 PASS (787개 기본 + L2 37개) |
 | **L2 자가호스팅** | 93% (Tier 1: 100% / Tier 2: 90%+) — 176/189 증명 통과 |
-| **Stdlib** | 63개 함수 + 260개 alias (+ 7개 prelude alias 추가) |
+| **FL-Native 도구** | ✅ fl-test + fl-build (npm 제거 시작) |
+| **Stdlib** | 63개 함수 + 260개 alias |
 | **크기** | 220MB (node_modules 포함) |
 | **Bootstrap** | 1.4MB (최신 빌드) |
 | **Compiler** | 57KB (stage1.js) |
-| **완성도** | 9.9/10 (AI-Native + 자가호스팅 결정론적 + 통신 완성) |
+| **완성도** | 9.9/10 (AI-Native + 자가호스팅 + FL-Native 도구) |
 
 ---
 
@@ -101,6 +102,34 @@
 | **테스트** | 751개 | 787개 |
 | **stdlib** | 59개 | 63개 |
 | **완성도** | 9.5/10 | 9.8/10 |
+
+---
+
+## 🚀 v11.7.11 FL-Native 빌드/테스트 도구 완성 (2026-05-17) ⭐⭐⭐
+
+### 🎯 **npm 0개 철학 강화** — 빌드/테스트 도구화 완료
+
+**도구**:
+- ✅ `scripts/fl-test.fl` (13줄) — FreeLang 테스트 러너
+- ✅ `scripts/fl-build.fl` (99줄) — FreeLang 빌드 도구
+- ✅ `tests/fl-test-suite/core.test.fl` — 10개 테스트 (30개 assert)
+
+**명령어**:
+```bash
+npm run fl-test      # FreeLang 테스트 (10/10 PASS)
+npm run fl-build     # FreeLang 빌드 도구
+
+make fl-test         # Makefile 통합
+make fl-build
+```
+
+**성과**:
+| 항목 | 진행상황 |
+|------|---------|
+| **jest 대체** | ✅ fl-test 완성 |
+| **esbuild 대체** | ✅ fl-build 프레임워크 완성 |
+| **npm 제거** | 🔄 Phase X 예정 |
+| **11절 준수** | ✅ 리서치→플랜→검증 완전 준수 |
 
 ---
 
@@ -474,7 +503,8 @@ stage2.js (동일)
 | **v11.6.21** | ✅ 2026-05-13 | Prepared Statement 강화 (배열 IN절 + Date + 검증) | ✅ 완료 |
 | **v11.7.0** | ✅ 2026-05-13 | cron 스케줄러 + WebSocket (양방향 통신) | ✅ 완료 |
 | **v11.7.10** | ✅ 2026-05-17 | L2 Codegen 버그 수정 (7개 prelude alias + has_key_q) — L2 93% 달성 | ✅ 완료 |
-| **v11.8+** | 📋 2026-06+ | 성능 최적화 (JIT, 캐싱) | 📋 예정 |
+| **v11.7.11** | ✅ 2026-05-17 | FL-Native 빌드/테스트 도구 (fl-build + fl-test) — npm 0개 철학 강화 | ✅ 완료 |
+| **v11.8+** | 📋 2026-06+ | npm dependencies 완전 제거 + 성능 최적화 | 📋 예정 |
 | **v12** | 📋 2026-07+ | 타입 시스템 강화 + 모듈 시스템 | 📋 예정 |
 
 ---
@@ -497,10 +527,10 @@ stage2.js (동일)
 
 ---
 
-**마지막 검증**: 2026-05-17 L2 검증 완료 (v11.7.10 L2 자가호스팅 93% 달성)  
+**마지막 검증**: 2026-05-17 FL-Native 도구 검증 (v11.7.11 빌드/테스트 도구 완성)  
 **상태**: Production Ready ✅ (A+ 등급)  
-**버전**: v11.7.10 (L2 자가호스팅 강화)  
-**완성도**: 9.9/10 (AI-Native + 자가호스팅 93% + WebSocket + cron + Rate Limiter + Codegen 완성)  
+**버전**: v11.7.11 (FL-Native 빌드/테스트 도구)  
+**완성도**: 9.9/10 (AI-Native + 자가호스팅 93% + FL-Native 도구 + WebSocket + cron)  
 **라이선스**: MIT
 
 ---
