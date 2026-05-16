@@ -1317,6 +1317,39 @@ loop().catch(e => {
       return eq.some((e: any) => Array.isArray(e) && e[1] === "fatal");
     }
 
+    // (fl-error-severity err) → "fatal" | "recoverable"
+    // err: ["io-err" severity source msg]
+    case "fl-error-severity": {
+      const e = args[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[1]) : null;
+    }
+
+    // (fl-error-source err) → "queue-overflow" | "handler" | "write"
+    case "fl-error-source": {
+      const e = args[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[2]) : null;
+    }
+
+    // (fl-error-message err) → message string
+    case "fl-error-message": {
+      const e = args[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[3]) : null;
+    }
+
+    // (fl-error-filter severity) → errors matching severity, clears them from queue
+    // severity: "fatal" | "recoverable" | "all"
+    case "fl-error-filter": {
+      const sev = String(args[0] ?? "all");
+      const eq: any[] = (globalThis as any).__flErrorQueue ?? [];
+      if (sev === "all") {
+        (globalThis as any).__flErrorQueue = [];
+        return eq;
+      }
+      const matched = eq.filter((e: any) => Array.isArray(e) && e[1] === sev);
+      (globalThis as any).__flErrorQueue = eq.filter((e: any) => !(Array.isArray(e) && e[1] === sev));
+      return matched;
+    }
+
     // (fl-queue-cap) → current cap
     // (fl-queue-cap n) → set cap to n, return old cap
     case "fl-queue-cap": {
