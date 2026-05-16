@@ -349,6 +349,7 @@
     (swap! lambda-defs-atom push
       (str "static FLValue " $fn-name
            "(FLClosure* _self, int _argc, FLValue* argv) {\n"
+           "    (void)_self; (void)_argc;\n"
            $env-decls
            $decls
            "    return " $body-c ";\n}"))
@@ -460,6 +461,7 @@
       (swap! wrapper-defs-atom push
         (str "static FLValue __fl_wrap_" $name
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
+             "    (void)_s; (void)_ac;\n"
              "    return " $name "(" $call-args ");\n}"))
       (let [[$body (cgc (get $args 2))]]
         (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))))
@@ -598,7 +600,9 @@
         [$ldefs (cgc-join-lambdas)]
         [$wdefs (cgc-join-wrappers)]]
   (str
-    "#include \"runtime.h\"\n\n"
+    "#include \"runtime.h\"\n"
+    "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
+    "#pragma GCC diagnostic ignored \"-Wunused-parameter\"\n\n"
     $fwd
     $gdecls "\n"
     $lfwd "\n"
