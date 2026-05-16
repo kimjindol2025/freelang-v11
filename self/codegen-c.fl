@@ -414,7 +414,8 @@
   (let [[$items (get-block-items (get $args $i))]
         [$test (get $items 0)]
         [$body (get $items 1)]
-        [$is-else (and (= (get $test :kind) "literal") (= (get $test :value) true))]]
+        [$is-else (and (= (get $test :kind) "literal")
+                       (or (= (get $test :value) true) (= (get $test :value) "true")))]]
     (cgc-cond-nested $args (- $i 1)
       (if $is-else
         (cgc $body)
@@ -722,7 +723,8 @@
   (let [[$items (get-block-items (get $args $i))]
         [$test (get $items 0)]
         [$body (get $items 1)]
-        [$is-else (and (= (get $test :kind) "literal") (= (get $test :value) true))]]
+        [$is-else (and (= (get $test :kind) "literal")
+                       (or (= (get $test :value) true) (= (get $test :value) "true")))]]
     (cgc-cond-nested-wr $args $vars (- $i 1)
       (if $is-else
         (cgc-with-recur $body $vars)
