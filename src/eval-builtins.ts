@@ -1471,6 +1471,125 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return !!(entry && !entry.stopped);
     }
 
+    // (tcp-server-raw port "handler") → "ok"
+    // raw chunk TCP 서버. 핸들러 호출 규약 (항상 3 인자):
+    //   handler("connect", connId, "")       — 신규 연결
+    //   handler("data",    connId, chunk)    — raw 데이터 수신 (binary encoding)
+    //   handler("close",   connId, "")       — 연결 종료
+    case "tcp-server-raw": {
+      const _rrCapReg = (globalThis as any).__flCapRegistry;
+      if (_rrCapReg) { for (const [_n,_c] of Object.entries(_rrCapReg) as any[]) { if ((_c as any).builtins.includes("tcp-server-raw") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
+      const _rrPort = Number(args[0] ?? 30390);
+      const _rrHandler = String(args[1] ?? "");
+      const _rrReg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
+      if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = _rrReg;
+      if (_rrReg[_rrPort] && !_rrReg[_rrPort].stopped) return "already-running";
+      if (!(globalThis as any).__flEventQueue) (globalThis as any).__flEventQueue = [];
+      if (!(globalThis as any).__flConnSocks) (globalThis as any).__flConnSocks = {};
+      const _rrNet = require("net");
+      const _rrEntry = { server: null as any, sockets: new Set<any>(), stopped: false };
+      _rrReg[_rrPort] = _rrEntry;
+      let _rrSeq = 0;
+      _rrEntry.server = _rrNet.createServer((sock: any) => {
+        if (_rrEntry.stopped) { sock.destroy(); return; }
+        const _rrConnId = `conn_${++_rrSeq}`;
+        _rrEntry.sockets.add(sock);
+        (globalThis as any).__flConnSocks[_rrConnId] = sock;
+        const _rrEnq = (evArgs: any[]) => {
+          const _q = (globalThis as any).__flEventQueue;
+          const _cap = (globalThis as any).__flQueueCap ?? 10000;
+          if (_q.length >= _cap) {
+            if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+            (globalThis as any).__flErrorQueue.push(["io-err","fatal","queue-overflow",`queue full (cap=${_cap}), dropping raw event`]);
+          } else { _q.push({ handler: _rrHandler, args: evArgs, sock }); }
+        };
+        _rrEnq(["connect", _rrConnId, ""]);
+        sock.on("data", (chunk: Buffer) => {
+          if (_rrEntry.stopped) return;
+          _rrEnq(["data", _rrConnId, chunk.toString("binary")]);
+        });
+        const _rrOnEnd = () => {
+          _rrEntry.sockets.delete(sock);
+          delete (globalThis as any).__flConnSocks[_rrConnId];
+          _rrEnq(["close", _rrConnId, ""]);
+        };
+        sock.on("close", _rrOnEnd);
+        sock.on("error", _rrOnEnd);
+      });
+      _rrEntry.server.listen(_rrPort, "0.0.0.0");
+      _rrEntry.server.on("error", () => { _rrEntry.stopped = true; delete _rrReg[_rrPort]; });
+      return "ok";
+    }
+
+    // (tcp-outbound host port "handler") → upstream-id (즉시 반환, 연결은 비동기)
+    // 이벤트 큐 경유 (항상 3 인자):
+    //   handler("connect", upstreamId, "")         — 연결 성공
+    //   handler("data",    upstreamId, chunk)       — 응답 수신
+    //   handler("close",   upstreamId, "")          — 종료
+    //   handler("error",   upstreamId, message)     — 연결 실패
+    case "tcp-outbound": {
+      const _obHost = String(args[0] ?? "localhost");
+      const _obPort = Number(args[1] ?? 80);
+      const _obHandler = String(args[2] ?? "");
+      if (!(globalThis as any).__flUpstreams) (globalThis as any).__flUpstreams = {};
+      if (!(globalThis as any).__flUpstreamSeq) (globalThis as any).__flUpstreamSeq = 0;
+      const _upId = `upstream_${++(globalThis as any).__flUpstreamSeq}`;
+      const _obNet = require("net");
+      const _obSock = _obNet.createConnection({ host: _obHost, port: _obPort });
+      (globalThis as any).__flUpstreams[_upId] = _obSock;
+      const _obEnq = (evArgs: any[]) => {
+        const _q = (globalThis as any).__flEventQueue;
+        const _cap = (globalThis as any).__flQueueCap ?? 10000;
+        if (_q.length >= _cap) {
+          if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+          (globalThis as any).__flErrorQueue.push(["io-err","fatal","queue-overflow",`queue full, dropping upstream event`]);
+        } else { _q.push({ handler: _obHandler, args: evArgs, sock: _obSock }); }
+      };
+      _obSock.on("connect", () => _obEnq(["connect", _upId, ""]));
+      _obSock.on("data",    (chunk: Buffer) => _obEnq(["data", _upId, chunk.toString("binary")]));
+      const _obOnEnd = () => { delete (globalThis as any).__flUpstreams[_upId]; _obEnq(["close", _upId, ""]); };
+      _obSock.on("close", _obOnEnd);
+      _obSock.on("error", (e: any) => { delete (globalThis as any).__flUpstreams[_upId]; _obEnq(["error", _upId, String(e.message ?? "connect failed")]); });
+      return _upId;
+    }
+
+    // (tcp-write conn-id data) → "ok" | "error" | "not-found"
+    // 인바운드(__flConnSocks) 또는 아웃바운드(__flUpstreams) 연결에 raw 전송
+    case "tcp-write": {
+      const _twId = String(args[0] ?? "");
+      const _twData = String(args[1] ?? "");
+      const _twSock = (globalThis as any).__flConnSocks?.[_twId]
+                   ?? (globalThis as any).__flUpstreams?.[_twId];
+      if (!_twSock || _twSock.destroyed) return "not-found";
+      try {
+        _twSock.write(Buffer.from(_twData, "binary"));
+        return "ok";
+      } catch (e: any) {
+        if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+        (globalThis as any).__flErrorQueue.push(["io-err","recoverable","write",`${_twId}: ${String(e.message)}`]);
+        return "error";
+      }
+    }
+
+    // (tcp-drop conn-id) → "ok" | "not-found"
+    // 인바운드 또는 아웃바운드 연결 강제 종료
+    case "tcp-drop": {
+      const _tdId = String(args[0] ?? "");
+      const _tdIn = (globalThis as any).__flConnSocks?.[_tdId];
+      if (_tdIn) {
+        try { _tdIn.destroy(); } catch {}
+        delete (globalThis as any).__flConnSocks[_tdId];
+        return "ok";
+      }
+      const _tdOut = (globalThis as any).__flUpstreams?.[_tdId];
+      if (_tdOut) {
+        try { _tdOut.destroy(); } catch {}
+        delete (globalThis as any).__flUpstreams[_tdId];
+        return "ok";
+      }
+      return "not-found";
+    }
+
     // Arithmetic
     case "+": {
       const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
