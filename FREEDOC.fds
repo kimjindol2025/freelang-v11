@@ -1,0 +1,71 @@
+FREEDOC {
+  version: 1
+  spec: "2026-05"
+}
+
+IDENTITY {
+  what: freelang_v11
+  domain: ai_native_language
+  lang: nodejs_interpreter
+  purpose: ai_agents_programming
+}
+
+POSITION {
+  status: done
+  stage: "5/5"
+  current: production_ready
+  next: []
+}
+
+MAP {
+  entry: bootstrap.js
+  compiler: src_compiler
+  stdlib: src_stdlib
+  tools: bin
+  test: test
+  docs: CLAUDE.md
+  cli: cli.js
+}
+
+FIXED {
+  runtime: nodejs
+  deps: 0
+  compiler_size: "57KB"
+  bootstrap_size: "1.4MB"
+  stdlib_functions: 63
+  stdlib_aliases: 260
+  self_hosting: proven
+}
+
+FAILURE {
+  bracket_consistency_cause: ai_error_rate_high
+  bracket_consistency_fixed: true
+  automatic_type_detection_cause: manual_casting
+  automatic_type_detection_fixed: true
+  parameter_marker_cause: ambiguity_prefix
+  parameter_marker_fixed: optional
+  serialization_cause: json_overhead
+  serialization_fixed: auto
+  self_hosting_cause: circular_dependency
+  self_hosting_fixed: proven
+}
+
+CONSTRAINT {
+  rules: [
+    ai_first_principle
+    one_file_complete
+    no_npm_dependencies
+    auto_serialization
+    bracket_consistency
+  ]
+}
+
+CLAIM {
+  claims: [
+    ai_first_citizen
+    not_competing_python
+    ai_writes_better
+    automatic_beats_manual
+    native_tooling_replaces_npm
+  ]
+}
