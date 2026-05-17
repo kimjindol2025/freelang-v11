@@ -1375,9 +1375,15 @@
           (let [[$input (get $argv 1)]
                 [$extra (slice $argv 2 (length $argv))]]
             (do-run $input $extra))
-          (let [[$input (get $argv 0)]
-                [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
-            (compile-file $input $output))))))))
+          (if (= $cmd "compile")
+            (let [[$input (get $argv 1)]
+                  [$output (if (and (>= (length $argv) 4) (= (get $argv 2) "-o"))
+                              (get $argv 3)
+                              (str $input ".out.js"))]]
+              (compile-file $input $output))
+            (let [[$input (get $argv 0)]
+                  [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
+              (compile-file $input $output)))))))))
 
 ;; Entry point trigger
 (cli-main)
