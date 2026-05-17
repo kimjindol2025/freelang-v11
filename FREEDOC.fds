@@ -1,0 +1,62 @@
+FREEDOC {
+  version: 1
+  spec: "2026-05"
+}
+
+IDENTITY {
+  what: freelang-v11
+  domain: ai-programming-language
+  lang: FreeLang
+  purpose: ai-first-language-toolchain
+  version: "v11.7.10"
+}
+
+POSITION {
+  status: in_progress
+  stage: "production"
+  current: freedoc-integration
+  next: [v12-alpha, freedoc-auto-generate]
+}
+
+MAP {
+  entry: bootstrap.js
+  src: src/
+  stdlib: lib/
+  docs: docs/AI_LEARNING_PATH.md
+  stdlib-ref: docs/STDLIB_REFERENCE.md
+  tests: tests/
+  examples: examples/patterns/
+}
+
+FIXED {
+  bootstrap: bootstrap.js
+  node: ">=24"
+  external-npm: 0
+  test-count: 1018
+}
+
+FAILURE {
+  bootstrap_edit_cause: bootstrap-is-ts-build-output
+  bootstrap_edit_fixed: edit-src-instead
+  bootstrap_path_cause: assumed-kim-root-not-freelang-v11
+  bootstrap_path_fixed: always-use-freelang-v11/bootstrap.js
+}
+
+CONSTRAINT {
+  rules: [
+    no_direct_bootstrap_edit,
+    no_external_npm,
+    coding_order_research_plan_task_impl_verify,
+    no_hotfix,
+    consult_before_deciding,
+    rollback_on_2_failures
+  ]
+}
+
+CLAIM {
+  claims: [
+    self_hosted_compiler,
+    deterministic_sha256_fixed_point,
+    ai_first_language_not_human_first
+  ]
+}
