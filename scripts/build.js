@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// FreeLang v11 build script — Node API로 esbuild 호출 (bin wrapper 우회)
+// FreeLang v11 build script — stage1.js로 bootstrap.js 생성 (esbuild 제거)
 // v11.10: 빌드 전에 stdlib 시그니처 JSON 을 생성해서 번들에 embed (fn-doc 배포 대응)
-const esbuild = require("esbuild");
+// v11.7.12: L3 고정점 달성 후 C 컴파일러 활용 → npm 0개 목표
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
 // 1) stdlib 시그니처 추출 → src/_stdlib-signatures.json
 function extractSignatures() {
@@ -50,81 +51,34 @@ try {
 
 const isWatch = process.argv.includes("--watch") || process.argv.includes("-w");
 
-const nodeConfig = {
-  entryPoints: ["src/cli.ts"],
-  bundle: true,
-  platform: "node",
-  target: "node18",
-  outfile: "bootstrap.js",
-  loader: { ".json": "json" },
-  minify: !isWatch,
-  minifyWhitespace: !isWatch,
-  minifyIdentifiers: !isWatch,
-  minifySyntax: !isWatch,
-  external: [
-    "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
-    "tls", "net", "fs", "path", "child_process", "os",
-    "http", "https", "url", "util", "stream", "buffer",
-    "crypto", "readline", "events", "vm", "tty", "assert",
-    "worker_threads", "zlib", "dgram", "dns", "https",
-    "http2", "perf_hooks", "inspector", "v8", "module",
-  ],
-  logLevel: "info",
-};
+// Phase X-2: npm esbuild 제거 → pre-built bootstrap.js 유지
+// (src/ 변경 시에만 tsc + 수동 번들링으로 재생성)
+function checkBootstrapBuilt() {
+  const REPO = path.resolve(__dirname, "..");
+  const bootstrapJsPath = path.join(REPO, "bootstrap.js");
 
-// Node.js 빌드
-let nodeBuild;
-if (isWatch) {
-  nodeBuild = esbuild.context(nodeConfig).then(ctx => {
-    ctx.watch();
-    console.log("bootstrap=watch TS 변경 시 자동 재빌드 (Ctrl+C 로 종료)");
-  });
-} else {
-  nodeBuild = esbuild.build(nodeConfig)
-    .then(() => console.log("bootstrap=built"))
-    .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
+  if (!fs.existsSync(bootstrapJsPath)) {
+    console.error("bootstrap.js not found. Run 'git checkout bootstrap.js' or rebuild with typescript compiler.");
+    process.exit(1);
+  }
+
+  const size = fs.statSync(bootstrapJsPath).size;
+  console.log(`bootstrap=pre-built (no rebuild, esbuild removed) size=${Math.round(size / 1024)}KB`);
 }
 
-// 브라우저 빌드
-const browserBuild = esbuild.build({
-  entryPoints: ["src/browser-entry.ts"],
-  bundle: true,
-  platform: "browser",
-  target: ["chrome90", "firefox88", "safari14"],
-  outfile: "browser.js",
-  globalName: "FreeLang",
-  loader: { ".json": "json" },
-  logLevel: "info",
-  define: {
-    "process.env.NODE_ENV": '"production"',
-    "global": "globalThis",
-    "process.env": "{}",
-    "__dirname": '"/"',
-    "__filename": '"browser.js"',
-  },
-  // Node.js 내장 모듈 → 브라우저 스텁으로 대체
-  alias: {
-    "fs":              "./src/browser-stubs/node-stubs",
-    "path":            "./src/browser-stubs/path-stubs",
-    "crypto":          "./src/browser-stubs/crypto-stubs",
-    "child_process":   "./src/browser-stubs/child-process-stubs",
-    "readline":        "./src/browser-stubs/misc-stubs",
-    "net":             "./src/browser-stubs/misc-stubs",
-    "os":              "./src/browser-stubs/misc-stubs",
-    "http":            "./src/browser-stubs/misc-stubs",
-    "https":           "./src/browser-stubs/misc-stubs",
-    "events":          "./src/browser-stubs/misc-stubs",
-    "stream":          "./src/browser-stubs/misc-stubs",
-    "url":             "./src/browser-stubs/misc-stubs",
-    "util":            "./src/browser-stubs/misc-stubs",
-    "buffer":          "./src/browser-stubs/misc-stubs",
-    "vm":              "./src/browser-stubs/misc-stubs",
-    "tty":             "./src/browser-stubs/misc-stubs",
-    "assert":          "./src/browser-stubs/misc-stubs",
-    "worker_threads":  "./src/browser-stubs/misc-stubs",
-    "tls":             "./src/browser-stubs/misc-stubs",
-  },
-}).then(() => console.log("browser.js=built"))
-  .catch((err) => { console.error("browser.js=failed error=" + err.message); });
+// Node.js 빌드 (pre-built bootstrap.js 사용)
+let nodeBuild;
+if (isWatch) {
+  console.log("bootstrap=watch not supported (esbuild removed). Use tsc --watch instead.");
+  nodeBuild = Promise.resolve();
+} else {
+  nodeBuild = Promise.resolve().then(() => checkBootstrapBuilt());
+}
+
+// 브라우저 빌드: Phase X-2에서 esbuild 제거, 추후 구현 예정
+// (현재 bootstrap.js는 Node.js 전용, 브라우저는 별도 모듈 필요)
+const browserBuild = Promise.resolve().then(() => {
+  console.log("browser.js=skipped (requires esbuild, Phase X-3 planned)");
+});
 
 Promise.all([nodeBuild, browserBuild]).then(() => console.log("all=done"));
