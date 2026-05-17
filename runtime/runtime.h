@@ -183,8 +183,24 @@ FLValue fl_atom_reset(FLValue atom, FLValue val);
 FLValue fl_includes_item(FLValue vec, FLValue item);
 FLValue fl_str_includes(FLValue s, FLValue sub);
 FLValue fl_string_p(FLValue v);
+FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
+FLValue fl_vec_last(FLValue vec);
+FLValue fl_map_del(FLValue map, FLValue key);
+FLValue fl_map_merge(FLValue a, FLValue b);
+FLValue fl_concat(FLValue a, FLValue b);
 
 /* ── S27: FL 소스 → AST (cgc-bridge.c + parser.c에서 제공) ── */
 FLValue fl_parse(FLValue src);
+
+/* ── JSON ── */
+FLValue fl_json_parse(FLValue src);
+FLValue fl_json_stringify(FLValue val);
+
+/* ── 비트 연산 ── */
+FLValue fl_bit_xor(FLValue a, FLValue b);
+FLValue fl_bit_and(FLValue a, FLValue b);
+FLValue fl_bit_or(FLValue a, FLValue b);
+FLValue fl_bit_shl(FLValue a, FLValue b);
+FLValue fl_bit_shr(FLValue a, FLValue b);
 
 #endif /* FREELANG_RUNTIME_H */

@@ -712,3 +712,222 @@ FLValue fl_str_includes(FLValue s, FLValue sub) {
 }
 
 FLValue fl_string_p(FLValue v) { return string_p(v); }
+
+/* ── stdlib aliases — self/all.fl compatibility ── */
+
+FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    int64_t s = start.tag == FL_INT ? start.i : 0;
+    int64_t e = end.tag == FL_INT ? (end.i < 0 ? (int64_t)v->len + end.i + 1 : end.i) : (int64_t)v->len;
+    if (s < 0) s = 0;
+    if (e > (int64_t)v->len) e = (int64_t)v->len;
+    FLValue r = fl_vec_new();
+    for (int64_t i = s; i < e; i++) r = fl_vec_push(r, v->data[i]);
+    return r;
+}
+
+FLValue fl_vec_last(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_nil();
+    FLVector* v = (FLVector*)vec.obj;
+    return v->len > 0 ? v->data[v->len-1] : fl_nil();
+}
+
+FLValue fl_map_del(FLValue map, FLValue key) {
+    if (map.tag != FL_MAP) return map;
+    FLMap* m = (FLMap*)map.obj;
+    FLValue r = fl_map_new();
+    for (uint32_t i = 0; i < m->len; i++)
+        if (!fl_truthy(fl_eq(m->entries[i].key, key)))
+            r = fl_map_set(r, m->entries[i].key, m->entries[i].val);
+    return r;
+}
+
+FLValue fl_map_merge(FLValue a, FLValue b) {
+    if (a.tag != FL_MAP) return b;
+    if (b.tag != FL_MAP) return a;
+    FLMap* ma = (FLMap*)a.obj;
+    FLValue r = a;
+    FLMap* mb = (FLMap*)b.obj;
+    for (uint32_t i = 0; i < mb->len; i++)
+        r = fl_map_set(r, mb->entries[i].key, mb->entries[i].val);
+    return r;
+}
+
+FLValue fl_concat(FLValue a, FLValue b) {
+    if (a.tag == FL_VECTOR && b.tag == FL_VECTOR) {
+        FLVector* va = (FLVector*)a.obj;
+        FLValue r = a;
+        FLVector* vb = (FLVector*)b.obj;
+        for (uint32_t i = 0; i < vb->len; i++) r = fl_vec_push(r, vb->data[i]);
+        return r;
+    }
+    /* string concat fallback */
+    char ba[256], bb[256];
+    const char* sa = fl_to_str(a, ba, sizeof(ba));
+    const char* sb = fl_to_str(b, bb, sizeof(bb));
+    size_t la = strlen(sa), lb = strlen(sb);
+    FLString* obj = malloc(sizeof(FLString) + la + lb + 1);
+    obj->base.type = FL_STRING; obj->base.rc = 1;
+    obj->len = (uint32_t)(la + lb);
+    memcpy(obj->data, sa, la);
+    memcpy(obj->data + la, sb, lb + 1);
+    FLValue r; r.tag = FL_STRING; r.obj = (FLObject*)obj; return r;
+}
+
+/* ── JSON parse / stringify (minimal implementation) ── */
+#include <stdlib.h>
+#include <ctype.h>
+
+static const char* json_skip_ws(const char* p) {
+    while (*p && isspace((unsigned char)*p)) p++;
+    return p;
+}
+
+static FLValue json_parse_value(const char** pp);
+
+static FLValue json_parse_string(const char** pp) {
+    const char* p = *pp + 1; /* skip opening " */
+    size_t cap = 64, len = 0;
+    char* buf = malloc(cap);
+    while (*p && *p != '"') {
+        if (*p == '\\') {
+            p++;
+            char c = *p++;
+            if (c=='n') buf[len++]='\n';
+            else if (c=='t') buf[len++]='\t';
+            else if (c=='r') buf[len++]='\r';
+            else buf[len++]=c;
+        } else {
+            buf[len++] = *p++;
+        }
+        if (len + 4 >= cap) { cap *= 2; buf = realloc(buf, cap); }
+    }
+    if (*p == '"') p++;
+    buf[len] = 0;
+    FLValue r = fl_str_val(buf); free(buf);
+    *pp = p; return r;
+}
+
+static FLValue json_parse_array(const char** pp) {
+    const char* p = *pp + 1; /* skip [ */
+    FLValue vec = fl_vec_new();
+    p = json_skip_ws(p);
+    if (*p == ']') { *pp = p+1; return vec; }
+    while (*p) {
+        p = json_skip_ws(p);
+        FLValue v = json_parse_value(&p);
+        vec = fl_vec_push(vec, v);
+        p = json_skip_ws(p);
+        if (*p == ',') p++;
+        else break;
+    }
+    if (*p == ']') p++;
+    *pp = p; return vec;
+}
+
+static FLValue json_parse_object(const char** pp) {
+    const char* p = *pp + 1; /* skip { */
+    FLValue map = fl_map_new();
+    p = json_skip_ws(p);
+    if (*p == '}') { *pp = p+1; return map; }
+    while (*p) {
+        p = json_skip_ws(p);
+        if (*p != '"') break;
+        FLValue key = json_parse_string(&p);
+        p = json_skip_ws(p);
+        if (*p == ':') p++;
+        p = json_skip_ws(p);
+        FLValue val = json_parse_value(&p);
+        map = fl_map_set(map, key, val);
+        p = json_skip_ws(p);
+        if (*p == ',') p++;
+        else break;
+    }
+    if (*p == '}') p++;
+    *pp = p; return map;
+}
+
+static FLValue json_parse_value(const char** pp) {
+    const char* p = json_skip_ws(*pp);
+    if (*p == '"') { FLValue r = json_parse_string(&p); *pp = p; return r; }
+    if (*p == '[') { FLValue r = json_parse_array(&p);  *pp = p; return r; }
+    if (*p == '{') { FLValue r = json_parse_object(&p); *pp = p; return r; }
+    if (strncmp(p,"null",4)==0)  { *pp=p+4; return fl_nil(); }
+    if (strncmp(p,"true",4)==0)  { *pp=p+4; return fl_bool(true); }
+    if (strncmp(p,"false",5)==0) { *pp=p+5; return fl_bool(false); }
+    /* number */
+    char* end; double d = strtod(p, &end);
+    if (end > p) {
+        *pp = end;
+        if (d == (int64_t)d) return fl_int((int64_t)d);
+        return fl_float(d);
+    }
+    *pp = p+1; return fl_nil();
+}
+
+FLValue fl_json_parse(FLValue src) {
+    if (src.tag != FL_STRING) return fl_nil();
+    FLString* s = (FLString*)src.obj;
+    const char* p = s->data;
+    return json_parse_value(&p);
+}
+
+static void json_stringify_buf(FLValue v, char* buf, size_t sz, size_t* pos) {
+#define JCAT(fmt, ...) do { \
+    int _n = snprintf(buf + *pos, sz - *pos, fmt, ##__VA_ARGS__); \
+    if (_n > 0) *pos += (size_t)_n; } while(0)
+
+    if (v.tag == FL_NIL)    { JCAT("null"); return; }
+    if (v.tag == FL_BOOL)   { JCAT("%s", v.b ? "true" : "false"); return; }
+    if (v.tag == FL_INT)    { JCAT("%lld", (long long)v.i); return; }
+    if (v.tag == FL_FLOAT)  { JCAT("%g", v.f); return; }
+    if (v.tag == FL_STRING) {
+        FLString* s = (FLString*)v.obj;
+        JCAT("\"");
+        for (uint32_t i = 0; i < s->len && *pos < sz-4; i++) {
+            char c = s->data[i];
+            if (c=='"')       { JCAT("\\\""); }
+            else if (c=='\\') { JCAT("\\\\"); }
+            else if (c=='\n') { JCAT("\\n");  }
+            else if (c=='\t') { JCAT("\\t");  }
+            else              { JCAT("%c", c); }
+        }
+        JCAT("\""); return;
+    }
+    if (v.tag == FL_VECTOR) {
+        FLVector* vec = (FLVector*)v.obj;
+        JCAT("[");
+        for (uint32_t i = 0; i < vec->len; i++) {
+            if (i) JCAT(",");
+            json_stringify_buf(vec->data[i], buf, sz, pos);
+        }
+        JCAT("]"); return;
+    }
+    if (v.tag == FL_MAP) {
+        FLMap* m = (FLMap*)v.obj;
+        JCAT("{");
+        for (uint32_t i = 0; i < m->len; i++) {
+            if (i) JCAT(",");
+            json_stringify_buf(m->entries[i].key, buf, sz, pos);
+            JCAT(":");
+            json_stringify_buf(m->entries[i].val, buf, sz, pos);
+        }
+        JCAT("}"); return;
+    }
+    JCAT("null");
+#undef JCAT
+}
+
+FLValue fl_json_stringify(FLValue val) {
+    char buf[65536]; size_t pos = 0;
+    json_stringify_buf(val, buf, sizeof(buf), &pos);
+    return fl_str_val(buf);
+}
+
+/* ── 비트 연산 ── */
+FLValue fl_bit_xor(FLValue a, FLValue b) { return fl_int(a.i ^ b.i); }
+FLValue fl_bit_and(FLValue a, FLValue b) { return fl_int(a.i & b.i); }
+FLValue fl_bit_or(FLValue a, FLValue b)  { return fl_int(a.i | b.i); }
+FLValue fl_bit_shl(FLValue a, FLValue b) { return fl_int(a.i << b.i); }
+FLValue fl_bit_shr(FLValue a, FLValue b) { return fl_int(a.i >> b.i); }

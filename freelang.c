@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 /* ──────────────────────────────── Arena ── */
-#define ARENA_SZ (1 << 22)   /* 4 MB */
+#define ARENA_SZ (1 << 26)   /* 64 MB */
 static char arena[ARENA_SZ];
 static size_t atop;
 static void* aa(size_t n) {
@@ -22,7 +22,7 @@ static void* aa(size_t n) {
 /* ──────────────────────────────── Lexer ── */
 typedef enum { T_LP,T_RP,T_LB,T_RB,T_LC,T_RC,T_NUM,T_STR,T_SYM,T_EOF } TK;
 typedef struct { TK k; char v[512]; } Tok;
-#define MAX_TOKS 32768
+#define MAX_TOKS 131072
 static Tok toks[MAX_TOKS];
 static int ntoks, tpos;
 
@@ -153,13 +153,42 @@ static void sym_add(SymSet* ss, const char* v) {
 
 static void collect_syms(N* n, SymSet* out_ss) {
     if (!n) return;
-    if (n->k == NA) { sym_add(out_ss, n->v); return; }
+    if (n->k == NA) {
+        if (n->v[0] == ':') return; /* keyword constant — never a free variable */
+        sym_add(out_ss, n->v);
+        return;
+    }
     if (n->k == NL) {
         /* skip c[0] — always operator/form name, not a variable reference */
         for (int i = 1; i < n->nc; i++) collect_syms(n->c[i], out_ss);
         return;
     }
     for (int i = 0; i < n->nc; i++) collect_syms(n->c[i], out_ss);
+}
+
+/* collect variable names bound by let forms inside a subtree */
+static void collect_let_bindings(N* n, SymSet* bound) {
+    if (!n) return;
+    if (n->k == NL && n->nc >= 2 && n->c[0] && n->c[0]->k == NA
+        && !strcmp(n->c[0]->v, "let")) {
+        N* bindings = n->c[1];
+        if (bindings) {
+            for (int i = 0; i < bindings->nc; i++) {
+                N* item = bindings->c[i];
+                /* double-bracket: [[$k expr] [$j expr]] — item is NV [$k expr] */
+                if (item && (item->k == NV || item->k == NL)
+                    && item->nc >= 1 && item->c[0] && item->c[0]->k == NA) {
+                    sym_add(bound, item->c[0]->v);
+                    if (item->nc >= 2) collect_let_bindings(item->c[1], bound);
+                } else {
+                    collect_let_bindings(item, bound);
+                }
+            }
+        }
+        for (int i = 2; i < n->nc; i++) collect_let_bindings(n->c[i], bound);
+        return;
+    }
+    for (int i = 0; i < n->nc; i++) collect_let_bindings(n->c[i], bound);
 }
 
 /* ──────────────────────────────── Emitter ── */
@@ -170,8 +199,21 @@ static void E(const char* fmt, ...) {
 
 static void cname(const char* s, char* b, size_t sz) {
     size_t i = 0;
-    for (size_t j = 0; s[j] && i < sz-2; j++)
-        b[i++] = (s[j] == '-' || s[j] == '?') ? '_' : s[j];
+    /* strip leading $ and : prefixes */
+    while (*s == '$' || *s == ':') s++;
+    for (size_t j = 0; s[j] && i < sz-2; j++) {
+        char c = s[j];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') || c == '_') {
+            b[i++] = c;
+        } else if (c == '?' && s[j+1] == '\0') {
+            /* trailing ? → _p (matches runtime null_p, list_p, etc.) */
+            if (i < (int)sz-3) { b[i++]='_'; b[i++]='p'; }
+        } else {
+            b[i++] = '_';  /* replace any special char with _ */
+        }
+    }
+    if (i == 0) { b[0]='_'; i=1; }  /* empty → _ */
     b[i] = 0;
     /* avoid C keywords — append _ if name collides */
     static const char* kw[] = {"double","float","int","long","short","char","void",
@@ -192,7 +234,7 @@ static void cesc(const char* s) {
 }
 
 /* nodes/nnodes forward — defined in Program section */
-#define MAX_NODES 4096
+#define MAX_NODES 32768
 static N* nodes[MAX_NODES];
 static int nnodes;
 
@@ -244,6 +286,8 @@ static void emit_node(N* n) {
         if (!strcmp(n->v,"true"))           { E("fl_bool(true)");  return; }
         if (!strcmp(n->v,"false"))          { E("fl_bool(false)"); return; }
         if (!strcmp(n->v,"nil") || !strcmp(n->v,"null")) { E("fl_nil()"); return; }
+        /* :keyword → string literal */
+        if (n->v[0] == ':') { E("fl_str_val(\""); cesc(n->v+1); E("\")"); return; }
         char b[512]; cname(n->v, b, sizeof(b));
         /* defn name used as value → wrap as FLValue fn */
         if (is_defn_name(n->v)) { E("fl_fn_new(_wrap_%s, 0, NULL)", b); return; }
@@ -321,7 +365,7 @@ static void emit_node(N* n) {
     }
     if (sym(op,"let")) {
         N* bl = a[0]; N** it = bl->c; int ni = bl->nc;
-        int nested = (ni > 0 && it[0]->k == NL);
+        int nested = (ni > 0 && (it[0]->k == NL || it[0]->k == NV));
         E("((__extension__ ({\n");
         if (nested) {
             for (int i = 0; i < ni; i++) {
@@ -385,6 +429,53 @@ static void emit_node(N* n) {
     if (sym(op,"map"))    { E("fl_map_fn(");    emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"filter")) { E("fl_filter_fn("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"reduce")) { E("fl_reduce_fn("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    /* stdlib aliases */
+    if (sym(op,"append") || sym(op,"push")) {
+        E("fl_vec_push("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"list")) {
+        if (na==0) { E("fl_vec_new()"); return; }
+        E("fl_vec_from((FLValue[]){"); emit_args(a,na); E("}, %d)", na); return; }
+    if (sym(op,"slice")) {
+        E("fl_vec_slice("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    /* JS runtime internal names used in self/all.fl */
+    if (sym(op,"_fl_map_set") || sym(op,"assoc") || sym(op,"obj-assoc")) {
+        E("fl_map_set("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    if (sym(op,"dissoc") || sym(op,"obj-dissoc")) {
+        E("fl_map_del("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"obj-keys") || sym(op,"keys")) {
+        E("fl_map_keys("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"obj-vals") || sym(op,"vals")) {
+        E("fl_map_vals("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"obj-entries") || sym(op,"entries")) {
+        E("fl_map_entries("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"obj-merge") || sym(op,"merge")) {
+        E("fl_map_merge("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"concat")) {
+        E("fl_concat("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"first")) { E("fl_vec_get("); emit_node(a[0]); E(", fl_int(0))"); return; }
+    if (sym(op,"last"))  { E("fl_vec_last("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"rest"))  { E("fl_vec_slice("); emit_node(a[0]); E(", fl_int(1), fl_int(-1))"); return; }
+    if (sym(op,"abs"))   { E("fl_abs("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"floor")) { E("fl_floor("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"ceil"))  { E("fl_ceil(");  emit_node(a[0]); E(")"); return; }
+    if (sym(op,"round")) { E("fl_ceil(");  emit_node(a[0]); E(")"); return; }
+    if (sym(op,"sqrt"))  { E("fl_math_sqrt("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"now") || sym(op,"now-ms") || sym(op,"now_ms"))
+        { E("fl_now_ms()"); return; }
+    if (sym(op,"bit-xor") || sym(op,"bit_xor"))
+        { E("fl_bit_xor("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"bit-and") || sym(op,"bit_and"))
+        { E("fl_bit_and("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"bit-or") || sym(op,"bit_or"))
+        { E("fl_bit_or("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"bit-shift-left") || sym(op,"bit_shift_left"))
+        { E("fl_bit_shl("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"bit-shift-right") || sym(op,"bit_shift_right"))
+        { E("fl_bit_shr("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"json-parse") || sym(op,"json_parse"))
+        { E("fl_json_parse("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"json-stringify") || sym(op,"json_stringify"))
+        { E("fl_json_stringify("); emit_node(a[0]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};
@@ -424,7 +515,7 @@ static void emit_node(N* n) {
     }
     /* generic call — defn/builtin → direct C, define/unknown → dynamic dispatch */
     char b[512]; cname(op->v, b, sizeof(b));
-    if (is_defn_name(op->v) || is_runtime_builtin(op->v)) {
+    if (is_defn_name(op->v) || is_runtime_builtin(b)) {  /* b = C-mangled name */
         E("%s(", b); emit_args(a, na); E(")");
     } else {
         if (na > 0) { E("fl_fn_call(%s, %d, (FLValue[]){", b, na); emit_args(a, na); E("})"); }
@@ -435,20 +526,38 @@ static void emit_node(N* n) {
 /* ──────────────────────────────── Program ── */
 
 static int is_runtime_builtin(const char* name) {
+    /* C-mangled names (after cname()) that are direct runtime functions */
     static const char* builtins[] = {
-        "length","get","range","split","join","trim","substring","type_of",
+        /* core */
+        "length","get","range","type_of",
+        /* predicates (? → _p via cname) */
         "null_p","list_p","map_p","fn_p","string_p","array_p","number_p",
-        "index_of","str_index_of","str_replace","str_includes",
-        "char_at","char_code_at",
+        "array_p","integer_p","float_p","vector_p","keyword_p",
+        /* string */
+        "split","join","trim","substring","index_of","str_index_of",
+        "str_replace","str_replace_all","str_includes","str_upper","str_lower",
+        "str_trim","str_length","str_split","str_join","str_starts_with","str_ends_with",
+        "str_contains","str_blank_p",
+        /* array */
         "first","last","rest","push","pop","reverse","flatten",
-        "map_p","map_entries","map_keys","map_vals","map_from_pairs",
+        "take","drop","sort","sort_by","flat_map","zip",
+        "char_at","char_code_at","includes_item",
+        /* map */
+        "map_entries","map_keys","map_vals",
         "fl_map_get","fl_map_set","fl_map_new","fl_map_len",
-        "fl_vec_get","fl_vec_set","fl_vec_push","fl_vec_new","fl_vec_len","fl_vec_from",
-        "fl_parse","fl_now","fl_now_ms","fl_get_argv",
+        "fl_map_from_pairs","fl_vec_get","fl_vec_set","fl_vec_push",
+        "fl_vec_new","fl_vec_len","fl_vec_from",
+        /* higher-order */
+        "fl_map_fn","fl_filter_fn","fl_reduce_fn",
+        /* math */
         "fl_abs","fl_floor","fl_ceil","fl_math_sqrt","fl_float","fl_int","fl_bool",
-        "fl_includes_item","fl_map_fn","fl_filter_fn","fl_reduce_fn",
-        "fl_string_p","fl_str_val","fl_str_includes",
+        /* io */
+        "fl_parse","fl_now","fl_now_ms","fl_get_argv","fl_println","fl_print",
+        "fl_str_val","fl_str_n","fl_str_includes","fl_string_p",
         "fl_file_read","fl_file_write",
+        /* misc */
+        "not","abs","floor","ceil","round","concat",
+        "json_parse","json_stringify","shell_exec","now_ms","now_iso","now_unix",
         NULL
     };
     for (int i = 0; builtins[i]; i++)
@@ -457,10 +566,14 @@ static int is_runtime_builtin(const char* name) {
 }
 
 static int is_defn_name(const char* name) {
+    /* match by C-mangled name so "json-keys" defn is found by "json_keys" call */
+    char nb[512]; cname(name, nb, sizeof(nb));
     for (int i = 0; i < nnodes; i++) {
         N* nd = nodes[i];
-        if (nd && nd->k==NL && nd->nc>=2 && sym(nd->c[0],"defn")
-            && !strcmp(nd->c[1]->v, name)) return 1;
+        if (!nd || nd->k!=NL || nd->nc<2) continue;
+        if (!sym(nd->c[0],"defn")) continue;
+        char fb[512]; cname(nd->c[1]->v, fb, sizeof(fb));
+        if (!strcmp(fb, nb)) return 1;
     }
     return 0;
 }
@@ -479,13 +592,19 @@ static int is_global_name(const char* name) {
 
 static void free_vars(N* fn_node, SymSet* fv) {
     SymSet used = {0};
-    if (fn_node->nc >= 3) collect_syms(fn_node->c[2], &used);
+    SymSet let_bound = {0};
+    if (fn_node->nc >= 3) {
+        collect_syms(fn_node->c[2], &used);
+        collect_let_bindings(fn_node->c[2], &let_bound);
+    }
     N* params = (fn_node->nc >= 2) ? fn_node->c[1] : NULL;
     for (int i = 0; i < used.n; i++) {
         const char* v = used.s[i]; int bound = 0;
         if (is_global_name(v)) continue;
         if (params) for (int j = 0; j < params->nc; j++)
             if (!strcmp(params->c[j]->v, v)) { bound=1; break; }
+        for (int j = 0; j < let_bound.n && !bound; j++)
+            if (!strcmp(let_bound.s[j], v)) bound=1;
         if (!bound) sym_add(fv, v);
     }
 }
@@ -507,16 +626,18 @@ static void flush_file(FILE* src, FILE* dst) {
 }
 
 static void emit_program(void) {
-    /* Two-buffer strategy:
+    /* Three-buffer strategy:
+     * fwddecl   — forward declarations (must precede preamble anonymous fns)
      * preamble  — anonymous fn C functions (populated by fn handler)
-     * body      — forward decls + defn bodies + main()
-     * Final output: header + preamble + body */
+     * body      — defn bodies + main()
+     * Final output: header + fwddecl + preamble + body */
+    FILE* fwddecl = tmpfile();
     preamble = tmpfile();
     FILE* body = tmpfile();
-    if (!preamble || !body) { fputs("error: tmpfile failed\n", stderr); exit(1); }
+    if (!fwddecl || !preamble || !body) { fputs("error: tmpfile failed\n", stderr); exit(1); }
 
     FILE* final_out = out;
-    out = body;
+    out = fwddecl;
 
     /* forward declarations */
     for (int i = 0; i < nnodes; i++) {
@@ -544,6 +665,8 @@ static void emit_program(void) {
         E("static FLValue %s;\n", b);
     }
     E("\n");
+    /* switch to body buffer for defn bodies and main */
+    out = body;
     /* function definitions — fn literals inside bodies populate preamble */
     for (int i = 0; i < nnodes; i++) {
         N* n = nodes[i];
@@ -592,8 +715,9 @@ static void emit_program(void) {
 
     out = final_out;
     fprintf(out, "#include \"runtime.h\"\n\n");
-    flush_file(preamble, out);
-    flush_file(body, out);
+    flush_file(fwddecl, out);   /* fwd decls first — anonymous fns may call defns */
+    flush_file(preamble, out);  /* anonymous fn bodies */
+    flush_file(body, out);      /* defn bodies + main */
 }
 
 /* ──────────────────────────────── Driver ── */
