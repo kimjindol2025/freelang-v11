@@ -201,6 +201,8 @@ static int  is_defn_name(const char*);
 static int  is_global_name(const char*);
 static void free_vars(N*, SymSet*);
 static void emit_node(N* n);
+static int is_runtime_builtin(const char* name);
+static int is_defn_name(const char* name);
 
 static void emit_args(N** a, int n) {
     for (int i = 0; i < n; i++) { if (i) E(", "); emit_node(a[i]); }
@@ -417,9 +419,9 @@ static void emit_node(N* n) {
         else E(", 0, NULL)");
         return;
     }
-    /* generic call — defn → direct C, define/unknown → dynamic dispatch */
+    /* generic call — defn/builtin → direct C, define/unknown → dynamic dispatch */
     char b[512]; cname(op->v, b, sizeof(b));
-    if (is_defn_name(op->v)) {
+    if (is_defn_name(op->v) || is_runtime_builtin(op->v)) {
         E("%s(", b); emit_args(a, na); E(")");
     } else {
         if (na > 0) { E("fl_fn_call(%s, %d, (FLValue[]){", b, na); emit_args(a, na); E("})"); }
@@ -428,6 +430,28 @@ static void emit_node(N* n) {
 }
 
 /* ──────────────────────────────── Program ── */
+
+static int is_runtime_builtin(const char* name) {
+    static const char* builtins[] = {
+        "length","get","range","split","join","trim","substring","type_of",
+        "null_p","list_p","map_p","fn_p","string_p","array_p","number_p",
+        "index_of","str_index_of","str_replace","str_includes",
+        "char_at","char_code_at",
+        "first","last","rest","push","pop","reverse","flatten",
+        "map_p","map_entries","map_keys","map_vals","map_from_pairs",
+        "fl_map_get","fl_map_set","fl_map_new","fl_map_len",
+        "fl_vec_get","fl_vec_set","fl_vec_push","fl_vec_new","fl_vec_len","fl_vec_from",
+        "fl_parse","fl_now","fl_now_ms","fl_get_argv",
+        "fl_abs","fl_floor","fl_ceil","fl_math_sqrt","fl_float","fl_int","fl_bool",
+        "fl_includes_item","fl_map_fn","fl_filter_fn","fl_reduce_fn",
+        "fl_string_p","fl_str_val","fl_str_includes",
+        "fl_file_read","fl_file_write",
+        NULL
+    };
+    for (int i = 0; builtins[i]; i++)
+        if (!strcmp(name, builtins[i])) return 1;
+    return 0;
+}
 
 static int is_defn_name(const char* name) {
     for (int i = 0; i < nnodes; i++) {
@@ -580,7 +604,7 @@ int main(int argc, char** argv) {
     /* compile */
     char cmd[4096];
     snprintf(cmd, sizeof(cmd),
-        "gcc -I%s %s %s/runtime.c -o %s",
+        "gcc -I%s %s %s/runtime.c -o %s -lm",
         runtime_dir, cfile, runtime_dir, binf);
     int rc = system(cmd);
     remove(cfile);
