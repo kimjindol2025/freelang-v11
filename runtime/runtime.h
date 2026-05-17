@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <setjmp.h>
 
 /* ── ABI 헌법 (self/ABI.md) ── */
 
@@ -183,8 +184,65 @@ FLValue fl_atom_reset(FLValue atom, FLValue val);
 FLValue fl_includes_item(FLValue vec, FLValue item);
 FLValue fl_str_includes(FLValue s, FLValue sub);
 FLValue fl_string_p(FLValue v);
+FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
+FLValue fl_vec_last(FLValue vec);
+FLValue fl_map_del(FLValue map, FLValue key);
+FLValue fl_map_merge(FLValue a, FLValue b);
+FLValue fl_concat(FLValue a, FLValue b);
 
 /* ── S27: FL 소스 → AST (cgc-bridge.c + parser.c에서 제공) ── */
 FLValue fl_parse(FLValue src);
+
+/* ── JSON ── */
+FLValue fl_json_parse(FLValue src);
+FLValue fl_json_stringify(FLValue val);
+
+/* ── 비트 연산 ── */
+FLValue fl_bit_xor(FLValue a, FLValue b);
+FLValue fl_bit_and(FLValue a, FLValue b);
+FLValue fl_bit_or(FLValue a, FLValue b);
+FLValue fl_bit_shl(FLValue a, FLValue b);
+FLValue fl_bit_shr(FLValue a, FLValue b);
+
+/* ── _fl_process_* ── */
+FLValue _fl_process_getcwd(void);
+FLValue _fl_process_chdir(FLValue path);
+FLValue _fl_process_pid(void);
+FLValue _fl_process_ppid(void);
+FLValue _fl_process_kill(FLValue pid);
+FLValue _fl_process_exists(FLValue pid);
+FLValue _fl_process_wait(FLValue pid);
+FLValue _fl_process_run(FLValue cmd);
+FLValue _fl_process_run_args(FLValue cmd, FLValue args);
+FLValue _fl_run_inherit(FLValue cmd);
+FLValue _fl_process_exec(FLValue cmd);
+FLValue _fl_process_exec_args(FLValue cmd, FLValue args);
+FLValue _fl_process_spawn(FLValue cmd, FLValue args);
+
+/* ── _fl_file_* / _fl_env_* / str_join ── */
+FLValue _fl_file_append(FLValue path, FLValue content);
+FLValue file_exists(FLValue path);
+FLValue _fl_file_delete(FLValue path);
+FLValue _fl_file_copy(FLValue src, FLValue dst);
+FLValue _fl_file_rename(FLValue old, FLValue nw);
+FLValue _fl_file_size(FLValue path);
+FLValue _fl_file_modified(FLValue path);
+FLValue _fl_file_mkdir(FLValue path);
+FLValue _fl_file_rmdir(FLValue path);
+FLValue _fl_file_list(FLValue path);
+FLValue _fl_file_is_file(FLValue path);
+FLValue _fl_file_is_dir(FLValue path);
+FLValue _fl_env_get(FLValue key);
+FLValue _fl_env_set(FLValue key, FLValue val);
+FLValue _fl_env_all(void);
+FLValue str_join(FLValue sep, FLValue vec);
+
+/* ── try/catch 인프라 ── */
+#define FL_TRY_MAX 64
+typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;
+extern FLTryFrame fl_try_stack[FL_TRY_MAX];
+extern int fl_try_top;
+void fl_throw(FLValue err);
+FLValue fl_make_error(const char* type, const char* msg);
 
 #endif /* FREELANG_RUNTIME_H */

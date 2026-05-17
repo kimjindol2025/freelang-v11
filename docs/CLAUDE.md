@@ -73,8 +73,8 @@
 (json_keys m)                       → (keys m)
 (now_ms)                            → (now-ms)  ;; kebab-case 정식명, snake는 deprecated
 (mariadb_all db sql p)              → (mariadb_query db sql p)
-(obj_merge a b)                     → 미구현 — (assoc a "k" v) 직접
-(obj_omit m ["k"])                  → (dissoc m "k")
+(obj_merge a b)                     → (obj-merge a b)  ;; 구현됨, kebab-case 정식명
+(obj_omit m ["k"])                  → (obj-omit m ["k"])  ;; 구현됨
 
 ;; ── 웹서버 버전 선택 ─────────────────────────────────────────────
 ;; 내부 API → server_* 직접 / 외부 노출 API → (load "src/express.fl")
@@ -943,7 +943,7 @@ freelang fn-doc str_split         # 함수 문서 조회
 | 2026-04-28 | P1: `saga_run` `workflow_parallel` `batch_map` `distribute` `time_exec` `span` | ✅ bootstrap.js |
 | 2026-04-28 | P0: `workflow_run` `:if` 조건부 실행, `:on_error`, `:fallback`, 체크포인트 | ✅ bootstrap.js |
 | 2026-04-28 | 파서: `[{...}]` 배열 제너릭 오인 방지, 예약어 map 키 허용 | ✅ bootstrap.js |
-| 2026-04-28 | `obj_merge` `obj_pick` `obj_omit` 추가 선언 | ⚠️ 미구현 → `assoc`/`dissoc` 사용 |
+| 2026-04-28 | `obj-merge` `obj-pick` `obj-omit` 구현 완료 | ✅ bootstrap.js |
 | 2026-04-27 | `get_env` `get_env_or` 추가 선언 | ⚠️ 미구현 → `shell_env` 사용 |
 | 2026-04-27 | `file_mkdir` `file_rmdir` 추가 | ✅ bootstrap.js |
 | 2026-04-27 | `server_req_body` JSON 자동파싱 | ✅ bootstrap.js |

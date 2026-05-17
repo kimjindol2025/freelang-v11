@@ -2720,3 +2720,69 @@ JS `typeof` 대신 FreeLang 관점의 타입명.
 ;; 출력 형식 (JSON 1줄)
 ; {"ts":1234567890,"level":"INFO","event":"user.login","ctx":{"userId":1}}
 ```
+
+---
+
+## TCP 빌트인 (S41.5, v11.7.x)
+
+Raw TCP 소켓 레벨 서버/클라이언트. HTTP 프록시, 게이트웨이, 커스텀 프로토콜 구현에 사용.
+
+### tcp-server-raw
+
+```lisp
+; (tcp-server-raw port "handler-name") → "ok"
+; handler 이름으로 등록된 함수가 이벤트 맵을 받음:
+;   ("connect" conn-id "")   — 클라이언트 연결
+;   ("data"    conn-id chunk) — 데이터 수신 (바이너리 가능)
+;   ("close"   conn-id "")   — 연결 종료
+
+(defn on-client [event conn-id data]
+  (cond
+    [(= event "connect") (println (str "연결: " conn-id))]
+    [(= event "data")    (tcp-write conn-id (str "echo: " data))]
+    [(= event "close")   (println (str "종료: " conn-id))]))
+
+(tcp-server-raw 9000 "on-client")
+```
+
+### tcp-outbound
+
+```lisp
+; (tcp-outbound host port "handler-name") → upstream-id (즉시 반환, 연결 비동기)
+; handler가 받는 이벤트: "connect" / "data" / "close" / "error"
+
+(define up-id (tcp-outbound "api.example.com" 80 "on-upstream"))
+
+(defn on-upstream [event conn-id data]
+  (cond
+    [(= event "connect") (tcp-write conn-id "GET / HTTP/1.0\r\n\r\n")]
+    [(= event "data")    (println data)]
+    [(= event "close")   (println "upstream closed")]))
+```
+
+### tcp-write
+
+```lisp
+; (tcp-write conn-id data) → "ok" | "error" | "not-found"
+; 인바운드(tcp-server-raw)와 아웃바운드(tcp-outbound) 공용
+
+(tcp-write conn-id "HTTP/1.1 200 OK\r\n\r\nHello")
+(tcp-write up-id   (str "GET " path " HTTP/1.0\r\n\r\n"))
+```
+
+### tcp-drop
+
+```lisp
+; (tcp-drop conn-id) → "ok" | "not-found"
+; 연결 강제 종료 (인바운드/아웃바운드 공용)
+
+(tcp-drop conn-id)
+```
+
+### 주의사항
+
+- `tcp-server-raw`는 HTTP 라인 단위가 아닌 raw chunk를 그대로 전달
+- `tcp-server-start` (기존 HTTP 내장 서버)와 혼용 가능
+- `tcp-outbound`는 즉시 ID를 반환하고 연결은 이벤트 큐를 통해 비동기 처리
+- 핸들러 이름은 문자열로 전달 (글로벌 함수명)
+```

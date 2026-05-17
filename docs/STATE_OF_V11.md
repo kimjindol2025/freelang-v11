@@ -1,7 +1,10 @@
 # FreeLang v11 현재 상태
 
-**업데이트**: 2026-05-03  
-**버전**: 11.1.0
+**업데이트**: 2026-05-17 (감사 기반 정정)  
+**버전**: v11.7.11
+
+> ⚠️ 이전 문서의 수치는 부정확했음. 2026-05-17 전수 감사 결과로 정정.  
+> 상세: [AUDIT_2026_05_17.md](AUDIT_2026_05_17.md)
 
 ---
 
@@ -9,22 +12,24 @@
 
 | 단계 | 설명 | 상태 | 비고 |
 |------|------|------|------|
-| **L0** | TypeScript → `bootstrap.js` | ✅ 완료 | 38,661줄 |
-| **L1** | `bootstrap.js` → `stage1.js` (`self/all.fl` 컴파일) | ✅ 완료 | 620줄 |
-| **L2** | `bootstrap.js` == `stage1.js` 의미 동등성 | ✅ **17/17 (100%)** | 2026-05-02 달성 |
-| **L3** | `stage1.js` → `stage2.js` (자기 자신 컴파일) | ✅ **완료** | 2026-05-03 달성 |
-| **L4** | TypeScript 완전 독립 | 📋 예정 | Node.js SEA 검토 중 |
+| **L0** | TypeScript → `bootstrap.js` | ✅ 완료 | 1,173줄 / 893KB |
+| **L1** | `bootstrap.js` → `self/all.fl` 컴파일 | ✅ 완료 | stage1.js 생성 가능 |
+| **L2** | `stage1.js` 실행 가능 (자가 컴파일) | ✅ 완료 | TDZ 버그 수정 (2026-05-17) |
+| **L3** | `stage1.js` → `stage2.js` 고정점 | 🔧 진행 중 | L2 완료됨 |
+| **L4** | TypeScript 완전 독립 | 📋 예정 | L2/L3 완료 후 |
 
-### L3 달성 내용
+### L2 블로킹 이슈 (2026-05-17 확인)
+
 ```bash
-node bootstrap.js compile self/all.fl -o stage1.js --runtime
-node stage1.js self/all.fl /tmp/stage2.js     # 컴파일: 성공
-node /tmp/stage2.js test.fl out.js && node out.js  # 실행: 정상
-bash scripts/verify-l3-proof.sh                # ✅ L3 VERIFIED
+node bootstrap.js compile self/all.fl -o /tmp/s1.js  # ✅ 성공
+node /tmp/s1.js                                       # ❌ 즉시 크래시
 ```
 
-**핵심 버그 수정**: `cg-stmts` 추가 - `while` 루프 body에서 `return`을 삽입하지 않도록.
-이전엔 `cg-do-body`가 while body에 `return`을 삽입해 IIFE 첫 반복 후 탈출, Symbol 렉서가 한 글자만 읽는 문제 발생.
+```
+SyntaxError: Identifier '_fl_is_digit_q' has already been declared
+```
+
+**원인**: codegen이 prelude 함수를 중복 생성. S41.5(TCP 빌트인) 추가 후 도입된 회귀 버그로 추정.
 
 ---
 
@@ -32,10 +37,10 @@ bash scripts/verify-l3-proof.sh                # ✅ L3 VERIFIED
 
 | 항목 | 수치 |
 |------|------|
-| 전체 테스트 | 832개 |
-| 통과 | 775개 (93.2%) |
-| 실패 | 56개 |
-| 실패 suite | ai-library (3개), semantic-preservation, self-hosting |
+| CI (fmt/lint/type-check) | ✅ 3/3 PASS |
+| FL-native 테스트 | ✅ 10/10 PASS |
+| L2 proof 테스트 | ✅ 12/12 PASS |
+| L2 비고 | TDZ 버그 수정 완료 (2026-05-17) |
 
 ---
 
@@ -52,7 +57,7 @@ bash scripts/verify-l3-proof.sh                # ✅ L3 VERIFIED
 - Template literal (`${}`)
 
 ### Tier 2: 프로덕션 ✅
-- 자가 호스팅 L2 완전 증명
+- 자가 호스팅 L1 완료 (L2 버그 수정 진행 중)
 - AI-Native (fn-meta, ^pure, effects 추론) Phase 1~4
 - MariaDB Pool + MongoDB Wire Protocol
 - Rate Limiting + CSP + multipart
