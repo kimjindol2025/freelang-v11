@@ -25,12 +25,12 @@
 | 항목 | 수치 |
 |------|------|
 | **버전** | v11.7.11 |
-| **테스트** | 824개 PASS (787개 기본 + L2 37개) |
-| **L2 자가호스팅** | 93% (Tier 1: 100% / Tier 2: 90%+) — 176/189 증명 통과 |
-| **FL-Native 도구** | ✅ fl-test + fl-build (npm 제거 시작) |
+| **테스트** | CI 3/3 PASS · FL-native 10/10 · L2 0/12 (버그 수정 중) |
+| **L2 자가호스팅** | L1 완료 / L2 블로킹 (codegen 중복 선언 버그) |
+| **FL-Native 도구** | ✅ fl-test + fl-build |
 | **Stdlib** | 63개 함수 + 260개 alias |
 | **크기** | 220MB (node_modules 포함) |
-| **Bootstrap** | 1.4MB (최신 빌드) |
+| **Bootstrap** | 1,173줄 / 893KB |
 | **Compiler** | 57KB (stage1.js) |
 | **완성도** | 9.9/10 (AI-Native + 자가호스팅 + FL-Native 도구) |
 
@@ -530,7 +530,7 @@ stage2.js (동일)
 **마지막 검증**: 2026-05-17 FL-Native 도구 검증 (v11.7.11 빌드/테스트 도구 완성)  
 **상태**: Production Ready ✅ (A+ 등급)  
 **버전**: v11.7.11 (FL-Native 빌드/테스트 도구)  
-**완성도**: 9.9/10 (AI-Native + 자가호스팅 93% + FL-Native 도구 + WebSocket + cron)  
+**완성도**: L1 자가호스팅 완료 · L2 버그 수정 진행 중 · 프로덕션 앱 10개 운영  
 **라이선스**: MIT
 
 ---
