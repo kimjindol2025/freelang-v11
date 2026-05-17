@@ -1496,12 +1496,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         _rrEntry.sockets.add(sock);
         (globalThis as any).__flConnSocks[_rrConnId] = sock;
         const _rrEnq = (evArgs: any[]) => {
-          const _q = (globalThis as any).__flEventQueue;
-          const _cap = (globalThis as any).__flQueueCap ?? 10000;
-          if (_q.length >= _cap) {
+          try {
+            callFnVal(_rrHandler, evArgs);
+          } catch (e: any) {
             if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
-            (globalThis as any).__flErrorQueue.push(["io-err","fatal","queue-overflow",`queue full (cap=${_cap}), dropping raw event`]);
-          } else { _q.push({ handler: _rrHandler, args: evArgs, sock }); }
+            (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
+          }
         };
         _rrEnq(["connect", _rrConnId, ""]);
         sock.on("data", (chunk: Buffer) => {
@@ -1538,12 +1538,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const _obSock = _obNet.createConnection({ host: _obHost, port: _obPort });
       (globalThis as any).__flUpstreams[_upId] = _obSock;
       const _obEnq = (evArgs: any[]) => {
-        const _q = (globalThis as any).__flEventQueue;
-        const _cap = (globalThis as any).__flQueueCap ?? 10000;
-        if (_q.length >= _cap) {
+        try {
+          callFnVal(_obHandler, evArgs);
+        } catch (e: any) {
           if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
-          (globalThis as any).__flErrorQueue.push(["io-err","fatal","queue-overflow",`queue full, dropping upstream event`]);
-        } else { _q.push({ handler: _obHandler, args: evArgs, sock: _obSock }); }
+          (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
+        }
       };
       _obSock.on("connect", () => _obEnq(["connect", _upId, ""]));
       _obSock.on("data",    (chunk: Buffer) => _obEnq(["data", _upId, chunk.toString("binary")]));
@@ -1588,6 +1588,36 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return "ok";
       }
       return "not-found";
+    }
+
+    // (fl-set-interval ms "handler-name") → interval-id
+    // Node.js setInterval로 주기적으로 FL 핸들러 호출. 이벤트 루프 비블로킹.
+    case "fl-set-interval": {
+      const _siMs = Math.max(1, Number(args[0] ?? 1000));
+      const _siHandler = String(args[1] ?? "");
+      if (!(globalThis as any).__flIntervals) (globalThis as any).__flIntervals = {};
+      if (!(globalThis as any).__flIntervalSeq) (globalThis as any).__flIntervalSeq = 0;
+      const _siId = `interval_${++(globalThis as any).__flIntervalSeq}`;
+      const _siHandle = setInterval(() => {
+        try {
+          if (_siHandler) callFnVal(_siHandler, []);
+        } catch (e: any) {
+          if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+          (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
+        }
+      }, _siMs);
+      (globalThis as any).__flIntervals[_siId] = _siHandle;
+      return _siId;
+    }
+
+    // (fl-clear-interval interval-id) → "ok" | "not-found"
+    case "fl-clear-interval": {
+      const _ciId = String(args[0] ?? "");
+      const _ciHandle = (globalThis as any).__flIntervals?.[_ciId];
+      if (!_ciHandle) return "not-found";
+      clearInterval(_ciHandle);
+      delete (globalThis as any).__flIntervals[_ciId];
+      return "ok";
     }
 
     // Arithmetic

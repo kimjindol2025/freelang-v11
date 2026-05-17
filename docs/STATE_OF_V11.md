@@ -14,8 +14,8 @@
 |------|------|------|------|
 | **L0** | TypeScript → `bootstrap.js` | ✅ 완료 | 1,173줄 / 893KB |
 | **L1** | `bootstrap.js` → `self/all.fl` 컴파일 | ✅ 완료 | stage1.js 생성 가능 |
-| **L2** | `stage1.js` 실행 가능 (자가 컴파일) | 🔴 **블로킹** | codegen 중복 선언 버그 |
-| **L3** | `stage1.js` → `stage2.js` 고정점 | ❌ 미달성 | L2 선행 필요 |
+| **L2** | `stage1.js` 실행 가능 (자가 컴파일) | ✅ 완료 | TDZ 버그 수정 (2026-05-17) |
+| **L3** | `stage1.js` → `stage2.js` 고정점 | 🔧 진행 중 | L2 완료됨 |
 | **L4** | TypeScript 완전 독립 | 📋 예정 | L2/L3 완료 후 |
 
 ### L2 블로킹 이슈 (2026-05-17 확인)
@@ -39,8 +39,8 @@ SyntaxError: Identifier '_fl_is_digit_q' has already been declared
 |------|------|
 | CI (fmt/lint/type-check) | ✅ 3/3 PASS |
 | FL-native 테스트 | ✅ 10/10 PASS |
-| L2 proof 테스트 | ❌ 0/12 FAIL |
-| L2 실패 원인 | codegen 중복 선언 (단일 버그) |
+| L2 proof 테스트 | ✅ 12/12 PASS |
+| L2 비고 | TDZ 버그 수정 완료 (2026-05-17) |
 
 ---
 
