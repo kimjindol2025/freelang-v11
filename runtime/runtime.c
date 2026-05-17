@@ -56,12 +56,37 @@ static const char* fl_to_str(FLValue v, char* buf, size_t sz) {
         case FL_STRING: return ((FLString*)v.obj)->data;
         case FL_VECTOR: {
             FLVector* vec = (FLVector*)v.obj;
-            snprintf(buf, sz, "[%u items]", vec->len);
+            char tmp[128];
+            int pos = 0;
+            buf[pos++] = '[';
+            for (uint32_t i = 0; i < vec->len && pos < (int)sz - 4; i++) {
+                if (i) buf[pos++] = ' ';
+                const char* s = fl_to_str(vec->data[i], tmp, sizeof(tmp));
+                int tlen = (int)strlen(s);
+                if (pos + tlen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
+                memcpy(buf+pos, s, tlen); pos += tlen;
+            }
+            buf[pos++] = ']'; buf[pos] = '\0';
             return buf;
         }
         case FL_MAP: {
             FLMap* mp = (FLMap*)v.obj;
-            snprintf(buf, sz, "{%u keys}", mp->len);
+            char tmp[128];
+            int pos = 0;
+            buf[pos++] = '{';
+            for (uint32_t i = 0; i < mp->len && pos < (int)sz - 4; i++) {
+                if (i) buf[pos++] = ' ';
+                const char* ks = fl_to_str(mp->entries[i].key, tmp, sizeof(tmp));
+                int klen = (int)strlen(ks);
+                if (pos + klen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
+                memcpy(buf+pos, ks, klen); pos += klen;
+                buf[pos++] = ' ';
+                const char* vs = fl_to_str(mp->entries[i].val, tmp, sizeof(tmp));
+                int vlen = (int)strlen(vs);
+                if (pos + vlen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
+                memcpy(buf+pos, vs, vlen); pos += vlen;
+            }
+            buf[pos++] = '}'; buf[pos] = '\0';
             return buf;
         }
         case FL_FN: return "#<fn>";

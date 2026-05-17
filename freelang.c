@@ -244,7 +244,10 @@ static void emit_node(N* n) {
         if (!strcmp(n->v,"true"))           { E("fl_bool(true)");  return; }
         if (!strcmp(n->v,"false"))          { E("fl_bool(false)"); return; }
         if (!strcmp(n->v,"nil") || !strcmp(n->v,"null")) { E("fl_nil()"); return; }
-        char b[512]; cname(n->v, b, sizeof(b)); E("%s", b); return;
+        char b[512]; cname(n->v, b, sizeof(b));
+        /* defn name used as value → wrap as FLValue fn */
+        if (is_defn_name(n->v)) { E("fl_fn_new(_wrap_%s, 0, NULL)", b); return; }
+        E("%s", b); return;
     }
     /* NV — vector literal */
     if (n->k == NV) {
@@ -523,6 +526,14 @@ static void emit_program(void) {
         char b[512]; cname(n->c[1]->v, b, sizeof(b));
         E("FLValue %s(", b); emit_params(n->c[2]); E(");\n");
     }
+    /* _wrap_ forward declarations (closure-compatible wrappers for defn) */
+    for (int i = 0; i < nnodes; i++) {
+        N* n = nodes[i];
+        if (!n || n->k != NL || n->nc < 3) continue;
+        if (!sym(n->c[0], "defn")) continue;
+        char b[512]; cname(n->c[1]->v, b, sizeof(b));
+        E("FLValue _wrap_%s(FLClosure* _cl, int _argc, FLValue* _av);\n", b);
+    }
     E("\n");
     /* global define declarations */
     for (int i = 0; i < nnodes; i++) {
@@ -541,6 +552,28 @@ static void emit_program(void) {
         char b[512]; cname(n->c[1]->v, b, sizeof(b));
         E("FLValue %s(", b); emit_params(n->c[2]); E(") {\n");
         E("    return "); emit_node(n->c[3]); E(";\n}\n\n");
+    }
+    /* _wrap_ bodies — closure-compatible delegates to direct defn */
+    for (int i = 0; i < nnodes; i++) {
+        N* n = nodes[i];
+        if (!n || n->k != NL || n->nc < 4) continue;
+        if (!sym(n->c[0], "defn")) continue;
+        char b[512]; cname(n->c[1]->v, b, sizeof(b));
+        N* params = n->c[2];
+        int np = params ? params->nc : 0;
+        E("FLValue _wrap_%s(FLClosure* _cl, int _argc, FLValue* _av) {\n", b);
+        E("    (void)_cl;\n");
+        if (np == 0) {
+            E("    return %s();\n", b);
+        } else {
+            E("    return %s(", b);
+            for (int j = 0; j < np; j++) {
+                if (j) E(", ");
+                E("_av[%d]", j);
+            }
+            E(");\n");
+        }
+        E("}\n\n");
     }
     /* main */
     E("int main(void) {\n");
