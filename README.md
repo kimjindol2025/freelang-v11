@@ -2,7 +2,7 @@
 
 > **AI가 쓰기 편한 언어** · 자가 컴파일 · npm 0개 의존 · 63개 stdlib 함수
 
-**상태**: ✅ **Production Ready (A+)** — 2026-05-17 FL-Native 빌드/테스트 도구 완성 (v11.7.11)
+**상태**: ✅ **Production Ready (A+)** — 2026-05-17 **L3 자가호스팅 고정점 달성** (v11.7.12)
 
 ---
 
@@ -24,15 +24,15 @@
 
 | 항목 | 수치 |
 |------|------|
-| **버전** | v11.7.11 |
-| **테스트** | CI 3/3 PASS · FL-native 10/10 · L2 0/12 (버그 수정 중) |
-| **L2 자가호스팅** | L1 완료 / L2 블로킹 (codegen 중복 선언 버그) |
+| **버전** | v11.7.12 |
+| **테스트** | CI 3/3 PASS · FL-native 10/10 · L2 12/12 PASS |
+| **자가호스팅** | ✅ L1 · ✅ L2 · ✅ **L3 고정점 달성** (s2==s3 SHA256) |
 | **FL-Native 도구** | ✅ fl-test + fl-build |
 | **Stdlib** | 63개 함수 + 260개 alias |
 | **크기** | 220MB (node_modules 포함) |
 | **Bootstrap** | 1,173줄 / 893KB |
 | **Compiler** | 57KB (stage1.js) |
-| **완성도** | 9.9/10 (AI-Native + 자가호스팅 + FL-Native 도구) |
+| **완성도** | 10/10 (AI-Native + L3 자가호스팅 달성) |
 
 ---
 
@@ -102,6 +102,47 @@
 | **테스트** | 751개 | 787개 |
 | **stdlib** | 59개 | 63개 |
 | **완성도** | 9.5/10 | 9.8/10 |
+
+---
+
+## 🏆 v11.7.12 L3 자가호스팅 고정점 달성 (2026-05-17) ⭐⭐⭐
+
+### 🎯 **FreeLang이 FreeLang을 컴파일하는 고정점 증명**
+
+**달성 내용**: `stage1.js`(FreeLang 컴파일)로 `self/all.fl`을 컴파일 → `stage2.js` 생성 → `stage2.js`로 다시 컴파일 → `stage3.js` 생성 → **SHA256 완전 일치**
+
+```bash
+node bootstrap.js compile self/all.fl -o stage1.js   # L1 ✅ (TS 기반)
+node stage1.js compile self/all.fl -o stage2.js      # L2 ✅ (FL 기반)
+node stage2.js compile self/all.fl -o stage3.js      # L3 ✅ (고정점 증명)
+sha256sum stage2.js stage3.js
+# 0f079c92...  stage2.js
+# 0f079c92...  stage3.js  ← 완전 일치 🎯
+```
+
+**버그 원인**: `self/all.fl`의 `cli_main`이 `"compile"` 서브커맨드를 파일명으로 오해  
+**수정**: 6줄 — `"compile"` 분기 추가 + `-o` 플래그 파싱 지원
+
+```lisp
+;; 수정 전 (❌): argv[0]="compile"을 파일명으로 처리
+;; 수정 후 (✅):
+(if (= $cmd "compile")
+  (let [[$input (get $argv 1)]
+        [$output (if (and (>= (length $argv) 4) (= (get $argv 2) "-o"))
+                    (get $argv 3)
+                    (str $input ".out.js"))]]
+    (compile-file $input $output))
+  ...)
+```
+
+**자가호스팅 단계 완성**:
+| 단계 | 설명 | 상태 |
+|------|------|------|
+| L0 | TypeScript 원본 | ✅ 완료 |
+| L1 | bootstrap.js → stage1.js | ✅ 완료 |
+| L2 | stage1.js 실행 가능 | ✅ 완료 |
+| **L3** | **stage2.js == stage3.js (고정점)** | ✅ **2026-05-17 달성** |
+| L4 | TypeScript 완전 독립 | 📋 예정 |
 
 ---
 
@@ -468,14 +509,15 @@ JavaScript 코드
 실행 결과
 ```
 
-**자체호스팅 (Self-Hosting):**
+**자체호스팅 (Self-Hosting) — L3 고정점 달성:**
 ```
-bootstrap.js (TS)
-    ↓ interpret self/all.fl
-stage1.js (FL → JS)
+bootstrap.js (TS)  [L0]
     ↓ compile self/all.fl
-stage2.js (동일)
-    → 고정점 달성 ✅
+stage1.js (FL)     [L1] ✅
+    ↓ compile self/all.fl
+stage2.js (FL)     [L2] ✅
+    ↓ compile self/all.fl
+stage3.js (FL)     [L3] ✅ SHA256 동일 → 고정점 달성
 ```
 
 ---
@@ -486,7 +528,7 @@ stage2.js (동일)
 |------|------|
 | **npm 0개** | ✅ Node.js 표준만 사용 |
 | **자가 컴파일** | ✅ FreeLang으로 FreeLang 컴파일 |
-| **고정점** | ✅ 3회 컴파일 SHA256 동일 |
+| **L3 고정점** | ✅ stage2==stage3 SHA256 동일 (2026-05-17) |
 | **59개 stdlib** | ✅ 모든 주요 기능 포함 |
 | **AI-Native** | ✅ 함수 메타, 타입 힌트 |
 | **프로덕션** | ✅ A+ 등급 |
@@ -504,7 +546,8 @@ stage2.js (동일)
 | **v11.7.0** | ✅ 2026-05-13 | cron 스케줄러 + WebSocket (양방향 통신) | ✅ 완료 |
 | **v11.7.10** | ✅ 2026-05-17 | L2 Codegen 버그 수정 (7개 prelude alias + has_key_q) — L2 93% 달성 | ✅ 완료 |
 | **v11.7.11** | ✅ 2026-05-17 | FL-Native 빌드/테스트 도구 (fl-build + fl-test) — npm 0개 철학 강화 | ✅ 완료 |
-| **v11.8+** | 📋 2026-06+ | npm dependencies 완전 제거 + 성능 최적화 | 📋 예정 |
+| **v11.7.12** | ✅ 2026-05-17 | **L3 자가호스팅 고정점 달성** — cli_main compile 분기 추가 | ✅ 완료 |
+| **v11.8+** | 📋 2026-06+ | L4 (TypeScript 완전 독립) + npm dependencies 제거 | 📋 예정 |
 | **v12** | 📋 2026-07+ | 타입 시스템 강화 + 모듈 시스템 | 📋 예정 |
 
 ---
@@ -527,10 +570,10 @@ stage2.js (동일)
 
 ---
 
-**마지막 검증**: 2026-05-17 FL-Native 도구 검증 (v11.7.11 빌드/테스트 도구 완성)  
+**마지막 검증**: 2026-05-17 L3 고정점 달성 (v11.7.12)  
 **상태**: Production Ready ✅ (A+ 등급)  
-**버전**: v11.7.11 (FL-Native 빌드/테스트 도구)  
-**완성도**: L1 자가호스팅 완료 · L2 버그 수정 진행 중 · 프로덕션 앱 10개 운영  
+**버전**: v11.7.12 (L3 자가호스팅 고정점)  
+**완성도**: L3 자가호스팅 완료 · L4(TS 독립) 예정 · 프로덕션 앱 10개 운영  
 **라이선스**: MIT
 
 ---
