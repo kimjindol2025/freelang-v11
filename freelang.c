@@ -550,6 +550,12 @@ static void emit_node(N* n) {
         { E("fl_json_parse("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"json-stringify") || sym(op,"json_stringify"))
         { E("fl_json_stringify("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"math-sqrt") || sym(op,"math_sqrt"))
+        { E("fl_math_sqrt("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"str-join") || sym(op,"str_join"))
+        { E("str_join("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"cli-args") || sym(op,"cli_args"))
+        { E("fl_get_argv()"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};
@@ -629,6 +635,14 @@ static int is_runtime_builtin(const char* name) {
         "fl_parse","fl_now","fl_now_ms","fl_get_argv","fl_println","fl_print",
         "fl_str_val","fl_str_n","fl_str_includes","fl_string_p",
         "fl_file_read","fl_file_write",
+        /* _fl_file_* */
+        "_fl_file_append","_fl_file_delete","_fl_file_copy","_fl_file_rename",
+        "_fl_file_size","_fl_file_modified","_fl_file_mkdir","_fl_file_rmdir",
+        "_fl_file_list","_fl_file_is_file","_fl_file_is_dir","file_exists",
+        /* _fl_env_* */
+        "_fl_env_get","_fl_env_set","_fl_env_all",
+        /* str_join */
+        "str_join",
         /* misc */
         "not","abs","floor","ceil","round","concat",
         "json_parse","json_stringify","shell_exec","now_ms","now_iso","now_unix",

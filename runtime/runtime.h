@@ -204,6 +204,24 @@ FLValue fl_bit_or(FLValue a, FLValue b);
 FLValue fl_bit_shl(FLValue a, FLValue b);
 FLValue fl_bit_shr(FLValue a, FLValue b);
 
+/* ── _fl_file_* / _fl_env_* / str_join ── */
+FLValue _fl_file_append(FLValue path, FLValue content);
+FLValue file_exists(FLValue path);
+FLValue _fl_file_delete(FLValue path);
+FLValue _fl_file_copy(FLValue src, FLValue dst);
+FLValue _fl_file_rename(FLValue old, FLValue nw);
+FLValue _fl_file_size(FLValue path);
+FLValue _fl_file_modified(FLValue path);
+FLValue _fl_file_mkdir(FLValue path);
+FLValue _fl_file_rmdir(FLValue path);
+FLValue _fl_file_list(FLValue path);
+FLValue _fl_file_is_file(FLValue path);
+FLValue _fl_file_is_dir(FLValue path);
+FLValue _fl_env_get(FLValue key);
+FLValue _fl_env_set(FLValue key, FLValue val);
+FLValue _fl_env_all(void);
+FLValue str_join(FLValue sep, FLValue vec);
+
 /* ── try/catch 인프라 ── */
 #define FL_TRY_MAX 64
 typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;
