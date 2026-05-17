@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <setjmp.h>
 
 /* ── ABI 헌법 (self/ABI.md) ── */
 
@@ -202,5 +203,13 @@ FLValue fl_bit_and(FLValue a, FLValue b);
 FLValue fl_bit_or(FLValue a, FLValue b);
 FLValue fl_bit_shl(FLValue a, FLValue b);
 FLValue fl_bit_shr(FLValue a, FLValue b);
+
+/* ── try/catch 인프라 ── */
+#define FL_TRY_MAX 64
+typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;
+extern FLTryFrame fl_try_stack[FL_TRY_MAX];
+extern int fl_try_top;
+void fl_throw(FLValue err);
+FLValue fl_make_error(const char* type, const char* msg);
 
 #endif /* FREELANG_RUNTIME_H */

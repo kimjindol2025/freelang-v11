@@ -141,7 +141,7 @@ FLValue fl_div(FLValue a, FLValue b) {
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
         return fl_float(av / bv);
     }
-    if (b.i == 0) { fputs("error: division by zero\n", stderr); exit(1); }
+    if (b.i == 0) { fl_throw(fl_make_error("ArithmeticError", "Division by zero")); }
     return fl_int(a.i / b.i);
 }
 
@@ -931,3 +931,30 @@ FLValue fl_bit_and(FLValue a, FLValue b) { return fl_int(a.i & b.i); }
 FLValue fl_bit_or(FLValue a, FLValue b)  { return fl_int(a.i | b.i); }
 FLValue fl_bit_shl(FLValue a, FLValue b) { return fl_int(a.i << b.i); }
 FLValue fl_bit_shr(FLValue a, FLValue b) { return fl_int(a.i >> b.i); }
+
+/* ── try/catch 런타임 ── */
+FLTryFrame fl_try_stack[FL_TRY_MAX];
+int fl_try_top = 0;
+
+void fl_throw(FLValue err) {
+    if (fl_try_top <= 0) {
+        if (err.tag == FL_STRING && err.obj)
+            fprintf(stderr, "Uncaught error: %s\n", ((FLString*)err.obj)->data);
+        else if (err.tag == FL_MAP) {
+            FLValue msg = fl_map_get(err, fl_str_val("message"));
+            if (msg.tag == FL_STRING && msg.obj)
+                fprintf(stderr, "Uncaught error: %s\n", ((FLString*)msg.obj)->data);
+            else fprintf(stderr, "Uncaught error\n");
+        } else fprintf(stderr, "Uncaught error\n");
+        exit(1);
+    }
+    fl_try_stack[fl_try_top - 1].err = err;
+    longjmp(fl_try_stack[fl_try_top - 1].buf, 1);
+}
+
+FLValue fl_make_error(const char* type, const char* msg) {
+    FLValue m = fl_map_new();
+    m = fl_map_set(m, fl_str_val("type"),    fl_str_val(type));
+    m = fl_map_set(m, fl_str_val("message"), fl_str_val(msg));
+    return m;
+}

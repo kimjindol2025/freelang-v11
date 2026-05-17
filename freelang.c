@@ -355,12 +355,72 @@ static void emit_node(N* n) {
         E(")");
         return;
     }
+    if (sym(op,"when")) {
+        E("(fl_truthy("); emit_node(a[0]); E(") ? ((__extension__({\n");
+        for (int i = 1; i < na-1; i++) { E("        "); emit_node(a[i]); E(";\n"); }
+        if (na > 1) E("        "); emit_node(na>1 ? a[na-1] : NULL); E(";\n    }))) : fl_nil())");
+        return;
+    }
+    if (sym(op,"when-not")) {
+        E("(!fl_truthy("); emit_node(a[0]); E(") ? ((__extension__({\n");
+        for (int i = 1; i < na-1; i++) { E("        "); emit_node(a[i]); E(";\n"); }
+        if (na > 1) E("        "); emit_node(na>1 ? a[na-1] : NULL); E(";\n    }))) : fl_nil())");
+        return;
+    }
     if (sym(op,"cond")) { emit_cond_r(a, na); return; }
+    if (sym(op,"case")) {
+        /* (case val v1 r1 v2 r2 ... [default]) — 홀수 trailing = 기본값 */
+        E("((__extension__({\n");
+        E("    FLValue _cv = "); emit_node(a[0]); E(";\n");
+        E("    FLValue _cr = fl_nil();\n");
+        int has_default = ((na % 2) == 0);  /* val + 짝수 나머지 = 기본값 있음 */
+        int pairs_end = has_default ? na - 1 : na;
+        for (int i = 1; i + 1 < pairs_end; i += 2) {
+            if (i == 1) E("    if");
+            else        E("    } else if");
+            E(" (fl_truthy(fl_eq(_cv, "); emit_node(a[i]); E("))) { _cr = ");
+            emit_node(a[i+1]); E(";\n");
+        }
+        if (pairs_end > 1) E("    } else { _cr = ");
+        else               E("    _cr = ");
+        if (has_default) emit_node(a[na-1]);
+        else             E("fl_nil()");
+        E(";\n");
+        if (pairs_end > 1) E("    }\n");
+        E("    _cr;\n})))");
+        return;
+    }
     if (sym(op,"do")) {
         E("((__extension__ ({\n");
         for (int i = 0; i < na-1; i++) { E("        "); emit_node(a[i]); E(";\n"); }
         if (na > 0) { E("        "); emit_node(a[na-1]); E(";\n"); }
         E("    })))");
+        return;
+    }
+    if (sym(op,"try")) {
+        /* catch 절 위치 탐색 */
+        int ci = -1;
+        for (int i = 0; i < na; i++)
+            if (a[i]->k == NL && a[i]->nc >= 1 && sym(a[i]->c[0], "catch"))
+                { ci = i; break; }
+        int body_end = (ci >= 0) ? ci : na;
+        E("((__extension__({\n");
+        E("    FLValue _tr = fl_nil();\n");
+        E("    fl_try_top++;\n");
+        E("    if (setjmp(fl_try_stack[fl_try_top-1].buf) == 0) {\n");
+        for (int i = 0; i < body_end - 1; i++) { E("        "); emit_node(a[i]); E(";\n"); }
+        if (body_end > 0) { E("        _tr = "); emit_node(a[body_end-1]); E(";\n"); }
+        E("        fl_try_top--;\n");
+        E("    } else {\n");
+        E("        FLValue _te = fl_try_stack[fl_try_top-1].err; fl_try_top--;\n");
+        if (ci >= 0 && a[ci]->nc >= 2) {
+            char eb[512]; cname(a[ci]->c[1]->v, eb, sizeof(eb));
+            E("        FLValue %s = _te;\n", eb);
+            int hn = a[ci]->nc;
+            for (int i = 2; i < hn - 1; i++) { E("        "); emit_node(a[ci]->c[i]); E(";\n"); }
+            if (hn > 2) { E("        _tr = "); emit_node(a[ci]->c[hn-1]); E(";\n"); }
+        }
+        E("    }\n    _tr;\n})))");
         return;
     }
     if (sym(op,"let")) {
@@ -388,6 +448,20 @@ static void emit_node(N* n) {
     }
     if (sym(op,"file-read"))  { E("fl_file_read("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"file-write")) { E("fl_file_write("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"doseq")) {
+        /* (doseq [x coll] body...) */
+        N* bv = a[0];  /* binding vector: c[0]=varname, c[1]=coll */
+        char bname[512]; cname(bv->c[0]->v, bname, sizeof(bname));
+        int lid = loop_counter++;
+        E("((__extension__({\n");
+        E("    FLValue _dsv%d = ", lid); emit_node(bv->c[1]); E(";\n");
+        E("    int64_t _dsn%d = fl_vec_len(_dsv%d).i;\n", lid, lid);
+        E("    for (int64_t _dsi%d = 0; _dsi%d < _dsn%d; _dsi%d++) {\n", lid,lid,lid,lid);
+        E("        FLValue %s = fl_vec_get(_dsv%d, fl_int(_dsi%d));\n", bname, lid, lid);
+        for (int i = 1; i < na; i++) { E("        "); emit_node(a[i]); E(";\n"); }
+        E("    }\n    fl_nil();\n})))");
+        return;
+    }
     /* loop/recur */
     if (sym(op,"loop")) {
         N* bl = a[0]; int nv = bl->nc/2, lid = loop_counter++;
