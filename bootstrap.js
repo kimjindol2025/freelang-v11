@@ -13084,6 +13084,95 @@ function evalWorldModel141(op, args3) {
 init_lexer();
 init_parser();
 
+// src/runtime-governance.ts
+var _mode = "normal";
+var _traceEnabled = true;
+var _debugEnabled = true;
+var _frozenContracts = /* @__PURE__ */ new Set();
+var _escalationCounts = /* @__PURE__ */ new Map();
+var _throttledContracts = /* @__PURE__ */ new Set();
+function getRuntimeMode() {
+  return _mode;
+}
+function isTraceEnabled() {
+  return _traceEnabled;
+}
+function isDebugEnabled() {
+  return _debugEnabled;
+}
+function isContractFrozen(name) {
+  return _frozenContracts.has(name);
+}
+function setRuntimeMode(newMode) {
+  _mode = newMode;
+  if (newMode === "panic") {
+    _traceEnabled = false;
+    _debugEnabled = false;
+  } else if (newMode === "protected") {
+    _traceEnabled = false;
+  } else if (newMode === "normal") {
+    _traceEnabled = true;
+    _debugEnabled = true;
+    _frozenContracts.clear();
+    _throttledContracts.clear();
+    _escalationCounts.clear();
+  }
+}
+function autoTransitionMode(healthScore, recentBurstCount) {
+  if (_mode === "panic") return;
+  if (healthScore < 0.5 || recentBurstCount >= 3) {
+    if (_mode !== "protected") setRuntimeMode("protected");
+  } else if (healthScore < 0.7) {
+    if (_mode === "normal") _mode = "degraded";
+  } else if (healthScore >= 0.9 && _mode === "degraded") {
+    setRuntimeMode("normal");
+  }
+}
+function applyGovernanceAction(action, contractName) {
+  switch (action) {
+    case "disable-trace":
+      _traceEnabled = false;
+      break;
+    case "drop-debug":
+      _debugEnabled = false;
+      break;
+    case "freeze-contract":
+      _frozenContracts.add(contractName);
+      break;
+    case "panic":
+      setRuntimeMode("panic");
+      break;
+    case "clear-events":
+      _clearEventsRequested = true;
+      break;
+  }
+}
+var _clearEventsRequested = false;
+function incrementEscalation(contractName) {
+  const n = (_escalationCounts.get(contractName) ?? 0) + 1;
+  _escalationCounts.set(contractName, n);
+  return n;
+}
+function recoverRuntime() {
+  setRuntimeMode("normal");
+  _frozenContracts.clear();
+  _throttledContracts.clear();
+  _escalationCounts.clear();
+  _clearEventsRequested = false;
+}
+function getRuntimePolicy() {
+  return {
+    "mode": _mode,
+    "trace-enabled": _traceEnabled,
+    "debug-enabled": _debugEnabled,
+    "collapse-enabled": true,
+    "active-contracts": -1,
+    // eval-builtins.ts에서 채움
+    "frozen-contracts": [..._frozenContracts],
+    "throttled-contracts": [..._throttledContracts]
+  };
+}
+
 // src/runtime-contracts.ts
 var _contracts = /* @__PURE__ */ new Map();
 var _throttleMap = /* @__PURE__ */ new Map();
@@ -13101,6 +13190,7 @@ function checkContracts(buf, newEvent) {
   const out = [];
   const now = newEvent.timestamp;
   for (const [name, c] of _contracts) {
+    if (isContractFrozen(name)) continue;
     if (c.eventType !== "any" && c.eventType !== newEvent.type) continue;
     if (c.errorKind && newEvent.errorKind !== c.errorKind) continue;
     const windowStart = now - c.windowMs;
@@ -13116,14 +13206,20 @@ function checkContracts(buf, newEvent) {
     const lastFire = _throttleMap.get(name) ?? 0;
     if (now - lastFire < Math.max(c.windowMs, 500)) continue;
     _throttleMap.set(name, now);
-    const sev = c.action === "error" ? "error" : c.action === "collapse" ? "warn" : c.action === "throttle" ? "info" : "warn";
+    const escalationCount = incrementEscalation(name);
+    const effectiveAction = c.escalationAction && c.escalationAt && escalationCount >= c.escalationAt ? c.escalationAction : c.action;
+    const sev = effectiveAction === "error" || effectiveAction === "panic" ? "error" : effectiveAction === "collapse" || effectiveAction === "disable-trace" ? "warn" : effectiveAction === "throttle" || effectiveAction === "drop-debug" ? "info" : effectiveAction === "freeze-contract" ? "warn" : "warn";
+    const governanceActions = ["disable-trace", "drop-debug", "freeze-contract", "clear-events", "panic"];
+    if (governanceActions.includes(effectiveAction)) {
+      applyGovernanceAction(effectiveAction, name);
+    }
     out.push({
       type: "contract-violation",
       severity: sev,
       contractName: name,
       timestamp: now,
-      message: `Contract "${name}": ${matchCount} \xD7 ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${c.action})`,
-      value: { contractName: name, matchCount, threshold: c.threshold, action: c.action }
+      message: `Contract "${name}": ${matchCount} \xD7 ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${effectiveAction}${escalationCount > 1 ? `, escalation: ${escalationCount}` : ""})`,
+      value: { contractName: name, matchCount, threshold: c.threshold, action: effectiveAction, escalationLevel: escalationCount }
     });
   }
   return out;
@@ -13146,6 +13242,18 @@ defineContract("auto:error-burst", {
   windowMs: 5e3,
   action: "error"
 });
+defineContract("auto:trace-disable", {
+  eventType: "trace",
+  threshold: 200,
+  windowMs: 1e3,
+  action: "disable-trace"
+});
+defineContract("auto:panic-cascade", {
+  eventType: "runtime-error",
+  threshold: 10,
+  windowMs: 5e3,
+  action: "panic"
+});
 
 // src/runtime-events.ts
 var SEVERITY_RANK = {
@@ -13160,7 +13268,9 @@ var DEFAULT_SEVERITY = {
   "trace": "info",
   "assert-fail": "error",
   "runtime-error": "fatal",
-  "contract-violation": "warn"
+  "contract-violation": "warn",
+  "mode-change": "info",
+  "governance-action": "warn"
 };
 var MAX_EVENTS = 1e3;
 var _buf = [];
@@ -13189,6 +13299,8 @@ function fingerprint(ev) {
   return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}|${ev.contractName ?? ""}`;
 }
 function recordEvent(ev) {
+  if (ev.type === "trace" && !isTraceEnabled()) return;
+  if (ev.type === "debug" && !isDebugEnabled()) return;
   const sev = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
   if (!shouldRecord(sev)) return;
   const eventId = getNextEventId();
@@ -15062,12 +15174,17 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (traceCount > 100) score -= Math.min(0.2, (traceCount - 100) / 500);
       if (collapseCount > 5) score -= Math.min(0.1, (collapseCount - 5) / 100);
       score = Math.round(Math.max(0, Math.min(1, score)) * 100) / 100;
+      const recentBurstCount = violations.filter((e) => {
+        return Date.now() - e.timestamp < 1e4;
+      }).length;
+      autoTransitionMode(score, recentBurstCount);
       const status = score >= 0.9 ? "healthy" : score >= 0.7 ? "degraded" : score >= 0.5 ? "warning" : "critical";
       const warnCount = rhEvs.filter((e) => e.severity === "warn").length;
       const errCount = rhEvs.filter((e) => e.severity === "error" || e.severity === "fatal").length;
       return {
         "score": score,
         "status": status,
+        "mode": getRuntimeMode(),
         "warnings": warnCount,
         "errors": errCount,
         "recent-contract-violations": violations.slice(-5).map((e) => ({
@@ -15076,6 +15193,42 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           "severity": e.severity
         }))
       };
+    }
+    case "runtime-mode": {
+      return getRuntimeMode();
+    }
+    case "set-runtime-mode": {
+      const modeArg = String(args3[0]).replace(/^:/, "");
+      const validModes = ["normal", "degraded", "protected", "panic"];
+      if (!validModes.includes(modeArg)) {
+        throw new Error(`set-runtime-mode: invalid mode "${modeArg}". Use :normal/:degraded/:protected/:panic`);
+      }
+      const prevMode = getRuntimeMode();
+      setRuntimeMode(modeArg);
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime mode: ${prevMode} \u2192 ${modeArg}`,
+        label: modeArg
+      });
+      return modeArg;
+    }
+    case "runtime-policy": {
+      const policy = getRuntimePolicy();
+      policy["active-contracts"] = getContracts().length;
+      return policy;
+    }
+    case "runtime-recover":
+    case "recover-runtime": {
+      const modeBeforeRecover = getRuntimeMode();
+      recoverRuntime();
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime recovered: ${modeBeforeRecover} \u2192 normal`,
+        label: "normal"
+      });
+      return "normal";
     }
     case "runtime-timeline": {
       const tlEvs = getEvents();

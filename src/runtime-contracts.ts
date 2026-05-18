@@ -6,6 +6,11 @@
 //   contract-violation 이벤트는 직접 반환 → runtime-events.ts가 _buf에 push
 
 import type { RuntimeEvent, EventSeverity } from "./runtime-events";
+import { applyGovernanceAction, isContractFrozen, incrementEscalation } from "./runtime-governance";
+
+export type ContractAction =
+  | "warn" | "error" | "collapse" | "throttle"
+  | "disable-trace" | "drop-debug" | "freeze-contract" | "clear-events" | "panic";
 
 export interface ContractDef {
   name: string;
@@ -13,7 +18,9 @@ export interface ContractDef {
   errorKind?: string;
   threshold: number;
   windowMs: number;
-  action: "warn" | "error" | "collapse" | "throttle";
+  action: ContractAction;
+  escalationAction?: ContractAction; // N회 위반 시 상위 action
+  escalationAt?: number;             // escalation 발동 위반 횟수
 }
 
 const _contracts = new Map<string, ContractDef>();
@@ -41,6 +48,7 @@ export function checkContracts(
   const now = newEvent.timestamp;
 
   for (const [name, c] of _contracts) {
+    if (isContractFrozen(name)) continue;
     if (c.eventType !== "any" && c.eventType !== newEvent.type) continue;
     if (c.errorKind && (newEvent as any).errorKind !== c.errorKind) continue;
 
@@ -62,19 +70,33 @@ export function checkContracts(
     if (now - lastFire < Math.max(c.windowMs, 500)) continue;
     _throttleMap.set(name, now);
 
+    // escalation 체크
+    const escalationCount = incrementEscalation(name);
+    const effectiveAction: ContractAction =
+      c.escalationAction && c.escalationAt && escalationCount >= c.escalationAt
+        ? c.escalationAction
+        : c.action;
+
     const sev: EventSeverity =
-      c.action === "error"    ? "error"
-      : c.action === "collapse" ? "warn"
-      : c.action === "throttle" ? "info"
+      effectiveAction === "error" || effectiveAction === "panic" ? "error"
+      : effectiveAction === "collapse" || effectiveAction === "disable-trace" ? "warn"
+      : effectiveAction === "throttle" || effectiveAction === "drop-debug" ? "info"
+      : effectiveAction === "freeze-contract" ? "warn"
       : "warn";
+
+    // governance action 실행
+    const governanceActions: ContractAction[] = ["disable-trace", "drop-debug", "freeze-contract", "clear-events", "panic"];
+    if (governanceActions.includes(effectiveAction)) {
+      applyGovernanceAction(effectiveAction, name);
+    }
 
     out.push({
       type: "contract-violation",
       severity: sev,
       contractName: name,
       timestamp: now,
-      message: `Contract "${name}": ${matchCount} × ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${c.action})`,
-      value: { contractName: name, matchCount, threshold: c.threshold, action: c.action },
+      message: `Contract "${name}": ${matchCount} × ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${effectiveAction}${escalationCount > 1 ? `, escalation: ${escalationCount}` : ""})`,
+      value: { contractName: name, matchCount, threshold: c.threshold, action: effectiveAction, escalationLevel: escalationCount },
     });
   }
 
@@ -103,4 +125,18 @@ defineContract("auto:error-burst", {
   threshold: 5,
   windowMs: 5000,
   action: "error",
+});
+
+defineContract("auto:trace-disable", {
+  eventType: "trace",
+  threshold: 200,
+  windowMs: 1000,
+  action: "disable-trace",
+});
+
+defineContract("auto:panic-cascade", {
+  eventType: "runtime-error",
+  threshold: 10,
+  windowMs: 5000,
+  action: "panic",
 });

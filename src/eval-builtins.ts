@@ -126,6 +126,11 @@ import {
   newTraceId, setRuntimeFilter, clearRuntimeFilter, getRuntimeFilter,
 } from "./runtime-events";
 import { getContracts, clearContracts, defineContract as _defineContract } from "./runtime-contracts";
+import {
+  getRuntimeMode, setRuntimeMode, getRuntimePolicy,
+  recoverRuntime, resetGovernance, consumeClearEventsRequest,
+  autoTransitionMode,
+} from "./runtime-governance";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1879,6 +1884,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (collapseCount > 5)  score -= Math.min(0.1, (collapseCount - 5) / 100);
       score = Math.round(Math.max(0, Math.min(1, score)) * 100) / 100;
 
+      // health 기반 자동 mode 전환
+      const recentBurstCount = violations.filter(e => {
+        return (Date.now() - e.timestamp) < 10000;
+      }).length;
+      autoTransitionMode(score, recentBurstCount);
+
       const status = score >= 0.9 ? "healthy" : score >= 0.7 ? "degraded" : score >= 0.5 ? "warning" : "critical";
       const warnCount  = rhEvs.filter(e => e.severity === "warn").length;
       const errCount   = rhEvs.filter(e => e.severity === "error" || e.severity === "fatal").length;
@@ -1886,6 +1897,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return {
         "score": score,
         "status": status,
+        "mode": getRuntimeMode(),
         "warnings": warnCount,
         "errors": errCount,
         "recent-contract-violations": violations.slice(-5).map(e => ({
@@ -1894,6 +1906,42 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           "severity": e.severity,
         })),
       };
+    }
+    case "runtime-mode": {
+      return getRuntimeMode();
+    }
+    case "set-runtime-mode": {
+      const modeArg = String(args[0]).replace(/^:/, "");
+      const validModes = ["normal", "degraded", "protected", "panic"];
+      if (!validModes.includes(modeArg)) {
+        throw new Error(`set-runtime-mode: invalid mode "${modeArg}". Use :normal/:degraded/:protected/:panic`);
+      }
+      const prevMode = getRuntimeMode();
+      setRuntimeMode(modeArg as any);
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime mode: ${prevMode} → ${modeArg}`,
+        label: modeArg,
+      });
+      return modeArg;
+    }
+    case "runtime-policy": {
+      const policy = getRuntimePolicy() as Record<string, unknown>;
+      policy["active-contracts"] = getContracts().length;
+      return policy;
+    }
+    case "runtime-recover":
+    case "recover-runtime": {
+      const modeBeforeRecover = getRuntimeMode();
+      recoverRuntime();
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime recovered: ${modeBeforeRecover} → normal`,
+        label: "normal",
+      });
+      return "normal";
     }
     case "runtime-timeline": {
       const tlEvs = getEvents();

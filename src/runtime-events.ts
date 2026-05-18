@@ -4,6 +4,7 @@
 // Phase 7: contract-violation type + contract integration
 
 import { checkContracts } from "./runtime-contracts";
+import { isTraceEnabled, isDebugEnabled } from "./runtime-governance";
 
 export type EventSeverity = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -12,7 +13,7 @@ const SEVERITY_RANK: Record<EventSeverity, number> = {
 };
 
 export interface RuntimeEvent {
-  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation";
+  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation" | "mode-change" | "governance-action";
   severity: EventSeverity;
   eventId: number;
   traceId?: string;
@@ -37,6 +38,8 @@ export const DEFAULT_SEVERITY: Record<RuntimeEvent["type"], EventSeverity> = {
   "assert-fail":        "error",
   "runtime-error":      "fatal",
   "contract-violation": "warn",
+  "mode-change":        "info",
+  "governance-action":  "warn",
 };
 
 const MAX_EVENTS = 1000;
@@ -65,6 +68,10 @@ function fingerprint(ev: RuntimeEvent): string {
 export function recordEvent(
   ev: Omit<RuntimeEvent, "eventId" | "severity"> & { severity?: EventSeverity }
 ): void {
+  // governance 모드 필터 (mode-change/governance-action은 항상 통과)
+  if (ev.type === "trace" && !isTraceEnabled()) return;
+  if (ev.type === "debug" && !isDebugEnabled()) return;
+
   const sev: EventSeverity = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
   if (!shouldRecord(sev)) return;
 
