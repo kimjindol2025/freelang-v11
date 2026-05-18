@@ -1,0 +1,155 @@
+;; stdlib-truth.fl — FreeLang stdlib 핵심 함수 동작 계약
+;; 실행: fl /root/kim/freelang-v11/stdlib-truth.fl
+;; 목적: "이 함수가 nil이면 뭘 반환?" 의문을 즉시 해소
+
+(define pass-count (atom 0))
+(define fail-count (atom 0))
+(define total-count (atom 0))
+
+(defn truth-assert [label got expected]
+  (swap! total-count + 1)
+  (let [ok (= (str got) (str expected))]
+    (if ok
+      (do
+        (swap! pass-count + 1)
+        (println (str "  PASS  " label " = " (str got))))
+      (do
+        (swap! fail-count + 1)
+        (println (str "  FAIL  " label))
+        (println (str "        got:      " (str got)))
+        (println (str "        expected: " (str expected)))))))
+
+(defn truth-error [label thunk expected-substr]
+  (swap! total-count + 1)
+  (let [result (try (do (thunk) "NO-ERROR") (catch $e (str $e)))]
+    (if (str-contains? result expected-substr)
+      (do
+        (swap! pass-count + 1)
+        (println (str "  PASS  " label " → ERROR(contains:" expected-substr ")")))
+      (do
+        (swap! fail-count + 1)
+        (println (str "  FAIL  " label))
+        (println (str "        got:      " result))
+        (println (str "        expected error containing: " expected-substr))))))
+
+(defn section [name]
+  (println (str "\n── " name " ──────────────────────────")))
+
+;; ─── str-index-of ─────────────────────────────────────────
+(section "str-index-of")
+(truth-assert "str-index-of \"abc\" \"b\""    (str-index-of "abc" "b")    1)
+(truth-assert "str-index-of \"abc\" \"x\""    (str-index-of "abc" "x")   -1)
+(truth-assert "str-index-of \"abc\" \"\""     (str-index-of "abc" "")     0)
+(truth-assert "str-index-of \"\" \"x\""       (str-index-of "" "x")      -1)
+(truth-assert "str-index-of nil \"x\""        (str-index-of nil "x")     -1)
+
+;; ─── str-replace ──────────────────────────────────────────
+(section "str-replace")
+(truth-assert "str-replace \"abc\" \"b\" \"X\""     (str-replace "abc" "b" "X")     "aXc")
+(truth-assert "str-replace \"aaa\" \"a\" \"X\""     (str-replace "aaa" "a" "X")     "XXX")
+(truth-assert "str-replace nil \"a\" \"X\""          (str-replace nil "a" "X")       "")
+(truth-assert "str-replace \"abc\" \"x\" \"Y\""     (str-replace "abc" "x" "Y")     "abc")
+
+;; ─── str-split ────────────────────────────────────────────
+(section "str-split")
+(truth-assert "str-split \"a,b,c\" \",\""    (str-split "a,b,c" ",")    ["a" "b" "c"])
+(truth-assert "str-split \"abc\" \"\""        (str-split "abc" "")       ["a" "b" "c"])
+(truth-assert "str-split \"\" \",\""          (str-split "" ",")         [""])
+(truth-assert "str-split nil \",\""           (str-split nil ",")        [])
+
+;; ─── str-join ─────────────────────────────────────────────
+(section "str-join")
+(truth-assert "str-join \", \" [\"a\" \"b\"]"    (str-join ", " ["a" "b"])    "a, b")
+(truth-assert "str-join \"\" [\"a\" \"b\"]"       (str-join "" ["a" "b"])      "ab")
+(truth-assert "str-join \",\" []"                  (str-join "," [])            "")
+
+;; ─── str-contains? ────────────────────────────────────────
+(section "str-contains?")
+(truth-assert "str-contains? \"hello\" \"ll\""    (str-contains? "hello" "ll")    true)
+(truth-assert "str-contains? \"hello\" \"xyz\""   (str-contains? "hello" "xyz")   false)
+(truth-assert "str-contains? nil \"x\""            (str-contains? nil "x")         false)
+(truth-assert "str-contains? \"abc\" \"\""         (str-contains? "abc" "")        true)
+
+;; ─── str-slice ────────────────────────────────────────────
+(section "str-slice")
+(truth-assert "str-slice \"hello\" 1 3"     (str-slice "hello" 1 3)    "el")
+(truth-assert "str-slice \"hello\" 2"       (str-slice "hello" 2)      "llo")
+(truth-assert "str-slice \"hello\" 0 0"     (str-slice "hello" 0 0)    "")
+;; nil → treated as string "nil", slice(0,2) = "nu"
+(truth-assert "str-slice nil 0 2"           (str-slice nil 0 2)        "nu")
+
+;; ─── str-trim / str-upper / str-lower ─────────────────────
+(section "str-trim / str-upper / str-lower")
+(truth-assert "str-trim \"  hi  \""    (str-trim "  hi  ")    "hi")
+;; nil → JS null.toString() path → "null"
+(truth-assert "str-trim nil"            (str-trim nil)          "null")
+(truth-assert "str-upper \"hello\""    (str-upper "hello")     "HELLO")
+(truth-assert "str-lower \"HELLO\""    (str-lower "HELLO")     "hello")
+
+;; ─── str-starts-with? / str-ends-with? ───────────────────
+(section "str-starts-with? / str-ends-with?")
+(truth-assert "str-starts-with? \"hello\" \"he\""    (str-starts-with? "hello" "he")    true)
+(truth-assert "str-starts-with? \"hello\" \"lo\""    (str-starts-with? "hello" "lo")    false)
+(truth-assert "str-ends-with? \"hello\" \"lo\""      (str-ends-with? "hello" "lo")      true)
+(truth-assert "str-ends-with? nil \"lo\""             (str-ends-with? nil "lo")          false)
+
+;; ─── length ───────────────────────────────────────────────
+(section "length")
+(truth-assert "length [1 2 3]"     (length [1 2 3])    3)
+(truth-assert "length []"           (length [])          0)
+(truth-assert "length \"abc\""     (length "abc")       3)
+(truth-assert "length nil"          (length nil)         0)
+
+;; ─── first / last / nth ───────────────────────────────────
+(section "first / last / nth")
+(truth-assert "first [10 20 30]"    (first [10 20 30])    10)
+(truth-assert "last [10 20 30]"     (last [10 20 30])     30)
+(truth-assert "first []"             (first [])            nil)
+(truth-assert "last []"              (last [])             nil)
+(truth-assert "nth [10 20 30] 1"    (nth [10 20 30] 1)   20)
+(truth-assert "nth [10 20 30] 5"    (nth [10 20 30] 5)   nil)
+
+;; ─── get ──────────────────────────────────────────────────
+(section "get")
+(truth-assert "get {\"a\" 1} \"a\""     (get {"a" 1} "a")     1)
+(truth-assert "get {\"a\" 1} \"b\""     (get {"a" 1} "b")     nil)
+(truth-assert "get nil \"a\""            (get nil "a")          nil)
+
+;; ─── map / filter / reduce ────────────────────────────────
+(section "map / filter / reduce")
+(truth-assert "map (fn [x] (* x 2)) [1 2 3]"          (map (fn [x] (* x 2)) [1 2 3])          [2 4 6])
+(truth-assert "filter (fn [x] (> x 2)) [1 2 3 4]"     (filter (fn [x] (> x 2)) [1 2 3 4])     [3 4])
+(truth-assert "reduce + 0 [1 2 3]"                      (reduce + 0 [1 2 3])                     6)
+(truth-assert "map fn []"                                (map (fn [x] x) [])                      [])
+
+;; ─── parse-int ────────────────────────────────────────────
+(section "parse-int")
+(truth-assert "parse-int \"42\""      (parse-int "42")       42)
+(truth-assert "parse-int \"3.9\""     (parse-int "3.9")      3)
+(truth-assert "parse-int \"abc\""     (parse-int "abc")      nil)
+(truth-assert "parse-int nil"          (parse-int nil)        nil)
+
+;; ─── type-of ──────────────────────────────────────────────
+(section "type-of")
+(truth-assert "type-of 42"           (type-of 42)          "number")
+(truth-assert "type-of \"hello\""    (type-of "hello")     "string")
+(truth-assert "type-of true"         (type-of true)        "boolean")
+(truth-assert "type-of nil"          (type-of nil)         "nil")
+(truth-assert "type-of []"           (type-of [])          "array")
+(truth-assert "type-of {}"           (type-of {})          "map")
+
+;; ─── json-parse / json-stringify ─────────────────────────
+(section "json-parse / json-stringify")
+(truth-assert "json-stringify {\"a\" 1}"                (json-stringify {"a" 1})            "{\"a\":1}")
+(truth-assert "json-stringify [1 2]"                     (json-stringify [1 2])              "[1,2]")
+(truth-assert "json-parse \"{\\\"a\\\":1}\" → get a"    (get (json-parse "{\"a\":1}") "a")  1)
+(truth-error  "json-parse \"bad\""
+              (fn [] (json-parse "bad"))
+              "invalid JSON")
+
+;; ─── 결과 요약 ────────────────────────────────────────────
+(println (str "\n══════════════════════════════════════════"))
+(println (str "결과: " (str @pass-count) " PASS / " (str @fail-count) " FAIL  (total " (str @total-count) ")"))
+(if (= @fail-count 0)
+  (println "✓ 모든 케이스 통과")
+  (println (str "✗ " (str @fail-count) "개 실패 — 위 FAIL 항목 확인")))
