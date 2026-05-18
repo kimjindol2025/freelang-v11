@@ -13084,6 +13084,69 @@ function evalWorldModel141(op, args3) {
 init_lexer();
 init_parser();
 
+// src/runtime-contracts.ts
+var _contracts = /* @__PURE__ */ new Map();
+var _throttleMap = /* @__PURE__ */ new Map();
+function defineContract(name, def) {
+  _contracts.set(name, { name, ...def });
+}
+function getContracts() {
+  return [..._contracts.values()];
+}
+function clearContracts() {
+  _contracts.clear();
+  _throttleMap.clear();
+}
+function checkContracts(buf, newEvent) {
+  const out = [];
+  const now = newEvent.timestamp;
+  for (const [name, c] of _contracts) {
+    if (c.eventType !== "any" && c.eventType !== newEvent.type) continue;
+    if (c.errorKind && newEvent.errorKind !== c.errorKind) continue;
+    const windowStart = now - c.windowMs;
+    let matchCount = 0;
+    for (let i = buf.length - 1; i >= 0; i--) {
+      const e = buf[i];
+      if (e.timestamp < windowStart) break;
+      if (c.eventType !== "any" && e.type !== c.eventType) continue;
+      if (c.errorKind && e.errorKind !== c.errorKind) continue;
+      matchCount += e.count ?? 1;
+    }
+    if (matchCount < c.threshold) continue;
+    const lastFire = _throttleMap.get(name) ?? 0;
+    if (now - lastFire < Math.max(c.windowMs, 500)) continue;
+    _throttleMap.set(name, now);
+    const sev = c.action === "error" ? "error" : c.action === "collapse" ? "warn" : c.action === "throttle" ? "info" : "warn";
+    out.push({
+      type: "contract-violation",
+      severity: sev,
+      contractName: name,
+      timestamp: now,
+      message: `Contract "${name}": ${matchCount} \xD7 ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${c.action})`,
+      value: { contractName: name, matchCount, threshold: c.threshold, action: c.action }
+    });
+  }
+  return out;
+}
+defineContract("auto:trace-explosion", {
+  eventType: "trace",
+  threshold: 50,
+  windowMs: 1e3,
+  action: "collapse"
+});
+defineContract("auto:assert-storm", {
+  eventType: "assert-fail",
+  threshold: 5,
+  windowMs: 5e3,
+  action: "warn"
+});
+defineContract("auto:error-burst", {
+  eventType: "runtime-error",
+  threshold: 5,
+  windowMs: 5e3,
+  action: "error"
+});
+
 // src/runtime-events.ts
 var SEVERITY_RANK = {
   debug: 0,
@@ -13096,7 +13159,8 @@ var DEFAULT_SEVERITY = {
   "debug": "debug",
   "trace": "info",
   "assert-fail": "error",
-  "runtime-error": "fatal"
+  "runtime-error": "fatal",
+  "contract-violation": "warn"
 };
 var MAX_EVENTS = 1e3;
 var _buf = [];
@@ -13122,7 +13186,7 @@ function shouldRecord(sev) {
   return _minSeverity === null || SEVERITY_RANK[sev] >= SEVERITY_RANK[_minSeverity];
 }
 function fingerprint(ev) {
-  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}`;
+  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}|${ev.contractName ?? ""}`;
 }
 function recordEvent(ev) {
   const sev = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
@@ -13142,6 +13206,20 @@ function recordEvent(ev) {
   full.count = 1;
   _buf.push(full);
   if (_buf.length > MAX_EVENTS) _buf.shift();
+  if (full.type !== "contract-violation") {
+    const violations = checkContracts(_buf, full);
+    for (const vev of violations) {
+      const vid = getNextEventId();
+      const vfull = {
+        ...vev,
+        severity: vev.severity ?? "warn",
+        eventId: vid,
+        count: 1
+      };
+      _buf.push(vfull);
+      if (_buf.length > MAX_EVENTS) _buf.shift();
+    }
+  }
 }
 function getEvents() {
   return _buf.slice();
@@ -14970,6 +15048,82 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs }
       };
     }
+    case "runtime-health": {
+      const rhEvs = getEvents();
+      const total = rhEvs.length || 1;
+      const errorCount = rhEvs.filter((e) => e.type === "runtime-error").length;
+      const failCount = rhEvs.filter((e) => e.type === "assert-fail").length;
+      const violations = rhEvs.filter((e) => e.type === "contract-violation");
+      const traceCount = rhEvs.filter((e) => e.type === "trace").length;
+      const collapseCount = rhEvs.filter((e) => e.collapsed).length;
+      let score = 1;
+      score -= (errorCount + failCount) / total * 0.4;
+      score -= violations.length / Math.max(total, 10) * 0.3;
+      if (traceCount > 100) score -= Math.min(0.2, (traceCount - 100) / 500);
+      if (collapseCount > 5) score -= Math.min(0.1, (collapseCount - 5) / 100);
+      score = Math.round(Math.max(0, Math.min(1, score)) * 100) / 100;
+      const status = score >= 0.9 ? "healthy" : score >= 0.7 ? "degraded" : score >= 0.5 ? "warning" : "critical";
+      const warnCount = rhEvs.filter((e) => e.severity === "warn").length;
+      const errCount = rhEvs.filter((e) => e.severity === "error" || e.severity === "fatal").length;
+      return {
+        "score": score,
+        "status": status,
+        "warnings": warnCount,
+        "errors": errCount,
+        "recent-contract-violations": violations.slice(-5).map((e) => ({
+          "contract": e.contractName,
+          "message": e.message,
+          "severity": e.severity
+        }))
+      };
+    }
+    case "runtime-timeline": {
+      const tlEvs = getEvents();
+      const SEV_CHAR = { debug: ".", info: "\xB7", warn: "\u26A0", error: "\u2716", fatal: "\u2726" };
+      return tlEvs.map((e) => {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => n.toString().padStart(2, "0")).join(":") + "." + d.getMilliseconds().toString().padStart(3, "0");
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 60);
+        return {
+          "time": hms,
+          "type": e.type,
+          "severity": e.severity,
+          "event-id": e.eventId,
+          "trace-id": e.traceId ?? null,
+          "summary": summary,
+          "collapsed": e.collapsed ?? false,
+          "count": e.count ?? 1
+        };
+      });
+    }
+    case "print-runtime-timeline": {
+      const ptEvs = getEvents();
+      const SEV_CHAR2 = { debug: ".", info: "\xB7", warn: "\u26A0", error: "\u2716", fatal: "\u2726" };
+      const lines = [];
+      for (const e of ptEvs) {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => n.toString().padStart(2, "0")).join(":");
+        const sev = SEV_CHAR2[e.severity ?? "info"] ?? "\xB7";
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 50);
+        const col = e.collapsed ? ` \xD7${e.count}` : "";
+        lines.push(`${hms} ${sev} ${e.type.padEnd(20)} ${summary}${col}`);
+      }
+      process.stderr.write(lines.join("\n") + (lines.length ? "\n" : ""));
+      return null;
+    }
+    case "list-contracts": {
+      return getContracts().map((c) => ({
+        "name": c.name,
+        "event-type": c.eventType,
+        "threshold": c.threshold,
+        "window-ms": c.windowMs,
+        "action": c.action,
+        ...c.errorKind ? { "error-kind": c.errorKind } : {}
+      }));
+    }
+    case "clear-contracts":
+      clearContracts();
+      return null;
     case "runtime-snapshot": {
       const snEvs = getEvents();
       const snSevCounts = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
@@ -20939,6 +21093,34 @@ function evalSpecialForm(interp2, op, expr2) {
 `
     );
     return wtVal;
+  }
+  if (op === "defcontract") {
+    if (expr2.args.length < 2) throw new Error("defcontract requires name and config map");
+    const nameArg = expr2.args[0];
+    const contractName = nameArg.kind === "variable" ? String(nameArg.name).replace(/^\$/, "") : nameArg.kind === "literal" ? String(nameArg.value) : String(nameArg);
+    const configVal = ev(expr2.args[1]) ?? {};
+    const cfgGet = (k) => configVal[k] ?? configVal[":" + k] ?? null;
+    const cfgStr = (k) => {
+      const v = cfgGet(k);
+      return v != null ? String(v).replace(/^:/, "") : void 0;
+    };
+    const cfgNum = (k) => {
+      const v = cfgGet(k);
+      return v != null ? Number(v) : void 0;
+    };
+    const eventType = cfgStr("event-type") ?? "any";
+    const threshold = cfgNum("threshold") ?? 3;
+    const windowMs = cfgNum("window-ms") ?? 5e3;
+    const action = cfgStr("action") ?? "warn";
+    const errorKind = cfgStr("error-kind");
+    defineContract(contractName, {
+      eventType,
+      threshold,
+      windowMs,
+      action,
+      ...errorKind ? { errorKind } : {}
+    });
+    return contractName;
   }
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
@@ -41567,7 +41749,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);

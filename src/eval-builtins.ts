@@ -125,6 +125,7 @@ import {
   RuntimeEvent, EventSeverity,
   newTraceId, setRuntimeFilter, clearRuntimeFilter, getRuntimeFilter,
 } from "./runtime-events";
+import { getContracts, clearContracts, defineContract as _defineContract } from "./runtime-contracts";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1862,6 +1863,87 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs },
       };
     }
+    case "runtime-health": {
+      const rhEvs = getEvents();
+      const total = rhEvs.length || 1;
+      const errorCount  = rhEvs.filter(e => e.type === "runtime-error").length;
+      const failCount   = rhEvs.filter(e => e.type === "assert-fail").length;
+      const violations  = rhEvs.filter(e => (e.type as string) === "contract-violation");
+      const traceCount  = rhEvs.filter(e => e.type === "trace").length;
+      const collapseCount = rhEvs.filter(e => e.collapsed).length;
+
+      let score = 1.0;
+      score -= ((errorCount + failCount) / total) * 0.4;
+      score -= (violations.length / Math.max(total, 10)) * 0.3;
+      if (traceCount > 100) score -= Math.min(0.2, (traceCount - 100) / 500);
+      if (collapseCount > 5)  score -= Math.min(0.1, (collapseCount - 5) / 100);
+      score = Math.round(Math.max(0, Math.min(1, score)) * 100) / 100;
+
+      const status = score >= 0.9 ? "healthy" : score >= 0.7 ? "degraded" : score >= 0.5 ? "warning" : "critical";
+      const warnCount  = rhEvs.filter(e => e.severity === "warn").length;
+      const errCount   = rhEvs.filter(e => e.severity === "error" || e.severity === "fatal").length;
+
+      return {
+        "score": score,
+        "status": status,
+        "warnings": warnCount,
+        "errors": errCount,
+        "recent-contract-violations": violations.slice(-5).map(e => ({
+          "contract": (e as any).contractName,
+          "message": e.message,
+          "severity": e.severity,
+        })),
+      };
+    }
+    case "runtime-timeline": {
+      const tlEvs = getEvents();
+      const SEV_CHAR: Record<string, string> = { debug: ".", info: "·", warn: "⚠", error: "✖", fatal: "✦" };
+      return tlEvs.map(e => {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()]
+          .map(n => n.toString().padStart(2, "0")).join(":") + "." + d.getMilliseconds().toString().padStart(3, "0");
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 60);
+        return {
+          "time": hms,
+          "type": e.type,
+          "severity": e.severity,
+          "event-id": e.eventId,
+          "trace-id": e.traceId ?? null,
+          "summary": summary,
+          "collapsed": e.collapsed ?? false,
+          "count": e.count ?? 1,
+        };
+      });
+    }
+    case "print-runtime-timeline": {
+      const ptEvs = getEvents();
+      const SEV_CHAR2: Record<string, string> = { debug: ".", info: "·", warn: "⚠", error: "✖", fatal: "✦" };
+      const lines: string[] = [];
+      for (const e of ptEvs) {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()]
+          .map(n => n.toString().padStart(2, "0")).join(":");
+        const sev = SEV_CHAR2[e.severity ?? "info"] ?? "·";
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 50);
+        const col = e.collapsed ? ` ×${e.count}` : "";
+        lines.push(`${hms} ${sev} ${(e.type as string).padEnd(20)} ${summary}${col}`);
+      }
+      process.stderr.write(lines.join("\n") + (lines.length ? "\n" : ""));
+      return null;
+    }
+    case "list-contracts": {
+      return getContracts().map(c => ({
+        "name": c.name,
+        "event-type": c.eventType,
+        "threshold": c.threshold,
+        "window-ms": c.windowMs,
+        "action": c.action,
+        ...(c.errorKind ? { "error-kind": c.errorKind } : {}),
+      }));
+    }
+    case "clear-contracts":
+      clearContracts();
+      return null;
     case "runtime-snapshot": {
       const snEvs = getEvents();
       const snSevCounts: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };

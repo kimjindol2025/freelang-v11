@@ -1,6 +1,9 @@
 // runtime-events.ts — FreeLang runtime event buffer
 // Phase 4: structured event substrate
 // Phase 6: severity / correlation / deduplication / noise filter
+// Phase 7: contract-violation type + contract integration
+
+import { checkContracts } from "./runtime-contracts";
 
 export type EventSeverity = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -9,7 +12,7 @@ const SEVERITY_RANK: Record<EventSeverity, number> = {
 };
 
 export interface RuntimeEvent {
-  type: "debug" | "trace" | "assert-fail" | "runtime-error";
+  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation";
   severity: EventSeverity;
   eventId: number;
   traceId?: string;
@@ -23,15 +26,17 @@ export interface RuntimeEvent {
   elapsedMs?: number;
   message?: string;
   errorKind?: string;
+  contractName?: string;
   collapsed?: boolean;
   count?: number;
 }
 
 export const DEFAULT_SEVERITY: Record<RuntimeEvent["type"], EventSeverity> = {
-  "debug":         "debug",
-  "trace":         "info",
-  "assert-fail":   "error",
-  "runtime-error": "fatal",
+  "debug":              "debug",
+  "trace":              "info",
+  "assert-fail":        "error",
+  "runtime-error":      "fatal",
+  "contract-violation": "warn",
 };
 
 const MAX_EVENTS = 1000;
@@ -53,7 +58,7 @@ function shouldRecord(sev: EventSeverity): boolean {
 }
 
 function fingerprint(ev: RuntimeEvent): string {
-  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}`;
+  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}|${ev.contractName ?? ""}`;
 }
 
 // ev.severity / ev.eventId 는 optional — 자동 할당
@@ -81,6 +86,22 @@ export function recordEvent(
   full.count = 1;
   _buf.push(full);
   if (_buf.length > MAX_EVENTS) _buf.shift();
+
+  // Contract 자동 평가 (contract-violation은 재귀 방지)
+  if (full.type !== "contract-violation") {
+    const violations = checkContracts(_buf, full);
+    for (const vev of violations) {
+      const vid = getNextEventId();
+      const vfull: RuntimeEvent = {
+        ...(vev as any),
+        severity: vev.severity ?? "warn",
+        eventId: vid,
+        count: 1,
+      };
+      _buf.push(vfull);
+      if (_buf.length > MAX_EVENTS) _buf.shift();
+    }
+  }
 }
 
 export function getEvents(): RuntimeEvent[] { return _buf.slice(); }

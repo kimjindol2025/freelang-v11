@@ -13,6 +13,7 @@ import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
 import { recordEvent, getEvents, newTraceId, EventSeverity } from "./runtime-events";
+import { defineContract } from "./runtime-contracts";
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 import { ReturnSignal } from "./return-signal";
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
@@ -269,6 +270,42 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   }
 
   // ── use ──────────────────────────────────────────────────────────
+  // ── defcontract ───────────────────────────────────────────────────
+  // (defcontract name {:event-type :runtime-error :threshold 3 ...})
+  if (op === "defcontract") {
+    if (expr.args.length < 2) throw new Error("defcontract requires name and config map");
+    const nameArg = expr.args[0] as any;
+    const contractName =
+      nameArg.kind === "variable" ? String(nameArg.name).replace(/^\$/, "")
+      : nameArg.kind === "literal" ? String(nameArg.value)
+      : String(nameArg);
+
+    const configVal: Record<string, any> = ev(expr.args[1]) ?? {};
+    // FreeLang에서 :key → string "key", 맵 키도 string
+    const cfgGet = (k: string): any => configVal[k] ?? configVal[":" + k] ?? null;
+    const cfgStr = (k: string): string | undefined => {
+      const v = cfgGet(k);
+      return v != null ? String(v).replace(/^:/, "") : undefined;
+    };
+    const cfgNum = (k: string): number | undefined => {
+      const v = cfgGet(k);
+      return v != null ? Number(v) : undefined;
+    };
+
+    const eventType = cfgStr("event-type") ?? "any";
+    const threshold = cfgNum("threshold") ?? 3;
+    const windowMs  = cfgNum("window-ms")  ?? 5000;
+    const action    = (cfgStr("action") ?? "warn") as "warn" | "error" | "collapse" | "throttle";
+    const errorKind = cfgStr("error-kind");
+
+    defineContract(contractName, {
+      eventType: eventType as any,
+      threshold, windowMs, action,
+      ...(errorKind ? { errorKind } : {}),
+    });
+    return contractName;
+  }
+
   // Phase D: (use NAME) — self/stdlib/NAME.fl 자동 로드 (간소 import)
   // 이미 import된 모듈은 cache로 skip (interp.importedFiles)
   if (op === "use") {
