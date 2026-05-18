@@ -190,6 +190,24 @@ export class MacroExpander {
     if ((node as any).kind === "keyword") {
       return ":" + (node as any).name;
     }
+    if ((node as any).kind === "block") {
+      const b = node as any;
+      if (b.type === "Array") {
+        const items: ASTNode[] = b.fields?.get?.("items") ?? [];
+        const elems = Array.isArray(items) ? items.map((i: ASTNode) => this.astToString(i)).join(" ") : "";
+        return `[${elems}]`;
+      }
+      if (b.type === "Map") {
+        const fields: Map<string, ASTNode> = b.fields ?? new Map();
+        const pairs: string[] = [];
+        if (fields instanceof Map) {
+          fields.forEach((v, k) => {
+            if (k !== "items") pairs.push(`${JSON.stringify(k)} ${this.astToString(v)}`);
+          });
+        }
+        return `{${pairs.join(" ")}}`;
+      }
+    }
     return JSON.stringify(node);
   }
 }

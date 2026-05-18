@@ -193,6 +193,24 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
   const ctx = interp.context;
 
+  // ── trace ─────────────────────────────────────────────────────────
+  // (trace expr) → expr 평가 + [TRACE] expr/value/elapsed 출력 후 값 반환
+  if (op === "trace") {
+    if (expr.args.length === 0) return null;
+    const traceStart = Date.now();
+    const traceVal = ev(expr.args[0]);
+    const traceElapsed = Date.now() - traceStart;
+    let traceExprText = "?";
+    try { traceExprText = ctx.macroExpander.astToString(expr.args[0]); } catch {}
+    const traceDisplay = (interp as any).toDisplayString
+      ? (interp as any).toDisplayString(traceVal)
+      : String(traceVal);
+    process.stderr.write(
+      `[TRACE]\n  expr:    ${traceExprText}\n  value:   ${traceDisplay}\n  elapsed: ${traceElapsed}ms\n`
+    );
+    return traceVal;
+  }
+
   // ── use ──────────────────────────────────────────────────────────
   // Phase D: (use NAME) — self/stdlib/NAME.fl 자동 로드 (간소 import)
   // 이미 import된 모듈은 cache로 skip (interp.importedFiles)

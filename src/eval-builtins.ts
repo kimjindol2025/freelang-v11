@@ -1686,6 +1686,38 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       process.stderr.write("[tap] " + label + toDisplay(val) + "\n");
       return val;
     }
+    case "debug": {
+      // (debug value) → [DEBUG] value 출력 후 value 반환
+      // (debug "label" value) → [DEBUG label] value 출력 후 value 반환
+      const hasLabel = args.length > 1;
+      const debugLabel = hasLabel ? String(args[0]) : "";
+      const debugVal = hasLabel ? args[1] : args[0];
+      const debugPrefix = debugLabel ? `[DEBUG ${debugLabel}]` : "[DEBUG]";
+      process.stderr.write(`${debugPrefix} ${toDisplay(debugVal)}\n`);
+      return debugVal;
+    }
+    case "assert": {
+      // (assert cond) 또는 (assert cond "메시지")
+      // 참이면 true 반환, 거짓이면 AssertionError throw
+      const assertCond = args[0];
+      const assertMsg = args.length > 1 ? String(args[1]) : undefined;
+      if (!assertCond) {
+        let assertExpr = "?";
+        try {
+          assertExpr = (interp as any).context.macroExpander.astToString(expr.args[0]);
+        } catch {}
+        const assertLine = expr.line ?? (interp as any).currentLine;
+        const assertFile = (interp as any).currentFilePath ?? "<unknown>";
+        const assertDetail = assertMsg ? `\n  msg:   ${assertMsg}` : "";
+        throw new FLRuntimeError(
+          ErrorCodes.RUNTIME,
+          `AssertionError:\n  expr:  ${assertExpr}\n  value: ${toDisplay(assertCond)}${assertDetail}`,
+          { expected: "truthy", got: String(assertCond) },
+          assertFile, assertLine, 0
+        );
+      }
+      return true;
+    }
     case "print-err":
       process.stderr.write(args.map((a: any) => toDisplay(a)).join(" ") + "\n");
       return null;

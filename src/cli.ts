@@ -40,6 +40,24 @@ function formatCallStack(stack: Array<{fn: string; line: number; args?: any[]}>)
   ).join("\n");
 }
 
+function mapJsError(msg: string): string {
+  if (msg.includes("Cannot read properties of null") ||
+      msg.includes("Cannot read properties of undefined")) {
+    const m = msg.match(/reading '([^']+)'/);
+    return m
+      ? `nil 값의 '${m[1]}' 속성에 접근 불가 — (nil? x)로 먼저 확인하세요`
+      : "nil 값에 접근 불가 — (nil? x)로 먼저 확인하세요";
+  }
+  if (msg.includes("is not a function")) {
+    const m = msg.match(/^(.+?) is not a function/);
+    return `${m?.[1] ?? "해당 값"}은 함수가 아닙니다 — (fn? x)로 먼저 확인하세요`;
+  }
+  if (msg.includes("Maximum call stack size exceeded")) {
+    return "스택 오버플로우 — 재귀 깊이 초과. (loop/recur)으로 변환하거나 종료 조건 확인";
+  }
+  return msg;
+}
+
 function formatError(err: any, source?: string, filePath?: string, callStack?: Array<{fn: string; line: number; args?: any[]}>): string {
   const fileName = filePath ? path.basename(filePath) : "<stdin>";
   const lines: string[] = [];
@@ -78,7 +96,7 @@ function formatError(err: any, source?: string, filePath?: string, callStack?: A
       lines.push("");
     }
 
-    lines.push(`  \x1b[31m✖\x1b[0m ${cleanMsg}`);
+    lines.push(`  \x1b[31m✖\x1b[0m ${mapJsError(cleanMsg)}`);
     const stack = callStack ?? (err as any).__flCallStack;
     if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
