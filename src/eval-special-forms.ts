@@ -12,7 +12,7 @@ import { SExpr, ASTNode, Variable, Literal } from "./ast";
 import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
-import { recordEvent, getEvents } from "./runtime-events";
+import { recordEvent, getEvents, newTraceId, EventSeverity } from "./runtime-events";
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 import { ReturnSignal } from "./return-signal";
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
@@ -198,6 +198,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   // (trace expr) → expr 평가 + [TRACE] expr/value/elapsed 출력 후 값 반환
   if (op === "trace") {
     if (expr.args.length === 0) return null;
+    const traceId = newTraceId();
     const traceStart = Date.now();
     const traceVal = ev(expr.args[0]);
     const traceElapsed = Date.now() - traceStart;
@@ -210,7 +211,7 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       `[TRACE]\n  expr:    ${traceExprText}\n  value:   ${traceDisplay}\n  elapsed: ${traceElapsed}ms\n`
     );
     recordEvent({
-      type: "trace", timestamp: Date.now(),
+      type: "trace", traceId, timestamp: Date.now(),
       file: (interp as any).currentFilePath, line: expr.line,
       expr: traceExprText, value: traceVal, elapsedMs: traceElapsed
     });
@@ -218,19 +219,47 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   }
 
   // ── with-trace ────────────────────────────────────────────────────
+  // (with-trace expr) 또는 (with-trace :severity :error expr)
   if (op === "with-trace") {
     if (expr.args.length === 0) return null;
+
+    // 선택적 :severity 키워드 파싱
+    // FreeLang에서 :foo → {kind:"literal", type:"string", value:"foo"} 또는 {kind:"keyword", name:"foo"}
+    const _wtNodeStr = (n: any): string | null => {
+      if (!n) return null;
+      if (n.kind === "keyword") return String(n.name);
+      if (n.kind === "literal" && (n.type === "string" || n.type === "symbol")) return String(n.value);
+      return null;
+    };
+    let wtSeverity: EventSeverity | undefined;
+    let wtArgIdx = 0;
+    if (expr.args.length >= 3) {
+      const keyStr = _wtNodeStr(expr.args[0]);
+      if (keyStr === "severity") {
+        const sevStr = _wtNodeStr(expr.args[1]) ?? "";
+        if (["debug","info","warn","error","fatal"].includes(sevStr)) {
+          wtSeverity = sevStr as EventSeverity;
+          wtArgIdx = 2;
+        }
+      }
+    }
+
+    const wtBodyArg = expr.args[wtArgIdx];
+    if (!wtBodyArg) return null;
+
+    const wtTraceId = newTraceId();
     const prevLen = getEvents().length;
     const wtStart = Date.now();
-    const wtVal = ev(expr.args[0]);
+    const wtVal = ev(wtBodyArg);
     const wtElapsed = Date.now() - wtStart;
     let wtExpr = "?";
-    try { wtExpr = ctx.macroExpander.astToString(expr.args[0]); } catch {}
+    try { wtExpr = ctx.macroExpander.astToString(wtBodyArg); } catch {}
     const childCount = getEvents().length - prevLen;
     const wtDisplay = (interp as any).toDisplayString
       ? (interp as any).toDisplayString(wtVal) : String(wtVal);
     recordEvent({
-      type: "trace", timestamp: Date.now(),
+      type: "trace", traceId: wtTraceId, timestamp: Date.now(),
+      severity: wtSeverity,
       expr: `(with-trace ${wtExpr})`, value: wtVal, elapsedMs: wtElapsed
     });
     process.stderr.write(

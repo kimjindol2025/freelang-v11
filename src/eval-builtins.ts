@@ -120,7 +120,11 @@ import { evalRefactorSelf, evalAlign, evalPredict_PHASE144, evalCuriosity, evalE
 // fl-parse: FL 소스 문자열 → AST 배열 (셀프 호스팅용)
 import { lex as _flLex } from "./lexer";
 import { parse as _flParse } from "./parser";
-import { recordEvent, getEvents, clearEvents, RuntimeEvent } from "./runtime-events";
+import {
+  recordEvent, getEvents, clearEvents,
+  RuntimeEvent, EventSeverity,
+  newTraceId, setRuntimeFilter, clearRuntimeFilter, getRuntimeFilter,
+} from "./runtime-events";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1726,6 +1730,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const n = Number(reOpts.last);
         if (!isNaN(n) && n > 0) reEvs = reEvs.slice(-n);
       }
+      if (reOpts.severity !== undefined) {
+        const sevRank: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
+        const minR = sevRank[String(reOpts.severity).replace(/^:/, "")] ?? 0;
+        reEvs = reEvs.filter(e => (sevRank[e.severity ?? "info"] ?? 0) >= minR);
+      }
       return reEvs;
     }
     case "clear-runtime-events":
@@ -1737,12 +1746,17 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const rsTms = rsTrace.map(e => e.elapsedMs ?? 0);
       const rsAvg = rsTms.length ? Math.round(rsTms.reduce((a, b) => a + b, 0) / rsTms.length) : null;
       const rsMax = rsTms.length ? Math.max(...rsTms) : null;
+      const rsSevCounts: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rsEvs) rsSevCounts[e.severity ?? "info"] = (rsSevCounts[e.severity ?? "info"] ?? 0) + 1;
+      const rsCollapsed = rsEvs.filter(e => e.collapsed).length;
       const result: Record<string, any> = {
         "event-count": rsEvs.length,
         "debug-count": rsEvs.filter(e => e.type === "debug").length,
         "trace-count": rsTrace.length,
         "assert-fail-count": rsEvs.filter(e => e.type === "assert-fail").length,
         "runtime-error-count": rsEvs.filter(e => e.type === "runtime-error").length,
+        "severity-counts": rsSevCounts,
+        "collapsed-count": rsCollapsed,
       };
       if (rsAvg !== null) result["avg-trace-ms"] = rsAvg;
       if (rsMax !== null) result["max-trace-ms"] = rsMax;
@@ -1846,6 +1860,86 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         "event-count-delta": sB.total - sA.total,
         "summary-a": { "runtime-errors": sA.errors, "avg-trace-ms": sA.avgMs },
         "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs },
+      };
+    }
+    case "runtime-snapshot": {
+      const snEvs = getEvents();
+      const snSevCounts: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      const snTraceIds = new Set<string>();
+      const snRecentErrors: any[] = [];
+      for (const e of snEvs) {
+        const s = e.severity ?? "info";
+        snSevCounts[s] = (snSevCounts[s] ?? 0) + 1;
+        if (e.traceId) snTraceIds.add(e.traceId);
+        if (s === "error" || s === "fatal") {
+          snRecentErrors.push({ type: e.type, message: e.message, expr: e.expr, line: e.line });
+        }
+      }
+      return {
+        "event-count": snEvs.length,
+        "severity-counts": snSevCounts,
+        "active-trace-ids": [...snTraceIds].slice(-10),
+        "recent-errors": snRecentErrors.slice(-5),
+        "active-filter": getRuntimeFilter(),
+      };
+    }
+    case "set-runtime-filter": {
+      const sfSev = String(args[0]).replace(/^:/, "") as EventSeverity;
+      if (!["debug","info","warn","error","fatal"].includes(sfSev)) {
+        throw new Error(`set-runtime-filter: invalid severity "${sfSev}". Use :debug/:info/:warn/:error/:fatal`);
+      }
+      setRuntimeFilter(sfSev);
+      return sfSev;
+    }
+    case "clear-runtime-filter":
+      clearRuntimeFilter();
+      return null;
+    case "runtime-replay-check": {
+      // (runtime-replay-check events-file source-file)
+      const rrEvFile  = String(args[0]);
+      const rrSrcFile = String(args[1]);
+      const rrFs = require("fs");
+      const refEvs: RuntimeEvent[] = JSON.parse(rrFs.readFileSync(rrEvFile, "utf-8"));
+      const rrSrc = rrFs.readFileSync(rrSrcFile, "utf-8");
+
+      // 현재 buffer 보존 → 재실행 → 비교 → 복구
+      const savedEvs = getEvents();
+      clearEvents();
+      try {
+        const rrToks = _flLex(rrSrc);
+        const rrAst  = _flParse(rrToks);
+        (interp as any).interpret(rrAst);
+      } catch { /* 에러가 있어도 이벤트는 수집됨 */ }
+      const newEvs = getEvents();
+
+      // 원래 buffer 복구
+      clearEvents();
+      for (const ev of savedEvs) recordEvent(ev);
+
+      // 비교: type + expr (타임스탬프/value 제외)
+      const toKey = (e: RuntimeEvent) => `${e.type}|${e.expr ?? ""}|${e.severity}`;
+      const refKeys = refEvs.map(toKey);
+      const newKeys = newEvs.map(toKey);
+      const total = Math.max(refKeys.length, newKeys.length);
+      let matches = 0;
+      const diffs: any[] = [];
+      for (let i = 0; i < Math.min(refKeys.length, newKeys.length); i++) {
+        if (refKeys[i] === newKeys[i]) {
+          matches++;
+        } else if (diffs.length < 10) {
+          diffs.push({
+            index: i,
+            ref:    { type: refEvs[i].type, expr: refEvs[i].expr },
+            actual: { type: newEvs[i]?.type, expr: newEvs[i]?.expr },
+          });
+        }
+      }
+      return {
+        "match-rate":  total > 0 ? Math.round((matches / total) * 100) / 100 : 1.0,
+        "diff-count":  diffs.length + Math.abs(refEvs.length - newEvs.length),
+        "ref-event-count": refEvs.length,
+        "new-event-count": newEvs.length,
+        "nondeterministic-events": diffs,
       };
     }
     case "assert": {

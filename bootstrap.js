@@ -13085,10 +13085,62 @@ init_lexer();
 init_parser();
 
 // src/runtime-events.ts
+var SEVERITY_RANK = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  fatal: 4
+};
+var DEFAULT_SEVERITY = {
+  "debug": "debug",
+  "trace": "info",
+  "assert-fail": "error",
+  "runtime-error": "fatal"
+};
 var MAX_EVENTS = 1e3;
 var _buf = [];
+var _eventIdCounter = 0;
+var _traceCounter = 0;
+var _minSeverity = null;
+function getNextEventId() {
+  return ++_eventIdCounter;
+}
+function newTraceId() {
+  return `trace-${++_traceCounter}`;
+}
+function setRuntimeFilter(minSev) {
+  _minSeverity = minSev;
+}
+function getRuntimeFilter() {
+  return _minSeverity;
+}
+function clearRuntimeFilter() {
+  _minSeverity = null;
+}
+function shouldRecord(sev) {
+  return _minSeverity === null || SEVERITY_RANK[sev] >= SEVERITY_RANK[_minSeverity];
+}
+function fingerprint(ev) {
+  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}`;
+}
 function recordEvent(ev) {
-  _buf.push(ev);
+  const sev = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
+  if (!shouldRecord(sev)) return;
+  const eventId = getNextEventId();
+  const full = { ...ev, severity: sev, eventId };
+  if (_buf.length > 0) {
+    const last = _buf[_buf.length - 1];
+    if (fingerprint(last) === fingerprint(full)) {
+      last.count = (last.count ?? 1) + 1;
+      last.collapsed = true;
+      last.timestamp = full.timestamp;
+      last.eventId = eventId;
+      return;
+    }
+  }
+  full.count = 1;
+  _buf.push(full);
   if (_buf.length > MAX_EVENTS) _buf.shift();
 }
 function getEvents() {
@@ -14797,6 +14849,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const n = Number(reOpts.last);
         if (!isNaN(n) && n > 0) reEvs = reEvs.slice(-n);
       }
+      if (reOpts.severity !== void 0) {
+        const sevRank = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
+        const minR = sevRank[String(reOpts.severity).replace(/^:/, "")] ?? 0;
+        reEvs = reEvs.filter((e) => (sevRank[e.severity ?? "info"] ?? 0) >= minR);
+      }
       return reEvs;
     }
     case "clear-runtime-events":
@@ -14808,12 +14865,17 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const rsTms = rsTrace.map((e) => e.elapsedMs ?? 0);
       const rsAvg = rsTms.length ? Math.round(rsTms.reduce((a, b) => a + b, 0) / rsTms.length) : null;
       const rsMax = rsTms.length ? Math.max(...rsTms) : null;
+      const rsSevCounts = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rsEvs) rsSevCounts[e.severity ?? "info"] = (rsSevCounts[e.severity ?? "info"] ?? 0) + 1;
+      const rsCollapsed = rsEvs.filter((e) => e.collapsed).length;
       const result = {
         "event-count": rsEvs.length,
         "debug-count": rsEvs.filter((e) => e.type === "debug").length,
         "trace-count": rsTrace.length,
         "assert-fail-count": rsEvs.filter((e) => e.type === "assert-fail").length,
-        "runtime-error-count": rsEvs.filter((e) => e.type === "runtime-error").length
+        "runtime-error-count": rsEvs.filter((e) => e.type === "runtime-error").length,
+        "severity-counts": rsSevCounts,
+        "collapsed-count": rsCollapsed
       };
       if (rsAvg !== null) result["avg-trace-ms"] = rsAvg;
       if (rsMax !== null) result["max-trace-ms"] = rsMax;
@@ -14906,6 +14968,80 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         "event-count-delta": sB.total - sA.total,
         "summary-a": { "runtime-errors": sA.errors, "avg-trace-ms": sA.avgMs },
         "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs }
+      };
+    }
+    case "runtime-snapshot": {
+      const snEvs = getEvents();
+      const snSevCounts = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      const snTraceIds = /* @__PURE__ */ new Set();
+      const snRecentErrors = [];
+      for (const e of snEvs) {
+        const s = e.severity ?? "info";
+        snSevCounts[s] = (snSevCounts[s] ?? 0) + 1;
+        if (e.traceId) snTraceIds.add(e.traceId);
+        if (s === "error" || s === "fatal") {
+          snRecentErrors.push({ type: e.type, message: e.message, expr: e.expr, line: e.line });
+        }
+      }
+      return {
+        "event-count": snEvs.length,
+        "severity-counts": snSevCounts,
+        "active-trace-ids": [...snTraceIds].slice(-10),
+        "recent-errors": snRecentErrors.slice(-5),
+        "active-filter": getRuntimeFilter()
+      };
+    }
+    case "set-runtime-filter": {
+      const sfSev = String(args3[0]).replace(/^:/, "");
+      if (!["debug", "info", "warn", "error", "fatal"].includes(sfSev)) {
+        throw new Error(`set-runtime-filter: invalid severity "${sfSev}". Use :debug/:info/:warn/:error/:fatal`);
+      }
+      setRuntimeFilter(sfSev);
+      return sfSev;
+    }
+    case "clear-runtime-filter":
+      clearRuntimeFilter();
+      return null;
+    case "runtime-replay-check": {
+      const rrEvFile = String(args3[0]);
+      const rrSrcFile = String(args3[1]);
+      const rrFs = require("fs");
+      const refEvs = JSON.parse(rrFs.readFileSync(rrEvFile, "utf-8"));
+      const rrSrc = rrFs.readFileSync(rrSrcFile, "utf-8");
+      const savedEvs = getEvents();
+      clearEvents();
+      try {
+        const rrToks = lex(rrSrc);
+        const rrAst = parse(rrToks);
+        interp2.interpret(rrAst);
+      } catch {
+      }
+      const newEvs = getEvents();
+      clearEvents();
+      for (const ev2 of savedEvs) recordEvent(ev2);
+      const toKey = (e) => `${e.type}|${e.expr ?? ""}|${e.severity}`;
+      const refKeys = refEvs.map(toKey);
+      const newKeys = newEvs.map(toKey);
+      const total = Math.max(refKeys.length, newKeys.length);
+      let matches = 0;
+      const diffs = [];
+      for (let i = 0; i < Math.min(refKeys.length, newKeys.length); i++) {
+        if (refKeys[i] === newKeys[i]) {
+          matches++;
+        } else if (diffs.length < 10) {
+          diffs.push({
+            index: i,
+            ref: { type: refEvs[i].type, expr: refEvs[i].expr },
+            actual: { type: newEvs[i]?.type, expr: newEvs[i]?.expr }
+          });
+        }
+      }
+      return {
+        "match-rate": total > 0 ? Math.round(matches / total * 100) / 100 : 1,
+        "diff-count": diffs.length + Math.abs(refEvs.length - newEvs.length),
+        "ref-event-count": refEvs.length,
+        "new-event-count": newEvs.length,
+        "nondeterministic-events": diffs
       };
     }
     case "assert": {
@@ -20724,6 +20860,7 @@ function evalSpecialForm(interp2, op, expr2) {
   const ctx = interp2.context;
   if (op === "trace") {
     if (expr2.args.length === 0) return null;
+    const traceId2 = newTraceId();
     const traceStart = Date.now();
     const traceVal = ev(expr2.args[0]);
     const traceElapsed = Date.now() - traceStart;
@@ -20742,6 +20879,7 @@ function evalSpecialForm(interp2, op, expr2) {
     );
     recordEvent({
       type: "trace",
+      traceId: traceId2,
       timestamp: Date.now(),
       file: interp2.currentFilePath,
       line: expr2.line,
@@ -20753,20 +20891,43 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "with-trace") {
     if (expr2.args.length === 0) return null;
+    const _wtNodeStr = (n) => {
+      if (!n) return null;
+      if (n.kind === "keyword") return String(n.name);
+      if (n.kind === "literal" && (n.type === "string" || n.type === "symbol")) return String(n.value);
+      return null;
+    };
+    let wtSeverity;
+    let wtArgIdx = 0;
+    if (expr2.args.length >= 3) {
+      const keyStr = _wtNodeStr(expr2.args[0]);
+      if (keyStr === "severity") {
+        const sevStr = _wtNodeStr(expr2.args[1]) ?? "";
+        if (["debug", "info", "warn", "error", "fatal"].includes(sevStr)) {
+          wtSeverity = sevStr;
+          wtArgIdx = 2;
+        }
+      }
+    }
+    const wtBodyArg = expr2.args[wtArgIdx];
+    if (!wtBodyArg) return null;
+    const wtTraceId = newTraceId();
     const prevLen = getEvents().length;
     const wtStart = Date.now();
-    const wtVal = ev(expr2.args[0]);
+    const wtVal = ev(wtBodyArg);
     const wtElapsed = Date.now() - wtStart;
     let wtExpr = "?";
     try {
-      wtExpr = ctx.macroExpander.astToString(expr2.args[0]);
+      wtExpr = ctx.macroExpander.astToString(wtBodyArg);
     } catch {
     }
     const childCount = getEvents().length - prevLen;
     const wtDisplay = interp2.toDisplayString ? interp2.toDisplayString(wtVal) : String(wtVal);
     recordEvent({
       type: "trace",
+      traceId: wtTraceId,
       timestamp: Date.now(),
+      severity: wtSeverity,
       expr: `(with-trace ${wtExpr})`,
       value: wtVal,
       elapsedMs: wtElapsed
