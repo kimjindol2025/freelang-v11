@@ -120,6 +120,7 @@ import { evalRefactorSelf, evalAlign, evalPredict_PHASE144, evalCuriosity, evalE
 // fl-parse: FL 소스 문자열 → AST 배열 (셀프 호스팅용)
 import { lex as _flLex } from "./lexer";
 import { parse as _flParse } from "./parser";
+import { recordEvent, getEvents, clearEvents } from "./runtime-events";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1694,8 +1695,20 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const debugVal = hasLabel ? args[1] : args[0];
       const debugPrefix = debugLabel ? `[DEBUG ${debugLabel}]` : "[DEBUG]";
       process.stderr.write(`${debugPrefix} ${toDisplay(debugVal)}\n`);
+      recordEvent({
+        type: "debug", timestamp: Date.now(),
+        file: (interp as any).currentFilePath,
+        line: expr.line ?? (interp as any).currentLine,
+        label: debugLabel || undefined,
+        value: debugVal
+      });
       return debugVal;
     }
+    case "runtime-events":
+      return getEvents();
+    case "clear-runtime-events":
+      clearEvents();
+      return null;
     case "assert": {
       // (assert cond) 또는 (assert cond "메시지")
       // 참이면 true 반환, 거짓이면 AssertionError throw
@@ -1709,6 +1722,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const assertLine = expr.line ?? (interp as any).currentLine;
         const assertFile = (interp as any).currentFilePath ?? "<unknown>";
         const assertDetail = assertMsg ? `\n  msg:   ${assertMsg}` : "";
+        recordEvent({
+          type: "assert-fail", timestamp: Date.now(),
+          file: assertFile, line: assertLine,
+          expr: assertExpr, message: assertMsg, value: assertCond
+        });
         throw new FLRuntimeError(
           ErrorCodes.RUNTIME,
           `AssertionError:\n  expr:  ${assertExpr}\n  value: ${toDisplay(assertCond)}${assertDetail}`,

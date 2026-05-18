@@ -13083,6 +13083,22 @@ function evalWorldModel141(op, args3) {
 // src/eval-builtins.ts
 init_lexer();
 init_parser();
+
+// src/runtime-events.ts
+var MAX_EVENTS = 1e3;
+var _buf = [];
+function recordEvent(ev) {
+  _buf.push(ev);
+  if (_buf.length > MAX_EVENTS) _buf.shift();
+}
+function getEvents() {
+  return _buf.slice();
+}
+function clearEvents() {
+  _buf.length = 0;
+}
+
+// src/eval-builtins.ts
 function flDeepEq(a, b) {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -14751,8 +14767,21 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const debugPrefix = debugLabel ? `[DEBUG ${debugLabel}]` : "[DEBUG]";
       process.stderr.write(`${debugPrefix} ${toDisplay2(debugVal)}
 `);
+      recordEvent({
+        type: "debug",
+        timestamp: Date.now(),
+        file: interp2.currentFilePath,
+        line: expr2.line ?? interp2.currentLine,
+        label: debugLabel || void 0,
+        value: debugVal
+      });
       return debugVal;
     }
+    case "runtime-events":
+      return getEvents();
+    case "clear-runtime-events":
+      clearEvents();
+      return null;
     case "assert": {
       const assertCond = args3[0];
       const assertMsg = args3.length > 1 ? String(args3[1]) : void 0;
@@ -14766,6 +14795,15 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const assertFile = interp2.currentFilePath ?? "<unknown>";
         const assertDetail = assertMsg ? `
   msg:   ${assertMsg}` : "";
+        recordEvent({
+          type: "assert-fail",
+          timestamp: Date.now(),
+          file: assertFile,
+          line: assertLine,
+          expr: assertExpr,
+          message: assertMsg,
+          value: assertCond
+        });
         throw new FLRuntimeError(
           ErrorCodes.RUNTIME,
           `AssertionError:
@@ -20576,7 +20614,44 @@ function evalSpecialForm(interp2, op, expr2) {
   elapsed: ${traceElapsed}ms
 `
     );
+    recordEvent({
+      type: "trace",
+      timestamp: Date.now(),
+      file: interp2.currentFilePath,
+      line: expr2.line,
+      expr: traceExprText,
+      value: traceVal,
+      elapsedMs: traceElapsed
+    });
     return traceVal;
+  }
+  if (op === "with-trace") {
+    if (expr2.args.length === 0) return null;
+    const prevLen = getEvents().length;
+    const wtStart = Date.now();
+    const wtVal = ev(expr2.args[0]);
+    const wtElapsed = Date.now() - wtStart;
+    let wtExpr = "?";
+    try {
+      wtExpr = ctx.macroExpander.astToString(expr2.args[0]);
+    } catch {
+    }
+    const childCount = getEvents().length - prevLen;
+    const wtDisplay = interp2.toDisplayString ? interp2.toDisplayString(wtVal) : String(wtVal);
+    recordEvent({
+      type: "trace",
+      timestamp: Date.now(),
+      expr: `(with-trace ${wtExpr})`,
+      value: wtVal,
+      elapsedMs: wtElapsed
+    });
+    process.stderr.write(
+      `[with-trace] ${wtExpr}
+  value:   ${wtDisplay}
+  elapsed: ${wtElapsed}ms  events: ${childCount}
+`
+    );
+    return wtVal;
   }
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
@@ -41205,7 +41280,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);

@@ -12,6 +12,7 @@ import { SExpr, ASTNode, Variable, Literal } from "./ast";
 import { isBlock, isControlBlock } from "./ast";
 import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
+import { recordEvent, getEvents } from "./runtime-events";
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 import { ReturnSignal } from "./return-signal";
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
@@ -208,7 +209,34 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     process.stderr.write(
       `[TRACE]\n  expr:    ${traceExprText}\n  value:   ${traceDisplay}\n  elapsed: ${traceElapsed}ms\n`
     );
+    recordEvent({
+      type: "trace", timestamp: Date.now(),
+      file: (interp as any).currentFilePath, line: expr.line,
+      expr: traceExprText, value: traceVal, elapsedMs: traceElapsed
+    });
     return traceVal;
+  }
+
+  // ── with-trace ────────────────────────────────────────────────────
+  if (op === "with-trace") {
+    if (expr.args.length === 0) return null;
+    const prevLen = getEvents().length;
+    const wtStart = Date.now();
+    const wtVal = ev(expr.args[0]);
+    const wtElapsed = Date.now() - wtStart;
+    let wtExpr = "?";
+    try { wtExpr = ctx.macroExpander.astToString(expr.args[0]); } catch {}
+    const childCount = getEvents().length - prevLen;
+    const wtDisplay = (interp as any).toDisplayString
+      ? (interp as any).toDisplayString(wtVal) : String(wtVal);
+    recordEvent({
+      type: "trace", timestamp: Date.now(),
+      expr: `(with-trace ${wtExpr})`, value: wtVal, elapsedMs: wtElapsed
+    });
+    process.stderr.write(
+      `[with-trace] ${wtExpr}\n  value:   ${wtDisplay}\n  elapsed: ${wtElapsed}ms  events: ${childCount}\n`
+    );
+    return wtVal;
   }
 
   // ── use ──────────────────────────────────────────────────────────

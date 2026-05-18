@@ -24,6 +24,7 @@ import { runWithWatch } from "./hot-reload"; // Phase 79: 워치 모드
 import { extractDocs } from "./doc-extractor"; // Phase 77: 문서 추출기
 import { renderMarkdown } from "./doc-renderer"; // Phase 77: 문서 렌더러
 import { createDefaultPipeline, createFmtCheckStep, createLintStep, createTestStep } from "./ci-runner"; // Phase 80: CI
+import { recordEvent } from "./runtime-events";
 import { WebServer } from "./web"; // Phase 3: Web Server
 import { fnMetaRegistry, FnMeta, EFFECT_CATALOG } from "./eval-special-forms"; // AI-Native Phase 1+2
 import { propRegistry, runProp } from "./stdlib-property"; // AI-Native Phase 4
@@ -120,6 +121,13 @@ function runSource(source: string, filePath?: string): { ok: boolean; value: any
     return { ok: true, value: ctx.lastValue };
   } catch (err: any) {
     const callStack: Array<{fn: string; line: number; args?: any[]}> = (interp as any).callStack ?? [];
+    recordEvent({
+      type: "runtime-error", timestamp: Date.now(),
+      file: filePath ?? "<unknown>",
+      line: (err as any).line ?? (interp as any).currentLine,
+      message: err?.message ?? String(err),
+      errorKind: (err as any).code ?? "E_RUNTIME"
+    });
     console.error(formatError(err, source, filePath, callStack));
     return { ok: false, value: null };
   }
