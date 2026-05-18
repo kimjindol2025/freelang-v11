@@ -14,6 +14,13 @@ import { tailCall, isTailCall } from "./tco";
 import { StructRegistry } from "./struct-system"; // Phase 66
 import { recordEvent, getEvents, newTraceId, EventSeverity } from "./runtime-events";
 import { defineContract } from "./runtime-contracts";
+import { pushBudget, popBudget, BudgetExceededError, checkBudget, hasBudget } from "./runtime-budget";
+import { pushContext, popContext } from "./runtime-context";
+
+// loop/recur 내부 max-ms 체크 헬퍼 (인라인으로 checkBudget 호출)
+function checkBudgetInLoop(): void {
+  if (hasBudget()) checkBudget(Date.now(), 0, 0);
+}
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 import { ReturnSignal } from "./return-signal";
 import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
@@ -304,6 +311,55 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       ...(errorKind ? { errorKind } : {}),
     });
     return contractName;
+  }
+
+  // ── with-budget ─────────────────────────────────────────────────
+  // (with-budget {:max-ms N :max-events N :max-recursion N} body)
+  // with-trace 패턴 동일 — body는 AST 지연 평가
+  if (op === "with-budget") {
+    if (expr.args.length < 2) throw new Error("with-budget requires budget-map and body");
+    const budgetMap: Record<string, any> = ev(expr.args[0]) ?? {};
+    const bodyNode = expr.args[1];
+
+    const cfgNum = (k: string): number | undefined => {
+      const v = budgetMap[k] ?? budgetMap[":" + k];
+      return v != null ? Number(v) : undefined;
+    };
+
+    const maxMs        = cfgNum("max-ms");
+    const maxEvents    = cfgNum("max-events");
+    const maxRecursion = cfgNum("max-recursion");
+
+    const startMs        = Date.now();
+    const startEvents    = getEvents().length;
+    const startRecursion = (interp as any).callDepth ?? 0;
+    const ctxId          = pushContext();
+
+    pushBudget({ maxMs, maxEvents, maxRecursion, startMs, startEvents, startRecursion, contextId: ctxId });
+
+    try {
+      const result = ev(bodyNode);
+      popBudget();
+      popContext();
+      return result;
+    } catch (e) {
+      popBudget();
+      popContext();
+      if (e instanceof BudgetExceededError) {
+        const actual = e.kind === "max-ms"        ? Date.now() - startMs
+                     : e.kind === "max-events"    ? getEvents().length - startEvents
+                     : (interp as any).callDepth - startRecursion;
+        recordEvent({
+          type: "budget-exceeded",
+          timestamp: Date.now(),
+          message: `Budget exceeded: ${e.kind} (limit=${e.limit}, actual=${actual})`,
+          label: e.kind,
+          value: { "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId },
+        });
+        return { "type": "budget-exceeded", "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId };
+      }
+      throw e;
+    }
   }
 
   // Phase D: (use NAME) — self/stdlib/NAME.fl 자동 로드 (간소 import)
@@ -1286,6 +1342,8 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     let iter = 0;
     try {
       while (iter++ < maxIter) {
+        // budget max-ms 체크 (1000회마다)
+        if (iter % 1000 === 0) checkBudgetInLoop();
         let recurred = false;
         for (const bodyNode of bodyNodes) {
           result = ev(bodyNode);

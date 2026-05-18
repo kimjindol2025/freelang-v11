@@ -12,6 +12,7 @@ import { globalProfiler } from "./profiler";
 import { vmFunctionRegistry } from "./vm-eligible"; // Phase 3-E
 import { VM } from "./vm"; // Phase 3-E
 import { ReturnSignal, isReturnSignal } from "./return-signal";
+import { checkBudget, hasBudget } from "./runtime-budget";
 
 const _callVM = new VM(); // Phase 3-E
 
@@ -330,6 +331,7 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     const savedStack = interp.context.variables.saveStack();
     const paramSet = new Set<string>(func.params);
     interp.callDepth++;
+    if (hasBudget()) checkBudget(Date.now(), 0, interp.callDepth);
     _callStack.push(_stackEntry);
     if (_callStack.length > 100) _callStack.shift(); // CALL_STACK_LIMIT
     let result: any;
@@ -366,10 +368,15 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
   // 일반 함수: 새 렉시컬 스코프
   interp.context.variables.push();
   interp.callDepth++;
+  if (hasBudget()) checkBudget(Date.now(), 0, interp.callDepth);
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
   try {
     for (let recurIter = 0; recurIter < 2_000_000; recurIter++) {
+      // budget max-ms 체크 (TCO 루프 — 1000회마다)
+      if (recurIter > 0 && recurIter % 1000 === 0 && hasBudget()) {
+        checkBudget(Date.now(), 0, 0);
+      }
       for (let i = 0; i < func.params.length; i++) {
         bindParam(interp, func.params[i], args[i]);
       }

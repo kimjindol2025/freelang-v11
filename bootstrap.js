@@ -13255,6 +13255,114 @@ defineContract("auto:panic-cascade", {
   action: "panic"
 });
 
+// src/runtime-budget.ts
+var BudgetExceededError = class extends Error {
+  constructor(kind, limit, actual, contextId) {
+    super(`Budget exceeded: ${kind} (limit=${limit}, actual=${actual})`);
+    this.kind = kind;
+    this.limit = limit;
+    this.actual = actual;
+    this.contextId = contextId;
+    this.name = "BudgetExceededError";
+  }
+};
+var _stack = [];
+var _budgetViolationCount = 0;
+function pushBudget(opts) {
+  _stack.push({ ...opts });
+}
+function popBudget() {
+  _stack.pop();
+}
+function hasBudget() {
+  return _stack.length > 0;
+}
+function getCurrentBudget() {
+  return _stack.length > 0 ? _stack[_stack.length - 1] : null;
+}
+function checkBudget(currentMs, currentEvents, currentRecursion) {
+  const b = getCurrentBudget();
+  if (!b) return;
+  if (b.maxMs !== void 0) {
+    const elapsed = currentMs - b.startMs;
+    if (elapsed > b.maxMs) {
+      _budgetViolationCount++;
+      throw new BudgetExceededError("max-ms", b.maxMs, elapsed, b.contextId);
+    }
+  }
+  if (b.maxEvents !== void 0) {
+    const used = currentEvents - b.startEvents;
+    if (used > b.maxEvents) {
+      _budgetViolationCount++;
+      throw new BudgetExceededError("max-events", b.maxEvents, used, b.contextId);
+    }
+  }
+  if (b.maxRecursion !== void 0) {
+    const depth = currentRecursion - b.startRecursion;
+    if (depth > b.maxRecursion) {
+      _budgetViolationCount++;
+      throw new BudgetExceededError("max-recursion", b.maxRecursion, depth, b.contextId);
+    }
+  }
+}
+function getBudgetViolationCount() {
+  return _budgetViolationCount;
+}
+function resetBudget() {
+  _stack.length = 0;
+  _budgetViolationCount = 0;
+}
+
+// src/runtime-watchdog.ts
+var STALL_THRESHOLD_MS = 1e4;
+var TRACE_STORM_RATE = 500;
+var _lastActivityMs = Date.now();
+var _lastEventCount = 0;
+var _alertCount = 0;
+var _alerts = [];
+function recordActivity(eventCount) {
+  const now = Date.now();
+  const elapsed = now - _lastActivityMs;
+  let alert = null;
+  const rate = elapsed > 0 ? (eventCount - _lastEventCount) / elapsed * 1e3 : 0;
+  if (rate > TRACE_STORM_RATE && elapsed < 1e3) {
+    alert = { kind: "trace-storm", elapsedMs: elapsed, eventCount };
+  }
+  _lastActivityMs = now;
+  _lastEventCount = eventCount;
+  if (alert) {
+    _alertCount++;
+    _alerts.push(alert);
+    if (_alerts.length > 20) _alerts.shift();
+  }
+  return alert;
+}
+function checkStall(eventCount) {
+  const now = Date.now();
+  const elapsed = now - _lastActivityMs;
+  if (elapsed > STALL_THRESHOLD_MS && eventCount === _lastEventCount) {
+    const alert = { kind: "stalled-execution", elapsedMs: elapsed, eventCount };
+    _alertCount++;
+    _alerts.push(alert);
+    if (_alerts.length > 20) _alerts.shift();
+    _lastActivityMs = now;
+    return alert;
+  }
+  return null;
+}
+function getWatchdogAlerts() {
+  return _alertCount;
+}
+function getRecentAlerts() {
+  return _alerts.slice();
+}
+function resetWatchdog() {
+  _lastActivityMs = Date.now();
+  _lastEventCount = 0;
+  _alertCount = 0;
+  _alerts.length = 0;
+}
+
 // src/runtime-events.ts
 var SEVERITY_RANK = {
   debug: 0,
@@ -13270,7 +13378,10 @@ var DEFAULT_SEVERITY = {
   "runtime-error": "fatal",
   "contract-violation": "warn",
   "mode-change": "info",
-  "governance-action": "warn"
+  "governance-action": "warn",
+  "budget-exceeded": "error",
+  "watchdog-alert": "warn",
+  "context-aborted": "warn"
 };
 var MAX_EVENTS = 1e3;
 var _buf = [];
@@ -13301,6 +13412,12 @@ function fingerprint(ev) {
 function recordEvent(ev) {
   if (ev.type === "trace" && !isTraceEnabled()) return;
   if (ev.type === "debug" && !isDebugEnabled()) return;
+  if (ev.type !== "budget-exceeded" && ev.type !== "watchdog-alert" && ev.type !== "context-aborted") {
+    if (hasBudget()) {
+      checkBudget(Date.now(), _buf.length, 0);
+    }
+    recordActivity(_buf.length);
+  }
   const sev = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
   if (!shouldRecord(sev)) return;
   const eventId = getNextEventId();
@@ -13338,6 +13455,52 @@ function getEvents() {
 }
 function clearEvents() {
   _buf.length = 0;
+}
+
+// src/runtime-context.ts
+var _contexts = /* @__PURE__ */ new Map();
+var _contextStack = [];
+var _abortedIds = /* @__PURE__ */ new Set();
+var _counter = 0;
+function nextContextId() {
+  return `ctx-${++_counter}`;
+}
+function pushContext(id) {
+  const ctxId = id ?? nextContextId();
+  _contexts.set(ctxId, { id: ctxId, startMs: Date.now(), active: true, aborted: false });
+  _contextStack.push(ctxId);
+  return ctxId;
+}
+function popContext() {
+  const id = _contextStack.pop();
+  if (id) {
+    const ctx = _contexts.get(id);
+    if (ctx) ctx.active = false;
+  }
+  return id ?? null;
+}
+function getCurrentContextId() {
+  return _contextStack.length > 0 ? _contextStack[_contextStack.length - 1] : null;
+}
+function abortContext(id) {
+  _abortedIds.add(id);
+  const ctx = _contexts.get(id);
+  if (ctx) {
+    ctx.aborted = true;
+    ctx.active = false;
+    return true;
+  }
+  return false;
+}
+function getActiveContexts() {
+  const now = Date.now();
+  return _contextStack.map((id) => _contexts.get(id)).filter((c) => !!c && c.active && !c.aborted).map((c) => ({ id: c.id, startMs: c.startMs, elapsedMs: now - c.startMs }));
+}
+function resetContexts() {
+  _contexts.clear();
+  _contextStack.length = 0;
+  _abortedIds.clear();
+  _counter = 0;
 }
 
 // src/eval-builtins.ts
@@ -15222,6 +15385,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "recover-runtime": {
       const modeBeforeRecover = getRuntimeMode();
       recoverRuntime();
+      resetBudget();
+      resetContexts();
+      resetWatchdog();
       recordEvent({
         type: "mode-change",
         timestamp: Date.now(),
@@ -15229,6 +15395,58 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         label: "normal"
       });
       return "normal";
+    }
+    case "runtime-resources": {
+      const rrEvs = getEvents();
+      const now = Date.now();
+      const recentEvs = rrEvs.filter((e) => now - e.timestamp < 1e3);
+      const stallAlert = checkStall(rrEvs.length);
+      if (stallAlert) {
+        recordEvent({
+          type: "watchdog-alert",
+          timestamp: now,
+          message: `Watchdog: ${stallAlert.kind} (elapsed=${stallAlert.elapsedMs}ms)`,
+          label: stallAlert.kind,
+          value: stallAlert
+        });
+      }
+      return {
+        "active-contexts": getActiveContexts().length,
+        "event-buffer-size": rrEvs.length,
+        "trace-rate": recentEvs.filter((e) => e.type === "trace").length,
+        "watchdog-alerts": getWatchdogAlerts(),
+        "budget-violations": getBudgetViolationCount(),
+        "runtime-mode": getRuntimeMode()
+      };
+    }
+    case "runtime-contexts": {
+      return getActiveContexts().map((c) => ({
+        "id": c.id,
+        "start-ms": c.startMs,
+        "elapsed-ms": c.elapsedMs
+      }));
+    }
+    case "abort-current-runtime":
+    case "abort-runtime-context": {
+      const ctxId = args3[0] != null ? String(args3[0]) : getCurrentContextId();
+      if (ctxId) {
+        abortContext(ctxId);
+        recordEvent({
+          type: "context-aborted",
+          timestamp: Date.now(),
+          message: `Context aborted: ${ctxId}`,
+          label: ctxId,
+          value: { "context-id": ctxId }
+        });
+      }
+      return ctxId ?? null;
+    }
+    case "runtime-watchdog-alerts": {
+      return getRecentAlerts().map((a) => ({
+        "kind": a.kind,
+        "elapsed-ms": a.elapsedMs,
+        "event-count": a.eventCount
+      }));
     }
     case "runtime-timeline": {
       const tlEvs = getEvents();
@@ -21000,6 +21218,9 @@ function runProp(prop, callFn2, callCheck) {
 }
 
 // src/eval-special-forms.ts
+function checkBudgetInLoop() {
+  if (hasBudget()) checkBudget(Date.now(), 0, 0);
+}
 var _vmCompiler = new BytecodeCompiler();
 var fnMetaRegistry = /* @__PURE__ */ new Map();
 var META_KEYS = /* @__PURE__ */ new Set(["doc", "returns", "context", "effects", "examples", "property"]);
@@ -21274,6 +21495,44 @@ function evalSpecialForm(interp2, op, expr2) {
       ...errorKind ? { errorKind } : {}
     });
     return contractName;
+  }
+  if (op === "with-budget") {
+    if (expr2.args.length < 2) throw new Error("with-budget requires budget-map and body");
+    const budgetMap = ev(expr2.args[0]) ?? {};
+    const bodyNode = expr2.args[1];
+    const cfgNum = (k) => {
+      const v = budgetMap[k] ?? budgetMap[":" + k];
+      return v != null ? Number(v) : void 0;
+    };
+    const maxMs = cfgNum("max-ms");
+    const maxEvents = cfgNum("max-events");
+    const maxRecursion = cfgNum("max-recursion");
+    const startMs = Date.now();
+    const startEvents = getEvents().length;
+    const startRecursion = interp2.callDepth ?? 0;
+    const ctxId = pushContext();
+    pushBudget({ maxMs, maxEvents, maxRecursion, startMs, startEvents, startRecursion, contextId: ctxId });
+    try {
+      const result = ev(bodyNode);
+      popBudget();
+      popContext();
+      return result;
+    } catch (e) {
+      popBudget();
+      popContext();
+      if (e instanceof BudgetExceededError) {
+        const actual = e.kind === "max-ms" ? Date.now() - startMs : e.kind === "max-events" ? getEvents().length - startEvents : interp2.callDepth - startRecursion;
+        recordEvent({
+          type: "budget-exceeded",
+          timestamp: Date.now(),
+          message: `Budget exceeded: ${e.kind} (limit=${e.limit}, actual=${actual})`,
+          label: e.kind,
+          value: { "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId }
+        });
+        return { "type": "budget-exceeded", "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId };
+      }
+      throw e;
+    }
   }
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
@@ -22090,6 +22349,7 @@ function evalSpecialForm(interp2, op, expr2) {
     let iter = 0;
     try {
       while (iter++ < maxIter) {
+        if (iter % 1e3 === 0) checkBudgetInLoop();
         let recurred = false;
         for (const bodyNode of bodyNodes) {
           result = ev(bodyNode);
@@ -39117,8 +39377,8 @@ function callUserFunction(interp2, name, args3) {
     throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
-    const _stack = interp2.callStack ?? [];
-    const tail = _stack.slice(-10).map((s, i) => `  #${_stack.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    const _stack2 = interp2.callStack ?? [];
+    const tail = _stack2.slice(-10).map((s, i) => `  #${_stack2.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
     throw new Error(
       `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
 ` + (tail ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
@@ -39162,6 +39422,7 @@ ${tail}` : "")
     const savedStack = interp2.context.variables.saveStack();
     const paramSet = new Set(func.params);
     interp2.callDepth++;
+    if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
     _callStack.push(_stackEntry);
     if (_callStack.length > 100) _callStack.shift();
     let result;
@@ -39197,10 +39458,14 @@ ${tail}` : "")
   }
   interp2.context.variables.push();
   interp2.callDepth++;
+  if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
   try {
     for (let recurIter = 0; recurIter < 2e6; recurIter++) {
+      if (recurIter > 0 && recurIter % 1e3 === 0 && hasBudget()) {
+        checkBudget(Date.now(), 0, 0);
+      }
       for (let i = 0; i < func.params.length; i++) {
         bindParam(interp2, func.params[i], args3[i]);
       }
@@ -41902,7 +42167,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract", "with-budget"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
@@ -42125,6 +42390,7 @@ var Interpreter = class _Interpreter {
       return evalBuiltin(this, op, args3, expr2);
     } catch (err4) {
       if (err4 && err4.constructor && err4.constructor.name === "ReturnSignal") throw err4;
+      if (err4?.name === "BudgetExceededError") throw err4;
       const line = expr2.line ?? this.currentLine;
       const col = expr2.col ?? 0;
       const rawMsg = err4.message ?? String(err4);

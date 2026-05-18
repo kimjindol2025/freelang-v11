@@ -5,6 +5,8 @@
 
 import { checkContracts } from "./runtime-contracts";
 import { isTraceEnabled, isDebugEnabled } from "./runtime-governance";
+import { checkBudget, hasBudget } from "./runtime-budget";
+import { recordActivity } from "./runtime-watchdog";
 
 export type EventSeverity = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -13,7 +15,7 @@ const SEVERITY_RANK: Record<EventSeverity, number> = {
 };
 
 export interface RuntimeEvent {
-  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation" | "mode-change" | "governance-action";
+  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation" | "mode-change" | "governance-action" | "budget-exceeded" | "watchdog-alert" | "context-aborted";
   severity: EventSeverity;
   eventId: number;
   traceId?: string;
@@ -40,6 +42,9 @@ export const DEFAULT_SEVERITY: Record<RuntimeEvent["type"], EventSeverity> = {
   "contract-violation": "warn",
   "mode-change":        "info",
   "governance-action":  "warn",
+  "budget-exceeded":    "error",
+  "watchdog-alert":     "warn",
+  "context-aborted":    "warn",
 };
 
 const MAX_EVENTS = 1000;
@@ -68,9 +73,18 @@ function fingerprint(ev: RuntimeEvent): string {
 export function recordEvent(
   ev: Omit<RuntimeEvent, "eventId" | "severity"> & { severity?: EventSeverity }
 ): void {
-  // governance 모드 필터 (mode-change/governance-action은 항상 통과)
+  // governance 모드 필터 (mode-change/governance-action/budget-exceeded는 항상 통과)
   if (ev.type === "trace" && !isTraceEnabled()) return;
   if (ev.type === "debug" && !isDebugEnabled()) return;
+
+  // budget 체크 (budget-exceeded 자체는 재귀 방지)
+  if (ev.type !== "budget-exceeded" && ev.type !== "watchdog-alert" && ev.type !== "context-aborted") {
+    if (hasBudget()) {
+      checkBudget(Date.now(), _buf.length, 0); // ms + event count 체크 (recursion은 eval-call-function에서)
+    }
+    // watchdog activity 갱신
+    recordActivity(_buf.length);
+  }
 
   const sev: EventSeverity = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
   if (!shouldRecord(sev)) return;

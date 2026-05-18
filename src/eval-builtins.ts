@@ -131,6 +131,12 @@ import {
   recoverRuntime, resetGovernance, consumeClearEventsRequest,
   autoTransitionMode,
 } from "./runtime-governance";
+import { getBudgetViolationCount, resetBudget } from "./runtime-budget";
+import {
+  getActiveContexts, abortContext, getCurrentContextId,
+  resetContexts, isContextAborted,
+} from "./runtime-context";
+import { getWatchdogAlerts, checkStall, getRecentAlerts, resetWatchdog } from "./runtime-watchdog";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1935,6 +1941,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "recover-runtime": {
       const modeBeforeRecover = getRuntimeMode();
       recoverRuntime();
+      resetBudget();
+      resetContexts();
+      resetWatchdog();
       recordEvent({
         type: "mode-change",
         timestamp: Date.now(),
@@ -1942,6 +1951,58 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         label: "normal",
       });
       return "normal";
+    }
+    case "runtime-resources": {
+      const rrEvs = getEvents();
+      const now = Date.now();
+      const recentEvs = rrEvs.filter(e => now - e.timestamp < 1000);
+      const stallAlert = checkStall(rrEvs.length);
+      if (stallAlert) {
+        recordEvent({
+          type: "watchdog-alert",
+          timestamp: now,
+          message: `Watchdog: ${stallAlert.kind} (elapsed=${stallAlert.elapsedMs}ms)`,
+          label: stallAlert.kind,
+          value: stallAlert,
+        });
+      }
+      return {
+        "active-contexts":   getActiveContexts().length,
+        "event-buffer-size": rrEvs.length,
+        "trace-rate":        recentEvs.filter(e => e.type === "trace").length,
+        "watchdog-alerts":   getWatchdogAlerts(),
+        "budget-violations": getBudgetViolationCount(),
+        "runtime-mode":      getRuntimeMode(),
+      };
+    }
+    case "runtime-contexts": {
+      return getActiveContexts().map(c => ({
+        "id":         c.id,
+        "start-ms":   c.startMs,
+        "elapsed-ms": c.elapsedMs,
+      }));
+    }
+    case "abort-current-runtime":
+    case "abort-runtime-context": {
+      const ctxId = args[0] != null ? String(args[0]) : getCurrentContextId();
+      if (ctxId) {
+        abortContext(ctxId);
+        recordEvent({
+          type: "context-aborted",
+          timestamp: Date.now(),
+          message: `Context aborted: ${ctxId}`,
+          label: ctxId,
+          value: { "context-id": ctxId },
+        });
+      }
+      return ctxId ?? null;
+    }
+    case "runtime-watchdog-alerts": {
+      return getRecentAlerts().map(a => ({
+        "kind":       a.kind,
+        "elapsed-ms": a.elapsedMs,
+        "event-count": a.eventCount,
+      }));
     }
     case "runtime-timeline": {
       const tlEvs = getEvents();

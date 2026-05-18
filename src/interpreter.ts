@@ -1690,7 +1690,7 @@ export class Interpreter {
     const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
     const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
     const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","comp","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-not","when-let","unless","cond","case","for","do","begin","progn","loop","recur","while","doseq","dotimes","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate","trace","with-trace","defcontract"]);
+    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","comp","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-not","when-let","unless","cond","case","for","do","begin","progn","loop","recur","while","doseq","dotimes","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate","trace","with-trace","defcontract","with-budget"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
@@ -1947,8 +1947,9 @@ export class Interpreter {
     try {
       return evalBuiltin(this, op, args, expr);
     } catch (err: any) {
-      // ReturnSignal은 가로채지 않고 함수 경계로 전파
+      // ReturnSignal / BudgetExceededError는 가로채지 않고 그대로 전파
       if (err && err.constructor && err.constructor.name === "ReturnSignal") throw err;
+      if (err?.name === "BudgetExceededError") throw err;
       const line = expr.line ?? this.currentLine;
       const col = (expr as any).col ?? 0;
       const rawMsg = (err.message ?? String(err));
