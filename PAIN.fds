@@ -1,0 +1,117 @@
+FREEDOC {
+  version: "1.2.4"
+  spec: "1.2"
+}
+
+IDENTITY {
+  what: freelang-pain-points
+  domain: language-design
+  lang: FreeLang
+  desc: "FreeLang v11 실사용 중 발견한 불편함·함정·개선 후보 목록"
+}
+
+POSITION {
+  status: open
+  stage: "draft"
+  current: collecting
+  next: [prioritize, design, implement]
+}
+
+PROBLEM {
+  who: freelang-developers
+  pain: "타입 없음·함수명 불일치·파서 함정·에러 노출·변이 불가 혼동"
+  cost: "디버깅 시간 증가·런타임까지 버그 발견 불가·AI 코드 생성 오류 반복"
+}
+
+FRICTION {
+  p1-no-type-system: {
+    what: "컴파일 타임 타입 검사 없음"
+    example: "(get nil 'x') → 런타임 에러, 컴파일 타임 경고 없음"
+    impact: high
+    workaround: "nil-or-empty? 수동 가드 모든 입력부에 삽입"
+  }
+
+  p2-stdlib-naming-inconsistency: {
+    what: "str-length 없음, length 사용 — 하지만 str-split·str-trim·str-contains? 는 str- 접두사 있음"
+    example: "(str-length s) → error / (length s) → ok"
+    impact: high
+    workaround: "항상 length 사용, str- 접두사 믿지 말 것"
+  }
+
+  p3-reserved-word-collision: {
+    what: "analyze 예약어 — 함수명으로 못 씀"
+    example: "(defn analyze ...) → Unexpected token: Analyze"
+    impact: medium
+    workaround: "run-analysis 같은 대체명 사용"
+  }
+
+  p4-no-regex: {
+    what: "정규식 없음"
+    example: "str-match / re-find 계열 함수 없음"
+    impact: medium
+    workaround: "str-contains? + str-index-of + str-slice 조합으로 수동 파싱"
+  }
+
+  p5-slice-no-bounds-check: {
+    what: "str-slice 범위 초과 시 런타임 에러, 방어 없음"
+    example: "(str-slice s 5 3) → crash"
+    impact: medium
+    workaround: "슬라이스 전 length 체크 수동"
+  }
+
+  p6-nth-empty-crash: {
+    what: "(nth [] 0) → 런타임 에러"
+    example: "(first []) → nil 이지만 (nth [] 0) → error"
+    impact: medium
+    workaround: "empty? 체크 후 nth 호출"
+  }
+
+  p7-conj-immutable-confusion: {
+    what: "conj가 새 배열 반환, 원본 불변 — 변이 기대하면 버그"
+    example: "(let [v []] (conj v 1) v) → [] (변화 없음)"
+    impact: high
+    workaround: "let 바인딩으로 재할당: (let [v (conj v 1)] ...)"
+  }
+
+  p8-db-exec-string-vs-map: {
+    what: "db-exec 첫 인자 문자열 → MariaDB, 맵 → SQLite — 조용히 다른 DB 연결"
+    example: "(db-exec '/path/db.db' ...) → MariaDB 소켓 연결 시도"
+    impact: high
+    workaround: "(define DB {'path' '/path/db.db'}) 맵 형태 강제"
+  }
+
+  p9-unicode-parser-break: {
+    what: "박스 드로잉 문자 등 비ASCII → 파서 크래시"
+    example: ";; ─────── (U+2500) → parse error"
+    impact: low
+    workaround: "주석에 ASCII만 사용"
+  }
+
+  p10-error-message-leakage: {
+    what: "런타임 에러 스택이 HTTP 응답에 그대로 노출"
+    example: "{error: '[run-analysis][parse-diff][map]...'}"
+    impact: medium
+    workaround: "서버 레벨 try/catch + 내부 에러 숨김 미들웨어"
+  }
+
+  p11-no-destructuring: {
+    what: "Map 구조분해 self-hosting에서 미완성 — bootstrap 경유만 동작"
+    example: "(let [{a :a} m] ...) → bootstrap ok, self 미지원"
+    impact: low
+    workaround: "(get m 'a') 명시적 접근"
+  }
+}
+
+CONSTRAINT {
+  rules: [
+    collected-from-real-usage-not-hypothetical,
+    each-item-has-workaround-until-fixed,
+    impact-rated-high-medium-low
+  ]
+}
+
+DECISION {
+  format: freeDoc-FRICTION-block
+  scope: freelang-v11-as-of-2026-05
+  next-action: prioritize-and-design-fixes-in-separate-session
+}
