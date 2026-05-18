@@ -120,7 +120,7 @@ import { evalRefactorSelf, evalAlign, evalPredict_PHASE144, evalCuriosity, evalE
 // fl-parse: FL 소스 문자열 → AST 배열 (셀프 호스팅용)
 import { lex as _flLex } from "./lexer";
 import { parse as _flParse } from "./parser";
-import { recordEvent, getEvents, clearEvents } from "./runtime-events";
+import { recordEvent, getEvents, clearEvents, RuntimeEvent } from "./runtime-events";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1704,11 +1704,150 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       });
       return debugVal;
     }
-    case "runtime-events":
-      return getEvents();
+    case "runtime-events": {
+      // (runtime-events) → 전체
+      // (runtime-events :type :trace) / (runtime-events :label "db") / (runtime-events :last 20)
+      if (args.length === 0) return getEvents();
+      const reOpts: Record<string, any> = {};
+      for (let i = 0; i + 1 < args.length; i += 2) {
+        const k = String(args[i]).replace(/^:/, "");
+        reOpts[k] = args[i + 1];
+      }
+      let reEvs = getEvents();
+      if (reOpts.type !== undefined) {
+        const t = String(reOpts.type).replace(/^:/, "");
+        reEvs = reEvs.filter(e => e.type === t);
+      }
+      if (reOpts.label !== undefined) {
+        const l = String(reOpts.label);
+        reEvs = reEvs.filter(e => e.label === l);
+      }
+      if (reOpts.last !== undefined) {
+        const n = Number(reOpts.last);
+        if (!isNaN(n) && n > 0) reEvs = reEvs.slice(-n);
+      }
+      return reEvs;
+    }
     case "clear-runtime-events":
       clearEvents();
       return null;
+    case "runtime-summary": {
+      const rsEvs = getEvents();
+      const rsTrace = rsEvs.filter(e => e.type === "trace");
+      const rsTms = rsTrace.map(e => e.elapsedMs ?? 0);
+      const rsAvg = rsTms.length ? Math.round(rsTms.reduce((a, b) => a + b, 0) / rsTms.length) : null;
+      const rsMax = rsTms.length ? Math.max(...rsTms) : null;
+      const result: Record<string, any> = {
+        "event-count": rsEvs.length,
+        "debug-count": rsEvs.filter(e => e.type === "debug").length,
+        "trace-count": rsTrace.length,
+        "assert-fail-count": rsEvs.filter(e => e.type === "assert-fail").length,
+        "runtime-error-count": rsEvs.filter(e => e.type === "runtime-error").length,
+      };
+      if (rsAvg !== null) result["avg-trace-ms"] = rsAvg;
+      if (rsMax !== null) result["max-trace-ms"] = rsMax;
+      return result;
+    }
+    case "runtime-analyze": {
+      const raEvs = getEvents();
+      const issues: any[] = [];
+
+      // Rule 1: nil-instability — 2회 이상 nil 관련 runtime-error
+      const nilErrors = raEvs.filter(e =>
+        e.type === "runtime-error" &&
+        (e.message?.includes("nil") || e.message?.includes("null") ||
+         e.message?.includes("Cannot read") || e.errorKind?.includes("nil"))
+      );
+      if (nilErrors.length >= 2) {
+        issues.push({
+          "likely-cause": "nil-instability",
+          "confidence": Math.min(0.5 + nilErrors.length * 0.15, 0.99),
+          "message": `Repeated nil-access detected (${nilErrors.length}회)`,
+          "suggestion": "(nil? x) 확인 또는 assert 추가",
+          "evidence-count": nilErrors.length,
+        });
+      }
+
+      // Rule 2: slow-operation — trace elapsed > 100ms
+      const slowTraces = raEvs.filter(e => e.type === "trace" && (e.elapsedMs ?? 0) > 100);
+      if (slowTraces.length > 0) {
+        const maxMs = Math.max(...slowTraces.map(e => e.elapsedMs ?? 0));
+        issues.push({
+          "likely-cause": "slow-operation",
+          "confidence": 0.85,
+          "message": `Trace latency high (max: ${maxMs}ms, count: ${slowTraces.length})`,
+          "hotspot": slowTraces.reduce((a, e) => (e.elapsedMs ?? 0) > (a.elapsedMs ?? 0) ? e : a).expr ?? "?",
+          "suggestion": "I/O 병목 확인 또는 캐시 적용",
+        });
+      }
+
+      // Rule 3: assertion-storm — 3회 이상 assert-fail
+      const assertFails = raEvs.filter(e => e.type === "assert-fail");
+      if (assertFails.length >= 3) {
+        issues.push({
+          "likely-cause": "assertion-storm",
+          "confidence": 0.9,
+          "message": `Multiple assertion failures (${assertFails.length}회)`,
+          "suggestion": "데이터 흐름 검토 필요",
+          "evidence-count": assertFails.length,
+        });
+      }
+
+      // Rule 4: error-spike — runtime-error 5회 이상
+      const runtimeErrors = raEvs.filter(e => e.type === "runtime-error");
+      if (runtimeErrors.length >= 5) {
+        issues.push({
+          "likely-cause": "error-spike",
+          "confidence": Math.min(0.6 + runtimeErrors.length * 0.05, 0.99),
+          "message": `High runtime-error rate (${runtimeErrors.length}회)`,
+          "suggestion": "에러 원인 클러스터링 후 근본 수정 필요",
+          "evidence-count": runtimeErrors.length,
+        });
+      }
+
+      if (issues.length === 0) {
+        return [{ "likely-cause": "healthy", "confidence": 1.0, "message": "이상 패턴 없음" }];
+      }
+      return issues;
+    }
+    case "save-runtime-events": {
+      const savePath = String(args[0]);
+      const saveFs = require("fs");
+      saveFs.writeFileSync(savePath, JSON.stringify(getEvents(), null, 2), "utf-8");
+      return savePath;
+    }
+    case "load-runtime-events": {
+      const loadPath = String(args[0]);
+      const loadFs = require("fs");
+      const loaded: RuntimeEvent[] = JSON.parse(loadFs.readFileSync(loadPath, "utf-8"));
+      clearEvents();
+      for (const ev of loaded) recordEvent(ev);
+      return loaded.length;
+    }
+    case "runtime-diff": {
+      const rdA: RuntimeEvent[] = Array.isArray(args[0]) ? args[0] : [];
+      const rdB: RuntimeEvent[] = Array.isArray(args[1]) ? args[1] : [];
+      const rdSum = (evs: RuntimeEvent[]) => {
+        const tms = evs.filter(e => e.type === "trace").map(e => e.elapsedMs ?? 0);
+        return {
+          total: evs.length,
+          errors: evs.filter(e => e.type === "runtime-error").length,
+          fails: evs.filter(e => e.type === "assert-fail").length,
+          avgMs: tms.length ? Math.round(tms.reduce((a, b) => a + b, 0) / tms.length) : 0,
+        };
+      };
+      const sA = rdSum(rdA);
+      const sB = rdSum(rdB);
+      return {
+        "improvement": sB.errors < sA.errors,
+        "runtime-error-delta": sB.errors - sA.errors,
+        "assert-fail-delta": sB.fails - sA.fails,
+        "trace-ms-delta": sB.avgMs - sA.avgMs,
+        "event-count-delta": sB.total - sA.total,
+        "summary-a": { "runtime-errors": sA.errors, "avg-trace-ms": sA.avgMs },
+        "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs },
+      };
+    }
     case "assert": {
       // (assert cond) 또는 (assert cond "메시지")
       // 참이면 true 반환, 거짓이면 AssertionError throw

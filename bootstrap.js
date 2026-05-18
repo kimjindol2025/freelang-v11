@@ -14777,11 +14777,137 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       });
       return debugVal;
     }
-    case "runtime-events":
-      return getEvents();
+    case "runtime-events": {
+      if (args3.length === 0) return getEvents();
+      const reOpts = {};
+      for (let i = 0; i + 1 < args3.length; i += 2) {
+        const k = String(args3[i]).replace(/^:/, "");
+        reOpts[k] = args3[i + 1];
+      }
+      let reEvs = getEvents();
+      if (reOpts.type !== void 0) {
+        const t = String(reOpts.type).replace(/^:/, "");
+        reEvs = reEvs.filter((e) => e.type === t);
+      }
+      if (reOpts.label !== void 0) {
+        const l = String(reOpts.label);
+        reEvs = reEvs.filter((e) => e.label === l);
+      }
+      if (reOpts.last !== void 0) {
+        const n = Number(reOpts.last);
+        if (!isNaN(n) && n > 0) reEvs = reEvs.slice(-n);
+      }
+      return reEvs;
+    }
     case "clear-runtime-events":
       clearEvents();
       return null;
+    case "runtime-summary": {
+      const rsEvs = getEvents();
+      const rsTrace = rsEvs.filter((e) => e.type === "trace");
+      const rsTms = rsTrace.map((e) => e.elapsedMs ?? 0);
+      const rsAvg = rsTms.length ? Math.round(rsTms.reduce((a, b) => a + b, 0) / rsTms.length) : null;
+      const rsMax = rsTms.length ? Math.max(...rsTms) : null;
+      const result = {
+        "event-count": rsEvs.length,
+        "debug-count": rsEvs.filter((e) => e.type === "debug").length,
+        "trace-count": rsTrace.length,
+        "assert-fail-count": rsEvs.filter((e) => e.type === "assert-fail").length,
+        "runtime-error-count": rsEvs.filter((e) => e.type === "runtime-error").length
+      };
+      if (rsAvg !== null) result["avg-trace-ms"] = rsAvg;
+      if (rsMax !== null) result["max-trace-ms"] = rsMax;
+      return result;
+    }
+    case "runtime-analyze": {
+      const raEvs = getEvents();
+      const issues = [];
+      const nilErrors = raEvs.filter(
+        (e) => e.type === "runtime-error" && (e.message?.includes("nil") || e.message?.includes("null") || e.message?.includes("Cannot read") || e.errorKind?.includes("nil"))
+      );
+      if (nilErrors.length >= 2) {
+        issues.push({
+          "likely-cause": "nil-instability",
+          "confidence": Math.min(0.5 + nilErrors.length * 0.15, 0.99),
+          "message": `Repeated nil-access detected (${nilErrors.length}\uD68C)`,
+          "suggestion": "(nil? x) \uD655\uC778 \uB610\uB294 assert \uCD94\uAC00",
+          "evidence-count": nilErrors.length
+        });
+      }
+      const slowTraces = raEvs.filter((e) => e.type === "trace" && (e.elapsedMs ?? 0) > 100);
+      if (slowTraces.length > 0) {
+        const maxMs = Math.max(...slowTraces.map((e) => e.elapsedMs ?? 0));
+        issues.push({
+          "likely-cause": "slow-operation",
+          "confidence": 0.85,
+          "message": `Trace latency high (max: ${maxMs}ms, count: ${slowTraces.length})`,
+          "hotspot": slowTraces.reduce((a, e) => (e.elapsedMs ?? 0) > (a.elapsedMs ?? 0) ? e : a).expr ?? "?",
+          "suggestion": "I/O \uBCD1\uBAA9 \uD655\uC778 \uB610\uB294 \uCE90\uC2DC \uC801\uC6A9"
+        });
+      }
+      const assertFails = raEvs.filter((e) => e.type === "assert-fail");
+      if (assertFails.length >= 3) {
+        issues.push({
+          "likely-cause": "assertion-storm",
+          "confidence": 0.9,
+          "message": `Multiple assertion failures (${assertFails.length}\uD68C)`,
+          "suggestion": "\uB370\uC774\uD130 \uD750\uB984 \uAC80\uD1A0 \uD544\uC694",
+          "evidence-count": assertFails.length
+        });
+      }
+      const runtimeErrors = raEvs.filter((e) => e.type === "runtime-error");
+      if (runtimeErrors.length >= 5) {
+        issues.push({
+          "likely-cause": "error-spike",
+          "confidence": Math.min(0.6 + runtimeErrors.length * 0.05, 0.99),
+          "message": `High runtime-error rate (${runtimeErrors.length}\uD68C)`,
+          "suggestion": "\uC5D0\uB7EC \uC6D0\uC778 \uD074\uB7EC\uC2A4\uD130\uB9C1 \uD6C4 \uADFC\uBCF8 \uC218\uC815 \uD544\uC694",
+          "evidence-count": runtimeErrors.length
+        });
+      }
+      if (issues.length === 0) {
+        return [{ "likely-cause": "healthy", "confidence": 1, "message": "\uC774\uC0C1 \uD328\uD134 \uC5C6\uC74C" }];
+      }
+      return issues;
+    }
+    case "save-runtime-events": {
+      const savePath = String(args3[0]);
+      const saveFs = require("fs");
+      saveFs.writeFileSync(savePath, JSON.stringify(getEvents(), null, 2), "utf-8");
+      return savePath;
+    }
+    case "load-runtime-events": {
+      const loadPath = String(args3[0]);
+      const loadFs = require("fs");
+      const loaded2 = JSON.parse(loadFs.readFileSync(loadPath, "utf-8"));
+      clearEvents();
+      for (const ev2 of loaded2) recordEvent(ev2);
+      return loaded2.length;
+    }
+    case "runtime-diff": {
+      const rdA = Array.isArray(args3[0]) ? args3[0] : [];
+      const rdB = Array.isArray(args3[1]) ? args3[1] : [];
+      const rdSum = (evs) => {
+        const tms = evs.filter((e) => e.type === "trace").map((e) => e.elapsedMs ?? 0);
+        return {
+          total: evs.length,
+          errors: evs.filter((e) => e.type === "runtime-error").length,
+          fails: evs.filter((e) => e.type === "assert-fail").length,
+          avgMs: tms.length ? Math.round(tms.reduce((a, b) => a + b, 0) / tms.length) : 0
+        };
+      };
+      const sA = rdSum(rdA);
+      const sB = rdSum(rdB);
+      return {
+        "improvement": sB.errors < sA.errors,
+        "runtime-error-delta": sB.errors - sA.errors,
+        "assert-fail-delta": sB.fails - sA.fails,
+        "trace-ms-delta": sB.avgMs - sA.avgMs,
+        "event-count-delta": sB.total - sA.total,
+        "summary-a": { "runtime-errors": sA.errors, "avg-trace-ms": sA.avgMs },
+        "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs }
+      };
+    }
     case "assert": {
       const assertCond = args3[0];
       const assertMsg = args3.length > 1 ? String(args3[1]) : void 0;
