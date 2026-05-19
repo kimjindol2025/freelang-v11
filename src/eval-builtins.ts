@@ -1729,6 +1729,7 @@ parentPort.on('message',msg=>{
 });
 `;
         const _ioWorker = new _IoW(_ioCode, { eval: true, workerData: { ctrlBuf: _ioCtrlBuf, dataBuf: _ioDataBuf } });
+        _ioWorker.unref();  // 모든 소켓이 닫히면 프로세스가 자연 종료되도록
         _ioWorker.on("error", () => { (globalThis as any).__flIoWorker = null; });
         (globalThis as any).__flIoWorker = _ioWorker;
         (globalThis as any).__flIoCtrl = new Int32Array(_ioCtrlBuf);
