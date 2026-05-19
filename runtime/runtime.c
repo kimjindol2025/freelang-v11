@@ -746,7 +746,6 @@ FLValue fl_map_del(FLValue map, FLValue key) {
 FLValue fl_map_merge(FLValue a, FLValue b) {
     if (a.tag != FL_MAP) return b;
     if (b.tag != FL_MAP) return a;
-    FLMap* ma = (FLMap*)a.obj;
     FLValue r = a;
     FLMap* mb = (FLMap*)b.obj;
     for (uint32_t i = 0; i < mb->len; i++)
@@ -756,7 +755,6 @@ FLValue fl_map_merge(FLValue a, FLValue b) {
 
 FLValue fl_concat(FLValue a, FLValue b) {
     if (a.tag == FL_VECTOR && b.tag == FL_VECTOR) {
-        FLVector* va = (FLVector*)a.obj;
         FLValue r = a;
         FLVector* vb = (FLVector*)b.obj;
         for (uint32_t i = 0; i < vb->len; i++) r = fl_vec_push(r, vb->data[i]);
