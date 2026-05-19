@@ -108,6 +108,15 @@ FRICTION {
     impact: high
   }
 
+  p14-sleep-blocks-event-loop: {
+    what: "sleep이 Atomics.wait(동기 스핀)으로 구현 → Node.js 이벤트 루프 완전 블로킹"
+    example: "tcp-outbound 연결 후 sleep으로 응답 대기 → connect/data 콜백 발화 불가"
+    impact: critical
+    need: "Pending Map + Reaper 구현 불가. 비동기 TCP 클라이언트 패턴 전체가 막힘"
+    workaround: "(fl-event-drain) polling 루프로 대체 — sleep 없이 이벤트 큐 소진 반복"
+    fix-target: "sleep을 setTimeout 기반 비블로킹으로 교체. 또는 (fl-yield) 함수 추가 — 한 틱 이벤트 루프 양보"
+  }
+
   p13-define-redefine-warning: {
     what: "(define x ...) 를 같은 스코프에서 반복하면 재정의 경고 발생"
     example: "(define store (metric-write store ...)) → ⚠️ store 이미 정의됨"

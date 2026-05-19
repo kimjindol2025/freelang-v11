@@ -1209,6 +1209,132 @@ loop().catch(e => {
       return resp.data;
     }
 
+    // rpc-client-call: 바이너리 RPC 클라이언트 (Worker Thread + Pending Map)
+    // 헤더 9B: [Type 1B][Req_ID 2B LE][Func_ID 2B LE][Length 4B LE]
+    // args: host port fn_id args_json timeout?
+    case "rpc-client-call": case "rpc_client_call": {
+      const _rHost = String(args[0] ?? "localhost");
+      const _rPort = Number(args[1] ?? 30390);
+      const _rFnId = Number(args[2] ?? 0);
+      const _rArgs = typeof args[3] === "string" ? args[3] : JSON.stringify(args[3] ?? null);
+      const _rTimeout = Number(args[4] ?? 10000);
+
+      if (!(globalThis as any).__rpcClientWorker) {
+        const { Worker: RpcWorker } = require("worker_threads");
+        const rpcCtrlBuf = new SharedArrayBuffer(4);
+        const rpcDataBuf = new SharedArrayBuffer(8 * 1024 * 1024);
+        Atomics.store(new Int32Array(rpcCtrlBuf), 0, 0);
+        const rpcWorkerCode = `
+const { workerData } = require('worker_threads');
+const net = require('net');
+const control = new Int32Array(workerData.controlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const HEADER = 9;
+const T_REQ = 0x01, T_RES = 0x02;
+const MAX_PKT = 10 * 1024 * 1024;
+const conns = new Map(); // key → {socket, buf, pending}
+
+function encodeReq(req_id, fn_id, payload) {
+  const pb = Buffer.from(payload, 'utf8');
+  const h = Buffer.allocUnsafe(HEADER);
+  h[0] = T_REQ;
+  h.writeUInt16LE(req_id, 1);
+  h.writeUInt16LE(fn_id, 3);
+  h.writeUInt32LE(pb.length, 5);
+  return Buffer.concat([h, pb]);
+}
+
+function getConn(host, port) {
+  const key = host + ':' + port;
+  if (conns.has(key)) {
+    const c = conns.get(key);
+    if (!c.socket.destroyed && c.socket.writable) return Promise.resolve(c);
+    conns.delete(key);
+  }
+  return new Promise((resolve, reject) => {
+    const c = { socket: null, buf: Buffer.alloc(0), pending: new Map() };
+    c.socket = net.createConnection({ host, port });
+    c.socket.on('connect', () => { conns.set(key, c); resolve(c); });
+    c.socket.on('data', chunk => {
+      c.buf = Buffer.concat([c.buf, chunk]);
+      while (c.buf.length >= HEADER) {
+        const plen = c.buf.readUInt32LE(5);
+        if (plen > MAX_PKT) { c.socket.destroy(); conns.delete(key); return; }
+        if (c.buf.length < HEADER + plen) break;
+        const type = c.buf[0];
+        const rid  = c.buf.readUInt16LE(1);
+        const pay  = c.buf.slice(HEADER, HEADER + plen).toString('utf8');
+        c.buf = c.buf.slice(HEADER + plen);
+        if (type === T_RES && c.pending.has(rid)) {
+          const cb = c.pending.get(rid); c.pending.delete(rid); cb(pay);
+        }
+      }
+    });
+    c.socket.on('error', e => { reject(e); conns.delete(key); });
+    c.socket.on('close', () => conns.delete(key));
+    setTimeout(() => reject(new Error('connect timeout')), 5000);
+  });
+}
+
+function sendRpc(host, port, fn_id, req_id, argsJson, timeout) {
+  return new Promise(async (resolve, reject) => {
+    let c; try { c = await getConn(host, port); } catch(e) { return reject(e); }
+    const frame = encodeReq(req_id, fn_id, argsJson);
+    const timer = setTimeout(() => { c.pending.delete(req_id); reject(new Error('rpc timeout')); }, timeout);
+    c.pending.set(req_id, result => { clearTimeout(timer); resolve(result); });
+    c.socket.write(frame);
+  });
+}
+
+async function loop() {
+  let seq = 0;
+  while (true) {
+    Atomics.wait(control, 0, 0);
+    const flag = Atomics.load(control, 0);
+    if (flag === -1) break;
+    const rlen = data.readInt32LE(0);
+    const rstr = data.toString('utf8', 4, 4 + rlen);
+    let resp;
+    try {
+      const req = JSON.parse(rstr);
+      seq = (seq + 1) & 0xFFFF;
+      const result = await sendRpc(req.host, req.port, req.fn_id, seq, req.args, req.timeout || 10000);
+      resp = { ok: true, result };
+    } catch(e) { resp = { ok: false, error: e.message }; }
+    const rs = JSON.stringify(resp);
+    data.writeInt32LE(rs.length, 0); data.write(rs, 4, 'utf8');
+    Atomics.store(control, 0, 2); Atomics.notify(control, 0);
+    Atomics.wait(control, 0, 2);
+  }
+}
+loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); });
+`;
+        const rpcWorker = new RpcWorker(rpcWorkerCode, {
+          eval: true,
+          workerData: { controlBuf: rpcCtrlBuf, dataBuf: rpcDataBuf },
+        });
+        rpcWorker.on("error", () => { (globalThis as any).__rpcClientWorker = null; });
+        (globalThis as any).__rpcClientWorker = rpcWorker;
+        (globalThis as any).__rpcClientCtrlBuf = rpcCtrlBuf;
+        (globalThis as any).__rpcClientDataBuf = rpcDataBuf;
+      }
+
+      const _rc = new Int32Array((globalThis as any).__rpcClientCtrlBuf);
+      const _rd = Buffer.from((globalThis as any).__rpcClientDataBuf);
+      const _rReqStr = JSON.stringify({ host: _rHost, port: _rPort, fn_id: _rFnId, args: _rArgs, timeout: _rTimeout });
+      _rd.writeInt32LE(_rReqStr.length, 0);
+      _rd.write(_rReqStr, 4, "utf8");
+      Atomics.store(_rc, 0, 1);
+      Atomics.notify(_rc, 0);
+      const _rWait = Atomics.wait(_rc, 0, 1, _rTimeout + 2000);
+      if (_rWait === "timed-out") return null;
+      const _rRespLen = _rd.readInt32LE(0);
+      const _rResp = JSON.parse(_rd.toString("utf8", 4, 4 + _rRespLen));
+      Atomics.store(_rc, 0, 0);
+      if (!_rResp.ok) throw new Error(_rResp.error ?? "rpc error");
+      return _rResp.result;
+    }
+
     // ── Capability Registry ────────────────────────────────────────────
     // globalThis.__flCapRegistry: { [name]: { enabled: boolean, builtins: string[] } }
     // self-host/bootstrap 동일 registry 사용. capability 단위로 enable/disable.
@@ -2747,6 +2873,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "char-code":
       if (typeof args[0] === "string" && args[0].length > 0) return args[0].charCodeAt(0);
       throw new Error(`char-code expects non-empty string`);
+    case "char-from-code":
+      return String.fromCharCode(Math.floor(Number(args[0]) & 0xFF));
     case "substring":
       return typeof args[0] === "string"
         ? args[0].substring(Math.floor(args[1] || 0), Math.floor(args[2] || args[0].length))
